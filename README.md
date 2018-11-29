@@ -1,2 +1,3 @@
 # votingRelay
-Voting relay implementation
+
+dVote library for Relay
