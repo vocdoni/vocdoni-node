@@ -2,53 +2,50 @@ package main
 
 import (
 	"fmt"
-	"github.com/syndtr/goleveldb/leveldb"
 	"time"
 	"github.com/vocdoni/dvote-relay/batch"
+	"github.com/vocdoni/dvote-relay/net"
 )
 
 var dbPath = "$HOME/.dvote/relay.db"
 var bdbPath = "$HOME/.dvote/batch.db"
-var batchSeconds = 3 //seconds
+var batchSeconds = 30 //seconds
+var batchSize = 3 //packets
 
 var err error
-var db *leveldb.DB
-var bdb *leveldb.DB
 var batchTimer *time.Ticker
-var batchSignal chan int
+var batchSignal chan bool
+var signal bool
 
 
 func setup() {
-	db, err = leveldb.OpenFile(dbPath, nil)
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
-	bdb, err = leveldb.OpenFile(bdbPath, nil)
-	if err != nil {
-		panic(err)
-	}
-	defer bdb.Close()
-
 	batchTimer = time.NewTicker(time.Second * time.Duration(batchSeconds))
-	//create batch signal channel
+	batchSignal = make(chan bool)
+
+	batch.DBPath = dbPath
+	batch.BDBPath = bdbPath
+	batch.BatchSignal = batchSignal
+	batch.BatchSize = batchSize
 }
 
 func main() {
 	setup()
+//	batch.Setup()
 	fmt.Println("Entering main loop")
+	go net.Listen("8080")
 	for {
 		select {
 		case <- batchTimer.C:
 			fmt.Println("Timer triggered")
-			fmt.Println(batch.Create(bdb))
+			fmt.Println(batch.Create())
 			//replace with chain link
-		case <- batchSignal:
-			fmt.Println("Signal triggered")
-			fmt.Println(batch.Create(bdb))
-//		case <- stopSignal:
-//			return
+		case signal := <-batchSignal:
+			if signal == true {
+				fmt.Println("Signal triggered")
+				fmt.Println(batch.Create())
+			}
+		default:
+			continue
 		}
 	}
 }

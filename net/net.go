@@ -4,16 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 	"io"
 	"github.com/vocdoni/dvote-relay/batch"
 	"github.com/vocdoni/dvote-relay/types"
 )
 
+
 func parse(rw http.ResponseWriter, request *http.Request) {
 	decoder := json.NewDecoder(request.Body)
 
-	var s Submission
+	var s types.Submission
+	var p types.Packet
 	err := decoder.Decode(&s)
 
 	if err != nil {
@@ -24,19 +25,25 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 	//check key
 	//decrypt
 	//check franchise
-	err = batch.add(p)
+	//construct packet
+
+	p.PID = 1
+	p.Nullifier = []byte{1,2,3}
+	p.Vote = []byte{4,5,6}
+	p.Franchise = []byte{7,8,9}
+	err = batch.Add(p)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	j, err := json.Marshal(s)
 	io.WriteString(rw, string(j))
 }
 
-func listen(port string) {
+func Listen(port string) {
 	http.HandleFunc("/submit", parse)
 	//add waitgroup
-	go func() {
+	func() {
 		fmt.Println("serving on " + port)
 		err := http.ListenAndServe(":" + port, nil)
 		if err != nil {

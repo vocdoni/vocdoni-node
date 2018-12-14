@@ -22,9 +22,9 @@ type Batch struct {
 }
 
 type Packet struct {
-	PID uint
-	Nullifier string
-	Vote  string
-	Franchise string
+	PID int
+	Nullifier []byte
+	Vote  []byte
+	Franchise []byte
 }
 
