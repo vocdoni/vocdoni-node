@@ -44,20 +44,16 @@ func Add(p types.Packet) error {
 	if err != nil {
 		return err
 	}
+
 	currentBatchSize++
-	fmt.Println(currentBatchSize)
 	if currentBatchSize >= BatchSize {
-		fmt.Println("sending ready")
 		BatchSignal <- true
-		fmt.Println("sent ready")
 	}
-	fmt.Println("returning")
 	return nil
 }
 
 //create (return batch)
 func Create() []byte {
-	fmt.Println("Creating batch")
 	DB, err = leveldb.OpenFile(DBPath, nil)
 	if err != nil {
 		panic(err)
