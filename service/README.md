@@ -3,8 +3,7 @@
 #### start http server
 
 ```
-processHttp.T.namespace = "vocdoni"
-T.Init()
+processHttp.T.Init()
 processHttp.Listen(1500, "http")
 ```
 
