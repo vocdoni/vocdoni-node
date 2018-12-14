@@ -5,22 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-	"strconv"
 	"io"
+	"github.com/vocdoni/dvote-relay/batch"
+	"github.com/vocdoni/dvote-relay/types"
 )
 
-type submission struct {
-	Type string
-	Nonce []byte
-	Key []byte
-	Package []byte
-	Expiry time.Time
-}
-
-func parseSubmission(rw http.ResponseWriter, request *http.Request) {
+func parse(rw http.ResponseWriter, request *http.Request) {
 	decoder := json.NewDecoder(request.Body)
 
-	var s submission
+	var s Submission
 	err := decoder.Decode(&s)
 
 	if err != nil {
@@ -28,20 +21,24 @@ func parseSubmission(rw http.ResponseWriter, request *http.Request) {
 	}
 
 	//check PoW
-	//check discriminator
+	//check key
 	//decrypt
 	//check franchise
-	//add to leveldb
+	err = batch.add(p)
+	if err != nil {
+		return err
+	}
+
 	j, err := json.Marshal(s)
-	//io.WriteString(rw, string(j))
+	io.WriteString(rw, string(j))
 }
 
-func listen(port int) {
-	http.HandleFunc("/submit", parseSubmission)
-	portstr := strconv.Itoa(port)
+func listen(port string) {
+	http.HandleFunc("/submit", parse)
+	//add waitgroup
 	go func() {
-		fmt.Println("serving on " + portstr)
-		err := http.ListenAndServe(":" + portstr, nil)
+		fmt.Println("serving on " + port)
+		err := http.ListenAndServe(":" + port, nil)
 		if err != nil {
 			panic("ListenAndServe: " + err.Error())
 		}

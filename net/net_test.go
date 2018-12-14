@@ -10,6 +10,10 @@ import (
 	"io/ioutil"
 )
 
+//func generateSubmission() submission {
+
+//}
+
 func TestListen(t *testing.T) {
 	t.Log("Testing listener")
 
@@ -21,15 +25,14 @@ func TestListen(t *testing.T) {
 		time.Now(),
 	}
 
-	go listen(8080)
+	listen("8080")
 
 	url := "http://localhost:8080/submit"
 	fmt.Println("URL:>", url)
 
 	j, err := json.Marshal(testSubmission)
 	if err != nil {
-		fmt.Println(err)
-		return
+		t.Errorf("Bad test JSON: %s", err)
 	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(j))
@@ -38,7 +41,7 @@ func TestListen(t *testing.T) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		t.Errorf("Error in client: %s", err)
 	}
 	defer resp.Body.Close()
 

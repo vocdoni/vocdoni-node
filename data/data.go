@@ -8,13 +8,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 )
 
-type votePacket struct {
-	PID uint
-	Nullifier string
-	Vote  string
-	Franchise string
-}
-
 func publish(object []byte) (string) {
 	sh := shell.NewShell("localhost:5001")
 	cid, err := sh.Add(bytes.NewBuffer(object))
