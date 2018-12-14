@@ -9,19 +9,19 @@ import (
 )
 
 type Tree struct {
-    namespace string
-    storage string
-    tree *merkletree.MerkleTree
+    Namespace string
+    Storage string
+    Tree *merkletree.MerkleTree
 }
 
-func (t *Tree) init() error {
-  if len(t.storage) < 1 {
+func (t *Tree) Init() error {
+  if len(t.Storage) < 1 {
     usr, err := user.Current()
     if err == nil {
-      t.storage = usr.HomeDir + "/.dvote/Tree"
-    } else { t.storage = "./dvoteTree" }
+      t.Storage = usr.HomeDir + "/.dvote/Tree"
+    } else { t.Storage = "./dvoteTree" }
   }
-  mtdb, err := db.NewLevelDbStorage(t.storage, false)
+  mtdb, err := db.NewLevelDbStorage(t.Storage, false)
 	if err != nil {
     return err
 	}
@@ -29,22 +29,22 @@ func (t *Tree) init() error {
 	if err != nil {
 	  return err
 	}
-  t.tree = mt
+  t.Tree = mt
   return nil
 }
 
-func (t *Tree) close() {
-	defer t.tree.Storage().Close()
+func (t *Tree) Close() {
+	defer t.Tree.Storage().Close()
 }
 
-func (t *Tree) addClaim(data []byte) error {
-  claim := mkcore.NewGenericClaim(t.namespace, "default", data, nil)
-  return t.tree.Add(claim)
+func (t *Tree) AddClaim(data []byte) error {
+  claim := mkcore.NewGenericClaim(t.Namespace, "default", data, nil)
+  return t.Tree.Add(claim)
 }
 
-func (t *Tree) genProof(data []byte) (string, error) {
-  claim := mkcore.NewGenericClaim(t.namespace, "default", data, nil)
-  mp, err := t.tree.GenerateProof(claim.Hi())
+func (t *Tree) GenProof(data []byte) (string, error) {
+  claim := mkcore.NewGenericClaim(t.Namespace, "default", data, nil)
+  mp, err := t.Tree.GenerateProof(claim.Hi())
   if err!=nil {
     return "", err
   }
@@ -52,11 +52,11 @@ func (t *Tree) genProof(data []byte) (string, error) {
   return mpHex, nil
 }
 
-func (t *Tree) checkProof(data []byte, mpHex string) (bool, error) {
+func (t *Tree) CheckProof(data []byte, mpHex string) (bool, error) {
   mp, err := common3.HexToBytes(mpHex)
   if err != nil {
     return false, err
   }
-  claim := mkcore.NewGenericClaim(t.namespace, "default", data, nil)
-  return merkletree.CheckProof(t.tree.Root(), mp, claim.Hi(), claim.Ht(), t.tree.NumLevels()), nil
+  claim := mkcore.NewGenericClaim(t.Namespace, "default", data, nil)
+  return merkletree.CheckProof(t.Tree.Root(), mp, claim.Hi(), claim.Ht(), t.Tree.NumLevels()), nil
 }
