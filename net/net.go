@@ -27,7 +27,7 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 	//check franchise
 	//construct packet
 
-	p.PID = 1
+	p.PID = "1"
 	p.Nullifier = []byte{1,2,3}
 	p.Vote = []byte{4,5,6}
 	p.Franchise = []byte{7,8,9}
