@@ -40,12 +40,12 @@ func main() {
 		select {
 		case <- batchTimer.C:
 			fmt.Println("Timer triggered")
-			fmt.Println(batch.Create())
+//			fmt.Println(batch.Create())
 			//replace with chain link
 		case signal := <-batchSignal:
 			if signal == true {
 				fmt.Println("Signal triggered")
-				fmt.Println(batch.Create())
+				batch.Create()
 			}
 		default:
 			continue

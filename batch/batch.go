@@ -14,22 +14,21 @@ var currentBatchSize int
 var err error
 
 func Setup(l *db.LevelDbStorage) {
-	rdb = l.WithPrefix([]byte("relay"))
-	bdb = l.WithPrefix([]byte("batch"))
-	fmt.Println("Batch storage:")
-	fmt.Println(bdb)
+	rdb = l.WithPrefix([]byte("relay_"))
+	bdb = l.WithPrefix([]byte("batch_"))
 }
 
 
 //add (queue for counting)
-func Add(p types.Packet) error {
-	fmt.Println(bdb)
+func Add(p types.Ballot) error {
 	err := bdb.Put([]byte(fmt.Sprintf("%v", p.Nullifier)),[]byte(fmt.Sprintf("%v", p)))
 	if err != nil {
 		return err
 	}
 
+	//this actually needs to see if it was added
 	currentBatchSize++
+	fmt.Println(bdb.Info())
 	if currentBatchSize >= BatchSize {
 		BatchSignal <- true
 	}
@@ -37,17 +36,23 @@ func Add(p types.Packet) error {
 }
 
 //create (return batch)
+//k is []byte nullifier
+//v is []byte package
 func Create() []byte {
 	var b []byte
-
+	var i int
 	iter := bdb.Iter()
 	for iter.Next() {
-		//k := iter.Key()
-		//v := iter.Value()
+		k := iter.Key()
+		v := iter.Value()
 		err := iter.Error()
 		if err != nil {
 			panic(err)
 		}
+		fmt.Println(i)
+		fmt.Println(string(k))
+		fmt.Println(string(v))
+		i++
 		//put p in batch
 		//rdb.Put(iter.Key(), iter.Val(), nil)
 		//bdb.Delete(iter.Key(), nil)

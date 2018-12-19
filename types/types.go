@@ -4,11 +4,19 @@ import (
 	"time"
 )
 
-type Submission struct {
+type Ballot struct {
 	Type string
-	Nonce []byte
+	PID string
+	Nullifier []byte
+	Vote  []byte
+	Franchise []byte
+}
+
+type Envelope struct {
+	Type string
+	Nonce uint64
 	KeyProof []byte
-	Package []byte
+	Ballot []byte
 	Timestamp time.Time
 }
 
@@ -19,12 +27,5 @@ type Batch struct {
 	TXID string
 	Nonce	[]byte
 	Signature string
-}
-
-type Packet struct {
-	PID string
-	Nullifier []byte
-	Vote  []byte
-	Franchise []byte
 }
 

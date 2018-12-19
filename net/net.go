@@ -13,13 +13,19 @@ import (
 func parse(rw http.ResponseWriter, request *http.Request) {
 	decoder := json.NewDecoder(request.Body)
 
-	var s types.Submission
-	var p types.Packet
-	err := decoder.Decode(&s)
+	var e types.Envelope
+	var b types.Ballot
 
+	err := decoder.Decode(&e)
 	if err != nil {
 		panic(err)
 	}
+
+	err = json.Unmarshal(e.Ballot, &b)
+	if err != nil {
+		panic(err)
+	}
+
 
 	//check PoW
 	//check key
@@ -27,16 +33,18 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 	//check franchise
 	//construct packet
 
-	p.PID = "1"
-	p.Nullifier = []byte{1,2,3}
-	p.Vote = []byte{4,5,6}
-	p.Franchise = []byte{7,8,9}
-	err = batch.Add(p)
+	//this should should be randomized, or actually taken from input
+	//b.PID = "1"
+	//b.Nullifier = []byte{1,2,3}
+	//b.Vote = []byte{4,5,6}
+	//b.Franchise = []byte{7,8,9}
+
+	err = batch.Add(b)
 	if err != nil {
 		panic(err)
 	}
 
-	j, err := json.Marshal(s)
+	j, err := json.Marshal(e)
 	io.WriteString(rw, string(j))
 }
 
