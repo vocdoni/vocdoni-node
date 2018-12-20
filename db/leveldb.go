@@ -33,10 +33,26 @@ type storageInfo struct {
 	KeyCount int
 }
 
+func (l *LevelDbStorage) Count() int {
+
+	keycount := 0
+	db := l.ldb
+	iter := db.NewIterator(util.BytesPrefix(l.prefix), nil)
+	for iter.Next() {
+		keycount++
+	}
+	iter.Release()
+	if err := iter.Error(); err != nil {
+		panic(err)
+	}
+	return keycount
+}
+
 func (l *LevelDbStorage) Info() string {
 
 	keycount := 0
-	iter := l.ldb.NewIterator(nil, nil)
+	db := l.ldb
+	iter := db.NewIterator(util.BytesPrefix(l.prefix), nil)
 	for iter.Next() {
 		keycount++
 	}

@@ -45,7 +45,12 @@ func main() {
 		case signal := <-batchSignal:
 			if signal == true {
 				fmt.Println("Signal triggered")
-				batch.Create()
+				n, b := batch.Create()
+				fmt.Println("Nullifiers:")
+				fmt.Println(n)
+				fmt.Println("Batch:")
+				fmt.Println(b)
+				batch.Compact(n)
 			}
 		default:
 			continue

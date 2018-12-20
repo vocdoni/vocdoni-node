@@ -45,6 +45,9 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 	}
 
 	j, err := json.Marshal(e)
+	if err != nil {
+		panic(err)
+	}
 	io.WriteString(rw, string(j))
 }
 
