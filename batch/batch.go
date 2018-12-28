@@ -44,7 +44,7 @@ func Add(ballot types.Ballot) error {
 //k is []byte 'batch_' + nullifier
 //v is []byte package
 //returns slice of nullifiers, batch json
-func Create() ([]string, []string) {
+func Fetch() ([]string, []string) {
 	var n []string
 	var b []string
 	iter := bdb.Iter()
@@ -73,7 +73,7 @@ func Create() ([]string, []string) {
 //move from bdb to rdb once pinned
 func Compact(n []string) {
 	for _, k := range n {
-		fmt.Println(k)
+		//fmt.Println(k)
 		v, err := bdb.Get([]byte(k))
 		if err != nil {
 			fmt.Println(err.Error())

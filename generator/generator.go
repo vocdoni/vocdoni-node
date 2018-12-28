@@ -75,7 +75,7 @@ func main() {
 	i, _ := strconv.Atoi(interval)
 	timer := time.NewTicker(time.Millisecond * time.Duration(i))
 	rand.Seed(time.Now().UnixNano())
-	url := "http://localhost:8080/submit"
+	url := "http://localhost:8090/submit"
 	fmt.Println("URL:>", url)
 
 	for {

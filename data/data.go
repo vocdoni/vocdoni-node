@@ -8,7 +8,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 )
 
-func publish(object []byte) string {
+func Publish(object []byte) string {
 	sh := shell.NewShell("localhost:5001")
 	cid, err := sh.Add(bytes.NewBuffer(object))
 	if err != nil {
@@ -18,7 +18,7 @@ func publish(object []byte) string {
 	return cid
 }
 
-func pin(path string) {
+func Pin(path string) {
 	sh := shell.NewShell("localhost:5001")
 	err := sh.Pin(path)
 	if err != nil{
@@ -28,7 +28,7 @@ func pin(path string) {
 }
 
 
-func retrieve(hash string) []byte {
+func Retrieve(hash string) []byte {
 	sh := shell.NewShell("localhost:5001")
 	reader, err := sh.Cat(hash)
 	if err != nil {

@@ -3,9 +3,12 @@ package main
 import (
 	"fmt"
 	"time"
+	"encoding/gob"
+	"bytes"
 	"github.com/vocdoni/dvote-relay/batch"
 	"github.com/vocdoni/dvote-relay/net"
 	"github.com/vocdoni/dvote-relay/db"
+	"github.com/vocdoni/dvote-relay/data"
 )
 
 var dbPath = "~/.dvote/relay.db"
@@ -35,7 +38,7 @@ func main() {
 	batch.BatchSize = batchSize
 
 	fmt.Println("Entering main loop")
-	go net.Listen("8080")
+	go net.Listen("8090")
 	for {
 		select {
 		case <- batchTimer.C:
@@ -45,12 +48,21 @@ func main() {
 		case signal := <-batchSignal:
 			if signal == true {
 				fmt.Println("Signal triggered")
-				n, b := batch.Create()
-				fmt.Println("Nullifiers:")
-				fmt.Println(n)
-				fmt.Println("Batch:")
-				fmt.Println(b)
-				batch.Compact(n)
+				ns, bs := batch.Fetch()
+				buf := &bytes.Buffer{}
+				gob.NewEncoder(buf).Encode(bs)
+				bb := buf.Bytes()
+				cid := data.Publish(bb)
+				data.Pin(cid)
+				fmt.Printf("Batch published at: %s \n", cid)
+				// add to ipfs
+				// add to chain
+				// announce to pubsub
+				//fmt.Println("Nullifiers:")
+				//fmt.Println(n)
+				//fmt.Println("Batch:")
+				//fmt.Println(b)
+				batch.Compact(ns)
 			}
 		default:
 			continue

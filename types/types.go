@@ -22,7 +22,7 @@ type Envelope struct {
 
 type Batch struct {
 	Type string
-	Nullifiers [][]byte
+	Nullifiers []string
 	URL string
 	TXID string
 	Nonce	[]byte
