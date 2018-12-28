@@ -1,10 +1,10 @@
 package tree
 
 import (
-  "github.com/iden3/go-iden3/db"
-  "github.com/iden3/go-iden3/merkletree"
-  mkcore "github.com/iden3/go-iden3/core"
-  common3 "github.com/iden3/go-iden3/common"
+  "github.com/vocdoni/go-iden3/db"
+  "github.com/vocdoni/go-iden3/merkletree"
+  mkcore "github.com/vocdoni/go-iden3/core"
+  common3 "github.com/vocdoni/go-iden3/common"
   "os/user"
 )
 

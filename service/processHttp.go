@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 	"log"
-	"github.com/vocdoni/dvote-process/tree"
+	"github.com/vocdoni/dvote-census/tree"
 )
 
 var T tree.Tree
