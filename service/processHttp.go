@@ -79,6 +79,10 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 		resp.Response, err = T.GenProof([]byte(c.ClaimData))
 	}
 
+	if op == "root" {
+		resp.Response = T.GetRoot()
+	}
+
 	if op == "check" {
 		if len(c.ProofData) < 1 {
 			resp.Error = true
@@ -109,18 +113,21 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 func Listen(port int, proto string) {
 	srv := &http.Server{
 		Addr: fmt.Sprintf(":%d", port),
-	 	ReadHeaderTimeout: 4 * time.Second,
+		ReadHeaderTimeout: 4 * time.Second,
 		ReadTimeout: 4 * time.Second,
 		WriteTimeout: 4 * time.Second,
 		IdleTimeout: 3 * time.Second,
 	}
 
 	http.HandleFunc("/addClaim", func(w http.ResponseWriter, r *http.Request) {
-    		claimHandler(w, r, "add")})
+			claimHandler(w, r, "add")})
 	http.HandleFunc("/genProof", func(w http.ResponseWriter, r *http.Request) {
-    		claimHandler(w, r, "gen")})
+			claimHandler(w, r, "gen")})
 	http.HandleFunc("/checkProof", func(w http.ResponseWriter, r *http.Request) {
-    		claimHandler(w, r, "check")})
+			claimHandler(w, r, "check")})
+	http.HandleFunc("/getRoot", func(w http.ResponseWriter, r *http.Request) {
+			claimHandler(w, r, "root")})
+
 
 	if proto == "https" {
 	  log.Print("Starting server in https mode")

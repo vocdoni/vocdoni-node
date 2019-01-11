@@ -60,3 +60,7 @@ func (t *Tree) CheckProof(data []byte, mpHex string) (bool, error) {
   claim := mkcore.NewGenericClaim(t.Namespace, "default", data, nil)
   return merkletree.CheckProof(t.Tree.Root(), mp, claim.Hi(), claim.Ht(), t.Tree.NumLevels()), nil
 }
+
+func (t *Tree) GetRoot() (string) {
+  return t.Tree.Root().Hex()
+}
