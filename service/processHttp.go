@@ -12,7 +12,7 @@ import (
 var T tree.Tree
 
 type Claim struct {
-	ProcessID string `json:"processID"`
+	CensusID string `json:"censusID"`
 	ClaimData string `json:"claimData"`
 	ProofData string `json:"proofData"`
 }
@@ -51,15 +51,15 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	}
 
 	// Process data
-	log.Printf("Received: %s,%s,%s ", c.ProcessID, c.ClaimData, c.ProofData)
+	log.Printf("Received: %s,%s,%s ", c.CensusID, c.ClaimData, c.ProofData)
 	resp.Error = false
 	resp.Response = ""
 
-	if len(c.ProcessID) > 0 {
-		T.Namespace = c.ProcessID
+	if len(c.CensusID) > 0 {
+		T.Namespace = c.CensusID
 	} else {
 		resp.Error = true
-		resp.Response = "processID is not valid"
+		resp.Response = "CensusID is not valid"
 		reply(&resp, w)
 		return
 	}
