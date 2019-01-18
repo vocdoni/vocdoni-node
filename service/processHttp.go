@@ -3,22 +3,32 @@ package processHttp
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"time"
 	"log"
+	"net/http"
+	"strconv"
+	"time"
+
 	"github.com/vocdoni/dvote-census/tree"
+	"github.com/vocdoni/dvote-relay/crypto/signature"
 )
 
-var T tree.Tree
+const authTimeWindow = 10 // Time window (seconds) in which TimeStamp will be accepted if auth enabled
+
+var authPubKey string
+
+var T tree.Tree          // MerkleTree dvote-census library
+var S signature.SignKeys // Signature dvote-relay library
 
 type Claim struct {
-	CensusID string `json:"censusID"`
-	ClaimData string `json:"claimData"`
-	ProofData string `json:"proofData"`
+	CensusID  string `json:"censusID"`  // References to MerkleTree namespace
+	ClaimData string `json:"claimData"` // Data to add to the MerkleTree
+	ProofData string `json:"proofData"` // MerkleProof to check
+	TimeStamp string `json:"timeStamp"` // Unix TimeStamp in seconds
+	Signature string `json:"signature"` // Signature as Hexadecimal String
 }
 
 type Result struct {
-	Error bool `json:"error"`
+	Error    bool   `json:"error"`
 	Response string `json:"response"`
 }
 
@@ -31,7 +41,7 @@ func reply(resp *Result, w http.ResponseWriter) {
 	}
 }
 
-func checkRequest(w http.ResponseWriter,req *http.Request) bool {
+func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 	if req.Body == nil {
 		http.Error(w, "Please send a request body", 400)
 		return false
@@ -39,10 +49,33 @@ func checkRequest(w http.ResponseWriter,req *http.Request) bool {
 	return true
 }
 
+func checkAuth(timestamp, signature, message string) bool {
+	if len(authPubKey) < 1 {
+		return true
+	}
+	currentTime := int64(time.Now().Unix())
+	timeStampRemote, err := strconv.ParseInt(timestamp, 10, 32)
+	if err != nil {
+		log.Printf("Cannot parse timestamp data %s\n", err)
+		return false
+	}
+	if timeStampRemote < currentTime+authTimeWindow &&
+		timeStampRemote > currentTime-authTimeWindow {
+		v, err := S.Verify(message, signature, authPubKey)
+		if err != nil {
+			log.Printf("Verification error: %s\n", err)
+		}
+		return v
+	}
+	return false
+}
+
 func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	var c Claim
 	var resp Result
-	if ok := checkRequest(w, req); !ok { return }
+	if ok := checkRequest(w, req); !ok {
+		return
+	}
 	// Decode JSON
 	err := json.NewDecoder(req.Body).Decode(&c)
 	if err != nil {
@@ -51,7 +84,8 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	}
 
 	// Process data
-	log.Printf("Received: %s,%s,%s ", c.CensusID, c.ClaimData, c.ProofData)
+	log.Printf("Received: %s,%s,%s,%s,%s", c.CensusID, c.ClaimData, c.ProofData,
+		c.TimeStamp, c.Signature)
 	resp.Error = false
 	resp.Response = ""
 
@@ -59,7 +93,7 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 		T.Namespace = c.CensusID
 	} else {
 		resp.Error = true
-		resp.Response = "CensusID is not valid"
+		resp.Response = "censusID is not valid"
 		reply(&resp, w)
 		return
 	}
@@ -72,7 +106,14 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	}
 
 	if op == "add" {
-		err = T.AddClaim([]byte(c.ClaimData))
+		msg := fmt.Sprintf("%s%s%s", c.CensusID, c.ClaimData, c.TimeStamp)
+		log.Printf("Msg to check: %s", msg)
+		if auth := checkAuth(c.TimeStamp, c.Signature, msg); auth {
+			err = T.AddClaim([]byte(c.ClaimData))
+		} else {
+			resp.Error = true
+			resp.Response = "invalid authentication"
+		}
 	}
 
 	if op == "gen" {
@@ -110,36 +151,46 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	reply(&resp, w)
 }
 
-func Listen(port int, proto string) {
+func Listen(port int, proto string, pubKey string) {
 	srv := &http.Server{
-		Addr: fmt.Sprintf(":%d", port),
+		Addr:              fmt.Sprintf(":%d", port),
 		ReadHeaderTimeout: 4 * time.Second,
-		ReadTimeout: 4 * time.Second,
-		WriteTimeout: 4 * time.Second,
-		IdleTimeout: 3 * time.Second,
+		ReadTimeout:       4 * time.Second,
+		WriteTimeout:      4 * time.Second,
+		IdleTimeout:       3 * time.Second,
 	}
 
 	http.HandleFunc("/addClaim", func(w http.ResponseWriter, r *http.Request) {
-			claimHandler(w, r, "add")})
+		claimHandler(w, r, "add")
+	})
 	http.HandleFunc("/genProof", func(w http.ResponseWriter, r *http.Request) {
-			claimHandler(w, r, "gen")})
+		claimHandler(w, r, "gen")
+	})
 	http.HandleFunc("/checkProof", func(w http.ResponseWriter, r *http.Request) {
-			claimHandler(w, r, "check")})
+		claimHandler(w, r, "check")
+	})
 	http.HandleFunc("/getRoot", func(w http.ResponseWriter, r *http.Request) {
-			claimHandler(w, r, "root")})
+		claimHandler(w, r, "root")
+	})
 
+	if len(pubKey) > 1 {
+		log.Printf("Enabling signature authentication with %s\n", pubKey)
+		authPubKey = pubKey
+	} else {
+		authPubKey = ""
+	}
 
 	if proto == "https" {
-	  log.Print("Starting server in https mode")
-	  if err := srv.ListenAndServeTLS("server.crt", "server.key"); err != nil {
-	    panic(err)
-	  }
+		log.Print("Starting server in https mode")
+		if err := srv.ListenAndServeTLS("server.crt", "server.key"); err != nil {
+			panic(err)
+		}
 	}
 	if proto == "http" {
-	  log.Print("Starting server in http mode")
-	  srv.SetKeepAlivesEnabled(false)
-	  if err := srv.ListenAndServe(); err != nil {
-	    panic(err)
-	  }
+		log.Print("Starting server in http mode")
+		srv.SetKeepAlivesEnabled(false)
+		if err := srv.ListenAndServe(); err != nil {
+			panic(err)
+		}
 	}
 }

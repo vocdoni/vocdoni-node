@@ -4,8 +4,16 @@
 
 ```
 processHttp.T.Init()
-processHttp.Listen(1500, "http")
+processHttp.Listen(1500, "http", "")
 ```
+
+To enable authentication (using pubKey signature):
+
+```
+pubK := "39f54ce5293520b689f6658ea7f3401f4ff931fa3d90dea21ff901cdf82bb8aa"
+processHttp.Listen(1500, "http", pubK)
+```
+
 
 #### add claims
 
@@ -13,6 +21,16 @@ processHttp.Listen(1500, "http")
 curl -d '{"censusID":"GoT_Favorite","claimData":"Jon Snow"}' http://localhost:1500/addClaim
 {"error":false,"response":""}
 ```
+
+```
+curl -d '{"censusID":"GoT_Favorite",
+"claimData":"Jon Snow", 
+"timeStamp":"1547814675", 
+"signature":"a117c4ce12b29090884112ffe57e664f007e7ef142a1679996e2d34fd2b852fe76966e47932f1e9d3a54610d0f361383afe2d9aab096e15d136c236abb0a0d0e"}' http://localhost:1500/addClaim
+{"error":false,"response":""}
+```
+
+The signature message is a concatenation of the following strings: `censusID, claimData, timeStamp`
 
 ```
 curl -d '{"censusID":"GoT_Favorite","claimData":"Tyrion"}' http://localhost:1500/addClaim
