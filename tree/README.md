@@ -19,4 +19,4 @@ Example of usage:
 
 #### To-Do
 
-+ Add export/import methods
+Avoid duplicates on dump/snapshot

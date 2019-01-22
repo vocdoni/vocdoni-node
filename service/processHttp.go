@@ -107,7 +107,6 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 
 	if op == "add" {
 		msg := fmt.Sprintf("%s%s%s", c.CensusID, c.ClaimData, c.TimeStamp)
-		log.Printf("Msg to check: %s", msg)
 		if auth := checkAuth(c.TimeStamp, c.Signature, msg); auth {
 			err = T.AddClaim([]byte(c.ClaimData))
 		} else {
@@ -122,6 +121,38 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 
 	if op == "root" {
 		resp.Response = T.GetRoot()
+	}
+
+	if op == "dump" {
+		values, err := T.Dump()
+		if err != nil {
+			resp.Error = true
+			resp.Response = fmt.Sprint(err)
+		} else {
+			jValues, err := json.Marshal(values)
+			if err != nil {
+				resp.Error = true
+				resp.Response = fmt.Sprint(err)
+			} else {
+				resp.Response = string(jValues)
+			}
+		}
+	}
+
+	if op == "snapshot" {
+		msg := fmt.Sprintf("%s%s%s", c.CensusID, c.ClaimData, c.TimeStamp)
+		if auth := checkAuth(c.TimeStamp, c.Signature, msg); auth {
+			snapshotNamespace, err := T.Snapshot()
+			if err != nil {
+				resp.Error = true
+				resp.Response = fmt.Sprint(err)
+			} else {
+				resp.Response = snapshotNamespace
+			}
+		} else {
+			resp.Error = true
+			resp.Response = "invalid authentication"
+		}
 	}
 
 	if op == "check" {
@@ -171,6 +202,12 @@ func Listen(port int, proto string, pubKey string) {
 	})
 	http.HandleFunc("/getRoot", func(w http.ResponseWriter, r *http.Request) {
 		claimHandler(w, r, "root")
+	})
+	http.HandleFunc("/snapshot", func(w http.ResponseWriter, r *http.Request) {
+		claimHandler(w, r, "snapshot")
+	})
+	http.HandleFunc("/dump", func(w http.ResponseWriter, r *http.Request) {
+		claimHandler(w, r, "dump")
 	})
 
 	if len(pubKey) > 1 {
