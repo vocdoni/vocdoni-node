@@ -8,10 +8,11 @@ import (
 	"math/rand"
 	"encoding/json"
 	"encoding/base64"
-	"net/http"
-	"bytes"
-	"io/ioutil"
+//	"net/http"
+//	"bytes"
+//	"io/ioutil"
 	"github.com/vocdoni/dvote-relay/types"
+	"github.com/vocdoni/dvote-relay/data"
 )
 
 func makeBallot() string {
@@ -75,28 +76,16 @@ func main() {
 	i, _ := strconv.Atoi(interval)
 	timer := time.NewTicker(time.Millisecond * time.Duration(i))
 	rand.Seed(time.Now().UnixNano())
-	url := "http://localhost:8090/submit"
-	fmt.Println("URL:>", url)
+	topic := "vocdoni_pubsub_testing"
+	fmt.Println("PubSub Topic:>", topic)
+
 
 	for {
 		select {
 		case <- timer.C:
-			fmt.Println(makeEnvelope(makeBallot()))
-			var jsonStr = []byte(makeEnvelope(makeBallot()))
-			req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-			req.Header.Set("X-Custom-Header", "myvalue")
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{}
-			resp, err := client.Do(req)
-			if err != nil {
-				panic(err)
-			}
-			defer resp.Body.Close()
-			fmt.Println("response Status:", resp.Status)
-			fmt.Println("response Headers:", resp.Header)
-			body, _ := ioutil.ReadAll(resp.Body)
-			fmt.Println("response Body:", string(body))
+			var jsonStr = makeEnvelope(makeBallot())
+			fmt.Println(jsonStr)
+			data.PsPublish(topic, jsonStr)
 		default:
 			continue
 		}

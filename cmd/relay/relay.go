@@ -37,8 +37,10 @@ func main() {
 	batch.BatchSignal = batchSignal
 	batch.BatchSize = batchSize
 
+	topic := "vocdoni_pubsub_testing"
+
 	fmt.Println("Entering main loop")
-	go net.Listen("8090")
+	go net.Sub(topic)
 	for {
 		select {
 		case <- batchTimer.C:
@@ -55,7 +57,6 @@ func main() {
 				cid := data.Publish(bb)
 				data.Pin(cid)
 				fmt.Printf("Batch published at: %s \n", cid)
-				// add to ipfs
 				// add to chain
 				// announce to pubsub
 				//fmt.Println("Nullifiers:")

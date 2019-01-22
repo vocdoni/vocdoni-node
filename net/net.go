@@ -7,7 +7,9 @@ import (
 	"io"
 	"github.com/vocdoni/dvote-relay/batch"
 	"github.com/vocdoni/dvote-relay/types"
+	"github.com/vocdoni/dvote-relay/data"
 )
+
 
 
 func parse(rw http.ResponseWriter, request *http.Request) {
@@ -49,6 +51,39 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 		panic(err)
 	}
 	io.WriteString(rw, string(j))
+}
+
+func Sub(topic string) error {
+	subscription := data.PsSubscribe(topic)
+	fmt.Println("Subscribed > " + topic)
+	for {
+		msg, err := subscription.Next()
+		if err != nil {
+			return err
+		}
+
+		payload := msg.Data()
+
+		var e types.Envelope
+		var b types.Ballot
+
+		err = json.Unmarshal(payload, &e)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(e.Ballot, &b)
+		if err != nil {
+			return err
+		}
+
+		err = batch.Add(b)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("Got > " + string(payload))
+	}
 }
 
 func Listen(port string) {

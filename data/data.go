@@ -53,11 +53,11 @@ func PsSubscribe(topic string) *shell.PubSubSubscription {
 	return sub
 }
 
-func PsPublish(topic, data string) {
+func PsPublish(topic, data string) error {
 	sh := shell.NewShell("localhost:5001")
 	err := sh.PubSubPublish(topic, data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
