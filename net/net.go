@@ -3,25 +3,24 @@ package net
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/vocdoni/dvote-relay/batch"
-	"github.com/vocdoni/dvote-relay/types"
-	"github.com/vocdoni/dvote-relay/data"
-	shell "github.com/ipfs/go-ipfs-api"
-)
 
+	"github.com/vocdoni/dvote-relay/batch"
+	"github.com/vocdoni/dvote-relay/data"
+	"github.com/vocdoni/dvote-relay/types"
+)
 
 func Sub(topic string) error {
 	subscription := data.PsSubscribe(topic)
 	fmt.Println("Subscribed > " + topic)
-	var msg shell.PubSubRecord
+	var msg data.Record
 	var err error
 	for {
-		msg, err = subscription.Next()
+		msg.Shell, err = subscription.Next()
 		if err != nil {
 			return err
 		}
 
-		payload := msg.Data()
+		payload := msg.Shell.Data
 
 		var e types.Envelope
 		var b types.Ballot

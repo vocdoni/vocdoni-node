@@ -1,12 +1,17 @@
 package data
 
 import (
-	"os"
-	"fmt"
 	"bytes"
+	"fmt"
 	"io/ioutil"
+	"os"
+
 	shell "github.com/ipfs/go-ipfs-api"
 )
+
+type Record struct {
+	Shell *shell.Message
+}
 
 func Publish(object []byte) string {
 	sh := shell.NewShell("localhost:5001")
@@ -21,12 +26,11 @@ func Publish(object []byte) string {
 func Pin(path string) {
 	sh := shell.NewShell("localhost:5001")
 	err := sh.Pin(path)
-	if err != nil{
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s", err)
 		os.Exit(1)
 	}
 }
-
 
 func Retrieve(hash string) []byte {
 	sh := shell.NewShell("localhost:5001")
