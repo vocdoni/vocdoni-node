@@ -159,24 +159,14 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 		if len(c.ProofData) < 1 {
 			resp.Error = true
 			resp.Response = "proofData not provided"
-			reply(&resp, w)
-			return
-		}
-		var validProof bool
-		validProof, err = T.CheckProof([]byte(c.ClaimData), c.ProofData)
-		if validProof {
-			resp.Response = "valid"
 		} else {
-			resp.Response = "invalid"
+			validProof, _ := T.CheckProof([]byte(c.ClaimData), c.ProofData)
+			if validProof {
+				resp.Response = "valid"
+			} else {
+				resp.Response = "invalid"
+			}
 		}
-	}
-
-	if err != nil {
-		resp.Error = true
-		resp.Response = fmt.Sprint(err)
-		log.Print(err)
-		reply(&resp, w)
-		return
 	}
 
 	reply(&resp, w)
