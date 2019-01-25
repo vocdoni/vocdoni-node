@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/vocdoni/dvote-census/tree"
@@ -84,8 +85,8 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	}
 
 	// Process data
-	log.Printf("Received: %s,%s,%s,%s,%s", c.CensusID, c.ClaimData, c.ProofData,
-		c.TimeStamp, c.Signature)
+	log.Printf("Received censusID:{%s} claimData:{%s} proofData:{%s} timeStamp:{%s} signature:{%s}\n",
+		c.CensusID, c.ClaimData, c.ProofData, c.TimeStamp, c.Signature)
 	resp.Error = false
 	resp.Response = ""
 
@@ -108,7 +109,12 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	if op == "add" {
 		msg := fmt.Sprintf("%s%s%s", c.CensusID, c.ClaimData, c.TimeStamp)
 		if auth := checkAuth(c.TimeStamp, c.Signature, msg); auth {
-			err = T.AddClaim([]byte(c.ClaimData))
+			if strings.HasPrefix(c.CensusID, "0x") {
+				resp.Error = true
+				resp.Response = "add claim to snapshot is not allowed"
+			} else {
+				err = T.AddClaim([]byte(c.ClaimData))
+			}
 		} else {
 			resp.Error = true
 			resp.Response = "invalid authentication"
@@ -142,12 +148,17 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	if op == "snapshot" {
 		msg := fmt.Sprintf("%s%s%s", c.CensusID, c.ClaimData, c.TimeStamp)
 		if auth := checkAuth(c.TimeStamp, c.Signature, msg); auth {
-			snapshotNamespace, err := T.Snapshot()
-			if err != nil {
+			if strings.HasPrefix(c.CensusID, "0x") {
 				resp.Error = true
-				resp.Response = fmt.Sprint(err)
+				resp.Response = "snapshot an snapshot makes no sense"
 			} else {
-				resp.Response = snapshotNamespace
+				snapshotNamespace, err := T.Snapshot()
+				if err != nil {
+					resp.Error = true
+					resp.Response = fmt.Sprint(err)
+				} else {
+					resp.Response = snapshotNamespace
+				}
 			}
 		} else {
 			resp.Error = true

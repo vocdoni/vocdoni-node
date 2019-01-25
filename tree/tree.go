@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/user"
 	"strings"
-	"time"
 
 	common3 "github.com/vocdoni/go-iden3/common"
 	mkcore "github.com/vocdoni/go-iden3/core"
@@ -47,7 +46,7 @@ func (t *Tree) Close() {
 }
 
 func (t *Tree) AddClaim(data []byte) error {
-	isSnapshot := strings.Contains(t.Namespace, "snapshot.")
+	isSnapshot := strings.HasPrefix(t.Namespace, "0x")
 	if isSnapshot {
 		return errors.New("No new claims can be added to a Snapshot")
 	}
@@ -100,15 +99,16 @@ func (t *Tree) Dump() ([]string, error) {
 func (t *Tree) Snapshot() (string, error) {
 	substorage := t.DbStorage.WithPrefix([]byte(t.Namespace))
 	nsHash := merkletree.HashBytes([]byte(t.Namespace))
-	currentTime := int64(time.Now().Unix())
-	snapshotNamespace := fmt.Sprintf("snapshot.%s.%d", t.Namespace, currentTime)
+	snapshotNamespace := t.GetRoot()
+	fmt.Printf("Snapshoting %s\n", snapshotNamespace)
+	t.Namespace = snapshotNamespace
 	substorage.Iterate(func(key, value []byte) {
 		nsValue := value[5:37]
 		if fmt.Sprint(nsHash) == fmt.Sprint(nsValue) {
+			fmt.Printf("%x\n", value)
 			data := value[69:]
-			//fmt.Printf(" Adding value: %s\n", data)
-			claim := mkcore.NewGenericClaim(snapshotNamespace, "default", data, nil)
-			err := t.Tree.Add(claim)
+			//claim := mkcore.NewGenericClaim(snapshotNamespace, "default", data, nil)
+			err := t.AddClaim(data)
 			if err != nil {
 				fmt.Println(err)
 			}
