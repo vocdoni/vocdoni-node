@@ -1,4 +1,4 @@
-package processHttp
+package censusmanager
 
 import (
 	"encoding/json"
