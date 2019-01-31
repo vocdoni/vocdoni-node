@@ -4,12 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"os/user"
-	"strings"
 
-	common3 "github.com/vocdoni/go-iden3/common"
-	mkcore "github.com/vocdoni/go-iden3/core"
-	"github.com/vocdoni/go-iden3/db"
-	"github.com/vocdoni/go-iden3/merkletree"
+	common3 "github.com/iden3/go-iden3/common"
+	mkcore "github.com/iden3/go-iden3/core"
+	db "github.com/iden3/go-iden3/db"
+	merkletree "github.com/iden3/go-iden3/merkletree"
 )
 
 type Tree struct {
@@ -32,7 +31,7 @@ func (t *Tree) Init() error {
 	if err != nil {
 		return err
 	}
-	mt, err := merkletree.New(mtdb, 140)
+	mt, err := merkletree.NewMerkleTree(mtdb, 140)
 	if err != nil {
 		return err
 	}
@@ -45,74 +44,75 @@ func (t *Tree) Close() {
 	defer t.Tree.Storage().Close()
 }
 
-func (t *Tree) AddClaim(data []byte) error {
-	isSnapshot := strings.HasPrefix(t.Namespace, "0x")
-	if isSnapshot {
-		return errors.New("No new claims can be added to a Snapshot")
+func (t *Tree) GetClaim(data []byte) (*mkcore.ClaimBasic, error) {
+	if len(data) > 496/8 {
+		return nil, errors.New("claim data too large")
 	}
-	claim := mkcore.NewGenericClaim(t.Namespace, "default", data, nil)
-	return t.Tree.Add(claim)
+	for i := len(data); i <= 496/8; i++ {
+		data = append(data, byte('0'))
+	}
+	var indexSlot [400 / 8]byte
+	var dataSlot [496 / 8]byte
+	copy(indexSlot[:], data[:400/8])
+	copy(dataSlot[:], data[:496/8])
+	e := mkcore.NewClaimBasic(indexSlot, dataSlot)
+	return e, nil
+}
+
+func (t *Tree) AddClaim(data []byte) error {
+	e, err := t.GetClaim(data)
+	if err != nil {
+		return err
+	}
+	return t.Tree.Add(e.Entry())
 }
 
 func (t *Tree) GenProof(data []byte) (string, error) {
-	claim := mkcore.NewGenericClaim(t.Namespace, "default", data, nil)
-	mp, err := t.Tree.GenerateProof(claim.Hi())
+	e, err := t.GetClaim(data)
 	if err != nil {
 		return "", err
 	}
-	mpHex := common3.BytesToHex(mp)
+	mp, err := t.Tree.GenerateProof(e.Entry().HIndex())
+	if err != nil {
+		return "", err
+	}
+	mpHex := common3.HexEncode(mp.Bytes())
 	return mpHex, nil
 }
 
 func (t *Tree) CheckProof(data []byte, mpHex string) (bool, error) {
-	mp, err := common3.HexToBytes(mpHex)
+	mpBytes, err := common3.HexDecode(mpHex)
 	if err != nil {
 		return false, err
 	}
-	claim := mkcore.NewGenericClaim(t.Namespace, "default", data, nil)
-	return merkletree.CheckProof(t.Tree.Root(), mp, claim.Hi(), claim.Ht(), t.Tree.NumLevels()), nil
+	mp, err := merkletree.NewProofFromBytes(mpBytes)
+	if err != nil {
+		return false, err
+	}
+	e, err := t.GetClaim(data)
+	if err != nil {
+		return false, err
+	}
+	return merkletree.VerifyProof(t.Tree.RootKey(), mp,
+		e.Entry().HIndex(), e.Entry().HValue()), nil
 }
 
 func (t *Tree) GetRoot() string {
-	return t.Tree.Root().Hex()
+	return t.Tree.RootKey().String()
 }
 
-/* Dump, Export and Snapshot functions are a bit tricky.
-   Since go-iden3 does not provide the necessary tools. Low level operations must be performed.
-   Once go-iden3 API is mature enough, these functions must be adapted.
-
-   To explore: Values are stored twice in the BD?
-*/
 func (t *Tree) Dump() ([]string, error) {
 	var response []string
-	substorage := t.DbStorage.WithPrefix([]byte(t.Namespace))
-	nsHash := merkletree.HashBytes([]byte(t.Namespace))
-	substorage.Iterate(func(key, value []byte) {
-		nsValue := value[5:37]
-		if fmt.Sprint(nsHash) == fmt.Sprint(nsValue) {
-			response = append(response, string(value[69:]))
+
+	err := t.Tree.Walk(t.Tree.RootKey(), func(n *merkletree.Node) {
+		if n.Type == merkletree.NodeTypeLeaf {
+			response = append(response, fmt.Sprintf("|%s", n.Entry.Data))
 		}
 	})
-	return response, nil
+	return response, err
 }
 
 func (t *Tree) Snapshot() (string, error) {
-	substorage := t.DbStorage.WithPrefix([]byte(t.Namespace))
-	nsHash := merkletree.HashBytes([]byte(t.Namespace))
-	snapshotNamespace := t.GetRoot()
-	fmt.Printf("Snapshoting %s\n", snapshotNamespace)
-	t.Namespace = snapshotNamespace
-	substorage.Iterate(func(key, value []byte) {
-		nsValue := value[5:37]
-		if fmt.Sprint(nsHash) == fmt.Sprint(nsValue) {
-			fmt.Printf("%x\n", value)
-			data := value[69:]
-			//claim := mkcore.NewGenericClaim(snapshotNamespace, "default", data, nil)
-			err := t.AddClaim(data)
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
-	})
+	snapshotNamespace := t.Tree.RootKey().String()
 	return snapshotNamespace, nil
 }
