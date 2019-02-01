@@ -12,19 +12,21 @@ import (
 )
 
 type Tree struct {
-	Namespace string
 	Storage   string
 	Tree      *merkletree.MerkleTree
 	DbStorage *db.LevelDbStorage
 }
 
-func (t *Tree) Init() error {
+func (t *Tree) Init(namespace string) error {
 	if len(t.Storage) < 1 {
+		if len(namespace) < 1 {
+			return errors.New("namespace not valid")
+		}
 		usr, err := user.Current()
 		if err == nil {
-			t.Storage = usr.HomeDir + "/.dvote/Tree"
+			t.Storage = usr.HomeDir + "/.dvote/census/" + namespace
 		} else {
-			t.Storage = "./dvoteTree"
+			t.Storage = "./dvoteTree/" + namespace
 		}
 	}
 	mtdb, err := db.NewLevelDbStorage(t.Storage, false)
@@ -49,7 +51,7 @@ func (t *Tree) GetClaim(data []byte) (*mkcore.ClaimBasic, error) {
 		return nil, errors.New("claim data too large")
 	}
 	for i := len(data); i <= 496/8; i++ {
-		data = append(data, byte('0'))
+		data = append(data, byte('.'))
 	}
 	var indexSlot [400 / 8]byte
 	var dataSlot [496 / 8]byte
@@ -106,7 +108,15 @@ func (t *Tree) Dump() ([]string, error) {
 
 	err := t.Tree.Walk(t.Tree.RootKey(), func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
-			response = append(response, fmt.Sprintf("|%s", n.Entry.Data))
+			rawValue := n.Value()
+			var cleanValue []byte
+			for i := 0; i < len(rawValue); i++ {
+				if rawValue[i] == byte('.') {
+					break
+				}
+				cleanValue = append(cleanValue, rawValue[i])
+			}
+			response = append(response, fmt.Sprintf("%s", cleanValue))
 		}
 	})
 	return response, err

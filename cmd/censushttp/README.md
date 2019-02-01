@@ -13,14 +13,14 @@ go build -o censusHttpService github.com/vocdoni/dvote-census/cmd/censushttp
 
 #### Usage
 
-`./censusHttpService <port> [publicKey]`
+`./censusHttpService <port> <namespace>[:pubKey] [<namespace>[:pubKey] ...]`
 
 Example:
 
 ```
-./censusHttpService 1500
-2018/12/17 09:54:20 Starting process HTTP service on port 1500
-2018/12/17 09:54:20 Starting server in http mode
+./censusHttpService 1500 Got_Favorite
+2019/02/01 20:01:15 Starting process HTTP service on port 1500 for namespace GoT_Favorite
+2019/02/01 20:01:15 Starting server in http mode
 ```
 
 #### add claims
@@ -34,6 +34,8 @@ curl -d '{"censusID":"GoT_Favorite","claimData":"Jon Snow"}' http://localhost:15
 If public key authentication enabled, `signature` field is required using Nancl signature.
 
 The signed message is expected to be a concatenation of the following fields: `censusID, claimData, timeStamp`
+
+There is a time window of 10 seconds while the signature is considered valid.
 
 ```
 curl -d '{"censusID":"GoT_Favorite",
