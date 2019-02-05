@@ -71,19 +71,7 @@ func checkAuth(timestamp, signature, message string) bool {
 	return false
 }
 
-func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "*")
-	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
-}
-
 func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
-	addCorsHeaders(&w, req)
-
-	if (*req).Method == "OPTIONS" {
-		return
-	}
-
 	var c Claim
 	var resp Result
 	if ok := checkRequest(w, req); !ok {
@@ -195,6 +183,12 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	reply(&resp, w)
 }
 
+func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
 func Listen(port int, proto string, pubKey string) {
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", port),
@@ -205,22 +199,58 @@ func Listen(port int, proto string, pubKey string) {
 	}
 
 	http.HandleFunc("/addClaim", func(w http.ResponseWriter, r *http.Request) {
-		claimHandler(w, r, "add")
+		addCorsHeaders(&w, r)
+
+		if r.Method == http.MethodPost {
+			claimHandler(w, r, "add")
+		} else if r.Method != http.MethodOptions {
+			http.Error(w, "Not found", http.StatusNotFound)
+		}
 	})
 	http.HandleFunc("/genProof", func(w http.ResponseWriter, r *http.Request) {
-		claimHandler(w, r, "gen")
+		addCorsHeaders(&w, r)
+
+		if r.Method == http.MethodPost {
+			claimHandler(w, r, "gen")
+		} else if r.Method != http.MethodOptions {
+			http.Error(w, "Not found", http.StatusNotFound)
+		}
 	})
 	http.HandleFunc("/checkProof", func(w http.ResponseWriter, r *http.Request) {
-		claimHandler(w, r, "check")
+		addCorsHeaders(&w, r)
+
+		if r.Method == http.MethodPost {
+			claimHandler(w, r, "check")
+		} else if r.Method != http.MethodOptions {
+			http.Error(w, "Not found", http.StatusNotFound)
+		}
 	})
 	http.HandleFunc("/getRoot", func(w http.ResponseWriter, r *http.Request) {
-		claimHandler(w, r, "root")
+		addCorsHeaders(&w, r)
+
+		if r.Method == http.MethodPost {
+			claimHandler(w, r, "root")
+		} else if r.Method != http.MethodOptions {
+			http.Error(w, "Not found", http.StatusNotFound)
+		}
 	})
 	http.HandleFunc("/snapshot", func(w http.ResponseWriter, r *http.Request) {
-		claimHandler(w, r, "snapshot")
+		addCorsHeaders(&w, r)
+
+		if r.Method == http.MethodPost {
+			claimHandler(w, r, "snapshot")
+		} else if r.Method != http.MethodOptions {
+			http.Error(w, "Not found", http.StatusNotFound)
+		}
 	})
 	http.HandleFunc("/dump", func(w http.ResponseWriter, r *http.Request) {
-		claimHandler(w, r, "dump")
+		addCorsHeaders(&w, r)
+
+		if r.Method == http.MethodPost {
+			claimHandler(w, r, "dump")
+		} else if r.Method != http.MethodOptions {
+			http.Error(w, "Not found", http.StatusNotFound)
+		}
 	})
 
 	if len(pubKey) > 1 {
