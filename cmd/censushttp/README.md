@@ -7,7 +7,7 @@ Reference implementation of a voting census service running on the Vocdoni platf
 In a GO ready environment:
 
 ```
-go get -u github.com/vocdoni/dvote-census
+go get -u github.com/vocdoni/dvote-census/...
 go build -o censusHttpService github.com/vocdoni/dvote-census/cmd/censushttp
 ```
 

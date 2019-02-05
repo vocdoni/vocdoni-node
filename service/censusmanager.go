@@ -71,7 +71,19 @@ func checkAuth(timestamp, signature, message string) bool {
 	return false
 }
 
+func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
 func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
+	addCorsHeaders(&w, req)
+
+	if (*req).Method == "OPTIONS" {
+		return
+	}
+
 	var c Claim
 	var resp Result
 	if ok := checkRequest(w, req); !ok {
