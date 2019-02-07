@@ -5,6 +5,8 @@ import (
 	"time"
 	"encoding/gob"
 	"bytes"
+	"os"
+	"flag"
 	"github.com/vocdoni/dvote-relay/batch"
 	"github.com/vocdoni/dvote-relay/net"
 	"github.com/vocdoni/dvote-relay/db"
@@ -19,6 +21,7 @@ var err error
 var batchTimer *time.Ticker
 var batchSignal chan bool
 var signal bool
+var transportType net.TransportID
 
 
 func main() {
@@ -31,16 +34,26 @@ func main() {
 
 	batch.Setup(db)
 
+	//gather transport type flag
+	var transportIDString string
+	flag.StringVar(&transportIDString, "transport", "PubSub", "Transport must be one of: PubSub, HTTP")
+	flag.Parse()
+	transportType = net.TransportIDFromString(transportIDString)
+
+
 	batchTimer = time.NewTicker(time.Second * time.Duration(batchSeconds))
 	batchSignal = make(chan bool)
 
 	batch.BatchSignal = batchSignal
 	batch.BatchSize = batchSize
 
-	topic := "vocdoni_pubsub_testing"
 
 	fmt.Println("Entering main loop")
-	go net.Sub(topic)
+	transport, err := net.Init(transportType)
+	if err != nil {
+		os.Exit(1)
+	}
+	go transport.Listen()
 	for {
 		select {
 		case <- batchTimer.C:

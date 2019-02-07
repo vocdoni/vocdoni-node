@@ -1,45 +1,43 @@
 package net
 
 import (
-	"encoding/json"
-	"fmt"
-
-	"github.com/vocdoni/dvote-relay/batch"
-	"github.com/vocdoni/dvote-relay/data"
-	"github.com/vocdoni/dvote-relay/types"
+	"errors"
 )
 
-func Sub(topic string) error {
-	subscription := data.PsSubscribe(topic)
-	fmt.Println("Subscribed > " + topic)
-	var msg data.Record
-	var err error
-	for {
-		msg.Shell, err = subscription.Next()
-		if err != nil {
-			return err
-		}
+type Transport interface {
+	Init(c string) error
+	Listen() error
+}
 
-		payload := msg.Shell.Data
+type TransportID int
 
-		var e types.Envelope
-		var b types.Ballot
+const (
+	HTTP TransportID = iota + 1
+	PubSub
+)
 
-		err = json.Unmarshal(payload, &e)
-		if err != nil {
-			return err
-		}
+func TransportIDFromString(i string) TransportID {
+	switch i {
+	case "PubSub" :
+		return PubSub
+	case "HTTP":
+		return HTTP
+	default:
+		return -1
+	}
+}
 
-		err = json.Unmarshal(e.Ballot, &b)
-		if err != nil {
-			return err
-		}
-
-		err = batch.Add(b)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("Got > " + string(payload))
+func Init(t TransportID) (Transport, error) {
+	switch t {
+	case PubSub :
+		var p PubSubHandle
+		p.Init("vocdoni_pubsub_testing")
+		return p, nil
+	case HTTP :
+		var h HttpHandle
+		h.Init("8080/submit")
+		return h, nil
+	default:
+		return nil, errors.New("Bad transport type specification")
 	}
 }
