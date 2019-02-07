@@ -34,19 +34,19 @@ func PsPublish(topic, data string) error {
 	return nil
 }
 
-func (p PubSubHandle) Init(topic string) error {
+func (p *PubSubHandle) Init(topic string) error {
 	p.topic = topic
 	p.subscription = PsSubscribe(p.topic)
-	fmt.Println("Subscribed > " + p.topic)
 	return nil
 }
 
-func (p PubSubHandle) Listen() error {
+func (p *PubSubHandle) Listen() error {
 	var msg *shell.Message
 	var err error
 	for {
 		msg, err = p.subscription.Next()
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "recieve error: %s", err)
 			return err
 		}
 
@@ -74,6 +74,6 @@ func (p PubSubHandle) Listen() error {
 	}
 }
 
-func (p PubSubHandle) Send(data string) error {
+func (p *PubSubHandle) Send(data string) error {
 	return PsPublish(p.topic, data)
 }

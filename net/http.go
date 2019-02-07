@@ -16,7 +16,7 @@ type HttpHandle struct {
 	path string
 }
 
-func (h HttpHandle) Init(c string) error {
+func (h *HttpHandle) Init(c string) error {
 	//split c to port and path
 	cs := strings.Split(c, "/")
 	h.port = cs[0]
@@ -66,11 +66,11 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 	io.WriteString(rw, string(j))
 }
 
-func (h HttpHandle) Listen() error {
+func (h *HttpHandle) Listen() error {
 	http.HandleFunc(h.path, parse)
 	//add waitgroup
 	func() {
-		fmt.Println("serving on " + h.port)
+		fmt.Println("serving on " + h.port + "/" + h.path)
 		err := http.ListenAndServe(":" + h.port, nil)
 		if err != nil {
 			return

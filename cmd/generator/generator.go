@@ -12,7 +12,7 @@ import (
 //	"bytes"
 //	"io/ioutil"
 	"github.com/vocdoni/dvote-relay/types"
-	"github.com/vocdoni/dvote-relay/data"
+	"github.com/vocdoni/dvote-relay/net"
 )
 
 func makeBallot() string {
@@ -85,7 +85,7 @@ func main() {
 		case <- timer.C:
 			var jsonStr = makeEnvelope(makeBallot())
 			fmt.Println(jsonStr)
-			data.PsPublish(topic, jsonStr)
+			net.PsPublish(topic, jsonStr)
 		default:
 			continue
 		}

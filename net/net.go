@@ -5,8 +5,8 @@ import (
 )
 
 type Transport interface {
-	Init(c string) error
 	Listen() error
+	Init(c string) error
 }
 
 type TransportID int
@@ -30,11 +30,11 @@ func TransportIDFromString(i string) TransportID {
 func Init(t TransportID) (Transport, error) {
 	switch t {
 	case PubSub :
-		var p PubSubHandle
+		p := new(PubSubHandle)
 		p.Init("vocdoni_pubsub_testing")
 		return p, nil
 	case HTTP :
-		var h HttpHandle
+		h := new(HttpHandle)
 		h.Init("8080/submit")
 		return h, nil
 	default:
