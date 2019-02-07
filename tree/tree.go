@@ -1,8 +1,8 @@
 package tree
 
 import (
+	"bytes"
 	"errors"
-	"fmt"
 	"os/user"
 
 	common3 "github.com/iden3/go-iden3/common"
@@ -103,6 +103,16 @@ func (t *Tree) GetRoot() string {
 	return t.Tree.RootKey().String()
 }
 
+func (t *Tree) GetIndex(data []byte) (string, error) {
+	e, err := t.GetClaim(data)
+	if err != nil {
+		return "", err
+	}
+	index, err := t.Tree.GetDataByIndex(e.Entry().HIndex())
+	return index.String(), err
+}
+
+/*
 func (t *Tree) Dump() ([]string, error) {
 	var response []string
 
@@ -121,8 +131,20 @@ func (t *Tree) Dump() ([]string, error) {
 	})
 	return response, err
 }
+*/
 
-func (t *Tree) Snapshot() (string, error) {
-	snapshotNamespace := t.Tree.RootKey().String()
-	return snapshotNamespace, nil
+func (t *Tree) Dump() (string, error) {
+	w := bytes.NewBufferString("")
+	err := t.Tree.DumpClaims(w, nil) // as rootKey we can pass a nil pointer, and it will use the current RootKey
+
+	return w.String(), err
+}
+
+func (t *Tree) Snapshot(root string) (*Tree, error) {
+	var rootHash merkletree.Hash
+	copy(rootHash[:32], root)
+	mt, err := t.Tree.Snapshot(&rootHash)
+	snapshotTree := new(Tree)
+	snapshotTree.Tree = mt
+	return snapshotTree, err
 }
