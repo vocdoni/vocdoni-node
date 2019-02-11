@@ -19,7 +19,7 @@ var Signatures map[string]string
 var Signature signature.SignKeys // Signature dvote-relay library
 
 type Claim struct {
-	CensusID  string `json:"censusID"`  // References to MerkleTree namespace
+	CensusID  string `json:"censusId"`  // References to MerkleTree namespace
 	RootHash  string `json:"rootHash"`  // References to MerkleTree rootHash
 	ClaimData string `json:"claimData"` // Data to add to the MerkleTree
 	ProofData string `json:"proofData"` // MerkleProof to check
@@ -99,7 +99,7 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	}
 
 	// Process data
-	log.Printf("censusID:{%s} rootHash:{%s} claimData:{%s} proofData:{%s} timeStamp:{%s} signature:{%s}\n",
+	log.Printf("censusId:{%s} rootHash:{%s} claimData:{%s} proofData:{%s} timeStamp:{%s} signature:{%s}\n",
 		c.CensusID, c.RootHash, c.ClaimData, c.ProofData, c.TimeStamp, c.Signature)
 	authString := fmt.Sprintf("%s%s%s%s", c.CensusID, c.RootHash, c.ClaimData, c.TimeStamp)
 	resp.Error = false
@@ -110,7 +110,7 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	}
 	if !censusFound {
 		resp.Error = true
-		resp.Response = "censusID not valid or not found"
+		resp.Response = "censusId not valid or not found"
 		reply(&resp, w)
 		return
 	}
