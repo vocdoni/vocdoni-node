@@ -3,6 +3,7 @@ package tree
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os/user"
 
 	common3 "github.com/iden3/go-iden3/common"
@@ -51,7 +52,7 @@ func (t *Tree) GetClaim(data []byte) (*mkcore.ClaimBasic, error) {
 		return nil, errors.New("claim data too large")
 	}
 	for i := len(data); i <= 496/8; i++ {
-		data = append(data, byte('.'))
+		data = append(data, '\x00')
 	}
 	var indexSlot [400 / 8]byte
 	var dataSlot [496 / 8]byte
@@ -112,32 +113,15 @@ func (t *Tree) GetIndex(data []byte) (string, error) {
 	return index.String(), err
 }
 
-/*
 func (t *Tree) Dump() ([]string, error) {
 	var response []string
-
-	err := t.Tree.Walk(t.Tree.RootKey(), func(n *merkletree.Node) {
+	err := t.Tree.Walk(nil, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
-			rawValue := n.Value()
-			var cleanValue []byte
-			for i := 0; i < len(rawValue); i++ {
-				if rawValue[i] == byte('.') {
-					break
-				}
-				cleanValue = append(cleanValue, rawValue[i])
-			}
-			response = append(response, fmt.Sprintf("%s", cleanValue))
+			data := bytes.Trim(n.Value()[65:], "\x00")
+			response = append(response, fmt.Sprintf("%s", data))
 		}
 	})
 	return response, err
-}
-*/
-
-func (t *Tree) Dump() (string, error) {
-	w := bytes.NewBufferString("")
-	err := t.Tree.DumpClaims(w, nil) // as rootKey we can pass a nil pointer, and it will use the current RootKey
-
-	return w.String(), err
 }
 
 func (t *Tree) Snapshot(root string) (*Tree, error) {

@@ -189,7 +189,7 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 				resp.Error = true
 				resp.Response = err.Error()
 			} else {
-				resp.Response = string(jValues)
+				resp.Response = fmt.Sprintf("%s", jValues)
 			}
 		}
 	}
