@@ -101,7 +101,7 @@ func (t *Tree) CheckProof(data []byte, mpHex string) (bool, error) {
 }
 
 func (t *Tree) GetRoot() string {
-	return t.Tree.RootKey().String()
+	return common3.HexEncode(t.Tree.RootKey().Bytes())
 }
 
 func (t *Tree) GetIndex(data []byte) (string, error) {
@@ -126,9 +126,13 @@ func (t *Tree) Dump() ([]string, error) {
 
 func (t *Tree) Snapshot(root string) (*Tree, error) {
 	var rootHash merkletree.Hash
-	copy(rootHash[:32], root)
-	mt, err := t.Tree.Snapshot(&rootHash)
 	snapshotTree := new(Tree)
+	rootBytes, err := common3.HexDecode(root)
+	if err != nil {
+		return snapshotTree, err
+	}
+	copy(rootHash[:32], rootBytes)
+	mt, err := t.Tree.Snapshot(&rootHash)
 	snapshotTree.Tree = mt
 	return snapshotTree, err
 }
