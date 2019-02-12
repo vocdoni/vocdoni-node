@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	tree "github.com/vocdoni/dvote-census/tree"
+	tree "github.com/vocdoni/dvote-relay/tree"
 	signature "github.com/vocdoni/dvote-relay/crypto/signature"
 )
 

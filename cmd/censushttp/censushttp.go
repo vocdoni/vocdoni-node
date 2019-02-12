@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	censusmanager "github.com/vocdoni/dvote-census/service"
+	censusmanager "github.com/vocdoni/dvote-relay/service/census"
 )
 
 func main() {
