@@ -1,4 +1,4 @@
-module github.com/vocdoni/dvote-relay
+module github.com/vocdoni/go-dvote
 
 require (
 	github.com/cheekybits/is v0.0.0-20150225183255-68e9c0620927 // indirect

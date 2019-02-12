@@ -7,10 +7,10 @@ import (
 	"bytes"
 	"os"
 	"flag"
-	"github.com/vocdoni/dvote-relay/batch"
-	"github.com/vocdoni/dvote-relay/net"
-	"github.com/vocdoni/dvote-relay/db"
-	"github.com/vocdoni/dvote-relay/data"
+	"github.com/vocdoni/go-dvote/batch"
+	"github.com/vocdoni/go-dvote/net"
+	"github.com/vocdoni/go-dvote/db"
+	"github.com/vocdoni/go-dvote/data"
 )
 
 var dbPath = "~/.dvote/relay.db"

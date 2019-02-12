@@ -11,8 +11,8 @@ import (
 //	"net/http"
 //	"bytes"
 //	"io/ioutil"
-	"github.com/vocdoni/dvote-relay/types"
-	"github.com/vocdoni/dvote-relay/net"
+	"github.com/vocdoni/go-dvote/types"
+	"github.com/vocdoni/go-dvote/net"
 )
 
 func makeBallot() string {

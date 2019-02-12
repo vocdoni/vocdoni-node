@@ -2,8 +2,8 @@ package batch
 
 import (
 	"fmt"
-	"github.com/vocdoni/dvote-relay/types"
-	"github.com/vocdoni/dvote-relay/db"
+	"github.com/vocdoni/go-dvote/types"
+	"github.com/vocdoni/go-dvote/db"
 	"encoding/json"
 )
 

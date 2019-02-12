@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/vocdoni/dvote-relay/batch"
-	"github.com/vocdoni/dvote-relay/types"
+	"github.com/vocdoni/go-dvote/batch"
+	"github.com/vocdoni/go-dvote/types"
 )
 
 type HttpHandle struct {

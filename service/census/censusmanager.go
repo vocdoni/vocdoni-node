@@ -8,15 +8,15 @@ import (
 	"strconv"
 	"time"
 
-	tree "github.com/vocdoni/dvote-relay/tree"
-	signature "github.com/vocdoni/dvote-relay/crypto/signature"
+	tree "github.com/vocdoni/go-dvote/tree"
+	signature "github.com/vocdoni/go-dvote/crypto/signature"
 )
 
 const hashSize = 32
 const authTimeWindow = 10         // Time window (seconds) in which TimeStamp will be accepted if auth enabled
 var MkTrees map[string]*tree.Tree // MerkleTree dvote-census library
 var Signatures map[string]string
-var Signature signature.SignKeys // Signature dvote-relay library
+var Signature signature.SignKeys // Signature go-dvote library
 
 type Claim struct {
 	CensusID  string `json:"censusId"`  // References to MerkleTree namespace
