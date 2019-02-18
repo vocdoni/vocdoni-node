@@ -43,7 +43,7 @@ The next table shows the available methods and its relation with the fields.
 
 ## Signature
 
-The signature provides authentication by signing a concatenation of the following strings (even if empty) without spaces: `censusId rootHash claimData timeStamp`.
+The signature provides authentication by signing a concatenation of the following strings (even if empty) without spaces: `method censusId rootHash claimData timeStamp`.
 
 The `timeStamp` when received on the server side must not differ more than 10 seconds from the current UNIX time.
 

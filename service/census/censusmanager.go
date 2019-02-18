@@ -118,9 +118,9 @@ func opHandler(c *Claim) *Result {
 	var err error
 
 	// Process data
-	log.Printf("censusId:{%s} rootHash:{%s} claimData:{%s} proofData:{%s} timeStamp:{%s} signature:{%s}\n",
-		c.CensusID, c.RootHash, c.ClaimData, c.ProofData, c.TimeStamp, c.Signature)
-	authString := fmt.Sprintf("%s%s%s%s", c.CensusID, c.RootHash, c.ClaimData, c.TimeStamp)
+	log.Printf("censusId:{%s} method:{%s} rootHash:{%s} claimData:{%s} proofData:{%s} timeStamp:{%s} signature:{%s}\n",
+		c.CensusID, c.Method, c.RootHash, c.ClaimData, c.ProofData, c.TimeStamp, c.Signature)
+	authString := fmt.Sprintf("%s%s%s%s%s", c.Method, c.CensusID, c.RootHash, c.ClaimData, c.TimeStamp)
 	resp.Error = false
 	resp.Response = ""
 	censusFound := false
