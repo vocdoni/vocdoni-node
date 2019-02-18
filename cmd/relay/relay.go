@@ -11,6 +11,7 @@ import (
 	"github.com/vocdoni/go-dvote/net"
 	"github.com/vocdoni/go-dvote/db"
 	"github.com/vocdoni/go-dvote/data"
+	"github.com/vocdoni/go-dvote/chain"
 )
 
 var dbPath = "~/.dvote/relay.db"
@@ -47,18 +48,20 @@ func main() {
 	batch.BatchSignal = batchSignal
 	batch.BatchSize = batchSize
 
+	node, err := chain.Init()
+	node.Start()
 
-	fmt.Println("Entering main loop")
 	transport, err := net.Init(transportType)
 	if err != nil {
 		os.Exit(1)
 	}
+	fmt.Println("Entering main loop")
 	go transport.Listen()
 	for {
 		select {
 		case <- batchTimer.C:
-			fmt.Println("Timer triggered")
-//			fmt.Println(batch.Create())
+			//fmt.Println("Timer triggered")
+//			//fmt.Println(batch.Create())
 			//replace with chain link
 		case signal := <-batchSignal:
 			if signal == true {
@@ -70,6 +73,7 @@ func main() {
 				cid := data.Publish(bb)
 				data.Pin(cid)
 				fmt.Printf("Batch published at: %s \n", cid)
+				node.LinkBatch([]byte(cid))
 				// add to chain
 				// announce to pubsub
 				//fmt.Println("Nullifiers:")
