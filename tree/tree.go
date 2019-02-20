@@ -118,6 +118,7 @@ func (t *Tree) Dump() ([]string, error) {
 	err := t.Tree.Walk(nil, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
 			data := bytes.Trim(n.Value()[65:], "\x00")
+			data = bytes.Replace(data, []byte("\u0000"), nil, -1)
 			response = append(response, fmt.Sprintf("%s", data))
 		}
 	})
