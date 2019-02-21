@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"os"
 	"flag"
+
 	"github.com/vocdoni/go-dvote/batch"
 	"github.com/vocdoni/go-dvote/net"
 	"github.com/vocdoni/go-dvote/db"

@@ -3,21 +3,22 @@ package chain
 import (
 	"context"
 	"fmt"
-	"log"
+	"io/ioutil"
 	"math/big"
+	"os"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/console"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-
 	//	"github.com/ethereum/go-ethereum/accounts/abi"
-	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 )
 
 type Node interface {
@@ -28,7 +29,9 @@ type Node interface {
 
 type EthNodeHandle struct {
 	n *node.Node
+	s *eth.Ethereum
 	c *eth.Config
+	k *keystore.KeyStore
 }
 
 func Init() (Node, error) {
@@ -40,7 +43,8 @@ func Init() (Node, error) {
 func (e *EthNodeHandle) Init() error {
 
 	nodeConfig := node.DefaultConfig
-	nodeConfig.IPCPath = "~/.go-dvote-eth.ipc"
+	nodeConfig.IPCPath = "run/eth/ipc"
+	nodeConfig.DataDir = "run/eth/data"
 
 	//might also make sense to use staticnodes instead of bootstrap
 	var urls = []string{
@@ -66,39 +70,46 @@ func (e *EthNodeHandle) Init() error {
 
 	ethConfig := eth.DefaultConfig
 	ethConfig.NetworkId = 1714
-	ethConfig.SyncMode = downloader.LightSync
+	//ethConfig.SyncMode = downloader.LightSync
+	var genesisJson *os.File
+	genesisJson, err = os.Open("genesis.json")
+	genesisBytes, _ := ioutil.ReadAll(genesisJson)
+	g := new(core.Genesis)
+	g.UnmarshalJSON(genesisBytes)
+	ethConfig.Genesis = g
+
+	ks := keystore.NewKeyStore("run/eth/keystore", keystore.StandardScryptN, keystore.StandardScryptP)
 
 	e.n = n
 	e.c = &ethConfig
+	e.k = ks
+
 	return nil
 }
 
 func (e *EthNodeHandle) Start() {
 	utils.RegisterEthService(e.n, e.c)
-	// start the stack and watch for SIG events
 	utils.StartNode(e.n)
-	//api := node.NewPublicAdminAPI(e.n)
-	//info, _ := api.NodeInfo()
-	//fmt.Println(info)
-	//client, _ := ethclient.Dial(e.n.IPCEndpoint())
-	//ctx, _ := context.WithCancel(context.TODO())
-	//sync, _ := client.SyncProgress(ctx)
-	//fmt.Println(sync)
-	// wait for explicit shutdown
-	//e.n.Wait()
-	//download chain?
+	if len(e.k.Accounts()) < 1 {
+		e.createAccount()
+	} else {
+		phrase := getPassPhrase("please provide primary account passphrase", false)
+		e.k.TimedUnlock(e.k.Accounts()[0], phrase, time.Duration(0))
+	}
 }
 
 func (e *EthNodeHandle) LinkBatch(data []byte) error {
-	contractAddr := "0x3e4FfefF898580eC8132A97A91543c8fdeF1210E"
+	//	contractAddr := "0x3e4FfefF898580eC8132A97A91543c8fdeF1210E"
+	bigWalletAddr := "0x781b6544b1a73c6d779eb23c7369cf8039640793"
 	var gasLimit uint64
-	gasLimit = 100000000000000000
-	return e.sendContractTx(contractAddr, gasLimit, data)
+	gasLimit = 8000000
+	return e.sendContractTx(bigWalletAddr, gasLimit, data)
 }
 
 // might be worthwhile to create generic SendTx to call contracttx, deploytx, etc
 
 func (e *EthNodeHandle) sendContractTx(addr string, limit uint64, data []byte) error {
+
 	fmt.Println(e.n)
 	client, err := ethclient.Dial(e.n.IPCEndpoint())
 	fmt.Println("Got IPC Endpoint:" + e.n.IPCEndpoint())
@@ -107,22 +118,14 @@ func (e *EthNodeHandle) sendContractTx(addr string, limit uint64, data []byte) e
 	defer cancel()
 	fmt.Println("context created")
 
-	mnemonic := "perfect kite link property simple eight welcome spring enforce universe barely cargo"
-	wallet, err := hdwallet.NewFromMnemonic(mnemonic)
-	if err != nil {
-		log.Fatal(err)
+	accounts := e.k.Accounts()
+	fmt.Println("Listing accounts")
+	for i, a := range accounts {
+		fmt.Printf("Found account %d %s\n", i, a.Address.String())
 	}
-
-	path := hdwallet.MustParseDerivationPath("m/44'/60'/0'/0/0")
-	account, err := wallet.Derive(path, true)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("recovered acct")
-	key, err := wallet.PrivateKey(account)
-	sendaddr, err := wallet.Address(account)
-	nonce, _ := client.NonceAt(ctx, sendaddr, nil)
+	acc := accounts[0]
+	sendAddr := acc.Address
+	nonce, _ := client.NonceAt(ctx, sendAddr, nil)
 	if err != nil {
 		fmt.Println("error")
 		return err
@@ -131,11 +134,49 @@ func (e *EthNodeHandle) sendContractTx(addr string, limit uint64, data []byte) e
 	fmt.Println("creating tx")
 	price, _ := client.SuggestGasPrice(ctx)
 	fmt.Println(price)
-	tx := types.NewTransaction(nonce, common.HexToAddress(addr), big.NewInt(0), limit, price, data)
-	signedTx, _ := types.SignTx(tx, types.HomesteadSigner{}, key)
+	var empty []byte
+	tx := types.NewTransaction(nonce, common.HexToAddress(addr), big.NewInt(1), limit, price, empty)
+	signedTx, err := e.k.SignTx(acc, tx, big.NewInt(int64(e.c.NetworkId)))
+	if err != nil {
+		fmt.Printf("Signing error: %s", err)
+	}
 	//create ctx
 	err = client.SendTransaction(ctx, signedTx)
 	fmt.Println(err)
-	//fix return
+	//fix return*/
 	return err
+}
+
+func (e *EthNodeHandle) createAccount() error {
+	phrase := getPassPhrase("Your new account will be locked with a passphrase. Please give a passphrase. Do not forget it!.", true)
+	acc, err := e.k.NewAccount(phrase)
+
+	if err != nil {
+		utils.Fatalf("Failed to create account: %v", err)
+	}
+	fmt.Printf("Address: {%x}\n", acc.Address)
+	e.k.TimedUnlock(e.k.Accounts()[0], phrase, time.Duration(0))
+
+	return nil
+}
+
+func getPassPhrase(prompt string, confirmation bool) string {
+	// Otherwise prompt the user for the password
+	if prompt != "" {
+		fmt.Println(prompt)
+	}
+	phrase, err := console.Stdin.PromptPassword("Passphrase: ")
+	if err != nil {
+		utils.Fatalf("Failed to read passphrase: %v", err)
+	}
+	if confirmation {
+		confirm, err := console.Stdin.PromptPassword("Repeat passphrase: ")
+		if err != nil {
+			utils.Fatalf("Failed to read passphrase confirmation: %v", err)
+		}
+		if phrase != confirm {
+			utils.Fatalf("Passphrases do not match")
+		}
+	}
+	return phrase
 }
