@@ -111,6 +111,12 @@ func NewSwarmPorts() *swarmPorts {
 	return sp
 }
 
+type pssSub struct {
+	Unregister func()
+	Delivery   (chan []byte)
+	Address    string
+}
+
 type SwarmNet struct {
 	Node       *node.Node
 	NodeConfig *node.Config
@@ -119,6 +125,7 @@ type SwarmNet struct {
 	Key        *ecdsa.PrivateKey
 	Pss        *pss.API
 	PssAddr    pss.PssAddress
+	PssTopics  map[string]*pssSub
 	Hive       *network.Hive
 	Ports      *swarmPorts
 }
@@ -196,7 +203,6 @@ func (sn *SwarmNet) Init() error {
 		node, _ := enode.ParseV4(url)
 		sn.Node.Server().AddPeer(node)
 	}
-	//defer sn.Node.Stop()
 
 	_, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -212,6 +218,9 @@ func (sn *SwarmNet) Init() error {
 		}
 	}
 
+	// Create topics map
+	sn.PssTopics = make(map[string]*pssSub)
+
 	// Set the enode ID and the pss Address, fail if not available
 	sn.EnodeID = sn.Node.Server().NodeInfo().Enode
 
@@ -226,29 +235,72 @@ func (sn *SwarmNet) Init() error {
 	return nil
 }
 
-func (sn *SwarmNet) Test() error {
-	topic := pss.BytesToTopic([]byte("vocdoni_test"))
-	symKey := make([]byte, 32)
-	copy(symKey, []byte("vocdoni"))
+func strTopic(topic string) pss.Topic {
+	return pss.BytesToTopic([]byte(topic))
+}
 
-	var emptyAddress pss.PssAddress
-	emptyAddress = []byte("")
-	symKeyId, err := sn.Pss.SetSymmetricKey(symKey, topic, emptyAddress, true)
-	if err != nil {
-		fmt.Errorf("pss cannot set symkey %v", err)
+func strSymKey(key string) []byte {
+	symKey := make([]byte, 32)
+	copy(symKey, []byte(key))
+	return symKey
+}
+
+func strAddress(addr string) pss.PssAddress {
+	var pssAddress pss.PssAddress
+	pssAddress = []byte(addr)
+	return pssAddress
+}
+
+func (sn *SwarmNet) PssSub(subType, key, topic, address string) error {
+	pssTopic := strTopic(topic)
+	pssAddress := strAddress(address)
+	switch subType {
+	case "sym":
+		_, err := sn.Pss.SetSymmetricKey(strSymKey(key), pssTopic, pssAddress, true)
+		if err != nil {
+			return err
+		}
 	}
+
+	sn.PssTopics[topic] = new(pssSub)
+	sn.PssTopics[topic].Address = address
+
 	var pssHandler pss.HandlerFunc = func(msg []byte, peer *p2p.Peer, asym bool, keyid string) error {
-		log.Info("pss received", "msg", fmt.Sprintf("%s", msg), "from", fmt.Sprintf("%x", peer))
+		log.Info("pss received", "msg", fmt.Sprintf("%s", msg), "keyid", fmt.Sprintf("%s", keyid))
+		sn.PssTopics[topic].Delivery <- msg
 		return nil
 	}
 	topicHandler := pss.NewHandler(pssHandler)
-	topicUnregister := sn.Pss.Register(&topic, topicHandler)
-	defer topicUnregister()
-	log.Info(fmt.Sprintf("Subscribed to topic %s", topic.String()))
+	sn.PssTopics[topic].Unregister = sn.Pss.Register(&pssTopic, topicHandler)
+
+	log.Info(fmt.Sprintf("Subscribed to topic %s", pssTopic.String()))
+	return nil
+}
+
+func (sn *SwarmNet) PssSendSym(symkey, topic, msg, address string) error {
+	symKeyId, err := sn.Pss.SetSymmetricKey(strSymKey(symkey), strTopic(topic),
+		strAddress(address), false)
+	if err != nil {
+		return err
+	}
+	err = sn.Pss.SendSym(symKeyId, strTopic(topic), hexutil.Bytes(msg))
+	return err
+}
+
+func (sn *SwarmNet) Test() error {
+	sn.PssSub("sym", "vocdoni", "vocdoni_test", "")
+
+	go func() {
+		for {
+			msg := <-sn.PssTopics["vocdoni_test"].Delivery
+			fmt.Printf("Pss received: %s\n", msg)
+		}
+	}()
 
 	hostname, _ := os.Hostname()
 	for {
-		err = sn.Pss.SendSym(symKeyId, topic, hexutil.Bytes(fmt.Sprintf("Hello world from %s", hostname)))
+		err := sn.PssSendSym("vocdoni", "vocdoni_test", fmt.Sprintf("Hello world from %s", hostname), "")
+		//err = sn.Pss.SendSym(symKeyId, topic, hexutil.Bytes(fmt.Sprintf("Hello world from %s", hostname)))
 		/*	err = pssCli.SendRaw(emptyAddress, topic, []byte("Hello world!"))
 			if err != nil {
 				log.Warn("pss cannot send raw", "err", err)
