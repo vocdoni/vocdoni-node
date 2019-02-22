@@ -264,9 +264,10 @@ func (sn *SwarmNet) PssSub(subType, key, topic, address string) error {
 
 	sn.PssTopics[topic] = new(pssSub)
 	sn.PssTopics[topic].Address = address
+	sn.PssTopics[topic].Delivery = make(chan []byte)
 
 	var pssHandler pss.HandlerFunc = func(msg []byte, peer *p2p.Peer, asym bool, keyid string) error {
-		log.Info("pss received", "msg", fmt.Sprintf("%s", msg), "keyid", fmt.Sprintf("%s", keyid))
+		//log.Info("pss received", "msg", fmt.Sprintf("%s", msg), "keyid", fmt.Sprintf("%s", keyid))
 		sn.PssTopics[topic].Delivery <- msg
 		return nil
 	}
@@ -277,13 +278,20 @@ func (sn *SwarmNet) PssSub(subType, key, topic, address string) error {
 	return nil
 }
 
-func (sn *SwarmNet) PssSendSym(symkey, topic, msg, address string) error {
-	symKeyId, err := sn.Pss.SetSymmetricKey(strSymKey(symkey), strTopic(topic),
-		strAddress(address), false)
-	if err != nil {
-		return err
+func (sn *SwarmNet) PssSend(subType, key, topic, msg, address string) error {
+	var err error
+	dstAddr := strAddress(address)
+	dstTopic := strTopic(topic)
+	if subType == "sym" {
+		symKeyId, err := sn.Pss.SetSymmetricKey(strSymKey(key), dstTopic, dstAddr, false)
+		if err != nil {
+			return err
+		}
+		err = sn.Pss.SendSym(symKeyId, strTopic(topic), hexutil.Bytes(msg))
 	}
-	err = sn.Pss.SendSym(symKeyId, strTopic(topic), hexutil.Bytes(msg))
+	if subType == "raw" {
+		err = sn.Pss.SendRaw(hexutil.Bytes(dstAddr), dstTopic, hexutil.Bytes(msg))
+	}
 	return err
 }
 
@@ -299,13 +307,7 @@ func (sn *SwarmNet) Test() error {
 
 	hostname, _ := os.Hostname()
 	for {
-		err := sn.PssSendSym("vocdoni", "vocdoni_test", fmt.Sprintf("Hello world from %s", hostname), "")
-		//err = sn.Pss.SendSym(symKeyId, topic, hexutil.Bytes(fmt.Sprintf("Hello world from %s", hostname)))
-		/*	err = pssCli.SendRaw(emptyAddress, topic, []byte("Hello world!"))
-			if err != nil {
-				log.Warn("pss cannot send raw", "err", err)
-			}
-		*/
+		err := sn.PssSend("sym", "vocdoni", "vocdoni_test", fmt.Sprintf("Hello world from %s", hostname), "")
 		log.Info("pss sent", "err", err)
 		time.Sleep(10 * time.Second)
 	}
