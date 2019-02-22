@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/node"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -89,7 +90,6 @@ func newSwarm(privkey *ecdsa.PrivateKey, datadir string, port int) (*swarm.Swarm
 	}
 	// register swarm service to the node
 	var swarmService node.ServiceConstructor = func(ctx *node.ServiceContext) (node.Service, error) {
-		//return swarm.NewSwarm(swarmCfg, nil)
 		return swarmNode, nil
 	}
 	return swarmNode, swarmCfg, swarmService
@@ -124,6 +124,7 @@ type SwarmNet struct {
 	Datadir    string
 	Key        *ecdsa.PrivateKey
 	Pss        *pss.API
+	PssPubKey  string
 	PssAddr    pss.PssAddress
 	PssTopics  map[string]*pssSub
 	Hive       *network.Hive
@@ -204,6 +205,7 @@ func (sn *SwarmNet) Init() error {
 		sn.Node.Server().AddPeer(node)
 	}
 
+	// wait to connect to the p2p network
 	_, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	time.Sleep(time.Second * 5)
@@ -221,15 +223,19 @@ func (sn *SwarmNet) Init() error {
 	// Create topics map
 	sn.PssTopics = make(map[string]*pssSub)
 
-	// Set the enode ID and the pss Address, fail if not available
+	// Set some extra data
 	sn.EnodeID = sn.Node.Server().NodeInfo().Enode
-
+	sn.PssPubKey = hexutil.Encode(crypto.FromECDSAPub(sn.Pss.PublicKey()))
 	sn.PssAddr, err = sn.Pss.BaseAddr()
 	if err != nil {
 		return fmt.Errorf("pss API fail %v", err)
 	}
+
+	// Print some information
+	log.Info(fmt.Sprintf("My PSS pubkey is %s", sn.PssPubKey))
 	log.Info(fmt.Sprintf("My PSS address is %x", sn.PssAddr))
 
+	// Run statistics goroutine
 	sn.PrintStats()
 
 	return nil
@@ -278,7 +284,7 @@ func (sn *SwarmNet) PssSub(subType, key, topic, address string) error {
 	return nil
 }
 
-func (sn *SwarmNet) PssSend(subType, key, topic, msg, address string) error {
+func (sn *SwarmNet) PssPub(subType, key, topic, msg, address string) error {
 	var err error
 	dstAddr := strAddress(address)
 	dstTopic := strTopic(topic)
@@ -291,6 +297,13 @@ func (sn *SwarmNet) PssSend(subType, key, topic, msg, address string) error {
 	}
 	if subType == "raw" {
 		err = sn.Pss.SendRaw(hexutil.Bytes(dstAddr), dstTopic, hexutil.Bytes(msg))
+	}
+	if subType == "asym" {
+		err = sn.Pss.SetPeerPublicKey(hexutil.Bytes(key), dstTopic, dstAddr)
+		if err != nil {
+			return err
+		}
+		err = sn.Pss.SendAsym(key, dstTopic, hexutil.Bytes(msg))
 	}
 	return err
 }
@@ -307,7 +320,7 @@ func (sn *SwarmNet) Test() error {
 
 	hostname, _ := os.Hostname()
 	for {
-		err := sn.PssSend("sym", "vocdoni", "vocdoni_test", fmt.Sprintf("Hello world from %s", hostname), "")
+		err := sn.PssPub("sym", "vocdoni", "vocdoni_test", fmt.Sprintf("Hello world from %s", hostname), "")
 		log.Info("pss sent", "err", err)
 		time.Sleep(10 * time.Second)
 	}
