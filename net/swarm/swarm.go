@@ -298,27 +298,21 @@ func (sn *SwarmNet) PssPub(subType, key, topic, msg, address string) error {
 		if err != nil {
 			return err
 		}
+		// send symetric message
 		err = sn.Pss.SendSym(symKeyId, strTopic(topic), hexutil.Bytes(msg))
 	}
 	if subType == "raw" {
 		err = sn.Pss.SendRaw(hexutil.Bytes(dstAddr), dstTopic, hexutil.Bytes(msg))
 	}
 	if subType == "asym" {
+		// add 0x prefix if not present
 		if hasHexPrefix := strings.HasPrefix(key, "0x"); !hasHexPrefix {
 			key = "0x" + key
 		}
-		topics, addresses, err := sn.Pss.GetPublickeyPeers(key)
+
+		// check if topic+address is already set for a pubKey
+		_, err := sn.Pss.GetPeerAddress(key, dstTopic)
 		if err != nil {
-			return err
-		}
-		topicFound := false
-		for i, t := range topics {
-			if dstTopic == t && fmt.Sprintf("%x", addresses[i]) == fmt.Sprintf("%x", dstAddr) {
-				topicFound = true
-				break
-			}
-		}
-		if !topicFound {
 			pubKeyBytes, err := hexutil.Decode(key)
 			if err != nil {
 				return err
@@ -329,25 +323,8 @@ func (sn *SwarmNet) PssPub(subType, key, topic, msg, address string) error {
 			}
 		}
 
+		// send asymetric message
 		err = sn.Pss.SendAsym(key, dstTopic, hexutil.Bytes(msg))
 	}
 	return err
-}
-
-func (sn *SwarmNet) Test() error {
-	sn.PssSub("sym", "vocdoni", "vocdoni_test", "")
-
-	go func() {
-		for {
-			msg := <-sn.PssTopics["vocdoni_test"].Delivery
-			fmt.Printf("Pss received: %s\n", msg)
-		}
-	}()
-
-	hostname, _ := os.Hostname()
-	for {
-		err := sn.PssPub("sym", "vocdoni", "vocdoni_test", fmt.Sprintf("Hello world from %s", hostname), "")
-		log.Info("pss sent", "err", err)
-		time.Sleep(10 * time.Second)
-	}
 }

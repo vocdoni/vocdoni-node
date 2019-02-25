@@ -28,10 +28,12 @@ func main() {
 
 	kind := os.Args[1]
 	topic := "vocdoni_test"
-	var key string
+	key := ""
 
-	if kind == "sym" || kind == "asym" {
-		key = os.Args[2]
+	if kind == "sym" || kind == "asym" || kind == "raw" {
+		if kind != "raw" {
+			key = os.Args[2]
+		}
 		sn.PssSub(kind, key, topic, "")
 		defer sn.PssTopics[topic].Unregister()
 	} else {
