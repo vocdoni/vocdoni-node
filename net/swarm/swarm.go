@@ -3,10 +3,10 @@ package swarm
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/user"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -300,14 +300,31 @@ func (sn *SwarmNet) PssPub(subType, key, topic, msg, address string) error {
 		err = sn.Pss.SendRaw(hexutil.Bytes(dstAddr), dstTopic, hexutil.Bytes(msg))
 	}
 	if subType == "asym" {
-		pubKeyBytes, err := hex.DecodeString(key)
+		if hasHexPrefix := strings.HasPrefix(key, "0x"); !hasHexPrefix {
+			key = "0x" + key
+		}
+		topics, addresses, err := sn.Pss.GetPublickeyPeers(key)
 		if err != nil {
 			return err
 		}
-		err = sn.Pss.SetPeerPublicKey(pubKeyBytes, dstTopic, dstAddr)
-		if err != nil {
-			return err
+		topicFound := false
+		for i, t := range topics {
+			if dstTopic == t && fmt.Sprintf("%x", addresses[i]) == fmt.Sprintf("%x", dstAddr) {
+				topicFound = true
+				break
+			}
 		}
+		if !topicFound {
+			pubKeyBytes, err := hexutil.Decode(key)
+			if err != nil {
+				return err
+			}
+			err = sn.Pss.SetPeerPublicKey(pubKeyBytes, dstTopic, dstAddr)
+			if err != nil {
+				return err
+			}
+		}
+
 		err = sn.Pss.SendAsym(key, dstTopic, hexutil.Bytes(msg))
 	}
 	return err
