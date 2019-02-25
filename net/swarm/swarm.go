@@ -125,7 +125,7 @@ type pssSub struct {
 	Address    string
 }
 
-type SwarmNet struct {
+type SimplePss struct {
 	Node       *node.Node
 	NodeConfig *node.Config
 	EnodeID    string
@@ -139,7 +139,7 @@ type SwarmNet struct {
 	Ports      *swarmPorts
 }
 
-func (sn *SwarmNet) SetLog(level string) error {
+func (sn *SimplePss) SetLog(level string) error {
 	// ensure good log formats for terminal
 	// handle verbosity flag
 	loglevel, err := log.LvlFromString(level)
@@ -153,7 +153,7 @@ func (sn *SwarmNet) SetLog(level string) error {
 	return nil
 }
 
-func (sn *SwarmNet) PrintStats() {
+func (sn *SimplePss) PrintStats() {
 	// statistics thread
 	go func() {
 		for {
@@ -169,15 +169,15 @@ func (sn *SwarmNet) PrintStats() {
 	}()
 }
 
-func (sn *SwarmNet) SetDatadir(datadir string) {
+func (sn *SimplePss) SetDatadir(datadir string) {
 	sn.Datadir = datadir
 }
 
-func (sn *SwarmNet) SetKey(key *ecdsa.PrivateKey) {
+func (sn *SimplePss) SetKey(key *ecdsa.PrivateKey) {
 	sn.Key = key
 }
 
-func (sn *SwarmNet) Init() error {
+func (sn *SimplePss) Init() error {
 	var err error
 	if len(sn.Datadir) < 1 {
 		usr, err := user.Current()
@@ -269,7 +269,7 @@ func strAddress(addr string) pss.PssAddress {
 	return pssAddress
 }
 
-func (sn *SwarmNet) PssSub(subType, key, topic, address string) error {
+func (sn *SimplePss) PssSub(subType, key, topic, address string) error {
 	pssTopic := strTopic(topic)
 	pssAddress := strAddress(address)
 	if subType == "sym" {
@@ -299,7 +299,7 @@ func (sn *SwarmNet) PssSub(subType, key, topic, address string) error {
 	return nil
 }
 
-func (sn *SwarmNet) PssPub(subType, key, topic, msg, address string) error {
+func (sn *SimplePss) PssPub(subType, key, topic, msg, address string) error {
 	var err error
 	dstAddr := strAddress(address)
 	dstTopic := strTopic(topic)

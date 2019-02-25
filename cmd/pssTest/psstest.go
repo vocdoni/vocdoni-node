@@ -15,7 +15,7 @@ func main() {
 		return
 	}
 
-	sn := new(swarm.SwarmNet)
+	sn := new(swarm.SimplePss)
 	err := sn.Init()
 	if err != nil {
 		fmt.Printf("%v\n", err)
