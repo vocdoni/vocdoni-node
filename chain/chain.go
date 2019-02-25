@@ -19,6 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	//	"github.com/ethereum/go-ethereum/accounts/abi"
+
+	"github.com/vocdoni/go-dvote/chain/contracts"
 )
 
 type Node interface {
@@ -36,11 +38,11 @@ type EthNodeHandle struct {
 
 func Init() (Node, error) {
 	e := new(EthNodeHandle)
-	err := e.Init()
+	err := e.init()
 	return e, err
 }
 
-func (e *EthNodeHandle) Init() error {
+func (e *EthNodeHandle) init() error {
 
 	nodeConfig := node.DefaultConfig
 	nodeConfig.IPCPath = "run/eth/ipc"
@@ -98,47 +100,42 @@ func (e *EthNodeHandle) Start() {
 	}
 }
 
-func (e *EthNodeHandle) LinkBatch(data []byte) error {
-	//	contractAddr := "0x3e4FfefF898580eC8132A97A91543c8fdeF1210E"
+func (e *EthNodeHandle) LinkBatch(ref []byte) error {
+	contractAddr := "0x3e4FfefF898580eC8132A97A91543c8fdeF1210E"
+	processHandle, err := process.
+}
+
+func (e *EthNodeHandle) TestTx(amount int) error {
 	bigWalletAddr := "0x781b6544b1a73c6d779eb23c7369cf8039640793"
 	var gasLimit uint64
 	gasLimit = 8000000
-	return e.sendContractTx(bigWalletAddr, gasLimit, data)
+	return e.sendContractTx(bigWalletAddr, gasLimit, int64(amount))
 }
 
 // might be worthwhile to create generic SendTx to call contracttx, deploytx, etc
 
-func (e *EthNodeHandle) sendContractTx(addr string, limit uint64, data []byte) error {
+func (e *EthNodeHandle) sendTx(addr string, limit uint64, amount int) error {
 
-	fmt.Println(e.n)
 	client, err := ethclient.Dial(e.n.IPCEndpoint())
-	fmt.Println("Got IPC Endpoint:" + e.n.IPCEndpoint())
 	deadline := time.Now().Add(1000 * time.Millisecond)
 	ctx, cancel := context.WithDeadline(context.TODO(), deadline)
 	defer cancel()
-	fmt.Println("context created")
 
 	accounts := e.k.Accounts()
-	fmt.Println("Listing accounts")
-	for i, a := range accounts {
-		fmt.Printf("Found account %d %s\n", i, a.Address.String())
-	}
 	acc := accounts[0]
 	sendAddr := acc.Address
 	nonce, _ := client.NonceAt(ctx, sendAddr, nil)
 	if err != nil {
-		fmt.Println("error")
 		return err
 	}
 	//create tx
-	fmt.Println("creating tx")
 	price, _ := client.SuggestGasPrice(ctx)
 	fmt.Println(price)
 	var empty []byte
-	tx := types.NewTransaction(nonce, common.HexToAddress(addr), big.NewInt(1), limit, price, empty)
+	tx := types.NewTransaction(nonce, common.HexToAddress(addr), big.NewInt(amount), limit, price, empty)
 	signedTx, err := e.k.SignTx(acc, tx, big.NewInt(int64(e.c.NetworkId)))
 	if err != nil {
-		fmt.Printf("Signing error: %s", err)
+		return err
 	}
 	//create ctx
 	err = client.SendTransaction(ctx, signedTx)
@@ -153,6 +150,7 @@ func (e *EthNodeHandle) createAccount() error {
 
 	if err != nil {
 		utils.Fatalf("Failed to create account: %v", err)
+		return err
 	}
 	fmt.Printf("Address: {%x}\n", acc.Address)
 	e.k.TimedUnlock(e.k.Accounts()[0], phrase, time.Duration(0))
