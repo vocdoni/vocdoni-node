@@ -10,26 +10,46 @@ import (
 )
 
 func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Use <sym|asym> <key>")
+		return
+	}
+
 	sn := new(swarm.SwarmNet)
 	err := sn.Init()
 	if err != nil {
 		fmt.Printf("%v\n", err)
 		return
 	}
-	key := os.Args[1]
-	topic := "vocdoni_test"
+	err = sn.SetLog("crit")
+	if err != nil {
+		fmt.Printf("Cannot set loglevel %v\n", err)
+	}
 
-	sn.PssSub("asym", key, topic, "")
+	kind := os.Args[1]
+	topic := "vocdoni_test"
+	var key string
+
+	if kind == "sym" || kind == "asym" {
+		key = os.Args[2]
+		sn.PssSub(kind, key, topic, "")
+		defer sn.PssTopics[topic].Unregister()
+	} else {
+		fmt.Println("First parameter must be sym or asym")
+		return
+	}
+
 	go func() {
 		for {
 			msg := <-sn.PssTopics[topic].Delivery
-			fmt.Printf("Pss received: %s\n", msg)
+			fmt.Printf("<- Pss received: %s\n", msg)
 		}
 	}()
 
 	hostname, _ := os.Hostname()
 	for {
-		err := sn.PssPub("asym", key, topic, fmt.Sprintf("Hello world from %s", hostname), "")
+		fmt.Printf("-> Sending %s pss to [%s]\n", kind, key)
+		err := sn.PssPub(kind, key, topic, fmt.Sprintf("Hello world from %s", hostname), "")
 		log.Info("pss sent", "err", err)
 		time.Sleep(10 * time.Second)
 	}

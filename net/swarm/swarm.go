@@ -132,14 +132,18 @@ type SwarmNet struct {
 	Ports      *swarmPorts
 }
 
-func (sn *SwarmNet) SetLog() {
+func (sn *SwarmNet) SetLog(level string) error {
 	// ensure good log formats for terminal
 	// handle verbosity flag
+	loglevel, err := log.LvlFromString(level)
+	if err != nil {
+		return err
+	}
 	hs := log.StreamHandler(os.Stderr, log.TerminalFormat(true))
-	loglevel := log.LvlInfo
 	hf := log.LvlFilterHandler(loglevel, hs)
 	h := log.CallerFileHandler(hf)
 	log.Root().SetHandler(h)
+	return nil
 }
 
 func (sn *SwarmNet) PrintStats() {
@@ -177,7 +181,7 @@ func (sn *SwarmNet) Init() error {
 		os.MkdirAll(sn.Datadir, 0755)
 	}
 
-	sn.SetLog()
+	sn.SetLog("info")
 	sn.Ports = NewSwarmPorts()
 
 	// create node
