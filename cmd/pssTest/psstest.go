@@ -40,11 +40,11 @@ func main() {
 		fmt.Println("First parameter must be sym or asym")
 		return
 	}
-
+	fmt.Printf("My PSS pubKey is %s\n", sn.PssPubKey)
 	go func() {
 		for {
-			msg := <-sn.PssTopics[topic].Delivery
-			fmt.Printf("<- Pss received: %s\n", msg)
+			pmsg := <-sn.PssTopics[topic].Delivery
+			fmt.Printf("<- Pss received msg:{%s}\n", pmsg.Msg)
 		}
 	}()
 

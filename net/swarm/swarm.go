@@ -112,9 +112,16 @@ func NewSwarmPorts() *swarmPorts {
 	return sp
 }
 
+type pssMsg struct {
+	Msg   []byte
+	Peer  *p2p.Peer
+	Asym  bool
+	Keyid string
+}
+
 type pssSub struct {
 	Unregister func()
-	Delivery   (chan []byte)
+	Delivery   (chan pssMsg)
 	Address    string
 }
 
@@ -274,11 +281,12 @@ func (sn *SwarmNet) PssSub(subType, key, topic, address string) error {
 
 	sn.PssTopics[topic] = new(pssSub)
 	sn.PssTopics[topic].Address = address
-	sn.PssTopics[topic].Delivery = make(chan []byte)
+	sn.PssTopics[topic].Delivery = make(chan pssMsg)
 
 	var pssHandler pss.HandlerFunc = func(msg []byte, peer *p2p.Peer, asym bool, keyid string) error {
 		log.Debug("pss received", "msg", fmt.Sprintf("%s", msg), "keyid", fmt.Sprintf("%s", keyid))
-		sn.PssTopics[topic].Delivery <- msg
+
+		sn.PssTopics[topic].Delivery <- pssMsg{Msg: msg, Peer: peer, Asym: asym, Keyid: keyid}
 		return nil
 	}
 	topicHandler := pss.NewHandler(pssHandler)
@@ -304,6 +312,7 @@ func (sn *SwarmNet) PssPub(subType, key, topic, msg, address string) error {
 		err = sn.Pss.SendSym(symKeyId, strTopic(topic), hexutil.Bytes(msg))
 	}
 	if subType == "raw" {
+		// sed raw message
 		err = sn.Pss.SendRaw(hexutil.Bytes(address), dstTopic, hexutil.Bytes(msg))
 	}
 	if subType == "asym" {
