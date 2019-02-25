@@ -3,6 +3,7 @@ package swarm
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/user"
@@ -299,7 +300,11 @@ func (sn *SwarmNet) PssPub(subType, key, topic, msg, address string) error {
 		err = sn.Pss.SendRaw(hexutil.Bytes(dstAddr), dstTopic, hexutil.Bytes(msg))
 	}
 	if subType == "asym" {
-		err = sn.Pss.SetPeerPublicKey(hexutil.Bytes(key), dstTopic, dstAddr)
+		pubKeyBytes, err := hex.DecodeString(key)
+		if err != nil {
+			return err
+		}
+		err = sn.Pss.SetPeerPublicKey(pubKeyBytes, dstTopic, dstAddr)
 		if err != nil {
 			return err
 		}

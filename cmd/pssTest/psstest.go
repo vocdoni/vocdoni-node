@@ -16,19 +16,20 @@ func main() {
 		fmt.Printf("%v\n", err)
 		return
 	}
-	key := "randomkey0"
-	sn.PssSub("sym", key, "vocdoni_test", "")
+	key := os.Args[1]
+	topic := "vocdoni_test"
 
+	sn.PssSub("asym", key, topic, "")
 	go func() {
 		for {
-			msg := <-sn.PssTopics["vocdoni_test"].Delivery
+			msg := <-sn.PssTopics[topic].Delivery
 			fmt.Printf("Pss received: %s\n", msg)
 		}
 	}()
 
 	hostname, _ := os.Hostname()
 	for {
-		err := sn.PssPub("sym", key, "vocdoni_test", fmt.Sprintf("Hello world from %s", hostname), "")
+		err := sn.PssPub("asym", key, topic, fmt.Sprintf("Hello world from %s", hostname), "")
 		log.Info("pss sent", "err", err)
 		time.Sleep(10 * time.Second)
 	}
