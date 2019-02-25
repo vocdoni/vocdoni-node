@@ -265,8 +265,7 @@ func strAddress(addr string) pss.PssAddress {
 func (sn *SwarmNet) PssSub(subType, key, topic, address string) error {
 	pssTopic := strTopic(topic)
 	pssAddress := strAddress(address)
-	switch subType {
-	case "sym":
+	if subType == "sym" {
 		_, err := sn.Pss.SetSymmetricKey(strSymKey(key), pssTopic, pssAddress, true)
 		if err != nil {
 			return err
@@ -278,14 +277,17 @@ func (sn *SwarmNet) PssSub(subType, key, topic, address string) error {
 	sn.PssTopics[topic].Delivery = make(chan []byte)
 
 	var pssHandler pss.HandlerFunc = func(msg []byte, peer *p2p.Peer, asym bool, keyid string) error {
-		//log.Info("pss received", "msg", fmt.Sprintf("%s", msg), "keyid", fmt.Sprintf("%s", keyid))
+		log.Debug("pss received", "msg", fmt.Sprintf("%s", msg), "keyid", fmt.Sprintf("%s", keyid))
 		sn.PssTopics[topic].Delivery <- msg
 		return nil
 	}
 	topicHandler := pss.NewHandler(pssHandler)
+	if subType == "raw" {
+		topicHandler = topicHandler.WithProxBin().WithRaw()
+	}
 	sn.PssTopics[topic].Unregister = sn.Pss.Register(&pssTopic, topicHandler)
 
-	log.Info(fmt.Sprintf("Subscribed to topic %s", pssTopic.String()))
+	log.Info(fmt.Sprintf("Subscribed to [%s] topic %s", subType, pssTopic.String()))
 	return nil
 }
 
@@ -302,7 +304,7 @@ func (sn *SwarmNet) PssPub(subType, key, topic, msg, address string) error {
 		err = sn.Pss.SendSym(symKeyId, strTopic(topic), hexutil.Bytes(msg))
 	}
 	if subType == "raw" {
-		err = sn.Pss.SendRaw(hexutil.Bytes(dstAddr), dstTopic, hexutil.Bytes(msg))
+		err = sn.Pss.SendRaw(hexutil.Bytes(address), dstTopic, hexutil.Bytes(msg))
 	}
 	if subType == "asym" {
 		// add 0x prefix if not present

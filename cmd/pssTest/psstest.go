@@ -49,9 +49,11 @@ func main() {
 	}()
 
 	hostname, _ := os.Hostname()
+
 	for {
 		fmt.Printf("-> Sending %s pss to [%s]\n", kind, key)
-		err := sn.PssPub(kind, key, topic, fmt.Sprintf("Hello world from %s", hostname), "")
+		currentTime := int64(time.Now().Unix())
+		err := sn.PssPub(kind, key, topic, fmt.Sprintf("Hello world from %s at %d", hostname, currentTime), "")
 		log.Info("pss sent", "err", err)
 		time.Sleep(10 * time.Second)
 	}
