@@ -112,7 +112,7 @@ func NewSwarmPorts() *swarmPorts {
 	return sp
 }
 
-type pssMsg struct {
+type PssMsg struct {
 	Msg   []byte
 	Peer  *p2p.Peer
 	Asym  bool
@@ -121,7 +121,7 @@ type pssMsg struct {
 
 type pssSub struct {
 	Unregister func()
-	Delivery   (chan pssMsg)
+	Delivery   (chan PssMsg)
 	Address    string
 }
 
@@ -281,12 +281,12 @@ func (sn *SimplePss) PssSub(subType, key, topic, address string) error {
 
 	sn.PssTopics[topic] = new(pssSub)
 	sn.PssTopics[topic].Address = address
-	sn.PssTopics[topic].Delivery = make(chan pssMsg)
+	sn.PssTopics[topic].Delivery = make(chan PssMsg)
 
 	var pssHandler pss.HandlerFunc = func(msg []byte, peer *p2p.Peer, asym bool, keyid string) error {
 		log.Debug("pss received", "msg", fmt.Sprintf("%s", msg), "keyid", fmt.Sprintf("%s", keyid))
 
-		sn.PssTopics[topic].Delivery <- pssMsg{Msg: msg, Peer: peer, Asym: asym, Keyid: keyid}
+		sn.PssTopics[topic].Delivery <- PssMsg{Msg: msg, Peer: peer, Asym: asym, Keyid: keyid}
 		return nil
 	}
 	topicHandler := pss.NewHandler(pssHandler)
