@@ -1,10 +1,11 @@
 package batch
 
 import (
-	"fmt"
-	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/db"
 	"encoding/json"
+	"fmt"
+
+	"github.com/vocdoni/go-dvote/db"
+	"github.com/vocdoni/go-dvote/types"
 )
 
 var rdb *db.LevelDbStorage
@@ -18,6 +19,33 @@ func Setup(l *db.LevelDbStorage) {
 	bdb = l.WithPrefix([]byte("batch_"))
 }
 
+func Recieve(messages <-chan types.Message) {
+	var message types.Message
+	var payload []byte
+	var e types.Envelope
+	var b types.Ballot
+	for {
+		message = <-messages
+		payload = message.Data
+
+		err = json.Unmarshal(payload, &e)
+		if err != nil {
+			//log error
+		}
+
+		err = json.Unmarshal(e.Ballot, &b)
+		if err != nil {
+			//log error
+		}
+
+		err = Add(b)
+		if err != nil {
+			//log error
+		}
+
+		fmt.Println("Got > " + string(payload))
+	}
+}
 
 //add (queue for counting)
 func Add(ballot types.Ballot) error {
@@ -28,7 +56,7 @@ func Add(ballot types.Ballot) error {
 	var err error
 	b, err = json.Marshal(ballot)
 	n, err = json.Marshal(ballot.Nullifier)
-	err = bdb.Put(n,b)
+	err = bdb.Put(n, b)
 	if err != nil {
 		return err
 	}
@@ -59,14 +87,14 @@ func Fetch() ([]string, []string) {
 		b = append(b, string(v))
 	}
 	iter.Release()
-//	jn, err := json.Marshal(n)
-//	if err != nil {
-//		panic(err)
-//	}
-//	jb, err := json.Marshal(b)
-//	if err != nil {
-//		panic(err)
-//	}
+	//	jn, err := json.Marshal(n)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	jb, err := json.Marshal(b)
+	//	if err != nil {
+	//		panic(err)
+	//	}
 	return n, b
 }
 
