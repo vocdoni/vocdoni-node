@@ -4,6 +4,10 @@ import (
 	"time"
 )
 
+type Store struct {
+	Datadir string
+}
+
 type Ballot struct {
 	Type string
 	PID string
