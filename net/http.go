@@ -1,10 +1,17 @@
 package net
 
 import (
+<<<<<<< HEAD
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+=======
+	"io"
+	"fmt"
+	"net/http"
+	"encoding/json"
+>>>>>>> 645e4e395e4fc2ae56a3d352b172fa0718c99e13
 	"strings"
 
 	"github.com/vocdoni/go-dvote/batch"
@@ -72,7 +79,7 @@ func (h *HTTPHandle) Listen() error {
 	//add waitgroup
 	func() {
 		fmt.Println("serving on " + h.port + "/" + h.path)
-		err := http.ListenAndServe(":"+h.port, nil)
+		err := http.ListenAndServe(":" + h.port, nil)
 		if err != nil {
 			return
 		}

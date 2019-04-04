@@ -9,7 +9,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 )
 
-//maybe should expose 'durablepublish' (publish + pin)
 type Storage interface {
 	Publish(o []byte) string
 	Retrieve(id string) []byte
