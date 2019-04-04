@@ -1,17 +1,10 @@
 package net
 
 import (
-<<<<<<< HEAD
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-=======
-	"io"
-	"fmt"
-	"net/http"
-	"encoding/json"
->>>>>>> 645e4e395e4fc2ae56a3d352b172fa0718c99e13
 	"strings"
 
 	"github.com/vocdoni/go-dvote/batch"
