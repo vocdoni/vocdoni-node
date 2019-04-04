@@ -37,7 +37,7 @@ func main() {
 
 	//gather transport type flag
 	var transportIDString string
-	flag.StringVar(&transportIDString, "transport", "PubSub", "Transport must be one of: PubSub, HTTP")
+	flag.StringVar(&transportIDString, "transport", "PSS", "Transport must be one of: PubSub, PSS, HTTP")
 	flag.Parse()
 	transportType = net.TransportIDFromString(transportIDString)
 
@@ -54,6 +54,7 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
+
 	go transport.Listen(listenerOutput, listenerErrors)
 	go batch.Recieve(listenerOutput)
 	for {

@@ -1,22 +1,22 @@
 package net
 
 import (
-	"io"
-	"fmt"
-	"net/http"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"strings"
 
 	"github.com/vocdoni/go-dvote/batch"
 	"github.com/vocdoni/go-dvote/types"
 )
 
-type HttpHandle struct {
+type HTTPHandle struct {
 	port string
 	path string
 }
 
-func (h *HttpHandle) Init(c string) error {
+func (h *HTTPHandle) Init(c string) error {
 	//split c to port and path
 	cs := strings.Split(c, "/")
 	h.port = cs[0]
@@ -25,6 +25,8 @@ func (h *HttpHandle) Init(c string) error {
 
 }
 
+//this should become submitVote handler
+//move initial logic to core router
 func parse(rw http.ResponseWriter, request *http.Request) {
 	decoder := json.NewDecoder(request.Body)
 
@@ -40,7 +42,6 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-
 
 	//check PoW
 	//check key
@@ -66,16 +67,15 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 	io.WriteString(rw, string(j))
 }
 
-func (h *HttpHandle) Listen() error {
+func (h *HTTPHandle) Listen() error {
 	http.HandleFunc(h.path, parse)
 	//add waitgroup
 	func() {
 		fmt.Println("serving on " + h.port + "/" + h.path)
-		err := http.ListenAndServe(":" + h.port, nil)
+		err := http.ListenAndServe(":"+h.port, nil)
 		if err != nil {
 			return
 		}
 	}()
 	return nil
 }
-

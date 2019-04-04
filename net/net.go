@@ -8,14 +8,21 @@ import (
 
 type Transport interface {
 	Listen(reciever chan<- types.Message, errors chan<- error)
-	Send(msg []byte, errors chan<- error)
 	Init() error
 }
+
+type RWTransport interface {
+	Transport
+	Send(msg []byte, errors chan<- error)
+}
+
 type TransportID int
 
 const (
 	PubSub TransportID = iota + 1
 	PSS
+	HTTP
+	Websockets
 )
 
 func TransportIDFromString(i string) TransportID {
@@ -24,6 +31,10 @@ func TransportIDFromString(i string) TransportID {
 		return PubSub
 	case "PSS":
 		return PSS
+	case "HTTP":
+		return HTTP
+	case "Websockets":
+		return Websockets
 	default:
 		return -1
 	}
@@ -47,7 +58,9 @@ func Init(t TransportID) (Transport, error) {
 		p.c = defaultConnection
 		p.Init()
 		return p, nil
+	//case HTTP:
+	//case Websockets:
 	default:
-		return nil, errors.New("Bad transport type specification")
+		return nil, errors.New("Bad transport type ID")
 	}
 }
