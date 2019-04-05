@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/big"
 	"os"
 	"time"
@@ -18,9 +19,10 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	//	"github.com/ethereum/go-ethereum/accounts/abi"
 
-	"github.com/vocdoni/go-dvote/chain/contracts"
+	votingprocess "github.com/vocdoni/go-dvote/chain/contracts"
 )
 
 type Node interface {
@@ -36,7 +38,7 @@ type EthNodeHandle struct {
 	k *keystore.KeyStore
 }
 
-func Init() (Node, error) {
+func Init() (*EthNodeHandle, error) {
 	e := new(EthNodeHandle)
 	err := e.init()
 	return e, err
@@ -101,15 +103,43 @@ func (e *EthNodeHandle) Start() {
 }
 
 func (e *EthNodeHandle) LinkBatch(ref []byte) error {
-	contractAddr := "0x3e4FfefF898580eC8132A97A91543c8fdeF1210E"
-	processHandle, err := process.
+	client, err := ethclient.Dial(e.n.IPCEndpoint())
+	if err != nil {
+		return err
+	}
+	//account := e.k.Accounts()[0]
+
+	/*
+		nonce, err := client.PendingNonceAt(context.Background(), account.Address)
+		if err != nil {
+			return err
+		}
+	*/
+
+	/*
+		deadline := time.Now().Add(1000 * time.Millisecond)
+		ctx, cancel := context.WithDeadline(context.TODO(), deadline)
+		defer cancel()
+		gasPrice, err := client.SuggestGasPrice(ctx)
+	*/
+
+	contractAddr := common.HexToAddress("0x3e4FfefF898580eC8132A97A91543c8fdeF1210E")
+	votingProcessInstance, err := votingprocess.NewVotingProcess(contractAddr, client)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("contract is loaded")
+	_ = votingProcessInstance
+	return nil
+
 }
 
 func (e *EthNodeHandle) TestTx(amount int) error {
 	bigWalletAddr := "0x781b6544b1a73c6d779eb23c7369cf8039640793"
 	var gasLimit uint64
 	gasLimit = 8000000
-	return e.sendContractTx(bigWalletAddr, gasLimit, int64(amount))
+	return e.sendTx(bigWalletAddr, gasLimit, amount)
 }
 
 // might be worthwhile to create generic SendTx to call contracttx, deploytx, etc
@@ -132,7 +162,7 @@ func (e *EthNodeHandle) sendTx(addr string, limit uint64, amount int) error {
 	price, _ := client.SuggestGasPrice(ctx)
 	fmt.Println(price)
 	var empty []byte
-	tx := types.NewTransaction(nonce, common.HexToAddress(addr), big.NewInt(amount), limit, price, empty)
+	tx := types.NewTransaction(nonce, common.HexToAddress(addr), big.NewInt(int64(amount)), limit, price, empty)
 	signedTx, err := e.k.SignTx(acc, tx, big.NewInt(int64(e.c.NetworkId)))
 	if err != nil {
 		return err
