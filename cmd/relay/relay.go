@@ -48,7 +48,7 @@ func main() {
 	batch.BatchSize = batchSize
 
 	fmt.Println("Entering main loop")
-	transport, err := net.Init(transportType)
+	transport, err := net.InitDefault(transportType)
 	listenerOutput := make(chan types.Message, 10)
 	listenerErrors := make(chan error)
 	if err != nil {

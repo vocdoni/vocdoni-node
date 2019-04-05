@@ -29,7 +29,7 @@ Create a simplePSS instance
 sn := new(swarm.SimplePss)
 ```
 
-Initialize and stard the swarm process. This will start the p2p protocol and automatically connect to the swarm network.
+Initialize and start the swarm process. This will start the p2p protocol and automatically connect to the swarm network.
 ```
 err := sn.Init()
 ```

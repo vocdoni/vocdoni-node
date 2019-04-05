@@ -12,7 +12,8 @@ type PSSHandle struct {
 	s *swarm.SimplePss
 }
 
-func (p *PSSHandle) Init() error {
+func (p *PSSHandle) Init(c *types.Connection) error {
+	p.c = c
 	sn := new(swarm.SimplePss)
 	err := sn.Init()
 	if err != nil {
@@ -22,7 +23,7 @@ func (p *PSSHandle) Init() error {
 	if err != nil {
 		return err
 	}
-	sn.PssSub(p.c.Kind, p.c.Key, p.c.Topic, p.c.Address)
+	sn.PssSub(p.c.Encryption, p.c.Key, p.c.Topic, p.c.Address)
 	p.s = sn
 	return nil
 }
@@ -43,7 +44,7 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message, errors chan<- error) {
 
 func (p *PSSHandle) Send(msg []byte, errors chan<- error) {
 
-	err := p.s.PssPub(p.c.Kind, p.c.Key, p.c.Topic, string(msg), p.c.Address)
+	err := p.s.PssPub(p.c.Encryption, p.c.Key, p.c.Topic, string(msg), p.c.Address)
 	if err != nil {
 		errors <- err
 	}

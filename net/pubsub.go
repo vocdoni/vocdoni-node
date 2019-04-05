@@ -33,7 +33,8 @@ func PsPublish(topic, data string) error {
 	return nil
 }
 
-func (p *PubSubHandle) Init() error {
+func (p *PubSubHandle) Init(c *types.Connection) error {
+	p.c = c
 	p.s = PsSubscribe(p.c.Topic)
 	return nil
 }

@@ -8,7 +8,7 @@ import (
 type Message struct {
 	Topic     string
 	Data      []byte
-	Address   string
+	Address   string //this is the address of the other side
 	TimeStamp time.Time
 }
 
@@ -16,7 +16,7 @@ type Message struct {
 //fields are used for all transport types.
 type Connection struct {
 	Topic   string //channel/topic for topic based messaging such as PSS, PubSub
-	Kind    string //what type of encryption to use
+	Encryption    string //what type of encryption to use
 	Key     string //this node's key
 	Address string //this node's address
 	Path    string //specific path on which a transport should listen
