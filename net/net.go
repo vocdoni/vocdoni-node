@@ -2,26 +2,39 @@ package net
 
 import (
 	"errors"
+
+	"github.com/vocdoni/go-dvote/types"
 )
 
 type Transport interface {
-	Listen() error
-	Init(c string) error
+	Listen(reciever chan<- types.Message, errors chan<- error)
+	Init() error
+}
+
+type RWTransport interface {
+	Transport
+	Send(msg []byte, errors chan<- error)
 }
 
 type TransportID int
 
 const (
-	HTTP TransportID = iota + 1
-	PubSub
+	PubSub TransportID = iota + 1
+	PSS
+	HTTP
+	Websockets
 )
 
 func TransportIDFromString(i string) TransportID {
 	switch i {
-	case "PubSub" :
+	case "PubSub":
 		return PubSub
+	case "PSS":
+		return PSS
 	case "HTTP":
 		return HTTP
+	case "Websockets":
+		return Websockets
 	default:
 		return -1
 	}
@@ -29,15 +42,25 @@ func TransportIDFromString(i string) TransportID {
 
 func Init(t TransportID) (Transport, error) {
 	switch t {
-	case PubSub :
+	case PubSub:
 		p := new(PubSubHandle)
-		p.Init("vocdoni_pubsub_testing")
+		defaultConnection := new(types.Connection)
+		defaultConnection.Topic = "vocdoni_testing"
+		p.c = defaultConnection
+		p.Init()
 		return p, nil
-	case HTTP :
-		h := new(HttpHandle)
-		h.Init("8080/submit")
-		return h, nil
+	case PSS:
+		p := new(PSSHandle)
+		defaultConnection := new(types.Connection)
+		defaultConnection.Topic = "vocdoni_testing"
+		defaultConnection.Key = ""
+		defaultConnection.Kind = "sym"
+		p.c = defaultConnection
+		p.Init()
+		return p, nil
+	//case HTTP:
+	//case Websockets:
 	default:
-		return nil, errors.New("Bad transport type specification")
+		return nil, errors.New("Bad transport type ID")
 	}
 }

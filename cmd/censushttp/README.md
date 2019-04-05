@@ -25,7 +25,7 @@ Example
 
 ## API
 
-A HTTP jSON endpoint is available with the following possible fields: `censusId`, `claimData`, `rootHash` and `proofData`.
+A HTTP jSON endpoint is available with the following possible fields: `method` `censusId`, `claimData`, `rootHash` and `proofData`.
 
 If `pubKey` has been configured for a specific `censusId`, then two more methods are available (`timeStamp` and `signature`) to provide authentication.
 
@@ -33,7 +33,7 @@ The next table shows the available methods and its relation with the fields.
 
 | method     | censusId  | claimData | rootHash | proofData | protected? | description |
 |------------|-----------|-----------|----------|-----------|------------|------------|
-| `addCLaim`   | mandatory | mandatory | none     | none      | yes | adds a new claim to the merkle tree       |
+| `addClaim`   | mandatory | mandatory | none     | none      | yes | adds a new claim to the merkle tree       |
 | `getRoot`    | mandatory | none      | none     | none      | no         | get the current merkletree root hash
 | `genProof`   | mandatory | mandatory | optional | none      | no         | generate the merkle proof for a given claim
 | `checkProof` | mandatory | mandatory | optional | mandatory | no         | check a claim and its merkle proof 
@@ -43,7 +43,7 @@ The next table shows the available methods and its relation with the fields.
 
 ## Signature
 
-The signature provides authentication by signing a concatenation of the following strings (even if empty) without spaces: `censusId rootHash claimData timeStamp`.
+The signature provides authentication by signing a concatenation of the following strings (even if empty) without spaces: `method censusId rootHash claimData timeStamp`.
 
 The `timeStamp` when received on the server side must not differ more than 10 seconds from the current UNIX time.
 
@@ -53,13 +53,13 @@ The `timeStamp` when received on the server side must not differ more than 10 se
 
 Add two new claims, one for `Jon Snow` and another for `Tyrion`.
 ```
-curl -d '{"censusID":"GoT_Favorite","claimData":"Jon Snow"}' http://localhost:1500/addClaim
+curl -d '{"method":"addClaim","censusID":"GoT_Favorite","claimData":"Jon Snow"}' http://localhost:1500
 
 {"error":false,"response":""}
 ```
 
 ```
-curl -d '{"censusID":"GoT_Favorite","claimData":"Tyrion"}' http://localhost:1500/addClaim
+curl -d '{"method":"addClaim","censusID":"GoT_Favorite","claimData":"Tyrion"}' http://localhost:1500
 
 {"error":false,"response":""}
 ```
@@ -68,10 +68,11 @@ In case signature is enabled:
 
 ```
 curl -d '{
+"method":"addClaim",
 "censusID":"GoT_Favorite",
 "claimData":"Jon Snow", 
 "timeStamp":"1547814675",
-"signature":"a117c4ce12b29090884112ffe57e664f007e7ef142a1679996e2d34fd2b852fe76966e47932f1e9d3a54610d0f361383afe2d9aab096e15d136c236abb0a0d0e" }' http://localhost:1500/addClaim
+"signature":"a117c4ce12b29090884112ffe57e664f007e7ef142a1679996e2d34fd2b852fe76966e47932f1e9d3a54610d0f361383afe2d9aab096e15d136c236abb0a0d0e" }' http://localhost:1500
 
 {"error":false,"response":""}
 ```
@@ -82,7 +83,7 @@ curl -d '{
 Generate a merkle proof for the claim `Jon Snow`
 
 ```
-curl -d '{"censusID":"GoT_Favorite","claimData":"Jon Snow"}' http://localhost:1500/genProof
+curl -d '{"method":"genProof","censusID":"GoT_Favorite","claimData":"Jon Snow"}' http://localhost:1500
 
 {"error":false,"response":"0x000200000000000000000000000000000000000000000000000000000000000212f8134039730791388a9bd0460f9fbd0757327212a64b3a2b0f0841ce561ee3"}
 ```
@@ -94,7 +95,7 @@ If `rootHash` is specified, the proof will be calculated for the given root hash
 The previous merkle proof is valid only for the current root hash. Let's get it
 
 ```
-curl -d '{"censusID":"GoT_Favorite"}' http://localhost:1500/getRoot
+curl -d '{"method":"getRoot","censusID":"GoT_Favorite"}' http://localhost:1500
 
 {"error":false,"response":"0x2f0ddde5cb995eae23dc3b75a5c0333f1cc89b73f3a00b0fe71996fb90fef04b"}
 ```
@@ -106,9 +107,10 @@ Now let's check if the proof is valid
 
 ```
 curl -d '{
+"method":"checkProof",
 "censusID":"GoT_Favorite","claimData":"Jon Snow",
 "rootHash":"0x2f0ddde5cb995eae23dc3b75a5c0333f1cc89b73f3a00b0fe71996fb90fef04b",
-"proofData":"0x000200000000000000000000000000000000000000000000000000000000000212f8134039730791388a9bd0460f9fbd0757327212a64b3a2b0f0841ce561ee3"}' http://localhost:1500/checkProof
+"proofData":"0x000200000000000000000000000000000000000000000000000000000000000212f8134039730791388a9bd0460f9fbd0757327212a64b3a2b0f0841ce561ee3"}' http://localhost:1500
 
 {"error":false,"response":"valid"}
 ```
@@ -120,7 +122,7 @@ If `rootHash` is not specified, the current root hash is used.
 Dump contents of a specific censusId (values)
 
 ```
-curl -d '{"censusID":"GoT_Favorite"}' http://localhost:1500/dump
+curl -d '{"method":"dump","censusID":"GoT_Favorite"}' http://localhost:1500
 
 {"error":false,"response":"[\"Tyrion\",\"Jon Snow\"]"}
 ```

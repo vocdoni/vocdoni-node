@@ -1,30 +1,30 @@
 package main
 
 import (
-	"fmt"
-	"time"
-	"encoding/gob"
 	"bytes"
-	"os"
+	"encoding/gob"
 	"flag"
+	"fmt"
+	"os"
+	"time"
 
 	"github.com/vocdoni/go-dvote/batch"
-	"github.com/vocdoni/go-dvote/net"
-	"github.com/vocdoni/go-dvote/db"
 	"github.com/vocdoni/go-dvote/data"
 	"github.com/vocdoni/go-dvote/chain"
+	"github.com/vocdoni/go-dvote/db"
+	"github.com/vocdoni/go-dvote/net"
+	"github.com/vocdoni/go-dvote/types"
 )
 
 var dbPath = "~/.dvote/relay.db"
 var batchSeconds = 10 //seconds
-var batchSize = 3 //packets
+var batchSize = 3     //packets
 
 var err error
 var batchTimer *time.Ticker
 var batchSignal chan bool
 var signal bool
 var transportType net.TransportID
-
 
 func main() {
 
@@ -38,10 +38,9 @@ func main() {
 
 	//gather transport type flag
 	var transportIDString string
-	flag.StringVar(&transportIDString, "transport", "PubSub", "Transport must be one of: PubSub, HTTP")
+	flag.StringVar(&transportIDString, "transport", "PSS", "Transport must be one of: PubSub, PSS, HTTP")
 	flag.Parse()
 	transportType = net.TransportIDFromString(transportIDString)
-
 
 	batchTimer = time.NewTicker(time.Second * time.Duration(batchSeconds))
 	batchSignal = make(chan bool)
@@ -52,17 +51,21 @@ func main() {
 	node, err := chain.Init()
 	node.Start()
 
+	fmt.Println("Entering main loop")
 	transport, err := net.Init(transportType)
+	listenerOutput := make(chan types.Message, 10)
+	listenerErrors := make(chan error)
 	if err != nil {
 		os.Exit(1)
 	}
-	fmt.Println("Entering main loop")
-	go transport.Listen()
+
+	go transport.Listen(listenerOutput, listenerErrors)
+	go batch.Recieve(listenerOutput)
 	for {
 		select {
-		case <- batchTimer.C:
-			//fmt.Println("Timer triggered")
-//			//fmt.Println(batch.Create())
+		case <-batchTimer.C:
+			fmt.Println("Timer triggered")
+			//			fmt.Println(batch.Create())
 			//replace with chain link
 		case signal := <-batchSignal:
 			if signal == true {
@@ -83,6 +86,8 @@ func main() {
 				//fmt.Println(b)
 				batch.Compact(ns)
 			}
+		case listenError := <-listenerErrors:
+			fmt.Println(listenError)
 		default:
 			continue
 		}

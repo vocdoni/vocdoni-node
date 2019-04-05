@@ -8,17 +8,24 @@ import (
 	"strconv"
 	"time"
 
+	signature "github.com/vocdoni/go-dvote/crypto/signature_ecdsa"
 	tree "github.com/vocdoni/go-dvote/tree"
-	signature "github.com/vocdoni/go-dvote/crypto/signature"
 )
 
-const hashSize = 32
-const authTimeWindow = 10         // Time window (seconds) in which TimeStamp will be accepted if auth enabled
-var MkTrees map[string]*tree.Tree // MerkleTree dvote-census library
-var Signatures map[string]string
-var Signature signature.SignKeys // Signature go-dvote library
+// Time window (seconds) in which TimeStamp will be accepted if auth enabled
+const authTimeWindow = 10
 
+// MkTrees map of merkle trees indexed by censusId
+var MkTrees map[string]*tree.Tree
+
+// Signatures map of management pubKeys indexed by censusId
+var Signatures map[string]string
+
+var currentSignature signature.SignKeys
+
+// Claim type represents a JSON object with all possible fields
 type Claim struct {
+	Method    string `json:"method"`    // method to call
 	CensusID  string `json:"censusId"`  // References to MerkleTree namespace
 	RootHash  string `json:"rootHash"`  // References to MerkleTree rootHash
 	ClaimData string `json:"claimData"` // Data to add to the MerkleTree
@@ -27,11 +34,13 @@ type Claim struct {
 	Signature string `json:"signature"` // Signature as Hexadecimal String
 }
 
+// Result type represents a JSON object with the result of the method executed
 type Result struct {
 	Error    bool   `json:"error"`
 	Response string `json:"response"`
 }
 
+// AddNamespace adds a new merkletree identified by a censusId (name)
 func AddNamespace(name, pubKey string) {
 	if len(MkTrees) == 0 {
 		MkTrees = make(map[string]*tree.Tree)
@@ -63,7 +72,7 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 	return true
 }
 
-func checkAuth(timestamp, signature, pubKey, message string) bool {
+func checkAuth(timestamp, signed, pubKey, message string) bool {
 	if len(pubKey) < 1 {
 		return true
 	}
@@ -75,7 +84,7 @@ func checkAuth(timestamp, signature, pubKey, message string) bool {
 	}
 	if timeStampRemote < currentTime+authTimeWindow &&
 		timeStampRemote > currentTime-authTimeWindow {
-		v, err := Signature.Verify(message, signature, pubKey)
+		v, err := currentSignature.Verify(message, signed, pubKey)
 		if err != nil {
 			log.Printf("Verification error: %s\n", err)
 		}
@@ -84,10 +93,8 @@ func checkAuth(timestamp, signature, pubKey, message string) bool {
 	return false
 }
 
-func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
+func httpHandler(w http.ResponseWriter, req *http.Request) {
 	var c Claim
-	var resp Result
-
 	if ok := checkRequest(w, req); !ok {
 		return
 	}
@@ -97,11 +104,23 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
+	if len(c.Method) < 1 {
+		http.Error(w, "method must be specified", 400)
+		return
+	}
+	resp := opHandler(&c)
+	reply(resp, w)
+}
+
+func opHandler(c *Claim) *Result {
+	var resp Result
+	op := c.Method
+	var err error
 
 	// Process data
-	log.Printf("censusId:{%s} rootHash:{%s} claimData:{%s} proofData:{%s} timeStamp:{%s} signature:{%s}\n",
-		c.CensusID, c.RootHash, c.ClaimData, c.ProofData, c.TimeStamp, c.Signature)
-	authString := fmt.Sprintf("%s%s%s%s", c.CensusID, c.RootHash, c.ClaimData, c.TimeStamp)
+	log.Printf("censusId:{%s} method:{%s} rootHash:{%s} claimData:{%s} proofData:{%s} timeStamp:{%s} signature:{%s}\n",
+		c.CensusID, c.Method, c.RootHash, c.ClaimData, c.ProofData, c.TimeStamp, c.Signature)
+	authString := fmt.Sprintf("%s%s%s%s%s", c.Method, c.CensusID, c.RootHash, c.ClaimData, c.TimeStamp)
 	resp.Error = false
 	resp.Response = ""
 	censusFound := false
@@ -111,73 +130,61 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 	if !censusFound {
 		resp.Error = true
 		resp.Response = "censusId not valid or not found"
-		reply(&resp, w)
-		return
+		return &resp
 	}
 
-	if op == "add" {
+	//Methods without rootHash
+
+	if op == "getRoot" {
+		resp.Response = MkTrees[c.CensusID].GetRoot()
+		return &resp
+	}
+
+	if op == "addClaim" {
 		if auth := checkAuth(c.TimeStamp, c.Signature, Signatures[c.CensusID], authString); auth {
 			err = MkTrees[c.CensusID].AddClaim([]byte(c.ClaimData))
 		} else {
 			resp.Error = true
 			resp.Response = "invalid authentication"
 		}
+		return &resp
 	}
 
-	if op == "gen" {
-		var t *tree.Tree
-		var err error
-		if len(c.RootHash) > 1 { //if rootHash specified
-			t, err = MkTrees[c.CensusID].Snapshot(c.RootHash)
-			if err != nil {
-				log.Printf("Snapshot error: %s", err.Error())
-				resp.Error = true
-				resp.Response = "invalid root hash"
-				reply(&resp, w)
-				return
-			}
-		} else { //if rootHash not specified use current tree
-			t = MkTrees[c.CensusID]
+	//Methods with rootHash, if rootHash specified snapshot the tree
+
+	var t *tree.Tree
+	if len(c.RootHash) > 1 { //if rootHash specified
+		t, err = MkTrees[c.CensusID].Snapshot(c.RootHash)
+		if err != nil {
+			log.Printf("Snapshot error: %s", err.Error())
+			resp.Error = true
+			resp.Response = "invalid root hash"
+			return &resp
 		}
+	} else { //if rootHash not specified use current tree
+		t = MkTrees[c.CensusID]
+	}
+
+	if op == "genProof" {
 		resp.Response, err = t.GenProof([]byte(c.ClaimData))
 		if err != nil {
 			resp.Error = true
 			resp.Response = err.Error()
-			reply(&resp, w)
-			return
 		}
+		return &resp
 	}
 
-	if op == "root" {
-		resp.Response = MkTrees[c.CensusID].GetRoot()
-	}
-
-	if op == "idx" {
-
+	if op == "getIdx" {
+		resp.Response, err = t.GetIndex([]byte(c.ClaimData))
+		return &resp
 	}
 
 	if op == "dump" {
-		var t *tree.Tree
 		if auth := checkAuth(c.TimeStamp, c.Signature, Signatures[c.CensusID], authString); !auth {
 			resp.Error = true
 			resp.Response = "invalid authentication"
-			reply(&resp, w)
-			return
+			return &resp
 		}
-
-		if len(c.RootHash) > 1 { //if rootHash specified
-			t, err = MkTrees[c.CensusID].Snapshot(c.RootHash)
-			if err != nil {
-				log.Printf("Snapshot error: %s", err.Error())
-				resp.Error = true
-				resp.Response = "invalid root hash"
-				reply(&resp, w)
-				return
-			}
-		} else { //if rootHash not specified use current merkletree
-			t = MkTrees[c.CensusID]
-		}
-
 		//dump the claim data and return it
 		values, err := t.Dump()
 		if err != nil {
@@ -192,44 +199,31 @@ func claimHandler(w http.ResponseWriter, req *http.Request, op string) {
 				resp.Response = fmt.Sprintf("%s", jValues)
 			}
 		}
+		return &resp
 	}
 
-	if op == "check" {
+	if op == "checkProof" {
 		if len(c.ProofData) < 1 {
 			resp.Error = true
 			resp.Response = "proofData not provided"
-			reply(&resp, w)
-			return
+			return &resp
 		}
-		var t *tree.Tree
-		if len(c.RootHash) > 1 { //if rootHash specified
-			t, err = MkTrees[c.CensusID].Snapshot(c.RootHash)
-			if err != nil {
-				log.Printf("Snapshot error: %s", err.Error())
-				resp.Error = true
-				resp.Response = "invalid root hash"
-				reply(&resp, w)
-				return
-			}
-		} else { //if rootHash not specified use current merkletree
-			t = MkTrees[c.CensusID]
-		}
-
+		// Generate proof and return it
 		validProof, err := t.CheckProof([]byte(c.ClaimData), c.ProofData)
 		if err != nil {
 			resp.Error = true
 			resp.Response = err.Error()
-			reply(&resp, w)
-			return
+			return &resp
 		}
 		if validProof {
 			resp.Response = "valid"
 		} else {
 			resp.Response = "invalid"
 		}
+		return &resp
 	}
 
-	reply(&resp, w)
+	return &resp
 }
 
 func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
@@ -238,6 +232,7 @@ func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
 	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 }
 
+// Listen starts a census service defined of type "proto"
 func Listen(port int, proto string) {
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", port),
@@ -247,52 +242,14 @@ func Listen(port int, proto string) {
 		IdleTimeout:       3 * time.Second,
 	}
 
-	http.HandleFunc("/addClaim", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		addCorsHeaders(&w, r)
-
 		if r.Method == http.MethodPost {
-			claimHandler(w, r, "add")
+			httpHandler(w, r)
 		} else if r.Method != http.MethodOptions {
 			http.Error(w, "Not found", http.StatusNotFound)
 		}
 	})
-	http.HandleFunc("/genProof", func(w http.ResponseWriter, r *http.Request) {
-		addCorsHeaders(&w, r)
-
-		if r.Method == http.MethodPost {
-			claimHandler(w, r, "gen")
-		} else if r.Method != http.MethodOptions {
-			http.Error(w, "Not found", http.StatusNotFound)
-		}
-	})
-	http.HandleFunc("/checkProof", func(w http.ResponseWriter, r *http.Request) {
-		addCorsHeaders(&w, r)
-
-		if r.Method == http.MethodPost {
-			claimHandler(w, r, "check")
-		} else if r.Method != http.MethodOptions {
-			http.Error(w, "Not found", http.StatusNotFound)
-		}
-	})
-	http.HandleFunc("/getRoot", func(w http.ResponseWriter, r *http.Request) {
-		addCorsHeaders(&w, r)
-
-		if r.Method == http.MethodPost {
-			claimHandler(w, r, "root")
-		} else if r.Method != http.MethodOptions {
-			http.Error(w, "Not found", http.StatusNotFound)
-		}
-	})
-	http.HandleFunc("/dump", func(w http.ResponseWriter, r *http.Request) {
-		addCorsHeaders(&w, r)
-
-		if r.Method == http.MethodPost {
-			claimHandler(w, r, "dump")
-		} else if r.Method != http.MethodOptions {
-			http.Error(w, "Not found", http.StatusNotFound)
-		}
-	})
-
 	if proto == "https" {
 		log.Print("Starting server in https mode")
 		if err := srv.ListenAndServeTLS("server.crt", "server.key"); err != nil {

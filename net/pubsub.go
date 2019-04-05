@@ -1,18 +1,17 @@
 package net
 
 import (
-	"os"
 	"fmt"
-	"encoding/json"
+	"os"
+	"time"
 
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/vocdoni/go-dvote/batch"
 	"github.com/vocdoni/go-dvote/types"
 )
 
 type PubSubHandle struct {
-	topic string
-	subscription *shell.PubSubSubscription
+	c *types.Connection
+	s *shell.PubSubSubscription
 }
 
 func PsSubscribe(topic string) *shell.PubSubSubscription {
@@ -34,46 +33,34 @@ func PsPublish(topic, data string) error {
 	return nil
 }
 
-func (p *PubSubHandle) Init(topic string) error {
-	p.topic = topic
-	p.subscription = PsSubscribe(p.topic)
+func (p *PubSubHandle) Init() error {
+	p.s = PsSubscribe(p.c.Topic)
 	return nil
 }
 
-func (p *PubSubHandle) Listen() error {
-	var msg *shell.Message
+func (p *PubSubHandle) Listen(reciever chan<- types.Message, errors chan<- error) {
+	var psMessage *shell.Message
+	var msg types.Message
 	var err error
 	for {
-		msg, err = p.subscription.Next()
+		psMessage, err = p.s.Next()
 		if err != nil {
+			errors <- err
 			fmt.Fprintf(os.Stderr, "recieve error: %s", err)
-			return err
 		}
+		msg.Topic = p.c.Topic
+		msg.Data = psMessage.Data
+		msg.Address = psMessage.From.String()
+		msg.TimeStamp = time.Now()
 
-		payload := msg.Data
+		reciever <- msg
 
-		var e types.Envelope
-		var b types.Ballot
-
-		err = json.Unmarshal(payload, &e)
-		if err != nil {
-			return err
-		}
-
-		err = json.Unmarshal(e.Ballot, &b)
-		if err != nil {
-			return err
-		}
-
-		err = batch.Add(b)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("Got > " + string(payload))
 	}
 }
 
-func (p *PubSubHandle) Send(data string) error {
-	return PsPublish(p.topic, data)
+func (p *PubSubHandle) Send(data []byte, errors chan<- error) {
+	err := PsPublish(p.c.Topic, string(data))
+	if err != nil {
+		errors <- err
+	}
 }
