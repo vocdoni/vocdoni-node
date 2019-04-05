@@ -35,7 +35,7 @@ transport.Send(exampleMessage, sendErrors)
 ## Supported protocols
 Currently supported are PSS and PubSub. Websocket support is planned in the near future.
 
-###PSS
+### PSS
 The relevant Connection specifier fields for PSS are Topic, Kind, Key, and Address:
 ```
 exampleConnection := new(types.Connection)
@@ -47,7 +47,7 @@ exampleTransport, err := net.Init(transportType, exampleConnection)
 ```
 
 
-###Pubsub
+### Pubsub
 The relevant Connection specifier field for PubSub is the Topic:
 ```
 exampleConnection := new(types.Connection)
@@ -56,5 +56,5 @@ exampleTransport, err := net.Init(transportType, exampleConnection)
 //use as above
 ```
 
-###Websockets
+### Websockets
 Work in progress
