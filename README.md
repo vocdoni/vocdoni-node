@@ -1,17 +1,10 @@
 # go-dvote
 
+This repository contains a set of libraries and tools for the Vocdoni's backend infrastrucutre, as described [in the documentation](http://vocdoni.io/docs/#/).
 
-## votingRelay
+The list of components that are implemented by `go-dvote` are
 
-dVote library for Relay
-
-Includes a dummy generator. Example run:
-ipfs daemon &
-./go-dvote
-and in another shell:
-./generator/generator 1000
-
-
-## dVote-census
-
-Library to work with the creation and management of vocdoni census
++ Voting relay
++ Gateway
++ Bootnode
++ Census service
