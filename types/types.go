@@ -23,7 +23,7 @@ type Connection struct {
 	Port    string //specific port on which a transport should listen
 }
 
-type Store struct {
+type DataStore struct {
 	Datadir string
 }
 

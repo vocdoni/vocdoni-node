@@ -55,7 +55,6 @@ func (p *PubSubHandle) Listen(reciever chan<- types.Message, errors chan<- error
 		msg.TimeStamp = time.Now()
 
 		reciever <- msg
-
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	swarm "github.com/vocdoni/go-dvote/net/swarm"
+	swarm "github.com/vocdoni/go-dvote/swarm"
 )
 
 func main() {
@@ -15,7 +15,7 @@ func main() {
 		return
 	}
 
-	sn := new(swarm.SimplePss)
+	sn := new(swarm.SimpleSwarm)
 	err := sn.Init()
 	if err != nil {
 		fmt.Printf("%v\n", err)

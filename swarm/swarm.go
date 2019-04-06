@@ -125,7 +125,7 @@ type pssSub struct {
 	Address    string
 }
 
-type SimplePss struct {
+type SimpleSwarm struct {
 	Node       *node.Node
 	NodeConfig *node.Config
 	EnodeID    string
@@ -139,7 +139,7 @@ type SimplePss struct {
 	Ports      *swarmPorts
 }
 
-func (sn *SimplePss) SetLog(level string) error {
+func (sn *SimpleSwarm) SetLog(level string) error {
 	// ensure good log formats for terminal
 	// handle verbosity flag
 	loglevel, err := log.LvlFromString(level)
@@ -153,7 +153,7 @@ func (sn *SimplePss) SetLog(level string) error {
 	return nil
 }
 
-func (sn *SimplePss) PrintStats() {
+func (sn *SimpleSwarm) PrintStats() {
 	// statistics thread
 	go func() {
 		for {
@@ -169,15 +169,15 @@ func (sn *SimplePss) PrintStats() {
 	}()
 }
 
-func (sn *SimplePss) SetDatadir(datadir string) {
+func (sn *SimpleSwarm) SetDatadir(datadir string) {
 	sn.Datadir = datadir
 }
 
-func (sn *SimplePss) SetKey(key *ecdsa.PrivateKey) {
+func (sn *SimpleSwarm) SetKey(key *ecdsa.PrivateKey) {
 	sn.Key = key
 }
 
-func (sn *SimplePss) Init() error {
+func (sn *SimpleSwarm) Init() error {
 	var err error
 	if len(sn.Datadir) < 1 {
 		usr, err := user.Current()
@@ -229,6 +229,8 @@ func (sn *SimplePss) Init() error {
 			sn.Hive = a.Service.(*network.Hive)
 		case *pss.API:
 			sn.Pss = a.Service.(*pss.API)
+		default:
+			fmt.Printf("%v", a)
 		}
 	}
 
@@ -269,7 +271,7 @@ func strAddress(addr string) pss.PssAddress {
 	return pssAddress
 }
 
-func (sn *SimplePss) PssSub(subType, key, topic, address string) error {
+func (sn *SimpleSwarm) PssSub(subType, key, topic, address string) error {
 	pssTopic := strTopic(topic)
 	pssAddress := strAddress(address)
 	if subType == "sym" {
@@ -299,7 +301,7 @@ func (sn *SimplePss) PssSub(subType, key, topic, address string) error {
 	return nil
 }
 
-func (sn *SimplePss) PssPub(subType, key, topic, msg, address string) error {
+func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
 	var err error
 	dstAddr := strAddress(address)
 	dstTopic := strTopic(topic)

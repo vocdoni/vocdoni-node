@@ -11,11 +11,13 @@ import (
 )
 
 type IPFSHandle struct {
-	s *types.Store
+	s *types.DataStore
 }
 
-func (i *IPFSHandle) Init(){
-	return
+func (i *IPFSHandle) Init(s *types.DataStore) error {
+	i.s = s
+	//test that ipfs is running/working
+	return nil
 }
 
 func (i *IPFSHandle) Publish(object []byte) string {

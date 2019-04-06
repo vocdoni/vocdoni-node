@@ -2,10 +2,11 @@ package data
 
 import (
 	"errors"
+	"github.com/vocdoni/go-dvote/types"
 )
 
 type Storage interface {
-	Init() 
+	Init(d *types.DataStore) error
 	Publish(o []byte) string
 	Retrieve(id string) []byte
 }
@@ -28,17 +29,36 @@ func StorageIDFromString(i string) StorageID {
 	}
 }
 
-func Init(t StorageID) (Storage, error) {
+func InitDefault(t StorageID) (Storage, error) {
 	switch t {
 	case IPFS:
 		s := new(IPFSHandle)
-		s.Init()
+		defaultDataStore := new(types.DataStore)
+		defaultDataStore.Datadir = "this_is_still_ignored"
+		s.Init(defaultDataStore)
 		return s, nil
 	case BZZ:
 		s := new(BZZHandle)
-		s.Init()
+		defaultDataStore := new(types.DataStore)
+		defaultDataStore.Datadir = "this_is_still_ignored"
+		s.Init(defaultDataStore)
 		return s, nil
 	default:
 		return nil, errors.New("Bad storage type specification")
+	}
+}
+
+func Init(t StorageID, d *types.DataStore) (Storage, error) {
+	switch t {
+	case IPFS:
+		s := new(IPFSHandle)
+		s.Init(d)
+		return s, nil
+	case BZZ:
+		s := new(BZZHandle)
+		s.Init(d)
+		return s, nil
+	default:
+		return nil, errors.New("Bad storage type or DataStore specification")
 	}
 }

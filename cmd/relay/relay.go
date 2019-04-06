@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
-	"encoding/gob"
+//	"bytes"
+//	"encoding/gob"
 	"flag"
 	"fmt"
 	"os"
@@ -52,17 +52,24 @@ func main() {
 	batch.BatchSignal = batchSignal
 	batch.BatchSize = batchSize
 
-	listenerOutput := make(chan types.Message, 10)
+	listenerOutput := make(chan types.Message)
 	listenerErrors := make(chan error)
 
 	transport, err := net.InitDefault(transportType)
+	if err != nil {
+		os.Exit(1)
+	}
+	fmt.Println("after pss init")
+	fmt.Println("%v", transport)
+
 	storage, err := data.InitDefault(storageType)
 	if err != nil {
 		os.Exit(1)
 	}
+	_ = storage
 
-	go transport.Listen(listenerOutput, listenerErrors)
 	go batch.Recieve(listenerOutput)
+	go transport.Listen(listenerOutput, listenerErrors)
 
 	fmt.Println("Entering main loop")
 	for {
@@ -74,19 +81,20 @@ func main() {
 		case signal := <-batchSignal:
 			if signal == true {
 				fmt.Println("Signal triggered")
-				ns, bs := batch.Fetch()
-				buf := &bytes.Buffer{}
-				gob.NewEncoder(buf).Encode(bs)
-				bb := buf.Bytes()
-				cid := storage.Publish(bb)
-				fmt.Printf("Batch published at: %s \n", cid)
+				//ns, bs := batch.Fetch()
+				//buf := &bytes.Buffer{}
+				//gob.NewEncoder(buf).Encode(bs)
+				//bb := buf.Bytes()
+				//cid := storage.Publish(bb)
+				//fmt.Printf("Batch published at: %s \n", cid)
+
 				// add to chain
 				// announce to pubsub
 				//fmt.Println("Nullifiers:")
 				//fmt.Println(n)
 				//fmt.Println("Batch:")
 				//fmt.Println(b)
-				batch.Compact(ns)
+				//batch.Compact(ns)
 			}
 		case listenError := <-listenerErrors:
 			fmt.Println(listenError)

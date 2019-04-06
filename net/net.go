@@ -52,19 +52,15 @@ func Init(t TransportID, c *types.Connection) (Transport, error) {
 func InitDefault(t TransportID) (Transport, error) {
 	switch t {
 	case PubSub:
-		p := new(PubSubHandle)
 		defaultConnection := new(types.Connection)
 		defaultConnection.Topic = "vocdoni_testing"
-		Init(t, defaultConnection)
-		return p, nil
+		return Init(t, defaultConnection)
 	case PSS:
-		p := new(PSSHandle)
 		defaultConnection := new(types.Connection)
 		defaultConnection.Topic = "vocdoni_testing"
 		defaultConnection.Encryption = "sym"
 		defaultConnection.Key = ""
-		Init(t, defaultConnection)
-		return p, nil
+		return Init(t, defaultConnection)
 	//case Websockets:
 	default:
 		return nil, errors.New("Bad transport type ID")
