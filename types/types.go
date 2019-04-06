@@ -23,6 +23,10 @@ type Connection struct {
 	Port    string //specific port on which a transport should listen
 }
 
+type Store struct {
+	Datadir string
+}
+
 //Ballot represents the choices of one user in one voting process
 type Ballot struct {
 	Type      string

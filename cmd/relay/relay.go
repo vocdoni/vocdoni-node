@@ -24,6 +24,7 @@ var batchTimer *time.Ticker
 var batchSignal chan bool
 var signal bool
 var transportType net.TransportID
+var storageType data.StorageID
 
 func main() {
 
@@ -37,9 +38,13 @@ func main() {
 
 	//gather transport type flag
 	var transportIDString string
-	flag.StringVar(&transportIDString, "transport", "PSS", "Transport must be one of: PubSub, PSS, HTTP")
+	var storageIDString string
+	flag.StringVar(&transportIDString, "transport", "PSS", "Transport must be one of: PSS, PubSub")
+	flag.StringVar(&storageIDString, "storage", "BZZ", "Transport must be one of: BZZ, IPFS")
 	flag.Parse()
+
 	transportType = net.TransportIDFromString(transportIDString)
+	storageType = data.StorageIDFromString(storageIDString)
 
 	batchTimer = time.NewTicker(time.Second * time.Duration(batchSeconds))
 	batchSignal = make(chan bool)
@@ -47,16 +52,19 @@ func main() {
 	batch.BatchSignal = batchSignal
 	batch.BatchSize = batchSize
 
-	fmt.Println("Entering main loop")
-	transport, err := net.InitDefault(transportType)
 	listenerOutput := make(chan types.Message, 10)
 	listenerErrors := make(chan error)
+
+	transport, err := net.InitDefault(transportType)
+	storage, err := data.InitDefault(storageType)
 	if err != nil {
 		os.Exit(1)
 	}
 
 	go transport.Listen(listenerOutput, listenerErrors)
 	go batch.Recieve(listenerOutput)
+
+	fmt.Println("Entering main loop")
 	for {
 		select {
 		case <-batchTimer.C:
@@ -70,8 +78,7 @@ func main() {
 				buf := &bytes.Buffer{}
 				gob.NewEncoder(buf).Encode(bs)
 				bb := buf.Bytes()
-				cid := data.Publish(bb)
-				data.Pin(cid)
+				cid := storage.Publish(bb)
 				fmt.Printf("Batch published at: %s \n", cid)
 				// add to chain
 				// announce to pubsub
