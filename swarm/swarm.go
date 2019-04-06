@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/swarm"
 
 	swarmapi "github.com/ethereum/go-ethereum/swarm/api"
+	"github.com/ethereum/go-ethereum/swarm/api/client"
 	"github.com/ethereum/go-ethereum/swarm/network"
 	"github.com/ethereum/go-ethereum/swarm/pss"
 )
@@ -137,6 +138,8 @@ type SimpleSwarm struct {
 	PssTopics  map[string]*pssSub
 	Hive       *network.Hive
 	Ports      *swarmPorts
+	ListenAddr string
+	Client     *client.Client
 }
 
 func (sn *SimpleSwarm) SetLog(level string) error {
@@ -203,7 +206,7 @@ func (sn *SimpleSwarm) Init() error {
 	}
 
 	// create and register Swarm service
-	swarmNode, _, swarmHandler := newSwarm(sn.Key, sn.Datadir, sn.Ports.Bzz)
+	swarmNode, swarmConfig, swarmHandler := newSwarm(sn.Key, sn.Datadir, sn.Ports.Bzz)
 	err = sn.Node.Register(swarmHandler)
 	if err != nil {
 		return fmt.Errorf("swarm register fail %v", err)
@@ -222,6 +225,11 @@ func (sn *SimpleSwarm) Init() error {
 	defer cancel()
 	time.Sleep(time.Second * 5)
 
+	// establish swarm client
+	sn.ListenAddr = swarmConfig.ListenAddr
+	swarmURL := sn.ListenAddr + ":" + string(sn.Ports.HTTPRPC)
+	sn.Client = client.NewClient(swarmURL)
+
 	// Get the services API
 	for _, a := range swarmNode.APIs() {
 		switch a.Service.(type) {
@@ -230,7 +238,7 @@ func (sn *SimpleSwarm) Init() error {
 		case *pss.API:
 			sn.Pss = a.Service.(*pss.API)
 		default:
-			fmt.Printf("%v", a)
+			log.Info("interface: " + fmt.Sprintf("%T", a.Service))
 		}
 	}
 

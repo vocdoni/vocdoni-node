@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+
 	"github.com/vocdoni/go-dvote/types"
 
 	shell "github.com/ipfs/go-ipfs-api"
@@ -20,15 +21,14 @@ func (i *IPFSHandle) Init(s *types.DataStore) error {
 	return nil
 }
 
-func (i *IPFSHandle) Publish(object []byte) string {
+func (i *IPFSHandle) Publish(object []byte) (string, error) {
 	sh := shell.NewShell("localhost:5001")
 	cid, err := sh.Add(bytes.NewBuffer(object))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
-		os.Exit(1)
+		return "", err
 	}
 	i.pin(cid)
-	return cid
+	return cid, nil
 }
 
 func (i *IPFSHandle) pin(path string) {
@@ -40,18 +40,15 @@ func (i *IPFSHandle) pin(path string) {
 	}
 }
 
-func (i *IPFSHandle) Retrieve(hash string) []byte {
+func (i *IPFSHandle) Retrieve(hash string) ([]byte, error) {
 	sh := shell.NewShell("localhost:5001")
 	reader, err := sh.Cat(hash)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
-		os.Exit(1)
+		return nil, err
 	}
 	content, err := ioutil.ReadAll(reader)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
-		os.Exit(1)
+		return nil, err
 	}
-	return content
+	return content, nil
 }
-

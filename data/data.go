@@ -2,13 +2,14 @@ package data
 
 import (
 	"errors"
+
 	"github.com/vocdoni/go-dvote/types"
 )
 
 type Storage interface {
 	Init(d *types.DataStore) error
-	Publish(o []byte) string
-	Retrieve(id string) []byte
+	Publish(o []byte) (string, error)
+	Retrieve(id string) ([]byte, error)
 }
 
 type StorageID int
@@ -20,7 +21,7 @@ const (
 
 func StorageIDFromString(i string) StorageID {
 	switch i {
-	case "IPFS" :
+	case "IPFS":
 		return IPFS
 	case "BZZ":
 		return BZZ
