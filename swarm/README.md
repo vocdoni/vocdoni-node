@@ -11,14 +11,14 @@ Using Swarm/PSS as a devp2p standalone protocol is hard, so this library aims to
 
 Download the library.
 ```
-go get -u github.com/vocdoni/go-dvote/net/swarm
+go get -u github.com/vocdoni/go-dvote/swarm
 ```
 
 Import it from your GoLang code.
 
 ```
 import ( 
-  swarm "github.com/vocdoni/go-dvote/net/swarm" 
+  swarm "github.com/vocdoni/go-dvote/swarm" 
 )
 ```
 

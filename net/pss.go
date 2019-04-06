@@ -3,7 +3,7 @@ package net
 import (
 	"time"
 
-	"github.com/vocdoni/go-dvote/net/swarm"
+	"github.com/vocdoni/go-dvote/swarm"
 	"github.com/vocdoni/go-dvote/types"
 )
 
