@@ -16,7 +16,7 @@ func main() {
 	}
 
 	sn := new(swarm.SimpleSwarm)
-	err := sn.Init()
+	err := sn.InitPSS()
 	if err != nil {
 		fmt.Printf("%v\n", err)
 		return

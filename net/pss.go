@@ -3,7 +3,6 @@ package net
 import (
 	"fmt"
 	"time"
-	"errors"
 
 	"github.com/vocdoni/go-dvote/swarm"
 	"github.com/vocdoni/go-dvote/types"
@@ -17,7 +16,7 @@ type PSSHandle struct {
 func (p *PSSHandle) Init(c *types.Connection) error {
 	p.c = c
 	sn := new(swarm.SimpleSwarm)
-	err := sn.Init()
+	err := sn.InitPSS()
 	if err != nil {
 		return err
 	}
@@ -42,9 +41,10 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message, errorReciever chan<- e
 			msg.Data = pssMessage.Msg
 			msg.Address = pssMessage.Peer.String()
 			msg.TimeStamp = time.Now()
+			//add error check
 			reciever <- msg
 		default:
-			errorReciever <- errors.New("no msg")
+			continue
 		}
 
 	}

@@ -16,7 +16,7 @@ type BZZHandle struct {
 func (b *BZZHandle) Init(d *types.DataStore) error {
 	b.d = d
 	sn := new(swarm.SimpleSwarm)
-	err := sn.Init()
+	err := sn.InitBZZ()
 	if err != nil {
 		return err
 	}

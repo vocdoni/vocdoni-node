@@ -180,23 +180,28 @@ func (sn *SimpleSwarm) SetKey(key *ecdsa.PrivateKey) {
 	sn.Key = key
 }
 
-func (sn *SimpleSwarm) Init() error {
+func (sn *SimpleSwarm) InitBZZ() error {
 	var err error
 	if len(sn.Datadir) < 1 {
 		usr, err := user.Current()
 		if err != nil {
 			return err
 		}
-		sn.Datadir = usr.HomeDir + "/.dvote/swarm"
+		sn.Datadir = usr.HomeDir + "/.dvote/bzz"
 		os.MkdirAll(sn.Datadir, 0755)
 	}
 
 	sn.SetLog("info")
 	sn.Ports = NewSwarmPorts()
+	sn.Ports.Bzz += 100
+	sn.Ports.HTTPRPC += 100
+	sn.Ports.P2P += 100
+	sn.Ports.WebSockets += 100
 
 	// create node
+	fmt.Println("%v", sn.Ports)
 	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
-		sn.Ports.HTTPRPC, sn.Ports.WebSockets, sn.Datadir, "pss")
+		sn.Ports.HTTPRPC, sn.Ports.WebSockets, sn.Datadir, "")
 	if err != nil {
 		return err
 	}
@@ -206,7 +211,7 @@ func (sn *SimpleSwarm) Init() error {
 	}
 
 	// create and register Swarm service
-	swarmNode, swarmConfig, swarmHandler := newSwarm(sn.Key, sn.Datadir, sn.Ports.Bzz)
+	_, swarmConfig, swarmHandler := newSwarm(sn.Key, sn.Datadir, sn.Ports.Bzz)
 	err = sn.Node.Register(swarmHandler)
 	if err != nil {
 		return fmt.Errorf("swarm register fail %v", err)
@@ -229,6 +234,85 @@ func (sn *SimpleSwarm) Init() error {
 	sn.ListenAddr = swarmConfig.ListenAddr
 	swarmURL := sn.ListenAddr + ":" + string(sn.Ports.HTTPRPC)
 	sn.Client = client.NewClient(swarmURL)
+
+	// Get the services API
+	//for _, a := range swarmNode.APIs() {
+	//	switch a.Service.(type) {
+	//	case *network.Hive:
+	//		sn.Hive = a.Service.(*network.Hive)
+	//	case *pss.API:
+	//		sn.Pss = a.Service.(*pss.API)
+	//	default:
+	//		log.Info("interface: " + fmt.Sprintf("%T", a.Service))
+	//	}
+	//}
+
+	// Create topics map
+	//sn.PssTopics = make(map[string]*pssSub)
+
+	// Set some extra data
+	//sn.EnodeID = sn.Node.Server().NodeInfo().Enode
+	//sn.PssPubKey = hexutil.Encode(crypto.FromECDSAPub(sn.Pss.PublicKey()))
+	//sn.PssAddr, err = sn.Pss.BaseAddr()
+	//if err != nil {
+	//	return fmt.Errorf("pss API fail %v", err)
+	//}
+
+	// Print some information
+	//log.Info(fmt.Sprintf("My PSS pubkey is %s", sn.PssPubKey))
+	//log.Info(fmt.Sprintf("My PSS address is %x", sn.PssAddr))
+
+	// Run statistics goroutine
+	sn.PrintStats()
+
+	return nil
+}
+
+func (sn *SimpleSwarm) InitPSS() error {
+	var err error
+	if len(sn.Datadir) < 1 {
+		usr, err := user.Current()
+		if err != nil {
+			return err
+		}
+		sn.Datadir = usr.HomeDir + "/.dvote/pss"
+		os.MkdirAll(sn.Datadir, 0755)
+	}
+
+	sn.SetLog("info")
+	sn.Ports = NewSwarmPorts()
+
+	// create node
+	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
+		sn.Ports.HTTPRPC, sn.Ports.WebSockets, sn.Datadir, "pss")
+	if err != nil {
+		return err
+	}
+	// up to here is default parameter generation
+	// set node key, if not set use the storage one or generate it
+	if sn.Key == nil {
+		sn.Key = sn.NodeConfig.NodeKey()
+	}
+
+	// create and register Swarm service
+	swarmNode, _, swarmHandler := newSwarm(sn.Key, sn.Datadir, sn.Ports.Bzz)
+	err = sn.Node.Register(swarmHandler)
+	if err != nil {
+		return fmt.Errorf("swarm register fail %v", err)
+	}
+
+	// start the node
+	sn.Node.Start()
+	for _, url := range SwarmBootnodes {
+		log.Info("Add bootnode " + url)
+		node, _ := enode.ParseV4(url)
+		sn.Node.Server().AddPeer(node)
+	}
+
+	// wait to connect to the p2p network
+	_, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	time.Sleep(time.Second * 5)
 
 	// Get the services API
 	for _, a := range swarmNode.APIs() {
