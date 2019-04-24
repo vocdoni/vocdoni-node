@@ -74,7 +74,7 @@ func newNode(key *ecdsa.PrivateKey, port int, httpport int, wsport int,
 	return stack, cfg, nil
 }
 
-func newSwarm(privkey *ecdsa.PrivateKey, datadir string, port int) (*swarm.Swarm, *swarmapi.Config, node.ServiceConstructor) {
+func newSwarm(privkey *ecdsa.PrivateKey, nodekey *ecdsa.PrivateKey, datadir string, port int) (*swarm.Swarm, *swarmapi.Config, node.ServiceConstructor) {
 	// create swarm service
 	swarmCfg := swarmapi.NewConfig()
 	swarmCfg.SyncEnabled = true
@@ -85,7 +85,7 @@ func newSwarm(privkey *ecdsa.PrivateKey, datadir string, port int) (*swarm.Swarm
 	swarmCfg.Pss.MsgTTL = time.Second * 10
 	swarmCfg.Pss.CacheTTL = time.Second * 30
 	swarmCfg.Pss.AllowRaw = true
-	swarmCfg.Init(privkey)
+	swarmCfg.Init(privkey, nodekey)
 	swarmNode, err := swarm.NewSwarm(swarmCfg, nil)
 	if err != nil {
 		log.Crit("cannot crate swarm node")
@@ -132,6 +132,7 @@ type SimpleSwarm struct {
 	EnodeID    string
 	Datadir    string
 	Key        *ecdsa.PrivateKey
+	NodeKey    *ecdsa.PrivateKey
 	Pss        *pss.API
 	PssPubKey  string
 	PssAddr    pss.PssAddress
@@ -187,7 +188,7 @@ func (sn *SimpleSwarm) InitBZZ() error {
 		if err != nil {
 			return err
 		}
-		sn.Datadir = usr.HomeDir + "/.dvote/bzz"
+		sn.Datadir = usr.HomeDir + "/.dvote/swarm"
 		os.MkdirAll(sn.Datadir, 0755)
 	}
 
@@ -198,6 +199,35 @@ func (sn *SimpleSwarm) InitBZZ() error {
 	sn.Ports.P2P += 100
 	sn.Ports.WebSockets += 100
 
+	// set private key
+	keypath := sn.Datadir + "/ecdsa.key"
+	if _, err := os.Stat(keypath); err == nil {
+		// load key
+		prvKey, err := crypto.LoadECDSA(keypath)
+		if err != nil {
+			return err
+		}
+		sn.Key = prvKey
+
+	} else if os.IsNotExist(err) {
+		// generate and store key
+		newKey, err := crypto.GenerateKey()
+		if err != nil {
+			return err
+		}
+		//write to file
+		err = crypto.SaveECDSA(keypath, newKey)
+		if err != nil {
+			return err
+		}
+		sn.Key = newKey
+
+	} else {
+		// Schrodinger: file may or may not exist. See err for details.
+		// this could be caused by permissions errors or a failing disk
+		return err
+	}
+
 	// create node
 	fmt.Println("%v", sn.Ports)
 	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
@@ -205,13 +235,14 @@ func (sn *SimpleSwarm) InitBZZ() error {
 	if err != nil {
 		return err
 	}
+
 	// set node key, if not set use the storage one or generate it
-	if sn.Key == nil {
-		sn.Key = sn.NodeConfig.NodeKey()
+	if sn.NodeKey == nil {
+		sn.NodeKey = sn.NodeConfig.NodeKey()
 	}
 
 	// create and register Swarm service
-	_, swarmConfig, swarmHandler := newSwarm(sn.Key, sn.Datadir, sn.Ports.Bzz)
+	_, swarmConfig, swarmHandler := newSwarm(sn.Key, sn.NodeKey, sn.Datadir, sn.Ports.Bzz)
 	err = sn.Node.Register(swarmHandler)
 	if err != nil {
 		return fmt.Errorf("swarm register fail %v", err)
@@ -295,7 +326,7 @@ func (sn *SimpleSwarm) InitPSS() error {
 	}
 
 	// create and register Swarm service
-	swarmNode, _, swarmHandler := newSwarm(sn.Key, sn.Datadir, sn.Ports.Bzz)
+	swarmNode, _, swarmHandler := newSwarm(sn.Key, sn.NodeKey, sn.Datadir, sn.Ports.Bzz)
 	err = sn.Node.Register(swarmHandler)
 	if err != nil {
 		return fmt.Errorf("swarm register fail %v", err)
