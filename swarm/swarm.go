@@ -188,7 +188,7 @@ func (sn *SimpleSwarm) InitBZZ() error {
 		if err != nil {
 			return err
 		}
-		sn.Datadir = usr.HomeDir + "/.dvote/swarm"
+		sn.Datadir = usr.HomeDir + "/.dvote/bzz"
 		os.MkdirAll(sn.Datadir, 0755)
 	}
 
@@ -312,6 +312,33 @@ func (sn *SimpleSwarm) InitPSS() error {
 
 	sn.SetLog("info")
 	sn.Ports = NewSwarmPorts()
+	keypath := sn.Datadir + "/ecdsa.key"
+	if _, err := os.Stat(keypath); err == nil {
+		// load key
+		prvKey, err := crypto.LoadECDSA(keypath)
+		if err != nil {
+			return err
+		}
+		sn.Key = prvKey
+
+	} else if os.IsNotExist(err) {
+		// generate and store key
+		newKey, err := crypto.GenerateKey()
+		if err != nil {
+			return err
+		}
+		//write to file
+		err = crypto.SaveECDSA(keypath, newKey)
+		if err != nil {
+			return err
+		}
+		sn.Key = newKey
+
+	} else {
+		// Schrodinger: file may or may not exist. See err for details.
+		// this could be caused by permissions errors or a failing disk
+		return err
+	}
 
 	// create node
 	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
@@ -319,10 +346,10 @@ func (sn *SimpleSwarm) InitPSS() error {
 	if err != nil {
 		return err
 	}
-	// up to here is default parameter generation
+
 	// set node key, if not set use the storage one or generate it
-	if sn.Key == nil {
-		sn.Key = sn.NodeConfig.NodeKey()
+	if sn.NodeKey == nil {
+		sn.NodeKey = sn.NodeConfig.NodeKey()
 	}
 
 	// create and register Swarm service
