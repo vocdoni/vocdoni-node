@@ -2,6 +2,7 @@ package types
 
 import (
 	"time"
+	"net"
 )
 
 //Message is a wrapper for messages from various net transport modules
@@ -10,6 +11,7 @@ type Message struct {
 	Data      []byte
 	Address   string //this is the address of the other side
 	TimeStamp time.Time
+	Conn	  net.Conn
 }
 
 //Connection describes the settings for any of the transports defined in the net module, note that not all

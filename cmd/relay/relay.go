@@ -1,8 +1,8 @@
 package main
 
 import (
-//	"bytes"
-//	"encoding/gob"
+	"bytes"
+	"encoding/gob"
 	"flag"
 	"fmt"
 	"os"
@@ -59,8 +59,6 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	fmt.Println("after pss init")
-	fmt.Println("%v", transport)
 
 	storage, err := data.InitDefault(storageType)
 	if err != nil {
@@ -68,6 +66,12 @@ func main() {
 	}
 	_ = storage
 
+	ws, err := net.InitDefault(net.TransportIDFromString("Websocket"))
+	if err != nil {
+		os.Exit(1)
+	}
+	
+	go ws.Listen(listenerOutput, listenerErrors)
 	go batch.Recieve(listenerOutput)
 	go transport.Listen(listenerOutput, listenerErrors)
 
@@ -81,12 +85,15 @@ func main() {
 		case signal := <-batchSignal:
 			if signal == true {
 				fmt.Println("Signal triggered")
-				//ns, bs := batch.Fetch()
-				//buf := &bytes.Buffer{}
-				//gob.NewEncoder(buf).Encode(bs)
-				//bb := buf.Bytes()
-				//cid := storage.Publish(bb)
-				//fmt.Printf("Batch published at: %s \n", cid)
+				_, bs := batch.Fetch()
+				buf := &bytes.Buffer{}
+				gob.NewEncoder(buf).Encode(bs)
+				bb := buf.Bytes()
+				cid, err := storage.Publish(bb)
+				if err != nil {
+					fmt.Printf("Storage error: %s", err)
+				}
+				fmt.Printf("Batch published at: %s \n", cid)
 
 				// add to chain
 				// announce to pubsub
