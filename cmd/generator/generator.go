@@ -2,17 +2,21 @@ package main
 
 import (
 	"os"
-	"strconv"
 	"time"
+	"flag"
+	"io"
+	"log"
 	"fmt"
 	"math/rand"
 	"encoding/json"
 	"encoding/base64"
+	"net/url"
+	"github.com/gorilla/websocket"
 //	"net/http"
 //	"bytes"
 //	"io/ioutil"
 	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/net"
+//	"github.com/vocdoni/go-dvote/net"
 )
 
 func makeBallot() string {
@@ -72,20 +76,55 @@ func makeEnvelope(ballot string) string {
 }
 
 func main() {
-	interval := os.Args[1]
-	i, _ := strconv.Atoi(interval)
-	timer := time.NewTicker(time.Millisecond * time.Duration(i))
+	var target = flag.String("target", "127.0.0.1:8080", "target IP and port")
+	var connections = flag.Int("conn", 1, "number of separate connections")
+	var interval = flag.Int("interval", 1000, "interval between requests in ms")
+
+	flag.Usage = func() {
+		io.WriteString(os.Stderr, `Websockets client generator
+		Example usage: ./generator -target=172.17.0.1 -conn=10 -interval=100
+		`)
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	timer := time.NewTicker(time.Millisecond * time.Duration(*interval))
 	rand.Seed(time.Now().UnixNano())
-	topic := "vocdoni_pubsub_testing"
-	fmt.Println("PubSub Topic:>", topic)
+	//topic := "vocdoni_pubsub_testing"
+	//fmt.Println("PubSub Topic:>", topic)
+	u := url.URL{Scheme: "ws", Host: *target, Path: "/vocdoni"}
 
+	var conns []*websocket.Conn
+	for i := 0; i < *connections; i++ {
+		c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+		if err != nil {
+			log.Printf("Failed to connect", i, err)
+			break
+		}
+		conns = append(conns, c)
+		defer func() {
+			c.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second))
+			time.Sleep(time.Second)
+			c.Close()
+		}()
+	}
 
+	log.Printf("Finished initializing %d connections", len(conns))
+
+	i := 0
 	for {
 		select {
 		case <- timer.C:
 			var jsonStr = makeEnvelope(makeBallot())
-			fmt.Println(jsonStr)
-			net.PsPublish(topic, jsonStr)
+			log.Printf("Conn %d sending message %s", i % *connections, jsonStr)
+			log.Printf("%v", conns)
+			conn := conns[i % *connections]
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second*5)); err != nil {
+				fmt.Printf("Failed to receive pong: %v", err)
+			}
+			conn.WriteMessage(websocket.TextMessage, []byte(jsonStr))
+			i++
+			log.Printf("Sent!")
 		default:
 			continue
 		}

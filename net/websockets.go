@@ -40,6 +40,8 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 		return err
 	}
 
+	log.Printf("resource limits set")
+
 	// Start epoll
 	var err error
 	w.e, err = epoll.MkEpoll()
@@ -47,12 +49,14 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 		return err
 	}
 
-	//go w.Listen()
-
 	http.HandleFunc(c.Path, w.upgrader)
-	if err := http.ListenAndServe(c.Address + ":" + c.Port, nil); err != nil {
-		return err
-	}
+	log.Printf("handler set")
+	go func() {
+		log.Fatal(http.ListenAndServe(c.Address + ":" + c.Port, nil))
+	}()
+
+	log.Printf("listener started")
+
 	return nil
 }
 

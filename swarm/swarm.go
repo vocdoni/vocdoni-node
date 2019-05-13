@@ -199,34 +199,36 @@ func (sn *SimpleSwarm) InitBZZ() error {
 	sn.Ports.P2P += 100
 	sn.Ports.WebSockets += 100
 
-	// set private key
-	keypath := sn.Datadir + "/ecdsa.key"
-	if _, err := os.Stat(keypath); err == nil {
-		// load key
-		prvKey, err := crypto.LoadECDSA(keypath)
-		if err != nil {
-			return err
-		}
-		sn.Key = prvKey
+	/*
+		// set private key
+		keypath := sn.Datadir + "/ecdsa.key"
+		if _, err := os.Stat(keypath); err == nil {
+			// load key
+			prvKey, err := crypto.LoadECDSA(keypath)
+			if err != nil {
+				return err
+			}
+			sn.Key = prvKey
 
-	} else if os.IsNotExist(err) {
-		// generate and store key
-		newKey, err := crypto.GenerateKey()
-		if err != nil {
-			return err
-		}
-		//write to file
-		err = crypto.SaveECDSA(keypath, newKey)
-		if err != nil {
-			return err
-		}
-		sn.Key = newKey
+		} else if os.IsNotExist(err) {
+			// generate and store key
+			newKey, err := crypto.GenerateKey()
+			if err != nil {
+				return err
+			}
+			//write to file
+			err = crypto.SaveECDSA(keypath, newKey)
+			if err != nil {
+				return err
+			}
+			sn.Key = newKey
 
-	} else {
-		// Schrodinger: file may or may not exist. See err for details.
-		// this could be caused by permissions errors or a failing disk
-		return err
-	}
+		} else {
+			// Schrodinger: file may or may not exist. See err for details.
+			// this could be caused by permissions errors or a failing disk
+			return err
+		}
+	*/
 
 	// create node
 	fmt.Println("%v", sn.Ports)
@@ -242,7 +244,7 @@ func (sn *SimpleSwarm) InitBZZ() error {
 	}
 
 	// create and register Swarm service
-	_, swarmConfig, swarmHandler := newSwarm(sn.Key, sn.NodeKey, sn.Datadir, sn.Ports.Bzz)
+	_, swarmConfig, swarmHandler := newSwarm(sn.NodeKey, sn.NodeKey, sn.Datadir, sn.Ports.Bzz)
 	err = sn.Node.Register(swarmHandler)
 	if err != nil {
 		return fmt.Errorf("swarm register fail %v", err)
@@ -312,33 +314,35 @@ func (sn *SimpleSwarm) InitPSS() error {
 
 	sn.SetLog("info")
 	sn.Ports = NewSwarmPorts()
-	keypath := sn.Datadir + "/ecdsa.key"
-	if _, err := os.Stat(keypath); err == nil {
-		// load key
-		prvKey, err := crypto.LoadECDSA(keypath)
-		if err != nil {
-			return err
-		}
-		sn.Key = prvKey
+	/*
+		keypath := sn.Datadir + "/ecdsa.key"
+		if _, err := os.Stat(keypath); err == nil {
+			// load key
+			prvKey, err := crypto.LoadECDSA(keypath)
+			if err != nil {
+				return err
+			}
+			sn.Key = prvKey
 
-	} else if os.IsNotExist(err) {
-		// generate and store key
-		newKey, err := crypto.GenerateKey()
-		if err != nil {
-			return err
-		}
-		//write to file
-		err = crypto.SaveECDSA(keypath, newKey)
-		if err != nil {
-			return err
-		}
-		sn.Key = newKey
+		} else if os.IsNotExist(err) {
+			// generate and store key
+			newKey, err := crypto.GenerateKey()
+			if err != nil {
+				return err
+			}
+			//write to file
+			err = crypto.SaveECDSA(keypath, newKey)
+			if err != nil {
+				return err
+			}
+			sn.Key = newKey
 
-	} else {
-		// Schrodinger: file may or may not exist. See err for details.
-		// this could be caused by permissions errors or a failing disk
-		return err
-	}
+		} else {
+			// Schrodinger: file may or may not exist. See err for details.
+			// this could be caused by permissions errors or a failing disk
+			return err
+		}
+	*/
 
 	// create node
 	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
@@ -353,7 +357,7 @@ func (sn *SimpleSwarm) InitPSS() error {
 	}
 
 	// create and register Swarm service
-	swarmNode, _, swarmHandler := newSwarm(sn.Key, sn.NodeKey, sn.Datadir, sn.Ports.Bzz)
+	swarmNode, _, swarmHandler := newSwarm(sn.NodeKey, sn.NodeKey, sn.Datadir, sn.Ports.Bzz)
 	err = sn.Node.Register(swarmHandler)
 	if err != nil {
 		return fmt.Errorf("swarm register fail %v", err)

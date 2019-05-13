@@ -55,25 +55,28 @@ func main() {
 	listenerOutput := make(chan types.Message)
 	listenerErrors := make(chan error)
 
+	fmt.Println("initializing transport:")
 	transport, err := net.InitDefault(transportType)
 	if err != nil {
 		os.Exit(1)
 	}
 
+	fmt.Println("initializing storage:")
 	storage, err := data.InitDefault(storageType)
 	if err != nil {
 		os.Exit(1)
 	}
 	_ = storage
 
+	fmt.Println("initializing websockets:")
 	ws, err := net.InitDefault(net.TransportIDFromString("Websocket"))
 	if err != nil {
 		os.Exit(1)
 	}
-	
-	go ws.Listen(listenerOutput, listenerErrors)
+
 	go batch.Recieve(listenerOutput)
 	go transport.Listen(listenerOutput, listenerErrors)
+	go ws.Listen(listenerOutput, listenerErrors)
 
 	fmt.Println("Entering main loop")
 	for {
