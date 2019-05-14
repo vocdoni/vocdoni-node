@@ -79,7 +79,7 @@ func main() {
 	go batch.Recieve(routerOutput)
 	go transport.Listen(listenerOutput, listenerErrors)
 	go ws.Listen(listenerOutput, listenerErrors)
-	go net.Route(listenerOutput, routerOutput, storage)
+	go net.Route(listenerOutput, routerOutput, listenerErrors, storage, ws)
 
 	fmt.Println("Entering main loop")
 	for {

@@ -9,12 +9,8 @@ import (
 
 type Transport interface {
 	Listen(reciever chan<- types.Message, errors chan<- error)
+	Send(msg types.Message, erros chan<- error)
 	Init(c *types.Connection) error
-}
-
-type RWTransport interface {
-	Transport
-	Send(msg []byte, errors chan<- error)
 }
 
 type TransportID int

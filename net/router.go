@@ -3,15 +3,15 @@ package net
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/vocdoni/go-dvote/data"
 	"github.com/vocdoni/go-dvote/types"
 
-	//	"github.com/vocdoni/go-dvote/net"
 	"encoding/json"
 )
 
-func Route(inbound <-chan types.Message, outbound chan<- types.Message, storage data.Storage) {
+func Route(inbound <-chan types.Message, outbound chan<- types.Message, errors chan<- error, storage data.Storage, wsTransport Transport) {
 	for {
 		select {
 		case msg := <-inbound:
@@ -32,6 +32,12 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, storage 
 			}
 			method := fmt.Sprintf("%v", requestMap["method"])
 			switch method {
+			case "ping":
+				reply := new(types.Message)
+				reply.TimeStamp = time.Now()
+				reply.Data = []byte("pong")
+				reply.Context = msg.Context
+				wsTransport.Send(*reply, errors)
 			case "fetchFile":
 				content, err := storage.Retrieve(fmt.Sprintf("%v", jsonMap["uri"]))
 				if err != nil {

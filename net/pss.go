@@ -52,9 +52,9 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message, errorReciever chan<- e
 	}
 }
 
-func (p *PSSHandle) Send(msg []byte, errors chan<- error) {
+func (p *PSSHandle) Send(msg types.Message, errors chan<- error) {
 
-	err := p.s.PssPub(p.c.Encryption, p.c.Key, p.c.Topic, string(msg), p.c.Address)
+	err := p.s.PssPub(p.c.Encryption, p.c.Key, p.c.Topic, string(msg.Data), p.c.Address)
 	if err != nil {
 		errors <- err
 	}

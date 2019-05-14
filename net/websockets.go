@@ -89,3 +89,7 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message, errorReciever ch
 		}
 	}
 }
+
+func (w *WebsocketHandle) Send(msg types.Message, erros chan<- error) {
+	wsutil.WriteServerMessage(*msg.Context.(types.WebsocketContext).Conn, ws.OpBinary, msg.Data)
+}
