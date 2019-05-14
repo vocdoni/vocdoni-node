@@ -25,6 +25,9 @@ require (
 	github.com/ethereum/go-ethereum v1.8.22-0.20190513125017-07d2d83c315a
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20190403181518-312b5175032f // indirect
+	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
+	github.com/gobwas/pool v0.2.0 // indirect
+	github.com/gobwas/ws v1.0.0
 	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
@@ -102,7 +105,7 @@ require (
 	golang.org/x/mobile v0.0.0-20190509164839-32b2708ab171 // indirect
 	golang.org/x/net v0.0.0-20190509222800-a4d6f7feada5 // indirect
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a // indirect
-	golang.org/x/sys v0.0.0-20190509141414-a5b02f93d862 // indirect
+	golang.org/x/sys v0.0.0-20190509141414-a5b02f93d862
 	golang.org/x/text v0.3.2 // indirect
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
 	golang.org/x/tools v0.0.0-20190513233021-7d589f28aaf4 // indirect
