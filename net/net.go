@@ -17,7 +17,6 @@ type RWTransport interface {
 	Send(msg []byte, errors chan<- error)
 }
 
-
 type TransportID int
 
 const (
@@ -75,7 +74,7 @@ func InitDefault(t TransportID) (Transport, error) {
 		defaultConnection := new(types.Connection)
 		defaultConnection.Address = "0.0.0.0"
 		defaultConnection.Path = "/vocdoni"
-		defaultConnection.Port = "8080"
+		defaultConnection.Port = "9000"
 		return Init(t, defaultConnection)
 	default:
 		return nil, errors.New("Bad transport type ID")

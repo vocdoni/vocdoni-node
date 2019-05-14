@@ -40,7 +40,7 @@ func main() {
 	var transportIDString string
 	var storageIDString string
 	flag.StringVar(&transportIDString, "transport", "PSS", "Transport must be one of: PSS, PubSub")
-	flag.StringVar(&storageIDString, "storage", "BZZ", "Transport must be one of: BZZ, IPFS")
+	flag.StringVar(&storageIDString, "storage", "IPFS", "Transport must be one of: BZZ, IPFS")
 	flag.Parse()
 
 	transportType = net.TransportIDFromString(transportIDString)
@@ -54,6 +54,8 @@ func main() {
 
 	listenerOutput := make(chan types.Message)
 	listenerErrors := make(chan error)
+
+	routerOutput := make(chan types.Message)
 
 	fmt.Println("initializing transport:")
 	transport, err := net.InitDefault(transportType)
@@ -74,9 +76,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	go batch.Recieve(listenerOutput)
+	go batch.Recieve(routerOutput)
 	go transport.Listen(listenerOutput, listenerErrors)
 	go ws.Listen(listenerOutput, listenerErrors)
+	go net.Route(listenerOutput, routerOutput, storage)
 
 	fmt.Println("Entering main loop")
 	for {

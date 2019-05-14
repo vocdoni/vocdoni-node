@@ -2,9 +2,8 @@ package data
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io/ioutil"
-	"os"
 
 	"github.com/vocdoni/go-dvote/types"
 
@@ -12,47 +11,59 @@ import (
 )
 
 type IPFSHandle struct {
-	s *types.DataStore
+	d *types.DataStore
+	s *shell.Shell
+	//can we add a shell here for use by all methods?
 }
 
-func (i *IPFSHandle) Init(s *types.DataStore) error {
-	i.s = s
+func (i *IPFSHandle) Init(d *types.DataStore) error {
+	i.d = d
+	i.s = shell.NewShell("localhost:5001")
+	if i.s.IsUp() {
+		return nil
+	}
 	//test that ipfs is running/working
-	return nil
+	return errors.New("Could not connect to IPFS daemon")
 }
 
 func (i *IPFSHandle) Publish(object []byte) (string, error) {
-	sh := shell.NewShell("localhost:5001")
-	cid, err := sh.Add(bytes.NewBuffer(object))
+	cid, err := i.s.Add(bytes.NewBuffer(object))
 	if err != nil {
 		return "", err
 	}
 	return cid, nil
 }
 
-func (i *IPFSHandle) Pin(path string) {
+func (i *IPFSHandle) Pin(path string) error {
 	sh := shell.NewShell("localhost:5001")
 	err := sh.Pin(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
+		return err
 	}
+	return nil
 }
 
-func (i *IPFSHandle) Unpin(path string) {
+func (i *IPFSHandle) Unpin(path string) error {
 	sh := shell.NewShell("localhost:5001")
 	err := sh.Unpin(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
+		return err
 	}
+	return nil
 }
 
-func (i *IPFSHandle) Pins() map[string]shell.PinInfo {
+func (i *IPFSHandle) ListPins() (map[string]string, error) {
 	sh := shell.NewShell("localhost:5001")
 	info, err := sh.Pins()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
+		return nil, err
 	}
-	return info
+	var pinMap map[string]string
+	pinMap = make(map[string]string)
+	for k, c := range info {
+		pinMap[k] = c.Type
+	}
+	return pinMap, nil
 }
 
 func (i *IPFSHandle) Retrieve(hash string) ([]byte, error) {

@@ -53,7 +53,7 @@ func makeBallot() string {
 func makeEnvelope(ballot string) string {
 	var env types.Envelope
 
-	env.Type = "envelope0"
+	env.Type = "zk-snarks-envelope"
 
 	env.Nonce = rand.Uint64()
 
@@ -76,7 +76,7 @@ func makeEnvelope(ballot string) string {
 }
 
 func main() {
-	var target = flag.String("target", "127.0.0.1:8080", "target IP and port")
+	var target = flag.String("target", "127.0.0.1:9000", "target IP and port")
 	var connections = flag.Int("conn", 1, "number of separate connections")
 	var interval = flag.Int("interval", 1000, "interval between requests in ms")
 

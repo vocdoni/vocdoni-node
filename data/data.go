@@ -10,6 +10,9 @@ type Storage interface {
 	Init(d *types.DataStore) error
 	Publish(o []byte) (string, error)
 	Retrieve(id string) ([]byte, error)
+	Pin(path string) error
+	Unpin(path string) error
+	ListPins() (map[string]string, error)
 }
 
 type StorageID int
