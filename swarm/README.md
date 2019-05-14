@@ -11,14 +11,14 @@ Using Swarm/PSS as a devp2p standalone protocol is hard, so this library aims to
 
 Download the library.
 ```
-go get -u github.com/vocdoni/go-dvote/net/swarm
+go get -u github.com/vocdoni/go-dvote/swarm
 ```
 
 Import it from your GoLang code.
 
 ```
 import ( 
-  swarm "github.com/vocdoni/go-dvote/net/swarm" 
+  swarm "github.com/vocdoni/go-dvote/swarm" 
 )
 ```
 
@@ -29,7 +29,7 @@ Create a simplePSS instance
 sn := new(swarm.SimplePss)
 ```
 
-Initialize and stard the swarm process. This will start the p2p protocol and automatically connect to the swarm network.
+Initialize and start the swarm process. This will start the p2p protocol and automatically connect to the swarm network.
 ```
 err := sn.Init()
 ```

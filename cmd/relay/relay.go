@@ -25,6 +25,7 @@ var batchTimer *time.Ticker
 var batchSignal chan bool
 var signal bool
 var transportType net.TransportID
+var storageType data.StorageID
 
 func main() {
 
@@ -38,9 +39,13 @@ func main() {
 
 	//gather transport type flag
 	var transportIDString string
-	flag.StringVar(&transportIDString, "transport", "PSS", "Transport must be one of: PubSub, PSS, HTTP")
+	var storageIDString string
+	flag.StringVar(&transportIDString, "transport", "PSS", "Transport must be one of: PSS, PubSub")
+	flag.StringVar(&storageIDString, "storage", "BZZ", "Transport must be one of: BZZ, IPFS")
 	flag.Parse()
+
 	transportType = net.TransportIDFromString(transportIDString)
+	storageType = data.StorageIDFromString(storageIDString)
 
 	batchTimer = time.NewTicker(time.Second * time.Duration(batchSeconds))
 	batchSignal = make(chan bool)
@@ -48,19 +53,33 @@ func main() {
 	batch.BatchSignal = batchSignal
 	batch.BatchSize = batchSize
 
-	node, err := chain.Init()
-	node.Start()
-
-	fmt.Println("Entering main loop")
-	transport, err := net.Init(transportType)
-	listenerOutput := make(chan types.Message, 10)
+	listenerOutput := make(chan types.Message)
 	listenerErrors := make(chan error)
+
+	fmt.Println("initializing transport:")
+	transport, err := net.InitDefault(transportType)
 	if err != nil {
 		os.Exit(1)
 	}
 
-	go transport.Listen(listenerOutput, listenerErrors)
+	fmt.Println("initializing storage:")
+	storage, err := data.InitDefault(storageType)
+	if err != nil {
+		os.Exit(1)
+	}
+	_ = storage
+
+	fmt.Println("initializing websockets:")
+	ws, err := net.InitDefault(net.TransportIDFromString("Websocket"))
+	if err != nil {
+		os.Exit(1)
+	}
+
 	go batch.Recieve(listenerOutput)
+	go transport.Listen(listenerOutput, listenerErrors)
+	go ws.Listen(listenerOutput, listenerErrors)
+
+	fmt.Println("Entering main loop")
 	for {
 		select {
 		case <-batchTimer.C:
@@ -70,21 +89,22 @@ func main() {
 		case signal := <-batchSignal:
 			if signal == true {
 				fmt.Println("Signal triggered")
-				ns, bs := batch.Fetch()
+				_, bs := batch.Fetch()
 				buf := &bytes.Buffer{}
 				gob.NewEncoder(buf).Encode(bs)
 				bb := buf.Bytes()
-				cid := data.Publish(bb)
-				data.Pin(cid)
+				cid, err := storage.Publish(bb)
+				if err != nil {
+					fmt.Printf("Storage error: %s", err)
+				}
 				fmt.Printf("Batch published at: %s \n", cid)
-				node.LinkBatch([]byte(cid))
 				// add to chain
 				// announce to pubsub
 				//fmt.Println("Nullifiers:")
 				//fmt.Println(n)
 				//fmt.Println("Batch:")
 				//fmt.Println(b)
-				batch.Compact(ns)
+				//batch.Compact(ns)
 			}
 		case listenError := <-listenerErrors:
 			fmt.Println(listenError)

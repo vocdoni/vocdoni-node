@@ -1,49 +1,65 @@
 package data
 
 import (
-	"bytes"
-	"fmt"
-	"io/ioutil"
-	"os"
+	"errors"
 
-	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/vocdoni/go-dvote/types"
 )
 
 type Storage interface {
-	Publish(o []byte) string
-	Retrieve(id string) []byte
+	Init(d *types.DataStore) error
+	Publish(o []byte) (string, error)
+	Retrieve(id string) ([]byte, error)
 }
 
-func Publish(object []byte) string {
-	sh := shell.NewShell("localhost:5001")
-	cid, err := sh.Add(bytes.NewBuffer(object))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
-		os.Exit(1)
+type StorageID int
+
+const (
+	IPFS StorageID = iota + 1
+	BZZ
+)
+
+func StorageIDFromString(i string) StorageID {
+	switch i {
+	case "IPFS":
+		return IPFS
+	case "BZZ":
+		return BZZ
+	default:
+		return -1
 	}
-	return cid
 }
 
-func Pin(path string) {
-	sh := shell.NewShell("localhost:5001")
-	err := sh.Pin(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
-		os.Exit(1)
+func InitDefault(t StorageID) (Storage, error) {
+	switch t {
+	case IPFS:
+		s := new(IPFSHandle)
+		defaultDataStore := new(types.DataStore)
+		defaultDataStore.Datadir = "this_is_still_ignored"
+		s.Init(defaultDataStore)
+		return s, nil
+	case BZZ:
+		s := new(BZZHandle)
+		defaultDataStore := new(types.DataStore)
+		defaultDataStore.Datadir = "this_is_still_ignored"
+		s.Init(defaultDataStore)
+		return s, nil
+	default:
+		return nil, errors.New("Bad storage type specification")
 	}
 }
 
-func Retrieve(hash string) []byte {
-	sh := shell.NewShell("localhost:5001")
-	reader, err := sh.Cat(hash)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
-		os.Exit(1)
+func Init(t StorageID, d *types.DataStore) (Storage, error) {
+	switch t {
+	case IPFS:
+		s := new(IPFSHandle)
+		s.Init(d)
+		return s, nil
+	case BZZ:
+		s := new(BZZHandle)
+		s.Init(d)
+		return s, nil
+	default:
+		return nil, errors.New("Bad storage type or DataStore specification")
 	}
-	content, err := ioutil.ReadAll(reader)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
-		os.Exit(1)
-	}
-	return content
 }

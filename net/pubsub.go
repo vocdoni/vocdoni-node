@@ -33,7 +33,8 @@ func PsPublish(topic, data string) error {
 	return nil
 }
 
-func (p *PubSubHandle) Init() error {
+func (p *PubSubHandle) Init(c *types.Connection) error {
+	p.c = c
 	p.s = PsSubscribe(p.c.Topic)
 	return nil
 }
@@ -48,13 +49,14 @@ func (p *PubSubHandle) Listen(reciever chan<- types.Message, errors chan<- error
 			errors <- err
 			fmt.Fprintf(os.Stderr, "recieve error: %s", err)
 		}
-		msg.Topic = p.c.Topic
+		ctx := new(types.PubSubContext)
+		ctx.Topic = p.c.Topic
+		ctx.PeerAddress = psMessage.From.String()
 		msg.Data = psMessage.Data
-		msg.Address = psMessage.From.String()
 		msg.TimeStamp = time.Now()
+		msg.Context = ctx
 
 		reciever <- msg
-
 	}
 }
 
