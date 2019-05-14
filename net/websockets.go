@@ -52,7 +52,7 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 	http.HandleFunc(c.Path, w.upgrader)
 	log.Printf("handler set")
 	go func() {
-		log.Fatal(http.ListenAndServe(c.Address + ":" + c.Port, nil))
+		log.Fatal(http.ListenAndServe(c.Address+":"+c.Port, nil))
 	}()
 
 	log.Printf("listener started")
@@ -78,14 +78,10 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message, errorReciever ch
 				}
 				conn.Close()
 			} else {
-				//contruct message
 				msg.Data = []byte(payload)
 				msg.Conn = conn
 				reciever <- msg
-				//send to channel
-				//log.Printf("Payload: %s", string(payload))
 			}
 		}
 	}
 }
-
