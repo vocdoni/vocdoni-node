@@ -37,10 +37,12 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message, errorReciever chan<- e
 	for {
 		select {
 		case pssMessage := <-p.s.PssTopics[p.c.Topic].Delivery:
-			msg.Topic = p.c.Topic
+			ctx := new(types.PssContext)
+			ctx.Topic = p.c.Topic
+			ctx.PeerAddress = pssMessage.Peer.String()
 			msg.Data = pssMessage.Msg
-			msg.Address = pssMessage.Peer.String()
 			msg.TimeStamp = time.Now()
+			msg.Context = ctx
 			//add error check
 			reciever <- msg
 		default:

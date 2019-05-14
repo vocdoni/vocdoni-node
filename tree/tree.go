@@ -75,7 +75,7 @@ func (t *Tree) GenProof(data []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	mp, err := t.Tree.GenerateProof(e.Entry().HIndex())
+	mp, err := t.Tree.GenerateProof(e.Entry().HIndex(), nil)
 	if err != nil {
 		return "", err
 	}

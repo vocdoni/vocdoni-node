@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"syscall"
+	"time"
 
 	"github.com/vocdoni/go-dvote/net/epoll"
 	"github.com/vocdoni/go-dvote/types"
@@ -79,7 +80,10 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message, errorReciever ch
 				conn.Close()
 			} else {
 				msg.Data = []byte(payload)
-				msg.Conn = conn
+				msg.TimeStamp = time.Now()
+				ctx := new(types.WebsocketContext)
+				ctx.Conn = &conn
+				msg.Context = ctx
 				reciever <- msg
 			}
 		}
