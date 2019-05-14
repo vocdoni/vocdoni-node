@@ -49,10 +49,12 @@ func (p *PubSubHandle) Listen(reciever chan<- types.Message, errors chan<- error
 			errors <- err
 			fmt.Fprintf(os.Stderr, "recieve error: %s", err)
 		}
-		msg.Topic = p.c.Topic
+		ctx := new(types.PubSubContext)
+		ctx.Topic = p.c.Topic
+		ctx.PeerAddress = psMessage.From.String()
 		msg.Data = psMessage.Data
-		msg.Address = psMessage.From.String()
 		msg.TimeStamp = time.Now()
+		msg.Context = ctx
 
 		reciever <- msg
 	}

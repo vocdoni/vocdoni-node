@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"syscall"
+	"time"
 
 	"github.com/vocdoni/go-dvote/net/epoll"
 	"github.com/vocdoni/go-dvote/types"
@@ -52,7 +53,7 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 	http.HandleFunc(c.Path, w.upgrader)
 	log.Printf("handler set")
 	go func() {
-		log.Fatal(http.ListenAndServe(c.Address + ":" + c.Port, nil))
+		log.Fatal(http.ListenAndServe(c.Address+":"+c.Port, nil))
 	}()
 
 	log.Printf("listener started")
@@ -80,7 +81,10 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message, errorReciever ch
 			} else {
 				//contruct message
 				msg.Data = []byte(payload)
-				msg.Conn = conn
+				msg.TimeStamp = time.Now()
+				ctx := new(types.WebsocketContext)
+				ctx.Conn = &conn
+				msg.Context = ctx
 				reciever <- msg
 				//send to channel
 				//log.Printf("Payload: %s", string(payload))
@@ -88,4 +92,3 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message, errorReciever ch
 		}
 	}
 }
-
