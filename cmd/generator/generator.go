@@ -1,22 +1,24 @@
 package main
 
 import (
-	"os"
-	"time"
+	"encoding/base64"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
-	"fmt"
 	"math/rand"
-	"encoding/json"
-	"encoding/base64"
 	"net/url"
+	"os"
+	"time"
+
 	"github.com/gorilla/websocket"
-//	"net/http"
-//	"bytes"
-//	"io/ioutil"
+
+	//	"net/http"
+	//	"bytes"
+	//	"io/ioutil"
 	"github.com/vocdoni/go-dvote/types"
-//	"github.com/vocdoni/go-dvote/net"
+	//	"github.com/vocdoni/go-dvote/net"
 )
 
 func makeBallot() string {
@@ -39,7 +41,6 @@ func makeBallot() string {
 	franchise := make([]byte, 32)
 	rand.Read(franchise)
 	bal.Franchise = franchise
-
 
 	b, err := json.Marshal(bal)
 	if err != nil {
@@ -111,18 +112,26 @@ func main() {
 
 	log.Printf("Finished initializing %d connections", len(conns))
 
+	dummyRequest := `{
+		"id": "req-2345679",
+		"request": {
+		  "method": "ping"
+		}
+	  }`
+
 	i := 0
 	for {
 		select {
-		case <- timer.C:
+		case <-timer.C:
 			var jsonStr = makeEnvelope(makeBallot())
-			log.Printf("Conn %d sending message %s", i % *connections, jsonStr)
+			log.Printf("Conn %d sending message %s", i%*connections, jsonStr)
 			log.Printf("%v", conns)
-			conn := conns[i % *connections]
+			conn := conns[i%*connections]
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second*5)); err != nil {
 				fmt.Printf("Failed to receive pong: %v", err)
 			}
 			conn.WriteMessage(websocket.TextMessage, []byte(jsonStr))
+			conn.WriteMessage(websocket.TextMessage, []byte(dummyRequest))
 			i++
 			log.Printf("Sent!")
 		default:

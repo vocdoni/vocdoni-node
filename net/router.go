@@ -15,22 +15,19 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errors c
 	for {
 		select {
 		case msg := <-inbound:
-			var genericJSON interface{}
-			err := json.Unmarshal(msg.Data, &genericJSON)
+			//probably from here to the switch should be factored out, error checking added
+			var msgJSON interface{}
+			err := json.Unmarshal(msg.Data, &msgJSON)
 			if err != nil {
 				log.Printf("Couldn't parse message JSON on message %v", msg)
 			}
-			jsonMap := genericJSON.(map[string]interface{})
-			if jsonMap["Type"] == "zk-snarks-envelope" || jsonMap["type"] == "lrs-envelope" {
+			msgMap := msgJSON.(map[string]interface{})
+			if msgMap["Type"] == "zk-snarks-envelope" || msgMap["type"] == "lrs-envelope" {
 				outbound <- msg
 				break
 			}
-			var requestMap map[string]interface{}
-			err = json.Unmarshal([]byte(jsonMap["request"].(string)), requestMap)
-			if err != nil {
-				log.Printf("Couldn't parse request JSON on request %v", jsonMap["request"])
-			}
-			method := fmt.Sprintf("%v", requestMap["method"])
+			requestMap := msgMap["request"].(map[string]interface{})
+			method := fmt.Sprintf("%v", requestMap["method"].(string))
 			switch method {
 			case "ping":
 				reply := new(types.Message)
@@ -39,7 +36,7 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errors c
 				reply.Context = msg.Context
 				wsTransport.Send(*reply, errors)
 			case "fetchFile":
-				content, err := storage.Retrieve(fmt.Sprintf("%v", jsonMap["uri"]))
+				content, err := storage.Retrieve(fmt.Sprintf("%v", requestMap["uri"]))
 				if err != nil {
 					log.Printf("Error fetching file on request %v", msg)
 					//send error reply, and also send to error channel?
