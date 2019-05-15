@@ -2,7 +2,7 @@ package batch
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 
 	"github.com/vocdoni/go-dvote/db"
 	"github.com/vocdoni/go-dvote/types"
@@ -43,7 +43,7 @@ func Recieve(messages <-chan types.Message) {
 			//log error
 		}
 
-		fmt.Println("Got > " + string(payload))
+		log.Printf("Recieved %", string(payload))
 	}
 }
 
@@ -101,10 +101,9 @@ func Fetch() ([]string, []string) {
 //move from bdb to rdb once pinned
 func Compact(n []string) {
 	for _, k := range n {
-		//fmt.Println(k)
 		v, err := bdb.Get([]byte(k))
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Println(err)
 		}
 		rdb.Put([]byte(k), v)
 		bdb.Delete([]byte(k))

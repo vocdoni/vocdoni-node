@@ -231,7 +231,6 @@ func (sn *SimpleSwarm) InitBZZ() error {
 	*/
 
 	// create node
-	fmt.Println("%v", sn.Ports)
 	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
 		sn.Ports.HTTPRPC, sn.Ports.WebSockets, sn.Datadir, "")
 	if err != nil {

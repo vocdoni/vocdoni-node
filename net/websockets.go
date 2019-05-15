@@ -1,7 +1,6 @@
 package net
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"syscall"
@@ -42,8 +41,6 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 		return err
 	}
 
-	log.Printf("resource limits set")
-
 	// Start epoll
 	var err error
 	w.e, err = epoll.MkEpoll()
@@ -52,12 +49,9 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 	}
 
 	http.HandleFunc(c.Path, w.upgrader)
-	log.Printf("handler set")
 	go func() {
 		log.Fatal(http.ListenAndServe(c.Address+":"+c.Port, nil))
 	}()
-
-	log.Printf("listener started")
 
 	return nil
 }
@@ -92,6 +86,5 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message, errorReciever ch
 }
 
 func (w *WebsocketHandle) Send(msg types.Message, erros chan<- error) {
-	fmt.Println("websocket send w/ body: %v", string(msg.Data))
 	wsutil.WriteServerMessage(*msg.Context.(*types.WebsocketContext).Conn, ws.OpBinary, msg.Data)
 }

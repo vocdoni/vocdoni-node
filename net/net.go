@@ -2,7 +2,6 @@ package net
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/vocdoni/go-dvote/types"
 )
@@ -47,7 +46,6 @@ func Init(t TransportID, c *types.Connection) (Transport, error) {
 	case Websocket:
 		w := new(WebsocketHandle)
 		w.Init(c)
-		fmt.Println("ws initialized")
 		return w, nil
 	default:
 		return nil, errors.New("Bad transport type ID or Connection specifier")
