@@ -1,6 +1,7 @@
 package net
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -8,10 +9,50 @@ import (
 	"github.com/vocdoni/go-dvote/data"
 	"github.com/vocdoni/go-dvote/types"
 
+	"encoding/base64"
 	"encoding/json"
 )
 
-func Route(inbound <-chan types.Message, outbound chan<- types.Message, errors chan<- error, storage data.Storage, wsTransport Transport) {
+var failBodyFmt = `{
+	"id": "%[1]s", 
+	"error": {
+	  "request": "%[1]s",
+	  "message": "%s"
+	}
+  }`
+
+var successBodyFmt = `{
+  "id": "%s",
+  "response": %s,
+  "signature": "%x"
+}`
+
+//content file must be b64 encoded
+var fetchResponseFmt = `{
+    "content": "%s",
+    "request": "%s",
+    "timestamp": %s
+  }`
+
+func failBody(requestId string, failString string) []byte {
+	return []byte(fmt.Sprintf(failBodyFmt, requestId, failString))
+}
+
+func successBody(requestId string, response string) []byte {
+	//need to calculate signature over response!
+	sig := []byte{0}
+	return []byte(fmt.Sprintf(successBodyFmt, requestId, response, sig))
+}
+
+func buildReply(msg types.Message, data []byte) types.Message {
+	reply := new(types.Message)
+	reply.TimeStamp = time.Now()
+	reply.Context = msg.Context
+	reply.Data = data
+	return *reply
+}
+
+func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorChan chan<- error, storage data.Storage, wsTransport Transport) {
 	for {
 		select {
 		case msg := <-inbound:
@@ -26,22 +67,21 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errors c
 				outbound <- msg
 				break
 			}
+			requestId := msgMap["id"].(string)
 			requestMap := msgMap["request"].(map[string]interface{})
 			method := fmt.Sprintf("%v", requestMap["method"].(string))
 			switch method {
 			case "ping":
-				reply := new(types.Message)
-				reply.TimeStamp = time.Now()
-				reply.Data = []byte("pong")
-				reply.Context = msg.Context
-				wsTransport.Send(*reply, errors)
+				wsTransport.Send(buildReply(msg, []byte("pong")), errorChan)
 			case "fetchFile":
 				content, err := storage.Retrieve(fmt.Sprintf("%v", requestMap["uri"]))
 				if err != nil {
-					log.Printf("Error fetching file on request %v", msg)
-					//send error reply, and also send to error channel?
+					failString := fmt.Sprintf("Error fetching file %s", requestMap["uri"])
+					errorChan <- errors.New(failString)
+					wsTransport.Send(buildReply(msg, failBody(requestId, failString)), errorChan)
 				}
-				//send success
+				b64content := base64.StdEncoding.EncodeToString(content)
+				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().String()))), errorChan)
 				log.Printf("%v", content)
 			case "addFile":
 				//data.Publish
