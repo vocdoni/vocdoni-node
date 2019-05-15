@@ -113,6 +113,7 @@ func main() {
 	log.Printf("Finished initializing %d connections", len(conns))
 
 	dummyRequest := `{"id": "req-2345679", "request": {"method": "ping"}}`
+	dummyRequestAddFile := `{"id": "req-2345679", "request": {"method": "addFile", "name": "My first file", "type": "ipfs", "content": "SGVsbG8gVm9jZG9uaSE=", "timestamp": "1"}}`
 
 	i := 0
 	for {
@@ -128,6 +129,8 @@ func main() {
 			}
 			conn.WriteMessage(websocket.TextMessage, []byte(jsonStr))
 			conn.WriteMessage(websocket.TextMessage, []byte(dummyRequest))
+			conn.WriteMessage(websocket.TextMessage, []byte(dummyRequestAddFile))
+			// request here
 			msgType, msg, err := conn.ReadMessage()
 			if err != nil {
 				log.Printf("Cannot read message")
