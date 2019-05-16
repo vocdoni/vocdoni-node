@@ -67,7 +67,7 @@ func InitDefault(t TransportID) (Transport, error) {
 	case Websocket:
 		defaultConnection := new(types.Connection)
 		defaultConnection.Address = "0.0.0.0"
-		defaultConnection.Path = "/vocdoni"
+		defaultConnection.Path = "/dvote"
 		defaultConnection.Port = 9090
 		return Init(t, defaultConnection)
 	default:

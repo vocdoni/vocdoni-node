@@ -53,6 +53,7 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 	go func() {
 		log.Fatal(http.ListenAndServe(c.Address+":"+strconv.Itoa(c.Port), nil))
 	}()
+	log.Printf("Dvote websocket endpoint initialized on %s", "ws://"+c.Address+":"+strconv.Itoa(c.Port))
 
 	return nil
 }
