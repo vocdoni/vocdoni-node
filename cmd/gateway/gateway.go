@@ -28,9 +28,9 @@ func main() {
 
 	genesis := flag.String("genesis", "genesis.json", "Ethereum genesis file")
 	netID := flag.Int("netID", 1714, "network ID for the Ethereum blockchain")
-	w3wsPort := flag.Int("w3wsPort", 9091, "websockets port")
+	w3wsPort := flag.Int("w3wsPort", 0, "websockets port")
 	w3wsHost := flag.String("w3wsHost", "0.0.0.0", "ws host to listen on")
-	w3httpPort := flag.Int("w3httpPort", 0, "http endpoint port, disabled if 0")
+	w3httpPort := flag.Int("w3httpPort", 9091, "http endpoint port, disabled if 0")
 	w3httpHost := flag.String("w3httpHost", "0.0.0.0", "http host to listen on")
 
 	flag.Parse()
