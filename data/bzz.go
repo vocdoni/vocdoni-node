@@ -2,6 +2,7 @@ package data
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 
 	"github.com/vocdoni/go-dvote/swarm"
@@ -47,4 +48,19 @@ func (b *BZZHandle) Retrieve(hash string) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+//STUB -- NEEDS IMPLEMENTATION
+func (b *BZZHandle) Pin(path string) error {
+	return errors.New("Not yet implemented in BZZ")
+}
+
+//STUB -- NEEDS IMPLEMENTATION
+func (b *BZZHandle) Unpin(path string) error {
+	return errors.New("Not yet implemented in BZZ")
+}
+
+//STUB -- NEEDS IMPLEMENTATION
+func (b *BZZHandle) ListPins() (map[string]string, error) {
+	return nil, errors.New("Not yet implemented in BZZ")
 }

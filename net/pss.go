@@ -1,7 +1,6 @@
 package net
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/vocdoni/go-dvote/swarm"
@@ -26,13 +25,10 @@ func (p *PSSHandle) Init(c *types.Connection) error {
 	}
 	sn.PssSub(p.c.Encryption, p.c.Key, p.c.Topic, p.c.Address)
 	p.s = sn
-	fmt.Println("pss init")
-	fmt.Println("%v", p)
 	return nil
 }
 
 func (p *PSSHandle) Listen(reciever chan<- types.Message, errorReciever chan<- error) {
-	fmt.Println("%v", p)
 	var msg types.Message
 	for {
 		select {
@@ -52,9 +48,9 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message, errorReciever chan<- e
 	}
 }
 
-func (p *PSSHandle) Send(msg []byte, errors chan<- error) {
+func (p *PSSHandle) Send(msg types.Message, errors chan<- error) {
 
-	err := p.s.PssPub(p.c.Encryption, p.c.Key, p.c.Topic, string(msg), p.c.Address)
+	err := p.s.PssPub(p.c.Encryption, p.c.Key, p.c.Topic, string(msg.Data), p.c.Address)
 	if err != nil {
 		errors <- err
 	}

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/gob"
 	"flag"
-	"fmt"
-	"os"
+	"log"
+	"os/user"
 	"time"
 
 	"github.com/vocdoni/go-dvote/batch"
@@ -16,9 +16,8 @@ import (
 	"github.com/vocdoni/go-dvote/types"
 )
 
-var dbPath = "~/.dvote/relay.db"
-var batchSeconds = 10 //seconds
-var batchSize = 3     //packets
+var batchSeconds = 6000 //seconds
+var batchSize = 10      //votes
 
 var err error
 var batchTimer *time.Ticker
@@ -28,10 +27,16 @@ var transportType net.TransportID
 var storageType data.StorageID
 
 func main() {
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+	dataDir := usr.HomeDir + "/.dvote"
+	dbPath := dataDir + "/relay.db"
 
 	db, err := db.NewLevelDbStorage(dbPath, false)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer db.Close()
 
@@ -41,7 +46,7 @@ func main() {
 	var transportIDString string
 	var storageIDString string
 	flag.StringVar(&transportIDString, "transport", "PSS", "Transport must be one of: PSS, PubSub")
-	flag.StringVar(&storageIDString, "storage", "BZZ", "Transport must be one of: BZZ, IPFS")
+	flag.StringVar(&storageIDString, "storage", "IPFS", "Transport must be one of: BZZ, IPFS")
 	flag.Parse()
 
 	transportType = net.TransportIDFromString(transportIDString)
@@ -56,48 +61,51 @@ func main() {
 	listenerOutput := make(chan types.Message)
 	listenerErrors := make(chan error)
 
-	fmt.Println("initializing transport:")
+	routerOutput := make(chan types.Message)
+
+	log.Println("Initializing transport")
 	transport, err := net.InitDefault(transportType)
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	fmt.Println("initializing storage:")
+	log.Println("Initializing storage")
 	storage, err := data.InitDefault(storageType)
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	_ = storage
 
-	fmt.Println("initializing websockets:")
+	log.Println("Initializing websockets")
 	ws, err := net.InitDefault(net.TransportIDFromString("Websocket"))
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	go batch.Recieve(listenerOutput)
+	go batch.Recieve(routerOutput)
 	go transport.Listen(listenerOutput, listenerErrors)
 	go ws.Listen(listenerOutput, listenerErrors)
+	go net.Route(listenerOutput, routerOutput, listenerErrors, storage, ws)
 
-	fmt.Println("Entering main loop")
+	log.Println("Entering main loop")
 	for {
 		select {
 		case <-batchTimer.C:
-			fmt.Println("Timer triggered")
+			//fmt.Println("Timer triggered")
 			//			fmt.Println(batch.Create())
 			//replace with chain link
+			continue
 		case signal := <-batchSignal:
 			if signal == true {
-				fmt.Println("Signal triggered")
 				_, bs := batch.Fetch()
 				buf := &bytes.Buffer{}
 				gob.NewEncoder(buf).Encode(bs)
 				bb := buf.Bytes()
 				cid, err := storage.Publish(bb)
 				if err != nil {
-					fmt.Printf("Storage error: %s", err)
+					log.Printf("Storage error: %s", err)
 				}
-				fmt.Printf("Batch published at: %s \n", cid)
+				log.Printf("Batch published at: %s \n", cid)
 				// add to chain
 				// announce to pubsub
 				//fmt.Println("Nullifiers:")
@@ -107,7 +115,7 @@ func main() {
 				//batch.Compact(ns)
 			}
 		case listenError := <-listenerErrors:
-			fmt.Println(listenError)
+			log.Println(listenError)
 		default:
 			continue
 		}

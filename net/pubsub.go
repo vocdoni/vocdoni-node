@@ -60,8 +60,8 @@ func (p *PubSubHandle) Listen(reciever chan<- types.Message, errors chan<- error
 	}
 }
 
-func (p *PubSubHandle) Send(data []byte, errors chan<- error) {
-	err := PsPublish(p.c.Topic, string(data))
+func (p *PubSubHandle) Send(msg types.Message, errors chan<- error) {
+	err := PsPublish(p.c.Topic, string(msg.Data))
 	if err != nil {
 		errors <- err
 	}

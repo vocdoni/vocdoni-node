@@ -14,7 +14,7 @@ type PssContext struct {
 	PeerAddress string //this is the address of the other side
 }
 
-func (c *PssContext) ConnectionType() string {
+func (c PssContext) ConnectionType() string {
 	return "PSS"
 }
 
@@ -32,7 +32,7 @@ type PubSubContext struct {
 	PeerAddress string
 }
 
-func (c *PubSubContext) ConnectionType() string {
+func (c PubSubContext) ConnectionType() string {
 	return "PubSub"
 }
 
@@ -45,7 +45,7 @@ type WebsocketContext struct {
 	Conn *net.Conn
 }
 
-func (c *WebsocketContext) ConnectionType() string {
+func (c WebsocketContext) ConnectionType() string {
 	return "Websocket"
 }
 

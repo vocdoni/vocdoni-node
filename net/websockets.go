@@ -41,8 +41,6 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 		return err
 	}
 
-	log.Printf("resource limits set")
-
 	// Start epoll
 	var err error
 	w.e, err = epoll.MkEpoll()
@@ -51,12 +49,9 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 	}
 
 	http.HandleFunc(c.Path, w.upgrader)
-	log.Printf("handler set")
 	go func() {
 		log.Fatal(http.ListenAndServe(c.Address+":"+c.Port, nil))
 	}()
-
-	log.Printf("listener started")
 
 	return nil
 }
@@ -79,16 +74,17 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message, errorReciever ch
 				}
 				conn.Close()
 			} else {
-				//contruct message
 				msg.Data = []byte(payload)
 				msg.TimeStamp = time.Now()
 				ctx := new(types.WebsocketContext)
 				ctx.Conn = &conn
 				msg.Context = ctx
 				reciever <- msg
-				//send to channel
-				//log.Printf("Payload: %s", string(payload))
 			}
 		}
 	}
+}
+
+func (w *WebsocketHandle) Send(msg types.Message, erros chan<- error) {
+	wsutil.WriteServerMessage(*msg.Context.(*types.WebsocketContext).Conn, ws.OpBinary, msg.Data)
 }
