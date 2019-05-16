@@ -32,10 +32,12 @@ const (
 
 // SwarmBootnodes list of bootnodes for the SWARM network
 var SwarmBootnodes = []string{
-	// EF Swarm Bootnode - AWS - eu-central-1
-	"enode://4c113504601930bf2000c29bcd98d1716b6167749f58bad703bae338332fe93cc9d9204f08afb44100dc7bea479205f5d162df579f9a8f76f8b402d339709023@3.122.203.99:30301",
-	// EF Swarm Bootnode - AWS - us-west-2
-	"enode://89f2ede3371bff1ad9f2088f2012984e280287a4e2b68007c2a6ad994909c51886b4a8e9e2ecc97f9910aca538398e0a5804b0ee80a187fde1ba4f32626322ba@52.35.212.179:30301",
+	"enode://9b2fe07e69ccc7db5fef15793dab7d7d2e697ed92132d6e9548218e68a34613a8671ad03a6658d862b468ed693cae8a0f8f8d37274e4a657ffb59ca84676e45b@52.232.7.187:30400",
+	"enode://76c1059162c93ef9df0f01097c824d17c492634df211ef4c806935b349082233b63b90c23970254b3b7138d630400f7cf9b71e80355a446a8b733296cb04169a@52.232.7.187:30401",
+	"enode://ce46bbe2a8263145d65252d52da06e000ad350ed09c876a71ea9544efa42f63c1e1b6cc56307373aaad8f9dd069c90d0ed2dd1530106200e16f4ca681dd8ae2d@52.232.7.187:30402",
+	"enode://f431e0d6008a6c35c6e670373d828390c8323e53da8158e7bfc43cf07e632cc9e472188be8df01decadea2d4a068f1428caba769b632554a8fb0607bc296988f@52.232.7.187:30403",
+	"enode://174720abfff83d7392f121108ae50ea54e04889afe020df883655c0f6cb95414db945a0228d8982fe000d86fc9f4b7669161adc89cd7cd56f78f01489ab2b99b@52.232.7.187:30404",
+	"enode://2ae89be4be61a689b6f9ecee4360a59e185e010ab750f14b63b4ae43d4180e872e18e3437d4386ce44875dc7cc6eb761acba06412fe3178f3dac1dab3b65703e@52.232.7.187:30405",
 }
 
 func newNode(key *ecdsa.PrivateKey, port int, httpport int, wsport int,
@@ -383,7 +385,8 @@ func (sn *SimpleSwarm) InitPSS() error {
 		case *pss.API:
 			sn.Pss = a.Service.(*pss.API)
 		default:
-			log.Info("interface: " + fmt.Sprintf("%T", a.Service))
+			//log.Info("interface: " + fmt.Sprintf("%T", a.Service))
+			continue
 		}
 	}
 
