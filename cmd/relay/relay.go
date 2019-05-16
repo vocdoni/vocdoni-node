@@ -10,7 +10,6 @@ import (
 
 	"github.com/vocdoni/go-dvote/batch"
 	"github.com/vocdoni/go-dvote/data"
-	"github.com/vocdoni/go-dvote/chain"
 	"github.com/vocdoni/go-dvote/db"
 	"github.com/vocdoni/go-dvote/net"
 	"github.com/vocdoni/go-dvote/types"
