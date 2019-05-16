@@ -70,7 +70,7 @@ type Connection struct {
 	Key        string //this node's key
 	Address    string //this node's address
 	Path       string //specific path on which a transport should listen
-	Port       string //specific port on which a transport should listen
+	Port       int    //specific port on which a transport should listen
 }
 
 type DataStore struct {

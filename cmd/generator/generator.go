@@ -107,7 +107,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	//topic := "vocdoni_pubsub_testing"
 	//fmt.Println("PubSub Topic:>", topic)
-	u := url.URL{Scheme: "ws", Host: *target, Path: "/vocdoni"}
+	u := url.URL{Scheme: "ws", Host: *target, Path: "/dvote"}
 
 	var conns []*websocket.Conn
 	for i := 0; i < *connections; i++ {

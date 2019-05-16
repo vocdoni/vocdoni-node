@@ -1,6 +1,7 @@
 package net
 
 import (
+	"log"
 	"time"
 
 	"github.com/vocdoni/go-dvote/swarm"
@@ -28,7 +29,7 @@ func (p *PSSHandle) Init(c *types.Connection) error {
 	return nil
 }
 
-func (p *PSSHandle) Listen(reciever chan<- types.Message, errorReciever chan<- error) {
+func (p *PSSHandle) Listen(reciever chan<- types.Message) {
 	var msg types.Message
 	for {
 		select {
@@ -39,7 +40,6 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message, errorReciever chan<- e
 			msg.Data = pssMessage.Msg
 			msg.TimeStamp = time.Now()
 			msg.Context = ctx
-			//add error check
 			reciever <- msg
 		default:
 			continue
@@ -48,10 +48,10 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message, errorReciever chan<- e
 	}
 }
 
-func (p *PSSHandle) Send(msg types.Message, errors chan<- error) {
+func (p *PSSHandle) Send(msg types.Message) {
 
 	err := p.s.PssPub(p.c.Encryption, p.c.Key, p.c.Topic, string(msg.Data), p.c.Address)
 	if err != nil {
-		errors <- err
+		log.Printf("PSS send error: %s", err)
 	}
 }
