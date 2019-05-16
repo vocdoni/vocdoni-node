@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"time"
 
 	"github.com/vocdoni/go-dvote/data"
@@ -32,25 +31,25 @@ var successBodyFmt = `{
 var fetchResponseFmt = `{
     "content": "%s",
     "request": "%s",
-    "timestamp": %s
+    "timestamp": %d
   }`
 
 var addResponseFmt = `{
 	"uri": "%s",
 	"request": "%s",
-	"timestamp": %s,
+	"timestamp": %d
 }`
 
 var listPinsResponseFmt = `{
     "files": %s,
     "request": "%s",
-    "timestamp": %s 
+    "timestamp": %d 
   }`
 
 var boolResponseFmt = `{
     "ok": %s,
     "request": "%s",
-    "timestamp": %s
+    "timestamp": %d
   }`
 
 func failBody(requestId string, failString string) []byte {
@@ -71,18 +70,29 @@ func buildReply(msg types.Message, data []byte) types.Message {
 	return *reply
 }
 
+func parseMsg(payload []byte) (map[string]interface{}, error) {
+	var msgJSON interface{}
+	err := json.Unmarshal(payload, &msgJSON)
+	if err != nil {
+		return nil, err
+	}
+	msgMap, ok := msgJSON.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("Could not parse request JSON")
+	}
+	return msgMap, nil
+}
+
 func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorChan chan<- error, storage data.Storage, wsTransport Transport) {
 	for {
 		select {
 		case msg := <-inbound:
 
-			//probably from here to the switch should be factored out
-			var msgJSON interface{}
-			err := json.Unmarshal(msg.Data, &msgJSON)
+			msgMap, err := parseMsg(msg.Data)
 			if err != nil {
 				log.Printf("Couldn't parse message JSON on message %v", msg)
 			}
-			msgMap := msgJSON.(map[string]interface{})
+
 			if msgMap["Type"] == "zk-snarks-envelope" || msgMap["type"] == "lrs-envelope" {
 				outbound <- msg
 				break
@@ -96,7 +106,10 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 			if !ok {
 				log.Printf("No request field in message or malformed")
 			}
-			method := fmt.Sprintf("%v", requestMap["method"].(string))
+			method, ok := requestMap["method"].(string)
+			if !ok {
+				log.Printf("No method field in request or malformed")
+			}
 
 			switch method {
 			case "ping":
@@ -114,7 +127,7 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 					wsTransport.Send(buildReply(msg, failBody(requestId, failString)), errorChan)
 				}
 				b64content := base64.StdEncoding.EncodeToString(content)
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().String()))), errorChan)
+				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().UnixNano()))), errorChan)
 				log.Printf("%v", content)
 			case "addFile":
 				content, ok := requestMap["content"].(string)
@@ -129,18 +142,20 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 					//err to errchan, reply
 					break
 				}
-				name, ok := requestMap["name"].(string)
-				if !ok {
-					log.Printf("No name field in addFile request or malformed")
-					//err to errchan, reply
-					break
-				}
-				timestamp, errAtoi := strconv.ParseInt(requestMap["timestamp"].(string), 10, 64)
-				if errAtoi != nil {
-					log.Printf("timestamp wrong format")
-					//err to errchan, reply
-					break
-				}
+				/*
+					name, ok := requestMap["name"].(string)
+					if !ok {
+						log.Printf("No name field in addFile request or malformed")
+						//err to errchan, reply
+						break
+					}
+						timestamp, errAtoi := strconv.ParseInt(requestMap["timestamp"].(), 10, 64)
+						if errAtoi != nil {
+							log.Printf("timestamp wrong format")
+							//err to errchan, reply
+							break
+						}
+				*/
 				reqType, ok := requestMap["type"].(string)
 				if !ok {
 					log.Printf("No type field in addFile request or malformed")
@@ -157,8 +172,8 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 					if err != nil {
 						log.Printf("cannot add file")
 					}
-					log.Printf("added %s with name %s and with timestamp %s", cid, name, timestamp)
-					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, cid, requestId, time.Now().String()))), errorChan)
+					//log.Printf("added %s with name %s and with timestamp %s", cid, name, timestamp)
+					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, cid, requestId, time.Now().UnixNano()))), errorChan)
 				}
 				//data.Publish
 			case "pinList":
@@ -170,7 +185,7 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 				if err != nil {
 					log.Printf("Internal error parsing pins")
 				}
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(listPinsResponseFmt, pinsJsonArray, requestId, time.Now()))), errorChan)
+				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(listPinsResponseFmt, pinsJsonArray, requestId, time.Now().UnixNano()))), errorChan)
 
 				//data.Pins
 			case "pinFile":
@@ -184,7 +199,7 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 					errorChan <- errors.New(failString)
 					wsTransport.Send(buildReply(msg, failBody(requestId, failString)), errorChan)
 				}
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().String()))), errorChan)
+				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()))), errorChan)
 			case "unpinFile":
 				uri, ok := requestMap["uri"].(string)
 				if !ok {
@@ -196,7 +211,7 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 					errorChan <- errors.New(failString)
 					wsTransport.Send(buildReply(msg, failBody(requestId, failString)), errorChan)
 				}
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().String()))), errorChan)
+				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()))), errorChan)
 			}
 		}
 	}
