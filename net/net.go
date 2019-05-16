@@ -7,8 +7,8 @@ import (
 )
 
 type Transport interface {
-	Listen(reciever chan<- types.Message, errors chan<- error)
-	Send(msg types.Message, erros chan<- error)
+	Listen(reciever chan<- types.Message)
+	Send(msg types.Message)
 	Init(c *types.Connection) error
 }
 
@@ -68,7 +68,7 @@ func InitDefault(t TransportID) (Transport, error) {
 		defaultConnection := new(types.Connection)
 		defaultConnection.Address = "0.0.0.0"
 		defaultConnection.Path = "/vocdoni"
-		defaultConnection.Port = "9090"
+		defaultConnection.Port = 9090
 		return Init(t, defaultConnection)
 	default:
 		return nil, errors.New("Bad transport type ID")

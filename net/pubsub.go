@@ -2,6 +2,7 @@ package net
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -39,15 +40,14 @@ func (p *PubSubHandle) Init(c *types.Connection) error {
 	return nil
 }
 
-func (p *PubSubHandle) Listen(reciever chan<- types.Message, errors chan<- error) {
+func (p *PubSubHandle) Listen(reciever chan<- types.Message) {
 	var psMessage *shell.Message
 	var msg types.Message
 	var err error
 	for {
 		psMessage, err = p.s.Next()
 		if err != nil {
-			errors <- err
-			fmt.Fprintf(os.Stderr, "recieve error: %s", err)
+			log.Printf("PubSub recieve error: %s", err)
 		}
 		ctx := new(types.PubSubContext)
 		ctx.Topic = p.c.Topic
@@ -60,9 +60,9 @@ func (p *PubSubHandle) Listen(reciever chan<- types.Message, errors chan<- error
 	}
 }
 
-func (p *PubSubHandle) Send(msg types.Message, errors chan<- error) {
+func (p *PubSubHandle) Send(msg types.Message) {
 	err := PsPublish(p.c.Topic, string(msg.Data))
 	if err != nil {
-		errors <- err
+		log.Printf("PubSub send error: %s", err)
 	}
 }

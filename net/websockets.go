@@ -3,6 +3,7 @@ package net
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -50,18 +51,18 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 
 	http.HandleFunc(c.Path, w.upgrader)
 	go func() {
-		log.Fatal(http.ListenAndServe(c.Address+":"+c.Port, nil))
+		log.Fatal(http.ListenAndServe(c.Address+":"+strconv.Itoa(c.Port), nil))
 	}()
 
 	return nil
 }
 
-func (w *WebsocketHandle) Listen(reciever chan<- types.Message, errorReciever chan<- error) {
+func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 	var msg types.Message
 	for {
 		connections, err := w.e.Wait()
 		if err != nil {
-			errorReciever <- err
+			log.Printf("WS recieve error: %s", err)
 			continue
 		}
 		for _, conn := range connections {
@@ -70,7 +71,7 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message, errorReciever ch
 			}
 			if payload, _, err := wsutil.ReadClientData(conn); err != nil {
 				if err := w.e.Remove(conn); err != nil {
-					errorReciever <- err
+					log.Printf("WS recieve rror: %s", err)
 				}
 				conn.Close()
 			} else {
@@ -85,6 +86,6 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message, errorReciever ch
 	}
 }
 
-func (w *WebsocketHandle) Send(msg types.Message, erros chan<- error) {
+func (w *WebsocketHandle) Send(msg types.Message) {
 	wsutil.WriteServerMessage(*msg.Context.(*types.WebsocketContext).Conn, ws.OpBinary, msg.Data)
 }

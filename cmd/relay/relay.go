@@ -57,10 +57,7 @@ func main() {
 	batch.BatchSignal = batchSignal
 	batch.BatchSize = batchSize
 
-	listenerOutput := make(chan types.Message)
-	listenerErrors := make(chan error)
-
-	routerOutput := make(chan types.Message)
+	transportOutput := make(chan types.Message)
 
 	log.Println("Initializing transport")
 	transport, err := net.InitDefault(transportType)
@@ -75,16 +72,18 @@ func main() {
 	}
 	_ = storage
 
-	log.Println("Initializing websockets")
-	ws, err := net.InitDefault(net.TransportIDFromString("Websocket"))
-	if err != nil {
-		log.Fatal(err)
-	}
+	/*
+		log.Println("Initializing websockets")
+		ws, err := net.InitDefault(net.TransportIDFromString("Websocket"))
+		if err != nil {
+			log.Fatal(err)
+		}
+	*/
 
-	go batch.Recieve(routerOutput)
-	go transport.Listen(listenerOutput, listenerErrors)
-	go ws.Listen(listenerOutput, listenerErrors)
-	go net.Route(listenerOutput, routerOutput, listenerErrors, storage, ws)
+	go transport.Listen(transportOutput)
+	go batch.Recieve(transportOutput)
+	//	go ws.Listen(listenerOutput)
+	//	go net.Route(listenerOutput, storage, ws)
 
 	log.Println("Entering main loop")
 	for {
@@ -113,8 +112,6 @@ func main() {
 				//fmt.Println(b)
 				//batch.Compact(ns)
 			}
-		case listenError := <-listenerErrors:
-			log.Println(listenError)
 		default:
 			continue
 		}
