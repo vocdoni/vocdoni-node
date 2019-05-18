@@ -3,6 +3,7 @@ package net
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -39,7 +40,7 @@ var fetchResponseFmt = `{
 var addResponseFmt = `{
 	"request": "%s",
 	"timestamp": %d,
-	"uri": "%s",
+	"uri": "%s"
 }`
 
 var listPinsResponseFmt = `{
@@ -136,7 +137,9 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 				}
 				parsedURIs := parseUrisContent(uri)
 				transportTypes := parseTransportFromUri(parsedURIs)
-				content, err := interface{}(nil), interface{}(nil)
+				var resp *http.Response
+				var content []byte
+				var err error
 				found := false
 				for idx, t := range transportTypes {
 					if found {
@@ -144,7 +147,9 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 					}
 					switch t {
 					case "http:", "https:":
-						content, err = http.Get(parsedURIs[idx])
+						resp, err = http.Get(parsedURIs[idx])
+						defer resp.Body.Close()
+						content, err = ioutil.ReadAll(resp.Body)
 						if content != nil {
 							found = true
 						}
@@ -158,7 +163,7 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 						}
 						break
 					case "bzz:", "bzz-feed":
-						err = -1
+						err = errors.New("Bzz and Bzz-feed not implemented yet")
 						break
 					}
 				}
@@ -168,9 +173,8 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 					fmt.Printf(failString)
 					wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
 				}
-				b64content := base64.StdEncoding.EncodeToString(content.([]byte))
+				b64content := base64.StdEncoding.EncodeToString(content)
 				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().UnixNano()))))
-				log.Printf("%v", content)
 
 			case "addFile":
 				content, ok := requestMap["content"].(string)
@@ -216,7 +220,8 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 						log.Printf("cannot add file")
 					}
 					//log.Printf("added %s with name %s and with timestamp %s", cid, name, timestamp)
-					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, requestId, time.Now().UnixNano(), cid))))
+					ipfsRouteBaseURL := "ipfs://"
+					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, requestId, time.Now().UnixNano(), ipfsRouteBaseURL+cid))))
 				}
 				//data.Publish
 			case "pinList":
