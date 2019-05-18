@@ -37,9 +37,9 @@ var fetchResponseFmt = `{
   }`
 
 var addResponseFmt = `{
-	"uri": "%s",
 	"request": "%s",
-	"timestamp": %d
+	"timestamp": %d,
+	"uri": "%s",
 }`
 
 var listPinsResponseFmt = `{
@@ -216,7 +216,7 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 						log.Printf("cannot add file")
 					}
 					//log.Printf("added %s with name %s and with timestamp %s", cid, name, timestamp)
-					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, cid, requestId, time.Now().UnixNano()))))
+					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, requestId, time.Now().UnixNano(), cid))))
 				}
 				//data.Publish
 			case "pinList":
