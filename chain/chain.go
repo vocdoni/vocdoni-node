@@ -80,13 +80,16 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	e.DefaultConfig = c
 	nodeConfig := node.DefaultConfig
 	nodeConfig.InsecureUnlockAllowed = true
+	nodeConfig.NoUSB = true
 	nodeConfig.WSHost = c.WSHost
 	nodeConfig.WSPort = c.WSPort
+	nodeConfig.WSModules = []string{}
 	nodeConfig.HTTPHost = c.HTTPHost
 	nodeConfig.HTTPPort = c.HTTPPort
 	nodeConfig.HTTPCors = []string{"*"}
+	nodeConfig.HTTPVirtualHosts = []string{"*"}
+	nodeConfig.HTTPModules = []string{}
 	nodeConfig.WSOrigins = []string{"*"}
-	nodeConfig.WSExposeAll = true
 	nodeConfig.NoUSB = true
 	nodeConfig.IPCPath = c.IPCPath
 	nodeConfig.DataDir = c.DataDir
