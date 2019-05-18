@@ -29,6 +29,7 @@ require (
 	github.com/influxdata/influxdb v1.7.6 // indirect
 	github.com/ipfs/go-ipfs-api v0.0.1
 	github.com/ipfs/go-ipfs-files v0.0.3 // indirect
+	github.com/ipfs/ipfs-update v0.0.0-20190125152008-596d840f5ca1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.1 // indirect
 	github.com/julienschmidt/httprouter v1.2.0 // indirect
 	github.com/karalabe/hid v0.0.0-20190507082517-9e0a1cda7275 // indirect
@@ -53,6 +54,7 @@ require (
 	github.com/uber-go/atomic v1.4.0 // indirect
 	github.com/uber/jaeger-client-go v2.16.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.0.0+incompatible // indirect
+	github.com/whyrusleeping/stump v0.0.0-20160611222256-206f8f13aae1 // indirect
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208 // indirect
 	go.uber.org/atomic v1.4.0 // indirect
 	golang.org/x/crypto v0.0.0-20190513172903-22d7a77e9e5f

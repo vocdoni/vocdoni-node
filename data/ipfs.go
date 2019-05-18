@@ -26,7 +26,7 @@ type IPFSHandle struct {
 
 func IPFSNewConfig() *IPFSConfig {
 	cfg := new(IPFSConfig)
-	cfg.Binary = "ipfs"
+	cfg.Binary = "/usr/local/bin/ipfs"
 	cfg.InitTimeout = 10
 	return cfg
 }
