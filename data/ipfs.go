@@ -17,10 +17,14 @@ type IPFSConfig struct {
 	InitTimeout int
 }
 
+func (c *IPFSConfig) Type() StorageID {
+	return IPFS
+}
+
 type IPFSHandle struct {
 	d *types.DataStore
 	s *shell.Shell
-	c *IPFSConfig
+	c *StorageConfig
 	//can we add a shell here for use by all methods?
 }
 
@@ -31,7 +35,7 @@ func IPFSNewConfig() *IPFSConfig {
 	return cfg
 }
 
-// init IPFS daemon with pubsub features enabled
+// init IPFS daemon
 func startIPFSDaemon(ipfsBinPath string) (err error) {
 	cmd := exec.Command(ipfsBinPath, "daemon")
 	if err := cmd.Start(); err != nil {
