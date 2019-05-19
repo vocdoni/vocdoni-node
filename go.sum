@@ -56,6 +56,8 @@ github.com/elastic/gosigar v0.10.2 h1:ktO7B8lAQQCf/CieNp1lQzKnbijg3FbfQqFUfAe6h/
 github.com/elastic/gosigar v0.10.2/go.mod h1:cdorVVzy1fhmEqmtgqkoE3bYtCfSCkVyjTyCIo22xvs=
 github.com/ethereum/go-ethereum v1.8.22-0.20190513125017-07d2d83c315a h1:jMOrKXNIzvnPElmKt73H5sjG93B/4aYHUImLQZAxbM8=
 github.com/ethereum/go-ethereum v1.8.22-0.20190513125017-07d2d83c315a/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
+github.com/ethereum/go-ethereum v1.8.22-0.20190517183939-97d3615612a4 h1:oUKn61kyH0Aw4Xy8MliWxv3FchyYAeerP49jo8qww9g=
+github.com/ethereum/go-ethereum v1.8.22-0.20190517183939-97d3615612a4/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
 github.com/fatih/color v1.7.0 h1:DkWD4oS2D8LGGgTQ6IvwJJXSL5Vp2ffcQg58nFV38Ys=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a h1:1znxn4+q2MrEdTk1eCk6KIV3muTYVclBIB6CTVR/zBc=
