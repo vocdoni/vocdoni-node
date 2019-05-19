@@ -2,11 +2,10 @@ package chain
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -34,40 +33,43 @@ type EthChainContext struct {
 	DefaultConfig *EthChainConfig
 }
 type EthChainConfig struct {
-	WSHost             string
-	WSPort             int
-	HTTPHost           string
-	HTTPPort           int
-	NodePort           int
-	NetworkId          int
-	NetworkGenesisFile string
-	BootstrapNodes     []string
-	KeyStore           string
-	DataDir            string
-	IPCPath            string
-	LightMode          bool
+	WSHost         string
+	WSPort         int
+	HTTPHost       string
+	HTTPPort       int
+	NodePort       int
+	NetworkId      int
+	NetworkGenesis []byte
+	BootstrapNodes []string
+	KeyStore       string
+	DataDir        string
+	IPCPath        string
+	LightMode      bool
 }
 
-func NewConfig() *EthChainConfig {
+// available chains: vctestnet
+func NewConfig(chain string) (*EthChainConfig, error) {
+	chainSpecs, err := GetChainSpecs(chain)
+	if err != nil {
+		return nil, err
+	}
 	cfg := new(EthChainConfig)
 	cfg.WSHost = "0.0.0.0"
 	cfg.WSPort = 9092
 	cfg.HTTPHost = "0.0.0.0"
 	cfg.HTTPPort = 9091
 	cfg.NodePort = 32000
-	cfg.NetworkId = 1714
-	cfg.NetworkGenesisFile = "genesis.json"
-	cfg.BootstrapNodes = []string{
-		"enode://e97bbd1b66c91a3e042703ec1a9af9361e7c84d892632cfa995bad96f3fa630b7048c8194e2bbc8984a612db7f5f8ca29be5d807d8abe5db86d5505b62eaa382@51.15.114.224:30303",
-		"enode://480fbf14bab92f6203140403f5a1d4b4a8af143b4bc2c48d7f09fd3a294d08955611c362064ea01681663e42638440a888c326977e178a35295f5c1ca99dfb0f@51.15.71.154:30303",
-		"enode://d6165c23b1d4415f845922b6589fcf19c62e07555c867848a890978993230dad039c248975578216b69a9f7a8fbc2b58db4817bd693f464a6aa45af90964b1e2@51.15.102.251:30303",
-		"enode://3722cb9af22c61294fe6a0a7beb1db176ef456eb4cab1f6551cefb44e253450342de6459bcf576bd97797cf0df9e818db3d048532f3068351ed1bacaa6ec0d20@51.15.89.137:30303",
+	cfg.NetworkId = chainSpecs.NetworkId
+	cfg.NetworkGenesis, err = base64.StdEncoding.DecodeString(chainSpecs.GenesisB64)
+	if err != nil {
+		return nil, err
 	}
+	cfg.BootstrapNodes = chainSpecs.BootNodes
 	cfg.KeyStore = "run/eth/keystore"
 	cfg.DataDir = "run/eth/data"
 	cfg.IPCPath = "run/eth/ipc"
 	cfg.LightMode = false
-	return cfg
+	return cfg, nil
 }
 
 func Init(c *EthChainConfig) (*EthChainContext, error) {
@@ -80,13 +82,16 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	e.DefaultConfig = c
 	nodeConfig := node.DefaultConfig
 	nodeConfig.InsecureUnlockAllowed = true
+	nodeConfig.NoUSB = true
 	nodeConfig.WSHost = c.WSHost
 	nodeConfig.WSPort = c.WSPort
+	nodeConfig.WSModules = []string{}
 	nodeConfig.HTTPHost = c.HTTPHost
 	nodeConfig.HTTPPort = c.HTTPPort
 	nodeConfig.HTTPCors = []string{"*"}
+	nodeConfig.HTTPVirtualHosts = []string{"*"}
+	nodeConfig.HTTPModules = []string{}
 	nodeConfig.WSOrigins = []string{"*"}
-	nodeConfig.WSExposeAll = true
 	nodeConfig.NoUSB = true
 	nodeConfig.IPCPath = c.IPCPath
 	nodeConfig.DataDir = c.DataDir
@@ -111,11 +116,8 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 		ethConfig.SyncMode = downloader.LightSync
 	}
 
-	var genesisJson *os.File
-	genesisJson, err = os.Open(c.NetworkGenesisFile)
-	genesisBytes, _ := ioutil.ReadAll(genesisJson)
 	g := new(core.Genesis)
-	err = g.UnmarshalJSON(genesisBytes)
+	err = g.UnmarshalJSON(c.NetworkGenesis)
 	if err != nil {
 		log.Println("Cannot read genesis file")
 		return err

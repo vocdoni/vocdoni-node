@@ -3,7 +3,10 @@ package net
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/vocdoni/go-dvote/data"
@@ -35,9 +38,9 @@ var fetchResponseFmt = `{
   }`
 
 var addResponseFmt = `{
-	"uri": "%s",
 	"request": "%s",
-	"timestamp": %d
+	"timestamp": %d,
+	"uri": "%s"
 }`
 
 var listPinsResponseFmt = `{
@@ -83,6 +86,24 @@ func parseMsg(payload []byte) (map[string]interface{}, error) {
 	return msgMap, nil
 }
 
+func parseUrisContent(uris string) []string {
+	out := make([]string, 0)
+	urisSplit := strings.Split(uris, ",")
+	for _, u := range urisSplit {
+		out = append(out, u)
+	}
+	return out
+}
+
+func parseTransportFromUri(uris []string) []string {
+	out := make([]string, 0)
+	for _, u := range uris {
+		splt := strings.Split(u, "/")
+		out = append(out, splt[0])
+	}
+	return out
+}
+
 func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Transport) {
 	for {
 		select {
@@ -114,7 +135,39 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 					log.Printf("No uri in fetchFile request or malformed")
 					//err to errchan, reply
 				}
-				content, err := storage.Retrieve(uri)
+				parsedURIs := parseUrisContent(uri)
+				transportTypes := parseTransportFromUri(parsedURIs)
+				var resp *http.Response
+				var content []byte
+				var err error
+				found := false
+				for idx, t := range transportTypes {
+					if found {
+						break
+					}
+					switch t {
+					case "http:", "https:":
+						resp, err = http.Get(parsedURIs[idx])
+						defer resp.Body.Close()
+						content, err = ioutil.ReadAll(resp.Body)
+						if content != nil {
+							found = true
+						}
+						break
+					case "ipfs:":
+						splt := strings.Split(parsedURIs[idx], "/")
+						hash := splt[len(splt)-1]
+						content, err = storage.Retrieve(hash)
+						if content != nil {
+							found = true
+						}
+						break
+					case "bzz:", "bzz-feed":
+						err = errors.New("Bzz and Bzz-feed not implemented yet")
+						break
+					}
+				}
+
 				if err != nil {
 					failString := fmt.Sprintf("Error fetching file %s", requestMap["uri"])
 					fmt.Printf(failString)
@@ -122,7 +175,7 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 				}
 				b64content := base64.StdEncoding.EncodeToString(content)
 				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().UnixNano()))))
-				log.Printf("%v", content)
+
 			case "addFile":
 				content, ok := requestMap["content"].(string)
 				if !ok {
@@ -167,7 +220,8 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 						log.Printf("cannot add file")
 					}
 					//log.Printf("added %s with name %s and with timestamp %s", cid, name, timestamp)
-					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, cid, requestId, time.Now().UnixNano()))))
+					ipfsRouteBaseURL := "ipfs://"
+					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, requestId, time.Now().UnixNano(), ipfsRouteBaseURL+cid))))
 				}
 				//data.Publish
 			case "pinList":

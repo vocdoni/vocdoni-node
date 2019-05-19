@@ -13,6 +13,7 @@ import (
 )
 
 type IPFSConfig struct {
+	Start       bool
 	Binary      string
 	InitTimeout int
 }
@@ -24,12 +25,13 @@ func (c *IPFSConfig) Type() StorageID {
 type IPFSHandle struct {
 	d *types.DataStore
 	s *shell.Shell
-	c *StorageConfig
+	c *IPFSConfig
 	//can we add a shell here for use by all methods?
 }
 
 func IPFSNewConfig() *IPFSConfig {
 	cfg := new(IPFSConfig)
+	cfg.Start = true
 	cfg.Binary = "ipfs"
 	cfg.InitTimeout = 10
 	return cfg
@@ -45,9 +47,11 @@ func startIPFSDaemon(ipfsBinPath string) (err error) {
 }
 
 func (i *IPFSHandle) Init(d *types.DataStore) error {
-	err := startIPFSDaemon(i.c.Binary)
-	if err != nil {
-		return err
+	if i.c.Start {
+		err := startIPFSDaemon(i.c.Binary)
+		if err != nil {
+			return err
+		}
 	}
 	i.d = d
 	i.s = shell.NewShell("localhost:5001")

@@ -37,7 +37,7 @@ func StorageIDFromString(i string) StorageID {
 	}
 }
 
-func InitDefault(t StorageID, config *StorageConfig) (Storage, error) {
+func InitDefault(t StorageID, config StorageConfig) (Storage, error) {
 	switch t {
 	case IPFS:
 		s := new(IPFSHandle)
