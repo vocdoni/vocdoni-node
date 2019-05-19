@@ -17,7 +17,7 @@ var resolverList = []string{
 // Only ipv4 support
 func Resolve(host string) string {
 	var ip string
-	rl := strShuffle(resolverList)
+	rl := StrShuffle(resolverList)
 	for _, ns := range rl {
 		ip = ResolveCustom(ns, host)
 		if ip != "" {
@@ -54,7 +54,8 @@ func isV4(address string) bool {
 	return strings.Count(address, ".") == 3
 }
 
-func strShuffle(vals []string) []string {
+// StrShuffle reandomizes the order of a string array
+func StrShuffle(vals []string) []string {
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	ret := make([]string, len(vals))
 	perm := r.Perm(len(vals))
