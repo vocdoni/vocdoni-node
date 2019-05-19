@@ -47,6 +47,7 @@ require (
 	github.com/prometheus/tsdb v0.7.1 // indirect
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d // indirect
 	github.com/sirupsen/logrus v1.4.1 // indirect
+	github.com/spf13/pflag v1.0.3
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tyler-smith/go-bip39 v1.0.0 // indirect
