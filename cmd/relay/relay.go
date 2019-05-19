@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"flag"
 	"log"
 	"os/user"
@@ -65,8 +66,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+	var storageConfig data.StorageConfig
 	log.Println("Initializing storage")
-	storage, err := data.InitDefault(storageType)
+	switch storageIDString {
+	case "IPFS":
+		storageConfig = data.IPFSNewConfig()
+	case "BZZ":
+		storageConfig = data.BZZNewConfig()
+	default:
+		log.Panic(errors.New("Storage not supported"))
+	}
+
+	storage, err := data.InitDefault(storageType, storageConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
