@@ -12,6 +12,19 @@ import (
 type BZZHandle struct {
 	d *types.DataStore
 	s *swarm.SimpleSwarm
+	c *BZZConfig
+}
+
+type BZZConfig struct {
+}
+
+func (c *BZZConfig) Type() StorageID {
+	return BZZ
+}
+
+func BZZNewConfig() *BZZConfig {
+	cfg := new(BZZConfig)
+	return cfg
 }
 
 func (b *BZZHandle) Init(d *types.DataStore) error {

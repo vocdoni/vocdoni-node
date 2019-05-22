@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"net"
 	"os"
 	"os/user"
 	"strings"
@@ -23,6 +24,8 @@ import (
 	"github.com/ethereum/go-ethereum/swarm/api/client"
 	"github.com/ethereum/go-ethereum/swarm/network"
 	"github.com/ethereum/go-ethereum/swarm/pss"
+
+	dvoteUtil "github.com/vocdoni/go-dvote/util"
 )
 
 const (
@@ -30,12 +33,32 @@ const (
 	MaxPeers = 10
 )
 
-// SwarmBootnodes list of bootnodes for the SWARM network
+// SwarmBootnodes list of bootnodes for the SWARM network. It supports DNS hostnames.
 var SwarmBootnodes = []string{
 	// EF Swarm Bootnode - AWS - eu-central-1
 	"enode://4c113504601930bf2000c29bcd98d1716b6167749f58bad703bae338332fe93cc9d9204f08afb44100dc7bea479205f5d162df579f9a8f76f8b402d339709023@3.122.203.99:30301",
 	// EF Swarm Bootnode - AWS - us-west-2
 	"enode://89f2ede3371bff1ad9f2088f2012984e280287a4e2b68007c2a6ad994909c51886b4a8e9e2ecc97f9910aca538398e0a5804b0ee80a187fde1ba4f32626322ba@52.35.212.179:30301",
+	// https://swarm-guide.readthedocs.io/en/latest/gettingstarted.html#connecting-to-the-public-swarm-cluster
+	"enode://76c1059162c93ef9df0f01097c824d17c492634df211ef4c806935b349082233b63b90c23970254b3b7138d630400f7cf9b71e80355a446a8b733296cb04169a@52.232.7.187:30401",
+	"enode://ce46bbe2a8263145d65252d52da06e000ad350ed09c876a71ea9544efa42f63c1e1b6cc56307373aaad8f9dd069c90d0ed2dd1530106200e16f4ca681dd8ae2d@52.232.7.187:30402",
+}
+
+func parseEnode(enode string) (string, error) {
+	splitAt := strings.Split(enode, "@")
+	if len(splitAt) != 2 {
+		return "", fmt.Errorf("swarm: invalid Enode %s", enode)
+	}
+	splitColon := strings.Split(splitAt[1], ":")
+	ip := splitColon[0]
+	isAddr := net.ParseIP(ip)
+	if isAddr == nil {
+		ip = dvoteUtil.Resolve(ip)
+		if ip == "" {
+			return "", fmt.Errorf("swarm: cannot resolve %s", enode)
+		}
+	}
+	return fmt.Sprintf("%s@%s:%s", splitAt[0],ip,splitColon[1]), nil
 }
 
 func newNode(key *ecdsa.PrivateKey, port int, httpport int, wsport int,
@@ -365,8 +388,13 @@ func (sn *SimpleSwarm) InitPSS() error {
 	// start the node
 	sn.Node.Start()
 	for _, url := range SwarmBootnodes {
-		log.Info("Add bootnode " + url)
-		node, _ := enode.ParseV4(url)
+		purl, err := parseEnode(url)
+		if err != nil {
+			log.Info(fmt.Sprintf("%v", err))
+			continue
+		}
+		log.Info("Add bootnode " + purl)
+		node, _ := enode.ParseV4(purl)
 		sn.Node.Server().AddPeer(node)
 	}
 
@@ -383,7 +411,8 @@ func (sn *SimpleSwarm) InitPSS() error {
 		case *pss.API:
 			sn.Pss = a.Service.(*pss.API)
 		default:
-			log.Info("interface: " + fmt.Sprintf("%T", a.Service))
+			//log.Info("interface: " + fmt.Sprintf("%T", a.Service))
+			continue
 		}
 	}
 

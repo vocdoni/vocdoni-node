@@ -4,23 +4,62 @@ import (
 	"bytes"
 	"errors"
 	"io/ioutil"
+	"os/exec"
+	"time"
 
 	"github.com/vocdoni/go-dvote/types"
 
 	shell "github.com/ipfs/go-ipfs-api"
 )
 
+type IPFSConfig struct {
+	Start       bool
+	Binary      string
+	InitTimeout int
+}
+
+func (c *IPFSConfig) Type() StorageID {
+	return IPFS
+}
+
 type IPFSHandle struct {
 	d *types.DataStore
 	s *shell.Shell
+	c *IPFSConfig
 	//can we add a shell here for use by all methods?
 }
 
+func IPFSNewConfig() *IPFSConfig {
+	cfg := new(IPFSConfig)
+	cfg.Start = true
+	cfg.Binary = "ipfs"
+	cfg.InitTimeout = 10
+	return cfg
+}
+
+// init IPFS daemon
+func startIPFSDaemon(ipfsBinPath string) (err error) {
+	cmd := exec.Command(ipfsBinPath, "daemon")
+	if err := cmd.Start(); err != nil {
+		return errors.New("Cannot init the IPFS daemon")
+	}
+	return nil
+}
+
 func (i *IPFSHandle) Init(d *types.DataStore) error {
+	if i.c.Start {
+		err := startIPFSDaemon(i.c.Binary)
+		if err != nil {
+			return err
+		}
+	}
 	i.d = d
 	i.s = shell.NewShell("localhost:5001")
-	if i.s.IsUp() {
-		return nil
+	for timeout := i.c.InitTimeout; timeout > 0; timeout-- {
+		if i.s.IsUp() {
+			return nil
+		}
+		time.Sleep(1 * time.Second)
 	}
 	//test that ipfs is running/working
 	return errors.New("Could not connect to IPFS daemon")

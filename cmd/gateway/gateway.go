@@ -1,13 +1,14 @@
 package main
 
 import (
-	"flag"
+	flag "github.com/spf13/pflag"
+	sig "github.com/vocdoni/go-dvote/crypto/signature_ecdsa"
+
 	"log"
 	"strings"
 	"time"
 
 	"github.com/vocdoni/go-dvote/chain"
-	sig "github.com/vocdoni/go-dvote/crypto/signature_ecdsa"
 	"github.com/vocdoni/go-dvote/data"
 	"github.com/vocdoni/go-dvote/net"
 	"github.com/vocdoni/go-dvote/types"
@@ -28,22 +29,24 @@ func main() {
 	dvotePort := flag.Int("dvotePort", 9090, "dvote API port")
 	dvoteRoute := flag.String("dvoteRoute", "/dvote", "dvote API route")
 
-	genesis := flag.String("genesis", "genesis.json", "Ethereum genesis file")
-	netID := flag.Int("netID", 1714, "network ID for the Ethereum blockchain")
-	w3wsPort := flag.Int("w3wsPort", 9091, "websockets port")
-	w3wsHost := flag.String("w3wsHost", "0.0.0.0", "ws host to listen on")
-	w3httpPort := flag.Int("w3httpPort", 0, "http endpoint port, disabled if 0")
-	w3httpHost := flag.String("w3httpHost", "0.0.0.0", "http host to listen on")
-
 	allowPrivate := flag.Bool("allowPrivate", true, "allows authorized clients to call private methods")
 	allowedAddrs := flag.String("allowedAddrs", "", "comma delimited list of allowed client eth addresses")
 	signingKey := flag.String("signingKey", "", "request signing key for this node")
+
+	chainType := flag.String("chain", "vctestnet", "Blockchain to connect")
+	w3wsPort := flag.Int("w3wsPort", 0, "websockets port")
+	w3wsHost := flag.String("w3wsHost", "0.0.0.0", "ws host to listen on")
+	w3httpPort := flag.Int("w3httpPort", 9091, "http endpoint port, disabled if 0")
+	w3httpHost := flag.String("w3httpHost", "0.0.0.0", "http host to listen on")
+
+	ipfsDaemon := flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
+	ipfsNoInit := flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
 
 	flag.Parse()
 
 	var signer *sig.SignKeys
 	if *allowPrivate {
-		keys := strings.Split(*authKeys, ",")
+		keys := strings.Split(*allowedAddrs, ",")
 		for _, key := range keys {
 			err := signer.AddAuthKey(key)
 			if err != nil {
@@ -82,25 +85,29 @@ func main() {
 			log.Fatal(err)
 		}
 
-		storage, err := data.InitDefault(data.StorageIDFromString("IPFS"))
+		ipfsConfig := data.IPFSNewConfig()
+		ipfsConfig.Start = !*ipfsNoInit
+		ipfsConfig.Binary = *ipfsDaemon
+		storage, err := data.InitDefault(data.StorageIDFromString("IPFS"), ipfsConfig)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		go websockets.Listen(listenerOutput)
-		go net.Route(listenerOutput, storage, websockets)
+		go net.Route(listenerOutput, storage, websockets, *signer)
 	}
 
 	var node *chain.EthChainContext
 	_ = node
 	if *w3Enabled {
-		w3cfg := chain.NewConfig()
+		w3cfg, err := chain.NewConfig(*chainType)
+		if err != nil {
+			log.Fatal(err)
+		}
 		w3cfg.WSPort = *w3wsPort
 		w3cfg.WSHost = *w3wsHost
 		w3cfg.HTTPPort = *w3httpPort
 		w3cfg.HTTPHost = *w3httpHost
-		w3cfg.NetworkGenesisFile = *genesis
-		w3cfg.NetworkId = *netID
 
 		node, err := chain.Init(w3cfg)
 		if err != nil {

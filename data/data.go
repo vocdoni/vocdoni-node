@@ -15,6 +15,10 @@ type Storage interface {
 	ListPins() (map[string]string, error)
 }
 
+type StorageConfig interface {
+	Type() StorageID
+}
+
 type StorageID int
 
 const (
@@ -33,20 +37,22 @@ func StorageIDFromString(i string) StorageID {
 	}
 }
 
-func InitDefault(t StorageID) (Storage, error) {
+func InitDefault(t StorageID, config StorageConfig) (Storage, error) {
 	switch t {
 	case IPFS:
 		s := new(IPFSHandle)
+		//s.c = IPFSNewConfig()
+		s.c = config.(*IPFSConfig)
 		defaultDataStore := new(types.DataStore)
 		defaultDataStore.Datadir = "this_is_still_ignored"
-		s.Init(defaultDataStore)
-		return s, nil
+		err := s.Init(defaultDataStore)
+		return s, err
 	case BZZ:
 		s := new(BZZHandle)
 		defaultDataStore := new(types.DataStore)
 		defaultDataStore.Datadir = "this_is_still_ignored"
-		s.Init(defaultDataStore)
-		return s, nil
+		err := s.Init(defaultDataStore)
+		return s, err
 	default:
 		return nil, errors.New("Bad storage type specification")
 	}

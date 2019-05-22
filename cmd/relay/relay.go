@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"flag"
 	"log"
 	"os/user"
@@ -57,10 +58,7 @@ func main() {
 	batch.BatchSignal = batchSignal
 	batch.BatchSize = batchSize
 
-	listenerOutput := make(chan types.Message)
-	listenerErrors := make(chan error)
-
-	routerOutput := make(chan types.Message)
+	transportOutput := make(chan types.Message)
 
 	log.Println("Initializing transport")
 	transport, err := net.InitDefault(transportType)
@@ -68,23 +66,35 @@ func main() {
 		log.Fatal(err)
 	}
 
+	var storageConfig data.StorageConfig
 	log.Println("Initializing storage")
-	storage, err := data.InitDefault(storageType)
+	switch storageIDString {
+	case "IPFS":
+		storageConfig = data.IPFSNewConfig()
+	case "BZZ":
+		storageConfig = data.BZZNewConfig()
+	default:
+		log.Panic(errors.New("Storage not supported"))
+	}
+
+	storage, err := data.InitDefault(storageType, storageConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
 	_ = storage
 
-	log.Println("Initializing websockets")
-	ws, err := net.InitDefault(net.TransportIDFromString("Websocket"))
-	if err != nil {
-		log.Fatal(err)
-	}
+	/*
+		log.Println("Initializing websockets")
+		ws, err := net.InitDefault(net.TransportIDFromString("Websocket"))
+		if err != nil {
+			log.Fatal(err)
+		}
+	*/
 
-	go batch.Recieve(routerOutput)
-	go transport.Listen(listenerOutput, listenerErrors)
-	go ws.Listen(listenerOutput, listenerErrors)
-	go net.Route(listenerOutput, routerOutput, listenerErrors, storage, ws)
+	go transport.Listen(transportOutput)
+	go batch.Recieve(transportOutput)
+	//	go ws.Listen(listenerOutput)
+	//	go net.Route(listenerOutput, storage, ws)
 
 	log.Println("Entering main loop")
 	for {
@@ -105,7 +115,6 @@ func main() {
 					log.Printf("Storage error: %s", err)
 				}
 				log.Printf("Batch published at: %s \n", cid)
-
 				// add to chain
 				// announce to pubsub
 				//fmt.Println("Nullifiers:")
@@ -114,8 +123,6 @@ func main() {
 				//fmt.Println(b)
 				//batch.Compact(ns)
 			}
-		case listenError := <-listenerErrors:
-			log.Println(listenError)
 		default:
 			continue
 		}
