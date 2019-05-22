@@ -127,7 +127,7 @@ func main() {
 	log.Printf("Finished initializing %d connections", len(conns))
 
 	//dummyRequestPing := `{"id": "req-0000001", "request": {"method": "ping"}}`
-	dummyRequestAddFile := `{"id": "req0000002", "request": {"method": "addFile", "name": "My first file", "type": "ipfs", "content": "SGVsbG8gVm9jZG9uaSE=", "timestamp": 1556110671}}`
+	dummyRequestAddFile := `{"id": "req0000002", "request": {"method": "addFile", "name": "My first file", "type": "ipfs", "content": "SGVsbG8gVm9jZG9uaSE=", "timestamp": 1556110671}, "signature": "539"}`
 	dummyRequestPinFileFmt := `{"id": "req0000003","request": {"method": "pinFile","uri": "%s","timestamp": 1556110671},"signature": "0x00"}`
 	dummyRequestListPins := `{"id": "req0000004","request": {"method": "pinList","timestamp": 1556110671},"signature": "0x00"}`
 	dummyRequestUnpinFileFmt := `{"id": "req0000005","request": {"method": "unpinFile","uri": "%s", "timestamp": 1556110671},"signature": "0x00"}`

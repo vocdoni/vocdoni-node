@@ -123,10 +123,18 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 				log.Printf("No ID field in message or malformed")
 			}
 
+			signature, ok := msgMap["signature"].(string)
+			if !ok {
+				log.Printf("No signature in request: %s", msg)
+			}
 			requestMap, ok := msgMap["request"].(map[string]interface{})
 			if !ok {
 				log.Printf("No request field in message or malformed")
 			}
+
+			rawRequest, err := json.Marshal(requestMap)
+			log.Printf(string(rawRequest))
+
 			method, ok := requestMap["method"].(string)
 			if !ok {
 				log.Printf("No method field in request or malformed")
@@ -180,54 +188,63 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 				b64content := base64.StdEncoding.EncodeToString(content)
 				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().UnixNano()), signer)))
 			case "addFile":
-				//check auth
-				content, ok := requestMap["content"].(string)
-				if !ok {
-					log.Printf("No content field in addFile request or malformed")
-					//err to errchan, reply
-					break
-				}
-				b64content, err := base64.StdEncoding.DecodeString(content)
+				authorized, err := signer.VerifySender(string(rawRequest), signature)
 				if err != nil {
-					log.Printf("Couldn't decode content")
-					//err to errchan, reply
+					log.Printf("Error checking authorization: %s", err)
 					break
 				}
-				/*
-					name, ok := requestMap["name"].(string)
+				if authorized {
+					content, ok := requestMap["content"].(string)
 					if !ok {
-						log.Printf("No name field in addFile request or malformed")
+						log.Printf("No content field in addFile request or malformed")
 						//err to errchan, reply
 						break
 					}
-						timestamp, errAtoi := strconv.ParseInt(requestMap["timestamp"].(), 10, 64)
-						if errAtoi != nil {
-							log.Printf("timestamp wrong format")
+					b64content, err := base64.StdEncoding.DecodeString(content)
+					if err != nil {
+						log.Printf("Couldn't decode content")
+						//err to errchan, reply
+						break
+					}
+					/*
+						name, ok := requestMap["name"].(string)
+						if !ok {
+							log.Printf("No name field in addFile request or malformed")
 							//err to errchan, reply
 							break
 						}
-				*/
-				reqType, ok := requestMap["type"].(string)
-				if !ok {
-					log.Printf("No type field in addFile request or malformed")
-					//err to errchan, reply
-					break
-				}
-				switch reqType {
-				case "swarm":
-					// TODO: Only need IPFS for now
-					//err to errchan, reply
-					break
-				case "ipfs":
-					cid, err := storage.Publish(b64content)
-					if err != nil {
-						log.Printf("cannot add file")
+							timestamp, errAtoi := strconv.ParseInt(requestMap["timestamp"].(), 10, 64)
+							if errAtoi != nil {
+								log.Printf("timestamp wrong format")
+								//err to errchan, reply
+								break
+							}
+					*/
+					reqType, ok := requestMap["type"].(string)
+					if !ok {
+						log.Printf("No type field in addFile request or malformed")
+						//err to errchan, reply
+						break
 					}
-					//log.Printf("added %s with name %s and with timestamp %s", cid, name, timestamp)
-					ipfsRouteBaseURL := "ipfs://"
-					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, requestId, time.Now().UnixNano(), ipfsRouteBaseURL+cid), signer)))
+					switch reqType {
+					case "swarm":
+						// TODO: Only need IPFS for now
+						//err to errchan, reply
+						break
+					case "ipfs":
+						cid, err := storage.Publish(b64content)
+						if err != nil {
+							log.Printf("cannot add file")
+						}
+						//log.Printf("added %s with name %s and with timestamp %s", cid, name, timestamp)
+						ipfsRouteBaseURL := "ipfs://"
+						wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, requestId, time.Now().UnixNano(), ipfsRouteBaseURL+cid), signer)))
+					}
+				} else {
+					wsTransport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
+					log.Println("Unauthorized request: %s", msg)
+					break
 				}
-				//data.Publish
 			case "pinList":
 				pins, err := storage.ListPins()
 				if err != nil {
