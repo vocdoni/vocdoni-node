@@ -45,7 +45,8 @@ func main() {
 	flag.Parse()
 
 	var signer *sig.SignKeys
-	if *allowPrivate {
+	signer = new(sig.SignKeys)
+	if *allowPrivate && *allowedAddrs != "" {
 		keys := strings.Split(*allowedAddrs, ",")
 		for _, key := range keys {
 			err := signer.AddAuthKey(key)
