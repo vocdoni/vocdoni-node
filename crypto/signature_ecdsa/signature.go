@@ -5,12 +5,14 @@ import (
 	hex "encoding/hex"
 	"errors"
 
+	"github.com/ethereum/go-ethereum/common"
 	crypto "github.com/ethereum/go-ethereum/crypto"
 )
 
 type SignKeys struct {
-	Public  *ecdsa.PublicKey
-	Private *ecdsa.PrivateKey
+	Public     *ecdsa.PublicKey
+	Private    *ecdsa.PrivateKey
+	Authorized []common.Address
 }
 
 // generate new keys
@@ -33,6 +35,16 @@ func (k *SignKeys) AddHexKey(privHex string) error {
 		k.Public = &k.Private.PublicKey
 	}
 	return err
+}
+
+func (k *SignKeys) AddAuthKey(address string) error {
+	if common.IsHexAddress(address) {
+		addr := common.HexToAddress(address)
+		k.Authorized = append(k.Authorized, addr)
+		return nil
+	} else {
+		return errors.New("Invalid address hex")
+	}
 }
 
 // returns the public and private keys as hex strings
@@ -66,4 +78,27 @@ func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 	hash := crypto.Keccak256([]byte(message))
 	result := crypto.VerifySignature(pub, hash, signature[:64])
 	return result, nil
+}
+
+func (k *SignKeys) VerifySender(message, sig string) (bool, error) {
+	sigHex, err := hex.DecodeString(sig)
+	if err != nil {
+		return false, err
+	}
+	msgHash := crypto.Keccak256Hash([]byte(message), sigHex)
+	signerPKBytes, err := crypto.Ecrecover(msgHash.Bytes(), []byte(sig))
+	if err != nil {
+		return false, err
+	}
+	signerPK, err := crypto.UnmarshalPubkey(signerPKBytes)
+	if err != nil {
+		return false, err
+	}
+	clientAddr := crypto.PubkeyToAddress(*signerPK)
+	for _, addr := range k.Authorized {
+		if addr == clientAddr {
+			return k.Verify(message, sig, string(signerPKBytes))
+		}
+	}
+	return false, errors.New("Unknown error in verify sender")
 }

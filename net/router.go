@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	signature "github.com/vocdoni/go-dvote/crypto/signature_ecdsa"
 	"github.com/vocdoni/go-dvote/data"
 	"github.com/vocdoni/go-dvote/types"
 
@@ -56,9 +57,8 @@ func failBody(requestId string, failString string) []byte {
 	return []byte(fmt.Sprintf(failBodyFmt, requestId, failString))
 }
 
-func successBody(requestId string, response string) []byte {
-	//need to calculate signature over response!
-	sig := []byte{0}
+func successBody(requestId string, response string, signer signature.SignKeys) []byte {
+	sig := signer.Sign(response)
 	return []byte(fmt.Sprintf(successBodyFmt, requestId, response, sig))
 }
 
@@ -83,7 +83,9 @@ func parseMsg(payload []byte) (map[string]interface{}, error) {
 	return msgMap, nil
 }
 
-func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorChan chan<- error, storage data.Storage, wsTransport Transport) {
+func checkSig
+
+func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Transport, signer signature.SignKeys) {
 	for {
 		select {
 		case msg := <-inbound:
@@ -93,10 +95,6 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 				log.Printf("Couldn't parse message JSON on message %v", msg)
 			}
 
-			if msgMap["Type"] == "zk-snarks-envelope" || msgMap["type"] == "lrs-envelope" {
-				outbound <- msg
-				break
-			}
 			requestId, ok := msgMap["id"].(string)
 			if !ok {
 				log.Printf("No ID field in message or malformed")
@@ -112,8 +110,6 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 			}
 
 			switch method {
-			case "ping":
-				wsTransport.Send(buildReply(msg, []byte("pong")), errorChan)
 			case "fetchFile":
 				uri, ok := requestMap["uri"].(string)
 				if !ok {
@@ -123,13 +119,14 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 				content, err := storage.Retrieve(uri)
 				if err != nil {
 					failString := fmt.Sprintf("Error fetching file %s", requestMap["uri"])
-					errorChan <- errors.New(failString)
-					wsTransport.Send(buildReply(msg, failBody(requestId, failString)), errorChan)
+					fmt.Printf(failString)
+					wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
 				}
 				b64content := base64.StdEncoding.EncodeToString(content)
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().UnixNano()))), errorChan)
+				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().UnixNano()), signer)))
 				log.Printf("%v", content)
 			case "addFile":
+				//check auth
 				content, ok := requestMap["content"].(string)
 				if !ok {
 					log.Printf("No content field in addFile request or malformed")
@@ -173,7 +170,7 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 						log.Printf("cannot add file")
 					}
 					//log.Printf("added %s with name %s and with timestamp %s", cid, name, timestamp)
-					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, cid, requestId, time.Now().UnixNano()))), errorChan)
+					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, cid, requestId, time.Now().UnixNano()), signer)))
 				}
 				//data.Publish
 			case "pinList":
@@ -185,7 +182,7 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 				if err != nil {
 					log.Printf("Internal error parsing pins")
 				}
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(listPinsResponseFmt, pinsJsonArray, requestId, time.Now().UnixNano()))), errorChan)
+				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(listPinsResponseFmt, pinsJsonArray, requestId, time.Now().UnixNano()), signer)))
 
 				//data.Pins
 			case "pinFile":
@@ -196,10 +193,10 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 				err := storage.Pin(uri)
 				if err != nil {
 					failString := fmt.Sprintf("Error pinning file %s", requestMap["uri"])
-					errorChan <- errors.New(failString)
-					wsTransport.Send(buildReply(msg, failBody(requestId, failString)), errorChan)
+					log.Printf(failString)
+					wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
 				}
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()))), errorChan)
+				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
 			case "unpinFile":
 				uri, ok := requestMap["uri"].(string)
 				if !ok {
@@ -208,10 +205,10 @@ func Route(inbound <-chan types.Message, outbound chan<- types.Message, errorCha
 				err := storage.Pin(uri)
 				if err != nil {
 					failString := fmt.Sprintf("Error unpinning file %s", requestMap["uri"])
-					errorChan <- errors.New(failString)
-					wsTransport.Send(buildReply(msg, failBody(requestId, failString)), errorChan)
+					log.Printf(failString)
+					wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
 				}
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()))), errorChan)
+				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
 			}
 		}
 	}
