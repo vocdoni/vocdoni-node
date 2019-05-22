@@ -38,6 +38,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/multiformats/go-multiaddr v0.0.2 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.0.2 // indirect
+	github.com/olekukonko/tablewriter v0.0.1 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/opentracing/opentracing-go v1.1.0 // indirect
