@@ -44,6 +44,26 @@ func main() {
 
 	flag.Parse()
 
+	var node *chain.EthChainContext
+	_ = node
+	if *w3Enabled {
+		w3cfg, err := chain.NewConfig(*chainType)
+		if err != nil {
+			log.Fatal(err)
+		}
+		w3cfg.WSPort = *w3wsPort
+		w3cfg.WSHost = *w3wsHost
+		w3cfg.HTTPPort = *w3httpPort
+		w3cfg.HTTPHost = *w3httpHost
+
+		node, err = chain.Init(w3cfg)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		node.Start()
+	}
+
 	var signer *sig.SignKeys
 	signer = new(sig.SignKeys)
 	if *allowPrivate && *allowedAddrs != "" {
@@ -60,6 +80,18 @@ func main() {
 		err := signer.AddHexKey(*signingKey)
 		if err != nil {
 			log.Fatal(err)
+		}
+	} else if *w3Enabled {
+		acc := node.Keys.Accounts()
+		if len(acc) > 0 {
+			keyJson, err := node.Keys.Export(acc[0], "", "")
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = signer.AddKeyFromEncryptedJSON(keyJson, "")
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	} else {
 		err := signer.Generate()
@@ -96,26 +128,6 @@ func main() {
 
 		go websockets.Listen(listenerOutput)
 		go net.Route(listenerOutput, storage, websockets, *signer)
-	}
-
-	var node *chain.EthChainContext
-	_ = node
-	if *w3Enabled {
-		w3cfg, err := chain.NewConfig(*chainType)
-		if err != nil {
-			log.Fatal(err)
-		}
-		w3cfg.WSPort = *w3wsPort
-		w3cfg.WSHost = *w3wsHost
-		w3cfg.HTTPPort = *w3httpPort
-		w3cfg.HTTPHost = *w3httpHost
-
-		node, err := chain.Init(w3cfg)
-		if err != nil {
-			log.Panic(err)
-		}
-
-		node.Start()
 	}
 
 	for {

@@ -5,6 +5,7 @@ import (
 	hex "encoding/hex"
 	"errors"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	crypto "github.com/ethereum/go-ethereum/crypto"
 )
@@ -35,6 +36,16 @@ func (k *SignKeys) AddHexKey(privHex string) error {
 		k.Public = &k.Private.PublicKey
 	}
 	return err
+}
+
+func (k *SignKeys) AddKeyFromEncryptedJSON(keyJson []byte, passphrase string) error {
+	key, err := keystore.DecryptKey(keyJson, passphrase)
+	if err != nil {
+		return err
+	}
+	k.Private = key.PrivateKey
+	k.Public = &key.PrivateKey.PublicKey
+	return nil
 }
 
 func (k *SignKeys) AddAuthKey(address string) error {
@@ -81,6 +92,10 @@ func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 }
 
 func (k *SignKeys) VerifySender(message, sig string) (bool, error) {
+	if sig[0:1] == "0x" {
+		sig = sig[2:]
+	}
+
 	sigHex, err := hex.DecodeString(sig)
 	if err != nil {
 		return false, err
