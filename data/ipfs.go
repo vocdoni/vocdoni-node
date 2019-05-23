@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"io/ioutil"
+	"log"
+	"os"
 	"os/exec"
 	"time"
 
@@ -37,8 +39,43 @@ func IPFSNewConfig() *IPFSConfig {
 	return cfg
 }
 
+// check if ipfs base dir exists
+func checkIPFSDirExists(path string) (bool, error) {
+	userHomeDir, err := os.UserHomeDir()
+	if err != nil {
+		return false, errors.New("Cannot get $HOME")
+	}
+	_, err = os.Stat(userHomeDir + "/." + path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
+}
+
 // init IPFS daemon
 func startIPFSDaemon(ipfsBinPath string) (err error) {
+
+	checkIPFSDirRes, err := checkIPFSDirExists(ipfsBinPath)
+
+	if err != nil {
+		log.Printf("%s", err)
+		return errors.New("Cannot check if IPFS dir exists")
+	}
+
+	if err == nil && !checkIPFSDirRes {
+		initCmd := exec.Command(ipfsBinPath, "init")
+		log.Printf("Initializing IPFS for first time ... wait until completed")
+		err := initCmd.Run()
+		if err != nil {
+			return errors.New("Cannot initialize IPFS for first time")
+		}
+		log.Printf("ipfs init done!")
+
+	}
+
 	cmd := exec.Command(ipfsBinPath, "daemon")
 	if err := cmd.Start(); err != nil {
 		return errors.New("Cannot init the IPFS daemon")
