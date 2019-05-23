@@ -242,6 +242,7 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 				} else {
 					wsTransport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
 					break
+				}
 			case "pinList":
 				authorized, err := signer.VerifySender(string(rawRequest), signature)
 				if err != nil {

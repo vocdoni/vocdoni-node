@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"time"
 
 	"github.com/vocdoni/go-dvote/types"
@@ -41,10 +42,11 @@ func IPFSNewConfig() *IPFSConfig {
 
 // check if ipfs base dir exists
 func checkIPFSDirExists(path string) (bool, error) {
-	userHomeDir, err := os.UserHomeDir()
+	usr, err := user.Current()
 	if err != nil {
 		return false, errors.New("Cannot get $HOME")
 	}
+	userHomeDir := usr.HomeDir
 	_, err = os.Stat(userHomeDir + "/." + path)
 	if err == nil {
 		return true, nil
