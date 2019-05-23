@@ -2,12 +2,12 @@
 
 A library to facilitate the usage of Swarm as a standalone tool.
 
-## SimplePss
+## PSS
 
 PSS is the swarm protocol for sending messages, similar to IPFs/PubSub and Ethereum/Whisper.
 It shares the Whisper cryptography and adds a routing layer based on Kademlia DHT.
 
-Using Swarm/PSS as a devp2p standalone protocol is hard, so this library aims to abstract the implementation and make it easy to integrate with any GoLang project. 
+Using Swarm/PSS as a standalone protocol is hard, so this library aims to abstract the implementation and make it easy to integrate with any Go Lang project. 
 
 Download the library.
 ```
@@ -24,14 +24,14 @@ import (
 
 #### Basic usage
 
-Create a simplePSS instance
+Create a simpleSwarm instance
 ```
-sn := new(swarm.SimplePss)
+sn := new(swarm.SimpleSwarm)
 ```
 
 Initialize and start the swarm process. This will start the p2p protocol and automatically connect to the swarm network.
 ```
-err := sn.Init()
+err := sn.InitPSS()
 ```
 
 Lets subscribe to a specific topic "aTopic" and add a symetric key which will be used to decrypt incoming messages (if encrypted).
@@ -67,54 +67,76 @@ Address can be used for sending more direct messages (using Kademlia routing). A
 #### Full example
 
 ```
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Use <sym|asym> <key>")
-		return
-	}
+package main
 
-	sn := new(swarm.SimplePss)
-	err := sn.Init()
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/ethereum/go-ethereum/log"
+	flag "github.com/spf13/pflag"
+	"github.com/tcnksm/go-input"
+	swarm "github.com/vocdoni/go-dvote/swarm"
+)
+
+func main() {
+	kind := flag.String("encryption", "raw", "pss encryption key schema")
+	key := flag.String("key", "vocdoni", "pss encryption key")
+	topic := flag.String("topic", "vocdoni_test", "pss topic")
+	addr := flag.String("address", "", "pss address")
+	logLevel := flag.String("log", "crit", "pss node log level")
+	flag.Parse()
+
+	sn := new(swarm.SimpleSwarm)
+	err := sn.InitPSS()
 	if err != nil {
 		fmt.Printf("%v\n", err)
 		return
 	}
-	err = sn.SetLog("crit")
+
+	err = sn.SetLog(*logLevel)
 	if err != nil {
 		fmt.Printf("Cannot set loglevel %v\n", err)
 	}
 
-	kind := os.Args[1]
-	topic := "vocdoni_test"
-	key := ""
+	sn.PssSub(*kind, *key, *topic, "")
+	defer sn.PssTopics[*topic].Unregister()
 
-	if kind == "sym" || kind == "asym" || kind == "raw" {
-		if kind != "raw" {
-			key = os.Args[2]
-		}
-		sn.PssSub(kind, key, topic, "")
-		defer sn.PssTopics[topic].Unregister()
-	} else {
-		fmt.Println("First parameter must be sym or asym")
-		return
-	}
 	fmt.Printf("My PSS pubKey is %s\n", sn.PssPubKey)
+
 	go func() {
 		for {
-			pmsg := <-sn.PssTopics[topic].Delivery
-			fmt.Printf("<- Pss received msg:{%s}\n", pmsg.Msg)
+			pmsg := <-sn.PssTopics[*topic].Delivery
+			fmt.Printf("\n%s\n", pmsg.Msg)
 		}
 	}()
 
 	hostname, _ := os.Hostname()
+	ui := &input.UI{
+		Writer: os.Stdout,
+		Reader: os.Stdin,
+	}
 
+	var msg string
 	for {
-		fmt.Printf("-> Sending %s pss to [%s]\n", kind, key)
+		msg, err = ui.Ask("", &input.Options{
+			Default:  "",
+			Required: true,
+			Loop:     false,
+		})
+		if len(msg) < 1 {
+			continue
+		}
+		if msg == "exit" {
+			break
+		}
 		currentTime := int64(time.Now().Unix())
-		err := sn.PssPub(kind, key, topic, fmt.Sprintf("Hello world from %s at %d", hostname, currentTime), "")
+		msg = fmt.Sprintf("[%d][%s] %s\n", currentTime, hostname, msg)
+		err := sn.PssPub(*kind, *key, *topic, msg, *addr)
 		log.Info("pss sent", "err", err)
-		time.Sleep(10 * time.Second)
 	}
 }
+
 ```
 

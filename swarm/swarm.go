@@ -218,41 +218,6 @@ func (sn *SimpleSwarm) InitBZZ() error {
 
 	sn.SetLog("info")
 	sn.Ports = NewSwarmPorts()
-	sn.Ports.Bzz += 100
-	sn.Ports.HTTPRPC += 100
-	sn.Ports.P2P += 100
-	sn.Ports.WebSockets += 100
-
-	/*
-		// set private key
-		keypath := sn.Datadir + "/ecdsa.key"
-		if _, err := os.Stat(keypath); err == nil {
-			// load key
-			prvKey, err := crypto.LoadECDSA(keypath)
-			if err != nil {
-				return err
-			}
-			sn.Key = prvKey
-
-		} else if os.IsNotExist(err) {
-			// generate and store key
-			newKey, err := crypto.GenerateKey()
-			if err != nil {
-				return err
-			}
-			//write to file
-			err = crypto.SaveECDSA(keypath, newKey)
-			if err != nil {
-				return err
-			}
-			sn.Key = newKey
-
-		} else {
-			// Schrodinger: file may or may not exist. See err for details.
-			// this could be caused by permissions errors or a failing disk
-			return err
-		}
-	*/
 
 	// create node
 	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
@@ -275,9 +240,14 @@ func (sn *SimpleSwarm) InitBZZ() error {
 
 	// start the node
 	sn.Node.Start()
-	for _, url := range SwarmBootnodes {
-		log.Info("Add bootnode " + url)
-		node, _ := enode.ParseV4(url)
+	for _, url := range dvoteUtil.StrShuffle(SwarmBootnodes) {
+		purl, err := parseEnode(url)
+		if err != nil {
+			log.Info(fmt.Sprintf("%v", err))
+			continue
+		}
+		log.Info("Add bootnode " + purl)
+		node, _ := enode.ParseV4(purl)
 		sn.Node.Server().AddPeer(node)
 	}
 
@@ -290,33 +260,6 @@ func (sn *SimpleSwarm) InitBZZ() error {
 	sn.ListenAddr = swarmConfig.ListenAddr
 	swarmURL := sn.ListenAddr + ":" + string(sn.Ports.HTTPRPC)
 	sn.Client = client.NewClient(swarmURL)
-
-	// Get the services API
-	//for _, a := range swarmNode.APIs() {
-	//	switch a.Service.(type) {
-	//	case *network.Hive:
-	//		sn.Hive = a.Service.(*network.Hive)
-	//	case *pss.API:
-	//		sn.Pss = a.Service.(*pss.API)
-	//	default:
-	//		log.Info("interface: " + fmt.Sprintf("%T", a.Service))
-	//	}
-	//}
-
-	// Create topics map
-	//sn.PssTopics = make(map[string]*pssSub)
-
-	// Set some extra data
-	//sn.EnodeID = sn.Node.Server().NodeInfo().Enode
-	//sn.PssPubKey = hexutil.Encode(crypto.FromECDSAPub(sn.Pss.PublicKey()))
-	//sn.PssAddr, err = sn.Pss.BaseAddr()
-	//if err != nil {
-	//	return fmt.Errorf("pss API fail %v", err)
-	//}
-
-	// Print some information
-	//log.Info(fmt.Sprintf("My PSS pubkey is %s", sn.PssPubKey))
-	//log.Info(fmt.Sprintf("My PSS address is %x", sn.PssAddr))
 
 	// Run statistics goroutine
 	sn.PrintStats()
@@ -337,35 +280,6 @@ func (sn *SimpleSwarm) InitPSS() error {
 
 	sn.SetLog("info")
 	sn.Ports = NewSwarmPorts()
-	/*
-		keypath := sn.Datadir + "/ecdsa.key"
-		if _, err := os.Stat(keypath); err == nil {
-			// load key
-			prvKey, err := crypto.LoadECDSA(keypath)
-			if err != nil {
-				return err
-			}
-			sn.Key = prvKey
-
-		} else if os.IsNotExist(err) {
-			// generate and store key
-			newKey, err := crypto.GenerateKey()
-			if err != nil {
-				return err
-			}
-			//write to file
-			err = crypto.SaveECDSA(keypath, newKey)
-			if err != nil {
-				return err
-			}
-			sn.Key = newKey
-
-		} else {
-			// Schrodinger: file may or may not exist. See err for details.
-			// this could be caused by permissions errors or a failing disk
-			return err
-		}
-	*/
 
 	// create node
 	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
@@ -388,7 +302,7 @@ func (sn *SimpleSwarm) InitPSS() error {
 
 	// start the node
 	sn.Node.Start()
-	for _, url := range SwarmBootnodes {
+	for _, url := range dvoteUtil.StrShuffle(SwarmBootnodes) {
 		purl, err := parseEnode(url)
 		if err != nil {
 			log.Info(fmt.Sprintf("%v", err))

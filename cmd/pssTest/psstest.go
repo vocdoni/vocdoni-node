@@ -48,6 +48,7 @@ func main() {
 		Writer: os.Stdout,
 		Reader: os.Stdin,
 	}
+
 	var msg string
 	for {
 		msg, err = ui.Ask("", &input.Options{
@@ -63,11 +64,7 @@ func main() {
 		}
 		currentTime := int64(time.Now().Unix())
 		msg = fmt.Sprintf("[%d][%s] %s\n", currentTime, hostname, msg)
-		//fmt.Printf("-> Sending %s pss to [%s]\n", *kind, *key)
-		//err := sn.PssPub(*kind, *key, *topic,
-		//	fmt.Sprintf("Hello I am %s, time is %d, my pubKey is %s and my PSS addr is %x", hostname, currentTime, sn.PssPubKey, sn.PssAddr), "b117308447d0b07f42565c45b2929ef0574519cedcb607191ead40c2e1")
 		err := sn.PssPub(*kind, *key, *topic, msg, *addr)
 		log.Info("pss sent", "err", err)
-		//time.Sleep(10 * time.Second)
 	}
 }
