@@ -133,7 +133,6 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 			}
 
 			rawRequest, err := json.Marshal(requestMap)
-			log.Printf(string(rawRequest))
 
 			method, ok := requestMap["method"].(string)
 			if !ok {
@@ -242,45 +241,72 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 					}
 				} else {
 					wsTransport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
-					log.Println("Unauthorized request: %s", msg)
 					break
 				}
 			case "pinList":
-				pins, err := storage.ListPins()
+				authorized, err := signer.VerifySender(string(rawRequest), signature)
 				if err != nil {
-					log.Printf("Internal error fetching pins")
+					log.Printf("Error checking authorization: %s", err)
+					break
 				}
-				pinsJsonArray, err := json.Marshal(pins)
-				if err != nil {
-					log.Printf("Internal error parsing pins")
+				if authorized {
+					pins, err := storage.ListPins()
+					if err != nil {
+						log.Printf("Internal error fetching pins")
+					}
+					pinsJsonArray, err := json.Marshal(pins)
+					if err != nil {
+						log.Printf("Internal error parsing pins")
+					}
+					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(listPinsResponseFmt, pinsJsonArray, requestId, time.Now().UnixNano()), signer)))
+				} else {
+					wsTransport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
+					break
 				}
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(listPinsResponseFmt, pinsJsonArray, requestId, time.Now().UnixNano()), signer)))
-
-				//data.Pins
 			case "pinFile":
-				uri, ok := requestMap["uri"].(string)
-				if !ok {
-					log.Printf("No uri in pinFile request or malformed")
-				}
-				err := storage.Pin(uri)
+				authorized, err := signer.VerifySender(string(rawRequest), signature)
 				if err != nil {
-					failString := fmt.Sprintf("Error pinning file %s", requestMap["uri"])
-					log.Printf(failString)
-					wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
+					log.Printf("Error checking authorization: %s", err)
+					break
 				}
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
+				if authorized {
+					uri, ok := requestMap["uri"].(string)
+					if !ok {
+						log.Printf("No uri in pinFile request or malformed")
+					}
+					err := storage.Pin(uri)
+					if err != nil {
+						failString := fmt.Sprintf("Error pinning file %s", requestMap["uri"])
+						log.Printf(failString)
+						wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
+					}
+					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
+				} else {
+					wsTransport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
+					break
+				}
 			case "unpinFile":
-				uri, ok := requestMap["uri"].(string)
-				if !ok {
-					log.Printf("No uri in unpinFile request or malformed")
-				}
-				err := storage.Pin(uri)
+				authorized, err := signer.VerifySender(string(rawRequest), signature)
 				if err != nil {
-					failString := fmt.Sprintf("Error unpinning file %s", requestMap["uri"])
-					log.Printf(failString)
-					wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
+					log.Printf("Error checking authorization: %s", err)
+					break
 				}
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
+				if authorized {
+					uri, ok := requestMap["uri"].(string)
+					if !ok {
+						log.Printf("No uri in unpinFile request or malformed")
+					}
+					err := storage.Pin(uri)
+					if err != nil {
+						failString := fmt.Sprintf("Error unpinning file %s", requestMap["uri"])
+						log.Printf(failString)
+						wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
+					}
+					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
+				} else {
+					wsTransport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
+					break
+				}
 			}
 		}
 	}

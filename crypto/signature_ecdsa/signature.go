@@ -4,9 +4,11 @@ import (
 	"crypto/ecdsa"
 	hex "encoding/hex"
 	"errors"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	crypto "github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -91,29 +93,28 @@ func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 	return result, nil
 }
 
-func (k *SignKeys) VerifySender(message, sig string) (bool, error) {
-	if sig[0:1] == "0x" {
-		sig = sig[2:]
+func signHash(data []byte) []byte {
+	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)
+	return crypto.Keccak256([]byte(msg))
+}
+
+func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
+	sig := hexutil.MustDecode(sigHex)
+	if sig[64] != 27 && sig[64] != 28 {
+		return false, errors.New("Bad recovery hex")
+	}
+	sig[64] -= 27
+
+	pubKey, err := crypto.SigToPub(signHash([]byte(msg)), sig)
+	if err != nil {
+		return false, errors.New("Bad sig")
 	}
 
-	sigHex, err := hex.DecodeString(sig)
-	if err != nil {
-		return false, err
-	}
-	msgHash := crypto.Keccak256Hash([]byte(message), sigHex)
-	signerPKBytes, err := crypto.Ecrecover(msgHash.Bytes(), []byte(sig))
-	if err != nil {
-		return false, err
-	}
-	signerPK, err := crypto.UnmarshalPubkey(signerPKBytes)
-	if err != nil {
-		return false, err
-	}
-	clientAddr := crypto.PubkeyToAddress(*signerPK)
+	recoveredAddr := crypto.PubkeyToAddress(*pubKey)
 	for _, addr := range k.Authorized {
-		if addr == clientAddr {
-			return k.Verify(message, sig, string(signerPKBytes))
+		if addr == recoveredAddr {
+			return true, nil
 		}
 	}
-	return false, errors.New("Unknown error in verify sender")
+	return false, nil
 }
