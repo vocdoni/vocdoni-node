@@ -58,7 +58,7 @@ func parseEnode(enode string) (string, error) {
 			return "", fmt.Errorf("swarm: cannot resolve %s", enode)
 		}
 	}
-	return fmt.Sprintf("%s@%s:%s", splitAt[0],ip,splitColon[1]), nil
+	return fmt.Sprintf("%s@%s:%s", splitAt[0], ip, splitColon[1]), nil
 }
 
 func newNode(key *ecdsa.PrivateKey, port int, httpport int, wsport int,
@@ -456,6 +456,7 @@ func strAddress(addr string) pss.PssAddress {
 func (sn *SimpleSwarm) PssSub(subType, key, topic, address string) error {
 	pssTopic := strTopic(topic)
 	pssAddress := strAddress(address)
+	log.Debug("pss subscription", "to", fmt.Sprintf("subscription to topic %s", pssTopic))
 	if subType == "sym" {
 		_, err := sn.Pss.SetSymmetricKey(strSymKey(key), pssTopic, pssAddress, true)
 		if err != nil {
