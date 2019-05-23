@@ -3,6 +3,7 @@ package swarm
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"os"
@@ -448,8 +449,7 @@ func strSymKey(key string) []byte {
 }
 
 func strAddress(addr string) pss.PssAddress {
-	var pssAddress pss.PssAddress
-	pssAddress = []byte(addr)
+	pssAddress, _ := hex.DecodeString(addr)
 	return pssAddress
 }
 
@@ -488,6 +488,7 @@ func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
 	var err error
 	dstAddr := strAddress(address)
 	dstTopic := strTopic(topic)
+	log.Info(fmt.Sprintf("Sending message to %x with topic %x", dstAddr, dstTopic))
 	if subType == "sym" {
 		symKeyId, err := sn.Pss.SetSymmetricKey(strSymKey(key), dstTopic, dstAddr, false)
 		if err != nil {

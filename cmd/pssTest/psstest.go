@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	flag "github.com/spf13/pflag"
-
 	"github.com/ethereum/go-ethereum/log"
+	flag "github.com/spf13/pflag"
+	"github.com/tcnksm/go-input"
 	swarm "github.com/vocdoni/go-dvote/swarm"
 )
 
@@ -15,7 +15,7 @@ func main() {
 	kind := flag.String("encryption", "raw", "pss encryption key schema")
 	key := flag.String("key", "vocdoni", "pss encryption key")
 	topic := flag.String("topic", "vocdoni_test", "pss topic")
-	_ = flag.String("address", "", "pss address")
+	addr := flag.String("address", "", "pss address")
 	logLevel := flag.String("log", "crit", "pss node log level")
 	flag.Parse()
 
@@ -39,18 +39,35 @@ func main() {
 	go func() {
 		for {
 			pmsg := <-sn.PssTopics[*topic].Delivery
-			fmt.Printf("<- Pss received msg:{%s}\n", pmsg.Msg)
+			fmt.Printf("\n%s\n", pmsg.Msg)
 		}
 	}()
 
 	hostname, _ := os.Hostname()
-
+	ui := &input.UI{
+		Writer: os.Stdout,
+		Reader: os.Stdin,
+	}
+	var msg string
 	for {
-		fmt.Printf("-> Sending %s pss to [%s]\n", *kind, *key)
+		msg, err = ui.Ask("", &input.Options{
+			Default:  "",
+			Required: true,
+			Loop:     false,
+		})
+		if len(msg) < 1 {
+			continue
+		}
+		if msg == "exit" {
+			break
+		}
 		currentTime := int64(time.Now().Unix())
-		err := sn.PssPub(*kind, *key, *topic,
-			fmt.Sprintf("Hello I am %s, time is %d, my pubKey is %s and my PSS addr is %x", hostname, currentTime, sn.PssPubKey, sn.PssAddr), "b117308447d0b07f42565c45b2929ef0574519cedcb607191ead40c2e1")
+		msg = fmt.Sprintf("[%d][%s] %s\n", currentTime, hostname, msg)
+		//fmt.Printf("-> Sending %s pss to [%s]\n", *kind, *key)
+		//err := sn.PssPub(*kind, *key, *topic,
+		//	fmt.Sprintf("Hello I am %s, time is %d, my pubKey is %s and my PSS addr is %x", hostname, currentTime, sn.PssPubKey, sn.PssAddr), "b117308447d0b07f42565c45b2929ef0574519cedcb607191ead40c2e1")
+		err := sn.PssPub(*kind, *key, *topic, msg, *addr)
 		log.Info("pss sent", "err", err)
-		time.Sleep(10 * time.Second)
+		//time.Sleep(10 * time.Second)
 	}
 }
