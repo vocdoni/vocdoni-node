@@ -28,7 +28,7 @@ var failBodyFmt = `{
 var successBodyFmt = `{
   "id": "%s",
   "response": %s,
-  "signature": "%x"
+  "signature": "0x%s"
 }`
 
 //content file must be b64 encoded
