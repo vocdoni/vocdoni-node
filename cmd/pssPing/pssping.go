@@ -8,12 +8,11 @@ import (
 	"flag"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/tcnksm/go-input"
 	swarm "github.com/vocdoni/go-dvote/swarm"
 )
 
 func main() {
-	kind := flag.String("encryption", "sym", "pss encryption key schema")
+	kind := flag.String("encryption", "raw", "pss encryption key schema")
 	key := flag.String("key", "vocdoni", "pss encryption key")
 	topic := flag.String("topic", "vocdoni_test", "pss topic")
 	addr := flag.String("address", "", "pss address")
@@ -45,27 +44,13 @@ func main() {
 	}()
 
 	hostname, _ := os.Hostname()
-	ui := &input.UI{
-		Writer: os.Stdout,
-		Reader: os.Stdin,
-	}
-
 	var msg string
 	for {
-		msg, err = ui.Ask("", &input.Options{
-			Default:  "",
-			Required: true,
-			Loop:     false,
-		})
-		if len(msg) < 1 {
-			continue
-		}
-		if msg == "exit" {
-			break
-		}
+		msg = "Hello world"
 		currentTime := int64(time.Now().Unix())
 		msg = fmt.Sprintf("[%d][%s] %s\n", currentTime, hostname, msg)
 		err := sn.PssPub(*kind, *key, *topic, msg, *addr)
 		log.Info("pss sent", "err", err)
+		time.Sleep(10 * time.Second)
 	}
 }
