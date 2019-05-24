@@ -12,7 +12,8 @@ import (
 )
 
 func main() {
-	kind := flag.String("encryption", "raw", "pss encryption key schema")
+	datadir := flag.String("datadir", "", "datadir for pss data")
+	kind := flag.String("encryption", "sym", "pss encryption key schema")
 	key := flag.String("key", "vocdoni", "pss encryption key")
 	topic := flag.String("topic", "vocdoni_test", "pss topic")
 	addr := flag.String("address", "", "pss address")
@@ -20,6 +21,7 @@ func main() {
 	flag.Parse()
 
 	sn := new(swarm.SimpleSwarm)
+	sn.SetDatadir(*datadir)
 	err := sn.InitPSS()
 	if err != nil {
 		fmt.Printf("%v\n", err)
