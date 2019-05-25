@@ -24,7 +24,7 @@ func (p *PSSHandle) Init(c *types.Connection) error {
 	if err != nil {
 		return err
 	}
-	sn.PssSub(p.c.Encryption, p.c.Key, p.c.Topic, p.c.Address)
+	sn.PssSub(p.c.Encryption, p.c.Key, p.c.Topic)
 	p.s = sn
 	return nil
 }

@@ -68,6 +68,7 @@ func newNode(key *ecdsa.PrivateKey, port int, httpport int, wsport int,
 	if key != nil {
 		cfg.P2P.PrivateKey = key
 	}
+	cfg.NoUSB = true
 	cfg.P2P.MaxPeers = MaxPeers
 	cfg.P2P.ListenAddr = fmt.Sprintf("0.0.0.0:%d", port)
 	cfg.P2P.EnableMsgEvents = true
@@ -95,9 +96,10 @@ func newNode(key *ecdsa.PrivateKey, port int, httpport int, wsport int,
 	return stack, cfg, nil
 }
 
-func newSwarm(privkey *ecdsa.PrivateKey, nodekey *ecdsa.PrivateKey, datadir string, port int) (*swarm.Swarm, *swarmapi.Config, node.ServiceConstructor) {
+func newSwarm(privkey *ecdsa.PrivateKey, nodekey *ecdsa.PrivateKey, datadir string, port int, lightnode bool) (*swarm.Swarm, *swarmapi.Config, node.ServiceConstructor) {
 	// create swarm service
 	swarmCfg := swarmapi.NewConfig()
+	swarmCfg.LightNodeEnabled = lightnode
 	swarmCfg.SyncEnabled = true
 	swarmCfg.Port = fmt.Sprintf("%d", port)
 	swarmCfg.Path = datadir
@@ -107,6 +109,7 @@ func newSwarm(privkey *ecdsa.PrivateKey, nodekey *ecdsa.PrivateKey, datadir stri
 	swarmCfg.Pss.CacheTTL = time.Second * 30
 	swarmCfg.Pss.AllowRaw = true
 	swarmCfg.Init(privkey, nodekey)
+
 	swarmNode, err := swarm.NewSwarm(swarmCfg, nil)
 	if err != nil {
 		log.Crit("cannot crate swarm node")
@@ -162,6 +165,7 @@ type SimpleSwarm struct {
 	Ports      *swarmPorts
 	ListenAddr string
 	Client     *client.Client
+	LightNode  bool
 }
 
 func (sn *SimpleSwarm) SetLog(level string) error {
@@ -229,7 +233,7 @@ func (sn *SimpleSwarm) InitBZZ() error {
 	}
 
 	// create and register Swarm service
-	_, swarmConfig, swarmHandler := newSwarm(sn.NodeKey, sn.NodeKey, sn.Datadir, sn.Ports.Bzz)
+	_, swarmConfig, swarmHandler := newSwarm(sn.NodeKey, sn.NodeKey, sn.Datadir, sn.Ports.Bzz, sn.LightNode)
 	err = sn.Node.Register(swarmHandler)
 	if err != nil {
 		return fmt.Errorf("swarm register fail %v", err)
@@ -291,8 +295,9 @@ func (sn *SimpleSwarm) InitPSS() error {
 	}
 
 	// create and register Swarm service
-	swarmNode, _, swarmHandler := newSwarm(sn.NodeKey, sn.NodeKey, sn.Datadir, sn.Ports.Bzz)
+	swarmNode, _, swarmHandler := newSwarm(sn.NodeKey, sn.NodeKey, sn.Datadir, sn.Ports.Bzz, sn.LightNode)
 	err = sn.Node.Register(swarmHandler)
+
 	if err != nil {
 		return fmt.Errorf("swarm register fail %v", err)
 	}
@@ -364,9 +369,9 @@ func strAddress(addr string) pss.PssAddress {
 	return pssAddress
 }
 
-func (sn *SimpleSwarm) PssSub(subType, key, topic, address string) error {
+func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	pssTopic := strTopic(topic)
-	pssAddress := strAddress(address)
+	pssAddress := strAddress("")
 	log.Debug("pss subscription", "to", fmt.Sprintf("subscription to topic %s", pssTopic))
 	if subType == "sym" {
 		_, err := sn.Pss.SetSymmetricKey(strSymKey(key), pssTopic, pssAddress, true)
@@ -376,7 +381,7 @@ func (sn *SimpleSwarm) PssSub(subType, key, topic, address string) error {
 	}
 
 	sn.PssTopics[topic] = new(pssSub)
-	sn.PssTopics[topic].Address = address
+	sn.PssTopics[topic].Address = ""
 	sn.PssTopics[topic].Delivery = make(chan PssMsg)
 
 	var pssHandler pss.HandlerFunc = func(msg []byte, peer *p2p.Peer, asym bool, keyid string) error {

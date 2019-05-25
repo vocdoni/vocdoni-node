@@ -37,8 +37,8 @@ err := sn.InitPSS()
 Lets subscribe to a specific topic "aTopic" and add a symetric key which will be used to decrypt incoming messages (if encrypted).
 
 ```
-// sn.PssSub(kind, key, topic, address)
-sn.PssSub("sym", "aSymetricKey", "aTopic, "")
+// sn.PssSub(kind, key, topic)
+sn.PssSub("sym", "aSymetricKey", "aTopic)
 ```
 
 There are three kind of messages which can be used:
@@ -100,7 +100,7 @@ func main() {
 		fmt.Printf("Cannot set loglevel %v\n", err)
 	}
 
-	sn.PssSub(*kind, *key, *topic, "")
+	sn.PssSub(*kind, *key, *topic)
 	defer sn.PssTopics[*topic].Unregister()
 
 	fmt.Printf("My PSS pubKey is %s\n", sn.PssPubKey)
