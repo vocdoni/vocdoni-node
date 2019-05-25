@@ -34,6 +34,7 @@ require (
 	github.com/karalabe/hid v0.0.0-20190507082517-9e0a1cda7275 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/libp2p/go-libp2p-peer v0.1.1 // indirect
+	github.com/marcusolsson/tui-go v0.4.0
 	github.com/mattn/go-isatty v0.0.7 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/multiformats/go-multiaddr v0.0.2 // indirect
