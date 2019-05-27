@@ -369,6 +369,18 @@ func strAddress(addr string) pss.PssAddress {
 	return pssAddress
 }
 
+// SetHandler sets a custom handler funcion for a topic subscription
+// Function must be pss.HandlerFunc type:
+//    func(msg []byte, peer *p2p.Peer, asym bool, keyid string)
+// Required extra packages are:
+//   "github.com/ethereum/go-ethereum/p2p"
+//   "github.com/ethereum/go-ethereum/swarm/pss"
+func (sn *SimpleSwarm) SetHandler(topic string, fh pss.HandlerFunc) {
+	pssTopic := strTopic(topic)
+	topicHandler := pss.NewHandler(fh)
+	sn.PssTopics[topic].Unregister = sn.Pss.Register(&pssTopic, topicHandler)
+}
+
 func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	pssTopic := strTopic(topic)
 	pssAddress := strAddress("")
