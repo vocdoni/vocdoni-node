@@ -187,6 +187,7 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 				b64content := base64.StdEncoding.EncodeToString(content)
 				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().UnixNano()), signer)))
 			case "addFile":
+				log.Println("Called method addFile with signature")
 				authorized, err := signer.VerifySender(string(rawRequest), signature)
 				if err != nil {
 					log.Printf("Error checking authorization: %s", err)

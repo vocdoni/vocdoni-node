@@ -29,7 +29,7 @@ func main() {
 	dvotePort := flag.Int("dvotePort", 9090, "dvote API port")
 	dvoteRoute := flag.String("dvoteRoute", "/dvote", "dvote API route")
 
-	allowPrivate := flag.Bool("allowPrivate", true, "allows authorized clients to call private methods")
+	allowPrivate := flag.Bool("allowPrivate", false, "allows authorized clients to call private methods")
 	allowedAddrs := flag.String("allowedAddrs", "", "comma delimited list of allowed client eth addresses")
 	signingKey := flag.String("signingKey", "", "request signing key for this node")
 

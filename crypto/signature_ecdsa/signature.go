@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	hex "encoding/hex"
 	"errors"
-	"fmt"
+	"log"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -93,19 +93,22 @@ func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 	return result, nil
 }
 
-func signHash(data []byte) []byte {
-	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)
-	return crypto.Keccak256([]byte(msg))
+func Hash(data []byte) []byte {
+	return crypto.Keccak256(data)
 }
 
 func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
+	if len(k.Authorized) < 1 {
+		log.Printf("Not checking signature, allowing request")
+		return true, nil
+	}
 	sig := hexutil.MustDecode(sigHex)
 	if sig[64] != 27 && sig[64] != 28 {
 		return false, errors.New("Bad recovery hex")
 	}
 	sig[64] -= 27
 
-	pubKey, err := crypto.SigToPub(signHash([]byte(msg)), sig)
+	pubKey, err := crypto.SigToPub(Hash([]byte(msg)), sig)
 	if err != nil {
 		return false, errors.New("Bad sig")
 	}
@@ -113,6 +116,7 @@ func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
 	recoveredAddr := crypto.PubkeyToAddress(*pubKey)
 	for _, addr := range k.Authorized {
 		if addr == recoveredAddr {
+			log.Printf("Allowed address %s", addr)
 			return true, nil
 		}
 	}
