@@ -108,7 +108,7 @@ func parseTransportFromUri(uris []string) []string {
 	return out
 }
 
-func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Transport, signer signature.SignKeys) {
+func Route(inbound <-chan types.Message, storage data.Storage, transport Transport, signer signature.SignKeys) {
 	for {
 		select {
 		case msg := <-inbound:
@@ -140,110 +140,45 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 			}
 
 			switch method {
+
 			case "fetchFile":
 				uri, ok := requestMap["uri"].(string)
 				if !ok {
-					log.Printf("No uri in fetchFile request or malformed")
-					//err to errchan, reply
+					log.Printf("No uri in fetchFile request or malformed: %s", uri)
+					break
 				}
-				parsedURIs := parseUrisContent(uri)
-				transportTypes := parseTransportFromUri(parsedURIs)
-				var resp *http.Response
-				var content []byte
-				var err error
-				found := false
-				for idx, t := range transportTypes {
-					if found {
-						break
-					}
-					switch t {
-					case "http:", "https:":
-						resp, err = http.Get(parsedURIs[idx])
-						defer resp.Body.Close()
-						content, err = ioutil.ReadAll(resp.Body)
-						if content != nil {
-							found = true
-						}
-						break
-					case "ipfs:":
-						splt := strings.Split(parsedURIs[idx], "/")
-						hash := splt[len(splt)-1]
-						content, err = storage.Retrieve(hash)
-						if content != nil {
-							found = true
-						}
-						break
-					case "bzz:", "bzz-feed":
-						err = errors.New("Bzz and Bzz-feed not implemented yet")
-						break
-					}
-				}
+				log.Printf("Called method fetchFile, uri %s", uri)
+				go fetchFile(uri, requestId, msg, storage, transport, signer)
 
-				if err != nil {
-					failString := fmt.Sprintf("Error fetching file %s", requestMap["uri"])
-					fmt.Printf(failString)
-					wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
-				}
-				b64content := base64.StdEncoding.EncodeToString(content)
-				wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().UnixNano()), signer)))
 			case "addFile":
-				log.Println("Called method addFile with signature")
+
 				authorized, err := signer.VerifySender(string(rawRequest), signature)
 				if err != nil {
-					log.Printf("Error checking authorization: %s", err)
+					log.Printf("Wrong authorization: %s", err)
 					break
 				}
 				if authorized {
 					content, ok := requestMap["content"].(string)
 					if !ok {
 						log.Printf("No content field in addFile request or malformed")
-						//err to errchan, reply
 						break
 					}
 					b64content, err := base64.StdEncoding.DecodeString(content)
 					if err != nil {
 						log.Printf("Couldn't decode content")
-						//err to errchan, reply
 						break
 					}
-					/*
-						name, ok := requestMap["name"].(string)
-						if !ok {
-							log.Printf("No name field in addFile request or malformed")
-							//err to errchan, reply
-							break
-						}
-							timestamp, errAtoi := strconv.ParseInt(requestMap["timestamp"].(), 10, 64)
-							if errAtoi != nil {
-								log.Printf("timestamp wrong format")
-								//err to errchan, reply
-								break
-							}
-					*/
 					reqType, ok := requestMap["type"].(string)
 					if !ok {
 						log.Printf("No type field in addFile request or malformed")
-						//err to errchan, reply
 						break
 					}
-					switch reqType {
-					case "swarm":
-						// TODO: Only need IPFS for now
-						//err to errchan, reply
-						break
-					case "ipfs":
-						cid, err := storage.Publish(b64content)
-						if err != nil {
-							log.Printf("cannot add file")
-						}
-						//log.Printf("added %s with name %s and with timestamp %s", cid, name, timestamp)
-						ipfsRouteBaseURL := "ipfs://"
-						wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(addResponseFmt, requestId, time.Now().UnixNano(), ipfsRouteBaseURL+cid), signer)))
-					}
+					go addFile(reqType, requestId, b64content, msg, storage, transport, signer)
+
 				} else {
-					wsTransport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
-					break
+					transport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
 				}
+				break
 			case "pinList":
 				authorized, err := signer.VerifySender(string(rawRequest), signature)
 				if err != nil {
@@ -251,19 +186,12 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 					break
 				}
 				if authorized {
-					pins, err := storage.ListPins()
-					if err != nil {
-						log.Printf("Internal error fetching pins")
-					}
-					pinsJsonArray, err := json.Marshal(pins)
-					if err != nil {
-						log.Printf("Internal error parsing pins")
-					}
-					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(listPinsResponseFmt, pinsJsonArray, requestId, time.Now().UnixNano()), signer)))
+					go pinList(requestId, msg, storage, transport, signer)
+
 				} else {
-					wsTransport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
-					break
+					transport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
 				}
+				break
 			case "pinFile":
 				authorized, err := signer.VerifySender(string(rawRequest), signature)
 				if err != nil {
@@ -274,18 +202,13 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 					uri, ok := requestMap["uri"].(string)
 					if !ok {
 						log.Printf("No uri in pinFile request or malformed")
+						break
 					}
-					err := storage.Pin(uri)
-					if err != nil {
-						failString := fmt.Sprintf("Error pinning file %s", requestMap["uri"])
-						log.Printf(failString)
-						wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
-					}
-					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
+					go pinFile(uri, requestId, msg, storage, transport, signer)
 				} else {
-					wsTransport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
-					break
+					transport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
 				}
+				break
 			case "unpinFile":
 				authorized, err := signer.VerifySender(string(rawRequest), signature)
 				if err != nil {
@@ -297,18 +220,117 @@ func Route(inbound <-chan types.Message, storage data.Storage, wsTransport Trans
 					if !ok {
 						log.Printf("No uri in unpinFile request or malformed")
 					}
-					err := storage.Pin(uri)
-					if err != nil {
-						failString := fmt.Sprintf("Error unpinning file %s", requestMap["uri"])
-						log.Printf(failString)
-						wsTransport.Send(buildReply(msg, failBody(requestId, failString)))
-					}
-					wsTransport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
+					go unPinFile(uri, requestId, msg, storage, transport, signer)
 				} else {
-					wsTransport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
-					break
+					transport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
 				}
+				break
 			}
 		}
+	}
+}
+
+func unPinFile(uri, requestId string, msg types.Message, storage data.Storage, transport Transport, signer signature.SignKeys) {
+	log.Printf("Calling UnPinFile %s", uri)
+	err := storage.Unpin(uri)
+	if err != nil {
+		failString := fmt.Sprintf("Error unpinning file %s", uri)
+		log.Printf(failString)
+		transport.Send(buildReply(msg, failBody(requestId, failString)))
+	} else {
+		transport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
+	}
+}
+
+func pinFile(uri, requestId string, msg types.Message, storage data.Storage, transport Transport, signer signature.SignKeys) {
+	log.Printf("Calling PinFile %s", uri)
+	err := storage.Pin(uri)
+	if err != nil {
+		failString := fmt.Sprintf("Error pinning file %s", uri)
+		log.Printf(failString)
+		transport.Send(buildReply(msg, failBody(requestId, failString)))
+	} else {
+		transport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
+	}
+}
+
+func pinList(requestId string, msg types.Message, storage data.Storage, transport Transport, signer signature.SignKeys) {
+	log.Println("Calling PinList")
+	pins, err := storage.ListPins()
+	if err != nil {
+		log.Printf("Internal error fetching pins")
+	}
+	pinsJsonArray, err := json.Marshal(pins)
+	if err != nil {
+		log.Printf("Internal error parsing pins")
+	} else {
+		transport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(listPinsResponseFmt, pinsJsonArray, requestId, time.Now().UnixNano()), signer)))
+	}
+}
+
+func addFile(reqType, requestId string, b64content []byte, msg types.Message, storage data.Storage, transport Transport, signer signature.SignKeys) {
+	log.Println("Calling addFile")
+	switch reqType {
+	case "swarm":
+		// TODO
+		break
+	case "ipfs":
+		cid, err := storage.Publish(b64content)
+		if err != nil {
+			log.Printf("Cannot add file")
+		}
+		log.Printf("Added file %s, b64 size of %d", cid, len(b64content))
+		ipfsRouteBaseURL := "ipfs://"
+		transport.Send(buildReply(msg,
+			successBody(requestId, fmt.Sprintf(addResponseFmt, requestId, time.Now().UnixNano(), ipfsRouteBaseURL+cid), signer)))
+	}
+
+}
+
+func fetchFile(uri, requestId string, msg types.Message, storage data.Storage, transport Transport, signer signature.SignKeys) {
+	log.Printf("Calling FetchFile %s", uri)
+	parsedURIs := parseUrisContent(uri)
+	transportTypes := parseTransportFromUri(parsedURIs)
+	var resp *http.Response
+	var content []byte
+	var err error
+	found := false
+	for idx, t := range transportTypes {
+		if found {
+			break
+		}
+		switch t {
+		case "http:", "https:":
+			resp, err = http.Get(parsedURIs[idx])
+			defer resp.Body.Close()
+			content, err = ioutil.ReadAll(resp.Body)
+			if content != nil {
+				found = true
+			}
+			break
+		case "ipfs:":
+			splt := strings.Split(parsedURIs[idx], "/")
+			hash := splt[len(splt)-1]
+			content, err = storage.Retrieve(hash)
+			if content != nil {
+				found = true
+			}
+			break
+		case "bzz:", "bzz-feed":
+			err = errors.New("Bzz and Bzz-feed not implemented yet")
+			break
+		}
+	}
+
+	if err != nil {
+		failString := fmt.Sprintf("Error fetching uri %s", uri)
+		fmt.Printf(failString)
+		transport.Send(buildReply(msg, failBody(requestId, failString)))
+	} else {
+		b64content := base64.StdEncoding.EncodeToString(content)
+		log.Printf("File fetched, b64 size %d", len(b64content))
+		transport.Send(buildReply(msg, successBody(requestId,
+			fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().UnixNano()),
+			signer)))
 	}
 }
