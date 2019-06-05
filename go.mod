@@ -13,6 +13,7 @@ require (
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/elastic/gosigar v0.10.2 // indirect
 	github.com/ethereum/go-ethereum v1.8.22-0.20190517183939-97d3615612a4
+	github.com/ethersphere/swarm v1.8.22-0.20190604123244-6d0902da3cf0
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20190403181518-312b5175032f // indirect
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
@@ -52,7 +53,6 @@ require (
 	github.com/spf13/pflag v1.0.3
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
 	github.com/syndtr/goleveldb v1.0.0
-	github.com/tcnksm/go-input v0.0.0-20180404061846-548a7d7a8ee8
 	github.com/tyler-smith/go-bip39 v1.0.0 // indirect
 	github.com/uber-go/atomic v1.4.0 // indirect
 	github.com/uber/jaeger-client-go v2.16.0+incompatible // indirect

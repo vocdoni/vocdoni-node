@@ -19,12 +19,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/swarm"
 
-	swarmapi "github.com/ethereum/go-ethereum/swarm/api"
-	"github.com/ethereum/go-ethereum/swarm/api/client"
-	"github.com/ethereum/go-ethereum/swarm/network"
-	"github.com/ethereum/go-ethereum/swarm/pss"
+	"github.com/ethersphere/swarm"
+	swarmapi "github.com/ethersphere/swarm/api"
+	"github.com/ethersphere/swarm/api/client"
+	"github.com/ethersphere/swarm/network"
+	"github.com/ethersphere/swarm/pss"
 
 	dvoteUtil "github.com/vocdoni/go-dvote/util"
 )
