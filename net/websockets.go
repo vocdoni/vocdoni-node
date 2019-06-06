@@ -58,6 +58,7 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 		}
 	}
 	w.p.AddHandler(path, upgradeConn)
+
 	if w.p.SSLDomain == "" {
 		log.Printf("ws initialized on ws://" + w.p.Address + ":" + strconv.Itoa(w.p.Port) + path)
 	} else {
