@@ -18,11 +18,11 @@ import (
 )
 
 var failBodyFmt = `{
-	"id": "%[1]s", 
-	"error": {
-	  "request": "%[1]s",
-	  "message": "%s"
-	}
+"id": "%[1]s", 
+"error": {
+  "request": "%[1]s",
+  "message": "%s"
+}
   }`
 
 var successBodyFmt = `{
@@ -39,9 +39,9 @@ var fetchResponseFmt = `{
   }`
 
 var addResponseFmt = `{
-	"request": "%s",
-	"timestamp": %d,
-	"uri": "%s"
+"request": "%s",
+"timestamp": %d,
+"uri": "%s"
 }`
 
 var listPinsResponseFmt = `{
@@ -77,17 +77,24 @@ func buildReply(msg types.Message, data []byte) types.Message {
 	return *reply
 }
 
-func parseMsg(payload []byte) (map[string]interface{}, error) {
-	var msgJSON interface{}
-	err := json.Unmarshal(payload, &msgJSON)
+//semi-unmarshalls message, returns method name
+func getMethod(payload []byte) (string, []byte, error) {
+	var msgStruct types.MessageRequest
+	err := json.Unmarshal(payload, &msgStruct)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	msgMap, ok := msgJSON.(map[string]interface{})
+	method, ok := msgStruct.Request["method"].(string)
 	if !ok {
-		return nil, errors.New("Could not parse request JSON")
+		log.Printf("No method field in request or malformed")
 	}
-	return msgMap, nil
+	/*assign rawRequest by calling json.Marshal on the Request field. This is
+	  assumed to work because json.Marshal encodes in lexographic order for map objects. */
+	rawRequest, err := json.Marshal(msgStruct.Request)
+	if err != nil {
+		return "", nil, err
+	}
+	return method, rawRequest, err
 }
 
 func parseUrisContent(uris string) []string {
@@ -113,116 +120,99 @@ func Route(inbound <-chan types.Message, storage data.Storage, transport Transpo
 		select {
 		case msg := <-inbound:
 
-			msgMap, err := parseMsg(msg.Data)
+			/*getMethod pulls method name and rawRequest from msg.Data*/
+			method, rawRequest, err := getMethod(msg.Data)
 			if err != nil {
-				log.Printf("Couldn't parse message JSON on message %v", msg)
-			}
-
-			requestId, ok := msgMap["id"].(string)
-			if !ok {
-				log.Printf("No ID field in message or malformed")
-			}
-
-			signature, ok := msgMap["signature"].(string)
-			if !ok {
-				log.Printf("No signature in request: %s", msg)
-			}
-			requestMap, ok := msgMap["request"].(map[string]interface{})
-			if !ok {
-				log.Printf("No request field in message or malformed")
-			}
-
-			rawRequest, err := json.Marshal(requestMap)
-
-			method, ok := requestMap["method"].(string)
-			if !ok {
-				log.Printf("No method field in request or malformed")
+				log.Printf("Couldn't extract method from JSON message %v", msg)
+				break
 			}
 
 			switch method {
-
 			case "fetchFile":
-				uri, ok := requestMap["uri"].(string)
-				if !ok {
-					log.Printf("No uri in fetchFile request or malformed: %s", uri)
+				var fileRequest types.FetchFileRequest
+				if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
+					log.Printf("Couldn't decode into FetchFileRequest type from request %v", msg.Data)
 					break
 				}
-				log.Printf("Called method fetchFile, uri %s", uri)
-				go fetchFile(uri, requestId, msg, storage, transport, signer)
+				log.Printf("Called method fetchFile, uri %s", fileRequest.Request.URI)
+				go fetchFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
 
 			case "addFile":
-
-				authorized, err := signer.VerifySender(string(rawRequest), signature)
+				var fileRequest types.AddFileRequest
+				if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
+					log.Printf("Couldn't decode into AddFileRequest type from request %s", msg.Data)
+					break
+				}
+				authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
 				if err != nil {
 					log.Printf("Wrong authorization: %s", err)
 					break
 				}
 				if authorized {
-					content, ok := requestMap["content"].(string)
-					if !ok {
-						log.Printf("No content field in addFile request or malformed")
-						break
-					}
+					content := fileRequest.Request.Content
 					b64content, err := base64.StdEncoding.DecodeString(content)
 					if err != nil {
 						log.Printf("Couldn't decode content")
 						break
 					}
-					reqType, ok := requestMap["type"].(string)
-					if !ok {
-						log.Printf("No type field in addFile request or malformed")
-						break
-					}
-					go addFile(reqType, requestId, b64content, msg, storage, transport, signer)
+					reqType := fileRequest.Request.Type
+
+					go addFile(reqType, fileRequest.ID, b64content, msg, storage, transport, signer)
 
 				} else {
-					transport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
+					transport.Send(buildReply(msg, failBody(fileRequest.ID, "Unauthorized")))
 				}
 				break
 			case "pinList":
-				authorized, err := signer.VerifySender(string(rawRequest), signature)
+				var fileRequest types.PinListRequest
+				if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
+					log.Printf("Couldn't decode into PinListRequest type from request %s", msg.Data)
+					break
+				}
+				authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
 				if err != nil {
 					log.Printf("Error checking authorization: %s", err)
 					break
 				}
 				if authorized {
-					go pinList(requestId, msg, storage, transport, signer)
-
+					go pinList(fileRequest.ID, msg, storage, transport, signer)
 				} else {
-					transport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
+					transport.Send(buildReply(msg, failBody(fileRequest.ID, "Unauthorized")))
 				}
 				break
 			case "pinFile":
-				authorized, err := signer.VerifySender(string(rawRequest), signature)
+				var fileRequest types.PinFileRequest
+				if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
+					log.Printf("Couldn't decode into PinFileRequest type from request %s", msg.Data)
+					break
+				}
+				authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
 				if err != nil {
 					log.Printf("Error checking authorization: %s", err)
 					break
 				}
 				if authorized {
-					uri, ok := requestMap["uri"].(string)
-					if !ok {
-						log.Printf("No uri in pinFile request or malformed")
-						break
-					}
-					go pinFile(uri, requestId, msg, storage, transport, signer)
+					go pinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
 				} else {
-					transport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
+					transport.Send(buildReply(msg, failBody(fileRequest.ID, "Unauthorized")))
 				}
 				break
 			case "unpinFile":
-				authorized, err := signer.VerifySender(string(rawRequest), signature)
+				var fileRequest types.UnpinFileRequest
+				if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
+					log.Printf("Couldn't decode into UnpinFileRequest type from request %s", msg.Data)
+					break
+				}
+				authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
 				if err != nil {
 					log.Printf("Error checking authorization: %s", err)
 					break
 				}
 				if authorized {
-					uri, ok := requestMap["uri"].(string)
-					if !ok {
-						log.Printf("No uri in unpinFile request or malformed")
-					}
-					go unPinFile(uri, requestId, msg, storage, transport, signer)
+
+					go unPinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
 				} else {
-					transport.Send(buildReply(msg, failBody(requestId, "Unauthorized")))
+					transport.Send(buildReply(msg, failBody(fileRequest.ID, "Unauthorized")))
 				}
 				break
 			}
