@@ -70,6 +70,8 @@ type Connection struct {
 	Key        string //this node's key
 	Address    string //this node's address
 	Path       string //specific path on which a transport should listen
+	SSLDomain  string //ssl domain
+	SSLCertDir string //ssl certificates directory
 	Port       int    //specific port on which a transport should listen
 }
 

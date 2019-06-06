@@ -17,18 +17,11 @@ import (
 type WebsocketHandle struct {
 	c *types.Connection
 	e *epoll.Epoll
+	p *Proxy
 }
 
-func (w *WebsocketHandle) upgrader(writer http.ResponseWriter, reader *http.Request) {
-	// Upgrade connection
-	conn, _, _, err := ws.UpgradeHTTP(reader, writer)
-	if err != nil {
-		return
-	}
-	if err := w.e.Add(conn); err != nil {
-		log.Printf("Failed to add connection %v", err)
-		conn.Close()
-	}
+func (w *WebsocketHandle) SetProxy(p *Proxy) {
+	w.p = p
 }
 
 func (w *WebsocketHandle) Init(c *types.Connection) error {
@@ -49,13 +42,28 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 		return err
 	}
 
-	http.HandleFunc(c.Path, w.upgrader)
-	go func() {
-		log.Fatal(http.ListenAndServe(c.Address+":"+strconv.Itoa(c.Port), nil))
-	}()
-	log.Printf("Dvote websocket endpoint initialized on %s", "ws://"+c.Address+":"+strconv.Itoa(c.Port))
-
 	return nil
+}
+
+func (w *WebsocketHandle) AddProxyHandler(path string) {
+	upgradeConn := func(writer http.ResponseWriter, reader *http.Request) {
+		// Upgrade connection
+		conn, _, _, err := ws.UpgradeHTTP(reader, writer)
+		if err != nil {
+			return
+		}
+		if err := w.e.Add(conn); err != nil {
+			log.Printf("Failed to add connection %v", err)
+			conn.Close()
+		}
+	}
+	w.p.AddHandler(path, upgradeConn)
+	if w.p.SSLDomain == "" {
+		log.Printf("ws initialized on ws://" + w.p.Address + ":" + strconv.Itoa(w.p.Port) + path)
+	} else {
+		log.Printf("wss initialized on wss://" + w.p.SSLDomain + ":" + strconv.Itoa(w.p.Port) + path)
+	}
+
 }
 
 func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {

@@ -21,6 +21,7 @@ const (
 )
 
 func TransportIDFromString(i string) TransportID {
+
 	switch i {
 	case "PubSub":
 		return PubSub
