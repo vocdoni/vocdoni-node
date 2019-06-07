@@ -115,22 +115,6 @@ func parseTransportFromUri(uris []string) []string {
 	return out
 }
 
-func testRawRequest(rawRequest []byte, msg types.Message) {
-	var rawContainer types.MessageRequest
-	err := json.Unmarshal(msg.Data, &rawContainer)
-	if err != nil {
-		log.Printf("couldn't extract raw request")
-	}
-	rawRequestMap, err := json.Marshal(rawContainer.Request)
-	log.Printf("marshalled request struct: %v", rawRequest)
-	log.Printf("marshalled request map: %v", rawRequestMap)
-	for i := range rawRequest {
-        if rawRequest[i] != rawRequestMap[i] {
-            log.Printf("Raw request mismatch")
-        }
-    }
-}
-
 func Route(inbound <-chan types.Message, storage data.Storage, transport Transport, signer signature.SignKeys) {
 	for {
 		select {
@@ -142,8 +126,6 @@ func Route(inbound <-chan types.Message, storage data.Storage, transport Transpo
 				log.Printf("Couldn't extract method from JSON message %v", msg)
 				break
 			}
-
-			testRawRequest(rawRequest, msg)
 
 			switch method {
 			case "fetchFile":
