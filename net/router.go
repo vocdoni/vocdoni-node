@@ -88,8 +88,8 @@ func getMethod(payload []byte) (string, []byte, error) {
 	if !ok {
 		log.Printf("No method field in request or malformed")
 	}
-	/*assign rawRequest by calling json.Marshal on the Request field. This is
-	  assumed to work because json.Marshal encodes in lexographic order for map objects. */
+	/*assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap) 
+	because json.Marshal encodes in lexographic order for map objects. */
 	rawRequest, err := json.Marshal(msgStruct.Request)
 	if err != nil {
 		return "", nil, err
@@ -115,6 +115,22 @@ func parseTransportFromUri(uris []string) []string {
 	return out
 }
 
+func testRawRequest(rawRequest []byte, msg types.Message) {
+	var rawContainer types.MessageRequest
+	err := json.Unmarshal(msg.Data, &rawContainer)
+	if err != nil {
+		log.Printf("couldn't extract raw request")
+	}
+	rawRequestMap, err := json.Marshal(rawContainer.Request)
+	log.Printf("marshalled request struct: %v", rawRequest)
+	log.Printf("marshalled request map: %v", rawRequestMap)
+	for i := range rawRequest {
+        if rawRequest[i] != rawRequestMap[i] {
+            log.Printf("Raw request mismatch")
+        }
+    }
+}
+
 func Route(inbound <-chan types.Message, storage data.Storage, transport Transport, signer signature.SignKeys) {
 	for {
 		select {
@@ -126,6 +142,8 @@ func Route(inbound <-chan types.Message, storage data.Storage, transport Transpo
 				log.Printf("Couldn't extract method from JSON message %v", msg)
 				break
 			}
+
+			testRawRequest(rawRequest, msg)
 
 			switch method {
 			case "fetchFile":

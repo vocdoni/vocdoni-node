@@ -8,8 +8,6 @@ type MessageRequest struct {
 }
 
 /* the following structs hold content decoded from File API JSON objects */
-
-
 type FetchFileRequest struct {
 	ID string `json:"id"`
 	Request struct{
