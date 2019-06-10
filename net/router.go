@@ -17,56 +17,29 @@ import (
 	"encoding/json"
 )
 
-var failBodyFmt = `{
-"id": "%[1]s", 
-"error": {
-  "request": "%[1]s",
-  "message": "%s"
-}
-  }`
-
-var successBodyFmt = `{
-  "id": "%s",
-  "response": %s,
-  "signature": "0x%s"
-}`
-
-//content file must be b64 encoded
-var fetchResponseFmt = `{
-    "content": "%s",
-    "request": "%s",
-    "timestamp": %d
-  }`
-
-var addResponseFmt = `{
-"request": "%s",
-"timestamp": %d,
-"uri": "%s"
-}`
-
-var listPinsResponseFmt = `{
-    "files": %s,
-    "request": "%s",
-    "timestamp": %d 
-  }`
-
-var boolResponseFmt = `{
-    "ok": %s,
-    "request": "%s",
-    "timestamp": %d
-  }`
-
-func failBody(requestId string, failString string) []byte {
-	return []byte(fmt.Sprintf(failBodyFmt, requestId, failString))
+func buildFailReply(requestId, message string) []byte {
+	var response types.FailBody
+	response.ID = requestId
+	response.Error.Message = message
+	response.Error.Request = requestId
+	rawResponse, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("Error marshaling response body: %s", err)
+	}
+	return rawResponse
 }
 
-func successBody(requestId string, response string, signer signature.SignKeys) []byte {
-	sig, err := signer.Sign(response)
+func signMsg(message interface{}, signer signature.SignKeys) string {
+	rawMsg, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("Unable to marshal message to sign: %s", err)
+	}
+	sig, err := signer.Sign(string(rawMsg))
 	if err != nil {
 		sig = "0x00"
 		log.Printf("Error signing response body: %s", err)
 	}
-	return []byte(fmt.Sprintf(successBodyFmt, requestId, response, sig))
+	return sig
 }
 
 func buildReply(msg types.Message, data []byte) types.Message {
@@ -88,7 +61,7 @@ func getMethod(payload []byte) (string, []byte, error) {
 	if !ok {
 		log.Printf("No method field in request or malformed")
 	}
-	/*assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap) 
+	/*assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)
 	because json.Marshal encodes in lexographic order for map objects. */
 	rawRequest, err := json.Marshal(msgStruct.Request)
 	if err != nil {
@@ -160,7 +133,7 @@ func Route(inbound <-chan types.Message, storage data.Storage, transport Transpo
 					go addFile(reqType, fileRequest.ID, b64content, msg, storage, transport, signer)
 
 				} else {
-					transport.Send(buildReply(msg, failBody(fileRequest.ID, "Unauthorized")))
+					transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
 				}
 				break
 			case "pinList":
@@ -177,7 +150,7 @@ func Route(inbound <-chan types.Message, storage data.Storage, transport Transpo
 				if authorized {
 					go pinList(fileRequest.ID, msg, storage, transport, signer)
 				} else {
-					transport.Send(buildReply(msg, failBody(fileRequest.ID, "Unauthorized")))
+					transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
 				}
 				break
 			case "pinFile":
@@ -194,7 +167,7 @@ func Route(inbound <-chan types.Message, storage data.Storage, transport Transpo
 				if authorized {
 					go pinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
 				} else {
-					transport.Send(buildReply(msg, failBody(fileRequest.ID, "Unauthorized")))
+					transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
 				}
 				break
 			case "unpinFile":
@@ -212,7 +185,7 @@ func Route(inbound <-chan types.Message, storage data.Storage, transport Transpo
 
 					go unPinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
 				} else {
-					transport.Send(buildReply(msg, failBody(fileRequest.ID, "Unauthorized")))
+					transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
 				}
 				break
 			}
@@ -224,11 +197,20 @@ func unPinFile(uri, requestId string, msg types.Message, storage data.Storage, t
 	log.Printf("Calling UnPinFile %s", uri)
 	err := storage.Unpin(uri)
 	if err != nil {
-		failString := fmt.Sprintf("Error unpinning file %s", uri)
-		log.Printf(failString)
-		transport.Send(buildReply(msg, failBody(requestId, failString)))
+		log.Printf(fmt.Sprintf("Error unpinning file %s", uri))
+		transport.Send(buildReply(msg, buildFailReply(requestId, "Error unpinning file")))
 	} else {
-		transport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
+		var response types.BoolResponse
+		response.ID = requestId
+		response.Response.OK = true
+		response.Response.Request = requestId
+		response.Response.Timestamp = time.Now().UnixNano()
+		response.Signature = signMsg(response.Response, signer)
+		rawResponse, err := json.Marshal(response)
+		if err != nil {
+			log.Printf("Error marshaling response body: %s", err)
+		}
+		transport.Send(buildReply(msg, rawResponse))
 	}
 }
 
@@ -236,11 +218,20 @@ func pinFile(uri, requestId string, msg types.Message, storage data.Storage, tra
 	log.Printf("Calling PinFile %s", uri)
 	err := storage.Pin(uri)
 	if err != nil {
-		failString := fmt.Sprintf("Error pinning file %s", uri)
-		log.Printf(failString)
-		transport.Send(buildReply(msg, failBody(requestId, failString)))
+		log.Printf(fmt.Sprintf("Error pinning file %s", uri))
+		transport.Send(buildReply(msg, buildFailReply(requestId, "Error pinning file")))
 	} else {
-		transport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(boolResponseFmt, "true", requestId, time.Now().UnixNano()), signer)))
+		var response types.BoolResponse
+		response.ID = requestId
+		response.Response.OK = true
+		response.Response.Request = requestId
+		response.Response.Timestamp = time.Now().UnixNano()
+		response.Signature = signMsg(response.Response, signer)
+		rawResponse, err := json.Marshal(response)
+		if err != nil {
+			log.Printf("Error marshaling response body: %s", err)
+		}
+		transport.Send(buildReply(msg, rawResponse))
 	}
 }
 
@@ -254,7 +245,17 @@ func pinList(requestId string, msg types.Message, storage data.Storage, transpor
 	if err != nil {
 		log.Printf("Internal error parsing pins")
 	} else {
-		transport.Send(buildReply(msg, successBody(requestId, fmt.Sprintf(listPinsResponseFmt, pinsJsonArray, requestId, time.Now().UnixNano()), signer)))
+		var response types.ListPinsResponse
+		response.ID = requestId
+		response.Response.Files = pinsJsonArray
+		response.Response.Request = requestId
+		response.Response.Timestamp = time.Now().UnixNano()
+		response.Signature = signMsg(response.Response, signer)
+		rawResponse, err := json.Marshal(response)
+		if err != nil {
+			log.Printf("Error marshaling response body: %s", err)
+		}
+		transport.Send(buildReply(msg, rawResponse))
 	}
 }
 
@@ -271,8 +272,17 @@ func addFile(reqType, requestId string, b64content []byte, msg types.Message, st
 		}
 		log.Printf("Added file %s, b64 size of %d", cid, len(b64content))
 		ipfsRouteBaseURL := "ipfs://"
-		transport.Send(buildReply(msg,
-			successBody(requestId, fmt.Sprintf(addResponseFmt, requestId, time.Now().UnixNano(), ipfsRouteBaseURL+cid), signer)))
+		var response types.AddResponse
+		response.ID = requestId
+		response.Response.Request = requestId
+		response.Response.Timestamp = time.Now().UnixNano()
+		response.Response.URI = ipfsRouteBaseURL+cid
+		response.Signature = signMsg(response.Response, signer)
+		rawResponse, err := json.Marshal(response)
+		if err != nil {
+			log.Printf("Error marshaling response body: %s", err)
+		}
+		transport.Send(buildReply(msg, rawResponse))
 	}
 
 }
@@ -313,14 +323,21 @@ func fetchFile(uri, requestId string, msg types.Message, storage data.Storage, t
 	}
 
 	if err != nil {
-		failString := fmt.Sprintf("Error fetching uri %s", uri)
-		fmt.Printf(failString)
-		transport.Send(buildReply(msg, failBody(requestId, failString)))
+		fmt.Printf(fmt.Sprintf("Error fetching uri %s", uri))
+		transport.Send(buildReply(msg, buildFailReply(requestId, "Error fetching uri")))
 	} else {
 		b64content := base64.StdEncoding.EncodeToString(content)
 		log.Printf("File fetched, b64 size %d", len(b64content))
-		transport.Send(buildReply(msg, successBody(requestId,
-			fmt.Sprintf(fetchResponseFmt, b64content, requestId, time.Now().UnixNano()),
-			signer)))
+		var response types.FetchResponse
+		response.ID = requestId
+		response.Response.Content = b64content
+		response.Response.Request = requestId
+		response.Response.Timestamp = time.Now().UnixNano()
+		response.Signature = signMsg(response.Response, signer)
+		rawResponse, err := json.Marshal(response)
+		if err != nil {
+			log.Printf("Error marshaling response body: %s", err)
+		}
+		transport.Send(buildReply(msg, rawResponse))
 	}
 }
