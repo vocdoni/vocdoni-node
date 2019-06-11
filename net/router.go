@@ -88,111 +88,134 @@ func parseTransportFromUri(uris []string) []string {
 	return out
 }
 
-type router map[string]func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys)
+type methodMap map[string]func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys)
 
-//InitRouter sets up router map with method strings as keys and funcs as values
-func initRouter() router {
-	requestRouter := make(router)
-
-	requestRouter["fetchFile"] = func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys) {
-		var fileRequest types.FetchFileRequest
-		if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-			log.Printf("Couldn't decode into FetchFileRequest type from request %v", msg.Data)
-			return
-		}
-		log.Printf("Called method fetchFile, uri %s", fileRequest.Request.URI)
-		go fetchFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
-	}
-
-	requestRouter["addFile"] = func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys) {
-		var fileRequest types.AddFileRequest
-		if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-			log.Printf("Couldn't decode into AddFileRequest type from request %s", msg.Data)
-			return
-		}
-		authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
-		if err != nil {
-			log.Printf("Wrong authorization: %s", err)
-			return
-		}
-		if authorized {
-			content := fileRequest.Request.Content
-			b64content, err := base64.StdEncoding.DecodeString(content)
-			if err != nil {
-				log.Printf("Couldn't decode content")
-				return
-			}
-			reqType := fileRequest.Request.Type
-
-			go addFile(reqType, fileRequest.ID, b64content, msg, storage, transport, signer)
-
-		} else {
-			transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
-		}
-	}
-
-	requestRouter["pinList"] = func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys) {
-		var fileRequest types.PinListRequest
-		if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-			log.Printf("Couldn't decode into PinListRequest type from request %s", msg.Data)
-			return
-		}
-		authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
-		if err != nil {
-			log.Printf("Error checking authorization: %s", err)
-			return
-		}
-		if authorized {
-			go pinList(fileRequest.ID, msg, storage, transport, signer)
-		} else {
-			transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
-		}
-	}
-
-	requestRouter["pinFile"] = func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys) {
-		var fileRequest types.PinFileRequest
-		if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-			log.Printf("Couldn't decode into PinFileRequest type from request %s", msg.Data)
-			return
-		}
-		authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
-		if err != nil {
-			log.Printf("Error checking authorization: %s", err)
-			return
-		}
-		if authorized {
-			go pinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
-		} else {
-			transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
-		}
-	}
-
-	requestRouter["unpinFile"] = func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys) {
-		var fileRequest types.UnpinFileRequest
-		if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-			log.Printf("Couldn't decode into UnpinFileRequest type from request %s", msg.Data)
-			return
-		}
-		authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
-		if err != nil {
-			log.Printf("Error checking authorization: %s", err)
-			return
-		}
-		if authorized {
-
-			go unPinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
-		} else {
-			transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
-		}
-	}
-	return requestRouter
+//Router holds a router object
+type Router struct {
+	requestMap methodMap
+	inbound    <-chan types.Message
+	storage    data.Storage
+	transport  Transport
+	signer     signature.SignKeys
 }
 
-func Route(inbound <-chan types.Message, storage data.Storage, transport Transport, signer signature.SignKeys) {
-	requestRouter := initRouter()
+//InitRouter sets up a Router object which can then be used to route requests
+func InitRouter(inbound <-chan types.Message, storage data.Storage, transport Transport, signer signature.SignKeys,
+	voteEnabled, censusEnabled, dvoteEnabled, w3Enabled bool) Router {
+	requestMap := make(methodMap)
+
+	if voteEnabled { //vote API methods go here
+	}
+
+	if censusEnabled { //census API methods go here
+	}
+
+	if dvoteEnabled {
+		requestMap["fetchFile"] = func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys) {
+			var fileRequest types.FetchFileRequest
+			if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
+				log.Printf("Couldn't decode into FetchFileRequest type from request %v", msg.Data)
+				return
+			}
+			log.Printf("Called method fetchFile, uri %s", fileRequest.Request.URI)
+			go fetchFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
+		}
+
+		requestMap["addFile"] = func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys) {
+			var fileRequest types.AddFileRequest
+			if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
+				log.Printf("Couldn't decode into AddFileRequest type from request %s", msg.Data)
+				return
+			}
+			authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
+			if err != nil {
+				log.Printf("Wrong authorization: %s", err)
+				return
+			}
+			if authorized {
+				content := fileRequest.Request.Content
+				b64content, err := base64.StdEncoding.DecodeString(content)
+				if err != nil {
+					log.Printf("Couldn't decode content")
+					return
+				}
+				reqType := fileRequest.Request.Type
+
+				go addFile(reqType, fileRequest.ID, b64content, msg, storage, transport, signer)
+
+			} else {
+				transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
+			}
+		}
+
+		requestMap["pinList"] = func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys) {
+			var fileRequest types.PinListRequest
+			if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
+				log.Printf("Couldn't decode into PinListRequest type from request %s", msg.Data)
+				return
+			}
+			authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
+			if err != nil {
+				log.Printf("Error checking authorization: %s", err)
+				return
+			}
+			if authorized {
+				go pinList(fileRequest.ID, msg, storage, transport, signer)
+			} else {
+				transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
+			}
+		}
+
+		requestMap["pinFile"] = func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys) {
+			var fileRequest types.PinFileRequest
+			if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
+				log.Printf("Couldn't decode into PinFileRequest type from request %s", msg.Data)
+				return
+			}
+			authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
+			if err != nil {
+				log.Printf("Error checking authorization: %s", err)
+				return
+			}
+			if authorized {
+				go pinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
+			} else {
+				transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
+			}
+		}
+
+		requestMap["unpinFile"] = func(msg types.Message, rawRequest []byte, storage data.Storage, transport Transport, signer signature.SignKeys) {
+			var fileRequest types.UnpinFileRequest
+			if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
+				log.Printf("Couldn't decode into UnpinFileRequest type from request %s", msg.Data)
+				return
+			}
+			authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
+			if err != nil {
+				log.Printf("Error checking authorization: %s", err)
+				return
+			}
+			if authorized {
+
+				go unPinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
+			} else {
+				transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
+			}
+		}
+	}
+
+	if w3Enabled { //web3 API methods go here 
+	}
+
+	routerObj := Router{requestMap, inbound, storage, transport, signer}
+	return routerObj
+}
+
+//Route routes requests through the Router object
+func (r Router) Route() {
 	for {
 		select {
-		case msg := <-inbound:
+		case msg := <-r.inbound:
 
 			/*getMethod pulls method name and rawRequest from msg.Data*/
 			method, rawRequest, err := getMethod(msg.Data)
@@ -200,98 +223,7 @@ func Route(inbound <-chan types.Message, storage data.Storage, transport Transpo
 				log.Printf("Couldn't extract method from JSON message %v", msg)
 				break
 			}
-
-			requestRouter[method](msg, rawRequest, storage, transport, signer)
-
-			/*switch method {
-			case "fetchFile":
-				var fileRequest types.FetchFileRequest
-				if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-					log.Printf("Couldn't decode into FetchFileRequest type from request %v", msg.Data)
-					break
-				}
-				log.Printf("Called method fetchFile, uri %s", fileRequest.Request.URI)
-				go fetchFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
-
-			case "addFile":
-				var fileRequest types.AddFileRequest
-				if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-					log.Printf("Couldn't decode into AddFileRequest type from request %s", msg.Data)
-					break
-				}
-				authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
-				if err != nil {
-					log.Printf("Wrong authorization: %s", err)
-					break
-				}
-				if authorized {
-					content := fileRequest.Request.Content
-					b64content, err := base64.StdEncoding.DecodeString(content)
-					if err != nil {
-						log.Printf("Couldn't decode content")
-						break
-					}
-					reqType := fileRequest.Request.Type
-
-					go addFile(reqType, fileRequest.ID, b64content, msg, storage, transport, signer)
-
-				} else {
-					transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
-				}
-				break
-			case "pinList":
-				var fileRequest types.PinListRequest
-				if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-					log.Printf("Couldn't decode into PinListRequest type from request %s", msg.Data)
-					break
-				}
-				authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
-				if err != nil {
-					log.Printf("Error checking authorization: %s", err)
-					break
-				}
-				if authorized {
-					go pinList(fileRequest.ID, msg, storage, transport, signer)
-				} else {
-					transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
-				}
-				break
-			case "pinFile":
-				var fileRequest types.PinFileRequest
-				if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-					log.Printf("Couldn't decode into PinFileRequest type from request %s", msg.Data)
-					break
-				}
-				authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
-				if err != nil {
-					log.Printf("Error checking authorization: %s", err)
-					break
-				}
-				if authorized {
-					go pinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
-				} else {
-					transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
-				}
-				break
-			case "unpinFile":
-				var fileRequest types.UnpinFileRequest
-				if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-					log.Printf("Couldn't decode into UnpinFileRequest type from request %s", msg.Data)
-					break
-				}
-				authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
-				if err != nil {
-					log.Printf("Error checking authorization: %s", err)
-					break
-				}
-				if authorized {
-
-					go unPinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
-				} else {
-					transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
-				}
-				break
-			}*/
+			r.requestMap[method](msg, rawRequest, r.storage, r.transport, r.signer)
 		}
 	}
 }
