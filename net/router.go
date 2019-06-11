@@ -97,6 +97,7 @@ type Router struct {
 	storage    data.Storage
 	transport  Transport
 	signer     signature.SignKeys
+	init       bool
 }
 
 //InitRouter sets up a Router object which can then be used to route requests
@@ -204,15 +205,18 @@ func InitRouter(inbound <-chan types.Message, storage data.Storage, transport Tr
 		}
 	}
 
-	if w3Enabled { //web3 API methods go here 
+	if w3Enabled { //web3 API methods go here
 	}
 
-	routerObj := Router{requestMap, inbound, storage, transport, signer}
+	routerObj := Router{requestMap, inbound, storage, transport, signer, true}
 	return routerObj
 }
 
 //Route routes requests through the Router object
 func (r Router) Route() {
+	if !r.init {
+		log.Printf("Router is not properly initialized: %v", r)
+	}
 	for {
 		select {
 		case msg := <-r.inbound:
@@ -223,7 +227,12 @@ func (r Router) Route() {
 				log.Printf("Couldn't extract method from JSON message %v", msg)
 				break
 			}
-			r.requestMap[method](msg, rawRequest, r.storage, r.transport, r.signer)
+			methodFunc := r.requestMap[method]
+			if methodFunc == nil {
+				log.Printf("Router has no method named $s", method)
+			} else {
+				methodFunc(msg, rawRequest, r.storage, r.transport, r.signer)
+			}
 		}
 	}
 }
