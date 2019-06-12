@@ -12,6 +12,7 @@ import (
 	"github.com/vocdoni/go-dvote/data"
 	"github.com/vocdoni/go-dvote/net"
 	"github.com/vocdoni/go-dvote/types"
+	"github.com/vocdoni/go-dvote/router"
 )
 
 /*
@@ -22,8 +23,6 @@ Testing the RPC can be performed with curl and/or websocat
  echo '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":74}' | websocat ws://127.0.0.1:9092
 */
 func main() {
-	voteEnabled := flag.Bool("voteApi", false, "enable vote API")
-	censusEnabled := flag.Bool("censusApi", false, "enable census API")
 	dvoteEnabled := flag.Bool("fileApi", true, "enable file API")
 	w3Enabled := flag.Bool("web3Api", true, "enable web3 API")
 
@@ -129,7 +128,7 @@ func main() {
 		}
 
 		go websockets.Listen(listenerOutput)
-		router := net.InitRouter(listenerOutput, storage, websockets, *signer, *voteEnabled, *censusEnabled, *dvoteEnabled, *w3Enabled)
+		router := router.InitRouter(listenerOutput, storage, websockets, *signer, *dvoteEnabled)
 		go router.Route()
 	}
 
