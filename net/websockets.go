@@ -52,9 +52,16 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 		if err != nil {
 			return
 		}
-		if err := w.e.Add(conn); err != nil {
-			log.Printf("Failed to add connection %v", err)
-			conn.Close()
+		if w.p.SSLDomain == "" {
+			if err := w.e.Add(conn, false); err != nil {
+				log.Printf("Failed to add connection %v", err)
+				conn.Close()
+			}
+		} else {
+			if err := w.e.Add(conn, true); err != nil {
+				log.Printf("Failed to add connection %v", err)
+				conn.Close()
+			}
 		}
 	}
 	w.p.AddHandler(path, upgradeConn)
@@ -80,9 +87,16 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 				break
 			}
 			if payload, _, err := wsutil.ReadClientData(conn); err != nil {
-				if err := w.e.Remove(conn); err != nil {
-					log.Printf("WS recieve rror: %s", err)
+				if w.p.SSLDomain == "" {
+					if err := w.e.Remove(conn, false); err != nil {
+						log.Printf("WS recieve error: %s", err)
+					}
+				} else {
+					if err := w.e.Remove(conn, true); err != nil {
+						log.Printf("WS recieve error: %s", err)
+					}
 				}
+
 				conn.Close()
 			} else {
 				msg.Data = []byte(payload)
