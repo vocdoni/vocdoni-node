@@ -11,8 +11,10 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
+// ProxyHandler function signature required to add a handler in the net/http Server
 type ProxyHandler func(http.ResponseWriter, *http.Request)
 
+// Proxy represents a proxy
 type Proxy struct {
 	Address    string //this node's address
 	SSLDomain  string //ssl domain
@@ -20,16 +22,20 @@ type Proxy struct {
 	Port       int    //specific port on which a transport should listen
 }
 
+// NewProxy creates a new proxy instance
 func NewProxy() *Proxy {
 	p := new(Proxy)
 	return p
 }
 
+// Init checks if SSL is activated or not and runs a http server consequently
 func (p *Proxy) Init() {
 
-	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "pong")
-	})
+	/*
+		http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, "pong")
+		})
+	*/
 
 	if p.SSLDomain != "" {
 		s := p.GenerateSSLCertificate()
@@ -49,6 +55,7 @@ func (p *Proxy) Init() {
 	}
 }
 
+// GenerateSSLCertificate generates a SSL certificated for the proxy
 func (p *Proxy) GenerateSSLCertificate() *http.Server {
 	m := autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
@@ -66,6 +73,7 @@ func (p *Proxy) GenerateSSLCertificate() *http.Server {
 	return serverConfig
 }
 
+// AddHandler adds a handler for the proxy
 func (p *Proxy) AddHandler(path string, handler ProxyHandler) {
 	http.HandleFunc(path, handler)
 }

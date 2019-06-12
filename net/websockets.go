@@ -14,16 +14,20 @@ import (
 	"github.com/gobwas/ws/wsutil"
 )
 
+// WebsocketHandle represents the information required to work with ws in go-dvote
 type WebsocketHandle struct {
-	c *types.Connection
-	e *epoll.Epoll
-	p *Proxy
+	c *types.Connection // the ws connection
+	e *epoll.Epoll      // epoll for the ws implementation
+	p *Proxy            // proxy where the ws will be associated
 }
 
+// SetProxy sets the proxy for the ws
 func (w *WebsocketHandle) SetProxy(p *Proxy) {
 	w.p = p
 }
 
+// Init increases the sys limitations regarding to the number of files opened
+// to handle the connections and creates the epoll
 func (w *WebsocketHandle) Init(c *types.Connection) error {
 	// Increase resources limitations
 	var rLimit syscall.Rlimit
@@ -45,6 +49,8 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 	return nil
 }
 
+// AddProxyHandler adds a handler on the proxy and upgrades the connection
+// a ws connection is activated with a normal http request with Connection: upgrade
 func (w *WebsocketHandle) AddProxyHandler(path string) {
 	upgradeConn := func(writer http.ResponseWriter, reader *http.Request) {
 		// Upgrade connection
@@ -74,6 +80,7 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 
 }
 
+// Listen listens for incoming data
 func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 	var msg types.Message
 	for {
@@ -110,6 +117,7 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 	}
 }
 
+// Send sends the response given a message
 func (w *WebsocketHandle) Send(msg types.Message) {
 	wsutil.WriteServerMessage(*msg.Context.(*types.WebsocketContext).Conn, ws.OpBinary, msg.Data)
 }

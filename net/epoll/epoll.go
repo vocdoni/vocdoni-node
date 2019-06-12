@@ -11,11 +11,12 @@ import (
 )
 
 type Epoll struct {
-	fd          int
-	connections map[int]net.Conn
-	lock        *sync.RWMutex
+	fd          int              // file descriptor
+	connections map[int]net.Conn // connections map
+	lock        *sync.RWMutex    // lock for the fd
 }
 
+// MkEpoll creates a linux epoll
 func MkEpoll() (*Epoll, error) {
 	fd, err := unix.EpollCreate1(0)
 	if err != nil {
@@ -28,6 +29,7 @@ func MkEpoll() (*Epoll, error) {
 	}, nil
 }
 
+// Add adds a connection
 func (e *Epoll) Add(conn net.Conn, ssl bool) error {
 	// Extract file descriptor associated with the connection
 	fd := websocketFD(conn, ssl)
@@ -42,6 +44,7 @@ func (e *Epoll) Add(conn net.Conn, ssl bool) error {
 	return nil
 }
 
+// Remove removes a connection
 func (e *Epoll) Remove(conn net.Conn, ssl bool) error {
 	fd := websocketFD(conn, ssl)
 	err := unix.EpollCtl(e.fd, syscall.EPOLL_CTL_DEL, fd, nil)
@@ -57,6 +60,7 @@ func (e *Epoll) Remove(conn net.Conn, ssl bool) error {
 	return nil
 }
 
+// Wait given an added connection, listens for new events
 func (e *Epoll) Wait() ([]net.Conn, error) {
 	events := make([]unix.EpollEvent, 100)
 	n, err := unix.EpollWait(e.fd, events, 100)

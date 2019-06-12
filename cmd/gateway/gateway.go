@@ -27,7 +27,7 @@ func main() {
 
 	dvoteHost := flag.String("dvoteHost", "0.0.0.0", "dvote API host")
 	dvotePort := flag.Int("dvotePort", 9090, "dvote API port")
-	dvoteRoute := flag.String("dvoteRoute", "/dvote-ws", "dvote API route")
+	dvoteRoute := flag.String("dvoteRoute", "/dvote", "dvote API route")
 
 	allowPrivate := flag.Bool("allowPrivate", false, "allows authorized clients to call private methods")
 	allowedAddrs := flag.String("allowedAddrs", "", "comma delimited list of allowed client eth addresses")
@@ -43,7 +43,7 @@ func main() {
 	ipfsNoInit := flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
 
 	sslDomain := flag.String("sslDomain", "", "ssl secure domain")
-	sslDirCert := flag.String("sslDircert", "./", "path where the ssl files will be stored")
+	sslDirCert := flag.String("sslDirCert", "./", "path where the ssl files will be stored")
 
 	flag.Parse()
 
