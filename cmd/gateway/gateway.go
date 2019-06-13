@@ -12,6 +12,7 @@ import (
 	"github.com/vocdoni/go-dvote/data"
 	"github.com/vocdoni/go-dvote/net"
 	"github.com/vocdoni/go-dvote/types"
+	"github.com/vocdoni/go-dvote/router"
 )
 
 /*
@@ -121,17 +122,18 @@ func main() {
 		ipfsConfig := data.IPFSNewConfig()
 		ipfsConfig.Start = !*ipfsNoInit
 		ipfsConfig.Binary = *ipfsDaemon
-		storage, err := data.InitDefault(data.StorageIDFromString("IPFS"), ipfsConfig)
+    storage, err := data.InitDefault(data.StorageIDFromString("IPFS"), ipfsConfig)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		go ws.Listen(listenerOutput)
-		go net.Route(listenerOutput, storage, ws, *signer)
+		router := router.InitRouter(listenerOutput, storage, ws, *signer, *dvoteEnabled)
+		go router.Route()
+    
 	}
 
 	for {
 		time.Sleep(1 * time.Second)
 	}
-
 }
