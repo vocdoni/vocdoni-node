@@ -1,8 +1,10 @@
 package net
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
@@ -76,4 +78,39 @@ func (p *Proxy) GenerateSSLCertificate() *http.Server {
 // AddHandler adds a handler for the proxy
 func (p *Proxy) AddHandler(path string, handler ProxyHandler) {
 	http.HandleFunc(path, handler)
+}
+
+// RegisterW3 enables the comunication with a running blockchain node through the proxy
+func (p *Proxy) RegisterW3(w3httpHost string, w3httpPort int, sslDomain string) func(writer http.ResponseWriter, reader *http.Request) {
+	fn := func(writer http.ResponseWriter, reader *http.Request) {
+		body, err := ioutil.ReadAll(reader.Body)
+		if err != nil {
+			panic(err)
+		}
+		var req *http.Request
+		if sslDomain == "" {
+			req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s:%s", "http://"+w3httpHost, strconv.Itoa(w3httpPort)), bytes.NewReader(body))
+		} else {
+			req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s:%s", "https://"+w3httpHost, strconv.Itoa(w3httpPort)), bytes.NewReader(body))
+		}
+		if err != nil {
+			log.Printf("Cannot create Web3 request: %s", err)
+		}
+		const contentType = "application/json"
+		req.Header.Set("Content-Type", contentType)
+		req.Header.Set("Accept", contentType)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Printf("Web3 request failed: %s", err)
+		}
+
+		respBody, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("Cannot read Web3 node response: %s", err)
+		}
+
+		log.Printf("web3 response: %s", respBody)
+	}
+
+	return fn
 }

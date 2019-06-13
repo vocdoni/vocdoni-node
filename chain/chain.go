@@ -88,10 +88,10 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	nodeConfig.WSModules = []string{}
 	nodeConfig.HTTPHost = c.HTTPHost
 	nodeConfig.HTTPPort = c.HTTPPort
-	nodeConfig.HTTPCors = []string{"*"}
+	nodeConfig.HTTPCors = []string{""}
 	nodeConfig.HTTPVirtualHosts = []string{"*"}
 	nodeConfig.HTTPModules = []string{}
-	nodeConfig.WSOrigins = []string{"*"}
+	nodeConfig.WSOrigins = []string{""}
 	nodeConfig.NoUSB = true
 	nodeConfig.IPCPath = c.IPCPath
 	nodeConfig.DataDir = c.DataDir
@@ -144,12 +144,14 @@ func (e *EthChainContext) Start() {
 		log.Printf("My Ethereum address %x\n", e.Keys.Accounts()[0].Address)
 	}
 	log.Printf("Started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
-	if e.DefaultConfig.WSPort > 0 {
-		log.Printf("Web3 WebSockets endpoint ws://%s:%d\n", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
-	}
-	if e.DefaultConfig.HTTPPort > 0 {
-		log.Printf("Web3 HTTP endpoint http://%s:%d\n", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
-	}
+	/*
+		if e.DefaultConfig.WSPort > 0 {
+			log.Printf("Web3 WebSockets endpoint ws://%s:%d\n", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
+		}
+		if e.DefaultConfig.HTTPPort > 0 {
+			log.Printf("Web3 HTTP endpoint http://%s:%d\n", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
+		}
+	*/
 }
 
 func (e *EthChainContext) LinkBatch(ref []byte) error {

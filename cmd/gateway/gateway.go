@@ -11,8 +11,8 @@ import (
 	"github.com/vocdoni/go-dvote/chain"
 	"github.com/vocdoni/go-dvote/data"
 	"github.com/vocdoni/go-dvote/net"
-	"github.com/vocdoni/go-dvote/types"
 	"github.com/vocdoni/go-dvote/router"
+	"github.com/vocdoni/go-dvote/types"
 )
 
 /*
@@ -39,6 +39,7 @@ func main() {
 	w3wsHost := flag.String("w3wsHost", "0.0.0.0", "ws host to listen on")
 	w3httpPort := flag.Int("w3httpPort", 9091, "http endpoint port, disabled if 0")
 	w3httpHost := flag.String("w3httpHost", "0.0.0.0", "http host to listen on")
+	w3Route := flag.String("w3Route", "/web3", "proxy endpoint exposing web3")
 
 	ipfsDaemon := flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
 	ipfsNoInit := flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
@@ -47,6 +48,13 @@ func main() {
 	sslDirCert := flag.String("sslDirCert", "./", "path where the ssl files will be stored")
 
 	flag.Parse()
+
+	p := net.NewProxy()
+	p.SSLDomain = *sslDomain
+	p.SSLCertDir = *sslDirCert
+	p.Address = *dvoteHost
+	p.Port = *dvotePort
+	p.Init()
 
 	var node *chain.EthChainContext
 	_ = node
@@ -66,6 +74,9 @@ func main() {
 		}
 
 		node.Start()
+		time.Sleep(1 * time.Second)
+		p.AddHandler(*w3Route, p.RegisterW3(*w3httpHost, *w3httpPort, *sslDomain))
+		log.Printf("Web3 HTTP endpoint http://%s:%d%s\n", *dvoteHost, *dvotePort, *w3Route)
 	}
 
 	var signer *sig.SignKeys
@@ -107,12 +118,6 @@ func main() {
 	listenerOutput := make(chan types.Message)
 
 	if *dvoteEnabled {
-		p := net.NewProxy()
-		p.SSLDomain = *sslDomain
-		p.SSLCertDir = *sslDirCert
-		p.Address = *dvoteHost
-		p.Port = *dvotePort
-		p.Init()
 
 		ws := new(net.WebsocketHandle)
 		ws.Init(new(types.Connection))
@@ -122,7 +127,7 @@ func main() {
 		ipfsConfig := data.IPFSNewConfig()
 		ipfsConfig.Start = !*ipfsNoInit
 		ipfsConfig.Binary = *ipfsDaemon
-    storage, err := data.InitDefault(data.StorageIDFromString("IPFS"), ipfsConfig)
+		storage, err := data.InitDefault(data.StorageIDFromString("IPFS"), ipfsConfig)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -130,7 +135,7 @@ func main() {
 		go ws.Listen(listenerOutput)
 		router := router.InitRouter(listenerOutput, storage, ws, *signer, *dvoteEnabled)
 		go router.Route()
-    
+
 	}
 
 	for {
