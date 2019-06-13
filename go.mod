@@ -18,7 +18,7 @@ require (
 	github.com/docker/docker v1.13.1 // indirect
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/elastic/gosigar v0.10.2 // indirect
-	github.com/ethereum/go-ethereum v1.8.27
+	github.com/ethereum/go-ethereum v1.8.22-0.20190613132322-2da6d1e04750
 	github.com/ethersphere/swarm v1.8.22-0.20190604123244-6d0902da3cf0
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
