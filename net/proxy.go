@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/vocdoni/go-dvote/types"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -18,10 +19,7 @@ type ProxyHandler func(http.ResponseWriter, *http.Request)
 
 // Proxy represents a proxy
 type Proxy struct {
-	Address    string //this node's address
-	SSLDomain  string //ssl domain
-	SSLCertDir string //ssl certificates directory
-	Port       int    //specific port on which a transport should listen
+	C *types.Connection
 }
 
 // NewProxy creates a new proxy instance
@@ -39,21 +37,21 @@ func (p *Proxy) Init() {
 		})
 	*/
 
-	if p.SSLDomain != "" {
+	if p.C.SSLDomain != "" {
 		s := p.GenerateSSLCertificate()
 		go func() {
 			log.Fatal(s.ListenAndServeTLS("", ""))
 		}()
-		log.Printf("Proxy with SSL initialized on %s", p.SSLDomain+":"+strconv.Itoa(p.Port))
+		log.Printf("Proxy with SSL initialized on https://%s", p.C.SSLDomain+":"+strconv.Itoa(p.C.Port))
 	}
-	if p.SSLDomain == "" {
+	if p.C.SSLDomain == "" {
 		s := &http.Server{
-			Addr: p.Address + ":" + strconv.Itoa(p.Port),
+			Addr: p.C.Address + ":" + strconv.Itoa(p.C.Port),
 		}
 		go func() {
 			log.Fatal(s.ListenAndServe())
 		}()
-		log.Printf("Proxy initialized on %s, ssl not activated", p.Address+":"+strconv.Itoa(p.Port))
+		log.Printf("Proxy initialized on http://%s, ssl not activated", p.C.Address+":"+strconv.Itoa(p.C.Port))
 	}
 }
 
@@ -61,12 +59,12 @@ func (p *Proxy) Init() {
 func (p *Proxy) GenerateSSLCertificate() *http.Server {
 	m := autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(p.SSLDomain),
-		Cache:      autocert.DirCache(p.SSLCertDir),
+		HostPolicy: autocert.HostWhitelist(p.C.SSLDomain),
+		Cache:      autocert.DirCache(p.C.SSLCertDir),
 	}
 
 	serverConfig := &http.Server{
-		Addr: fmt.Sprintf("%s:%d", p.Address, p.Port), // 443 ssl
+		Addr: fmt.Sprintf("%s:%d", p.C.Address, p.C.Port), // 443 ssl
 		TLSConfig: &tls.Config{
 			GetCertificate: m.GetCertificate,
 		},
@@ -80,37 +78,33 @@ func (p *Proxy) AddHandler(path string, handler ProxyHandler) {
 	http.HandleFunc(path, handler)
 }
 
-// RegisterW3 enables the comunication with a running blockchain node through the proxy
-func (p *Proxy) RegisterW3(w3httpHost string, w3httpPort int, sslDomain string) func(writer http.ResponseWriter, reader *http.Request) {
+// AddEndpoint adds an endpoint representing the url where the request will be handled
+func (p *Proxy) AddEndpoint(host string, port int) func(writer http.ResponseWriter, reader *http.Request) {
 	fn := func(writer http.ResponseWriter, reader *http.Request) {
 		body, err := ioutil.ReadAll(reader.Body)
 		if err != nil {
 			panic(err)
 		}
 		var req *http.Request
-		if sslDomain == "" {
-			req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s:%s", "http://"+w3httpHost, strconv.Itoa(w3httpPort)), bytes.NewReader(body))
-		} else {
-			req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s:%s", "https://"+w3httpHost, strconv.Itoa(w3httpPort)), bytes.NewReader(body))
-		}
+		req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s:%s", "http://"+host, strconv.Itoa(port)), bytes.NewReader(body))
+
 		if err != nil {
-			log.Printf("Cannot create Web3 request: %s", err)
+			log.Printf("Cannot create http request: %s", err)
 		}
 		const contentType = "application/json"
 		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("Accept", contentType)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			log.Printf("Web3 request failed: %s", err)
+			log.Printf("Request failed: %s", err)
 		}
 
 		respBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Printf("Cannot read Web3 node response: %s", err)
+			log.Printf("Cannot read response: %s", err)
 		}
 
-		log.Printf("web3 response: %s", respBody)
+		log.Printf("Response: %s", respBody)
 	}
-
 	return fn
 }

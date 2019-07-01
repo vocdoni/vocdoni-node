@@ -50,10 +50,11 @@ func main() {
 	flag.Parse()
 
 	p := net.NewProxy()
-	p.SSLDomain = *sslDomain
-	p.SSLCertDir = *sslDirCert
-	p.Address = *dvoteHost
-	p.Port = *dvotePort
+	p.C = new(types.Connection)
+	p.C.SSLDomain = *sslDomain
+	p.C.SSLCertDir = *sslDirCert
+	p.C.Address = *dvoteHost
+	p.C.Port = *dvotePort
 	p.Init()
 
 	var node *chain.EthChainContext
@@ -75,8 +76,8 @@ func main() {
 
 		node.Start()
 		time.Sleep(1 * time.Second)
-		p.AddHandler(*w3Route, p.RegisterW3(*w3httpHost, *w3httpPort, *sslDomain))
-		log.Printf("Web3 HTTP endpoint http://%s:%d%s\n", *dvoteHost, *dvotePort, *w3Route)
+		p.AddHandler(*w3Route, p.AddEndpoint(*w3httpHost, *w3httpPort))
+		log.Printf("web3 available at %s", *w3Route)
 	}
 
 	var signer *sig.SignKeys
@@ -99,11 +100,11 @@ func main() {
 	} else if *w3Enabled {
 		acc := node.Keys.Accounts()
 		if len(acc) > 0 {
-			keyJson, err := node.Keys.Export(acc[0], "", "")
+			keyJSON, err := node.Keys.Export(acc[0], "", "")
 			if err != nil {
 				log.Fatal(err)
 			}
-			err = signer.AddKeyFromEncryptedJSON(keyJson, "")
+			err = signer.AddKeyFromEncryptedJSON(keyJSON, "")
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -123,6 +124,7 @@ func main() {
 		ws.Init(new(types.Connection))
 		ws.SetProxy(p)
 		ws.AddProxyHandler(*dvoteRoute)
+		log.Printf("ws available at %s", *dvoteRoute)
 
 		ipfsConfig := data.IPFSNewConfig()
 		ipfsConfig.Start = !*ipfsNoInit

@@ -3,7 +3,6 @@ package net
 import (
 	"log"
 	"net/http"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -58,26 +57,14 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 		if err != nil {
 			return
 		}
-		if w.p.SSLDomain == "" {
-			if err := w.e.Add(conn, false); err != nil {
-				log.Printf("Failed to add connection %v", err)
-				conn.Close()
-			}
-		} else {
-			if err := w.e.Add(conn, true); err != nil {
-				log.Printf("Failed to add connection %v", err)
-				conn.Close()
-			}
+		err = w.e.Add(conn, false)
+		if err != nil {
+			log.Printf("Failed to add connection %v", err)
+			conn.Close()
 		}
+
 	}
 	w.p.AddHandler(path, upgradeConn)
-
-	if w.p.SSLDomain == "" {
-		log.Printf("ws initialized on ws://" + w.p.Address + ":" + strconv.Itoa(w.p.Port) + path)
-	} else {
-		log.Printf("wss initialized on wss://" + w.p.SSLDomain + ":" + strconv.Itoa(w.p.Port) + path)
-	}
-
 }
 
 // Listen listens for incoming data
@@ -94,16 +81,9 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 				break
 			}
 			if payload, _, err := wsutil.ReadClientData(conn); err != nil {
-				if w.p.SSLDomain == "" {
-					if err := w.e.Remove(conn, false); err != nil {
-						log.Printf("WS recieve error: %s", err)
-					}
-				} else {
-					if err := w.e.Remove(conn, true); err != nil {
-						log.Printf("WS recieve error: %s", err)
-					}
+				if err := w.e.Remove(conn, false); err != nil {
+					log.Printf("WS recieve error: %s", err)
 				}
-
 				conn.Close()
 			} else {
 				msg.Data = []byte(payload)
