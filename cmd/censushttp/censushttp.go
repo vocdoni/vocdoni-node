@@ -1,17 +1,50 @@
 package main
 
 import (
-	"log"
 	"os"
 	"strconv"
 	"strings"
 
+	viper "github.com/spf13/viper"
+	flag "github.com/spf13/pflag"
+
 	censusmanager "github.com/vocdoni/go-dvote/service/census"
+	"github.com/vocdoni/go-dvote/log"
+	"github.com/vocdoni/go-dvote/config"
 )
 
+func newConfig() (config.CensusCfg, error) {
+	//setup flags
+	flag.String("loglevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	flag.Parse()
+	viper := viper.New()
+	var globalCfg config.CensusCfg
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("/go-dvote/cmd/censushttp/") // path to look for the config file in
+	viper.AddConfigPath(".")                      // optionally look for config in the working directory
+	err := viper.ReadInConfig()
+	if err != nil {
+		return globalCfg, err
+	}
+
+	viper.BindPFlags(flag.CommandLine)
+	
+	err = viper.Unmarshal(&globalCfg)
+	return globalCfg, err
+}
+
 func main() {
+	//setup config
+	globalCfg, err := newConfig()
+	//setup logger
+	log.InitLoggerAtLevel(globalCfg.LogLevel)
+	if err != nil {
+		log.Fatalf("Could not load config: %v", err)
+	}
+
 	if len(os.Args) < 2 {
-		log.Fatal("Usage: " + os.Args[0] +
+		log.Fatalf("Usage: " + os.Args[0] +
 			" <port> <namespace>[:pubKey] [<namespace>[:pubKey]]...")
 		os.Exit(2)
 	}
@@ -26,10 +59,10 @@ func main() {
 		pubK := ""
 		if len(s) > 1 {
 			pubK = s[1]
-			log.Printf("Public Key authentication enabled on namespace %s\n", ns)
+			log.Infof("Public Key authentication enabled on namespace %s\n", ns)
 		}
 		censusmanager.AddNamespace(ns, pubK)
-		log.Printf("Starting process HTTP service on port %d for namespace %s\n",
+		log.Infof("Starting process HTTP service on port %d for namespace %s\n",
 			port, ns)
 	}
 	censusmanager.Listen(port, "http")

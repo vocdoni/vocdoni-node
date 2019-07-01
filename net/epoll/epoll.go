@@ -1,13 +1,14 @@
 package epoll
 
 import (
-	"log"
 	"net"
 	"reflect"
 	"sync"
 	"syscall"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/vocdoni/go-dvote/log"
 )
 
 type Epoll struct {
@@ -40,7 +41,7 @@ func (e *Epoll) Add(conn net.Conn, ssl bool) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.connections[fd] = conn
-	log.Printf("Total number of connections: %v", len(e.connections))
+	log.Infof("Total number of connections: %v", len(e.connections))
 	return nil
 }
 
@@ -55,7 +56,7 @@ func (e *Epoll) Remove(conn net.Conn, ssl bool) error {
 	defer e.lock.Unlock()
 	delete(e.connections, fd)
 	if len(e.connections)%100 == 0 {
-		log.Printf("Total number of connections: %v", len(e.connections))
+		log.Infof("Total number of connections: %v", len(e.connections))
 	}
 	return nil
 }

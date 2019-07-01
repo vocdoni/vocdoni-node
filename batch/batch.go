@@ -2,10 +2,10 @@ package batch
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/vocdoni/go-dvote/db"
 	"github.com/vocdoni/go-dvote/types"
+	"github.com/vocdoni/go-dvote/log"
 )
 
 var rdb *db.LevelDbStorage
@@ -43,7 +43,7 @@ func Recieve(messages <-chan types.Message) {
 			//log error
 		}
 
-		log.Printf("Recieved %", string(payload))
+		log.Infof("Recieved payload: %v", payload)
 	}
 }
 
@@ -81,7 +81,7 @@ func Fetch() ([]string, []string) {
 		v := iter.Value()
 		err := iter.Error()
 		if err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 		n = append(n, string(k[6:]))
 		b = append(b, string(v))
@@ -89,11 +89,11 @@ func Fetch() ([]string, []string) {
 	iter.Release()
 	//	jn, err := json.Marshal(n)
 	//	if err != nil {
-	//		panic(err)
+	//		log.Panic(err)
 	//	}
 	//	jb, err := json.Marshal(b)
 	//	if err != nil {
-	//		panic(err)
+	//		log.Panic(err)
 	//	}
 	return n, b
 }
@@ -103,7 +103,7 @@ func Compact(n []string) {
 	for _, k := range n {
 		v, err := bdb.Get([]byte(k))
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 		}
 		rdb.Put([]byte(k), v)
 		bdb.Delete([]byte(k))

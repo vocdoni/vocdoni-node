@@ -3,8 +3,6 @@ package chain
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
-	"log"
 	"math/big"
 	"time"
 
@@ -13,12 +11,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/console"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/vocdoni/go-dvote/config"
+	"github.com/vocdoni/go-dvote/log"
 
 	//	"github.com/ethereum/go-ethereum/accounts/abi"
 
@@ -48,17 +48,17 @@ type EthChainConfig struct {
 }
 
 // available chains: vctestnet
-func NewConfig(chain string) (*EthChainConfig, error) {
-	chainSpecs, err := GetChainSpecs(chain)
+func NewConfig(w3Cfg config.W3Cfg) (*EthChainConfig, error) {
+	chainSpecs, err := GetChainSpecs(w3Cfg.ChainType)
 	if err != nil {
 		return nil, err
 	}
 	cfg := new(EthChainConfig)
-	cfg.WSHost = "0.0.0.0"
-	cfg.WSPort = 9092
-	cfg.HTTPHost = "0.0.0.0"
-	cfg.HTTPPort = 9091
-	cfg.NodePort = 32000
+	cfg.WSHost = w3Cfg.WsHost
+	cfg.WSPort = w3Cfg.WsPort
+	cfg.HTTPHost = w3Cfg.HttpHost
+	cfg.HTTPPort = w3Cfg.HttpPort
+	cfg.NodePort = w3Cfg.NodePort
 	cfg.NetworkId = chainSpecs.NetworkId
 	cfg.NetworkGenesis, err = base64.StdEncoding.DecodeString(chainSpecs.GenesisB64)
 	if err != nil {
@@ -119,7 +119,7 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	g := new(core.Genesis)
 	err = g.UnmarshalJSON(c.NetworkGenesis)
 	if err != nil {
-		log.Println("Cannot read genesis file")
+		log.Errorf("Cannot read genesis file")
 		return err
 	}
 	ethConfig.Genesis = g
@@ -141,14 +141,14 @@ func (e *EthChainContext) Start() {
 	} else {
 		//phrase := getPassPhrase("please provide primary account passphrase", false)
 		e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
-		log.Printf("My Ethereum address %x\n", e.Keys.Accounts()[0].Address)
+		log.Infof("My Ethereum address %x\n", e.Keys.Accounts()[0].Address)
 	}
-	log.Printf("Started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
+	log.Infof("Started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
 	if e.DefaultConfig.WSPort > 0 {
-		log.Printf("Web3 WebSockets endpoint ws://%s:%d\n", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
+		log.Infof("Web3 WebSockets endpoint ws://%s:%d\n", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
 	}
 	if e.DefaultConfig.HTTPPort > 0 {
-		log.Printf("Web3 HTTP endpoint http://%s:%d\n", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
+		log.Infof("Web3 HTTP endpoint http://%s:%d\n", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
 	}
 }
 
@@ -176,10 +176,10 @@ func (e *EthChainContext) LinkBatch(ref []byte) error {
 	contractAddr := common.HexToAddress("0x3e4FfefF898580eC8132A97A91543c8fdeF1210E")
 	votingProcessInstance, err := votingprocess.NewVotingProcess(contractAddr, client)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error: %v", err)
 	}
 
-	fmt.Println("contract is loaded")
+	log.Infof("contract is loaded")
 	_ = votingProcessInstance
 	return nil
 
@@ -210,16 +210,16 @@ func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
 	}
 	//create tx
 	price, _ := client.SuggestGasPrice(ctx)
-	fmt.Println(price)
+	log.Infof("Price: $v", price)
 	var empty []byte
-	tx := types.NewTransaction(nonce, common.HexToAddress(addr), big.NewInt(int64(amount)), limit, price, empty)
+	tx := ethTypes.NewTransaction(nonce, common.HexToAddress(addr), big.NewInt(int64(amount)), limit, price, empty)
 	signedTx, err := e.Keys.SignTx(acc, tx, big.NewInt(int64(e.Config.NetworkId)))
 	if err != nil {
 		return err
 	}
 	//create ctx
 	err = client.SendTransaction(ctx, signedTx)
-	log.Println(err)
+	log.Errorf("Error: %v", err)
 	//fix return*/
 	return err
 }
@@ -233,7 +233,7 @@ func (e *EthChainContext) createAccount() error {
 		return err
 	}
 	e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
-	log.Printf("My Ethereum address %x\n", e.Keys.Accounts()[0].Address)
+	log.Infof("My Ethereum address %x\n", e.Keys.Accounts()[0].Address)
 
 	return nil
 }
@@ -241,7 +241,7 @@ func (e *EthChainContext) createAccount() error {
 func getPassPhrase(prompt string, confirmation bool) string {
 	// Otherwise prompt the user for the password
 	if prompt != "" {
-		fmt.Println(prompt)
+		log.Info(prompt)
 	}
 	phrase, err := console.Stdin.PromptPassword("Passphrase: ")
 	if err != nil {

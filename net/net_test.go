@@ -4,10 +4,11 @@ import (
 	"testing"
 	"encoding/json"
 	"net/http"
-	"fmt"
 	"time"
 	"bytes"
 	"io/ioutil"
+
+	"github.com/vocdoni/go-dvote/log"
 )
 
 //func generateSubmission() submission {
@@ -28,7 +29,7 @@ func TestListen(t *testing.T) {
 	listen("8080")
 
 	url := "http://localhost:8080/submit"
-	fmt.Println("URL:>", url)
+	log.Infof("URL:>", url)
 
 	j, err := json.Marshal(testSubmission)
 	if err != nil {
@@ -45,8 +46,6 @@ func TestListen(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("response Status:", resp.Status)
-	fmt.Println("response Headers:", resp.Header)
 	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("response Body:", string(body))
+	log.Infof("Response: Status: %v, Headers: %v, Body: %v", resp.Status, resp.Header, body)
 }

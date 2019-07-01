@@ -4,21 +4,23 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"flag"
-	"fmt"
 	"io"
-	"log"
+	"fmt"
 	"math/rand"
 	"net/url"
 	"os"
 	"time"
 
+	"github.com/spf13/viper"
+	flag "github.com/spf13/pflag"
 	"github.com/gorilla/websocket"
 
 	//	"net/http"
 	//	"bytes"
 	//	"io/ioutil"
 	"github.com/vocdoni/go-dvote/types"
+	"github.com/vocdoni/go-dvote/log"
+	"github.com/vocdoni/go-dvote/config"
 	//	"github.com/vocdoni/go-dvote/net"
 )
 
@@ -45,7 +47,7 @@ func makeBallot() string {
 
 	b, err := json.Marshal(bal)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		return "error"
 	}
 	//todo: add encryption, pow
@@ -69,7 +71,7 @@ func makeEnvelope(ballot string) string {
 
 	e, err := json.Marshal(env)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		return "error"
 	}
 	//todo: add encryption, pow
@@ -90,10 +92,12 @@ func parseMsg(payload []byte) (map[string]interface{}, error) {
 	return msgMap, nil
 }
 
-func main() {
-	var target = flag.String("target", "127.0.0.1:9090", "target IP and port")
-	var connections = flag.Int("conn", 1, "number of separate connections")
-	var interval = flag.Int("interval", 1000, "interval between requests in ms")
+func newConfig() (config.GenCfg, error) {
+	//setup flags
+	flag.String("loglevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	flag.String("target", "127.0.0.1:9090", "target IP and port")
+	flag.Int("conn", 1, "number of separate connections")
+	flag.Int("interval", 1000, "interval between requests in ms")
 
 	flag.Usage = func() {
 		io.WriteString(os.Stderr, `Websockets client generator
@@ -101,19 +105,45 @@ func main() {
 		`)
 		flag.PrintDefaults()
 	}
-	flag.Parse()
 
-	timer := time.NewTicker(time.Millisecond * time.Duration(*interval))
+	flag.Parse()
+	viper := viper.New()
+	var globalCfg config.GenCfg
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("/go-dvote/cmd/generator/") // path to look for the config file in
+	viper.AddConfigPath(".")                      // optionally look for config in the working directory
+	err := viper.ReadInConfig()
+	if err != nil {
+		return globalCfg, err
+	}
+
+	viper.BindPFlags(flag.CommandLine)
+	
+	err = viper.Unmarshal(&globalCfg)
+	return globalCfg, err
+}
+
+func main() {
+	//setup config
+	globalCfg, err := newConfig()
+	//setup logger
+	log.InitLoggerAtLevel(globalCfg.LogLevel)
+	if err != nil {
+		log.Fatalf("Could not load config: %v", err)
+	}
+
+	timer := time.NewTicker(time.Millisecond * time.Duration(globalCfg.Interval))
 	rand.Seed(time.Now().UnixNano())
 	//topic := "vocdoni_pubsub_testing"
 	//fmt.Println("PubSub Topic:>", topic)
-	u := url.URL{Scheme: "ws", Host: *target, Path: "/dvote"}
+	u := url.URL{Scheme: "ws", Host: globalCfg.Target, Path: "/dvote"}
 
 	var conns []*websocket.Conn
-	for i := 0; i < *connections; i++ {
+	for i := 0; i < globalCfg.Connections; i++ {
 		c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 		if err != nil {
-			log.Printf("Failed to connect", i, err)
+			log.Errorf("Failed to connect", i, err)
 			break
 		}
 		conns = append(conns, c)
@@ -124,7 +154,7 @@ func main() {
 		}()
 	}
 
-	log.Printf("Finished initializing %d connections", len(conns))
+	log.Infof("Finished initializing %d connections", len(conns))
 
 	//dummyRequestPing := `{"id": "req-0000001", "request": {"method": "ping"}}`
 	dummyRequestAddFile := `{"id": "req0000002", "request": {"method": "addFile", "name": "My first file", "type": "ipfs", "content": "SGVsbG8gVm9jZG9uaSE=", "timestamp": 1556110671}, "signature": "539"}`
@@ -139,68 +169,66 @@ func main() {
 			//var jsonStr = makeEnvelope(makeBallot())
 			//log.Printf("Conn %d sending message %s", i%*connections, jsonStr)
 			//log.Printf("%v", conns)
-			conn := conns[i%*connections]
+			conn := conns[i%globalCfg.Connections]
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second*5)); err != nil {
-				fmt.Printf("Failed to receive pong: %v", err)
+				log.Errorf("Failed to receive pong: %v", err)
 			}
 			//conn.WriteMessage(websocket.TextMessage, []byte(jsonStr))  //test with raw votes
 			//conn.WriteMessage(websocket.TextMessage, []byte(dummyRequestPing))
-			log.Printf("Conn %d sending message %s", i%*connections, dummyRequestAddFile)
+			log.Infof("Conn %d sending message %s", i%globalCfg.Connections, dummyRequestAddFile)
 			conn.WriteMessage(websocket.TextMessage, []byte(dummyRequestAddFile))
 			// request here
 			msgType, msg, err := conn.ReadMessage()
 			if err != nil {
-				log.Printf("Cannot read message")
+				log.Errorf("Cannot read message")
 				break
 			}
-			fmt.Println("Response message type: ", msgType)
-			fmt.Println("Response message content: ", string(msg))
+			log.Infof("Message info: Response message type: %v, Response message content: %v", msgType, string(msg))
 			msgMap, err := parseMsg(msg)
 			if err != nil {
-				log.Printf("couldn't parse message %v", string(msg))
-				log.Printf("error was: %v", err)
+				log.Errorf("Couldn't parse message: %v, error: %v", err)
 				break
 			}
 			responseMap, ok := msgMap["response"].(map[string]interface{})
 			if !ok {
-				log.Printf("couldnt parse response field")
+				log.Errorf("couldnt parse response field")
 				break
 			}
 			uri, ok := responseMap["uri"].(string)
 			if !ok {
-				log.Printf("couldnt parse uri")
+				log.Errorf("couldnt parse uri")
 				break
 			}
 
-			log.Printf("Conn %d sending message %s", i%*connections, fmt.Sprintf(dummyRequestPinFileFmt, uri))
+			log.Infof("Sending message: connection: %v, message: %v, uri: %v", i%globalCfg.Connections, dummyRequestPinFileFmt, uri)
 			conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(dummyRequestPinFileFmt, uri)))
 			msgType, msg, err = conn.ReadMessage()
 			if err != nil {
-				log.Printf("Cannot read message")
+				log.Errorf("Cannot read message")
 				break
 			}
-			fmt.Println("Response message content: ", string(msg))
+			log.Infof("Response message content: ", string(msg))
 
-			log.Printf("Conn %d sending message %s", i%*connections, dummyRequestListPins)
+			log.Infof("Sending message: connection: %v, message: %v", i%globalCfg.Connections, dummyRequestListPins)
 			conn.WriteMessage(websocket.TextMessage, []byte(dummyRequestListPins))
 			msgType, msg, err = conn.ReadMessage()
 			if err != nil {
-				log.Printf("Cannot read message")
+				log.Errorf("Cannot read message")
 				break
 			}
-			fmt.Println("Response message content: ", string(msg))
+			log.Infof("Response message content: ", string(msg))
 
-			log.Printf("Conn %d sending message %s", i%*connections, fmt.Sprintf(dummyRequestUnpinFileFmt, uri))
+			log.Infof("Sending message: connection: %v, message: %v, uri: %v", i%globalCfg.Connections, dummyRequestUnpinFileFmt, uri)
 			conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(dummyRequestUnpinFileFmt, uri)))
 			msgType, msg, err = conn.ReadMessage()
 			if err != nil {
-				log.Printf("Cannot read message")
+				log.Errorf("Cannot read message")
 				break
 			}
-			fmt.Println("Response message content: ", string(msg))
+			log.Infof("Response message content: ", string(msg))
 
 			i++
-			log.Printf("Sent!")
+			log.Infof("Sent!")
 		default:
 			continue
 		}

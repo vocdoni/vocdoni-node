@@ -1,7 +1,6 @@
 package net
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 	"syscall"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/vocdoni/go-dvote/net/epoll"
 	"github.com/vocdoni/go-dvote/types"
+	"github.com/vocdoni/go-dvote/log"
 
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
@@ -60,12 +60,12 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 		}
 		if w.p.SSLDomain == "" {
 			if err := w.e.Add(conn, false); err != nil {
-				log.Printf("Failed to add connection %v", err)
+				log.Warnf("Failed to add connection %v", err)
 				conn.Close()
 			}
 		} else {
 			if err := w.e.Add(conn, true); err != nil {
-				log.Printf("Failed to add connection %v", err)
+				log.Warnf("Failed to add connection %v", err)
 				conn.Close()
 			}
 		}
@@ -73,9 +73,9 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 	w.p.AddHandler(path, upgradeConn)
 
 	if w.p.SSLDomain == "" {
-		log.Printf("ws initialized on ws://" + w.p.Address + ":" + strconv.Itoa(w.p.Port) + path)
+		log.Infof("ws initialized on ws://" + w.p.Address + ":" + strconv.Itoa(w.p.Port) + path)
 	} else {
-		log.Printf("wss initialized on wss://" + w.p.SSLDomain + ":" + strconv.Itoa(w.p.Port) + path)
+		log.Infof("wss initialized on wss://" + w.p.SSLDomain + ":" + strconv.Itoa(w.p.Port) + path)
 	}
 
 }
@@ -86,7 +86,7 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 	for {
 		connections, err := w.e.Wait()
 		if err != nil {
-			log.Printf("WS recieve error: %s", err)
+			log.Warnf("WS recieve error: %s", err)
 			continue
 		}
 		for _, conn := range connections {
@@ -96,11 +96,11 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 			if payload, _, err := wsutil.ReadClientData(conn); err != nil {
 				if w.p.SSLDomain == "" {
 					if err := w.e.Remove(conn, false); err != nil {
-						log.Printf("WS recieve error: %s", err)
+						log.Warnf("WS recieve error: %s", err)
 					}
 				} else {
 					if err := w.e.Remove(conn, true); err != nil {
-						log.Printf("WS recieve error: %s", err)
+						log.Warnf("WS recieve error: %s", err)
 					}
 				}
 

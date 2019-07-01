@@ -1,7 +1,6 @@
 package router
 
 import (
-	"log"
 	"strings"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/vocdoni/go-dvote/data"
 	"github.com/vocdoni/go-dvote/types"
 	"github.com/vocdoni/go-dvote/net"
+	"github.com/vocdoni/go-dvote/log"
 
 	"encoding/json"
 )
@@ -20,7 +20,7 @@ func buildFailReply(requestId, message string) []byte {
 	response.Error.Request = requestId
 	rawResponse, err := json.Marshal(response)
 	if err != nil {
-		log.Printf("Error marshaling response body: %s", err)
+		log.Warnf("Error marshaling response body: %s", err)
 	}
 	return rawResponse
 }
@@ -28,12 +28,12 @@ func buildFailReply(requestId, message string) []byte {
 func signMsg(message interface{}, signer signature.SignKeys) string {
 	rawMsg, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("Unable to marshal message to sign: %s", err)
+		log.Warnf("Unable to marshal message to sign: %s", err)
 	}
 	sig, err := signer.Sign(string(rawMsg))
 	if err != nil {
 		sig = "0x00"
-		log.Printf("Error signing response body: %s", err)
+		log.Warnf("Error signing response body: %s", err)
 	}
 	return sig
 }
@@ -55,7 +55,7 @@ func getMethod(payload []byte) (string, []byte, error) {
 	}
 	method, ok := msgStruct.Request["method"].(string)
 	if !ok {
-		log.Printf("No method field in request or malformed")
+		log.Warnf("No method field in request or malformed")
 	}
 	/*assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)
 	because json.Marshal encodes in lexographic order for map objects. */
@@ -118,7 +118,7 @@ func (r *Router) registerMethod(methodName string,
 //Route routes requests through the Router object
 func (r *Router) Route() {
 	if len(r.requestMap) == 0 {
-		log.Printf("Router methods are not properly initialized: %v", r)
+		log.Warnf("Router methods are not properly initialized: %v", r)
 		return
 	}
 	for {
@@ -128,12 +128,12 @@ func (r *Router) Route() {
 			/*getMethod pulls method name and rawRequest from msg.Data*/
 			method, rawRequest, err := getMethod(msg.Data)
 			if err != nil {
-				log.Printf("Couldn't extract method from JSON message %v", msg)
+				log.Warnf("Couldn't extract method from JSON message %v", msg)
 				break
 			}
 			methodFunc := r.requestMap[method]
 			if methodFunc == nil {
-				log.Printf("Router has no method named %s", method)
+				log.Warnf("Router has no method named %s", method)
 			} else {
 				methodFunc(msg, rawRequest, r.storage, r.transport, r.signer)
 			}

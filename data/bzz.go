@@ -34,10 +34,6 @@ func (b *BZZHandle) Init(d *types.DataStore) error {
 	if err != nil {
 		return err
 	}
-	err = sn.SetLog("crit")
-	if err != nil {
-		return err
-	}
 	b.s = sn
 	return nil
 }

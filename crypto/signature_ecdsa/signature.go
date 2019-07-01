@@ -4,12 +4,12 @@ import (
 	"crypto/ecdsa"
 	hex "encoding/hex"
 	"errors"
-	"log"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	crypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/vocdoni/go-dvote/log"
 )
 
 type SignKeys struct {
@@ -99,7 +99,7 @@ func Hash(data []byte) []byte {
 
 func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
 	if len(k.Authorized) < 1 {
-		log.Printf("Not checking signature, allowing request")
+		log.Infof("Not checking signature, allowing request")
 		return true, nil
 	}
 	sig := hexutil.MustDecode(sigHex)
@@ -116,7 +116,7 @@ func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
 	recoveredAddr := crypto.PubkeyToAddress(*pubKey)
 	for _, addr := range k.Authorized {
 		if addr == recoveredAddr {
-			log.Printf("Allowed address %s", addr)
+			log.Infof("Allowed address %s", addr)
 			return true, nil
 		}
 	}

@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
-	"flag"
-	"log"
 	"os/user"
 	"time"
+
+	"github.com/spf13/viper"
+	flag "github.com/spf13/pflag"
 
 	"github.com/vocdoni/go-dvote/batch"
 	"github.com/vocdoni/go-dvote/data"
 	"github.com/vocdoni/go-dvote/db"
 	"github.com/vocdoni/go-dvote/net"
 	"github.com/vocdoni/go-dvote/types"
+	"github.com/vocdoni/go-dvote/log"
+	"github.com/vocdoni/go-dvote/config"
 )
 
 var batchSeconds = 6000 //seconds
@@ -26,7 +29,39 @@ var signal bool
 var transportType net.TransportID
 var storageType data.StorageID
 
+func newConfig() (config.RelayCfg, error) {
+	//setup flags
+	flag.String("loglevel", "info", "Log level must be one of: debug, info, warn, error, dpanic, panic, fatal")
+	flag.String("transport", "PSS", "Transport must be one of: PSS, PubSub")
+	flag.String("storage", "IPFS", "Transport must be one of: BZZ, IPFS")
+	flag.Parse()
+	viper := viper.New()
+	var globalCfg config.RelayCfg
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("/go-dvote/cmd/relay/") // path to look for the config file in
+	viper.AddConfigPath(".")                      // optionally look for config in the working directory
+	err := viper.ReadInConfig()
+	if err != nil {
+		return globalCfg, err
+	}
+
+	viper.BindPFlags(flag.CommandLine)
+	
+	err = viper.Unmarshal(&globalCfg)
+	return globalCfg, err
+}
+
+
 func main() {
+	//setup config
+	globalCfg, err := newConfig()
+	//setup logger
+	log.InitLoggerAtLevel(globalCfg.LogLevel)
+	if err != nil {
+		log.Fatalf("Could not load config: %v", err)
+	}
+
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -42,15 +77,9 @@ func main() {
 
 	batch.Setup(db)
 
-	//gather transport type flag
-	var transportIDString string
-	var storageIDString string
-	flag.StringVar(&transportIDString, "transport", "PSS", "Transport must be one of: PSS, PubSub")
-	flag.StringVar(&storageIDString, "storage", "IPFS", "Transport must be one of: BZZ, IPFS")
-	flag.Parse()
 
-	transportType = net.TransportIDFromString(transportIDString)
-	storageType = data.StorageIDFromString(storageIDString)
+	transportType = net.TransportIDFromString(globalCfg.TransportIDString)
+	storageType = data.StorageIDFromString(globalCfg.StorageIDString)
 
 	batchTimer = time.NewTicker(time.Second * time.Duration(batchSeconds))
 	batchSignal = make(chan bool)
@@ -60,15 +89,15 @@ func main() {
 
 	transportOutput := make(chan types.Message)
 
-	log.Println("Initializing transport")
+	log.Infof("Initializing transport")
 	transport, err := net.InitDefault(transportType)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var storageConfig data.StorageConfig
-	log.Println("Initializing storage")
-	switch storageIDString {
+	log.Infof("Initializing storage")
+	switch globalCfg.StorageIDString {
 	case "IPFS":
 		storageConfig = data.IPFSNewConfig()
 	case "BZZ":
@@ -96,7 +125,7 @@ func main() {
 	//	go ws.Listen(listenerOutput)
 	//	go net.Route(listenerOutput, storage, ws)
 
-	log.Println("Entering main loop")
+	log.Infof("Entering main loop")
 	for {
 		select {
 		case <-batchTimer.C:
@@ -112,15 +141,12 @@ func main() {
 				bb := buf.Bytes()
 				cid, err := storage.Publish(bb)
 				if err != nil {
-					log.Printf("Storage error: %s", err)
+					log.Errorf("Storage error: %s", err)
 				}
-				log.Printf("Batch published at: %s \n", cid)
+				log.Infof("Batch published at: %s \n", cid)
 				// add to chain
 				// announce to pubsub
-				//fmt.Println("Nullifiers:")
-				//fmt.Println(n)
-				//fmt.Println("Batch:")
-				//fmt.Println(b)
+				//log.Infof("Batch info: Nullifiers: %v, Batch: %v", n, b)
 				//batch.Compact(ns)
 			}
 		default:

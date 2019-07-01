@@ -2,13 +2,14 @@ package net
 
 import (
 	"crypto/tls"
-	"fmt"
-	"log"
 	"net/http"
 	"strconv"
+	"fmt"
 
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
+
+	"github.com/vocdoni/go-dvote/log"
 )
 
 // ProxyHandler function signature required to add a handler in the net/http Server
@@ -42,7 +43,7 @@ func (p *Proxy) Init() {
 		go func() {
 			log.Fatal(s.ListenAndServeTLS("", ""))
 		}()
-		log.Printf("Proxy with SSL initialized on %s", p.SSLDomain+":"+strconv.Itoa(p.Port))
+		log.Infof("Proxy with SSL initialized on domain %v, port %v", p.SSLDomain, strconv.Itoa(p.Port))
 	}
 	if p.SSLDomain == "" {
 		s := &http.Server{
@@ -51,7 +52,7 @@ func (p *Proxy) Init() {
 		go func() {
 			log.Fatal(s.ListenAndServe())
 		}()
-		log.Printf("Proxy initialized on %s, ssl not activated", p.Address+":"+strconv.Itoa(p.Port))
+		log.Infof("Proxy initialized, ssl not activated. Address: %v, Port: %v", p.Address, strconv.Itoa(p.Port))
 	}
 }
 

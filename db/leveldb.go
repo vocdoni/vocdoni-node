@@ -10,6 +10,8 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
+
+	"github.com/vocdoni/go-dvote/log"
 )
 
 
@@ -43,7 +45,7 @@ func (l *LevelDbStorage) Count() int {
 	}
 	iter.Release()
 	if err := iter.Error(); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	return keycount
 }
@@ -97,7 +99,7 @@ func (l *LevelDbStorage) Delete(key []byte) error {
 
 func (l *LevelDbStorage) Close() {
 	if err := l.ldb.Close(); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 }
 

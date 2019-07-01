@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"os/user"
 	"time"
 
 	"github.com/vocdoni/go-dvote/types"
+	"github.com/vocdoni/go-dvote/log"
 
 	shell "github.com/ipfs/go-ipfs-api"
 )
@@ -63,18 +63,18 @@ func startIPFSDaemon(ipfsBinPath string) (err error) {
 	checkIPFSDirRes, err := checkIPFSDirExists(ipfsBinPath)
 
 	if err != nil {
-		log.Printf("%s", err)
+		log.Warn(err)
 		return errors.New("Cannot check if IPFS dir exists")
 	}
 
 	if err == nil && !checkIPFSDirRes {
 		initCmd := exec.Command(ipfsBinPath, "init")
-		log.Printf("Initializing IPFS for first time ... wait until completed")
+		log.Infof("Initializing IPFS for first time ... wait until completed")
 		err := initCmd.Run()
 		if err != nil {
 			return errors.New("Cannot initialize IPFS for first time")
 		}
-		log.Printf("ipfs init done!")
+		log.Infof("ipfs init done!")
 
 	}
 
