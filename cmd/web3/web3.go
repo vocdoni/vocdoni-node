@@ -13,20 +13,34 @@ import (
 
 func newConfig() (config.W3Cfg, error) {
 	//setup flags
-	flag.String("loglevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+
+	flag.String("chain", "vctestnet", "Blockchain to connect")
+	flag.Int("wsPort", 0, "websockets port")
+	flag.String("wsHost", "0.0.0.0", "ws host to listen on")
+	flag.Int("httpPort", 9091, "http endpoint port, disabled if 0")
+	flag.String("httpHost", "0.0.0.0", "http host to listen on")
+	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	
 	flag.Parse()
 	viper := viper.New()
 	var globalCfg config.W3Cfg
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("/go-dvote/cmd/web3/") // path to look for the config file in
+	viper.AddConfigPath(*path) // path to look for the config file in
 	viper.AddConfigPath(".")                      // optionally look for config in the working directory
 	err := viper.ReadInConfig()
 	if err != nil {
 		return globalCfg, err
 	}
 
-	viper.BindPFlags(flag.CommandLine)
+	viper.BindPFlag("chainType", flag.Lookup("chain"))
+	viper.BindPFlag("wsPort", flag.Lookup("wsPort"))
+	viper.BindPFlag("wsHost", flag.Lookup("wsHost"))
+	viper.BindPFlag("httpPort", flag.Lookup("httpPort"))
+	viper.BindPFlag("httpHost", flag.Lookup("httpHost"))
+	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
+
 	
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err

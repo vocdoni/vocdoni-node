@@ -16,22 +16,41 @@ import (
 
 func newConfig() (config.PssCfg, error) {
 	//setup flags
-	flag.String("loglevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+
+	flag.String("encryption", "sym", "encryption key schema (raw, sym, asym)")
+	flag.String("key", "vocdoni", "encryption key (sym or asym)")
+	flag.String("topic", "vocdoni_test", "pss topic to subscribe")
+	flag.String("address", "", "pss address to send messages")
+	flag.String("nick", "", "nick name for the pss messages")
+	flag.String("datadir", "", "datadir directory for swarm/pss files")
+	flag.Bool("light", false, "use light mode (less consumption)")
+	flag.Bool("pingmode", false, "use non interactive ping mode")
+	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 	flag.Parse()
 	viper := viper.New()
 	var globalCfg config.PssCfg
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("/go-dvote/cmd/pssChat/") // path to look for the config file in
+	viper.AddConfigPath(*path) // path to look for the config file in
 	viper.AddConfigPath(".")                      // optionally look for config in the working directory
 	err := viper.ReadInConfig()
 	if err != nil {
 		return globalCfg, err
 	}
 
-	viper.BindPFlags(flag.CommandLine)
+	viper.BindPFlag("encryption", flag.Lookup("encryption"))
+	viper.BindPFlag("key", flag.Lookup("key"))
+	viper.BindPFlag("topic", flag.Lookup("topic"))
+	viper.BindPFlag("address", flag.Lookup("address"))
+	viper.BindPFlag("nick", flag.Lookup("nick"))
+	viper.BindPFlag("datadir", flag.Lookup("datadir"))
+	viper.BindPFlag("light", flag.Lookup("light"))
+	viper.BindPFlag("pingmode", flag.Lookup("pingmode"))
+	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
 	
 	err = viper.Unmarshal(&globalCfg)
+
 	return globalCfg, err
 }
 
@@ -50,8 +69,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not load config: %v", err)
 	}
-	globalCfg.Nick, _ = os.Hostname()
-
+	if globalCfg.Nick == "" {
+		globalCfg.Nick, _ = os.Hostname()
+	}
 	sn := new(swarm.SimpleSwarm)
 	sn.LightNode = globalCfg.Light
 	sn.SetDatadir(globalCfg.Datadir)

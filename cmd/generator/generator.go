@@ -94,7 +94,9 @@ func parseMsg(payload []byte) (map[string]interface{}, error) {
 
 func newConfig() (config.GenCfg, error) {
 	//setup flags
-	flag.String("loglevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+
+	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 	flag.String("target", "127.0.0.1:9090", "target IP and port")
 	flag.Int("conn", 1, "number of separate connections")
 	flag.Int("interval", 1000, "interval between requests in ms")
@@ -111,14 +113,17 @@ func newConfig() (config.GenCfg, error) {
 	var globalCfg config.GenCfg
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("/go-dvote/cmd/generator/") // path to look for the config file in
+	viper.AddConfigPath(*path) // path to look for the config file in
 	viper.AddConfigPath(".")                      // optionally look for config in the working directory
 	err := viper.ReadInConfig()
 	if err != nil {
 		return globalCfg, err
 	}
 
-	viper.BindPFlags(flag.CommandLine)
+	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
+	viper.BindPFlag("target", flag.Lookup("target"))
+	viper.BindPFlag("conn", flag.Lookup("conn"))
+	viper.BindPFlag("interval", flag.Lookup("interval"))
 	
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err

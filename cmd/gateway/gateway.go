@@ -19,21 +19,66 @@ import (
 
 func newConfig() (config.GWCfg, error) {
 	//setup flags
-	flag.String("loglevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+
+	flag.Bool("fileApi", true, "enable file API")
+	flag.Bool("web3Api", true, "enable web3 API")
+
+	flag.String("dvoteHost", "0.0.0.0", "dvote API host")
+	flag.Int("dvotePort", 9090, "dvote API port")
+	flag.String("dvoteRoute", "/dvote", "dvote API route")
+
+	flag.Bool("allowPrivate", false, "allows authorized clients to call private methods")
+	flag.String("allowedAddrs", "", "comma delimited list of allowed client eth addresses")
+	flag.String("signingKey", "", "request signing key for this node")
+
+	flag.String("chain", "vctestnet", "Blockchain to connect")
+	flag.Int("w3wsPort", 0, "websockets port")
+	flag.String("w3wsHost", "0.0.0.0", "ws host to listen on")
+	flag.Int("w3httpPort", 9091, "http endpoint port, disabled if 0")
+	flag.String("w3httpHost", "0.0.0.0", "http host to listen on")
+	flag.Int("w3nodePort", 32000, "node port")
+
+	flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
+	flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
+
+	flag.String("sslDomain", "", "ssl secure domain")
+	flag.String("sslDirCert", "./", "path where the ssl files will be stored")
+
+	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+
 	flag.Parse()
 	viper := viper.New()
 	var globalCfg config.GWCfg
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("/go-dvote/cmd/gateway/") // path to look for the config file in
+	viper.AddConfigPath(*path) // path to look for the config file in
 	viper.AddConfigPath(".")                      // optionally look for config in the working directory
 	err := viper.ReadInConfig()
 	if err != nil {
 		return globalCfg, err
 	}
 
-	viper.BindPFlags(flag.CommandLine)
-	
+	viper.BindPFlag("api.fileApi", flag.Lookup("fileApi"))
+	viper.BindPFlag("api.web3Api", flag.Lookup("web3Api"))
+	viper.BindPFlag("dvote.host", flag.Lookup("dvoteHost"))
+	viper.BindPFlag("dvote.port", flag.Lookup("dvotePort"))
+	viper.BindPFlag("dvote.route", flag.Lookup("dvoteRoute"))
+	viper.BindPFlag("client.allowPrivate", flag.Lookup("allowPrivate"))
+	viper.BindPFlag("client.allowedAddrs", flag.Lookup("allowedAddrs"))
+	viper.BindPFlag("client.signingKey", flag.Lookup("signingKey"))
+	viper.BindPFlag("w3.chainType", flag.Lookup("chain"))
+	viper.BindPFlag("w3.wsPort", flag.Lookup("w3wsPort"))
+	viper.BindPFlag("w3.wsHost", flag.Lookup("w3wsHost"))
+	viper.BindPFlag("w3.httpPort", flag.Lookup("w3httpPort"))
+	viper.BindPFlag("w3.httpHost", flag.Lookup("w3httpHost"))
+	viper.BindPFlag("w3.nodePort", flag.Lookup("w3nodePort"))
+	viper.BindPFlag("ipfs.daemon", flag.Lookup("ipfsDaemon"))
+	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
+	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
+	viper.BindPFlag("ssl.dirCert", flag.Lookup("sslDirCert"))
+	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
+
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
 }

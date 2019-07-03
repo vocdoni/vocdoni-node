@@ -29,24 +29,32 @@ var signal bool
 var transportType net.TransportID
 var storageType data.StorageID
 
+
 func newConfig() (config.RelayCfg, error) {
 	//setup flags
-	flag.String("loglevel", "info", "Log level must be one of: debug, info, warn, error, dpanic, panic, fatal")
+	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+	flag.String("loglevel", "warn", "Log level must be one of: debug, info, warn, error, dpanic, panic, fatal")
 	flag.String("transport", "PSS", "Transport must be one of: PSS, PubSub")
 	flag.String("storage", "IPFS", "Transport must be one of: BZZ, IPFS")
 	flag.Parse()
+
 	viper := viper.New()
 	var globalCfg config.RelayCfg
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("/go-dvote/cmd/relay/") // path to look for the config file in
+	viper.AddConfigPath(*path) // path to look for the config file in
 	viper.AddConfigPath(".")                      // optionally look for config in the working directory
+
 	err := viper.ReadInConfig()
 	if err != nil {
 		return globalCfg, err
 	}
 
-	viper.BindPFlags(flag.CommandLine)
+	//bind flags to config
+	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
+	viper.BindPFlag("transport", flag.Lookup("transport"))
+	viper.BindPFlag("storage", flag.Lookup("storage"))
+	
 	
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err

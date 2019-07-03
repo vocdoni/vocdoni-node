@@ -15,20 +15,21 @@ import (
 
 func newConfig() (config.CensusCfg, error) {
 	//setup flags
-	flag.String("loglevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 	flag.Parse()
 	viper := viper.New()
 	var globalCfg config.CensusCfg
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("/go-dvote/cmd/censushttp/") // path to look for the config file in
+	viper.AddConfigPath(*path) // path to look for the config file in
 	viper.AddConfigPath(".")                      // optionally look for config in the working directory
 	err := viper.ReadInConfig()
 	if err != nil {
 		return globalCfg, err
 	}
 
-	viper.BindPFlags(flag.CommandLine)
+	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
 	
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err

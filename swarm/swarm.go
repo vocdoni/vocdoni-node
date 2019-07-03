@@ -294,7 +294,7 @@ func (sn *SimpleSwarm) InitPSS() error {
 			log.Info(err)
 			continue
 		}
-		log.Infof("Add bootnode ", purl)
+		log.Infof("Add bootnode %v", purl)
 		node, _ := enode.ParseV4(purl)
 		sn.Node.Server().AddPeer(node)
 	}
