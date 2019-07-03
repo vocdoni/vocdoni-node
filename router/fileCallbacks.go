@@ -11,11 +11,11 @@ import (
 	"time"
 	"errors"
 
-signature "github.com/vocdoni/go-dvote/crypto/signature_ecdsa"
-"github.com/vocdoni/go-dvote/data"
-"github.com/vocdoni/go-dvote/types"
-"github.com/vocdoni/go-dvote/net"
-"github.com/vocdoni/go-dvote/log"
+signature "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
+"gitlab.com/vocdoni/go-dvote/data"
+"gitlab.com/vocdoni/go-dvote/types"
+"gitlab.com/vocdoni/go-dvote/net"
+"gitlab.com/vocdoni/go-dvote/log"
 )
 
 type requestMethod func(msg types.Message, rawRequest []byte, storage data.Storage, transport net.Transport, signer signature.SignKeys)

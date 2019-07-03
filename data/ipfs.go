@@ -9,8 +9,8 @@ import (
 	"os/user"
 	"time"
 
-	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/log"
 
 	shell "github.com/ipfs/go-ipfs-api"
 )

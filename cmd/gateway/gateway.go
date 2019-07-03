@@ -3,18 +3,18 @@ package main
 import (
 	viper "github.com/spf13/viper"
 	flag "github.com/spf13/pflag"
-	sig "github.com/vocdoni/go-dvote/crypto/signature_ecdsa"
+	sig "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
 
 	"strings"
 	"time"
 
-	"github.com/vocdoni/go-dvote/chain"
-	"github.com/vocdoni/go-dvote/data"
-	"github.com/vocdoni/go-dvote/net"
-	"github.com/vocdoni/go-dvote/router"
-	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/config"
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/chain"
+	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/net"
+	"gitlab.com/vocdoni/go-dvote/router"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 func newConfig() (config.GWCfg, error) {

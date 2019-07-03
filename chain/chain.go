@@ -17,12 +17,12 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/vocdoni/go-dvote/config"
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/log"
 
 	//	"github.com/ethereum/go-ethereum/accounts/abi"
 
-	votingprocess "github.com/vocdoni/go-dvote/chain/contracts"
+	votingprocess "gitlab.com/vocdoni/go-dvote/chain/contracts"
 )
 
 type EthChainContext struct {

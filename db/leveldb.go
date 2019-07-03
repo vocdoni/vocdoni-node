@@ -11,7 +11,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 

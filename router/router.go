@@ -4,11 +4,11 @@ import (
 	"strings"
 	"time"
 
-	signature "github.com/vocdoni/go-dvote/crypto/signature_ecdsa"
-	"github.com/vocdoni/go-dvote/data"
-	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/net"
-	"github.com/vocdoni/go-dvote/log"
+	signature "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
+	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/net"
+	"gitlab.com/vocdoni/go-dvote/log"
 
 	"encoding/json"
 )

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vocdoni/go-dvote/batch"
-	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/batch"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 type HTTPHandle struct {

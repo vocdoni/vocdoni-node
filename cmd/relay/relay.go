@@ -10,13 +10,13 @@ import (
 	"github.com/spf13/viper"
 	flag "github.com/spf13/pflag"
 
-	"github.com/vocdoni/go-dvote/batch"
-	"github.com/vocdoni/go-dvote/data"
-	"github.com/vocdoni/go-dvote/db"
-	"github.com/vocdoni/go-dvote/net"
-	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/log"
-	"github.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/batch"
+	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/db"
+	"gitlab.com/vocdoni/go-dvote/net"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/config"
 )
 
 var batchSeconds = 6000 //seconds

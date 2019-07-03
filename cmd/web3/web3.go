@@ -6,9 +6,9 @@ import (
 
 	"time"
 
-	"github.com/vocdoni/go-dvote/config"
-	"github.com/vocdoni/go-dvote/chain"
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/chain"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 func newConfig() (config.W3Cfg, error) {

@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"io/ioutil"
 
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 //func generateSubmission() submission {

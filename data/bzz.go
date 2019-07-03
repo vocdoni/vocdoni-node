@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io/ioutil"
 
-	"github.com/vocdoni/go-dvote/swarm"
-	"github.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/swarm"
+	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 type BZZHandle struct {

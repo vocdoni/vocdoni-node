@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 // ProxyHandler function signature required to add a handler in the net/http Server

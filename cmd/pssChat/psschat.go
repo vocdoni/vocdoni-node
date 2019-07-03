@@ -7,9 +7,9 @@ import (
 	"fmt"
 
 	"github.com/marcusolsson/tui-go"
-	swarm "github.com/vocdoni/go-dvote/swarm"
-	"github.com/vocdoni/go-dvote/config"
-	"github.com/vocdoni/go-dvote/log"
+	swarm "gitlab.com/vocdoni/go-dvote/swarm"
+	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/log"
 	"github.com/spf13/viper"
 	flag "github.com/spf13/pflag"
 )

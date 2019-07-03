@@ -7,9 +7,9 @@ import (
 	"time"
 	"fmt"
 
-	signature "github.com/vocdoni/go-dvote/crypto/signature_ecdsa"
-	tree "github.com/vocdoni/go-dvote/tree"
-	"github.com/vocdoni/go-dvote/log"
+	signature "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
+	tree "gitlab.com/vocdoni/go-dvote/tree"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 // Time window (seconds) in which TimeStamp will be accepted if auth enabled

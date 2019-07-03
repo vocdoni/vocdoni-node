@@ -3,9 +3,9 @@ package net
 import (
 	"time"
 
-	"github.com/vocdoni/go-dvote/swarm"
-	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/swarm"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 type PSSHandle struct {

@@ -3,7 +3,7 @@ package data
 import (
 	"errors"
 
-	"github.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 type Storage interface {

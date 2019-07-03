@@ -18,10 +18,10 @@ import (
 	//	"net/http"
 	//	"bytes"
 	//	"io/ioutil"
-	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/log"
-	"github.com/vocdoni/go-dvote/config"
-	//	"github.com/vocdoni/go-dvote/net"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/config"
+	//	"gitlab.com/vocdoni/go-dvote/net"
 )
 
 func makeBallot() string {

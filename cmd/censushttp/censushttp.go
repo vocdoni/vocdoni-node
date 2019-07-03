@@ -8,9 +8,9 @@ import (
 	viper "github.com/spf13/viper"
 	flag "github.com/spf13/pflag"
 
-	censusmanager "github.com/vocdoni/go-dvote/service/census"
-	"github.com/vocdoni/go-dvote/log"
-	"github.com/vocdoni/go-dvote/config"
+	censusmanager "gitlab.com/vocdoni/go-dvote/service/census"
+	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/config"
 )
 
 func newConfig() (config.CensusCfg, error) {

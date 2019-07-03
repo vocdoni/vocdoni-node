@@ -25,8 +25,8 @@ import (
 	"github.com/ethersphere/swarm/network"
 	"github.com/ethersphere/swarm/pss"
 
-	dvoteUtil "github.com/vocdoni/go-dvote/util"
-	"github.com/vocdoni/go-dvote/log"
+	dvoteUtil "gitlab.com/vocdoni/go-dvote/util"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 const (

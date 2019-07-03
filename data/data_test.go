@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	//"github.com/vocdoni/go-dvote/log"
+	//"gitlab.com/vocdoni/go-dvote/log"
 )
 
 func TestPublishAndRetrieve(t *testing.T) {

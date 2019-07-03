@@ -3,9 +3,9 @@ package batch
 import (
 	"encoding/json"
 
-	"github.com/vocdoni/go-dvote/db"
-	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/db"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 var rdb *db.LevelDbStorage

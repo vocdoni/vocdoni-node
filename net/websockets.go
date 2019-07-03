@@ -6,9 +6,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/vocdoni/go-dvote/net/epoll"
-	"github.com/vocdoni/go-dvote/types"
-	"github.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/net/epoll"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/log"
 
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
