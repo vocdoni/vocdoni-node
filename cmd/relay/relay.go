@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"os/user"
+	"os"
 	"time"
 
 	"github.com/spf13/viper"
@@ -31,31 +32,54 @@ var storageType data.StorageID
 
 
 func newConfig() (config.RelayCfg, error) {
+	var globalCfg config.RelayCfg
 	//setup flags
-	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+	usr, err := user.Current()
+	if err != nil {
+		return globalCfg, err
+	}
+	defaultDirPath := usr.HomeDir + "/.dvote/relay"
+	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for relay config")
+
 	flag.String("loglevel", "warn", "Log level must be one of: debug, info, warn, error, dpanic, panic, fatal")
 	flag.String("transport", "PSS", "Transport must be one of: PSS, PubSub")
 	flag.String("storage", "IPFS", "Transport must be one of: BZZ, IPFS")
+	
 	flag.Parse()
 
 	viper := viper.New()
-	var globalCfg config.RelayCfg
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(*path) // path to look for the config file in
-	viper.AddConfigPath(".")                      // optionally look for config in the working directory
+	viper.SetDefault("logLevel", "warn")
+	viper.SetDefault("transportIDString", "PSS")
+	viper.SetDefault("storageIDString", "IPFS")
 
-	err := viper.ReadInConfig()
-	if err != nil {
-		return globalCfg, err
+	viper.SetConfigType("yaml")
+	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+		if err = viper.SafeWriteConfigAs(*path); err != nil {
+			if os.IsNotExist(err) {
+				err = os.MkdirAll(defaultDirPath, os.ModePerm)
+				if err != nil {
+					return globalCfg, err
+				}
+				err = viper.WriteConfigAs(*path)
+				if err != nil {
+					return globalCfg, err
+				}
+			}
+		}
 	}
 
 	//bind flags to config
 	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
-	viper.BindPFlag("transport", flag.Lookup("transport"))
-	viper.BindPFlag("storage", flag.Lookup("storage"))
+	viper.BindPFlag("transportIDString", flag.Lookup("transport"))
+	viper.BindPFlag("storageIDString", flag.Lookup("storage"))
 	
 	
+	viper.SetConfigFile(*path)
+	err = viper.ReadInConfig()
+	if err != nil {
+		return globalCfg, err
+	}
+
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"os/user"
 	"time"
 	"fmt"
 
@@ -15,8 +16,14 @@ import (
 )
 
 func newConfig() (config.PssCfg, error) {
+	var globalCfg config.PssCfg
 	//setup flags
-	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+	usr, err := user.Current()
+	if err != nil {
+		return globalCfg, err
+	}
+	defaultDirPath := usr.HomeDir + "/.dvote/psschat"
+	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for psschat config")
 
 	flag.String("encryption", "sym", "encryption key schema (raw, sym, asym)")
 	flag.String("key", "vocdoni", "encryption key (sym or asym)")
@@ -28,15 +35,32 @@ func newConfig() (config.PssCfg, error) {
 	flag.Bool("pingmode", false, "use non interactive ping mode")
 	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 	flag.Parse()
+
 	viper := viper.New()
-	var globalCfg config.PssCfg
-	viper.SetConfigName("config")
+	viper.SetDefault("encryption", "sym")
+	viper.SetDefault("key", "vocdoni")
+	viper.SetDefault("topic", "vocdoni_test")
+	viper.SetDefault("address", "")
+	viper.SetDefault("nick", "")
+	viper.SetDefault("datadir", "")
+	viper.SetDefault("light", false)
+	viper.SetDefault("pingmode", false)
+	viper.SetDefault("loglevel", "warn")
+
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(*path) // path to look for the config file in
-	viper.AddConfigPath(".")                      // optionally look for config in the working directory
-	err := viper.ReadInConfig()
-	if err != nil {
-		return globalCfg, err
+	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+		if err = viper.SafeWriteConfigAs(*path); err != nil {
+			if os.IsNotExist(err) {
+				err = os.MkdirAll(defaultDirPath, os.ModePerm)
+				if err != nil {
+					return globalCfg, err
+				}
+				err = viper.WriteConfigAs(*path)
+				if err != nil {
+					return globalCfg, err
+				}
+			}
+		}
 	}
 
 	viper.BindPFlag("encryption", flag.Lookup("encryption"))
@@ -49,8 +73,13 @@ func newConfig() (config.PssCfg, error) {
 	viper.BindPFlag("pingmode", flag.Lookup("pingmode"))
 	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
 	
-	err = viper.Unmarshal(&globalCfg)
+	viper.SetConfigFile(*path)
+	err = viper.ReadInConfig()
+	if err != nil {
+		return globalCfg, err
+	}
 
+	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
 }
 

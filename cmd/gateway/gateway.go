@@ -2,10 +2,9 @@ package main
 
 import (
 	flag "github.com/spf13/pflag"
-	viper "github.com/spf13/viper"
+	"github.com/spf13/viper"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
 
-	"fmt"
 	"os"
 	"os/user"
 	"strings"
@@ -80,7 +79,6 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("logLevel", "warn")
 
 	viper.SetConfigType("yaml")
-	fmt.Printf("Default path: %s/config.yaml \n set path: %s\n", defaultDirPath, *path)
 	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
 		if err = viper.SafeWriteConfigAs(*path); err != nil {
 			if os.IsNotExist(err) {
@@ -94,7 +92,6 @@ func newConfig() (config.GWCfg, error) {
 				}
 			}
 		}
-		fmt.Printf("Wrote config file to %s\n", *path)
 	}
 
 	//bind flags after writing default config so flag use 

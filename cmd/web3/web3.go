@@ -5,6 +5,8 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"time"
+	"os"
+	"os/user"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/chain"
@@ -12,8 +14,14 @@ import (
 )
 
 func newConfig() (config.W3Cfg, error) {
+	var globalCfg config.W3Cfg
 	//setup flags
-	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+	usr, err := user.Current()
+	if err != nil {
+		return globalCfg, err
+	}
+	defaultDirPath := usr.HomeDir + "/.dvote/web3"
+	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for web3 config")
 
 	flag.String("chain", "vctestnet", "Blockchain to connect")
 	flag.Int("wsPort", 0, "websockets port")
@@ -23,15 +31,29 @@ func newConfig() (config.W3Cfg, error) {
 	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 	
 	flag.Parse()
+
 	viper := viper.New()
-	var globalCfg config.W3Cfg
-	viper.SetConfigName("config")
+	viper.SetDefault("chainType", "vctestnet")
+	viper.SetDefault("wsPort", 0)
+	viper.SetDefault("wsHost", "0.0.0.0")
+	viper.SetDefault("httpPort", 9091)
+	viper.SetDefault("httpHost", "0.0.0.0")
+	viper.SetDefault("logLevel", "warn")
+
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(*path) // path to look for the config file in
-	viper.AddConfigPath(".")                      // optionally look for config in the working directory
-	err := viper.ReadInConfig()
-	if err != nil {
-		return globalCfg, err
+	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+		if err = viper.SafeWriteConfigAs(*path); err != nil {
+			if os.IsNotExist(err) {
+				err = os.MkdirAll(defaultDirPath, os.ModePerm)
+				if err != nil {
+					return globalCfg, err
+				}
+				err = viper.WriteConfigAs(*path)
+				if err != nil {
+					return globalCfg, err
+				}
+			}
+		}
 	}
 
 	viper.BindPFlag("chainType", flag.Lookup("chain"))
@@ -42,6 +64,12 @@ func newConfig() (config.W3Cfg, error) {
 	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
 
 	
+	viper.SetConfigFile(*path)
+	err = viper.ReadInConfig()
+	if err != nil {
+		return globalCfg, err
+	}
+
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
 }

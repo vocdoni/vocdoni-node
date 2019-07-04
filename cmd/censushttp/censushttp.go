@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/user"
 	"strconv"
 	"strings"
 
@@ -14,23 +15,45 @@ import (
 )
 
 func newConfig() (config.CensusCfg, error) {
-	//setup flags
-	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
-	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
-	flag.Parse()
-	viper := viper.New()
 	var globalCfg config.CensusCfg
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(*path) // path to look for the config file in
-	viper.AddConfigPath(".")                      // optionally look for config in the working directory
-	err := viper.ReadInConfig()
+	//setup flags
+	usr, err := user.Current()
 	if err != nil {
 		return globalCfg, err
+	}
+	defaultDirPath := usr.HomeDir + "/.dvote/censushttp"
+	//setup flags
+	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for censushttp config")
+	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	
+
+	viper := viper.New()
+	viper.SetDefault("loglevel", "warn")
+	flag.Parse()
+	viper.SetConfigType("yaml")
+	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+		if err = viper.SafeWriteConfigAs(*path); err != nil {
+			if os.IsNotExist(err) {
+				err = os.MkdirAll(defaultDirPath, os.ModePerm)
+				if err != nil {
+					return globalCfg, err
+				}
+				err = viper.WriteConfigAs(*path)
+				if err != nil {
+					return globalCfg, err
+				}
+			}
+		}
 	}
 
 	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
 	
+	viper.SetConfigFile(*path)
+	err = viper.ReadInConfig()
+	if err != nil {
+		return globalCfg, err
+	}
+
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
 }

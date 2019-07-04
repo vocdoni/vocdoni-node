@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"os/user"
 	"time"
 
 	"github.com/spf13/viper"
@@ -93,8 +94,14 @@ func parseMsg(payload []byte) (map[string]interface{}, error) {
 }
 
 func newConfig() (config.GenCfg, error) {
+	var globalCfg config.GenCfg
 	//setup flags
-	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+	usr, err := user.Current()
+	if err != nil {
+		return globalCfg, err
+	}
+	defaultDirPath := usr.HomeDir + "/.dvote/generator"
+	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for generator config")
 
 	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 	flag.String("target", "127.0.0.1:9090", "target IP and port")
@@ -108,23 +115,41 @@ func newConfig() (config.GenCfg, error) {
 		flag.PrintDefaults()
 	}
 
+
 	flag.Parse()
-	viper := viper.New()
-	var globalCfg config.GenCfg
-	viper.SetConfigName("config")
+
+	viper.SetDefault("logLevel", "warn")
+	viper.SetDefault("target", "127.0.0.1:9090")
+	viper.SetDefault("connections", 1)
+	viper.SetDefault("interval", 1000)
+
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(*path) // path to look for the config file in
-	viper.AddConfigPath(".")                      // optionally look for config in the working directory
-	err := viper.ReadInConfig()
-	if err != nil {
-		return globalCfg, err
+	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+		if err = viper.SafeWriteConfigAs(*path); err != nil {
+			if os.IsNotExist(err) {
+				err = os.MkdirAll(defaultDirPath, os.ModePerm)
+				if err != nil {
+					return globalCfg, err
+				}
+				err = viper.WriteConfigAs(*path)
+				if err != nil {
+					return globalCfg, err
+				}
+			}
+		}
 	}
 
 	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
 	viper.BindPFlag("target", flag.Lookup("target"))
-	viper.BindPFlag("conn", flag.Lookup("conn"))
+	viper.BindPFlag("connections", flag.Lookup("conn"))
 	viper.BindPFlag("interval", flag.Lookup("interval"))
-	
+
+	viper.SetConfigFile(*path)
+	err = viper.ReadInConfig()
+	if err != nil {
+		return globalCfg, err
+	}
+
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
 }
@@ -173,7 +198,7 @@ func main() {
 		case <-timer.C:
 			//var jsonStr = makeEnvelope(makeBallot())
 			//log.Printf("Conn %d sending message %s", i%*connections, jsonStr)
-			//log.Printf("%v", conns)
+			//log.Infof("%v", conns)
 			conn := conns[i%globalCfg.Connections]
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second*5)); err != nil {
 				log.Errorf("Failed to receive pong: %v", err)
