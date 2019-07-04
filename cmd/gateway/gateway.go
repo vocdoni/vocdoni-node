@@ -1,25 +1,34 @@
 package main
 
 import (
-	viper "github.com/spf13/viper"
 	flag "github.com/spf13/pflag"
+	viper "github.com/spf13/viper"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
 
+	"fmt"
+	"os"
+	"os/user"
 	"strings"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/chain"
+	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 func newConfig() (config.GWCfg, error) {
+	var globalCfg config.GWCfg
 	//setup flags
-	path := flag.String("cfgpath", "./", "cfgpath. Specify filepath for gateway config file")
+	usr, err := user.Current()
+	if err != nil {
+		return globalCfg, err
+	}
+	defaultDirPath := usr.HomeDir + "/.dvote/gateway"
+	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for gateway config")
 
 	flag.Bool("fileApi", true, "enable file API")
 	flag.Bool("web3Api", true, "enable web3 API")
@@ -48,17 +57,48 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 
 	flag.Parse()
+
 	viper := viper.New()
-	var globalCfg config.GWCfg
-	viper.SetConfigName("config")
+	viper.SetDefault("api.fileApi", true)
+	viper.SetDefault("api.web3Api", true)
+	viper.SetDefault("dvote.host", "0.0.0.0")
+	viper.SetDefault("dvote.port", 9090)
+	viper.SetDefault("dvote.route", "/dvote")
+	viper.SetDefault("client.allowPrivate", false)
+	viper.SetDefault("client.allowedAddrs", "")
+	viper.SetDefault("client.signingKey", "")
+	viper.SetDefault("w3.chainType", "vctestnet")
+	viper.SetDefault("w3.wsPort", 0)
+	viper.SetDefault("w3.wsHost", "0.0.0.0")
+	viper.SetDefault("w3.httpPort", 9091)
+	viper.SetDefault("w3.httpHost", "0.0.0.0")
+	viper.SetDefault("w3.nodePort", 32000)
+	viper.SetDefault("ipfs.daemon", "ipfs")
+	viper.SetDefault("ipfs.noInit", false)
+	viper.SetDefault("ssl.domain", "")
+	viper.SetDefault("ssl.dirCert", "./")
+	viper.SetDefault("logLevel", "warn")
+
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(*path) // path to look for the config file in
-	viper.AddConfigPath(".")                      // optionally look for config in the working directory
-	err := viper.ReadInConfig()
-	if err != nil {
-		return globalCfg, err
+	fmt.Printf("Default path: %s/config.yaml \n set path: %s\n", defaultDirPath, *path)
+	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+		if err = viper.SafeWriteConfigAs(*path); err != nil {
+			if os.IsNotExist(err) {
+				err = os.MkdirAll(defaultDirPath, os.ModePerm)
+				if err != nil {
+					return globalCfg, err
+				}
+				err = viper.WriteConfigAs(*path)
+				if err != nil {
+					return globalCfg, err
+				}
+			}
+		}
+		fmt.Printf("Wrote config file to %s\n", *path)
 	}
 
+	//bind flags after writing default config so flag use 
+	//does not write config on first program run
 	viper.BindPFlag("api.fileApi", flag.Lookup("fileApi"))
 	viper.BindPFlag("api.web3Api", flag.Lookup("web3Api"))
 	viper.BindPFlag("dvote.host", flag.Lookup("dvoteHost"))
@@ -78,6 +118,12 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
 	viper.BindPFlag("ssl.dirCert", flag.Lookup("sslDirCert"))
 	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
+
+	viper.SetConfigFile(*path)
+	err = viper.ReadInConfig()
+	if err != nil {
+		return globalCfg, err
+	}
 
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
