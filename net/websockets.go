@@ -3,6 +3,7 @@ package net
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -57,14 +58,36 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 		if err != nil {
 			return
 		}
-		err = w.e.Add(conn, false)
-		if err != nil {
-			log.Printf("Failed to add connection %v", err)
-			conn.Close()
-		}
+		/*
+				err = w.e.Add(conn, false)
+				if err != nil {
+					log.Printf("Failed to add connection %v", err)
+					conn.Close()
+				}
 
+			}
+			w.p.AddHandler(path, upgradeConn)
+		*/
+		if w.p.C.SSLDomain == "" {
+			if err := w.e.Add(conn, false); err != nil {
+				log.Printf("Failed to add connection %v", err)
+				conn.Close()
+			}
+		} else {
+			if err := w.e.Add(conn, true); err != nil {
+				log.Printf("Failed to add connection %v", err)
+				conn.Close()
+			}
+		}
 	}
 	w.p.AddHandler(path, upgradeConn)
+
+	if w.p.C.SSLDomain == "" {
+		log.Printf("ws initialized on ws://" + w.p.C.Address + ":" + strconv.Itoa(w.p.C.Port) + path)
+	} else {
+		log.Printf("wss initialized on wss://" + w.p.C.SSLDomain + ":" + strconv.Itoa(w.p.C.Port) + path)
+
+	}
 }
 
 // Listen listens for incoming data
@@ -81,8 +104,14 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 				break
 			}
 			if payload, _, err := wsutil.ReadClientData(conn); err != nil {
-				if err := w.e.Remove(conn, false); err != nil {
-					log.Printf("WS recieve error: %s", err)
+				if w.p.C.SSLDomain == "" {
+					if err := w.e.Remove(conn, false); err != nil {
+						log.Printf("WS recieve error: %s", err)
+					}
+				} else {
+					if err := w.e.Remove(conn, true); err != nil {
+						log.Printf("WS recieve error: %s", err)
+					}
 				}
 				conn.Close()
 			} else {
