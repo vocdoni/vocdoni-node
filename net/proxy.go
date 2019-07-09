@@ -3,6 +3,7 @@ package net
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -31,15 +32,18 @@ func NewProxy() *Proxy {
 }
 
 // Init checks if SSL is activated or not and runs a http server consequently
-func (p *Proxy) Init() {
-	if p.C.SSLDomain != "" {
-		s := p.GenerateSSLCertificate()
-		go func() {
-			log.Fatal(s.ListenAndServeTLS("", ""))
-		}()
-		log.Infof("Proxy with SSL initialized on https://%s", p.C.SSLDomain+":"+strconv.Itoa(p.C.Port))
-	}
-	if p.C.SSLDomain == "" {
+func (p *Proxy) Init() error {
+	if len(p.C.SSLDomain) > 0 {
+		s, err := p.GenerateSSLCertificate()
+		if err == nil {
+			go func() {
+				log.Fatal(s.ListenAndServeTLS("", ""))
+			}()
+			log.Infof("Proxy with SSL initialized on https://%s", p.C.SSLDomain+":"+strconv.Itoa(p.C.Port))
+		} else {
+			return err
+		}
+	} else {
 		s := &http.Server{
 			Addr: p.C.Address + ":" + strconv.Itoa(p.C.Port),
 		}
@@ -48,10 +52,11 @@ func (p *Proxy) Init() {
 		}()
 		log.Infof("Proxy initialized on http://%s, ssl not activated", p.C.Address+":"+strconv.Itoa(p.C.Port))
 	}
+	return nil
 }
 
 // GenerateSSLCertificate generates a SSL certificated for the proxy
-func (p *Proxy) GenerateSSLCertificate() *http.Server {
+func (p *Proxy) GenerateSSLCertificate() (*http.Server, error) {
 	m := autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(p.C.SSLDomain),
@@ -65,7 +70,12 @@ func (p *Proxy) GenerateSSLCertificate() *http.Server {
 		},
 	}
 	serverConfig.TLSConfig.NextProtos = append(serverConfig.TLSConfig.NextProtos, acme.ALPNProto)
-	return serverConfig
+
+	if len(serverConfig.TLSConfig.Certificates) == 0 {
+		return serverConfig, errors.New("Cannot create signed SSL certificate")
+	}
+
+	return serverConfig, nil
 }
 
 // AddHandler adds a handler for the proxy

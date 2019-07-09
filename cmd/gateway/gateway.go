@@ -162,9 +162,21 @@ func main() {
 	p := net.NewProxy()
 	p.C.SSLDomain = globalCfg.Ssl.Domain
 	p.C.SSLCertDir = globalCfg.Ssl.DirCert
+	log.Infof("Storing SSL certificate in %s", p.C.SSLCertDir)
 	p.C.Address = globalCfg.Dvote.Host
 	p.C.Port = globalCfg.Dvote.Port
-	p.Init()
+	err = p.Init()
+	if err != nil {
+		log.Warn("LetsEncrypt SSL certificate cannot be obtained, probably port 443 is not accessible or domain provided is not correct")
+		log.Warn("Disabling SSL!")
+		// Probably SSL has failed
+		p.C.SSLDomain = ""
+		globalCfg.Ssl.Domain = ""
+		err = p.Init()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	if globalCfg.Api.Web3Api {
 		w3cfg, err := chain.NewConfig(globalCfg.W3)
