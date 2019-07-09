@@ -4,21 +4,30 @@ import (
 	"crypto/ecdsa"
 	hex "encoding/hex"
 	"errors"
+	"fmt"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	crypto "github.com/ethereum/go-ethereum/crypto"
-	"gitlab.com/vocdoni/go-dvote/log"
 )
 
+// AddressLengh is the lenght of an Ethereum address
+const AddressLength = 20
+
+// SigningPrefix is the prefix added when hashing
+const SigningPrefix = "x19Ethereum Signed Message:\n"
+
+// SignKeys represents an ECDSA pair of keys for signing.
+// Authorized addresses is a list of Ethereum like addresses which are checked on Verify
 type SignKeys struct {
 	Public     *ecdsa.PublicKey
 	Private    *ecdsa.PrivateKey
-	Authorized []common.Address
+	Authorized []Address
 }
 
-// generate new keys
+// Address is an Ethereum like adrress
+type Address [AddressLength]byte
+
+// Generate generates new keys
 func (k *SignKeys) Generate() error {
 	var err error
 	key, err := crypto.GenerateKey()
@@ -30,7 +39,7 @@ func (k *SignKeys) Generate() error {
 	return nil
 }
 
-// imports a private hex key
+// AddHexKey imports a private hex key
 func (k *SignKeys) AddHexKey(privHex string) error {
 	var err error
 	k.Private, err = crypto.HexToECDSA(privHex)
@@ -40,45 +49,37 @@ func (k *SignKeys) AddHexKey(privHex string) error {
 	return err
 }
 
-func (k *SignKeys) AddKeyFromEncryptedJSON(keyJson []byte, passphrase string) error {
-	key, err := keystore.DecryptKey(keyJson, passphrase)
-	if err != nil {
-		return err
-	}
-	k.Private = key.PrivateKey
-	k.Public = &key.PrivateKey.PublicKey
-	return nil
-}
-
+// AddAuthKey adds a new authorized address key
 func (k *SignKeys) AddAuthKey(address string) error {
-	if common.IsHexAddress(address) {
-		addr := common.HexToAddress(address)
+	if len(address) == AddressLength {
+		var addr Address
+		copy(addr[:], []byte(address)[:])
 		k.Authorized = append(k.Authorized, addr)
 		return nil
 	} else {
-		return errors.New("Invalid address hex")
+		return errors.New("Invalid address lenght")
 	}
 }
 
-// returns the public and private keys as hex strings
+// HexString returns the public and private keys as hex strings
 func (k *SignKeys) HexString() (string, string) {
 	pubHex := hex.EncodeToString(crypto.CompressPubkey(k.Public))
 	privHex := hex.EncodeToString(crypto.FromECDSA(k.Private))
 	return pubHex, privHex
 }
 
-// message is a normal string (no HexString)
+// Sign signs a message. Message is a normal string (no HexString nor a Hash)
 func (k *SignKeys) Sign(message string) (string, error) {
 	if k.Private == nil {
 		return "", errors.New("No private key available")
 	}
-	hash := crypto.Keccak256([]byte(message))
+	hash := Hash(message)
 	signature, err := crypto.Sign(hash, k.Private)
 	signHex := hex.EncodeToString(signature)
 	return signHex, err
 }
 
-// message is a normal string, signature and pubHex are HexStrings
+// Verify verifies a message. Signature and pubHex are HexStrings
 func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 	signature, err := hex.DecodeString(signHex)
 	if err != nil {
@@ -88,18 +89,20 @@ func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	hash := crypto.Keccak256([]byte(message))
+	hash := Hash(message)
 	result := crypto.VerifySignature(pub, hash, signature[:64])
 	return result, nil
 }
 
-func Hash(data []byte) []byte {
-	return crypto.Keccak256(data)
+// Hash string data adding Ethereum prefix
+func Hash(data string) []byte {
+	payloadToSign := fmt.Sprintf("%s%d%s", SigningPrefix, len(data), data)
+	return crypto.Keccak256([]byte(payloadToSign))
 }
 
+// VerifySender verifies if a message is sent by some Authorized address key
 func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
 	if len(k.Authorized) < 1 {
-		log.Infof("Not checking signature, allowing request")
 		return true, nil
 	}
 	sig := hexutil.MustDecode(sigHex)
@@ -108,15 +111,15 @@ func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
 	}
 	sig[64] -= 27
 
-	pubKey, err := crypto.SigToPub(Hash([]byte(msg)), sig)
+	pubKey, err := crypto.SigToPub(Hash(msg), sig)
 	if err != nil {
 		return false, errors.New("Bad sig")
 	}
 
-	recoveredAddr := crypto.PubkeyToAddress(*pubKey)
+	recoveredAddr := [20]byte(crypto.PubkeyToAddress(*pubKey))
+
 	for _, addr := range k.Authorized {
 		if addr == recoveredAddr {
-			log.Infof("Allowed address %s", addr)
 			return true, nil
 		}
 	}

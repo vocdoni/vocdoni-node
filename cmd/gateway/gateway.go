@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
@@ -94,7 +95,7 @@ func newConfig() (config.GWCfg, error) {
 		}
 	}
 
-	//bind flags after writing default config so flag use 
+	//bind flags after writing default config so flag use
 	//does not write config on first program run
 	viper.BindPFlag("api.fileApi", flag.Lookup("fileApi"))
 	viper.BindPFlag("api.web3Api", flag.Lookup("web3Api"))
@@ -124,6 +125,16 @@ func newConfig() (config.GWCfg, error) {
 
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
+}
+
+func addKeyFromEncryptedJSON(keyJson []byte, passphrase string, signKeys *sig.SignKeys) error {
+	key, err := keystore.DecryptKey(keyJson, passphrase)
+	if err != nil {
+		return err
+	}
+	signKeys.Private = key.PrivateKey
+	signKeys.Public = &key.PrivateKey.PublicKey
+	return nil
 }
 
 /*
@@ -181,7 +192,9 @@ func main() {
 			if err != nil {
 				log.Fatalf("Error: %v", err)
 			}
-			err = signer.AddKeyFromEncryptedJSON(keyJson, "")
+			err = addKeyFromEncryptedJSON(keyJson, "", signer)
+			pub, _ := signer.HexString()
+			log.Infof("Added pubKey %s from keystore", pub)
 			if err != nil {
 				log.Fatalf("Error: %v", err)
 			}
