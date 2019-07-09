@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
@@ -129,6 +130,16 @@ func newConfig() (config.GWCfg, error) {
 	return globalCfg, err
 }
 
+func addKeyFromEncryptedJSON(keyJson []byte, passphrase string, signKeys *sig.SignKeys) error {
+	key, err := keystore.DecryptKey(keyJson, passphrase)
+	if err != nil {
+		return err
+	}
+	signKeys.Private = key.PrivateKey
+	signKeys.Public = &key.PrivateKey.PublicKey
+	return nil
+}
+
 /*
 Example code for using web3 implementation
 
@@ -196,7 +207,9 @@ func main() {
 			if err != nil {
 				log.Fatalf("Error: %v", err)
 			}
-			err = signer.AddKeyFromEncryptedJSON(keyJSON, "")
+			err = addKeyFromEncryptedJSON(keyJson, "", signer)
+			pub, _ := signer.HexString()
+			log.Infof("Added pubKey %s from keystore", pub)
 			if err != nil {
 				log.Fatalf("Error: %v", err)
 			}
