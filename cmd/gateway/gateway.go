@@ -207,7 +207,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("Error: %v", err)
 			}
-			err = addKeyFromEncryptedJSON(keyJson, "", signer)
+			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
 			pub, _ := signer.HexString()
 			log.Infof("Added pubKey %s from keystore", pub)
 			if err != nil {
