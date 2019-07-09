@@ -1,9 +1,8 @@
 package config
 
-
 //GWCfg stores global configs for gateway
 type GWCfg struct {
-	W3 W3Cfg
+	W3   W3Cfg
 	Ipfs struct {
 		Daemon string
 		NoInit bool
@@ -32,25 +31,26 @@ type GWCfg struct {
 //PssCfg stores global configs for Pss chat
 type PssCfg struct {
 	Encryption string
-	Key string
-	Topic string
-	Address string
-	Nick string
-	Datadir string
-	Light bool
-	PingMode bool
-	LogLevel string
+	Key        string
+	Topic      string
+	Address    string
+	Nick       string
+	Datadir    string
+	Light      bool
+	PingMode   bool
+	LogLevel   string
 }
 
 //W3Cfg stores global configs for web3
 type W3Cfg struct {
 	ChainType string
-	WsHost string
-	WsPort int
-	HttpHost string
-	HttpPort int
-	NodePort int
-	LogLevel string
+	WsHost    string
+	WsPort    int
+	HttpHost  string
+	HttpPort  int
+	NodePort  int
+	LogLevel  string
+	Route     string
 }
 
 //CensusCfg stores global configs for censushttp
@@ -60,14 +60,14 @@ type CensusCfg struct {
 
 //RelayCfg stores global configs for relay
 type RelayCfg struct {
-	LogLevel string
+	LogLevel          string
 	TransportIDString string
-	StorageIDString string
+	StorageIDString   string
 }
 
 type GenCfg struct {
-	LogLevel string
-	Target string
+	LogLevel    string
+	Target      string
 	Connections int
-	Interval int
+	Interval    int
 }

@@ -178,8 +178,8 @@ func main() {
 		}
 		node.Start()
 		time.Sleep(1 * time.Second)
-		p.AddHandler("/web3", p.AddEndpoint(w3cfg.HTTPHost, w3cfg.HTTPPort))
-		log.Infof("web3 available at %s", "/web3")
+		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(w3cfg.HTTPHost, w3cfg.HTTPPort))
+		log.Infof("web3 available at %s", globalCfg.W3.Route)
 	}
 
 	var signer *sig.SignKeys
