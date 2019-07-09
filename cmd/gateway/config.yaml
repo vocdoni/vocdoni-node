@@ -5,6 +5,7 @@ w3:
   httpHost: "0.0.0.0"
   httpPort: 9091
   nodePort: 32000
+  route: "/web3"
 ipfs: 
   daemon: "ipfs"
   noInit: false

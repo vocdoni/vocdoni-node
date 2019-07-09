@@ -26,6 +26,7 @@ type Proxy struct {
 // NewProxy creates a new proxy instance
 func NewProxy() *Proxy {
 	p := new(Proxy)
+	p.C = new(types.Connection)
 	return p
 }
 

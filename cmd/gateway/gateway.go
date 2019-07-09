@@ -46,6 +46,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.Int("w3httpPort", 9091, "http endpoint port, disabled if 0")
 	flag.String("w3httpHost", "0.0.0.0", "http host to listen on")
 	flag.Int("w3nodePort", 32000, "node port")
+	flag.String("w3Route", "/web3", "proxy endpoint exposing web3")
 
 	flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
 	flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
@@ -72,6 +73,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("w3.httpPort", 9091)
 	viper.SetDefault("w3.httpHost", "0.0.0.0")
 	viper.SetDefault("w3.nodePort", 32000)
+	viper.SetDefault("w3.route", "/web3")
 	viper.SetDefault("ipfs.daemon", "ipfs")
 	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ssl.domain", "")
@@ -94,7 +96,7 @@ func newConfig() (config.GWCfg, error) {
 		}
 	}
 
-	//bind flags after writing default config so flag use 
+	//bind flags after writing default config so flag use
 	//does not write config on first program run
 	viper.BindPFlag("api.fileApi", flag.Lookup("fileApi"))
 	viper.BindPFlag("api.web3Api", flag.Lookup("web3Api"))
@@ -110,6 +112,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("w3.httpPort", flag.Lookup("w3httpPort"))
 	viper.BindPFlag("w3.httpHost", flag.Lookup("w3httpHost"))
 	viper.BindPFlag("w3.nodePort", flag.Lookup("w3nodePort"))
+	viper.BindPFlag("w3.route", flag.Lookup("w3Route"))
 	viper.BindPFlag("ipfs.daemon", flag.Lookup("ipfsDaemon"))
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
@@ -136,6 +139,7 @@ Testing the RPC can be performed with curl and/or websocat
 func main() {
 	//setup config
 	globalCfg, err := newConfig()
+	//fmt.Printf("-> %s\n", globalCfg.Ssl.Domain)
 	//setup logger
 	log.InitLoggerAtLevel(globalCfg.LogLevel)
 	if err != nil {
@@ -144,6 +148,14 @@ func main() {
 
 	var node *chain.EthChainContext
 	_ = node
+
+	p := net.NewProxy()
+	p.C.SSLDomain = globalCfg.Ssl.Domain
+	p.C.SSLCertDir = globalCfg.Ssl.DirCert
+	p.C.Address = globalCfg.Dvote.Host
+	p.C.Port = globalCfg.Dvote.Port
+	p.Init()
+
 	if globalCfg.Api.Web3Api {
 		w3cfg, err := chain.NewConfig(globalCfg.W3)
 		if err != nil {
@@ -156,8 +168,8 @@ func main() {
 		}
 		node.Start()
 		time.Sleep(1 * time.Second)
-		p.AddHandler(*w3Route, p.AddEndpoint(*w3httpHost, *w3httpPort))
-		log.Printf("web3 available at %s", *w3Route)
+		p.AddHandler("/web3", p.AddEndpoint(w3cfg.HTTPHost, w3cfg.HTTPPort))
+		log.Infof("web3 available at %s", "/web3")
 	}
 
 	var signer *sig.SignKeys
@@ -199,16 +211,11 @@ func main() {
 	listenerOutput := make(chan types.Message)
 
 	if globalCfg.Api.FileApi {
-		p := net.NewProxy()
-		p.SSLDomain = globalCfg.Ssl.Domain
-		p.SSLCertDir = globalCfg.Ssl.DirCert
-		p.Address = globalCfg.Dvote.Host
-		p.Port = globalCfg.Dvote.Port
-		p.Init()
 		ws := new(net.WebsocketHandle)
 		ws.Init(new(types.Connection))
 		ws.SetProxy(p)
 		ws.AddProxyHandler(globalCfg.Dvote.Route)
+		log.Infof("ws file api available at %s", globalCfg.Dvote.Route)
 
 		ipfsConfig := data.IPFSNewConfig()
 		ipfsConfig.Start = !globalCfg.Ipfs.NoInit

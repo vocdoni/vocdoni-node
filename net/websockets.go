@@ -73,9 +73,9 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 	w.p.AddHandler(path, upgradeConn)
 
 	if w.p.C.SSLDomain == "" {
-		log.Infof("ws initialized on ws://" + w.p.C.Address + ":" + strconv.Itoa(w.p.C.Port) + path)
+		log.Infof("ws initialized on ws://" + w.p.C.Address + ":" + strconv.Itoa(w.p.C.Port))
 	} else {
-		log.Infof("wss initialized on wss://" + w.p.C.SSLDomain + ":" + strconv.Itoa(w.p.C.Port) + path)
+		log.Infof("wss initialized on wss://" + w.p.C.SSLDomain + ":" + strconv.Itoa(w.p.C.Port))
 
 	}
 }
