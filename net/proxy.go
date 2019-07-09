@@ -5,13 +5,14 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/vocdoni/go-dvote/types"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
+
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 // ProxyHandler function signature required to add a handler in the net/http Server
@@ -30,19 +31,12 @@ func NewProxy() *Proxy {
 
 // Init checks if SSL is activated or not and runs a http server consequently
 func (p *Proxy) Init() {
-
-	/*
-		http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, "pong")
-		})
-	*/
-
 	if p.C.SSLDomain != "" {
 		s := p.GenerateSSLCertificate()
 		go func() {
 			log.Fatal(s.ListenAndServeTLS("", ""))
 		}()
-		log.Printf("Proxy with SSL initialized on https://%s", p.C.SSLDomain+":"+strconv.Itoa(p.C.Port))
+		log.Infof("Proxy with SSL initialized on https://%s", p.C.SSLDomain+":"+strconv.Itoa(p.C.Port))
 	}
 	if p.C.SSLDomain == "" {
 		s := &http.Server{
@@ -51,7 +45,7 @@ func (p *Proxy) Init() {
 		go func() {
 			log.Fatal(s.ListenAndServe())
 		}()
-		log.Printf("Proxy initialized on http://%s, ssl not activated", p.C.Address+":"+strconv.Itoa(p.C.Port))
+		log.Infof("Proxy initialized on http://%s, ssl not activated", p.C.Address+":"+strconv.Itoa(p.C.Port))
 	}
 }
 
@@ -89,22 +83,22 @@ func (p *Proxy) AddEndpoint(host string, port int) func(writer http.ResponseWrit
 		req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s:%s", "http://"+host, strconv.Itoa(port)), bytes.NewReader(body))
 
 		if err != nil {
-			log.Printf("Cannot create http request: %s", err)
+			log.Infof("Cannot create http request: %s", err)
 		}
 		const contentType = "application/json"
 		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("Accept", contentType)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			log.Printf("Request failed: %s", err)
+			log.Infof("Request failed: %s", err)
 		}
 
 		respBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Printf("Cannot read response: %s", err)
+			log.Infof("Cannot read response: %s", err)
 		}
 
-		log.Printf("Response: %s", respBody)
+		log.Infof("Response: %s", respBody)
 	}
 	return fn
 }

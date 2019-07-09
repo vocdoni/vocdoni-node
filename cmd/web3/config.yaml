@@ -1,0 +1,6 @@
+chainType: "vctestnet"
+wsPort: 0
+wsHost: "0.0.0.0"
+httpPort: 9091
+httpHost: "0.0.0.0"
+logLevel: "warn"

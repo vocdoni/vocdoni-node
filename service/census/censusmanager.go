@@ -2,14 +2,14 @@ package censusmanager
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
+	"fmt"
 
-	signature "github.com/vocdoni/go-dvote/crypto/signature_ecdsa"
-	tree "github.com/vocdoni/go-dvote/tree"
+	signature "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
+	tree "gitlab.com/vocdoni/go-dvote/tree"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 // Time window (seconds) in which TimeStamp will be accepted if auth enabled
@@ -79,14 +79,14 @@ func checkAuth(timestamp, signed, pubKey, message string) bool {
 	currentTime := int64(time.Now().Unix())
 	timeStampRemote, err := strconv.ParseInt(timestamp, 10, 32)
 	if err != nil {
-		log.Printf("Cannot parse timestamp data %s\n", err)
+		log.Warnf("Cannot parse timestamp data %s\n", err)
 		return false
 	}
 	if timeStampRemote < currentTime+authTimeWindow &&
 		timeStampRemote > currentTime-authTimeWindow {
 		v, err := currentSignature.Verify(message, signed, pubKey)
 		if err != nil {
-			log.Printf("Verification error: %s\n", err)
+			log.Warnf("Verification error: %s\n", err)
 		}
 		return v
 	}
@@ -118,8 +118,8 @@ func opHandler(c *Claim) *Result {
 	var err error
 
 	// Process data
-	log.Printf("censusId:{%s} method:{%s} rootHash:{%s} claimData:{%s} proofData:{%s} timeStamp:{%s} signature:{%s}\n",
-		c.CensusID, c.Method, c.RootHash, c.ClaimData, c.ProofData, c.TimeStamp, c.Signature)
+	log.Infof("Process data", "censusId", c.CensusID, "method", c.Method, "rootHash", c.RootHash, 
+	"claimData", c.ClaimData, "proofData", c.ProofData, "timeStamp", c.TimeStamp, "signature", c.Signature)
 	authString := fmt.Sprintf("%s%s%s%s%s", c.Method, c.CensusID, c.RootHash, c.ClaimData, c.TimeStamp)
 	resp.Error = false
 	resp.Response = ""
@@ -156,7 +156,7 @@ func opHandler(c *Claim) *Result {
 	if len(c.RootHash) > 1 { //if rootHash specified
 		t, err = MkTrees[c.CensusID].Snapshot(c.RootHash)
 		if err != nil {
-			log.Printf("Snapshot error: %s", err.Error())
+			log.Warnf("Snapshot error: %s", err.Error())
 			resp.Error = true
 			resp.Response = "invalid root hash"
 			return &resp
@@ -251,16 +251,16 @@ func Listen(port int, proto string) {
 		}
 	})
 	if proto == "https" {
-		log.Print("Starting server in https mode")
+		log.Infof("Starting server in https mode")
 		if err := srv.ListenAndServeTLS("server.crt", "server.key"); err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 	}
 	if proto == "http" {
-		log.Print("Starting server in http mode")
+		log.Infof("Starting server in http mode")
 		srv.SetKeepAlivesEnabled(false)
 		if err := srv.ListenAndServe(); err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 	}
 }

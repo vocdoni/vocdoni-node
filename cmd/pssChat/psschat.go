@@ -2,16 +2,88 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
+	"os/user"
 	"time"
+	"fmt"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/marcusolsson/tui-go"
+	swarm "gitlab.com/vocdoni/go-dvote/swarm"
+	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/log"
+	"github.com/spf13/viper"
 	flag "github.com/spf13/pflag"
-	swarm "github.com/vocdoni/go-dvote/swarm"
 )
 
+func newConfig() (config.PssCfg, error) {
+	var globalCfg config.PssCfg
+	//setup flags
+	usr, err := user.Current()
+	if err != nil {
+		return globalCfg, err
+	}
+	defaultDirPath := usr.HomeDir + "/.dvote/psschat"
+	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for psschat config")
+
+	flag.String("encryption", "sym", "encryption key schema (raw, sym, asym)")
+	flag.String("key", "vocdoni", "encryption key (sym or asym)")
+	flag.String("topic", "vocdoni_test", "pss topic to subscribe")
+	flag.String("address", "", "pss address to send messages")
+	flag.String("nick", "", "nick name for the pss messages")
+	flag.String("datadir", "", "datadir directory for swarm/pss files")
+	flag.Bool("light", false, "use light mode (less consumption)")
+	flag.Bool("pingmode", false, "use non interactive ping mode")
+	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	flag.Parse()
+
+	viper := viper.New()
+	viper.SetDefault("encryption", "sym")
+	viper.SetDefault("key", "vocdoni")
+	viper.SetDefault("topic", "vocdoni_test")
+	viper.SetDefault("address", "")
+	viper.SetDefault("nick", "")
+	viper.SetDefault("datadir", "")
+	viper.SetDefault("light", false)
+	viper.SetDefault("pingmode", false)
+	viper.SetDefault("loglevel", "warn")
+
+	viper.SetConfigType("yaml")
+	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+		if err = viper.SafeWriteConfigAs(*path); err != nil {
+			if os.IsNotExist(err) {
+				err = os.MkdirAll(defaultDirPath, os.ModePerm)
+				if err != nil {
+					return globalCfg, err
+				}
+				err = viper.WriteConfigAs(*path)
+				if err != nil {
+					return globalCfg, err
+				}
+			}
+		}
+	}
+
+	viper.BindPFlag("encryption", flag.Lookup("encryption"))
+	viper.BindPFlag("key", flag.Lookup("key"))
+	viper.BindPFlag("topic", flag.Lookup("topic"))
+	viper.BindPFlag("address", flag.Lookup("address"))
+	viper.BindPFlag("nick", flag.Lookup("nick"))
+	viper.BindPFlag("datadir", flag.Lookup("datadir"))
+	viper.BindPFlag("light", flag.Lookup("light"))
+	viper.BindPFlag("pingmode", flag.Lookup("pingmode"))
+	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
+	
+	viper.SetConfigFile(*path)
+	err = viper.ReadInConfig()
+	if err != nil {
+		return globalCfg, err
+	}
+
+	err = viper.Unmarshal(&globalCfg)
+	return globalCfg, err
+}
+
+//Message holds a pss chat message
 type Message struct {
 	Type int    `json:"type"`
 	Nick string `json:"nick"`
@@ -19,53 +91,45 @@ type Message struct {
 }
 
 func main() {
-	hostname, _ := os.Hostname()
-
-	kind := flag.String("encryption", "sym", "encryption key schema (raw, sym, asym)")
-	key := flag.String("key", "vocdoni", "encryption key (sym or asym)")
-	topic := flag.String("topic", "vocdoni_test", "pss topic to subscribe")
-	addr := flag.String("address", "", "pss address to send messages")
-	nick := flag.String("nick", hostname, "nick name for the pss messages")
-	dir := flag.String("datadir", "", "datadir directory for swarm/pss files")
-	light := flag.Bool("light", false, "use light mode (less consumption)")
-	pingMode := flag.Bool("pingmode", false, "use non interactive ping mode")
-	logLevel := flag.String("log", "crit", "log level (info, warn, crit)")
-	flag.Parse()
-
-	sn := new(swarm.SimpleSwarm)
-	sn.LightNode = *light
-	sn.SetDatadir(*dir)
-
-	err := sn.InitPSS()
+	//setup config
+	globalCfg, err := newConfig()
+	//setup logger
+	log.InitLoggerAtLevel(globalCfg.LogLevel)
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		log.Fatalf("Could not load config: %v", err)
+	}
+	if globalCfg.Nick == "" {
+		globalCfg.Nick, _ = os.Hostname()
+	}
+	sn := new(swarm.SimpleSwarm)
+	sn.LightNode = globalCfg.Light
+	sn.SetDatadir(globalCfg.Datadir)
+
+	err = sn.InitPSS()
+	if err != nil {
+		log.Errorf("%v\n", err)
 		return
 	}
 
-	err = sn.SetLog(*logLevel)
-	if err != nil {
-		fmt.Printf("Cannot set loglevel %v\n", err)
-	}
+	sn.PssSub(globalCfg.Encryption, globalCfg.Key, globalCfg.Topic)
+	defer sn.PssTopics[globalCfg.Topic].Unregister()
 
-	sn.PssSub(*kind, *key, *topic)
-	defer sn.PssTopics[*topic].Unregister()
+	log.Infof("My PSS pubKey is %s", sn.PssPubKey)
 
-	log.Info("My PSS pubKey is %s", sn.PssPubKey)
-
-	if *pingMode {
-		ping(*topic, *kind, *key, *nick, *addr, sn, *light)
+	if globalCfg.PingMode {
+		ping(globalCfg, sn)
 	} else {
-		chat(*topic, *kind, *key, *nick, *addr, sn, *light)
+		chat(globalCfg, sn)
 	}
 }
 
-func ping(topic, enc, key, mynick, addr string, sn *swarm.SimpleSwarm, light bool) {
+func ping(globalCfg config.PssCfg, sn *swarm.SimpleSwarm) {
 	go func() {
 		var nick string
 		var msg string
 		var jmsg Message
 		for {
-			pmsg := <-sn.PssTopics[topic].Delivery
+			pmsg := <-sn.PssTopics[globalCfg.Topic].Delivery
 			err := json.Unmarshal(pmsg.Msg, &jmsg)
 			if err != nil {
 				nick = "raw"
@@ -74,20 +138,20 @@ func ping(topic, enc, key, mynick, addr string, sn *swarm.SimpleSwarm, light boo
 				nick = jmsg.Nick
 				msg = jmsg.Data
 			}
-			fmt.Printf("%s <%s>: %s\n", time.Now().Format("3:04PM"), nick, msg)
+			log.Infof("Message info: Time: %v, Nick: %v, Message: %v", time.Now().Format("3:04PM"), nick, msg)
 		}
 	}()
 
 	var jmsg Message
 	jmsg.Type = 0
-	jmsg.Nick = mynick
+	jmsg.Nick = globalCfg.Nick
 	for {
 		jmsg.Data = "Hello world"
 		msg, err := json.Marshal(jmsg)
 		if err != nil {
-			log.Crit(err.Error())
+			log.Fatal(err.Error())
 		}
-		err = sn.PssPub(enc, key, topic, fmt.Sprintf("%s", msg), addr)
+		err = sn.PssPub(globalCfg.Encryption, globalCfg.Key, globalCfg.Topic, fmt.Sprintf("%s", msg), globalCfg.Address)
 		if err != nil {
 			log.Warn(err.Error())
 		}
@@ -95,7 +159,7 @@ func ping(topic, enc, key, mynick, addr string, sn *swarm.SimpleSwarm, light boo
 	}
 }
 
-func chat(topic, enc, key, mynick, addr string, sn *swarm.SimpleSwarm, light bool) {
+func chat(globalCfg config.PssCfg, sn *swarm.SimpleSwarm) {
 	var ui tui.UI
 	info := tui.NewHBox()
 	info.SetSizePolicy(tui.Expanding, tui.Expanding)
@@ -120,16 +184,16 @@ func chat(topic, enc, key, mynick, addr string, sn *swarm.SimpleSwarm, light boo
 	sidebar := tui.NewVBox(
 		tui.NewLabel(""),
 		tui.NewLabel("TOPIC"),
-		tui.NewLabel(topic),
+		tui.NewLabel(globalCfg.Topic),
 		tui.NewLabel(""),
 		tui.NewLabel("ENCRYPT"),
-		tui.NewLabel(enc),
+		tui.NewLabel(globalCfg.Encryption),
 		tui.NewLabel(""),
 		tui.NewLabel("KEY"),
-		tui.NewLabel(key),
+		tui.NewLabel(globalCfg.Key),
 		tui.NewLabel(""),
 		tui.NewLabel("LIGHT"),
-		tui.NewLabel(fmt.Sprintf("%t", light)),
+		tui.NewLabel(fmt.Sprintf("%t", globalCfg.Light)),
 		tui.NewLabel(""),
 
 		tui.NewSpacer(),
@@ -144,7 +208,7 @@ func chat(topic, enc, key, mynick, addr string, sn *swarm.SimpleSwarm, light boo
 		var nick string
 		var msg string
 		for {
-			pmsg := <-sn.PssTopics[topic].Delivery
+			pmsg := <-sn.PssTopics[globalCfg.Topic].Delivery
 			err := json.Unmarshal(pmsg.Msg, &jmsg)
 			if err != nil {
 				nick = "raw"
@@ -184,19 +248,19 @@ func chat(topic, enc, key, mynick, addr string, sn *swarm.SimpleSwarm, light boo
 	input.OnSubmit(func(e *tui.Entry) {
 		var jmsg Message
 		jmsg.Type = 0
-		jmsg.Nick = mynick
+		jmsg.Nick = globalCfg.Nick
 		jmsg.Data = e.Text()
 		msg, err := json.Marshal(jmsg)
 		if err != nil {
-			log.Crit(err.Error())
+			log.Fatal(err.Error())
 		}
-		err = sn.PssPub(enc, key, topic, fmt.Sprintf("%s", msg), addr)
+		err = sn.PssPub(globalCfg.Encryption, globalCfg.Key, globalCfg.Topic, fmt.Sprintf("%s", msg), globalCfg.Address)
 		if err != nil {
 			log.Warn(err.Error())
 		}
 		history.Append(tui.NewHBox(
 			tui.NewLabel(time.Now().Format("3:04PM")),
-			tui.NewPadder(1, 0, tui.NewLabel(fmt.Sprintf("<%s>", mynick))),
+			tui.NewPadder(1, 0, tui.NewLabel(fmt.Sprintf("<%s>", globalCfg.Nick))),
 			tui.NewLabel(fmt.Sprintf("%s", jmsg.Data)),
 			tui.NewSpacer(),
 		))
@@ -206,7 +270,7 @@ func chat(topic, enc, key, mynick, addr string, sn *swarm.SimpleSwarm, light boo
 	root := tui.NewHBox(sidebar, chat, infoBox)
 	ui, err := tui.New(root)
 	if err != nil {
-		log.Crit(err.Error())
+		log.Fatal(err.Error())
 	}
 	quit := false
 
@@ -224,7 +288,7 @@ func chat(topic, enc, key, mynick, addr string, sn *swarm.SimpleSwarm, light boo
 
 	go func() {
 		if err := ui.Run(); err != nil {
-			log.Crit(err.Error())
+			log.Fatal(err.Error())
 		}
 	}()
 

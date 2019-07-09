@@ -1,11 +1,11 @@
 package net
 
 import (
-	"log"
 	"time"
 
-	"github.com/vocdoni/go-dvote/swarm"
-	"github.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/swarm"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 type PSSHandle struct {
@@ -17,10 +17,6 @@ func (p *PSSHandle) Init(c *types.Connection) error {
 	p.c = c
 	sn := new(swarm.SimpleSwarm)
 	err := sn.InitPSS()
-	if err != nil {
-		return err
-	}
-	err = sn.SetLog("crit")
 	if err != nil {
 		return err
 	}
@@ -52,6 +48,6 @@ func (p *PSSHandle) Send(msg types.Message) {
 
 	err := p.s.PssPub(p.c.Encryption, p.c.Key, p.c.Topic, string(msg.Data), p.c.Address)
 	if err != nil {
-		log.Printf("PSS send error: %s", err)
+		log.Warnf("PSS send error: %s", err)
 	}
 }

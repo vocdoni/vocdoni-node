@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"fmt"
 	"net"
+	"fmt"
 	"os"
 	"os/user"
 	"strings"
@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/ethersphere/swarm"
@@ -26,7 +25,8 @@ import (
 	"github.com/ethersphere/swarm/network"
 	"github.com/ethersphere/swarm/pss"
 
-	dvoteUtil "github.com/vocdoni/go-dvote/util"
+	dvoteUtil "gitlab.com/vocdoni/go-dvote/util"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 const (
@@ -112,7 +112,7 @@ func newSwarm(privkey *ecdsa.PrivateKey, nodekey *ecdsa.PrivateKey, datadir stri
 
 	swarmNode, err := swarm.NewSwarm(swarmCfg, nil)
 	if err != nil {
-		log.Crit("cannot crate swarm node")
+		log.Fatalf("cannot create swarm node")
 	}
 	// register swarm service to the node
 	var swarmService node.ServiceConstructor = func(ctx *node.ServiceContext) (node.Service, error) {
@@ -168,20 +168,6 @@ type SimpleSwarm struct {
 	LightNode  bool
 }
 
-func (sn *SimpleSwarm) SetLog(level string) error {
-	// ensure good log formats for terminal
-	// handle verbosity flag
-	loglevel, err := log.LvlFromString(level)
-	if err != nil {
-		return err
-	}
-	hs := log.StreamHandler(os.Stderr, log.TerminalFormat(true))
-	hf := log.LvlFilterHandler(loglevel, hs)
-	h := log.CallerFileHandler(hf)
-	log.Root().SetHandler(h)
-	return nil
-}
-
 func (sn *SimpleSwarm) PrintStats() {
 	// statistics thread
 	go func() {
@@ -191,7 +177,7 @@ func (sn *SimpleSwarm) PrintStats() {
 				var addrs [][]byte
 				addrs = append(addrs, []byte(addr))
 				peerCount := sn.Node.Server().PeerCount()
-				log.Info(fmt.Sprintf("PeerCount:%d NeighDepth:%d", peerCount, sn.Hive.NeighbourhoodDepth))
+				log.Infof("Node server: PeerCount: %v, Neighborhood Depth: %v", peerCount, sn.Hive.NeighbourhoodDepth)
 			}
 			time.Sleep(time.Second * 5)
 		}
@@ -217,7 +203,6 @@ func (sn *SimpleSwarm) InitBZZ() error {
 		os.MkdirAll(sn.Datadir, 0755)
 	}
 
-	sn.SetLog("info")
 	sn.Ports = NewSwarmPorts()
 
 	// create node
@@ -244,10 +229,10 @@ func (sn *SimpleSwarm) InitBZZ() error {
 	for _, url := range dvoteUtil.StrShuffle(SwarmBootnodes) {
 		purl, err := parseEnode(url)
 		if err != nil {
-			log.Info(fmt.Sprintf("%v", err))
+			log.Error(err)
 			continue
 		}
-		log.Info("Add bootnode " + purl)
+		log.Infof("Add bootnode " + purl)
 		node, _ := enode.ParseV4(purl)
 		sn.Node.Server().AddPeer(node)
 	}
@@ -279,7 +264,6 @@ func (sn *SimpleSwarm) InitPSS() error {
 		os.MkdirAll(sn.Datadir, 0755)
 	}
 
-	sn.SetLog("info")
 	sn.Ports = NewSwarmPorts()
 
 	// create node
@@ -307,10 +291,10 @@ func (sn *SimpleSwarm) InitPSS() error {
 	for _, url := range dvoteUtil.StrShuffle(SwarmBootnodes) {
 		purl, err := parseEnode(url)
 		if err != nil {
-			log.Info(fmt.Sprintf("%v", err))
+			log.Info(err)
 			continue
 		}
-		log.Info("Add bootnode " + purl)
+		log.Infof("Add bootnode %v", purl)
 		node, _ := enode.ParseV4(purl)
 		sn.Node.Server().AddPeer(node)
 	}
@@ -345,8 +329,8 @@ func (sn *SimpleSwarm) InitPSS() error {
 	}
 
 	// Print some information
-	log.Info(fmt.Sprintf("My PSS pubkey is %s", sn.PssPubKey))
-	log.Info(fmt.Sprintf("My PSS address is %x", sn.PssAddr))
+	log.Infof("My PSS pubkey is %s", sn.PssPubKey)
+	log.Infof("My PSS address is %x", sn.PssAddr)
 
 	// Run statistics goroutine
 	sn.PrintStats()
@@ -384,7 +368,7 @@ func (sn *SimpleSwarm) SetHandler(topic string, fh pss.HandlerFunc) {
 func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	pssTopic := strTopic(topic)
 	pssAddress := strAddress("")
-	log.Debug("pss subscription", "to", fmt.Sprintf("subscription to topic %s", pssTopic))
+	log.Debugf("pss subscription to topic %s", pssTopic)
 	if subType == "sym" {
 		_, err := sn.Pss.SetSymmetricKey(strSymKey(key), pssTopic, pssAddress, true)
 		if err != nil {
@@ -397,7 +381,7 @@ func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	sn.PssTopics[topic].Delivery = make(chan PssMsg)
 
 	var pssHandler pss.HandlerFunc = func(msg []byte, peer *p2p.Peer, asym bool, keyid string) error {
-		log.Debug("pss received", "msg", fmt.Sprintf("%s", msg), "keyid", fmt.Sprintf("%s", keyid))
+		log.Debugf("pss received msg: %v, keyid: %v", msg, keyid)
 
 		sn.PssTopics[topic].Delivery <- PssMsg{Msg: msg, Peer: peer, Asym: asym, Keyid: keyid}
 		return nil
@@ -408,7 +392,7 @@ func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	}
 	sn.PssTopics[topic].Unregister = sn.Pss.Register(&pssTopic, topicHandler)
 
-	log.Info(fmt.Sprintf("Subscribed to [%s] topic %s", subType, pssTopic.String()))
+	log.Infof("Pss subscribed to %v, topic %v", subType, pssTopic.String())
 	return nil
 }
 
@@ -416,7 +400,7 @@ func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
 	var err error
 	dstAddr := strAddress(address)
 	dstTopic := strTopic(topic)
-	log.Info(fmt.Sprintf("Sending message to %x with topic %x", dstAddr, dstTopic))
+	log.Infof("Sending message to addressee %v, with topic %v", dstAddr, dstTopic)
 	if subType == "sym" {
 		symKeyId, err := sn.Pss.SetSymmetricKey(strSymKey(key), dstTopic, dstAddr, false)
 		if err != nil {

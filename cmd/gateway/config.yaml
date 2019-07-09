@@ -1,0 +1,25 @@
+w3: 
+  chainType: "vctestnet"
+  wsHost: "0.0.0.0"
+  wsPort: 0
+  httpHost: "0.0.0.0"
+  httpPort: 9091
+  nodePort: 32000
+ipfs: 
+  daemon: "ipfs"
+  noInit: false
+dvote:
+  host: "0.0.0.0"
+  port: 9090
+  route: "/dvote"
+api:
+  fileApi: true
+  web3Api: true
+client:
+  allowPrivate: false
+  allowedAddrs: ""
+  signingKey: ""
+ssl: 
+  domain: ""
+  dirCert: "./"
+logLevel: "warn"

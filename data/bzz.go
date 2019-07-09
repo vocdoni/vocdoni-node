@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io/ioutil"
 
-	"github.com/vocdoni/go-dvote/swarm"
-	"github.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/swarm"
+	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 type BZZHandle struct {
@@ -31,10 +31,6 @@ func (b *BZZHandle) Init(d *types.DataStore) error {
 	b.d = d
 	sn := new(swarm.SimpleSwarm)
 	err := sn.InitBZZ()
-	if err != nil {
-		return err
-	}
-	err = sn.SetLog("crit")
 	if err != nil {
 		return err
 	}

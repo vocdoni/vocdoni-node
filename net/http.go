@@ -2,13 +2,13 @@ package net
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/vocdoni/go-dvote/batch"
-	"github.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/batch"
+	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 type HTTPHandle struct {
@@ -35,12 +35,12 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 
 	err := decoder.Decode(&e)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	err = json.Unmarshal(e.Ballot, &b)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	//check PoW
@@ -57,12 +57,12 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 
 	err = batch.Add(b)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	j, err := json.Marshal(e)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	io.WriteString(rw, string(j))
 }
@@ -71,7 +71,7 @@ func (h *HTTPHandle) Listen() error {
 	http.HandleFunc(h.path, parse)
 	//add waitgroup
 	func() {
-		fmt.Println("serving on " + h.port + "/" + h.path)
+		log.Infof("serving on " + h.port + "/" + h.path)
 		err := http.ListenAndServe(":" + h.port, nil)
 		if err != nil {
 			return

@@ -2,9 +2,10 @@ package data
 
 import (
 	"testing"
-	"fmt"
 	"encoding/json"
 	"strings"
+
+	//"gitlab.com/vocdoni/go-dvote/log"
 )
 
 func TestPublishAndRetrieve(t *testing.T) {
@@ -26,8 +27,8 @@ func TestPublishAndRetrieve(t *testing.T) {
 	hash := publish(testObject)
 	content := retrieve(hash)
 	postpub := string(content)
-	//fmt.Println(hash)
-	//fmt.Println(string(content))
+	//log.Info(hash)
+	//log.Info(content)
 	if strings.Compare(prepub,postpub) != 0 {
 		t.Errorf("Published file doesn't match. Expected:\n %s \n Got: \n %s \n", prepub, postpub)
 	}
