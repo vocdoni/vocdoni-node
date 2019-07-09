@@ -7,7 +7,7 @@ import (
 	"time"
 	"fmt"
 
-	signature "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
+	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	tree "gitlab.com/vocdoni/go-dvote/tree"
 	"gitlab.com/vocdoni/go-dvote/log"
 )

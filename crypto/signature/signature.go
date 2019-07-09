@@ -5,6 +5,7 @@ import (
 	hex "encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	crypto "github.com/ethereum/go-ethereum/crypto"
@@ -14,7 +15,7 @@ import (
 const AddressLength = 20
 
 // SigningPrefix is the prefix added when hashing
-const SigningPrefix = "x19Ethereum Signed Message:\n"
+const SigningPrefix = "\x19Ethereum Signed Message:\n"
 
 // SignKeys represents an ECDSA pair of keys for signing.
 // Authorized addresses is a list of Ethereum like addresses which are checked on Verify
@@ -42,7 +43,7 @@ func (k *SignKeys) Generate() error {
 // AddHexKey imports a private hex key
 func (k *SignKeys) AddHexKey(privHex string) error {
 	var err error
-	k.Private, err = crypto.HexToECDSA(privHex)
+	k.Private, err = crypto.HexToECDSA(sanitizeHex(privHex))
 	if err == nil {
 		k.Public = &k.Private.PublicKey
 	}
@@ -65,7 +66,7 @@ func (k *SignKeys) AddAuthKey(address string) error {
 func (k *SignKeys) HexString() (string, string) {
 	pubHex := hex.EncodeToString(crypto.CompressPubkey(k.Public))
 	privHex := hex.EncodeToString(crypto.FromECDSA(k.Private))
-	return pubHex, privHex
+	return sanitizeHex(pubHex), sanitizeHex(privHex)
 }
 
 // Sign signs a message. Message is a normal string (no HexString nor a Hash)
@@ -75,17 +76,20 @@ func (k *SignKeys) Sign(message string) (string, error) {
 	}
 	hash := Hash(message)
 	signature, err := crypto.Sign(hash, k.Private)
+	if err != nil {
+		return "", err
+	}
 	signHex := hex.EncodeToString(signature)
-	return signHex, err
+	return fmt.Sprintf("0x%s", signHex), err
 }
 
 // Verify verifies a message. Signature and pubHex are HexStrings
 func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
-	signature, err := hex.DecodeString(signHex)
+	signature, err := hex.DecodeString(sanitizeHex(signHex))
 	if err != nil {
 		return false, err
 	}
-	pub, err := hex.DecodeString(pubHex)
+	pub, err := hex.DecodeString(sanitizeHex(pubHex))
 	if err != nil {
 		return false, err
 	}
@@ -97,7 +101,7 @@ func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 // Hash string data adding Ethereum prefix
 func Hash(data string) []byte {
 	payloadToSign := fmt.Sprintf("%s%d%s", SigningPrefix, len(data), data)
-	return crypto.Keccak256([]byte(payloadToSign))
+	return crypto.Keccak256Hash([]byte(payloadToSign)).Bytes()
 }
 
 // VerifySender verifies if a message is sent by some Authorized address key
@@ -124,4 +128,11 @@ func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func sanitizeHex(hexStr string) string {
+	if strings.HasPrefix(hexStr, "0x") {
+		return fmt.Sprintf("%s", hexStr[2:])
+	}
+	return hexStr
 }
