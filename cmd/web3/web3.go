@@ -1,15 +1,15 @@
 package main
 
 import (
-	"github.com/spf13/viper"
 	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
-	"time"
 	"os"
 	"os/user"
+	"time"
 
-	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/chain"
+	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 
@@ -28,8 +28,9 @@ func newConfig() (config.W3Cfg, error) {
 	flag.String("wsHost", "0.0.0.0", "ws host to listen on")
 	flag.Int("httpPort", 9091, "http endpoint port, disabled if 0")
 	flag.String("httpHost", "0.0.0.0", "http host to listen on")
+	flag.String("route", "/web3", "proxy endpoint exposing web3")
 	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
-	
+
 	flag.Parse()
 
 	viper := viper.New()
@@ -38,6 +39,7 @@ func newConfig() (config.W3Cfg, error) {
 	viper.SetDefault("wsHost", "0.0.0.0")
 	viper.SetDefault("httpPort", 9091)
 	viper.SetDefault("httpHost", "0.0.0.0")
+	viper.SetDefault("route", "/web3")
 	viper.SetDefault("logLevel", "warn")
 
 	viper.SetConfigType("yaml")
@@ -61,9 +63,9 @@ func newConfig() (config.W3Cfg, error) {
 	viper.BindPFlag("wsHost", flag.Lookup("wsHost"))
 	viper.BindPFlag("httpPort", flag.Lookup("httpPort"))
 	viper.BindPFlag("httpHost", flag.Lookup("httpHost"))
+	viper.BindPFlag("route", flag.Lookup("route"))
 	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
 
-	
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
 	if err != nil {

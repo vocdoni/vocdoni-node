@@ -130,8 +130,8 @@ func newConfig() (config.GWCfg, error) {
 	return globalCfg, err
 }
 
-func addKeyFromEncryptedJSON(keyJson []byte, passphrase string, signKeys *sig.SignKeys) error {
-	key, err := keystore.DecryptKey(keyJson, passphrase)
+func addKeyFromEncryptedJSON(keyJSON []byte, passphrase string, signKeys *sig.SignKeys) error {
+	key, err := keystore.DecryptKey(keyJSON, passphrase)
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,6 @@ Testing the RPC can be performed with curl and/or websocat
 func main() {
 	//setup config
 	globalCfg, err := newConfig()
-	//fmt.Printf("-> %s\n", globalCfg.Ssl.Domain)
 	//setup logger
 	log.InitLoggerAtLevel(globalCfg.LogLevel)
 	if err != nil {
