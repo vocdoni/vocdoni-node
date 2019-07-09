@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	signature "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
+	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/net"

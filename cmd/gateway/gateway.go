@@ -4,7 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	sig "gitlab.com/vocdoni/go-dvote/crypto/signature_ecdsa"
+	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 
 	"os"
 	"os/user"
