@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"math/big"
+	"os/user"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -19,10 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
-
 	//	"github.com/ethereum/go-ethereum/accounts/abi"
-
-	votingprocess "gitlab.com/vocdoni/go-dvote/chain/contracts"
 )
 
 type EthChainContext struct {
@@ -65,9 +63,16 @@ func NewConfig(w3Cfg config.W3Cfg) (*EthChainConfig, error) {
 		return nil, err
 	}
 	cfg.BootstrapNodes = chainSpecs.BootNodes
-	cfg.KeyStore = "run/eth/keystore"
-	cfg.DataDir = "run/eth/data"
-	cfg.IPCPath = "run/eth/ipc"
+
+	usr, err := user.Current()
+	if err != nil {
+		return nil, err
+	}
+	defaultDirPath := usr.HomeDir + "/.dvote/ethereum"
+
+	cfg.KeyStore = defaultDirPath + "/keystore"
+	cfg.DataDir = defaultDirPath + "/data"
+	cfg.IPCPath = defaultDirPath + "/ipc"
 	cfg.LightMode = false
 	return cfg, nil
 }
@@ -92,7 +97,6 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	nodeConfig.HTTPVirtualHosts = []string{"*"}
 	nodeConfig.HTTPModules = []string{}
 	nodeConfig.WSOrigins = []string{"*"}
-	nodeConfig.NoUSB = true
 	nodeConfig.IPCPath = c.IPCPath
 	nodeConfig.DataDir = c.DataDir
 	nodeConfig.P2P.BootstrapNodes = make([]*enode.Node, 0, len(c.BootstrapNodes))
@@ -119,7 +123,7 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	g := new(core.Genesis)
 	err = g.UnmarshalJSON(c.NetworkGenesis)
 	if err != nil {
-		log.Errorf("Cannot read genesis file")
+		log.Errorf("Cannot read genesis")
 		return err
 	}
 	ethConfig.Genesis = g
@@ -152,39 +156,6 @@ func (e *EthChainContext) Start() {
 	}
 }
 
-func (e *EthChainContext) LinkBatch(ref []byte) error {
-	client, err := ethclient.Dial(e.Node.IPCEndpoint())
-	if err != nil {
-		return err
-	}
-	//account := e.k.Accounts()[0]
-
-	/*
-		nonce, err := client.PendingNonceAt(context.Background(), account.Address)
-		if err != nil {
-			return err
-		}
-	*/
-
-	/*
-		deadline := time.Now().Add(1000 * time.Millisecond)
-		ctx, cancel := context.WithDeadline(context.TODO(), deadline)
-		defer cancel()
-		gasPrice, err := client.SuggestGasPrice(ctx)
-	*/
-
-	contractAddr := common.HexToAddress("0x3e4FfefF898580eC8132A97A91543c8fdeF1210E")
-	votingProcessInstance, err := votingprocess.NewVotingProcess(contractAddr, client)
-	if err != nil {
-		log.Fatalf("Error: %v", err)
-	}
-
-	log.Infof("contract is loaded")
-	_ = votingProcessInstance
-	return nil
-
-}
-
 func (e *EthChainContext) TestTx(amount int) error {
 	bigWalletAddr := "0x781b6544b1a73c6d779eb23c7369cf8039640793"
 	var gasLimit uint64
@@ -193,7 +164,6 @@ func (e *EthChainContext) TestTx(amount int) error {
 }
 
 // might be worthwhile to create generic SendTx to call contracttx, deploytx, etc
-
 func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
 
 	client, err := ethclient.Dial(e.Node.IPCEndpoint())
