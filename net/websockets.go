@@ -6,9 +6,9 @@ import (
 	"syscall"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net/epoll"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/log"
 
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
@@ -58,7 +58,7 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 		if err != nil {
 			return
 		}
-		if w.p.SSLDomain == "" {
+		if w.p.C.SSLDomain == "" {
 			if err := w.e.Add(conn, false); err != nil {
 				log.Warnf("Failed to add connection %v", err)
 				conn.Close()
@@ -72,12 +72,12 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 	}
 	w.p.AddHandler(path, upgradeConn)
 
-	if w.p.SSLDomain == "" {
-		log.Infof("ws initialized on ws://" + w.p.Address + ":" + strconv.Itoa(w.p.Port) + path)
+	if w.p.C.SSLDomain == "" {
+		log.Infof("ws initialized on ws://" + w.p.C.Address + ":" + strconv.Itoa(w.p.C.Port))
 	} else {
-		log.Infof("wss initialized on wss://" + w.p.SSLDomain + ":" + strconv.Itoa(w.p.Port) + path)
-	}
+		log.Infof("wss initialized on wss://" + w.p.C.SSLDomain + ":" + strconv.Itoa(w.p.C.Port))
 
+	}
 }
 
 // Listen listens for incoming data
@@ -94,7 +94,7 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 				break
 			}
 			if payload, _, err := wsutil.ReadClientData(conn); err != nil {
-				if w.p.SSLDomain == "" {
+				if w.p.C.SSLDomain == "" {
 					if err := w.e.Remove(conn, false); err != nil {
 						log.Warnf("WS recieve error: %s", err)
 					}
@@ -103,7 +103,6 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 						log.Warnf("WS recieve error: %s", err)
 					}
 				}
-
 				conn.Close()
 			} else {
 				msg.Data = []byte(payload)

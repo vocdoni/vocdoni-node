@@ -14,10 +14,6 @@ require (
 	github.com/elastic/gosigar v0.10.3 // indirect
 	github.com/ethereum/go-ethereum v1.8.22-0.20190613132322-2da6d1e04750
 	github.com/ethersphere/swarm v0.0.0-20190613131100-4744b7c9d747
-	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
-	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff // indirect
-	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
-	github.com/gobwas/pool v0.2.0 // indirect
 	github.com/gobwas/ws v1.0.1
 	github.com/golang/protobuf v1.3.1 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
@@ -26,7 +22,6 @@ require (
 	github.com/howeyc/fsnotify v0.9.0 // indirect
 	github.com/huin/goupnp v1.0.0 // indirect
 	github.com/iden3/go-iden3 v0.0.5
-	github.com/influxdata/influxdb v1.7.6 // indirect
 	github.com/ipfs/go-ipfs-api v0.0.1
 	github.com/jackpal/go-nat-pmp v1.0.1 // indirect
 	github.com/julienschmidt/httprouter v1.2.0 // indirect
@@ -53,7 +48,6 @@ require (
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58 // indirect
 	golang.org/x/sys v0.0.0-20190412213103-97732733099d
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190213234257-ec84240a7772 // indirect

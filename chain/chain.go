@@ -93,7 +93,7 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	nodeConfig.WSModules = []string{}
 	nodeConfig.HTTPHost = c.HTTPHost
 	nodeConfig.HTTPPort = c.HTTPPort
-	nodeConfig.HTTPCors = []string{"*"}
+	nodeConfig.HTTPCors = []string{""}
 	nodeConfig.HTTPVirtualHosts = []string{"*"}
 	nodeConfig.HTTPModules = []string{}
 	nodeConfig.WSOrigins = []string{"*"}

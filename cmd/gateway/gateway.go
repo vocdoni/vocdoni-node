@@ -27,8 +27,8 @@ func newConfig() (config.GWCfg, error) {
 	if err != nil {
 		return globalCfg, err
 	}
-	defaultDirPath := usr.HomeDir + "/.dvote/gateway"
-	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for gateway config")
+	userDir := usr.HomeDir + "/.dvote"
+	path := flag.String("cfgpath", userDir+"/config.yaml", "cfgpath. Specify filepath for gateway config")
 
 	flag.Bool("fileApi", true, "enable file API")
 	flag.Bool("web3Api", true, "enable web3 API")
@@ -47,12 +47,13 @@ func newConfig() (config.GWCfg, error) {
 	flag.Int("w3httpPort", 9091, "http endpoint port, disabled if 0")
 	flag.String("w3httpHost", "0.0.0.0", "http host to listen on")
 	flag.Int("w3nodePort", 32000, "node port")
+	flag.String("w3Route", "/web3", "proxy endpoint exposing web3")
 
 	flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
 	flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
 
 	flag.String("sslDomain", "", "ssl secure domain")
-	flag.String("sslDirCert", "./", "path where the ssl files will be stored")
+	flag.String("dataDir", userDir, "directory where data is stored")
 
 	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 
@@ -73,17 +74,18 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("w3.httpPort", 9091)
 	viper.SetDefault("w3.httpHost", "0.0.0.0")
 	viper.SetDefault("w3.nodePort", 32000)
+	viper.SetDefault("w3.route", "/web3")
 	viper.SetDefault("ipfs.daemon", "ipfs")
 	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ssl.domain", "")
-	viper.SetDefault("ssl.dirCert", "./")
+	viper.SetDefault("dataDir", userDir)
 	viper.SetDefault("logLevel", "warn")
 
 	viper.SetConfigType("yaml")
-	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
 		if err = viper.SafeWriteConfigAs(*path); err != nil {
 			if os.IsNotExist(err) {
-				err = os.MkdirAll(defaultDirPath, os.ModePerm)
+				err = os.MkdirAll(userDir, os.ModePerm)
 				if err != nil {
 					return globalCfg, err
 				}
@@ -111,10 +113,11 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("w3.httpPort", flag.Lookup("w3httpPort"))
 	viper.BindPFlag("w3.httpHost", flag.Lookup("w3httpHost"))
 	viper.BindPFlag("w3.nodePort", flag.Lookup("w3nodePort"))
+	viper.BindPFlag("w3.route", flag.Lookup("w3Route"))
 	viper.BindPFlag("ipfs.daemon", flag.Lookup("ipfsDaemon"))
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
-	viper.BindPFlag("ssl.dirCert", flag.Lookup("sslDirCert"))
+	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
 
 	viper.SetConfigFile(*path)
@@ -127,8 +130,8 @@ func newConfig() (config.GWCfg, error) {
 	return globalCfg, err
 }
 
-func addKeyFromEncryptedJSON(keyJson []byte, passphrase string, signKeys *sig.SignKeys) error {
-	key, err := keystore.DecryptKey(keyJson, passphrase)
+func addKeyFromEncryptedJSON(keyJSON []byte, passphrase string, signKeys *sig.SignKeys) error {
+	key, err := keystore.DecryptKey(keyJSON, passphrase)
 	if err != nil {
 		return err
 	}
@@ -155,6 +158,26 @@ func main() {
 
 	var node *chain.EthChainContext
 	_ = node
+
+	p := net.NewProxy()
+	p.C.SSLDomain = globalCfg.Ssl.Domain
+	p.C.SSLCertDir = globalCfg.DataDir
+	log.Infof("Storing SSL certificate in %s", p.C.SSLCertDir)
+	p.C.Address = globalCfg.Dvote.Host
+	p.C.Port = globalCfg.Dvote.Port
+	err = p.Init()
+	if err != nil {
+		log.Warn("LetsEncrypt SSL certificate cannot be obtained, probably port 443 is not accessible or domain provided is not correct")
+		log.Warn("Disabling SSL!")
+		// Probably SSL has failed
+		p.C.SSLDomain = ""
+		globalCfg.Ssl.Domain = ""
+		err = p.Init()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	if globalCfg.Api.Web3Api {
 		w3cfg, err := chain.NewConfig(globalCfg.W3)
 		if err != nil {
@@ -166,6 +189,9 @@ func main() {
 			log.Panicf("Error: %v", err)
 		}
 		node.Start()
+		time.Sleep(1 * time.Second)
+		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(w3cfg.HTTPHost, w3cfg.HTTPPort))
+		log.Infof("web3 available at %s", globalCfg.W3.Route)
 	}
 
 	var signer *sig.SignKeys
@@ -188,11 +214,11 @@ func main() {
 	} else if globalCfg.Api.Web3Api {
 		acc := node.Keys.Accounts()
 		if len(acc) > 0 {
-			keyJson, err := node.Keys.Export(acc[0], "", "")
+			keyJSON, err := node.Keys.Export(acc[0], "", "")
 			if err != nil {
 				log.Fatalf("Error: %v", err)
 			}
-			err = addKeyFromEncryptedJSON(keyJson, "", signer)
+			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
 			pub, _ := signer.HexString()
 			log.Infof("Added pubKey %s from keystore", pub)
 			if err != nil {
@@ -209,16 +235,11 @@ func main() {
 	listenerOutput := make(chan types.Message)
 
 	if globalCfg.Api.FileApi {
-		p := net.NewProxy()
-		p.SSLDomain = globalCfg.Ssl.Domain
-		p.SSLCertDir = globalCfg.Ssl.DirCert
-		p.Address = globalCfg.Dvote.Host
-		p.Port = globalCfg.Dvote.Port
-		p.Init()
 		ws := new(net.WebsocketHandle)
 		ws.Init(new(types.Connection))
 		ws.SetProxy(p)
 		ws.AddProxyHandler(globalCfg.Dvote.Route)
+		log.Infof("ws file api available at %s", globalCfg.Dvote.Route)
 
 		ipfsConfig := data.IPFSNewConfig()
 		ipfsConfig.Start = !globalCfg.Ipfs.NoInit
