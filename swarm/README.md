@@ -11,14 +11,14 @@ Using Swarm/PSS as a standalone protocol is hard, so this library aims to abstra
 
 Download the library.
 ```
-go get -u github.com/vocdoni/go-dvote/swarm
+go get -u gitlab.com/vocdoni/go-dvote/swarm
 ```
 
 Import it from your GoLang code.
 
 ```
 import ( 
-  swarm "github.com/vocdoni/go-dvote/swarm" 
+  swarm "gitlab.com/vocdoni/go-dvote/swarm" 
 )
 ```
 
@@ -77,7 +77,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	flag "github.com/spf13/pflag"
 	"github.com/tcnksm/go-input"
-	swarm "github.com/vocdoni/go-dvote/swarm"
+	swarm "gitlab.com/vocdoni/go-dvote/swarm"
 )
 
 func main() {

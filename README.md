@@ -15,7 +15,7 @@ Gateways provide an entry point to the P2P networks.
 They allow clients to reach decentralized services (census, relays, blockchain, etc.) through a WebSocket or an HTTP API interface.
 
 ```
-git clone https://github.com/vocdoni/go-dvote.git
+git clone https://gitlab.com/vocdoni/go-dvote.git
 cd go-dvote
 unset GOPATH
 go build cmd/gatewat/gateway.go
