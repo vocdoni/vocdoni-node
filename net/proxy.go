@@ -129,7 +129,7 @@ func (p *Proxy) AddEndpoint(host string, port int) func(writer http.ResponseWrit
 		if err != nil {
 			log.Infof("Cannot read response: %s", err)
 		}
-
+		writer.Write(respBody)
 		log.Infof("Response: %s", respBody)
 	}
 	return fn
