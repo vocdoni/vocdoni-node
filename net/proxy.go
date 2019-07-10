@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/types"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 
