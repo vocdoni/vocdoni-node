@@ -27,8 +27,8 @@ func newConfig() (config.GWCfg, error) {
 	if err != nil {
 		return globalCfg, err
 	}
-	defaultDirPath := usr.HomeDir + "/.dvote/gateway"
-	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for gateway config")
+	userDir := usr.HomeDir + "/.dvote"
+	path := flag.String("cfgpath", userDir+"/config.yaml", "cfgpath. Specify filepath for gateway config")
 
 	flag.Bool("fileApi", true, "enable file API")
 	flag.Bool("web3Api", true, "enable web3 API")
@@ -53,7 +53,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
 
 	flag.String("sslDomain", "", "ssl secure domain")
-	flag.String("sslDirCert", "./", "path where the ssl files will be stored")
+	flag.String("dataDir", userDir, "directory where data is stored")
 
 	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 
@@ -78,14 +78,14 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("ipfs.daemon", "ipfs")
 	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ssl.domain", "")
-	viper.SetDefault("ssl.dirCert", "./")
+	viper.SetDefault("dataDir", userDir)
 	viper.SetDefault("logLevel", "warn")
 
 	viper.SetConfigType("yaml")
-	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
 		if err = viper.SafeWriteConfigAs(*path); err != nil {
 			if os.IsNotExist(err) {
-				err = os.MkdirAll(defaultDirPath, os.ModePerm)
+				err = os.MkdirAll(userDir, os.ModePerm)
 				if err != nil {
 					return globalCfg, err
 				}
@@ -117,7 +117,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("ipfs.daemon", flag.Lookup("ipfsDaemon"))
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
-	viper.BindPFlag("ssl.dirCert", flag.Lookup("sslDirCert"))
+	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
 
 	viper.SetConfigFile(*path)
@@ -161,7 +161,7 @@ func main() {
 
 	p := net.NewProxy()
 	p.C.SSLDomain = globalCfg.Ssl.Domain
-	p.C.SSLCertDir = globalCfg.Ssl.DirCert
+	p.C.SSLCertDir = globalCfg.DataDir
 	log.Infof("Storing SSL certificate in %s", p.C.SSLCertDir)
 	p.C.Address = globalCfg.Dvote.Host
 	p.C.Port = globalCfg.Dvote.Port

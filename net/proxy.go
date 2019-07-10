@@ -3,11 +3,11 @@ package net
 import (
 	"bytes"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/vocdoni/go-dvote/types"
 	"golang.org/x/crypto/acme"
@@ -31,19 +31,43 @@ func NewProxy() *Proxy {
 	return p
 }
 
+func getCertificates(domain string, m *autocert.Manager) [][]byte {
+	hello := &tls.ClientHelloInfo{
+		ServerName:   domain,
+		CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305},
+	}
+	hello.CipherSuites = append(hello.CipherSuites, tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305)
+
+	cert, err := m.GetCertificate(hello)
+	if err != nil {
+		return nil
+	}
+	return cert.Certificate
+}
+
 // Init checks if SSL is activated or not and runs a http server consequently
 func (p *Proxy) Init() error {
+	var s *http.Server
+	var m *autocert.Manager
+	forceNonTLS := true
+
 	if len(p.C.SSLDomain) > 0 {
-		s, err := p.GenerateSSLCertificate()
-		if err == nil {
-			go func() {
-				log.Fatal(s.ListenAndServeTLS("", ""))
-			}()
-			log.Infof("Proxy with SSL initialized on https://%s", p.C.SSLDomain+":"+strconv.Itoa(p.C.Port))
+		s, m = p.GenerateSSLCertificate()
+		go func() {
+			log.Warn(s.ListenAndServeTLS("", ""))
+		}()
+
+		time.Sleep(time.Second * 5)
+		certs := getCertificates(p.C.SSLDomain, m)
+		if certs == nil {
+			log.Warn("Letsencrypt TLS certificate cannot be obtained. Maybe port 443 is not accessible or domain name is wrong.")
+			s.Close()
 		} else {
-			return err
+			forceNonTLS = false
+			log.Infof("Proxy with SSL initialized on https://%s", p.C.SSLDomain+":"+strconv.Itoa(p.C.Port))
 		}
-	} else {
+	}
+	if forceNonTLS {
 		s := &http.Server{
 			Addr: p.C.Address + ":" + strconv.Itoa(p.C.Port),
 		}
@@ -51,12 +75,13 @@ func (p *Proxy) Init() error {
 			log.Fatal(s.ListenAndServe())
 		}()
 		log.Infof("Proxy initialized on http://%s, ssl not activated", p.C.Address+":"+strconv.Itoa(p.C.Port))
+
 	}
 	return nil
 }
 
 // GenerateSSLCertificate generates a SSL certificated for the proxy
-func (p *Proxy) GenerateSSLCertificate() (*http.Server, error) {
+func (p *Proxy) GenerateSSLCertificate() (*http.Server, *autocert.Manager) {
 	m := autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(p.C.SSLDomain),
@@ -71,11 +96,7 @@ func (p *Proxy) GenerateSSLCertificate() (*http.Server, error) {
 	}
 	serverConfig.TLSConfig.NextProtos = append(serverConfig.TLSConfig.NextProtos, acme.ALPNProto)
 
-	if len(serverConfig.TLSConfig.Certificates) == 0 {
-		return serverConfig, errors.New("Cannot create signed SSL certificate")
-	}
-
-	return serverConfig, nil
+	return serverConfig, &m
 }
 
 // AddHandler adds a handler for the proxy

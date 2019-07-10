@@ -26,6 +26,7 @@ type GWCfg struct {
 		DirCert string
 	}
 	LogLevel string
+	DataDir  string
 }
 
 //PssCfg stores global configs for Pss chat
