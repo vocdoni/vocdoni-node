@@ -1,0 +1,20 @@
+FROM golang:alpine
+
+ENV COMPONENT_VERSION=2.00
+
+RUN mkdir -p /app && mkdir -p /app/data
+WORKDIR /app
+ENV GOPATH=
+ENV GW_DATA_DIR=/app/data
+ENV GW_LOGLEVEL=debug
+
+RUN apk update && apk add --no-cache build-base git binutils \
+ binutils-gold libc6-compat ca-certificates openssl linux-headers && \
+ apk add go-ipfs --update-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ --allow-untrusted
+
+ADD . .
+
+RUN  go build -o gateway cmd/gateway/gateway.go && \
+ apk del build-base git binutils binutils-gold linux-headers
+
+CMD /app/dockerfiles/gateway/files/gatewayStart.sh
