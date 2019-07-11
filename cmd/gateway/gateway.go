@@ -68,7 +68,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("client.allowPrivate", false)
 	viper.SetDefault("client.allowedAddrs", "")
 	viper.SetDefault("client.signingKey", "")
-	viper.SetDefault("w3.chainType", "vctestnet")
+	viper.SetDefault("w3.chainType", "goerli")
 	viper.SetDefault("w3.wsPort", 0)
 	viper.SetDefault("w3.wsHost", "0.0.0.0")
 	viper.SetDefault("w3.httpPort", 9091)
