@@ -41,7 +41,7 @@ func (e *Epoll) Add(conn net.Conn, ssl bool) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.connections[fd] = conn
-	log.Infof("Total number of connections: %v", len(e.connections))
+	log.Debugf("total number of connections: %v", len(e.connections))
 	return nil
 }
 
@@ -56,7 +56,7 @@ func (e *Epoll) Remove(conn net.Conn, ssl bool) error {
 	defer e.lock.Unlock()
 	delete(e.connections, fd)
 	if len(e.connections)%100 == 0 {
-		log.Infof("Total number of connections: %v", len(e.connections))
+		log.Debugf("total number of connections: %v", len(e.connections))
 	}
 	return nil
 }

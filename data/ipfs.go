@@ -50,7 +50,7 @@ func startIPFSDaemon(ipfsBinPath string) error {
 	if err != nil {
 		log.Warn(err.Error())
 		initCmd := exec.Command(ipfsBinPath, "init")
-		log.Info("Initializing IPFS for first time ... wait until completed")
+		log.Info("initializing IPFS for first time ... wait until completed")
 		err := initCmd.Run()
 		if err != nil {
 			log.Warn(err.Error())

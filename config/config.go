@@ -13,8 +13,8 @@ type GWCfg struct {
 		Route string
 	}
 	Api struct {
-		FileApi bool
-		Web3Api bool
+		DvoteApi bool
+		Web3Api  bool
 	}
 	Client struct {
 		AllowPrivate bool
@@ -29,7 +29,7 @@ type GWCfg struct {
 	ListenHost string
 	LogLevel   string
 	DataDir    string
-	W3External string
+	W3external string
 }
 
 //PssCfg stores global configs for Pss chat

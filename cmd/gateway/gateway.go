@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	flag "github.com/spf13/pflag"
@@ -37,35 +36,35 @@ func newConfig() (config.GWCfg, error) {
 	userDir := usr.HomeDir + "/.dvote"
 	path := flag.String("cfgpath", userDir+"/config.yaml", "cfgpath. Specify filepath for gateway config")
 
-	flag.Bool("fileApi", true, "enable file API")
+	flag.Bool("dvoteApi", true, "enable dvote API")
 	flag.Bool("web3Api", true, "enable web3 API")
 
 	flag.String("listenHost", "0.0.0.0", "http host endpoint")
 	flag.Int("listenPort", 9090, "http port endpoint")
 
-	flag.String("dvoteRoute", "/dvote", "dvote API route")
+	flag.String("dvoteRoute", "/dvote", "dvote endpoint API route")
 
 	flag.Bool("allowPrivate", false, "allows authorized clients to call private methods")
-	flag.String("allowedAddrs", "", "comma delimited list of allowed client eth addresses")
+	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses")
 	flag.String("signingKey", "", "request signing key for this node")
 
-	flag.String("chain", "vctestnet", "Blockchain to connect")
+	flag.String("chain", "goerli", "Ethereum blockchain to use")
 	flag.Int("w3nodePort", 32000, "node port")
-	flag.String("w3Route", "/web3", "proxy endpoint exposing web3")
-	flag.String("w3External", "", "URL where the gateway will be connected for WEB3 related. Local blockchain node won't be initialized.")
+	flag.String("w3route", "/web3", "web3 endpoint API route")
+	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
 
 	flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
 	flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
 
-	flag.String("sslDomain", "", "ssl secure domain")
+	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	flag.String("dataDir", userDir, "directory where data is stored")
 
-	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 
 	flag.Parse()
 
 	viper := viper.New()
-	viper.SetDefault("api.fileApi", true)
+	viper.SetDefault("api.dvoteApi", true)
 	viper.SetDefault("api.web3Api", true)
 	viper.SetDefault("listenHost", "0.0.0.0")
 	viper.SetDefault("listenPort", 9090)
@@ -76,7 +75,10 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("w3.chainType", "goerli")
 	viper.SetDefault("w3.nodePort", 32000)
 	viper.SetDefault("w3.route", "/web3")
-	viper.SetDefault("w3External", "")
+	viper.SetDefault("w3.external", "")
+	viper.SetDefault("w3.httpPort", "9091")
+	viper.SetDefault("w3.httpHost", "127.0.0.1")
+
 	viper.SetDefault("ipfs.daemon", "ipfs")
 	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ssl.domain", "")
@@ -101,7 +103,7 @@ func newConfig() (config.GWCfg, error) {
 
 	//bind flags after writing default config so flag use
 	//does not write config on first program run
-	viper.BindPFlag("api.fileApi", flag.Lookup("fileApi"))
+	viper.BindPFlag("api.dvoteApi", flag.Lookup("dvoteApi"))
 	viper.BindPFlag("api.web3Api", flag.Lookup("web3Api"))
 	viper.BindPFlag("listenHost", flag.Lookup("listenHost"))
 	viper.BindPFlag("listenPort", flag.Lookup("listenPort"))
@@ -111,13 +113,13 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("client.signingKey", flag.Lookup("signingKey"))
 	viper.BindPFlag("w3.chainType", flag.Lookup("chain"))
 	viper.BindPFlag("w3.nodePort", flag.Lookup("w3nodePort"))
-	viper.BindPFlag("w3.route", flag.Lookup("w3Route"))
-	viper.BindPFlag("w3External", flag.Lookup("w3External"))
+	viper.BindPFlag("w3.route", flag.Lookup("w3route"))
+	viper.BindPFlag("w3external", flag.Lookup("w3external"))
 	viper.BindPFlag("ipfs.daemon", flag.Lookup("ipfsDaemon"))
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
-	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
+	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -152,7 +154,7 @@ func main() {
 	//setup logger
 	log.InitLoggerAtLevel(globalCfg.LogLevel)
 	if err != nil {
-		log.Fatalf("Could not load config: %v", err)
+		log.Fatalf("could not load config: %v", err)
 	}
 
 	var node *chain.EthChainContext
@@ -161,19 +163,19 @@ func main() {
 	p := net.NewProxy()
 	p.C.SSLDomain = globalCfg.Ssl.Domain
 	p.C.SSLCertDir = globalCfg.DataDir
-	log.Infof("Storing SSL certificate in %s", p.C.SSLCertDir)
+	log.Infof("storing SSL certificate in %s", p.C.SSLCertDir)
 	p.C.Address = globalCfg.ListenHost
 	p.C.Port = globalCfg.ListenPort
 	err = p.Init()
 	if err != nil {
-		log.Warn("LetsEncrypt SSL certificate cannot be obtained, probably port 443 is not accessible or domain provided is not correct")
-		log.Warn("Disabling SSL!")
+		log.Warn("letsEncrypt SSL certificate cannot be obtained, probably port 443 is not accessible or domain provided is not correct")
+		log.Info("disabling SSL!")
 		// Probably SSL has failed
 		p.C.SSLDomain = ""
 		globalCfg.Ssl.Domain = ""
 		err = p.Init()
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(err.Error())
 		}
 	}
 
@@ -184,7 +186,7 @@ func main() {
 		for _, key := range keys {
 			err := signer.AddAuthKey(key)
 			if err != nil {
-				log.Errorf("Error adding allowed key: %s", err)
+				log.Error(err.Error())
 			}
 		}
 	}
@@ -192,48 +194,48 @@ func main() {
 	if globalCfg.Client.SigningKey != "" {
 		err := signer.AddHexKey(globalCfg.Client.SigningKey)
 		if err != nil {
-			log.Fatalf("Error: %v", err)
+			log.Fatal(err.Error())
 		}
 	} else {
 		err := signer.Generate()
 		if err != nil {
-			log.Fatalf("Error: %v", err)
+			log.Fatal(err.Error())
 		}
 	}
 
-	if globalCfg.Api.Web3Api && globalCfg.W3External == "" {
+	if globalCfg.Api.Web3Api && globalCfg.W3external == "" {
 		w3cfg, err := chain.NewConfig(globalCfg.W3)
 		if err != nil {
-			log.Fatalf("Error: %v", err)
+			log.Fatal(err.Error())
 		}
 		node, err = chain.Init(w3cfg)
 		if err != nil {
-			log.Panicf("Error: %v", err)
+			log.Panic(err.Error())
 		}
 		node.Start()
 		time.Sleep(1 * time.Second)
-		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(fmt.Sprintf("http://%s:%s", w3cfg.HTTPHost, strconv.Itoa(w3cfg.HTTPPort))))
+		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
 
 		acc := node.Keys.Accounts()
 		if len(acc) > 0 {
 			keyJSON, err := node.Keys.Export(acc[0], "", "")
 			if err != nil {
-				log.Fatalf("Error: %v", err)
+				log.Fatal(err.Error())
 			}
 			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
 			pub, _ := signer.HexString()
-			log.Infof("Added pubKey %s from keystore", pub)
+			log.Infof("added pubKey %s from keystore", pub)
 			if err != nil {
 				log.Fatalf("Error: %v", err)
 			}
 		}
 	}
 
-	if globalCfg.Api.Web3Api && globalCfg.W3External != "" {
-		u, err := goneturl.Parse(globalCfg.W3External)
+	if globalCfg.Api.Web3Api && globalCfg.W3external != "" {
+		u, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
-			log.Fatalf("Cannot parse W3External URL")
+			log.Fatalf("cannot parse w3external URL")
 		}
 
 		log.Debugf("%s", fmt.Sprintf("%s", u.String()))
@@ -245,25 +247,25 @@ func main() {
 			"params":  []interface{}{},
 		})
 		if err != nil {
-			log.Fatalf("Marshal: %v", err)
+			log.Fatal(err.Error())
 		}
-		resp, err := http.Post(globalCfg.W3External,
+		resp, err := http.Post(globalCfg.W3external,
 			"application/json", strings.NewReader(string(data)))
 		if err != nil {
-			log.Fatalf("Cannot connect to w3 endpoint")
+			log.Fatal("cannot connect to w3 endpoint")
 		}
 		defer resp.Body.Close()
 		_, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Fatalf("ReadAll: %v", err)
+			log.Fatal(err.Error())
 		}
-		log.Infof("successfuly connected to w3 endpoint at external url: %s", globalCfg.W3External)
+		log.Infof("successfuly connected to w3 endpoint at external url: %s", globalCfg.W3external)
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
 	}
 
 	listenerOutput := make(chan types.Message)
 
-	if globalCfg.Api.FileApi {
+	if globalCfg.Api.DvoteApi {
 		ws := new(net.WebsocketHandle)
 		ws.Init(new(types.Connection))
 		ws.SetProxy(p)
@@ -279,7 +281,7 @@ func main() {
 		}
 
 		go ws.Listen(listenerOutput)
-		router := router.InitRouter(listenerOutput, storage, ws, *signer, globalCfg.Api.FileApi)
+		router := router.InitRouter(listenerOutput, storage, ws, *signer, globalCfg.Api.DvoteApi)
 		go router.Route()
 
 	}

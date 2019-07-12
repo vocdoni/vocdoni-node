@@ -6,9 +6,9 @@ import (
 
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/net"
+	"gitlab.com/vocdoni/go-dvote/types"
 
 	"encoding/json"
 )
@@ -20,7 +20,7 @@ func buildFailReply(requestId, message string) []byte {
 	response.Error.Request = requestId
 	rawResponse, err := json.Marshal(response)
 	if err != nil {
-		log.Warnf("Error marshaling response body: %s", err)
+		log.Warnf("error marshaling response body: %s", err)
 	}
 	return rawResponse
 }
@@ -28,12 +28,12 @@ func buildFailReply(requestId, message string) []byte {
 func signMsg(message interface{}, signer signature.SignKeys) string {
 	rawMsg, err := json.Marshal(message)
 	if err != nil {
-		log.Warnf("Unable to marshal message to sign: %s", err)
+		log.Warnf("unable to marshal message to sign: %s", err)
 	}
 	sig, err := signer.Sign(string(rawMsg))
 	if err != nil {
 		sig = "0x00"
-		log.Warnf("Error signing response body: %s", err)
+		log.Warnf("error signing response body: %s", err)
 	}
 	return sig
 }
@@ -55,7 +55,7 @@ func getMethod(payload []byte) (string, []byte, error) {
 	}
 	method, ok := msgStruct.Request["method"].(string)
 	if !ok {
-		log.Warnf("No method field in request or malformed")
+		log.Warnf("no method field in request or malformed")
 	}
 	/*assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)
 	because json.Marshal encodes in lexographic order for map objects. */
@@ -109,16 +109,15 @@ func InitRouter(inbound <-chan types.Message, storage data.Storage, transport ne
 	return routerObj
 }
 
-func (r *Router) registerMethod(methodName string, 
+func (r *Router) registerMethod(methodName string,
 	methodCallback requestMethod) {
 	r.requestMap[methodName] = methodCallback
 }
 
-
 //Route routes requests through the Router object
 func (r *Router) Route() {
 	if len(r.requestMap) == 0 {
-		log.Warnf("Router methods are not properly initialized: %v", r)
+		log.Warnf("router methods are not properly initialized: %v", r)
 		return
 	}
 	for {
@@ -128,12 +127,12 @@ func (r *Router) Route() {
 			/*getMethod pulls method name and rawRequest from msg.Data*/
 			method, rawRequest, err := getMethod(msg.Data)
 			if err != nil {
-				log.Warnf("Couldn't extract method from JSON message %v", msg)
+				log.Warnf("couldn't extract method from JSON message %v", msg)
 				break
 			}
 			methodFunc := r.requestMap[method]
 			if methodFunc == nil {
-				log.Warnf("Router has no method named %s", method)
+				log.Warnf("router has no method named %s", method)
 			} else {
 				methodFunc(msg, rawRequest, r.storage, r.transport, r.signer)
 			}

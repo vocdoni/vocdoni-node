@@ -1,6 +1,8 @@
 package log
 
 import (
+	"time"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -16,7 +18,7 @@ func getCurrentLogger() *zap.SugaredLogger {
 	if log != nil {
 		return log
 	}
-	newLogger("warn")
+	newLogger("info")
 	return log
 }
 
@@ -44,15 +46,17 @@ func getLevelFromString(logLevel string) zapcore.Level {
 func newConfig(logLevel string) zap.Config {
 	var encoderCfg = zapcore.EncoderConfig{
 		// Keys can be anything except the empty string.
-		TimeKey:        "ts",
-		LevelKey:       "level",
-		NameKey:        "logger",
-		CallerKey:      "caller",
-		MessageKey:     "msg",
-		StacktraceKey:  "stacktrace",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.CapitalColorLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		TimeKey:  "ts",
+		LevelKey: "level",
+		//	NameKey:        "logger",
+		CallerKey:     "caller",
+		MessageKey:    "msg",
+		StacktraceKey: "stacktrace",
+		LineEnding:    zapcore.DefaultLineEnding,
+		EncodeLevel:   zapcore.CapitalColorLevelEncoder,
+		EncodeTime: func(ts time.Time, encoder zapcore.PrimitiveArrayEncoder) {
+			encoder.AppendString(ts.Local().Format(time.RFC3339))
+		},
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}

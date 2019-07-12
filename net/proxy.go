@@ -60,11 +60,13 @@ func (p *Proxy) Init() error {
 		time.Sleep(time.Second * 5)
 		certs := getCertificates(p.C.SSLDomain, m)
 		if certs == nil {
-			log.Warn("Letsencrypt TLS certificate cannot be obtained. Maybe port 443 is not accessible or domain name is wrong.")
+			log.Warn("letsencrypt TLS certificate cannot be obtained. Maybe port 443 is not accessible or domain name is wrong.")
+			log.Infof(`you might redirect port 443 with iptables using the following command (required just the first time): 
+								sudo iptables -t nat -I PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports %d`, p.C.Port)
 			s.Close()
 		} else {
 			forceNonTLS = false
-			log.Infof("Proxy with SSL initialized on https://%s", p.C.SSLDomain+":"+strconv.Itoa(p.C.Port))
+			log.Infof("proxy with SSL initialized on https://%s", p.C.SSLDomain+":"+strconv.Itoa(p.C.Port))
 		}
 	}
 	if forceNonTLS {
@@ -74,7 +76,7 @@ func (p *Proxy) Init() error {
 		go func() {
 			log.Fatal(s.ListenAndServe())
 		}()
-		log.Infof("Proxy initialized on http://%s, ssl not activated", p.C.Address+":"+strconv.Itoa(p.C.Port))
+		log.Infof("proxy initialized on http://%s, ssl not activated", p.C.Address+":"+strconv.Itoa(p.C.Port))
 
 	}
 	return nil
@@ -116,7 +118,7 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 		req, err = http.NewRequest(reader.Method, url, bytes.NewReader(body))
 
 		if err != nil {
-			log.Infof("Cannot create request: %s", err)
+			log.Warnf("cannot create request: %s", err)
 		}
 
 		req.Header.Set("Content-Type", reader.Header.Get("Content-Type"))
@@ -127,15 +129,15 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 		resp, err := http.DefaultClient.Do(req)
 
 		if err != nil {
-			log.Infof("Request failed: %s", err)
+			log.Warnf("request failed: %s", err)
 		}
 
 		respBody, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Infof("Cannot read response: %s", err)
+			log.Infof("cannot read response: %s", err)
 		}
 		writer.Write(respBody)
-		log.Debugf("Response: %s", respBody)
+		log.Debugf("response: %s", respBody)
 	}
 	return fn
 }
