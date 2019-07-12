@@ -77,6 +77,8 @@ github.com/elazarl/go-bindata-assetfs v1.0.0/go.mod h1:v+YaWX3bdea5J/mo8dSETolEo
 github.com/ethereum/go-ethereum v1.8.27/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
 github.com/ethereum/go-ethereum v1.8.29-0.20190620093831-25c3282cf126 h1:Rkkk6s7eQ5cce/K/gVe8Ph4dXAp4JXP542A6j1UQbOk=
 github.com/ethereum/go-ethereum v1.8.29-0.20190620093831-25c3282cf126/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
+github.com/ethereum/go-ethereum v1.9.0 h1:9Kaf7UfDkV3aIUJlf14hI/GgEgRAUq60u4fBlb9dLWw=
+github.com/ethereum/go-ethereum v1.9.0/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
 github.com/ethersphere/swarm v0.0.0-20190613131100-4744b7c9d747 h1:Z1zdPAp5ygDoWBkPBuIp6ORInhoR/PvN/jij26bd06o=
 github.com/ethersphere/swarm v0.0.0-20190613131100-4744b7c9d747/go.mod h1:C9BVzJ8xZuvqd4pfyV1fVz183WsKbpop7b9g0KTlins=
 github.com/fatih/color v1.7.0 h1:DkWD4oS2D8LGGgTQ6IvwJJXSL5Vp2ffcQg58nFV38Ys=
