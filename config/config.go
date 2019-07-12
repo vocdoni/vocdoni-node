@@ -25,8 +25,11 @@ type GWCfg struct {
 		Domain  string
 		DirCert string
 	}
-	LogLevel string
-	DataDir  string
+	ListenPort int
+	ListenHost string
+	LogLevel   string
+	DataDir    string
+	W3External string
 }
 
 //PssCfg stores global configs for Pss chat

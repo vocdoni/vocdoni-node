@@ -105,22 +105,27 @@ func (p *Proxy) AddHandler(path string, handler ProxyHandler) {
 }
 
 // AddEndpoint adds an endpoint representing the url where the request will be handled
-func (p *Proxy) AddEndpoint(host string, port int) func(writer http.ResponseWriter, reader *http.Request) {
+func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader *http.Request) {
 	fn := func(writer http.ResponseWriter, reader *http.Request) {
 		body, err := ioutil.ReadAll(reader.Body)
 		if err != nil {
 			panic(err)
 		}
 		var req *http.Request
-		req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s:%s", "http://"+host, strconv.Itoa(port)), bytes.NewReader(body))
+		log.Debugf("%s", url)
+		req, err = http.NewRequest(reader.Method, url, bytes.NewReader(body))
 
 		if err != nil {
-			log.Infof("Cannot create http request: %s", err)
+			log.Infof("Cannot create request: %s", err)
 		}
-		const contentType = "application/json"
-		req.Header.Set("Content-Type", contentType)
-		req.Header.Set("Accept", contentType)
+
+		req.Header.Set("Content-Type", reader.Header.Get("Content-Type"))
+		req.Header.Set("Accept", reader.Header.Get("Accept"))
+		req.Header.Set("Content-Length", reader.Header.Get("Content-Length"))
+		req.Header.Set("User-Agent", reader.Header.Get("User-Agent"))
+
 		resp, err := http.DefaultClient.Do(req)
+
 		if err != nil {
 			log.Infof("Request failed: %s", err)
 		}
@@ -130,7 +135,7 @@ func (p *Proxy) AddEndpoint(host string, port int) func(writer http.ResponseWrit
 			log.Infof("Cannot read response: %s", err)
 		}
 		writer.Write(respBody)
-		log.Infof("Response: %s", respBody)
+		log.Debugf("Response: %s", respBody)
 	}
 	return fn
 }

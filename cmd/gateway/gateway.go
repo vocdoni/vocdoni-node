@@ -1,11 +1,18 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strconv"
+
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 
+	goneturl "net/url"
 	"os"
 	"os/user"
 	"strings"
@@ -33,8 +40,9 @@ func newConfig() (config.GWCfg, error) {
 	flag.Bool("fileApi", true, "enable file API")
 	flag.Bool("web3Api", true, "enable web3 API")
 
-	flag.String("dvoteHost", "0.0.0.0", "dvote API host")
-	flag.Int("dvotePort", 9090, "dvote API port")
+	flag.String("listenHost", "0.0.0.0", "http host endpoint")
+	flag.Int("listenPort", 9090, "http port endpoint")
+
 	flag.String("dvoteRoute", "/dvote", "dvote API route")
 
 	flag.Bool("allowPrivate", false, "allows authorized clients to call private methods")
@@ -42,12 +50,9 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("signingKey", "", "request signing key for this node")
 
 	flag.String("chain", "vctestnet", "Blockchain to connect")
-	flag.Int("w3wsPort", 0, "websockets port")
-	flag.String("w3wsHost", "0.0.0.0", "ws host to listen on")
-	flag.Int("w3httpPort", 9091, "http endpoint port, disabled if 0")
-	flag.String("w3httpHost", "0.0.0.0", "http host to listen on")
 	flag.Int("w3nodePort", 32000, "node port")
 	flag.String("w3Route", "/web3", "proxy endpoint exposing web3")
+	flag.String("w3External", "", "URL where the gateway will be connected for WEB3 related. Local blockchain node won't be initialized.")
 
 	flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
 	flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
@@ -62,19 +67,16 @@ func newConfig() (config.GWCfg, error) {
 	viper := viper.New()
 	viper.SetDefault("api.fileApi", true)
 	viper.SetDefault("api.web3Api", true)
-	viper.SetDefault("dvote.host", "0.0.0.0")
-	viper.SetDefault("dvote.port", 9090)
+	viper.SetDefault("listenHost", "0.0.0.0")
+	viper.SetDefault("listenPort", 9090)
 	viper.SetDefault("dvote.route", "/dvote")
 	viper.SetDefault("client.allowPrivate", false)
 	viper.SetDefault("client.allowedAddrs", "")
 	viper.SetDefault("client.signingKey", "")
 	viper.SetDefault("w3.chainType", "goerli")
-	viper.SetDefault("w3.wsPort", 0)
-	viper.SetDefault("w3.wsHost", "0.0.0.0")
-	viper.SetDefault("w3.httpPort", 9091)
-	viper.SetDefault("w3.httpHost", "0.0.0.0")
 	viper.SetDefault("w3.nodePort", 32000)
 	viper.SetDefault("w3.route", "/web3")
+	viper.SetDefault("w3External", "")
 	viper.SetDefault("ipfs.daemon", "ipfs")
 	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ssl.domain", "")
@@ -101,19 +103,16 @@ func newConfig() (config.GWCfg, error) {
 	//does not write config on first program run
 	viper.BindPFlag("api.fileApi", flag.Lookup("fileApi"))
 	viper.BindPFlag("api.web3Api", flag.Lookup("web3Api"))
-	viper.BindPFlag("dvote.host", flag.Lookup("dvoteHost"))
-	viper.BindPFlag("dvote.port", flag.Lookup("dvotePort"))
+	viper.BindPFlag("listenHost", flag.Lookup("listenHost"))
+	viper.BindPFlag("listenPort", flag.Lookup("listenPort"))
 	viper.BindPFlag("dvote.route", flag.Lookup("dvoteRoute"))
 	viper.BindPFlag("client.allowPrivate", flag.Lookup("allowPrivate"))
 	viper.BindPFlag("client.allowedAddrs", flag.Lookup("allowedAddrs"))
 	viper.BindPFlag("client.signingKey", flag.Lookup("signingKey"))
 	viper.BindPFlag("w3.chainType", flag.Lookup("chain"))
-	viper.BindPFlag("w3.wsPort", flag.Lookup("w3wsPort"))
-	viper.BindPFlag("w3.wsHost", flag.Lookup("w3wsHost"))
-	viper.BindPFlag("w3.httpPort", flag.Lookup("w3httpPort"))
-	viper.BindPFlag("w3.httpHost", flag.Lookup("w3httpHost"))
 	viper.BindPFlag("w3.nodePort", flag.Lookup("w3nodePort"))
 	viper.BindPFlag("w3.route", flag.Lookup("w3Route"))
+	viper.BindPFlag("w3External", flag.Lookup("w3External"))
 	viper.BindPFlag("ipfs.daemon", flag.Lookup("ipfsDaemon"))
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
@@ -163,8 +162,8 @@ func main() {
 	p.C.SSLDomain = globalCfg.Ssl.Domain
 	p.C.SSLCertDir = globalCfg.DataDir
 	log.Infof("Storing SSL certificate in %s", p.C.SSLCertDir)
-	p.C.Address = globalCfg.Dvote.Host
-	p.C.Port = globalCfg.Dvote.Port
+	p.C.Address = globalCfg.ListenHost
+	p.C.Port = globalCfg.ListenPort
 	err = p.Init()
 	if err != nil {
 		log.Warn("LetsEncrypt SSL certificate cannot be obtained, probably port 443 is not accessible or domain provided is not correct")
@@ -176,22 +175,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-	}
-
-	if globalCfg.Api.Web3Api {
-		w3cfg, err := chain.NewConfig(globalCfg.W3)
-		if err != nil {
-			log.Fatalf("Error: %v", err)
-		}
-
-		node, err = chain.Init(w3cfg)
-		if err != nil {
-			log.Panicf("Error: %v", err)
-		}
-		node.Start()
-		time.Sleep(1 * time.Second)
-		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(w3cfg.HTTPHost, w3cfg.HTTPPort))
-		log.Infof("web3 available at %s", globalCfg.W3.Route)
 	}
 
 	var signer *sig.SignKeys
@@ -211,7 +194,27 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error: %v", err)
 		}
-	} else if globalCfg.Api.Web3Api {
+	} else {
+		err := signer.Generate()
+		if err != nil {
+			log.Fatalf("Error: %v", err)
+		}
+	}
+
+	if globalCfg.Api.Web3Api && globalCfg.W3External == "" {
+		w3cfg, err := chain.NewConfig(globalCfg.W3)
+		if err != nil {
+			log.Fatalf("Error: %v", err)
+		}
+		node, err = chain.Init(w3cfg)
+		if err != nil {
+			log.Panicf("Error: %v", err)
+		}
+		node.Start()
+		time.Sleep(1 * time.Second)
+		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(fmt.Sprintf("http://%s:%s", w3cfg.HTTPHost, strconv.Itoa(w3cfg.HTTPPort))))
+		log.Infof("web3 available at %s", globalCfg.W3.Route)
+
 		acc := node.Keys.Accounts()
 		if len(acc) > 0 {
 			keyJSON, err := node.Keys.Export(acc[0], "", "")
@@ -225,11 +228,37 @@ func main() {
 				log.Fatalf("Error: %v", err)
 			}
 		}
-	} else {
-		err := signer.Generate()
+	}
+
+	if globalCfg.Api.Web3Api && globalCfg.W3External != "" {
+		u, err := goneturl.Parse(globalCfg.W3External)
 		if err != nil {
-			log.Fatalf("Error: %v", err)
+			log.Fatalf("Cannot parse W3External URL")
 		}
+
+		log.Debugf("%s", fmt.Sprintf("%s", u.String()))
+		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(u.String()))
+		data, err := json.Marshal(map[string]interface{}{
+			"jsonrpc": "2.0",
+			"method":  "net_peerCount",
+			"id":      74,
+			"params":  []interface{}{},
+		})
+		if err != nil {
+			log.Fatalf("Marshal: %v", err)
+		}
+		resp, err := http.Post(globalCfg.W3External,
+			"application/json", strings.NewReader(string(data)))
+		if err != nil {
+			log.Fatalf("Cannot connect to w3 endpoint")
+		}
+		defer resp.Body.Close()
+		_, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalf("ReadAll: %v", err)
+		}
+		log.Infof("successfuly connected to w3 endpoint at external url: %s", globalCfg.W3External)
+		log.Infof("web3 available at %s", globalCfg.W3.Route)
 	}
 
 	listenerOutput := make(chan types.Message)
