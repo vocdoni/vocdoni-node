@@ -12,7 +12,12 @@ The list of components that are implemented by `go-dvote` are
 ## Gateway
 
 Gateways provide an entry point to the P2P networks. 
-They allow clients to reach decentralized services (census, relays, blockchain, etc.) through a WebSocket or an HTTP API interface.
+
+They allow clients to reach decentralized services (census, relays, blockchain, etc.) through a HTTP/WebSockets API interface.
+
+#### Compile and run
+
+Compile from source in a golang environment:
 
 ```
 git clone https://gitlab.com/vocdoni/go-dvote.git
@@ -22,7 +27,9 @@ go build cmd/gatewat/gateway.go
 ./gateway --help
 ```
 
----
+Or with docker (configuration options in file `dockerfiles/gateway/env`):
 
-If you run `go get ./...` it will update dependencies and `go.mod` file. Unless you are sure what you are doing, it's better to not update it. 
-Go modules is still in early stage of adoption and dependencies might easy break.
+```
+bash dockerfiles/gateway/dockerlaunch.sh
+```
+
