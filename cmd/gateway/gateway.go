@@ -246,7 +246,7 @@ func main() {
 		ipfsConfig.Binary = globalCfg.Ipfs.Daemon
 		storage, err := data.InitDefault(data.StorageIDFromString("IPFS"), ipfsConfig)
 		if err != nil {
-			log.Fatalf("Error: %v", err)
+			log.Fatalf(err.Error())
 		}
 
 		go ws.Listen(listenerOutput)

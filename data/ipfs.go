@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"io/ioutil"
-	"os"
 	"os/exec"
-	"os/user"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
 
 	shell "github.com/ipfs/go-ipfs-api"
 )
@@ -41,41 +39,30 @@ func IPFSNewConfig() *IPFSConfig {
 }
 
 // check if ipfs base dir exists
-func checkIPFSDirExists(path string) (bool, error) {
-	usr, err := user.Current()
-	if err != nil {
-		return false, errors.New("Cannot get $HOME")
-	}
-	userHomeDir := usr.HomeDir
-	_, err = os.Stat(userHomeDir + "/." + path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return true, err
+func checkIPFSinit(bin string) error {
+	initCmd := exec.Command(bin, "config", "show")
+	return initCmd.Run()
 }
 
 // init IPFS daemon
-func startIPFSDaemon(ipfsBinPath string) (err error) {
-
-	checkIPFSDirRes, err := checkIPFSDirExists(ipfsBinPath)
-
+func startIPFSDaemon(ipfsBinPath string) error {
+	err := checkIPFSinit(ipfsBinPath)
 	if err != nil {
-		log.Warn(err)
-		return errors.New("Cannot check if IPFS dir exists")
-	}
-
-	if err == nil && !checkIPFSDirRes {
+		log.Warn(err.Error())
 		initCmd := exec.Command(ipfsBinPath, "init")
-		log.Infof("Initializing IPFS for first time ... wait until completed")
+		log.Info("Initializing IPFS for first time ... wait until completed")
 		err := initCmd.Run()
 		if err != nil {
-			return errors.New("Cannot initialize IPFS for first time")
+			log.Warn(err.Error())
+			return err
 		}
-		log.Infof("ipfs init done!")
-
+		err = checkIPFSinit(ipfsBinPath)
+		if err == nil {
+			log.Info("ipfs init done!")
+		} else {
+			log.Warn(err.Error())
+			return err
+		}
 	}
 
 	cmd := exec.Command(ipfsBinPath, "daemon")
@@ -96,6 +83,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	i.s = shell.NewShell("localhost:5001")
 	for timeout := i.c.InitTimeout; timeout > 0; timeout-- {
 		if i.s.IsUp() {
+			log.Info("IPFS daemon started")
 			return nil
 		}
 		time.Sleep(1 * time.Second)
