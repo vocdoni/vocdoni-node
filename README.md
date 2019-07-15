@@ -15,6 +15,23 @@ Gateways provide an entry point to the P2P networks.
 
 They allow clients to reach decentralized services (census, relays, blockchain, etc.) through a HTTP/WebSockets API interface.
 
+#### Status
+
+- [x] Unified WebSockets JSON API
+- [x] Ethereum blockchain(s) support
+- [x] Letsencrypt SSL support
+- [x] Swarm PSS integration
+- [x] Nice logs
+- [x] Docker support
+- [x] ECDSA signature integration
+- [x] Census Merkle Tree implementation
+- [ ] BootNode automatic discovery
+- [ ] Native IPFS support
+- [ ] IPFS cluster support
+- [ ] Linkable Ring Signature integration
+- [ ] ZK-snark integration
+- [ ] Tendermint/Vochain implementation
+
 #### Compile and run
 
 Compile from source in a golang environment:
