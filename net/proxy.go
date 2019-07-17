@@ -70,7 +70,7 @@ func (p *Proxy) Init() error {
 		}
 	}
 	if forceNonTLS {
-		s := &http.Server{
+		s = &http.Server{
 			Addr: p.C.Address + ":" + strconv.Itoa(p.C.Port),
 		}
 		go func() {
@@ -79,6 +79,7 @@ func (p *Proxy) Init() error {
 		log.Infof("proxy initialized on http://%s, ssl not activated", p.C.Address+":"+strconv.Itoa(p.C.Port))
 
 	}
+
 	return nil
 }
 
@@ -136,6 +137,9 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 		if err != nil {
 			log.Infof("cannot read response: %s", err)
 		}
+		writer.Header().Set("Access-Control-Allow-Origin", "*")
+		writer.Header().Set("Access-Control-Allow-Methods", "POST, GET")
+		writer.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token")
 		writer.Write(respBody)
 		log.Debugf("response: %s", respBody)
 	}
