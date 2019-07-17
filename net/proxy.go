@@ -138,6 +138,8 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 			log.Infof("cannot read response: %s", err)
 		}
 		writer.Header().Set("Access-Control-Allow-Origin", "*")
+		writer.Header().Set("Access-Control-Allow-Methods", "POST, GET")
+		writer.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token")
 		writer.Write(respBody)
 		log.Debugf("response: %s", respBody)
 	}

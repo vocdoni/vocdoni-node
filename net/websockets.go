@@ -70,6 +70,8 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 			}
 		}
 		writer.Header().Set("Access-Control-Allow-Origin", "*")
+		writer.Header().Set("Access-Control-Allow-Methods", "POST, GET")
+		writer.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token")
 	}
 	w.p.AddHandler(path, upgradeConn)
 
