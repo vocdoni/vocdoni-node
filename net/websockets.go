@@ -69,6 +69,7 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 				conn.Close()
 			}
 		}
+		writer.Header().Set("Access-Control-Allow-Origin", "*")
 	}
 	w.p.AddHandler(path, upgradeConn)
 
