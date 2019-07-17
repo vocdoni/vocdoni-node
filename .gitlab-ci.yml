@@ -1,0 +1,57 @@
+# BASE
+# https://docs.gitlab.com/ce/ci/docker/using_docker_build.html#container-registry-examples
+
+image: docker:stable
+services:
+  - docker:dind
+
+stages:
+  - build
+  - test
+  - release
+#  - deploy
+
+variables:
+  # DOCKER_HOST: tcp://docker:2375
+  DOCKER_DRIVER: overlay2
+  DVOTE_GATEWAY_BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/vocdoni-gateway:${CI_COMMIT_REF_SLUG}
+  DVOTE_GATEWAY_RELEASE_IMAGE: ${CI_REGISTRY_IMAGE}/vocdoni-gateway:latest
+
+before_script:
+  - docker login -u gitlab-ci-token -p ${CI_BUILD_TOKEN} ${CI_REGISTRY}
+
+###############################################################################
+## DVOTE GATEWAY
+###############################################################################
+
+gateway-docker-build:
+  stage: build
+  script:
+    - docker pull ${DVOTE_GATEWAY_RELEASE_IMAGE} || true
+    - docker build --pull -t ${DVOTE_GATEWAY_BUILD_IMAGE} -f dockerfile.gateway .
+    - docker push ${DVOTE_GATEWAY_BUILD_IMAGE}
+#  only:
+#    changes:
+#      - dockerfile.gateway
+#      - ...
+
+gateway-docker-test:
+  stage: test
+  script:
+    - docker pull ${DVOTE_GATEWAY_BUILD_IMAGE}
+    - docker run ${DVOTE_GATEWAY_BUILD_IMAGE}  /bin/sh -c 'apk add git build-base && go test ./...'
+
+gateway-docker-release:
+  stage: release
+  script:
+    - docker pull ${DVOTE_GATEWAY_BUILD_IMAGE}
+    - docker tag ${DVOTE_GATEWAY_BUILD_IMAGE} ${DVOTE_GATEWAY_RELEASE_IMAGE}
+    - docker push ${DVOTE_GATEWAY_RELEASE_IMAGE}
+  only:
+    - master
+
+#  only:
+#    changes:
+#      - dockerfile.gateway
+#      - ...
+ 
