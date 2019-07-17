@@ -30,16 +30,16 @@ gateway-docker-build:
     - docker pull ${DVOTE_GATEWAY_RELEASE_IMAGE} || true
     - docker build --pull -t ${DVOTE_GATEWAY_BUILD_IMAGE} -f dockerfile.gateway .
     - docker push ${DVOTE_GATEWAY_BUILD_IMAGE}
-#  only:
-#    changes:
-#      - dockerfile.gateway
-#      - ...
+  only:
+    - master
 
 gateway-docker-test:
   stage: test
   script:
     - docker pull ${DVOTE_GATEWAY_BUILD_IMAGE}
     - docker run ${DVOTE_GATEWAY_BUILD_IMAGE}  /bin/sh -c 'apk add git build-base && go test ./...'
+  only:
+    - master
 
 gateway-docker-release:
   stage: release
@@ -49,9 +49,3 @@ gateway-docker-release:
     - docker push ${DVOTE_GATEWAY_RELEASE_IMAGE}
   only:
     - master
-
-#  only:
-#    changes:
-#      - dockerfile.gateway
-#      - ...
- 
