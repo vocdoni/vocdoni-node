@@ -35,30 +35,22 @@ func newConfig() (config.GWCfg, error) {
 	}
 	userDir := usr.HomeDir + "/.dvote"
 	path := flag.String("cfgpath", userDir+"/config.yaml", "cfgpath. Specify filepath for gateway config")
-
 	flag.Bool("dvoteApi", true, "enable dvote API")
 	flag.Bool("web3Api", true, "enable web3 API")
-
 	flag.String("listenHost", "0.0.0.0", "http host endpoint")
 	flag.Int("listenPort", 9090, "http port endpoint")
-
 	flag.String("dvoteRoute", "/dvote", "dvote endpoint API route")
-
 	flag.Bool("allowPrivate", false, "allows authorized clients to call private methods")
 	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses")
 	flag.String("signingKey", "", "request signing key for this node")
-
 	flag.String("chain", "goerli", "Ethereum blockchain to use")
 	flag.Int("w3nodePort", 32000, "node port")
 	flag.String("w3route", "/web3", "web3 endpoint API route")
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
-
 	flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
 	flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
-
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	flag.String("dataDir", userDir, "directory where data is stored")
-
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 
 	flag.Parse()
@@ -151,6 +143,7 @@ Testing the RPC can be performed with curl and/or websocat
 func main() {
 	//setup config
 	globalCfg, err := newConfig()
+	log.Infof("using datadir %s", globalCfg.DataDir)
 	//setup logger
 	log.InitLoggerAtLevel(globalCfg.LogLevel)
 	if err != nil {
@@ -158,27 +151,26 @@ func main() {
 	}
 
 	var node *chain.EthChainContext
-	_ = node
-
-	p := net.NewProxy()
-	p.C.SSLDomain = globalCfg.Ssl.Domain
-	p.C.SSLCertDir = globalCfg.DataDir
-	log.Infof("storing SSL certificate in %s", p.C.SSLCertDir)
-	p.C.Address = globalCfg.ListenHost
-	p.C.Port = globalCfg.ListenPort
-	err = p.Init()
+	pxy := net.NewProxy()
+	pxy.C.SSLDomain = globalCfg.Ssl.Domain
+	pxy.C.SSLCertDir = globalCfg.DataDir
+	log.Infof("storing SSL certificate in %s", pxy.C.SSLCertDir)
+	pxy.C.Address = globalCfg.ListenHost
+	pxy.C.Port = globalCfg.ListenPort
+	err = pxy.Init()
 	if err != nil {
 		log.Warn("letsEncrypt SSL certificate cannot be obtained, probably port 443 is not accessible or domain provided is not correct")
 		log.Info("disabling SSL!")
 		// Probably SSL has failed
-		p.C.SSLDomain = ""
+		pxy.C.SSLDomain = ""
 		globalCfg.Ssl.Domain = ""
-		err = p.Init()
+		err = pxy.Init()
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 	}
 
+	// Signing key
 	var signer *sig.SignKeys
 	signer = new(sig.SignKeys)
 	if globalCfg.Client.AllowPrivate && globalCfg.Client.AllowedAddrs != "" {
@@ -203,6 +195,8 @@ func main() {
 		}
 	}
 
+	// Web3 and chain
+	globalCfg.W3.DataDir = globalCfg.DataDir
 	if globalCfg.Api.Web3Api && globalCfg.W3external == "" {
 		w3cfg, err := chain.NewConfig(globalCfg.W3)
 		if err != nil {
@@ -214,7 +208,7 @@ func main() {
 		}
 		node.Start()
 		time.Sleep(1 * time.Second)
-		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
+		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
 
 		acc := node.Keys.Accounts()
@@ -233,13 +227,13 @@ func main() {
 	}
 
 	if globalCfg.Api.Web3Api && globalCfg.W3external != "" {
-		u, err := goneturl.Parse(globalCfg.W3external)
+		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
 			log.Fatalf("cannot parse w3external URL")
 		}
 
-		log.Debugf("%s", fmt.Sprintf("%s", u.String()))
-		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(u.String()))
+		log.Debugf("%s", fmt.Sprintf("%s", url.String()))
+		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(url.String()))
 		data, err := json.Marshal(map[string]interface{}{
 			"jsonrpc": "2.0",
 			"method":  "net_peerCount",
@@ -268,7 +262,7 @@ func main() {
 	if globalCfg.Api.DvoteApi {
 		ws := new(net.WebsocketHandle)
 		ws.Init(new(types.Connection))
-		ws.SetProxy(p)
+		ws.SetProxy(pxy)
 		ws.AddProxyHandler(globalCfg.Dvote.Route)
 		log.Infof("ws file api available at %s", globalCfg.Dvote.Route)
 

@@ -55,6 +55,7 @@ type W3Cfg struct {
 	NodePort  int
 	LogLevel  string
 	Route     string
+	DataDir   string
 }
 
 //CensusCfg stores global configs for censushttp

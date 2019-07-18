@@ -29,6 +29,6 @@ ENVFILE=""
 # RUN DOCKER
 docker run --name `echo $IMAGE_TAG-$RANDOM | tr "/" "-"` -d \
 	-p 4001:4001 -p 5001:5001 -p 9090:9090 -p 32000:32000 \
-	-v data.gateway:/app/data \
+	-v data.gateway:/app/data.gateway \
 	`[ -n "$ENVFILE" ] && echo -n "--env-file $ENVFILE"` \
 	$IMAGE_TAG

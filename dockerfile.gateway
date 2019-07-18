@@ -1,14 +1,14 @@
 FROM golang:alpine
 
-ENV COMPONENT_VERSION=2.01
+ENV COMPONENT_VERSION=2.02
 
 WORKDIR /app
 ENV GOPATH=
-ENV GW_DATA_DIR=/app/data
+ENV GW_DATA_DIR=/app/data.gateway
 ENV GW_LOGLEVEL=debug
 ADD . .
 
-RUN mkdir -p /app && mkdir -p /app/data && \
+RUN mkdir -p /app && mkdir -p /app/data.gateway && \
  apk update && apk add --no-cache build-base git binutils \
  binutils-gold libc6-compat ca-certificates openssl linux-headers && \
  apk add go-ipfs --update-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ --allow-untrusted && \

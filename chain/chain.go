@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"math/big"
-	"os/user"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -63,13 +62,7 @@ func NewConfig(w3Cfg config.W3Cfg) (*EthChainConfig, error) {
 		return nil, err
 	}
 	cfg.BootstrapNodes = chainSpecs.BootNodes
-
-	usr, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-	defaultDirPath := usr.HomeDir + "/.dvote/ethereum"
-
+	defaultDirPath := w3Cfg.DataDir + "/ethereum"
 	cfg.KeyStore = defaultDirPath + "/keystore"
 	cfg.DataDir = defaultDirPath + "/data"
 	cfg.IPCPath = defaultDirPath + "/ipc"
