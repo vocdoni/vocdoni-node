@@ -1,4 +1,4 @@
-GW_DATA_DIR=/app/data.gateway
+GW_DATA_DIR=/app/run
 GW_LOGLEVEL=debug
 #GW_CFG_PATH=
 #GW_SSL_DOMAIN=
