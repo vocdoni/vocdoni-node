@@ -48,6 +48,7 @@ type PssCfg struct {
 //W3Cfg stores global configs for web3
 type W3Cfg struct {
 	ChainType string
+	LightMode bool
 	WsHost    string
 	WsPort    int
 	HttpHost  string
