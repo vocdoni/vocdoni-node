@@ -34,18 +34,18 @@ func newConfig() (config.GWCfg, error) {
 		return globalCfg, err
 	}
 	userDir := usr.HomeDir + "/.dvote"
-	path := flag.String("cfgpath", userDir+"/config.yaml", "cfgpath. Specify filepath for gateway config")
+	path := flag.String("cfgpath", userDir+"/config.yaml", "filepath for custom gateway config")
 	flag.Bool("dvoteApi", true, "enable dvote API")
 	flag.Bool("web3Api", true, "enable web3 API")
 	flag.String("listenHost", "0.0.0.0", "http host endpoint")
 	flag.Int("listenPort", 9090, "http port endpoint")
 	flag.String("dvoteRoute", "/dvote", "dvote endpoint API route")
-	flag.Bool("allowPrivate", false, "allows authorized clients to call private methods")
-	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses")
-	flag.String("signingKey", "", "request signing key for this node")
+	flag.Bool("allowPrivate", false, "allows private methods over the APIs")
+	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
+	flag.String("signingKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
 	flag.String("chain", "goerli", "Ethereum blockchain to use")
 	flag.Bool("chainLightMode", false, "synchronize Ethereum blockchain in light mode")
-	flag.Int("w3nodePort", 32000, "node port")
+	flag.Int("w3nodePort", 32000, "Ethereum p2p node port to use")
 	flag.String("w3route", "/web3", "web3 endpoint API route")
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
 	flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
@@ -152,7 +152,6 @@ func main() {
 		log.Fatalf("could not load config: %v", err)
 	}
 
-	var node *chain.EthChainContext
 	pxy := net.NewProxy()
 	pxy.C.SSLDomain = globalCfg.Ssl.Domain
 	pxy.C.SSLCertDir = globalCfg.DataDir
@@ -175,6 +174,7 @@ func main() {
 	// Signing key
 	var signer *sig.SignKeys
 	signer = new(sig.SignKeys)
+	// Add Authorized keys for private methods
 	if globalCfg.Client.AllowPrivate && globalCfg.Client.AllowedAddrs != "" {
 		keys := strings.Split(globalCfg.Client.AllowedAddrs, ",")
 		for _, key := range keys {
@@ -185,34 +185,31 @@ func main() {
 		}
 	}
 
+	// Set Ethereum node context
+	globalCfg.W3.DataDir = globalCfg.DataDir
+	w3cfg, err := chain.NewConfig(globalCfg.W3)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	node, err := chain.Init(w3cfg)
+	if err != nil {
+		log.Panic(err.Error())
+	}
+
+	// Add signing private key if exist in configuration or flags
 	if globalCfg.Client.SigningKey != "" {
+		log.Infof("adding custom signing key")
 		err := signer.AddHexKey(globalCfg.Client.SigningKey)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
+		pub, _ := signer.HexString()
+		log.Infof("using custom pubKey %s", pub)
+		os.RemoveAll(globalCfg.DataDir + "/.keyStore.tmp")
+		node.Keys = keystore.NewPlaintextKeyStore(globalCfg.DataDir + "/.keyStore.tmp")
+		node.Keys.ImportECDSA(signer.Private, "")
 	} else {
-		err := signer.Generate()
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-	}
-
-	// Web3 and chain
-	globalCfg.W3.DataDir = globalCfg.DataDir
-	if globalCfg.Api.Web3Api && globalCfg.W3external == "" {
-		w3cfg, err := chain.NewConfig(globalCfg.W3)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		node, err = chain.Init(w3cfg)
-		if err != nil {
-			log.Panic(err.Error())
-		}
-		node.Start()
-		time.Sleep(1 * time.Second)
-		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
-		log.Infof("web3 available at %s", globalCfg.W3.Route)
-
+		// Get stored keys from Ethereum node context
 		acc := node.Keys.Accounts()
 		if len(acc) > 0 {
 			keyJSON, err := node.Keys.Export(acc[0], "", "")
@@ -221,20 +218,32 @@ func main() {
 			}
 			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
 			pub, _ := signer.HexString()
-			log.Infof("added pubKey %s from keystore", pub)
+			log.Infof("using pubKey %s from keystore", pub)
 			if err != nil {
-				log.Fatalf("Error: %v", err)
+				log.Fatalf(err.Error())
 			}
 		}
 	}
 
-	if globalCfg.Api.Web3Api && globalCfg.W3external != "" {
+	// Start Ethereum Web3 native node
+	if globalCfg.Api.Web3Api && len(globalCfg.W3external) == 0 {
+		log.Info("starting Ethereum node")
+		node.Start()
+		for i := 0; i < len(node.Keys.Accounts()); i++ {
+			log.Debugf("got ethereum address: %x", node.Keys.Accounts()[i].Address)
+		}
+		time.Sleep(1 * time.Second)
+		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
+		log.Infof("web3 available at %s", globalCfg.W3.Route)
+	}
+
+	if globalCfg.Api.Web3Api && len(globalCfg.W3external) > 0 {
 		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
 			log.Fatalf("cannot parse w3external URL")
 		}
 
-		log.Debugf("%s", fmt.Sprintf("%s", url.String()))
+		log.Debugf("testing web3 endpoint %s", url.String())
 		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(url.String()))
 		data, err := json.Marshal(map[string]interface{}{
 			"jsonrpc": "2.0",
@@ -248,14 +257,14 @@ func main() {
 		resp, err := http.Post(globalCfg.W3external,
 			"application/json", strings.NewReader(string(data)))
 		if err != nil {
-			log.Fatal("cannot connect to w3 endpoint")
+			log.Fatal("cannot connect to web3 endpoint")
 		}
 		defer resp.Body.Close()
 		_, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		log.Infof("successfuly connected to w3 endpoint at external url: %s", globalCfg.W3external)
+		log.Infof("successfuly connected to web3 endpoint at external url: %s", globalCfg.W3external)
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
 	}
 
@@ -266,7 +275,7 @@ func main() {
 		ws.Init(new(types.Connection))
 		ws.SetProxy(pxy)
 		ws.AddProxyHandler(globalCfg.Dvote.Route)
-		log.Infof("ws file api available at %s", globalCfg.Dvote.Route)
+		log.Infof("websockets file API available at %s", globalCfg.Dvote.Route)
 
 		ipfsConfig := data.IPFSNewConfig()
 		ipfsConfig.Start = !globalCfg.Ipfs.NoInit
