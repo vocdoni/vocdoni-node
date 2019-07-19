@@ -43,7 +43,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.Bool("allowPrivate", false, "allows private methods over the APIs")
 	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	flag.String("signingKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
-	flag.String("chain", "goerli", "Ethereum blockchain to use")
+	flag.String("chain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
 	flag.Bool("chainLightMode", false, "synchronize Ethereum blockchain in light mode")
 	flag.Int("w3nodePort", 32000, "Ethereum p2p node port to use")
 	flag.String("w3route", "/web3", "web3 endpoint API route")

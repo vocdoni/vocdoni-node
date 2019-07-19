@@ -2,6 +2,8 @@ package chain
 
 import (
 	"errors"
+
+	ethparams "github.com/ethereum/go-ethereum/params"
 )
 
 // ChainSpecs defines a set of blockchain network specifications
@@ -12,15 +14,27 @@ type ChainSpecs struct {
 	BootNodes  []string // List of Bootnodes for this network
 }
 
+var AvailableChains = []string{"mainnet, goerli, vctestnet"}
+
 func GetChainSpecs(name string) (*ChainSpecs, error) {
 	switch name {
+	case "mainnet":
+		return &mainnet, nil
 	case "vctestnet":
 		return &vctestnet, nil
 	case "goerli":
 		return &goerli, nil
 	default:
-		return nil, errors.New("Chain name not found")
+		return nil, errors.New("chain name not found")
 	}
+}
+
+// Ethereum MainNet
+var mainnet = ChainSpecs{
+	Name:       "mainnet",
+	GenesisB64: "",
+	NetworkId:  0,
+	BootNodes:  ethparams.MainnetBootnodes,
 }
 
 // VocDoni Ethereum PoA Testnet
@@ -61,13 +75,7 @@ MDAwMDAwMDAiCn0KCgo=`,
 var goerli = ChainSpecs{
 	Name:      "goerli",
 	NetworkId: 5,
-	BootNodes: []string{
-		"enode://011f758e6552d105183b1761c5e2dea0111bc20fd5f6422bc7f91e0fabbec9a6595caf6239b37feb773dddd3f87240d99d859431891e4a642cf2a0a9e6cbb98a@51.141.78.53:30303",
-		"enode://176b9417f511d05b6b2cf3e34b756cf0a7096b3094572a8f6ef4cdcb9d1f9d00683bf0f83347eebdf3b81c3521c2332086d9592802230bf528eaf606a1d9677b@13.93.54.137:30303",
-		"enode://46add44b9f13965f7b9875ac6b85f016f341012d84f975377573800a863526f4da19ae2c620ec73d11591fa9510e992ecc03ad0751f53cc02f7c7ed6d55c7291@94.237.54.114:30313",
-		"enode://c1f8b7c2ac4453271fa07d8e9ecf9a2e8285aa0bd0c07df0131f47153306b0736fd3db8924e7a9bf0bed6b1d8d4f87362a71b033dc7c64547728d953e43e59b2@52.64.155.147:30303",
-		"enode://f4a9c6ee28586009fb5a96c8af13a58ed6d8315a9eee4772212c1d4d9cebe5a8b8a78ea4434f318726317d04a3f531a1ef0420cf9752605a562cfe858c46e263@213.186.16.82:30303",
-	},
+	BootNodes: ethparams.GoerliBootnodes,
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog
 ICAgImVpcDE1MEJsb2NrIjowLAogICAgImVpcDE1MEhhc2giOiAiMHhiZjdlMzMxZjdmN2MxZGQy
 ZTA1MTU5NjY2YjNiZjhiYzdhOGEzYTllYjFkNTE4OTY5ZWFiNTI5ZGQ5Yjg4YzFhIiwKICAgICJl

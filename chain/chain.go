@@ -108,19 +108,20 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	}
 
 	ethConfig := eth.DefaultConfig
-	ethConfig.NetworkId = uint64(c.NetworkId)
+	if c.NetworkId > 0 {
+		ethConfig.NetworkId = uint64(c.NetworkId)
+		g := new(core.Genesis)
+		err = g.UnmarshalJSON(c.NetworkGenesis)
+		if err != nil {
+			log.Errorf("cannot read genesis")
+			return err
+		}
+		ethConfig.Genesis = g
+	}
 	if c.LightMode {
 		log.Info("using chain light mode synchronization")
 		ethConfig.SyncMode = downloader.LightSync
 	}
-
-	g := new(core.Genesis)
-	err = g.UnmarshalJSON(c.NetworkGenesis)
-	if err != nil {
-		log.Errorf("cannot read genesis")
-		return err
-	}
-	ethConfig.Genesis = g
 
 	ks := keystore.NewKeyStore(c.KeyStore, keystore.StandardScryptN, keystore.StandardScryptP)
 
