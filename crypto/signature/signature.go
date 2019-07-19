@@ -104,6 +104,11 @@ func Hash(data string) []byte {
 	return crypto.Keccak256Hash([]byte(payloadToSign)).Bytes()
 }
 
+// HashRaw hashes a string with no prefix
+func HashRaw(data string) []byte {
+	return crypto.Keccak256Hash([]byte(data)).Bytes()
+}
+
 // VerifySender verifies if a message is sent by some Authorized address key
 func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
 	if len(k.Authorized) < 1 {

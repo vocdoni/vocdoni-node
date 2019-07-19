@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 
 	"net/http"
@@ -136,7 +137,7 @@ func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
 
 //PublishBytes publishes a file containing msg to ipfs
 func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
-	filePath := fileDir + "/" + string(crypto.Hash(string(msg))) + ".txt"
+	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
 	log.Infof("Publishing file: %s", filePath)
 	err := ioutil.WriteFile(filePath, msg, 0666)
 	rootHash, err := addAndPin(nd, filePath)
