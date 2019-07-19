@@ -1,11 +1,18 @@
 package config
 
+import (
+	"github.com/libp2p/go-libp2p-core/crypto"
+	peer "github.com/libp2p/go-libp2p-peer"
+)
+
 //GWCfg stores global configs for gateway
 type GWCfg struct {
-	W3   W3Cfg
-	Ipfs struct {
-		Daemon string
-		NoInit bool
+	W3      W3Cfg
+	Cluster ClusterCfg
+	Ipfs    struct {
+		ConfigPath string
+		Daemon     string
+		NoInit     bool
 	}
 	Dvote struct {
 		Host  string
@@ -69,6 +76,8 @@ type RelayCfg struct {
 	LogLevel          string
 	TransportIDString string
 	StorageIDString   string
+	IpfsConfigPath    string
+	Cluster           ClusterCfg
 }
 
 type GenCfg struct {
@@ -76,4 +85,18 @@ type GenCfg struct {
 	Target      string
 	Connections int
 	Interval    int
+}
+
+type ClusterCfg struct {
+	Stats           bool
+	Tracing         bool
+	Consensus       string
+	Leave           bool
+	Bootstraps      []string
+	PinTracker      string
+	Alloc           string
+	Secret          string
+	PeerID          peer.ID
+	Private         crypto.PrivKey
+	ClusterLogLevel string
 }

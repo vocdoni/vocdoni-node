@@ -3,6 +3,8 @@ package types
 import (
 	"net"
 	"time"
+
+	"gitlab.com/vocdoni/go-dvote/config"
 )
 
 type MessageContext interface {
@@ -77,6 +79,7 @@ type Connection struct {
 
 type DataStore struct {
 	Datadir string
+	ClusterCfg config.ClusterCfg
 }
 
 //Ballot represents the choices of one user in one voting process

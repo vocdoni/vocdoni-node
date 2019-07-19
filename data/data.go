@@ -2,6 +2,7 @@ package data
 
 import (
 	"errors"
+	"os/user"
 
 	"gitlab.com/vocdoni/go-dvote/types"
 )
@@ -37,15 +38,23 @@ func StorageIDFromString(i string) StorageID {
 	}
 }
 
-func InitDefault(t StorageID, config StorageConfig) (Storage, error) {
+func IPFSNewConfig(path string) *types.DataStore {
+	datastore := new(types.DataStore)
+	datastore.Datadir = path
+	return datastore
+}
+
+func InitDefault(t StorageID) (Storage, error) {
 	switch t {
 	case IPFS:
+		usr, err := user.Current()
+		if err != nil {
+			return nil, errors.New("Cannot get $HOME")
+		}
 		s := new(IPFSHandle)
-		//s.c = IPFSNewConfig()
-		s.c = config.(*IPFSConfig)
 		defaultDataStore := new(types.DataStore)
-		defaultDataStore.Datadir = "this_is_still_ignored"
-		err := s.Init(defaultDataStore)
+		defaultDataStore.Datadir = usr.HomeDir + "/.ipfstest/"
+		err = s.Init(defaultDataStore)
 		return s, err
 	case BZZ:
 		s := new(BZZHandle)

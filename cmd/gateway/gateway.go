@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 
+	"encoding/hex"
 	goneturl "net/url"
 	"os"
 	"os/user"
@@ -48,8 +49,9 @@ func newConfig() (config.GWCfg, error) {
 	flag.Int("w3nodePort", 32000, "Ethereum p2p node port to use")
 	flag.String("w3route", "/web3", "web3 endpoint API route")
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
-	flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
-	flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
+	flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
+	flag.String("ipfsClusterKey", "", "enables ipfs cluster using a shared key")
+	flag.StringSlice("ipfsClusterPeers", []string{}, "ipfs cluster peer bootstrap addresses in multiaddr format")
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
@@ -72,11 +74,19 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("w3.external", "")
 	viper.SetDefault("w3.httpPort", "9091")
 	viper.SetDefault("w3.httpHost", "127.0.0.1")
-	viper.SetDefault("ipfs.daemon", "ipfs")
-	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ssl.domain", "")
 	viper.SetDefault("dataDir", userDir)
 	viper.SetDefault("logLevel", "warn")
+	viper.SetDefault("ipfs.noInit", false)
+	viper.SetDefault("ipfs.configPath", userDir+"/.ipfs")
+	viper.SetDefault("cluster.secret", "")
+	viper.SetDefault("cluster.bootstraps", []string{})
+	viper.SetDefault("cluster.stats", false)
+	viper.SetDefault("cluster.tracing", false)
+	viper.SetDefault("cluster.consensus", "raft")
+	viper.SetDefault("cluster.pintracker", "map")
+	viper.SetDefault("cluster.leave", true)
+	viper.SetDefault("cluster.alloc", "disk")
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -109,11 +119,12 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("w3.nodePort", flag.Lookup("w3nodePort"))
 	viper.BindPFlag("w3.route", flag.Lookup("w3route"))
 	viper.BindPFlag("w3external", flag.Lookup("w3external"))
-	viper.BindPFlag("ipfs.daemon", flag.Lookup("ipfsDaemon"))
-	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
+	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
+	viper.BindPFlag("cluster.secret", flag.Lookup("ipfsClusterKey"))
+	viper.BindPFlag("cluster.bootstraps", flag.Lookup("ipfsClusterPeers"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -135,17 +146,12 @@ func addKeyFromEncryptedJSON(keyJSON []byte, passphrase string, signKeys *sig.Si
 	return nil
 }
 
-/*
-Example code for using web3 implementation
-
-Testing the RPC can be performed with curl and/or websocat
- curl -X POST -H "Content-Type:application/json" --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":74}' localhost:9091
- echo '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":74}' | websocat ws://127.0.0.1:9092
-*/
 func main() {
 	//setup config
 	globalCfg, err := newConfig()
 	log.Infof("using datadir %s", globalCfg.DataDir)
+	globalCfg.Ipfs.ConfigPath = globalCfg.DataDir + "/ipfs"
+
 	//setup logger
 	log.InitLoggerAtLevel(globalCfg.LogLevel)
 	if err != nil {
@@ -201,7 +207,7 @@ func main() {
 		log.Infof("adding custom signing key")
 		err := signer.AddHexKey(globalCfg.Client.SigningKey)
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatalf("Fatal error adding hex key: %v", err.Error())
 		}
 		pub, _ := signer.HexString()
 		log.Infof("using custom pubKey %s", pub)
@@ -268,30 +274,46 @@ func main() {
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
 	}
 
-	listenerOutput := make(chan types.Message)
+	// Storage
+	var storage data.Storage
+	if !globalCfg.Ipfs.NoInit {
+		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
+		ipfsStore.ClusterCfg = globalCfg.Cluster
+		if len(globalCfg.Cluster.Secret) > 0 {
+			if len(globalCfg.Cluster.Secret) > 16 {
+				log.Fatal("ipfsClusterKey too long")
+			}
+			encodedSecret := hex.EncodeToString([]byte(globalCfg.Cluster.Secret))
+			for i := len(encodedSecret); i < 32; i++ {
+				encodedSecret += "0"
+			}
+			ipfsStore.ClusterCfg.Secret = encodedSecret
+			log.Infof("ipfs cluster encoded secret: %s", encodedSecret)
+		}
+		ipfsStore.ClusterCfg.ClusterLogLevel = strings.ToUpper(globalCfg.LogLevel)
+		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
+		if err != nil {
+			log.Fatalf(err.Error())
+		}
+	}
 
+	// Dvote API
+	listenerOutput := make(chan types.Message)
 	if globalCfg.Api.DvoteApi {
+		log.Debug("Setting up ipfs")
 		ws := new(net.WebsocketHandle)
 		ws.Init(new(types.Connection))
 		ws.SetProxy(pxy)
 		ws.AddProxyHandler(globalCfg.Dvote.Route)
 		log.Infof("websockets file API available at %s", globalCfg.Dvote.Route)
 
-		ipfsConfig := data.IPFSNewConfig()
-		ipfsConfig.Start = !globalCfg.Ipfs.NoInit
-		ipfsConfig.Binary = globalCfg.Ipfs.Daemon
-		storage, err := data.InitDefault(data.StorageIDFromString("IPFS"), ipfsConfig)
-		if err != nil {
-			log.Fatalf(err.Error())
-		}
-
 		go ws.Listen(listenerOutput)
 		router := router.InitRouter(listenerOutput, storage, ws, *signer, globalCfg.Api.DvoteApi)
 		go router.Route()
-
 	}
 
 	for {
 		time.Sleep(1 * time.Second)
 	}
+
 }

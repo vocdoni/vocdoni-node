@@ -1,159 +1,179 @@
-package data
+package main
 
 import (
 	"context"
 	"errors"
 	"io/ioutil"
-
-	"net/http"
+	"log"
 	"os"
-
-	//"os/exec"
+	"os/signal"
+	"os/user"
 	"strings"
+	"syscall"
+	"time"
 
 	ipfscmds "github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
 	"github.com/ipfs/go-ipfs/core/corehttp"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
-	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/ipfs/interface-go-ipfs-core/options"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
-	logging "github.com/whyrusleeping/go-logging"
+	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/ipfs"
+
+	"net/http"
+	_ "net/http/pprof"
 
 	files "github.com/ipfs/go-ipfs-files"
 	"github.com/ipfs/go-ipfs/core/coreunix"
-	crypto "gitlab.com/vocdoni/go-dvote/crypto/signature"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
+	flag "github.com/spf13/pflag"
 )
+
+const programName = `dvote-ipfs-test`
 
 type IPFSHandle struct {
 	nd      *ipfscore.IpfsNode
 	coreAPI coreiface.CoreAPI
-	dataDir string
 }
 
-// check if ipfs base dir exists
-func checkIPFSinit(bin string) (bool, error) {
-	_, err := os.Stat(bin)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return true, err
-
-	// initCmd := exec.Command(bin, "config", "show")
-	// return initCmd.Run()
-}
-
-//Init sets up an IPFS native node and cluster
-func (i *IPFSHandle) Init(d *types.DataStore) error {
-	lvl, err := logging.LogLevel("ERROR")
+func main() {
+	usr, err := user.Current()
 	if err != nil {
-		log.Warn(err.Error())
+		log.Fatal("No user")
 	}
-	ipfslog.SetAllLoggers(lvl)
-	const programName = `dvote-ipfs`
-
-	dirExists, err := checkIPFSinit(d.Datadir)
-	if err != nil {
-		log.Warn(err.Error())
-		return errors.New("cannot check if IPFS dir exists")
-	}
-	if !dirExists {
-		err = os.MkdirAll(d.Datadir, os.ModePerm)
-	}
+	defaultPath := usr.HomeDir + "/.ipfstest"
+	path := flag.String("ipfspath", defaultPath, "ipfspath. Specify filepath for ipfs config file")
+	flag.Parse()
 
 	go func() {
-		log.Info(http.ListenAndServe("localhost:6060", nil))
+		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
 	ipfs.InstallDatabasePlugins()
-	ipfs.ConfigRoot = d.Datadir
-	//check if needs init
+	ipfs.ConfigRoot = *path
+
 	if !fsrepo.IsInitialized(ipfs.ConfigRoot) {
 		err := ipfs.Init()
 		if err != nil {
-			log.Warn(err.Error())
-			return err
-		} else {
-			log.Info("IPFS init done!")
+			log.Println("Error in init: ")
+			log.Println(err)
 		}
 	}
-
 	nd, coreAPI, err := ipfs.StartNode()
 	if err != nil {
-		log.Errorf("Error in StartNode: ", err)
+		log.Printf("Error in StartNode: %s ", err.Error())
 	}
-	log.Infof("Peer ID: %s", nd.Identity.Pretty())
+	log.Println("Peer ID: ", nd.Identity.Pretty())
 
 	//start http
-	cctx := ipfs.CmdCtx(nd, d.Datadir)
+	cctx := ipfs.CmdCtx(nd, defaultPath)
 	cctx.ReqLog = &ipfscmds.ReqLog{}
 
 	gatewayOpt := corehttp.GatewayOption(true, corehttp.WebUIPaths...)
 	var opts = []corehttp.ServeOption{
+		//		corehttp.MetricsCollectionOption("api"),
+		//		corehttp.CheckVersionOption(),
 		corehttp.CommandsOption(cctx),
 		corehttp.WebUIOption,
 		gatewayOpt,
+		//		corehttp.VersionOption(),
+		//		defaultMux("/debug/vars"),
+		//		defaultMux("/debug/pprof/"),
+		//		corehttp.MutexFractionOption("/debug/pprof-mutex/"),
+		//		corehttp.MetricsScrapingOption("/debug/metrics/prometheus"),
+		//		corehttp.LogOption(),
 	}
-
 	go corehttp.ListenAndServe(nd, "/ip4/0.0.0.0/tcp/5001", opts...)
 
-	i.nd = nd
-	i.coreAPI = coreAPI
-	i.dataDir = d.Datadir
+	var ipfsHandler IPFSHandle
+	ipfsHandler.nd = nd
+	ipfsHandler.coreAPI = coreAPI
 
 	ipfs.ProgramName = programName
-	log.Infof("ipfs init done!")
 
-	if len(d.ClusterCfg.Secret) > 0 {
-		log.Info("initializing ipfs cluster")
-		clusterPath := d.Datadir + "/.cluster"
-		d.ClusterCfg.PeerID = i.nd.Identity
-		d.ClusterCfg.Private = i.nd.PrivateKey
-		err = ipfs.InitCluster(clusterPath, "conf.json", "id.json", d.ClusterCfg)
-		if err != nil {
-			log.Fatalf("Error initializing ipfs cluster: %v", err)
+	clusterPath := *path + "/.cluster"
+	clusterConfig := new(config.ClusterCfg)
+	err = ipfs.InitCluster(clusterPath, "conf.json", "id.json", *clusterConfig)
+	if err != nil {
+		log.Fatalf("Error initializing ipfs cluster: %v", err)
+	}
+	go ipfs.RunCluster(*clusterConfig)
+
+	ticker := time.NewTicker(time.Second * time.Duration(10))
+	signalChan := make(chan os.Signal, 10)
+	signal.Notify(
+		signalChan,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGHUP,
+		syscall.SIGKILL,
+	)
+
+	for {
+		select {
+		case <-ticker.C:
+			cid, err := ipfsHandler.Publish(*path + "/0001.txt")
+			if err != nil {
+				log.Printf("Publishing error: %v", err)
+			} else {
+				log.Printf("CID:%v", cid)
+			}
+
+			err = ipfsHandler.Pin(cid)
+			if err != nil {
+				log.Printf("Pinning error: %v", err)
+			} else {
+				log.Printf("Path pinned")
+			}
+
+			err = ipfsHandler.UnPin(cid)
+			if err != nil {
+				log.Printf("Unpinning error: %v", err)
+			} else {
+				log.Printf("Path unpinned")
+			}
+
+			time.Sleep(3 * time.Second)
+
+			pinlist, err := ipfsHandler.ListPins()
+			if err != nil {
+				log.Printf("Pin list error: %v", err)
+			} else {
+				log.Println("Pin list:")
+				for key, value := range pinlist {
+					log.Printf("\tKey: %v", key)
+					log.Printf("\tValue: %v", value)
+				}
+			}
+
+			data, err := ipfsHandler.Retrieve(cid)
+			if err != nil {
+				log.Printf("Retrieve error: %v", err)
+			} else {
+				log.Printf("Retrieved message: %s", data)
+			}
+
+		case <-signalChan:
+			nd.Close()
+			os.Exit(1)
+		default:
+			continue
 		}
-		go ipfs.RunCluster(d.ClusterCfg)
 	}
-	return nil
 }
 
-//PublishFile publishes a file specified by root to ipfs
-func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
-	rootHash, err := addAndPin(nd, string(root))
+func (i *IPFSHandle) Publish(root string) (string, error) {
+	rootHash, err := addAndPin(i.nd, root)
 	if err != nil {
 		return "", err
 	}
 	return rootHash, nil
-}
-
-//PublishBytes publishes a file containing msg to ipfs
-func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
-	filePath := fileDir + "/" + string(crypto.Hash(string(msg))) + ".txt"
-	log.Infof("Publishing file: %s", filePath)
-	err := ioutil.WriteFile(filePath, msg, 0666)
-	rootHash, err := addAndPin(nd, filePath)
-	if err != nil {
-		return "", err
-	}
-	return rootHash, nil
-}
-
-//Publish publishes a message to ipfs
-func (i *IPFSHandle) Publish(msg []byte) (string, error) {
-	roothash, err := PublishBytes(msg, i.dataDir, i.nd)
-	return roothash, err
 }
 
 func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 	defer n.Blockstore.PinLock().Unlock()
+
 	stat, err := os.Lstat(root)
 	if err != nil {
 		return "", err
@@ -164,6 +184,7 @@ func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 		return "", err
 	}
 	defer f.Close()
+
 	fileAdder, err := coreunix.NewAdder(context.Background(), n.Pinning, n.Blockstore, n.DAG)
 	if err != nil {
 		return "", err
@@ -185,7 +206,7 @@ func (i *IPFSHandle) Pin(path string) error {
 	return i.coreAPI.Pin().Add(context.Background(), rp, options.Pin.Recursive(true))
 }
 
-func (i *IPFSHandle) Unpin(path string) error {
+func (i *IPFSHandle) UnPin(path string) error {
 	p := corepath.New(path)
 	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
 	if err != nil {
