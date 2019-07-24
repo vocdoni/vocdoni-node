@@ -68,7 +68,9 @@ type W3Cfg struct {
 
 //CensusCfg stores global configs for censushttp
 type CensusCfg struct {
-	LogLevel string
+	LogLevel   string
+	Namespaces []string
+	Port       int
 }
 
 //RelayCfg stores global configs for relay

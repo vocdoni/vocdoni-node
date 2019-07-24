@@ -3,15 +3,14 @@ package main
 import (
 	"os"
 	"os/user"
-	"strconv"
 	"strings"
 
-	viper "github.com/spf13/viper"
 	flag "github.com/spf13/pflag"
+	viper "github.com/spf13/viper"
 
-	censusmanager "gitlab.com/vocdoni/go-dvote/service/census"
-	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/log"
+	censusmanager "gitlab.com/vocdoni/go-dvote/service/census"
 )
 
 func newConfig() (config.CensusCfg, error) {
@@ -24,11 +23,12 @@ func newConfig() (config.CensusCfg, error) {
 	defaultDirPath := usr.HomeDir + "/.dvote/censushttp"
 	//setup flags
 	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for censushttp config")
-	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
-	
+	flag.String("logLevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	flag.Int("port", 8080, "HTTP port to listen")
+	flag.String("namespaces", "", "Namespace and/or allowed public keys, syntax is <namespace>[:pubKey],[<namespace>[:pubKey]],...")
 
 	viper := viper.New()
-	viper.SetDefault("loglevel", "warn")
+	viper.SetDefault("logLevel", "info")
 	flag.Parse()
 	viper.SetConfigType("yaml")
 	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -46,8 +46,10 @@ func newConfig() (config.CensusCfg, error) {
 		}
 	}
 
-	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
-	
+	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
+	viper.BindPFlag("port", flag.Lookup("port"))
+	viper.BindPFlag("namespaces", flag.Lookup("namespaces"))
+
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
 	if err != nil {
@@ -72,13 +74,10 @@ func main() {
 			" <port> <namespace>[:pubKey] [<namespace>[:pubKey]]...")
 		os.Exit(2)
 	}
-	port, err := strconv.Atoi(os.Args[1])
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(2)
-	}
-	for i := 2; i < len(os.Args); i++ {
-		s := strings.Split(os.Args[i], ":")
+	port := globalCfg.Port
+
+	for i := 0; i < len(globalCfg.Namespaces); i++ {
+		s := strings.Split(globalCfg.Namespaces[i], ":")
 		ns := s[0]
 		pubK := ""
 		if len(s) > 1 {

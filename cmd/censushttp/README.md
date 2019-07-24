@@ -13,12 +13,12 @@ go build -o censusHttpService gitlab.com/vocdoni/dvote-census/cmd/censushttp
 
 ## Usage
 
-`./censusHttpService <port> <censusId>[:pubKey] [<censusId>[:pubKey] ...]`
+`./censusHttpService --port 8080 --namespaces <censusId>[:pubKey],[<censusId>[:pubKey] ...]`
 
 Example
 
 ```
-./censusHttpService 1500 Got_Favorite
+./censusHttpService --port 1500 --namespaces GoT_Favorite
 2019/02/12 10:20:16 Starting process HTTP service on port 1500 for namespace GoT_Favorite
 2019/02/12 10:20:16 Starting server in http mode
 ```
@@ -53,13 +53,13 @@ The `timeStamp` when received on the server side must not differ more than 10 se
 
 Add two new claims, one for `Jon Snow` and another for `Tyrion`.
 ```
-curl -d '{"method":"addClaim","censusID":"GoT_Favorite","claimData":"Jon Snow"}' http://localhost:1500
+curl -d '{"method":"addClaim","censusId":"GoT_Favorite","claimData":"Jon Snow"}' http://localhost:1500
 
 {"error":false,"response":""}
 ```
 
 ```
-curl -d '{"method":"addClaim","censusID":"GoT_Favorite","claimData":"Tyrion"}' http://localhost:1500
+curl -d '{"method":"addClaim","censusId":"GoT_Favorite","claimData":"Tyrion"}' http://localhost:1500
 
 {"error":false,"response":""}
 ```
@@ -69,7 +69,7 @@ In case signature is enabled:
 ```
 curl -d '{
 "method":"addClaim",
-"censusID":"GoT_Favorite",
+"censusId":"GoT_Favorite",
 "claimData":"Jon Snow", 
 "timeStamp":"1547814675",
 "signature":"a117c4ce12b29090884112ffe57e664f007e7ef142a1679996e2d34fd2b852fe76966e47932f1e9d3a54610d0f361383afe2d9aab096e15d136c236abb0a0d0e" }' http://localhost:1500
@@ -83,7 +83,7 @@ curl -d '{
 Generate a merkle proof for the claim `Jon Snow`
 
 ```
-curl -d '{"method":"genProof","censusID":"GoT_Favorite","claimData":"Jon Snow"}' http://localhost:1500
+curl -d '{"method":"genProof","censusId":"GoT_Favorite","claimData":"Jon Snow"}' http://localhost:1500
 
 {"error":false,"response":"0x000200000000000000000000000000000000000000000000000000000000000212f8134039730791388a9bd0460f9fbd0757327212a64b3a2b0f0841ce561ee3"}
 ```
@@ -95,7 +95,7 @@ If `rootHash` is specified, the proof will be calculated for the given root hash
 The previous merkle proof is valid only for the current root hash. Let's get it
 
 ```
-curl -d '{"method":"getRoot","censusID":"GoT_Favorite"}' http://localhost:1500
+curl -d '{"method":"getRoot","censusId":"GoT_Favorite"}' http://localhost:1500
 
 {"error":false,"response":"0x2f0ddde5cb995eae23dc3b75a5c0333f1cc89b73f3a00b0fe71996fb90fef04b"}
 ```
@@ -108,7 +108,7 @@ Now let's check if the proof is valid
 ```
 curl -d '{
 "method":"checkProof",
-"censusID":"GoT_Favorite","claimData":"Jon Snow",
+"censusId":"GoT_Favorite","claimData":"Jon Snow",
 "rootHash":"0x2f0ddde5cb995eae23dc3b75a5c0333f1cc89b73f3a00b0fe71996fb90fef04b",
 "proofData":"0x000200000000000000000000000000000000000000000000000000000000000212f8134039730791388a9bd0460f9fbd0757327212a64b3a2b0f0841ce561ee3"}' http://localhost:1500
 
@@ -122,7 +122,7 @@ If `rootHash` is not specified, the current root hash is used.
 Dump contents of a specific censusId (values)
 
 ```
-curl -d '{"method":"dump","censusID":"GoT_Favorite"}' http://localhost:1500
+curl -d '{"method":"dump","censusId":"GoT_Favorite"}' http://localhost:1500
 
 {"error":false,"response":"[\"Tyrion\",\"Jon Snow\"]"}
 ```

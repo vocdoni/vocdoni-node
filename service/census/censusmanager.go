@@ -2,14 +2,14 @@ package censusmanager
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
-	"fmt"
 
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
-	tree "gitlab.com/vocdoni/go-dvote/tree"
 	"gitlab.com/vocdoni/go-dvote/log"
+	tree "gitlab.com/vocdoni/go-dvote/tree"
 )
 
 // Time window (seconds) in which TimeStamp will be accepted if auth enabled
@@ -48,7 +48,7 @@ func AddNamespace(name, pubKey string) {
 	if len(Signatures) == 0 {
 		Signatures = make(map[string]string)
 	}
-
+	log.Infof("Adding namespace %s", name)
 	mkTree := tree.Tree{}
 	mkTree.Init(name)
 	MkTrees[name] = &mkTree
@@ -118,14 +118,17 @@ func opHandler(c *Claim) *Result {
 	var err error
 
 	// Process data
-	log.Infof("Process data", "censusId", c.CensusID, "method", c.Method, "rootHash", c.RootHash, 
-	"claimData", c.ClaimData, "proofData", c.ProofData, "timeStamp", c.TimeStamp, "signature", c.Signature)
+	log.Infof("Processing data => censusID:%s Method:%s Root:%s Data:'%s' Proof:%s Timestamp:%s Signature:%s",
+		c.CensusID, c.Method, c.RootHash, c.ClaimData, c.ProofData, c.TimeStamp, c.Signature)
 	authString := fmt.Sprintf("%s%s%s%s%s", c.Method, c.CensusID, c.RootHash, c.ClaimData, c.TimeStamp)
 	resp.Error = false
 	resp.Response = ""
 	censusFound := false
-	if len(c.CensusID) > 0 {
-		_, censusFound = MkTrees[c.CensusID]
+	for k := range MkTrees {
+		if k == c.CensusID {
+			censusFound = true
+			break
+		}
 	}
 	if !censusFound {
 		resp.Error = true
