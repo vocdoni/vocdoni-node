@@ -74,7 +74,7 @@ func fetchFile(uri, requestId string, msg types.Message, storage data.Storage, t
 		response.ID = requestId
 		response.Response.Content = b64content
 		response.Response.Request = requestId
-		response.Response.Timestamp = time.Now().UnixNano()
+		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Signature = signMsg(response.Response, signer)
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
@@ -127,7 +127,7 @@ func addFile(reqType, requestId string, b64content []byte, msg types.Message, st
 		var response types.AddResponse
 		response.ID = requestId
 		response.Response.Request = requestId
-		response.Response.Timestamp = time.Now().UnixNano()
+		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Response.URI = ipfsRouteBaseURL + cid
 		response.Signature = signMsg(response.Response, signer)
 		rawResponse, err := json.Marshal(response)
@@ -171,7 +171,7 @@ func pinList(requestId string, msg types.Message, storage data.Storage, transpor
 		response.ID = requestId
 		response.Response.Files = pinsJsonArray
 		response.Response.Request = requestId
-		response.Response.Timestamp = time.Now().UnixNano()
+		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Signature = signMsg(response.Response, signer)
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
@@ -210,7 +210,7 @@ func pinFile(uri, requestId string, msg types.Message, storage data.Storage, tra
 		response.ID = requestId
 		response.Response.OK = true
 		response.Response.Request = requestId
-		response.Response.Timestamp = time.Now().UnixNano()
+		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Signature = signMsg(response.Response, signer)
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
@@ -250,7 +250,7 @@ func unPinFile(uri, requestId string, msg types.Message, storage data.Storage, t
 		response.ID = requestId
 		response.Response.OK = true
 		response.Response.Request = requestId
-		response.Response.Timestamp = time.Now().UnixNano()
+		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Signature = signMsg(response.Response, signer)
 		rawResponse, err := json.Marshal(response)
 		if err != nil {

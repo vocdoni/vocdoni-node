@@ -4,24 +4,24 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"io"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/url"
 	"os"
 	"os/user"
 	"time"
 
-	"github.com/spf13/viper"
-	flag "github.com/spf13/pflag"
 	"github.com/gorilla/websocket"
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	//	"net/http"
 	//	"bytes"
 	//	"io/ioutil"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
 	//	"gitlab.com/vocdoni/go-dvote/net"
 )
 
@@ -68,7 +68,7 @@ func makeEnvelope(ballot string) string {
 
 	env.Ballot = []byte(ballot)
 
-	env.Timestamp = time.Now()
+	env.Timestamp = int32(time.Now().Unix())
 
 	e, err := json.Marshal(env)
 	if err != nil {
@@ -114,7 +114,6 @@ func newConfig() (config.GenCfg, error) {
 		`)
 		flag.PrintDefaults()
 	}
-
 
 	flag.Parse()
 

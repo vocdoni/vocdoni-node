@@ -2,7 +2,6 @@ package types
 
 import (
 	"net"
-	"time"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 )
@@ -60,7 +59,7 @@ func (c *WebsocketContext) Conn() *net.Conn {
 //Message is a wrapper for messages from various net transport modules
 type Message struct {
 	Data      []byte
-	TimeStamp time.Time
+	TimeStamp int32
 	Context   MessageContext
 }
 
@@ -78,7 +77,7 @@ type Connection struct {
 }
 
 type DataStore struct {
-	Datadir string
+	Datadir    string
 	ClusterCfg config.ClusterCfg
 }
 
@@ -97,7 +96,7 @@ type Envelope struct {
 	Nonce     uint64
 	KeyProof  []byte
 	Ballot    []byte
-	Timestamp time.Time
+	Timestamp int32
 }
 
 //Batch contains a number of Ballots, ready to be counted

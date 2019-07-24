@@ -5,8 +5,8 @@ import (
 	"time"
 
 	shell "github.com/ipfs/go-ipfs-api"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 type PubSubHandle struct {
@@ -52,7 +52,7 @@ func (p *PubSubHandle) Listen(reciever chan<- types.Message) {
 		ctx.Topic = p.c.Topic
 		ctx.PeerAddress = psMessage.From.String()
 		msg.Data = psMessage.Data
-		msg.TimeStamp = time.Now()
+		msg.TimeStamp = int32(time.Now().Unix())
 		msg.Context = ctx
 
 		reciever <- msg

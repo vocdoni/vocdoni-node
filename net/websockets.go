@@ -109,7 +109,7 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 				conn.Close()
 			} else {
 				msg.Data = []byte(payload)
-				msg.TimeStamp = time.Now()
+				msg.TimeStamp = int32(time.Now().Unix())
 				ctx := new(types.WebsocketContext)
 				ctx.Conn = &conn
 				msg.Context = ctx
