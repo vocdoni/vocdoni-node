@@ -3,9 +3,9 @@ package net
 import (
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/swarm"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 type PSSHandle struct {
@@ -34,7 +34,7 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message) {
 			ctx.Topic = p.c.Topic
 			ctx.PeerAddress = pssMessage.Peer.String()
 			msg.Data = pssMessage.Msg
-			msg.TimeStamp = time.Now()
+			msg.TimeStamp = int32(time.Now().Unix())
 			msg.Context = ctx
 			reciever <- msg
 		default:

@@ -40,7 +40,7 @@ func signMsg(message interface{}, signer signature.SignKeys) string {
 
 func buildReply(msg types.Message, data []byte) types.Message {
 	reply := new(types.Message)
-	reply.TimeStamp = time.Now()
+	reply.TimeStamp = int32(time.Now().Unix())
 	reply.Context = msg.Context
 	reply.Data = data
 	return *reply
