@@ -1,9 +1,0 @@
-encryption: "sym"
-key: "vocdoni"
-topic: "vocdoni_test"
-address: ""
-nick: ""
-datadir: ""
-light: false
-pingMode: false
-logLevel: "warn"
