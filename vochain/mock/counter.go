@@ -9,15 +9,19 @@ import (
 	"syscall"
 
 	tlog "github.com/tendermint/tendermint/libs/log"
+	"github.com/tendermint/tendermint/proxy"
+	"gitlab.com/vocdoni/go-dvote/log"
 
 	"github.com/tendermint/tendermint/abci/example/code"
-	"github.com/tendermint/tendermint/abci/types"
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
+	cmn "github.com/tendermint/tendermint/libs/common"
 	dbm "github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/node"
 	"github.com/tendermint/tendermint/p2p"
 	pvm "github.com/tendermint/tendermint/privval"
-	"github.com/tendermint/tendermint/proxy"
+	tmtypes "github.com/tendermint/tendermint/types"
+	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
 // State represents the application internal state
@@ -29,7 +33,7 @@ type State struct {
 }
 
 type CounterApplication struct {
-	types.BaseApplication
+	abcitypes.BaseApplication
 	state     State
 	hashCount int
 	txCount   int
@@ -40,11 +44,11 @@ func NewCounterApplication(serial bool) *CounterApplication {
 	return &CounterApplication{serial: serial}
 }
 
-func (app *CounterApplication) Info(req types.RequestInfo) types.ResponseInfo {
-	return types.ResponseInfo{Data: fmt.Sprintf("{\"hashes\":%v,\"txs\":%v}", app.hashCount, app.txCount)}
+func (app *CounterApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
+	return abcitypes.ResponseInfo{Data: fmt.Sprintf("{\"hashes\":%v,\"txs\":%v}", app.hashCount, app.txCount)}
 }
 
-func (app *CounterApplication) SetOption(req types.RequestSetOption) types.ResponseSetOption {
+func (app *CounterApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
 	key, value := req.Key, req.Value
 	if key == "serial" && value == "on" {
 		app.serial = true
@@ -56,16 +60,16 @@ func (app *CounterApplication) SetOption(req types.RequestSetOption) types.Respo
 				Error: fmt.Sprintf("Unknown key (%s) or value (%s)", key, value),
 			}
 		*/
-		return types.ResponseSetOption{}
+		return abcitypes.ResponseSetOption{}
 	}
 
-	return types.ResponseSetOption{}
+	return abcitypes.ResponseSetOption{}
 }
 
-func (app *CounterApplication) DeliverTx(req types.RequestDeliverTx) types.ResponseDeliverTx {
+func (app *CounterApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	if app.serial {
 		if len(req.Tx) > 8 {
-			return types.ResponseDeliverTx{
+			return abcitypes.ResponseDeliverTx{
 				Code: code.CodeTypeEncodingError,
 				Log:  fmt.Sprintf("Max tx size is 8 bytes, got %d", len(req.Tx))}
 		}
@@ -73,19 +77,19 @@ func (app *CounterApplication) DeliverTx(req types.RequestDeliverTx) types.Respo
 		copy(tx8[len(tx8)-len(req.Tx):], req.Tx)
 		txValue := binary.BigEndian.Uint64(tx8)
 		if txValue != uint64(app.txCount) {
-			return types.ResponseDeliverTx{
+			return abcitypes.ResponseDeliverTx{
 				Code: code.CodeTypeBadNonce,
 				Log:  fmt.Sprintf("Invalid nonce. Expected %v, got %v", app.txCount, txValue)}
 		}
 	}
 	app.txCount++
-	return types.ResponseDeliverTx{Code: code.CodeTypeOK}
+	return abcitypes.ResponseDeliverTx{Code: code.CodeTypeOK}
 }
 
-func (app *CounterApplication) CheckTx(req types.RequestCheckTx) types.ResponseCheckTx {
+func (app *CounterApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	if app.serial {
 		if len(req.Tx) > 8 {
-			return types.ResponseCheckTx{
+			return abcitypes.ResponseCheckTx{
 				Code: code.CodeTypeEncodingError,
 				Log:  fmt.Sprintf("Max tx size is 8 bytes, got %d", len(req.Tx))}
 		}
@@ -93,42 +97,44 @@ func (app *CounterApplication) CheckTx(req types.RequestCheckTx) types.ResponseC
 		copy(tx8[len(tx8)-len(req.Tx):], req.Tx)
 		txValue := binary.BigEndian.Uint64(tx8)
 		if txValue < uint64(app.txCount) {
-			return types.ResponseCheckTx{
+			return abcitypes.ResponseCheckTx{
 				Code: code.CodeTypeBadNonce,
 				Log:  fmt.Sprintf("Invalid nonce. Expected >= %v, got %v", app.txCount, txValue)}
 		}
 	}
-	return types.ResponseCheckTx{Code: code.CodeTypeOK}
+	return abcitypes.ResponseCheckTx{Code: code.CodeTypeOK}
 }
 
-func (app *CounterApplication) Commit() (resp types.ResponseCommit) {
+func (app *CounterApplication) Commit() (resp abcitypes.ResponseCommit) {
 	app.hashCount++
 	if app.txCount == 0 {
-		return types.ResponseCommit{}
+		return abcitypes.ResponseCommit{}
 	}
 	hash := make([]byte, 8)
 	binary.BigEndian.PutUint64(hash, uint64(app.txCount))
-	return types.ResponseCommit{Data: hash}
+	return abcitypes.ResponseCommit{Data: hash}
 }
 
-func (app *CounterApplication) Query(reqQuery types.RequestQuery) types.ResponseQuery {
+func (app *CounterApplication) Query(reqQuery abcitypes.RequestQuery) abcitypes.ResponseQuery {
+	log.Infof("%+v", "In Query")
 	switch reqQuery.Path {
 	case "hash":
-		return types.ResponseQuery{Value: []byte(fmt.Sprintf("%v", app.hashCount))}
+		return abcitypes.ResponseQuery{Value: []byte(fmt.Sprintf("%v", app.hashCount))}
 	case "tx":
-		return types.ResponseQuery{Value: []byte(fmt.Sprintf("%v", app.txCount))}
+		return abcitypes.ResponseQuery{Value: []byte(fmt.Sprintf("%v", app.txCount))}
 	default:
-		return types.ResponseQuery{Log: fmt.Sprintf("Invalid query path. Expected hash or tx, got %v", reqQuery.Path)}
+		return abcitypes.ResponseQuery{Log: fmt.Sprintf("Invalid query path. Expected hash or tx, got %v", reqQuery.Path)}
 	}
 }
 
-func (app *CounterApplication) InitChain(reqInit types.RequestInitChain) types.ResponseInitChain {
+func (app *CounterApplication) InitChain(reqInit abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
+	log.Infof("%+v", "Initializing Chain")
 	ctx := NewDefaultContext()
 	_, err := startInProcess(ctx)
 	if err != nil {
-		fmt.Sprintf("%+v", err)
+		log.Errorf("%+v", err)
 	}
-	return types.ResponseInitChain{}
+	return abcitypes.ResponseInitChain{}
 }
 
 type Context struct {
@@ -164,6 +170,7 @@ func NewLevelDB(name, dir string) (db dbm.DB, err error) {
 }
 
 func openDB(rootDir string) (dbm.DB, error) {
+	log.Infof("%+v", "Creating levelDB...")
 	dataDir := filepath.Join(rootDir, "tendermint_data")
 	db, err := NewLevelDB("application", dataDir)
 	return db, err
@@ -181,15 +188,59 @@ func startInProcess(ctx *Context) (*node.Node, error) {
 	app := NewCounterApplication(false)
 	app.state.db = db
 
-	nodeKey, err := p2p.LoadOrGenNodeKey(cfg.NodeKeyFile())
-	if err != nil {
-		return nil, err
+	// private validator
+	privValKeyFile := cfg.PrivValidatorKeyFile()
+	privValStateFile := cfg.PrivValidatorStateFile()
+	var pv *pvm.FilePV
+	if cmn.FileExists(privValKeyFile) {
+		pv = pvm.LoadFilePV(privValKeyFile, privValStateFile)
+		log.Infof("Found private validator", "keyFile", privValKeyFile,
+			"stateFile", privValStateFile)
+	} else {
+		pv = pvm.GenFilePV(privValKeyFile, privValStateFile)
+		pv.Save()
+		log.Infof("Generated private validator", "keyFile", privValKeyFile,
+			"stateFile", privValStateFile)
 	}
 
+	nodeKeyFile := cfg.NodeKeyFile()
+	if cmn.FileExists(nodeKeyFile) {
+		log.Infof("Found node key", "path", nodeKeyFile)
+	}
+	nodeKey, err := p2p.LoadOrGenNodeKey(nodeKeyFile)
+	if err != nil {
+		log.DPanicf("Cannot load or generate node key: %v", err)
+		//return err
+	}
+	log.Info("Generated node key", "path", nodeKeyFile)
+
+	// genesis file
+	genFile := cfg.GenesisFile()
+	if cmn.FileExists(genFile) {
+		log.Infof("Found genesis file", "path", genFile)
+	} else {
+		genDoc := tmtypes.GenesisDoc{
+			ChainID:         fmt.Sprintf("test-chain-%v", cmn.RandStr(6)),
+			GenesisTime:     tmtime.Now(),
+			ConsensusParams: tmtypes.DefaultConsensusParams(),
+		}
+		key := pv.GetPubKey()
+		genDoc.Validators = []tmtypes.GenesisValidator{{
+			Address: key.Address(),
+			PubKey:  key,
+			Power:   10,
+		}}
+
+		if err := genDoc.SaveAs(genFile); err != nil {
+			log.DPanicf("Cannot load or generate genesis file: %v", err)
+			//return err
+		}
+		log.Info("Generated genesis file", "path", genFile)
+	}
 	// create & start tendermint node
 	tmNode, err := node.NewNode(
 		cfg,
-		pvm.LoadOrGenFilePV(cfg.PrivValidatorKeyFile(), cfg.PrivValidatorStateFile()),
+		pvm.LoadOrGenFilePV(privValKeyFile, privValStateFile),
 		nodeKey,
 		proxy.NewLocalClientCreator(app),
 		node.DefaultGenesisDocProviderFunc(cfg),
@@ -197,20 +248,23 @@ func startInProcess(ctx *Context) (*node.Node, error) {
 		node.DefaultMetricsProvider(cfg.Instrumentation),
 		ctx.Logger.With("module", "node"),
 	)
-	if err != nil {
-		return nil, err
-	}
+	/*
+		n, err := node.DefaultNewNode(cfg, ctx.Logger.With("module", "node"))
+		if err != nil {
+			log.DPanicf("Failed to create node: %v", err)
+		}*/
 
-	err = tmNode.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	TrapSignal(func() {
+	// Stop upon receiving SIGTERM or CTRL-C.
+	cmn.TrapSignal(ctx.Logger.With("module", "node"), func() {
 		if tmNode.IsRunning() {
-			_ = tmNode.Stop()
+			tmNode.Stop()
 		}
 	})
+
+	if err := tmNode.Start(); err != nil {
+		log.DPanicf("Failed to start node: %v", err)
+	}
+	log.Info("Started node", "nodeInfo", tmNode.Switch().NodeInfo())
 
 	// run forever (the node will not be returned)
 	select {}
