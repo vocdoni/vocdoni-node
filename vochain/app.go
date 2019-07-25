@@ -1,4 +1,4 @@
-package mock
+package vochain
 
 import (
 	"encoding/binary"
@@ -47,7 +47,7 @@ func saveState(state State) {
 	state.db.Set(stateKey, stateBytes)
 }
 
-type CounterApplication struct {
+type VotingApplication struct {
 	abcitypes.BaseApplication
 	state     State
 	hashCount int
@@ -55,21 +55,21 @@ type CounterApplication struct {
 	serial    bool
 }
 
-func NewCounterApplication(serial bool, dbName string, dbDir string) *CounterApplication {
+func NewVotingApplication(serial bool, dbName string, dbDir string) *VotingApplication {
 	db, err := dbm.NewGoLevelDB(dbName, dbDir)
 	if err != nil {
 		log.DPanicf("Cannot initialize application db : %v", err)
 		//return err
 	}
 	state := loadState(db)
-	return &CounterApplication{state: state}
+	return &VotingApplication{state: state}
 }
 
-func (app *CounterApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
+func (app *VotingApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
 	return abcitypes.ResponseInfo{Data: fmt.Sprintf("{\"hashes\":%v,\"txs\":%v}", app.hashCount, app.txCount)}
 }
 
-func (app *CounterApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
+func (app *VotingApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
 	key, value := req.Key, req.Value
 	if key == "serial" && value == "on" {
 		app.serial = true
@@ -87,7 +87,7 @@ func (app *CounterApplication) SetOption(req abcitypes.RequestSetOption) abcityp
 	return abcitypes.ResponseSetOption{}
 }
 
-func (app *CounterApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+func (app *VotingApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	if app.serial {
 		if len(req.Tx) > 8 {
 			return abcitypes.ResponseDeliverTx{
@@ -107,7 +107,7 @@ func (app *CounterApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcityp
 	return abcitypes.ResponseDeliverTx{Code: code.CodeTypeOK}
 }
 
-func (app *CounterApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
+func (app *VotingApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	if app.serial {
 		if len(req.Tx) > 8 {
 			return abcitypes.ResponseCheckTx{
@@ -126,7 +126,7 @@ func (app *CounterApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.R
 	return abcitypes.ResponseCheckTx{Code: code.CodeTypeOK}
 }
 
-func (app *CounterApplication) Commit() (resp abcitypes.ResponseCommit) {
+func (app *VotingApplication) Commit() (resp abcitypes.ResponseCommit) {
 	app.hashCount++
 	if app.txCount == 0 {
 		return abcitypes.ResponseCommit{}
@@ -137,7 +137,7 @@ func (app *CounterApplication) Commit() (resp abcitypes.ResponseCommit) {
 	return abcitypes.ResponseCommit{Data: hash}
 }
 
-func (app *CounterApplication) Query(reqQuery abcitypes.RequestQuery) abcitypes.ResponseQuery {
+func (app *VotingApplication) Query(reqQuery abcitypes.RequestQuery) abcitypes.ResponseQuery {
 	log.Infof("%+v", "In Query")
 	switch reqQuery.Path {
 	case "hash":
@@ -152,7 +152,7 @@ func (app *CounterApplication) Query(reqQuery abcitypes.RequestQuery) abcitypes.
 	}
 }
 
-func (app *CounterApplication) InitChain(reqInit abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
+func (app *VotingApplication) InitChain(reqInit abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
 	log.Infof("%+v", "Initializing Chain")
 	return abcitypes.ResponseInitChain{}
 }
