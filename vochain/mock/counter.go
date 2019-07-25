@@ -2,26 +2,20 @@ package mock
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"syscall"
 
-	tlog "github.com/tendermint/tendermint/libs/log"
-	"github.com/tendermint/tendermint/proxy"
 	"gitlab.com/vocdoni/go-dvote/log"
 
 	"github.com/tendermint/tendermint/abci/example/code"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	cfg "github.com/tendermint/tendermint/config"
-	cmn "github.com/tendermint/tendermint/libs/common"
-	dbm "github.com/tendermint/tendermint/libs/db"
-	"github.com/tendermint/tendermint/node"
-	"github.com/tendermint/tendermint/p2p"
-	pvm "github.com/tendermint/tendermint/privval"
-	tmtypes "github.com/tendermint/tendermint/types"
-	tmtime "github.com/tendermint/tendermint/types/time"
+	"github.com/tendermint/tendermint/version"
+	dbm "github.com/tendermint/tm-cmn/db"
+)
+
+var (
+	stateKey                         = []byte("stateKey")
+	ProtocolVersion version.Protocol = 0x1
 )
 
 // State represents the application internal state
@@ -32,6 +26,27 @@ type State struct {
 	AppHash []byte `json:"app_hash"`
 }
 
+func loadState(db dbm.DB) State {
+	stateBytes := db.Get(stateKey)
+	var state State
+	if len(stateBytes) != 0 {
+		err := json.Unmarshal(stateBytes, &state)
+		if err != nil {
+			panic(err)
+		}
+	}
+	state.db = db
+	return state
+}
+
+func saveState(state State) {
+	stateBytes, err := json.Marshal(state)
+	if err != nil {
+		panic(err)
+	}
+	state.db.Set(stateKey, stateBytes)
+}
+
 type CounterApplication struct {
 	abcitypes.BaseApplication
 	state     State
@@ -40,8 +55,14 @@ type CounterApplication struct {
 	serial    bool
 }
 
-func NewCounterApplication(serial bool) *CounterApplication {
-	return &CounterApplication{serial: serial}
+func NewCounterApplication(serial bool, dbName string, dbDir string) *CounterApplication {
+	db, err := dbm.NewGoLevelDB(dbName, dbDir)
+	if err != nil {
+		log.DPanicf("Cannot initialize application db : %v", err)
+		//return err
+	}
+	state := loadState(db)
+	return &CounterApplication{state: state}
 }
 
 func (app *CounterApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
@@ -112,6 +133,7 @@ func (app *CounterApplication) Commit() (resp abcitypes.ResponseCommit) {
 	}
 	hash := make([]byte, 8)
 	binary.BigEndian.PutUint64(hash, uint64(app.txCount))
+	saveState(app.state)
 	return abcitypes.ResponseCommit{Data: hash}
 }
 
@@ -122,6 +144,9 @@ func (app *CounterApplication) Query(reqQuery abcitypes.RequestQuery) abcitypes.
 		return abcitypes.ResponseQuery{Value: []byte(fmt.Sprintf("%v", app.hashCount))}
 	case "tx":
 		return abcitypes.ResponseQuery{Value: []byte(fmt.Sprintf("%v", app.txCount))}
+	case "state":
+		state := loadState(app.state.db)
+		return abcitypes.ResponseQuery{Value: []byte(fmt.Sprintf("%+v\n\n%+v", app.state, state))}
 	default:
 		return abcitypes.ResponseQuery{Log: fmt.Sprintf("Invalid query path. Expected hash or tx, got %v", reqQuery.Path)}
 	}
@@ -129,160 +154,5 @@ func (app *CounterApplication) Query(reqQuery abcitypes.RequestQuery) abcitypes.
 
 func (app *CounterApplication) InitChain(reqInit abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
 	log.Infof("%+v", "Initializing Chain")
-	ctx := NewDefaultContext()
-	_, err := startInProcess(ctx)
-	if err != nil {
-		log.Errorf("%+v", err)
-	}
 	return abcitypes.ResponseInitChain{}
-}
-
-type Context struct {
-	Config *cfg.Config
-	Logger tlog.Logger
-}
-
-func NewDefaultContext() *Context {
-	return NewContext(
-		cfg.DefaultConfig(),
-		tlog.NewTMLogger(tlog.NewSyncWriter(os.Stdout)),
-	)
-}
-
-func NewContext(config *cfg.Config, logger tlog.Logger) *Context {
-	return &Context{config, logger}
-}
-
-var DBBackend = ""
-
-// NewLevelDB instantiate a new LevelDB instance according to DBBackend.
-func NewLevelDB(name, dir string) (db dbm.DB, err error) {
-	backend := dbm.GoLevelDBBackend
-	if DBBackend == string(dbm.CLevelDBBackend) {
-		backend = dbm.CLevelDBBackend
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("couldn't create db: %v", r)
-		}
-	}()
-	return dbm.NewDB(name, backend, dir), err
-}
-
-func openDB(rootDir string) (dbm.DB, error) {
-	log.Infof("%+v", "Creating levelDB...")
-	dataDir := filepath.Join(rootDir, "tendermint_data")
-	db, err := NewLevelDB("application", dataDir)
-	return db, err
-}
-
-func startInProcess(ctx *Context) (*node.Node, error) {
-	cfg := ctx.Config
-	home := cfg.RootDir
-
-	db, err := openDB(home)
-	if err != nil {
-		return nil, err
-	}
-
-	app := NewCounterApplication(false)
-	app.state.db = db
-
-	// private validator
-	privValKeyFile := cfg.PrivValidatorKeyFile()
-	privValStateFile := cfg.PrivValidatorStateFile()
-	var pv *pvm.FilePV
-	if cmn.FileExists(privValKeyFile) {
-		pv = pvm.LoadFilePV(privValKeyFile, privValStateFile)
-		log.Infof("Found private validator", "keyFile", privValKeyFile,
-			"stateFile", privValStateFile)
-	} else {
-		pv = pvm.GenFilePV(privValKeyFile, privValStateFile)
-		pv.Save()
-		log.Infof("Generated private validator", "keyFile", privValKeyFile,
-			"stateFile", privValStateFile)
-	}
-
-	nodeKeyFile := cfg.NodeKeyFile()
-	if cmn.FileExists(nodeKeyFile) {
-		log.Infof("Found node key", "path", nodeKeyFile)
-	}
-	nodeKey, err := p2p.LoadOrGenNodeKey(nodeKeyFile)
-	if err != nil {
-		log.DPanicf("Cannot load or generate node key: %v", err)
-		//return err
-	}
-	log.Info("Generated node key", "path", nodeKeyFile)
-
-	// genesis file
-	genFile := cfg.GenesisFile()
-	if cmn.FileExists(genFile) {
-		log.Infof("Found genesis file", "path", genFile)
-	} else {
-		genDoc := tmtypes.GenesisDoc{
-			ChainID:         fmt.Sprintf("test-chain-%v", cmn.RandStr(6)),
-			GenesisTime:     tmtime.Now(),
-			ConsensusParams: tmtypes.DefaultConsensusParams(),
-		}
-		key := pv.GetPubKey()
-		genDoc.Validators = []tmtypes.GenesisValidator{{
-			Address: key.Address(),
-			PubKey:  key,
-			Power:   10,
-		}}
-
-		if err := genDoc.SaveAs(genFile); err != nil {
-			log.DPanicf("Cannot load or generate genesis file: %v", err)
-			//return err
-		}
-		log.Info("Generated genesis file", "path", genFile)
-	}
-	// create & start tendermint node
-	tmNode, err := node.NewNode(
-		cfg,
-		pvm.LoadOrGenFilePV(privValKeyFile, privValStateFile),
-		nodeKey,
-		proxy.NewLocalClientCreator(app),
-		node.DefaultGenesisDocProviderFunc(cfg),
-		node.DefaultDBProvider,
-		node.DefaultMetricsProvider(cfg.Instrumentation),
-		ctx.Logger.With("module", "node"),
-	)
-	/*
-		n, err := node.DefaultNewNode(cfg, ctx.Logger.With("module", "node"))
-		if err != nil {
-			log.DPanicf("Failed to create node: %v", err)
-		}*/
-
-	// Stop upon receiving SIGTERM or CTRL-C.
-	cmn.TrapSignal(ctx.Logger.With("module", "node"), func() {
-		if tmNode.IsRunning() {
-			tmNode.Stop()
-		}
-	})
-
-	if err := tmNode.Start(); err != nil {
-		log.DPanicf("Failed to start node: %v", err)
-	}
-	log.Info("Started node", "nodeInfo", tmNode.Switch().NodeInfo())
-
-	// run forever (the node will not be returned)
-	select {}
-}
-
-// TrapSignal traps SIGINT and SIGTERM and terminates the server correctly.
-func TrapSignal(cleanupFunc func()) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-sigs
-		switch sig {
-		case syscall.SIGTERM:
-			defer cleanupFunc()
-			os.Exit(128 + int(syscall.SIGTERM))
-		case syscall.SIGINT:
-			defer cleanupFunc()
-			os.Exit(128 + int(syscall.SIGINT))
-		}
-	}()
 }
