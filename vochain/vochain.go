@@ -76,6 +76,8 @@ func newTendermint(app abci.Application, configFile string) (*nm.Node, error) {
 	if err := config.ValidateBasic(); err != nil {
 		return nil, errors.Wrap(err, "config is invalid")
 	}
+	newpath := filepath.Join(config.RootDir, "data")
+	os.MkdirAll(newpath, os.ModePerm)
 
 	// create logger
 	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
