@@ -41,6 +41,7 @@ curl -s http://localhost:1500 -d '{
 	"timestamp":'$(date +%s)',
 	"method":"checkProof",
 	"censusId":"GoT_Favorite",
+	"claimData":"'$C'",
 	"proofData":'$proof'}}' | jq .
 
 echo "getRoot"

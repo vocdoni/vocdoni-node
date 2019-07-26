@@ -146,8 +146,6 @@ func main() {
 		}
 	})
 
-	//censusmanager.HTTPlisten(port, "http", signer)
-
 	for {
 		time.Sleep(time.Second * 1)
 	}

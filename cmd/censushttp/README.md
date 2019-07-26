@@ -7,8 +7,7 @@ Reference implementation of a voting census service running on the Vocdoni platf
 In a GO ready environment:
 
 ```
-go get -u gitlab.com/vocdoni/dvote-census/...
-go build -o censusHttpService gitlab.com/vocdoni/dvote-census/cmd/censushttp
+go build -o censusHttpService gitlab.com/vocdoni/go-dvote/cmd/censushttp
 ```
 
 ## Usage
@@ -25,11 +24,7 @@ Example
 
 ## API
 
-A HTTP jSON endpoint is available with the following possible fields: `method` `censusId`, `claimData`, `rootHash` and `proofData`.
-
-If `pubKey` has been configured for a specific `censusId`, then two more methods are available (`timeStamp` and `signature`) to provide authentication.
-
-The next table shows the available methods and its relation with the fields.
+The next table shows a summary of the available methods and its relation with the fields.
 
 | method     | censusId  | claimData | rootHash | proofData | protected? | description |
 |------------|-----------|-----------|----------|-----------|------------|------------|
@@ -41,13 +36,12 @@ The next table shows the available methods and its relation with the fields.
 | `dump`       | mandatory | none      | optional | none      | yes        | list the contents of the census for a given hash
 
 
-## Signature
-
-The signature provides authentication by signing a concatenation of the following strings (even if empty) without spaces: `method censusId rootHash claimData timeStamp`.
-
-The `timeStamp` when received on the server side must not differ more than 10 seconds from the current UNIX time.
+Check https://vocdoni.io/docs/#/architecture/protocol/json-api and 
+https://vocdoni.io/docs/#/architecture/components/census-service for more details
 
 ## Examples
+
+**DEPRECATED**, see `test.sh` file for better examples
 
 #### add claims
 
