@@ -71,7 +71,9 @@ type CensusCfg struct {
 	LogLevel   string
 	Namespaces []string
 	Port       int
-	SigningKey string
+	SignKey    string
+	DataDir    string
+	SslDomain  string
 }
 
 //RelayCfg stores global configs for relay

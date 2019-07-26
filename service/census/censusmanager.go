@@ -2,7 +2,6 @@ package censusmanager
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -32,14 +31,14 @@ func AddNamespace(name, pubKey string) {
 	if len(Signatures) == 0 {
 		Signatures = make(map[string]string)
 	}
-	log.Infof("Adding namespace %s", name)
+	log.Infof("adding namespace %s", name)
 	mkTree := tree.Tree{}
 	mkTree.Init(name)
 	MkTrees[name] = &mkTree
 	Signatures[name] = pubKey
 }
 
-func reply(resp *types.CensusResponseMessage, w http.ResponseWriter) {
+func httpReply(resp *types.CensusResponseMessage, w http.ResponseWriter) {
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -72,8 +71,8 @@ func checkAuth(timestamp int32, signed, pubKey, message string) bool {
 	return false
 }
 
-func httpHandler(w http.ResponseWriter, req *http.Request, signer *signature.SignKeys) {
-	log.Debug("New request received")
+func HTTPhandler(w http.ResponseWriter, req *http.Request, signer *signature.SignKeys) {
+	log.Debug("new request received")
 	var rm types.CensusRequestMessage
 	if ok := checkRequest(w, req); !ok {
 		return
@@ -89,7 +88,7 @@ func httpHandler(w http.ResponseWriter, req *http.Request, signer *signature.Sig
 	*/
 	err := json.NewDecoder(req.Body).Decode(&rm)
 	if err != nil {
-		log.Warnf("Cannot decode JSON: %s", err.Error())
+		log.Warnf("cannot decode JSON: %s", err.Error())
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -97,27 +96,26 @@ func httpHandler(w http.ResponseWriter, req *http.Request, signer *signature.Sig
 		http.Error(w, "method must be specified", 400)
 		return
 	}
-	log.Debugf("Found method %s", rm.Request.Method)
-	resp := opHandler(&rm.Request, true)
+	log.Debugf("found method %s", rm.Request.Method)
+	resp := Handler(&rm.Request, true)
 	respMsg := new(types.CensusResponseMessage)
 	respMsg.Response = *resp
-	respMsg.Signature = "0x0"
 	respMsg.ID = rm.ID
 	respMsg.Response.Request = rm.ID
 	respMsg.Signature, err = signer.SignJSON(respMsg.Response)
 	if err != nil {
 		log.Warn(err.Error())
 	}
-	reply(respMsg, w)
+	httpReply(respMsg, w)
 }
 
-func opHandler(r *types.CensusRequest, isAuth bool) *types.CensusResponse {
+func Handler(r *types.CensusRequest, isAuth bool) *types.CensusResponse {
 	resp := new(types.CensusResponse)
 	op := r.Method
 	var err error
 
 	// Process data
-	log.Infof("Processing data => %+v", *r)
+	log.Infof("processing data => %+v", *r)
 
 	resp.Ok = true
 	resp.Error = ""
@@ -136,7 +134,6 @@ func opHandler(r *types.CensusRequest, isAuth bool) *types.CensusResponse {
 	}
 
 	//Methods without rootHash
-
 	if op == "getRoot" {
 		resp.Root = MkTrees[r.CensusID].GetRoot()
 		return resp
@@ -160,12 +157,11 @@ func opHandler(r *types.CensusRequest, isAuth bool) *types.CensusResponse {
 	}
 
 	//Methods with rootHash, if rootHash specified snapshot the tree
-
 	var t *tree.Tree
 	if len(r.RootHash) > 1 { //if rootHash specified
 		t, err = MkTrees[r.CensusID].Snapshot(r.RootHash)
 		if err != nil {
-			log.Warnf("Snapshot error: %s", err.Error())
+			log.Warnf("snapshot error: %s", err.Error())
 			resp.Ok = false
 			resp.Error = "invalid root hash"
 			return resp
@@ -227,43 +223,4 @@ func opHandler(r *types.CensusRequest, isAuth bool) *types.CensusResponse {
 	}
 
 	return resp
-}
-
-func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "*")
-	(*w).Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
-}
-
-// Listen starts a census service defined of type "proto"
-func Listen(port int, proto string, signer *signature.SignKeys) {
-	srv := &http.Server{
-		Addr:              fmt.Sprintf(":%d", port),
-		ReadHeaderTimeout: 4 * time.Second,
-		ReadTimeout:       4 * time.Second,
-		WriteTimeout:      4 * time.Second,
-		IdleTimeout:       3 * time.Second,
-	}
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		addCorsHeaders(&w, r)
-		if r.Method == http.MethodPost {
-			httpHandler(w, r, signer)
-		} else if r.Method != http.MethodOptions {
-			http.Error(w, "Not found", http.StatusNotFound)
-		}
-	})
-	if proto == "https" {
-		log.Infof("Starting server in https mode")
-		if err := srv.ListenAndServeTLS("server.crt", "server.key"); err != nil {
-			log.Panic(err)
-		}
-	}
-	if proto == "http" {
-		log.Infof("Starting server in http mode")
-		srv.SetKeepAlivesEnabled(false)
-		if err := srv.ListenAndServe(); err != nil {
-			log.Panic(err)
-		}
-	}
 }

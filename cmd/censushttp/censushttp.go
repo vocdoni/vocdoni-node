@@ -1,14 +1,17 @@
 package main
 
 import (
+	"net/http"
 	"os"
 	"os/user"
 	"strings"
+	"time"
 
 	flag "github.com/spf13/pflag"
 	viper "github.com/spf13/viper"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/net"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -29,6 +32,8 @@ func newConfig() (config.CensusCfg, error) {
 	flag.Int("port", 8080, "HTTP port to listen")
 	flag.String("namespaces", "", "Namespace and/or allowed public keys, syntax is <namespace>[:pubKey],[<namespace>[:pubKey]],...")
 	flag.String("signKey", "", "Private key for signing API response messages (ECDSA)")
+	flag.String("sslDomain", "", "Enables HTTPs using a LetsEncrypt certificate")
+	flag.String("dataDir", defaultDirPath, "Use a custom dir for storing the run time data")
 
 	viper := viper.New()
 	viper.SetDefault("logLevel", "info")
@@ -53,7 +58,9 @@ func newConfig() (config.CensusCfg, error) {
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("port", flag.Lookup("port"))
 	viper.BindPFlag("namespaces", flag.Lookup("namespaces"))
-	viper.BindPFlag("signingKey", flag.Lookup("signKey"))
+	viper.BindPFlag("signKey", flag.Lookup("signKey"))
+	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
+	viper.BindPFlag("sslDomain", flag.Lookup("sslDomain"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -63,6 +70,12 @@ func newConfig() (config.CensusCfg, error) {
 
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
+}
+
+func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 }
 
 func main() {
@@ -79,9 +92,9 @@ func main() {
 	signer = new(signature.SignKeys)
 
 	// Add signing private key if exist in configuration or flags
-	if len(globalCfg.SigningKey) > 1 {
+	if len(globalCfg.SignKey) > 1 {
 		log.Infof("adding signing key")
-		err := signer.AddHexKey(globalCfg.SigningKey)
+		err := signer.AddHexKey(globalCfg.SignKey)
 		if err != nil {
 			log.Fatalf("Fatal error adding hex key: %v", err.Error())
 		}
@@ -91,10 +104,9 @@ func main() {
 		log.Warn("no signing key provided, generating one...")
 		signer.Generate()
 		pub, priv := signer.HexString()
-		log.Infof("Public: %s | Private: %s", pub, priv)
+		log.Infof("Public: %s Private: %s", pub, priv)
 	}
 
-	port := globalCfg.Port
 	for i := 0; i < len(globalCfg.Namespaces); i++ {
 		s := strings.Split(globalCfg.Namespaces[i], ":")
 		ns := s[0]
@@ -104,8 +116,39 @@ func main() {
 			log.Infof("public Key authentication enabled on namespace %s", ns)
 		}
 		censusmanager.AddNamespace(ns, pubK)
-		log.Infof("starting process HTTP service on port %d for namespace %s", port, ns)
 	}
-	censusmanager.Listen(port, "http", signer)
 
+	pxy := net.NewProxy()
+	pxy.C.SSLDomain = globalCfg.SslDomain
+	pxy.C.SSLCertDir = globalCfg.DataDir
+	log.Infof("storing SSL certificate in %s", pxy.C.SSLCertDir)
+	pxy.C.Address = "0.0.0.0"
+	pxy.C.Port = globalCfg.Port
+	err = pxy.Init()
+	if err != nil {
+		log.Warn("letsEncrypt SSL certificate cannot be obtained, probably port 443 is not accessible or domain provided is not correct")
+		log.Info("disabling SSL!")
+		// Probably SSL has failed
+		pxy.C.SSLDomain = ""
+		globalCfg.SslDomain = ""
+		err = pxy.Init()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+	}
+
+	pxy.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
+		addCorsHeaders(&w, r)
+		if r.Method == http.MethodPost {
+			censusmanager.HTTPhandler(w, r, signer)
+		} else if r.Method != http.MethodOptions {
+			http.Error(w, "Not found", http.StatusNotFound)
+		}
+	})
+
+	//censusmanager.HTTPlisten(port, "http", signer)
+
+	for {
+		time.Sleep(time.Second * 1)
+	}
 }
