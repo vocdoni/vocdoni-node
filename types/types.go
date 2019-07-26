@@ -108,3 +108,4 @@ type Batch struct {
 	Nonce      []byte
 	Signature  string
 }
+

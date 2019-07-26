@@ -3,6 +3,7 @@ package signature
 import (
 	"crypto/ecdsa"
 	hex "encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -81,6 +82,19 @@ func (k *SignKeys) Sign(message string) (string, error) {
 	}
 	signHex := hex.EncodeToString(signature)
 	return fmt.Sprintf("0x%s", signHex), err
+}
+
+// SignJSON signs a JSON message. Message is a struct interface
+func (k *SignKeys) SignJSON(message interface{}) (string, error) {
+	rawMsg, err := json.Marshal(message)
+	if err != nil {
+		return "", errors.New("unable to marshal message to sign: %s")
+	}
+	sig, err := k.Sign(string(rawMsg))
+	if err != nil {
+		return "",errors.New("error signing response body: %s")
+	}
+	return sig, nil
 }
 
 // Verify verifies a message. Signature and pubHex are HexStrings

@@ -117,3 +117,41 @@ type FailBody struct {
 		Message string `json:"message"`
 	} `json:"error"`
 }
+
+// CensusRequestMessage represents a census manager JSON request package
+type CensusRequestMessage struct {
+	ID        string        `json:"id"`
+	Request   CensusRequest `json:"request"`
+	Signature string        `json:"signature"`
+}
+
+// CensusRequest type represents a JSON object with all possible requests fields
+type CensusRequest struct {
+	Method     string   `json:"method"`     // method to call
+	CensusID   string   `json:"censusId"`   // References to MerkleTree namespace
+	RootHash   string   `json:"rootHash"`   // References to MerkleTree rootHash
+	ClaimData  string   `json:"claimData"`  // Data to add to the MerkleTree
+	ClaimsData []string `json:"claimsData"` //Multiple Data to add to the MerkleTree
+	ProofData  string   `json:"proofData"`  // MerkleProof to check
+	TimeStamp  int32    `json:"timestamp"`  // Unix TimeStamp in seconds
+}
+
+// CensusResponseMessage represents a census manager JSON response package
+type CensusResponseMessage struct {
+	ID        string         `json:"id"`
+	Response  CensusResponse `json:"request"`
+	Signature string         `json:"signature"`
+}
+
+// CensusResponse represents a JSON object with the response of the requested method
+type CensusResponse struct {
+	Ok         bool     `json:"ok"`
+	Request    string   `json:"request"`
+	Error      string   `json:"error"`
+	Root       string   `json:"root"`
+	Siblings   string   `json:"siblings"`
+	Idx        string   `json:"idx"`
+	ValidProof bool     `json:"validProof"`
+	ClaimsData []string `json:"claimsData"`
+	TimeStamp  int32    `json:"timestamp"`
+}

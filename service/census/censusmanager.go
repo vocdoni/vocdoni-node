@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/types"
+
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	tree "gitlab.com/vocdoni/go-dvote/tree"
@@ -22,42 +24,6 @@ var Signatures map[string]string
 
 var currentSignature signature.SignKeys
 
-type RequestMessage struct {
-	ID        string  `json:"id"`
-	Request   Request `json:"request"`
-	Signature string  `json:"signature"`
-}
-
-// Claim type represents a JSON object with all possible fields
-type Request struct {
-	Method     string   `json:"method"`     // method to call
-	CensusID   string   `json:"censusId"`   // References to MerkleTree namespace
-	RootHash   string   `json:"rootHash"`   // References to MerkleTree rootHash
-	ClaimData  string   `json:"claimData"`  // Data to add to the MerkleTree
-	ClaimsData []string `json:"claimsData"` //Multiple Data to add to the MerkleTree
-	ProofData  string   `json:"proofData"`  // MerkleProof to check
-	TimeStamp  int32    `json:"timestamp"`  // Unix TimeStamp in seconds
-}
-
-type ResponseMessage struct {
-	ID        string   `json:"id"`
-	Response  Response `json:"request"`
-	Signature string   `json:"signature"`
-}
-
-// Result type represents a JSON object with the result of the method executed
-type Response struct {
-	Ok         bool     `json:"ok"`
-	Request    string   `json:"request"`
-	Error      string   `json:"error"`
-	Root       string   `json:"root"`
-	Siblings   string   `json:"siblings"`
-	Idx        string   `json:"idx"`
-	ValidProof bool     `json:"validProof"`
-	ClaimsData []string `json:"claimsData"`
-	TimeStamp  int32    `json:"timestamp"` // Unix TimeStamp in seconds
-}
-
 // AddNamespace adds a new merkletree identified by a censusId (name)
 func AddNamespace(name, pubKey string) {
 	if len(MkTrees) == 0 {
@@ -73,7 +39,7 @@ func AddNamespace(name, pubKey string) {
 	Signatures[name] = pubKey
 }
 
-func reply(resp *ResponseMessage, w http.ResponseWriter) {
+func reply(resp *types.CensusResponseMessage, w http.ResponseWriter) {
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -106,9 +72,9 @@ func checkAuth(timestamp int32, signed, pubKey, message string) bool {
 	return false
 }
 
-func httpHandler(w http.ResponseWriter, req *http.Request) {
+func httpHandler(w http.ResponseWriter, req *http.Request, signer *signature.SignKeys) {
 	log.Debug("New request received")
-	var rm RequestMessage
+	var rm types.CensusRequestMessage
 	if ok := checkRequest(w, req); !ok {
 		return
 	}
@@ -133,16 +99,20 @@ func httpHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	log.Debugf("Found method %s", rm.Request.Method)
 	resp := opHandler(&rm.Request, true)
-	respMsg := new(ResponseMessage)
+	respMsg := new(types.CensusResponseMessage)
 	respMsg.Response = *resp
 	respMsg.Signature = "0x0"
 	respMsg.ID = rm.ID
 	respMsg.Response.Request = rm.ID
+	respMsg.Signature, err = signer.SignJSON(respMsg.Response)
+	if err != nil {
+		log.Warn(err.Error())
+	}
 	reply(respMsg, w)
 }
 
-func opHandler(r *Request, isAuth bool) *Response {
-	resp := new(Response)
+func opHandler(r *types.CensusRequest, isAuth bool) *types.CensusResponse {
+	resp := new(types.CensusResponse)
 	op := r.Method
 	var err error
 
@@ -266,7 +236,7 @@ func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
 }
 
 // Listen starts a census service defined of type "proto"
-func Listen(port int, proto string) {
+func Listen(port int, proto string, signer *signature.SignKeys) {
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", port),
 		ReadHeaderTimeout: 4 * time.Second,
@@ -278,7 +248,7 @@ func Listen(port int, proto string) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		addCorsHeaders(&w, r)
 		if r.Method == http.MethodPost {
-			httpHandler(w, r)
+			httpHandler(w, r, signer)
 		} else if r.Method != http.MethodOptions {
 			http.Error(w, "Not found", http.StatusNotFound)
 		}
