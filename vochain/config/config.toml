@@ -30,7 +30,7 @@ fast_sync = true
 db_backend = "goleveldb"
 
 # Database directory
-db_dir = "data"
+db_dir = "data/coredb"
 
 # Output level for logging, including package level options
 log_level = "main:info,state:info,*:error"
@@ -164,7 +164,7 @@ persistent_peers = ""
 upnp = false
 
 # Path to address book
-addr_book_file = "config/addrbook.json"
+addr_book_file = "vochain/config/addrbook.json"
 
 # Set true for strict address routability rules
 # Set false for private or local networks
@@ -239,7 +239,7 @@ max_msg_bytes = 1048576
 ##### consensus configuration options #####
 [consensus]
 
-wal_file = "data/cs.wal/wal"
+wal_file = "vochain/data/cs.wal/wal"
 
 timeout_propose = "3s"
 timeout_propose_delta = "500ms"

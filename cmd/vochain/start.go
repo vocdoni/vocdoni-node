@@ -34,8 +34,8 @@ var appdbDir string
 
 func init() {
 	flag.StringVar(&configFile, "config", "vochain/config/config.toml", "Path to config.toml")
-	flag.StringVar(&appdbName, "appdbname", "./data/vochaindb", "Application database name")
-	flag.StringVar(&appdbDir, "appdbdir", "./data/appdb", "Path where the application database will be located")
+	flag.StringVar(&appdbName, "appdbname", "vochaindb", "Application database name")
+	flag.StringVar(&appdbDir, "appdbdir", "vochain/data/appdb", "Path where the application database will be located")
 }
 
 func main() {
