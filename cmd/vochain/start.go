@@ -1,4 +1,4 @@
-package vochain
+package main
 
 import (
 	"flag"
@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/cosmos/cosmos-sdk/codec"
-	abci "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	cmn "github.com/tendermint/tendermint/libs/common"
@@ -35,7 +34,7 @@ var appdbDir string
 
 func init() {
 	flag.StringVar(&configFile, "config", "vochain/config/config.toml", "Path to config.toml")
-	flag.StringVar(&appdbName, "appdbname", "vochaindb", "Application database name")
+	flag.StringVar(&appdbName, "appdbname", "./data/vochaindb", "Application database name")
 	flag.StringVar(&appdbDir, "appdbdir", "./data/appdb", "Path where the application database will be located")
 }
 
@@ -48,15 +47,6 @@ func main() {
 	defer db.Close()
 	vlog.Info("NewBaseApp")
 	app := vochain.NewBaseApplication(db)
-
-	appState := fmt.Sprintf("{censusManagers:['%s','%s','%s']}", testtypes.ValidatorsPubK1, testtypes.ValidatorsPubK2, testtypes.ValidatorsPubK3)
-	appStateJSON, err := codec.Cdc.MarshalJSON(appState)
-
-	req := abci.RequestInitChain{
-		AppStateBytes: appStateJSON,
-	}
-	app.InitChain(req)
-	//app.Commit()
 
 	flag.Parse()
 	vlog.Info("newTendermint")
@@ -117,7 +107,8 @@ func newTendermint(app vochain.BaseApplication, configFile string) (*nm.Node, er
 	}
 
 	// read genesis file or create it with previously generated keys
-	//appstatebytesX, err := hex.DecodeString(testtypes.CensusManagersPubK1)
+	appState := fmt.Sprintf("{censusManagers:['%s','%s','%s']}", testtypes.ValidatorsPubK1, testtypes.ValidatorsPubK2, testtypes.ValidatorsPubK3)
+	appStateJSON, err := codec.Cdc.MarshalJSON(appState)
 
 	genFile := config.GenesisFile()
 	if cmn.FileExists(genFile) {
@@ -137,19 +128,13 @@ func newTendermint(app vochain.BaseApplication, configFile string) (*nm.Node, er
 				Power:   10,
 			},
 		}
-		appState := fmt.Sprintf("{censusManagers:['%s','%s','%s']}", testtypes.ValidatorsPubK1, testtypes.ValidatorsPubK2, testtypes.ValidatorsPubK3)
-		//vlog.Info(appState)
-		appStateJSON, err := codec.Cdc.MarshalJSON(appState)
-		if err != nil {
-			vlog.Error("Error JSONizining appState: +v", err)
-			panic("Error JSONizining appState")
-		}
-		genDoc.AppStateBytes = appStateJSON
+		genDoc.AppState = appStateJSON
 
 		if err := genDoc.SaveAs(genFile); err != nil {
 			panic(fmt.Sprintf("Cannot load or generate genesis file: %v", err))
 		}
 		logger.Info("Generated genesis file", "path", genFile)
+		vlog.Info("genesis file: %+v", genFile)
 	}
 
 	// create node

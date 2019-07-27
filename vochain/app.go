@@ -1,9 +1,10 @@
 package vochain
 
 import (
+	vlog "gitlab.com/vocdoni/go-dvote/log"
+
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	dbm "github.com/tendermint/tm-cmn/db"
-	log "gitlab.com/vocdoni/go-dvote/log"
 )
 
 type BaseApplication struct {
@@ -45,7 +46,7 @@ func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 }
 
 func (BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-	log.Infof("GETAPPSTATEBYTES: %+v", req.GetAppStateBytes())
+	vlog.Infof("GETAPPSTATEBYTES: %+v", req.GetAppStateBytes())
 	return abcitypes.ResponseInitChain{}
 }
 
