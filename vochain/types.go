@@ -47,3 +47,38 @@ const (
 func (c CurrentProcessState) String() string {
 	return fmt.Sprintf("%d", c)
 }
+
+type TxMethod string
+
+const (
+	newProcessTx          TxMethod = "newProcessTx"
+	voteTx                TxMethod = "voteTx"
+	addCensusManagerTx    TxMethod = "addCensusManagerTx"
+	removeCensusManagerTx TxMethod = "removeCensusManagerTx"
+	addValidatorTx        TxMethod = "addValidatorTx"
+	removeValidatorTx     TxMethod = "removeValidatorTx"
+	getProcessState       TxMethod = "getProcessState"
+)
+
+// String returns the CurrentProcessState integer as string
+func (m TxMethod) String() string {
+	return fmt.Sprintf("%d", m)
+}
+
+type Tx interface {
+	GetMethod() string
+	GetArgs() []string
+}
+
+type ValidTx struct {
+	Method TxMethod `json:"method"`
+	Args   []string `json:"args"`
+}
+
+func (tx ValidTx) GetMethod() string {
+	return tx.Method.String()
+}
+
+func (tx ValidTx) GetArgs() []string {
+	return tx.Args
+}

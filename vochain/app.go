@@ -1,23 +1,23 @@
 package vochain
 
 import (
-	vlog "gitlab.com/vocdoni/go-dvote/log"
-
+	"github.com/cosmos/cosmos-sdk/codec"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	dbm "github.com/tendermint/tm-cmn/db"
+	vlog "gitlab.com/vocdoni/go-dvote/log"
 )
 
 type BaseApplication struct {
-	db      *dbm.GoLevelDB
-	name    string
-	appHash string
+	db   *dbm.GoLevelDB
+	name string
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
-func NewBaseApplication(db *dbm.GoLevelDB) *BaseApplication {
+func NewBaseApplication(db *dbm.GoLevelDB, name string) *BaseApplication {
 	return &BaseApplication{
-		db: db,
+		db:   db,
+		name: name,
 	}
 }
 
@@ -34,6 +34,7 @@ func (BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Respo
 }
 
 func (BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
+	_ = splitTx(req.Tx)
 	return abcitypes.ResponseCheckTx{Code: 0}
 }
 
@@ -46,7 +47,6 @@ func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 }
 
 func (BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-	vlog.Infof("GETAPPSTATEBYTES: %+v", req.GetAppStateBytes())
 	return abcitypes.ResponseInitChain{}
 }
 
@@ -56,4 +56,13 @@ func (BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.Res
 
 func (BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	return abcitypes.ResponseEndBlock{}
+}
+
+func splitTx(content []byte) error {
+	vlog.Infof("%+v", content)
+	var validTx ValidTx
+	err := codec.Cdc.UnmarshalJSON(content, &validTx)
+	vlog.Infof("%+v", err)
+	return nil
+
 }

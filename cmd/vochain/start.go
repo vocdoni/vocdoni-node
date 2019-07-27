@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/cosmos/cosmos-sdk/codec"
+	abci "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	cmn "github.com/tendermint/tendermint/libs/common"
@@ -31,11 +32,13 @@ import (
 var configFile string
 var appdbName string
 var appdbDir string
+var appName string
 
 func init() {
 	flag.StringVar(&configFile, "config", "vochain/config/config.toml", "Path to config.toml")
 	flag.StringVar(&appdbName, "appdbname", "vochaindb", "Application database name")
 	flag.StringVar(&appdbDir, "appdbdir", "vochain/data/appdb", "Path where the application database will be located")
+	flag.StringVar(&appName, "appName", "testapp", "Name of the app")
 }
 
 func main() {
@@ -46,7 +49,8 @@ func main() {
 	}
 	defer db.Close()
 	vlog.Info("NewBaseApp")
-	app := vochain.NewBaseApplication(db)
+
+	app := vochain.NewBaseApplication(db, appName)
 
 	flag.Parse()
 	vlog.Info("newTendermint")
@@ -61,6 +65,10 @@ func main() {
 		node.Stop()
 		node.Wait()
 	}()
+
+	txbytes := []byte(`{"method": "TEST","args": ["a", "b"]}`)
+	req := abci.RequestCheckTx{Tx: txbytes}
+	go app.CheckTx(req)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
