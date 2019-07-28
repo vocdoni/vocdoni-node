@@ -109,13 +109,26 @@ type BoolResponse struct {
 	Signature string `json:"signature"`
 }
 
+//ErrorResponse holds a fail response to be sent from the router
+type ErrorResponse struct {
+	ID    string `json:"id"`
+	Error struct {
+		Request   string `json:"request"`
+		Message   string `json:"message"`
+		Timestamp int32  `json:"timestamp"`
+	} `json:"error"`
+	Signature string `json:"signature"`
+}
+
 //FailBody holds a fail message to be sent from the router
 type FailBody struct {
 	ID    string `json:"id"`
 	Error struct {
-		Request string `json:"request"`
-		Message string `json:"message"`
+		Request   string `json:"request"`
+		Message   string `json:"message"`
+		Timestamp int32  `json:"timestamp"`
 	} `json:"error"`
+	Signature string `json:"signature"`
 }
 
 // CensusRequestMessage represents a census manager JSON request package

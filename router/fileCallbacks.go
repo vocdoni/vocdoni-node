@@ -3,6 +3,7 @@ package router
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -36,6 +37,8 @@ func fetchFile(uri, requestId string, msg types.Message, storage data.Storage, t
 	var resp *http.Response
 	var content []byte
 	var err error
+	var errMsg string
+
 	found := false
 	for idx, t := range transportTypes {
 		if found {
@@ -65,8 +68,8 @@ func fetchFile(uri, requestId string, msg types.Message, storage data.Storage, t
 	}
 
 	if err != nil {
-		log.Warnf("error fetching uri %s", uri)
-		transport.Send(buildReply(msg, buildFailReply(requestId, "Error fetching uri")))
+		errMsg = fmt.Sprintf("error fetching uri %s", uri)
+		sendError(transport, signer, msg, requestId, errMsg)
 	} else {
 		b64content := base64.StdEncoding.EncodeToString(content)
 		log.Debugf("file fetched, b64 size %d", len(b64content))
@@ -81,28 +84,54 @@ func fetchFile(uri, requestId string, msg types.Message, storage data.Storage, t
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
-			log.Warnf("error marshaling response body: %s", err)
+			errMsg = fmt.Sprintf("error marshaling response body: %s", err)
+			sendError(transport, signer, msg, requestId, errMsg)
+		} else {
+			transport.Send(buildReply(msg, rawResponse))
 		}
-		transport.Send(buildReply(msg, rawResponse))
 	}
 }
 
-func addFileMethod(msg types.Message, rawRequest []byte, storage data.Storage, transport net.Transport, signer signature.SignKeys) {
+func sendError(transport net.Transport, signer signature.SignKeys, msg types.Message, requestID, errMsg string) {
+	log.Warn(errMsg)
+	var err error
+	var response types.ErrorResponse
+	response.ID = requestID
+	response.Error.Request = requestID
+	response.Error.Timestamp = int32(time.Now().Unix())
+	response.Error.Message = errMsg
+	response.Signature, err = signer.SignJSON(response.Error)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	rawResponse, err := json.Marshal(response)
+	if err != nil {
+		log.Warnf("error marshaling response body: %s", err)
+	}
+	transport.Send(buildReply(msg, rawResponse))
+}
+
+func addFileMethod(msg types.Message, rawRequest []byte, storage data.Storage,
+	transport net.Transport, signer signature.SignKeys) {
 	var fileRequest types.AddFileRequest
+	var errMsg string
 	if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-		log.Warnf("couldn't decode into AddFileRequest type from request %s", msg.Data)
+		errMsg = fmt.Sprintf("could not unmarshal AddFileRequest (%s)", err.Error())
+		sendError(transport, signer, msg, fileRequest.ID, errMsg)
 		return
 	}
 	authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
 	if err != nil {
-		log.Warnf("wrong authorization: %s", err)
+		errMsg = fmt.Sprintf("wrong authorization: %s", err.Error())
+		sendError(transport, signer, msg, fileRequest.ID, errMsg)
 		return
 	}
 	if authorized {
 		content := fileRequest.Request.Content
 		b64content, err := base64.StdEncoding.DecodeString(content)
 		if err != nil {
-			log.Warnf("couldn't decode content")
+			errMsg = "could not decode base64 content"
+			sendError(transport, signer, msg, fileRequest.ID, errMsg)
 			return
 		}
 		reqType := fileRequest.Request.Type
@@ -110,7 +139,8 @@ func addFileMethod(msg types.Message, rawRequest []byte, storage data.Storage, t
 		go addFile(reqType, fileRequest.ID, b64content, msg, storage, transport, signer)
 
 	} else {
-		transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
+		errMsg = "unauthorized"
+		sendError(transport, signer, msg, fileRequest.ID, errMsg)
 	}
 }
 
@@ -123,7 +153,9 @@ func addFile(reqType, requestId string, b64content []byte, msg types.Message, st
 	case "ipfs":
 		cid, err := storage.Publish(b64content)
 		if err != nil {
-			log.Warnf("cannot add file")
+			sendError(transport, signer, msg, requestId,
+				fmt.Sprintf("cannot add file (%s)", err.Error()))
+			return
 		}
 		log.Debugf("added file %s, b64 size of %d", cid, len(b64content))
 		ipfsRouteBaseURL := "ipfs://"
@@ -138,40 +170,50 @@ func addFile(reqType, requestId string, b64content []byte, msg types.Message, st
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
-			log.Warnf("error marshaling response body: %s", err)
+			sendError(transport, signer, msg, requestId,
+				fmt.Sprintf("could not unmarshal response (%s)", err.Error()))
+		} else {
+			transport.Send(buildReply(msg, rawResponse))
 		}
-		transport.Send(buildReply(msg, rawResponse))
 	}
 
 }
 
 func pinListMethod(msg types.Message, rawRequest []byte, storage data.Storage, transport net.Transport, signer signature.SignKeys) {
 	var fileRequest types.PinListRequest
+	var errMsg string
 	if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-		log.Warnf("couldn't decode into PinListRequest type from request %s", msg.Data)
+		errMsg = fmt.Sprintf("couldn't decode into PinListRequest type from request (%s)", err.Error())
+		sendError(transport, signer, msg, fileRequest.ID, errMsg)
 		return
 	}
 	authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
 	if err != nil {
-		log.Warnf("error checking authorization: %s", err)
+		errMsg = fmt.Sprintf("error checking authorization (%s)", err.Error())
+		sendError(transport, signer, msg, fileRequest.ID, errMsg)
 		return
 	}
 	if authorized {
 		go pinList(fileRequest.ID, msg, storage, transport, signer)
 	} else {
-		transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
+		sendError(transport, signer, msg, fileRequest.ID, "Unauthorized")
 	}
 }
 
 func pinList(requestId string, msg types.Message, storage data.Storage, transport net.Transport, signer signature.SignKeys) {
+	var errMsg string
 	log.Info("calling PinList")
 	pins, err := storage.ListPins()
 	if err != nil {
-		log.Warn("internal error fetching pins")
+		errMsg = fmt.Sprintf("internal error fetching pins (%s)", err.Error())
+		sendError(transport, signer, msg, requestId, errMsg)
+		return
 	}
 	pinsJsonArray, err := json.Marshal(pins)
 	if err != nil {
-		log.Warn("internal error parsing pins")
+		errMsg = fmt.Sprintf("internal error parsing pins (%s)", err.Error())
+		sendError(transport, signer, msg, requestId, errMsg)
+		return
 	} else {
 		var response types.ListPinsResponse
 		response.ID = requestId
@@ -184,7 +226,9 @@ func pinList(requestId string, msg types.Message, storage data.Storage, transpor
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
-			log.Warnf("error marshaling response body: %s", err)
+			errMsg = fmt.Sprintf("internal error marshalig response body (%s)", err.Error())
+			sendError(transport, signer, msg, requestId, errMsg)
+			return
 		}
 		transport.Send(buildReply(msg, rawResponse))
 	}
@@ -193,18 +237,18 @@ func pinList(requestId string, msg types.Message, storage data.Storage, transpor
 func pinFileMethod(msg types.Message, rawRequest []byte, storage data.Storage, transport net.Transport, signer signature.SignKeys) {
 	var fileRequest types.PinFileRequest
 	if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-		log.Warnf("couldn't decode into PinFileRequest type from request %s", msg.Data)
+		sendError(transport, signer, msg, fileRequest.ID, fmt.Sprintf("could not decode PinFileRequest (%s)", err.Error()))
 		return
 	}
 	authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
 	if err != nil {
-		log.Warnf("error checking authorization: %s", err)
+		sendError(transport, signer, msg, fileRequest.ID, "error checking authorization")
 		return
 	}
 	if authorized {
 		go pinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
 	} else {
-		transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
+		sendError(transport, signer, msg, fileRequest.ID, "unauthorized")
 	}
 }
 
@@ -212,8 +256,7 @@ func pinFile(uri, requestId string, msg types.Message, storage data.Storage, tra
 	log.Infof("calling PinFile %s", uri)
 	err := storage.Pin(uri)
 	if err != nil {
-		log.Warnf("error pinning file %s", uri)
-		transport.Send(buildReply(msg, buildFailReply(requestId, "Error pinning file")))
+		sendError(transport, signer, msg, requestId, fmt.Sprintf("error pinning file (%s)", err.Error()))
 	} else {
 		var response types.BoolResponse
 		response.ID = requestId
@@ -226,28 +269,29 @@ func pinFile(uri, requestId string, msg types.Message, storage data.Storage, tra
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
-			log.Warnf("error marshaling response body: %s", err)
+			sendError(transport, signer, msg, requestId, fmt.Sprintf("error marshaling (%s)", err.Error()))
+		} else {
+			transport.Send(buildReply(msg, rawResponse))
 		}
-		transport.Send(buildReply(msg, rawResponse))
 	}
 }
 
 func unpinFileMethod(msg types.Message, rawRequest []byte, storage data.Storage, transport net.Transport, signer signature.SignKeys) {
 	var fileRequest types.UnpinFileRequest
 	if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-		log.Warnf("couldn't decode into UnpinFileRequest type from request %s", msg.Data)
+		sendError(transport, signer, msg, fileRequest.ID,
+			fmt.Sprintf("could not decode UnpinFileRequest (%s)", err.Error()))
 		return
 	}
 	authorized, err := signer.VerifySender(string(rawRequest), fileRequest.Signature)
 	if err != nil {
-		log.Warnf("error checking authorization: %s", err)
+		sendError(transport, signer, msg, fileRequest.ID, "unauthorized")
 		return
 	}
 	if authorized {
-
 		go unPinFile(fileRequest.Request.URI, fileRequest.ID, msg, storage, transport, signer)
 	} else {
-		transport.Send(buildReply(msg, buildFailReply(fileRequest.ID, "Unauthorized")))
+		sendError(transport, signer, msg, fileRequest.ID, "unauthorized")
 	}
 }
 
@@ -255,8 +299,7 @@ func unPinFile(uri, requestId string, msg types.Message, storage data.Storage, t
 	log.Infof("calling UnPinFile %s", uri)
 	err := storage.Unpin(uri)
 	if err != nil {
-		log.Warnf("error unpinning file %s", uri)
-		transport.Send(buildReply(msg, buildFailReply(requestId, "Error unpinning file")))
+		sendError(transport, signer, msg, requestId, fmt.Sprintf("could not unpin file (%s)", err.Error()))
 	} else {
 		var response types.BoolResponse
 		response.ID = requestId
@@ -269,8 +312,9 @@ func unPinFile(uri, requestId string, msg types.Message, storage data.Storage, t
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
-			log.Warnf("error marshaling response body: %s", err)
+			sendError(transport, signer, msg, requestId, fmt.Sprintf("could not unmarshal response (%s)", err.Error()))
+		} else {
+			transport.Send(buildReply(msg, rawResponse))
 		}
-		transport.Send(buildReply(msg, rawResponse))
 	}
 }

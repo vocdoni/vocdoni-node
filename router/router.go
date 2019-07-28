@@ -13,18 +13,6 @@ import (
 	"encoding/json"
 )
 
-func buildFailReply(requestId, message string) []byte {
-	var response types.FailBody
-	response.ID = requestId
-	response.Error.Message = message
-	response.Error.Request = requestId
-	rawResponse, err := json.Marshal(response)
-	if err != nil {
-		log.Warnf("error marshaling response body: %s", err)
-	}
-	return rawResponse
-}
-
 func buildReply(msg types.Message, data []byte) types.Message {
 	reply := new(types.Message)
 	reply.TimeStamp = int32(time.Now().Unix())
