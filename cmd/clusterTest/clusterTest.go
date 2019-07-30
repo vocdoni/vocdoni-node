@@ -1,4 +1,4 @@
-package clusterTest
+package clustertest
 
 import (
 	"encoding/json"
