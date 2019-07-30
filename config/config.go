@@ -105,3 +105,10 @@ type ClusterCfg struct {
 	Private         crypto.PrivKey
 	ClusterLogLevel string
 }
+
+type ClusterTestCfg struct {
+	LogLevel    string
+	Targets     []string
+	Interval    int
+	PkgSize 	int
+}
