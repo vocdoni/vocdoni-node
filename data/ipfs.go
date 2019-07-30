@@ -53,7 +53,7 @@ func checkIPFSinit(bin string) (bool, error) {
 
 //Init sets up an IPFS native node and cluster
 func (i *IPFSHandle) Init(d *types.DataStore) error {
-	lvl, err := logging.LogLevel("WARN")
+	lvl, err := logging.LogLevel("WARNING")
 	if err != nil {
 		log.Warn(err.Error())
 	}
