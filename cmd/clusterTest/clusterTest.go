@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -58,7 +59,7 @@ func newConfig() (config.ClusterTestCfg, error) {
 	flag.Parse()
 
 	viper.SetDefault("logLevel", "warn")
-	viper.SetDefault("targets", "")
+	viper.SetDefault("targets", []string{"127.0.0.1:9090"})
 	viper.SetDefault("interval", 1000)
 	viper.SetDefault("pkgSize", 1000)
 
@@ -137,13 +138,14 @@ func main() {
 		case <-timer.C:
 			msg := make([]byte, globalCfg.PkgSize)
 			_, _ = r.Read(msg)
-			request := fmt.Sprintf(dummyRequestAddFile, msg)
+			b64 := base64.StdEncoding.EncodeToString(msg)
+			request := fmt.Sprintf(dummyRequestAddFile, b64)
 			c := r.Intn(len(conns))
 			conn := conns[c]
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second*5)); err != nil {
 				log.Errorf("Failed to receive pong: %v", err)
 			}
-			log.Infof("Conn %d sending message number %d", c, i)
+			log.Infof("Conn %d sending message number %d, message %s", c, i, request)
 			conn.WriteMessage(websocket.TextMessage, []byte(request))
 			// request here
 			i++

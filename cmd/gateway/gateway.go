@@ -55,6 +55,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
+	flag.String("clusterloglevel", "ERROR", "Log level for ipfs cluster (debug, info, warning, error)")
 
 	flag.Parse()
 
@@ -87,6 +88,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("cluster.pintracker", "map")
 	viper.SetDefault("cluster.leave", true)
 	viper.SetDefault("cluster.alloc", "disk")
+	viper.SetDefault("cluster.clusterloglevel", "ERROR")
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -125,6 +127,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("cluster.secret", flag.Lookup("ipfsClusterKey"))
 	viper.BindPFlag("cluster.bootstraps", flag.Lookup("ipfsClusterPeers"))
+	viper.BindPFlag("cluster.clusterloglevel", flag.Lookup("clusterloglevel"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
