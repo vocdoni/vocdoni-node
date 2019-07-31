@@ -1,4 +1,4 @@
-package clustertest
+package main
 
 import (
 	"encoding/json"
@@ -45,7 +45,7 @@ func newConfig() (config.ClusterTestCfg, error) {
 
 	flag.String("logLevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 	flag.Int("pkgSize", 1000, "size in bytes of files to upload")
-	flag.StringArray("targets", []string{"127.0.0.1:9090"}, "target IP and port")
+	flag.StringSlice("targets", []string{"127.0.0.1:9090"}, "target IP and port")
 	flag.Int("interval", 1000, "interval between requests in ms")
 
 	flag.Usage = func() {
@@ -105,7 +105,7 @@ func main() {
 	timer := time.NewTicker(time.Millisecond * time.Duration(globalCfg.Interval))
 	rand.Seed(time.Now().UnixNano())
 
-	var u []url.URL
+	u := make([]url.URL, len(globalCfg.Targets))
 	for i := 0; i < len(globalCfg.Targets); i++ {
 		u[i] = url.URL{Scheme: "ws", Host: globalCfg.Targets[i], Path: "/dvote"}
 	}
@@ -114,7 +114,7 @@ func main() {
 	for i := 0; i < len(globalCfg.Targets); i++ {
 		c, _, err := websocket.DefaultDialer.Dial(u[i].String(), nil)
 		if err != nil {
-			log.Errorf("Failed to connect", i, err)
+			log.Error("Failed to connect: ", i, err)
 			break
 		}
 		conns = append(conns, c)
@@ -146,7 +146,7 @@ func main() {
 			log.Infof("Conn %d sending message number %d", c, i)
 			conn.WriteMessage(websocket.TextMessage, []byte(request))
 			// request here
-
+			i++
 
 			msgType, msg, err := conn.ReadMessage()
 			if err != nil {
@@ -154,7 +154,6 @@ func main() {
 				break
 			}
 			log.Infof("Message info: Response message type: %v, Response message content: %v", msgType, string(msg))
-			i++
 		default:
 			continue
 		}
