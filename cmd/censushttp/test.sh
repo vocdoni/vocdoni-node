@@ -1,11 +1,24 @@
 #!/bin/bash
 
 C="JonSnow-$RANDOM"
+#PUB="0347f650ea2adee1affe2fe81ee8e11c637d506da98dc16e74fc64ecb31e1bb2c1"
+PUB=""
+SIG="000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+
+echo "addCensus"
+curl -s http://localhost:1500 -d '{
+"id":"req-'$RANDOM'",
+"signature":"'$SIG'",
+"request":{
+	"timestamp":'$(date +%s)',
+	"method":"addCensus",
+	"censusId":"GoT_Favorite",
+	"pubKeys":["'$PUB'"]}}' | jq .
 
 echo "addClaim"
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"addClaim",
@@ -15,17 +28,17 @@ curl -s http://localhost:1500 -d '{
 echo "addClaim"
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"addClaim",
 	"censusId":"GoT_Favorite",
-	"claimData":"Tyrion '$RANDOM'"}}' | jq .
+	"claimData":"Tyrion-'$RANDOM'"}}' | jq .
 
 echo "genProof"
 proof=$(curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"genProof",
@@ -36,7 +49,7 @@ echo $proof
 echo "checkProof"
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"checkProof",
@@ -47,7 +60,7 @@ curl -s http://localhost:1500 -d '{
 echo "getRoot"
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"getRoot",
@@ -56,7 +69,7 @@ curl -s http://localhost:1500 -d '{
 echo "dump"
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"dump",

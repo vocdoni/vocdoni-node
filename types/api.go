@@ -146,6 +146,7 @@ type CensusRequest struct {
 	ClaimData  string   `json:"claimData"`  // Data to add to the MerkleTree
 	ClaimsData []string `json:"claimsData"` //Multiple Data to add to the MerkleTree
 	ProofData  string   `json:"proofData"`  // MerkleProof to check
+	PubKeys    []string `json:"pubKeys"`    // Public key managers for creating a new census
 	TimeStamp  int32    `json:"timestamp"`  // Unix TimeStamp in seconds
 }
 

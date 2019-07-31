@@ -68,12 +68,12 @@ type W3Cfg struct {
 
 //CensusCfg stores global configs for censushttp
 type CensusCfg struct {
-	LogLevel   string
-	Namespaces []string
-	Port       int
-	SignKey    string
-	DataDir    string
-	SslDomain  string
+	LogLevel  string
+	Port      int
+	SignKey   string
+	DataDir   string
+	SslDomain string
+	RootKey   string
 }
 
 //RelayCfg stores global configs for relay

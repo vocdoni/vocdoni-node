@@ -25,12 +25,12 @@ func (t *Tree) Init(namespace string) error {
 		}
 		usr, err := user.Current()
 		if err == nil {
-			t.Storage = usr.HomeDir + "/.dvote/census/" + namespace
+			t.Storage = usr.HomeDir + "/.dvote/census"
 		} else {
-			t.Storage = "./dvoteTree/" + namespace
+			t.Storage = "./dvoteTree"
 		}
 	}
-	mtdb, err := db.NewLevelDbStorage(t.Storage, false)
+	mtdb, err := db.NewLevelDbStorage(t.Storage+"/"+namespace, false)
 	if err != nil {
 		return err
 	}

@@ -15,6 +15,12 @@ import (
 // AddressLengh is the lenght of an Ethereum address
 const AddressLength = 20
 
+// SignatureLength is the size of an ECDSA signature
+const SignatureLength = 132
+
+// PubKeyLength is the size of a Public Key
+const PubKeyLength = 66
+
 // SigningPrefix is the prefix added when hashing
 const SigningPrefix = "\x19Ethereum Signed Message:\n"
 
@@ -92,7 +98,7 @@ func (k *SignKeys) SignJSON(message interface{}) (string, error) {
 	}
 	sig, err := k.Sign(string(rawMsg))
 	if err != nil {
-		return "",errors.New("error signing response body: %s")
+		return "", errors.New("error signing response body: %s")
 	}
 	return sig, nil
 }
@@ -110,6 +116,12 @@ func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 	hash := Hash(message)
 	result := crypto.VerifySignature(pub, hash, signature[:64])
 	return result, nil
+}
+
+// Standalone function for verify a message
+func Verify(message, signHex, pubHex string) (bool, error) {
+	sk := new(SignKeys)
+	return sk.Verify(message, signHex, pubHex)
 }
 
 // Hash string data adding Ethereum prefix
