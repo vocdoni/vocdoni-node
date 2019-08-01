@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	dbm "github.com/tendermint/tm-cmn/db"
+	dbm "github.com/tendermint/tm-db"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
