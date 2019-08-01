@@ -115,7 +115,7 @@ func InitCluster(path, configFile, idFile string, c config.ClusterCfg) error {
 }
 
 // Runs the cluster
-func RunCluster(c config.ClusterCfg) error {
+func RunCluster(c config.ClusterCfg) (*ipfscluster.Cluster, error) {
 	/*
 		currUser, err := user.Current()
 		if err != nil {
@@ -175,7 +175,7 @@ func RunCluster(c config.ClusterCfg) error {
 
 	go bootstrap(ctx, cluster, bootstraps)
 
-	return handleSignals(ctx, cancel, cluster, host, dht)
+	return cluster, handleSignals(ctx, cancel, cluster, host, dht)
 }
 
 // createCluster creates all the necessary things to produce the cluster

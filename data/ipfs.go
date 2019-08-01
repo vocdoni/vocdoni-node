@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"mime/multipart"
 
 	"net/http"
 	"os"
@@ -18,9 +19,10 @@ import (
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
-	"github.com/ipfs/interface-go-ipfs-core/options"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
 	logging "github.com/whyrusleeping/go-logging"
+	ipfscluster "github.com/ipfs/ipfs-cluster"
+	clusterapi "github.com/ipfs/ipfs-cluster/api"
 	"gitlab.com/vocdoni/go-dvote/ipfs"
 
 	files "github.com/ipfs/go-ipfs-files"
@@ -32,6 +34,7 @@ import (
 
 type IPFSHandle struct {
 	nd      *ipfscore.IpfsNode
+	cluster *ipfscluster.Cluster
 	coreAPI coreiface.CoreAPI
 	dataDir string
 }
@@ -121,14 +124,17 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 		if err != nil {
 			log.Fatalf("Error initializing ipfs cluster: %v", err)
 		}
-		go ipfs.RunCluster(d.ClusterCfg)
+		i.cluster, err = ipfs.RunCluster(d.ClusterCfg)
+		if err != nil {
+			log.Fatalf("Error running ipfs cluster: %v", err)
+		}
 	}
 	return nil
 }
 
 //PublishFile publishes a file specified by root to ipfs
-func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
-	rootHash, err := addAndPin(nd, string(root))
+func PublishFile(root []byte, cluster *ipfscluster.Cluster) (string, error) {
+	rootHash, err := addFile(string(root), cluster)
 	if err != nil {
 		return "", err
 	}
@@ -136,11 +142,11 @@ func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
 }
 
 //PublishBytes publishes a file containing msg to ipfs
-func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
+func PublishBytes(msg []byte, fileDir string, cluster *ipfscluster.Cluster) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
 	log.Infof("Publishing file: %s", filePath)
 	err := ioutil.WriteFile(filePath, msg, 0666)
-	rootHash, err := addAndPin(nd, filePath)
+	rootHash, err := addFile(filePath, cluster)
 	if err != nil {
 		return "", err
 	}
@@ -149,8 +155,18 @@ func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, er
 
 //Publish publishes a message to ipfs
 func (i *IPFSHandle) Publish(msg []byte) (string, error) {
-	roothash, err := PublishBytes(msg, i.dataDir, i.nd)
+	roothash, err := PublishBytes(msg, i.dataDir, i.cluster)
 	return roothash, err
+}
+
+func addFile(filePath string, cluster *ipfscluster.Cluster) (rootHash string, err error) {
+	reader, err := os.Open(filePath)
+	if err != nil {
+		log.Error("Could not add file: ", filePath)
+	}
+	multi := multipart.NewReader(reader, "EOF")
+	cid, err := cluster.AddFile(multi, clusterapi.DefaultAddParams())
+	return cid.String(), err
 }
 
 func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
@@ -180,10 +196,11 @@ func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 func (i *IPFSHandle) Pin(path string) error {
 	p := corepath.New(path)
 	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
+	pin := clusterapi.PinCid(rp.Cid())
 	if err != nil {
 		return err
 	}
-	return i.coreAPI.Pin().Add(context.Background(), rp, options.Pin.Recursive(true))
+	return i.cluster.Pin(context.Background(), pin)
 }
 
 func (i *IPFSHandle) Unpin(path string) error {
@@ -192,18 +209,18 @@ func (i *IPFSHandle) Unpin(path string) error {
 	if err != nil {
 		return err
 	}
-	return i.coreAPI.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true))
+	return i.cluster.Unpin(context.Background(), rp.Cid())
 }
 
 func (i *IPFSHandle) ListPins() (map[string]string, error) {
-	pins, err := i.coreAPI.Pin().Ls(context.Background())
+	pins, err := i.cluster.Pins(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	var pinMap map[string]string
 	pinMap = make(map[string]string)
 	for _, p := range pins {
-		pinMap[p.Path().String()] = p.Type()
+		pinMap[p.Cid.String()] = p.Type.String()
 	}
 	return pinMap, nil
 }
