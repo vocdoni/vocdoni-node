@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"io"
 	"mime/multipart"
+	gocid "github.com/ipfs/go-cid"
 
 	"net/http"
 	"os"
@@ -137,38 +139,43 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 }
 
 //PublishFile publishes a file specified by root to ipfs
-func PublishFile(root []byte, cluster *ipfscluster.Cluster) (string, error) {
-	rootHash, err := addFile(string(root), cluster)
+func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
+	rootHash, err := addAndPin(nd, string(root))
 	if err != nil {
 		return "", err
 	}
 	return rootHash, nil
 }
 
+
 //PublishBytes publishes a file containing msg to ipfs
-func PublishBytes(msg []byte, fileDir string, cluster *ipfscluster.Cluster) (string, error) {
+func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
 	log.Infof("Publishing file: %s", filePath)
 	err := ioutil.WriteFile(filePath, msg, 0666)
-	rootHash, err := addFile(filePath, cluster)
+	rootHash, err := addAndPin(nd, filePath)
 	if err != nil {
 		return "", err
 	}
 	return rootHash, nil
+
 }
+
 
 //Publish publishes a message to ipfs
 func (i *IPFSHandle) Publish(msg []byte) (string, error) {
-	roothash, err := PublishBytes(msg, i.dataDir, i.cluster)
+	roothash, err := PublishBytes(msg, i.dataDir, i.nd)
 	return roothash, err
 }
 
 func addFile(filePath string, cluster *ipfscluster.Cluster) (rootHash string, err error) {
 	reader, err := os.Open(filePath)
 	if err != nil {
-		log.Error("Could not add file: ", filePath)
+		log.Error("Could not open file: ", filePath)
 	}
-	multi := multipart.NewReader(reader, "EOF")
+	part := strings.NewReader("<start of file>")
+	_ = io.MultiReader(part, reader)
+	multi := multipart.NewReader(reader, "")
 	cid, err := cluster.AddFile(multi, &clusterapi.AddParams{
 		Recursive:      true,
 		Layout:         "balanced", // corresponds to balanced layout
@@ -217,12 +224,11 @@ func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 }
 
 func (i *IPFSHandle) Pin(path string) error {
-	p := corepath.New(path)
-	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
-	pin := clusterapi.PinCid(rp.Cid())
+	cid, err := gocid.Decode(path)
 	if err != nil {
 		return err
 	}
+	pin := clusterapi.PinCid(cid)
 	return i.cluster.Pin(context.Background(), pin)
 }
 

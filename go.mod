@@ -23,6 +23,7 @@ require (
 	github.com/iden3/go-iden3 v0.0.5-0.20190709081248-908d792a8964
 	github.com/influxdata/influxdb v1.7.7 // indirect
 	github.com/ipfs/dir-index-html v1.0.3 // indirect
+	github.com/ipfs/go-cid v0.0.2
 	github.com/ipfs/go-datastore v0.0.5
 	github.com/ipfs/go-fs-lock v0.0.1
 	github.com/ipfs/go-ipfs v0.4.22-0.20190715142216-333c9d16135a

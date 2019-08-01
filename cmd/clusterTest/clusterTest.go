@@ -128,34 +128,77 @@ func main() {
 
 	log.Infof("Finished initializing %d connections", len(conns))
 
-	//dummyRequestPing := `{"id": "req-0000001", "request": {"method": "ping"}}`
 	dummyRequestAddFile := `{"id": "req0000002", "request": {"method": "addFile", "name": "My first file", "type": "ipfs", "content": "%s", "timestamp": 1556110671}, "signature": "539"}`
+	dummyRequestPinFileFmt := `{"id": "req0000003","request": {"method": "pinFile","uri": "%s","timestamp": 1556110671},"signature": "0x00"}`
+	dummyRequestListPins := `{"id": "req0000004","request": {"method": "pinList","timestamp": 1556110671},"signature": "0x00"}`
+	//dummyRequestUnpinFileFmt := `{"id": "req0000005","request": {"method": "unpinFile","uri": "%s", "timestamp": 1556110671},"signature": "0x00"}`
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	i := 0
 	for {
 		select {
 		case <-timer.C:
-			msg := make([]byte, globalCfg.PkgSize)
-			_, _ = r.Read(msg)
-			b64 := base64.StdEncoding.EncodeToString(msg)
-			request := fmt.Sprintf(dummyRequestAddFile, b64)
 			c := r.Intn(len(conns))
-			conn := conns[c]
-			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second*5)); err != nil {
-				log.Errorf("Failed to receive pong: %v", err)
+				conn := conns[c]
+				if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second*5)); err != nil {
+					log.Errorf("Failed to receive pong: %v", err)
+				}
+			for i := 0; i < 10; i++ {
+				msg := make([]byte, globalCfg.PkgSize)
+				_, _ = r.Read(msg)
+				b64 := base64.StdEncoding.EncodeToString(msg)
+				request := fmt.Sprintf(dummyRequestAddFile, b64)
+				log.Infof("Conn %d sending message number %d, message %s", c, i, request)
+				conn.WriteMessage(websocket.TextMessage, []byte(request))
+				// request here
+				msgType, msg, err := conn.ReadMessage()
+			if err != nil {
+				log.Errorf("Cannot read message")
+				break
 			}
-			log.Infof("Conn %d sending message number %d, message %s", c, i, request)
-			conn.WriteMessage(websocket.TextMessage, []byte(request))
-			// request here
-			i++
+			log.Infof("Message info: Response message type: %v, Response message content: %v", msgType, string(msg))
 
+			msgMap, err := parseMsg(msg)
+			if err != nil {
+				log.Errorf("Couldn't parse message: %v, error: %v", err)
+				break
+			}
+			responseMap, ok := msgMap["response"].(map[string]interface{})
+			if !ok {
+				log.Errorf("couldnt parse response field")
+				break
+			}
+			uri, ok := responseMap["uri"].(string)
+			if !ok {
+				log.Errorf("couldnt parse uri")
+				break
+			}
+			log.Infof("Sending message: connection: %v, message: %v, uri: %v", c, dummyRequestPinFileFmt, uri)
+			conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(dummyRequestPinFileFmt, uri)))
+			msgType, msg, err = conn.ReadMessage()
+			if err != nil {
+				log.Errorf("Cannot read message")
+				break
+			}
+			log.Infof("Message info: Response message type: %v, Response message content: %v", msgType, string(msg))
+			}
+
+			log.Infof("Sending message: connection: %v, message: %v", c, dummyRequestListPins)
+			conn.WriteMessage(websocket.TextMessage, []byte(dummyRequestListPins))
 			msgType, msg, err := conn.ReadMessage()
 			if err != nil {
 				log.Errorf("Cannot read message")
 				break
 			}
 			log.Infof("Message info: Response message type: %v, Response message content: %v", msgType, string(msg))
+
+			// log.Infof("Sending message: connection: %v, message: %v, uri: %v", c, dummyRequestUnpinFileFmt, uri)
+			// conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(dummyRequestUnpinFileFmt, uri)))
+			// msgType, msg, err = conn.ReadMessage()
+			// if err != nil {
+			// 	log.Errorf("Cannot read message")
+			// 	break
+			// }
+			// log.Infof("Response message content: ", string(msg))
 		default:
 			continue
 		}
