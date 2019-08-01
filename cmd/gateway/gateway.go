@@ -302,7 +302,6 @@ func main() {
 	// Dvote API
 	listenerOutput := make(chan types.Message)
 	if globalCfg.Api.DvoteApi {
-		log.Debug("Setting up ipfs")
 		ws := new(net.WebsocketHandle)
 		ws.Init(new(types.Connection))
 		ws.SetProxy(pxy)

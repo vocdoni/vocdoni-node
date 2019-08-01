@@ -124,7 +124,11 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 		if err != nil {
 			log.Fatalf("Error initializing ipfs cluster: %v", err)
 		}
-		i.cluster, err = ipfs.RunCluster(d.ClusterCfg)
+		ch := make(chan *ipfscluster.Cluster)
+		go ipfs.RunCluster(d.ClusterCfg, ch)
+		log.Debug("Cluster has run!!!")
+		cluster := <- ch
+		i.cluster = cluster
 		if err != nil {
 			log.Fatalf("Error running ipfs cluster: %v", err)
 		}
