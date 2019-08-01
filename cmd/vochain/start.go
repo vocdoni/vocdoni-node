@@ -7,12 +7,13 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	//"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
 	"github.com/cosmos/cosmos-sdk/codec"
-	abci "github.com/tendermint/tendermint/abci/types"
+	//abci "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	cmn "github.com/tendermint/tendermint/libs/common"
@@ -25,7 +26,7 @@ import (
 	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-cmn/db"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain"
+	vochain "gitlab.com/vocdoni/go-dvote/vochain/app"
 	testtypes "gitlab.com/vocdoni/go-dvote/vochain/test"
 )
 
@@ -66,9 +67,12 @@ func main() {
 		node.Wait()
 	}()
 
-	txbytes := []byte(`{"method": "TEST","args": ["a", "b"]}`)
-	req := abci.RequestCheckTx{Tx: txbytes}
-	go app.CheckTx(req)
+	//time.Sleep(3 * time.Second)
+	//txbytes := []byte(`{"method": "voteTx","args": ["a", "b"]}`)
+	//req := abci.RequestCheckTx{Tx: txbytes}
+	//go vlog.Infof("%s", app.CheckTx(req))
+	//req := abci.RequestDeliverTx{Tx: txbytes}
+	//vlog.Infof("%s", app.DeliverTx(req))
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -150,7 +154,7 @@ func newTendermint(app vochain.BaseApplication, configFile string) (*nm.Node, er
 		config,
 		pv,
 		nodeKey,
-		proxy.NewLocalClientCreator(app),
+		proxy.NewLocalClientCreator(app), // Note we use proxy.NewLocalClientCreator here to create a local client instead of one communicating through a socket or gRPC.
 		nm.DefaultGenesisDocProviderFunc(config),
 		nm.DefaultDBProvider,
 		nm.DefaultMetricsProvider(config.Instrumentation),

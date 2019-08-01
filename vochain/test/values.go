@@ -1,4 +1,4 @@
-package test
+package vochain
 
 // Constants for testing basic voting stuff required
 // This can be ethereum pulled data
