@@ -165,7 +165,26 @@ func addFile(filePath string, cluster *ipfscluster.Cluster) (rootHash string, er
 		log.Error("Could not add file: ", filePath)
 	}
 	multi := multipart.NewReader(reader, "EOF")
-	cid, err := cluster.AddFile(multi, clusterapi.DefaultAddParams())
+	cid, err := cluster.AddFile(multi, &clusterapi.AddParams{
+		Recursive:      true,
+		Layout:         "balanced", // corresponds to balanced layout
+		Chunker:        "size-262144",
+		RawLeaves:      false,
+		Hidden:         false,
+		Wrap:           false,
+		Shard:          true,
+		Progress:       false,
+		CidVersion:     0,
+		HashFun:        "sha2-256",
+		StreamChannels: true,
+		NoCopy:         false,
+		PinOptions: clusterapi.PinOptions{
+			ReplicationFactorMin: 1,
+			ReplicationFactorMax: 4,
+			Name:                 "",
+			ShardSize:            clusterapi.DefaultShardSize,
+		},
+	})
 	return cid.String(), err
 }
 
