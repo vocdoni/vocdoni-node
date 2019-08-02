@@ -12,15 +12,7 @@ go build -o censusHttpService gitlab.com/vocdoni/go-dvote/cmd/censushttp
 
 ## Usage
 
-`./censusHttpService --port 8080 --namespaces <censusId>[:pubKey],[<censusId>[:pubKey] ...]`
-
-Example
-
-```
-./censusHttpService --port 1500 --namespaces GoT_Favorite
-2019/02/12 10:20:16 Starting process HTTP service on port 1500 for namespace GoT_Favorite
-2019/02/12 10:20:16 Starting server in http mode
-```
+`./censushttp --port 1500 --logLevel debug --rootKey 347f650ea2adee1affe2fe81ee8e11c637d506da98dc16e74fc64ecb31e1bb2c1`
 
 ## API
 
@@ -28,12 +20,13 @@ The next table shows a summary of the available methods and its relation with th
 
 | method     | censusId  | claimData | rootHash | proofData | protected? | description |
 |------------|-----------|-----------|----------|-----------|------------|------------|
-| `addClaim`   | mandatory | mandatory | none     | none      | yes | adds a new claim to the merkle tree       |
-| `getRoot`    | mandatory | none      | none     | none      | no         | get the current merkletree root hash
-| `genProof`   | mandatory | mandatory | optional | none      | no         | generate the merkle proof for a given claim
-| `checkProof` | mandatory | mandatory | optional | mandatory | no         | check a claim and its merkle proof 
-| `getIdx`     | mandatory | mandatory | optional | none      | no         | get the merkletree data index of a given claim
-| `dump`       | mandatory | none      | optional | none      | yes        | list the contents of the census for a given hash
+| `addCensus`  | mandatory | none      | none     | none      | yes      | adds a new claim to the merkle tree       |
+| `addClaim`   | mandatory | mandatory | none     | none      | yes      | adds a new claim to the merkle tree       |
+| `getRoot`    | mandatory | none      | none     | none      | no       | get the current merkletree root hash
+| `genProof`   | mandatory | mandatory | optional | none      | no       | generate the merkle proof for a given claim
+| `checkProof` | mandatory | mandatory | optional | mandatory | no       | check a claim and its merkle proof 
+| `getIdx`     | mandatory | mandatory | optional | none      | no       | get the merkletree data index of a given claim
+| `dump`       | mandatory | none      | optional | none      | yes      | list the contents of the census for a given hash
 
 
 Check https://vocdoni.io/docs/#/architecture/protocol/json-api and 
