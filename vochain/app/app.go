@@ -3,25 +3,33 @@ package vochain
 import (
 	"strings"
 
+	"github.com/gogo/protobuf/proto"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	dbm "github.com/tendermint/tm-db"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
+// BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
-	db             dbm.DB
-	name           string
-	checkTxState   *voctypes.State //
-	deliverTxState *voctypes.State // the working state for block execution
+	name  string          // application name from ABCI info
+	db    dbm.DB          // common DB backend
+	store *voctypes.Store // main state (non volatile state)
+	// volatile state
+	checkState   *voctypes.State // checkState is set on initialization and reset on Commit
+	deliverState *voctypes.State // deliverState is set on InitChain and BeginBlock and cleared on Commit
+
+	consensusParams *abcitypes.ConsensusParams
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
+// NewBaseApplication creates a new BaseApplication given a name an a DB backend
 func NewBaseApplication(db dbm.DB, name string) *BaseApplication {
 	return &BaseApplication{
-		db:   db,
-		name: name,
+		name:  name,
+		db:    db,
+		store: voctypes.NewStore(db),
 	}
 }
 
@@ -59,6 +67,9 @@ func (BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseC
 	// CHECK IF REQ IS VALID
 	tx := splitTx(req.Tx)
 	m, err := tx.GetMethod()
+	vlog.Infof("%s", m)
+	vlog.Infof("%s", err)
+
 	if err != nil {
 		// reject
 		return abcitypes.ResponseCheckTx{Code: 1}
@@ -75,8 +86,57 @@ func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 	return abcitypes.ResponseQuery{Code: 0}
 }
 
-func (BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-	return abcitypes.ResponseInitChain{}
+// ______________________ INITCHAIN ______________________
+
+func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
+	// stash the consensus params in the store and memoize
+	if req.ConsensusParams != nil {
+		app.setConsensusParams(req.ConsensusParams)
+		app.storeConsensusParams(req.ConsensusParams)
+	}
+	initHeader := abcitypes.Header{ChainID: req.ChainId, Time: req.Time}
+	// initialize the deliver state and check state with a correct header
+	app.setDeliverState(initHeader)
+	app.setCheckState(initHeader)
+
+	return abcitypes.ResponseInitChain{
+		Validators:      req.Validators,
+		ConsensusParams: req.ConsensusParams,
+	}
+}
+
+// setConsensusParams memoizes the consensus params.
+func (app *BaseApplication) setConsensusParams(consensusParams *abcitypes.ConsensusParams) {
+	app.consensusParams = consensusParams
+}
+
+// setConsensusParams stores the consensus params.
+func (app *BaseApplication) storeConsensusParams(consensusParams *abcitypes.ConsensusParams) {
+	consensusParamsBz, err := proto.Marshal(consensusParams)
+	if err != nil {
+		panic(err)
+	}
+	app.db.Set([]byte("consensus_params"), consensusParamsBz)
+}
+
+// setCheckState sets checkState with the store and the context wrapping it.
+// It is called by InitChain() and Commit()
+func (app *BaseApplication) setCheckState(header abcitypes.Header) {
+	store := app.store
+	state := new(voctypes.State)
+	state.SetStore(*store)
+	state.SetContext(voctypes.NewContext(*store, header, true))
+	app.deliverState = state
+}
+
+// setDeliverState sets checkState with the store and the context wrapping it.
+// It is called by InitChain() and BeginBlock(), and deliverState is set nil on Commit().
+func (app *BaseApplication) setDeliverState(header abcitypes.Header) {
+	store := app.store
+	state := new(voctypes.State)
+	state.SetStore(*store)
+	state.SetContext(voctypes.NewContext(*store, header, false))
+	app.deliverState = state
 }
 
 func (BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {

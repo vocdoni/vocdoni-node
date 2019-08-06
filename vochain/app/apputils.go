@@ -7,12 +7,12 @@ import (
 )
 
 func splitTx(content []byte) voctypes.ValidTx {
-	vlog.Infof("%+v", content)
 	var validTx voctypes.ValidTx
 	err := codec.Cdc.UnmarshalJSON(content, &validTx)
+	vlog.Infof("%s", validTx.String())
 	txMethod, err := validTx.GetMethod()
 	if err != nil {
-		vlog.Fatalf("%s", err)
+		vlog.Infof("%s", err)
 	}
 	if txMethod != "" {
 		validTx.Method = txMethod
