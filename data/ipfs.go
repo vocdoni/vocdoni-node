@@ -138,8 +138,8 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	return nil
 }
 
-//PublishFile publishes a file specified by root to ipfs
-func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
+//PublishFile publishes a file specified by root to ipfs (node)
+func publishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
 	rootHash, err := addAndPin(nd, string(root))
 	if err != nil {
 		return "", err
@@ -148,11 +148,11 @@ func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
 }
 
 
-//PublishBytes publishes a file containing msg to ipfs
-func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
+//PublishBytes publishes a file containing msg to ipfs (node)
+func publishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
 	log.Infof("Publishing file: %s", filePath)
-	err := ioutil.WriteFile(filePath, msg, 0666)
+	err := ioutil.WriteFile(filePath, msg, 0666) //these should be more restrictive
 	rootHash, err := addAndPin(nd, filePath)
 	if err != nil {
 		return "", err
@@ -162,12 +162,19 @@ func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, er
 }
 
 
-//Publish publishes a message to ipfs
+//This should disambiguate publish mode (cluster vs node, and call appropraite func)
 func (i *IPFSHandle) Publish(msg []byte) (string, error) {
-	roothash, err := PublishBytes(msg, i.dataDir, i.nd)
-	return roothash, err
+	roothash, err := publishBytes(msg, i.dataDir, i.nd)
+	if err != nil {
+		return "", err
+	}
+	if i.cluster != nil {
+		i.Pin(roothash)
+	}
+	return roothash, nil
 }
 
+//This is cluster add (currently non-functional due to MIME-type requirement)
 func addFile(filePath string, cluster *ipfscluster.Cluster) (rootHash string, err error) {
 	reader, err := os.Open(filePath)
 	if err != nil {
@@ -199,6 +206,8 @@ func addFile(filePath string, cluster *ipfscluster.Cluster) (rootHash string, er
 	return cid.String(), err
 }
 
+
+//this is node add and node pin
 func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 	defer n.Blockstore.PinLock().Unlock()
 	stat, err := os.Lstat(root)
@@ -223,6 +232,7 @@ func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 	return node.Cid().String(), nil
 }
 
+//This is cluster pin
 func (i *IPFSHandle) Pin(path string) error {
 	cid, err := gocid.Decode(path)
 	if err != nil {
@@ -232,6 +242,8 @@ func (i *IPFSHandle) Pin(path string) error {
 	return i.cluster.Pin(context.Background(), pin)
 }
 
+
+//This is cluster unpin
 func (i *IPFSHandle) Unpin(path string) error {
 	p := corepath.New(path)
 	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
@@ -241,6 +253,7 @@ func (i *IPFSHandle) Unpin(path string) error {
 	return i.cluster.Unpin(context.Background(), rp.Cid())
 }
 
+//This is cluster listpins
 func (i *IPFSHandle) ListPins() (map[string]string, error) {
 	pins, err := i.cluster.Pins(context.Background())
 	if err != nil {
@@ -254,6 +267,7 @@ func (i *IPFSHandle) ListPins() (map[string]string, error) {
 	return pinMap, nil
 }
 
+//This is node retrieve
 func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
 	ctx := context.Background()
 
