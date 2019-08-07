@@ -1,9 +1,6 @@
 package vochain
 
 import (
-	"strings"
-
-	"github.com/gogo/protobuf/proto"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	dbm "github.com/tendermint/tm-db"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
@@ -54,28 +51,28 @@ func (BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Respo
 	// CHECK IF THE SIGNATURE IS VALID
 	// CHECK IF THE VOTE EXISTS
 	// CHECK IF THE VOTER IS IN THE CENSUS
-	tx := splitTx(req.Tx)
-	m, err := tx.GetMethod()
-	vlog.Infof("%+v", m)
-	if err != nil {
-		//
-	}
 	return abcitypes.ResponseDeliverTx{Code: 0}
 }
 
+// CheckTx called by Tendermint for every transaction received from the network users,
+// before it enters the mempool. This is intended to filter out transactions to avoid
+// filling out the mempool and polluting the blocks with invalid transactions.
+// At this level, only the basic checks are performed
+// Here we do some basic sanity checks around the raw Tx received.
 func (BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
-	// CHECK IF REQ IS VALID
 	tx := splitTx(req.Tx)
-	m, err := tx.GetMethod()
-	vlog.Infof("%s", m)
-	vlog.Infof("%s", err)
-
-	if err != nil {
-		// reject
+	m := tx.ValidateMethod()
+	vlog.Infof("Is valid method? %s", m)
+	// reject because of method
+	if !m {
 		return abcitypes.ResponseCheckTx{Code: 1}
 	}
-	// TODO CHECK ARGS METHOD
-	return abcitypes.ResponseCheckTx{Info: strings.Join(tx.GetArgs(), m.String()), Code: 0}
+	a := tx.ValidateArgs()
+	// reject because of args
+	if !a {
+		return abcitypes.ResponseCheckTx{Code: 1}
+	}
+	return abcitypes.ResponseCheckTx{Info: tx.String(), Code: 0}
 }
 
 func (BaseApplication) Commit() abcitypes.ResponseCommit {
@@ -88,55 +85,8 @@ func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 
 // ______________________ INITCHAIN ______________________
 
-func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-	// stash the consensus params in the store and memoize
-	if req.ConsensusParams != nil {
-		app.setConsensusParams(req.ConsensusParams)
-		app.storeConsensusParams(req.ConsensusParams)
-	}
-	initHeader := abcitypes.Header{ChainID: req.ChainId, Time: req.Time}
-	// initialize the deliver state and check state with a correct header
-	app.setDeliverState(initHeader)
-	app.setCheckState(initHeader)
-
-	return abcitypes.ResponseInitChain{
-		Validators:      req.Validators,
-		ConsensusParams: req.ConsensusParams,
-	}
-}
-
-// setConsensusParams memoizes the consensus params.
-func (app *BaseApplication) setConsensusParams(consensusParams *abcitypes.ConsensusParams) {
-	app.consensusParams = consensusParams
-}
-
-// setConsensusParams stores the consensus params.
-func (app *BaseApplication) storeConsensusParams(consensusParams *abcitypes.ConsensusParams) {
-	consensusParamsBz, err := proto.Marshal(consensusParams)
-	if err != nil {
-		panic(err)
-	}
-	app.db.Set([]byte("consensus_params"), consensusParamsBz)
-}
-
-// setCheckState sets checkState with the store and the context wrapping it.
-// It is called by InitChain() and Commit()
-func (app *BaseApplication) setCheckState(header abcitypes.Header) {
-	store := app.store
-	state := new(voctypes.State)
-	state.SetStore(*store)
-	state.SetContext(voctypes.NewContext(*store, header, true))
-	app.deliverState = state
-}
-
-// setDeliverState sets checkState with the store and the context wrapping it.
-// It is called by InitChain() and BeginBlock(), and deliverState is set nil on Commit().
-func (app *BaseApplication) setDeliverState(header abcitypes.Header) {
-	store := app.store
-	state := new(voctypes.State)
-	state.SetStore(*store)
-	state.SetContext(voctypes.NewContext(*store, header, false))
-	app.deliverState = state
+func (BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
+	return abcitypes.ResponseInitChain{}
 }
 
 func (BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {

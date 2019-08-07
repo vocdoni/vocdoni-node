@@ -1,4 +1,4 @@
-package types
+package vochain
 
 import (
 	dbm "github.com/tendermint/tm-db"

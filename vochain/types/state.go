@@ -1,4 +1,4 @@
-package types
+package vochain
 
 // State represents a volatile state for Vochain
 type State struct {

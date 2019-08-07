@@ -6,11 +6,12 @@ import (
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
-func splitTx(content []byte) voctypes.ValidTx {
-	var validTx voctypes.ValidTx
+func splitTx(content []byte) voctypes.Tx {
+	var validTx voctypes.Tx
 	err := codec.Cdc.UnmarshalJSON(content, &validTx)
 	vlog.Infof("%s", validTx.String())
-	txMethod, err := validTx.GetMethod()
+	txMethod := validTx.GetMethod()
+	
 	if err != nil {
 		vlog.Infof("%s", err)
 	}

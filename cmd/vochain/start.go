@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"syscall"
 
-	//"time"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
 	"github.com/cosmos/cosmos-sdk/codec"
-	//abci "github.com/tendermint/tendermint/abci/types"
+	abci "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	cmn "github.com/tendermint/tendermint/libs/common"
@@ -68,10 +68,10 @@ func main() {
 		node.Wait()
 	}()
 
-	//time.Sleep(3 * time.Second)
-	//txbytes := []byte(`{"method": "voteTx","args": ["a", "b"]}`)
-	//req := abci.RequestCheckTx{Tx: txbytes}
-	//go vlog.Infof("%s", app.CheckTx(req))
+	time.Sleep(3 * time.Second)
+	txbytes := []byte(`{"method": "voteTx","args": ["a", "b"]}`)
+	req := abci.RequestCheckTx{Tx: txbytes}
+	go vlog.Infof("%s", app.CheckTx(req))
 	//req := abci.RequestDeliverTx{Tx: txbytes}
 	//vlog.Infof("%s", app.DeliverTx(req))
 

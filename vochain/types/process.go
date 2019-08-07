@@ -1,4 +1,4 @@
-package types
+package vochain
 
 import (
 	"fmt"
@@ -63,14 +63,19 @@ const (
 // String returns the CurrentProcessState as string
 func (c CurrentProcessState) String() string {
 	switch c {
+	// scheduled
 	case 0:
 		return fmt.Sprintf("%s", "scheduled")
+	// active
 	case 1:
 		return fmt.Sprintf("%s", "active")
+	// paused
 	case 2:
 		return fmt.Sprintf("%s", "paused")
+	// finished
 	case 3:
 		return fmt.Sprintf("%s", "finished")
+	// canceled
 	case 4:
 		return fmt.Sprintf("%s", "canceled")
 	}
