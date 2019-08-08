@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"io"
+	"io/ioutil"
 	"mime/multipart"
+
 	gocid "github.com/ipfs/go-cid"
 
 	"net/http"
@@ -22,9 +23,9 @@ import (
 	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
-	logging "github.com/whyrusleeping/go-logging"
 	ipfscluster "github.com/ipfs/ipfs-cluster"
 	clusterapi "github.com/ipfs/ipfs-cluster/api"
+	logging "github.com/whyrusleeping/go-logging"
 	"gitlab.com/vocdoni/go-dvote/ipfs"
 
 	files "github.com/ipfs/go-ipfs-files"
@@ -129,7 +130,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 		ch := make(chan *ipfscluster.Cluster)
 		go ipfs.RunCluster(d.ClusterCfg, ch)
 		log.Debug("Cluster has run!!!")
-		cluster := <- ch
+		cluster := <-ch
 		i.cluster = cluster
 		if err != nil {
 			log.Fatalf("Error running ipfs cluster: %v", err)
@@ -147,7 +148,6 @@ func publishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
 	return rootHash, nil
 }
 
-
 //PublishBytes publishes a file containing msg to ipfs (node)
 func publishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
@@ -160,7 +160,6 @@ func publishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, er
 	return rootHash, nil
 
 }
-
 
 //This should disambiguate publish mode (cluster vs node, and call appropraite func)
 func (i *IPFSHandle) Publish(msg []byte) (string, error) {
@@ -206,7 +205,6 @@ func addFile(filePath string, cluster *ipfscluster.Cluster) (rootHash string, er
 	return cid.String(), err
 }
 
-
 //this is node add and node pin
 func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 	defer n.Blockstore.PinLock().Unlock()
@@ -239,9 +237,10 @@ func (i *IPFSHandle) Pin(path string) error {
 		return err
 	}
 	pin := clusterapi.PinCid(cid)
+	pin.PinOptions.ReplicationFactorMin = 2
+	pin.PinOptions.ReplicationFactorMax = -1
 	return i.cluster.Pin(context.Background(), pin)
 }
-
 
 //This is cluster unpin
 func (i *IPFSHandle) Unpin(path string) error {
