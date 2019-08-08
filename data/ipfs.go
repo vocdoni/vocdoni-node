@@ -237,7 +237,6 @@ func (i *IPFSHandle) Pin(path string) error {
 		return err
 	}
 	pin := clusterapi.PinCid(cid)
-	pin.PinOptions.ReplicationFactorMin = 2
 	pin.PinOptions.ReplicationFactorMax = -1
 	return i.cluster.Pin(context.Background(), pin)
 }
