@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"mime/multipart"
 
 	gocid "github.com/ipfs/go-cid"
 
@@ -22,6 +20,7 @@ import (
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
+	"github.com/ipfs/interface-go-ipfs-core/options"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
 	ipfscluster "github.com/ipfs/ipfs-cluster"
 	clusterapi "github.com/ipfs/ipfs-cluster/api"
@@ -139,15 +138,6 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	return nil
 }
 
-//PublishFile publishes a file specified by root to ipfs (node)
-func publishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
-	rootHash, err := addAndPin(nd, string(root))
-	if err != nil {
-		return "", err
-	}
-	return rootHash, nil
-}
-
 //PublishBytes publishes a file containing msg to ipfs (node)
 func publishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
@@ -159,50 +149,6 @@ func publishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, er
 	}
 	return rootHash, nil
 
-}
-
-//This should disambiguate publish mode (cluster vs node, and call appropraite func)
-func (i *IPFSHandle) Publish(msg []byte) (string, error) {
-	roothash, err := publishBytes(msg, i.dataDir, i.nd)
-	if err != nil {
-		return "", err
-	}
-	if i.cluster != nil {
-		i.Pin(roothash)
-	}
-	return roothash, nil
-}
-
-//This is cluster add (currently non-functional due to MIME-type requirement)
-func addFile(filePath string, cluster *ipfscluster.Cluster) (rootHash string, err error) {
-	reader, err := os.Open(filePath)
-	if err != nil {
-		log.Error("Could not open file: ", filePath)
-	}
-	part := strings.NewReader("<start of file>")
-	_ = io.MultiReader(part, reader)
-	multi := multipart.NewReader(reader, "")
-	cid, err := cluster.AddFile(multi, &clusterapi.AddParams{
-		Recursive:      true,
-		Layout:         "balanced", // corresponds to balanced layout
-		Chunker:        "size-262144",
-		RawLeaves:      false,
-		Hidden:         false,
-		Wrap:           false,
-		Shard:          true,
-		Progress:       false,
-		CidVersion:     0,
-		HashFun:        "sha2-256",
-		StreamChannels: true,
-		NoCopy:         false,
-		PinOptions: clusterapi.PinOptions{
-			ReplicationFactorMin: 1,
-			ReplicationFactorMax: 4,
-			Name:                 "",
-			ShardSize:            clusterapi.DefaultShardSize,
-		},
-	})
-	return cid.String(), err
 }
 
 //this is node add and node pin
@@ -230,42 +176,19 @@ func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 	return node.Cid().String(), nil
 }
 
-//This is cluster pin
-func (i *IPFSHandle) Pin(path string) error {
-	cid, err := gocid.Decode(path)
+//Public publish function, handles cluster and standalone modes
+func (i *IPFSHandle) Publish(msg []byte) (string, error) {
+	roothash, err := publishBytes(msg, i.dataDir, i.nd)
 	if err != nil {
-		return err
+		return "", err
 	}
-	pin := clusterapi.PinCid(cid)
-	pin.PinOptions.ReplicationFactorMax = -1
-	return i.cluster.Pin(context.Background(), pin)
+	if i.cluster != nil {
+		i.clusterPin(roothash)
+	}
+	return roothash, nil
 }
 
-//This is cluster unpin
-func (i *IPFSHandle) Unpin(path string) error {
-	p := corepath.New(path)
-	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
-	if err != nil {
-		return err
-	}
-	return i.cluster.Unpin(context.Background(), rp.Cid())
-}
-
-//This is cluster listpins
-func (i *IPFSHandle) ListPins() (map[string]string, error) {
-	pins, err := i.cluster.Pins(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	var pinMap map[string]string
-	pinMap = make(map[string]string)
-	for _, p := range pins {
-		pinMap[p.Cid.String()] = p.Type.String()
-	}
-	return pinMap, nil
-}
-
-//This is node retrieve
+//Retrieve from local node
 func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
 	ctx := context.Background()
 
@@ -286,4 +209,100 @@ func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
 	}
 
 	return ioutil.ReadAll(r)
+}
+
+//Pin Descriminator
+func (i *IPFSHandle) Pin(path string) error {
+	if i.cluster != nil {
+		return i.clusterPin(path)
+	} else {
+		return i.nodePin(path)
+	}
+}
+
+//Node Pin
+func (i *IPFSHandle) nodePin(path string) error {
+	p := corepath.New(path)
+	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
+	if err != nil {
+		return err
+	}
+	return i.coreAPI.Pin().Add(context.Background(), rp, options.Pin.Recursive(true))
+}
+
+//Cluster pin
+func (i *IPFSHandle) clusterPin(path string) error {
+	cid, err := gocid.Decode(path)
+	if err != nil {
+		return err
+	}
+	pin := clusterapi.PinCid(cid)
+	pin.PinOptions.ReplicationFactorMax = -1
+	return i.cluster.Pin(context.Background(), pin)
+}
+
+//Unpin descriminator
+func (i *IPFSHandle) Unpin(path string) error {
+	if i.cluster != nil {
+		return i.clusterUnpin(path)
+	} else {
+		return i.nodeUnpin(path)
+	}
+}
+
+//Node Unpin
+func (i *IPFSHandle) nodeUnpin(path string) error {
+	p := corepath.New(path)
+	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
+	if err != nil {
+		return err
+	}
+	return i.coreAPI.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true))
+}
+
+//Cluster unpin
+func (i *IPFSHandle) clusterUnpin(path string) error {
+	p := corepath.New(path)
+	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
+	if err != nil {
+		return err
+	}
+	return i.cluster.Unpin(context.Background(), rp.Cid())
+}
+
+//Listpins descriminator
+func (i *IPFSHandle) ListPins() (map[string]string, error) {
+	if i.cluster != nil {
+		return i.clusterListPins()
+	} else {
+		return i.nodeListPins()
+	}
+}
+
+//Node Listpins
+func (i *IPFSHandle) nodeListPins() (map[string]string, error) {
+	pins, err := i.coreAPI.Pin().Ls(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var pinMap map[string]string
+	pinMap = make(map[string]string)
+	for _, p := range pins {
+		pinMap[p.Path().String()] = p.Type()
+	}
+	return pinMap, nil
+}
+
+//This is cluster listpins
+func (i *IPFSHandle) clusterListPins() (map[string]string, error) {
+	pins, err := i.cluster.Pins(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var pinMap map[string]string
+	pinMap = make(map[string]string)
+	for _, p := range pins {
+		pinMap[p.Cid.String()] = p.Type.String()
+	}
+	return pinMap, nil
 }
