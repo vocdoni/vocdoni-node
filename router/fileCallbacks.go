@@ -158,12 +158,13 @@ func addFile(reqType, requestId string, b64content []byte, msg types.Message, st
 			return
 		}
 		log.Debugf("added file %s, b64 size of %d", cid, len(b64content))
-		ipfsRouteBaseURL := "ipfs://"
+		// ipfsRouteBaseURL := "ipfs://"
 		var response types.AddResponse
 		response.ID = requestId
 		response.Response.Request = requestId
 		response.Response.Timestamp = int32(time.Now().Unix())
-		response.Response.URI = ipfsRouteBaseURL + cid
+		// response.Response.URI = ipfsRouteBaseURL + cid
+		response.Response.URI = cid
 		response.Signature, err = signer.SignJSON(response.Response)
 		if err != nil {
 			log.Warn(err.Error())
