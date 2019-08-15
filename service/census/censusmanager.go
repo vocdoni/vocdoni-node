@@ -283,6 +283,28 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool) *types.Cen
 		return resp
 	}
 
+	if op == "addClaimBulk" {
+		if isAuth {
+			addedClaims := 0
+			for _, c := range r.ClaimsData {
+				err := cm.Trees[r.CensusID].AddClaim([]byte(c))
+				if err != nil {
+					log.Warnf("error adding claim: %s", err.Error())
+					resp.Ok = false
+					resp.Error = err.Error()
+					return resp
+				}
+				log.Infof("claim added %s", c)
+				addedClaims++
+			}
+			log.Infof("%d claims addedd successfully", addedClaims)
+		} else {
+			resp.Ok = false
+			resp.Error = "invalid authentication"
+		}
+		return resp
+	}
+
 	if op == "addClaim" {
 		if isAuth {
 			err = cm.Trees[r.CensusID].AddClaim([]byte(r.ClaimData))

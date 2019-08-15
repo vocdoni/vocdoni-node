@@ -25,15 +25,15 @@ curl -s http://localhost:1500 -d '{
 	"censusId":"GoT_Favorite",
 	"claimData":"'$C'"}}' | jq .
 
-echo "addClaim"
+echo "addClaimBulk"
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
 "signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
-	"method":"addClaim",
+	"method":"addClaimBulk",
 	"censusId":"GoT_Favorite",
-	"claimData":"Tyrion-'$RANDOM'"}}' | jq .
+	"claimsData": ["Tyrion-'$RANDOM'","Arya-'$RANDOM'","Jaime-'$RANDOM'","Bran-'$RANDOM'"]}}' | jq .
 
 echo "genProof"
 proof=$(curl -s http://localhost:1500 -d '{
