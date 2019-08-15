@@ -47,3 +47,24 @@ func TestSignature(t *testing.T) {
 		t.Errorf("Hardcoded signature %s do not match\n", hardcodedSignature)
 	}
 }
+
+func TestEncryption(t *testing.T) {
+	t.Log("Testing encryption and decryption")
+	var s SignKeys
+	s.Generate()
+	pub, priv := s.HexString()
+	t.Logf("Generated pub:%s priv:%s\n", pub, priv)
+	message := "hello"
+	t.Logf("Message to encrypt: %s\n", message)
+	msgEnc, err := s.Encrypt(message)
+	if err != nil {
+		t.Errorf("Error while encrypting %s\n", err)
+	}
+	t.Logf("Encrypted hexString is %s\n", msgEnc)
+	t.Logf("Testing Decryption")
+	msgPlain, err := s.Decrypt(msgEnc)
+	if err != nil {
+		t.Errorf("Error while decrypting %s\n", err)
+	}
+	t.Logf("Decrypted plain String is %s\n", msgPlain)
+}

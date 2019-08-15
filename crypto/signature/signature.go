@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	crypto "github.com/ethereum/go-ethereum/crypto"
 )
@@ -166,4 +167,43 @@ func sanitizeHex(hexStr string) string {
 		return fmt.Sprintf("%s", hexStr[2:])
 	}
 	return hexStr
+}
+
+// Encrypt uses secp256k1 standard from https://www.secg.org/sec2-v2.pdf to encrypt a message.
+// The result is a Hexadecimal string
+func (k *SignKeys) Encrypt(message string) (string, error) {
+	pub, _ := k.HexString()
+	pubBytes, err := hex.DecodeString(pub)
+	if err != nil {
+		return "", err
+	}
+	pubKey, err := secp256k1.ParsePubKey(pubBytes)
+	if err != nil {
+		return "", err
+	}
+	ciphertext, err := secp256k1.Encrypt(pubKey, []byte(message))
+	if err != nil {
+		return "", err
+	}
+	return sanitizeHex(hex.EncodeToString(ciphertext)), nil
+}
+
+// Decrypt uses secp256k1 standard to decrypt a Hexadecimal string message
+// The result is plain text (no hex encoded)
+func (k *SignKeys) Decrypt(hexMessage string) (string, error) {
+	_, priv := k.HexString()
+	pkBytes, err := hex.DecodeString(priv)
+	if err != nil {
+		return "", err
+	}
+	privKey, _ := secp256k1.PrivKeyFromBytes(pkBytes)
+	cipertext, err := hex.DecodeString(sanitizeHex(hexMessage))
+	if err != nil {
+		return "", err
+	}
+	plaintext, err := secp256k1.Decrypt(privKey, cipertext)
+	if err != nil {
+		return "", err
+	}
+	return string(plaintext), nil
 }

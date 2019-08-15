@@ -5,6 +5,7 @@ go 1.12
 require (
 	github.com/apilayer/freegeoip v3.5.0+incompatible // indirect
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
+	github.com/decred/dcrd/dcrec/secp256k1 v1.0.2
 	github.com/docker/docker v1.13.1 // indirect
 	github.com/elastic/gosigar v0.10.4 // indirect
 	github.com/ethereum/go-ethereum v1.9.0
