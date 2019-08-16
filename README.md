@@ -50,6 +50,8 @@ Or with docker (configuration options in file `dockerfiles/gateway/env`):
 bash dockerfiles/gateway/dockerlaunch.sh
 ```
 
+All data will be stored in the shared directory `run/`.
+
 ## Census Manager
 
 The Census Manager provides a service for both, organizations and users. Its purpose is to store and manage one or multiple census. A census is basically a list of public keys stored as a Merkle Tree.
@@ -79,6 +81,14 @@ cd go-dvote
 unset GOPATH
 go build -o censushttp gitlab.com/vocdoni/go-dvote/cmd/censushttp
 ```
+
+Or with docker (configuration options in file `dockerfiles/census/env`):
+
+```
+bash dockerfiles/census/dockerlaunch.sh
+```
+
+All data will be stored in the shared directory `run/`.
 
 ## Usage
 
