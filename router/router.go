@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/config"
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -26,6 +27,7 @@ func getMethod(payload []byte) (string, []byte, error) {
 	var msgStruct types.MessageRequest
 	err := json.Unmarshal(payload, &msgStruct)
 	if err != nil {
+		log.Error("Could not unmarshall JSON, error: %s", err)
 		return "", nil, err
 	}
 	method, ok := msgStruct.Request["method"].(string)
@@ -71,21 +73,27 @@ type Router struct {
 }
 
 //InitRouter sets up a Router object which can then be used to route requests
-func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport, signer signature.SignKeys, dvoteEnabled bool) Router {
+func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport, signer signature.SignKeys, globalCfg *config.GWCfg) Router {
 	requestMap := make(methodMap)
 	routerObj := Router{requestMap, inbound, storage, transport, signer}
-	if dvoteEnabled {
+	if globalCfg.Api.File.Enabled {
 		routerObj.registerMethod("fetchFile", fetchFileMethod)
 		routerObj.registerMethod("addFile", addFileMethod)
 		routerObj.registerMethod("pinList", pinListMethod)
 		routerObj.registerMethod("pinFile", pinFileMethod)
 		routerObj.registerMethod("unpinFile", unpinFileMethod)
 	}
+	if globalCfg.Api.Census.Enabled {
+		routerObj.registerMethod("addCensus", censusProxyMethod)
+		routerObj.registerMethod("addClaim", censusProxyMethod)
+		routerObj.registerMethod("addClaimBulk", censusProxyMethod)
+		routerObj.registerMethod("getRoot", censusProxyMethod)
+		routerObj.registerMethod("dump", censusProxyMethod)
+	}
 	return routerObj
 }
 
-func (r *Router) registerMethod(methodName string,
-	methodCallback requestMethod) {
+func (r *Router) registerMethod(methodName string, methodCallback requestMethod) {
 	r.requestMap[methodName] = methodCallback
 }
 
@@ -102,13 +110,14 @@ func (r *Router) Route() {
 			/*getMethod pulls method name and rawRequest from msg.Data*/
 			method, rawRequest, err := getMethod(msg.Data)
 			if err != nil {
-				log.Warnf("couldn't extract method from JSON message %v", msg)
+				log.Warnf("couldn't extract method from JSON message %s", msg)
 				break
 			}
 			methodFunc := r.requestMap[method]
 			if methodFunc == nil {
 				log.Warnf("router has no method named %s", method)
 			} else {
+				log.Info("calling method %s", method)
 				methodFunc(msg, rawRequest, r.storage, r.transport, r.signer)
 			}
 		}

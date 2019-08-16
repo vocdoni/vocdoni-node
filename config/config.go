@@ -20,8 +20,17 @@ type GWCfg struct {
 		Route string
 	}
 	Api struct {
-		DvoteApi bool
-		Web3Api  bool
+		File struct {
+			Enabled bool
+			Route   string
+		}
+		Census struct {
+			Enabled bool
+			Route   string
+		}
+		Web3 struct {
+			Enabled bool
+		}
 	}
 	Client struct {
 		AllowPrivate bool

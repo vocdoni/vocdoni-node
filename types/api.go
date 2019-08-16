@@ -140,14 +140,15 @@ type CensusRequestMessage struct {
 
 // CensusRequest type represents a JSON object with all possible requests fields
 type CensusRequest struct {
-	Method     string   `json:"method"`     // method to call
-	CensusID   string   `json:"censusId"`   // References to MerkleTree namespace
-	RootHash   string   `json:"rootHash"`   // References to MerkleTree rootHash
-	ClaimData  string   `json:"claimData"`  // Data to add to the MerkleTree
-	ClaimsData []string `json:"claimsData"` //Multiple Data to add to the MerkleTree
-	ProofData  string   `json:"proofData"`  // MerkleProof to check
-	PubKeys    []string `json:"pubKeys"`    // Public key managers for creating a new census
-	TimeStamp  int32    `json:"timestamp"`  // Unix TimeStamp in seconds
+	Method     string   `json:"method"`              // method to call
+	CensusID   string   `json:"censusId"`            // References to MerkleTree namespace
+	RootHash   string   `json:"rootHash"`            // References to MerkleTree rootHash
+	ClaimData  string   `json:"claimData"`           // Data to add to the MerkleTree
+	ClaimsData []string `json:"claimsData"`          // Multiple Data to add to the MerkleTree
+	ProofData  string   `json:"proofData"`           // MerkleProof to check
+	PubKeys    []string `json:"pubKeys"`             // Public key managers for creating a new census
+	TimeStamp  int32    `json:"timestamp"`           // Unix TimeStamp in seconds
+	CensusURI  string   `json:"censusUri,omitempty"` //Census Service URI for proxy messages
 }
 
 // CensusResponseMessage represents a census manager JSON response package

@@ -36,11 +36,12 @@ func newConfig() (config.GWCfg, error) {
 	}
 	userDir := usr.HomeDir + "/.dvote"
 	path := flag.String("cfgpath", userDir+"/config.yaml", "filepath for custom gateway config")
-	flag.Bool("dvoteApi", true, "enable dvote API")
+	flag.Bool("fileApi", true, "enable file API")
 	flag.Bool("web3Api", true, "enable web3 API")
-	flag.String("listenHost", "0.0.0.0", "http host endpoint")
-	flag.Int("listenPort", 9090, "http port endpoint")
-	flag.String("dvoteRoute", "/dvote", "dvote endpoint API route")
+	flag.Bool("censusApi", true, "enable census API")
+	flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
+	flag.Int("listenPort", 9090, "API endpoint http port")
+	flag.String("fileRoute", "/file", "file API route")
 	flag.Bool("allowPrivate", false, "allows private methods over the APIs")
 	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	flag.String("signingKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
@@ -60,11 +61,13 @@ func newConfig() (config.GWCfg, error) {
 	flag.Parse()
 
 	viper := viper.New()
-	viper.SetDefault("api.dvoteApi", true)
-	viper.SetDefault("api.web3Api", true)
 	viper.SetDefault("listenHost", "0.0.0.0")
 	viper.SetDefault("listenPort", 9090)
-	viper.SetDefault("dvote.route", "/dvote")
+	viper.SetDefault("api.file.enabled", true)
+	viper.SetDefault("api.file.route", "/file")
+	viper.SetDefault("api.web3.enabled", true)
+	viper.SetDefault("api.census.enabled", true)
+	viper.SetDefault("api.census.route", "/census")
 	viper.SetDefault("client.allowPrivate", false)
 	viper.SetDefault("client.allowedAddrs", "")
 	viper.SetDefault("client.signingKey", "")
@@ -108,11 +111,12 @@ func newConfig() (config.GWCfg, error) {
 
 	//bind flags after writing default config so flag use
 	//does not write config on first program run
-	viper.BindPFlag("api.dvoteApi", flag.Lookup("dvoteApi"))
-	viper.BindPFlag("api.web3Api", flag.Lookup("web3Api"))
+	viper.BindPFlag("api.file.enabled", flag.Lookup("fileApi"))
+	viper.BindPFlag("api.file.route", flag.Lookup("fileRoute"))
+	viper.BindPFlag("api.census.enabled", flag.Lookup("censusApi"))
+	viper.BindPFlag("api.web3.enabled", flag.Lookup("web3Api"))
 	viper.BindPFlag("listenHost", flag.Lookup("listenHost"))
 	viper.BindPFlag("listenPort", flag.Lookup("listenPort"))
-	viper.BindPFlag("dvote.route", flag.Lookup("dvoteRoute"))
 	viper.BindPFlag("client.allowPrivate", flag.Lookup("allowPrivate"))
 	viper.BindPFlag("client.allowedAddrs", flag.Lookup("allowedAddrs"))
 	viper.BindPFlag("client.signingKey", flag.Lookup("signingKey"))
@@ -161,6 +165,7 @@ func main() {
 		log.Fatalf("could not load config: %v", err)
 	}
 
+	//setup listener
 	pxy := net.NewProxy()
 	pxy.C.SSLDomain = globalCfg.Ssl.Domain
 	pxy.C.SSLCertDir = globalCfg.DataDir
@@ -235,7 +240,7 @@ func main() {
 	}
 
 	// Start Ethereum Web3 native node
-	if globalCfg.Api.Web3Api && len(globalCfg.W3external) == 0 {
+	if globalCfg.Api.Web3.Enabled && len(globalCfg.W3external) == 0 {
 		log.Info("starting Ethereum node")
 		node.Start()
 		for i := 0; i < len(node.Keys.Accounts()); i++ {
@@ -246,7 +251,7 @@ func main() {
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
 	}
 
-	if globalCfg.Api.Web3Api && len(globalCfg.W3external) > 0 {
+	if globalCfg.Api.Web3.Enabled && len(globalCfg.W3external) > 0 {
 		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
 			log.Fatalf("cannot parse w3external URL")
@@ -299,18 +304,30 @@ func main() {
 		}
 	}
 
-	// Dvote API
-	listenerOutput := make(chan types.Message)
-	if globalCfg.Api.DvoteApi {
-		ws := new(net.WebsocketHandle)
-		ws.Init(new(types.Connection))
-		ws.SetProxy(pxy)
-		ws.AddProxyHandler(globalCfg.Dvote.Route)
-		log.Infof("websockets file API available at %s", globalCfg.Dvote.Route)
+	// API Initialization
+	// if any api :
+	ws := new(net.WebsocketHandle)
+	ws.Init(new(types.Connection))
+	ws.SetProxy(pxy)
 
-		go ws.Listen(listenerOutput)
-		router := router.InitRouter(listenerOutput, storage, ws, *signer, globalCfg.Api.DvoteApi)
-		go router.Route()
+	listenerOutput := make(chan types.Message)
+	go ws.Listen(listenerOutput)
+
+	router := router.InitRouter(listenerOutput, storage, ws, *signer, &globalCfg)
+	go router.Route()
+
+	// Dvote API
+	if globalCfg.Api.File.Enabled {
+		log.Debug("Setting up file API")
+		ws.AddProxyHandler(globalCfg.Api.File.Route)
+		log.Infof("websockets file API available at %s", globalCfg.Api.File.Route)
+	}
+
+	// Census Handler
+	if globalCfg.Api.Census.Enabled {
+		log.Debug("Setting up census handler")
+		ws.AddProxyHandler(globalCfg.Api.Census.Route)
+		log.Infof("HTTPS census API available at %s", globalCfg.Api.Census.Route)
 	}
 
 	for {
