@@ -18,15 +18,18 @@ go build -o censusHttpService gitlab.com/vocdoni/go-dvote/cmd/censushttp
 
 The next table shows a summary of the available methods and its relation with the fields.
 
-| method     | censusId  | claimData | rootHash | proofData | protected? | description |
-|------------|-----------|-----------|----------|-----------|------------|------------|
-| `addCensus`  | mandatory | none      | none     | none      | yes      | adds a new claim to the merkle tree       |
-| `addClaim`   | mandatory | mandatory | none     | none      | yes      | adds a new claim to the merkle tree       |
+| method     | censusId  | claimData | rootHash | proofData | protected? | description
+|------------|-----------|-----------|----------|-----------|------------|------------
+| `addCensus`  | mandatory | none      | none     | none      | yes      | adds a new census namespace (new merkle tree)
+| `addClaim`   | mandatory | mandatory | none     | none      | yes      | adds a new claim to the merkle tree
 | `getRoot`    | mandatory | none      | none     | none      | no       | get the current merkletree root hash
 | `genProof`   | mandatory | mandatory | optional | none      | no       | generate the merkle proof for a given claim
 | `checkProof` | mandatory | mandatory | optional | mandatory | no       | check a claim and its merkle proof 
 | `getIdx`     | mandatory | mandatory | optional | none      | no       | get the merkletree data index of a given claim
-| `dump`       | mandatory | none      | optional | none      | yes      | list the contents of the census for a given hash
+| `dump`       | mandatory | none      | optional | none      | yes      | list the contents of the census for a given hash in Hex
+| `dumpPlain`  | mandatory | none      | optional | none      | yes      | list the contents of the census (claims as plain strings)
+| `importDump` | mandatory | mandatory | optional | none      | yes      | import the claims from a dump
+
 
 
 Check https://vocdoni.io/docs/#/architecture/protocol/json-api and 

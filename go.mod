@@ -7,7 +7,6 @@ require (
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.2
 	github.com/docker/docker v1.13.1 // indirect
-	github.com/elastic/gosigar v0.10.4 // indirect
 	github.com/ethereum/go-ethereum v1.9.0
 	github.com/ethersphere/swarm v0.0.0-20190613131100-4744b7c9d747
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
@@ -22,6 +21,7 @@ require (
 	github.com/howeyc/fsnotify v0.9.0 // indirect
 	github.com/hsanjuan/go-libp2p-http v0.1.0 // indirect
 	github.com/iden3/go-iden3 v0.0.5-0.20190709081248-908d792a8964
+	github.com/iden3/go-iden3-core v0.0.7-0.20190818083133-1e1f38b0cd4a
 	github.com/influxdata/influxdb v1.7.7 // indirect
 	github.com/ipfs/dir-index-html v1.0.3 // indirect
 	github.com/ipfs/go-cid v0.0.2

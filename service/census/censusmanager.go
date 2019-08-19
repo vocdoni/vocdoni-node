@@ -290,12 +290,10 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool) *types.Cen
 				err := cm.Trees[r.CensusID].AddClaim([]byte(c))
 				if err != nil {
 					log.Warnf("error adding claim: %s", err.Error())
-					resp.Ok = false
-					resp.Error = err.Error()
-					return resp
+				} else {
+					log.Infof("claim added %s", c)
+					addedClaims++
 				}
-				log.Infof("claim added %s", c)
-				addedClaims++
 			}
 			log.Infof("%d claims addedd successfully", addedClaims)
 		} else {
@@ -314,6 +312,25 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool) *types.Cen
 				resp.Error = err.Error()
 			} else {
 				log.Info("claim addedd successfully")
+			}
+		} else {
+			resp.Ok = false
+			resp.Error = "invalid authentication"
+		}
+		return resp
+	}
+
+	if op == "importDump" {
+		if isAuth {
+			if len(r.ClaimsData) > 0 {
+				err = cm.Trees[r.CensusID].ImportDump(r.ClaimsData)
+				if err != nil {
+					log.Warnf("error importing dump: %s", err.Error())
+					resp.Ok = false
+					resp.Error = err.Error()
+				} else {
+					log.Infof("dump imported successfully, %d claims", len(r.ClaimsData))
+				}
 			}
 		} else {
 			resp.Ok = false
@@ -350,19 +367,25 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool) *types.Cen
 		return resp
 	}
 
-	if op == "dump" {
+	if op == "dump" || op == "dumpPlain" {
 		if !isAuth {
 			resp.Ok = false
 			resp.Error = "invalid authentication"
 			return resp
 		}
 		//dump the claim data and return it
-		values, err := t.Dump()
-		if err != nil {
-			resp.Ok = false
-			resp.Error = err.Error()
+		var dumpValues []string
+		if op == "dump" {
+			dumpValues, err = t.Dump(r.RootHash)
 		} else {
-			resp.ClaimsData = values
+			dumpValues, err = t.DumpPlain(r.RootHash)
+		}
+		if err != nil {
+			resp.Error = err.Error()
+			resp.Ok = false
+		} else {
+
+			resp.ClaimsData = dumpValues
 		}
 		return resp
 	}
