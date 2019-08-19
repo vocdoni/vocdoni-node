@@ -1,37 +1,35 @@
 package vochain
 
 import (
-	"github.com/cosmos/cosmos-sdk/codec"
-	vlog "gitlab.com/vocdoni/go-dvote/log"
+	codec "github.com/cosmos/cosmos-sdk/codec"
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
-func splitTx(content []byte) voctypes.Tx {
-	var validTx voctypes.Tx
-	err := codec.Cdc.UnmarshalJSON(content, &validTx)
-	vlog.Infof("%s", validTx.String())
-	txMethod := validTx.GetMethod()
-	
+// SplitAndCheckTxBytes splits a tx into method and args parts and does some basic checks
+func SplitAndCheckTxBytes(content []byte) (voctypes.ValidTx, error) {
+	var t voctypes.Tx
+	var vt voctypes.ValidTx
+	var err error
+
+	err = codec.Cdc.UnmarshalJSON(content, &t)
+	// unmarshal bytes
 	if err != nil {
-		vlog.Infof("%s", err)
+		return vt, err
 	}
-	if txMethod != "" {
-		validTx.Method = txMethod
+
+	// validate method name
+	m := t.ValidateMethod()
+	if m == "" {
+		return vt, err
 	}
-	return validTx
-}
+	vt.Method = m
 
-func validateHash(hash []byte) bool {
-	// VALIDATE HASH LENGTH AND FORMAT
-	return false
-}
+	// validate method args
+	args, err := t.ValidateArgs()
+	if err != nil {
+		return vt, err
+	}
+	vt.Args = args
 
-func validateSignature(sig []byte) bool {
-	// VALIDATE WITH SIGNATURE TYPE
-	return false
-}
-
-func verifySignature(sig []byte, pubk []byte) bool {
-	// RETURNS TRUE IF SIG CORRESPONDS TO PASSED PUBK
-	return false
+	return vt, nil
 }

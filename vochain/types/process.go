@@ -2,46 +2,30 @@ package vochain
 
 import (
 	"fmt"
-
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-// GlobalState represents the Tendermint blockchain global state
-type GlobalState struct {
-	// ProcessList is a list containing all the processes in the blockchain
-	ProcessList *ProcessState `json:"processList"`
-	// ValidatorsPubk is a list containing all the Vochain allowed Validators public keys
-	ValidatorsPubK []tmtypes.Address `json:"minerspubk"`
-	// CensusManagerPubk is a list containing all the public keys allowed to init a new voting process
-	CensusManagersPubK []tmtypes.Address `json:"censusmanagerpubk"`
-}
+// ________________________ PROCESS ________________________
 
-// ProcessState represents a state per process
-type ProcessState struct {
-	// ID id of the process
-	ID string `json:"id"`
-	// MkRoot merkle root of all the census in the process
-	MkRoot string `json:"mkroot"`
-	// InitBlock represents the tendermint block where the process goes from scheduled to active
-	InitBlock tmtypes.Block `json:"initblock"`
-	// EndBlock represents the tendermint block where the process goes from active to finished
-	EndBlock tmtypes.Block `json:"endblock"`
-	// EncryptionKeys are the keys required to encrypt the votes
-	EncryptionKeys []tmtypes.Address `json:"encryptionkeys"`
-	// CurrentState is the current process state
-	CurrentState CurrentProcessState `json:"currentstate"`
+// Process represents a state per process
+type Process struct {
+	EntityID string
 	// Votes is a list containing all the processed and valid votes (here votes are final)
 	Votes []Vote `json:"votes"`
+	// MkRoot merkle root of all the census in the process
+	MkRoot string `json:"mkroot"`
+	// EndBlock represents the tendermint block where the process goes from active to finished
+	NumberOfBlocks int64 `json:"endblock"`
+	// InitBlock represents the tendermint block where the process goes from scheduled to active
+	InitBlock int64 `json:"initblock"`
+	// CurrentState is the current process state
+	CurrentState CurrentProcessState `json:"currentstate"`
+	// EncryptionKeys are the keys required to encrypt the votes
+	EncryptionKeys string `json:"encryptionkeys"`
 }
 
-// Vote represents a single vote
-type Vote struct {
-	// Nullifier is a special hash that prevents double voting
-	Nullifier string `json:"nullifier"`
-	// Payload contains the vote itself
-	Payload string `json:"payload"`
-	// CensusProof contains the prove indicating that the user is in the census of the process
-	CensusProof string `json:"censusproof"`
+// NewProcess returns a new Process instance
+func NewProcess() *Process {
+	return &Process{}
 }
 
 // CurrentProcessState represents the current phase of process state
@@ -78,6 +62,24 @@ func (c CurrentProcessState) String() string {
 	// canceled
 	case 4:
 		return fmt.Sprintf("%s", "canceled")
+	default:
+		return ""
 	}
-	return ""
+}
+
+// ________________________ VOTE ________________________
+
+// Vote represents a single vote
+type Vote struct {
+	// Payload contains the vote itself
+	Payload string `json:"payload"`
+	// Nullifier is a special hash that prevents double voting
+	Nullifier string `json:"nullifier"`
+	// CensusProof contains the prove indicating that the user is in the census of the process
+	CensusProof string `json:"censusproof"`
+}
+
+// NewVote returns a new Vote instance
+func NewVote() *Vote {
+	return &Vote{}
 }

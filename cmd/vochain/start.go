@@ -7,14 +7,13 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
-
 	"time"
+
+	abci "github.com/tendermint/tendermint/abci/types"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
-	"github.com/cosmos/cosmos-sdk/codec"
-	abci "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	cmn "github.com/tendermint/tendermint/libs/common"
@@ -37,10 +36,9 @@ var appdbDir string
 var appName string
 
 func init() {
-	flag.StringVar(&configFile, "config", "vochain/config/config.toml", "Path to config.toml")
+	flag.StringVar(&configFile, "config", "/home/jordi/vocdoni/go-dvote/vochain/config/config.toml", "Path to config.toml")
 	flag.StringVar(&appdbName, "appdbname", "vochaindb", "Application database name")
-	flag.StringVar(&appdbDir, "appdbdir", "vochain/data/appdb", "Path where the application database will be located")
-	flag.StringVar(&appName, "appName", "testapp", "Name of the app")
+	flag.StringVar(&appdbDir, "appdbdir", "/home/jordi/vocdoni/go-dvote/vochain/data/appdb", "Path where the application database will be located")
 }
 
 func main() {
@@ -52,7 +50,7 @@ func main() {
 	defer db.Close()
 	vlog.Info("NewBaseApp")
 
-	app := vochain.NewBaseApplication(db, appName)
+	app := vochain.NewBaseApplication(db)
 
 	flag.Parse()
 	vlog.Info("newTendermint")
@@ -68,17 +66,23 @@ func main() {
 		node.Wait()
 	}()
 
-	time.Sleep(3 * time.Second)
-	txbytes := []byte(`{"method": "voteTx","args": ["a", "b"]}`)
-	req := abci.RequestCheckTx{Tx: txbytes}
-	go vlog.Infof("%s", app.CheckTx(req))
-	//req := abci.RequestDeliverTx{Tx: txbytes}
-	//vlog.Infof("%s", app.DeliverTx(req))
+	n := 0
+	for n < 10 {
+		n++
+		time.Sleep(3 * time.Second)
+		//txbytes := []byte(`{"method": "voteTx", "args": {"nullifier": "0", "payload": "0", "censusProof": "0"}}`)
+		txbytes := []byte(`{"method": "newProcessTx", "args": { "entityId": "0", "entityResolver": "0", "metadataHash": "0", "mkRoot": "0", "initBlock": "0", "numberOfBlocks": "0", "encryptionKeys": "0"  }}`)
+		req := abci.RequestCheckTx{Tx: txbytes}
+		go vlog.Infof("%+v", app.CheckTx(req))
+		req2 := abci.RequestDeliverTx{Tx: txbytes}
+		go vlog.Infof("%+v", app.DeliverTx(req2))
+	}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	os.Exit(0)
+
 }
 
 func newTendermint(app vochain.BaseApplication, configFile string) (*nm.Node, error) {
@@ -120,8 +124,8 @@ func newTendermint(app vochain.BaseApplication, configFile string) (*nm.Node, er
 	}
 
 	// read genesis file or create it with previously generated keys
-	appState := fmt.Sprintf("{censusManagers:['%s','%s','%s']}", testtypes.ValidatorsPubK1, testtypes.ValidatorsPubK2, testtypes.ValidatorsPubK3)
-	appStateJSON, err := codec.Cdc.MarshalJSON(appState)
+	//appState := fmt.Sprintf("{censusManagers:['%s','%s','%s']}", testtypes.ValidatorsPubK1, testtypes.ValidatorsPubK2, testtypes.ValidatorsPubK3)
+	//appStateJSON, err := codec.Cdc.MarshalJSON(appState)
 
 	genFile := config.GenesisFile()
 	if cmn.FileExists(genFile) {
@@ -141,7 +145,7 @@ func newTendermint(app vochain.BaseApplication, configFile string) (*nm.Node, er
 				Power:   10,
 			},
 		}
-		genDoc.AppState = appStateJSON
+		//genDoc.AppState = appStateJSON
 
 		if err := genDoc.SaveAs(genFile); err != nil {
 			panic(fmt.Sprintf("Cannot load or generate genesis file: %v", err))
@@ -155,7 +159,7 @@ func newTendermint(app vochain.BaseApplication, configFile string) (*nm.Node, er
 		config,
 		pv,
 		nodeKey,
-		proxy.NewLocalClientCreator(app), // Note we use proxy.NewLocalClientCreator here to create a local client instead of one communicating through a socket or gRPC.
+		proxy.NewLocalClientCreator(&app), // Note we use proxy.NewLocalClientCreator here to create a local client instead of one communicating through a socket or gRPC.
 		nm.DefaultGenesisDocProviderFunc(config),
 		nm.DefaultDBProvider,
 		nm.DefaultMetricsProvider(config.Instrumentation),
