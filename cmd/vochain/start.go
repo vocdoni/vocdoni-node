@@ -51,7 +51,6 @@ func main() {
 	vlog.Info("NewBaseApp")
 
 	app := vochain.NewBaseApplication(db)
-
 	flag.Parse()
 	vlog.Info("newTendermint")
 	node, err := newTendermint(*app, configFile)
@@ -69,12 +68,13 @@ func main() {
 	n := 0
 	for n < 10 {
 		n++
-		time.Sleep(3 * time.Second)
+		time.Sleep(10 * time.Second)
 		//txbytes := []byte(`{"method": "voteTx", "args": {"nullifier": "0", "payload": "0", "censusProof": "0"}}`)
 		txbytes := []byte(`{"method": "newProcessTx", "args": { "entityId": "0", "entityResolver": "0", "metadataHash": "0", "mkRoot": "0", "initBlock": "0", "numberOfBlocks": "0", "encryptionKeys": "0"  }}`)
-		req := abci.RequestCheckTx{Tx: txbytes}
-		go vlog.Infof("%+v", app.CheckTx(req))
+		//req := abci.RequestCheckTx{Tx: txbytes}
+		//go vlog.Infof("%+v", app.CheckTx(req))
 		req2 := abci.RequestDeliverTx{Tx: txbytes}
+		//time.Sleep(10 * time.Second)
 		go vlog.Infof("%+v", app.DeliverTx(req2))
 	}
 

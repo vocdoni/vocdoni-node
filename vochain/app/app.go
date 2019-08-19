@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	abci "github.com/tendermint/tendermint/abci/types"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -23,6 +24,10 @@ var (
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
+	// Heigth is the number of blocks of the app
+	Height int64 `json:"height"`
+	// AppHash is the root hash of the app
+	AppHash []byte `json:"apphash"`
 	// Database allowing processes be persistent
 	db dbm.DB `json:"db"`
 	// volatile states
@@ -41,8 +46,22 @@ func NewBaseApplication(db dbm.DB) *BaseApplication {
 	}
 }
 
-func (BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
-	return abcitypes.ResponseInfo{}
+func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
+	var height int64
+	heightBytes := app.db.Get(heightKey)
+	if len(heightBytes) != 0 {
+		err := json.Unmarshal(heightBytes, &height)
+		if err != nil {
+			vlog.Errorf("Cannot unmarshal height")
+		}
+		vlog.Info("HEIGHT: %v", height)
+	}
+	appHashBytes := app.db.Get(appHashKey)
+	vlog.Infof("APP HASH %v", app.AppHash)
+	return abcitypes.ResponseInfo{
+		LastBlockHeight:  height,
+		LastBlockAppHash: appHashBytes,
+	}
 }
 
 func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
@@ -63,16 +82,14 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		vlog.Info("TX ARGS STRING %v", npta)
 		vlog.Info("TX ARGS STRING END")
 
-		if _, ok := app.deliverTxState.Processes[npta.MkRoot]; ok {
-			app.deliverTxState.Processes[npta.MkRoot] = voctypes.Process{
-				EntityID:       npta.EntityID,
-				Votes:          make([]voctypes.Vote, 0),
-				MkRoot:         npta.MkRoot,
-				NumberOfBlocks: npta.NumberOfBlocks,
-				InitBlock:      npta.InitBlock,
-				CurrentState:   voctypes.Scheduled,
-				EncryptionKeys: npta.EncryptionKeys,
-			}
+		app.deliverTxState.Processes[npta.MkRoot] = voctypes.Process{
+			EntityID:       npta.EntityID,
+			Votes:          make([]voctypes.Vote, 0),
+			MkRoot:         npta.MkRoot,
+			NumberOfBlocks: npta.NumberOfBlocks,
+			InitBlock:      npta.InitBlock,
+			CurrentState:   voctypes.Scheduled,
+			EncryptionKeys: npta.EncryptionKeys,
 		}
 
 		newBytes, err := json.Marshal(app.deliverTxState.Processes)
@@ -108,16 +125,23 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 		}
 		app.db.Set(heightKey, heightBytes)
 	*/
+	app.Height += 1
+	b := []byte(strconv.FormatInt(app.Height, 10))
+	app.db.Set(heightKey, b)
 	out := app.db.Get(processesKey)
-	processes := make(map[string]voctypes.Process, 0)
+	var processes map[string]voctypes.Process
 	_ = json.Unmarshal(out, &processes)
 	vlog.Info("DB CONTENT: %v", processes)
 	h := sha256.New()
 	h.Write(out)
-	app.db.Set(appHashKey, h.Sum(nil))
+	app.AppHash = h.Sum(nil)
+	app.db.Set(appHashKey, app.AppHash)
+	vlog.Info("DB CONTENT: %v", app.AppHash)
+	app.deliverTxState = nil
 	return abcitypes.ResponseCommit{
-		Data: h.Sum(nil),
+		Data: app.AppHash,
 	}
+
 }
 
 func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
@@ -170,12 +194,12 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		if err != nil {
 			vlog.Errorf("Cannot unmarshal height")
 		}
-		app.deliverTxState.Height = height
-	} else {
-		app.deliverTxState.Height = 0
+		vlog.Info("HEIGHT: %v", height)
+		app.Height = height
 	}
 
-	app.deliverTxState.AppHash = req.GetAppStateBytes()
+	appHashBytes := app.db.Get(appHashKey)
+	app.AppHash = appHashBytes
 
 	return abcitypes.ResponseInitChain{}
 }
@@ -189,20 +213,32 @@ func (app *BaseApplication) validateHeight(req abci.RequestBeginBlock) error {
 
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	// validate chain height
+
 	if err := app.validateHeight(req); err != nil {
 		panic(err)
 	}
-	if app.deliverTxState == nil {
-		app.deliverTxState = &voctypes.State{}
-	} else {
-		app.deliverTxState.Height = req.Header.Height
-		app.deliverTxState.AppHash = req.Header.AppHash
-	}
 
+	app.deliverTxState = &voctypes.State{}
+	var height int64
+	heightBytes := app.db.Get(heightKey)
+	if len(heightBytes) != 0 {
+		err := json.Unmarshal(heightBytes, &height)
+		if err != nil {
+			vlog.Errorf("Cannot unmarshal height")
+		}
+		vlog.Info("HEIGHT: %v", height)
+		app.Height = height
+	}
+	vlog.Infof("APP HEIGHT %v", app.Height)
+	appHashBytes := app.db.Get(appHashKey)
+	app.AppHash = appHashBytes
+	vlog.Infof("APP HASH %v", app.AppHash)
+
+	req.Header.Height = app.Height
+	req.Header.AppHash = app.AppHash
 	return abcitypes.ResponseBeginBlock{}
 }
 
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	app.deliverTxState = nil
 	return abcitypes.ResponseEndBlock{}
 }
