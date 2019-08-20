@@ -17,18 +17,16 @@ type GWCfg struct {
 	Dvote struct {
 		Host  string
 		Port  int
-		Route string
 	}
 	Api struct {
+		Route string
 		File struct {
 			Enabled bool
-			Route   string
 		}
 		Census struct {
 			Enabled bool
-			Route   string
 		}
-		Web3 struct {
+		Vote struct {
 			Enabled bool
 		}
 	}
@@ -63,6 +61,7 @@ type PssCfg struct {
 
 //W3Cfg stores global configs for web3
 type W3Cfg struct {
+	Enabled bool
 	ChainType string
 	LightMode bool
 	WsHost    string

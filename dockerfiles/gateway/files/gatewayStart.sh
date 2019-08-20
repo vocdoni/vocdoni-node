@@ -11,9 +11,9 @@ GWARGS="\
  ${GW_LISTEN_HOST:+ --listenHost ${GW_LISTEN_HOST}}\
  ${GW_LISTEN_PORT:+ --listenPort ${GW_LISTEN_PORT}}\
  ${GW_FILE_ENABLED:+ --fileApi=${GW_FILE_ENABLED}}\
- ${GW_FILE_ROUTE:+ --fileRoute=${GW_FILE_ROUTE}}\
  ${GW_CENSUS_ENABLED:+ --censusApi=${GW_CENSUS_ENABLED}}\
- ${GW_CENSUS_ROUTE:+ --censusRoute=${GW_CENSUS_ROUTE}}\
+ ${GW_VOTE_ENABLED:+ --censusApi=${GW_VOTE_ENABLED}}\
+ ${GW_API_ROUTE:+ --apiRoute=${GW_API_ROUTE}}\
  ${GW_W3_ENABLED:+ --web3Api}\
  ${GW_W3_EXTERNAL:+ --w3external ${GW_W3_EXTERNAL}}\
  ${GW_W3_ROUTE:+ --w3route ${GW_W3_ROUTE}}\
