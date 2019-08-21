@@ -193,7 +193,7 @@ func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 // ResponseInitChain can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-
+	app.deliverTxState = voctypes.NewState()
 	// load processes from db
 	var processes map[string]*voctypes.Process
 	processesBytes := app.db.Get(processesKey)
@@ -203,8 +203,6 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 			vlog.Errorf("Cannot unmarshal processes")
 		}
 		app.deliverTxState.Processes = processes
-	} else {
-		app.deliverTxState.Processes = make(map[string]*voctypes.Process, 0)
 	}
 
 	// load validators public keys from db
@@ -215,8 +213,8 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		if err != nil {
 			vlog.Errorf("Cannot unmarshal validators public keys")
 		}
+		app.deliverTxState.ValidatorsPubK = valk
 	}
-	app.deliverTxState.ValidatorsPubK = valk
 
 	// load trusted oracles public keys from db
 	var orlk []tmtypes.Address
@@ -226,8 +224,8 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		if err != nil {
 			vlog.Errorf("Cannot unmarshal trusted oracles public keys")
 		}
+		app.deliverTxState.TrustedOraclesPubK = orlk
 	}
-	app.deliverTxState.TrustedOraclesPubK = orlk
 
 	// load chain height from db
 	var height int64
@@ -261,8 +259,6 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	if err := app.validateHeight(req); err != nil {
 		panic(err)
 	}
-	// creates new deliverTxState
-	app.deliverTxState = voctypes.NewState()
 
 	// load processes from db
 	var processes map[string]*voctypes.Process
@@ -273,8 +269,6 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 			vlog.Errorf("Cannot unmarshal processes")
 		}
 		app.deliverTxState.Processes = processes
-	} else {
-		app.deliverTxState.Processes = make(map[string]*voctypes.Process, 0)
 	}
 
 	// load validators public keys from db
@@ -285,8 +279,8 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 		if err != nil {
 			vlog.Errorf("Cannot unmarshal validators public keys")
 		}
+		app.deliverTxState.ValidatorsPubK = valk
 	}
-	app.deliverTxState.ValidatorsPubK = valk
 
 	// load trusted oracles public keys from db
 	var orlk []tmtypes.Address
@@ -296,8 +290,8 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 		if err != nil {
 			vlog.Errorf("Cannot unmarshal trusted oracles public keys")
 		}
+		app.deliverTxState.TrustedOraclesPubK = orlk
 	}
-	app.deliverTxState.TrustedOraclesPubK = orlk
 
 	// app height and app hash from the request
 	app.height = req.Header.Height
