@@ -23,6 +23,10 @@ type Process struct {
 	EncryptionKeys string `json:"encryptionkeys"`
 }
 
+func (p Process) String() string {
+	return fmt.Sprintf(`{ "entityId": %v, "mkRoot": %v, "initBlock": %v, "encryptionKeys": %v, "currentState": %v }`, p.EntityID, p.MkRoot, p.InitBlock, p.EncryptionKeys, p.CurrentState)
+}
+
 // NewProcess returns a new Process instance
 func NewProcess() *Process {
 	return &Process{}
