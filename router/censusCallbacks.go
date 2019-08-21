@@ -6,15 +6,47 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"time"
+	"fmt"
 
-	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
-	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-func censusProxyMethod(msg types.Message, rawRequest []byte, storage data.Storage, transport net.Transport, signer signature.SignKeys) {
+func censusLocalMethod(msg types.Message, rawRequest []byte, router *Router) {
+	log.Info("got local census request")
+	var censusRequest types.CensusRequestMessage
+	if err := json.Unmarshal(msg.Data, &censusRequest); err != nil {
+		log.Warnf("couldn't decode into CensusRequest type from request %v", msg.Data)
+		return
+	}
+	log.Infof("request is: %v", censusRequest)
+	go censusLocal(msg, censusRequest, router)
+}
+
+func censusLocal(msg types.Message, crm types.CensusRequestMessage, router *Router) {
+	var err error
+	var response types.CensusResponseMessage
+	cresponse := router.census.Handler(&crm.Request, true)
+	response.Response = *cresponse
+	//response.Request = router.census.Handler(&crm.Request, true)
+	response.ID = crm.ID
+	
+	response.Response.TimeStamp = int32(time.Now().Unix())
+	response.Signature, err = router.signer.SignJSON(response.Response)
+		if err != nil {
+			log.Warn(err.Error())
+		}
+		rawResponse, err := json.Marshal(response)
+		if err != nil {
+			sendError(router.transport, router.signer, msg, crm.ID, fmt.Sprintf("could not unmarshal response (%s)", err.Error()))
+		} else {
+			log.Infof("sending census resposne: %s", rawResponse)
+			router.transport.Send(buildReply(msg, rawResponse))
+		}
+}
+
+func censusProxyMethod(msg types.Message, rawRequest []byte, router *Router) {
 	log.Info("Census request sent to method")
 	var censusRequest types.CensusRequestMessage
 	if err := json.Unmarshal(msg.Data, &censusRequest); err != nil {
@@ -24,11 +56,11 @@ func censusProxyMethod(msg types.Message, rawRequest []byte, storage data.Storag
 	log.Infof("Message data is: %s", msg.Data)
 	log.Infof("Request is: %v", censusRequest)
 	log.Infof("Proxying census request to %s", censusRequest.Request.CensusURI)
-	go censusProxy(msg, censusRequest, transport)
+	go censusProxy(msg, censusRequest, router)
 }
 
 // Strips CensusURI and forwards to census service, send reply back to client
-func censusProxy(msg types.Message, censusRequestMessage types.CensusRequestMessage, transport net.Transport) {
+func censusProxy(msg types.Message, censusRequestMessage types.CensusRequestMessage, router *Router) {
 	censusURI, err := url.Parse(censusRequestMessage.Request.CensusURI)
 	if err != nil {
 		log.Error("Provided census URI was malformed")
@@ -58,5 +90,5 @@ func censusProxy(msg types.Message, censusRequestMessage types.CensusRequestMess
 	}
 	log.Infof("got response from census service: %s", body)
 	//success, send resp to client
-	transport.Send(buildReply(msg, body))
+	router.transport.Send(buildReply(msg, body))
 }

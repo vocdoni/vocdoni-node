@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/data"
@@ -302,8 +303,21 @@ func main() {
 		}
 		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 		if err != nil {
-			log.Fatalf(err.Error())
+			log.Fatal(err.Error())
 		}
+	}
+
+	var censusManager census.CensusManager
+
+	if globalCfg.Api.Census.Enabled {
+		log.Info("starting census manager")
+		if _, err := os.Stat(globalCfg.DataDir + "/census"); os.IsNotExist(err) {
+			err = os.MkdirAll(globalCfg.DataDir+"/census", os.ModePerm)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+		}
+		censusManager.Init(globalCfg.DataDir+"/census", "")
 	}
 
 	// API Initialization
@@ -316,10 +330,15 @@ func main() {
 		listenerOutput := make(chan types.Message)
 		go ws.Listen(listenerOutput)
 
-		router := router.InitRouter(listenerOutput, storage, ws, *signer, &globalCfg)
-		go router.Route()
+		routerApi := router.InitRouter(listenerOutput, storage, ws, *signer)
+		if globalCfg.Api.File.Enabled {
+			routerApi.EnableFileAPI()
+		}
+		if globalCfg.Api.Census.Enabled {
+			routerApi.EnableCensusAPI(&censusManager)
+		}
 
-
+		go routerApi.Route()
 		log.Debug("Setting up API router")
 		ws.AddProxyHandler(globalCfg.Api.Route)
 		log.Infof("websockets API available at %s", globalCfg.Api.Route)
@@ -328,5 +347,4 @@ func main() {
 	for {
 		time.Sleep(1 * time.Second)
 	}
-
 }

@@ -14,7 +14,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
-	censusmanager "gitlab.com/vocdoni/go-dvote/service/census"
+	censusmanager "gitlab.com/vocdoni/go-dvote/census"
 )
 
 func newConfig() (config.CensusCfg, error) {

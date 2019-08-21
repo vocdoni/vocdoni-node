@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/census"
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -61,7 +61,7 @@ func parseTransportFromUri(uris []string) []string {
 	return out
 }
 
-type methodMap map[string]func(msg types.Message, rawRequest []byte, storage data.Storage, transport net.Transport, signer signature.SignKeys)
+type methodMap map[string]func(msg types.Message, rawRequest []byte, r *Router)
 
 //Router holds a router object
 type Router struct {
@@ -70,31 +70,37 @@ type Router struct {
 	storage    data.Storage
 	transport  net.Transport
 	signer     signature.SignKeys
+	census     *census.CensusManager
 }
 
 //InitRouter sets up a Router object which can then be used to route requests
-func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport, signer signature.SignKeys, globalCfg *config.GWCfg) Router {
+func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
+	signer signature.SignKeys) Router {
 	requestMap := make(methodMap)
-	routerObj := Router{requestMap, inbound, storage, transport, signer}
-	if globalCfg.Api.File.Enabled {
-		routerObj.registerMethod("fetchFile", fetchFileMethod)
-		routerObj.registerMethod("addFile", addFileMethod)
-		routerObj.registerMethod("pinList", pinListMethod)
-		routerObj.registerMethod("pinFile", pinFileMethod)
-		routerObj.registerMethod("unpinFile", unpinFileMethod)
-	}
-	if globalCfg.Api.Census.Enabled {
-		routerObj.registerMethod("addCensus", censusProxyMethod)
-		routerObj.registerMethod("addClaim", censusProxyMethod)
-		routerObj.registerMethod("addClaimBulk", censusProxyMethod)
-		routerObj.registerMethod("getRoot", censusProxyMethod)
-		routerObj.registerMethod("dump", censusProxyMethod)
-	}
-	return routerObj
+	cm := new(census.CensusManager)
+	return Router{requestMap, inbound, storage, transport, signer, cm}
 }
 
 func (r *Router) registerMethod(methodName string, methodCallback requestMethod) {
 	r.requestMap[methodName] = methodCallback
+}
+
+//EnableFileAPI enables the FILE API in the Router
+func (r *Router) EnableFileAPI() {
+	r.registerMethod("fetchFile", fetchFileMethod)
+	r.registerMethod("addFile", addFileMethod)
+	r.registerMethod("pinList", pinListMethod)
+	r.registerMethod("pinFile", pinFileMethod)
+	r.registerMethod("unpinFile", unpinFileMethod)
+}
+
+//EnableCensusAPI enables the Census API in the Router
+func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
+	r.census = cm
+	r.registerMethod("getRoot", censusLocalMethod)
+	r.registerMethod("dump", censusLocalMethod)
+	r.registerMethod("genProof", censusLocalMethod)
+	r.registerMethod("checkProof", censusLocalMethod)
 }
 
 //Route routes requests through the Router object
@@ -118,7 +124,7 @@ func (r *Router) Route() {
 				log.Warnf("router has no method named %s", method)
 			} else {
 				log.Info("calling method %s", method)
-				methodFunc(msg, rawRequest, r.storage, r.transport, r.signer)
+				methodFunc(msg, rawRequest, r)
 			}
 		}
 	}
