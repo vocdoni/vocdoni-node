@@ -76,6 +76,10 @@ func (m TxMethod) String() string {
 }
 
 // ________________________ TX ARGS ________________________
+var (
+	newProcessTxArgsKeys = []string{"entityId", "entityResolver", "metadataHash", "mkRoot", "numberOfBlocks", "initBlock", "encryptionKeys"}
+	voteTxArgsKeys       = []string{"processId", "nullifier", "payload", "censusProof"}
+)
 
 // TxArgs generic interface to address valid method args
 type TxArgs interface{}
@@ -105,13 +109,14 @@ func (n NewProcessTxArgs) String() string {
 
 // VoteTxArgs represents the data required in order to cast a vote
 type VoteTxArgs struct {
-	Nullifier   string `json:"nullifier"`
-	Payload     string `json:"payload"`
-	CensusProof string `json:"censusproof"`
+	ProcessID   string `json:"processId"`   // the id of the process
+	Nullifier   string `json:"nullifier"`   // nullifier for the vote, unique identifyer
+	Payload     string `json:"payload"`     // vote data
+	CensusProof string `json:"censusProof"` // proof inclusion into the census of the process
 }
 
 func (n VoteTxArgs) String() string {
-	return fmt.Sprintf(`{ "nullifier": %v, "payload": %v, "censusProof": %v }`, n.Nullifier, n.Payload, n.CensusProof)
+	return fmt.Sprintf(`{ "processId": %v, "nullifier": %v, "payload": %v, "censusProof": %v }`, n.ProcessID, n.Nullifier, n.Payload, n.CensusProof)
 }
 
 // AddTrustedOracleTxArgs represents the data required in order to add a new trusted oracle
@@ -154,85 +159,80 @@ func (n RemoveValidatorTxArgs) String() string {
 // ValidateArgs does a sanity check onto the arguments passed to a valid TxMethod
 func (tx Tx) ValidateArgs() (TxArgs, error) {
 	var t TxArgs
+
 	switch tx.Method {
 	case "newProcessTx":
 		// invalid length
 		if len(tx.Args) != 7 {
 			return nil, errors.New("Invalid args number")
 		}
-		// invalid args
-		if _, ok := tx.Args["entityId"]; ok {
-			if _, ok = tx.Args["entityResolver"]; ok {
-				if _, ok = tx.Args["metadataHash"]; ok {
-					if _, ok = tx.Args["mkRoot"]; ok {
-						if _, ok = tx.Args["encryptionKeys"]; ok {
-							nblocks, err := strconv.ParseInt(tx.Args["numberOfBlocks"], 10, 64)
-							if err == nil {
-								iblock, err := strconv.ParseInt(tx.Args["initBlock"], 10, 64)
-								if err == nil {
-									t = NewProcessTxArgs{
-										EntityID:       tx.Args["entityId"],
-										EntityResolver: tx.Args["entityResolver"],
-										MetadataHash:   tx.Args["metadataHash"],
-										MkRoot:         tx.Args["mkRoot"],
-										NumberOfBlocks: nblocks,
-										InitBlock:      iblock,
-										EncryptionKeys: tx.Args["encryptionKeys"],
-									}
-								} else {
-									return nil, errors.New("initBlock arg not found")
-								}
-							} else {
-								return nil, errors.New("numberOfBlocks arg not found")
-							}
-						} else {
-							return nil, errors.New("encryptionKeys arg not found")
-						}
-					} else {
-						return nil, errors.New("mkRoot arg not found")
-					}
-				} else {
-					return nil, errors.New("metadataHash arg not found")
-				}
-			} else {
-				return nil, errors.New("entityResolver arg not found")
+
+		allOk := true
+		var errMsg string
+		for _, m := range newProcessTxArgsKeys {
+			if _, ok := tx.Args[m]; !ok {
+				allOk = false
+				errMsg = m
 			}
-		} else {
-			return nil, errors.New("entityId arg not found")
 		}
-		// sanity check done
-		return t, nil
+
+		if allOk {
+			nblocks, err := strconv.ParseInt(tx.Args["numberOfBlocks"], 10, 64)
+			if err == nil {
+				iblock, err := strconv.ParseInt(tx.Args["initBlock"], 10, 64)
+				if err == nil {
+					t = NewProcessTxArgs{
+						EntityID:       tx.Args["entityId"],
+						EntityResolver: tx.Args["entityResolver"],
+						MetadataHash:   tx.Args["metadataHash"],
+						MkRoot:         tx.Args["mkRoot"],
+						NumberOfBlocks: nblocks,
+						InitBlock:      iblock,
+						EncryptionKeys: tx.Args["encryptionKeys"],
+					}
+					// sanity check done
+					return t, nil
+				}
+				return nil, errors.New("cannot parse init block")
+			}
+			return nil, errors.New("cannot parse number of blocks")
+		}
+		return nil, fmt.Errorf("%v does not match the schema", errMsg)
+
 	case "voteTx":
 		// invalid length
-		if len(tx.Args) != 3 {
+		if len(tx.Args) != 4 {
 			return nil, errors.New("Invalid args number")
 		}
-		// invalid args
-		if _, ok := tx.Args["nullifier"]; ok {
-			if _, ok = tx.Args["payload"]; ok {
-				if _, ok = tx.Args["censusProof"]; ok {
-					// VoteTxArgs can be created
-					t = VoteTxArgs{
-						Nullifier:   tx.Args["nullifier"],
-						Payload:     tx.Args["payload"],
-						CensusProof: tx.Args["censusProof"],
-					}
-				} else {
-					return nil, errors.New("censusProof arg not found")
-				}
-			} else {
-				return nil, errors.New("payload arg not found")
+
+		allOk := true
+		var errMsg string
+		for _, m := range voteTxArgsKeys {
+			if _, ok := tx.Args[m]; !ok {
+				allOk = false
+				errMsg = m
 			}
-		} else {
-			return nil, errors.New("nullifier arg not found")
 		}
-		// sanity check done
-		return t, nil
+		// invalid args
+		if allOk {
+			// VoteTxArgs can be created
+			t = VoteTxArgs{
+				ProcessID:   tx.Args["processId"],
+				Nullifier:   tx.Args["nullifier"],
+				Payload:     tx.Args["payload"],
+				CensusProof: tx.Args["censusProof"],
+			}
+			// sanity check done
+			return t, nil
+		}
+		return nil, fmt.Errorf("%v does not match the schema", errMsg)
+
 	case "addTrustedOracleTx":
 		// invalid length
 		if len(tx.Args) != 1 {
 			return nil, errors.New("Invalid args number")
 		}
+
 		// invalid args
 		if _, ok := tx.Args["address"]; ok {
 			// AddTrustedOracleTxArgs can be created
@@ -242,13 +242,16 @@ func (tx Tx) ValidateArgs() (TxArgs, error) {
 		} else {
 			return nil, errors.New("address arg not found")
 		}
+
 		// sanity check done
 		return t, nil
+
 	case "removeTrustedOracleTx":
 		// invalid length
 		if len(tx.Args) != 1 {
 			return nil, errors.New("Invalid args number")
 		}
+
 		// invalid args
 		if _, ok := tx.Args["address"]; ok {
 			// RemoveTrustedOracleTxArgs can be created
@@ -258,29 +261,39 @@ func (tx Tx) ValidateArgs() (TxArgs, error) {
 		} else {
 			return nil, errors.New("address arg not found")
 		}
+
 		// sanity check done
 		return t, nil
+
 	case "addValidatorTx":
 		// invalid length
 		if len(tx.Args) != 1 {
 			return nil, errors.New("Invalid args number")
 		}
+
 		// invalid args
 		if _, ok := tx.Args["address"]; ok {
-			// AddvalidatorTxArgs can be created
-			t = AddValidatorTxArgs{
-				Address: []byte(tx.Args["address"]),
+			if _, ok := tx.Args["power"]; ok {
+				// AddvalidatorTxArgs can be created
+				t = AddValidatorTxArgs{
+					Address: []byte(tx.Args["address"]),
+				}
+			} else {
+				return nil, errors.New("address arg not found")
 			}
 		} else {
-			return nil, errors.New("address arg not found")
+			return nil, errors.New("power arg not found")
 		}
+
 		// sanity check done
 		return t, nil
+
 	case "removeValidatorTx":
 		// invalid length
 		if len(tx.Args) != 1 {
 			return nil, errors.New("Invalid args number")
 		}
+
 		// invalid args
 		if _, ok := tx.Args["address"]; ok {
 			// RemoveValidatorTxArgs can be created
@@ -290,8 +303,10 @@ func (tx Tx) ValidateArgs() (TxArgs, error) {
 		} else {
 			return nil, errors.New("address arg not found")
 		}
+
 		// sanity check done
 		return t, nil
+
 	default:
 		return nil, errors.New("Cannot validate args")
 	}

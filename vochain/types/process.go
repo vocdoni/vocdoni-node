@@ -10,7 +10,7 @@ import (
 type Process struct {
 	EntityID string
 	// Votes is a list containing all the processed and valid votes (here votes are final)
-	Votes []Vote `json:"votes"`
+	Votes map[string]*Vote `json:"votes"`
 	// MkRoot merkle root of all the census in the process
 	MkRoot string `json:"mkroot"`
 	// EndBlock represents the tendermint block where the process goes from active to finished
@@ -24,7 +24,7 @@ type Process struct {
 }
 
 func (p Process) String() string {
-	return fmt.Sprintf(`{ "entityId": %v, "mkRoot": %v, "initBlock": %v, "encryptionKeys": %v, "currentState": %v }`, p.EntityID, p.MkRoot, p.InitBlock, p.EncryptionKeys, p.CurrentState)
+	return fmt.Sprintf(`{ "entityId": %v, "votes": %v,  "mkRoot": %v, "initBlock": %v, "encryptionKeys": %v, "currentState": %v }`, p.EntityID, p.Votes["0"], p.MkRoot, p.InitBlock, p.EncryptionKeys, p.CurrentState)
 }
 
 // NewProcess returns a new Process instance
@@ -77,8 +77,6 @@ func (c CurrentProcessState) String() string {
 type Vote struct {
 	// Payload contains the vote itself
 	Payload string `json:"payload"`
-	// Nullifier is a special hash that prevents double voting
-	Nullifier string `json:"nullifier"`
 	// CensusProof contains the prove indicating that the user is in the census of the process
 	CensusProof string `json:"censusproof"`
 }

@@ -110,32 +110,49 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	switch tx.Method {
 	// new process tx
 	case "newProcessTx":
-		var npta = tx.Args.(voctypes.NewProcessTxArgs)
+		npta := tx.Args.(voctypes.NewProcessTxArgs)
 		// check if process exists
 		if _, ok := app.deliverTxState.Processes[npta.MkRoot]; !ok {
 			// if not create new
 			app.deliverTxState.Processes[npta.MkRoot] = &voctypes.Process{
 				EntityID:       npta.EntityID,
-				Votes:          make([]voctypes.Vote, 0),
+				Votes:          make(map[string]*voctypes.Vote, 0),
 				MkRoot:         npta.MkRoot,
 				NumberOfBlocks: npta.NumberOfBlocks,
 				InitBlock:      npta.InitBlock,
 				CurrentState:   voctypes.Scheduled,
 				EncryptionKeys: npta.EncryptionKeys,
 			}
-			// marshall process
-			newBytes, err := json.Marshal(app.deliverTxState.Processes)
-			if err != nil {
-				vlog.Errorf("Cannot marshal DeliverTxState processes")
-			}
-			// save process into db
-			app.db.Set(processesKey, newBytes)
 		} else {
 			// process exists, return process data as info
 			vlog.Info("The process already exists with the following data: \n")
 			vlog.Infof("Process data: %v", app.deliverTxState.Processes[npta.MkRoot].String())
 		}
+	case "voteTx":
+		vta := tx.Args.(voctypes.VoteTxArgs)
+		// check if vote has a valid processID
+		if _, ok := app.deliverTxState.Processes[vta.ProcessID]; ok {
+			// check if vote is already submitted
+			if _, ok := app.deliverTxState.Processes[vta.ProcessID].Votes[vta.Nullifier]; !ok {
+				app.deliverTxState.Processes[vta.ProcessID].Votes[vta.Nullifier] = &voctypes.Vote{
+					Payload:     vta.Payload,
+					CensusProof: vta.CensusProof,
+				}
+			} else {
+				vlog.Info("Vote already submitted")
+			}
+		} else {
+			vlog.Info("Process does not exist")
+		}
 	}
+
+	// marshall processes
+	newBytes, err := json.Marshal(app.deliverTxState.Processes)
+	if err != nil {
+		vlog.Errorf("Cannot marshal DeliverTxState processes")
+	}
+	// save process into db
+	app.db.Set(processesKey, newBytes)
 
 	return abcitypes.ResponseDeliverTx{Info: tx.String(), Code: 0}
 }
@@ -297,6 +314,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	app.height = req.Header.Height
 	app.appHash = req.Header.AppHash
 
+	vlog.Infof("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
 	return abcitypes.ResponseBeginBlock{}
 }
 
