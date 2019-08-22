@@ -27,7 +27,7 @@ func getMethod(payload []byte) (string, []byte, error) {
 	var msgStruct types.MessageRequest
 	err := json.Unmarshal(payload, &msgStruct)
 	if err != nil {
-		log.Error("Could not unmarshall JSON, error: %s", err)
+		log.Errorf("Could not unmarshall JSON, error: %s", err)
 		return "", nil, err
 	}
 	method, ok := msgStruct.Request["method"].(string)
@@ -123,9 +123,28 @@ func (r *Router) Route() {
 			if methodFunc == nil {
 				log.Warnf("router has no method named %s", method)
 			} else {
-				log.Info("calling method %s", method)
+				log.Infof("calling method %s", method)
 				methodFunc(msg, rawRequest, r)
 			}
 		}
 	}
+}
+
+func sendError(transport net.Transport, signer signature.SignKeys, msg types.Message, requestID, errMsg string) {
+	log.Warn(errMsg)
+	var err error
+	var response types.ErrorResponse
+	response.ID = requestID
+	response.Error.Request = requestID
+	response.Error.Timestamp = int32(time.Now().Unix())
+	response.Error.Message = errMsg
+	response.Signature, err = signer.SignJSON(response.Error)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	rawResponse, err := json.Marshal(response)
+	if err != nil {
+		log.Warnf("error marshaling response body: %s", err)
+	}
+	transport.Send(buildReply(msg, rawResponse))
 }

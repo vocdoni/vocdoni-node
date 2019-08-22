@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	hexeth "github.com/ethereum/go-ethereum/common/hexutil"
 	crypto "github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -77,6 +77,12 @@ func (k *SignKeys) HexString() (string, string) {
 	return sanitizeHex(pubHex), sanitizeHex(privHex)
 }
 
+// EthAddrString return the Ethereum address from the Signing ECDSA public key
+func (k *SignKeys) EthAddrString() string {
+	recoveredAddr := [20]byte(crypto.PubkeyToAddress(*k.Public))
+	return fmt.Sprintf("%x", recoveredAddr)
+}
+
 // Sign signs a message. Message is a normal string (no HexString nor a Hash)
 func (k *SignKeys) Sign(message string) (string, error) {
 	if k.Private == nil {
@@ -125,6 +131,47 @@ func Verify(message, signHex, pubHex string) (bool, error) {
 	return sk.Verify(message, signHex, pubHex)
 }
 
+// Standaolone function to obtain the Ethereum address from a ECDSA public key
+func AddrFromPublicKey(pubHex string) (string, error) {
+	pubBytes, err := hex.DecodeString(pubHex)
+	if err != nil {
+		return "", err
+	}
+	pub, err := crypto.DecompressPubkey(pubBytes)
+	//pub, err := crypto.UnmarshalPubkey(pubBytes)
+	if err != nil {
+		return "", err
+	}
+	recoveredAddr := [20]byte(crypto.PubkeyToAddress(*pub))
+	return fmt.Sprintf("%x", recoveredAddr), nil
+}
+
+// ExtractEthAddr recovers the Ethereum address that created the signature of a message
+func AddrFromSignature(msg, sigHex string) ([20]byte, error) {
+	//sig := hexutil.MustDecode(sigHex)
+	sig, err := hex.DecodeString(sanitizeHex(sigHex))
+	if err != nil {
+		return [20]byte{}, err
+	}
+	// Hack to avoid Hex codification problems with Ethereum
+	sigHexEth := hexeth.Encode(sig)
+	sig, err = hexeth.Decode(sigHexEth)
+	if err != nil {
+		return [20]byte{}, err
+	}
+	if sig[64] != 27 && sig[64] != 28 {
+		return [20]byte{}, errors.New("Bad recovery hex")
+	}
+	sig[64] -= 27
+
+	pubKey, err := crypto.SigToPub(Hash(msg), sig)
+	if err != nil {
+		return [20]byte{}, errors.New("Bad sig")
+	}
+
+	return [20]byte(crypto.PubkeyToAddress(*pubKey)), nil
+}
+
 // Hash string data adding Ethereum prefix
 func Hash(data string) []byte {
 	payloadToSign := fmt.Sprintf("%s%d%s", SigningPrefix, len(data), data)
@@ -141,19 +188,10 @@ func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
 	if len(k.Authorized) < 1 {
 		return true, nil
 	}
-	sig := hexutil.MustDecode(sigHex)
-	if sig[64] != 27 && sig[64] != 28 {
-		return false, errors.New("Bad recovery hex")
-	}
-	sig[64] -= 27
-
-	pubKey, err := crypto.SigToPub(Hash(msg), sig)
+	recoveredAddr, err := AddrFromSignature(msg, sigHex)
 	if err != nil {
-		return false, errors.New("Bad sig")
+		return false, err
 	}
-
-	recoveredAddr := [20]byte(crypto.PubkeyToAddress(*pubKey))
-
 	for _, addr := range k.Authorized {
 		if addr == recoveredAddr {
 			return true, nil

@@ -1,6 +1,9 @@
 package signature
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestSignature(t *testing.T) {
 	t.Log("Testing signature creation and verification")
@@ -67,4 +70,33 @@ func TestEncryption(t *testing.T) {
 		t.Errorf("Error while decrypting %s\n", err)
 	}
 	t.Logf("Decrypted plain String is %s\n", msgPlain)
+}
+
+func TestAddr(t *testing.T) {
+	t.Log("Testing Ethereum address compatibility")
+	var s SignKeys
+	s.Generate()
+	pub, priv := s.HexString()
+	t.Logf("Generated pub:%s priv:%s\n", pub, priv)
+	addr1 := s.EthAddrString()
+	addr2, err := AddrFromPublicKey(pub)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	if addr1 != addr2 {
+		t.Errorf("Calculated address from pubKey do not match: %s != %s\n", addr1, addr2)
+	}
+	signature, err := s.Sign("Hello world")
+	if err != nil {
+		t.Error(err.Error())
+	}
+	t.Logf("Signature created: %s\n", signature)
+	addr3, err := AddrFromSignature("Hello World", signature)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	addr3s := fmt.Sprintf("%x", addr3)
+	if addr3s != addr2 {
+		t.Errorf("Extracted signature address do not match: %s != %s\n", addr2, addr3s)
+	}
 }

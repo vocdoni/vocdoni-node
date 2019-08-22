@@ -87,28 +87,10 @@ func fetchFile(uri, requestId string, msg types.Message, router *Router) {
 			errMsg = fmt.Sprintf("error marshaling response body: %s", err)
 			sendError(router.transport, router.signer, msg, requestId, errMsg)
 		} else {
+			log.Debugf("sending response %s", rawResponse)
 			router.transport.Send(buildReply(msg, rawResponse))
 		}
 	}
-}
-
-func sendError(transport net.Transport, signer signature.SignKeys, msg types.Message, requestID, errMsg string) {
-	log.Warn(errMsg)
-	var err error
-	var response types.ErrorResponse
-	response.ID = requestID
-	response.Error.Request = requestID
-	response.Error.Timestamp = int32(time.Now().Unix())
-	response.Error.Message = errMsg
-	response.Signature, err = signer.SignJSON(response.Error)
-	if err != nil {
-		log.Warn(err.Error())
-	}
-	rawResponse, err := json.Marshal(response)
-	if err != nil {
-		log.Warnf("error marshaling response body: %s", err)
-	}
-	transport.Send(buildReply(msg, rawResponse))
 }
 
 func addFileMethod(msg types.Message, rawRequest []byte, router *Router) {
@@ -134,9 +116,7 @@ func addFileMethod(msg types.Message, rawRequest []byte, router *Router) {
 			return
 		}
 		reqType := fileRequest.Request.Type
-
 		go addFile(reqType, fileRequest.ID, b64content, msg, router.storage, router.transport, router.signer)
-
 	} else {
 		errMsg = "unauthorized"
 		sendError(router.transport, router.signer, msg, fileRequest.ID, errMsg)
@@ -173,6 +153,7 @@ func addFile(reqType, requestId string, b64content []byte, msg types.Message, st
 			sendError(transport, signer, msg, requestId,
 				fmt.Sprintf("could not unmarshal response (%s)", err.Error()))
 		} else {
+			log.Debugf("sending response %s", rawResponse)
 			transport.Send(buildReply(msg, rawResponse))
 		}
 	}
@@ -271,6 +252,7 @@ func pinFile(uri, requestId string, msg types.Message, storage data.Storage, tra
 		if err != nil {
 			sendError(transport, signer, msg, requestId, fmt.Sprintf("error marshaling (%s)", err.Error()))
 		} else {
+			log.Debugf("sending response %s", rawResponse)
 			transport.Send(buildReply(msg, rawResponse))
 		}
 	}
@@ -314,6 +296,7 @@ func unPinFile(uri, requestId string, msg types.Message, storage data.Storage, t
 		if err != nil {
 			sendError(transport, signer, msg, requestId, fmt.Sprintf("could not unmarshal response (%s)", err.Error()))
 		} else {
+			log.Debugf("sending response %s", rawResponse)
 			transport.Send(buildReply(msg, rawResponse))
 		}
 	}

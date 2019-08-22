@@ -223,7 +223,7 @@ func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, s
 		log.Warnf("authorization error: %s", err.Error())
 		auth = false
 	}
-	resp := cm.Handler(&rm.Request, auth)
+	resp := cm.Handler(&rm.Request, auth, "")
 	respMsg := new(types.CensusResponseMessage)
 	respMsg.Response = *resp
 	respMsg.ID = rm.ID
@@ -235,21 +235,41 @@ func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, s
 	httpReply(respMsg, w)
 }
 
+func (cm *CensusManager) LocalHandler(crm *types.CensusRequestMessage, signer *signature.SignKeys) *types.CensusResponseMessage {
+	log.Debug("new census request received")
+	auth := true
+	err := cm.CheckAuth(crm)
+	if err != nil {
+		log.Debugf("authorization error: %s", err.Error())
+		auth = false
+	}
+	resp := cm.Handler(&crm.Request, auth, "")
+	respMsg := new(types.CensusResponseMessage)
+	respMsg.Response = *resp
+	respMsg.ID = crm.ID
+	respMsg.Response.Request = crm.ID
+	respMsg.Signature, err = signer.SignJSON(respMsg.Response)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	return respMsg
+}
+
 // Handler handles an API census manager request
-func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool) *types.CensusResponse {
+func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPrefix string) *types.CensusResponse {
 	resp := new(types.CensusResponse)
 	op := r.Method
 	var err error
 
 	// Process data
-	log.Infof("processing data => %+v", *r)
+	log.Infof("processing data %+v", *r)
 	resp.Ok = true
 	resp.Error = ""
 	resp.TimeStamp = int32(time.Now().Unix())
 
 	if op == "addCensus" {
 		if isAuth {
-			err = cm.AddNamespace(r.CensusID, r.PubKeys)
+			err = cm.AddNamespace(censusPrefix+r.CensusID, r.PubKeys)
 			if err != nil {
 				log.Warnf("error creating census: %s", err.Error())
 				resp.Ok = false
@@ -359,11 +379,6 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool) *types.Cen
 			resp.Ok = false
 			resp.Error = err.Error()
 		}
-		return resp
-	}
-
-	if op == "getIdx" {
-		resp.Idx, err = t.GetIndex([]byte(r.ClaimData))
 		return resp
 	}
 
