@@ -163,27 +163,27 @@ func (k *SignKeys) VerifyJSON(message interface{}, signHex string) (bool, error)
 }
 
 // VerifySender verifies if a message is sent by some Authorized address key
-func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
+func (k *SignKeys) VerifySender(msg, sigHex string) (bool, string, error) {
 	if len(k.Authorized) < 1 {
-		return true, nil
+		return true, "", nil
 	}
 	recoveredAddr, err := AddrFromSignature(msg, sigHex)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 	for _, addr := range k.Authorized {
 		if fmt.Sprintf("%x", addr) == recoveredAddr {
-			return true, nil
+			return true, recoveredAddr, nil
 		}
 	}
-	return false, nil
+	return false, recoveredAddr, nil
 }
 
 // VerifyJSONsender verifies if a JSON message is sent by some Authorized address key
-func (k *SignKeys) VerifyJSONsender(msg, sigHex string) (bool, error) {
+func (k *SignKeys) VerifyJSONsender(msg interface{}, sigHex string) (bool, string, error) {
 	rawMsg, err := json.Marshal(msg)
 	if err != nil {
-		return false, errors.New("unable to marshal message to sign: %s")
+		return false, "", errors.New("unable to marshal message to sign: %s")
 	}
 	return k.VerifySender(string(rawMsg), sigHex)
 }
@@ -239,6 +239,15 @@ func AddrFromSignature(msg, sigHex string) (string, error) {
 	}
 	addr := crypto.PubkeyToAddress(*pub)
 	return fmt.Sprintf("%x", addr), nil
+}
+
+// AddrFromJSONsignature recovers the Ethereum address that created the signature of a JSON message
+func AddrFromJSONsignature(msg interface{}, sigHex string) (string, error) {
+	rawMsg, err := json.Marshal(msg)
+	if err != nil {
+		return "", errors.New("unable to marshal message to sign: %s")
+	}
+	return AddrFromSignature(string(rawMsg), sigHex)
 }
 
 func hexToPubKey(pubHex string) (*ecdsa.PublicKey, error) {

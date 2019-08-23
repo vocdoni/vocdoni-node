@@ -115,7 +115,7 @@ func TestAddr(t *testing.T) {
 	if err != nil {
 		t.Error(err.Error())
 	}
-	v, err := s.VerifySender("hello vocdoni", signature)
+	v, _, err := s.VerifySender("hello vocdoni", signature)
 	if err != nil {
 		t.Error(err.Error())
 	}

@@ -101,7 +101,7 @@ func addFileMethod(msg types.Message, rawRequest []byte, router *Router) {
 		sendError(router.transport, router.signer, msg, fileRequest.ID, errMsg)
 		return
 	}
-	authorized, err := router.signer.VerifySender(string(rawRequest), fileRequest.Signature)
+	authorized, _, err := router.signer.VerifySender(string(rawRequest), fileRequest.Signature)
 	if err != nil {
 		errMsg = fmt.Sprintf("wrong authorization: %s", err.Error())
 		sendError(router.transport, router.signer, msg, fileRequest.ID, errMsg)
@@ -168,7 +168,7 @@ func pinListMethod(msg types.Message, rawRequest []byte, router *Router) {
 		sendError(router.transport, router.signer, msg, fileRequest.ID, errMsg)
 		return
 	}
-	authorized, err := router.signer.VerifySender(string(rawRequest), fileRequest.Signature)
+	authorized, _, err := router.signer.VerifySender(string(rawRequest), fileRequest.Signature)
 	if err != nil {
 		errMsg = fmt.Sprintf("error checking authorization (%s)", err.Error())
 		sendError(router.transport, router.signer, msg, fileRequest.ID, errMsg)
@@ -221,7 +221,7 @@ func pinFileMethod(msg types.Message, rawRequest []byte, router *Router) {
 		sendError(router.transport, router.signer, msg, fileRequest.ID, fmt.Sprintf("could not decode PinFileRequest (%s)", err.Error()))
 		return
 	}
-	authorized, err := router.signer.VerifySender(string(rawRequest), fileRequest.Signature)
+	authorized, _, err := router.signer.VerifySender(string(rawRequest), fileRequest.Signature)
 	if err != nil {
 		sendError(router.transport, router.signer, msg, fileRequest.ID, "error checking authorization")
 		return
@@ -265,7 +265,7 @@ func unpinFileMethod(msg types.Message, rawRequest []byte, router *Router) {
 			fmt.Sprintf("could not decode UnpinFileRequest (%s)", err.Error()))
 		return
 	}
-	authorized, err := router.signer.VerifySender(string(rawRequest), fileRequest.Signature)
+	authorized, _, err := router.signer.VerifySender(string(rawRequest), fileRequest.Signature)
 	if err != nil {
 		sendError(router.transport, router.signer, msg, fileRequest.ID, "unauthorized")
 		return
