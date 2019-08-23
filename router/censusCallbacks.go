@@ -24,7 +24,7 @@ func censusLocalMethod(msg types.Message, rawRequest []byte, router *Router) {
 	if err != nil {
 		log.Debugf("client not authorized for private methods")
 	}
-	var addr [20]byte
+	var addr string
 	if len(censusRequest.Signature) > 0 {
 		addr, err = signature.AddrFromSignature(string(rawRequest), censusRequest.Signature)
 		if err != nil {

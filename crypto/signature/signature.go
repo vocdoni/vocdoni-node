@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
-	hexeth "github.com/ethereum/go-ethereum/common/hexutil"
 	crypto "github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -23,7 +22,7 @@ const SignatureLength = 132
 const PubKeyLength = 66
 
 // SigningPrefix is the prefix added when hashing
-const SigningPrefix = "\x19Ethereum Signed Message:\n"
+const SigningPrefix = "\u0019Ethereum Signed Message:\n"
 
 // SignKeys represents an ECDSA pair of keys for signing.
 // Authorized addresses is a list of Ethereum like addresses which are checked on Verify
@@ -62,7 +61,7 @@ func (k *SignKeys) AddHexKey(privHex string) error {
 func (k *SignKeys) AddAuthKey(address string) error {
 	if len(address) == AddressLength {
 		var addr Address
-		copy(addr[:], []byte(address)[:])
+		copy(addr[:], []byte(sanitizeHex(address))[:])
 		k.Authorized = append(k.Authorized, addr)
 		return nil
 	} else {
@@ -72,9 +71,36 @@ func (k *SignKeys) AddAuthKey(address string) error {
 
 // HexString returns the public and private keys as hex strings
 func (k *SignKeys) HexString() (string, string) {
-	pubHex := hex.EncodeToString(crypto.CompressPubkey(k.Public))
-	privHex := hex.EncodeToString(crypto.FromECDSA(k.Private))
-	return sanitizeHex(pubHex), sanitizeHex(privHex)
+	pubHex := fmt.Sprintf("%x", crypto.FromECDSAPub(k.Public))
+	privHex := fmt.Sprintf("%x", crypto.FromECDSA(k.Private))
+	return pubHex, privHex
+}
+
+// CompressPubKey returns the compressed public key in hexString format
+func CompressPubKey(pubHex string) (string, error) {
+	pubBytes, err := hex.DecodeString(sanitizeHex(pubHex))
+	if err != nil {
+		return "", err
+	}
+	pub, err := crypto.UnmarshalPubkey(pubBytes)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", crypto.CompressPubkey(pub)), nil
+}
+
+// DecompressPubKey takes a hexString compressed public key and returns it descompressed
+func DecompressPubKey(pubHexComp string) (string, error) {
+	pubBytes, err := hex.DecodeString(pubHexComp)
+	if err != nil {
+		return "", err
+	}
+	pub, err := crypto.DecompressPubkey(pubBytes)
+	if err != nil {
+		return "", err
+	}
+	pubHex := fmt.Sprintf("%x", crypto.FromECDSAPub(pub))
+	return pubHex, nil
 }
 
 // EthAddrString return the Ethereum address from the Signing ECDSA public key
@@ -88,13 +114,11 @@ func (k *SignKeys) Sign(message string) (string, error) {
 	if k.Private == nil {
 		return "", errors.New("No private key available")
 	}
-	hash := Hash(message)
-	signature, err := crypto.Sign(hash, k.Private)
+	signature, err := crypto.Sign(Hash(message), k.Private)
 	if err != nil {
 		return "", err
 	}
-	signHex := hex.EncodeToString(signature)
-	return fmt.Sprintf("0x%s", signHex), err
+	return fmt.Sprintf("%x", signature), nil
 }
 
 // SignJSON signs a JSON message. Message is a struct interface
@@ -107,7 +131,7 @@ func (k *SignKeys) SignJSON(message interface{}) (string, error) {
 	if err != nil {
 		return "", errors.New("error signing response body: %s")
 	}
-	return sig, nil
+	return sanitizeHex(sig), nil
 }
 
 // Verify verifies a message. Signature and pubHex are HexStrings
@@ -133,12 +157,11 @@ func Verify(message, signHex, pubHex string) (bool, error) {
 
 // Standaolone function to obtain the Ethereum address from a ECDSA public key
 func AddrFromPublicKey(pubHex string) (string, error) {
-	pubBytes, err := hex.DecodeString(pubHex)
+	pubBytes, err := hex.DecodeString(sanitizeHex(pubHex))
 	if err != nil {
 		return "", err
 	}
-	pub, err := crypto.DecompressPubkey(pubBytes)
-	//pub, err := crypto.UnmarshalPubkey(pubBytes)
+	pub, err := crypto.UnmarshalPubkey(pubBytes)
 	if err != nil {
 		return "", err
 	}
@@ -147,40 +170,34 @@ func AddrFromPublicKey(pubHex string) (string, error) {
 }
 
 // ExtractEthAddr recovers the Ethereum address that created the signature of a message
-func AddrFromSignature(msg, sigHex string) ([20]byte, error) {
-	//sig := hexutil.MustDecode(sigHex)
+func AddrFromSignature(msg, sigHex string) (string, error) {
 	sig, err := hex.DecodeString(sanitizeHex(sigHex))
 	if err != nil {
-		return [20]byte{}, err
+		return "", err
 	}
-	// Hack to avoid Hex codification problems with Ethereum
-	sigHexEth := hexeth.Encode(sig)
-	sig, err = hexeth.Decode(sigHexEth)
-	if err != nil {
-		return [20]byte{}, err
+	if sig[64] > 1 {
+		sig[64] -= 27
 	}
-	if sig[64] != 27 && sig[64] != 28 {
-		return [20]byte{}, errors.New("Bad recovery hex")
+	if sig[64] < 0 || sig[64] > 1 {
+		return "", errors.New("Bad recover ID byte")
 	}
-	sig[64] -= 27
-
 	pubKey, err := crypto.SigToPub(Hash(msg), sig)
 	if err != nil {
-		return [20]byte{}, errors.New("Bad sig")
+		return "", err
 	}
-
-	return [20]byte(crypto.PubkeyToAddress(*pubKey)), nil
+	addr := crypto.PubkeyToAddress(*pubKey)
+	return fmt.Sprintf("%x", addr), nil
 }
 
 // Hash string data adding Ethereum prefix
 func Hash(data string) []byte {
 	payloadToSign := fmt.Sprintf("%s%d%s", SigningPrefix, len(data), data)
-	return crypto.Keccak256Hash([]byte(payloadToSign)).Bytes()
+	return crypto.Keccak256([]byte(payloadToSign))
 }
 
 // HashRaw hashes a string with no prefix
 func HashRaw(data string) []byte {
-	return crypto.Keccak256Hash([]byte(data)).Bytes()
+	return crypto.Keccak256([]byte(data))
 }
 
 // VerifySender verifies if a message is sent by some Authorized address key
@@ -193,7 +210,7 @@ func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
 		return false, err
 	}
 	for _, addr := range k.Authorized {
-		if addr == recoveredAddr {
+		if fmt.Sprintf("%x", addr) == recoveredAddr {
 			return true, nil
 		}
 	}
@@ -223,7 +240,7 @@ func (k *SignKeys) Encrypt(message string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return sanitizeHex(hex.EncodeToString(ciphertext)), nil
+	return fmt.Sprintf("%x", ciphertext), nil
 }
 
 // Decrypt uses secp256k1 standard to decrypt a Hexadecimal string message
