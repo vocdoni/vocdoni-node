@@ -78,6 +78,7 @@ func InitRouter(inbound <-chan types.Message, storage data.Storage, transport ne
 	signer signature.SignKeys) Router {
 	requestMap := make(methodMap)
 	cm := new(census.CensusManager)
+	log.Infof("using signer with address %s", signer.EthAddrString())
 	return Router{requestMap, inbound, storage, transport, signer, cm}
 }
 
@@ -101,6 +102,10 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.registerMethod("dump", censusLocalMethod)
 	r.registerMethod("genProof", censusLocalMethod)
 	r.registerMethod("checkProof", censusLocalMethod)
+	r.registerMethod("addCensus", censusLocalMethod)
+	r.registerMethod("addClaim", censusLocalMethod)
+	r.registerMethod("addClaimBulk", censusLocalMethod)
+
 }
 
 //Route routes requests through the Router object

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -255,7 +256,9 @@ func (cm *CensusManager) LocalHandler(crm *types.CensusRequestMessage, signer *s
 	return respMsg
 }
 
-// Handler handles an API census manager request
+// Handler handles an API census manager request.
+// isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
+// censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
 func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPrefix string) *types.CensusResponse {
 	resp := new(types.CensusResponse)
 	op := r.Method
@@ -275,7 +278,8 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 				resp.Ok = false
 				resp.Error = err.Error()
 			} else {
-				log.Infof("census %s created successfully managed by %s", r.CensusID, r.PubKeys)
+				log.Infof("census %s%s created successfully managed by %s", censusPrefix, r.CensusID, r.PubKeys)
+				resp.CensusID = censusPrefix + r.CensusID
 			}
 		} else {
 			resp.Ok = false
@@ -297,6 +301,16 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 		return resp
 	}
 
+	// validAuthPrefix is true: either censusPrefix is not used or censusID contains the prefix
+	validAuthPrefix := false
+	if len(censusPrefix) == 0 {
+		validAuthPrefix = true
+		log.Debugf("prefix not specified, allowing access to all census IDs if pubkey validation correct")
+	} else {
+		validAuthPrefix = strings.HasPrefix(r.CensusID, censusPrefix)
+		log.Debugf("prefix allowed for %s", r.CensusID)
+	}
+
 	//Methods without rootHash
 	if op == "getRoot" {
 		resp.Root = cm.Trees[r.CensusID].GetRoot()
@@ -304,7 +318,7 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 	}
 
 	if op == "addClaimBulk" {
-		if isAuth {
+		if isAuth && validAuthPrefix {
 			addedClaims := 0
 			for _, c := range r.ClaimsData {
 				err := cm.Trees[r.CensusID].AddClaim([]byte(c))
@@ -324,7 +338,7 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 	}
 
 	if op == "addClaim" {
-		if isAuth {
+		if isAuth && validAuthPrefix {
 			err = cm.Trees[r.CensusID].AddClaim([]byte(r.ClaimData))
 			if err != nil {
 				log.Warnf("error adding claim: %s", err.Error())
@@ -341,7 +355,7 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 	}
 
 	if op == "importDump" {
-		if isAuth {
+		if isAuth && validAuthPrefix {
 			if len(r.ClaimsData) > 0 {
 				err = cm.Trees[r.CensusID].ImportDump(r.ClaimsData)
 				if err != nil {
@@ -383,7 +397,7 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 	}
 
 	if op == "dump" || op == "dumpPlain" {
-		if !isAuth {
+		if !isAuth || !validAuthPrefix {
 			resp.Ok = false
 			resp.Error = "invalid authentication"
 			return resp

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 
-	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
@@ -20,25 +19,18 @@ func censusLocalMethod(msg types.Message, rawRequest []byte, router *Router) {
 		log.Warnf("couldn't decode into CensusRequest type from request %v", msg.Data)
 		return
 	}
-	authorized, err := router.signer.VerifySender(string(rawRequest), censusRequest.Signature)
+	authorized, addr, err := router.signer.VerifyJSONsender(censusRequest.Request, censusRequest.Signature)
 	if err != nil {
-		log.Debugf("client not authorized for private methods")
+		log.Debug(err.Error())
 	}
-	var addr string
-	if len(censusRequest.Signature) > 0 {
-		addr, err = signature.AddrFromSignature(string(rawRequest), censusRequest.Signature)
-		if err != nil {
-			log.Warnf("error extracting Ethereum address from signature: %s", err)
-		}
-	}
-	go censusLocal(msg, &censusRequest, router, authorized, fmt.Sprintf("%x", addr))
+	go censusLocal(msg, &censusRequest, router, authorized, addr)
 }
 
 func censusLocal(msg types.Message, crm *types.CensusRequestMessage, router *Router, auth bool, addr string) {
 	var response types.CensusResponseMessage
 	var err error
-	log.Debugf("recovered address %s", addr)
-	cresponse := router.census.Handler(&crm.Request, auth, addr)
+	log.Debugf("clien authorization %t. Recovered address is %s", auth, addr)
+	cresponse := router.census.Handler(&crm.Request, auth, addr+"/")
 	response.Response = *cresponse
 	response.ID = crm.ID
 	response.Signature, err = router.signer.SignJSON(response.Response)

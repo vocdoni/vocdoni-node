@@ -164,6 +164,7 @@ type CensusResponse struct {
 	Request    string   `json:"request"`
 	Error      string   `json:"error"`
 	Root       string   `json:"root"`
+	CensusID   string   `json:"censusId"`
 	Siblings   string   `json:"siblings"`
 	ValidProof bool     `json:"validProof"`
 	ClaimsData []string `json:"claimsData"`
