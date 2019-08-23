@@ -59,14 +59,17 @@ func (k *SignKeys) AddHexKey(privHex string) error {
 
 // AddAuthKey adds a new authorized address key
 func (k *SignKeys) AddAuthKey(address string) error {
-	if len(address) == AddressLength {
+	addrBytes, err := hex.DecodeString(sanitizeHex(address))
+	if err != nil {
+		return err
+	}
+	if len(addrBytes) == AddressLength {
 		var addr Address
-		copy(addr[:], []byte(sanitizeHex(address))[:])
+		copy(addr[:], addrBytes[:AddressLength])
 		k.Authorized = append(k.Authorized, addr)
 		return nil
-	} else {
-		return errors.New("Invalid address lenght")
 	}
+	return errors.New("invalid address lenght")
 }
 
 // HexString returns the public and private keys as hex strings
@@ -103,9 +106,9 @@ func DecompressPubKey(pubHexComp string) (string, error) {
 	return pubHex, nil
 }
 
-// EthAddrString return the Ethereum address from the Signing ECDSA public key
+// EthAddrString return the Ethereum address from the ECDSA public key
 func (k *SignKeys) EthAddrString() string {
-	recoveredAddr := [20]byte(crypto.PubkeyToAddress(*k.Public))
+	recoveredAddr := crypto.PubkeyToAddress(*k.Public).Bytes()
 	return fmt.Sprintf("%x", recoveredAddr)
 }
 
@@ -134,13 +137,14 @@ func (k *SignKeys) SignJSON(message interface{}) (string, error) {
 	return sanitizeHex(sig), nil
 }
 
-// Verify verifies a message. Signature and pubHex are HexStrings
-func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
-	signature, err := hex.DecodeString(sanitizeHex(signHex))
+// Verify verifies a message. Signature is HexString
+func (k *SignKeys) Verify(message, signHex string) (bool, error) {
+	pubHex, err := PubKeyFromSignature(message, signHex)
+	signature, err := hex.DecodeString(signHex)
 	if err != nil {
 		return false, err
 	}
-	pub, err := hex.DecodeString(sanitizeHex(pubHex))
+	pub, err := hex.DecodeString(pubHex)
 	if err != nil {
 		return false, err
 	}
@@ -149,55 +153,13 @@ func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 	return result, nil
 }
 
-// Standalone function for verify a message
-func Verify(message, signHex, pubHex string) (bool, error) {
-	sk := new(SignKeys)
-	return sk.Verify(message, signHex, pubHex)
-}
-
-// Standaolone function to obtain the Ethereum address from a ECDSA public key
-func AddrFromPublicKey(pubHex string) (string, error) {
-	pubBytes, err := hex.DecodeString(sanitizeHex(pubHex))
+// Verify verifies a JSON message. Signature is HexString
+func (k *SignKeys) VerifyJSON(message interface{}, signHex string) (bool, error) {
+	rawMsg, err := json.Marshal(message)
 	if err != nil {
-		return "", err
+		return false, errors.New("unable to marshal message to sign: %s")
 	}
-	pub, err := crypto.UnmarshalPubkey(pubBytes)
-	if err != nil {
-		return "", err
-	}
-	recoveredAddr := [20]byte(crypto.PubkeyToAddress(*pub))
-	return fmt.Sprintf("%x", recoveredAddr), nil
-}
-
-// ExtractEthAddr recovers the Ethereum address that created the signature of a message
-func AddrFromSignature(msg, sigHex string) (string, error) {
-	sig, err := hex.DecodeString(sanitizeHex(sigHex))
-	if err != nil {
-		return "", err
-	}
-	if sig[64] > 1 {
-		sig[64] -= 27
-	}
-	if sig[64] < 0 || sig[64] > 1 {
-		return "", errors.New("Bad recover ID byte")
-	}
-	pubKey, err := crypto.SigToPub(Hash(msg), sig)
-	if err != nil {
-		return "", err
-	}
-	addr := crypto.PubkeyToAddress(*pubKey)
-	return fmt.Sprintf("%x", addr), nil
-}
-
-// Hash string data adding Ethereum prefix
-func Hash(data string) []byte {
-	payloadToSign := fmt.Sprintf("%s%d%s", SigningPrefix, len(data), data)
-	return crypto.Keccak256([]byte(payloadToSign))
-}
-
-// HashRaw hashes a string with no prefix
-func HashRaw(data string) []byte {
-	return crypto.Keccak256([]byte(data))
+	return k.Verify(string(rawMsg), signHex)
 }
 
 // VerifySender verifies if a message is sent by some Authorized address key
@@ -215,6 +177,87 @@ func (k *SignKeys) VerifySender(msg, sigHex string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// VerifyJSONsender verifies if a JSON message is sent by some Authorized address key
+func (k *SignKeys) VerifyJSONsender(msg, sigHex string) (bool, error) {
+	rawMsg, err := json.Marshal(msg)
+	if err != nil {
+		return false, errors.New("unable to marshal message to sign: %s")
+	}
+	return k.VerifySender(string(rawMsg), sigHex)
+}
+
+// Standalone function for verify a message
+func Verify(message, signHex, pubHex string) (bool, error) {
+	sk := new(SignKeys)
+	return sk.Verify(message, signHex)
+}
+
+// Standaolone function to obtain the Ethereum address from a ECDSA public key
+func AddrFromPublicKey(pubHex string) (string, error) {
+	pubBytes, err := hex.DecodeString(sanitizeHex(pubHex))
+	if err != nil {
+		return "", err
+	}
+	pub, err := crypto.UnmarshalPubkey(pubBytes)
+	if err != nil {
+		return "", err
+	}
+	recoveredAddr := [20]byte(crypto.PubkeyToAddress(*pub))
+	return fmt.Sprintf("%x", recoveredAddr), nil
+}
+
+// PubKeyFromSignature recovers the ECDSA public key that created the signature of a message
+func PubKeyFromSignature(msg, sigHex string) (string, error) {
+	sig, err := hex.DecodeString(sanitizeHex(sigHex))
+	if err != nil {
+		return "", err
+	}
+	if sig[64] > 1 {
+		sig[64] -= 27
+	}
+	if sig[64] < 0 || sig[64] > 1 {
+		return "", errors.New("Bad recover ID byte")
+	}
+	pubKey, err := crypto.SigToPub(Hash(msg), sig)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", crypto.FromECDSAPub(pubKey)), nil
+}
+
+// AddrFromSignature recovers the Ethereum address that created the signature of a message
+func AddrFromSignature(msg, sigHex string) (string, error) {
+	pubHex, err := PubKeyFromSignature(msg, sigHex)
+	if err != nil {
+		return "", err
+	}
+	pub, err := hexToPubKey(pubHex)
+	if err != nil {
+		return "", err
+	}
+	addr := crypto.PubkeyToAddress(*pub)
+	return fmt.Sprintf("%x", addr), nil
+}
+
+func hexToPubKey(pubHex string) (*ecdsa.PublicKey, error) {
+	pubBytes, err := hex.DecodeString(sanitizeHex(pubHex))
+	if err != nil {
+		return new(ecdsa.PublicKey), err
+	}
+	return crypto.UnmarshalPubkey(pubBytes)
+}
+
+// Hash string data adding Ethereum prefix
+func Hash(data string) []byte {
+	payloadToSign := fmt.Sprintf("%s%d%s", SigningPrefix, len(data), data)
+	return crypto.Keccak256([]byte(payloadToSign))
+}
+
+// HashRaw hashes a string with no prefix
+func HashRaw(data string) []byte {
+	return crypto.Keccak256([]byte(data))
 }
 
 func sanitizeHex(hexStr string) string {

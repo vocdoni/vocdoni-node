@@ -25,7 +25,7 @@ func TestSignature(t *testing.T) {
 	}
 	pub, priv = s2.HexString()
 	t.Logf("Imported pub:%s priv:%s\n", pub, priv)
-	v, err := s.Verify(message, msgSign, pub)
+	v, err := s.Verify(message, msgSign)
 	if err != nil {
 		t.Errorf("Verification error: %s\n", err)
 	}
@@ -111,7 +111,10 @@ func TestAddr(t *testing.T) {
 		t.Errorf("Extracted signature address do not match: %s != %s\n", addr2, addr3)
 	}
 
-	s.AddAuthKey(addr3)
+	err = s.AddAuthKey(addr3)
+	if err != nil {
+		t.Error(err.Error())
+	}
 	v, err := s.VerifySender("hello vocdoni", signature)
 	if err != nil {
 		t.Error(err.Error())
@@ -120,11 +123,22 @@ func TestAddr(t *testing.T) {
 		t.Error("Cannot verify sender")
 	}
 
-	v, err = s.Verify("hello vocdoni", signature, pub)
+	v, err = s.Verify("hello vocdoni", signature)
 	if err != nil {
 		t.Error(err.Error())
 	}
 	if !v {
 		t.Error("Cannot verify signature")
 	}
+
+	signature2, err := s.Sign("bye-bye vocdoni")
+	addr4, err := AddrFromSignature("bye-bye vocdoni", signature2)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	if addr4 != addr3 {
+		t.Error("extracted address from second message do not match")
+	}
+	t.Logf("%s == %s", addr3, addr4)
+
 }
