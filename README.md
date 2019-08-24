@@ -9,6 +9,8 @@ The list of main components implemented in `go-dvote` are:
 + Census Manager
 + Tendermint Vochain
 
+Find the package lib reference [here](https://godoc.org/gitlab.com/vocdoni/go-dvote)
+
 ## Gateway
 
 Gateways provide an entry point to the P2P networks. 
