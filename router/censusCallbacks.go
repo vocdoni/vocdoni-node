@@ -33,6 +33,7 @@ func censusLocal(msg types.Message, crm *types.CensusRequestMessage, router *Rou
 	cresponse := router.census.Handler(&crm.Request, auth, addr+"/")
 	response.Response = *cresponse
 	response.ID = crm.ID
+	response.Response.Request = crm.ID
 	response.Signature, err = router.signer.SignJSON(response.Response)
 	if err != nil {
 		log.Warn(err.Error())
