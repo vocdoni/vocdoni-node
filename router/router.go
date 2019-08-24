@@ -98,6 +98,7 @@ func (r *Router) EnableFileAPI() {
 //EnableCensusAPI enables the Census API in the Router
 func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.census = cm
+	cm.Data = &r.storage
 	r.registerMethod("getRoot", censusLocalMethod)
 	r.registerMethod("dump", censusLocalMethod)
 	r.registerMethod("genProof", censusLocalMethod)
@@ -105,7 +106,7 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.registerMethod("addCensus", censusLocalMethod)
 	r.registerMethod("addClaim", censusLocalMethod)
 	r.registerMethod("addClaimBulk", censusLocalMethod)
-
+	r.registerMethod("publish", censusLocalMethod)
 }
 
 //Route routes requests through the Router object

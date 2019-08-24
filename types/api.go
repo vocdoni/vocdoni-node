@@ -165,8 +165,15 @@ type CensusResponse struct {
 	Error      string   `json:"error"`
 	Root       string   `json:"root"`
 	CensusID   string   `json:"censusId"`
+	URI        string   `json:"uri"`
 	Siblings   string   `json:"siblings"`
 	ValidProof bool     `json:"validProof"`
 	ClaimsData []string `json:"claimsData"`
 	TimeStamp  int32    `json:"timestamp"`
+}
+
+// CensusDump represents a Dump of the census. Used for publishing on IPFS/Swarm filesystems.
+type CensusDump struct {
+	RootHash   string   `json:"rootHash"`
+	ClaimsData []string `json:"claimsData"`
 }

@@ -13,6 +13,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	tree "gitlab.com/vocdoni/go-dvote/tree"
 )
@@ -32,6 +33,7 @@ type CensusManager struct {
 	AuthWindow int32                 //Time window (seconds) in which TimeStamp will be accepted if auth enabled
 	Census     CensusNamespaces      //Available namespaces
 	Trees      map[string]*tree.Tree //MkTrees map of merkle trees indexed by censusId
+	Data       *data.Storage
 }
 
 // Init creates a new census manager
@@ -236,26 +238,6 @@ func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, s
 	httpReply(respMsg, w)
 }
 
-func (cm *CensusManager) LocalHandler(crm *types.CensusRequestMessage, signer *signature.SignKeys) *types.CensusResponseMessage {
-	log.Debug("new census request received")
-	auth := true
-	err := cm.CheckAuth(crm)
-	if err != nil {
-		log.Debugf("authorization error: %s", err.Error())
-		auth = false
-	}
-	resp := cm.Handler(&crm.Request, auth, "")
-	respMsg := new(types.CensusResponseMessage)
-	respMsg.Response = *resp
-	respMsg.ID = crm.ID
-	respMsg.Response.Request = crm.ID
-	respMsg.Signature, err = signer.SignJSON(respMsg.Response)
-	if err != nil {
-		log.Warn(err.Error())
-	}
-	return respMsg
-}
-
 // Handler handles an API census manager request.
 // isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
 // censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
@@ -417,6 +399,41 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 			resp.ClaimsData = dumpValues
 		}
 		return resp
+	}
+
+	if op == "publish" {
+		// To-Do implement Gzip compression
+		if !isAuth || !validAuthPrefix {
+			resp.Ok = false
+			resp.Error = "invalid authentication"
+			return resp
+		}
+		if cm.Data == nil {
+			resp.Ok = false
+			resp.Error = "not supported"
+			return resp
+		}
+		var dump types.CensusDump
+		dump.RootHash = t.GetRoot()
+		dump.ClaimsData, err = t.Dump(t.GetRoot())
+		if err != nil {
+			resp.Error = err.Error()
+			resp.Ok = false
+			log.Warnf("cannot dump census with root %s: %s", t.GetRoot(), err.Error())
+			return resp
+		}
+		dumpBytes, err := json.Marshal(dump)
+		if err != nil {
+			resp.Error = err.Error()
+			resp.Ok = false
+			log.Warnf("cannot marshal census dump: %s", err.Error())
+			return resp
+		}
+		dataStorage := *cm.Data
+		cid, err := dataStorage.Publish(dumpBytes)
+		resp.URI = dataStorage.GetURIprefix() + cid
+		log.Infof("published census at %s", resp.URI)
+		resp.Root = t.GetRoot()
 	}
 
 	if op == "checkProof" {

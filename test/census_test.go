@@ -59,6 +59,13 @@ func TestCensus(t *testing.T) {
 
 	// Create the API router
 	var storage data.Storage
+	ipfsDir := fmt.Sprintf("/tmp/ipfs%d", rand.Intn(1000))
+	ipfsStore := data.IPFSNewConfig(ipfsDir)
+	defer os.RemoveAll(ipfsDir)
+	storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
+	if err != nil {
+		t.Errorf("cannot start IPFS %s", err.Error())
+	}
 	routerApi := router.InitRouter(listenerOutput, storage, ws, *signer1)
 
 	// Create the Census Manager and enable it trough the router
@@ -88,6 +95,9 @@ func TestCensus(t *testing.T) {
 		t.Errorf("dial: %s", err.Error())
 	}
 	defer c.Close()
+
+	// Wait to let all get correctly initialitzed
+	time.Sleep(5 * time.Second)
 
 	// Send the API requets
 	var req types.CensusRequest
@@ -120,8 +130,33 @@ func TestCensus(t *testing.T) {
 		t.Errorf("client should not be authorized on addClaim")
 	}
 
+	// addBlaimBulk
+	var claims []string
+	req.Method = "addClaimBulk"
+	req.ClaimData = ""
+	for i := 0; i < 100; i++ {
+		claims = append(claims, fmt.Sprintf("0123456789abcdef0123456789abc%d", i))
+	}
+	req.ClaimsData = claims
+	resp, err = sendCensusReq(req, signer2)
+	t.Logf("addClaimBulk response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("failed adding a bulk of claims")
+	}
+
+	// publish
+	req.Method = "publish"
+	req.ClaimsData = []string{}
+	resp, err = sendCensusReq(req, signer2)
+	t.Logf("publish response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("failed publishing tree to storage")
+	}
+
 	// Close connection
 	c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	os.RemoveAll(ipfsDir)
+	os.RemoveAll(censusDir)
 }
 
 func sendCensusReq(req types.CensusRequest, signer *sig.SignKeys) (types.CensusResponse, error) {

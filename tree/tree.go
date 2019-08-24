@@ -122,14 +122,14 @@ func stringToHash(hash string) (merkletree.Hash, error) {
 }
 
 func (t *Tree) Dump(root string) (claims []string, err error) {
-	var rootHash *merkletree.Hash
+	var rootHash merkletree.Hash
 	if len(root) > 0 {
-		*rootHash, err = stringToHash(root)
+		rootHash, err = stringToHash(root)
 		if err != nil {
 			return
 		}
 	}
-	claims, err = t.Tree.DumpClaims(rootHash)
+	claims, err = t.Tree.DumpClaims(&rootHash)
 	return
 }
 

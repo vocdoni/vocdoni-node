@@ -176,6 +176,11 @@ func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 	return node.Cid().String(), nil
 }
 
+//GetURIprefix returns the URI prefix which identifies the protocol
+func (i *IPFSHandle) GetURIprefix() string {
+	return "ipfs://"
+}
+
 //Public publish function, handles cluster and standalone modes
 func (i *IPFSHandle) Publish(msg []byte) (string, error) {
 	roothash, err := publishBytes(msg, i.dataDir, i.nd)

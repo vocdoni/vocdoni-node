@@ -14,6 +14,7 @@ type Storage interface {
 	Pin(path string) error
 	Unpin(path string) error
 	ListPins() (map[string]string, error)
+	GetURIprefix() string
 }
 
 type StorageConfig interface {
@@ -53,7 +54,7 @@ func InitDefault(t StorageID) (Storage, error) {
 		}
 		s := new(IPFSHandle)
 		defaultDataStore := new(types.DataStore)
-		defaultDataStore.Datadir = usr.HomeDir + "/.ipfstest/"
+		defaultDataStore.Datadir = usr.HomeDir + "/.ipfs/"
 		err = s.Init(defaultDataStore)
 		return s, err
 	case BZZ:
@@ -72,6 +73,7 @@ func Init(t StorageID, d *types.DataStore) (Storage, error) {
 	case IPFS:
 		s := new(IPFSHandle)
 		s.Init(d)
+
 		return s, nil
 	case BZZ:
 		s := new(BZZHandle)
