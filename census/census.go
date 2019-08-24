@@ -355,6 +355,60 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 		return resp
 	}
 
+	if op == "importRemote" {
+		// To-Do implement Gzip compression
+		if !isAuth || !validAuthPrefix {
+			resp.Ok = false
+			resp.Error = "invalid authentication"
+			return resp
+		}
+		if cm.Data == nil {
+			resp.Ok = false
+			resp.Error = "not supported"
+			return resp
+		}
+		dataStorage := *cm.Data
+		if !strings.HasPrefix(r.URI, dataStorage.GetURIprefix()) ||
+			len(r.URI) <= len(dataStorage.GetURIprefix()) {
+			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, dataStorage.GetURIprefix())
+			resp.Ok = false
+			resp.Error = "URI not supported"
+			return resp
+		}
+		log.Infof("retrieving remote census %s", r.CensusURI)
+		censusRaw, err := dataStorage.Retrieve(r.URI[len(dataStorage.GetURIprefix()):])
+		if err != nil {
+			log.Warnf("cannot retrieve census: %s", err.Error())
+			resp.Ok = false
+			resp.Error = "cannot retrieve census"
+			return resp
+		}
+		var dump types.CensusDump
+		err = json.Unmarshal(censusRaw, &dump)
+		if err != nil {
+			log.Warnf("retrieved census do not have a correct format: %s", err.Error())
+			resp.Ok = false
+			resp.Error = "retrieved census do not have a correct format"
+			return resp
+		}
+		log.Infof("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
+		if len(dump.ClaimsData) > 0 {
+			err = cm.Trees[r.CensusID].ImportDump(dump.ClaimsData)
+			if err != nil {
+				log.Warnf("error importing dump: %s", err.Error())
+				resp.Ok = false
+				resp.Error = "error importing census"
+			} else {
+				log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
+			}
+		} else {
+			log.Warnf("no claims found on the retreived census")
+			resp.Ok = false
+			resp.Error = "no claims found"
+		}
+		return resp
+	}
+
 	//Methods with rootHash, if rootHash specified snapshot the tree
 	var t *tree.Tree
 	if len(r.RootHash) > 1 { //if rootHash specified

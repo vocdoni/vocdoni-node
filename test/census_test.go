@@ -101,6 +101,8 @@ func TestCensus(t *testing.T) {
 
 	// Send the API requets
 	var req types.CensusRequest
+
+	// Create census
 	req.Method = "addCensus"
 	req.CensusID = "test"
 	resp, err := sendCensusReq(req, signer2)
@@ -150,7 +152,51 @@ func TestCensus(t *testing.T) {
 	resp, err = sendCensusReq(req, signer2)
 	t.Logf("publish response %+v", resp)
 	if !resp.Ok {
-		t.Errorf("failed publishing tree to storage")
+		t.Errorf("failed publishing tree to remote storage")
+	}
+	uri := resp.URI
+
+	// getRoot
+	req.Method = "getRoot"
+	resp, err = sendCensusReq(req, signer2)
+	t.Logf("getRoot response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("fail on getRoot")
+	}
+	root := resp.Root
+	if len(root) < 1 {
+		t.Errorf("got invalid root")
+	}
+
+	// add second census
+	req.Method = "addCensus"
+	req.CensusID = "importTest"
+	resp, err = sendCensusReq(req, signer2)
+	t.Logf("addCensus response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("fail on addCensus")
+	}
+
+	// importRemote
+	time.Sleep(1 * time.Second)
+	req.Method = "importRemote"
+	req.CensusID = resp.CensusID
+	req.URI = uri
+	resp, err = sendCensusReq(req, signer2)
+	t.Logf("importRemote response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("failed importing tree from remote storage")
+	}
+
+	// getRoot
+	req.Method = "getRoot"
+	resp, err = sendCensusReq(req, signer2)
+	t.Logf("getRoot response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("fail on getRoot")
+	}
+	if root != resp.Root {
+		t.Errorf("root is different after importing! %s != %s", root, resp.Root)
 	}
 
 	// Close connection

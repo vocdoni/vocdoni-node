@@ -107,6 +107,7 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.registerMethod("addClaim", censusLocalMethod)
 	r.registerMethod("addClaimBulk", censusLocalMethod)
 	r.registerMethod("publish", censusLocalMethod)
+	r.registerMethod("importRemote", censusLocalMethod)
 }
 
 //Route routes requests through the Router object

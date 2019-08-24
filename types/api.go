@@ -148,7 +148,8 @@ type CensusRequest struct {
 	ProofData  string   `json:"proofData"`           // MerkleProof to check
 	PubKeys    []string `json:"pubKeys"`             // Public key managers for creating a new census
 	TimeStamp  int32    `json:"timestamp"`           // Unix TimeStamp in seconds
-	CensusURI  string   `json:"censusUri,omitempty"` //Census Service URI for proxy messages
+	CensusURI  string   `json:"censusUri,omitempty"` // Census Service URI for proxy messages
+	URI        string   `json:"uri"`                 // URI of a census to import/export
 }
 
 // CensusResponseMessage represents a census manager JSON response package
