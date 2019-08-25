@@ -3,13 +3,13 @@ package censusmanager
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
-	"fmt"
+
+	"gitlab.com/vocdoni/go-dvote/types"
 
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
-	tree "gitlab.com/vocdoni/go-dvote/tree"
 	"gitlab.com/vocdoni/go-dvote/log"
+	tree "gitlab.com/vocdoni/go-dvote/tree"
 )
 
 // Time window (seconds) in which TimeStamp will be accepted if auth enabled
@@ -23,23 +23,6 @@ var Signatures map[string]string
 
 var currentSignature signature.SignKeys
 
-// Claim type represents a JSON object with all possible fields
-type Claim struct {
-	Method    string `json:"method"`    // method to call
-	CensusID  string `json:"censusId"`  // References to MerkleTree namespace
-	RootHash  string `json:"rootHash"`  // References to MerkleTree rootHash
-	ClaimData string `json:"claimData"` // Data to add to the MerkleTree
-	ProofData string `json:"proofData"` // MerkleProof to check
-	TimeStamp string `json:"timeStamp"` // Unix TimeStamp in seconds
-	Signature string `json:"signature"` // Signature as Hexadecimal String
-}
-
-// Result type represents a JSON object with the result of the method executed
-type Result struct {
-	Error    bool   `json:"error"`
-	Response string `json:"response"`
-}
-
 // AddNamespace adds a new merkletree identified by a censusId (name)
 func AddNamespace(name, pubKey string) {
 	if len(MkTrees) == 0 {
@@ -48,14 +31,14 @@ func AddNamespace(name, pubKey string) {
 	if len(Signatures) == 0 {
 		Signatures = make(map[string]string)
 	}
-
+	log.Infof("adding namespace %s", name)
 	mkTree := tree.Tree{}
 	mkTree.Init(name)
 	MkTrees[name] = &mkTree
 	Signatures[name] = pubKey
 }
 
-func reply(resp *Result, w http.ResponseWriter) {
+func httpReply(resp *types.CensusResponseMessage, w http.ResponseWriter) {
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -72,18 +55,13 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 	return true
 }
 
-func checkAuth(timestamp, signed, pubKey, message string) bool {
+func checkAuth(timestamp int32, signed, pubKey, message string) bool {
 	if len(pubKey) < 1 {
 		return true
 	}
-	currentTime := int64(time.Now().Unix())
-	timeStampRemote, err := strconv.ParseInt(timestamp, 10, 32)
-	if err != nil {
-		log.Warnf("Cannot parse timestamp data %s\n", err)
-		return false
-	}
-	if timeStampRemote < currentTime+authTimeWindow &&
-		timeStampRemote > currentTime-authTimeWindow {
+	currentTime := int32(time.Now().Unix())
+	if timestamp < currentTime+authTimeWindow &&
+		timestamp > currentTime-authTimeWindow {
 		v, err := currentSignature.Verify(message, signed, pubKey)
 		if err != nil {
 			log.Warnf("Verification error: %s\n", err)
@@ -93,174 +71,156 @@ func checkAuth(timestamp, signed, pubKey, message string) bool {
 	return false
 }
 
-func httpHandler(w http.ResponseWriter, req *http.Request) {
-	var c Claim
+func HTTPhandler(w http.ResponseWriter, req *http.Request, signer *signature.SignKeys) {
+	log.Debug("new request received")
+	var rm types.CensusRequestMessage
 	if ok := checkRequest(w, req); !ok {
 		return
 	}
 	// Decode JSON
-	err := json.NewDecoder(req.Body).Decode(&c)
+	log.Debug("Decoding JSON")
+
+	/*
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(req.Body)
+		reqStr := buf.String()
+		log.Debug(reqStr)
+	*/
+	err := json.NewDecoder(req.Body).Decode(&rm)
 	if err != nil {
+		log.Warnf("cannot decode JSON: %s", err.Error())
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	if len(c.Method) < 1 {
+	if len(rm.Request.Method) < 1 {
 		http.Error(w, "method must be specified", 400)
 		return
 	}
-	resp := opHandler(&c)
-	reply(resp, w)
+	log.Debugf("found method %s", rm.Request.Method)
+	resp := Handler(&rm.Request, true)
+	respMsg := new(types.CensusResponseMessage)
+	respMsg.Response = *resp
+	respMsg.ID = rm.ID
+	respMsg.Response.Request = rm.ID
+	respMsg.Signature, err = signer.SignJSON(respMsg.Response)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	httpReply(respMsg, w)
 }
 
-func opHandler(c *Claim) *Result {
-	var resp Result
-	op := c.Method
+func Handler(r *types.CensusRequest, isAuth bool) *types.CensusResponse {
+	resp := new(types.CensusResponse)
+	op := r.Method
 	var err error
 
 	// Process data
-	log.Infof("Process data", "censusId", c.CensusID, "method", c.Method, "rootHash", c.RootHash, 
-	"claimData", c.ClaimData, "proofData", c.ProofData, "timeStamp", c.TimeStamp, "signature", c.Signature)
-	authString := fmt.Sprintf("%s%s%s%s%s", c.Method, c.CensusID, c.RootHash, c.ClaimData, c.TimeStamp)
-	resp.Error = false
-	resp.Response = ""
+	log.Infof("processing data => %+v", *r)
+
+	resp.Ok = true
+	resp.Error = ""
+	resp.TimeStamp = int32(time.Now().Unix())
 	censusFound := false
-	if len(c.CensusID) > 0 {
-		_, censusFound = MkTrees[c.CensusID]
+	for k := range MkTrees {
+		if k == r.CensusID {
+			censusFound = true
+			break
+		}
 	}
 	if !censusFound {
-		resp.Error = true
-		resp.Response = "censusId not valid or not found"
-		return &resp
+		resp.Ok = false
+		resp.Error = "censusId not valid or not found"
+		return resp
 	}
 
 	//Methods without rootHash
-
 	if op == "getRoot" {
-		resp.Response = MkTrees[c.CensusID].GetRoot()
-		return &resp
+		resp.Root = MkTrees[r.CensusID].GetRoot()
+		return resp
 	}
 
 	if op == "addClaim" {
-		if auth := checkAuth(c.TimeStamp, c.Signature, Signatures[c.CensusID], authString); auth {
-			err = MkTrees[c.CensusID].AddClaim([]byte(c.ClaimData))
+		if isAuth {
+			err = MkTrees[r.CensusID].AddClaim([]byte(r.ClaimData))
+			if err != nil {
+				log.Warnf("error adding claim: %s", err.Error())
+				resp.Ok = false
+				resp.Error = err.Error()
+			} else {
+				log.Info("claim addedd successfully ")
+			}
 		} else {
-			resp.Error = true
-			resp.Response = "invalid authentication"
+			resp.Ok = false
+			resp.Error = "invalid authentication"
 		}
-		return &resp
+		return resp
 	}
 
 	//Methods with rootHash, if rootHash specified snapshot the tree
-
 	var t *tree.Tree
-	if len(c.RootHash) > 1 { //if rootHash specified
-		t, err = MkTrees[c.CensusID].Snapshot(c.RootHash)
+	if len(r.RootHash) > 1 { //if rootHash specified
+		t, err = MkTrees[r.CensusID].Snapshot(r.RootHash)
 		if err != nil {
-			log.Warnf("Snapshot error: %s", err.Error())
-			resp.Error = true
-			resp.Response = "invalid root hash"
-			return &resp
+			log.Warnf("snapshot error: %s", err.Error())
+			resp.Ok = false
+			resp.Error = "invalid root hash"
+			return resp
 		}
 	} else { //if rootHash not specified use current tree
-		t = MkTrees[c.CensusID]
+		t = MkTrees[r.CensusID]
 	}
 
 	if op == "genProof" {
-		resp.Response, err = t.GenProof([]byte(c.ClaimData))
+		resp.Siblings, err = t.GenProof([]byte(r.ClaimData))
 		if err != nil {
-			resp.Error = true
-			resp.Response = err.Error()
+			resp.Ok = false
+			resp.Error = err.Error()
 		}
-		return &resp
+		return resp
 	}
 
 	if op == "getIdx" {
-		resp.Response, err = t.GetIndex([]byte(c.ClaimData))
-		return &resp
+		resp.Idx, err = t.GetIndex([]byte(r.ClaimData))
+		return resp
 	}
 
 	if op == "dump" {
-		if auth := checkAuth(c.TimeStamp, c.Signature, Signatures[c.CensusID], authString); !auth {
-			resp.Error = true
-			resp.Response = "invalid authentication"
-			return &resp
+		if !isAuth {
+			resp.Ok = false
+			resp.Error = "invalid authentication"
+			return resp
 		}
 		//dump the claim data and return it
 		values, err := t.Dump()
 		if err != nil {
-			resp.Error = true
-			resp.Response = err.Error()
+			resp.Ok = false
+			resp.Error = err.Error()
 		} else {
-			jValues, err := json.Marshal(values)
-			if err != nil {
-				resp.Error = true
-				resp.Response = err.Error()
-			} else {
-				resp.Response = fmt.Sprintf("%s", jValues)
-			}
+			resp.ClaimsData = values
 		}
-		return &resp
+		return resp
 	}
 
 	if op == "checkProof" {
-		if len(c.ProofData) < 1 {
-			resp.Error = true
-			resp.Response = "proofData not provided"
-			return &resp
+		if len(r.ProofData) < 1 {
+			resp.Ok = false
+			resp.Error = "proofData not provided"
+			return resp
 		}
 		// Generate proof and return it
-		validProof, err := t.CheckProof([]byte(c.ClaimData), c.ProofData)
+		validProof, err := t.CheckProof([]byte(r.ClaimData), r.ProofData)
 		if err != nil {
-			resp.Error = true
-			resp.Response = err.Error()
-			return &resp
+			resp.Ok = false
+			resp.Error = err.Error()
+			return resp
 		}
 		if validProof {
-			resp.Response = "valid"
+			resp.ValidProof = true
 		} else {
-			resp.Response = "invalid"
+			resp.ValidProof = false
 		}
-		return &resp
+		return resp
 	}
 
-	return &resp
-}
-
-func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "*")
-	(*w).Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
-}
-
-// Listen starts a census service defined of type "proto"
-func Listen(port int, proto string) {
-	srv := &http.Server{
-		Addr:              fmt.Sprintf(":%d", port),
-		ReadHeaderTimeout: 4 * time.Second,
-		ReadTimeout:       4 * time.Second,
-		WriteTimeout:      4 * time.Second,
-		IdleTimeout:       3 * time.Second,
-	}
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		addCorsHeaders(&w, r)
-		if r.Method == http.MethodPost {
-			httpHandler(w, r)
-		} else if r.Method != http.MethodOptions {
-			http.Error(w, "Not found", http.StatusNotFound)
-		}
-	})
-	if proto == "https" {
-		log.Infof("Starting server in https mode")
-		if err := srv.ListenAndServeTLS("server.crt", "server.key"); err != nil {
-			log.Panic(err)
-		}
-	}
-	if proto == "http" {
-		log.Infof("Starting server in http mode")
-		srv.SetKeepAlivesEnabled(false)
-		if err := srv.ListenAndServe(); err != nil {
-			log.Panic(err)
-		}
-	}
+	return resp
 }

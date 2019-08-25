@@ -4,20 +4,23 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
-	"os/user"
 	"os"
+	osSignal "os/signal"
+	"os/user"
+	"syscall"
 	"time"
+	"strings"
 
-	"github.com/spf13/viper"
 	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"gitlab.com/vocdoni/go-dvote/batch"
+	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/db"
+	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/config"
 )
 
 var batchSeconds = 6000 //seconds
@@ -30,7 +33,6 @@ var signal bool
 var transportType net.TransportID
 var storageType data.StorageID
 
-
 func newConfig() (config.RelayCfg, error) {
 	var globalCfg config.RelayCfg
 	//setup flags
@@ -41,16 +43,34 @@ func newConfig() (config.RelayCfg, error) {
 	defaultDirPath := usr.HomeDir + "/.dvote/relay"
 	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for relay config")
 
-	flag.String("loglevel", "warn", "Log level must be one of: debug, info, warn, error, dpanic, panic, fatal")
+	flag.String("logLevel", "info", "Log level must be one of: debug, info, warn, error, dpanic, panic, fatal")
 	flag.String("transport", "PSS", "Transport must be one of: PSS, PubSub")
 	flag.String("storage", "IPFS", "Transport must be one of: BZZ, IPFS")
-	
+	flag.String("ipfsConfigPath", "default", "ipfs config filepath. default is $HOME/.ipfs")
+	flag.Bool("ipfsStats", false, "enable ipfs cluster stats")
+	flag.Bool("ipfsTracing", false, "enable ipfs cluster tracing")
+	flag.String("ipfsConsensus", "raft", "ipfs cluster consensus algorithm. Valid values are: raft, crdt.")
+	flag.String("ipfsPinTracker", "map", "ipfs cluster pin tracker. Valid values are: stateless, map.")
+	flag.Bool("ipfsLeave", true, "ipfs cluster leave")
+	flag.String("ipfsAlloc", "disk", "ipfs cluster allocation. Valid values are: disk, disk-reposize, pincount.")
+	flag.String("clusterKey", "default", "ipfs cluster key in 32-bit hex")
+	flag.StringSlice("ipfsBootstraps", []string{}, "ipfs cluster peer bootstrap addresses in multiaddr format")
+
 	flag.Parse()
 
 	viper := viper.New()
 	viper.SetDefault("logLevel", "warn")
 	viper.SetDefault("transportIDString", "PSS")
 	viper.SetDefault("storageIDString", "IPFS")
+	viper.SetDefault("ipfsConfigPath", "default")
+	viper.SetDefault("cluster.stats", false)
+	viper.SetDefault("cluster.tracing", false)
+	viper.SetDefault("cluster.consensus", "raft")
+	viper.SetDefault("cluster.pintracker", "map")
+	viper.SetDefault("cluster.leave", true)
+	viper.SetDefault("cluster.alloc", "disk")
+	viper.SetDefault("cluster.secret", "default")
+	viper.SetDefault("cluster.bootstraps", []string{})
 
 	viper.SetConfigType("yaml")
 	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -69,11 +89,19 @@ func newConfig() (config.RelayCfg, error) {
 	}
 
 	//bind flags to config
-	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
+	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("transportIDString", flag.Lookup("transport"))
 	viper.BindPFlag("storageIDString", flag.Lookup("storage"))
-	
-	
+	viper.BindPFlag("ipfsconfigpath", flag.Lookup("ipfsConfigPath"))
+	viper.BindPFlag("cluster.stats", flag.Lookup("ipfsStats"))
+	viper.BindPFlag("cluster.tracing", flag.Lookup("ipfsTracing"))
+	viper.BindPFlag("cluster.consensus", flag.Lookup("ipfsConsensus"))
+	viper.BindPFlag("cluster.pintracker", flag.Lookup("ipfsPinTracker"))
+	viper.BindPFlag("cluster.leave", flag.Lookup("ipfsLeave"))
+	viper.BindPFlag("cluster.alloc", flag.Lookup("ipfsAlloc"))
+	viper.BindPFlag("cluster.secret", flag.Lookup("clusterKey"))
+	viper.BindPFlag("cluster.bootstraps", flag.Lookup("ipfsBootstraps"))
+
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
 	if err != nil {
@@ -83,7 +111,6 @@ func newConfig() (config.RelayCfg, error) {
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
 }
-
 
 func main() {
 	//setup config
@@ -109,7 +136,6 @@ func main() {
 
 	batch.Setup(db)
 
-
 	transportType = net.TransportIDFromString(globalCfg.TransportIDString)
 	storageType = data.StorageIDFromString(globalCfg.StorageIDString)
 
@@ -127,18 +153,30 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var storageConfig data.StorageConfig
+	var dataStore *types.DataStore
 	log.Infof("Initializing storage")
 	switch globalCfg.StorageIDString {
 	case "IPFS":
-		storageConfig = data.IPFSNewConfig()
+		usr, err := user.Current()
+		if err != nil {
+			log.Errorf("Cannot get $HOME")
+		}
+		var ipfsPath string
+		if globalCfg.IpfsConfigPath == "default" {
+			ipfsPath = usr.HomeDir + "/.ipfs"
+		} else {
+			ipfsPath = globalCfg.IpfsConfigPath
+		}
+		dataStore = data.IPFSNewConfig(ipfsPath)
+		dataStore.ClusterCfg = globalCfg.Cluster
+		dataStore.ClusterCfg.ClusterLogLevel = strings.ToUpper(globalCfg.LogLevel)
 	case "BZZ":
-		storageConfig = data.BZZNewConfig()
+		dataStore = data.BZZNewConfig()
 	default:
 		log.Panic(errors.New("Storage not supported"))
 	}
 
-	storage, err := data.InitDefault(storageType, storageConfig)
+	storage, err := data.Init(storageType, dataStore)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -156,6 +194,15 @@ func main() {
 	go batch.Recieve(transportOutput)
 	//	go ws.Listen(listenerOutput)
 	//	go net.Route(listenerOutput, storage, ws)
+
+	signalChan := make(chan os.Signal, 10)
+	osSignal.Notify(
+		signalChan,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGHUP,
+		syscall.SIGKILL,
+	)
 
 	log.Infof("Entering main loop")
 	for {
@@ -181,6 +228,8 @@ func main() {
 				//log.Infof("Batch info: Nullifiers: %v, Batch: %v", n, b)
 				//batch.Compact(ns)
 			}
+		case <-signalChan:
+			os.Exit(1)
 		default:
 			continue
 		}

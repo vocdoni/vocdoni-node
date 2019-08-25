@@ -3,6 +3,7 @@ package signature
 import (
 	"crypto/ecdsa"
 	hex "encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -98,6 +99,19 @@ func (k *SignKeys) Sign(message string) (string, error) {
 	return fmt.Sprintf("0x%s", signHex), err
 }
 
+// SignJSON signs a JSON message. Message is a struct interface
+func (k *SignKeys) SignJSON(message interface{}) (string, error) {
+	rawMsg, err := json.Marshal(message)
+	if err != nil {
+		return "", errors.New("unable to marshal message to sign: %s")
+	}
+	sig, err := k.Sign(string(rawMsg))
+	if err != nil {
+		return "",errors.New("error signing response body: %s")
+	}
+	return sig, nil
+}
+
 // Verify verifies a message. Signature and pubHex are HexStrings
 func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 	signature, err := hex.DecodeString(sanitizeHex(signHex))
@@ -117,6 +131,11 @@ func (k *SignKeys) Verify(message, signHex, pubHex string) (bool, error) {
 func Hash(data string) []byte {
 	payloadToSign := fmt.Sprintf("%s%d%s", SigningPrefix, len(data), data)
 	return crypto.Keccak256Hash([]byte(payloadToSign)).Bytes()
+}
+
+// HashRaw hashes a string with no prefix
+func HashRaw(data string) []byte {
+	return crypto.Keccak256Hash([]byte(data)).Bytes()
 }
 
 // VerifySender verifies if a message is sent by some Authorized address key

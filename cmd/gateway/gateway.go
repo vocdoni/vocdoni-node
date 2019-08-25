@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 
+	"encoding/hex"
 	goneturl "net/url"
 	"os"
 	"os/user"
@@ -34,31 +35,25 @@ func newConfig() (config.GWCfg, error) {
 		return globalCfg, err
 	}
 	userDir := usr.HomeDir + "/.dvote"
-	path := flag.String("cfgpath", userDir+"/config.yaml", "cfgpath. Specify filepath for gateway config")
-
+	path := flag.String("cfgpath", userDir+"/config.yaml", "filepath for custom gateway config")
 	flag.Bool("dvoteApi", true, "enable dvote API")
 	flag.Bool("web3Api", true, "enable web3 API")
-
 	flag.String("listenHost", "0.0.0.0", "http host endpoint")
 	flag.Int("listenPort", 9090, "http port endpoint")
-
 	flag.String("dvoteRoute", "/dvote", "dvote endpoint API route")
-
-	flag.Bool("allowPrivate", false, "allows authorized clients to call private methods")
-	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses")
-	flag.String("signingKey", "", "request signing key for this node")
-
-	flag.String("chain", "goerli", "Ethereum blockchain to use")
-	flag.Int("w3nodePort", 32000, "node port")
+	flag.Bool("allowPrivate", false, "allows private methods over the APIs")
+	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
+	flag.String("signingKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
+	flag.String("chain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
+	flag.Bool("chainLightMode", false, "synchronize Ethereum blockchain in light mode")
+	flag.Int("w3nodePort", 32000, "Ethereum p2p node port to use")
 	flag.String("w3route", "/web3", "web3 endpoint API route")
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
-
-	flag.String("ipfsDaemon", "ipfs", "ipfs daemon path")
-	flag.Bool("ipfsNoInit", false, "do not start ipfs daemon (if already started)")
-
+	flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
+	flag.String("ipfsClusterKey", "", "enables ipfs cluster using a shared key")
+	flag.StringSlice("ipfsClusterPeers", []string{}, "ipfs cluster peer bootstrap addresses in multiaddr format")
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	flag.String("dataDir", userDir, "directory where data is stored")
-
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 
 	flag.Parse()
@@ -73,17 +68,25 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("client.allowedAddrs", "")
 	viper.SetDefault("client.signingKey", "")
 	viper.SetDefault("w3.chainType", "goerli")
+	viper.SetDefault("w3.lightMode", false)
 	viper.SetDefault("w3.nodePort", 32000)
 	viper.SetDefault("w3.route", "/web3")
 	viper.SetDefault("w3.external", "")
 	viper.SetDefault("w3.httpPort", "9091")
 	viper.SetDefault("w3.httpHost", "127.0.0.1")
-
-	viper.SetDefault("ipfs.daemon", "ipfs")
-	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ssl.domain", "")
 	viper.SetDefault("dataDir", userDir)
 	viper.SetDefault("logLevel", "warn")
+	viper.SetDefault("ipfs.noInit", false)
+	viper.SetDefault("ipfs.configPath", userDir+"/.ipfs")
+	viper.SetDefault("cluster.secret", "")
+	viper.SetDefault("cluster.bootstraps", []string{})
+	viper.SetDefault("cluster.stats", false)
+	viper.SetDefault("cluster.tracing", false)
+	viper.SetDefault("cluster.consensus", "raft")
+	viper.SetDefault("cluster.pintracker", "map")
+	viper.SetDefault("cluster.leave", true)
+	viper.SetDefault("cluster.alloc", "disk")
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -112,14 +115,16 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("client.allowedAddrs", flag.Lookup("allowedAddrs"))
 	viper.BindPFlag("client.signingKey", flag.Lookup("signingKey"))
 	viper.BindPFlag("w3.chainType", flag.Lookup("chain"))
+	viper.BindPFlag("w3.lightMode", flag.Lookup("chainLightMode"))
 	viper.BindPFlag("w3.nodePort", flag.Lookup("w3nodePort"))
 	viper.BindPFlag("w3.route", flag.Lookup("w3route"))
 	viper.BindPFlag("w3external", flag.Lookup("w3external"))
-	viper.BindPFlag("ipfs.daemon", flag.Lookup("ipfsDaemon"))
-	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
+	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
+	viper.BindPFlag("cluster.secret", flag.Lookup("ipfsClusterKey"))
+	viper.BindPFlag("cluster.bootstraps", flag.Lookup("ipfsClusterPeers"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -141,46 +146,41 @@ func addKeyFromEncryptedJSON(keyJSON []byte, passphrase string, signKeys *sig.Si
 	return nil
 }
 
-/*
-Example code for using web3 implementation
-
-Testing the RPC can be performed with curl and/or websocat
- curl -X POST -H "Content-Type:application/json" --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":74}' localhost:9091
- echo '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":74}' | websocat ws://127.0.0.1:9092
-*/
 func main() {
 	//setup config
 	globalCfg, err := newConfig()
+	log.Infof("using datadir %s", globalCfg.DataDir)
+	globalCfg.Ipfs.ConfigPath = globalCfg.DataDir + "/ipfs"
+
 	//setup logger
 	log.InitLoggerAtLevel(globalCfg.LogLevel)
 	if err != nil {
 		log.Fatalf("could not load config: %v", err)
 	}
 
-	var node *chain.EthChainContext
-	_ = node
-
-	p := net.NewProxy()
-	p.C.SSLDomain = globalCfg.Ssl.Domain
-	p.C.SSLCertDir = globalCfg.DataDir
-	log.Infof("storing SSL certificate in %s", p.C.SSLCertDir)
-	p.C.Address = globalCfg.ListenHost
-	p.C.Port = globalCfg.ListenPort
-	err = p.Init()
+	pxy := net.NewProxy()
+	pxy.C.SSLDomain = globalCfg.Ssl.Domain
+	pxy.C.SSLCertDir = globalCfg.DataDir
+	log.Infof("storing SSL certificate in %s", pxy.C.SSLCertDir)
+	pxy.C.Address = globalCfg.ListenHost
+	pxy.C.Port = globalCfg.ListenPort
+	err = pxy.Init()
 	if err != nil {
 		log.Warn("letsEncrypt SSL certificate cannot be obtained, probably port 443 is not accessible or domain provided is not correct")
 		log.Info("disabling SSL!")
 		// Probably SSL has failed
-		p.C.SSLDomain = ""
+		pxy.C.SSLDomain = ""
 		globalCfg.Ssl.Domain = ""
-		err = p.Init()
+		err = pxy.Init()
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 	}
 
+	// Signing key
 	var signer *sig.SignKeys
 	signer = new(sig.SignKeys)
+	// Add Authorized keys for private methods
 	if globalCfg.Client.AllowPrivate && globalCfg.Client.AllowedAddrs != "" {
 		keys := strings.Split(globalCfg.Client.AllowedAddrs, ",")
 		for _, key := range keys {
@@ -191,32 +191,31 @@ func main() {
 		}
 	}
 
-	if globalCfg.Client.SigningKey != "" {
-		err := signer.AddHexKey(globalCfg.Client.SigningKey)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-	} else {
-		err := signer.Generate()
-		if err != nil {
-			log.Fatal(err.Error())
-		}
+	// Set Ethereum node context
+	globalCfg.W3.DataDir = globalCfg.DataDir
+	w3cfg, err := chain.NewConfig(globalCfg.W3)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	node, err := chain.Init(w3cfg)
+	if err != nil {
+		log.Panic(err.Error())
 	}
 
-	if globalCfg.Api.Web3Api && globalCfg.W3external == "" {
-		w3cfg, err := chain.NewConfig(globalCfg.W3)
+	// Add signing private key if exist in configuration or flags
+	if globalCfg.Client.SigningKey != "" {
+		log.Infof("adding custom signing key")
+		err := signer.AddHexKey(globalCfg.Client.SigningKey)
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatalf("Fatal error adding hex key: %v", err.Error())
 		}
-		node, err = chain.Init(w3cfg)
-		if err != nil {
-			log.Panic(err.Error())
-		}
-		node.Start()
-		time.Sleep(1 * time.Second)
-		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
-		log.Infof("web3 available at %s", globalCfg.W3.Route)
-
+		pub, _ := signer.HexString()
+		log.Infof("using custom pubKey %s", pub)
+		os.RemoveAll(globalCfg.DataDir + "/.keyStore.tmp")
+		node.Keys = keystore.NewPlaintextKeyStore(globalCfg.DataDir + "/.keyStore.tmp")
+		node.Keys.ImportECDSA(signer.Private, "")
+	} else {
+		// Get stored keys from Ethereum node context
 		acc := node.Keys.Accounts()
 		if len(acc) > 0 {
 			keyJSON, err := node.Keys.Export(acc[0], "", "")
@@ -225,21 +224,33 @@ func main() {
 			}
 			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
 			pub, _ := signer.HexString()
-			log.Infof("added pubKey %s from keystore", pub)
+			log.Infof("using pubKey %s from keystore", pub)
 			if err != nil {
-				log.Fatalf("Error: %v", err)
+				log.Fatalf(err.Error())
 			}
 		}
 	}
 
-	if globalCfg.Api.Web3Api && globalCfg.W3external != "" {
-		u, err := goneturl.Parse(globalCfg.W3external)
+	// Start Ethereum Web3 native node
+	if globalCfg.Api.Web3Api && len(globalCfg.W3external) == 0 {
+		log.Info("starting Ethereum node")
+		node.Start()
+		for i := 0; i < len(node.Keys.Accounts()); i++ {
+			log.Debugf("got ethereum address: %x", node.Keys.Accounts()[i].Address)
+		}
+		time.Sleep(1 * time.Second)
+		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
+		log.Infof("web3 available at %s", globalCfg.W3.Route)
+	}
+
+	if globalCfg.Api.Web3Api && len(globalCfg.W3external) > 0 {
+		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
 			log.Fatalf("cannot parse w3external URL")
 		}
 
-		log.Debugf("%s", fmt.Sprintf("%s", u.String()))
-		p.AddHandler(globalCfg.W3.Route, p.AddEndpoint(u.String()))
+		log.Debugf("testing web3 endpoint %s", url.String())
+		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(url.String()))
 		data, err := json.Marshal(map[string]interface{}{
 			"jsonrpc": "2.0",
 			"method":  "net_peerCount",
@@ -252,41 +263,57 @@ func main() {
 		resp, err := http.Post(globalCfg.W3external,
 			"application/json", strings.NewReader(string(data)))
 		if err != nil {
-			log.Fatal("cannot connect to w3 endpoint")
+			log.Fatal("cannot connect to web3 endpoint")
 		}
 		defer resp.Body.Close()
 		_, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		log.Infof("successfuly connected to w3 endpoint at external url: %s", globalCfg.W3external)
+		log.Infof("successfuly connected to web3 endpoint at external url: %s", globalCfg.W3external)
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
 	}
 
-	listenerOutput := make(chan types.Message)
-
-	if globalCfg.Api.DvoteApi {
-		ws := new(net.WebsocketHandle)
-		ws.Init(new(types.Connection))
-		ws.SetProxy(p)
-		ws.AddProxyHandler(globalCfg.Dvote.Route)
-		log.Infof("ws file api available at %s", globalCfg.Dvote.Route)
-
-		ipfsConfig := data.IPFSNewConfig()
-		ipfsConfig.Start = !globalCfg.Ipfs.NoInit
-		ipfsConfig.Binary = globalCfg.Ipfs.Daemon
-		storage, err := data.InitDefault(data.StorageIDFromString("IPFS"), ipfsConfig)
+	// Storage
+	var storage data.Storage
+	if !globalCfg.Ipfs.NoInit {
+		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
+		ipfsStore.ClusterCfg = globalCfg.Cluster
+		if len(globalCfg.Cluster.Secret) > 0 {
+			if len(globalCfg.Cluster.Secret) > 16 {
+				log.Fatal("ipfsClusterKey too long")
+			}
+			encodedSecret := hex.EncodeToString([]byte(globalCfg.Cluster.Secret))
+			for i := len(encodedSecret); i < 32; i++ {
+				encodedSecret += "0"
+			}
+			ipfsStore.ClusterCfg.Secret = encodedSecret
+			log.Infof("ipfs cluster encoded secret: %s", encodedSecret)
+		}
+		ipfsStore.ClusterCfg.ClusterLogLevel = strings.ToUpper(globalCfg.LogLevel)
+		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 		if err != nil {
 			log.Fatalf(err.Error())
 		}
+	}
+
+	// Dvote API
+	listenerOutput := make(chan types.Message)
+	if globalCfg.Api.DvoteApi {
+		log.Debug("Setting up ipfs")
+		ws := new(net.WebsocketHandle)
+		ws.Init(new(types.Connection))
+		ws.SetProxy(pxy)
+		ws.AddProxyHandler(globalCfg.Dvote.Route)
+		log.Infof("websockets file API available at %s", globalCfg.Dvote.Route)
 
 		go ws.Listen(listenerOutput)
 		router := router.InitRouter(listenerOutput, storage, ws, *signer, globalCfg.Api.DvoteApi)
 		go router.Route()
-
 	}
 
 	for {
 		time.Sleep(1 * time.Second)
 	}
+
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"math/big"
-	"os/user"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -59,21 +58,15 @@ func NewConfig(w3Cfg config.W3Cfg) (*EthChainConfig, error) {
 	cfg.NodePort = w3Cfg.NodePort
 	cfg.NetworkId = chainSpecs.NetworkId
 	cfg.NetworkGenesis, err = base64.StdEncoding.DecodeString(chainSpecs.GenesisB64)
+	cfg.LightMode = w3Cfg.LightMode
 	if err != nil {
 		return nil, err
 	}
 	cfg.BootstrapNodes = chainSpecs.BootNodes
-
-	usr, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-	defaultDirPath := usr.HomeDir + "/.dvote/ethereum"
-
+	defaultDirPath := w3Cfg.DataDir + "/ethereum"
 	cfg.KeyStore = defaultDirPath + "/keystore"
 	cfg.DataDir = defaultDirPath + "/data"
 	cfg.IPCPath = defaultDirPath + "/ipc"
-	cfg.LightMode = false
 	return cfg, nil
 }
 
@@ -115,18 +108,20 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	}
 
 	ethConfig := eth.DefaultConfig
-	ethConfig.NetworkId = uint64(c.NetworkId)
+	if c.NetworkId > 0 {
+		ethConfig.NetworkId = uint64(c.NetworkId)
+		g := new(core.Genesis)
+		err = g.UnmarshalJSON(c.NetworkGenesis)
+		if err != nil {
+			log.Errorf("cannot read genesis")
+			return err
+		}
+		ethConfig.Genesis = g
+	}
 	if c.LightMode {
+		log.Info("using chain light mode synchronization")
 		ethConfig.SyncMode = downloader.LightSync
 	}
-
-	g := new(core.Genesis)
-	err = g.UnmarshalJSON(c.NetworkGenesis)
-	if err != nil {
-		log.Errorf("Cannot read genesis")
-		return err
-	}
-	ethConfig.Genesis = g
 
 	ks := keystore.NewKeyStore(c.KeyStore, keystore.StandardScryptN, keystore.StandardScryptP)
 
@@ -145,14 +140,14 @@ func (e *EthChainContext) Start() {
 	} else {
 		//phrase := getPassPhrase("please provide primary account passphrase", false)
 		e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
-		log.Infof("My Ethereum address %x\n", e.Keys.Accounts()[0].Address)
+		log.Infof("my Ethereum address %x\n", e.Keys.Accounts()[0].Address)
 	}
-	log.Infof("Started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
+	log.Infof("started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
 	if e.DefaultConfig.WSPort > 0 {
-		log.Infof("Web3 WebSockets endpoint ws://%s:%d\n", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
+		log.Infof("web3 WebSockets endpoint ws://%s:%d\n", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
 	}
 	if e.DefaultConfig.HTTPPort > 0 {
-		log.Infof("Web3 HTTP endpoint http://%s:%d\n", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
+		log.Infof("web3 HTTP endpoint http://%s:%d\n", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
 	}
 }
 
@@ -189,7 +184,7 @@ func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
 	}
 	//create ctx
 	err = client.SendTransaction(ctx, signedTx)
-	log.Errorf("Error: %v", err)
+	log.Errorf(err.Error())
 	//fix return*/
 	return err
 }
@@ -199,11 +194,11 @@ func (e *EthChainContext) createAccount() error {
 	_, err := e.Keys.NewAccount("")
 
 	if err != nil {
-		utils.Fatalf("Failed to create account: %v", err)
+		utils.Fatalf("failed to create account: %v", err)
 		return err
 	}
 	e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
-	log.Infof("My Ethereum address %x\n", e.Keys.Accounts()[0].Address)
+	log.Infof("my Ethereum address %x\n", e.Keys.Accounts()[0].Address)
 
 	return nil
 }
@@ -215,15 +210,15 @@ func getPassPhrase(prompt string, confirmation bool) string {
 	}
 	phrase, err := console.Stdin.PromptPassword("Passphrase: ")
 	if err != nil {
-		utils.Fatalf("Failed to read passphrase: %v", err)
+		utils.Fatalf("failed to read passphrase: %v", err)
 	}
 	if confirmation {
-		confirm, err := console.Stdin.PromptPassword("Repeat passphrase: ")
+		confirm, err := console.Stdin.PromptPassword("repeat passphrase: ")
 		if err != nil {
-			utils.Fatalf("Failed to read passphrase confirmation: %v", err)
+			utils.Fatalf("failed to read passphrase confirmation: %v", err)
 		}
 		if phrase != confirm {
-			utils.Fatalf("Passphrases do not match")
+			utils.Fatalf("passphrases do not match")
 		}
 	}
 	return phrase

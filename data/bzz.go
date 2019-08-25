@@ -22,8 +22,8 @@ func (c *BZZConfig) Type() StorageID {
 	return BZZ
 }
 
-func BZZNewConfig() *BZZConfig {
-	cfg := new(BZZConfig)
+func BZZNewConfig() *types.DataStore {
+	cfg := new(types.DataStore)
 	return cfg
 }
 

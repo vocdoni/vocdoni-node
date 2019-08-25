@@ -74,8 +74,11 @@ func fetchFile(uri, requestId string, msg types.Message, storage data.Storage, t
 		response.ID = requestId
 		response.Response.Content = b64content
 		response.Response.Request = requestId
-		response.Response.Timestamp = time.Now().UnixNano()
-		response.Signature = signMsg(response.Response, signer)
+		response.Response.Timestamp = int32(time.Now().Unix())
+		response.Signature, err = signer.SignJSON(response.Response)
+		if err != nil {
+			log.Warn(err.Error())
+		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
 			log.Warnf("error marshaling response body: %s", err)
@@ -127,9 +130,12 @@ func addFile(reqType, requestId string, b64content []byte, msg types.Message, st
 		var response types.AddResponse
 		response.ID = requestId
 		response.Response.Request = requestId
-		response.Response.Timestamp = time.Now().UnixNano()
+		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Response.URI = ipfsRouteBaseURL + cid
-		response.Signature = signMsg(response.Response, signer)
+		response.Signature, err = signer.SignJSON(response.Response)
+		if err != nil {
+			log.Warn(err.Error())
+		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
 			log.Warnf("error marshaling response body: %s", err)
@@ -171,8 +177,11 @@ func pinList(requestId string, msg types.Message, storage data.Storage, transpor
 		response.ID = requestId
 		response.Response.Files = pinsJsonArray
 		response.Response.Request = requestId
-		response.Response.Timestamp = time.Now().UnixNano()
-		response.Signature = signMsg(response.Response, signer)
+		response.Response.Timestamp = int32(time.Now().Unix())
+		response.Signature, err = signer.SignJSON(response.Response)
+		if err != nil {
+			log.Warn(err.Error())
+		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
 			log.Warnf("error marshaling response body: %s", err)
@@ -210,8 +219,11 @@ func pinFile(uri, requestId string, msg types.Message, storage data.Storage, tra
 		response.ID = requestId
 		response.Response.OK = true
 		response.Response.Request = requestId
-		response.Response.Timestamp = time.Now().UnixNano()
-		response.Signature = signMsg(response.Response, signer)
+		response.Response.Timestamp = int32(time.Now().Unix())
+		response.Signature, err = signer.SignJSON(response.Response)
+		if err != nil {
+			log.Warn(err.Error())
+		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
 			log.Warnf("error marshaling response body: %s", err)
@@ -250,8 +262,11 @@ func unPinFile(uri, requestId string, msg types.Message, storage data.Storage, t
 		response.ID = requestId
 		response.Response.OK = true
 		response.Response.Request = requestId
-		response.Response.Timestamp = time.Now().UnixNano()
-		response.Signature = signMsg(response.Response, signer)
+		response.Response.Timestamp = int32(time.Now().Unix())
+		response.Signature, err = signer.SignJSON(response.Response)
+		if err != nil {
+			log.Warn(err.Error())
+		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
 			log.Warnf("error marshaling response body: %s", err)

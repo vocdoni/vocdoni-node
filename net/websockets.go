@@ -69,6 +69,9 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 				conn.Close()
 			}
 		}
+		writer.Header().Set("Access-Control-Allow-Origin", "*")
+		writer.Header().Set("Access-Control-Allow-Methods", "POST, GET")
+		writer.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token")
 	}
 	w.p.AddHandler(path, upgradeConn)
 
@@ -106,7 +109,7 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 				conn.Close()
 			} else {
 				msg.Data = []byte(payload)
-				msg.TimeStamp = time.Now()
+				msg.TimeStamp = int32(time.Now().Unix())
 				ctx := new(types.WebsocketContext)
 				ctx.Conn = &conn
 				msg.Context = ctx

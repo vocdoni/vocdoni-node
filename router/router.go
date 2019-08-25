@@ -25,22 +25,9 @@ func buildFailReply(requestId, message string) []byte {
 	return rawResponse
 }
 
-func signMsg(message interface{}, signer signature.SignKeys) string {
-	rawMsg, err := json.Marshal(message)
-	if err != nil {
-		log.Warnf("unable to marshal message to sign: %s", err)
-	}
-	sig, err := signer.Sign(string(rawMsg))
-	if err != nil {
-		sig = "0x00"
-		log.Warnf("error signing response body: %s", err)
-	}
-	return sig
-}
-
 func buildReply(msg types.Message, data []byte) types.Message {
 	reply := new(types.Message)
-	reply.TimeStamp = time.Now()
+	reply.TimeStamp = int32(time.Now().Unix())
 	reply.Context = msg.Context
 	reply.Data = data
 	return *reply
