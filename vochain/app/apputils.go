@@ -2,6 +2,7 @@ package vochain
 
 import (
 	codec "github.com/cosmos/cosmos-sdk/codec"
+	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
@@ -32,4 +33,10 @@ func SplitAndCheckTxBytes(content []byte) (voctypes.ValidTx, error) {
 	vt.Args = args
 
 	return vt, nil
+}
+
+func VerifyAgainstOracles(oracles []eth.Address, message, signature string) bool {
+	for c, k := range oracles {
+
+	}
 }

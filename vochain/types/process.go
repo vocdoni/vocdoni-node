@@ -20,11 +20,24 @@ type Process struct {
 	// CurrentState is the current process state
 	CurrentState CurrentProcessState `json:"currentstate"`
 	// EncryptionKeys are the keys required to encrypt the votes
-	EncryptionKeys string `json:"encryptionkeys"`
+	EncryptionKeys []string `json:"encryptionkeys"`
 }
 
-func (p Process) String() string {
-	return fmt.Sprintf(`{ "entityId": %v, "votes": %v,  "mkRoot": %v, "initBlock": %v, "encryptionKeys": %v, "currentState": %v }`, p.EntityID, p.Votes["0"], p.MkRoot, p.InitBlock, p.EncryptionKeys, p.CurrentState)
+func (p *Process) String() string {
+	return fmt.Sprintf(`{ 
+		"entityId": %v,
+		"votes": %v,
+		"mkRoot": %v,
+		"initBlock": %v,
+		"encryptionKeys": %v,
+		"currentState": %v }`,
+		p.EntityID,
+		p.Votes,
+		p.MkRoot,
+		p.InitBlock,
+		p.EncryptionKeys,
+		p.CurrentState,
+	)
 }
 
 // NewProcess returns a new Process instance
@@ -49,8 +62,8 @@ const (
 )
 
 // String returns the CurrentProcessState as string
-func (c CurrentProcessState) String() string {
-	switch c {
+func (c *CurrentProcessState) String() string {
+	switch *c {
 	// scheduled
 	case 0:
 		return fmt.Sprintf("%s", "scheduled")

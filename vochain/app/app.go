@@ -4,12 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	abci "github.com/tendermint/tendermint/abci/types"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tmtypes "github.com/tendermint/tendermint/types"
 	dbm "github.com/tendermint/tm-db"
+	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
@@ -114,6 +115,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		// check if process exists
 		if _, ok := app.deliverTxState.Processes[npta.MkRoot]; !ok {
 			// if not create new
+
 			app.deliverTxState.Processes[npta.MkRoot] = &voctypes.Process{
 				EntityID:       npta.EntityID,
 				Votes:          make(map[string]*voctypes.Vote, 0),
@@ -144,6 +146,40 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		} else {
 			vlog.Info("Process does not exist")
 		}
+	case "addTrustedOracleTx":
+		atot := tx.Args.(voctypes.AddTrustedOracleTxArgs)
+		found := false
+		for _, t := range app.deliverTxState.TrustedOraclesPubK {
+			if reflect.DeepEqual(t, atot.Address) {
+				found = true
+			}
+		}
+		if !found {
+			app.deliverTxState.TrustedOraclesPubK = append(app.deliverTxState.TrustedOraclesPubK, atot.Address)
+		} else {
+			vlog.Info("Trusted oracle is already added")
+		}
+	case "removeTrustedOracleTx":
+		rtot := tx.Args.(voctypes.RemoveTrustedOracleTxArgs)
+		found := false
+		position := -1
+		for pos, t := range app.deliverTxState.TrustedOraclesPubK {
+			if reflect.DeepEqual(t, rtot.Address) {
+				found = true
+				position = pos
+			}
+		}
+		if found {
+			app.deliverTxState.TrustedOraclesPubK[len(app.deliverTxState.TrustedOraclesPubK)-1] = app.deliverTxState.TrustedOraclesPubK[position]
+			app.deliverTxState.TrustedOraclesPubK[position] = app.deliverTxState.TrustedOraclesPubK[len(app.deliverTxState.TrustedOraclesPubK)-1]
+			app.deliverTxState.TrustedOraclesPubK = app.deliverTxState.TrustedOraclesPubK[:len(app.deliverTxState.TrustedOraclesPubK)-1]
+		} else {
+			vlog.Info("Trusted oracle not present in list, can not be removed")
+		}
+	case "addValidatorTx":
+
+	case "removeValidatorTx":
+
 	}
 
 	// marshall processes
@@ -223,7 +259,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 
 	// load validators public keys from db
-	var valk []tmtypes.Address
+	var valk []abcitypes.ValidatorUpdate
 	validatorBytes := app.db.Get(validatorsPubKKey)
 	if len(validatorBytes) != 0 {
 		err := json.Unmarshal(validatorBytes, &valk)
@@ -234,7 +270,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 
 	// load trusted oracles public keys from db
-	var orlk []tmtypes.Address
+	var orlk []eth.Address
 	oraclesBytes := app.db.Get(trustedOraclesPubKKey)
 	if len(oraclesBytes) != 0 {
 		err := json.Unmarshal(oraclesBytes, &orlk)
@@ -289,7 +325,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	}
 
 	// load validators public keys from db
-	var valk []tmtypes.Address
+	var valk []abcitypes.ValidatorUpdate
 	validatorBytes := app.db.Get(validatorsPubKKey)
 	if len(validatorBytes) != 0 {
 		err := json.Unmarshal(validatorBytes, &valk)
@@ -300,7 +336,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	}
 
 	// load trusted oracles public keys from db
-	var orlk []tmtypes.Address
+	var orlk []eth.Address
 	oraclesBytes := app.db.Get(trustedOraclesPubKKey)
 	if len(oraclesBytes) != 0 {
 		err := json.Unmarshal(oraclesBytes, &orlk)

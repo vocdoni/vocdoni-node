@@ -5,6 +5,7 @@ import (
 	hex "encoding/hex"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -27,6 +28,20 @@ type SignKeys struct {
 
 // Address is an Ethereum like adrress
 type Address [AddressLength]byte
+
+// AddressFromString gets an string and creates and address with each element
+func AddressFromString(s string) (Address, error) {
+	var a Address
+	// check if string represents a valid address
+	re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
+	if re.MatchString(s) {
+		for c, e := range s {
+			a[c] = byte(e)
+		}
+		return a, nil
+	}
+	return a, errors.New("String is not valid")
+}
 
 // Generate generates new keys
 func (k *SignKeys) Generate() error {
