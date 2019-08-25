@@ -17,11 +17,18 @@ type GWCfg struct {
 	Dvote struct {
 		Host  string
 		Port  int
-		Route string
 	}
 	Api struct {
-		DvoteApi bool
-		Web3Api  bool
+		Route string
+		File struct {
+			Enabled bool
+		}
+		Census struct {
+			Enabled bool
+		}
+		Vote struct {
+			Enabled bool
+		}
 	}
 	Client struct {
 		AllowPrivate bool
@@ -54,6 +61,7 @@ type PssCfg struct {
 
 //W3Cfg stores global configs for web3
 type W3Cfg struct {
+	Enabled bool
 	ChainType string
 	LightMode bool
 	WsHost    string
@@ -68,12 +76,12 @@ type W3Cfg struct {
 
 //CensusCfg stores global configs for censushttp
 type CensusCfg struct {
-	LogLevel   string
-	Namespaces []string
-	Port       int
-	SignKey    string
-	DataDir    string
-	SslDomain  string
+	LogLevel  string
+	Port      int
+	SignKey   string
+	DataDir   string
+	SslDomain string
+	RootKey   string
 }
 
 //RelayCfg stores global configs for relay
@@ -104,4 +112,11 @@ type ClusterCfg struct {
 	PeerID          peer.ID
 	Private         crypto.PrivKey
 	ClusterLogLevel string
+}
+
+type ClusterTestCfg struct {
+	LogLevel    string
+	Targets     []string
+	Interval    int
+	PkgSize 	int
 }

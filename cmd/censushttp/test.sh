@@ -1,31 +1,72 @@
 #!/bin/bash
 
 C="JonSnow-$RANDOM"
+#PUB="0347f650ea2adee1affe2fe81ee8e11c637d506da98dc16e74fc64ecb31e1bb2c1"
+PUB=""
+SIG="000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 
+addCensus() {
+echo "addCensus"
+curl -s http://localhost:1500 -d '{
+"id":"req-'$RANDOM'",
+"signature":"'$SIG'",
+"request":{
+	"timestamp":'$(date +%s)',
+	"method":"addCensus",
+	"censusId":"GoT_Favorite",
+	"pubKeys":["'$PUB'"]}}' | jq .
+}
+
+addClaim() {
 echo "addClaim"
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"addClaim",
 	"censusId":"GoT_Favorite",
 	"claimData":"'$C'"}}' | jq .
+}
 
-echo "addClaim"
+addClaimBulk() {
+echo "addClaimBulk"
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
-	"method":"addClaim",
+	"method":"addClaimBulk",
 	"censusId":"GoT_Favorite",
-	"claimData":"Tyrion '$RANDOM'"}}' | jq .
+	"claimsData": ["Tyrion-'$RANDOM'","Arya-'$RANDOM'","Jaime-'$RANDOM'","Bran-'$RANDOM'"]}}' | jq .
+}
 
+fill() {
+claims="["
+i=0
+while [ $i -lt 99 ]; do
+	c=$(echo $RANDOM$RANDOM$RANDOM$RANDOM | sha256sum -z | awk '{print $1}')
+	claims="${claims}\"${c::-2}\","
+	i=$(($i+1))
+done
+c=$(echo $RANDOM$RANDOM$RANDOM$RANDOM | sha256sum -z | awk '{print $1}')
+claims="${claims}\"${c::-2}\"]"
+
+curl -s http://localhost:1500 -d '{
+"id":"req-'$RANDOM'",
+"signature":"'$SIG'",
+"request":{
+	"timestamp":'$(date +%s)',
+	"method":"addClaimBulk",
+	"censusId":"GoT_Favorite",
+	"claimsData":'$claims'}}' | jq .
+}
+
+checkProof() {
 echo "genProof"
 proof=$(curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"genProof",
@@ -36,31 +77,71 @@ echo $proof
 echo "checkProof"
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"checkProof",
 	"censusId":"GoT_Favorite",
 	"claimData":"'$C'",
 	"proofData":'$proof'}}' | jq .
+}
 
+getRoot() {
 echo "getRoot"
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"getRoot",
 	"censusId":"GoT_Favorite"}}' | jq .
+}
 
-echo "dump"
+dump() {
 curl -s http://localhost:1500 -d '{
 "id":"req-'$RANDOM'",
-"signature":"0x0",
+"signature":"'$SIG'",
 "request":{
 	"timestamp":'$(date +%s)',
 	"method":"dump",
+	"censusId":"GoT_Favorite"}}' | jq .request.claimsData | tr -d '\n' | tr -d ' '
+}
+
+dumpPlain() {
+echo "dumpPlain"
+curl -s http://localhost:1500 -d '{
+"id":"req-'$RANDOM'",
+"signature":"'$SIG'",
+"request":{
+	"timestamp":'$(date +%s)',
+	"method":"dumpPlain",
 	"censusId":"GoT_Favorite"}}' | jq .
+}
+
+function import() {
+echo "import claims from $1"
+claims="$(cat $1)"
+curl -s http://localhost:1500 -d '{
+"id":"req-'$RANDOM'",
+"signature":"'$SIG'",
+"request":{
+	"timestamp":'$(date +%s)',
+	"method":"importDump",
+	"claimsData":'$claims',
+	"censusId":"GoT_Favorite"}}' | jq .
+}
+
+[ -z "$1" -o "$1" == "all" ] && {
+addCensus
+addClaim
+checkProof
+getRoot
+dump
+dumpPlain
+exit
+}
+
+$@
 
 #curl -d '{
 #"method":"addClaim",

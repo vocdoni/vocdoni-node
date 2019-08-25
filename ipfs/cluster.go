@@ -115,7 +115,7 @@ func InitCluster(path, configFile, idFile string, c config.ClusterCfg) error {
 }
 
 // Runs the cluster
-func RunCluster(c config.ClusterCfg) error {
+func RunCluster(c config.ClusterCfg, ch chan *ipfscluster.Cluster) (error) {
 	/*
 		currUser, err := user.Current()
 		if err != nil {
@@ -165,7 +165,9 @@ func RunCluster(c config.ClusterCfg) error {
 
 	log.Infof("Creating cluster with key: %s", hex.EncodeToString(cfgs.clusterCfg.Secret))
 	cluster, err := createCluster(ctx, &c, host, pubsub, dht, ident, cfgs, raftStaging)
+	ch <- cluster
 	checkErr("starting cluster", err)
+	log.Debug("created cluster")
 
 	// noop if no bootstraps
 	// if bootstrapping fails, consensus will never be ready

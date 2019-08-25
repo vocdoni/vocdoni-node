@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"os"
 	"os/user"
-	"strings"
 	"time"
 
 	flag "github.com/spf13/pflag"
@@ -15,7 +14,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
-	censusmanager "gitlab.com/vocdoni/go-dvote/service/census"
+	censusmanager "gitlab.com/vocdoni/go-dvote/census"
 )
 
 func newConfig() (config.CensusCfg, error) {
@@ -30,10 +29,10 @@ func newConfig() (config.CensusCfg, error) {
 	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for censushttp config")
 	flag.String("logLevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 	flag.Int("port", 8080, "HTTP port to listen")
-	flag.String("namespaces", "", "Namespace and/or allowed public keys, syntax is <namespace>[:pubKey],[<namespace>[:pubKey]],...")
 	flag.String("signKey", "", "Private key for signing API response messages (ECDSA)")
 	flag.String("sslDomain", "", "Enables HTTPs using a LetsEncrypt certificate")
 	flag.String("dataDir", defaultDirPath, "Use a custom dir for storing the run time data")
+	flag.String("rootKey", "", "Public ECDSA key allowed to create new Census")
 
 	viper := viper.New()
 	viper.SetDefault("logLevel", "info")
@@ -57,10 +56,10 @@ func newConfig() (config.CensusCfg, error) {
 
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("port", flag.Lookup("port"))
-	viper.BindPFlag("namespaces", flag.Lookup("namespaces"))
 	viper.BindPFlag("signKey", flag.Lookup("signKey"))
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("sslDomain", flag.Lookup("sslDomain"))
+	viper.BindPFlag("rootKey", flag.Lookup("rootKey"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -106,16 +105,13 @@ func main() {
 		pub, priv := signer.HexString()
 		log.Infof("Public: %s Private: %s", pub, priv)
 	}
-
-	for i := 0; i < len(globalCfg.Namespaces); i++ {
-		s := strings.Split(globalCfg.Namespaces[i], ":")
-		ns := s[0]
-		pubK := ""
-		if len(s) > 1 {
-			pubK = s[1]
-			log.Infof("public Key authentication enabled on namespace %s", ns)
-		}
-		censusmanager.AddNamespace(ns, pubK)
+	var cm censusmanager.CensusManager
+	err = cm.Init(globalCfg.DataDir, globalCfg.RootKey)
+	if err != nil {
+		log.Fatalf("cannot initialize census manager: %s", err.Error())
+	}
+	for i := 0; i < len(cm.Census.Namespaces); i++ {
+		log.Infof("loaded namespace %s", cm.Census.Namespaces[i].Name)
 	}
 
 	pxy := net.NewProxy()
@@ -140,7 +136,7 @@ func main() {
 	pxy.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
 		addCorsHeaders(&w, r)
 		if r.Method == http.MethodPost {
-			censusmanager.HTTPhandler(w, r, signer)
+			cm.HTTPhandler(w, r, signer)
 		} else if r.Method != http.MethodOptions {
 			http.Error(w, "Not found", http.StatusNotFound)
 		}

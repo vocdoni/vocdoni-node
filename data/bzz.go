@@ -38,6 +38,10 @@ func (b *BZZHandle) Init(d *types.DataStore) error {
 	return nil
 }
 
+func (b *BZZHandle) GetURIprefix() string {
+	return "bzz://"
+}
+
 func (b *BZZHandle) Publish(object []byte) (string, error) {
 	hash, err := b.s.Client.UploadRaw(bytes.NewReader(object), int64(len(object)), false)
 	if err != nil {

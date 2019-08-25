@@ -21,6 +21,7 @@ import (
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/ipfs"
+	ipfscluster "github.com/ipfs/ipfs-cluster"
 
 	"net/http"
 	_ "net/http/pprof"
@@ -35,6 +36,7 @@ const programName = `dvote-ipfs-test`
 type IPFSHandle struct {
 	nd      *ipfscore.IpfsNode
 	coreAPI coreiface.CoreAPI
+	cluster *ipfscluster.Cluster
 }
 
 func main() {
@@ -98,7 +100,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error initializing ipfs cluster: %v", err)
 	}
-	go ipfs.RunCluster(*clusterConfig)
+	ch := make(chan *ipfscluster.Cluster)
+	go ipfs.RunCluster(*clusterConfig, ch)
+	cluster := <-ch
+	ipfsHandler.cluster = cluster
 
 	ticker := time.NewTicker(time.Second * time.Duration(10))
 	signalChan := make(chan os.Signal, 10)

@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/data"
@@ -36,11 +37,13 @@ func newConfig() (config.GWCfg, error) {
 	}
 	userDir := usr.HomeDir + "/.dvote"
 	path := flag.String("cfgpath", userDir+"/config.yaml", "filepath for custom gateway config")
-	flag.Bool("dvoteApi", true, "enable dvote API")
+	flag.Bool("fileApi", true, "enable file API")
+	flag.Bool("censusApi", true, "enable census API")
+	flag.Bool("voteApi", true, "enable vote API")
 	flag.Bool("web3Api", true, "enable web3 API")
-	flag.String("listenHost", "0.0.0.0", "http host endpoint")
-	flag.Int("listenPort", 9090, "http port endpoint")
-	flag.String("dvoteRoute", "/dvote", "dvote endpoint API route")
+	flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
+	flag.Int("listenPort", 9090, "API endpoint http port")
+	flag.String("apiRoute", "/dvote", "dvote API route")
 	flag.Bool("allowPrivate", false, "allows private methods over the APIs")
 	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	flag.String("signingKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
@@ -55,18 +58,21 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
+	flag.String("clusterLogLevel", "ERROR", "Log level for ipfs cluster (debug, info, warning, error)")
 
 	flag.Parse()
 
 	viper := viper.New()
-	viper.SetDefault("api.dvoteApi", true)
-	viper.SetDefault("api.web3Api", true)
 	viper.SetDefault("listenHost", "0.0.0.0")
 	viper.SetDefault("listenPort", 9090)
-	viper.SetDefault("dvote.route", "/dvote")
+	viper.SetDefault("api.file.enabled", true)
+	viper.SetDefault("api.census.enabled", true)
+	viper.SetDefault("api.vote.enabled", true)
+	viper.SetDefault("api.route", "/dvote")
 	viper.SetDefault("client.allowPrivate", false)
 	viper.SetDefault("client.allowedAddrs", "")
 	viper.SetDefault("client.signingKey", "")
+	viper.SetDefault("w3.enabled", true)
 	viper.SetDefault("w3.chainType", "goerli")
 	viper.SetDefault("w3.lightMode", false)
 	viper.SetDefault("w3.nodePort", 32000)
@@ -87,6 +93,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("cluster.pintracker", "map")
 	viper.SetDefault("cluster.leave", true)
 	viper.SetDefault("cluster.alloc", "disk")
+	viper.SetDefault("cluster.clusterLogLevel", "ERROR")
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -106,14 +113,16 @@ func newConfig() (config.GWCfg, error) {
 
 	//bind flags after writing default config so flag use
 	//does not write config on first program run
-	viper.BindPFlag("api.dvoteApi", flag.Lookup("dvoteApi"))
-	viper.BindPFlag("api.web3Api", flag.Lookup("web3Api"))
+	viper.BindPFlag("api.file.enabled", flag.Lookup("fileApi"))
+	viper.BindPFlag("api.census.enabled", flag.Lookup("censusApi"))
+	viper.BindPFlag("api.vote.enabled", flag.Lookup("voteApi"))
+	viper.BindPFlag("api.route", flag.Lookup("apiRoute"))
 	viper.BindPFlag("listenHost", flag.Lookup("listenHost"))
 	viper.BindPFlag("listenPort", flag.Lookup("listenPort"))
-	viper.BindPFlag("dvote.route", flag.Lookup("dvoteRoute"))
 	viper.BindPFlag("client.allowPrivate", flag.Lookup("allowPrivate"))
 	viper.BindPFlag("client.allowedAddrs", flag.Lookup("allowedAddrs"))
 	viper.BindPFlag("client.signingKey", flag.Lookup("signingKey"))
+	viper.BindPFlag("w3.enabled", flag.Lookup("web3Api"))
 	viper.BindPFlag("w3.chainType", flag.Lookup("chain"))
 	viper.BindPFlag("w3.lightMode", flag.Lookup("chainLightMode"))
 	viper.BindPFlag("w3.nodePort", flag.Lookup("w3nodePort"))
@@ -125,6 +134,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("cluster.secret", flag.Lookup("ipfsClusterKey"))
 	viper.BindPFlag("cluster.bootstraps", flag.Lookup("ipfsClusterPeers"))
+	viper.BindPFlag("cluster.clusterloglevel", flag.Lookup("clusterLogLevel"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -158,6 +168,7 @@ func main() {
 		log.Fatalf("could not load config: %v", err)
 	}
 
+	//setup listener
 	pxy := net.NewProxy()
 	pxy.C.SSLDomain = globalCfg.Ssl.Domain
 	pxy.C.SSLCertDir = globalCfg.DataDir
@@ -232,7 +243,7 @@ func main() {
 	}
 
 	// Start Ethereum Web3 native node
-	if globalCfg.Api.Web3Api && len(globalCfg.W3external) == 0 {
+	if globalCfg.W3.Enabled && len(globalCfg.W3external) == 0 {
 		log.Info("starting Ethereum node")
 		node.Start()
 		for i := 0; i < len(node.Keys.Accounts()); i++ {
@@ -243,7 +254,7 @@ func main() {
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
 	}
 
-	if globalCfg.Api.Web3Api && len(globalCfg.W3external) > 0 {
+	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
 		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
 			log.Fatalf("cannot parse w3external URL")
@@ -290,30 +301,50 @@ func main() {
 			ipfsStore.ClusterCfg.Secret = encodedSecret
 			log.Infof("ipfs cluster encoded secret: %s", encodedSecret)
 		}
-		ipfsStore.ClusterCfg.ClusterLogLevel = strings.ToUpper(globalCfg.LogLevel)
 		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 		if err != nil {
-			log.Fatalf(err.Error())
+			log.Fatal(err.Error())
 		}
 	}
 
+	var censusManager census.CensusManager
+
+	if globalCfg.Api.Census.Enabled {
+		log.Info("starting census manager")
+		if _, err := os.Stat(globalCfg.DataDir + "/census"); os.IsNotExist(err) {
+			err = os.MkdirAll(globalCfg.DataDir+"/census", os.ModePerm)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+		}
+		censusManager.Init(globalCfg.DataDir+"/census", "")
+	}
+
+	// API Initialization
 	// Dvote API
-	listenerOutput := make(chan types.Message)
-	if globalCfg.Api.DvoteApi {
-		log.Debug("Setting up ipfs")
+	if globalCfg.Api.File.Enabled || globalCfg.Api.Census.Enabled || globalCfg.Api.Vote.Enabled {
 		ws := new(net.WebsocketHandle)
 		ws.Init(new(types.Connection))
 		ws.SetProxy(pxy)
-		ws.AddProxyHandler(globalCfg.Dvote.Route)
-		log.Infof("websockets file API available at %s", globalCfg.Dvote.Route)
 
+		listenerOutput := make(chan types.Message)
 		go ws.Listen(listenerOutput)
-		router := router.InitRouter(listenerOutput, storage, ws, *signer, globalCfg.Api.DvoteApi)
-		go router.Route()
+
+		routerApi := router.InitRouter(listenerOutput, storage, ws, *signer)
+		if globalCfg.Api.File.Enabled {
+			routerApi.EnableFileAPI()
+		}
+		if globalCfg.Api.Census.Enabled {
+			routerApi.EnableCensusAPI(&censusManager)
+		}
+
+		go routerApi.Route()
+		log.Debug("Setting up API router")
+		ws.AddProxyHandler(globalCfg.Api.Route)
+		log.Infof("websockets API available at %s", globalCfg.Api.Route)
 	}
 
 	for {
 		time.Sleep(1 * time.Second)
 	}
-
 }

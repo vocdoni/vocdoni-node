@@ -3,13 +3,12 @@ package tree
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"os/user"
 
-	common3 "github.com/iden3/go-iden3/common"
-	mkcore "github.com/iden3/go-iden3/core"
-	db "github.com/iden3/go-iden3/db"
-	merkletree "github.com/iden3/go-iden3/merkletree"
+	common3 "github.com/iden3/go-iden3-core/common"
+	mkcore "github.com/iden3/go-iden3-core/core"
+	db "github.com/iden3/go-iden3-core/db"
+	merkletree "github.com/iden3/go-iden3-core/merkletree"
 )
 
 type Tree struct {
@@ -18,6 +17,8 @@ type Tree struct {
 	DbStorage *db.LevelDbStorage
 }
 
+const maxClaimSize = 62
+
 func (t *Tree) Init(namespace string) error {
 	if len(t.Storage) < 1 {
 		if len(namespace) < 1 {
@@ -25,12 +26,12 @@ func (t *Tree) Init(namespace string) error {
 		}
 		usr, err := user.Current()
 		if err == nil {
-			t.Storage = usr.HomeDir + "/.dvote/census/" + namespace
+			t.Storage = usr.HomeDir + "/.dvote/census"
 		} else {
-			t.Storage = "./dvoteTree/" + namespace
+			t.Storage = "./dvoteTree"
 		}
 	}
-	mtdb, err := db.NewLevelDbStorage(t.Storage, false)
+	mtdb, err := db.NewLevelDbStorage(t.Storage+"/"+namespace, false)
 	if err != nil {
 		return err
 	}
@@ -48,16 +49,16 @@ func (t *Tree) Close() {
 }
 
 func (t *Tree) GetClaim(data []byte) (*mkcore.ClaimBasic, error) {
-	if len(data) > 496/8 {
+	if len(data) > maxClaimSize {
 		return nil, errors.New("claim data too large")
 	}
-	for i := len(data); i <= 496/8; i++ {
+	for i := len(data); i <= maxClaimSize; i++ {
 		data = append(data, '\x00')
 	}
 	var indexSlot [400 / 8]byte
-	var dataSlot [496 / 8]byte
+	var dataSlot [maxClaimSize]byte
 	copy(indexSlot[:], data[:400/8])
-	copy(dataSlot[:], data[:496/8])
+	copy(dataSlot[:], data[:maxClaimSize])
 	e := mkcore.NewClaimBasic(indexSlot, dataSlot)
 	return e, nil
 }
@@ -113,27 +114,60 @@ func (t *Tree) GetIndex(data []byte) (string, error) {
 	return index.String(), err
 }
 
-func (t *Tree) Dump() ([]string, error) {
+func stringToHash(hash string) (merkletree.Hash, error) {
+	var rootHash merkletree.Hash
+	rootBytes, err := common3.HexDecode(hash)
+	copy(rootHash[:32], rootBytes)
+	return rootHash, err
+}
+
+func (t *Tree) Dump(root string) (claims []string, err error) {
+	var rootHash merkletree.Hash
+	if len(root) > 0 {
+		rootHash, err = stringToHash(root)
+		if err != nil {
+			return
+		}
+	}
+	claims, err = t.Tree.DumpClaims(&rootHash)
+	return
+}
+
+func (t *Tree) DumpPlain(root string) ([]string, error) {
 	var response []string
-	err := t.Tree.Walk(nil, func(n *merkletree.Node) {
+	var err error
+	var rootHash *merkletree.Hash
+	if len(root) > 0 {
+		*rootHash, err = stringToHash(root)
+		if err != nil {
+			return response, err
+		}
+	}
+	err = t.Tree.Walk(rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
 			data := bytes.Trim(n.Value()[65:], "\x00")
 			data = bytes.Replace(data, []byte("\u0000"), nil, -1)
-			response = append(response, fmt.Sprintf("%s", data))
+			response = append(response, string(data))
 		}
 	})
 	return response, err
 }
 
+func (t *Tree) ImportDump(claims []string) error {
+	return t.Tree.ImportDumpedClaims(claims)
+}
+
 func (t *Tree) Snapshot(root string) (*Tree, error) {
-	var rootHash merkletree.Hash
+	var rootHash *merkletree.Hash
 	snapshotTree := new(Tree)
-	rootBytes, err := common3.HexDecode(root)
-	if err != nil {
-		return snapshotTree, err
+	var err error
+	if len(root) > 0 {
+		*rootHash, err = stringToHash(root)
+		if err != nil {
+			return snapshotTree, err
+		}
 	}
-	copy(rootHash[:32], rootBytes)
-	mt, err := t.Tree.Snapshot(&rootHash)
+	mt, err := t.Tree.Snapshot(rootHash)
 	snapshotTree.Tree = mt
 	return snapshotTree, err
 }
