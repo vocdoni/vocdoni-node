@@ -165,8 +165,8 @@ func (cm *CensusManager) CheckAuth(crm *types.CensusRequestMessage) error {
 
 	// Check timestamp
 	currentTime := int32(time.Now().Unix())
-	if crm.Request.TimeStamp > currentTime+cm.AuthWindow ||
-		crm.Request.TimeStamp < currentTime-cm.AuthWindow {
+	if crm.Request.Timestamp > currentTime+cm.AuthWindow ||
+		crm.Request.Timestamp < currentTime-cm.AuthWindow {
 		return errors.New("timestamp is not valid")
 	}
 
@@ -250,7 +250,7 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 	log.Infof("processing data %+v", *r)
 	resp.Ok = true
 	resp.Error = ""
-	resp.TimeStamp = int32(time.Now().Unix())
+	resp.Timestamp = int32(time.Now().Unix())
 
 	if op == "addCensus" {
 		if isAuth {

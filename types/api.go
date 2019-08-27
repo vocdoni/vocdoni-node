@@ -121,6 +121,7 @@ type ErrorResponse struct {
 }
 
 //FailBody holds a fail message to be sent from the router
+/*
 type FailBody struct {
 	ID    string `json:"id"`
 	Error struct {
@@ -130,6 +131,7 @@ type FailBody struct {
 	} `json:"error"`
 	Signature string `json:"signature"`
 }
+*/
 
 // CensusRequestMessage represents a census manager JSON request package
 type CensusRequestMessage struct {
@@ -147,7 +149,7 @@ type CensusRequest struct {
 	ClaimsData []string `json:"claimsData,omitempty"` // Multiple Data to add to the MerkleTree
 	ProofData  string   `json:"proofData,omitempty"`  // MerkleProof to check
 	PubKeys    []string `json:"pubKeys,omitempty"`    // Public key managers for creating a new census
-	TimeStamp  int32    `json:"timestamp"`            // Unix TimeStamp in seconds
+	Timestamp  int32    `json:"timestamp"`            // Unix TimeStamp in seconds
 	CensusURI  string   `json:"censusUri,omitempty"`  // Census Service URI for proxy messages
 	URI        string   `json:"uri,omitempty"`        // URI of a census to import/export
 }
@@ -169,7 +171,7 @@ type CensusResponse struct {
 	Request   string    `json:"request"`
 	Root       string   `json:"root,omitempty"`
 	Siblings   string   `json:"siblings,omitempty"`
-	TimeStamp  int32    `json:"timestamp"`
+	Timestamp  int32    `json:"timestamp"`
 	URI        string   `json:"uri,omitempty"`
 	ValidProof bool     `json:"validProof,omitempty"`
 }

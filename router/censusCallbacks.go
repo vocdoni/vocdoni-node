@@ -29,8 +29,12 @@ func censusLocalMethod(msg types.Message, rawRequest []byte, router *Router) {
 func censusLocal(msg types.Message, crm *types.CensusRequestMessage, router *Router, auth bool, addr string) {
 	var response types.CensusResponseMessage
 	var err error
-	log.Debugf("clien authorization %t. Recovered address is %s", auth, addr)
+	log.Debugf("client authorization %t. Recovered address is %s", auth, addr)
 	cresponse := router.census.Handler(&crm.Request, auth, addr+"/")
+	if cresponse.Ok != true {
+		sendError(router.transport, router.signer, msg, crm.ID, cresponse.Error)
+		return
+	}
 	response.Response = *cresponse
 	response.ID = crm.ID
 	response.Response.Request = crm.ID
@@ -61,6 +65,7 @@ func censusProxyMethod(msg types.Message, rawRequest []byte, router *Router) {
 }
 
 // Strips CensusURI and forwards to census service, send reply back to client
+// This is unlikely to return correctly formatted errors at present
 func censusProxy(msg types.Message, censusRequestMessage types.CensusRequestMessage, router *Router) {
 	censusURI, err := url.Parse(censusRequestMessage.Request.CensusURI)
 	if err != nil {
