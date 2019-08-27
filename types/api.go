@@ -160,17 +160,18 @@ type CensusResponseMessage struct {
 }
 
 // CensusResponse represents a JSON object with the response of the requested method
+// Inner fields must be represented in alphabetic order
 type CensusResponse struct {
+	CensusID   string   `json:"censusId,omitempty"`
+	ClaimsData []string `json:"claimsData,omitempty"`
+	Error      string   `json:"error,omitempty"`
 	Ok         bool     `json:"ok"`
 	Request   string    `json:"request"`
-	Error      string   `json:"error,omitempty"`
 	Root       string   `json:"root,omitempty"`
-	CensusID   string   `json:"censusId,omitempty"`
-	URI        string   `json:"uri,omitempty"`
 	Siblings   string   `json:"siblings,omitempty"`
-	ValidProof bool     `json:"validProof,omitempty"`
-	ClaimsData []string `json:"claimsData,omitempty"`
 	TimeStamp  int32    `json:"timestamp"`
+	URI        string   `json:"uri,omitempty"`
+	ValidProof bool     `json:"validProof,omitempty"`
 }
 
 // CensusDump represents a Dump of the census. Used for publishing on IPFS/Swarm filesystems.
