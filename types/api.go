@@ -113,8 +113,8 @@ type BoolResponse struct {
 type ErrorResponse struct {
 	ID    string `json:"id"`
 	Error struct {
-		Request   string `json:"request"`
 		Message   string `json:"message"`
+		Request   string `json:"request"`
 		Timestamp int32  `json:"timestamp"`
 	} `json:"error"`
 	Signature string `json:"signature"`
