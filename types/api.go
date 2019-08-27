@@ -155,14 +155,14 @@ type CensusRequest struct {
 // CensusResponseMessage represents a census manager JSON response package
 type CensusResponseMessage struct {
 	ID        string         `json:"id"`
-	Response  CensusResponse `json:"request"`
+	Response  CensusResponse `json:"response"`
 	Signature string         `json:"signature"`
 }
 
 // CensusResponse represents a JSON object with the response of the requested method
 type CensusResponse struct {
 	Ok         bool     `json:"ok"`
-	Request    string   `json:"request"`
+	Request   string    `json:"request"`
 	Error      string   `json:"error,omitempty"`
 	Root       string   `json:"root,omitempty"`
 	CensusID   string   `json:"censusId,omitempty"`

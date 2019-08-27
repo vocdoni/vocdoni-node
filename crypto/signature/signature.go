@@ -134,7 +134,8 @@ func (k *SignKeys) SignJSON(message interface{}) (string, error) {
 	if err != nil {
 		return "", errors.New("error signing response body: %s")
 	}
-	return sanitizeHex(sig), nil
+	prefixedSig := "0x" + sanitizeHex(sig)
+	return prefixedSig, nil
 }
 
 // Verify verifies a message. Signature is HexString
