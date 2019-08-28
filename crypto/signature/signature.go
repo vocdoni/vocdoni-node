@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
+	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	crypto "github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -36,18 +36,31 @@ type SignKeys struct {
 // Address is an Ethereum like adrress
 type Address [AddressLength]byte
 
+func (a *Address) String() string {
+	return fmt.Sprintf("%s", a.String())
+}
+
 // AddressFromString gets an string and creates and address with each element
-func AddressFromString(s string) (Address, error) {
-	var a Address
-	// check if string represents a valid address
-	re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
-	if re.MatchString(s) {
-		for c, e := range s {
-			a[c] = byte(e)
-		}
-		return a, nil
+func AddressFromString(s string) Address {
+	hex, err := hexutil.Decode(s)
+	if err != nil {
+		//
 	}
-	return a, errors.New("String is not valid")
+	var a Address
+	for c, e := range hex {
+		a[c] = e
+	}
+	return a
+}
+
+// StringFromAddress gets an encoded Address and returns the human readable ASCII string
+func StringFromAddress(a Address) string {
+	out := make([]byte, 20)
+	for c, e := range a {
+		out[c] = e
+	}
+	s := hexutil.Encode(out)
+	return s
 }
 
 // Generate generates new keys

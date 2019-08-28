@@ -14,20 +14,23 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
+	codec "github.com/cosmos/cosmos-sdk/codec"
 	cfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	cmn "github.com/tendermint/tendermint/libs/common"
 	tlog "github.com/tendermint/tendermint/libs/log"
 	nm "github.com/tendermint/tendermint/node"
 	"github.com/tendermint/tendermint/p2p"
-	"github.com/tendermint/tendermint/privval"
+	privval "github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-db"
+	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 	vochain "gitlab.com/vocdoni/go-dvote/vochain/app"
 	testtypes "gitlab.com/vocdoni/go-dvote/vochain/test"
+	vochaintypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
 var configFile string
@@ -44,7 +47,7 @@ func init() {
 func main() {
 	db, err := dbm.NewGoLevelDBWithOpts(appdbName, appdbDir, nil)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to open badger db: %v", err)
+		fmt.Fprintf(os.Stderr, "failed to open db: %v", err)
 		os.Exit(1)
 	}
 	defer db.Close()
@@ -120,7 +123,6 @@ func newTendermint(app vochain.BaseApplication, configFile string) (*nm.Node, er
 		config.PrivValidatorKeyFile(),
 		config.PrivValidatorStateFile(),
 	)
-
 	// read or create node key
 	nodeKey, err := p2p.LoadOrGenNodeKey(config.NodeKeyFile())
 	if err != nil {
@@ -141,16 +143,29 @@ func newTendermint(app vochain.BaseApplication, configFile string) (*nm.Node, er
 			GenesisTime:     tmtime.Now(),
 			ConsensusParams: tmtypes.DefaultConsensusParams(),
 		}
-		key := pv.GetPubKey()
-		genDoc.Validators = []tmtypes.GenesisValidator{
-			{
-				Address: key.Address(),
-				PubKey:  key,
-				Power:   10,
-			},
+		/*
+			key := pv.GetPubKey()
+			genDoc.Validators = []tmtypes.GenesisValidator{
+				{
+					Address: key.Address(),
+					PubKey:  key,
+					Power:   10,
+				},
+			}
+		*/
+		state := &vochaintypes.State{
+			TrustedOraclesPubK: getOraclesFromEth(),
+			ValidatorsPubK:     getValidatorsFromEth(pv),
+			Processes:          make(map[string]*vochaintypes.Process, 0),
 		}
-		//genDoc.AppState = appStateJSON
+		genDoc.AppState = codec.Cdc.MustMarshalJSON(*state)
 
+		genDoc.Validators = getValidatorsFromEth(pv)
+		/*
+			h := sha256.New()
+			h.Write(genDoc.AppState)
+			genDoc.AppHash = h.Sum(nil)
+		*/
 		if err := genDoc.SaveAs(genFile); err != nil {
 			panic(fmt.Sprintf("Cannot load or generate genesis file: %v", err))
 		}
@@ -173,4 +188,27 @@ func newTendermint(app vochain.BaseApplication, configFile string) (*nm.Node, er
 	}
 
 	return node, nil
+}
+
+func getValidatorsFromEth(nodeKey *privval.FilePV) []tmtypes.GenesisValidator {
+	// TODO oracle doing stuff
+	// oracle returns a list of validators... then
+	validators := []tmtypes.GenesisValidator{
+		{
+			Address: nodeKey.GetPubKey().Address(),
+			PubKey:  nodeKey.GetPubKey(),
+			Power:   10,
+		},
+	}
+	return validators
+}
+
+func getOraclesFromEth() []eth.Address {
+	// TODO oracle doing stuff
+	// oracle returns a list of trusted oracles
+	//"0xF904848ea36c46817096E94f932A9901E377C8a5"
+	list := make([]eth.Address, 1)
+	list[0] = eth.AddressFromString("0xF904848ea36c46817096E94f932A9901E377C8a5")
+	vlog.Infof("Oracles return: %v", list[0])
+	return list
 }

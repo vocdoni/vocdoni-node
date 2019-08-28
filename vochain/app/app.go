@@ -7,12 +7,13 @@ import (
 	"reflect"
 	"strconv"
 
+	codec "github.com/cosmos/cosmos-sdk/codec"
 	abci "github.com/tendermint/tendermint/abci/types"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 	dbm "github.com/tendermint/tm-db"
 	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
-
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
@@ -101,7 +102,7 @@ func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Respo
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	// we can't commit transactions inside the DeliverTx because in such case Query, which may be called in parallel, will return inconsistent data
 	// split incomin tx
-	tx, err := SplitAndCheckTxBytes(req.Tx)
+	tx, err := ValidateTx(req.Tx)
 	if err != nil {
 		vlog.Info(err)
 		return abcitypes.ResponseDeliverTx{Code: 1}
@@ -111,11 +112,9 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	switch tx.Method {
 	// new process tx
 	case "newProcessTx":
-		npta := tx.Args.(voctypes.NewProcessTxArgs)
+		npta := tx.Args.(*voctypes.NewProcessTxArgs)
 		// check if process exists
 		if _, ok := app.deliverTxState.Processes[npta.MkRoot]; !ok {
-			// if not create new
-
 			app.deliverTxState.Processes[npta.MkRoot] = &voctypes.Process{
 				EntityID:       npta.EntityID,
 				Votes:          make(map[string]*voctypes.Vote, 0),
@@ -125,13 +124,14 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 				CurrentState:   voctypes.Scheduled,
 				EncryptionKeys: npta.EncryptionKeys,
 			}
+
 		} else {
 			// process exists, return process data as info
 			vlog.Info("The process already exists with the following data: \n")
 			vlog.Infof("Process data: %v", app.deliverTxState.Processes[npta.MkRoot].String())
 		}
 	case "voteTx":
-		vta := tx.Args.(voctypes.VoteTxArgs)
+		vta := tx.Args.(*voctypes.VoteTxArgs)
 		// check if vote has a valid processID
 		if _, ok := app.deliverTxState.Processes[vta.ProcessID]; ok {
 			// check if vote is already submitted
@@ -147,7 +147,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			vlog.Info("Process does not exist")
 		}
 	case "addTrustedOracleTx":
-		atot := tx.Args.(voctypes.AddTrustedOracleTxArgs)
+		atot := tx.Args.(*voctypes.AddTrustedOracleTxArgs)
 		found := false
 		for _, t := range app.deliverTxState.TrustedOraclesPubK {
 			if reflect.DeepEqual(t, atot.Address) {
@@ -160,7 +160,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			vlog.Info("Trusted oracle is already added")
 		}
 	case "removeTrustedOracleTx":
-		rtot := tx.Args.(voctypes.RemoveTrustedOracleTxArgs)
+		rtot := tx.Args.(*voctypes.RemoveTrustedOracleTxArgs)
 		found := false
 		position := -1
 		for pos, t := range app.deliverTxState.TrustedOraclesPubK {
@@ -169,6 +169,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 				position = pos
 			}
 		}
+
 		if found {
 			app.deliverTxState.TrustedOraclesPubK[len(app.deliverTxState.TrustedOraclesPubK)-1] = app.deliverTxState.TrustedOraclesPubK[position]
 			app.deliverTxState.TrustedOraclesPubK[position] = app.deliverTxState.TrustedOraclesPubK[len(app.deliverTxState.TrustedOraclesPubK)-1]
@@ -176,6 +177,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		} else {
 			vlog.Info("Trusted oracle not present in list, can not be removed")
 		}
+
 	case "addValidatorTx":
 
 	case "removeValidatorTx":
@@ -201,11 +203,14 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 
 	// check raw tx data and returns OK if matches with any defined ValixTx schema
-	tx, err := SplitAndCheckTxBytes(req.Tx)
+	tx, err := ValidateTx(req.Tx)
 	if err != nil {
 		vlog.Info(err)
 		return abcitypes.ResponseCheckTx{Code: 1}
 	}
+
+	// validate signature length
+	// TODO
 	return abcitypes.ResponseCheckTx{Info: tx.String(), Code: 0}
 }
 
@@ -246,38 +251,42 @@ func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 // ResponseInitChain can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-	app.deliverTxState = voctypes.NewState()
-	// load processes from db
-	var processes map[string]*voctypes.Process
-	processesBytes := app.db.Get(processesKey)
-	if len(processesBytes) != 0 {
-		err := json.Unmarshal(processesBytes, &processes)
-		if err != nil {
-			vlog.Errorf("Cannot unmarshal processes")
+	if len(req.AppStateBytes) != 0 {
+		app.deliverTxState = voctypes.NewState()
+		codec.Cdc.UnmarshalJSON(req.AppStateBytes, app.deliverTxState)
+	} else {
+		// load processes from db
+		var processes map[string]*voctypes.Process
+		processesBytes := app.db.Get(processesKey)
+		if len(processesBytes) != 0 {
+			err := json.Unmarshal(processesBytes, &processes)
+			if err != nil {
+				vlog.Errorf("Cannot unmarshal processes")
+			}
+			app.deliverTxState.Processes = processes
 		}
-		app.deliverTxState.Processes = processes
-	}
 
-	// load validators public keys from db
-	var valk []abcitypes.ValidatorUpdate
-	validatorBytes := app.db.Get(validatorsPubKKey)
-	if len(validatorBytes) != 0 {
-		err := json.Unmarshal(validatorBytes, &valk)
-		if err != nil {
-			vlog.Errorf("Cannot unmarshal validators public keys")
+		// load validators public keys from db
+		var valk []tmtypes.GenesisValidator
+		validatorBytes := app.db.Get(validatorsPubKKey)
+		if len(validatorBytes) != 0 {
+			err := json.Unmarshal(validatorBytes, &valk)
+			if err != nil {
+				vlog.Errorf("Cannot unmarshal validators public keys")
+			}
+			app.deliverTxState.ValidatorsPubK = valk
 		}
-		app.deliverTxState.ValidatorsPubK = valk
-	}
 
-	// load trusted oracles public keys from db
-	var orlk []eth.Address
-	oraclesBytes := app.db.Get(trustedOraclesPubKKey)
-	if len(oraclesBytes) != 0 {
-		err := json.Unmarshal(oraclesBytes, &orlk)
-		if err != nil {
-			vlog.Errorf("Cannot unmarshal trusted oracles public keys")
+		// load trusted oracles public keys from db
+		var orlk []eth.Address
+		oraclesBytes := app.db.Get(trustedOraclesPubKKey)
+		if len(oraclesBytes) != 0 {
+			err := json.Unmarshal(oraclesBytes, &orlk)
+			if err != nil {
+				vlog.Errorf("Cannot unmarshal trusted oracles public keys")
+			}
+			app.deliverTxState.TrustedOraclesPubK = orlk
 		}
-		app.deliverTxState.TrustedOraclesPubK = orlk
 	}
 
 	// load chain height from db
@@ -292,6 +301,15 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	app.height = height
 
 	// load apphash from db
+	/*
+		if len(req.AppStateBytes) == 0 {
+			app.appHash = app.db.Get(appHashKey)
+		} else {
+			h := sha256.New()
+			h.Write(req.AppStateBytes)
+			app.appHash = h.Sum(nil)
+		}
+	*/
 	app.appHash = app.db.Get(appHashKey)
 
 	return abcitypes.ResponseInitChain{}
@@ -325,7 +343,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	}
 
 	// load validators public keys from db
-	var valk []abcitypes.ValidatorUpdate
+	var valk []tmtypes.GenesisValidator
 	validatorBytes := app.db.Get(validatorsPubKKey)
 	if len(validatorBytes) != 0 {
 		err := json.Unmarshal(validatorBytes, &valk)

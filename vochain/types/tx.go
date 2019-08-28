@@ -14,8 +14,9 @@ import (
 
 // Tx represents a raw Tx that has a method and an args keys
 type Tx struct {
-	Method string            `json:"method"`
-	Args   map[string]string `json:"args"`
+	Method    string            `json:"method"`
+	Args      map[string]string `json:"args"`
+	Signature string            `json:"signature"`
 }
 
 // ValidateMethod returns true if the method is defined in the TxMethod enum
@@ -35,21 +36,8 @@ func (tx *Tx) ValidateMethod() TxMethod {
 	case "removeValidatorTx":
 		return RemoveValidatorTx
 	default:
-		return ""
+		return InvalidTx
 	}
-}
-
-// ________________________ VALID TX ________________________
-
-// ValidTx represents a Tx with a valid method and valid args for the method
-type ValidTx struct {
-	Method TxMethod `json:"method"`
-	Args   TxArgs   `json:"args"`
-}
-
-// String converets a ValidTx struct to a human easy readable string format
-func (vtx *ValidTx) String() string {
-	return fmt.Sprintf(`{ "method": %s, "args": %v }`, vtx.Method.String(), vtx.Args)
 }
 
 // ________________________ TX METHODS ________________________
@@ -72,6 +60,8 @@ const (
 	// RemoveValidatorTx is the method name for removing an existing validator address
 	// in the consensusParams validator list
 	RemoveValidatorTx TxMethod = "removeValidatorTx"
+	// InvalidTx represents any Tx which is not valid
+	InvalidTx TxMethod = "invalidTx"
 )
 
 // String returns the CurrentProcessState as string
@@ -87,27 +77,32 @@ var (
 		"metadataHash",
 		"mkRoot",
 		"numberOfBlocks",
+		"processId",
 		"initBlock",
 		"encryptionKeys",
-		"signature",
+		"timestamp",
 	}
 	voteTxArgsKeys = []string{
 		"processId",
 		"nullifier",
 		"payload",
 		"censusProof",
+		"timestamp",
 	}
 	listUpdatesArgsKeys = []string{
 		"address",
-		"signature",
+		"timestamp",
 	}
 )
 
 // TxArgs generic interface to address valid method args
-type TxArgs interface{}
+type TxArgs interface {
+	String() string
+}
 
 // NewProcessTxArgs represents the data required in order to start a new process
 type NewProcessTxArgs struct {
+	ProcessID string `json:"processId"`
 	// EntityID the process belongs to
 	EntityID string `json:"entityId"`
 	// EntityResolver the resolver of the entity
@@ -124,28 +119,32 @@ type NewProcessTxArgs struct {
 	InitBlock int64 `json:"initBlock"`
 	// EncryptionKeys are the keys required to encrypt the votes
 	EncryptionKeys []string `json:"encryptionKeys"`
-	// Signature to determine who sends the tx
-	Signature string `json:"signature"`
+	// Timestamp for avoid flooding atacks
+	Timestamp int64 `json:"timestamp"`
 }
 
+// Not includes signature
 func (n *NewProcessTxArgs) String() string {
-	return fmt.Sprintf(`{ 
+	return fmt.Sprintf(`{
+		"method": "newProcessTx",
+		"encryptionKeys": %v 
 		"entityId": %v, 
-		"entityResolver": %v, 
+		"entityResolver": %v,
+		"initBlock": %v, 
 		"metadataHash": %v, 
 		"mkRoot": %v, 
-		"initBlock": %v, 
-		"numberOfBlocks": %v, 
-		"encryptionKeys": %v, 
-		"signature": %v  }`,
+		"numberOfBlocks": %v,
+		"processId": %v,
+		"timestamp": %v}`,
+		n.EncryptionKeys,
 		n.EntityID,
 		n.EntityResolver,
+		n.InitBlock,
 		n.MetadataHash,
 		n.MkRoot,
-		n.InitBlock,
 		n.NumberOfBlocks,
-		n.EncryptionKeys,
-		n.Signature,
+		n.ProcessID,
+		n.Timestamp,
 	)
 }
 
@@ -159,18 +158,23 @@ type VoteTxArgs struct {
 	Payload string `json:"payload"`
 	// CensusProof proof inclusion into the census of the process
 	CensusProof string `json:"censusProof"`
+	// Timestamp for avoid flooding atacks
+	Timestamp int64 `json:"timestamp"`
 }
 
 func (n *VoteTxArgs) String() string {
-	return fmt.Sprintf(`{ 
-		"processId": %v,
+	return fmt.Sprintf(`{
+		"method": "newVoteTx",
+		"censusProof": %v,
 		"nullifier": %v,
 		"payload": %v,
-		"censusProof": %v }`,
-		n.ProcessID,
+		"processId": %v,
+		"timestamp: %v }`,
+		n.CensusProof,
 		n.Nullifier,
 		n.Payload,
-		n.CensusProof,
+		n.ProcessID,
+		n.Timestamp,
 	)
 }
 
@@ -178,40 +182,41 @@ func (n *VoteTxArgs) String() string {
 // order to add a new trusted oracle
 type AddTrustedOracleTxArgs struct {
 	Address   eth.Address `json:"address"`
-	Signature string      `json:"signature"`
+	Timestamp int64       `json:"timestamp"`
 }
 
 func (n *AddTrustedOracleTxArgs) String() string {
-	return fmt.Sprintf(`{ "address": %v, "signature": %v }`, n.Address, n.Signature)
+	return fmt.Sprintf(`{ "method": "addTrustedOracleTx", address": %v, "timestamp": %v }`, n.Address, n.Timestamp)
 }
 
 // RemoveTrustedOracleTxArgs represents the data required in
 // order to remove an existing trusted oracle
 type RemoveTrustedOracleTxArgs struct {
 	Address   eth.Address `json:"address"`
-	Signature string      `json:"signature"`
+	Timestamp int64       `json:"timestamp"`
 }
 
 func (n *RemoveTrustedOracleTxArgs) String() string {
-	return fmt.Sprintf(`{ "address": %v, "signature": %v }`, n.Address, n.Signature)
+	return fmt.Sprintf(`{ "method": "addTrustedOracleTx", "address": %v, "timestamp": %v }`, n.Address, n.Timestamp)
 }
 
 // AddValidatorTxArgs represents the data required in
 // order to add a new validator node
 type AddValidatorTxArgs struct {
 	Address   tmtypes.Address `json:"address"`
-	Power     uint64          `json:"power"`
-	Signature string          `json:"signature"`
+	Power     int64           `json:"power"`
+	Timestamp int64           `json:"timestamp"`
 }
 
 func (n *AddValidatorTxArgs) String() string {
-	return fmt.Sprintf(`{ 
+	return fmt.Sprintf(`{
+		"method": "addTrustedOracleTx", 
 		"address": %v,
 		"power": %v,
-		"signature": %v }`,
+		"timestamp": %v }`,
 		n.Address,
 		n.Power,
-		n.Signature,
+		n.Timestamp,
 	)
 }
 
@@ -219,11 +224,11 @@ func (n *AddValidatorTxArgs) String() string {
 // order to remove an existing validator node
 type RemoveValidatorTxArgs struct {
 	Address   tmtypes.Address `json:"address"`
-	Signature string          `json:"signature"`
+	Timestamp int64           `json:"timestamp"`
 }
 
 func (n *RemoveValidatorTxArgs) String() string {
-	return fmt.Sprintf(`{ "address": %v, "signature": %v }`, n.Address, n.Signature)
+	return fmt.Sprintf(`{ "method": "addTrustedOracleTx", "address": %v, "timestamp": %v }`, n.Address, n.Timestamp)
 }
 
 func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
@@ -250,18 +255,22 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 		if err == nil {
 			iblock, err := strconv.ParseInt(tx.Args["initBlock"], 10, 64)
 			if err == nil {
-				t = NewProcessTxArgs{
-					EntityID:       tx.Args["entityId"],
-					EntityResolver: tx.Args["entityResolver"],
-					MetadataHash:   tx.Args["metadataHash"],
-					MkRoot:         tx.Args["mkRoot"],
-					NumberOfBlocks: nblocks,
-					InitBlock:      iblock,
-					EncryptionKeys: strings.Split(tx.Args["encryptionKeys"], ","),
-					Signature:      tx.Args["signature"],
+				timestamp, err := strconv.ParseInt(tx.Args["timestamp"], 10, 64)
+				if err == nil {
+					t = &NewProcessTxArgs{
+						EntityID:       tx.Args["entityId"],
+						EntityResolver: tx.Args["entityResolver"],
+						MetadataHash:   tx.Args["metadataHash"],
+						MkRoot:         tx.Args["mkRoot"],
+						NumberOfBlocks: nblocks,
+						InitBlock:      iblock,
+						EncryptionKeys: strings.Split(tx.Args["encryptionKeys"], ","),
+						Timestamp:      timestamp,
+						ProcessID:      tx.Args["processId"],
+					}
+					// sanity check done
+					return t, nil
 				}
-				// sanity check done
-				return t, nil
 			}
 			return nil, errors.New("cannot parse initBlock")
 		}
@@ -274,7 +283,7 @@ func (tx *Tx) validateVoteTxArgs() (TxArgs, error) {
 	var t TxArgs
 
 	// invalid length
-	if len(tx.Args) != 4 {
+	if len(tx.Args) != 5 {
 		return nil, errors.New("Invalid args number")
 	}
 
@@ -290,14 +299,18 @@ func (tx *Tx) validateVoteTxArgs() (TxArgs, error) {
 
 	// create tx args specific struct
 	if allOk {
-		t = VoteTxArgs{
-			ProcessID:   tx.Args["processId"],
-			Nullifier:   tx.Args["nullifier"],
-			Payload:     tx.Args["payload"],
-			CensusProof: tx.Args["censusProof"],
+		timestamp, err := strconv.ParseInt(tx.Args["timestamp"], 10, 64)
+		if err == nil {
+			t = &VoteTxArgs{
+				ProcessID:   tx.Args["processId"],
+				Nullifier:   tx.Args["nullifier"],
+				Payload:     tx.Args["payload"],
+				CensusProof: tx.Args["censusProof"],
+				Timestamp:   timestamp,
+			}
+			// sanity check done
+			return t, nil
 		}
-		// sanity check done
-		return t, nil
 	}
 	return nil, fmt.Errorf("cannot parse %v", errMsg)
 }
@@ -321,11 +334,12 @@ func (tx *Tx) validateAddTrustedOracleTxArgs() (TxArgs, error) {
 
 	// create tx args specific struct
 	if allOk {
-		a, err := eth.AddressFromString(tx.Args["Address"])
-		if err != nil {
-			t = AddTrustedOracleTxArgs{
+		a := eth.AddressFromString(tx.Args["Address"])
+		timestamp, err := strconv.ParseInt(tx.Args["timestamp"], 10, 64)
+		if err == nil {
+			t = &AddTrustedOracleTxArgs{
 				Address:   a,
-				Signature: tx.Args["signature"],
+				Timestamp: timestamp,
 			}
 			return t, nil
 		}
@@ -353,11 +367,12 @@ func (tx *Tx) validateRemoveTrustedOracleTxArgs() (TxArgs, error) {
 
 	// create tx args specific struct
 	if allOk {
-		a, err := eth.AddressFromString(tx.Args["Address"])
-		if err != nil {
-			t = RemoveTrustedOracleTxArgs{
+		a := eth.AddressFromString(tx.Args["Address"])
+		timestamp, err := strconv.ParseInt(tx.Args["timestamp"], 10, 64)
+		if err == nil {
+			t = &RemoveTrustedOracleTxArgs{
 				Address:   a,
-				Signature: tx.Args["signature"],
+				Timestamp: timestamp,
 			}
 			return t, nil
 		}
@@ -386,11 +401,18 @@ func (tx *Tx) validateAddValidatorTxArgs() (TxArgs, error) {
 	// create tx args specific struct
 	if allOk {
 		if _, ok := tx.Args["power"]; ok {
-			t = AddValidatorTxArgs{
-				Address:   []byte(tx.Args["address"]),
-				Signature: tx.Args["signature"],
+			power, err := strconv.ParseInt(tx.Args["timestamp"], 10, 64)
+			if err == nil {
+				timestamp, err := strconv.ParseInt(tx.Args["timestamp"], 10, 64)
+				if err == nil {
+					t = &AddValidatorTxArgs{
+						Address:   []byte(tx.Args["address"]),
+						Timestamp: timestamp,
+						Power:     power,
+					}
+					return t, nil
+				}
 			}
-			return t, nil
 		}
 		return nil, errors.New("cannot parse power")
 	}
@@ -416,11 +438,14 @@ func (tx *Tx) validateRemoveValidatorTxArgs() (TxArgs, error) {
 
 	// create tx args specific struct
 	if allOk {
-		t = RemoveValidatorTxArgs{
-			Address:   []byte(tx.Args["address"]),
-			Signature: tx.Args["signature"],
+		timestamp, err := strconv.ParseInt(tx.Args["timestamp"], 10, 64)
+		if err == nil {
+			t = &RemoveValidatorTxArgs{
+				Address:   []byte(tx.Args["address"]),
+				Timestamp: timestamp,
+			}
+			return t, nil
 		}
-		return t, nil
 	}
 	return nil, fmt.Errorf("cannot parse %v", errMsg)
 }
@@ -449,4 +474,22 @@ func (tx *Tx) ValidateArgs() (TxArgs, error) {
 	default:
 		return nil, errors.New("Cannot validate args")
 	}
+}
+
+// ________________________ VALID TX ________________________
+
+// ValidTx represents a Tx with a valid method and valid args for the method
+type ValidTx struct {
+	Method TxMethod `json:"method"`
+	Args   TxArgs   `json:"args"`
+}
+
+// String converets a ValidTx struct to a human easy readable string format
+func (vtx *ValidTx) String() string {
+	return fmt.Sprintf(`{
+		"method": %s,
+		"args": %v}`,
+		vtx.Method.String(),
+		vtx.Args,
+	)
 }

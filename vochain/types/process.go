@@ -8,6 +8,9 @@ import (
 
 // Process represents a state per process
 type Process struct {
+	// ProcessID identifies unequivocally a process
+	ProcessID string
+	// EntityID identifies unequivocally a process
 	EntityID string
 	// Votes is a list containing all the processed and valid votes (here votes are final)
 	Votes map[string]*Vote `json:"votes"`
@@ -24,13 +27,15 @@ type Process struct {
 }
 
 func (p *Process) String() string {
-	return fmt.Sprintf(`{ 
+	return fmt.Sprintf(`{
+		"processId": %v, 
 		"entityId": %v,
 		"votes": %v,
 		"mkRoot": %v,
 		"initBlock": %v,
 		"encryptionKeys": %v,
 		"currentState": %v }`,
+		p.ProcessID,
 		p.EntityID,
 		p.Votes,
 		p.MkRoot,
@@ -61,40 +66,33 @@ const (
 	Canceled
 )
 
+const (
+	SCHEDULED string = "scheduled"
+	ACTIVE    string = "active"
+	PAUSED    string = "paused"
+	FINISHED  string = "finished"
+	CANCELED  string = "cancelled"
+)
+
 // String returns the CurrentProcessState as string
 func (c *CurrentProcessState) String() string {
 	switch *c {
 	// scheduled
 	case 0:
-		return fmt.Sprintf("%s", "scheduled")
+		return fmt.Sprintf("%s", SCHEDULED)
 	// active
 	case 1:
-		return fmt.Sprintf("%s", "active")
+		return fmt.Sprintf("%s", ACTIVE)
 	// paused
 	case 2:
-		return fmt.Sprintf("%s", "paused")
+		return fmt.Sprintf("%s", PAUSED)
 	// finished
 	case 3:
-		return fmt.Sprintf("%s", "finished")
+		return fmt.Sprintf("%s", FINISHED)
 	// canceled
 	case 4:
-		return fmt.Sprintf("%s", "canceled")
+		return fmt.Sprintf("%s", CANCELED)
 	default:
 		return ""
 	}
-}
-
-// ________________________ VOTE ________________________
-
-// Vote represents a single vote
-type Vote struct {
-	// Payload contains the vote itself
-	Payload string `json:"payload"`
-	// CensusProof contains the prove indicating that the user is in the census of the process
-	CensusProof string `json:"censusproof"`
-}
-
-// NewVote returns a new Vote instance
-func NewVote() *Vote {
-	return &Vote{}
 }
