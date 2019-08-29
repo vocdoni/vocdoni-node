@@ -173,6 +173,16 @@ func TestCensus(t *testing.T) {
 		t.Errorf("failed adding a bulk of claims")
 	}
 
+	// dumpPlain
+	req.Method = "dumpPlain"
+	req.ClaimData = ""
+	req.ClaimsData = []string{}
+	resp, err = sendCensusReq(req, signer2)
+	t.Logf("dumpPlain response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("failed dumping plain claims")
+	}
+
 	// publish
 	req.Method = "publish"
 	req.ClaimsData = []string{}
@@ -239,7 +249,7 @@ func sendCensusReq(req types.CensusRequest, signer *sig.SignKeys) (types.CensusR
 	var err error
 	cmReq.Request = req
 	cmReq.ID = fmt.Sprintf("%d", rand.Intn(1000))
-	cmReq.Request.TimeStamp = int32(time.Now().Unix())
+	cmReq.Request.Timestamp = int32(time.Now().Unix())
 	cmReq.Signature, err = signer.SignJSON(cmReq.Request)
 
 	if err != nil {

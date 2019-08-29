@@ -101,6 +101,7 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	cm.Data = &r.storage
 	r.registerMethod("getRoot", censusLocalMethod)
 	r.registerMethod("dump", censusLocalMethod)
+	r.registerMethod("dumpPlain", censusLocalMethod)
 	r.registerMethod("genProof", censusLocalMethod)
 	r.registerMethod("checkProof", censusLocalMethod)
 	r.registerMethod("addCensus", censusLocalMethod)
