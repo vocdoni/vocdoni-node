@@ -13,29 +13,25 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-func censusLocalMethod(msg types.Message, rawRequest []byte, router *Router) {
+func censusLocalMethod(msg types.Message, request routerRequest, router *Router) {
 	log.Info("got local census request")
 	var censusRequest types.CensusRequestMessage
 	if err := json.Unmarshal(msg.Data, &censusRequest); err != nil {
 		log.Warnf("couldn't decode into CensusRequest type from request %v", msg.Data)
 		return
 	}
-	authorized, addr, err := router.signer.VerifyJSONsender(censusRequest.Request, censusRequest.Signature)
-	if err != nil {
-		log.Debug(err.Error())
-	}
-	go censusLocal(msg, &censusRequest, router, authorized, addr)
+	censusLocal(msg, &censusRequest, router, request.authenticated, request.address)
 }
 
 func censusLocal(msg types.Message, crm *types.CensusRequestMessage, router *Router, auth bool, addr string) {
 	var response types.CensusResponseMessage
 	var err error
-	log.Debugf("client authorization %t. Recovered address is %s", auth, addr)
-	if len(addr) < signature.AddressLength {
+	log.Debugf("client authorization %t. Recovered address is [%s]", auth, addr)
+	if auth && len(addr) < signature.AddressLength {
 		sendError(router.transport, router.signer, msg, crm.ID, "cannot recover address")
 		return
 	}
-	cresponse := router.census.Handler(&crm.Request, auth, addr+"/")
+	cresponse := router.census.Handler(&crm.Request, auth, "0x"+addr+"/")
 	if cresponse.Ok != true {
 		sendError(router.transport, router.signer, msg, crm.ID, cresponse.Error)
 		return
@@ -56,7 +52,7 @@ func censusLocal(msg types.Message, crm *types.CensusRequestMessage, router *Rou
 	}
 }
 
-func censusProxyMethod(msg types.Message, rawRequest []byte, router *Router) {
+func censusProxyMethod(msg types.Message, request routerRequest, router *Router) {
 	log.Info("Census request sent to method")
 	var censusRequest types.CensusRequestMessage
 	if err := json.Unmarshal(msg.Data, &censusRequest); err != nil {
@@ -66,7 +62,7 @@ func censusProxyMethod(msg types.Message, rawRequest []byte, router *Router) {
 	log.Infof("Message data is: %s", msg.Data)
 	log.Infof("Request is: %v", censusRequest)
 	log.Infof("Proxying census request to %s", censusRequest.Request.CensusURI)
-	go censusProxy(msg, censusRequest, router)
+	censusProxy(msg, censusRequest, router)
 }
 
 // Strips CensusURI and forwards to census service, send reply back to client

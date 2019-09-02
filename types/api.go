@@ -2,9 +2,26 @@ package types
 
 /*MessageRequest holds a decoded request but does not decode the body*/
 type MessageRequest struct {
-	ID        string                 `json:"id"`
-	Request   map[string]interface{} `json:"request"`
-	Signature string                 `json:"signature"`
+	ID string `json:"id"`
+	//	Request   map[string]interface{} `json:"request"`
+	Request   MetaRequest `json:"request"`
+	Signature string      `json:"signature"`
+}
+
+//MetaRequest holds all possible request methods ordered by field name. It's used by the router to check the signature
+type MetaRequest struct {
+	CensusID   string   `json:"censusId,omitempty"`
+	CensusURI  string   `json:"censusUri,omitempty"`
+	ClaimData  string   `json:"claimData,omitempty"`
+	ClaimsData []string `json:"claimsData,omitempty"`
+	Content    string   `json:"content,omitempty"`
+	Method     string   `json:"method"`
+	Name       string   `json:"name,omitempty"`
+	ProofData  string   `json:"proofData,omitempty"`
+	PubKeys    []string `json:"pubKeys,omitempty"`
+	RootHash   string   `json:"rootHash,omitempty"`
+	Timestamp  int32    `json:"timestamp"`
+	URI        string   `json:"uri,omitempty"`
 }
 
 /* the following structs hold content decoded from File API JSON objects */
