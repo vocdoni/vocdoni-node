@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
+	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
@@ -30,6 +31,10 @@ func censusLocal(msg types.Message, crm *types.CensusRequestMessage, router *Rou
 	var response types.CensusResponseMessage
 	var err error
 	log.Debugf("client authorization %t. Recovered address is %s", auth, addr)
+	if len(addr) < signature.AddressLength {
+		sendError(router.transport, router.signer, msg, crm.ID, "cannot recover address")
+		return
+	}
 	cresponse := router.census.Handler(&crm.Request, auth, addr+"/")
 	if cresponse.Ok != true {
 		sendError(router.transport, router.signer, msg, crm.ID, cresponse.Error)

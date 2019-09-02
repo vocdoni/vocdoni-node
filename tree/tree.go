@@ -117,6 +117,9 @@ func (t *Tree) GetIndex(data []byte) (string, error) {
 func stringToHash(hash string) (merkletree.Hash, error) {
 	var rootHash merkletree.Hash
 	rootBytes, err := common3.HexDecode(hash)
+	if err != nil {
+		return rootHash, err
+	}
 	copy(rootHash[:32], rootBytes)
 	return rootHash, err
 }
@@ -158,12 +161,12 @@ func (t *Tree) ImportDump(claims []string) error {
 }
 
 func (t *Tree) Snapshot(root string) (*Tree, error) {
-	var rootHash *merkletree.Hash
+	rootHash := new(merkletree.Hash)
 	snapshotTree := new(Tree)
 	var err error
 	if len(root) > 0 {
 		*rootHash, err = stringToHash(root)
-		if err != nil {
+		if err != nil || rootHash == nil {
 			return snapshotTree, err
 		}
 	}
