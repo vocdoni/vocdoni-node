@@ -132,7 +132,7 @@ func (r *Router) Route() {
 				log.Warnf("router has no method named %s", method)
 			} else {
 				log.Infof("calling method %s", method)
-				log.Debugf("data received: %+v", msg)
+				log.Debugf("data received: %s", msg)
 				methodFunc(msg, rawRequest, r)
 			}
 		}
