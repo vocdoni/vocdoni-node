@@ -28,6 +28,7 @@ Run it executing `go test -v test/census_test.go`
 */
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -142,7 +143,7 @@ func TestCensus(t *testing.T) {
 	// addClaim
 	req.CensusID = censusID
 	req.Method = "addClaim"
-	req.ClaimData = "hash1"
+	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
 	resp, err = sendCensusReq(req, signer2, true)
 	t.Logf("addClaim response %+v", resp)
 	if !resp.Ok {
@@ -152,7 +153,7 @@ func TestCensus(t *testing.T) {
 	// addClaim not authorized
 	req.CensusID = censusID
 	req.Method = "addClaim"
-	req.ClaimData = "hash2"
+	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello2"))
 	resp, err = sendCensusReq(req, signer1, true)
 	t.Logf("addClaim response %+v", resp)
 	if resp.Ok {
@@ -164,7 +165,8 @@ func TestCensus(t *testing.T) {
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
 	for i := 0; i < 100; i++ {
-		claims = append(claims, fmt.Sprintf("0123456789abcdef0123456789abc%d", i))
+		claims = append(claims, base64.StdEncoding.EncodeToString([]byte(
+			fmt.Sprintf("0123456789abcdef0123456789abc%d", i))))
 	}
 	req.ClaimsData = claims
 	resp, err = sendCensusReq(req, signer2, true)
