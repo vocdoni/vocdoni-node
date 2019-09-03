@@ -141,7 +141,7 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 }
 
 // CheckAuth check if a census request message is authorized
-func (cm *CensusManager) CheckAuth(crm *types.CensusRequestMessage) error {
+func (cm *CensusManager) CheckAuth(crm *types.MessageRequest) error {
 	if len(crm.Signature) < signature.SignatureLength || len(crm.Request.CensusID) < 1 {
 		return errors.New("signature or censusId not provided or invalid")
 	}
@@ -205,7 +205,7 @@ func (cm *CensusManager) CheckAuth(crm *types.CensusRequestMessage) error {
 // HTTPhandler handles an API census manager request via HTTP
 func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *signature.SignKeys) {
 	log.Debug("new request received")
-	var rm types.CensusRequestMessage
+	var rm types.MessageRequest
 	if ok := checkRequest(w, req); !ok {
 		return
 	}
@@ -243,7 +243,7 @@ func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, s
 // Handler handles an API census manager request.
 // isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
 // censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
-func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPrefix string) *types.CensusResponse {
+func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string) *types.CensusResponse {
 	resp := new(types.CensusResponse)
 	op := r.Method
 	var err error

@@ -21,66 +21,11 @@ type MetaRequest struct {
 	PubKeys    []string `json:"pubKeys,omitempty"`
 	RootHash   string   `json:"rootHash,omitempty"`
 	Timestamp  int32    `json:"timestamp"`
+	Type       string   `json:"type"`
 	URI        string   `json:"uri,omitempty"`
 }
 
 /* the following structs hold content decoded from File API JSON objects */
-
-//FetchFileRequest holds a fetchFile request message
-type FetchFileRequest struct {
-	ID      string `json:"id"`
-	Request struct {
-		Method    string `json:"method"`
-		URI       string `json:"uri"`
-		Timestamp int32  `json:"timestamp"`
-	} `json:"request"`
-	Signature string `json:"signature"`
-}
-
-//AddFileRequest holds an addFile request message
-type AddFileRequest struct {
-	ID      string `json:"id"`
-	Request struct {
-		Method    string `json:"method"`
-		Type      string `json:"type"`
-		Content   string `json:"content"`
-		Name      string `json:"name"`
-		Timestamp int32  `json:"timestamp"`
-	} `json:"request"`
-	Signature string `json:"signature"`
-}
-
-//PinListRequest holds a pinList request message
-type PinListRequest struct {
-	ID      string `json:"id"`
-	Request struct {
-		Method    string `json:"method"`
-		Timestamp int32  `json:"timestamp"`
-	} `json:"request"`
-	Signature string `json:"signature"`
-}
-
-//PinFileRequest holds a pinFile request message
-type PinFileRequest struct {
-	ID      string `json:"id"`
-	Request struct {
-		Method    string `json:"method"`
-		URI       string `json:"uri"`
-		Timestamp int32  `json:"timestamp"`
-	} `json:"request"`
-	Signature string `json:"signature"`
-}
-
-//UnpinFileRequest holds an unpinFile request message
-type UnpinFileRequest struct {
-	ID      string `json:"id"`
-	Request struct {
-		Method    string `json:"method"`
-		URI       string `json:"uri"`
-		Timestamp uint   `json:"timestamp"`
-	} `json:"request"`
-	Signature string `json:"signature"`
-}
 
 //FetchResponse holds a fetchResponse response to be sent from the router
 type FetchResponse struct {
@@ -149,28 +94,6 @@ type FailBody struct {
 	Signature string `json:"signature"`
 }
 */
-
-// CensusRequestMessage represents a census manager JSON request package
-type CensusRequestMessage struct {
-	ID        string        `json:"id"`
-	Request   CensusRequest `json:"request"`
-	Signature string        `json:"signature"`
-}
-
-// CensusRequest type represents a JSON object with all possible requests fields
-type CensusRequest struct {
-	CensusID   string   `json:"censusId"`             // References to MerkleTree namespace
-	CensusURI  string   `json:"censusUri,omitempty"`  // Census Service URI for proxy messages
-	ClaimData  string   `json:"claimData,omitempty"`  // Data to add to the MerkleTree
-	ClaimsData []string `json:"claimsData,omitempty"` // Multiple Data to add to the MerkleTree
-	Method     string   `json:"method"`               // method to call
-	ProofData  string   `json:"proofData,omitempty"`  // MerkleProof to check
-	PubKeys    []string `json:"pubKeys,omitempty"`    // Public key managers for creating a new census
-	RootHash   string   `json:"rootHash,omitempty"`   // References to MerkleTree rootHash
-	Timestamp  int32    `json:"timestamp"`            // Unix TimeStamp in seconds
-	URI        string   `json:"uri,omitempty"`        // URI of a census to import/export
-}
-
 // CensusResponseMessage represents a census manager JSON response package
 type CensusResponseMessage struct {
 	ID        string         `json:"id"`
