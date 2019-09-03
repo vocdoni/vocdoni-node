@@ -49,7 +49,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("signingKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
 	flag.String("chain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
 	flag.Bool("chainLightMode", false, "synchronize Ethereum blockchain in light mode")
-	flag.Int("w3nodePort", 32000, "Ethereum p2p node port to use")
+	flag.Int("w3nodePort", 30303, "Ethereum p2p node port to use")
 	flag.String("w3route", "/web3", "web3 endpoint API route")
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
 	flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
@@ -250,8 +250,20 @@ func main() {
 			log.Debugf("got ethereum address: %x", node.Keys.Accounts()[i].Address)
 		}
 		time.Sleep(1 * time.Second)
+		log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
 		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
+		go func() {
+			for {
+				time.Sleep(60 * time.Second)
+				if &node.Eth != nil {
+					log.Debugf("[ethereum info] peers:%d synced:%t block:%s",
+						node.Node.Server().PeerCount(),
+						node.Eth.Synced(),
+						node.Eth.BlockChain().CurrentBlock().Number())
+				}
+			}
+		}()
 	}
 
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
