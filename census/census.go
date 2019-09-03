@@ -314,7 +314,7 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 					log.Warnf("error adding claim: %s", err.Error())
 					invalidClaims = append(invalidClaims, i)
 				} else {
-					log.Debugf("claim added %s", data)
+					log.Debugf("claim added %x", data)
 					addedClaims++
 				}
 			}
@@ -343,7 +343,7 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 				resp.Ok = false
 				resp.Error = err.Error()
 			} else {
-				log.Debugf("claim added %s", data)
+				log.Debugf("claim added %x", data)
 			}
 		} else {
 			resp.Ok = false
