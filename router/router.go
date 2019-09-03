@@ -15,10 +15,10 @@ import (
 	"encoding/json"
 )
 
-func buildReply(msg types.Message, data []byte) types.Message {
+func buildReply(context types.MessageContext, data []byte) types.Message {
 	reply := new(types.Message)
 	reply.TimeStamp = int32(time.Now().Unix())
-	reply.Context = msg.Context
+	reply.Context = context
 	reply.Data = data
 	return *reply
 }
@@ -32,7 +32,7 @@ func parseUrisContent(uris string) []string {
 	return out
 }
 
-func parseTransportFromUri(uris []string) []string {
+func parseTransportFromURI(uris []string) []string {
 	out := make([]string, 0)
 	for _, u := range uris {
 		splt := strings.Split(u, "/")
@@ -41,7 +41,7 @@ func parseTransportFromUri(uris []string) []string {
 	return out
 }
 
-type requestMethod func(msg types.Message, request routerRequest, router *Router)
+type requestMethod func(request routerRequest, router *Router)
 
 //type methodMap map[string]func(msg types.Message, request routerRequest, r *Router)
 type methodMap map[string]requestMethod
@@ -60,25 +60,29 @@ type Router struct {
 type routerRequest struct {
 	method        string
 	id            string
-	rawRequest    []byte
+	structured    types.MetaRequest
 	authenticated bool
 	address       string
+	context       types.MessageContext
 }
 
 //semi-unmarshalls message, returns method name
-func (r *Router) getRequest(payload []byte) (request routerRequest, err error) {
+func (r *Router) getRequest(payload []byte, context types.MessageContext) (request routerRequest, err error) {
 	var msgStruct types.MessageRequest
 	err = json.Unmarshal(payload, &msgStruct)
 	if err != nil {
 		log.Errorf("could not unmarshall JSON, error: %s", err)
 		return request, err
 	}
+	request.structured = msgStruct.Request
 	request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.Request, msgStruct.Signature)
 	request.method = msgStruct.Request.Method
 	request.id = msgStruct.ID
+	request.context = context
 	/*assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)
-	because json.Marshal encodes in lexographic order for map objects. */
-	request.rawRequest, err = json.Marshal(msgStruct.Request)
+	because json.Marshal encodes in lexographic order for map objects.
+	request.raw, err = json.Marshal(msgStruct.Request)
+	*/
 	return request, err
 }
 
@@ -102,27 +106,27 @@ func (r *Router) registerMethod(methodName string, methodCallback requestMethod,
 
 //EnableFileAPI enables the FILE API in the Router
 func (r *Router) EnableFileAPI() {
-	r.registerMethod("fetchFile", fetchFileMethod, false) // false = public method
-	r.registerMethod("addFile", addFileMethod, true)      // true = private method
-	r.registerMethod("pinList", pinListMethod, true)
-	r.registerMethod("pinFile", pinFileMethod, true)
-	r.registerMethod("unpinFile", unpinFileMethod, true)
+	r.registerMethod("fetchFile", fetchFile, false) // false = public method
+	r.registerMethod("addFile", addFile, true)      // true = private method
+	r.registerMethod("pinList", pinList, true)
+	r.registerMethod("pinFile", pinFile, true)
+	r.registerMethod("unpinFile", unpinFile, true)
 }
 
 //EnableCensusAPI enables the Census API in the Router
 func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.census = cm
 	cm.Data = &r.storage
-	r.registerMethod("getRoot", censusLocalMethod, false) // false = public method
-	r.registerMethod("dump", censusLocalMethod, true)     // true = private method
-	r.registerMethod("dumpPlain", censusLocalMethod, true)
-	r.registerMethod("genProof", censusLocalMethod, false)
-	r.registerMethod("checkProof", censusLocalMethod, false)
-	r.registerMethod("addCensus", censusLocalMethod, true)
-	r.registerMethod("addClaim", censusLocalMethod, true)
-	r.registerMethod("addClaimBulk", censusLocalMethod, true)
-	r.registerMethod("publish", censusLocalMethod, true)
-	r.registerMethod("importRemote", censusLocalMethod, true)
+	r.registerMethod("getRoot", censusLocal, false) // false = public method
+	r.registerMethod("dump", censusLocal, true)     // true = private method
+	r.registerMethod("dumpPlain", censusLocal, true)
+	r.registerMethod("genProof", censusLocal, false)
+	r.registerMethod("checkProof", censusLocal, false)
+	r.registerMethod("addCensus", censusLocal, true)
+	r.registerMethod("addClaim", censusLocal, true)
+	r.registerMethod("addClaimBulk", censusLocal, true)
+	r.registerMethod("publish", censusLocal, true)
+	r.registerMethod("importRemote", censusLocal, true)
 }
 
 //Route routes requests through the Router object
@@ -134,7 +138,7 @@ func (r *Router) Route() {
 	for {
 		select {
 		case msg := <-r.inbound:
-			request, err := r.getRequest(msg.Data)
+			request, err := r.getRequest(msg.Data, msg.Context)
 			if err != nil || request.method == "" {
 				log.Warnf("couldn't extract method from JSON message %s", msg)
 				break
@@ -146,17 +150,17 @@ func (r *Router) Route() {
 			if methodFunc == nil {
 				errMsg := fmt.Sprintf("router has no method named %s or unauthorized", request.method)
 				log.Warn(errMsg)
-				go sendError(r.transport, r.signer, msg, request.id, errMsg)
+				go sendError(r.transport, r.signer, request.context, request.id, errMsg)
 			} else {
 				log.Infof("calling method %s", request.method)
-				log.Debugf("data received: %s", request.rawRequest)
-				go methodFunc(msg, request, r)
+				log.Debugf("data received: %v+", request.structured)
+				go methodFunc(request, r)
 			}
 		}
 	}
 }
 
-func sendError(transport net.Transport, signer signature.SignKeys, msg types.Message, requestID, errMsg string) {
+func sendError(transport net.Transport, signer signature.SignKeys, context types.MessageContext, requestID, errMsg string) {
 	log.Warn(errMsg)
 	var err error
 	var response types.ErrorResponse
@@ -172,5 +176,5 @@ func sendError(transport net.Transport, signer signature.SignKeys, msg types.Mes
 	if err != nil {
 		log.Warnf("error marshaling response body: %s", err)
 	}
-	transport.Send(buildReply(msg, rawResponse))
+	transport.Send(buildReply(context, rawResponse))
 }

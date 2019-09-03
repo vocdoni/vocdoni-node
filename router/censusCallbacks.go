@@ -1,57 +1,46 @@
 package router
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
 
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-func censusLocalMethod(msg types.Message, request routerRequest, router *Router) {
-	log.Info("got local census request")
-	var censusRequest types.CensusRequestMessage
-	if err := json.Unmarshal(msg.Data, &censusRequest); err != nil {
-		log.Warnf("couldn't decode into CensusRequest type from request %v", msg.Data)
-		return
-	}
-	censusLocal(msg, &censusRequest, router, request.authenticated, request.address)
-}
-
-func censusLocal(msg types.Message, crm *types.CensusRequestMessage, router *Router, auth bool, addr string) {
+func censusLocal(request routerRequest, router *Router) {
 	var response types.CensusResponseMessage
 	var err error
+	auth := request.authenticated
+	addr := request.address
 	log.Debugf("client authorization %t. Recovered address is [%s]", auth, addr)
 	if auth && len(addr) < signature.AddressLength {
-		sendError(router.transport, router.signer, msg, crm.ID, "cannot recover address")
+		sendError(router.transport, router.signer, request.context, request.id, "cannot recover address")
 		return
 	}
-	cresponse := router.census.Handler(&crm.Request, auth, "0x"+addr+"/")
+	cresponse := router.census.Handler(&request.structured, auth, "0x"+addr+"/")
 	if cresponse.Ok != true {
-		sendError(router.transport, router.signer, msg, crm.ID, cresponse.Error)
+		sendError(router.transport, router.signer, request.context, request.id, cresponse.Error)
 		return
 	}
 	response.Response = *cresponse
-	response.ID = crm.ID
-	response.Response.Request = crm.ID
+	response.ID = request.id
+	response.Response.Request = request.id
 	response.Signature, err = router.signer.SignJSON(response.Response)
 	if err != nil {
 		log.Warn(err.Error())
 	}
 	rawResponse, err := json.Marshal(response)
 	if err != nil {
-		sendError(router.transport, router.signer, msg, crm.ID, fmt.Sprintf("could not unmarshal response (%s)", err.Error()))
+		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err.Error()))
 	} else {
 		log.Infof("sending census resposne: %s", rawResponse)
-		router.transport.Send(buildReply(msg, rawResponse))
+		router.transport.Send(buildReply(request.context, rawResponse))
 	}
 }
 
+/*
 func censusProxyMethod(msg types.Message, request routerRequest, router *Router) {
 	log.Info("Census request sent to method")
 	var censusRequest types.CensusRequestMessage
@@ -99,3 +88,4 @@ func censusProxy(msg types.Message, censusRequestMessage types.CensusRequestMess
 	//success, send resp to client
 	router.transport.Send(buildReply(msg, body))
 }
+*/
