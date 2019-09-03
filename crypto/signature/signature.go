@@ -108,7 +108,7 @@ func DecompressPubKey(pubHexComp string) (string, error) {
 
 // EthAddrString return the Ethereum address from the ECDSA public key
 func (k *SignKeys) EthAddrString() string {
-	recoveredAddr := crypto.PubkeyToAddress(*k.Public).Bytes()
+	recoveredAddr := crypto.PubkeyToAddress(*k.Public)
 	return fmt.Sprintf("%x", recoveredAddr)
 }
 
