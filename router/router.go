@@ -139,9 +139,12 @@ func (r *Router) Route() {
 		select {
 		case msg := <-r.inbound:
 			request, err := r.getRequest(msg.Data, msg.Context)
-			if err != nil || request.method == "" {
+			if request.method == "" {
 				log.Warnf("couldn't extract method from JSON message %s", msg)
 				break
+			}
+			if err != nil {
+				log.Warnf("Error parsing request: %s", err.Error())
 			}
 			methodFunc := r.publicRequestMap[request.method]
 			if methodFunc == nil && request.authenticated {
