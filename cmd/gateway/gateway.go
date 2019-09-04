@@ -349,6 +349,9 @@ func main() {
 		if globalCfg.Api.Census.Enabled {
 			routerApi.EnableCensusAPI(&censusManager)
 		}
+		if globalCfg.Api.Vote.Enabled {
+			routerApi.EnableVoteAPI()
+		}
 
 		go routerApi.Route()
 		log.Debug("Setting up API router")
