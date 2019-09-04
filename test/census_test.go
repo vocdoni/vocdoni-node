@@ -28,6 +28,7 @@ Run it executing `go test -v test/census_test.go`
 */
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -132,7 +133,7 @@ func TestCensus(t *testing.T) {
 	// Create census
 	req.Method = "addCensus"
 	req.CensusID = "test"
-	resp, err := sendCensusReq(req, signer2)
+	resp, err := sendCensusReq(req, signer2, true)
 	t.Logf("getRoot response %+v", resp)
 	if !resp.Ok {
 		t.Errorf("fail on getRoot")
@@ -142,8 +143,8 @@ func TestCensus(t *testing.T) {
 	// addClaim
 	req.CensusID = censusID
 	req.Method = "addClaim"
-	req.ClaimData = "hash1"
-	resp, err = sendCensusReq(req, signer2)
+	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
+	resp, err = sendCensusReq(req, signer2, true)
 	t.Logf("addClaim response %+v", resp)
 	if !resp.Ok {
 		t.Errorf("fail on addClaim")
@@ -152,8 +153,8 @@ func TestCensus(t *testing.T) {
 	// addClaim not authorized
 	req.CensusID = censusID
 	req.Method = "addClaim"
-	req.ClaimData = "hash2"
-	resp, err = sendCensusReq(req, signer1)
+	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello2"))
+	resp, err = sendCensusReq(req, signer1, true)
 	t.Logf("addClaim response %+v", resp)
 	if resp.Ok {
 		t.Errorf("client should not be authorized on addClaim")
@@ -164,19 +165,30 @@ func TestCensus(t *testing.T) {
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
 	for i := 0; i < 100; i++ {
-		claims = append(claims, fmt.Sprintf("0123456789abcdef0123456789abc%d", i))
+		claims = append(claims, base64.StdEncoding.EncodeToString([]byte(
+			fmt.Sprintf("0123456789abcdef0123456789abc%d", i))))
 	}
 	req.ClaimsData = claims
-	resp, err = sendCensusReq(req, signer2)
+	resp, err = sendCensusReq(req, signer2, true)
 	t.Logf("addClaimBulk response %+v", resp)
 	if !resp.Ok {
 		t.Errorf("failed adding a bulk of claims")
 	}
 
+	// dumpPlain
+	req.Method = "dumpPlain"
+	req.ClaimData = ""
+	req.ClaimsData = []string{}
+	resp, err = sendCensusReq(req, signer2, true)
+	t.Logf("dumpPlain response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("failed dumping plain claims")
+	}
+
 	// publish
 	req.Method = "publish"
 	req.ClaimsData = []string{}
-	resp, err = sendCensusReq(req, signer2)
+	resp, err = sendCensusReq(req, signer2, true)
 	t.Logf("publish response %+v", resp)
 	if !resp.Ok {
 		t.Errorf("failed publishing tree to remote storage")
@@ -185,7 +197,7 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	req.Method = "getRoot"
-	resp, err = sendCensusReq(req, signer2)
+	resp, err = sendCensusReq(req, signer2, false)
 	t.Logf("getRoot response %+v", resp)
 	if !resp.Ok {
 		t.Errorf("fail on getRoot")
@@ -198,7 +210,7 @@ func TestCensus(t *testing.T) {
 	// add second census
 	req.Method = "addCensus"
 	req.CensusID = "importTest"
-	resp, err = sendCensusReq(req, signer2)
+	resp, err = sendCensusReq(req, signer2, true)
 	t.Logf("addCensus response %+v", resp)
 	if !resp.Ok {
 		t.Errorf("fail on addCensus")
@@ -209,7 +221,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "importRemote"
 	req.CensusID = resp.CensusID
 	req.URI = uri
-	resp, err = sendCensusReq(req, signer2)
+	resp, err = sendCensusReq(req, signer2, true)
 	t.Logf("importRemote response %+v", resp)
 	if !resp.Ok {
 		t.Errorf("failed importing tree from remote storage")
@@ -217,7 +229,7 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	req.Method = "getRoot"
-	resp, err = sendCensusReq(req, signer2)
+	resp, err = sendCensusReq(req, signer2, false)
 	t.Logf("getRoot response %+v", resp)
 	if !resp.Ok {
 		t.Errorf("fail on getRoot")
@@ -232,18 +244,19 @@ func TestCensus(t *testing.T) {
 	os.RemoveAll(censusDir)
 }
 
-func sendCensusReq(req types.CensusRequest, signer *sig.SignKeys) (types.CensusResponse, error) {
+func sendCensusReq(req types.CensusRequest, signer *sig.SignKeys, sign bool) (types.CensusResponse, error) {
 	var cmRes types.CensusResponseMessage
 	var resp types.CensusResponse
 	var cmReq types.CensusRequestMessage
 	var err error
 	cmReq.Request = req
 	cmReq.ID = fmt.Sprintf("%d", rand.Intn(1000))
-	cmReq.Request.TimeStamp = int32(time.Now().Unix())
-	cmReq.Signature, err = signer.SignJSON(cmReq.Request)
-
-	if err != nil {
-		return resp, err
+	cmReq.Request.Timestamp = int32(time.Now().Unix())
+	if sign {
+		cmReq.Signature, err = signer.SignJSON(cmReq.Request)
+		if err != nil {
+			return resp, err
+		}
 	}
 	rawReq, err := json.Marshal(cmReq)
 	if err != nil {

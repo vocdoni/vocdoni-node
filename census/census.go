@@ -1,7 +1,9 @@
 package census
 
 import (
+	"encoding/base64"
 	"encoding/json"
+
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -165,8 +167,8 @@ func (cm *CensusManager) CheckAuth(crm *types.CensusRequestMessage) error {
 
 	// Check timestamp
 	currentTime := int32(time.Now().Unix())
-	if crm.Request.TimeStamp > currentTime+cm.AuthWindow ||
-		crm.Request.TimeStamp < currentTime-cm.AuthWindow {
+	if crm.Request.Timestamp > currentTime+cm.AuthWindow ||
+		crm.Request.Timestamp < currentTime-cm.AuthWindow {
 		return errors.New("timestamp is not valid")
 	}
 
@@ -250,7 +252,7 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 	log.Infof("processing data %+v", *r)
 	resp.Ok = true
 	resp.Error = ""
-	resp.TimeStamp = int32(time.Now().Unix())
+	resp.Timestamp = int32(time.Now().Unix())
 
 	if op == "addCensus" {
 		if isAuth {
@@ -302,14 +304,22 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 	if op == "addClaimBulk" {
 		if isAuth && validAuthPrefix {
 			addedClaims := 0
-			for _, c := range r.ClaimsData {
-				err := cm.Trees[r.CensusID].AddClaim([]byte(c))
+			var invalidClaims []int
+			for i, c := range r.ClaimsData {
+				data, err := base64.StdEncoding.DecodeString(c)
+				if err == nil {
+					err = cm.Trees[r.CensusID].AddClaim(data)
+				}
 				if err != nil {
 					log.Warnf("error adding claim: %s", err.Error())
+					invalidClaims = append(invalidClaims, i)
 				} else {
-					log.Infof("claim added %s", c)
+					log.Debugf("claim added %x", data)
 					addedClaims++
 				}
+			}
+			if len(invalidClaims) > 0 {
+				resp.InvalidClaims = invalidClaims
 			}
 			log.Infof("%d claims addedd successfully", addedClaims)
 		} else {
@@ -321,13 +331,19 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 
 	if op == "addClaim" {
 		if isAuth && validAuthPrefix {
-			err = cm.Trees[r.CensusID].AddClaim([]byte(r.ClaimData))
+			data, err := base64.StdEncoding.DecodeString(r.ClaimData)
+			if err != nil {
+				log.Warnf("error decoding base64 string: %s", err.Error())
+				resp.Ok = false
+				resp.Error = err.Error()
+			}
+			err = cm.Trees[r.CensusID].AddClaim(data)
 			if err != nil {
 				log.Warnf("error adding claim: %s", err.Error())
 				resp.Ok = false
 				resp.Error = err.Error()
 			} else {
-				log.Info("claim addedd successfully")
+				log.Debugf("claim added %x", data)
 			}
 		} else {
 			resp.Ok = false
@@ -440,10 +456,14 @@ func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPref
 		}
 		//dump the claim data and return it
 		var dumpValues []string
+		root := r.RootHash
+		if len(root) < 1 {
+			root = t.GetRoot()
+		}
 		if op == "dump" {
-			dumpValues, err = t.Dump(r.RootHash)
+			dumpValues, err = t.Dump(root)
 		} else {
-			dumpValues, err = t.DumpPlain(r.RootHash)
+			dumpValues, err = t.DumpPlain(root)
 		}
 		if err != nil {
 			resp.Error = err.Error()

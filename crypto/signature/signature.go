@@ -13,11 +13,11 @@ import (
 	crypto "github.com/ethereum/go-ethereum/crypto"
 )
 
-// AddressLengh is the lenght of an Ethereum address
+// AddressLength is the lenght of an Ethereum address
 const AddressLength = 20
 
-// SignatureLength is the size of an ECDSA signature
-const SignatureLength = 132
+// SignatureLength is the size of an ECDSA signature in hexString format
+const SignatureLength = 130
 
 // PubKeyLength is the size of a Public Key
 const PubKeyLength = 66
@@ -136,7 +136,7 @@ func DecompressPubKey(pubHexComp string) (string, error) {
 
 // EthAddrString return the Ethereum address from the ECDSA public key
 func (k *SignKeys) EthAddrString() string {
-	recoveredAddr := crypto.PubkeyToAddress(*k.Public).Bytes()
+	recoveredAddr := crypto.PubkeyToAddress(*k.Public)
 	return fmt.Sprintf("%x", recoveredAddr)
 }
 
@@ -162,12 +162,16 @@ func (k *SignKeys) SignJSON(message interface{}) (string, error) {
 	if err != nil {
 		return "", errors.New("error signing response body: %s")
 	}
-	return sanitizeHex(sig), nil
+	prefixedSig := "0x" + sanitizeHex(sig)
+	return prefixedSig, nil
 }
 
 // Verify verifies a message. Signature is HexString
 func (k *SignKeys) Verify(message, signHex string) (bool, error) {
 	pubHex, err := PubKeyFromSignature(message, signHex)
+	if err != nil {
+		return false, err
+	}
 	signature, err := hex.DecodeString(signHex)
 	if err != nil {
 		return false, err
@@ -192,12 +196,12 @@ func (k *SignKeys) VerifyJSON(message interface{}, signHex string) (bool, error)
 
 // VerifySender verifies if a message is sent by some Authorized address key
 func (k *SignKeys) VerifySender(msg, sigHex string) (bool, string, error) {
-	if len(k.Authorized) < 1 {
-		return true, "", nil
-	}
 	recoveredAddr, err := AddrFromSignature(msg, sigHex)
 	if err != nil {
 		return false, "", err
+	}
+	if len(k.Authorized) < 1 {
+		return true, recoveredAddr, nil
 	}
 	for _, addr := range k.Authorized {
 		if fmt.Sprintf("%x", addr) == recoveredAddr {
@@ -238,6 +242,9 @@ func AddrFromPublicKey(pubHex string) (string, error) {
 
 // PubKeyFromSignature recovers the ECDSA public key that created the signature of a message
 func PubKeyFromSignature(msg, sigHex string) (string, error) {
+	if len(sanitizeHex(sigHex)) != SignatureLength {
+		return "", errors.New("signature length not correct")
+	}
 	sig, err := hex.DecodeString(sanitizeHex(sigHex))
 	if err != nil {
 		return "", err
