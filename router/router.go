@@ -129,6 +129,16 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.registerMethod("importRemote", censusLocal, true)
 }
 
+//EnableVoteAPI enabled the Vote API in the Router
+func (r *Router) EnableVoteAPI() {
+	r.registerMethod("submitEnvelope", submitEnvelope, false)
+	r.registerMethod("getEnvelopeStatus", getEnvelopeStatus, false)
+	r.registerMethod("getEnvelope", getEnvelope, false)
+	r.registerMethod("getEnvelopeHeight", getEnvelopeHeight, false)
+	r.registerMethod("getProcessList", getProcessList, false)
+	r.registerMethod("getEnvelopeList", getEnvelopeList, false)
+}
+
 //Route routes requests through the Router object
 func (r *Router) Route() {
 	if len(r.publicRequestMap) == 0 && len(r.privateRequestMap) == 0 {
