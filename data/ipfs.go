@@ -243,7 +243,8 @@ func (i *IPFSHandle) clusterPin(path string) error {
 	}
 	pin := clusterapi.PinCid(cid)
 	pin.PinOptions.ReplicationFactorMax = -1
-	return i.cluster.Pin(context.Background(), pin)
+	_, err = i.cluster.Pin(context.Background(), cid, pin.PinOptions)
+	return err
 }
 
 //Unpin descriminator
@@ -272,7 +273,8 @@ func (i *IPFSHandle) clusterUnpin(path string) error {
 	if err != nil {
 		return err
 	}
-	return i.cluster.Unpin(context.Background(), rp.Cid())
+	_, err = i.cluster.Unpin(context.Background(), rp.Cid())
+	return err
 }
 
 //Listpins descriminator

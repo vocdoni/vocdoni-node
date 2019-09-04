@@ -35,7 +35,7 @@ var pluginOnce sync.Once
 // so it isn't accidentally called more than once.
 func InstallDatabasePlugins() {
 	pluginOnce.Do(func() {
-		loader, err := loader.NewPluginLoader()
+		loader, err := loader.NewPluginLoader("")
 		if err != nil {
 			panic(err)
 		}
@@ -70,16 +70,16 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, confProfiles []
 		}
 	}
 
-		for _, profile := range confProfiles {
-			transformer, ok := config.Profiles[profile]
-			if !ok {
-				return errors.Errorf("invalid configuration profile: %s", profile)
-			}
-
-			if err := transformer.Transform(conf); err != nil {
-				return err
-			}
+	for _, profile := range confProfiles {
+		transformer, ok := config.Profiles[profile]
+		if !ok {
+			return errors.Errorf("invalid configuration profile: %s", profile)
 		}
+
+		if err := transformer.Transform(conf); err != nil {
+			return err
+		}
+	}
 
 	if err := fsrepo.Init(repoRoot, conf); err != nil {
 		return err
@@ -133,7 +133,7 @@ func addDefaultAssets(out io.Writer, repoRoot string) error {
 
 	dkey, err := assets.SeedInitDocs(nd)
 	log.Errorf("init: seeding init docs failed: %s", err)
-	
+
 	log.Debugf("init: seeded init docs %s", dkey)
 
 	log.Infof("to get started, enter:\n\tipfs cat /ipfs/%s/readme\n\n", dkey)

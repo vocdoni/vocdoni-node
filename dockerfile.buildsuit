@@ -1,0 +1,16 @@
+FROM golang:alpine
+
+ENV COMPONENT_VERSION=1.0
+
+WORKDIR /app
+ENV GOPATH=
+ENV GW_DATA_DIR=/app/run
+ENV GW_LOGLEVEL=debug
+ADD . .
+
+RUN mkdir -p /app/run && \
+ apk update && apk add --no-cache build-base git binutils \
+ binutils-gold libc6-compat ca-certificates openssl linux-headers && \
+ go mod download
+ 
+CMD /app/dockerfiles/gateway/files/gatewayStart.sh
