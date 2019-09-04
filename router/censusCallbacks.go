@@ -10,7 +10,7 @@ import (
 )
 
 func censusLocal(request routerRequest, router *Router) {
-	var response types.CensusResponseMessage
+	var response types.ResponseMessage
 	var err error
 	auth := request.authenticated
 	addr := request.address
