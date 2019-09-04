@@ -141,19 +141,19 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 }
 
 // CheckAuth check if a census request message is authorized
-func (cm *CensusManager) CheckAuth(crm *types.RequestMessage) error {
-	if len(crm.Signature) < signature.SignatureLength || len(crm.Request.CensusID) < 1 {
+func (cm *CensusManager) CheckAuth(rm *types.RequestMessage) error {
+	if len(rm.Signature) < signature.SignatureLength || len(rm.Request.CensusID) < 1 {
 		return errors.New("signature or censusId not provided or invalid")
 	}
 	ns := new(Namespace)
 	for _, n := range cm.Census.Namespaces {
-		if n.Name == crm.Request.CensusID {
+		if n.Name == rm.Request.CensusID {
 			ns = &n
 		}
 	}
 
 	// Add root key, if method is addCensus
-	if crm.Request.Method == "addCensus" {
+	if rm.Request.Method == "addCensus" {
 		if len(cm.Census.RootKey) < signature.PubKeyLength {
 			log.Warn("root key does not exist, considering addCensus valid for any request")
 			return nil
@@ -167,8 +167,8 @@ func (cm *CensusManager) CheckAuth(crm *types.RequestMessage) error {
 
 	// Check timestamp
 	currentTime := int32(time.Now().Unix())
-	if crm.Request.Timestamp > currentTime+cm.AuthWindow ||
-		crm.Request.Timestamp < currentTime-cm.AuthWindow {
+	if rm.Request.Timestamp > currentTime+cm.AuthWindow ||
+		rm.Request.Timestamp < currentTime-cm.AuthWindow {
 		return errors.New("timestamp is not valid")
 	}
 
@@ -180,12 +180,12 @@ func (cm *CensusManager) CheckAuth(crm *types.RequestMessage) error {
 			return nil
 		}
 		valid := false
-		msg, err := json.Marshal(crm.Request)
+		msg, err := json.Marshal(rm.Request)
 		if err != nil {
 			return errors.New("cannot unmarshal")
 		}
 		for _, n := range ns.Keys {
-			valid, err = signature.Verify(string(msg), crm.Signature, n)
+			valid, err = signature.Verify(string(msg), rm.Signature, n)
 			if err != nil {
 				log.Warnf("verification error (%s)", err.Error())
 				valid = false
