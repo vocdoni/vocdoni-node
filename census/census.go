@@ -456,10 +456,14 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		//dump the claim data and return it
 		var dumpValues []string
+		root := r.RootHash
+		if len(root) < 1 {
+			root = t.GetRoot()
+		}
 		if op == "dump" {
-			dumpValues, err = t.Dump(r.RootHash)
+			dumpValues, err = t.Dump(root)
 		} else {
-			dumpValues, err = t.DumpPlain(r.RootHash)
+			dumpValues, err = t.DumpPlain(root)
 		}
 		if err != nil {
 			resp.Error = err.Error()

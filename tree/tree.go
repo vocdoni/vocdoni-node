@@ -139,14 +139,14 @@ func (t *Tree) Dump(root string) (claims []string, err error) {
 func (t *Tree) DumpPlain(root string) ([]string, error) {
 	var response []string
 	var err error
-	var rootHash *merkletree.Hash
+	var rootHash merkletree.Hash
 	if len(root) > 0 {
-		*rootHash, err = stringToHash(root)
+		rootHash, err = stringToHash(root)
 		if err != nil {
 			return response, err
 		}
 	}
-	err = t.Tree.Walk(rootHash, func(n *merkletree.Node) {
+	err = t.Tree.Walk(&rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
 			data := bytes.Trim(n.Value()[65:], "\x00")
 			data = bytes.Replace(data, []byte("\u0000"), nil, -1)

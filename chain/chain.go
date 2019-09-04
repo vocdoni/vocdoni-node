@@ -106,8 +106,8 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	if err != nil {
 		return err
 	}
-
 	ethConfig := eth.DefaultConfig
+
 	if c.NetworkId > 0 {
 		ethConfig.NetworkId = uint64(c.NetworkId)
 		g := new(core.Genesis)
@@ -128,13 +128,13 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	e.Node = n
 	e.Config = &ethConfig
 	e.Keys = ks
-
 	return nil
 }
 
 func (e *EthChainContext) Start() {
 	utils.RegisterEthService(e.Node, e.Config)
 	utils.StartNode(e.Node)
+
 	if len(e.Keys.Accounts()) < 1 {
 		e.createAccount()
 	} else {
@@ -149,6 +149,13 @@ func (e *EthChainContext) Start() {
 	if e.DefaultConfig.HTTPPort > 0 {
 		log.Infof("web3 HTTP endpoint http://%s:%d\n", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
 	}
+
+	var et *eth.Ethereum
+	err := e.Node.Service(&et)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	e.Eth = et
 }
 
 func (e *EthChainContext) TestTx(amount int) error {
