@@ -1,20 +1,21 @@
 package vochain
 
 import (
+	"encoding/json"
 	"errors"
 
-	codec "github.com/cosmos/cosmos-sdk/codec"
 	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
 // ValidateTx splits a tx into method and args parts and does some basic checks
 func ValidateTx(content []byte) (voctypes.ValidTx, error) {
+
 	var t voctypes.Tx
 	var vt voctypes.ValidTx
 	var err error
 
-	err = codec.Cdc.UnmarshalJSON(content, &t)
+	err = json.Unmarshal(content, &t)
 	// unmarshal bytes
 	if err != nil {
 		return vt, err
@@ -39,10 +40,10 @@ func ValidateTx(content []byte) (voctypes.ValidTx, error) {
 		vt.Args = args.(*voctypes.NewProcessTxArgs)
 	case voctypes.VoteTx:
 		vt.Args = args.(*voctypes.VoteTxArgs)
-	case voctypes.AddTrustedOracleTx:
-		vt.Args = args.(*voctypes.AddTrustedOracleTxArgs)
-	case voctypes.RemoveTrustedOracleTx:
-		vt.Args = args.(*voctypes.RemoveTrustedOracleTxArgs)
+	case voctypes.AddOracleTx:
+		vt.Args = args.(*voctypes.AddOracleTxArgs)
+	case voctypes.RemoveOracleTx:
+		vt.Args = args.(*voctypes.RemoveOracleTxArgs)
 	case voctypes.AddValidatorTx:
 		vt.Args = args.(*voctypes.AddValidatorTxArgs)
 	case voctypes.RemoveValidatorTx:

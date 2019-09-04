@@ -12,24 +12,23 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	dbm "github.com/tendermint/tm-db"
-	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
 // database keys
 var (
-	processesKey          = []byte("processesKey")
-	validatorsPubKKey     = []byte("validatorsPubKKey")
-	trustedOraclesPubKKey = []byte("trustedOraclesPubKKey")
-	heightKey             = []byte("heightKey")
-	appHashKey            = []byte("appHashKey")
+	processesKey  = []byte("processesKey")
+	validatorsKey = []byte("validatorsKey")
+	oraclesKey    = []byte("oraclesKey")
+	heightKey     = []byte("heightKey")
+	appHashKey    = []byte("appHashKey")
 )
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
-	height  int64  // heigth is the number of blocks of the app
-	appHash []byte // appHash is the root hash of the app
+	height  int64  `json:"height"`  // heigth is the number of blocks of the app
+	appHash []byte `json:"appHash"` // appHash is the root hash of the app
 	db      dbm.DB // database allowing processes be persistent
 
 	// volatile states
@@ -114,13 +113,13 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	case "newProcessTx":
 		npta := tx.Args.(*voctypes.NewProcessTxArgs)
 		// check if process exists
-		if _, ok := app.deliverTxState.Processes[npta.MkRoot]; !ok {
-			app.deliverTxState.Processes[npta.MkRoot] = &voctypes.Process{
+		if _, ok := app.deliverTxState.Processes[npta.ProcessID]; !ok {
+			app.deliverTxState.Processes[npta.ProcessID] = &voctypes.Process{
 				EntityID:       npta.EntityID,
 				Votes:          make(map[string]*voctypes.Vote, 0),
 				MkRoot:         npta.MkRoot,
 				NumberOfBlocks: npta.NumberOfBlocks,
-				InitBlock:      npta.InitBlock,
+				StartBlock:     npta.StartBlock,
 				CurrentState:   voctypes.Scheduled,
 				EncryptionKeys: npta.EncryptionKeys,
 			}
@@ -146,24 +145,24 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		} else {
 			vlog.Info("Process does not exist")
 		}
-	case "addTrustedOracleTx":
-		atot := tx.Args.(*voctypes.AddTrustedOracleTxArgs)
+	case "addOracleTx":
+		atot := tx.Args.(*voctypes.AddOracleTxArgs)
 		found := false
-		for _, t := range app.deliverTxState.TrustedOraclesPubK {
+		for _, t := range app.deliverTxState.Oracles {
 			if reflect.DeepEqual(t, atot.Address) {
 				found = true
 			}
 		}
 		if !found {
-			app.deliverTxState.TrustedOraclesPubK = append(app.deliverTxState.TrustedOraclesPubK, atot.Address)
+			app.deliverTxState.Oracles = append(app.deliverTxState.Oracles, atot.Address.String())
 		} else {
 			vlog.Info("Trusted oracle is already added")
 		}
-	case "removeTrustedOracleTx":
-		rtot := tx.Args.(*voctypes.RemoveTrustedOracleTxArgs)
+	case "removeOracleTx":
+		rtot := tx.Args.(*voctypes.RemoveOracleTxArgs)
 		found := false
 		position := -1
-		for pos, t := range app.deliverTxState.TrustedOraclesPubK {
+		for pos, t := range app.deliverTxState.Oracles {
 			if reflect.DeepEqual(t, rtot.Address) {
 				found = true
 				position = pos
@@ -171,9 +170,9 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		}
 
 		if found {
-			app.deliverTxState.TrustedOraclesPubK[len(app.deliverTxState.TrustedOraclesPubK)-1] = app.deliverTxState.TrustedOraclesPubK[position]
-			app.deliverTxState.TrustedOraclesPubK[position] = app.deliverTxState.TrustedOraclesPubK[len(app.deliverTxState.TrustedOraclesPubK)-1]
-			app.deliverTxState.TrustedOraclesPubK = app.deliverTxState.TrustedOraclesPubK[:len(app.deliverTxState.TrustedOraclesPubK)-1]
+			app.deliverTxState.Oracles[len(app.deliverTxState.Oracles)-1] = app.deliverTxState.Oracles[position]
+			app.deliverTxState.Oracles[position] = app.deliverTxState.Oracles[len(app.deliverTxState.Oracles)-1]
+			app.deliverTxState.Oracles = app.deliverTxState.Oracles[:len(app.deliverTxState.Oracles)-1]
 		} else {
 			vlog.Info("Trusted oracle not present in list, can not be removed")
 		}
@@ -184,13 +183,8 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 
 	}
 
-	// marshall processes
-	newBytes, err := json.Marshal(app.deliverTxState.Processes)
-	if err != nil {
-		vlog.Errorf("Cannot marshal DeliverTxState processes")
-	}
 	// save process into db
-	app.db.Set(processesKey, newBytes)
+	app.db.Set(processesKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Processes))
 
 	return abcitypes.ResponseDeliverTx{Info: tx.String(), Code: 0}
 }
@@ -221,10 +215,7 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	app.db.Set(heightKey, b)
 
 	// marhsall state
-	state, err := json.Marshal(*app.deliverTxState)
-	if err != nil {
-		vlog.Errorf("Cannot marshal processes")
-	}
+	state := codec.Cdc.MustMarshalJSON(*app.deliverTxState)
 	// hash of the state
 	h := sha256.New()
 	h.Write(state)
@@ -251,67 +242,10 @@ func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 // ResponseInitChain can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-	if len(req.AppStateBytes) != 0 {
-		app.deliverTxState = voctypes.NewState()
-		codec.Cdc.UnmarshalJSON(req.AppStateBytes, app.deliverTxState)
-	} else {
-		// load processes from db
-		var processes map[string]*voctypes.Process
-		processesBytes := app.db.Get(processesKey)
-		if len(processesBytes) != 0 {
-			err := json.Unmarshal(processesBytes, &processes)
-			if err != nil {
-				vlog.Errorf("Cannot unmarshal processes")
-			}
-			app.deliverTxState.Processes = processes
-		}
-
-		// load validators public keys from db
-		var valk []tmtypes.GenesisValidator
-		validatorBytes := app.db.Get(validatorsPubKKey)
-		if len(validatorBytes) != 0 {
-			err := json.Unmarshal(validatorBytes, &valk)
-			if err != nil {
-				vlog.Errorf("Cannot unmarshal validators public keys")
-			}
-			app.deliverTxState.ValidatorsPubK = valk
-		}
-
-		// load trusted oracles public keys from db
-		var orlk []eth.Address
-		oraclesBytes := app.db.Get(trustedOraclesPubKKey)
-		if len(oraclesBytes) != 0 {
-			err := json.Unmarshal(oraclesBytes, &orlk)
-			if err != nil {
-				vlog.Errorf("Cannot unmarshal trusted oracles public keys")
-			}
-			app.deliverTxState.TrustedOraclesPubK = orlk
-		}
-	}
-
-	// load chain height from db
-	var height int64
-	heightBytes := app.db.Get(heightKey)
-	if len(heightBytes) != 0 {
-		err := json.Unmarshal(heightBytes, &height)
-		if err != nil {
-			vlog.Errorf("Cannot unmarshal height")
-		}
-	}
-	app.height = height
-
-	// load apphash from db
-	/*
-		if len(req.AppStateBytes) == 0 {
-			app.appHash = app.db.Get(appHashKey)
-		} else {
-			h := sha256.New()
-			h.Write(req.AppStateBytes)
-			app.appHash = h.Sum(nil)
-		}
-	*/
-	app.appHash = app.db.Get(appHashKey)
-
+	app.deliverTxState = voctypes.NewState()
+	codec.Cdc.UnmarshalJSON(req.AppStateBytes, app.deliverTxState)
+	app.db.Set(validatorsKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Validators))
+	app.db.Set(oraclesKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Oracles))
 	return abcitypes.ResponseInitChain{}
 }
 
@@ -335,7 +269,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	var processes map[string]*voctypes.Process
 	processesBytes := app.db.Get(processesKey)
 	if len(processesBytes) != 0 {
-		err := json.Unmarshal(processesBytes, &processes)
+		err := codec.Cdc.UnmarshalJSON(processesBytes, &processes)
 		if err != nil {
 			vlog.Errorf("Cannot unmarshal processes")
 		}
@@ -344,30 +278,33 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 
 	// load validators public keys from db
 	var valk []tmtypes.GenesisValidator
-	validatorBytes := app.db.Get(validatorsPubKKey)
+	validatorBytes := app.db.Get(validatorsKey)
+	vlog.Infof("Validator bytes beginblock: %v", validatorBytes)
 	if len(validatorBytes) != 0 {
-		err := json.Unmarshal(validatorBytes, &valk)
+		err := codec.Cdc.UnmarshalJSON(validatorBytes, &valk)
 		if err != nil {
 			vlog.Errorf("Cannot unmarshal validators public keys")
 		}
-		app.deliverTxState.ValidatorsPubK = valk
+		app.deliverTxState.Validators = valk
 	}
 
 	// load trusted oracles public keys from db
-	var orlk []eth.Address
-	oraclesBytes := app.db.Get(trustedOraclesPubKKey)
+	var orlk []string
+	oraclesBytes := app.db.Get(oraclesKey)
 	if len(oraclesBytes) != 0 {
-		err := json.Unmarshal(oraclesBytes, &orlk)
+		err := codec.Cdc.UnmarshalJSON(oraclesBytes, &orlk)
 		if err != nil {
 			vlog.Errorf("Cannot unmarshal trusted oracles public keys")
 		}
-		app.deliverTxState.TrustedOraclesPubK = orlk
+		app.deliverTxState.Oracles = orlk
 	}
 
 	// app height and app hash from the request
 	app.height = req.Header.Height
 	app.appHash = req.Header.AppHash
 
+	vlog.Infof("APP HEIGHT ON BEGIN BLOCK: %v", app.height)
+	vlog.Infof("APP HASH ON BEGIN BLOCK: %v", app.appHash)
 	vlog.Infof("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
 	return abcitypes.ResponseBeginBlock{}
 }

@@ -8,8 +8,6 @@ type Vote struct {
 	Payload string `json:"payload"`
 	// CensusProof contains the prove indicating that the user is in the census of the process
 	CensusProof string `json:"censusproof"`
-	// Nullifier avoids double voting
-	Nullifier string `json:"nullifier"`
 }
 
 // NewVote returns a new Vote instance

@@ -1,36 +1,91 @@
 package vochain
 
-// Constants for testing basic voting stuff required
-// This can be ethereum pulled data
+// ALL SIGNED WITH -> 0xf904848ea36c46817096e94f932a9901e377c8a5
 const (
-	// PER PROCESS
-	// ProcessID Id of the voting process
-	ProcessID = 0
-	// ProcessMerkleRoot Process Merkle Root
-	ProcessMerkleRoot = "4148ce7c58382acc72f3efe1b674dbf29e6786a3f1e22cc8fa2504aa611e2456"
-	// ProcessInitBlock Block Height where voting can be initiated
-	ProcessInitBlock = 10
-	// ProcessEndBlock Block Height where voting will be terminated
-	ProcessEndBlock = 20
-	// ProcessEncryptionKeys1 Encry[topm]
-	ProcessEncryptionKeys1 = "oJ7aREF7FucoW+/zTlr1NByzkUGniNrTCRMeZiMcDVg="
-	// ProcessEncryptionKeys2
-	ProcessEncryptionKeys2 = "oJ7aREF7FucoW+/zTlr1NByzkUGniNrTCRMeZiMcEVg="
-	// ProcessEncryptionKeys3
-	ProcessEncryptionKeys3 = "oJ7aREF7FucoW+/zTlr1NByzkUGniNrTCRMeZiMcFVg="
-	// GLOBAL
-	// ChainID Id of the blockchain to be used
-	ChainID = "0x1"
-	// ValidatorsPubK1 Public keys of the tendermint Validators
-	ValidatorsPubK1 = "oJ7aREF7FucoW+/zTlr1NByzkUGniNrTCRMeZiMcAVg="
-	// ValidatorsPubK2
-	ValidatorsPubK2 = "oJ7aREF7FucoW+/zTlr1NByzkUGniNrTCRMeZiMcBVg="
-	// ValidatorsPubK3
-	ValidatorsPubK3 = "oJ7aREF7FucoW+/zTlr1NByzkUGniNrTCRMeZiMcCVg="
-	//  CensusManagersPubK1 Public keys of the Census managers
-	CensusManagersPubK1 = "oJ7aREF7FucoW+/zTlr1NByzkUGniNrTCRMeZiMcGVg="
-	// CensusManagersPubK2
-	CensusManagersPubK2 = "oJ7aREF7FucoW+/zTlr1NByzkUGniNrTCRMeZiMcHVg="
-	// CensusManagersPubK3
-	CensusManagersPubK3 = "oJ7aREF7FucoW+/zTlr1NByzkUGniNrTCRMeZiMcIVg="
+
+	// ________________________ NEW PROCESS ________________________
+
+	// in hex -> 0x7b0a09226d6574686f64223a20226e657750726f636573735478222c0a0922656e6372797074696f6e4b657973223a205b0a09092230786361626238613361373365613461303364303235613661633265626262623139613534356534666231306537393165633962356339343264373761613230373630663634653436303463646662656336363534333561333832613863396266643536306336663066636138613237303863646133303266363538333638623336222c0a09092230783936373861643061613266626437663231323233396532316564313437326538346361353538666563663730613534626266373930316438396333303631393163353265376631303031323936303038356563646262656562323265363361386538366235386637383839393062346462353363646634653061353561633165220a095d2c0a0922656e746974794964223a2022307838316237323631663836343631396165646631616432666331666365346236346338616564393065346261653062383163326638343265663731373539336466222c200a0922656e746974795265736f6c766572223a2022307864616331376639353864326565353233613232303632303639393435393763313364383331656337222c0a0922696e6974426c6f636b223a2035302c200a09226d6574616461746148617368223a2022307839346437323631663836343631396165646631616432666331666365346236346338616564393065346261653062383163326638343265663731373539356565222c200a09226d6b526f6f74223a2022307834356437323632663836343631396165646631616432666331666365626236346338616564393065346261653062383163326638343265663731373539356666222c200a09226e756d6265724f66426c6f636b73223a2032302c0a092270726f636573734964223a2022307863643032303739313530346164336461313231613666616563383131306236326363616334363936396230636636663863333439303336336663653635613632222c0a092274696d657374616d70223a20313535363131303637310a7d
+	HARDCODED_NEW_PROCESS_TX = `{"method":"newProcessTx", "args": { "encryptionKeys": "0xcabb8a3a73ea4a03d025a6ac2ebbbb19a545e4fb10e791ec9b5c942d77aa20760f64e4604cdfbec665435a382a8c9bfd560c6f0fca8a2708cda302f658368b36,0x9678ad0aa2fbd7f212239e21ed1472e84ca558fecf70a54bbf7901d89c306191c52e7f10012960085ecdbbeeb22e63a8e86b58f788990b4db53cdf4e0a55ac1e","entityId":"0x81b7261f864619aedf1ad2fc1fce4b64c8aed90e4bae0b81c2f842ef717593df","entityResolver":"0xdac17f958d2ee523a2206206994597c13d831ec7","startBlock":50,"metadataHash":"0x94d7261f864619aedf1ad2fc1fce4b64c8aed90e4bae0b81c2f842ef717595ee","mkRoot":"0x45d7262f864619aedf1ad2fc1fcebb64c8aed90e4bae0b81c2f842ef717595ff","numberOfBlocks":20,"processId":"0xcd020791504ad3da121a6faec8110b62ccac46969b0cf6f8c3490363fce65a62","timestamp":1556110671}, "signature":"81eaf8091d676ba02a2613662e85ced7cb5b9ef41b39f3524148c6646335acdd5e83a2a4e6a67daa97a0f209da01cf40100289afbd5b4ba598a4c58711b63eda1c"}`
+
+	/*
+	   {
+	     "address": "0xf904848ea36c46817096e94f932a9901e377c8a5",
+	     "msg": "{\"method\":\"newProcessTx\",\"encryptionKeys\":[\"0xcabb8a3a73ea4a03d025a6ac2ebbbb19a545e4fb10e791ec9b5c942d77aa20760f64e4604cdfbec665435a382a8c9bfd560c6f0fca8a2708cda302f658368b36\",\"0x9678ad0aa2fbd7f212239e21ed1472e84ca558fecf70a54bbf7901d89c306191c52e7f10012960085ecdbbeeb22e63a8e86b58f788990b4db53cdf4e0a55ac1e\"],\"entityId\":\"0x81b7261f864619aedf1ad2fc1fce4b64c8aed90e4bae0b81c2f842ef717593df\",\"entityResolver\":\"0xdac17f958d2ee523a2206206994597c13d831ec7\",\"initBlock\":50,\"metadataHash\":\"0x94d7261f864619aedf1ad2fc1fce4b64c8aed90e4bae0b81c2f842ef717595ee\",\"mkRoot\":\"0x45d7262f864619aedf1ad2fc1fcebb64c8aed90e4bae0b81c2f842ef717595ff\",\"numberOfBlocks\":20,\"processId\":\"0xcd020791504ad3da121a6faec8110b62ccac46969b0cf6f8c3490363fce65a62\",\"timestamp\":1556110671}",
+	     "sig": "0x81eaf8091d676ba02a2613662e85ced7cb5b9ef41b39f3524148c6646335acdd5e83a2a4e6a67daa97a0f209da01cf40100289afbd5b4ba598a4c58711b63eda1c",
+	     "version": "3",
+	     "signer": "MEW"
+	   }
+	*/
+
+	// ________________________ NEW VOTE ________________________
+
+	// payload in base64
+	HARDCODED_NEW_VOTE_TX = `{"method":"voteTx","args":{"censusProof":"0x45d7262f864619aedf1ad2fc1fcebb64c8aed90e4bae0b81c2f842ef717595ff","nullifier":"0x94d7261f864619aedf1ad2fc1fce4b64c8aed90e4bae0b81c2f842ef717595ee","payload":"VGhpcyBpcyBteSB2b3Rl","processId":"0xcd020791504ad3da121a6faec8110b62ccac46969b0cf6f8c3490363fce65a62","timestamp":1558110671}}`
+
+	// ________________________ ADD ORACLE ________________________
+
+	HARDCODED_ADD_TRUSTED_ORACLE_TX = `{"method":"addTrustedOracleTx","address":"0xf904848ea36c46817096e94f932a9901e377c8a5","timestamp":1558110676}`
+
+	/*
+	   {
+	     "address": "0xf904848ea36c46817096e94f932a9901e377c8a5",
+	     "msg": "{\"method\":\"addTrustedOracleTx\",\"address\":\"0xf904848ea36c46817096e94f932a9901e377c8a5\",\"timestamp\":1558110676}",
+	     "sig": "0xd8c68073d235fc92a7f673d07fca964f4c3507dd5a4282e235110e4a13e5e6dc39735ecd3d85a625a96a9c3d9e1f0694f378ff044dd676169fa868566638140d1b",
+	     "version": "3",
+	     "signer": "MEW"
+	   }
+	*/
+
+	// ________________________ REMOVE ORACLE ________________________
+
+	HARDCODED_REMOVE_TRUSTED_ORACLE_TX = `{"method":"removeTrustedOracleTx","address":"0xf904848ea36c46817096e94f932a9901e377c8a5","timestamp":1558110676}`
+
+	/*
+	   {
+	     "address": "0xf904848ea36c46817096e94f932a9901e377c8a5",
+	     "msg": "{\"method\":\"removeTrustedOracleTx\",\"address\":\"0xf904848ea36c46817096e94f932a9901e377c8a5\",\"timestamp\":1558110676}",
+	     "sig": "0xc9b49b79624bb226161ace5ad742c06a7791ff9f341f8dd4154226f18dc84acf566d031ba9437ef9e9a6d5f66fd1da9c39b63cb7a7127da05c576756864e0f8f1b",
+	     "version": "3",
+	     "signer": "MEW"
+	   }
+	*/
+
+	// ________________________ ADD VALIDATOR ________________________
+
+	HARDCODED_ADD_VALIDATOR_TX = `{"method":"addValidatorTx","address":"0xf904848ea36c46817096e94f932a9901e377c8a5","power":10,"timestamp":1558110676}`
+
+	/*
+	   {
+	     "address": "0xf904848ea36c46817096e94f932a9901e377c8a5",
+	     "msg": "{\"method\":\"addValidatorTx\",\"address\":\"0xf904848ea36c46817096e94f932a9901e377c8a5\",\"power\":10,\"timestamp\":1558110676}",
+	     "sig": "0x1a8195310940f45e63279bf7ba45a3cb71b5b817564f077e99c2ebb089b657984578c4e43dd728ac3ed124fa20708cb07ed430e3c3a236a25007c6bea7b201361b",
+	     "version": "3",
+	     "signer": "MEW"
+	   }
+	*/
+
+	// ________________________ REMOVE VALIDATOR ________________________
+
+	HARDCODED_REMOVE_VALIDATOR_TX = `{"method":"removeValidatorTx","address":"0xf904848ea36c46817096e94f932a9901e377c8a5","timestamp":1558110676}`
+
+	/*
+	   {
+	     "address": "0xf904848ea36c46817096e94f932a9901e377c8a5",
+	     "msg": "{\"method\":\"removeValidatorTx\",\"address\":\"0xf904848ea36c46817096e94f932a9901e377c8a5\",\"timestamp\":1558110676}",
+	     "sig": "0xc129e4b7993fecaaca4b5be6e0f9e272521fc481a8b82ff3ec866a663bc18a9830e7b8998f1864fe215fa9871fbfcc5107bf07c51c5fc81b72a85a5590ffc9981c",
+	     "version": "3",
+	     "signer": "MEW"
+	   }
+	*/
+
+	// ________________________ VALIDATORS ________________________
+
+	HARDCODED_VALIDATOR_1 = `{"address":"8B8218BDA1C6394A0C38F998789817EC25AFCA62","pub_key":{"type":"tendermint/PubKeyEd25519","value":"CIXn+6+K3/8M4ZZyyvz3usDmn3kyJ0ENEkAnRnUh/IQ="},"power":"10","name":""}`
+	HARDCODED_VALIDATOR_2 = `{"address":"94B36AC90E8C5929071CDA5654BAA2FD8C981209","pub_key":{"type":"tendermint/PubKeyEd25519","value":"wK0tpitmQh/vhIZmDSQbDJit3QOhNZxZC4PBxmAsqEc="},"power":"10","name":""}`
+
+	// ________________________ ORACLES ________________________
+
+	HARDCODED_ORACLE_1 = "0xf904848ea36c46817096e94f932a9901e377c8a5"
+	HARDCODED_ORACLE_2 = "0x52bc44d5378309ee2abf1539bf71de1b7d7be3b5"
 )
