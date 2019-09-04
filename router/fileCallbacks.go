@@ -79,28 +79,6 @@ func fetchFile(request routerRequest, router *Router) {
 	}
 }
 
-/*
-
-func addFileMethod(msg types.Message, request routerRequest, router *Router) {
-	var fileRequest types.AddFileRequest
-	var errMsg string
-	if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-		errMsg = fmt.Sprintf("could not unmarshal AddFileRequest (%s)", err.Error())
-		sendError(router.transport, router.signer, msg, fileRequest.ID, errMsg)
-		return
-	}
-	content := fileRequest.Request.Content
-	b64content, err := base64.StdEncoding.DecodeString(content)
-	if err != nil {
-		errMsg = "could not decode base64 content"
-		sendError(router.transport, router.signer, msg, fileRequest.ID, errMsg)
-		return
-	}
-	reqType := fileRequest.Request.Type
-	addFile(reqType, fileRequest.ID, b64content, msg, router.storage, router.transport, router.signer)
-}
-*/
-
 func addFile(request routerRequest, router *Router) {
 	log.Infof("calling addFile")
 	reqType := request.structured.Type
@@ -142,20 +120,6 @@ func addFile(request routerRequest, router *Router) {
 	}
 }
 
-/*
-
-func pinListMethod(msg types.Message, request routerRequest, router *Router) {
-	var fileRequest types.PinListRequest
-	var errMsg string
-	if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-		errMsg = fmt.Sprintf("couldn't decode into PinListRequest type from request (%s)", err.Error())
-		sendError(router.transport, router.signer, msg, fileRequest.ID, errMsg)
-		return
-	}
-	pinList(fileRequest.ID, msg, router.storage, router.transport, router.signer)
-}
-*/
-
 func pinList(request routerRequest, router *Router) {
 	var errMsg string
 	log.Info("calling PinList")
@@ -189,19 +153,6 @@ func pinList(request routerRequest, router *Router) {
 	}
 }
 
-/*
-
-func pinFileMethod(msg types.Message, request routerRequest, router *Router) {
-	var fileRequest types.PinFileRequest
-	if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-		sendError(router.transport, router.signer, msg, fileRequest.ID, fmt.Sprintf("could not decode PinFileRequest (%s)", err.Error()))
-		return
-	}
-	pinFile(fileRequest.Request.URI, fileRequest.ID, msg, router.storage, router.transport, router.signer)
-}
-
-*/
-
 func pinFile(request routerRequest, router *Router) {
 	uri := request.structured.URI
 	log.Infof("calling PinFile %s", uri)
@@ -227,18 +178,6 @@ func pinFile(request routerRequest, router *Router) {
 		}
 	}
 }
-
-/*
-func unpinFileMethod(msg types.Message, request routerRequest, router *Router) {
-	var fileRequest types.UnpinFileRequest
-	if err := json.Unmarshal(msg.Data, &fileRequest); err != nil {
-		sendError(router.transport, router.signer, msg, fileRequest.ID,
-			fmt.Sprintf("could not decode UnpinFileRequest (%s)", err.Error()))
-	} else {
-		unPinFile(fileRequest.Request.URI, fileRequest.ID, msg, router.storage, router.transport, router.signer)
-	}
-}
-*/
 
 func unpinFile(request routerRequest, router *Router) {
 	uri := request.structured.URI
