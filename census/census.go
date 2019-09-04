@@ -123,7 +123,7 @@ func (cm *CensusManager) save() error {
 	return ioutil.WriteFile(nsConfig, data, 644)
 }
 
-func httpReply(resp *types.CensusResponseMessage, w http.ResponseWriter) {
+func httpReply(resp *types.ResponseMessage, w http.ResponseWriter) {
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -141,19 +141,19 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 }
 
 // CheckAuth check if a census request message is authorized
-func (cm *CensusManager) CheckAuth(crm *types.CensusRequestMessage) error {
-	if len(crm.Signature) < signature.SignatureLength || len(crm.Request.CensusID) < 1 {
+func (cm *CensusManager) CheckAuth(rm *types.RequestMessage) error {
+	if len(rm.Signature) < signature.SignatureLength || len(rm.Request.CensusID) < 1 {
 		return errors.New("signature or censusId not provided or invalid")
 	}
 	ns := new(Namespace)
 	for _, n := range cm.Census.Namespaces {
-		if n.Name == crm.Request.CensusID {
+		if n.Name == rm.Request.CensusID {
 			ns = &n
 		}
 	}
 
 	// Add root key, if method is addCensus
-	if crm.Request.Method == "addCensus" {
+	if rm.Request.Method == "addCensus" {
 		if len(cm.Census.RootKey) < signature.PubKeyLength {
 			log.Warn("root key does not exist, considering addCensus valid for any request")
 			return nil
@@ -167,8 +167,8 @@ func (cm *CensusManager) CheckAuth(crm *types.CensusRequestMessage) error {
 
 	// Check timestamp
 	currentTime := int32(time.Now().Unix())
-	if crm.Request.Timestamp > currentTime+cm.AuthWindow ||
-		crm.Request.Timestamp < currentTime-cm.AuthWindow {
+	if rm.Request.Timestamp > currentTime+cm.AuthWindow ||
+		rm.Request.Timestamp < currentTime-cm.AuthWindow {
 		return errors.New("timestamp is not valid")
 	}
 
@@ -180,12 +180,12 @@ func (cm *CensusManager) CheckAuth(crm *types.CensusRequestMessage) error {
 			return nil
 		}
 		valid := false
-		msg, err := json.Marshal(crm.Request)
+		msg, err := json.Marshal(rm.Request)
 		if err != nil {
 			return errors.New("cannot unmarshal")
 		}
 		for _, n := range ns.Keys {
-			valid, err = signature.Verify(string(msg), crm.Signature, n)
+			valid, err = signature.Verify(string(msg), rm.Signature, n)
 			if err != nil {
 				log.Warnf("verification error (%s)", err.Error())
 				valid = false
@@ -205,7 +205,7 @@ func (cm *CensusManager) CheckAuth(crm *types.CensusRequestMessage) error {
 // HTTPhandler handles an API census manager request via HTTP
 func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *signature.SignKeys) {
 	log.Debug("new request received")
-	var rm types.CensusRequestMessage
+	var rm types.RequestMessage
 	if ok := checkRequest(w, req); !ok {
 		return
 	}
@@ -229,7 +229,7 @@ func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, s
 		auth = false
 	}
 	resp := cm.Handler(&rm.Request, auth, "")
-	respMsg := new(types.CensusResponseMessage)
+	respMsg := new(types.ResponseMessage)
 	respMsg.Response = *resp
 	respMsg.ID = rm.ID
 	respMsg.Response.Request = rm.ID
@@ -243,8 +243,8 @@ func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, s
 // Handler handles an API census manager request.
 // isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
 // censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
-func (cm *CensusManager) Handler(r *types.CensusRequest, isAuth bool, censusPrefix string) *types.CensusResponse {
-	resp := new(types.CensusResponse)
+func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string) *types.MetaResponse {
+	resp := new(types.MetaResponse)
 	op := r.Method
 	var err error
 

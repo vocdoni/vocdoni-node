@@ -51,7 +51,7 @@ import (
 var c *websocket.Conn
 
 func TestCensus(t *testing.T) {
-	log.InitLoggerAtLevel("debug")
+	log.InitLoggerAtLevel("Debug")
 	// create the proxy to handle HTTP queries
 	pxy := net.NewProxy()
 	pxy.C.Address = "127.0.0.1"
@@ -128,7 +128,7 @@ func TestCensus(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// Send the API requets
-	var req types.CensusRequest
+	var req types.MetaRequest
 
 	// Create census
 	req.Method = "addCensus"
@@ -244,10 +244,10 @@ func TestCensus(t *testing.T) {
 	os.RemoveAll(censusDir)
 }
 
-func sendCensusReq(req types.CensusRequest, signer *sig.SignKeys, sign bool) (types.CensusResponse, error) {
-	var cmRes types.CensusResponseMessage
-	var resp types.CensusResponse
-	var cmReq types.CensusRequestMessage
+func sendCensusReq(req types.MetaRequest, signer *sig.SignKeys, sign bool) (types.MetaResponse, error) {
+	var cmRes types.ResponseMessage
+	var resp types.MetaResponse
+	var cmReq types.RequestMessage
 	var err error
 	cmReq.Request = req
 	cmReq.ID = fmt.Sprintf("%d", rand.Intn(1000))
