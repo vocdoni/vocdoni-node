@@ -59,7 +59,7 @@ func fetchFile(request routerRequest, router *Router) {
 	} else {
 		b64content := base64.StdEncoding.EncodeToString(content)
 		log.Debugf("file fetched, b64 size %d", len(b64content))
-		var response types.FetchResponse
+		var response types.ResponseMessage
 		response.ID = request.id
 		response.Response.Content = b64content
 		response.Response.Request = request.id
@@ -122,7 +122,7 @@ func addFile(request routerRequest, router *Router) {
 			return
 		}
 		log.Debugf("added file %s, b64 size of %d", cid, len(b64content))
-		var response types.AddResponse
+		var response types.ResponseMessage
 		response.ID = request.id
 		response.Response.Request = request.id
 		response.Response.Timestamp = int32(time.Now().Unix())
@@ -170,7 +170,7 @@ func pinList(request routerRequest, router *Router) {
 		errMsg = fmt.Sprintf("internal error parsing pins (%s)", err.Error())
 		sendError(router.transport, router.signer, request.context, request.id, errMsg)
 	} else {
-		var response types.ListPinsResponse
+		var response types.ResponseMessage
 		response.ID = request.id
 		response.Response.Files = pinsJSONArray
 		response.Response.Request = request.id
@@ -209,9 +209,9 @@ func pinFile(request routerRequest, router *Router) {
 	if err != nil {
 		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("error pinning file (%s)", err.Error()))
 	} else {
-		var response types.BoolResponse
+		var response types.ResponseMessage
 		response.ID = request.id
-		response.Response.OK = true
+		response.Response.Ok = true
 		response.Response.Request = request.id
 		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Signature, err = router.signer.SignJSON(response.Response)
@@ -247,9 +247,9 @@ func unpinFile(request routerRequest, router *Router) {
 	if err != nil {
 		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unpin file (%s)", err.Error()))
 	} else {
-		var response types.BoolResponse
+		var response types.ResponseMessage
 		response.ID = request.id
-		response.Response.OK = true
+		response.Response.Ok = true
 		response.Response.Request = request.id
 		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Signature, err = router.signer.SignJSON(response.Response)

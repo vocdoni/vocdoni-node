@@ -123,7 +123,7 @@ func (cm *CensusManager) save() error {
 	return ioutil.WriteFile(nsConfig, data, 644)
 }
 
-func httpReply(resp *types.CensusResponseMessage, w http.ResponseWriter) {
+func httpReply(resp *types.ResponseMessage, w http.ResponseWriter) {
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -141,7 +141,7 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 }
 
 // CheckAuth check if a census request message is authorized
-func (cm *CensusManager) CheckAuth(crm *types.MessageRequest) error {
+func (cm *CensusManager) CheckAuth(crm *types.RequestMessage) error {
 	if len(crm.Signature) < signature.SignatureLength || len(crm.Request.CensusID) < 1 {
 		return errors.New("signature or censusId not provided or invalid")
 	}
@@ -205,7 +205,7 @@ func (cm *CensusManager) CheckAuth(crm *types.MessageRequest) error {
 // HTTPhandler handles an API census manager request via HTTP
 func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *signature.SignKeys) {
 	log.Debug("new request received")
-	var rm types.MessageRequest
+	var rm types.RequestMessage
 	if ok := checkRequest(w, req); !ok {
 		return
 	}
@@ -229,7 +229,7 @@ func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, s
 		auth = false
 	}
 	resp := cm.Handler(&rm.Request, auth, "")
-	respMsg := new(types.CensusResponseMessage)
+	respMsg := new(types.ResponseMessage)
 	respMsg.Response = *resp
 	respMsg.ID = rm.ID
 	respMsg.Response.Request = rm.ID
@@ -243,8 +243,8 @@ func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, s
 // Handler handles an API census manager request.
 // isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
 // censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
-func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string) *types.CensusResponse {
-	resp := new(types.CensusResponse)
+func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string) *types.MetaResponse {
+	resp := new(types.MetaResponse)
 	op := r.Method
 	var err error
 

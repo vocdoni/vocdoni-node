@@ -68,7 +68,7 @@ type routerRequest struct {
 
 //semi-unmarshalls message, returns method name
 func (r *Router) getRequest(payload []byte, context types.MessageContext) (request routerRequest, err error) {
-	var msgStruct types.MessageRequest
+	var msgStruct types.RequestMessage
 	err = json.Unmarshal(payload, &msgStruct)
 	if err != nil {
 		log.Errorf("could not unmarshall JSON, error: %s", err)
@@ -163,7 +163,7 @@ func (r *Router) Route() {
 func sendError(transport net.Transport, signer signature.SignKeys, context types.MessageContext, requestID, errMsg string) {
 	log.Warn(errMsg)
 	var err error
-	var response types.ErrorResponse
+	var response types.ErrorMessage
 	response.ID = requestID
 	response.Error.Request = requestID
 	response.Error.Timestamp = int32(time.Now().Unix())
