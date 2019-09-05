@@ -2,6 +2,7 @@ package tree
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"os/user"
 
@@ -150,7 +151,8 @@ func (t *Tree) DumpPlain(root string) ([]string, error) {
 		if n.Type == merkletree.NodeTypeLeaf {
 			data := bytes.Trim(n.Value()[65:], "\x00")
 			data = bytes.Replace(data, []byte("\u0000"), nil, -1)
-			response = append(response, string(data))
+			datab64 := base64.StdEncoding.EncodeToString(data)
+			response = append(response, datab64)
 		}
 	})
 	return response, err

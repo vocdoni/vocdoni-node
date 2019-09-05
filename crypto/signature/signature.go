@@ -214,7 +214,7 @@ func AddrFromPublicKey(pubHex string) (string, error) {
 
 // PubKeyFromSignature recovers the ECDSA public key that created the signature of a message
 func PubKeyFromSignature(msg, sigHex string) (string, error) {
-	if len(sanitizeHex(sigHex)) != SignatureLength {
+	if len(sanitizeHex(sigHex)) < SignatureLength || len(sanitizeHex(sigHex)) > SignatureLength+12 {
 		return "", errors.New("signature length not correct")
 	}
 	sig, err := hex.DecodeString(sanitizeHex(sigHex))
