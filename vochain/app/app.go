@@ -131,7 +131,9 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		}
 	case "voteTx":
 		vta := tx.Args.(*voctypes.VoteTxArgs)
-		// check if vote has a valid processID
+		// check if vote has a valid process
+		vlog.Infof("DELIVERTX STATE VOTETX DELIVERTX: %v", app.deliverTxState)
+
 		if _, ok := app.deliverTxState.Processes[vta.ProcessID]; ok {
 			// check if vote is already submitted
 			if _, ok := app.deliverTxState.Processes[vta.ProcessID].Votes[vta.Nullifier]; !ok {
@@ -144,6 +146,8 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			}
 		} else {
 			vlog.Info("Process does not exist")
+			return abcitypes.ResponseDeliverTx{Info: tx.String(), Code: 1}
+
 		}
 	case "addOracleTx":
 		atot := tx.Args.(*voctypes.AddOracleTxArgs)
@@ -215,6 +219,7 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	app.db.Set(heightKey, b)
 
 	// marhsall state
+	vlog.Infof("DELIVERTX COMMIT STATE: %v", *app.deliverTxState)
 	state := codec.Cdc.MustMarshalJSON(*app.deliverTxState)
 	// hash of the state
 	h := sha256.New()
@@ -222,7 +227,7 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	app.appHash = h.Sum(nil)
 	app.db.Set(appHashKey, app.appHash)
 	// reset deliverTxState
-	app.deliverTxState = voctypes.NewState()
+	//app.deliverTxState = voctypes.NewState()
 
 	// return apphash as data to be included into the block
 	return abcitypes.ResponseCommit{
@@ -246,6 +251,8 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	codec.Cdc.UnmarshalJSON(req.AppStateBytes, app.deliverTxState)
 	app.db.Set(validatorsKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Validators))
 	app.db.Set(oraclesKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Oracles))
+	app.db.Set(processesKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Processes))
+	vlog.Infof("DELIVERTX STATE VOTETX DELIVERTX: %v", app.deliverTxState)
 	return abcitypes.ResponseInitChain{}
 }
 
@@ -279,7 +286,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	// load validators public keys from db
 	var valk []tmtypes.GenesisValidator
 	validatorBytes := app.db.Get(validatorsKey)
-	vlog.Infof("Validator bytes beginblock: %v", validatorBytes)
+	//vlog.Infof("Validator bytes beginblock: %v", validatorBytes)
 	if len(validatorBytes) != 0 {
 		err := codec.Cdc.UnmarshalJSON(validatorBytes, &valk)
 		if err != nil {

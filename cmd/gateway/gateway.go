@@ -5,15 +5,21 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"syscall"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	//abcicli "github.com/tendermint/tendermint/abci/client"
+	dbm "github.com/tendermint/tm-db"
+
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 
 	"encoding/hex"
 	goneturl "net/url"
 	"os"
+	"os/signal"
 	"os/user"
 	"strings"
 	"time"
@@ -26,6 +32,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 func newConfig() (config.GWCfg, error) {
@@ -59,6 +66,9 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	flag.String("clusterLogLevel", "ERROR", "Log level for ipfs cluster (debug, info, warning, error)")
+	flag.String("vochainConfigFilePath", "/home/jordi/vocdoni/go-dvote/vochain/config/config.toml", "vochain config file path")
+	flag.String("vochainAppDBName", "vochaindb", "sets the name of the application database for the vochain")
+	flag.String("vochainAppDBPath", "/home/jordi/vocdoni/go-dvote/vochain/data", "sets the path indicating where to store the vochain related data")
 
 	flag.Parse()
 
@@ -94,6 +104,9 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("cluster.leave", true)
 	viper.SetDefault("cluster.alloc", "disk")
 	viper.SetDefault("cluster.clusterLogLevel", "ERROR")
+	viper.SetDefault("vochain.configFilePath", "/home/jordi/vocdoni/go-dvote/vochain/config/config.toml")
+	viper.SetDefault("vochain.appDBName", "vochaindb")
+	viper.SetDefault("vochain.appDBPath", "/home/jordi/vocdoni/go-dvote/vochain/data")
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -135,6 +148,10 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("cluster.secret", flag.Lookup("ipfsClusterKey"))
 	viper.BindPFlag("cluster.bootstraps", flag.Lookup("ipfsClusterPeers"))
 	viper.BindPFlag("cluster.clusterloglevel", flag.Lookup("clusterLogLevel"))
+
+	viper.BindPFlag("vochain.configFilePath", flag.Lookup("vochainConfigFilePath"))
+	viper.BindPFlag("vochain.appDBName", flag.Lookup("vochainAppDBName"))
+	viper.BindPFlag("vochain.appDBPath", flag.Lookup("vochainAppDBPath"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -332,6 +349,23 @@ func main() {
 		censusManager.Init(globalCfg.DataDir+"/census", "")
 	}
 
+	// Vochain Initialization
+
+	// app layer db
+	db, err := dbm.NewGoLevelDBWithOpts(globalCfg.Vochain.AppDBName, globalCfg.Vochain.AppDBPath, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to open db: %v", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// node + app layer
+	app, vnode := vochain.Start(globalCfg.Vochain.ConfigFilePath, db)
+	defer func() {
+		vnode.Stop()
+		vnode.Wait()
+	}()
+
 	// API Initialization
 	// Dvote API
 	if globalCfg.Api.File.Enabled || globalCfg.Api.Census.Enabled || globalCfg.Api.Vote.Enabled {
@@ -350,7 +384,8 @@ func main() {
 			routerApi.EnableCensusAPI(&censusManager)
 		}
 		if globalCfg.Api.Vote.Enabled {
-			routerApi.EnableVoteAPI()
+			// todo: client params as cli flags
+			routerApi.EnableVoteAPI(app)
 		}
 
 		go routerApi.Route()
@@ -359,7 +394,43 @@ func main() {
 		log.Infof("websockets API available at %s", globalCfg.Api.Route)
 	}
 
+	// close if interrupt received
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+	os.Exit(0)
+
 	for {
 		time.Sleep(1 * time.Second)
 	}
+
 }
+
+/*
+
+
+
+	// TESTING
+
+	//n := 0
+	//for n < 10 {
+	//	n++
+	time.Sleep(5 * time.Second)
+	//txbytes := []byte(`{"method": "voteTx", "args": {"nullifier": "0", "payload": "0", "censusProof": "0"}}`)
+	//txbytes := []byte(test.HARDCODED_NEW_VOTE_TX)
+	//req := abci.RequestCheckTx{Tx: txbytes}
+	//go vlog.Infof("%+v", app.CheckTx(req))
+	//req2 := abci.RequestDeliverTx{Tx: txbytes}
+	//time.Sleep(10 * time.Second)
+	//time.Sleep(5 * time.Second)
+	//go vlog.Infof("%+v", app.DeliverTx(req2))
+	//txbytes2 := []byte(`{"method": "voteTx", "args": { "processId": "0", "nullifier": "0", "censusProof": "0", "payload": "0" }}`)
+	//req3 := abci.RequestDeliverTx{Tx: txbytes}
+	//go vlog.Infof("%+v", app.DeliverTx(req3))
+	//}
+
+	// END TESTING
+
+
+
+*/

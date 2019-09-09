@@ -9,18 +9,19 @@ import (
 type GWCfg struct {
 	W3      W3Cfg
 	Cluster ClusterCfg
+	Vochain VochainCfg
 	Ipfs    struct {
 		ConfigPath string
 		Daemon     string
 		NoInit     bool
 	}
 	Dvote struct {
-		Host  string
-		Port  int
+		Host string
+		Port int
 	}
 	Api struct {
 		Route string
-		File struct {
+		File  struct {
 			Enabled bool
 		}
 		Census struct {
@@ -61,7 +62,7 @@ type PssCfg struct {
 
 //W3Cfg stores global configs for web3
 type W3Cfg struct {
-	Enabled bool
+	Enabled   bool
 	ChainType string
 	LightMode bool
 	WsHost    string
@@ -115,8 +116,16 @@ type ClusterCfg struct {
 }
 
 type ClusterTestCfg struct {
-	LogLevel    string
-	Targets     []string
-	Interval    int
-	PkgSize 	int
+	LogLevel string
+	Targets  []string
+	Interval int
+	PkgSize  int
+}
+
+// TO MODIFY
+// Basic app config for now, TBD: Create Vochain config file from gateway flags
+type VochainCfg struct {
+	ConfigFilePath string
+	AppDBName      string
+	AppDBPath      string
 }

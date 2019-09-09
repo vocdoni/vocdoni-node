@@ -11,6 +11,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
+	vochain "gitlab.com/vocdoni/go-dvote/vochain/app"
 
 	"encoding/json"
 )
@@ -55,6 +56,23 @@ type Router struct {
 	transport         net.Transport
 	signer            signature.SignKeys
 	census            *census.CensusManager
+	vochain           *vochain.BaseApplication
+}
+
+func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
+	signer signature.SignKeys) *Router {
+	privateReqMap := make(methodMap)
+	publicReqMap := make(methodMap)
+	cm := new(census.CensusManager)
+	return &Router{
+		privateRequestMap: privateReqMap,
+		publicRequestMap:  publicReqMap,
+		census:            cm,
+		inbound:           inbound,
+		storage:           storage,
+		transport:         transport,
+		signer:            signer,
+	}
 }
 
 type routerRequest struct {
@@ -88,12 +106,10 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 
 //InitRouter sets up a Router object which can then be used to route requests
 func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
-	signer signature.SignKeys) Router {
-	privateReqMap := make(methodMap)
-	publicReqMap := make(methodMap)
-	cm := new(census.CensusManager)
+	signer signature.SignKeys) *Router {
+
 	log.Infof("using signer with address %s", signer.EthAddrString())
-	return Router{privateReqMap, publicReqMap, inbound, storage, transport, signer, cm}
+	return NewRouter(inbound, storage, transport, signer)
 }
 
 func (r *Router) registerMethod(methodName string, methodCallback requestMethod, private bool) {
@@ -130,13 +146,15 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 }
 
 //EnableVoteAPI enabled the Vote API in the Router
-func (r *Router) EnableVoteAPI() {
+func (r *Router) EnableVoteAPI(app *vochain.BaseApplication) {
+	r.vochain = app
 	r.registerMethod("submitEnvelope", submitEnvelope, false)
 	r.registerMethod("getEnvelopeStatus", getEnvelopeStatus, false)
 	r.registerMethod("getEnvelope", getEnvelope, false)
 	r.registerMethod("getEnvelopeHeight", getEnvelopeHeight, false)
 	r.registerMethod("getProcessList", getProcessList, false)
 	r.registerMethod("getEnvelopeList", getEnvelopeList, false)
+
 }
 
 //Route routes requests through the Router object
