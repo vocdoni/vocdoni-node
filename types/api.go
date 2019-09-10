@@ -27,7 +27,11 @@ type MetaRequest struct {
 	PubKeys    []string `json:"pubKeys,omitempty"`
 	RootHash   string   `json:"rootHash,omitempty"`
 	Timestamp  int32    `json:"timestamp"`
+<<<<<<< HEAD
 	Type       string   `json:"type,omitempty"`
+=======
+	Type       string   `json:"type"`
+>>>>>>> master
 	URI        string   `json:"uri,omitempty"`
 }
 

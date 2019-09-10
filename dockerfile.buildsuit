@@ -1,0 +1,14 @@
+FROM golang:alpine
+
+ENV COMPONENT_VERSION=1.21
+
+WORKDIR /app
+ENV GOPATH=
+ENV GW_DATA_DIR=/app/run
+ENV GW_LOGLEVEL=debug
+
+RUN apk update && apk add --no-cache build-base git binutils \
+ binutils-gold libc6-compat ca-certificates openssl linux-headers && \
+ git clone https://gitlab.com/vocdoni/go-dvote.git/ . && go mod download && rm -rf /app
+ 
+CMD /bin/sh

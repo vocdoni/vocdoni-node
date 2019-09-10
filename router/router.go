@@ -143,6 +143,7 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.registerMethod("addClaimBulk", censusLocal, true)
 	r.registerMethod("publish", censusLocal, true)
 	r.registerMethod("importRemote", censusLocal, true)
+<<<<<<< HEAD
 }
 
 //EnableVoteAPI enabled the Vote API in the Router
@@ -155,6 +156,8 @@ func (r *Router) EnableVoteAPI(app *vochain.BaseApplication) {
 	r.registerMethod("getProcessList", getProcessList, false)
 	r.registerMethod("getEnvelopeList", getEnvelopeList, false)
 
+=======
+>>>>>>> master
 }
 
 //Route routes requests through the Router object
