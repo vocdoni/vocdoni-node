@@ -22,7 +22,7 @@ type MetaRequest struct {
 	PubKeys    []string `json:"pubKeys,omitempty"`
 	RootHash   string   `json:"rootHash,omitempty"`
 	Timestamp  int32    `json:"timestamp"`
-	Type       string   `json:"type"`
+	Type       string   `json:"type,omitempty"`
 	URI        string   `json:"uri,omitempty"`
 }
 
