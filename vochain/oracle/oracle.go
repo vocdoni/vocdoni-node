@@ -19,18 +19,21 @@ package vochain
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/big"
 	"strings"
 
 	eth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	crypto "github.com/ethereum/go-ethereum/crypto"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	tmclient "github.com/tendermint/tendermint/abci/client"
 	"gitlab.com/vocdoni/go-dvote/chain"
+	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"
+	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/log"
+	app "gitlab.com/vocdoni/go-dvote/vochain/app"
+	
 )
 
 // Oracle represents an oracle with a connection to Ethereum and Vochain
@@ -38,7 +41,9 @@ type Oracle struct {
 	// ethereum connection
 	ethereumConnection *chain.EthChainContext
 	// vochain connection
-	vochainConnection *tmclient.Client
+	vochainConnection *app.BaseApplication
+	// ipfs connection
+	storage *data.Storage
 	// ethereum subscribed events
 	ethereumEventList []string
 	// vochain subscribed events
@@ -46,11 +51,48 @@ type Oracle struct {
 }
 
 // NewOracle creates an Oracle given an existing Ethereum and Vochain connection
-func NewOracle(ethCon *chain.EthChainContext, voCon *tmclient.Client) *Oracle {
+func NewOracle(ethCon *chain.EthChainContext, voCon *app.BaseApplication, store *data.Storage) *Oracle {
 	return &Oracle{
 		ethereumConnection: ethCon,
 		vochainConnection:  voCon,
+		storage:            store,
+		ethereumEventList: []string{
+			"GenesisChanged(string)",
+			"ChainIdChanged(uint)",
+			"ProcessCreated(address,bytes32,string)",
+			"ProcessCanceled(address,bytes32)",
+			"ValidatorAdded(string)",
+			"ValidatorRemoved(string)",
+			"OracleAdded(string)",
+			"OracleRemoved(string)",
+			"PrivateKeyPublished(bytes32,string)",
+			"ResultsPublished(bytes32,string)",
+		},
 	}
+}
+
+type EventGenesisChanged string
+type EventChainIdChanged *big.Int
+type EventProcessCreated struct {
+	EntityAddress [20]byte
+	ProcessId     [32]byte
+	MerkleTree    string
+}
+type EventProcessCanceled struct {
+	EntityAddress [20]byte
+	ProcessId     [32]byte
+}
+type ValidatorAdded string
+type ValidatorRemoved string
+type OracleAdded string
+type OracleRemoved string
+type PrivateKeyPublished struct {
+	ProcessId  [32]byte
+	PrivateKey string
+}
+type ResultsPublished struct {
+	ProcessId [32]byte
+	Results   string
 }
 
 // BlockInfo represents the basic Ethereum block information
@@ -82,12 +124,6 @@ func (o *Oracle) GetEthereumEventList() {}
 // GetVochainEventList gets the vochain events to which we are subscribed
 func (o *Oracle) GetVochainEventList() {}
 
-// SetEthereumEventList sets the ethereum events to which we want to be subscribed
-func (o *Oracle) SetEthereumEventList() {}
-
-// SetVochainEventList sets the vochain events to which we want to be subscribed
-func (o *Oracle) SetVochainEventList() {}
-
 // SendEthereumTx sends a transaction to ethereum
 func (o *Oracle) SendEthereumTx() {}
 
@@ -100,7 +136,7 @@ func (o *Oracle) EthereumBlockListener() BlockInfo {
 	if err != nil {
 		log.Fatal(err)
 	}
-	headers := make(chan *types.Header)
+	headers := make(chan *ethtypes.Header)
 	sub, err := client.SubscribeNewHead(context.Background(), headers)
 	if err != nil {
 		log.Fatal(err)
@@ -142,7 +178,7 @@ func (o *Oracle) SubscribeToEthereumContract(address string) {
 		Addresses: []common.Address{contractAddress},
 	}
 
-	logs := make(chan types.Log)
+	logs := make(chan ethtypes.Log)
 	sub, err := client.SubscribeFilterLogs(context.Background(), query, logs)
 	if err != nil {
 		log.Fatal(err)
@@ -159,7 +195,7 @@ func (o *Oracle) SubscribeToEthereumContract(address string) {
 }
 
 // Example. TODO
-func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string, contractABI string) {
+func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) interface{} {
 	client, err := ethclient.Dial(o.ethereumConnection.Node.WSEndpoint())
 	if err != nil {
 		log.Fatal(err)
@@ -179,37 +215,110 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string, cont
 		log.Fatal(err)
 	}
 
-	contractAbi, err := abi.JSON(strings.NewReader(contractABI))
+	contractABI, err := abi.JSON(strings.NewReader(contract.VotingProcessABI))
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	logGenesisChanged := []byte(o.ethereumEventList[0])
+	logChainIdChanged := []byte(o.ethereumEventList[1])
+	logProcessCreated := []byte(o.ethereumEventList[2])
+	logProcessCanceled := []byte(o.ethereumEventList[3])
+	logValidatorAdded := []byte(o.ethereumEventList[4])
+	logValidatorRemoved := []byte(o.ethereumEventList[5])
+	logOracleAdded := []byte(o.ethereumEventList[6])
+	logOracleRemoved := []byte(o.ethereumEventList[7])
+	logPrivateKeyPublished := []byte(o.ethereumEventList[8])
+	logResultsPublished := []byte(o.ethereumEventList[9])
+
+	HashLogGenesisChanged := crypto.Keccak256Hash(logGenesisChanged)
+	HashLogChainIdChanged := crypto.Keccak256Hash(logChainIdChanged)
+	HashLogProcessCreated := crypto.Keccak256Hash(logProcessCreated)
+	HashLogProcessCanceled := crypto.Keccak256Hash(logProcessCanceled)
+	HashLogValidatorAdded := crypto.Keccak256Hash(logValidatorAdded)
+	HashLogValidatorRemoved := crypto.Keccak256Hash(logValidatorRemoved)
+	HashLogOracleAdded := crypto.Keccak256Hash(logOracleAdded)
+	HashLogOracleRemoved := crypto.Keccak256Hash(logOracleRemoved)
+	HashLogPrivateKeyPublished := crypto.Keccak256Hash(logPrivateKeyPublished)
+	HashLogResultsPublished := crypto.Keccak256Hash(logResultsPublished)
 
 	for _, vLog := range logs {
 		fmt.Println(vLog.BlockHash.Hex()) // 0x3404b8c050aa0aacd0223e91b5c32fee6400f357764771d0684fa7b3f448f1a8
 		fmt.Println(vLog.BlockNumber)     // 2394201
 		fmt.Println(vLog.TxHash.Hex())    // 0x280201eda63c9ff6f305fcee51d5eb86167fab40ca3108ec784e8652a0e2b1a6
 
-		event := struct {
-			Key   [32]byte
-			Value [32]byte
-		}{}
-		err := contractAbi.Unpack(&event, "ItemSet", vLog.Data)
-		if err != nil {
-			log.Fatal(err)
+		// need to crete struct to decode raw log data
+		switch vLog.Topics[0].Hex() {
+		case HashLogGenesisChanged.Hex():
+			log.Info("New log: GenesisChanged")
+			var eventGenesisChanged EventGenesisChanged
+			err := contractABI.Unpack(&eventGenesisChanged, "GenesisChanged", vLog.Data)
+			if err != nil {
+				log.Fatal(err)
+			}
+			eventGenesisChanged = EventGenesisChanged(vLog.Topics[1].String())
+			return eventGenesisChanged
+		case HashLogChainIdChanged.Hex():
+			return nil
+		case HashLogProcessCreated.Hex():
+			log.Info("New log: ProcessCreated")
+			var eventProcessCreated EventProcessCreated
+			err := contractABI.Unpack(&eventProcessCreated, "ProcessCreated", vLog.Data)
+			if err != nil {
+				log.Fatal(err)
+			}
+			/*
+				EntityAddress [20]byte
+				ProcessId     [32]byte
+				MerkleTree    string
+			*/
+
+			var topics [4]string
+			for i := range vLog.Topics {
+				topics[i] = vLog.Topics[i].Hex()
+			}
+
+			return nil
+
+		case HashLogProcessCanceled.Hex():
+			//stub
+			return nil
+		case HashLogValidatorAdded.Hex():
+			//stub
+			return nil
+		case HashLogValidatorRemoved.Hex():
+			//stub
+			return nil
+		case HashLogOracleAdded.Hex():
+			//stub
+			return nil
+		case HashLogOracleRemoved.Hex():
+			//stub
+			return nil
+		case HashLogPrivateKeyPublished.Hex():
+			//stub
+			return nil
+		case HashLogResultsPublished.Hex():
+			//stub
+			return nil
 		}
 
-		fmt.Println(string(event.Key[:]))   // foo
-		fmt.Println(string(event.Value[:])) // bar
-
-		var topics [4]string
-		for i := range vLog.Topics {
-			topics[i] = vLog.Topics[i].Hex()
-		}
-
-		fmt.Println(topics[0]) // 0xe79e73da417710ae99aa2088575580a60415d359acfad9cdd3382d59c80281d4
 	}
-
-	eventSignature := []byte("ItemSet(bytes32,bytes32)")
-	hash := crypto.Keccak256Hash(eventSignature)
-	fmt.Println(hash.Hex()) // 0xe79e73da417710ae99aa2088575580a60415d359acfad9cdd3382d59c80281d4
+	return nil
 }
+
+/*
+func (o *Oracle) GetIPFSContent(fileUri string) []byte {
+	var content []byte
+	var err error
+	splt := strings.Split(fileUri, "/")
+	hash := splt[len(splt)-1]
+	content, err = o.ipfsConnection.Retrieve(hash)
+	if err != nil {
+		return make([]byte, 0)
+	}
+	b64content := base64.StdEncoding.EncodeToString(content)
+	content = []byte(b64content)
+	return content
+}
+*/

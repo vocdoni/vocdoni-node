@@ -32,7 +32,8 @@ import (
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/vochain"
+	vochain "gitlab.com/vocdoni/go-dvote/vochain"
+	oracle "gitlab.com/vocdoni/go-dvote/vochain/oracle"
 )
 
 func newConfig() (config.GWCfg, error) {
@@ -365,6 +366,10 @@ func main() {
 		vnode.Stop()
 		vnode.Wait()
 	}()
+
+	oracle_eth_connection := node
+	_ = oracle.NewOracle(oracle_eth_connection, app, &storage)
+	//_ = orc.ReadEthereumEventLogs(0, 0, "")
 
 	// API Initialization
 	// Dvote API
