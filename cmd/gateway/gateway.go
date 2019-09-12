@@ -255,9 +255,14 @@ func main() {
 	}
 
 	log.Infof("testing vote process contract methods:")
-	node.NewVotingProcessHandle("0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
-	log.Infof("handle created")
-	//node.ProcessHandle.Get(proccessId)
+	PH, err := chain.NewVotingProcessHandle("0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
+	if err != nil {
+		log.Errorf("Error creating process handle: %s", err)
+	} else {
+		log.Infof("handle created")
+	}
+	_ = PH
+	//PH.Get(proccessId)
 
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
 		url, err := goneturl.Parse(globalCfg.W3external)

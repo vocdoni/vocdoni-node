@@ -23,19 +23,19 @@ type ProcessMetadata struct {
 }
 
 // Constructor for proc_transactor on node
-func (e *EthChainContext) NewVotingProcessHandle(contractAddressHex string) error {
+func NewVotingProcessHandle(contractAddressHex string) (*ProcessHandle, error) {
 	var contractBackend = new(bind.ContractBackend)
 	address := common.HexToAddress(contractAddressHex)
 
 	votingProcess, err := votingProcess.NewVotingProcess(address, *contractBackend)
 	if err != nil {
 		log.Errorf("Error constructing votingProcess handle: %s", err)
+		return new(ProcessHandle), err
 	}
 	PH := new(ProcessHandle)
 	PH.VotingProcess = votingProcess
 	//assign vp to something in e?
-	e.ProcessHandle = PH
-	return nil
+	return PH, nil
 }
 
 func (ph *ProcessHandle) Get(pid [32]byte) (ProcessMetadata, error) {
