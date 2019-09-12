@@ -284,6 +284,22 @@ func main() {
 		}()
 	}
 
+	log.Infof("testing vote process contract methods:")
+	PH, err := chain.NewVotingProcessHandle("0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
+	if err != nil {
+		log.Errorf("Error creating process handle: %s", err)
+	} else {
+		log.Infof("handle created")
+	}
+	var pid [32]byte
+	copy(pid[:], []byte("c04fb0c89caca0ba171f5c1583b41f041031f34006fa0a46c2ccab65b691bd65"))
+	meta, err := PH.Get(pid)
+	if err != nil {
+		log.Errorf("Error fetching metadata: %s", err)
+	} else {
+		log.Infof("Process metadata: %v", meta)
+	}
+
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
 		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
