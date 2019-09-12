@@ -42,8 +42,8 @@ type Oracle struct {
 	ethereumConnection *chain.EthChainContext
 	// vochain connection
 	vochainConnection *app.BaseApplication
-	// ipfs connection
-	storage *data.Storage
+	// voting process contract handle
+	processHandle *chain.ProcessHandle
 	// ethereum subscribed events
 	ethereumEventList []string
 	// vochain subscribed events
@@ -51,11 +51,15 @@ type Oracle struct {
 }
 
 // NewOracle creates an Oracle given an existing Ethereum and Vochain connection
-func NewOracle(ethCon *chain.EthChainContext, voCon *app.BaseApplication, store *data.Storage) *Oracle {
+func NewOracle(ethCon *chain.EthChainContext, voCon *app.BaseApplication, contractAddressHex string, storage data.Storage) (*Oracle, error) {
+	PH, err := chain.NewVotingProcessHandle(contractAddressHex, storage)
+	if err != nil {
+		return new(Oracle), err
+	}
 	return &Oracle{
 		ethereumConnection: ethCon,
 		vochainConnection:  voCon,
-		storage:            store,
+		processHandle:      PH,
 		ethereumEventList: []string{
 			"GenesisChanged(string)",
 			"ChainIdChanged(uint)",
@@ -68,7 +72,7 @@ func NewOracle(ethCon *chain.EthChainContext, voCon *app.BaseApplication, store 
 			"PrivateKeyPublished(bytes32,string)",
 			"ResultsPublished(bytes32,string)",
 		},
-	}
+	}, nil
 }
 
 type EventGenesisChanged string
@@ -293,13 +297,19 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			}
 			log.Infof("PROCESS INDEX LOADED: %v", processIdx)
 
-			processes, err := votingContract.Processes(nil, processIdx)
-			log.Infof("PROCESS FROM PROCESSES ARRAY: %v", processes)
+			processInfo, err := o.processHandle.Get(eventProcessCreated.ProcessId)
+			//processes, err := votingContract.Get(nil, eventProcessCreated.ProcessId)
+
+			//processInfo, err := o.storage.Retrieve(processes.Metadata)
+			if err != nil {
+				log.Errorf("Error fetching process metadata from chain module: %s", err)
+			}
+			log.Infof("PROCESS INFO: %v", processInfo)
 			if err != nil {
 				log.Info("Cannot get process given the index")
 				log.Warnf("The error is: %v", err)
 			}
-			log.Info("PROCESS LOADED: %v", processes)
+			log.Info("PROCESS LOADED: %v", processInfo)
 			return nil
 
 		case HashLogProcessCanceled.Hex():

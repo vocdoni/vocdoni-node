@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	gocid "github.com/ipfs/go-cid"
 
@@ -195,11 +196,17 @@ func (i *IPFSHandle) Publish(msg []byte) (string, error) {
 
 //Retrieve from local node
 func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	defer cancel()
 
-	if !strings.HasPrefix(path, "/ipfs/") {
-		path = "/ipfs/" + path
+	if strings.HasPrefix(path, "ipfs://") {
+		path = path[7:]
 	}
+	/*
+		if !strings.HasPrefix(path, "/ipfs/") {
+			path = "/ipfs/" + path
+		}
+	*/
 
 	pth := corepath.New(path)
 
