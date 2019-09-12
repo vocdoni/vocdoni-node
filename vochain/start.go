@@ -3,14 +3,14 @@ package vochain
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 
 	//"time"
 
 	//abci "github.com/tendermint/tendermint/abci/types"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+	"gitlab.com/vocdoni/go-dvote/config"
 
 	codec "github.com/cosmos/cosmos-sdk/codec"
 	//abci "github.com/tendermint/tendermint/abci/types"
@@ -33,7 +33,7 @@ import (
 )
 
 // Start starts a new vochain validator node
-func Start(configFilePath string, db *dbm.GoLevelDB) (*vochain.BaseApplication, *nm.Node) {
+func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*vochain.BaseApplication, *nm.Node) {
 	// PUT ON GATEWAY CONFIG
 	/*
 		flag.StringVar(&configFile, "config", "/home/jordi/vocdoni/go-dvote/vochain/config/config.toml", "Path to config.toml")
@@ -47,7 +47,7 @@ func Start(configFilePath string, db *dbm.GoLevelDB) (*vochain.BaseApplication, 
 	app := vochain.NewBaseApplication(db)
 	//flag.Parse()
 	vlog.Info("Creating node and application")
-	node, err := newTendermint(app, configFilePath)
+	node, err := newTendermint(app, globalCfg)
 	if err != nil {
 		vlog.Info(err)
 		return app, node
@@ -61,52 +61,59 @@ func Start(configFilePath string, db *dbm.GoLevelDB) (*vochain.BaseApplication, 
 }
 
 // we need to set init (first time validators and oracles)
-func newTendermint(app *vochain.BaseApplication, configFile string) (*nm.Node, error) {
+func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) (*nm.Node, error) {
 	// create node config
-	config := cfg.DefaultConfig()
-	config.RootDir = filepath.Dir(filepath.Dir(configFile))
-	viper.SetConfigFile(configFile)
-	if err := viper.ReadInConfig(); err != nil {
-		return nil, errors.Wrap(err, "viper failed to read config file")
+	var err error
+
+	tconfig := cfg.DefaultConfig()
+	tconfig.SetRoot(localConfig.DataDir)
+	os.MkdirAll(localConfig.DataDir+"/config", 0755)
+	os.MkdirAll(localConfig.DataDir+"/data", 0755)
+
+	tconfig.LogLevel = localConfig.LogLevel
+	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RpcListen
+	tconfig.P2P.ListenAddress = localConfig.P2pListen
+	tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]")
+	vlog.Debugf("persistent peers: %s", tconfig.P2P.PersistentPeers)
+	//tconfig.P2P.Seeds = strings.Join(localConfig.Peers[:], ",")
+	tconfig.P2P.AddrBookStrict = false
+	if localConfig.Genesis != "" {
+		vlog.Infof("using custom genesis file %s", localConfig.Genesis)
+		tconfig.Genesis = localConfig.Genesis
 	}
-	if err := viper.Unmarshal(config); err != nil {
-		return nil, errors.Wrap(err, "viper failed to unmarshal config")
-	}
-	if err := config.ValidateBasic(); err != nil {
+	vlog.Infof("using keyfile %s", tconfig.NodeKeyFile())
+
+	if err := tconfig.ValidateBasic(); err != nil {
 		return nil, errors.Wrap(err, "config is invalid")
 	}
 
-	// create data dir
-	newpath := filepath.Join(config.RootDir, "data")
-	os.MkdirAll(newpath, os.ModePerm)
-
 	// create logger
 	logger := tlog.NewTMLogger(tlog.NewSyncWriter(os.Stdout))
-	var err error
+
 	//config.LogLevel = "none"
-	logger, err = tmflags.ParseLogLevel(config.LogLevel, logger, cfg.DefaultLogLevel())
+	logger, err = tmflags.ParseLogLevel(tconfig.LogLevel, logger, cfg.DefaultLogLevel())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse log level")
 	}
 
 	// read or create private validator
 	pv := privval.LoadOrGenFilePV(
-		config.PrivValidatorKeyFile(),
-		config.PrivValidatorStateFile(),
+		tconfig.PrivValidatorKeyFile(),
+		tconfig.PrivValidatorStateFile(),
 	)
 
 	// read or create node key
-	nodeKey, err := p2p.LoadOrGenNodeKey(config.NodeKeyFile())
+	nodeKey, err := p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load node's key")
 	}
 
 	// read or create genesis file
-	genFile := config.GenesisFile()
+	genFile := tconfig.GenesisFile()
 	if cmn.FileExists(genFile) {
-		vlog.Info("Found genesis file", "path", genFile)
+		vlog.Infof("found genesis file %s", genFile)
 	} else {
-		vlog.Info("Creating genesis file")
+		vlog.Info("creating genesis file")
 		genDoc := tmtypes.GenesisDoc{
 			ChainID:         "0x1",
 			GenesisTime:     tmtime.Now(),
@@ -129,21 +136,21 @@ func newTendermint(app *vochain.BaseApplication, configFile string) (*nm.Node, e
 
 		// save genesis
 		if err := genDoc.SaveAs(genFile); err != nil {
-			panic(fmt.Sprintf("Cannot load or generate genesis file: %v", err))
+			panic(fmt.Sprintf("cannot load or generate genesis file: %v", err))
 		}
-		logger.Info("Generated genesis file", "path", genFile)
-		vlog.Info("genesis file: %+v", genFile)
+		logger.Info("generated genesis file", "path", genFile)
+		vlog.Infof("genesis file: %+v", genFile)
 	}
 
 	// create node
 	node, err := nm.NewNode(
-		config,
+		tconfig,
 		pv,                               // the node val
 		nodeKey,                          // node val key
 		proxy.NewLocalClientCreator(app), // Note we use proxy.NewLocalClientCreator here to create a local client instead of one communicating through a socket or gRPC.
-		nm.DefaultGenesisDocProviderFunc(config),
+		nm.DefaultGenesisDocProviderFunc(tconfig),
 		nm.DefaultDBProvider,
-		nm.DefaultMetricsProvider(config.Instrumentation),
+		nm.DefaultMetricsProvider(tconfig.Instrumentation),
 		logger)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create new Tendermint node")
