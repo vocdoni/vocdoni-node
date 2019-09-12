@@ -18,6 +18,7 @@ package vochain
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
@@ -25,15 +26,14 @@ import (
 	eth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	crypto "github.com/ethereum/go-ethereum/crypto"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	crypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	app "gitlab.com/vocdoni/go-dvote/vochain/app"
-	
 )
 
 // Oracle represents an oracle with a connection to Ethereum and Vochain
@@ -196,7 +196,9 @@ func (o *Oracle) SubscribeToEthereumContract(address string) {
 
 // Example. TODO
 func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) interface{} {
-	client, err := ethclient.Dial(o.ethereumConnection.Node.WSEndpoint())
+	log.Info(o.ethereumConnection.Node.WSEndpoint())
+
+	client, err := ethclient.Dial("https://gwdev1.vocdoni.net/web3")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -218,6 +220,11 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 	contractABI, err := abi.JSON(strings.NewReader(contract.VotingProcessABI))
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	votingContract, err := contract.NewVotingProcess(common.HexToAddress(contractAddr), client)
+	if err != nil {
+		log.Errorf("Cannot get the contract at %v", contractAddr)
 	}
 
 	logGenesisChanged := []byte(o.ethereumEventList[0])
@@ -267,6 +274,8 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			if err != nil {
 				log.Fatal(err)
 			}
+			log.Infof("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
+
 			/*
 				EntityAddress [20]byte
 				ProcessId     [32]byte
@@ -277,7 +286,20 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			for i := range vLog.Topics {
 				topics[i] = vLog.Topics[i].Hex()
 			}
+			log.Infof("TOPICS: %v", topics)
+			processIdx, err := votingContract.GetProcessIndex(nil, eventProcessCreated.ProcessId)
+			if err != nil {
+				log.Error("Cannot get process index from smartcontract")
+			}
+			log.Infof("PROCESS INDEX LOADED: %v", processIdx)
 
+			processes, err := votingContract.Processes(nil, processIdx)
+			log.Infof("PROCESS FROM PROCESSES ARRAY: %v", processes)
+			if err != nil {
+				log.Info("Cannot get process given the index")
+				log.Warnf("The error is: %v", err)
+			}
+			log.Info("PROCESS LOADED: %v", processes)
 			return nil
 
 		case HashLogProcessCanceled.Hex():

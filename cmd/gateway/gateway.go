@@ -368,8 +368,8 @@ func main() {
 	}()
 
 	oracle_eth_connection := node
-	_ = oracle.NewOracle(oracle_eth_connection, app, &storage)
-	//_ = orc.ReadEthereumEventLogs(0, 0, "")
+	orc := oracle.NewOracle(oracle_eth_connection, app, &storage)
+	orc.ReadEthereumEventLogs(1280570, 1280574, "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
 
 	// API Initialization
 	// Dvote API
