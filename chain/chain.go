@@ -28,6 +28,7 @@ type EthChainContext struct {
 	Config        *eth.Config
 	Keys          *keystore.KeyStore
 	DefaultConfig *EthChainConfig
+	ProcessHandle *ProcessHandle
 }
 type EthChainConfig struct {
 	WSHost         string
