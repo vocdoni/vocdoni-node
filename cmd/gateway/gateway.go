@@ -261,8 +261,14 @@ func main() {
 	} else {
 		log.Infof("handle created")
 	}
-	_ = PH
-	//PH.Get(proccessId)
+	var pid [32]byte
+	copy(pid[:], []byte("c04fb0c89caca0ba171f5c1583b41f041031f34006fa0a46c2ccab65b691bd65"))
+	meta, err := PH.Get(pid)
+	if err != nil {
+		log.Errorf("Error fetching metadata: %s", err)
+	} else {
+		log.Infof("Process metadata: %v", meta)
+	}
 
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
 		url, err := goneturl.Parse(globalCfg.W3external)
