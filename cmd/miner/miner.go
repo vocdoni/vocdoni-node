@@ -27,24 +27,24 @@ func newConfig() (config.VochainCfg, error) {
 	userDir := usr.HomeDir + "/.dvote"
 
 	path := flag.String("configFilePath", userDir+"/vochain.yaml", "vochain config file path")
-	flag.String("tendermintConfig", userDir+"/tendermint.yaml", "tendermint config file path")
 	flag.String("dataDir", userDir+"/vochain", "sets the path indicating where to store the vochain related data")
 	flag.String("p2pListen", "0.0.0.0:26656", "p2p host and port to listent")
 	flag.String("rpcListen", "127.0.0.1:26657", "rpc host and port to listent")
 	flag.String("genesis", "", "use alternative geneiss file")
 	flag.StringArray("peers", []string{}, "coma separated list of p2p peers")
+	flag.StringArray("seeds", []string{}, "coma separated list of p2p seed nodes")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	flag.Parse()
 
 	viper := viper.New()
 	viper.SetDefault("configFilePath", userDir+"/vochain.yaml")
-	viper.SetDefault("tendermintConfig", userDir+"/tendermint.yaml")
 	viper.SetDefault("dataDir", userDir+"/vochain")
 	viper.SetDefault("logLevel", "warn")
 	viper.SetDefault("p2pListen", "0.0.0.0:26656")
 	viper.SetDefault("rpcListen", "0.0.0.0:26657")
 	viper.SetDefault("genesis", "")
 	viper.SetDefault("peers", []string{})
+	viper.SetDefault("seeds", []string{})
 
 	viper.SetConfigType("yaml")
 
@@ -63,10 +63,10 @@ func newConfig() (config.VochainCfg, error) {
 
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("configFilePath", flag.Lookup("configFilePath"))
-	viper.BindPFlag("tendermintConfig", flag.Lookup("tendermintConfig"))
 	viper.BindPFlag("p2pListen", flag.Lookup("p2pListen"))
 	viper.BindPFlag("rpcListen", flag.Lookup("rpcListen"))
 	viper.BindPFlag("peers", flag.Lookup("peers"))
+	viper.BindPFlag("seeds", flag.Lookup("seeds"))
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("genesis", flag.Lookup("genesis"))
 

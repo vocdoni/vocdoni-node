@@ -133,4 +133,5 @@ type VochainCfg struct {
 	DataDir          string
 	Genesis          string
 	Peers            []string
+	Seeds            []string
 }
