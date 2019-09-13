@@ -134,4 +134,5 @@ type VochainCfg struct {
 	Genesis          string
 	Peers            []string
 	Seeds            []string
+	SeedMode         bool
 }

@@ -76,6 +76,7 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]")
 	tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]")
 	tconfig.P2P.AddrBookStrict = false
+	tconfig.P2P.SeedMode = localConfig.SeedMode
 
 	if localConfig.Genesis != "" {
 		vlog.Infof("using custom genesis file %s", localConfig.Genesis)
