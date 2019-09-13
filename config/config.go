@@ -135,4 +135,5 @@ type VochainCfg struct {
 	Peers            []string
 	Seeds            []string
 	SeedMode         bool
+	KeyFile          string
 }

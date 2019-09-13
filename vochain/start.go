@@ -82,7 +82,6 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 		vlog.Infof("using custom genesis file %s", localConfig.Genesis)
 		tconfig.Genesis = localConfig.Genesis
 	}
-	vlog.Infof("using keyfile %s", tconfig.NodeKeyFile())
 
 	if err := tconfig.ValidateBasic(); err != nil {
 		return nil, errors.Wrap(err, "config is invalid")
@@ -104,10 +103,19 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	)
 
 	// read or create node key
-	nodeKey, err := p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile())
+	var nodeKey *p2p.NodeKey
+	if localConfig.KeyFile != "" {
+		nodeKey, err = p2p.LoadOrGenNodeKey(localConfig.KeyFile)
+		vlog.Infof("using keyfile %s", localConfig.KeyFile)
+	} else {
+		nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile())
+		vlog.Infof("using keyfile %s", tconfig.NodeKeyFile())
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load node's key")
 	}
+	vlog.Infof("my vochain pubKey: %s", nodeKey.PubKey())
+	vlog.Infof("my vochain ID: %s", nodeKey.ID())
 
 	// read or create genesis file
 	genFile := tconfig.GenesisFile()
