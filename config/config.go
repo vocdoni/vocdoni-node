@@ -125,7 +125,16 @@ type ClusterTestCfg struct {
 // TO MODIFY
 // Basic app config for now, TBD: Create Vochain config file from gateway flags
 type VochainCfg struct {
-	ConfigFilePath string
-	AppDBName      string
-	AppDBPath      string
+	LogLevel         string
+	ConfigFilePath   string
+	TendermintConfig string
+	RpcListen        string
+	P2pListen        string
+	DataDir          string
+	Genesis          string
+	Peers            []string
+	Seeds            []string
+	SeedMode         bool
+	KeyFile          string
+	MinerKeyFile     string
 }

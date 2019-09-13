@@ -45,6 +45,8 @@ func newConfig() (config.GWCfg, error) {
 	}
 	userDir := usr.HomeDir + "/.dvote"
 	path := flag.String("cfgpath", userDir+"/config.yaml", "filepath for custom gateway config")
+	dataDir := flag.String("dataDir", userDir, "directory where data is stored")
+	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	flag.Bool("fileApi", true, "enable file API")
 	flag.Bool("censusApi", true, "enable census API")
 	flag.Bool("voteApi", true, "enable vote API")
@@ -64,12 +66,14 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("ipfsClusterKey", "", "enables ipfs cluster using a shared key")
 	flag.StringSlice("ipfsClusterPeers", []string{}, "ipfs cluster peer bootstrap addresses in multiaddr format")
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
-	flag.String("dataDir", userDir, "directory where data is stored")
-	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	flag.String("clusterLogLevel", "ERROR", "Log level for ipfs cluster (debug, info, warning, error)")
-	flag.String("vochainConfigFilePath", "/home/jordi/vocdoni/go-dvote/vochain/config/config.toml", "vochain config file path")
-	flag.String("vochainAppDBName", "vochaindb", "sets the name of the application database for the vochain")
-	flag.String("vochainAppDBPath", "/home/jordi/vocdoni/go-dvote/vochain/data", "sets the path indicating where to store the vochain related data")
+
+	flag.String("vochainListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
+	flag.String("vochainRPClisten", "127.0.0.1:26657", "rpc host and port to listent for the voting chain")
+	flag.String("vochainGenesis", "", "use alternative geneiss file for the voting chain")
+	flag.String("vochainLogLevel", "error", "voting chain node log level")
+	flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
+	flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
 
 	flag.Parse()
 
@@ -105,9 +109,14 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("cluster.leave", true)
 	viper.SetDefault("cluster.alloc", "disk")
 	viper.SetDefault("cluster.clusterLogLevel", "ERROR")
-	viper.SetDefault("vochain.configFilePath", "/home/jordi/vocdoni/go-dvote/vochain/config/config.toml")
-	viper.SetDefault("vochain.appDBName", "vochaindb")
-	viper.SetDefault("vochain.appDBPath", "/home/jordi/vocdoni/go-dvote/vochain/data")
+
+	viper.SetDefault("vochain.p2pListen", "0.0.0.0:26656")
+	viper.SetDefault("vochain.rpcListen", "0.0.0.0:26657")
+	viper.SetDefault("vochain.logLevel", "error")
+	viper.SetDefault("vochain.genesis", "")
+	viper.SetDefault("vochain.peers", []string{})
+	viper.SetDefault("vochain.seeds", []string{})
+	viper.SetDefault("vochain.dataDir", *dataDir+"/vochain")
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -150,9 +159,13 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("cluster.bootstraps", flag.Lookup("ipfsClusterPeers"))
 	viper.BindPFlag("cluster.clusterloglevel", flag.Lookup("clusterLogLevel"))
 
-	viper.BindPFlag("vochain.configFilePath", flag.Lookup("vochainConfigFilePath"))
-	viper.BindPFlag("vochain.appDBName", flag.Lookup("vochainAppDBName"))
-	viper.BindPFlag("vochain.appDBPath", flag.Lookup("vochainAppDBPath"))
+	viper.BindPFlag("vochain.p2pListen", flag.Lookup("vochainListen"))
+	viper.BindPFlag("vochain.rpcListen", flag.Lookup("vochainRPClisten"))
+	viper.BindPFlag("vochain.logLevel", flag.Lookup("vochainLogLevel"))
+	viper.BindPFlag("vochain.peers", flag.Lookup("vochainPeers"))
+	viper.BindPFlag("vochain.seeds", flag.Lookup("vochainSeeds"))
+	viper.BindPFlag("vochain.genesis", flag.Lookup("vochainGenesis"))
+	viper.Set("vochain.dataDir", *dataDir+"/vochain")
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -355,7 +368,7 @@ func main() {
 		if err != nil {
 			log.Fatal("could not publish process info")
 		}
-		log.Infof("PROCESS INFO CID: %S", cid)
+		log.Infof("PROCESS INFO CID: %s", cid)
 	}
 
 	var censusManager census.CensusManager
@@ -374,7 +387,7 @@ func main() {
 	// Vochain Initialization
 
 	// app layer db
-	db, err := dbm.NewGoLevelDBWithOpts(globalCfg.Vochain.AppDBName, globalCfg.Vochain.AppDBPath, nil)
+	db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.Vochain.DataDir, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to open db: %v", err)
 		os.Exit(1)
@@ -382,7 +395,7 @@ func main() {
 	defer db.Close()
 
 	// node + app layer
-	app, vnode := vochain.Start(globalCfg.Vochain.ConfigFilePath, db)
+	app, vnode := vochain.Start(globalCfg.Vochain, db)
 	defer func() {
 		vnode.Stop()
 		vnode.Wait()
