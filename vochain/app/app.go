@@ -132,7 +132,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	case "voteTx":
 		vta := tx.Args.(*voctypes.VoteTxArgs)
 		// check if vote has a valid process
-		vlog.Infof("DELIVERTX STATE VOTETX DELIVERTX: %v", app.deliverTxState)
+		//vlog.Infof("DELIVERTX STATE VOTETX DELIVERTX: %v", app.deliverTxState)
 
 		if _, ok := app.deliverTxState.Processes[vta.ProcessID]; ok {
 			// check if vote is already submitted
@@ -219,7 +219,7 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	app.db.Set(heightKey, b)
 
 	// marhsall state
-	vlog.Infof("DELIVERTX COMMIT STATE: %v", *app.deliverTxState)
+	//vlog.Infof("DELIVERTX COMMIT STATE: %v", *app.deliverTxState)
 	state := codec.Cdc.MustMarshalJSON(*app.deliverTxState)
 	// hash of the state
 	h := sha256.New()
@@ -252,7 +252,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	app.db.Set(validatorsKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Validators))
 	app.db.Set(oraclesKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Oracles))
 	app.db.Set(processesKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Processes))
-	vlog.Infof("DELIVERTX STATE VOTETX DELIVERTX: %v", app.deliverTxState)
+	//vlog.Infof("DELIVERTX STATE VOTETX DELIVERTX: %v", app.deliverTxState)
 	return abcitypes.ResponseInitChain{}
 }
 
@@ -310,9 +310,9 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	app.height = req.Header.Height
 	app.appHash = req.Header.AppHash
 
-	vlog.Infof("APP HEIGHT ON BEGIN BLOCK: %v", app.height)
-	vlog.Infof("APP HASH ON BEGIN BLOCK: %v", app.appHash)
-	vlog.Infof("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
+	//vlog.Infof("APP HEIGHT ON BEGIN BLOCK: %v", app.height)
+	//vlog.Infof("APP HASH ON BEGIN BLOCK: %v", app.appHash)
+	//vlog.Infof("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
 	return abcitypes.ResponseBeginBlock{}
 }
 

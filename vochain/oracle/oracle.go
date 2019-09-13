@@ -18,6 +18,7 @@ package vochain
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
@@ -25,15 +26,14 @@ import (
 	eth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	crypto "github.com/ethereum/go-ethereum/crypto"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	crypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	app "gitlab.com/vocdoni/go-dvote/vochain/app"
-	
 )
 
 // Oracle represents an oracle with a connection to Ethereum and Vochain
@@ -42,8 +42,8 @@ type Oracle struct {
 	ethereumConnection *chain.EthChainContext
 	// vochain connection
 	vochainConnection *app.BaseApplication
-	// ipfs connection
-	storage *data.Storage
+	// voting process contract handle
+	processHandle *chain.ProcessHandle
 	// ethereum subscribed events
 	ethereumEventList []string
 	// vochain subscribed events
@@ -51,11 +51,15 @@ type Oracle struct {
 }
 
 // NewOracle creates an Oracle given an existing Ethereum and Vochain connection
-func NewOracle(ethCon *chain.EthChainContext, voCon *app.BaseApplication, store *data.Storage) *Oracle {
+func NewOracle(ethCon *chain.EthChainContext, voCon *app.BaseApplication, contractAddressHex string, storage data.Storage) (*Oracle, error) {
+	PH, err := chain.NewVotingProcessHandle(contractAddressHex, storage)
+	if err != nil {
+		return new(Oracle), err
+	}
 	return &Oracle{
 		ethereumConnection: ethCon,
 		vochainConnection:  voCon,
-		storage:            store,
+		processHandle:      PH,
 		ethereumEventList: []string{
 			"GenesisChanged(string)",
 			"ChainIdChanged(uint)",
@@ -68,7 +72,7 @@ func NewOracle(ethCon *chain.EthChainContext, voCon *app.BaseApplication, store 
 			"PrivateKeyPublished(bytes32,string)",
 			"ResultsPublished(bytes32,string)",
 		},
-	}
+	}, nil
 }
 
 type EventGenesisChanged string
@@ -196,7 +200,9 @@ func (o *Oracle) SubscribeToEthereumContract(address string) {
 
 // Example. TODO
 func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) interface{} {
-	client, err := ethclient.Dial(o.ethereumConnection.Node.WSEndpoint())
+	log.Info(o.ethereumConnection.Node.WSEndpoint())
+
+	client, err := ethclient.Dial("https://gwdev1.vocdoni.net/web3")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -218,6 +224,11 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 	contractABI, err := abi.JSON(strings.NewReader(contract.VotingProcessABI))
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	votingContract, err := contract.NewVotingProcess(common.HexToAddress(contractAddr), client)
+	if err != nil {
+		log.Errorf("Cannot get the contract at %v", contractAddr)
 	}
 
 	logGenesisChanged := []byte(o.ethereumEventList[0])
@@ -267,6 +278,8 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			if err != nil {
 				log.Fatal(err)
 			}
+			log.Infof("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
+
 			/*
 				EntityAddress [20]byte
 				ProcessId     [32]byte
@@ -277,7 +290,26 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			for i := range vLog.Topics {
 				topics[i] = vLog.Topics[i].Hex()
 			}
+			log.Infof("TOPICS: %v", topics)
+			processIdx, err := votingContract.GetProcessIndex(nil, eventProcessCreated.ProcessId)
+			if err != nil {
+				log.Error("Cannot get process index from smartcontract")
+			}
+			log.Infof("PROCESS INDEX LOADED: %v", processIdx)
 
+			processInfo, err := o.processHandle.Get(eventProcessCreated.ProcessId)
+			//processes, err := votingContract.Get(nil, eventProcessCreated.ProcessId)
+
+			//processInfo, err := o.storage.Retrieve(processes.Metadata)
+			if err != nil {
+				log.Errorf("Error fetching process metadata from chain module: %s", err)
+			}
+			log.Infof("PROCESS INFO: %v", processInfo)
+			if err != nil {
+				log.Info("Cannot get process given the index")
+				log.Warnf("The error is: %v", err)
+			}
+			log.Info("PROCESS LOADED: %v", processInfo)
 			return nil
 
 		case HashLogProcessCanceled.Hex():

@@ -283,7 +283,23 @@ func main() {
 			}
 		}()
 	}
-
+	/*
+		log.Infof("testing vote process contract methods:")
+		PH, err := chain.NewVotingProcessHandle("0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
+		if err != nil {
+			log.Errorf("Error creating process handle: %s", err)
+		} else {
+			log.Infof("handle created")
+		}
+		var pid [32]byte
+		copy(pid[:], []byte("c04fb0c89caca0ba171f5c1583b41f041031f34006fa0a46c2ccab65b691bd65"))
+		meta, err := PH.Get(pid)
+		if err != nil {
+			log.Errorf("Error fetching metadata: %s", err)
+		} else {
+			log.Infof("Process metadata: %v", meta)
+		}
+	*/
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
 		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
@@ -335,6 +351,11 @@ func main() {
 		if err != nil {
 			log.Fatal(err.Error())
 		}
+		cid, err := storage.Publish([]byte(`{"version":"1.0","type":"snark-vote","startBlock":10000,"numberOfBlocks":400,"census":{"merkleRoot":"0x0000000000000000000000000000000000000000000000000","merkleTree":"ipfs://1234123412341234"},"details":{"entityId":"0x180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85","encryptionPublicKey":"12345678","title":{"default":"Universal Basic Income"},"description":{"default":"## Markdown text goes here\n### Abstract"},"headerImage":"<content uri>","questions":[{"type":"single-choice","question":{"default":"Should universal basic income become a human right?"},"description":{"default":"## Markdown text goes here\n### Abstract"},"voteOptions":[{"title":{"default":"Yes"},"value":"1"},{"title":{"default":"No"},"value":"2"}]}]}}`))
+		if err != nil {
+			log.Fatal("could not publish process info")
+		}
+		log.Infof("PROCESS INFO CID: %S", cid)
 	}
 
 	var censusManager census.CensusManager
@@ -368,8 +389,11 @@ func main() {
 	}()
 
 	oracle_eth_connection := node
-	_ = oracle.NewOracle(oracle_eth_connection, app, &storage)
-	//_ = orc.ReadEthereumEventLogs(0, 0, "")
+	orc, err := oracle.NewOracle(oracle_eth_connection, app, "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b", storage)
+	if err != nil {
+		log.Fatalf("Couldn't create oracle: %s", err)
+	}
+	orc.ReadEthereumEventLogs(1280570, 1280574, "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
 
 	// API Initialization
 	// Dvote API
