@@ -136,4 +136,5 @@ type VochainCfg struct {
 	Seeds            []string
 	SeedMode         bool
 	KeyFile          string
+	MinerKeyFile     string
 }

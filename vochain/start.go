@@ -79,8 +79,18 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	tconfig.P2P.SeedMode = localConfig.SeedMode
 
 	if localConfig.Genesis != "" {
-		vlog.Infof("using custom genesis file %s", localConfig.Genesis)
-		tconfig.Genesis = localConfig.Genesis
+		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
+			dir, err := os.Getwd()
+			if err != nil {
+				vlog.Fatal(err)
+			}
+			tconfig.Genesis = dir + "/" + localConfig.Genesis
+
+		} else {
+			tconfig.Genesis = localConfig.Genesis
+		}
+	} else {
+		tconfig.Genesis = tconfig.GenesisFile()
 	}
 
 	if err := tconfig.ValidateBasic(); err != nil {
@@ -97,8 +107,28 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	}
 
 	// read or create private validator
+	var minerKeyFile string
+	if localConfig.MinerKeyFile == "" {
+		minerKeyFile = tconfig.PrivValidatorKeyFile()
+	} else {
+		if isAbs := strings.HasPrefix(localConfig.MinerKeyFile, "/"); !isAbs {
+			dir, err := os.Getwd()
+			if err != nil {
+				vlog.Fatal(err)
+			}
+			minerKeyFile = dir + "/" + localConfig.MinerKeyFile
+		} else {
+			minerKeyFile = localConfig.MinerKeyFile
+		}
+		if !cmn.FileExists(tconfig.PrivValidatorKeyFile()) {
+			filePV := privval.LoadFilePVEmptyState(minerKeyFile, tconfig.PrivValidatorStateFile())
+			filePV.Save()
+		}
+	}
+
+	vlog.Infof("using miner key file %s", minerKeyFile)
 	pv := privval.LoadOrGenFilePV(
-		tconfig.PrivValidatorKeyFile(),
+		minerKeyFile,
 		tconfig.PrivValidatorStateFile(),
 	)
 
@@ -118,9 +148,8 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	vlog.Infof("my vochain ID: %s", nodeKey.ID())
 
 	// read or create genesis file
-	genFile := tconfig.GenesisFile()
-	if cmn.FileExists(genFile) {
-		vlog.Infof("found genesis file %s", genFile)
+	if cmn.FileExists(tconfig.Genesis) {
+		vlog.Infof("found genesis file %s", tconfig.Genesis)
 	} else {
 		vlog.Info("creating genesis file")
 		genDoc := tmtypes.GenesisDoc{
@@ -144,11 +173,11 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 		genDoc.AppState = codec.Cdc.MustMarshalJSON(*state)
 
 		// save genesis
-		if err := genDoc.SaveAs(genFile); err != nil {
+		if err := genDoc.SaveAs(tconfig.Genesis); err != nil {
 			panic(fmt.Sprintf("cannot load or generate genesis file: %v", err))
 		}
-		logger.Info("generated genesis file", "path", genFile)
-		vlog.Infof("genesis file: %+v", genFile)
+		logger.Info("generated genesis file", "path", tconfig.Genesis)
+		vlog.Infof("genesis file: %+v", tconfig.Genesis)
 	}
 
 	// create node
