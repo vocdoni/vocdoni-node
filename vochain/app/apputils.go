@@ -2,7 +2,6 @@ package vochain
 
 import (
 	"encoding/json"
-	"errors"
 
 	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
@@ -58,12 +57,14 @@ func ValidateTx(content []byte) (voctypes.ValidTx, error) {
 	}
 
 	// validate signature
-	dataToSign := vt.Args.String()
-	if verifySignature(dataToSign, t.Signature) {
-		return vt, nil
-	}
+	//dataToSign := vt.Args.String()
+	//if verifySignature(dataToSign, t.Signature) {
+	//	return vt, nil
+	//}
 
-	return vt, errors.New("Invalid signature")
+	//return vt, errors.New("Invalid signature")
+
+	return vt, nil
 }
 
 // verifies a signature given a message and the signature

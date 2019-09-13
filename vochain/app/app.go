@@ -115,13 +115,13 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		// check if process exists
 		if _, ok := app.deliverTxState.Processes[npta.ProcessID]; !ok {
 			app.deliverTxState.Processes[npta.ProcessID] = &voctypes.Process{
-				EntityID:       npta.EntityID,
-				Votes:          make(map[string]*voctypes.Vote, 0),
-				MkRoot:         npta.MkRoot,
-				NumberOfBlocks: npta.NumberOfBlocks,
-				StartBlock:     npta.StartBlock,
-				CurrentState:   voctypes.Scheduled,
-				EncryptionKeys: npta.EncryptionKeys,
+				EntityID:            npta.EntityID,
+				Votes:               make(map[string]*voctypes.Vote, 0),
+				MkRoot:              npta.MkRoot,
+				NumberOfBlocks:      npta.NumberOfBlocks,
+				StartBlock:          npta.StartBlock,
+				CurrentState:        voctypes.Scheduled,
+				EncryptionPublicKey: npta.EncryptionPublicKey,
 			}
 
 		} else {
@@ -312,7 +312,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 
 	//vlog.Infof("APP HEIGHT ON BEGIN BLOCK: %v", app.height)
 	//vlog.Infof("APP HASH ON BEGIN BLOCK: %v", app.appHash)
-	//vlog.Infof("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
+	vlog.Infof("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
 	return abcitypes.ResponseBeginBlock{}
 }
 

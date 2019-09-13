@@ -3,7 +3,6 @@ package vochain
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	tmtypes "github.com/tendermint/tendermint/types"
 	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
@@ -79,7 +78,7 @@ var (
 		"numberOfBlocks",
 		"processId",
 		"startBlock",
-		"encryptionKeys",
+		"encryptionPublicKey",
 		"timestamp",
 	}
 	voteTxArgsKeys = []string{
@@ -117,8 +116,8 @@ type NewProcessTxArgs struct {
 	// StartBlock represents the tendermint block where the process goes
 	// from scheduled to active
 	StartBlock int64 `json:"startBlock"`
-	// EncryptionKeys are the keys required to encrypt the votes
-	EncryptionKeys []string `json:"encryptionKeys"`
+	// encryptionPublicKey are the keys required to encrypt the votes
+	EncryptionPublicKey string `json:"encryptionPublicKey"`
 	// Timestamp for avoid flooding atacks
 	Timestamp int64 `json:"timestamp"`
 }
@@ -126,7 +125,7 @@ type NewProcessTxArgs struct {
 func (n *NewProcessTxArgs) String() string {
 	return fmt.Sprintf(`{
 		"method": newProcessTx,
-		"encryptionKeys": %s 
+		"encryptionPublicKey": %s 
 		"entityId": "%s", 
 		"entityResolver": "%s",
 		"startBlock": %d, 
@@ -135,7 +134,7 @@ func (n *NewProcessTxArgs) String() string {
 		"numberOfBlocks": %d,
 		"processId": "%s",
 		"timestamp": %d}`,
-		n.EncryptionKeys,
+		n.EncryptionPublicKey,
 		n.EntityID,
 		n.EntityResolver,
 		n.StartBlock,
@@ -258,9 +257,10 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 			MkRoot:         tx.Args["mkRoot"].(string),
 			NumberOfBlocks: int64(tx.Args["numberOfBlocks"].(float64)),
 			StartBlock:     int64(tx.Args["startBlock"].(float64)),
-			EncryptionKeys: strings.Split(tx.Args["encryptionKeys"].(string), ","),
-			Timestamp:      int64(tx.Args["timestamp"].(float64)),
-			ProcessID:      tx.Args["processId"].(string),
+			//encryptionPublicKey: strings.Split(tx.Args["encryptionPublicKey"].(string), ","),
+			EncryptionPublicKey: tx.Args["encryptionPublicKey"].(string),
+			Timestamp:           int64(tx.Args["timestamp"].(float64)),
+			ProcessID:           tx.Args["processId"].(string),
 		}
 		// sanity check done
 		return t, nil

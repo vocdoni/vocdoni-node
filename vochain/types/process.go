@@ -20,8 +20,8 @@ type Process struct {
 	StartBlock int64 `json:"startBlock"`
 	// CurrentState is the current process state
 	CurrentState CurrentProcessState `json:"currentState"`
-	// EncryptionKeys are the keys required to encrypt the votes
-	EncryptionKeys []string `json:"encryptionKeys"`
+	// EncryptionPublicKey are the keys required to encrypt the votes
+	EncryptionPublicKey string `json:"encryptionPublicKey"`
 }
 
 func (p *Process) String() string {
@@ -38,7 +38,7 @@ func (p *Process) String() string {
 		p.MkRoot,
 		p.StartBlock,
 		p.NumberOfBlocks,
-		p.EncryptionKeys,
+		p.EncryptionPublicKey,
 		p.CurrentState,
 	)
 }

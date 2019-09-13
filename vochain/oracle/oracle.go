@@ -29,6 +29,7 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	crypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	abci "github.com/tendermint/tendermint/abci/types"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/data"
@@ -297,7 +298,14 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			}
 			log.Infof("PROCESS INDEX LOADED: %v", processIdx)
 
-			processInfo, err := o.processHandle.Get(eventProcessCreated.ProcessId)
+			processInfo, err := o.processHandle.GetProcessMetadata(eventProcessCreated.ProcessId)
+			pinfoMarshal := []byte(processInfo.String())
+
+			log.Infof("PINFOMARSHAL: %s", pinfoMarshal)
+			testTx := abci.RequestDeliverTx{
+				Tx: pinfoMarshal,
+			}
+			log.Infof("RESPNSE DELIVERTX: %v", o.vochainConnection.DeliverTx(testTx))
 			//processes, err := votingContract.Get(nil, eventProcessCreated.ProcessId)
 
 			//processInfo, err := o.storage.Retrieve(processes.Metadata)
@@ -309,7 +317,7 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 				log.Info("Cannot get process given the index")
 				log.Warnf("The error is: %v", err)
 			}
-			log.Info("PROCESS LOADED: %v", processInfo)
+			//log.Fatalf("PROCESS LOADED: %v", processInfo)
 			return nil
 
 		case HashLogProcessCanceled.Hex():
