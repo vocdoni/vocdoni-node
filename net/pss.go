@@ -16,7 +16,7 @@ type PSSHandle struct {
 func (p *PSSHandle) Init(c *types.Connection) error {
 	p.c = c
 	sn := new(swarm.SimpleSwarm)
-	err := sn.InitPSS()
+	err := sn.InitPSS(swarm.VocdoniBootnodes)
 	if err != nil {
 		return err
 	}

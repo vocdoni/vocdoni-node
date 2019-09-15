@@ -108,12 +108,13 @@ func main() {
 	sn.LightNode = globalCfg.Light
 	sn.SetDatadir(globalCfg.Datadir)
 
+	bootNodes := swarm.SwarmBootnodes
 	if globalCfg.Bootnode != "" {
 		log.Infof("Using custom bootNode %s", globalCfg.Bootnode)
-		swarm.SwarmBootnodes = []string{globalCfg.Bootnode}
+		bootNodes = []string{globalCfg.Bootnode}
 	}
 
-	err = sn.InitPSS(true)
+	err = sn.InitPSS(bootNodes)
 	if err != nil {
 		log.Errorf("%v\n", err)
 		return

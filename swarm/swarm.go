@@ -43,6 +43,11 @@ var SwarmBootnodes = []string{
 	"enode://89f2ede3371bff1ad9f2088f2012984e280287a4e2b68007c2a6ad994909c51886b4a8e9e2ecc97f9910aca538398e0a5804b0ee80a187fde1ba4f32626322ba@52.35.212.179:30301",
 }
 
+// VocdoniBootnodes list of bootnodes for the Vocdoni SWARM network. It supports DNS hostnames.
+var VocdoniBootnodes = []string{
+	"enode://d6e2a7a90ca736b1651974ca47feb2bc93a9bbc136c91140256c654b50d7de8c52d993fed56737bfabdf210b6892132471e8da499ce7a4b95c917d70935c3af2@seed.vocdoni.net:4171",
+}
+
 func parseEnode(enode string) (string, error) {
 	splitAt := strings.Split(enode, "@")
 	if len(splitAt) != 2 {
@@ -197,7 +202,7 @@ func (sn *SimpleSwarm) SetKey(key *ecdsa.PrivateKey) {
 	sn.Key = key
 }
 
-func (sn *SimpleSwarm) InitPSS(bootStrap bool) error {
+func (sn *SimpleSwarm) InitPSS(bootNodes []string) error {
 	var err error
 	if len(sn.Datadir) < 1 {
 		usr, err := user.Current()
@@ -232,20 +237,20 @@ func (sn *SimpleSwarm) InitPSS(bootStrap bool) error {
 		return fmt.Errorf("swarm register fail %v", err)
 	}
 
-	// start the node
-	if bootStrap {
-		var bootNodes []*enode.Node
-		for _, url := range dvoteUtil.StrShuffle(SwarmBootnodes) {
+	// add bootNodes and start the node
+	if len(bootNodes) > 0 {
+		var ebootNodes []*enode.Node
+		for _, url := range dvoteUtil.StrShuffle(bootNodes) {
 			purl, err := parseEnode(url)
 			if err != nil {
 				log.Info(err)
 				continue
 			}
-			log.Infof("Add bootnode %v", purl)
+			log.Infof("add bootnode %v", purl)
 			node, _ := enode.ParseV4(purl)
-			bootNodes = append(bootNodes, node)
+			ebootNodes = append(ebootNodes, node)
 		}
-		sn.Node.Config().P2P.BootstrapNodes = bootNodes
+		sn.Node.Config().P2P.BootstrapNodes = ebootNodes
 	}
 	sn.Node.Start()
 
@@ -279,8 +284,9 @@ func (sn *SimpleSwarm) InitPSS(bootStrap bool) error {
 	}
 
 	// Print some information
-	log.Infof("My PSS pubkey is %s", sn.PssPubKey)
-	log.Infof("My PSS address is %x", sn.PssAddr)
+	log.Infof("my PSS pubkey is %s", sn.PssPubKey)
+	log.Infof("my PSS address is %x", sn.PssAddr)
+	log.Infof("my PSS enode is %s", sn.EnodeID)
 
 	// Run statistics goroutine
 	sn.PrintStats()

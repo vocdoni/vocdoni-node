@@ -86,15 +86,13 @@ func main() {
 	sp.WebSockets = 0
 	sn.Ports = sp
 
-	err = sn.InitPSS(false)
+	err = sn.InitPSS([]string{})
 	if err != nil {
 		log.Errorf("%v\n", err)
 		return
 	}
 
 	log.Infof("listening on %s:%d", globalCfg.ListenHost, globalCfg.ListenPort)
-	log.Infof("my enode ID: %s", sn.EnodeID)
-	log.Infof("my PSS pubKey is %s", sn.PssPubKey)
 
 	for {
 		time.Sleep(1 * time.Second)
