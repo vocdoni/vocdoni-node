@@ -15,12 +15,12 @@ type GWCfg struct {
 		NoInit     bool
 	}
 	Dvote struct {
-		Host  string
-		Port  int
+		Host string
+		Port int
 	}
 	Api struct {
 		Route string
-		File struct {
+		File  struct {
 			Enabled bool
 		}
 		Census struct {
@@ -57,11 +57,19 @@ type PssCfg struct {
 	Light      bool
 	PingMode   bool
 	LogLevel   string
+	Bootnode   string
+}
+
+type PssMetaCfg struct {
+	LogLevel   string
+	Datadir    string
+	ListenHost string
+	ListenPort int16
 }
 
 //W3Cfg stores global configs for web3
 type W3Cfg struct {
-	Enabled bool
+	Enabled   bool
 	ChainType string
 	LightMode bool
 	WsHost    string
@@ -115,8 +123,8 @@ type ClusterCfg struct {
 }
 
 type ClusterTestCfg struct {
-	LogLevel    string
-	Targets     []string
-	Interval    int
-	PkgSize 	int
+	LogLevel string
+	Targets  []string
+	Interval int
+	PkgSize  int
 }

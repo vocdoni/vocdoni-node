@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"net"
 	"fmt"
+	"net"
 	"os"
 	"os/user"
 	"strings"
@@ -25,8 +25,9 @@ import (
 	"github.com/ethersphere/swarm/network"
 	"github.com/ethersphere/swarm/pss"
 
-	dvoteUtil "gitlab.com/vocdoni/go-dvote/util"
+	"github.com/ethereum/go-ethereum/p2p/nat"
 	"gitlab.com/vocdoni/go-dvote/log"
+	dvoteUtil "gitlab.com/vocdoni/go-dvote/util"
 )
 
 const (
@@ -74,6 +75,10 @@ func newNode(key *ecdsa.PrivateKey, port int, httpport int, wsport int,
 	cfg.P2P.EnableMsgEvents = true
 	cfg.P2P.NoDiscovery = false
 	cfg.P2P.DiscoveryV5 = true
+	ip, err := dvoteUtil.GetPublicIP()
+	if err == nil {
+		cfg.P2P.NAT = nat.ExtIP(ip)
+	}
 	cfg.IPCPath = datadir + "/node.ipc"
 	cfg.DataDir = datadir
 	if httpport > 0 {
@@ -192,68 +197,7 @@ func (sn *SimpleSwarm) SetKey(key *ecdsa.PrivateKey) {
 	sn.Key = key
 }
 
-func (sn *SimpleSwarm) InitBZZ() error {
-	var err error
-	if len(sn.Datadir) < 1 {
-		usr, err := user.Current()
-		if err != nil {
-			return err
-		}
-		sn.Datadir = usr.HomeDir + "/.dvote/bzz"
-		os.MkdirAll(sn.Datadir, 0755)
-	}
-
-	sn.Ports = NewSwarmPorts()
-
-	// create node
-	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
-		sn.Ports.HTTPRPC, sn.Ports.WebSockets, sn.Datadir, "")
-	if err != nil {
-		return err
-	}
-
-	// set node key, if not set use the storage one or generate it
-	if sn.NodeKey == nil {
-		sn.NodeKey = sn.NodeConfig.NodeKey()
-	}
-
-	// create and register Swarm service
-	_, swarmConfig, swarmHandler := newSwarm(sn.NodeKey, sn.NodeKey, sn.Datadir, sn.Ports.Bzz, sn.LightNode)
-	err = sn.Node.Register(swarmHandler)
-	if err != nil {
-		return fmt.Errorf("swarm register fail %v", err)
-	}
-
-	// start the node
-	sn.Node.Start()
-	for _, url := range dvoteUtil.StrShuffle(SwarmBootnodes) {
-		purl, err := parseEnode(url)
-		if err != nil {
-			log.Error(err)
-			continue
-		}
-		log.Infof("Add bootnode " + purl)
-		node, _ := enode.ParseV4(purl)
-		sn.Node.Server().AddPeer(node)
-	}
-
-	// wait to connect to the p2p network
-	_, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	time.Sleep(time.Second * 5)
-
-	// establish swarm client
-	sn.ListenAddr = swarmConfig.ListenAddr
-	swarmURL := sn.ListenAddr + ":" + string(sn.Ports.HTTPRPC)
-	sn.Client = client.NewClient(swarmURL)
-
-	// Run statistics goroutine
-	sn.PrintStats()
-
-	return nil
-}
-
-func (sn *SimpleSwarm) InitPSS() error {
+func (sn *SimpleSwarm) InitPSS(bootStrap bool) error {
 	var err error
 	if len(sn.Datadir) < 1 {
 		usr, err := user.Current()
@@ -264,7 +208,9 @@ func (sn *SimpleSwarm) InitPSS() error {
 		os.MkdirAll(sn.Datadir, 0755)
 	}
 
-	sn.Ports = NewSwarmPorts()
+	if sn.Ports == nil {
+		sn.Ports = NewSwarmPorts()
+	}
 
 	// create node
 	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
@@ -287,17 +233,21 @@ func (sn *SimpleSwarm) InitPSS() error {
 	}
 
 	// start the node
-	sn.Node.Start()
-	for _, url := range dvoteUtil.StrShuffle(SwarmBootnodes) {
-		purl, err := parseEnode(url)
-		if err != nil {
-			log.Info(err)
-			continue
+	if bootStrap {
+		var bootNodes []*enode.Node
+		for _, url := range dvoteUtil.StrShuffle(SwarmBootnodes) {
+			purl, err := parseEnode(url)
+			if err != nil {
+				log.Info(err)
+				continue
+			}
+			log.Infof("Add bootnode %v", purl)
+			node, _ := enode.ParseV4(purl)
+			bootNodes = append(bootNodes, node)
 		}
-		log.Infof("Add bootnode %v", purl)
-		node, _ := enode.ParseV4(purl)
-		sn.Node.Server().AddPeer(node)
+		sn.Node.Config().P2P.BootstrapNodes = bootNodes
 	}
+	sn.Node.Start()
 
 	// wait to connect to the p2p network
 	_, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -368,7 +318,6 @@ func (sn *SimpleSwarm) SetHandler(topic string, fh pss.HandlerFunc) {
 func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	pssTopic := strTopic(topic)
 	pssAddress := strAddress("")
-	log.Debugf("pss subscription to topic %s", pssTopic)
 	if subType == "sym" {
 		_, err := sn.Pss.SetSymmetricKey(strSymKey(key), pssTopic, pssAddress, true)
 		if err != nil {

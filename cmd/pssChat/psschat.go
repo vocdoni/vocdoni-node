@@ -2,17 +2,17 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/user"
 	"time"
-	"fmt"
 
 	"github.com/marcusolsson/tui-go"
-	swarm "gitlab.com/vocdoni/go-dvote/swarm"
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"github.com/spf13/viper"
-	flag "github.com/spf13/pflag"
+	swarm "gitlab.com/vocdoni/go-dvote/swarm"
 )
 
 func newConfig() (config.PssCfg, error) {
@@ -29,6 +29,7 @@ func newConfig() (config.PssCfg, error) {
 	flag.String("key", "vocdoni", "encryption key (sym or asym)")
 	flag.String("topic", "vocdoni_test", "pss topic to subscribe")
 	flag.String("address", "", "pss address to send messages")
+	flag.String("bootnode", "", "pss custom peer bootnode")
 	flag.String("nick", "", "nick name for the pss messages")
 	flag.String("datadir", "", "datadir directory for swarm/pss files")
 	flag.Bool("light", false, "use light mode (less consumption)")
@@ -41,6 +42,7 @@ func newConfig() (config.PssCfg, error) {
 	viper.SetDefault("key", "vocdoni")
 	viper.SetDefault("topic", "vocdoni_test")
 	viper.SetDefault("address", "")
+	viper.SetDefault("bootnode", "")
 	viper.SetDefault("nick", "")
 	viper.SetDefault("datadir", "")
 	viper.SetDefault("light", false)
@@ -67,12 +69,13 @@ func newConfig() (config.PssCfg, error) {
 	viper.BindPFlag("key", flag.Lookup("key"))
 	viper.BindPFlag("topic", flag.Lookup("topic"))
 	viper.BindPFlag("address", flag.Lookup("address"))
+	viper.BindPFlag("bootnode", flag.Lookup("bootnode"))
 	viper.BindPFlag("nick", flag.Lookup("nick"))
 	viper.BindPFlag("datadir", flag.Lookup("datadir"))
 	viper.BindPFlag("light", flag.Lookup("light"))
 	viper.BindPFlag("pingmode", flag.Lookup("pingmode"))
 	viper.BindPFlag("logLevel", flag.Lookup("loglevel"))
-	
+
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
 	if err != nil {
@@ -105,7 +108,12 @@ func main() {
 	sn.LightNode = globalCfg.Light
 	sn.SetDatadir(globalCfg.Datadir)
 
-	err = sn.InitPSS()
+	if globalCfg.Bootnode != "" {
+		log.Infof("Using custom bootNode %s", globalCfg.Bootnode)
+		swarm.SwarmBootnodes = []string{globalCfg.Bootnode}
+	}
+
+	err = sn.InitPSS(true)
 	if err != nil {
 		log.Errorf("%v\n", err)
 		return
