@@ -8,8 +8,6 @@ import (
 
 	autonat "github.com/libp2p/go-libp2p-autonat-svc"
 
-	ipfsconfig "github.com/ipfs/go-ipfs-config"
-	"github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
 	ipfsapi "github.com/ipfs/go-ipfs/core/coreapi"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
@@ -35,10 +33,17 @@ func Init() error {
 		return errors.New(e)
 	}
 
+	mode := os.FileMode(int(0770))
+	err = os.MkdirAll(ConfigRoot, mode)
+	if err != nil {
+		return err
+	}
+
 	f, err := os.Create(path.Join(ConfigRoot, "version"))
 	if err != nil {
 		return err
 	}
+
 	_, werr := f.Write([]byte(fmt.Sprintf("%d\n", RepoVersion)))
 	if werr != nil {
 		return werr
@@ -51,6 +56,7 @@ func Init() error {
 
 func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 	log.Infof("Attempting to start node...")
+	log.Infof("ConfigRoot: %s", ConfigRoot)
 	r, err := fsrepo.Open(ConfigRoot)
 	if err != nil {
 		log.Infof("Error opening repo dir")
@@ -91,16 +97,4 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 	}
 
 	return node, api, nil
-}
-
-func CmdCtx(node *ipfscore.IpfsNode, repoPath string) commands.Context {
-	return commands.Context{
-		ConfigRoot: repoPath,
-		LoadConfig: func(path string) (*ipfsconfig.Config, error) {
-			return node.Repo.Config()
-		},
-		ConstructNode: func() (*ipfscore.IpfsNode, error) {
-			return node, nil
-		},
-	}
 }

@@ -3,30 +3,21 @@ package data
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/ioutil"
+	"os/user"
 
-	gocid "github.com/ipfs/go-cid"
-
-	"net/http"
 	"os"
 
 	//"os/exec"
 	"strings"
 
 	files "github.com/ipfs/go-ipfs-files"
-	ipfscmds "github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
-	"github.com/ipfs/go-ipfs/core/corehttp"
 	"github.com/ipfs/go-ipfs/core/coreunix"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
-	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/ipfs/interface-go-ipfs-core/options"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
-	ipfscluster "github.com/ipfs/ipfs-cluster"
-	clusterapi "github.com/ipfs/ipfs-cluster/api"
-	logging "github.com/whyrusleeping/go-logging"
 	crypto "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/ipfs"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -35,14 +26,18 @@ import (
 
 type IPFSHandle struct {
 	Node    *ipfscore.IpfsNode
-	cluster *ipfscluster.Cluster
 	CoreAPI coreiface.CoreAPI
 	DataDir string
 }
 
 // check if ipfs base dir exists
-func checkIPFSinit(bin string) (bool, error) {
-	_, err := os.Stat(bin)
+func checkIPFSDirExists(path string) (bool, error) {
+	usr, err := user.Current()
+	if err != nil {
+		return false, errors.New("Cannot get $HOME")
+	}
+	userHomeDir := usr.HomeDir
+	_, err = os.Stat(userHomeDir + "/." + path)
 	if err == nil {
 		return true, nil
 	}
@@ -50,107 +45,64 @@ func checkIPFSinit(bin string) (bool, error) {
 		return false, nil
 	}
 	return true, err
-
-	// initCmd := exec.Command(bin, "config", "show")
-	// return initCmd.Run()
 }
 
-//Init sets up an IPFS native node and cluster
 func (i *IPFSHandle) Init(d *types.DataStore) error {
-	lvl, err := logging.LogLevel(strings.ToUpper(d.ClusterCfg.ClusterLogLevel))
-	if err != nil {
-		log.Warn(err.Error())
-	}
-	ipfslog.SetAllLoggers(lvl)
-	const programName = `dvote-ipfs`
-
-	dirExists, err := checkIPFSinit(d.Datadir)
-	if err != nil {
-		log.Warn(err.Error())
-		return errors.New("cannot check if IPFS dir exists")
-	}
-	if !dirExists {
-		err = os.MkdirAll(d.Datadir, os.ModePerm)
-	}
-
-	go func() {
-		log.Info(http.ListenAndServe("localhost:6060", nil))
-	}()
-
 	ipfs.InstallDatabasePlugins()
 	ipfs.ConfigRoot = d.Datadir
 	//check if needs init
 	if !fsrepo.IsInitialized(ipfs.ConfigRoot) {
 		err := ipfs.Init()
 		if err != nil {
-			log.Warn(err.Error())
-			return err
-		} else {
-			log.Info("IPFS init done!")
+			log.Errorf("Error in IPFS init: %s", err)
 		}
 	}
-
 	nd, coreAPI, err := ipfs.StartNode()
 	if err != nil {
-		log.Errorf("Error in StartNode: ", err)
+		return err
 	}
-	log.Infof("Peer ID: %s", nd.Identity.Pretty())
-
-	//start http
-	cctx := ipfs.CmdCtx(nd, d.Datadir)
-	cctx.ReqLog = &ipfscmds.ReqLog{}
-
-	gatewayOpt := corehttp.GatewayOption(true, corehttp.WebUIPaths...)
-	var opts = []corehttp.ServeOption{
-		corehttp.CommandsOption(cctx),
-		corehttp.WebUIOption,
-		gatewayOpt,
-	}
-
-	go corehttp.ListenAndServe(nd, "/ip4/0.0.0.0/tcp/5001", opts...)
+	log.Infof("IPFS Peer ID: %s", nd.Identity.Pretty())
 
 	i.Node = nd
 	i.CoreAPI = coreAPI
 	i.DataDir = d.Datadir
 
-	ipfs.ProgramName = programName
-	log.Infof("ipfs init done!")
-
-	if len(d.ClusterCfg.Secret) > 0 {
-		log.Info("initializing ipfs cluster")
-		clusterPath := d.Datadir + "/.cluster"
-		d.ClusterCfg.PeerID = i.Node.Identity
-		d.ClusterCfg.Private = i.Node.PrivateKey
-		err = ipfs.InitCluster(clusterPath, "conf.json", "id.json", d.ClusterCfg)
-		if err != nil {
-			log.Fatalf("Error initializing ipfs cluster: %v", err)
-		}
-		ch := make(chan *ipfscluster.Cluster)
-		go ipfs.RunCluster(d.ClusterCfg, ch)
-		log.Debug("Cluster has run!!!")
-		cluster := <-ch
-		i.cluster = cluster
-		if err != nil {
-			log.Fatalf("Error running ipfs cluster: %v", err)
-		}
-	}
 	return nil
 }
 
-//PublishBytes publishes a file containing msg to ipfs (node)
-func publishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
-	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
+//GetURIprefix returns the URI prefix which identifies the protocol
+func (i *IPFSHandle) GetURIprefix() string {
+	return "ipfs://"
+}
+
+//PublishFile publishes a file specified by root to ipfs
+func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
+	rootHash, err := addAndPin(nd, string(root))
+	if err != nil {
+		return "", err
+	}
+	return rootHash, nil
+}
+
+//PublishBytes publishes a file containing msg to ipfs
+func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
+	filePath := fileDir + "/" + string(crypto.HashRaw(string(msg))) + ".txt"
 	log.Infof("Publishing file: %s", filePath)
-	err := ioutil.WriteFile(filePath, msg, 0666) //these should be more restrictive
+	err := ioutil.WriteFile(filePath, msg, 0666)
 	rootHash, err := addAndPin(nd, filePath)
 	if err != nil {
 		return "", err
 	}
 	return rootHash, nil
-
 }
 
-//this is node add and node pin
+//Publish publishes a message to ipfs
+func (i *IPFSHandle) Publish(msg []byte) (string, error) {
+	//if sent a message instead of a file
+	roothash, err := PublishBytes(msg, i.DataDir, i.Node)
+	return roothash, err
+}
+
 func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 	defer n.Blockstore.PinLock().Unlock()
 	stat, err := os.Lstat(root)
@@ -175,24 +127,37 @@ func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 	return node.Cid().String(), nil
 }
 
-//GetURIprefix returns the URI prefix which identifies the protocol
-func (i *IPFSHandle) GetURIprefix() string {
-	return "ipfs://"
-}
-
-//Public publish function, handles cluster and standalone modes
-func (i *IPFSHandle) Publish(msg []byte) (string, error) {
-	roothash, err := publishBytes(msg, i.DataDir, i.Node)
+func (i *IPFSHandle) Pin(path string) error {
+	p := corepath.New(path)
+	rp, err := i.CoreAPI.ResolvePath(context.Background(), p)
 	if err != nil {
-		return "", err
+		return err
 	}
-	if i.cluster != nil {
-		i.clusterPin(roothash)
-	}
-	return roothash, nil
+	return i.CoreAPI.Pin().Add(context.Background(), rp, options.Pin.Recursive(true))
 }
 
-//Retrieve from local node
+func (i *IPFSHandle) Unpin(path string) error {
+	p := corepath.New(path)
+	rp, err := i.CoreAPI.ResolvePath(context.Background(), p)
+	if err != nil {
+		return err
+	}
+	return i.CoreAPI.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true))
+}
+
+func (i *IPFSHandle) ListPins() (map[string]string, error) {
+	pins, err := i.CoreAPI.Pin().Ls(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var pinMap map[string]string
+	pinMap = make(map[string]string)
+	for _, p := range pins {
+		pinMap[p.Path().String()] = p.Type()
+	}
+	return pinMap, nil
+}
+
 func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
 	ctx := context.Background()
 
@@ -213,102 +178,4 @@ func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
 	}
 
 	return ioutil.ReadAll(r)
-}
-
-//Pin Descriminator
-func (i *IPFSHandle) Pin(path string) error {
-	if i.cluster != nil {
-		return i.clusterPin(path)
-	} else {
-		return i.nodePin(path)
-	}
-}
-
-//Node Pin
-func (i *IPFSHandle) nodePin(path string) error {
-	p := corepath.New(path)
-	rp, err := i.CoreAPI.ResolvePath(context.Background(), p)
-	if err != nil {
-		return err
-	}
-	return i.CoreAPI.Pin().Add(context.Background(), rp, options.Pin.Recursive(true))
-}
-
-//Cluster pin
-func (i *IPFSHandle) clusterPin(path string) error {
-	cid, err := gocid.Decode(path)
-	if err != nil {
-		return err
-	}
-	pin := clusterapi.PinCid(cid)
-	pin.PinOptions.ReplicationFactorMax = -1
-	_, err = i.cluster.Pin(context.Background(), cid, pin.PinOptions)
-	return err
-}
-
-//Unpin descriminator
-func (i *IPFSHandle) Unpin(path string) error {
-	if i.cluster != nil {
-		return i.clusterUnpin(path)
-	} else {
-		return i.nodeUnpin(path)
-	}
-}
-
-//Node Unpin
-func (i *IPFSHandle) nodeUnpin(path string) error {
-	p := corepath.New(path)
-	rp, err := i.CoreAPI.ResolvePath(context.Background(), p)
-	if err != nil {
-		return err
-	}
-	return i.CoreAPI.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true))
-}
-
-//Cluster unpin
-func (i *IPFSHandle) clusterUnpin(path string) error {
-	p := corepath.New(path)
-	rp, err := i.CoreAPI.ResolvePath(context.Background(), p)
-	if err != nil {
-		return err
-	}
-	_, err = i.cluster.Unpin(context.Background(), rp.Cid())
-	return err
-}
-
-//Listpins descriminator
-func (i *IPFSHandle) ListPins() (map[string]string, error) {
-	if i.cluster != nil {
-		return i.clusterListPins()
-	} else {
-		return i.nodeListPins()
-	}
-}
-
-//Node Listpins
-func (i *IPFSHandle) nodeListPins() (map[string]string, error) {
-	pins, err := i.CoreAPI.Pin().Ls(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	var pinMap map[string]string
-	pinMap = make(map[string]string)
-	for _, p := range pins {
-		pinMap[p.Path().String()] = p.Type()
-	}
-	return pinMap, nil
-}
-
-//This is cluster listpins
-func (i *IPFSHandle) clusterListPins() (map[string]string, error) {
-	pins, err := i.cluster.Pins(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	var pinMap map[string]string
-	pinMap = make(map[string]string)
-	for _, p := range pins {
-		pinMap[p.Cid.String()] = p.Type.String()
-	}
-	return pinMap, nil
 }

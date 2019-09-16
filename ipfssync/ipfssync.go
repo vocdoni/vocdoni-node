@@ -103,7 +103,7 @@ func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
 				}
 				for _, v := range msg.PinList {
 					if _, e := pins[v]; !e {
-						log.Infof("pining %s", v)
+						log.Infof("pinning %s", v)
 						pinned := false
 						go func() {
 							err := is.Storage.Pin(v)
@@ -118,7 +118,7 @@ func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
 							waitTime--
 						}
 						if waitTime < 1 {
-							log.Warnf("pining timeout for %s", v)
+							log.Warnf("pinning timeout for %s", v)
 						}
 					} else {
 						log.Debugf("we already have %v", v)
