@@ -2,9 +2,8 @@ package config
 
 //GWCfg stores global configs for gateway
 type GWCfg struct {
-	W3      W3Cfg
-	Cluster ClusterCfg
-	Ipfs    struct {
+	W3   W3Cfg
+	Ipfs struct {
 		ConfigPath string
 		Daemon     string
 		NoInit     bool
@@ -93,7 +92,6 @@ type RelayCfg struct {
 	TransportIDString string
 	StorageIDString   string
 	IpfsConfigPath    string
-	Cluster           ClusterCfg
 }
 
 type GenCfg struct {
