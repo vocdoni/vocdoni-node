@@ -222,6 +222,7 @@ func (is *IPFSsync) Start() {
 	if err != nil {
 		panic(err)
 	}
+	log.Infof("my multiaddress: %s", is.myMultiAddr.String())
 
 	go func() {
 		var syncMsg IPFSsyncMessage

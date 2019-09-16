@@ -64,13 +64,10 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 		Repo:      r,
 		Online:    true,
 		Permanent: true,
-
-		/*
-			ExtraOpts: map[string]bool{
-				"mplex":  true,
-				"ipnsps": true,
-			},
-		*/
+		ExtraOpts: map[string]bool{
+			"mplex":  true,
+			"ipnsps": true,
+		},
 	}
 
 	node, err := ipfscore.NewNode(ctx, cfg)
