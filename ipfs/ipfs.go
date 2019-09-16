@@ -2,13 +2,15 @@ package ipfs
 
 import (
 	"context"
-	"os"
 	"fmt"
+	"os"
 	"path"
 
-	ipfscore "github.com/ipfs/go-ipfs/core"
-	"github.com/ipfs/go-ipfs/commands"
+	autonat "github.com/libp2p/go-libp2p-autonat-svc"
+
 	ipfsconfig "github.com/ipfs/go-ipfs-config"
+	"github.com/ipfs/go-ipfs/commands"
+	ipfscore "github.com/ipfs/go-ipfs/core"
 	ipfsapi "github.com/ipfs/go-ipfs/core/coreapi"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
@@ -59,14 +61,16 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 	ctx := context.Background()
 
 	cfg := &ipfscore.BuildCfg{
-		Repo:   r,
-		Online: true,
+		Repo:      r,
+		Online:    true,
+		Permanent: true,
+
 		/*
 			ExtraOpts: map[string]bool{
 				"mplex":  true,
 				"ipnsps": true,
 			},
-			*/
+		*/
 	}
 
 	node, err := ipfscore.NewNode(ctx, cfg)
@@ -77,11 +81,18 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 	node.IsDaemon = true
 	node.IsOnline = true
 
+	auts, err := autonat.NewAutoNATService(node.Context(), node.PeerHost)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	node.AutoNAT = auts
+
 	api, err := ipfsapi.NewCoreAPI(node)
 	if err != nil {
 		log.Info("Error constructing core API")
 		return nil, nil, err
 	}
+
 	return node, api, nil
 }
 

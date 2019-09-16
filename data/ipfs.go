@@ -14,9 +14,11 @@ import (
 	//"os/exec"
 	"strings"
 
+	files "github.com/ipfs/go-ipfs-files"
 	ipfscmds "github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
 	"github.com/ipfs/go-ipfs/core/corehttp"
+	"github.com/ipfs/go-ipfs/core/coreunix"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
@@ -25,20 +27,17 @@ import (
 	ipfscluster "github.com/ipfs/ipfs-cluster"
 	clusterapi "github.com/ipfs/ipfs-cluster/api"
 	logging "github.com/whyrusleeping/go-logging"
-	"gitlab.com/vocdoni/go-dvote/ipfs"
-
-	files "github.com/ipfs/go-ipfs-files"
-	"github.com/ipfs/go-ipfs/core/coreunix"
 	crypto "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/ipfs"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 type IPFSHandle struct {
-	nd      *ipfscore.IpfsNode
+	Node    *ipfscore.IpfsNode
 	cluster *ipfscluster.Cluster
-	coreAPI coreiface.CoreAPI
-	dataDir string
+	CoreAPI coreiface.CoreAPI
+	DataDir string
 }
 
 // check if ipfs base dir exists
@@ -110,9 +109,9 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 
 	go corehttp.ListenAndServe(nd, "/ip4/0.0.0.0/tcp/5001", opts...)
 
-	i.nd = nd
-	i.coreAPI = coreAPI
-	i.dataDir = d.Datadir
+	i.Node = nd
+	i.CoreAPI = coreAPI
+	i.DataDir = d.Datadir
 
 	ipfs.ProgramName = programName
 	log.Infof("ipfs init done!")
@@ -120,8 +119,8 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	if len(d.ClusterCfg.Secret) > 0 {
 		log.Info("initializing ipfs cluster")
 		clusterPath := d.Datadir + "/.cluster"
-		d.ClusterCfg.PeerID = i.nd.Identity
-		d.ClusterCfg.Private = i.nd.PrivateKey
+		d.ClusterCfg.PeerID = i.Node.Identity
+		d.ClusterCfg.Private = i.Node.PrivateKey
 		err = ipfs.InitCluster(clusterPath, "conf.json", "id.json", d.ClusterCfg)
 		if err != nil {
 			log.Fatalf("Error initializing ipfs cluster: %v", err)
@@ -183,7 +182,7 @@ func (i *IPFSHandle) GetURIprefix() string {
 
 //Public publish function, handles cluster and standalone modes
 func (i *IPFSHandle) Publish(msg []byte) (string, error) {
-	roothash, err := publishBytes(msg, i.dataDir, i.nd)
+	roothash, err := publishBytes(msg, i.DataDir, i.Node)
 	if err != nil {
 		return "", err
 	}
@@ -203,7 +202,7 @@ func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
 
 	pth := corepath.New(path)
 
-	nd, err := i.coreAPI.Unixfs().Get(ctx, pth)
+	nd, err := i.CoreAPI.Unixfs().Get(ctx, pth)
 	if err != nil {
 		return nil, err
 	}
@@ -228,11 +227,11 @@ func (i *IPFSHandle) Pin(path string) error {
 //Node Pin
 func (i *IPFSHandle) nodePin(path string) error {
 	p := corepath.New(path)
-	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
+	rp, err := i.CoreAPI.ResolvePath(context.Background(), p)
 	if err != nil {
 		return err
 	}
-	return i.coreAPI.Pin().Add(context.Background(), rp, options.Pin.Recursive(true))
+	return i.CoreAPI.Pin().Add(context.Background(), rp, options.Pin.Recursive(true))
 }
 
 //Cluster pin
@@ -259,17 +258,17 @@ func (i *IPFSHandle) Unpin(path string) error {
 //Node Unpin
 func (i *IPFSHandle) nodeUnpin(path string) error {
 	p := corepath.New(path)
-	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
+	rp, err := i.CoreAPI.ResolvePath(context.Background(), p)
 	if err != nil {
 		return err
 	}
-	return i.coreAPI.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true))
+	return i.CoreAPI.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true))
 }
 
 //Cluster unpin
 func (i *IPFSHandle) clusterUnpin(path string) error {
 	p := corepath.New(path)
-	rp, err := i.coreAPI.ResolvePath(context.Background(), p)
+	rp, err := i.CoreAPI.ResolvePath(context.Background(), p)
 	if err != nil {
 		return err
 	}
@@ -288,7 +287,7 @@ func (i *IPFSHandle) ListPins() (map[string]string, error) {
 
 //Node Listpins
 func (i *IPFSHandle) nodeListPins() (map[string]string, error) {
-	pins, err := i.coreAPI.Pin().Ls(context.Background())
+	pins, err := i.CoreAPI.Pin().Ls(context.Background())
 	if err != nil {
 		return nil, err
 	}

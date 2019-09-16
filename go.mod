@@ -36,6 +36,8 @@ require (
 	github.com/ipfs/interface-go-ipfs-core v0.2.2
 	github.com/ipfs/ipfs-cluster v0.11.0-rc8.0.20190829153225-ef8483e30e42
 	github.com/libp2p/go-conn-security v0.0.1 // indirect
+	github.com/libp2p/go-libp2p-autonat v0.1.0
+	github.com/libp2p/go-libp2p-autonat-svc v0.1.0
 	github.com/libp2p/go-libp2p-core v0.2.2
 	github.com/libp2p/go-libp2p-host v0.1.0
 	github.com/libp2p/go-libp2p-interface-connmgr v0.0.5 // indirect

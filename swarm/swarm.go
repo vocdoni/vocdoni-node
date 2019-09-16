@@ -187,9 +187,9 @@ func (sn *SimpleSwarm) PrintStats() {
 				var addrs [][]byte
 				addrs = append(addrs, []byte(addr))
 				peerCount := sn.Node.Server().PeerCount()
-				log.Infof("Node server: PeerCount: %v, Neighborhood Depth: %v", peerCount, sn.Hive.NeighbourhoodDepth)
+				log.Infof("PeerCount: %d, Neighborhood: %d", peerCount, sn.Hive.NeighbourhoodDepth)
 			}
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 30)
 		}
 	}()
 }
@@ -336,7 +336,7 @@ func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	sn.PssTopics[topic].Delivery = make(chan PssMsg)
 
 	var pssHandler pss.HandlerFunc = func(msg []byte, peer *p2p.Peer, asym bool, keyid string) error {
-		log.Debugf("pss received msg: %v, keyid: %v", msg, keyid)
+		log.Debugf("pss received msg: %s, keyid: %v", msg, keyid)
 
 		sn.PssTopics[topic].Delivery <- PssMsg{Msg: msg, Peer: peer, Asym: asym, Keyid: keyid}
 		return nil
@@ -347,7 +347,7 @@ func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	}
 	sn.PssTopics[topic].Unregister = sn.Pss.Register(&pssTopic, topicHandler)
 
-	log.Infof("Pss subscribed to %v, topic %v", subType, pssTopic.String())
+	log.Infof("Pss subscribed to %v, topic %x", subType, pssTopic.String())
 	return nil
 }
 
@@ -355,7 +355,7 @@ func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
 	var err error
 	dstAddr := strAddress(address)
 	dstTopic := strTopic(topic)
-	log.Infof("Sending message to addressee %v, with topic %v", dstAddr, dstTopic)
+	log.Debugf("Sending message to %x, with topic %x", dstAddr, dstTopic)
 	if subType == "sym" {
 		symKeyId, err := sn.Pss.SetSymmetricKey(strSymKey(key), dstTopic, dstAddr, false)
 		if err != nil {
@@ -391,4 +391,9 @@ func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
 		err = sn.Pss.SendAsym(key, dstTopic, hexutil.Bytes(msg))
 	}
 	return err
+}
+
+func (sn *SimpleSwarm) InitBZZ() error {
+	// NOT IMPLEMENTED
+	return nil
 }
