@@ -10,6 +10,7 @@ import (
 	mkcore "github.com/iden3/go-iden3-core/core"
 	db "github.com/iden3/go-iden3-core/db"
 	merkletree "github.com/iden3/go-iden3-core/merkletree"
+	"golang.org/x/text/unicode/norm"
 )
 
 type Tree struct {
@@ -137,7 +138,7 @@ func (t *Tree) Dump(root string) (claims []string, err error) {
 	return
 }
 
-func (t *Tree) DumpPlain(root string) ([]string, error) {
+func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, error) {
 	var response []string
 	var err error
 	var rootHash merkletree.Hash
@@ -150,9 +151,13 @@ func (t *Tree) DumpPlain(root string) ([]string, error) {
 	err = t.Tree.Walk(&rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
 			data := bytes.Trim(n.Value()[65:], "\x00")
-			data = bytes.Replace(data, []byte("\u0000"), nil, -1)
-			datab64 := base64.StdEncoding.EncodeToString(data)
-			response = append(response, datab64)
+			data = bytes.Replace(data, []byte("\x00"), nil, -1)
+			if responseBase64 {
+				datab64 := base64.StdEncoding.EncodeToString(data)
+				response = append(response, datab64)
+			} else {
+				response = append(response, string(norm.NFC.Bytes(data)))
+			}
 		}
 	})
 	return response, err

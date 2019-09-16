@@ -15,7 +15,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	userDir := usr.HomeDir + "/.dvote"
+	userDir := usr.HomeDir + "/.ipfs"
 	logLevel := flag.String("logLevel", "info", "log level")
 	dataDir := flag.String("dataDir", userDir, "directory for storing data")
 	key := flag.String("key", "", "symetric key of the sync ipfs cluster")
@@ -25,12 +25,11 @@ func main() {
 	flag.Parse()
 	log.InitLoggerAtLevel(*logLevel)
 
-	ipfsStore := data.IPFSNewConfig(*dataDir + "/.ipfs")
+	ipfsStore := data.IPFSNewConfig(*dataDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-
 	is := ipfssync.NewIPFSsync(*dataDir, *key, storage)
 	is.HelloTime = *helloTime
 	is.UpdateTime = *updateTime

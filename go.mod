@@ -73,6 +73,7 @@ require (
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
+	golang.org/x/text v0.3.2
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190709231704-1e4459ed25ff // indirect
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gopkg.in/urfave/cli.v1 v1.0.0-00010101000000-000000000000 // indirect

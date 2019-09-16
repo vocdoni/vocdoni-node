@@ -44,8 +44,43 @@ func guessMyAddress(port int, id string) string {
 
 func (is *IPFSsync) updatePinsTree() {
 	for _, v := range is.listPins() {
+		// FALTEN 2 BYTES!!! WTF?
+		log.Infof("Adding to MT: |%s|", v)
 		is.hashTree.AddClaim([]byte(v))
 	}
+}
+
+func (is *IPFSsync) pinMissing() error {
+	mkPins, err := is.hashTree.DumpPlain(is.hashTree.GetRoot(), false)
+	if err != nil {
+		return err
+	}
+	pins, err := is.Storage.ListPins()
+	if err != nil {
+		return err
+	}
+	for _, v := range mkPins {
+		if _, e := pins[v]; !e {
+			log.Infof("pinning %s", v)
+			pinned := false
+			go func() {
+				err := is.Storage.Pin(v)
+				if err != nil {
+					log.Warn(err.Error())
+				}
+				pinned = true
+			}()
+			waitTime := 100
+			for !pinned && waitTime > 0 {
+				time.Sleep(100 * time.Millisecond)
+				waitTime--
+			}
+			if waitTime < 1 {
+				log.Warnf("pinning timeout for %s", v)
+			}
+		}
+	}
+	return nil
 }
 
 func (is *IPFSsync) sendMsg(ipfsmsg IPFSsyncMessage) error {
@@ -93,37 +128,8 @@ func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
 	if msg.Type == "update" {
 		if len(msg.Hash) > 31 && len(msg.Address) > 31 && !is.updateLock {
 			if msg.Hash != is.hashTree.GetRoot() {
-				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
 				is.updateLock = true
-				pins, err := is.Storage.ListPins()
-				if err != nil {
-					log.Warn(err.Error())
-					is.updateLock = false
-					return err
-				}
-				for _, v := range msg.PinList {
-					if _, e := pins[v]; !e {
-						log.Infof("pinning %s", v)
-						pinned := false
-						go func() {
-							err := is.Storage.Pin(v)
-							if err != nil {
-								log.Warn(err.Error())
-							}
-							pinned = true
-						}()
-						waitTime := 100
-						for !pinned && waitTime > 0 {
-							time.Sleep(100 * time.Millisecond)
-							waitTime--
-						}
-						if waitTime < 1 {
-							log.Warnf("pinning timeout for %s", v)
-						}
-					} else {
-						log.Debugf("we already have %v", v)
-					}
-				}
+				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
 				is.updatePinsTree()
 				is.updateLock = false
 			}
@@ -245,11 +251,21 @@ func (is *IPFSsync) Start() {
 		}
 	}()
 
-	for {
-		time.Sleep(time.Second * time.Duration(is.UpdateTime))
-		if !is.updateLock {
-			is.updatePinsTree()
-			is.sendUpdate()
+	go func() {
+		for {
+			time.Sleep(time.Second * time.Duration(is.UpdateTime))
+			if !is.updateLock {
+				is.updatePinsTree()
+				is.sendUpdate()
+			}
 		}
+	}()
+
+	for {
+		err = is.pinMissing()
+		if err != nil {
+			log.Warn(err.Error())
+		}
+		time.Sleep(time.Second * 60)
 	}
 }
