@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/viper"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 
-	"encoding/hex"
 	goneturl "net/url"
 	"os"
 	"os/user"
@@ -53,12 +52,9 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("w3route", "/web3", "web3 endpoint API route")
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
 	flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
-	flag.String("ipfsClusterKey", "", "enables ipfs cluster using a shared key")
-	flag.StringSlice("ipfsClusterPeers", []string{}, "ipfs cluster peer bootstrap addresses in multiaddr format")
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
-	flag.String("clusterLogLevel", "ERROR", "Log level for ipfs cluster (debug, info, warning, error)")
 
 	flag.Parse()
 
@@ -85,15 +81,6 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("logLevel", "warn")
 	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ipfs.configPath", userDir+"/.ipfs")
-	viper.SetDefault("cluster.secret", "")
-	viper.SetDefault("cluster.bootstraps", []string{})
-	viper.SetDefault("cluster.stats", false)
-	viper.SetDefault("cluster.tracing", false)
-	viper.SetDefault("cluster.consensus", "raft")
-	viper.SetDefault("cluster.pintracker", "map")
-	viper.SetDefault("cluster.leave", true)
-	viper.SetDefault("cluster.alloc", "disk")
-	viper.SetDefault("cluster.clusterLogLevel", "ERROR")
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -132,9 +119,6 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
-	viper.BindPFlag("cluster.secret", flag.Lookup("ipfsClusterKey"))
-	viper.BindPFlag("cluster.bootstraps", flag.Lookup("ipfsClusterPeers"))
-	viper.BindPFlag("cluster.clusterloglevel", flag.Lookup("clusterLogLevel"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -301,18 +285,6 @@ func main() {
 	var storage data.Storage
 	if !globalCfg.Ipfs.NoInit {
 		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
-		ipfsStore.ClusterCfg = globalCfg.Cluster
-		if len(globalCfg.Cluster.Secret) > 0 {
-			if len(globalCfg.Cluster.Secret) > 16 {
-				log.Fatal("ipfsClusterKey too long")
-			}
-			encodedSecret := hex.EncodeToString([]byte(globalCfg.Cluster.Secret))
-			for i := len(encodedSecret); i < 32; i++ {
-				encodedSecret += "0"
-			}
-			ipfsStore.ClusterCfg.Secret = encodedSecret
-			log.Infof("ipfs cluster encoded secret: %s", encodedSecret)
-		}
 		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 		if err != nil {
 			log.Fatal(err.Error())
