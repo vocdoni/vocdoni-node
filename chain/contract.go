@@ -95,12 +95,14 @@ func (ph *ProcessHandle) GetProcessMetadata(pid [32]byte) (*vochain.NewProcessTx
 	return processTxArgs, nil
 }
 
-// node.proc_transactor.do_this()
+func (ph *ProcessHandle) GetOracles() ([]string, error) {
+	return ph.VotingProcess.GetOracles(nil)
+}
 
-// node.proc_transactor.do_that()
+func (ph *ProcessHandle) GetValidators() ([]string, error) {
+	return ph.VotingProcess.GetValidators(nil)
+}
 
-// Contructor for entity_transactor on node ?>
-
-// node.entity_transactor.do_this()
-
-// node.entity_transactor.do_that()
+func (ph *ProcessHandle) GetGenesis() (string, error) {
+	return ph.VotingProcess.GetGenesis(nil)
+}

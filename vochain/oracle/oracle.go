@@ -89,7 +89,9 @@ type EventProcessCanceled struct {
 }
 type ValidatorAdded string
 type ValidatorRemoved string
-type OracleAdded string
+type OracleAdded struct {
+	OraclePublicKey string
+}
 type OracleRemoved string
 type PrivateKeyPublished struct {
 	ProcessId  [32]byte
@@ -262,16 +264,19 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 		// need to crete struct to decode raw log data
 		switch vLog.Topics[0].Hex() {
 		case HashLogGenesisChanged.Hex():
-			log.Info("New log: GenesisChanged")
-			var eventGenesisChanged EventGenesisChanged
-			err := contractABI.Unpack(&eventGenesisChanged, "GenesisChanged", vLog.Data)
-			if err != nil {
-				log.Fatal(err)
-			}
-			eventGenesisChanged = EventGenesisChanged(vLog.Topics[1].String())
-			return eventGenesisChanged
+			/*
+				log.Info("New log: GenesisChanged")
+				var eventGenesisChanged EventGenesisChanged
+				err := contractABI.Unpack(&eventGenesisChanged, "GenesisChanged", vLog.Data)
+				if err != nil {
+					log.Fatal(err)
+				}
+				eventGenesisChanged = EventGenesisChanged(vLog.Topics[1].String())
+				return eventGenesisChanged
+			*/
+			//return nil
 		case HashLogChainIdChanged.Hex():
-			return nil
+			//return nil
 		case HashLogProcessCreated.Hex():
 			log.Info("New log: ProcessCreated")
 			var eventProcessCreated EventProcessCreated
@@ -319,29 +324,49 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 				log.Warnf("The error is: %v", err)
 			}
 			//log.Fatalf("PROCESS LOADED: %v", processInfo)
-			return nil
+			oracles, err := o.processHandle.GetOracles()
+			if err != nil {
+				log.Errorf("Error getting oracles: %s", err)
+			}
+			log.Infof("GET ORACLES STRING: %v", oracles)
+
+			validators, err := o.processHandle.GetValidators()
+			if err != nil {
+				log.Errorf("Error getting validators: %s", err)
+			}
+			log.Infof("GET VALIDATORS STRING: %v", validators)
+
+			//return nil
 
 		case HashLogProcessCanceled.Hex():
 			//stub
-			return nil
+			//return nil
 		case HashLogValidatorAdded.Hex():
 			//stub
-			return nil
+			//return nil
 		case HashLogValidatorRemoved.Hex():
 			//stub
 			return nil
 		case HashLogOracleAdded.Hex():
+			log.Info("New log: AddOracle")
+			var eventAddOracle OracleAdded
+			log.Infof("ORACLE ADDED EVENT DATA: %v", vLog.Data)
+			err := contractABI.Unpack(&eventAddOracle, "OracleAdded", vLog.Data)
+			if err != nil {
+				log.Fatalf("Cannot unpack addOracle event: %v", err)
+			}
+			log.Infof("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
 			//stub
 			return nil
 		case HashLogOracleRemoved.Hex():
 			//stub
-			return nil
+			//return nil
 		case HashLogPrivateKeyPublished.Hex():
 			//stub
-			return nil
+			//return nil
 		case HashLogResultsPublished.Hex():
 			//stub
-			return nil
+			//return nil
 		}
 
 	}

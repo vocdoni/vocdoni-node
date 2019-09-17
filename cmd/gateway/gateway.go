@@ -406,7 +406,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Couldn't create oracle: %s", err)
 	}
-	orc.ReadEthereumEventLogs(1280570, 1280574, "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
+	orc.ReadEthereumEventLogs(1000000, 1314200, "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
 
 	// API Initialization
 	// Dvote API
