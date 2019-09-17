@@ -355,7 +355,7 @@ func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
 	var err error
 	dstAddr := strAddress(address)
 	dstTopic := strTopic(topic)
-	log.Debugf("Sending message to %x, with topic %x", dstAddr, dstTopic)
+	log.Debugf("Sending message to [%x]/%x", dstAddr, dstTopic)
 	if subType == "sym" {
 		symKeyId, err := sn.Pss.SetSymmetricKey(strSymKey(key), dstTopic, dstAddr, false)
 		if err != nil {

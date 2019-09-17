@@ -42,15 +42,21 @@ func guessMyAddress(port int, id string) string {
 	return ""
 }
 
-func (is *IPFSsync) updatePinsTree() {
-	for _, v := range is.listPins() {
-		// FALTEN 2 BYTES!!! WTF?
-		log.Infof("Adding to MT: |%s|", v)
+func (is *IPFSsync) updatePinsTree(extraPins []string) {
+	for _, v := range append(is.listPins(), extraPins...) {
+		if len(v) > is.hashTree.GetMaxClaimSize() {
+			log.Warnf("CID exceeds the claim size %d", len(v))
+			continue
+		}
 		is.hashTree.AddClaim([]byte(v))
 	}
 }
 
-func (is *IPFSsync) pinMissing() error {
+func (is *IPFSsync) syncPins() error {
+	if is.syncLock {
+		return nil
+	}
+	is.syncLock = true
 	mkPins, err := is.hashTree.DumpPlain(is.hashTree.GetRoot(), false)
 	if err != nil {
 		return err
@@ -80,6 +86,7 @@ func (is *IPFSsync) pinMissing() error {
 			}
 		}
 	}
+	is.syncLock = false
 	return nil
 }
 
@@ -130,7 +137,7 @@ func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
 			if msg.Hash != is.hashTree.GetRoot() {
 				is.updateLock = true
 				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
-				is.updatePinsTree()
+				is.updatePinsTree(msg.PinList)
 				is.updateLock = false
 			}
 		}
@@ -183,6 +190,7 @@ type IPFSsync struct {
 	Transport   net.PSSHandle
 	hashTree    tree.Tree
 	updateLock  bool
+	syncLock    bool
 	myAddress   string
 	myNodeID    string
 	myMultiAddr ma.Multiaddr
@@ -206,7 +214,7 @@ func (is *IPFSsync) Start() {
 	os.RemoveAll(is.DataDir + "/ipfsSync.db")
 	is.hashTree.Storage = is.DataDir
 	is.hashTree.Init("ipfsSync.db")
-	is.updatePinsTree()
+	is.updatePinsTree([]string{})
 	log.Infof("current hash %s", is.hashTree.GetRoot())
 
 	var conn types.Connection
@@ -254,18 +262,19 @@ func (is *IPFSsync) Start() {
 	go func() {
 		for {
 			time.Sleep(time.Second * time.Duration(is.UpdateTime))
+			log.Infof("my current hash %s", is.hashTree.GetRoot())
 			if !is.updateLock {
-				is.updatePinsTree()
+				is.updatePinsTree([]string{})
 				is.sendUpdate()
 			}
 		}
 	}()
 
 	for {
-		err = is.pinMissing()
+		err = is.syncPins()
 		if err != nil {
 			log.Warn(err.Error())
 		}
-		time.Sleep(time.Second * 60)
+		time.Sleep(time.Second * 32)
 	}
 }

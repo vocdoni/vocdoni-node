@@ -8,6 +8,8 @@ import (
 
 	autonat "github.com/libp2p/go-libp2p-autonat-svc"
 
+	ipfsconfig "github.com/ipfs/go-ipfs-config"
+	"github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
 	ipfsapi "github.com/ipfs/go-ipfs/core/coreapi"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
@@ -25,7 +27,6 @@ func Init() error {
 	if err != nil {
 		return err
 	}
-
 	log.Infof("checking if daemon is running...")
 	if daemonLocked {
 		log.Debugf("ipfs daemon is running")
@@ -48,10 +49,9 @@ func Init() error {
 	if werr != nil {
 		return werr
 	}
-
-	var profiles []string
 	InstallDatabasePlugins()
-	return doInit(os.Stdout, ConfigRoot, 2048, profiles, nil)
+	_, err = doInit(os.Stdout, ConfigRoot, 2048, []string{}, nil)
+	return err
 }
 
 func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
@@ -98,4 +98,16 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 	}
 
 	return node, api, nil
+}
+
+func CmdCtx(node *ipfscore.IpfsNode, repoPath string) commands.Context {
+	return commands.Context{
+		ConfigRoot: repoPath,
+		LoadConfig: func(path string) (*ipfsconfig.Config, error) {
+			return node.Repo.Config()
+		},
+		ConstructNode: func() (*ipfscore.IpfsNode, error) {
+			return node, nil
+		},
+	}
 }

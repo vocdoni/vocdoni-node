@@ -12,9 +12,12 @@ import (
 	"strings"
 
 	files "github.com/ipfs/go-ipfs-files"
+	ipfscmds "github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
+	corehttp "github.com/ipfs/go-ipfs/core/corehttp"
 	"github.com/ipfs/go-ipfs/core/coreunix"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
+	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/ipfs/interface-go-ipfs-core/options"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
@@ -25,9 +28,10 @@ import (
 )
 
 type IPFSHandle struct {
-	Node    *ipfscore.IpfsNode
-	CoreAPI coreiface.CoreAPI
-	DataDir string
+	Node     *ipfscore.IpfsNode
+	CoreAPI  coreiface.CoreAPI
+	DataDir  string
+	LogLevel string
 }
 
 // check if ipfs base dir exists
@@ -48,8 +52,13 @@ func checkIPFSDirExists(path string) (bool, error) {
 }
 
 func (i *IPFSHandle) Init(d *types.DataStore) error {
+	if i.LogLevel == "" {
+		i.LogLevel = "warn"
+	}
+	ipfslog.SetLogLevel("*", i.LogLevel)
 	ipfs.InstallDatabasePlugins()
 	ipfs.ConfigRoot = d.Datadir
+
 	//check if needs init
 	if !fsrepo.IsInitialized(ipfs.ConfigRoot) {
 		err := ipfs.Init()
@@ -62,6 +71,18 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 		return err
 	}
 	log.Infof("IPFS Peer ID: %s", nd.Identity.Pretty())
+	//start http
+	cctx := ipfs.CmdCtx(nd, d.Datadir)
+	cctx.ReqLog = &ipfscmds.ReqLog{}
+
+	gatewayOpt := corehttp.GatewayOption(true, corehttp.WebUIPaths...)
+	var opts = []corehttp.ServeOption{
+		corehttp.CommandsOption(cctx),
+		corehttp.WebUIOption,
+		gatewayOpt,
+	}
+
+	go corehttp.ListenAndServe(nd, "/ip4/0.0.0.0/tcp/5001", opts...)
 
 	i.Node = nd
 	i.CoreAPI = coreAPI

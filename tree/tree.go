@@ -19,7 +19,11 @@ type Tree struct {
 	DbStorage *db.LevelDbStorage
 }
 
-const maxClaimSize = 62
+const MaxClaimSize = 62
+
+func (t *Tree) GetMaxClaimSize() int {
+	return MaxClaimSize
+}
 
 func (t *Tree) Init(namespace string) error {
 	if len(t.Storage) < 1 {
@@ -51,21 +55,25 @@ func (t *Tree) Close() {
 }
 
 func (t *Tree) GetClaim(data []byte) (*mkcore.ClaimBasic, error) {
-	if len(data) > maxClaimSize {
+	if len(data) > MaxClaimSize {
 		return nil, errors.New("claim data too large")
 	}
-	for i := len(data); i <= maxClaimSize; i++ {
+	for i := len(data); i <= MaxClaimSize; i++ {
 		data = append(data, '\x00')
 	}
 	var indexSlot [400 / 8]byte
-	var dataSlot [maxClaimSize]byte
+	var dataSlot [MaxClaimSize]byte
 	copy(indexSlot[:], data[:400/8])
-	copy(dataSlot[:], data[:maxClaimSize])
+	copy(dataSlot[:], data[:MaxClaimSize])
 	e := mkcore.NewClaimBasic(indexSlot, dataSlot)
 	return e, nil
 }
 
 func (t *Tree) AddClaim(data []byte) error {
+	//padding
+	for i := len(data); i < MaxClaimSize; i++ {
+		data = append(data, byte('\u0000'))
+	}
 	e, err := t.GetClaim(data)
 	if err != nil {
 		return err
@@ -150,8 +158,8 @@ func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, error) {
 	}
 	err = t.Tree.Walk(&rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
-			data := bytes.Trim(n.Value()[65:], "\x00")
-			data = bytes.Replace(data, []byte("\x00"), nil, -1)
+			//data := bytes.Trim(n.Value()[2:MaxClaimSize+2], "\x00")
+			data := bytes.Replace(n.Value()[2:MaxClaimSize+2], []byte("\x00"), nil, -1)
 			if responseBase64 {
 				datab64 := base64.StdEncoding.EncodeToString(data)
 				response = append(response, datab64)
