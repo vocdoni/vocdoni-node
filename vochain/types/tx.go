@@ -6,6 +6,7 @@ import (
 
 	tmtypes "github.com/tendermint/tendermint/types"
 	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 // ________________________ TX ________________________
@@ -124,16 +125,17 @@ type NewProcessTxArgs struct {
 
 func (n *NewProcessTxArgs) String() string {
 	return fmt.Sprintf(`{
-		"method": newProcessTx,
-		"encryptionPublicKey": %s 
+		"method": "newProcessTx",
+		"args" : {
+		"encryptionPublicKey": "%s", 
 		"entityId": "%s", 
 		"entityResolver": "%s",
 		"startBlock": %d, 
 		"metadataHash": "%s", 
-		"mkRoot": %s, 
+		"mkRoot": "%s", 
 		"numberOfBlocks": %d,
 		"processId": "%s",
-		"timestamp": %d}`,
+		"timestamp": %d}}`,
 		n.EncryptionPublicKey,
 		n.EntityID,
 		n.EntityResolver,
@@ -232,6 +234,7 @@ func (n *RemoveValidatorTxArgs) String() string {
 func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 	var t TxArgs
 
+	log.Infof("length of tx.args: %d", len(tx.Args))
 	// invalid length
 	if len(tx.Args) != 9 {
 		return t, errors.New("Invalid args number")

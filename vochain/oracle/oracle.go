@@ -299,6 +299,7 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			log.Infof("PROCESS INDEX LOADED: %v", processIdx)
 
 			processInfo, err := o.processHandle.GetProcessMetadata(eventProcessCreated.ProcessId)
+
 			pinfoMarshal := []byte(processInfo.String())
 
 			log.Infof("PINFOMARSHAL: %s", pinfoMarshal)

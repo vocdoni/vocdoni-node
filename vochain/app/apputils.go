@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/log"
 	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
@@ -15,11 +16,14 @@ func ValidateTx(content []byte) (voctypes.ValidTx, error) {
 	var err error
 
 	err = json.Unmarshal(content, &t)
+	if err != nil {
+		log.Infof("Error in unmarshall: %s", err)
+	}
 	// unmarshal bytes
 	if err != nil {
 		return vt, err
 	}
-
+	log.Infof("Unmarshaled content: %v", t)
 	// validate method name
 	m := t.ValidateMethod()
 	if m == voctypes.InvalidTx {
@@ -27,6 +31,7 @@ func ValidateTx(content []byte) (voctypes.ValidTx, error) {
 	}
 	vt.Method = m
 
+	log.Infof("T prior to validation: %v", t)
 	// validate method args
 	args, err := t.ValidateArgs()
 	if err != nil {

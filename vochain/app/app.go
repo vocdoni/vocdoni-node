@@ -101,6 +101,7 @@ func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Respo
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	// we can't commit transactions inside the DeliverTx because in such case Query, which may be called in parallel, will return inconsistent data
 	// split incomin tx
+	vlog.Infof("ValidateTX ARGS: %s", string(req.Tx))
 	tx, err := ValidateTx(req.Tx)
 	if err != nil {
 		vlog.Info(err)
