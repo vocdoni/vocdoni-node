@@ -7,6 +7,8 @@ type GWCfg struct {
 		ConfigPath string
 		Daemon     string
 		NoInit     bool
+		SyncKey    string
+		SyncPeers  []string
 	}
 	Dvote struct {
 		Host string

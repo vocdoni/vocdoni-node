@@ -9,14 +9,18 @@ import (
 )
 
 type PSSHandle struct {
-	Conn  *types.Connection
-	Swarm *swarm.SimpleSwarm
+	Conn      *types.Connection
+	Swarm     *swarm.SimpleSwarm
+	BootNodes []string
 }
 
 func (p *PSSHandle) Init(c *types.Connection) error {
 	p.Conn = c
 	sn := new(swarm.SimpleSwarm)
-	err := sn.InitPSS(swarm.VocdoniBootnodes)
+	if len(p.BootNodes) == 0 {
+		p.BootNodes = swarm.VocdoniBootnodes
+	}
+	err := sn.InitPSS(p.BootNodes)
 	if err != nil {
 		return err
 	}

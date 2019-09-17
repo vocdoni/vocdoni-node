@@ -21,6 +21,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
@@ -52,6 +53,8 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("w3route", "/web3", "web3 endpoint API route")
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
 	flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
+	flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
+	flag.StringArray("ipfsSyncPeers", []string{}, "use custom ipfsSync peers/bootnodes for accessing the DHT")
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
@@ -81,6 +84,8 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("logLevel", "warn")
 	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ipfs.configPath", userDir+"/.ipfs")
+	viper.SetDefault("ipfs.syncKey", "")
+	viper.SetDefault("ipfs.syncPeers", []string{})
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -119,6 +124,8 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
+	viper.BindPFlag("ipfs.syncKey", flag.Lookup("ipfsSyncKey"))
+	viper.BindPFlag("ipfs.syncPeers", flag.Lookup("ipfsSyncPeers"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -161,9 +168,10 @@ func main() {
 	pxy.C.Port = globalCfg.ListenPort
 	err = pxy.Init()
 	if err != nil {
-		log.Warn("letsEncrypt SSL certificate cannot be obtained, probably port 443 is not accessible or domain provided is not correct")
-		log.Info("disabling SSL!")
-		// Probably SSL has failed
+		// letsencrypt SSL has failed
+		log.Warn("letsEncrypt SSL certificate cannot be obtained")
+		log.Warn("probably port 443 is not accessible or domain provided is not correct")
+		log.Info("disabling SSL")
 		pxy.C.SSLDomain = ""
 		globalCfg.Ssl.Domain = ""
 		err = pxy.Init()
@@ -283,16 +291,26 @@ func main() {
 
 	// Storage
 	var storage data.Storage
+	var storageSync ipfssync.IPFSsync
 	if !globalCfg.Ipfs.NoInit {
 		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
 		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
+		if len(globalCfg.Ipfs.SyncKey) > 0 {
+			log.Info("enabling ipfs cluster synchronization")
+			storageSync = ipfssync.NewIPFSsync(globalCfg.DataDir+"/.ipfsSync", globalCfg.Ipfs.SyncKey, storage)
+			if len(globalCfg.Ipfs.SyncPeers) > 0 {
+				log.Debugf("using custom ipfs sync bootnodes %s", globalCfg.Ipfs.SyncPeers)
+				storageSync.Transport.BootNodes = globalCfg.Ipfs.SyncPeers
+			}
+			storageSync.Start()
+		}
 	}
 
+	// Census Manager
 	var censusManager census.CensusManager
-
 	if globalCfg.Api.Census.Enabled {
 		log.Info("starting census manager")
 		if _, err := os.Stat(globalCfg.DataDir + "/census"); os.IsNotExist(err) {
@@ -304,7 +322,6 @@ func main() {
 		censusManager.Init(globalCfg.DataDir+"/census", "")
 	}
 
-	// API Initialization
 	// Dvote API
 	if globalCfg.Api.File.Enabled || globalCfg.Api.Census.Enabled || globalCfg.Api.Vote.Enabled {
 		ws := new(net.WebsocketHandle)

@@ -43,12 +43,16 @@ func guessMyAddress(port int, id string) string {
 }
 
 func (is *IPFSsync) updatePinsTree(extraPins []string) {
+	currentRoot := is.hashTree.GetRoot()
 	for _, v := range append(is.listPins(), extraPins...) {
 		if len(v) > is.hashTree.GetMaxClaimSize() {
 			log.Warnf("CID exceeds the claim size %d", len(v))
 			continue
 		}
 		is.hashTree.AddClaim([]byte(v))
+	}
+	if currentRoot != is.hashTree.GetRoot() {
+		is.lastHash = currentRoot
 	}
 }
 
@@ -90,7 +94,24 @@ func (is *IPFSsync) syncPins() error {
 	return nil
 }
 
-func (is *IPFSsync) sendMsg(ipfsmsg IPFSsyncMessage) error {
+func (is *IPFSsync) askPins(address string, hash string) error {
+	var msg IPFSsyncMessage
+	msg.Type = "fetch"
+	msg.Address = is.myAddress
+	msg.Hash = hash
+	return is.unicastMsg(address, msg)
+}
+
+func (is *IPFSsync) sendPins(address string) error {
+	var msg IPFSsyncMessage
+	msg.Type = "fetchReply"
+	msg.Address = is.myAddress
+	msg.Hash = is.hashTree.GetRoot()
+	msg.PinList = is.listPins()
+	return is.unicastMsg(address, msg)
+}
+
+func (is *IPFSsync) broadcastMsg(ipfsmsg IPFSsyncMessage) error {
 	var msg types.Message
 	d, err := json.Marshal(ipfsmsg)
 	if err != nil {
@@ -133,15 +154,37 @@ func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
 		}
 	}
 	if msg.Type == "update" {
-		if len(msg.Hash) > 31 && len(msg.Address) > 31 && !is.updateLock {
-			if msg.Hash != is.hashTree.GetRoot() {
-				is.updateLock = true
+		if len(msg.Hash) > 31 && len(msg.Address) > 31 && !is.updateLock && len(is.askLock) == 0 {
+			if msg.Hash != is.hashTree.GetRoot() && msg.Hash != is.lastHash {
 				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
-				is.updatePinsTree(msg.PinList)
-				is.updateLock = false
+				is.askLock = msg.Hash
+				return is.askPins(msg.Address, msg.Hash)
 			}
 		}
 	}
+	if msg.Type == "fetchReply" {
+		if len(msg.Hash) > 31 && len(msg.Address) > 31 && !is.updateLock {
+			if msg.Hash != is.hashTree.GetRoot() {
+				is.updateLock = true
+				log.Infof("got new pin list %s from %s", msg.Hash, msg.Address)
+				is.updatePinsTree(msg.PinList)
+				is.updateLock = false
+				if is.askLock == msg.Hash {
+					is.askLock = ""
+				}
+				return nil
+			}
+		}
+	}
+	if msg.Type == "fetch" {
+		if len(msg.Hash) > 31 && len(msg.Address) > 31 {
+			if msg.Hash == is.hashTree.GetRoot() {
+				log.Infof("got fetch query, sending pin list to %s", msg.Address)
+				return is.sendPins(msg.Address)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -150,10 +193,9 @@ func (is *IPFSsync) sendUpdate() {
 	msg.Type = "update"
 	msg.Address = is.myAddress
 	msg.Hash = is.hashTree.GetRoot()
-	msg.PinList = is.listPins()
-	if len(msg.PinList) > 0 {
+	if len(is.listPins()) > 0 {
 		log.Infof("current hash %s", msg.Hash)
-		err := is.sendMsg(msg)
+		err := is.broadcastMsg(msg)
 		if err != nil {
 			log.Warn(err.Error())
 		}
@@ -166,7 +208,7 @@ func (is *IPFSsync) sendHello() {
 	msg.Address = is.myAddress
 	msg.Maddress = is.myMultiAddr.String()
 	msg.NodeID = is.myNodeID
-	err := is.sendMsg(msg)
+	err := is.broadcastMsg(msg)
 	if err != nil {
 		log.Warn(err.Error())
 	}
@@ -189,11 +231,14 @@ type IPFSsync struct {
 	Storage     *data.IPFSHandle
 	Transport   net.PSSHandle
 	hashTree    tree.Tree
+	Topic       string
 	updateLock  bool
 	syncLock    bool
+	askLock     string
 	myAddress   string
 	myNodeID    string
 	myMultiAddr ma.Multiaddr
+	lastHash    string
 }
 
 //NewIPFSsync creates a new IPFSsync instance
@@ -206,6 +251,15 @@ func NewIPFSsync(dataDir, key string, storage data.Storage) IPFSsync {
 	is.UpdateTime = 20
 	is.Storage = storage.(*data.IPFSHandle)
 	return is
+}
+
+func (is *IPFSsync) unicastMsg(address string, msg IPFSsyncMessage) error {
+	rawmsg, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	is.Transport.Swarm.PssPub("sym", is.Key, is.Topic, string(rawmsg), address)
+	return err
 }
 
 //Start initializes and start an IPFSsync instance
@@ -222,6 +276,8 @@ func (is *IPFSsync) Start() {
 	conn.Key = is.Key
 	conn.Encryption = "sym"
 	conn.Topic = string(signature.HashRaw(conn.Key))
+	is.Topic = conn.Topic
+	is.Key = conn.Key
 
 	err := is.Transport.Init(&conn)
 	if err != nil {
@@ -262,11 +318,28 @@ func (is *IPFSsync) Start() {
 	go func() {
 		for {
 			time.Sleep(time.Second * time.Duration(is.UpdateTime))
-			log.Infof("my current hash %s", is.hashTree.GetRoot())
 			if !is.updateLock {
 				is.updatePinsTree([]string{})
 				is.sendUpdate()
 			}
+		}
+	}()
+
+	go func() {
+		for {
+			if len(is.askLock) > 0 {
+				for i := 0; i < 100; i++ {
+					if len(is.askLock) == 0 {
+						break
+					}
+					time.Sleep(time.Millisecond * 100)
+				}
+				if len(is.askLock) > 0 {
+					is.askLock = ""
+					log.Warn("ask lock released due timeout")
+				}
+			}
+			time.Sleep(time.Millisecond * 200)
 		}
 	}()
 
