@@ -2,6 +2,7 @@ package vochain
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -29,6 +30,9 @@ import (
 // testing purposes until genesis
 const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
 
+// List of default Vocdoni seed nodes
+var DefaultSeedNodes = []string{"78d8a2b03193e07f1eb050cc023d63fa88fa98b4@116.202.8.150:11714", "b"}
+
 // Start starts a new vochain validator node
 func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*vochain.BaseApplication, *nm.Node) {
 
@@ -52,6 +56,44 @@ func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*vochain.BaseApplica
 	return app, node
 }
 
+//NewGenesis creates a new genesis file and saves it to tconfig.Genesis path
+func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
+	vlog.Info("creating genesis file")
+	genDoc := tmtypes.GenesisDoc{
+		ChainID:         "0x1",
+		GenesisTime:     tmtime.Now(),
+		ConsensusParams: tmtypes.DefaultConsensusParams(),
+	}
+
+	list := make([]tmtypes.GenesisValidator, 0)
+	list = append(list, tmtypes.GenesisValidator{
+		Address: pv.GetPubKey().Address(),
+		PubKey:  pv.GetPubKey(),
+		Power:   10,
+	})
+
+	// create app state getting validators and oracle keys from eth
+	// one oracle needs to exist
+	state := &vochaintypes.State{
+		Oracles:    []string{testOracleAddress},
+		Validators: list,
+		Processes:  make(map[string]*vochaintypes.Process, 0),
+	}
+
+	// set validators from eth smart contract
+	genDoc.Validators = state.Validators
+
+	// amino marshall state
+	genDoc.AppState = codec.Cdc.MustMarshalJSON(*state)
+
+	// save genesis
+	if err := genDoc.SaveAs(tconfig.Genesis); err != nil {
+		return err
+	}
+	vlog.Infof("genesis file: %+v", tconfig.Genesis)
+	return nil
+}
+
 // we need to set init (first time validators and oracles)
 func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) (*nm.Node, error) {
 	// create node config
@@ -66,7 +108,15 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RpcListen
 	tconfig.P2P.ListenAddress = localConfig.P2pListen
 	tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]")
-	tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]")
+	if len(tconfig.P2P.PersistentPeers) > 0 {
+		vlog.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
+	}
+	if len(localConfig.Peers) == 0 {
+		tconfig.P2P.Seeds = strings.Trim(strings.Join(DefaultSeedNodes[:], ","), "[]")
+	} else {
+		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]")
+	}
+	vlog.Infof("seed nodes: %s", tconfig.P2P.Seeds)
 	tconfig.P2P.AddrBookStrict = false
 	tconfig.P2P.SeedMode = localConfig.SeedMode
 
@@ -136,49 +186,19 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load node's key")
 	}
-	vlog.Infof("my vochain pubKey: %s", nodeKey.PubKey())
+	vlog.Infof("my vochain address: %s", nodeKey.PubKey().Address())
 	vlog.Infof("my vochain ID: %s", nodeKey.ID())
 
 	// read or create genesis file
 	if cmn.FileExists(tconfig.Genesis) {
 		vlog.Infof("found genesis file %s", tconfig.Genesis)
 	} else {
-		vlog.Info("creating genesis file")
-		genDoc := tmtypes.GenesisDoc{
-			ChainID:         "0x1",
-			GenesisTime:     tmtime.Now(),
-			ConsensusParams: tmtypes.DefaultConsensusParams(),
+		err := ioutil.WriteFile(tconfig.Genesis, []byte(TestnetGenesis1), 0644)
+		if err != nil {
+			vlog.Warn(err)
+		} else {
+			vlog.Infof("new testnet genesis created, stored at %s", tconfig.Genesis)
 		}
-
-		// TO CHANGE: USED UNTIL HAVING COMMON GENESIS
-		list := make([]tmtypes.GenesisValidator, 0)
-		list = append(list, tmtypes.GenesisValidator{
-			Address: pv.GetPubKey().Address(),
-			PubKey:  pv.GetPubKey(),
-			Power:   10,
-		})
-		// END TO CHANGE
-
-		// create app state getting validators and oracle keys from eth
-		// one oracle needs to exist
-		state := &vochaintypes.State{
-			Oracles:    []string{testOracleAddress},
-			Validators: list,
-			Processes:  make(map[string]*vochaintypes.Process, 0),
-		}
-
-		// set validators from eth smart contract
-		genDoc.Validators = state.Validators
-
-		// amino marshall state
-		genDoc.AppState = codec.Cdc.MustMarshalJSON(*state)
-
-		// save genesis
-		if err := genDoc.SaveAs(tconfig.Genesis); err != nil {
-			panic(fmt.Sprintf("cannot load or generate genesis file: %v", err))
-		}
-		logger.Info("generated genesis file", "path", tconfig.Genesis)
-		vlog.Infof("genesis file: %+v", tconfig.Genesis)
 	}
 
 	// create node
