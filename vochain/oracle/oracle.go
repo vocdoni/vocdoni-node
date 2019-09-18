@@ -286,12 +286,6 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			}
 			log.Infof("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
 
-			/*
-				EntityAddress [20]byte
-				ProcessId     [32]byte
-				MerkleTree    string
-			*/
-
 			var topics [4]string
 			for i := range vLog.Topics {
 				topics[i] = vLog.Topics[i].Hex()
