@@ -26,14 +26,12 @@ import (
 	vochaintypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
+// testing purposes until genesis
+const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
+
 // Start starts a new vochain validator node
 func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*vochain.BaseApplication, *nm.Node) {
-	// PUT ON GATEWAY CONFIG
-	/*
-		flag.StringVar(&configFile, "config", "/home/jordi/vocdoni/go-dvote/vochain/config/config.toml", "Path to config.toml")
-		flag.StringVar(&appdbName, "appdbname", "vochaindb", "Application database name")
-		flag.StringVar(&appdbDir, "appdbdir", "/home/jordi/vocdoni/go-dvote/vochain/data", "Path where the application database will be located")
-	*/
+
 	// create application db
 	vlog.Info("Initializing Vochain")
 
@@ -152,11 +150,20 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 			ConsensusParams: tmtypes.DefaultConsensusParams(),
 		}
 
+		// TO CHANGE: USED UNTIL HAVING COMMON GENESIS
+		list := make([]tmtypes.GenesisValidator, 0)
+		list = append(list, tmtypes.GenesisValidator{
+			Address: pv.GetPubKey().Address(),
+			PubKey:  pv.GetPubKey(),
+			Power:   10,
+		})
+		// END TO CHANGE
+
 		// create app state getting validators and oracle keys from eth
 		// one oracle needs to exist
 		state := &vochaintypes.State{
-			Oracles:    getOraclesFromEth(), // plus existing oracle ?
-			Validators: getValidatorsFromEth(*pv),
+			Oracles:    []string{testOracleAddress},
+			Validators: list,
 			Processes:  make(map[string]*vochaintypes.Process, 0),
 		}
 
@@ -189,30 +196,4 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	}
 
 	return node, nil
-}
-
-// temp function
-func getValidatorsFromEth(nodeKey privval.FilePV) []tmtypes.GenesisValidator {
-	// TODO oracle doing stuff
-	// oracle returns a list of validators... then
-	list := make([]tmtypes.GenesisValidator, 0)
-	list = append(list, tmtypes.GenesisValidator{
-
-		Address: nodeKey.GetPubKey().Address(),
-		PubKey:  nodeKey.GetPubKey(),
-		Power:   10,
-	},
-	)
-	return list
-}
-
-// temp func
-func getOraclesFromEth() []string {
-	// TODO oracle doing stuff
-	// oracle returns a list of trusted oracles
-	//"0xF904848ea36c46817096E94f932A9901E377C8a5"
-	list := make([]string, 0)
-	list = append(list, "0xF904848ea36c46817096E94f932A9901E377C8a5")
-	vlog.Infof("Oracles return: %v", list[0])
-	return list
 }

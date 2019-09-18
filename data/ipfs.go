@@ -179,8 +179,8 @@ func (i *IPFSHandle) ListPins() (map[string]string, error) {
 func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
 	ctx := context.Background()
 
-	if !strings.HasPrefix(path, "/ipfs/") {
-		path = "/ipfs/" + path
+	if strings.HasPrefix(path, "ipfs://") {
+		path = path[7:]
 	}
 
 	pth := corepath.New(path)

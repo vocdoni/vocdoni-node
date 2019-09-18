@@ -203,7 +203,7 @@ func (o *Oracle) SubscribeToEthereumContract(address string) {
 
 // Example. TODO
 func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) interface{} {
-	log.Info(o.ethereumConnection.Node.WSEndpoint())
+	log.Debug(o.ethereumConnection.Node.WSEndpoint())
 
 	client, err := ethclient.Dial("https://gwdev1.vocdoni.net/web3")
 	if err != nil {
@@ -257,9 +257,9 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 	HashLogResultsPublished := crypto.Keccak256Hash(logResultsPublished)
 
 	for _, vLog := range logs {
-		fmt.Println(vLog.BlockHash.Hex()) // 0x3404b8c050aa0aacd0223e91b5c32fee6400f357764771d0684fa7b3f448f1a8
-		fmt.Println(vLog.BlockNumber)     // 2394201
-		fmt.Println(vLog.TxHash.Hex())    // 0x280201eda63c9ff6f305fcee51d5eb86167fab40ca3108ec784e8652a0e2b1a6
+		//fmt.Println(vLog.BlockHash.Hex()) // 0x3404b8c050aa0aacd0223e91b5c32fee6400f357764771d0684fa7b3f448f1a8
+		//fmt.Println(vLog.BlockNumber)     // 2394201
+		//fmt.Println(vLog.TxHash.Hex())    // 0x280201eda63c9ff6f305fcee51d5eb86167fab40ca3108ec784e8652a0e2b1a6
 
 		// need to crete struct to decode raw log data
 		switch vLog.Topics[0].Hex() {
@@ -278,43 +278,43 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 		case HashLogChainIdChanged.Hex():
 			//return nil
 		case HashLogProcessCreated.Hex():
-			log.Info("New log: ProcessCreated")
+			log.Debug("New log: ProcessCreated")
 			var eventProcessCreated EventProcessCreated
 			err := contractABI.Unpack(&eventProcessCreated, "ProcessCreated", vLog.Data)
 			if err != nil {
 				log.Fatal(err)
 			}
-			log.Infof("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
+			log.Debugf("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
 
 			var topics [4]string
 			for i := range vLog.Topics {
 				topics[i] = vLog.Topics[i].Hex()
 			}
-			log.Infof("TOPICS: %v", topics)
+			log.Debugf("TOPICS: %v", topics)
 			processIdx, err := votingContract.GetProcessIndex(nil, eventProcessCreated.ProcessId)
 			if err != nil {
 				log.Error("Cannot get process index from smartcontract")
 			}
-			log.Infof("PROCESS INDEX LOADED: %v", processIdx)
+			log.Debugf("PROCESS INDEX LOADED: %v", processIdx)
 
 			processInfo, err := o.processHandle.GetProcessMetadata(eventProcessCreated.ProcessId)
 
 			pinfoMarshal := []byte(processInfo.String())
 
-			log.Infof("PINFOMARSHAL: %s", pinfoMarshal)
+			log.Debugf("PINFOMARSHAL: %s", pinfoMarshal)
 			testTx := abci.RequestDeliverTx{
 				Tx: pinfoMarshal,
 			}
-			log.Infof("RESPNSE DELIVERTX: %v", o.vochainConnection.DeliverTx(testTx))
+			log.Debugf("RESPNSE DELIVERTX: %v", o.vochainConnection.DeliverTx(testTx))
 			//processes, err := votingContract.Get(nil, eventProcessCreated.ProcessId)
 
 			//processInfo, err := o.storage.Retrieve(processes.Metadata)
 			if err != nil {
 				log.Errorf("Error fetching process metadata from chain module: %s", err)
 			}
-			log.Infof("PROCESS INFO: %v", processInfo)
+			log.Debugf("PROCESS INFO: %v", processInfo)
 			if err != nil {
-				log.Info("Cannot get process given the index")
+				log.Debug("Cannot get process given the index")
 				log.Warnf("The error is: %v", err)
 			}
 			//log.Fatalf("PROCESS LOADED: %v", processInfo)
@@ -322,13 +322,13 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			if err != nil {
 				log.Errorf("Error getting oracles: %s", err)
 			}
-			log.Infof("GET ORACLES STRING: %v", oracles)
+			log.Debugf("GET ORACLES STRING: %v", oracles)
 
 			validators, err := o.processHandle.GetValidators()
 			if err != nil {
 				log.Errorf("Error getting validators: %s", err)
 			}
-			log.Infof("GET VALIDATORS STRING: %v", validators)
+			log.Debugf("GET VALIDATORS STRING: %v", validators)
 
 			//return nil
 
@@ -342,14 +342,14 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			//stub
 			return nil
 		case HashLogOracleAdded.Hex():
-			log.Info("New log: AddOracle")
+			log.Debug("New log: AddOracle")
 			var eventAddOracle OracleAdded
-			log.Infof("ORACLE ADDED EVENT DATA: %v", vLog.Data)
+			log.Debugf("ORACLE ADDED EVENT DATA: %v", vLog.Data)
 			err := contractABI.Unpack(&eventAddOracle, "OracleAdded", vLog.Data)
 			if err != nil {
 				log.Fatalf("Cannot unpack addOracle event: %v", err)
 			}
-			log.Infof("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
+			log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
 			//stub
 			return nil
 		case HashLogOracleRemoved.Hex():
@@ -366,19 +366,3 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 	}
 	return nil
 }
-
-/*
-func (o *Oracle) GetIPFSContent(fileUri string) []byte {
-	var content []byte
-	var err error
-	splt := strings.Split(fileUri, "/")
-	hash := splt[len(splt)-1]
-	content, err = o.ipfsConnection.Retrieve(hash)
-	if err != nil {
-		return make([]byte, 0)
-	}
-	b64content := base64.StdEncoding.EncodeToString(content)
-	content = []byte(b64content)
-	return content
-}
-*/

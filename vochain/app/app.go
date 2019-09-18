@@ -78,9 +78,9 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	// gets the app hash from database
 	appHashBytes := app.db.Get(appHashKey)
 	if len(appHashBytes) != 0 {
-		vlog.Infof("AppHash from abci.Info : %v", appHashBytes)
+		vlog.Debugf("AppHash from abci.Info : %v", appHashBytes)
 	} else {
-		vlog.Infof("AppHash is empty")
+		vlog.Debugf("AppHash is empty")
 	}
 
 	// return info required during the handshake that happens on startup
@@ -101,10 +101,10 @@ func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Respo
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	// we can't commit transactions inside the DeliverTx because in such case Query, which may be called in parallel, will return inconsistent data
 	// split incomin tx
-	vlog.Infof("ValidateTX ARGS: %s", string(req.Tx))
+	vlog.Debugf("ValidateTX ARGS: %s", string(req.Tx))
 	tx, err := ValidateTx(req.Tx)
 	if err != nil {
-		vlog.Info(err)
+		vlog.Warn(err)
 		return abcitypes.ResponseDeliverTx{Code: 1}
 	}
 
@@ -127,8 +127,8 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 
 		} else {
 			// process exists, return process data as info
-			vlog.Info("The process already exists with the following data: \n")
-			vlog.Infof("Process data: %v", app.deliverTxState.Processes[npta.MkRoot].String())
+			vlog.Debug("The process already exists with the following data: \n")
+			vlog.Debugf("Process data: %v", app.deliverTxState.Processes[npta.MkRoot].String())
 		}
 	case "voteTx":
 		vta := tx.Args.(*voctypes.VoteTxArgs)
@@ -143,10 +143,10 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 					CensusProof: vta.CensusProof,
 				}
 			} else {
-				vlog.Info("Vote already submitted")
+				vlog.Debug("Vote already submitted")
 			}
 		} else {
-			vlog.Info("Process does not exist")
+			vlog.Debug("Process does not exist")
 			return abcitypes.ResponseDeliverTx{Info: tx.String(), Code: 1}
 
 		}
@@ -161,7 +161,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		if !found {
 			app.deliverTxState.Oracles = append(app.deliverTxState.Oracles, atot.Address.String())
 		} else {
-			vlog.Info("Trusted oracle is already added")
+			vlog.Debugf("Trusted oracle is already added")
 		}
 	case "removeOracleTx":
 		rtot := tx.Args.(*voctypes.RemoveOracleTxArgs)
@@ -179,7 +179,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			app.deliverTxState.Oracles[position] = app.deliverTxState.Oracles[len(app.deliverTxState.Oracles)-1]
 			app.deliverTxState.Oracles = app.deliverTxState.Oracles[:len(app.deliverTxState.Oracles)-1]
 		} else {
-			vlog.Info("Trusted oracle not present in list, can not be removed")
+			vlog.Debugf("Trusted oracle not present in list, can not be removed")
 		}
 
 	case "addValidatorTx":
@@ -204,7 +204,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 	// check raw tx data and returns OK if matches with any defined ValixTx schema
 	tx, err := ValidateTx(req.Tx)
 	if err != nil {
-		vlog.Info(err)
+		vlog.Debug(err)
 		return abcitypes.ResponseCheckTx{Code: 1}
 	}
 
@@ -279,7 +279,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	if len(processesBytes) != 0 {
 		err := codec.Cdc.UnmarshalJSON(processesBytes, &processes)
 		if err != nil {
-			vlog.Errorf("Cannot unmarshal processes")
+			vlog.Debug("Cannot unmarshal processes")
 		}
 		app.deliverTxState.Processes = processes
 	}
@@ -291,7 +291,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	if len(validatorBytes) != 0 {
 		err := codec.Cdc.UnmarshalJSON(validatorBytes, &valk)
 		if err != nil {
-			vlog.Errorf("Cannot unmarshal validators public keys")
+			vlog.Debug("Cannot unmarshal validators public keys")
 		}
 		app.deliverTxState.Validators = valk
 	}
@@ -302,7 +302,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	if len(oraclesBytes) != 0 {
 		err := codec.Cdc.UnmarshalJSON(oraclesBytes, &orlk)
 		if err != nil {
-			vlog.Errorf("Cannot unmarshal trusted oracles public keys")
+			vlog.Debug("Cannot unmarshal trusted oracles public keys")
 		}
 		app.deliverTxState.Oracles = orlk
 	}
@@ -313,7 +313,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 
 	//vlog.Infof("APP HEIGHT ON BEGIN BLOCK: %v", app.height)
 	//vlog.Infof("APP HASH ON BEGIN BLOCK: %v", app.appHash)
-	vlog.Infof("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
+	vlog.Debugf("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
 	return abcitypes.ResponseBeginBlock{}
 }
 

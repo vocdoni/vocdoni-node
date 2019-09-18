@@ -55,7 +55,7 @@ type ProcessMetadata struct {
 func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*ProcessHandle, error) {
 	client, err := ethclient.Dial("https://gwdev1.vocdoni.net/web3")
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 	address := common.HexToAddress(contractAddressHex)
 

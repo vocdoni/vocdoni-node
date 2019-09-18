@@ -17,13 +17,13 @@ func ValidateTx(content []byte) (voctypes.ValidTx, error) {
 
 	err = json.Unmarshal(content, &t)
 	if err != nil {
-		log.Infof("Error in unmarshall: %s", err)
+		log.Debugf("Error in unmarshall: %s", err)
 	}
 	// unmarshal bytes
 	if err != nil {
 		return vt, err
 	}
-	log.Infof("Unmarshaled content: %v", t)
+	log.Debugf("Unmarshaled content: %v", t)
 	// validate method name
 	m := t.ValidateMethod()
 	if m == voctypes.InvalidTx {
@@ -31,7 +31,7 @@ func ValidateTx(content []byte) (voctypes.ValidTx, error) {
 	}
 	vt.Method = m
 
-	log.Infof("T prior to validation: %v", t)
+	log.Debugf("T prior to validation: %v", t)
 	// validate method args
 	args, err := t.ValidateArgs()
 	if err != nil {
