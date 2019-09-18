@@ -31,7 +31,7 @@ import (
 const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
 
 // List of default Vocdoni seed nodes
-var DefaultSeedNodes = []string{"78d8a2b03193e07f1eb050cc023d63fa88fa98b4@116.202.8.150:11714", "b"}
+var DefaultSeedNodes = []string{"78d8a2b03193e07f1eb050cc023d63fa88fa98b4@116.202.8.150:11714"}
 
 // Start starts a new vochain validator node
 func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*vochain.BaseApplication, *nm.Node) {
@@ -107,16 +107,18 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	tconfig.LogLevel = localConfig.LogLevel
 	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RpcListen
 	tconfig.P2P.ListenAddress = localConfig.P2pListen
-	tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]")
-	if len(tconfig.P2P.PersistentPeers) > 0 {
-		vlog.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
-	}
 	if len(localConfig.Peers) == 0 {
-		tconfig.P2P.Seeds = strings.Trim(strings.Join(DefaultSeedNodes[:], ","), "[]")
+		tconfig.P2P.Seeds = strings.Join(DefaultSeedNodes[:], ",")
 	} else {
 		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]")
 	}
 	vlog.Infof("seed nodes: %s", tconfig.P2P.Seeds)
+	if len(localConfig.Peers) > 0 {
+		tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]")
+	} else {
+		tconfig.P2P.PersistentPeers = tconfig.P2P.Seeds
+	}
+	vlog.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
 	tconfig.P2P.AddrBookStrict = false
 	tconfig.P2P.SeedMode = localConfig.SeedMode
 
