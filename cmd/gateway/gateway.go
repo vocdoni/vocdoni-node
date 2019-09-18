@@ -16,7 +16,6 @@ import (
 
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 
-	"encoding/hex"
 	goneturl "net/url"
 	"os"
 	"os/signal"
@@ -28,6 +27,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
@@ -63,10 +63,9 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("w3route", "/web3", "web3 endpoint API route")
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
 	flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
-	flag.String("ipfsClusterKey", "", "enables ipfs cluster using a shared key")
-	flag.StringSlice("ipfsClusterPeers", []string{}, "ipfs cluster peer bootstrap addresses in multiaddr format")
+	flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
+	flag.StringArray("ipfsSyncPeers", []string{}, "use custom ipfsSync peers/bootnodes for accessing the DHT")
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
-	flag.String("clusterLogLevel", "ERROR", "Log level for ipfs cluster (debug, info, warning, error)")
 
 	flag.String("vochainListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
 	flag.String("vochainRPClisten", "127.0.0.1:26657", "rpc host and port to listent for the voting chain")
@@ -101,15 +100,8 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("logLevel", "warn")
 	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ipfs.configPath", userDir+"/.ipfs")
-	viper.SetDefault("cluster.secret", "")
-	viper.SetDefault("cluster.bootstraps", []string{})
-	viper.SetDefault("cluster.stats", false)
-	viper.SetDefault("cluster.tracing", false)
-	viper.SetDefault("cluster.consensus", "raft")
-	viper.SetDefault("cluster.pintracker", "map")
-	viper.SetDefault("cluster.leave", true)
-	viper.SetDefault("cluster.alloc", "disk")
-	viper.SetDefault("cluster.clusterLogLevel", "ERROR")
+	viper.SetDefault("ipfs.syncKey", "")
+	viper.SetDefault("ipfs.syncPeers", []string{})
 
 	viper.SetDefault("vochain.p2pListen", "0.0.0.0:26656")
 	viper.SetDefault("vochain.rpcListen", "0.0.0.0:26657")
@@ -157,9 +149,8 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
-	viper.BindPFlag("cluster.secret", flag.Lookup("ipfsClusterKey"))
-	viper.BindPFlag("cluster.bootstraps", flag.Lookup("ipfsClusterPeers"))
-	viper.BindPFlag("cluster.clusterloglevel", flag.Lookup("clusterLogLevel"))
+	viper.BindPFlag("ipfs.syncKey", flag.Lookup("ipfsSyncKey"))
+	viper.BindPFlag("ipfs.syncPeers", flag.Lookup("ipfsSyncPeers"))
 
 	viper.BindPFlag("vochain.p2pListen", flag.Lookup("vochainListen"))
 	viper.BindPFlag("vochain.rpcListen", flag.Lookup("vochainRPClisten"))
@@ -211,9 +202,10 @@ func main() {
 	pxy.C.Port = globalCfg.ListenPort
 	err = pxy.Init()
 	if err != nil {
-		log.Warn("letsEncrypt SSL certificate cannot be obtained, probably port 443 is not accessible or domain provided is not correct")
-		log.Info("disabling SSL!")
-		// Probably SSL has failed
+		// letsencrypt SSL has failed
+		log.Warn("letsEncrypt SSL certificate cannot be obtained")
+		log.Warn("probably port 443 is not accessible or domain provided is not correct")
+		log.Info("disabling SSL")
 		pxy.C.SSLDomain = ""
 		globalCfg.Ssl.Domain = ""
 		err = pxy.Init()
@@ -333,33 +325,26 @@ func main() {
 
 	// Storage
 	var storage data.Storage
+	var storageSync ipfssync.IPFSsync
 	if !globalCfg.Ipfs.NoInit {
 		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
-		ipfsStore.ClusterCfg = globalCfg.Cluster
-		if len(globalCfg.Cluster.Secret) > 0 {
-			if len(globalCfg.Cluster.Secret) > 16 {
-				log.Fatal("ipfsClusterKey too long")
-			}
-			encodedSecret := hex.EncodeToString([]byte(globalCfg.Cluster.Secret))
-			for i := len(encodedSecret); i < 32; i++ {
-				encodedSecret += "0"
-			}
-			ipfsStore.ClusterCfg.Secret = encodedSecret
-			log.Infof("ipfs cluster encoded secret: %s", encodedSecret)
-		}
 		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		cid, err := storage.Publish([]byte(`{"version":"1.0","type":"snark-vote","startBlock":10000,"numberOfBlocks":400,"census":{"merkleRoot":"0x0000000000000000000000000000000000000000000000000","merkleTree":"ipfs://1234123412341234"},"details":{"entityId":"0x180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85","encryptionPublicKey":"12345678","title":{"default":"Universal Basic Income"},"description":{"default":"## Markdown text goes here\n### Abstract"},"headerImage":"<content uri>","questions":[{"type":"single-choice","question":{"default":"Should universal basic income become a human right?"},"description":{"default":"## Markdown text goes here\n### Abstract"},"voteOptions":[{"title":{"default":"Yes"},"value":"1"},{"title":{"default":"No"},"value":"2"}]}]}}`))
-		if err != nil {
-			log.Fatal("could not publish process info")
+		if len(globalCfg.Ipfs.SyncKey) > 0 {
+			log.Info("enabling ipfs cluster synchronization")
+			storageSync = ipfssync.NewIPFSsync(globalCfg.DataDir+"/.ipfsSync", globalCfg.Ipfs.SyncKey, storage)
+			if len(globalCfg.Ipfs.SyncPeers) > 0 {
+				log.Debugf("using custom ipfs sync bootnodes %s", globalCfg.Ipfs.SyncPeers)
+				storageSync.Transport.BootNodes = globalCfg.Ipfs.SyncPeers
+			}
+			storageSync.Start()
 		}
-		log.Infof("PROCESS INFO CID: %s", cid)
 	}
 
+	// Census Manager
 	var censusManager census.CensusManager
-
 	if globalCfg.Api.Census.Enabled {
 		log.Info("starting census manager")
 		if _, err := os.Stat(globalCfg.DataDir + "/census"); os.IsNotExist(err) {

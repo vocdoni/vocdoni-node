@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"net"
 	"fmt"
+	"net"
 	"os"
 	"os/user"
 	"strings"
@@ -25,8 +25,9 @@ import (
 	"github.com/ethersphere/swarm/network"
 	"github.com/ethersphere/swarm/pss"
 
-	dvoteUtil "gitlab.com/vocdoni/go-dvote/util"
+	"github.com/ethereum/go-ethereum/p2p/nat"
 	"gitlab.com/vocdoni/go-dvote/log"
+	dvoteUtil "gitlab.com/vocdoni/go-dvote/util"
 )
 
 const (
@@ -40,6 +41,11 @@ var SwarmBootnodes = []string{
 	"enode://4c113504601930bf2000c29bcd98d1716b6167749f58bad703bae338332fe93cc9d9204f08afb44100dc7bea479205f5d162df579f9a8f76f8b402d339709023@3.122.203.99:30301",
 	// EF Swarm Bootnode - AWS - us-west-2
 	"enode://89f2ede3371bff1ad9f2088f2012984e280287a4e2b68007c2a6ad994909c51886b4a8e9e2ecc97f9910aca538398e0a5804b0ee80a187fde1ba4f32626322ba@52.35.212.179:30301",
+}
+
+// VocdoniBootnodes list of bootnodes for the Vocdoni SWARM network. It supports DNS hostnames.
+var VocdoniBootnodes = []string{
+	"enode://d6e2a7a90ca736b1651974ca47feb2bc93a9bbc136c91140256c654b50d7de8c52d993fed56737bfabdf210b6892132471e8da499ce7a4b95c917d70935c3af2@seed.vocdoni.net:4171",
 }
 
 func parseEnode(enode string) (string, error) {
@@ -74,6 +80,10 @@ func newNode(key *ecdsa.PrivateKey, port int, httpport int, wsport int,
 	cfg.P2P.EnableMsgEvents = true
 	cfg.P2P.NoDiscovery = false
 	cfg.P2P.DiscoveryV5 = true
+	ip, err := dvoteUtil.GetPublicIP()
+	if err == nil {
+		cfg.P2P.NAT = nat.ExtIP(ip)
+	}
 	cfg.IPCPath = datadir + "/node.ipc"
 	cfg.DataDir = datadir
 	if httpport > 0 {
@@ -177,9 +187,9 @@ func (sn *SimpleSwarm) PrintStats() {
 				var addrs [][]byte
 				addrs = append(addrs, []byte(addr))
 				peerCount := sn.Node.Server().PeerCount()
-				log.Infof("Node server: PeerCount: %v, Neighborhood Depth: %v", peerCount, sn.Hive.NeighbourhoodDepth)
+				log.Infof("PeerCount: %d, Neighborhood: %d", peerCount, sn.Hive.NeighbourhoodDepth)
 			}
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 30)
 		}
 	}()
 }
@@ -192,68 +202,7 @@ func (sn *SimpleSwarm) SetKey(key *ecdsa.PrivateKey) {
 	sn.Key = key
 }
 
-func (sn *SimpleSwarm) InitBZZ() error {
-	var err error
-	if len(sn.Datadir) < 1 {
-		usr, err := user.Current()
-		if err != nil {
-			return err
-		}
-		sn.Datadir = usr.HomeDir + "/.dvote/bzz"
-		os.MkdirAll(sn.Datadir, 0755)
-	}
-
-	sn.Ports = NewSwarmPorts()
-
-	// create node
-	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
-		sn.Ports.HTTPRPC, sn.Ports.WebSockets, sn.Datadir, "")
-	if err != nil {
-		return err
-	}
-
-	// set node key, if not set use the storage one or generate it
-	if sn.NodeKey == nil {
-		sn.NodeKey = sn.NodeConfig.NodeKey()
-	}
-
-	// create and register Swarm service
-	_, swarmConfig, swarmHandler := newSwarm(sn.NodeKey, sn.NodeKey, sn.Datadir, sn.Ports.Bzz, sn.LightNode)
-	err = sn.Node.Register(swarmHandler)
-	if err != nil {
-		return fmt.Errorf("swarm register fail %v", err)
-	}
-
-	// start the node
-	sn.Node.Start()
-	for _, url := range dvoteUtil.StrShuffle(SwarmBootnodes) {
-		purl, err := parseEnode(url)
-		if err != nil {
-			log.Error(err)
-			continue
-		}
-		log.Infof("Add bootnode " + purl)
-		node, _ := enode.ParseV4(purl)
-		sn.Node.Server().AddPeer(node)
-	}
-
-	// wait to connect to the p2p network
-	_, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	time.Sleep(time.Second * 5)
-
-	// establish swarm client
-	sn.ListenAddr = swarmConfig.ListenAddr
-	swarmURL := sn.ListenAddr + ":" + string(sn.Ports.HTTPRPC)
-	sn.Client = client.NewClient(swarmURL)
-
-	// Run statistics goroutine
-	sn.PrintStats()
-
-	return nil
-}
-
-func (sn *SimpleSwarm) InitPSS() error {
+func (sn *SimpleSwarm) InitPSS(bootNodes []string) error {
 	var err error
 	if len(sn.Datadir) < 1 {
 		usr, err := user.Current()
@@ -264,7 +213,9 @@ func (sn *SimpleSwarm) InitPSS() error {
 		os.MkdirAll(sn.Datadir, 0755)
 	}
 
-	sn.Ports = NewSwarmPorts()
+	if sn.Ports == nil {
+		sn.Ports = NewSwarmPorts()
+	}
 
 	// create node
 	sn.Node, sn.NodeConfig, err = newNode(sn.Key, sn.Ports.P2P,
@@ -286,18 +237,22 @@ func (sn *SimpleSwarm) InitPSS() error {
 		return fmt.Errorf("swarm register fail %v", err)
 	}
 
-	// start the node
-	sn.Node.Start()
-	for _, url := range dvoteUtil.StrShuffle(SwarmBootnodes) {
-		purl, err := parseEnode(url)
-		if err != nil {
-			log.Info(err)
-			continue
+	// add bootNodes and start the node
+	if len(bootNodes) > 0 {
+		var ebootNodes []*enode.Node
+		for _, url := range dvoteUtil.StrShuffle(bootNodes) {
+			purl, err := parseEnode(url)
+			if err != nil {
+				log.Info(err)
+				continue
+			}
+			log.Infof("add bootnode %v", purl)
+			node, _ := enode.ParseV4(purl)
+			ebootNodes = append(ebootNodes, node)
 		}
-		log.Infof("Add bootnode %v", purl)
-		node, _ := enode.ParseV4(purl)
-		sn.Node.Server().AddPeer(node)
+		sn.Node.Config().P2P.BootstrapNodes = ebootNodes
 	}
+	sn.Node.Start()
 
 	// wait to connect to the p2p network
 	_, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -329,8 +284,9 @@ func (sn *SimpleSwarm) InitPSS() error {
 	}
 
 	// Print some information
-	log.Infof("My PSS pubkey is %s", sn.PssPubKey)
-	log.Infof("My PSS address is %x", sn.PssAddr)
+	log.Infof("my PSS pubkey is %s", sn.PssPubKey)
+	log.Infof("my PSS address is %x", sn.PssAddr)
+	log.Infof("my PSS enode is %s", sn.EnodeID)
 
 	// Run statistics goroutine
 	sn.PrintStats()
@@ -368,7 +324,6 @@ func (sn *SimpleSwarm) SetHandler(topic string, fh pss.HandlerFunc) {
 func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	pssTopic := strTopic(topic)
 	pssAddress := strAddress("")
-	log.Debugf("pss subscription to topic %s", pssTopic)
 	if subType == "sym" {
 		_, err := sn.Pss.SetSymmetricKey(strSymKey(key), pssTopic, pssAddress, true)
 		if err != nil {
@@ -381,7 +336,7 @@ func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	sn.PssTopics[topic].Delivery = make(chan PssMsg)
 
 	var pssHandler pss.HandlerFunc = func(msg []byte, peer *p2p.Peer, asym bool, keyid string) error {
-		log.Debugf("pss received msg: %v, keyid: %v", msg, keyid)
+		log.Debugf("pss received msg: %s, keyid: %v", msg, keyid)
 
 		sn.PssTopics[topic].Delivery <- PssMsg{Msg: msg, Peer: peer, Asym: asym, Keyid: keyid}
 		return nil
@@ -392,7 +347,7 @@ func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	}
 	sn.PssTopics[topic].Unregister = sn.Pss.Register(&pssTopic, topicHandler)
 
-	log.Infof("Pss subscribed to %v, topic %v", subType, pssTopic.String())
+	log.Infof("Pss subscribed to %v, topic %x", subType, pssTopic.String())
 	return nil
 }
 
@@ -400,7 +355,7 @@ func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
 	var err error
 	dstAddr := strAddress(address)
 	dstTopic := strTopic(topic)
-	log.Infof("Sending message to addressee %v, with topic %v", dstAddr, dstTopic)
+	log.Debugf("Sending message to [%x]/%x", dstAddr, dstTopic)
 	if subType == "sym" {
 		symKeyId, err := sn.Pss.SetSymmetricKey(strSymKey(key), dstTopic, dstAddr, false)
 		if err != nil {
@@ -436,4 +391,9 @@ func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
 		err = sn.Pss.SendAsym(key, dstTopic, hexutil.Bytes(msg))
 	}
 	return err
+}
+
+func (sn *SimpleSwarm) InitBZZ() error {
+	// NOT IMPLEMENTED
+	return nil
 }

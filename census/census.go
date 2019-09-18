@@ -463,7 +463,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		if op == "dump" {
 			dumpValues, err = t.Dump(root)
 		} else {
-			dumpValues, err = t.DumpPlain(root)
+			dumpValues, err = t.DumpPlain(root, true)
 		}
 		if err != nil {
 			resp.Error = err.Error()

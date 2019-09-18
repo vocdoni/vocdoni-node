@@ -12,6 +12,7 @@ require (
 	github.com/ethereum/go-ethereum v1.9.3
 	github.com/ethersphere/swarm v0.4.3
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
+	github.com/glendc/go-external-ip v0.0.0-20170425150139-139229dcdddd
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
 	github.com/gobwas/pool v0.2.0 // indirect
 	github.com/gobwas/ws v1.0.2
@@ -36,6 +37,8 @@ require (
 	github.com/ipfs/interface-go-ipfs-core v0.2.2
 	github.com/ipfs/ipfs-cluster v0.11.0-rc8.0.20190829153225-ef8483e30e42
 	github.com/libp2p/go-conn-security v0.0.1 // indirect
+	github.com/libp2p/go-libp2p-autonat v0.1.0
+	github.com/libp2p/go-libp2p-autonat-svc v0.1.0
 	github.com/libp2p/go-libp2p-core v0.2.2
 	github.com/libp2p/go-libp2p-host v0.1.0
 	github.com/libp2p/go-libp2p-interface-connmgr v0.0.5 // indirect
@@ -72,6 +75,7 @@ require (
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
+	golang.org/x/text v0.3.2
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190709231704-1e4459ed25ff // indirect
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gopkg.in/urfave/cli.v1 v1.0.0-00010101000000-000000000000 // indirect

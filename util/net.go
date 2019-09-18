@@ -6,7 +6,14 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	externalip "github.com/glendc/go-external-ip"
 )
+
+func GetPublicIP() (net.IP, error) {
+	consensus := externalip.DefaultConsensus(nil, nil)
+	return consensus.ExternalIP()
+}
 
 var resolverList = []string{
 	"8.8.8.8", "1.0.0.1", "9.9.9.9", "64.6.64.6", "176.103.130.130", "198.101.242.72",

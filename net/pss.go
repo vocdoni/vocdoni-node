@@ -9,19 +9,23 @@ import (
 )
 
 type PSSHandle struct {
-	c *types.Connection
-	s *swarm.SimpleSwarm
+	Conn      *types.Connection
+	Swarm     *swarm.SimpleSwarm
+	BootNodes []string
 }
 
 func (p *PSSHandle) Init(c *types.Connection) error {
-	p.c = c
+	p.Conn = c
 	sn := new(swarm.SimpleSwarm)
-	err := sn.InitPSS()
+	if len(p.BootNodes) == 0 {
+		p.BootNodes = swarm.VocdoniBootnodes
+	}
+	err := sn.InitPSS(p.BootNodes)
 	if err != nil {
 		return err
 	}
-	sn.PssSub(p.c.Encryption, p.c.Key, p.c.Topic)
-	p.s = sn
+	sn.PssSub(p.Conn.Encryption, p.Conn.Key, p.Conn.Topic)
+	p.Swarm = sn
 	return nil
 }
 
@@ -29,9 +33,9 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message) {
 	var msg types.Message
 	for {
 		select {
-		case pssMessage := <-p.s.PssTopics[p.c.Topic].Delivery:
+		case pssMessage := <-p.Swarm.PssTopics[p.Conn.Topic].Delivery:
 			ctx := new(types.PssContext)
-			ctx.Topic = p.c.Topic
+			ctx.Topic = p.Conn.Topic
 			ctx.PeerAddress = pssMessage.Peer.String()
 			msg.Data = pssMessage.Msg
 			msg.TimeStamp = int32(time.Now().Unix())
@@ -46,7 +50,7 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message) {
 
 func (p *PSSHandle) Send(msg types.Message) {
 
-	err := p.s.PssPub(p.c.Encryption, p.c.Key, p.c.Topic, string(msg.Data), p.c.Address)
+	err := p.Swarm.PssPub(p.Conn.Encryption, p.Conn.Key, p.Conn.Topic, string(msg.Data), p.Conn.Address)
 	if err != nil {
 		log.Warnf("PSS send error: %s", err)
 	}

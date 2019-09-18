@@ -30,62 +30,53 @@ func initWithDefaults(out io.Writer, repoRoot string, profile string) error {
 
 var pluginOnce sync.Once
 
-// InstallDatabasePlugins installs the default database plugins
-// used by openbazaar-go. This function is guarded by a sync.Once
-// so it isn't accidentally called more than once.
 func InstallDatabasePlugins() {
 	pluginOnce.Do(func() {
 		loader, err := loader.NewPluginLoader("")
 		if err != nil {
-			panic(err)
+			log.Fatal(err.Error())
 		}
 		err = loader.Initialize()
 		if err != nil {
-			panic(err)
+			log.Fatal(err.Error())
 		}
-
 		err = loader.Inject()
 		if err != nil {
-			panic(err)
+			log.Fatal(err.Error())
 		}
 	})
 }
 
-func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, confProfiles []string, conf *config.Config) error {
-	log.Infof("initializing IPFS node at %s\n", repoRoot)
+func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, confProfiles []string, conf *config.Config) (*config.Config, error) {
+	log.Infof("initializing IPFS node at %s", repoRoot)
 
 	if err := checkWritable(repoRoot); err != nil {
-		return err
+		return nil, err
 	}
 
 	if fsrepo.IsInitialized(repoRoot) {
-		return errors.New("Repo exists!")
+		return nil, errors.New("Repo exists!")
 	}
 
 	if conf == nil {
 		var err error
 		conf, err = config.Init(out, nBitsForKeypair)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	for _, profile := range confProfiles {
-		transformer, ok := config.Profiles[profile]
-		if !ok {
-			return errors.Errorf("invalid configuration profile: %s", profile)
-		}
-
-		if err := transformer.Transform(conf); err != nil {
-			return err
-		}
-	}
+	// Some optimizations from https://medium.com/coinmonks/ipfs-production-configuration-57121f0daab2
+	conf.Datastore.BloomFilterSize = 1048576
+	conf.Swarm.ConnMgr.LowWater = 100
+	conf.Swarm.ConnMgr.HighWater = 400
+	conf.Swarm.ConnMgr.GracePeriod = "20s"
 
 	if err := fsrepo.Init(repoRoot, conf); err != nil {
-		return err
+		return nil, err
 	}
-
-	return nil
+	log.Info("IPFS configuration file initialized")
+	return conf, nil
 }
 
 func checkWritable(dir string) error {

@@ -72,13 +72,13 @@ func Init(t StorageID, d *types.DataStore) (Storage, error) {
 	switch t {
 	case IPFS:
 		s := new(IPFSHandle)
-		s.Init(d)
+		err := s.Init(d)
 
-		return s, nil
+		return s, err
 	case BZZ:
 		s := new(BZZHandle)
-		s.Init(d)
-		return s, nil
+		err := s.Init(d)
+		return s, err
 	default:
 		return nil, errors.New("Bad storage type or DataStore specification")
 	}
