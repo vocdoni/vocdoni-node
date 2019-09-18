@@ -18,7 +18,6 @@ package vochain
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
@@ -231,7 +230,7 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 
 	votingContract, err := contract.NewVotingProcess(common.HexToAddress(contractAddr), client)
 	if err != nil {
-		log.Errorf("Cannot get the contract at %v", contractAddr)
+		log.Errorf("cannot get the contract at %v", contractAddr)
 	}
 
 	logGenesisChanged := []byte(o.ethereumEventList[0])
@@ -278,59 +277,55 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 		case HashLogChainIdChanged.Hex():
 			//return nil
 		case HashLogProcessCreated.Hex():
-			log.Debug("New log: ProcessCreated")
+			log.Debug("new log: processCreated")
 			var eventProcessCreated EventProcessCreated
 			err := contractABI.Unpack(&eventProcessCreated, "ProcessCreated", vLog.Data)
 			if err != nil {
 				log.Fatal(err)
 			}
-			log.Debugf("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
+			//log.Debugf("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
 
 			var topics [4]string
 			for i := range vLog.Topics {
 				topics[i] = vLog.Topics[i].Hex()
 			}
-			log.Debugf("TOPICS: %v", topics)
+			log.Debugf("topics: %v", topics)
 			processIdx, err := votingContract.GetProcessIndex(nil, eventProcessCreated.ProcessId)
 			if err != nil {
-				log.Error("Cannot get process index from smartcontract")
+				log.Error("cannot get process index from smartcontract")
 			}
-			log.Debugf("PROCESS INDEX LOADED: %v", processIdx)
+			log.Debugf("Pprocess index loaded: %v", processIdx)
 
 			processInfo, err := o.processHandle.GetProcessMetadata(eventProcessCreated.ProcessId)
 
 			pinfoMarshal := []byte(processInfo.String())
 
-			log.Debugf("PINFOMARSHAL: %s", pinfoMarshal)
 			testTx := abci.RequestDeliverTx{
 				Tx: pinfoMarshal,
 			}
-			log.Debugf("RESPNSE DELIVERTX: %v", o.vochainConnection.DeliverTx(testTx))
+
+			response := o.vochainConnection.DeliverTx(testTx)
+			log.Debugf("response deliverTX success: %t", response.IsOK())
 			//processes, err := votingContract.Get(nil, eventProcessCreated.ProcessId)
 
 			//processInfo, err := o.storage.Retrieve(processes.Metadata)
 			if err != nil {
-				log.Errorf("Error fetching process metadata from chain module: %s", err)
+				log.Errorf("error fetching process metadata from chain module: %s", err)
 			}
-			log.Debugf("PROCESS INFO: %v", processInfo)
+			log.Debugf("process info: %v", processInfo)
 			if err != nil {
-				log.Debug("Cannot get process given the index")
-				log.Warnf("The error is: %v", err)
+				log.Warnf("cannot get process given the index: %v", err)
 			}
 			//log.Fatalf("PROCESS LOADED: %v", processInfo)
-			oracles, err := o.processHandle.GetOracles()
+			_, err = o.processHandle.GetOracles()
 			if err != nil {
-				log.Errorf("Error getting oracles: %s", err)
+				log.Errorf("error getting oracles: %s", err)
 			}
-			log.Debugf("GET ORACLES STRING: %v", oracles)
 
-			validators, err := o.processHandle.GetValidators()
+			_, err = o.processHandle.GetValidators()
 			if err != nil {
-				log.Errorf("Error getting validators: %s", err)
+				log.Errorf("error getting validators: %s", err)
 			}
-			log.Debugf("GET VALIDATORS STRING: %v", validators)
-
-			//return nil
 
 		case HashLogProcessCanceled.Hex():
 			//stub
@@ -342,12 +337,12 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			//stub
 			return nil
 		case HashLogOracleAdded.Hex():
-			log.Debug("New log: AddOracle")
+			log.Debug("new log event: AddOracle")
 			var eventAddOracle OracleAdded
-			log.Debugf("ORACLE ADDED EVENT DATA: %v", vLog.Data)
+			log.Debugf("added event data: %v", vLog.Data)
 			err := contractABI.Unpack(&eventAddOracle, "OracleAdded", vLog.Data)
 			if err != nil {
-				log.Fatalf("Cannot unpack addOracle event: %v", err)
+				return err
 			}
 			log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
 			//stub

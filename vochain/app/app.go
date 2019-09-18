@@ -56,9 +56,9 @@ func NewBaseApplication(db dbm.DB) *BaseApplication {
 func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
 
 	// print some basic version info about tendermint components (coreVersion, p2pVersion, blockVersion)
-	vlog.Infof("Tendermint Core version: %v", req.Version)
-	vlog.Infof("Tendermint P2P protocol version: %v", req.P2PVersion)
-	vlog.Infof("Tendermint Block protocol version: %v", req.BlockVersion)
+	vlog.Infof("tendermint Core version: %v", req.Version)
+	vlog.Infof("tendermint P2P protocol version: %v", req.P2PVersion)
+	vlog.Infof("tendermint Block protocol version: %v", req.BlockVersion)
 
 	// gets the app height from database
 	var height int64
@@ -67,20 +67,20 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 		err := json.Unmarshal(heightBytes, &height)
 		if err != nil {
 			// error if cannot unmarshal height from database
-			vlog.Errorf("Cannot unmarshal Height from database")
+			vlog.Errorf("cannot unmarshal Height from database")
 		}
-		vlog.Infof("Height from abci.Info : %v", height)
+		vlog.Infof("height from abci.Info : %v", height)
 	} else {
 		// database height value is empty
-		vlog.Infof("Height from abci.Info is %v, initializing tendermint application database for first time", height)
+		vlog.Infof("height from abci.Info is %v, initializing tendermint application database for first time", height)
 	}
 
 	// gets the app hash from database
 	appHashBytes := app.db.Get(appHashKey)
 	if len(appHashBytes) != 0 {
-		vlog.Debugf("AppHash from abci.Info : %v", appHashBytes)
+		vlog.Debugf("app hash from abci.Info: %x", appHashBytes)
 	} else {
-		vlog.Debugf("AppHash is empty")
+		vlog.Debugf("app hash is empty")
 	}
 
 	// return info required during the handshake that happens on startup
@@ -101,7 +101,7 @@ func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Respo
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	// we can't commit transactions inside the DeliverTx because in such case Query, which may be called in parallel, will return inconsistent data
 	// split incomin tx
-	vlog.Debugf("ValidateTX ARGS: %s", string(req.Tx))
+	vlog.Debugf("validateTX ARGS: %s", string(req.Tx))
 	tx, err := ValidateTx(req.Tx)
 	if err != nil {
 		vlog.Warn(err)
@@ -124,11 +124,13 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 				CurrentState:        voctypes.Scheduled,
 				EncryptionPublicKey: npta.EncryptionPublicKey,
 			}
+			vlog.Infof("new process %s", npta.ProcessID)
+			vlog.Debugf("process ID data: %+v", app.deliverTxState.Processes[npta.ProcessID])
 
 		} else {
 			// process exists, return process data as info
-			vlog.Debug("The process already exists with the following data: \n")
-			vlog.Debugf("Process data: %v", app.deliverTxState.Processes[npta.MkRoot].String())
+			vlog.Debug("the process already exists with the following data: \n")
+			vlog.Debugf("process data: %v", app.deliverTxState.Processes[npta.MkRoot].String())
 		}
 	case "voteTx":
 		vta := tx.Args.(*voctypes.VoteTxArgs)
@@ -143,10 +145,10 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 					CensusProof: vta.CensusProof,
 				}
 			} else {
-				vlog.Debug("Vote already submitted")
+				vlog.Debug("vote already submitted")
 			}
 		} else {
-			vlog.Debug("Process does not exist")
+			vlog.Debug("process does not exist")
 			return abcitypes.ResponseDeliverTx{Info: tx.String(), Code: 1}
 
 		}
@@ -161,7 +163,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		if !found {
 			app.deliverTxState.Oracles = append(app.deliverTxState.Oracles, atot.Address.String())
 		} else {
-			vlog.Debugf("Trusted oracle is already added")
+			vlog.Debugf("trusted oracle is already added")
 		}
 	case "removeOracleTx":
 		rtot := tx.Args.(*voctypes.RemoveOracleTxArgs)
@@ -179,7 +181,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			app.deliverTxState.Oracles[position] = app.deliverTxState.Oracles[len(app.deliverTxState.Oracles)-1]
 			app.deliverTxState.Oracles = app.deliverTxState.Oracles[:len(app.deliverTxState.Oracles)-1]
 		} else {
-			vlog.Debugf("Trusted oracle not present in list, can not be removed")
+			vlog.Debugf("trusted oracle not present in list, can not be removed")
 		}
 
 	case "addValidatorTx":
@@ -279,7 +281,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	if len(processesBytes) != 0 {
 		err := codec.Cdc.UnmarshalJSON(processesBytes, &processes)
 		if err != nil {
-			vlog.Debug("Cannot unmarshal processes")
+			vlog.Warn("cannot unmarshal processes")
 		}
 		app.deliverTxState.Processes = processes
 	}
@@ -291,7 +293,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	if len(validatorBytes) != 0 {
 		err := codec.Cdc.UnmarshalJSON(validatorBytes, &valk)
 		if err != nil {
-			vlog.Debug("Cannot unmarshal validators public keys")
+			vlog.Warn("cannot unmarshal validators public keys")
 		}
 		app.deliverTxState.Validators = valk
 	}
@@ -302,7 +304,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	if len(oraclesBytes) != 0 {
 		err := codec.Cdc.UnmarshalJSON(oraclesBytes, &orlk)
 		if err != nil {
-			vlog.Debug("Cannot unmarshal trusted oracles public keys")
+			vlog.Warn("cannot unmarshal trusted oracles public keys")
 		}
 		app.deliverTxState.Oracles = orlk
 	}
@@ -313,7 +315,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 
 	//vlog.Infof("APP HEIGHT ON BEGIN BLOCK: %v", app.height)
 	//vlog.Infof("APP HASH ON BEGIN BLOCK: %v", app.appHash)
-	vlog.Debugf("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
+	//vlog.Debugf("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
 	return abcitypes.ResponseBeginBlock{}
 }
 
