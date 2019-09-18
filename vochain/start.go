@@ -5,15 +5,10 @@ import (
 	"os"
 	"strings"
 
-	//"time"
-
-	//abci "github.com/tendermint/tendermint/abci/types"
-
 	"github.com/pkg/errors"
 	"gitlab.com/vocdoni/go-dvote/config"
 
 	codec "github.com/cosmos/cosmos-sdk/codec"
-	//abci "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	cmn "github.com/tendermint/tendermint/libs/common"
@@ -28,7 +23,6 @@ import (
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 	vochain "gitlab.com/vocdoni/go-dvote/vochain/app"
 
-	//test "gitlab.com/vocdoni/go-dvote/vochain/test"
 	vochaintypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 

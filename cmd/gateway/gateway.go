@@ -74,6 +74,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("vochainLogLevel", "error", "voting chain node log level")
 	flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
+	flag.String("vochainContract", "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b", "voting smart contract where the oracle will listen")
 
 	flag.Parse()
 
@@ -117,6 +118,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("vochain.peers", []string{})
 	viper.SetDefault("vochain.seeds", []string{})
 	viper.SetDefault("vochain.dataDir", *dataDir+"/vochain")
+	viper.SetDefault("vochain.contract", "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -166,6 +168,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("vochain.seeds", flag.Lookup("vochainSeeds"))
 	viper.BindPFlag("vochain.genesis", flag.Lookup("vochainGenesis"))
 	viper.Set("vochain.dataDir", *dataDir+"/vochain")
+	viper.BindPFlag("vochain.contract", flag.Lookup("vochainContract"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -296,23 +299,7 @@ func main() {
 			}
 		}()
 	}
-	/*
-		log.Infof("testing vote process contract methods:")
-		PH, err := chain.NewVotingProcessHandle("0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
-		if err != nil {
-			log.Errorf("Error creating process handle: %s", err)
-		} else {
-			log.Infof("handle created")
-		}
-		var pid [32]byte
-		copy(pid[:], []byte("c04fb0c89caca0ba171f5c1583b41f041031f34006fa0a46c2ccab65b691bd65"))
-		meta, err := PH.Get(pid)
-		if err != nil {
-			log.Errorf("Error fetching metadata: %s", err)
-		} else {
-			log.Infof("Process metadata: %v", meta)
-		}
-	*/
+
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
 		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
@@ -401,12 +388,12 @@ func main() {
 		vnode.Wait()
 	}()
 
-	oracle_eth_connection := node
-	orc, err := oracle.NewOracle(oracle_eth_connection, app, "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b", storage)
+	oracleEthConnection := node
+	orc, err := oracle.NewOracle(oracleEthConnection, app, globalCfg.Vochain.Contract, storage)
 	if err != nil {
 		log.Fatalf("Couldn't create oracle: %s", err)
 	}
-	orc.ReadEthereumEventLogs(1000000, 1314200, "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
+	orc.ReadEthereumEventLogs(1000000, 1314200, globalCfg.Vochain.Contract)
 
 	// API Initialization
 	// Dvote API
@@ -447,32 +434,3 @@ func main() {
 	}
 
 }
-
-/*
-
-
-
-	// TESTING
-
-	//n := 0
-	//for n < 10 {
-	//	n++
-	time.Sleep(5 * time.Second)
-	//txbytes := []byte(`{"method": "voteTx", "args": {"nullifier": "0", "payload": "0", "censusProof": "0"}}`)
-	//txbytes := []byte(test.HARDCODED_NEW_VOTE_TX)
-	//req := abci.RequestCheckTx{Tx: txbytes}
-	//go vlog.Infof("%+v", app.CheckTx(req))
-	//req2 := abci.RequestDeliverTx{Tx: txbytes}
-	//time.Sleep(10 * time.Second)
-	//time.Sleep(5 * time.Second)
-	//go vlog.Infof("%+v", app.DeliverTx(req2))
-	//txbytes2 := []byte(`{"method": "voteTx", "args": { "processId": "0", "nullifier": "0", "censusProof": "0", "payload": "0" }}`)
-	//req3 := abci.RequestDeliverTx{Tx: txbytes}
-	//go vlog.Infof("%+v", app.DeliverTx(req3))
-	//}
-
-	// END TESTING
-
-
-
-*/
