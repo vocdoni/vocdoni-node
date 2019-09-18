@@ -61,47 +61,22 @@ func ValidateTx(content []byte) (voctypes.ValidTx, error) {
 		return vt, nil
 	}
 
-	// validate signature
-	//dataToSign := vt.Args.String()
-	//if verifySignature(dataToSign, t.Signature) {
-	//	return vt, nil
-	//}
-
-	//return vt, errors.New("Invalid signature")
+	// validate signature TBD
 
 	return vt, nil
 }
 
-// verifies a signature given a message and the signature
-func verifySignature(message, signature string) bool {
-	sigPubKey, err := eth.PubKeyFromSignature(message, signature)
-	if err != nil {
-		return false
-	}
-	ok, err := eth.Verify(message, signature, sigPubKey)
-	return ok
-}
-
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
 func VerifySignatureAgainstOracles(oracles []eth.Address, message, signature string) bool {
-	sigPubKey, err := eth.PubKeyFromSignature(message, signature)
+
+	signKeys := eth.SignKeys{
+		Authorized: oracles,
+	}
+	res, _, err := signKeys.VerifySender(message, signature)
+
 	if err != nil {
 		return false
 	}
-	_, err = eth.Verify(message, signature, sigPubKey)
-	if err != nil {
-		return false
-	}
-	sigAddr, err := eth.AddrFromPublicKey(sigPubKey)
-	if err != nil {
-		return false
-	}
-	for _, o := range oracles {
-		if sigAddr == o.String() {
-			if ok, _ := eth.Verify(message, signature, o.String()); ok {
-				return true
-			}
-		}
-	}
-	return false
+
+	return res
 }
