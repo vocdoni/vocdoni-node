@@ -83,7 +83,6 @@ func (ph *ProcessHandle) GetProcessMetadata(pid [32]byte) (*vochain.NewProcessTx
 
 	processInfoStructured := new(ProcessMetadata)
 	json.Unmarshal(processInfo, &processInfoStructured)
-	log.Info("PROCESSINFOSTRUCTURED: %v", processInfoStructured)
 	processTxArgs := new(vochain.NewProcessTxArgs)
 	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
 	processTxArgs.EntityID = processMeta.EntityAddress.String()
