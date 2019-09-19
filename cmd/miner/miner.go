@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
+	"strings"
 	"syscall"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	dbm "github.com/tendermint/tm-db"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/util"
 	vochain "gitlab.com/vocdoni/go-dvote/vochain"
 )
 
@@ -103,6 +105,21 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+
+	if len(globalCfg.PublicAddr) == 0 {
+		ip, err := util.GetPublicIP()
+		if err != nil || len(ip.String()) < 8 {
+			log.Warnf("public IP discovery failed: %s", err.Error())
+		} else {
+			addrport := strings.Split(globalCfg.P2pListen, ":")
+			if len(addrport) > 0 {
+				globalCfg.PublicAddr = fmt.Sprintf("%s:%s", ip.String(), addrport[len(addrport)-1])
+			}
+		}
+	}
+	if globalCfg.PublicAddr != "" {
+		log.Infof("public IP address: %s", globalCfg.PublicAddr)
+	}
 
 	// node + app layer
 	log.Debugf("initializing vochain with tendermint config %s", globalCfg.TendermintConfig)
