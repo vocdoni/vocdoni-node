@@ -110,7 +110,7 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	vlog.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 
-	if len(localConfig.Seeds) > 0 && !localConfig.SeedMode {
+	if len(localConfig.Seeds) == 0 && !localConfig.SeedMode {
 		tconfig.P2P.Seeds = strings.Join(DefaultSeedNodes[:], ",")
 	} else {
 		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]")
