@@ -168,7 +168,7 @@ func (k *SignKeys) SignJSON(message interface{}) (string, error) {
 
 // Verify verifies a message. Signature is HexString
 func (k *SignKeys) Verify(message, signHex string) (bool, error) {
-	pubHex, err := PubKeyFromSignature(message, signHex)
+	pubHex, err := PubKeyFromSignature(message, sanitizeHex(signHex))
 	if err != nil {
 		return false, err
 	}
