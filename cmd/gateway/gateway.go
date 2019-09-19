@@ -286,7 +286,7 @@ func main() {
 		go func() {
 			for {
 				time.Sleep(60 * time.Second)
-				if &node.Eth != nil {
+				if node.Eth != nil {
 					log.Debugf("[ethereum info] peers:%d synced:%t block:%s",
 						node.Node.Server().PeerCount(),
 						node.Eth.Synced(),
@@ -391,12 +391,27 @@ func main() {
 		vnode.Wait()
 	}()
 
-	oracleEthConnection := node
-	orc, err := oracle.NewOracle(oracleEthConnection, app, globalCfg.Vochain.Contract, storage)
+	// checking if Eth node is synced
+	orc, err := oracle.NewOracle(node, app, globalCfg.Vochain.Contract, storage)
 	if err != nil {
-		log.Fatalf("Couldn't create oracle: %s", err)
+		log.Fatalf("couldn't create oracle: %s", err)
 	}
-	orc.ReadEthereumEventLogs(1000000, 1314200, globalCfg.Vochain.Contract)
+
+	go func() {
+		if node.Eth != nil {
+			for {
+				if node.Eth.Synced() {
+					log.Debug("ethereum node fully synced")
+					orc.ReadEthereumEventLogs(1000000, 1314200, globalCfg.Vochain.Contract)
+					return
+				}
+				time.Sleep(10 * time.Second)
+				log.Debug("waiting for ethereum to sync before starting Oracle")
+			}
+		} else {
+			time.Sleep(time.Second * 1)
+		}
+	}()
 
 	// API Initialization
 	// Dvote API
