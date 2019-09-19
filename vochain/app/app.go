@@ -27,8 +27,8 @@ var (
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
-	height  int64  `json:"height"`  // heigth is the number of blocks of the app
-	appHash []byte `json:"appHash"` // appHash is the root hash of the app
+	height  int64  // heigth is the number of blocks of the app
+	appHash []byte // appHash is the root hash of the app
 	db      dbm.DB // database allowing processes be persistent
 
 	// volatile states
@@ -255,7 +255,6 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	app.db.Set(validatorsKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Validators))
 	app.db.Set(oraclesKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Oracles))
 	app.db.Set(processesKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Processes))
-	//vlog.Infof("DELIVERTX STATE VOTETX DELIVERTX: %v", app.deliverTxState)
 	return abcitypes.ResponseInitChain{}
 }
 
