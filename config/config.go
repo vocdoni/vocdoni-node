@@ -112,6 +112,7 @@ type VochainCfg struct {
 	TendermintConfig string
 	RpcListen        string
 	P2pListen        string
+	PublicAddr       string
 	DataDir          string
 	Genesis          string
 	Peers            []string

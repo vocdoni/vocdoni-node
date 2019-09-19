@@ -107,6 +107,8 @@ func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) 
 	tconfig.LogLevel = localConfig.LogLevel
 	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RpcListen
 	tconfig.P2P.ListenAddress = localConfig.P2pListen
+	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
+
 	if len(localConfig.Seeds) > 0 && !localConfig.SeedMode {
 		tconfig.P2P.Seeds = strings.Join(DefaultSeedNodes[:], ",")
 	} else {

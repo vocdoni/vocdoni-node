@@ -32,6 +32,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 	vochain "gitlab.com/vocdoni/go-dvote/vochain"
 	oracle "gitlab.com/vocdoni/go-dvote/vochain/oracle"
 )
@@ -68,6 +69,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 
 	flag.String("vochainListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
+	flag.String("vochainAddress", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
 	flag.String("vochainRPClisten", "127.0.0.1:26657", "rpc host and port to listent for the voting chain")
 	flag.String("vochainGenesis", "", "use alternative geneiss file for the voting chain")
 	flag.String("vochainLogLevel", "error", "voting chain node log level")
@@ -104,6 +106,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("ipfs.syncPeers", []string{})
 
 	viper.SetDefault("vochain.p2pListen", "0.0.0.0:26656")
+	viper.SetDefault("vochain.address", "")
 	viper.SetDefault("vochain.rpcListen", "0.0.0.0:26657")
 	viper.SetDefault("vochain.logLevel", "error")
 	viper.SetDefault("vochain.genesis", "")
@@ -153,6 +156,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("ipfs.syncPeers", flag.Lookup("ipfsSyncPeers"))
 
 	viper.BindPFlag("vochain.p2pListen", flag.Lookup("vochainListen"))
+	viper.BindPFlag("vochain.publicAddress", flag.Lookup("vochainAddress"))
 	viper.BindPFlag("vochain.rpcListen", flag.Lookup("vochainRPClisten"))
 	viper.BindPFlag("vochain.logLevel", flag.Lookup("vochainLogLevel"))
 	viper.BindPFlag("vochain.peers", flag.Lookup("vochainPeers"))
@@ -367,6 +371,20 @@ func main() {
 	defer db.Close()
 
 	// node + app layer
+	if len(globalCfg.Vochain.PublicAddr) == 0 {
+		ip, err := util.GetPublicIP()
+		if err != nil || len(ip.String()) < 8 {
+			log.Warnf("public IP discovery failed: %s", err.Error())
+		} else {
+			addrport := strings.Split(globalCfg.Vochain.P2pListen, ":")
+			if len(addrport) > 0 {
+				globalCfg.Vochain.PublicAddr = fmt.Sprintf("%s:%s", ip.String(), addrport[len(addrport)-1])
+			}
+		}
+	}
+	if globalCfg.Vochain.PublicAddr != "" {
+		log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
+	}
 	app, vnode := vochain.Start(globalCfg.Vochain, db)
 	defer func() {
 		vnode.Stop()
