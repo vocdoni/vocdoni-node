@@ -31,7 +31,7 @@ import (
 const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
 
 // List of default Vocdoni seed nodes
-var DefaultSeedNodes = []string{"bd340199f9b7d606fac8b83c98969e050060d24c@116.202.8.150:11714"}
+var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
 
 // Start starts a new vochain validator node
 func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*vochain.BaseApplication, *nm.Node) {
