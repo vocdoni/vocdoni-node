@@ -7,12 +7,14 @@ import (
 	"strings"
 	"time"
 
-	externalip "github.com/glendc/go-external-ip"
+	externalip "gitlab.com/vocdoni/go-external-ip"
 )
 
+//GetPublicIP returns the external/public IP of the host
+// For now, let's only support IPv4. Hope we can change this in the future...
 func GetPublicIP() (net.IP, error) {
 	consensus := externalip.DefaultConsensus(nil, nil)
-	return consensus.ExternalIP()
+	return consensus.ExternalIP(4)
 }
 
 var resolverList = []string{
