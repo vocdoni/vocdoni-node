@@ -204,7 +204,7 @@ func (o *Oracle) SubscribeToEthereumContract(address string) {
 func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) interface{} {
 	log.Debug(o.ethereumConnection.Node.WSEndpoint())
 
-	client, err := ethclient.Dial("https://gwdev1.vocdoni.net/web3")
+	client, err := ethclient.Dial("http://localhost:9091")
 	if err != nil {
 		log.Fatal(err)
 	}
