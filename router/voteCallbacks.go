@@ -1,53 +1,51 @@
 package router
 
+import (
+	"encoding/json"
+	"time"
+
+	abci "github.com/tendermint/tendermint/abci/types"
+
+	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
+	vochain "gitlab.com/vocdoni/go-dvote/vochain/types"
+)
+
 func submitEnvelope(request routerRequest, router *Router) {
+	voteTxArgs := new(vochain.VoteTxArgs)
+	voteTxArgs.ProcessID = request.structured.ProcessId
+	voteTxArgs.Nullifier = request.structured.Nullifier
+	voteTxArgs.Payload = request.structured.Payload
+	voteTxArgs.Timestamp = int64(request.structured.Timestamp)
 
-	//txbytes := []byte(vtest.HARDCODED_NEW_VOTE_TX)
-	//req := abci.RequestDeliverTx{Tx: txbytes}
-	//log.Infof("%+v", router.vochain.DeliverTx(req))
-	/*
-			var errMsg string
-			log.Info("calling submit envelope")
-			args := fmt.Sprintf(`{
-				"method": voteTx,
-				"args": {
-					processId: %s,
-					nullifier:
-				}
-			}`)
-			envelopeData := vtypes.Tx {
-				Method: request.method,
-				Args: request.structured.,
-			}
-			//txbytes := []byte(vtest.HARDCODED_NEW_PROCESS_TX)
-			//txbytes := []byte(vtest.HARDCODED_NEW_PROCESS_TX)
+	voteTxBytes := []byte(voteTxArgs.String())
 
-			//req := abci.RequestDeliverTx{Tx: txbytes}
-			//log.Infof("%+v", router.vochain.DeliverTx(req))
-			//go log.Infof("%+v", router.vochain.Commit())
-			//req2 := abci.RequestDeliverTx{Tx: txbytes}
-			//time.Sleep(10 * time.Second)
-			//time.Sleep(5 * time.Second)
-			//go vlog.Infof("%+v", app.DeliverTx(req2))
+	req := abci.RequestDeliverTx{Tx: voteTxBytes}
+	vochainResponse := router.vochain.DeliverTx(req)
 
-		/*
-			{
-				"id": "req-2345679",
-				"request": {
-				  "method": "submitEnvelope",
-				  "processId": "hexString",
-				  "payload": "base64-data",
-				  "timestamp": 1556110671
-				},
-				"signature": "hexString"
-			  }
+	var apiResponse types.ResponseMessage
+	apiResponse.ID = request.id
+	apiResponse.Response.Request = request.id
+	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 
-	*/
+	if vochainResponse.Code != 0 {
+		apiResponse.Response.Ok = false
+	} else {
+		apiResponse.Response.Ok = true
+	}
 
-	// request.structure.ProcessId
-	// request.structured.Payload
-	// router.vochain.method?
-	// submitEnvelope
+	var err error
+	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	rawApiResponse, err := json.Marshal(apiResponse)
+	if err != nil {
+		log.Errorf("Error marshaling submitEnvelope reply: %s", err)
+	}
+
+	router.transport.Send(buildReply(request.context, rawApiResponse))
+
 }
 
 func getEnvelopeStatus(request routerRequest, router *Router) {

@@ -164,11 +164,12 @@ type VoteTxArgs struct {
 func (n *VoteTxArgs) String() string {
 	return fmt.Sprintf(`{
 		"method": voteTx,
+		"args" : {
 		"censusProof": "%s",
 		"nullifier": "%s",
 		"payload": "%s",
 		"processId": "%s",
-		"timestamp: %d }`,
+		"timestamp: %d }}`,
 		n.CensusProof,
 		n.Nullifier,
 		n.Payload,
