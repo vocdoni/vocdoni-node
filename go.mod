@@ -23,6 +23,7 @@ require (
 	github.com/howeyc/fsnotify v0.9.0 // indirect
 	github.com/hsanjuan/go-libp2p-http v0.0.2 // indirect
 	github.com/iden3/go-iden3-core v0.0.7-0.20190904124812-741e2fdbb8f0
+	github.com/iden3/go-iden3-crypto v0.0.3-0.20190831180703-c95c95b7b161
 	github.com/influxdata/influxdb v1.7.7 // indirect
 	github.com/ipfs/dir-index-html v1.0.3 // indirect
 	github.com/ipfs/go-cid v0.0.3
