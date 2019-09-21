@@ -22,6 +22,17 @@ GWARGS="\
  ${GW_IPFS_NOINIT:+ --ipfsNoInit=${GW_IPFS_NOINIT}}\
  ${GW_IPFS_CLUSTER_KEY:+ --ipfsClusterKey ${GW_IPFS_CLUSTER_KEY}}\
  ${GW_IPFS_CLUSTER_PEERS:+ --ipfsClusterPeers ${GW_IPFS_CLUSTER_PEERS}}\
+ ${GW_VOCHAINADDRESS:+ --vochainAddress ${GW_VOCHAINADDRESS}}\
+ ${GW_VOCHAINGENESIS:+ --vochainGenesis ${GW_VOCHAINGENESIS}}\
+ ${GW_VOCHAINCONTRACT:+ --vochainContract ${GW_VOCHAINCONTRACT}}\
+ ${GW_VOCHAINLISTEN:+ --vochainListen ${GW_VOCHAINLISTEN}}\
+ ${GW_VOCHAINLOGLEVEL:+ --vochainLogLevel ${GW_VOCHAINLOGLEVEL}}\
+ ${GW_VOCHAINPEERS:+ --vochainPeers ${GW_VOCHAINPEERS}}\
+ ${GW_VOCHAINRPCLISTEN:+ --vochainRPClisten ${GW_VOCHAINRPCLISTEN}}\
+ ${GW_VOCHAINSEEDS:+ --vochainSeeds ${GW_VOCHAINSEEDS}}\
+ ${GW_VOTEAPI:+ --voteApi=${GW_VOTEAPI}}\
+ ${GW_IPFSSYNCKEY:+ --ipfsSyncKey ${GW_IPFSSYNCKEY}}\
+ ${GW_IPFSSYNCPEERS:+ --ipfsSyncPeers ${GW_IPFSSYNCPEERS}}\
  "
 
 CMD="/app/gateway $GWARGS $@"
