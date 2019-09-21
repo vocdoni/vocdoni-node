@@ -273,7 +273,7 @@ func PubKeyFromSignature(msg, sigHex string) (string, error) {
 		sig[64] -= 27
 	}
 	if sig[64] < 0 || sig[64] > 1 {
-		return "", errors.New("Bad recover ID byte")
+		return "", errors.New("bad recover ID byte")
 	}
 	pubKey, err := crypto.SigToPub(Hash(msg), sig)
 	if err != nil {

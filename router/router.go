@@ -1,6 +1,7 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -82,6 +83,7 @@ type routerRequest struct {
 	authenticated bool
 	address       string
 	context       types.MessageContext
+	private       bool
 }
 
 //semi-unmarshalls message, returns method name
@@ -93,8 +95,26 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 		return request, err
 	}
 	request.structured = msgStruct.Request
-	request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.Request, msgStruct.Signature)
 	request.method = msgStruct.Request.Method
+	if request.method == "" {
+		return request, errors.New("method not found")
+	}
+	methodFunc := r.publicRequestMap[request.method]
+	request.private = false
+	if methodFunc == nil {
+		methodFunc = r.privateRequestMap[request.method]
+		if methodFunc != nil {
+			request.private = true
+			request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.Request, msgStruct.Signature)
+		} else {
+			return request, errors.New("method not valid")
+		}
+	}
+	// if no authrized keys, authenticate all requests
+	if len(r.signer.Authorized) == 0 {
+		request.authenticated = true
+	}
+
 	request.id = msgStruct.ID
 	request.context = context
 	/*assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)
@@ -167,17 +187,19 @@ func (r *Router) Route() {
 		select {
 		case msg := <-r.inbound:
 			request, err := r.getRequest(msg.Data, msg.Context)
-			if request.method == "" {
-				log.Warnf("couldn't extract method from JSON message %s", msg)
+			if !request.authenticated && err != nil {
+				log.Warnf("error parsing request: %s", err.Error())
+				go sendError(r.transport, r.signer, request.context, request.id, err.Error())
 				break
 			}
-			if err != nil {
-				log.Warnf("Error parsing request: %s", err.Error())
-			}
-			methodFunc := r.publicRequestMap[request.method]
-			if methodFunc == nil && request.authenticated {
+
+			var methodFunc requestMethod
+			if !request.private {
+				methodFunc = r.publicRequestMap[request.method]
+			} else if request.private && request.authenticated {
 				methodFunc = r.privateRequestMap[request.method]
 			}
+
 			if methodFunc == nil {
 				errMsg := fmt.Sprintf("router has no method named %s or unauthorized", request.method)
 				log.Warn(errMsg)
