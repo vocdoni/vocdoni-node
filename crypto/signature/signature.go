@@ -22,6 +22,9 @@ const SignatureLength = 130
 // PubKeyLength is the size of a Public Key
 const PubKeyLength = 66
 
+// PubKeyCompLength is the size of a uncompressed Public Key
+const PubKeyLengthUncompressed = 130
+
 // SigningPrefix is the prefix added when hashing
 const SigningPrefix = "\u0019Ethereum Signed Message:\n"
 
@@ -103,12 +106,16 @@ func (k *SignKeys) AddAuthKey(address string) error {
 // HexString returns the public and private keys as hex strings
 func (k *SignKeys) HexString() (string, string) {
 	pubHex := fmt.Sprintf("%x", crypto.FromECDSAPub(k.Public))
+	pubHexComp, _ := CompressPubKey(pubHex)
 	privHex := fmt.Sprintf("%x", crypto.FromECDSA(k.Private))
-	return pubHex, privHex
+	return pubHexComp, privHex
 }
 
 // CompressPubKey returns the compressed public key in hexString format
 func CompressPubKey(pubHex string) (string, error) {
+	if len(pubHex) <= PubKeyLength {
+		return pubHex, nil
+	}
 	pubBytes, err := hex.DecodeString(sanitizeHex(pubHex))
 	if err != nil {
 		return "", err
@@ -122,6 +129,9 @@ func CompressPubKey(pubHex string) (string, error) {
 
 // DecompressPubKey takes a hexString compressed public key and returns it descompressed
 func DecompressPubKey(pubHexComp string) (string, error) {
+	if len(pubHexComp) > PubKeyLength {
+		return pubHexComp, nil
+	}
 	pubBytes, err := hex.DecodeString(pubHexComp)
 	if err != nil {
 		return "", err
@@ -185,7 +195,7 @@ func (k *SignKeys) Verify(message, signHex string) (bool, error) {
 	return result, nil
 }
 
-// Verify verifies a JSON message. Signature is HexString
+// VerifyJSON verifies a JSON message. Signature is HexString
 func (k *SignKeys) VerifyJSON(message interface{}, signHex string) (bool, error) {
 	rawMsg, err := json.Marshal(message)
 	if err != nil {
@@ -228,7 +238,17 @@ func Verify(message, signHex, pubHex string) (bool, error) {
 
 // Standaolone function to obtain the Ethereum address from a ECDSA public key
 func AddrFromPublicKey(pubHex string) (string, error) {
-	pubBytes, err := hex.DecodeString(sanitizeHex(pubHex))
+	var pubHexDesc string
+	var err error
+	if len(pubHex) <= PubKeyLength {
+		pubHexDesc, err = DecompressPubKey(sanitizeHex(pubHex))
+		if err != nil {
+			return "", err
+		}
+	} else {
+		pubHexDesc = pubHex
+	}
+	pubBytes, err := hex.DecodeString(pubHexDesc)
 	if err != nil {
 		return "", err
 	}
