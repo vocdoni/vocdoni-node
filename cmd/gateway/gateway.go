@@ -358,7 +358,7 @@ func main() {
 				log.Debugf("using custom ipfs sync bootnodes %s", globalCfg.Ipfs.SyncPeers)
 				storageSync.Transport.BootNodes = globalCfg.Ipfs.SyncPeers
 			}
-			storageSync.Start()
+			go storageSync.Start()
 		}
 	}
 

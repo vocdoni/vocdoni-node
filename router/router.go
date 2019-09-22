@@ -96,7 +96,6 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	var msgStruct types.RequestMessage
 	err = json.Unmarshal(payload, &msgStruct)
 	if err != nil {
-		log.Errorf("could not unmarshall JSON, error: %s", err)
 		return request, err
 	}
 	request.structured = msgStruct.Request
@@ -194,7 +193,7 @@ func (r *Router) Route() {
 			request, err := r.getRequest(msg.Data, msg.Context)
 			if !request.authenticated && err != nil {
 				log.Warnf("error parsing request: %s", err.Error())
-				go sendError(r.transport, r.signer, request.context, request.id, err.Error())
+				go sendError(r.transport, r.signer, request.context, request.id, "cannot parse request")
 				break
 			}
 
@@ -240,11 +239,13 @@ func sendError(transport net.Transport, signer signature.SignKeys, context types
 	response.Error.Message = errMsg
 	response.Signature, err = signer.SignJSON(response.Error)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 	}
-	rawResponse, err := json.Marshal(response)
-	if err != nil {
-		log.Warnf("error marshaling response body: %s", err)
+	if context != nil {
+		rawResponse, err := json.Marshal(response)
+		if err != nil {
+			log.Warnf("error marshaling response body: %s", err)
+		}
+		transport.Send(buildReply(context, rawResponse))
 	}
-	transport.Send(buildReply(context, rawResponse))
 }
