@@ -39,6 +39,7 @@ type GWCfg struct {
 	ListenPort int
 	ListenHost string
 	LogLevel   string
+	LogOutput  string
 	DataDir    string
 	W3external string
 }
@@ -112,6 +113,7 @@ type VochainCfg struct {
 	TendermintConfig string
 	RpcListen        string
 	P2pListen        string
+	PublicAddr       string
 	DataDir          string
 	Genesis          string
 	Peers            []string

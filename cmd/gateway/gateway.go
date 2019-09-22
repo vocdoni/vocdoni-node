@@ -32,8 +32,9 @@ import (
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 	vochain "gitlab.com/vocdoni/go-dvote/vochain"
-	oracle "gitlab.com/vocdoni/go-dvote/vochain/oracle"
+	vochainApp "gitlab.com/vocdoni/go-dvote/vochain/app"
 )
 
 func newConfig() (config.GWCfg, error) {
@@ -47,6 +48,7 @@ func newConfig() (config.GWCfg, error) {
 	path := flag.String("cfgpath", userDir+"/config.yaml", "filepath for custom gateway config")
 	dataDir := flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
+	flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	flag.Bool("fileApi", true, "enable file API")
 	flag.Bool("censusApi", true, "enable census API")
 	flag.Bool("voteApi", true, "enable vote API")
@@ -68,6 +70,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 
 	flag.String("vochainListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
+	flag.String("vochainAddress", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
 	flag.String("vochainRPClisten", "127.0.0.1:26657", "rpc host and port to listent for the voting chain")
 	flag.String("vochainGenesis", "", "use alternative geneiss file for the voting chain")
 	flag.String("vochainLogLevel", "error", "voting chain node log level")
@@ -98,12 +101,14 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("ssl.domain", "")
 	viper.SetDefault("dataDir", userDir)
 	viper.SetDefault("logLevel", "warn")
+	viper.SetDefault("logOutput", "stdout")
 	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ipfs.configPath", userDir+"/.ipfs")
 	viper.SetDefault("ipfs.syncKey", "")
 	viper.SetDefault("ipfs.syncPeers", []string{})
 
 	viper.SetDefault("vochain.p2pListen", "0.0.0.0:26656")
+	viper.SetDefault("vochain.address", "")
 	viper.SetDefault("vochain.rpcListen", "0.0.0.0:26657")
 	viper.SetDefault("vochain.logLevel", "error")
 	viper.SetDefault("vochain.genesis", "")
@@ -148,11 +153,13 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
+	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ipfs.syncKey", flag.Lookup("ipfsSyncKey"))
 	viper.BindPFlag("ipfs.syncPeers", flag.Lookup("ipfsSyncPeers"))
 
 	viper.BindPFlag("vochain.p2pListen", flag.Lookup("vochainListen"))
+	viper.BindPFlag("vochain.publicAddress", flag.Lookup("vochainAddress"))
 	viper.BindPFlag("vochain.rpcListen", flag.Lookup("vochainRPClisten"))
 	viper.BindPFlag("vochain.logLevel", flag.Lookup("vochainLogLevel"))
 	viper.BindPFlag("vochain.peers", flag.Lookup("vochainPeers"))
@@ -184,14 +191,14 @@ func addKeyFromEncryptedJSON(keyJSON []byte, passphrase string, signKeys *sig.Si
 func main() {
 	//setup config
 	globalCfg, err := newConfig()
-	log.Infof("using datadir %s", globalCfg.DataDir)
 	globalCfg.Ipfs.ConfigPath = globalCfg.DataDir + "/ipfs"
 
 	//setup logger
-	log.InitLoggerAtLevel(globalCfg.LogLevel)
+	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
 	if err != nil {
-		log.Fatalf("could not load config: %v", err)
+		log.Fatalf("could not load config: %s", err.Error())
 	}
+	log.Infof("using datadir %s", globalCfg.DataDir)
 
 	//setup listener
 	pxy := net.NewProxy()
@@ -283,7 +290,7 @@ func main() {
 			for {
 				time.Sleep(60 * time.Second)
 				if node.Eth != nil {
-					log.Debugf("[ethereum info] peers:%d synced:%t block:%s",
+					log.Infof("[ethereum info] peers:%d synced:%t block:%s",
 						node.Node.Server().PeerCount(),
 						node.Eth.Synced(),
 						node.Eth.BlockChain().CurrentBlock().Number())
@@ -295,7 +302,7 @@ func main() {
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
 		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
-			log.Fatalf("cannot parse w3external URL")
+			log.Fatal("cannot parse w3external URL")
 		}
 
 		log.Debugf("testing web3 endpoint %s", url.String())
@@ -329,9 +336,20 @@ func main() {
 	if !globalCfg.Ipfs.NoInit {
 		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
 		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
+		storage.ListPins()
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
+		go func() {
+			for {
+				time.Sleep(time.Second * 60)
+				stats, err := storage.Stats()
+				if err != nil {
+					log.Warnf("IPFS node returned an error: %s", err.Error())
+				}
+				log.Infof("[ipfs info] %s", stats)
+			}
+		}()
 		if len(globalCfg.Ipfs.SyncKey) > 0 {
 			log.Info("enabling ipfs cluster synchronization")
 			storageSync = ipfssync.NewIPFSsync(globalCfg.DataDir+"/.ipfsSync", globalCfg.Ipfs.SyncKey, storage)
@@ -339,7 +357,7 @@ func main() {
 				log.Debugf("using custom ipfs sync bootnodes %s", globalCfg.Ipfs.SyncPeers)
 				storageSync.Transport.BootNodes = globalCfg.Ipfs.SyncPeers
 			}
-			storageSync.Start()
+			go storageSync.Start()
 		}
 	}
 
@@ -350,53 +368,70 @@ func main() {
 		if _, err := os.Stat(globalCfg.DataDir + "/census"); os.IsNotExist(err) {
 			err = os.MkdirAll(globalCfg.DataDir+"/census", os.ModePerm)
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Fatal(err)
 			}
 		}
 		censusManager.Init(globalCfg.DataDir+"/census", "")
 	}
 
 	// Vochain Initialization
+	var app *vochainApp.BaseApplication
 
-	// app layer db
-	db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.Vochain.DataDir, nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to open db: %v", err)
-		os.Exit(1)
-	}
-	defer db.Close()
-
-	// node + app layer
-	app, vnode := vochain.Start(globalCfg.Vochain, db)
-	defer func() {
-		vnode.Stop()
-		vnode.Wait()
-	}()
-
-	// checking if Eth node is synced
-	orc, err := oracle.NewOracle(node, app, globalCfg.Vochain.Contract, storage)
-	if err != nil {
-		log.Fatalf("couldn't create oracle: %s", err)
-	}
-
-	go func() {
-		if node.Eth != nil {
-			for {
-				if node.Eth.Synced() {
-					log.Debug("ethereum node fully synced")
-					orc.ReadEthereumEventLogs(1000000, 1314200, globalCfg.Vochain.Contract)
-					return
-				}
-				time.Sleep(10 * time.Second)
-				log.Debug("waiting for ethereum to sync before starting Oracle")
-			}
-		} else {
-			time.Sleep(time.Second * 1)
+	if globalCfg.Api.Vote.Enabled {
+		log.Info("initializing vochain")
+		// app layer db
+		db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.Vochain.DataDir, nil)
+		if err != nil {
+			log.Fatalf("failed to open db: %s", err.Error())
 		}
-	}()
+		defer db.Close()
 
-	// API Initialization
-	// Dvote API
+		// node + app layer
+		if len(globalCfg.Vochain.PublicAddr) == 0 {
+			ip, err := util.GetPublicIP()
+			if err != nil || len(ip.String()) < 8 {
+				log.Warnf("public IP discovery failed: %s", err.Error())
+			} else {
+				addrport := strings.Split(globalCfg.Vochain.P2pListen, ":")
+				if len(addrport) > 0 {
+					globalCfg.Vochain.PublicAddr = fmt.Sprintf("%s:%s", ip.String(), addrport[len(addrport)-1])
+				}
+			}
+		}
+		if globalCfg.Vochain.PublicAddr != "" {
+			log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
+		}
+		_, vnode := vochain.Start(globalCfg.Vochain, db)
+		defer func() {
+			vnode.Stop()
+			vnode.Wait()
+		}()
+
+		/*		// checking if Eth node is synced
+				orc, err := oracle.NewOracle(node, app, globalCfg.Vochain.Contract, storage)
+				if err != nil {
+					log.Fatalf("couldn't create oracle: %s", err.Error())
+				}
+
+				go func() {
+					if node.Eth != nil {
+						for {
+							if node.Eth.Synced() {
+								log.Info("ethereum node fully synced, starting Oracle")
+								orc.ReadEthereumEventLogs(1000000, 1314200, globalCfg.Vochain.Contract)
+								return
+							}
+							time.Sleep(10 * time.Second)
+							log.Debug("waiting for ethereum to sync before starting Oracle")
+						}
+					} else {
+						time.Sleep(time.Second * 1)
+					}
+				}()
+		*/
+	}
+
+	// API Endpoint initialization
 	if globalCfg.Api.File.Enabled || globalCfg.Api.Census.Enabled || globalCfg.Api.Vote.Enabled {
 		ws := new(net.WebsocketHandle)
 		ws.Init(new(types.Connection))
@@ -405,22 +440,30 @@ func main() {
 		listenerOutput := make(chan types.Message)
 		go ws.Listen(listenerOutput)
 
-		routerApi := router.InitRouter(listenerOutput, storage, ws, *signer)
+		routerAPI := router.InitRouter(listenerOutput, storage, ws, *signer)
 		if globalCfg.Api.File.Enabled {
-			routerApi.EnableFileAPI()
+			log.Info("enabling file API")
+			routerAPI.EnableFileAPI()
 		}
 		if globalCfg.Api.Census.Enabled {
-			routerApi.EnableCensusAPI(&censusManager)
+			log.Info("enabling census API")
+			routerAPI.EnableCensusAPI(&censusManager)
 		}
 		if globalCfg.Api.Vote.Enabled {
 			// todo: client params as cli flags
-			routerApi.EnableVoteAPI(app)
+			log.Info("enabling vote API")
+			routerAPI.EnableVoteAPI(app)
 		}
 
-		go routerApi.Route()
-		log.Debug("Setting up API router")
+		go routerAPI.Route()
 		ws.AddProxyHandler(globalCfg.Api.Route)
 		log.Infof("websockets API available at %s", globalCfg.Api.Route)
+		go func() {
+			for {
+				time.Sleep(60 * time.Second)
+				log.Infof("[router info] privateReqs:%d publicReqs:%d", routerAPI.PrivateCalls, routerAPI.PublicCalls)
+			}
+		}()
 	}
 
 	// close if interrupt received

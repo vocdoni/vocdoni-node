@@ -16,14 +16,14 @@ import (
 
 // WebsocketHandle represents the information required to work with ws in go-dvote
 type WebsocketHandle struct {
-	c *types.Connection // the ws connection
-	e *epoll.Epoll      // epoll for the ws implementation
-	p *Proxy            // proxy where the ws will be associated
+	Connection *types.Connection // the ws connection
+	Epoll      *epoll.Epoll      // epoll for the ws implementation
+	WsProxy    *Proxy            // proxy where the ws will be associated
 }
 
 // SetProxy sets the proxy for the ws
 func (w *WebsocketHandle) SetProxy(p *Proxy) {
-	w.p = p
+	w.WsProxy = p
 }
 
 // Init increases the sys limitations regarding to the number of files opened
@@ -41,7 +41,7 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 
 	// Start epoll
 	var err error
-	w.e, err = epoll.MkEpoll()
+	w.Epoll, err = epoll.MkEpoll()
 	if err != nil {
 		return err
 	}
@@ -58,14 +58,14 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 		if err != nil {
 			return
 		}
-		if w.p.C.SSLDomain == "" {
-			if err := w.e.Add(conn, false); err != nil {
-				log.Warnf("Failed to add connection %v", err)
+		if w.WsProxy.C.SSLDomain == "" {
+			if err := w.Epoll.Add(conn, false); err != nil {
+				log.Warnf("failed to add connection %v", err)
 				conn.Close()
 			}
 		} else {
-			if err := w.e.Add(conn, true); err != nil {
-				log.Warnf("Failed to add connection %v", err)
+			if err := w.Epoll.Add(conn, true); err != nil {
+				log.Warnf("failed to add connection %v", err)
 				conn.Close()
 			}
 		}
@@ -73,12 +73,12 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 		writer.Header().Set("Access-Control-Allow-Methods", "POST, GET")
 		writer.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token")
 	}
-	w.p.AddHandler(path, upgradeConn)
+	w.WsProxy.AddHandler(path, upgradeConn)
 
-	if w.p.C.SSLDomain == "" {
-		log.Infof("ws initialized on ws://" + w.p.C.Address + ":" + strconv.Itoa(w.p.C.Port))
+	if w.WsProxy.C.SSLDomain == "" {
+		log.Infof("ws initialized on ws://" + w.WsProxy.C.Address + ":" + strconv.Itoa(w.WsProxy.C.Port))
 	} else {
-		log.Infof("wss initialized on wss://" + w.p.C.SSLDomain + ":" + strconv.Itoa(w.p.C.Port))
+		log.Infof("wss initialized on wss://" + w.WsProxy.C.SSLDomain + ":" + strconv.Itoa(w.WsProxy.C.Port))
 
 	}
 }
@@ -87,9 +87,9 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 	var msg types.Message
 	for {
-		connections, err := w.e.Wait()
+		connections, err := w.Epoll.Wait()
 		if err != nil {
-			log.Warnf("WS recieve error: %s", err)
+			log.Warn(err)
 			continue
 		}
 		for _, conn := range connections {
@@ -97,13 +97,13 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 				break
 			}
 			if payload, _, err := wsutil.ReadClientData(conn); err != nil {
-				if w.p.C.SSLDomain == "" {
-					if err := w.e.Remove(conn, false); err != nil {
-						log.Warnf("WS recieve error: %s", err)
+				if w.WsProxy.C.SSLDomain == "" {
+					if err := w.Epoll.Remove(conn, false); err != nil {
+						log.Warn(err)
 					}
 				} else {
-					if err := w.e.Remove(conn, true); err != nil {
-						log.Warnf("WS recieve error: %s", err)
+					if err := w.Epoll.Remove(conn, true); err != nil {
+						log.Warn(err)
 					}
 				}
 				conn.Close()

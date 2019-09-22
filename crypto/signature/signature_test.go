@@ -48,16 +48,16 @@ func TestSignature(t *testing.T) {
 	if signature != hardcodedSignature {
 		t.Errorf("Hardcoded signature %s do not match\n", hardcodedSignature)
 	}
-	pubComp, err := CompressPubKey(pub)
-	if err != nil {
-		t.Errorf("Failed compressing key: %s\n", err.Error())
-	}
-	pub2, err := DecompressPubKey(pubComp)
+	pub2, err := DecompressPubKey(pub)
 	if err != nil {
 		t.Errorf("Failed decompressing key: %s\n", err.Error())
 	}
-	if pub != pub2 {
-		t.Errorf("Compression/Decompression of pubkey do not match (%s != %s)", pub, pub2)
+	pubComp, err := CompressPubKey(pub2)
+	if err != nil {
+		t.Errorf("Failed compressing key: %s\n", err.Error())
+	}
+	if pub != pubComp {
+		t.Errorf("Compression/Decompression of pubkey do not match (%s != %s)", pub, pubComp)
 	}
 }
 

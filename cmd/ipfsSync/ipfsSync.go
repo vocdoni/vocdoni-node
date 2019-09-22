@@ -23,8 +23,7 @@ func main() {
 	helloTime := flag.Int("helloTime", 40, "period in seconds for sending hello messages")
 	updateTime := flag.Int("updateTime", 20, "period in seconds for sending update messages")
 	flag.Parse()
-	log.InitLoggerAtLevel(*logLevel)
-
+	log.InitLogger(*logLevel, "stdout")
 	ipfsStore := data.IPFSNewConfig(*dataDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {

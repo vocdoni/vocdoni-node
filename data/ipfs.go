@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -104,8 +105,8 @@ func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
 
 //PublishBytes publishes a file containing msg to ipfs
 func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
-	filePath := fileDir + "/" + string(crypto.HashRaw(string(msg))) + ".txt"
-	log.Infof("Publishing file: %s", filePath)
+	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
+	log.Infof("publishing file: %s", filePath)
 	err := ioutil.WriteFile(filePath, msg, 0666)
 	rootHash, err := addAndPin(nd, filePath)
 	if err != nil {
@@ -161,6 +162,23 @@ func (i *IPFSHandle) Unpin(path string) error {
 		return err
 	}
 	return i.CoreAPI.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true))
+}
+
+func (i *IPFSHandle) Stats() (string, error) {
+	response := ""
+	peers, err := i.CoreAPI.Swarm().Peers(context.Background())
+	if err != nil {
+		return response, err
+	}
+	addresses, err := i.CoreAPI.Swarm().KnownAddrs(context.Background())
+	if err != nil {
+		return response, err
+	}
+	pins, err := i.CoreAPI.Pin().Ls(context.Background())
+	if err != nil {
+		return response, err
+	}
+	return fmt.Sprintf("peers:%d addresses:%d pins:%d", len(peers), len(addresses), len(pins)), nil
 }
 
 func (i *IPFSHandle) ListPins() (map[string]string, error) {

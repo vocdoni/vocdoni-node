@@ -145,10 +145,10 @@ func (e *EthChainContext) Start() {
 	}
 	log.Infof("started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
 	if e.DefaultConfig.WSPort > 0 {
-		log.Infof("web3 WebSockets endpoint ws://%s:%d\n", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
+		log.Infof("web3 WebSockets endpoint ws://%s:%d", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
 	}
 	if e.DefaultConfig.HTTPPort > 0 {
-		log.Infof("web3 HTTP endpoint http://%s:%d\n", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
+		log.Infof("web3 HTTP endpoint http://%s:%d", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
 	}
 
 	var et *eth.Ethereum

@@ -194,7 +194,7 @@ func (is *IPFSsync) sendUpdate() {
 	msg.Address = is.myAddress
 	msg.Hash = is.hashTree.GetRoot()
 	if len(is.listPins()) > 0 {
-		log.Infof("current hash %s", msg.Hash)
+		log.Debugf("current hash %s", msg.Hash)
 		err := is.broadcastMsg(msg)
 		if err != nil {
 			log.Warn(err.Error())

@@ -69,18 +69,18 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 			// error if cannot unmarshal height from database
 			vlog.Errorf("cannot unmarshal Height from database")
 		}
-		vlog.Infof("height from abci.Info : %v", height)
+		vlog.Infof("height : %d", height)
 	} else {
 		// database height value is empty
-		vlog.Infof("height from abci.Info is %v, initializing tendermint application database for first time", height)
+		vlog.Infof("initializing tendermint application database for first time", height)
 	}
 
 	// gets the app hash from database
 	appHashBytes := app.db.Get(appHashKey)
 	if len(appHashBytes) != 0 {
-		vlog.Debugf("app hash from abci.Info: %x", appHashBytes)
+		vlog.Infof("app hash: %x", appHashBytes)
 	} else {
-		vlog.Debugf("app hash is empty")
+		vlog.Warnf("app hash is empty")
 	}
 
 	// return info required during the handshake that happens on startup
@@ -130,7 +130,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		} else {
 			// process exists, return process data as info
 			vlog.Debug("the process already exists with the following data: \n")
-			vlog.Debugf("process data: %v", app.deliverTxState.Processes[npta.MkRoot].String())
+			vlog.Debugf("process data: %s", app.deliverTxState.Processes[npta.MkRoot].String())
 		}
 	case "voteTx":
 		vta := tx.Args.(*voctypes.VoteTxArgs)
@@ -312,9 +312,6 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	app.height = req.Header.Height
 	app.appHash = req.Header.AppHash
 
-	//vlog.Infof("APP HEIGHT ON BEGIN BLOCK: %v", app.height)
-	//vlog.Infof("APP HASH ON BEGIN BLOCK: %v", app.appHash)
-	//vlog.Debugf("DB CONTENT ON BEGIN BLOCK: %v", app.deliverTxState)
 	return abcitypes.ResponseBeginBlock{}
 }
 

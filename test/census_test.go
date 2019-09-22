@@ -51,7 +51,7 @@ import (
 var c *websocket.Conn
 
 func TestCensus(t *testing.T) {
-	log.InitLoggerAtLevel("Debug")
+	log.InitLogger("debug", "stdout")
 	// create the proxy to handle HTTP queries
 	pxy := net.NewProxy()
 	pxy.C.Address = "127.0.0.1"
@@ -236,6 +236,18 @@ func TestCensus(t *testing.T) {
 	}
 	if root != resp.Root {
 		t.Errorf("root is different after importing! %s != %s", root, resp.Root)
+	}
+
+	// getSize
+	req.Method = "getSize"
+	req.RootHash = ""
+	resp, err = sendCensusReq(req, signer2, false)
+	t.Logf("getSize response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("fail on getSize")
+	}
+	if 101 != resp.Size {
+		t.Errorf("size is not correct: 102 != %d", resp.Size)
 	}
 
 	// Close connection

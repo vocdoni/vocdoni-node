@@ -9,16 +9,13 @@ import (
 
 var log *zap.SugaredLogger
 
-func InitLoggerAtLevel(logLevel string) {
-	newLogger(logLevel)
+//InitLogger initializes the logger. Output can be either "stdout/stderr/filePath"
+func InitLogger(logLevel string, output string) {
+	newLogger(logLevel, output)
 }
 
-//GetLogger returns a logger object. If none exists, it will set one up.
+//GetLogger returns a logger object
 func getCurrentLogger() *zap.SugaredLogger {
-	if log != nil {
-		return log
-	}
-	newLogger("info")
 	return log
 }
 
@@ -43,7 +40,7 @@ func getLevelFromString(logLevel string) zapcore.Level {
 	}
 }
 
-func newConfig(logLevel string) zap.Config {
+func newConfig(logLevel, output string) zap.Config {
 	var encoderCfg = zapcore.EncoderConfig{
 		// Keys can be anything except the empty string.
 		TimeKey:  "ts",
@@ -69,15 +66,15 @@ func newConfig(logLevel string) zap.Config {
 			Thereafter: 100,
 		},
 		EncoderConfig:    encoderCfg,
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
+		OutputPaths:      []string{output},
+		ErrorOutputPaths: []string{output},
 	}
 	return cfg
 }
 
 //Creates a new logger object with debug option
-func newLogger(logLevel string) {
-	cfg := newConfig(logLevel)
+func newLogger(logLevel, output string) {
+	cfg := newConfig(logLevel, output)
 
 	logger, err := cfg.Build()
 	if err != nil {
@@ -86,7 +83,7 @@ func newLogger(logLevel string) {
 	defer logger.Sync()
 	withOptions := logger.WithOptions(zap.AddCallerSkip(1))
 	log = withOptions.Sugar()
-	log.Info("logger construction succeeded")
+	log.Infof("logger construction succeeded at level %s and output %s", logLevel, output)
 }
 
 //Debug sends a debug level log message

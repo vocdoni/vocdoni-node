@@ -146,6 +146,25 @@ func (t *Tree) Dump(root string) (claims []string, err error) {
 	return
 }
 
+//Size returns the number of leaf nodes on the merkle tree
+func (t *Tree) Size(root string) (int64, error) {
+	var err error
+	var rootHash merkletree.Hash
+	var size int64
+	if len(root) > 0 {
+		rootHash, err = stringToHash(root)
+		if err != nil {
+			return size, err
+		}
+	}
+	err = t.Tree.Walk(&rootHash, func(n *merkletree.Node) {
+		if n.Type == merkletree.NodeTypeLeaf {
+			size++
+		}
+	})
+	return size, err
+}
+
 func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, error) {
 	var response []string
 	var err error

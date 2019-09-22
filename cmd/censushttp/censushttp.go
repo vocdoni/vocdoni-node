@@ -12,9 +12,9 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/net"
 
+	censusmanager "gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
-	censusmanager "gitlab.com/vocdoni/go-dvote/census"
 )
 
 func newConfig() (config.CensusCfg, error) {
@@ -81,7 +81,7 @@ func main() {
 	//setup config
 	globalCfg, err := newConfig()
 	//setup logger
-	log.InitLoggerAtLevel(globalCfg.LogLevel)
+	log.InitLogger(globalCfg.LogLevel, "stdout")
 	if err != nil {
 		log.Fatalf("Could not load config: %v", err)
 	}
