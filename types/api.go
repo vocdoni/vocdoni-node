@@ -59,6 +59,7 @@ type MetaResponse struct {
 	Request       string   `json:"request"`
 	Root          string   `json:"root,omitempty"`
 	Siblings      string   `json:"siblings,omitempty"`
+	Size          int64    `json:"size,omitempty"`
 	Timestamp     int32    `json:"timestamp"`
 	URI           string   `json:"uri,omitempty"`
 	ValidProof    bool     `json:"validProof,omitempty"`

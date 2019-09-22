@@ -160,6 +160,7 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.registerMethod("getRoot", censusLocal, Public) // false = public method
 	r.registerMethod("dump", censusLocal, Private)   // true = private method
 	r.registerMethod("dumpPlain", censusLocal, Private)
+	r.registerMethod("getSize", censusLocal, Public)
 	r.registerMethod("genProof", censusLocal, Public)
 	r.registerMethod("checkProof", censusLocal, Public)
 	r.registerMethod("addCensus", censusLocal, Private)

@@ -448,6 +448,15 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		return resp
 	}
 
+	if op == "getSize" {
+		resp.Size, err = t.Size(t.GetRoot())
+		if err != nil {
+			resp.Ok = false
+			resp.Error = err.Error()
+		}
+		return resp
+	}
+
 	if op == "dump" || op == "dumpPlain" {
 		if !isAuth || !validAuthPrefix {
 			resp.Ok = false

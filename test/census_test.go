@@ -238,6 +238,18 @@ func TestCensus(t *testing.T) {
 		t.Errorf("root is different after importing! %s != %s", root, resp.Root)
 	}
 
+	// getSize
+	req.Method = "getSize"
+	req.RootHash = ""
+	resp, err = sendCensusReq(req, signer2, false)
+	t.Logf("getSize response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("fail on getSize")
+	}
+	if 101 != resp.Size {
+		t.Errorf("size is not correct: 102 != %d", resp.Size)
+	}
+
 	// Close connection
 	c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	os.RemoveAll(ipfsDir)
