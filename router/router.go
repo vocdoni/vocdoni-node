@@ -17,6 +17,9 @@ import (
 	"encoding/json"
 )
 
+const Private = true
+const Public = false
+
 func buildReply(context types.MessageContext, data []byte) types.Message {
 	reply := new(types.Message)
 	reply.TimeStamp = int32(time.Now().Unix())
@@ -58,6 +61,8 @@ type Router struct {
 	signer            signature.SignKeys
 	census            *census.CensusManager
 	vochain           *vochain.BaseApplication
+	PrivateCalls      int64
+	PublicCalls       int64
 }
 
 func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
@@ -142,45 +147,45 @@ func (r *Router) registerMethod(methodName string, methodCallback requestMethod,
 
 //EnableFileAPI enables the FILE API in the Router
 func (r *Router) EnableFileAPI() {
-	r.registerMethod("fetchFile", fetchFile, false) // false = public method
-	r.registerMethod("addFile", addFile, true)      // true = private method
-	r.registerMethod("pinList", pinList, true)
-	r.registerMethod("pinFile", pinFile, true)
-	r.registerMethod("unpinFile", unpinFile, true)
+	r.registerMethod("fetchFile", fetchFile, Public) // false = public method
+	r.registerMethod("addFile", addFile, Private)    // true = private method
+	r.registerMethod("pinList", pinList, Private)
+	r.registerMethod("pinFile", pinFile, Private)
+	r.registerMethod("unpinFile", unpinFile, Private)
 }
 
 //EnableCensusAPI enables the Census API in the Router
 func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.census = cm
 	cm.Data = &r.storage
-	r.registerMethod("getRoot", censusLocal, false) // false = public method
-	r.registerMethod("dump", censusLocal, true)     // true = private method
-	r.registerMethod("dumpPlain", censusLocal, true)
-	r.registerMethod("genProof", censusLocal, false)
-	r.registerMethod("checkProof", censusLocal, false)
-	r.registerMethod("addCensus", censusLocal, true)
-	r.registerMethod("addClaim", censusLocal, true)
-	r.registerMethod("addClaimBulk", censusLocal, true)
-	r.registerMethod("publish", censusLocal, true)
-	r.registerMethod("importRemote", censusLocal, true)
+	r.registerMethod("getRoot", censusLocal, Public) // false = public method
+	r.registerMethod("dump", censusLocal, Private)   // true = private method
+	r.registerMethod("dumpPlain", censusLocal, Private)
+	r.registerMethod("genProof", censusLocal, Public)
+	r.registerMethod("checkProof", censusLocal, Public)
+	r.registerMethod("addCensus", censusLocal, Private)
+	r.registerMethod("addClaim", censusLocal, Private)
+	r.registerMethod("addClaimBulk", censusLocal, Private)
+	r.registerMethod("publish", censusLocal, Private)
+	r.registerMethod("importRemote", censusLocal, Private)
 }
 
 //EnableVoteAPI enabled the Vote API in the Router
 func (r *Router) EnableVoteAPI(app *vochain.BaseApplication) {
 	r.vochain = app
-	r.registerMethod("submitEnvelope", submitEnvelope, false)
-	r.registerMethod("getEnvelopeStatus", getEnvelopeStatus, false)
-	r.registerMethod("getEnvelope", getEnvelope, false)
-	r.registerMethod("getEnvelopeHeight", getEnvelopeHeight, false)
-	r.registerMethod("getProcessList", getProcessList, false)
-	r.registerMethod("getEnvelopeList", getEnvelopeList, false)
+	r.registerMethod("submitEnvelope", submitEnvelope, Public)
+	r.registerMethod("getEnvelopeStatus", getEnvelopeStatus, Public)
+	r.registerMethod("getEnvelope", getEnvelope, Public)
+	r.registerMethod("getEnvelopeHeight", getEnvelopeHeight, Public)
+	r.registerMethod("getProcessList", getProcessList, Public)
+	r.registerMethod("getEnvelopeList", getEnvelopeList, Public)
 
 }
 
 //Route routes requests through the Router object
 func (r *Router) Route() {
 	if len(r.publicRequestMap) == 0 && len(r.privateRequestMap) == 0 {
-		log.Warnf("router methods are not properly initialized: %v", r)
+		log.Warnf("router methods are not properly initialized: %+v", r)
 		return
 	}
 	for {
@@ -199,14 +204,26 @@ func (r *Router) Route() {
 			} else if request.private && request.authenticated {
 				methodFunc = r.privateRequestMap[request.method]
 			}
-
 			if methodFunc == nil {
 				errMsg := fmt.Sprintf("router has no method named %s or unauthorized", request.method)
 				log.Warn(errMsg)
 				go sendError(r.transport, r.signer, request.context, request.id, errMsg)
 			} else {
 				log.Infof("calling method %s", request.method)
-				log.Debugf("data received: %v+", request.structured)
+				log.Debugf("data received: %+v", request.structured)
+
+				if request.private {
+					r.PrivateCalls++
+					if r.PrivateCalls >= 2^64 {
+						r.PrivateCalls = 0
+					}
+				} else {
+					r.PublicCalls++
+					if r.PublicCalls >= 2^64 {
+						r.PublicCalls = 0
+					}
+				}
+
 				go methodFunc(request, r)
 			}
 		}

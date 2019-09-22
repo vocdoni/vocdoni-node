@@ -39,6 +39,7 @@ type GWCfg struct {
 	ListenPort int
 	ListenHost string
 	LogLevel   string
+	LogOutput  string
 	DataDir    string
 	W3external string
 }

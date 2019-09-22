@@ -51,7 +51,7 @@ import (
 var c *websocket.Conn
 
 func TestCensus(t *testing.T) {
-	log.InitLoggerAtLevel("Debug")
+	log.InitLogger("debug", "stdout")
 	// create the proxy to handle HTTP queries
 	pxy := net.NewProxy()
 	pxy.C.Address = "127.0.0.1"

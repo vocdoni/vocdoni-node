@@ -12,7 +12,7 @@ GWARGS="\
  ${GW_LISTEN_PORT:+ --listenPort ${GW_LISTEN_PORT}}\
  ${GW_FILE_ENABLED:+ --fileApi=${GW_FILE_ENABLED}}\
  ${GW_CENSUS_ENABLED:+ --censusApi=${GW_CENSUS_ENABLED}}\
- ${GW_VOTE_ENABLED:+ --censusApi=${GW_VOTE_ENABLED}}\
+ ${GW_VOTE_ENABLED:+ --voteApi=${GW_VOTE_ENABLED}}\
  ${GW_API_ROUTE:+ --apiRoute=${GW_API_ROUTE}}\
  ${GW_W3_ENABLED:+ --web3Api}\
  ${GW_W3_EXTERNAL:+ --w3external ${GW_W3_EXTERNAL}}\
@@ -30,7 +30,6 @@ GWARGS="\
  ${GW_VOCHAINPEERS:+ --vochainPeers ${GW_VOCHAINPEERS}}\
  ${GW_VOCHAINRPCLISTEN:+ --vochainRPClisten ${GW_VOCHAINRPCLISTEN}}\
  ${GW_VOCHAINSEEDS:+ --vochainSeeds ${GW_VOCHAINSEEDS}}\
- ${GW_VOTEAPI:+ --voteApi=${GW_VOTEAPI}}\
  ${GW_IPFSSYNCKEY:+ --ipfsSyncKey ${GW_IPFSSYNCKEY}}\
  ${GW_IPFSSYNCPEERS:+ --ipfsSyncPeers ${GW_IPFSSYNCPEERS}}\
  "

@@ -71,7 +71,7 @@ func main() {
 	//setup config
 	globalCfg, err := newConfig()
 	//setup logger
-	log.InitLoggerAtLevel(globalCfg.LogLevel)
+	log.InitLogger(globalCfg.LogLevel, "stdout")
 	if err != nil {
 		log.Fatalf("could not load config: %v", err)
 	}

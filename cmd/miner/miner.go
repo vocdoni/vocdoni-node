@@ -92,7 +92,7 @@ func newConfig() (config.VochainCfg, error) {
 }
 func main() {
 	globalCfg, err := newConfig()
-	log.InitLoggerAtLevel(globalCfg.LogLevel)
+	log.InitLogger(globalCfg.LogLevel, "stdout")
 	if err != nil {
 		log.Fatalf("could not load config: %v", err)
 	}
