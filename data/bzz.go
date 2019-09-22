@@ -68,6 +68,10 @@ func (b *BZZHandle) Pin(path string) error {
 	return errors.New("Not yet implemented in BZZ")
 }
 
+func (b *BZZHandle) Stats() (string, error) {
+	return "", errors.New("Not yet implemented in BZZ")
+}
+
 //STUB -- NEEDS IMPLEMENTATION
 func (b *BZZHandle) Unpin(path string) error {
 	return errors.New("Not yet implemented in BZZ")

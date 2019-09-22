@@ -27,9 +27,9 @@ func Init() error {
 	if err != nil {
 		return err
 	}
-	log.Infof("checking if daemon is running...")
+	log.Info("checking if daemon is running")
 	if daemonLocked {
-		log.Debugf("ipfs daemon is running")
+		log.Debug("ipfs daemon is running")
 		e := "ipfs daemon is running. please stop it to run this command"
 		return errors.New(e)
 	}
@@ -55,11 +55,11 @@ func Init() error {
 }
 
 func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
-	log.Infof("Attempting to start node...")
-	log.Infof("ConfigRoot: %s", ConfigRoot)
+	log.Info("attempting to start IPFS node")
+	log.Infof("config root: %s", ConfigRoot)
 	r, err := fsrepo.Open(ConfigRoot)
 	if err != nil {
-		log.Infof("Error opening repo dir")
+		log.Warn("Error opening repo dir")
 		return nil, nil, err
 	}
 	//	defer r.Close()
@@ -79,7 +79,7 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 
 	node, err := ipfscore.NewNode(ctx, cfg)
 	if err != nil {
-		log.Infof("Error constructing node")
+		log.Warn("error constructing node")
 		return nil, nil, err
 	}
 	node.IsDaemon = true
@@ -93,7 +93,7 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 
 	api, err := ipfsapi.NewCoreAPI(node)
 	if err != nil {
-		log.Info("Error constructing core API")
+		log.Warn("error constructing core API")
 		return nil, nil, err
 	}
 

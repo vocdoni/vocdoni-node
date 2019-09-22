@@ -15,6 +15,7 @@ type Storage interface {
 	Unpin(path string) error
 	ListPins() (map[string]string, error)
 	GetURIprefix() string
+	Stats() (string, error)
 }
 
 type StorageConfig interface {

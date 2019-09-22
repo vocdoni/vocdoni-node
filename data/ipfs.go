@@ -164,6 +164,23 @@ func (i *IPFSHandle) Unpin(path string) error {
 	return i.CoreAPI.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true))
 }
 
+func (i *IPFSHandle) Stats() (string, error) {
+	response := ""
+	peers, err := i.CoreAPI.Swarm().Peers(context.Background())
+	if err != nil {
+		return response, err
+	}
+	addresses, err := i.CoreAPI.Swarm().KnownAddrs(context.Background())
+	if err != nil {
+		return response, err
+	}
+	pins, err := i.CoreAPI.Pin().Ls(context.Background())
+	if err != nil {
+		return response, err
+	}
+	return fmt.Sprintf("peers:%d addresses:%d pins:%d", len(peers), len(addresses), len(pins)), nil
+}
+
 func (i *IPFSHandle) ListPins() (map[string]string, error) {
 	pins, err := i.CoreAPI.Pin().Ls(context.Background())
 	if err != nil {

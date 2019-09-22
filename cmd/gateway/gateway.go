@@ -197,7 +197,7 @@ func main() {
 	//setup logger
 	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
 	if err != nil {
-		log.Fatalf("could not load config: %v", err)
+		log.Fatalf("could not load config: %s", err.Error())
 	}
 	log.Infof("using datadir %s", globalCfg.DataDir)
 
@@ -303,7 +303,7 @@ func main() {
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
 		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
-			log.Fatalf("cannot parse w3external URL")
+			log.Fatal("cannot parse w3external URL")
 		}
 
 		log.Debugf("testing web3 endpoint %s", url.String())
@@ -337,9 +337,20 @@ func main() {
 	if !globalCfg.Ipfs.NoInit {
 		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
 		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
+		storage.ListPins()
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
+		go func() {
+			for {
+				time.Sleep(time.Second * 60)
+				stats, err := storage.Stats()
+				if err != nil {
+					log.Warnf("IPFS node returned an error: %s", err.Error())
+				}
+				log.Infof("[ipfs info] %s", stats)
+			}
+		}()
 		if len(globalCfg.Ipfs.SyncKey) > 0 {
 			log.Info("enabling ipfs cluster synchronization")
 			storageSync = ipfssync.NewIPFSsync(globalCfg.DataDir+"/.ipfsSync", globalCfg.Ipfs.SyncKey, storage)
@@ -358,7 +369,7 @@ func main() {
 		if _, err := os.Stat(globalCfg.DataDir + "/census"); os.IsNotExist(err) {
 			err = os.MkdirAll(globalCfg.DataDir+"/census", os.ModePerm)
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Fatal(err)
 			}
 		}
 		censusManager.Init(globalCfg.DataDir+"/census", "")
@@ -372,7 +383,7 @@ func main() {
 		// app layer db
 		db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.Vochain.DataDir, nil)
 		if err != nil {
-			log.Fatal("failed to open db: %v", err)
+			log.Fatalf("failed to open db: %s", err.Error())
 		}
 		defer db.Close()
 
@@ -400,14 +411,14 @@ func main() {
 		// checking if Eth node is synced
 		orc, err := oracle.NewOracle(node, app, globalCfg.Vochain.Contract, storage)
 		if err != nil {
-			log.Fatalf("couldn't create oracle: %s", err)
+			log.Fatalf("couldn't create oracle: %s", err.Error())
 		}
 
 		go func() {
 			if node.Eth != nil {
 				for {
 					if node.Eth.Synced() {
-						log.Debug("ethereum node fully synced")
+						log.Info("ethereum node fully synced, starting Oracle")
 						orc.ReadEthereumEventLogs(1000000, 1314200, globalCfg.Vochain.Contract)
 						return
 					}

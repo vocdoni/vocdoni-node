@@ -80,7 +80,7 @@ func fetchFile(request routerRequest, router *Router) {
 }
 
 func addFile(request routerRequest, router *Router) {
-	log.Infof("calling addFile")
+	log.Debugf("calling addFile")
 	reqType := request.structured.Type
 	b64content, err := base64.StdEncoding.DecodeString(request.structured.Content)
 	if err != nil {
@@ -122,7 +122,7 @@ func addFile(request routerRequest, router *Router) {
 
 func pinList(request routerRequest, router *Router) {
 	var errMsg string
-	log.Info("calling PinList")
+	log.Debug("calling PinList")
 	pins, err := router.storage.ListPins()
 	if err != nil {
 		errMsg = fmt.Sprintf("internal error fetching pins (%s)", err.Error())
@@ -141,7 +141,7 @@ func pinList(request routerRequest, router *Router) {
 		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Signature, err = router.signer.SignJSON(response.Response)
 		if err != nil {
-			log.Warn(err.Error())
+			log.Warn(err)
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
@@ -155,7 +155,7 @@ func pinList(request routerRequest, router *Router) {
 
 func pinFile(request routerRequest, router *Router) {
 	uri := request.structured.URI
-	log.Infof("calling PinFile %s", uri)
+	log.Debugf("calling PinFile %s", uri)
 	err := router.storage.Pin(uri)
 	if err != nil {
 		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("error pinning file (%s)", err.Error()))
@@ -181,7 +181,7 @@ func pinFile(request routerRequest, router *Router) {
 
 func unpinFile(request routerRequest, router *Router) {
 	uri := request.structured.URI
-	log.Infof("calling UnPinFile %s", uri)
+	log.Debugf("calling UnPinFile %s", uri)
 	err := router.storage.Unpin(uri)
 	if err != nil {
 		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unpin file (%s)", err.Error()))
@@ -193,7 +193,7 @@ func unpinFile(request routerRequest, router *Router) {
 		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Signature, err = router.signer.SignJSON(response.Response)
 		if err != nil {
-			log.Warn(err.Error())
+			log.Warn(err)
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
