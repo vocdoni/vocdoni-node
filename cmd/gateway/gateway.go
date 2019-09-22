@@ -35,7 +35,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/util"
 	vochain "gitlab.com/vocdoni/go-dvote/vochain"
 	vochainApp "gitlab.com/vocdoni/go-dvote/vochain/app"
-	oracle "gitlab.com/vocdoni/go-dvote/vochain/oracle"
 )
 
 func newConfig() (config.GWCfg, error) {
@@ -402,33 +401,34 @@ func main() {
 		if globalCfg.Vochain.PublicAddr != "" {
 			log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
 		}
-		app, vnode := vochain.Start(globalCfg.Vochain, db)
+		_, vnode := vochain.Start(globalCfg.Vochain, db)
 		defer func() {
 			vnode.Stop()
 			vnode.Wait()
 		}()
 
-		// checking if Eth node is synced
-		orc, err := oracle.NewOracle(node, app, globalCfg.Vochain.Contract, storage)
-		if err != nil {
-			log.Fatalf("couldn't create oracle: %s", err.Error())
-		}
-
-		go func() {
-			if node.Eth != nil {
-				for {
-					if node.Eth.Synced() {
-						log.Info("ethereum node fully synced, starting Oracle")
-						orc.ReadEthereumEventLogs(1000000, 1314200, globalCfg.Vochain.Contract)
-						return
-					}
-					time.Sleep(10 * time.Second)
-					log.Debug("waiting for ethereum to sync before starting Oracle")
+		/*		// checking if Eth node is synced
+				orc, err := oracle.NewOracle(node, app, globalCfg.Vochain.Contract, storage)
+				if err != nil {
+					log.Fatalf("couldn't create oracle: %s", err.Error())
 				}
-			} else {
-				time.Sleep(time.Second * 1)
-			}
-		}()
+
+				go func() {
+					if node.Eth != nil {
+						for {
+							if node.Eth.Synced() {
+								log.Info("ethereum node fully synced, starting Oracle")
+								orc.ReadEthereumEventLogs(1000000, 1314200, globalCfg.Vochain.Contract)
+								return
+							}
+							time.Sleep(10 * time.Second)
+							log.Debug("waiting for ethereum to sync before starting Oracle")
+						}
+					} else {
+						time.Sleep(time.Second * 1)
+					}
+				}()
+		*/
 	}
 
 	// API Endpoint initialization
