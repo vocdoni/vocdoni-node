@@ -4,9 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-
-	tmtypes "github.com/tendermint/tendermint/types"
-	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
 )
 
 // ________________________ TX ________________________
@@ -191,8 +188,8 @@ func (n *VoteTxArgs) String() string {
 // AddOracleTxArgs represents the data required in
 // order to add a new  oracle
 type AddOracleTxArgs struct {
-	Address   eth.Address `json:"address"`
-	Timestamp int64       `json:"timestamp"`
+	Address   string `json:"address"`
+	Timestamp int    `json:"timestamp"`
 }
 
 func (n *AddOracleTxArgs) String() string {
@@ -202,8 +199,8 @@ func (n *AddOracleTxArgs) String() string {
 // RemoveOracleTxArgs represents the data required in
 // order to remove an existing  oracle
 type RemoveOracleTxArgs struct {
-	Address   eth.Address `json:"address"`
-	Timestamp int64       `json:"timestamp"`
+	Address   string `json:"address"`
+	Timestamp int    `json:"timestamp"`
 }
 
 func (n *RemoveOracleTxArgs) String() string {
@@ -213,9 +210,9 @@ func (n *RemoveOracleTxArgs) String() string {
 // AddValidatorTxArgs represents the data required in
 // order to add a new validator node
 type AddValidatorTxArgs struct {
-	Address   tmtypes.Address `json:"address"`
-	Power     int64           `json:"power"`
-	Timestamp int64           `json:"timestamp"`
+	Address   string `json:"address"`
+	Power     int    `json:"power"`
+	Timestamp int    `json:"timestamp"`
 }
 
 func (n *AddValidatorTxArgs) String() string {
@@ -233,8 +230,8 @@ func (n *AddValidatorTxArgs) String() string {
 // RemoveValidatorTxArgs represents the data required in
 // order to remove an existing validator node
 type RemoveValidatorTxArgs struct {
-	Address   tmtypes.Address `json:"address"`
-	Timestamp int64           `json:"timestamp"`
+	Address   string `json:"address"`
+	Timestamp int    `json:"timestamp"`
 }
 
 func (n *RemoveValidatorTxArgs) String() string {

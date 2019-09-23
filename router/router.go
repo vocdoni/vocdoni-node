@@ -12,7 +12,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain/app"
+	vochain "gitlab.com/vocdoni/go-dvote/vochain"
 
 	"encoding/json"
 )
