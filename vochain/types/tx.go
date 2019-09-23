@@ -158,7 +158,7 @@ type VoteTxArgs struct {
 	// Nonce for avoid replay attacks
 	Nonce string `json:"nonce"`
 	// VotePackage vote data
-	VotePackage []byte `json:"votePackage"`
+	VotePackage string `json:"votePackage"`
 	// Proof proof inclusion into the census of the process
 	Proof string `json:"proof"`
 	// Signature sign( JSON.stringify( { nonce, processId, proof, 'vote-package' } ), privateKey )
@@ -303,7 +303,7 @@ func (tx *Tx) validateVoteTxArgs() (TxArgs, error) {
 			ProcessID:   tx.Args["processId"].(string),
 			Nullifier:   tx.Args["nullifier"].(string),
 			Nonce:       tx.Args["nonce"].(string),
-			VotePackage: tx.Args["votePackage"].([]byte),
+			VotePackage: tx.Args["votePackage"].(string),
 			Proof:       tx.Args["proof"].(string),
 			Signature:   tx.Args["signature"].(string),
 			Timestamp:   int64(tx.Args["timestamp"].(float64)),
