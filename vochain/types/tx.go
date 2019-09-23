@@ -71,9 +71,7 @@ func (m *TxMethod) String() string {
 
 var (
 	newProcessTxArgsKeys = []string{
-		"entityId",
-		"entityResolver",
-		"metadataHash",
+		"entityAddress",
 		"mkRoot",
 		"numberOfBlocks",
 		"processId",
@@ -105,11 +103,7 @@ type TxArgs interface {
 type NewProcessTxArgs struct {
 	ProcessID string `json:"processId"`
 	// EntityID the process belongs to
-	EntityID string `json:"entityId"`
-	// EntityResolver the resolver of the entity
-	EntityResolver string `json:"entityResolver"`
-	// MetadataHash hash of the entity metadata
-	MetadataHash string `json:"metadataHash"`
+	EntityAddress string `json:"entityAddress"`
 	// MkRoot merkle root of all the census in the process
 	MkRoot string `json:"mkRoot"`
 	// NumberOfBlocks represents the tendermint block where the process
@@ -129,8 +123,7 @@ func (n *NewProcessTxArgs) String() string {
 		"method": "newProcessTx",
 		"args" : {
 		"encryptionPublicKey": "%s", 
-		"entityId": "%s", 
-		"entityResolver": "%s",
+		"entityAddress": "%s", 
 		"startBlock": %d, 
 		"metadataHash": "%s", 
 		"mkRoot": "%s", 
@@ -138,10 +131,8 @@ func (n *NewProcessTxArgs) String() string {
 		"processId": "%s",
 		"timestamp": %d}}`,
 		n.EncryptionPublicKey,
-		n.EntityID,
-		n.EntityResolver,
+		n.EntityAddress,
 		n.StartBlock,
-		n.MetadataHash,
 		n.MkRoot,
 		n.NumberOfBlocks,
 		n.ProcessID,
@@ -245,7 +236,7 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 	var t TxArgs
 
 	// invalid length
-	if len(tx.Args) != 9 {
+	if len(tx.Args) != 7 {
 		return t, errors.New("Invalid args number")
 	}
 
@@ -262,9 +253,7 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 	// create tx args specific struct
 	if allOk {
 		t = &NewProcessTxArgs{
-			EntityID:       tx.Args["entityId"].(string),
-			EntityResolver: tx.Args["entityResolver"].(string),
-			MetadataHash:   tx.Args["metadataHash"].(string),
+			EntityAddress:  tx.Args["entityAddress"].(string),
 			MkRoot:         tx.Args["mkRoot"].(string),
 			NumberOfBlocks: int64(tx.Args["numberOfBlocks"].(float64)),
 			StartBlock:     int64(tx.Args["startBlock"].(float64)),

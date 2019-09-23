@@ -116,7 +116,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		// check if process exists
 		if _, ok := app.deliverTxState.Processes[npta.ProcessID]; !ok {
 			app.deliverTxState.Processes[npta.ProcessID] = &voctypes.Process{
-				EntityID:            npta.EntityID,
+				EntityAddress:       npta.EntityAddress,
 				Votes:               make(map[string]*voctypes.Vote, 0),
 				MkRoot:              npta.MkRoot,
 				NumberOfBlocks:      npta.NumberOfBlocks,

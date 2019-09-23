@@ -8,8 +8,8 @@ import (
 
 // Process represents a state per process
 type Process struct {
-	// EntityID identifies unequivocally a process
-	EntityID string `json:"entityId"`
+	// EntityAddress identifies unequivocally a process
+	EntityAddress string `json:"entityAddress"`
 	// Votes is a list containing all the processed and valid votes (here votes are final)
 	Votes map[string]*Vote `json:"votes"`
 	// MkRoot merkle root of all the census in the process
@@ -33,7 +33,7 @@ func (p *Process) String() string {
 		"numberOfBlocks": %v,
 		"encryptionKeys": %v,
 		"currentState": %v }`,
-		p.EntityID,
+		p.EntityAddress,
 		p.Votes,
 		p.MkRoot,
 		p.StartBlock,

@@ -50,8 +50,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"
-	"gitlab.com/vocdoni/go-dvote/data"
-	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/log"
 	app "gitlab.com/vocdoni/go-dvote/vochain/app"
 )
@@ -71,8 +69,8 @@ type Oracle struct {
 }
 
 // NewOracle creates an Oracle given an existing Ethereum and Vochain connection
-func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, contractAddressHex string, storage data.Storage) (*Oracle, error) {
-	PH, err := chain.NewVotingProcessHandle(contractAddressHex, storage)
+func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, contractAddressHex string) (*Oracle, error) {
+	PH, err := chain.NewVotingProcessHandle(contractAddressHex)
 	if err != nil {
 		return new(Oracle), err
 	}
@@ -220,7 +218,6 @@ func (o *Oracle) SubscribeToEthereumContract(address string) {
 	}
 }
 
-// Example. TODO
 func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) interface{} {
 	log.Debug(o.ethereumConnection.Node.WSEndpoint())
 
@@ -395,7 +392,6 @@ func newConfig() (config.OracleCfg, error) {
 	dataDir := flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
-
 	flag.String("signingKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
 	flag.String("chain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
 	flag.Bool("chainLightMode", false, "synchronize Ethereum blockchain in light mode")
@@ -403,9 +399,6 @@ func newConfig() (config.OracleCfg, error) {
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
 	flag.Bool("allowPrivate", false, "allows private methods over the APIs")
 	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
-	flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
-	flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
-	flag.StringArray("ipfsSyncPeers", []string{}, "use custom ipfsSync peers/bootnodes for accessing the DHT")
 	flag.String("vochainListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
 	flag.String("vochainAddress", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
 	flag.String("vochainGenesis", "", "use alternative geneiss file for the voting chain")
@@ -413,7 +406,6 @@ func newConfig() (config.OracleCfg, error) {
 	flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
 	flag.String("vochainContract", "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b", "voting smart contract where the oracle will listen")
-
 	flag.String("vochainRPCListen", "127.0.0.1:26657", "rpc host and port to listent for the voting chain")
 
 	flag.Parse()
@@ -427,17 +419,11 @@ func newConfig() (config.OracleCfg, error) {
 	viper.SetDefault("w3external", "")
 	viper.SetDefault("ethereumClient.allowPrivate", false)
 	viper.SetDefault("ethereumClient.allowedAddrs", "")
-
 	viper.SetDefault("ethereumConfig.httpPort", "9091")
 	viper.SetDefault("ethereumConfig.httpHost", "127.0.0.1")
-
 	viper.SetDefault("dataDir", userDir)
 	viper.SetDefault("logLevel", "warn")
 	viper.SetDefault("logOutput", "stdout")
-	viper.SetDefault("ipfsConfig.noInit", false)
-	viper.SetDefault("ipfsConfig.configPath", userDir+"/.ipfs")
-	viper.SetDefault("ipfsConfig.syncKey", "")
-	viper.SetDefault("ipfsConfig.syncPeers", []string{})
 	viper.SetDefault("vochainConfig.p2pListen", "0.0.0.0:26656")
 	viper.SetDefault("vochainConfig.address", "")
 	viper.SetDefault("vochainConfig.genesis", "")
@@ -445,9 +431,7 @@ func newConfig() (config.OracleCfg, error) {
 	viper.SetDefault("vochainConfig.peers", []string{})
 	viper.SetDefault("vochainConfig.seeds", []string{})
 	viper.SetDefault("vochainConfig.contract", "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
-
 	viper.SetDefault("vochainConfig.rpcListen", "0.0.0.0:26657")
-
 	viper.SetDefault("vochainConfig.dataDir", *dataDir+"/vochain")
 
 	viper.SetConfigType("yaml")
@@ -473,9 +457,6 @@ func newConfig() (config.OracleCfg, error) {
 	viper.BindPFlag("w3external", flag.Lookup("w3external"))
 	viper.BindPFlag("ethereumClient.allowPrivate", flag.Lookup("allowPrivate"))
 	viper.BindPFlag("ethereumClient.allowedAddrs", flag.Lookup("allowedAddrs"))
-	viper.BindPFlag("ipfsConfig.noInit", flag.Lookup("ipfsNoInit"))
-	viper.BindPFlag("ipfsConfig.syncKey", flag.Lookup("ipfsSyncKey"))
-	viper.BindPFlag("ipfsConfig.syncPeers", flag.Lookup("ipfsSyncPeers"))
 	viper.BindPFlag("vochainConfig.p2pListen", flag.Lookup("vochainListen"))
 	viper.BindPFlag("vochainConfig.address", flag.Lookup("vochainAddress"))
 	viper.BindPFlag("vochainConfig.genesis", flag.Lookup("vochainGenesis"))
@@ -485,7 +466,6 @@ func newConfig() (config.OracleCfg, error) {
 	viper.BindPFlag("vochainConfig.contract", flag.Lookup("vochainContract"))
 	viper.BindPFlag("ethereumClient.signingKey", flag.Lookup("signingKey"))
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
-
 	viper.BindPFlag("vochainConfig.rpcListen", flag.Lookup("vochainRPCListen"))
 
 	viper.SetConfigFile(*path)
@@ -643,41 +623,9 @@ func main() {
 		log.Infof("successfuly connected to web3 endpoint at external url: %s", globalCfg.W3external)
 	}
 
-	// start ipfs
-	// Storage
-	var storage data.Storage
-	var storageSync ipfssync.IPFSsync
-	if !globalCfg.IpfsConfig.NoInit {
-		ipfsStore := data.IPFSNewConfig(globalCfg.IpfsConfig.ConfigPath)
-		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
-		storage.ListPins()
-		if err != nil {
-			log.Fatal(err)
-		}
-		go func() {
-			for {
-				time.Sleep(time.Second * 60)
-				stats, err := storage.Stats()
-				if err != nil {
-					log.Warnf("IPFS node returned an error: %s", err.Error())
-				}
-				log.Infof("[ipfs info] %s", stats)
-			}
-		}()
-		if len(globalCfg.IpfsConfig.SyncKey) > 0 {
-			log.Info("enabling ipfs cluster synchronization")
-			storageSync = ipfssync.NewIPFSsync(globalCfg.DataDir+"/.ipfsSync", globalCfg.IpfsConfig.SyncKey, storage)
-			if len(globalCfg.IpfsConfig.SyncPeers) > 0 {
-				log.Debugf("using custom ipfs sync bootnodes %s", globalCfg.IpfsConfig.SyncPeers)
-				storageSync.Transport.BootNodes = globalCfg.IpfsConfig.SyncPeers
-			}
-			go storageSync.Start()
-		}
-	}
-
 	// wait chains sync
 	// eth
-	orc, err := NewOracle(node, app, globalCfg.VochainConfig.Contract, storage)
+	orc, err := NewOracle(node, app, globalCfg.VochainConfig.Contract)
 	if err != nil {
 		log.Fatalf("couldn't create oracle: %s", err.Error())
 	}

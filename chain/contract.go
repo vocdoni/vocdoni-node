@@ -52,7 +52,7 @@ type ProcessMetadata struct {
 }
 
 // Constructor for proc_transactor on node
-func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*ProcessHandle, error) {
+func NewVotingProcessHandle(contractAddressHex string) (*ProcessHandle, error) {
 	client, err := ethclient.Dial("https://gwdev1.vocdoni.net/web3")
 	if err != nil {
 		log.Error(err)
@@ -67,7 +67,6 @@ func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*P
 	PH := new(ProcessHandle)
 	PH.VotingProcess = votingProcess
 
-	PH.storage = storage
 	return PH, nil
 }
 
@@ -85,7 +84,7 @@ func (ph *ProcessHandle) GetProcessMetadata(pid [32]byte) (*vochain.NewProcessTx
 	json.Unmarshal(processInfo, &processInfoStructured)
 	processTxArgs := new(vochain.NewProcessTxArgs)
 	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
-	processTxArgs.EntityID = processMeta.EntityAddress.String()
+	processTxArgs.EntityAddress = processMeta.EntityAddress.String()
 	processTxArgs.MkRoot = processInfoStructured.Census.MerkleRoot
 	processTxArgs.NumberOfBlocks = processInfoStructured.NumberOfBlocks
 	processTxArgs.StartBlock = processInfoStructured.StartBlock
