@@ -517,6 +517,19 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		resp.URI = dataStorage.GetURIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
 		resp.Root = t.GetRoot()
+
+		// adding published census with censusID = rootHash
+		log.Infof("adding new namespace for published census %s", resp.Root)
+		err = cm.AddNamespace(resp.Root, r.PubKeys)
+		if err != nil {
+			log.Warnf("error creating local published census: %s", err.Error())
+		} else {
+			log.Infof("import claims to new census")
+			err = cm.Trees[resp.Root].ImportDump(dump.ClaimsData)
+			if err != nil {
+				log.Warn(err)
+			}
+		}
 	}
 
 	if op == "checkProof" {
