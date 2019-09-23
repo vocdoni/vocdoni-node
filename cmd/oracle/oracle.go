@@ -301,7 +301,7 @@ func main() {
 			for {
 				if node.Eth.Synced() {
 					log.Info("ethereum node fully synced, starting Oracle")
-					orc.ReadEthereumEventLogs(1000000, 1314200, globalCfg.VochainConfig.Contract)
+					orc.ReadEthereumEventLogs(1000000, 1348906, globalCfg.VochainConfig.Contract)
 					return
 				}
 				time.Sleep(10 * time.Second)

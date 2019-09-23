@@ -76,6 +76,7 @@ func (ph *ProcessHandle) GetProcessData(pid [32]byte) (*vochain.NewProcessTxArgs
 	if err != nil {
 		log.Errorf("Error fetching process metadata from Ethereum: %s", err)
 	}
+	log.Debugf("PROCESS META: %+v", processMeta)
 
 	processTxArgs := new(vochain.NewProcessTxArgs)
 	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)

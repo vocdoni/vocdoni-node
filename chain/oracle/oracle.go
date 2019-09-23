@@ -298,7 +298,7 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			if err != nil {
 				log.Errorf("error fetching process metadata from chain module: %s", err)
 			}
-			log.Debugf("process info: %v", processInfo)
+			log.Debugf("process info: %+v", processInfo)
 			if err != nil {
 				log.Warnf("cannot get process given the index: %v", err)
 			}

@@ -126,18 +126,15 @@ func (n *NewProcessTxArgs) String() string {
 		"encryptionPrivateKey": "%s", 
 		"entityAddress": "%s", 
 		"startBlock": %d, 
-		"metadataHash": "%s", 
 		"mkRoot": "%s", 
 		"numberOfBlocks": %d,
-		"processId": "%s",
-		"timestamp": %d}}`,
+		"processId": "%s" }}`,
 		n.EncryptionPrivateKey,
 		n.EntityAddress,
 		n.StartBlock,
 		n.MkRoot,
 		n.NumberOfBlocks,
 		n.ProcessID,
-		n.Timestamp,
 	)
 }
 
