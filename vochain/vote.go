@@ -11,7 +11,7 @@ type Vote struct {
 	// Nullifier is the hash of the private key
 	Nullifier string `json:"nullifier"`
 	// VotePackage base64 encoded vote content
-	VotePackage string `json:"vote-package"`
+	VotePackage string `json:"votePackage"`
 	// Nonce unique number per vote attempt, so that replay attacks can't reuse this payload
 	Nonce string `json:"nonce"`
 	// Signature sign( JSON.stringify( { nonce, processId, proof, 'vote-package' } ), privateKey )

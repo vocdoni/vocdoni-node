@@ -16,17 +16,19 @@ func submitEnvelope(request routerRequest, router *Router) {
 	voteTxArgs.ProcessID = request.structured.ProcessId
 	voteTxArgs.Nullifier = request.structured.Nullifier
 	//voteTxArgs.Payload = request.structured.Payload
+	voteTxArgs.VotePackage = request.structured.Payload
 
 	voteTxBytes := []byte(voteTxArgs.String())
 
 	req := abci.RequestDeliverTx{Tx: voteTxBytes}
-	vochainResponse := router.vochain.DeliverTx(req)
+	vochainReqRes := router.vochainClient.DeliverTxAsync(req)
 
 	var apiResponse types.ResponseMessage
 	apiResponse.ID = request.id
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 
+	vochainResponse := vochainReqRes.Response.GetDeliverTx()
 	if vochainResponse.Code != 0 {
 		apiResponse.Response.Ok = false
 	} else {
@@ -62,6 +64,11 @@ func getEnvelope(request routerRequest, router *Router) {
 func getEnvelopeHeight(request routerRequest, router *Router) {
 	// request.structured.ProcessId
 	// getEnvelopeHeight
+}
+
+func getBlockHeight(request routerRequest, router *Router) {
+	// request.structured.ProcessId
+	// getBlockHeight
 }
 
 func getProcessList(request routerRequest, router *Router) {
