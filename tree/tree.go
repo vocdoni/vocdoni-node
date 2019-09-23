@@ -94,6 +94,28 @@ func (t *Tree) GenProof(data []byte) (string, error) {
 	return mpHex, nil
 }
 
+// CheckProof standalone function for checking a merkle proof
+func CheckProof(root, mpHex string, data []byte) (bool, error) {
+	mpBytes, err := common3.HexDecode(mpHex)
+	if err != nil {
+		return false, err
+	}
+	mp, err := merkletree.NewProofFromBytes(mpBytes)
+	if err != nil {
+		return false, err
+	}
+	rootHash, err := stringToHash(root)
+	if err != nil {
+		return false, err
+	}
+	e, err := merkletree.NewEntryFromBytes(data)
+	if err != nil {
+		return false, err
+	}
+	return merkletree.VerifyProof(&rootHash, mp,
+		e.HIndex(), e.HValue()), nil
+}
+
 func (t *Tree) CheckProof(data []byte, mpHex string) (bool, error) {
 	mpBytes, err := common3.HexDecode(mpHex)
 	if err != nil {

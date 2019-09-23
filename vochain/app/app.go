@@ -102,7 +102,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	// we can't commit transactions inside the DeliverTx because in such case Query, which may be called in parallel, will return inconsistent data
 	// split incomin tx
 	vlog.Debugf("validateTX ARGS: %s", string(req.Tx))
-	tx, err := ValidateTx(req.Tx)
+	tx, err := ValidateTx(req.Tx, app.db.(*dbm.GoLevelDB))
 	if err != nil {
 		vlog.Warn(err)
 		return abcitypes.ResponseDeliverTx{Code: 1}
@@ -204,7 +204,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 
 	// check raw tx data and returns OK if matches with any defined ValixTx schema
-	tx, err := ValidateTx(req.Tx)
+	tx, err := ValidateTx(req.Tx, app.db.(*dbm.GoLevelDB))
 	if err != nil {
 		vlog.Debug(err)
 		return abcitypes.ResponseCheckTx{Code: 1}
