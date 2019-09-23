@@ -3,6 +3,7 @@ package vochain
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	tmtypes "github.com/tendermint/tendermint/types"
 	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
@@ -108,12 +109,12 @@ type NewProcessTxArgs struct {
 	MkRoot string `json:"mkRoot"`
 	// NumberOfBlocks represents the tendermint block where the process
 	// goes from active to finished
-	NumberOfBlocks int64 `json:"numberOfBlocks"`
+	NumberOfBlocks *big.Int `json:"numberOfBlocks"`
 	// StartBlock represents the tendermint block where the process goes
 	// from scheduled to active
-	StartBlock int64 `json:"startBlock"`
-	// encryptionPublicKey are the keys required to encrypt the votes
-	EncryptionPublicKey string `json:"encryptionPublicKey"`
+	StartBlock *big.Int `json:"startBlock"`
+	// EncryptionPrivateKey are the keys required to encrypt the votes
+	EncryptionPrivateKey string `json:"encryptionPrivateKey"`
 	// Timestamp for avoid flooding atacks
 	Timestamp int64 `json:"timestamp"`
 }
@@ -122,7 +123,7 @@ func (n *NewProcessTxArgs) String() string {
 	return fmt.Sprintf(`{
 		"method": "newProcessTx",
 		"args" : {
-		"encryptionPublicKey": "%s", 
+		"encryptionPrivateKey": "%s", 
 		"entityAddress": "%s", 
 		"startBlock": %d, 
 		"metadataHash": "%s", 
@@ -130,7 +131,7 @@ func (n *NewProcessTxArgs) String() string {
 		"numberOfBlocks": %d,
 		"processId": "%s",
 		"timestamp": %d}}`,
-		n.EncryptionPublicKey,
+		n.EncryptionPrivateKey,
 		n.EntityAddress,
 		n.StartBlock,
 		n.MkRoot,
@@ -149,7 +150,7 @@ type VoteTxArgs struct {
 	// Nonce for avoid replay attacks
 	Nonce string `json:"nonce"`
 	// VotePackage vote data
-	VotePackage []byte `json:"votePackage"`
+	VotePackage string `json:"votePackage"`
 	// Proof proof inclusion into the census of the process
 	Proof string `json:"proof"`
 	// Signature sign( JSON.stringify( { nonce, processId, proof, 'vote-package' } ), privateKey )
@@ -255,12 +256,12 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 		t = &NewProcessTxArgs{
 			EntityAddress:  tx.Args["entityAddress"].(string),
 			MkRoot:         tx.Args["mkRoot"].(string),
-			NumberOfBlocks: int64(tx.Args["numberOfBlocks"].(float64)),
-			StartBlock:     int64(tx.Args["startBlock"].(float64)),
+			NumberOfBlocks: big.NewInt(tx.Args["numberOfBlocks"].(int64)),
+			StartBlock:     big.NewInt(tx.Args["startBlock"].(int64)),
 			//encryptionPublicKey: strings.Split(tx.Args["encryptionPublicKey"].(string), ","),
-			EncryptionPublicKey: tx.Args["encryptionPublicKey"].(string),
-			Timestamp:           int64(tx.Args["timestamp"].(float64)),
-			ProcessID:           tx.Args["processId"].(string),
+			EncryptionPrivateKey: tx.Args["encryptionPrivateKey"].(string),
+			Timestamp:            int64(tx.Args["timestamp"].(int64)),
+			ProcessID:            tx.Args["processId"].(string),
 		}
 		// sanity check done
 		return t, nil
@@ -292,7 +293,7 @@ func (tx *Tx) validateVoteTxArgs() (TxArgs, error) {
 			ProcessID:   tx.Args["processId"].(string),
 			Nullifier:   tx.Args["nullifier"].(string),
 			Nonce:       tx.Args["nonce"].(string),
-			VotePackage: tx.Args["votePackage"].([]byte),
+			VotePackage: tx.Args["votePackage"].(string),
 			Proof:       tx.Args["proof"].(string),
 			Signature:   tx.Args["signature"].(string),
 			Timestamp:   int64(tx.Args["timestamp"].(float64)),

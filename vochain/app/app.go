@@ -116,13 +116,13 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		// check if process exists
 		if _, ok := app.deliverTxState.Processes[npta.ProcessID]; !ok {
 			app.deliverTxState.Processes[npta.ProcessID] = &voctypes.Process{
-				EntityAddress:       npta.EntityAddress,
-				Votes:               make(map[string]*voctypes.Vote, 0),
-				MkRoot:              npta.MkRoot,
-				NumberOfBlocks:      npta.NumberOfBlocks,
-				StartBlock:          npta.StartBlock,
-				CurrentState:        voctypes.Scheduled,
-				EncryptionPublicKey: npta.EncryptionPublicKey,
+				EntityAddress:        npta.EntityAddress,
+				Votes:                make(map[string]*voctypes.Vote, 0),
+				MkRoot:               npta.MkRoot,
+				NumberOfBlocks:       npta.NumberOfBlocks,
+				StartBlock:           npta.StartBlock,
+				CurrentState:         voctypes.Scheduled,
+				EncryptionPrivateKey: npta.EncryptionPrivateKey,
 			}
 			vlog.Infof("new process %s", npta.ProcessID)
 			vlog.Debugf("process ID data: %+v", app.deliverTxState.Processes[npta.ProcessID])
