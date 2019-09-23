@@ -207,6 +207,18 @@ func TestCensus(t *testing.T) {
 		t.Errorf("got invalid root")
 	}
 
+	// getRoot from published census and check censusID=root
+	req.Method = "getRoot"
+	req.CensusID = root
+	resp, err = sendCensusReq(req, signer2, false)
+	t.Logf("getRoot response of published census %+v", resp)
+	if !resp.Ok {
+		t.Errorf("fail on getRoot of published census")
+	}
+	if root != resp.Root {
+		t.Errorf("got invalid root from published census")
+	}
+
 	// add second census
 	req.Method = "addCensus"
 	req.CensusID = "importTest"

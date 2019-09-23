@@ -11,6 +11,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	crypto "github.com/ethereum/go-ethereum/crypto"
+	poseidon "github.com/iden3/go-iden3-crypto/poseidon"
 )
 
 // AddressLength is the lenght of an Ethereum address
@@ -322,6 +323,15 @@ func Hash(data string) []byte {
 // HashRaw hashes a string with no prefix
 func HashRaw(data string) []byte {
 	return crypto.Keccak256([]byte(data))
+}
+
+// HashPoseidon hash a string using Poseidon hash function
+func HashPoseidon(data string) []byte {
+	hashNum, err := poseidon.HashBytes([]byte(data))
+	if err != nil {
+		return []byte{}
+	}
+	return hashNum.Bytes()
 }
 
 func sanitizeHex(hexStr string) string {

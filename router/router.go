@@ -101,24 +101,29 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	request.structured = msgStruct.Request
 	request.method = msgStruct.Request.Method
 	if request.method == "" {
-		return request, errors.New("method not found")
+		return request, errors.New("method is empty")
 	}
 	methodFunc := r.publicRequestMap[request.method]
 	request.private = false
 	if methodFunc == nil {
 		methodFunc = r.privateRequestMap[request.method]
 		if methodFunc != nil {
+			// if method is Private
 			request.private = true
 			request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.Request, msgStruct.Signature)
+			// if no authrized keys, authenticate all requests
+			if !request.authenticated && len(r.signer.Authorized) == 0 {
+				request.authenticated = true
+			}
 		} else {
-			return request, errors.New("method not valid")
+			// if method not found
+			return request, errors.New(fmt.Sprintf("method not valid [%s]", request.method))
 		}
-	}
-	// if no authrized keys, authenticate all requests
-	if len(r.signer.Authorized) == 0 {
+	} else {
+		// if method is Public
 		request.authenticated = true
+		request.address = "00000000000000000000"
 	}
-
 	request.id = msgStruct.ID
 	request.context = context
 	/*assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)

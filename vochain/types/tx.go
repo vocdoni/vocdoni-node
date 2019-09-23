@@ -142,21 +142,34 @@ func (n *NewProcessTxArgs) String() string {
 }
 
 // VoteTxArgs represents the data required in order to cast a vote
+const VOteTxArgsSize = 6
+
 type VoteTxArgs struct {
-	// ProcessID the id of the process
-	ProcessID string `json:"processId"`
-	// Nullifier for the vote, unique identifyer
-	Nullifier string `json:"nullifier"`
 	// Nonce for avoid replay attacks
-	Nonce string `json:"nonce"`
-	// VotePackage vote data
-	VotePackage string `json:"votePackage"`
+	Nonce string `json:"nonce,omitempty"`
+	// Nullifier for the vote, unique identifyer
+	Nullifier string `json:"nullifier,omitempty"`
+	// ProcessID the id of the process
+	ProcessID string `json:"processId,omitempty"`
 	// Proof proof inclusion into the census of the process
-	Proof string `json:"proof"`
+	Proof string `json:"proof,omitempty"`
 	// Signature sign( JSON.stringify( { nonce, processId, proof, 'vote-package' } ), privateKey )
-	Signature string `json:"signature"`
-	// Timestamp for avoid flooding atacks
-	Timestamp int64 `json:"timestamp"`
+	Signature string `json:"signature,omitempty"`
+	// VotePackage vote data
+	VotePackage string `json:"vote-package,omitempty"`
+}
+
+type VoteTxArgsSigned struct {
+	// Nonce for avoid replay attacks
+	Nonce string `json:"nonce,omitempty"`
+	// Nullifier for the vote, unique identifyer
+	Nullifier string `json:"nullifier,omitempty"`
+	// ProcessID the id of the process
+	ProcessID string `json:"processId,omitempty"`
+	// Proof proof inclusion into the census of the process
+	Proof string `json:"proof,omitempty"`
+	// VotePackage vote data
+	VotePackage string `json:"vote-package,omitempty"`
 }
 
 func (n *VoteTxArgs) String() string {
@@ -168,15 +181,13 @@ func (n *VoteTxArgs) String() string {
 		"votePackage": "%s",
 		"processId": "%s",
 		"nonce": "%s",
-		"signature": "%s",
-		"timestamp: %d }}`,
+		"signature": "%s" }}`,
 		n.Proof,
 		n.Nullifier,
 		n.VotePackage,
 		n.ProcessID,
 		n.Nonce,
 		n.Signature,
-		n.Timestamp,
 	)
 }
 
@@ -273,7 +284,7 @@ func (tx *Tx) validateVoteTxArgs() (TxArgs, error) {
 	var t TxArgs
 
 	// invalid length
-	if len(tx.Args) != 7 {
+	if len(tx.Args) != VOteTxArgsSize {
 		return nil, errors.New("Invalid args number")
 	}
 
@@ -296,13 +307,12 @@ func (tx *Tx) validateVoteTxArgs() (TxArgs, error) {
 			VotePackage: tx.Args["votePackage"].(string),
 			Proof:       tx.Args["proof"].(string),
 			Signature:   tx.Args["signature"].(string),
-			Timestamp:   int64(tx.Args["timestamp"].(float64)),
 		}
 		// sanity check done
 		return t, nil
 
 	}
-	return nil, fmt.Errorf("cannot parse %v", errMsg)
+	return nil, fmt.Errorf("cannot parse %s", errMsg)
 }
 
 /*
