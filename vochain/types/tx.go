@@ -3,6 +3,7 @@ package vochain
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	tmtypes "github.com/tendermint/tendermint/types"
 	eth "gitlab.com/vocdoni/go-dvote/crypto/signature"
@@ -71,9 +72,7 @@ func (m *TxMethod) String() string {
 
 var (
 	newProcessTxArgsKeys = []string{
-		"entityId",
-		"entityResolver",
-		"metadataHash",
+		"entityAddress",
 		"mkRoot",
 		"numberOfBlocks",
 		"processId",
@@ -105,21 +104,17 @@ type TxArgs interface {
 type NewProcessTxArgs struct {
 	ProcessID string `json:"processId"`
 	// EntityID the process belongs to
-	EntityID string `json:"entityId"`
-	// EntityResolver the resolver of the entity
-	EntityResolver string `json:"entityResolver"`
-	// MetadataHash hash of the entity metadata
-	MetadataHash string `json:"metadataHash"`
+	EntityAddress string `json:"entityAddress"`
 	// MkRoot merkle root of all the census in the process
 	MkRoot string `json:"mkRoot"`
 	// NumberOfBlocks represents the tendermint block where the process
 	// goes from active to finished
-	NumberOfBlocks int64 `json:"numberOfBlocks"`
+	NumberOfBlocks *big.Int `json:"numberOfBlocks"`
 	// StartBlock represents the tendermint block where the process goes
 	// from scheduled to active
-	StartBlock int64 `json:"startBlock"`
-	// encryptionPublicKey are the keys required to encrypt the votes
-	EncryptionPublicKey string `json:"encryptionPublicKey"`
+	StartBlock *big.Int `json:"startBlock"`
+	// EncryptionPrivateKey are the keys required to encrypt the votes
+	EncryptionPrivateKey string `json:"encryptionPrivateKey"`
 	// Timestamp for avoid flooding atacks
 	Timestamp int64 `json:"timestamp"`
 }
@@ -128,43 +123,50 @@ func (n *NewProcessTxArgs) String() string {
 	return fmt.Sprintf(`{
 		"method": "newProcessTx",
 		"args" : {
-		"encryptionPublicKey": "%s", 
-		"entityId": "%s", 
-		"entityResolver": "%s",
+		"encryptionPrivateKey": "%s", 
+		"entityAddress": "%s", 
 		"startBlock": %d, 
-		"metadataHash": "%s", 
 		"mkRoot": "%s", 
 		"numberOfBlocks": %d,
-		"processId": "%s",
-		"timestamp": %d}}`,
-		n.EncryptionPublicKey,
-		n.EntityID,
-		n.EntityResolver,
+		"processId": "%s" }}`,
+		n.EncryptionPrivateKey,
+		n.EntityAddress,
 		n.StartBlock,
-		n.MetadataHash,
 		n.MkRoot,
 		n.NumberOfBlocks,
 		n.ProcessID,
-		n.Timestamp,
 	)
 }
 
 // VoteTxArgs represents the data required in order to cast a vote
+const VOteTxArgsSize = 6
+
 type VoteTxArgs struct {
-	// ProcessID the id of the process
-	ProcessID string `json:"processId"`
-	// Nullifier for the vote, unique identifyer
-	Nullifier string `json:"nullifier"`
 	// Nonce for avoid replay attacks
-	Nonce string `json:"nonce"`
-	// VotePackage vote data
-	VotePackage string `json:"votePackage"`
+	Nonce string `json:"nonce,omitempty"`
+	// Nullifier for the vote, unique identifyer
+	Nullifier string `json:"nullifier,omitempty"`
+	// ProcessID the id of the process
+	ProcessID string `json:"processId,omitempty"`
 	// Proof proof inclusion into the census of the process
-	Proof string `json:"proof"`
+	Proof string `json:"proof,omitempty"`
 	// Signature sign( JSON.stringify( { nonce, processId, proof, 'vote-package' } ), privateKey )
-	Signature string `json:"signature"`
-	// Timestamp for avoid flooding atacks
-	Timestamp int64 `json:"timestamp"`
+	Signature string `json:"signature,omitempty"`
+	// VotePackage vote data
+	VotePackage string `json:"vote-package,omitempty"`
+}
+
+type VoteTxArgsSigned struct {
+	// Nonce for avoid replay attacks
+	Nonce string `json:"nonce,omitempty"`
+	// Nullifier for the vote, unique identifyer
+	Nullifier string `json:"nullifier,omitempty"`
+	// ProcessID the id of the process
+	ProcessID string `json:"processId,omitempty"`
+	// Proof proof inclusion into the census of the process
+	Proof string `json:"proof,omitempty"`
+	// VotePackage vote data
+	VotePackage string `json:"vote-package,omitempty"`
 }
 
 func (n *VoteTxArgs) String() string {
@@ -176,15 +178,13 @@ func (n *VoteTxArgs) String() string {
 		"votePackage": "%s",
 		"processId": "%s",
 		"nonce": "%s",
-		"signature": "%s",
-		"timestamp: %d }}`,
+		"signature": "%s" }}`,
 		n.Proof,
 		n.Nullifier,
 		n.VotePackage,
 		n.ProcessID,
 		n.Nonce,
 		n.Signature,
-		n.Timestamp,
 	)
 }
 
@@ -245,7 +245,7 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 	var t TxArgs
 
 	// invalid length
-	if len(tx.Args) != 9 {
+	if len(tx.Args) != 7 {
 		return t, errors.New("Invalid args number")
 	}
 
@@ -262,16 +262,14 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 	// create tx args specific struct
 	if allOk {
 		t = &NewProcessTxArgs{
-			EntityID:       tx.Args["entityId"].(string),
-			EntityResolver: tx.Args["entityResolver"].(string),
-			MetadataHash:   tx.Args["metadataHash"].(string),
+			EntityAddress:  tx.Args["entityAddress"].(string),
 			MkRoot:         tx.Args["mkRoot"].(string),
-			NumberOfBlocks: int64(tx.Args["numberOfBlocks"].(float64)),
-			StartBlock:     int64(tx.Args["startBlock"].(float64)),
+			NumberOfBlocks: big.NewInt(tx.Args["numberOfBlocks"].(int64)),
+			StartBlock:     big.NewInt(tx.Args["startBlock"].(int64)),
 			//encryptionPublicKey: strings.Split(tx.Args["encryptionPublicKey"].(string), ","),
-			EncryptionPublicKey: tx.Args["encryptionPublicKey"].(string),
-			Timestamp:           int64(tx.Args["timestamp"].(float64)),
-			ProcessID:           tx.Args["processId"].(string),
+			EncryptionPrivateKey: tx.Args["encryptionPrivateKey"].(string),
+			Timestamp:            int64(tx.Args["timestamp"].(int64)),
+			ProcessID:            tx.Args["processId"].(string),
 		}
 		// sanity check done
 		return t, nil
@@ -283,7 +281,7 @@ func (tx *Tx) validateVoteTxArgs() (TxArgs, error) {
 	var t TxArgs
 
 	// invalid length
-	if len(tx.Args) != 7 {
+	if len(tx.Args) != VOteTxArgsSize {
 		return nil, errors.New("Invalid args number")
 	}
 
@@ -306,13 +304,12 @@ func (tx *Tx) validateVoteTxArgs() (TxArgs, error) {
 			VotePackage: tx.Args["votePackage"].(string),
 			Proof:       tx.Args["proof"].(string),
 			Signature:   tx.Args["signature"].(string),
-			Timestamp:   int64(tx.Args["timestamp"].(float64)),
 		}
 		// sanity check done
 		return t, nil
 
 	}
-	return nil, fmt.Errorf("cannot parse %v", errMsg)
+	return nil, fmt.Errorf("cannot parse %s", errMsg)
 }
 
 /*

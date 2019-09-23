@@ -1,7 +1,6 @@
 package chain
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,6 +31,7 @@ type QuestionMetadata struct {
 	VoteOptions []VoteOption      `json:"voteOptions"`
 }
 
+/*
 type ProcessMetadata struct {
 	Version        string `json:"version"`
 	Type           string `json:"type"`
@@ -50,9 +50,10 @@ type ProcessMetadata struct {
 		Questions           []QuestionMetadata `json:"questions"`
 	}
 }
+*/
 
 // Constructor for proc_transactor on node
-func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*ProcessHandle, error) {
+func NewVotingProcessHandle(contractAddressHex string) (*ProcessHandle, error) {
 	client, err := ethclient.Dial("https://gwdev1.vocdoni.net/web3")
 	if err != nil {
 		log.Error(err)
@@ -67,29 +68,23 @@ func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*P
 	PH := new(ProcessHandle)
 	PH.VotingProcess = votingProcess
 
-	PH.storage = storage
 	return PH, nil
 }
 
-func (ph *ProcessHandle) GetProcessMetadata(pid [32]byte) (*vochain.NewProcessTxArgs, error) {
+func (ph *ProcessHandle) GetProcessData(pid [32]byte) (*vochain.NewProcessTxArgs, error) {
 	processMeta, err := ph.VotingProcess.Get(nil, pid)
 	if err != nil {
 		log.Errorf("Error fetching process metadata from Ethereum: %s", err)
 	}
-	processInfo, err := ph.storage.Retrieve(processMeta.Metadata)
-	if err != nil {
-		log.Errorf("Error fetching process info from IFPS: %s", err)
-	}
+	log.Debugf("PROCESS META: %+v", processMeta)
 
-	processInfoStructured := new(ProcessMetadata)
-	json.Unmarshal(processInfo, &processInfoStructured)
 	processTxArgs := new(vochain.NewProcessTxArgs)
 	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
-	processTxArgs.EntityID = processMeta.EntityAddress.String()
-	processTxArgs.MkRoot = processInfoStructured.Census.MerkleRoot
-	processTxArgs.NumberOfBlocks = processInfoStructured.NumberOfBlocks
-	processTxArgs.StartBlock = processInfoStructured.StartBlock
-	processTxArgs.EncryptionPublicKey = processInfoStructured.Details.EncryptionPublicKey
+	processTxArgs.EntityAddress = processMeta.EntityAddress.String()
+	processTxArgs.MkRoot = processMeta.CensusMerkleRoot
+	processTxArgs.NumberOfBlocks = processMeta.NumberOfBlocks
+	processTxArgs.StartBlock = processMeta.StartBlock
+	processTxArgs.EncryptionPrivateKey = processMeta.VoteEncryptionPrivateKey
 
 	return processTxArgs, nil
 }

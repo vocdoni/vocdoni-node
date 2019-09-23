@@ -2,43 +2,44 @@ package vochain
 
 import (
 	"fmt"
+	"math/big"
 )
 
 // ________________________ PROCESS ________________________
 
 // Process represents a state per process
 type Process struct {
-	// EntityID identifies unequivocally a process
-	EntityID string `json:"entityId"`
+	// EntityAddress identifies unequivocally a process
+	EntityAddress string `json:"entityAddress"`
 	// Votes is a list containing all the processed and valid votes (here votes are final)
 	Votes map[string]*Vote `json:"votes"`
 	// MkRoot merkle root of all the census in the process
 	MkRoot string `json:"mkroot"`
 	// NumberOfBlocks represents the amount of tendermint blocks that the process will last
-	NumberOfBlocks int64 `json:"numberOfBlocks"`
+	NumberOfBlocks *big.Int `json:"numberOfBlocks"`
 	// StartBlock represents the tendermint block where the process goes from scheduled to active
-	StartBlock int64 `json:"startBlock"`
+	StartBlock *big.Int `json:"startBlock"`
 	// CurrentState is the current process state
 	CurrentState CurrentProcessState `json:"currentState"`
-	// EncryptionPublicKey are the keys required to encrypt the votes
-	EncryptionPublicKey string `json:"encryptionPublicKey"`
+	// EncryptionPrivateKey are the keys required to encrypt the votes
+	EncryptionPrivateKey string `json:"encryptionPrivateKey"`
 }
 
 func (p *Process) String() string {
 	return fmt.Sprintf(`{
-		"entityId": %v,
+		"entityAddress": %s,
 		"votes": %v,
-		"mkRoot": %v,
+		"mkRoot": %s,
 		"startBlock": %v,
 		"numberOfBlocks": %v,
-		"encryptionKeys": %v,
+		"encryptionPrivateKey": %s,
 		"currentState": %v }`,
-		p.EntityID,
+		p.EntityAddress,
 		p.Votes,
 		p.MkRoot,
 		p.StartBlock,
 		p.NumberOfBlocks,
-		p.EncryptionPublicKey,
+		p.EncryptionPrivateKey,
 		p.CurrentState,
 	)
 }
