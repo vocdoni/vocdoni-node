@@ -141,8 +141,8 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			// check if vote is already submitted
 			if _, ok := app.deliverTxState.Processes[vta.ProcessID].Votes[vta.Nullifier]; !ok {
 				app.deliverTxState.Processes[vta.ProcessID].Votes[vta.Nullifier] = &voctypes.Vote{
-					Payload:     vta.Payload,
-					CensusProof: vta.CensusProof,
+					VotePackage: vta.VotePackage,
+					Proof:       vta.Proof,
 				}
 			} else {
 				vlog.Debug("vote already submitted")
@@ -241,6 +241,25 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 
 // Query query for data from the application at current or past height.
 func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
+	var queryData voctypes.QueryData
+	err := json.Unmarshal(req.Data, &queryData)
+	if err != nil {
+		vlog.Warnf("cannot unmarshall query request")
+		return abcitypes.ResponseQuery{Code: 1}
+	}
+	switch queryData.Method {
+	case "getEnvelopeStatus":
+		//app.db.Get()
+	case "getEnvelope":
+	case "getEnvelopeHeight":
+	case "getProcessList":
+	case "getEnvelopeList":
+	case "getChainHeight":
+	default:
+		vlog.Warnf("unrecognized method")
+		return abcitypes.ResponseQuery{Code: 1}
+	}
+
 	return abcitypes.ResponseQuery{Code: 0}
 }
 

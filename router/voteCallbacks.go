@@ -15,7 +15,7 @@ func submitEnvelope(request routerRequest, router *Router) {
 	voteTxArgs := new(vochain.VoteTxArgs)
 	voteTxArgs.ProcessID = request.structured.ProcessId
 	voteTxArgs.Nullifier = request.structured.Nullifier
-	voteTxArgs.Payload = request.structured.Payload
+	//voteTxArgs.Payload = request.structured.Payload
 	voteTxArgs.Timestamp = int64(request.structured.Timestamp)
 
 	voteTxBytes := []byte(voteTxArgs.String())

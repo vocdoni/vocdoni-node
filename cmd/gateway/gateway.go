@@ -181,7 +181,7 @@ func newConfig() (config.GWCfg, error) {
 func addKeyFromEncryptedJSON(keyJSON []byte, passphrase string, signKeys *sig.SignKeys) error {
 	key, err := keystore.DecryptKey(keyJSON, passphrase)
 	if err != nil {
-		return err
+		return err // Storage
 	}
 	signKeys.Private = key.PrivateKey
 	signKeys.Public = &key.PrivateKey.PublicKey
@@ -288,7 +288,7 @@ func main() {
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
 		go func() {
 			for {
-				time.Sleep(60 * time.Second)
+				time.Sleep(15 * time.Second)
 				if node.Eth != nil {
 					log.Infof("[ethereum info] peers:%d synced:%t block:%s",
 						node.Node.Server().PeerCount(),
@@ -407,28 +407,6 @@ func main() {
 			vnode.Wait()
 		}()
 
-		/*		// checking if Eth node is synced
-				orc, err := oracle.NewOracle(node, app, globalCfg.Vochain.Contract, storage)
-				if err != nil {
-					log.Fatalf("couldn't create oracle: %s", err.Error())
-				}
-
-				go func() {
-					if node.Eth != nil {
-						for {
-							if node.Eth.Synced() {
-								log.Info("ethereum node fully synced, starting Oracle")
-								orc.ReadEthereumEventLogs(1000000, 1314200, globalCfg.Vochain.Contract)
-								return
-							}
-							time.Sleep(10 * time.Second)
-							log.Debug("waiting for ethereum to sync before starting Oracle")
-						}
-					} else {
-						time.Sleep(time.Second * 1)
-					}
-				}()
-		*/
 	}
 
 	// API Endpoint initialization

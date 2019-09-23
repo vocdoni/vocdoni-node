@@ -83,9 +83,11 @@ var (
 	}
 	voteTxArgsKeys = []string{
 		"processId",
+		"proof",
 		"nullifier",
-		"payload",
-		"censusProof",
+		"nonce",
+		"votePackage",
+		"signature",
 		"timestamp",
 	}
 	listUpdatesArgsKeys = []string{
@@ -153,10 +155,14 @@ type VoteTxArgs struct {
 	ProcessID string `json:"processId"`
 	// Nullifier for the vote, unique identifyer
 	Nullifier string `json:"nullifier"`
-	// Payload vote data
-	Payload string `json:"payload"`
-	// CensusProof proof inclusion into the census of the process
-	CensusProof string `json:"censusProof"`
+	// Nonce for avoid replay attacks
+	Nonce string `json:"nonce"`
+	// VotePackage vote data
+	VotePackage []byte `json:"votePackage"`
+	// Proof proof inclusion into the census of the process
+	Proof string `json:"proof"`
+	// Signature sign( JSON.stringify( { nonce, processId, proof, 'vote-package' } ), privateKey )
+	Signature string `json:"signature"`
 	// Timestamp for avoid flooding atacks
 	Timestamp int64 `json:"timestamp"`
 }
@@ -165,15 +171,19 @@ func (n *VoteTxArgs) String() string {
 	return fmt.Sprintf(`{
 		"method": voteTx,
 		"args" : {
-		"censusProof": "%s",
+		"proof": "%s",
 		"nullifier": "%s",
-		"payload": "%s",
+		"votePackage": "%s",
 		"processId": "%s",
+		"nonce": "%s",
+		"signature": "%s",
 		"timestamp: %d }}`,
-		n.CensusProof,
+		n.Proof,
 		n.Nullifier,
-		n.Payload,
+		n.VotePackage,
 		n.ProcessID,
+		n.Nonce,
+		n.Signature,
 		n.Timestamp,
 	)
 }
@@ -251,7 +261,6 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 
 	// create tx args specific struct
 	if allOk {
-
 		t = &NewProcessTxArgs{
 			EntityID:       tx.Args["entityId"].(string),
 			EntityResolver: tx.Args["entityResolver"].(string),
@@ -266,7 +275,6 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 		}
 		// sanity check done
 		return t, nil
-
 	}
 	return nil, fmt.Errorf("cannot parse %v", errMsg)
 }
@@ -275,7 +283,7 @@ func (tx *Tx) validateVoteTxArgs() (TxArgs, error) {
 	var t TxArgs
 
 	// invalid length
-	if len(tx.Args) != 5 {
+	if len(tx.Args) != 7 {
 		return nil, errors.New("Invalid args number")
 	}
 
@@ -294,8 +302,10 @@ func (tx *Tx) validateVoteTxArgs() (TxArgs, error) {
 		t = &VoteTxArgs{
 			ProcessID:   tx.Args["processId"].(string),
 			Nullifier:   tx.Args["nullifier"].(string),
-			Payload:     tx.Args["payload"].(string),
-			CensusProof: tx.Args["censusProof"].(string),
+			Nonce:       tx.Args["nonce"].(string),
+			VotePackage: tx.Args["votePackage"].([]byte),
+			Proof:       tx.Args["proof"].(string),
+			Signature:   tx.Args["signature"].(string),
 			Timestamp:   int64(tx.Args["timestamp"].(float64)),
 		}
 		// sanity check done

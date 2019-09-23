@@ -4,14 +4,8 @@ package config
 type GWCfg struct {
 	W3      W3Cfg
 	Vochain VochainCfg
-	Ipfs    struct {
-		ConfigPath string
-		Daemon     string
-		NoInit     bool
-		SyncKey    string
-		SyncPeers  []string
-	}
-	Dvote struct {
+	Ipfs    IPFSCfg
+	Dvote   struct {
 		Host string
 		Port int
 	}
@@ -27,12 +21,8 @@ type GWCfg struct {
 			Enabled bool
 		}
 	}
-	Client struct {
-		AllowPrivate bool
-		AllowedAddrs string
-		SigningKey   string
-	}
-	Ssl struct {
+	Client EthereumClient
+	Ssl    struct {
 		Domain  string
 		DirCert string
 	}
@@ -42,6 +32,20 @@ type GWCfg struct {
 	LogOutput  string
 	DataDir    string
 	W3external string
+}
+
+type IPFSCfg struct {
+	ConfigPath string
+	Daemon     string
+	NoInit     bool
+	SyncKey    string
+	SyncPeers  []string
+}
+
+type EthereumClient struct {
+	AllowPrivate bool
+	AllowedAddrs string
+	SigningKey   string
 }
 
 //PssCfg stores global configs for Pss chat
@@ -122,4 +126,16 @@ type VochainCfg struct {
 	KeyFile          string
 	MinerKeyFile     string
 	Contract         string
+}
+
+type OracleCfg struct {
+	EthereumConfig W3Cfg
+	EthereumClient EthereumClient
+	VochainConfig  VochainCfg
+	// The expected VochainClient field does not exists because no needs config
+	IpfsConfig IPFSCfg
+	LogLevel   string
+	LogOutput  string
+	DataDir    string
+	W3external string
 }
