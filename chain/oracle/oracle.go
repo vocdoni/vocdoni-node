@@ -18,7 +18,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain"
 	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/log"
-	app "gitlab.com/vocdoni/go-dvote/vochain/app"
+	app "gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 // Oracle represents an oracle with a connection to Ethereum and Vochain

@@ -12,8 +12,8 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
+	vochainApp "gitlab.com/vocdoni/go-dvote/vochain"
 	vochainClient "gitlab.com/vocdoni/go-dvote/vochain/client"
-	vochainApp "gitlab.com/vocdoni/go-dvote/vochain/app"
 
 	"encoding/json"
 )

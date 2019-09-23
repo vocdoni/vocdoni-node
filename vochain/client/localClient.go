@@ -1,4 +1,4 @@
-package vochain
+package vochaincli
 
 // From: https://github.com/tendermint/tendermint/blob/master/abci/client/local_client.go
 

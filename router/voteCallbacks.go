@@ -8,13 +8,14 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain/types"
+	vochain "gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 func submitEnvelope(request routerRequest, router *Router) {
 	voteTxArgs := new(vochain.VoteTxArgs)
 	voteTxArgs.ProcessID = request.structured.ProcessId
 	voteTxArgs.Nullifier = request.structured.Nullifier
+	//voteTxArgs.Payload = request.structured.Payload
 	voteTxArgs.VotePackage = request.structured.Payload
 
 	voteTxBytes := []byte(voteTxArgs.String())
