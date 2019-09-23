@@ -101,7 +101,7 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	request.structured = msgStruct.Request
 	request.method = msgStruct.Request.Method
 	if request.method == "" {
-		return request, errors.New("method not found")
+		return request, errors.New("method is empty")
 	}
 	methodFunc := r.publicRequestMap[request.method]
 	request.private = false
@@ -117,7 +117,7 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 			}
 		} else {
 			// if method not found
-			return request, errors.New("method not valid")
+			return request, errors.New(fmt.Sprintf("method not valid [%s]", request.method))
 		}
 	} else {
 		// if method is Public
