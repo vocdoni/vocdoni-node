@@ -187,7 +187,9 @@ func (o *Oracle) SubscribeToEthereumContract(address string) {
 	}
 }
 
-func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) interface{} {
+func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) map[int]string {
+	outMap := make(map[int]string)
+
 	log.Debug(o.ethereumConnection.Node.WSEndpoint())
 
 	client, err := ethclient.Dial("http://localhost:9091")
@@ -241,6 +243,7 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 	HashLogPrivateKeyPublished := crypto.Keccak256Hash(logPrivateKeyPublished)
 	HashLogResultsPublished := crypto.Keccak256Hash(logResultsPublished)
 
+	count := 0
 	for _, vLog := range logs {
 		//fmt.Println(vLog.BlockHash.Hex()) // 0x3404b8c050aa0aacd0223e91b5c32fee6400f357764771d0684fa7b3f448f1a8
 		//fmt.Println(vLog.BlockNumber)     // 2394201
@@ -283,9 +286,6 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			log.Debugf("Pprocess index loaded: %v", processIdx)
 
 			processInfo, err := o.processHandle.GetProcessData(eventProcessCreated.ProcessId)
-
-			//pinfoMarshal := []byte(processInfo.String())
-
 			//testTx := abci.RequestDeliverTx{
 			//	Tx: pinfoMarshal,
 			//}
@@ -295,23 +295,19 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			//processes, err := votingContract.Get(nil, eventProcessCreated.ProcessId)
 
 			//processInfo, err := o.storage.Retrieve(processes.Metadata)
+
 			if err != nil {
 				log.Errorf("error fetching process metadata from chain module: %s", err)
 			}
-			log.Debugf("process info: %+v", processInfo)
-			if err != nil {
-				log.Warnf("cannot get process given the index: %v", err)
-			}
-			//log.Fatalf("PROCESS LOADED: %v", processInfo)
-			_, err = o.processHandle.GetOracles()
-			if err != nil {
-				log.Errorf("error getting oracles: %s", err)
-			}
-
-			_, err = o.processHandle.GetValidators()
-			if err != nil {
-				log.Errorf("error getting validators: %s", err)
-			}
+			/*
+				log.Debugf("process info: %+v", processInfo)
+				if err != nil {
+					log.Warnf("cannot get process given the index: %v", err)
+				}
+			*/
+			tx := processInfo.String()
+			outMap[count] = tx
+			count++
 
 		case HashLogProcessCanceled.Hex():
 			//stub
@@ -328,7 +324,7 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 			log.Debugf("added event data: %v", vLog.Data)
 			err := contractABI.Unpack(&eventAddOracle, "OracleAdded", vLog.Data)
 			if err != nil {
-				return err
+				return nil // TBD
 			}
 			log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
 			//stub
@@ -345,5 +341,5 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) inte
 		}
 
 	}
-	return nil
+	return outMap
 }

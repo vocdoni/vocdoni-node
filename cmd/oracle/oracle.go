@@ -43,6 +43,9 @@ import (
 	oracle "gitlab.com/vocdoni/go-dvote/chain/oracle"
 	"gitlab.com/vocdoni/go-dvote/log"
 	app "gitlab.com/vocdoni/go-dvote/vochain/app"
+
+	//vclient "gitlab.com/vocdoni/go-dvote/vochain/client"
+	rpccli "github.com/tendermint/tendermint/rpc/client"
 )
 
 func newConfig() (config.OracleCfg, error) {
@@ -175,11 +178,14 @@ func main() {
 	}
 
 	log.Debugf("initializing vochain with tendermint config %s", globalCfg.VochainConfig)
-	_, vnode := vochain.Start(globalCfg.VochainConfig, db)
+	app, vnode := vochain.Start(globalCfg.VochainConfig, db)
 	defer func() {
 		vnode.Stop()
 		vnode.Wait()
 	}()
+
+	// start vochain client
+	//client := vclient.NewLocalClient(nil, app)
 
 	// start ethereum node
 
@@ -298,11 +304,20 @@ func main() {
 
 	go func() {
 		if node.Eth != nil {
+			tmRPC := rpccli.NewHTTP("http://localhost:26657", "/websocket")
 			for {
 				if node.Eth.Synced() {
 					log.Info("ethereum node fully synced, starting Oracle")
-					orc.ReadEthereumEventLogs(1000000, 1348906, globalCfg.VochainConfig.Contract)
-					return
+					logs := orc.ReadEthereumEventLogs(1000000, 1348906, globalCfg.VochainConfig.Contract)
+					for _, v := range logs {
+						log.Debugf("Logs: %+v", v)
+						res, err := tmRPC.BroadcastTxSync([]byte(v))
+						if err != nil {
+							fmt.Println(err)
+						}
+						log.Infof("Res: %+v", res)
+					}
+					break
 				}
 				time.Sleep(10 * time.Second)
 				log.Debug("waiting for ethereum to sync before starting Oracle")

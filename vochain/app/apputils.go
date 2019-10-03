@@ -26,7 +26,7 @@ func ValidateTx(content []byte, appDb *dbm.GoLevelDB) (voctypes.ValidTx, error) 
 	if err != nil {
 		return vt, err
 	}
-	log.Debugf("Unmarshaled content: %v", t)
+	//log.Debugf("Unmarshaled content: %v", t)
 	// validate method name
 	m := t.ValidateMethod()
 	if m == voctypes.InvalidTx {

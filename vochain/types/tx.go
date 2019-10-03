@@ -77,8 +77,7 @@ var (
 		"numberOfBlocks",
 		"processId",
 		"startBlock",
-		"encryptionPublicKey",
-		"timestamp",
+		"encryptionPrivateKey",
 	}
 	voteTxArgsKeys = []string{
 		"processId",
@@ -115,8 +114,6 @@ type NewProcessTxArgs struct {
 	StartBlock *big.Int `json:"startBlock"`
 	// EncryptionPrivateKey are the keys required to encrypt the votes
 	EncryptionPrivateKey string `json:"encryptionPrivateKey"`
-	// Timestamp for avoid flooding atacks
-	Timestamp int64 `json:"timestamp"`
 }
 
 func (n *NewProcessTxArgs) String() string {
@@ -245,7 +242,7 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 	var t TxArgs
 
 	// invalid length
-	if len(tx.Args) != 7 {
+	if len(tx.Args) != 6 {
 		return t, errors.New("Invalid args number")
 	}
 
@@ -264,11 +261,10 @@ func (tx *Tx) validateNewProcessTxArgs() (TxArgs, error) {
 		t = &NewProcessTxArgs{
 			EntityAddress:  tx.Args["entityAddress"].(string),
 			MkRoot:         tx.Args["mkRoot"].(string),
-			NumberOfBlocks: big.NewInt(tx.Args["numberOfBlocks"].(int64)),
-			StartBlock:     big.NewInt(tx.Args["startBlock"].(int64)),
+			NumberOfBlocks: big.NewInt(int64(tx.Args["numberOfBlocks"].(float64))),
+			StartBlock:     big.NewInt(int64(tx.Args["startBlock"].(float64))),
 			//encryptionPublicKey: strings.Split(tx.Args["encryptionPublicKey"].(string), ","),
 			EncryptionPrivateKey: tx.Args["encryptionPrivateKey"].(string),
-			Timestamp:            int64(tx.Args["timestamp"].(int64)),
 			ProcessID:            tx.Args["processId"].(string),
 		}
 		// sanity check done

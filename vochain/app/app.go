@@ -101,7 +101,7 @@ func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Respo
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	// we can't commit transactions inside the DeliverTx because in such case Query, which may be called in parallel, will return inconsistent data
 	// split incomin tx
-	vlog.Debugf("validateTX ARGS: %s", string(req.Tx))
+	vlog.Debugf("validateTX content: %s", string(req.Tx))
 	tx, err := ValidateTx(req.Tx, app.db.(*dbm.GoLevelDB))
 	if err != nil {
 		vlog.Warn(err)
