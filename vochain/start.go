@@ -121,6 +121,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 
 	tconfig.P2P.AddrBookStrict = false
 	tconfig.P2P.SeedMode = localConfig.SeedMode
+	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
 
 	if localConfig.Genesis != "" {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
