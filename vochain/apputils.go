@@ -8,14 +8,13 @@ import (
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	tree "gitlab.com/vocdoni/go-dvote/tree"
-	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
 // ValidateTx splits a tx into method and args parts and does some basic checks
-func ValidateTx(content []byte, appDb *dbm.GoLevelDB) (voctypes.ValidTx, error) {
+func ValidateTx(content []byte, appDb *dbm.GoLevelDB) (ValidTx, error) {
 
-	var t voctypes.Tx
-	var vt voctypes.ValidTx
+	var t Tx
+	var vt ValidTx
 	var err error
 
 	err = json.Unmarshal(content, &t)
@@ -29,7 +28,7 @@ func ValidateTx(content []byte, appDb *dbm.GoLevelDB) (voctypes.ValidTx, error) 
 	//log.Debugf("Unmarshaled content: %v", t)
 	// validate method name
 	m := t.ValidateMethod()
-	if m == voctypes.InvalidTx {
+	if m == InvalidTx {
 		return vt, err
 	}
 	vt.Method = m
@@ -42,30 +41,30 @@ func ValidateTx(content []byte, appDb *dbm.GoLevelDB) (voctypes.ValidTx, error) 
 
 	// create specific args struct depending on tx method
 	switch m {
-	case voctypes.NewProcessTx:
-		vt.Args = args.(*voctypes.NewProcessTxArgs)
-	case voctypes.VoteTx:
-		voteArgs := args.(*voctypes.VoteTxArgs)
+	case NewProcessTx:
+		vt.Args = args.(*NewProcessTxArgs)
+	case VoteTx:
+		voteArgs := args.(*VoteTxArgs)
 		if voteArgs == nil {
 			return vt, fmt.Errorf("cannot parse VoteTX")
 		}
 		vt.Args = voteArgs
 		return vt, voteTxCheck(voteArgs, appDb)
-	case voctypes.AddOracleTx:
-		vt.Args = args.(*voctypes.AddOracleTxArgs)
+	case AddOracleTx:
+		vt.Args = args.(*AddOracleTxArgs)
 		break
-	case voctypes.RemoveOracleTx:
-		vt.Args = args.(*voctypes.RemoveOracleTxArgs)
-	case voctypes.AddValidatorTx:
-		vt.Args = args.(*voctypes.AddValidatorTxArgs)
-	case voctypes.RemoveValidatorTx:
-		vt.Args = args.(*voctypes.RemoveValidatorTxArgs)
-	case voctypes.InvalidTx:
+	case RemoveOracleTx:
+		vt.Args = args.(*RemoveOracleTxArgs)
+	case AddValidatorTx:
+		vt.Args = args.(*AddValidatorTxArgs)
+	case RemoveValidatorTx:
+		vt.Args = args.(*RemoveValidatorTxArgs)
+	case InvalidTx:
 		vt.Args = nil
 	}
 
 	// voteTx does not require signature
-	if vt.Method == voctypes.VoteTx {
+	if vt.Method == VoteTx {
 		return vt, nil
 	}
 
@@ -89,13 +88,13 @@ func VerifySignatureAgainstOracles(oracles []signature.Address, message, signHex
 	return res
 }
 
-func voteTxCheck(voteArgs *voctypes.VoteTxArgs, appDb *dbm.GoLevelDB) error {
-	var processInfo voctypes.Process
+func voteTxCheck(voteArgs *VoteTxArgs, appDb *dbm.GoLevelDB) error {
+	var processInfo Process
 	err := json.Unmarshal(appDb.Get([]byte(voteArgs.ProcessID)), &processInfo)
 	if err != nil {
 		return fmt.Errorf("cannot get process Info on VoteTx (%s)", err.Error())
 	}
-	var voteArgsSign voctypes.VoteTxArgsSigned
+	var voteArgsSign VoteTxArgsSigned
 	voteArgsSign.Nonce = voteArgs.Nonce
 	voteArgsSign.ProcessID = voteArgs.ProcessID
 	voteArgsSign.Proof = voteArgs.Proof

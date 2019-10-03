@@ -9,7 +9,7 @@ import (
 	votingProcess "gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain/types"
+	vochain "gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 //These methods represent an exportable abstraction over raw contract bindings

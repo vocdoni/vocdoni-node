@@ -34,7 +34,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	vochain "gitlab.com/vocdoni/go-dvote/vochain"
-	vochainApp "gitlab.com/vocdoni/go-dvote/vochain/app"
 )
 
 func newConfig() (config.GWCfg, error) {
@@ -375,7 +374,7 @@ func main() {
 	}
 
 	// Vochain Initialization
-	var app *vochainApp.BaseApplication
+	var app *vochain.BaseApplication
 
 	if globalCfg.Api.Vote.Enabled {
 		log.Info("initializing vochain")

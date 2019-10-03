@@ -13,7 +13,6 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	dbm "github.com/tendermint/tm-db"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
-	voctypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
 // database keys
@@ -33,8 +32,8 @@ type BaseApplication struct {
 
 	// volatile states
 	// see https://tendermint.com/docs/spec/abci/apps.html#state
-	checkTxState   *voctypes.State // checkState is set on initialization and reset on Commit
-	deliverTxState *voctypes.State // deliverState is set on InitChain and BeginBlock and cleared on Commit
+	checkTxState   *State // checkState is set on initialization and reset on Commit
+	deliverTxState *State // deliverState is set on InitChain and BeginBlock and cleared on Commit
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
@@ -43,8 +42,8 @@ var _ abcitypes.Application = (*BaseApplication)(nil)
 func NewBaseApplication(db dbm.DB) *BaseApplication {
 	return &BaseApplication{
 		db:             db,
-		checkTxState:   voctypes.NewState(),
-		deliverTxState: voctypes.NewState(),
+		checkTxState:   NewState(),
+		deliverTxState: NewState(),
 	}
 }
 
@@ -112,16 +111,16 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	switch tx.Method {
 	// new process tx
 	case "newProcessTx":
-		npta := tx.Args.(*voctypes.NewProcessTxArgs)
+		npta := tx.Args.(*NewProcessTxArgs)
 		// check if process exists
 		if _, ok := app.deliverTxState.Processes[npta.ProcessID]; !ok {
-			app.deliverTxState.Processes[npta.ProcessID] = &voctypes.Process{
+			app.deliverTxState.Processes[npta.ProcessID] = &Process{
 				EntityAddress:        npta.EntityAddress,
-				Votes:                make(map[string]*voctypes.Vote, 0),
+				Votes:                make(map[string]*Vote, 0),
 				MkRoot:               npta.MkRoot,
 				NumberOfBlocks:       npta.NumberOfBlocks,
 				StartBlock:           npta.StartBlock,
-				CurrentState:         voctypes.Scheduled,
+				CurrentState:         Scheduled,
 				EncryptionPrivateKey: npta.EncryptionPrivateKey,
 			}
 			vlog.Infof("new process %s", npta.ProcessID)
@@ -133,14 +132,14 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			vlog.Debugf("process data: %s", app.deliverTxState.Processes[npta.MkRoot].String())
 		}
 	case "voteTx":
-		vta := tx.Args.(*voctypes.VoteTxArgs)
+		vta := tx.Args.(*VoteTxArgs)
 		// check if vote has a valid process
 		//vlog.Infof("DELIVERTX STATE VOTETX DELIVERTX: %v", app.deliverTxState)
 
 		if _, ok := app.deliverTxState.Processes[vta.ProcessID]; ok {
 			// check if vote is already submitted
 			if _, ok := app.deliverTxState.Processes[vta.ProcessID].Votes[vta.Nullifier]; !ok {
-				app.deliverTxState.Processes[vta.ProcessID].Votes[vta.Nullifier] = &voctypes.Vote{
+				app.deliverTxState.Processes[vta.ProcessID].Votes[vta.Nullifier] = &Vote{
 					VotePackage: vta.VotePackage,
 					Proof:       vta.Proof,
 				}
@@ -153,7 +152,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 
 		}
 	case "addOracleTx":
-		atot := tx.Args.(*voctypes.AddOracleTxArgs)
+		atot := tx.Args.(*AddOracleTxArgs)
 		found := false
 		for _, t := range app.deliverTxState.Oracles {
 			if reflect.DeepEqual(t, atot.Address) {
@@ -161,12 +160,12 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			}
 		}
 		if !found {
-			app.deliverTxState.Oracles = append(app.deliverTxState.Oracles, atot.Address.String())
+			app.deliverTxState.Oracles = append(app.deliverTxState.Oracles, atot.Address)
 		} else {
 			vlog.Debugf("trusted oracle is already added")
 		}
 	case "removeOracleTx":
-		rtot := tx.Args.(*voctypes.RemoveOracleTxArgs)
+		rtot := tx.Args.(*RemoveOracleTxArgs)
 		found := false
 		position := -1
 		for pos, t := range app.deliverTxState.Oracles {
@@ -241,7 +240,7 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 
 // Query query for data from the application at current or past height.
 func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
-	var queryData voctypes.QueryData
+	var queryData QueryData
 	err := json.Unmarshal(req.Data, &queryData)
 	if err != nil {
 		vlog.Warnf("cannot unmarshall query request")
@@ -269,7 +268,7 @@ func (BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery
 // ResponseInitChain can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-	app.deliverTxState = voctypes.NewState()
+	app.deliverTxState = NewState()
 	codec.Cdc.UnmarshalJSON(req.AppStateBytes, app.deliverTxState)
 	app.db.Set(validatorsKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Validators))
 	app.db.Set(oraclesKey, codec.Cdc.MustMarshalJSON(app.deliverTxState.Oracles))
@@ -294,7 +293,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	}
 
 	// load processes from db
-	var processes map[string]*voctypes.Process
+	var processes map[string]*Process
 	processesBytes := app.db.Get(processesKey)
 	if len(processesBytes) != 0 {
 		err := codec.Cdc.UnmarshalJSON(processesBytes, &processes)

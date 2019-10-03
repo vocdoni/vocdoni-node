@@ -22,9 +22,6 @@ import (
 	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-db"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain/app"
-
-	vochaintypes "gitlab.com/vocdoni/go-dvote/vochain/types"
 )
 
 // testing purposes until genesis
@@ -34,13 +31,13 @@ const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
 var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
 
 // Start starts a new vochain validator node
-func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*vochain.BaseApplication, *nm.Node) {
+func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*BaseApplication, *nm.Node) {
 
 	// create application db
 	vlog.Info("initializing Vochain")
 
 	// creating new vochain app
-	app := vochain.NewBaseApplication(db)
+	app := NewBaseApplication(db)
 	//flag.Parse()
 	vlog.Info("creating node and application")
 	node, err := newTendermint(app, globalCfg)
@@ -74,10 +71,10 @@ func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
 
 	// create app state getting validators and oracle keys from eth
 	// one oracle needs to exist
-	state := &vochaintypes.State{
+	state := &State{
 		Oracles:    []string{testOracleAddress},
 		Validators: list,
-		Processes:  make(map[string]*vochaintypes.Process, 0),
+		Processes:  make(map[string]*Process, 0),
 	}
 
 	// set validators from eth smart contract
@@ -95,7 +92,7 @@ func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
 }
 
 // we need to set init (first time validators and oracles)
-func newTendermint(app *vochain.BaseApplication, localConfig config.VochainCfg) (*nm.Node, error) {
+func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Node, error) {
 	// create node config
 	var err error
 

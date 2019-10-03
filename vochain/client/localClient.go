@@ -1,4 +1,4 @@
-package vochain
+package vochaincli
 
 // From: https://github.com/tendermint/tendermint/blob/master/abci/client/local_client.go
 
@@ -16,13 +16,13 @@ import (
 	cmn "github.com/tendermint/tendermint/libs/common"
 )
 
-var _ Client = (*localClient)(nil)
+var _ Client = (*LocalClient)(nil)
 
 // NOTE: use defer to unlock mutex because Application might panic (e.g., in
 // case of malicious tx or query). It only makes sense for publicly exposed
 // methods like CheckTx (/broadcast_tx_* RPC endpoint) or Query (/abci_query
 // RPC endpoint), but defers are used everywhere for the sake of consistency.
-type localClient struct {
+type LocalClient struct {
 	cmn.BaseService
 
 	mtx *sync.Mutex
@@ -30,30 +30,30 @@ type localClient struct {
 	Callback
 }
 
-func NewLocalClient(mtx *sync.Mutex, app types.Application) *localClient {
+func NewLocalClient(mtx *sync.Mutex, app types.Application) *LocalClient {
 	if mtx == nil {
 		mtx = new(sync.Mutex)
 	}
-	localClient := &localClient{
+	LocalClient := &LocalClient{
 		mtx:         mtx,
 		Application: app,
 	}
-	localClient.BaseService = *cmn.NewBaseService(nil, "localClient", localClient)
-	return localClient
+	LocalClient.BaseService = *cmn.NewBaseService(nil, "LocalClient", LocalClient)
+	return LocalClient
 }
 
-func (app *localClient) SetResponseCallback(cb Callback) {
+func (app *LocalClient) SetResponseCallback(cb Callback) {
 	app.mtx.Lock()
 	app.Callback = cb
 	app.mtx.Unlock()
 }
 
 // TODO: change types.Application to include Error()?
-func (app *localClient) Error() error {
+func (app *LocalClient) Error() error {
 	return nil
 }
 
-func (app *localClient) DeliverTxAsync(params types.RequestDeliverTx) *ReqRes {
+func (app *LocalClient) DeliverTxAsync(params types.RequestDeliverTx) *ReqRes {
 	app.mtx.Lock()
 	defer app.mtx.Unlock()
 
@@ -64,7 +64,7 @@ func (app *localClient) DeliverTxAsync(params types.RequestDeliverTx) *ReqRes {
 	)
 }
 
-func (app *localClient) CheckTxAsync(req types.RequestCheckTx) *ReqRes {
+func (app *LocalClient) CheckTxAsync(req types.RequestCheckTx) *ReqRes {
 	app.mtx.Lock()
 	defer app.mtx.Unlock()
 
@@ -78,15 +78,15 @@ func (app *localClient) CheckTxAsync(req types.RequestCheckTx) *ReqRes {
 // Async
 //-------------------------------------------------------
 
-func (app *localClient) FlushSync() error {
+func (app *LocalClient) FlushSync() error {
 	return nil
 }
 
-func (app *localClient) EchoSync(msg string) (*types.ResponseEcho, error) {
+func (app *LocalClient) EchoSync(msg string) (*types.ResponseEcho, error) {
 	return &types.ResponseEcho{Message: msg}, nil
 }
 
-func (app *localClient) InfoSync(req types.RequestInfo) (*types.ResponseInfo, error) {
+func (app *LocalClient) InfoSync(req types.RequestInfo) (*types.ResponseInfo, error) {
 	app.mtx.Lock()
 	defer app.mtx.Unlock()
 
@@ -94,7 +94,7 @@ func (app *localClient) InfoSync(req types.RequestInfo) (*types.ResponseInfo, er
 	return &res, nil
 }
 
-func (app *localClient) SetOptionSync(req types.RequestSetOption) (*types.ResponseSetOption, error) {
+func (app *LocalClient) SetOptionSync(req types.RequestSetOption) (*types.ResponseSetOption, error) {
 	app.mtx.Lock()
 	defer app.mtx.Unlock()
 
@@ -102,7 +102,7 @@ func (app *localClient) SetOptionSync(req types.RequestSetOption) (*types.Respon
 	return &res, nil
 }
 
-func (app *localClient) QuerySync(req types.RequestQuery) (*types.ResponseQuery, error) {
+func (app *LocalClient) QuerySync(req types.RequestQuery) (*types.ResponseQuery, error) {
 	app.mtx.Lock()
 	defer app.mtx.Unlock()
 
@@ -110,7 +110,7 @@ func (app *localClient) QuerySync(req types.RequestQuery) (*types.ResponseQuery,
 	return &res, nil
 }
 
-func (app *localClient) CommitSync() (*types.ResponseCommit, error) {
+func (app *LocalClient) CommitSync() (*types.ResponseCommit, error) {
 	app.mtx.Lock()
 	defer app.mtx.Unlock()
 
@@ -118,7 +118,7 @@ func (app *localClient) CommitSync() (*types.ResponseCommit, error) {
 	return &res, nil
 }
 
-func (app *localClient) InitChainSync(req types.RequestInitChain) (*types.ResponseInitChain, error) {
+func (app *LocalClient) InitChainSync(req types.RequestInitChain) (*types.ResponseInitChain, error) {
 	app.mtx.Lock()
 	defer app.mtx.Unlock()
 
@@ -126,7 +126,7 @@ func (app *localClient) InitChainSync(req types.RequestInitChain) (*types.Respon
 	return &res, nil
 }
 
-func (app *localClient) BeginBlockSync(req types.RequestBeginBlock) (*types.ResponseBeginBlock, error) {
+func (app *LocalClient) BeginBlockSync(req types.RequestBeginBlock) (*types.ResponseBeginBlock, error) {
 	app.mtx.Lock()
 	defer app.mtx.Unlock()
 
@@ -134,7 +134,7 @@ func (app *localClient) BeginBlockSync(req types.RequestBeginBlock) (*types.Resp
 	return &res, nil
 }
 
-func (app *localClient) EndBlockSync(req types.RequestEndBlock) (*types.ResponseEndBlock, error) {
+func (app *LocalClient) EndBlockSync(req types.RequestEndBlock) (*types.ResponseEndBlock, error) {
 	app.mtx.Lock()
 	defer app.mtx.Unlock()
 
@@ -144,7 +144,7 @@ func (app *localClient) EndBlockSync(req types.RequestEndBlock) (*types.Response
 
 //-------------------------------------------------------
 
-func (app *localClient) callback(req *types.Request, res *types.Response) *ReqRes {
+func (app *LocalClient) callback(req *types.Request, res *types.Response) *ReqRes {
 	app.Callback(req, res)
 	return newLocalReqRes(req, res)
 }

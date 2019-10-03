@@ -42,7 +42,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain"
 	oracle "gitlab.com/vocdoni/go-dvote/chain/oracle"
 	"gitlab.com/vocdoni/go-dvote/log"
-	app "gitlab.com/vocdoni/go-dvote/vochain/app"
 
 	//vclient "gitlab.com/vocdoni/go-dvote/vochain/client"
 	rpccli "github.com/tendermint/tendermint/rpc/client"
@@ -155,7 +154,7 @@ func main() {
 	log.Info("starting oracle")
 
 	// start vochain node
-	var app *app.BaseApplication
+	var app *vochain.BaseApplication
 	db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.DataDir, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to open db: %v", err)
