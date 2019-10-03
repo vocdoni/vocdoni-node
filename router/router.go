@@ -62,6 +62,7 @@ type Router struct {
 	signer            signature.SignKeys
 	census            *census.CensusManager
 	vochainClient     *vochainClient.LocalClient
+	vochainApp        *vochainApp.BaseApplication
 	PrivateCalls      int64
 	PublicCalls       int64
 }
@@ -178,6 +179,7 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 
 //EnableVoteAPI enabled the Vote API in the Router
 func (r *Router) EnableVoteAPI(app *vochainApp.BaseApplication) {
+	r.vochainApp = app
 	r.vochainClient = vochainClient.NewLocalClient(nil, app)
 	r.registerMethod("submitEnvelope", submitEnvelope, Public)
 	r.registerMethod("getEnvelopeStatus", getEnvelopeStatus, Public)
@@ -185,6 +187,7 @@ func (r *Router) EnableVoteAPI(app *vochainApp.BaseApplication) {
 	r.registerMethod("getEnvelopeHeight", getEnvelopeHeight, Public)
 	r.registerMethod("getProcessList", getProcessList, Public)
 	r.registerMethod("getEnvelopeList", getEnvelopeList, Public)
+	r.registerMethod("getBlockHeight", getBlockHeight, Public)
 
 }
 

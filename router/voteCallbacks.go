@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/json"
+	"math/rand"
 	"time"
 
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -50,6 +51,7 @@ func submitEnvelope(request routerRequest, router *Router) {
 }
 
 func getEnvelopeStatus(request routerRequest, router *Router) {
+
 	// request.structured.ProcessId
 	// request.structured.Nullifier
 	// getEnvelopeStatus
@@ -62,13 +64,45 @@ func getEnvelope(request routerRequest, router *Router) {
 }
 
 func getEnvelopeHeight(request routerRequest, router *Router) {
-	// request.structured.ProcessId
-	// getEnvelopeHeight
+	var apiResponse types.ResponseMessage
+	apiResponse.ID = request.id
+	apiResponse.Response.Request = request.id
+	apiResponse.Response.Timestamp = int32(time.Now().Unix())
+	apiResponse.Response.Height = rand.Int31n(1024)
+	apiResponse.Response.Ok = true
+	var err error
+	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	rawApiResponse, err := json.Marshal(apiResponse)
+	if err != nil {
+		log.Errorf("Error marshaling getEnvelopeHeight reply: %s", err)
+	}
+
+	router.transport.Send(buildReply(request.context, rawApiResponse))
+
 }
 
 func getBlockHeight(request routerRequest, router *Router) {
-	// request.structured.ProcessId
-	// getBlockHeight
+	var apiResponse types.ResponseMessage
+	apiResponse.ID = request.id
+	apiResponse.Response.Request = request.id
+	apiResponse.Response.Timestamp = int32(time.Now().Unix())
+	apiResponse.Response.Height = rand.Int31n(1024)
+	apiResponse.Response.Ok = true
+
+	var err error
+	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	rawApiResponse, err := json.Marshal(apiResponse)
+	if err != nil {
+		log.Errorf("Error marshaling getBlockHeight reply: %s", err)
+	}
+
+	router.transport.Send(buildReply(request.context, rawApiResponse))
 }
 
 func getProcessList(request routerRequest, router *Router) {
