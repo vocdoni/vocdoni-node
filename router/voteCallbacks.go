@@ -69,7 +69,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 	apiResponse.Response.Height = rand.Int31n(1024)
-
+	apiResponse.Response.Ok = true
 	var err error
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
@@ -90,6 +90,7 @@ func getBlockHeight(request routerRequest, router *Router) {
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 	apiResponse.Response.Height = rand.Int31n(1024)
+	apiResponse.Response.Ok = true
 
 	var err error
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)

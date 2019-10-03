@@ -187,6 +187,7 @@ func (r *Router) EnableVoteAPI(app *vochainApp.BaseApplication) {
 	r.registerMethod("getEnvelopeHeight", getEnvelopeHeight, Public)
 	r.registerMethod("getProcessList", getProcessList, Public)
 	r.registerMethod("getEnvelopeList", getEnvelopeList, Public)
+	r.registerMethod("getBlockHeight", getBlockHeight, Public)
 
 }
 
