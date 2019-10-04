@@ -303,7 +303,7 @@ func main() {
 
 	go func() {
 		if node.Eth != nil {
-			tmRPC := rpccli.NewHTTP("http://localhost:26657", "/websocket")
+			tmRPC := rpccli.NewHTTP("http://gwdev1.vocdoni.net:26657", "/websocket")
 			for {
 				if node.Eth.Synced() {
 					log.Info("ethereum node fully synced, starting Oracle")

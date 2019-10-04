@@ -53,7 +53,6 @@ func NewBaseApplication(db dbm.DB) *BaseApplication {
 // Tendermint expects LastBlockAppHash and LastBlockHeight to be updated during Commit,
 // ensuring that Commit is never called twice for the same block height.
 func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
-
 	// print some basic version info about tendermint components (coreVersion, p2pVersion, blockVersion)
 	vlog.Infof("tendermint Core version: %v", req.Version)
 	vlog.Infof("tendermint P2P protocol version: %v", req.P2PVersion)
@@ -287,6 +286,7 @@ func (app *BaseApplication) validateHeight(req abci.RequestBeginBlock) error {
 // The header contains the height, timestamp, and more - it exactly matches the Tendermint block header.
 // The LastCommitInfo and ByzantineValidators can be used to determine rewards and punishments for the validators.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
+	vlog.Debugf("DBCONTENT ON BEGINBLOCK: %+v", app.deliverTxState)
 	// validate chain height
 	if err := app.validateHeight(req); err != nil {
 		panic(err)

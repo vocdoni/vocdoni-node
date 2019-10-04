@@ -54,7 +54,7 @@ type ProcessMetadata struct {
 
 // Constructor for proc_transactor on node
 func NewVotingProcessHandle(contractAddressHex string) (*ProcessHandle, error) {
-	client, err := ethclient.Dial("https://gwdev1.vocdoni.net/web3")
+	client, err := ethclient.Dial("http://127.0.0.1:9091")
 	if err != nil {
 		log.Error(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"gitlab.com/vocdoni/go-dvote/config"
@@ -56,6 +57,10 @@ func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*BaseApplication, *n
 //NewGenesis creates a new genesis file and saves it to tconfig.Genesis path
 func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
 	vlog.Info("creating genesis file")
+
+	consensusParams := tmtypes.DefaultConsensusParams()
+	consensusParams.Block.TimeIotaMs = 20000
+
 	genDoc := tmtypes.GenesisDoc{
 		ChainID:         "0x1",
 		GenesisTime:     tmtime.Now(),
@@ -122,6 +127,10 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	tconfig.P2P.AddrBookStrict = false
 	tconfig.P2P.SeedMode = localConfig.SeedMode
 	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
+	tconfig.Consensus.TimeoutPropose = time.Second * 5
+	tconfig.Consensus.TimeoutPrevote = time.Second * 5
+	tconfig.Consensus.TimeoutPrecommit = time.Second * 5
+	tconfig.Consensus.TimeoutCommit = time.Second * 5
 
 	if localConfig.Genesis != "" {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
