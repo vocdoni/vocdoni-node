@@ -440,7 +440,14 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 	}
 
 	if op == "genProof" {
-		resp.Siblings, err = t.GenProof([]byte(r.ClaimData))
+		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
+		if err != nil {
+			log.Warnf("error decoding base64 string: %s", err.Error())
+			resp.Ok = false
+			resp.Error = err.Error()
+			return resp
+		}
+		resp.Siblings, err = t.GenProof(data)
 		if err != nil {
 			resp.Ok = false
 			resp.Error = err.Error()
@@ -539,7 +546,14 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			return resp
 		}
 		// Generate proof and return it
-		validProof, err := t.CheckProof([]byte(r.ClaimData), r.ProofData)
+		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
+		if err != nil {
+			log.Warnf("error decoding base64 string: %s", err.Error())
+			resp.Ok = false
+			resp.Error = err.Error()
+			return resp
+		}
+		validProof, err := t.CheckProof(data, r.ProofData)
 		if err != nil {
 			resp.Ok = false
 			resp.Error = err.Error()

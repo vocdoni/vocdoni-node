@@ -160,6 +160,26 @@ func TestCensus(t *testing.T) {
 		t.Errorf("client should not be authorized on addClaim")
 	}
 
+	// GenProof valid
+	req.CensusID = censusID
+	req.Method = "genProof"
+	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
+	resp, err = sendCensusReq(req, signer2, false)
+	t.Logf("genProof response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("proof cannot be obtained")
+	}
+
+	// GenProof not valid
+	req.CensusID = censusID
+	req.Method = "genProof"
+	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello3"))
+	resp, err = sendCensusReq(req, signer2, false)
+	t.Logf("genProof response %+v", resp)
+	if len(resp.Siblings) > 1 {
+		t.Errorf("proof should not exist!")
+	}
+
 	// addBlaimBulk
 	var claims []string
 	req.Method = "addClaimBulk"

@@ -57,10 +57,6 @@ func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*BaseApplication, *n
 //NewGenesis creates a new genesis file and saves it to tconfig.Genesis path
 func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
 	vlog.Info("creating genesis file")
-<<<<<<< HEAD
-
-=======
->>>>>>> master
 	consensusParams := tmtypes.DefaultConsensusParams()
 	consensusParams.Block.TimeIotaMs = 20000
 

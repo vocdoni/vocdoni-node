@@ -90,6 +90,9 @@ func (t *Tree) GenProof(data []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if !mp.Existence {
+		return "", nil
+	}
 	mpHex := common3.HexEncode(mp.Bytes())
 	return mpHex, nil
 }
@@ -124,6 +127,9 @@ func (t *Tree) CheckProof(data []byte, mpHex string) (bool, error) {
 	mp, err := merkletree.NewProofFromBytes(mpBytes)
 	if err != nil {
 		return false, err
+	}
+	if !mp.Existence {
+		return false, nil
 	}
 	e, err := t.GetClaim(data)
 	if err != nil {
