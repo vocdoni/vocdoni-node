@@ -120,6 +120,7 @@ type VochainCfg struct {
 	PublicAddr       string
 	DataDir          string
 	Genesis          string
+	CreateGenesis    bool
 	Peers            []string
 	Seeds            []string
 	SeedMode         bool
