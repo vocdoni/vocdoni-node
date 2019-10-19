@@ -16,7 +16,7 @@ const (
 	appTreeName     = "appTree"
 	processTreeName = "processTree"
 	voteTreeName    = "voteTree"
-	headerKey       = "header"
+	heightKey       = "height"
 	appHashKey      = "appHash"
 	oracleKey       = "oracle"
 	validatorKey    = "validator"
@@ -45,7 +45,7 @@ func NewVochainState(dataDir string) (*VochainState, error) {
 	}
 
 	// set keys
-	appTree.Set([]byte(headerKey), []byte(""))
+	appTree.Set([]byte(heightKey), []byte(""))
 	appTree.Set([]byte(appHashKey), []byte(""))
 	appTree.Set([]byte(oracleKey), []byte(""))
 	appTree.Set([]byte(validatorKey), []byte(""))
@@ -248,7 +248,7 @@ func (v *VochainState) CountVotes(processID string) int64 {
 
 // GetHeight returns the blockchain last block commited height
 func (v *VochainState) GetHeight() []byte {
-	_, h := v.AppTree.Get([]byte(oracleKey))
+	_, h := v.AppTree.Get([]byte(heightKey))
 	return h
 }
 

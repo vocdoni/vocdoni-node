@@ -55,7 +55,7 @@ type MetaResponse struct {
 	Content       string   `json:"content,omitempty"`
 	Error         string   `json:"error,omitempty"`
 	Files         []byte   `json:"files,omitempty"`
-	Height        int32    `json:"height,omitempty"`
+	Height        int64    `json:"height,omitempty"`
 	InvalidClaims []int    `json:"invalidClaims,omitempty"`
 	Message       string   `json:"message,omitempty"`
 	Ok            bool     `json:"ok,omitempty"`

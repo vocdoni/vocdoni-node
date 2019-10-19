@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	amino "github.com/tendermint/go-amino"
 	voclient "github.com/tendermint/tendermint/rpc/client"
 	"gitlab.com/vocdoni/go-dvote/census"
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
@@ -63,6 +64,7 @@ type Router struct {
 	tmclient          *voclient.HTTP
 	PrivateCalls      int64
 	PublicCalls       int64
+	codec             *amino.Codec
 }
 
 func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
@@ -78,6 +80,7 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net
 		storage:           storage,
 		transport:         transport,
 		signer:            signer,
+		codec:             amino.NewCodec(),
 	}
 }
 

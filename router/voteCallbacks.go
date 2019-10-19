@@ -2,7 +2,6 @@ package router
 
 import (
 	"encoding/json"
-	"math/rand"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -76,7 +75,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
-	apiResponse.Response.Height = rand.Int31n(1024)
+	apiResponse.Response.Height = 0
 	apiResponse.Response.Ok = true
 	var err error
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
@@ -97,10 +96,24 @@ func getBlockHeight(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
-	apiResponse.Response.Height = rand.Int31n(1024)
-	apiResponse.Response.Ok = true
-
-	var err error
+	qdata := vochain.QueryData{
+		Method: "getBlockHeight",
+	}
+	qdataBytes, err := json.Marshal(qdata)
+	if err != nil {
+		log.Errorf("cannot marshal query data: (%s)", err.Error())
+	}
+	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
+	if err != nil {
+		apiResponse.Response.Ok = false
+	} else {
+		apiResponse.Response.Ok = true
+	}
+	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Height)
+	log.Warnf("Response height is: %s", apiResponse.Response.Height)
+	if err != nil {
+		log.Errorf("cannot unmarshal height: %s", err.Error())
+	}
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
 		log.Warn(err.Error())

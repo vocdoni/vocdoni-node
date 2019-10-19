@@ -39,9 +39,9 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	vlog.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
 	vlog.Infof("tendermint Block protocol version: %d", req.BlockVersion)
 
-	// gets the app header from database
+	// gets the app height from database
 	var height int64
-	_, heightBytes := app.State.AppTree.Get([]byte("height"))
+	_, heightBytes := app.State.AppTree.Get([]byte(heightKey))
 	if heightBytes != nil {
 		err := app.State.Codec.UnmarshalBinaryBare(heightBytes, &height)
 		if err != nil {
@@ -89,7 +89,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	if err != nil {
 		vlog.Errorf("cannot marshal initial height: %s", err)
 	}
-	app.State.AppTree.Set([]byte("height"), initHeight)
+	app.State.AppTree.Set([]byte(heightKey), initHeight)
 	app.State.Save()
 	return abcitypes.ResponseInitChain{}
 }
@@ -104,11 +104,11 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 		app.State.Lock = true
 		app.State.Rollback()
 	}
-	header, err := app.State.Codec.MarshalBinaryBare(req.Header)
+	height, err := app.State.Codec.MarshalBinaryBare(req.Header.Height)
 	if err != nil {
 		vlog.Error("cannot marshal height")
 	}
-	app.State.AppTree.Set([]byte(headerKey), header)
+	app.State.AppTree.Set([]byte(heightKey), height)
 	return abcitypes.ResponseBeginBlock{}
 }
 
@@ -131,7 +131,6 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 }
 
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
-	app.State.AppTree.Get([]byte("height"))
 	app.State.Save()
 	app.State.Lock = false
 	return abcitypes.ResponseCommit{
@@ -147,11 +146,12 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	switch reqData.Method {
 	case "getEnvelopeStatus":
 		p, err := app.State.GetProcess(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier))
-		if err != nil || p == nil {
+		if err != nil {
+			return abcitypes.ResponseQuery{Code: 1, Info: "", Value: []byte{0}}
+		} else if p == nil {
 			return abcitypes.ResponseQuery{Code: 0, Info: "", Value: []byte{0}}
-		} else {
-			return abcitypes.ResponseQuery{Code: 0, Info: "", Value: []byte{1}}
 		}
+		return abcitypes.ResponseQuery{Code: 0, Info: "", Value: []byte{1}}
 	case "getEnvelope":
 		p, err := app.State.GetProcess(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier)) // nullifier hash(addr+pid), processId by pid_nullifier
 		if err != nil {
