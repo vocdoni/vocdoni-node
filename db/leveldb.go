@@ -6,20 +6,20 @@ import (
 	"encoding/json"
 
 	"github.com/syndtr/goleveldb/leveldb"
-//	"github.com/syndtr/goleveldb/leveldb/errors"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
-	"github.com/syndtr/goleveldb/leveldb/iterator"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 
-
+// LevelDbStorage represents an abstraction of a levelDB with prefix
 type LevelDbStorage struct {
 	ldb    *leveldb.DB
 	prefix []byte
 }
 
+// NewLevelDbStorage returns a level db (new or existing) giving a path
 func NewLevelDbStorage(path string, errorIfMissing bool) (*LevelDbStorage, error) {
 	o := &opt.Options{
 		ErrorIfMissing: errorIfMissing,
@@ -35,6 +35,7 @@ type storageInfo struct {
 	KeyCount int
 }
 
+// Count returns the number of elements of the database
 func (l *LevelDbStorage) Count() int {
 
 	keycount := 0
@@ -50,6 +51,7 @@ func (l *LevelDbStorage) Count() int {
 	return keycount
 }
 
+// Info returns some basic info regarding the database
 func (l *LevelDbStorage) Info() string {
 
 	keycount := 0
@@ -69,10 +71,12 @@ func (l *LevelDbStorage) Info() string {
 	return string(json)
 }
 
+// WithPrefix returns a levelDB with an appended new prefix
 func (l *LevelDbStorage) WithPrefix(prefix []byte) *LevelDbStorage {
 	return &LevelDbStorage{l.ldb, append(l.prefix, prefix...)}
 }
 
+// Get returns the value of a given key
 func (l *LevelDbStorage) Get(key []byte) ([]byte, error) {
 	v, err := l.ldb.Get(append(l.prefix, key[:]...), nil)
 	if err != nil {
@@ -81,6 +85,7 @@ func (l *LevelDbStorage) Get(key []byte) ([]byte, error) {
 	return v, err
 }
 
+// Put updates the value of a given key
 func (l *LevelDbStorage) Put(key []byte, value []byte) error {
 	err := l.ldb.Put(append(l.prefix, key[:]...), value, nil)
 	if err != nil {
@@ -89,6 +94,7 @@ func (l *LevelDbStorage) Put(key []byte, value []byte) error {
 	return nil
 }
 
+// Delete deletes a db entry
 func (l *LevelDbStorage) Delete(key []byte) error {
 	err := l.ldb.Delete(append(l.prefix, key[:]...), nil)
 	if err != nil {
@@ -97,19 +103,21 @@ func (l *LevelDbStorage) Delete(key []byte) error {
 	return nil
 }
 
+// Close closes a database instance
 func (l *LevelDbStorage) Close() {
 	if err := l.ldb.Close(); err != nil {
 		log.Panic(err)
 	}
 }
 
+// Iter returns an iterator over the database
 func (l *LevelDbStorage) Iter() iterator.Iterator {
 	db := l.ldb
 	i := db.NewIterator(util.BytesPrefix(l.prefix), nil)
 	return i
 }
 
+// LevelDB returns a pointer to the DB
 func (l *LevelDbStorage) LevelDB() *leveldb.DB {
 	return l.ldb
 }
-

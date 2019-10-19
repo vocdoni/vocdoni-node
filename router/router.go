@@ -6,14 +6,13 @@ import (
 	"strings"
 	"time"
 
+	voclient "github.com/tendermint/tendermint/rpc/client"
 	"gitlab.com/vocdoni/go-dvote/census"
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
-	vochainApp "gitlab.com/vocdoni/go-dvote/vochain"
-	vochainClient "gitlab.com/vocdoni/go-dvote/vochain/client"
 
 	"encoding/json"
 )
@@ -61,8 +60,7 @@ type Router struct {
 	transport         net.Transport
 	signer            signature.SignKeys
 	census            *census.CensusManager
-	vochainClient     *vochainClient.LocalClient
-	vochainApp        *vochainApp.BaseApplication
+	tmclient          *voclient.HTTP
 	PrivateCalls      int64
 	PublicCalls       int64
 }
@@ -178,9 +176,8 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 }
 
 //EnableVoteAPI enabled the Vote API in the Router
-func (r *Router) EnableVoteAPI(app *vochainApp.BaseApplication) {
-	r.vochainApp = app
-	r.vochainClient = vochainClient.NewLocalClient(nil, app)
+func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP) {
+	r.tmclient = rpcClient
 	r.registerMethod("submitEnvelope", submitEnvelope, Public)
 	r.registerMethod("getEnvelopeStatus", getEnvelopeStatus, Public)
 	r.registerMethod("getEnvelope", getEnvelope, Public)

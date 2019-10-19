@@ -5,38 +5,48 @@ import (
 	"math/rand"
 	"time"
 
-	abci "github.com/tendermint/tendermint/abci/types"
-
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain"
+	vochain "gitlab.com/vocdoni/go-dvote/types"
 )
 
 func submitEnvelope(request routerRequest, router *Router) {
-	voteTxArgs := new(vochain.VoteTxArgs)
+	voteTxArgs := new(vochain.VoteTx)
 	voteTxArgs.ProcessID = request.structured.ProcessId
+	voteTxArgs.Nonce = request.structured.Nonce
 	voteTxArgs.Nullifier = request.structured.Nullifier
-	//voteTxArgs.Payload = request.structured.Payload
 	voteTxArgs.VotePackage = request.structured.Payload
+	voteTxArgs.Proof = request.structured.ProofData
+	voteTxArgs.Type = "vote"
+	voteTxArgs.Signature = request.structured.Signature
 
-	voteTxBytes := []byte(voteTxArgs.String())
+	voteTxBytes, err := json.Marshal(voteTxArgs)
+	if err != nil {
+		log.Errorf("error marshaling voteTx args: %s", err.Error())
+	}
 
-	req := abci.RequestDeliverTx{Tx: voteTxBytes}
-	vochainReqRes := router.vochainClient.DeliverTxAsync(req)
+	res, err := router.tmclient.BroadcastTxCommit(voteTxBytes)
+	if err != nil {
+		log.Warnf("cannot commit tx: %s", err)
+	} else {
+		log.Infof("transaction result: %+v", res)
+		log.Infof("transactions result details: %+v", res.CheckTx.GetInfo())
+	}
 
 	var apiResponse types.ResponseMessage
 	apiResponse.ID = request.id
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 
-	vochainResponse := vochainReqRes.Response.GetDeliverTx()
+	// not sure if its enough information
+	vochainResponse := res.DeliverTx
 	if vochainResponse.Code != 0 {
 		apiResponse.Response.Ok = false
 	} else {
 		apiResponse.Response.Ok = true
 	}
+	apiResponse.Response.Message = vochainResponse.GetInfo()
 
-	var err error
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
 		log.Warn(err.Error())
@@ -45,9 +55,7 @@ func submitEnvelope(request routerRequest, router *Router) {
 	if err != nil {
 		log.Errorf("Error marshaling submitEnvelope reply: %s", err)
 	}
-
 	router.transport.Send(buildReply(request.context, rawApiResponse))
-
 }
 
 func getEnvelopeStatus(request routerRequest, router *Router) {

@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"gitlab.com/vocdoni/go-dvote/config"
 
-	codec "github.com/cosmos/cosmos-sdk/codec"
 	cfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	cmn "github.com/tendermint/tendermint/libs/common"
@@ -38,7 +37,10 @@ func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*BaseApplication, *n
 	vlog.Info("initializing Vochain")
 
 	// creating new vochain app
-	app := NewBaseApplication(db)
+	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
+	if err != nil {
+		vlog.Errorf("Cannot init vochain application: %s", err.Error())
+	}
 	//flag.Parse()
 	vlog.Info("creating node and application")
 	node, err := newTendermint(app, globalCfg)
@@ -73,20 +75,8 @@ func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
 		Power:   10,
 	})
 
-	// create app state getting validators and oracle keys from eth
-	// one oracle needs to exist
-	state := &State{
-		Oracles:    []string{testOracleAddress},
-		Validators: list,
-		Processes:  make(map[string]*Process, 0),
-	}
-
 	// set validators from eth smart contract
-	genDoc.Validators = state.Validators
-
-	// amino marshall state
-	genDoc.AppState = codec.Cdc.MustMarshalJSON(*state)
-
+	genDoc.Validators = list
 	// save genesis
 	if err := genDoc.SaveAs(tconfig.GenesisFile()); err != nil {
 		return err
@@ -190,14 +180,6 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 		tconfig.PrivValidatorStateFile(),
 	)
 
-	if localConfig.CreateGenesis {
-		err := NewGenesis(tconfig, pv)
-		if err != nil {
-			vlog.Warn(err)
-			return nil, err
-		}
-	}
-
 	// read or create node key
 	var nodeKey *p2p.NodeKey
 	if localConfig.KeyFile != "" {
@@ -217,6 +199,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	if cmn.FileExists(tconfig.Genesis) {
 		vlog.Infof("found genesis file %s", tconfig.Genesis)
 	} else {
+		vlog.Infof("loaded genesis: %s", TestnetGenesis1)
 		err := ioutil.WriteFile(tconfig.Genesis, []byte(TestnetGenesis1), 0644)
 		if err != nil {
 			vlog.Warn(err)

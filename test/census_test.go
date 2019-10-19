@@ -94,7 +94,7 @@ func TestCensus(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot start IPFS %s", err.Error())
 	}
-	routerApi := router.InitRouter(listenerOutput, storage, ws, *signer1)
+	routerAPI := router.InitRouter(listenerOutput, storage, ws, *signer1)
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.CensusManager
@@ -109,9 +109,9 @@ func TestCensus(t *testing.T) {
 		t.Error(err.Error())
 	}
 	defer os.RemoveAll(censusDir)
-	routerApi.EnableCensusAPI(&cm)
+	routerAPI.EnableCensusAPI(&cm)
 
-	go routerApi.Route()
+	go routerAPI.Route()
 	ws.AddProxyHandler("/dvote")
 
 	// Create websocket client

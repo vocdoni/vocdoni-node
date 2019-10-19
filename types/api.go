@@ -21,14 +21,16 @@ type MetaRequest struct {
 	Method     string   `json:"method"`
 	Name       string   `json:"name,omitempty"`
 	Nullifier  string   `json:"nullifier,omitempty"`
+	Nonce      string   `json:"nonce,omitempty"`
 	Payload    string   `json:"payload,omitempty"`
 	ProcessId  string   `json:"processId,omitempty"`
 	ProofData  string   `json:"proofData,omitempty"`
-	PubKeys    []string `json:"pubKeys,omitempty"`
+	PubKeys    []string `json:"encryptionPublicKeys,omitempty"`
 	RootHash   string   `json:"rootHash,omitempty"`
 	Timestamp  int32    `json:"timestamp"`
 	Type       string   `json:"type,omitempty"`
 	URI        string   `json:"uri,omitempty"`
+	Signature  string   `json:"signature,omitempty"`
 }
 
 //ResponseMessage wraps an api response

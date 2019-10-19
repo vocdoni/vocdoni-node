@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 
 	//abcicli "github.com/tendermint/tendermint/abci/client"
+	tmnode "github.com/tendermint/tendermint/node"
 	dbm "github.com/tendermint/tm-db"
 
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
@@ -23,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	voclient "github.com/tendermint/tendermint/rpc/client"
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
@@ -33,7 +35,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/router"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain"
+	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 func newConfig() (config.GWCfg, error) {
@@ -76,7 +78,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("vochainLogLevel", "error", "voting chain node log level")
 	flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
-	flag.String("vochainContract", "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b", "voting smart contract where the oracle will listen")
+	flag.String("vochainContract", "0xb99F60f7a651589022c9495d3e555a46e3625A42", "voting smart contract where the oracle will listen")
 
 	flag.Parse()
 
@@ -116,7 +118,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("vochain.peers", []string{})
 	viper.SetDefault("vochain.seeds", []string{})
 	viper.SetDefault("vochain.dataDir", *dataDir+"/vochain")
-	viper.SetDefault("vochain.contract", "0x3eF4dE917a6315c1De87b02FD8b19EACef324c3b")
+	viper.SetDefault("vochain.contract", "0xb99F60f7a651589022c9495d3e555a46e3625A42")
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
@@ -338,7 +340,6 @@ func main() {
 	if !globalCfg.Ipfs.NoInit {
 		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
 		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
-		storage.ListPins()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -374,15 +375,14 @@ func main() {
 			}
 		}
 		censusManager.Init(globalCfg.DataDir+"/census", "")
+
 	}
 
-	// Vochain Initialization
-	var app *vochain.BaseApplication
-
+	var vnode *tmnode.Node
 	if globalCfg.Api.Vote.Enabled {
 		log.Info("initializing vochain")
 		// app layer db
-		db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.Vochain.DataDir, nil)
+		db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.Vochain.DataDir+"/data", nil)
 		if err != nil {
 			log.Fatalf("failed to open db: %s", err.Error())
 		}
@@ -403,7 +403,7 @@ func main() {
 		if globalCfg.Vochain.PublicAddr != "" {
 			log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
 		}
-		_, vnode := vochain.Start(globalCfg.Vochain, db)
+		_, vnode = vochain.Start(globalCfg.Vochain, db)
 		defer func() {
 			vnode.Stop()
 			vnode.Wait()
@@ -430,9 +430,11 @@ func main() {
 			routerAPI.EnableCensusAPI(&censusManager)
 		}
 		if globalCfg.Api.Vote.Enabled {
+			// creating the RPC calls client
+			rpcClient := voclient.NewHTTP(globalCfg.Vochain.RpcListen, "/websocket")
 			// todo: client params as cli flags
 			log.Info("enabling vote API")
-			routerAPI.EnableVoteAPI(app)
+			routerAPI.EnableVoteAPI(rpcClient)
 		}
 
 		go routerAPI.Route()
@@ -445,6 +447,8 @@ func main() {
 			}
 		}()
 	}
+
+	log.Infof("Gateway startup complete")
 
 	// close if interrupt received
 	c := make(chan os.Signal, 1)

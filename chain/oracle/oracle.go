@@ -1,13 +1,14 @@
-package chain
+package oracle
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"math/big"
 	"strings"
-
-	"fmt"
-
-	voclient "gitlab.com/vocdoni/go-dvote/vochain/client"
+	"time"
 
 	eth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -15,36 +16,66 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	crypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	amino "github.com/tendermint/go-amino"
+	voclient "github.com/tendermint/tendermint/rpc/client"
+	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	app "gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 // Oracle represents an oracle with a connection to Ethereum and Vochain
 type Oracle struct {
+	// voting process contract address
+	contractAddress common.Address
+	//voting process contract abi
+	contractABI abi.ABI
 	// ethereum connection
 	ethereumConnection *chain.EthChainContext
 	// vochain connection
-	vochainConnection interface{}
+	vochainConnection *voclient.HTTP
+	// census connection
+	censusConnection *census.CensusManager
 	// voting process contract handle
 	processHandle *chain.ProcessHandle
 	// ethereum subscribed events
 	ethereumEventList []string
+	codec             *amino.Codec
+	signingKeys       *signature.SignKeys
 	// vochain subscribed events
-	vochainEventList []string
+	// vochainEventList []string
+	// census subscribed events
+	// censusEventList []string
 }
 
-// NewOracle creates an Oracle given an existing Ethereum and Vochain connection
-func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, contractAddressHex string) (*Oracle, error) {
-	PH, err := chain.NewVotingProcessHandle(contractAddressHex)
+// NewOracle creates an Oracle given an existing Ethereum and Vochain and/or Census connection
+func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, cm *census.CensusManager, contractAddressHex string, storage data.Storage, signer *signature.SignKeys) (*Oracle, error) {
+	contractAddr := common.HexToAddress(contractAddressHex)
+	ph, err := chain.NewVotingProcessHandle(contractAddressHex, storage)
 	if err != nil {
 		return new(Oracle), err
 	}
+	var vochainConn *voclient.HTTP
+	if vochainApp != nil {
+		vochainConn = voclient.NewHTTP("localhost:26657", "/websocket")
+		if vochainConn == nil {
+			return nil, errors.New("cannot connect to tendermint http endpoint")
+		}
+	}
+	contractABI, err := abi.JSON(strings.NewReader(contract.VotingProcessABI))
+	if err != nil {
+		log.Fatal(err)
+	}
 	return &Oracle{
+		contractAddress:    contractAddr,
+		contractABI:        contractABI,
 		ethereumConnection: ethCon,
-		vochainConnection:  voclient.NewLocalClient(nil, vochainApp),
-		processHandle:      PH,
+		vochainConnection:  vochainConn,
+		censusConnection:   cm,
+		processHandle:      ph,
 		ethereumEventList: []string{
 			"GenesisChanged(string)",
 			"ChainIdChanged(uint)",
@@ -57,6 +88,8 @@ func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, c
 			"PrivateKeyPublished(bytes32,string)",
 			"ResultsPublished(bytes32,string)",
 		},
+		codec:       amino.NewCodec(),
+		signingKeys: signer,
 	}, nil
 }
 
@@ -66,8 +99,8 @@ type EventProcessCreated struct {
 	EntityAddress  [20]byte
 	ProcessId      [32]byte
 	MerkleTree     string
-	StartBlock     uint64
-	NumberOfBlocks uint64
+	StartBlock     *big.Int
+	NumberOfBlocks *big.Int
 }
 type EventProcessCanceled struct {
 	EntityAddress [20]byte
@@ -125,7 +158,7 @@ func (o *Oracle) SendVochainTx() {}
 
 // EthereumBlockListener returns a block info when a new block is created on Ethereum
 func (o *Oracle) EthereumBlockListener() BlockInfo {
-	client, err := ethclient.Dial(o.ethereumConnection.Node.WSEndpoint())
+	client, err := ethclient.Dial("wss://goerli.infura.io/ws/v3/3419e8a6ab0844628a18e54671ed69e3")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -159,16 +192,17 @@ func (o *Oracle) EthereumBlockListener() BlockInfo {
 
 // SubscribeToEthereumContract sets the ethereum contract to which oracle should listen
 // and listens for events on this contract
-func (o *Oracle) SubscribeToEthereumContract(address string) {
+// blocking function -- should be called in gorouting
+func (o *Oracle) SubscribeEthereumEventLogs() {
 	// create ws client
-	client, err := ethclient.Dial(o.ethereumConnection.Node.WSEndpoint())
+	//client, err := ethclient.Dial(o.ethereumConnection.Node.WSEndpoint())
+	client, err := ethclient.Dial("wss://goerli.infura.io/ws/v3/3419e8a6ab0844628a18e54671ed69e3")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	contractAddress := common.HexToAddress(address)
 	query := eth.FilterQuery{
-		Addresses: []common.Address{contractAddress},
+		Addresses: []common.Address{o.contractAddress},
 	}
 
 	logs := make(chan ethtypes.Log)
@@ -181,15 +215,19 @@ func (o *Oracle) SubscribeToEthereumContract(address string) {
 		select {
 		case err := <-sub.Err():
 			log.Fatal(err)
-		case vLog := <-logs:
-			fmt.Println(vLog) // pointer to event log
+		case event := <-logs:
+			log.Warnf("Eth event recieved: %v", event) // pointer to event log
+			if o.vochainConnection != nil {
+				o.handleLogEntryVochain(event)
+			}
+			if o.censusConnection != nil {
+				o.handleLogEntryCensus(event)
+			}
 		}
 	}
 }
 
-func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) map[int]string {
-	outMap := make(map[int]string)
-
+func (o *Oracle) ReadEthereumEventLogs(from, to int64) interface{} {
 	log.Debug(o.ethereumConnection.Node.WSEndpoint())
 
 	client, err := ethclient.Dial("http://localhost:9091")
@@ -197,12 +235,11 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) map[
 		log.Fatal(err)
 	}
 
-	contractAddress := common.HexToAddress(contractAddr)
 	query := eth.FilterQuery{
 		FromBlock: big.NewInt(from),
 		ToBlock:   big.NewInt(to),
 		Addresses: []common.Address{
-			contractAddress,
+			o.contractAddress,
 		},
 	}
 
@@ -211,16 +248,28 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) map[
 		log.Fatal(err)
 	}
 
-	contractABI, err := abi.JSON(strings.NewReader(contract.VotingProcessABI))
-	if err != nil {
-		log.Fatal(err)
+	log.Debug("reading logs ...")
+	for _, event := range logs {
+		if o.vochainConnection != nil {
+			log.Debug("handling logs ...")
+			err := o.handleLogEntryVochain(event)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Warn("vochain connection is nil")
+		}
+		if o.censusConnection != nil {
+			err := o.handleLogEntryCensus(event)
+			if err != nil {
+				return err
+			}
+		}
 	}
+	return nil
+}
 
-	votingContract, err := contract.NewVotingProcess(common.HexToAddress(contractAddr), client)
-	if err != nil {
-		log.Errorf("cannot get the contract at %v", contractAddr)
-	}
-
+func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 	logGenesisChanged := []byte(o.ethereumEventList[0])
 	logChainIdChanged := []byte(o.ethereumEventList[1])
 	logProcessCreated := []byte(o.ethereumEventList[2])
@@ -243,103 +292,244 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64, contractAddr string) map[
 	HashLogPrivateKeyPublished := crypto.Keccak256Hash(logPrivateKeyPublished)
 	HashLogResultsPublished := crypto.Keccak256Hash(logResultsPublished)
 
-	count := 0
-	for _, vLog := range logs {
-		//fmt.Println(vLog.BlockHash.Hex()) // 0x3404b8c050aa0aacd0223e91b5c32fee6400f357764771d0684fa7b3f448f1a8
-		//fmt.Println(vLog.BlockNumber)     // 2394201
-		//fmt.Println(vLog.TxHash.Hex())    // 0x280201eda63c9ff6f305fcee51d5eb86167fab40ca3108ec784e8652a0e2b1a6
-
-		// need to crete struct to decode raw log data
-		switch vLog.Topics[0].Hex() {
-		case HashLogGenesisChanged.Hex():
-			/*
-				log.Info("New log: GenesisChanged")
-				var eventGenesisChanged EventGenesisChanged
-				err := contractABI.Unpack(&eventGenesisChanged, "GenesisChanged", vLog.Data)
-				if err != nil {
-					log.Fatal(err)
-				}
-				eventGenesisChanged = EventGenesisChanged(vLog.Topics[1].String())
-				return eventGenesisChanged
-			*/
-			//return nil
-		case HashLogChainIdChanged.Hex():
-			//return nil
-		case HashLogProcessCreated.Hex():
-			log.Debug("new log: processCreated")
-			var eventProcessCreated EventProcessCreated
-			err := contractABI.Unpack(&eventProcessCreated, "ProcessCreated", vLog.Data)
+	switch event.Topics[0].Hex() {
+	case HashLogGenesisChanged.Hex():
+		/*
+			log.Info("New log: GenesisChanged")
+			var eventGenesisChanged EventGenesisChanged
+			err := contractABI.Unpack(&eventGenesisChanged, "GenesisChanged", vLog.Data)
 			if err != nil {
 				log.Fatal(err)
 			}
-			//log.Debugf("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
+			eventGenesisChanged = EventGenesisChanged(vLog.Topics[1].String())
+			return eventGenesisChanged
+		*/
+		//return nil
+	case HashLogChainIdChanged.Hex():
+		//return nil
+	case HashLogProcessCreated.Hex():
+		log.Debug("new log: processCreated")
+		var eventProcessCreated EventProcessCreated
+		err := o.contractABI.Unpack(&eventProcessCreated, "ProcessCreated", event.Data)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Debugf("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
 
-			var topics [4]string
-			for i := range vLog.Topics {
-				topics[i] = vLog.Topics[i].Hex()
-			}
-			log.Debugf("topics: %v", topics)
-			processIdx, err := votingContract.GetProcessIndex(nil, eventProcessCreated.ProcessId)
-			if err != nil {
-				log.Error("cannot get process index from smartcontract")
-			}
-			log.Debugf("Pprocess index loaded: %v", processIdx)
+		var topics [4]string
+		for i := range event.Topics {
+			topics[i] = event.Topics[i].Hex()
+		}
+		log.Debugf("topics: %v", topics)
+		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.ProcessId)
+		if err != nil {
+			log.Error("cannot get process index from smartcontract")
+		}
+		log.Debugf("Process index loaded: %v", processIdx)
 
-			processInfo, err := o.processHandle.GetProcessData(eventProcessCreated.ProcessId)
-			//testTx := abci.RequestDeliverTx{
-			//	Tx: pinfoMarshal,
-			//}
-
-			//response := o.vochainConnection.DeliverTx(testTx)
-			//log.Debugf("response deliverTX success: %t", response.IsOK())
-			//processes, err := votingContract.Get(nil, eventProcessCreated.ProcessId)
-
-			//processInfo, err := o.storage.Retrieve(processes.Metadata)
-
-			if err != nil {
-				log.Errorf("error fetching process metadata from chain module: %s", err)
-			}
-			/*
-				log.Debugf("process info: %+v", processInfo)
-				if err != nil {
-					log.Warnf("cannot get process given the index: %v", err)
-				}
-			*/
-			tx := processInfo.String()
-			outMap[count] = tx
-			count++
-
-		case HashLogProcessCanceled.Hex():
-			//stub
-			//return nil
-		case HashLogValidatorAdded.Hex():
-			//stub
-			//return nil
-		case HashLogValidatorRemoved.Hex():
-			//stub
-			return nil
-		case HashLogOracleAdded.Hex():
-			log.Debug("new log event: AddOracle")
-			var eventAddOracle OracleAdded
-			log.Debugf("added event data: %v", vLog.Data)
-			err := contractABI.Unpack(&eventAddOracle, "OracleAdded", vLog.Data)
-			if err != nil {
-				return nil // TBD
-			}
-			log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
-			//stub
-			return nil
-		case HashLogOracleRemoved.Hex():
-			//stub
-			//return nil
-		case HashLogPrivateKeyPublished.Hex():
-			//stub
-			//return nil
-		case HashLogResultsPublished.Hex():
-			//stub
-			//return nil
+		processTx, err := o.processHandle.GetProcessTxArgs(eventProcessCreated.ProcessId)
+		if err != nil {
+			log.Errorf("Error getting process metadata: %s", err)
+		} else {
+			log.Infof("Process meta: %s", &processTx)
 		}
 
+		log.Debugf("signing with key: %s", o.signingKeys.EthAddrString())
+		processTx.Signature, err = o.signingKeys.SignJSON(processTx)
+		if err != nil {
+			log.Errorf("cannot sign oracle tx: %s", err.Error())
+		}
+		log.Debugf("processTx before json.Marshal HandleLogVochainEntry: %+v", processTx)
+		tx, err := json.Marshal(processTx)
+		if err != nil {
+			log.Errorf("error marshaling process tx: %s", err)
+		} else {
+			log.Infof("Tx after json.Marshal HandleLogVochainEntry: %s", string(tx))
+		}
+
+		res, err := o.vochainConnection.BroadcastTxSync(tx)
+		if err != nil {
+			log.Warnf("result tx: %s", err)
+		} else {
+			log.Infof("transaction result: %+v", res)
+			log.Infof("transactions result details: %+v", res.Log)
+		}
+		//log.Fatalf("PROCESS LOADED: %v", processInfo)
+		_, err = o.processHandle.GetOracles()
+		if err != nil {
+			log.Errorf("error getting oracles: %s", err)
+		}
+
+		_, err = o.processHandle.GetValidators()
+		if err != nil {
+			log.Errorf("error getting validators: %s", err)
+		}
+
+		// To change at some point
+		time.Sleep(2 * time.Second)
+
+	case HashLogProcessCanceled.Hex():
+		//stub
+		//return nil
+	case HashLogValidatorAdded.Hex():
+		//stub
+		//return nil
+	case HashLogValidatorRemoved.Hex():
+		//stub
+		return nil
+	case HashLogOracleAdded.Hex():
+		log.Debug("new log event: AddOracle")
+		var eventAddOracle OracleAdded
+		log.Debugf("added event data: %v", event.Data)
+		err := o.contractABI.Unpack(&eventAddOracle, "OracleAdded", event.Data)
+		if err != nil {
+			return err
+		}
+		log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
+		//stub
+		return nil
+	case HashLogOracleRemoved.Hex():
+		//stub
+		//return nil
+	case HashLogPrivateKeyPublished.Hex():
+		//stub
+		//return nil
+	case HashLogResultsPublished.Hex():
+		//stub
+		//return nil
 	}
-	return outMap
+	return nil
+}
+
+func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
+	logGenesisChanged := []byte(o.ethereumEventList[0])
+	logChainIdChanged := []byte(o.ethereumEventList[1])
+	logProcessCreated := []byte(o.ethereumEventList[2])
+	logProcessCanceled := []byte(o.ethereumEventList[3])
+	logValidatorAdded := []byte(o.ethereumEventList[4])
+	logValidatorRemoved := []byte(o.ethereumEventList[5])
+	logOracleAdded := []byte(o.ethereumEventList[6])
+	logOracleRemoved := []byte(o.ethereumEventList[7])
+	logPrivateKeyPublished := []byte(o.ethereumEventList[8])
+	logResultsPublished := []byte(o.ethereumEventList[9])
+
+	HashLogGenesisChanged := crypto.Keccak256Hash(logGenesisChanged)
+	HashLogChainIdChanged := crypto.Keccak256Hash(logChainIdChanged)
+	HashLogProcessCreated := crypto.Keccak256Hash(logProcessCreated)
+	HashLogProcessCanceled := crypto.Keccak256Hash(logProcessCanceled)
+	HashLogValidatorAdded := crypto.Keccak256Hash(logValidatorAdded)
+	HashLogValidatorRemoved := crypto.Keccak256Hash(logValidatorRemoved)
+	HashLogOracleAdded := crypto.Keccak256Hash(logOracleAdded)
+	HashLogOracleRemoved := crypto.Keccak256Hash(logOracleRemoved)
+	HashLogPrivateKeyPublished := crypto.Keccak256Hash(logPrivateKeyPublished)
+	HashLogResultsPublished := crypto.Keccak256Hash(logResultsPublished)
+
+	switch event.Topics[0].Hex() {
+	case HashLogGenesisChanged.Hex():
+		/*
+			log.Info("New log: GenesisChanged")
+			var eventGenesisChanged EventGenesisChanged
+			err := contractABI.Unpack(&eventGenesisChanged, "GenesisChanged", vLog.Data)
+			if err != nil {
+				log.Fatal(err)
+			}
+			eventGenesisChanged = EventGenesisChanged(vLog.Topics[1].String())
+			return eventGenesisChanged
+		*/
+		//return nil
+	case HashLogChainIdChanged.Hex():
+		//return nil
+	case HashLogProcessCreated.Hex():
+		log.Debug("new log: processCreated")
+		var eventProcessCreated EventProcessCreated
+		err := o.contractABI.Unpack(&eventProcessCreated, "ProcessCreated", event.Data)
+		if err != nil {
+			log.Fatal(err)
+		}
+		//log.Debugf("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
+
+		var topics [4]string
+		for i := range event.Topics {
+			topics[i] = event.Topics[i].Hex()
+		}
+		log.Debugf("topics: %v", topics)
+		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.ProcessId)
+		if err != nil {
+			log.Error("cannot get process index from smartcontract")
+		}
+		log.Debugf("Process index loaded: %v", processIdx)
+
+		processInfo, err := o.processHandle.GetProcessMetadata(eventProcessCreated.ProcessId)
+		if err != nil {
+			log.Errorf("Error getting process metadata: %s", err)
+		} else {
+			log.Infof("Process meta: %s", &processInfo)
+		}
+		if o.censusConnection != nil {
+			/*
+				log.Infof("adding new namespace for published census %s", resp.Root)
+				err = o.censusConnection.AddNamespace(resp.Root, r.PubKeys)
+				if err != nil {
+					log.Warnf("error creating local published census: %s", err.Error())
+				} else {
+					log.Infof("import claims to new census")
+					err = o.censusConnection.Trees[resp.Root].ImportDump(dump.ClaimsData)
+					if err != nil {
+						log.Warn(err)
+					}
+				}
+
+				o.censusConnection.AddNamespace(processInfo)
+			*/
+		}
+
+		if err != nil {
+			log.Errorf("error fetching process metadata from chain module: %s", err)
+		}
+		log.Debugf("process info: %+v", processInfo)
+		if err != nil {
+			log.Warnf("cannot get process given the index: %v", err)
+		}
+		//log.Fatalf("PROCESS LOADED: %v", processInfo)
+		_, err = o.processHandle.GetOracles()
+		if err != nil {
+			log.Errorf("error getting oracles: %s", err)
+		}
+
+		_, err = o.processHandle.GetValidators()
+		if err != nil {
+			log.Errorf("error getting validators: %s", err)
+		}
+
+	case HashLogProcessCanceled.Hex():
+		//stub
+		//return nil
+	case HashLogValidatorAdded.Hex():
+		//stub
+		//return nil
+	case HashLogValidatorRemoved.Hex():
+		//stub
+		return nil
+	case HashLogOracleAdded.Hex():
+		log.Debug("new log event: AddOracle")
+		var eventAddOracle OracleAdded
+		log.Debugf("added event data: %v", event.Data)
+		err := o.contractABI.Unpack(&eventAddOracle, "OracleAdded", event.Data)
+		if err != nil {
+			return err
+		}
+		log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
+		//stub
+		return nil
+	case HashLogOracleRemoved.Hex():
+		//stub
+		//return nil
+	case HashLogPrivateKeyPublished.Hex():
+		//stub
+		//return nil
+	case HashLogResultsPublished.Hex():
+		//stub
+		//return nil
+	}
+	return nil
 }

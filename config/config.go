@@ -134,7 +134,7 @@ type OracleCfg struct {
 	EthereumClient EthereumClient
 	VochainConfig  VochainCfg
 	// The expected VochainClient field does not exists because no needs config
-	IpfsConfig IPFSCfg
+	Ipfs       IPFSCfg
 	LogLevel   string
 	LogOutput  string
 	DataDir    string

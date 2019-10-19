@@ -2,14 +2,14 @@ package chain
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-
 	votingProcess "gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain"
+	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 //These methods represent an exportable abstraction over raw contract bindings
@@ -31,7 +31,6 @@ type QuestionMetadata struct {
 	VoteOptions []VoteOption      `json:"voteOptions"`
 }
 
-/*
 type ProcessMetadata struct {
 	Version        string `json:"version"`
 	Type           string `json:"type"`
@@ -50,10 +49,9 @@ type ProcessMetadata struct {
 		Questions           []QuestionMetadata `json:"questions"`
 	}
 }
-*/
 
 // Constructor for proc_transactor on node
-func NewVotingProcessHandle(contractAddressHex string) (*ProcessHandle, error) {
+func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*ProcessHandle, error) {
 	client, err := ethclient.Dial("http://127.0.0.1:9091")
 	if err != nil {
 		log.Error(err)
@@ -67,25 +65,50 @@ func NewVotingProcessHandle(contractAddressHex string) (*ProcessHandle, error) {
 	}
 	PH := new(ProcessHandle)
 	PH.VotingProcess = votingProcess
+	PH.storage = storage
 
 	return PH, nil
 }
 
-func (ph *ProcessHandle) GetProcessData(pid [32]byte) (*vochain.NewProcessTxArgs, error) {
+func (ph *ProcessHandle) GetProcessMetadata(pid [32]byte) (*ProcessMetadata, error) {
+	processInfoStructured := new(ProcessMetadata)
+	processMeta, err := ph.VotingProcess.Get(nil, pid)
+	if err != nil {
+		return processInfoStructured, err
+	}
+	processInfo, err := ph.storage.Retrieve(processMeta.Metadata)
+	if err != nil {
+		return processInfoStructured, err
+	}
+	censusTree, err := ph.storage.Retrieve(processMeta.CensusMerkleTree)
+	if err != nil {
+		return processInfoStructured, err
+	}
+	//json.Unmarshal(processInfo, &processInfoStructured)
+	log.Info("Structured Info: %s", processInfo)
+	log.Info("Merkle tree: %s", censusTree)
+	return processInfoStructured, nil
+}
+
+func (ph *ProcessHandle) GetProcessTxArgs(pid [32]byte) (types.NewProcessTx, error) {
 	processMeta, err := ph.VotingProcess.Get(nil, pid)
 	if err != nil {
 		log.Errorf("Error fetching process metadata from Ethereum: %s", err)
 	}
 
-	processTxArgs := new(vochain.NewProcessTxArgs)
+	processTxArgs := new(types.NewProcessTx)
 	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
-	processTxArgs.EntityAddress = processMeta.EntityAddress.String()
+	processTxArgs.EntityID = processMeta.EntityAddress.String()
 	processTxArgs.MkRoot = processMeta.CensusMerkleRoot
-	processTxArgs.NumberOfBlocks = processMeta.NumberOfBlocks
-	processTxArgs.StartBlock = processMeta.StartBlock
-	processTxArgs.EncryptionPrivateKey = processMeta.VoteEncryptionPrivateKey
+	processTxArgs.NumberOfBlocks = processMeta.NumberOfBlocks.Int64()
+	processTxArgs.StartBlock = processMeta.StartBlock.Int64()
+	processTxArgs.EncryptionPublicKeys = []string{processMeta.VoteEncryptionPrivateKey}
+	processTxArgs.Type = "newProcess"
+	return *processTxArgs, nil
+}
 
-	return processTxArgs, nil
+func (ph *ProcessHandle) GetProcessIndex(pid [32]byte) (*big.Int, error) {
+	return ph.VotingProcess.GetProcessIndex(nil, pid)
 }
 
 func (ph *ProcessHandle) GetOracles() ([]string, error) {

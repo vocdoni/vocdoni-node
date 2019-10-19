@@ -566,6 +566,5 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		return resp
 	}
-
 	return resp
 }
