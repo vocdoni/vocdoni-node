@@ -58,21 +58,29 @@ func (t *Tree) GetClaim(data []byte) (*mkcore.ClaimBasic, error) {
 	if len(data) > MaxClaimSize {
 		return nil, errors.New("claim data too large")
 	}
-	for i := len(data); i <= MaxClaimSize; i++ {
-		data = append(data, '\x00')
+	if len(data) < MaxClaimSize {
+		doPadding(&data)
 	}
+	return getClaimFromData(data), nil
+}
+
+func getClaimFromData(data []byte) *mkcore.ClaimBasic {
 	var indexSlot [400 / 8]byte
 	var dataSlot [MaxClaimSize]byte
 	copy(indexSlot[:], data[:400/8])
 	copy(dataSlot[:], data[:MaxClaimSize])
-	e := mkcore.NewClaimBasic(indexSlot, dataSlot)
-	return e, nil
+	return mkcore.NewClaimBasic(indexSlot, dataSlot)
+}
+
+func doPadding(data *[]byte) {
+	for i := len(*data); i < MaxClaimSize; i++ {
+		*data = append(*data, byte('\u0000'))
+	}
 }
 
 func (t *Tree) AddClaim(data []byte) error {
-	//padding
-	for i := len(data); i < MaxClaimSize; i++ {
-		data = append(data, byte('\u0000'))
+	if len(data) < MaxClaimSize {
+		doPadding(&data)
 	}
 	e, err := t.GetClaim(data)
 	if err != nil {
@@ -82,6 +90,9 @@ func (t *Tree) AddClaim(data []byte) error {
 }
 
 func (t *Tree) GenProof(data []byte) (string, error) {
+	if len(data) < MaxClaimSize {
+		doPadding(&data)
+	}
 	e, err := t.GetClaim(data)
 	if err != nil {
 		return "", err
@@ -111,32 +122,16 @@ func CheckProof(root, mpHex string, data []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	e, err := merkletree.NewEntryFromBytes(data)
-	if err != nil {
-		return false, err
+	if len(data) < MaxClaimSize {
+		doPadding(&data)
 	}
+	e := getClaimFromData(data)
 	return merkletree.VerifyProof(&rootHash, mp,
-		e.HIndex(), e.HValue()), nil
+		e.Entry().HIndex(), e.Entry().HValue()), nil
 }
 
 func (t *Tree) CheckProof(data []byte, mpHex string) (bool, error) {
-	mpBytes, err := common3.HexDecode(mpHex)
-	if err != nil {
-		return false, err
-	}
-	mp, err := merkletree.NewProofFromBytes(mpBytes)
-	if err != nil {
-		return false, err
-	}
-	if !mp.Existence {
-		return false, nil
-	}
-	e, err := t.GetClaim(data)
-	if err != nil {
-		return false, err
-	}
-	return merkletree.VerifyProof(t.Tree.RootKey(), mp,
-		e.Entry().HIndex(), e.Entry().HValue()), nil
+	return CheckProof(t.GetRoot(), mpHex, data)
 }
 
 func (t *Tree) GetRoot() string {

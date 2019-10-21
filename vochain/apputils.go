@@ -1,7 +1,6 @@
 package vochain
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -182,8 +181,8 @@ func AdminTxCheck(adminTx *vochaintypes.AdminTx, state *VochainState) error {
 	return nil
 }
 
-func checkMerkleProof(rootHash, proof string, leafData []byte) (bool, error) {
-	hexproof := hex.EncodeToString([]byte(proof))
+// hexproof is the hexadecimal a string. leafData is the claim data in byte format
+func checkMerkleProof(rootHash, hexproof string, leafData []byte) (bool, error) {
 	return tree.CheckProof(rootHash, hexproof, leafData)
 }
 
