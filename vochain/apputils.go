@@ -108,7 +108,7 @@ func VoteTxCheck(vote *vochaintypes.VoteTx, state *VochainState) error {
 		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
 	}
 	voteID := fmt.Sprintf("%s%s", vote.ProcessID, vote.Nullifier)
-	v, _ := state.GetVote(voteID)
+	v, _ := state.GetEnvelope(voteID)
 	if v != nil {
 		return fmt.Errorf("vote already exists")
 	}

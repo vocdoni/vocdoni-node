@@ -232,7 +232,7 @@ func TestCensus(t *testing.T) {
 
 	// CheckProof valid
 	req.RootHash = ""
-	req.ProofData = siblings
+	req.Payload.Proof = siblings
 	req.Method = "checkProof"
 	resp, err = sendCensusReq(req, signer2, false)
 	t.Logf("checkProof response %+v", resp)
@@ -244,7 +244,7 @@ func TestCensus(t *testing.T) {
 	}
 
 	// CheckProof invalid (old root)
-	req.ProofData = siblings
+	req.Payload.Proof = siblings
 	req.Method = "checkProof"
 	req.RootHash = root
 	resp, err = sendCensusReq(req, signer2, false)

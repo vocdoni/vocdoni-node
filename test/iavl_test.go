@@ -136,13 +136,13 @@ func TestAddVote(t *testing.T) {
 	}
 }
 
-func TestGetVote(t *testing.T) {
+func TestGetEnvelope(t *testing.T) {
 	s := testcommon.NewVochainStateWithProcess()
 	if s != nil {
 		if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
 			t.Error(err)
 		}
-		if _, err := s.GetVote("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d51055592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
+		if _, err := s.GetEnvelope("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d51055592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
 			t.Error(err)
 		}
 	}

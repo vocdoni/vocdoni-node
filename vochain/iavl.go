@@ -215,8 +215,8 @@ func (v *VochainState) AddVote(vote *vochaintypes.Vote) error {
 	return nil
 }
 
-// GetVote returns the info of a vote if already exists
-func (v *VochainState) GetVote(voteID string) (*vochaintypes.Vote, error) {
+// GetEnvelope returns the info of a vote if already exists
+func (v *VochainState) GetEnvelope(voteID string) (*vochaintypes.Vote, error) {
 	var vote *vochaintypes.Vote
 	if !v.VoteTree.Has([]byte(voteID)) {
 		return nil, fmt.Errorf("vote with id (%s) does not exists", voteID)

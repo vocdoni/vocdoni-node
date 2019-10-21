@@ -540,7 +540,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 	}
 
 	if op == "checkProof" {
-		if len(r.ProofData) < 1 {
+		if len(r.Payload.Proof) < 1 {
 			resp.Ok = false
 			resp.Error = "proofData not provided"
 			return resp
@@ -553,7 +553,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			resp.Error = err.Error()
 			return resp
 		}
-		validProof, err := t.CheckProof(data, r.ProofData)
+		validProof, err := t.CheckProof(data, r.Payload.Proof)
 		if err != nil {
 			resp.Ok = false
 			resp.Error = err.Error()

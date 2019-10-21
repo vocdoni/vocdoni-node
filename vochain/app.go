@@ -147,21 +147,21 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	case "getEnvelopeStatus":
 		p, err := app.State.GetProcess(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier))
 		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Value: []byte{0}}
+			return abcitypes.ResponseQuery{Code: 1, Value: []byte("false")}
 		} else if p == nil {
-			return abcitypes.ResponseQuery{Code: 0, Value: []byte{0}}
+			return abcitypes.ResponseQuery{Code: 0, Value: []byte("false")}
 		}
-		return abcitypes.ResponseQuery{Code: 0, Value: []byte{1}}
+		return abcitypes.ResponseQuery{Code: 0, Value: []byte("true")}
 	case "getEnvelope":
-		p, err := app.State.GetProcess(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier)) // nullifier hash(addr+pid), processId by pid_nullifier
+		e, err := app.State.GetEnvelope(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier)) // nullifier hash(addr+pid), processId by pid_nullifier
 		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get process: %s", err.Error())}
+			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get envelope: %s", err.Error())}
 		}
-		pBytes, err := app.State.Codec.MarshalBinaryBare(p)
+		eBytes, err := app.State.Codec.MarshalBinaryBare(e.VotePackage)
 		if err != nil {
 			return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal processBytes"}
 		}
-		return abcitypes.ResponseQuery{Code: 0, Value: pBytes}
+		return abcitypes.ResponseQuery{Code: 0, Value: eBytes}
 	case "getEnvelopeHeight":
 		votes := app.State.CountVotes(reqData.ProcessID)
 		vBytes, err := app.State.Codec.MarshalBinaryBare(votes)
