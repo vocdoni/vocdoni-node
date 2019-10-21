@@ -180,6 +180,18 @@ func TestCensus(t *testing.T) {
 		t.Errorf("proof should not exist!")
 	}
 
+	// getRoot
+	req.Method = "getRoot"
+	resp, err = sendCensusReq(req, signer2, false)
+	t.Logf("getRoot response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("fail on getRoot")
+	}
+	root := resp.Root
+	if len(root) < 1 {
+		t.Errorf("got invalid root")
+	}
+
 	// addBlaimBulk
 	var claims []string
 	req.Method = "addClaimBulk"
@@ -205,6 +217,46 @@ func TestCensus(t *testing.T) {
 		t.Errorf("failed dumping plain claims")
 	}
 
+	// GenProof valid
+	req.Method = "genProof"
+	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abc0"))
+	resp, err = sendCensusReq(req, signer2, false)
+	t.Logf("genProof response %+v", resp)
+	if !resp.Ok {
+		t.Errorf("proof is invalid but it should be valid (%s)", resp.Error)
+	}
+	siblings := resp.Siblings
+	if len(siblings) == 0 {
+		t.Errorf("proof not generated while it should be generated correctly")
+	}
+
+	// CheckProof valid
+	req.RootHash = ""
+	req.ProofData = siblings
+	req.Method = "checkProof"
+	resp, err = sendCensusReq(req, signer2, false)
+	t.Logf("checkProof response %+v", resp)
+	if !resp.ValidProof {
+		t.Error("proof is invalid but it should be valid")
+	}
+	if !resp.Ok {
+		t.Errorf("proof cannot be checked (%s)", resp.Error)
+	}
+
+	// CheckProof invalid (old root)
+	req.ProofData = siblings
+	req.Method = "checkProof"
+	req.RootHash = root
+	resp, err = sendCensusReq(req, signer2, false)
+	t.Logf("checkProof response %+v", resp)
+	if resp.ValidProof {
+		t.Errorf("proof must be invalid for hash %s but it is valid!", root)
+	}
+	if !resp.Ok {
+		t.Errorf("proof cannot be checked (%s)", resp.Error)
+	}
+	req.RootHash = ""
+
 	// publish
 	req.Method = "publish"
 	req.ClaimsData = []string{}
@@ -222,7 +274,7 @@ func TestCensus(t *testing.T) {
 	if !resp.Ok {
 		t.Errorf("fail on getRoot")
 	}
-	root := resp.Root
+	root = resp.Root
 	if len(root) < 1 {
 		t.Errorf("got invalid root")
 	}
