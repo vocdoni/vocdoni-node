@@ -147,34 +147,34 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	case "getEnvelopeStatus":
 		p, err := app.State.GetProcess(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier))
 		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: "", Value: []byte{0}}
+			return abcitypes.ResponseQuery{Code: 1, Value: []byte{0}}
 		} else if p == nil {
-			return abcitypes.ResponseQuery{Code: 0, Info: "", Value: []byte{0}}
+			return abcitypes.ResponseQuery{Code: 0, Value: []byte{0}}
 		}
-		return abcitypes.ResponseQuery{Code: 0, Info: "", Value: []byte{1}}
+		return abcitypes.ResponseQuery{Code: 0, Value: []byte{1}}
 	case "getEnvelope":
 		p, err := app.State.GetProcess(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier)) // nullifier hash(addr+pid), processId by pid_nullifier
 		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get process: %s", err.Error()), Value: make([]byte, 0)}
+			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get process: %s", err.Error())}
 		}
 		pBytes, err := app.State.Codec.MarshalBinaryBare(p)
 		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal processBytes", Value: make([]byte, 0)}
+			return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal processBytes"}
 		}
-		return abcitypes.ResponseQuery{Code: 0, Info: "", Value: pBytes}
+		return abcitypes.ResponseQuery{Code: 0, Value: pBytes}
 	case "getEnvelopeHeight":
 		votes := app.State.CountVotes(reqData.ProcessID)
 		vBytes, err := app.State.Codec.MarshalBinaryBare(votes)
 		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal votes count bytes", Value: make([]byte, 0)}
+			return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal votes count bytes"}
 		}
-		return abcitypes.ResponseQuery{Code: 0, Info: "", Value: vBytes}
+		return abcitypes.ResponseQuery{Code: 0, Value: vBytes}
 	case "getBlockHeight":
-		return abcitypes.ResponseQuery{Code: 0, Info: "", Value: app.State.GetHeight()}
+		return abcitypes.ResponseQuery{Code: 0, Value: app.State.GetHeight()}
 	case "getProcessList":
-		return abcitypes.ResponseQuery{Code: 1, Info: "not implemented", Value: make([]byte, 0)}
+		return abcitypes.ResponseQuery{Code: 1, Info: "not implemented"}
 	case "getEnvelopeList":
-		return abcitypes.ResponseQuery{Code: 1, Info: "not implemented", Value: make([]byte, 0)}
+		return abcitypes.ResponseQuery{Code: 1, Info: "not implemented"}
 	default:
 		return abcitypes.ResponseQuery{Code: 1, Info: "undefined query method"}
 	}

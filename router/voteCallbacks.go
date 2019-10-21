@@ -24,12 +24,11 @@ func submitEnvelope(request routerRequest, router *Router) {
 		log.Errorf("error marshaling voteTx args: %s", err.Error())
 	}
 
-	res, err := router.tmclient.BroadcastTxCommit(voteTxBytes)
+	res, err := router.tmclient.BroadcastTxSync(voteTxBytes)
 	if err != nil {
-		log.Warnf("cannot commit tx: %s", err)
+		log.Warnf("cannot broadcast tx: %s", err)
 	} else {
-		log.Infof("transaction result: %+v", res)
-		log.Infof("transactions result details: %+v", res.CheckTx.GetInfo())
+		log.Infof("transactions result details: %s", res.Data.String())
 	}
 
 	var apiResponse types.ResponseMessage
@@ -38,13 +37,12 @@ func submitEnvelope(request routerRequest, router *Router) {
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 
 	// not sure if its enough information
-	vochainResponse := res.DeliverTx
-	if vochainResponse.Code != 0 {
+	if res.Code != 0 {
 		apiResponse.Response.Ok = false
 	} else {
 		apiResponse.Response.Ok = true
 	}
-	apiResponse.Response.Message = vochainResponse.GetInfo()
+	apiResponse.Response.Message = res.Data.String()
 
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
@@ -75,9 +73,28 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
-	apiResponse.Response.Height = 0
-	apiResponse.Response.Ok = true
-	var err error
+	qdata := vochain.QueryData{
+		Method:    "getEnvelopeHeight",
+		ProcessID: request.structured.ProcessId,
+	}
+	qdataBytes, err := json.Marshal(qdata)
+	if err != nil {
+		log.Errorf("cannot marshal query data: (%s)", err.Error())
+	}
+	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
+	if err != nil {
+		apiResponse.Response.Ok = false
+	} else {
+		apiResponse.Response.Ok = true
+	}
+	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Height)
+	if apiResponse.Response.Height == 0 {
+		apiResponse.Response.Height = -1
+	}
+	log.Debugf("Response height is: %d", apiResponse.Response.Height)
+	if err != nil {
+		log.Errorf("cannot unmarshal height: %s", err.Error())
+	}
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
 		log.Warn(err.Error())
@@ -87,6 +104,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 		log.Errorf("Error marshaling getEnvelopeHeight reply: %s", err)
 	}
 
+	log.Debugf("api response: %+v", apiResponse.Response)
 	router.transport.Send(buildReply(request.context, rawApiResponse))
 
 }
@@ -110,7 +128,7 @@ func getBlockHeight(request routerRequest, router *Router) {
 		apiResponse.Response.Ok = true
 	}
 	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Height)
-	log.Warnf("Response height is: %s", apiResponse.Response.Height)
+	log.Debugf("Response height is: %d", apiResponse.Response.Height)
 	if err != nil {
 		log.Errorf("cannot unmarshal height: %s", err.Error())
 	}
@@ -122,7 +140,7 @@ func getBlockHeight(request routerRequest, router *Router) {
 	if err != nil {
 		log.Errorf("Error marshaling getBlockHeight reply: %s", err)
 	}
-
+	log.Debugf("api response: %+v", apiResponse.Response)
 	router.transport.Send(buildReply(request.context, rawApiResponse))
 }
 

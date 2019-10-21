@@ -11,26 +11,27 @@ type RequestMessage struct {
 /*MetaRequest contains all of the possible request fields.
 Fields must be in alphabetical order */
 type MetaRequest struct {
-	CensusID   string   `json:"censusId,omitempty"`
-	CensusURI  string   `json:"censusUri,omitempty"`
-	ClaimData  string   `json:"claimData,omitempty"`
-	ClaimsData []string `json:"claimsData,omitempty"`
-	Content    string   `json:"content,omitempty"`
-	From       int32    `json:"from,omitempty"`
-	ListSize   int32    `json:"listSize,omitempty"`
-	Method     string   `json:"method"`
-	Name       string   `json:"name,omitempty"`
-	Nullifier  string   `json:"nullifier,omitempty"`
-	Nonce      string   `json:"nonce,omitempty"`
-	Payload    string   `json:"payload,omitempty"`
-	ProcessId  string   `json:"processId,omitempty"`
-	ProofData  string   `json:"proofData,omitempty"`
-	PubKeys    []string `json:"encryptionPublicKeys,omitempty"`
-	RootHash   string   `json:"rootHash,omitempty"`
-	Timestamp  int32    `json:"timestamp"`
-	Type       string   `json:"type,omitempty"`
-	URI        string   `json:"uri,omitempty"`
-	Signature  string   `json:"signature,omitempty"`
+	CensusID    string   `json:"censusId,omitempty"`
+	CensusURI   string   `json:"censusUri,omitempty"`
+	ClaimData   string   `json:"claimData,omitempty"`
+	ClaimsData  []string `json:"claimsData,omitempty"`
+	Content     string   `json:"content,omitempty"`
+	From        int32    `json:"from,omitempty"`
+	ListSize    int32    `json:"listSize,omitempty"`
+	Method      string   `json:"method"`
+	Name        string   `json:"name,omitempty"`
+	Nullifier   string   `json:"nullifier,omitempty"`
+	Nonce       string   `json:"nonce,omitempty"`
+	Payload     string   `json:"payload,omitempty"`
+	ProcessId   string   `json:"processId,omitempty"`
+	ProofData   string   `json:"proofData,omitempty"`
+	PubKeys     []string `json:"encryptionPublicKeys,omitempty"`
+	RootHash    string   `json:"rootHash,omitempty"`
+	Timestamp   int32    `json:"timestamp"`
+	Type        string   `json:"type,omitempty"`
+	URI         string   `json:"uri,omitempty"`
+	Signature   string   `json:"signature,omitempty"`
+	VotePackage string   `json:"vote-package"`
 }
 
 //ResponseMessage wraps an api response
