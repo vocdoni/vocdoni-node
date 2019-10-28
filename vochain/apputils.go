@@ -63,6 +63,9 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 	switch txType {
 	case "VoteTx":
 		votetx := reflect.Indirect(reflect.ValueOf(tx)).Interface().(vochaintypes.VoteTx)
+		if votetx.ProcessID[0:2] == "0x" {
+			votetx.ProcessID = votetx.ProcessID[2:]
+		}
 		vote := &vochaintypes.Vote{
 			Nullifier:   votetx.Nullifier,
 			Nonce:       votetx.Nonce,

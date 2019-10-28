@@ -34,8 +34,9 @@ type EnvelopePayload struct {
 	VotePackage string `json:"vote-package"`
 	Nullifier   string `json:"nullifier,omitempty"`
 	Nonce       string `json:"nonce,omitempty"`
-	Proof       string `json:"proofData,omitempty"`
+	Proof       string `json:"proof,omitempty"`
 	Signature   string `json:"signature,omitempty"`
+	ProcessId   string `json:"processId,omitempty"`
 }
 
 //ResponseMessage wraps an api response

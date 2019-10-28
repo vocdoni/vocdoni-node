@@ -347,14 +347,13 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 			log.Infof("Tx after json.Marshal HandleLogVochainEntry: %s", string(tx))
 		}
 
-		res, err := o.vochainConnection.BroadcastTxSync(tx)
+		res, err := o.vochainConnection.BroadcastTxCommit(tx)
 		if err != nil {
 			log.Warnf("result tx: %s", err)
 		} else {
 			log.Infof("transaction result: %+v", res)
-			log.Infof("transactions result details: %+v", res.Log)
+			log.Infof("transactions result details: { checkTx: %s, deliverTx: %s }", res.CheckTx.String(), res.DeliverTx.String())
 		}
-		//log.Fatalf("PROCESS LOADED: %v", processInfo)
 		_, err = o.processHandle.GetOracles()
 		if err != nil {
 			log.Errorf("error getting oracles: %s", err)
@@ -367,6 +366,7 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 
 		// To change at some point
 		time.Sleep(2 * time.Second)
+		break
 
 	case HashLogProcessCanceled.Hex():
 		//stub
