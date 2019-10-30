@@ -425,6 +425,34 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		return resp
 	}
 
+	if op == "checkProof" {
+		if len(r.Payload.Proof) < 1 {
+			resp.Ok = false
+			resp.Error = "proofData not provided"
+			return resp
+		}
+		root := r.RootHash
+		if len(root) < 1 {
+			root = cm.Trees[r.CensusID].GetRoot()
+		}
+		// Generate proof and return it
+		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
+		if err != nil {
+			log.Warnf("error decoding base64 string: %s", err.Error())
+			resp.Ok = false
+			resp.Error = err.Error()
+			return resp
+		}
+		validProof, err := tree.CheckProof(root, r.Payload.Proof, data)
+		if err != nil {
+			resp.Ok = false
+			resp.Error = err.Error()
+			return resp
+		}
+		resp.ValidProof = validProof
+		return resp
+	}
+
 	//Methods with rootHash, if rootHash specified snapshot the tree
 	var t *tree.Tree
 	if len(r.RootHash) > 1 { //if rootHash specified
@@ -539,32 +567,5 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 	}
 
-	if op == "checkProof" {
-		if len(r.Payload.Proof) < 1 {
-			resp.Ok = false
-			resp.Error = "proofData not provided"
-			return resp
-		}
-		// Generate proof and return it
-		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
-		if err != nil {
-			log.Warnf("error decoding base64 string: %s", err.Error())
-			resp.Ok = false
-			resp.Error = err.Error()
-			return resp
-		}
-		validProof, err := t.CheckProof(data, r.Payload.Proof)
-		if err != nil {
-			resp.Ok = false
-			resp.Error = err.Error()
-			return resp
-		}
-		if validProof {
-			resp.ValidProof = true
-		} else {
-			resp.ValidProof = false
-		}
-		return resp
-	}
 	return resp
 }

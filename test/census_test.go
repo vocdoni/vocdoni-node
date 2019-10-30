@@ -192,7 +192,7 @@ func TestCensus(t *testing.T) {
 		t.Errorf("got invalid root")
 	}
 
-	// addBlaimBulk
+	// addClaimBulk
 	var claims []string
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
@@ -219,6 +219,7 @@ func TestCensus(t *testing.T) {
 
 	// GenProof valid
 	req.Method = "genProof"
+	req.RootHash = ""
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abc0"))
 	resp, err = sendCensusReq(req, signer2, false)
 	t.Logf("genProof response %+v", resp)
@@ -231,9 +232,8 @@ func TestCensus(t *testing.T) {
 	}
 
 	// CheckProof valid
-	req.RootHash = ""
-	req.Payload.Proof = siblings
 	req.Method = "checkProof"
+	req.Payload.Proof = siblings
 	resp, err = sendCensusReq(req, signer2, false)
 	t.Logf("checkProof response %+v", resp)
 	if !resp.ValidProof {

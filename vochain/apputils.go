@@ -126,7 +126,7 @@ func VoteTxCheck(vote *vochaintypes.VoteTx, state *VochainState) error {
 		return fmt.Errorf("cannot extract public key from signature (%s)", err.Error())
 	}
 	pubKeyHash := signature.HashPoseidon(pubKey)
-	if len(pubKeyHash) > 32 {
+	if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 {
 		return fmt.Errorf("wrong Poseidon hash size (%s)", err.Error())
 	}
 	valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)

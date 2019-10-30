@@ -2,6 +2,7 @@ package signature
 
 import (
 	"crypto/ecdsa"
+	"encoding/base64"
 	hex "encoding/hex"
 	"encoding/json"
 	"errors"
@@ -11,7 +12,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	crypto "github.com/ethereum/go-ethereum/crypto"
-	poseidon "github.com/iden3/go-iden3-crypto/poseidon"
+	"gitlab.com/vocdoni/go-dvote/crypto/hashing"
 )
 
 // AddressLength is the lenght of an Ethereum address
@@ -325,13 +326,14 @@ func HashRaw(data string) []byte {
 	return crypto.Keccak256([]byte(data))
 }
 
-// HashPoseidon hash a string using Poseidon hash function
-func HashPoseidon(data string) []byte {
-	hashNum, err := poseidon.HashBytes([]byte(data))
+// HashPoseidon hash a hexString using Poseidon hash function
+func HashPoseidon(hexStr string) []byte {
+	b64hash, err := hashing.PoseidonHash(hexStr)
 	if err != nil {
 		return []byte{}
 	}
-	return hashNum.Bytes()
+	hash, _ := base64.StdEncoding.DecodeString(b64hash)
+	return hash
 }
 
 func sanitizeHex(hexStr string) string {

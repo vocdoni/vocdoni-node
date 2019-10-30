@@ -8,10 +8,13 @@ import (
 	poseidon "github.com/iden3/go-iden3-crypto/poseidon"
 )
 
-// PoseidonHash computes the Poseidon hash of the given hex string
-func PoseidonHash(hexPayload string) (hexHash string, err error) {
+// PoseidonHash computes the base64 Poseidon hash of the given hex string
+func PoseidonHash(hexPayload string) (b64Hash string, err error) {
 	if hexPayload[0:2] == "0x" {
 		hexPayload = hexPayload[2:]
+	}
+	if len(hexPayload)%2 != 0 {
+		hexPayload = "0" + hexPayload
 	}
 	hexPayloadBytes, err := hex.DecodeString(hexPayload)
 	if err != nil {
