@@ -116,7 +116,7 @@ type Tx struct {
 type VoteTx struct {
 	Nonce       string `json:"nonce,omitempty"`
 	Nullifier   string `json:"nullifier,omitempty"`
-	ProcessID   string `json:"processID"`
+	ProcessID   string `json:"processId"`
 	Proof       string `json:"proof,omitempty"`
 	Signature   string `json:"signature,omitempty"`
 	Type        string `json:"type"`

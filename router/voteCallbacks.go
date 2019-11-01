@@ -24,12 +24,12 @@ func submitEnvelope(request routerRequest, router *Router) {
 		log.Errorf("error marshaling voteTx args: %s", err.Error())
 	}
 
-	res, err := router.tmclient.BroadcastTxCommit(voteTxBytes)
+	res, err := router.tmclient.BroadcastTxSync(voteTxBytes)
 	if err != nil {
 		log.Warnf("cannot broadcast tx: %s", err)
 	} else {
-		log.Infof("transaction checkTx details: %s", res.CheckTx.String())
-		log.Infof("transactions deliverTx details: %s", res.DeliverTx.String())
+		log.Infof("transaction checkTx details: %s", res.Code)
+		//log.Infof("transactions deliverTx details: %s", res.DeliverTx.String())
 	}
 
 	var apiResponse types.ResponseMessage
@@ -38,12 +38,15 @@ func submitEnvelope(request routerRequest, router *Router) {
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 
 	// not sure if its enough information
-	if res.DeliverTx.Code != 0 {
+	if res.Code != 0 && res != nil {
 		apiResponse.Response.Ok = false
 	} else {
-		apiResponse.Response.Ok = true
+		if res != nil {
+			apiResponse.Response.Ok = true
+		}
+		apiResponse.Response.Ok = false
 	}
-	apiResponse.Response.Message = res.DeliverTx.Info
+	apiResponse.Response.Message = res.Log
 
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {

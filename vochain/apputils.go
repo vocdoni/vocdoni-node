@@ -115,27 +115,32 @@ func VoteTxCheck(vote *vochaintypes.VoteTx, state *VochainState) error {
 	if v != nil {
 		return fmt.Errorf("vote already exists")
 	}
-	sign := vote.Signature
-	vote.Signature = ""
-	voteBytes, err := json.Marshal(vote)
-	if err != nil {
-		return fmt.Errorf("cannot marshal vote (%s)", err.Error())
-	}
-	pubKey, err := signature.PubKeyFromSignature(string(voteBytes), sign)
-	if err != nil {
-		return fmt.Errorf("cannot extract public key from signature (%s)", err.Error())
-	}
-	pubKeyHash := signature.HashPoseidon(pubKey)
-	if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 {
-		return fmt.Errorf("wrong Poseidon hash size (%s)", err.Error())
-	}
-	valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
-	if err != nil {
-		return fmt.Errorf("cannot check merkle proof (%s)", err.Error())
-	}
-	if !valid {
-		return fmt.Errorf("proof not valid")
-	}
+	/*
+		sign := vote.Signature
+		vote.Signature = ""
+		voteBytes, err := json.Marshal(vote)
+		if err != nil {
+			return fmt.Errorf("cannot marshal vote (%s)", err.Error())
+		}
+		pubKey, err := signature.PubKeyFromSignature(string(voteBytes), sign)
+		if err != nil {
+			return fmt.Errorf("cannot extract public key from signature (%s)", err.Error())
+		}
+		log.Debugf("pubkey: %s", pubKey)
+		pubKeyHash := signature.HashPoseidon(pubKey)
+		if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 {
+			return fmt.Errorf("wrong Poseidon hash size (%s)", err.Error())
+		}
+		log.Debugf("pubkeyhash: %b", pubKey)
+		valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
+		if err != nil {
+			return fmt.Errorf("cannot check merkle proof (%s)", err.Error())
+		}
+		log.Debugf("valid: %s", valid)
+		if !valid {
+			return fmt.Errorf("proof not valid")
+		}
+	*/
 	return nil
 }
 
