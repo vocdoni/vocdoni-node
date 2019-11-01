@@ -145,13 +145,11 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	}
 	switch reqData.Method {
 	case "getEnvelopeStatus":
-		p, err := app.State.GetProcess(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier))
+		_, err := app.State.GetEnvelope(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier))
 		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Value: []byte("false")}
-		} else if p == nil {
-			return abcitypes.ResponseQuery{Code: 0, Value: []byte("false")}
+			return abcitypes.ResponseQuery{Code: 1}
 		}
-		return abcitypes.ResponseQuery{Code: 0, Value: []byte("true")}
+		return abcitypes.ResponseQuery{Code: 0}
 	case "getEnvelope":
 		e, err := app.State.GetEnvelope(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier)) // nullifier hash(addr+pid), processId by pid_nullifier
 		if err != nil {

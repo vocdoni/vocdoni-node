@@ -190,7 +190,7 @@ func (v *VochainState) AddProcess(p *vochaintypes.Process, pid string) error {
 func (v *VochainState) GetProcess(pid string) (*vochaintypes.Process, error) {
 	var newProcess *vochaintypes.Process
 	if !v.ProcessTree.Has([]byte(pid)) {
-		return nil, fmt.Errorf("key (%s) does not exist", pid)
+		return nil, fmt.Errorf("cannot find process with id (%s)", pid)
 	}
 	_, processBytes := v.ProcessTree.Get([]byte(pid))
 	if processBytes == nil {
@@ -200,13 +200,13 @@ func (v *VochainState) GetProcess(pid string) (*vochaintypes.Process, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal process with id (%s)", pid)
 	}
-
+	//log.Debugf("response get process: %+v", *newProcess)
 	return newProcess, nil
 }
 
 // AddVote adds a new vote to a process if the process exists and the vote is not already submmited
 func (v *VochainState) AddVote(vote *vochaintypes.Vote) error {
-	voteID := fmt.Sprintf("%s%s", vote.ProcessID, vote.Nullifier)
+	voteID := fmt.Sprintf("%s_%s", vote.ProcessID, vote.Nullifier)
 	newVoteBytes, err := v.Codec.MarshalBinaryBare(vote)
 	if err != nil {
 		return errors.New("cannot marshal vote")
@@ -225,11 +225,12 @@ func (v *VochainState) GetEnvelope(voteID string) (*vochaintypes.Vote, error) {
 	if len(voteBytes) == 0 {
 		return nil, fmt.Errorf("vote with id (%s) does not exists", voteID)
 	}
+	//log.Debugf("get envelope votebytes: %b", voteBytes)
 	err := v.Codec.UnmarshalBinaryBare(voteBytes, &vote)
 	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal vote with id (%s)", voteID)
 	}
-
+	//log.Debugf("get envelope value: %+v", vote)
 	return vote, nil
 }
 

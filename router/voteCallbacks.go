@@ -46,7 +46,6 @@ func submitEnvelope(request routerRequest, router *Router) {
 		}
 		apiResponse.Response.Ok = false
 	}
-	apiResponse.Response.Message = res.Log
 
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
@@ -67,7 +66,7 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	qdata := vochain.QueryData{
 		Method:    "getEnvelopeStatus",
 		ProcessID: request.structured.ProcessId,
-		Nullifier: request.structured.Payload.Nullifier,
+		Nullifier: request.structured.Nullifier,
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
@@ -75,14 +74,17 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
+		log.Warnf("cannot query: %s", err.Error())
 		apiResponse.Response.Ok = false
 	} else {
 		apiResponse.Response.Ok = true
+		if queryResult.Response.Code == 0 {
+			apiResponse.Response.Registered = "true"
+		} else {
+			apiResponse.Response.Registered = "false"
+		}
 	}
-	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Registered)
-	if err != nil {
-		log.Errorf("cannot unmarshal vote package: %s", err.Error())
-	}
+
 	log.Debugf("Response is: %d", apiResponse.Response)
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
@@ -105,7 +107,7 @@ func getEnvelope(request routerRequest, router *Router) {
 	qdata := vochain.QueryData{
 		Method:    "getEnvelope",
 		ProcessID: request.structured.ProcessId,
-		Nullifier: request.structured.Payload.Nullifier,
+		Nullifier: request.structured.Nullifier,
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
@@ -117,7 +119,7 @@ func getEnvelope(request routerRequest, router *Router) {
 	} else {
 		apiResponse.Response.Ok = true
 	}
-	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Content)
+	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Payload)
 	if err != nil {
 		log.Errorf("cannot unmarshal vote package: %s", err.Error())
 	}

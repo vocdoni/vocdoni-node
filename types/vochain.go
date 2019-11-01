@@ -189,11 +189,11 @@ type Validator struct {
 // QueryData is an abstraction of any kind of data a query request could have
 type QueryData struct {
 	Method    string `json:"method"`
-	ProcessID string `json:"processId"`
-	Nullifier string `json:"nullifier"`
-	From      int64  `json:"from"`
-	ListSize  int64  `json:"listSize"`
-	Timestamp int64  `json:"timestamp"`
+	ProcessID string `json:"processId,omitempty"`
+	Nullifier string `json:"nullifier,omitempty"`
+	From      int64  `json:"from,omitempty"`
+	ListSize  int64  `json:"listSize,omitempty"`
+	Timestamp int64  `json:"timestamp,omitempty"`
 }
 
 type AppState struct {

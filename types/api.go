@@ -20,6 +20,7 @@ type MetaRequest struct {
 	ListSize   int64           `json:"listSize,omitempty"`
 	Method     string          `json:"method"`
 	Name       string          `json:"name,omitempty"`
+	Nullifier  string          `json:"nullifier,omitempty"`
 	Payload    EnvelopePayload `json:"payload,omitempty"`
 	ProcessId  string          `json:"processId,omitempty"`
 	PubKeys    []string        `json:"encryptionPublicKeys,omitempty"`
@@ -74,6 +75,7 @@ type MetaResponse struct {
 	ValidProof    bool     `json:"validProof,omitempty"`
 	Registered    string   `json:"registered,omitempty"`
 	Nullifiers    []string `json:"nullifiers,omitempty"`
+	Payload       string   `json:"payload,omitempty"`
 }
 
 type CensusDump struct {
