@@ -65,7 +65,10 @@ type MetaResponse struct {
 	Height        int64    `json:"height,omitempty"`
 	InvalidClaims []int    `json:"invalidClaims,omitempty"`
 	Message       string   `json:"message,omitempty"`
+	Nullifiers    []string `json:"nullifiers,omitempty"`
 	Ok            bool     `json:"ok,omitempty"`
+	Payload       string   `json:"payload,omitempty"`
+	Registered    string   `json:"registered,omitempty"`
 	Request       string   `json:"request"`
 	Root          string   `json:"root,omitempty"`
 	Siblings      string   `json:"siblings,omitempty"`
@@ -73,9 +76,6 @@ type MetaResponse struct {
 	Timestamp     int32    `json:"timestamp"`
 	URI           string   `json:"uri,omitempty"`
 	ValidProof    bool     `json:"validProof,omitempty"`
-	Registered    string   `json:"registered,omitempty"`
-	Nullifiers    []string `json:"nullifiers,omitempty"`
-	Payload       string   `json:"payload,omitempty"`
 }
 
 type CensusDump struct {
