@@ -139,7 +139,9 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 //InitRouter sets up a Router object which can then be used to route requests
 func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
 	signer signature.SignKeys) *Router {
-
+	if &signer == nil {
+		panic("signer is nil")
+	}
 	log.Infof("using signer with address %s", signer.EthAddrString())
 	return NewRouter(inbound, storage, transport, signer)
 }
