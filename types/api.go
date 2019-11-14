@@ -21,7 +21,7 @@ type MetaRequest struct {
 	Method     string   `json:"method"`
 	Name       string   `json:"name,omitempty"`
 	Nullifier  string   `json:"nullifier,omitempty"`
-	Payload    VoteTx   `json:"payload,omitempty"`
+	Payload    *VoteTx  `json:"payload,omitempty"`
 	ProcessID  string   `json:"processId,omitempty"`
 	PubKeys    []string `json:"encryptionPublicKeys,omitempty"`
 	RootHash   string   `json:"rootHash,omitempty"`
@@ -56,6 +56,7 @@ type MetaResponse struct {
 	Height        int64    `json:"height,omitempty"`
 	InvalidClaims []int    `json:"invalidClaims,omitempty"`
 	Message       string   `json:"message,omitempty"`
+	Nullifier     string   `json:"nullifier,omitempty"`
 	Nullifiers    []string `json:"nullifiers,omitempty"`
 	Ok            bool     `json:"ok,omitempty"`
 	Payload       string   `json:"payload,omitempty"`
