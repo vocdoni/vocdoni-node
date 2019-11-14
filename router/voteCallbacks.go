@@ -11,12 +11,12 @@ import (
 
 func submitEnvelope(request routerRequest, router *Router) {
 	voteTxArgs := new(vochain.VoteTx)
-	voteTxArgs.ProcessID = request.structured.Payload.ProcessId
+	voteTxArgs.ProcessID = request.structured.Payload.ProcessID
 	voteTxArgs.Nonce = request.structured.Payload.Nonce
 	voteTxArgs.Nullifier = request.structured.Payload.Nullifier
 	voteTxArgs.VotePackage = request.structured.Payload.VotePackage
 	voteTxArgs.Proof = request.structured.Payload.Proof
-	voteTxArgs.Type = "vote"
+	voteTxArgs.Type = "vote" // TO-DO get type from ProcessID
 	voteTxArgs.Signature = request.structured.Payload.Signature
 
 	voteTxBytes, err := json.Marshal(voteTxArgs)
@@ -26,10 +26,9 @@ func submitEnvelope(request routerRequest, router *Router) {
 
 	res, err := router.tmclient.BroadcastTxSync(voteTxBytes)
 	if err != nil {
-		log.Warnf("cannot broadcast tx: %s", err)
+		log.Warnf("cannot broadcast tx: %s", err.Error())
 	} else {
-		log.Infof("transaction checkTx details: %s", res.Code)
-		//log.Infof("transactions deliverTx details: %s", res.DeliverTx.String())
+		log.Infof("transaction checkTx details: %s", res.Data.Bytes())
 	}
 
 	var apiResponse types.ResponseMessage
@@ -38,7 +37,7 @@ func submitEnvelope(request routerRequest, router *Router) {
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 
 	// not sure if its enough information
-	if res.Code != 0 && res != nil {
+	if res != nil && res.Code != 0 {
 		apiResponse.Response.Ok = false
 	} else {
 		if res != nil {
@@ -53,7 +52,7 @@ func submitEnvelope(request routerRequest, router *Router) {
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
-		log.Errorf("Error marshaling submitEnvelope reply: %s", err)
+		log.Errorf("Error marshaling submitEnvelope reply: %s", err.Error())
 	}
 	router.transport.Send(buildReply(request.context, rawApiResponse))
 }
@@ -65,7 +64,7 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 	qdata := vochain.QueryData{
 		Method:    "getEnvelopeStatus",
-		ProcessID: request.structured.ProcessId,
+		ProcessID: request.structured.ProcessID,
 		Nullifier: request.structured.Nullifier,
 	}
 	qdataBytes, err := json.Marshal(qdata)
@@ -106,7 +105,7 @@ func getEnvelope(request routerRequest, router *Router) {
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 	qdata := vochain.QueryData{
 		Method:    "getEnvelope",
-		ProcessID: request.structured.ProcessId,
+		ProcessID: request.structured.ProcessID,
 		Nullifier: request.structured.Nullifier,
 	}
 	qdataBytes, err := json.Marshal(qdata)
@@ -144,7 +143,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 	qdata := vochain.QueryData{
 		Method:    "getEnvelopeHeight",
-		ProcessID: request.structured.ProcessId,
+		ProcessID: request.structured.ProcessID,
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {

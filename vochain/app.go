@@ -118,7 +118,7 @@ func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Respo
 
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	if _, _, err := ValidateTx(req.Tx, app.State); err != nil {
-		return abcitypes.ResponseCheckTx{Code: 1, Info: err.Error()}
+		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte(err.Error())}
 	}
 	return abcitypes.ResponseCheckTx{Code: 0}
 }

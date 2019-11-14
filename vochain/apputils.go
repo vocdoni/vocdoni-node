@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/log"
 	tree "gitlab.com/vocdoni/go-dvote/tree"
 	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 
@@ -113,34 +114,39 @@ func VoteTxCheck(vote *vochaintypes.VoteTx, state *VochainState) error {
 	voteID := fmt.Sprintf("%s_%s", vote.ProcessID, vote.Nullifier)
 	v, _ := state.GetEnvelope(voteID)
 	if v != nil {
-		return fmt.Errorf("vote already exists")
+		//	return fmt.Errorf("vote already exists")
 	}
-	/*
-		sign := vote.Signature
-		vote.Signature = ""
-		voteBytes, err := json.Marshal(vote)
-		if err != nil {
-			return fmt.Errorf("cannot marshal vote (%s)", err.Error())
-		}
-		pubKey, err := signature.PubKeyFromSignature(string(voteBytes), sign)
-		if err != nil {
-			return fmt.Errorf("cannot extract public key from signature (%s)", err.Error())
-		}
-		log.Debugf("pubkey: %s", pubKey)
-		pubKeyHash := signature.HashPoseidon(pubKey)
-		if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 {
-			return fmt.Errorf("wrong Poseidon hash size (%s)", err.Error())
-		}
-		log.Debugf("pubkeyhash: %b", pubKey)
-		valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
-		if err != nil {
-			return fmt.Errorf("cannot check merkle proof (%s)", err.Error())
-		}
-		log.Debugf("valid: %s", valid)
-		if !valid {
-			return fmt.Errorf("proof not valid")
-		}
-	*/
+
+	var voteTmp vochaintypes.VoteTx
+	voteTmp.Nonce = vote.Nonce
+	voteTmp.Nullifier = vote.Nullifier
+	voteTmp.ProcessID = vote.ProcessID
+	voteTmp.Proof = vote.Proof
+	voteTmp.VotePackage = vote.VotePackage
+
+	voteBytes, err := json.Marshal(voteTmp)
+	if err != nil {
+		//		return fmt.Errorf("cannot marshal vote (%s)", err.Error())
+	}
+	log.Debugf("executing VoteTxCheck of: %s", voteBytes)
+	pubKey, err := signature.PubKeyFromSignature(string(voteBytes), vote.Signature)
+	if err != nil {
+		log.Warnf("cannot extract pubKey: %s", err.Error())
+		//		return fmt.Errorf("cannot extract public key from signature (%s)", err.Error())
+	}
+	log.Debugf("extracted pubkey: %s", pubKey)
+	pubKeyHash := signature.HashPoseidon(pubKey)
+	if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 {
+		//		return fmt.Errorf("wrong Poseidon hash size (%s)", err.Error())
+	}
+	valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
+	if err != nil {
+		//		return fmt.Errorf("cannot check merkle proof (%s)", err.Error())
+	}
+	log.Debugf("proof valid? %t", valid)
+	if !valid {
+		//		return fmt.Errorf("proof not valid")
+	}
 	return nil
 }
 

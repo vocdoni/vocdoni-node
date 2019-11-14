@@ -11,33 +11,24 @@ type RequestMessage struct {
 /*MetaRequest contains all of the possible request fields.
 Fields must be in alphabetical order */
 type MetaRequest struct {
-	CensusID   string          `json:"censusId,omitempty"`
-	CensusURI  string          `json:"censusUri,omitempty"`
-	ClaimData  string          `json:"claimData,omitempty"`
-	ClaimsData []string        `json:"claimsData,omitempty"`
-	Content    string          `json:"content,omitempty"`
-	From       int64           `json:"from,omitempty"`
-	ListSize   int64           `json:"listSize,omitempty"`
-	Method     string          `json:"method"`
-	Name       string          `json:"name,omitempty"`
-	Nullifier  string          `json:"nullifier,omitempty"`
-	Payload    EnvelopePayload `json:"payload,omitempty"`
-	ProcessId  string          `json:"processId,omitempty"`
-	PubKeys    []string        `json:"encryptionPublicKeys,omitempty"`
-	RootHash   string          `json:"rootHash,omitempty"`
-	Timestamp  int32           `json:"timestamp"`
-	Type       string          `json:"type,omitempty"`
-	URI        string          `json:"uri,omitempty"`
-	Signature  string          `json:"signature,omitempty"`
-}
-
-type EnvelopePayload struct {
-	VotePackage string `json:"vote-package"`
-	Nullifier   string `json:"nullifier,omitempty"`
-	Nonce       string `json:"nonce,omitempty"`
-	Proof       string `json:"proof,omitempty"`
-	Signature   string `json:"signature,omitempty"`
-	ProcessId   string `json:"processId,omitempty"`
+	CensusID   string   `json:"censusId,omitempty"`
+	CensusURI  string   `json:"censusUri,omitempty"`
+	ClaimData  string   `json:"claimData,omitempty"`
+	ClaimsData []string `json:"claimsData,omitempty"`
+	Content    string   `json:"content,omitempty"`
+	From       int64    `json:"from,omitempty"`
+	ListSize   int64    `json:"listSize,omitempty"`
+	Method     string   `json:"method"`
+	Name       string   `json:"name,omitempty"`
+	Nullifier  string   `json:"nullifier,omitempty"`
+	Payload    VoteTx   `json:"payload,omitempty"`
+	ProcessID  string   `json:"processId,omitempty"`
+	PubKeys    []string `json:"encryptionPublicKeys,omitempty"`
+	RootHash   string   `json:"rootHash,omitempty"`
+	Timestamp  int32    `json:"timestamp"`
+	Type       string   `json:"type,omitempty"`
+	URI        string   `json:"uri,omitempty"`
+	Signature  string   `json:"signature,omitempty"`
 }
 
 //ResponseMessage wraps an api response

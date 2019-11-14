@@ -119,7 +119,7 @@ type VoteTx struct {
 	ProcessID   string `json:"processId"`
 	Proof       string `json:"proof,omitempty"`
 	Signature   string `json:"signature,omitempty"`
-	Type        string `json:"type"`
+	Type        string `json:"type,omitempty"`
 	VotePackage string `json:"vote-package,omitempty"`
 }
 
@@ -165,7 +165,11 @@ type AdminTx struct {
 
 // ValidateType a valid Tx type specified in ValidTypes
 func ValidateType(t string) string {
-	return ValidTypes[t]
+	val, ok := ValidTypes[t]
+	if !ok {
+		return ""
+	}
+	return val
 }
 
 // ________________________ VALIDATORS ________________________

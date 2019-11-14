@@ -122,9 +122,8 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	tconfig.Consensus.TimeoutPrevote = time.Second * 5
 	tconfig.Consensus.TimeoutPrecommit = time.Second * 5
 	tconfig.Consensus.TimeoutCommit = time.Second * 5
-
-	tconfig.Consensus.TimeoutCommit = time.Second * 20
-	tconfig.Consensus.TimeoutPropose = time.Second * 5
+	tconfig.RPC.TimeoutBroadcastTxCommit = time.Second * 20
+	tconfig.Mempool.Recheck = false
 
 	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
