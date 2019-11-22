@@ -16,7 +16,7 @@ import (
 //Use these methods, rather than those present in the contracts folder
 type ProcessHandle struct {
 	VotingProcess *votingProcess.VotingProcess
-	storage       data.Storage
+	storage       *data.Storage
 }
 
 type VoteOption struct {
@@ -51,7 +51,7 @@ type ProcessMetadata struct {
 }
 
 // Constructor for proc_transactor on node
-func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*ProcessHandle, error) {
+func NewVotingProcessHandle(contractAddressHex string, storage *data.Storage) (*ProcessHandle, error) {
 	client, err := ethclient.Dial("http://127.0.0.1:9091")
 	if err != nil {
 		log.Error(err)
@@ -71,16 +71,20 @@ func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*P
 }
 
 func (ph *ProcessHandle) GetProcessMetadata(pid [32]byte) (*ProcessMetadata, error) {
+	if ph.storage == nil {
+		return nil, fmt.Errorf("no storage configured, cannot get process metadata")
+	}
 	processInfoStructured := new(ProcessMetadata)
 	processMeta, err := ph.VotingProcess.Get(nil, pid)
 	if err != nil {
 		return processInfoStructured, err
 	}
-	processInfo, err := ph.storage.Retrieve(processMeta.Metadata)
+	storage := *ph.storage
+	processInfo, err := storage.Retrieve(processMeta.Metadata)
 	if err != nil {
 		return processInfoStructured, err
 	}
-	censusTree, err := ph.storage.Retrieve(processMeta.CensusMerkleTree)
+	censusTree, err := storage.Retrieve(processMeta.CensusMerkleTree)
 	if err != nil {
 		return processInfoStructured, err
 	}
