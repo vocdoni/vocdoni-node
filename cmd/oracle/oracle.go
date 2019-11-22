@@ -70,7 +70,7 @@ func newConfig() (config.OracleCfg, error) {
 	flag.String("vochainLogLevel", "error", "voting chain node log level")
 	flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
-	flag.String("vochainContract", "0xb99F60f7a651589022c9495d3e555a46e3625A42", "voting smart contract where the oracle will listen")
+	flag.String("vochainContract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f", "voting smart contract where the oracle will listen")
 	flag.String("vochainRPCListen", "127.0.0.1:26657", "rpc host and port to listent for the voting chain")
 
 	flag.Parse()
@@ -95,7 +95,7 @@ func newConfig() (config.OracleCfg, error) {
 	viper.SetDefault("vochainConfig.logLevel", "error")
 	viper.SetDefault("vochainConfig.peers", []string{})
 	viper.SetDefault("vochainConfig.seeds", []string{})
-	viper.SetDefault("vochainConfig.contract", "0xb99F60f7a651589022c9495d3e555a46e3625A42")
+	viper.SetDefault("vochainConfig.contract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f")
 	viper.SetDefault("vochainConfig.rpcListen", "0.0.0.0:26657")
 	viper.SetDefault("vochainConfig.dataDir", *dataDir+"/vochain")
 
