@@ -9,10 +9,10 @@ import (
 
 var (
 	OracleListHardcoded []string = []string{
-		"0x0fA7A3FdB5C7C611646a535BDDe669Db64DC03d2",
-		"0x00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
-		"0x237B54D0163Aa131254fA260Fc12DB0E6DC76FC7",
-		"0xF904848ea36c46817096E94f932A9901E377C8a5",
+		"0fA7A3FdB5C7C611646a535BDDe669Db64DC03d2",
+		"00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
+		"237B54D0163Aa131254fA260Fc12DB0E6DC76FC7",
+		"F904848ea36c46817096E94f932A9901E377C8a5",
 	}
 
 	ValidatorListHardcoded []vochain.Validator = []vochain.Validator{
@@ -47,13 +47,13 @@ var (
 	}
 
 	ProcessHardcoded *vochain.Process = &vochain.Process{
-		EntityID:              "0x180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85",
-		MkRoot:                "0x0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
-		NumberOfBlocks:        1000,
-		StartBlock:            0,
-		CurrentState:          vochain.Scheduled,
-		EncryptionPrivateKeys: []string{""},
-		EncryptionPublicKeys:  OracleListHardcoded, // reusing oracle keys as encryption pub keys
+		EntityID:             "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85",
+		MkRoot:               "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
+		NumberOfBlocks:       1000,
+		StartBlock:           0,
+		CurrentState:         vochain.Scheduled,
+		EncryptionPublicKeys: OracleListHardcoded, // reusing oracle keys as encryption pub keys
+		Type:                 "petition-sign",
 	}
 
 	VoteHardcoded *vochain.Vote = &vochain.Vote{
@@ -71,7 +71,8 @@ var (
 		MkRoot:               "0x0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
 		NumberOfBlocks:       1000,
 		ProcessID:            "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
-		Signature:            "c9c58be460d79120046a319b54fc902108c98b8845aba19f5976129c0a0acd20636dfca020ef189dc80b1974b6a59da4d9d07c5963ca6bd4cd5cabaa84a81a771b",
+		ProcessType:          "petition-sign",
+		Signature:            "b25259cff9ce3a709e517c6a01e445f216212f58f553fa26d25566b7c731339242ef9a0df0235b53a819a64ebf2c3394fb6b56138c5113cc1905c68ffcebb1971c",
 		StartBlock:           0,
 		Type:                 "newProcess",
 	}
@@ -82,40 +83,37 @@ var (
 		ProcessID:   "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
 		Proof:       "00030000000000000000000000000000000000000000000000000000000000070ab34471caaefc9bb249cb178335f367988c159f3907530ef7daa1e1bf0c9c7a218f981be7c0c46ffa345d291abb36a17c22722814fb0110240b8640fd1484a6268dc2f0fc2152bf83c06566fbf155f38b8293033d4779a63bba6c7157fd10c8",
 		Signature:   "773de3c55da3e355337ab0632ebd3da0b0eecc3dfa01149460b18df46b2a3a7e1ac8168e2db134e2e6abcb1dd3c328cabfdbd047aa602187992250128d24397e1b",
-		Type:        "voteTx",
+		Type:        "vote",
 		VotePackage: "eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19",
 	}
 
 	HardcodedAdminTxAddOracle *vochain.AdminTx = &vochain.AdminTx{
 		Address:   "0x39106af1fF18bD60a38a296fd81B1f28f315852B", //oracle address or pubkey validator
 		Nonce:     "0x1",
-		Power:     0,
+		Signature: "11ccdaacd6b6c2c832ea51b4dc695ce9f3c31b7fecd81a2509e7daf183a126e974f1b68060dd406c83ea2db1147d7a56fd6033e8cf7834ce0cf5ec504f09f2ee1b",
 		Type:      "addOracle",
-		Signature: "1b425f44a0bf9b627603038dc02e435cb5500c9aa9b2031829461c9030a338716d8e5f6319dd95283c22c6ad4fcd43511cdf4a981498d5cfef83412fe7595de31b",
 	}
 
 	HardcodedAdminTxRemoveOracle *vochain.AdminTx = &vochain.AdminTx{
 		Address:   "0x00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
 		Nonce:     "0x1",
-		Power:     0,
+		Signature: "70f89a73f2b7a712e1281e49758ea7fa32769666b38773eeff5a3a0f0e20b6c46b5bb05d9257c9156bf7e7b7334b0af9cb38bc0ae19c70d4f64633529a49585d1b",
 		Type:      "removeOracle",
-		Signature: "b7e4b0b7e3af8eb9e5ea992a6d6915e5017c14e15ac8f3ab74e71d116a56342d63882eeb88b8c3a915aa3098929e7242d3524e6af3fb048728a2ac03e857e53c1c",
 	}
 
 	HardcodedAdminTxAddValidator *vochain.AdminTx = &vochain.AdminTx{
 		Address:   "GyZfKNK3lT5AQXQ4pwrVdgG3rRisx9tS4bM9EIZ0zYY=",
 		Nonce:     "0x1",
 		Power:     10,
-		Type:      "addValidator",
 		Signature: "0c869d72bd7d8d9df538f68d506c93ff47e7e6bd7f3c6462e45d4926b061501f23b6631bfc3c89c5e5b02dd6f0bf19f576ab982a8065b18ca961868097daf61f1c",
+		Type:      "addValidator",
 	}
 
 	HardcodedAdminTxRemoveValidator *vochain.AdminTx = &vochain.AdminTx{
 		Address:   "5DC922017285EC24415F3E7ECD045665EADA8B5A",
 		Nonce:     "0x1",
-		Power:     0,
+		Signature: "777fde5f25337e70c463815513f3cf4f2d78aaf00d5f02ac7371cf419387569952ac98e3f7be8b9ce0911508ae73547a0cf3d3a443602f13c3e0a7009b4dce581c",
 		Type:      "removeValidator",
-		Signature: "19339a03a286fbf2ce73499ff09fbe890859e6c3d5c7222170fa5fb96a85fc474a7053fad28b31b7b8fff8995df686ec382480ba5b18f41ff2c8f2d39a2d65c31b",
 	}
 )
 
@@ -151,6 +149,6 @@ func NewVochainStateWithProcess() *iavl.VochainState {
 	}
 	// add process
 	processBytes, err := s.Codec.MarshalBinaryBare(ProcessHardcoded)
-	s.ProcessTree.Set([]byte("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), processBytes)
+	s.ProcessTree.Set([]byte("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), processBytes)
 	return s
 }

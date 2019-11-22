@@ -52,8 +52,7 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	}
 	//vlog.Infof("height : %d", header)
 	// gets the app hash from database
-	var appHashBytes []byte
-	_, appHashBytes = app.State.AppTree.Get([]byte(appHashKey))
+	_, appHashBytes := app.State.AppTree.Get([]byte(appHashKey))
 	if appHashBytes != nil {
 		vlog.Infof("app hash: %x", appHashBytes)
 	} else {

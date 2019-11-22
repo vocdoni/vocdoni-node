@@ -29,27 +29,27 @@ func ValidateTx(content []byte, state *VochainState) (interface{}, string, error
 
 	switch structType {
 	case "VoteTx":
-		var vote *vochaintypes.VoteTx
-		err = json.Unmarshal(content, &vote)
+		var voteTx vochaintypes.VoteTx
+		err = json.Unmarshal(content, &voteTx)
 		if err != nil {
 			return nil, "", fmt.Errorf("cannot parse VoteTX")
 		}
-		return vote, "VoteTx", VoteTxCheck(vote, state)
+		return voteTx, "VoteTx", VoteTxCheck(voteTx, state)
 
 	case "AdminTx":
-		var adminTx *vochaintypes.AdminTx
+		var adminTx vochaintypes.AdminTx
 		err = json.Unmarshal(content, &adminTx)
 		if err != nil {
 			return nil, "", fmt.Errorf("cannot parse AdminTx")
 		}
 		return adminTx, "AdminTx", AdminTxCheck(adminTx, state)
 	case "NewProcessTx":
-		var process *vochaintypes.NewProcessTx
-		err = json.Unmarshal(content, &process)
+		var processTx vochaintypes.NewProcessTx
+		err = json.Unmarshal(content, &processTx)
 		if err != nil {
 			return nil, "", fmt.Errorf("cannot parse NewProcessTx")
 		}
-		return process, "NewProcessTx", NewProcessTxCheck(process, state)
+		return processTx, "NewProcessTx", NewProcessTxCheck(processTx, state)
 	}
 
 	return nil, "", fmt.Errorf("invalid type")
@@ -64,16 +64,44 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 	switch txType {
 	case "VoteTx":
 		votetx := reflect.Indirect(reflect.ValueOf(tx)).Interface().(vochaintypes.VoteTx)
-		if votetx.ProcessID[0:2] == "0x" {
-			votetx.ProcessID = votetx.ProcessID[2:]
+		process, _ := state.GetProcess(votetx.ProcessID)
+		if process == nil {
+			return fmt.Errorf("process with id (%s) does not exists", votetx.ProcessID)
 		}
-		vote := &vochaintypes.Vote{
-			Nullifier:   votetx.Nullifier,
-			Nonce:       votetx.Nonce,
-			ProcessID:   votetx.ProcessID,
-			VotePackage: votetx.VotePackage,
-			Signature:   votetx.Signature,
-			Proof:       votetx.Proof,
+		vote := new(vochaintypes.Vote)
+		if process.Type == "snark-vote" {
+			vote.Nullifier = votetx.Nullifier
+			vote.Nonce = sanitizeHex(votetx.Nonce)
+			vote.ProcessID = votetx.ProcessID
+			vote.VotePackage = sanitizeHex(votetx.VotePackage)
+			vote.Proof = sanitizeHex(votetx.Proof)
+		} else if process.Type == "poll-vote" || process.Type == "petition-sign" {
+			vote.Nonce = votetx.Nonce
+			vote.ProcessID = votetx.ProcessID
+			vote.Proof = votetx.Proof
+			vote.VotePackage = votetx.VotePackage
+
+			voteBytes, err := json.Marshal(vote)
+			if err != nil {
+				return fmt.Errorf("cannot marshal vote (%s)", err.Error())
+			}
+			pubKey, err := signature.PubKeyFromSignature(string(voteBytes), votetx.Signature)
+			if err != nil {
+				//log.Warnf("cannot extract pubKey: %s", err.Error())
+				return fmt.Errorf("cannot extract public key from signature (%s)", err.Error())
+			}
+			addr, err := signature.AddrFromPublicKey(string(pubKey))
+			if err != nil {
+				return fmt.Errorf("cannot extract address from public key")
+			}
+			vote.Nonce = sanitizeHex(votetx.Nonce)
+			vote.VotePackage = sanitizeHex(votetx.VotePackage)
+			vote.Signature = sanitizeHex(votetx.Signature)
+			vote.Proof = sanitizeHex(votetx.Proof)
+			vote.ProcessID = votetx.ProcessID
+			vote.Nullifier = string(GenerateNullifier(addr, vote.ProcessID))
+		} else {
+			return fmt.Errorf("invalid process type")
 		}
 		return state.AddVote(vote)
 	case "AdminTx":
@@ -91,13 +119,13 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 	case "NewProcessTx":
 		processtx := reflect.Indirect(reflect.ValueOf(tx)).Interface().(vochaintypes.NewProcessTx)
 		newprocess := &vochaintypes.Process{
-			EntityID:              processtx.EntityID,
-			EncryptionPrivateKeys: []string{},
-			EncryptionPublicKeys:  processtx.EncryptionPublicKeys,
-			MkRoot:                processtx.MkRoot,
-			NumberOfBlocks:        processtx.NumberOfBlocks,
-			StartBlock:            processtx.StartBlock,
-			CurrentState:          vochaintypes.Scheduled,
+			EntityID:             sanitizeHex(processtx.EntityID),
+			EncryptionPublicKeys: processtx.EncryptionPublicKeys,
+			MkRoot:               sanitizeHex(processtx.MkRoot),
+			NumberOfBlocks:       processtx.NumberOfBlocks,
+			StartBlock:           processtx.StartBlock,
+			CurrentState:         vochaintypes.Scheduled,
+			Type:                 processtx.ProcessType,
 		}
 		return state.AddProcess(newprocess, processtx.ProcessID)
 	}
@@ -106,52 +134,74 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 }
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
-func VoteTxCheck(vote *vochaintypes.VoteTx, state *VochainState) error {
+func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 	process, _ := state.GetProcess(vote.ProcessID)
 	if process == nil {
 		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
 	}
-	voteID := fmt.Sprintf("%s_%s", vote.ProcessID, vote.Nullifier)
-	v, _ := state.GetEnvelope(voteID)
-	if v != nil {
-		//	return fmt.Errorf("vote already exists")
-	}
 
-	var voteTmp vochaintypes.VoteTx
-	voteTmp.Nonce = vote.Nonce
-	voteTmp.Nullifier = vote.Nullifier
-	voteTmp.ProcessID = vote.ProcessID
-	voteTmp.Proof = vote.Proof
-	voteTmp.VotePackage = vote.VotePackage
+	if process.Type == "snark-vote" {
+		voteID := fmt.Sprintf("%s_%s", signature.SanitizeHex(vote.ProcessID), signature.SanitizeHex(vote.Nullifier))
+		v, _ := state.GetEnvelope(voteID)
+		if v != nil {
+			return fmt.Errorf("vote already exists")
+		}
+		// TODO check snark
+	} else if process.Type == "poll-vote" || process.Type == "petition-sign" {
+		var voteTmp vochaintypes.VoteTx
+		voteTmp.Nonce = vote.Nonce
+		voteTmp.ProcessID = vote.ProcessID
+		voteTmp.Proof = vote.Proof
+		voteTmp.VotePackage = vote.VotePackage
 
-	voteBytes, err := json.Marshal(voteTmp)
-	if err != nil {
-		//		return fmt.Errorf("cannot marshal vote (%s)", err.Error())
-	}
-	log.Debugf("executing VoteTxCheck of: %s", voteBytes)
-	pubKey, err := signature.PubKeyFromSignature(string(voteBytes), vote.Signature)
-	if err != nil {
-		log.Warnf("cannot extract pubKey: %s", err.Error())
-		//		return fmt.Errorf("cannot extract public key from signature (%s)", err.Error())
-	}
-	log.Debugf("extracted pubkey: %s", pubKey)
-	pubKeyHash := signature.HashPoseidon(pubKey)
-	if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 {
-		//		return fmt.Errorf("wrong Poseidon hash size (%s)", err.Error())
-	}
-	valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
-	if err != nil {
-		//		return fmt.Errorf("cannot check merkle proof (%s)", err.Error())
-	}
-	log.Debugf("proof valid? %t", valid)
-	if !valid {
-		//		return fmt.Errorf("proof not valid")
+		voteBytes, err := json.Marshal(voteTmp)
+		if err != nil {
+			return fmt.Errorf("cannot marshal vote (%s)", err.Error())
+		}
+		//log.Debugf("executing VoteTxCheck of: %s", voteBytes)
+		pubKey, err := signature.PubKeyFromSignature(string(voteBytes), vote.Signature)
+		if err != nil {
+			log.Warnf("cannot extract pubKey: %s", err.Error())
+			return fmt.Errorf("cannot extract public key from signature (%s)", err.Error())
+		}
+
+		addr, err := signature.AddrFromPublicKey(string(pubKey))
+		if err != nil {
+			return fmt.Errorf("cannot extract address from public key")
+		}
+		// assign a nullifier
+		voteTmp.Nullifier = string(GenerateNullifier(addr, vote.ProcessID))
+
+		// check if vote exists
+		voteID := fmt.Sprintf("%s_%s", sanitizeHex(vote.ProcessID), sanitizeHex(voteTmp.Nullifier))
+		v, _ := state.GetEnvelope(voteID)
+		if v != nil {
+			return fmt.Errorf("vote already exists")
+		}
+		// UNCOMMENT FOR POSEIDON HASH
+		/*
+			//log.Debugf("extracted pubkey: %s", pubKey)
+			pubKeyHash := signature.HashPoseidon(pubKey)
+			if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 {
+				return fmt.Errorf("wrong Poseidon hash size (%s)", err.Error())
+			}
+			valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
+			if err != nil {
+				return fmt.Errorf("cannot check merkle proof (%s)", err.Error())
+			}
+			//log.Debugf("proof valid? %t", valid)
+			if !valid {
+				return fmt.Errorf("proof not valid")
+			}
+		*/
+	} else {
+		return fmt.Errorf("invalid process type")
 	}
 	return nil
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
-func NewProcessTxCheck(process *vochaintypes.NewProcessTx, state *VochainState) error {
+func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *VochainState) error {
 	// get oracles
 	oracles, err := state.GetOracles()
 	if err != nil || len(oracles) == 0 {
@@ -159,6 +209,7 @@ func NewProcessTxCheck(process *vochaintypes.NewProcessTx, state *VochainState) 
 	}
 	sign := process.Signature
 	process.Signature = ""
+
 	processBytes, err := json.Marshal(process)
 	if err != nil {
 		return fmt.Errorf("cannot marshal process (%s)", err.Error())
@@ -172,11 +223,17 @@ func NewProcessTxCheck(process *vochaintypes.NewProcessTx, state *VochainState) 
 	if err == nil {
 		return fmt.Errorf("process with id (%s) already exists", process.ProcessID)
 	}
+	// check type
+	if process.ProcessType == "snark-vote" || process.ProcessType == "poll-vote" || process.ProcessType == "petition-sign" {
+		// ok
+	} else {
+		return fmt.Errorf("process type (%s) not valid", process.ProcessType)
+	}
 	return nil
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
-func AdminTxCheck(adminTx *vochaintypes.AdminTx, state *VochainState) error {
+func AdminTxCheck(adminTx vochaintypes.AdminTx, state *VochainState) error {
 	// get oracles
 	oracles, err := state.GetOracles()
 	if err != nil || len(oracles) == 0 {
@@ -190,7 +247,7 @@ func AdminTxCheck(adminTx *vochaintypes.AdminTx, state *VochainState) error {
 	}
 	authorized, addr := VerifySignatureAgainstOracles(oracles, string(adminTxBytes), sign)
 	if !authorized {
-		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr)
+		return fmt.Errorf("unauthorized to perform an adminTx, address: %s, message: %s", addr, string(adminTxBytes))
 	}
 	return nil
 }
@@ -204,7 +261,7 @@ func checkMerkleProof(rootHash, hexproof string, leafData []byte) (bool, error) 
 func VerifySignatureAgainstOracles(oracles []string, message, signHex string) (bool, string) {
 	oraclesAddr := make([]signature.Address, len(oracles))
 	for i, v := range oracles {
-		oraclesAddr[i] = signature.AddressFromString(v)
+		oraclesAddr[i] = signature.AddressFromString(fmt.Sprintf("0x%s", v))
 	}
 	signKeys := signature.SignKeys{
 		Authorized: oraclesAddr,
@@ -215,7 +272,7 @@ func VerifySignatureAgainstOracles(oracles []string, message, signHex string) (b
 
 // GenerateNullifier generates the nullifier of a vote (hash(address+processId))
 func GenerateNullifier(address, processID string) []byte {
-	return signature.HashRaw(fmt.Sprintf("%s%s", address, processID))
+	return signature.HashRaw(fmt.Sprintf("%s%s", signature.SanitizeHex(address), signature.SanitizeHex(processID)))
 }
 
 // GenerateAddressFromEd25519PublicKeyString returns the address as string from given pubkey represented as string

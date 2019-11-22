@@ -16,7 +16,7 @@ func submitEnvelope(request routerRequest, router *Router) {
 	voteTxArgs.Nullifier = request.structured.Payload.Nullifier
 	voteTxArgs.VotePackage = request.structured.Payload.VotePackage
 	voteTxArgs.Proof = request.structured.Payload.Proof
-	voteTxArgs.Type = "vote" // TO-DO get type from ProcessID
+	voteTxArgs.Type = "vote"
 	voteTxArgs.Signature = request.structured.Payload.Signature
 
 	voteTxBytes, err := json.Marshal(voteTxArgs)
@@ -28,7 +28,7 @@ func submitEnvelope(request routerRequest, router *Router) {
 	if err != nil {
 		log.Warnf("cannot broadcast tx: %s", err.Error())
 	} else {
-		log.Infof("transaction checkTx details: %s", res.Data.Bytes())
+		log.Infof("transaction hash: %s", res.Hash.String())
 	}
 
 	var apiResponse types.ResponseMessage
@@ -36,13 +36,9 @@ func submitEnvelope(request routerRequest, router *Router) {
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
 
-	// not sure if its enough information
-	if res != nil && res.Code != 0 {
-		apiResponse.Response.Ok = false
+	if res.Code == 0 {
+		apiResponse.Response.Ok = true
 	} else {
-		if res != nil {
-			apiResponse.Response.Ok = true
-		}
 		apiResponse.Response.Ok = false
 	}
 

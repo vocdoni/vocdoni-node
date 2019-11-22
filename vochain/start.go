@@ -27,7 +27,7 @@ import (
 // testing purposes until genesis
 const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
 
-// List of default Vocdoni seed nodes
+// DefaultSeedNodes list of default Vocdoni seed nodes
 var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
 
 // Start starts a new vochain validator node
@@ -41,7 +41,6 @@ func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*BaseApplication, *n
 	if err != nil {
 		vlog.Errorf("Cannot init vochain application: %s", err.Error())
 	}
-	//flag.Parse()
 	vlog.Info("creating node and application")
 	node, err := newTendermint(app, globalCfg)
 	if err != nil {
@@ -118,12 +117,13 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	tconfig.P2P.AddrBookStrict = false
 	tconfig.P2P.SeedMode = localConfig.SeedMode
 	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
-	tconfig.Consensus.TimeoutPropose = time.Second * 5
-	tconfig.Consensus.TimeoutPrevote = time.Second * 5
-	tconfig.Consensus.TimeoutPrecommit = time.Second * 5
+	tconfig.Consensus.TimeoutPropose = time.Second * 3
+	tconfig.Consensus.TimeoutPrevote = time.Millisecond * 400
+	tconfig.Consensus.TimeoutPrecommit = time.Millisecond * 400
 	tconfig.Consensus.TimeoutCommit = time.Second * 5
-	tconfig.RPC.TimeoutBroadcastTxCommit = time.Second * 20
-	tconfig.Mempool.Recheck = false
+	tconfig.RPC.TimeoutBroadcastTxCommit = time.Second * 9
+	tconfig.Mempool.Recheck = true
+	tconfig.Mempool.Broadcast = true
 
 	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {

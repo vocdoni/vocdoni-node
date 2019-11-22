@@ -2,7 +2,6 @@ package types
 
 import (
 	"fmt"
-	"strings"
 )
 
 // ________________________ STATE ________________________
@@ -13,17 +12,17 @@ import (
 // Vote represents a signle Vote
 type Vote struct {
 	// Nonce unique number per vote attempt, so that replay attacks can't reuse this payload
-	Nonce string
+	Nonce string `json:"nonce,omitempty"`
 	// Nullifier is the hash of the private key
-	Nullifier string
-	// ProcessId contains the vote itself
-	ProcessID string
+	Nullifier string `json:"nullifier,omitempty"`
+	// ProcessID contains the vote itself
+	ProcessID string `json:"processId,omitempty"`
 	// Proof contains the prove indicating that the user is in the census of the process
-	Proof string
+	Proof string `json:"proof,omitempty"`
 	// Signature sign( JSON.stringify( { nonce, processId, proof, 'vote-package' } ), privateKey )
-	Signature string
+	Signature string `json:"signature,omitempty"`
 	// VotePackage base64 encoded vote content
-	VotePackage string
+	VotePackage string `json:"vote-package,omitempty"`
 }
 
 // NewVote returns a new Vote instance
@@ -35,20 +34,20 @@ func NewVote() *Vote {
 
 // Process represents a state per process
 type Process struct {
-	// EntityID identifies unequivocally a process
-	EntityID string
-	// MkRoot merkle root of all the census in the process
-	MkRoot string
-	// NumberOfBlocks represents the amount of tendermint blocks that the process will last
-	NumberOfBlocks int64
-	// StartBlock represents the tendermint block where the process goes from scheduled to active
-	StartBlock int64
 	// CurrentState is the current process state
-	CurrentState CurrentProcessState
+	CurrentState CurrentProcessState `json:"state,omitempty"`
 	// EncryptionPublicKey are the keys required to encrypt the votes
-	EncryptionPublicKeys []string
-	// EncryptionPrivateKey are the keys required to decrypt the votes
-	EncryptionPrivateKeys []string
+	EncryptionPublicKeys []string `json:"encryptionPublicKeys,omitempty"`
+	// EntityID identifies unequivocally a process
+	EntityID string `json:"entityId,omitempty"`
+	// MkRoot merkle root of all the census in the process
+	MkRoot string `json:"mkRoot,omitempty"`
+	// NumberOfBlocks represents the amount of tendermint blocks that the process will last
+	NumberOfBlocks int64 `json:"numberOfBlocks,omitempty"`
+	// StartBlock represents the tendermint block where the process goes from scheduled to active
+	StartBlock int64 `json:"startBlock,omitempty"`
+	// Type represents the process type
+	Type string `json:"type,omitempty"`
 }
 
 // NewProcess returns a new Process instance
@@ -134,31 +133,18 @@ type NewProcessTx struct {
 	// NumberOfBlocks represents the tendermint block where the process goes from active to finished
 	NumberOfBlocks int64  `json:"numberOfBlocks"`
 	ProcessID      string `json:"processId"`
+	ProcessType    string `json:"processType"`
 	Signature      string `json:"signature,omitempty"`
 	// StartBlock represents the tendermint block where the process goes from scheduled to active
 	StartBlock int64  `json:"startBlock"`
-	Type       string `json:"type"` // newProcess
-}
-
-func (p *NewProcessTx) ToJsonString() string {
-	return fmt.Sprintf(`{
-		"encryptionPublicKeys":[%s],
-		"entityID":%s,
-		"mkRoot":%s,
-		"numberOfBlocks":%d,
-		"processId":%s
-		"startBlock":%d,
-		"type":%s
-	}`, strings.Join(p.EncryptionPublicKeys, ","),
-		p.EntityID, p.MkRoot, p.NumberOfBlocks,
-		p.ProcessID, p.StartBlock, p.Type)
+	Type       string `json:"type,omitempty"`
 }
 
 // AdminTx represents a Tx that can be only executed by some authorized addresses
 type AdminTx struct {
 	Address   string `json:"address"`
 	Nonce     string `json:"nonce"`
-	Power     int64  `json:"power"`
+	Power     int64  `json:"power,omitempty"`
 	Signature string `json:"signature,omitempty"`
 	Type      string `json:"type"` //addValidator, removeValidator, addOracle, removeOracle
 }
@@ -192,14 +178,18 @@ type Validator struct {
 
 // QueryData is an abstraction of any kind of data a query request could have
 type QueryData struct {
-	Method    string `json:"method"`
-	ProcessID string `json:"processId,omitempty"`
-	Nullifier string `json:"nullifier,omitempty"`
-	From      int64  `json:"from,omitempty"`
-	ListSize  int64  `json:"listSize,omitempty"`
-	Timestamp int64  `json:"timestamp,omitempty"`
+	Method      string `json:"method"`
+	ProcessID   string `json:"processId,omitempty"`
+	Nullifier   string `json:"nullifier,omitempty"`
+	From        int64  `json:"from,omitempty"`
+	ListSize    int64  `json:"listSize,omitempty"`
+	Timestamp   int64  `json:"timestamp,omitempty"`
+	ProcessType string `json:"type,omitempty"`
 }
 
+// ________________________ GENESIS APP STATE ________________________
+
+// AppState application state in genesis
 type AppState struct {
 	Validators []struct {
 		Address string `json:"address"`
