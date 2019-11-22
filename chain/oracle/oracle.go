@@ -52,7 +52,7 @@ type Oracle struct {
 }
 
 // NewOracle creates an Oracle given an existing Ethereum and Vochain and/or Census connection
-func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, cm *census.CensusManager, contractAddressHex string, storage data.Storage, signer *signature.SignKeys) (*Oracle, error) {
+func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, cm *census.CensusManager, contractAddressHex string, storage *data.Storage, signer *signature.SignKeys) (*Oracle, error) {
 	contractAddr := common.HexToAddress(contractAddressHex)
 	ph, err := chain.NewVotingProcessHandle(contractAddressHex, storage)
 	if err != nil {

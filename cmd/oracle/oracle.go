@@ -36,8 +36,6 @@ import (
 	dbm "github.com/tendermint/tm-db"
 	"gitlab.com/vocdoni/go-dvote/config"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
-	"gitlab.com/vocdoni/go-dvote/data"
-	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/util"
 	vochain "gitlab.com/vocdoni/go-dvote/vochain"
 
@@ -56,7 +54,6 @@ func newConfig() (config.OracleCfg, error) {
 		return cfg, err
 	}
 	userDir := usr.HomeDir + "/.dvote"
-	path := flag.String("cfgpath", userDir+"/oracle.yaml", "filepath for custom gateway config")
 	dataDir := flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
@@ -75,18 +72,11 @@ func newConfig() (config.OracleCfg, error) {
 	flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
 	flag.String("vochainContract", "0xb99F60f7a651589022c9495d3e555a46e3625A42", "voting smart contract where the oracle will listen")
 	flag.String("vochainRPCListen", "127.0.0.1:26657", "rpc host and port to listent for the voting chain")
-	flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
-	flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
-	flag.StringArray("ipfsSyncPeers", []string{}, "use custom ipfsSync peers/bootnodes for accessing the DHT")
 
 	flag.Parse()
 
 	viper := viper.New()
 
-	viper.SetDefault("ipfs.noInit", false)
-	viper.SetDefault("ipfs.configPath", userDir+"/.ipfs")
-	viper.SetDefault("ipfs.syncKey", "")
-	viper.SetDefault("ipfs.syncPeers", []string{})
 	viper.SetDefault("ethereumClient.signingKey", "")
 	viper.SetDefault("ethereumConfig.chainType", "goerli")
 	viper.SetDefault("ethereumConfig.lightMode", false)
@@ -96,7 +86,7 @@ func newConfig() (config.OracleCfg, error) {
 	viper.SetDefault("ethereumClient.allowedAddrs", "")
 	viper.SetDefault("ethereumConfig.httpPort", "9091")
 	viper.SetDefault("ethereumConfig.httpHost", "127.0.0.1")
-	viper.SetDefault("dataDir", userDir)
+	viper.SetDefault("dataDir", dataDir)
 	viper.SetDefault("logLevel", "warn")
 	viper.SetDefault("logOutput", "stdout")
 	viper.SetDefault("vochainConfig.p2pListen", "0.0.0.0:26656")
@@ -111,17 +101,15 @@ func newConfig() (config.OracleCfg, error) {
 
 	viper.SetConfigType("yaml")
 
-	if *path == userDir+"/oracle.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
-		if err = viper.SafeWriteConfigAs(*path); err != nil {
-			if os.IsNotExist(err) {
-				err = os.MkdirAll(userDir, os.ModePerm)
-				if err != nil {
-					return cfg, err
-				}
-				err = viper.WriteConfigAs(*path)
-				if err != nil {
-					return cfg, err
-				}
+	if err = viper.SafeWriteConfigAs(*dataDir + "/oracle.yaml"); err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(*dataDir, os.ModePerm)
+			if err != nil {
+				return cfg, err
+			}
+			err = viper.WriteConfigAs(*dataDir + "/oracle.yaml")
+			if err != nil {
+				return cfg, err
 			}
 		}
 	}
@@ -144,11 +132,8 @@ func newConfig() (config.OracleCfg, error) {
 	viper.BindPFlag("vochainConfig.seeds", flag.Lookup("vochainSeeds"))
 	viper.BindPFlag("vochainConfig.contract", flag.Lookup("vochainContract"))
 	viper.BindPFlag("vochainConfig.rpcListen", flag.Lookup("vochainRPCListen"))
-	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
-	viper.BindPFlag("ipfs.syncKey", flag.Lookup("ipfsSyncKey"))
-	viper.BindPFlag("ipfs.syncPeers", flag.Lookup("ipfsSyncPeers"))
 
-	viper.SetConfigFile(*path)
+	viper.SetConfigFile(*dataDir + "/oracle.yaml")
 	err = viper.ReadInConfig()
 	if err != nil {
 		return cfg, err
@@ -306,38 +291,8 @@ func main() {
 		log.Infof("successfuly connected to web3 endpoint at external url: %s", globalCfg.W3external)
 	}
 
-	var storage data.Storage
-	var storageSync ipfssync.IPFSsync
-	if !globalCfg.Ipfs.NoInit {
-		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
-		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
-		if err != nil {
-			log.Fatal(err)
-		}
-		go func() {
-			for {
-				time.Sleep(time.Second * 60)
-				stats, err := storage.Stats()
-				if err != nil {
-					log.Warnf("IPFS node returned an error: %s", err.Error())
-				}
-				log.Infof("[ipfs info] %s", stats)
-			}
-		}()
-		if len(globalCfg.Ipfs.SyncKey) > 0 {
-			log.Info("enabling ipfs cluster synchronization")
-			storageSync = ipfssync.NewIPFSsync(globalCfg.DataDir+"/.ipfsSync", globalCfg.Ipfs.SyncKey, storage)
-			if len(globalCfg.Ipfs.SyncPeers) > 0 {
-				log.Debugf("using custom ipfs sync bootnodes %s", globalCfg.Ipfs.SyncPeers)
-				storageSync.Transport.BootNodes = globalCfg.Ipfs.SyncPeers
-			}
-			go storageSync.Start()
-		}
-	}
-
-	// wait chains sync
 	// eth
-	orc, err := oracle.NewOracle(node, app, nil, globalCfg.VochainConfig.Contract, storage, signer)
+	orc, err := oracle.NewOracle(node, app, nil, globalCfg.VochainConfig.Contract, nil, signer)
 	if err != nil {
 		log.Fatalf("couldn't create oracle: %s", err.Error())
 	}
@@ -356,10 +311,6 @@ func main() {
 					log.Info("Waiting for Eth to sync before starting oracle.")
 				}
 			}
-
-			// tendermint
-
-			// end wait chains sync
 		}
 	}()
 
