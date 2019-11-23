@@ -203,7 +203,6 @@ func (e *EthChainContext) createAccount() error {
 
 	if err != nil {
 		utils.Fatalf("failed to create account: %v", err)
-		return err
 	}
 	e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
 	log.Infof("my Ethereum address %x\n", e.Keys.Accounts()[0].Address)

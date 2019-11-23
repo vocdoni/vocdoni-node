@@ -19,7 +19,6 @@ func PsSubscribe(topic string) *shell.PubSubSubscription {
 	sub, err := sh.PubSubSubscribe(topic)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 	return sub
 }
