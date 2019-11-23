@@ -42,7 +42,7 @@ type SignKeys struct {
 type Address [AddressLength]byte
 
 func (a *Address) String() string {
-	return fmt.Sprintf("%s", a.String())
+	return fmt.Sprintf("%s", a[:])
 }
 
 // AddressFromString gets an string and creates and address with each element

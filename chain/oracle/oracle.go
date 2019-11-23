@@ -366,7 +366,6 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 
 		// To change at some point
 		time.Sleep(2 * time.Second)
-		break
 
 	case HashLogProcessCanceled.Hex():
 		//stub

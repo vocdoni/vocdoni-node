@@ -38,7 +38,6 @@ func fetchFile(request routerRequest, router *Router) {
 			if content != nil {
 				found = true
 			}
-			break
 		case "ipfs:":
 			splt := strings.Split(parsedURIs[idx], "/")
 			hash := splt[len(splt)-1]
@@ -46,10 +45,8 @@ func fetchFile(request routerRequest, router *Router) {
 			if content != nil {
 				found = true
 			}
-			break
 		case "bzz:", "bzz-feed":
 			err = errors.New("Bzz and Bzz-feed not implemented yet")
-			break
 		}
 	}
 
@@ -91,7 +88,6 @@ func addFile(request routerRequest, router *Router) {
 	switch reqType {
 	case "swarm":
 		// TODO
-		break
 	case "ipfs":
 		cid, err := router.storage.Publish(b64content)
 		if err != nil {
