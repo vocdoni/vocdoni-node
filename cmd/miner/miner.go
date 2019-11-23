@@ -133,8 +133,4 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	os.Exit(0)
-
-	for {
-		time.Sleep(1 * time.Second)
-	}
 }

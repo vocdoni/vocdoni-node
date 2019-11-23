@@ -34,7 +34,7 @@ func main() {
 	is.UpdateTime = *updateTime
 	is.Port = *port
 	is.Start()
-	for {
-		time.Sleep(1 * time.Second)
-	}
+
+	// Block forever.
+	select {}
 }
