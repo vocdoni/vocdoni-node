@@ -129,6 +129,7 @@ func TestCensus(t *testing.T) {
 
 	// Send the API requets
 	var req types.MetaRequest
+	req.Payload = new(types.VoteTx)
 
 	// Create census
 	req.Method = "addCensus"
