@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"gitlab.com/vocdoni/go-dvote/db"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 var rdb *db.LevelDbStorage
