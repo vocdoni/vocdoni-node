@@ -16,7 +16,7 @@ var (
 	}
 
 	ValidatorListHardcoded []vochain.Validator = []vochain.Validator{
-		vochain.Validator{
+		{
 			Address: "243A633E60AAFB177018D76C5AA0A3DF0ACC13D1",
 			PubKey: vochain.PubKey{
 				Type:  "tendermint/PubKeyEd25519",
@@ -25,7 +25,7 @@ var (
 			Power: 10,
 			Name:  "",
 		},
-		vochain.Validator{
+		{
 			Address: "5DC922017285EC24415F3E7ECD045665EADA8B5A",
 			PubKey: vochain.PubKey{
 				Type:  "tendermint/PubKeyEd25519",
