@@ -1,7 +1,6 @@
 package net
 
 import (
-	"os"
 	"time"
 
 	shell "github.com/ipfs/go-ipfs-api"
@@ -19,7 +18,6 @@ func PsSubscribe(topic string) *shell.PubSubSubscription {
 	sub, err := sh.PubSubSubscribe(topic)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 	return sub
 }
