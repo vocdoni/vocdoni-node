@@ -7,7 +7,6 @@ import (
 	"os/user"
 	"strings"
 	"syscall"
-	"time"
 
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"

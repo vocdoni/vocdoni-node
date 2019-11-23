@@ -2,7 +2,6 @@ package main
 
 import (
 	"os/user"
-	"time"
 
 	flag "github.com/spf13/pflag"
 	"gitlab.com/vocdoni/go-dvote/data"
