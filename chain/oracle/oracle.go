@@ -335,7 +335,7 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 		log.Debugf("signing with key: %s", o.signingKeys.EthAddrString())
 		processTx.Signature, err = o.signingKeys.SignJSON(processTx)
 		if err != nil {
-			log.Errorf("cannot sign oracle tx: %s", err.Error())
+			log.Errorf("cannot sign oracle tx: %s", err)
 		}
 		log.Debugf("processTx before json.Marshal HandleLogVochainEntry: %+v", processTx)
 		tx, err := json.Marshal(processTx)
@@ -454,7 +454,7 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 				log.Infof("adding new namespace for published census %s", resp.Root)
 				err = o.censusConnection.AddNamespace(resp.Root, r.PubKeys)
 				if err != nil {
-					log.Warnf("error creating local published census: %s", err.Error())
+					log.Warnf("error creating local published census: %s", err)
 				} else {
 					log.Infof("import claims to new census")
 					err = o.censusConnection.Trees[resp.Root].ImportDump(dump.ClaimsData)

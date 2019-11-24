@@ -58,7 +58,7 @@ func TestCensus(t *testing.T) {
 	pxy.C.Port = 8788
 	err := pxy.Init()
 	if err != nil {
-		t.Error(err.Error())
+		t.Error(err)
 	}
 
 	// the server
@@ -72,7 +72,7 @@ func TestCensus(t *testing.T) {
 	signer2.Generate()
 	err = signer1.AddAuthKey(signer2.EthAddrString())
 	if err != nil {
-		t.Errorf("cannot add authorized address %s", err.Error())
+		t.Errorf("cannot add authorized address %s", err)
 	}
 	t.Logf("added authorized address %s", signer2.EthAddrString())
 
@@ -92,7 +92,7 @@ func TestCensus(t *testing.T) {
 	defer os.RemoveAll(ipfsDir)
 	storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {
-		t.Errorf("cannot start IPFS %s", err.Error())
+		t.Errorf("cannot start IPFS %s", err)
 	}
 	routerAPI := router.InitRouter(listenerOutput, storage, ws, *signer1)
 
@@ -102,11 +102,11 @@ func TestCensus(t *testing.T) {
 	pub, _ := signer2.HexString()
 	err = os.Mkdir(censusDir, 0755)
 	if err != nil {
-		t.Error(err.Error())
+		t.Error(err)
 	}
 	err = cm.Init(censusDir, pub)
 	if err != nil {
-		t.Error(err.Error())
+		t.Error(err)
 	}
 	defer os.RemoveAll(censusDir)
 	routerAPI.EnableCensusAPI(&cm)
@@ -120,7 +120,7 @@ func TestCensus(t *testing.T) {
 	t.Logf("connecting to %s", u.String())
 	c, _, err = websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		t.Errorf("dial: %s", err.Error())
+		t.Errorf("dial: %s", err)
 	}
 	defer c.Close()
 

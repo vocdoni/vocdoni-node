@@ -50,11 +50,11 @@ func TestSignature(t *testing.T) {
 	}
 	pub2, err := DecompressPubKey(pub)
 	if err != nil {
-		t.Errorf("Failed decompressing key: %s\n", err.Error())
+		t.Errorf("Failed decompressing key: %s\n", err)
 	}
 	pubComp, err := CompressPubKey(pub2)
 	if err != nil {
-		t.Errorf("Failed compressing key: %s\n", err.Error())
+		t.Errorf("Failed compressing key: %s\n", err)
 	}
 	if pub != pubComp {
 		t.Errorf("Compression/Decompression of pubkey do not match (%s != %s)", pub, pubComp)
@@ -92,19 +92,19 @@ func TestAddr(t *testing.T) {
 	addr2, err := AddrFromPublicKey(pub)
 	t.Logf("Recovered address from pubKey %s", addr2)
 	if err != nil {
-		t.Error(err.Error())
+		t.Error(err)
 	}
 	if addr1 != addr2 {
 		t.Errorf("Calculated address from pubKey do not match: %s != %s\n", addr1, addr2)
 	}
 	signature, err := s.Sign("hello vocdoni")
 	if err != nil {
-		t.Error(err.Error())
+		t.Error(err)
 	}
 	t.Logf("Signature created: %s\n", signature)
 	addr3, err := AddrFromSignature("hello vocdoni", signature)
 	if err != nil {
-		t.Error(err.Error())
+		t.Error(err)
 	}
 	//addr3s := fmt.Sprintf("%x", addr3)
 	if addr3 != addr2 {
@@ -113,11 +113,11 @@ func TestAddr(t *testing.T) {
 
 	err = s.AddAuthKey(addr3)
 	if err != nil {
-		t.Error(err.Error())
+		t.Error(err)
 	}
 	v, _, err := s.VerifySender("hello vocdoni", signature)
 	if err != nil {
-		t.Error(err.Error())
+		t.Error(err)
 	}
 	if !v {
 		t.Error("Cannot verify sender")
@@ -125,7 +125,7 @@ func TestAddr(t *testing.T) {
 
 	v, err = s.Verify("hello vocdoni", signature)
 	if err != nil {
-		t.Error(err.Error())
+		t.Error(err)
 	}
 	if !v {
 		t.Error("Cannot verify signature")
@@ -134,7 +134,7 @@ func TestAddr(t *testing.T) {
 	signature2, err := s.Sign("bye-bye vocdoni")
 	addr4, err := AddrFromSignature("bye-bye vocdoni", signature2)
 	if err != nil {
-		t.Error(err.Error())
+		t.Error(err)
 	}
 	if addr4 != addr3 {
 		t.Error("extracted address from second message do not match")

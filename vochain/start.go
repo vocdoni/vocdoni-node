@@ -39,7 +39,7 @@ func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*BaseApplication, *n
 	// creating new vochain app
 	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
 	if err != nil {
-		vlog.Errorf("Cannot init vochain application: %s", err.Error())
+		vlog.Errorf("Cannot init vochain application: %s", err)
 	}
 	vlog.Info("creating node and application")
 	node, err := newTendermint(app, globalCfg)

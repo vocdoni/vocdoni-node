@@ -13,7 +13,7 @@ func TestVochainState(t *testing.T) {
 	os.RemoveAll("/tmp/db")
 	s, err := iavl.NewVochainState("/tmp/db")
 	if err != nil {
-		t.Errorf("cannot create vochain state (%s)", err.Error())
+		t.Errorf("cannot create vochain state (%s)", err)
 	}
 	for i := 0; i < 10; i++ {
 		s.AppTree.Set([]byte(string(i)), []byte(fmt.Sprintf("number %d", i)))

@@ -157,7 +157,7 @@ func main() {
 	// app layer db
 	db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.VochainConfig.DataDir+"/data", nil)
 	if err != nil {
-		log.Fatalf("failed to open db: %s", err.Error())
+		log.Fatalf("failed to open db: %s", err)
 	}
 	defer db.Close()
 
@@ -165,7 +165,7 @@ func main() {
 	if len(globalCfg.VochainConfig.PublicAddr) == 0 {
 		ip, err := util.GetPublicIP()
 		if err != nil || len(ip.String()) < 8 {
-			log.Warnf("public IP discovery failed: %s", err.Error())
+			log.Warnf("public IP discovery failed: %s", err)
 		} else {
 			addrport := strings.Split(globalCfg.VochainConfig.P2pListen, ":")
 			if len(addrport) > 0 {
@@ -194,7 +194,7 @@ func main() {
 		for _, key := range keys {
 			err := signer.AddAuthKey(key)
 			if err != nil {
-				log.Error(err.Error())
+				log.Error(err)
 			}
 		}
 	}
@@ -203,11 +203,11 @@ func main() {
 	globalCfg.EthereumConfig.DataDir = globalCfg.DataDir
 	w3cfg, err := chain.NewConfig(globalCfg.EthereumConfig)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal(err)
 	}
 	node, err := chain.Init(w3cfg)
 	if err != nil {
-		log.Panic(err.Error())
+		log.Panic(err)
 	}
 
 	// Add signing private key if exist in configuration or flags
@@ -215,7 +215,7 @@ func main() {
 		log.Infof("adding custom signing key")
 		err := signer.AddHexKey(globalCfg.EthereumClient.SigningKey)
 		if err != nil {
-			log.Fatalf("Fatal error adding hex key: %v", err.Error())
+			log.Fatalf("Fatal error adding hex key: %v", err)
 		}
 		pub, _ := signer.HexString()
 		log.Infof("using custom pubKey %s", pub)
@@ -228,13 +228,13 @@ func main() {
 		if len(acc) > 0 {
 			keyJSON, err := node.Keys.Export(acc[0], "", "")
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Fatal(err)
 			}
 			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
 			pub, _ := signer.HexString()
 			log.Infof("using pubKey %s from keystore", pub)
 			if err != nil {
-				log.Fatalf(err.Error())
+				log.Fatal(err)
 			}
 		}
 	}
@@ -276,7 +276,7 @@ func main() {
 			"params":  []interface{}{},
 		})
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 		resp, err := http.Post(globalCfg.W3external,
 			"application/json", strings.NewReader(string(data)))
@@ -286,7 +286,7 @@ func main() {
 		defer resp.Body.Close()
 		_, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 		log.Infof("successfuly connected to web3 endpoint at external url: %s", globalCfg.W3external)
 	}
@@ -294,7 +294,7 @@ func main() {
 	// eth
 	orc, err := oracle.NewOracle(node, app, nil, globalCfg.VochainConfig.Contract, nil, signer)
 	if err != nil {
-		log.Fatalf("couldn't create oracle: %s", err.Error())
+		log.Fatalf("couldn't create oracle: %s", err)
 	}
 
 	go func() {
