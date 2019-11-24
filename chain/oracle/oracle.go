@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"time"
 
 	eth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -96,12 +95,9 @@ func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, c
 type EventGenesisChanged string
 type EventChainIdChanged *big.Int
 type EventProcessCreated struct {
-	EntityAddress  [20]byte
-	ProcessId      [32]byte
-	MerkleTree     string
-	StartBlock     *big.Int
-	NumberOfBlocks *big.Int
-	Type           string
+	EntityAddress [20]byte
+	ProcessId     [32]byte
+	MerkleTree    string
 }
 type EventProcessCanceled struct {
 	EntityAddress [20]byte
@@ -333,7 +329,7 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 		if err != nil {
 			log.Errorf("Error getting process metadata: %s", err)
 		} else {
-			log.Infof("Process meta: %s", &processTx)
+			log.Infof("Process meta: %+v", processTx)
 		}
 
 		log.Debugf("signing with key: %s", o.signingKeys.EthAddrString())
@@ -355,21 +351,6 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 		} else {
 			log.Infof("transaction hash: %s", res.Hash.String())
 		}
-
-		/*
-			_, err = o.processHandle.GetOracles()
-			if err != nil {
-				log.Errorf("error getting oracles: %s", err)
-			}
-
-			_, err = o.processHandle.GetValidators()
-			if err != nil {
-				log.Errorf("error getting validators: %s", err)
-			}
-		*/
-
-		time.Sleep(2 * time.Second)
-		break
 
 	case HashLogProcessCanceled.Hex():
 		//stub
