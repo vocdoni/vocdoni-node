@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"gitlab.com/vocdoni/go-dvote/batch"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 type HTTPHandle struct {
@@ -72,7 +72,7 @@ func (h *HTTPHandle) Listen() error {
 	//add waitgroup
 	func() {
 		log.Infof("serving on " + h.port + "/" + h.path)
-		err := http.ListenAndServe(":" + h.port, nil)
+		err := http.ListenAndServe(":"+h.port, nil)
 		if err != nil {
 			return
 		}

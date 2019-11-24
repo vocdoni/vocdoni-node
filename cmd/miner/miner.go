@@ -7,7 +7,6 @@ import (
 	"os/user"
 	"strings"
 	"syscall"
-	"time"
 
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -133,8 +132,4 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	os.Exit(0)
-
-	for {
-		time.Sleep(1 * time.Second)
-	}
 }

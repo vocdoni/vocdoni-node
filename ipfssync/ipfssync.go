@@ -18,12 +18,12 @@ import (
 )
 
 type IPFSsyncMessage struct {
-	Type     string   `json:type`
-	Address  string   `json:address`
-	Maddress string   `json:mAddress`
-	NodeID   string   `json:nodeId`
-	Hash     string   `json:hash`
-	PinList  []string `json:pinList`
+	Type     string   `json:"type"`
+	Address  string   `json:"address"`
+	Maddress string   `json:"mAddress"`
+	NodeID   string   `json:"nodeId"`
+	Hash     string   `json:"hash"`
+	PinList  []string `json:"pinList"`
 }
 
 //shity function to workaround NAT problems (hope it's temporary)

@@ -1,6 +1,6 @@
 module gitlab.com/vocdoni/go-dvote
 
-go 1.12
+go 1.13
 
 require (
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
@@ -30,14 +30,11 @@ require (
 	github.com/iden3/go-iden3-core v0.0.7-0.20190904124812-741e2fdbb8f0
 	github.com/iden3/go-iden3-crypto v0.0.3-0.20190831180703-c95c95b7b161
 	github.com/influxdata/influxdb v1.7.7 // indirect
-	github.com/ipfs/go-blockservice v0.1.2 // indirect
-	github.com/ipfs/go-ipfs v0.4.22-0.20190903225735-3c04d7423817
+	github.com/ipfs/go-ipfs v0.4.22-0.20190912212424-7e7b76259f65
 	github.com/ipfs/go-ipfs-api v0.0.1
 	github.com/ipfs/go-ipfs-config v0.0.11
 	github.com/ipfs/go-ipfs-files v0.0.3
-	github.com/ipfs/go-ipld-cbor v0.0.3 // indirect
 	github.com/ipfs/go-log v0.0.1
-	github.com/ipfs/go-mfs v0.1.1 // indirect
 	github.com/ipfs/interface-go-ipfs-core v0.2.2
 	github.com/libp2p/go-libp2p v0.3.1 // indirect
 	github.com/libp2p/go-libp2p-autonat-svc v0.1.0
@@ -84,25 +81,5 @@ require (
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190709231704-1e4459ed25ff // indirect
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
-	gopkg.in/urfave/cli.v1 v1.0.0-00010101000000-000000000000 // indirect
+	gopkg.in/urfave/cli.v1 v1.20.0 // indirect
 )
-
-replace git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
-
-replace gopkg.in/urfave/cli.v1 => github.com/urfave/cli v1.21.0
-
-replace github.com/go-critic/go-critic v0.0.0-20181204210945-1df300866540 => github.com/go-critic/go-critic v0.3.4
-
-replace github.com/golangci/go-tools v0.0.0-20180109140146-af6baa5dc196 => github.com/golangci/go-tools v0.0.0-20190318060251-af6baa5dc196
-
-replace github.com/golangci/gofmt v0.0.0-20181105071733-0b8337e80d98 => github.com/golangci/gofmt v0.0.0-20181222123516-0b8337e80d98
-
-replace github.com/golangci/gosec v0.0.0-20180901114220-66fb7fc33547 => github.com/golangci/gosec v0.0.0-20190211064107-66fb7fc33547
-
-replace github.com/golangci/ineffassign v0.0.0-20180808204949-42439a7714cc => github.com/golangci/ineffassign v0.0.0-20190609212857-42439a7714cc
-
-replace github.com/golangci/lint-1 v0.0.0-20180610141402-ee948d087217 => github.com/golangci/lint-1 v0.0.0-20190420132249-ee948d087217
-
-replace mvdan.cc/unparam v0.0.0-20190124213536-fbb59629db34 => mvdan.cc/unparam v0.0.0-20190209190245-fbb59629db34
-
-replace github.com/golangci/errcheck v0.0.0-20181003203344-ef45e06d44b6 => github.com/golangci/errcheck v0.0.0-20181223084120-ef45e06d44b6
