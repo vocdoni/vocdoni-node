@@ -200,44 +200,42 @@ func (r *Router) Route() {
 		return
 	}
 	for {
-		select {
-		case msg := <-r.inbound:
-			request, err := r.getRequest(msg.Data, msg.Context)
-			if !request.authenticated && err != nil {
-				log.Warnf("error parsing request: %s", err.Error())
-				go sendError(r.transport, r.signer, request.context, request.id, "cannot parse request")
-				break
+		msg := <-r.inbound
+		request, err := r.getRequest(msg.Data, msg.Context)
+		if !request.authenticated && err != nil {
+			log.Warnf("error parsing request: %s", err.Error())
+			go sendError(r.transport, r.signer, request.context, request.id, "cannot parse request")
+			break
+		}
+
+		var methodFunc requestMethod
+		if !request.private {
+			methodFunc = r.publicRequestMap[request.method]
+		} else if request.private && request.authenticated {
+			methodFunc = r.privateRequestMap[request.method]
+		}
+		if methodFunc == nil {
+			errMsg := fmt.Sprintf("router has no method named %s or unauthorized", request.method)
+			log.Warn(errMsg)
+			go sendError(r.transport, r.signer, request.context, request.id, errMsg)
+			continue
+		}
+		log.Infof("calling method %s", request.method)
+		log.Debugf("data received: %+v", request.structured)
+
+		if request.private {
+			r.PrivateCalls++
+			if r.PrivateCalls >= 2^64 {
+				r.PrivateCalls = 0
 			}
-
-			var methodFunc requestMethod
-			if !request.private {
-				methodFunc = r.publicRequestMap[request.method]
-			} else if request.private && request.authenticated {
-				methodFunc = r.privateRequestMap[request.method]
-			}
-			if methodFunc == nil {
-				errMsg := fmt.Sprintf("router has no method named %s or unauthorized", request.method)
-				log.Warn(errMsg)
-				go sendError(r.transport, r.signer, request.context, request.id, errMsg)
-			} else {
-				log.Infof("calling method %s", request.method)
-				log.Debugf("data received: %+v", request.structured)
-
-				if request.private {
-					r.PrivateCalls++
-					if r.PrivateCalls >= 2^64 {
-						r.PrivateCalls = 0
-					}
-				} else {
-					r.PublicCalls++
-					if r.PublicCalls >= 2^64 {
-						r.PublicCalls = 0
-					}
-				}
-
-				go methodFunc(request, r)
+		} else {
+			r.PublicCalls++
+			if r.PublicCalls >= 2^64 {
+				r.PublicCalls = 0
 			}
 		}
+
+		go methodFunc(request, r)
 	}
 }
 
