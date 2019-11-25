@@ -352,23 +352,21 @@ func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 }
 
 func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
-	var err error
 	dstAddr := strAddress(address)
 	dstTopic := strTopic(topic)
 	log.Debugf("Sending message to [%x]/%x", dstAddr, dstTopic)
-	if subType == "sym" {
+	switch subType {
+	case "sym":
 		symKeyId, err := sn.Pss.SetSymmetricKey(strSymKey(key), dstTopic, dstAddr, false)
 		if err != nil {
 			return err
 		}
 		// send symetric message
-		err = sn.Pss.SendSym(symKeyId, strTopic(topic), hexutil.Bytes(msg))
-	}
-	if subType == "raw" {
+		return sn.Pss.SendSym(symKeyId, strTopic(topic), hexutil.Bytes(msg))
+	case "raw":
 		// sed raw message
-		err = sn.Pss.SendRaw(hexutil.Bytes(address), dstTopic, hexutil.Bytes(msg))
-	}
-	if subType == "asym" {
+		return sn.Pss.SendRaw(hexutil.Bytes(address), dstTopic, hexutil.Bytes(msg))
+	case "asym":
 		// add 0x prefix if not present
 		if hasHexPrefix := strings.HasPrefix(key, "0x"); !hasHexPrefix {
 			key = "0x" + key
@@ -388,9 +386,9 @@ func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
 		}
 
 		// send asymetric message
-		err = sn.Pss.SendAsym(key, dstTopic, hexutil.Bytes(msg))
+		return sn.Pss.SendAsym(key, dstTopic, hexutil.Bytes(msg))
 	}
-	return err
+	return nil
 }
 
 func (sn *SimpleSwarm) InitBZZ() error {
