@@ -11,10 +11,11 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	dbm "github.com/tendermint/tm-db"
+
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/util"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain"
+	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 func newConfig() (config.VochainCfg, error) {

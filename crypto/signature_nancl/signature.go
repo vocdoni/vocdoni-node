@@ -1,12 +1,12 @@
 package signature
 
 import (
-	rand "crypto/rand"
-	hex "encoding/hex"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
-	sign "golang.org/x/crypto/nacl/sign"
+	"golang.org/x/crypto/nacl/sign"
 )
 
 const signatureSize = 128

@@ -6,11 +6,10 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	vochain "gitlab.com/vocdoni/go-dvote/types"
 )
 
 func submitEnvelope(request routerRequest, router *Router) {
-	voteTxArgs := new(vochain.VoteTx)
+	voteTxArgs := new(types.VoteTx)
 	voteTxArgs.ProcessID = request.structured.Payload.ProcessID
 	voteTxArgs.Nonce = request.structured.Payload.Nonce
 	voteTxArgs.Nullifier = request.structured.Payload.Nullifier
@@ -58,7 +57,7 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
-	qdata := vochain.QueryData{
+	qdata := types.QueryData{
 		Method:    "getEnvelopeStatus",
 		ProcessID: request.structured.ProcessID,
 		Nullifier: request.structured.Nullifier,
@@ -99,7 +98,7 @@ func getEnvelope(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
-	qdata := vochain.QueryData{
+	qdata := types.QueryData{
 		Method:    "getEnvelope",
 		ProcessID: request.structured.ProcessID,
 		Nullifier: request.structured.Nullifier,
@@ -137,7 +136,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
-	qdata := vochain.QueryData{
+	qdata := types.QueryData{
 		Method:    "getEnvelopeHeight",
 		ProcessID: request.structured.ProcessID,
 	}
@@ -177,7 +176,7 @@ func getBlockHeight(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Response.Request = request.id
 	apiResponse.Response.Timestamp = int32(time.Now().Unix())
-	qdata := vochain.QueryData{
+	qdata := types.QueryData{
 		Method: "getBlockHeight",
 	}
 	qdataBytes, err := json.Marshal(qdata)
@@ -237,7 +236,7 @@ func getEnvelopeList(request routerRequest, router *Router) {
 		}
 		// here we can ask to tendermint via query to get the results from the database
 
-		qdata := vochain.QueryData{
+		qdata := types.QueryData{
 			Method:    "getEnvelopeList",
 			ProcessID: request.structured.ProcessId,
 			From:      request.structured.From,

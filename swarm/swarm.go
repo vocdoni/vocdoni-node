@@ -26,6 +26,7 @@ import (
 	"github.com/ethersphere/swarm/pss"
 
 	"github.com/ethereum/go-ethereum/p2p/nat"
+
 	"gitlab.com/vocdoni/go-dvote/log"
 	dvoteUtil "gitlab.com/vocdoni/go-dvote/util"
 )

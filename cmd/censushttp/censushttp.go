@@ -1,11 +1,12 @@
 package main
 
 import (
-	flag "github.com/spf13/pflag"
-	viper "github.com/spf13/viper"
 	"net/http"
 	"os"
 	"os/user"
+
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/net"

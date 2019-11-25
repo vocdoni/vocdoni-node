@@ -13,10 +13,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	crypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	amino "github.com/tendermint/go-amino"
 	voclient "github.com/tendermint/tendermint/rpc/client"
+
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
 	"gitlab.com/vocdoni/go-dvote/config"
 
 	cfg "github.com/tendermint/tendermint/config"
@@ -16,11 +17,12 @@ import (
 	tlog "github.com/tendermint/tendermint/libs/log"
 	nm "github.com/tendermint/tendermint/node"
 	"github.com/tendermint/tendermint/p2p"
-	privval "github.com/tendermint/tendermint/privval"
+	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	dbm "github.com/tendermint/tm-db"
+
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 )
 

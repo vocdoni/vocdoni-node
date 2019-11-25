@@ -25,6 +25,7 @@ import (
 	"time"
 
 	voclient "github.com/tendermint/tendermint/rpc/client"
+
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"

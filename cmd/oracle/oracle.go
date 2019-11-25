@@ -34,14 +34,16 @@ import (
 	"github.com/spf13/viper"
 	tmnode "github.com/tendermint/tendermint/node"
 	dbm "github.com/tendermint/tm-db"
+
 	"gitlab.com/vocdoni/go-dvote/config"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/util"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain"
+	"gitlab.com/vocdoni/go-dvote/vochain"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+
 	"gitlab.com/vocdoni/go-dvote/chain"
-	oracle "gitlab.com/vocdoni/go-dvote/chain/oracle"
+	"gitlab.com/vocdoni/go-dvote/chain/oracle"
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 

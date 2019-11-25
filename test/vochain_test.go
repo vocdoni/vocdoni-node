@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	testcommon "gitlab.com/vocdoni/go-dvote/test/test_common"
-	vochain "gitlab.com/vocdoni/go-dvote/vochain"
+	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 func TestNewProcessTxCheck(t *testing.T) {

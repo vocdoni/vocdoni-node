@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 	vochain "gitlab.com/vocdoni/go-dvote/types"
 )

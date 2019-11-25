@@ -3,15 +3,16 @@ package signature
 import (
 	"crypto/ecdsa"
 	"encoding/base64"
-	hex "encoding/hex"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
-	crypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"gitlab.com/vocdoni/go-dvote/crypto/hashing"
 )
 
@@ -274,7 +275,7 @@ func PubKeyFromSignature(msg, sigHex string) (string, error) {
 	if sig[64] > 1 {
 		sig[64] -= 27
 	}
-	if sig[64] < 0 || sig[64] > 1 {
+	if sig[64] > 1 {
 		return "", errors.New("bad recover ID byte")
 	}
 	pubKey, err := crypto.SigToPub(Hash(msg), sig)
@@ -337,10 +338,7 @@ func HashPoseidon(hexStr string) []byte {
 }
 
 func SanitizeHex(hexStr string) string {
-	if strings.HasPrefix(hexStr, "0x") {
-		return fmt.Sprintf("%s", hexStr[2:])
-	}
-	return hexStr
+	return strings.TrimPrefix(hexStr, "0x")
 }
 
 // Encrypt uses secp256k1 standard from https://www.secg.org/sec2-v2.pdf to encrypt a message.

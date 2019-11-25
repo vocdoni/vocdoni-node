@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+
 	votingProcess "gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"

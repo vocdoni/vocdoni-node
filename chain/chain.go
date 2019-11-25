@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	//	"github.com/ethereum/go-ethereum/accounts/abi"

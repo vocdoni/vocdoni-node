@@ -12,13 +12,14 @@ import (
 	files "github.com/ipfs/go-ipfs-files"
 	ipfscmds "github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
-	corehttp "github.com/ipfs/go-ipfs/core/corehttp"
+	"github.com/ipfs/go-ipfs/core/corehttp"
 	"github.com/ipfs/go-ipfs/core/coreunix"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/ipfs/interface-go-ipfs-core/options"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
+
 	crypto "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/ipfs"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -108,6 +109,9 @@ func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, er
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
 	log.Infof("publishing file: %s", filePath)
 	err := ioutil.WriteFile(filePath, msg, 0666)
+	if err != nil {
+		return "", err
+	}
 	rootHash, err := addAndPin(nd, filePath)
 	if err != nil {
 		return "", err

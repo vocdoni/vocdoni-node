@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 
-	poseidon "github.com/iden3/go-iden3-crypto/poseidon"
+	"github.com/iden3/go-iden3-crypto/poseidon"
 )
 
 // PoseidonHash computes the base64 Poseidon hash of the given hex string

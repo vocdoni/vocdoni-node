@@ -14,10 +14,10 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/types"
 
-	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
-	tree "gitlab.com/vocdoni/go-dvote/tree"
+	"gitlab.com/vocdoni/go-dvote/tree"
 )
 
 type CensusNamespaces struct {
@@ -543,6 +543,12 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		dataStorage := *cm.Data
 		cid, err := dataStorage.Publish(dumpBytes)
+		if err != nil {
+			resp.Error = err.Error()
+			resp.Ok = false
+			log.Warnf("cannot publish census dump: %s", err)
+			return resp
+		}
 		resp.URI = dataStorage.GetURIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
 		resp.Root = t.GetRoot()

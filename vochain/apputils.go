@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"reflect"
 
-	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
-	tree "gitlab.com/vocdoni/go-dvote/tree"
+	"gitlab.com/vocdoni/go-dvote/tree"
 	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 
 	"github.com/tendermint/tendermint/crypto"
