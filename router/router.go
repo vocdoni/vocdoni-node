@@ -208,7 +208,6 @@ func (r *Router) Route() {
 				go sendError(r.transport, r.signer, request.context, request.id, "cannot parse request")
 				break
 			}
-
 			var methodFunc requestMethod
 			if !request.private {
 				methodFunc = r.publicRequestMap[request.method]
@@ -234,7 +233,6 @@ func (r *Router) Route() {
 						r.PublicCalls = 0
 					}
 				}
-
 				go methodFunc(request, r)
 			}
 		}

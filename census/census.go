@@ -297,11 +297,11 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 
 	//Methods without rootHash
 	switch op {
-	case "getRoot" {
+	case "getRoot":
 		resp.Root = cm.Trees[r.CensusID].GetRoot()
 		return resp
 
-	case "addClaimBulk" {
+	case "addClaimBulk":
 		if isAuth && validAuthPrefix {
 			addedClaims := 0
 			var invalidClaims []int
@@ -328,7 +328,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		return resp
 
-	case "addClaim" {
+	case "addClaim":
 		if isAuth && validAuthPrefix {
 			data, err := base64.StdEncoding.DecodeString(r.ClaimData)
 			if err != nil {
@@ -350,7 +350,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		return resp
 
-	case "importDump" {
+	case "importDump":
 		if isAuth && validAuthPrefix {
 			if len(r.ClaimsData) > 0 {
 				err = cm.Trees[r.CensusID].ImportDump(r.ClaimsData)
@@ -368,7 +368,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		return resp
 
-	case "importRemote" {
+	case "importRemote":
 		// To-Do implement Gzip compression
 		if !isAuth || !validAuthPrefix {
 			resp.Ok = false
@@ -421,7 +421,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		return resp
 
-	case "checkProof" {
+	case "checkProof":
 		if len(r.Payload.Proof) < 1 {
 			resp.Ok = false
 			resp.Error = "proofData not provided"
@@ -464,7 +464,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 	}
 
 	switch op {
-	case "genProof" {
+	case "genProof":
 		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
 		if err != nil {
 			log.Warnf("error decoding base64 string: %s", err)
@@ -479,7 +479,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		return resp
 
-	case "getSize" {
+	case "getSize":
 		resp.Size, err = t.Size(t.GetRoot())
 		if err != nil {
 			resp.Ok = false
@@ -487,7 +487,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		return resp
 
-	case "dump" || op == "dumpPlain" {
+	case "dump", "dumpPlain":
 		if !isAuth || !validAuthPrefix {
 			resp.Ok = false
 			resp.Error = "invalid authentication"
@@ -513,7 +513,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		return resp
 
-	case "publish" {
+	case "publish":
 		// To-Do implement Gzip compression
 		if !isAuth || !validAuthPrefix {
 			resp.Ok = false

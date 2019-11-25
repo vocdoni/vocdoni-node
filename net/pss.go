@@ -32,24 +32,18 @@ func (p *PSSHandle) Init(c *types.Connection) error {
 func (p *PSSHandle) Listen(reciever chan<- types.Message) {
 	var msg types.Message
 	for {
-		select {
-		case pssMessage := <-p.Swarm.PssTopics[p.Conn.Topic].Delivery:
-			ctx := new(types.PssContext)
-			ctx.Topic = p.Conn.Topic
-			ctx.PeerAddress = pssMessage.Peer.String()
-			msg.Data = pssMessage.Msg
-			msg.TimeStamp = int32(time.Now().Unix())
-			msg.Context = ctx
-			reciever <- msg
-		default:
-			continue
-		}
-
+		pssMessage := <-p.Swarm.PssTopics[p.Conn.Topic].Delivery
+		ctx := new(types.PssContext)
+		ctx.Topic = p.Conn.Topic
+		ctx.PeerAddress = pssMessage.Peer.String()
+		msg.Data = pssMessage.Msg
+		msg.TimeStamp = int32(time.Now().Unix())
+		msg.Context = ctx
+		reciever <- msg
 	}
 }
 
 func (p *PSSHandle) Send(msg types.Message) {
-
 	err := p.Swarm.PssPub(p.Conn.Encryption, p.Conn.Key, p.Conn.Topic, string(msg.Data), p.Conn.Address)
 	if err != nil {
 		log.Warnf("PSS send error: %s", err)
