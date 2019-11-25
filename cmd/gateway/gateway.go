@@ -200,7 +200,7 @@ func main() {
 	//setup logger
 	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
 	if err != nil {
-		log.Fatalf("could not load config: %s", err.Error())
+		log.Fatalf("could not load config: %s", err)
 	}
 	log.Infof("using datadir %s", globalCfg.DataDir)
 
@@ -221,7 +221,7 @@ func main() {
 		globalCfg.Ssl.Domain = ""
 		err = pxy.Init()
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 	}
 
@@ -234,7 +234,7 @@ func main() {
 		for _, key := range keys {
 			err := signer.AddAuthKey(key)
 			if err != nil {
-				log.Error(err.Error())
+				log.Error(err)
 			}
 		}
 	}
@@ -243,11 +243,11 @@ func main() {
 	globalCfg.W3.DataDir = globalCfg.DataDir
 	w3cfg, err := chain.NewConfig(globalCfg.W3)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal(err)
 	}
 	node, err := chain.Init(w3cfg)
 	if err != nil {
-		log.Panic(err.Error())
+		log.Panic(err)
 	}
 
 	// Add signing private key if exist in configuration or flags
@@ -255,7 +255,7 @@ func main() {
 		log.Infof("adding custom signing key")
 		err := signer.AddHexKey(globalCfg.Client.SigningKey)
 		if err != nil {
-			log.Fatalf("Fatal error adding hex key: %v", err.Error())
+			log.Fatalf("Fatal error adding hex key: %v", err)
 		}
 		pub, _ := signer.HexString()
 		log.Infof("using custom pubKey %s", pub)
@@ -268,13 +268,13 @@ func main() {
 		if len(acc) > 0 {
 			keyJSON, err := node.Keys.Export(acc[0], "", "")
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Fatal(err)
 			}
 			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
 			pub, _ := signer.HexString()
 			log.Infof("using pubKey %s from keystore", pub)
 			if err != nil {
-				log.Fatalf(err.Error())
+				log.Fatal(err)
 			}
 		}
 	}
@@ -318,7 +318,7 @@ func main() {
 			"params":  []interface{}{},
 		})
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 		resp, err := http.Post(globalCfg.W3external,
 			"application/json", strings.NewReader(string(data)))
@@ -328,7 +328,7 @@ func main() {
 		defer resp.Body.Close()
 		_, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 		log.Infof("successfuly connected to web3 endpoint at external url: %s", globalCfg.W3external)
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
@@ -348,7 +348,7 @@ func main() {
 				time.Sleep(time.Second * 60)
 				stats, err := storage.Stats()
 				if err != nil {
-					log.Warnf("IPFS node returned an error: %s", err.Error())
+					log.Warnf("IPFS node returned an error: %s", err)
 				}
 				log.Infof("[ipfs info] %s", stats)
 			}
@@ -384,7 +384,7 @@ func main() {
 		// app layer db
 		db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.Vochain.DataDir+"/data", nil)
 		if err != nil {
-			log.Fatalf("failed to open db: %s", err.Error())
+			log.Fatalf("failed to open db: %s", err)
 		}
 		defer db.Close()
 
@@ -392,7 +392,7 @@ func main() {
 		if len(globalCfg.Vochain.PublicAddr) == 0 {
 			ip, err := util.GetPublicIP()
 			if err != nil || len(ip.String()) < 8 {
-				log.Warnf("public IP discovery failed: %s", err.Error())
+				log.Warnf("public IP discovery failed: %s", err)
 			} else {
 				addrport := strings.Split(globalCfg.Vochain.P2pListen, ":")
 				if len(addrport) > 0 {

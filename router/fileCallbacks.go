@@ -63,7 +63,7 @@ func fetchFile(request routerRequest, router *Router) {
 		response.Response.Timestamp = int32(time.Now().Unix())
 		response.Signature, err = router.signer.SignJSON(response.Response)
 		if err != nil {
-			log.Warn(err.Error())
+			log.Warn(err)
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
@@ -92,7 +92,7 @@ func addFile(request routerRequest, router *Router) {
 		cid, err := router.storage.Publish(b64content)
 		if err != nil {
 			sendError(router.transport, router.signer, request.context, request.id,
-				fmt.Sprintf("cannot add file (%s)", err.Error()))
+				fmt.Sprintf("cannot add file (%s)", err))
 			return
 		}
 		log.Debugf("added file %s, b64 size of %d", cid, len(b64content))
@@ -103,12 +103,12 @@ func addFile(request routerRequest, router *Router) {
 		response.Response.URI = router.storage.GetURIprefix() + cid
 		response.Signature, err = router.signer.SignJSON(response.Response)
 		if err != nil {
-			log.Warn(err.Error())
+			log.Warn(err)
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
 			sendError(router.transport, router.signer, request.context, request.id,
-				fmt.Sprintf("could not unmarshal response (%s)", err.Error()))
+				fmt.Sprintf("could not unmarshal response (%s)", err))
 		} else {
 			log.Debugf("sending response %s", rawResponse)
 			router.transport.Send(buildReply(request.context, rawResponse))
@@ -121,13 +121,13 @@ func pinList(request routerRequest, router *Router) {
 	log.Debug("calling PinList")
 	pins, err := router.storage.ListPins()
 	if err != nil {
-		errMsg = fmt.Sprintf("internal error fetching pins (%s)", err.Error())
+		errMsg = fmt.Sprintf("internal error fetching pins (%s)", err)
 		sendError(router.transport, router.signer, request.context, request.id, errMsg)
 		return
 	}
 	pinsJSONArray, err := json.Marshal(pins)
 	if err != nil {
-		errMsg = fmt.Sprintf("internal error parsing pins (%s)", err.Error())
+		errMsg = fmt.Sprintf("internal error parsing pins (%s)", err)
 		sendError(router.transport, router.signer, request.context, request.id, errMsg)
 	} else {
 		var response types.ResponseMessage
@@ -141,7 +141,7 @@ func pinList(request routerRequest, router *Router) {
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
-			errMsg = fmt.Sprintf("internal error marshalig response body (%s)", err.Error())
+			errMsg = fmt.Sprintf("internal error marshalig response body (%s)", err)
 			sendError(router.transport, router.signer, request.context, request.id, errMsg)
 			return
 		}
@@ -154,33 +154,7 @@ func pinFile(request routerRequest, router *Router) {
 	log.Debugf("calling PinFile %s", uri)
 	err := router.storage.Pin(uri)
 	if err != nil {
-		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("error pinning file (%s)", err.Error()))
-	} else {
-		var response types.ResponseMessage
-		response.ID = request.id
-		response.Response.Ok = true
-		response.Response.Request = request.id
-		response.Response.Timestamp = int32(time.Now().Unix())
-		response.Signature, err = router.signer.SignJSON(response.Response)
-		if err != nil {
-			log.Warn(err.Error())
-		}
-		rawResponse, err := json.Marshal(response)
-		if err != nil {
-			sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("error marshaling (%s)", err.Error()))
-		} else {
-			log.Debugf("sending response %s", rawResponse)
-			router.transport.Send(buildReply(request.context, rawResponse))
-		}
-	}
-}
-
-func unpinFile(request routerRequest, router *Router) {
-	uri := request.structured.URI
-	log.Debugf("calling UnPinFile %s", uri)
-	err := router.storage.Unpin(uri)
-	if err != nil {
-		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unpin file (%s)", err.Error()))
+		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("error pinning file (%s)", err))
 	} else {
 		var response types.ResponseMessage
 		response.ID = request.id
@@ -193,7 +167,33 @@ func unpinFile(request routerRequest, router *Router) {
 		}
 		rawResponse, err := json.Marshal(response)
 		if err != nil {
-			sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err.Error()))
+			sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("error marshaling (%s)", err))
+		} else {
+			log.Debugf("sending response %s", rawResponse)
+			router.transport.Send(buildReply(request.context, rawResponse))
+		}
+	}
+}
+
+func unpinFile(request routerRequest, router *Router) {
+	uri := request.structured.URI
+	log.Debugf("calling UnPinFile %s", uri)
+	err := router.storage.Unpin(uri)
+	if err != nil {
+		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unpin file (%s)", err))
+	} else {
+		var response types.ResponseMessage
+		response.ID = request.id
+		response.Response.Ok = true
+		response.Response.Request = request.id
+		response.Response.Timestamp = int32(time.Now().Unix())
+		response.Signature, err = router.signer.SignJSON(response.Response)
+		if err != nil {
+			log.Warn(err)
+		}
+		rawResponse, err := json.Marshal(response)
+		if err != nil {
+			sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err))
 		} else {
 			log.Debugf("sending response %s", rawResponse)
 			router.transport.Send(buildReply(request.context, rawResponse))

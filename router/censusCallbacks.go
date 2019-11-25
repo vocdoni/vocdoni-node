@@ -29,11 +29,11 @@ func censusLocal(request routerRequest, router *Router) {
 	response.Response.Request = request.id
 	response.Signature, err = router.signer.SignJSON(response.Response)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 	}
 	rawResponse, err := json.Marshal(response)
 	if err != nil {
-		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err.Error()))
+		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err))
 	} else {
 		log.Infof("sending census resposne: %s", rawResponse)
 		router.transport.Send(buildReply(request.context, rawResponse))

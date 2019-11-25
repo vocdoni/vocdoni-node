@@ -34,15 +34,15 @@ func InstallDatabasePlugins() {
 	pluginOnce.Do(func() {
 		loader, err := loader.NewPluginLoader("")
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 		err = loader.Initialize()
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 		err = loader.Inject()
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 	})
 }

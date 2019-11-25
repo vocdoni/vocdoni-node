@@ -154,7 +154,7 @@ func (e *EthChainContext) Start() {
 	var et *eth.Ethereum
 	err := e.Node.Service(&et)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 	}
 	e.Eth = et
 }
@@ -192,7 +192,7 @@ func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
 	}
 	//create ctx
 	err = client.SendTransaction(ctx, signedTx)
-	log.Errorf(err.Error())
+	log.Error(err)
 	//fix return*/
 	return err
 }

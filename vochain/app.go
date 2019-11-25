@@ -21,7 +21,7 @@ var _ abcitypes.Application = (*BaseApplication)(nil)
 func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	s, err := NewVochainState(dbpath)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create vochain state: (%s)", err.Error())
+		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}
 	return &BaseApplication{
 		State: s,
@@ -72,7 +72,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	var appState vochain.AppState
 	err := json.Unmarshal(req.AppStateBytes, &appState)
 	if err != nil {
-		vlog.Errorf("cannot unmarshal app state bytes: %s", err.Error())
+		vlog.Errorf("cannot unmarshal app state bytes: %s", err)
 	}
 	for _, v := range appState.Oracles {
 		app.State.AddOracle(v)
@@ -80,7 +80,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	for i := 0; i < len(appState.Validators); i++ {
 		p, err := strconv.ParseInt(appState.Validators[i].Power, 10, 64)
 		if err != nil {
-			vlog.Errorf("cannot parse power from validator: %s", err.Error())
+			vlog.Errorf("cannot parse power from validator: %s", err)
 		}
 		app.State.AddValidator(appState.Validators[i].PubKey.Value, p)
 	}
@@ -152,7 +152,7 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	case "getEnvelope":
 		e, err := app.State.GetEnvelope(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier)) // nullifier hash(addr+pid), processId by pid_nullifier
 		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get envelope: %s", err.Error())}
+			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get envelope: %s", err)}
 		}
 		eBytes, err := app.State.Codec.MarshalBinaryBare(e.VotePackage)
 		if err != nil {

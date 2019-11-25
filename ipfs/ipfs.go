@@ -87,7 +87,7 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 
 	auts, err := autonat.NewAutoNATService(node.Context(), node.PeerHost)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 	}
 	node.AutoNAT = auts
 

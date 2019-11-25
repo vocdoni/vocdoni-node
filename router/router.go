@@ -204,7 +204,7 @@ func (r *Router) Route() {
 		case msg := <-r.inbound:
 			request, err := r.getRequest(msg.Data, msg.Context)
 			if !request.authenticated && err != nil {
-				log.Warnf("error parsing request: %s", err.Error())
+				log.Warnf("error parsing request: %s", err)
 				go sendError(r.transport, r.signer, request.context, request.id, "cannot parse request")
 				break
 			}

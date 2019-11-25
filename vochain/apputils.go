@@ -22,7 +22,7 @@ func ValidateTx(content []byte, state *VochainState) (interface{}, string, error
 
 	err = json.Unmarshal(content, &txType)
 	if err != nil || len(txType.Type) < 1 {
-		return nil, "", fmt.Errorf("cannot extract type (%s)", err.Error())
+		return nil, "", fmt.Errorf("cannot extract type (%s)", err)
 	}
 
 	structType := vochaintypes.ValidateType(txType.Type)
@@ -59,7 +59,7 @@ func ValidateTx(content []byte, state *VochainState) (interface{}, string, error
 func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 	tx, txType, err := ValidateTx(content, state)
 	if err != nil {
-		return fmt.Errorf("transaction validation failed with error (%s)", err.Error())
+		return fmt.Errorf("transaction validation failed with error (%s)", err)
 	}
 	switch txType {
 	case "VoteTx":
@@ -83,12 +83,12 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 
 			voteBytes, err := json.Marshal(vote)
 			if err != nil {
-				return fmt.Errorf("cannot marshal vote (%s)", err.Error())
+				return fmt.Errorf("cannot marshal vote (%s)", err)
 			}
 			pubKey, err := signature.PubKeyFromSignature(string(voteBytes), votetx.Signature)
 			if err != nil {
-				//log.Warnf("cannot extract pubKey: %s", err.Error())
-				return fmt.Errorf("cannot extract public key from signature (%s)", err.Error())
+				//log.Warnf("cannot extract pubKey: %s", err)
+				return fmt.Errorf("cannot extract public key from signature (%s)", err)
 			}
 			addr, err := signature.AddrFromPublicKey(string(pubKey))
 			if err != nil {
@@ -156,13 +156,13 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 
 		voteBytes, err := json.Marshal(voteTmp)
 		if err != nil {
-			return fmt.Errorf("cannot marshal vote (%s)", err.Error())
+			return fmt.Errorf("cannot marshal vote (%s)", err)
 		}
 		//log.Debugf("executing VoteTxCheck of: %s", voteBytes)
 		pubKey, err := signature.PubKeyFromSignature(string(voteBytes), vote.Signature)
 		if err != nil {
-			log.Warnf("cannot extract pubKey: %s", err.Error())
-			return fmt.Errorf("cannot extract public key from signature (%s)", err.Error())
+			log.Warnf("cannot extract pubKey: %s", err)
+			return fmt.Errorf("cannot extract public key from signature (%s)", err)
 		}
 
 		addr, err := signature.AddrFromPublicKey(string(pubKey))
@@ -183,11 +183,11 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 			//log.Debugf("extracted pubkey: %s", pubKey)
 			pubKeyHash := signature.HashPoseidon(pubKey)
 			if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 {
-				return fmt.Errorf("wrong Poseidon hash size (%s)", err.Error())
+				return fmt.Errorf("wrong Poseidon hash size (%s)", err)
 			}
 			valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
 			if err != nil {
-				return fmt.Errorf("cannot check merkle proof (%s)", err.Error())
+				return fmt.Errorf("cannot check merkle proof (%s)", err)
 			}
 			//log.Debugf("proof valid? %t", valid)
 			if !valid {
@@ -212,7 +212,7 @@ func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *VochainState) e
 
 	processBytes, err := json.Marshal(process)
 	if err != nil {
-		return fmt.Errorf("cannot marshal process (%s)", err.Error())
+		return fmt.Errorf("cannot marshal process (%s)", err)
 	}
 	authorized, addr := VerifySignatureAgainstOracles(oracles, string(processBytes), sign)
 	if !authorized {
@@ -243,7 +243,7 @@ func AdminTxCheck(adminTx vochaintypes.AdminTx, state *VochainState) error {
 	adminTx.Signature = ""
 	adminTxBytes, err := json.Marshal(adminTx)
 	if err != nil {
-		return fmt.Errorf("cannot marshal adminTx (%s)", err.Error())
+		return fmt.Errorf("cannot marshal adminTx (%s)", err)
 	}
 	authorized, addr := VerifySignatureAgainstOracles(oracles, string(adminTxBytes), sign)
 	if !authorized {

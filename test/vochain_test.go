@@ -16,7 +16,7 @@ func TestNewProcessTxCheck(t *testing.T) {
 		t.Error("cannot create state")
 	}
 	if err := vochain.NewProcessTxCheck(*testcommon.HardcodedNewProcessTx, s); err != nil {
-		t.Errorf("cannot validate new process tx: %s", err.Error())
+		t.Errorf("cannot validate new process tx: %s", err)
 	}
 }
 
@@ -27,7 +27,7 @@ func TestVoteTxCheck(t *testing.T) {
 		t.Error("cannot create state")
 	}
 	if err := vochain.VoteTxCheck(*testcommon.HardcodedNewVoteTx, s); err != nil {
-		t.Errorf("cannot validate vote: %s", err.Error())
+		t.Errorf("cannot validate vote: %s", err)
 	}
 }
 
@@ -38,7 +38,7 @@ func TestAdminTxCheckAddOracle(t *testing.T) {
 		t.Error("cannot create state")
 	}
 	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxAddOracle, s); err != nil {
-		t.Errorf("cannot add oracle: %s", err.Error())
+		t.Errorf("cannot add oracle: %s", err)
 	}
 }
 
@@ -49,7 +49,7 @@ func TestAdminTxCheckRemoveOracle(t *testing.T) {
 		t.Error("cannot create state")
 	}
 	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxRemoveOracle, s); err != nil {
-		t.Errorf("cannot remove oracle: %s", err.Error())
+		t.Errorf("cannot remove oracle: %s", err)
 	}
 }
 
@@ -60,7 +60,7 @@ func TestAdminTxCheckAddValidator(t *testing.T) {
 		t.Error("cannot create state")
 	}
 	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxAddValidator, s); err != nil {
-		t.Errorf("cannot add validator: %s", err.Error())
+		t.Errorf("cannot add validator: %s", err)
 	}
 }
 
@@ -71,7 +71,7 @@ func TestAdminTxCheckRemoveValidator(t *testing.T) {
 		t.Error("cannot create state")
 	}
 	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxRemoveValidator, s); err != nil {
-		t.Errorf("cannot remove validator: %s", err.Error())
+		t.Errorf("cannot remove validator: %s", err)
 	}
 }
 
@@ -87,12 +87,12 @@ func TestCreateProcess(t *testing.T) {
 	}
 	err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err != nil {
-		t.Errorf("cannot create process: %s", err.Error())
+		t.Errorf("cannot create process: %s", err)
 	}
 	// cannot add same process
 	err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err == nil {
-		t.Errorf("same process added: %s", err.Error())
+		t.Errorf("same process added: %s", err)
 	}
 	// cannot add process if not oracle
 	badoracle := testcommon.HardcodedNewProcessTx
@@ -103,7 +103,7 @@ func TestCreateProcess(t *testing.T) {
 	}
 	err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err == nil {
-		t.Errorf("process added by non oracle: %s", err.Error())
+		t.Errorf("process added by non oracle: %s", err)
 	}
 }
 
@@ -119,12 +119,12 @@ func TestSubmitEnvelope(t *testing.T) {
 	}
 	err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err != nil {
-		t.Errorf("cannot submit envelope: %s", err.Error())
+		t.Errorf("cannot submit envelope: %s", err)
 	}
 	// cannot add same envelope
 	err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err == nil {
-		t.Errorf("cannot submit envelope twice: %s", err.Error())
+		t.Errorf("cannot submit envelope twice: %s", err)
 	}
 	// cannot add to non existent process
 	badpid := testcommon.HardcodedNewVoteTx
@@ -135,6 +135,6 @@ func TestSubmitEnvelope(t *testing.T) {
 	}
 	err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err == nil {
-		t.Errorf("cannot submit envelope twice: %s", err.Error())
+		t.Errorf("cannot submit envelope twice: %s", err)
 	}
 }

@@ -93,7 +93,7 @@ func main() {
 		log.Infof("adding signing key")
 		err := signer.AddHexKey(globalCfg.SignKey)
 		if err != nil {
-			log.Fatalf("Fatal error adding hex key: %v", err.Error())
+			log.Fatalf("Fatal error adding hex key: %v", err)
 		}
 		pub, _ := signer.HexString()
 		log.Infof("using custom pubKey %s", pub)
@@ -106,7 +106,7 @@ func main() {
 	var cm censusmanager.CensusManager
 	err = cm.Init(globalCfg.DataDir, globalCfg.RootKey)
 	if err != nil {
-		log.Fatalf("cannot initialize census manager: %s", err.Error())
+		log.Fatalf("cannot initialize census manager: %s", err)
 	}
 	for i := 0; i < len(cm.Census.Namespaces); i++ {
 		log.Infof("loaded namespace %s", cm.Census.Namespaces[i].Name)
@@ -127,7 +127,7 @@ func main() {
 		globalCfg.SslDomain = ""
 		err = pxy.Init()
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 	}
 

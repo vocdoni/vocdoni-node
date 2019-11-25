@@ -158,11 +158,11 @@ func ping(globalCfg config.PssCfg, sn *swarm.SimpleSwarm) {
 		jmsg.Data = "Hello world"
 		msg, err := json.Marshal(jmsg)
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 		err = sn.PssPub(globalCfg.Encryption, globalCfg.Key, globalCfg.Topic, fmt.Sprintf("%s", msg), globalCfg.Address)
 		if err != nil {
-			log.Warn(err.Error())
+			log.Warn(err)
 		}
 		time.Sleep(10 * time.Second)
 	}
@@ -261,11 +261,11 @@ func chat(globalCfg config.PssCfg, sn *swarm.SimpleSwarm) {
 		jmsg.Data = e.Text()
 		msg, err := json.Marshal(jmsg)
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 		err = sn.PssPub(globalCfg.Encryption, globalCfg.Key, globalCfg.Topic, fmt.Sprintf("%s", msg), globalCfg.Address)
 		if err != nil {
-			log.Warn(err.Error())
+			log.Warn(err)
 		}
 		history.Append(tui.NewHBox(
 			tui.NewLabel(time.Now().Format("3:04PM")),
@@ -279,7 +279,7 @@ func chat(globalCfg config.PssCfg, sn *swarm.SimpleSwarm) {
 	root := tui.NewHBox(sidebar, chat, infoBox)
 	ui, err := tui.New(root)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal(err)
 	}
 	quit := false
 
@@ -297,7 +297,7 @@ func chat(globalCfg config.PssCfg, sn *swarm.SimpleSwarm) {
 
 	go func() {
 		if err := ui.Run(); err != nil {
-			log.Fatal(err.Error())
+			log.Fatal(err)
 		}
 	}()
 

@@ -30,7 +30,7 @@ type IPFSsyncMessage struct {
 func guessMyAddress(port int, id string) string {
 	ip, err := util.GetPublicIP()
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 		return ""
 	}
 	if len(ip.To4().String()) > 8 {
@@ -76,7 +76,7 @@ func (is *IPFSsync) syncPins() error {
 			go func() {
 				err := is.Storage.Pin(v)
 				if err != nil {
-					log.Warn(err.Error())
+					log.Warn(err)
 				}
 				pinned = true
 			}()
@@ -197,7 +197,7 @@ func (is *IPFSsync) sendUpdate() {
 		log.Debugf("current hash %s", msg.Hash)
 		err := is.broadcastMsg(msg)
 		if err != nil {
-			log.Warn(err.Error())
+			log.Warn(err)
 		}
 	}
 }
@@ -210,7 +210,7 @@ func (is *IPFSsync) sendHello() {
 	msg.NodeID = is.myNodeID
 	err := is.broadcastMsg(msg)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 	}
 }
 
@@ -281,7 +281,7 @@ func (is *IPFSsync) Start() {
 
 	err := is.Transport.Init(&conn)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal(err)
 	}
 
 	msg := make(chan types.Message)
@@ -301,7 +301,7 @@ func (is *IPFSsync) Start() {
 			d := <-msg
 			err = json.Unmarshal(d.Data, &syncMsg)
 			if err != nil {
-				log.Warnf("cannot unmarshal message %s", err.Error())
+				log.Warnf("cannot unmarshal message %s", err)
 			} else {
 				go is.Handle(syncMsg)
 			}
@@ -346,7 +346,7 @@ func (is *IPFSsync) Start() {
 	for {
 		err = is.syncPins()
 		if err != nil {
-			log.Warn(err.Error())
+			log.Warn(err)
 		}
 		time.Sleep(time.Second * 32)
 	}

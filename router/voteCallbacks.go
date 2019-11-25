@@ -21,12 +21,12 @@ func submitEnvelope(request routerRequest, router *Router) {
 
 	voteTxBytes, err := json.Marshal(voteTxArgs)
 	if err != nil {
-		log.Errorf("error marshaling voteTx args: %s", err.Error())
+		log.Errorf("error marshaling voteTx args: %s", err)
 	}
 
 	res, err := router.tmclient.BroadcastTxSync(voteTxBytes)
 	if err != nil {
-		log.Warnf("cannot broadcast tx: %s", err.Error())
+		log.Warnf("cannot broadcast tx: %s", err)
 	} else {
 		log.Infof("transaction hash: %s", res.Hash.String())
 	}
@@ -44,11 +44,11 @@ func submitEnvelope(request routerRequest, router *Router) {
 
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
-		log.Errorf("Error marshaling submitEnvelope reply: %s", err.Error())
+		log.Errorf("Error marshaling submitEnvelope reply: %s", err)
 	}
 	router.transport.Send(buildReply(request.context, rawApiResponse))
 }
@@ -65,11 +65,11 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err.Error())
+		log.Errorf("cannot marshal query data: (%s)", err)
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
-		log.Warnf("cannot query: %s", err.Error())
+		log.Warnf("cannot query: %s", err)
 		apiResponse.Response.Ok = false
 	} else {
 		apiResponse.Response.Ok = true
@@ -83,7 +83,7 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	log.Debugf("Response is: %d", apiResponse.Response)
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
@@ -106,7 +106,7 @@ func getEnvelope(request routerRequest, router *Router) {
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err.Error())
+		log.Errorf("cannot marshal query data: (%s)", err)
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
@@ -116,12 +116,12 @@ func getEnvelope(request routerRequest, router *Router) {
 	}
 	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Payload)
 	if err != nil {
-		log.Errorf("cannot unmarshal vote package: %s", err.Error())
+		log.Errorf("cannot unmarshal vote package: %s", err)
 	}
 	log.Debugf("Response is: %d", apiResponse.Response)
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
@@ -143,7 +143,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err.Error())
+		log.Errorf("cannot marshal query data: (%s)", err)
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
@@ -153,7 +153,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	}
 	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Height)
 	if err != nil {
-		log.Errorf("cannot unmarshal height: %s", err.Error())
+		log.Errorf("cannot unmarshal height: %s", err)
 	}
 	if apiResponse.Response.Height == 0 {
 		apiResponse.Response.Height = -1
@@ -161,7 +161,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	log.Debugf("Response height is: %d", apiResponse.Response.Height)
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
@@ -182,7 +182,7 @@ func getBlockHeight(request routerRequest, router *Router) {
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err.Error())
+		log.Errorf("cannot marshal query data: (%s)", err)
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
@@ -193,11 +193,11 @@ func getBlockHeight(request routerRequest, router *Router) {
 	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Height)
 	log.Debugf("Response height is: %d", apiResponse.Response.Height)
 	if err != nil {
-		log.Errorf("cannot unmarshal height: %s", err.Error())
+		log.Errorf("cannot unmarshal height: %s", err)
 	}
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 	if err != nil {
-		log.Warn(err.Error())
+		log.Warn(err)
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
@@ -245,7 +245,7 @@ func getEnvelopeList(request routerRequest, router *Router) {
 		}
 		qdataBytes, err := json.Marshal(qdata)
 		if err != nil {
-			log.Errorf("cannot marshal query data: (%s)", err.Error())
+			log.Errorf("cannot marshal query data: (%s)", err)
 		}
 		queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 		if err != nil {
@@ -256,11 +256,11 @@ func getEnvelopeList(request routerRequest, router *Router) {
 		err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Nullifiers)
 		log.Debugf("Response is: %d", apiResponse.Response)
 		if err != nil {
-			log.Errorf("cannot unmarshal nullifiers: %s", err.Error())
+			log.Errorf("cannot unmarshal nullifiers: %s", err)
 		}
 		apiResponse.Signature, err = router.signer.SignJSON(apiResponse.Response)
 		if err != nil {
-			log.Warn(err.Error())
+			log.Warn(err)
 		}
 		rawApiResponse, err := json.Marshal(apiResponse)
 		if err != nil {

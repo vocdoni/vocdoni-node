@@ -26,7 +26,7 @@ func main() {
 	ipfsStore := data.IPFSNewConfig(*dataDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal(err)
 	}
 	is := ipfssync.NewIPFSsync(*dataDir, *key, storage)
 	is.HelloTime = *helloTime
