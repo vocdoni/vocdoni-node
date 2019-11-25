@@ -31,6 +31,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"math/rand"
 	"net/url"
@@ -50,8 +51,10 @@ import (
 
 var c *websocket.Conn
 
+var level = flag.String("level", "error", "logging level")
+
 func TestCensus(t *testing.T) {
-	log.InitLogger("debug", "stdout")
+	log.InitLogger(*level, "stdout")
 	// create the proxy to handle HTTP queries
 	pxy := net.NewProxy()
 	pxy.C.Address = "127.0.0.1"
