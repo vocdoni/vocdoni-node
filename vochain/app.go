@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	amino "github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 	vochain "gitlab.com/vocdoni/go-dvote/types"
@@ -13,18 +14,21 @@ import (
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
 	State *VochainState
+	Codec *amino.Codec
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
 // NewBaseApplication creates a new BaseApplication given a name an a DB backend
 func NewBaseApplication(dbpath string) (*BaseApplication, error) {
-	s, err := NewVochainState(dbpath)
+	c := amino.NewCodec()
+	s, err := NewVochainState(dbpath, c)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}
 	return &BaseApplication{
 		State: s,
+		Codec: c,
 	}, nil
 }
 
@@ -40,28 +44,25 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	vlog.Infof("tendermint Block protocol version: %d", req.BlockVersion)
 
 	// gets the app height from database
-	var height int64
-	_, heightBytes := app.State.AppTree.Get([]byte(heightKey))
+	var header abcitypes.Header
+	_, heightBytes := app.State.AppTree.Get([]byte(headerKey))
 	if heightBytes != nil {
-		err := app.State.Codec.UnmarshalBinaryBare(heightBytes, &height)
+		err := app.State.Codec.UnmarshalBinaryBare(heightBytes, &header)
 		if err != nil {
 			vlog.Errorf("cannot unmarshal header from database")
 		}
-	} else {
-		vlog.Infof("initializing tendermint application database for first time, height %d", 0)
 	}
-	//vlog.Infof("height : %d", header)
-	// gets the app hash from database
-	_, appHashBytes := app.State.AppTree.Get([]byte(appHashKey))
-	if appHashBytes != nil {
-		vlog.Infof("app hash: %x", appHashBytes)
+	if header.Height == 0 {
+		vlog.Infof("initializing tendermint application database for first time, height %d", 0)
 	} else {
-		vlog.Warnf("app hash is empty")
-		appHashBytes = []byte{}
+		vlog.Infof("block height from database: %d", header.Height)
+	}
+	if len(header.AppHash) != 0 {
+		vlog.Infof("apphash %x", header.AppHash)
 	}
 	return abcitypes.ResponseInfo{
-		LastBlockHeight:  height,
-		LastBlockAppHash: appHashBytes,
+		LastBlockHeight:  header.Height,
+		LastBlockAppHash: header.AppHash,
 	}
 }
 
@@ -69,27 +70,33 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 // ResponseInitChain can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-	var appState vochain.AppState
-	err := json.Unmarshal(req.AppStateBytes, &appState)
+	// setting the app initial state with validators, oracles, height = 0 and empty apphash
+	// unmarshal app state from genesis
+	var genesisAppState vochain.GenesisAppState
+	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
 		vlog.Errorf("cannot unmarshal app state bytes: %s", err)
 	}
-	for _, v := range appState.Oracles {
+	// get oracles
+	for _, v := range genesisAppState.Oracles {
 		app.State.AddOracle(v)
 	}
-	for i := 0; i < len(appState.Validators); i++ {
-		p, err := strconv.ParseInt(appState.Validators[i].Power, 10, 64)
+	// get validators
+	for i := 0; i < len(genesisAppState.Validators); i++ {
+		p, err := strconv.ParseInt(genesisAppState.Validators[i].Power, 10, 64)
 		if err != nil {
 			vlog.Errorf("cannot parse power from validator: %s", err)
 		}
-		app.State.AddValidator(appState.Validators[i].PubKey.Value, p)
+		app.State.AddValidator(genesisAppState.Validators[i].PubKey.Value, p)
 	}
-	initHeight, err := app.State.Codec.MarshalBinaryBare(0)
-	if err != nil {
-		vlog.Errorf("cannot marshal initial height: %s", err)
-	}
-	app.State.AppTree.Set([]byte(heightKey), initHeight)
+
+	var header abcitypes.Header
+	header.Height = 0
+	header.AppHash = []byte{}
+	headerBytes, err := app.Codec.MarshalBinaryBare(header)
+	app.State.AppTree.Set([]byte(headerKey), headerBytes)
 	app.State.Save()
+	// TBD: using empty list here, should return validatorsUpdate to use the validators obtained here
 	return abcitypes.ResponseInitChain{}
 }
 
@@ -101,13 +108,14 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 		vlog.Warn("app state is locked")
 	} else {
 		app.State.Lock = true
+		// reset app state to latest persistent data
 		app.State.Rollback()
 	}
-	height, err := app.State.Codec.MarshalBinaryBare(req.Header.Height)
+	headerBytes, err := app.Codec.MarshalBinaryBare(req.Header)
 	if err != nil {
-		vlog.Error("cannot marshal height")
+		vlog.Warnf("cannot marshal header in BeginBlock")
 	}
-	app.State.AppTree.Set([]byte(heightKey), height)
+	app.State.AppTree.Set([]byte(headerKey), headerBytes)
 	return abcitypes.ResponseBeginBlock{}
 }
 
@@ -130,10 +138,10 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 }
 
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
-	app.State.Save()
 	app.State.Lock = false
+	hash := app.State.Save()
 	return abcitypes.ResponseCommit{
-		Data: app.State.GetHash(),
+		Data: hash,
 	}
 }
 func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
@@ -167,7 +175,12 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 		}
 		return abcitypes.ResponseQuery{Code: 0, Value: vBytes}
 	case "getBlockHeight":
-		return abcitypes.ResponseQuery{Code: 0, Value: app.State.GetHeight()}
+		h := app.State.GetHeight()
+		hbytes, err := app.Codec.MarshalBinaryBare(h)
+		if err != nil {
+			hbytes = []byte{}
+		}
+		return abcitypes.ResponseQuery{Code: 0, Value: hbytes}
 	case "getProcessList":
 		return abcitypes.ResponseQuery{Code: 1, Info: "not implemented"}
 	case "getEnvelopeList":
