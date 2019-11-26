@@ -14,7 +14,8 @@ import (
 	ipfsapi "github.com/ipfs/go-ipfs/core/coreapi"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
-	errors "github.com/pkg/errors"
+	"github.com/pkg/errors"
+
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 

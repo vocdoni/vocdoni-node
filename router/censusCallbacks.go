@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )

@@ -40,6 +40,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
 	"gitlab.com/vocdoni/go-dvote/census"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"

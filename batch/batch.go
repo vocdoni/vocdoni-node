@@ -51,13 +51,15 @@ func Recieve(messages <-chan types.Message) {
 func Add(ballot types.Ballot) error {
 	//this is probably adding []
 	//err := bdb.Put(fmt.Sprintf("%v", p.Nullifier)),[]byte(fmt.Sprintf("%v", p)))
-	var b []byte
-	var n []byte
-	var err error
-	b, err = json.Marshal(ballot)
-	n, err = json.Marshal(ballot.Nullifier)
-	err = bdb.Put(n, b)
+	b, err := json.Marshal(ballot)
 	if err != nil {
+		return err
+	}
+	n, err := json.Marshal(ballot.Nullifier)
+	if err != nil {
+		return err
+	}
+	if err := bdb.Put(n, b); err != nil {
 		return err
 	}
 
@@ -72,9 +74,7 @@ func Add(ballot types.Ballot) error {
 //k is []byte 'batch_' + nullifier
 //v is []byte package
 //returns slice of nullifiers, batch json
-func Fetch() ([]string, []string) {
-	var n []string
-	var b []string
+func Fetch() (n, b []string) {
 	iter := bdb.Iter()
 	for iter.Next() {
 		k := iter.Key()

@@ -13,7 +13,8 @@ import (
 	"github.com/ipfs/go-ipfs/namesys"
 	"github.com/ipfs/go-ipfs/plugin/loader"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
-	errors "github.com/pkg/errors"
+	"github.com/pkg/errors"
+
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 

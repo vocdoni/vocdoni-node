@@ -6,8 +6,9 @@ import (
 	"os"
 	"time"
 
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -129,7 +130,9 @@ func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
 		return nil
 	}
 	log.Debugf("got %+v", msg)
-	if msg.Type == "hello" {
+
+	switch msg.Type {
+	case "hello":
 		peers, err := is.Storage.CoreAPI.Swarm().Peers(is.Storage.Node.Context())
 		if err != nil {
 			return err
@@ -152,8 +155,8 @@ func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
 			}
 			return is.Storage.CoreAPI.Swarm().Connect(is.Storage.Node.Context(), *peerInfo)
 		}
-	}
-	if msg.Type == "update" {
+
+	case "update":
 		if len(msg.Hash) > 31 && len(msg.Address) > 31 && !is.updateLock && len(is.askLock) == 0 {
 			if msg.Hash != is.hashTree.GetRoot() && msg.Hash != is.lastHash {
 				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
@@ -161,8 +164,8 @@ func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
 				return is.askPins(msg.Address, msg.Hash)
 			}
 		}
-	}
-	if msg.Type == "fetchReply" {
+
+	case "fetchReply":
 		if len(msg.Hash) > 31 && len(msg.Address) > 31 && !is.updateLock {
 			if msg.Hash != is.hashTree.GetRoot() {
 				is.updateLock = true
@@ -175,8 +178,8 @@ func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
 				return nil
 			}
 		}
-	}
-	if msg.Type == "fetch" {
+
+	case "fetch":
 		if len(msg.Hash) > 31 && len(msg.Address) > 31 {
 			if msg.Hash == is.hashTree.GetRoot() {
 				log.Infof("got fetch query, sending pin list to %s", msg.Address)

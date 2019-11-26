@@ -4,6 +4,7 @@ import (
 	"time"
 
 	shell "github.com/ipfs/go-ipfs-api"
+
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )

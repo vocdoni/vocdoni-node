@@ -8,8 +8,8 @@ import (
 
 	common3 "github.com/iden3/go-iden3-core/common"
 	mkcore "github.com/iden3/go-iden3-core/core"
-	db "github.com/iden3/go-iden3-core/db"
-	merkletree "github.com/iden3/go-iden3-core/merkletree"
+	"github.com/iden3/go-iden3-core/db"
+	"github.com/iden3/go-iden3-core/merkletree"
 	"golang.org/x/text/unicode/norm"
 )
 

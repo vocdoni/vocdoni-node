@@ -8,9 +8,10 @@ import (
 
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
-	swarm "gitlab.com/vocdoni/go-dvote/swarm"
+	"gitlab.com/vocdoni/go-dvote/swarm"
 )
 
 func newConfig() (config.PssMetaCfg, error) {

@@ -8,8 +8,9 @@ import (
 
 	amino "github.com/tendermint/go-amino"
 	voclient "github.com/tendermint/tendermint/rpc/client"
+
 	"gitlab.com/vocdoni/go-dvote/census"
-	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
@@ -120,7 +121,7 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 			}
 		} else {
 			// if method not found
-			return request, errors.New(fmt.Sprintf("method not valid [%s]", request.method))
+			return request, fmt.Errorf("method not valid [%s]", request.method)
 		}
 	} else {
 		// if method is Public
@@ -139,9 +140,6 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 //InitRouter sets up a Router object which can then be used to route requests
 func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
 	signer signature.SignKeys) *Router {
-	if &signer == nil {
-		panic("signer is nil")
-	}
 	log.Infof("using signer with address %s", signer.EthAddrString())
 	return NewRouter(inbound, storage, transport, signer)
 }
@@ -200,42 +198,41 @@ func (r *Router) Route() {
 		return
 	}
 	for {
-		select {
-		case msg := <-r.inbound:
-			request, err := r.getRequest(msg.Data, msg.Context)
-			if !request.authenticated && err != nil {
-				log.Warnf("error parsing request: %s", err)
-				go sendError(r.transport, r.signer, request.context, request.id, "cannot parse request")
-				break
-			}
-			var methodFunc requestMethod
-			if !request.private {
-				methodFunc = r.publicRequestMap[request.method]
-			} else if request.private && request.authenticated {
-				methodFunc = r.privateRequestMap[request.method]
-			}
-			if methodFunc == nil {
-				errMsg := fmt.Sprintf("router has no method named %s or unauthorized", request.method)
-				log.Warn(errMsg)
-				go sendError(r.transport, r.signer, request.context, request.id, errMsg)
-			} else {
-				log.Infof("calling method %s", request.method)
-				log.Debugf("data received: %+v", request.structured)
+		msg := <-r.inbound
+		request, err := r.getRequest(msg.Data, msg.Context)
+		if !request.authenticated && err != nil {
+			log.Warnf("error parsing request: %s", err)
+			go sendError(r.transport, r.signer, request.context, request.id, "cannot parse request")
+			break
+		}
+		var methodFunc requestMethod
+		if !request.private {
+			methodFunc = r.publicRequestMap[request.method]
+		} else if request.private && request.authenticated {
+			methodFunc = r.privateRequestMap[request.method]
+		}
+		if methodFunc == nil {
+			errMsg := fmt.Sprintf("router has no method named %s or unauthorized", request.method)
+			log.Warn(errMsg)
+			go sendError(r.transport, r.signer, request.context, request.id, errMsg)
+			continue
+		}
 
-				if request.private {
-					r.PrivateCalls++
-					if r.PrivateCalls >= 2^64 {
-						r.PrivateCalls = 0
-					}
-				} else {
-					r.PublicCalls++
-					if r.PublicCalls >= 2^64 {
-						r.PublicCalls = 0
-					}
-				}
-				go methodFunc(request, r)
+		log.Infof("calling method %s", request.method)
+		log.Debugf("data received: %+v", request.structured)
+
+		if request.private {
+			r.PrivateCalls++
+			if r.PrivateCalls >= 2^64 {
+				r.PrivateCalls = 0
+			}
+		} else {
+			r.PublicCalls++
+			if r.PublicCalls >= 2^64 {
+				r.PublicCalls = 0
 			}
 		}
+		go methodFunc(request, r)
 	}
 }
 

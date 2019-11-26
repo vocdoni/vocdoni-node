@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	amino "github.com/tendermint/go-amino"
-	iavl "github.com/tendermint/iavl"
+	"github.com/tendermint/iavl"
 	tmtypes "github.com/tendermint/tendermint/abci/types"
 	tmdb "github.com/tendermint/tm-db"
-	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
+
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 )
 
@@ -300,10 +301,7 @@ func (v *VochainState) GetWorkingHash() []byte {
 }
 
 func sanitizeHex(hexStr string) string {
-	if strings.HasPrefix(hexStr, "0x") {
-		return fmt.Sprintf("%s", hexStr[2:])
-	}
-	return hexStr
+	return strings.TrimPrefix(hexStr, "0x")
 }
 
 // ProcessList returns a list of processId given an entityId

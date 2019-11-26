@@ -40,8 +40,7 @@ func Resolve(host string) string {
 // If domain cannot be solved, returns an empty string
 // Only ipv4 support
 func ResolveCustom(nameserver string, host string) string {
-	var resolver *net.Resolver
-	resolver = &net.Resolver{
+	resolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{}

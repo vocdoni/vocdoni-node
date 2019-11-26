@@ -4,6 +4,7 @@ import (
 	"os/user"
 
 	flag "github.com/spf13/pflag"
+
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/log"
