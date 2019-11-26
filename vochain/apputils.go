@@ -70,9 +70,9 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 		}
 		vote := new(vochaintypes.Vote)
 		if process.Type == "snark-vote" {
-			vote.Nullifier = votetx.Nullifier
+			vote.Nullifier = sanitizeHex(votetx.Nullifier)
 			vote.Nonce = sanitizeHex(votetx.Nonce)
-			vote.ProcessID = votetx.ProcessID
+			vote.ProcessID = sanitizeHex(votetx.ProcessID)
 			vote.VotePackage = sanitizeHex(votetx.VotePackage)
 			vote.Proof = sanitizeHex(votetx.Proof)
 		} else if process.Type == "poll-vote" || process.Type == "petition-sign" {
@@ -98,11 +98,13 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 			vote.VotePackage = sanitizeHex(votetx.VotePackage)
 			vote.Signature = sanitizeHex(votetx.Signature)
 			vote.Proof = sanitizeHex(votetx.Proof)
-			vote.ProcessID = votetx.ProcessID
-			vote.Nullifier = string(GenerateNullifier(addr, vote.ProcessID))
+			vote.ProcessID = sanitizeHex(votetx.ProcessID)
+			vote.Nullifier = GenerateNullifier(addr, vote.ProcessID)
+
 		} else {
 			return fmt.Errorf("invalid process type")
 		}
+		//log.Debugf("adding vote: %+v", vote)
 		return state.AddVote(vote)
 	case "AdminTx":
 		adminTx := reflect.Indirect(reflect.ValueOf(tx)).Interface().(vochaintypes.AdminTx)
@@ -170,7 +172,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 			return fmt.Errorf("cannot extract address from public key")
 		}
 		// assign a nullifier
-		voteTmp.Nullifier = string(GenerateNullifier(addr, vote.ProcessID))
+		voteTmp.Nullifier = GenerateNullifier(addr, vote.ProcessID)
 
 		// check if vote exists
 		voteID := fmt.Sprintf("%s_%s", sanitizeHex(vote.ProcessID), sanitizeHex(voteTmp.Nullifier))
@@ -271,8 +273,8 @@ func VerifySignatureAgainstOracles(oracles []string, message, signHex string) (b
 }
 
 // GenerateNullifier generates the nullifier of a vote (hash(address+processId))
-func GenerateNullifier(address, processID string) []byte {
-	return signature.HashRaw(fmt.Sprintf("%s%s", signature.SanitizeHex(address), signature.SanitizeHex(processID)))
+func GenerateNullifier(address, processID string) string {
+	return fmt.Sprintf("%x", signature.HashRaw(fmt.Sprintf("%s%s", signature.SanitizeHex(address), signature.SanitizeHex(processID))))
 }
 
 // GenerateAddressFromEd25519PublicKeyString returns the address as string from given pubkey represented as string
