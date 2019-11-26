@@ -5,13 +5,15 @@ import (
 	"os"
 	"testing"
 
+	"github.com/tendermint/go-amino"
 	testcommon "gitlab.com/vocdoni/go-dvote/test/test_common"
 	iavl "gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 func TestVochainState(t *testing.T) {
 	os.RemoveAll("/tmp/db")
-	s, err := iavl.NewVochainState("/tmp/db")
+	c := amino.NewCodec()
+	s, err := iavl.NewVochainState("/tmp/db", c)
 	if err != nil {
 		t.Errorf("cannot create vochain state (%s)", err)
 	}

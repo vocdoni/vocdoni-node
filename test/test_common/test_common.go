@@ -3,6 +3,7 @@ package test_common
 import (
 	"os"
 
+	amino "github.com/tendermint/go-amino"
 	vochain "gitlab.com/vocdoni/go-dvote/types"
 	iavl "gitlab.com/vocdoni/go-dvote/vochain"
 )
@@ -118,8 +119,9 @@ var (
 )
 
 func NewVochainStateWithOracles() *iavl.VochainState {
+	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
-	s, err := iavl.NewVochainState("/tmp/db")
+	s, err := iavl.NewVochainState("/tmp/db", c)
 	if err != nil {
 		return nil
 	}
@@ -129,8 +131,9 @@ func NewVochainStateWithOracles() *iavl.VochainState {
 }
 
 func NewVochainStateWithValidators() *iavl.VochainState {
+	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
-	s, err := iavl.NewVochainState("/tmp/db")
+	s, err := iavl.NewVochainState("/tmp/db", c)
 	if err != nil {
 		return nil
 	}
@@ -142,8 +145,9 @@ func NewVochainStateWithValidators() *iavl.VochainState {
 }
 
 func NewVochainStateWithProcess() *iavl.VochainState {
+	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
-	s, err := iavl.NewVochainState("/tmp/db")
+	s, err := iavl.NewVochainState("/tmp/db", c)
 	if err != nil {
 		return nil
 	}
