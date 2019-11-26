@@ -5,8 +5,8 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
-	"strconv"
 	"time"
 
 	"golang.org/x/crypto/acme"
@@ -47,40 +47,48 @@ func getCertificates(domain string, m *autocert.Manager) [][]byte {
 }
 
 // Init checks if SSL is activated or not and runs a http server consequently
+//
+// When it returns, the server is ready.
 func (p *Proxy) Init() error {
 	var s *http.Server
 	var m *autocert.Manager
 	forceNonTLS := true
 
+	addr := fmt.Sprintf("%s:%d", p.C.Address, p.C.Port)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	log.Infof("proxy listening on %s", addr)
+
 	if len(p.C.SSLDomain) > 0 {
 		s, m = p.GenerateSSLCertificate()
 		go func() {
-			log.Warn(s.ListenAndServeTLS("", ""))
+			log.Fatal(s.ServeTLS(ln, "", ""))
 		}()
 
-		time.Sleep(time.Second * 5)
+		// TODO(mvdan): Figure out why this sleep is necessary. It
+		// used to be 5s. Now that we start the tcp listener first, is
+		// there still a reason to sleep?
+		time.Sleep(time.Second)
 		certs := getCertificates(p.C.SSLDomain, m)
 		if certs == nil {
 			log.Warn("letsencrypt TLS certificate cannot be obtained. Maybe port 443 is not accessible or domain name is wrong.")
-			log.Infof(`you might redirect port 443 with iptables using the following command (required just the first time): 
+			log.Infof(`you might redirect port 443 with iptables using the following command (required just the first time):
 								sudo iptables -t nat -I PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports %d`, p.C.Port)
 			s.Close()
 		} else {
 			forceNonTLS = false
-			log.Infof("proxy with SSL initialized on https://%s", p.C.SSLDomain+":"+strconv.Itoa(p.C.Port))
+			log.Infof("proxy with SSL ready at https://%s:%d", p.C.SSLDomain, p.C.Port)
 		}
 	}
 	if forceNonTLS {
-		s = &http.Server{
-			Addr: p.C.Address + ":" + strconv.Itoa(p.C.Port),
-		}
+		s = &http.Server{}
 		go func() {
-			log.Fatal(s.ListenAndServe())
+			log.Fatal(s.Serve(ln))
 		}()
-		log.Infof("proxy initialized on http://%s, ssl not activated", p.C.Address+":"+strconv.Itoa(p.C.Port))
-
+		log.Infof("proxy without SSL ready at http://%s", addr)
 	}
-
 	return nil
 }
 

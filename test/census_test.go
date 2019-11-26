@@ -59,23 +59,20 @@ func TestCensus(t *testing.T) {
 	// create the proxy to handle HTTP queries
 	pxy := net.NewProxy()
 	pxy.C.Address = "127.0.0.1"
+	// TODO(mvdan): use a random unused port via :0
 	pxy.C.Port = 8788
-	err := pxy.Init()
-	if err != nil {
+	if err := pxy.Init(); err != nil {
 		t.Error(err)
 	}
 
 	// the server
-	var signer1 *sig.SignKeys
-	signer1 = new(sig.SignKeys)
+	signer1 := new(sig.SignKeys)
 	signer1.Generate()
 
 	// the client
-	var signer2 *sig.SignKeys
-	signer2 = new(sig.SignKeys)
+	signer2 := new(sig.SignKeys)
 	signer2.Generate()
-	err = signer1.AddAuthKey(signer2.EthAddrString())
-	if err != nil {
+	if err := signer1.AddAuthKey(signer2.EthAddrString()); err != nil {
 		t.Errorf("cannot add authorized address %s", err)
 	}
 	t.Logf("added authorized address %s", signer2.EthAddrString())
@@ -90,11 +87,10 @@ func TestCensus(t *testing.T) {
 	go ws.Listen(listenerOutput)
 
 	// Create the API router
-	var storage data.Storage
 	ipfsDir := fmt.Sprintf("/tmp/ipfs%d", rand.Intn(1000))
 	ipfsStore := data.IPFSNewConfig(ipfsDir)
 	defer os.RemoveAll(ipfsDir)
-	storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
+	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {
 		t.Errorf("cannot start IPFS %s", err)
 	}
@@ -104,12 +100,10 @@ func TestCensus(t *testing.T) {
 	var cm census.CensusManager
 	censusDir := fmt.Sprintf("/tmp/census%d", rand.Intn(1000))
 	pub, _ := signer2.HexString()
-	err = os.Mkdir(censusDir, 0755)
-	if err != nil {
+	if err := os.Mkdir(censusDir, 0755); err != nil {
 		t.Error(err)
 	}
-	err = cm.Init(censusDir, pub)
-	if err != nil {
+	if err := cm.Init(censusDir, pub); err != nil {
 		t.Error(err)
 	}
 	defer os.RemoveAll(censusDir)
@@ -119,7 +113,6 @@ func TestCensus(t *testing.T) {
 	ws.AddProxyHandler("/dvote")
 
 	// Create websocket client
-	time.Sleep(1 * time.Second)
 	u := url.URL{Scheme: "ws", Host: "127.0.0.1:8788", Path: "/dvote"}
 	t.Logf("connecting to %s", u.String())
 	c, _, err = websocket.DefaultDialer.Dial(u.String(), nil)
@@ -127,9 +120,6 @@ func TestCensus(t *testing.T) {
 		t.Errorf("dial: %s", err)
 	}
 	defer c.Close()
-
-	// Wait to let all get correctly initialitzed
-	time.Sleep(5 * time.Second)
 
 	// Send the API requets
 	var req types.MetaRequest
@@ -349,11 +339,11 @@ func sendCensusReq(req types.MetaRequest, signer *sig.SignKeys, sign bool) (type
 	var cmRes types.ResponseMessage
 	var resp types.MetaResponse
 	var cmReq types.RequestMessage
-	var err error
 	cmReq.Request = req
 	cmReq.ID = fmt.Sprintf("%d", rand.Intn(1000))
 	cmReq.Request.Timestamp = int32(time.Now().Unix())
 	if sign {
+		var err error
 		cmReq.Signature, err = signer.SignJSON(cmReq.Request)
 		if err != nil {
 			return resp, err
