@@ -18,32 +18,29 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
-
-	"fmt"
 	goneturl "net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	tmnode "github.com/tendermint/tendermint/node"
 	dbm "github.com/tendermint/tm-db"
 
-	"gitlab.com/vocdoni/go-dvote/config"
-	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
-	"gitlab.com/vocdoni/go-dvote/util"
-	"gitlab.com/vocdoni/go-dvote/vochain"
-
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/chain/oracle"
+	"gitlab.com/vocdoni/go-dvote/config"
+	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/util"
+	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 func newConfig() (config.OracleCfg, error) {
@@ -63,6 +60,10 @@ func newConfig() (config.OracleCfg, error) {
 	flag.Bool("chainLightMode", false, "synchronize Ethereum blockchain in light mode")
 	flag.Int("w3nodePort", 30303, "Ethereum p2p node port to use")
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
+	flag.Int("w3WSPort", 9092, "web3 websocket port")
+	flag.String("w3WSHost", "127.0.0.1", "web3 websocket host")
+	flag.Int("w3HttpPort", 9091, "web3 websocket port")
+	flag.String("w3HttpHost", "127.0.0.1", "web3 websocket host")
 	flag.Bool("allowPrivate", false, "allows private methods over the APIs")
 	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	flag.String("vochainListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
@@ -87,6 +88,8 @@ func newConfig() (config.OracleCfg, error) {
 	viper.SetDefault("ethereumClient.allowedAddrs", "")
 	viper.SetDefault("ethereumConfig.httpPort", "9091")
 	viper.SetDefault("ethereumConfig.httpHost", "127.0.0.1")
+	viper.SetDefault("ethereumConfig.wsPort", "9092")
+	viper.SetDefault("ethereumConfig.wsHost", "127.0.0.1")
 	viper.SetDefault("dataDir", dataDir)
 	viper.SetDefault("logLevel", "warn")
 	viper.SetDefault("logOutput", "stdout")
@@ -123,6 +126,10 @@ func newConfig() (config.OracleCfg, error) {
 	viper.BindPFlag("ethereumConfig.lightNode", flag.Lookup("chainLightMode"))
 	viper.BindPFlag("ethereumConfig.nodePort", flag.Lookup("w3nodePort"))
 	viper.BindPFlag("w3external", flag.Lookup("w3external"))
+	viper.BindPFlag("ethereumConfig.httpPort", flag.Lookup("w3HttpPort"))
+	viper.BindPFlag("ethereumConfig.httpHost", flag.Lookup("w3HttpHost"))
+	viper.BindPFlag("ethereumConfig.wsPort", flag.Lookup("w3WSPort"))
+	viper.BindPFlag("ethereumConfig.wsHost", flag.Lookup("w3WSHost"))
 	viper.BindPFlag("ethereumClient.allowPrivate", flag.Lookup("allowPrivate"))
 	viper.BindPFlag("ethereumClient.allowedAddrs", flag.Lookup("allowedAddrs"))
 	viper.BindPFlag("vochainConfig.p2pListen", flag.Lookup("vochainListen"))
@@ -249,6 +256,9 @@ func main() {
 		time.Sleep(1 * time.Second)
 		log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
 		log.Infof("web3 available at localhost:%d", globalCfg.EthereumConfig.NodePort)
+		log.Infof("web3 HTTP-RPC endpoint at %s:%d", globalCfg.EthereumConfig.HttpHost, globalCfg.EthereumConfig.HttpPort)
+		log.Infof("web3 WS-RPC endpoint at %s:%d", globalCfg.EthereumConfig.WsHost, globalCfg.EthereumConfig.WsPort)
+
 		go func() {
 			for {
 				time.Sleep(15 * time.Second)
@@ -268,7 +278,7 @@ func main() {
 			log.Fatal("cannot parse w3external URL")
 		}
 
-		log.Debugf("testing web3 endpoint %s", url)
+		log.Debugf("testing web3 HTTP-RPC endpoint %s", url)
 		data, err := json.Marshal(map[string]interface{}{
 			"jsonrpc": "2.0",
 			"method":  "net_peerCount",

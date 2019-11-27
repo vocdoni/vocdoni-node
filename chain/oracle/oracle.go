@@ -93,30 +93,30 @@ func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, c
 	}, nil
 }
 
-type EventGenesisChanged string
-type EventChainIdChanged *big.Int
-type EventProcessCreated struct {
-	EntityAddress [20]byte
-	ProcessId     [32]byte
-	MerkleTree    string
+type eventGenesisChanged string
+type eventChainIDChanged *big.Int
+type eventProcessCreated struct {
+	entityAddress [20]byte
+	processID     [32]byte
+	merkleTree    string
 }
-type EventProcessCanceled struct {
-	EntityAddress [20]byte
-	ProcessId     [32]byte
+type eventProcessCanceled struct {
+	entityAddress [20]byte
+	processID     [32]byte
 }
-type ValidatorAdded string
-type ValidatorRemoved string
-type OracleAdded struct {
-	OraclePublicKey string
+type validatorAdded string
+type validatorRemoved string
+type oracleAdded struct {
+	oraclePublicKey string
 }
-type OracleRemoved string
-type PrivateKeyPublished struct {
-	ProcessId  [32]byte
-	PrivateKey string
+type oracleRemoved string
+type privateKeyPublished struct {
+	processID  [32]byte
+	privateKey string
 }
-type ResultsPublished struct {
-	ProcessId [32]byte
-	Results   string
+type resultsPublished struct {
+	processID [32]byte
+	results   string
 }
 
 // BlockInfo represents the basic Ethereum block information
@@ -156,7 +156,7 @@ func (o *Oracle) SendVochainTx() {}
 
 // EthereumBlockListener returns a block info when a new block is created on Ethereum
 func (o *Oracle) EthereumBlockListener() BlockInfo {
-	client, err := ethclient.Dial("wss://goerli.infura.io/ws/v3/3419e8a6ab0844628a18e54671ed69e3")
+	client, err := ethclient.Dial("ws://127.0.0.1:9092")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -188,13 +188,12 @@ func (o *Oracle) EthereumBlockListener() BlockInfo {
 	}
 }
 
-// SubscribeToEthereumContract sets the ethereum contract to which oracle should listen
-// and listens for events on this contract
-// blocking function -- should be called in gorouting
+// SubscribeEthereumEventLogs subscribe to the oracle
+// defined smart contract via websocket. Blocking function (use go routine)
 func (o *Oracle) SubscribeEthereumEventLogs() {
 	// create ws client
 	//client, err := ethclient.Dial(o.ethereumConnection.Node.WSEndpoint())
-	client, err := ethclient.Dial("wss://goerli.infura.io/ws/v3/3419e8a6ab0844628a18e54671ed69e3")
+	client, err := ethclient.Dial("ws://127.0.0.1:9092")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -225,6 +224,8 @@ func (o *Oracle) SubscribeEthereumEventLogs() {
 	}
 }
 
+// ReadEthereumEventLogs reads the oracle
+// defined smart contract and looks for events.
 func (o *Oracle) ReadEthereumEventLogs(from, to int64) interface{} {
 	log.Debug(o.ethereumConnection.Node.WSEndpoint())
 
@@ -269,7 +270,7 @@ func (o *Oracle) ReadEthereumEventLogs(from, to int64) interface{} {
 
 func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 	logGenesisChanged := []byte(o.ethereumEventList[0])
-	logChainIdChanged := []byte(o.ethereumEventList[1])
+	logChainIDChanged := []byte(o.ethereumEventList[1])
 	logProcessCreated := []byte(o.ethereumEventList[2])
 	logProcessCanceled := []byte(o.ethereumEventList[3])
 	logValidatorAdded := []byte(o.ethereumEventList[4])
@@ -280,7 +281,7 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 	logResultsPublished := []byte(o.ethereumEventList[9])
 
 	HashLogGenesisChanged := crypto.Keccak256Hash(logGenesisChanged)
-	HashLogChainIdChanged := crypto.Keccak256Hash(logChainIdChanged)
+	HashLogChainIDChanged := crypto.Keccak256Hash(logChainIDChanged)
 	HashLogProcessCreated := crypto.Keccak256Hash(logProcessCreated)
 	HashLogProcessCanceled := crypto.Keccak256Hash(logProcessCanceled)
 	HashLogValidatorAdded := crypto.Keccak256Hash(logValidatorAdded)
@@ -303,29 +304,29 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 			return eventGenesisChanged
 		*/
 		//return nil
-	case HashLogChainIdChanged.Hex():
+	case HashLogChainIDChanged.Hex():
 		//return nil
 	case HashLogProcessCreated.Hex():
 		log.Debug("new log: processCreated")
-		var eventProcessCreated EventProcessCreated
+		var eventProcessCreated eventProcessCreated
 		err := o.contractABI.Unpack(&eventProcessCreated, "ProcessCreated", event.Data)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Debugf("processid: %s", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
+		log.Debugf("processid: %s", hex.EncodeToString(eventProcessCreated.processID[:]))
 		log.Debugf("event process created: %+v", eventProcessCreated)
 		var topics [4]string
 		for i := range event.Topics {
 			topics[i] = event.Topics[i].Hex()
 		}
 		log.Debugf("topics: %s", topics)
-		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.ProcessId)
+		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.processID)
 		if err != nil {
 			log.Error("cannot get process index from smartcontract")
 		}
 		log.Debugf("Process index loaded: %v", processIdx)
 
-		processTx, err := o.processHandle.GetProcessTxArgs(eventProcessCreated.ProcessId)
+		processTx, err := o.processHandle.GetProcessTxArgs(eventProcessCreated.processID)
 
 		if err != nil {
 			log.Errorf("Error getting process metadata: %s", err)
@@ -364,13 +365,13 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 		return nil
 	case HashLogOracleAdded.Hex():
 		log.Debug("new log event: AddOracle")
-		var eventAddOracle OracleAdded
+		var eventAddOracle oracleAdded
 		log.Debugf("added event data: %v", event.Data)
 		err := o.contractABI.Unpack(&eventAddOracle, "OracleAdded", event.Data)
 		if err != nil {
 			return err
 		}
-		log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
+		log.Debugf("AddOracleEvent: %v", eventAddOracle.oraclePublicKey)
 		//stub
 		return nil
 	case HashLogOracleRemoved.Hex():
@@ -388,7 +389,7 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 
 func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 	logGenesisChanged := []byte(o.ethereumEventList[0])
-	logChainIdChanged := []byte(o.ethereumEventList[1])
+	logChainIDChanged := []byte(o.ethereumEventList[1])
 	logProcessCreated := []byte(o.ethereumEventList[2])
 	logProcessCanceled := []byte(o.ethereumEventList[3])
 	logValidatorAdded := []byte(o.ethereumEventList[4])
@@ -399,7 +400,7 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 	logResultsPublished := []byte(o.ethereumEventList[9])
 
 	HashLogGenesisChanged := crypto.Keccak256Hash(logGenesisChanged)
-	HashLogChainIdChanged := crypto.Keccak256Hash(logChainIdChanged)
+	HashLogChainIDChanged := crypto.Keccak256Hash(logChainIDChanged)
 	HashLogProcessCreated := crypto.Keccak256Hash(logProcessCreated)
 	HashLogProcessCanceled := crypto.Keccak256Hash(logProcessCanceled)
 	HashLogValidatorAdded := crypto.Keccak256Hash(logValidatorAdded)
@@ -422,11 +423,11 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 			return eventGenesisChanged
 		*/
 		//return nil
-	case HashLogChainIdChanged.Hex():
+	case HashLogChainIDChanged.Hex():
 		//return nil
 	case HashLogProcessCreated.Hex():
 		log.Debug("new log: processCreated")
-		var eventProcessCreated EventProcessCreated
+		var eventProcessCreated eventProcessCreated
 		err := o.contractABI.Unpack(&eventProcessCreated, "ProcessCreated", event.Data)
 		if err != nil {
 			log.Fatal(err)
@@ -438,13 +439,13 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 			topics[i] = event.Topics[i].Hex()
 		}
 		log.Debugf("topics: %v", topics)
-		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.ProcessId)
+		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.processID)
 		if err != nil {
 			log.Error("cannot get process index from smartcontract")
 		}
 		log.Debugf("Process index loaded: %v", processIdx)
 
-		processInfo, err := o.processHandle.GetProcessMetadata(eventProcessCreated.ProcessId)
+		processInfo, err := o.processHandle.GetProcessMetadata(eventProcessCreated.processID)
 		if err != nil {
 			log.Errorf("Error getting process metadata: %s", err)
 		} else {
@@ -497,13 +498,13 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 		return nil
 	case HashLogOracleAdded.Hex():
 		log.Debug("new log event: AddOracle")
-		var eventAddOracle OracleAdded
+		var eventAddOracle oracleAdded
 		log.Debugf("added event data: %v", event.Data)
 		err := o.contractABI.Unpack(&eventAddOracle, "OracleAdded", event.Data)
 		if err != nil {
 			return err
 		}
-		log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
+		log.Debugf("AddOracleEvent: %v", eventAddOracle.oraclePublicKey)
 		//stub
 		return nil
 	case HashLogOracleRemoved.Hex():
