@@ -296,7 +296,6 @@ func TestCensus(t *testing.T) {
 	}
 
 	// importRemote
-	time.Sleep(1 * time.Second)
 	req.Method = "importRemote"
 	req.CensusID = resp.CensusID
 	req.URI = uri
@@ -336,7 +335,6 @@ func TestCensus(t *testing.T) {
 }
 
 func sendCensusReq(req types.MetaRequest, signer *sig.SignKeys, sign bool) (types.MetaResponse, error) {
-	var cmRes types.ResponseMessage
 	var resp types.MetaResponse
 	var cmReq types.RequestMessage
 	cmReq.Request = req
@@ -353,15 +351,15 @@ func sendCensusReq(req types.MetaRequest, signer *sig.SignKeys, sign bool) (type
 	if err != nil {
 		return resp, err
 	}
-	err = c.WriteMessage(websocket.TextMessage, rawReq)
+	if err := c.WriteMessage(websocket.TextMessage, rawReq); err != nil {
+		return resp, err
+	}
+	_, message, err := c.ReadMessage()
 	if err != nil {
 		return resp, err
 	}
-	time.Sleep(1 * time.Second)
-	_, message, err := c.ReadMessage()
-
-	err = json.Unmarshal(message, &cmRes)
-	if err != nil {
+	var cmRes types.ResponseMessage
+	if err := json.Unmarshal(message, &cmRes); err != nil {
 		return resp, err
 	}
 	if cmRes.ID != cmReq.ID {
