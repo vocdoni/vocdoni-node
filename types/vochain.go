@@ -189,8 +189,8 @@ type QueryData struct {
 
 // ________________________ GENESIS APP STATE ________________________
 
-// AppState application state in genesis
-type AppState struct {
+// GensisAppState application state in genesis
+type GenesisAppState struct {
 	Validators []struct {
 		Address string `json:"address"`
 		PubKey  struct {

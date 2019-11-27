@@ -7,6 +7,7 @@ import (
 
 	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/iavl"
+	tmtypes "github.com/tendermint/tendermint/abci/types"
 	tmdb "github.com/tendermint/tm-db"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
@@ -19,8 +20,7 @@ const (
 	processTreeName = "processTree"
 	voteTreeName    = "voteTree"
 	// keys
-	heightKey    = "height"
-	appHashKey   = "appHash"
+	headerKey    = "header"
 	oracleKey    = "oracle"
 	validatorKey = "validator"
 	processKey   = "process"
@@ -42,19 +42,18 @@ type VochainState struct {
 }
 
 // NewVochainState creates a new VochainState
-func NewVochainState(dataDir string) (*VochainState, error) {
+func NewVochainState(dataDir string, codec *amino.Codec) (*VochainState, error) {
 	appTree, err := tmdb.NewGoLevelDB(appTreeName, dataDir)
 	if err != nil {
 		return nil, err
 	}
 
 	// set keys
-	appTree.Set([]byte(heightKey), []byte(""))
-	appTree.Set([]byte(appHashKey), []byte(""))
-	appTree.Set([]byte(oracleKey), []byte(""))
-	appTree.Set([]byte(validatorKey), []byte(""))
-	appTree.Set([]byte(processKey), []byte("")) // iavl process tree mkroot
-	appTree.Set([]byte(voteKey), []byte(""))    // iavl vote tree mkroot
+	appTree.Set([]byte(headerKey), []byte{})
+	appTree.Set([]byte(oracleKey), []byte{})
+	appTree.Set([]byte(validatorKey), []byte{})
+	appTree.Set([]byte(processKey), []byte{}) // iavl process tree mkroot
+	appTree.Set([]byte(voteKey), []byte{})    // iavl vote tree mkroot
 
 	processTree, err := tmdb.NewGoLevelDB(processTreeName, dataDir)
 	if err != nil {
@@ -68,7 +67,7 @@ func NewVochainState(dataDir string) (*VochainState, error) {
 		AppTree:     iavl.NewMutableTree(appTree, PrefixDBCacheSize),
 		ProcessTree: iavl.NewMutableTree(processTree, PrefixDBCacheSize),
 		VoteTree:    iavl.NewMutableTree(voteTree, PrefixDBCacheSize),
-		Codec:       amino.NewCodec(),
+		Codec:       codec,
 	}, nil
 }
 
@@ -259,22 +258,33 @@ func (v *VochainState) CountVotes(processID string) int64 {
 }
 
 // GetHeight returns the blockchain last block commited height
-func (v *VochainState) GetHeight() []byte {
-	_, h := v.AppTree.Get([]byte(heightKey))
-	return h
+func (v *VochainState) GetHeight() int64 {
+	_, headerBytes := v.AppTree.Get([]byte(headerKey))
+	var header tmtypes.Header
+	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
+	if err != nil {
+		return 0
+	}
+	return header.Height
 }
 
 // GetAppHash returns last hash of the application
 func (v *VochainState) GetAppHash() []byte {
-	_, h := v.AppTree.Get([]byte(appHashKey))
-	return h
+	_, headerBytes := v.AppTree.Get([]byte(headerKey))
+	var header tmtypes.Header
+	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
+	if err != nil {
+		return []byte{}
+	}
+	return header.AppHash
 }
 
 // Save persistent save of vochain mem trees
-func (v *VochainState) Save() {
-	v.AppTree.SaveVersion()
-	v.ProcessTree.SaveVersion()
-	v.VoteTree.SaveVersion()
+func (v *VochainState) Save() []byte {
+	h1, _, _ := v.AppTree.SaveVersion()
+	h2, _, _ := v.ProcessTree.SaveVersion()
+	h3, _, _ := v.VoteTree.SaveVersion()
+	return signature.HashRaw(fmt.Sprintf("%s%s%s", h1, h2, h3))
 }
 
 // Rollback rollbacks to the last persistent db data version
@@ -286,7 +296,7 @@ func (v *VochainState) Rollback() {
 
 // GetHash returns the hash of the vochain trees mkroots
 // hash(appTree+processTree+voteTree)
-func (v *VochainState) GetHash() []byte {
+func (v *VochainState) GetWorkingHash() []byte {
 	return signature.HashRaw(fmt.Sprintf("%s%s%s", v.AppTree.WorkingHash(), v.ProcessTree.WorkingHash(), v.VoteTree.WorkingHash()))
 }
 
