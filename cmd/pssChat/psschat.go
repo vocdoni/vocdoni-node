@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/marcusolsson/tui-go"
@@ -19,11 +18,11 @@ import (
 func newConfig() (config.PssCfg, error) {
 	var globalCfg config.PssCfg
 	//setup flags
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
 	}
-	defaultDirPath := usr.HomeDir + "/.dvote/psschat"
+	defaultDirPath := home + "/.dvote/psschat"
 	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for psschat config")
 
 	flag.String("encryption", "sym", "encryption key schema (raw, sym, asym)")
@@ -271,7 +270,7 @@ func chat(globalCfg config.PssCfg, sn *swarm.SimpleSwarm) {
 		history.Append(tui.NewHBox(
 			tui.NewLabel(time.Now().Format("3:04PM")),
 			tui.NewPadder(1, 0, tui.NewLabel(fmt.Sprintf("<%s>", globalCfg.Nick))),
-			tui.NewLabel(fmt.Sprintf("%s", jmsg.Data)),
+			tui.NewLabel(jmsg.Data),
 			tui.NewSpacer(),
 		))
 		input.SetText("")

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"os/user"
 	"strings"
 	"syscall"
 
@@ -22,11 +21,11 @@ func newConfig() (config.VochainCfg, error) {
 	var globalCfg config.VochainCfg
 
 	//setup flags
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
 	}
-	userDir := usr.HomeDir + "/.dvote"
+	userDir := home + "/.dvote"
 
 	path := flag.String("configFilePath", userDir+"/vochain.yaml", "vochain config file path")
 	dataDir := flag.String("dataDir", userDir+"/vochain/data", "sets the path indicating where to store the vochain related data")

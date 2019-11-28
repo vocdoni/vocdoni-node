@@ -1,7 +1,7 @@
 package main
 
 import (
-	"os/user"
+	"os"
 
 	flag "github.com/spf13/pflag"
 
@@ -11,11 +11,11 @@ import (
 )
 
 func main() {
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
 	}
-	userDir := usr.HomeDir + "/.ipfs"
+	userDir := home + "/.ipfs"
 	logLevel := flag.String("logLevel", "info", "log level")
 	dataDir := flag.String("dataDir", userDir, "directory for storing data")
 	key := flag.String("key", "", "symetric key of the sync ipfs cluster")

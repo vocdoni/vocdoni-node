@@ -120,7 +120,7 @@ func (cm *CensusManager) save() error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(nsConfig, data, 644)
+	return ioutil.WriteFile(nsConfig, data, 0644)
 }
 
 func httpReply(resp *types.ResponseMessage, w http.ResponseWriter) {

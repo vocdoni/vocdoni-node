@@ -5,7 +5,6 @@ import (
 	"github.com/spf13/viper"
 
 	"os"
-	"os/user"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/chain"
@@ -16,11 +15,11 @@ import (
 func newConfig() (config.W3Cfg, error) {
 	var globalCfg config.W3Cfg
 	//setup flags
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
 	}
-	defaultDirPath := usr.HomeDir + "/.dvote/web3"
+	defaultDirPath := home + "/.dvote/web3"
 	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for web3 config")
 
 	flag.String("chain", "vctestnet", "Blockchain to connect")

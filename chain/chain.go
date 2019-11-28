@@ -162,8 +162,7 @@ func (e *EthChainContext) Start() {
 
 func (e *EthChainContext) TestTx(amount int) error {
 	bigWalletAddr := "0x781b6544b1a73c6d779eb23c7369cf8039640793"
-	var gasLimit uint64
-	gasLimit = 8000000
+	const gasLimit = 8000000
 	return e.sendTx(bigWalletAddr, gasLimit, amount)
 }
 

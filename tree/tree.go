@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"os/user"
+	"os"
 
 	common3 "github.com/iden3/go-iden3-core/common"
 	mkcore "github.com/iden3/go-iden3-core/core"
@@ -30,9 +30,9 @@ func (t *Tree) Init(namespace string) error {
 		if len(namespace) < 1 {
 			return errors.New("namespace not valid")
 		}
-		usr, err := user.Current()
+		home, err := os.UserHomeDir()
 		if err == nil {
-			t.Storage = usr.HomeDir + "/.dvote/census"
+			t.Storage = home + "/.dvote/census"
 		} else {
 			t.Storage = "./dvoteTree"
 		}

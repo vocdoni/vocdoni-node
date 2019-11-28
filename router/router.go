@@ -30,15 +30,6 @@ func buildReply(context types.MessageContext, data []byte) types.Message {
 	return *reply
 }
 
-func parseUrisContent(uris string) []string {
-	out := make([]string, 0)
-	urisSplit := strings.Split(uris, ",")
-	for _, u := range urisSplit {
-		out = append(out, u)
-	}
-	return out
-}
-
 func parseTransportFromURI(uris []string) []string {
 	out := make([]string, 0)
 	for _, u := range uris {

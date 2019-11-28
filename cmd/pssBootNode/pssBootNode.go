@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/user"
-	"time"
 
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -17,11 +15,11 @@ import (
 func newConfig() (config.PssMetaCfg, error) {
 	var globalCfg config.PssMetaCfg
 	//setup flags
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
 	}
-	defaultDirPath := usr.HomeDir + "/.dvote/pss"
+	defaultDirPath := home + "/.dvote/pss"
 	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for pss config")
 
 	flag.String("listenHost", "0.0.0.0", "address host to listen")
@@ -95,7 +93,6 @@ func main() {
 
 	log.Infof("listening on %s:%d", globalCfg.ListenHost, globalCfg.ListenPort)
 
-	for {
-		time.Sleep(1 * time.Second)
-	}
+	// Block forever.
+	select {}
 }

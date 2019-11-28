@@ -69,13 +69,15 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 			return fmt.Errorf("process with id (%s) does not exists", votetx.ProcessID)
 		}
 		vote := new(vochaintypes.Vote)
-		if process.Type == "snark-vote" {
+		switch process.Type {
+		case "snark-vote":
 			vote.Nullifier = sanitizeHex(votetx.Nullifier)
 			vote.Nonce = sanitizeHex(votetx.Nonce)
 			vote.ProcessID = sanitizeHex(votetx.ProcessID)
 			vote.VotePackage = sanitizeHex(votetx.VotePackage)
 			vote.Proof = sanitizeHex(votetx.Proof)
-		} else if process.Type == "poll-vote" || process.Type == "petition-sign" {
+
+		case "poll-vote", "petition-sign":
 			vote.Nonce = votetx.Nonce
 			vote.ProcessID = votetx.ProcessID
 			vote.Proof = votetx.Proof
@@ -101,7 +103,7 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 			vote.ProcessID = sanitizeHex(votetx.ProcessID)
 			vote.Nullifier = GenerateNullifier(addr, vote.ProcessID)
 
-		} else {
+		default:
 			return fmt.Errorf("invalid process type")
 		}
 		//log.Debugf("adding vote: %+v", vote)
@@ -142,14 +144,16 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
 	}
 
-	if process.Type == "snark-vote" {
+	switch process.Type {
+	case "snark-vote":
 		voteID := fmt.Sprintf("%s_%s", signature.SanitizeHex(vote.ProcessID), signature.SanitizeHex(vote.Nullifier))
 		v, _ := state.GetEnvelope(voteID)
 		if v != nil {
 			return fmt.Errorf("vote already exists")
 		}
 		// TODO check snark
-	} else if process.Type == "poll-vote" || process.Type == "petition-sign" {
+
+	case "poll-vote", "petition-sign":
 		var voteTmp vochaintypes.VoteTx
 		voteTmp.Nonce = vote.Nonce
 		voteTmp.ProcessID = vote.ProcessID
@@ -196,7 +200,8 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 				return fmt.Errorf("proof not valid")
 			}
 		*/
-	} else {
+
+	default:
 		return fmt.Errorf("invalid process type")
 	}
 	return nil
@@ -226,9 +231,10 @@ func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *VochainState) e
 		return fmt.Errorf("process with id (%s) already exists", process.ProcessID)
 	}
 	// check type
-	if process.ProcessType == "snark-vote" || process.ProcessType == "poll-vote" || process.ProcessType == "petition-sign" {
+	switch process.ProcessType {
+	case "snark-vote", "poll-vote", "petition-sign":
 		// ok
-	} else {
+	default:
 		return fmt.Errorf("process type (%s) not valid", process.ProcessType)
 	}
 	return nil

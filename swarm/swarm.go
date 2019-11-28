@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/user"
 	"strings"
 	"time"
 
@@ -206,11 +205,11 @@ func (sn *SimpleSwarm) SetKey(key *ecdsa.PrivateKey) {
 func (sn *SimpleSwarm) InitPSS(bootNodes []string) error {
 	var err error
 	if len(sn.Datadir) < 1 {
-		usr, err := user.Current()
+		home, err := os.UserHomeDir()
 		if err != nil {
 			return err
 		}
-		sn.Datadir = usr.HomeDir + "/.dvote/pss"
+		sn.Datadir = home + "/.dvote/pss"
 		os.MkdirAll(sn.Datadir, 0755)
 	}
 

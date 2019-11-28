@@ -330,8 +330,6 @@ func TestCensus(t *testing.T) {
 
 	// Close connection
 	c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-	os.RemoveAll(ipfsDir)
-	os.RemoveAll(censusDir)
 }
 
 func sendCensusReq(req types.MetaRequest, signer *sig.SignKeys, sign bool) (types.MetaResponse, error) {

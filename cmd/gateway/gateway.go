@@ -20,7 +20,6 @@ import (
 	goneturl "net/url"
 	"os"
 	"os/signal"
-	"os/user"
 	"strings"
 	"time"
 
@@ -42,11 +41,11 @@ import (
 func newConfig() (config.GWCfg, error) {
 	var globalCfg config.GWCfg
 	//setup flags
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
 	}
-	userDir := usr.HomeDir + "/.dvote"
+	userDir := home + "/.dvote"
 	path := flag.String("cfgpath", userDir+"/config.yaml", "filepath for custom gateway config")
 	dataDir := flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
@@ -227,8 +226,7 @@ func main() {
 	}
 
 	// Signing key
-	var signer *sig.SignKeys
-	signer = new(sig.SignKeys)
+	signer := new(sig.SignKeys)
 	// Add Authorized keys for private methods
 	if globalCfg.Client.AllowPrivate && globalCfg.Client.AllowedAddrs != "" {
 		keys := strings.Split(globalCfg.Client.AllowedAddrs, ",")

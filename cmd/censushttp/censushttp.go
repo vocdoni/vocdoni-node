@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"os"
-	"os/user"
 
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -19,11 +18,11 @@ import (
 func newConfig() (config.CensusCfg, error) {
 	var globalCfg config.CensusCfg
 	//setup flags
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
 	}
-	defaultDirPath := usr.HomeDir + "/.dvote/censushttp"
+	defaultDirPath := home + "/.dvote/censushttp"
 	//setup flags
 	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for censushttp config")
 	flag.String("logLevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
@@ -86,8 +85,7 @@ func main() {
 	}
 
 	// Signing key
-	var signer *signature.SignKeys
-	signer = new(signature.SignKeys)
+	signer := new(signature.SignKeys)
 
 	// Add signing private key if exist in configuration or flags
 	if len(globalCfg.SignKey) > 1 {

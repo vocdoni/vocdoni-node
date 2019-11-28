@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/user"
 	"strings"
 
 	files "github.com/ipfs/go-ipfs-files"
@@ -35,11 +34,11 @@ type IPFSHandle struct {
 
 // check if ipfs base dir exists
 func checkIPFSDirExists(path string) (bool, error) {
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return false, errors.New("Cannot get $HOME")
 	}
-	userHomeDir := usr.HomeDir
+	userHomeDir := home
 	_, err = os.Stat(userHomeDir + "/." + path)
 	if err == nil {
 		return true, nil
@@ -190,8 +189,7 @@ func (i *IPFSHandle) ListPins() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var pinMap map[string]string
-	pinMap = make(map[string]string)
+	pinMap := make(map[string]string)
 	for _, p := range pins {
 		pinMap[p.Path().String()] = p.Type()
 	}
@@ -201,10 +199,7 @@ func (i *IPFSHandle) ListPins() (map[string]string, error) {
 func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
 	ctx := context.Background()
 
-	if strings.HasPrefix(path, "ipfs://") {
-		path = path[7:]
-	}
-
+	path = strings.TrimPrefix(path, "ipfs://")
 	pth := corepath.New(path)
 
 	nd, err := i.CoreAPI.Unixfs().Get(ctx, pth)

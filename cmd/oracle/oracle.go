@@ -26,7 +26,6 @@ import (
 	goneturl "net/url"
 	"os"
 	"os/signal"
-	"os/user"
 	"syscall"
 	"time"
 
@@ -51,11 +50,11 @@ func newConfig() (config.OracleCfg, error) {
 	var cfg config.OracleCfg
 
 	//setup flags
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return cfg, err
 	}
-	userDir := usr.HomeDir + "/.dvote"
+	userDir := home + "/.dvote"
 	dataDir := flag.String("dataDir", userDir, "directory where data is stored")
 	flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
@@ -188,8 +187,7 @@ func main() {
 	// start ethereum node
 
 	// Signing key
-	var signer *sig.SignKeys
-	signer = new(sig.SignKeys)
+	signer := new(sig.SignKeys)
 	// Add Authorized keys for private methods
 	if globalCfg.EthereumClient.AllowPrivate && globalCfg.EthereumClient.AllowedAddrs != "" {
 		keys := strings.Split(globalCfg.EthereumClient.AllowedAddrs, ",")
