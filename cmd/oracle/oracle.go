@@ -74,6 +74,7 @@ func newConfig() (config.OracleCfg, error) {
 	flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
 	flag.String("vochainContract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f", "voting smart contract where the oracle will listen")
 	flag.String("vochainRPCListen", "127.0.0.1:26657", "rpc host and port to listent for the voting chain")
+	flag.Bool("subscribeOnly", true, "oracle can read all ethereum logs or just subscribe to the new ones, by default only subscribe")
 
 	flag.Parse()
 
@@ -102,6 +103,7 @@ func newConfig() (config.OracleCfg, error) {
 	viper.SetDefault("vochainConfig.contract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f")
 	viper.SetDefault("vochainConfig.rpcListen", "0.0.0.0:26657")
 	viper.SetDefault("vochainConfig.dataDir", *dataDir+"/vochain")
+	viper.SetDefault("subscribeOnly", true)
 
 	viper.SetConfigType("yaml")
 
@@ -140,6 +142,7 @@ func newConfig() (config.OracleCfg, error) {
 	viper.BindPFlag("vochainConfig.seeds", flag.Lookup("vochainSeeds"))
 	viper.BindPFlag("vochainConfig.contract", flag.Lookup("vochainContract"))
 	viper.BindPFlag("vochainConfig.rpcListen", flag.Lookup("vochainRPCListen"))
+	viper.BindPFlag("subscribeOnly", flag.Lookup("subscribeOnly"))
 
 	viper.SetConfigFile(*dataDir + "/oracle.yaml")
 	err = viper.ReadInConfig()
@@ -313,8 +316,12 @@ func main() {
 				if node.Eth.Synced() {
 					log.Info("ethereum node fully synced")
 					log.Info("oracle startup complete")
-					go orc.ReadEthereumEventLogs(0, int64(node.Eth.BlockChain().CurrentBlock().NumberU64()))
-					go orc.SubscribeEthereumEventLogs()
+					if globalCfg.SubscribeOnly {
+						go orc.SubscribeEthereumEventLogs()
+					} else {
+						go orc.ReadEthereumEventLogs(0, int64(node.Eth.BlockChain().CurrentBlock().NumberU64()))
+						go orc.SubscribeEthereumEventLogs()
+					}
 					break
 				} else {
 					time.Sleep(10 * time.Second)

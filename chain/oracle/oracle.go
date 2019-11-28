@@ -96,27 +96,27 @@ func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, c
 type eventGenesisChanged string
 type eventChainIDChanged *big.Int
 type eventProcessCreated struct {
-	entityAddress [20]byte
-	processID     [32]byte
-	merkleTree    string
+	EntityAddress [20]byte
+	ProcessId     [32]byte
+	MerkleTree    string
 }
 type eventProcessCanceled struct {
-	entityAddress [20]byte
-	processID     [32]byte
+	EntityAddress [20]byte
+	ProcessId     [32]byte
 }
 type validatorAdded string
 type validatorRemoved string
 type oracleAdded struct {
-	oraclePublicKey string
+	OraclePublicKey string
 }
 type oracleRemoved string
 type privateKeyPublished struct {
-	processID  [32]byte
-	privateKey string
+	ProcessId  [32]byte
+	PrivateKey string
 }
 type resultsPublished struct {
-	processID [32]byte
-	results   string
+	ProcessId [32]byte
+	Results   string
 }
 
 // BlockInfo represents the basic Ethereum block information
@@ -313,20 +313,20 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Debugf("processid: %s", hex.EncodeToString(eventProcessCreated.processID[:]))
+		log.Debugf("processid: %s", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
 		log.Debugf("event process created: %+v", eventProcessCreated)
 		var topics [4]string
 		for i := range event.Topics {
 			topics[i] = event.Topics[i].Hex()
 		}
 		log.Debugf("topics: %s", topics)
-		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.processID)
+		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.ProcessId)
 		if err != nil {
 			log.Error("cannot get process index from smartcontract")
 		}
 		log.Debugf("Process index loaded: %v", processIdx)
 
-		processTx, err := o.processHandle.GetProcessTxArgs(eventProcessCreated.processID)
+		processTx, err := o.processHandle.GetProcessTxArgs(eventProcessCreated.ProcessId)
 
 		if err != nil {
 			log.Errorf("Error getting process metadata: %s", err)
@@ -371,7 +371,7 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 		if err != nil {
 			return err
 		}
-		log.Debugf("AddOracleEvent: %v", eventAddOracle.oraclePublicKey)
+		log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
 		//stub
 		return nil
 	case HashLogOracleRemoved.Hex():
@@ -439,13 +439,13 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 			topics[i] = event.Topics[i].Hex()
 		}
 		log.Debugf("topics: %v", topics)
-		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.processID)
+		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.ProcessId)
 		if err != nil {
 			log.Error("cannot get process index from smartcontract")
 		}
 		log.Debugf("Process index loaded: %v", processIdx)
 
-		processInfo, err := o.processHandle.GetProcessMetadata(eventProcessCreated.processID)
+		processInfo, err := o.processHandle.GetProcessMetadata(eventProcessCreated.ProcessId)
 		if err != nil {
 			log.Errorf("Error getting process metadata: %s", err)
 		} else {
@@ -504,7 +504,7 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 		if err != nil {
 			return err
 		}
-		log.Debugf("AddOracleEvent: %v", eventAddOracle.oraclePublicKey)
+		log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
 		//stub
 		return nil
 	case HashLogOracleRemoved.Hex():
