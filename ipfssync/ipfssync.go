@@ -35,10 +35,10 @@ func guessMyAddress(port int, id string) string {
 		return ""
 	}
 	if len(ip.To4().String()) > 8 {
-		return fmt.Sprintf("/ip4/%s/tcp/%d/ipfs/%s", ip.String(), port, id)
+		return fmt.Sprintf("/ip4/%s/tcp/%d/ipfs/%s", ip, port, id)
 	}
 	if len(ip.To16().String()) > 8 {
-		return fmt.Sprintf("/ip6/[%s]/tcp/%d/ipfs/%s", ip.String(), port, id)
+		return fmt.Sprintf("/ip6/[%s]/tcp/%d/ipfs/%s", ip, port, id)
 	}
 	return ""
 }
@@ -295,7 +295,7 @@ func (is *IPFSsync) Start() {
 	if err != nil {
 		panic(err)
 	}
-	log.Infof("my multiaddress: %s", is.myMultiAddr.String())
+	log.Infof("my multiaddress: %s", is.myMultiAddr)
 
 	go func() {
 		var syncMsg IPFSsyncMessage

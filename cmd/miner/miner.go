@@ -113,7 +113,7 @@ func main() {
 		} else {
 			addrport := strings.Split(globalCfg.P2pListen, ":")
 			if len(addrport) > 0 {
-				globalCfg.PublicAddr = fmt.Sprintf("%s:%s", ip.String(), addrport[len(addrport)-1])
+				globalCfg.PublicAddr = fmt.Sprintf("%s:%s", ip, addrport[len(addrport)-1])
 				log.Infof("public IP address: %s", globalCfg.PublicAddr)
 			}
 		}

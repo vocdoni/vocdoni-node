@@ -308,7 +308,7 @@ func main() {
 			log.Fatal("cannot parse w3external URL")
 		}
 
-		log.Debugf("testing web3 endpoint %s", url.String())
+		log.Debugf("testing web3 endpoint %s", url)
 		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(url.String()))
 		data, err := json.Marshal(map[string]interface{}{
 			"jsonrpc": "2.0",
@@ -395,7 +395,7 @@ func main() {
 			} else {
 				addrport := strings.Split(globalCfg.Vochain.P2pListen, ":")
 				if len(addrport) > 0 {
-					globalCfg.Vochain.PublicAddr = fmt.Sprintf("%s:%s", ip.String(), addrport[len(addrport)-1])
+					globalCfg.Vochain.PublicAddr = fmt.Sprintf("%s:%s", ip, addrport[len(addrport)-1])
 				}
 			}
 		}
