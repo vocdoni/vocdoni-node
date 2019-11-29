@@ -52,22 +52,16 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 // AddProxyHandler adds a handler on the proxy and upgrades the connection
 // a ws connection is activated with a normal http request with Connection: upgrade
 func (w *WebsocketHandle) AddProxyHandler(path string) {
+	ssl := w.WsProxy.C.SSLDomain != ""
 	upgradeConn := func(writer http.ResponseWriter, reader *http.Request) {
 		// Upgrade connection
 		conn, _, _, err := ws.UpgradeHTTP(reader, writer)
 		if err != nil {
 			return
 		}
-		if w.WsProxy.C.SSLDomain == "" {
-			if err := w.Epoll.Add(conn, false); err != nil {
-				log.Warnf("failed to add connection %v", err)
-				conn.Close()
-			}
-		} else {
-			if err := w.Epoll.Add(conn, true); err != nil {
-				log.Warnf("failed to add connection %v", err)
-				conn.Close()
-			}
+		if err := w.Epoll.Add(conn, ssl); err != nil {
+			log.Warnf("failed to add connection %v", err)
+			conn.Close()
 		}
 		writer.Header().Set("Access-Control-Allow-Origin", "*")
 		writer.Header().Set("Access-Control-Allow-Methods", "POST, GET")
@@ -75,7 +69,7 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 	}
 	w.WsProxy.AddHandler(path, upgradeConn)
 
-	if w.WsProxy.C.SSLDomain == "" {
+	if !ssl {
 		log.Infof("ws initialized on ws://" + w.WsProxy.C.Address + ":" + strconv.Itoa(w.WsProxy.C.Port))
 	} else {
 		log.Infof("wss initialized on wss://" + w.WsProxy.C.SSLDomain + ":" + strconv.Itoa(w.WsProxy.C.Port))
@@ -96,25 +90,21 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 			if conn == nil {
 				break
 			}
-			if payload, _, err := wsutil.ReadClientData(conn); err != nil {
-				if w.WsProxy.C.SSLDomain == "" {
-					if err := w.Epoll.Remove(conn, false); err != nil {
-						log.Warn(err)
-					}
-				} else {
-					if err := w.Epoll.Remove(conn, true); err != nil {
-						log.Warn(err)
-					}
+			payload, _, err := wsutil.ReadClientData(conn)
+			if err != nil {
+				ssl := w.WsProxy.C.SSLDomain != ""
+				if err := w.Epoll.Remove(conn, ssl); err != nil {
+					log.Warn(err)
 				}
 				conn.Close()
-			} else {
-				msg.Data = []byte(payload)
-				msg.TimeStamp = int32(time.Now().Unix())
-				ctx := new(types.WebsocketContext)
-				ctx.Conn = &conn
-				msg.Context = ctx
-				reciever <- msg
+				continue
 			}
+			msg.Data = []byte(payload)
+			msg.TimeStamp = int32(time.Now().Unix())
+			ctx := new(types.WebsocketContext)
+			ctx.Conn = &conn
+			msg.Context = ctx
+			reciever <- msg
 		}
 	}
 }
