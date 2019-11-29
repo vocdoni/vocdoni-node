@@ -34,7 +34,6 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
-	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -113,9 +112,9 @@ func TestCensus(t *testing.T) {
 	ws.AddProxyHandler("/dvote")
 
 	// Create websocket client
-	u := url.URL{Scheme: "ws", Host: "127.0.0.1:8788", Path: "/dvote"}
-	t.Logf("connecting to %s", u.String())
-	c, _, err = websocket.DefaultDialer.Dial(u.String(), nil)
+	u := "ws://127.0.0.1:8788/dvote"
+	t.Logf("connecting to %s", u)
+	c, _, err = websocket.DefaultDialer.Dial(u, nil)
 	if err != nil {
 		t.Errorf("dial: %s", err)
 	}

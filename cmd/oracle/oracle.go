@@ -170,7 +170,7 @@ func main() {
 		} else {
 			addrport := strings.Split(globalCfg.VochainConfig.P2pListen, ":")
 			if len(addrport) > 0 {
-				globalCfg.VochainConfig.PublicAddr = fmt.Sprintf("%s:%s", ip.String(), addrport[len(addrport)-1])
+				globalCfg.VochainConfig.PublicAddr = fmt.Sprintf("%s:%s", ip, addrport[len(addrport)-1])
 			}
 		}
 	}
@@ -268,7 +268,7 @@ func main() {
 			log.Fatal("cannot parse w3external URL")
 		}
 
-		log.Debugf("testing web3 endpoint %s", url.String())
+		log.Debugf("testing web3 endpoint %s", url)
 		data, err := json.Marshal(map[string]interface{}{
 			"jsonrpc": "2.0",
 			"method":  "net_peerCount",

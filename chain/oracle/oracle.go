@@ -350,7 +350,7 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 		if err != nil {
 			log.Warnf("result tx: %s", err)
 		} else {
-			log.Infof("transaction hash: %s", res.Hash.String())
+			log.Infof("transaction hash: %s", res.Hash)
 		}
 
 	case HashLogProcessCanceled.Hex():

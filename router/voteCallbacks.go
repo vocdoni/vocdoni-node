@@ -27,7 +27,7 @@ func submitEnvelope(request routerRequest, router *Router) {
 	if err != nil {
 		log.Warnf("cannot broadcast tx: %s", err)
 	} else {
-		log.Infof("transaction hash: %s", res.Hash.String())
+		log.Infof("transaction hash: %s", res.Hash)
 	}
 
 	var apiResponse types.ResponseMessage
