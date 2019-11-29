@@ -103,7 +103,8 @@ var ValidTypes = map[string]string{
 	"addValidator":    "AdminTx",
 	"removeValidator": "AdminTx",
 	"addOracle":       "AdminTx",
-	"removeOracle":    "AdminTx"}
+	"removeOracle":    "AdminTx",
+}
 
 // Tx is an abstraction for any specific tx which is primarly defined by its type
 // For now we have 3 tx types {voteTx, newProcessTx, adminTx}

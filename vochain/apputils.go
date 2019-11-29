@@ -3,7 +3,6 @@ package vochain
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -15,14 +14,11 @@ import (
 )
 
 // ValidateTx splits a tx into method and args parts and does some basic checks
-func ValidateTx(content []byte, state *VochainState) (interface{}, string, error) {
-
+func ValidateTx(content []byte, state *VochainState) (interface{}, error) {
 	var txType vochaintypes.Tx
-	var err error
-
-	err = json.Unmarshal(content, &txType)
+	err := json.Unmarshal(content, &txType)
 	if err != nil || len(txType.Type) < 1 {
-		return nil, "", fmt.Errorf("cannot extract type (%s)", err)
+		return nil, fmt.Errorf("cannot extract type (%s)", err)
 	}
 
 	structType := vochaintypes.ValidateType(txType.Type)
@@ -30,64 +26,60 @@ func ValidateTx(content []byte, state *VochainState) (interface{}, string, error
 	switch structType {
 	case "VoteTx":
 		var voteTx vochaintypes.VoteTx
-		err = json.Unmarshal(content, &voteTx)
-		if err != nil {
-			return nil, "", fmt.Errorf("cannot parse VoteTX")
+		if err := json.Unmarshal(content, &voteTx); err != nil {
+			return nil, fmt.Errorf("cannot parse VoteTX")
 		}
-		return voteTx, "VoteTx", VoteTxCheck(voteTx, state)
+		return voteTx, VoteTxCheck(voteTx, state)
 
 	case "AdminTx":
 		var adminTx vochaintypes.AdminTx
-		err = json.Unmarshal(content, &adminTx)
-		if err != nil {
-			return nil, "", fmt.Errorf("cannot parse AdminTx")
+		if err := json.Unmarshal(content, &adminTx); err != nil {
+			return nil, fmt.Errorf("cannot parse AdminTx")
 		}
-		return adminTx, "AdminTx", AdminTxCheck(adminTx, state)
+		return adminTx, AdminTxCheck(adminTx, state)
 	case "NewProcessTx":
 		var processTx vochaintypes.NewProcessTx
-		err = json.Unmarshal(content, &processTx)
-		if err != nil {
-			return nil, "", fmt.Errorf("cannot parse NewProcessTx")
+		if err := json.Unmarshal(content, &processTx); err != nil {
+			return nil, fmt.Errorf("cannot parse NewProcessTx")
 		}
-		return processTx, "NewProcessTx", NewProcessTxCheck(processTx, state)
+		return processTx, NewProcessTxCheck(processTx, state)
 	}
 
-	return nil, "", fmt.Errorf("invalid type")
+	return nil, fmt.Errorf("invalid type")
 }
 
 // ValidateAndDeliverTx validates a tx and executes the methods required for changing the app state
 func ValidateAndDeliverTx(content []byte, state *VochainState) error {
-	tx, txType, err := ValidateTx(content, state)
+	tx, err := ValidateTx(content, state)
 	if err != nil {
 		return fmt.Errorf("transaction validation failed with error (%s)", err)
 	}
-	switch txType {
-	case "VoteTx":
-		votetx := reflect.Indirect(reflect.ValueOf(tx)).Interface().(vochaintypes.VoteTx)
-		process, _ := state.GetProcess(votetx.ProcessID)
+	switch tx := tx.(type) {
+	case vochaintypes.VoteTx:
+		process, _ := state.GetProcess(tx.ProcessID)
 		if process == nil {
-			return fmt.Errorf("process with id (%s) does not exists", votetx.ProcessID)
+			return fmt.Errorf("process with id (%s) does not exists", tx.ProcessID)
 		}
 		vote := new(vochaintypes.Vote)
 		switch process.Type {
 		case "snark-vote":
-			vote.Nullifier = sanitizeHex(votetx.Nullifier)
-			vote.Nonce = sanitizeHex(votetx.Nonce)
-			vote.ProcessID = sanitizeHex(votetx.ProcessID)
-			vote.VotePackage = sanitizeHex(votetx.VotePackage)
-			vote.Proof = sanitizeHex(votetx.Proof)
+			vote.Nullifier = sanitizeHex(tx.Nullifier)
+			vote.Nonce = sanitizeHex(tx.Nonce)
+			vote.ProcessID = sanitizeHex(tx.ProcessID)
+			vote.VotePackage = sanitizeHex(tx.VotePackage)
+			vote.Proof = sanitizeHex(tx.Proof)
 
 		case "poll-vote", "petition-sign":
-			vote.Nonce = votetx.Nonce
-			vote.ProcessID = votetx.ProcessID
-			vote.Proof = votetx.Proof
-			vote.VotePackage = votetx.VotePackage
+			vote.Nonce = tx.Nonce
+			vote.ProcessID = tx.ProcessID
+			vote.Proof = tx.Proof
+			vote.VotePackage = tx.VotePackage
 
 			voteBytes, err := json.Marshal(vote)
 			if err != nil {
 				return fmt.Errorf("cannot marshal vote (%s)", err)
 			}
-			pubKey, err := signature.PubKeyFromSignature(string(voteBytes), votetx.Signature)
+			pubKey, err := signature.PubKeyFromSignature(string(voteBytes), tx.Signature)
 			if err != nil {
 				//log.Warnf("cannot extract pubKey: %s", err)
 				return fmt.Errorf("cannot extract public key from signature (%s)", err)
@@ -96,11 +88,11 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 			if err != nil {
 				return fmt.Errorf("cannot extract address from public key")
 			}
-			vote.Nonce = sanitizeHex(votetx.Nonce)
-			vote.VotePackage = sanitizeHex(votetx.VotePackage)
-			vote.Signature = sanitizeHex(votetx.Signature)
-			vote.Proof = sanitizeHex(votetx.Proof)
-			vote.ProcessID = sanitizeHex(votetx.ProcessID)
+			vote.Nonce = sanitizeHex(tx.Nonce)
+			vote.VotePackage = sanitizeHex(tx.VotePackage)
+			vote.Signature = sanitizeHex(tx.Signature)
+			vote.Proof = sanitizeHex(tx.Proof)
+			vote.ProcessID = sanitizeHex(tx.ProcessID)
 			vote.Nullifier = GenerateNullifier(addr, vote.ProcessID)
 
 		default:
@@ -108,33 +100,30 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 		}
 		//log.Debugf("adding vote: %+v", vote)
 		return state.AddVote(vote)
-	case "AdminTx":
-		adminTx := reflect.Indirect(reflect.ValueOf(tx)).Interface().(vochaintypes.AdminTx)
-		switch adminTx.Type {
+	case vochaintypes.AdminTx:
+		switch tx.Type {
 		case "addOracle":
-			return state.AddOracle(adminTx.Address)
+			return state.AddOracle(tx.Address)
 		case "removeOracle":
-			return state.RemoveOracle(adminTx.Address)
+			return state.RemoveOracle(tx.Address)
 		case "addValidator":
-			return state.AddValidator(adminTx.Address, adminTx.Power)
+			return state.AddValidator(tx.Address, tx.Power)
 		case "removeValidator":
-			return state.RemoveValidator(adminTx.Address)
+			return state.RemoveValidator(tx.Address)
 		}
-	case "NewProcessTx":
-		processtx := reflect.Indirect(reflect.ValueOf(tx)).Interface().(vochaintypes.NewProcessTx)
+	case vochaintypes.NewProcessTx:
 		newprocess := &vochaintypes.Process{
-			EntityID:             sanitizeHex(processtx.EntityID),
-			EncryptionPublicKeys: processtx.EncryptionPublicKeys,
-			MkRoot:               sanitizeHex(processtx.MkRoot),
-			NumberOfBlocks:       processtx.NumberOfBlocks,
-			StartBlock:           processtx.StartBlock,
+			EntityID:             sanitizeHex(tx.EntityID),
+			EncryptionPublicKeys: tx.EncryptionPublicKeys,
+			MkRoot:               sanitizeHex(tx.MkRoot),
+			NumberOfBlocks:       tx.NumberOfBlocks,
+			StartBlock:           tx.StartBlock,
 			CurrentState:         vochaintypes.Scheduled,
-			Type:                 processtx.ProcessType,
+			Type:                 tx.ProcessType,
 		}
-		return state.AddProcess(newprocess, processtx.ProcessID)
+		return state.AddProcess(newprocess, tx.ProcessID)
 	}
 	return fmt.Errorf("invalid type")
-
 }
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
