@@ -3,8 +3,9 @@ package ipfs
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 
 	autonat "github.com/libp2p/go-libp2p-autonat-svc"
 
@@ -35,21 +36,16 @@ func Init() error {
 		return errors.New(e)
 	}
 
-	mode := os.FileMode(int(0770))
-	err = os.MkdirAll(ConfigRoot, mode)
-	if err != nil {
+	if err := os.MkdirAll(ConfigRoot, 0770); err != nil {
 		return err
 	}
 
-	f, err := os.Create(path.Join(ConfigRoot, "version"))
-	if err != nil {
+	if err := ioutil.WriteFile(filepath.Join(ConfigRoot, "version"),
+		[]byte(fmt.Sprintf("%d\n", RepoVersion)), 0666,
+	); err != nil {
 		return err
 	}
 
-	_, werr := f.Write([]byte(fmt.Sprintf("%d\n", RepoVersion)))
-	if werr != nil {
-		return werr
-	}
 	InstallDatabasePlugins()
 	_, err = doInit(os.Stdout, ConfigRoot, 2048, []string{}, nil)
 	return err
