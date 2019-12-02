@@ -36,7 +36,7 @@ gateway-docker-test:
   stage: test
   script:
     - docker pull ${DVOTE_GATEWAY_BUILD_IMAGE}
-    - docker run ${DVOTE_GATEWAY_BUILD_IMAGE}  /bin/sh -c 'apk add git build-base && go test ./...'
+    - docker run ${DVOTE_GATEWAY_BUILD_IMAGE}  /bin/sh -c 'apk add git build-base && go build cmd/gateway/gateway.go && go build cmd/oracle/oracle.go && go build cmd/miner/miner.go && go test ./...'
   
 
 gateway-docker-release:
