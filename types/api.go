@@ -71,6 +71,7 @@ type MetaResponse struct {
 	ValidProof    bool     `json:"validProof,omitempty"`
 }
 
+
 type CensusDump struct {
 	RootHash   string   `json:"rootHash"`
 	ClaimsData []string `json:"claimsData"`

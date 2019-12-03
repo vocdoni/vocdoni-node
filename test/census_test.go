@@ -90,7 +90,7 @@ func TestCensus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot start IPFS %s", err)
 	}
-	routerAPI := router.InitRouter(listenerOutput, storage, ws, *signer1)
+	routerAPI := router.InitRouter(listenerOutput, storage, ws, signer1)
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.CensusManager

@@ -154,15 +154,14 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 		log.Errorf("cannot marshal query data: (%s)", err)
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
-	ok := new(bool)
+	apiResponse.Response.Ok = new(bool)
 	if err != nil {
-		*ok = false
-		apiResponse.Response.Ok = ok
+		*apiResponse.Response.Ok = false
 	} else {
-		*ok = true
-		apiResponse.Response.Ok = ok
+		*apiResponse.Response.Ok = true
 	}
-	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Height)
+	apiResponse.Response.Height = new(int64)
+	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, apiResponse.Response.Height)
 	if err != nil {
 		log.Errorf("cannot unmarshal height: %s", err)
 	}
@@ -193,15 +192,14 @@ func getBlockHeight(request routerRequest, router *Router) {
 		log.Errorf("cannot marshal query data: (%s)", err)
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
-	ok := new(bool)
+	apiResponse.Response.Ok = new(bool)
 	if err != nil {
-		*ok = false
-		apiResponse.Response.Ok = ok
+		*apiResponse.Response.Ok = false
 	} else {
-		*ok = true
-		apiResponse.Response.Ok = ok
+		*apiResponse.Response.Ok = true
 	}
-	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Height)
+	apiResponse.Response.Height = new(int64)
+	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, apiResponse.Response.Height)
 	log.Debugf("Response height is: %d", *apiResponse.Response.Height)
 	if err != nil {
 		log.Errorf("cannot unmarshal height: %s", err)
