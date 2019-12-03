@@ -156,7 +156,6 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 		// log.Debugf("executing VoteTxCheck of: %s", voteBytes)
 		pubKey, err := signature.PubKeyFromSignature(string(voteBytes), vote.Signature)
 		if err != nil {
-			log.Warnf("cannot extract pubKey: %s", err)
 			return fmt.Errorf("cannot extract public key from signature (%s)", err)
 		}
 
@@ -171,25 +170,21 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 		voteID := fmt.Sprintf("%s_%s", sanitizeHex(vote.ProcessID), sanitizeHex(voteTmp.Nullifier))
 		v, _ := state.GetEnvelope(voteID)
 		if v != nil {
-			log.Debugf("vote already exists")
 			return fmt.Errorf("vote already exists")
 		}
 
 		// check merkle proof
 		log.Debugf("extracted pubkey: %s", pubKey)
 		pubKeyHash := signature.HashPoseidon(pubKey)
-		if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 {
-			log.Warnf("wrong Poseidon hash size (%s)", err)
-			//return fmt.Errorf("wrong Poseidon hash size (%s)", err)
+		if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 { //TO-DO check the exact size of PoseidonHash
+			return fmt.Errorf("wrong Poseidon hash size (%s)", err)
 		}
 		valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
 		if err != nil {
-			log.Warnf("error checking merkle proof: %s", err)
-			//return fmt.Errorf("cannot check merkle proof (%s)", err)
+			return fmt.Errorf("cannot check merkle proof (%s)", err)
 		}
-		log.Debugf("proof valid? %t", valid)
 		if !valid {
-			//return fmt.Errorf("proof not valid")
+			return fmt.Errorf("proof not valid")
 		}
 
 	default:
