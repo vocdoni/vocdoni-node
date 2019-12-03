@@ -267,21 +267,7 @@ func main() {
 		os.RemoveAll(globalCfg.DataDir + "/.keyStore.tmp")
 		node.Keys = keystore.NewPlaintextKeyStore(globalCfg.DataDir + "/.keyStore.tmp")
 		node.Keys.ImportECDSA(signer.Private, "")
-	} else {
-		// Get stored keys from Ethereum node context
-		acc := node.Keys.Accounts()
-		if len(acc) > 0 {
-			keyJSON, err := node.Keys.Export(acc[0], "", "")
-			if err != nil {
-				log.Fatal(err)
-			}
-			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
-			pub, _ := signer.HexString()
-			log.Infof("using pubKey %s from keystore", pub)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
+
 	}
 
 	// Start Ethereum Web3 native node
@@ -309,6 +295,7 @@ func main() {
 	}
 
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
+		//TO-DO create signing key since node.Start() is not executed and the ethereum account is not created on first run
 		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
 			log.Fatal("cannot parse w3external URL")
@@ -337,6 +324,23 @@ func main() {
 		}
 		log.Infof("successfuly connected to web3 endpoint at external url: %s", globalCfg.W3external)
 		log.Infof("web3 available at %s", globalCfg.W3.Route)
+	}
+
+	if globalCfg.Client.SigningKey == "" {
+		// Get stored keys from Ethereum node context
+		acc := node.Keys.Accounts()
+		if len(acc) > 0 {
+			keyJSON, err := node.Keys.Export(acc[0], "", "")
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
+			pub, _ := signer.HexString()
+			log.Infof("using pubKey %s from keystore", pub)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 	}
 
 	// Storage
@@ -425,7 +429,7 @@ func main() {
 		listenerOutput := make(chan types.Message)
 		go ws.Listen(listenerOutput)
 
-		routerAPI := router.InitRouter(listenerOutput, storage, ws, *signer)
+		routerAPI := router.InitRouter(listenerOutput, storage, ws, signer)
 		if globalCfg.Api.File.Enabled {
 			log.Info("enabling file API")
 			routerAPI.EnableFileAPI()

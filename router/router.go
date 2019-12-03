@@ -131,9 +131,9 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 
 //InitRouter sets up a Router object which can then be used to route requests
 func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
-	signer signature.SignKeys) *Router {
+	signer *signature.SignKeys) *Router {
 	log.Infof("using signer with address %s", signer.EthAddrString())
-	return NewRouter(inbound, storage, transport, signer)
+	return NewRouter(inbound, storage, transport, *signer)
 }
 
 func (r *Router) registerMethod(methodName string, methodCallback requestMethod, private bool) {
