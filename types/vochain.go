@@ -127,7 +127,7 @@ type VoteTx struct {
 type NewProcessTx struct {
 	// EncryptionPublicKeys are the keys required to encrypt the votes
 	EncryptionPublicKeys []string `json:"encryptionPublicKeys,omitempty"`
-	//EntityID the process belongs to
+	// EntityID the process belongs to
 	EntityID string `json:"entityId"`
 	// MkRoot merkle root of all the census in the process
 	MkRoot string `json:"mkRoot,omitempty"`
@@ -147,7 +147,7 @@ type AdminTx struct {
 	Nonce     string `json:"nonce"`
 	Power     int64  `json:"power,omitempty"`
 	Signature string `json:"signature,omitempty"`
-	Type      string `json:"type"` //addValidator, removeValidator, addOracle, removeOracle
+	Type      string `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
 }
 
 // ValidateType a valid Tx type specified in ValidTypes

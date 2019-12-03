@@ -89,7 +89,7 @@ var (
 	}
 
 	HardcodedAdminTxAddOracle *vochain.AdminTx = &vochain.AdminTx{
-		Address:   "0x39106af1fF18bD60a38a296fd81B1f28f315852B", //oracle address or pubkey validator
+		Address:   "0x39106af1fF18bD60a38a296fd81B1f28f315852B", // oracle address or pubkey validator
 		Nonce:     "0x1",
 		Signature: "11ccdaacd6b6c2c832ea51b4dc695ce9f3c31b7fecd81a2509e7daf183a126e974f1b68060dd406c83ea2db1147d7a56fd6033e8cf7834ce0cf5ec504f09f2ee1b",
 		Type:      "addOracle",

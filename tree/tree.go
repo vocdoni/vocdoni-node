@@ -1,4 +1,4 @@
-//Package tree provides the functions for creating and managing an iden3 merkletree
+// Package tree provides the functions for creating and managing an iden3 merkletree
 package tree
 
 import (
@@ -170,7 +170,7 @@ func (t *Tree) Dump(root string) (claims []string, err error) {
 	return
 }
 
-//Size returns the number of leaf nodes on the merkle tree
+// Size returns the number of leaf nodes on the merkle tree
 func (t *Tree) Size(root string) (int64, error) {
 	var err error
 	var rootHash merkletree.Hash
@@ -201,7 +201,7 @@ func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, error) {
 	}
 	err = t.Tree.Walk(&rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
-			//data := bytes.Trim(n.Value()[2:MaxClaimSize+2], "\x00")
+			// data := bytes.Trim(n.Value()[2:MaxClaimSize+2], "\x00")
 			data := bytes.Replace(n.Value()[2:MaxClaimSize+2], []byte("\x00"), nil, -1)
 			if responseBase64 {
 				datab64 := base64.StdEncoding.EncodeToString(data)

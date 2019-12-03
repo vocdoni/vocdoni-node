@@ -1,7 +1,8 @@
-//Package router provides the routing and entry point for the go-dvote API
+// Package router provides the routing and entry point for the go-dvote API
 package router
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -16,12 +17,12 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
-
-	"encoding/json"
 )
 
-const Private = true
-const Public = false
+const (
+	Private = true
+	Public  = false
+)
 
 func buildReply(context types.MessageContext, data []byte) types.Message {
 	reply := new(types.Message)
@@ -42,10 +43,10 @@ func parseTransportFromURI(uris []string) []string {
 
 type requestMethod func(request routerRequest, router *Router)
 
-//type methodMap map[string]func(msg types.Message, request routerRequest, r *Router)
+// type methodMap map[string]func(msg types.Message, request routerRequest, r *Router)
 type methodMap map[string]requestMethod
 
-//Router holds a router object
+// Router holds a router object
 type Router struct {
 	privateRequestMap methodMap
 	publicRequestMap  methodMap
@@ -87,7 +88,7 @@ type routerRequest struct {
 	private       bool
 }
 
-//semi-unmarshalls message, returns method name
+// semi-unmarshalls message, returns method name
 func (r *Router) getRequest(payload []byte, context types.MessageContext) (request routerRequest, err error) {
 	var msgStruct types.RequestMessage
 	err = json.Unmarshal(payload, &msgStruct)
@@ -129,7 +130,7 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	return request, err
 }
 
-//InitRouter sets up a Router object which can then be used to route requests
+// InitRouter sets up a Router object which can then be used to route requests
 func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
 	signer *signature.SignKeys) *Router {
 	log.Infof("using signer with address %s", signer.EthAddrString())
@@ -144,7 +145,7 @@ func (r *Router) registerMethod(methodName string, methodCallback requestMethod,
 	}
 }
 
-//EnableFileAPI enables the FILE API in the Router
+// EnableFileAPI enables the FILE API in the Router
 func (r *Router) EnableFileAPI() {
 	r.registerMethod("fetchFile", fetchFile, Public) // false = public method
 	r.registerMethod("addFile", addFile, Private)    // true = private method
@@ -153,7 +154,7 @@ func (r *Router) EnableFileAPI() {
 	r.registerMethod("unpinFile", unpinFile, Private)
 }
 
-//EnableCensusAPI enables the Census API in the Router
+// EnableCensusAPI enables the Census API in the Router
 func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.census = cm
 	cm.Data = &r.storage
@@ -170,7 +171,7 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.registerMethod("importRemote", censusLocal, Private)
 }
 
-//EnableVoteAPI enabled the Vote API in the Router
+// EnableVoteAPI enabled the Vote API in the Router
 func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP) {
 	r.tmclient = rpcClient
 	r.registerMethod("submitEnvelope", submitEnvelope, Public)
@@ -180,10 +181,9 @@ func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP) {
 	r.registerMethod("getProcessList", getProcessList, Public)
 	r.registerMethod("getEnvelopeList", getEnvelopeList, Public)
 	r.registerMethod("getBlockHeight", getBlockHeight, Public)
-
 }
 
-//Route routes requests through the Router object
+// Route routes requests through the Router object
 func (r *Router) Route() {
 	if len(r.publicRequestMap) == 0 && len(r.privateRequestMap) == 0 {
 		log.Warnf("router methods are not properly initialized: %+v", r)

@@ -10,7 +10,7 @@ type MessageContext interface {
 
 type PssContext struct {
 	Topic       string
-	PeerAddress string //this is the address of the other side
+	PeerAddress string // this is the address of the other side
 }
 
 func (c PssContext) ConnectionType() string {
@@ -54,31 +54,31 @@ func (c *WebsocketContext) Conn() *net.Conn {
 }
 */
 
-//Message is a wrapper for messages from various net transport modules
+// Message is a wrapper for messages from various net transport modules
 type Message struct {
 	Data      []byte
 	TimeStamp int32
 	Context   MessageContext
 }
 
-//Connection describes the settings for any of the transports defined in the net module, note that not all
-//fields are used for all transport types.
+// Connection describes the settings for any of the transports defined in the net module, note that not all
+// fields are used for all transport types.
 type Connection struct {
-	Topic      string //channel/topic for topic based messaging such as PSS, PubSub
-	Encryption string //what type of encryption to use
-	Key        string //this node's key
-	Address    string //this node's address
-	Path       string //specific path on which a transport should listen
-	SSLDomain  string //ssl domain
-	SSLCertDir string //ssl certificates directory
-	Port       int    //specific port on which a transport should listen
+	Topic      string // channel/topic for topic based messaging such as PSS, PubSub
+	Encryption string // what type of encryption to use
+	Key        string // this node's key
+	Address    string // this node's address
+	Path       string // specific path on which a transport should listen
+	SSLDomain  string // ssl domain
+	SSLCertDir string // ssl certificates directory
+	Port       int    // specific port on which a transport should listen
 }
 
 type DataStore struct {
 	Datadir string
 }
 
-//Ballot represents the choices of one user in one voting process
+// Ballot represents the choices of one user in one voting process
 type Ballot struct {
 	Type      string
 	PID       string
@@ -87,7 +87,7 @@ type Ballot struct {
 	Franchise []byte
 }
 
-//Envelope contains a Ballot, and additional metadata for processing
+// Envelope contains a Ballot, and additional metadata for processing
 type Envelope struct {
 	Type      string
 	Nonce     uint64
@@ -96,7 +96,7 @@ type Envelope struct {
 	Timestamp int32
 }
 
-//Batch contains a number of Ballots, ready to be counted
+// Batch contains a number of Ballots, ready to be counted
 type Batch struct {
 	Type       string
 	Nullifiers []string

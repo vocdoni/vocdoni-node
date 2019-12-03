@@ -32,14 +32,14 @@ type MetaRequest struct {
 	VotePublicKeys []string `json:"encryptionPublicKeys,omitempty"`
 }
 
-//ResponseMessage wraps an api response
+// ResponseMessage wraps an api response
 type ResponseMessage struct {
 	ID        string       `json:"id"`
 	Response  MetaResponse `json:"response"`
 	Signature string       `json:"signature"`
 }
 
-//ErrorMessage wraps an api error
+// ErrorMessage wraps an api error
 type ErrorMessage struct {
 	ID        string       `json:"id"`
 	Error     MetaResponse `json:"error"`

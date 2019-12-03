@@ -57,7 +57,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	ipfs.InstallDatabasePlugins()
 	ipfs.ConfigRoot = d.Datadir
 
-	//check if needs init
+	// check if needs init
 	if !fsrepo.IsInitialized(ipfs.ConfigRoot) {
 		err := ipfs.Init()
 		if err != nil {
@@ -69,12 +69,12 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 		return err
 	}
 	log.Infof("IPFS Peer ID: %s", nd.Identity.Pretty())
-	//start http
+	// start http
 	cctx := ipfs.CmdCtx(nd, d.Datadir)
 	cctx.ReqLog = &ipfscmds.ReqLog{}
 
 	gatewayOpt := corehttp.GatewayOption(true, corehttp.WebUIPaths...)
-	var opts = []corehttp.ServeOption{
+	opts := []corehttp.ServeOption{
 		corehttp.CommandsOption(cctx),
 		corehttp.WebUIOption,
 		gatewayOpt,
@@ -89,12 +89,12 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	return nil
 }
 
-//GetURIprefix returns the URI prefix which identifies the protocol
+// GetURIprefix returns the URI prefix which identifies the protocol
 func (i *IPFSHandle) GetURIprefix() string {
 	return "ipfs://"
 }
 
-//PublishFile publishes a file specified by root to ipfs
+// PublishFile publishes a file specified by root to ipfs
 func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
 	rootHash, err := addAndPin(nd, string(root))
 	if err != nil {
@@ -103,7 +103,7 @@ func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
 	return rootHash, nil
 }
 
-//PublishBytes publishes a file containing msg to ipfs
+// PublishBytes publishes a file containing msg to ipfs
 func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
 	log.Infof("publishing file: %s", filePath)
@@ -118,9 +118,9 @@ func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, er
 	return rootHash, nil
 }
 
-//Publish publishes a message to ipfs
+// Publish publishes a message to ipfs
 func (i *IPFSHandle) Publish(msg []byte) (string, error) {
-	//if sent a message instead of a file
+	// if sent a message instead of a file
 	roothash, err := PublishBytes(msg, i.DataDir, i.Node)
 	return roothash, err
 }

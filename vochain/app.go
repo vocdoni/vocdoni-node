@@ -145,6 +145,7 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 		Data: hash,
 	}
 }
+
 func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
 	var reqData vochain.QueryData
 	err := json.Unmarshal(req.GetData(), &reqData)

@@ -1,4 +1,4 @@
-//Package data provides an abstraction layer for distributed data storage providers (currently only IPFS)
+// Package data provides an abstraction layer for distributed data storage providers (currently only IPFS)
 package data
 
 import (

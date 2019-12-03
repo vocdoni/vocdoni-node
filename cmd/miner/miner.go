@@ -20,7 +20,7 @@ import (
 func newConfig() (config.VochainCfg, error) {
 	var globalCfg config.VochainCfg
 
-	//setup flags
+	// setup flags
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
@@ -89,6 +89,7 @@ func newConfig() (config.VochainCfg, error) {
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
 }
+
 func main() {
 	globalCfg, err := newConfig()
 	log.InitLogger(globalCfg.LogLevel, "stdout")

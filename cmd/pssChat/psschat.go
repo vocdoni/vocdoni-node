@@ -17,7 +17,7 @@ import (
 
 func newConfig() (config.PssCfg, error) {
 	var globalCfg config.PssCfg
-	//setup flags
+	// setup flags
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
@@ -50,7 +50,7 @@ func newConfig() (config.PssCfg, error) {
 	viper.SetDefault("loglevel", "warn")
 
 	viper.SetConfigType("yaml")
-	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+	if *path == defaultDirPath+"/config.yaml" { // if path left default, write new cfg file if empty or if file doesn't exist.
 		if err = viper.SafeWriteConfigAs(*path); err != nil {
 			if os.IsNotExist(err) {
 				err = os.MkdirAll(defaultDirPath, os.ModePerm)
@@ -86,7 +86,7 @@ func newConfig() (config.PssCfg, error) {
 	return globalCfg, err
 }
 
-//Message holds a pss chat message
+// Message holds a pss chat message
 type Message struct {
 	Type int    `json:"type"`
 	Nick string `json:"nick"`
@@ -94,9 +94,9 @@ type Message struct {
 }
 
 func main() {
-	//setup config
+	// setup config
 	globalCfg, err := newConfig()
-	//setup logger
+	// setup logger
 	log.InitLogger(globalCfg.LogLevel, "stdout")
 	if err != nil {
 		log.Fatalf("Could not load config: %v", err)

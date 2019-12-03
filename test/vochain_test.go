@@ -11,7 +11,7 @@ import (
 
 func TestNewProcessTxCheck(t *testing.T) {
 	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithOracles() //vochain.NewVochainState("/tmp/db")
+	s := testcommon.NewVochainStateWithOracles() // vochain.NewVochainState("/tmp/db")
 	if s == nil {
 		t.Error("cannot create state")
 	}
@@ -77,7 +77,7 @@ func TestAdminTxCheckRemoveValidator(t *testing.T) {
 
 func TestCreateProcess(t *testing.T) {
 	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithOracles() //vochain.NewVochainState("/tmp/db")
+	s := testcommon.NewVochainStateWithOracles() // vochain.NewVochainState("/tmp/db")
 	if s == nil {
 		t.Error("cannot create state")
 	}
@@ -109,7 +109,7 @@ func TestCreateProcess(t *testing.T) {
 
 func TestSubmitEnvelope(t *testing.T) {
 	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithProcess() //vochain.NewVochainState("/tmp/db")
+	s := testcommon.NewVochainStateWithProcess() // vochain.NewVochainState("/tmp/db")
 	if s == nil {
 		t.Error("cannot create state")
 	}

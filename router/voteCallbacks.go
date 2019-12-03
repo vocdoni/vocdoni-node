@@ -217,7 +217,6 @@ func getBlockHeight(request routerRequest, router *Router) {
 }
 
 func getProcessList(request routerRequest, router *Router) {
-
 	// request.structured.From
 	// request.structured.ListSize
 	// getProcessList

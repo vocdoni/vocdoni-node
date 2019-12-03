@@ -37,7 +37,6 @@ type storageInfo struct {
 
 // Count returns the number of elements of the database
 func (l *LevelDbStorage) Count() int {
-
 	keycount := 0
 	db := l.ldb
 	iter := db.NewIterator(util.BytesPrefix(l.prefix), nil)
@@ -53,7 +52,6 @@ func (l *LevelDbStorage) Count() int {
 
 // Info returns some basic info regarding the database
 func (l *LevelDbStorage) Info() string {
-
 	keycount := 0
 	db := l.ldb
 	iter := db.NewIterator(util.BytesPrefix(l.prefix), nil)

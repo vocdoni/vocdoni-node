@@ -8,11 +8,13 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-var rdb *db.LevelDbStorage
-var bdb *db.LevelDbStorage
-var BatchSignal chan bool
-var BatchSize int
-var err error
+var (
+	rdb         *db.LevelDbStorage
+	bdb         *db.LevelDbStorage
+	BatchSignal chan bool
+	BatchSize   int
+	err         error
+)
 
 func Setup(l *db.LevelDbStorage) {
 	rdb = l.WithPrefix([]byte("relay_"))
@@ -30,27 +32,27 @@ func Recieve(messages <-chan types.Message) {
 
 		err = json.Unmarshal(payload, &e)
 		if err != nil {
-			//log error
+			// log error
 		}
 
 		err = json.Unmarshal(e.Ballot, &b)
 		if err != nil {
-			//log error
+			// log error
 		}
 
 		err = Add(b)
 		if err != nil {
-			//log error
+			// log error
 		}
 
 		log.Infof("Recieved payload: %v", payload)
 	}
 }
 
-//add (queue for counting)
+// add (queue for counting)
 func Add(ballot types.Ballot) error {
-	//this is probably adding []
-	//err := bdb.Put(fmt.Sprintf("%v", p.Nullifier)),[]byte(fmt.Sprintf("%v", p)))
+	// this is probably adding []
+	// err := bdb.Put(fmt.Sprintf("%v", p.Nullifier)),[]byte(fmt.Sprintf("%v", p)))
 	b, err := json.Marshal(ballot)
 	if err != nil {
 		return err
@@ -63,17 +65,17 @@ func Add(ballot types.Ballot) error {
 		return err
 	}
 
-	//this actually needs to see if it was added
+	// this actually needs to see if it was added
 	if bdb.Count() >= BatchSize {
 		BatchSignal <- true
 	}
 	return nil
 }
 
-//create (return batch)
-//k is []byte 'batch_' + nullifier
-//v is []byte package
-//returns slice of nullifiers, batch json
+// create (return batch)
+// k is []byte 'batch_' + nullifier
+// v is []byte package
+// returns slice of nullifiers, batch json
 func Fetch() (n, b []string) {
 	iter := bdb.Iter()
 	for iter.Next() {
@@ -98,7 +100,7 @@ func Fetch() (n, b []string) {
 	return n, b
 }
 
-//move from bdb to rdb once pinned
+// move from bdb to rdb once pinned
 func Compact(n []string) {
 	for _, k := range n {
 		v, err := bdb.Get([]byte(k))

@@ -1,11 +1,11 @@
 package main
 
 import (
-	flag "github.com/spf13/pflag"
-	"github.com/spf13/viper"
-
 	"os"
 	"time"
+
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
@@ -14,7 +14,7 @@ import (
 
 func newConfig() (config.W3Cfg, error) {
 	var globalCfg config.W3Cfg
-	//setup flags
+	// setup flags
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
@@ -42,7 +42,7 @@ func newConfig() (config.W3Cfg, error) {
 	viper.SetDefault("logLevel", "warn")
 
 	viper.SetConfigType("yaml")
-	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+	if *path == defaultDirPath+"/config.yaml" { // if path left default, write new cfg file if empty or if file doesn't exist.
 		if err = viper.SafeWriteConfigAs(*path); err != nil {
 			if os.IsNotExist(err) {
 				err = os.MkdirAll(defaultDirPath, os.ModePerm)
@@ -83,9 +83,9 @@ Testing the RPC can be performed with curl and/or websocat
  echo '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":74}' | websocat ws://127.0.0.1:9092
 */
 func main() {
-	//setup config
+	// setup config
 	globalCfg, err := newConfig()
-	//setup logger
+	// setup logger
 	log.InitLogger(globalCfg.LogLevel, "stdout")
 	if err != nil {
 		log.Fatalf("Could not load config: %v", err)
@@ -106,5 +106,4 @@ func main() {
 	for {
 		time.Sleep(1 * time.Second)
 	}
-
 }

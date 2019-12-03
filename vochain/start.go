@@ -1,4 +1,4 @@
-//Package vochain provides all the functions for creating and managing a vocdoni voting blockchain
+// Package vochain provides all the functions for creating and managing a vocdoni voting blockchain
 package vochain
 
 import (
@@ -35,7 +35,6 @@ var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.20
 
 // Start starts a new vochain validator node
 func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*BaseApplication, *nm.Node) {
-
 	// create application db
 	vlog.Info("initializing Vochain")
 
@@ -58,7 +57,7 @@ func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*BaseApplication, *n
 	return app, node
 }
 
-//NewGenesis creates a new genesis file and saves it to tconfig.Genesis path
+// NewGenesis creates a new genesis file and saves it to tconfig.Genesis path
 func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
 	vlog.Info("creating genesis file")
 	consensusParams := tmtypes.DefaultConsensusParams()
@@ -147,7 +146,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	// create logger
 	logger := tlog.NewTMLogger(tlog.NewSyncWriter(os.Stdout))
 
-	//config.LogLevel = "none"
+	// config.LogLevel = "none"
 	logger, err = tmflags.ParseLogLevel(tconfig.LogLevel, logger, cfg.DefaultLogLevel())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse log level")

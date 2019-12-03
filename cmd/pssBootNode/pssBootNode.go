@@ -14,7 +14,7 @@ import (
 
 func newConfig() (config.PssMetaCfg, error) {
 	var globalCfg config.PssMetaCfg
-	//setup flags
+	// setup flags
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
@@ -36,7 +36,7 @@ func newConfig() (config.PssMetaCfg, error) {
 	viper.SetDefault("logLevel", "info")
 
 	viper.SetConfigType("yaml")
-	if *path == defaultDirPath+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+	if *path == defaultDirPath+"/config.yaml" { // if path left default, write new cfg file if empty or if file doesn't exist.
 		if err = viper.SafeWriteConfigAs(*path); err != nil {
 			if os.IsNotExist(err) {
 				err = os.MkdirAll(defaultDirPath, os.ModePerm)
@@ -67,9 +67,9 @@ func newConfig() (config.PssMetaCfg, error) {
 }
 
 func main() {
-	//setup config
+	// setup config
 	globalCfg, err := newConfig()
-	//setup logger
+	// setup logger
 	log.InitLogger(globalCfg.LogLevel, "stdout")
 	if err != nil {
 		log.Fatalf("could not load config: %v", err)

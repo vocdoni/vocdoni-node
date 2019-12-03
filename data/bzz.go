@@ -63,7 +63,7 @@ func (b *BZZHandle) Retrieve(hash string) ([]byte, error) {
 	return data, nil
 }
 
-//STUB -- NEEDS IMPLEMENTATION
+// STUB -- NEEDS IMPLEMENTATION
 func (b *BZZHandle) Pin(path string) error {
 	return errors.New("Not yet implemented in BZZ")
 }
@@ -72,12 +72,12 @@ func (b *BZZHandle) Stats() (string, error) {
 	return "", errors.New("Not yet implemented in BZZ")
 }
 
-//STUB -- NEEDS IMPLEMENTATION
+// STUB -- NEEDS IMPLEMENTATION
 func (b *BZZHandle) Unpin(path string) error {
 	return errors.New("Not yet implemented in BZZ")
 }
 
-//STUB -- NEEDS IMPLEMENTATION
+// STUB -- NEEDS IMPLEMENTATION
 func (b *BZZHandle) ListPins() (map[string]string, error) {
 	return nil, errors.New("Not yet implemented in BZZ")
 }

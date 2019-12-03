@@ -5,23 +5,22 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	goneturl "net/url"
+	"os"
+	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	//abcicli "github.com/tendermint/tendermint/abci/client"
+	// abcicli "github.com/tendermint/tendermint/abci/client"
 	tmnode "github.com/tendermint/tendermint/node"
 	dbm "github.com/tendermint/tm-db"
 
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
-
-	goneturl "net/url"
-	"os"
-	"os/signal"
-	"strings"
-	"time"
 
 	voclient "github.com/tendermint/tendermint/rpc/client"
 
@@ -40,7 +39,7 @@ import (
 
 func newConfig() (config.GWCfg, error) {
 	var globalCfg config.GWCfg
-	//setup flags
+	// setup flags
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
@@ -125,7 +124,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("vochain.contract", "0xb99F60f7a651589022c9495d3e555a46e3625A42")
 
 	viper.SetConfigType("yaml")
-	if *path == userDir+"/config.yaml" { //if path left default, write new cfg file if empty or if file doesn't exist.
+	if *path == userDir+"/config.yaml" { // if path left default, write new cfg file if empty or if file doesn't exist.
 		if err = viper.SafeWriteConfigAs(*path); err != nil {
 			if os.IsNotExist(err) {
 				err = os.MkdirAll(userDir, os.ModePerm)
@@ -140,8 +139,8 @@ func newConfig() (config.GWCfg, error) {
 		}
 	}
 
-	//bind flags after writing default config so flag use
-	//does not write config on first program run
+	// bind flags after writing default config so flag use
+	// does not write config on first program run
 	viper.BindPFlag("api.file.enabled", flag.Lookup("fileApi"))
 	viper.BindPFlag("api.census.enabled", flag.Lookup("censusApi"))
 	viper.BindPFlag("api.vote.enabled", flag.Lookup("voteApi"))
@@ -199,18 +198,18 @@ func addKeyFromEncryptedJSON(keyJSON []byte, passphrase string, signKeys *sig.Si
 }
 
 func main() {
-	//setup config
+	// setup config
 	globalCfg, err := newConfig()
 	globalCfg.Ipfs.ConfigPath = globalCfg.DataDir + "/ipfs"
 
-	//setup logger
+	// setup logger
 	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
 	if err != nil {
 		log.Fatalf("could not load config: %s", err)
 	}
 	log.Infof("using datadir %s", globalCfg.DataDir)
 
-	//setup listener
+	// setup listener
 	pxy := net.NewProxy()
 	pxy.C.SSLDomain = globalCfg.Ssl.Domain
 	pxy.C.SSLCertDir = globalCfg.DataDir

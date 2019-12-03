@@ -73,7 +73,6 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 		log.Infof("ws initialized on ws://" + w.WsProxy.C.Address + ":" + strconv.Itoa(w.WsProxy.C.Port))
 	} else {
 		log.Infof("wss initialized on wss://" + w.WsProxy.C.SSLDomain + ":" + strconv.Itoa(w.WsProxy.C.Port))
-
 	}
 }
 

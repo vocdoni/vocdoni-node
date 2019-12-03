@@ -1,4 +1,4 @@
-//Package swarm provides an easy-to-use abstraction layer for using the basic operations of ethersphere/swarm
+// Package swarm provides an easy-to-use abstraction layer for using the basic operations of ethersphere/swarm
 package swarm
 
 import (
@@ -268,7 +268,7 @@ func (sn *SimpleSwarm) InitPSS(bootNodes []string) error {
 		case *pss.API:
 			sn.Pss = a.Service.(*pss.API)
 		default:
-			//log.Info("interface: " + fmt.Sprintf("%T", a.Service))
+			// log.Info("interface: " + fmt.Sprintf("%T", a.Service))
 			continue
 		}
 	}

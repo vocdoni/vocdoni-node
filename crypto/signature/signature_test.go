@@ -106,7 +106,7 @@ func TestAddr(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	//addr3s := fmt.Sprintf("%x", addr3)
+	// addr3s := fmt.Sprintf("%x", addr3)
 	if addr3 != addr2 {
 		t.Errorf("Extracted signature address do not match: %s != %s\n", addr2, addr3)
 	}
@@ -140,5 +140,4 @@ func TestAddr(t *testing.T) {
 		t.Error("extracted address from second message do not match")
 	}
 	t.Logf("%s == %s", addr3, addr4)
-
 }

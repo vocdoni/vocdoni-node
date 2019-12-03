@@ -193,9 +193,8 @@ func (_VotingProcess *VotingProcessTransactorRaw) Transact(opts *bind.TransactOp
 //
 // Solidity: function entityProcessCount(address ) constant returns(uint256)
 func (_VotingProcess *VotingProcessCaller) EntityProcessCount(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
+	ret0 := new(*big.Int)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "entityProcessCount", arg0)
 	return *ret0, err
@@ -219,9 +218,8 @@ func (_VotingProcess *VotingProcessCallerSession) EntityProcessCount(arg0 common
 //
 // Solidity: function equalStrings(string str1, string str2) constant returns(bool)
 func (_VotingProcess *VotingProcessCaller) EqualStrings(opts *bind.CallOpts, str1 string, str2 string) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
+	ret0 := new(bool)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "equalStrings", str1, str2)
 	return *ret0, err
@@ -309,9 +307,8 @@ func (_VotingProcess *VotingProcessCallerSession) Get(processId [32]byte) (struc
 //
 // Solidity: function getChainId() constant returns(uint256)
 func (_VotingProcess *VotingProcessCaller) GetChainId(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
+	ret0 := new(*big.Int)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "getChainId")
 	return *ret0, err
@@ -335,9 +332,8 @@ func (_VotingProcess *VotingProcessCallerSession) GetChainId() (*big.Int, error)
 //
 // Solidity: function getEntityProcessCount(address entityAddress) constant returns(uint256)
 func (_VotingProcess *VotingProcessCaller) GetEntityProcessCount(opts *bind.CallOpts, entityAddress common.Address) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
+	ret0 := new(*big.Int)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "getEntityProcessCount", entityAddress)
 	return *ret0, err
@@ -361,9 +357,8 @@ func (_VotingProcess *VotingProcessCallerSession) GetEntityProcessCount(entityAd
 //
 // Solidity: function getGenesis() constant returns(string)
 func (_VotingProcess *VotingProcessCaller) GetGenesis(opts *bind.CallOpts) (string, error) {
-	var (
-		ret0 = new(string)
-	)
+	ret0 := new(string)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "getGenesis")
 	return *ret0, err
@@ -387,9 +382,8 @@ func (_VotingProcess *VotingProcessCallerSession) GetGenesis() (string, error) {
 //
 // Solidity: function getNextProcessId(address entityAddress) constant returns(bytes32)
 func (_VotingProcess *VotingProcessCaller) GetNextProcessId(opts *bind.CallOpts, entityAddress common.Address) ([32]byte, error) {
-	var (
-		ret0 = new([32]byte)
-	)
+	ret0 := new([32]byte)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "getNextProcessId", entityAddress)
 	return *ret0, err
@@ -413,9 +407,8 @@ func (_VotingProcess *VotingProcessCallerSession) GetNextProcessId(entityAddress
 //
 // Solidity: function getOracles() constant returns(string[])
 func (_VotingProcess *VotingProcessCaller) GetOracles(opts *bind.CallOpts) ([]string, error) {
-	var (
-		ret0 = new([]string)
-	)
+	ret0 := new([]string)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "getOracles")
 	return *ret0, err
@@ -439,9 +432,8 @@ func (_VotingProcess *VotingProcessCallerSession) GetOracles() ([]string, error)
 //
 // Solidity: function getPrivateKey(bytes32 processId) constant returns(string privateKey)
 func (_VotingProcess *VotingProcessCaller) GetPrivateKey(opts *bind.CallOpts, processId [32]byte) (string, error) {
-	var (
-		ret0 = new(string)
-	)
+	ret0 := new(string)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "getPrivateKey", processId)
 	return *ret0, err
@@ -465,9 +457,8 @@ func (_VotingProcess *VotingProcessCallerSession) GetPrivateKey(processId [32]by
 //
 // Solidity: function getProcessId(address entityAddress, uint256 processCountIndex) constant returns(bytes32)
 func (_VotingProcess *VotingProcessCaller) GetProcessId(opts *bind.CallOpts, entityAddress common.Address, processCountIndex *big.Int) ([32]byte, error) {
-	var (
-		ret0 = new([32]byte)
-	)
+	ret0 := new([32]byte)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "getProcessId", entityAddress, processCountIndex)
 	return *ret0, err
@@ -491,9 +482,8 @@ func (_VotingProcess *VotingProcessCallerSession) GetProcessId(entityAddress com
 //
 // Solidity: function getProcessIndex(bytes32 processId) constant returns(uint256)
 func (_VotingProcess *VotingProcessCaller) GetProcessIndex(opts *bind.CallOpts, processId [32]byte) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
+	ret0 := new(*big.Int)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "getProcessIndex", processId)
 	return *ret0, err
@@ -517,9 +507,8 @@ func (_VotingProcess *VotingProcessCallerSession) GetProcessIndex(processId [32]
 //
 // Solidity: function getResults(bytes32 processId) constant returns(string results)
 func (_VotingProcess *VotingProcessCaller) GetResults(opts *bind.CallOpts, processId [32]byte) (string, error) {
-	var (
-		ret0 = new(string)
-	)
+	ret0 := new(string)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "getResults", processId)
 	return *ret0, err
@@ -543,9 +532,8 @@ func (_VotingProcess *VotingProcessCallerSession) GetResults(processId [32]byte)
 //
 // Solidity: function getValidators() constant returns(string[])
 func (_VotingProcess *VotingProcessCaller) GetValidators(opts *bind.CallOpts) ([]string, error) {
-	var (
-		ret0 = new([]string)
-	)
+	ret0 := new([]string)
+
 	out := ret0
 	err := _VotingProcess.contract.Call(opts, out, "getValidators")
 	return *ret0, err
@@ -920,7 +908,6 @@ type VotingProcessChainIdChanged struct {
 //
 // Solidity: event ChainIdChanged(uint256 chainId)
 func (_VotingProcess *VotingProcessFilterer) FilterChainIdChanged(opts *bind.FilterOpts) (*VotingProcessChainIdChangedIterator, error) {
-
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "ChainIdChanged")
 	if err != nil {
 		return nil, err
@@ -932,7 +919,6 @@ func (_VotingProcess *VotingProcessFilterer) FilterChainIdChanged(opts *bind.Fil
 //
 // Solidity: event ChainIdChanged(uint256 chainId)
 func (_VotingProcess *VotingProcessFilterer) WatchChainIdChanged(opts *bind.WatchOpts, sink chan<- *VotingProcessChainIdChanged) (event.Subscription, error) {
-
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "ChainIdChanged")
 	if err != nil {
 		return nil, err
@@ -1053,7 +1039,6 @@ type VotingProcessGenesisChanged struct {
 //
 // Solidity: event GenesisChanged(string genesis)
 func (_VotingProcess *VotingProcessFilterer) FilterGenesisChanged(opts *bind.FilterOpts) (*VotingProcessGenesisChangedIterator, error) {
-
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "GenesisChanged")
 	if err != nil {
 		return nil, err
@@ -1065,7 +1050,6 @@ func (_VotingProcess *VotingProcessFilterer) FilterGenesisChanged(opts *bind.Fil
 //
 // Solidity: event GenesisChanged(string genesis)
 func (_VotingProcess *VotingProcessFilterer) WatchGenesisChanged(opts *bind.WatchOpts, sink chan<- *VotingProcessGenesisChanged) (event.Subscription, error) {
-
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "GenesisChanged")
 	if err != nil {
 		return nil, err
@@ -1186,7 +1170,6 @@ type VotingProcessOracleAdded struct {
 //
 // Solidity: event OracleAdded(string oraclePublicKey)
 func (_VotingProcess *VotingProcessFilterer) FilterOracleAdded(opts *bind.FilterOpts) (*VotingProcessOracleAddedIterator, error) {
-
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "OracleAdded")
 	if err != nil {
 		return nil, err
@@ -1198,7 +1181,6 @@ func (_VotingProcess *VotingProcessFilterer) FilterOracleAdded(opts *bind.Filter
 //
 // Solidity: event OracleAdded(string oraclePublicKey)
 func (_VotingProcess *VotingProcessFilterer) WatchOracleAdded(opts *bind.WatchOpts, sink chan<- *VotingProcessOracleAdded) (event.Subscription, error) {
-
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "OracleAdded")
 	if err != nil {
 		return nil, err
@@ -1319,7 +1301,6 @@ type VotingProcessOracleRemoved struct {
 //
 // Solidity: event OracleRemoved(string oraclePublicKey)
 func (_VotingProcess *VotingProcessFilterer) FilterOracleRemoved(opts *bind.FilterOpts) (*VotingProcessOracleRemovedIterator, error) {
-
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "OracleRemoved")
 	if err != nil {
 		return nil, err
@@ -1331,7 +1312,6 @@ func (_VotingProcess *VotingProcessFilterer) FilterOracleRemoved(opts *bind.Filt
 //
 // Solidity: event OracleRemoved(string oraclePublicKey)
 func (_VotingProcess *VotingProcessFilterer) WatchOracleRemoved(opts *bind.WatchOpts, sink chan<- *VotingProcessOracleRemoved) (event.Subscription, error) {
-
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "OracleRemoved")
 	if err != nil {
 		return nil, err
@@ -1453,7 +1433,6 @@ type VotingProcessPrivateKeyPublished struct {
 //
 // Solidity: event PrivateKeyPublished(bytes32 indexed processId, string privateKey)
 func (_VotingProcess *VotingProcessFilterer) FilterPrivateKeyPublished(opts *bind.FilterOpts, processId [][32]byte) (*VotingProcessPrivateKeyPublishedIterator, error) {
-
 	var processIdRule []interface{}
 	for _, processIdItem := range processId {
 		processIdRule = append(processIdRule, processIdItem)
@@ -1470,7 +1449,6 @@ func (_VotingProcess *VotingProcessFilterer) FilterPrivateKeyPublished(opts *bin
 //
 // Solidity: event PrivateKeyPublished(bytes32 indexed processId, string privateKey)
 func (_VotingProcess *VotingProcessFilterer) WatchPrivateKeyPublished(opts *bind.WatchOpts, sink chan<- *VotingProcessPrivateKeyPublished, processId [][32]byte) (event.Subscription, error) {
-
 	var processIdRule []interface{}
 	for _, processIdItem := range processId {
 		processIdRule = append(processIdRule, processIdItem)
@@ -1597,7 +1575,6 @@ type VotingProcessProcessCanceled struct {
 //
 // Solidity: event ProcessCanceled(address indexed entityAddress, bytes32 processId)
 func (_VotingProcess *VotingProcessFilterer) FilterProcessCanceled(opts *bind.FilterOpts, entityAddress []common.Address) (*VotingProcessProcessCanceledIterator, error) {
-
 	var entityAddressRule []interface{}
 	for _, entityAddressItem := range entityAddress {
 		entityAddressRule = append(entityAddressRule, entityAddressItem)
@@ -1614,7 +1591,6 @@ func (_VotingProcess *VotingProcessFilterer) FilterProcessCanceled(opts *bind.Fi
 //
 // Solidity: event ProcessCanceled(address indexed entityAddress, bytes32 processId)
 func (_VotingProcess *VotingProcessFilterer) WatchProcessCanceled(opts *bind.WatchOpts, sink chan<- *VotingProcessProcessCanceled, entityAddress []common.Address) (event.Subscription, error) {
-
 	var entityAddressRule []interface{}
 	for _, entityAddressItem := range entityAddress {
 		entityAddressRule = append(entityAddressRule, entityAddressItem)
@@ -1742,7 +1718,6 @@ type VotingProcessProcessCreated struct {
 //
 // Solidity: event ProcessCreated(address indexed entityAddress, bytes32 processId, string merkleTree)
 func (_VotingProcess *VotingProcessFilterer) FilterProcessCreated(opts *bind.FilterOpts, entityAddress []common.Address) (*VotingProcessProcessCreatedIterator, error) {
-
 	var entityAddressRule []interface{}
 	for _, entityAddressItem := range entityAddress {
 		entityAddressRule = append(entityAddressRule, entityAddressItem)
@@ -1759,7 +1734,6 @@ func (_VotingProcess *VotingProcessFilterer) FilterProcessCreated(opts *bind.Fil
 //
 // Solidity: event ProcessCreated(address indexed entityAddress, bytes32 processId, string merkleTree)
 func (_VotingProcess *VotingProcessFilterer) WatchProcessCreated(opts *bind.WatchOpts, sink chan<- *VotingProcessProcessCreated, entityAddress []common.Address) (event.Subscription, error) {
-
 	var entityAddressRule []interface{}
 	for _, entityAddressItem := range entityAddress {
 		entityAddressRule = append(entityAddressRule, entityAddressItem)
@@ -1886,7 +1860,6 @@ type VotingProcessResultsPublished struct {
 //
 // Solidity: event ResultsPublished(bytes32 indexed processId, string results)
 func (_VotingProcess *VotingProcessFilterer) FilterResultsPublished(opts *bind.FilterOpts, processId [][32]byte) (*VotingProcessResultsPublishedIterator, error) {
-
 	var processIdRule []interface{}
 	for _, processIdItem := range processId {
 		processIdRule = append(processIdRule, processIdItem)
@@ -1903,7 +1876,6 @@ func (_VotingProcess *VotingProcessFilterer) FilterResultsPublished(opts *bind.F
 //
 // Solidity: event ResultsPublished(bytes32 indexed processId, string results)
 func (_VotingProcess *VotingProcessFilterer) WatchResultsPublished(opts *bind.WatchOpts, sink chan<- *VotingProcessResultsPublished, processId [][32]byte) (event.Subscription, error) {
-
 	var processIdRule []interface{}
 	for _, processIdItem := range processId {
 		processIdRule = append(processIdRule, processIdItem)
@@ -2029,7 +2001,6 @@ type VotingProcessValidatorAdded struct {
 //
 // Solidity: event ValidatorAdded(string validatorPublicKey)
 func (_VotingProcess *VotingProcessFilterer) FilterValidatorAdded(opts *bind.FilterOpts) (*VotingProcessValidatorAddedIterator, error) {
-
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "ValidatorAdded")
 	if err != nil {
 		return nil, err
@@ -2041,7 +2012,6 @@ func (_VotingProcess *VotingProcessFilterer) FilterValidatorAdded(opts *bind.Fil
 //
 // Solidity: event ValidatorAdded(string validatorPublicKey)
 func (_VotingProcess *VotingProcessFilterer) WatchValidatorAdded(opts *bind.WatchOpts, sink chan<- *VotingProcessValidatorAdded) (event.Subscription, error) {
-
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "ValidatorAdded")
 	if err != nil {
 		return nil, err
@@ -2162,7 +2132,6 @@ type VotingProcessValidatorRemoved struct {
 //
 // Solidity: event ValidatorRemoved(string validatorPublicKey)
 func (_VotingProcess *VotingProcessFilterer) FilterValidatorRemoved(opts *bind.FilterOpts) (*VotingProcessValidatorRemovedIterator, error) {
-
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "ValidatorRemoved")
 	if err != nil {
 		return nil, err
@@ -2174,7 +2143,6 @@ func (_VotingProcess *VotingProcessFilterer) FilterValidatorRemoved(opts *bind.F
 //
 // Solidity: event ValidatorRemoved(string validatorPublicKey)
 func (_VotingProcess *VotingProcessFilterer) WatchValidatorRemoved(opts *bind.WatchOpts, sink chan<- *VotingProcessValidatorRemoved) (event.Subscription, error) {
-
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "ValidatorRemoved")
 	if err != nil {
 		return nil, err

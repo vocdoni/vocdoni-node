@@ -17,13 +17,13 @@ import (
 
 func newConfig() (config.CensusCfg, error) {
 	var globalCfg config.CensusCfg
-	//setup flags
+	// setup flags
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return globalCfg, err
 	}
 	defaultDirPath := home + "/.dvote/censushttp"
-	//setup flags
+	// setup flags
 	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for censushttp config")
 	flag.String("logLevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
 	flag.Int("port", 8080, "HTTP port to listen")
@@ -37,7 +37,7 @@ func newConfig() (config.CensusCfg, error) {
 	flag.Parse()
 	viper.SetConfigType("yaml")
 	if *path == defaultDirPath+"/config.yaml" {
-		//if path left default, write new cfg file if empty or if file doesn't exist.
+		// if path left default, write new cfg file if empty or if file doesn't exist.
 		if err = viper.SafeWriteConfigAs(*path); err != nil {
 			if os.IsNotExist(err) {
 				err = os.MkdirAll(defaultDirPath, os.ModePerm)
@@ -76,9 +76,9 @@ func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	//setup config
+	// setup config
 	globalCfg, err := newConfig()
-	//setup logger
+	// setup logger
 	log.InitLogger(globalCfg.LogLevel, "stdout")
 	if err != nil {
 		log.Fatalf("Could not load config: %v", err)

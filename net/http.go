@@ -17,16 +17,15 @@ type HTTPHandle struct {
 }
 
 func (h *HTTPHandle) Init(c string) error {
-	//split c to port and path
+	// split c to port and path
 	cs := strings.Split(c, "/")
 	h.port = cs[0]
 	h.path = cs[1]
 	return nil
-
 }
 
-//this should become submitVote handler
-//move initial logic to core router
+// this should become submitVote handler
+// move initial logic to core router
 func parse(rw http.ResponseWriter, request *http.Request) {
 	decoder := json.NewDecoder(request.Body)
 
@@ -43,17 +42,17 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 		log.Panic(err)
 	}
 
-	//check PoW
-	//check key
-	//decrypt
-	//check franchise
-	//construct packet
+	// check PoW
+	// check key
+	// decrypt
+	// check franchise
+	// construct packet
 
-	//this should should be randomized, or actually taken from input
-	//b.PID = "1"
-	//b.Nullifier = []byte{1,2,3}
-	//b.Vote = []byte{4,5,6}
-	//b.Franchise = []byte{7,8,9}
+	// this should should be randomized, or actually taken from input
+	// b.PID = "1"
+	// b.Nullifier = []byte{1,2,3}
+	// b.Vote = []byte{4,5,6}
+	// b.Franchise = []byte{7,8,9}
 
 	err = batch.Add(b)
 	if err != nil {
@@ -69,7 +68,7 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 
 func (h *HTTPHandle) Listen() error {
 	http.HandleFunc(h.path, parse)
-	//add waitgroup
+	// add waitgroup
 	func() {
 		log.Infof("serving on " + h.port + "/" + h.path)
 		err := http.ListenAndServe(":"+h.port, nil)

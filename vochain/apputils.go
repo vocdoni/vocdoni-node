@@ -80,7 +80,7 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 			}
 			pubKey, err := signature.PubKeyFromSignature(string(voteBytes), tx.Signature)
 			if err != nil {
-				//log.Warnf("cannot extract pubKey: %s", err)
+				// log.Warnf("cannot extract pubKey: %s", err)
 				return fmt.Errorf("cannot extract public key from signature (%s)", err)
 			}
 			addr, err := signature.AddrFromPublicKey(string(pubKey))
@@ -97,7 +97,7 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 		default:
 			return fmt.Errorf("invalid process type")
 		}
-		//log.Debugf("adding vote: %+v", vote)
+		// log.Debugf("adding vote: %+v", vote)
 		return state.AddVote(vote)
 	case vochaintypes.AdminTx:
 		switch tx.Type {
@@ -153,7 +153,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 		if err != nil {
 			return fmt.Errorf("cannot marshal vote (%s)", err)
 		}
-		//log.Debugf("executing VoteTxCheck of: %s", voteBytes)
+		// log.Debugf("executing VoteTxCheck of: %s", voteBytes)
 		pubKey, err := signature.PubKeyFromSignature(string(voteBytes), vote.Signature)
 		if err != nil {
 			log.Warnf("cannot extract pubKey: %s", err)

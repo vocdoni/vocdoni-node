@@ -1,4 +1,4 @@
-//Package ipfssync provides a service to synchronize IPFS datasets over a p2p network between two or more nodes
+// Package ipfssync provides a service to synchronize IPFS datasets over a p2p network between two or more nodes
 package ipfssync
 
 import (
@@ -28,7 +28,7 @@ type IPFSsyncMessage struct {
 	PinList  []string `json:"pinList"`
 }
 
-//shity function to workaround NAT problems (hope it's temporary)
+// shity function to workaround NAT problems (hope it's temporary)
 func guessMyAddress(port int, id string) string {
 	ip, err := util.GetPublicIP()
 	if err != nil {
@@ -245,7 +245,7 @@ type IPFSsync struct {
 	lastHash    string
 }
 
-//NewIPFSsync creates a new IPFSsync instance
+// NewIPFSsync creates a new IPFSsync instance
 func NewIPFSsync(dataDir, key string, storage data.Storage) IPFSsync {
 	var is IPFSsync
 	is.DataDir = dataDir
@@ -266,7 +266,7 @@ func (is *IPFSsync) unicastMsg(address string, msg IPFSsyncMessage) error {
 	return err
 }
 
-//Start initializes and start an IPFSsync instance
+// Start initializes and start an IPFSsync instance
 func (is *IPFSsync) Start() {
 	log.Infof("initializing new pin storage")
 	os.RemoveAll(is.DataDir + "/ipfsSync.db")

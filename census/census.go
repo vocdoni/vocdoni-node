@@ -1,4 +1,4 @@
-//Package census provides the census management operation
+// Package census provides the census management operation
 package census
 
 import (
@@ -22,7 +22,7 @@ import (
 )
 
 type CensusNamespaces struct {
-	RootKey    string      `json:"rootKey"` //Public key allowed to created new census
+	RootKey    string      `json:"rootKey"` // Public key allowed to created new census
 	Namespaces []Namespace `json:"namespaces"`
 }
 
@@ -32,10 +32,10 @@ type Namespace struct {
 }
 
 type CensusManager struct {
-	Storage    string                //Root storage data dir
-	AuthWindow int32                 //Time window (seconds) in which TimeStamp will be accepted if auth enabled
-	Census     CensusNamespaces      //Available namespaces
-	Trees      map[string]*tree.Tree //MkTrees map of merkle trees indexed by censusId
+	Storage    string                // Root storage data dir
+	AuthWindow int32                 // Time window (seconds) in which TimeStamp will be accepted if auth enabled
+	Census     CensusNamespaces      // Available namespaces
+	Trees      map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
 	Data       *data.Storage
 }
 
@@ -51,7 +51,7 @@ func (cm *CensusManager) Init(storage, rootKey string) error {
 		log.Info("creating new config file")
 		var cns CensusNamespaces
 		if len(rootKey) < signature.PubKeyLength {
-			//log.Warn("no root key provided or invalid, anyone will be able to create new census")
+			// log.Warn("no root key provided or invalid, anyone will be able to create new census")
 			cns.RootKey = ""
 		} else {
 			cns.RootKey = rootKey
@@ -301,7 +301,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		log.Debugf("prefix allowed for %s", r.CensusID)
 	}
 
-	//Methods without rootHash
+	// Methods without rootHash
 	switch op {
 	case "getRoot":
 		resp.Root = cm.Trees[r.CensusID].GetRoot()
@@ -471,9 +471,9 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		return resp
 	}
 
-	//Methods with rootHash, if rootHash specified snapshot the tree
+	// Methods with rootHash, if rootHash specified snapshot the tree
 	var t *tree.Tree
-	if len(r.RootHash) > 1 { //if rootHash specified
+	if len(r.RootHash) > 1 { // if rootHash specified
 		t, err = cm.Trees[r.CensusID].Snapshot(r.RootHash)
 		if err != nil {
 			log.Warnf("snapshot error: %s", err)
@@ -482,7 +482,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			resp.Error = "invalid root hash"
 			return resp
 		}
-	} else { //if rootHash not specified use current tree
+	} else { // if rootHash not specified use current tree
 		t = cm.Trees[r.CensusID]
 	}
 
@@ -520,7 +520,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			resp.Error = "invalid authentication"
 			return resp
 		}
-		//dump the claim data and return it
+		// dump the claim data and return it
 		var dumpValues []string
 		root := r.RootHash
 		if len(root) < 1 {
@@ -536,7 +536,6 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			*ok = false
 			resp.Ok = ok
 		} else {
-
 			resp.ClaimsData = dumpValues
 		}
 		return resp

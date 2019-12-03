@@ -1,6 +1,6 @@
 package config
 
-//GWCfg stores global configs for gateway
+// GWCfg stores global configs for gateway
 type GWCfg struct {
 	W3      W3Cfg
 	Vochain VochainCfg
@@ -48,7 +48,7 @@ type EthereumClient struct {
 	SigningKey   string
 }
 
-//PssCfg stores global configs for Pss chat
+// PssCfg stores global configs for Pss chat
 type PssCfg struct {
 	Encryption string
 	Key        string
@@ -69,7 +69,7 @@ type PssMetaCfg struct {
 	ListenPort int16
 }
 
-//W3Cfg stores global configs for web3
+// W3Cfg stores global configs for web3
 type W3Cfg struct {
 	Enabled   bool
 	ChainType string
@@ -84,7 +84,7 @@ type W3Cfg struct {
 	DataDir   string
 }
 
-//CensusCfg stores global configs for censushttp
+// CensusCfg stores global configs for censushttp
 type CensusCfg struct {
 	LogLevel  string
 	Port      int
@@ -94,7 +94,7 @@ type CensusCfg struct {
 	RootKey   string
 }
 
-//RelayCfg stores global configs for relay
+// RelayCfg stores global configs for relay
 type RelayCfg struct {
 	LogLevel          string
 	TransportIDString string

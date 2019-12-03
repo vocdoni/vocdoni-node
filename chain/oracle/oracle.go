@@ -31,7 +31,7 @@ import (
 type Oracle struct {
 	// voting process contract address
 	contractAddress common.Address
-	//voting process contract abi
+	// voting process contract abi
 	contractABI abi.ABI
 	// ethereum connection
 	ethereumConnection *chain.EthChainContext
@@ -93,27 +93,37 @@ func NewOracle(ethCon *chain.EthChainContext, vochainApp *app.BaseApplication, c
 	}, nil
 }
 
-type eventGenesisChanged string
-type eventChainIDChanged *big.Int
-type eventProcessCreated struct {
-	EntityAddress [20]byte
-	ProcessId     [32]byte
-	MerkleTree    string
-}
+type (
+	eventGenesisChanged string
+	eventChainIDChanged *big.Int
+	eventProcessCreated struct {
+		EntityAddress [20]byte
+		ProcessId     [32]byte
+		MerkleTree    string
+	}
+)
+
 type eventProcessCanceled struct {
 	EntityAddress [20]byte
 	ProcessId     [32]byte
 }
-type validatorAdded string
-type validatorRemoved string
-type oracleAdded struct {
-	OraclePublicKey string
-}
-type oracleRemoved string
-type privateKeyPublished struct {
-	ProcessId  [32]byte
-	PrivateKey string
-}
+
+type (
+	validatorAdded   string
+	validatorRemoved string
+	oracleAdded      struct {
+		OraclePublicKey string
+	}
+)
+
+type (
+	oracleRemoved       string
+	privateKeyPublished struct {
+		ProcessId  [32]byte
+		PrivateKey string
+	}
+)
+
 type resultsPublished struct {
 	ProcessId [32]byte
 	Results   string
@@ -192,7 +202,7 @@ func (o *Oracle) EthereumBlockListener() BlockInfo {
 // defined smart contract via websocket. Blocking function (use go routine)
 func (o *Oracle) SubscribeEthereumEventLogs() {
 	// create ws client
-	//client, err := ethclient.Dial(o.ethereumConnection.Node.WSEndpoint())
+	// client, err := ethclient.Dial(o.ethereumConnection.Node.WSEndpoint())
 	client, err := ethclient.Dial("ws://127.0.0.1:9092")
 	if err != nil {
 		log.Fatal(err)
@@ -305,7 +315,7 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 		*/
 		//return nil
 	case HashLogChainIDChanged.Hex():
-		//return nil
+		// return nil
 	case HashLogProcessCreated.Hex():
 		log.Debug("new log: processCreated")
 		var eventProcessCreated eventProcessCreated
@@ -355,13 +365,13 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 		}
 
 	case HashLogProcessCanceled.Hex():
-		//stub
-		//return nil
+		// stub
+		// return nil
 	case HashLogValidatorAdded.Hex():
-		//stub
-		//return nil
+		// stub
+		// return nil
 	case HashLogValidatorRemoved.Hex():
-		//stub
+		// stub
 		return nil
 	case HashLogOracleAdded.Hex():
 		log.Debug("new log event: AddOracle")
@@ -372,17 +382,17 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 			return err
 		}
 		log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
-		//stub
+		// stub
 		return nil
 	case HashLogOracleRemoved.Hex():
-		//stub
-		//return nil
+		// stub
+		// return nil
 	case HashLogPrivateKeyPublished.Hex():
-		//stub
-		//return nil
+		// stub
+		// return nil
 	case HashLogResultsPublished.Hex():
-		//stub
-		//return nil
+		// stub
+		// return nil
 	}
 	return nil
 }
@@ -424,7 +434,7 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 		*/
 		//return nil
 	case HashLogChainIDChanged.Hex():
-		//return nil
+		// return nil
 	case HashLogProcessCreated.Hex():
 		log.Debug("new log: processCreated")
 		var eventProcessCreated eventProcessCreated
@@ -432,7 +442,7 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		//log.Debugf("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
+		// log.Debugf("PROCESS EVENT, PROCESSID STRING: %v", hex.EncodeToString(eventProcessCreated.ProcessId[:]))
 
 		var topics [4]string
 		for i := range event.Topics {
@@ -476,7 +486,7 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 		if err != nil {
 			log.Warnf("cannot get process given the index: %v", err)
 		}
-		//log.Fatalf("PROCESS LOADED: %v", processInfo)
+		// log.Fatalf("PROCESS LOADED: %v", processInfo)
 		_, err = o.processHandle.GetOracles()
 		if err != nil {
 			log.Errorf("error getting oracles: %s", err)
@@ -488,13 +498,13 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 		}
 
 	case HashLogProcessCanceled.Hex():
-		//stub
-		//return nil
+		// stub
+		// return nil
 	case HashLogValidatorAdded.Hex():
-		//stub
-		//return nil
+		// stub
+		// return nil
 	case HashLogValidatorRemoved.Hex():
-		//stub
+		// stub
 		return nil
 	case HashLogOracleAdded.Hex():
 		log.Debug("new log event: AddOracle")
@@ -505,17 +515,17 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 			return err
 		}
 		log.Debugf("AddOracleEvent: %v", eventAddOracle.OraclePublicKey)
-		//stub
+		// stub
 		return nil
 	case HashLogOracleRemoved.Hex():
-		//stub
-		//return nil
+		// stub
+		// return nil
 	case HashLogPrivateKeyPublished.Hex():
-		//stub
-		//return nil
+		// stub
+		// return nil
 	case HashLogResultsPublished.Hex():
-		//stub
-		//return nil
+		// stub
+		// return nil
 	}
 	return nil
 }

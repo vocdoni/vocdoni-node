@@ -1,4 +1,4 @@
-//Package chain provides the functions to interact with the Ethereum-like control blockchain
+// Package chain provides the functions to interact with the Ethereum-like control blockchain
 package chain
 
 import (
@@ -32,6 +32,7 @@ type EthChainContext struct {
 	DefaultConfig *EthChainConfig
 	ProcessHandle *ProcessHandle
 }
+
 type EthChainConfig struct {
 	WSHost         string
 	WSPort         int
@@ -141,7 +142,7 @@ func (e *EthChainContext) Start() {
 	if len(e.Keys.Accounts()) < 1 {
 		e.createAccount()
 	} else {
-		//phrase := getPassPhrase("please provide primary account passphrase", false)
+		// phrase := getPassPhrase("please provide primary account passphrase", false)
 		e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
 		log.Infof("my Ethereum address %x\n", e.Keys.Accounts()[0].Address)
 	}
@@ -169,7 +170,6 @@ func (e *EthChainContext) TestTx(amount int) error {
 
 // might be worthwhile to create generic SendTx to call contracttx, deploytx, etc
 func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
-
 	client, err := ethclient.Dial(e.Node.IPCEndpoint())
 	deadline := time.Now().Add(1000 * time.Millisecond)
 	ctx, cancel := context.WithDeadline(context.TODO(), deadline)
@@ -182,7 +182,7 @@ func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
 	if err != nil {
 		return err
 	}
-	//create tx
+	// create tx
 	price, _ := client.SuggestGasPrice(ctx)
 	log.Infof("Price: $v", price)
 	var empty []byte
@@ -191,17 +191,16 @@ func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
 	if err != nil {
 		return err
 	}
-	//create ctx
+	// create ctx
 	err = client.SendTransaction(ctx, signedTx)
 	log.Error(err)
-	//fix return*/
+	// fix return*/
 	return err
 }
 
 func (e *EthChainContext) createAccount() error {
-	//phrase := getPassPhrase("Your new account will be locked with a passphrase. Please give a passphrase. Do not forget it!.", true)
+	// phrase := getPassPhrase("Your new account will be locked with a passphrase. Please give a passphrase. Do not forget it!.", true)
 	_, err := e.Keys.NewAccount("")
-
 	if err != nil {
 		utils.Fatalf("failed to create account: %v", err)
 	}

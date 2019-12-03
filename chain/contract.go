@@ -13,8 +13,8 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-//These methods represent an exportable abstraction over raw contract bindings
-//Use these methods, rather than those present in the contracts folder
+// These methods represent an exportable abstraction over raw contract bindings
+// Use these methods, rather than those present in the contracts folder
 type ProcessHandle struct {
 	VotingProcess *votingProcess.VotingProcess
 	storage       *data.Storage
@@ -89,7 +89,7 @@ func (ph *ProcessHandle) GetProcessMetadata(pid [32]byte) (*ProcessMetadata, err
 	if err != nil {
 		return processInfoStructured, err
 	}
-	//json.Unmarshal(processInfo, &processInfoStructured)
+	// json.Unmarshal(processInfo, &processInfoStructured)
 	log.Info("Structured Info: %s", processInfo)
 	log.Info("Merkle tree: %s", censusTree)
 	return processInfoStructured, nil

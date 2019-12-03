@@ -46,7 +46,7 @@ import (
 func newConfig() (config.OracleCfg, error) {
 	var cfg config.OracleCfg
 
-	//setup flags
+	// setup flags
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return cfg, err

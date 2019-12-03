@@ -234,12 +234,12 @@ func (v *VochainState) GetEnvelope(voteID string) (*vochaintypes.Vote, error) {
 	if len(voteBytes) == 0 {
 		return nil, fmt.Errorf("vote with id (%s) does not exists", voteID)
 	}
-	//log.Debugf("get envelope votebytes: %b", voteBytes)
+	// log.Debugf("get envelope votebytes: %b", voteBytes)
 	err := v.Codec.UnmarshalBinaryBare(voteBytes, &vote)
 	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal vote with id (%s)", voteID)
 	}
-	//log.Debugf("get envelope value: %+v", vote)
+	// log.Debugf("get envelope value: %+v", vote)
 	return vote, nil
 }
 

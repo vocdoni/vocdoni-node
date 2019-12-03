@@ -10,7 +10,7 @@ import (
 	externalip "gitlab.com/vocdoni/go-external-ip"
 )
 
-//GetPublicIP returns the external/public IP of the host
+// GetPublicIP returns the external/public IP of the host
 // For now, let's only support IPv4. Hope we can change this in the future...
 func GetPublicIP() (net.IP, error) {
 	consensus := externalip.DefaultConsensus(nil, nil)
@@ -45,7 +45,8 @@ func ResolveCustom(nameserver string, host string) string {
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{}
 			return d.DialContext(ctx, "udp", net.JoinHostPort(nameserver, "53"))
-		}}
+		},
+	}
 	ips, err := resolver.LookupIPAddr(context.Background(), host)
 	if err != nil {
 		return ""

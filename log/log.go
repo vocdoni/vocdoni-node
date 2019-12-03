@@ -9,7 +9,7 @@ import (
 
 var log *zap.SugaredLogger
 
-//InitLogger initializes the logger. Output can be either "stdout/stderr/filePath"
+// InitLogger initializes the logger. Output can be either "stdout/stderr/filePath"
 func InitLogger(logLevel string, output string) {
 	cfg := newConfig(logLevel, output)
 
@@ -45,7 +45,7 @@ func levelFromString(logLevel string) zapcore.Level {
 }
 
 func newConfig(logLevel, output string) zap.Config {
-	var encoderCfg = zapcore.EncoderConfig{
+	encoderCfg := zapcore.EncoderConfig{
 		// Keys can be anything except the empty string.
 		TimeKey:  "ts",
 		LevelKey: "level",
@@ -61,7 +61,7 @@ func newConfig(logLevel, output string) zap.Config {
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
-	var cfg = zap.Config{
+	cfg := zap.Config{
 		Level:       zap.NewAtomicLevelAt(levelFromString(logLevel)),
 		Development: false,
 		Encoding:    "console",
@@ -76,107 +76,107 @@ func newConfig(logLevel, output string) zap.Config {
 	return cfg
 }
 
-//Debug sends a debug level log message
+// Debug sends a debug level log message
 func Debug(args ...interface{}) {
 	log.Debug(args...)
 }
 
-//Info sends an info level log message
+// Info sends an info level log message
 func Info(args ...interface{}) {
 	log.Info(args...)
 }
 
-//Warn sends a warn level log message
+// Warn sends a warn level log message
 func Warn(args ...interface{}) {
 	log.Warn(args...)
 }
 
-//Error sends an error level log message
+// Error sends an error level log message
 func Error(args ...interface{}) {
 	log.Error(args...)
 }
 
-//DPanic sends a dpanic level log message
+// DPanic sends a dpanic level log message
 func DPanic(args ...interface{}) {
 	log.DPanic(args...)
 }
 
-//Panic sends a panic level log message
+// Panic sends a panic level log message
 func Panic(args ...interface{}) {
 	log.Panic(args...)
 }
 
-//Fatal sends a fatal level log message
+// Fatal sends a fatal level log message
 func Fatal(args ...interface{}) {
 	log.Fatal(args...)
 }
 
-//Debugf sends a formatted debug level log message
+// Debugf sends a formatted debug level log message
 func Debugf(template string, args ...interface{}) {
 	log.Debugf(template, args...)
 }
 
-//Infof sends a formatted info level log message
+// Infof sends a formatted info level log message
 func Infof(template string, args ...interface{}) {
 	log.Infof(template, args...)
 }
 
-//Warnf sends a formatted warn level log message
+// Warnf sends a formatted warn level log message
 func Warnf(template string, args ...interface{}) {
 	log.Warnf(template, args...)
 }
 
-//Errorf sends a formatted error level log message
+// Errorf sends a formatted error level log message
 func Errorf(template string, args ...interface{}) {
 	log.Errorf(template, args...)
 }
 
-//DPanicf sends a formatted dpanic level log message
+// DPanicf sends a formatted dpanic level log message
 func DPanicf(template string, args ...interface{}) {
 	log.DPanicf(template, args...)
 }
 
-//Panicf sends a formatted panic level log message
+// Panicf sends a formatted panic level log message
 func Panicf(template string, args ...interface{}) {
 	log.Panicf(template, args...)
 }
 
-//Fatalf sends a formatted fatal level log message
+// Fatalf sends a formatted fatal level log message
 func Fatalf(template string, args ...interface{}) {
 	log.Fatalf(template, args...)
 }
 
-//Debugw sends a key-value formatted debug level log message
+// Debugw sends a key-value formatted debug level log message
 func Debugw(msg string, keysAndValues ...interface{}) {
 	log.Debugw(msg, keysAndValues...)
 }
 
-//Infow sends a key-value formatted info level log message
+// Infow sends a key-value formatted info level log message
 func Infow(msg string, keysAndValues ...interface{}) {
 	log.Infow(msg, keysAndValues...)
 }
 
-//Warnw sends a key-value formatted warn level log message
+// Warnw sends a key-value formatted warn level log message
 func Warnw(msg string, keysAndValues ...interface{}) {
 	log.Warnw(msg, keysAndValues...)
 }
 
-//Errorw sends a key-value formatted error level log message
+// Errorw sends a key-value formatted error level log message
 func Errorw(msg string, keysAndValues ...interface{}) {
 	log.Errorw(msg, keysAndValues...)
 }
 
-//DPanicw sends a key-value formatted dpanic level log message
+// DPanicw sends a key-value formatted dpanic level log message
 func DPanicw(msg string, keysAndValues ...interface{}) {
 	log.DPanicw(msg, keysAndValues...)
 }
 
-//Panicw sends a key-value formatted panic level log message
+// Panicw sends a key-value formatted panic level log message
 func Panicw(msg string, keysAndValues ...interface{}) {
 	log.Panicw(msg, keysAndValues...)
 }
 
-//Fatalw sends a key-value formatted fatal level log message
+// Fatalw sends a key-value formatted fatal level log message
 func Fatalw(msg string, keysAndValues ...interface{}) {
 	log.Fatalw(msg, keysAndValues...)
 }

@@ -137,7 +137,6 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 		req.Header.Set("User-Agent", reader.Header.Get("User-Agent"))
 
 		resp, err := http.DefaultClient.Do(req)
-
 		if err != nil {
 			log.Warnf("request failed: %s", err)
 		}
