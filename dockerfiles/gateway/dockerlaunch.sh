@@ -2,6 +2,9 @@
 
 # INFO
 IMAGE_TAG="vocdoni/gateway"
+API_PORT="${API_PORT:-9090}"
+IN_MEMORY="${IN_MEMORY:-false}"
+
 echo "Using image '$IMAGE_TAG:latest'\n"
 
 docker build -t $IMAGE_TAG -f dockerfile.gateway . || {
@@ -26,9 +29,11 @@ ENVFILE=""
 
 [ ! -d run ] && mkdir run
 
+[ "$IN_MEMORY" == "true" ] && EXTRA_OPTS="$EXTRA_OPTS --volume-driver memfs"
+
 # RUN DOCKER
 docker run --name `echo $IMAGE_TAG-$RANDOM | tr "/" "-"` -d \
-	-p 4001:4001 -p 5001:5001 -p 443:9090 -p 30303:30303 -p 9096:9096 \
-	-v $PWD/run:/app/run \
+	-p 4001:4001 -p 5001:5001 -p $PORT:9090 -p 30303:30303 -p 9096:9096 \
+	-v $PWD/run:/app/run $EXTRA_OPTS \
 	`[ -n "$ENVFILE" ] && echo -n "--env-file $ENVFILE"` \
 	$IMAGE_TAG
