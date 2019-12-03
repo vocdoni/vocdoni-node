@@ -54,12 +54,12 @@ type MetaResponse struct {
 	Content       string   `json:"content,omitempty"`
 	Error         string   `json:"error,omitempty"`
 	Files         []byte   `json:"files,omitempty"`
-	Height        int64    `json:"height,omitempty"`
+	Height        *int64   `json:"height,omitempty"`
 	InvalidClaims []int    `json:"invalidClaims,omitempty"`
 	Message       string   `json:"message,omitempty"`
 	Nullifier     string   `json:"nullifier,omitempty"`
 	Nullifiers    []string `json:"nullifiers,omitempty"`
-	Ok            bool     `json:"ok,omitempty"`
+	Ok            *bool    `json:"ok,omitempty"`
 	Payload       string   `json:"payload,omitempty"`
 	Registered    string   `json:"registered,omitempty"`
 	Request       string   `json:"request"`

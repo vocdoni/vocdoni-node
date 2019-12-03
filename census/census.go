@@ -251,7 +251,9 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 
 	// Process data
 	log.Infof("processing data %+v", *r)
-	resp.Ok = true
+	ok := new(bool)
+	*ok = true
+	resp.Ok = ok
 	resp.Error = ""
 	resp.Timestamp = int32(time.Now().Unix())
 
@@ -260,14 +262,16 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			err = cm.AddNamespace(censusPrefix+r.CensusID, r.PubKeys)
 			if err != nil {
 				log.Warnf("error creating census: %s", err)
-				resp.Ok = false
+				*ok = false
+				resp.Ok = ok
 				resp.Error = err.Error()
 			} else {
 				log.Infof("census %s%s created successfully managed by %s", censusPrefix, r.CensusID, r.PubKeys)
 				resp.CensusID = censusPrefix + r.CensusID
 			}
 		} else {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "invalid authentication"
 		}
 		return resp
@@ -281,7 +285,8 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 	}
 	if !censusFound {
-		resp.Ok = false
+		*ok = false
+		resp.Ok = ok
 		resp.Error = "censusId not valid or not found"
 		return resp
 	}
@@ -324,7 +329,8 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			}
 			log.Infof("%d claims addedd successfully", addedClaims)
 		} else {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "invalid authentication"
 		}
 		return resp
@@ -334,19 +340,22 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			data, err := base64.StdEncoding.DecodeString(r.ClaimData)
 			if err != nil {
 				log.Warnf("error decoding base64 string: %s", err)
-				resp.Ok = false
+				*ok = false
+				resp.Ok = ok
 				resp.Error = err.Error()
 			}
 			err = cm.Trees[r.CensusID].AddClaim(data)
 			if err != nil {
 				log.Warnf("error adding claim: %s", err)
-				resp.Ok = false
+				*ok = false
+				resp.Ok = ok
 				resp.Error = err.Error()
 			} else {
 				log.Debugf("claim added %x", data)
 			}
 		} else {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "invalid authentication"
 		}
 		return resp
@@ -357,14 +366,16 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 				err = cm.Trees[r.CensusID].ImportDump(r.ClaimsData)
 				if err != nil {
 					log.Warnf("error importing dump: %s", err)
-					resp.Ok = false
+					*ok = false
+					resp.Ok = ok
 					resp.Error = err.Error()
 				} else {
 					log.Infof("dump imported successfully, %d claims", len(r.ClaimsData))
 				}
 			}
 		} else {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "invalid authentication"
 		}
 		return resp
@@ -372,12 +383,14 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 	case "importRemote":
 		// To-Do implement Gzip compression
 		if !isAuth || !validAuthPrefix {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "invalid authentication"
 			return resp
 		}
 		if cm.Data == nil {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "not supported"
 			return resp
 		}
@@ -385,7 +398,8 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		if !strings.HasPrefix(r.URI, dataStorage.GetURIprefix()) ||
 			len(r.URI) <= len(dataStorage.GetURIprefix()) {
 			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, dataStorage.GetURIprefix())
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "URI not supported"
 			return resp
 		}
@@ -393,7 +407,8 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		censusRaw, err := dataStorage.Retrieve(r.URI[len(dataStorage.GetURIprefix()):])
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "cannot retrieve census"
 			return resp
 		}
@@ -401,7 +416,8 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		err = json.Unmarshal(censusRaw, &dump)
 		if err != nil {
 			log.Warnf("retrieved census do not have a correct format: %s", err)
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "retrieved census do not have a correct format"
 			return resp
 		}
@@ -410,21 +426,24 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			err = cm.Trees[r.CensusID].ImportDump(dump.ClaimsData)
 			if err != nil {
 				log.Warnf("error importing dump: %s", err)
-				resp.Ok = false
+				*ok = false
+				resp.Ok = ok
 				resp.Error = "error importing census"
 			} else {
 				log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
 			}
 		} else {
 			log.Warnf("no claims found on the retreived census")
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "no claims found"
 		}
 		return resp
 
 	case "checkProof":
 		if len(r.Payload.Proof) < 1 {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "proofData not provided"
 			return resp
 		}
@@ -436,13 +455,15 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
 		if err != nil {
 			log.Warnf("error decoding base64 string: %s", err)
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = err.Error()
 			return resp
 		}
 		validProof, err := tree.CheckProof(root, r.Payload.Proof, data)
 		if err != nil {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = err.Error()
 			return resp
 		}
@@ -456,7 +477,8 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		t, err = cm.Trees[r.CensusID].Snapshot(r.RootHash)
 		if err != nil {
 			log.Warnf("snapshot error: %s", err)
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "invalid root hash"
 			return resp
 		}
@@ -469,13 +491,15 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
 		if err != nil {
 			log.Warnf("error decoding base64 string: %s", err)
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = err.Error()
 			return resp
 		}
 		resp.Siblings, err = t.GenProof(data)
 		if err != nil {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = err.Error()
 		}
 		return resp
@@ -483,14 +507,16 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 	case "getSize":
 		resp.Size, err = t.Size(t.GetRoot())
 		if err != nil {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = err.Error()
 		}
 		return resp
 
 	case "dump", "dumpPlain":
 		if !isAuth || !validAuthPrefix {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "invalid authentication"
 			return resp
 		}
@@ -507,7 +533,8 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		if err != nil {
 			resp.Error = err.Error()
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 		} else {
 
 			resp.ClaimsData = dumpValues
@@ -517,12 +544,14 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 	case "publish":
 		// To-Do implement Gzip compression
 		if !isAuth || !validAuthPrefix {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "invalid authentication"
 			return resp
 		}
 		if cm.Data == nil {
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			resp.Error = "not supported"
 			return resp
 		}
@@ -531,14 +560,16 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		dump.ClaimsData, err = t.Dump(t.GetRoot())
 		if err != nil {
 			resp.Error = err.Error()
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			log.Warnf("cannot dump census with root %s: %s", t.GetRoot(), err)
 			return resp
 		}
 		dumpBytes, err := json.Marshal(dump)
 		if err != nil {
 			resp.Error = err.Error()
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			log.Warnf("cannot marshal census dump: %s", err)
 			return resp
 		}
@@ -546,7 +577,8 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		cid, err := dataStorage.Publish(dumpBytes)
 		if err != nil {
 			resp.Error = err.Error()
-			resp.Ok = false
+			*ok = false
+			resp.Ok = ok
 			log.Warnf("cannot publish census dump: %s", err)
 			return resp
 		}

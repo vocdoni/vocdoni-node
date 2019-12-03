@@ -68,7 +68,6 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 			vote.ProcessID = sanitizeHex(tx.ProcessID)
 			vote.VotePackage = sanitizeHex(tx.VotePackage)
 			vote.Proof = sanitizeHex(tx.Proof)
-
 		case "poll-vote", "petition-sign":
 			vote.Nonce = tx.Nonce
 			vote.ProcessID = tx.ProcessID
@@ -138,6 +137,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 		voteID := fmt.Sprintf("%s_%s", signature.SanitizeHex(vote.ProcessID), signature.SanitizeHex(vote.Nullifier))
 		v, _ := state.GetEnvelope(voteID)
 		if v != nil {
+			log.Debugf("vote already exists")
 			return fmt.Errorf("vote already exists")
 		}
 		// TODO check snark
@@ -171,6 +171,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 		voteID := fmt.Sprintf("%s_%s", sanitizeHex(vote.ProcessID), sanitizeHex(voteTmp.Nullifier))
 		v, _ := state.GetEnvelope(voteID)
 		if v != nil {
+			//log.Debugf("vote already exists")
 			return fmt.Errorf("vote already exists")
 		}
 		// UNCOMMENT FOR POSEIDON HASH

@@ -20,7 +20,7 @@ func censusLocal(request routerRequest, router *Router) {
 		return
 	}
 	cresponse := router.census.Handler(&request.structured, auth, "0x"+addr+"/")
-	if !cresponse.Ok {
+	if !*cresponse.Ok {
 		sendError(router.transport, router.signer, request.context, request.id, cresponse.Error)
 		return
 	}

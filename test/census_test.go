@@ -125,7 +125,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "addCensus"
 	req.CensusID = "test"
 	resp := sendCensusReq(t, c, req, signer2)
-	if !resp.Ok {
+	if !*resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 	censusID := resp.CensusID
@@ -135,7 +135,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
 	resp = sendCensusReq(t, c, req, signer2)
-	if !resp.Ok {
+	if !*resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
@@ -144,7 +144,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello2"))
 	resp = sendCensusReq(t, c, req, signer1)
-	if resp.Ok {
+	if resp.Ok != nil && *resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
@@ -153,7 +153,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "genProof"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
 	resp = sendCensusReq(t, c, req, nil)
-	if !resp.Ok {
+	if !*resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
@@ -184,7 +184,7 @@ func TestCensus(t *testing.T) {
 	}
 	req.ClaimsData = claims
 	resp = sendCensusReq(t, c, req, signer2)
-	if !resp.Ok {
+	if !*resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
@@ -193,7 +193,7 @@ func TestCensus(t *testing.T) {
 	req.ClaimData = ""
 	req.ClaimsData = []string{}
 	resp = sendCensusReq(t, c, req, signer2)
-	if !resp.Ok {
+	if !*resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
@@ -220,7 +220,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "checkProof"
 	req.RootHash = root
 	resp = sendCensusReq(t, c, req, nil)
-	if !resp.Ok {
+	if !*resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 	if resp.ValidProof {
@@ -232,7 +232,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "publish"
 	req.ClaimsData = []string{}
 	resp = sendCensusReq(t, c, req, signer2)
-	if !resp.Ok {
+	if !*resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 	uri := resp.URI
@@ -249,7 +249,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "getRoot"
 	req.CensusID = root
 	resp = sendCensusReq(t, c, req, nil)
-	if !resp.Ok {
+	if !*resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 	if root != resp.Root {
@@ -260,7 +260,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "addCensus"
 	req.CensusID = "importTest"
 	resp = sendCensusReq(t, c, req, signer2)
-	if !resp.Ok {
+	if !*resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
@@ -269,7 +269,7 @@ func TestCensus(t *testing.T) {
 	req.CensusID = resp.CensusID
 	req.URI = uri
 	resp = sendCensusReq(t, c, req, signer2)
-	if !resp.Ok {
+	if !*resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
