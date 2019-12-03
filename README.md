@@ -17,12 +17,14 @@ Gateways provide an entry point to the P2P networks.
 
 They allow clients to reach decentralized services (census, relays, blockchain, etc.) through a HTTP/WebSockets API interface.
 
+Find more documentation [here](https://vocdoni.io/docs/#/architecture/components/gateway)
+
 #### Status
 
 - [x] Unified WebSockets JSON API
 - [x] Ethereum blockchain(s) support
 - [x] Letsencrypt SSL support
-- [ ] Swarm PSS integration
+- [x] Swarm PSS integration
 - [x] Nice logs
 - [x] Docker support
 - [x] ECDSA signature integration
@@ -32,7 +34,7 @@ They allow clients to reach decentralized services (census, relays, blockchain, 
 - [x] IPFS cluster support
 - [ ] Linkable Ring Signature integration
 - [ ] ZK-snark integration
-- [ ] Tendermint/Vochain implementation
+- [x] Tendermint/Vochain implementation
 
 #### Compile and run
 
@@ -49,7 +51,7 @@ go build cmd/gatewat/gateway.go
 Or with docker (configuration options in file `dockerfiles/gateway/env`):
 
 ```
-bash dockerfiles/gateway/dockerlaunch.sh
+IN_MEMORY=true dockerfiles/gateway/dockerlaunch.sh
 ```
 
 All data will be stored in the shared directory `run/`.
