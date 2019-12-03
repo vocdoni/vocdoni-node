@@ -162,7 +162,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 		*ok = true
 		apiResponse.Response.Ok = ok
 	}
-	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, apiResponse.Response.Height)
+	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Height)
 	if err != nil {
 		log.Errorf("cannot unmarshal height: %s", err)
 	}
@@ -201,7 +201,7 @@ func getBlockHeight(request routerRequest, router *Router) {
 		*ok = true
 		apiResponse.Response.Ok = ok
 	}
-	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, apiResponse.Response.Height)
+	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Response.Height)
 	log.Debugf("Response height is: %d", *apiResponse.Response.Height)
 	if err != nil {
 		log.Errorf("cannot unmarshal height: %s", err)
