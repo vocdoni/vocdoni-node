@@ -1,3 +1,4 @@
+//Package router provides the routing and entry point for the go-dvote API
 package router
 
 import (

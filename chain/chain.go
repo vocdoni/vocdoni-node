@@ -1,3 +1,4 @@
+//Package chain provides the functions to interact with the Ethereum-like control blockchain
 package chain
 
 import (

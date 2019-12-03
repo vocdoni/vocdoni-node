@@ -1,3 +1,4 @@
+//Package tree provides the functions for creating and managing an iden3 merkletree
 package tree
 
 import (

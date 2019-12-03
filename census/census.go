@@ -1,3 +1,4 @@
+//Package census provides the census management operation
 package census
 
 import (

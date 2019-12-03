@@ -1,3 +1,4 @@
+//Package signature provides the cryptographic operations used in go-dvote
 package signature
 
 import (

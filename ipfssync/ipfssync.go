@@ -1,3 +1,4 @@
+//Package ipfssync provides a service to synchronize IPFS datasets over a p2p network between two or more nodes
 package ipfssync
 
 import (

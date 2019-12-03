@@ -1,3 +1,4 @@
+//Package vochain provides all the functions for creating and managing a vocdoni voting blockchain
 package vochain
 
 import (

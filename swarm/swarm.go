@@ -1,3 +1,4 @@
+//Package swarm provides an easy-to-use abstraction layer for using the basic operations of ethersphere/swarm
 package swarm
 
 import (
