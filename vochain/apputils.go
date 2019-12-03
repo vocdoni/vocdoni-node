@@ -165,7 +165,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 		}
 		// assign a nullifier
 		voteTmp.Nullifier = GenerateNullifier(addr, vote.ProcessID)
-
+		log.Debugf("generated nullifier: %s", voteTmp.Nullifier)
 		// check if vote exists
 		voteID := fmt.Sprintf("%s_%s", sanitizeHex(vote.ProcessID), sanitizeHex(voteTmp.Nullifier))
 		v, _ := state.GetEnvelope(voteID)
