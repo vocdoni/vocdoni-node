@@ -36,7 +36,7 @@ type CensusManager struct {
 	AuthWindow int32                 // Time window (seconds) in which TimeStamp will be accepted if auth enabled
 	Census     CensusNamespaces      // Available namespaces
 	Trees      map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
-	Data       *data.Storage
+	Data       data.Storage
 }
 
 // Init creates a new census manager
@@ -394,17 +394,16 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			resp.Error = "not supported"
 			return resp
 		}
-		dataStorage := *cm.Data
-		if !strings.HasPrefix(r.URI, dataStorage.GetURIprefix()) ||
-			len(r.URI) <= len(dataStorage.GetURIprefix()) {
-			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, dataStorage.GetURIprefix())
+		if !strings.HasPrefix(r.URI, cm.Data.GetURIprefix()) ||
+			len(r.URI) <= len(cm.Data.GetURIprefix()) {
+			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, cm.Data.GetURIprefix())
 			*ok = false
 			resp.Ok = ok
 			resp.Error = "URI not supported"
 			return resp
 		}
 		log.Infof("retrieving remote census %s", r.CensusURI)
-		censusRaw, err := dataStorage.Retrieve(r.URI[len(dataStorage.GetURIprefix()):])
+		censusRaw, err := cm.Data.Retrieve(r.URI[len(cm.Data.GetURIprefix()):])
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
 			*ok = false
@@ -572,8 +571,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			log.Warnf("cannot marshal census dump: %s", err)
 			return resp
 		}
-		dataStorage := *cm.Data
-		cid, err := dataStorage.Publish(dumpBytes)
+		cid, err := cm.Data.Publish(dumpBytes)
 		if err != nil {
 			resp.Error = err.Error()
 			*ok = false
@@ -581,7 +579,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			log.Warnf("cannot publish census dump: %s", err)
 			return resp
 		}
-		resp.URI = dataStorage.GetURIprefix() + cid
+		resp.URI = cm.Data.GetURIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
 		resp.Root = t.GetRoot()
 
