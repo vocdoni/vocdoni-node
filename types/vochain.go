@@ -1,9 +1,5 @@
 package types
 
-import (
-	"fmt"
-)
-
 // ________________________ STATE ________________________
 // Defined in ../../db/iavl.go for convenience
 
@@ -55,6 +51,8 @@ func NewProcess() *Process {
 	return &Process{}
 }
 
+//go:generate stringer -type CurrentProcessState
+
 // CurrentProcessState represents the current phase of process state
 type CurrentProcessState int8
 
@@ -70,29 +68,6 @@ const (
 	// Canceled process is canceled and/or invalid
 	Canceled
 )
-
-// String returns the CurrentProcessState as string
-func (c *CurrentProcessState) String() string {
-	switch *c {
-	// scheduled
-	case 0:
-		return fmt.Sprint("scheduled")
-	// active
-	case 1:
-		return fmt.Sprintf("active")
-	// paused
-	case 2:
-		return fmt.Sprintf("paused")
-	// finished
-	case 3:
-		return fmt.Sprintf("finished")
-	// canceled
-	case 4:
-		return fmt.Sprintf("canceled")
-	default:
-		return ""
-	}
-}
 
 // ________________________ TX ________________________
 
