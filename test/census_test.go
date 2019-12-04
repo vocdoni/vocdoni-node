@@ -55,10 +55,10 @@ func TestCensus(t *testing.T) {
 	// create the proxy to handle HTTP queries
 	pxy := net.NewProxy()
 	pxy.C.Address = "127.0.0.1"
-	// TODO(mvdan): use a random unused port via :0
-	pxy.C.Port = 8788
-	if err := pxy.Init(); err != nil {
-		t.Error(err)
+	pxy.C.Port = 0
+	addr, err := pxy.Init()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// the server
@@ -97,10 +97,10 @@ func TestCensus(t *testing.T) {
 	censusDir := fmt.Sprintf("/tmp/census%d", rand.Intn(1000))
 	pub, _ := signer2.HexString()
 	if err := os.Mkdir(censusDir, 0755); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if err := cm.Init(censusDir, pub); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	defer os.RemoveAll(censusDir)
 	routerAPI.EnableCensusAPI(&cm)
@@ -109,7 +109,7 @@ func TestCensus(t *testing.T) {
 	ws.AddProxyHandler("/dvote")
 
 	// Create websocket client
-	u := "ws://127.0.0.1:8788/dvote"
+	u := fmt.Sprintf("ws://%s/dvote", addr)
 	t.Logf("connecting to %s", u)
 	c, _, err := websocket.DefaultDialer.Dial(u, nil)
 	if err != nil {
@@ -212,7 +212,7 @@ func TestCensus(t *testing.T) {
 	req.Payload.Proof = siblings
 	resp = sendCensusReq(t, c, req, nil)
 	if !resp.ValidProof {
-		t.Error("proof is invalid but it should be valid")
+		t.Fatal("proof is invalid but it should be valid")
 	}
 
 	// CheckProof invalid (old root)

@@ -48,17 +48,18 @@ func getCertificates(domain string, m *autocert.Manager) [][]byte {
 
 // Init checks if SSL is activated or not and runs a http server consequently
 //
-// When it returns, the server is ready.
-func (p *Proxy) Init() error {
+// When it returns, the server is ready. The returned address is useful if the
+// port was left as 0, to retrieve the randomly allocated port.
+func (p *Proxy) Init() (net.Addr, error) {
 	var s *http.Server
 	var m *autocert.Manager
 	forceNonTLS := true
 
-	addr := fmt.Sprintf("%s:%d", p.C.Address, p.C.Port)
-	ln, err := net.Listen("tcp", addr)
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", p.C.Address, p.C.Port))
 	if err != nil {
-		return err
+		return nil, err
 	}
+	addr := ln.Addr()
 	log.Infof("proxy listening on %s", addr)
 
 	if len(p.C.SSLDomain) > 0 {
@@ -89,7 +90,7 @@ func (p *Proxy) Init() error {
 		}()
 		log.Infof("proxy without SSL ready at http://%s", addr)
 	}
-	return nil
+	return addr, nil
 }
 
 // GenerateSSLCertificate generates a SSL certificated for the proxy

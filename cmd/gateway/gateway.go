@@ -216,16 +216,14 @@ func main() {
 	log.Infof("storing SSL certificate in %s", pxy.C.SSLCertDir)
 	pxy.C.Address = globalCfg.ListenHost
 	pxy.C.Port = globalCfg.ListenPort
-	err = pxy.Init()
-	if err != nil {
+	if _, err := pxy.Init(); err != nil {
 		// letsencrypt SSL has failed
 		log.Warn("letsEncrypt SSL certificate cannot be obtained")
 		log.Warn("probably port 443 is not accessible or domain provided is not correct")
 		log.Info("disabling SSL")
 		pxy.C.SSLDomain = ""
 		globalCfg.Ssl.Domain = ""
-		err = pxy.Init()
-		if err != nil {
+		if _, err := pxy.Init(); err != nil {
 			log.Fatal(err)
 		}
 	}
