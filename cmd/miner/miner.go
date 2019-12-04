@@ -108,9 +108,8 @@ func main() {
 
 	if len(globalCfg.PublicAddr) == 0 {
 		ip, err := util.GetPublicIP()
-
-		if err != nil || len(ip.String()) < 8 {
-			log.Warnf("public IP discovery failed: %s", err)
+		if err != nil {
+			log.Warn(err)
 		} else {
 			addrport := strings.Split(globalCfg.P2pListen, ":")
 			if len(addrport) > 0 {

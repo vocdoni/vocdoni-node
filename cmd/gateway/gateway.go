@@ -399,8 +399,8 @@ func main() {
 		// node + app layer
 		if len(globalCfg.Vochain.PublicAddr) == 0 {
 			ip, err := util.GetPublicIP()
-			if err != nil || len(ip.String()) < 8 {
-				log.Warnf("public IP discovery failed: %s", err)
+			if err != nil {
+				log.Warn(err)
 			} else {
 				addrport := strings.Split(globalCfg.Vochain.P2pListen, ":")
 				if len(addrport) > 0 {

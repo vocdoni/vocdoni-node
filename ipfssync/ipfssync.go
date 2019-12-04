@@ -35,11 +35,11 @@ func guessMyAddress(port int, id string) string {
 		log.Warn(err)
 		return ""
 	}
-	if len(ip.To4().String()) > 8 {
-		return fmt.Sprintf("/ip4/%s/tcp/%d/ipfs/%s", ip, port, id)
+	if ip4 := ip.To4(); ip4 != nil {
+		return fmt.Sprintf("/ip4/%s/tcp/%d/ipfs/%s", ip4, port, id)
 	}
-	if len(ip.To16().String()) > 8 {
-		return fmt.Sprintf("/ip6/[%s]/tcp/%d/ipfs/%s", ip, port, id)
+	if ip6 := ip.To16(); ip6 != nil {
+		return fmt.Sprintf("/ip6/[%s]/tcp/%d/ipfs/%s", ip6, port, id)
 	}
 	return ""
 }

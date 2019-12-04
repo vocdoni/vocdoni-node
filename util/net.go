@@ -2,9 +2,9 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"net"
-	"strings"
 	"time"
 
 	externalip "gitlab.com/vocdoni/go-external-ip"
@@ -12,9 +12,16 @@ import (
 
 // GetPublicIP returns the external/public IP of the host
 // For now, let's only support IPv4. Hope we can change this in the future...
+//
+// If a nil error is returned, the returned IP must be valid.
 func GetPublicIP() (net.IP, error) {
 	consensus := externalip.DefaultConsensus(nil, nil)
-	return consensus.ExternalIP(4)
+	ip, err := consensus.ExternalIP(4)
+	// if the IP isn't a valid ipv4, To4 will return nil
+	if ip = ip.To4(); ip == nil {
+		return nil, fmt.Errorf("public IP discovery failed: %v", err)
+	}
+	return ip, nil
 }
 
 var resolverList = []string{
@@ -52,16 +59,14 @@ func ResolveCustom(nameserver string, host string) string {
 		return ""
 	}
 	for _, ip := range ips {
-		if isV4(ip.String()) {
+		if isV4(ip.IP) {
 			return ip.String()
 		}
 	}
 	return ""
 }
 
-func isV4(address string) bool {
-	return strings.Count(address, ".") == 3
-}
+func isV4(ip net.IP) bool { return ip.To4() != nil }
 
 // StrShuffle reandomizes the order of a string array
 func StrShuffle(vals []string) []string {
