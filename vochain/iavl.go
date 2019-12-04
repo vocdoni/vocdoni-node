@@ -244,10 +244,11 @@ func (v *VochainState) GetEnvelope(voteID string) (*vochaintypes.Vote, error) {
 }
 
 // CountVotes returns the number of votes registered for a given process id
+/*
 func (v *VochainState) CountVotes(processID string) int64 {
 	processID = sanitizeHex(processID)
 	var count int64
-	v.VoteTree.Iterate(func(key []byte, value []byte) bool {
+	v.VoteTree.IterateRange([]byte(processID), []byte{}, true, func(key []byte, value []byte) bool {
 		k := strings.Split(string(key), "_")
 		if k[0] == processID {
 			count++
@@ -255,6 +256,35 @@ func (v *VochainState) CountVotes(processID string) int64 {
 		return false
 	})
 	return count
+}
+*/
+func (v *VochainState) CountVotes(processID string) int64 {
+	processID = sanitizeHex(processID)
+	var count int64
+	v.VoteTree.IterateRange([]byte(processID), nil, true, func(key []byte, value []byte) bool {
+		count++
+		return false
+	})
+	return count
+}
+
+// GetEnvelopeList returns a list of registered envelopes nullifiers given a processId
+func (v *VochainState) GetEnvelopeList(processID string, from, listSize int64) []string {
+	processID = sanitizeHex(processID)
+	var nullifiers []string
+	idx := int64(0)
+	v.VoteTree.IterateRange([]byte(processID), nil, true, func(key []byte, value []byte) bool {
+		if idx >= listSize {
+			return true
+		}
+		if idx >= from {
+			k := strings.Split(string(key), "_")
+			nullifiers = append(nullifiers, k[1])
+		}
+		idx++
+		return false
+	})
+	return nullifiers
 }
 
 // GetHeight returns the blockchain last block commited height

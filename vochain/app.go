@@ -186,7 +186,16 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	case "getProcessList":
 		return abcitypes.ResponseQuery{Code: 1, Info: "not implemented"}
 	case "getEnvelopeList":
-		return abcitypes.ResponseQuery{Code: 1, Info: "not implemented"}
+		n := app.State.GetEnvelopeList(reqData.ProcessID, reqData.From, reqData.ListSize)
+		if len(n) != 0 {
+			nBytes, err := app.State.Codec.MarshalBinaryBare(n)
+			if err != nil {
+				return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal envelope list bytes"}
+			}
+			return abcitypes.ResponseQuery{Code: 0, Value: nBytes, Info: "ok"}
+		} else {
+			return abcitypes.ResponseQuery{Code: 0, Value: []byte{}, Info: "any envelope available"}
+		}
 	default:
 		return abcitypes.ResponseQuery{Code: 1, Info: "undefined query method"}
 	}
