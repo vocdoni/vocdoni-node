@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
@@ -49,6 +50,8 @@ import (
 )
 
 var level = flag.String("level", "error", "logging level")
+
+func init() { rand.Seed(time.Now().UnixNano()) }
 
 func TestCensus(t *testing.T) {
 	log.InitLogger(*level, "stdout")
@@ -83,9 +86,12 @@ func TestCensus(t *testing.T) {
 	go ws.Listen(listenerOutput)
 
 	// Create the API router
-	ipfsDir := fmt.Sprintf("/tmp/ipfs%d", rand.Intn(1000))
-	ipfsStore := data.IPFSNewConfig(ipfsDir)
+	ipfsDir, err := ioutil.TempDir("", "ipfs")
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(ipfsDir)
+	ipfsStore := data.IPFSNewConfig(ipfsDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {
 		t.Fatalf("cannot start IPFS %s", err)
@@ -94,15 +100,15 @@ func TestCensus(t *testing.T) {
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.CensusManager
-	censusDir := fmt.Sprintf("/tmp/census%d", rand.Intn(1000))
-	pub, _ := signer2.HexString()
-	if err := os.Mkdir(censusDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := cm.Init(censusDir, pub); err != nil {
+	censusDir, err := ioutil.TempDir("", "census")
+	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(censusDir)
+	pub, _ := signer2.HexString()
+	if err := cm.Init(censusDir, pub); err != nil {
+		t.Fatal(err)
+	}
 	routerAPI.EnableCensusAPI(&cm)
 
 	go routerAPI.Route()

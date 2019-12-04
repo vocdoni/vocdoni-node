@@ -292,7 +292,7 @@ func main() {
 	}
 
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
-		//TO-DO create signing key since node.Start() is not executed and the ethereum account is not created on first run
+		// TO-DO create signing key since node.Start() is not executed and the ethereum account is not created on first run
 		url, err := goneturl.Parse(globalCfg.W3external)
 		if err != nil {
 			log.Fatal("cannot parse w3external URL")
