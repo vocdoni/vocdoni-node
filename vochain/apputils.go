@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -92,7 +93,11 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 			vote.Signature = sanitizeHex(tx.Signature)
 			vote.Proof = sanitizeHex(tx.Proof)
 			vote.ProcessID = sanitizeHex(tx.ProcessID)
-			vote.Nullifier = GenerateNullifier(addr, vote.ProcessID)
+			nullifier, err := GenerateNullifier(addr, vote.ProcessID)
+			if err != nil {
+				return fmt.Errorf("cannot generate nullifier")
+			}
+			vote.Nullifier = nullifier
 
 		default:
 			return fmt.Errorf("invalid process type")
@@ -164,7 +169,11 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 			return fmt.Errorf("cannot extract address from public key")
 		}
 		// assign a nullifier
-		voteTmp.Nullifier = GenerateNullifier(addr, vote.ProcessID)
+		nullifier, err := GenerateNullifier(addr, vote.ProcessID)
+		if err != nil {
+			return fmt.Errorf("cannot generate nullifier")
+		}
+		voteTmp.Nullifier = nullifier
 		log.Debugf("generated nullifier: %s", voteTmp.Nullifier)
 		// check if vote exists
 		voteID := fmt.Sprintf("%s_%s", sanitizeHex(vote.ProcessID), sanitizeHex(voteTmp.Nullifier))
@@ -265,8 +274,17 @@ func VerifySignatureAgainstOracles(oracles []string, message, signHex string) (b
 }
 
 // GenerateNullifier generates the nullifier of a vote (hash(address+processId))
-func GenerateNullifier(address, processID string) string {
-	return fmt.Sprintf("%x", signature.HashRaw(fmt.Sprintf("%s%s", signature.SanitizeHex(address), signature.SanitizeHex(processID))))
+func GenerateNullifier(address, processID string) (string, error) {
+	var err error
+	addrBytes, err := hex.DecodeString(signature.SanitizeHex(address))
+	if err != nil {
+		return "", err
+	}
+	pidBytes, err := hex.DecodeString(signature.SanitizeHex(processID))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", signature.HashRaw(fmt.Sprintf("%s%s", addrBytes, pidBytes))), nil
 }
 
 // GenerateAddressFromEd25519PublicKeyString returns the address as string from given pubkey represented as string
