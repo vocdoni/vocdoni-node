@@ -16,12 +16,11 @@ type HTTPHandle struct {
 	path string
 }
 
-func (h *HTTPHandle) Init(c string) error {
+func (h *HTTPHandle) Init(c string) {
 	// split c to port and path
 	cs := strings.Split(c, "/")
 	h.port = cs[0]
 	h.path = cs[1]
-	return nil
 }
 
 // this should become submitVote handler
@@ -69,12 +68,6 @@ func parse(rw http.ResponseWriter, request *http.Request) {
 func (h *HTTPHandle) Listen() error {
 	http.HandleFunc(h.path, parse)
 	// add waitgroup
-	func() {
-		log.Infof("serving on " + h.port + "/" + h.path)
-		err := http.ListenAndServe(":"+h.port, nil)
-		if err != nil {
-			return
-		}
-	}()
-	return nil
+	log.Infof("serving on " + h.port + "/" + h.path)
+	return http.ListenAndServe(":"+h.port, nil)
 }

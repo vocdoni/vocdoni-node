@@ -25,7 +25,7 @@ func initWithDefaults(out io.Writer, repoRoot string, profile string) error {
 		profiles = strings.Split(profile, ",")
 	}
 
-	return doInit(out, repoRoot, false, nBitsForKeypairDefault, profiles, nil)
+	return doInit(out, repoRoot, false, nBitsForKeypairDefault)
 }
 */
 
@@ -48,7 +48,7 @@ func InstallDatabasePlugins() {
 	})
 }
 
-func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, confProfiles []string, conf *config.Config) (*config.Config, error) {
+func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config, error) {
 	log.Infof("initializing IPFS node at %s", repoRoot)
 
 	if err := checkWritable(repoRoot); err != nil {
@@ -59,12 +59,9 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, confProfiles []
 		return nil, errors.New("Repo exists!")
 	}
 
-	if conf == nil {
-		var err error
-		conf, err = config.Init(out, nBitsForKeypair)
-		if err != nil {
-			return nil, err
-		}
+	conf, err := config.Init(out, nBitsForKeypair)
+	if err != nil {
+		return nil, err
 	}
 
 	// Some optimizations from https://medium.com/coinmonks/ipfs-production-configuration-57121f0daab2
@@ -108,7 +105,7 @@ func checkWritable(dir string) error {
 	return err
 }
 
-func addDefaultAssets(out io.Writer, repoRoot string) error {
+func addDefaultAssets(repoRoot string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

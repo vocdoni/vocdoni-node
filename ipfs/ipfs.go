@@ -47,7 +47,7 @@ func Init() error {
 	}
 
 	InstallDatabasePlugins()
-	_, err = doInit(os.Stdout, ConfigRoot, 2048, []string{}, nil)
+	_, err = doInit(os.Stdout, ConfigRoot, 2048)
 	return err
 }
 

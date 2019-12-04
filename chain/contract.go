@@ -97,7 +97,7 @@ func (ph *ProcessHandle) GetProcessMetadata(pid [32]byte) (*ProcessMetadata, err
 func (ph *ProcessHandle) GetProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error) {
 	processMeta, err := ph.VotingProcess.Get(nil, pid)
 	if err != nil {
-		log.Errorf("Error fetching process metadata from Ethereum: %s", err)
+		return nil, fmt.Errorf("error fetching process metadata from Ethereum: %s", err)
 	}
 
 	processTxArgs := new(types.NewProcessTx)
@@ -107,10 +107,9 @@ func (ph *ProcessHandle) GetProcessTxArgs(pid [32]byte) (*types.NewProcessTx, er
 	processTxArgs.NumberOfBlocks = processMeta.NumberOfBlocks.Int64()
 	processTxArgs.StartBlock = processMeta.StartBlock.Int64()
 	processTxArgs.EncryptionPublicKeys = []string{processMeta.VoteEncryptionPrivateKey}
-	if processMeta.ProcessType == "snark-vote" || processMeta.ProcessType == "poll-vote" || processMeta.ProcessType == "petition-sign" {
+	switch processMeta.ProcessType {
+	case "snark-vote", "poll-vote", "petition-sign":
 		processTxArgs.ProcessType = processMeta.ProcessType
-	} else {
-		processTxArgs.ProcessType = ""
 	}
 	processTxArgs.Type = "newProcess"
 	return processTxArgs, nil

@@ -4,6 +4,7 @@ package chain
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -140,7 +141,9 @@ func (e *EthChainContext) Start() {
 	utils.StartNode(e.Node)
 
 	if len(e.Keys.Accounts()) < 1 {
-		e.createAccount()
+		if err := e.createAccount(); err != nil {
+			log.Error(err)
+		}
 	} else {
 		// phrase := getPassPhrase("please provide primary account passphrase", false)
 		e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
@@ -202,11 +205,10 @@ func (e *EthChainContext) createAccount() error {
 	// phrase := getPassPhrase("Your new account will be locked with a passphrase. Please give a passphrase. Do not forget it!.", true)
 	_, err := e.Keys.NewAccount("")
 	if err != nil {
-		utils.Fatalf("failed to create account: %v", err)
+		return fmt.Errorf("failed to create account: %v", err)
 	}
 	e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
 	log.Infof("my Ethereum address %x\n", e.Keys.Accounts()[0].Address)
-
 	return nil
 }
 

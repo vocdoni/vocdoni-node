@@ -337,11 +337,10 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 		log.Debugf("Process index loaded: %v", processIdx)
 
 		processTx, err := o.processHandle.GetProcessTxArgs(eventProcessCreated.ProcessId)
-
 		if err != nil {
-			log.Errorf("Error getting process metadata: %s", err)
+			log.Errorf("error getting process metadata: %s", err)
 		} else {
-			log.Infof("Process meta: %+v", processTx)
+			log.Infof("process meta: %+v", processTx)
 		}
 
 		log.Debugf("signing with key: %s", o.signingKeys.EthAddrString())

@@ -69,10 +69,10 @@ func newConfig() (config.CensusCfg, error) {
 	return globalCfg, err
 }
 
-func addCorsHeaders(w *http.ResponseWriter, req *http.Request) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "*")
-	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+func addCorsHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 }
 
 func main() {
@@ -129,7 +129,7 @@ func main() {
 	}
 
 	pxy.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-		addCorsHeaders(&w, r)
+		addCorsHeaders(w)
 		if r.Method == http.MethodPost {
 			cm.HTTPhandler(w, r, signer)
 		} else if r.Method != http.MethodOptions {
