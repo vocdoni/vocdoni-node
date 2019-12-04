@@ -33,7 +33,7 @@ ENVFILE=""
 
 # RUN DOCKER
 docker run --name `echo $IMAGE_TAG-$RANDOM | tr "/" "-"` -d \
-	-p 4001:4001 -p 5001:5001 -p $PORT:9090 -p 30303:30303 -p 9096:9096 \
+	-p 4001:4001 -p 5001:5001 -p $API_PORT:9090 -p 30303:30303 -p 9096:9096 \
 	-v $PWD/run:/app/run $EXTRA_OPTS \
 	`[ -n "$ENVFILE" ] && echo -n "--env-file $ENVFILE"` \
 	$IMAGE_TAG
