@@ -22,7 +22,6 @@ import (
 	"github.com/tendermint/tendermint/proxy"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
-	dbm "github.com/tendermint/tm-db"
 
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 )
@@ -34,7 +33,7 @@ const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
 var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
 
 // Start starts a new vochain validator node
-func Start(globalCfg config.VochainCfg, db *dbm.GoLevelDB) (*BaseApplication, *nm.Node) {
+func Start(globalCfg config.VochainCfg) (*BaseApplication, *nm.Node) {
 	// create application db
 	vlog.Info("initializing Vochain")
 

@@ -32,7 +32,6 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	tmnode "github.com/tendermint/tendermint/node"
-	dbm "github.com/tendermint/tm-db"
 
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/chain/oracle"
@@ -165,12 +164,6 @@ func main() {
 	var app *vochain.BaseApplication
 
 	log.Info("initializing vochain")
-	// app layer db
-	db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.VochainConfig.DataDir+"/data", nil)
-	if err != nil {
-		log.Fatalf("failed to open db: %s", err)
-	}
-	defer db.Close()
 
 	// node + app layer
 	if len(globalCfg.VochainConfig.PublicAddr) == 0 {
@@ -188,7 +181,7 @@ func main() {
 		log.Infof("public IP address: %s", globalCfg.VochainConfig.PublicAddr)
 	}
 	var vnode *tmnode.Node
-	app, vnode = vochain.Start(globalCfg.VochainConfig, db)
+	app, vnode = vochain.Start(globalCfg.VochainConfig)
 	defer func() {
 		vnode.Stop()
 		vnode.Wait()

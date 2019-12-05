@@ -9,7 +9,6 @@ import (
 
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	dbm "github.com/tendermint/tm-db"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -98,14 +97,6 @@ func main() {
 	}
 	log.Info("starting miner")
 
-	// app layer db
-	db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.DataDir+"/data", nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to open db: %v", err)
-		os.Exit(1)
-	}
-	defer db.Close()
-
 	if len(globalCfg.PublicAddr) == 0 {
 		ip, err := util.GetPublicIP()
 		if err != nil {
@@ -121,7 +112,7 @@ func main() {
 
 	// node + app layer
 	log.Debugf("initializing vochain with tendermint config %s", globalCfg.TendermintConfig)
-	_, vnode := vochain.Start(globalCfg, db)
+	_, vnode := vochain.Start(globalCfg)
 	defer func() {
 		vnode.Stop()
 		vnode.Wait()

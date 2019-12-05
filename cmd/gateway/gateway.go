@@ -18,7 +18,6 @@ import (
 
 	// abcicli "github.com/tendermint/tendermint/abci/client"
 	tmnode "github.com/tendermint/tendermint/node"
-	dbm "github.com/tendermint/tm-db"
 
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 
@@ -387,13 +386,6 @@ func main() {
 	var vnode *tmnode.Node
 	if globalCfg.Api.Vote.Enabled {
 		log.Info("initializing vochain")
-		// app layer db
-		db, err := dbm.NewGoLevelDBWithOpts("vochain", globalCfg.Vochain.DataDir+"/data", nil)
-		if err != nil {
-			log.Fatalf("failed to open db: %s", err)
-		}
-		defer db.Close()
-
 		// node + app layer
 		if len(globalCfg.Vochain.PublicAddr) == 0 {
 			ip, err := util.GetPublicIP()
@@ -409,7 +401,7 @@ func main() {
 		if globalCfg.Vochain.PublicAddr != "" {
 			log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
 		}
-		_, vnode = vochain.Start(globalCfg.Vochain, db)
+		_, vnode = vochain.Start(globalCfg.Vochain)
 		defer func() {
 			vnode.Stop()
 			vnode.Wait()
