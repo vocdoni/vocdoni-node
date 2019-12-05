@@ -63,6 +63,7 @@ func (p *Proxy) Init() (net.Addr, error) {
 	log.Infof("proxy listening on %s", addr)
 
 	if len(p.C.SSLDomain) > 0 {
+		log.Infof("fetching letsencrypt SSL certificate for %s", p.C.SSLDomain)
 		s, m = p.GenerateSSLCertificate()
 		go func() {
 			log.Fatal(s.ServeTLS(ln, "", ""))
@@ -74,9 +75,9 @@ func (p *Proxy) Init() (net.Addr, error) {
 		time.Sleep(time.Second)
 		certs := getCertificates(p.C.SSLDomain, m)
 		if certs == nil {
-			log.Warn("letsencrypt TLS certificate cannot be obtained. Maybe port 443 is not accessible or domain name is wrong.")
-			log.Infof(`you might redirect port 443 with iptables using the following command (required just the first time):
-								sudo iptables -t nat -I PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports %d`, p.C.Port)
+			log.Warnf(`letsencrypt TLS certificate cannot be obtained. Maybe port 443 is not accessible or domain name is wrong.
+						You might want to redirect port 443 with iptables using the following command:
+							sudo iptables -t nat -I PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports %d`, p.C.Port)
 			s.Close()
 		} else {
 			forceNonTLS = false

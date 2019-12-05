@@ -208,9 +208,10 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	// create node
 	node, err := nm.NewNode(
 		tconfig,
-		pv,                               // the node val
-		nodeKey,                          // node val key
-		proxy.NewLocalClientCreator(app), // Note we use proxy.NewLocalClientCreator here to create a local client instead of one communicating through a socket or gRPC.
+		pv,      // the node val
+		nodeKey, // node val key
+		proxy.NewLocalClientCreator(app),
+		// Note we use proxy.NewLocalClientCreator here to create a local client instead of one communicating through a socket or gRPC.
 		nm.DefaultGenesisDocProviderFunc(tconfig),
 		nm.DefaultDBProvider,
 		nm.DefaultMetricsProvider(tconfig.Instrumentation),
@@ -218,8 +219,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create new Tendermint node")
 	}
-	vlog.Infof("time IOTA ms: %d", node.GenesisDoc().ConsensusParams.Block.TimeIotaMs)
-	vlog.Infof("consensus config %+v", node.Config().Consensus)
+	vlog.Debugf("consensus config %+v", *node.Config().Consensus)
 
 	return node, nil
 }
