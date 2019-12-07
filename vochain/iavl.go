@@ -73,7 +73,7 @@ func NewVochainState(dataDir string, codec *amino.Codec) (*VochainState, error) 
 
 // AddOracle adds a trusted oracle given its address if not exists
 func (v *VochainState) AddOracle(address string) error {
-	address = sanitizeHex(address)
+	address = signature.TrimHex(address)
 	_, oraclesBytes := v.AppTree.Get([]byte(oracleKey))
 	var oracles []string
 	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
@@ -93,7 +93,7 @@ func (v *VochainState) AddOracle(address string) error {
 
 // RemoveOracle removes a trusted oracle given its address if exists
 func (v *VochainState) RemoveOracle(address string) error {
-	address = sanitizeHex(address)
+	address = signature.TrimHex(address)
 	_, oraclesBytes := v.AppTree.Get([]byte(oracleKey))
 	var oracles []string
 	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
@@ -124,7 +124,7 @@ func (v *VochainState) GetOracles() ([]string, error) {
 
 // AddValidator adds a tendemint validator if it is not already added
 func (v *VochainState) AddValidator(pubKey string, power int64) error {
-	pubKey = sanitizeHex(pubKey)
+	pubKey = signature.TrimHex(pubKey)
 	_, validatorsBytes := v.AppTree.Get([]byte(validatorKey))
 	var validators []vochaintypes.Validator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
@@ -154,7 +154,7 @@ func (v *VochainState) AddValidator(pubKey string, power int64) error {
 
 // RemoveValidator removes a tendermint validator if exists
 func (v *VochainState) RemoveValidator(address string) error {
-	address = sanitizeHex(address)
+	address = signature.TrimHex(address)
 	_, validatorsBytes := v.AppTree.Get([]byte(validatorKey))
 	var validators []vochaintypes.Validator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
@@ -185,7 +185,7 @@ func (v *VochainState) GetValidators() ([]vochaintypes.Validator, error) {
 
 // AddProcess adds a new process to vochain if not already added
 func (v *VochainState) AddProcess(p *vochaintypes.Process, pid string) error {
-	pid = sanitizeHex(pid)
+	pid = signature.TrimHex(pid)
 	newProcessBytes, err := v.Codec.MarshalBinaryBare(p)
 	if err != nil {
 		return errors.New("cannot marshal process bytes")
@@ -197,7 +197,7 @@ func (v *VochainState) AddProcess(p *vochaintypes.Process, pid string) error {
 // GetProcess returns a process info given a processId if exists
 func (v *VochainState) GetProcess(pid string) (*vochaintypes.Process, error) {
 	var newProcess *vochaintypes.Process
-	pid = sanitizeHex(pid)
+	pid = signature.TrimHex(pid)
 	if !v.ProcessTree.Has([]byte(pid)) {
 		return nil, fmt.Errorf("cannot find process with id (%s)", pid)
 	}
@@ -214,7 +214,7 @@ func (v *VochainState) GetProcess(pid string) (*vochaintypes.Process, error) {
 
 // AddVote adds a new vote to a process if the process exists and the vote is not already submmited
 func (v *VochainState) AddVote(vote *vochaintypes.Vote) error {
-	voteID := fmt.Sprintf("%s_%s", sanitizeHex(vote.ProcessID), sanitizeHex(vote.Nullifier))
+	voteID := fmt.Sprintf("%s_%s", signature.TrimHex(vote.ProcessID), signature.TrimHex(vote.Nullifier))
 	newVoteBytes, err := v.Codec.MarshalBinaryBare(vote)
 	if err != nil {
 		return errors.New("cannot marshal vote")
@@ -226,7 +226,7 @@ func (v *VochainState) AddVote(vote *vochaintypes.Vote) error {
 // GetEnvelope returns the info of a vote if already exists
 func (v *VochainState) GetEnvelope(voteID string) (*vochaintypes.Vote, error) {
 	var vote *vochaintypes.Vote
-	voteID = sanitizeHex(voteID)
+	voteID = signature.TrimHex(voteID)
 	if !v.VoteTree.Has([]byte(voteID)) {
 		return nil, fmt.Errorf("vote with id (%s) does not exists", voteID)
 	}
@@ -246,7 +246,7 @@ func (v *VochainState) GetEnvelope(voteID string) (*vochaintypes.Vote, error) {
 // CountVotes returns the number of votes registered for a given process id
 /*
 func (v *VochainState) CountVotes(processID string) int64 {
-	processID = sanitizeHex(processID)
+	processID = signature.TrimHex(processID)
 	var count int64
 	v.VoteTree.IterateRange([]byte(processID), []byte{}, true, func(key []byte, value []byte) bool {
 		k := strings.Split(string(key), "_")
@@ -259,7 +259,7 @@ func (v *VochainState) CountVotes(processID string) int64 {
 }
 */
 func (v *VochainState) CountVotes(processID string) int64 {
-	processID = sanitizeHex(processID)
+	processID = signature.TrimHex(processID)
 	var count int64
 	v.VoteTree.IterateRange([]byte(processID), nil, true, func(key []byte, value []byte) bool {
 		count++
@@ -270,7 +270,7 @@ func (v *VochainState) CountVotes(processID string) int64 {
 
 // GetEnvelopeList returns a list of registered envelopes nullifiers given a processId
 func (v *VochainState) GetEnvelopeList(processID string, from, listSize int64) []string {
-	processID = sanitizeHex(processID)
+	processID = signature.TrimHex(processID)
 	var nullifiers []string
 	idx := int64(0)
 	v.VoteTree.IterateRange([]byte(processID), nil, true, func(key []byte, value []byte) bool {
@@ -328,10 +328,6 @@ func (v *VochainState) Rollback() {
 // hash(appTree+processTree+voteTree)
 func (v *VochainState) GetWorkingHash() []byte {
 	return signature.HashRaw(fmt.Sprintf("%s%s%s", v.AppTree.WorkingHash(), v.ProcessTree.WorkingHash(), v.VoteTree.WorkingHash()))
-}
-
-func sanitizeHex(hexStr string) string {
-	return strings.TrimPrefix(hexStr, "0x")
 }
 
 // ProcessList returns a list of processId given an entityId

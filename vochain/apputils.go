@@ -64,11 +64,11 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 		vote := new(vochaintypes.Vote)
 		switch process.Type {
 		case "snark-vote":
-			vote.Nullifier = sanitizeHex(tx.Nullifier)
-			vote.Nonce = sanitizeHex(tx.Nonce)
-			vote.ProcessID = sanitizeHex(tx.ProcessID)
-			vote.VotePackage = sanitizeHex(tx.VotePackage)
-			vote.Proof = sanitizeHex(tx.Proof)
+			vote.Nullifier = signature.TrimHex(tx.Nullifier)
+			vote.Nonce = signature.TrimHex(tx.Nonce)
+			vote.ProcessID = signature.TrimHex(tx.ProcessID)
+			vote.VotePackage = signature.TrimHex(tx.VotePackage)
+			vote.Proof = signature.TrimHex(tx.Proof)
 		case "poll-vote", "petition-sign":
 			vote.Nonce = tx.Nonce
 			vote.ProcessID = tx.ProcessID
@@ -88,11 +88,11 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 			if err != nil {
 				return fmt.Errorf("cannot extract address from public key")
 			}
-			vote.Nonce = sanitizeHex(tx.Nonce)
-			vote.VotePackage = sanitizeHex(tx.VotePackage)
-			vote.Signature = sanitizeHex(tx.Signature)
-			vote.Proof = sanitizeHex(tx.Proof)
-			vote.ProcessID = sanitizeHex(tx.ProcessID)
+			vote.Nonce = signature.TrimHex(tx.Nonce)
+			vote.VotePackage = signature.TrimHex(tx.VotePackage)
+			vote.Signature = signature.TrimHex(tx.Signature)
+			vote.Proof = signature.TrimHex(tx.Proof)
+			vote.ProcessID = signature.TrimHex(tx.ProcessID)
 			nullifier, err := GenerateNullifier(addr, vote.ProcessID)
 			if err != nil {
 				return fmt.Errorf("cannot generate nullifier")
@@ -117,9 +117,9 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 		}
 	case vochaintypes.NewProcessTx:
 		newprocess := &vochaintypes.Process{
-			EntityID:             sanitizeHex(tx.EntityID),
+			EntityID:             signature.TrimHex(tx.EntityID),
 			EncryptionPublicKeys: tx.EncryptionPublicKeys,
-			MkRoot:               sanitizeHex(tx.MkRoot),
+			MkRoot:               signature.TrimHex(tx.MkRoot),
 			NumberOfBlocks:       tx.NumberOfBlocks,
 			StartBlock:           tx.StartBlock,
 			CurrentState:         vochaintypes.Scheduled,
@@ -139,7 +139,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 
 	switch process.Type {
 	case "snark-vote":
-		voteID := fmt.Sprintf("%s_%s", signature.SanitizeHex(vote.ProcessID), signature.SanitizeHex(vote.Nullifier))
+		voteID := fmt.Sprintf("%s_%s", signature.TrimHex(vote.ProcessID), signature.TrimHex(vote.Nullifier))
 		v, _ := state.GetEnvelope(voteID)
 		if v != nil {
 			log.Debugf("vote already exists")
@@ -176,7 +176,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 		voteTmp.Nullifier = nullifier
 		log.Debugf("generated nullifier: %s", voteTmp.Nullifier)
 		// check if vote exists
-		voteID := fmt.Sprintf("%s_%s", sanitizeHex(vote.ProcessID), sanitizeHex(voteTmp.Nullifier))
+		voteID := fmt.Sprintf("%s_%s", signature.TrimHex(vote.ProcessID), signature.TrimHex(voteTmp.Nullifier))
 		v, _ := state.GetEnvelope(voteID)
 		if v != nil {
 			return fmt.Errorf("vote already exists")
@@ -276,11 +276,11 @@ func VerifySignatureAgainstOracles(oracles []string, message, signHex string) (b
 // GenerateNullifier generates the nullifier of a vote (hash(address+processId))
 func GenerateNullifier(address, processID string) (string, error) {
 	var err error
-	addrBytes, err := hex.DecodeString(signature.SanitizeHex(address))
+	addrBytes, err := hex.DecodeString(signature.TrimHex(address))
 	if err != nil {
 		return "", err
 	}
-	pidBytes, err := hex.DecodeString(signature.SanitizeHex(processID))
+	pidBytes, err := hex.DecodeString(signature.TrimHex(processID))
 	if err != nil {
 		return "", err
 	}

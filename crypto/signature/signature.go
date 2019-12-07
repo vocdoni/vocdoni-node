@@ -85,7 +85,7 @@ func (k *SignKeys) Generate() error {
 // AddHexKey imports a private hex key
 func (k *SignKeys) AddHexKey(privHex string) error {
 	var err error
-	k.Private, err = crypto.HexToECDSA(SanitizeHex(privHex))
+	k.Private, err = crypto.HexToECDSA(TrimHex(privHex))
 	if err == nil {
 		k.Public = &k.Private.PublicKey
 	}
@@ -94,7 +94,7 @@ func (k *SignKeys) AddHexKey(privHex string) error {
 
 // AddAuthKey adds a new authorized address key
 func (k *SignKeys) AddAuthKey(address string) error {
-	addrBytes, err := hex.DecodeString(SanitizeHex(address))
+	addrBytes, err := hex.DecodeString(TrimHex(address))
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func CompressPubKey(pubHex string) (string, error) {
 	if len(pubHex) <= PubKeyLength {
 		return pubHex, nil
 	}
-	pubBytes, err := hex.DecodeString(SanitizeHex(pubHex))
+	pubBytes, err := hex.DecodeString(TrimHex(pubHex))
 	if err != nil {
 		return "", err
 	}
@@ -176,13 +176,13 @@ func (k *SignKeys) SignJSON(message interface{}) (string, error) {
 	if err != nil {
 		return "", errors.New("error signing response body: %s")
 	}
-	prefixedSig := "0x" + SanitizeHex(sig)
+	prefixedSig := "0x" + TrimHex(sig)
 	return prefixedSig, nil
 }
 
 // Verify verifies a message. Signature is HexString
 func (k *SignKeys) Verify(message, signHex string) (bool, error) {
-	pubHex, err := PubKeyFromSignature(message, SanitizeHex(signHex))
+	pubHex, err := PubKeyFromSignature(message, TrimHex(signHex))
 	if err != nil {
 		return false, err
 	}
@@ -245,7 +245,7 @@ func AddrFromPublicKey(pubHex string) (string, error) {
 	var pubHexDesc string
 	var err error
 	if len(pubHex) <= PubKeyLength {
-		pubHexDesc, err = DecompressPubKey(SanitizeHex(pubHex))
+		pubHexDesc, err = DecompressPubKey(TrimHex(pubHex))
 		if err != nil {
 			return "", err
 		}
@@ -266,10 +266,10 @@ func AddrFromPublicKey(pubHex string) (string, error) {
 
 // PubKeyFromSignature recovers the ECDSA public key that created the signature of a message
 func PubKeyFromSignature(msg, sigHex string) (string, error) {
-	if len(SanitizeHex(sigHex)) < SignatureLength || len(SanitizeHex(sigHex)) > SignatureLength+12 {
+	if len(TrimHex(sigHex)) < SignatureLength || len(TrimHex(sigHex)) > SignatureLength+12 {
 		return "", errors.New("signature length not correct")
 	}
-	sig, err := hex.DecodeString(SanitizeHex(sigHex))
+	sig, err := hex.DecodeString(TrimHex(sigHex))
 	if err != nil {
 		return "", err
 	}
@@ -310,7 +310,7 @@ func AddrFromJSONsignature(msg interface{}, sigHex string) (string, error) {
 }
 
 func hexToPubKey(pubHex string) (*ecdsa.PublicKey, error) {
-	pubBytes, err := hex.DecodeString(SanitizeHex(pubHex))
+	pubBytes, err := hex.DecodeString(TrimHex(pubHex))
 	if err != nil {
 		return new(ecdsa.PublicKey), err
 	}
@@ -338,7 +338,7 @@ func HashPoseidon(hexStr string) []byte {
 	return hash
 }
 
-func SanitizeHex(hexStr string) string {
+func TrimHex(hexStr string) string {
 	return strings.TrimPrefix(hexStr, "0x")
 }
 
@@ -370,7 +370,7 @@ func (k *SignKeys) Decrypt(hexMessage string) (string, error) {
 		return "", err
 	}
 	privKey, _ := secp256k1.PrivKeyFromBytes(pkBytes)
-	cipertext, err := hex.DecodeString(SanitizeHex(hexMessage))
+	cipertext, err := hex.DecodeString(TrimHex(hexMessage))
 	if err != nil {
 		return "", err
 	}
