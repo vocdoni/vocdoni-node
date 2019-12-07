@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"time"
 
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
@@ -69,10 +68,6 @@ func (p *Proxy) Init() (net.Addr, error) {
 			log.Fatal(s.ServeTLS(ln, "", ""))
 		}()
 
-		// TODO(mvdan): Figure out why this sleep is necessary. It
-		// used to be 5s. Now that we start the tcp listener first, is
-		// there still a reason to sleep?
-		time.Sleep(time.Second)
 		certs := getCertificates(p.C.SSLDomain, m)
 		if certs == nil {
 			log.Warnf(`letsencrypt TLS certificate cannot be obtained. Maybe port 443 is not accessible or domain name is wrong.
