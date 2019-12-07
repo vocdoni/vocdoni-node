@@ -1,0 +1,4 @@
+# Go files implementing contracts are large files with long lines, so they are
+# generally not interesting for 'git diff' or 'git grep'. If anything, they make
+# grepping harder.
+*/contracts/*.go -diff -text
