@@ -19,11 +19,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-const (
-	Private = true
-	Public  = false
-)
-
 func buildReply(context types.MessageContext, data []byte) types.Message {
 	reply := new(types.Message)
 	reply.TimeStamp = int32(time.Now().Unix())
@@ -137,50 +132,50 @@ func InitRouter(inbound <-chan types.Message, storage data.Storage, transport ne
 	return NewRouter(inbound, storage, transport, *signer)
 }
 
-func (r *Router) registerMethod(methodName string, methodCallback requestMethod, private bool) {
-	if private {
-		r.privateRequestMap[methodName] = methodCallback
-	} else {
-		r.publicRequestMap[methodName] = methodCallback
-	}
+func (r *Router) registerPrivate(methodName string, methodCallback requestMethod) {
+	r.privateRequestMap[methodName] = methodCallback
+}
+
+func (r *Router) registerPublic(methodName string, methodCallback requestMethod) {
+	r.publicRequestMap[methodName] = methodCallback
 }
 
 // EnableFileAPI enables the FILE API in the Router
 func (r *Router) EnableFileAPI() {
-	r.registerMethod("fetchFile", fetchFile, Public) // false = public method
-	r.registerMethod("addFile", addFile, Private)    // true = private method
-	r.registerMethod("pinList", pinList, Private)
-	r.registerMethod("pinFile", pinFile, Private)
-	r.registerMethod("unpinFile", unpinFile, Private)
+	r.registerPublic("fetchFile", fetchFile)
+	r.registerPrivate("addFile", addFile)
+	r.registerPrivate("pinList", pinList)
+	r.registerPrivate("pinFile", pinFile)
+	r.registerPrivate("unpinFile", unpinFile)
 }
 
 // EnableCensusAPI enables the Census API in the Router
 func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 	r.census = cm
 	cm.Data = r.storage
-	r.registerMethod("getRoot", censusLocal, Public) // false = public method
-	r.registerMethod("dump", censusLocal, Private)   // true = private method
-	r.registerMethod("dumpPlain", censusLocal, Private)
-	r.registerMethod("getSize", censusLocal, Public)
-	r.registerMethod("genProof", censusLocal, Public)
-	r.registerMethod("checkProof", censusLocal, Public)
-	r.registerMethod("addCensus", censusLocal, Private)
-	r.registerMethod("addClaim", censusLocal, Private)
-	r.registerMethod("addClaimBulk", censusLocal, Private)
-	r.registerMethod("publish", censusLocal, Private)
-	r.registerMethod("importRemote", censusLocal, Private)
+	r.registerPublic("getRoot", censusLocal)
+	r.registerPrivate("dump", censusLocal)
+	r.registerPrivate("dumpPlain", censusLocal)
+	r.registerPublic("getSize", censusLocal)
+	r.registerPublic("genProof", censusLocal)
+	r.registerPublic("checkProof", censusLocal)
+	r.registerPrivate("addCensus", censusLocal)
+	r.registerPrivate("addClaim", censusLocal)
+	r.registerPrivate("addClaimBulk", censusLocal)
+	r.registerPrivate("publish", censusLocal)
+	r.registerPrivate("importRemote", censusLocal)
 }
 
 // EnableVoteAPI enabled the Vote API in the Router
 func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP) {
 	r.tmclient = rpcClient
-	r.registerMethod("submitEnvelope", submitEnvelope, Public)
-	r.registerMethod("getEnvelopeStatus", getEnvelopeStatus, Public)
-	r.registerMethod("getEnvelope", getEnvelope, Public)
-	r.registerMethod("getEnvelopeHeight", getEnvelopeHeight, Public)
-	r.registerMethod("getProcessList", getProcessList, Public)
-	r.registerMethod("getEnvelopeList", getEnvelopeList, Public)
-	r.registerMethod("getBlockHeight", getBlockHeight, Public)
+	r.registerPublic("submitEnvelope", submitEnvelope)
+	r.registerPublic("getEnvelopeStatus", getEnvelopeStatus)
+	r.registerPublic("getEnvelope", getEnvelope)
+	r.registerPublic("getEnvelopeHeight", getEnvelopeHeight)
+	r.registerPublic("getProcessList", getProcessList)
+	r.registerPublic("getEnvelopeList", getEnvelopeList)
+	r.registerPublic("getBlockHeight", getBlockHeight)
 }
 
 // Route routes requests through the Router object
