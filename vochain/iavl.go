@@ -202,7 +202,7 @@ func (v *VochainState) GetProcess(pid string) (*vochaintypes.Process, error) {
 		return nil, fmt.Errorf("cannot find process with id (%s)", pid)
 	}
 	_, processBytes := v.ProcessTree.Get([]byte(pid))
-	if processBytes == nil {
+	if len(processBytes) == 0 {
 		return nil, fmt.Errorf("cannot find process with id (%s)", pid)
 	}
 	err := v.Codec.UnmarshalBinaryBare(processBytes, &newProcess)

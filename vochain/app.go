@@ -47,7 +47,7 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	// gets the app height from database
 	var header abcitypes.Header
 	_, heightBytes := app.State.AppTree.Get([]byte(headerKey))
-	if heightBytes != nil {
+	if len(heightBytes) > 0 {
 		err := app.State.Codec.UnmarshalBinaryBare(heightBytes, &header)
 		if err != nil {
 			vlog.Errorf("cannot unmarshal header from database")

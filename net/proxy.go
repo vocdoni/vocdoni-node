@@ -69,7 +69,7 @@ func (p *Proxy) Init() (net.Addr, error) {
 		}()
 
 		certs := getCertificates(p.C.SSLDomain, m)
-		if certs == nil {
+		if len(certs) == 0 {
 			log.Warnf(`letsencrypt TLS certificate cannot be obtained. Maybe port 443 is not accessible or domain name is wrong.
 						You might want to redirect port 443 with iptables using the following command:
 							sudo iptables -t nat -I PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports %d`, p.C.Port)

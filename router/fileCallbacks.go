@@ -35,14 +35,14 @@ func fetchFile(request routerRequest, router *Router) {
 			resp, err = http.Get(parsedURIs[idx])
 			defer resp.Body.Close()
 			content, err = ioutil.ReadAll(resp.Body)
-			if content != nil {
+			if len(content) > 0 {
 				found = true
 			}
 		case "ipfs:":
 			splt := strings.Split(parsedURIs[idx], "/")
 			hash := splt[len(splt)-1]
 			content, err = router.storage.Retrieve(hash)
-			if content != nil {
+			if len(content) > 0 {
 				found = true
 			}
 		case "bzz:", "bzz-feed":
