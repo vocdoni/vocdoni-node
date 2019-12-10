@@ -165,12 +165,6 @@ func (e *EthChainContext) Start() {
 	e.Eth = et
 }
 
-func (e *EthChainContext) TestTx(amount int) error {
-	bigWalletAddr := "0x781b6544b1a73c6d779eb23c7369cf8039640793"
-	const gasLimit = 8000000
-	return e.sendTx(bigWalletAddr, gasLimit, amount)
-}
-
 // might be worthwhile to create generic SendTx to call contracttx, deploytx, etc
 func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
 	client, err := ethclient.Dial(e.Node.IPCEndpoint())
@@ -187,7 +181,6 @@ func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
 	}
 	// create tx
 	price, _ := client.SuggestGasPrice(ctx)
-	log.Infof("Price: $v", price)
 	var empty []byte
 	tx := ethTypes.NewTransaction(nonce, common.HexToAddress(addr), big.NewInt(int64(amount)), limit, price, empty)
 	signedTx, err := e.Keys.SignTx(acc, tx, big.NewInt(int64(e.Config.NetworkId)))
