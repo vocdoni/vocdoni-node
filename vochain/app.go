@@ -95,6 +95,9 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	header.Height = 0
 	header.AppHash = []byte{}
 	headerBytes, err := app.Codec.MarshalBinaryBare(header)
+	if err != nil {
+		vlog.Errorf("cannot marshal header: %s", err)
+	}
 	app.State.AppTree.Set([]byte(headerKey), headerBytes)
 	app.State.Save()
 	// TBD: using empty list here, should return validatorsUpdate to use the validators obtained here

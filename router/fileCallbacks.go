@@ -33,10 +33,12 @@ func fetchFile(request routerRequest, router *Router) {
 		switch t {
 		case "http:", "https:":
 			resp, err = http.Get(parsedURIs[idx])
-			defer resp.Body.Close()
-			content, err = ioutil.ReadAll(resp.Body)
-			if len(content) > 0 {
-				found = true
+			if err == nil {
+				defer resp.Body.Close()
+				content, err = ioutil.ReadAll(resp.Body)
+				if len(content) > 0 {
+					found = true
+				}
 			}
 		case "ipfs:":
 			splt := strings.Split(parsedURIs[idx], "/")
