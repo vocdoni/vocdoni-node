@@ -117,6 +117,7 @@ func addDefaultAssets(repoRoot string) error {
 	if err != nil { // NB: repo is owned by the node
 		return err
 	}
+	defer r.Close()
 
 	nd, err := core.NewNode(ctx, &core.BuildCfg{Repo: r})
 	if err != nil {
@@ -141,6 +142,7 @@ func initializeIpnsKeyspace(repoRoot string) error {
 	if err != nil { // NB: repo is owned by the node
 		return err
 	}
+	defer r.Close()
 
 	nd, err := core.NewNode(ctx, &core.BuildCfg{Repo: r})
 	if err != nil {

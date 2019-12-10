@@ -59,7 +59,6 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 		log.Warn("Error opening repo dir")
 		return nil, nil, err
 	}
-	//	defer r.Close()
 
 	ctx := context.Background()
 

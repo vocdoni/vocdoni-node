@@ -206,6 +206,7 @@ func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer nd.Close()
 
 	r, ok := nd.(files.File)
 	if !ok {
