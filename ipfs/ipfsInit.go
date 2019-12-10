@@ -64,6 +64,10 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 		return nil, err
 	}
 
+	// We don't need mdns, and it doesn't look like it works when not
+	// running as root, anyway.
+	conf.Discovery.MDNS.Enabled = false
+
 	// Some optimizations from https://medium.com/coinmonks/ipfs-production-configuration-57121f0daab2
 	conf.Datastore.BloomFilterSize = 1048576
 	conf.Swarm.ConnMgr.LowWater = 100
