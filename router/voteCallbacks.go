@@ -75,13 +75,17 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 		log.Warnf("cannot query: %s", err)
 		*ok = false
 		apiResponse.Response.Ok = ok
+		apiResponse.Response.Registered = ok
 	} else {
 		*ok = true
 		apiResponse.Response.Ok = ok
+		registered := new(bool)
 		if queryResult.Response.Code == 0 {
-			apiResponse.Response.Registered = "true"
+			*registered = true
+			apiResponse.Response.Registered = registered
 		} else {
-			apiResponse.Response.Registered = "false"
+			*registered = false
+			apiResponse.Response.Registered = registered
 		}
 	}
 

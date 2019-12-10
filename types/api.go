@@ -61,7 +61,7 @@ type MetaResponse struct {
 	Nullifiers    *[]string `json:"nullifiers,omitempty"`
 	Ok            *bool     `json:"ok,omitempty"`
 	Payload       string    `json:"payload,omitempty"`
-	Registered    string    `json:"registered,omitempty"`
+	Registered    *bool     `json:"registered,omitempty"`
 	Request       string    `json:"request"`
 	Root          string    `json:"root,omitempty"`
 	Siblings      string    `json:"siblings,omitempty"`
