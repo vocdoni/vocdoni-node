@@ -161,9 +161,7 @@ func pinFile(request routerRequest, router *Router) {
 	}
 	var response types.ResponseMessage
 	response.ID = request.id
-	ok := new(bool)
-	*ok = true
-	response.Response.Ok = ok
+	response.Response.Ok = types.True
 	response.Response.Request = request.id
 	response.Response.Timestamp = int32(time.Now().Unix())
 	response.Signature, err = router.signer.SignJSON(response.Response)
@@ -189,9 +187,7 @@ func unpinFile(request routerRequest, router *Router) {
 	}
 	var response types.ResponseMessage
 	response.ID = request.id
-	ok := new(bool)
-	*ok = true
-	response.Response.Ok = ok
+	response.Response.Ok = types.True
 	response.Response.Request = request.id
 	response.Response.Timestamp = int32(time.Now().Unix())
 	response.Signature, err = router.signer.SignJSON(response.Response)
