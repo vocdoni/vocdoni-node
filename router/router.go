@@ -118,10 +118,9 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	}
 	request.id = msgStruct.ID
 	request.context = context
-	/*assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)
-	because json.Marshal encodes in lexographic order for map objects.
-	request.raw, err = json.Marshal(msgStruct.Request)
-	*/
+	// assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)
+	// because json.Marshal encodes in lexographic order for map objects.
+	// request.raw, err = json.Marshal(msgStruct.Request)
 	return request, err
 }
 

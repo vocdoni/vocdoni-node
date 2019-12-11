@@ -1,6 +1,6 @@
 package types
 
-/*MessageRequest holds a decoded request but does not decode the body*/
+// MessageRequest holds a decoded request but does not decode the body
 type RequestMessage struct {
 	ID string `json:"id"`
 	//	Request   map[string]interface{} `json:"request"`
@@ -8,8 +8,8 @@ type RequestMessage struct {
 	Signature string      `json:"signature"`
 }
 
-/*MetaRequest contains all of the possible request fields.
-Fields must be in alphabetical order */
+// MetaRequest contains all of the possible request fields.
+// Fields must be in alphabetical order
 type MetaRequest struct {
 	CensusID       string   `json:"censusId,omitempty"`
 	CensusURI      string   `json:"censusUri,omitempty"`
@@ -46,8 +46,8 @@ type ErrorMessage struct {
 	Signature string       `json:"signature"`
 }
 
-/*MetaResponse contains all of the possible request fields.
-Fields must be in alphabetical order */
+// MetaResponse contains all of the possible request fields.
+// Fields must be in alphabetical order
 type MetaResponse struct {
 	CensusID      string    `json:"censusId,omitempty"`
 	ClaimsData    []string  `json:"claimsData,omitempty"`

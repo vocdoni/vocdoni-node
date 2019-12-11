@@ -1,6 +1,7 @@
 package test
 
-/* This test starts the following services
+/*
+This test starts the following services
 
 1. Starts the Proxy
 2. Starts the IPFS storage
