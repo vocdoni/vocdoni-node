@@ -118,7 +118,9 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 	fn := func(writer http.ResponseWriter, reader *http.Request) {
 		body, err := ioutil.ReadAll(reader.Body)
 		if err != nil {
-			panic(err)
+			http.Error(writer, "", http.StatusInternalServerError)
+			log.Errorf("failed to read request body: %v", err)
+			return
 		}
 		var req *http.Request
 		log.Debugf("%s", url)

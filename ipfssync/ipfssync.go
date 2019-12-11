@@ -271,7 +271,9 @@ func (is *IPFSsync) Start() {
 	log.Infof("initializing new pin storage")
 	os.RemoveAll(is.DataDir + "/ipfsSync.db")
 	is.hashTree.Storage = is.DataDir
-	is.hashTree.Init("ipfsSync.db")
+	if err := is.hashTree.Init("ipfsSync.db"); err != nil {
+		log.Fatal(err)
+	}
 	is.updatePinsTree([]string{})
 	log.Infof("current hash %s", is.hashTree.GetRoot())
 
@@ -283,8 +285,7 @@ func (is *IPFSsync) Start() {
 	is.Topic = conn.Topic
 	is.Key = conn.Key
 
-	err := is.Transport.Init(&conn)
-	if err != nil {
+	if err := is.Transport.Init(&conn); err != nil {
 		log.Fatal(err)
 	}
 
@@ -292,9 +293,10 @@ func (is *IPFSsync) Start() {
 	go is.Transport.Listen(msg)
 	is.myAddress = fmt.Sprintf("%x", is.Transport.Swarm.PssAddr)
 	is.myNodeID = is.Storage.Node.PeerHost.ID().String()
+	var err error
 	is.myMultiAddr, err = ma.NewMultiaddr(guessMyAddress(4001, is.myNodeID))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	log.Infof("my multiaddress: %s", is.myMultiAddr)
 
