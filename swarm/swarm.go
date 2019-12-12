@@ -81,7 +81,7 @@ func newNode(key *ecdsa.PrivateKey, port int, httpport int, wsport int,
 	cfg.P2P.EnableMsgEvents = true
 	cfg.P2P.NoDiscovery = false
 	cfg.P2P.DiscoveryV5 = true
-	ip, err := dvoteUtil.GetPublicIP()
+	ip, err := dvoteUtil.PublicIP()
 	if err == nil {
 		cfg.P2P.NAT = nat.ExtIP(ip)
 	}

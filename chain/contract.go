@@ -71,7 +71,7 @@ func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*P
 	return PH, nil
 }
 
-func (ph *ProcessHandle) GetProcessMetadata(pid [32]byte) (*ProcessMetadata, error) {
+func (ph *ProcessHandle) ProcessMetadata(pid [32]byte) (*ProcessMetadata, error) {
 	if ph.storage == nil {
 		return nil, fmt.Errorf("no storage configured, cannot get process metadata")
 	}
@@ -94,7 +94,7 @@ func (ph *ProcessHandle) GetProcessMetadata(pid [32]byte) (*ProcessMetadata, err
 	return processInfoStructured, nil
 }
 
-func (ph *ProcessHandle) GetProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error) {
+func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error) {
 	processMeta, err := ph.VotingProcess.Get(nil, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process metadata from Ethereum: %s", err)
@@ -115,18 +115,18 @@ func (ph *ProcessHandle) GetProcessTxArgs(pid [32]byte) (*types.NewProcessTx, er
 	return processTxArgs, nil
 }
 
-func (ph *ProcessHandle) GetProcessIndex(pid [32]byte) (*big.Int, error) {
+func (ph *ProcessHandle) ProcessIndex(pid [32]byte) (*big.Int, error) {
 	return ph.VotingProcess.GetProcessIndex(nil, pid)
 }
 
-func (ph *ProcessHandle) GetOracles() ([]string, error) {
+func (ph *ProcessHandle) Oracles() ([]string, error) {
 	return ph.VotingProcess.GetOracles(nil)
 }
 
-func (ph *ProcessHandle) GetValidators() ([]string, error) {
+func (ph *ProcessHandle) Validators() ([]string, error) {
 	return ph.VotingProcess.GetValidators(nil)
 }
 
-func (ph *ProcessHandle) GetGenesis() (string, error) {
+func (ph *ProcessHandle) Genesis() (string, error) {
 	return ph.VotingProcess.GetGenesis(nil)
 }

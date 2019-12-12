@@ -157,13 +157,13 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	}
 	switch reqData.Method {
 	case "getEnvelopeStatus":
-		_, err := app.State.GetEnvelope(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier))
+		_, err := app.State.Envelope(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier))
 		if err != nil {
 			return abcitypes.ResponseQuery{Code: 1}
 		}
 		return abcitypes.ResponseQuery{Code: 0}
 	case "getEnvelope":
-		e, err := app.State.GetEnvelope(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier)) // nullifier hash(addr+pid), processId by pid_nullifier
+		e, err := app.State.Envelope(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier)) // nullifier hash(addr+pid), processId by pid_nullifier
 		if err != nil {
 			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get envelope: %s", err)}
 		}
@@ -180,7 +180,7 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 		}
 		return abcitypes.ResponseQuery{Code: 0, Value: vBytes}
 	case "getBlockHeight":
-		h := app.State.GetHeight()
+		h := app.State.Height()
 		hbytes, err := app.Codec.MarshalBinaryBare(h)
 		if err != nil {
 			hbytes = []byte{}
@@ -189,7 +189,7 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	case "getProcessList":
 		return abcitypes.ResponseQuery{Code: 1, Info: "not implemented"}
 	case "getEnvelopeList":
-		n := app.State.GetEnvelopeList(reqData.ProcessID, reqData.From, reqData.ListSize)
+		n := app.State.EnvelopeList(reqData.ProcessID, reqData.From, reqData.ListSize)
 		if len(n) != 0 {
 			nBytes, err := app.State.Codec.MarshalBinaryBare(n)
 			if err != nil {

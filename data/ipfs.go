@@ -89,8 +89,8 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	return nil
 }
 
-// GetURIprefix returns the URI prefix which identifies the protocol
-func (i *IPFSHandle) GetURIprefix() string {
+// URIprefix returns the URI prefix which identifies the protocol
+func (i *IPFSHandle) URIprefix() string {
 	return "ipfs://"
 }
 

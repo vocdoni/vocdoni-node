@@ -149,14 +149,14 @@ func (o *Oracle) Info() {}
 // Start starts the oracle
 func (o *Oracle) Start() {}
 
-// GetEthereumContract gets a contract from ethereum if exists
-func (o *Oracle) GetEthereumContract() {}
+// EthereumContract gets a contract from ethereum if exists
+func (o *Oracle) EthereumContract() {}
 
-// GetEthereumEventList gets the ethereum events to which we are subscribed
-func (o *Oracle) GetEthereumEventList() {}
+// EthereumEventList gets the ethereum events to which we are subscribed
+func (o *Oracle) EthereumEventList() {}
 
-// GetVochainEventList gets the vochain events to which we are subscribed
-func (o *Oracle) GetVochainEventList() {}
+// VochainEventList gets the vochain events to which we are subscribed
+func (o *Oracle) VochainEventList() {}
 
 // SendEthereumTx sends a transaction to ethereum
 func (o *Oracle) SendEthereumTx() {}
@@ -330,13 +330,13 @@ func (o *Oracle) handleLogEntryVochain(event ethtypes.Log) error {
 			topics[i] = event.Topics[i].Hex()
 		}
 		log.Debugf("topics: %s", topics)
-		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.ProcessId)
+		processIdx, err := o.processHandle.ProcessIndex(eventProcessCreated.ProcessId)
 		if err != nil {
 			log.Error("cannot get process index from smartcontract")
 		}
 		log.Debugf("Process index loaded: %v", processIdx)
 
-		processTx, err := o.processHandle.GetProcessTxArgs(eventProcessCreated.ProcessId)
+		processTx, err := o.processHandle.ProcessTxArgs(eventProcessCreated.ProcessId)
 		if err != nil {
 			log.Errorf("error getting process metadata: %s", err)
 		} else {
@@ -448,13 +448,13 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 			topics[i] = event.Topics[i].Hex()
 		}
 		log.Debugf("topics: %v", topics)
-		processIdx, err := o.processHandle.GetProcessIndex(eventProcessCreated.ProcessId)
+		processIdx, err := o.processHandle.ProcessIndex(eventProcessCreated.ProcessId)
 		if err != nil {
 			log.Error("cannot get process index from smartcontract")
 		}
 		log.Debugf("Process index loaded: %v", processIdx)
 
-		processInfo, err := o.processHandle.GetProcessMetadata(eventProcessCreated.ProcessId)
+		processInfo, err := o.processHandle.ProcessMetadata(eventProcessCreated.ProcessId)
 		if err != nil {
 			log.Errorf("Error getting process metadata: %s", err)
 		} else {
@@ -486,12 +486,12 @@ func (o *Oracle) handleLogEntryCensus(event ethtypes.Log) error {
 			log.Warnf("cannot get process given the index: %v", err)
 		}
 		// log.Fatalf("PROCESS LOADED: %v", processInfo)
-		_, err = o.processHandle.GetOracles()
+		_, err = o.processHandle.Oracles()
 		if err != nil {
 			log.Errorf("error getting oracles: %s", err)
 		}
 
-		_, err = o.processHandle.GetValidators()
+		_, err = o.processHandle.Validators()
 		if err != nil {
 			log.Errorf("error getting validators: %s", err)
 		}

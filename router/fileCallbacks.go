@@ -102,7 +102,7 @@ func addFile(request routerRequest, router *Router) {
 		response.ID = request.id
 		response.Request = request.id
 		response.Timestamp = int32(time.Now().Unix())
-		response.URI = router.storage.GetURIprefix() + cid
+		response.URI = router.storage.URIprefix() + cid
 		response.Signature, err = router.signer.SignJSON(response.MetaResponse)
 		if err != nil {
 			log.Warn(err)

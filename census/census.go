@@ -299,7 +299,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 	// Methods without rootHash
 	switch op {
 	case "getRoot":
-		resp.Root = cm.Trees[r.CensusID].GetRoot()
+		resp.Root = cm.Trees[r.CensusID].Root()
 		return resp
 
 	case "addClaimBulk":
@@ -381,15 +381,15 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			resp.Error = "not supported"
 			return resp
 		}
-		if !strings.HasPrefix(r.URI, cm.Data.GetURIprefix()) ||
-			len(r.URI) <= len(cm.Data.GetURIprefix()) {
-			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, cm.Data.GetURIprefix())
+		if !strings.HasPrefix(r.URI, cm.Data.URIprefix()) ||
+			len(r.URI) <= len(cm.Data.URIprefix()) {
+			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, cm.Data.URIprefix())
 			resp.Ok = types.False
 			resp.Error = "URI not supported"
 			return resp
 		}
 		log.Infof("retrieving remote census %s", r.CensusURI)
-		censusRaw, err := cm.Data.Retrieve(r.URI[len(cm.Data.GetURIprefix()):])
+		censusRaw, err := cm.Data.Retrieve(r.URI[len(cm.Data.URIprefix()):])
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
 			resp.Ok = types.False
@@ -429,7 +429,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		}
 		root := r.RootHash
 		if len(root) < 1 {
-			root = cm.Trees[r.CensusID].GetRoot()
+			root = cm.Trees[r.CensusID].Root()
 		}
 		// Generate proof and return it
 		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
@@ -480,7 +480,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		return resp
 
 	case "getSize":
-		resp.Size, err = t.Size(t.GetRoot())
+		resp.Size, err = t.Size(t.Root())
 		if err != nil {
 			resp.Ok = types.False
 			resp.Error = err.Error()
@@ -497,7 +497,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 		var dumpValues []string
 		root := r.RootHash
 		if len(root) < 1 {
-			root = t.GetRoot()
+			root = t.Root()
 		}
 		if op == "dump" {
 			dumpValues, err = t.Dump(root)
@@ -525,12 +525,12 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			return resp
 		}
 		var dump types.CensusDump
-		dump.RootHash = t.GetRoot()
-		dump.ClaimsData, err = t.Dump(t.GetRoot())
+		dump.RootHash = t.Root()
+		dump.ClaimsData, err = t.Dump(t.Root())
 		if err != nil {
 			resp.Error = err.Error()
 			resp.Ok = types.False
-			log.Warnf("cannot dump census with root %s: %s", t.GetRoot(), err)
+			log.Warnf("cannot dump census with root %s: %s", t.Root(), err)
 			return resp
 		}
 		dumpBytes, err := json.Marshal(dump)
@@ -547,9 +547,9 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 			log.Warnf("cannot publish census dump: %s", err)
 			return resp
 		}
-		resp.URI = cm.Data.GetURIprefix() + cid
+		resp.URI = cm.Data.URIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
-		resp.Root = t.GetRoot()
+		resp.Root = t.Root()
 
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %s", resp.Root)

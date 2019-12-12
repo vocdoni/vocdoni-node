@@ -98,7 +98,7 @@ func main() {
 	log.Info("starting miner")
 
 	if len(globalCfg.PublicAddr) == 0 {
-		ip, err := util.GetPublicIP()
+		ip, err := util.PublicIP()
 		if err != nil {
 			log.Warn(err)
 		} else {

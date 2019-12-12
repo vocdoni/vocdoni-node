@@ -57,7 +57,7 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 	}
 	switch tx := tx.(type) {
 	case vochaintypes.VoteTx:
-		process, _ := state.GetProcess(tx.ProcessID)
+		process, _ := state.Process(tx.ProcessID)
 		if process == nil {
 			return fmt.Errorf("process with id (%s) does not exists", tx.ProcessID)
 		}
@@ -132,7 +132,7 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
 func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
-	process, _ := state.GetProcess(vote.ProcessID)
+	process, _ := state.Process(vote.ProcessID)
 	if process == nil {
 		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
 	}
@@ -140,7 +140,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 	switch process.Type {
 	case "snark-vote":
 		voteID := fmt.Sprintf("%s_%s", signature.TrimHex(vote.ProcessID), signature.TrimHex(vote.Nullifier))
-		v, _ := state.GetEnvelope(voteID)
+		v, _ := state.Envelope(voteID)
 		if v != nil {
 			log.Debugf("vote already exists")
 			return fmt.Errorf("vote already exists")
@@ -177,7 +177,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 		log.Debugf("generated nullifier: %s", voteTmp.Nullifier)
 		// check if vote exists
 		voteID := fmt.Sprintf("%s_%s", signature.TrimHex(vote.ProcessID), signature.TrimHex(voteTmp.Nullifier))
-		v, _ := state.GetEnvelope(voteID)
+		v, _ := state.Envelope(voteID)
 		if v != nil {
 			return fmt.Errorf("vote already exists")
 		}
@@ -205,7 +205,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
 func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *VochainState) error {
 	// get oracles
-	oracles, err := state.GetOracles()
+	oracles, err := state.Oracles()
 	if err != nil || len(oracles) == 0 {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
@@ -221,7 +221,7 @@ func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *VochainState) e
 		return fmt.Errorf("unauthorized to create a process, message: %s, recovered addr: %s", string(processBytes), addr)
 	}
 	// get process
-	_, err = state.GetProcess(process.ProcessID)
+	_, err = state.Process(process.ProcessID)
 	if err == nil {
 		return fmt.Errorf("process with id (%s) already exists", process.ProcessID)
 	}
@@ -238,7 +238,7 @@ func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *VochainState) e
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
 func AdminTxCheck(adminTx vochaintypes.AdminTx, state *VochainState) error {
 	// get oracles
-	oracles, err := state.GetOracles()
+	oracles, err := state.Oracles()
 	if err != nil || len(oracles) == 0 {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}

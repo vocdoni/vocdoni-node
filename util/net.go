@@ -10,11 +10,11 @@ import (
 	externalip "gitlab.com/vocdoni/go-external-ip"
 )
 
-// GetPublicIP returns the external/public IP of the host
+// PublicIP returns the external/public IP of the host
 // For now, let's only support IPv4. Hope we can change this in the future...
 //
 // If a nil error is returned, the returned IP must be valid.
-func GetPublicIP() (net.IP, error) {
+func PublicIP() (net.IP, error) {
 	consensus := externalip.DefaultConsensus(nil, nil)
 	ip, err := consensus.ExternalIP(4)
 	// if the IP isn't a valid ipv4, To4 will return nil

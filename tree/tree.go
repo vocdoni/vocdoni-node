@@ -22,7 +22,7 @@ type Tree struct {
 
 const MaxClaimSize = 62
 
-func (t *Tree) GetMaxClaimSize() int {
+func (t *Tree) MaxClaimSize() int {
 	return MaxClaimSize
 }
 
@@ -55,7 +55,7 @@ func (t *Tree) Close() {
 	defer t.Tree.Storage().Close()
 }
 
-func (t *Tree) GetClaim(data []byte) (*mkcore.ClaimBasic, error) {
+func (t *Tree) Claim(data []byte) (*mkcore.ClaimBasic, error) {
 	if len(data) > MaxClaimSize {
 		return nil, errors.New("claim data too large")
 	}
@@ -83,7 +83,7 @@ func (t *Tree) AddClaim(data []byte) error {
 	if len(data) < MaxClaimSize {
 		doPadding(&data)
 	}
-	e, err := t.GetClaim(data)
+	e, err := t.Claim(data)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (t *Tree) GenProof(data []byte) (string, error) {
 	if len(data) < MaxClaimSize {
 		doPadding(&data)
 	}
-	e, err := t.GetClaim(data)
+	e, err := t.Claim(data)
 	if err != nil {
 		return "", err
 	}
@@ -132,15 +132,15 @@ func CheckProof(root, mpHex string, data []byte) (bool, error) {
 }
 
 func (t *Tree) CheckProof(data []byte, mpHex string) (bool, error) {
-	return CheckProof(t.GetRoot(), mpHex, data)
+	return CheckProof(t.Root(), mpHex, data)
 }
 
-func (t *Tree) GetRoot() string {
+func (t *Tree) Root() string {
 	return common3.HexEncode(t.Tree.RootKey().Bytes())
 }
 
-func (t *Tree) GetIndex(data []byte) (string, error) {
-	e, err := t.GetClaim(data)
+func (t *Tree) Index(data []byte) (string, error) {
+	e, err := t.Claim(data)
 	if err != nil {
 		return "", err
 	}

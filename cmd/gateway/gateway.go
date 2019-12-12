@@ -388,7 +388,7 @@ func main() {
 		log.Info("initializing vochain")
 		// node + app layer
 		if len(globalCfg.Vochain.PublicAddr) == 0 {
-			ip, err := util.GetPublicIP()
+			ip, err := util.PublicIP()
 			if err != nil {
 				log.Warn(err)
 			} else {

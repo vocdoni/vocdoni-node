@@ -15,7 +15,7 @@ type Storage interface {
 	Pin(path string) error
 	Unpin(path string) error
 	ListPins() (map[string]string, error)
-	GetURIprefix() string
+	URIprefix() string
 	Stats() (string, error)
 }
 

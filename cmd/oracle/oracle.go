@@ -167,7 +167,7 @@ func main() {
 
 	// node + app layer
 	if len(globalCfg.VochainConfig.PublicAddr) == 0 {
-		ip, err := util.GetPublicIP()
+		ip, err := util.PublicIP()
 		if err != nil {
 			log.Warn(err)
 		} else {

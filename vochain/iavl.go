@@ -114,8 +114,8 @@ func (v *VochainState) RemoveOracle(address string) error {
 	return errors.New("oracle not found")
 }
 
-// GetOracles returns the current oracle list
-func (v *VochainState) GetOracles() ([]string, error) {
+// Oracles returns the current oracle list
+func (v *VochainState) Oracles() ([]string, error) {
 	_, oraclesBytes := v.AppTree.Get([]byte(oracleKey))
 	var oracles []string
 	err := v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
@@ -175,8 +175,8 @@ func (v *VochainState) RemoveValidator(address string) error {
 	return errors.New("validator not found")
 }
 
-// GetValidators returns a list of the validators saved on persistent storage
-func (v *VochainState) GetValidators() ([]vochaintypes.Validator, error) {
+// Validators returns a list of the validators saved on persistent storage
+func (v *VochainState) Validators() ([]vochaintypes.Validator, error) {
 	_, validatorBytes := v.AppTree.Get([]byte(validatorKey))
 	var validators []vochaintypes.Validator
 	err := v.Codec.UnmarshalBinaryBare(validatorBytes, &validators)
@@ -194,8 +194,8 @@ func (v *VochainState) AddProcess(p *vochaintypes.Process, pid string) error {
 	return nil
 }
 
-// GetProcess returns a process info given a processId if exists
-func (v *VochainState) GetProcess(pid string) (*vochaintypes.Process, error) {
+// Process returns a process info given a processId if exists
+func (v *VochainState) Process(pid string) (*vochaintypes.Process, error) {
 	var newProcess *vochaintypes.Process
 	pid = signature.TrimHex(pid)
 	if !v.ProcessTree.Has([]byte(pid)) {
@@ -223,8 +223,8 @@ func (v *VochainState) AddVote(vote *vochaintypes.Vote) error {
 	return nil
 }
 
-// GetEnvelope returns the info of a vote if already exists
-func (v *VochainState) GetEnvelope(voteID string) (*vochaintypes.Vote, error) {
+// Envelope returns the info of a vote if already exists
+func (v *VochainState) Envelope(voteID string) (*vochaintypes.Vote, error) {
 	var vote *vochaintypes.Vote
 	voteID = signature.TrimHex(voteID)
 	if !v.VoteTree.Has([]byte(voteID)) {
@@ -268,8 +268,8 @@ func (v *VochainState) CountVotes(processID string) int64 {
 	return count
 }
 
-// GetEnvelopeList returns a list of registered envelopes nullifiers given a processId
-func (v *VochainState) GetEnvelopeList(processID string, from, listSize int64) []string {
+// EnvelopeList returns a list of registered envelopes nullifiers given a processId
+func (v *VochainState) EnvelopeList(processID string, from, listSize int64) []string {
 	processID = signature.TrimHex(processID)
 	var nullifiers []string
 	idx := int64(0)
@@ -287,8 +287,8 @@ func (v *VochainState) GetEnvelopeList(processID string, from, listSize int64) [
 	return nullifiers
 }
 
-// GetHeight returns the blockchain last block commited height
-func (v *VochainState) GetHeight() int64 {
+// Height returns the blockchain last block commited height
+func (v *VochainState) Height() int64 {
 	_, headerBytes := v.AppTree.Get([]byte(headerKey))
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
@@ -298,8 +298,8 @@ func (v *VochainState) GetHeight() int64 {
 	return header.Height
 }
 
-// GetAppHash returns last hash of the application
-func (v *VochainState) GetAppHash() []byte {
+// AppHash returns last hash of the application
+func (v *VochainState) AppHash() []byte {
 	_, headerBytes := v.AppTree.Get([]byte(headerKey))
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
@@ -324,14 +324,14 @@ func (v *VochainState) Rollback() {
 	v.VoteTree.Rollback()
 }
 
-// GetHash returns the hash of the vochain trees mkroots
+// Hash returns the hash of the vochain trees mkroots
 // hash(appTree+processTree+voteTree)
-func (v *VochainState) GetWorkingHash() []byte {
+func (v *VochainState) WorkingHash() []byte {
 	return signature.HashRaw(fmt.Sprintf("%s%s%s", v.AppTree.WorkingHash(), v.ProcessTree.WorkingHash(), v.VoteTree.WorkingHash()))
 }
 
 // ProcessList returns a list of processId given an entityId
-// func (v *VochainState) GetProcessList(entityId string) []Process
+// func (v *VochainState) ProcessList(entityId string) []Process
 
 // EnvelopeList returns a list of envelopes given a processId
-// func (v *VochainState) GetEnvelopeList(processId string) []Vote
+// func (v *VochainState) EnvelopeList(processId string) []Vote

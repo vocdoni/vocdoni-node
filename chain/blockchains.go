@@ -17,7 +17,7 @@ type ChainSpecs struct {
 
 var AvailableChains = []string{"mainnet, goerli, vctestnet"}
 
-func GetChainSpecs(name string) (*ChainSpecs, error) {
+func ChainSpecsFor(name string) (*ChainSpecs, error) {
 	switch name {
 	case "mainnet":
 		return &mainnet, nil

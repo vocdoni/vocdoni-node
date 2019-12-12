@@ -38,7 +38,7 @@ func (b *BZZHandle) Init(d *types.DataStore) error {
 	return nil
 }
 
-func (b *BZZHandle) GetURIprefix() string {
+func (b *BZZHandle) URIprefix() string {
 	return "bzz://"
 }
 
