@@ -2,10 +2,10 @@ package types
 
 // MessageRequest holds a decoded request but does not decode the body
 type RequestMessage struct {
-	ID string `json:"id"`
-	//	Request   map[string]interface{} `json:"request"`
-	Request   MetaRequest `json:"request"`
-	Signature string      `json:"signature"`
+	MetaRequest `json:"request"`
+
+	ID        string `json:"id"`
+	Signature string `json:"signature"`
 }
 
 // MetaRequest contains all of the possible request fields.
@@ -34,9 +34,10 @@ type MetaRequest struct {
 
 // ResponseMessage wraps an api response
 type ResponseMessage struct {
-	ID        string       `json:"id"`
-	Response  MetaResponse `json:"response"`
-	Signature string       `json:"signature"`
+	MetaResponse `json:"response"`
+
+	ID        string `json:"id"`
+	Signature string `json:"signature"`
 }
 
 // ErrorMessage wraps an api error

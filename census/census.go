@@ -143,18 +143,18 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 
 // CheckAuth check if a census request message is authorized
 func (cm *CensusManager) CheckAuth(rm *types.RequestMessage) error {
-	if len(rm.Signature) < signature.SignatureLength || len(rm.Request.CensusID) < 1 {
+	if len(rm.Signature) < signature.SignatureLength || len(rm.CensusID) < 1 {
 		return errors.New("signature or censusId not provided or invalid")
 	}
 	ns := new(Namespace)
 	for _, n := range cm.Census.Namespaces {
-		if n.Name == rm.Request.CensusID {
+		if n.Name == rm.CensusID {
 			ns = &n
 		}
 	}
 
 	// Add root key, if method is addCensus
-	if rm.Request.Method == "addCensus" {
+	if rm.Method == "addCensus" {
 		if len(cm.Census.RootKey) < signature.PubKeyLength {
 			log.Warn("root key does not exist, considering addCensus valid for any request")
 			return nil
@@ -168,8 +168,8 @@ func (cm *CensusManager) CheckAuth(rm *types.RequestMessage) error {
 
 	// Check timestamp
 	currentTime := int32(time.Now().Unix())
-	if rm.Request.Timestamp > currentTime+cm.AuthWindow ||
-		rm.Request.Timestamp < currentTime-cm.AuthWindow {
+	if rm.Timestamp > currentTime+cm.AuthWindow ||
+		rm.Timestamp < currentTime-cm.AuthWindow {
 		return errors.New("timestamp is not valid")
 	}
 
@@ -181,7 +181,7 @@ func (cm *CensusManager) CheckAuth(rm *types.RequestMessage) error {
 			return nil
 		}
 		valid := false
-		msg, err := json.Marshal(rm.Request)
+		msg, err := json.Marshal(rm.MetaRequest)
 		if err != nil {
 			return errors.New("cannot unmarshal")
 		}
@@ -218,23 +218,23 @@ func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, s
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	if len(rm.Request.Method) < 1 {
+	if len(rm.Method) < 1 {
 		http.Error(w, "method must be specified", 400)
 		return
 	}
-	log.Debugf("found method %s", rm.Request.Method)
+	log.Debugf("found method %s", rm.Method)
 	auth := true
 	err = cm.CheckAuth(&rm)
 	if err != nil {
 		log.Warnf("authorization error: %s", err)
 		auth = false
 	}
-	resp := cm.Handler(&rm.Request, auth, "")
+	resp := cm.Handler(&rm.MetaRequest, auth, "")
 	respMsg := new(types.ResponseMessage)
-	respMsg.Response = *resp
+	respMsg.MetaResponse = *resp
 	respMsg.ID = rm.ID
-	respMsg.Response.Request = rm.ID
-	respMsg.Signature, err = signer.SignJSON(respMsg.Response)
+	respMsg.Request = rm.ID
+	respMsg.Signature, err = signer.SignJSON(respMsg.MetaResponse)
 	if err != nil {
 		log.Warn(err)
 	}

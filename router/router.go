@@ -74,9 +74,10 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net
 }
 
 type routerRequest struct {
+	types.MetaRequest
+
 	method        string
 	id            string
-	structured    types.MetaRequest
 	authenticated bool
 	address       string
 	context       types.MessageContext
@@ -90,8 +91,8 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	if err != nil {
 		return request, err
 	}
-	request.structured = msgStruct.Request
-	request.method = msgStruct.Request.Method
+	request.MetaRequest = msgStruct.MetaRequest
+	request.method = msgStruct.Method
 	if request.method == "" {
 		return request, errors.New("method is empty")
 	}
@@ -102,7 +103,7 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 		if methodFunc != nil {
 			// if method is Private
 			request.private = true
-			request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.Request, msgStruct.Signature)
+			request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.MetaRequest, msgStruct.Signature)
 			// if no authrized keys, authenticate all requests
 			if !request.authenticated && len(r.signer.Authorized) == 0 {
 				request.authenticated = true
@@ -120,7 +121,7 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	request.context = context
 	// assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)
 	// because json.Marshal encodes in lexographic order for map objects.
-	// request.raw, err = json.Marshal(msgStruct.Request)
+	// request.raw, err = json.Marshal(msgStruct.MetaRequest)
 	return request, err
 }
 
@@ -205,7 +206,7 @@ func (r *Router) Route() {
 		}
 
 		log.Infof("calling method %s", request.method)
-		log.Debugf("data received: %+v", request.structured)
+		log.Debugf("data received: %+v", request.MetaRequest)
 
 		if request.private {
 			r.PrivateCalls++

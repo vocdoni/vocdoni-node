@@ -19,15 +19,15 @@ func censusLocal(request routerRequest, router *Router) {
 		sendError(router.transport, router.signer, request.context, request.id, "cannot recover address")
 		return
 	}
-	cresponse := router.census.Handler(&request.structured, auth, "0x"+addr+"/")
+	cresponse := router.census.Handler(&request.MetaRequest, auth, "0x"+addr+"/")
 	if !*cresponse.Ok {
 		sendError(router.transport, router.signer, request.context, request.id, cresponse.Error)
 		return
 	}
-	response.Response = *cresponse
+	response.MetaResponse = *cresponse
 	response.ID = request.id
-	response.Response.Request = request.id
-	response.Signature, err = router.signer.SignJSON(response.Response)
+	response.Request = request.id
+	response.Signature, err = router.signer.SignJSON(response.MetaResponse)
 	if err != nil {
 		log.Warn(err)
 	}

@@ -16,7 +16,7 @@ import (
 )
 
 func fetchFile(request routerRequest, router *Router) {
-	uri := request.structured.URI
+	uri := request.URI
 	log.Debugf("calling FetchFile %s", uri)
 	parsedURIs := strings.Split(uri, ",")
 	transportTypes := parseTransportFromURI(parsedURIs)
@@ -61,10 +61,10 @@ func fetchFile(request routerRequest, router *Router) {
 	log.Debugf("file fetched, b64 size %d", len(b64content))
 	var response types.ResponseMessage
 	response.ID = request.id
-	response.Response.Content = b64content
-	response.Response.Request = request.id
-	response.Response.Timestamp = int32(time.Now().Unix())
-	response.Signature, err = router.signer.SignJSON(response.Response)
+	response.Content = b64content
+	response.Request = request.id
+	response.Timestamp = int32(time.Now().Unix())
+	response.Signature, err = router.signer.SignJSON(response.MetaResponse)
 	if err != nil {
 		log.Warn(err)
 	}
@@ -80,8 +80,8 @@ func fetchFile(request routerRequest, router *Router) {
 
 func addFile(request routerRequest, router *Router) {
 	log.Debugf("calling addFile")
-	reqType := request.structured.Type
-	b64content, err := base64.StdEncoding.DecodeString(request.structured.Content)
+	reqType := request.Type
+	b64content, err := base64.StdEncoding.DecodeString(request.Content)
 	if err != nil {
 		errMsg := "could not decode base64 content"
 		sendError(router.transport, router.signer, request.context, request.id, errMsg)
@@ -100,10 +100,10 @@ func addFile(request routerRequest, router *Router) {
 		log.Debugf("added file %s, b64 size of %d", cid, len(b64content))
 		var response types.ResponseMessage
 		response.ID = request.id
-		response.Response.Request = request.id
-		response.Response.Timestamp = int32(time.Now().Unix())
-		response.Response.URI = router.storage.GetURIprefix() + cid
-		response.Signature, err = router.signer.SignJSON(response.Response)
+		response.Request = request.id
+		response.Timestamp = int32(time.Now().Unix())
+		response.URI = router.storage.GetURIprefix() + cid
+		response.Signature, err = router.signer.SignJSON(response.MetaResponse)
 		if err != nil {
 			log.Warn(err)
 		}
@@ -135,10 +135,10 @@ func pinList(request routerRequest, router *Router) {
 	}
 	var response types.ResponseMessage
 	response.ID = request.id
-	response.Response.Files = pinsJSONArray
-	response.Response.Request = request.id
-	response.Response.Timestamp = int32(time.Now().Unix())
-	response.Signature, err = router.signer.SignJSON(response.Response)
+	response.Files = pinsJSONArray
+	response.Request = request.id
+	response.Timestamp = int32(time.Now().Unix())
+	response.Signature, err = router.signer.SignJSON(response.MetaResponse)
 	if err != nil {
 		log.Warn(err)
 	}
@@ -152,7 +152,7 @@ func pinList(request routerRequest, router *Router) {
 }
 
 func pinFile(request routerRequest, router *Router) {
-	uri := request.structured.URI
+	uri := request.URI
 	log.Debugf("calling PinFile %s", uri)
 	err := router.storage.Pin(uri)
 	if err != nil {
@@ -161,10 +161,10 @@ func pinFile(request routerRequest, router *Router) {
 	}
 	var response types.ResponseMessage
 	response.ID = request.id
-	response.Response.Ok = types.True
-	response.Response.Request = request.id
-	response.Response.Timestamp = int32(time.Now().Unix())
-	response.Signature, err = router.signer.SignJSON(response.Response)
+	response.Ok = types.True
+	response.Request = request.id
+	response.Timestamp = int32(time.Now().Unix())
+	response.Signature, err = router.signer.SignJSON(response.MetaResponse)
 	if err != nil {
 		log.Warn(err)
 	}
@@ -178,7 +178,7 @@ func pinFile(request routerRequest, router *Router) {
 }
 
 func unpinFile(request routerRequest, router *Router) {
-	uri := request.structured.URI
+	uri := request.URI
 	log.Debugf("calling UnPinFile %s", uri)
 	err := router.storage.Unpin(uri)
 	if err != nil {
@@ -187,10 +187,10 @@ func unpinFile(request routerRequest, router *Router) {
 	}
 	var response types.ResponseMessage
 	response.ID = request.id
-	response.Response.Ok = types.True
-	response.Response.Request = request.id
-	response.Response.Timestamp = int32(time.Now().Unix())
-	response.Signature, err = router.signer.SignJSON(response.Response)
+	response.Ok = types.True
+	response.Request = request.id
+	response.Timestamp = int32(time.Now().Unix())
+	response.Signature, err = router.signer.SignJSON(response.MetaResponse)
 	if err != nil {
 		log.Warn(err)
 	}

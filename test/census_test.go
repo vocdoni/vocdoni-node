@@ -301,12 +301,12 @@ func sendCensusReq(t *testing.T, c *websocket.Conn, req types.MetaRequest, signe
 	method := req.Method
 
 	var cmReq types.RequestMessage
-	cmReq.Request = req
+	cmReq.MetaRequest = req
 	cmReq.ID = fmt.Sprintf("%d", rand.Intn(1000))
-	cmReq.Request.Timestamp = int32(time.Now().Unix())
+	cmReq.Timestamp = int32(time.Now().Unix())
 	if signer != nil {
 		var err error
-		cmReq.Signature, err = signer.SignJSON(cmReq.Request)
+		cmReq.Signature, err = signer.SignJSON(cmReq.MetaRequest)
 		if err != nil {
 			t.Fatalf("%s: %v", method, err)
 		}
@@ -329,5 +329,5 @@ func sendCensusReq(t *testing.T, c *websocket.Conn, req types.MetaRequest, signe
 	if cmRes.ID != cmReq.ID {
 		t.Fatalf("%s: %v", method, "request ID doesn't match")
 	}
-	return cmRes.Response
+	return cmRes.MetaResponse
 }
