@@ -71,17 +71,18 @@ type PssMetaCfg struct {
 
 // W3Cfg stores global configs for web3
 type W3Cfg struct {
-	Enabled   bool
-	ChainType string
-	LightMode bool
-	WsHost    string
-	WsPort    int
-	HttpHost  string
-	HttpPort  int
-	NodePort  int
-	LogLevel  string
-	Route     string
-	DataDir   string
+	Enabled    bool
+	ChainType  string
+	LightMode  bool
+	WsHost     string
+	WsPort     int
+	HttpHost   string
+	HttpPort   int
+	NodePort   int
+	LogLevel   string
+	Route      string
+	DataDir    string
+	W3External string
 }
 
 // CensusCfg stores global configs for censushttp

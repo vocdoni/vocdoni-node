@@ -156,7 +156,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("w3.route", flag.Lookup("w3route"))
 	viper.BindPFlag("w3.wsPort", flag.Lookup("w3WSPort"))
 	viper.BindPFlag("w3.wsHost", flag.Lookup("w3WSHost"))
-	viper.BindPFlag("w3external", flag.Lookup("w3external"))
+	viper.BindPFlag("w3.w3external", flag.Lookup("w3.w3external"))
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
@@ -401,12 +401,12 @@ func main() {
 		if globalCfg.Vochain.PublicAddr != "" {
 			log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
 		}
-		_, vnode = vochain.Start(globalCfg.Vochain)
+		_, vnode = vochain.NewVochain(globalCfg.Vochain)
+		go vochain.Start(vnode)
 		defer func() {
 			vnode.Stop()
 			vnode.Wait()
 		}()
-
 	}
 
 	// API Endpoint initialization

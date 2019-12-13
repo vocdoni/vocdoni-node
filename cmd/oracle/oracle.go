@@ -17,13 +17,10 @@ package main
 // WRITE TO ETH SM IF PROCESS FINISHED
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	goneturl "net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -31,10 +28,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	tmnode "github.com/tendermint/tendermint/node"
 
+	nm "github.com/tendermint/tendermint/node"
+	voclient "github.com/tendermint/tendermint/rpc/client"
 	"gitlab.com/vocdoni/go-dvote/chain"
-	"gitlab.com/vocdoni/go-dvote/chain/oracle"
+	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
 	"gitlab.com/vocdoni/go-dvote/config"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -60,11 +58,6 @@ func newConfig() (config.OracleCfg, error) {
 	flag.Int("w3nodePort", 30303, "Ethereum p2p node port to use")
 	flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
 	flag.Int("w3WSPort", 9092, "web3 websocket port")
-	flag.String("w3WSHost", "127.0.0.1", "web3 websocket host")
-	flag.Int("w3HttpPort", 9091, "web3 websocket port")
-	flag.String("w3HttpHost", "127.0.0.1", "web3 websocket host")
-	flag.Bool("allowPrivate", false, "allows private methods over the APIs")
-	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	flag.String("vochainListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
 	flag.String("vochainAddress", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
 	flag.String("vochainGenesis", "", "use alternative geneiss file for the voting chain")
@@ -83,11 +76,11 @@ func newConfig() (config.OracleCfg, error) {
 	viper.SetDefault("ethereumConfig.chainType", "goerli")
 	viper.SetDefault("ethereumConfig.lightMode", false)
 	viper.SetDefault("ethereumConfig.nodePort", 32000)
-	viper.SetDefault("w3external", "")
+	viper.SetDefault("ethereumConfig.w3external", "")
 	viper.SetDefault("ethereumClient.allowPrivate", false)
 	viper.SetDefault("ethereumClient.allowedAddrs", "")
-	viper.SetDefault("ethereumConfig.httpPort", "9091")
-	viper.SetDefault("ethereumConfig.httpHost", "127.0.0.1")
+	viper.SetDefault("ethereumConfig.httpPort", "")
+	viper.SetDefault("ethereumConfig.httpHost", "")
 	viper.SetDefault("ethereumConfig.wsPort", "9092")
 	viper.SetDefault("ethereumConfig.wsHost", "127.0.0.1")
 	viper.SetDefault("dataDir", dataDir)
@@ -124,15 +117,10 @@ func newConfig() (config.OracleCfg, error) {
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
 	viper.BindPFlag("ethereumClient.signingKey", flag.Lookup("signingKey"))
 	viper.BindPFlag("ethereumConfig.chainType", flag.Lookup("chain"))
-	viper.BindPFlag("ethereumConfig.lightNode", flag.Lookup("chainLightMode"))
+	viper.BindPFlag("ethereumConfig.lightMode", flag.Lookup("chainLightMode"))
 	viper.BindPFlag("ethereumConfig.nodePort", flag.Lookup("w3nodePort"))
-	viper.BindPFlag("w3external", flag.Lookup("w3external"))
-	viper.BindPFlag("ethereumConfig.httpPort", flag.Lookup("w3HttpPort"))
-	viper.BindPFlag("ethereumConfig.httpHost", flag.Lookup("w3HttpHost"))
+	viper.BindPFlag("ethereumConfig.w3external", flag.Lookup("w3external"))
 	viper.BindPFlag("ethereumConfig.wsPort", flag.Lookup("w3WSPort"))
-	viper.BindPFlag("ethereumConfig.wsHost", flag.Lookup("w3WSHost"))
-	viper.BindPFlag("ethereumClient.allowPrivate", flag.Lookup("allowPrivate"))
-	viper.BindPFlag("ethereumClient.allowedAddrs", flag.Lookup("allowedAddrs"))
 	viper.BindPFlag("vochainConfig.p2pListen", flag.Lookup("vochainListen"))
 	viper.BindPFlag("vochainConfig.address", flag.Lookup("vochainAddress"))
 	viper.BindPFlag("vochainConfig.genesis", flag.Lookup("vochainGenesis"))
@@ -161,10 +149,7 @@ func main() {
 	log.Info("starting oracle")
 
 	// start vochain node
-	var app *vochain.BaseApplication
-
 	log.Info("initializing vochain")
-
 	// node + app layer
 	if len(globalCfg.VochainConfig.PublicAddr) == 0 {
 		ip, err := util.PublicIP()
@@ -180,14 +165,26 @@ func main() {
 	if globalCfg.VochainConfig.PublicAddr != "" {
 		log.Infof("public IP address: %s", globalCfg.VochainConfig.PublicAddr)
 	}
-	var vnode *tmnode.Node
-	app, vnode = vochain.Start(globalCfg.VochainConfig)
+	var vnode *nm.Node
+	var app *vochain.BaseApplication
+	go func() {
+		log.Infof("starting Vochain synchronization")
+		app, vnode = vochain.NewVochain(globalCfg.VochainConfig)
+		vnode.Start()
+		log.Infof("vochain current height: %d", app.State.Height())
+		for {
+			log.Infof("[vochain info] Height:%d Mempool:%d Clients:%d",
+				vnode.BlockStore().Height(),
+				vnode.Mempool().Size(),
+				vnode.EventBus().NumClients(),
+			)
+			time.Sleep(20 * time.Second)
+		}
+	}()
 	defer func() {
 		vnode.Stop()
 		vnode.Wait()
 	}()
-
-	// start ethereum node
 
 	// Signing key
 	signer := new(sig.SignKeys)
@@ -243,83 +240,48 @@ func main() {
 	}
 
 	// Start Ethereum Web3 native node
-	if len(globalCfg.W3external) == 0 {
-		log.Info("starting Ethereum node")
-		node.Start()
-		for i := 0; i < len(node.Keys.Accounts()); i++ {
-			log.Debugf("got ethereum address: %x", node.Keys.Accounts()[i].Address)
-		}
-		time.Sleep(1 * time.Second)
-		log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
-		log.Infof("web3 available at localhost:%d", globalCfg.EthereumConfig.NodePort)
-		log.Infof("web3 HTTP-RPC endpoint at %s:%d", globalCfg.EthereumConfig.HttpHost, globalCfg.EthereumConfig.HttpPort)
-		log.Infof("web3 WS-RPC endpoint at %s:%d", globalCfg.EthereumConfig.WsHost, globalCfg.EthereumConfig.WsPort)
-
-		go func() {
-			for {
-				time.Sleep(15 * time.Second)
-				if node.Eth != nil {
-					log.Infof("[ethereum info] peers:%d synced:%t block:%s",
-						node.Node.Server().PeerCount(),
-						node.Eth.Synced(),
-						node.Eth.BlockChain().CurrentBlock().Number())
-				}
-			}
-		}()
+	log.Info("starting Ethereum node")
+	node.Start()
+	for i := 0; i < len(node.Keys.Accounts()); i++ {
+		log.Debugf("got ethereum address: %x", node.Keys.Accounts()[i].Address)
 	}
+	time.Sleep(1 * time.Second)
+	log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
+	log.Infof("web3 available at localhost:%d", globalCfg.EthereumConfig.NodePort)
+	log.Infof("web3 WS-RPC endpoint at %s:%d", globalCfg.EthereumConfig.WsHost, globalCfg.EthereumConfig.WsPort)
+	go node.PrintInfo(20 * time.Second)
 
-	if len(globalCfg.W3external) > 0 {
-		url, err := goneturl.Parse(globalCfg.W3external)
-		if err != nil {
-			log.Fatal("cannot parse w3external URL")
-		}
-
-		log.Debugf("testing web3 HTTP-RPC endpoint %s", url)
-		data, err := json.Marshal(map[string]interface{}{
-			"jsonrpc": "2.0",
-			"method":  "net_peerCount",
-			"id":      74,
-			"params":  []interface{}{},
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-		resp, err := http.Post(globalCfg.W3external,
-			"application/json", strings.NewReader(string(data)))
-		if err != nil {
-			log.Fatal("cannot connect to web3 endpoint")
-		}
-		defer resp.Body.Close()
-		_, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Infof("successfuly connected to web3 endpoint at external url: %s", globalCfg.W3external)
-	}
-
-	// eth
-	orc, err := oracle.NewOracle(node, app, nil, globalCfg.VochainConfig.Contract, nil, signer)
+	// Create Ethereum Event Log listener and register oracle handlers
+	ev, err := ethevents.NewEthEvents(globalCfg.VochainConfig.Contract, signer, "")
 	if err != nil {
-		log.Fatalf("couldn't create oracle: %s", err)
+		log.Fatalf("couldn't create ethereum  events listener: %s", err)
 	}
+	if len(globalCfg.W3external) > 0 {
+		ev.DialAddr = globalCfg.W3external
+	}
+	vochainConn := voclient.NewHTTP("localhost:26657", "/websocket")
+	if vochainConn == nil {
+		log.Fatal("cannot connect to vochain http endpoint")
+	}
+	ev.VochainCLI = vochainConn
 
 	go func() {
-		if node.Eth != nil {
-			for {
-				if node.Eth.Synced() {
-					log.Info("ethereum node fully synced")
-					log.Info("oracle startup complete")
-					if globalCfg.SubscribeOnly {
-						go orc.SubscribeEthereumEventLogs()
-					} else {
-						go orc.ReadEthereumEventLogs(0, int64(node.Eth.BlockChain().CurrentBlock().NumberU64()))
-						go orc.SubscribeEthereumEventLogs()
-					}
-					break
+		for {
+			height, synced, peers, _ := node.SyncInfo()
+			if synced && peers > 0 && vnode != nil {
+				log.Info("ethereum node fully synced")
+				log.Info("oracle startup complete")
+				ev.AddEventHandler(ethevents.HandleVochainOracle)
+				if globalCfg.SubscribeOnly {
+					go ev.SubscribeEthereumEventLogs()
 				} else {
-					time.Sleep(10 * time.Second)
-					log.Info("Waiting for Eth to sync before starting oracle.")
+					go ev.ReadEthereumEventLogs(0, hex2int64(height))
+					go ev.SubscribeEthereumEventLogs()
 				}
+				break
+			} else {
+				time.Sleep(10 * time.Second)
+				log.Info("waiting for Ethereum and Vochain to sync before starting oracle")
 			}
 		}
 	}()
@@ -339,4 +301,13 @@ func addKeyFromEncryptedJSON(keyJSON []byte, passphrase string, signKeys *sig.Si
 	signKeys.Private = key.PrivateKey
 	signKeys.Public = &key.PrivateKey.PublicKey
 	return nil
+}
+
+func hex2int64(hexStr string) int64 {
+	// remove 0x suffix if found in the input string
+	cleaned := strings.Replace(hexStr, "0x", "", -1)
+
+	// base 16 for hexadecimal
+	result, _ := strconv.ParseUint(cleaned, 16, 64)
+	return int64(result)
 }

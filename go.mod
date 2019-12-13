@@ -17,7 +17,6 @@ require (
 	github.com/ethereum/go-ethereum v1.9.8
 	github.com/ethersphere/swarm v0.4.3
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
-	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
 	github.com/gobwas/pool v0.2.0 // indirect
 	github.com/gobwas/ws v1.0.2
@@ -45,7 +44,6 @@ require (
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/pkg/errors v0.8.1
 	github.com/polydawn/refmt v0.0.0-20190807091052-3d65705ee9f1 // indirect
-	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4 // indirect
 	github.com/prometheus/procfs v0.0.4 // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/robertkrimen/otto v0.0.0-20180617131154-15f95af6e78d // indirect
@@ -54,12 +52,12 @@ require (
 	github.com/spf13/afero v1.2.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.3
-	github.com/spf13/viper v1.4.0
+	github.com/spf13/viper v1.5.0
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/tendermint/go-amino v0.15.0
 	github.com/tendermint/iavl v0.12.4
-	github.com/tendermint/tendermint v0.32.3
-	github.com/tendermint/tm-db v0.1.1
+	github.com/tendermint/tendermint v0.32.8
+	github.com/tendermint/tm-db v0.2.0
 	github.com/uber-go/atomic v1.4.0 // indirect
 	github.com/uber/jaeger-client-go v2.17.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.0.0+incompatible // indirect
@@ -74,6 +72,5 @@ require (
 	golang.org/x/sys v0.0.0-20191128015809-6d18c012aee9
 	golang.org/x/text v0.3.2
 	golang.org/x/tools v0.0.0-20191127201027-ecd32218bd7f // indirect
-	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 // indirect
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190709231704-1e4459ed25ff // indirect
 )

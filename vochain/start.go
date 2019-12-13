@@ -2,7 +2,6 @@
 package vochain
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -33,7 +32,7 @@ const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
 var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
 
 // Start starts a new vochain validator node
-func Start(globalCfg config.VochainCfg) (*BaseApplication, *nm.Node) {
+func NewVochain(globalCfg config.VochainCfg) (*BaseApplication, *nm.Node) {
 	// create application db
 	vlog.Info("initializing Vochain")
 
@@ -45,15 +44,13 @@ func Start(globalCfg config.VochainCfg) (*BaseApplication, *nm.Node) {
 	vlog.Info("creating node and application")
 	node, err := newTendermint(app, globalCfg)
 	if err != nil {
-		vlog.Info(err)
-		return app, node
-	}
-	node.Start()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v", err)
-		os.Exit(2)
+		vlog.Fatal(err)
 	}
 	return app, node
+}
+
+func Start(node *nm.Node) error {
+	return node.Start()
 }
 
 // NewGenesis creates a new genesis file and saves it to tconfig.Genesis path
@@ -91,6 +88,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	var err error
 
 	tconfig := cfg.DefaultConfig()
+	tconfig.FastSyncMode = true
 	tconfig.SetRoot(localConfig.DataDir)
 	os.MkdirAll(localConfig.DataDir+"/config", 0755)
 	os.MkdirAll(localConfig.DataDir+"/data", 0755)
