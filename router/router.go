@@ -51,8 +51,8 @@ type Router struct {
 	signer            signature.SignKeys
 	census            *census.CensusManager
 	tmclient          *voclient.HTTP
-	PrivateCalls      int64
-	PublicCalls       int64
+	PrivateCalls      uint64
+	PublicCalls       uint64
 	codec             *amino.Codec
 }
 
@@ -96,26 +96,22 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	if request.method == "" {
 		return request, errors.New("method is empty")
 	}
-	methodFunc := r.publicRequestMap[request.method]
-	request.private = false
-	if methodFunc == nil {
-		methodFunc = r.privateRequestMap[request.method]
-		if methodFunc != nil {
-			// if method is Private
-			request.private = true
-			request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.MetaRequest, msgStruct.Signature)
-			// if no authrized keys, authenticate all requests
-			if !request.authenticated && len(r.signer.Authorized) == 0 {
-				request.authenticated = true
-			}
-		} else {
-			// if method not found
-			return request, fmt.Errorf("method not valid [%s]", request.method)
-		}
-	} else {
+	if fn := r.publicRequestMap[request.method]; fn != nil {
 		// if method is Public
+		request.private = false
 		request.authenticated = true
 		request.address = "00000000000000000000"
+	} else if fn := r.privateRequestMap[request.method]; fn != nil {
+		// if method is Private
+		request.private = true
+		request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.MetaRequest, msgStruct.Signature)
+		// if no authrized keys, authenticate all requests
+		if !request.authenticated && len(r.signer.Authorized) == 0 {
+			request.authenticated = true
+		}
+	} else {
+		// if method not found
+		return request, fmt.Errorf("method not valid [%s]", request.method)
 	}
 	request.id = msgStruct.ID
 	request.context = context
@@ -210,14 +206,8 @@ func (r *Router) Route() {
 
 		if request.private {
 			r.PrivateCalls++
-			if r.PrivateCalls >= 2^64 {
-				r.PrivateCalls = 0
-			}
 		} else {
 			r.PublicCalls++
-			if r.PublicCalls >= 2^64 {
-				r.PublicCalls = 0
-			}
 		}
 		go methodFunc(request, r)
 	}

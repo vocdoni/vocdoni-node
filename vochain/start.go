@@ -22,7 +22,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 
-	vlog "gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 // testing purposes until genesis
@@ -34,23 +34,23 @@ var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.20
 // Start starts a new vochain validator node
 func NewVochain(globalCfg config.VochainCfg) *BaseApplication {
 	// create application db
-	vlog.Info("initializing Vochain")
+	log.Info("initializing Vochain")
 
 	// creating new vochain app
 	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
 	if err != nil {
-		vlog.Errorf("cannot init vochain application: %s", err)
+		log.Errorf("cannot init vochain application: %s", err)
 	}
 
-	vlog.Info("creating node and application")
+	log.Info("creating node and application")
 	go func() {
 		app.Node, err = newTendermint(app, globalCfg)
 		if err != nil {
-			vlog.Fatal(err)
+			log.Fatal(err)
 		}
 		err = app.Node.Start()
 		if err != nil {
-			vlog.Fatal(err)
+			log.Fatal(err)
 		}
 	}()
 	return app
@@ -62,7 +62,7 @@ func Start(node *nm.Node) error {
 
 // NewGenesis creates a new genesis file and saves it to tconfig.Genesis path
 func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
-	vlog.Info("creating genesis file")
+	log.Info("creating genesis file")
 	consensusParams := tmtypes.DefaultConsensusParams()
 	consensusParams.Block.TimeIotaMs = 20000
 
@@ -85,7 +85,7 @@ func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
 	if err := genDoc.SaveAs(tconfig.GenesisFile()); err != nil {
 		return err
 	}
-	vlog.Infof("genesis file: %+v", tconfig.Genesis)
+	log.Infof("genesis file: %+v", tconfig.Genesis)
 	return nil
 }
 
@@ -104,7 +104,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RpcListen
 	tconfig.P2P.ListenAddress = localConfig.P2pListen
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
-	vlog.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
+	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 
 	if !localConfig.CreateGenesis {
 		if len(localConfig.Seeds) == 0 && !localConfig.SeedMode {
@@ -112,12 +112,12 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 		} else {
 			tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]")
 		}
-		vlog.Infof("seed nodes: %s", tconfig.P2P.Seeds)
+		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
 
 		if len(localConfig.Peers) > 0 {
 			tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]")
 		}
-		vlog.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
+		log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
 	}
 
 	tconfig.P2P.AddrBookStrict = false
@@ -132,7 +132,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
 			dir, err := os.Getwd()
 			if err != nil {
-				vlog.Fatal(err)
+				log.Fatal(err)
 			}
 			tconfig.Genesis = dir + "/" + localConfig.Genesis
 
@@ -164,7 +164,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 		if isAbs := strings.HasPrefix(localConfig.MinerKeyFile, "/"); !isAbs {
 			dir, err := os.Getwd()
 			if err != nil {
-				vlog.Fatal(err)
+				log.Fatal(err)
 			}
 			minerKeyFile = dir + "/" + localConfig.MinerKeyFile
 		} else {
@@ -176,7 +176,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 		}
 	}
 
-	vlog.Infof("using miner key file %s", minerKeyFile)
+	log.Infof("using miner key file %s", minerKeyFile)
 	pv := privval.LoadOrGenFilePV(
 		minerKeyFile,
 		tconfig.PrivValidatorStateFile(),
@@ -186,27 +186,27 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	var nodeKey *p2p.NodeKey
 	if localConfig.KeyFile != "" {
 		nodeKey, err = p2p.LoadOrGenNodeKey(localConfig.KeyFile)
-		vlog.Infof("using keyfile %s", localConfig.KeyFile)
+		log.Infof("using keyfile %s", localConfig.KeyFile)
 	} else {
 		nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile())
-		vlog.Infof("using keyfile %s", tconfig.NodeKeyFile())
+		log.Infof("using keyfile %s", tconfig.NodeKeyFile())
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load node's key")
 	}
-	vlog.Infof("my vochain address: %s", nodeKey.PubKey().Address())
-	vlog.Infof("my vochain ID: %s", nodeKey.ID())
+	log.Infof("my vochain address: %s", nodeKey.PubKey().Address())
+	log.Infof("my vochain ID: %s", nodeKey.ID())
 
 	// read or create genesis file
 	if cmn.FileExists(tconfig.Genesis) {
-		vlog.Infof("found genesis file %s", tconfig.Genesis)
+		log.Infof("found genesis file %s", tconfig.Genesis)
 	} else {
-		vlog.Infof("loaded genesis: %s", TestnetGenesis1)
+		log.Infof("loaded genesis: %s", TestnetGenesis1)
 		err := ioutil.WriteFile(tconfig.Genesis, []byte(TestnetGenesis1), 0644)
 		if err != nil {
-			vlog.Warn(err)
+			log.Warn(err)
 		} else {
-			vlog.Infof("new testnet genesis created, stored at %s", tconfig.Genesis)
+			log.Infof("new testnet genesis created, stored at %s", tconfig.Genesis)
 		}
 	}
 
@@ -224,7 +224,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create new Tendermint node")
 	}
-	vlog.Debugf("consensus config %+v", *node.Config().Consensus)
+	log.Debugf("consensus config %+v", *node.Config().Consensus)
 
 	return node, nil
 }

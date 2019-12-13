@@ -4,19 +4,20 @@ import (
 	"os"
 
 	amino "github.com/tendermint/go-amino"
+
 	vochain "gitlab.com/vocdoni/go-dvote/types"
 	iavl "gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 var (
-	OracleListHardcoded []string = []string{
+	OracleListHardcoded = []string{
 		"0fA7A3FdB5C7C611646a535BDDe669Db64DC03d2",
 		"00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
 		"237B54D0163Aa131254fA260Fc12DB0E6DC76FC7",
 		"F904848ea36c46817096E94f932A9901E377C8a5",
 	}
 
-	ValidatorListHardcoded []vochain.Validator = []vochain.Validator{
+	ValidatorListHardcoded = []vochain.Validator{
 		{
 			Address: "243A633E60AAFB177018D76C5AA0A3DF0ACC13D1",
 			PubKey: vochain.PubKey{
@@ -37,7 +38,7 @@ var (
 		},
 	}
 
-	HardcodedValidator *vochain.Validator = &vochain.Validator{
+	HardcodedValidator = &vochain.Validator{
 		Address: "77EA441EA0EB29F049FC57DE524C55833A7FF575",
 		PubKey: vochain.PubKey{
 			Type:  "tendermint/PubKeyEd25519",
@@ -47,7 +48,7 @@ var (
 		Name:  "",
 	}
 
-	ProcessHardcoded *vochain.Process = &vochain.Process{
+	ProcessHardcoded = &vochain.Process{
 		EntityID:             "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85",
 		MkRoot:               "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
 		NumberOfBlocks:       1000,
@@ -57,7 +58,7 @@ var (
 		Type:                 "petition-sign",
 	}
 
-	VoteHardcoded *vochain.Vote = &vochain.Vote{
+	VoteHardcoded = &vochain.Vote{
 		ProcessID:   "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
 		Proof:       "0x00030000000000000000000000000000000000000000000000000000000000070ab34471caaefc9bb249cb178335f367988c159f3907530ef7daa1e1bf0c9c7a218f981be7c0c46ffa345d291abb36a17c22722814fb0110240b8640fd1484a6268dc2f0fc2152bf83c06566fbf155f38b8293033d4779a63bba6c7157fd10c8",
 		Nullifier:   "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0", // nullifier and nonce are the same here
@@ -66,7 +67,7 @@ var (
 		Signature:   "8ee76647eb9a5639c776aff4e0452410edc50fe5b3d0a6d619383effc02daa4b2f00e74105d84eb016bf424a0e4bfcee1045db13b97ae2c4d484c8fdff541bce1b",
 	}
 
-	HardcodedNewProcessTx *vochain.NewProcessTx = &vochain.NewProcessTx{
+	HardcodedNewProcessTx = &vochain.NewProcessTx{
 		EncryptionPublicKeys: []string{"a", "b"},
 		EntityID:             "0x180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85",
 		MkRoot:               "0x0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
@@ -78,7 +79,7 @@ var (
 		Type:                 "newProcess",
 	}
 
-	HardcodedNewVoteTx *vochain.VoteTx = &vochain.VoteTx{
+	HardcodedNewVoteTx = &vochain.VoteTx{
 		Nonce:       "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0",
 		Nullifier:   "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0",
 		ProcessID:   "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
@@ -88,21 +89,21 @@ var (
 		VotePackage: "eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19",
 	}
 
-	HardcodedAdminTxAddOracle *vochain.AdminTx = &vochain.AdminTx{
+	HardcodedAdminTxAddOracle = &vochain.AdminTx{
 		Address:   "0x39106af1fF18bD60a38a296fd81B1f28f315852B", // oracle address or pubkey validator
 		Nonce:     "0x1",
 		Signature: "11ccdaacd6b6c2c832ea51b4dc695ce9f3c31b7fecd81a2509e7daf183a126e974f1b68060dd406c83ea2db1147d7a56fd6033e8cf7834ce0cf5ec504f09f2ee1b",
 		Type:      "addOracle",
 	}
 
-	HardcodedAdminTxRemoveOracle *vochain.AdminTx = &vochain.AdminTx{
+	HardcodedAdminTxRemoveOracle = &vochain.AdminTx{
 		Address:   "0x00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
 		Nonce:     "0x1",
 		Signature: "70f89a73f2b7a712e1281e49758ea7fa32769666b38773eeff5a3a0f0e20b6c46b5bb05d9257c9156bf7e7b7334b0af9cb38bc0ae19c70d4f64633529a49585d1b",
 		Type:      "removeOracle",
 	}
 
-	HardcodedAdminTxAddValidator *vochain.AdminTx = &vochain.AdminTx{
+	HardcodedAdminTxAddValidator = &vochain.AdminTx{
 		Address:   "GyZfKNK3lT5AQXQ4pwrVdgG3rRisx9tS4bM9EIZ0zYY=",
 		Nonce:     "0x1",
 		Power:     10,
@@ -110,7 +111,7 @@ var (
 		Type:      "addValidator",
 	}
 
-	HardcodedAdminTxRemoveValidator *vochain.AdminTx = &vochain.AdminTx{
+	HardcodedAdminTxRemoveValidator = &vochain.AdminTx{
 		Address:   "5DC922017285EC24415F3E7ECD045665EADA8B5A",
 		Nonce:     "0x1",
 		Signature: "777fde5f25337e70c463815513f3cf4f2d78aaf00d5f02ac7371cf419387569952ac98e3f7be8b9ce0911508ae73547a0cf3d3a443602f13c3e0a7009b4dce581c",

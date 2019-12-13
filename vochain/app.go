@@ -9,7 +9,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	nm "github.com/tendermint/tendermint/node"
 
-	vlog "gitlab.com/vocdoni/go-dvote/log"
+	log "gitlab.com/vocdoni/go-dvote/log"
 	vochain "gitlab.com/vocdoni/go-dvote/types"
 )
 
@@ -42,9 +42,9 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 // ensuring that Commit is never called twice for the same block height.
 func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
 	// print some basic version info about tendermint components (coreVersion, p2pVersion, blockVersion)
-	vlog.Infof("tendermint Core version: %s", req.Version)
-	vlog.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
-	vlog.Infof("tendermint Block protocol version: %d", req.BlockVersion)
+	log.Infof("tendermint Core version: %s", req.Version)
+	log.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
+	log.Infof("tendermint Block protocol version: %d", req.BlockVersion)
 
 	// gets the app height from database
 	var header abcitypes.Header
@@ -52,16 +52,16 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	if len(heightBytes) > 0 {
 		err := app.State.Codec.UnmarshalBinaryBare(heightBytes, &header)
 		if err != nil {
-			vlog.Errorf("cannot unmarshal header from database")
+			log.Errorf("cannot unmarshal header from database")
 		}
 	}
 	if header.Height == 0 {
-		vlog.Infof("initializing tendermint application database for first time, height %d", 0)
+		log.Infof("initializing tendermint application database for first time, height %d", 0)
 	} else {
-		vlog.Infof("block height from database: %d", header.Height)
+		log.Infof("block height from database: %d", header.Height)
 	}
 	if len(header.AppHash) != 0 {
-		vlog.Infof("apphash %x", header.AppHash)
+		log.Infof("apphash %x", header.AppHash)
 	}
 	return abcitypes.ResponseInfo{
 		LastBlockHeight:  header.Height,
@@ -78,7 +78,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	var genesisAppState vochain.GenesisAppState
 	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
-		vlog.Errorf("cannot unmarshal app state bytes: %s", err)
+		log.Errorf("cannot unmarshal app state bytes: %s", err)
 	}
 	// get oracles
 	for _, v := range genesisAppState.Oracles {
@@ -88,7 +88,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	for i := 0; i < len(genesisAppState.Validators); i++ {
 		p, err := strconv.ParseInt(genesisAppState.Validators[i].Power, 10, 64)
 		if err != nil {
-			vlog.Errorf("cannot parse power from validator: %s", err)
+			log.Errorf("cannot parse power from validator: %s", err)
 		}
 		app.State.AddValidator(genesisAppState.Validators[i].PubKey.Value, p)
 	}
@@ -98,7 +98,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	header.AppHash = []byte{}
 	headerBytes, err := app.Codec.MarshalBinaryBare(header)
 	if err != nil {
-		vlog.Errorf("cannot marshal header: %s", err)
+		log.Errorf("cannot marshal header: %s", err)
 	}
 	app.State.AppTree.Set([]byte(headerKey), headerBytes)
 	app.State.Save()
@@ -111,7 +111,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 // The LastCommitInfo and ByzantineValidators can be used to determine rewards and punishments for the validators.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	if app.State.Lock {
-		vlog.Warn("app state is locked")
+		log.Warn("app state is locked")
 	} else {
 		app.State.Lock = true
 		// reset app state to latest persistent data
@@ -119,7 +119,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	}
 	headerBytes, err := app.Codec.MarshalBinaryBare(req.Header)
 	if err != nil {
-		vlog.Warnf("cannot marshal header in BeginBlock")
+		log.Warnf("cannot marshal header in BeginBlock")
 	}
 	app.State.AppTree.Set([]byte(headerKey), headerBytes)
 	return abcitypes.ResponseBeginBlock{}

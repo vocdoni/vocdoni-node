@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tendermint/go-amino"
+
 	testcommon "gitlab.com/vocdoni/go-dvote/test/test_common"
 	iavl "gitlab.com/vocdoni/go-dvote/vochain"
 )

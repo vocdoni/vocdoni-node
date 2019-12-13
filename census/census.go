@@ -62,14 +62,11 @@ func (cm *CensusManager) Init(storage, rootKey string) error {
 		return err
 	}
 
-	jsonFile, err := os.Open(nsConfig)
+	jsonBytes, err := ioutil.ReadFile(nsConfig)
 	if err != nil {
 		return err
 	}
-	defer jsonFile.Close()
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-	err = json.Unmarshal(byteValue, &cm.Census)
-	if err != nil {
+	if err := json.Unmarshal(jsonBytes, &cm.Census); err != nil {
 		log.Warn("could not unmarshal json config file, probably empty. Skipping")
 		return nil
 	}
