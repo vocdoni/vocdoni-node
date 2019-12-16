@@ -112,13 +112,10 @@ func main() {
 
 	// node + app layer
 	log.Debugf("initializing vochain with tendermint config %s", globalCfg.TendermintConfig)
-	_, vnode := vochain.NewVochain(globalCfg)
-	if err := vnode.Start(); err != nil {
-		log.Fatal(err)
-	}
+	vnode := vochain.NewVochain(globalCfg)
 	defer func() {
-		vnode.Stop()
-		vnode.Wait()
+		vnode.Node.Stop()
+		vnode.Node.Wait()
 	}()
 
 	// close if interrupt received

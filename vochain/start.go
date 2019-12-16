@@ -32,21 +32,28 @@ const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
 var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
 
 // Start starts a new vochain validator node
-func NewVochain(globalCfg config.VochainCfg) (*BaseApplication, *nm.Node) {
+func NewVochain(globalCfg config.VochainCfg) *BaseApplication {
 	// create application db
 	vlog.Info("initializing Vochain")
 
 	// creating new vochain app
 	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
 	if err != nil {
-		vlog.Errorf("Cannot init vochain application: %s", err)
+		vlog.Errorf("cannot init vochain application: %s", err)
 	}
+
 	vlog.Info("creating node and application")
-	node, err := newTendermint(app, globalCfg)
-	if err != nil {
-		vlog.Fatal(err)
-	}
-	return app, node
+	go func() {
+		app.Node, err = newTendermint(app, globalCfg)
+		if err != nil {
+			vlog.Fatal(err)
+		}
+		err = app.Node.Start()
+		if err != nil {
+			vlog.Fatal(err)
+		}
+	}()
+	return app
 }
 
 func Start(node *nm.Node) error {

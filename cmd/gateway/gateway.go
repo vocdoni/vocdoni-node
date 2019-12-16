@@ -17,7 +17,6 @@ import (
 	"github.com/spf13/viper"
 
 	// abcicli "github.com/tendermint/tendermint/abci/client"
-	tmnode "github.com/tendermint/tendermint/node"
 
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 
@@ -375,7 +374,7 @@ func main() {
 	}
 
 	// Initialize and start Vochain
-	var vnode *tmnode.Node
+	var vnode *vochain.BaseApplication
 	if globalCfg.Api.Vote.Enabled {
 		log.Info("initializing vochain")
 		// node + app layer
@@ -393,14 +392,38 @@ func main() {
 		if globalCfg.Vochain.PublicAddr != "" {
 			log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
 		}
+		vnode = vochain.NewVochain(globalCfg.Vochain)
 		go func() {
-			_, vnode = vochain.NewVochain(globalCfg.Vochain)
-			vochain.Start(vnode)
+			for {
+				if vnode.Node != nil {
+					log.Infof("[vochain info] Height:%d Mempool:%d AppTree:%d VoteTree:%d",
+						vnode.Node.BlockStore().Height(),
+						vnode.Node.Mempool().Size(),
+						vnode.State.AppTree.Size(),
+						vnode.State.VoteTree.Size(),
+					)
+				}
+				time.Sleep(20 * time.Second)
+			}
 		}()
 		defer func() {
-			vnode.Stop()
-			vnode.Wait()
+			vnode.Node.Stop()
+			vnode.Node.Wait()
 		}()
+	}
+
+	// Wait for Vochain to be ready
+	if globalCfg.Api.Vote.Enabled {
+		for {
+			if vnode.Node != nil {
+				log.Infof("vochain blockchain synchronized")
+				break
+			}
+			time.Sleep(time.Second * 5)
+			log.Infof("[synchronizing vochain] block:%d iavl-size:%d vote-tree-size:%d",
+				vnode.State.Height(), vnode.State.AppTree.Size(),
+				vnode.State.VoteTree.Size())
+		}
 	}
 
 	// Wait for Ethereum to be ready
@@ -410,16 +433,7 @@ func main() {
 				log.Infof("ethereum blockchain synchronized")
 				break
 			}
-		}
-	}
-
-	// Wait for Vochain to be ready
-	if globalCfg.Api.Vote.Enabled {
-		for {
-			if vnode != nil {
-				log.Infof("vochain blockchain synchronized")
-				break
-			}
+			time.Sleep(time.Second * 5)
 		}
 	}
 
@@ -460,7 +474,7 @@ func main() {
 		}()
 	}
 
-	log.Infof("Gateway startup complete")
+	log.Infof("gateway startup complete")
 
 	// close if interrupt received
 	c := make(chan os.Signal, 1)

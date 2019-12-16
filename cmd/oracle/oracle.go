@@ -29,7 +29,6 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	nm "github.com/tendermint/tendermint/node"
 	voclient "github.com/tendermint/tendermint/rpc/client"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
@@ -165,25 +164,24 @@ func main() {
 	if globalCfg.VochainConfig.PublicAddr != "" {
 		log.Infof("public IP address: %s", globalCfg.VochainConfig.PublicAddr)
 	}
-	var vnode *nm.Node
-	var app *vochain.BaseApplication
+	log.Infof("starting Vochain synchronization")
+	vnode := vochain.NewVochain(globalCfg.VochainConfig)
 	go func() {
-		log.Infof("starting Vochain synchronization")
-		app, vnode = vochain.NewVochain(globalCfg.VochainConfig)
-		vnode.Start()
-		log.Infof("vochain current height: %d", app.State.Height())
+		log.Infof("vochain current height: %d", vnode.State.Height())
 		for {
-			log.Infof("[vochain info] Height:%d Mempool:%d Clients:%d",
-				vnode.BlockStore().Height(),
-				vnode.Mempool().Size(),
-				vnode.EventBus().NumClients(),
-			)
+			if vnode.Node != nil {
+				log.Infof("[vochain info] Height:%d Mempool:%d AppTree:%d",
+					vnode.Node.BlockStore().Height(),
+					vnode.Node.Mempool().Size(),
+					vnode.State.AppTree.Size(),
+				)
+			}
 			time.Sleep(20 * time.Second)
 		}
 	}()
 	defer func() {
-		vnode.Stop()
-		vnode.Wait()
+		vnode.Node.Stop()
+		vnode.Node.Wait()
 	}()
 
 	// Signing key
@@ -264,6 +262,18 @@ func main() {
 		log.Fatal("cannot connect to vochain http endpoint")
 	}
 	ev.VochainCLI = vochainConn
+
+	// Wait for Vochain to be ready
+	for {
+		if vnode.Node != nil {
+			log.Infof("vochain blockchain synchronized")
+			break
+		}
+		time.Sleep(time.Second * 5)
+		log.Infof("[synchronizing vochain] block:%d iavl-size:%d vote-tree-size:%d",
+			vnode.State.Height(), vnode.State.AppTree.Size(),
+			vnode.State.VoteTree.Size())
+	}
 
 	go func() {
 		for {

@@ -7,6 +7,7 @@ import (
 
 	amino "github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	nm "github.com/tendermint/tendermint/node"
 
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 	vochain "gitlab.com/vocdoni/go-dvote/types"
@@ -16,6 +17,7 @@ import (
 type BaseApplication struct {
 	State *VochainState
 	Codec *amino.Codec
+	Node  *nm.Node
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
