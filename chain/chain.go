@@ -146,19 +146,19 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 
 // Start starts an Ethereum blockchain connection and web3 APIs
 func (e *EthChainContext) Start() {
+	utils.RegisterEthService(e.Node, e.Config)
+	if len(e.Keys.Accounts()) < 1 {
+		if err := e.createAccount(); err != nil {
+			log.Error(err)
+		}
+	} else {
+		// phrase := getPassPhrase("please provide primary account passphrase", false)
+		e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
+		log.Infof("my Ethereum address %x", e.Keys.Accounts()[0].Address)
+	}
 	if len(e.DefaultConfig.W3external) == 0 {
-		utils.RegisterEthService(e.Node, e.Config)
 		utils.StartNode(e.Node)
 
-		if len(e.Keys.Accounts()) < 1 {
-			if err := e.createAccount(); err != nil {
-				log.Error(err)
-			}
-		} else {
-			// phrase := getPassPhrase("please provide primary account passphrase", false)
-			e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
-			log.Infof("my Ethereum address %x", e.Keys.Accounts()[0].Address)
-		}
 		log.Infof("started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
 		if e.DefaultConfig.WSPort > 0 {
 			log.Infof("web3 WebSockets endpoint ws://%s:%d", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
