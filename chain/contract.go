@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	votingProcess "gitlab.com/vocdoni/go-dvote/chain/contracts"
-	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
@@ -17,7 +16,6 @@ import (
 // Use these methods, rather than those present in the contracts folder
 type ProcessHandle struct {
 	VotingProcess *votingProcess.VotingProcess
-	storage       data.Storage
 }
 
 type VoteOption struct {
@@ -52,8 +50,8 @@ type ProcessMetadata struct {
 }
 
 // Constructor for proc_transactor on node
-func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*ProcessHandle, error) {
-	client, err := ethclient.Dial("http://127.0.0.1:9091")
+func NewVotingProcessHandle(contractAddressHex string, dialEndpoint string) (*ProcessHandle, error) {
+	client, err := ethclient.Dial(dialEndpoint)
 	if err != nil {
 		log.Error(err)
 	}
@@ -61,37 +59,12 @@ func NewVotingProcessHandle(contractAddressHex string, storage data.Storage) (*P
 
 	votingProcess, err := votingProcess.NewVotingProcess(address, client)
 	if err != nil {
-		log.Errorf("Error constructing votingProcess handle: %s", err)
+		log.Errorf("error constructing votingProcess handle: %s", err)
 		return new(ProcessHandle), err
 	}
 	PH := new(ProcessHandle)
 	PH.VotingProcess = votingProcess
-	PH.storage = storage
-
 	return PH, nil
-}
-
-func (ph *ProcessHandle) ProcessMetadata(pid [32]byte) (*ProcessMetadata, error) {
-	if ph.storage == nil {
-		return nil, fmt.Errorf("no storage configured, cannot get process metadata")
-	}
-	processInfoStructured := new(ProcessMetadata)
-	processMeta, err := ph.VotingProcess.Get(nil, pid)
-	if err != nil {
-		return processInfoStructured, err
-	}
-	processInfo, err := ph.storage.Retrieve(processMeta.Metadata)
-	if err != nil {
-		return processInfoStructured, err
-	}
-	censusTree, err := ph.storage.Retrieve(processMeta.CensusMerkleTree)
-	if err != nil {
-		return processInfoStructured, err
-	}
-	// json.Unmarshal(processInfo, &processInfoStructured)
-	log.Info("Structured Info: %s", processInfo)
-	log.Info("Merkle tree: %s", censusTree)
-	return processInfoStructured, nil
 }
 
 func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error) {
@@ -104,6 +77,7 @@ func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error
 	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
 	processTxArgs.EntityID = processMeta.EntityAddress.String()
 	processTxArgs.MkRoot = processMeta.CensusMerkleRoot
+	processTxArgs.MkURI = processMeta.CensusMerkleTree
 	processTxArgs.NumberOfBlocks = processMeta.NumberOfBlocks.Int64()
 	processTxArgs.StartBlock = processMeta.StartBlock.Int64()
 	processTxArgs.EncryptionPublicKeys = []string{processMeta.VoteEncryptionPrivateKey}

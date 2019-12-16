@@ -106,6 +106,8 @@ type NewProcessTx struct {
 	EntityID string `json:"entityId"`
 	// MkRoot merkle root of all the census in the process
 	MkRoot string `json:"mkRoot,omitempty"`
+	// MkURI merkle tree URI
+	MkURI string `json:"mkURI,omitempty"`
 	// NumberOfBlocks represents the tendermint block where the process goes from active to finished
 	NumberOfBlocks int64  `json:"numberOfBlocks"`
 	ProcessID      string `json:"processId"`

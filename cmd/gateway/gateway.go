@@ -156,7 +156,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("w3.route", flag.Lookup("w3route"))
 	viper.BindPFlag("w3.wsPort", flag.Lookup("w3WSPort"))
 	viper.BindPFlag("w3.wsHost", flag.Lookup("w3WSHost"))
-	viper.BindPFlag("w3external", flag.Lookup("w3external"))
+	viper.BindPFlag("w3.w3external", flag.Lookup("w3external"))
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
@@ -181,7 +181,6 @@ func newConfig() (config.GWCfg, error) {
 	if err != nil {
 		return globalCfg, err
 	}
-
 	err = viper.Unmarshal(&globalCfg)
 	return globalCfg, err
 }
@@ -266,28 +265,20 @@ func main() {
 
 	}
 
-	// Start Ethereum Web3 native node
-	if globalCfg.W3.Enabled && len(globalCfg.W3external) == 0 {
+	// Start Ethereum Web3 node
+	if globalCfg.W3.Enabled {
 		log.Info("starting Ethereum node")
 		node.Start()
 		for i := 0; i < len(node.Keys.Accounts()); i++ {
 			log.Debugf("got ethereum address: %x", node.Keys.Accounts()[i].Address)
 		}
-		time.Sleep(1 * time.Second)
-		log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
-		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
-		log.Infof("web3 available at %s", globalCfg.W3.Route)
-		go func() {
-			for {
-				time.Sleep(15 * time.Second)
-				if node.Eth != nil {
-					log.Infof("[ethereum info] peers:%d synced:%t block:%s",
-						node.Node.Server().PeerCount(),
-						node.Eth.Synced(),
-						node.Eth.BlockChain().CurrentBlock().Number())
-				}
-			}
-		}()
+		if len(globalCfg.W3.W3External) == 0 {
+			time.Sleep(1 * time.Second)
+			log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
+			pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
+			log.Infof("web3 available at %s", globalCfg.W3.Route)
+		}
+		go node.PrintInfo(time.Second * 15)
 	}
 
 	if globalCfg.W3.Enabled && len(globalCfg.W3external) > 0 {
@@ -383,6 +374,7 @@ func main() {
 
 	}
 
+	// Initialize and start Vochain
 	var vnode *tmnode.Node
 	if globalCfg.Api.Vote.Enabled {
 		log.Info("initializing vochain")
@@ -401,12 +393,34 @@ func main() {
 		if globalCfg.Vochain.PublicAddr != "" {
 			log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
 		}
-		_, vnode = vochain.Start(globalCfg.Vochain)
+		go func() {
+			_, vnode = vochain.NewVochain(globalCfg.Vochain)
+			vochain.Start(vnode)
+		}()
 		defer func() {
 			vnode.Stop()
 			vnode.Wait()
 		}()
+	}
 
+	// Wait for Ethereum to be ready
+	if globalCfg.W3.Enabled {
+		for {
+			if _, synced, peers, _ := node.SyncInfo(); synced && peers > 0 {
+				log.Infof("ethereum blockchain synchronized")
+				break
+			}
+		}
+	}
+
+	// Wait for Vochain to be ready
+	if globalCfg.Api.Vote.Enabled {
+		for {
+			if vnode != nil {
+				log.Infof("vochain blockchain synchronized")
+				break
+			}
+		}
 	}
 
 	// API Endpoint initialization

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/rpc"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -47,6 +49,7 @@ type EthChainConfig struct {
 	DataDir        string
 	IPCPath        string
 	LightMode      bool
+	W3external     string
 }
 
 // available chains: vctestnet
@@ -55,6 +58,7 @@ func NewConfig(w3Cfg config.W3Cfg) (*EthChainConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	cfg := new(EthChainConfig)
 	cfg.WSHost = w3Cfg.WsHost
 	cfg.WSPort = w3Cfg.WsPort
@@ -64,6 +68,7 @@ func NewConfig(w3Cfg config.W3Cfg) (*EthChainConfig, error) {
 	cfg.NetworkId = chainSpecs.NetworkId
 	cfg.NetworkGenesis, err = base64.StdEncoding.DecodeString(chainSpecs.GenesisB64)
 	cfg.LightMode = w3Cfg.LightMode
+	cfg.W3external = w3Cfg.W3External
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +132,9 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 		log.Info("using chain light mode synchronization")
 		ethConfig.SyncMode = downloader.LightSync
 	}
+	if len(c.W3external) > 0 {
+		log.Infof("using external web3 endpoint %s", c.W3external)
+	}
 
 	ks := keystore.NewKeyStore(c.KeyStore, keystore.StandardScryptN, keystore.StandardScryptP)
 
@@ -136,10 +144,9 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	return nil
 }
 
+// Start starts an Ethereum blockchain connection and web3 APIs
 func (e *EthChainContext) Start() {
 	utils.RegisterEthService(e.Node, e.Config)
-	utils.StartNode(e.Node)
-
 	if len(e.Keys.Accounts()) < 1 {
 		if err := e.createAccount(); err != nil {
 			log.Error(err)
@@ -147,22 +154,28 @@ func (e *EthChainContext) Start() {
 	} else {
 		// phrase := getPassPhrase("please provide primary account passphrase", false)
 		e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
-		log.Infof("my Ethereum address %x\n", e.Keys.Accounts()[0].Address)
+		log.Infof("my Ethereum address %x", e.Keys.Accounts()[0].Address)
 	}
-	log.Infof("started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
-	if e.DefaultConfig.WSPort > 0 {
-		log.Infof("web3 WebSockets endpoint ws://%s:%d", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
-	}
-	if e.DefaultConfig.HTTPPort > 0 {
-		log.Infof("web3 HTTP endpoint http://%s:%d", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
-	}
+	if len(e.DefaultConfig.W3external) == 0 {
+		utils.StartNode(e.Node)
 
-	var et *eth.Ethereum
-	err := e.Node.Service(&et)
-	if err != nil {
-		log.Warn(err)
+		log.Infof("started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
+		if e.DefaultConfig.WSPort > 0 {
+			log.Infof("web3 WebSockets endpoint ws://%s:%d", e.DefaultConfig.WSHost, e.DefaultConfig.WSPort)
+		}
+		if e.DefaultConfig.HTTPPort > 0 {
+			log.Infof("web3 HTTP endpoint http://%s:%d", e.DefaultConfig.HTTPHost, e.DefaultConfig.HTTPPort)
+		}
+
+		if !e.DefaultConfig.LightMode {
+			var et *eth.Ethereum
+			err := e.Node.Service(&et)
+			if err != nil {
+				log.Fatal(err)
+			}
+			e.Eth = et
+		}
 	}
-	e.Eth = et
 }
 
 // might be worthwhile to create generic SendTx to call contracttx, deploytx, etc
@@ -224,4 +237,50 @@ func getPassPhrase(prompt string, confirmation bool) string {
 		}
 	}
 	return phrase
+}
+
+// PrintInfo prints every N seconds some ethereum information (sync and height). It's blocking!
+func (e *EthChainContext) PrintInfo(seconds time.Duration) {
+	for {
+		time.Sleep(seconds)
+		height, synced, peers, err := e.SyncInfo()
+		if err != nil {
+			log.Warn(err)
+		}
+		log.Infof("[ethereum info] synced:%t height:%s peers:%d mode:%s", synced, height, peers, e.Config.SyncMode)
+	}
+}
+
+// SyncInfo returns the height and syncing Ethereum blockchain information
+func (e *EthChainContext) SyncInfo() (height string, synced bool, peers int, err error) {
+	if e.DefaultConfig.LightMode {
+		synced = true
+		var r *rpc.Client
+		r, err = e.Node.Attach()
+		r.Call(&synced, "eth_syncing") // true = syncing / false if synced
+		synced = !synced
+		err = r.Call(&height, "eth_blockNumber")
+		peers = e.Node.Server().PeerCount()
+		return
+	}
+	if len(e.DefaultConfig.W3external) > 0 {
+		var client *ethclient.Client
+		var sp *ethereum.SyncProgress
+		client, err = ethclient.Dial(e.DefaultConfig.W3external)
+		if err != nil {
+			return "0", true, 0, err
+		}
+		sp, err = client.SyncProgress(context.Background())
+		height = fmt.Sprintf("%d", sp.CurrentBlock)
+		synced = true
+		peers = 1
+		return
+	}
+	if e.Eth != nil {
+		synced = e.Eth.Synced()
+		height = e.Eth.BlockChain().CurrentBlock().Number().String()
+		peers = e.Node.Server().PeerCount()
+		return
+	}
+	return "0", false, 0, fmt.Errorf("cannot get sync info, unknown error")
 }
