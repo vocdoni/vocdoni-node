@@ -414,15 +414,17 @@ func main() {
 
 	// Wait for Vochain to be ready
 	if globalCfg.Api.Vote.Enabled {
+		var h, hPrev int64
 		for {
 			if vnode.Node != nil {
 				log.Infof("vochain blockchain synchronized")
 				break
 			}
-			time.Sleep(time.Second * 5)
-			log.Infof("[synchronizing vochain] block:%d iavl-size:%d vote-tree-size:%d",
-				vnode.State.Height(), vnode.State.AppTree.Size(),
-				vnode.State.VoteTree.Size())
+			hPrev = h
+			time.Sleep(time.Second * 10)
+			h = vnode.State.Height()
+			log.Infof("[vochain info] synchronizing block %d at %d b/s",
+				int64((h-hPrev)/10), h)
 		}
 	}
 
