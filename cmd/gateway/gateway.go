@@ -424,7 +424,7 @@ func main() {
 			time.Sleep(time.Second * 10)
 			h = vnode.State.Height()
 			log.Infof("[vochain info] synchronizing block %d at %d b/s",
-				int64((h-hPrev)/10), h)
+				h, int64((h-hPrev)/10))
 		}
 	}
 
