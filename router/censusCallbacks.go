@@ -20,12 +20,13 @@ func censusLocal(request routerRequest, router *Router) {
 		return
 	}
 	cresponse := router.census.Handler(&request.MetaRequest, auth, "0x"+addr+"/")
-	if !*cresponse.Ok {
-		sendError(router.transport, router.signer, request.context, request.id, cresponse.Error)
+	if !cresponse.Ok {
+		sendError(router.transport, router.signer, request.context, request.id, *cresponse.Error)
 		return
 	}
 	response.MetaResponse = *cresponse
 	response.ID = request.id
+	response.Ok = true
 	response.Request = request.id
 	response.Signature, err = router.signer.SignJSON(response.MetaResponse)
 	if err != nil {

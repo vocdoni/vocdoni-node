@@ -21,29 +21,34 @@ func submitEnvelope(request routerRequest, router *Router) {
 	voteTxBytes, err := json.Marshal(voteTxArgs)
 	if err != nil {
 		log.Errorf("error marshaling voteTx args: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal voteTx args")
 	}
 
 	res, err := router.tmclient.BroadcastTxSync(voteTxBytes)
-	if err != nil {
-		log.Warnf("cannot broadcast tx: %s", err)
-	} else {
-		log.Infof("transaction hash: %s, transaction code: %d", res.Hash, res.Code)
+	if err != nil || res.Code != 0 {
+		log.Warnf("cannot broadcast tx (res.Code=%d): %s", res.Code, err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot broadcast tx")
+		return
 	}
+	log.Infof("transaction hash: %s, transaction code: %d", res.Hash, res.Code)
 
 	var apiResponse types.ResponseMessage
 	apiResponse.ID = request.id
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
-
-	apiResponse.Ok = types.Bool(res.Code == 0)
+	apiResponse.Ok = (res.Code == 0)
 
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
 		log.Warn(err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot sign reply")
+		return
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
-		log.Errorf("Error marshaling submitEnvelope reply: %s", err)
+		log.Errorf("error marshaling submitEnvelope reply: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
+		return
 	}
 	router.transport.Send(buildReply(request.context, rawApiResponse))
 }
@@ -53,6 +58,7 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
+	apiResponse.Ok = true
 	qdata := types.QueryData{
 		Method:    "getEnvelopeStatus",
 		ProcessID: request.ProcessID,
@@ -61,24 +67,30 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
 		log.Errorf("cannot marshal query data: (%s)", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal query data")
+		return
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
 		log.Warnf("cannot query: %s", err)
-		apiResponse.Ok = types.False
-		apiResponse.Registered = types.False
-	} else {
-		apiResponse.Ok = types.Bool(queryResult.Response.Code == 0)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot perform ABCI query")
+		return
 	}
-
-	log.Debugf("Response is: %d", apiResponse.MetaResponse)
+	if queryResult.Response.Code != 0 {
+		sendError(router.transport, router.signer, request.context, request.id, "cannot fetch envelope")
+		return
+	}
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
 		log.Warn(err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot sign reply")
+		return
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
-		log.Errorf("Error marshaling getEnvelopeStatus reply: %s", err)
+		log.Errorf("error marshaling getEnvelopeStatus reply: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
+		return
 	}
 
 	log.Debugf("api response: %+v", apiResponse.MetaResponse)
@@ -90,6 +102,7 @@ func getEnvelope(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
+	apiResponse.Ok = true
 	qdata := types.QueryData{
 		Method:    "getEnvelope",
 		ProcessID: request.ProcessID,
@@ -98,25 +111,34 @@ func getEnvelope(request routerRequest, router *Router) {
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
 		log.Errorf("cannot marshal query data: (%s)", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal query data")
+		return
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
-	apiResponse.Ok = types.Bool(err == nil)
-
+	if queryResult.Response.Code != 0 {
+		sendError(router.transport, router.signer, request.context, request.id, "cannot fetch envelope")
+		return
+	}
 	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Payload)
 	if err != nil {
 		log.Errorf("cannot unmarshal vote package: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot unmarshal vote package")
+		return
 	}
-	log.Debugf("Response is: %d", apiResponse.MetaResponse)
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
 		log.Warn(err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot sign reply")
+		return
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
-		log.Errorf("Error marshaling getEnvelope reply: %s", err)
+		log.Errorf("error marshaling getEnvelope reply: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
+		return
 	}
 
-	log.Debugf("api response: %+v", apiResponse.MetaResponse)
+	log.Debugf("getEnvelope response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawApiResponse))
 }
 
@@ -125,30 +147,40 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
+	apiResponse.Ok = true
 	qdata := types.QueryData{
 		Method:    "getEnvelopeHeight",
 		ProcessID: request.ProcessID,
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err)
+		log.Errorf("cannot marshal query data: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal query")
+		return
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
-	apiResponse.Ok = types.Bool(err == nil)
-
+	if queryResult.Response.Code != 0 {
+		sendError(router.transport, router.signer, request.context, request.id, "cannot fetch envelope height")
+		return
+	}
 	apiResponse.Height = new(int64)
 	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, apiResponse.Height)
 	if err != nil {
 		log.Errorf("cannot unmarshal height: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal height")
+		return
 	}
-	log.Debugf("Response height is: %d", *apiResponse.Height)
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
 		log.Warn(err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot sign reply")
+		return
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
-		log.Errorf("Error marshaling getEnvelopeHeight reply: %s", err)
+		log.Errorf("error marshaling getEnvelopeHeight reply: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
+		return
 	}
 
 	log.Debugf("api response: %+v", apiResponse.MetaResponse)
@@ -160,29 +192,39 @@ func getBlockHeight(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
+	apiResponse.Ok = true
 	qdata := types.QueryData{
 		Method: "getBlockHeight",
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
 		log.Errorf("cannot marshal query data: (%s)", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal query")
+		return
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
-	apiResponse.Ok = types.Bool(err == nil)
-
+	if queryResult.Response.Code != 0 {
+		sendError(router.transport, router.signer, request.context, request.id, "cannot fetch height")
+		return
+	}
 	apiResponse.Height = new(int64)
 	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, apiResponse.Height)
-	log.Debugf("Response height is: %d", *apiResponse.Height)
 	if err != nil {
 		log.Errorf("cannot unmarshal height: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot unmarshal height")
+		return
 	}
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
 		log.Warn(err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot sign reply")
+		return
 	}
 	rawApiResponse, err := json.Marshal(apiResponse)
 	if err != nil {
-		log.Errorf("Error marshaling getBlockHeight reply: %s", err)
+		log.Errorf("error marshaling getBlockHeight reply: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshaling reply")
+		return
 	}
 	log.Debugf("api response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawApiResponse))
@@ -199,7 +241,7 @@ func getEnvelopeList(request routerRequest, router *Router) {
 	apiResponse.ID = request.id
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
-
+	apiResponse.Ok = true
 	// here we can ask to tendermint via query to get the results from the database
 	qdata := types.QueryData{
 		Method:    "getEnvelopeList",
@@ -210,8 +252,14 @@ func getEnvelopeList(request routerRequest, router *Router) {
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
 		log.Errorf("cannot marshal query data: (%s)", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal query")
+		return
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
+	if queryResult.Response.Code != 0 {
+		sendError(router.transport, router.signer, request.context, request.id, "cannot fetch envelope list")
+		return
+	}
 	apiResponse.Nullifiers = new([]string)
 	if err != nil {
 		*apiResponse.Nullifiers = []string{""}
@@ -221,17 +269,22 @@ func getEnvelopeList(request routerRequest, router *Router) {
 	} else {
 		*apiResponse.Nullifiers = []string{""}
 	}
-	log.Debugf("Response is: %d", apiResponse.MetaResponse)
 	if err != nil {
 		log.Errorf("cannot unmarshal nullifiers: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot unmarshal nullifiers")
+		return
 	}
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
 		log.Warn(err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot sign reply")
+		return
 	}
 	rawAPIResponse, err := json.Marshal(apiResponse)
 	if err != nil {
-		log.Errorf("Error marshaling getEnvelopeList reply: %s", err)
+		log.Errorf("error marshaling getEnvelopeList reply: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
+		return
 	}
 	log.Debugf("api response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawAPIResponse))

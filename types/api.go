@@ -53,14 +53,13 @@ type MetaResponse struct {
 	CensusID      string    `json:"censusId,omitempty"`
 	ClaimsData    []string  `json:"claimsData,omitempty"`
 	Content       string    `json:"content,omitempty"`
-	Error         string    `json:"error,omitempty"`
+	Error         *string   `json:"error,omitempty"`
 	Files         []byte    `json:"files,omitempty"`
 	Height        *int64    `json:"height,omitempty"`
 	InvalidClaims []int     `json:"invalidClaims,omitempty"`
-	Message       string    `json:"message,omitempty"`
 	Nullifier     string    `json:"nullifier,omitempty"`
 	Nullifiers    *[]string `json:"nullifiers,omitempty"`
-	Ok            *bool     `json:"ok,omitempty"`
+	Ok            bool      `json:"ok"`
 	Payload       string    `json:"payload,omitempty"`
 	Registered    *bool     `json:"registered,omitempty"`
 	Request       string    `json:"request"`

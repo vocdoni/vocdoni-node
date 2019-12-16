@@ -61,6 +61,7 @@ func fetchFile(request routerRequest, router *Router) {
 	log.Debugf("file fetched, b64 size %d", len(b64content))
 	var response types.ResponseMessage
 	response.ID = request.id
+	response.Ok = true
 	response.Content = b64content
 	response.Request = request.id
 	response.Timestamp = int32(time.Now().Unix())
@@ -103,6 +104,7 @@ func addFile(request routerRequest, router *Router) {
 		response.Request = request.id
 		response.Timestamp = int32(time.Now().Unix())
 		response.URI = router.storage.URIprefix() + cid
+		response.Ok = true
 		response.Signature, err = router.signer.SignJSON(response.MetaResponse)
 		if err != nil {
 			log.Warn(err)
@@ -135,6 +137,7 @@ func pinList(request routerRequest, router *Router) {
 	}
 	var response types.ResponseMessage
 	response.ID = request.id
+	response.Ok = true
 	response.Files = pinsJSONArray
 	response.Request = request.id
 	response.Timestamp = int32(time.Now().Unix())
@@ -161,7 +164,7 @@ func pinFile(request routerRequest, router *Router) {
 	}
 	var response types.ResponseMessage
 	response.ID = request.id
-	response.Ok = types.True
+	response.Ok = true
 	response.Request = request.id
 	response.Timestamp = int32(time.Now().Unix())
 	response.Signature, err = router.signer.SignJSON(response.MetaResponse)
@@ -187,7 +190,7 @@ func unpinFile(request routerRequest, router *Router) {
 	}
 	var response types.ResponseMessage
 	response.ID = request.id
-	response.Ok = types.True
+	response.Ok = true
 	response.Request = request.id
 	response.Timestamp = int32(time.Now().Unix())
 	response.Signature, err = router.signer.SignJSON(response.MetaResponse)
