@@ -31,14 +31,14 @@ type (
 	eventChainIDChanged *big.Int
 	eventProcessCreated struct {
 		EntityAddress [20]byte
-		ProcessID     [32]byte
+		ProcessId     [32]byte
 		MerkleTree    string
 	}
 )
 
 type eventProcessCanceled struct {
 	EntityAddress [20]byte
-	ProcessID     [32]byte
+	ProcessId     [32]byte
 }
 
 type (
@@ -52,13 +52,13 @@ type (
 type (
 	oracleRemoved       string
 	privateKeyPublished struct {
-		ProcessID  [32]byte
+		ProcessId  [32]byte
 		PrivateKey string
 	}
 )
 
 type resultsPublished struct {
-	ProcessID [32]byte
+	ProcessId [32]byte
 	Results   string
 }
 
@@ -156,9 +156,9 @@ func processMeta(contractABI *abi.ABI, eventData *[]byte, ph *chain.ProcessHandl
 		return nil, err
 	}
 	log.Debugf("processid:%x entityAddress:%x mkTree:%s",
-		eventProcessCreated.ProcessID,
+		eventProcessCreated.ProcessId,
 		eventProcessCreated.EntityAddress,
 		eventProcessCreated.MerkleTree,
 	)
-	return ph.ProcessTxArgs(eventProcessCreated.ProcessID)
+	return ph.ProcessTxArgs(eventProcessCreated.ProcessId)
 }
