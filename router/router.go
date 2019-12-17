@@ -244,6 +244,7 @@ func info(request routerRequest, router *Router) {
 	var err error
 	response.ID = request.id
 	response.Ok = true
+	response.MetaResponse.Timestamp = int32(time.Now().Unix())
 	response.Request = request.id
 	response.MetaResponse.APIList = router.APIs
 	response.MetaResponse.Request = request.id
