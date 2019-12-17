@@ -189,9 +189,8 @@ func (r *Router) Route() {
 		msg := <-r.inbound
 		request, err := r.getRequest(msg.Data, msg.Context)
 		if !request.authenticated && err != nil {
-			log.Warnf("error parsing request: %s", err)
-			go sendError(r.transport, r.signer, request.context, request.id, "cannot parse request")
-			break
+			go sendError(r.transport, r.signer, request.context, request.id, err.Error())
+			continue
 		}
 		var methodFunc requestMethod
 		if !request.private {
@@ -201,7 +200,6 @@ func (r *Router) Route() {
 		}
 		if methodFunc == nil {
 			errMsg := fmt.Sprintf("router has no method named %s or unauthorized", request.method)
-			log.Warn(errMsg)
 			go sendError(r.transport, r.signer, request.context, request.id, errMsg)
 			continue
 		}
