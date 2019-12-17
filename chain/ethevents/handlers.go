@@ -89,7 +89,7 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 
 	switch event.Topics[0].Hex() {
 	case HashLogGenesisChanged.Hex():
-		//return nil
+		// return nil
 	case HashLogChainIDChanged.Hex():
 		// return nil
 	case HashLogProcessCreated.Hex():

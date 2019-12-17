@@ -6,19 +6,55 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/net/epoll"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"github.com/gorilla/websocket"
 
-	"github.com/gobwas/ws"
-	"github.com/gobwas/ws/wsutil"
+	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
 )
+
+type Client struct {
+	ID   string
+	Conn *websocket.Conn
+	Pool *clientPool
+}
+
+type clientPool struct {
+	Clients    map[*Client]bool
+	Register   chan *Client
+	Unregister chan *Client
+}
+
+func newClientPool() *clientPool {
+	return &clientPool{
+		Clients:    make(map[*Client]bool),
+		Register:   make(chan *Client),
+		Unregister: make(chan *Client),
+	}
+}
+
+func (p *clientPool) Start() {
+	for {
+		select {
+		case client := <-p.Register:
+			p.Clients[client] = true
+			log.Infof("client with id: %s connected", client.ID)
+			log.Debugf("client pool size: %d", len(p.Clients))
+			break
+		case client := <-p.Unregister:
+			delete(p.Clients, client)
+			log.Infof("client with id: %s disconnected", client.ID)
+			log.Debugf("client pool size: %d", len(p.Clients))
+			break
+		}
+	}
+}
 
 // WebsocketHandle represents the information required to work with ws in go-dvote
 type WebsocketHandle struct {
 	Connection *types.Connection // the ws connection
-	Epoll      *epoll.Epoll      // epoll for the ws implementation
 	WsProxy    *Proxy            // proxy where the ws will be associated
+	Upgrader   *websocket.Upgrader
+	Pool       *clientPool
 }
 
 // SetProxy sets the proxy for the ws
@@ -39,35 +75,52 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 		return err
 	}
 
-	// Start epoll
-	var err error
-	w.Epoll, err = epoll.MkEpoll()
-	if err != nil {
-		return err
+	w.Upgrader = &websocket.Upgrader{
+		ReadBufferSize:  4096,
+		WriteBufferSize: 4096,
+		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
 
+	w.Pool = newClientPool()
+	go w.Pool.Start()
+
 	return nil
+}
+
+func (w *WebsocketHandle) Upgrade(responseWriter http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
+	conn, err := w.Upgrader.Upgrade(responseWriter, r, nil)
+	if err != nil {
+		log.Infof("cannot upgrade http connection to ws: %s", err)
+		return nil, err
+	}
+
+	return conn, nil
 }
 
 // AddProxyHandler adds a handler on the proxy and upgrades the connection
 // a ws connection is activated with a normal http request with Connection: upgrade
 func (w *WebsocketHandle) AddProxyHandler(path string) {
 	ssl := w.WsProxy.C.SSLDomain != ""
-	upgradeConn := func(writer http.ResponseWriter, reader *http.Request) {
+	serveWs := func(writer http.ResponseWriter, reader *http.Request) {
 		// Upgrade connection
-		conn, _, _, err := ws.UpgradeHTTP(reader, writer)
+		conn, err := w.Upgrade(writer, reader)
 		if err != nil {
 			return
 		}
-		if err := w.Epoll.Add(conn, ssl); err != nil {
-			log.Warnf("failed to add connection %v", err)
-			conn.Close()
+
+		client := &Client{
+			Conn: conn,
+			Pool: w.Pool,
+			ID:   time.Now().String(),
 		}
+
+		w.Pool.Register <- client
+
 		writer.Header().Set("Access-Control-Allow-Origin", "*")
 		writer.Header().Set("Access-Control-Allow-Methods", "POST, GET")
 		writer.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token")
 	}
-	w.WsProxy.AddHandler(path, upgradeConn)
+	w.WsProxy.AddHandler(path, serveWs)
 
 	if !ssl {
 		log.Infof("ws initialized on ws://" + w.WsProxy.C.Address + ":" + strconv.Itoa(w.WsProxy.C.Port))
@@ -79,29 +132,22 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 // Listen listens for incoming data
 func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 	var msg types.Message
+
 	for {
-		connections, err := w.Epoll.Wait()
-		if err != nil {
-			log.Warn(err)
-			continue
-		}
-		for _, conn := range connections {
-			if conn == nil {
+		for client, added := range w.Pool.Clients {
+			if added == false {
 				break
 			}
-			payload, _, err := wsutil.ReadClientData(conn)
+			_, payload, err := client.Conn.ReadMessage()
 			if err != nil {
-				ssl := w.WsProxy.C.SSLDomain != ""
-				if err := w.Epoll.Remove(conn, ssl); err != nil {
-					log.Warn(err)
-				}
-				conn.Close()
+				w.Pool.Unregister <- client
+				client.Conn.Close()
 				continue
 			}
 			msg.Data = []byte(payload)
 			msg.TimeStamp = int32(time.Now().Unix())
-			ctx := new(types.WebsocketContext)
-			ctx.Conn = &conn
+			ctx := new(WebsocketContext)
+			ctx.Conn = client.Conn
 			msg.Context = ctx
 			reciever <- msg
 		}
@@ -110,5 +156,14 @@ func (w *WebsocketHandle) Listen(reciever chan<- types.Message) {
 
 // Send sends the response given a message
 func (w *WebsocketHandle) Send(msg types.Message) {
-	wsutil.WriteServerMessage(*msg.Context.(*types.WebsocketContext).Conn, ws.OpBinary, msg.Data)
+	clientConn := *msg.Context.(*WebsocketContext).Conn
+	clientConn.WriteMessage(websocket.BinaryMessage, msg.Data)
+}
+
+type WebsocketContext struct {
+	Conn *websocket.Conn
+}
+
+func (c WebsocketContext) ConnectionType() string {
+	return "Websocket"
 }

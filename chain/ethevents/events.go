@@ -33,7 +33,7 @@ type EthereumEvents struct {
 	DialAddr string
 	// list of handler functions that will be called on events
 	EventHandlers []EventHandler
-	//VochainCli is the Vochain HTTP client
+	// VochainCli is the Vochain HTTP client
 	VochainCLI *voclient.HTTP
 }
 

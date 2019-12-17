@@ -1,9 +1,5 @@
 package types
 
-import (
-	"net"
-)
-
 type MessageContext interface {
 	ConnectionType() string
 }
@@ -40,13 +36,6 @@ func (c *PubSubContext) Topic() string {
 	return c.Topic
 }
 */
-type WebsocketContext struct {
-	Conn *net.Conn
-}
-
-func (c WebsocketContext) ConnectionType() string {
-	return "Websocket"
-}
 
 /*
 func (c *WebsocketContext) Conn() *net.Conn {
