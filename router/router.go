@@ -54,6 +54,7 @@ type Router struct {
 	PrivateCalls      uint64
 	PublicCalls       uint64
 	codec             *amino.Codec
+	APIs              []string
 }
 
 func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
@@ -61,16 +62,17 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net
 	privateReqMap := make(methodMap)
 	publicReqMap := make(methodMap)
 	cm := new(census.CensusManager)
-	return &Router{
-		privateRequestMap: privateReqMap,
-		publicRequestMap:  publicReqMap,
-		census:            cm,
-		inbound:           inbound,
-		storage:           storage,
-		transport:         transport,
-		signer:            signer,
-		codec:             amino.NewCodec(),
-	}
+	r := new(Router)
+	r.privateRequestMap = privateReqMap
+	r.publicRequestMap = publicReqMap
+	r.census = cm
+	r.inbound = inbound
+	r.storage = storage
+	r.transport = transport
+	r.signer = signer
+	r.codec = amino.NewCodec()
+	r.registerPublic("getGatewayInfo", info)
+	return r
 }
 
 type routerRequest struct {
@@ -138,6 +140,7 @@ func (r *Router) registerPublic(methodName string, methodCallback requestMethod)
 
 // EnableFileAPI enables the FILE API in the Router
 func (r *Router) EnableFileAPI() {
+	r.APIs = append(r.APIs, "file")
 	r.registerPublic("fetchFile", fetchFile)
 	r.registerPrivate("addFile", addFile)
 	r.registerPrivate("pinList", pinList)
@@ -147,6 +150,7 @@ func (r *Router) EnableFileAPI() {
 
 // EnableCensusAPI enables the Census API in the Router
 func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
+	r.APIs = append(r.APIs, "census")
 	r.census = cm
 	cm.Data = r.storage
 	r.registerPublic("getRoot", censusLocal)
@@ -164,6 +168,7 @@ func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
 
 // EnableVoteAPI enabled the Vote API in the Router
 func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP) {
+	r.APIs = append(r.APIs, "vote")
 	r.tmclient = rpcClient
 	r.registerPublic("submitEnvelope", submitEnvelope)
 	r.registerPublic("getEnvelopeStatus", getEnvelopeStatus)
@@ -233,5 +238,27 @@ func sendError(transport net.Transport, signer signature.SignKeys, context types
 			log.Warnf("error marshaling response body: %s", err)
 		}
 		transport.Send(buildReply(context, rawResponse))
+	}
+}
+
+func info(request routerRequest, router *Router) {
+	var response types.ResponseMessage
+	var err error
+	response.ID = request.id
+	response.Ok = true
+	response.Request = request.id
+	response.MetaResponse.APIList = router.APIs
+	response.MetaResponse.Request = request.id
+	response.Signature, err = router.signer.SignJSON(response.MetaResponse)
+	if err != nil {
+		log.Warn(err)
+	}
+	rawResponse, err := json.Marshal(response)
+	if err != nil {
+		log.Error(err)
+		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err))
+	} else {
+		log.Infof("sending census resposne: %s", rawResponse)
+		router.transport.Send(buildReply(request.context, rawResponse))
 	}
 }

@@ -50,6 +50,7 @@ type ErrorMessage struct {
 // MetaResponse contains all of the possible request fields.
 // Fields must be in alphabetical order
 type MetaResponse struct {
+	APIList       []string  `json:"apiList,omitempty"`
 	CensusID      string    `json:"censusId,omitempty"`
 	ClaimsData    []string  `json:"claimsData,omitempty"`
 	Content       string    `json:"content,omitempty"`
