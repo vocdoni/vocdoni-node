@@ -18,17 +18,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 
-/*
-func initWithDefaults(out io.Writer, repoRoot string, profile string) error {
-	var profiles []string
-	if profile != "" {
-		profiles = strings.Split(profile, ",")
-	}
-
-	return doInit(out, repoRoot, false, nBitsForKeypairDefault)
-}
-*/
-
 var pluginOnce sync.Once
 
 func InstallDatabasePlugins() {
@@ -56,7 +45,7 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 	}
 
 	if fsrepo.IsInitialized(repoRoot) {
-		return nil, errors.New("Repo exists!")
+		return nil, errors.New("repo exists")
 	}
 
 	conf, err := config.Init(out, nBitsForKeypair)
@@ -64,15 +53,16 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 		return nil, err
 	}
 
-	// We don't need mdns, and it doesn't look like it works when not
-	// running as root, anyway.
-	conf.Discovery.MDNS.Enabled = false
-
-	// Some optimizations from https://medium.com/coinmonks/ipfs-production-configuration-57121f0daab2
+	// Some optimizations to avoid using too much resources
 	conf.Datastore.BloomFilterSize = 1048576
-	conf.Swarm.ConnMgr.LowWater = 100
-	conf.Swarm.ConnMgr.HighWater = 400
-	conf.Swarm.ConnMgr.GracePeriod = "20s"
+	conf.Swarm.ConnMgr.LowWater = 20
+	conf.Swarm.ConnMgr.HighWater = 100
+	conf.Swarm.ConnMgr.GracePeriod = "2s"
+	conf.Swarm.DisableBandwidthMetrics = true
+	conf.Swarm.EnableAutoRelay = false
+	conf.Swarm.DisableRelay = true
+	conf.Datastore.GCPeriod = "5m"
+	conf.Discovery.MDNS.Enabled = false
 
 	if err := fsrepo.Init(repoRoot, conf); err != nil {
 		return nil, err

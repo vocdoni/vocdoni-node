@@ -13,6 +13,7 @@ import (
 	"github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
 	ipfsapi "github.com/ipfs/go-ipfs/core/coreapi"
+	"github.com/ipfs/go-ipfs/core/corerepo"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/pkg/errors"
@@ -91,6 +92,9 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 		log.Warn("error constructing core API")
 		return nil, nil, err
 	}
+
+	// Start garbage collector
+	go corerepo.PeriodicGC(ctx, node)
 
 	return node, api, nil
 }
