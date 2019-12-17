@@ -258,7 +258,7 @@ func info(request routerRequest, router *Router) {
 		log.Error(err)
 		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err))
 	} else {
-		log.Infof("sending census resposne: %s", rawResponse)
+		log.Debugf("sending info resposne: %s", rawResponse)
 		router.transport.Send(buildReply(request.context, rawResponse))
 	}
 }
