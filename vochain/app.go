@@ -9,6 +9,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	nm "github.com/tendermint/tendermint/node"
 
+	"gitlab.com/vocdoni/go-dvote/log"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 	vochain "gitlab.com/vocdoni/go-dvote/types"
 )
@@ -45,27 +46,12 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	vlog.Infof("tendermint Core version: %s", req.Version)
 	vlog.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
 	vlog.Infof("tendermint Block protocol version: %d", req.BlockVersion)
-
-	// gets the app height from database
-	var header abcitypes.Header
-	_, heightBytes := app.State.AppTree.Get([]byte(headerKey))
-	if len(heightBytes) > 0 {
-		err := app.State.Codec.UnmarshalBinaryBare(heightBytes, &header)
-		if err != nil {
-			vlog.Errorf("cannot unmarshal header from database")
-		}
-	}
-	if header.Height == 0 {
-		vlog.Infof("initializing tendermint application database for first time, height %d", 0)
-	} else {
-		vlog.Infof("block height from database: %d", header.Height)
-	}
-	if len(header.AppHash) != 0 {
-		vlog.Infof("apphash %x", header.AppHash)
-	}
+	height := app.State.Height()
+	hash := app.State.AppHash()
+	log.Infof("current height is %d, current APP hash is %x", height, hash)
 	return abcitypes.ResponseInfo{
-		LastBlockHeight:  header.Height,
-		LastBlockAppHash: header.AppHash,
+		LastBlockHeight:  height,
+		LastBlockAppHash: hash,
 	}
 }
 
@@ -102,6 +88,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 	app.State.AppTree.Set([]byte(headerKey), headerBytes)
 	app.State.Save()
+
 	// TBD: using empty list here, should return validatorsUpdate to use the validators obtained here
 	return abcitypes.ResponseInitChain{}
 }

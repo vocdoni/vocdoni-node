@@ -11,6 +11,7 @@ import (
 	tmdb "github.com/tendermint/tm-db"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/log"
 	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 )
 
@@ -48,13 +49,6 @@ func NewVochainState(dataDir string, codec *amino.Codec) (*VochainState, error) 
 		return nil, err
 	}
 
-	// set keys
-	appTree.Set([]byte(headerKey), []byte{})
-	appTree.Set([]byte(oracleKey), []byte{})
-	appTree.Set([]byte(validatorKey), []byte{})
-	appTree.Set([]byte(processKey), []byte{}) // iavl process tree mkroot
-	appTree.Set([]byte(voteKey), []byte{})    // iavl vote tree mkroot
-
 	processTree, err := tmdb.NewGoLevelDB(processTreeName, dataDir)
 	if err != nil {
 		return nil, err
@@ -63,12 +57,16 @@ func NewVochainState(dataDir string, codec *amino.Codec) (*VochainState, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &VochainState{
+	var vs = VochainState{
 		AppTree:     iavl.NewMutableTree(appTree, PrefixDBCacheSize),
 		ProcessTree: iavl.NewMutableTree(processTree, PrefixDBCacheSize),
 		VoteTree:    iavl.NewMutableTree(voteTree, PrefixDBCacheSize),
 		Codec:       codec,
-	}, nil
+	}
+	vs.AppTree.Load()
+	vs.ProcessTree.Load()
+	vs.VoteTree.Load()
+	return &vs, err
 }
 
 // AddOracle adds a trusted oracle given its address if not exists
@@ -293,6 +291,7 @@ func (v *VochainState) Height() int64 {
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
 	if err != nil {
+		log.Errorf("cannot get vochain height: %s", err)
 		return 0
 	}
 	return header.Height
@@ -311,9 +310,19 @@ func (v *VochainState) AppHash() []byte {
 
 // Save persistent save of vochain mem trees
 func (v *VochainState) Save() []byte {
-	h1, _, _ := v.AppTree.SaveVersion()
-	h2, _, _ := v.ProcessTree.SaveVersion()
-	h3, _, _ := v.VoteTree.SaveVersion()
+	h1, _, err := v.AppTree.SaveVersion()
+	if err != nil {
+		log.Errorf("cannot sve vochain state to disk: %s", err)
+	}
+	h2, _, err := v.ProcessTree.SaveVersion()
+	if err != nil {
+		log.Errorf("cannot sve vochain state to disk: %s", err)
+	}
+	h3, _, err := v.VoteTree.SaveVersion()
+	if err != nil {
+		log.Errorf("cannot sve vochain state to disk: %s", err)
+	}
+
 	return signature.HashRaw(fmt.Sprintf("%s%s%s", h1, h2, h3))
 }
 
