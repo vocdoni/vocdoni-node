@@ -401,10 +401,11 @@ func main() {
 		go func() {
 			for {
 				if vnode.Node != nil {
-					log.Infof("[vochain info] Height:%d Mempool:%d AppTree:%d VoteTree:%d",
+					log.Infof("[vochain info] Height:%d Mempool:%d AppTree:%d ProcessTree:%d VoteTree:%d",
 						vnode.Node.BlockStore().Height(),
 						vnode.Node.Mempool().Size(),
 						vnode.State.AppTree.Size(),
+						vnode.State.ProcessTree.Size(),
 						vnode.State.VoteTree.Size(),
 					)
 				}

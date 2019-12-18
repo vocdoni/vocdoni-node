@@ -99,11 +99,11 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	if app.State.Lock {
 		log.Warn("app state is locked")
-	} else {
-		app.State.Lock = true
-		// reset app state to latest persistent data
-		app.State.Rollback()
+		return abcitypes.ResponseBeginBlock{}
 	}
+	app.State.Lock = true
+	// reset app state to latest persistent data
+	app.State.Rollback()
 	headerBytes, err := app.Codec.MarshalBinaryBare(req.Header)
 	if err != nil {
 		log.Warnf("cannot marshal header in BeginBlock")
@@ -131,11 +131,14 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 }
 
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
-	app.State.Lock = false
-	hash := app.State.Save()
-	return abcitypes.ResponseCommit{
-		Data: hash,
+	if app.State.Lock {
+		app.State.Lock = false
+		hash := app.State.Save()
+		return abcitypes.ResponseCommit{
+			Data: hash,
+		}
 	}
+	return abcitypes.ResponseCommit{}
 }
 
 func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {

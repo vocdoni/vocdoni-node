@@ -5,6 +5,7 @@ import (
 
 	amino "github.com/tendermint/go-amino"
 
+	"gitlab.com/vocdoni/go-dvote/log"
 	vochain "gitlab.com/vocdoni/go-dvote/types"
 	iavl "gitlab.com/vocdoni/go-dvote/vochain"
 )
@@ -120,6 +121,7 @@ var (
 )
 
 func NewVochainStateWithOracles() *iavl.VochainState {
+	log.InitLogger("error", "stdout")
 	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
 	s, err := iavl.NewVochainState("/tmp/db", c)
@@ -132,6 +134,7 @@ func NewVochainStateWithOracles() *iavl.VochainState {
 }
 
 func NewVochainStateWithValidators() *iavl.VochainState {
+	log.InitLogger("error", "stdout")
 	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
 	s, err := iavl.NewVochainState("/tmp/db", c)
@@ -146,6 +149,7 @@ func NewVochainStateWithValidators() *iavl.VochainState {
 }
 
 func NewVochainStateWithProcess() *iavl.VochainState {
+	log.InitLogger("error", "stdout")
 	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
 	s, err := iavl.NewVochainState("/tmp/db", c)

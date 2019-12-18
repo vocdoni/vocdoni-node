@@ -63,9 +63,19 @@ func NewVochainState(dataDir string, codec *amino.Codec) (*VochainState, error) 
 		VoteTree:    iavl.NewMutableTree(voteTree, PrefixDBCacheSize),
 		Codec:       codec,
 	}
-	vs.AppTree.Load()
-	vs.ProcessTree.Load()
-	vs.VoteTree.Load()
+
+	version, err := vs.AppTree.Load()
+	if err != nil {
+		return nil, err
+	}
+
+	vs.AppTree.DeleteVersion(version)
+	vs.ProcessTree.DeleteVersion(version)
+	vs.VoteTree.DeleteVersion(version)
+	atVersion, err := vs.AppTree.LoadVersion(version - 1)
+	ptVersion, err := vs.ProcessTree.LoadVersion(version - 1)
+	vtVersion, err := vs.VoteTree.LoadVersion(version - 1)
+	log.Infof("application trees successfully loaded. appTree version:%d processTree version:%d voteTree version: %d", atVersion, ptVersion, vtVersion)
 	return &vs, err
 }
 
