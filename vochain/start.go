@@ -89,6 +89,46 @@ func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
 	return nil
 }
 
+// tenderLogger implements tendermint's Logger interface, with a couple of
+// modifications.
+//
+// First, it routes the logs to go-dvote's logger, so that we don't end up with
+// two loggers writing directly to stdout or stderr.
+//
+// Second, because we generally don't care about tendermint errors such as
+// failures to connect to peers, we route all log levels to our debug level.
+// They will only surface if dvote's log level is "debug".
+type tenderLogger struct {
+	keyvals []interface{}
+}
+
+var _ tlog.Logger = (*tenderLogger)(nil)
+
+// TODO(mvdan): use zap's WithCallerSkip so that we show the position
+// information corresponding to where tenderLogger was called, instead of just
+// the pointless positions here.
+
+func (l *tenderLogger) Debug(msg string, keyvals ...interface{}) {
+	log.Debugw("[tendermint debug] "+msg, keyvals...)
+}
+
+func (l *tenderLogger) Info(msg string, keyvals ...interface{}) {
+	log.Debugw("[tendermint info] "+msg, keyvals...)
+}
+
+func (l *tenderLogger) Error(msg string, keyvals ...interface{}) {
+	log.Debugw("[tendermint error] "+msg, keyvals...)
+}
+
+func (l *tenderLogger) With(keyvals ...interface{}) tlog.Logger {
+	// Make sure we copy the values, to avoid modifying the parent.
+	// TODO(mvdan): use zap's With method directly.
+	l2 := &tenderLogger{}
+	l2.keyvals = append(l2.keyvals, l.keyvals...)
+	l2.keyvals = append(l2.keyvals, keyvals...)
+	return l2
+}
+
 // we need to set init (first time validators and oracles)
 func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Node, error) {
 	// create node config
@@ -148,9 +188,8 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	}
 
 	// create logger
-	logger := tlog.NewTMLogger(tlog.NewSyncWriter(os.Stdout))
+	logger := tlog.Logger(&tenderLogger{})
 
-	// config.LogLevel = "none"
 	logger, err = tmflags.ParseLogLevel(tconfig.LogLevel, logger, cfg.DefaultLogLevel())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse log level")

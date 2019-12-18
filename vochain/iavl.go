@@ -57,7 +57,7 @@ func NewVochainState(dataDir string, codec *amino.Codec) (*VochainState, error) 
 	if err != nil {
 		return nil, err
 	}
-	var vs = VochainState{
+	vs := VochainState{
 		AppTree:     iavl.NewMutableTree(appTree, PrefixDBCacheSize),
 		ProcessTree: iavl.NewMutableTree(processTree, PrefixDBCacheSize),
 		VoteTree:    iavl.NewMutableTree(voteTree, PrefixDBCacheSize),
