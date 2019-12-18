@@ -70,7 +70,7 @@ func NewVotingProcessHandle(contractAddressHex string, dialEndpoint string) (*Pr
 func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error) {
 	processMeta, err := ph.VotingProcess.Get(nil, pid)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching process metadata from Ethereum: %s", err)
+		//	return nil, fmt.Errorf("error fetching process metadata from Ethereum: %s", err)
 	}
 
 	processTxArgs := new(types.NewProcessTx)
@@ -78,8 +78,12 @@ func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error
 	processTxArgs.EntityID = processMeta.EntityAddress.String()
 	processTxArgs.MkRoot = processMeta.CensusMerkleRoot
 	processTxArgs.MkURI = processMeta.CensusMerkleTree
-	processTxArgs.NumberOfBlocks = processMeta.NumberOfBlocks.Int64()
-	processTxArgs.StartBlock = processMeta.StartBlock.Int64()
+	if processMeta.NumberOfBlocks != nil {
+		processTxArgs.NumberOfBlocks = processMeta.NumberOfBlocks.Int64()
+	}
+	if processMeta.StartBlock != nil {
+		processTxArgs.StartBlock = processMeta.StartBlock.Int64()
+	}
 	processTxArgs.EncryptionPublicKeys = []string{processMeta.VoteEncryptionPrivateKey}
 	switch processMeta.ProcessType {
 	case "snark-vote", "poll-vote", "petition-sign":

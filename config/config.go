@@ -32,6 +32,7 @@ type GWCfg struct {
 	LogOutput  string
 	DataDir    string
 	W3external string
+	CensusSync bool
 }
 
 type IPFSCfg struct {

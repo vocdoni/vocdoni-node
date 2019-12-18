@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -250,7 +249,7 @@ func main() {
 	go node.PrintInfo(20 * time.Second)
 
 	// Create Ethereum Event Log listener and register oracle handlers
-	ev, err := ethevents.NewEthEvents(globalCfg.VochainConfig.Contract, signer, "")
+	ev, err := ethevents.NewEthEvents(globalCfg.VochainConfig.Contract, signer, "", nil)
 	if err != nil {
 		log.Fatalf("couldn't create ethereum  events listener: %s", err)
 	}
@@ -285,7 +284,7 @@ func main() {
 				if globalCfg.SubscribeOnly {
 					go ev.SubscribeEthereumEventLogs()
 				} else {
-					go ev.ReadEthereumEventLogs(0, hex2int64(height))
+					go ev.ReadEthereumEventLogs(0, util.Hex2int64(height))
 					go ev.SubscribeEthereumEventLogs()
 				}
 				break
@@ -311,13 +310,4 @@ func addKeyFromEncryptedJSON(keyJSON []byte, passphrase string, signKeys *sig.Si
 	signKeys.Private = key.PrivateKey
 	signKeys.Public = &key.PrivateKey.PublicKey
 	return nil
-}
-
-func hex2int64(hexStr string) int64 {
-	// remove 0x suffix if found in the input string
-	cleaned := strings.Replace(hexStr, "0x", "", -1)
-
-	// base 16 for hexadecimal
-	result, _ := strconv.ParseUint(cleaned, 16, 64)
-	return int64(result)
 }

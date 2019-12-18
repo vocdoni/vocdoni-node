@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	voclient "github.com/tendermint/tendermint/rpc/client"
+	"gitlab.com/vocdoni/go-dvote/census"
 	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -35,6 +36,8 @@ type EthereumEvents struct {
 	EventHandlers []EventHandler
 	// VochainCli is the Vochain HTTP client
 	VochainCLI *voclient.HTTP
+	// CensusManager is the census manager service
+	Census *census.CensusManager
 }
 
 // EventHandler function type is executed on each Ethereum event
@@ -50,7 +53,7 @@ type BlockInfo struct {
 }
 
 // NewEthEvents creates a new Ethereum events handler
-func NewEthEvents(contractAddressHex string, signer *signature.SignKeys, w3Endpoint string) (*EthereumEvents, error) {
+func NewEthEvents(contractAddressHex string, signer *signature.SignKeys, w3Endpoint string, cens *census.CensusManager) (*EthereumEvents, error) {
 	if len(w3Endpoint) == 0 {
 		w3Endpoint = "ws://127.0.0.1:9092"
 	}
@@ -69,6 +72,7 @@ func NewEthEvents(contractAddressHex string, signer *signature.SignKeys, w3Endpo
 		ProcessHandle:   ph,
 		Signer:          signer,
 		DialAddr:        w3Endpoint,
+		Census:          cens,
 	}, nil
 }
 
@@ -171,7 +175,7 @@ func (ev *EthereumEvents) ReadEthereumEventLogs(from, to int64) interface{} {
 	for _, event := range logs {
 		for _, h := range ev.EventHandlers {
 			if err := h(event, ev); err != nil {
-				log.Error(err)
+				log.Warn(err)
 			}
 		}
 	}

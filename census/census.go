@@ -32,11 +32,12 @@ type Namespace struct {
 }
 
 type CensusManager struct {
-	Storage    string                // Root storage data dir
-	AuthWindow int32                 // Time window (seconds) in which TimeStamp will be accepted if auth enabled
-	Census     CensusNamespaces      // Available namespaces
-	Trees      map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
-	Data       data.Storage
+	Storage     string                // Root storage data dir
+	AuthWindow  int32                 // Time window (seconds) in which TimeStamp will be accepted if auth enabled
+	Census      CensusNamespaces      // Available namespaces
+	Trees       map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
+	Data        data.Storage
+	ImportQueue map[string]string
 }
 
 // Init creates a new census manager
@@ -44,6 +45,7 @@ func (cm *CensusManager) Init(storage, rootKey string) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storage)
 	cm.Storage = storage
 	cm.Trees = make(map[string]*tree.Tree)
+	cm.ImportQueue = make(map[string]string)
 	cm.AuthWindow = 10
 
 	log.Infof("loading namespaces and keys from %s", nsConfig)
@@ -74,7 +76,9 @@ func (cm *CensusManager) Init(storage, rootKey string) error {
 		log.Infof("updating root key to %s", rootKey)
 		cm.Census.RootKey = rootKey
 	} else {
-		log.Infof("current root key %s", rootKey)
+		if rootKey != "" {
+			log.Infof("current root key %s", rootKey)
+		}
 	}
 	// Initialize existing merkle trees
 	for _, ns := range cm.Census.Namespaces {
@@ -88,12 +92,14 @@ func (cm *CensusManager) Init(storage, rootKey string) error {
 			cm.Trees[ns.Name] = &t
 		}
 	}
+	// Start daemon for importing remote census
+	go cm.ImportQueueDaemon()
+
 	return nil
 }
 
 // AddNamespace adds a new merkletree identified by a censusId (name)
 func (cm *CensusManager) AddNamespace(name string, pubKeys []string) error {
-	log.Infof("adding namespace %s", name)
 	if _, e := cm.Trees[name]; e {
 		return errors.New("namespace already exist")
 	}
@@ -108,6 +114,22 @@ func (cm *CensusManager) AddNamespace(name string, pubKeys []string) error {
 	ns.Name = name
 	ns.Keys = pubKeys
 	cm.Census.Namespaces = append(cm.Census.Namespaces, ns)
+	return cm.save()
+}
+
+// DelNamespace removes a merkletree namespace
+func (cm *CensusManager) DelNamespace(name string) error {
+	if _, e := cm.Trees[name]; e {
+		delete(cm.Trees, name)
+		os.RemoveAll(cm.Storage + "/" + name)
+	}
+	for i, ns := range cm.Census.Namespaces {
+		if ns.Name == name {
+			cm.Census.Namespaces = cm.Census.Namespaces[:i+
+				copy(cm.Census.Namespaces[i:], cm.Census.Namespaces[i+1:])]
+			break
+		}
+	}
 	return cm.save()
 }
 
@@ -238,6 +260,58 @@ func (cm *CensusManager) HTTPhandler(w http.ResponseWriter, req *http.Request, s
 	httpReply(respMsg, w)
 }
 
+// AddToImportQueue adds a new census to the queue for being imported remotelly
+func (cm *CensusManager) AddToImportQueue(censusID string, censusURI string) {
+	cm.ImportQueue[censusID] = censusURI
+}
+
+// ImportQueueDaemon fetch and import remote census added on ImportQueue
+func (cm *CensusManager) ImportQueueDaemon() {
+	log.Info("starting import queue daemon")
+	for {
+		for cid, uri := range cm.ImportQueue {
+			if _, ok := cm.Trees[cid]; ok {
+				log.Debugf("census %s already exist, skipping", cid)
+				delete(cm.ImportQueue, cid)
+				continue
+			}
+			log.Infof("retrieving remote census %s", uri)
+			censusRaw, err := cm.Data.Retrieve(uri[len(cm.Data.URIprefix()):])
+			if err != nil {
+				log.Warnf("cannot retrieve census: %s", err)
+				delete(cm.ImportQueue, cid)
+				continue
+			}
+			var dump types.CensusDump
+			err = json.Unmarshal(censusRaw, &dump)
+			if err != nil {
+				log.Warnf("retrieved census does not have a valid format: %s", err)
+				delete(cm.ImportQueue, cid)
+				continue
+			}
+			log.Infof("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
+			if len(dump.ClaimsData) > 0 {
+				if err := cm.AddNamespace(cid, []string{}); err != nil {
+					log.Errorf("cannot create new census namespace: %s", err)
+					continue
+				}
+				err = cm.Trees[cid].ImportDump(dump.ClaimsData)
+				if err != nil {
+					log.Warnf("error importing dump: %s", err)
+					delete(cm.ImportQueue, cid)
+					continue
+				} else {
+					log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
+				}
+			} else {
+				log.Warnf("no claims found on the retreived census")
+				delete(cm.ImportQueue, cid)
+			}
+		}
+		time.Sleep(time.Second * 1)
+	}
+}
+
 // Handler handles an API census manager request.
 // isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
 // censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
@@ -247,7 +321,7 @@ func (cm *CensusManager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix
 	var err error
 
 	// Process data
-	log.Infof("processing data %+v", *r)
+	log.Debugf("processing data %+v", *r)
 	resp.Ok = true
 	resp.Error = new(string)
 	*resp.Error = ""

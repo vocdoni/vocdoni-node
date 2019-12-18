@@ -18,6 +18,7 @@ import (
 
 	// abcicli "github.com/tendermint/tendermint/abci/client"
 
+	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 
 	voclient "github.com/tendermint/tendermint/rpc/client"
@@ -77,7 +78,9 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("vochainLogLevel", "error", "voting chain node log level")
 	flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
-	flag.String("vochainContract", "0xb99F60f7a651589022c9495d3e555a46e3625A42", "voting smart contract where the oracle will listen")
+
+	flag.String("contract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f", "smart contract to follow for synchronization and coordination with other nodes")
+	flag.Bool("censusSync", true, "automatically import new census published on smart contract")
 
 	flag.Parse()
 
@@ -105,6 +108,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("dataDir", userDir)
 	viper.SetDefault("logLevel", "warn")
 	viper.SetDefault("logOutput", "stdout")
+	viper.SetDefault("censusSync", true)
 	viper.SetDefault("ipfs.noInit", false)
 	viper.SetDefault("ipfs.configPath", userDir+"/.ipfs")
 	viper.SetDefault("ipfs.syncKey", "")
@@ -119,7 +123,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("vochain.peers", []string{})
 	viper.SetDefault("vochain.seeds", []string{})
 	viper.SetDefault("vochain.dataDir", *dataDir+"/vochain")
-	viper.SetDefault("vochain.contract", "0xb99F60f7a651589022c9495d3e555a46e3625A42")
+	viper.SetDefault("vochain.contract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f")
 
 	viper.SetConfigType("yaml")
 	if *path == userDir+"/config.yaml" { // if path left default, write new cfg file if empty or if file doesn't exist.
@@ -160,6 +164,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
+	viper.BindPFlag("censusSync", flag.Lookup("censusSync"))
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ipfs.syncKey", flag.Lookup("ipfsSyncKey"))
 	viper.BindPFlag("ipfs.syncPeers", flag.Lookup("ipfsSyncPeers"))
@@ -173,7 +178,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("vochain.createGenesis", flag.Lookup("vochainCreateGenesis"))
 	viper.BindPFlag("vochain.genesis", flag.Lookup("vochainGenesis"))
 	viper.Set("vochain.dataDir", *dataDir+"/vochain")
-	viper.BindPFlag("vochain.contract", flag.Lookup("vochainContract"))
+	viper.BindPFlag("vochain.contract", flag.Lookup("contract"))
 
 	viper.SetConfigFile(*path)
 	err = viper.ReadInConfig()
@@ -475,8 +480,32 @@ func main() {
 			}
 		}()
 	}
-
 	log.Infof("gateway startup complete")
+
+	// Census Oracle
+	if globalCfg.CensusSync && globalCfg.Api.Census.Enabled {
+		log.Infof("starting census import oracle")
+		ev, err := ethevents.NewEthEvents(globalCfg.Vochain.Contract, nil, "", &censusManager)
+		if err != nil {
+			log.Fatalf("couldn't create ethereum events listener: %s", err)
+		}
+		ev.AddEventHandler(ethevents.HandleCensus)
+
+		go func() {
+			for _, synced, _, _ := node.SyncInfo(); !synced; {
+				time.Sleep(time.Second * 2)
+			}
+			height, _, _, _ := node.SyncInfo()
+			log.Infof("searching for census from block 0 to %s", height)
+			ev.ReadEthereumEventLogs(0, util.Hex2int64(height))
+			// Wait until having some peers
+			for _, _, peers, _ := node.SyncInfo(); peers > 0; {
+				time.Sleep(time.Second * 2)
+			}
+			log.Info("subscribing to new ethereum census")
+			ev.SubscribeEthereumEventLogs()
+		}()
+	}
 
 	// close if interrupt received
 	c := make(chan os.Signal, 1)

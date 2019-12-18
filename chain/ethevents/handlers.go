@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -146,6 +147,27 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 		// stub
 		// return nil
 	}
+	return nil
+}
+
+// HandleCensus handles the import of census merkle trees published in Ethereum
+func HandleCensus(event ethtypes.Log, e *EthereumEvents) error {
+	logProcessCreated := []byte(ethereumEventList[2])
+	// Only handle processCreated event
+	if event.Topics[0].Hex() != crypto.Keccak256Hash(logProcessCreated).Hex() {
+		return nil
+	}
+	// Get process metadata
+	processTx, err := processMeta(&e.ContractABI, &event.Data, e.ProcessHandle)
+	if err != nil {
+		return err
+	}
+	// Import remote census
+	if !strings.HasPrefix(processTx.MkURI, e.Census.Data.URIprefix()) || len(processTx.MkRoot) == 0 {
+		return fmt.Errorf("process %s is not valid or compatible (%s/%s)", processTx.ProcessID, processTx.MkURI, processTx.MkRoot)
+	}
+	//e.Census.ImportQueue[processTx.MkRoot] = processTx.MkURI
+	e.Census.AddToImportQueue(processTx.MkRoot, processTx.MkURI)
 	return nil
 }
 
