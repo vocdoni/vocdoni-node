@@ -224,8 +224,8 @@ func sendError(transport net.Transport, signer signature.SignKeys, context types
 	response.Error.Ok = false
 	response.Error.Request = requestID
 	response.Error.Timestamp = int32(time.Now().Unix())
-	response.Error.Error = new(string)
-	*response.Error.Error = errMsg
+	response.Error.Message = new(string)
+	*response.Error.Message = errMsg
 	response.Signature, err = signer.SignJSON(response.Error)
 	if err != nil {
 		log.Warn(err)

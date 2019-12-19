@@ -22,12 +22,13 @@ func submitEnvelope(request routerRequest, router *Router) {
 	if err != nil {
 		log.Errorf("error marshaling voteTx args: %s", err)
 		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal voteTx args")
+		return
 	}
 
 	res, err := router.tmclient.BroadcastTxSync(voteTxBytes)
 	if err != nil || res.Code != 0 {
-		log.Warnf("cannot broadcast tx (res.Code=%d): %s", res.Code, err)
-		sendError(router.transport, router.signer, request.context, request.id, "cannot broadcast tx")
+		log.Warnf("cannot broadcast tx (res.Code=%d): %s || %s", res.Code, err, string(res.Data))
+		sendError(router.transport, router.signer, request.context, request.id, string(res.Data))
 		return
 	}
 	log.Infof("transaction hash: %s, transaction code: %d", res.Hash, res.Code)
@@ -73,11 +74,11 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
 		log.Warnf("cannot query: %s", err)
-		sendError(router.transport, router.signer, request.context, request.id, "cannot perform ABCI query")
+		sendError(router.transport, router.signer, request.context, request.id, queryResult.Response.GetInfo())
 		return
 	}
 	if queryResult.Response.Code != 0 {
-		sendError(router.transport, router.signer, request.context, request.id, "cannot fetch envelope")
+		sendError(router.transport, router.signer, request.context, request.id, queryResult.Response.GetInfo())
 		return
 	}
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
@@ -116,7 +117,7 @@ func getEnvelope(request routerRequest, router *Router) {
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if queryResult.Response.Code != 0 {
-		sendError(router.transport, router.signer, request.context, request.id, "cannot fetch envelope")
+		sendError(router.transport, router.signer, request.context, request.id, queryResult.Response.GetInfo())
 		return
 	}
 	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Payload)
@@ -160,7 +161,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if queryResult.Response.Code != 0 {
-		sendError(router.transport, router.signer, request.context, request.id, "cannot fetch envelope height")
+		sendError(router.transport, router.signer, request.context, request.id, queryResult.Response.GetInfo())
 		return
 	}
 	apiResponse.Height = new(int64)
@@ -257,7 +258,7 @@ func getEnvelopeList(request routerRequest, router *Router) {
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if queryResult.Response.Code != 0 {
-		sendError(router.transport, router.signer, request.context, request.id, "cannot fetch envelope list")
+		sendError(router.transport, router.signer, request.context, request.id, queryResult.Response.GetInfo())
 		return
 	}
 	apiResponse.Nullifiers = new([]string)

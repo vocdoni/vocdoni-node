@@ -13,3 +13,7 @@ func Hex2int64(hexStr string) int64 {
 	result, _ := strconv.ParseUint(cleaned, 16, 64)
 	return int64(result)
 }
+
+func TrimHex(hexStr string) string {
+	return strings.TrimPrefix(hexStr, "0x")
+}

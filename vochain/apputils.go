@@ -9,6 +9,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/tree"
 	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/tmhash"
@@ -64,11 +65,11 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 		vote := new(vochaintypes.Vote)
 		switch process.Type {
 		case "snark-vote":
-			vote.Nullifier = signature.TrimHex(tx.Nullifier)
-			vote.Nonce = signature.TrimHex(tx.Nonce)
-			vote.ProcessID = signature.TrimHex(tx.ProcessID)
-			vote.VotePackage = signature.TrimHex(tx.VotePackage)
-			vote.Proof = signature.TrimHex(tx.Proof)
+			vote.Nullifier = util.TrimHex(tx.Nullifier)
+			vote.Nonce = util.TrimHex(tx.Nonce)
+			vote.ProcessID = util.TrimHex(tx.ProcessID)
+			vote.VotePackage = util.TrimHex(tx.VotePackage)
+			vote.Proof = util.TrimHex(tx.Proof)
 		case "poll-vote", "petition-sign":
 			vote.Nonce = tx.Nonce
 			vote.ProcessID = tx.ProcessID
@@ -88,11 +89,11 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 			if err != nil {
 				return fmt.Errorf("cannot extract address from public key")
 			}
-			vote.Nonce = signature.TrimHex(tx.Nonce)
-			vote.VotePackage = signature.TrimHex(tx.VotePackage)
-			vote.Signature = signature.TrimHex(tx.Signature)
-			vote.Proof = signature.TrimHex(tx.Proof)
-			vote.ProcessID = signature.TrimHex(tx.ProcessID)
+			vote.Nonce = util.TrimHex(tx.Nonce)
+			vote.VotePackage = util.TrimHex(tx.VotePackage)
+			vote.Signature = util.TrimHex(tx.Signature)
+			vote.Proof = util.TrimHex(tx.Proof)
+			vote.ProcessID = util.TrimHex(tx.ProcessID)
 			nullifier, err := GenerateNullifier(addr, vote.ProcessID)
 			if err != nil {
 				return fmt.Errorf("cannot generate nullifier")
@@ -117,9 +118,9 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 		}
 	case vochaintypes.NewProcessTx:
 		newprocess := &vochaintypes.Process{
-			EntityID:             signature.TrimHex(tx.EntityID),
+			EntityID:             util.TrimHex(tx.EntityID),
 			EncryptionPublicKeys: tx.EncryptionPublicKeys,
-			MkRoot:               signature.TrimHex(tx.MkRoot),
+			MkRoot:               util.TrimHex(tx.MkRoot),
 			NumberOfBlocks:       tx.NumberOfBlocks,
 			StartBlock:           tx.StartBlock,
 			CurrentState:         vochaintypes.Scheduled,
@@ -139,7 +140,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 
 	switch process.Type {
 	case "snark-vote":
-		voteID := fmt.Sprintf("%s_%s", signature.TrimHex(vote.ProcessID), signature.TrimHex(vote.Nullifier))
+		voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
 		v, _ := state.Envelope(voteID)
 		if v != nil {
 			log.Debugf("vote already exists")
@@ -176,7 +177,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 		voteTmp.Nullifier = nullifier
 		log.Debugf("generated nullifier: %s", voteTmp.Nullifier)
 		// check if vote exists
-		voteID := fmt.Sprintf("%s_%s", signature.TrimHex(vote.ProcessID), signature.TrimHex(voteTmp.Nullifier))
+		voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(voteTmp.Nullifier))
 		v, _ := state.Envelope(voteID)
 		if v != nil {
 			return fmt.Errorf("vote already exists")
@@ -276,11 +277,11 @@ func VerifySignatureAgainstOracles(oracles []string, message, signHex string) (b
 // GenerateNullifier generates the nullifier of a vote (hash(address+processId))
 func GenerateNullifier(address, processID string) (string, error) {
 	var err error
-	addrBytes, err := hex.DecodeString(signature.TrimHex(address))
+	addrBytes, err := hex.DecodeString(util.TrimHex(address))
 	if err != nil {
 		return "", err
 	}
-	pidBytes, err := hex.DecodeString(signature.TrimHex(processID))
+	pidBytes, err := hex.DecodeString(util.TrimHex(processID))
 	if err != nil {
 		return "", err
 	}

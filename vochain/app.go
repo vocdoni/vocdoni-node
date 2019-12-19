@@ -12,6 +12,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	vlog "gitlab.com/vocdoni/go-dvote/log"
 	vochain "gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 // BaseApplication reflects the ABCI application implementation.
@@ -149,13 +150,13 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	}
 	switch reqData.Method {
 	case "getEnvelopeStatus":
-		_, err := app.State.Envelope(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier))
+		_, err := app.State.Envelope(fmt.Sprintf("%s_%s", util.TrimHex(reqData.ProcessID), util.TrimHex(reqData.Nullifier)))
 		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1}
+			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get envelope: %s", err)}
 		}
 		return abcitypes.ResponseQuery{Code: 0}
 	case "getEnvelope":
-		e, err := app.State.Envelope(fmt.Sprintf("%s_%s", reqData.ProcessID, reqData.Nullifier)) // nullifier hash(addr+pid), processId by pid_nullifier
+		e, err := app.State.Envelope(fmt.Sprintf("%s_%s", util.TrimHex(reqData.ProcessID), util.TrimHex(reqData.Nullifier))) // nullifier hash(addr+pid), processId by pid_nullifier
 		if err != nil {
 			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get envelope: %s", err)}
 		}
