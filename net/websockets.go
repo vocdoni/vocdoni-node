@@ -3,7 +3,6 @@ package net
 import (
 	"net/http"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -26,19 +25,7 @@ func (w *WebsocketHandle) SetProxy(p *Proxy) {
 	w.WsProxy = p
 }
 
-// Init increases the sys limitations regarding to the number of files opened
-// to handle the connections and creates the epoll
 func (w *WebsocketHandle) Init(c *types.Connection) error {
-	// Increase resources limitations
-	var rLimit syscall.Rlimit
-	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
-		return err
-	}
-	rLimit.Cur = rLimit.Max
-	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
-		return err
-	}
-
 	w.Upgrader = &websocket.Upgrader{
 		ReadBufferSize:  4096,
 		WriteBufferSize: 4096,

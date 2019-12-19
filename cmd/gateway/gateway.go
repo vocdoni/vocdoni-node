@@ -211,6 +211,14 @@ func main() {
 	}
 	log.Infof("using datadir %s", globalCfg.DataDir)
 
+	// Ensure we can have at least 8k open files. This is necessary, since
+	// many components like IPFS and Tendermint require keeping many active
+	// connections. Some systems have low defaults like 1024, which can make
+	// the gateway crash after it's been running for a bit.
+	if err := ensureNumberFiles(8000); err != nil {
+		log.Fatalf("could not ensure we can have enough open files: %v", err)
+	}
+
 	// setup listener
 	pxy := net.NewProxy()
 	pxy.C.SSLDomain = globalCfg.Ssl.Domain
@@ -514,4 +522,23 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	os.Exit(0)
+}
+
+func ensureNumberFiles(min uint64) error {
+	// Note that this function should work on Unix-y systems, but not on
+	// others like Windows.
+
+	var rlim syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlim); err != nil {
+		return err
+	}
+	if rlim.Max < min {
+		return fmt.Errorf("hard limit is %d, but we require a minimum of %d", rlim.Max, min)
+	}
+	if rlim.Cur >= rlim.Max {
+		return nil // nothing to do
+	}
+	log.Infof("raising file descriptor soft limit from %d to %d", rlim.Cur, rlim.Max)
+	rlim.Cur = rlim.Max
+	return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rlim)
 }
