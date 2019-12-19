@@ -164,7 +164,7 @@ func HandleCensus(event ethtypes.Log, e *EthereumEvents) error {
 	}
 	// Import remote census
 	if !strings.HasPrefix(processTx.MkURI, e.Census.Data.URIprefix()) || len(processTx.MkRoot) == 0 {
-		return fmt.Errorf("process %s is not valid or compatible (%s/%s)", processTx.ProcessID, processTx.MkURI, processTx.MkRoot)
+		return fmt.Errorf("process not valid => %+v", processTx)
 	}
 	//e.Census.ImportQueue[processTx.MkRoot] = processTx.MkURI
 	e.Census.AddToImportQueue(processTx.MkRoot, processTx.MkURI)
@@ -177,10 +177,5 @@ func processMeta(contractABI *abi.ABI, eventData *[]byte, ph *chain.ProcessHandl
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("processid:%x entityAddress:%x mkTree:%s",
-		eventProcessCreated.ProcessId,
-		eventProcessCreated.EntityAddress,
-		eventProcessCreated.MerkleTree,
-	)
 	return ph.ProcessTxArgs(eventProcessCreated.ProcessId)
 }

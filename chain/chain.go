@@ -24,6 +24,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/util"
 	//	"github.com/ethereum/go-ethereum/accounts/abi"
 )
 
@@ -263,6 +264,7 @@ func (e *EthChainContext) SyncInfo() (height string, synced bool, peers int, err
 		r.Call(&synced, "eth_syncing") // true = syncing / false if synced
 		synced = !synced
 		err = r.Call(&height, "eth_blockNumber")
+		height = fmt.Sprintf("%d", util.Hex2int64(height))
 		peers = e.Node.Server().PeerCount()
 		return
 	}

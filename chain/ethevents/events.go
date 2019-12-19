@@ -152,7 +152,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs() {
 
 // ReadEthereumEventLogs reads the oracle
 // defined smart contract and looks for events.
-func (ev *EthereumEvents) ReadEthereumEventLogs(from, to int64) interface{} {
+func (ev *EthereumEvents) ReadEthereumEventLogs(from, to int64) error {
 	log.Infof("reading ethereum events from block %d to %d", from, to)
 	client, err := ethclient.Dial(ev.DialAddr)
 	if err != nil {
@@ -169,7 +169,7 @@ func (ev *EthereumEvents) ReadEthereumEventLogs(from, to int64) interface{} {
 
 	logs, err := client.FilterLogs(context.Background(), query)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	for _, event := range logs {

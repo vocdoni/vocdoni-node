@@ -156,7 +156,9 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 		if len(localConfig.Peers) > 0 {
 			tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]")
 		}
-		log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
+		if len(tconfig.P2P.PersistentPeers) > 0 {
+			log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
+		}
 	}
 
 	tconfig.P2P.AddrBookStrict = false
@@ -239,13 +241,11 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	if cmn.FileExists(tconfig.Genesis) {
 		log.Infof("found genesis file %s", tconfig.Genesis)
 	} else {
-		log.Infof("loaded genesis: %s", TestnetGenesis1)
-		err := ioutil.WriteFile(tconfig.Genesis, []byte(TestnetGenesis1), 0644)
-		if err != nil {
-			log.Warn(err)
-		} else {
-			log.Infof("new testnet genesis created, stored at %s", tconfig.Genesis)
+		log.Debugf("loaded genesis: %s", TestnetGenesis1)
+		if err := ioutil.WriteFile(tconfig.Genesis, []byte(TestnetGenesis1), 0644); err != nil {
+			return nil, err
 		}
+		log.Infof("new genesis created, stored at %s", tconfig.Genesis)
 	}
 
 	// create node

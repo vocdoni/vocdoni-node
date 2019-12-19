@@ -36,7 +36,7 @@ type IPFSHandle struct {
 func checkIPFSDirExists(path string) (bool, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return false, errors.New("Cannot get $HOME")
+		return false, errors.New("cannot get $HOME")
 	}
 	userHomeDir := home
 	_, err = os.Stat(userHomeDir + "/." + path)
@@ -57,18 +57,20 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	ipfs.InstallDatabasePlugins()
 	ipfs.ConfigRoot = d.Datadir
 
+	os.Setenv("IPFS_FD_MAX", "1024")
+
 	// check if needs init
 	if !fsrepo.IsInitialized(ipfs.ConfigRoot) {
 		err := ipfs.Init()
 		if err != nil {
-			log.Errorf("Error in IPFS init: %s", err)
+			log.Errorf("error in IPFS init: %s", err)
 		}
 	}
 	nd, coreAPI, err := ipfs.StartNode()
 	if err != nil {
 		return err
 	}
-	log.Infof("IPFS Peer ID: %s", nd.Identity.Pretty())
+	log.Infof("IPFS peerID: %s", nd.Identity.Pretty())
 	// start http
 	cctx := ipfs.CmdCtx(nd, d.Datadir)
 	cctx.ReqLog = &ipfscmds.ReqLog{}
@@ -210,7 +212,7 @@ func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
 
 	r, ok := nd.(files.File)
 	if !ok {
-		return nil, errors.New("Received incorrect type from Unixfs().Get()")
+		return nil, errors.New("received incorrect type from Unixfs().Get()")
 	}
 
 	return ioutil.ReadAll(r)

@@ -59,7 +59,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	flag.String("signingKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
 	flag.String("chain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
-	flag.Bool("chainLightMode", false, "synchronize Ethereum blockchain in light mode")
+	flag.Bool("chainLightMode", true, "synchronize Ethereum blockchain in light mode")
 	flag.Int("w3nodePort", 30303, "Ethereum p2p node port to use")
 	flag.String("w3route", "/web3", "web3 endpoint API route")
 	flag.Int("w3WSPort", 9092, "web3 websocket port")
@@ -96,7 +96,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("client.signingKey", "")
 	viper.SetDefault("w3.enabled", true)
 	viper.SetDefault("w3.chainType", "goerli")
-	viper.SetDefault("w3.lightMode", false)
+	viper.SetDefault("w3.lightMode", true)
 	viper.SetDefault("w3.nodePort", 32000)
 	viper.SetDefault("w3.route", "/web3")
 	viper.SetDefault("w3.external", "")
@@ -223,19 +223,13 @@ func main() {
 	pxy := net.NewProxy()
 	pxy.C.SSLDomain = globalCfg.Ssl.Domain
 	pxy.C.SSLCertDir = globalCfg.DataDir
-	log.Infof("storing SSL certificate in %s", pxy.C.SSLCertDir)
+	if globalCfg.Ssl.Domain != "" {
+		log.Infof("storing SSL certificate in %s", pxy.C.SSLCertDir)
+	}
 	pxy.C.Address = globalCfg.ListenHost
 	pxy.C.Port = globalCfg.ListenPort
 	if _, err := pxy.Init(); err != nil {
-		// letsencrypt SSL has failed
-		log.Warn("letsEncrypt SSL certificate cannot be obtained")
-		log.Warn("probably port 443 is not accessible or domain provided is not correct")
-		log.Info("disabling SSL")
-		pxy.C.SSLDomain = ""
-		globalCfg.Ssl.Domain = ""
-		if _, err := pxy.Init(); err != nil {
-			log.Fatal(err)
-		}
+		log.Fatal(err)
 	}
 
 	// Signing key
@@ -354,7 +348,7 @@ func main() {
 		}
 		go func() {
 			for {
-				time.Sleep(time.Second * 60)
+				time.Sleep(time.Second * 40)
 				stats, err := storage.Stats()
 				if err != nil {
 					log.Warnf("IPFS node returned an error: %s", err)
@@ -363,7 +357,7 @@ func main() {
 			}
 		}()
 		if len(globalCfg.Ipfs.SyncKey) > 0 {
-			log.Info("enabling ipfs cluster synchronization")
+			log.Info("enabling ipfs synchronization")
 			storageSync = ipfssync.NewIPFSsync(globalCfg.DataDir+"/.ipfsSync", globalCfg.Ipfs.SyncKey, storage)
 			if len(globalCfg.Ipfs.SyncPeers) > 0 {
 				log.Debugf("using custom ipfs sync bootnodes %s", globalCfg.Ipfs.SyncPeers)
@@ -410,7 +404,7 @@ func main() {
 		go func() {
 			for {
 				if vnode.Node != nil {
-					log.Infof("[vochain info] Height:%d Mempool:%d AppTree:%d ProcessTree:%d VoteTree:%d",
+					log.Infof("[vochain info] height:%d mempool:%d appTree:%d processTree:%d voteTree:%d",
 						vnode.Node.BlockStore().Height(),
 						vnode.Node.Mempool().Size(),
 						vnode.State.AppTree.Size(),
@@ -432,13 +426,13 @@ func main() {
 		var h, hPrev int64
 		for {
 			if vnode.Node != nil {
-				log.Infof("vochain blockchain synchronized")
+				log.Infof("replay of vochain local blocks finished")
 				break
 			}
 			hPrev = h
 			time.Sleep(time.Second * 10)
 			h = vnode.State.Height()
-			log.Infof("[vochain info] synchronizing block %d at %d b/s",
+			log.Infof("[vochain info] replaying block %d at %d b/s",
 				h, int64((h-hPrev)/10))
 		}
 	}

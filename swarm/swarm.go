@@ -46,7 +46,7 @@ var SwarmBootnodes = []string{
 
 // VocdoniBootnodes list of bootnodes for the Vocdoni SWARM network. It supports DNS hostnames.
 var VocdoniBootnodes = []string{
-	"enode://d6e2a7a90ca736b1651974ca47feb2bc93a9bbc136c91140256c654b50d7de8c52d993fed56737bfabdf210b6892132471e8da499ce7a4b95c917d70935c3af2@seed.vocdoni.net:4171",
+	"enode://e4ac4e498020e693401f4e5d61d9a4c948b8a6a9d48162d210f9ebf513652995c2d8cca5ad7e9950bda314afc75e0a46934e79b3f911b93fe9fc76636143aab0@seed.vocdoni.net:4171",
 }
 
 func parseEnode(enode string) (string, error) {
@@ -102,7 +102,7 @@ func newNode(key *ecdsa.PrivateKey, port int, httpport int, wsport int,
 	}
 	stack, err := node.New(cfg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("ServiceNode create fail: %v", err)
+		return nil, nil, fmt.Errorf("serviceNode create fail: %v", err)
 	}
 	return stack, cfg, nil
 }
@@ -188,7 +188,7 @@ func (sn *SimpleSwarm) PrintStats() {
 				var addrs [][]byte
 				addrs = append(addrs, []byte(addr))
 				peerCount := sn.Node.Server().PeerCount()
-				log.Infof("PeerCount: %d, Neighborhood: %d", peerCount, sn.Hive.NeighbourhoodDepth)
+				log.Infof("[pss info] peerCount: %d, neighborhood: %d", peerCount, sn.Hive.NeighbourhoodDepth)
 			}
 			time.Sleep(time.Second * 30)
 		}
@@ -348,14 +348,14 @@ func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
 	}
 	sn.PssTopics[topic].Unregister = sn.Pss.Register(&pssTopic, topicHandler)
 
-	log.Infof("Pss subscribed to %v, topic %x", subType, pssTopic.String())
+	log.Infof("pss subscribed to %v, topic %x", subType, pssTopic.String())
 	return nil
 }
 
 func (sn *SimpleSwarm) PssPub(subType, key, topic, msg, address string) error {
 	dstAddr := strAddress(address)
 	dstTopic := strTopic(topic)
-	log.Debugf("Sending message to [%x]/%x", dstAddr, dstTopic)
+	log.Debugf("sending message to [%x]/%x", dstAddr, dstTopic)
 	switch subType {
 	case "sym":
 		symKeyId, err := sn.Pss.SetSymmetricKey(strSymKey(key), dstTopic, dstAddr, false)
