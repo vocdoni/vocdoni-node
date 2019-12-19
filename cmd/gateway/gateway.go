@@ -338,6 +338,7 @@ func main() {
 	var storage data.Storage
 	var storageSync ipfssync.IPFSsync
 	if !globalCfg.Ipfs.NoInit {
+		os.Setenv("IPFS_FD_MAX", "1024")
 		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
 		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 		if err != nil {

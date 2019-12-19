@@ -257,6 +257,9 @@ func (e *EthChainContext) SyncInfo() (height string, synced bool, peers int, err
 		synced = true
 		var r *rpc.Client
 		r, err = e.Node.Attach()
+		if r == nil || err != nil {
+			return "0", false, 0, err
+		}
 		r.Call(&synced, "eth_syncing") // true = syncing / false if synced
 		synced = !synced
 		err = r.Call(&height, "eth_blockNumber")
