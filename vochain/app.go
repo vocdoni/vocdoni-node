@@ -152,7 +152,7 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	case "getEnvelopeStatus":
 		_, err := app.State.Envelope(fmt.Sprintf("%s_%s", util.TrimHex(reqData.ProcessID), util.TrimHex(reqData.Nullifier)))
 		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get envelope: %s", err)}
+			return abcitypes.ResponseQuery{Code: 1}
 		}
 		return abcitypes.ResponseQuery{Code: 0}
 	case "getEnvelope":

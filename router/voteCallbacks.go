@@ -60,6 +60,7 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
 	apiResponse.Ok = true
+	apiResponse.Registered = types.True
 	qdata := types.QueryData{
 		Method:    "getEnvelopeStatus",
 		ProcessID: request.ProcessID,
@@ -74,12 +75,11 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
 		log.Warnf("cannot query: %s", err)
-		sendError(router.transport, router.signer, request.context, request.id, queryResult.Response.GetInfo())
+		sendError(router.transport, router.signer, request.context, request.id, "cannot query")
 		return
 	}
 	if queryResult.Response.Code != 0 {
-		sendError(router.transport, router.signer, request.context, request.id, queryResult.Response.GetInfo())
-		return
+		apiResponse.Registered = types.False
 	}
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
@@ -116,6 +116,11 @@ func getEnvelope(request routerRequest, router *Router) {
 		return
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
+	if err != nil {
+		log.Warnf("cannot query: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot query")
+		return
+	}
 	if queryResult.Response.Code != 0 {
 		sendError(router.transport, router.signer, request.context, request.id, queryResult.Response.GetInfo())
 		return
