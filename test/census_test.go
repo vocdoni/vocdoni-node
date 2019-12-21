@@ -100,7 +100,7 @@ func TestCensus(t *testing.T) {
 	routerAPI := router.InitRouter(listenerOutput, storage, ws, signer1)
 
 	// Create the Census Manager and enable it trough the router
-	var cm census.CensusManager
+	var cm census.Manager
 	censusDir, err := ioutil.TempDir("", "census")
 	if err != nil {
 		t.Fatal(err)

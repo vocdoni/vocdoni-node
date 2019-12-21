@@ -6,8 +6,8 @@ import (
 	ethparams "github.com/ethereum/go-ethereum/params"
 )
 
-// ChainSpecs defines a set of blockchain network specifications
-type ChainSpecs struct {
+// Specs defines a set of blockchain network specifications
+type Specs struct {
 	Name        string   // Identity name
 	GenesisB64  string   // Base64 JSON encoded genesis file
 	GenesisHash string   // Genesis Hash
@@ -17,7 +17,7 @@ type ChainSpecs struct {
 
 var AvailableChains = []string{"mainnet, goerli, vctestnet"}
 
-func ChainSpecsFor(name string) (*ChainSpecs, error) {
+func SpecsFor(name string) (*Specs, error) {
 	switch name {
 	case "mainnet":
 		return &mainnet, nil
@@ -29,7 +29,7 @@ func ChainSpecsFor(name string) (*ChainSpecs, error) {
 }
 
 // Ethereum MainNet
-var mainnet = ChainSpecs{
+var mainnet = Specs{
 	Name:       "mainnet",
 	GenesisB64: "",
 	NetworkId:  0,
@@ -37,7 +37,7 @@ var mainnet = ChainSpecs{
 }
 
 // Goerli Ethereum PoA Testnet
-var goerli = ChainSpecs{
+var goerli = Specs{
 	Name:        "goerli",
 	NetworkId:   5,
 	BootNodes:   ethparams.GoerliBootnodes,

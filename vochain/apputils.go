@@ -16,7 +16,7 @@ import (
 )
 
 // ValidateTx splits a tx into method and args parts and does some basic checks
-func ValidateTx(content []byte, state *VochainState) (interface{}, error) {
+func ValidateTx(content []byte, state *State) (interface{}, error) {
 	var txType vochaintypes.Tx
 	err := json.Unmarshal(content, &txType)
 	if err != nil || len(txType.Type) < 1 {
@@ -51,7 +51,7 @@ func ValidateTx(content []byte, state *VochainState) (interface{}, error) {
 }
 
 // ValidateAndDeliverTx validates a tx and executes the methods required for changing the app state
-func ValidateAndDeliverTx(content []byte, state *VochainState) error {
+func ValidateAndDeliverTx(content []byte, state *State) error {
 	tx, err := ValidateTx(content, state)
 	if err != nil {
 		return fmt.Errorf("transaction validation failed with error (%s)", err)
@@ -132,7 +132,7 @@ func ValidateAndDeliverTx(content []byte, state *VochainState) error {
 }
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
-func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
+func VoteTxCheck(vote vochaintypes.VoteTx, state *State) error {
 	process, _ := state.Process(vote.ProcessID)
 	if process == nil {
 		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
@@ -204,7 +204,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *VochainState) error {
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
-func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *VochainState) error {
+func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *State) error {
 	// get oracles
 	oracles, err := state.Oracles()
 	if err != nil || len(oracles) == 0 {
@@ -237,7 +237,7 @@ func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *VochainState) e
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
-func AdminTxCheck(adminTx vochaintypes.AdminTx, state *VochainState) error {
+func AdminTxCheck(adminTx vochaintypes.AdminTx, state *State) error {
 	// get oracles
 	oracles, err := state.Oracles()
 	if err != nil || len(oracles) == 0 {

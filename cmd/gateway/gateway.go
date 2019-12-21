@@ -368,7 +368,7 @@ func main() {
 	}
 
 	// Census Manager
-	var censusManager census.CensusManager
+	var censusManager census.Manager
 	if globalCfg.Api.Census.Enabled {
 		log.Info("starting census manager")
 		if _, err := os.Stat(globalCfg.DataDir + "/census"); os.IsNotExist(err) {

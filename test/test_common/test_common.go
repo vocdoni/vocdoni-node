@@ -120,11 +120,11 @@ var (
 	}
 )
 
-func NewVochainStateWithOracles() *iavl.VochainState {
+func NewVochainStateWithOracles() *iavl.State {
 	log.InitLogger("error", "stdout")
 	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
-	s, err := iavl.NewVochainState("/tmp/db", c)
+	s, err := iavl.NewState("/tmp/db", c)
 	if err != nil {
 		return nil
 	}
@@ -133,11 +133,11 @@ func NewVochainStateWithOracles() *iavl.VochainState {
 	return s
 }
 
-func NewVochainStateWithValidators() *iavl.VochainState {
+func NewVochainStateWithValidators() *iavl.State {
 	log.InitLogger("error", "stdout")
 	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
-	s, err := iavl.NewVochainState("/tmp/db", c)
+	s, err := iavl.NewState("/tmp/db", c)
 	if err != nil {
 		return nil
 	}
@@ -148,11 +148,11 @@ func NewVochainStateWithValidators() *iavl.VochainState {
 	return s
 }
 
-func NewVochainStateWithProcess() *iavl.VochainState {
+func NewVochainStateWithProcess() *iavl.State {
 	log.InitLogger("error", "stdout")
 	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
-	s, err := iavl.NewVochainState("/tmp/db", c)
+	s, err := iavl.NewState("/tmp/db", c)
 	if err != nil {
 		return nil
 	}

@@ -36,8 +36,8 @@ type EthereumEvents struct {
 	EventHandlers []EventHandler
 	// VochainCli is the Vochain HTTP client
 	VochainCLI *voclient.HTTP
-	// CensusManager is the census manager service
-	Census *census.CensusManager
+	// Manager is the census manager service
+	Census *census.Manager
 }
 
 // EventHandler function type is executed on each Ethereum event
@@ -53,7 +53,7 @@ type BlockInfo struct {
 }
 
 // NewEthEvents creates a new Ethereum events handler
-func NewEthEvents(contractAddressHex string, signer *signature.SignKeys, w3Endpoint string, cens *census.CensusManager) (*EthereumEvents, error) {
+func NewEthEvents(contractAddressHex string, signer *signature.SignKeys, w3Endpoint string, cens *census.Manager) (*EthereumEvents, error) {
 	if len(w3Endpoint) == 0 {
 		w3Endpoint = "ws://127.0.0.1:9092"
 	}

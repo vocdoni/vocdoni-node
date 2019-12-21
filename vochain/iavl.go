@@ -34,8 +34,8 @@ const (
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
 var PrefixDBCacheSize = 0
 
-// VochainState represents the state of the vochain application
-type VochainState struct {
+// State represents the state of the vochain application
+type State struct {
 	AppTree     *iavl.MutableTree
 	ProcessTree *iavl.MutableTree
 	VoteTree    *iavl.MutableTree
@@ -43,8 +43,8 @@ type VochainState struct {
 	Lock        bool
 }
 
-// NewVochainState creates a new VochainState
-func NewVochainState(dataDir string, codec *amino.Codec) (*VochainState, error) {
+// NewState creates a new State
+func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	appTree, err := tmdb.NewGoLevelDB(appTreeName, dataDir)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func NewVochainState(dataDir string, codec *amino.Codec) (*VochainState, error) 
 	if err != nil {
 		return nil, err
 	}
-	vs := VochainState{
+	vs := State{
 		AppTree:     iavl.NewMutableTree(appTree, PrefixDBCacheSize),
 		ProcessTree: iavl.NewMutableTree(processTree, PrefixDBCacheSize),
 		VoteTree:    iavl.NewMutableTree(voteTree, PrefixDBCacheSize),
@@ -81,7 +81,7 @@ func NewVochainState(dataDir string, codec *amino.Codec) (*VochainState, error) 
 }
 
 // AddOracle adds a trusted oracle given its address if not exists
-func (v *VochainState) AddOracle(address string) error {
+func (v *State) AddOracle(address string) error {
 	address = util.TrimHex(address)
 	_, oraclesBytes := v.AppTree.Get([]byte(oracleKey))
 	var oracles []string
@@ -101,7 +101,7 @@ func (v *VochainState) AddOracle(address string) error {
 }
 
 // RemoveOracle removes a trusted oracle given its address if exists
-func (v *VochainState) RemoveOracle(address string) error {
+func (v *State) RemoveOracle(address string) error {
 	address = util.TrimHex(address)
 	_, oraclesBytes := v.AppTree.Get([]byte(oracleKey))
 	var oracles []string
@@ -124,7 +124,7 @@ func (v *VochainState) RemoveOracle(address string) error {
 }
 
 // Oracles returns the current oracle list
-func (v *VochainState) Oracles() ([]string, error) {
+func (v *State) Oracles() ([]string, error) {
 	_, oraclesBytes := v.AppTree.Get([]byte(oracleKey))
 	var oracles []string
 	err := v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
@@ -132,7 +132,7 @@ func (v *VochainState) Oracles() ([]string, error) {
 }
 
 // AddValidator adds a tendemint validator if it is not already added
-func (v *VochainState) AddValidator(pubKey string, power int64) error {
+func (v *State) AddValidator(pubKey string, power int64) error {
 	pubKey = util.TrimHex(pubKey)
 	_, validatorsBytes := v.AppTree.Get([]byte(validatorKey))
 	var validators []vochaintypes.Validator
@@ -162,7 +162,7 @@ func (v *VochainState) AddValidator(pubKey string, power int64) error {
 }
 
 // RemoveValidator removes a tendermint validator if exists
-func (v *VochainState) RemoveValidator(address string) error {
+func (v *State) RemoveValidator(address string) error {
 	address = util.TrimHex(address)
 	_, validatorsBytes := v.AppTree.Get([]byte(validatorKey))
 	var validators []vochaintypes.Validator
@@ -185,7 +185,7 @@ func (v *VochainState) RemoveValidator(address string) error {
 }
 
 // Validators returns a list of the validators saved on persistent storage
-func (v *VochainState) Validators() ([]vochaintypes.Validator, error) {
+func (v *State) Validators() ([]vochaintypes.Validator, error) {
 	_, validatorBytes := v.AppTree.Get([]byte(validatorKey))
 	var validators []vochaintypes.Validator
 	err := v.Codec.UnmarshalBinaryBare(validatorBytes, &validators)
@@ -193,7 +193,7 @@ func (v *VochainState) Validators() ([]vochaintypes.Validator, error) {
 }
 
 // AddProcess adds a new process to vochain if not already added
-func (v *VochainState) AddProcess(p *vochaintypes.Process, pid string) error {
+func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 	pid = util.TrimHex(pid)
 	newProcessBytes, err := v.Codec.MarshalBinaryBare(p)
 	if err != nil {
@@ -204,7 +204,7 @@ func (v *VochainState) AddProcess(p *vochaintypes.Process, pid string) error {
 }
 
 // Process returns a process info given a processId if exists
-func (v *VochainState) Process(pid string) (*vochaintypes.Process, error) {
+func (v *State) Process(pid string) (*vochaintypes.Process, error) {
 	var newProcess *vochaintypes.Process
 	pid = util.TrimHex(pid)
 	if !v.ProcessTree.Has([]byte(pid)) {
@@ -222,7 +222,7 @@ func (v *VochainState) Process(pid string) (*vochaintypes.Process, error) {
 }
 
 // AddVote adds a new vote to a process if the process exists and the vote is not already submmited
-func (v *VochainState) AddVote(vote *vochaintypes.Vote) error {
+func (v *State) AddVote(vote *vochaintypes.Vote) error {
 	voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
 	newVoteBytes, err := v.Codec.MarshalBinaryBare(vote)
 	if err != nil {
@@ -233,7 +233,7 @@ func (v *VochainState) AddVote(vote *vochaintypes.Vote) error {
 }
 
 // Envelope returns the info of a vote if already exists
-func (v *VochainState) Envelope(voteID string) (*vochaintypes.Vote, error) {
+func (v *State) Envelope(voteID string) (*vochaintypes.Vote, error) {
 	var vote *vochaintypes.Vote
 	voteID = util.TrimHex(voteID)
 	if !v.VoteTree.Has([]byte(voteID)) {
@@ -253,7 +253,7 @@ func (v *VochainState) Envelope(voteID string) (*vochaintypes.Vote, error) {
 }
 
 // CountVotes returns the number of votes registered for a given process id
-func (v *VochainState) CountVotes(processID string) int64 {
+func (v *State) CountVotes(processID string) int64 {
 	processID = util.TrimHex(processID)
 	var count int64
 	v.VoteTree.IterateRange([]byte(processID), nil, true, func(key []byte, value []byte) bool {
@@ -267,7 +267,7 @@ func (v *VochainState) CountVotes(processID string) int64 {
 }
 
 /*
-func (v *VochainState) CountVotes(processID string) int64 {
+func (v *State) CountVotes(processID string) int64 {
 	processID = util.TrimHex(processID)
 	var count int64
 	v.VoteTree.IterateRange([]byte(processID), nil, true, func(key []byte, value []byte) bool {
@@ -278,7 +278,7 @@ func (v *VochainState) CountVotes(processID string) int64 {
 }
 */
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
-func (v *VochainState) EnvelopeList(processID string, from, listSize int64) []string {
+func (v *State) EnvelopeList(processID string, from, listSize int64) []string {
 	processID = util.TrimHex(processID)
 	var nullifiers []string
 	idx := int64(0)
@@ -297,7 +297,7 @@ func (v *VochainState) EnvelopeList(processID string, from, listSize int64) []st
 }
 
 // Height returns the blockchain last block commited height
-func (v *VochainState) Height() int64 {
+func (v *State) Height() int64 {
 	_, headerBytes := v.AppTree.Get([]byte(headerKey))
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
@@ -309,7 +309,7 @@ func (v *VochainState) Height() int64 {
 }
 
 // AppHash returns last hash of the application
-func (v *VochainState) AppHash() []byte {
+func (v *State) AppHash() []byte {
 	_, headerBytes := v.AppTree.Get([]byte(headerKey))
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
@@ -320,7 +320,7 @@ func (v *VochainState) AppHash() []byte {
 }
 
 // Save persistent save of vochain mem trees
-func (v *VochainState) Save() []byte {
+func (v *State) Save() []byte {
 	h1, _, err := v.AppTree.SaveVersion()
 	if err != nil {
 		log.Errorf("cannot sve vochain state to disk: %s", err)
@@ -338,7 +338,7 @@ func (v *VochainState) Save() []byte {
 }
 
 // Rollback rollbacks to the last persistent db data version
-func (v *VochainState) Rollback() {
+func (v *State) Rollback() {
 	v.AppTree.Rollback()
 	v.ProcessTree.Rollback()
 	v.VoteTree.Rollback()
@@ -346,12 +346,12 @@ func (v *VochainState) Rollback() {
 
 // Hash returns the hash of the vochain trees mkroots
 // hash(appTree+processTree+voteTree)
-func (v *VochainState) WorkingHash() []byte {
+func (v *State) WorkingHash() []byte {
 	return signature.HashRaw(fmt.Sprintf("%s%s%s", v.AppTree.WorkingHash(), v.ProcessTree.WorkingHash(), v.VoteTree.WorkingHash()))
 }
 
 // ProcessList returns a list of processId given an entityId
-// func (v *VochainState) ProcessList(entityId string) []Process
+// func (v *State) ProcessList(entityId string) []Process
 
 // EnvelopeList returns a list of envelopes given a processId
-// func (v *VochainState) EnvelopeList(processId string) []Vote
+// func (v *State) EnvelopeList(processId string) []Vote

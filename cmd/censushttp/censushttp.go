@@ -102,7 +102,7 @@ func main() {
 		pub, priv := signer.HexString()
 		log.Infof("Public: %s Private: %s", pub, priv)
 	}
-	var cm censusmanager.CensusManager
+	var cm censusmanager.Manager
 	err = cm.Init(globalCfg.DataDir, globalCfg.RootKey)
 	if err != nil {
 		log.Fatalf("cannot initialize census manager: %s", err)

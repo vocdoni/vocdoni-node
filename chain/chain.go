@@ -55,7 +55,7 @@ type EthChainConfig struct {
 
 // available chains: vctestnet
 func NewConfig(w3Cfg config.W3Cfg) (*EthChainConfig, error) {
-	chainSpecs, err := ChainSpecsFor(w3Cfg.ChainType)
+	chainSpecs, err := SpecsFor(w3Cfg.ChainType)
 	if err != nil {
 		return nil, err
 	}

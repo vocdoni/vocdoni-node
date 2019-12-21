@@ -17,7 +17,7 @@ import (
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
-	State *VochainState
+	State *State
 	Codec *amino.Codec
 	Node  *nm.Node
 }
@@ -27,7 +27,7 @@ var _ abcitypes.Application = (*BaseApplication)(nil)
 // NewBaseApplication creates a new BaseApplication given a name an a DB backend
 func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	c := amino.NewCodec()
-	s, err := NewVochainState(dbpath, c)
+	s, err := NewState(dbpath, c)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}

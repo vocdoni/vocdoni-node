@@ -19,7 +19,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
-type IPFSsyncMessage struct {
+type Message struct {
 	Type     string   `json:"type"`
 	Address  string   `json:"address"`
 	Maddress string   `json:"mAddress"`
@@ -97,7 +97,7 @@ func (is *IPFSsync) syncPins() error {
 }
 
 func (is *IPFSsync) askPins(address string, hash string) error {
-	var msg IPFSsyncMessage
+	var msg Message
 	msg.Type = "fetch"
 	msg.Address = is.myAddress
 	msg.Hash = hash
@@ -105,7 +105,7 @@ func (is *IPFSsync) askPins(address string, hash string) error {
 }
 
 func (is *IPFSsync) sendPins(address string) error {
-	var msg IPFSsyncMessage
+	var msg Message
 	msg.Type = "fetchReply"
 	msg.Address = is.myAddress
 	msg.Hash = is.hashTree.Root()
@@ -113,7 +113,7 @@ func (is *IPFSsync) sendPins(address string) error {
 	return is.unicastMsg(address, msg)
 }
 
-func (is *IPFSsync) broadcastMsg(ipfsmsg IPFSsyncMessage) error {
+func (is *IPFSsync) broadcastMsg(ipfsmsg Message) error {
 	var msg types.Message
 	d, err := json.Marshal(ipfsmsg)
 	if err != nil {
@@ -125,8 +125,8 @@ func (is *IPFSsync) broadcastMsg(ipfsmsg IPFSsyncMessage) error {
 	return nil
 }
 
-// Handle handles an IPFSsyncMessage
-func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
+// Handle handles an Message
+func (is *IPFSsync) Handle(msg Message) error {
 	if msg.Address == is.myAddress {
 		return nil
 	}
@@ -193,7 +193,7 @@ func (is *IPFSsync) Handle(msg IPFSsyncMessage) error {
 }
 
 func (is *IPFSsync) sendUpdate() {
-	var msg IPFSsyncMessage
+	var msg Message
 	msg.Type = "update"
 	msg.Address = is.myAddress
 	msg.Hash = is.hashTree.Root()
@@ -207,7 +207,7 @@ func (is *IPFSsync) sendUpdate() {
 }
 
 func (is *IPFSsync) sendHello() {
-	var msg IPFSsyncMessage
+	var msg Message
 	msg.Type = "hello"
 	msg.Address = is.myAddress
 	msg.Maddress = is.myMultiAddr.String()
@@ -257,7 +257,7 @@ func NewIPFSsync(dataDir, key string, storage data.Storage) IPFSsync {
 	return is
 }
 
-func (is *IPFSsync) unicastMsg(address string, msg IPFSsyncMessage) error {
+func (is *IPFSsync) unicastMsg(address string, msg Message) error {
 	rawmsg, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -301,7 +301,7 @@ func (is *IPFSsync) Start() {
 	log.Infof("my multiaddress: %s", is.myMultiAddr)
 
 	go func() {
-		var syncMsg IPFSsyncMessage
+		var syncMsg Message
 		var err error
 		for {
 			d := <-msg

@@ -49,7 +49,7 @@ type Router struct {
 	storage           data.Storage
 	transport         net.Transport
 	signer            signature.SignKeys
-	census            *census.CensusManager
+	census            *census.Manager
 	tmclient          *voclient.HTTP
 	PrivateCalls      uint64
 	PublicCalls       uint64
@@ -61,7 +61,7 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net
 	signer signature.SignKeys) *Router {
 	privateReqMap := make(methodMap)
 	publicReqMap := make(methodMap)
-	cm := new(census.CensusManager)
+	cm := new(census.Manager)
 	r := new(Router)
 	r.privateRequestMap = privateReqMap
 	r.publicRequestMap = publicReqMap
@@ -149,7 +149,7 @@ func (r *Router) EnableFileAPI() {
 }
 
 // EnableCensusAPI enables the Census API in the Router
-func (r *Router) EnableCensusAPI(cm *census.CensusManager) {
+func (r *Router) EnableCensusAPI(cm *census.Manager) {
 	r.APIs = append(r.APIs, "census")
 	r.census = cm
 	cm.Data = r.storage
