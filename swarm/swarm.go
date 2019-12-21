@@ -2,7 +2,6 @@
 package swarm
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
@@ -256,8 +255,7 @@ func (sn *SimpleSwarm) InitPSS(bootNodes []string) error {
 	sn.Node.Start()
 
 	// wait to connect to the p2p network
-	_, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	// TODO(mvdan): replace the sleep
 	time.Sleep(time.Second * 5)
 
 	// Get the services API

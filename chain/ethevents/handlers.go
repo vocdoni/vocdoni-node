@@ -95,7 +95,7 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 		// return nil
 	case HashLogProcessCreated.Hex():
 		// Get process metadata
-		processTx, err := processMeta(&e.ContractABI, &event.Data, e.ProcessHandle)
+		processTx, err := processMeta(&e.ContractABI, event.Data, e.ProcessHandle)
 		if err != nil {
 			return err
 		}
@@ -158,7 +158,7 @@ func HandleCensus(event ethtypes.Log, e *EthereumEvents) error {
 		return nil
 	}
 	// Get process metadata
-	processTx, err := processMeta(&e.ContractABI, &event.Data, e.ProcessHandle)
+	processTx, err := processMeta(&e.ContractABI, event.Data, e.ProcessHandle)
 	if err != nil {
 		return err
 	}
@@ -166,14 +166,14 @@ func HandleCensus(event ethtypes.Log, e *EthereumEvents) error {
 	if !strings.HasPrefix(processTx.MkURI, e.Census.Data.URIprefix()) || len(processTx.MkRoot) == 0 {
 		return fmt.Errorf("process not valid => %+v", processTx)
 	}
-	//e.Census.ImportQueue[processTx.MkRoot] = processTx.MkURI
+	// e.Census.ImportQueue[processTx.MkRoot] = processTx.MkURI
 	e.Census.AddToImportQueue(processTx.MkRoot, processTx.MkURI)
 	return nil
 }
 
-func processMeta(contractABI *abi.ABI, eventData *[]byte, ph *chain.ProcessHandle) (*types.NewProcessTx, error) {
+func processMeta(contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*types.NewProcessTx, error) {
 	var eventProcessCreated eventProcessCreated
-	err := contractABI.Unpack(&eventProcessCreated, "ProcessCreated", *eventData)
+	err := contractABI.Unpack(&eventProcessCreated, "ProcessCreated", eventData)
 	if err != nil {
 		return nil, err
 	}

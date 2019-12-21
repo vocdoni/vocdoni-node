@@ -52,7 +52,7 @@ func (t *Tree) Init(namespace string) error {
 }
 
 func (t *Tree) Close() {
-	defer t.Tree.Storage().Close()
+	t.Tree.Storage().Close()
 }
 
 func (t *Tree) Claim(data []byte) (*mkcore.ClaimBasic, error) {

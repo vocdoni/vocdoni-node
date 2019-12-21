@@ -182,8 +182,7 @@ func (e *EthChainContext) Start() {
 // might be worthwhile to create generic SendTx to call contracttx, deploytx, etc
 func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
 	client, err := ethclient.Dial(e.Node.IPCEndpoint())
-	deadline := time.Now().Add(1000 * time.Millisecond)
-	ctx, cancel := context.WithDeadline(context.TODO(), deadline)
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Second)
 	defer cancel()
 
 	accounts := e.Keys.Accounts()
@@ -202,10 +201,7 @@ func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
 		return err
 	}
 	// create ctx
-	err = client.SendTransaction(ctx, signedTx)
-	log.Error(err)
-	// fix return*/
-	return err
+	return client.SendTransaction(ctx, signedTx)
 }
 
 func (e *EthChainContext) createAccount() error {

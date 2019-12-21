@@ -266,14 +266,14 @@ func getEnvelopeList(request routerRequest, router *Router) {
 		sendError(router.transport, router.signer, request.context, request.id, queryResult.Response.GetInfo())
 		return
 	}
-	apiResponse.Nullifiers = new([]string)
+	apiResponse.Nullifiers = []string{}
 	if err != nil {
-		*apiResponse.Nullifiers = []string{""}
+		apiResponse.Nullifiers = []string{""}
 	}
 	if len(queryResult.Response.Value) != 0 {
 		err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &apiResponse.Nullifiers)
 	} else {
-		*apiResponse.Nullifiers = []string{""}
+		apiResponse.Nullifiers = []string{""}
 	}
 	if err != nil {
 		log.Errorf("cannot unmarshal nullifiers: %s", err)

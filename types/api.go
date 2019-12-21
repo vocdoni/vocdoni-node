@@ -50,26 +50,26 @@ type ErrorMessage struct {
 // MetaResponse contains all of the possible request fields.
 // Fields must be in alphabetical order
 type MetaResponse struct {
-	APIList       []string  `json:"apiList,omitempty"`
-	CensusID      string    `json:"censusId,omitempty"`
-	ClaimsData    []string  `json:"claimsData,omitempty"`
-	Content       string    `json:"content,omitempty"`
-	Files         []byte    `json:"files,omitempty"`
-	Height        *int64    `json:"height,omitempty"`
-	InvalidClaims []int     `json:"invalidClaims,omitempty"`
-	Message       *string   `json:"message,omitempty"`
-	Nullifier     string    `json:"nullifier,omitempty"`
-	Nullifiers    *[]string `json:"nullifiers,omitempty"`
-	Ok            bool      `json:"ok"`
-	Payload       string    `json:"payload,omitempty"`
-	Registered    *bool     `json:"registered,omitempty"`
-	Request       string    `json:"request"`
-	Root          string    `json:"root,omitempty"`
-	Siblings      string    `json:"siblings,omitempty"`
-	Size          int64     `json:"size,omitempty"`
-	Timestamp     int32     `json:"timestamp"`
-	URI           string    `json:"uri,omitempty"`
-	ValidProof    bool      `json:"validProof,omitempty"`
+	APIList       []string `json:"apiList,omitempty"`
+	CensusID      string   `json:"censusId,omitempty"`
+	ClaimsData    []string `json:"claimsData,omitempty"`
+	Content       string   `json:"content,omitempty"`
+	Files         []byte   `json:"files,omitempty"`
+	Height        *int64   `json:"height,omitempty"`
+	InvalidClaims []int    `json:"invalidClaims,omitempty"`
+	Message       *string  `json:"message,omitempty"`
+	Nullifier     string   `json:"nullifier,omitempty"`
+	Nullifiers    []string `json:"nullifiers,omitempty"`
+	Ok            bool     `json:"ok"`
+	Payload       string   `json:"payload,omitempty"`
+	Registered    *bool    `json:"registered,omitempty"`
+	Request       string   `json:"request"`
+	Root          string   `json:"root,omitempty"`
+	Siblings      string   `json:"siblings,omitempty"`
+	Size          int64    `json:"size,omitempty"`
+	Timestamp     int32    `json:"timestamp"`
+	URI           string   `json:"uri,omitempty"`
+	ValidProof    bool     `json:"validProof,omitempty"`
 }
 
 type CensusDump struct {
