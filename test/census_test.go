@@ -126,7 +126,6 @@ func TestCensus(t *testing.T) {
 
 	// Send the API requets
 	var req types.MetaRequest
-	req.Payload = new(types.VoteTx)
 
 	// Create census
 	req.Method = "addCensus"
@@ -216,14 +215,14 @@ func TestCensus(t *testing.T) {
 
 	// CheckProof valid
 	req.Method = "checkProof"
-	req.Payload.Proof = siblings
+	req.ProofData = siblings
 	resp = sendCensusReq(t, c, req, nil)
 	if !resp.ValidProof {
 		t.Fatal("proof is invalid but it should be valid")
 	}
 
 	// CheckProof invalid (old root)
-	req.Payload.Proof = siblings
+	req.ProofData = siblings
 	req.Method = "checkProof"
 	req.RootHash = root
 	resp = sendCensusReq(t, c, req, nil)

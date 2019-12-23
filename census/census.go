@@ -290,6 +290,11 @@ func (m *Manager) ImportQueueDaemon() {
 				continue
 			}
 			log.Infof("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
+			if dump.RootHash != cid {
+				log.Warn("dump root Hash and Ethereum root hash do not match, aborting import")
+				delete(m.ImportQueue, cid)
+				continue
+			}
 			if len(dump.ClaimsData) > 0 {
 				if err := m.AddNamespace(cid, []string{}); err != nil {
 					log.Errorf("cannot create new census namespace: %s", err)
@@ -303,10 +308,16 @@ func (m *Manager) ImportQueueDaemon() {
 				} else {
 					log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
 				}
+				if m.Trees[cid].Root() != dump.RootHash {
+					log.Warnf("root hash does not match on imported census, aborting import")
+					if err := m.DelNamespace(cid); err != nil {
+						log.Error(err)
+					}
+				}
 			} else {
 				log.Warnf("no claims found on the retreived census")
-				delete(m.ImportQueue, cid)
 			}
+			delete(m.ImportQueue, cid)
 		}
 		time.Sleep(time.Second * 1)
 	}
@@ -476,7 +487,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		return resp
 
 	case "checkProof":
-		if len(r.Payload.Proof) < 1 {
+		if len(r.ProofData) < 1 {
 			resp.SetError("proofData not provided")
 			return resp
 		}
@@ -491,7 +502,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			resp.SetError(err)
 			return resp
 		}
-		validProof, err := tree.CheckProof(root, r.Payload.Proof, data)
+		validProof, err := tree.CheckProof(root, r.ProofData, data)
 		if err != nil {
 			resp.SetError(err)
 			return resp
