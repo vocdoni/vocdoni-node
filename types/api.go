@@ -1,5 +1,7 @@
 package types
 
+import "fmt"
+
 // MessageRequest holds a decoded request but does not decode the body
 type RequestMessage struct {
 	MetaRequest `json:"request"`
@@ -70,6 +72,13 @@ type MetaResponse struct {
 	Timestamp     int32    `json:"timestamp"`
 	URI           string   `json:"uri,omitempty"`
 	ValidProof    bool     `json:"validProof,omitempty"`
+}
+
+// SetError sets the MetaResponse's Ok field to false, and Message to a string
+// representation of v. Usually, v's type will be error or string.
+func (r *MetaResponse) SetError(v interface{}) {
+	r.Ok = false
+	*r.Message = fmt.Sprintf("%s", v)
 }
 
 type CensusDump struct {

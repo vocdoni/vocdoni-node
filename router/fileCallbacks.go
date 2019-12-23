@@ -23,7 +23,6 @@ func fetchFile(request routerRequest, router *Router) {
 	var resp *http.Response
 	var content []byte
 	var err error
-	var errMsg string
 
 	found := false
 	for idx, t := range transportTypes {
@@ -53,7 +52,7 @@ func fetchFile(request routerRequest, router *Router) {
 	}
 
 	if err != nil {
-		errMsg = fmt.Sprintf("error fetching uri %s", uri)
+		errMsg := fmt.Sprintf("error fetching uri %s", uri)
 		sendError(router.transport, router.signer, request.context, request.id, errMsg)
 		return
 	}
@@ -71,7 +70,7 @@ func fetchFile(request routerRequest, router *Router) {
 	}
 	rawResponse, err := json.Marshal(response)
 	if err != nil {
-		errMsg = fmt.Sprintf("error marshaling response body: %s", err)
+		errMsg := fmt.Sprintf("error marshaling response body: %s", err)
 		sendError(router.transport, router.signer, request.context, request.id, errMsg)
 	} else {
 		log.Debugf("sending response %s", rawResponse)
@@ -121,17 +120,16 @@ func addFile(request routerRequest, router *Router) {
 }
 
 func pinList(request routerRequest, router *Router) {
-	var errMsg string
 	log.Debug("calling PinList")
 	pins, err := router.storage.ListPins()
 	if err != nil {
-		errMsg = fmt.Sprintf("internal error fetching pins (%s)", err)
+		errMsg := fmt.Sprintf("internal error fetching pins (%s)", err)
 		sendError(router.transport, router.signer, request.context, request.id, errMsg)
 		return
 	}
 	pinsJSONArray, err := json.Marshal(pins)
 	if err != nil {
-		errMsg = fmt.Sprintf("internal error parsing pins (%s)", err)
+		errMsg := fmt.Sprintf("internal error parsing pins (%s)", err)
 		sendError(router.transport, router.signer, request.context, request.id, errMsg)
 		return
 	}
@@ -147,7 +145,7 @@ func pinList(request routerRequest, router *Router) {
 	}
 	rawResponse, err := json.Marshal(response)
 	if err != nil {
-		errMsg = fmt.Sprintf("internal error marshalig response body (%s)", err)
+		errMsg := fmt.Sprintf("internal error marshalig response body (%s)", err)
 		sendError(router.transport, router.signer, request.context, request.id, errMsg)
 		return
 	}
