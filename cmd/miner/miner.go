@@ -26,8 +26,8 @@ func newConfig() (config.VochainCfg, error) {
 	}
 	userDir := home + "/.dvote"
 
-	path := flag.String("configFilePath", userDir+"/vochain.yaml", "vochain config file path")
-	dataDir := flag.String("dataDir", userDir+"/vochain/data", "sets the path indicating where to store the vochain related data")
+	path := flag.String("configFilePath", userDir+"/vochain/config/vochain.yaml", "vochain config file path")
+	dataDir := flag.String("dataDir", userDir+"/vochain/", "sets the path indicating where to store the vochain related data")
 	flag.String("p2pListen", "0.0.0.0:26656", "p2p host and port to listent")
 	flag.String("rpcListen", "127.0.0.1:26657", "rpc host and port to listent")
 	flag.String("genesis", "", "use alternative geneiss file")
@@ -40,8 +40,8 @@ func newConfig() (config.VochainCfg, error) {
 	flag.Parse()
 
 	viper := viper.New()
-	viper.SetDefault("configFilePath", *dataDir+"/vochain.yaml")
-	viper.SetDefault("dataDir", *dataDir+"/vochain/data")
+	viper.SetDefault("configFilePath", *path)
+	viper.SetDefault("dataDir", *dataDir)
 	viper.SetDefault("logLevel", "warn")
 	viper.SetDefault("keyFile", "")
 	viper.SetDefault("minerKeyFile", "")

@@ -5,7 +5,7 @@ const (
 	TestnetGenesis1 = `
 {
   "genesis_time": "2019-09-13T08:08:50.199392102Z",
-  "chain_id": "0x3",
+  "chain_id": "0x5",
   "consensus_params": {
     "block": {
       "max_bytes": "22020096",
