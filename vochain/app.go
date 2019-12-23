@@ -10,8 +10,7 @@ import (
 	nm "github.com/tendermint/tendermint/node"
 
 	"gitlab.com/vocdoni/go-dvote/log"
-	vlog "gitlab.com/vocdoni/go-dvote/log"
-	vochain "gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
@@ -44,9 +43,9 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 // ensuring that Commit is never called twice for the same block height.
 func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
 	// print some basic version info about tendermint components (coreVersion, p2pVersion, blockVersion)
-	vlog.Infof("tendermint Core version: %s", req.Version)
-	vlog.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
-	vlog.Infof("tendermint Block protocol version: %d", req.BlockVersion)
+	log.Infof("tendermint Core version: %s", req.Version)
+	log.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
+	log.Infof("tendermint Block protocol version: %d", req.BlockVersion)
 	height := app.State.Height()
 	hash := app.State.AppHash()
 	log.Infof("current height is %d, current APP hash is %x", height, hash)
@@ -62,7 +61,7 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
 	// setting the app initial state with validators, oracles, height = 0 and empty apphash
 	// unmarshal app state from genesis
-	var genesisAppState vochain.GenesisAppState
+	var genesisAppState types.GenesisAppState
 	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
 		log.Errorf("cannot unmarshal app state bytes: %s", err)
@@ -143,7 +142,7 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 }
 
 func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
-	var reqData vochain.QueryData
+	var reqData types.QueryData
 	err := json.Unmarshal(req.GetData(), &reqData)
 	if err != nil {
 		return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot unmarshal request in app query: %s", err)}

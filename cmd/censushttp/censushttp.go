@@ -10,7 +10,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/net"
 
-	censusmanager "gitlab.com/vocdoni/go-dvote/census"
+	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 )
@@ -102,7 +102,7 @@ func main() {
 		pub, priv := signer.HexString()
 		log.Infof("Public: %s Private: %s", pub, priv)
 	}
-	var cm censusmanager.Manager
+	var cm census.Manager
 	err = cm.Init(globalCfg.DataDir, globalCfg.RootKey)
 	if err != nil {
 		log.Fatalf("cannot initialize census manager: %s", err)
