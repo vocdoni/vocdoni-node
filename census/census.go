@@ -323,8 +323,6 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	// Process data
 	log.Debugf("processing data %+v", *r)
 	resp.Ok = true
-	resp.Message = new(string)
-	*resp.Message = ""
 	resp.Timestamp = int32(time.Now().Unix())
 
 	if op == "addCensus" {

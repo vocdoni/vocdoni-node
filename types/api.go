@@ -59,7 +59,7 @@ type MetaResponse struct {
 	Files         []byte   `json:"files,omitempty"`
 	Height        *int64   `json:"height,omitempty"`
 	InvalidClaims []int    `json:"invalidClaims,omitempty"`
-	Message       *string  `json:"message,omitempty"`
+	Message       string   `json:"message,omitempty"`
 	Nullifier     string   `json:"nullifier,omitempty"`
 	Nullifiers    []string `json:"nullifiers,omitempty"`
 	Ok            bool     `json:"ok"`
@@ -78,7 +78,7 @@ type MetaResponse struct {
 // representation of v. Usually, v's type will be error or string.
 func (r *MetaResponse) SetError(v interface{}) {
 	r.Ok = false
-	*r.Message = fmt.Sprintf("%s", v)
+	r.Message = fmt.Sprintf("%s", v)
 }
 
 type CensusDump struct {
