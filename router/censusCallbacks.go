@@ -11,15 +11,18 @@ import (
 
 func censusLocal(request routerRequest, router *Router) {
 	var response types.ResponseMessage
+	var cresponse *types.MetaResponse
 	var err error
 	auth := request.authenticated
 	addr := request.address
 	log.Debugf("client authorization %t. Recovered address is [%s]", auth, addr)
-	if auth && len(addr) < signature.AddressLength {
-		sendError(router.transport, router.signer, request.context, request.id, "cannot recover address")
-		return
+	if auth {
+		if len(addr) < signature.AddressLength {
+			sendError(router.transport, router.signer, request.context, request.id, "cannot recover address")
+			return
+		}
 	}
-	cresponse := router.census.Handler(&request.MetaRequest, auth, "0x"+addr+"/")
+	cresponse = router.census.Handler(&request.MetaRequest, auth, "0x"+addr+"/")
 	if !cresponse.Ok {
 		sendError(router.transport, router.signer, request.context, request.id, *cresponse.Message)
 		return

@@ -23,6 +23,7 @@ type MetaRequest struct {
 	Nullifier      string   `json:"nullifier,omitempty"`
 	Payload        *VoteTx  `json:"payload,omitempty"`
 	ProcessID      string   `json:"processId,omitempty"`
+	ProofData      string   `json:"proofData,omitempty"`
 	PubKeys        []string `json:"pubKeys,omitempty"`
 	RootHash       string   `json:"rootHash,omitempty"`
 	Signature      string   `json:"signature,omitempty"`
