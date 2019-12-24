@@ -59,12 +59,6 @@ func InitDefault(t StorageID) (Storage, error) {
 		defaultDataStore.Datadir = home + "/.ipfs/"
 		err = s.Init(defaultDataStore)
 		return s, err
-	case BZZ:
-		s := new(BZZHandle)
-		defaultDataStore := new(types.DataStore)
-		defaultDataStore.Datadir = "this_is_still_ignored"
-		err := s.Init(defaultDataStore)
-		return s, err
 	default:
 		return nil, errors.New("Bad storage type specification")
 	}
@@ -74,11 +68,6 @@ func Init(t StorageID, d *types.DataStore) (Storage, error) {
 	switch t {
 	case IPFS:
 		s := new(IPFSHandle)
-		err := s.Init(d)
-
-		return s, err
-	case BZZ:
-		s := new(BZZHandle)
 		err := s.Init(d)
 		return s, err
 	default:

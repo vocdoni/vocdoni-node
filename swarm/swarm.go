@@ -23,6 +23,7 @@ import (
 	"github.com/ethersphere/swarm/api/client"
 	"github.com/ethersphere/swarm/network"
 	"github.com/ethersphere/swarm/pss"
+	"github.com/ethersphere/swarm/pss/message"
 
 	"github.com/ethereum/go-ethereum/p2p/nat"
 
@@ -293,8 +294,8 @@ func (sn *SimpleSwarm) InitPSS(bootNodes []string) error {
 	return nil
 }
 
-func strTopic(topic string) pss.Topic {
-	return pss.BytesToTopic([]byte(topic))
+func strTopic(topic string) message.Topic {
+	return message.NewTopic([]byte(topic))
 }
 
 func strSymKey(key string) []byte {
