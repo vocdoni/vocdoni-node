@@ -253,7 +253,9 @@ func (sn *SimpleSwarm) InitPSS(bootNodes []string) error {
 		}
 		sn.Node.Config().P2P.BootstrapNodes = ebootNodes
 	}
-	sn.Node.Start()
+	if err := sn.Node.Start(); err != nil {
+		return err
+	}
 
 	// wait to connect to the p2p network
 	// TODO(mvdan): replace the sleep
