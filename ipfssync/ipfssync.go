@@ -270,7 +270,7 @@ func (is *IPFSsync) unicastMsg(address string, msg Message) error {
 func (is *IPFSsync) Start() {
 	log.Infof("initializing new pin storage")
 	os.RemoveAll(is.DataDir + "/ipfsSync.db")
-	is.hashTree.Storage = is.DataDir
+	is.hashTree.StorageDir = is.DataDir
 	if err := is.hashTree.Init("ipfsSync.db"); err != nil {
 		log.Fatal(err)
 	}

@@ -152,7 +152,7 @@ func (r *Router) EnableFileAPI() {
 func (r *Router) EnableCensusAPI(cm *census.Manager) {
 	r.APIs = append(r.APIs, "census")
 	r.census = cm
-	cm.Data = r.storage
+	cm.Storage = r.storage
 	r.registerPublic("getRoot", censusLocal)
 	r.registerPrivate("dump", censusLocal)
 	r.registerPrivate("dumpPlain", censusLocal)

@@ -32,18 +32,21 @@ type Namespace struct {
 }
 
 type Manager struct {
-	Storage     string                // Root storage data dir
+	StorageDir  string                // Root storage data dir
 	AuthWindow  int32                 // Time window (seconds) in which TimeStamp will be accepted if auth enabled
 	Census      Namespaces            // Available namespaces
 	Trees       map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
-	Data        data.Storage
+	Storage     data.Storage
 	ImportQueue map[string]string
 }
+
+// Data helps satisfy an ethevents interface.
+func (m *Manager) Data() data.Storage { return m.Storage }
 
 // Init creates a new census manager
 func (m *Manager) Init(storage, rootKey string) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storage)
-	m.Storage = storage
+	m.StorageDir = storage
 	m.Trees = make(map[string]*tree.Tree)
 	m.ImportQueue = make(map[string]string)
 	m.AuthWindow = 10
@@ -83,7 +86,7 @@ func (m *Manager) Init(storage, rootKey string) error {
 	// Initialize existing merkle trees
 	for _, ns := range m.Census.Namespaces {
 		t := tree.Tree{}
-		t.Storage = m.Storage
+		t.StorageDir = m.StorageDir
 		err := t.Init(ns.Name)
 		if err != nil {
 			log.Warn(err)
@@ -104,7 +107,7 @@ func (m *Manager) AddNamespace(name string, pubKeys []string) error {
 		return errors.New("namespace already exist")
 	}
 	mkTree := tree.Tree{}
-	mkTree.Storage = m.Storage
+	mkTree.StorageDir = m.StorageDir
 	err := mkTree.Init(name)
 	if err != nil {
 		return err
@@ -121,7 +124,7 @@ func (m *Manager) AddNamespace(name string, pubKeys []string) error {
 func (m *Manager) DelNamespace(name string) error {
 	if _, e := m.Trees[name]; e {
 		delete(m.Trees, name)
-		os.RemoveAll(m.Storage + "/" + name)
+		os.RemoveAll(m.StorageDir + "/" + name)
 	}
 	for i, ns := range m.Census.Namespaces {
 		if ns.Name == name {
@@ -135,7 +138,7 @@ func (m *Manager) DelNamespace(name string) error {
 
 func (m *Manager) save() error {
 	log.Info("saving namespaces")
-	nsConfig := fmt.Sprintf("%s/namespaces.json", m.Storage)
+	nsConfig := fmt.Sprintf("%s/namespaces.json", m.StorageDir)
 	data, err := json.Marshal(m.Census)
 	if err != nil {
 		return err
@@ -276,7 +279,7 @@ func (m *Manager) ImportQueueDaemon() {
 				continue
 			}
 			log.Infof("retrieving remote census %s", uri)
-			censusRaw, err := m.Data.Retrieve(uri[len(m.Data.URIprefix()):])
+			censusRaw, err := m.Storage.Retrieve(uri[len(m.Storage.URIprefix()):])
 			if err != nil {
 				log.Warnf("cannot retrieve census: %s", err)
 				delete(m.ImportQueue, cid)
@@ -447,18 +450,18 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			resp.SetError("invalid authentication")
 			return resp
 		}
-		if m.Data == nil {
+		if m.Storage == nil {
 			resp.SetError("not supported")
 			return resp
 		}
-		if !strings.HasPrefix(r.URI, m.Data.URIprefix()) ||
-			len(r.URI) <= len(m.Data.URIprefix()) {
-			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, m.Data.URIprefix())
+		if !strings.HasPrefix(r.URI, m.Storage.URIprefix()) ||
+			len(r.URI) <= len(m.Storage.URIprefix()) {
+			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, m.Storage.URIprefix())
 			resp.SetError("URI not supported")
 			return resp
 		}
 		log.Infof("retrieving remote census %s", r.CensusURI)
-		censusRaw, err := m.Data.Retrieve(r.URI[len(m.Data.URIprefix()):])
+		censusRaw, err := m.Storage.Retrieve(r.URI[len(m.Storage.URIprefix()):])
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
 			resp.SetError("cannot retrieve census")
@@ -574,7 +577,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			resp.SetError("invalid authentication")
 			return resp
 		}
-		if m.Data == nil {
+		if m.Storage == nil {
 			resp.SetError("not supported")
 			return resp
 		}
@@ -592,13 +595,13 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			log.Warnf("cannot marshal census dump: %s", err)
 			return resp
 		}
-		cid, err := m.Data.Publish(dumpBytes)
+		cid, err := m.Storage.Publish(dumpBytes)
 		if err != nil {
 			resp.SetError(err)
 			log.Warnf("cannot publish census dump: %s", err)
 			return resp
 		}
-		resp.URI = m.Data.URIprefix() + cid
+		resp.URI = m.Storage.URIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
 		resp.Root = t.Root()
 

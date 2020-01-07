@@ -148,11 +148,13 @@ func DecompressPubKey(pubHexComp string) (string, error) {
 	return pubHex, nil
 }
 
-// EthAddrString return the Ethereum address from the ECDSA public key
+// PublicKey return the Ethereum address from the ECDSA public key
 func (k *SignKeys) EthAddrString() string {
 	recoveredAddr := crypto.PubkeyToAddress(*k.Public)
 	return fmt.Sprintf("%x", recoveredAddr)
 }
+
+func (k *SignKeys) String() string { return k.EthAddrString() }
 
 // Sign signs a message. Message is a normal string (no HexString nor a Hash)
 func (k *SignKeys) Sign(message string) (string, error) {

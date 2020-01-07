@@ -10,13 +10,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	voclient "github.com/tendermint/tendermint/rpc/client"
+	cttypes "github.com/tendermint/tendermint/rpc/core/types"
+	ttypes "github.com/tendermint/tendermint/types"
 	"gitlab.com/vocdoni/go-dvote/census"
 	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"
+	"gitlab.com/vocdoni/go-dvote/data"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/vocdoni/go-dvote/chain"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 
@@ -28,16 +29,36 @@ type EthereumEvents struct {
 	ContractABI abi.ABI
 	// voting process contract handle
 	ProcessHandle *chain.ProcessHandle
-	// ethereum subscribed events
-	Signer *signature.SignKeys
 	// dial web3 address
 	DialAddr string
 	// list of handler functions that will be called on events
 	EventHandlers []EventHandler
+
+	// ethereum subscribed events
+	Signer Signer
 	// VochainCli is the Vochain HTTP client
-	VochainCLI *voclient.HTTP
-	// Manager is the census manager service
-	Census *census.Manager
+	VochainCLI VochainClient
+	// Census is the census manager service
+	Census CensusManager
+}
+
+type Signer interface {
+	// TODO(mvdan): expose Sign, not SignJSON
+	// TODO(mvdan): the result should be []byte, not string
+	SignJSON(message interface{}) (string, error)
+
+	fmt.Stringer
+}
+
+type VochainClient interface {
+	// TODO(mvdan): do we want a more generic API?
+	BroadcastTxSync(tx ttypes.Tx) (*cttypes.ResultBroadcastTx, error)
+}
+
+type CensusManager interface {
+	AddToImportQueue(censusID, censusURI string)
+	// TODO(mvdan): is this too wide? maybe just URIprefix?
+	Data() data.Storage
 }
 
 // EventHandler function type is executed on each Ethereum event
@@ -53,7 +74,7 @@ type BlockInfo struct {
 }
 
 // NewEthEvents creates a new Ethereum events handler
-func NewEthEvents(contractAddressHex string, signer *signature.SignKeys, w3Endpoint string, cens *census.Manager) (*EthereumEvents, error) {
+func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, cens *census.Manager) (*EthereumEvents, error) {
 	if len(w3Endpoint) == 0 {
 		w3Endpoint = "ws://127.0.0.1:9092"
 	}

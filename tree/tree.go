@@ -16,9 +16,9 @@ import (
 )
 
 type Tree struct {
-	Storage   string
-	Tree      *merkletree.MerkleTree
-	DbStorage *db.LevelDbStorage
+	StorageDir string
+	Tree       *merkletree.MerkleTree
+	DbStorage  *db.LevelDbStorage
 }
 
 const MaxClaimSize = 62
@@ -28,18 +28,18 @@ func (t *Tree) MaxClaimSize() int {
 }
 
 func (t *Tree) Init(namespace string) error {
-	if len(t.Storage) < 1 {
+	if len(t.StorageDir) < 1 {
 		if len(namespace) < 1 {
 			return errors.New("namespace not valid")
 		}
 		home, err := os.UserHomeDir()
 		if err == nil {
-			t.Storage = home + "/.dvote/census"
+			t.StorageDir = home + "/.dvote/census"
 		} else {
-			t.Storage = "./dvoteTree"
+			t.StorageDir = "./dvoteTree"
 		}
 	}
-	mtdb, err := db.NewLevelDbStorage(t.Storage+"/"+namespace, false)
+	mtdb, err := db.NewLevelDbStorage(t.StorageDir+"/"+namespace, false)
 	if err != nil {
 		return err
 	}

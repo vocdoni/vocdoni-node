@@ -101,7 +101,7 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 		}
 		log.Infof("process meta: %+v", processTx)
 
-		log.Debugf("signing with key: %s", e.Signer.EthAddrString())
+		log.Debugf("signing with key: %s", e.Signer)
 		processTx.Signature, err = e.Signer.SignJSON(processTx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %s", err)
@@ -163,10 +163,9 @@ func HandleCensus(event ethtypes.Log, e *EthereumEvents) error {
 		return err
 	}
 	// Import remote census
-	if !strings.HasPrefix(processTx.MkURI, e.Census.Data.URIprefix()) || len(processTx.MkRoot) == 0 {
+	if !strings.HasPrefix(processTx.MkURI, e.Census.Data().URIprefix()) || len(processTx.MkRoot) == 0 {
 		return fmt.Errorf("process not valid => %+v", processTx)
 	}
-	// e.Census.ImportQueue[processTx.MkRoot] = processTx.MkURI
 	e.Census.AddToImportQueue(processTx.MkRoot, processTx.MkURI)
 	return nil
 }
