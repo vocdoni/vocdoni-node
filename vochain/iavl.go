@@ -34,6 +34,9 @@ const (
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
 var PrefixDBCacheSize = 0
 
+// EventCallback is the function type used by State.Callbacks
+type EventCallback func(interface{})
+
 // State represents the state of the vochain application
 type State struct {
 	AppTree     *iavl.MutableTree
@@ -41,6 +44,7 @@ type State struct {
 	VoteTree    *iavl.MutableTree
 	Codec       *amino.Codec
 	Lock        bool
+	Callbacks   map[string]EventCallback //addVote, addProcess....
 }
 
 // NewState creates a new State
@@ -77,7 +81,14 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	ptVersion, err := vs.ProcessTree.LoadVersion(version - 1)
 	vtVersion, err := vs.VoteTree.LoadVersion(version - 1)
 	log.Infof("application trees successfully loaded. appTree version:%d processTree version:%d voteTree version: %d", atVersion, ptVersion, vtVersion)
+	vs.Callbacks = make(map[string]EventCallback)
 	return &vs, err
+}
+
+// AddCallback adds a new callback function of type EventCallback which will be exeuted on event name
+func (v *State) AddCallback(name string, f EventCallback) error {
+	v.Callbacks[name] = f
+	return nil
 }
 
 // AddOracle adds a trusted oracle given its address if not exists
@@ -200,6 +211,9 @@ func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 		return errors.New("cannot marshal process bytes")
 	}
 	v.ProcessTree.Set([]byte(pid), newProcessBytes)
+	if callBack, ok := v.Callbacks["addProcess"]; ok {
+		go callBack(p)
+	}
 	return nil
 }
 
@@ -229,6 +243,9 @@ func (v *State) AddVote(vote *vochaintypes.Vote) error {
 		return errors.New("cannot marshal vote")
 	}
 	v.VoteTree.Set([]byte(voteID), newVoteBytes)
+	if callBack, ok := v.Callbacks["addVote"]; ok {
+		go callBack(vote)
+	}
 	return nil
 }
 

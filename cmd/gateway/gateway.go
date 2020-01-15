@@ -34,6 +34,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
+	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 )
 
 func newConfig() (config.GWCfg, error) {
@@ -52,6 +53,7 @@ func newConfig() (config.GWCfg, error) {
 	flag.Bool("censusApi", true, "enable census API")
 	flag.Bool("voteApi", true, "enable vote API")
 	flag.Bool("web3Api", true, "enable web3 API")
+	flag.Bool("resultsApi", true, "enable results API")
 	flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
 	flag.Int("listenPort", 9090, "API endpoint http port")
 	flag.String("apiRoute", "/dvote", "dvote API route")
@@ -90,6 +92,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.SetDefault("api.file.enabled", true)
 	viper.SetDefault("api.census.enabled", true)
 	viper.SetDefault("api.vote.enabled", true)
+	viper.SetDefault("api.results.enabled", true)
 	viper.SetDefault("api.route", "/dvote")
 	viper.SetDefault("client.allowPrivate", false)
 	viper.SetDefault("client.allowedAddrs", "")
@@ -146,6 +149,7 @@ func newConfig() (config.GWCfg, error) {
 	viper.BindPFlag("api.file.enabled", flag.Lookup("fileApi"))
 	viper.BindPFlag("api.census.enabled", flag.Lookup("censusApi"))
 	viper.BindPFlag("api.vote.enabled", flag.Lookup("voteApi"))
+	viper.BindPFlag("api.results.enabled", flag.Lookup("resultsApi"))
 	viper.BindPFlag("api.route", flag.Lookup("apiRoute"))
 	viper.BindPFlag("listenHost", flag.Lookup("listenHost"))
 	viper.BindPFlag("listenPort", flag.Lookup("listenPort"))
@@ -401,6 +405,7 @@ func main() {
 			log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
 		}
 		vnode = vochain.NewVochain(globalCfg.Vochain)
+		//vnode.State.AddCallback("addVote")
 		go func() {
 			for {
 				if vnode.Node != nil {
@@ -471,6 +476,13 @@ func main() {
 			rpcClient := voclient.NewHTTP(globalCfg.Vochain.RpcListen, "/websocket")
 			// todo: client params as cli flags
 			log.Info("enabling vote API")
+			if globalCfg.Api.Results.Enabled {
+				log.Info("starting vochain scrutinizer")
+				routerAPI.Scrutinizer, err = scrutinizer.NewScrutinizer(globalCfg.DataDir+"/scrutinizer", vnode.State)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
 			routerAPI.EnableVoteAPI(rpcClient)
 		}
 

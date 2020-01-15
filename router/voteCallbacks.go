@@ -295,3 +295,36 @@ func getEnvelopeList(request routerRequest, router *Router) {
 	log.Debugf("api response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawAPIResponse))
 }
+
+func getResults(request routerRequest, router *Router) {
+	var apiResponse types.ResponseMessage
+	var err error
+	apiResponse.ID = request.id
+	apiResponse.Request = request.id
+	apiResponse.Timestamp = int32(time.Now().Unix())
+	apiResponse.Ok = true
+	//sendError(router.transport, router.signer, request.context, request.id, "cannot unmarshal nullifiers")
+	if len(request.ProcessID) != 64 {
+		sendError(router.transport, router.signer, request.context, request.id, "processID length not valid")
+		return
+	}
+	apiResponse.Results, err = router.Scrutinizer.VoteResult(request.ProcessID)
+	if err != nil {
+		log.Warn(err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot get results")
+	}
+	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
+	if err != nil {
+		log.Warn(err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot sign reply")
+		return
+	}
+	rawAPIResponse, err := json.Marshal(apiResponse)
+	if err != nil {
+		log.Errorf("error marshaling getEnvelopeList reply: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
+		return
+	}
+	log.Debugf("api response: %+v", apiResponse.MetaResponse)
+	router.transport.Send(buildReply(request.context, rawAPIResponse))
+}

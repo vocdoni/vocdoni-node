@@ -20,6 +20,9 @@ type GWCfg struct {
 		Vote struct {
 			Enabled bool
 		}
+		Results struct {
+			Enabled bool
+		}
 	}
 	Client EthereumClient
 	Ssl    struct {

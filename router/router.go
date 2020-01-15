@@ -17,6 +17,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 )
 
 func buildReply(context types.MessageContext, data []byte) types.Message {
@@ -51,6 +52,7 @@ type Router struct {
 	signer            signature.SignKeys
 	census            *census.Manager
 	tmclient          *voclient.HTTP
+	Scrutinizer       *scrutinizer.Scrutinizer
 	PrivateCalls      uint64
 	PublicCalls       uint64
 	codec             *amino.Codec
@@ -177,6 +179,10 @@ func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP) {
 	r.registerPublic("getProcessList", getProcessList)
 	r.registerPublic("getEnvelopeList", getEnvelopeList)
 	r.registerPublic("getBlockHeight", getBlockHeight)
+	if r.Scrutinizer != nil {
+		r.APIs = append(r.APIs, "results")
+		r.registerPublic("getResults", getResults)
+	}
 }
 
 // Route routes requests through the Router object

@@ -33,8 +33,6 @@ var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.20
 
 // Start starts a new vochain validator node
 func NewVochain(globalCfg config.VochainCfg) *BaseApplication {
-	// create application db
-	log.Info("initializing Vochain")
 	// creating new vochain app
 	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
 	if err != nil {
