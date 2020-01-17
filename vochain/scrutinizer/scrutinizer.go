@@ -99,6 +99,7 @@ func (s *Scrutinizer) addVote(v interface{}) {
 	}
 }
 
+// VoteResult returns the current result for a processId summarized in a two dimension int slice
 func (s *Scrutinizer) VoteResult(processId string) ([][]uint32, error) {
 	processBytes, err := s.Storage.Get([]byte(processId))
 	if err != nil {
@@ -109,5 +110,33 @@ func (s *Scrutinizer) VoteResult(processId string) ([][]uint32, error) {
 	if err != nil {
 		return nil, err
 	}
-	return pv, nil
+	return pruneVoteResult(pv), nil
+}
+
+// To-be-improved
+func pruneVoteResult(pv ProcessVotes) ProcessVotes {
+	var pvc [][]uint32
+	for i := 0; i < MaxQuestions; i++ {
+		j := 0
+		for ; j < MaxQuestions; j++ { // find the real size of first dimension
+			if pv[i][j] != 0 {
+				break
+			}
+		}
+		if j < MaxQuestions { // we found some non-zero element, copy pv to pvc
+			pvc = make([][]uint32, i+1)
+			for i2 := 0; i2 <= i; i2++ { //copy only the first non-zero values
+				j2 := MaxOptions - 1
+				for ; j2 >= 0; j2-- {
+					if pv[i2][j2] != 0 {
+						break
+					}
+				}
+				pvc[i2] = make([]uint32, j2+1)
+				copy(pvc[i2], pv[i2])
+			}
+			break
+		}
+	}
+	return pvc
 }
