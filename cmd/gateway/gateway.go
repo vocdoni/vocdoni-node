@@ -387,6 +387,8 @@ func main() {
 
 	// Initialize and start Vochain
 	var vnode *vochain.BaseApplication
+	var sc *scrutinizer.Scrutinizer
+
 	if globalCfg.Api.Vote.Enabled {
 		log.Info("initializing vochain")
 		// node + app layer
@@ -405,7 +407,13 @@ func main() {
 			log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
 		}
 		vnode = vochain.NewVochain(globalCfg.Vochain)
-		//vnode.State.AddCallback("addVote")
+		if globalCfg.Api.Results.Enabled {
+			log.Info("starting vochain scrutinizer")
+			sc, err = scrutinizer.NewScrutinizer(globalCfg.DataDir+"/scrutinizer", vnode.State)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 		go func() {
 			for {
 				if vnode.Node != nil {
@@ -428,6 +436,13 @@ func main() {
 
 	// Wait for Vochain to be ready
 	if globalCfg.Api.Vote.Enabled {
+		if globalCfg.Api.Results.Enabled {
+			log.Info("starting vochain scrutinizer")
+			sc, err = scrutinizer.NewScrutinizer(globalCfg.DataDir+"/scrutinizer", vnode.State)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 		var h, hPrev int64
 		for {
 			if vnode.Node != nil {
@@ -476,13 +491,7 @@ func main() {
 			rpcClient := voclient.NewHTTP(globalCfg.Vochain.RpcListen, "/websocket")
 			// todo: client params as cli flags
 			log.Info("enabling vote API")
-			if globalCfg.Api.Results.Enabled {
-				log.Info("starting vochain scrutinizer")
-				routerAPI.Scrutinizer, err = scrutinizer.NewScrutinizer(globalCfg.DataDir+"/scrutinizer", vnode.State)
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
+			routerAPI.Scrutinizer = sc
 			routerAPI.EnableVoteAPI(rpcClient)
 		}
 
