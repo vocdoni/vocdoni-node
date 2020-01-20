@@ -352,7 +352,7 @@ func main() {
 		}
 		go func() {
 			for {
-				time.Sleep(time.Second * 40)
+				time.Sleep(time.Second * 20)
 				stats, err := storage.Stats()
 				if err != nil {
 					log.Warnf("IPFS node returned an error: %s", err)
@@ -436,13 +436,6 @@ func main() {
 
 	// Wait for Vochain to be ready
 	if globalCfg.Api.Vote.Enabled {
-		if globalCfg.Api.Results.Enabled {
-			log.Info("starting vochain scrutinizer")
-			sc, err = scrutinizer.NewScrutinizer(globalCfg.DataDir+"/scrutinizer", vnode.State)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
 		var h, hPrev int64
 		for {
 			if vnode.Node != nil {
@@ -450,10 +443,10 @@ func main() {
 				break
 			}
 			hPrev = h
-			time.Sleep(time.Second * 10)
+			time.Sleep(time.Second * 5)
 			h = vnode.State.Height()
 			log.Infof("[vochain info] replaying block %d at %d b/s",
-				h, int64((h-hPrev)/10))
+				h, int64((h-hPrev)/5))
 		}
 	}
 
