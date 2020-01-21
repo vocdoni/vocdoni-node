@@ -66,6 +66,7 @@ type MetaResponse struct {
 	Nullifiers    []string   `json:"nullifiers,omitempty"`
 	Ok            bool       `json:"ok"`
 	Payload       string     `json:"payload,omitempty"`
+	ProcessIDs    []string   `json:"processIds,omitempty"`
 	Registered    *bool      `json:"registered,omitempty"`
 	Request       string     `json:"request"`
 	Results       [][]uint32 `json:"results,omitempty"`
@@ -87,4 +88,9 @@ func (r *MetaResponse) SetError(v interface{}) {
 type CensusDump struct {
 	RootHash   string   `json:"rootHash"`
 	ClaimsData []string `json:"claimsData"`
+}
+
+// VotePackage represents the payload of a vote (usually base64 encoded)
+type VotePackage struct {
+	Votes []int `json:"votes"`
 }

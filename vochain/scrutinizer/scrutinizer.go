@@ -3,6 +3,7 @@ package scrutinizer
 import (
 	"encoding/base64"
 	"encoding/json"
+
 	amino "github.com/tendermint/go-amino"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -11,22 +12,24 @@ import (
 )
 
 const (
+	// MaxQuestions is the maximum number of questions allowed in a VotePackage
 	MaxQuestions = 64
-	MaxOptions   = 64
+	// MaxOptions is the maximum number of options allowed in a VotePackage question
+	MaxOptions = 64
 )
 
+// Scrutinizer is the component which makes the accounting of the voting processes and keeps it indexed in a local database
 type Scrutinizer struct {
 	VochainState *vochain.State
 	Storage      *db.LevelDbStorage
 	Codec        *amino.Codec
 }
 
-type VotePackage struct {
-	Votes []int `json:"votes"`
-}
-
+// ProcessVotes represents the results of a voting process using a two dimensions slice [ question1:[option1,option2], question2:[option1,option2], ...]
 type ProcessVotes [][]uint32
 
+// NewScrutinizer returns an instance of the Scrutinizer
+// using the local storage database of dbPath and integrated into the state vochain instance
 func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	var s Scrutinizer
 	var err error
@@ -45,7 +48,7 @@ func (s *Scrutinizer) addVote(v interface{}) {
 		return
 	}
 
-	var vote VotePackage
+	var vote types.VotePackage
 	if err := json.Unmarshal(rawVote, &vote); err != nil {
 		log.Error(err)
 		return
@@ -100,8 +103,8 @@ func (s *Scrutinizer) addVote(v interface{}) {
 }
 
 // VoteResult returns the current result for a processId summarized in a two dimension int slice
-func (s *Scrutinizer) VoteResult(processId string) ([][]uint32, error) {
-	processBytes, err := s.Storage.Get([]byte(processId))
+func (s *Scrutinizer) VoteResult(processID string) ([][]uint32, error) {
+	processBytes, err := s.Storage.Get([]byte(processID))
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +114,25 @@ func (s *Scrutinizer) VoteResult(processId string) ([][]uint32, error) {
 		return nil, err
 	}
 	return pruneVoteResult(pv), nil
+}
+
+// ProcessListSize returns the number of indexes process ids
+func (s *Scrutinizer) ProcessListSize() int {
+	return s.Storage.Count()
+}
+
+// ProcessList returns the list of process ids
+func (s *Scrutinizer) ProcessList(max int) (procList []string) {
+	iter := s.Storage.LevelDB().NewIterator(nil, nil)
+	for iter.Next() {
+		if max < 1 {
+			break
+		}
+		procList = append(procList, string(iter.Key()))
+		max--
+	}
+	iter.Release()
+	return
 }
 
 // To-be-improved
