@@ -155,7 +155,7 @@ func pruneVoteResult(pv ProcessVotes) ProcessVotes {
 		}
 		if j < MaxQuestions { // we found some non-zero element, copy pv to pvc
 			pvc = make([][]uint32, i+1)
-			for i2 := 0; i2 <= i; i2++ { //copy only the first non-zero values
+			for i2 := 0; i2 <= i; i2++ { // copy only the first non-zero values
 				j2 := MaxOptions - 1
 				for ; j2 >= 0; j2-- {
 					if pv[i2][j2] != 0 {

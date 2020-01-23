@@ -32,23 +32,6 @@ type IPFSHandle struct {
 	LogLevel string
 }
 
-// check if ipfs base dir exists
-func checkIPFSDirExists(path string) (bool, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false, errors.New("cannot get $HOME")
-	}
-	userHomeDir := home
-	_, err = os.Stat(userHomeDir + "/." + path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return true, err
-}
-
 func (i *IPFSHandle) Init(d *types.DataStore) error {
 	if i.LogLevel == "" {
 		i.LogLevel = "warn"

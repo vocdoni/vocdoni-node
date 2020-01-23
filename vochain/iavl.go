@@ -44,7 +44,7 @@ type State struct {
 	VoteTree    *iavl.MutableTree
 	Codec       *amino.Codec
 	Lock        bool
-	Callbacks   map[string]EventCallback //addVote, addProcess....
+	Callbacks   map[string]EventCallback // addVote, addProcess....
 }
 
 // NewState creates a new State
@@ -78,11 +78,20 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	vs.ProcessTree.DeleteVersion(version)
 	vs.VoteTree.DeleteVersion(version)
 	atVersion, err := vs.AppTree.LoadVersion(version - 1)
+	if err != nil {
+		return nil, err
+	}
 	ptVersion, err := vs.ProcessTree.LoadVersion(version - 1)
+	if err != nil {
+		return nil, err
+	}
 	vtVersion, err := vs.VoteTree.LoadVersion(version - 1)
+	if err != nil {
+		return nil, err
+	}
 	log.Infof("application trees successfully loaded. appTree version:%d processTree version:%d voteTree version: %d", atVersion, ptVersion, vtVersion)
 	vs.Callbacks = make(map[string]EventCallback)
-	return &vs, err
+	return &vs, nil
 }
 
 // AddCallback adds a new callback function of type EventCallback which will be exeuted on event name

@@ -1,16 +1,12 @@
 package ipfs
 
 import (
-	"context"
 	"io"
 	"os"
 	"path"
 	"sync"
 
 	config "github.com/ipfs/go-ipfs-config"
-	"github.com/ipfs/go-ipfs/assets"
-	"github.com/ipfs/go-ipfs/core"
-	"github.com/ipfs/go-ipfs/namesys"
 	"github.com/ipfs/go-ipfs/plugin/loader"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	"github.com/pkg/errors"
@@ -97,48 +93,4 @@ func checkWritable(dir string) error {
 	}
 
 	return err
-}
-
-func addDefaultAssets(repoRoot string) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	r, err := fsrepo.Open(repoRoot)
-	if err != nil { // NB: repo is owned by the node
-		return err
-	}
-	defer r.Close()
-
-	nd, err := core.NewNode(ctx, &core.BuildCfg{Repo: r})
-	if err != nil {
-		return err
-	}
-	defer nd.Close()
-
-	dkey, err := assets.SeedInitDocs(nd)
-	log.Errorf("init: seeding init docs failed: %s", err)
-
-	log.Debugf("init: seeded init docs %s", dkey)
-
-	log.Infof("to get started, enter:\n\tipfs cat /ipfs/%s/readme\n\n", dkey)
-	return err
-}
-
-func initializeIpnsKeyspace(repoRoot string) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	r, err := fsrepo.Open(repoRoot)
-	if err != nil { // NB: repo is owned by the node
-		return err
-	}
-	defer r.Close()
-
-	nd, err := core.NewNode(ctx, &core.BuildCfg{Repo: r})
-	if err != nil {
-		return err
-	}
-	defer nd.Close()
-
-	return namesys.InitializeKeyspace(ctx, nd.Namesys, nd.Pinning, nd.PrivateKey)
 }

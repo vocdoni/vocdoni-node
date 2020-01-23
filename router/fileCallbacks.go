@@ -47,7 +47,7 @@ func fetchFile(request routerRequest, router *Router) {
 				found = true
 			}
 		case "bzz:", "bzz-feed":
-			err = errors.New("Bzz and Bzz-feed not implemented yet")
+			err = errors.New("bzz and bzz-feed not implemented yet")
 		}
 	}
 

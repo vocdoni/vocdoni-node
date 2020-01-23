@@ -52,7 +52,7 @@ func InitDefault(t StorageID) (Storage, error) {
 	case IPFS:
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return nil, errors.New("Cannot get $HOME")
+			return nil, errors.New("cannot get $HOME")
 		}
 		s := new(IPFSHandle)
 		defaultDataStore := new(types.DataStore)
@@ -60,7 +60,7 @@ func InitDefault(t StorageID) (Storage, error) {
 		err = s.Init(defaultDataStore)
 		return s, err
 	default:
-		return nil, errors.New("Bad storage type specification")
+		return nil, errors.New("bad storage type specification")
 	}
 }
 
@@ -71,6 +71,6 @@ func Init(t StorageID, d *types.DataStore) (Storage, error) {
 		err := s.Init(d)
 		return s, err
 	default:
-		return nil, errors.New("Bad storage type or DataStore specification")
+		return nil, errors.New("bad storage type or DataStore specification")
 	}
 }
