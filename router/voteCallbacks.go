@@ -307,11 +307,21 @@ func getResults(request routerRequest, router *Router) {
 		sendError(router.transport, router.signer, request.context, request.id, "processID length not valid")
 		return
 	}
+
 	apiResponse.Results, err = router.Scrutinizer.VoteResult(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
 		sendError(router.transport, router.signer, request.context, request.id, "cannot get results")
 	}
+
+	procInfo, err := router.Scrutinizer.ProcessInfo(request.ProcessID)
+	if err != nil {
+		log.Warn(err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot get process info")
+	}
+	apiResponse.Type = procInfo.Type
+	apiResponse.State = procInfo.CurrentState.String()
+
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
 		log.Warn(err)
@@ -335,7 +345,7 @@ func getProcListResults(request routerRequest, router *Router) {
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
 	apiResponse.Ok = true
-	apiResponse.ProcessIDs = router.Scrutinizer.ProcessList(64)
+	apiResponse.ProcessIDs = router.Scrutinizer.ProcessList(64, request.FromID)
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
 		log.Warn(err)

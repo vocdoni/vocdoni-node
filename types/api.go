@@ -19,6 +19,7 @@ type MetaRequest struct {
 	ClaimsData     []string `json:"claimsData,omitempty"`
 	Content        string   `json:"content,omitempty"`
 	From           int64    `json:"from,omitempty"`
+	FromID         string   `json:"fromId,omitempty"`
 	ListSize       int64    `json:"listSize,omitempty"`
 	Method         string   `json:"method"`
 	Name           string   `json:"name,omitempty"`
@@ -58,7 +59,6 @@ type MetaResponse struct {
 	ClaimsData    []string   `json:"claimsData,omitempty"`
 	Content       string     `json:"content,omitempty"`
 	Files         []byte     `json:"files,omitempty"`
-	Finished      bool       `json:"finished,omitempty"`
 	Height        *int64     `json:"height,omitempty"`
 	InvalidClaims []int      `json:"invalidClaims,omitempty"`
 	Message       string     `json:"message,omitempty"`
@@ -73,7 +73,9 @@ type MetaResponse struct {
 	Root          string     `json:"root,omitempty"`
 	Siblings      string     `json:"siblings,omitempty"`
 	Size          int64      `json:"size,omitempty"`
+	State         string     `json:"state,omitempty"`
 	Timestamp     int32      `json:"timestamp"`
+	Type          string     `json:"type"`
 	URI           string     `json:"uri,omitempty"`
 	ValidProof    bool       `json:"validProof,omitempty"`
 }

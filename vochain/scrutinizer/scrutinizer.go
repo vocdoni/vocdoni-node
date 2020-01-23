@@ -102,6 +102,11 @@ func (s *Scrutinizer) addVote(v interface{}) {
 	}
 }
 
+// ProcessInfo returns the available information regarding an election process id
+func (s *Scrutinizer) ProcessInfo(processID string) (*types.Process, error) {
+	return s.VochainState.Process(processID)
+}
+
 // VoteResult returns the current result for a processId summarized in a two dimension int slice
 func (s *Scrutinizer) VoteResult(processID string) ([][]uint32, error) {
 	processBytes, err := s.Storage.Get([]byte(processID))
@@ -122,8 +127,11 @@ func (s *Scrutinizer) ProcessListSize() int {
 }
 
 // ProcessList returns the list of process ids
-func (s *Scrutinizer) ProcessList(max int) (procList []string) {
+func (s *Scrutinizer) ProcessList(max int, from string) (procList []string) {
 	iter := s.Storage.LevelDB().NewIterator(nil, nil)
+	if len(from) > 0 {
+		iter.Seek([]byte(from))
+	}
 	for iter.Next() {
 		if max < 1 {
 			break
