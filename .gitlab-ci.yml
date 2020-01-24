@@ -1,15 +1,7 @@
-# BASE
-# https://docs.gitlab.com/ce/ci/docker/using_docker_build.html#container-registry-examples
-
-image: docker:stable
-services:
-  - docker:dind
-
 stages:
   - build
   - test
   - release
-#  - deploy
 
 variables:
   # DOCKER_HOST: tcp://docker:2375
@@ -17,33 +9,32 @@ variables:
   DVOTE_GATEWAY_BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/vocdoni-gateway:${CI_COMMIT_REF_SLUG}
   DVOTE_GATEWAY_RELEASE_IMAGE: ${CI_REGISTRY_IMAGE}/vocdoni-gateway:latest
 
-before_script:
-  - docker login -u gitlab-ci-token -p ${CI_BUILD_TOKEN} ${CI_REGISTRY}
+  GOPATH:  ${CI_PROJECT_DIR}/.cache/gopath  # to cache Go module downloads
+  GOCACHE: ${CI_PROJECT_DIR}/.cache/gocache # to cache Go build archives
+  GOFLAGS: -mod=readonly
 
-###############################################################################
-## DVOTE GATEWAY
-###############################################################################
+cache:
+  key: always-same-cache
+  paths:
+    - .cache/
 
-gateway-docker-build:
-  stage: build
-  script:
-    - docker pull ${DVOTE_GATEWAY_RELEASE_IMAGE} || true
-    - docker build --pull -t ${DVOTE_GATEWAY_BUILD_IMAGE} -f dockerfile.gateway .
-    - docker push ${DVOTE_GATEWAY_BUILD_IMAGE}
-  
-
-gateway-docker-test:
+go-test:
+  image: golang:1.13.5
   stage: test
   script:
-    - docker pull ${DVOTE_GATEWAY_BUILD_IMAGE}
-    - docker run ${DVOTE_GATEWAY_BUILD_IMAGE}  /bin/sh -c 'apk add git build-base && go build cmd/gateway/gateway.go && go build cmd/oracle/oracle.go && go build cmd/miner/miner.go && go test ./...'
-  
+    - go env
+    - go test ./...
 
-gateway-docker-release:
+docker-release:
+  image: docker:stable
+  services:
+    - docker:dind
   stage: release
   script:
-    - docker pull ${DVOTE_GATEWAY_BUILD_IMAGE}
+    - docker build --pull -t ${DVOTE_GATEWAY_BUILD_IMAGE} -f dockerfile.gateway .
     - docker tag ${DVOTE_GATEWAY_BUILD_IMAGE} ${DVOTE_GATEWAY_RELEASE_IMAGE}
+    - docker login -u gitlab-ci-token -p ${CI_BUILD_TOKEN} ${CI_REGISTRY}
+    - docker push ${DVOTE_GATEWAY_BUILD_IMAGE}
     - docker push ${DVOTE_GATEWAY_RELEASE_IMAGE}
   only:
     - master
