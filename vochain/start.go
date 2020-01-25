@@ -32,8 +32,9 @@ const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
 var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
 
 // Start starts a new vochain validator node
-func NewVochain(globalCfg config.VochainCfg) *BaseApplication {
+func NewVochain(globalCfg *config.VochainCfg) *BaseApplication {
 	// creating new vochain app
+	log.Infof("%+v", globalCfg)
 	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
 	if err != nil {
 		log.Errorf("cannot init vochain application: %s", err)
@@ -127,7 +128,7 @@ func (l *tenderLogger) With(keyvals ...interface{}) tlog.Logger {
 }
 
 // we need to set init (first time validators and oracles)
-func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Node, error) {
+func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*nm.Node, error) {
 	// create node config
 	var err error
 
@@ -138,8 +139,8 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 	os.MkdirAll(localConfig.DataDir+"/data", 0755)
 
 	tconfig.LogLevel = localConfig.LogLevel
-	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RpcListen
-	tconfig.P2P.ListenAddress = localConfig.P2pListen
+	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RPCListen
+	tconfig.P2P.ListenAddress = localConfig.P2PListen
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 
@@ -152,7 +153,7 @@ func newTendermint(app *BaseApplication, localConfig config.VochainCfg) (*nm.Nod
 		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
 
 		if len(localConfig.Peers) > 0 {
-			tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]")
+			tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]")
 		}
 		if len(tconfig.P2P.PersistentPeers) > 0 {
 			log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)

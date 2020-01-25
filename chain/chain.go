@@ -63,8 +63,8 @@ func NewConfig(w3Cfg config.W3Cfg) (*EthChainConfig, error) {
 	cfg := new(EthChainConfig)
 	cfg.WSHost = w3Cfg.WsHost
 	cfg.WSPort = w3Cfg.WsPort
-	cfg.HTTPHost = w3Cfg.HttpHost
-	cfg.HTTPPort = w3Cfg.HttpPort
+	cfg.HTTPHost = w3Cfg.HTTPHost
+	cfg.HTTPPort = w3Cfg.HTTPPort
 	cfg.NodePort = w3Cfg.NodePort
 	cfg.NetworkId = chainSpecs.NetworkId
 	cfg.NetworkGenesis, err = base64.StdEncoding.DecodeString(chainSpecs.GenesisB64)
