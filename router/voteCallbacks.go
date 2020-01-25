@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -238,9 +239,42 @@ func getBlockHeight(request routerRequest, router *Router) {
 }
 
 func getProcessList(request routerRequest, router *Router) {
-	// request.From
-	// request.ListSize
-	// getProcessList
+	var apiResponse types.ResponseMessage
+	apiResponse.ID = request.id
+	apiResponse.Request = request.id
+	apiResponse.Timestamp = int32(time.Now().Unix())
+	apiResponse.Ok = true
+	queryResult, err := router.tmclient.TxSearch(fmt.Sprintf("processCreated.entityId=%s", request.EntityId), false, 1, 30)
+	if err != nil {
+		log.Errorf("cannot query: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, err.Error())
+	}
+	var processList []string
+	for _, res := range queryResult.Txs {
+		for _, evt := range res.TxResult.Events {
+			processList = append(processList, string(evt.Attributes[1].Value))
+		}
+	}
+	if len(processList) == 0 {
+		apiResponse.ProcessList = []string{""}
+	} else {
+		apiResponse.ProcessList = processList
+	}
+
+	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
+	if err != nil {
+		log.Warn(err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot sign reply")
+		return
+	}
+	rawAPIResponse, err := json.Marshal(apiResponse)
+	if err != nil {
+		log.Errorf("error marshaling getEnvelopeList reply: %s", err)
+		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
+		return
+	}
+	log.Debugf("api response: %+v", apiResponse.MetaResponse)
+	router.transport.Send(buildReply(request.context, rawAPIResponse))
 }
 
 func getEnvelopeList(request routerRequest, router *Router) {

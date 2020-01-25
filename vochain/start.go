@@ -166,6 +166,10 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*nm.No
 	tconfig.Consensus.TimeoutPrecommit = time.Second * 1
 	tconfig.Consensus.TimeoutCommit = time.Second * 10
 
+	// tx events
+	tconfig.TxIndex.IndexTags = "tx.hash,processCreated.entityId"
+	tconfig.TxIndex.IndexAllTags = true
+
 	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
 			dir, err := os.Getwd()

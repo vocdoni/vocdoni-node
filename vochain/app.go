@@ -124,8 +124,13 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 }
 
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	if err := ValidateAndDeliverTx(req.Tx, app.State); err != nil {
+	// ValidateAndDeliverTx should return events
+	err, events := ValidateAndDeliverTx(req.Tx, app.State)
+	if err != nil {
 		return abcitypes.ResponseDeliverTx{Code: 1}
+	}
+	if events != nil {
+		return abcitypes.ResponseDeliverTx{Code: 0, Events: events}
 	}
 	return abcitypes.ResponseDeliverTx{Code: 0}
 }

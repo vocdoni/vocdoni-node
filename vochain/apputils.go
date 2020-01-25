@@ -11,8 +11,10 @@ import (
 	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/tmhash"
+	"github.com/tendermint/tendermint/libs/common"
 )
 
 // ValidateTx splits a tx into method and args parts and does some basic checks
@@ -57,16 +59,16 @@ func ValidateTx(content []byte, state *State) (interface{}, error) {
 }
 
 // ValidateAndDeliverTx validates a tx and executes the methods required for changing the app state
-func ValidateAndDeliverTx(content []byte, state *State) error {
+func ValidateAndDeliverTx(content []byte, state *State) (error, []abcitypes.Event) {
 	tx, err := ValidateTx(content, state)
 	if err != nil {
-		return fmt.Errorf("transaction validation failed with error (%s)", err)
+		return fmt.Errorf("transaction validation failed with error (%s)", err), nil
 	}
 	switch tx := tx.(type) {
 	case vochaintypes.VoteTx:
 		process, _ := state.Process(tx.ProcessID)
 		if process == nil {
-			return fmt.Errorf("process with id (%s) does not exists", tx.ProcessID)
+			return fmt.Errorf("process with id (%s) does not exists", tx.ProcessID), nil
 		}
 		vote := new(vochaintypes.Vote)
 		switch process.Type {
@@ -84,16 +86,16 @@ func ValidateAndDeliverTx(content []byte, state *State) error {
 
 			voteBytes, err := json.Marshal(vote)
 			if err != nil {
-				return fmt.Errorf("cannot marshal vote (%s)", err)
+				return fmt.Errorf("cannot marshal vote (%s)", err), nil
 			}
 			pubKey, err := signature.PubKeyFromSignature(string(voteBytes), tx.Signature)
 			if err != nil {
 				// log.Warnf("cannot extract pubKey: %s", err)
-				return fmt.Errorf("cannot extract public key from signature (%s)", err)
+				return fmt.Errorf("cannot extract public key from signature (%s)", err), nil
 			}
 			addr, err := signature.AddrFromPublicKey(string(pubKey))
 			if err != nil {
-				return fmt.Errorf("cannot extract address from public key")
+				return fmt.Errorf("cannot extract address from public key"), nil
 			}
 			vote.Nonce = util.TrimHex(tx.Nonce)
 			vote.VotePackage = util.TrimHex(tx.VotePackage)
@@ -102,28 +104,28 @@ func ValidateAndDeliverTx(content []byte, state *State) error {
 			vote.ProcessID = util.TrimHex(tx.ProcessID)
 			nullifier, err := GenerateNullifier(addr, vote.ProcessID)
 			if err != nil {
-				return fmt.Errorf("cannot generate nullifier")
+				return fmt.Errorf("cannot generate nullifier"), nil
 			}
 			vote.Nullifier = nullifier
 
 		default:
-			return fmt.Errorf("invalid process type")
+			return fmt.Errorf("invalid process type"), nil
 		}
 		// log.Debugf("adding vote: %+v", vote)
-		return state.AddVote(vote)
+		return state.AddVote(vote), nil
 	case vochaintypes.AdminTx:
 		switch tx.Type {
 		case "addOracle":
-			return state.AddOracle(tx.Address)
+			return state.AddOracle(tx.Address), nil
 		case "removeOracle":
-			return state.RemoveOracle(tx.Address)
+			return state.RemoveOracle(tx.Address), nil
 		case "addValidator":
-			return state.AddValidator(tx.Address, tx.Power)
+			return state.AddValidator(tx.Address, tx.Power), nil
 		case "removeValidator":
-			return state.RemoveValidator(tx.Address)
+			return state.RemoveValidator(tx.Address), nil
 		}
 	case vochaintypes.NewProcessTx:
-		newprocess := &vochaintypes.Process{
+		newProcess := &vochaintypes.Process{
 			EntityID:             util.TrimHex(tx.EntityID),
 			EncryptionPublicKeys: tx.EncryptionPublicKeys,
 			MkRoot:               util.TrimHex(tx.MkRoot),
@@ -133,11 +135,29 @@ func ValidateAndDeliverTx(content []byte, state *State) error {
 			Paused:               false,
 			Type:                 tx.ProcessType,
 		}
-		return state.AddProcess(newprocess, tx.ProcessID)
-	case vochaintypes.CancelProcessTx:
-		return state.CancelProcess(util.TrimHex(tx.ProcessID))
+		err = state.AddProcess(newProcess, tx.ProcessID)
+		if err != nil {
+			return err, nil
+		}
+		events := []abcitypes.Event{
+			{
+				Type: "processCreated",
+				Attributes: common.KVPairs{
+					common.KVPair{
+						Key:   []byte("entityId"),
+						Value: []byte(newProcess.EntityID),
+					},
+					common.KVPair{
+						Key:   []byte("processId"),
+						Value: []byte(tx.ProcessID),
+					},
+				},
+			},
+		}
+		return nil, events
+
 	}
-	return fmt.Errorf("invalid type")
+	return fmt.Errorf("invalid type"), nil
 }
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
