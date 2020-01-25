@@ -132,6 +132,16 @@ func TestGetProcess(t *testing.T) {
 	}
 }
 
+func TestCancelProcess(t *testing.T) {
+	s := testcommon.NewVochainStateWithProcess()
+	if s == nil {
+		t.Error("cannot create state")
+	}
+	if err := s.CancelProcess("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestAddVote(t *testing.T) {
 	s := testcommon.NewVochainStateWithProcess()
 	if s != nil {

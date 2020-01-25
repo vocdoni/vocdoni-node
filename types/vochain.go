@@ -30,8 +30,8 @@ func NewVote() *Vote {
 
 // Process represents a state per process
 type Process struct {
-	// CurrentState is the current process state
-	CurrentState CurrentProcessState `json:"state,omitempty"`
+	// Canceled if true process is canceled
+	Canceled bool `json:"canceled,omitempty"`
 	// EncryptionPublicKey are the keys required to encrypt the votes
 	EncryptionPublicKeys []string `json:"encryptionPublicKeys,omitempty"`
 	// EntityID identifies unequivocally a process
@@ -51,30 +51,13 @@ func NewProcess() *Process {
 	return &Process{}
 }
 
-//go:generate stringer -type CurrentProcessState
-
-// CurrentProcessState represents the current phase of process state
-type CurrentProcessState int8
-
-const (
-	// Scheduled process is scheduled to start at some point of time
-	Scheduled CurrentProcessState = iota
-	// Active process is in progress
-	Active
-	// Paused active process is paused
-	Paused
-	// Finished process is finished
-	Finished
-	// Canceled process is canceled and/or invalid
-	Canceled
-)
-
 // ________________________ TX ________________________
 
 // ValidTypes represents an allowed specific tx type
 var ValidTypes = map[string]string{
 	"vote":            "VoteTx",
 	"newProcess":      "NewProcessTx",
+	"cancelProcess":   "CancelProcessTx",
 	"addValidator":    "AdminTx",
 	"removeValidator": "AdminTx",
 	"addOracle":       "AdminTx",
@@ -116,6 +99,14 @@ type NewProcessTx struct {
 	// StartBlock represents the tendermint block where the process goes from scheduled to active
 	StartBlock int64  `json:"startBlock"`
 	Type       string `json:"type,omitempty"`
+}
+
+// CancelProcessTx represents a tx for canceling a valid process
+type CancelProcessTx struct {
+	// EntityID the process belongs to
+	ProcessID string `json:"processId"`
+	Signature string `json:"signature,omitempty"`
+	Type      string `json:"type,omitempty"`
 }
 
 // AdminTx represents a Tx that can be only executed by some authorized addresses

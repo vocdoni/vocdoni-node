@@ -226,6 +226,24 @@ func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 	return nil
 }
 
+// CancelProcess sets the process canceled atribute to true
+func (v *State) CancelProcess(pid string) error {
+	pid = util.TrimHex(pid)
+	_, processBytes := v.ProcessTree.Get([]byte(pid))
+	var process vochaintypes.Process
+	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
+		return errors.New("cannot unmarshal process")
+	}
+	process.Canceled = true
+	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
+	if err != nil {
+		return errors.New("cannot marshal updated process bytes")
+	}
+	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
+	return nil
+
+}
+
 // Process returns a process info given a processId if exists
 func (v *State) Process(pid string) (*vochaintypes.Process, error) {
 	var newProcess *vochaintypes.Process

@@ -45,8 +45,14 @@ func ValidateTx(content []byte, state *State) (interface{}, error) {
 			return nil, fmt.Errorf("cannot parse NewProcessTx")
 		}
 		return processTx, NewProcessTxCheck(processTx, state)
-	}
 
+	case "CancelProcessTx":
+		var cancelProcessTx vochaintypes.CancelProcessTx
+		if err := json.Unmarshal(content, &cancelProcessTx); err != nil {
+			return nil, fmt.Errorf("cannot parse CancelProcessTx")
+		}
+		return cancelProcessTx, CancelProcessTxCheck(cancelProcessTx, state)
+	}
 	return nil, fmt.Errorf("invalid type")
 }
 
@@ -123,10 +129,12 @@ func ValidateAndDeliverTx(content []byte, state *State) error {
 			MkRoot:               util.TrimHex(tx.MkRoot),
 			NumberOfBlocks:       tx.NumberOfBlocks,
 			StartBlock:           tx.StartBlock,
-			CurrentState:         vochaintypes.Scheduled,
+			Canceled:             false,
 			Type:                 tx.ProcessType,
 		}
 		return state.AddProcess(newprocess, tx.ProcessID)
+	case vochaintypes.CancelProcessTx:
+		return state.CancelProcess(util.TrimHex(tx.ProcessID))
 	}
 	return fmt.Errorf("invalid type")
 }
@@ -137,70 +145,73 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *State) error {
 	if process == nil {
 		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
 	}
+	endBlock := process.StartBlock + process.NumberOfBlocks
+	// check if process is active
+	if (endBlock >= state.Height() || process.StartBlock < state.Height()) && !process.Canceled {
+		switch process.Type {
+		case "snark-vote":
+			voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
+			v, _ := state.Envelope(voteID)
+			if v != nil {
+				log.Debugf("vote already exists")
+				return fmt.Errorf("vote already exists")
+			}
+			// TODO check snark
+			return nil
+		case "poll-vote", "petition-sign":
+			var voteTmp vochaintypes.VoteTx
+			voteTmp.Nonce = vote.Nonce
+			voteTmp.ProcessID = vote.ProcessID
+			voteTmp.Proof = vote.Proof
+			voteTmp.VotePackage = vote.VotePackage
 
-	switch process.Type {
-	case "snark-vote":
-		voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
-		v, _ := state.Envelope(voteID)
-		if v != nil {
-			log.Debugf("vote already exists")
-			return fmt.Errorf("vote already exists")
-		}
-		// TODO check snark
+			voteBytes, err := json.Marshal(voteTmp)
+			if err != nil {
+				return fmt.Errorf("cannot marshal vote (%s)", err)
+			}
+			// log.Debugf("executing VoteTxCheck of: %s", voteBytes)
+			pubKey, err := signature.PubKeyFromSignature(string(voteBytes), vote.Signature)
+			if err != nil {
+				return fmt.Errorf("cannot extract public key from signature (%s)", err)
+			}
 
-	case "poll-vote", "petition-sign":
-		var voteTmp vochaintypes.VoteTx
-		voteTmp.Nonce = vote.Nonce
-		voteTmp.ProcessID = vote.ProcessID
-		voteTmp.Proof = vote.Proof
-		voteTmp.VotePackage = vote.VotePackage
+			addr, err := signature.AddrFromPublicKey(string(pubKey))
+			if err != nil {
+				return fmt.Errorf("cannot extract address from public key")
+			}
+			// assign a nullifier
+			nullifier, err := GenerateNullifier(addr, vote.ProcessID)
+			if err != nil {
+				return fmt.Errorf("cannot generate nullifier")
+			}
+			voteTmp.Nullifier = nullifier
+			log.Debugf("generated nullifier: %s", voteTmp.Nullifier)
+			// check if vote exists
+			voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(voteTmp.Nullifier))
+			v, _ := state.Envelope(voteID)
+			if v != nil {
+				return fmt.Errorf("vote already exists")
+			}
 
-		voteBytes, err := json.Marshal(voteTmp)
-		if err != nil {
-			return fmt.Errorf("cannot marshal vote (%s)", err)
+			// check merkle proof
+			log.Debugf("extracted pubkey: %s", pubKey)
+			pubKeyHash := signature.HashPoseidon(pubKey)
+			if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 { // TO-DO check the exact size of PoseidonHash
+				return fmt.Errorf("wrong Poseidon hash size (%s)", err)
+			}
+			valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
+			if err != nil {
+				return fmt.Errorf("cannot check merkle proof (%s)", err)
+			}
+			if !valid {
+				return fmt.Errorf("proof not valid")
+			}
+			return nil
+		default:
+			return fmt.Errorf("invalid process type")
 		}
-		// log.Debugf("executing VoteTxCheck of: %s", voteBytes)
-		pubKey, err := signature.PubKeyFromSignature(string(voteBytes), vote.Signature)
-		if err != nil {
-			return fmt.Errorf("cannot extract public key from signature (%s)", err)
-		}
-
-		addr, err := signature.AddrFromPublicKey(string(pubKey))
-		if err != nil {
-			return fmt.Errorf("cannot extract address from public key")
-		}
-		// assign a nullifier
-		nullifier, err := GenerateNullifier(addr, vote.ProcessID)
-		if err != nil {
-			return fmt.Errorf("cannot generate nullifier")
-		}
-		voteTmp.Nullifier = nullifier
-		log.Debugf("generated nullifier: %s", voteTmp.Nullifier)
-		// check if vote exists
-		voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(voteTmp.Nullifier))
-		v, _ := state.Envelope(voteID)
-		if v != nil {
-			return fmt.Errorf("vote already exists")
-		}
-
-		// check merkle proof
-		log.Debugf("extracted pubkey: %s", pubKey)
-		pubKeyHash := signature.HashPoseidon(pubKey)
-		if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 { // TO-DO check the exact size of PoseidonHash
-			return fmt.Errorf("wrong Poseidon hash size (%s)", err)
-		}
-		valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
-		if err != nil {
-			return fmt.Errorf("cannot check merkle proof (%s)", err)
-		}
-		if !valid {
-			return fmt.Errorf("proof not valid")
-		}
-
-	default:
-		return fmt.Errorf("invalid process type")
 	}
-	return nil
+	return fmt.Errorf("cannot add vote, invalid blocks frame or process canceled")
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
@@ -210,6 +221,15 @@ func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *State) error {
 	if err != nil || len(oracles) == 0 {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
+
+	// start and endblock sanity check
+	if process.StartBlock < state.Height() {
+		return fmt.Errorf("cannot add process with start block lower or equal than the current tendermint height")
+	}
+	if process.NumberOfBlocks <= 0 {
+		return fmt.Errorf("cannot add process with duration lower or equal than the current tendermint height")
+	}
+
 	sign := process.Signature
 	process.Signature = ""
 
@@ -232,6 +252,40 @@ func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *State) error {
 		// ok
 	default:
 		return fmt.Errorf("process type (%s) not valid", process.ProcessType)
+	}
+	return nil
+}
+
+// CancelProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
+func CancelProcessTxCheck(cancelProcessTx vochaintypes.CancelProcessTx, state *State) error {
+	// get oracles
+	oracles, err := state.Oracles()
+	if err != nil || len(oracles) == 0 {
+		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
+	}
+	// check signature
+	sign := cancelProcessTx.Signature
+	cancelProcessTx.Signature = ""
+	processBytes, err := json.Marshal(cancelProcessTx)
+	if err != nil {
+		return fmt.Errorf("cannot marshal cancel process info (%s)", err)
+	}
+	authorized, addr := VerifySignatureAgainstOracles(oracles, string(processBytes), sign)
+	if !authorized {
+		return fmt.Errorf("unauthorized to create a process, message: %s, recovered addr: %s", string(processBytes), addr)
+	}
+	// get process
+	process, err := state.Process(util.TrimHex(cancelProcessTx.ProcessID))
+	if err != nil {
+		return fmt.Errorf("cannot cancel the process: %s", err)
+	}
+	// check process not already canceled or finalized
+	if process.Canceled {
+		return fmt.Errorf("cannot cancel an already canceled process")
+	}
+	endBlock := process.StartBlock + process.NumberOfBlocks
+	if endBlock < state.Height() {
+		return fmt.Errorf("cannot cancel a finalized process")
 	}
 	return nil
 }

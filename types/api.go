@@ -18,6 +18,7 @@ type MetaRequest struct {
 	ClaimData      string   `json:"claimData,omitempty"`
 	ClaimsData     []string `json:"claimsData,omitempty"`
 	Content        string   `json:"content,omitempty"`
+	EntityId       string   `json:"entityId,omitempty"`
 	From           int64    `json:"from,omitempty"`
 	FromID         string   `json:"fromId,omitempty"`
 	ListSize       int64    `json:"listSize,omitempty"`
@@ -58,7 +59,9 @@ type MetaResponse struct {
 	CensusID      string     `json:"censusId,omitempty"`
 	ClaimsData    []string   `json:"claimsData,omitempty"`
 	Content       string     `json:"content,omitempty"`
+	EntityID      string     `json:"entityId,omitempty"`
 	Files         []byte     `json:"files,omitempty"`
+	Finished      bool       `json:"finished,omitempty"`
 	Height        *int64     `json:"height,omitempty"`
 	InvalidClaims []int      `json:"invalidClaims,omitempty"`
 	Message       string     `json:"message,omitempty"`
@@ -67,6 +70,7 @@ type MetaResponse struct {
 	Ok            bool       `json:"ok"`
 	Payload       string     `json:"payload,omitempty"`
 	ProcessIDs    []string   `json:"processIds,omitempty"`
+	ProcessList   []string   `json:"processList,omitempty"`
 	Registered    *bool      `json:"registered,omitempty"`
 	Request       string     `json:"request"`
 	Results       [][]uint32 `json:"results,omitempty"`

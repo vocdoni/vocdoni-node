@@ -30,17 +30,19 @@ var ethereumEventList = []string{
 type (
 	eventGenesisChanged string
 	eventChainIDChanged *big.Int
+)
+
+type (
 	eventProcessCreated struct {
 		EntityAddress [20]byte
 		ProcessId     [32]byte
 		MerkleTree    string
 	}
+	eventProcessCanceled struct {
+		EntityAddress [20]byte
+		ProcessId     [32]byte
+	}
 )
-
-type eventProcessCanceled struct {
-	EntityAddress [20]byte
-	ProcessId     [32]byte
-}
 
 type (
 	validatorAdded   string
@@ -120,8 +122,29 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 		}
 
 	case HashLogProcessCanceled.Hex():
-		// stub
-		// return nil
+		cancelProcessTx, err := cancelProcessMeta(&e.ContractABI, event.Data, e.ProcessHandle)
+		if err != nil {
+			return err
+		}
+		log.Infof("cancel process meta: %+v", cancelProcessTx)
+
+		log.Debugf("signing with key: %s", e.Signer)
+		cancelProcessTx.Signature, err = e.Signer.SignJSON(cancelProcessTx)
+		if err != nil {
+			return fmt.Errorf("cannot sign oracle tx: %s", err)
+		}
+		tx, err := json.Marshal(cancelProcessTx)
+		if err != nil {
+			return fmt.Errorf("error marshaling process tx: %s", err)
+		}
+		log.Debugf("broadcasting Vochain TX: %s", string(tx))
+
+		res, err := e.VochainCLI.BroadcastTxSync(tx)
+		if err != nil {
+			log.Warnf("tx cannot be broadcasted: %s", err)
+		} else {
+			log.Infof("new transaction hash: %s", res.Hash)
+		}
 	case HashLogValidatorAdded.Hex():
 		// stub
 		// return nil
@@ -177,4 +200,13 @@ func processMeta(contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle
 		return nil, err
 	}
 	return ph.ProcessTxArgs(eventProcessCreated.ProcessId)
+}
+
+func cancelProcessMeta(contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*types.CancelProcessTx, error) {
+	var eventProcessCanceled eventProcessCanceled
+	err := contractABI.Unpack(&eventProcessCanceled, "ProcessCanceled", eventData)
+	if err != nil {
+		return nil, err
+	}
+	return ph.CancelProcessTxArgs(eventProcessCanceled.ProcessId)
 }

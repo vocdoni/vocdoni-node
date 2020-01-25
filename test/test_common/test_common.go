@@ -54,7 +54,7 @@ var (
 		MkRoot:               "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
 		NumberOfBlocks:       1000,
 		StartBlock:           0,
-		CurrentState:         types.Scheduled,
+		Canceled:             false,
 		EncryptionPublicKeys: OracleListHardcoded, // reusing oracle keys as encryption pub keys
 		Type:                 "petition-sign",
 	}
@@ -78,6 +78,12 @@ var (
 		Signature:            "b25259cff9ce3a709e517c6a01e445f216212f58f553fa26d25566b7c731339242ef9a0df0235b53a819a64ebf2c3394fb6b56138c5113cc1905c68ffcebb1971c",
 		StartBlock:           0,
 		Type:                 "newProcess",
+	}
+
+	HardcodedCancelProcessTx = &types.CancelProcessTx{
+		ProcessID: "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
+		Signature: "685707c15ed3c0ab71bdf75157a724f340ffaba716cc9d7d9a317acd7f62e9fa739c201f270cced59c405d18dc945360a498a8a84132f9920b83ba08673996e01c",
+		Type:      "cancelProcess",
 	}
 
 	HardcodedNewVoteTx = &types.VoteTx{

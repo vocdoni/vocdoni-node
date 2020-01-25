@@ -70,7 +70,7 @@ func NewVotingProcessHandle(contractAddressHex string, dialEndpoint string) (*Pr
 func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error) {
 	processMeta, err := ph.VotingProcess.Get(nil, pid)
 	if err != nil {
-		//	return nil, fmt.Errorf("error fetching process metadata from Ethereum: %s", err)
+		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
 	}
 
 	processTxArgs := new(types.NewProcessTx)
@@ -91,6 +91,17 @@ func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error
 	}
 	processTxArgs.Type = "newProcess"
 	return processTxArgs, nil
+}
+
+func (ph *ProcessHandle) CancelProcessTxArgs(pid [32]byte) (*types.CancelProcessTx, error) {
+	_, err := ph.VotingProcess.Get(nil, pid)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
+	}
+	cancelProcessTxArgs := new(types.CancelProcessTx)
+	cancelProcessTxArgs.ProcessID = fmt.Sprintf("%x", pid)
+	cancelProcessTxArgs.Type = "cancelProcess"
+	return cancelProcessTxArgs, nil
 }
 
 func (ph *ProcessHandle) ProcessIndex(pid [32]byte) (*big.Int, error) {
