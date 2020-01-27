@@ -1,0 +1,26 @@
+version: "3"
+
+services:
+  gateway:
+    container_name: gateway
+    image: "vocdoni/gateway"
+    entrypoint: "/app/dockerfiles/gateway/files/gatewayStart.sh"
+    env_file: "$PWD/dockerfiles/gateway/env"
+    volumes:
+      - $PWD/run/gateway:/app/run/
+    networks:
+      localnet:
+        ipv4_address: 10.17.14.6
+    ports: 
+      - "30303:30303"
+      - "32000:32000"
+      - "9090-9092:9090-9092"
+      - "26664-26665:26656-26657"
+
+networks:
+  localnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.17.14.0/24
