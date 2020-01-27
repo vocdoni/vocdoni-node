@@ -54,8 +54,8 @@ type EthChainConfig struct {
 }
 
 // available chains: vctestnet
-func NewConfig(w3Cfg config.W3Cfg) (*EthChainConfig, error) {
-	chainSpecs, err := SpecsFor(w3Cfg.ChainType)
+func NewConfig(ethCfg *config.EthCfg, w3Cfg *config.W3Cfg) (*EthChainConfig, error) {
+	chainSpecs, err := SpecsFor(ethCfg.ChainType)
 	if err != nil {
 		return nil, err
 	}
@@ -65,16 +65,16 @@ func NewConfig(w3Cfg config.W3Cfg) (*EthChainConfig, error) {
 	cfg.WSPort = w3Cfg.WsPort
 	cfg.HTTPHost = w3Cfg.HTTPHost
 	cfg.HTTPPort = w3Cfg.HTTPPort
-	cfg.NodePort = w3Cfg.NodePort
+	cfg.NodePort = ethCfg.NodePort
 	cfg.NetworkId = chainSpecs.NetworkId
 	cfg.NetworkGenesis, err = base64.StdEncoding.DecodeString(chainSpecs.GenesisB64)
-	cfg.LightMode = w3Cfg.LightMode
+	cfg.LightMode = ethCfg.LightMode
 	cfg.W3external = w3Cfg.W3External
 	if err != nil {
 		return nil, err
 	}
 	cfg.BootstrapNodes = chainSpecs.BootNodes
-	defaultDirPath := w3Cfg.DataDir + "/ethereum"
+	defaultDirPath := ethCfg.DataDir
 	cfg.KeyStore = defaultDirPath + "/keystore"
 	cfg.DataDir = defaultDirPath + "/data"
 	cfg.IPCPath = defaultDirPath + "/ipc"

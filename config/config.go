@@ -9,7 +9,7 @@ type GWCfg struct {
 	// Ipfs ipfs config options
 	Ipfs *IPFSCfg
 	// Client ethereum client config options
-	Client *EthereumClient
+	Ethereum *EthCfg
 	// API api config options
 	API *API
 	// Ssl tls related config options
@@ -40,11 +40,11 @@ type GWCfg struct {
 // NewGatewayConfig initializes the fields in the gateway config stuct
 func NewGatewayConfig() *GWCfg {
 	return &GWCfg{
-		W3:      new(W3Cfg),
-		Vochain: new(VochainCfg),
-		Ipfs:    new(IPFSCfg),
-		Client:  new(EthereumClient),
-		API:     new(API),
+		W3:       new(W3Cfg),
+		Vochain:  new(VochainCfg),
+		Ipfs:     new(IPFSCfg),
+		Ethereum: new(EthCfg),
+		API:      new(API),
 		Ssl: struct {
 			Domain  string
 			DirCert string
@@ -59,6 +59,10 @@ type API struct {
 	Census  bool
 	Vote    bool
 	Results bool
+	// AllowPrivate allow to use private methods
+	AllowPrivate bool
+	// AllowedAddrs allowed addresses to interact with
+	AllowedAddrs string
 }
 
 // IPFSCfg includes all possible config params needed by IPFS
@@ -70,16 +74,6 @@ type IPFSCfg struct {
 	NoInit    bool
 	SyncKey   string
 	SyncPeers []string
-}
-
-// EthereumClient includes all possible config params needed by the EthereumClient
-type EthereumClient struct {
-	// AllowPrivate allow to use private methods
-	AllowPrivate bool
-	// AllowedAddrs allowed addresses to interact with
-	AllowedAddrs string
-	// SigningKey key used to sign transactions
-	SigningKey string
 }
 
 // PssCfg stores global configs for Pss chat
@@ -104,14 +98,26 @@ type PssMetaCfg struct {
 	ListenPort int16
 }
 
-// W3Cfg stores global configs for web3
-type W3Cfg struct {
-	// Enabled if true w3 will be initialized
-	Enabled bool
+// EthCfg stores global configs for ethereum bockchain
+type EthCfg struct {
 	// ChainType chain to connect with
 	ChainType string
 	// LightMode use ethereum node in light mode
 	LightMode bool
+	// NodePort port annouced for p2p connections
+	NodePort int
+	// LogLevel logging level
+	LogLevel string
+	// DataDir path indicating where the ethereum related data will be stored
+	DataDir string
+	// SigningKey key used to sign transactions
+	SigningKey string
+}
+
+// W3Cfg stores global configs for web3
+type W3Cfg struct {
+	// Enabled if true w3 will be initialized
+	Enabled bool
 	// WsHost node websocket host endpoint
 	WsHost string
 	// WsPort node websocket port endpoint
@@ -120,14 +126,8 @@ type W3Cfg struct {
 	HTTPHost string
 	// HTTPPort node http port endpoint
 	HTTPPort int
-	// NodePort port annouced for p2p connections
-	NodePort int
-	// LogLevel logging level
-	LogLevel string
 	// Route web3 route endpoint
 	Route string
-	// DataDir path indicating where the ethereum related data will be stored
-	DataDir string
 	// W3External URL of an external ethereum node to connect with
 	W3External string
 	// HTTPAPI if true and local node http api will be available
@@ -144,14 +144,6 @@ type CensusCfg struct {
 	DataDir   string
 	SslDomain string
 	RootKey   string
-}
-
-// RelayCfg stores global configs for relay
-type RelayCfg struct {
-	LogLevel          string
-	TransportIDString string
-	StorageIDString   string
-	IpfsConfigPath    string
 }
 
 type GenCfg struct {
@@ -193,23 +185,20 @@ type VochainCfg struct {
 
 // OracleCfg includes all possible config params needed by the Oracle
 type OracleCfg struct {
+	// DataDir directory where data and config files are stored
+	DataDir string
 	// EthereumConfig ethereum node config parameters
-	EthereumConfig *W3Cfg
-	// EthereumClient ethereum client for the running node
-	EthereumClient *EthereumClient
+	EthConfig *EthCfg
+	// W3Config Web3 config parameters
+	W3Config *W3Cfg
 	// VochainConfig vochain node config parameters
 	VochainConfig *VochainCfg
-	// VochainClient field does not exists because no needs config at this stage of development
 	// LogLevel logging level
 	LogLevel string
 	// LogOutput logging output
 	LogOutput string
-	// DataDir path indicating the route where the data related to the Oracle will be stored
-	DataDir string
 	// SubscribeOnly if true only new received events will be processed, otherwise all events of the current chain will be processed
 	SubscribeOnly bool
-	// ConfigFilePath path where the config file is or will be stored
-	ConfigFilePath string
 	// Contract address of the ethereum voting smart contract
 	Contract string
 }
@@ -217,9 +206,9 @@ type OracleCfg struct {
 // NewOracleCfg initializes the Oracle config
 func NewOracleCfg() *OracleCfg {
 	return &OracleCfg{
-		EthereumConfig: new(W3Cfg),
-		EthereumClient: new(EthereumClient),
-		VochainConfig:  new(VochainCfg),
+		EthConfig:     new(EthCfg),
+		W3Config:      new(W3Cfg),
+		VochainConfig: new(VochainCfg),
 	}
 }
 

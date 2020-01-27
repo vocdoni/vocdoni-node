@@ -34,7 +34,7 @@ var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.20
 // Start starts a new vochain validator node
 func NewVochain(globalCfg *config.VochainCfg) *BaseApplication {
 	// creating new vochain app
-	log.Infof("%+v", globalCfg)
+	log.Debugf("%+v", globalCfg)
 	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
 	if err != nil {
 		log.Errorf("cannot init vochain application: %s", err)
@@ -145,10 +145,9 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*nm.No
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 
 	if !localConfig.CreateGenesis {
-		if len(localConfig.Seeds) == 0 && !localConfig.SeedMode {
+		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]")
+		if len(tconfig.P2P.Seeds) < 8 && !localConfig.SeedMode {
 			tconfig.P2P.Seeds = strings.Join(DefaultSeedNodes[:], ",")
-		} else {
-			tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]")
 		}
 		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
 
