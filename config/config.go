@@ -157,6 +157,8 @@ type GenCfg struct {
 type VochainCfg struct {
 	// LogLevel logging level
 	LogLevel string
+	// LogOutput logging output
+	LogOutput string
 	// ConfigFilePath path where the config file is or will be stored
 	ConfigFilePath string
 	// RPCListen address for the RPC server tp listen on

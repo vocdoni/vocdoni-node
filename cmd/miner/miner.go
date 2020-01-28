@@ -35,9 +35,9 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	// CLI flags have preference over the config file
 
 	userDir := home + "/.dvote"
-	// setup flags
-	globalCfg.ConfigFilePath = *flag.String("configFilePath", userDir+"/vochain/config/", "sets the path indicating where to store the Vochain config file")
-	globalCfg.DataDir = *flag.String("dataDir", userDir+"/vochain/", "sets the path indicating where to store the Vochain related data")
+
+	// creating flags
+	globalCfg.DataDir = *flag.String("dataDir", userDir+"/vochain", "directory where data is stored")
 	globalCfg.P2PListen = *flag.String("p2pListen", "0.0.0.0:26656", "p2p host and port to listen")
 	globalCfg.RPCListen = *flag.String("rpcListen", "0.0.0.0:26657", "rpc host and port to listen")
 	globalCfg.Genesis = *flag.String("genesis", "", "use alternative genesis file")
@@ -47,18 +47,20 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	globalCfg.Peers = *flag.StringArray("peers", []string{}, "coma separated list of p2p peers")
 	globalCfg.Seeds = *flag.StringArray("seeds", []string{}, "coma separated list of p2p seed nodes")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
+	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.PublicAddr = *flag.String("publicAddr", "", "IP address where the node will be exposed, guessed automatically if empty")
 	// parse flags
 	flag.Parse()
 
 	// setting up viper
 	viper := viper.New()
-	viper.AddConfigPath(globalCfg.ConfigFilePath)
-	viper.SetConfigName("vochain")
+	viper.AddConfigPath(globalCfg.DataDir)
+	viper.SetConfigName("vochain-miner")
 	viper.SetConfigType("yml")
+
 	// binding flags to viper
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
-	viper.BindPFlag("configFilePath", flag.Lookup("configFilePath"))
+	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
 	viper.BindPFlag("p2pListen", flag.Lookup("p2pListen"))
 	viper.BindPFlag("rpcListen", flag.Lookup("rpcListen"))
 	viper.BindPFlag("keyFile", flag.Lookup("keyFile"))
@@ -71,25 +73,25 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	viper.BindPFlag("publicAddr", flag.Lookup("publicAddr"))
 
 	// check if config file exists
-	_, err = os.Stat(globalCfg.ConfigFilePath + "vochain.yml")
+	_, err = os.Stat(globalCfg.DataDir + "/vochain-miner.yml")
 	if os.IsNotExist(err) {
 		cfgError = config.Error{
 			Critical: false,
-			Message:  fmt.Sprintf("cannot read config file in: %s, with error: %s. A new one will be created", globalCfg.ConfigFilePath, err),
+			Message:  fmt.Sprintf("creating new config file in %s", globalCfg.DataDir),
 		}
 		// creting config folder if not exists
-		err = os.MkdirAll(globalCfg.ConfigFilePath, os.ModePerm)
+		err = os.MkdirAll(globalCfg.DataDir, os.ModePerm)
 		if err != nil {
 			cfgError = config.Error{
 				Critical: false,
-				Message:  fmt.Sprintf("cannot create config dir, with error: %s", err),
+				Message:  fmt.Sprintf("cannot create data directory (%s)", err),
 			}
 		}
 		// create config file if not exists
 		if err = viper.SafeWriteConfig(); err != nil {
 			cfgError = config.Error{
 				Critical: false,
-				Message:  fmt.Sprintf("cannot write config file into config dir with error: %s", err),
+				Message:  fmt.Sprintf("cannot write config file into config dir (%s)", err),
 			}
 		}
 	} else {
@@ -98,14 +100,14 @@ func newConfig() (*config.VochainCfg, config.Error) {
 		if err != nil {
 			cfgError = config.Error{
 				Critical: false,
-				Message:  fmt.Sprintf("cannot read loaded config file in: %s, with error: %s", globalCfg.ConfigFilePath, err),
+				Message:  fmt.Sprintf("cannot read loaded config file in %s (%s)", err, globalCfg.DataDir),
 			}
 		}
 		err = viper.Unmarshal(&globalCfg)
 		if err != nil {
 			cfgError = config.Error{
 				Critical: false,
-				Message:  fmt.Sprintf("cannot unmarshal loaded config file in: %s, with error: %s", globalCfg.ConfigFilePath, err),
+				Message:  fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
 			}
 		}
 	}
@@ -116,11 +118,14 @@ func newConfig() (*config.VochainCfg, config.Error) {
 func main() {
 	// creating config and init logger
 	globalCfg, cfgErr := newConfig()
-	if globalCfg != nil {
-		log.InitLogger(globalCfg.LogLevel, "stdout")
+	if globalCfg == nil {
+		panic("cannot read configuration")
 	}
 
-	log.Infof("initializing vochain with tendermint config %+v", globalCfg)
+	fmt.Println(globalCfg.LogLevel)
+	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
+
+	log.Debugf("initializing vochain with tendermint config %+v", globalCfg)
 
 	// check if errors during config creation and determine if Critical
 	if cfgErr.Critical && cfgErr.Message != "" {
