@@ -2,14 +2,14 @@ package config
 
 // GWCfg stores global configs for gateway
 type GWCfg struct {
-	// W3 ethereum config options
-	W3 *W3Cfg
-	// Vochain vochain config options
-	Vochain *VochainCfg
+	// W3Config ethereum config options
+	W3Config *W3Cfg
+	// VochainConfig vochain config options
+	VochainConfig *VochainCfg
 	// Ipfs ipfs config options
 	Ipfs *IPFSCfg
-	// Client ethereum client config options
-	Ethereum *EthCfg
+	// EthConfig ethereum client config options
+	EthConfig *EthCfg
 	// API api config options
 	API *API
 	// Ssl tls related config options
@@ -33,18 +33,16 @@ type GWCfg struct {
 	CensusSync bool
 	// Contract ethereum contract to use as source of truth for some operations
 	Contract string
-	// ConfigFilePath path indicating where is the gateway config file or where to store if not present
-	ConfigFilePath string
 }
 
 // NewGatewayConfig initializes the fields in the gateway config stuct
 func NewGatewayConfig() *GWCfg {
 	return &GWCfg{
-		W3:       new(W3Cfg),
-		Vochain:  new(VochainCfg),
-		Ipfs:     new(IPFSCfg),
-		Ethereum: new(EthCfg),
-		API:      new(API),
+		W3Config:      new(W3Cfg),
+		VochainConfig: new(VochainCfg),
+		Ipfs:          new(IPFSCfg),
+		EthConfig:     new(EthCfg),
+		API:           new(API),
 		Ssl: struct {
 			Domain  string
 			DirCert string

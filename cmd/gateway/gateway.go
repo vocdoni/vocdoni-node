@@ -1,11 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	neturl "net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -57,12 +53,11 @@ func newConfig() (*config.GWCfg, config.Error) {
 
 	userDir := home + "/.dvote"
 	// gateway
-	globalCfg.DataDir = *flag.String("dataDir", userDir+"/gateway/", "directory where data is stored")
+	globalCfg.DataDir = *flag.String("dataDir", userDir, "directory where data is stored")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
 	globalCfg.ListenPort = *flag.Int("listenPort", 9090, "API endpoint http port")
-	globalCfg.ConfigFilePath = *flag.String("configFilePath", userDir+"/gateway/", "path where the gateway config file is located")
 	globalCfg.Contract = *flag.String("contract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f", "smart contract to follow for synchronization and coordination with other nodes")
 	globalCfg.CensusSync = *flag.Bool("censusSync", true, "automatically import new census published on smart contract")
 	// api
@@ -71,46 +66,46 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable vote API")
 	globalCfg.API.Results = *flag.Bool("resultsApi", true, "enable results API")
 	globalCfg.API.Route = *flag.String("apiRoute", "/dvote", "dvote API route")
-	// ethereum client
-	globalCfg.Client.AllowPrivate = *flag.Bool("allowPrivate", false, "allows private methods over the APIs")
-	globalCfg.Client.AllowedAddrs = *flag.String("allowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
-	globalCfg.Client.SigningKey = *flag.String("signingKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
+	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false, "allows private methods over the APIs")
+	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	// ethereum node
-	globalCfg.W3.Enabled = *flag.Bool("w3enabled", true, "if true web3 will be enabled")
-	globalCfg.W3.ChainType = *flag.String("w3chain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
-	globalCfg.W3.LightMode = *flag.Bool("w3chainLightMode", true, "synchronize Ethereum blockchain in light mode")
-	globalCfg.W3.NodePort = *flag.Int("w3nodePort", 30303, "Ethereum p2p node port to use")
-	globalCfg.W3.Route = *flag.String("w3route", "/web3", "web3 endpoint API route")
-	globalCfg.W3.WsPort = *flag.Int("w3WsPort", 9092, "web3 websocket port")
-	globalCfg.W3.WsHost = *flag.String("w3WsHost", "0.0.0.0", "web3 websocket host")
-	globalCfg.W3.HTTPPort = *flag.Int("w3HTTPPort", 9091, "ethereum http server port")
-	globalCfg.W3.HTTPHost = *flag.String("w3HTTPHost", "0.0.0.0", "ethereum http server host")
-	globalCfg.W3.W3External = *flag.String("w3external", "", "use external WEB3 endpoint. Local Ethereum node won't be initialized.")
-	globalCfg.W3.DataDir = *flag.String("w3dataDir", userDir, "sets the path indicating where to store the ethereum related data")
+	globalCfg.EthConfig.SigningKey = *flag.String("ethSigningKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
+	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
+	globalCfg.EthConfig.LightMode = *flag.Bool("ethChainLightMode", true, "synchronize Ethereum blockchain in light mode")
+	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to use")
+	globalCfg.EthConfig.DataDir = globalCfg.DataDir + "/ethereum"
+	// ethereum web3
+	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true web3 will be enabled")
+	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
+	globalCfg.W3Config.WsPort = *flag.Int("w3WsPort", 9092, "web3 websocket port")
+	globalCfg.W3Config.WsHost = *flag.String("w3WsHost", "0.0.0.0", "web3 websocket host")
+	globalCfg.W3Config.HTTPPort = *flag.Int("w3HTTPPort", 9091, "ethereum http server port")
+	globalCfg.W3Config.HTTPHost = *flag.String("w3HTTPHost", "0.0.0.0", "ethereum http server host")
 	// ipfs
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
 	globalCfg.Ipfs.SyncKey = *flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
 	globalCfg.Ipfs.SyncPeers = *flag.StringArray("ipfsSyncPeers", []string{}, "use custom ipfsSync peers/bootnodes for accessing the DHT")
-	globalCfg.Ipfs.ConfigPath = *flag.String("ipfsConfigPath", userDir+"/ipfs/", "path indicating where to store ipfs related data")
+	globalCfg.Ipfs.ConfigPath = globalCfg.DataDir + "/ipfs"
 	// ssl
 	globalCfg.Ssl.Domain = *flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	globalCfg.Ssl.DirCert = *flag.String("sslDirCert", userDir+"/tls/", "path where to store ssl related data")
 	// vochain
-	globalCfg.Vochain.DataDir = *flag.String("vochainDataDir", userDir+"/vochain/", "sets the path indicating where to store the Vochain related data")
-	globalCfg.Vochain.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
-	globalCfg.Vochain.PublicAddr = *flag.String("vochainPublicAddr", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
-	globalCfg.Vochain.RPCListen = *flag.String("vochainRPCListen", "0.0.0.0:26657", "rpc host and port to listent for the voting chain")
-	globalCfg.Vochain.CreateGenesis = *flag.Bool("vochainCreateGenesis", false, "create own/testing genesis file on vochain")
-	globalCfg.Vochain.Genesis = *flag.String("vochainGenesis", "", "use alternative geneiss file for the voting chain")
-	globalCfg.Vochain.LogLevel = *flag.String("vochainLogLevel", "info", "voting chain node log level")
-	globalCfg.Vochain.Peers = *flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
-	globalCfg.Vochain.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
-	globalCfg.Vochain.KeyFile = *flag.String("vochainKeyFile", "", "user alternative vochain p2p node key file")
+	globalCfg.VochainConfig.DataDir = globalCfg.DataDir + "/vochain"
+	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
+	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
+	globalCfg.VochainConfig.RPCListen = *flag.String("vochainRPCListen", "0.0.0.0:26657", "rpc host and port to listent for the voting chain")
+	globalCfg.VochainConfig.CreateGenesis = *flag.Bool("vochainCreateGenesis", false, "create own/testing genesis file on vochain")
+	globalCfg.VochainConfig.Genesis = *flag.String("vochainGenesis", "", "use alternative geneiss file for the voting chain")
+	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "info", "voting chain node log level")
+	globalCfg.VochainConfig.LogOutput = *flag.String("vochainLogOutput", "stdout", "Log output (stdout, stderr or filepath)")
+	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
+	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
+	globalCfg.VochainConfig.KeyFile = *flag.String("vochainKeyFile", "", "user alternative vochain p2p node key file")
 	// parse flags
 	flag.Parse()
 	// setting up viper
 	viper := viper.New()
-	viper.AddConfigPath(globalCfg.ConfigFilePath)
+	viper.AddConfigPath(globalCfg.DataDir)
 	viper.SetConfigName("gateway")
 	viper.SetConfigType("yml")
 	// binding flags to viper
@@ -120,7 +115,6 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
 	viper.BindPFlag("listenHost", flag.Lookup("listenHost"))
 	viper.BindPFlag("listenPort", flag.Lookup("listenPort"))
-	viper.BindPFlag("configFilePath", flag.Lookup("configFilePath"))
 	viper.BindPFlag("censusSync", flag.Lookup("censusSync"))
 	viper.BindPFlag("contract", flag.Lookup("contract"))
 	// api
@@ -129,62 +123,62 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("api.vote", flag.Lookup("voteApi"))
 	viper.BindPFlag("api.results", flag.Lookup("resultsApi"))
 	viper.BindPFlag("api.route", flag.Lookup("apiRoute"))
-	// ethereum client
-	viper.BindPFlag("client.allowPrivate", flag.Lookup("allowPrivate"))
-	viper.BindPFlag("client.allowedAddrs", flag.Lookup("allowedAddrs"))
-	viper.BindPFlag("client.signingKey", flag.Lookup("signingKey"))
-	// w3
-	viper.BindPFlag("w3.enabled", flag.Lookup("w3enabled"))
-	viper.BindPFlag("w3.chainType", flag.Lookup("w3chain"))
-	viper.BindPFlag("w3.lightMode", flag.Lookup("w3chainLightMode"))
-	viper.BindPFlag("w3.nodePort", flag.Lookup("w3nodePort"))
-	viper.BindPFlag("w3.route", flag.Lookup("w3route"))
-	viper.BindPFlag("w3.wsPort", flag.Lookup("w3WsPort"))
-	viper.BindPFlag("w3.wsHost", flag.Lookup("w3WsHost"))
-	viper.BindPFlag("w3.httpPort", flag.Lookup("w3HTTPPort"))
-	viper.BindPFlag("w3.httpHost", flag.Lookup("w3HTTPHost"))
-	viper.BindPFlag("w3.w3external", flag.Lookup("w3external"))
-	viper.BindPFlag("w3.dataDir", flag.Lookup("w3dataDir"))
+	viper.BindPFlag("api.allowPrivate", flag.Lookup("apiAllowPrivate"))
+	viper.BindPFlag("api.allowedAddrs", flag.Lookup("apiAllowedAddrs"))
+	// ethereum node
+	viper.Set("ethConfig.datadir", globalCfg.DataDir+"/ethereum")
+	viper.BindPFlag("ethConfig.signingKey", flag.Lookup("ethSigningKey"))
+	viper.BindPFlag("ethConfig.chainType", flag.Lookup("ethChain"))
+	viper.BindPFlag("ethConfig.lightMode", flag.Lookup("ethChainLightMode"))
+	viper.BindPFlag("ethConfig.nodePort", flag.Lookup("ethNodePort"))
+	// ethereum web3
+	viper.BindPFlag("w3Config.route", flag.Lookup("w3Route"))
+	viper.BindPFlag("w3Config.enabled", flag.Lookup("w3Enabled"))
+	viper.BindPFlag("w3Config.wsPort", flag.Lookup("w3WsPort"))
+	viper.BindPFlag("w3Config.wsHost", flag.Lookup("w3WsHost"))
+	viper.BindPFlag("w3Config.httpPort", flag.Lookup("w3HTTPPort"))
+	viper.BindPFlag("w3Config.httpHost", flag.Lookup("w3HTTPHost"))
 	// ssl
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
 	viper.BindPFlag("ssl.dirCert", flag.Lookup("sslDirCert"))
 	// ipfs
+	viper.Set("ipfs.configPath", globalCfg.DataDir+"/ipfs")
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ipfs.syncKey", flag.Lookup("ipfsSyncKey"))
 	viper.BindPFlag("ipfs.syncPeers", flag.Lookup("ipfsSyncPeers"))
-	viper.BindPFlag("ipfs.configPath", flag.Lookup("ipfsConfigPath"))
 	// vochain
-	viper.BindPFlag("vochain.p2pListen", flag.Lookup("vochainP2PListen"))
-	viper.BindPFlag("vochain.publicAddr", flag.Lookup("vochainPublicAddr"))
-	viper.BindPFlag("vochain.rpcListen", flag.Lookup("vochainRPCListen"))
-	viper.BindPFlag("vochain.logLevel", flag.Lookup("vochainLogLevel"))
-	viper.BindPFlag("vochain.peers", flag.Lookup("vochainPeers"))
-	viper.BindPFlag("vochain.seeds", flag.Lookup("vochainSeeds"))
-	viper.BindPFlag("vochain.createGenesis", flag.Lookup("vochainCreateGenesis"))
-	viper.BindPFlag("vochain.genesis", flag.Lookup("vochainGenesis"))
-	viper.BindPFlag("vochain.keyFile", flag.Lookup("vochainKeyFile"))
-	viper.BindPFlag("vochain.dataDir", flag.Lookup("vochainDataDir"))
+	viper.Set("vochainConfig.dataDir", globalCfg.DataDir+"/vochain")
+	viper.BindPFlag("vochainConfig.p2pListen", flag.Lookup("vochainP2PListen"))
+	viper.BindPFlag("vochainConfig.publicAddr", flag.Lookup("vochainPublicAddr"))
+	viper.BindPFlag("vochainConfig.rpcListen", flag.Lookup("vochainRPCListen"))
+	viper.BindPFlag("vochainConfig.logLevel", flag.Lookup("vochainLogLevel"))
+	viper.BindPFlag("vochainConfig.logOutput", flag.Lookup("vochainLogOutput"))
+	viper.BindPFlag("vochainConfig.peers", flag.Lookup("vochainPeers"))
+	viper.BindPFlag("vochainConfig.seeds", flag.Lookup("vochainSeeds"))
+	viper.BindPFlag("vochainConfig.createGenesis", flag.Lookup("vochainCreateGenesis"))
+	viper.BindPFlag("vochainConfig.genesis", flag.Lookup("vochainGenesis"))
+	viper.BindPFlag("vochainConfig.keyFile", flag.Lookup("vochainKeyFile"))
 
 	// check if config file exists
-	_, err = os.Stat(globalCfg.ConfigFilePath + "gateway.yml")
+	_, err = os.Stat(globalCfg.DataDir + "/gateway.yml")
 	if os.IsNotExist(err) {
 		cfgError = config.Error{
 			Critical: false,
-			Message:  fmt.Sprintf("cannot read config file in: %s, with error: %s. A new one will be created", globalCfg.ConfigFilePath, err),
+			Message:  fmt.Sprintf("creating new config file in %s", globalCfg.DataDir),
 		}
 		// creting config folder if not exists
-		err = os.MkdirAll(globalCfg.ConfigFilePath, os.ModePerm)
+		err = os.MkdirAll(globalCfg.DataDir, os.ModePerm)
 		if err != nil {
 			cfgError = config.Error{
 				Critical: false,
-				Message:  fmt.Sprintf("cannot create config dir, with error: %s", err),
+				Message:  fmt.Sprintf("cannot create data directory (%s)", err),
 			}
 		}
 		// create config file if not exists
 		if err = viper.SafeWriteConfig(); err != nil {
 			cfgError = config.Error{
 				Critical: false,
-				Message:  fmt.Sprintf("cannot write config file into config dir with error: %s", err),
+				Message:  fmt.Sprintf("cannot write config file into config dir (%s)", err),
 			}
 		}
 	} else {
@@ -193,14 +187,14 @@ func newConfig() (*config.GWCfg, config.Error) {
 		if err != nil {
 			cfgError = config.Error{
 				Critical: false,
-				Message:  fmt.Sprintf("cannot read loaded config file in: %s, with error: %s", globalCfg.ConfigFilePath, err),
+				Message:  fmt.Sprintf("cannot read loaded config file in %s (%s)", err, globalCfg.DataDir),
 			}
 		}
-		//err = viper.Unmarshal(&globalCfg)
+		err = viper.Unmarshal(&globalCfg)
 		if err != nil {
 			cfgError = config.Error{
 				Critical: false,
-				Message:  fmt.Sprintf("cannot unmarshal loaded config file in: %s, with error: %s", globalCfg.ConfigFilePath, err),
+				Message:  fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
 			}
 		}
 	}
@@ -221,11 +215,13 @@ func main() {
 	// setup config
 	// creating config and init logger
 	globalCfg, cfgErr := newConfig()
-	if globalCfg != nil {
-		log.InitLogger(globalCfg.LogLevel, "stdout")
+	if globalCfg == nil {
+		panic("cannot read configuration")
 	}
+	fmt.Println(globalCfg.LogLevel)
+	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
 
-	log.Infof("initializing vochain with tendermint config %+v", globalCfg)
+	log.Debugf("initializing gateway config %+v", globalCfg)
 
 	// check if errors during config creation and determine if Critical
 	if cfgErr.Critical && cfgErr.Message != "" {
@@ -236,7 +232,7 @@ func main() {
 		log.Infof("config file loaded successfully, remember CLI flags have preference")
 	}
 
-	log.Infof("using datadir %s", globalCfg.DataDir)
+	log.Info("starting gateway")
 
 	// Ensure we can have at least 8k open files. This is necessary, since
 	// many components like IPFS and Tendermint require keeping many active
@@ -259,11 +255,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Ethereum
+	log.Debugf("initializing ethereum")
 	// Signing key
 	signer := new(sig.SignKeys)
 	// Add Authorized keys for private methods
-	if globalCfg.Client.AllowPrivate && globalCfg.Client.AllowedAddrs != "" {
-		keys := strings.Split(globalCfg.Client.AllowedAddrs, ",")
+	if globalCfg.API.AllowPrivate && globalCfg.API.AllowedAddrs != "" {
+		keys := strings.Split(globalCfg.API.AllowedAddrs, ",")
 		for _, key := range keys {
 			err := signer.AddAuthKey(key)
 			if err != nil {
@@ -273,7 +271,7 @@ func main() {
 	}
 
 	// Set Ethereum node context
-	w3cfg, err := chain.NewConfig(*globalCfg.W3)
+	w3cfg, err := chain.NewConfig(globalCfg.EthConfig, globalCfg.W3Config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -283,83 +281,47 @@ func main() {
 	}
 
 	// Add signing private key if exist in configuration or flags
-	if globalCfg.Client.SigningKey != "" {
+	if globalCfg.EthConfig.SigningKey != "" {
 		log.Infof("adding custom signing key")
-		err := signer.AddHexKey(globalCfg.Client.SigningKey)
+		err := signer.AddHexKey(globalCfg.EthConfig.SigningKey)
 		if err != nil {
 			log.Fatalf("Fatal error adding hex key: %v", err)
 		}
 		pub, _ := signer.HexString()
 		log.Infof("using custom pubKey %s", pub)
-		os.RemoveAll(globalCfg.W3.DataDir + "/.keyStore.tmp")
-		node.Keys = keystore.NewPlaintextKeyStore(globalCfg.W3.DataDir + "/.keyStore.tmp")
+		os.RemoveAll(globalCfg.EthConfig.DataDir + "/keystore/tmp")
+		node.Keys = keystore.NewPlaintextKeyStore(globalCfg.EthConfig.DataDir + "/keyStore/tmp")
 		node.Keys.ImportECDSA(signer.Private, "")
-
-	}
-
-	// Start Ethereum Web3 node
-	if globalCfg.W3.Enabled {
-		log.Info("starting Ethereum node")
-		node.Start()
-		for i := 0; i < len(node.Keys.Accounts()); i++ {
-			log.Debugf("got ethereum address: %x", node.Keys.Accounts()[i].Address)
-		}
-		if len(globalCfg.W3.W3External) == 0 {
-			time.Sleep(1 * time.Second)
-			log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
-			pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
-			log.Infof("web3 available at %s", globalCfg.W3.Route)
-		}
-		go node.PrintInfo(time.Second * 15)
-	}
-
-	if globalCfg.W3.Enabled && len(globalCfg.W3.W3External) > 0 {
-		// TO-DO create signing key since node.Start() is not executed and the ethereum account is not created on first run
-		url, err := neturl.Parse(globalCfg.W3.W3External)
-		if err != nil {
-			log.Fatal("cannot parse w3external URL")
-		}
-
-		log.Debugf("testing web3 endpoint %s", url)
-		pxy.AddHandler(globalCfg.W3.Route, pxy.AddEndpoint(url.String()))
-		data, err := json.Marshal(map[string]interface{}{
-			"jsonrpc": "2.0",
-			"method":  "net_peerCount",
-			"id":      74,
-			"params":  []interface{}{},
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-		resp, err := http.Post(globalCfg.W3.W3External,
-			"application/json", strings.NewReader(string(data)))
-		if err != nil {
-			log.Fatal("cannot connect to web3 endpoint")
-		}
-		defer resp.Body.Close()
-		_, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Infof("successfuly connected to web3 endpoint at external url: %s", globalCfg.W3.W3External)
-		log.Infof("web3 available at %s", globalCfg.W3.Route)
-	}
-
-	if globalCfg.Client.SigningKey == "" {
+		defer os.RemoveAll(globalCfg.EthConfig.DataDir + "/keystore/tmp")
+	} else {
 		// Get stored keys from Ethereum node context
 		acc := node.Keys.Accounts()
 		if len(acc) > 0 {
 			keyJSON, err := node.Keys.Export(acc[0], "", "")
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("cannot open JSON keystore from %s (%s)", acc[0], err)
 			}
 			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
 			pub, _ := signer.HexString()
-			log.Infof("using pubKey %s from keystore", pub)
+			log.Infof("using ethereum pubkey %s from keystore", pub)
 			if err != nil {
 				log.Fatal(err)
 			}
 		}
+	}
+
+	// Start Ethereum Web3 node
+	log.Info("starting Ethereum node")
+	node.Start()
+	for i := 0; i < len(node.Keys.Accounts()); i++ {
+		log.Debugf("got ethereum address: %x", node.Keys.Accounts()[i].Address)
+	}
+	go node.PrintInfo(time.Second * 20)
+
+	log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
+	if globalCfg.W3Config.Enabled {
+		pxy.AddHandler(globalCfg.W3Config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
+		log.Infof("web3 available at %s", globalCfg.W3Config.Route)
 	}
 
 	// Storage
@@ -414,26 +376,26 @@ func main() {
 	if globalCfg.API.Vote {
 		log.Info("initializing vochain")
 		// node + app layer
-		if len(globalCfg.Vochain.PublicAddr) == 0 {
+		if len(globalCfg.VochainConfig.PublicAddr) == 0 {
 			ip, err := util.PublicIP()
 			if err != nil {
 				log.Warn(err)
 			} else {
-				addrport := strings.Split(globalCfg.Vochain.P2PListen, ":")
+				addrport := strings.Split(globalCfg.VochainConfig.P2PListen, ":")
 				if len(addrport) > 0 {
-					globalCfg.Vochain.PublicAddr = fmt.Sprintf("%s:%s", ip, addrport[len(addrport)-1])
+					globalCfg.VochainConfig.PublicAddr = fmt.Sprintf("%s:%s", ip, addrport[len(addrport)-1])
 				}
 			}
 		} else {
-			addrport := strings.Split(globalCfg.Vochain.P2PListen, ":")
+			addrport := strings.Split(globalCfg.VochainConfig.P2PListen, ":")
 			if len(addrport) > 0 {
-				globalCfg.Vochain.PublicAddr = fmt.Sprintf("%s:%s", addrport[0], addrport[1])
+				globalCfg.VochainConfig.PublicAddr = fmt.Sprintf("%s:%s", addrport[0], addrport[1])
 			}
 		}
-		if globalCfg.Vochain.PublicAddr != "" {
-			log.Infof("public IP address: %s", globalCfg.Vochain.PublicAddr)
+		if globalCfg.VochainConfig.PublicAddr != "" {
+			log.Infof("vochain exposed IP address: %s", globalCfg.VochainConfig.PublicAddr)
 		}
-		vnode = vochain.NewVochain(globalCfg.Vochain)
+		vnode = vochain.NewVochain(globalCfg.VochainConfig)
 		if globalCfg.API.Results {
 			log.Info("starting vochain scrutinizer")
 			sc, err = scrutinizer.NewScrutinizer(globalCfg.DataDir+"/scrutinizer", vnode.State)
@@ -478,14 +440,12 @@ func main() {
 	}
 
 	// Wait for Ethereum to be ready
-	if globalCfg.W3.Enabled {
-		for {
-			if _, synced, peers, _ := node.SyncInfo(); synced && peers > 1 {
-				log.Infof("ethereum blockchain synchronized")
-				break
-			}
-			time.Sleep(time.Second * 5)
+	for {
+		if _, synced, peers, _ := node.SyncInfo(); synced && peers > 1 {
+			log.Infof("ethereum blockchain synchronized")
+			break
 		}
+		time.Sleep(time.Second * 5)
 	}
 
 	// API Endpoint initialization
@@ -508,7 +468,7 @@ func main() {
 		}
 		if globalCfg.API.Vote {
 			// creating the RPC calls client
-			rpcClient := voclient.NewHTTP(globalCfg.Vochain.RPCListen, "/websocket")
+			rpcClient := voclient.NewHTTP(globalCfg.VochainConfig.RPCListen, "/websocket")
 			// todo: client params as cli flags
 			log.Info("enabling vote API")
 			routerAPI.Scrutinizer = sc
@@ -530,7 +490,7 @@ func main() {
 	// Census Oracle
 	if globalCfg.CensusSync && globalCfg.API.Census {
 		log.Infof("starting census import oracle")
-		ev, err := ethevents.NewEthEvents(globalCfg.Contract, nil, fmt.Sprintf("ws://%s:%d", globalCfg.W3.WsHost, globalCfg.W3.WsPort), &censusManager)
+		ev, err := ethevents.NewEthEvents(globalCfg.Contract, nil, fmt.Sprintf("ws://%s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort), &censusManager)
 		if err != nil {
 			log.Fatalf("couldn't create ethereum events listener: %s", err)
 		}
