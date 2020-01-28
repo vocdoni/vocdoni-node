@@ -221,7 +221,7 @@ func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 	}
 	v.ProcessTree.Set([]byte(pid), newProcessBytes)
 	if callBack, ok := v.Callbacks["addProcess"]; ok {
-		go callBack(p)
+		go callBack(pid)
 	}
 	return nil
 }
