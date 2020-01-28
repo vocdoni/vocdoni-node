@@ -159,8 +159,6 @@ type VochainCfg struct {
 	LogLevel string
 	// LogOutput logging output
 	LogOutput string
-	// ConfigFilePath path where the config file is or will be stored
-	ConfigFilePath string
 	// RPCListen address for the RPC server tp listen on
 	RPCListen string
 	// P2PListen address to listen for incoming P2P connections

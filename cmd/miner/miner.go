@@ -37,7 +37,7 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	userDir := home + "/.dvote"
 
 	// creating flags
-	globalCfg.DataDir = *flag.String("dataDir", userDir+"/vochain", "directory where data is stored")
+	globalCfg.DataDir = *flag.String("dataDir", userDir, "directory where data is stored")
 	globalCfg.P2PListen = *flag.String("p2pListen", "0.0.0.0:26656", "p2p host and port to listen")
 	globalCfg.RPCListen = *flag.String("rpcListen", "0.0.0.0:26657", "rpc host and port to listen")
 	globalCfg.Genesis = *flag.String("genesis", "", "use alternative genesis file")
@@ -111,7 +111,7 @@ func newConfig() (*config.VochainCfg, config.Error) {
 			}
 		}
 	}
-
+	globalCfg.DataDir += "/vochain"
 	return globalCfg, cfgError
 }
 
@@ -124,8 +124,6 @@ func main() {
 
 	fmt.Println(globalCfg.LogLevel)
 	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
-
-	log.Debugf("initializing vochain with tendermint config %+v", globalCfg)
 
 	// check if errors during config creation and determine if Critical
 	if cfgErr.Critical && cfgErr.Message != "" {
