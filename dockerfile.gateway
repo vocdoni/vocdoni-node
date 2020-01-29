@@ -1,14 +1,12 @@
 FROM vocdoni/go-dvote:latest
 
 ENV COMPONENT_VERSION=2.04
-ENV GW_DATA_DIR=/app/run
-ENV GW_LOGLEVEL=debug
 
 WORKDIR /app
 
 COPY . .
 
-RUN mkdir -p /app/run && go build -o gateway cmd/gateway/gateway.go && \
+RUN go build -o gateway cmd/gateway/gateway.go && \
  apk del build-base git binutils binutils-gold linux-headers openssl && \
  rm -rf /root/go
 
