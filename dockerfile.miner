@@ -1,0 +1,15 @@
+FROM vocdoni/go-dvote:latest
+
+ENV COMPONENT_VERSION=2.04
+ENV MINER_DATA_DIR=/app/run
+ENV MINER_LOGLEVEL=debug
+
+WORKDIR /app
+
+COPY . .
+
+RUN mkdir -p /app/run && go build -o miner cmd/miner/miner.go && \
+ apk del build-base git binutils binutils-gold linux-headers openssl && \
+ rm -rf /root/go
+ 
+CMD /bin/sh
