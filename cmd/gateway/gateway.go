@@ -96,8 +96,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.VochainConfig.RPCListen = *flag.String("vochainRPCListen", "0.0.0.0:26657", "rpc host and port to listent for the voting chain")
 	globalCfg.VochainConfig.CreateGenesis = *flag.Bool("vochainCreateGenesis", false, "create own/testing genesis file on vochain")
 	globalCfg.VochainConfig.Genesis = *flag.String("vochainGenesis", "", "use alternative geneiss file for the voting chain")
-	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "info", "voting chain node log level")
-	globalCfg.VochainConfig.LogOutput = *flag.String("vochainLogOutput", "stdout", "Log output (stdout, stderr or filepath)")
+	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "error", "voting chain node log level")
 	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
 	globalCfg.VochainConfig.KeyFile = *flag.String("vochainKeyFile", "", "user alternative vochain p2p node key file")
@@ -152,7 +151,6 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.publicAddr", flag.Lookup("vochainPublicAddr"))
 	viper.BindPFlag("vochainConfig.rpcListen", flag.Lookup("vochainRPCListen"))
 	viper.BindPFlag("vochainConfig.logLevel", flag.Lookup("vochainLogLevel"))
-	viper.BindPFlag("vochainConfig.logOutput", flag.Lookup("vochainLogOutput"))
 	viper.BindPFlag("vochainConfig.peers", flag.Lookup("vochainPeers"))
 	viper.BindPFlag("vochainConfig.seeds", flag.Lookup("vochainSeeds"))
 	viper.BindPFlag("vochainConfig.createGenesis", flag.Lookup("vochainCreateGenesis"))
@@ -190,14 +188,15 @@ func newConfig() (*config.GWCfg, config.Error) {
 				Message:  fmt.Sprintf("cannot read loaded config file in %s (%s)", err, globalCfg.DataDir),
 			}
 		}
-		err = viper.Unmarshal(&globalCfg)
-		if err != nil {
-			cfgError = config.Error{
-				Critical: false,
-				Message:  fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
-			}
+	}
+	err = viper.Unmarshal(&globalCfg)
+	if err != nil {
+		cfgError = config.Error{
+			Critical: false,
+			Message:  fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
 		}
 	}
+
 	return globalCfg, cfgError
 }
 
@@ -218,14 +217,13 @@ func main() {
 	if globalCfg == nil {
 		panic("cannot read configuration")
 	}
-	fmt.Println(globalCfg.LogLevel)
 	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
 
 	log.Debugf("initializing gateway config %+v", globalCfg)
 
 	// check if errors during config creation and determine if Critical
 	if cfgErr.Critical && cfgErr.Message != "" {
-		log.Fatalf("Critical error loading config: %s", cfgErr.Message)
+		log.Fatalf("critical error loading config: %s", cfgErr.Message)
 	} else if !cfgErr.Critical && cfgErr.Message != "" {
 		log.Warnf("non Critical error loading config: %s", cfgErr.Message)
 	} else if !cfgErr.Critical && cfgErr.Message == "" {

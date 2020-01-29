@@ -34,13 +34,12 @@ var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.20
 // Start starts a new vochain validator node
 func NewVochain(globalCfg *config.VochainCfg) *BaseApplication {
 	// creating new vochain app
-	log.Debugf("%+v", globalCfg)
 	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
 	if err != nil {
 		log.Errorf("cannot init vochain application: %s", err)
 	}
 
-	log.Info("creating node and application")
+	log.Info("creating tendermint node and application")
 	go func() {
 		app.Node, err = newTendermint(app, globalCfg)
 		if err != nil {
