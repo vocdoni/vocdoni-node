@@ -345,7 +345,7 @@ func main() {
 		if len(globalCfg.Ipfs.SyncKey) > 0 {
 			log.Info("enabling ipfs synchronization")
 			storageSync = ipfssync.NewIPFSsync(globalCfg.Ipfs.ConfigPath+"/.ipfsSync", globalCfg.Ipfs.SyncKey, storage)
-			if len(globalCfg.Ipfs.SyncPeers) > 0 {
+			if len(globalCfg.Ipfs.SyncPeers) > 0 && len(globalCfg.Ipfs.SyncPeers[0]) > 8 {
 				log.Debugf("using custom ipfs sync bootnodes %s", globalCfg.Ipfs.SyncPeers)
 				storageSync.Transport.BootNodes = globalCfg.Ipfs.SyncPeers
 			}
