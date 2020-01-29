@@ -139,19 +139,19 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*nm.No
 
 	tconfig.LogLevel = localConfig.LogLevel
 	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RPCListen
-	tconfig.P2P.ListenAddress = localConfig.P2PListen
+	tconfig.P2P.ListenAddress = "tcp://" + localConfig.P2PListen
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 
 	if !localConfig.CreateGenesis {
-		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]")
+		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]\"")
 		if len(tconfig.P2P.Seeds) < 8 && !localConfig.SeedMode {
 			tconfig.P2P.Seeds = strings.Join(DefaultSeedNodes[:], ",")
 		}
 		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
 
 		if len(localConfig.Peers) > 0 {
-			tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]")
+			tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]\"")
 		}
 		if len(tconfig.P2P.PersistentPeers) > 0 {
 			log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
