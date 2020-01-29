@@ -114,14 +114,15 @@ func newConfig() (*ethereumStandaloneCfgWrapper, config.Error) {
 				Message:  fmt.Sprintf("cannot read loaded config file in %s (%s)", err, ethereumCfgWrapper.dataDir),
 			}
 		}
-		err = viper.Unmarshal(&ethereumCfgWrapper)
-		if err != nil {
-			cfgError = config.Error{
-				Critical: false,
-				Message:  fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
-			}
+	}
+	err = viper.Unmarshal(&ethereumCfgWrapper)
+	if err != nil {
+		cfgError = config.Error{
+			Critical: false,
+			Message:  fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
 		}
 	}
+
 	return ethereumCfgWrapper, cfgError
 }
 

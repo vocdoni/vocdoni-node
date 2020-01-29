@@ -103,14 +103,15 @@ func newConfig() (*config.VochainCfg, config.Error) {
 				Message:  fmt.Sprintf("cannot read loaded config file in %s (%s)", err, globalCfg.DataDir),
 			}
 		}
-		err = viper.Unmarshal(&globalCfg)
-		if err != nil {
-			cfgError = config.Error{
-				Critical: false,
-				Message:  fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
-			}
+	}
+	err = viper.Unmarshal(&globalCfg)
+	if err != nil {
+		cfgError = config.Error{
+			Critical: false,
+			Message:  fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
 		}
 	}
+
 	globalCfg.DataDir += "/vochain"
 	return globalCfg, cfgError
 }
