@@ -1,0 +1,13 @@
+FROM vocdoni/go-dvote:latest
+
+ENV COMPONENT_VERSION=2.04
+
+WORKDIR /app
+
+COPY . .
+
+RUN go build -o oracle cmd/oracle/oracle.go && \
+ apk del build-base git binutils binutils-gold linux-headers openssl && \
+ rm -rf /root/go
+ 
+CMD /app/dockerfiles/oracle/files/oracleStart.sh

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -55,11 +56,10 @@ func newConfig() (*config.OracleCfg, config.Error) {
 
 	// CLI flags will be used if something fails from this point
 	// CLI flags have preference over the config file
-
-	userDir := home + "/.dvote"
+	// Booleans should be passed to the CLI as: var=True/false
 
 	// oracle
-	globalCfg.DataDir = *flag.String("dataDir", userDir, "directory where data is stored")
+	globalCfg.DataDir = *flag.String("dataDir", home+"/.dvote", "directory where data is stored")
 	globalCfg.SubscribeOnly = *flag.Bool("subscribeOnly", true, "oracle can read all ethereum logs or just subscribe to the new ones, by default only subscribe")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
@@ -81,8 +81,8 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to listen on")
 	globalCfg.EthConfig.DataDir = globalCfg.DataDir + "/ethereum"
 	// web3
-	globalCfg.W3Config.WsPort = *flag.Int("w3WSPort", 9092, "web3 websocket server port")
-	globalCfg.W3Config.WsHost = *flag.String("w3WSHost", "0.0.0.0", "web3 websocket server host")
+	globalCfg.W3Config.WsPort = *flag.Int("w3WsPort", 9092, "web3 websocket server port")
+	globalCfg.W3Config.WsHost = *flag.String("w3WsHost", "0.0.0.0", "web3 websocket server host")
 	globalCfg.W3Config.HTTPPort = *flag.Int("w3HTTPPort", 9091, "web3 http server port")
 	globalCfg.W3Config.HTTPHost = *flag.String("w3HTTPHost", "0.0.0.0", "web3 http server host")
 	// parse flags
@@ -117,8 +117,8 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	viper.BindPFlag("ethConfig.lightMode", flag.Lookup("ethChainLightMode"))
 	viper.BindPFlag("ethConfig.nodePort", flag.Lookup("ethNodePort"))
 	viper.Set("w3Config.enabled", true)
-	viper.BindPFlag("w3Config.wsPort", flag.Lookup("w3WSPort"))
-	viper.BindPFlag("w3Config.wsHost", flag.Lookup("w3WSHost"))
+	viper.BindPFlag("w3Config.wsPort", flag.Lookup("w3WsPort"))
+	viper.BindPFlag("w3Config.wsHost", flag.Lookup("w3WsHost"))
 	viper.BindPFlag("w3Config.httpPort", flag.Lookup("w3HTTPPort"))
 	viper.BindPFlag("w3Config.httpHost", flag.Lookup("w3HTTPHost"))
 
@@ -173,8 +173,6 @@ func main() {
 	}
 	fmt.Println(globalCfg.LogLevel)
 	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
-
-	log.Debugf("initializing oracle with config %+v", globalCfg)
 
 	// check if errors during config creation and determine if Critical
 	if cfgErr.Critical && cfgErr.Message != "" {
@@ -318,13 +316,17 @@ func main() {
 			if synced && peers > 1 && vnode != nil {
 				log.Info("ethereum node fully synced")
 				log.Info("oracle startup complete")
+				lastBlock, err := strconv.ParseInt(height, 10, 64)
+				if err != nil {
+					log.Fatalf("cannot read logs, ethereum last block parsing failed: %s at block %d", err, height)
+				}
 				ev.AddEventHandler(ethevents.HandleVochainOracle)
 				if globalCfg.SubscribeOnly {
-					log.Infof("reading ethereum events from current block %d", util.Hex2int64(height))
+					log.Infof("reading ethereum events from current block %d", lastBlock)
 					go ev.SubscribeEthereumEventLogs()
 				} else {
-					log.Infof("reading ethereum events from block 0 to %d", util.Hex2int64(height))
-					go ev.ReadEthereumEventLogs(0, util.Hex2int64(height))
+					log.Infof("reading ethereum events from block 0 to %d", lastBlock)
+					go ev.ReadEthereumEventLogs(0, lastBlock)
 					go ev.SubscribeEthereumEventLogs()
 				}
 				break

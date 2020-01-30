@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # INFO
-IMAGE_TAG="vocdoni/miner"
+IMAGE_TAG="vocdoni/oracle"
 IN_MEMORY="${IN_MEMORY:-false}"
 
 echo "Using image '$IMAGE_TAG:latest'\n"
 
-docker build -t $IMAGE_TAG -f dockerfile.miner . || {
-	echo "ERROR: docker image cannot be created, exiting..."
-	exit 2
-}
+#docker build -t $IMAGE_TAG -f dockerfile.oracle . || {
+#	echo "ERROR: docker image cannot be created, exiting..."
+#	exit 2
+#}
 
 # CHECK IF ALREADY RUNNING
 COUNT="$(docker ps -a | grep $IMAGE_TAG | wc -l)"
@@ -22,7 +22,7 @@ COUNT="$(docker ps -a | grep $IMAGE_TAG | wc -l)"
 }
 
 ENVFILE=""
-[ -f dockerfiles/miner/env ] && ENVFILE="dockerfiles/miner/env"
+[ -f dockerfiles/oracle/env ] && ENVFILE="dockerfiles/oracle/env"
 [ -f env ] && ENVFILE="env"
 [ -n "$ENVFILE" ] && echo "using ENV FILE $ENVFILE" 
 

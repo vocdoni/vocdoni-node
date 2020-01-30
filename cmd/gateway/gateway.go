@@ -50,10 +50,10 @@ func newConfig() (*config.GWCfg, config.Error) {
 
 	// CLI flags will be used if something fails from this point
 	// CLI flags have preference over the config file
+	// Booleans should be passed to the CLI as: var=True/false
 
-	userDir := home + "/.dvote"
 	// gateway
-	globalCfg.DataDir = *flag.String("dataDir", userDir, "directory where data is stored")
+	globalCfg.DataDir = *flag.String("dataDir", home+"/.dvote", "directory where data is stored")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
@@ -88,7 +88,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.Ipfs.ConfigPath = globalCfg.DataDir + "/ipfs"
 	// ssl
 	globalCfg.Ssl.Domain = *flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
-	globalCfg.Ssl.DirCert = *flag.String("sslDirCert", userDir+"/tls/", "path where to store ssl related data")
+	globalCfg.Ssl.DirCert = *flag.String("sslDirCert", globalCfg.DataDir+"/tls/", "path where to store ssl related data")
 	// vochain
 	globalCfg.VochainConfig.DataDir = globalCfg.DataDir + "/vochain"
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")

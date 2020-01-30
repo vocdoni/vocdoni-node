@@ -34,10 +34,8 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	// CLI flags will be used if something fails from this point
 	// CLI flags have preference over the config file
 
-	userDir := home + "/.dvote"
-
 	// creating flags
-	globalCfg.DataDir = *flag.String("dataDir", userDir, "directory where data is stored")
+	globalCfg.DataDir = *flag.String("dataDir", home+"/.dvote", "directory where data is stored")
 	globalCfg.P2PListen = *flag.String("p2pListen", "0.0.0.0:26656", "p2p host and port to listen")
 	globalCfg.RPCListen = *flag.String("rpcListen", "0.0.0.0:26657", "rpc host and port to listen")
 	globalCfg.Genesis = *flag.String("genesis", "", "use alternative genesis file")

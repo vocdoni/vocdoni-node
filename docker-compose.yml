@@ -3,13 +3,11 @@ version: "3"
 services:
 
   miner0:
-    container_name: miner0
     image: "vocdoni/miner"
     entrypoint: "dockerfiles/miner/files/minerStart.sh"
-    command: ""
     env_file: "dockerfiles/testsuite/env.miner0"
     volumes:
-      - $PWD/run/miner0:/root/.dvote/
+      - $PWD/run/miner0:/app/run/
     networks:
       localnet:
         ipv4_address: 10.17.14.2
@@ -17,12 +15,11 @@ services:
       - "26656-26657:26656-26657"    
 
   miner1:
-    container_name: miner1
     image: "vocdoni/miner"
     entrypoint: "dockerfiles/miner/files/minerStart.sh"
     env_file: "dockerfiles/testsuite/env.miner1"
     volumes:
-      - $PWD/run/miner1:/root/.dvote/
+      - $PWD/run/miner1:/app/run/
     networks:
       localnet:
         ipv4_address: 10.17.14.3
@@ -30,25 +27,37 @@ services:
       - "26658-26659:26656-26657"    
 
   miner2:
-    container_name: miner2
     image: "vocdoni/miner"
     entrypoint: "dockerfiles/miner/files/minerStart.sh"
     env_file: "dockerfiles/testsuite/env.miner2"
     volumes:
-      - $PWD/run/miner2:/root/.dvote/
+      - $PWD/run/miner2:/app/run/
     networks:
       localnet:
         ipv4_address: 10.17.14.4
     ports: 
       - "26660-26661:26656-26657"
 
+  oracle:
+    image: "vocdoni/oracle"
+    entrypoint: "dockerfiles/oracle/files/oracleStart.sh"
+    env_file: "dockerfiles/testsuite/env.oracle"
+    volumes: 
+      - $PWD/run/oracle:/app/run/
+    networks:
+      localnet:
+        ipv4_address: 10.17.14.5
+    ports: 
+      - "30304:30303"
+      - "32001:32000"
+      - "26662-26663:26656-26657"
+
   gateway:
-    container_name: gateway
     image: "vocdoni/gateway"
     entrypoint: "dockerfiles/gateway/files/gatewayStart.sh"
     env_file: "dockerfiles/testsuite/env.gateway"
     volumes:
-      - $PWD/run/gateway:/root/.dvote/
+      - $PWD/run/gateway:/app/run/
     networks:
       localnet:
         ipv4_address: 10.17.14.6
