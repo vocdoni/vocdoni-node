@@ -19,11 +19,13 @@ cache:
     - .cache/
 
 go-test:
-  image: golang:1.13.5
+  image: golang:1.13.7
   stage: test
   script:
     - go env
-    - go test ./...
+    - go test -vet=off ./... # we run vet later
+    - go vet ./...
+    - diff -u <(echo -n) <(gofmt -s -d *) # don't include .cache/
 
 docker-release:
   image: docker:stable

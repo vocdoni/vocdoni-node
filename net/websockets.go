@@ -90,7 +90,7 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 
 // Send sends the response given a message
 func (w *WebsocketHandle) Send(msg types.Message) {
-	clientConn := *msg.Context.(*WebsocketContext).Conn
+	clientConn := msg.Context.(*WebsocketContext).Conn
 	clientConn.WriteMessage(websocket.BinaryMessage, msg.Data)
 }
 
