@@ -51,7 +51,7 @@ func (a *Address) String() string {
 func AddressFromString(s string) Address {
 	hex, err := hexutil.Decode(s)
 	if err != nil {
-		//
+		panic(err)
 	}
 	var a Address
 	for c, e := range hex {
@@ -159,7 +159,7 @@ func (k *SignKeys) String() string { return k.EthAddrString() }
 // Sign signs a message. Message is a normal string (no HexString nor a Hash)
 func (k *SignKeys) Sign(message string) (string, error) {
 	if k.Private == nil {
-		return "", errors.New("No private key available")
+		return "", errors.New("no private key available")
 	}
 	signature, err := crypto.Sign(Hash(message), k.Private)
 	if err != nil {

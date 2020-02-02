@@ -41,7 +41,7 @@ func Init(t TransportID, c *types.Connection) (Transport, error) {
 		p.Init(c)
 		return p, nil
 	default:
-		return nil, errors.New("Bad transport type ID or Connection specifier")
+		return nil, errors.New("bad transport type ID or Connection specifier")
 	}
 }
 
@@ -58,6 +58,6 @@ func InitDefault(t TransportID) (Transport, error) {
 		defaultConnection.Key = ""
 		return Init(t, defaultConnection)
 	default:
-		return nil, errors.New("Bad transport type ID")
+		return nil, errors.New("bad transport type ID")
 	}
 }

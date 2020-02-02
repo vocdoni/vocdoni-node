@@ -49,8 +49,7 @@ func (s *Scrutinizer) addProcess(v interface{}) {
 		log.Errorf("process %s already exist!")
 		return
 	}
-	var pv ProcessVotes
-	pv = make([][]uint32, MaxQuestions)
+	pv := make([][]uint32, MaxQuestions)
 	for i := range pv {
 		pv[i] = make([]uint32, MaxOptions)
 	}

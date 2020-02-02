@@ -165,7 +165,7 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 		return
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
-	if queryResult.Response.Code != 0 {
+	if err != nil || queryResult.Response.Code != 0 {
 		sendError(router.transport, router.signer, request.context, request.id, queryResult.Response.GetInfo())
 		return
 	}
@@ -209,7 +209,7 @@ func getBlockHeight(request routerRequest, router *Router) {
 		return
 	}
 	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
-	if queryResult.Response.Code != 0 {
+	if err != nil || queryResult.Response.Code != 0 {
 		sendError(router.transport, router.signer, request.context, request.id, "cannot fetch height")
 		return
 	}

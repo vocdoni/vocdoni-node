@@ -14,17 +14,20 @@ func TestCensus(t *testing.T) {
 	proof := "0x00010000000000000000000000000000000000000000000000000000000000010ebcdf8e6d1c254ff4884616e93d7da69d755c56d0b1cda1e414592cf875acb5"
 	pubk := "04c0b80d53d7ee47d6f1b8c8fdc90f44716194f3117be0e133e3a9f61c1444b8d2e210449ad64a72230b25b5b261fb0bb753a86589eb226a4595251ff97f1f672d"
 	dataB64, err := hashing.PoseidonHash(pubk)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	data, err := base64.StdEncoding.DecodeString(dataB64)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	valid, err := CheckProof(root, proof, data)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if !valid {
-		t.Errorf("proof invalid, but should be valid")
+		t.Fatalf("proof invalid, but should be valid")
 	} else {
 		t.Log("proof valid")
 	}
@@ -38,6 +41,9 @@ func TestCensus(t *testing.T) {
 		t.Fatal(err)
 	}
 	valid, err = CheckProof(root, proof, data)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !valid {
 		t.Errorf("proof is invalid, but should be valid")
 	} else {

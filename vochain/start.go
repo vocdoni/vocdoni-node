@@ -26,7 +26,7 @@ import (
 )
 
 // testing purposes until genesis
-const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
+// const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
 
 // DefaultSeedNodes list of default Vocdoni seed nodes
 var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}

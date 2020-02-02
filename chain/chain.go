@@ -5,16 +5,12 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/console"
 	"github.com/ethereum/go-ethereum/core"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -179,31 +175,6 @@ func (e *EthChainContext) Start() {
 	}
 }
 
-// might be worthwhile to create generic SendTx to call contracttx, deploytx, etc
-func (e *EthChainContext) sendTx(addr string, limit uint64, amount int) error {
-	client, err := ethclient.Dial(e.Node.IPCEndpoint())
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Second)
-	defer cancel()
-
-	accounts := e.Keys.Accounts()
-	acc := accounts[0]
-	sendAddr := acc.Address
-	nonce, _ := client.NonceAt(ctx, sendAddr, nil)
-	if err != nil {
-		return err
-	}
-	// create tx
-	price, _ := client.SuggestGasPrice(ctx)
-	var empty []byte
-	tx := ethTypes.NewTransaction(nonce, common.HexToAddress(addr), big.NewInt(int64(amount)), limit, price, empty)
-	signedTx, err := e.Keys.SignTx(acc, tx, big.NewInt(int64(e.Config.NetworkId)))
-	if err != nil {
-		return err
-	}
-	// create ctx
-	return client.SendTransaction(ctx, signedTx)
-}
-
 func (e *EthChainContext) createAccount() error {
 	// phrase := getPassPhrase("Your new account will be locked with a passphrase. Please give a passphrase. Do not forget it!.", true)
 	_, err := e.Keys.NewAccount("")
@@ -215,6 +186,7 @@ func (e *EthChainContext) createAccount() error {
 	return nil
 }
 
+/*
 func getPassPhrase(prompt string, confirmation bool) string {
 	// Otherwise prompt the user for the password
 	if prompt != "" {
@@ -235,6 +207,7 @@ func getPassPhrase(prompt string, confirmation bool) string {
 	}
 	return phrase
 }
+*/
 
 // PrintInfo prints every N seconds some ethereum information (sync and height). It's blocking!
 func (e *EthChainContext) PrintInfo(seconds time.Duration) {
