@@ -244,10 +244,11 @@ func getProcessList(request routerRequest, router *Router) {
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
 	apiResponse.Ok = true
-	queryResult, err := router.tmclient.TxSearch(fmt.Sprintf("processCreated.entityId=%s", request.EntityId), false, 1, 30)
+	queryResult, err := router.tmclient.TxSearch(fmt.Sprintf("processCreated.entityId='%s'", util.TrimHex(request.EntityId)), false, 1, 30)
 	if err != nil {
 		log.Errorf("cannot query: %s", err)
 		sendError(router.transport, router.signer, request.context, request.id, err.Error())
+		return
 	}
 	var processList []string
 	for _, res := range queryResult.Txs {

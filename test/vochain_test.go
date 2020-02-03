@@ -86,12 +86,12 @@ func TestCreateProcess(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", *testcommon.HardcodedNewProcessTx)
 	}
-	err = vochain.ValidateAndDeliverTx(bytes, s)
+	err, _ = vochain.ValidateAndDeliverTx(bytes, s)
 	if err != nil {
 		t.Errorf("cannot create process: %s", err)
 	}
 	// cannot add same process
-	err = vochain.ValidateAndDeliverTx(bytes, s)
+	err, _ = vochain.ValidateAndDeliverTx(bytes, s)
 	if err == nil {
 		t.Errorf("same process added: %s", err)
 	}
@@ -102,7 +102,7 @@ func TestCreateProcess(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", badoracle)
 	}
-	err = vochain.ValidateAndDeliverTx(bytes, s)
+	err, _ = vochain.ValidateAndDeliverTx(bytes, s)
 	if err == nil {
 		t.Errorf("process added by non oracle: %s", err)
 	}
