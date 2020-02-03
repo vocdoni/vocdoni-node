@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"time"
 
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
@@ -63,6 +64,7 @@ func (p *Proxy) Init() (net.Addr, error) {
 	if len(p.C.SSLDomain) > 0 {
 		log.Infof("fetching letsencrypt TLS certificate for %s", p.C.SSLDomain)
 		s, m = p.GenerateSSLCertificate()
+
 		go func() {
 			log.Fatal(s.ServeTLS(ln, "", ""))
 		}()
@@ -84,6 +86,11 @@ func (p *Proxy) Init() (net.Addr, error) {
 		}()
 		log.Infof("proxy ready at http://%s", addr)
 	}
+	s.ReadTimeout = 5 * time.Second
+	s.WriteTimeout = 10 * time.Second
+	s.IdleTimeout = 30 * time.Second
+	s.ReadHeaderTimeout = 2 * time.Second
+
 	return addr, nil
 }
 
