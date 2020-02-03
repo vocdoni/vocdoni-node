@@ -320,8 +320,11 @@ func getResults(request routerRequest, router *Router) {
 		sendError(router.transport, router.signer, request.context, request.id, "cannot get process info")
 	}
 	apiResponse.Type = procInfo.Type
-	apiResponse.State = procInfo.CurrentState.String()
-
+	if procInfo.Canceled {
+		apiResponse.State = "canceled"
+	} else {
+		apiResponse.State = "active"
+	}
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
 		log.Warn(err)

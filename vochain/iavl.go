@@ -234,6 +234,9 @@ func (v *State) CancelProcess(pid string) error {
 	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
 		return errors.New("cannot unmarshal process")
 	}
+	if process.Canceled {
+		return nil
+	}
 	process.Canceled = true
 	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
 	if err != nil {
@@ -241,7 +244,48 @@ func (v *State) CancelProcess(pid string) error {
 	}
 	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
 	return nil
+}
 
+// PauseProcess sets the process paused atribute to true
+func (v *State) PauseProcess(pid string) error {
+	pid = util.TrimHex(pid)
+	_, processBytes := v.ProcessTree.Get([]byte(pid))
+	var process vochaintypes.Process
+	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
+		return errors.New("cannot unmarshal process")
+	}
+	// already paused
+	if process.Paused {
+		return nil
+	}
+	process.Paused = true
+	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
+	if err != nil {
+		return errors.New("cannot marshal updated process bytes")
+	}
+	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
+	return nil
+}
+
+// ResumeProcess sets the process paused atribute to true
+func (v *State) ResumeProcess(pid string) error {
+	pid = util.TrimHex(pid)
+	_, processBytes := v.ProcessTree.Get([]byte(pid))
+	var process vochaintypes.Process
+	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
+		return errors.New("cannot unmarshal process")
+	}
+	// non paused process cannot be resumed
+	if !process.Paused {
+		return nil
+	}
+	process.Paused = false
+	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
+	if err != nil {
+		return errors.New("cannot marshal updated process bytes")
+	}
+	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
+	return nil
 }
 
 // Process returns a process info given a processId if exists

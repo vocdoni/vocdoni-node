@@ -32,6 +32,8 @@ func NewVote() *Vote {
 type Process struct {
 	// Canceled if true process is canceled
 	Canceled bool `json:"canceled,omitempty"`
+	// Paused if true process is paused and cannot add or modify any vote
+	Paused bool `json:"paused,omitempty"`
 	// EncryptionPublicKey are the keys required to encrypt the votes
 	EncryptionPublicKeys []string `json:"encryptionPublicKeys,omitempty"`
 	// EntityID identifies unequivocally a process

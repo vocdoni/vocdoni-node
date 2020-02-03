@@ -130,6 +130,7 @@ func ValidateAndDeliverTx(content []byte, state *State) error {
 			NumberOfBlocks:       tx.NumberOfBlocks,
 			StartBlock:           tx.StartBlock,
 			Canceled:             false,
+			Paused:               false,
 			Type:                 tx.ProcessType,
 		}
 		return state.AddProcess(newprocess, tx.ProcessID)
@@ -146,8 +147,8 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *State) error {
 		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
 	}
 	endBlock := process.StartBlock + process.NumberOfBlocks
-	// check if process is active
-	if (endBlock >= state.Height() || process.StartBlock < state.Height()) && !process.Canceled {
+	// check if process is enabled
+	if (endBlock >= state.Height() || process.StartBlock < state.Height()) && !process.Canceled && !process.Paused {
 		switch process.Type {
 		case "snark-vote":
 			voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
@@ -211,7 +212,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *State) error {
 			return fmt.Errorf("invalid process type")
 		}
 	}
-	return fmt.Errorf("cannot add vote, invalid blocks frame or process canceled")
+	return fmt.Errorf("cannot add vote, invalid blocks frame or process canceled/paused")
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process

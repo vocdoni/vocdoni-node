@@ -68,6 +68,7 @@ type MetaResponse struct {
 	Nullifier     string     `json:"nullifier,omitempty"`
 	Nullifiers    []string   `json:"nullifiers,omitempty"`
 	Ok            bool       `json:"ok"`
+	Paused        bool       `json:"paused"`
 	Payload       string     `json:"payload,omitempty"`
 	ProcessIDs    []string   `json:"processIds,omitempty"`
 	ProcessList   []string   `json:"processList,omitempty"`
