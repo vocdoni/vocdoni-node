@@ -3,6 +3,7 @@ package net
 import (
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -18,6 +19,7 @@ type WebsocketHandle struct {
 	Upgrader   *websocket.Upgrader
 
 	internalReceiver chan types.Message
+	mu               sync.Mutex
 }
 
 // SetProxy sets the proxy for the ws
@@ -91,6 +93,8 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 // Send sends the response given a message
 func (w *WebsocketHandle) Send(msg types.Message) {
 	clientConn := msg.Context.(*WebsocketContext).Conn
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	clientConn.WriteMessage(websocket.BinaryMessage, msg.Data)
 }
 
