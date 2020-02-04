@@ -68,7 +68,7 @@ type MetaResponse struct {
 	Nullifier     string     `json:"nullifier,omitempty"`
 	Nullifiers    []string   `json:"nullifiers,omitempty"`
 	Ok            bool       `json:"ok"`
-	Paused        bool       `json:"paused"`
+	Paused        bool       `json:"paused,omitempty"`
 	Payload       string     `json:"payload,omitempty"`
 	ProcessIDs    []string   `json:"processIds,omitempty"`
 	ProcessList   []string   `json:"processList,omitempty"`
@@ -80,7 +80,7 @@ type MetaResponse struct {
 	Size          int64      `json:"size,omitempty"`
 	State         string     `json:"state,omitempty"`
 	Timestamp     int32      `json:"timestamp"`
-	Type          string     `json:"type"`
+	Type          string     `json:"type,omitempty"`
 	URI           string     `json:"uri,omitempty"`
 	ValidProof    bool       `json:"validProof,omitempty"`
 }
