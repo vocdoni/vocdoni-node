@@ -148,7 +148,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *State) error {
 	}
 	endBlock := process.StartBlock + process.NumberOfBlocks
 	// check if process is enabled
-	if (endBlock >= state.Height() || process.StartBlock < state.Height()) && !process.Canceled && !process.Paused {
+	if (process.StartBlock >= state.Height() && state.Height() <= endBlock) && !process.Canceled && !process.Paused {
 		switch process.Type {
 		case "snark-vote":
 			voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
