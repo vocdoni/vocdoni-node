@@ -303,7 +303,7 @@ func getResults(request routerRequest, router *Router) {
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
 	apiResponse.Ok = true
-	if len(request.ProcessID) != 64 {
+	if len(request.ProcessID) < 64 || len(request.ProcessID) > 66 {
 		sendError(router.transport, router.signer, request.context, request.id, "processID length not valid")
 		return
 	}
