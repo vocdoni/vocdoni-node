@@ -4,7 +4,7 @@ package vochain
 const (
 	TestnetGenesis1 = `
 {
-  "genesis_time": "2020-02-04T10:20:50.199392102Z",
+  "genesis_time": "2020-02-04T09:30:50.199392102Z",
   "chain_id": "0x6",
   "consensus_params": {
     "block": {
