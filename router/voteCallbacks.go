@@ -6,6 +6,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 func submitEnvelope(request routerRequest, router *Router) {
@@ -303,7 +304,8 @@ func getResults(request routerRequest, router *Router) {
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
 	apiResponse.Ok = true
-	if len(request.ProcessID) < 64 || len(request.ProcessID) > 66 {
+	request.ProcessID = util.TrimHex(request.ProcessID)
+	if len(request.ProcessID) != 64 {
 		sendError(router.transport, router.signer, request.context, request.id, "processID length not valid")
 		return
 	}
@@ -348,7 +350,7 @@ func getProcListResults(request routerRequest, router *Router) {
 	apiResponse.Request = request.id
 	apiResponse.Timestamp = int32(time.Now().Unix())
 	apiResponse.Ok = true
-	apiResponse.ProcessIDs = router.Scrutinizer.ProcessList(64, request.FromID)
+	apiResponse.ProcessIDs = router.Scrutinizer.ProcessList(64, util.TrimHex(request.FromID))
 	apiResponse.Signature, err = router.signer.SignJSON(apiResponse.MetaResponse)
 	if err != nil {
 		log.Warn(err)
