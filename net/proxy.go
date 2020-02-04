@@ -64,6 +64,10 @@ func (p *Proxy) Init() (net.Addr, error) {
 	if len(p.C.SSLDomain) > 0 {
 		log.Infof("fetching letsencrypt TLS certificate for %s", p.C.SSLDomain)
 		s, m = p.GenerateSSLCertificate()
+		s.ReadTimeout = 5 * time.Second
+		s.WriteTimeout = 10 * time.Second
+		s.IdleTimeout = 30 * time.Second
+		s.ReadHeaderTimeout = 2 * time.Second
 
 		go func() {
 			log.Fatal(s.ServeTLS(ln, "", ""))
@@ -81,15 +85,15 @@ func (p *Proxy) Init() (net.Addr, error) {
 		}
 	} else {
 		s = &http.Server{}
+		s.ReadTimeout = 5 * time.Second
+		s.WriteTimeout = 10 * time.Second
+		s.IdleTimeout = 30 * time.Second
+		s.ReadHeaderTimeout = 2 * time.Second
 		go func() {
 			log.Fatal(s.Serve(ln))
 		}()
 		log.Infof("proxy ready at http://%s", addr)
 	}
-	s.ReadTimeout = 5 * time.Second
-	s.WriteTimeout = 10 * time.Second
-	s.IdleTimeout = 30 * time.Second
-	s.ReadHeaderTimeout = 2 * time.Second
 
 	return addr, nil
 }
