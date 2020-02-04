@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -499,8 +500,12 @@ func main() {
 				time.Sleep(time.Second * 2)
 			}
 			height, _, _, _ := node.SyncInfo()
-			log.Infof("searching for census from block 0 to %s", height)
-			ev.ReadEthereumEventLogs(0, util.Hex2int64(height))
+			lastBlock, err := strconv.ParseInt(height, 10, 64)
+			if err != nil {
+				log.Fatalf("cannot read logs, ethereum last block parsing failed: %s at block %d", err, height)
+			}
+			log.Infof("searching for census from block 0 to %s", lastBlock)
+			ev.ReadEthereumEventLogs(0, lastBlock)
 			// Wait until having some peers
 			for _, _, peers, _ := node.SyncInfo(); peers > 0; {
 				time.Sleep(time.Second * 2)
