@@ -4,7 +4,6 @@ package census
 import (
 	"encoding/base64"
 	"encoding/json"
-	"sync"
 
 	"errors"
 	"fmt"
@@ -39,7 +38,6 @@ type Manager struct {
 	Trees       map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
 	Storage     data.Storage
 	ImportQueue map[string]string
-	Lock        sync.RWMutex
 }
 
 // Data helps satisfy an ethevents interface.
@@ -105,8 +103,6 @@ func (m *Manager) Init(storage, rootKey string) error {
 
 // AddNamespace adds a new merkletree identified by a censusId (name)
 func (m *Manager) AddNamespace(name string, pubKeys []string) error {
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
 	if _, e := m.Trees[name]; e {
 		return errors.New("namespace already exist")
 	}
@@ -126,8 +122,6 @@ func (m *Manager) AddNamespace(name string, pubKeys []string) error {
 
 // DelNamespace removes a merkletree namespace
 func (m *Manager) DelNamespace(name string) error {
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
 	if _, e := m.Trees[name]; e {
 		delete(m.Trees, name)
 		os.RemoveAll(m.StorageDir + "/" + name)
@@ -144,8 +138,6 @@ func (m *Manager) DelNamespace(name string) error {
 
 func (m *Manager) save() error {
 	log.Info("saving namespaces")
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
 	nsConfig := fmt.Sprintf("%s/namespaces.json", m.StorageDir)
 	data, err := json.Marshal(m.Census)
 	if err != nil {

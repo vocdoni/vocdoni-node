@@ -504,7 +504,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("cannot read logs, ethereum last block parsing failed: %s at block %d", err, height)
 			}
-			log.Infof("searching for census from block 0 to %d", lastBlock)
+			log.Infof("searching for census from block 0 to %s", lastBlock)
 			ev.ReadEthereumEventLogs(0, lastBlock)
 			// Wait until having some peers
 			for _, _, peers, _ := node.SyncInfo(); peers > 0; {
