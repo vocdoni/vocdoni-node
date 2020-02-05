@@ -97,11 +97,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 // The header contains the height, timestamp, and more - it exactly matches the Tendermint block header.
 // The LastCommitInfo and ByzantineValidators can be used to determine rewards and punishments for the validators.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	if app.State.Lock {
-		log.Warn("app state is locked")
-		return abcitypes.ResponseBeginBlock{}
-	}
-	app.State.Lock = true
+	app.State.Lock.Lock()
 	// reset app state to latest persistent data
 	app.State.Rollback()
 	headerBytes, err := app.Codec.MarshalBinaryBare(req.Header)
@@ -136,14 +132,11 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 }
 
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
-	if app.State.Lock {
-		app.State.Lock = false
-		hash := app.State.Save()
-		return abcitypes.ResponseCommit{
-			Data: hash,
-		}
+	defer app.State.Lock.Unlock()
+	hash := app.State.Save()
+	return abcitypes.ResponseCommit{
+		Data: hash,
 	}
-	return abcitypes.ResponseCommit{}
 }
 
 func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {

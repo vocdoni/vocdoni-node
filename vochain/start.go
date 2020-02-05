@@ -161,9 +161,13 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*nm.No
 	tconfig.P2P.AddrBookStrict = false
 	tconfig.P2P.SeedMode = localConfig.SeedMode
 	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
+
+	tconfig.Consensus.TimeoutProposeDelta = time.Millisecond * 500
 	tconfig.Consensus.TimeoutPropose = time.Second * 3
-	tconfig.Consensus.TimeoutPrevote = time.Second * 1
-	tconfig.Consensus.TimeoutPrecommit = time.Second * 1
+	tconfig.Consensus.TimeoutPrevoteDelta = time.Millisecond * 500
+	tconfig.Consensus.TimeoutPrevote = time.Second * 3
+	tconfig.Consensus.TimeoutPrecommitDelta = time.Millisecond * 500
+	tconfig.Consensus.TimeoutPrecommit = time.Second * 3
 	tconfig.Consensus.TimeoutCommit = time.Second * 10
 
 	// tx events

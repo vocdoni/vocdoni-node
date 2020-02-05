@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/iavl"
@@ -43,7 +44,7 @@ type State struct {
 	ProcessTree *iavl.MutableTree
 	VoteTree    *iavl.MutableTree
 	Codec       *amino.Codec
-	Lock        bool
+	Lock        sync.Mutex
 	Callbacks   map[string]EventCallback // addVote, addProcess....
 }
 
@@ -411,15 +412,15 @@ func (v *State) AppHash() []byte {
 func (v *State) Save() []byte {
 	h1, _, err := v.AppTree.SaveVersion()
 	if err != nil {
-		log.Errorf("cannot sve vochain state to disk: %s", err)
+		log.Errorf("cannot save vochain state to disk: %s", err)
 	}
 	h2, _, err := v.ProcessTree.SaveVersion()
 	if err != nil {
-		log.Errorf("cannot sve vochain state to disk: %s", err)
+		log.Errorf("cannot save vochain state to disk: %s", err)
 	}
 	h3, _, err := v.VoteTree.SaveVersion()
 	if err != nil {
-		log.Errorf("cannot sve vochain state to disk: %s", err)
+		log.Errorf("cannot save vochain state to disk: %s", err)
 	}
 
 	return signature.HashRaw(fmt.Sprintf("%s%s%s", h1, h2, h3))
