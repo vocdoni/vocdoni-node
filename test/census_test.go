@@ -60,7 +60,7 @@ func TestCensus(t *testing.T) {
 	pxy := net.NewProxy()
 	pxy.C.Address = "127.0.0.1"
 	pxy.C.Port = 0
-	addr, err := pxy.Init()
+	err := pxy.Init()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestCensus(t *testing.T) {
 	ws.AddProxyHandler("/dvote")
 
 	// Create websocket client
-	u := fmt.Sprintf("ws://%s/dvote", addr)
+	u := fmt.Sprintf("ws://%s/dvote", pxy.Addr)
 	t.Logf("connecting to %s", u)
 	c, _, err := websocket.DefaultDialer.Dial(u, nil)
 	if err != nil {

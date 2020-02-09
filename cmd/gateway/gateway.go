@@ -250,7 +250,7 @@ func main() {
 	}
 	pxy.C.Address = globalCfg.ListenHost
 	pxy.C.Port = globalCfg.ListenPort
-	if _, err := pxy.Init(); err != nil {
+	if err := pxy.Init(); err != nil {
 		log.Fatal(err)
 	}
 

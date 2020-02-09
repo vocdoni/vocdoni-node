@@ -7,22 +7,29 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 
+	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 
-	"gitlab.com/vocdoni/go-dvote/log"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
+
+	"github.com/gorilla/websocket"
 )
 
-// ProxyHandler function signature required to add a handler in the net/http Server
-type ProxyHandler func(http.ResponseWriter, *http.Request)
+// ProxyWsHandler function signature required to add a handler in the net/http Server
+type ProxyWsHandler func(c *websocket.Conn)
 
 // Proxy represents a proxy
 type Proxy struct {
-	C *types.Connection
+	C      *types.Connection
+	Server *chi.Mux
+	Addr   net.Addr
 }
 
 // NewProxy creates a new proxy instance
@@ -50,52 +57,63 @@ func getCertificates(domain string, m *autocert.Manager) [][]byte {
 //
 // When it returns, the server is ready. The returned address is useful if the
 // port was left as 0, to retrieve the randomly allocated port.
-func (p *Proxy) Init() (net.Addr, error) {
+func (p *Proxy) Init() error {
 	var s *http.Server
-	var m *autocert.Manager
 
 	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", p.C.Address, p.C.Port))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	addr := ln.Addr()
-	log.Infof("proxy listening on %s", addr)
+
+	p.Server = chi.NewRouter()
+	p.Server.Use(middleware.RealIP)
+	p.Server.Use(middleware.Logger)
+	p.Server.Use(middleware.Recoverer)
+	p.Server.Use(middleware.Throttle(500))
+	p.Server.Use(middleware.Timeout(30 * time.Second))
+
+	p.Server.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("pong"))
+	})
 
 	if len(p.C.SSLDomain) > 0 {
 		log.Infof("fetching letsencrypt TLS certificate for %s", p.C.SSLDomain)
+		var m *autocert.Manager
 		s, m = p.GenerateSSLCertificate()
 		s.ReadTimeout = 5 * time.Second
 		s.WriteTimeout = 10 * time.Second
 		s.IdleTimeout = 30 * time.Second
 		s.ReadHeaderTimeout = 2 * time.Second
-
+		s.Handler = p.Server
+		log.Info("starting go-chi https server")
 		go func() {
 			log.Fatal(s.ServeTLS(ln, "", ""))
 		}()
-
 		certs := getCertificates(p.C.SSLDomain, m)
 		if len(certs) == 0 {
 			log.Warnf(`letsencrypt TLS certificate cannot be obtained. Maybe port 443 is not accessible or domain name is wrong.
-						You might want to redirect port 443 with iptables using the following command:
-						sudo iptables -t nat -I PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports %d`, p.C.Port)
-			s.Close()
-			return nil, fmt.Errorf("cannot get letsencrypt TLS certificate")
-		} else {
-			log.Infof("proxy with TLS ready at https://%s:%d", p.C.SSLDomain, p.C.Port)
+							You might want to redirect port 443 with iptables using the following command:
+							sudo iptables -t nat -I PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports %d`, p.C.Port)
+			return fmt.Errorf("cannot get letsencrypt TLS certificate")
 		}
+		log.Infof("proxy ready at https://%s", ln.Addr())
+
 	} else {
+		log.Info("starting go-chi http server")
 		s = &http.Server{}
 		s.ReadTimeout = 5 * time.Second
 		s.WriteTimeout = 10 * time.Second
-		s.IdleTimeout = 30 * time.Second
+		s.IdleTimeout = 60 * time.Second
 		s.ReadHeaderTimeout = 2 * time.Second
+		s.Handler = p.Server
 		go func() {
 			log.Fatal(s.Serve(ln))
 		}()
-		log.Infof("proxy ready at http://%s", addr)
+		log.Infof("proxy ready at http://%s", ln.Addr())
 	}
+	p.Addr = ln.Addr()
 
-	return addr, nil
+	return nil
 }
 
 // GenerateSSLCertificate generates a SSL certificated for the proxy
@@ -117,9 +135,18 @@ func (p *Proxy) GenerateSSLCertificate() (*http.Server, *autocert.Manager) {
 	return serverConfig, &m
 }
 
-// AddHandler adds a handler for the proxy
-func (p *Proxy) AddHandler(path string, handler ProxyHandler) {
-	http.HandleFunc(path, handler)
+// AddWsHandler adds a websocket handler in the proxy
+func (p *Proxy) AddWsHandler(path string, handler ProxyWsHandler) {
+	p.Server.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		wshandler(w, r, handler)
+	})
+}
+
+// AddHandler adds a handler in the proxy
+func (p *Proxy) AddHandler(path string, handler http.HandlerFunc) {
+	p.Server.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		handler(w, r)
+	})
 }
 
 // AddEndpoint adds an endpoint representing the url where the request will be handled
@@ -160,4 +187,93 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 		log.Debugf("response: %s", respBody)
 	}
 	return fn
+}
+
+// WsHandle handles the websockets connection on the go-dvote proxy
+type WebsocketHandle struct {
+	Connection *types.Connection // the ws connection
+	WsProxy    *Proxy            // proxy where the ws will be associated
+	Upgrader   *websocket.Upgrader
+
+	internalReceiver chan types.Message
+	mu               sync.Mutex
+}
+
+type WebsocketContext struct {
+	Conn *websocket.Conn
+}
+
+func (c WebsocketContext) ConnectionType() string {
+	return "Websocket"
+}
+
+// SetProxy sets the proxy for the ws
+func (w *WebsocketHandle) SetProxy(p *Proxy) {
+	w.WsProxy = p
+}
+
+// Init initializes the websockets handler and the internal channel to communicate with other go-dvote components
+func (w *WebsocketHandle) Init(c *types.Connection) error {
+	w.Upgrader = &websocket.Upgrader{
+		ReadBufferSize:  4096,
+		WriteBufferSize: 8192,
+		CheckOrigin:     func(r *http.Request) bool { return true },
+	}
+	w.internalReceiver = make(chan types.Message, 1)
+	return nil
+}
+
+// AddProxyHandler adds the current websocket handler into the Proxy
+func (w *WebsocketHandle) AddProxyHandler(path string) {
+	serveWs := func(conn *websocket.Conn) {
+		// Read websocket messages until the connection is closed. HTTP
+		// handlers are run in new goroutines, so we don't need to spawn
+		// another goroutine.
+		for {
+			_, payload, err := conn.ReadMessage()
+			if err != nil {
+				conn.Close()
+				break
+			}
+			msg := types.Message{
+				Data:      []byte(payload),
+				TimeStamp: int32(time.Now().Unix()),
+				Context: &WebsocketContext{
+					Conn: conn,
+				},
+			}
+			w.internalReceiver <- msg
+		}
+	}
+	w.WsProxy.AddWsHandler(path, serveWs)
+}
+
+// Listen will listen the websockets handler and write the received data into the channel
+func (w *WebsocketHandle) Listen(receiver chan<- types.Message) {
+	for {
+		msg := <-w.internalReceiver
+		receiver <- msg
+	}
+}
+
+// Send sends the response given a message
+func (w *WebsocketHandle) Send(msg types.Message) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	clientConn := msg.Context.(*WebsocketContext).Conn
+	clientConn.WriteMessage(websocket.BinaryMessage, msg.Data)
+}
+
+func wshandler(w http.ResponseWriter, r *http.Request, ph ProxyWsHandler) {
+	upgrader := &websocket.Upgrader{
+		ReadBufferSize:  4096,
+		WriteBufferSize: 4096,
+		CheckOrigin:     func(r *http.Request) bool { return true },
+	}
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Errorf("failed to set websocket upgrade: %s", err)
+		return
+	}
+	ph(conn)
 }
