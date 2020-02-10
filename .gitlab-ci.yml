@@ -25,6 +25,7 @@ go-test:
     - go env
     - go test -vet=off ./... # we run vet later
     - go vet ./...
+    - go test -vet=off -race ./...
     - diff -u <(echo -n) <(gofmt -s -d *) # don't include .cache/
 
 docker-release:
