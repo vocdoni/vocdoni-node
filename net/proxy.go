@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/cors"
 
 	"github.com/gorilla/websocket"
 )
@@ -71,6 +72,15 @@ func (p *Proxy) Init() error {
 	p.Server.Use(middleware.Recoverer)
 	p.Server.Use(middleware.Throttle(500))
 	p.Server.Use(middleware.Timeout(30 * time.Second))
+
+	cors := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type"},
+		AllowCredentials: false,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	})
+	p.Server.Use(cors.Handler)
 
 	p.Server.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("pong"))
