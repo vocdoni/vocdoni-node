@@ -70,7 +70,7 @@ func (p *Proxy) Init() error {
 	p.Server.Use(middleware.RealIP)
 	p.Server.Use(middleware.Logger)
 	p.Server.Use(middleware.Recoverer)
-	p.Server.Use(middleware.Throttle(500))
+	p.Server.Use(middleware.Throttle(5000))
 	p.Server.Use(middleware.Timeout(30 * time.Second))
 
 	cors := cors.New(cors.Options{

@@ -25,6 +25,7 @@ func buildReply(context types.MessageContext, data []byte) types.Message {
 	reply.TimeStamp = int32(time.Now().Unix())
 	reply.Context = context
 	reply.Data = data
+	log.Debugf("response %s", data)
 	return *reply
 }
 
@@ -211,8 +212,8 @@ func (r *Router) Route() {
 			continue
 		}
 
-		log.Infof("calling method %s", request.method)
-		log.Debugf("data received: %+v", request.MetaRequest)
+		log.Infof("api method %s", request.method)
+		log.Debugf("received: %+v", request.MetaRequest)
 
 		if request.private {
 			r.PrivateCalls++
@@ -262,7 +263,6 @@ func info(request routerRequest, router *Router) {
 		log.Error(err)
 		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err))
 	} else {
-		log.Debugf("sending info resposne: %s", rawResponse)
 		router.transport.Send(buildReply(request.context, rawResponse))
 	}
 }

@@ -33,7 +33,7 @@ func submitEnvelope(request routerRequest, router *Router) {
 		sendError(router.transport, router.signer, request.context, request.id, string(res.Data))
 		return
 	}
-	log.Infof("transaction hash: %s, transaction code: %d", res.Hash, res.Code)
+	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
 
 	var apiResponse types.ResponseMessage
 	apiResponse.ID = request.id
@@ -96,7 +96,6 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 		return
 	}
 
-	log.Debugf("api response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawApiResponse))
 }
 
@@ -146,7 +145,6 @@ func getEnvelope(request routerRequest, router *Router) {
 		return
 	}
 
-	log.Debugf("getEnvelope response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawApiResponse))
 }
 
@@ -191,7 +189,6 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 		return
 	}
 
-	log.Debugf("api response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawApiResponse))
 }
 
@@ -234,7 +231,6 @@ func getBlockHeight(request routerRequest, router *Router) {
 		sendError(router.transport, router.signer, request.context, request.id, "cannot marshaling reply")
 		return
 	}
-	log.Debugf("api response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawApiResponse))
 }
 
@@ -274,7 +270,6 @@ func getProcessList(request routerRequest, router *Router) {
 		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
 		return
 	}
-	log.Debugf("api response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawAPIResponse))
 }
 
@@ -328,7 +323,6 @@ func getEnvelopeList(request routerRequest, router *Router) {
 		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
 		return
 	}
-	log.Debugf("api response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawAPIResponse))
 }
 
@@ -374,7 +368,6 @@ func getResults(request routerRequest, router *Router) {
 		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
 		return
 	}
-	log.Debugf("api response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawAPIResponse))
 }
 
@@ -398,6 +391,5 @@ func getProcListResults(request routerRequest, router *Router) {
 		sendError(router.transport, router.signer, request.context, request.id, "cannot marshal reply")
 		return
 	}
-	log.Debugf("api response: %+v", apiResponse.MetaResponse)
 	router.transport.Send(buildReply(request.context, rawAPIResponse))
 }

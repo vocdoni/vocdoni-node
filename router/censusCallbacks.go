@@ -39,7 +39,6 @@ func censusLocal(request routerRequest, router *Router) {
 	if err != nil {
 		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err))
 	} else {
-		log.Infof("sending census resposne: %s", rawResponse)
 		router.transport.Send(buildReply(request.context, rawResponse))
 	}
 }

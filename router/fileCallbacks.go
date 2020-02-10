@@ -73,7 +73,6 @@ func fetchFile(request routerRequest, router *Router) {
 		errMsg := fmt.Sprintf("error marshaling response body: %s", err)
 		sendError(router.transport, router.signer, request.context, request.id, errMsg)
 	} else {
-		log.Debugf("sending response %s", rawResponse)
 		router.transport.Send(buildReply(request.context, rawResponse))
 	}
 }
@@ -113,7 +112,6 @@ func addFile(request routerRequest, router *Router) {
 			sendError(router.transport, router.signer, request.context, request.id,
 				fmt.Sprintf("could not unmarshal response (%s)", err))
 		} else {
-			log.Debugf("sending response %s", rawResponse)
 			router.transport.Send(buildReply(request.context, rawResponse))
 		}
 	}
@@ -173,7 +171,6 @@ func pinFile(request routerRequest, router *Router) {
 	if err != nil {
 		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("error marshaling (%s)", err))
 	} else {
-		log.Debugf("sending response %s", rawResponse)
 		router.transport.Send(buildReply(request.context, rawResponse))
 	}
 }
@@ -199,7 +196,6 @@ func unpinFile(request routerRequest, router *Router) {
 	if err != nil {
 		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err))
 	} else {
-		log.Debugf("sending response %s", rawResponse)
 		router.transport.Send(buildReply(request.context, rawResponse))
 	}
 }

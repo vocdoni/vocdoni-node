@@ -46,7 +46,7 @@ func (s *Scrutinizer) addProcess(v interface{}) {
 	log.Debugf("add new process %s to scrutinizer local database", pid)
 	process, err := s.Storage.Get([]byte(pid))
 	if err == nil || len(process) > 0 {
-		log.Errorf("process %s already exist!")
+		log.Errorf("process %s already exist!", pid)
 		return
 	}
 	pv := make([][]uint32, MaxQuestions)
