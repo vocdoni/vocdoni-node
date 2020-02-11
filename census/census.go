@@ -361,14 +361,8 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		return resp
 	}
 
-	censusFound := false
-	for k := range m.Trees {
-		if k == r.CensusID {
-			censusFound = true
-			break
-		}
-	}
-	if !censusFound {
+	// check if census exist
+	if _, censusFound := m.Trees[r.CensusID]; !censusFound {
 		resp.SetError("censusId not valid or not found")
 		return resp
 	}
