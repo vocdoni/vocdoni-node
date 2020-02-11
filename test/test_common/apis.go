@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -26,7 +25,14 @@ type DvoteApiServer struct {
 	PxyAddr   string
 }
 
-func (d *DvoteApiServer) Start(level string, t *testing.T) error {
+/*
+DvoteApiServer starts a basic dvote server
+1. Starts the Proxy
+2. Starts the IPFS storage
+3. Starts the Dvote API router
+4. Starts the Census Manager
+*/
+func (d *DvoteApiServer) Start(level string) error {
 	log.InitLogger(level, "stdout")
 	d.Signer = new(signature.SignKeys)
 	d.Signer.Generate()
@@ -37,7 +43,6 @@ func (d *DvoteApiServer) Start(level string, t *testing.T) error {
 	pxy.C.Port = 0
 	err := pxy.Init()
 	if err != nil {
-		t.Fatal(err)
 		return err
 	}
 	d.PxyAddr = fmt.Sprintf("ws://%s/dvote", pxy.Addr)
@@ -54,14 +59,12 @@ func (d *DvoteApiServer) Start(level string, t *testing.T) error {
 	// Create the API router
 	d.IpfsDir, err = ioutil.TempDir("", "ipfs")
 	if err != nil {
-		t.Fatal(err)
 		return err
 	}
 	//defer os.RemoveAll(ipfsDir)
 	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {
-		t.Fatalf("cannot start IPFS %s", err)
 		return err
 	}
 	routerAPI := router.InitRouter(listenerOutput, storage, ws, d.Signer)
@@ -70,12 +73,10 @@ func (d *DvoteApiServer) Start(level string, t *testing.T) error {
 	var cm census.Manager
 	d.CensusDir, err = ioutil.TempDir("", "census")
 	if err != nil {
-		t.Fatal(err)
 		return err
 	}
 
 	if err := cm.Init(d.CensusDir, ""); err != nil {
-		t.Fatal(err)
 		return err
 	}
 	routerAPI.EnableCensusAPI(&cm)
@@ -94,8 +95,8 @@ func (r *ApiConnection) Connect(addr string) (err error) {
 	return
 }
 
-func (r *ApiConnection) Request(t *testing.T, req types.MetaRequest, signer *signature.SignKeys) types.MetaResponse {
-	t.Helper()
+func (r *ApiConnection) Request(req types.MetaRequest, signer *signature.SignKeys) (*types.MetaResponse, error) {
+	//t.Helper()
 	method := req.Method
 
 	var cmReq types.RequestMessage
@@ -106,26 +107,26 @@ func (r *ApiConnection) Request(t *testing.T, req types.MetaRequest, signer *sig
 		var err error
 		cmReq.Signature, err = signer.SignJSON(cmReq.MetaRequest)
 		if err != nil {
-			t.Fatalf("%s: %v", method, err)
+			return nil, fmt.Errorf("%s: %v", method, err)
 		}
 	}
 	rawReq, err := json.Marshal(cmReq)
 	if err != nil {
-		t.Fatalf("%s: %v", method, err)
+		return nil, fmt.Errorf("%s: %v", method, err)
 	}
 	if err := r.Conn.WriteMessage(websocket.TextMessage, rawReq); err != nil {
-		t.Fatalf("%s: %v", method, err)
+		return nil, fmt.Errorf("%s: %v", method, err)
 	}
 	_, message, err := r.Conn.ReadMessage()
 	if err != nil {
-		t.Fatalf("%s: %v", method, err)
+		return nil, fmt.Errorf("%s: %v", method, err)
 	}
 	var cmRes types.ResponseMessage
 	if err := json.Unmarshal(message, &cmRes); err != nil {
-		t.Fatalf("%s: %v", method, err)
+		return nil, fmt.Errorf("%s: %v", method, err)
 	}
 	if cmRes.ID != cmReq.ID {
-		t.Fatalf("%s: %v", method, "request ID doesn't match")
+		return nil, fmt.Errorf("%s: %v", method, "request ID doesn't match")
 	}
-	return cmRes.MetaResponse
+	return &cmRes.MetaResponse, nil
 }

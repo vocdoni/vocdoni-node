@@ -44,7 +44,7 @@ import (
 	common "gitlab.com/vocdoni/go-dvote/test/test_common"
 )
 
-var level = flag.String("level", "error", "logging level")
+var level = flag.String("logLevel", "error", "logging level")
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -53,7 +53,10 @@ func TestCensus(t *testing.T) {
 	var err error
 
 	var server common.DvoteApiServer
-	server.Start(*level, t)
+	err = server.Start(*level)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(server.IpfsDir)
 	defer os.RemoveAll(server.CensusDir)
 
@@ -81,7 +84,10 @@ func TestCensus(t *testing.T) {
 	// Create census
 	req.Method = "addCensus"
 	req.CensusID = "test"
-	resp := c.Request(t, req, signer2)
+	resp, err := c.Request(req, signer2)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -91,7 +97,10 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
-	resp = c.Request(t, req, signer2)
+	resp, err = c.Request(req, signer2)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -100,7 +109,10 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello2"))
-	resp = c.Request(t, req, signer1)
+	resp, err = c.Request(req, signer1)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -109,7 +121,10 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "genProof"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
-	resp = c.Request(t, req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -118,14 +133,20 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "genProof"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello3"))
-	resp = c.Request(t, req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if len(resp.Siblings) > 1 {
 		t.Fatalf("proof should not exist!")
 	}
 
 	// getRoot
 	req.Method = "getRoot"
-	resp = c.Request(t, req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	root := resp.Root
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
@@ -140,7 +161,10 @@ func TestCensus(t *testing.T) {
 			fmt.Sprintf("0123456789abcdef0123456789abc%d", i))))
 	}
 	req.ClaimsData = claims
-	resp = c.Request(t, req, signer2)
+	resp, err = c.Request(req, signer2)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -149,7 +173,10 @@ func TestCensus(t *testing.T) {
 	req.Method = "dumpPlain"
 	req.ClaimData = ""
 	req.ClaimsData = []string{}
-	resp = c.Request(t, req, signer2)
+	resp, err = c.Request(req, signer2)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -158,7 +185,10 @@ func TestCensus(t *testing.T) {
 	req.Method = "genProof"
 	req.RootHash = ""
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abc0"))
-	resp = c.Request(t, req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	siblings := resp.Siblings
 	if len(siblings) == 0 {
 		t.Fatalf("proof not generated while it should be generated correctly")
@@ -167,7 +197,10 @@ func TestCensus(t *testing.T) {
 	// CheckProof valid
 	req.Method = "checkProof"
 	req.ProofData = siblings
-	resp = c.Request(t, req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.ValidProof {
 		t.Fatal("proof is invalid but it should be valid")
 	}
@@ -176,7 +209,10 @@ func TestCensus(t *testing.T) {
 	req.ProofData = siblings
 	req.Method = "checkProof"
 	req.RootHash = root
-	resp = c.Request(t, req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -188,7 +224,10 @@ func TestCensus(t *testing.T) {
 	// publish
 	req.Method = "publish"
 	req.ClaimsData = []string{}
-	resp = c.Request(t, req, signer2)
+	resp, err = c.Request(req, signer2)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -196,7 +235,10 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	req.Method = "getRoot"
-	resp = c.Request(t, req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	root = resp.Root
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
@@ -205,7 +247,10 @@ func TestCensus(t *testing.T) {
 	// getRoot from published census and check censusID=root
 	req.Method = "getRoot"
 	req.CensusID = root
-	resp = c.Request(t, req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -216,7 +261,10 @@ func TestCensus(t *testing.T) {
 	// add second census
 	req.Method = "addCensus"
 	req.CensusID = "importTest"
-	resp = c.Request(t, req, signer2)
+	resp, err = c.Request(req, signer2)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -225,14 +273,20 @@ func TestCensus(t *testing.T) {
 	req.Method = "importRemote"
 	req.CensusID = resp.CensusID
 	req.URI = uri
-	resp = c.Request(t, req, signer2)
+	resp, err = c.Request(req, signer2)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
 	// getRoot
 	req.Method = "getRoot"
-	resp = c.Request(t, req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if root != resp.Root {
 		t.Fatalf("root is different after importing! %s != %s", root, resp.Root)
 	}
@@ -240,7 +294,10 @@ func TestCensus(t *testing.T) {
 	// getSize
 	req.Method = "getSize"
 	req.RootHash = ""
-	resp = c.Request(t, req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if exp, got := int64(101), resp.Size; exp != got {
 		t.Fatalf("expected size %v, got %v", exp, got)
 	}
