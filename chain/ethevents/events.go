@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	eth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -33,13 +34,14 @@ type EthereumEvents struct {
 	DialAddr string
 	// list of handler functions that will be called on events
 	EventHandlers []EventHandler
-
 	// ethereum subscribed events
 	Signer Signer
 	// VochainCli is the Vochain HTTP client
 	VochainCLI VochainClient
 	// Census is the census manager service
 	Census CensusManager
+	// EventProcessor handles events pending to process
+	EventProcessor *EventProcessor
 }
 
 type Signer interface {
@@ -73,6 +75,11 @@ type BlockInfo struct {
 	TxNumber int
 }
 
+type EventProcessor struct {
+	CurrentBlock int64
+	Events       chan ethtypes.Log
+}
+
 // NewEthEvents creates a new Ethereum events handler
 func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, cens *census.Manager) (*EthereumEvents, error) {
 	if len(w3Endpoint) == 0 {
@@ -94,6 +101,9 @@ func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, c
 		Signer:          signer,
 		DialAddr:        w3Endpoint,
 		Census:          cens,
+		EventProcessor: &EventProcessor{
+			Events: make(chan ethtypes.Log),
+		},
 	}, nil
 }
 
@@ -156,17 +166,14 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs() {
 		log.Fatal(err)
 	}
 
+	go ev.runEventProcessor(12, client)
+
 	for {
 		select {
 		case err := <-sub.Err():
 			log.Fatal(err)
 		case event := <-logs:
-			log.Warnf("ethereum event recieved: %v", event)
-			for _, h := range ev.EventHandlers {
-				if err := h(event, ev); err != nil {
-					log.Error(err)
-				}
-			}
+			ev.EventProcessor.Events <- event
 		}
 	}
 }
@@ -201,4 +208,26 @@ func (ev *EthereumEvents) ReadEthereumEventLogs(from, to int64) error {
 		}
 	}
 	return nil
+}
+
+func (ev *EthereumEvents) runEventProcessor(threshold int64, client *ethclient.Client) {
+	for {
+		evt := <-ev.EventProcessor.Events
+		for {
+			if (ev.EventProcessor.CurrentBlock - int64(evt.BlockNumber)) >= threshold {
+				for _, h := range ev.EventHandlers {
+					if err := h(evt, ev); err != nil {
+						log.Error(err)
+					}
+				}
+				break
+			}
+			time.Sleep(time.Second * 15)
+			header, err := client.HeaderByNumber(context.Background(), nil)
+			if err != nil {
+				log.Warnf("Cannot sync event processor block")
+			}
+			ev.EventProcessor.CurrentBlock = header.Number.Int64()
+		}
+	}
 }
