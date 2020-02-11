@@ -30,24 +30,18 @@ Run it executing `go test -v test/census_test.go`
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
-
-	"gitlab.com/vocdoni/go-dvote/census"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
-	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/net"
-	"gitlab.com/vocdoni/go-dvote/router"
 	"gitlab.com/vocdoni/go-dvote/types"
+
+	common "gitlab.com/vocdoni/go-dvote/test/test_common"
 )
 
 var level = flag.String("level", "error", "logging level")
@@ -56,73 +50,30 @@ func init() { rand.Seed(time.Now().UnixNano()) }
 
 func TestCensus(t *testing.T) {
 	log.InitLogger(*level, "stdout")
-	// create the proxy to handle HTTP queries
-	pxy := net.NewProxy()
-	pxy.C.Address = "127.0.0.1"
-	pxy.C.Port = 0
-	err := pxy.Init()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var err error
 
-	// the server
+	var server common.DvoteApiServer
+	server.Start(*level, t)
+	defer os.RemoveAll(server.IpfsDir)
+	defer os.RemoveAll(server.CensusDir)
+
 	signer1 := new(sig.SignKeys)
 	signer1.Generate()
-
-	// the client
 	signer2 := new(sig.SignKeys)
 	signer2.Generate()
-	if err := signer1.AddAuthKey(signer2.EthAddrString()); err != nil {
+	if err := server.Signer.AddAuthKey(signer2.EthAddrString()); err != nil {
 		t.Fatalf("cannot add authorized address %s", err)
 	}
 	t.Logf("added authorized address %s", signer2.EthAddrString())
 
-	// Create WebSocket endpoint
-	ws := new(net.WebsocketHandle)
-	ws.Init(new(types.Connection))
-	ws.SetProxy(pxy)
-
-	// Create the listener for routing messages
-	listenerOutput := make(chan types.Message)
-	go ws.Listen(listenerOutput)
-
-	// Create the API router
-	ipfsDir, err := ioutil.TempDir("", "ipfs")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(ipfsDir)
-	ipfsStore := data.IPFSNewConfig(ipfsDir)
-	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
-	if err != nil {
-		t.Fatalf("cannot start IPFS %s", err)
-	}
-	routerAPI := router.InitRouter(listenerOutput, storage, ws, signer1)
-
-	// Create the Census Manager and enable it trough the router
-	var cm census.Manager
-	censusDir, err := ioutil.TempDir("", "census")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(censusDir)
-	pub, _ := signer2.HexString()
-	if err := cm.Init(censusDir, pub); err != nil {
-		t.Fatal(err)
-	}
-	routerAPI.EnableCensusAPI(&cm)
-
-	go routerAPI.Route()
-	ws.AddProxyHandler("/dvote")
-
 	// Create websocket client
-	u := fmt.Sprintf("ws://%s/dvote", pxy.Addr)
-	t.Logf("connecting to %s", u)
-	c, _, err := websocket.DefaultDialer.Dial(u, nil)
+	t.Logf("connecting to %s", server.PxyAddr)
+	var c common.ApiConnection
+	err = c.Connect(server.PxyAddr)
 	if err != nil {
 		t.Fatalf("dial: %s", err)
 	}
-	defer c.Close()
+	defer c.Conn.Close()
 
 	// Send the API requets
 	var req types.MetaRequest
@@ -130,7 +81,7 @@ func TestCensus(t *testing.T) {
 	// Create census
 	req.Method = "addCensus"
 	req.CensusID = "test"
-	resp := sendCensusReq(t, c, req, signer2)
+	resp := c.Request(t, req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -140,7 +91,7 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
-	resp = sendCensusReq(t, c, req, signer2)
+	resp = c.Request(t, req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -149,7 +100,7 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello2"))
-	resp = sendCensusReq(t, c, req, signer1)
+	resp = c.Request(t, req, signer1)
 	if resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -158,7 +109,7 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "genProof"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
-	resp = sendCensusReq(t, c, req, nil)
+	resp = c.Request(t, req, nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -167,14 +118,14 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "genProof"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello3"))
-	resp = sendCensusReq(t, c, req, nil)
+	resp = c.Request(t, req, nil)
 	if len(resp.Siblings) > 1 {
 		t.Fatalf("proof should not exist!")
 	}
 
 	// getRoot
 	req.Method = "getRoot"
-	resp = sendCensusReq(t, c, req, nil)
+	resp = c.Request(t, req, nil)
 	root := resp.Root
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
@@ -189,7 +140,7 @@ func TestCensus(t *testing.T) {
 			fmt.Sprintf("0123456789abcdef0123456789abc%d", i))))
 	}
 	req.ClaimsData = claims
-	resp = sendCensusReq(t, c, req, signer2)
+	resp = c.Request(t, req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -198,7 +149,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "dumpPlain"
 	req.ClaimData = ""
 	req.ClaimsData = []string{}
-	resp = sendCensusReq(t, c, req, signer2)
+	resp = c.Request(t, req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -207,7 +158,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "genProof"
 	req.RootHash = ""
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abc0"))
-	resp = sendCensusReq(t, c, req, nil)
+	resp = c.Request(t, req, nil)
 	siblings := resp.Siblings
 	if len(siblings) == 0 {
 		t.Fatalf("proof not generated while it should be generated correctly")
@@ -216,7 +167,7 @@ func TestCensus(t *testing.T) {
 	// CheckProof valid
 	req.Method = "checkProof"
 	req.ProofData = siblings
-	resp = sendCensusReq(t, c, req, nil)
+	resp = c.Request(t, req, nil)
 	if !resp.ValidProof {
 		t.Fatal("proof is invalid but it should be valid")
 	}
@@ -225,7 +176,7 @@ func TestCensus(t *testing.T) {
 	req.ProofData = siblings
 	req.Method = "checkProof"
 	req.RootHash = root
-	resp = sendCensusReq(t, c, req, nil)
+	resp = c.Request(t, req, nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -237,7 +188,7 @@ func TestCensus(t *testing.T) {
 	// publish
 	req.Method = "publish"
 	req.ClaimsData = []string{}
-	resp = sendCensusReq(t, c, req, signer2)
+	resp = c.Request(t, req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -245,7 +196,7 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	req.Method = "getRoot"
-	resp = sendCensusReq(t, c, req, nil)
+	resp = c.Request(t, req, nil)
 	root = resp.Root
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
@@ -254,7 +205,7 @@ func TestCensus(t *testing.T) {
 	// getRoot from published census and check censusID=root
 	req.Method = "getRoot"
 	req.CensusID = root
-	resp = sendCensusReq(t, c, req, nil)
+	resp = c.Request(t, req, nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -265,7 +216,7 @@ func TestCensus(t *testing.T) {
 	// add second census
 	req.Method = "addCensus"
 	req.CensusID = "importTest"
-	resp = sendCensusReq(t, c, req, signer2)
+	resp = c.Request(t, req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -274,14 +225,14 @@ func TestCensus(t *testing.T) {
 	req.Method = "importRemote"
 	req.CensusID = resp.CensusID
 	req.URI = uri
-	resp = sendCensusReq(t, c, req, signer2)
+	resp = c.Request(t, req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
 	// getRoot
 	req.Method = "getRoot"
-	resp = sendCensusReq(t, c, req, nil)
+	resp = c.Request(t, req, nil)
 	if root != resp.Root {
 		t.Fatalf("root is different after importing! %s != %s", root, resp.Root)
 	}
@@ -289,44 +240,8 @@ func TestCensus(t *testing.T) {
 	// getSize
 	req.Method = "getSize"
 	req.RootHash = ""
-	resp = sendCensusReq(t, c, req, nil)
+	resp = c.Request(t, req, nil)
 	if exp, got := int64(101), resp.Size; exp != got {
 		t.Fatalf("expected size %v, got %v", exp, got)
 	}
-}
-
-func sendCensusReq(t *testing.T, c *websocket.Conn, req types.MetaRequest, signer *sig.SignKeys) types.MetaResponse {
-	t.Helper()
-	method := req.Method
-
-	var cmReq types.RequestMessage
-	cmReq.MetaRequest = req
-	cmReq.ID = fmt.Sprintf("%d", rand.Intn(1000))
-	cmReq.Timestamp = int32(time.Now().Unix())
-	if signer != nil {
-		var err error
-		cmReq.Signature, err = signer.SignJSON(cmReq.MetaRequest)
-		if err != nil {
-			t.Fatalf("%s: %v", method, err)
-		}
-	}
-	rawReq, err := json.Marshal(cmReq)
-	if err != nil {
-		t.Fatalf("%s: %v", method, err)
-	}
-	if err := c.WriteMessage(websocket.TextMessage, rawReq); err != nil {
-		t.Fatalf("%s: %v", method, err)
-	}
-	_, message, err := c.ReadMessage()
-	if err != nil {
-		t.Fatalf("%s: %v", method, err)
-	}
-	var cmRes types.ResponseMessage
-	if err := json.Unmarshal(message, &cmRes); err != nil {
-		t.Fatalf("%s: %v", method, err)
-	}
-	if cmRes.ID != cmReq.ID {
-		t.Fatalf("%s: %v", method, "request ID doesn't match")
-	}
-	return cmRes.MetaResponse
 }
