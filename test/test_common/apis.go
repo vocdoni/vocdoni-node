@@ -80,6 +80,7 @@ func (d *DvoteApiServer) Start(level string) error {
 		return err
 	}
 	routerAPI.EnableCensusAPI(&cm)
+	routerAPI.EnableFileAPI()
 
 	go routerAPI.Route()
 	ws.AddProxyHandler("/dvote")

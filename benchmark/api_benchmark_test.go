@@ -71,11 +71,37 @@ func censusTest(addr string) error {
 	signer := new(sig.SignKeys)
 	signer.Generate()
 
+	// getInfo
+	log.Infof("[%d] get info", rint)
+	req.Method = "getGatewayInfo"
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("%s failed", req.Method)
+	}
+	log.Infof("apis available: %v", resp.APIList)
+
+	censusEnabled := false
+	fileEnabled := false
+	for _, a := range resp.APIList {
+		if a == "census" {
+			censusEnabled = true
+		}
+		if a == "file" {
+			fileEnabled = true
+		}
+	}
+	if !censusEnabled || !fileEnabled {
+		return fmt.Errorf("required APIs not enabled (file=%t, census=%t)", fileEnabled, censusEnabled)
+	}
+
 	// Create census
 	log.Infof("[%d] Create census", rint)
 	req.Method = "addCensus"
 	req.CensusID = fmt.Sprintf("test%d", rint)
-	resp, err := c.Request(req, signer)
+	resp, err = c.Request(req, signer)
 	if err != nil {
 		return err
 	}
@@ -87,7 +113,7 @@ func censusTest(addr string) error {
 	req.CensusID = resp.CensusID
 
 	// addClaimBulk
-	log.Infof("[%d] Add bulk claims", rint)
+	log.Infof("[%d] add bulk claims", rint)
 	var claims []string
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
@@ -118,31 +144,41 @@ func censusTest(addr string) error {
 	}
 
 	// GenProof valid
-	log.Infof("[%d] get proof", rint)
+	log.Infof("[%d] generating proofs", rint)
 	req.Method = "genProof"
 	req.RootHash = ""
-	req.ClaimData = base64.StdEncoding.EncodeToString([]byte(
-		fmt.Sprintf("%d0123456789abcdef0123456789abc0", rint)))
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		return err
-	}
-	siblings := resp.Siblings
-	if len(siblings) == 0 {
-		return fmt.Errorf("proof not generated while it should be generated correctly")
+	var siblings []string
+	claims = []string{}
+
+	for i := 0; i < 100; i++ {
+		req.ClaimData = base64.StdEncoding.EncodeToString([]byte(
+			fmt.Sprintf("%d0123456789abcdef0123456789abc%d", rint, i)))
+		resp, err = c.Request(req, nil)
+		if err != nil {
+			return err
+		}
+		if len(resp.Siblings) == 0 {
+			return fmt.Errorf("proof not generated while it should be generated correctly")
+		}
+		siblings = append(siblings, resp.Siblings)
+		claims = append(claims, req.ClaimData)
 	}
 
 	// CheckProof valid
-	log.Infof("[%d] check proof", rint)
+	log.Infof("[%d] checking proofs", rint)
 	req.Method = "checkProof"
-	req.ProofData = siblings
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		return err
+	for i, s := range siblings {
+		req.ProofData = s
+		req.ClaimData = claims[i]
+		resp, err = c.Request(req, nil)
+		if err != nil {
+			return err
+		}
+		if !resp.ValidProof {
+			return fmt.Errorf("proof is invalid but it should be valid")
+		}
 	}
-	if !resp.ValidProof {
-		return fmt.Errorf("proof is invalid but it should be valid")
-	}
+	req.ProofData = ""
 
 	// publish
 	log.Infof("[%d] publish census", rint)
@@ -180,6 +216,47 @@ func censusTest(addr string) error {
 		return fmt.Errorf("expected size %v, got %v", exp, got)
 	}
 
+	// addFile
+	log.Infof("[%d] add files", rint)
+	req.Method = "addFile"
+	req.Type = "ipfs"
+	var uris []string
+	for i := 0; i < 100; i++ {
+		req.Name = fmt.Sprintf("%d_%d", rint, i)
+		req.Content = base64.StdEncoding.EncodeToString([]byte(
+			fmt.Sprintf("%d0123456789abcdef0123456789abc%d", rint, i)))
+		resp, err = c.Request(req, nil)
+		if err != nil {
+			return err
+		}
+		if !resp.Ok {
+			return fmt.Errorf("%s failed", req.Method)
+		}
+		if len(resp.URI) < 1 {
+			return fmt.Errorf("%s wrong URI received", req.Method)
+		}
+		uris = append(uris, resp.URI)
+	}
+	req.Type = ""
+
+	// fetchFile
+	log.Infof("[%d] fetching files", rint)
+	req.Method = "fetchFile"
+	for _, u := range uris {
+		req.URI = u
+		resp, err = c.Request(req, nil)
+		if err != nil {
+			return err
+		}
+		if !resp.Ok {
+			return fmt.Errorf("%s failed", req.Method)
+		}
+		if len(resp.Content) < 32 {
+			return fmt.Errorf("%s wrong content received", req.Method)
+		}
+	}
+
 	log.Infof("[%d] finish", rint)
 	return nil
+
 }

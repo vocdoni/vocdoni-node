@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"os"
 
 	common3 "github.com/iden3/go-iden3-core/common"
@@ -128,7 +127,6 @@ func CheckProof(root, mpHex string, data []byte) (bool, error) {
 		doPadding(&data)
 	}
 	e := getClaimFromData(data)
-	fmt.Printf("RootHash:%x Proof:%x HI:%s HV:%s\n", rootHash, mp.Bytes(), e.Entry().HIndex().Hex(), e.Entry().HValue().Hex())
 	return merkletree.VerifyProof(&rootHash, mp,
 		e.Entry().HIndex(), e.Entry().HValue()), nil
 }
