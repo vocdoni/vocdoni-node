@@ -64,6 +64,8 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.Contract = *flag.String("contract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f", "voting smart contract where the oracle will listen")
+	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
+
 	// vochain
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "vochain p2p host and port to listen on")
 	globalCfg.VochainConfig.Genesis = *flag.String("vochainGenesis", "", "use alternative geneiss file for the voting chain")
@@ -100,6 +102,8 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
 	viper.BindPFlag("contract", flag.Lookup("contract"))
 	viper.BindPFlag("subscribeOnly", flag.Lookup("subscribeOnly"))
+	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
+
 	// vochain
 	viper.Set("vochainConfig.dataDir", globalCfg.DataDir+"/vochain")
 	viper.BindPFlag("vochainConfig.logLevel", flag.Lookup("vochainLogLevel"))
@@ -126,22 +130,19 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	_, err = os.Stat(globalCfg.DataDir + "/oracle.yml")
 	if os.IsNotExist(err) {
 		cfgError = config.Error{
-			Critical: false,
-			Message:  fmt.Sprintf("creating new config file in %s", globalCfg.DataDir),
+			Message: fmt.Sprintf("creating new config file in %s", globalCfg.DataDir),
 		}
 		// creting config folder if not exists
 		err = os.MkdirAll(globalCfg.DataDir, os.ModePerm)
 		if err != nil {
 			cfgError = config.Error{
-				Critical: false,
-				Message:  fmt.Sprintf("cannot create data directory (%s)", err),
+				Message: fmt.Sprintf("cannot create data directory: %s", err),
 			}
 		}
 		// create config file if not exists
 		if err = viper.SafeWriteConfig(); err != nil {
 			cfgError = config.Error{
-				Critical: false,
-				Message:  fmt.Sprintf("cannot write config file into config dir (%s)", err),
+				Message: fmt.Sprintf("cannot write config file into config dir: %s", err),
 			}
 		}
 	} else {
@@ -149,19 +150,25 @@ func newConfig() (*config.OracleCfg, config.Error) {
 		err = viper.ReadInConfig()
 		if err != nil {
 			cfgError = config.Error{
-				Critical: false,
-				Message:  fmt.Sprintf("cannot read loaded config file in %s (%s)", err, globalCfg.DataDir),
+				Message: fmt.Sprintf("cannot read loaded config file in %s: %s", globalCfg.DataDir, err),
 			}
 		}
 	}
 	err = viper.Unmarshal(&globalCfg)
 	if err != nil {
 		cfgError = config.Error{
-			Critical: false,
-			Message:  fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
+			Message: fmt.Sprintf("cannot unmarshal loaded config file: %s", err),
 		}
 	}
 
+	if globalCfg.SaveConfig {
+		viper.Set("saveConfig", false)
+		if err := viper.WriteConfig(); err != nil {
+			cfgError = config.Error{
+				Message: fmt.Sprintf("cannot overwrite config file into config dir: %s", err),
+			}
+		}
+	}
 	return globalCfg, cfgError
 }
 

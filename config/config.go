@@ -33,6 +33,8 @@ type GWCfg struct {
 	CensusSync bool
 	// Contract ethereum contract to use as source of truth for some operations
 	Contract string
+	// SaveConfig overwrites the config file with the CLI provided flags
+	SaveConfig bool
 }
 
 // NewGatewayConfig initializes the fields in the gateway config stuct
@@ -179,6 +181,8 @@ type VochainCfg struct {
 	KeyFile string
 	// MinerKeyFile the node private validator key file, needed to sign consensus messages
 	MinerKeyFile string
+	// SaveConfig overwrites the config file with the CLI provided flags
+	SaveConfig bool
 }
 
 // OracleCfg includes all possible config params needed by the Oracle
@@ -199,6 +203,8 @@ type OracleCfg struct {
 	SubscribeOnly bool
 	// Contract address of the ethereum voting smart contract
 	Contract string
+	// SaveConfig overwrites the config file with the CLI provided flags
+	SaveConfig bool
 }
 
 // NewOracleCfg initializes the Oracle config
