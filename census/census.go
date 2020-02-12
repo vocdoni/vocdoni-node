@@ -33,13 +33,17 @@ type Namespace struct {
 }
 
 type Manager struct {
-	StorageDir  string                // Root storage data dir
-	AuthWindow  int32                 // Time window (seconds) in which TimeStamp will be accepted if auth enabled
-	Census      Namespaces            // Available namespaces
-	Trees       map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
-	Storage     data.Storage
+	StorageDir string     // Root storage data dir
+	AuthWindow int32      // Time window (seconds) in which TimeStamp will be accepted if auth enabled
+	Census     Namespaces // Available namespaces
+
+	// TODO(mvdan): should we protect Census with the mutex too?
+	TreesMu sync.RWMutex
+	Trees   map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
+
+	Storage data.Storage
+	// TODO(mvdan): this looks very racy. probably replace it with a chan.
 	ImportQueue map[string]string
-	Lock        sync.RWMutex
 }
 
 // Data helps satisfy an ethevents interface.
@@ -87,14 +91,14 @@ func (m *Manager) Init(storage, rootKey string) error {
 	}
 	// Initialize existing merkle trees
 	for _, ns := range m.Census.Namespaces {
-		t := tree.Tree{}
-		t.StorageDir = m.StorageDir
-		err := t.Init(ns.Name)
+		tr := tree.Tree{}
+		tr.StorageDir = m.StorageDir
+		err := tr.Init(ns.Name)
 		if err != nil {
 			log.Warn(err)
 		} else {
 			log.Infof("initialized merkle tree %s", ns.Name)
-			m.Trees[ns.Name] = &t
+			m.Trees[ns.Name] = &tr
 		}
 	}
 	// Start daemon for importing remote census
@@ -103,31 +107,32 @@ func (m *Manager) Init(storage, rootKey string) error {
 	return nil
 }
 
-// AddNamespace adds a new merkletree identified by a censusId (name)
-func (m *Manager) AddNamespace(name string, pubKeys []string) error {
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
+// AddNamespace adds a new merkletree identified by a censusId (name), and
+// returns the new tree.
+func (m *Manager) AddNamespace(name string, pubKeys []string) (*tree.Tree, error) {
+	m.TreesMu.Lock()
+	defer m.TreesMu.Unlock()
 	if _, e := m.Trees[name]; e {
-		return errors.New("namespace already exist")
+		return nil, errors.New("namespace already exist")
 	}
-	mkTree := tree.Tree{}
-	mkTree.StorageDir = m.StorageDir
-	err := mkTree.Init(name)
-	if err != nil {
-		return err
+	tr := &tree.Tree{
+		StorageDir: m.StorageDir,
 	}
-	m.Trees[name] = &mkTree
-	var ns Namespace
-	ns.Name = name
-	ns.Keys = pubKeys
-	m.Census.Namespaces = append(m.Census.Namespaces, ns)
-	return m.save()
+	if err := tr.Init(name); err != nil {
+		return nil, err
+	}
+	m.Trees[name] = tr
+	m.Census.Namespaces = append(m.Census.Namespaces, Namespace{
+		Name: name,
+		Keys: pubKeys,
+	})
+	return tr, m.save()
 }
 
 // DelNamespace removes a merkletree namespace
 func (m *Manager) DelNamespace(name string) error {
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
+	m.TreesMu.Lock()
+	defer m.TreesMu.Unlock()
 	if _, e := m.Trees[name]; e {
 		delete(m.Trees, name)
 		os.RemoveAll(m.StorageDir + "/" + name)
@@ -279,7 +284,13 @@ func (m *Manager) ImportQueueDaemon() {
 	log.Info("starting import queue daemon")
 	for {
 		for cid, uri := range m.ImportQueue {
-			if _, ok := m.Trees[cid]; ok {
+			// TODO(mvdan): this lock is separate from the one
+			// from AddNamespace below. The namespace might appear
+			// in between the two pieces of code.
+			m.TreesMu.RLock()
+			_, exists := m.Trees[cid]
+			m.TreesMu.RUnlock()
+			if exists {
 				log.Debugf("census %s already exist, skipping", cid)
 				delete(m.ImportQueue, cid)
 				continue
@@ -305,11 +316,12 @@ func (m *Manager) ImportQueueDaemon() {
 				continue
 			}
 			if len(dump.ClaimsData) > 0 {
-				if err := m.AddNamespace(cid, []string{}); err != nil {
+				tr, err := m.AddNamespace(cid, []string{})
+				if err != nil {
 					log.Errorf("cannot create new census namespace: %s", err)
 					continue
 				}
-				err = m.Trees[cid].ImportDump(dump.ClaimsData)
+				err = tr.ImportDump(dump.ClaimsData)
 				if err != nil {
 					log.Warnf("error importing dump: %s", err)
 					delete(m.ImportQueue, cid)
@@ -317,7 +329,7 @@ func (m *Manager) ImportQueueDaemon() {
 				} else {
 					log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
 				}
-				if m.Trees[cid].Root() != dump.RootHash {
+				if tr.Root() != dump.RootHash {
 					log.Warnf("root hash does not match on imported census, aborting import")
 					if err := m.DelNamespace(cid); err != nil {
 						log.Error(err)
@@ -347,7 +359,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 
 	if op == "addCensus" {
 		if isAuth {
-			err = m.AddNamespace(censusPrefix+r.CensusID, r.PubKeys)
+			_, err = m.AddNamespace(censusPrefix+r.CensusID, r.PubKeys)
 			if err != nil {
 				log.Warnf("error creating census: %s", err)
 				resp.SetError(err)
@@ -362,7 +374,10 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	}
 
 	// check if census exist
-	if _, censusFound := m.Trees[r.CensusID]; !censusFound {
+	m.TreesMu.RLock()
+	tr, censusFound := m.Trees[r.CensusID]
+	m.TreesMu.RUnlock()
+	if !censusFound {
 		resp.SetError("censusId not valid or not found")
 		return resp
 	}
@@ -380,7 +395,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	// Methods without rootHash
 	switch op {
 	case "getRoot":
-		resp.Root = m.Trees[r.CensusID].Root()
+		resp.Root = tr.Root()
 		return resp
 
 	case "addClaimBulk":
@@ -390,7 +405,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			for i, c := range r.ClaimsData {
 				data, err := base64.StdEncoding.DecodeString(c)
 				if err == nil {
-					err = m.Trees[r.CensusID].AddClaim(data)
+					err = tr.AddClaim(data)
 				}
 				if err != nil {
 					log.Warnf("error adding claim: %s", err)
@@ -416,7 +431,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 				log.Warnf("error decoding base64 string: %s", err)
 				resp.SetError(err)
 			}
-			err = m.Trees[r.CensusID].AddClaim(data)
+			err = tr.AddClaim(data)
 			if err != nil {
 				log.Warnf("error adding claim: %s", err)
 				resp.SetError(err)
@@ -431,7 +446,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	case "importDump":
 		if isAuth && validAuthPrefix {
 			if len(r.ClaimsData) > 0 {
-				err = m.Trees[r.CensusID].ImportDump(r.ClaimsData)
+				err = tr.ImportDump(r.ClaimsData)
 				if err != nil {
 					log.Warnf("error importing dump: %s", err)
 					resp.SetError(err)
@@ -476,7 +491,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		}
 		log.Infof("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
 		if len(dump.ClaimsData) > 0 {
-			err = m.Trees[r.CensusID].ImportDump(dump.ClaimsData)
+			err = tr.ImportDump(dump.ClaimsData)
 			if err != nil {
 				log.Warnf("error importing dump: %s", err)
 				resp.SetError("error importing census")
@@ -496,7 +511,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		}
 		root := r.RootHash
 		if len(root) < 1 {
-			root = m.Trees[r.CensusID].Root()
+			root = tr.Root()
 		}
 		// Generate proof and return it
 		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
@@ -514,17 +529,15 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		return resp
 	}
 
-	// Methods with rootHash, if rootHash specified snapshot the tree
-	var t *tree.Tree
-	if len(r.RootHash) > 1 { // if rootHash specified
-		t, err = m.Trees[r.CensusID].Snapshot(r.RootHash)
+	// Methods with rootHash, if rootHash specified snapshot the tree.
+	// Otherwise, we use the same tree.
+	if len(r.RootHash) > 1 {
+		tr, err = tr.Snapshot(r.RootHash)
 		if err != nil {
 			log.Warnf("snapshot error: %s", err)
 			resp.SetError("invalid root hash")
 			return resp
 		}
-	} else { // if rootHash not specified use current tree
-		t = m.Trees[r.CensusID]
 	}
 
 	switch op {
@@ -535,14 +548,14 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			resp.SetError(err)
 			return resp
 		}
-		resp.Siblings, err = t.GenProof(data)
+		resp.Siblings, err = tr.GenProof(data)
 		if err != nil {
 			resp.SetError(err)
 		}
 		return resp
 
 	case "getSize":
-		resp.Size, err = t.Size(t.Root())
+		resp.Size, err = tr.Size(tr.Root())
 		if err != nil {
 			resp.SetError(err)
 		}
@@ -557,12 +570,12 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		var dumpValues []string
 		root := r.RootHash
 		if len(root) < 1 {
-			root = t.Root()
+			root = tr.Root()
 		}
 		if op == "dump" {
-			dumpValues, err = t.Dump(root)
+			dumpValues, err = tr.Dump(root)
 		} else {
-			dumpValues, err = t.DumpPlain(root, true)
+			dumpValues, err = tr.DumpPlain(root, true)
 		}
 		if err != nil {
 			resp.SetError(err)
@@ -582,11 +595,11 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			return resp
 		}
 		var dump types.CensusDump
-		dump.RootHash = t.Root()
-		dump.ClaimsData, err = t.Dump(t.Root())
+		dump.RootHash = tr.Root()
+		dump.ClaimsData, err = tr.Dump(tr.Root())
 		if err != nil {
 			resp.SetError(err)
-			log.Warnf("cannot dump census with root %s: %s", t.Root(), err)
+			log.Warnf("cannot dump census with root %s: %s", tr.Root(), err)
 			return resp
 		}
 		dumpBytes, err := json.Marshal(dump)
@@ -603,16 +616,16 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		}
 		resp.URI = m.Storage.URIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
-		resp.Root = t.Root()
+		resp.Root = tr.Root()
 
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %s", resp.Root)
-		err = m.AddNamespace(resp.Root, r.PubKeys)
+		tr2, err := m.AddNamespace(resp.Root, r.PubKeys)
 		if err != nil {
 			log.Warnf("error creating local published census: %s", err)
 		} else {
 			log.Infof("import claims to new census")
-			err = m.Trees[resp.Root].ImportDump(dump.ClaimsData)
+			err = tr2.ImportDump(dump.ClaimsData)
 			if err != nil {
 				log.Warn(err)
 			}
