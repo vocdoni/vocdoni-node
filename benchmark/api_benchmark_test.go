@@ -1,32 +1,6 @@
+// +build racy
+
 package test
-
-/*
-This test starts the following services
-
-1. Starts the Proxy
-2. Starts the IPFS storage
-3. Starts the Dvote API router
-4. Starts the Census Manager
-
-Then it creates two pairs of signing keys
-
-sign1: as the signer for the API server
-sign2: as the signer for the API client
-
-Sign2 address is added as "allowedAddress" for the API router.
-
-A WebSockets client is created to make the API calls.
-
-Then the following census operations are tested:
-
-1. addCensus, getRoot, addClaim (to check basic operation)
-2. addClaimBulk to add 100 claims to the census merkle tree
-3. publish to export and publish the census to IPFS
-4. importRemote to import the IPFS exported census to a new census
-5. check that the new census has the same rootHash of the original one
-
-Run it executing `go test -v test/census_test.go`
-*/
 
 import (
 	"encoding/base64"
@@ -34,7 +8,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -65,42 +38,17 @@ func TestBenchmark(t *testing.T) {
 		host = &server.PxyAddr
 	}
 
-	var tc testCounter
-
+	errch := make(chan error, 1)
 	for i := 0; i < *routines; i++ {
-		go launchTest(t, *host, &tc)
+		go func() { errch <- censusTest(*host) }()
 	}
-	p := 10
-	for {
-		time.Sleep(time.Microsecond * 100)
-		if tc.Alive < 1 {
-			break
-		}
-		if p == 0 {
-			log.Debugf("Alive routines: %d", tc.Alive)
-			p = 10
+	for i := 0; i < *routines; i++ {
+		if err := <-errch; err != nil {
+			t.Errorf("subtest failed: %v", err)
 		} else {
-			p--
+			t.Logf("subtest finished")
 		}
 	}
-}
-
-type testCounter struct {
-	Alive int
-	Lock  sync.RWMutex
-}
-
-func launchTest(t *testing.T, addr string, tc *testCounter) {
-	tc.Lock.Lock()
-	tc.Alive++
-	tc.Lock.Unlock()
-	err := censusTest(addr)
-	if err != nil {
-		t.Error(err)
-	}
-	tc.Lock.Lock()
-	tc.Alive--
-	tc.Lock.Unlock()
 }
 
 func censusTest(addr string) error {
