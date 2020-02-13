@@ -41,6 +41,7 @@ require (
 	github.com/libp2p/go-libp2p-core v0.2.2
 	github.com/libp2p/go-libp2p-http v0.1.3 // indirect
 	github.com/libp2p/go-libp2p-pubsub v0.1.1 // indirect
+	github.com/libp2p/go-reuseport v0.0.1
 	github.com/marcusolsson/tui-go v0.4.0
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.11 // indirect

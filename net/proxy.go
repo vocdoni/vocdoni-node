@@ -7,14 +7,17 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
-	"golang.org/x/crypto/acme"
-	"golang.org/x/crypto/acme/autocert"
-
+	reuse "github.com/libp2p/go-reuseport"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -22,6 +25,8 @@ import (
 
 	"github.com/gorilla/websocket"
 )
+
+const desiredSoMaxConn = 4096
 
 // ProxyWsHandler function signature required to add a handler in the net/http Server
 type ProxyWsHandler func(c *websocket.Conn)
@@ -61,9 +66,14 @@ func getCertificates(domain string, m *autocert.Manager) [][]byte {
 func (p *Proxy) Init() error {
 	var s *http.Server
 
-	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", p.C.Address, p.C.Port))
+	ln, err := reuse.Listen("tcp", fmt.Sprintf("%s:%d", p.C.Address, p.C.Port))
 	if err != nil {
 		return err
+	}
+
+	if n := somaxconn(); n < desiredSoMaxConn {
+		log.Warnf("operating system SOMAXCONN is smaller than recommended (%d). "+
+			"Consider increasing it: echo %d | sudo tee /proc/sys/net/core/somaxconn", n, desiredSoMaxConn)
 	}
 
 	p.Server = chi.NewRouter()
@@ -276,8 +286,8 @@ func (w *WebsocketHandle) Send(msg types.Message) {
 
 func wshandler(w http.ResponseWriter, r *http.Request, ph ProxyWsHandler) {
 	upgrader := &websocket.Upgrader{
-		ReadBufferSize:  4096,
-		WriteBufferSize: 4096,
+		ReadBufferSize:  8192,
+		WriteBufferSize: 8192,
 		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -286,4 +296,16 @@ func wshandler(w http.ResponseWriter, r *http.Request, ph ProxyWsHandler) {
 		return
 	}
 	ph(conn)
+}
+
+func somaxconn() int {
+	content, err := ioutil.ReadFile("/proc/sys/net/core/somaxconn")
+	if err != nil {
+		return syscall.SOMAXCONN
+	}
+	n, err := strconv.Atoi(strings.Trim(fmt.Sprintf("%s", content), "\n"))
+	if err != nil {
+		return syscall.SOMAXCONN
+	}
+	return n
 }
