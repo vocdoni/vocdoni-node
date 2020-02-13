@@ -59,7 +59,7 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	// Booleans should be passed to the CLI as: var=True/false
 
 	// oracle
-	globalCfg.DataDir = *flag.String("dataDir", home+"/.dvote", "directory where data is stored")
+	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
 	globalCfg.SubscribeOnly = *flag.Bool("subscribeOnly", true, "oracle can read all ethereum logs or just subscribe to the new ones, by default only subscribe")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")

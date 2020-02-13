@@ -54,7 +54,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	// Booleans should be passed to the CLI as: var=True/false
 
 	// gateway
-	globalCfg.DataDir = *flag.String("dataDir", home+"/.dvote", "directory where data is stored")
+	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
@@ -62,7 +62,6 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.Contract = *flag.String("contract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f", "smart contract to follow for synchronization and coordination with other nodes")
 	globalCfg.CensusSync = *flag.Bool("censusSync", true, "automatically import new census published on smart contract")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
-
 	// api
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable census API")
@@ -76,7 +75,6 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
 	globalCfg.EthConfig.LightMode = *flag.Bool("ethChainLightMode", true, "synchronize Ethereum blockchain in light mode")
 	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to use")
-	globalCfg.EthConfig.DataDir = globalCfg.DataDir + "/ethereum"
 	// ethereum web3
 	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true web3 will be enabled")
 	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
@@ -88,12 +86,10 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
 	globalCfg.Ipfs.SyncKey = *flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
 	globalCfg.Ipfs.SyncPeers = *flag.StringArray("ipfsSyncPeers", []string{}, "use custom ipfsSync peers/bootnodes for accessing the DHT")
-	globalCfg.Ipfs.ConfigPath = globalCfg.DataDir + "/ipfs"
 	// ssl
 	globalCfg.Ssl.Domain = *flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	globalCfg.Ssl.DirCert = *flag.String("sslDirCert", globalCfg.DataDir+"/tls/", "path where to store ssl related data")
 	// vochain
-	globalCfg.VochainConfig.DataDir = globalCfg.DataDir + "/vochain"
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
 	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
 	globalCfg.VochainConfig.RPCListen = *flag.String("vochainRPCListen", "0.0.0.0:26657", "rpc host and port to listent for the voting chain")
@@ -228,7 +224,7 @@ func main() {
 	}
 	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
 
-	log.Debugf("initializing gateway config %+v", globalCfg)
+	log.Debugf("initializing gateway config %+v", *globalCfg)
 
 	// check if errors during config creation and determine if Critical
 	if cfgErr.Critical && cfgErr.Message != "" {

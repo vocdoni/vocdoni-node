@@ -45,7 +45,7 @@ func newConfig() (*ethereumStandaloneCfgWrapper, config.Error) {
 	// CLI flags have preference over the config file
 
 	// general
-	ethereumCfgWrapper.dataDir = *flag.String("dataDir", home+"/.dvote", "directory where data is stored")
+	flag.StringVar(&ethereumCfgWrapper.dataDir, "dataDir", home+"/.dvote", "directory where data is stored")
 	ethereumCfgWrapper.logLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	ethereumCfgWrapper.logOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	// ethereum node
