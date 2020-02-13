@@ -42,8 +42,12 @@ type Manager struct {
 	Trees   map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
 
 	Storage data.Storage
-	// TODO(mvdan): this looks very racy. probably replace it with a chan.
-	ImportQueue map[string]string
+
+	importQueue chan censusImport
+}
+
+type censusImport struct {
+	censusID, censusURI string
 }
 
 // Data helps satisfy an ethevents interface.
@@ -54,7 +58,9 @@ func (m *Manager) Init(storage, rootKey string) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storage)
 	m.StorageDir = storage
 	m.Trees = make(map[string]*tree.Tree)
-	m.ImportQueue = make(map[string]string)
+
+	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
+	m.importQueue = make(chan censusImport, 32)
 	m.AuthWindow = 10
 
 	log.Infof("loading namespaces and keys from %s", nsConfig)
@@ -102,7 +108,7 @@ func (m *Manager) Init(storage, rootKey string) error {
 		}
 	}
 	// Start daemon for importing remote census
-	go m.ImportQueueDaemon()
+	go m.importQueueDaemon()
 
 	return nil
 }
@@ -275,72 +281,63 @@ func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *
 }
 
 // AddToImportQueue adds a new census to the queue for being imported remotelly
-func (m *Manager) AddToImportQueue(censusID string, censusURI string) {
-	m.ImportQueue[censusID] = censusURI
+func (m *Manager) AddToImportQueue(censusID, censusURI string) {
+	m.importQueue <- censusImport{censusID: censusID, censusURI: censusURI}
 }
 
-// ImportQueueDaemon fetch and import remote census added on ImportQueue
-func (m *Manager) ImportQueueDaemon() {
+// ImportQueueDaemon fetches and imports remote census added via importQueue.
+func (m *Manager) importQueueDaemon() {
 	log.Info("starting import queue daemon")
-	for {
-		for cid, uri := range m.ImportQueue {
-			// TODO(mvdan): this lock is separate from the one
-			// from AddNamespace below. The namespace might appear
-			// in between the two pieces of code.
-			m.TreesMu.RLock()
-			_, exists := m.Trees[cid]
-			m.TreesMu.RUnlock()
-			if exists {
-				log.Debugf("census %s already exist, skipping", cid)
-				delete(m.ImportQueue, cid)
-				continue
-			}
-			log.Infof("retrieving remote census %s", uri)
-			censusRaw, err := m.Storage.Retrieve(uri[len(m.Storage.URIprefix()):])
-			if err != nil {
-				log.Warnf("cannot retrieve census: %s", err)
-				delete(m.ImportQueue, cid)
-				continue
-			}
-			var dump types.CensusDump
-			err = json.Unmarshal(censusRaw, &dump)
-			if err != nil {
-				log.Warnf("retrieved census does not have a valid format: %s", err)
-				delete(m.ImportQueue, cid)
-				continue
-			}
-			log.Infof("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
-			if dump.RootHash != cid {
-				log.Warn("dump root Hash and Ethereum root hash do not match, aborting import")
-				delete(m.ImportQueue, cid)
-				continue
-			}
-			if len(dump.ClaimsData) > 0 {
-				tr, err := m.AddNamespace(cid, []string{})
-				if err != nil {
-					log.Errorf("cannot create new census namespace: %s", err)
-					continue
-				}
-				err = tr.ImportDump(dump.ClaimsData)
-				if err != nil {
-					log.Warnf("error importing dump: %s", err)
-					delete(m.ImportQueue, cid)
-					continue
-				} else {
-					log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
-				}
-				if tr.Root() != dump.RootHash {
-					log.Warnf("root hash does not match on imported census, aborting import")
-					if err := m.DelNamespace(cid); err != nil {
-						log.Error(err)
-					}
-				}
-			} else {
-				log.Warnf("no claims found on the retreived census")
-			}
-			delete(m.ImportQueue, cid)
+	for imp := range m.importQueue {
+		cid, uri := imp.censusID, imp.censusURI
+		// TODO(mvdan): this lock is separate from the one
+		// from AddNamespace below. The namespace might appear
+		// in between the two pieces of code.
+		m.TreesMu.RLock()
+		_, exists := m.Trees[cid]
+		m.TreesMu.RUnlock()
+		if exists {
+			log.Debugf("census %s already exist, skipping", cid)
+			continue
 		}
-		time.Sleep(time.Second * 1)
+		log.Infof("retrieving remote census %s", uri)
+		censusRaw, err := m.Storage.Retrieve(uri[len(m.Storage.URIprefix()):])
+		if err != nil {
+			log.Warnf("cannot retrieve census: %s", err)
+			continue
+		}
+		var dump types.CensusDump
+		err = json.Unmarshal(censusRaw, &dump)
+		if err != nil {
+			log.Warnf("retrieved census does not have a valid format: %s", err)
+			continue
+		}
+		log.Infof("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
+		if dump.RootHash != cid {
+			log.Warn("dump root Hash and Ethereum root hash do not match, aborting import")
+			continue
+		}
+		if len(dump.ClaimsData) == 0 {
+			log.Warnf("no claims found on the retreived census")
+			continue
+		}
+		tr, err := m.AddNamespace(cid, []string{})
+		if err != nil {
+			log.Errorf("cannot create new census namespace: %s", err)
+			continue
+		}
+		err = tr.ImportDump(dump.ClaimsData)
+		if err != nil {
+			log.Warnf("error importing dump: %s", err)
+			continue
+		}
+		log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
+		if tr.Root() != dump.RootHash {
+			log.Warnf("root hash does not match on imported census, aborting import")
+			if err := m.DelNamespace(cid); err != nil {
+				log.Error(err)
+			}
+		}
 	}
 }
 
