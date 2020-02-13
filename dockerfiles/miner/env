@@ -1,0 +1,12 @@
+miner_dataDir=/app/run
+#miner_genesis=
+#miner_keyFile=
+#miner_logLevel=debug
+#miner_logOutput=stdout
+#miner_minerKeyFile=
+#miner_p2pListen=0.0.0.0:26656
+#miner_peers=
+#miner_publicAddr=0.0.0.0:26656
+#miner_rpcListen=0.0.0.0:26657
+#miner_seedMode=False
+#miner_seeds=""
