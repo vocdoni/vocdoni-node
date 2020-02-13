@@ -139,8 +139,8 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("w3Config.httpPort", flag.Lookup("w3HTTPPort"))
 	viper.BindPFlag("w3Config.httpHost", flag.Lookup("w3HTTPHost"))
 	// ssl
+	viper.Set("ssl.dirCert", globalCfg.DataDir+"/tls")
 	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
-	viper.BindPFlag("ssl.dirCert", flag.Lookup("sslDirCert"))
 	// ipfs
 	viper.Set("ipfs.configPath", globalCfg.DataDir+"/ipfs")
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
