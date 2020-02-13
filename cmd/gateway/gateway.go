@@ -444,7 +444,7 @@ func main() {
 
 	// Wait for Ethereum to be ready
 	for {
-		if _, synced, peers, _ := node.SyncInfo(); synced && peers > 0 {
+		if height, synced, peers, _ := node.SyncInfo(); synced && peers > 1 && height != "0" {
 			log.Infof("ethereum blockchain synchronized")
 			break
 		}

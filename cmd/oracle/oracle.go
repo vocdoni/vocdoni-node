@@ -320,7 +320,7 @@ func main() {
 	go func() {
 		for {
 			height, synced, peers, _ := node.SyncInfo()
-			if synced && peers > 0 && vnode != nil {
+			if synced && peers > 1 && height != "0" && vnode != nil {
 				log.Info("ethereum node fully synced")
 				log.Info("oracle startup complete")
 				lastBlock, err := strconv.ParseInt(height, 10, 64)
