@@ -209,7 +209,38 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 	return fn
 }
 
-// WsHandle handles the websockets connection on the go-dvote proxy
+// AddWsHTTPBridge adds a WS endpoint to interact with the underlying web3
+func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
+	return func(c *websocket.Conn) {
+		for {
+			msgType, msg, err := c.ReadMessage()
+			if err != nil {
+				log.Debugf("websocket closed by the client: %s", err)
+				c.Close()
+				return
+			}
+			req, err := http.NewRequest("POST", url, bytes.NewReader(msg))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Length", strconv.Itoa(len(msg)))
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				log.Warnf("request failed: %s", err)
+				continue
+			}
+			respBody, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Warnf("cannot read response: %s", err)
+				continue
+			}
+			if err := c.WriteMessage(msgType, respBody); err != nil {
+				log.Warnf("cannot write message: %s", err)
+			}
+		}
+	}
+}
+
+// WebsocketHandle handles the websockets connection on the go-dvote proxy
 type WebsocketHandle struct {
 	Connection *types.Connection // the ws connection
 	WsProxy    *Proxy            // proxy where the ws will be associated

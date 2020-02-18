@@ -324,7 +324,9 @@ func main() {
 	log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
 	if globalCfg.W3Config.Enabled {
 		pxy.AddHandler(globalCfg.W3Config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
+		pxy.AddWsHandler(globalCfg.W3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
 		log.Infof("web3 available at %s", globalCfg.W3Config.Route)
+		log.Infof("web3 Websocket available at %s", globalCfg.W3Config.Route+"ws")
 	}
 
 	// Storage
