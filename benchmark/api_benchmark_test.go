@@ -1,5 +1,3 @@
-// +build racy
-
 package test
 
 import (
@@ -18,52 +16,43 @@ import (
 	common "gitlab.com/vocdoni/go-dvote/test/test_common"
 )
 
-var logLevel = flag.String("logLevel", "error", "logging level")
-var host = flag.String("host", "", "alternative host to launch the tests (i.e ws://192.168.1.33:9090/dvote)")
-var routines = flag.Int("routines", 5, "number of routines to launch in paralel")
+var (
+	logLevel = flag.String("logLevel", "error", "logging level")
+	host     = flag.String("host", "", "alternative host to run against, e.g. ws://$HOST:9090/dvote)")
+)
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
-func TestBenchmark(t *testing.T) {
+func BenchmarkCensus(b *testing.B) {
 	log.InitLogger(*logLevel, "stdout")
 
 	if *host == "" {
 		var server common.DvoteApiServer
-		err := server.Start(*logLevel)
-		if err != nil {
-			t.Fatal(err)
+		if err := server.Start(*logLevel); err != nil {
+			b.Fatal(err)
 		}
+		// TODO(mvdan): use b.Cleanup once Go 1.14 is out, so that we
+		// can support many benchmark iterations.
 		defer os.RemoveAll(server.IpfsDir)
 		defer os.RemoveAll(server.CensusDir)
 		host = &server.PxyAddr
 	}
 
-	errch := make(chan error, 1)
-	for i := 0; i < *routines; i++ {
-		go func() { errch <- censusTest(*host) }()
-	}
-	for i := 0; i < *routines; i++ {
-		if err := <-errch; err != nil {
-			t.Errorf("subtest failed: %v", err)
-		} else {
-			t.Logf("subtest finished")
+	b.RunParallel(func(pb *testing.PB) {
+		// Create websocket client
+		var c common.ApiConnection
+		if err := c.Connect(*host); err != nil {
+			b.Fatalf("dial: %s", err)
 		}
-	}
+		defer c.Conn.Close()
+
+		for pb.Next() {
+			censusBench(b, c)
+		}
+	})
 }
 
-func censusTest(addr string) error {
-	var err error
-	rint := rand.Int()
-
-	// Create websocket client
-	log.Infof("connecting to %s", addr)
-	var c common.ApiConnection
-	err = c.Connect(addr)
-	if err != nil {
-		return fmt.Errorf("dial: %s", err)
-	}
-	defer c.Conn.Close()
-
+func censusBench(b *testing.B, c common.ApiConnection) {
 	// API requets
 	var req types.MetaRequest
 
@@ -72,14 +61,15 @@ func censusTest(addr string) error {
 	signer.Generate()
 
 	// getInfo
+	rint := rand.Int()
 	log.Infof("[%d] get info", rint)
 	req.Method = "getGatewayInfo"
 	resp, err := c.Request(req, nil)
 	if err != nil {
-		return err
+		b.Fatal(err)
 	}
 	if !resp.Ok {
-		return fmt.Errorf("%s failed", req.Method)
+		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
 	log.Infof("apis available: %v", resp.APIList)
 
@@ -94,7 +84,7 @@ func censusTest(addr string) error {
 		}
 	}
 	if !censusEnabled || !fileEnabled {
-		return fmt.Errorf("required APIs not enabled (file=%t, census=%t)", fileEnabled, censusEnabled)
+		b.Fatalf("required APIs not enabled (file=%t, census=%t)", fileEnabled, censusEnabled)
 	}
 
 	// Create census
@@ -103,10 +93,10 @@ func censusTest(addr string) error {
 	req.CensusID = fmt.Sprintf("test%d", rint)
 	resp, err = c.Request(req, signer)
 	if err != nil {
-		return err
+		b.Fatal(err)
 	}
 	if !resp.Ok {
-		return fmt.Errorf("%s failed", req.Method)
+		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
 
 	// Set correct censusID for commint requests
@@ -124,10 +114,10 @@ func censusTest(addr string) error {
 	req.ClaimsData = claims
 	resp, err = c.Request(req, signer)
 	if err != nil {
-		return err
+		b.Fatal(err)
 	}
 	if !resp.Ok {
-		return fmt.Errorf("%s failed", req.Method)
+		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
 
 	// dumpPlain
@@ -137,10 +127,10 @@ func censusTest(addr string) error {
 	req.ClaimsData = []string{}
 	resp, err = c.Request(req, signer)
 	if err != nil {
-		return err
+		b.Fatal(err)
 	}
 	if !resp.Ok {
-		return fmt.Errorf("%s failed", req.Method)
+		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
 
 	// GenProof valid
@@ -155,10 +145,10 @@ func censusTest(addr string) error {
 			fmt.Sprintf("%d0123456789abcdef0123456789abc%d", rint, i)))
 		resp, err = c.Request(req, nil)
 		if err != nil {
-			return err
+			b.Fatal(err)
 		}
 		if len(resp.Siblings) == 0 {
-			return fmt.Errorf("proof not generated while it should be generated correctly")
+			b.Fatalf("proof not generated while it should be generated correctly")
 		}
 		siblings = append(siblings, resp.Siblings)
 		claims = append(claims, req.ClaimData)
@@ -172,10 +162,10 @@ func censusTest(addr string) error {
 		req.ClaimData = claims[i]
 		resp, err = c.Request(req, nil)
 		if err != nil {
-			return err
+			b.Fatal(err)
 		}
 		if !resp.ValidProof {
-			return fmt.Errorf("proof is invalid but it should be valid")
+			b.Fatalf("proof is invalid but it should be valid")
 		}
 	}
 	req.ProofData = ""
@@ -186,10 +176,10 @@ func censusTest(addr string) error {
 	req.ClaimsData = []string{}
 	resp, err = c.Request(req, signer)
 	if err != nil {
-		return err
+		b.Fatal(err)
 	}
 	if !resp.Ok {
-		return fmt.Errorf("%s failed", req.Method)
+		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
 
 	// getRoot
@@ -197,11 +187,11 @@ func censusTest(addr string) error {
 	req.Method = "getRoot"
 	resp, err = c.Request(req, nil)
 	if err != nil {
-		return err
+		b.Fatal(err)
 	}
 	root := resp.Root
 	if len(root) < 1 {
-		return fmt.Errorf("got invalid root")
+		b.Fatalf("got invalid root")
 	}
 
 	// getSize
@@ -210,10 +200,10 @@ func censusTest(addr string) error {
 	req.RootHash = ""
 	resp, err = c.Request(req, nil)
 	if err != nil {
-		return err
+		b.Fatal(err)
 	}
 	if exp, got := int64(100), resp.Size; exp != got {
-		return fmt.Errorf("expected size %v, got %v", exp, got)
+		b.Fatalf("expected size %v, got %v", exp, got)
 	}
 
 	// addFile
@@ -227,13 +217,13 @@ func censusTest(addr string) error {
 			fmt.Sprintf("%d0123456789abcdef0123456789abc%d", rint, i)))
 		resp, err = c.Request(req, nil)
 		if err != nil {
-			return err
+			b.Fatal(err)
 		}
 		if !resp.Ok {
-			return fmt.Errorf("%s failed", req.Method)
+			b.Fatalf("%s failed: %s", req.Method, resp.Message)
 		}
 		if len(resp.URI) < 1 {
-			return fmt.Errorf("%s wrong URI received", req.Method)
+			b.Fatalf("%s wrong URI received", req.Method)
 		}
 		uris = append(uris, resp.URI)
 	}
@@ -246,17 +236,14 @@ func censusTest(addr string) error {
 		req.URI = u
 		resp, err = c.Request(req, nil)
 		if err != nil {
-			return err
+			b.Fatal(err)
 		}
 		if !resp.Ok {
-			return fmt.Errorf("%s failed", req.Method)
+			b.Fatalf("%s failed: %s", req.Method, resp.Message)
 		}
 		if len(resp.Content) < 32 {
-			return fmt.Errorf("%s wrong content received", req.Method)
+			b.Fatalf("%s wrong content received", req.Method)
 		}
 	}
-
 	log.Infof("[%d] finish", rint)
-	return nil
-
 }
