@@ -86,12 +86,12 @@ func TestCreateProcess(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", *testcommon.HardcodedNewProcessTx)
 	}
-	err, _ = vochain.ValidateAndDeliverTx(bytes, s)
+	_, err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err != nil {
 		t.Errorf("cannot create process: %s", err)
 	}
 	// cannot add same process
-	err, _ = vochain.ValidateAndDeliverTx(bytes, s)
+	_, err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err == nil {
 		t.Errorf("same process added: %s", err)
 	}
@@ -102,7 +102,7 @@ func TestCreateProcess(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", badoracle)
 	}
-	err, _ = vochain.ValidateAndDeliverTx(bytes, s)
+	_, err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err == nil {
 		t.Errorf("process added by non oracle: %s", err)
 	}
@@ -119,12 +119,12 @@ func TestSubmitEnvelope(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", *testcommon.HardcodedNewVoteTx)
 	}
-	err = vochain.ValidateAndDeliverTx(bytes, s)
+	_, err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err != nil {
 		t.Errorf("cannot submit envelope: %s", err)
 	}
 	// cannot add same envelope
-	err = vochain.ValidateAndDeliverTx(bytes, s)
+	_, err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err == nil {
 		t.Errorf("cannot submit envelope twice: %s", err)
 	}
@@ -135,7 +135,7 @@ func TestSubmitEnvelope(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", badpid)
 	}
-	err = vochain.ValidateAndDeliverTx(bytes, s)
+	_, err = vochain.ValidateAndDeliverTx(bytes, s)
 	if err == nil {
 		t.Errorf("cannot submit envelope twice: %s", err)
 	}

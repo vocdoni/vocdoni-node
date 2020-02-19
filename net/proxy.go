@@ -220,6 +220,10 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 				return
 			}
 			req, err := http.NewRequest("POST", url, bytes.NewReader(msg))
+			if err != nil {
+				log.Warnf("invalid request: %s", err)
+				continue
+			}
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Accept", "application/json")
 			req.Header.Set("Content-Length", strconv.Itoa(len(msg)))

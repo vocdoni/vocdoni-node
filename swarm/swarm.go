@@ -184,9 +184,9 @@ func (sn *SimpleSwarm) PrintStats() {
 	go func() {
 		for {
 			if sn.Node.Server() != nil && sn.Hive != nil {
-				addr := fmt.Sprintf("%x", sn.PssAddr)
-				var addrs [][]byte
-				addrs = append(addrs, []byte(addr))
+				// addr := fmt.Sprintf("%x", sn.PssAddr)
+				// var addrs [][]byte
+				// addrs = append(addrs, []byte(addr))
 				peerCount := sn.Node.Server().PeerCount()
 				log.Infof("[pss info] peerCount: %d, neighborhood: %d", peerCount, sn.Hive.NeighbourhoodDepth)
 			}

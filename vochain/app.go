@@ -121,7 +121,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	// ValidateAndDeliverTx should return events
-	err, events := ValidateAndDeliverTx(req.Tx, app.State)
+	events, err := ValidateAndDeliverTx(req.Tx, app.State)
 	if err != nil {
 		return abcitypes.ResponseDeliverTx{Code: 1}
 	}

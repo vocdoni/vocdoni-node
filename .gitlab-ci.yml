@@ -14,7 +14,7 @@ variables:
   GOFLAGS: -mod=readonly
 
 cache:
-  key: always-same-cache
+  key: ${CI_JOB_NAME} # separate caches by job, but not by branch
   paths:
     - .cache/
 
@@ -22,11 +22,17 @@ go-test:
   image: golang:1.13.7
   stage: test
   script:
-    - go env
-    - go test -vet=off ./... # we run vet later
-    - go vet ./...
+    - go test -vet=off ./... # we run vet in another step
     - go test -vet=off -race ./...
-    - diff -u <(echo -n) <(gofmt -s -d *) # don't include .cache/
+
+go-analyze:
+  image: golang:1.13.7
+  stage: test
+  script:
+    - diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
+    - go vet ./...
+    - curl -L https://github.com/dominikh/go-tools/releases/download/2019.2.3/staticcheck_linux_amd64.tar.gz | tar -xzf -
+    - ./staticcheck/staticcheck ./...
 
 docker-release:
   image: docker:stable

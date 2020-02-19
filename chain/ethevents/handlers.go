@@ -3,7 +3,6 @@ package ethevents
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -28,11 +27,6 @@ var ethereumEventList = []string{
 }
 
 type (
-	eventGenesisChanged string
-	eventChainIDChanged *big.Int
-)
-
-type (
 	eventProcessCreated struct {
 		EntityAddress [20]byte
 		ProcessId     [32]byte
@@ -42,28 +36,18 @@ type (
 		EntityAddress [20]byte
 		ProcessId     [32]byte
 	}
-)
-
-type (
-	validatorAdded   string
-	validatorRemoved string
-	oracleAdded      struct {
+	oracleAdded struct {
 		OraclePublicKey string
 	}
-)
-
-type (
-	oracleRemoved       string
 	privateKeyPublished struct {
 		ProcessId  [32]byte
 		PrivateKey string
 	}
+	resultsPublished struct {
+		ProcessId [32]byte
+		Results   string
+	}
 )
-
-type resultsPublished struct {
-	ProcessId [32]byte
-	Results   string
-}
 
 // HandleVochainOracle handles the new process creation on ethereum for the Oracle.
 // Once a new process is created, the Oracle sends a transaction on the Vochain to create such process
@@ -164,9 +148,11 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 		// stub
 		// return nil
 	case HashLogPrivateKeyPublished.Hex():
+		var _ privateKeyPublished
 		// stub
 		// return nil
 	case HashLogResultsPublished.Hex():
+		var _ resultsPublished
 		// stub
 		// return nil
 	}

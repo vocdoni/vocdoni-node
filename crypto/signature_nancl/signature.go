@@ -26,7 +26,7 @@ func (k *SignKeys) Generate() error {
 
 func (k *SignKeys) AddHexKeys(pubHex string, privHex string) error {
 	if len(pubHex) < 32 || len(privHex) < 64 {
-		return errors.New("Wrong key size, must be pub:32 priv:64 (bytes)")
+		return errors.New("wrong key size, must be pub:32 priv:64 (bytes)")
 	}
 	pubKey, err := hex.DecodeString(pubHex)
 	if err != nil {
@@ -52,7 +52,7 @@ func (k *SignKeys) HexString() (string, string) {
 // message is a normal string (no HexString)
 func (k *SignKeys) Sign(message string) (string, error) {
 	if k.Private == nil {
-		return "", errors.New("No private key available")
+		return "", errors.New("no private key available")
 	}
 	signature := sign.Sign(nil, []byte(message), k.Private)
 	signHexFull := hex.EncodeToString(signature)

@@ -61,7 +61,7 @@ func (d *DvoteApiServer) Start(level string) error {
 	if err != nil {
 		return err
 	}
-	//defer os.RemoveAll(ipfsDir)
+	// defer os.RemoveAll(ipfsDir)
 	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {
@@ -97,7 +97,7 @@ func (r *ApiConnection) Connect(addr string) (err error) {
 }
 
 func (r *ApiConnection) Request(req types.MetaRequest, signer *signature.SignKeys) (*types.MetaResponse, error) {
-	//t.Helper()
+	// t.Helper()
 	method := req.Method
 
 	var cmReq types.RequestMessage

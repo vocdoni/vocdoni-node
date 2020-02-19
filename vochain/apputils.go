@@ -59,16 +59,16 @@ func ValidateTx(content []byte, state *State) (interface{}, error) {
 }
 
 // ValidateAndDeliverTx validates a tx and executes the methods required for changing the app state
-func ValidateAndDeliverTx(content []byte, state *State) (error, []abcitypes.Event) {
+func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, error) {
 	tx, err := ValidateTx(content, state)
 	if err != nil {
-		return fmt.Errorf("transaction validation failed with error (%s)", err), nil
+		return nil, fmt.Errorf("transaction validation failed with error (%s)", err)
 	}
 	switch tx := tx.(type) {
 	case vochaintypes.VoteTx:
 		process, _ := state.Process(tx.ProcessID)
 		if process == nil {
-			return fmt.Errorf("process with id (%s) does not exists", tx.ProcessID), nil
+			return nil, fmt.Errorf("process with id (%s) does not exists", tx.ProcessID)
 		}
 		vote := new(vochaintypes.Vote)
 		switch process.Type {
@@ -86,16 +86,16 @@ func ValidateAndDeliverTx(content []byte, state *State) (error, []abcitypes.Even
 
 			voteBytes, err := json.Marshal(vote)
 			if err != nil {
-				return fmt.Errorf("cannot marshal vote (%s)", err), nil
+				return nil, fmt.Errorf("cannot marshal vote (%s)", err)
 			}
 			pubKey, err := signature.PubKeyFromSignature(string(voteBytes), tx.Signature)
 			if err != nil {
 				// log.Warnf("cannot extract pubKey: %s", err)
-				return fmt.Errorf("cannot extract public key from signature (%s)", err), nil
+				return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
 			}
 			addr, err := signature.AddrFromPublicKey(string(pubKey))
 			if err != nil {
-				return fmt.Errorf("cannot extract address from public key"), nil
+				return nil, fmt.Errorf("cannot extract address from public key")
 			}
 			vote.Nonce = util.TrimHex(tx.Nonce)
 			vote.VotePackage = util.TrimHex(tx.VotePackage)
@@ -104,25 +104,25 @@ func ValidateAndDeliverTx(content []byte, state *State) (error, []abcitypes.Even
 			vote.ProcessID = util.TrimHex(tx.ProcessID)
 			nullifier, err := GenerateNullifier(addr, vote.ProcessID)
 			if err != nil {
-				return fmt.Errorf("cannot generate nullifier"), nil
+				return nil, fmt.Errorf("cannot generate nullifier")
 			}
 			vote.Nullifier = nullifier
 
 		default:
-			return fmt.Errorf("invalid process type"), nil
+			return nil, fmt.Errorf("invalid process type")
 		}
 		// log.Debugf("adding vote: %+v", vote)
-		return state.AddVote(vote), nil
+		return nil, state.AddVote(vote)
 	case vochaintypes.AdminTx:
 		switch tx.Type {
 		case "addOracle":
-			return state.AddOracle(tx.Address), nil
+			return nil, state.AddOracle(tx.Address)
 		case "removeOracle":
-			return state.RemoveOracle(tx.Address), nil
+			return nil, state.RemoveOracle(tx.Address)
 		case "addValidator":
-			return state.AddValidator(tx.Address, tx.Power), nil
+			return nil, state.AddValidator(tx.Address, tx.Power)
 		case "removeValidator":
-			return state.RemoveValidator(tx.Address), nil
+			return nil, state.RemoveValidator(tx.Address)
 		}
 	case vochaintypes.NewProcessTx:
 		newProcess := &vochaintypes.Process{
@@ -137,7 +137,7 @@ func ValidateAndDeliverTx(content []byte, state *State) (error, []abcitypes.Even
 		}
 		err = state.AddProcess(newProcess, tx.ProcessID)
 		if err != nil {
-			return err, nil
+			return nil, err
 		}
 		events := []abcitypes.Event{
 			{
@@ -154,10 +154,10 @@ func ValidateAndDeliverTx(content []byte, state *State) (error, []abcitypes.Even
 				},
 			},
 		}
-		return nil, events
+		return events, nil
 
 	}
-	return fmt.Errorf("invalid type"), nil
+	return nil, fmt.Errorf("invalid type")
 }
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote

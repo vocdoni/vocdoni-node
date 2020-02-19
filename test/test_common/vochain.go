@@ -132,9 +132,12 @@ func NewVochainStateWithOracles() *vochain.State {
 	os.RemoveAll("/tmp/db")
 	s, err := vochain.NewState("/tmp/db", c)
 	if err != nil {
-		return nil
+		panic(err)
 	}
 	oraclesBytes, err := s.Codec.MarshalBinaryBare(OracleListHardcoded)
+	if err != nil {
+		panic(err)
+	}
 	s.AppTree.Set([]byte("oracle"), oraclesBytes)
 	return s
 }
@@ -145,11 +148,17 @@ func NewVochainStateWithValidators() *vochain.State {
 	os.RemoveAll("/tmp/db")
 	s, err := vochain.NewState("/tmp/db", c)
 	if err != nil {
-		return nil
+		panic(err)
 	}
 	validatorsBytes, err := s.Codec.MarshalBinaryBare(ValidatorListHardcoded)
+	if err != nil {
+		panic(err)
+	}
 	s.AppTree.Set([]byte("validator"), validatorsBytes)
 	oraclesBytes, err := s.Codec.MarshalBinaryBare(OracleListHardcoded)
+	if err != nil {
+		panic(err)
+	}
 	s.AppTree.Set([]byte("oracle"), oraclesBytes)
 	return s
 }
@@ -160,10 +169,13 @@ func NewVochainStateWithProcess() *vochain.State {
 	os.RemoveAll("/tmp/db")
 	s, err := vochain.NewState("/tmp/db", c)
 	if err != nil {
-		return nil
+		panic(err)
 	}
 	// add process
 	processBytes, err := s.Codec.MarshalBinaryBare(ProcessHardcoded)
+	if err != nil {
+		panic(err)
+	}
 	s.ProcessTree.Set([]byte("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), processBytes)
 	return s
 }

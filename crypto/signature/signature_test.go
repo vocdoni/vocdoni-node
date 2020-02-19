@@ -44,6 +44,9 @@ func TestSignature(t *testing.T) {
 		t.Errorf("PrivKey from %s not match the hardcoded one\nGot %s\nMust have %s\n", hardcodedPriv, priv, hardcodedPriv[2:])
 	}
 	signature, err := s3.Sign(message)
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Logf("Signature: %s\n", signature)
 	if signature != hardcodedSignature {
 		t.Errorf("Hardcoded signature %s do not match\n", hardcodedSignature)
@@ -132,6 +135,9 @@ func TestAddr(t *testing.T) {
 	}
 
 	signature2, err := s.Sign("bye-bye vocdoni")
+	if err != nil {
+		t.Fatal(err)
+	}
 	addr4, err := AddrFromSignature("bye-bye vocdoni", signature2)
 	if err != nil {
 		t.Error(err)
