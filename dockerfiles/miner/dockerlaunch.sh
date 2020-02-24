@@ -6,7 +6,7 @@ IN_MEMORY="${IN_MEMORY:-false}"
 
 echo "Using image '$IMAGE_TAG:latest'\n"
 
-docker build -t $IMAGE_TAG -f dockerfile.miner . || {
+docker build -t $IMAGE_TAG --target miner . || {
 	echo "ERROR: docker image cannot be created, exiting..."
 	exit 2
 }
