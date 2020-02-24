@@ -4,7 +4,7 @@
 IMAGE_TAG="vocdoni/census"
 echo "Using image '$IMAGE_TAG:latest'\n"
 
-docker build -t $IMAGE_TAG -f dockerfile.census . || {
+docker build -t $IMAGE_TAG --target census . || {
 	echo "ERROR: docker image cannot be created, exiting..."
 	exit 2
 }
