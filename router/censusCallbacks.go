@@ -6,23 +6,23 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-func censusLocal(request routerRequest, router *Router) {
+func (r *Router) censusLocal(request routerRequest) {
 	var cresponse *types.MetaResponse
 	auth := request.authenticated
 	addr := request.address
 	log.Debugf("client authorization %t. Recovered address is [%s]", auth, addr)
 	if auth {
 		if len(addr) < signature.AddressLength {
-			router.sendError(request, "cannot recover address")
+			r.sendError(request, "cannot recover address")
 			return
 		}
 	}
-	cresponse = router.census.Handler(&request.MetaRequest, auth, "0x"+addr+"/")
+	cresponse = r.census.Handler(&request.MetaRequest, auth, "0x"+addr+"/")
 	if !cresponse.Ok {
-		router.sendError(request, cresponse.Message)
+		r.sendError(request, cresponse.Message)
 		return
 	}
 	var response types.ResponseMessage
 	response.MetaResponse = *cresponse
-	router.transport.Send(router.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, response))
 }

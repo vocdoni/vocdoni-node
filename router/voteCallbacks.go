@@ -9,7 +9,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
-func submitEnvelope(request routerRequest, router *Router) {
+func (r *Router) submitEnvelope(request routerRequest) {
 	voteTxArgs := new(types.VoteTx)
 	voteTxArgs.ProcessID = request.Payload.ProcessID
 	voteTxArgs.Nonce = request.Payload.Nonce
@@ -22,22 +22,22 @@ func submitEnvelope(request routerRequest, router *Router) {
 	voteTxBytes, err := json.Marshal(voteTxArgs)
 	if err != nil {
 		log.Errorf("error marshaling voteTx args: %s", err)
-		router.sendError(request, "cannot marshal voteTx args")
+		r.sendError(request, "cannot marshal voteTx args")
 		return
 	}
 
-	res, err := router.tmclient.BroadcastTxSync(voteTxBytes)
+	res, err := r.tmclient.BroadcastTxSync(voteTxBytes)
 	if err != nil || res.Code != 0 {
 		log.Warnf("cannot broadcast tx (res.Code=%d): %s || %s", res.Code, err, string(res.Data))
-		router.sendError(request, string(res.Data))
+		r.sendError(request, string(res.Data))
 		return
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
 	var response types.ResponseMessage
-	router.transport.Send(router.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, response))
 }
 
-func getEnvelopeStatus(request routerRequest, router *Router) {
+func (r *Router) getEnvelopeStatus(request routerRequest) {
 	qdata := types.QueryData{
 		Method:    "getEnvelopeStatus",
 		ProcessID: request.ProcessID,
@@ -46,13 +46,13 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
 		log.Errorf("cannot marshal query data: (%s)", err)
-		router.sendError(request, "cannot marshal query data")
+		r.sendError(request, "cannot marshal query data")
 		return
 	}
-	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
+	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
 		log.Warnf("cannot query: %s", err)
-		router.sendError(request, "cannot query")
+		r.sendError(request, "cannot query")
 		return
 	}
 	var response types.ResponseMessage
@@ -60,10 +60,10 @@ func getEnvelopeStatus(request routerRequest, router *Router) {
 	if queryResult.Response.Code != 0 {
 		response.Registered = types.False
 	}
-	router.transport.Send(router.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, response))
 }
 
-func getEnvelope(request routerRequest, router *Router) {
+func (r *Router) getEnvelope(request routerRequest) {
 	qdata := types.QueryData{
 		Method:    "getEnvelope",
 		ProcessID: request.ProcessID,
@@ -72,29 +72,29 @@ func getEnvelope(request routerRequest, router *Router) {
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
 		log.Errorf("cannot marshal query data: (%s)", err)
-		router.sendError(request, "cannot marshal query data")
+		r.sendError(request, "cannot marshal query data")
 		return
 	}
-	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
+	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
 		log.Warnf("cannot query: %s", err)
-		router.sendError(request, "cannot query")
+		r.sendError(request, "cannot query")
 		return
 	}
 	if queryResult.Response.Code != 0 {
-		router.sendError(request, queryResult.Response.GetInfo())
+		r.sendError(request, queryResult.Response.GetInfo())
 		return
 	}
 	var response types.ResponseMessage
-	if err := router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &response.Payload); err != nil {
+	if err := r.codec.UnmarshalBinaryBare(queryResult.Response.Value, &response.Payload); err != nil {
 		log.Errorf("cannot unmarshal vote package: %s", err)
-		router.sendError(request, "cannot unmarshal vote package")
+		r.sendError(request, "cannot unmarshal vote package")
 		return
 	}
-	router.transport.Send(router.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, response))
 }
 
-func getEnvelopeHeight(request routerRequest, router *Router) {
+func (r *Router) getEnvelopeHeight(request routerRequest) {
 	qdata := types.QueryData{
 		Method:    "getEnvelopeHeight",
 		ProcessID: request.ProcessID,
@@ -102,56 +102,56 @@ func getEnvelopeHeight(request routerRequest, router *Router) {
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
 		log.Errorf("cannot marshal query data: %s", err)
-		router.sendError(request, "cannot marshal query")
+		r.sendError(request, "cannot marshal query")
 		return
 	}
-	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
+	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil || queryResult.Response.Code != 0 {
-		router.sendError(request, queryResult.Response.GetInfo())
+		r.sendError(request, queryResult.Response.GetInfo())
 		return
 	}
 	var response types.ResponseMessage
 	response.Height = new(int64)
-	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, response.Height)
+	err = r.codec.UnmarshalBinaryBare(queryResult.Response.Value, response.Height)
 	if err != nil {
 		log.Errorf("cannot unmarshal height: %s", err)
-		router.sendError(request, "cannot marshal height")
+		r.sendError(request, "cannot marshal height")
 		return
 	}
-	router.transport.Send(router.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, response))
 }
 
-func getBlockHeight(request routerRequest, router *Router) {
+func (r *Router) getBlockHeight(request routerRequest) {
 	qdata := types.QueryData{
 		Method: "getBlockHeight",
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
 		log.Errorf("cannot marshal query data: (%s)", err)
-		router.sendError(request, "cannot marshal query")
+		r.sendError(request, "cannot marshal query")
 		return
 	}
-	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
+	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil || queryResult.Response.Code != 0 {
-		router.sendError(request, "cannot fetch height")
+		r.sendError(request, "cannot fetch height")
 		return
 	}
 	var response types.ResponseMessage
 	response.Height = new(int64)
-	err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, response.Height)
+	err = r.codec.UnmarshalBinaryBare(queryResult.Response.Value, response.Height)
 	if err != nil {
 		log.Errorf("cannot unmarshal height: %s", err)
-		router.sendError(request, "cannot unmarshal height")
+		r.sendError(request, "cannot unmarshal height")
 		return
 	}
-	router.transport.Send(router.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, response))
 }
 
-func getProcessList(request routerRequest, router *Router) {
-	queryResult, err := router.tmclient.TxSearch(fmt.Sprintf("processCreated.entityId='%s'", util.TrimHex(request.EntityId)), false, 1, 30)
+func (r *Router) getProcessList(request routerRequest) {
+	queryResult, err := r.tmclient.TxSearch(fmt.Sprintf("processCreated.entityId='%s'", util.TrimHex(request.EntityId)), false, 1, 30)
 	if err != nil {
 		log.Errorf("cannot query: %s", err)
-		router.sendError(request, err.Error())
+		r.sendError(request, err.Error())
 		return
 	}
 	var processList []string
@@ -166,10 +166,10 @@ func getProcessList(request routerRequest, router *Router) {
 	} else {
 		response.ProcessList = processList
 	}
-	router.transport.Send(router.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, response))
 }
 
-func getEnvelopeList(request routerRequest, router *Router) {
+func (r *Router) getEnvelopeList(request routerRequest) {
 	// here we can ask to tendermint via query to get the results from the database
 	qdata := types.QueryData{
 		Method:    "getEnvelopeList",
@@ -180,12 +180,12 @@ func getEnvelopeList(request routerRequest, router *Router) {
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
 		log.Errorf("cannot marshal query data: (%s)", err)
-		router.sendError(request, "cannot marshal query")
+		r.sendError(request, "cannot marshal query")
 		return
 	}
-	queryResult, err := router.tmclient.ABCIQuery("", qdataBytes)
+	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
 	if queryResult.Response.Code != 0 {
-		router.sendError(request, queryResult.Response.GetInfo())
+		r.sendError(request, queryResult.Response.GetInfo())
 		return
 	}
 	var response types.ResponseMessage
@@ -194,38 +194,38 @@ func getEnvelopeList(request routerRequest, router *Router) {
 		response.Nullifiers = []string{""}
 	}
 	if len(queryResult.Response.Value) != 0 {
-		err = router.codec.UnmarshalBinaryBare(queryResult.Response.Value, &response.Nullifiers)
+		err = r.codec.UnmarshalBinaryBare(queryResult.Response.Value, &response.Nullifiers)
 	} else {
 		response.Nullifiers = []string{""}
 	}
 	if err != nil {
 		log.Errorf("cannot unmarshal nullifiers: %s", err)
-		router.sendError(request, "cannot unmarshal nullifiers")
+		r.sendError(request, "cannot unmarshal nullifiers")
 		return
 	}
-	router.transport.Send(router.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, response))
 }
 
-func getResults(request routerRequest, router *Router) {
+func (r *Router) getResults(request routerRequest) {
 	var err error
 	request.ProcessID = util.TrimHex(request.ProcessID)
 	if len(request.ProcessID) != 64 {
-		router.sendError(request, "processID length not valid")
+		r.sendError(request, "processID length not valid")
 		return
 	}
 
 	var response types.ResponseMessage
-	response.Results, err = router.Scrutinizer.VoteResult(request.ProcessID)
+	response.Results, err = r.Scrutinizer.VoteResult(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
-		router.sendError(request, "cannot get results")
+		r.sendError(request, "cannot get results")
 		return
 	}
 
-	procInfo, err := router.Scrutinizer.ProcessInfo(request.ProcessID)
+	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
-		router.sendError(request, "cannot get process info")
+		r.sendError(request, "cannot get process info")
 		return
 	}
 	response.Type = procInfo.Type
@@ -234,11 +234,11 @@ func getResults(request routerRequest, router *Router) {
 	} else {
 		response.State = "active"
 	}
-	router.transport.Send(router.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, response))
 }
 
-func getProcListResults(request routerRequest, router *Router) {
+func (r *Router) getProcListResults(request routerRequest) {
 	var response types.ResponseMessage
-	response.ProcessIDs = router.Scrutinizer.ProcessList(64, util.TrimHex(request.FromID))
-	router.transport.Send(router.buildReply(request, response))
+	response.ProcessIDs = r.Scrutinizer.ProcessList(64, util.TrimHex(request.FromID))
+	r.transport.Send(r.buildReply(request, response))
 }

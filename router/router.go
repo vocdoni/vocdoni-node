@@ -58,43 +58,39 @@ func parseTransportFromURI(uris []string) []string {
 	return out
 }
 
-type requestMethod func(request routerRequest, router *Router)
-
-// type methodMap map[string]func(msg types.Message, request routerRequest, r *Router)
-type methodMap map[string]requestMethod
+type registeredMethod struct {
+	public  bool
+	handler func(routerRequest)
+}
 
 // Router holds a router object
 type Router struct {
-	privateRequestMap methodMap
-	publicRequestMap  methodMap
-	inbound           <-chan types.Message
-	storage           data.Storage
-	transport         net.Transport
-	signer            signature.SignKeys
-	census            *census.Manager
-	tmclient          *voclient.HTTP
-	Scrutinizer       *scrutinizer.Scrutinizer
-	PrivateCalls      uint64
-	PublicCalls       uint64
-	codec             *amino.Codec
-	APIs              []string
+	methods      map[string]registeredMethod
+	inbound      <-chan types.Message
+	storage      data.Storage
+	transport    net.Transport
+	signer       signature.SignKeys
+	census       *census.Manager
+	tmclient     *voclient.HTTP
+	Scrutinizer  *scrutinizer.Scrutinizer
+	PrivateCalls uint64
+	PublicCalls  uint64
+	codec        *amino.Codec
+	APIs         []string
 }
 
 func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
 	signer signature.SignKeys) *Router {
-	privateReqMap := make(methodMap)
-	publicReqMap := make(methodMap)
 	cm := new(census.Manager)
 	r := new(Router)
-	r.privateRequestMap = privateReqMap
-	r.publicRequestMap = publicReqMap
+	r.methods = make(map[string]registeredMethod)
 	r.census = cm
 	r.inbound = inbound
 	r.storage = storage
 	r.transport = transport
 	r.signer = signer
 	r.codec = amino.NewCodec()
-	r.registerPublic("getGatewayInfo", info)
+	r.registerPublic("getGatewayInfo", r.info)
 	return r
 }
 
@@ -121,22 +117,21 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	if request.method == "" {
 		return request, errors.New("method is empty")
 	}
-	if fn := r.publicRequestMap[request.method]; fn != nil {
-		// if method is Public
+	method, ok := r.methods[request.method]
+	if !ok {
+		return request, fmt.Errorf("method not valid [%s]", request.method)
+	}
+	if method.public {
 		request.private = false
 		request.authenticated = true
 		request.address = "00000000000000000000"
-	} else if fn := r.privateRequestMap[request.method]; fn != nil {
-		// if method is Private
+	} else {
 		request.private = true
 		request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.MetaRequest, msgStruct.Signature)
 		// if no authrized keys, authenticate all requests
 		if !request.authenticated && len(r.signer.Authorized) == 0 {
 			request.authenticated = true
 		}
-	} else {
-		// if method not found
-		return request, fmt.Errorf("method not valid [%s]", request.method)
 	}
 	request.id = msgStruct.ID
 	request.context = context
@@ -153,22 +148,28 @@ func InitRouter(inbound <-chan types.Message, storage data.Storage, transport ne
 	return NewRouter(inbound, storage, transport, *signer)
 }
 
-func (r *Router) registerPrivate(methodName string, methodCallback requestMethod) {
-	r.privateRequestMap[methodName] = methodCallback
+func (r *Router) registerPrivate(name string, handler func(routerRequest)) {
+	if _, ok := r.methods[name]; ok {
+		log.Fatalf("duplicate method: %q", name)
+	}
+	r.methods[name] = registeredMethod{handler: handler}
 }
 
-func (r *Router) registerPublic(methodName string, methodCallback requestMethod) {
-	r.publicRequestMap[methodName] = methodCallback
+func (r *Router) registerPublic(name string, handler func(routerRequest)) {
+	if _, ok := r.methods[name]; ok {
+		log.Fatalf("duplicate method: %q", name)
+	}
+	r.methods[name] = registeredMethod{public: true, handler: handler}
 }
 
 // EnableFileAPI enables the FILE API in the Router
 func (r *Router) EnableFileAPI() {
 	r.APIs = append(r.APIs, "file")
-	r.registerPublic("fetchFile", fetchFile)
-	r.registerPrivate("addFile", addFile)
-	r.registerPrivate("pinList", pinList)
-	r.registerPrivate("pinFile", pinFile)
-	r.registerPrivate("unpinFile", unpinFile)
+	r.registerPublic("fetchFile", r.fetchFile)
+	r.registerPrivate("addFile", r.addFile)
+	r.registerPrivate("pinList", r.pinList)
+	r.registerPrivate("pinFile", r.pinFile)
+	r.registerPrivate("unpinFile", r.unpinFile)
 }
 
 // EnableCensusAPI enables the Census API in the Router
@@ -176,40 +177,40 @@ func (r *Router) EnableCensusAPI(cm *census.Manager) {
 	r.APIs = append(r.APIs, "census")
 	r.census = cm
 	cm.Storage = r.storage
-	r.registerPublic("getRoot", censusLocal)
-	r.registerPrivate("dump", censusLocal)
-	r.registerPrivate("dumpPlain", censusLocal)
-	r.registerPublic("getSize", censusLocal)
-	r.registerPublic("genProof", censusLocal)
-	r.registerPublic("checkProof", censusLocal)
-	r.registerPrivate("addCensus", censusLocal)
-	r.registerPrivate("addClaim", censusLocal)
-	r.registerPrivate("addClaimBulk", censusLocal)
-	r.registerPrivate("publish", censusLocal)
-	r.registerPrivate("importRemote", censusLocal)
+	r.registerPublic("getRoot", r.censusLocal)
+	r.registerPrivate("dump", r.censusLocal)
+	r.registerPrivate("dumpPlain", r.censusLocal)
+	r.registerPublic("getSize", r.censusLocal)
+	r.registerPublic("genProof", r.censusLocal)
+	r.registerPublic("checkProof", r.censusLocal)
+	r.registerPrivate("addCensus", r.censusLocal)
+	r.registerPrivate("addClaim", r.censusLocal)
+	r.registerPrivate("addClaimBulk", r.censusLocal)
+	r.registerPrivate("publish", r.censusLocal)
+	r.registerPrivate("importRemote", r.censusLocal)
 }
 
 // EnableVoteAPI enabled the Vote API in the Router
 func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP) {
 	r.APIs = append(r.APIs, "vote")
 	r.tmclient = rpcClient
-	r.registerPublic("submitEnvelope", submitEnvelope)
-	r.registerPublic("getEnvelopeStatus", getEnvelopeStatus)
-	r.registerPublic("getEnvelope", getEnvelope)
-	r.registerPublic("getEnvelopeHeight", getEnvelopeHeight)
-	r.registerPublic("getProcessList", getProcessList)
-	r.registerPublic("getEnvelopeList", getEnvelopeList)
-	r.registerPublic("getBlockHeight", getBlockHeight)
+	r.registerPublic("submitEnvelope", r.submitEnvelope)
+	r.registerPublic("getEnvelopeStatus", r.getEnvelopeStatus)
+	r.registerPublic("getEnvelope", r.getEnvelope)
+	r.registerPublic("getEnvelopeHeight", r.getEnvelopeHeight)
+	r.registerPublic("getProcessList", r.getProcessList)
+	r.registerPublic("getEnvelopeList", r.getEnvelopeList)
+	r.registerPublic("getBlockHeight", r.getBlockHeight)
 	if r.Scrutinizer != nil {
 		r.APIs = append(r.APIs, "results")
-		r.registerPublic("getResults", getResults)
-		r.registerPublic("getProcListResults", getProcListResults)
+		r.registerPublic("getResults", r.getResults)
+		r.registerPublic("getProcListResults", r.getProcListResults)
 	}
 }
 
 // Route routes requests through the Router object
 func (r *Router) Route() {
-	if len(r.publicRequestMap) == 0 && len(r.privateRequestMap) == 0 {
+	if len(r.methods) == 0 {
 		log.Warnf("router methods are not properly initialized: %+v", r)
 		return
 	}
@@ -220,14 +221,14 @@ func (r *Router) Route() {
 			go r.sendError(request, err.Error())
 			continue
 		}
-		var methodFunc requestMethod
-		if !request.private {
-			methodFunc = r.publicRequestMap[request.method]
-		} else if request.private && request.authenticated {
-			methodFunc = r.privateRequestMap[request.method]
+		method, ok := r.methods[request.method]
+		if !ok {
+			errMsg := fmt.Sprintf("router has no method %q", request.method)
+			go r.sendError(request, errMsg)
+			continue
 		}
-		if methodFunc == nil {
-			errMsg := fmt.Sprintf("router has no method named %s or unauthorized", request.method)
+		if !method.public && !request.authenticated {
+			errMsg := fmt.Sprintf("authentication is required for %q", request.method)
 			go r.sendError(request, errMsg)
 			continue
 		}
@@ -240,7 +241,7 @@ func (r *Router) Route() {
 		} else {
 			r.PublicCalls++
 		}
-		go methodFunc(request, r)
+		go method.handler(request)
 	}
 }
 
@@ -272,10 +273,10 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 	}
 }
 
-func info(request routerRequest, router *Router) {
+func (r *Router) info(request routerRequest) {
 	var response types.ResponseMessage
 	response.MetaResponse.Timestamp = int32(time.Now().Unix())
-	response.MetaResponse.APIList = router.APIs
+	response.MetaResponse.APIList = r.APIs
 	response.MetaResponse.Request = request.id
-	router.transport.Send(router.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, response))
 }
