@@ -20,13 +20,33 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 )
 
-func buildReply(context types.MessageContext, data []byte) types.Message {
-	reply := new(types.Message)
-	reply.TimeStamp = int32(time.Now().Unix())
-	reply.Context = context
-	reply.Data = data
-	log.Debugf("response %s", data)
-	return *reply
+func (r *Router) buildReply(request routerRequest, response types.ResponseMessage) types.Message {
+	response.ID = request.id
+	response.Ok = true
+	response.Request = request.id
+	respData, err := json.Marshal(response)
+	if err != nil {
+		// This should never happen. If it does, return a very simple
+		// plaintext error, and log the error.
+		log.Error(err)
+		return types.Message{
+			TimeStamp: int32(time.Now().Unix()),
+			Context:   request.context,
+			Data:      []byte(err.Error()),
+		}
+	}
+	log.Debugf("response %s", respData)
+
+	response.Signature, err = r.signer.SignJSON(response.MetaResponse)
+	if err != nil {
+		log.Warn(err)
+		// continue without the signature
+	}
+	return types.Message{
+		TimeStamp: int32(time.Now().Unix()),
+		Context:   request.context,
+		Data:      respData,
+	}
 }
 
 func parseTransportFromURI(uris []string) []string {
@@ -197,7 +217,7 @@ func (r *Router) Route() {
 		msg := <-r.inbound
 		request, err := r.getRequest(msg.Data, msg.Context)
 		if !request.authenticated && err != nil {
-			go sendError(r.transport, r.signer, request.context, request.id, err.Error())
+			go r.sendError(request, err.Error())
 			continue
 		}
 		var methodFunc requestMethod
@@ -208,7 +228,7 @@ func (r *Router) Route() {
 		}
 		if methodFunc == nil {
 			errMsg := fmt.Sprintf("router has no method named %s or unauthorized", request.method)
-			go sendError(r.transport, r.signer, request.context, request.id, errMsg)
+			go r.sendError(request, errMsg)
 			continue
 		}
 
@@ -224,45 +244,38 @@ func (r *Router) Route() {
 	}
 }
 
-func sendError(transport net.Transport, signer signature.SignKeys, context types.MessageContext, requestID, errMsg string) {
+func (r *Router) sendError(request routerRequest, errMsg string) {
 	log.Warn(errMsg)
 	var err error
 	var response types.ErrorMessage
-	response.ID = requestID
-	response.Error.Request = requestID
+	response.ID = request.id
+	response.Error.Request = request.id
 	response.Error.Timestamp = int32(time.Now().Unix())
 	response.Error.SetError(errMsg)
-	response.Signature, err = signer.SignJSON(response.Error)
+	response.Signature, err = r.signer.SignJSON(response.Error)
 	if err != nil {
 		log.Warn(err)
 	}
-	if context != nil {
-		rawResponse, err := json.Marshal(response)
+	if request.context != nil {
+		// TODO(mvdan): consolidate with Router.buildReply once we
+		// simplify the api types.
+		data, err := json.Marshal(response)
 		if err != nil {
 			log.Warnf("error marshaling response body: %s", err)
 		}
-		transport.Send(buildReply(context, rawResponse))
+		msg := types.Message{
+			TimeStamp: int32(time.Now().Unix()),
+			Context:   request.context,
+			Data:      data,
+		}
+		r.transport.Send(msg)
 	}
 }
 
 func info(request routerRequest, router *Router) {
 	var response types.ResponseMessage
-	var err error
-	response.ID = request.id
-	response.Ok = true
 	response.MetaResponse.Timestamp = int32(time.Now().Unix())
-	response.Request = request.id
 	response.MetaResponse.APIList = router.APIs
 	response.MetaResponse.Request = request.id
-	response.Signature, err = router.signer.SignJSON(response.MetaResponse)
-	if err != nil {
-		log.Warn(err)
-	}
-	rawResponse, err := json.Marshal(response)
-	if err != nil {
-		log.Error(err)
-		sendError(router.transport, router.signer, request.context, request.id, fmt.Sprintf("could not unmarshal response (%s)", err))
-	} else {
-		router.transport.Send(buildReply(request.context, rawResponse))
-	}
+	router.transport.Send(router.buildReply(request, response))
 }
