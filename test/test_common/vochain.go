@@ -1,9 +1,13 @@
 package test_common
 
 import (
+	"math/rand"
 	"os"
+	"strconv"
 
 	amino "github.com/tendermint/go-amino"
+	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
+	"github.com/tendermint/tendermint/privval"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -11,42 +15,13 @@ import (
 )
 
 var (
+	rint = rand.Int()
+
 	OracleListHardcoded = []string{
 		"0fA7A3FdB5C7C611646a535BDDe669Db64DC03d2",
 		"00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
 		"237B54D0163Aa131254fA260Fc12DB0E6DC76FC7",
 		"F904848ea36c46817096E94f932A9901E377C8a5",
-	}
-
-	ValidatorListHardcoded = []types.Validator{
-		{
-			Address: "243A633E60AAFB177018D76C5AA0A3DF0ACC13D1",
-			PubKey: types.PubKey{
-				Type:  "tendermint/PubKeyEd25519",
-				Value: "MlOJMC1nwAYDmaju+2VJijoIO6cBF36Ygmsdc4gKZtk=",
-			},
-			Power: 10,
-			Name:  "",
-		},
-		{
-			Address: "5DC922017285EC24415F3E7ECD045665EADA8B5A",
-			PubKey: types.PubKey{
-				Type:  "tendermint/PubKeyEd25519",
-				Value: "4MlhCW62N/5bj5tD66//h9RnsAh+xjAdMU8lGiEwvyM=",
-			},
-			Power: 10,
-			Name:  "",
-		},
-	}
-
-	HardcodedValidator = &types.Validator{
-		Address: "77EA441EA0EB29F049FC57DE524C55833A7FF575",
-		PubKey: types.PubKey{
-			Type:  "tendermint/PubKeyEd25519",
-			Value: "GyZfKNK3lT5AQXQ4pwrVdgG3rRisx9tS4bM9EIZ0zYY=",
-		},
-		Power: 10,
-		Name:  "",
 	}
 
 	ProcessHardcoded = &types.Process{
@@ -144,13 +119,19 @@ func NewVochainStateWithOracles() *vochain.State {
 
 func NewVochainStateWithValidators() *vochain.State {
 	log.InitLogger("error", "stdout")
+	rint = rand.Int()
 	c := amino.NewCodec()
+	cryptoAmino.RegisterAmino(c)
 	os.RemoveAll("/tmp/db")
 	s, err := vochain.NewState("/tmp/db", c)
 	if err != nil {
 		panic(err)
 	}
-	validatorsBytes, err := s.Codec.MarshalBinaryBare(ValidatorListHardcoded)
+	vals := make([]privval.FilePV, 2)
+	vals[0] = *privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
+	rint = rand.Int()
+	vals[1] = *privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
+	validatorsBytes, err := c.MarshalJSON(vals)
 	if err != nil {
 		panic(err)
 	}

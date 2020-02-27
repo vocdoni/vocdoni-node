@@ -216,7 +216,7 @@ func main() {
 	}
 
 	log.Infof("starting Vochain synchronization")
-	vnode := vochain.NewVochain(globalCfg.VochainConfig)
+	vnode := vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1), nil)
 	go func() {
 		log.Infof("vochain current height: %d", vnode.State.Height())
 		for {

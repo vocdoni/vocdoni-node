@@ -3,10 +3,10 @@ package vochain
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	amino "github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	nm "github.com/tendermint/tendermint/node"
 
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -26,6 +26,7 @@ var _ abcitypes.Application = (*BaseApplication)(nil)
 // NewBaseApplication creates a new BaseApplication given a name an a DB backend
 func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	c := amino.NewCodec()
+	cryptoAmino.RegisterAmino(c)
 	s, err := NewState(dbpath, c)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
@@ -62,7 +63,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	// setting the app initial state with validators, oracles, height = 0 and empty apphash
 	// unmarshal app state from genesis
 	var genesisAppState types.GenesisAppState
-	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
+	err := app.Codec.UnmarshalJSON(req.AppStateBytes, &genesisAppState)
 	if err != nil {
 		log.Errorf("cannot unmarshal app state bytes: %s", err)
 	}
@@ -72,11 +73,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
-		p, err := strconv.ParseInt(genesisAppState.Validators[i].Power, 10, 64)
-		if err != nil {
-			log.Errorf("cannot parse power from validator: %s", err)
-		}
-		app.State.AddValidator(genesisAppState.Validators[i].PubKey.Value, p)
+		app.State.AddValidator(genesisAppState.Validators[i].PubKey, genesisAppState.Validators[i].Power)
 	}
 
 	var header abcitypes.Header

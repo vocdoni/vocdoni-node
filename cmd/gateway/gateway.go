@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -349,7 +348,7 @@ func main() {
 		go func() {
 			for {
 				time.Sleep(time.Second * 20)
-				stats, err := storage.Stats(context.TODO())
+				stats, err := storage.Stats()
 				if err != nil {
 					log.Warnf("IPFS node returned an error: %s", err)
 				}
@@ -407,7 +406,8 @@ func main() {
 		if globalCfg.VochainConfig.PublicAddr != "" {
 			log.Infof("vochain exposed IP address: %s", globalCfg.VochainConfig.PublicAddr)
 		}
-		vnode = vochain.NewVochain(globalCfg.VochainConfig)
+
+		vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1), nil)
 		if globalCfg.API.Results {
 			log.Info("starting vochain scrutinizer")
 			sc, err = scrutinizer.NewScrutinizer(globalCfg.DataDir+"/scrutinizer", vnode.State)

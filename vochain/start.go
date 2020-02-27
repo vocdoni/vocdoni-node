@@ -19,8 +19,6 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
-	tmtypes "github.com/tendermint/tendermint/types"
-	tmtime "github.com/tendermint/tendermint/types/time"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 )
@@ -31,8 +29,8 @@ import (
 // DefaultSeedNodes list of default Vocdoni seed nodes
 var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
 
-// Start starts a new vochain validator node
-func NewVochain(globalCfg *config.VochainCfg) *BaseApplication {
+// NewVochain starts a node with an ABCI application
+func NewVochain(globalCfg *config.VochainCfg, genesis []byte, pv *privval.FilePV) *BaseApplication {
 	// creating new vochain app
 	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
 	if err != nil {
@@ -41,7 +39,7 @@ func NewVochain(globalCfg *config.VochainCfg) *BaseApplication {
 
 	log.Info("creating tendermint node and application")
 	go func() {
-		app.Node, err = newTendermint(app, globalCfg)
+		app.Node, err = newTendermint(app, globalCfg, genesis, pv)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -53,37 +51,9 @@ func NewVochain(globalCfg *config.VochainCfg) *BaseApplication {
 	return app
 }
 
+// Start starts a new vochain validator node
 func Start(node *nm.Node) error {
 	return node.Start()
-}
-
-// NewGenesis creates a new genesis file and saves it to tconfig.Genesis path
-func NewGenesis(tconfig *cfg.Config, pv *privval.FilePV) error {
-	log.Info("creating genesis file")
-	consensusParams := tmtypes.DefaultConsensusParams()
-	consensusParams.Block.TimeIotaMs = 20000
-
-	genDoc := tmtypes.GenesisDoc{
-		ChainID:         "0x2",
-		GenesisTime:     tmtime.Now(),
-		ConsensusParams: consensusParams,
-	}
-
-	list := make([]tmtypes.GenesisValidator, 0)
-	list = append(list, tmtypes.GenesisValidator{
-		Address: pv.GetPubKey().Address(),
-		PubKey:  pv.GetPubKey(),
-		Power:   10,
-	})
-
-	// set validators from eth smart contract
-	genDoc.Validators = list
-	// save genesis
-	if err := genDoc.SaveAs(tconfig.GenesisFile()); err != nil {
-		return err
-	}
-	log.Infof("genesis file: %+v", tconfig.Genesis)
-	return nil
 }
 
 // tenderLogger implements tendermint's Logger interface, with a couple of
@@ -127,7 +97,7 @@ func (l *tenderLogger) With(keyvals ...interface{}) tlog.Logger {
 }
 
 // we need to set init (first time validators and oracles)
-func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*nm.Node, error) {
+func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis []byte, pv *privval.FilePV) (*nm.Node, error) {
 	// create node config
 	var err error
 
@@ -202,30 +172,16 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*nm.No
 	}
 
 	// read or create private validator
-	var minerKeyFile string
-	if localConfig.MinerKeyFile == "" {
-		minerKeyFile = tconfig.PrivValidatorKeyFile()
+	if pv == nil {
+		pv, err = NewPrivateValidator(localConfig, tconfig)
+		if err != nil {
+			return nil, errors.Wrap(err, "cannot create validator key and state")
+		}
 	} else {
-		if isAbs := strings.HasPrefix(localConfig.MinerKeyFile, "/"); !isAbs {
-			dir, err := os.Getwd()
-			if err != nil {
-				log.Fatal(err)
-			}
-			minerKeyFile = dir + "/" + localConfig.MinerKeyFile
-		} else {
-			minerKeyFile = localConfig.MinerKeyFile
-		}
-		if !cmn.FileExists(tconfig.PrivValidatorKeyFile()) {
-			filePV := privval.LoadFilePVEmptyState(minerKeyFile, tconfig.PrivValidatorStateFile())
-			filePV.Save()
-		}
+		pv.Save()
 	}
 
-	log.Infof("using miner key file %s", minerKeyFile)
-	pv := privval.LoadOrGenFilePV(
-		minerKeyFile,
-		tconfig.PrivValidatorStateFile(),
-	)
+	log.Infof("using miner key: %s", pv.Key.Address)
 
 	// read or create node key
 	var nodeKey *p2p.NodeKey
@@ -246,8 +202,8 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*nm.No
 	if cmn.FileExists(tconfig.Genesis) {
 		log.Infof("found genesis file %s", tconfig.Genesis)
 	} else {
-		log.Debugf("loaded genesis: %s", TestnetGenesis1)
-		if err := ioutil.WriteFile(tconfig.Genesis, []byte(TestnetGenesis1), 0644); err != nil {
+		log.Debugf("loaded genesis: %s", string(genesis))
+		if err := ioutil.WriteFile(tconfig.Genesis, genesis, 0644); err != nil {
 			return nil, err
 		}
 		log.Infof("new genesis created, stored at %s", tconfig.Genesis)

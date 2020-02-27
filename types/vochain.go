@@ -1,9 +1,24 @@
 package types
 
+import (
+	"github.com/tendermint/tendermint/crypto"
+	tmtypes "github.com/tendermint/tendermint/types"
+)
+
 // ________________________ STATE ________________________
 // Defined in ../../db/iavl.go for convenience
 
 // ________________________ VOTE ________________________
+
+// VotePackageStruct represents a vote package
+type VotePackageStruct struct {
+	// Nonce vote nonce
+	Nonce string `json:"nonce"`
+	// Type vote type
+	Type string `json:"type"`
+	// Votes directly mapped to the `questions` field of the process metadata
+	Votes []int `json:"votes"`
+}
 
 // Vote represents a signle Vote
 type Vote struct {
@@ -113,11 +128,12 @@ type CancelProcessTx struct {
 
 // AdminTx represents a Tx that can be only executed by some authorized addresses
 type AdminTx struct {
-	Address   string `json:"address"`
-	Nonce     string `json:"nonce"`
-	Power     int64  `json:"power,omitempty"`
-	Signature string `json:"signature,omitempty"`
-	Type      string `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
+	Address   string        `json:"address"`
+	Nonce     string        `json:"nonce"`
+	Power     int64         `json:"power,omitempty"`
+	PubKey    crypto.PubKey `json:"pub_key, omitempty"`
+	Signature string        `json:"signature,omitempty"`
+	Type      string        `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
 }
 
 // ValidateType a valid Tx type specified in ValidTypes
@@ -130,20 +146,6 @@ func ValidateType(t string) string {
 }
 
 // ________________________ VALIDATORS ________________________
-
-// PubKey represents a validator pubkey with a key scheme type and its pubkey value
-type PubKey struct {
-	Type  string `json:"type"`
-	Value string `json:"value"`
-}
-
-// Validator represents a single tendermint validator
-type Validator struct {
-	Address string `json:"address"`
-	PubKey  PubKey `json:"pub-key"`
-	Power   int64  `json:"power"`
-	Name    string `json:"name"`
-}
 
 // ________________________ QUERIES ________________________
 
@@ -162,14 +164,6 @@ type QueryData struct {
 
 // GenesisAppState application state in genesis
 type GenesisAppState struct {
-	Validators []struct {
-		Address string `json:"address"`
-		PubKey  struct {
-			Type  string `json:"type"`
-			Value string `json:"value"`
-		} `json:"pubkey"`
-		Power string `json:"power"`
-		Name  string `json:"name"`
-	} `json:"validators"`
-	Oracles []string `json:"oracles"`
+	Validators []tmtypes.GenesisValidator `json:"validators"`
+	Oracles    []string                   `json:"oracles"`
 }

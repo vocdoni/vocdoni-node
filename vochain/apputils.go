@@ -4,17 +4,30 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"os"
+	"strconv"
+	"strings"
 
+	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/tree"
+	"gitlab.com/vocdoni/go-dvote/types"
 	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 
+	amino "github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	cfg "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/crypto"
+	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/common"
+	cmn "github.com/tendermint/tendermint/libs/common"
+	"github.com/tendermint/tendermint/privval"
+	tmtypes "github.com/tendermint/tendermint/types"
+	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
 // ValidateTx splits a tx into method and args parts and does some basic checks
@@ -120,7 +133,7 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 		case "removeOracle":
 			return nil, state.RemoveOracle(tx.Address)
 		case "addValidator":
-			return nil, state.AddValidator(tx.Address, tx.Power)
+			return nil, state.AddValidator(tx.PubKey, tx.Power)
 		case "removeValidator":
 			return nil, state.RemoveValidator(tx.Address)
 		}
@@ -366,4 +379,70 @@ func GenerateNullifier(address, processID string) (string, error) {
 // GenerateAddressFromEd25519PublicKeyString returns the address as string from given pubkey represented as string
 func GenerateAddressFromEd25519PublicKeyString(publicKey string) string {
 	return crypto.Address(tmhash.SumTruncated([]byte(publicKey))).String()
+}
+
+func NewPrivateValidator(cfg *config.VochainCfg, tconfig *cfg.Config) (*privval.FilePV, error) {
+	var minerKeyFile string
+	if cfg.MinerKeyFile == "" {
+		minerKeyFile = tconfig.PrivValidatorKeyFile()
+	} else {
+		if isAbs := strings.HasPrefix(cfg.MinerKeyFile, "/"); !isAbs {
+			dir, err := os.Getwd()
+			if err != nil {
+				return nil, err
+			}
+			minerKeyFile = dir + "/" + cfg.MinerKeyFile
+		} else {
+			minerKeyFile = cfg.MinerKeyFile
+		}
+		if !cmn.FileExists(tconfig.PrivValidatorKeyFile()) {
+			filePV := privval.LoadFilePVEmptyState(minerKeyFile, tconfig.PrivValidatorStateFile())
+			filePV.Save()
+		}
+	}
+
+	pv := privval.LoadOrGenFilePV(
+		minerKeyFile,
+		tconfig.PrivValidatorStateFile(),
+	)
+
+	return pv, nil
+}
+
+// NewGenesis creates a new genesis and return its bytes
+func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *tmtypes.ConsensusParams, validators []privval.FilePV, oracles []string) ([]byte, error) {
+	// default consensus params
+	appState := new(types.GenesisAppState)
+	appState.Validators = make([]tmtypes.GenesisValidator, len(validators))
+	for idx, val := range validators {
+		appState.Validators[idx] = tmtypes.GenesisValidator{
+			Address: val.GetAddress(),
+			PubKey:  val.GetPubKey(),
+			Power:   10,
+			Name:    strconv.Itoa(rand.Int()),
+		}
+	}
+
+	appState.Oracles = oracles
+	cdc := amino.NewCodec()
+	cryptoAmino.RegisterAmino(cdc)
+
+	appStateBytes, err := cdc.MarshalJSON(appState)
+	if err != nil {
+		return []byte{}, err
+	}
+	genDoc := tmtypes.GenesisDoc{
+		ChainID:         chainID,
+		GenesisTime:     tmtime.Now(),
+		ConsensusParams: consensusParams,
+		Validators:      appState.Validators,
+		AppState:        appStateBytes,
+	}
+
+	genBytes, err := cdc.MarshalJSON(genDoc)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return genBytes, nil
 }
