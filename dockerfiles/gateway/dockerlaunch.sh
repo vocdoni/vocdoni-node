@@ -7,7 +7,7 @@ IN_MEMORY="${IN_MEMORY:-false}"
 
 echo "Using image '$IMAGE_TAG:latest'\n"
 
-docker build -t $IMAGE_TAG --target gateway . || {
+docker build -t $IMAGE_TAG -f dockerfile.gateway . || {
 	echo "ERROR: docker image cannot be created, exiting..."
 	exit 2
 }

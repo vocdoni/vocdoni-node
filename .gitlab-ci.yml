@@ -40,7 +40,7 @@ docker-release:
     - docker:dind
   stage: release
   script:
-    - docker build -t ${DVOTE_GATEWAY_BUILD_IMAGE} --target gateway .
+    - docker build --pull -t ${DVOTE_GATEWAY_BUILD_IMAGE} -f dockerfile.gateway .
     - docker tag ${DVOTE_GATEWAY_BUILD_IMAGE} ${DVOTE_GATEWAY_RELEASE_IMAGE}
     - docker login -u gitlab-ci-token -p ${CI_BUILD_TOKEN} ${CI_REGISTRY}
     - docker push ${DVOTE_GATEWAY_BUILD_IMAGE}
