@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -342,7 +343,7 @@ func main() {
 		go func() {
 			for {
 				time.Sleep(time.Second * 20)
-				stats, err := storage.Stats()
+				stats, err := storage.Stats(context.TODO())
 				if err != nil {
 					log.Warnf("IPFS node returned an error: %s", err)
 				}

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -40,7 +41,7 @@ func (r *Router) fetchFile(request routerRequest) {
 		case "ipfs:":
 			splt := strings.Split(parsedURIs[idx], "/")
 			hash := splt[len(splt)-1]
-			content, err = r.storage.Retrieve(hash)
+			content, err = r.storage.Retrieve(context.TODO(), hash)
 			if len(content) > 0 {
 				found = true
 			}
@@ -74,7 +75,7 @@ func (r *Router) addFile(request routerRequest) {
 	case "swarm":
 		// TODO
 	case "ipfs":
-		cid, err := r.storage.Publish(b64content)
+		cid, err := r.storage.Publish(context.TODO(), b64content)
 		if err != nil {
 			r.sendError(request,
 				fmt.Sprintf("cannot add file (%s)", err))
@@ -89,7 +90,7 @@ func (r *Router) addFile(request routerRequest) {
 
 func (r *Router) pinList(request routerRequest) {
 	log.Debug("calling PinList")
-	pins, err := r.storage.ListPins()
+	pins, err := r.storage.ListPins(context.TODO())
 	if err != nil {
 		errMsg := fmt.Sprintf("internal error fetching pins (%s)", err)
 		r.sendError(request, errMsg)
@@ -108,7 +109,7 @@ func (r *Router) pinList(request routerRequest) {
 
 func (r *Router) pinFile(request routerRequest) {
 	log.Debugf("calling PinFile %s", request.URI)
-	err := r.storage.Pin(request.URI)
+	err := r.storage.Pin(context.TODO(), request.URI)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("error pinning file (%s)", err))
 		return
@@ -119,7 +120,7 @@ func (r *Router) pinFile(request routerRequest) {
 
 func (r *Router) unpinFile(request routerRequest) {
 	log.Debugf("calling UnPinFile %s", request.URI)
-	err := r.storage.Unpin(request.URI)
+	err := r.storage.Unpin(context.TODO(), request.URI)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("could not unpin file (%s)", err))
 		return

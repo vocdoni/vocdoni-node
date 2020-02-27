@@ -44,8 +44,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 
 	// check if needs init
 	if !fsrepo.IsInitialized(ipfs.ConfigRoot) {
-		err := ipfs.Init()
-		if err != nil {
+		if err := ipfs.Init(); err != nil {
 			log.Errorf("error in IPFS init: %s", err)
 		}
 	}
@@ -80,8 +79,8 @@ func (i *IPFSHandle) URIprefix() string {
 }
 
 // PublishFile publishes a file specified by root to ipfs
-func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
-	rootHash, err := addAndPin(nd, string(root))
+func PublishFile(ctx context.Context, root []byte, nd *ipfscore.IpfsNode) (string, error) {
+	rootHash, err := addAndPin(ctx, nd, string(root))
 	if err != nil {
 		return "", err
 	}
@@ -89,14 +88,14 @@ func PublishFile(root []byte, nd *ipfscore.IpfsNode) (string, error) {
 }
 
 // PublishBytes publishes a file containing msg to ipfs
-func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
+func PublishBytes(ctx context.Context, msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
 	log.Infof("publishing file: %s", filePath)
 	err := ioutil.WriteFile(filePath, msg, 0666)
 	if err != nil {
 		return "", err
 	}
-	rootHash, err := addAndPin(nd, filePath)
+	rootHash, err := addAndPin(ctx, nd, filePath)
 	if err != nil {
 		return "", err
 	}
@@ -104,13 +103,12 @@ func PublishBytes(msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, er
 }
 
 // Publish publishes a message to ipfs
-func (i *IPFSHandle) Publish(msg []byte) (string, error) {
+func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (string, error) {
 	// if sent a message instead of a file
-	roothash, err := PublishBytes(msg, i.DataDir, i.Node)
-	return roothash, err
+	return PublishBytes(ctx, msg, i.DataDir, i.Node)
 }
 
-func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
+func addAndPin(ctx context.Context, n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 	defer n.Blockstore.PinLock().Unlock()
 	stat, err := os.Lstat(root)
 	if err != nil {
@@ -122,7 +120,7 @@ func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 		return "", err
 	}
 	defer f.Close()
-	fileAdder, err := coreunix.NewAdder(context.Background(), n.Pinning, n.Blockstore, n.DAG)
+	fileAdder, err := coreunix.NewAdder(ctx, n.Pinning, n.Blockstore, n.DAG)
 	if err != nil {
 		return "", err
 	}
@@ -134,43 +132,43 @@ func addAndPin(n *ipfscore.IpfsNode, root string) (rootHash string, err error) {
 	return node.Cid().String(), nil
 }
 
-func (i *IPFSHandle) Pin(path string) error {
+func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
 	p := corepath.New(path)
-	rp, err := i.CoreAPI.ResolvePath(context.Background(), p)
+	rp, err := i.CoreAPI.ResolvePath(ctx, p)
 	if err != nil {
 		return err
 	}
-	return i.CoreAPI.Pin().Add(context.Background(), rp, options.Pin.Recursive(true))
+	return i.CoreAPI.Pin().Add(ctx, rp, options.Pin.Recursive(true))
 }
 
-func (i *IPFSHandle) Unpin(path string) error {
+func (i *IPFSHandle) Unpin(ctx context.Context, path string) error {
 	p := corepath.New(path)
-	rp, err := i.CoreAPI.ResolvePath(context.Background(), p)
+	rp, err := i.CoreAPI.ResolvePath(ctx, p)
 	if err != nil {
 		return err
 	}
-	return i.CoreAPI.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true))
+	return i.CoreAPI.Pin().Rm(ctx, rp, options.Pin.RmRecursive(true))
 }
 
-func (i *IPFSHandle) Stats() (string, error) {
+func (i *IPFSHandle) Stats(ctx context.Context) (string, error) {
 	response := ""
-	peers, err := i.CoreAPI.Swarm().Peers(context.Background())
+	peers, err := i.CoreAPI.Swarm().Peers(ctx)
 	if err != nil {
 		return response, err
 	}
-	addresses, err := i.CoreAPI.Swarm().KnownAddrs(context.Background())
+	addresses, err := i.CoreAPI.Swarm().KnownAddrs(ctx)
 	if err != nil {
 		return response, err
 	}
-	pins, err := i.CoreAPI.Pin().Ls(context.Background())
+	pins, err := i.CoreAPI.Pin().Ls(ctx)
 	if err != nil {
 		return response, err
 	}
 	return fmt.Sprintf("peers:%d addresses:%d pins:%d", len(peers), len(addresses), len(pins)), nil
 }
 
-func (i *IPFSHandle) ListPins() (map[string]string, error) {
-	pins, err := i.CoreAPI.Pin().Ls(context.Background())
+func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
+	pins, err := i.CoreAPI.Pin().Ls(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -181,9 +179,7 @@ func (i *IPFSHandle) ListPins() (map[string]string, error) {
 	return pinMap, nil
 }
 
-func (i *IPFSHandle) Retrieve(path string) ([]byte, error) {
-	ctx := context.Background()
-
+func (i *IPFSHandle) Retrieve(ctx context.Context, path string) ([]byte, error) {
 	path = strings.TrimPrefix(path, "ipfs://")
 	pth := corepath.New(path)
 

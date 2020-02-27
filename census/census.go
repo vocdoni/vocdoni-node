@@ -2,6 +2,7 @@
 package census
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"sync"
@@ -301,7 +302,7 @@ func (m *Manager) importQueueDaemon() {
 			continue
 		}
 		log.Infof("retrieving remote census %s", uri)
-		censusRaw, err := m.Storage.Retrieve(uri[len(m.Storage.URIprefix()):])
+		censusRaw, err := m.Storage.Retrieve(context.TODO(), uri[len(m.Storage.URIprefix()):])
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
 			continue
@@ -473,7 +474,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			return resp
 		}
 		log.Infof("retrieving remote census %s", r.CensusURI)
-		censusRaw, err := m.Storage.Retrieve(r.URI[len(m.Storage.URIprefix()):])
+		censusRaw, err := m.Storage.Retrieve(context.TODO(), r.URI[len(m.Storage.URIprefix()):])
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
 			resp.SetError("cannot retrieve census")
@@ -605,7 +606,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			log.Warnf("cannot marshal census dump: %s", err)
 			return resp
 		}
-		cid, err := m.Storage.Publish(dumpBytes)
+		cid, err := m.Storage.Publish(context.TODO(), dumpBytes)
 		if err != nil {
 			resp.SetError(err)
 			log.Warnf("cannot publish census dump: %s", err)

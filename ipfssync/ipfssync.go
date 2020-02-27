@@ -2,6 +2,7 @@
 package ipfssync
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -59,40 +60,27 @@ func (is *IPFSsync) updatePinsTree(extraPins []string) {
 }
 
 func (is *IPFSsync) syncPins() error {
-	if is.syncLock {
-		return nil
-	}
-	is.syncLock = true
 	mkPins, err := is.hashTree.DumpPlain(is.hashTree.Root(), false)
 	if err != nil {
 		return err
 	}
-	pins, err := is.Storage.ListPins()
+	ctx := context.TODO() // the caller should probably provide it
+	pins, err := is.Storage.ListPins(ctx)
 	if err != nil {
 		return err
 	}
 	for _, v := range mkPins {
-		if _, e := pins[v]; !e {
-			log.Infof("pinning %s", v)
-			pinned := false
-			go func() {
-				err := is.Storage.Pin(v)
-				if err != nil {
-					log.Warn(err)
-				}
-				pinned = true
-			}()
-			waitTime := 100
-			for !pinned && waitTime > 0 {
-				time.Sleep(100 * time.Millisecond)
-				waitTime--
-			}
-			if waitTime < 1 {
-				log.Warnf("pinning timeout for %s", v)
-			}
+		if _, e := pins[v]; e {
+			continue
+		}
+
+		log.Infof("pinning %s", v)
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		if err := is.Storage.Pin(ctx, v); err != nil {
+			log.Warn(err)
 		}
 	}
-	is.syncLock = false
 	return nil
 }
 
@@ -219,7 +207,7 @@ func (is *IPFSsync) sendHello() {
 }
 
 func (is *IPFSsync) listPins() (pins []string) {
-	list, _ := is.Storage.ListPins()
+	list, _ := is.Storage.ListPins(context.TODO())
 	for i := range list {
 		pins = append(pins, i)
 	}
@@ -236,9 +224,8 @@ type IPFSsync struct {
 	Transport   net.PSSHandle
 	hashTree    tree.Tree
 	Topic       string
-	updateLock  bool
-	syncLock    bool
-	askLock     string
+	updateLock  bool   // TODO(mvdan): this is super racy
+	askLock     string // TODO(mvdan): this is super racy
 	myAddress   string
 	myNodeID    string
 	myMultiAddr ma.Multiaddr
