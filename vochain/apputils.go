@@ -381,6 +381,7 @@ func GenerateAddressFromEd25519PublicKeyString(publicKey string) string {
 	return crypto.Address(tmhash.SumTruncated([]byte(publicKey))).String()
 }
 
+// NewPrivateValidator returns a tendermint file private validator given the required config
 func NewPrivateValidator(cfg *config.VochainCfg, tconfig *cfg.Config) (*privval.FilePV, error) {
 	var minerKeyFile string
 	if cfg.MinerKeyFile == "" {

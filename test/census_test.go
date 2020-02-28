@@ -41,17 +41,23 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 
-	common "gitlab.com/vocdoni/go-dvote/test/test_common"
+	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 )
 
-var logLevel = flag.String("logLevel", "error", "logging level")
+var (
+	logLevel = flag.String("logLevel", "error", "logging level")
+)
 
-func init() { rand.Seed(time.Now().UnixNano()) }
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func TestCensus(t *testing.T) {
+	apis := []string{"file", "census", ""}
 	log.InitLogger(*logLevel, "stdout")
-	var server common.DvoteApiServer
-	err := server.Start(*logLevel, []string{"file", "census"})
+
+	var server common.DvoteAPIServer
+	err := server.Start(*logLevel, apis)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +75,7 @@ func TestCensus(t *testing.T) {
 
 	// Create websocket client
 	t.Logf("connecting to %s", server.PxyAddr)
-	var c common.ApiConnection
+	var c common.APIConnection
 	err = c.Connect(server.PxyAddr)
 	if err != nil {
 		t.Fatalf("dial: %s", err)

@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	testcommon "gitlab.com/vocdoni/go-dvote/test/test_common"
+	testcommon "gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
@@ -31,7 +31,7 @@ func TestVoteTxCheck(t *testing.T) {
 		t.Errorf("cannot validate vote: %s", err)
 	}
 }
-*/
+
 func TestAdminTxCheckAddOracle(t *testing.T) {
 	os.RemoveAll("/tmp/db")
 	s := testcommon.NewVochainStateWithOracles()
@@ -75,6 +75,7 @@ func TestAdminTxCheckRemoveValidator(t *testing.T) {
 		t.Errorf("cannot remove validator: %s", err)
 	}
 }
+*/
 
 func TestCreateProcess(t *testing.T) {
 	os.RemoveAll("/tmp/db")

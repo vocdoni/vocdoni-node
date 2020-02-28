@@ -1,4 +1,4 @@
-package test_common
+package testcommon
 
 import (
 	"encoding/json"
@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	voclient "github.com/tendermint/tendermint/rpc/client"
+
 	"gitlab.com/vocdoni/go-dvote/census"
+	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	dnet "gitlab.com/vocdoni/go-dvote/net"
@@ -18,22 +21,33 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-type DvoteApiServer struct {
-	Signer    *signature.SignKeys
-	CensusDir string
-	IpfsDir   string
-	PxyAddr   string
+// DvoteAPIServer contains all the required pieces for running a go-dvote api server
+type DvoteAPIServer struct {
+	Signer           *signature.SignKeys
+	VochainCfg       *config.VochainCfg
+	VochainRPCClient *voclient.HTTP
+	CensusDir        string
+	IpfsDir          string
+	ScrutinizerDir   string
+	PxyAddr          string
 }
 
 /*
-DvoteApiServer starts a basic dvote server
-1. Starts the Proxy
-2. Starts the IPFS storage
-3. Starts the Dvote API router
+Start starts a basic dvote server
+1. Create signing key
+2. Starts the Proxy
+3. Starts the IPFS storage
 4. Starts the Census Manager
+5. Starts the Vochain miner if vote api enabled
+6. Starts the Dvote API router if enabled
+7. Starts the scrutinizer service and API if enabled
 */
-func (d *DvoteApiServer) Start(level string) error {
-	log.InitLogger(level, "stdout")
+func (d *DvoteAPIServer) Start(logLevel string, apis []string) error {
+	log.InitLogger(logLevel, "stdout")
+	var err error
+	rand.Seed(time.Now().UnixNano())
+	rint := rand.Int()
+	// create signer
 	d.Signer = new(signature.SignKeys)
 	d.Signer.Generate()
 
@@ -41,7 +55,7 @@ func (d *DvoteApiServer) Start(level string) error {
 	pxy := dnet.NewProxy()
 	pxy.C.Address = "127.0.0.1"
 	pxy.C.Port = 0
-	err := pxy.Init()
+	err = pxy.Init()
 	if err != nil {
 		return err
 	}
@@ -57,7 +71,7 @@ func (d *DvoteApiServer) Start(level string) error {
 	go ws.Listen(listenerOutput)
 
 	// Create the API router
-	d.IpfsDir, err = ioutil.TempDir("", "ipfs")
+	d.IpfsDir, err = ioutil.TempDir("", fmt.Sprintf("ipfs%d", rint))
 	if err != nil {
 		return err
 	}
@@ -71,7 +85,7 @@ func (d *DvoteApiServer) Start(level string) error {
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
-	d.CensusDir, err = ioutil.TempDir("", "census")
+	d.CensusDir, err = ioutil.TempDir("", fmt.Sprintf("census%d", rint))
 	if err != nil {
 		return err
 	}
@@ -79,24 +93,45 @@ func (d *DvoteApiServer) Start(level string) error {
 	if err := cm.Init(d.CensusDir, ""); err != nil {
 		return err
 	}
-	routerAPI.EnableCensusAPI(&cm)
-	routerAPI.EnableFileAPI()
+
+	for _, a := range apis {
+		switch a {
+		case "file":
+			routerAPI.EnableFileAPI()
+		case "census":
+			routerAPI.EnableCensusAPI(&cm)
+		case "vote":
+			vnode, err := NewMockVochainNode(d, logLevel)
+			if err != nil {
+				return err
+			}
+			sc, err := NewMockScrutinizer(d, vnode)
+			if err != nil {
+				return err
+			}
+			routerAPI.Scrutinizer = sc
+			routerAPI.EnableVoteAPI(d.VochainRPCClient)
+		}
+	}
 
 	go routerAPI.Route()
 	ws.AddProxyHandler("/dvote")
 	return nil
 }
 
-type ApiConnection struct {
+// APIConnection holds an API websocket connection
+type APIConnection struct {
 	Conn *websocket.Conn
 }
 
-func (r *ApiConnection) Connect(addr string) (err error) {
+// Connect starts a connection with the given endpoint
+func (r *APIConnection) Connect(addr string) (err error) {
 	r.Conn, _, err = websocket.DefaultDialer.Dial(addr, nil)
 	return
 }
 
-func (r *ApiConnection) Request(req types.MetaRequest, signer *signature.SignKeys) (*types.MetaResponse, error) {
+// Request makes a request to the previously connected endpoint
+func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKeys) (*types.MetaResponse, error) {
 	// t.Helper()
 	method := req.Method
 

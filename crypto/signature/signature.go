@@ -107,7 +107,7 @@ func (k *SignKeys) AddAuthKey(address string) error {
 	return errors.New("invalid address lenght")
 }
 
-// HexString returns the public and private keys as hex strings
+// HexString returns the public compressed and private keys as hex strings
 func (k *SignKeys) HexString() (string, string) {
 	pubHex := fmt.Sprintf("%x", crypto.FromECDSAPub(k.Public))
 	pubHexComp, _ := CompressPubKey(pubHex)
@@ -377,4 +377,16 @@ func (k *SignKeys) Decrypt(hexMessage string) (string, error) {
 		return "", err
 	}
 	return string(plaintext), nil
+}
+
+// CreateEthRandomKeysBatch creates a set of eth random signing keys
+func CreateEthRandomKeysBatch(n int) ([]*SignKeys, error) {
+	s := make([]*SignKeys, n)
+	for i := 0; i < n; i++ {
+		s[i] = new(SignKeys)
+		if err := s[i].Generate(); err != nil {
+			return nil, err
+		}
+	}
+	return s, nil
 }

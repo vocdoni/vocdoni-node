@@ -131,7 +131,7 @@ type AdminTx struct {
 	Address   string        `json:"address"`
 	Nonce     string        `json:"nonce"`
 	Power     int64         `json:"power,omitempty"`
-	PubKey    crypto.PubKey `json:"pub_key, omitempty"`
+	PubKey    crypto.PubKey `json:"pub_key,omitempty"`
 	Signature string        `json:"signature,omitempty"`
 	Type      string        `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
 }

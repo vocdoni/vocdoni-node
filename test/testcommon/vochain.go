@@ -1,6 +1,8 @@
-package test_common
+package testcommon
 
 import (
+	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"strconv"
@@ -8,10 +10,14 @@ import (
 	amino "github.com/tendermint/go-amino"
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"github.com/tendermint/tendermint/privval"
+	voclient "github.com/tendermint/tendermint/rpc/client"
+	tmtypes "github.com/tendermint/tendermint/types"
 
+	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
+	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 )
 
 var (
@@ -159,4 +165,51 @@ func NewVochainStateWithProcess() *vochain.State {
 	}
 	s.ProcessTree.Set([]byte("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), processBytes)
 	return s
+}
+
+func NewMockVochainNode(d *DvoteAPIServer, logLevel string) (*vochain.BaseApplication, error) {
+	var err error
+	var vnode *vochain.BaseApplication
+
+	cdc := amino.NewCodec()
+	cryptoAmino.RegisterAmino(cdc)
+	// start vochain node
+	// create config
+	d.VochainCfg = new(config.VochainCfg)
+	d.VochainCfg.DataDir, err = ioutil.TempDir("", fmt.Sprintf("vochain%d", rint))
+	if err != nil {
+		return nil, err
+	}
+	// create genesis file
+	consensusParams := tmtypes.DefaultConsensusParams()
+	validator := privval.GenFilePV(d.VochainCfg.DataDir+"/config/priv_validator_key.json", d.VochainCfg.DataDir+"/data/priv_validator_state.json")
+	oracles := []string{d.Signer.EthAddrString()}
+	genBytes, err := vochain.NewGenesis(d.VochainCfg, strconv.Itoa(rand.Int()), consensusParams, []privval.FilePV{*validator}, oracles)
+	if err != nil {
+		return nil, err
+	}
+	// creating node
+	d.VochainCfg.LogLevel = logLevel
+	d.VochainCfg.P2PListen = "0.0.0.0:26656"
+	d.VochainCfg.PublicAddr = "0.0.0.0:26656"
+	d.VochainCfg.RPCListen = "0.0.0.0:26657"
+	// run node
+	vnode = vochain.NewVochain(d.VochainCfg, genBytes, validator)
+	// create vochain rpc conection
+	d.VochainRPCClient = voclient.NewHTTP(d.VochainCfg.RPCListen, "/websocket")
+	return vnode, nil
+}
+
+func NewMockScrutinizer(d *DvoteAPIServer, vnode *vochain.BaseApplication) (*scrutinizer.Scrutinizer, error) {
+	var err error
+	log.Info("starting vochain scrutinizer")
+	d.ScrutinizerDir, err = ioutil.TempDir("", fmt.Sprintf("scrutinizer%d", rint))
+	if err != nil {
+		return nil, err
+	}
+	sc, err := scrutinizer.NewScrutinizer(d.ScrutinizerDir, vnode.State)
+	if err != nil {
+		return nil, err
+	}
+	return sc, nil
 }

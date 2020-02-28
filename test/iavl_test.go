@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"strconv"
 	"testing"
 
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/privval"
 
 	"gitlab.com/vocdoni/go-dvote/log"
-	testcommon "gitlab.com/vocdoni/go-dvote/test/test_common"
+	testcommon "gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
@@ -85,7 +84,7 @@ func TestGetOracles(t *testing.T) {
 func TestAddValidator(t *testing.T) {
 	s := testcommon.NewVochainStateWithValidators()
 	rint := rand.Int()
-	val := privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
+	val := privval.GenFilePV(fmt.Sprintf("/tmp/vochainBenchmark%d", rint), fmt.Sprintf("/tmp/vochainBenchmark%d", rint))
 	if s != nil {
 		if err := s.AddValidator(val.GetPubKey(), 10); err != nil {
 			t.Error(err)

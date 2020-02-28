@@ -2,33 +2,36 @@ package test
 
 import (
 	"encoding/base64"
-	"flag"
 	"fmt"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
 
+	flag "github.com/spf13/pflag"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 
-	common "gitlab.com/vocdoni/go-dvote/test/test_common"
+	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 )
 
 var (
-	logLevel = flag.String("logLevel", "error", "logging level")
+	logLevel = flag.String("logLevel", "debug", "logging level")
 	host     = flag.String("host", "", "alternative host to run against, e.g. ws://$HOST:9090/dvote)")
 )
 
-func init() { rand.Seed(time.Now().UnixNano()) }
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func BenchmarkCensus(b *testing.B) {
+	apis := []string{"file", "census", ""}
 	log.InitLogger(*logLevel, "stdout")
 
 	if *host == "" {
-		var server common.DvoteApiServer
-		if err := server.Start(*logLevel); err != nil {
+		var server common.DvoteAPIServer
+		if err := server.Start(*logLevel, apis); err != nil {
 			b.Fatal(err)
 		}
 		// TODO(mvdan): use b.Cleanup once Go 1.14 is out, so that we
@@ -40,7 +43,7 @@ func BenchmarkCensus(b *testing.B) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
-		var c common.ApiConnection
+		var c common.APIConnection
 		if err := c.Connect(*host); err != nil {
 			b.Fatalf("dial: %s", err)
 		}
@@ -52,7 +55,7 @@ func BenchmarkCensus(b *testing.B) {
 	})
 }
 
-func censusBench(b *testing.B, c common.ApiConnection) {
+func censusBench(b *testing.B, c common.APIConnection) {
 	// API requets
 	var req types.MetaRequest
 
@@ -72,20 +75,6 @@ func censusBench(b *testing.B, c common.ApiConnection) {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
 	log.Infof("apis available: %v", resp.APIList)
-
-	censusEnabled := false
-	fileEnabled := false
-	for _, a := range resp.APIList {
-		if a == "census" {
-			censusEnabled = true
-		}
-		if a == "file" {
-			fileEnabled = true
-		}
-	}
-	if !censusEnabled || !fileEnabled {
-		b.Fatalf("required APIs not enabled (file=%t, census=%t)", fileEnabled, censusEnabled)
-	}
 
 	// Create census
 	log.Infof("[%d] Create census", rint)
