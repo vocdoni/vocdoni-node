@@ -447,8 +447,12 @@ func main() {
 	}
 
 	// Wait for Ethereum to be ready
+	minPeers := 1
+	if globalCfg.EthConfig.LightMode {
+		minPeers = 2
+	}
 	for {
-		if height, synced, peers, _ := node.SyncInfo(); synced && peers > 1 && height != "0" {
+		if height, synced, peers, _ := node.SyncInfo(); synced && peers >= minPeers && height != "0" {
 			log.Infof("ethereum blockchain synchronized")
 			break
 		}
