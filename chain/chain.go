@@ -43,6 +43,7 @@ type EthChainConfig struct {
 	NetworkId      int
 	NetworkGenesis []byte
 	BootstrapNodes []string
+	TrustedPeers   []string
 	KeyStore       string
 	DataDir        string
 	IPCPath        string
@@ -72,12 +73,17 @@ func NewConfig(ethCfg *config.EthCfg, w3Cfg *config.W3Cfg) (*EthChainConfig, err
 	}
 	if len(ethCfg.BootNodes) > 0 && len(ethCfg.BootNodes[0]) > 32 {
 		r := strings.NewReplacer("[", "", "]", "") // viper []string{} sanity
-
 		for _, b := range ethCfg.BootNodes {
 			cfg.BootstrapNodes = append(cfg.BootstrapNodes, r.Replace(b))
 		}
 	} else {
 		cfg.BootstrapNodes = chainSpecs.BootNodes
+	}
+	if len(ethCfg.TrustedPeers) > 0 && len(ethCfg.TrustedPeers[0]) > 32 {
+		r := strings.NewReplacer("[", "", "]", "") // viper []string{} sanity
+		for _, b := range ethCfg.TrustedPeers {
+			cfg.TrustedPeers = append(cfg.TrustedPeers, r.Replace(b))
+		}
 	}
 	defaultDirPath := ethCfg.DataDir
 	cfg.KeyStore = defaultDirPath + "/keystore"
@@ -193,7 +199,17 @@ func (e *EthChainContext) Start() {
 			}
 			e.Eth = et
 		}
-		log.Infof("my Enode address: %s", e.Node.Server().NodeInfo().Enode)
+		log.Infof("my enode address: %s", e.Node.Server().NodeInfo().Enode)
+
+		for _, p := range e.DefaultConfig.TrustedPeers {
+			node, err := enode.ParseV4(p)
+			if err != nil {
+				log.Warn(err)
+				continue
+			}
+			log.Infof("adding tusted peer %s", node)
+			e.Node.Server().AddTrustedPeer(node)
+		}
 	}
 }
 

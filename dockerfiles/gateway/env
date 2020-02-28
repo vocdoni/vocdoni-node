@@ -7,6 +7,7 @@ gw_apiAllowPrivate=True
 #gw_ethChain=goerli
 #gw_ethChainLightMode=True
 #gw_ethBootNodes=
+#gw_ethTrustedPeers=
 gw_dataDir=/app/run
 #gw_fileApi=True
 #gw_ipfsNoInit=False

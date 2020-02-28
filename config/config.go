@@ -114,6 +114,8 @@ type EthCfg struct {
 	SigningKey string
 	// BootNodes list for bootstraping the Ethereum network
 	BootNodes []string
+	// TrustedPeers list of p2p Ethereum peers to trust and connect (if possible)
+	TrustedPeers []string
 }
 
 // W3Cfg stores global configs for web3

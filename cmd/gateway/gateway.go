@@ -76,7 +76,8 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
 	globalCfg.EthConfig.LightMode = *flag.Bool("ethChainLightMode", true, "synchronize Ethereum blockchain in light mode")
 	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to use")
-	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootNodes", []string{}, "Ethereum p2p custom bootstrap nodes")
+	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootNodes", []string{}, "Ethereum p2p custom bootstrap nodes (enode://<pubKey>@<ip>[:port])")
+	globalCfg.EthConfig.TrustedPeers = *flag.StringArray("ethTrustedPeers", []string{}, "Ethereum p2p trusted peer nodes (enode://<pubKey>@<ip>[:port])")
 	// ethereum web3
 	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true web3 will be enabled")
 	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
@@ -134,6 +135,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("ethConfig.lightMode", flag.Lookup("ethChainLightMode"))
 	viper.BindPFlag("ethConfig.nodePort", flag.Lookup("ethNodePort"))
 	viper.BindPFlag("ethConfig.bootNodes", flag.Lookup("ethBootNodes"))
+	viper.BindPFlag("ethConfig.trustedPeers", flag.Lookup("ethTrustedPeers"))
 	// ethereum web3
 	viper.BindPFlag("w3Config.route", flag.Lookup("w3Route"))
 	viper.BindPFlag("w3Config.enabled", flag.Lookup("w3Enabled"))

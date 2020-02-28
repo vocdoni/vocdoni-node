@@ -10,6 +10,7 @@ GWARGS="\
  ${gw_ethChain:+ --ethChain=${gw_ethChain}}\
  ${gw_ethChainLightMode:+ --ethChainLightMode=${gw_ethChainLightMode}}\
  ${gw_ethBootNodes:+ --ethBootNodes=${gw_ethBootNodes}}\
+ ${gw_ethTrustedPeers:+ --ethTrustedPeers=${gw_ethTrustedPeers}}\
  ${gw_dataDir:+ --dataDir=${gw_dataDir}}\
  ${gw_fileApi:+ --fileApi}\
  ${gw_ipfsNoInit:+ --ipfsNoInit}\
