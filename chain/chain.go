@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -16,8 +17,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -69,7 +70,15 @@ func NewConfig(ethCfg *config.EthCfg, w3Cfg *config.W3Cfg) (*EthChainConfig, err
 	if err != nil {
 		return nil, err
 	}
-	cfg.BootstrapNodes = chainSpecs.BootNodes
+	if len(ethCfg.BootNodes) > 0 && len(ethCfg.BootNodes[0]) > 32 {
+		r := strings.NewReplacer("[", "", "]", "") // viper []string{} sanity
+
+		for _, b := range ethCfg.BootNodes {
+			cfg.BootstrapNodes = append(cfg.BootstrapNodes, r.Replace(b))
+		}
+	} else {
+		cfg.BootstrapNodes = chainSpecs.BootNodes
+	}
 	defaultDirPath := ethCfg.DataDir
 	cfg.KeyStore = defaultDirPath + "/keystore"
 	cfg.DataDir = defaultDirPath + "/data"
@@ -99,6 +108,17 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	nodeConfig.WSOrigins = []string{"*"}
 	nodeConfig.IPCPath = c.IPCPath
 	nodeConfig.DataDir = c.DataDir
+	nodeConfig.P2P.DiscoveryV5 = true
+	myPublicIP, err := util.PublicIP()
+	if err != nil {
+		log.Warn("cannot get external public IPv4 address")
+	} else {
+		natInt, err := nat.Parse("extip:" + myPublicIP.String())
+		if err != nil {
+			return err
+		}
+		nodeConfig.P2P.NAT = natInt
+	}
 	nodeConfig.P2P.BootstrapNodes = make([]*enode.Node, 0, len(c.BootstrapNodes))
 	for _, url := range c.BootstrapNodes {
 		if url != "" {
@@ -109,6 +129,7 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 			nodeConfig.P2P.BootstrapNodes = append(nodeConfig.P2P.BootstrapNodes, node)
 		}
 	}
+	log.Debugf("using ethereum bootstrap nodes: %v", nodeConfig.P2P.BootstrapNodes)
 	n, err := node.New(&nodeConfig)
 	if err != nil {
 		return err
@@ -172,6 +193,7 @@ func (e *EthChainContext) Start() {
 			}
 			e.Eth = et
 		}
+		log.Infof("my Enode address: %s", e.Node.Server().NodeInfo().Enode)
 	}
 }
 

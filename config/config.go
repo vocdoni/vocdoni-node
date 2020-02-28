@@ -112,6 +112,8 @@ type EthCfg struct {
 	DataDir string
 	// SigningKey key used to sign transactions
 	SigningKey string
+	// BootNodes list for bootstraping the Ethereum network
+	BootNodes []string
 }
 
 // W3Cfg stores global configs for web3
