@@ -129,5 +129,8 @@ func (r *ApiConnection) Request(req types.MetaRequest, signer *signature.SignKey
 	if cmRes.ID != cmReq.ID {
 		return nil, fmt.Errorf("%s: %v", method, "request ID doesn't match")
 	}
+	if cmRes.Signature == "" {
+		return nil, fmt.Errorf("%s: empty signature in response: %s", method, message)
+	}
 	return &cmRes.MetaResponse, nil
 }

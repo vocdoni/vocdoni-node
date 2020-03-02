@@ -24,6 +24,12 @@ func (r *Router) buildReply(request routerRequest, response types.ResponseMessag
 	response.ID = request.id
 	response.Ok = true
 	response.Request = request.id
+	var err error
+	response.Signature, err = r.signer.SignJSON(response.MetaResponse)
+	if err != nil {
+		log.Warn(err)
+		// continue without the signature
+	}
 	respData, err := json.Marshal(response)
 	if err != nil {
 		// This should never happen. If it does, return a very simple
@@ -36,12 +42,6 @@ func (r *Router) buildReply(request routerRequest, response types.ResponseMessag
 		}
 	}
 	log.Debugf("response %s", respData)
-
-	response.Signature, err = r.signer.SignJSON(response.MetaResponse)
-	if err != nil {
-		log.Warn(err)
-		// continue without the signature
-	}
 	return types.Message{
 		TimeStamp: int32(time.Now().Unix()),
 		Context:   request.context,
