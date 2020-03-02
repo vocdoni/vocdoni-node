@@ -24,10 +24,11 @@ func (r *Router) buildReply(request routerRequest, response types.ResponseMessag
 	response.ID = request.id
 	response.Ok = true
 	response.Request = request.id
+	response.Timestamp = int32(time.Now().Unix())
 	var err error
 	response.Signature, err = r.signer.SignJSON(response.MetaResponse)
 	if err != nil {
-		log.Warn(err)
+		log.Error(err)
 		// continue without the signature
 	}
 	respData, err := json.Marshal(response)
@@ -255,7 +256,7 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 	response.Error.SetError(errMsg)
 	response.Signature, err = r.signer.SignJSON(response.Error)
 	if err != nil {
-		log.Warn(err)
+		log.Error(err)
 	}
 	if request.context != nil {
 		// TODO(mvdan): consolidate with Router.buildReply once we
@@ -275,7 +276,6 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 
 func (r *Router) info(request routerRequest) {
 	var response types.ResponseMessage
-	response.MetaResponse.Timestamp = int32(time.Now().Unix())
 	response.MetaResponse.APIList = r.APIs
 	response.MetaResponse.Request = request.id
 	r.transport.Send(r.buildReply(request, response))
