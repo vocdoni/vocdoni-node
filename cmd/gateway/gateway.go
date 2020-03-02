@@ -35,6 +35,10 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 )
 
+var (
+	ethNoWaitSync bool
+)
+
 func newConfig() (*config.GWCfg, config.Error) {
 	var err error
 	var cfgError config.Error
@@ -78,6 +82,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to use")
 	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootNodes", []string{}, "Ethereum p2p custom bootstrap nodes (enode://<pubKey>@<ip>[:port])")
 	globalCfg.EthConfig.TrustedPeers = *flag.StringArray("ethTrustedPeers", []string{}, "Ethereum p2p trusted peer nodes (enode://<pubKey>@<ip>[:port])")
+	flag.BoolVar(&ethNoWaitSync, "ethNoWaitSync", false, "do not wait for Ethereum to synchronize (for testing only)")
 	// ethereum web3
 	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true web3 will be enabled")
 	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
@@ -451,12 +456,14 @@ func main() {
 	if globalCfg.EthConfig.LightMode {
 		minPeers = 2
 	}
-	for {
-		if height, synced, peers, _ := node.SyncInfo(); synced && peers >= minPeers && height != "0" {
-			log.Infof("ethereum blockchain synchronized")
-			break
+	if !ethNoWaitSync {
+		for {
+			if height, synced, peers, _ := node.SyncInfo(); synced && peers >= minPeers && height != "0" {
+				log.Infof("ethereum blockchain synchronized")
+				break
+			}
+			time.Sleep(time.Second * 5)
 		}
-		time.Sleep(time.Second * 5)
 	}
 
 	// API Endpoint initialization
