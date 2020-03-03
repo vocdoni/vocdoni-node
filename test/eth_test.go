@@ -18,31 +18,34 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-var (
-	testRequests = []struct {
-		name     string
-		request  map[string]interface{}
-		response map[string]interface{}
-	}{
-		{
-			name:     "net_PeerCount",
-			request:  map[string]interface{}{"id": float64(74), "method": "net_peerCount", "params": []string{}},
-			response: map[string]interface{}{"result": "0x0"},
-		},
-		{
-			name:     "net_listening",
-			request:  map[string]interface{}{"id": float64(67), "method": "net_listening", "params": []string{}},
-			response: map[string]interface{}{"result": true},
-		},
-		{
-			name:     "net_version",
-			request:  map[string]interface{}{"id": float64(67), "method": "net_version", "params": []string{}},
-			response: map[string]interface{}{"result": "5"},
-		},
-	}
-)
+type jsonrpcRequestWrapper struct {
+	ID      int
+	Jsonrpc string
+	Method  string
+	Params  []string
+}
 
-const route = "/web3"
+var testRequests = []struct {
+	name    string
+	request jsonrpcRequestWrapper
+	result  interface{}
+}{
+	{
+		name:    "net_PeerCount",
+		request: jsonrpcRequestWrapper{ID: 74, Method: "net_peerCount"},
+		result:  "0x0",
+	},
+	{
+		name:    "net_listening",
+		request: jsonrpcRequestWrapper{ID: 67, Method: "net_listening"},
+		result:  true,
+	},
+	{
+		name:    "net_version",
+		request: jsonrpcRequestWrapper{ID: 67, Method: "net_version"},
+		result:  "5",
+	},
+}
 
 func TestWeb3WSEndpoint(t *testing.T) {
 	// init logger
@@ -84,8 +87,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	for _, tt := range testRequests {
 		t.Run(tt.name, func(t *testing.T) {
 			// write message
-			tt.request["jsonrpc"] = "2.0"
-			tt.response["id"] = tt.request["id"]
+			tt.request.Jsonrpc = "2.0"
 			reqBytes, err := json.Marshal(tt.request)
 			if err != nil {
 				t.Fatalf("cannot marshal request: %s", err)
@@ -104,13 +106,12 @@ func TestWeb3WSEndpoint(t *testing.T) {
 			// check if response == expected
 			var resp map[string]interface{}
 			err = json.Unmarshal(message, &resp)
-			tt.response["jsonrpc"] = "2.0"
 			if err != nil {
 				t.Fatalf("cannot unmarshal response: %s", err)
 			}
 
-			if !cmp.Equal(resp, tt.response) {
-				t.Fatalf("response not expected: %+v %+v", resp, tt.response)
+			if diff := cmp.Diff(resp["result"], tt.result); diff != "" {
+				t.Fatalf("result not expected, diff is: %s", diff)
 			}
 		})
 	}
@@ -125,7 +126,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 func NewMockEthereum(logLevel, dataDir string, pxy *net.Proxy) (*chain.EthChainContext, error) {
 	// create base config
 	ethConfig := &config.EthCfg{LogLevel: logLevel, DataDir: dataDir, ChainType: "goerli", LightMode: false, NodePort: 30303}
-	w3Config := &config.W3Cfg{HTTPHost: "0.0.0.0", WsHost: "0.0.0.0", Route: route, Enabled: true, HTTPAPI: true, WSAPI: true, HTTPPort: 9091, WsPort: 9092}
+	w3Config := &config.W3Cfg{HTTPHost: "0.0.0.0", WsHost: "0.0.0.0", Route: "/web3", Enabled: true, HTTPAPI: true, WSAPI: true, HTTPPort: 9091, WsPort: 9092}
 	// init node
 	w3cfg, err := chain.NewConfig(ethConfig, w3Config)
 	if err != nil {
