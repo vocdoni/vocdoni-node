@@ -52,10 +52,7 @@ func (d *DvoteAPIServer) Start(logLevel string, apis []string) error {
 	d.Signer.Generate()
 
 	// create the proxy to handle HTTP queries
-	pxy := dnet.NewProxy()
-	pxy.C.Address = "127.0.0.1"
-	pxy.C.Port = 0
-	err = pxy.Init()
+	pxy, err := NewMockProxy()
 	if err != nil {
 		return err
 	}
@@ -168,4 +165,16 @@ func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKey
 		return nil, fmt.Errorf("%s: empty signature in response: %s", method, message)
 	}
 	return &cmRes.MetaResponse, nil
+}
+
+// NewMockProxy creates a new testing proxy with predefined valudes
+func NewMockProxy() (*dnet.Proxy, error) {
+	pxy := dnet.NewProxy()
+	pxy.C.Address = "127.0.0.1"
+	pxy.C.Port = 0
+	err := pxy.Init()
+	if err != nil {
+		return nil, err
+	}
+	return pxy, nil
 }
