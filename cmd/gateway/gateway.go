@@ -35,9 +35,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 )
 
-var (
-	ethNoWaitSync bool
-)
+var ethNoWaitSync bool
 
 func newConfig() (*config.GWCfg, config.Error) {
 	var err error

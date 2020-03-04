@@ -17,21 +17,22 @@ import (
 )
 
 var (
-	logLevel = flag.String("logLevel", "debug", "logging level")
+	logLevel = flag.String("logLevel", "error", "logging level")
 	host     = flag.String("host", "", "alternative host to run against, e.g. ws://$HOST:9090/dvote)")
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
+func init() { rand.Seed(time.Now().UnixNano()) }
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	log.InitLogger(*logLevel, "stdout")
+	os.Exit(m.Run())
 }
 
 func BenchmarkCensus(b *testing.B) {
-	apis := []string{"file", "census", ""}
-	log.InitLogger(*logLevel, "stdout")
-
 	if *host == "" {
 		var server common.DvoteAPIServer
-		if err := server.Start(*logLevel, apis); err != nil {
+		if err := server.Start("file", "census"); err != nil {
 			b.Fatal(err)
 		}
 		// TODO(mvdan): use b.Cleanup once Go 1.14 is out, so that we

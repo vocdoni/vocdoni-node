@@ -48,8 +48,6 @@ var testRequests = []struct {
 }
 
 func TestWeb3WSEndpoint(t *testing.T) {
-	// init logger
-	log.InitLogger(*logLevel, "stdout")
 	// create ethereum tmp datadir
 	dataDir, err := ioutil.TempDir("", "ethereum")
 	if err != nil {

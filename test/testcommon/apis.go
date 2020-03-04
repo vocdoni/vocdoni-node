@@ -17,7 +17,6 @@ import (
 	dnet "gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
 
-	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
@@ -42,11 +41,8 @@ Start starts a basic dvote server
 6. Starts the Dvote API router if enabled
 7. Starts the scrutinizer service and API if enabled
 */
-func (d *DvoteAPIServer) Start(logLevel string, apis []string) error {
-	log.InitLogger(logLevel, "stdout")
+func (d *DvoteAPIServer) Start(apis ...string) error {
 	var err error
-	rand.Seed(time.Now().UnixNano())
-	rint := rand.Int()
 	// create signer
 	d.Signer = new(signature.SignKeys)
 	d.Signer.Generate()
@@ -68,7 +64,7 @@ func (d *DvoteAPIServer) Start(logLevel string, apis []string) error {
 	go ws.Listen(listenerOutput)
 
 	// Create the API router
-	d.IpfsDir, err = ioutil.TempDir("", fmt.Sprintf("ipfs%d", rint))
+	d.IpfsDir, err = ioutil.TempDir("", "dvote-ipfs")
 	if err != nil {
 		return err
 	}
@@ -91,14 +87,14 @@ func (d *DvoteAPIServer) Start(logLevel string, apis []string) error {
 		return err
 	}
 
-	for _, a := range apis {
-		switch a {
+	for _, api := range apis {
+		switch api {
 		case "file":
 			routerAPI.EnableFileAPI()
 		case "census":
 			routerAPI.EnableCensusAPI(&cm)
 		case "vote":
-			vnode, err := NewMockVochainNode(d, logLevel)
+			vnode, err := NewMockVochainNode(d)
 			if err != nil {
 				return err
 			}
@@ -108,6 +104,8 @@ func (d *DvoteAPIServer) Start(logLevel string, apis []string) error {
 			}
 			routerAPI.Scrutinizer = sc
 			routerAPI.EnableVoteAPI(d.VochainRPCClient)
+		default:
+			panic(fmt.Sprintf("unknown api: %q", api))
 		}
 	}
 

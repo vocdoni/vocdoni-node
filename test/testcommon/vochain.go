@@ -108,7 +108,6 @@ var (
 )
 
 func NewVochainStateWithOracles() *vochain.State {
-	log.InitLogger("error", "stdout")
 	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
 	s, err := vochain.NewState("/tmp/db", c)
@@ -124,7 +123,6 @@ func NewVochainStateWithOracles() *vochain.State {
 }
 
 func NewVochainStateWithValidators() *vochain.State {
-	log.InitLogger("error", "stdout")
 	rint = rand.Int()
 	c := amino.NewCodec()
 	cryptoAmino.RegisterAmino(c)
@@ -151,7 +149,6 @@ func NewVochainStateWithValidators() *vochain.State {
 }
 
 func NewVochainStateWithProcess() *vochain.State {
-	log.InitLogger("error", "stdout")
 	c := amino.NewCodec()
 	os.RemoveAll("/tmp/db")
 	s, err := vochain.NewState("/tmp/db", c)
@@ -167,7 +164,7 @@ func NewVochainStateWithProcess() *vochain.State {
 	return s
 }
 
-func NewMockVochainNode(d *DvoteAPIServer, logLevel string) (*vochain.BaseApplication, error) {
+func NewMockVochainNode(d *DvoteAPIServer) (*vochain.BaseApplication, error) {
 	var err error
 	var vnode *vochain.BaseApplication
 
@@ -189,7 +186,7 @@ func NewMockVochainNode(d *DvoteAPIServer, logLevel string) (*vochain.BaseApplic
 		return nil, err
 	}
 	// creating node
-	d.VochainCfg.LogLevel = logLevel
+	d.VochainCfg.LogLevel = "error"
 	d.VochainCfg.P2PListen = "0.0.0.0:26656"
 	d.VochainCfg.PublicAddr = "0.0.0.0:26656"
 	d.VochainCfg.RPCListen = "0.0.0.0:26657"

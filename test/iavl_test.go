@@ -9,13 +9,11 @@ import (
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/privval"
 
-	"gitlab.com/vocdoni/go-dvote/log"
 	testcommon "gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 func TestVochainState(t *testing.T) {
-	log.InitLogger("error", "stdout")
 	os.RemoveAll("/tmp/db")
 	c := amino.NewCodec()
 	s, err := vochain.NewState("/tmp/db", c)

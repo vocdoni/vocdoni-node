@@ -44,20 +44,19 @@ import (
 	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 )
 
-var (
-	logLevel = flag.String("logLevel", "error", "logging level")
-)
+var logLevel = flag.String("logLevel", "error", "logging level")
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
+func init() { rand.Seed(time.Now().UnixNano()) }
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	log.InitLogger(*logLevel, "stdout")
+	os.Exit(m.Run())
 }
 
 func TestCensus(t *testing.T) {
-	apis := []string{"file", "census", ""}
-	log.InitLogger(*logLevel, "stdout")
-
 	var server common.DvoteAPIServer
-	err := server.Start(*logLevel, apis)
+	err := server.Start("file", "census")
 	if err != nil {
 		t.Fatal(err)
 	}

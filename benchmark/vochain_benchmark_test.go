@@ -28,17 +28,11 @@ const (
 	startBlock     = 1
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 func BenchmarkVochain(b *testing.B) {
-	apis := []string{"file", "census", "vote"}
-	log.InitLogger(*logLevel, "stdout")
 	var dvoteServer common.DvoteAPIServer
 	rint := rand.Int()
 	if *host == "" {
-		if err := dvoteServer.Start(*logLevel, apis); err != nil {
+		if err := dvoteServer.Start("file", "census", "vote"); err != nil {
 			b.Fatal(err)
 		}
 		defer os.RemoveAll(dvoteServer.IpfsDir)
