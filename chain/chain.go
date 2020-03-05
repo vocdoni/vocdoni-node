@@ -22,7 +22,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/util"
-	//	"github.com/ethereum/go-ethereum/accounts/abi"
 )
 
 type EthChainContext struct {

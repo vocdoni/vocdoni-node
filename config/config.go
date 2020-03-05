@@ -31,8 +31,8 @@ type GWCfg struct {
 	W3External string
 	// CensusSync if true census sync will be enabled
 	CensusSync bool
-	// Contract ethereum contract to use as source of truth for some operations
-	Contract string
+	// EthProcessDomain ethereum contract to use as source of truth for some operations
+	EthProcessDomain string
 	// SaveConfig overwrites the config file with the CLI provided flags
 	SaveConfig bool
 }
@@ -205,8 +205,8 @@ type OracleCfg struct {
 	LogOutput string
 	// SubscribeOnly if true only new received events will be processed, otherwise all events of the current chain will be processed
 	SubscribeOnly bool
-	// Contract address of the ethereum voting smart contract
-	Contract string
+	// EthProcessDomain ethereum contract to use as source of truth for some operations
+	EthProcessDomain string
 	// SaveConfig overwrites the config file with the CLI provided flags
 	SaveConfig bool
 }

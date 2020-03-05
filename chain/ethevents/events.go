@@ -14,7 +14,7 @@ import (
 	cttypes "github.com/tendermint/tendermint/rpc/core/types"
 	ttypes "github.com/tendermint/tendermint/types"
 	"gitlab.com/vocdoni/go-dvote/census"
-	contract "gitlab.com/vocdoni/go-dvote/chain/contracts"
+	"gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/data"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -90,7 +90,7 @@ func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, c
 	if err != nil {
 		return nil, err
 	}
-	contractABI, err := abi.JSON(strings.NewReader(contract.VotingProcessABI))
+	contractABI, err := abi.JSON(strings.NewReader(contracts.VotingProcessABI))
 	if err != nil {
 		log.Fatal(err)
 	}

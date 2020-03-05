@@ -39,6 +39,8 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
+const ensRegistryAddr = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
+
 func newConfig() (*config.OracleCfg, config.Error) {
 	var err error
 	var cfgError config.Error
@@ -63,8 +65,8 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	globalCfg.SubscribeOnly = *flag.Bool("subscribeOnly", true, "oracle can read all ethereum logs or just subscribe to the new ones, by default only subscribe")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
-	globalCfg.Contract = *flag.String("contract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f", "voting smart contract where the oracle will listen")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
+	globalCfg.EthProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
 
 	// vochain
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "vochain p2p host and port to listen on")
@@ -100,9 +102,9 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
-	viper.BindPFlag("contract", flag.Lookup("contract"))
 	viper.BindPFlag("subscribeOnly", flag.Lookup("subscribeOnly"))
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
+	viper.BindPFlag("ethProcessDomain", flag.Lookup("ethProcessDomain"))
 
 	// vochain
 	viper.Set("vochainConfig.dataDir", globalCfg.DataDir+"/vochain")
@@ -291,8 +293,16 @@ func main() {
 	log.Infof("web3 WS-RPC endpoint at %s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort)
 	go node.PrintInfo(time.Second * 20)
 
+	// get voting contract
+	votingProcessAddr, err := chain.VotingProcessAddress(ensRegistryAddr, globalCfg.EthProcessDomain, fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort))
+	if err != nil || votingProcessAddr == "" {
+		log.Warnf("cannot get voting process contract: %s", err)
+	} else {
+		log.Infof("loaded voting contract at address: %s", votingProcessAddr)
+	}
+
 	// Create Ethereum Event Log listener and register oracle handlers
-	ev, err := ethevents.NewEthEvents(globalCfg.Contract, signer, fmt.Sprintf("ws://%s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort), nil)
+	ev, err := ethevents.NewEthEvents(votingProcessAddr, signer, fmt.Sprintf("ws://%s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort), nil)
 	if err != nil {
 		log.Fatalf("couldn't create ethereum  events listener: %s", err)
 	}

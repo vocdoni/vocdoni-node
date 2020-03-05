@@ -14,16 +14,12 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	// abcicli "github.com/tendermint/tendermint/abci/client"
-
-	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
-	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
-
 	voclient "github.com/tendermint/tendermint/rpc/client"
-
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain"
+	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
 	"gitlab.com/vocdoni/go-dvote/config"
+	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -36,6 +32,8 @@ import (
 )
 
 var ethNoWaitSync bool
+
+const ensRegistryAddr = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
 
 func newConfig() (*config.GWCfg, config.Error) {
 	var err error
@@ -62,9 +60,9 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
 	globalCfg.ListenPort = *flag.Int("listenPort", 9090, "API endpoint http port")
-	globalCfg.Contract = *flag.String("contract", "0x6f55bAE05cd2C88e792d4179C051359d02C6b34f", "smart contract to follow for synchronization and coordination with other nodes")
 	globalCfg.CensusSync = *flag.Bool("censusSync", true, "automatically import new census published on smart contract")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
+	globalCfg.EthProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
 	// api
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable census API")
@@ -120,8 +118,8 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("listenHost", flag.Lookup("listenHost"))
 	viper.BindPFlag("listenPort", flag.Lookup("listenPort"))
 	viper.BindPFlag("censusSync", flag.Lookup("censusSync"))
-	viper.BindPFlag("contract", flag.Lookup("contract"))
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
+	viper.BindPFlag("ethProcessDomain", flag.Lookup("ethProcessDomain"))
 
 	// api
 	viper.BindPFlag("api.file", flag.Lookup("fileApi"))
@@ -455,6 +453,7 @@ func main() {
 	if globalCfg.EthConfig.LightMode {
 		minPeers = 2
 	}
+
 	if !ethNoWaitSync {
 		for {
 			if height, synced, peers, _ := node.SyncInfo(); synced && peers >= minPeers && height != "0" {
@@ -463,6 +462,14 @@ func main() {
 			}
 			time.Sleep(time.Second * 5)
 		}
+	}
+
+	// get voting contract
+	votingProcessAddr, err := chain.VotingProcessAddress(ensRegistryAddr, globalCfg.EthProcessDomain, fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort))
+	if err != nil || votingProcessAddr == "" {
+		log.Warnf("cannot get voting process contract: %s", err)
+	} else {
+		log.Infof("loaded voting contract at address: %s", votingProcessAddr)
 	}
 
 	// API Endpoint initialization
@@ -507,7 +514,7 @@ func main() {
 	// Census Oracle
 	if globalCfg.CensusSync && globalCfg.API.Census {
 		log.Infof("starting census import oracle")
-		ev, err := ethevents.NewEthEvents(globalCfg.Contract, nil, fmt.Sprintf("ws://%s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort), &censusManager)
+		ev, err := ethevents.NewEthEvents(votingProcessAddr, nil, fmt.Sprintf("ws://%s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort), &censusManager)
 		if err != nil {
 			log.Fatalf("couldn't create ethereum events listener: %s", err)
 		}
