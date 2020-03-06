@@ -3,6 +3,7 @@ package test
 import (
 	"encoding/base64"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -28,7 +29,16 @@ const (
 	startBlock     = 1
 )
 
+var (
+	logLevel   = flag.String("logLevel", "error", "logging level (debug, info, warning, error)")
+	host       = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
+	censusSize = flag.Int("censusSize", 100, "number of census entries to add")
+)
+
 func BenchmarkVochain(b *testing.B) {
+	rand.Seed(time.Now().UnixNano())
+	flag.Parse()
+	log.InitLogger(*logLevel, "stdout")
 	var dvoteServer common.DvoteAPIServer
 	rint := rand.Int()
 	if *host == "" {
@@ -42,7 +52,7 @@ func BenchmarkVochain(b *testing.B) {
 	}
 
 	// create random key batch
-	keySet, err := signature.CreateEthRandomKeysBatch(100)
+	keySet, err := signature.CreateEthRandomKeysBatch(*censusSize)
 	if err != nil {
 		b.Fatalf("cannot create keySet: %s", err)
 	}
@@ -56,7 +66,7 @@ func BenchmarkVochain(b *testing.B) {
 			b.Fatalf("cannot decompress public key: %+v", pubKeys[i])
 		}
 	}
-	log.Infof("generated keys: %s", pubKeys)
+	log.Infof("generated %d keys", len(pubKeys))
 
 	// get signer pubkey
 	signerPub, _ := dvoteServer.Signer.HexString()

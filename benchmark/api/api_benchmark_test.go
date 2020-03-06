@@ -2,13 +2,13 @@ package test
 
 import (
 	"encoding/base64"
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
 
-	flag "github.com/spf13/pflag"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -17,19 +17,15 @@ import (
 )
 
 var (
-	logLevel = flag.String("logLevel", "error", "logging level")
-	host     = flag.String("host", "", "alternative host to run against, e.g. ws://$HOST:9090/dvote)")
+	logLevel   = flag.String("logLevel", "error", "logging level (debug, info, warning, error)")
+	host       = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
+	censusSize = flag.Int("censusSize", 100, "number of census entries to add")
 )
 
-func init() { rand.Seed(time.Now().UnixNano()) }
-
-func TestMain(m *testing.M) {
+func BenchmarkCensus(b *testing.B) {
+	rand.Seed(time.Now().UnixNano())
 	flag.Parse()
 	log.InitLogger(*logLevel, "stdout")
-	os.Exit(m.Run())
-}
-
-func BenchmarkCensus(b *testing.B) {
 	if *host == "" {
 		var server common.DvoteAPIServer
 		if err := server.Start("file", "census"); err != nil {
@@ -93,13 +89,14 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	req.CensusID = resp.CensusID
 
 	// addClaimBulk
-	log.Infof("[%d] add bulk claims", rint)
+	log.Infof("[%d] add bulk claims (size %d)", rint, *censusSize)
 	var claims []string
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
-	for i := 0; i < 100; i++ {
+	for i := 0; i < *censusSize; i++ {
+		log.Infof("%d0123456789abcdef0123456789%d", rint, i)
 		claims = append(claims, base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("%d0123456789abcdef0123456789abc%d", rint, i))))
+			fmt.Sprintf("%d0123456789abcdef%d", rint, i))))
 	}
 	req.ClaimsData = claims
 	resp, err = c.Request(req, signer)
@@ -130,9 +127,9 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	var siblings []string
 	claims = []string{}
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < *censusSize; i++ {
 		req.ClaimData = base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("%d0123456789abcdef0123456789abc%d", rint, i)))
+			fmt.Sprintf("%d0123456789abcdef%d", rint, i)))
 		resp, err = c.Request(req, nil)
 		if err != nil {
 			b.Fatal(err)
@@ -192,8 +189,8 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	if exp, got := int64(100), resp.Size; exp != got {
-		b.Fatalf("expected size %v, got %v", exp, got)
+	if got := resp.Size; int64(*censusSize) != got {
+		b.Fatalf("expected size %v, got %v", *censusSize, got)
 	}
 
 	// addFile
