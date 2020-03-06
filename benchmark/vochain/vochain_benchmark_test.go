@@ -26,7 +26,6 @@ const (
 	numberOfBlocks = 1000
 	processID      = "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"
 	processType    = "poll-vote"
-	startBlock     = 1
 )
 
 var (
@@ -139,6 +138,14 @@ func BenchmarkVochain(b *testing.B) {
 		b.Fatalf("got invalid root")
 	}
 
+	log.Infof("check block height is not less than process start block")
+	req.Method = "getBlockHeight"
+	req.Timestamp = int32(time.Now().Unix())
+	resp, err = conn.Request(req, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+
 	// create process
 	process := &types.NewProcessTx{
 		EncryptionPublicKeys: []string{""},
@@ -147,7 +154,7 @@ func BenchmarkVochain(b *testing.B) {
 		NumberOfBlocks:       numberOfBlocks,
 		ProcessID:            processID,
 		ProcessType:          processType,
-		StartBlock:           startBlock,
+		StartBlock:           *resp.Height + 1,
 		Type:                 "newProcess",
 	}
 	process.Signature, err = dvoteServer.Signer.SignJSON(process)
