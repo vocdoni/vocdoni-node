@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	amino "github.com/tendermint/go-amino"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -22,7 +21,6 @@ const (
 type Scrutinizer struct {
 	VochainState *vochain.State
 	Storage      *db.LevelDbStorage
-	Codec        *amino.Codec
 }
 
 // ProcessVotes represents the results of a voting process using a two dimensions slice [ question1:[option1,option2], question2:[option1,option2], ...]
@@ -34,7 +32,6 @@ func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	var s Scrutinizer
 	var err error
 	s.VochainState = state
-	s.Codec = s.VochainState.Codec
 	s.Storage, err = db.NewLevelDbStorage(dbPath, false)
 	s.VochainState.AddCallback("addProcess", s.addProcess)
 	s.VochainState.AddCallback("addVote", s.addVote)
@@ -54,7 +51,7 @@ func (s *Scrutinizer) addProcess(v interface{}) {
 		pv[i] = make([]uint32, MaxOptions)
 	}
 
-	process, err = s.Codec.MarshalBinaryBare(pv)
+	process, err = s.VochainState.Codec.MarshalBinaryBare(pv)
 	if err != nil {
 		log.Error(err)
 		return
@@ -92,7 +89,7 @@ func (s *Scrutinizer) addVote(v interface{}) {
 	}
 	var pv ProcessVotes
 
-	err = s.Codec.UnmarshalBinaryBare(process, &pv)
+	err = s.VochainState.Codec.UnmarshalBinaryBare(process, &pv)
 	if err != nil {
 		log.Error("cannot unmarshal vote (%s)", err.Error())
 		return
@@ -105,7 +102,7 @@ func (s *Scrutinizer) addVote(v interface{}) {
 		pv[question][opt]++
 	}
 
-	process, err = s.Codec.MarshalBinaryBare(pv)
+	process, err = s.VochainState.Codec.MarshalBinaryBare(pv)
 	if err != nil {
 		log.Error(err)
 		return
@@ -130,7 +127,7 @@ func (s *Scrutinizer) VoteResult(processID string) ([][]uint32, error) {
 		return nil, err
 	}
 	var pv ProcessVotes
-	err = s.Codec.UnmarshalBinaryBare(processBytes, &pv)
+	err = s.VochainState.Codec.UnmarshalBinaryBare(processBytes, &pv)
 	if err != nil {
 		return nil, err
 	}
