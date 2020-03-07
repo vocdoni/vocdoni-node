@@ -8,7 +8,8 @@ import (
 	"os"
 
 	common3 "github.com/iden3/go-iden3-core/common"
-	mkcore "github.com/iden3/go-iden3-core/core"
+	"github.com/iden3/go-iden3-core/core/claims"
+
 	"github.com/iden3/go-iden3-core/db"
 	"github.com/iden3/go-iden3-core/merkletree"
 	"golang.org/x/text/unicode/norm"
@@ -20,7 +21,7 @@ type Tree struct {
 	DbStorage  *db.LevelDbStorage
 }
 
-const MaxClaimSize = 62
+const MaxClaimSize = 120
 
 func (t *Tree) MaxClaimSize() int {
 	return MaxClaimSize
@@ -55,7 +56,7 @@ func (t *Tree) Close() {
 	t.Tree.Storage().Close()
 }
 
-func (t *Tree) Claim(data []byte) (*mkcore.ClaimBasic, error) {
+func (t *Tree) Claim(data []byte) (*claims.ClaimBasic, error) {
 	if len(data) > MaxClaimSize {
 		return nil, errors.New("claim data too large")
 	}
@@ -65,12 +66,12 @@ func (t *Tree) Claim(data []byte) (*mkcore.ClaimBasic, error) {
 	return getClaimFromData(data), nil
 }
 
-func getClaimFromData(data []byte) *mkcore.ClaimBasic {
-	var indexSlot [400 / 8]byte
+func getClaimFromData(data []byte) *claims.ClaimBasic {
+	var indexSlot [112]byte
 	var dataSlot [MaxClaimSize]byte
 	copy(indexSlot[:], data[:400/8])
 	copy(dataSlot[:], data[:MaxClaimSize])
-	return mkcore.NewClaimBasic(indexSlot, dataSlot)
+	return claims.NewClaimBasic(indexSlot, dataSlot)
 }
 
 func doPadding(data *[]byte) {
@@ -87,7 +88,7 @@ func (t *Tree) AddClaim(data []byte) error {
 	if err != nil {
 		return err
 	}
-	return t.Tree.Add(e.Entry())
+	return t.Tree.AddEntry(e.Entry())
 }
 
 func (t *Tree) GenProof(data []byte) (string, error) {

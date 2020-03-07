@@ -6,6 +6,7 @@ require (
 	bazil.org/fuse v0.0.0-20191221031930-2713cb0db94b // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
+	github.com/appleboy/gin-jwt/v2 v2.6.2 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200211191935-58c705f5cf52 // indirect
 	github.com/btcsuite/btcd v0.20.1-beta // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
@@ -19,15 +20,15 @@ require (
 	github.com/ethersphere/swarm v0.5.4
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
+	github.com/gin-contrib/cors v1.3.0 // indirect
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-chi/cors v1.0.0
 	github.com/golang/mock v1.3.1-0.20190508161146-9fa652df1129 // indirect
 	github.com/google/go-cmp v0.3.1
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect
 	github.com/gorilla/websocket v1.4.1
-	github.com/iden3/go-iden3-core v0.0.7-0.20190904124812-741e2fdbb8f0
-	github.com/iden3/go-iden3-crypto v0.0.3-0.20190831180703-c95c95b7b161
-	github.com/influxdata/influxdb v1.7.7 // indirect
+	github.com/iden3/go-iden3-core v0.0.7-0.20200306161755-b1ca8370e595
+	github.com/iden3/go-iden3-crypto v0.0.3
 	github.com/ipfs/go-ipfs v0.4.22-0.20190912212424-7e7b76259f65
 	github.com/ipfs/go-ipfs-api v0.0.1
 	github.com/ipfs/go-ipfs-config v0.0.11
@@ -35,6 +36,7 @@ require (
 	github.com/ipfs/go-log v0.0.1
 	github.com/ipfs/interface-go-ipfs-core v0.2.2
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
+	github.com/jamesruan/sodium v0.0.0-20181216154042-9620b83ffeae // indirect
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/libp2p/go-libp2p v0.3.1 // indirect
 	github.com/libp2p/go-libp2p-autonat-svc v0.1.0
