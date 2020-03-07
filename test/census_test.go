@@ -31,12 +31,12 @@ Run it executing `go test -v test/census_test.go`
 import (
 	"encoding/base64"
 	"flag"
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -45,6 +45,7 @@ import (
 )
 
 var logLevel = flag.String("logLevel", "error", "logging level")
+var censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -159,9 +160,17 @@ func TestCensus(t *testing.T) {
 	var claims []string
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
-	for i := 0; i < 100; i++ {
-		claims = append(claims, base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("0123456789abcdef0123456789abc%d", i))))
+	keys, err := signature.CreateEthRandomKeysBatch(*censusSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range keys {
+		pub, _ := k.HexString()
+		pubDesc, err := signature.DecompressPubKey(pub)
+		if err != nil {
+			t.Fatal(err)
+		}
+		claims = append(claims, base64.StdEncoding.EncodeToString(signature.HashPoseidon(pubDesc)))
 	}
 	req.ClaimsData = claims
 	resp, err = c.Request(req, signer2)
@@ -187,7 +196,7 @@ func TestCensus(t *testing.T) {
 	// GenProof valid
 	req.Method = "genProof"
 	req.RootHash = ""
-	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abc0"))
+	req.ClaimData = claims[1]
 	resp, err = c.Request(req, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -301,7 +310,7 @@ func TestCensus(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if exp, got := int64(101), resp.Size; exp != got {
+	if exp, got := int64(*censusSize+1), resp.Size; exp != got {
 		t.Fatalf("expected size %v, got %v", exp, got)
 	}
 }
