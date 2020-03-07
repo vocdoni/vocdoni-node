@@ -6,21 +6,17 @@ require (
 	bazil.org/fuse v0.0.0-20191221031930-2713cb0db94b // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
-	github.com/appleboy/gin-jwt/v2 v2.6.2 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200211191935-58c705f5cf52 // indirect
 	github.com/btcsuite/btcd v0.20.1-beta // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.2
 	github.com/dgraph-io/badger v1.6.0 // indirect
-	github.com/docker/docker v1.13.1 // indirect
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.10
 	github.com/ethersphere/go-sw3 v0.2.1 // indirect
 	github.com/ethersphere/swarm v0.5.4
-	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
-	github.com/gin-contrib/cors v1.3.0 // indirect
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-chi/cors v1.0.0
 	github.com/golang/mock v1.3.1-0.20190508161146-9fa652df1129 // indirect
@@ -36,7 +32,6 @@ require (
 	github.com/ipfs/go-log v0.0.1
 	github.com/ipfs/interface-go-ipfs-core v0.2.2
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
-	github.com/jamesruan/sodium v0.0.0-20181216154042-9620b83ffeae // indirect
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/libp2p/go-libp2p v0.3.1 // indirect
 	github.com/libp2p/go-libp2p-autonat-svc v0.1.0
@@ -81,6 +76,5 @@ require (
 	golang.org/x/sys v0.0.0-20200212091648-12a6c2dcc1e4 // indirect
 	golang.org/x/text v0.3.2
 	golang.org/x/tools v0.0.0-20191224055732-dd894d0a8a40 // indirect
-	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190709231704-1e4459ed25ff // indirect
 	gopkg.in/yaml.v2 v2.2.7 // indirect
 )
