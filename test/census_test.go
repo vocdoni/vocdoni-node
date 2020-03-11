@@ -37,7 +37,6 @@ import (
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
-	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 
@@ -64,9 +63,9 @@ func TestCensus(t *testing.T) {
 	defer os.RemoveAll(server.IpfsDir)
 	defer os.RemoveAll(server.CensusDir)
 
-	signer1 := new(sig.SignKeys)
+	signer1 := new(signature.SignKeys)
 	signer1.Generate()
-	signer2 := new(sig.SignKeys)
+	signer2 := new(signature.SignKeys)
 	signer2.Generate()
 	if err := server.Signer.AddAuthKey(signer2.EthAddrString()); err != nil {
 		t.Fatalf("cannot add authorized address %s", err)

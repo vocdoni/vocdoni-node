@@ -14,7 +14,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/tree"
 	"gitlab.com/vocdoni/go-dvote/types"
-	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 
 	amino "github.com/tendermint/go-amino"
@@ -24,7 +23,6 @@ import (
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/common"
-	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -32,37 +30,37 @@ import (
 
 // ValidateTx splits a tx into method and args parts and does some basic checks
 func ValidateTx(content []byte, state *State) (interface{}, error) {
-	var txType vochaintypes.Tx
+	var txType types.Tx
 	err := json.Unmarshal(content, &txType)
 	if err != nil || len(txType.Type) < 1 {
 		return nil, fmt.Errorf("cannot extract type (%s)", err)
 	}
 
-	structType := vochaintypes.ValidateType(txType.Type)
+	structType := types.ValidateType(txType.Type)
 
 	switch structType {
 	case "VoteTx":
-		var voteTx vochaintypes.VoteTx
+		var voteTx types.VoteTx
 		if err := json.Unmarshal(content, &voteTx); err != nil {
 			return nil, fmt.Errorf("cannot parse VoteTX")
 		}
 		return voteTx, VoteTxCheck(voteTx, state)
 
 	case "AdminTx":
-		var adminTx vochaintypes.AdminTx
+		var adminTx types.AdminTx
 		if err := json.Unmarshal(content, &adminTx); err != nil {
 			return nil, fmt.Errorf("cannot parse AdminTx")
 		}
 		return adminTx, AdminTxCheck(adminTx, state)
 	case "NewProcessTx":
-		var processTx vochaintypes.NewProcessTx
+		var processTx types.NewProcessTx
 		if err := json.Unmarshal(content, &processTx); err != nil {
 			return nil, fmt.Errorf("cannot parse NewProcessTx")
 		}
 		return processTx, NewProcessTxCheck(processTx, state)
 
 	case "CancelProcessTx":
-		var cancelProcessTx vochaintypes.CancelProcessTx
+		var cancelProcessTx types.CancelProcessTx
 		if err := json.Unmarshal(content, &cancelProcessTx); err != nil {
 			return nil, fmt.Errorf("cannot parse CancelProcessTx")
 		}
@@ -78,12 +76,12 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 		return nil, fmt.Errorf("transaction validation failed with error (%s)", err)
 	}
 	switch tx := tx.(type) {
-	case vochaintypes.VoteTx:
+	case types.VoteTx:
 		process, _ := state.Process(tx.ProcessID)
 		if process == nil {
 			return nil, fmt.Errorf("process with id (%s) does not exists", tx.ProcessID)
 		}
-		vote := new(vochaintypes.Vote)
+		vote := new(types.Vote)
 		switch process.Type {
 		case "snark-vote":
 			vote.Nullifier = util.TrimHex(tx.Nullifier)
@@ -126,7 +124,7 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 		}
 		// log.Debugf("adding vote: %+v", vote)
 		return nil, state.AddVote(vote)
-	case vochaintypes.AdminTx:
+	case types.AdminTx:
 		switch tx.Type {
 		case "addOracle":
 			return nil, state.AddOracle(tx.Address)
@@ -137,8 +135,8 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 		case "removeValidator":
 			return nil, state.RemoveValidator(tx.Address)
 		}
-	case vochaintypes.NewProcessTx:
-		newProcess := &vochaintypes.Process{
+	case types.NewProcessTx:
+		newProcess := &types.Process{
 			EntityID:             util.TrimHex(tx.EntityID),
 			EncryptionPublicKeys: tx.EncryptionPublicKeys,
 			MkRoot:               util.TrimHex(tx.MkRoot),
@@ -174,7 +172,7 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 }
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
-func VoteTxCheck(vote vochaintypes.VoteTx, state *State) error {
+func VoteTxCheck(vote types.VoteTx, state *State) error {
 	process, _ := state.Process(vote.ProcessID)
 	if process == nil {
 		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
@@ -193,7 +191,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *State) error {
 			// TODO check snark
 			return nil
 		case "poll-vote", "petition-sign":
-			var voteTmp vochaintypes.VoteTx
+			var voteTmp types.VoteTx
 			voteTmp.Nonce = vote.Nonce
 			voteTmp.ProcessID = vote.ProcessID
 			voteTmp.Proof = vote.Proof
@@ -249,7 +247,7 @@ func VoteTxCheck(vote vochaintypes.VoteTx, state *State) error {
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
-func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *State) error {
+func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 	// get oracles
 	oracles, err := state.Oracles()
 	if err != nil || len(oracles) == 0 {
@@ -291,7 +289,7 @@ func NewProcessTxCheck(process vochaintypes.NewProcessTx, state *State) error {
 }
 
 // CancelProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
-func CancelProcessTxCheck(cancelProcessTx vochaintypes.CancelProcessTx, state *State) error {
+func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) error {
 	// get oracles
 	oracles, err := state.Oracles()
 	if err != nil || len(oracles) == 0 {
@@ -325,7 +323,7 @@ func CancelProcessTxCheck(cancelProcessTx vochaintypes.CancelProcessTx, state *S
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
-func AdminTxCheck(adminTx vochaintypes.AdminTx, state *State) error {
+func AdminTxCheck(adminTx types.AdminTx, state *State) error {
 	// get oracles
 	oracles, err := state.Oracles()
 	if err != nil || len(oracles) == 0 {
@@ -396,7 +394,7 @@ func NewPrivateValidator(cfg *config.VochainCfg, tconfig *cfg.Config) (*privval.
 		} else {
 			minerKeyFile = cfg.MinerKeyFile
 		}
-		if !cmn.FileExists(tconfig.PrivValidatorKeyFile()) {
+		if !common.FileExists(tconfig.PrivValidatorKeyFile()) {
 			filePV := privval.LoadFilePVEmptyState(minerKeyFile, tconfig.PrivValidatorStateFile())
 			filePV.Save()
 		}

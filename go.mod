@@ -1,6 +1,6 @@
 module gitlab.com/vocdoni/go-dvote
 
-go 1.13
+go 1.14
 
 require (
 	bazil.org/fuse v0.0.0-20191221031930-2713cb0db94b // indirect
@@ -69,7 +69,7 @@ require (
 	go.uber.org/atomic v1.5.1 // indirect
 	go.uber.org/multierr v1.4.0 // indirect
 	go.uber.org/zap v1.13.0
-	golang.org/x/crypto v0.0.0-20200210222208-86ce3cb69678
+	golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4
 	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect

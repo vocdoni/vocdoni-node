@@ -19,19 +19,19 @@ cache:
     - .cache/
 
 go-test:
-  image: golang:1.13.7
+  image: golang:1.14
   stage: test
   script:
     - go test -vet=off ./... # we run vet in another step
     - go test -vet=off -race ./...
 
 go-analyze:
-  image: golang:1.13.7
+  image: golang:1.14
   stage: test
   script:
     - diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
     - go vet ./...
-    - curl -L https://github.com/dominikh/go-tools/releases/download/2019.2.3/staticcheck_linux_amd64.tar.gz | tar -xzf -
+    - curl -L https://github.com/dominikh/go-tools/releases/download/2020.1.3/staticcheck_linux_amd64.tar.gz | tar -xzf -
     - ./staticcheck/staticcheck ./...
 
 docker-release:

@@ -21,9 +21,9 @@ func TestVochainState(t *testing.T) {
 		t.Errorf("cannot create vochain state (%s)", err)
 	}
 	for i := 0; i < 10; i++ {
-		s.AppTree.Set([]byte(string(i)), []byte(fmt.Sprintf("number %d", i)))
-		s.ProcessTree.Set([]byte(string(i+1)), []byte(fmt.Sprintf("number %d", i+1)))
-		s.VoteTree.Set([]byte(string(i+2)), []byte(fmt.Sprintf("number %d", i+2)))
+		s.AppTree.Set([]byte(fmt.Sprintf("%d", i)), []byte(fmt.Sprintf("number %d", i)))
+		s.ProcessTree.Set([]byte(fmt.Sprintf("%d", i+1)), []byte(fmt.Sprintf("number %d", i+1)))
+		s.VoteTree.Set([]byte(fmt.Sprintf("%d", i+2)), []byte(fmt.Sprintf("number %d", i+2)))
 	}
 	s.AppTree.SaveVersion()
 	s.ProcessTree.SaveVersion()
@@ -33,16 +33,16 @@ func TestVochainState(t *testing.T) {
 	processHash := fmt.Sprintf("%x", s.ProcessTree.Hash())
 	voteHash := fmt.Sprintf("%x", s.VoteTree.Hash())
 
-	if appHash != "7b72f3fec170cfbc2f537f0d65cf8921b9d8203bce599b810ae30451d89bf9ad" {
-		t.Errorf("app hash is not correct %s", appHash)
+	if appHash != "0e7629c22261bde17ddd23970280c3a7eac63777aea5be57e65ae66f65047d37" {
+		t.Errorf("app hash is not correct: %s", appHash)
 	}
 
-	if processHash != "01faa0aa2aa87033832276fd7132c564b2a68e75b70635c1e33354e53d24d12c" {
-		t.Errorf("app hash is not correct %s", appHash)
+	if processHash != "b97b7bdf7c92b1c48077e347bcf492beee46873966460115f8eaa2131cc601eb" {
+		t.Errorf("process hash is not correct: %s", processHash)
 	}
 
-	if voteHash != "8faf5a59b9443523f10cedfbd3b91582e97ae0171b01d717a9c38dd6b88b1e4b" {
-		t.Errorf("app hash is not correct %s", appHash)
+	if voteHash != "33e0fe2e01bc3ad286c2539ce3782497398d9960ee4b6714f46cfe6f54640ea5" {
+		t.Errorf("vote hash is not correct: %s", voteHash)
 	}
 }
 

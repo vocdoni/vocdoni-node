@@ -12,7 +12,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/net"
 	dnet "gitlab.com/vocdoni/go-dvote/net"
 	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -121,7 +120,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 }
 
 // NewMockEthereum creates an ethereum node, attaches a signing key and adds a http or ws endpoint to a given proxy
-func NewMockEthereum(logLevel, dataDir string, pxy *net.Proxy) (*chain.EthChainContext, error) {
+func NewMockEthereum(logLevel, dataDir string, pxy *dnet.Proxy) (*chain.EthChainContext, error) {
 	// create base config
 	ethConfig := &config.EthCfg{LogLevel: logLevel, DataDir: dataDir, ChainType: "goerli", LightMode: false, NodePort: 30303}
 	w3Config := &config.W3Cfg{HTTPHost: "0.0.0.0", WsHost: "0.0.0.0", Route: "/web3", Enabled: true, HTTPAPI: true, WSAPI: true, HTTPPort: 9091, WsPort: 9092}

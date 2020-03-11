@@ -15,7 +15,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
-	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
@@ -38,7 +37,7 @@ func BenchmarkVochain(b *testing.B) {
 	rand.Seed(time.Now().UnixNano())
 	flag.Parse()
 	log.InitLogger(*logLevel, "stdout")
-	var dvoteServer common.DvoteAPIServer
+	var dvoteServer testcommon.DvoteAPIServer
 	rint := rand.Int()
 	if *host == "" {
 		if err := dvoteServer.Start("file", "census", "vote"); err != nil {
@@ -71,7 +70,7 @@ func BenchmarkVochain(b *testing.B) {
 	signerPub, _ := dvoteServer.Signer.HexString()
 
 	// check required components
-	var conn common.APIConnection
+	var conn testcommon.APIConnection
 	if err := conn.Connect(*host); err != nil {
 		b.Fatalf("dial: %s", err)
 	}
@@ -192,7 +191,7 @@ func BenchmarkVochain(b *testing.B) {
 	// send votes in parallel
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
-		var c common.APIConnection
+		var c testcommon.APIConnection
 		if err := c.Connect(*host); err != nil {
 			b.Fatalf("dial: %s", err)
 		}
