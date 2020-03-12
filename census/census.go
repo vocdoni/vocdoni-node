@@ -396,6 +396,16 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		resp.Root = tr.Root()
 		return resp
 
+	case "getCensusList":
+		if isAuth && validAuthPrefix {
+			for n := range m.Trees {
+				resp.CensusList = append(resp.CensusList, n)
+			}
+		} else {
+			resp.SetError("invalid authentication")
+		}
+		return resp
+
 	case "addClaimBulk":
 		if isAuth && validAuthPrefix {
 			addedClaims := 0

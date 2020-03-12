@@ -189,6 +189,7 @@ func (r *Router) EnableCensusAPI(cm *census.Manager) {
 	r.registerPrivate("addClaimBulk", r.censusLocal)
 	r.registerPrivate("publish", r.censusLocal)
 	r.registerPrivate("importRemote", r.censusLocal)
+	r.registerPrivate("getCensusList", r.censusLocal)
 }
 
 // EnableVoteAPI enabled the Vote API in the Router

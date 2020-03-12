@@ -57,6 +57,7 @@ type ErrorMessage struct {
 type MetaResponse struct {
 	APIList       []string   `json:"apiList,omitempty"`
 	CensusID      string     `json:"censusId,omitempty"`
+	CensusList    []string   `json:"censusList,omitempty"`
 	ClaimsData    []string   `json:"claimsData,omitempty"`
 	Content       string     `json:"content,omitempty"`
 	EntityID      string     `json:"entityId,omitempty"`

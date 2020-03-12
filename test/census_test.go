@@ -312,4 +312,15 @@ func TestCensus(t *testing.T) {
 	if exp, got := int64(*censusSize+1), resp.Size; exp != got {
 		t.Fatalf("expected size %v, got %v", exp, got)
 	}
+
+	// get census list
+	req.Method = "getCensusList"
+	resp, err = c.Request(req, signer2)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(resp.CensusList) != 3 {
+		t.Fatalf("census list size does not match")
+	}
+	log.Infof("census list: %v", resp.CensusList)
 }
