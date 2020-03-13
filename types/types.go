@@ -1,5 +1,7 @@
 package types
 
+import "encoding/json"
+
 type MessageContext interface {
 	ConnectionType() string
 }
@@ -48,6 +50,14 @@ type Message struct {
 	Data      []byte
 	TimeStamp int32
 	Context   MessageContext
+}
+
+func (m *Message) Encode() ([]byte, error) {
+	return json.Marshal(m)
+}
+
+func (m *Message) Decode(data []byte) error {
+	return json.Unmarshal(data, m)
 }
 
 // Connection describes the settings for any of the transports defined in the net module, note that not all
