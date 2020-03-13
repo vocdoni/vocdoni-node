@@ -3,14 +3,10 @@ module gitlab.com/vocdoni/go-dvote
 go 1.14
 
 require (
-	bazil.org/fuse v0.0.0-20191221031930-2713cb0db94b // indirect
-	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200211191935-58c705f5cf52 // indirect
-	github.com/btcsuite/btcd v0.20.1-beta // indirect
-	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
+	github.com/davidlazar/go-crypto v0.0.0-20190912175916-7055855a373f // indirect
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.2
-	github.com/dgraph-io/badger v1.6.0 // indirect
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.10
@@ -19,37 +15,37 @@ require (
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-chi/cors v1.0.0
-	github.com/golang/mock v1.3.1-0.20190508161146-9fa652df1129 // indirect
-	github.com/google/go-cmp v0.3.1
+	github.com/google/go-cmp v0.4.0
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect
 	github.com/gorilla/websocket v1.4.1
 	github.com/iden3/go-iden3-core v0.0.7-0.20200306161755-b1ca8370e595
 	github.com/iden3/go-iden3-crypto v0.0.3
-	github.com/ipfs/go-ipfs v0.4.22-0.20190912212424-7e7b76259f65
-	github.com/ipfs/go-ipfs-api v0.0.1
-	github.com/ipfs/go-ipfs-config v0.0.11
-	github.com/ipfs/go-ipfs-files v0.0.3
-	github.com/ipfs/go-log v0.0.1
-	github.com/ipfs/interface-go-ipfs-core v0.2.2
+	github.com/ipfs/go-filestore v1.0.0 // indirect
+	github.com/ipfs/go-ipfs v0.4.22-0.20200313001058-457b6e79ff3c
+	github.com/ipfs/go-ipfs-api v0.0.3
+	github.com/ipfs/go-ipfs-config v0.2.1
+	github.com/ipfs/go-ipfs-files v0.0.6
+	github.com/ipfs/go-log v1.0.2
+	github.com/ipfs/interface-go-ipfs-core v0.2.6
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
+	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
-	github.com/libp2p/go-libp2p v0.3.1 // indirect
+	github.com/libp2p/go-libp2p v0.6.0
 	github.com/libp2p/go-libp2p-autonat-svc v0.1.0
-	github.com/libp2p/go-libp2p-blankhost v0.1.4 // indirect
-	github.com/libp2p/go-libp2p-core v0.2.2
-	github.com/libp2p/go-libp2p-http v0.1.3 // indirect
-	github.com/libp2p/go-libp2p-pubsub v0.1.1 // indirect
+	github.com/libp2p/go-libp2p-core v0.5.0
+	github.com/libp2p/go-libp2p-crypto v0.1.0
+	github.com/libp2p/go-libp2p-discovery v0.2.0
+	github.com/libp2p/go-libp2p-kad-dht v0.5.1
 	github.com/libp2p/go-reuseport v0.0.1
+	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/marcusolsson/tui-go v0.4.0
-	github.com/mattn/go-colorable v0.1.4 // indirect
-	github.com/mattn/go-isatty v0.0.11 // indirect
+	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/miekg/dns v1.1.16 // indirect
-	github.com/multiformats/go-multiaddr v0.0.4
+	github.com/multiformats/go-multiaddr v0.2.1
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/polydawn/refmt v0.0.0-20190807091052-3d65705ee9f1 // indirect
-	github.com/prometheus/procfs v0.0.4 // indirect
 	github.com/robertkrimen/otto v0.0.0-20191219234010-c382bd3c16ff // indirect
 	github.com/smartystreets/assertions v1.0.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
@@ -63,18 +59,16 @@ require (
 	github.com/tendermint/tm-db v0.2.0
 	github.com/uber/jaeger-client-go v2.21.1+incompatible // indirect
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
-	github.com/whyrusleeping/mdns v0.0.0-20190826153040-b9b60ed33aa9 // indirect
+	github.com/whyrusleeping/cbor-gen v0.0.0-20200223203819-95cdfde1438f // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
-	go.opencensus.io v0.22.0 // indirect
-	go.uber.org/atomic v1.5.1 // indirect
-	go.uber.org/multierr v1.4.0 // indirect
-	go.uber.org/zap v1.13.0
+	go.uber.org/multierr v1.5.0 // indirect
+	go.uber.org/zap v1.14.0
 	golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4
-	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
-	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
-	golang.org/x/sys v0.0.0-20200212091648-12a6c2dcc1e4 // indirect
+	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
+	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
+	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect
 	golang.org/x/text v0.3.2
-	golang.org/x/tools v0.0.0-20191224055732-dd894d0a8a40 // indirect
+	golang.org/x/tools v0.0.0-20200312194400-c312e98713c2 // indirect
 	gopkg.in/yaml.v2 v2.2.7 // indirect
+	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
 )
