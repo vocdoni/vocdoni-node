@@ -180,7 +180,9 @@ func (e *EthChainContext) Start() {
 		log.Infof("my Ethereum address %x", e.Keys.Accounts()[0].Address)
 	}
 	if len(e.DefaultConfig.W3external) == 0 {
-		utils.StartNode(e.Node)
+		if err := e.Node.Start(); err != nil {
+			log.Fatalf("error starting ethereum node: %v", err)
+		}
 
 		log.Infof("started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
 		if e.DefaultConfig.WSPort > 0 {
@@ -231,15 +233,15 @@ func getPassPhrase(prompt string, confirmation bool) string {
 	}
 	phrase, err := console.Stdin.PromptPassword("Passphrase: ")
 	if err != nil {
-		utils.Fatalf("failed to read passphrase: %v", err)
+		log.Fatalf("failed to read passphrase: %v", err)
 	}
 	if confirmation {
 		confirm, err := console.Stdin.PromptPassword("repeat passphrase: ")
 		if err != nil {
-			utils.Fatalf("failed to read passphrase confirmation: %v", err)
+			log.Fatalf("failed to read passphrase confirmation: %v", err)
 		}
 		if phrase != confirm {
-			utils.Fatalf("passphrases do not match")
+			log.Fatalf("passphrases do not match")
 		}
 	}
 	return phrase

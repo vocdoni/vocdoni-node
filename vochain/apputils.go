@@ -104,7 +104,7 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 				// log.Warnf("cannot extract pubKey: %s", err)
 				return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
 			}
-			addr, err := signature.AddrFromPublicKey(string(pubKey))
+			addr, err := signature.AddrFromPublicKey(pubKey)
 			if err != nil {
 				return nil, fmt.Errorf("cannot extract address from public key")
 			}
@@ -142,8 +142,6 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 			MkRoot:               util.TrimHex(tx.MkRoot),
 			NumberOfBlocks:       tx.NumberOfBlocks,
 			StartBlock:           tx.StartBlock,
-			Canceled:             false,
-			Paused:               false,
 			Type:                 tx.ProcessType,
 		}
 		err = state.AddProcess(newProcess, tx.ProcessID)
@@ -207,7 +205,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 				return fmt.Errorf("cannot extract public key from signature (%s)", err)
 			}
 
-			addr, err := signature.AddrFromPublicKey(string(pubKey))
+			addr, err := signature.AddrFromPublicKey(pubKey)
 			if err != nil {
 				return fmt.Errorf("cannot extract address from public key")
 			}

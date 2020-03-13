@@ -84,11 +84,10 @@ func (p *Proxy) Init() error {
 	p.Server.Use(middleware.Timeout(30 * time.Second))
 
 	cors := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type"},
-		AllowCredentials: false,
-		MaxAge:           300, // Maximum value not ignored by any of major browsers
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders: []string{"Content-Type"},
+		MaxAge:         300, // Maximum value not ignored by any of major browsers
 	})
 	p.Server.Use(cors.Handler)
 
@@ -291,11 +290,9 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 				break
 			}
 			msg := types.Message{
-				Data:      []byte(payload),
+				Data:      payload,
 				TimeStamp: int32(time.Now().Unix()),
-				Context: &WebsocketContext{
-					Conn: conn,
-				},
+				Context:   &WebsocketContext{Conn: conn},
 			}
 			w.internalReceiver <- msg
 		}

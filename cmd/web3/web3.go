@@ -86,22 +86,19 @@ func newConfig() (*ethereumStandaloneCfgWrapper, config.Error) {
 	_, err = os.Stat(ethereumCfgWrapper.dataDir + "/web3-standalone.yml")
 	if os.IsNotExist(err) {
 		cfgError = config.Error{
-			Critical: false,
-			Message:  fmt.Sprintf("creating new config file in %s", ethereumCfgWrapper.dataDir),
+			Message: fmt.Sprintf("creating new config file in %s", ethereumCfgWrapper.dataDir),
 		}
 		// creting config folder if not exists
 		err = os.MkdirAll(ethereumCfgWrapper.dataDir, os.ModePerm)
 		if err != nil {
 			cfgError = config.Error{
-				Critical: false,
-				Message:  fmt.Sprintf("cannot create data directory (%s)", err),
+				Message: fmt.Sprintf("cannot create data directory (%s)", err),
 			}
 		}
 		// create config file if not exists
 		if err = viper.SafeWriteConfig(); err != nil {
 			cfgError = config.Error{
-				Critical: false,
-				Message:  fmt.Sprintf("cannot write config file into config dir (%s)", err),
+				Message: fmt.Sprintf("cannot write config file into config dir (%s)", err),
 			}
 		}
 	} else {
@@ -109,16 +106,14 @@ func newConfig() (*ethereumStandaloneCfgWrapper, config.Error) {
 		err = viper.ReadInConfig()
 		if err != nil {
 			cfgError = config.Error{
-				Critical: false,
-				Message:  fmt.Sprintf("cannot read loaded config file in %s (%s)", err, ethereumCfgWrapper.dataDir),
+				Message: fmt.Sprintf("cannot read loaded config file in %s (%s)", err, ethereumCfgWrapper.dataDir),
 			}
 		}
 	}
 	err = viper.Unmarshal(&ethereumCfgWrapper)
 	if err != nil {
 		cfgError = config.Error{
-			Critical: false,
-			Message:  fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
+			Message: fmt.Sprintf("cannot unmarshal loaded config file (%s)", err),
 		}
 	}
 

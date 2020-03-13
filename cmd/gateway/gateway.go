@@ -444,7 +444,7 @@ func main() {
 			time.Sleep(time.Second * 5)
 			h = vnode.State.Height()
 			log.Infof("[vochain info] replaying block %d at %d b/s",
-				h, int64((h-hPrev)/5))
+				h, (h-hPrev)/5)
 		}
 	}
 

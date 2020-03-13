@@ -62,9 +62,8 @@ func newConfig(logLevel, output string) zap.Config {
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 	cfg := zap.Config{
-		Level:       zap.NewAtomicLevelAt(levelFromString(logLevel)),
-		Development: false,
-		Encoding:    "console",
+		Level:    zap.NewAtomicLevelAt(levelFromString(logLevel)),
+		Encoding: "console",
 		Sampling: &zap.SamplingConfig{
 			Initial:    100,
 			Thereafter: 100,

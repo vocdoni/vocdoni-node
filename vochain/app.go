@@ -83,7 +83,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	if err != nil {
 		log.Errorf("cannot marshal header: %s", err)
 	}
-	app.State.AppTree.Set([]byte(headerKey), headerBytes)
+	app.State.AppTree.Set(headerKey, headerBytes)
 	app.State.Save()
 
 	// TBD: using empty list here, should return validatorsUpdate to use the validators obtained here
@@ -101,7 +101,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	if err != nil {
 		log.Warnf("cannot marshal header in BeginBlock")
 	}
-	app.State.AppTree.Set([]byte(headerKey), headerBytes)
+	app.State.AppTree.Set(headerKey, headerBytes)
 	return abcitypes.ResponseBeginBlock{}
 }
 

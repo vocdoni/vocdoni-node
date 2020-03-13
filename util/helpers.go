@@ -10,7 +10,10 @@ func Hex2int64(hexStr string) int64 {
 	cleaned := strings.Replace(hexStr, "0x", "", -1)
 
 	// base 16 for hexadecimal
-	result, _ := strconv.ParseUint(cleaned, 16, 64)
+	result, err := strconv.ParseUint(cleaned, 16, 64)
+	if err != nil {
+		panic(err)
+	}
 	return int64(result)
 }
 

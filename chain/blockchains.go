@@ -30,10 +30,8 @@ func SpecsFor(name string) (*Specs, error) {
 
 // Ethereum MainNet
 var mainnet = Specs{
-	Name:       "mainnet",
-	GenesisB64: "",
-	NetworkId:  0,
-	BootNodes:  ethparams.MainnetBootnodes,
+	Name:      "mainnet",
+	BootNodes: ethparams.MainnetBootnodes,
 }
 
 // Goerli Ethereum PoA Testnet

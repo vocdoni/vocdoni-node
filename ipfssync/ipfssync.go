@@ -207,7 +207,10 @@ func (is *IPFSsync) sendHello() {
 }
 
 func (is *IPFSsync) listPins() (pins []string) {
-	list, _ := is.Storage.ListPins(context.TODO())
+	list, err := is.Storage.ListPins(context.TODO())
+	if err != nil {
+		log.Error(err)
+	}
 	for i := range list {
 		pins = append(pins, i)
 	}

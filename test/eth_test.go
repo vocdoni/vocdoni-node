@@ -19,7 +19,6 @@ type jsonrpcRequestWrapper struct {
 	ID      int
 	Jsonrpc string
 	Method  string
-	Params  []string
 }
 
 var testRequests = []struct {
@@ -56,6 +55,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	}
 	// start node
 	node.Start()
+	defer node.Node.Stop()
 	// proxy websocket handle
 	pxyAddr := fmt.Sprintf("ws://%s/web3ws", pxy.Addr)
 	// Create WebSocket endpoint
@@ -80,7 +80,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 			if err != nil {
 				t.Fatalf("cannot marshal request: %s", err)
 			}
-			log.Infof("testing: %s, sending request: %s", tt.name, tt.request)
+			log.Infof("testing: %s, sending request: %v", tt.name, tt.request)
 			err = c.WriteMessage(websocket.TextMessage, reqBytes)
 			if err != nil {
 				t.Fatalf("cannot write to ws: %s", err)

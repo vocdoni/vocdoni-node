@@ -6,7 +6,7 @@ import (
 )
 
 func TestPoseidonHashing(t *testing.T) {
-	base64Regex, _ := regexp.Compile("^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$")
+	base64Regex := regexp.MustCompile("^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$")
 
 	// mnemonic := "fly cheap color olive setup rigid april forum over grief predict pipe toddler argue give"
 	pubKey := "0x045a126cbbd3c66b6d542d40d91085e3f2b5db3bbc8cda0d59615deb08784e4f833e0bb082194790143c3d01cedb4a9663cb8c7bdaaad839cb794dd309213fcf30"

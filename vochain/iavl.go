@@ -23,14 +23,15 @@ const (
 	appTreeName     = "appTree"
 	processTreeName = "processTree"
 	voteTreeName    = "voteTree"
-	// keys
-	headerKey    = "header"
-	oracleKey    = "oracle"
-	validatorKey = "validator"
-	processKey   = "process"
-	voteKey      = "vote"
 	// validators default power
 	validatorPower = 0
+)
+
+var (
+	// keys; not constants because of []byte
+	headerKey    = []byte("header")
+	oracleKey    = []byte("oracle")
+	validatorKey = []byte("validator")
 )
 
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
@@ -97,15 +98,14 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 }
 
 // AddCallback adds a new callback function of type EventCallback which will be exeuted on event name
-func (v *State) AddCallback(name string, f EventCallback) error {
+func (v *State) AddCallback(name string, f EventCallback) {
 	v.Callbacks[name] = f
-	return nil
 }
 
 // AddOracle adds a trusted oracle given its address if not exists
 func (v *State) AddOracle(address string) error {
 	address = util.TrimHex(address)
-	_, oraclesBytes := v.AppTree.Get([]byte(oracleKey))
+	_, oraclesBytes := v.AppTree.Get(oracleKey)
 	var oracles []string
 	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	for _, v := range oracles {
@@ -118,14 +118,14 @@ func (v *State) AddOracle(address string) error {
 	if err != nil {
 		return errors.New("cannot marshal oracles")
 	}
-	v.AppTree.Set([]byte(oracleKey), newOraclesBytes)
+	v.AppTree.Set(oracleKey, newOraclesBytes)
 	return nil
 }
 
 // RemoveOracle removes a trusted oracle given its address if exists
 func (v *State) RemoveOracle(address string) error {
 	address = util.TrimHex(address)
-	_, oraclesBytes := v.AppTree.Get([]byte(oracleKey))
+	_, oraclesBytes := v.AppTree.Get(oracleKey)
 	var oracles []string
 	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	for i, o := range oracles {
@@ -138,7 +138,7 @@ func (v *State) RemoveOracle(address string) error {
 			if err != nil {
 				return errors.New("cannot marshal oracles")
 			}
-			v.AppTree.Set([]byte(oracleKey), newOraclesBytes)
+			v.AppTree.Set(oracleKey, newOraclesBytes)
 			return nil
 		}
 	}
@@ -147,7 +147,7 @@ func (v *State) RemoveOracle(address string) error {
 
 // Oracles returns the current oracle list
 func (v *State) Oracles() ([]string, error) {
-	_, oraclesBytes := v.AppTree.Get([]byte(oracleKey))
+	_, oraclesBytes := v.AppTree.Get(oracleKey)
 	var oracles []string
 	err := v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	return oracles, err
@@ -156,7 +156,7 @@ func (v *State) Oracles() ([]string, error) {
 // AddValidator adds a tendemint validator if it is not already added
 func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
 	addr := pubKey.Address().String()
-	_, validatorsBytes := v.AppTree.Get([]byte(validatorKey))
+	_, validatorsBytes := v.AppTree.Get(validatorKey)
 	var validators []tmtypes.GenesisValidator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
 	for _, v := range validators {
@@ -168,7 +168,6 @@ func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
 		Address: pubKey.Address(),
 		PubKey:  pubKey,
 		Power:   validatorPower,
-		Name:    "",
 	}
 	validators = append(validators, newVal)
 
@@ -176,13 +175,13 @@ func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
 	if err != nil {
 		return errors.New("cannot marshal validator")
 	}
-	v.AppTree.Set([]byte(validatorKey), validatorsBytes)
+	v.AppTree.Set(validatorKey, validatorsBytes)
 	return nil
 }
 
 // RemoveValidator removes a tendermint validator if exists
 func (v *State) RemoveValidator(address string) error {
-	_, validatorsBytes := v.AppTree.Get([]byte(validatorKey))
+	_, validatorsBytes := v.AppTree.Get(validatorKey)
 	var validators []tmtypes.GenesisValidator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
 	for i, val := range validators {
@@ -195,7 +194,7 @@ func (v *State) RemoveValidator(address string) error {
 			if err != nil {
 				return errors.New("cannot marshal validators")
 			}
-			v.AppTree.Set([]byte(validatorKey), validatorsBytes)
+			v.AppTree.Set(validatorKey, validatorsBytes)
 			return nil
 		}
 	}
@@ -204,7 +203,7 @@ func (v *State) RemoveValidator(address string) error {
 
 // Validators returns a list of the validators saved on persistent storage
 func (v *State) Validators() ([]tmtypes.GenesisValidator, error) {
-	_, validatorBytes := v.AppTree.Get([]byte(validatorKey))
+	_, validatorBytes := v.AppTree.Get(validatorKey)
 	var validators []tmtypes.GenesisValidator
 	err := v.Codec.UnmarshalBinaryBare(validatorBytes, &validators)
 	return validators, err
@@ -384,7 +383,7 @@ func (v *State) EnvelopeList(processID string, from, listSize int64) []string {
 
 // Height returns the blockchain last block commited height
 func (v *State) Height() int64 {
-	_, headerBytes := v.AppTree.Get([]byte(headerKey))
+	_, headerBytes := v.AppTree.Get(headerKey)
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
 	if err != nil {
@@ -396,7 +395,7 @@ func (v *State) Height() int64 {
 
 // AppHash returns last hash of the application
 func (v *State) AppHash() []byte {
-	_, headerBytes := v.AppTree.Get([]byte(headerKey))
+	_, headerBytes := v.AppTree.Get(headerKey)
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
 	if err != nil {
