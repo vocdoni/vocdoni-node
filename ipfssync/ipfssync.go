@@ -11,7 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
@@ -220,11 +219,12 @@ func (is *IPFSsync) listPins() (pins []string) {
 type IPFSsync struct {
 	DataDir     string
 	Key         string
+	PrivKey     string
 	Port        int16
 	HelloTime   int
 	UpdateTime  int
 	Storage     *data.IPFSHandle
-	Transport   net.PSSHandle
+	Transport   net.SubPubHandle
 	hashTree    tree.Tree
 	Topic       string
 	updateLock  bool   // TODO(mvdan): this is super racy
@@ -236,10 +236,11 @@ type IPFSsync struct {
 }
 
 // NewIPFSsync creates a new IPFSsync instance
-func NewIPFSsync(dataDir, key string, storage data.Storage) IPFSsync {
+func NewIPFSsync(dataDir, groupKey, privKeyHex string, storage data.Storage) IPFSsync {
 	var is IPFSsync
 	is.DataDir = dataDir
-	is.Key = key
+	is.Topic = groupKey
+	is.PrivKey = privKeyHex
 	is.Port = 4171
 	is.HelloTime = 40
 	is.UpdateTime = 20
@@ -248,12 +249,10 @@ func NewIPFSsync(dataDir, key string, storage data.Storage) IPFSsync {
 }
 
 func (is *IPFSsync) unicastMsg(address string, msg Message) error {
-	rawmsg, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	is.Transport.Swarm.PssPub("sym", is.Key, is.Topic, string(rawmsg), address)
-	return err
+	// TO-DO make this unicast
+	//is.Transport.SubPub.PeerConnect(address, func(rw *bufio.ReadWriter) {
+	//})
+	return is.broadcastMsg(msg)
 }
 
 // Start initializes and start an IPFSsync instance
@@ -269,11 +268,8 @@ func (is *IPFSsync) Start() {
 
 	var conn types.Connection
 	conn.Port = int(is.Port)
-	conn.Key = is.Key
-	conn.Encryption = "sym"
-	conn.Topic = string(signature.HashRaw(conn.Key))
-	is.Topic = conn.Topic
-	is.Key = conn.Key
+	conn.Key = is.PrivKey
+	conn.Topic = is.Topic
 
 	if err := is.Transport.Init(&conn); err != nil {
 		log.Fatal(err)
@@ -281,7 +277,7 @@ func (is *IPFSsync) Start() {
 
 	msg := make(chan types.Message)
 	go is.Transport.Listen(msg)
-	is.myAddress = fmt.Sprintf("%x", is.Transport.Swarm.PssAddr)
+	is.myAddress = is.Transport.SubPub.PubKey
 	is.myNodeID = is.Storage.Node.PeerHost.ID().String()
 	var err error
 	is.myMultiAddr, err = ma.NewMultiaddr(guessMyAddress(4001, is.myNodeID))

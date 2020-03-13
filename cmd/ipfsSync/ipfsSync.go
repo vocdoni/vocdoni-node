@@ -5,6 +5,7 @@ import (
 
 	flag "github.com/spf13/pflag"
 
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -29,7 +30,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	is := ipfssync.NewIPFSsync(*dataDir, *key, storage)
+	var sk signature.SignKeys
+	sk.Generate()
+	_, privKey := sk.HexString()
+	is := ipfssync.NewIPFSsync(*dataDir, *key, privKey, storage)
 	is.HelloTime = *helloTime
 	is.UpdateTime = *updateTime
 	is.Port = *port
