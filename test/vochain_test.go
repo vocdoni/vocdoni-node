@@ -2,19 +2,18 @@ package test
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 
-	testcommon "gitlab.com/vocdoni/go-dvote/test/testcommon"
+	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 func TestNewProcessTxCheck(t *testing.T) {
-	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithOracles() // vochain.NewVochainState("/tmp/db")
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	// TODO(mvdan): re-enable once
+	// https://gitlab.com/vocdoni/go-dvote/-/issues/172 is fixed.
+	// t.Parallel()
+
+	s := testcommon.NewVochainStateWithOracles(t)
 	if err := vochain.NewProcessTxCheck(*testcommon.HardcodedNewProcessTx, s); err != nil {
 		t.Errorf("cannot validate new process tx: %s", err)
 	}
@@ -22,55 +21,45 @@ func TestNewProcessTxCheck(t *testing.T) {
 
 /*
 func TestVoteTxCheck(t *testing.T) {
-	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithProcess()
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithProcess(t)
 	if err := vochain.VoteTxCheck(*testcommon.HardcodedNewVoteTx, s); err != nil {
 		t.Errorf("cannot validate vote: %s", err)
 	}
 }
 
 func TestAdminTxCheckAddOracle(t *testing.T) {
-	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithOracles()
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithOracles(t)
 	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxAddOracle, s); err != nil {
 		t.Errorf("cannot add oracle: %s", err)
 	}
 }
 
 func TestAdminTxCheckRemoveOracle(t *testing.T) {
-	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithOracles()
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithOracles(t)
 	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxRemoveOracle, s); err != nil {
 		t.Errorf("cannot remove oracle: %s", err)
 	}
 }
 
 func TestAdminTxCheckAddValidator(t *testing.T) {
-	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithValidators()
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithValidators(t)
 	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxAddValidator, s); err != nil {
 		t.Errorf("cannot add validator: %s", err)
 	}
 }
 
 func TestAdminTxCheckRemoveValidator(t *testing.T) {
-	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithValidators()
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithValidators(t)
 	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxRemoveValidator, s); err != nil {
 		t.Errorf("cannot remove validator: %s", err)
 	}
@@ -78,11 +67,11 @@ func TestAdminTxCheckRemoveValidator(t *testing.T) {
 */
 
 func TestCreateProcess(t *testing.T) {
-	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithOracles() // vochain.NewVochainState("/tmp/db")
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	// TODO(mvdan): re-enable once
+	// https://gitlab.com/vocdoni/go-dvote/-/issues/172 is fixed.
+	// t.Parallel()
+
+	s := testcommon.NewVochainStateWithOracles(t)
 	bytes, err := json.Marshal(*testcommon.HardcodedNewProcessTx)
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", *testcommon.HardcodedNewProcessTx)
@@ -111,11 +100,9 @@ func TestCreateProcess(t *testing.T) {
 
 /*
 func TestSubmitEnvelope(t *testing.T) {
-	os.RemoveAll("/tmp/db")
-	s := testcommon.NewVochainStateWithProcess() // vochain.NewVochainState("/tmp/db")
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithProcess(t)
 	bytes, err := json.Marshal(*testcommon.HardcodedNewVoteTx)
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", *testcommon.HardcodedNewVoteTx)

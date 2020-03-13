@@ -3,8 +3,6 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -13,7 +11,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	dnet "gitlab.com/vocdoni/go-dvote/net"
-	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
+	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
@@ -47,19 +45,12 @@ var testRequests = []struct {
 }
 
 func TestWeb3WSEndpoint(t *testing.T) {
-	// create ethereum tmp datadir
-	dataDir, err := ioutil.TempDir("", "ethereum")
-	if err != nil {
-		t.Fatalf("cannot create ethereum node dataDir: %s", err)
-	}
-	defer os.RemoveAll(dataDir)
+	t.Parallel()
+
 	// create the proxy
-	pxy, err := common.NewMockProxy()
-	if err != nil {
-		t.Fatalf("cannot init proxy: %s", err)
-	}
+	pxy := testcommon.NewMockProxy(t)
 	// create ethereum node
-	node, err := NewMockEthereum(*logLevel, dataDir, pxy)
+	node, err := NewMockEthereum(*logLevel, testcommon.TempDir(t, "ethereum"), pxy)
 	if err != nil {
 		t.Fatalf("cannot create ethereum node: %s", err)
 	}

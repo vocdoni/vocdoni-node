@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
-	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -40,12 +39,7 @@ func BenchmarkVochain(b *testing.B) {
 	var dvoteServer testcommon.DvoteAPIServer
 	rint := rand.Int()
 	if *host == "" {
-		if err := dvoteServer.Start("file", "census", "vote"); err != nil {
-			b.Fatal(err)
-		}
-		defer os.RemoveAll(dvoteServer.IpfsDir)
-		defer os.RemoveAll(dvoteServer.CensusDir)
-		defer os.RemoveAll(dvoteServer.VochainCfg.DataDir)
+		dvoteServer.Start(b, "file", "census", "vote")
 		host = &dvoteServer.PxyAddr
 	}
 
@@ -70,17 +64,12 @@ func BenchmarkVochain(b *testing.B) {
 	signerPub, _ := dvoteServer.Signer.HexString()
 
 	// check required components
-	var conn testcommon.APIConnection
-	if err := conn.Connect(*host); err != nil {
-		b.Fatalf("dial: %s", err)
-	}
+	var c testcommon.APIConnection
+	c.Connect(b, *host)
 	var req types.MetaRequest
 	log.Info("get info")
 	req.Method = "getGatewayInfo"
-	resp, err := conn.Request(req, nil)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp := c.Request(req, nil)
 	if !resp.Ok {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
@@ -90,10 +79,7 @@ func BenchmarkVochain(b *testing.B) {
 	log.Infof("creating census")
 	req.Method = "addCensus"
 	req.CensusID = fmt.Sprintf("test%d", rint)
-	resp, err = conn.Request(req, dvoteServer.Signer)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, dvoteServer.Signer)
 	if !resp.Ok {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
@@ -117,10 +103,7 @@ func BenchmarkVochain(b *testing.B) {
 		claims = append(claims, poseidonHashes[i])
 	}
 	req.ClaimsData = claims
-	resp, err = conn.Request(req, dvoteServer.Signer)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, dvoteServer.Signer)
 	if !resp.Ok {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
@@ -128,10 +111,7 @@ func BenchmarkVochain(b *testing.B) {
 	// get census root
 	log.Infof("get root")
 	req.Method = "getRoot"
-	resp, err = conn.Request(req, nil)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	mkRoot := resp.Root
 	if len(mkRoot) < 1 {
 		b.Fatalf("got invalid root")
@@ -140,10 +120,7 @@ func BenchmarkVochain(b *testing.B) {
 	log.Infof("check block height is not less than process start block")
 	req.Method = "getBlockHeight"
 	req.Timestamp = int32(time.Now().Unix())
-	resp, err = conn.Request(req, nil)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 
 	// create process
 	process := &types.NewProcessTx{
@@ -178,10 +155,7 @@ func BenchmarkVochain(b *testing.B) {
 	req.Timestamp = int32(time.Now().Unix())
 
 	for {
-		resp, err = conn.Request(req, nil)
-		if err != nil {
-			b.Fatal(err)
-		}
+		resp = c.Request(req, nil)
 		if resp.ProcessList[0] == "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105" {
 			break
 		}
@@ -192,10 +166,7 @@ func BenchmarkVochain(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
 		var c testcommon.APIConnection
-		if err := c.Connect(*host); err != nil {
-			b.Fatalf("dial: %s", err)
-		}
-		defer c.Conn.Close()
+		c.Connect(b, *host)
 
 		count := 0
 		for pb.Next() {
@@ -209,10 +180,7 @@ func BenchmarkVochain(b *testing.B) {
 	req.Method = "getResults"
 	req.ProcessID = process.ProcessID
 	req.Timestamp = int32(time.Now().Unix())
-	resp, err = conn.Request(req, nil)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	log.Infof("submited votes: %+v", resp.Results)
 }
 
@@ -231,10 +199,7 @@ func vochainBench(b *testing.B, c testcommon.APIConnection, s *signature.SignKey
 	req.CensusID = censusID
 	req.RootHash = mkRoot
 	req.ClaimData = poseidon
-	resp, err := c.Request(req, nil)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp := c.Request(req, nil)
 	if len(resp.Siblings) == 0 {
 		b.Fatalf("proof not generated while it should be generated correctly")
 	}
@@ -267,10 +232,7 @@ func vochainBench(b *testing.B, c testcommon.APIConnection, s *signature.SignKey
 	// sending submitEnvelope request
 	log.Info("vote payload: %+v,", req.Payload)
 	log.Infof("request: %+v", req)
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	if !resp.Ok {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
@@ -286,10 +248,7 @@ func vochainBench(b *testing.B, c testcommon.APIConnection, s *signature.SignKey
 		b.Fatal(err)
 	}
 	for {
-		resp, err = c.Request(req, nil)
-		if err != nil {
-			b.Fatal(err)
-		}
+		resp = c.Request(req, nil)
 		if *resp.Registered {
 			break
 		}

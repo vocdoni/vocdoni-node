@@ -1,11 +1,11 @@
 package testcommon
 
 import (
-	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"strconv"
+	"testing"
 
 	amino "github.com/tendermint/go-amino"
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
@@ -21,8 +21,6 @@ import (
 )
 
 var (
-	rint = rand.Int()
-
 	OracleListHardcoded = []string{
 		"0fA7A3FdB5C7C611646a535BDDe669Db64DC03d2",
 		"00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
@@ -107,83 +105,84 @@ var (
 	}
 )
 
-func NewVochainStateWithOracles() *vochain.State {
-	c := amino.NewCodec()
-	os.RemoveAll("/tmp/db")
-	s, err := vochain.NewState("/tmp/db", c)
+func TempDir(tb testing.TB, name string) string {
+	tb.Helper()
+	dir, err := ioutil.TempDir("", name)
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
+	}
+	tb.Cleanup(func() { os.RemoveAll(dir) })
+	return dir
+}
+
+func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
+	c := amino.NewCodec()
+	s, err := vochain.NewState(TempDir(tb, "vochain-db"), c)
+	if err != nil {
+		tb.Fatal(err)
 	}
 	oraclesBytes, err := s.Codec.MarshalBinaryBare(OracleListHardcoded)
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 	s.AppTree.Set([]byte("oracle"), oraclesBytes)
 	return s
 }
 
-func NewVochainStateWithValidators() *vochain.State {
-	rint = rand.Int()
+func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 	c := amino.NewCodec()
 	cryptoAmino.RegisterAmino(c)
-	os.RemoveAll("/tmp/db")
-	s, err := vochain.NewState("/tmp/db", c)
+	s, err := vochain.NewState(TempDir(tb, "vochain-db"), c)
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 	vals := make([]privval.FilePV, 2)
+	rint := rand.Int()
 	vals[0] = *privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
 	rint = rand.Int()
 	vals[1] = *privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
 	validatorsBytes, err := c.MarshalJSON(vals)
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 	s.AppTree.Set([]byte("validator"), validatorsBytes)
 	oraclesBytes, err := s.Codec.MarshalBinaryBare(OracleListHardcoded)
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 	s.AppTree.Set([]byte("oracle"), oraclesBytes)
 	return s
 }
 
-func NewVochainStateWithProcess() *vochain.State {
+func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 	c := amino.NewCodec()
-	os.RemoveAll("/tmp/db")
-	s, err := vochain.NewState("/tmp/db", c)
+	s, err := vochain.NewState(TempDir(tb, "vochain-db"), c)
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 	// add process
 	processBytes, err := s.Codec.MarshalBinaryBare(ProcessHardcoded)
 	if err != nil {
-		panic(err)
+		tb.Fatal(err)
 	}
 	s.ProcessTree.Set([]byte("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), processBytes)
 	return s
 }
 
-func NewMockVochainNode(d *DvoteAPIServer) (*vochain.BaseApplication, error) {
-	var err error
-	var vnode *vochain.BaseApplication
-
+func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplication {
 	cdc := amino.NewCodec()
 	cryptoAmino.RegisterAmino(cdc)
 	// start vochain node
 	// create config
 	d.VochainCfg = new(config.VochainCfg)
-	d.VochainCfg.DataDir, err = ioutil.TempDir("", fmt.Sprintf("vochain%d", rint))
-	if err != nil {
-		return nil, err
-	}
+	d.VochainCfg.DataDir = TempDir(tb, "vochain-data")
 	// create genesis file
 	consensusParams := tmtypes.DefaultConsensusParams()
 	validator := privval.GenFilePV(d.VochainCfg.DataDir+"/config/priv_validator_key.json", d.VochainCfg.DataDir+"/data/priv_validator_state.json")
 	oracles := []string{d.Signer.EthAddrString()}
 	genBytes, err := vochain.NewGenesis(d.VochainCfg, strconv.Itoa(rand.Int()), consensusParams, []privval.FilePV{*validator}, oracles)
 	if err != nil {
-		return nil, err
+		tb.Fatal(err)
 	}
 	// creating node
 	d.VochainCfg.LogLevel = "error"
@@ -191,22 +190,18 @@ func NewMockVochainNode(d *DvoteAPIServer) (*vochain.BaseApplication, error) {
 	d.VochainCfg.PublicAddr = "0.0.0.0:26656"
 	d.VochainCfg.RPCListen = "0.0.0.0:26657"
 	// run node
-	vnode = vochain.NewVochain(d.VochainCfg, genBytes, validator)
+	vnode := vochain.NewVochain(d.VochainCfg, genBytes, validator)
 	// create vochain rpc conection
 	d.VochainRPCClient = voclient.NewHTTP(d.VochainCfg.RPCListen, "/websocket")
-	return vnode, nil
+	return vnode
 }
 
-func NewMockScrutinizer(d *DvoteAPIServer, vnode *vochain.BaseApplication) (*scrutinizer.Scrutinizer, error) {
-	var err error
+func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer, vnode *vochain.BaseApplication) *scrutinizer.Scrutinizer {
 	log.Info("starting vochain scrutinizer")
-	d.ScrutinizerDir, err = ioutil.TempDir("", fmt.Sprintf("scrutinizer%d", rint))
-	if err != nil {
-		return nil, err
-	}
+	d.ScrutinizerDir = TempDir(tb, "scrutinizer")
 	sc, err := scrutinizer.NewScrutinizer(d.ScrutinizerDir, vnode.State)
 	if err != nil {
-		return nil, err
+		tb.Fatal(err)
 	}
-	return sc, nil
+	return sc
 }

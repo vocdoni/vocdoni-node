@@ -3,20 +3,20 @@ package test
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"testing"
 
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/privval"
 
-	testcommon "gitlab.com/vocdoni/go-dvote/test/testcommon"
+	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 func TestVochainState(t *testing.T) {
-	os.RemoveAll("/tmp/db")
+	t.Parallel()
+
 	c := amino.NewCodec()
-	s, err := vochain.NewState("/tmp/db", c)
+	s, err := vochain.NewState(testcommon.TempDir(t, "vochain-db"), c)
 	if err != nil {
 		t.Errorf("cannot create vochain state (%s)", err)
 	}
@@ -47,7 +47,9 @@ func TestVochainState(t *testing.T) {
 }
 
 func TestAddOracle(t *testing.T) {
-	s := testcommon.NewVochainStateWithOracles()
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithOracles(t)
 	if s != nil {
 		if err := s.AddOracle("0x414896B0BC763b8762456DB00F9c76EBd49979C4"); err != nil {
 			t.Error(err)
@@ -56,7 +58,9 @@ func TestAddOracle(t *testing.T) {
 }
 
 func TestRemoveOracle(t *testing.T) {
-	s := testcommon.NewVochainStateWithOracles()
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithOracles(t)
 	if s != nil {
 		if err := s.RemoveOracle(testcommon.OracleListHardcoded[0]); err != nil {
 			t.Error(err)
@@ -65,7 +69,9 @@ func TestRemoveOracle(t *testing.T) {
 }
 
 func TestGetOracles(t *testing.T) {
-	s := testcommon.NewVochainStateWithOracles()
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithOracles(t)
 	if s != nil {
 		oracles, err := s.Oracles()
 		if err != nil {
@@ -80,7 +86,9 @@ func TestGetOracles(t *testing.T) {
 }
 
 func TestAddValidator(t *testing.T) {
-	s := testcommon.NewVochainStateWithValidators()
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithValidators(t)
 	rint := rand.Int()
 	val := privval.GenFilePV(fmt.Sprintf("/tmp/vochainBenchmark%d", rint), fmt.Sprintf("/tmp/vochainBenchmark%d", rint))
 	if s != nil {
@@ -92,7 +100,9 @@ func TestAddValidator(t *testing.T) {
 
 /*
 func TestRemoveValidator(t *testing.T) {
-	s := testcommon.NewVochainStateWithValidators()
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithValidators(t)
 	if s != nil {
 		if err := s.RemoveValidator(testcommon.ValidatorListHardcoded[1].GetAddress().String()); err != nil {
 			t.Error(err)
@@ -101,7 +111,9 @@ func TestRemoveValidator(t *testing.T) {
 }
 
 func TestGetValidators(t *testing.T) {
-	s := testcommon.NewVochainStateWithValidators()
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithValidators(t)
 	if s != nil {
 		validators, err := s.Validators()
 		if err != nil {
@@ -117,37 +129,36 @@ func TestGetValidators(t *testing.T) {
 */
 
 func TestAddProcess(t *testing.T) {
-	s := testcommon.NewVochainStateWithProcess()
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithProcess(t)
 	if err := s.AddProcess(testcommon.ProcessHardcoded, "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"); err != nil {
 		t.Error(err)
 	}
 }
 
 func TestGetProcess(t *testing.T) {
-	s := testcommon.NewVochainStateWithProcess()
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithProcess(t)
 	if _, err := s.Process("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"); err != nil {
 		t.Error(err)
 	}
 }
 
 func TestCancelProcess(t *testing.T) {
-	s := testcommon.NewVochainStateWithProcess()
-	if s == nil {
-		t.Error("cannot create state")
-	}
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithProcess(t)
 	if err := s.CancelProcess("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"); err != nil {
 		t.Error(err)
 	}
 }
 
 func TestAddVote(t *testing.T) {
-	s := testcommon.NewVochainStateWithProcess()
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithProcess(t)
 	if s != nil {
 		if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
 			t.Error(err)
@@ -156,7 +167,9 @@ func TestAddVote(t *testing.T) {
 }
 
 func TestGetEnvelope(t *testing.T) {
-	s := testcommon.NewVochainStateWithProcess()
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithProcess(t)
 	if s != nil {
 		if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
 			t.Error(err)
@@ -168,7 +181,9 @@ func TestGetEnvelope(t *testing.T) {
 }
 
 func TestCountVotes(t *testing.T) {
-	s := testcommon.NewVochainStateWithProcess()
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithProcess(t)
 	if s != nil {
 		if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
 			t.Error(err)
@@ -184,7 +199,9 @@ func TestCountVotes(t *testing.T) {
 }
 
 func TestGetEnvelopeList(t *testing.T) {
-	s := testcommon.NewVochainStateWithProcess()
+	t.Parallel()
+
+	s := testcommon.NewVochainStateWithProcess(t)
 	if s != nil {
 		if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
 			t.Error(err)

@@ -43,8 +43,10 @@ import (
 	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 )
 
-var logLevel = flag.String("logLevel", "error", "logging level")
-var censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")
+var (
+	logLevel   = flag.String("logLevel", "error", "logging level")
+	censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")
+)
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -55,13 +57,10 @@ func TestMain(m *testing.M) {
 }
 
 func TestCensus(t *testing.T) {
+	t.Parallel()
+
 	var server common.DvoteAPIServer
-	err := server.Start("file", "census")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(server.IpfsDir)
-	defer os.RemoveAll(server.CensusDir)
+	server.Start(t, "file", "census")
 
 	signer1 := new(signature.SignKeys)
 	signer1.Generate()
@@ -75,11 +74,7 @@ func TestCensus(t *testing.T) {
 	// Create websocket client
 	t.Logf("connecting to %s", server.PxyAddr)
 	var c common.APIConnection
-	err = c.Connect(server.PxyAddr)
-	if err != nil {
-		t.Fatalf("dial: %s", err)
-	}
-	defer c.Conn.Close()
+	c.Connect(t, server.PxyAddr)
 
 	// Send the API requets
 	var req types.MetaRequest
@@ -87,10 +82,7 @@ func TestCensus(t *testing.T) {
 	// Create census
 	req.Method = "addCensus"
 	req.CensusID = "test"
-	resp, err := c.Request(req, signer2)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp := c.Request(req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -100,10 +92,7 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
-	resp, err = c.Request(req, signer2)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -112,10 +101,7 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello2"))
-	resp, err = c.Request(req, signer1)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, signer1)
 	if resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -124,10 +110,7 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "genProof"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -136,20 +119,14 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "genProof"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello3"))
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	if len(resp.Siblings) > 1 {
 		t.Fatalf("proof should not exist!")
 	}
 
 	// getRoot
 	req.Method = "getRoot"
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	root := resp.Root
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
@@ -172,10 +149,7 @@ func TestCensus(t *testing.T) {
 		claims = append(claims, base64.StdEncoding.EncodeToString(signature.HashPoseidon(pubDesc)))
 	}
 	req.ClaimsData = claims
-	resp, err = c.Request(req, signer2)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -184,10 +158,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "dumpPlain"
 	req.ClaimData = ""
 	req.ClaimsData = []string{}
-	resp, err = c.Request(req, signer2)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -196,10 +167,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "genProof"
 	req.RootHash = ""
 	req.ClaimData = claims[1]
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	siblings := resp.Siblings
 	if len(siblings) == 0 {
 		t.Fatalf("proof not generated while it should be generated correctly")
@@ -208,10 +176,7 @@ func TestCensus(t *testing.T) {
 	// CheckProof valid
 	req.Method = "checkProof"
 	req.ProofData = siblings
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	if !resp.ValidProof {
 		t.Fatal("proof is invalid but it should be valid")
 	}
@@ -220,10 +185,7 @@ func TestCensus(t *testing.T) {
 	req.ProofData = siblings
 	req.Method = "checkProof"
 	req.RootHash = root
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -235,10 +197,7 @@ func TestCensus(t *testing.T) {
 	// publish
 	req.Method = "publish"
 	req.ClaimsData = []string{}
-	resp, err = c.Request(req, signer2)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -246,10 +205,7 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	req.Method = "getRoot"
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	root = resp.Root
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
@@ -258,10 +214,7 @@ func TestCensus(t *testing.T) {
 	// getRoot from published census and check censusID=root
 	req.Method = "getRoot"
 	req.CensusID = root
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -272,10 +225,7 @@ func TestCensus(t *testing.T) {
 	// add second census
 	req.Method = "addCensus"
 	req.CensusID = "importTest"
-	resp, err = c.Request(req, signer2)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -284,20 +234,14 @@ func TestCensus(t *testing.T) {
 	req.Method = "importRemote"
 	req.CensusID = resp.CensusID
 	req.URI = uri
-	resp, err = c.Request(req, signer2)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
 	// getRoot
 	req.Method = "getRoot"
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	if root != resp.Root {
 		t.Fatalf("root is different after importing! %s != %s", root, resp.Root)
 	}
@@ -305,20 +249,14 @@ func TestCensus(t *testing.T) {
 	// getSize
 	req.Method = "getSize"
 	req.RootHash = ""
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	if exp, got := int64(*censusSize+1), resp.Size; exp != got {
 		t.Fatalf("expected size %v, got %v", exp, got)
 	}
 
 	// get census list
 	req.Method = "getCensusList"
-	resp, err = c.Request(req, signer2)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp = c.Request(req, signer2)
 	if len(resp.CensusList) != 3 {
 		t.Fatalf("census list size does not match")
 	}

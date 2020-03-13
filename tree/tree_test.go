@@ -47,5 +47,4 @@ func TestCensus(t *testing.T) {
 	} else {
 		t.Log("proof valid")
 	}
-
 }

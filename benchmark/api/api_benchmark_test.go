@@ -28,22 +28,18 @@ func BenchmarkCensus(b *testing.B) {
 	log.InitLogger(*logLevel, "stdout")
 	if *host == "" {
 		var server common.DvoteAPIServer
-		if err := server.Start("file", "census"); err != nil {
-			b.Fatal(err)
-		}
-		// TODO(mvdan): use b.Cleanup once Go 1.14 is out, so that we
-		// can support many benchmark iterations.
-		defer os.RemoveAll(server.IpfsDir)
-		defer os.RemoveAll(server.CensusDir)
+		server.Start(b, "file", "census")
+		b.Cleanup(func() {
+			os.RemoveAll(server.IpfsDir)
+			os.RemoveAll(server.CensusDir)
+		})
 		host = &server.PxyAddr
 	}
 
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
 		var c common.APIConnection
-		if err := c.Connect(*host); err != nil {
-			b.Fatalf("dial: %s", err)
-		}
+		c.Connect(b, *host)
 		defer c.Conn.Close()
 
 		for pb.Next() {
@@ -64,10 +60,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	rint := rand.Int()
 	log.Infof("[%d] get info", rint)
 	req.Method = "getGatewayInfo"
-	resp, err := c.Request(req, nil)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp := c.Request(req, nil)
 	if !resp.Ok {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
@@ -77,10 +70,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	log.Infof("[%d] Create census", rint)
 	req.Method = "addCensus"
 	req.CensusID = fmt.Sprintf("test%d", rint)
-	resp, err = c.Request(req, signer)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, signer)
 	if !resp.Ok {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
@@ -99,10 +89,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 			fmt.Sprintf("%d0123456789abcdef%d", rint, i))))
 	}
 	req.ClaimsData = claims
-	resp, err = c.Request(req, signer)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, signer)
 	if !resp.Ok {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
@@ -112,10 +99,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	req.Method = "dumpPlain"
 	req.ClaimData = ""
 	req.ClaimsData = []string{}
-	resp, err = c.Request(req, signer)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, signer)
 	if !resp.Ok {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
@@ -130,10 +114,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	for i := 0; i < *censusSize; i++ {
 		req.ClaimData = base64.StdEncoding.EncodeToString([]byte(
 			fmt.Sprintf("%d0123456789abcdef%d", rint, i)))
-		resp, err = c.Request(req, nil)
-		if err != nil {
-			b.Fatal(err)
-		}
+		resp = c.Request(req, nil)
 		if len(resp.Siblings) == 0 {
 			b.Fatalf("proof not generated while it should be generated correctly")
 		}
@@ -147,10 +128,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	for i, s := range siblings {
 		req.ProofData = s
 		req.ClaimData = claims[i]
-		resp, err = c.Request(req, nil)
-		if err != nil {
-			b.Fatal(err)
-		}
+		resp = c.Request(req, nil)
 		if !resp.ValidProof {
 			b.Fatalf("proof is invalid but it should be valid")
 		}
@@ -161,10 +139,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	log.Infof("[%d] publish census", rint)
 	req.Method = "publish"
 	req.ClaimsData = []string{}
-	resp, err = c.Request(req, signer)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, signer)
 	if !resp.Ok {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
@@ -172,10 +147,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	// getRoot
 	log.Infof("[%d] get root", rint)
 	req.Method = "getRoot"
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	root := resp.Root
 	if len(root) < 1 {
 		b.Fatalf("got invalid root")
@@ -185,10 +157,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	log.Infof("[%d] get size", rint)
 	req.Method = "getSize"
 	req.RootHash = ""
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		b.Fatal(err)
-	}
+	resp = c.Request(req, nil)
 	if got := resp.Size; int64(*censusSize) != got {
 		b.Fatalf("expected size %v, got %v", *censusSize, got)
 	}
@@ -202,10 +171,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 		req.Name = fmt.Sprintf("%d_%d", rint, i)
 		req.Content = base64.StdEncoding.EncodeToString([]byte(
 			fmt.Sprintf("%d0123456789abcdef0123456789abc%d", rint, i)))
-		resp, err = c.Request(req, nil)
-		if err != nil {
-			b.Fatal(err)
-		}
+		resp = c.Request(req, nil)
 		if !resp.Ok {
 			b.Fatalf("%s failed: %s", req.Method, resp.Message)
 		}
@@ -221,10 +187,7 @@ func censusBench(b *testing.B, c common.APIConnection) {
 	req.Method = "fetchFile"
 	for _, u := range uris {
 		req.URI = u
-		resp, err = c.Request(req, nil)
-		if err != nil {
-			b.Fatal(err)
-		}
+		resp = c.Request(req, nil)
 		if !resp.Ok {
 			b.Fatalf("%s failed: %s", req.Method, resp.Message)
 		}

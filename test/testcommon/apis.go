@@ -3,8 +3,8 @@ package testcommon
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -41,17 +41,13 @@ Start starts a basic dvote server
 6. Starts the Dvote API router if enabled
 7. Starts the scrutinizer service and API if enabled
 */
-func (d *DvoteAPIServer) Start(apis ...string) error {
-	var err error
+func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// create signer
 	d.Signer = new(signature.SignKeys)
 	d.Signer.Generate()
 
 	// create the proxy to handle HTTP queries
-	pxy, err := NewMockProxy()
-	if err != nil {
-		return err
-	}
+	pxy := NewMockProxy(tb)
 	d.PxyAddr = fmt.Sprintf("ws://%s/dvote", pxy.Addr)
 
 	// Create WebSocket endpoint
@@ -64,27 +60,20 @@ func (d *DvoteAPIServer) Start(apis ...string) error {
 	go ws.Listen(listenerOutput)
 
 	// Create the API router
-	d.IpfsDir, err = ioutil.TempDir("", "dvote-ipfs")
-	if err != nil {
-		return err
-	}
-	// defer os.RemoveAll(ipfsDir)
+	d.IpfsDir = TempDir(tb, "dvote-ipfs")
 	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {
-		return err
+		tb.Fatal(err)
 	}
 	routerAPI := router.InitRouter(listenerOutput, storage, ws, d.Signer)
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
-	d.CensusDir, err = ioutil.TempDir("", fmt.Sprintf("census%d", rint))
-	if err != nil {
-		return err
-	}
+	d.CensusDir = TempDir(tb, "census")
 
 	if err := cm.Init(d.CensusDir, ""); err != nil {
-		return err
+		tb.Fatal(err)
 	}
 
 	for _, api := range apis {
@@ -94,40 +83,40 @@ func (d *DvoteAPIServer) Start(apis ...string) error {
 		case "census":
 			routerAPI.EnableCensusAPI(&cm)
 		case "vote":
-			vnode, err := NewMockVochainNode(d)
-			if err != nil {
-				return err
-			}
-			sc, err := NewMockScrutinizer(d, vnode)
-			if err != nil {
-				return err
-			}
+			vnode := NewMockVochainNode(tb, d)
+			sc := NewMockScrutinizer(tb, d, vnode)
 			routerAPI.Scrutinizer = sc
 			routerAPI.EnableVoteAPI(d.VochainRPCClient)
 		default:
-			panic(fmt.Sprintf("unknown api: %q", api))
+			tb.Fatalf("unknown api: %q", api)
 		}
 	}
 
 	go routerAPI.Route()
 	ws.AddProxyHandler("/dvote")
-	return nil
 }
 
 // APIConnection holds an API websocket connection
 type APIConnection struct {
+	tb   testing.TB
 	Conn *websocket.Conn
 }
 
 // Connect starts a connection with the given endpoint
-func (r *APIConnection) Connect(addr string) (err error) {
+func (r *APIConnection) Connect(tb testing.TB, addr string) {
+	tb.Helper()
+	r.tb = tb
+	var err error
 	r.Conn, _, err = websocket.DefaultDialer.Dial(addr, nil)
-	return
+	if err != nil {
+		tb.Fatal(err)
+	}
+	r.tb.Cleanup(func() { r.Conn.Close() })
 }
 
 // Request makes a request to the previously connected endpoint
-func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKeys) (*types.MetaResponse, error) {
-	// t.Helper()
+func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKeys) *types.MetaResponse {
+	r.tb.Helper()
 	method := req.Method
 
 	var cmReq types.RequestMessage
@@ -138,41 +127,41 @@ func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKey
 		var err error
 		cmReq.Signature, err = signer.SignJSON(cmReq.MetaRequest)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %v", method, err)
+			r.tb.Fatalf("%s: %v", method, err)
 		}
 	}
 	rawReq, err := json.Marshal(cmReq)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %v", method, err)
+		r.tb.Fatalf("%s: %v", method, err)
 	}
 	if err := r.Conn.WriteMessage(websocket.TextMessage, rawReq); err != nil {
-		return nil, fmt.Errorf("%s: %v", method, err)
+		r.tb.Fatalf("%s: %v", method, err)
 	}
 	_, message, err := r.Conn.ReadMessage()
 	if err != nil {
-		return nil, fmt.Errorf("%s: %v", method, err)
+		r.tb.Fatalf("%s: %v", method, err)
 	}
 	var cmRes types.ResponseMessage
 	if err := json.Unmarshal(message, &cmRes); err != nil {
-		return nil, fmt.Errorf("%s: %v", method, err)
+		r.tb.Fatalf("%s: %v", method, err)
 	}
 	if cmRes.ID != cmReq.ID {
-		return nil, fmt.Errorf("%s: %v", method, "request ID doesn't match")
+		r.tb.Fatalf("%s: %v", method, "request ID doesn'tb match")
 	}
 	if cmRes.Signature == "" {
-		return nil, fmt.Errorf("%s: empty signature in response: %s", method, message)
+		r.tb.Fatalf("%s: empty signature in response: %s", method, message)
 	}
-	return &cmRes.MetaResponse, nil
+	return &cmRes.MetaResponse
 }
 
 // NewMockProxy creates a new testing proxy with predefined valudes
-func NewMockProxy() (*dnet.Proxy, error) {
+func NewMockProxy(tb testing.TB) *dnet.Proxy {
 	pxy := dnet.NewProxy()
 	pxy.C.Address = "127.0.0.1"
 	pxy.C.Port = 0
 	err := pxy.Init()
 	if err != nil {
-		return nil, err
+		tb.Fatal(err)
 	}
-	return pxy, nil
+	return pxy
 }
