@@ -18,7 +18,6 @@ import (
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/ipfs/interface-go-ipfs-core/options"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
-
 	crypto "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/ipfs"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -34,7 +33,7 @@ type IPFSHandle struct {
 
 func (i *IPFSHandle) Init(d *types.DataStore) error {
 	if i.LogLevel == "" {
-		i.LogLevel = "warn"
+		i.LogLevel = "ERROR"
 	}
 	ipfslog.SetLogLevel("*", i.LogLevel)
 	ipfs.InstallDatabasePlugins()
@@ -133,6 +132,8 @@ func addAndPin(ctx context.Context, n *ipfscore.IpfsNode, root string) (rootHash
 }
 
 func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
+	//path = strings.ReplaceAll(path, "/ipld/", "/ipfs/")
+
 	p := corepath.New(path)
 	rp, err := i.CoreAPI.ResolvePath(ctx, p)
 	if err != nil {
@@ -168,7 +169,7 @@ func (i *IPFSHandle) Stats(ctx context.Context) (string, error) {
 }
 
 func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
-	pins, err := i.CoreAPI.Pin().Ls(ctx)
+	pins, err := i.CoreAPI.Pin().Ls(ctx, options.Pin.Type.All())
 	if err != nil {
 		return nil, err
 	}
