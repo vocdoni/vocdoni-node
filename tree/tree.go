@@ -76,7 +76,7 @@ func getClaimFromData(data []byte) *claims.ClaimBasic {
 
 func doPadding(data *[]byte) {
 	for i := len(*data); i < MaxClaimSize; i++ {
-		*data = append(*data, byte('\u0000'))
+		*data = append(*data, byte('\x00'))
 	}
 }
 
@@ -84,10 +84,7 @@ func (t *Tree) AddClaim(data []byte) error {
 	if len(data) < MaxClaimSize {
 		doPadding(&data)
 	}
-	e, err := t.Claim(data)
-	if err != nil {
-		return err
-	}
+	e := getClaimFromData(data)
 	return t.Tree.AddEntry(e.Entry())
 }
 
@@ -202,13 +199,18 @@ func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, error) {
 	}
 	err = t.Tree.Walk(&rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
-			// data := bytes.Trim(n.Value()[2:MaxClaimSize+2], "\x00")
-			data := bytes.Replace(n.Value()[2:MaxClaimSize+2], []byte("\x00"), nil, -1)
+			var data [MaxClaimSize + 8]byte
+			i := 0
+			for _, e := range n.Entry.Value() {
+				copy(data[i:i+len(e)], e[:len(e)])
+				i = i + len(e)
+			}
+			dataClean := bytes.Replace(data[:len(data)], []byte("\x00"), nil, -1)
 			if responseBase64 {
-				datab64 := base64.StdEncoding.EncodeToString(data)
+				datab64 := base64.StdEncoding.EncodeToString(dataClean)
 				response = append(response, datab64)
 			} else {
-				response = append(response, string(norm.NFC.Bytes(data)))
+				response = append(response, string(norm.NFC.Bytes(dataClean)))
 			}
 		}
 	})
