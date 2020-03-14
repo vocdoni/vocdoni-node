@@ -266,6 +266,15 @@ func AddrFromPublicKey(pubHex string) (string, error) {
 	return fmt.Sprintf("%x", recoveredAddr), nil
 }
 
+func PubKeyFromPrivateKey(privHex string) (string, error) {
+	var s SignKeys
+	if err := s.AddHexKey(privHex); err != nil {
+		return "", err
+	}
+	pub, _ := s.HexString()
+	return pub, nil
+}
+
 // PubKeyFromSignature recovers the ECDSA public key that created the signature of a message
 func PubKeyFromSignature(msg, sigHex string) (string, error) {
 	if len(util.TrimHex(sigHex)) < SignatureLength || len(util.TrimHex(sigHex)) > SignatureLength+12 {
