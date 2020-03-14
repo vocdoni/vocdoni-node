@@ -63,14 +63,15 @@ func (m *Message) Decode(data []byte) error {
 // Connection describes the settings for any of the transports defined in the net module, note that not all
 // fields are used for all transport types.
 type Connection struct {
-	Topic      string // channel/topic for topic based messaging such as PSS, PubSub
-	Encryption string // what type of encryption to use
-	Key        string // this node's key
-	Address    string // this node's address
-	Path       string // specific path on which a transport should listen
-	SSLDomain  string // ssl domain
-	SSLCertDir string // ssl certificates directory
-	Port       int    // specific port on which a transport should listen
+	Topic        string // channel/topic for topic based messaging such as PSS, PubSub
+	Encryption   string // what type of encryption to use
+	TransportKey string // transport layer key for encrypting messages
+	Key          string // this node's key
+	Address      string // this node's address
+	Path         string // specific path on which a transport should listen
+	SSLDomain    string // ssl domain
+	SSLCertDir   string // ssl certificates directory
+	Port         int    // specific port on which a transport should listen
 }
 
 type DataStore struct {

@@ -43,9 +43,21 @@ func (p *PSSHandle) Listen(reciever chan<- types.Message) {
 	}
 }
 
+func (p *PSSHandle) Address() string {
+	return p.Conn.Address
+}
+
+func (p *PSSHandle) SetBootnodes(bootnodes []string) {
+	p.BootNodes = bootnodes
+}
+
 func (p *PSSHandle) Send(msg types.Message) {
 	err := p.Swarm.PssPub(p.Conn.Encryption, p.Conn.Key, p.Conn.Topic, string(msg.Data), p.Conn.Address)
 	if err != nil {
 		log.Warnf("PSS send error: %s", err)
 	}
+}
+
+func (p *PSSHandle) SendUnicast(address string, msg types.Message) {
+	p.Swarm.PssPub("sym", p.Conn.Key, p.Conn.Topic, string(msg.Data), address)
 }

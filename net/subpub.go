@@ -1,7 +1,9 @@
 package net
 
 import (
+	"bufio"
 	"fmt"
+	"time"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -21,13 +23,14 @@ func (p *SubPubHandle) Init(c *types.Connection) error {
 	if err := s.AddHexKey(p.Conn.Key); err != nil {
 		return fmt.Errorf("cannot import privkey %s: %s", p.Conn.Key, err)
 	}
-	if len(p.Conn.Topic) == 0 {
+	if len(p.Conn.TransportKey) == 0 {
 		return fmt.Errorf("groupkey topic not specified")
 	}
 	if p.Conn.Port == 0 {
 		p.Conn.Port = 45678
 	}
-	sp := subpub.NewSubPub(s.Private, p.Conn.Topic, int32(p.Conn.Port))
+	private := p.Conn.Encryption == "private"
+	sp := subpub.NewSubPub(s.Private, p.Conn.TransportKey, int32(p.Conn.Port), private)
 	p.SubPub = &sp
 	return nil
 }
@@ -35,20 +38,31 @@ func (p *SubPubHandle) Init(c *types.Connection) error {
 func (s *SubPubHandle) Listen(reciever chan<- types.Message) {
 	s.SubPub.Connect()
 	go s.SubPub.Subcribe()
+	var msg types.Message
 	for {
-		var msg types.Message
-		if err := msg.Decode(<-s.SubPub.Reader); err != nil {
-			log.Warn(err)
-		}
+		msg.Data = <-s.SubPub.Reader
+		msg.TimeStamp = int32(time.Now().Unix())
 		reciever <- msg
 	}
 }
 
+func (s *SubPubHandle) Address() string {
+	return s.SubPub.PubKey
+}
+
+func (s *SubPubHandle) SetBootnodes(bootnodes []string) {
+	s.SubPub.BootNodes = bootnodes
+}
+
 func (s *SubPubHandle) Send(msg types.Message) {
-	b, err := msg.Encode()
-	if err != nil {
-		log.Warn(err)
-	} else {
-		s.SubPub.BroadcastWriter <- b
-	}
+	s.SubPub.BroadcastWriter <- msg.Data
+}
+
+func (s *SubPubHandle) SendUnicast(address string, msg types.Message) {
+	s.SubPub.PeerConnect(address, func(rw *bufio.ReadWriter) {
+		if err := s.SubPub.SendMessage(rw, msg.Data); err != nil {
+			log.Warnf("cannot send message to %s: %s", address, err)
+		}
+		rw.Flush()
+	})
 }

@@ -58,9 +58,21 @@ func (p *PubSubHandle) Listen(reciever chan<- types.Message) {
 	}
 }
 
+func (p *PubSubHandle) Address() string {
+	return "" //To-Do
+}
+
+func (w *PubSubHandle) SetBootnodes(bootnodes []string) {
+	//To-Do
+}
+
 func (p *PubSubHandle) Send(msg types.Message) {
 	err := PsPublish(p.c.Topic, string(msg.Data))
 	if err != nil {
 		log.Warnf("PubSub send error: %s", err)
 	}
+}
+
+func (p *PubSubHandle) SendUnicast(address string, msg types.Message) {
+	// To-Do
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
@@ -74,7 +75,7 @@ func (is *IPFSsync) syncPins() error {
 		}
 
 		log.Infof("pinning %s", v)
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, is.Timeout)
 		defer cancel()
 		if err := is.Storage.Pin(ctx, v); err != nil {
 			log.Warn(err)
@@ -117,7 +118,6 @@ func (is *IPFSsync) Handle(msg Message) error {
 	if msg.Address == is.myAddress {
 		return nil
 	}
-	log.Debugf("got %+v", msg)
 
 	switch msg.Type {
 	case "hello":
@@ -223,20 +223,23 @@ type IPFSsync struct {
 	Port        int16
 	HelloTime   int
 	UpdateTime  int
+	Bootnodes   []string
 	Storage     *data.IPFSHandle
-	Transport   net.SubPubHandle
+	Transport   net.Transport
 	hashTree    tree.Tree
 	Topic       string
+	Timeout     time.Duration
 	updateLock  bool   // TODO(mvdan): this is super racy
 	askLock     string // TODO(mvdan): this is super racy
 	myAddress   string
 	myNodeID    string
 	myMultiAddr ma.Multiaddr
 	lastHash    string
+	private     bool
 }
 
-// NewIPFSsync creates a new IPFSsync instance
-func NewIPFSsync(dataDir, groupKey, privKeyHex string, storage data.Storage) IPFSsync {
+// NewIPFSsync creates a new IPFSsync instance. Transports supported are "libp2p" and "pss"
+func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.Storage) IPFSsync {
 	var is IPFSsync
 	is.DataDir = dataDir
 	is.Topic = groupKey
@@ -244,15 +247,33 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex string, storage data.Storage) IPF
 	is.Port = 4171
 	is.HelloTime = 40
 	is.UpdateTime = 20
+	is.Timeout = time.Second * 600
 	is.Storage = storage.(*data.IPFSHandle)
+	if transport == "privlibp2p" {
+		transport = "libp2p"
+		is.private = true
+	}
+	switch transport {
+	case "libp2p":
+		is.Transport = &net.SubPubHandle{}
+	case "pss":
+		is.Transport = &net.PSSHandle{}
+	default:
+		is.Transport = &net.SubPubHandle{}
+	}
 	return is
 }
 
-func (is *IPFSsync) unicastMsg(address string, msg Message) error {
-	// TO-DO make this unicast
-	//is.Transport.SubPub.PeerConnect(address, func(rw *bufio.ReadWriter) {
-	//})
-	return is.broadcastMsg(msg)
+func (is *IPFSsync) unicastMsg(address string, ipfsmsg Message) error {
+	var msg types.Message
+	d, err := json.Marshal(ipfsmsg)
+	if err != nil {
+		return err
+	}
+	msg.Data = d
+	msg.TimeStamp = int32(time.Now().Unix())
+	go is.Transport.SendUnicast(address, msg)
+	return nil
 }
 
 // Start initializes and start an IPFSsync instance
@@ -269,15 +290,21 @@ func (is *IPFSsync) Start() {
 	var conn types.Connection
 	conn.Port = int(is.Port)
 	conn.Key = is.PrivKey
-	conn.Topic = is.Topic
+	conn.Address, _ = signature.PubKeyFromPrivateKey(is.PrivKey)
+	conn.Topic = fmt.Sprintf("%x", signature.HashRaw(is.Topic))
+	conn.TransportKey = is.Topic
+	if is.private {
+		conn.Encryption = "private"
+	}
 
 	if err := is.Transport.Init(&conn); err != nil {
 		log.Fatal(err)
 	}
+	is.Transport.SetBootnodes(is.Bootnodes)
 
 	msg := make(chan types.Message)
 	go is.Transport.Listen(msg)
-	is.myAddress = is.Transport.SubPub.PubKey
+	is.myAddress = is.Transport.Address()
 	is.myNodeID = is.Storage.Node.PeerHost.ID().String()
 	var err error
 	is.myMultiAddr, err = ma.NewMultiaddr(guessMyAddress(4001, is.myNodeID))

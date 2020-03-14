@@ -27,8 +27,10 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	multiaddr "github.com/multiformats/go-multiaddr"
+
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/util"
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
@@ -40,7 +42,9 @@ type SubPub struct {
 	Topic           string
 	BroadcastWriter chan ([]byte)
 	Reader          chan ([]byte)
+	BootNodes       []string
 	PubKey          string
+	Private         bool
 	port            int32
 	privKey         string
 	host            host.Host
@@ -60,13 +64,21 @@ func (ps *SubPub) handleStream(stream network.Stream) {
 	// 'stream' will stay open until you close it (or the other side closes it).
 }
 
+// SendMessage encrypts and writes a message on the readwriter buffer
+func (ps *SubPub) SendMessage(rw *bufio.ReadWriter, msg []byte) error {
+	log.Debugf("sending message: %s", msg)
+	if !ps.Private {
+		msg = []byte(ps.encrypt(msg)) // TO-DO find a better way to encapsulate data! byte -> b64 -> byte is not the best...
+	}
+	if _, err := rw.Write(append(msg, byte(delimiter))); err != nil {
+		return err
+	}
+	return rw.Flush()
+}
+
 func (ps *SubPub) broadcastHandler(rw *bufio.ReadWriter) {
 	for {
-		b := <-ps.BroadcastWriter
-		log.Debugf("sending message: %s", b)
-		encMsg := ps.encrypt(b) // TO-DO find a better way to encapsulate data! byte -> b64 -> byte is not the best...
-		b = append([]byte(encMsg), byte(delimiter))
-		if _, err := rw.Write(b); err != nil {
+		if err := ps.SendMessage(rw, <-ps.BroadcastWriter); err != nil {
 			log.Warnf("error writing to buffer: %s", err)
 			return
 		}
@@ -82,17 +94,20 @@ func (ps *SubPub) readHandler(rw *bufio.ReadWriter) {
 			log.Debugf("error reading from buffer: %s", err)
 			return
 		}
-		plain, ok := ps.decrypt(string(message[:len(message)-1]))
-		if !ok {
-			log.Warn("cannot decrypt message")
-			continue
+		if !ps.Private {
+			var ok bool
+			message, ok = ps.decrypt(string(message[:len(message)-1]))
+			if !ok {
+				log.Warn("cannot decrypt message")
+				continue
+			}
 		}
-		log.Debugf("message received: %s", plain)
-		go func() { ps.Reader <- plain }()
+		log.Debugf("message received: %s", message)
+		go func() { ps.Reader <- message }()
 	}
 }
 
-func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int32) SubPub {
+func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int32, private bool) SubPub {
 	var ps SubPub
 	ps.Key = key
 	copy(ps.GroupKey[:], signature.HashRaw(groupKey)[:32])
@@ -102,6 +117,7 @@ func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int32) SubPub {
 	ps.BroadcastWriter = make(chan []byte)
 	ps.Reader = make(chan []byte)
 	ps.port = port
+	ps.Private = private
 	return ps
 }
 
@@ -116,27 +132,37 @@ func (ps *SubPub) Connect() {
 	ipfslog.SetLogLevel("*", "ERROR")
 
 	// 0.0.0.0 will listen on any interface device.
-	//ip, _ := util.PublicIP()
 	sourceMultiAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", ps.port))
 	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.ECDSA, 2048, strings.NewReader(ps.privKey))
 
-	var psk []byte
-	copy(psk[:], ps.GroupKey[:])
-	// libp2p.New constructs a new libp2p Host.
+	var c libp2p.Config
+	libp2p.Defaults(&c)
+	c.RelayCustom = true
+	c.Relay = false
+	c.EnableAutoRelay = false
+	c.PeerKey = prvKey
+	if ps.Private {
+		c.PSK = ps.GroupKey[:32]
+	}
+	c.ListenAddrs = []multiaddr.Multiaddr{sourceMultiAddr}
 
-	ps.host, err = libp2p.New(ctx,
+	log.Debugf("libp2p config: %+v", c)
+	ps.host, err = c.NewNode(ctx)
+	/*ps.host, err = libp2p.New(ctx,
 		libp2p.ListenAddrs(sourceMultiAddr),
-		//libp2p.PrivateNetwork(psk), works?
 		libp2p.DisableRelay(),
 		libp2p.Identity(prvKey),
+		libp2p.PrivateNetwork(psk),
+		libp2p.NATPortMap(),
 	)
+	*/
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
-
-	log.Infof("libp2p peerID: %s", ps.host.ID())
-	log.Infof("libp2p multiaddress: %s", sourceMultiAddr)
+	//log.Infof("libp2p peerID: %s", ps.host.ID())
+	ip, _ := util.PublicIP()
+	log.Infof("my subpub multiaddr /ip4/%s/tcp/%d/p2p/%s ", ip, ps.port, ps.host.ID())
 
 	// Set a function as stream handler. This function is called when a peer
 	// initiates a connection and starts a stream with this peer.
@@ -169,17 +195,28 @@ func (ps *SubPub) Connect() {
 
 	// Let's connect to the bootstrap nodes first. They will tell us about the
 	// other nodes in the network.
+	var bootnodes []multiaddr.Multiaddr
+	if len(ps.BootNodes) > 0 {
+		bootnodes = parseMultiaddress(ps.BootNodes)
+	} else {
+		bootnodes = dht.DefaultBootstrapPeers
+	}
+
 	log.Info("connecting to bootstrap nodes...")
+	log.Debugf("bootnodes: %+v", bootnodes)
 	var wg sync.WaitGroup
-	for _, peerAddr := range dht.DefaultBootstrapPeers {
+	for _, peerAddr := range bootnodes {
 		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := ps.host.Connect(ctx, *peerinfo); err != nil {
-				log.Debug(err)
-			} else {
-				log.Infof("connection established with bootstrap node: %s", peerinfo)
+			if peerinfo != nil {
+				log.Debugf("trying %s", *peerinfo)
+				if err := ps.host.Connect(ctx, *peerinfo); err != nil {
+					log.Debug(err)
+				} else {
+					log.Infof("connection established with bootstrap node: %s", peerinfo)
+				}
 			}
 		}()
 	}
@@ -197,6 +234,7 @@ func (ps *SubPub) Subcribe() {
 	go func() {
 		for {
 			ps.discover(ctx)
+			time.Sleep(time.Second)
 		}
 	}()
 	select {}
@@ -229,6 +267,17 @@ func (ps *SubPub) PeerConnect(pubKey string, callback func(*bufio.ReadWriter)) e
 		}
 	}
 	return nil
+}
+
+func parseMultiaddress(maddress []string) (ma []multiaddr.Multiaddr) {
+	for _, m := range maddress {
+		mad, err := multiaddr.NewMultiaddr(m)
+		if err != nil {
+			log.Warn(err)
+		}
+		ma = append(ma, mad)
+	}
+	return ma
 }
 
 func (ps *SubPub) discover(ctx context.Context) {

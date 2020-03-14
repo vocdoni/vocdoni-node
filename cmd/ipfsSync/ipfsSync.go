@@ -23,6 +23,9 @@ func main() {
 	port := flag.Int16("port", 4171, "port for the sync network")
 	helloTime := flag.Int("helloTime", 40, "period in seconds for sending hello messages")
 	updateTime := flag.Int("updateTime", 20, "period in seconds for sending update messages")
+	p2pType := flag.String("transport", "libp2p", "p2p transport network to use: libp2p, privlibp2p or pss")
+	bootnodes := flag.StringArray("bootnodes", []string{}, "list of bootnodes (multiaddress separated by commas)")
+
 	flag.Parse()
 	log.InitLogger(*logLevel, "stdout")
 	ipfsStore := data.IPFSNewConfig(*dataDir)
@@ -33,10 +36,11 @@ func main() {
 	var sk signature.SignKeys
 	sk.Generate()
 	_, privKey := sk.HexString()
-	is := ipfssync.NewIPFSsync(*dataDir, *key, privKey, storage)
+	is := ipfssync.NewIPFSsync(*dataDir, *key, privKey, *p2pType, storage)
 	is.HelloTime = *helloTime
 	is.UpdateTime = *updateTime
 	is.Port = *port
+	is.Bootnodes = *bootnodes
 	is.Start()
 
 	// Block forever.

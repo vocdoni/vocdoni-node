@@ -316,6 +316,19 @@ func (w *WebsocketHandle) Send(msg types.Message) {
 	clientConn.WriteMessage(websocket.BinaryMessage, msg.Data)
 }
 
+func (w *WebsocketHandle) SendUnicast(address string, msg types.Message) {
+	// WebSocket is not p2p so sendUnicast makes the same of Send()
+	w.Send(msg)
+}
+
+func (w *WebsocketHandle) SetBootnodes(bootnodes []string) {
+	// No bootnodes on websockets handler
+}
+
+func (w *WebsocketHandle) Address() string {
+	return w.Connection.Address
+}
+
 func wshandler(w http.ResponseWriter, r *http.Request, ph ProxyWsHandler) {
 	upgrader := &websocket.Upgrader{
 		ReadBufferSize:  8192,
