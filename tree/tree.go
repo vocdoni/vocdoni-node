@@ -202,10 +202,10 @@ func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, error) {
 			var data [MaxClaimSize + 8]byte
 			i := 0
 			for _, e := range n.Entry.Value() {
-				copy(data[i:i+len(e)], e[:len(e)])
+				copy(data[i:i+len(e)], e[:])
 				i = i + len(e)
 			}
-			dataClean := bytes.Replace(data[:len(data)], []byte("\x00"), nil, -1)
+			dataClean := bytes.Replace(data[:], []byte("\x00"), nil, -1)
 			if responseBase64 {
 				datab64 := base64.StdEncoding.EncodeToString(dataClean)
 				response = append(response, datab64)

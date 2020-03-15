@@ -19,6 +19,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
 	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/ipfssync"
@@ -108,6 +109,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 
 	// parse flags
 	flag.Parse()
+
 	// setting up viper
 	viper := viper.New()
 	viper.AddConfigPath(globalCfg.DataDir)
@@ -201,6 +203,22 @@ func newConfig() (*config.GWCfg, config.Error) {
 		cfgError = config.Error{
 			Message: fmt.Sprintf("cannot unmarshal loaded config file: %s", err),
 		}
+	}
+
+	if len(globalCfg.EthConfig.SigningKey) < 32 {
+		fmt.Println("no signing key, generating one...")
+		var signer signature.SignKeys
+		err = signer.Generate()
+		if err != nil {
+			cfgError = config.Error{
+				Message: fmt.Sprintf("cannot generate signing key: %s", err),
+			}
+			return globalCfg, cfgError
+		}
+		_, priv := signer.HexString()
+		viper.Set("ethConfig.signingKey", priv)
+		globalCfg.EthConfig.SigningKey = priv
+		globalCfg.SaveConfig = true
 	}
 
 	if globalCfg.SaveConfig {
@@ -300,34 +318,21 @@ func main() {
 	}
 
 	// Add signing private key if exist in configuration or flags
-	if globalCfg.EthConfig.SigningKey != "" {
+	if len(globalCfg.EthConfig.SigningKey) != 32 {
 		log.Infof("adding custom signing key")
 		err := signer.AddHexKey(globalCfg.EthConfig.SigningKey)
 		if err != nil {
-			log.Fatalf("Fatal error adding hex key: %v", err)
+			log.Fatalf("error adding hex key: %s", err)
 		}
 		pub, _ := signer.HexString()
 		log.Infof("using custom pubKey %s", pub)
-		os.RemoveAll(globalCfg.EthConfig.DataDir + "/keystore/tmp")
-		node.Keys = keystore.NewPlaintextKeyStore(globalCfg.EthConfig.DataDir + "/keyStore/tmp")
-		node.Keys.ImportECDSA(signer.Private, "")
-		defer os.RemoveAll(globalCfg.EthConfig.DataDir + "/keystore/tmp")
 	} else {
-		// Get stored keys from Ethereum node context
-		acc := node.Keys.Accounts()
-		if len(acc) > 0 {
-			keyJSON, err := node.Keys.Export(acc[0], "", "")
-			if err != nil {
-				log.Fatalf("cannot open JSON keystore from %s (%s)", acc[0], err)
-			}
-			err = addKeyFromEncryptedJSON(keyJSON, "", signer)
-			pub, _ := signer.HexString()
-			log.Infof("using ethereum pubkey %s from keystore", pub)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
+		log.Fatal("no private key or wrong key (size != 256 bits)")
 	}
+	os.RemoveAll(globalCfg.EthConfig.DataDir + "/keystore/tmp")
+	node.Keys = keystore.NewPlaintextKeyStore(globalCfg.EthConfig.DataDir + "/keyStore/tmp")
+	node.Keys.ImportECDSA(signer.Private, "")
+	defer os.RemoveAll(globalCfg.EthConfig.DataDir + "/keystore/tmp")
 
 	// Start Ethereum Web3 node
 	log.Info("starting Ethereum node")
@@ -365,10 +370,10 @@ func main() {
 		if len(globalCfg.Ipfs.SyncKey) > 0 {
 			log.Info("enabling ipfs synchronization")
 			_, priv := signer.HexString()
-			storageSync = ipfssync.NewIPFSsync(globalCfg.Ipfs.ConfigPath+"/.ipfsSync", globalCfg.Ipfs.SyncKey, priv, storage)
+			storageSync = ipfssync.NewIPFSsync(globalCfg.Ipfs.ConfigPath+"/.ipfsSync", globalCfg.Ipfs.SyncKey, priv, "libp2p", storage)
 			if len(globalCfg.Ipfs.SyncPeers) > 0 && len(globalCfg.Ipfs.SyncPeers[0]) > 8 {
 				log.Debugf("using custom ipfs sync bootnodes %s", globalCfg.Ipfs.SyncPeers)
-				storageSync.Transport.BootNodes = globalCfg.Ipfs.SyncPeers
+				storageSync.Transport.SetBootnodes(globalCfg.Ipfs.SyncPeers)
 			}
 			go storageSync.Start()
 		}
