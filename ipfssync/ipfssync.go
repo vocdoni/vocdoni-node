@@ -146,7 +146,7 @@ func (is *IPFSsync) Handle(msg Message) error {
 
 	case "update":
 		if len(msg.Hash) > 31 && len(msg.Address) > 31 && !is.updateLock && len(is.askLock) == 0 {
-			if msg.Hash != is.hashTree.Root() && msg.Hash != is.lastHash {
+			if exist, err := is.hashTree.HashExist(msg.Hash); err == nil && !exist {
 				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
 				is.askLock = msg.Hash
 				return is.askPins(msg.Address, msg.Hash)

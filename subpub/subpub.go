@@ -51,6 +51,7 @@ type SubPub struct {
 	Host            host.Host
 	GroupPeers      []peer.ID
 	DiscoveryPeriod time.Duration
+	GroupMu         *sync.RWMutex
 
 	close   chan bool
 	privKey string
@@ -137,6 +138,7 @@ func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int32, private bool)
 	ps.Private = private
 	ps.DiscoveryPeriod = time.Second * 10
 	ps.close = make(chan bool)
+	ps.GroupMu = new(sync.RWMutex)
 	return ps
 }
 
@@ -314,27 +316,30 @@ func (ps *SubPub) peersManager() {
 		case <-ps.close:
 			return
 		default:
+			ps.GroupMu.Lock()
 			for i, p := range ps.GroupPeers {
 				if len(ps.Host.Network().ConnsToPeer(p)) == 0 {
-					// To-Do RW Mutex
 					ps.GroupPeers[i] = ps.GroupPeers[len(ps.GroupPeers)-1]
 					ps.GroupPeers[len(ps.GroupPeers)-1] = ""
 					ps.GroupPeers = ps.GroupPeers[:len(ps.GroupPeers)-1]
 				}
 			}
+			ps.GroupMu.Unlock()
 			time.Sleep(10 * time.Second)
 		}
 	}
 }
 
 func (ps *SubPub) addConnectedPeer(pid peer.ID) {
-	//To-Do RW Mutex
+	ps.GroupMu.Lock()
+	defer ps.GroupMu.Unlock()
 	ps.GroupPeers = append(ps.GroupPeers, pid)
 }
 
 func (ps *SubPub) connectedPeer(pid peer.ID) bool {
+	ps.GroupMu.Lock()
+	defer ps.GroupMu.Unlock()
 	for _, p := range ps.GroupPeers {
-		// To-Do Read Mutex
 		if p == pid {
 			return true
 		}
