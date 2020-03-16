@@ -235,3 +235,15 @@ func (t *Tree) Snapshot(root string) (*Tree, error) {
 	snapshotTree.Tree = mt
 	return snapshotTree, err
 }
+
+func (t *Tree) HashExist(hash string) (bool, error) {
+	h, err := stringToHash(hash)
+	if err != nil {
+		return false, err
+	}
+	n, err := t.Tree.GetNode(&h)
+	if err != nil || n == nil {
+		return false, nil
+	}
+	return true, nil
+}
