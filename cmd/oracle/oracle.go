@@ -293,26 +293,11 @@ func main() {
 	log.Infof("web3 WS-RPC endpoint at %s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort)
 	go node.PrintInfo(time.Second * 20)
 
-	// get voting contract
-	votingProcessAddr, err := chain.VotingProcessAddress(ensRegistryAddr, globalCfg.EthProcessDomain, fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort))
-	if err != nil || votingProcessAddr == "" {
-		log.Warnf("cannot get voting process contract: %s", err)
-	} else {
-		log.Infof("loaded voting contract at address: %s", votingProcessAddr)
-	}
-
-	// Create Ethereum Event Log listener and register oracle handlers
-	ev, err := ethevents.NewEthEvents(votingProcessAddr, signer, fmt.Sprintf("ws://%s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort), nil)
-	if err != nil {
-		log.Fatalf("couldn't create ethereum  events listener: %s", err)
-	}
-
 	// initializing Vochain connection
 	vochainConn := voclient.NewHTTP(globalCfg.VochainConfig.RPCListen, "/websocket")
 	if vochainConn == nil {
 		log.Fatal("cannot connect to vochain HTTP endpoint")
 	}
-	ev.VochainCLI = vochainConn
 
 	// Wait for Vochain to be ready
 	for {
@@ -337,6 +322,20 @@ func main() {
 				if err != nil {
 					log.Fatalf("cannot read logs, ethereum last block parsing failed: %s at block %d", err, height)
 				}
+				// get voting contract
+				votingProcessAddr, err := chain.VotingProcessAddress(ensRegistryAddr, globalCfg.EthProcessDomain, fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort))
+				if err != nil || votingProcessAddr == "" {
+					log.Warnf("cannot get voting process contract: %s", err)
+				} else {
+					log.Infof("loaded voting contract at address: %s", votingProcessAddr)
+				}
+
+				// Create Ethereum Event Log listener and register oracle handlers
+				ev, err := ethevents.NewEthEvents(votingProcessAddr, signer, fmt.Sprintf("ws://%s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort), nil)
+				if err != nil {
+					log.Fatalf("couldn't create ethereum  events listener: %s", err)
+				}
+				ev.VochainCLI = vochainConn
 				ev.AddEventHandler(ethevents.HandleVochainOracle)
 				if globalCfg.SubscribeOnly {
 					log.Infof("reading ethereum events from current block %d", lastBlock)
