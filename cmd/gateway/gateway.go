@@ -19,7 +19,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
 	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/ipfssync"
@@ -207,7 +206,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 
 	if len(globalCfg.EthConfig.SigningKey) < 32 {
 		fmt.Println("no signing key, generating one...")
-		var signer signature.SignKeys
+		var signer sig.SignKeys
 		err = signer.Generate()
 		if err != nil {
 			cfgError = config.Error{
@@ -231,16 +230,6 @@ func newConfig() (*config.GWCfg, config.Error) {
 	}
 
 	return globalCfg, cfgError
-}
-
-func addKeyFromEncryptedJSON(keyJSON []byte, passphrase string, signKeys *sig.SignKeys) error {
-	key, err := keystore.DecryptKey(keyJSON, passphrase)
-	if err != nil {
-		return err // Storage
-	}
-	signKeys.Private = key.PrivateKey
-	signKeys.Public = &key.PrivateKey.PublicKey
-	return nil
 }
 
 func main() {
