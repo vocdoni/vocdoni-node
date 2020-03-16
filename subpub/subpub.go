@@ -42,15 +42,20 @@ type SubPub struct {
 	Topic           string
 	BroadcastWriter chan ([]byte)
 	Reader          chan ([]byte)
+	NoBootStrap     bool
 	BootNodes       []string
 	PubKey          string
 	Private         bool
-	port            int32
-	privKey         string
-	host            host.Host
-	groupPeers      []peer.ID
-	dht             *dht.IpfsDHT
-	routing         *discovery.RoutingDiscovery
+	MultiAddr       string
+	Port            int32
+	Host            host.Host
+	GroupPeers      []peer.ID
+	DiscoveryPeriod time.Duration
+
+	close   chan bool
+	privKey string
+	dht     *dht.IpfsDHT
+	routing *discovery.RoutingDiscovery
 }
 
 func (ps *SubPub) handleStream(stream network.Stream) {
@@ -78,32 +83,44 @@ func (ps *SubPub) SendMessage(rw *bufio.ReadWriter, msg []byte) error {
 
 func (ps *SubPub) broadcastHandler(rw *bufio.ReadWriter) {
 	for {
-		if err := ps.SendMessage(rw, <-ps.BroadcastWriter); err != nil {
-			log.Warnf("error writing to buffer: %s", err)
+		select {
+		case <-ps.close:
 			return
+		default:
+			if err := ps.SendMessage(rw, <-ps.BroadcastWriter); err != nil {
+				log.Warnf("error writing to buffer: %s", err)
+				return
+			}
+			rw.Flush()
 		}
-		rw.Flush()
 	}
 }
 
 func (ps *SubPub) readHandler(rw *bufio.ReadWriter) {
+	var err error
+	var message []byte
 	for {
-		var err error
-		var message []byte
-		if message, err = rw.ReadBytes(byte(delimiter)); err != nil {
-			log.Debugf("error reading from buffer: %s", err)
+		select {
+		case <-ps.close:
 			return
-		}
-		if !ps.Private {
-			var ok bool
-			message, ok = ps.decrypt(string(message[:len(message)-1]))
-			if !ok {
-				log.Warn("cannot decrypt message")
-				continue
+		default:
+			if message, err = rw.ReadBytes(byte(delimiter)); err != nil {
+				log.Debugf("error reading from buffer: %s", err)
+				return
 			}
+			// Remove delimiter
+			message = message[:len(message)-1]
+			if !ps.Private {
+				var ok bool
+				message, ok = ps.decrypt(string(message))
+				if !ok {
+					log.Warn("cannot decrypt message")
+					continue
+				}
+			}
+			log.Debugf("message received: %s", message)
+			go func() { ps.Reader <- message }()
 		}
-		log.Debugf("message received: %s", message)
-		go func() { ps.Reader <- message }()
 	}
 }
 
@@ -116,8 +133,10 @@ func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int32, private bool)
 	ps.privKey = hex.EncodeToString(key.D.Bytes())
 	ps.BroadcastWriter = make(chan []byte)
 	ps.Reader = make(chan []byte)
-	ps.port = port
+	ps.Port = port
 	ps.Private = private
+	ps.DiscoveryPeriod = time.Second * 10
+	ps.close = make(chan bool)
 	return ps
 }
 
@@ -132,7 +151,7 @@ func (ps *SubPub) Connect() {
 	ipfslog.SetLogLevel("*", "ERROR")
 
 	// 0.0.0.0 will listen on any interface device.
-	sourceMultiAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", ps.port))
+	sourceMultiAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", ps.Port))
 	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.ECDSA, 2048, strings.NewReader(ps.privKey))
 	if err != nil {
 		log.Fatal(err)
@@ -149,26 +168,19 @@ func (ps *SubPub) Connect() {
 	c.ListenAddrs = []multiaddr.Multiaddr{sourceMultiAddr}
 
 	log.Debugf("libp2p config: %+v", c)
-	ps.host, err = c.NewNode(ctx)
-	/*ps.host, err = libp2p.New(ctx,
-		libp2p.ListenAddrs(sourceMultiAddr),
-		libp2p.DisableRelay(),
-		libp2p.Identity(prvKey),
-		libp2p.PrivateNetwork(psk),
-		libp2p.NATPortMap(),
-	)
-	*/
+	ps.Host, err = c.NewNode(ctx)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
-	//log.Infof("libp2p peerID: %s", ps.host.ID())
+
 	ip, _ := util.PublicIP()
-	log.Infof("my subpub multiaddr /ip4/%s/tcp/%d/p2p/%s ", ip, ps.port, ps.host.ID())
+	ps.MultiAddr = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", ip, ps.Port, ps.Host.ID())
+	log.Infof("my subpub multiaddress %s", ps.MultiAddr)
 
 	// Set a function as stream handler. This function is called when a peer
 	// initiates a connection and starts a stream with this peer.
-	ps.host.SetStreamHandler(protocol.ID(ps.Topic), ps.handleStream)
+	ps.Host.SetStreamHandler(protocol.ID(ps.Topic), ps.handleStream)
 
 	// Start a DHT, for use in peer discovery. We can't just make a new DHT
 	// client because we want each peer to maintain its own local copy of the
@@ -181,48 +193,50 @@ func (ps *SubPub) Connect() {
 		dhtopts.MaxRecordAge(1 * time.Hour),
 	}
 
-	ps.dht, err = dht.New(ctx, ps.host, opts...)
+	ps.dht, err = dht.New(ctx, ps.Host, opts...)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	// Bootstrap the DHT. In the default configuration, this spawns a Background
-	// thread that will refresh the peer table every five minutes.
-	log.Info("bootstrapping the DHT")
-	if err = ps.dht.Bootstrap(ctx); err != nil {
-		log.Fatal(err)
-		return
-	}
+	if !ps.NoBootStrap {
+		// Bootstrap the DHT. In the default configuration, this spawns a Background
+		// thread that will refresh the peer table every five minutes.
+		log.Info("bootstrapping the DHT")
+		if err = ps.dht.Bootstrap(ctx); err != nil {
+			log.Fatal(err)
+			return
+		}
 
-	// Let's connect to the bootstrap nodes first. They will tell us about the
-	// other nodes in the network.
-	var bootnodes []multiaddr.Multiaddr
-	if len(ps.BootNodes) > 0 {
-		bootnodes = parseMultiaddress(ps.BootNodes)
-	} else {
-		bootnodes = dht.DefaultBootstrapPeers
-	}
+		// Let's connect to the bootstrap nodes first. They will tell us about the
+		// other nodes in the network.
+		var bootnodes []multiaddr.Multiaddr
+		if len(ps.BootNodes) > 0 {
+			bootnodes = parseMultiaddress(ps.BootNodes)
+		} else {
+			bootnodes = dht.DefaultBootstrapPeers
+		}
 
-	log.Info("connecting to bootstrap nodes...")
-	log.Debugf("bootnodes: %+v", bootnodes)
-	var wg sync.WaitGroup
-	for _, peerAddr := range bootnodes {
-		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if peerinfo != nil {
-				log.Debugf("trying %s", *peerinfo)
-				if err := ps.host.Connect(ctx, *peerinfo); err != nil {
-					log.Debug(err)
-				} else {
-					log.Infof("connection established with bootstrap node: %s", peerinfo)
+		log.Info("connecting to bootstrap nodes...")
+		log.Debugf("bootnodes: %+v", bootnodes)
+		var wg sync.WaitGroup
+		for _, peerAddr := range bootnodes {
+			peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if peerinfo != nil {
+					log.Debugf("trying %s", *peerinfo)
+					if err := ps.Host.Connect(ctx, *peerinfo); err != nil {
+						log.Debug(err)
+					} else {
+						log.Infof("connection established with bootstrap node: %s", peerinfo)
+					}
 				}
-			}
-		}()
+			}()
+		}
+		wg.Wait()
 	}
-	wg.Wait()
 	// We use a rendezvous point "meet me here" to announce our location.
 	// This is like telling your friends to meet you at the Eiffel Tower.
 	ps.routing = discovery.NewRoutingDiscovery(ps.dht)
@@ -231,15 +245,26 @@ func (ps *SubPub) Connect() {
 	discovery.Advertise(ctx, ps.routing, ps.PubKey)
 }
 
+func (ps *SubPub) Close() {
+	log.Debug("received close signal")
+	ps.close <- true
+}
+
 func (ps *SubPub) Subcribe() {
 	ctx := context.Background()
+	go ps.peersManager()
 	go func() {
 		for {
-			ps.discover(ctx)
-			time.Sleep(time.Second)
+			select {
+			case <-ps.close:
+				return
+			default:
+				ps.discover(ctx)
+				time.Sleep(ps.DiscoveryPeriod)
+			}
 		}
 	}()
-	select {}
+	<-ps.close
 }
 
 func (ps *SubPub) PeerConnect(pubKey string, callback func(*bufio.ReadWriter)) error {
@@ -250,20 +275,21 @@ func (ps *SubPub) PeerConnect(pubKey string, callback func(*bufio.ReadWriter)) e
 	if err != nil {
 		return err
 	}
-
 	for peer := range peerChan {
 		// not myself
-		if peer.ID == ps.host.ID() {
+		if peer.ID == ps.Host.ID() {
 			continue
 		}
 
 		log.Infof("found peer: %s", peer.ID)
-		ps.groupPeers = append(ps.groupPeers, peer.ID)
 
-		stream, err := ps.host.NewStream(ctx, peer.ID, protocol.ID(ps.Topic))
+		stream, err := ps.Host.NewStream(ctx, peer.ID, protocol.ID(ps.Topic))
 		if err != nil {
 			log.Debugf("connection failed: ", err)
 		} else {
+			if !ps.connectedPeer(peer.ID) {
+				ps.addConnectedPeer(peer.ID)
+			}
 			log.Infof("connected to peer %s", peer.ID)
 			callback(bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream)))
 		}
@@ -282,6 +308,40 @@ func parseMultiaddress(maddress []string) (ma []multiaddr.Multiaddr) {
 	return ma
 }
 
+func (ps *SubPub) peersManager() {
+	for {
+		select {
+		case <-ps.close:
+			return
+		default:
+			for i, p := range ps.GroupPeers {
+				if len(ps.Host.Network().ConnsToPeer(p)) == 0 {
+					// To-Do RW Mutex
+					ps.GroupPeers[i] = ps.GroupPeers[len(ps.GroupPeers)-1]
+					ps.GroupPeers[len(ps.GroupPeers)-1] = ""
+					ps.GroupPeers = ps.GroupPeers[:len(ps.GroupPeers)-1]
+				}
+			}
+			time.Sleep(10 * time.Second)
+		}
+	}
+}
+
+func (ps *SubPub) addConnectedPeer(pid peer.ID) {
+	//To-Do RW Mutex
+	ps.GroupPeers = append(ps.GroupPeers, pid)
+}
+
+func (ps *SubPub) connectedPeer(pid peer.ID) bool {
+	for _, p := range ps.GroupPeers {
+		// To-Do Read Mutex
+		if p == pid {
+			return true
+		}
+	}
+	return false
+}
+
 func (ps *SubPub) discover(ctx context.Context) {
 	log.Debug("announcing ourselves as SubPub participants")
 	discovery.Advertise(ctx, ps.routing, ps.Topic)
@@ -296,26 +356,31 @@ func (ps *SubPub) discover(ctx context.Context) {
 	}
 
 	for peer := range peerChan {
-		// not myself
-		if peer.ID == ps.host.ID() {
-			continue
-		}
+		select {
+		case <-ps.close:
+			return
+		default:
+			// not myself
+			if peer.ID == ps.Host.ID() {
+				break
+			}
 
-		// if already connected
-		if len(ps.host.Network().ConnsToPeer(peer.ID)) > 0 {
-			log.Debugf("peer %s already connected", peer.ID)
-			continue
-		}
-		// if new peer, let's connect to it
-		log.Debugf("found peer: %s", peer.ID)
-		ps.groupPeers = append(ps.groupPeers, peer.ID)
+			// if already connected
+			if ps.connectedPeer(peer.ID) {
+				log.Debugf("peer %s already connected", peer.ID)
+				break
+			}
+			// if new peer, let's connect to it
+			log.Debugf("found peer: %s", peer.ID)
 
-		stream, err := ps.host.NewStream(ctx, peer.ID, protocol.ID(ps.Topic))
-		if err == nil {
-			log.Infof("connected to peer %s", peer.ID)
-			rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
-			go ps.broadcastHandler(rw)
-			go ps.readHandler(rw)
+			stream, err := ps.Host.NewStream(ctx, peer.ID, protocol.ID(ps.Topic))
+			if err == nil {
+				ps.addConnectedPeer(peer.ID)
+				log.Infof("connected to peer %s", peer.ID)
+				rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+				go ps.broadcastHandler(rw)
+				go ps.readHandler(rw)
+			}
 		}
 	}
 }
