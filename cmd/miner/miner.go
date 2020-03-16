@@ -48,6 +48,7 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.PublicAddr = *flag.String("publicAddr", "", "IP address where the node will be exposed, guessed automatically if empty")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
+	globalCfg.Dev = *flag.Bool("dev", false, "run and connect to the development network")
 
 	// parse flags
 	flag.Parse()
@@ -72,6 +73,7 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	viper.BindPFlag("genesis", flag.Lookup("genesis"))
 	viper.BindPFlag("publicAddr", flag.Lookup("publicAddr"))
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
+	viper.BindPFlag("dev", flag.Lookup("dev"))
 
 	// check if config file exists
 	_, err = os.Stat(globalCfg.DataDir + "/vochain-miner.yml")

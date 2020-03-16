@@ -67,6 +67,7 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
 	globalCfg.EthProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
+	globalCfg.Dev = *flag.Bool("dev", false, "run and connect to the development network")
 
 	// vochain
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "vochain p2p host and port to listen on")
@@ -78,6 +79,7 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	globalCfg.VochainConfig.KeyFile = *flag.String("vochainKeyFile", "", "user alternative vochain p2p node key file")
 	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "", "IP address where the vochain node will be exposed, guessed automatically if empty")
 	globalCfg.VochainConfig.DataDir = globalCfg.DataDir + "/vochain"
+
 	// ethereum
 	globalCfg.EthConfig.SigningKey = *flag.String("ethSigningKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
 	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
@@ -107,6 +109,7 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	viper.BindPFlag("subscribeOnly", flag.Lookup("subscribeOnly"))
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
 	viper.BindPFlag("ethProcessDomain", flag.Lookup("ethProcessDomain"))
+	viper.BindPFlag("dev", flag.Lookup("dev"))
 
 	// vochain
 	viper.Set("vochainConfig.dataDir", globalCfg.DataDir+"/vochain")
@@ -118,6 +121,7 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.peers", flag.Lookup("vochainPeers"))
 	viper.BindPFlag("vochainConfig.seeds", flag.Lookup("vochainSeeds"))
 	viper.BindPFlag("vochainConfig.keyFile", flag.Lookup("vochainKeyFile"))
+
 	// ethereum
 	viper.Set("ethConfig.datadir", globalCfg.DataDir+"/ethereum")
 	viper.BindPFlag("ethConfig.signingKey", flag.Lookup("ethSigningKey"))
@@ -198,6 +202,11 @@ func main() {
 	}
 
 	log.Info("starting oracle")
+
+	if globalCfg.Dev {
+		log.Info("using development mode")
+		globalCfg.VochainConfig.Dev = globalCfg.Dev
+	}
 
 	// start vochain node
 	log.Info("initializing Vochain")

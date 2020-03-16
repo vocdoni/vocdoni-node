@@ -23,11 +23,12 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 
-// testing purposes until genesis
-// const testOracleAddress = "0xF904848ea36c46817096E94f932A9901E377C8a5"
-
-// DefaultSeedNodes list of default Vocdoni seed nodes
-var DefaultSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
+var (
+	// ProdSeedNodes production vochain network seed nodes
+	ProdSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
+	// TestSeedNodes testing vochain network seed nodes
+	TestSeedNodes = []string{"7440a5b086e16620ce7b13198479016aa2b07988@51.15.113.137:11714"}
+)
 
 // NewVochain starts a node with an ABCI application
 func NewVochain(globalCfg *config.VochainCfg, genesis []byte, pv *privval.FilePV) *BaseApplication {
@@ -98,6 +99,15 @@ func (l *tenderLogger) With(keyvals ...interface{}) tlog.Logger {
 
 // we need to set init (first time validators and oracles)
 func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis []byte, pv *privval.FilePV) (*nm.Node, error) {
+	var defaultSeedNodes []string
+	if len(localConfig.Seeds) == 0 {
+		if !localConfig.Dev {
+			defaultSeedNodes = ProdSeedNodes
+		} else {
+			defaultSeedNodes = TestSeedNodes
+		}
+	}
+
 	// create node config
 	var err error
 
@@ -116,7 +126,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	if !localConfig.CreateGenesis {
 		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]\"")
 		if len(tconfig.P2P.Seeds) < 8 && !localConfig.SeedMode {
-			tconfig.P2P.Seeds = strings.Join(DefaultSeedNodes[:], ",")
+			tconfig.P2P.Seeds = strings.Join(defaultSeedNodes[:], ",")
 		}
 		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
 

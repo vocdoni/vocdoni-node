@@ -63,6 +63,8 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.CensusSync = *flag.Bool("censusSync", true, "automatically import new census published on smart contract")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
 	globalCfg.EthProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
+	globalCfg.Dev = *flag.Bool("dev", false, "run and connect to the development network")
+
 	// api
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable census API")
@@ -103,6 +105,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
 	globalCfg.VochainConfig.KeyFile = *flag.String("vochainKeyFile", "", "user alternative vochain p2p node key file")
+
 	// parse flags
 	flag.Parse()
 	// setting up viper
@@ -120,6 +123,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("censusSync", flag.Lookup("censusSync"))
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
 	viper.BindPFlag("ethProcessDomain", flag.Lookup("ethProcessDomain"))
+	viper.BindPFlag("dev", flag.Lookup("dev"))
 
 	// api
 	viper.BindPFlag("api.file", flag.Lookup("fileApi"))
@@ -231,6 +235,12 @@ func main() {
 	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
 
 	log.Debugf("initializing gateway config %+v", *globalCfg)
+
+	// using dev mode
+	if globalCfg.Dev {
+		log.Info("using development mode")
+		globalCfg.VochainConfig.Dev = globalCfg.Dev
+	}
 
 	// check if errors during config creation and determine if Critical
 	if cfgErr.Critical && cfgErr.Message != "" {

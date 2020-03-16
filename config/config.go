@@ -17,6 +17,8 @@ type GWCfg struct {
 		Domain  string
 		DirCert string
 	}
+	// Dev indicates we use the gateway development mode
+	Dev bool
 	// ListenPort port where the gateway will listen on
 	ListenPort int
 	// ListenHost host where the gateway will listen on
@@ -159,6 +161,9 @@ type GenCfg struct {
 
 // VochainCfg includes all possible config params needed by the Vochain
 type VochainCfg struct {
+	// Dev indicates we use the Vochain development mode
+	// currently only changes the seed nodes to connect with
+	Dev bool
 	// LogLevel logging level
 	LogLevel string
 	// LogOutput logging output
@@ -191,6 +196,8 @@ type VochainCfg struct {
 
 // OracleCfg includes all possible config params needed by the Oracle
 type OracleCfg struct {
+	// Dev indicates we use the development mode
+	Dev bool
 	// DataDir directory where data and config files are stored
 	DataDir string
 	// EthereumConfig ethereum node config parameters
