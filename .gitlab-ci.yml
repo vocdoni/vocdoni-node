@@ -31,8 +31,9 @@ go-analyze:
   script:
     - diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
     - go vet ./...
-    - curl -L https://github.com/dominikh/go-tools/releases/download/2020.1.3/staticcheck_linux_amd64.tar.gz | tar -xzf -
-    - ./staticcheck/staticcheck ./...
+    # TODO(mvdan): re-enable once https://github.com/dominikh/go-tools/issues/706 is fixed
+    # - curl -L https://github.com/dominikh/go-tools/releases/download/2020.1.3/staticcheck_linux_amd64.tar.gz | tar -xzf -
+    # - ./staticcheck/staticcheck ./...
 
 docker-release:
   image: docker:stable
