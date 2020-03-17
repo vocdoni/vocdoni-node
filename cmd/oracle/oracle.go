@@ -83,6 +83,8 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
 	globalCfg.EthConfig.LightMode = *flag.Bool("ethChainLightMode", false, "synchronize Ethereum blockchain in light mode")
 	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to listen on")
+	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootnodes", []string{}, "Ethereum p2p custom bootstrap nodes (enode://<pubKey>@<ip>[:port])")
+	globalCfg.EthConfig.TrustedPeers = *flag.StringArray("ethTrustedPeers", []string{}, "Ethereum p2p trusted peer nodes (enode://<pubKey>@<ip>[:port])")
 	globalCfg.EthConfig.DataDir = globalCfg.DataDir + "/ethereum"
 	// web3
 	globalCfg.W3Config.WsPort = *flag.Int("w3WsPort", 9092, "web3 websocket server port")
@@ -122,6 +124,9 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	viper.BindPFlag("ethConfig.chainType", flag.Lookup("ethChain"))
 	viper.BindPFlag("ethConfig.lightMode", flag.Lookup("ethChainLightMode"))
 	viper.BindPFlag("ethConfig.nodePort", flag.Lookup("ethNodePort"))
+	viper.BindPFlag("ethConfig.trustedPeers", flag.Lookup("ethTrustedPeers"))
+	viper.BindPFlag("ethConfig.bootnodes", flag.Lookup("ethBootnodes"))
+
 	viper.Set("w3Config.enabled", true)
 	viper.BindPFlag("w3Config.wsPort", flag.Lookup("w3WsPort"))
 	viper.BindPFlag("w3Config.wsHost", flag.Lookup("w3WsHost"))
