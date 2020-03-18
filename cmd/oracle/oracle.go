@@ -232,7 +232,12 @@ func main() {
 	}
 
 	log.Infof("starting Vochain synchronization")
-	vnode := vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1), nil)
+	var vnode *vochain.BaseApplication
+	if globalCfg.Dev {
+		vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis3), nil)
+	} else {
+		vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1), nil)
+	}
 	go func() {
 		log.Infof("vochain current height: %d", vnode.State.Height())
 		for {

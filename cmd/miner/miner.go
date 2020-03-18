@@ -164,7 +164,12 @@ func main() {
 	log.Infof("exposed host IP address: %s", globalCfg.PublicAddr)
 
 	// node + app layer
-	vnode := vochain.NewVochain(globalCfg, []byte(vochain.TestnetGenesis1), nil)
+	var vnode *vochain.BaseApplication
+	if globalCfg.Dev {
+		vnode = vochain.NewVochain(globalCfg, []byte(vochain.TestnetGenesis3), nil)
+	} else {
+		vnode = vochain.NewVochain(globalCfg, []byte(vochain.TestnetGenesis1), nil)
+	}
 	defer func() {
 		vnode.Node.Stop()
 		vnode.Node.Wait()

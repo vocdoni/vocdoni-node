@@ -409,7 +409,11 @@ func main() {
 			log.Infof("vochain exposed IP address: %s", globalCfg.VochainConfig.PublicAddr)
 		}
 
-		vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1), nil)
+		if globalCfg.Dev {
+			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis3), nil)
+		} else {
+			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1), nil)
+		}
 		if globalCfg.API.Results {
 			log.Info("starting vochain scrutinizer")
 			sc, err = scrutinizer.NewScrutinizer(globalCfg.DataDir+"/scrutinizer", vnode.State)

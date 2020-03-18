@@ -188,4 +188,90 @@ const (
   "signbytes": ""
 }
 `
+
+	TestnetGenesis3 = `
+{
+  "genesis_time": "2020-03-16T14:29:50.512370579Z",
+  "chain_id": "chain-OsVhCM",
+  "consensus_params": {
+    "block": {
+      "max_bytes": "22020096",
+      "max_gas": "-1",
+      "time_iota_ms": "10000"
+    },
+    "evidence": {
+      "max_age": "100000"
+    },
+    "validator": {
+      "pub_key_types": [
+        "ed25519"
+      ]
+    }
+  },
+  "validators": [
+    {
+      "address": "5C69093136E0CB84E5CFA8E958DADB33C0D0CCCF",
+      "pub_key": {
+        "type": "tendermint/PubKeyEd25519",
+        "value": "mXc5xXTKgDSYcy1lBCT1Ag7Lh1nPWHMa/p80XZPzAPY="
+      },
+      "power": "10",
+      "name": "miner0"
+    },
+    {
+      "address": "2E1B244B84E223747126EF621C022D5CEFC56F69",
+      "pub_key": {
+        "type": "tendermint/PubKeyEd25519",
+        "value": "gaf2ZfdxpoielRXDXyBcMxkdzywcE10WsvLMe1K62UY="
+      },
+      "power": "10",
+      "name": "miner1"
+    },
+    {
+      "address": "4EF00A8C18BD472167E67F28694F31451A195581",
+      "pub_key": {
+        "type": "tendermint/PubKeyEd25519",
+        "value": "dZXMBiQl4s0/YplfX9iMnCWonJp2gjrFHHXaIwqqtmc="
+      },
+      "power": "10",
+      "name": "miner2"
+    }
+  ],
+  "app_hash": "",
+  "app_state": {
+    "validators": [
+      {
+        "address": "5C69093136E0CB84E5CFA8E958DADB33C0D0CCCF",
+        "pub_key": {
+          "type": "tendermint/PubKeyEd25519",
+          "value": "mXc5xXTKgDSYcy1lBCT1Ag7Lh1nPWHMa/p80XZPzAPY="
+        },
+        "power": "10",
+        "name": "miner0"
+      },
+      {
+        "address": "2E1B244B84E223747126EF621C022D5CEFC56F69",
+        "pub_key": {
+          "type": "tendermint/PubKeyEd25519",
+          "value": "gaf2ZfdxpoielRXDXyBcMxkdzywcE10WsvLMe1K62UY="
+        },
+        "power": "10",
+        "name": "miner1"
+      },
+      {
+        "address": "4EF00A8C18BD472167E67F28694F31451A195581",
+        "pub_key": {
+          "type": "tendermint/PubKeyEd25519",
+          "value": "dZXMBiQl4s0/YplfX9iMnCWonJp2gjrFHHXaIwqqtmc="
+        },
+        "power": "10",
+        "name": "miner2"
+      }
+    ],
+    "oracles": [
+      "0xb926be24A9ca606B515a835E91298C7cF0f2846f"
+    ]
+  }
+}
+`
 )
