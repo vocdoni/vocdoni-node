@@ -7,6 +7,7 @@ GWARGS="\
  ${gw_censusApi:+ --censusApi}\
  ${gw_censusSync:+ --censusSync=${gw_censusSync}}\
  ${gw_contract:+ --contract=${gw_contract}}\
+ ${gw_dev:+ --dev}\
  ${gw_ethChain:+ --ethChain=${gw_ethChain}}\
  ${gw_ethChainLightMode:+ --ethChainLightMode=${gw_ethChainLightMode}}\
  ${gw_ethBootNodes:+ --ethBootNodes=${gw_ethBootNodes}}\

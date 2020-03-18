@@ -4,6 +4,7 @@ gw_apiAllowPrivate=True
 #gw_censusApi=True
 #gw_censusSync=
 #gw_contract=
+#gw_dev=
 #gw_ethChain=goerli
 #gw_ethChainLightMode=True
 #gw_ethBootNodes=

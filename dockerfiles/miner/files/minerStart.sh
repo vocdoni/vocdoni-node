@@ -12,6 +12,7 @@ MINERARGS="\
  ${miner_peers:+ --peers=${miner_peers}}\
  ${miner_rpcListen:+ --rpcListen=${miner_rpcListen}}\
  ${miner_seeds:+ --seeds=${miner_seeds}}\
+ ${miner_dev:+ --dev}\
 "
 
 CMD="/app/miner $MINERARGS $@"

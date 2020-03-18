@@ -1,4 +1,5 @@
 miner_dataDir=/app/run
+#miner_dev=
 #miner_genesis=
 #miner_keyFile=
 #miner_logLevel=debug

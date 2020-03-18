@@ -1,4 +1,5 @@
 #oracle_contract=
+#oracle_dev=
 #oracle_ethChain=goerli
 oracle_subscribeOnly=False
 oracle_ethChainLightMode=False
