@@ -27,11 +27,6 @@ var testRequests = []struct {
 	result  interface{}
 }{
 	{
-		name:    "net_PeerCount",
-		request: jsonrpcRequestWrapper{ID: 74, Method: "net_peerCount"},
-		result:  "0x0",
-	},
-	{
 		name:    "net_listening",
 		request: jsonrpcRequestWrapper{ID: 67, Method: "net_listening"},
 		result:  true,
