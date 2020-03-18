@@ -157,3 +157,12 @@ type GenesisAppState struct {
 	Validators []tmtypes.GenesisValidator `json:"validators"`
 	Oracles    []string                   `json:"oracles"`
 }
+
+// ________________________ CALLBACKS DATA STRUCTS ________________________
+
+// ScrutinizerOnProcessData holds the required data for callbacks when
+// a new process is added into the vochain.
+type ScrutinizerOnProcessData struct {
+	EntityID  string
+	ProcessID string
+}

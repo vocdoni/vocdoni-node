@@ -62,6 +62,7 @@ type MetaResponse struct {
 	ClaimsData    []string   `json:"claimsData,omitempty"`
 	Content       string     `json:"content,omitempty"`
 	EntityID      string     `json:"entityId,omitempty"`
+	EntityIDs     []string   `json:"entityIds,omitempty"`
 	Files         []byte     `json:"files,omitempty"`
 	Finished      bool       `json:"finished,omitempty"`
 	Height        *int64     `json:"height,omitempty"`

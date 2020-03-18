@@ -182,6 +182,13 @@ func BenchmarkVochain(b *testing.B) {
 	req.Timestamp = int32(time.Now().Unix())
 	resp = c.Request(req, nil)
 	log.Infof("submited votes: %+v", resp.Results)
+
+	// get entities that created at least ones process
+	log.Infof("get entities")
+	req.Method = "getScrutinizerEntities"
+	req.Timestamp = int32(time.Now().Unix())
+	resp = c.Request(req, nil)
+	log.Infof("created entities: %+v", resp.EntityIDs)
 }
 
 func vochainBench(b *testing.B, c testcommon.APIConnection, s *signature.SignKeys, poseidon, mkRoot, processID, censusID string) {

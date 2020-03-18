@@ -207,6 +207,7 @@ func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP) {
 		r.APIs = append(r.APIs, "results")
 		r.registerPublic("getResults", r.getResults)
 		r.registerPublic("getProcListResults", r.getProcListResults)
+		r.registerPublic("getScrutinizerEntities", r.getScrutinizerEntities)
 	}
 }
 

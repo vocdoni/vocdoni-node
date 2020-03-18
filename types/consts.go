@@ -8,3 +8,10 @@ var (
 	False = Bool(false)
 	True  = Bool(true)
 )
+
+const (
+	// ScrutinizerProcessPrefix is the prefix for the levelDB process keys
+	ScrutinizerProcessPrefix = "p_"
+	// ScrutinizerEntityPrefix is the prefix for the levelDB entity keys
+	ScrutinizerEntityPrefix = "e_"
+)

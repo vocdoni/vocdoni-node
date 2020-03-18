@@ -14,6 +14,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
 	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
@@ -218,7 +219,10 @@ func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 	}
 	v.ProcessTree.Set([]byte(pid), newProcessBytes)
 	if callBack, ok := v.Callbacks["addProcess"]; ok {
-		go callBack(pid)
+		go callBack(&types.ScrutinizerOnProcessData{
+			EntityID:  p.EntityID,
+			ProcessID: pid,
+		})
 	}
 	return nil
 }

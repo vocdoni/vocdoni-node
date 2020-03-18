@@ -239,6 +239,12 @@ func (r *Router) getResults(request routerRequest) {
 
 func (r *Router) getProcListResults(request routerRequest) {
 	var response types.ResponseMessage
-	response.ProcessIDs = r.Scrutinizer.ProcessList(64, util.TrimHex(request.FromID))
+	response.ProcessIDs = r.Scrutinizer.List(64, util.TrimHex(request.FromID), types.ScrutinizerProcessPrefix)
+	r.transport.Send(r.buildReply(request, response))
+}
+
+func (r *Router) getScrutinizerEntities(request routerRequest) {
+	var response types.ResponseMessage
+	response.EntityIDs = r.Scrutinizer.List(64, util.TrimHex(request.FromID), types.ScrutinizerEntityPrefix)
 	r.transport.Send(r.buildReply(request, response))
 }
