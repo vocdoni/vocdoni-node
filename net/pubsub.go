@@ -3,7 +3,7 @@ package net
 import (
 	"time"
 
-	shell "github.com/ipfs/go-ipfs-api"
+	ipfsapi "github.com/ipfs/go-ipfs-api"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -11,59 +11,53 @@ import (
 
 type PubSubHandle struct {
 	c *types.Connection
-	s *shell.PubSubSubscription
+	s *ipfsapi.PubSubSubscription
 }
 
-func PsSubscribe(topic string) *shell.PubSubSubscription {
-	sh := shell.NewShell("localhost:5001")
-	sub, err := sh.PubSubSubscribe(topic)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return sub
+func PsSubscribe(topic string) (*ipfsapi.PubSubSubscription, error) {
+	sh := ipfsapi.NewShell("localhost:5001")
+	return sh.PubSubSubscribe(topic)
 }
 
 func PsPublish(topic, data string) error {
-	sh := shell.NewShell("localhost:5001")
-	err := sh.PubSubPublish(topic, data)
-	if err != nil {
-		return err
-	}
-	return nil
+	sh := ipfsapi.NewShell("localhost:5001")
+	return sh.PubSubPublish(topic, data)
 }
 
 func (p *PubSubHandle) Init(c *types.Connection) error {
 	p.c = c
-	p.s = PsSubscribe(p.c.Topic)
+	s, err := PsSubscribe(p.c.Topic)
+	if err != nil {
+		return err
+	}
+	p.s = s
 	return nil
 }
 
 func (p *PubSubHandle) Listen(reciever chan<- types.Message) {
-	var psMessage *shell.Message
-	var msg types.Message
-	var err error
 	for {
-		psMessage, err = p.s.Next()
+		psMessage, err := p.s.Next()
 		if err != nil {
 			log.Warnf("PubSub recieve error: %s", err)
+			continue
 		}
-		ctx := new(types.PubSubContext)
-		ctx.Topic = p.c.Topic
-		ctx.PeerAddress = psMessage.From.String()
-		msg.Data = psMessage.Data
-		msg.TimeStamp = int32(time.Now().Unix())
-		msg.Context = ctx
-
-		reciever <- msg
+		reciever <- types.Message{
+			Data:      psMessage.Data,
+			TimeStamp: int32(time.Now().Unix()),
+			Context: &types.PubSubContext{
+				Topic:       p.c.Topic,
+				PeerAddress: psMessage.From.String(),
+			},
+		}
 	}
 }
 
 func (p *PubSubHandle) Address() string {
-	return "" //To-Do
+	return "" // To-Do
 }
 
 func (w *PubSubHandle) SetBootnodes(bootnodes []string) {
-	//To-Do
+	// To-Do
 }
 
 func (p *PubSubHandle) Send(msg types.Message) {

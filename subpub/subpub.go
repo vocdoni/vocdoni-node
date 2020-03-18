@@ -40,8 +40,8 @@ type SubPub struct {
 	Key             *ecdsa.PrivateKey
 	GroupKey        [32]byte
 	Topic           string
-	BroadcastWriter chan ([]byte)
-	Reader          chan ([]byte)
+	BroadcastWriter chan []byte
+	Reader          chan []byte
 	NoBootStrap     bool
 	BootNodes       []string
 	PubKey          string
@@ -51,13 +51,16 @@ type SubPub struct {
 	Host            host.Host
 	GroupPeers      []peer.ID
 	DiscoveryPeriod time.Duration
-	GroupMu         *sync.RWMutex
+	GroupMu         sync.RWMutex
 
+	// TODO(mvdan): replace with a context
 	close   chan bool
 	privKey string
 	dht     *dht.IpfsDHT
 	routing *discovery.RoutingDiscovery
 }
+
+// TODO(mvdan): we probably don't want to hard-code bufio in the API this much.
 
 func (ps *SubPub) handleStream(stream network.Stream) {
 	log.Info("got a new stream!")
@@ -98,35 +101,36 @@ func (ps *SubPub) broadcastHandler(rw *bufio.ReadWriter) {
 }
 
 func (ps *SubPub) readHandler(rw *bufio.ReadWriter) {
-	var err error
-	var message []byte
 	for {
 		select {
 		case <-ps.close:
 			return
 		default:
-			if message, err = rw.ReadBytes(byte(delimiter)); err != nil {
-				log.Debugf("error reading from buffer: %s", err)
-				return
-			}
-			// Remove delimiter
-			message = message[:len(message)-1]
-			if !ps.Private {
-				var ok bool
-				message, ok = ps.decrypt(string(message))
-				if !ok {
-					log.Warn("cannot decrypt message")
-					continue
-				}
-			}
-			log.Debugf("message received: %s", message)
-			go func() { ps.Reader <- message }()
+			// continues below
 		}
+		var message []byte
+		var err error
+		if message, err = rw.ReadBytes(byte(delimiter)); err != nil {
+			log.Debugf("error reading from buffer: %s", err)
+			return
+		}
+		// Remove delimiter
+		message = message[:len(message)-1]
+		if !ps.Private {
+			var ok bool
+			message, ok = ps.decrypt(string(message))
+			if !ok {
+				log.Warn("cannot decrypt message")
+				continue
+			}
+		}
+		log.Debugf("message received: %s", message)
+		go func() { ps.Reader <- message }()
 	}
 }
 
-func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int32, private bool) SubPub {
-	var ps SubPub
+func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int32, private bool) *SubPub {
+	ps := new(SubPub)
 	ps.Key = key
 	copy(ps.GroupKey[:], signature.HashRaw(groupKey)[:32])
 	ps.Topic = fmt.Sprintf("%x", signature.HashRaw("topic"+groupKey))
@@ -138,12 +142,11 @@ func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int32, private bool)
 	ps.Private = private
 	ps.DiscoveryPeriod = time.Second * 10
 	ps.close = make(chan bool)
-	ps.GroupMu = new(sync.RWMutex)
 	return ps
 }
 
 func (ps *SubPub) Connect() {
-	ctx := context.Background()
+	ctx := context.TODO()
 	log.Infof("public address: %s", ps.PubKey)
 	log.Infof("private key: %s", ps.privKey)
 	if len(ps.Topic) == 0 {
@@ -189,7 +192,7 @@ func (ps *SubPub) Connect() {
 	// DHT, so that the bootstrapping node of the DHT can go down without
 
 	// Let's try to apply some tunning for reducing the DHT fingerprint
-	var opts = []dhtopts.Option{
+	opts := []dhtopts.Option{
 		dhtopts.RoutingTableLatencyTolerance(time.Second * 20),
 		dhtopts.BucketSize(5),
 		dhtopts.MaxRecordAge(1 * time.Hour),
@@ -212,11 +215,9 @@ func (ps *SubPub) Connect() {
 
 		// Let's connect to the bootstrap nodes first. They will tell us about the
 		// other nodes in the network.
-		var bootnodes []multiaddr.Multiaddr
+		bootnodes := dht.DefaultBootstrapPeers
 		if len(ps.BootNodes) > 0 {
 			bootnodes = parseMultiaddress(ps.BootNodes)
-		} else {
-			bootnodes = dht.DefaultBootstrapPeers
 		}
 
 		log.Info("connecting to bootstrap nodes...")
@@ -224,16 +225,17 @@ func (ps *SubPub) Connect() {
 		var wg sync.WaitGroup
 		for _, peerAddr := range bootnodes {
 			peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+			if peerinfo == nil {
+				continue // nothing to do
+			}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if peerinfo != nil {
-					log.Debugf("trying %s", *peerinfo)
-					if err := ps.Host.Connect(ctx, *peerinfo); err != nil {
-						log.Debug(err)
-					} else {
-						log.Infof("connection established with bootstrap node: %s", peerinfo)
-					}
+				log.Debugf("trying %s", *peerinfo)
+				if err := ps.Host.Connect(ctx, *peerinfo); err != nil {
+					log.Debug(err)
+				} else {
+					log.Infof("connection established with bootstrap node: %s", peerinfo)
 				}
 			}()
 		}
@@ -242,7 +244,6 @@ func (ps *SubPub) Connect() {
 	// We use a rendezvous point "meet me here" to announce our location.
 	// This is like telling your friends to meet you at the Eiffel Tower.
 	ps.routing = discovery.NewRoutingDiscovery(ps.dht)
-
 }
 
 func (ps *SubPub) Close() {
@@ -251,7 +252,7 @@ func (ps *SubPub) Close() {
 }
 
 func (ps *SubPub) advertise(ctx context.Context, topic string) {
-	duration := time.Duration(1 * time.Nanosecond)
+	duration := 1 * time.Nanosecond
 	for {
 		select {
 		case <-time.After(duration):
@@ -261,31 +262,27 @@ func (ps *SubPub) advertise(ctx context.Context, topic string) {
 			return
 		}
 	}
-
 }
 
 func (ps *SubPub) Subcribe() {
-	ctx := context.Background()
+	ctx := context.TODO()
 	go ps.peersManager()
 	go ps.advertise(ctx, ps.Topic)
 	go ps.advertise(ctx, ps.PubKey)
 
-	go func() {
-		for {
-			select {
-			case <-ps.close:
-				return
-			default:
-				ps.discover(ctx)
-				time.Sleep(ps.DiscoveryPeriod)
-			}
+	for {
+		select {
+		case <-ps.close:
+			return
+		default:
+			ps.discover(ctx)
+			time.Sleep(ps.DiscoveryPeriod)
 		}
-	}()
-	<-ps.close
+	}
 }
 
 func (ps *SubPub) PeerConnect(pubKey string, callback func(*bufio.ReadWriter)) error {
-	ctx := context.Background()
+	ctx := context.TODO()
 
 	log.Infof("searching for peer %s", pubKey)
 	peerChan, err := ps.routing.FindPeers(ctx, pubKey)
@@ -303,13 +300,13 @@ func (ps *SubPub) PeerConnect(pubKey string, callback func(*bufio.ReadWriter)) e
 		stream, err := ps.Host.NewStream(ctx, peer.ID, protocol.ID(ps.Topic))
 		if err != nil {
 			log.Debugf("connection failed: ", err)
-		} else {
-			if !ps.connectedPeer(peer.ID) {
-				ps.addConnectedPeer(peer.ID)
-			}
-			log.Infof("connected to peer %s", peer.ID)
-			callback(bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream)))
+			continue
 		}
+		if !ps.connectedPeer(peer.ID) {
+			ps.addConnectedPeer(peer.ID)
+		}
+		log.Infof("connected to peer %s", peer.ID)
+		callback(bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream)))
 	}
 	return nil
 }
@@ -376,27 +373,28 @@ func (ps *SubPub) discover(ctx context.Context) {
 		case <-ps.close:
 			return
 		default:
-			// not myself
-			if peer.ID == ps.Host.ID() {
-				break
-			}
+			// continues below
+		}
+		// not myself
+		if peer.ID == ps.Host.ID() {
+			break
+		}
 
-			// if already connected
-			if ps.connectedPeer(peer.ID) {
-				log.Debugf("peer %s already connected", peer.ID)
-				break
-			}
-			// if new peer, let's connect to it
-			log.Debugf("found peer: %s", peer.ID)
+		// if already connected
+		if ps.connectedPeer(peer.ID) {
+			log.Debugf("peer %s already connected", peer.ID)
+			break
+		}
+		// if new peer, let's connect to it
+		log.Debugf("found peer: %s", peer.ID)
 
-			stream, err := ps.Host.NewStream(ctx, peer.ID, protocol.ID(ps.Topic))
-			if err == nil {
-				ps.addConnectedPeer(peer.ID)
-				log.Infof("connected to peer %s", peer.ID)
-				rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
-				go ps.broadcastHandler(rw)
-				go ps.readHandler(rw)
-			}
+		stream, err := ps.Host.NewStream(ctx, peer.ID, protocol.ID(ps.Topic))
+		if err == nil {
+			ps.addConnectedPeer(peer.ID)
+			log.Infof("connected to peer %s", peer.ID)
+			rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+			go ps.broadcastHandler(rw)
+			go ps.readHandler(rw)
 		}
 	}
 }
@@ -413,10 +411,10 @@ func (ps *SubPub) encrypt(msg []byte) string {
 func (ps *SubPub) decrypt(b64msg string) ([]byte, bool) {
 	msg, err := base64.StdEncoding.DecodeString(b64msg)
 	if err != nil {
-		return []byte{}, false
+		return nil, false
 	}
 	if len(msg) < 25 {
-		return []byte{}, false
+		return nil, false
 	}
 	var decryptNonce [24]byte
 	copy(decryptNonce[:], msg[:24])
