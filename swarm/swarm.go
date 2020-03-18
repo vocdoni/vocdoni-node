@@ -324,6 +324,16 @@ func (sn *SimpleSwarm) SetHandler(topic string, fh pss.HandlerFunc) {
 }
 
 func (sn *SimpleSwarm) PssSub(subType, key, topic string) error {
+	switch subType {
+	case "sym":
+		break
+	case "asym":
+		break
+	case "raw":
+		break
+	default:
+		return fmt.Errorf("subscription type not valid")
+	}
 	pssTopic := strTopic(topic)
 	pssAddress := strAddress("")
 	if subType == "sym" {

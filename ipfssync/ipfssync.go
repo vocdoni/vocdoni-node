@@ -146,7 +146,7 @@ func (is *IPFSsync) Handle(msg Message) error {
 
 	case "update":
 		if len(msg.Hash) > 31 && len(msg.Address) > 31 && !is.updateLock && len(is.askLock) == 0 {
-			if exist, err := is.hashTree.HashExist(msg.Hash); err == nil && !exist {
+			if exist, err := is.hashTree.HashExist(msg.Hash); err == nil && !exist && is.lastHash != msg.Hash {
 				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
 				is.askLock = msg.Hash
 				return is.askPins(msg.Address, msg.Hash)
@@ -290,7 +290,7 @@ func (is *IPFSsync) Start() {
 	var conn types.Connection
 	conn.Port = int(is.Port)
 	conn.Key = is.PrivKey
-	conn.Address, _ = signature.PubKeyFromPrivateKey(is.PrivKey)
+	//conn.Address, _ = signature.PubKeyFromPrivateKey(is.PrivKey)
 	conn.Topic = fmt.Sprintf("%x", signature.HashRaw(is.Topic))
 	conn.TransportKey = is.Topic
 	if is.private {

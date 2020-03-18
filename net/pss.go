@@ -1,6 +1,7 @@
 package net
 
 import (
+	"fmt"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -24,8 +25,9 @@ func (p *PSSHandle) Init(c *types.Connection) error {
 	if err != nil {
 		return err
 	}
-	sn.PssSub(p.Conn.Encryption, p.Conn.Key, p.Conn.Topic)
+	sn.PssSub("sym", p.Conn.TransportKey, p.Conn.Topic)
 	p.Swarm = sn
+	c.Address = fmt.Sprintf("%x", p.Swarm.PssAddr)
 	return nil
 }
 
@@ -52,12 +54,12 @@ func (p *PSSHandle) SetBootnodes(bootnodes []string) {
 }
 
 func (p *PSSHandle) Send(msg types.Message) {
-	err := p.Swarm.PssPub(p.Conn.Encryption, p.Conn.Key, p.Conn.Topic, string(msg.Data), p.Conn.Address)
+	err := p.Swarm.PssPub("sym", p.Conn.TransportKey, p.Conn.Topic, string(msg.Data), "")
 	if err != nil {
 		log.Warnf("PSS send error: %s", err)
 	}
 }
 
 func (p *PSSHandle) SendUnicast(address string, msg types.Message) {
-	p.Swarm.PssPub("sym", p.Conn.Key, p.Conn.Topic, string(msg.Data), address)
+	p.Swarm.PssPub("sym", p.Conn.TransportKey, p.Conn.Topic, string(msg.Data), address)
 }
