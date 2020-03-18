@@ -5,22 +5,22 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"sync"
-
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/types"
+	"github.com/klauspost/compress/zstd"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/tree"
+	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 type Namespaces struct {
@@ -45,6 +45,8 @@ type Manager struct {
 	Storage data.Storage
 
 	importQueue chan censusImport
+
+	compressor
 }
 
 type censusImport struct {
@@ -63,6 +65,8 @@ func (m *Manager) Init(storage, rootKey string) error {
 	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
 	m.importQueue = make(chan censusImport, 32)
 	m.AuthWindow = 10
+
+	m.compressor = newCompressor()
 
 	log.Infof("loading namespaces and keys from %s", nsConfig)
 	if _, err := os.Stat(nsConfig); os.IsNotExist(err) {
@@ -307,6 +311,7 @@ func (m *Manager) importQueueDaemon() {
 			log.Warnf("cannot retrieve census: %s", err)
 			continue
 		}
+		censusRaw = m.decompressBytes(censusRaw)
 		var dump types.CensusDump
 		err = json.Unmarshal(censusRaw, &dump)
 		if err != nil {
@@ -474,7 +479,6 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		return resp
 
 	case "importRemote":
-		// To-Do implement Gzip compression
 		if !isAuth || !validAuthPrefix {
 			resp.SetError("invalid authentication")
 			return resp
@@ -496,6 +500,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			resp.SetError("cannot retrieve census")
 			return resp
 		}
+		censusRaw = m.decompressBytes(censusRaw)
 		var dump types.CensusDump
 		err = json.Unmarshal(censusRaw, &dump)
 		if err != nil {
@@ -599,7 +604,6 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		return resp
 
 	case "publish":
-		// To-Do implement Gzip compression
 		if !isAuth || !validAuthPrefix {
 			resp.SetError("invalid authentication")
 			return resp
@@ -622,6 +626,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			log.Warnf("cannot marshal census dump: %s", err)
 			return resp
 		}
+		dumpBytes = m.compressBytes(dumpBytes)
 		cid, err := m.Storage.Publish(context.TODO(), dumpBytes)
 		if err != nil {
 			resp.SetError(err)
@@ -647,4 +652,78 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	}
 
 	return resp
+}
+
+type compressor struct {
+	encoder *zstd.Encoder
+	decoder *zstd.Decoder
+}
+
+func newCompressor() compressor {
+	var c compressor
+	var err error
+	c.encoder, err = zstd.NewWriter(nil)
+	if err != nil {
+		panic(err) // we don't use options, this shouldn't happen
+	}
+	c.decoder, err = zstd.NewReader(nil)
+	if err != nil {
+		panic(err) // we don't use options, this shouldn't happen
+	}
+	return c
+}
+
+// compressBytes compresses the input via zstd.
+func (c compressor) compressBytes(src []byte) []byte {
+	// ~50KiB of JSON containing base64 tends to compress to ~10% of its
+	// original size. This size also seems like a good starting point for
+	// most realistic compression ratios.
+	estimate := len(src) / 10
+	start := time.Now()
+	dst := c.encoder.EncodeAll(src, make([]byte, 0, estimate))
+	elapsed := time.Since(start)
+	log.Debugf("compressed %.2f KiB to %.2f KiB in %s with zstd, %.1f%% of the original size",
+		float64(len(src))/1000,
+		float64(len(dst))/1000,
+		elapsed,
+		float64(len(dst)*100)/float64(len(src)))
+	return dst
+}
+
+// isZstd reports whether the input bytes begin with zstd's magic number,
+// 0xFD2FB528 in little-endian format.
+//
+// There are "magic number detection" modules, but most are pretty heavy and
+// unnecessary, and we only need to detect zstd v1.
+func isZstd(src []byte) bool {
+	return len(src) >= 4 &&
+		src[0] == 0x28 && src[1] == 0xB5 &&
+		src[2] == 0x2f && src[3] == 0xFD
+}
+
+// decompressBytes tries to decompress the input as best it can. If it detects
+// the input to be zstd, it decompresses using that algorithm. Otherwise, it
+// assumes the input bytes aren't compressed and returns them as-is.
+func (c compressor) decompressBytes(src []byte) []byte {
+	if !isZstd(src) {
+		// We assume that no compression is used, e.g. before we started
+		// compressing census dumps when publishing to ipfs.
+		return src
+	}
+	// We use a compressione stimate of 1/10th the size. Let's use 5x as a
+	// starting point, following the same rule while being conservative.
+	estimate := len(src) * 5
+	start := time.Now()
+	dst, err := c.decoder.DecodeAll(src, make([]byte, 0, estimate))
+	if err != nil {
+		log.Errorf("could not decompress zstd: %v", err)
+		return nil
+	}
+	elapsed := time.Since(start)
+	log.Debugf("decompressed %.2f KiB to %.2f KiB in %s with zstd, %.1f%% of the original size",
+		float64(len(src))/1000,
+		float64(len(dst))/1000,
+		elapsed,
+		float64(len(dst)*100)/float64(len(src)))
+	return dst
 }
