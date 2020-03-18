@@ -21,12 +21,13 @@ import (
 )
 
 type Message struct {
-	Type     string   `json:"type"`
-	Address  string   `json:"address"`
-	Maddress string   `json:"mAddress"`
-	NodeID   string   `json:"nodeId"`
-	Hash     string   `json:"hash"`
-	PinList  []string `json:"pinList"`
+	Type      string   `json:"type"`
+	Address   string   `json:"address"`
+	Maddress  string   `json:"mAddress"`
+	NodeID    string   `json:"nodeId"`
+	Hash      string   `json:"hash"`
+	PinList   []string `json:"pinList"`
+	Timestamp int32    `json:"timestamp"`
 }
 
 // shity function to workaround NAT problems (hope it's temporary)
@@ -89,6 +90,7 @@ func (is *IPFSsync) askPins(address string, hash string) error {
 	msg.Type = "fetch"
 	msg.Address = is.myAddress
 	msg.Hash = hash
+	msg.Timestamp = int32(time.Now().Unix())
 	return is.unicastMsg(address, msg)
 }
 
@@ -98,6 +100,8 @@ func (is *IPFSsync) sendPins(address string) error {
 	msg.Address = is.myAddress
 	msg.Hash = is.hashTree.Root()
 	msg.PinList = is.listPins()
+	msg.Timestamp = int32(time.Now().Unix())
+
 	return is.unicastMsg(address, msg)
 }
 
@@ -118,7 +122,10 @@ func (is *IPFSsync) Handle(msg Message) error {
 	if msg.Address == is.myAddress {
 		return nil
 	}
-
+	if int32(time.Now().Unix())-msg.Timestamp > is.TimestampWindow {
+		log.Debug("discarting old message")
+		return nil
+	}
 	switch msg.Type {
 	case "hello":
 		peers, err := is.Storage.CoreAPI.Swarm().Peers(is.Storage.Node.Context())
@@ -184,6 +191,7 @@ func (is *IPFSsync) sendUpdate() {
 	msg.Type = "update"
 	msg.Address = is.myAddress
 	msg.Hash = is.hashTree.Root()
+	msg.Timestamp = int32(time.Now().Unix())
 	if len(is.listPins()) > 0 {
 		log.Debugf("current hash %s", msg.Hash)
 		err := is.broadcastMsg(msg)
@@ -199,6 +207,7 @@ func (is *IPFSsync) sendHello() {
 	msg.Address = is.myAddress
 	msg.Maddress = is.myMultiAddr.String()
 	msg.NodeID = is.myNodeID
+	msg.Timestamp = int32(time.Now().Unix())
 	err := is.broadcastMsg(msg)
 	if err != nil {
 		log.Warn(err)
@@ -217,18 +226,20 @@ func (is *IPFSsync) listPins() (pins []string) {
 }
 
 type IPFSsync struct {
-	DataDir     string
-	Key         string
-	PrivKey     string
-	Port        int16
-	HelloTime   int
-	UpdateTime  int
-	Bootnodes   []string
-	Storage     *data.IPFSHandle
-	Transport   net.Transport
+	DataDir         string
+	Key             string
+	PrivKey         string
+	Port            int16
+	HelloTime       int
+	UpdateTime      int
+	Bootnodes       []string
+	Storage         *data.IPFSHandle
+	Transport       net.Transport
+	Topic           string
+	Timeout         time.Duration
+	TimestampWindow int32
+
 	hashTree    tree.Tree
-	Topic       string
-	Timeout     time.Duration
 	updateLock  bool   // TODO(mvdan): this is super racy
 	askLock     string // TODO(mvdan): this is super racy
 	myAddress   string
@@ -249,6 +260,7 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 	is.UpdateTime = 20
 	is.Timeout = time.Second * 600
 	is.Storage = storage.(*data.IPFSHandle)
+	is.TimestampWindow = 30
 	if transport == "privlibp2p" {
 		transport = "libp2p"
 		is.private = true

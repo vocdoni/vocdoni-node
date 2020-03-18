@@ -243,8 +243,6 @@ func (ps *SubPub) Connect() {
 	// This is like telling your friends to meet you at the Eiffel Tower.
 	ps.routing = discovery.NewRoutingDiscovery(ps.dht)
 
-	log.Info("advertise own pubKey so nodes can find me")
-	discovery.Advertise(ctx, ps.routing, ps.PubKey)
 }
 
 func (ps *SubPub) Close() {
@@ -252,9 +250,26 @@ func (ps *SubPub) Close() {
 	ps.close <- true
 }
 
+func (ps *SubPub) advertise(ctx context.Context, topic string) {
+	duration := time.Duration(1 * time.Nanosecond)
+	for {
+		select {
+		case <-time.After(duration):
+			log.Infof("advertising topic %s", topic)
+			duration, _ = ps.routing.Advertise(ctx, topic)
+		case <-ps.close:
+			return
+		}
+	}
+
+}
+
 func (ps *SubPub) Subcribe() {
 	ctx := context.Background()
 	go ps.peersManager()
+	go ps.advertise(ctx, ps.Topic)
+	go ps.advertise(ctx, ps.PubKey)
+
 	go func() {
 		for {
 			select {
@@ -348,9 +363,6 @@ func (ps *SubPub) connectedPeer(pid peer.ID) bool {
 }
 
 func (ps *SubPub) discover(ctx context.Context) {
-	log.Debug("announcing ourselves as SubPub participants")
-	discovery.Advertise(ctx, ps.routing, ps.Topic)
-
 	// Now, look for others who have announced
 	// This is like your friend telling you the location to meet you.
 	log.Debugf("searching for SubPub group identity %s", ps.Topic)
@@ -359,7 +371,6 @@ func (ps *SubPub) discover(ctx context.Context) {
 		log.Fatal(err)
 		return
 	}
-
 	for peer := range peerChan {
 		select {
 		case <-ps.close:
