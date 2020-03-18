@@ -21,6 +21,7 @@ type MetaRequest struct {
 	EntityId       string   `json:"entityId,omitempty"`
 	From           int64    `json:"from,omitempty"`
 	FromID         string   `json:"fromId,omitempty"`
+	Hash           bool     `json:"hash,omitempty"`
 	ListSize       int64    `json:"listSize,omitempty"`
 	Method         string   `json:"method"`
 	Name           string   `json:"name,omitempty"`
