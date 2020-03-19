@@ -9,7 +9,7 @@ ORACLEARGS="\
  ${oracle_ethNodePort:+ --ethNodePort=${oracle_ethNodePort}}\
  ${oracle_ethBootNodes:+ --ethBootNodes=${oracle_ethBootNodes}}\
  ${oracle_ethTrustedPeers:+ --ethTrustedPeers=${oracle_ethTrustedPeers}}\
- ${oracle_dev:+ --dev}\
+ ${oracle_dev:+ --dev=${oracle_dev}}\
  ${oracle_logLevel:+ --logLevel=${oracle_logLevel}}\
  ${oracle_logOutput:+ --logOutput=${oracle_logOutput}}\
  ${oracle_subscribeOnly:+ --subscribeOnly=${oracle_subscribeOnly}}\
