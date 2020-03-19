@@ -72,3 +72,9 @@ require (
 	gopkg.in/yaml.v2 v2.2.7 // indirect
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
 )
+
+// Duktape is very slow to build, and can't be built with multiple cores since
+// it includes a lot of C in a single file. Until
+// https://github.com/ethereum/go-ethereum/issues/20590 is fixed, stub it out
+// with a replace directive. The stub was hacked together with vim.
+replace gopkg.in/olebedev/go-duktape.v3 => ./duktape-stub
