@@ -92,6 +92,7 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
+	req.Digested = true
 	resp = c.Request(req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)

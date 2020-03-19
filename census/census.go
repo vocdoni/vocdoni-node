@@ -418,7 +418,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			for i, c := range r.ClaimsData {
 				data, err := base64.StdEncoding.DecodeString(c)
 				if err == nil {
-					if r.Hash {
+					if !r.Digested {
 						data = signature.HashPoseidon(fmt.Sprintf("%x", data))
 					}
 					err = tr.AddClaim(data)
@@ -447,7 +447,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 				log.Warnf("error decoding base64 string: %s", err)
 				resp.SetError(err)
 			}
-			if r.Hash {
+			if !r.Digested {
 				data = signature.HashPoseidon(fmt.Sprintf("%x", data))
 			}
 			err = tr.AddClaim(data)
