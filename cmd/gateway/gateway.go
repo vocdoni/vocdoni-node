@@ -56,6 +56,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 
 	// gateway
 	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
+	flag.BoolVar(&globalCfg.Dev, "dev", false, "run and connect to the development network")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
@@ -63,7 +64,6 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.CensusSync = *flag.Bool("censusSync", true, "automatically import new census published on smart contract")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
 	globalCfg.EthProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
-	globalCfg.Dev = *flag.Bool("dev", false, "run and connect to the development network")
 
 	// api
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
@@ -94,7 +94,6 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.Ipfs.SyncPeers = *flag.StringArray("ipfsSyncPeers", []string{}, "use custom ipfsSync peers/bootnodes for accessing the DHT")
 	// ssl
 	globalCfg.Ssl.Domain = *flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
-	globalCfg.Ssl.DirCert = *flag.String("sslDirCert", globalCfg.DataDir+"/tls/", "path where to store ssl related data")
 	// vochain
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
 	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
@@ -109,6 +108,9 @@ func newConfig() (*config.GWCfg, config.Error) {
 	// parse flags
 	flag.Parse()
 
+	if globalCfg.Dev {
+		globalCfg.DataDir += "/dev"
+	}
 	// setting up viper
 	viper := viper.New()
 	viper.AddConfigPath(globalCfg.DataDir)
@@ -168,6 +170,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.createGenesis", flag.Lookup("vochainCreateGenesis"))
 	viper.BindPFlag("vochainConfig.genesis", flag.Lookup("vochainGenesis"))
 	viper.BindPFlag("vochainConfig.keyFile", flag.Lookup("vochainKeyFile"))
+	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
 
 	// check if config file exists
 	_, err = os.Stat(globalCfg.DataDir + "/gateway.yml")
@@ -245,8 +248,7 @@ func main() {
 
 	// using dev mode
 	if globalCfg.Dev {
-		log.Info("using development mode")
-		globalCfg.VochainConfig.Dev = globalCfg.Dev
+		log.Infof("using development mode, datadir %s", globalCfg.DataDir)
 	}
 
 	// check if errors during config creation and determine if Critical
