@@ -16,20 +16,20 @@ RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/...
 
 FROM debian:10.2-slim AS gateway
 WORKDIR /app
-COPY --from=builder /src/gateway /src/dockerfiles/gateway/files/gatewayStart.sh ./
+COPY --from=builder /src/gateway /src/dockerfiles/gateway/files/gatewayStart.sh /src/misc ./
 ENTRYPOINT ["/app/gatewayStart.sh"]
 
 FROM debian:10.2-slim AS census
 WORKDIR /app
-COPY --from=builder /src/censushttp /src/dockerfiles/census/files/censusStart.sh ./
+COPY --from=builder /src/censushttp /src/dockerfiles/census/files/censusStart.sh /src/misc ./
 ENTRYPOINT ["/app/censusStart.sh"]
 
 FROM debian:10.2-slim AS miner
 WORKDIR /app
-COPY --from=builder /src/miner /src/dockerfiles/miner/files/minerStart.sh ./
+COPY --from=builder /src/miner /src/dockerfiles/miner/files/minerStart.sh /src/misc ./
 ENTRYPOINT ["/app/minerStart.sh"]
 
 FROM debian:10.2-slim AS oracle
 WORKDIR /app
-COPY --from=builder /src/oracle /src/dockerfiles/oracle/files/oracleStart.sh ./
+COPY --from=builder /src/oracle /src/dockerfiles/oracle/files/oracleStart.sh /src/misc ./
 ENTRYPOINT ["/app/oracleStart.sh"]
