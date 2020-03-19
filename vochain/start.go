@@ -27,7 +27,7 @@ var (
 	// ProdSeedNodes production vochain network seed nodes
 	ProdSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
 	// TestSeedNodes testing vochain network seed nodes
-	TestSeedNodes = []string{"7440a5b086e16620ce7b13198479016aa2b07988@116.202.8.150:11715"}
+	DevSeedNodes = []string{"7440a5b086e16620ce7b13198479016aa2b07988@116.202.8.150:11715"}
 )
 
 // NewVochain starts a node with an ABCI application
@@ -99,15 +99,6 @@ func (l *tenderLogger) With(keyvals ...interface{}) tlog.Logger {
 
 // we need to set init (first time validators and oracles)
 func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis []byte, pv *privval.FilePV) (*nm.Node, error) {
-	var defaultSeedNodes []string
-	if len(localConfig.Seeds) == 0 {
-		if !localConfig.Dev {
-			defaultSeedNodes = ProdSeedNodes
-		} else {
-			defaultSeedNodes = TestSeedNodes
-		}
-	}
-
 	// create node config
 	var err error
 
@@ -126,7 +117,11 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	if !localConfig.CreateGenesis {
 		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]\"")
 		if len(tconfig.P2P.Seeds) < 8 && !localConfig.SeedMode {
-			tconfig.P2P.Seeds = strings.Join(defaultSeedNodes[:], ",")
+			if !localConfig.Dev {
+				tconfig.P2P.Seeds = strings.Join(ProdSeedNodes[:], ",")
+			} else {
+				tconfig.P2P.Seeds = strings.Join(DevSeedNodes[:], ",")
+			}
 		}
 		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
 
