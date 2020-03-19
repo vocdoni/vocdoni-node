@@ -3,6 +3,7 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -50,7 +51,9 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	}
 	// start node
 	node.Start()
-	defer node.Node.Stop()
+	// TODO(mvdan): re-enable Node.Stop once
+	// https://github.com/ethereum/go-ethereum/issues/20420 is fixed
+	// defer node.Node.Stop()
 	// proxy websocket handle
 	pxyAddr := fmt.Sprintf("ws://%s/web3ws", pxy.Addr)
 	// Create WebSocket endpoint
@@ -108,8 +111,22 @@ func TestWeb3WSEndpoint(t *testing.T) {
 // NewMockEthereum creates an ethereum node, attaches a signing key and adds a http or ws endpoint to a given proxy
 func NewMockEthereum(logLevel, dataDir string, pxy *dnet.Proxy) (*chain.EthChainContext, error) {
 	// create base config
-	ethConfig := &config.EthCfg{LogLevel: logLevel, DataDir: dataDir, ChainType: "goerli", LightMode: false, NodePort: 30303}
-	w3Config := &config.W3Cfg{HTTPHost: "0.0.0.0", WsHost: "0.0.0.0", Route: "/web3", Enabled: true, HTTPAPI: true, WSAPI: true, HTTPPort: 9091, WsPort: 9092}
+	ethConfig := &config.EthCfg{
+		LogLevel:  logLevel,
+		DataDir:   dataDir,
+		ChainType: "goerli",
+	}
+	w3Config := &config.W3Cfg{
+		HTTPHost: "0.0.0.0",
+		WsHost:   "0.0.0.0",
+		Route:    "/web3",
+		Enabled:  true,
+		HTTPAPI:  true,
+		WSAPI:    true,
+		// TODO(mvdan): use 0 to grab a random unused port instead.
+		HTTPPort: 1000 + rand.Intn(10000),
+		WsPort:   1000 + rand.Intn(10000),
+	}
 	// init node
 	w3cfg, err := chain.NewConfig(ethConfig, w3Config)
 	if err != nil {
