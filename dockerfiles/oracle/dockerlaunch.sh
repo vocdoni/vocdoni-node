@@ -6,10 +6,10 @@ IN_MEMORY="${IN_MEMORY:-false}"
 
 echo "Using image '$IMAGE_TAG:latest'\n"
 
-#docker build -t $IMAGE_TAG --target oracle . || {
-#	echo "ERROR: docker image cannot be created, exiting..."
-#	exit 2
-#}
+docker build -t $IMAGE_TAG --target oracle . || {
+	echo "ERROR: docker image cannot be created, exiting..."
+	exit 2
+}
 
 # CHECK IF ALREADY RUNNING
 COUNT="$(docker ps -a | grep $IMAGE_TAG | wc -l)"
