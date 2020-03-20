@@ -19,14 +19,14 @@ cache:
     - .cache/
 
 go-test:
-  image: golang:1.14
+  image: golang:1.14.1
   stage: test
   script:
     - go test -vet=off ./... # we run vet in another step
     - go test -vet=off -race ./...
 
 go-analyze:
-  image: golang:1.14
+  image: golang:1.14.1
   stage: test
   script:
     - diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
