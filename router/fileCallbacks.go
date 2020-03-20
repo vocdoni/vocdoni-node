@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-
-	"errors"
 	"strings"
 
 	"gitlab.com/vocdoni/go-dvote/log"

@@ -132,7 +132,7 @@ func addAndPin(ctx context.Context, n *ipfscore.IpfsNode, root string) (rootHash
 }
 
 func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
-	//path = strings.ReplaceAll(path, "/ipld/", "/ipfs/")
+	// path = strings.ReplaceAll(path, "/ipld/", "/ipfs/")
 
 	p := corepath.New(path)
 	rp, err := i.CoreAPI.ResolvePath(ctx, p)

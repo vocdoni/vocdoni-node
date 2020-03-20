@@ -1,6 +1,7 @@
 package ipfs
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -9,7 +10,6 @@ import (
 	config "github.com/ipfs/go-ipfs-config"
 	"github.com/ipfs/go-ipfs/plugin/loader"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
-	"github.com/pkg/errors"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 )
@@ -41,7 +41,7 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 	}
 
 	if fsrepo.IsInitialized(repoRoot) {
-		return nil, errors.New("repo exists")
+		return nil, fmt.Errorf("repo exists")
 	}
 
 	conf, err := config.Init(out, nBitsForKeypair)
@@ -75,9 +75,9 @@ func checkWritable(dir string) error {
 		fi, err := os.Create(testfile)
 		if err != nil {
 			if os.IsPermission(err) {
-				return errors.Errorf("%s is not writeable by the current user", dir)
+				return fmt.Errorf("%s is not writeable by the current user", dir)
 			}
-			return errors.Errorf("unexpected error while checking writeablility of repo root: %s", err)
+			return fmt.Errorf("unexpected error while checking writeablility of repo root: %s", err)
 		}
 		fi.Close()
 		return os.Remove(testfile)
@@ -89,7 +89,7 @@ func checkWritable(dir string) error {
 	}
 
 	if os.IsPermission(err) {
-		return errors.Errorf("cannot write to %s, incorrect permissions", err)
+		return fmt.Errorf("cannot write to %s, incorrect permissions", err)
 	}
 
 	return err

@@ -22,8 +22,8 @@ go-test:
   image: golang:1.14.1
   stage: test
   script:
-    - go test -vet=off ./... # we run vet in another step
-    - go test -vet=off -race ./...
+    - go test -vet=off -timeout=1m ./... # we run vet in another step
+    - go test -vet=off -timeout=5m -race ./...
 
 go-analyze:
   image: golang:1.14.1

@@ -16,7 +16,6 @@ import (
 	"github.com/ipfs/go-ipfs/core/corerepo"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
-	"github.com/pkg/errors"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 )
@@ -33,8 +32,7 @@ func Init() error {
 	log.Info("checking if daemon is running")
 	if daemonLocked {
 		log.Debug("ipfs daemon is running")
-		e := "ipfs daemon is running. please stop it to run this command"
-		return errors.New(e)
+		return fmt.Errorf("ipfs daemon is running. please stop it to run this command")
 	}
 
 	if err := os.MkdirAll(ConfigRoot, 0770); err != nil {

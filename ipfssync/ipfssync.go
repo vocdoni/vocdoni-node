@@ -302,7 +302,7 @@ func (is *IPFSsync) Start() {
 	var conn types.Connection
 	conn.Port = int(is.Port)
 	conn.Key = is.PrivKey
-	//conn.Address, _ = signature.PubKeyFromPrivateKey(is.PrivKey)
+	// conn.Address, _ = signature.PubKeyFromPrivateKey(is.PrivKey)
 	conn.Topic = fmt.Sprintf("%x", signature.HashRaw(is.Topic))
 	conn.TransportKey = is.Topic
 	if is.private {

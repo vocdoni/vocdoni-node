@@ -2,12 +2,11 @@
 package vochain
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 
@@ -165,7 +164,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	}
 
 	if err := tconfig.ValidateBasic(); err != nil {
-		return nil, errors.Wrap(err, "config is invalid")
+		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
 
 	// create logger
@@ -173,14 +172,14 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 
 	logger, err = tmflags.ParseLogLevel(tconfig.LogLevel, logger, cfg.DefaultLogLevel())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse log level")
+		return nil, fmt.Errorf("failed to parse log level: %w", err)
 	}
 
 	// read or create private validator
 	if pv == nil {
 		pv, err = NewPrivateValidator(localConfig, tconfig)
 		if err != nil {
-			return nil, errors.Wrap(err, "cannot create validator key and state")
+			return nil, fmt.Errorf("cannot create validator key and state: %w", err)
 		}
 	} else {
 		pv.Save()
@@ -198,7 +197,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		log.Infof("using keyfile %s", tconfig.NodeKeyFile())
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load node's key")
+		return nil, fmt.Errorf("failed to load node's key: %w", err)
 	}
 	log.Infof("my vochain address: %s", nodeKey.PubKey().Address())
 	log.Infof("my vochain ID: %s", nodeKey.ID())
@@ -226,7 +225,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		nm.DefaultMetricsProvider(tconfig.Instrumentation),
 		logger)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create new Tendermint node")
+		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}
 	log.Debugf("consensus config %+v", *node.Config().Consensus)
 
