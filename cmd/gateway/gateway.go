@@ -64,7 +64,6 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.CensusSync = *flag.Bool("censusSync", true, "automatically import new census published on smart contract")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
 	globalCfg.EthProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
-
 	// api
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable census API")

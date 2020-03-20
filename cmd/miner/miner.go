@@ -36,6 +36,7 @@ func newConfig() (*config.VochainCfg, config.Error) {
 
 	// creating flags
 	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
+	flag.BoolVar(&globalCfg.Dev, "dev", false, "run and connect to the development network")
 	globalCfg.P2PListen = *flag.String("p2pListen", "0.0.0.0:26656", "p2p host and port to listen")
 	globalCfg.RPCListen = *flag.String("rpcListen", "0.0.0.0:26657", "rpc host and port to listen")
 	globalCfg.Genesis = *flag.String("genesis", "", "use alternative genesis file")
@@ -48,10 +49,13 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.PublicAddr = *flag.String("publicAddr", "", "IP address where the node will be exposed, guessed automatically if empty")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
-	globalCfg.Dev = *flag.Bool("dev", false, "run and connect to the development network")
 
 	// parse flags
 	flag.Parse()
+
+	if globalCfg.Dev {
+		globalCfg.DataDir += "/dev"
+	}
 
 	// setting up viper
 	viper := viper.New()

@@ -62,12 +62,12 @@ func newConfig() (*config.OracleCfg, config.Error) {
 
 	// oracle
 	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
+	flag.BoolVar(&globalCfg.Dev, "dev", false, "run and connect to the development network")
 	globalCfg.SubscribeOnly = *flag.Bool("subscribeOnly", true, "oracle can read all ethereum logs or just subscribe to the new ones, by default only subscribe")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
 	globalCfg.EthProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
-	globalCfg.Dev = *flag.Bool("dev", false, "run and connect to the development network")
 
 	// vochain
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "vochain p2p host and port to listen on")
@@ -78,7 +78,6 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	globalCfg.VochainConfig.RPCListen = *flag.String("vochainRPCListen", "0.0.0.0:26657", "vochain rpc host and port to listen on")
 	globalCfg.VochainConfig.KeyFile = *flag.String("vochainKeyFile", "", "user alternative vochain p2p node key file")
 	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "", "IP address where the vochain node will be exposed, guessed automatically if empty")
-	globalCfg.VochainConfig.DataDir = globalCfg.DataDir + "/vochain"
 
 	// ethereum
 	globalCfg.EthConfig.SigningKey = *flag.String("ethSigningKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
@@ -88,6 +87,7 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootnodes", []string{}, "Ethereum p2p custom bootstrap nodes (enode://<pubKey>@<ip>[:port])")
 	globalCfg.EthConfig.TrustedPeers = *flag.StringArray("ethTrustedPeers", []string{}, "Ethereum p2p trusted peer nodes (enode://<pubKey>@<ip>[:port])")
 	globalCfg.EthConfig.DataDir = globalCfg.DataDir + "/ethereum"
+
 	// web3
 	globalCfg.W3Config.WsPort = *flag.Int("w3WsPort", 9092, "web3 websocket server port")
 	globalCfg.W3Config.WsHost = *flag.String("w3WsHost", "0.0.0.0", "web3 websocket server host")
@@ -95,6 +95,10 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	globalCfg.W3Config.HTTPHost = *flag.String("w3HTTPHost", "0.0.0.0", "web3 http server host")
 	// parse flags
 	flag.Parse()
+
+	if globalCfg.Dev {
+		globalCfg.DataDir += "/dev"
+	}
 
 	// setting up viper
 	viper := viper.New()
@@ -121,6 +125,7 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.peers", flag.Lookup("vochainPeers"))
 	viper.BindPFlag("vochainConfig.seeds", flag.Lookup("vochainSeeds"))
 	viper.BindPFlag("vochainConfig.keyFile", flag.Lookup("vochainKeyFile"))
+	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
 
 	// ethereum
 	viper.Set("ethConfig.datadir", globalCfg.DataDir+"/ethereum")
@@ -205,7 +210,6 @@ func main() {
 
 	if globalCfg.Dev {
 		log.Info("using development mode")
-		globalCfg.VochainConfig.Dev = globalCfg.Dev
 	}
 
 	// start vochain node
