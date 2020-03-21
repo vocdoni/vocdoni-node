@@ -225,29 +225,6 @@ func (e *EthChainContext) createAccount() error {
 	return nil
 }
 
-/*
-func getPassPhrase(prompt string, confirmation bool) string {
-	// Otherwise prompt the user for the password
-	if prompt != "" {
-		log.Info(prompt)
-	}
-	phrase, err := console.Stdin.PromptPassword("Passphrase: ")
-	if err != nil {
-		log.Fatalf("failed to read passphrase: %v", err)
-	}
-	if confirmation {
-		confirm, err := console.Stdin.PromptPassword("repeat passphrase: ")
-		if err != nil {
-			log.Fatalf("failed to read passphrase confirmation: %v", err)
-		}
-		if phrase != confirm {
-			log.Fatalf("passphrases do not match")
-		}
-	}
-	return phrase
-}
-*/
-
 // PrintInfo prints every N seconds some ethereum information (sync and height). It's blocking!
 func (e *EthChainContext) PrintInfo(seconds time.Duration) {
 	for {

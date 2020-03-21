@@ -77,15 +77,6 @@ func (i *IPFSHandle) URIprefix() string {
 	return "ipfs://"
 }
 
-// PublishFile publishes a file specified by root to ipfs
-func PublishFile(ctx context.Context, root []byte, nd *ipfscore.IpfsNode) (string, error) {
-	rootHash, err := addAndPin(ctx, nd, string(root))
-	if err != nil {
-		return "", err
-	}
-	return rootHash, nil
-}
-
 // PublishBytes publishes a file containing msg to ipfs
 func PublishBytes(ctx context.Context, msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))

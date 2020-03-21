@@ -201,15 +201,6 @@ func (k *SignKeys) Verify(message, signHex string) (bool, error) {
 	return result, nil
 }
 
-// VerifyJSON verifies a JSON message. Signature is HexString
-func (k *SignKeys) VerifyJSON(message interface{}, signHex string) (bool, error) {
-	rawMsg, err := json.Marshal(message)
-	if err != nil {
-		return false, errors.New("unable to marshal message to sign: %s")
-	}
-	return k.Verify(string(rawMsg), signHex)
-}
-
 // VerifySender verifies if a message is sent by some Authorized address key
 func (k *SignKeys) VerifySender(msg, sigHex string) (bool, string, error) {
 	recoveredAddr, err := AddrFromSignature(msg, sigHex)

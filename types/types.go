@@ -1,7 +1,5 @@
 package types
 
-import "encoding/json"
-
 type MessageContext interface {
 	ConnectionType() string
 }
@@ -15,15 +13,6 @@ func (c PssContext) ConnectionType() string {
 	return "PSS"
 }
 
-/*
-func (c *PssContext) Topic() string {
-	return c.Topic
-}
-
-func (c *PssContext) PeerAddress() string {
-	return c.PeerAddress
-}
-*/
 type PubSubContext struct {
 	Topic       string
 	PeerAddress string
@@ -33,31 +22,11 @@ func (c PubSubContext) ConnectionType() string {
 	return "PubSub"
 }
 
-/*
-func (c *PubSubContext) Topic() string {
-	return c.Topic
-}
-*/
-
-/*
-func (c *WebsocketContext) Conn() *net.Conn {
-	return c.Conn
-}
-*/
-
 // Message is a wrapper for messages from various net transport modules
 type Message struct {
 	Data      []byte
 	TimeStamp int32
 	Context   MessageContext
-}
-
-func (m *Message) Encode() ([]byte, error) {
-	return json.Marshal(m)
-}
-
-func (m *Message) Decode(data []byte) error {
-	return json.Unmarshal(data, m)
 }
 
 // Connection describes the settings for any of the transports defined in the net module, note that not all

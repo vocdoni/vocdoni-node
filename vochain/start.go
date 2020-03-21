@@ -51,11 +51,6 @@ func NewVochain(globalCfg *config.VochainCfg, genesis []byte, pv *privval.FilePV
 	return app
 }
 
-// Start starts a new vochain validator node
-func Start(node *nm.Node) error {
-	return node.Start()
-}
-
 // tenderLogger implements tendermint's Logger interface, with a couple of
 // modifications.
 //

@@ -3,8 +3,6 @@ package db
 // modified from https://github.com/iden3/go-iden3/blob/master/db/leveldb.go
 
 import (
-	"encoding/json"
-
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -31,10 +29,6 @@ func NewLevelDbStorage(path string, errorIfMissing bool) (*LevelDbStorage, error
 	return &LevelDbStorage{ldb, []byte{}}, nil
 }
 
-type storageInfo struct {
-	KeyCount int
-}
-
 // Count returns the number of elements of the database
 func (l *LevelDbStorage) Count() int {
 	keycount := 0
@@ -48,25 +42,6 @@ func (l *LevelDbStorage) Count() int {
 		log.Panic(err)
 	}
 	return keycount
-}
-
-// Info returns some basic info regarding the database
-func (l *LevelDbStorage) Info() string {
-	keycount := 0
-	db := l.ldb
-	iter := db.NewIterator(util.BytesPrefix(l.prefix), nil)
-	for iter.Next() {
-		keycount++
-	}
-	iter.Release()
-	if err := iter.Error(); err != nil {
-		return err.Error()
-	}
-	json, _ := json.MarshalIndent(
-		storageInfo{keycount},
-		"", "  ",
-	)
-	return string(json)
 }
 
 // WithPrefix returns a levelDB with an appended new prefix

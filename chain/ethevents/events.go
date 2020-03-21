@@ -107,11 +107,6 @@ func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, c
 	}, nil
 }
 
-// NewBlockInfo creates a pointer to a new BlockInfo
-func NewBlockInfo() *BlockInfo {
-	return &BlockInfo{}
-}
-
 // AddEventHandler adds a new handler even log function
 func (ev *EthereumEvents) AddEventHandler(h EventHandler) {
 	ev.EventHandlers = append(ev.EventHandlers, h)
@@ -138,7 +133,7 @@ func (ev *EthereumEvents) EthereumBlockListener() BlockInfo {
 			if err != nil {
 				log.Fatal(err)
 			}
-			blockInfo := NewBlockInfo()
+			blockInfo := &BlockInfo{}
 			blockInfo.Hash = block.Hash().Hex()            // 0xbc10defa8dda384c96a17640d84de5578804945d347072e091b4e5f390ddea7f
 			blockInfo.Number = block.Number().Uint64()     // 3477413
 			blockInfo.Time = block.Time()                  // 1529525947

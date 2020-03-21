@@ -19,9 +19,7 @@ import (
 	amino "github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
-	"github.com/tendermint/tendermint/crypto"
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
-	"github.com/tendermint/tendermint/crypto/tmhash"
 	"github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -370,11 +368,6 @@ func GenerateNullifier(address, processID string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%x", signature.HashRaw(fmt.Sprintf("%s%s", addrBytes, pidBytes))), nil
-}
-
-// GenerateAddressFromEd25519PublicKeyString returns the address as string from given pubkey represented as string
-func GenerateAddressFromEd25519PublicKeyString(publicKey string) string {
-	return crypto.Address(tmhash.SumTruncated([]byte(publicKey))).String()
 }
 
 // NewPrivateValidator returns a tendermint file private validator given the required config

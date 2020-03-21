@@ -152,13 +152,6 @@ type CensusCfg struct {
 	RootKey   string
 }
 
-type GenCfg struct {
-	LogLevel    string
-	Target      string
-	Connections int
-	Interval    int
-}
-
 // VochainCfg includes all possible config params needed by the Vochain
 type VochainCfg struct {
 	// Dev indicates we use the Vochain development mode

@@ -351,17 +351,6 @@ func (v *State) CountVotes(processID string) int64 {
 	return count
 }
 
-/*
-func (v *State) CountVotes(processID string) int64 {
-	processID = util.TrimHex(processID)
-	var count int64
-	v.VoteTree.IterateRange([]byte(processID), nil, true, func(key []byte, value []byte) bool {
-		count++
-		return false
-	})
-	return count
-}
-*/
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
 func (v *State) EnvelopeList(processID string, from, listSize int64) []string {
 	processID = util.TrimHex(processID)

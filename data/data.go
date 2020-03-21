@@ -4,7 +4,6 @@ package data
 import (
 	"context"
 	"errors"
-	"os"
 
 	"gitlab.com/vocdoni/go-dvote/types"
 )
@@ -18,10 +17,6 @@ type Storage interface {
 	ListPins(ctx context.Context) (map[string]string, error)
 	URIprefix() string
 	Stats(ctx context.Context) (string, error)
-}
-
-type StorageConfig interface {
-	Type() StorageID
 }
 
 type StorageID int
@@ -46,23 +41,6 @@ func IPFSNewConfig(path string) *types.DataStore {
 	datastore := new(types.DataStore)
 	datastore.Datadir = path
 	return datastore
-}
-
-func InitDefault(t StorageID) (Storage, error) {
-	switch t {
-	case IPFS:
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, errors.New("cannot get $HOME")
-		}
-		s := new(IPFSHandle)
-		defaultDataStore := new(types.DataStore)
-		defaultDataStore.Datadir = home + "/.ipfs/"
-		err = s.Init(defaultDataStore)
-		return s, err
-	default:
-		return nil, errors.New("bad storage type specification")
-	}
 }
 
 func Init(t StorageID, d *types.DataStore) (Storage, error) {

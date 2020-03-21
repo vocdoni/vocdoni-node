@@ -36,11 +36,6 @@ type Vote struct {
 	VotePackage string `json:"vote-package,omitempty"`
 }
 
-// NewVote returns a new Vote instance
-func NewVote() *Vote {
-	return &Vote{}
-}
-
 // ________________________ PROCESS ________________________
 
 // Process represents a state per process
@@ -61,11 +56,6 @@ type Process struct {
 	StartBlock int64 `json:"startBlock,omitempty"`
 	// Type represents the process type
 	Type string `json:"type,omitempty"`
-}
-
-// NewProcess returns a new Process instance
-func NewProcess() *Process {
-	return &Process{}
 }
 
 // ________________________ TX ________________________
