@@ -170,7 +170,7 @@ func main() {
 	// node + app layer
 	var vnode *vochain.BaseApplication
 	if globalCfg.Dev {
-		vnode = vochain.NewVochain(globalCfg, []byte(vochain.TestnetGenesis3), nil)
+		vnode = vochain.NewVochain(globalCfg, []byte(vochain.DevelopmentGenesis1), nil)
 	} else {
 		vnode = vochain.NewVochain(globalCfg, []byte(vochain.TestnetGenesis1), nil)
 	}

@@ -411,7 +411,7 @@ func main() {
 		}
 
 		if globalCfg.Dev {
-			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis3), nil)
+			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.DevelopmentGenesis1), nil)
 		} else {
 			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1), nil)
 		}
