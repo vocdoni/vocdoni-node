@@ -42,7 +42,7 @@ type EthChainConfig struct {
 	NetworkId      int
 	NetworkGenesis []byte
 	BootstrapNodes []string
-	TrustedPeers   []string
+	TrustedPeers   []*enode.Node
 	KeyStore       string
 	DataDir        string
 	IPCPath        string
@@ -50,7 +50,7 @@ type EthChainConfig struct {
 	W3external     string
 }
 
-// available chains: vctestnet
+// NewConfig returns an Ethereum config using some default values
 func NewConfig(ethCfg *config.EthCfg, w3Cfg *config.W3Cfg) (*EthChainConfig, error) {
 	chainSpecs, err := SpecsFor(ethCfg.ChainType)
 	if err != nil {
@@ -81,7 +81,12 @@ func NewConfig(ethCfg *config.EthCfg, w3Cfg *config.W3Cfg) (*EthChainConfig, err
 	if len(ethCfg.TrustedPeers) > 0 && len(ethCfg.TrustedPeers[0]) > 32 {
 		r := strings.NewReplacer("[", "", "]", "") // viper []string{} sanity
 		for _, b := range ethCfg.TrustedPeers {
-			cfg.TrustedPeers = append(cfg.TrustedPeers, r.Replace(b))
+			node, err := enode.ParseV4(r.Replace(b))
+			if err != nil {
+				log.Warn(err)
+				continue
+			}
+			cfg.TrustedPeers = append(cfg.TrustedPeers, node)
 		}
 	}
 	defaultDirPath := ethCfg.DataDir
@@ -154,6 +159,9 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	if c.LightMode {
 		log.Info("using chain light mode synchronization")
 		ethConfig.SyncMode = downloader.LightSync
+	} else {
+		log.Info("using chain fast mode synchronization")
+		ethConfig.SyncMode = downloader.FastSync
 	}
 	if len(c.W3external) > 0 {
 		log.Infof("using external web3 endpoint %s", c.W3external)
@@ -201,15 +209,11 @@ func (e *EthChainContext) Start() {
 			e.Eth = et
 		}
 		log.Infof("my enode address: %s", e.Node.Server().NodeInfo().Enode)
-
 		for _, p := range e.DefaultConfig.TrustedPeers {
-			node, err := enode.ParseV4(p)
-			if err != nil {
-				log.Warn(err)
-				continue
-			}
-			log.Infof("adding tusted peer %s", node)
-			e.Node.Server().AddTrustedPeer(node)
+			log.Infof("adding tusted peer %s", p)
+			// AddTrustedPeer does not work as expected, but AddPeer does. So using both.
+			e.Node.Server().AddPeer(p)
+			e.Node.Server().AddTrustedPeer(p)
 		}
 	}
 }
@@ -248,8 +252,13 @@ func (e *EthChainContext) SyncInfo() (height string, synced bool, peers int, err
 		}
 		r.Call(&synced, "eth_syncing") // true = syncing / false if synced
 		synced = !synced
-		err = r.Call(&height, "eth_blockNumber")
-		height = fmt.Sprintf("%d", util.Hex2int64(height))
+		r.Call(&height, "eth_blockNumber")
+		block := util.Hex2int64(height)
+		if block == 0 {
+			// Workaround
+			synced = false
+		}
+		height = fmt.Sprintf("%d", block)
 		peers = e.Node.Server().PeerCount()
 		return
 	}
@@ -268,7 +277,13 @@ func (e *EthChainContext) SyncInfo() (height string, synced bool, peers int, err
 	}
 	if e.Eth != nil {
 		synced = e.Eth.Synced()
-		height = e.Eth.BlockChain().CurrentBlock().Number().String()
+		if synced {
+			height = e.Eth.BlockChain().CurrentBlock().Number().String()
+		} else {
+			height = fmt.Sprintf("%d/%d",
+				e.Eth.Downloader().Progress().CurrentBlock,
+				e.Eth.Downloader().Progress().HighestBlock)
+		}
 		peers = e.Node.Server().PeerCount()
 		return
 	}

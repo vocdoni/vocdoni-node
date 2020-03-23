@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -463,7 +462,6 @@ func main() {
 	if globalCfg.EthConfig.LightMode {
 		minPeers = 2
 	}
-
 	if !ethNoWaitSync {
 		for {
 			if height, synced, peers, _ := node.SyncInfo(); synced && peers >= minPeers && height != "0" {
@@ -534,11 +532,7 @@ func main() {
 			for _, synced, _, _ := node.SyncInfo(); !synced; {
 				time.Sleep(time.Second * 2)
 			}
-			height, _, _, _ := node.SyncInfo()
-			lastBlock, err := strconv.ParseInt(height, 10, 64)
-			if err != nil {
-				log.Fatalf("cannot read logs, ethereum last block parsing failed: %s at block %d", err, height)
-			}
+			lastBlock := node.Eth.BlockChain().CurrentBlock().Number().Int64()
 			log.Infof("searching for census from block 0 to %d", lastBlock)
 			ev.ReadEthereumEventLogs(0, lastBlock)
 			// Wait until having some peers
