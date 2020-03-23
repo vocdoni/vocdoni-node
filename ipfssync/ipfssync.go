@@ -106,14 +106,14 @@ func (is *IPFSsync) sendPins(address string) error {
 }
 
 func (is *IPFSsync) broadcastMsg(ipfsmsg Message) error {
-	var msg types.Message
 	d, err := json.Marshal(ipfsmsg)
 	if err != nil {
 		return err
 	}
-	msg.Data = d
-	msg.TimeStamp = int32(time.Now().Unix())
-	is.Transport.Send(msg)
+	is.Transport.Send(types.Message{
+		Data:      d,
+		TimeStamp: int32(time.Now().Unix()),
+	})
 	return nil
 }
 
@@ -251,16 +251,17 @@ type IPFSsync struct {
 
 // NewIPFSsync creates a new IPFSsync instance. Transports supported are "libp2p" and "pss"
 func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.Storage) IPFSsync {
-	var is IPFSsync
-	is.DataDir = dataDir
-	is.Topic = groupKey
-	is.PrivKey = privKeyHex
-	is.Port = 4171
-	is.HelloTime = 40
-	is.UpdateTime = 20
-	is.Timeout = time.Second * 600
-	is.Storage = storage.(*data.IPFSHandle)
-	is.TimestampWindow = 30
+	is := IPFSsync{
+		DataDir:         dataDir,
+		Topic:           groupKey,
+		PrivKey:         privKeyHex,
+		Port:            4171,
+		HelloTime:       40,
+		UpdateTime:      20,
+		Timeout:         time.Second * 600,
+		Storage:         storage.(*data.IPFSHandle),
+		TimestampWindow: 30,
+	}
 	if transport == "privlibp2p" {
 		transport = "libp2p"
 		is.private = true
@@ -299,12 +300,13 @@ func (is *IPFSsync) Start() {
 	is.updatePinsTree([]string{})
 	log.Infof("current hash %s", is.hashTree.Root())
 
-	var conn types.Connection
-	conn.Port = int(is.Port)
-	conn.Key = is.PrivKey
+	conn := types.Connection{
+		Port:         int(is.Port),
+		Key:          is.PrivKey,
+		Topic:        fmt.Sprintf("%x", signature.HashRaw(is.Topic)),
+		TransportKey: is.Topic,
+	}
 	// conn.Address, _ = signature.PubKeyFromPrivateKey(is.PrivKey)
-	conn.Topic = fmt.Sprintf("%x", signature.HashRaw(is.Topic))
-	conn.TransportKey = is.Topic
 	if is.private {
 		conn.Encryption = "private"
 	}
@@ -326,11 +328,10 @@ func (is *IPFSsync) Start() {
 	log.Infof("my multiaddress: %s", is.myMultiAddr)
 
 	go func() {
-		var syncMsg Message
-		var err error
 		for {
 			d := <-msg
-			err = json.Unmarshal(d.Data, &syncMsg)
+			var syncMsg Message
+			err := json.Unmarshal(d.Data, &syncMsg)
 			if err != nil {
 				log.Warnf("cannot unmarshal message %s", err)
 			} else {

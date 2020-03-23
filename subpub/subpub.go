@@ -108,9 +108,8 @@ func (ps *SubPub) readHandler(rw *bufio.ReadWriter) {
 		default:
 			// continues below
 		}
-		var message []byte
-		var err error
-		if message, err = rw.ReadBytes(byte(delimiter)); err != nil {
+		message, err := rw.ReadBytes(byte(delimiter))
+		if err != nil {
 			log.Debugf("error reading from buffer: %s", err)
 			return
 		}
@@ -208,7 +207,7 @@ func (ps *SubPub) Connect() {
 		// Bootstrap the DHT. In the default configuration, this spawns a Background
 		// thread that will refresh the peer table every five minutes.
 		log.Info("bootstrapping the DHT")
-		if err = ps.dht.Bootstrap(ctx); err != nil {
+		if err := ps.dht.Bootstrap(ctx); err != nil {
 			log.Fatal(err)
 			return
 		}

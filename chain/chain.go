@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/core"
@@ -18,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	"github.com/ethereum/go-ethereum/rpc"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -245,8 +243,7 @@ func (e *EthChainContext) PrintInfo(seconds time.Duration) {
 func (e *EthChainContext) SyncInfo() (height string, synced bool, peers int, err error) {
 	if e.DefaultConfig.LightMode {
 		synced = true
-		var r *rpc.Client
-		r, err = e.Node.Attach()
+		r, err := e.Node.Attach()
 		if r == nil || err != nil {
 			return "0", false, 0, err
 		}
@@ -260,20 +257,16 @@ func (e *EthChainContext) SyncInfo() (height string, synced bool, peers int, err
 		}
 		height = fmt.Sprintf("%d", block)
 		peers = e.Node.Server().PeerCount()
-		return
+		return height, synced, peers, err
 	}
 	if len(e.DefaultConfig.W3external) > 0 {
-		var client *ethclient.Client
-		var sp *ethereum.SyncProgress
-		client, err = ethclient.Dial(e.DefaultConfig.W3external)
+		client, err := ethclient.Dial(e.DefaultConfig.W3external)
 		if err != nil {
 			return "0", true, 0, err
 		}
-		sp, err = client.SyncProgress(context.Background())
+		sp, err := client.SyncProgress(context.Background())
 		height = fmt.Sprintf("%d", sp.CurrentBlock)
-		synced = true
-		peers = 1
-		return
+		return height, true, 1, err
 	}
 	if e.Eth != nil {
 		synced = e.Eth.Synced()
@@ -285,7 +278,7 @@ func (e *EthChainContext) SyncInfo() (height string, synced bool, peers int, err
 				e.Eth.Downloader().Progress().HighestBlock)
 		}
 		peers = e.Node.Server().PeerCount()
-		return
+		return height, synced, peers, nil
 	}
 	return "0", false, 0, fmt.Errorf("cannot get sync info, unknown error")
 }

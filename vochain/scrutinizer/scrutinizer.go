@@ -77,7 +77,6 @@ func (s *Scrutinizer) addEntity(eid string) {
 		return
 	}
 	log.Infof("entity %s added", eid)
-
 }
 
 func (s *Scrutinizer) addProcess(pid string) {

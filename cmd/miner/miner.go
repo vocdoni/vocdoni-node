@@ -93,7 +93,7 @@ func newConfig() (*config.VochainCfg, config.Error) {
 			}
 		}
 		// create config file if not exists
-		if err = viper.SafeWriteConfig(); err != nil {
+		if err := viper.SafeWriteConfig(); err != nil {
 			cfgError = config.Error{
 				Message: fmt.Sprintf("cannot write config file into config dir: %s", err),
 			}

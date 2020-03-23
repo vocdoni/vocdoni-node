@@ -102,16 +102,18 @@ type APIConnection struct {
 	Conn *websocket.Conn
 }
 
-// Connect starts a connection with the given endpoint
-func (r *APIConnection) Connect(tb testing.TB, addr string) {
+// NewAPIConnection starts a connection with the given endpoint address. The
+// connection is closed automatically when the test or benchmark finishes.
+func NewAPIConnection(tb testing.TB, addr string) *APIConnection {
 	tb.Helper()
-	r.tb = tb
+	r := &APIConnection{tb: tb}
 	var err error
 	r.Conn, _, err = websocket.DefaultDialer.Dial(addr, nil)
 	if err != nil {
 		tb.Fatal(err)
 	}
 	r.tb.Cleanup(func() { r.Conn.Close() })
+	return r
 }
 
 // Request makes a request to the previously connected endpoint

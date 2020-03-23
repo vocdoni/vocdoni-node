@@ -51,7 +51,7 @@ func newConfig() (config.PssCfg, error) {
 
 	viper.SetConfigType("yaml")
 	if *path == defaultDirPath+"/config.yaml" { // if path left default, write new cfg file if empty or if file doesn't exist.
-		if err = viper.SafeWriteConfigAs(*path); err != nil {
+		if err := viper.SafeWriteConfigAs(*path); err != nil {
 			if os.IsNotExist(err) {
 				err = os.MkdirAll(defaultDirPath, os.ModePerm)
 				if err != nil {

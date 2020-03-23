@@ -64,8 +64,7 @@ func BenchmarkVochain(b *testing.B) {
 	signerPub, _ := dvoteServer.Signer.HexString()
 
 	// check required components
-	var c testcommon.APIConnection
-	c.Connect(b, *host)
+	c := testcommon.NewAPIConnection(b, *host)
 	var req types.MetaRequest
 	log.Info("get info")
 	req.Method = "getGatewayInfo"
@@ -165,8 +164,7 @@ func BenchmarkVochain(b *testing.B) {
 	// send votes in parallel
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
-		var c testcommon.APIConnection
-		c.Connect(b, *host)
+		c := testcommon.NewAPIConnection(b, *host)
 
 		count := 0
 		for pb.Next() {
@@ -191,7 +189,7 @@ func BenchmarkVochain(b *testing.B) {
 	log.Infof("created entities: %+v", resp.EntityIDs)
 }
 
-func vochainBench(b *testing.B, c testcommon.APIConnection, s *signature.SignKeys, poseidon, mkRoot, processID, censusID string) {
+func vochainBench(b *testing.B, c *testcommon.APIConnection, s *signature.SignKeys, poseidon, mkRoot, processID, censusID string) {
 	rint := rand.Int()
 	// API requests
 	var req types.MetaRequest

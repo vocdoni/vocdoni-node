@@ -38,9 +38,7 @@ func BenchmarkCensus(b *testing.B) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
-		var c common.APIConnection
-		c.Connect(b, *host)
-		defer c.Conn.Close()
+		c := common.NewAPIConnection(b, *host)
 
 		for pb.Next() {
 			censusBench(b, c)
@@ -48,7 +46,7 @@ func BenchmarkCensus(b *testing.B) {
 	})
 }
 
-func censusBench(b *testing.B, c common.APIConnection) {
+func censusBench(b *testing.B, c *common.APIConnection) {
 	// API requets
 	var req types.MetaRequest
 

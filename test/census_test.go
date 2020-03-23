@@ -73,8 +73,7 @@ func TestCensus(t *testing.T) {
 
 	// Create websocket client
 	t.Logf("connecting to %s", server.PxyAddr)
-	var c common.APIConnection
-	c.Connect(t, server.PxyAddr)
+	c := common.NewAPIConnection(t, server.PxyAddr)
 
 	// Send the API requets
 	var req types.MetaRequest

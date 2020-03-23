@@ -74,7 +74,6 @@ func (m *Manager) Init(storage, rootKey string) error {
 		var cns Namespaces
 		if len(rootKey) < signature.PubKeyLength {
 			// log.Warn("no root key provided or invalid, anyone will be able to create new census")
-			cns.RootKey = ""
 		} else {
 			cns.RootKey = rootKey
 		}
@@ -250,12 +249,12 @@ func (m *Manager) CheckAuth(rm *types.RequestMessage) error {
 // HTTPhandler handles an API census manager request via HTTP
 func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *signature.SignKeys) {
 	log.Debug("new request received")
-	var rm types.RequestMessage
 	if ok := checkRequest(w, req); !ok {
 		return
 	}
 	// Decode JSON
 	log.Debug("decoding JSON")
+	var rm types.RequestMessage
 	err := json.NewDecoder(req.Body).Decode(&rm)
 	if err != nil {
 		log.Warnf("cannot decode JSON: %s", err)
@@ -313,8 +312,7 @@ func (m *Manager) importQueueDaemon() {
 		}
 		censusRaw = m.decompressBytes(censusRaw)
 		var dump types.CensusDump
-		err = json.Unmarshal(censusRaw, &dump)
-		if err != nil {
+		if err := json.Unmarshal(censusRaw, &dump); err != nil {
 			log.Warnf("retrieved census does not have a valid format: %s", err)
 			continue
 		}
@@ -352,17 +350,15 @@ func (m *Manager) importQueueDaemon() {
 // censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
 func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string) *types.MetaResponse {
 	resp := new(types.MetaResponse)
-	op := r.Method
-	var err error
 
 	// Process data
 	log.Debugf("processing data %+v", *r)
 	resp.Ok = true
 	resp.Timestamp = int32(time.Now().Unix())
 
-	if op == "addCensus" {
+	if r.Method == "addCensus" {
 		if isAuth {
-			_, err = m.AddNamespace(censusPrefix+r.CensusID, r.PubKeys)
+			_, err := m.AddNamespace(censusPrefix+r.CensusID, r.PubKeys)
 			if err != nil {
 				log.Warnf("error creating census: %s", err)
 				resp.SetError(err)
@@ -396,7 +392,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	}
 
 	// Methods without rootHash
-	switch op {
+	switch r.Method {
 	case "getRoot":
 		resp.Root = tr.Root()
 		return resp
@@ -465,7 +461,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	case "importDump":
 		if isAuth && validAuthPrefix {
 			if len(r.ClaimsData) > 0 {
-				err = tr.ImportDump(r.ClaimsData)
+				err := tr.ImportDump(r.ClaimsData)
 				if err != nil {
 					log.Warnf("error importing dump: %s", err)
 					resp.SetError(err)
@@ -551,6 +547,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	// Methods with rootHash, if rootHash specified snapshot the tree.
 	// Otherwise, we use the same tree.
 	if len(r.RootHash) > 1 {
+		var err error
 		tr, err = tr.Snapshot(r.RootHash)
 		if err != nil {
 			log.Warnf("snapshot error: %s", err)
@@ -559,7 +556,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		}
 	}
 
-	switch op {
+	switch r.Method {
 	case "genProof":
 		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
 		if err != nil {
@@ -574,6 +571,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		return resp
 
 	case "getSize":
+		var err error
 		resp.Size, err = tr.Size(tr.Root())
 		if err != nil {
 			resp.SetError(err)
@@ -591,7 +589,8 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		if len(root) < 1 {
 			root = tr.Root()
 		}
-		if op == "dump" {
+		var err error
+		if r.Method == "dump" {
 			dumpValues, err = tr.Dump(root)
 		} else {
 			dumpValues, err = tr.DumpPlain(root, true)
@@ -614,6 +613,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		}
 		var dump types.CensusDump
 		dump.RootHash = tr.Root()
+		var err error
 		dump.ClaimsData, err = tr.Dump(tr.Root())
 		if err != nil {
 			resp.SetError(err)

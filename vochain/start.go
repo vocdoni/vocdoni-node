@@ -43,8 +43,7 @@ func NewVochain(globalCfg *config.VochainCfg, genesis []byte, pv *privval.FilePV
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = app.Node.Start()
-		if err != nil {
+		if err := app.Node.Start(); err != nil {
 			log.Fatal(err)
 		}
 	}()

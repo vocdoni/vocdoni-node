@@ -64,8 +64,6 @@ func getCertificates(domain string, m *autocert.Manager) [][]byte {
 // When it returns, the server is ready. The returned address is useful if the
 // port was left as 0, to retrieve the randomly allocated port.
 func (p *Proxy) Init() error {
-	var s *http.Server
-
 	ln, err := reuse.Listen("tcp", fmt.Sprintf("%s:%d", p.C.Address, p.C.Port))
 	if err != nil {
 		return err
@@ -97,8 +95,7 @@ func (p *Proxy) Init() error {
 
 	if len(p.C.SSLDomain) > 0 {
 		log.Infof("fetching letsencrypt TLS certificate for %s", p.C.SSLDomain)
-		var m *autocert.Manager
-		s, m = p.GenerateSSLCertificate()
+		s, m := p.GenerateSSLCertificate()
 		s.ReadTimeout = 5 * time.Second
 		s.WriteTimeout = 10 * time.Second
 		s.IdleTimeout = 30 * time.Second
@@ -119,19 +116,19 @@ func (p *Proxy) Init() error {
 
 	} else {
 		log.Info("starting go-chi http server")
-		s = &http.Server{}
-		s.ReadTimeout = 5 * time.Second
-		s.WriteTimeout = 10 * time.Second
-		s.IdleTimeout = 60 * time.Second
-		s.ReadHeaderTimeout = 2 * time.Second
-		s.Handler = p.Server
+		s := &http.Server{
+			ReadTimeout:       5 * time.Second,
+			WriteTimeout:      10 * time.Second,
+			IdleTimeout:       60 * time.Second,
+			ReadHeaderTimeout: 2 * time.Second,
+			Handler:           p.Server,
+		}
 		go func() {
 			log.Fatal(s.Serve(ln))
 		}()
 		log.Infof("proxy ready at http://%s", ln.Addr())
 	}
 	p.Addr = ln.Addr()
-
 	return nil
 }
 
@@ -177,10 +174,8 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 			log.Errorf("failed to read request body: %v", err)
 			return
 		}
-		var req *http.Request
 		log.Debugf("%s", url)
-		req, err = http.NewRequest(reader.Method, url, bytes.NewReader(body))
-
+		req, err := http.NewRequest(reader.Method, url, bytes.NewReader(body))
 		if err != nil {
 			log.Warnf("cannot create request: %s", err)
 		}
