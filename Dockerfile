@@ -5,11 +5,16 @@ FROM golang:1.14.1 AS builder
 
 WORKDIR /src
 
-# We also need the duktape stub for the 'go mod download'. Note that we need two
+# We also need the duktape stub for downloading deps. Note that we need two
 # COPY lines, since otherwise we do the equivalent of 'cp duktape-stub/* .'.
+# We use 'go list -test ./...' instead of 'go mod download', as the latter is
+# too aggressive. For example, it downloads test deps of our deps, which we
+# don't need to run our tests.
+# TODO(mvdan): go back to 'go mod download' once
+# https://github.com/golang/go/issues/36460 is done, probably Go 1.15
 COPY go.mod go.sum ./
 COPY duktape-stub duktape-stub
-RUN go mod download
+RUN go list -test ./...
 
 COPY . .
 RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/...
