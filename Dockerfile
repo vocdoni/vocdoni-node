@@ -17,22 +17,30 @@ RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/...
 # These multiple targets can be used to obtain each of the images, such as
 # --target=miner.
 
+# Note that debian slim images are very minimal, so they don't contain
+# ca-certificates. Add them, as it's needed for outbound TLS to work, which is a
+# requirement to obtain let's encrypt certificates.
+
 FROM debian:10.3-slim AS gateway
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY --from=builder /src/gateway /src/dockerfiles/gateway/files/gatewayStart.sh /src/misc ./
 ENTRYPOINT ["/app/gatewayStart.sh"]
 
 FROM debian:10.3-slim AS census
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY --from=builder /src/censushttp /src/dockerfiles/census/files/censusStart.sh /src/misc ./
 ENTRYPOINT ["/app/censusStart.sh"]
 
 FROM debian:10.3-slim AS miner
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY --from=builder /src/miner /src/dockerfiles/miner/files/minerStart.sh /src/misc ./
 ENTRYPOINT ["/app/minerStart.sh"]
 
 FROM debian:10.3-slim AS oracle
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY --from=builder /src/oracle /src/dockerfiles/oracle/files/oracleStart.sh /src/misc ./
 ENTRYPOINT ["/app/oracleStart.sh"]
