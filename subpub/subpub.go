@@ -47,7 +47,7 @@ type SubPub struct {
 	PubKey          string
 	Private         bool
 	MultiAddr       string
-	Port            int32
+	Port            int
 	Host            host.Host
 	GroupPeers      []peer.ID
 	DiscoveryPeriod time.Duration
@@ -128,7 +128,7 @@ func (ps *SubPub) readHandler(rw *bufio.ReadWriter) {
 	}
 }
 
-func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int32, private bool) *SubPub {
+func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int, private bool) *SubPub {
 	ps := new(SubPub)
 	ps.Key = key
 	copy(ps.GroupKey[:], signature.HashRaw(groupKey)[:32])
@@ -144,8 +144,7 @@ func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int32, private bool)
 	return ps
 }
 
-func (ps *SubPub) Connect() {
-	ctx := context.TODO()
+func (ps *SubPub) Connect(ctx context.Context) {
 	log.Infof("public address: %s", ps.PubKey)
 	log.Infof("private key: %s", ps.privKey)
 	if len(ps.Topic) == 0 {
@@ -155,7 +154,10 @@ func (ps *SubPub) Connect() {
 	ipfslog.SetLogLevel("*", "ERROR")
 
 	// 0.0.0.0 will listen on any interface device.
-	sourceMultiAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", ps.Port))
+	sourceMultiAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", ps.Port))
+	if err != nil {
+		log.Fatal(err)
+	}
 	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.ECDSA, 2048, strings.NewReader(ps.privKey))
 	if err != nil {
 		log.Fatal(err)
@@ -178,7 +180,10 @@ func (ps *SubPub) Connect() {
 		return
 	}
 
-	ip, _ := util.PublicIP()
+	ip, err := util.PublicIP()
+	if err != nil {
+		log.Fatal(err)
+	}
 	ps.MultiAddr = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", ip, ps.Port, ps.Host.ID())
 	log.Infof("my subpub multiaddress %s", ps.MultiAddr)
 
@@ -223,7 +228,10 @@ func (ps *SubPub) Connect() {
 		log.Debugf("bootnodes: %+v", bootnodes)
 		var wg sync.WaitGroup
 		for _, peerAddr := range bootnodes {
-			peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+			peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
+			if err != nil {
+				log.Fatal(err)
+			}
 			if peerinfo == nil {
 				continue // nothing to do
 			}
@@ -251,20 +259,36 @@ func (ps *SubPub) Close() {
 }
 
 func (ps *SubPub) advertise(ctx context.Context, topic string) {
-	duration := 1 * time.Nanosecond
+	// Initially, we don't wait until the next advertise call.
+	var duration time.Duration
 	for {
 		select {
 		case <-time.After(duration):
 			log.Infof("advertising topic %s", topic)
-			duration, _ = ps.routing.Advertise(ctx, topic)
+
+			// The duration should be updated, and be in the order
+			// of multiple hours.
+			var err error
+			duration, err = ps.routing.Advertise(ctx, topic)
+			if err == nil && duration < time.Second {
+				err = fmt.Errorf("refusing to advertise too often: %v", duration)
+			}
+			if err != nil {
+				// TODO: do we care about this error? it happens
+				// on the tests pretty often.
+
+				log.Infof("could not advertise topic %q: %v", topic, err)
+				// Since the duration is 0s now, reset it to
+				// something sane, like 1m.
+				duration = time.Minute
+			}
 		case <-ps.close:
 			return
 		}
 	}
 }
 
-func (ps *SubPub) Subcribe() {
-	ctx := context.TODO()
+func (ps *SubPub) Subscribe(ctx context.Context) {
 	go ps.peersManager()
 	go ps.advertise(ctx, ps.Topic)
 	go ps.advertise(ctx, ps.PubKey)
@@ -374,27 +398,28 @@ func (ps *SubPub) discover(ctx context.Context) {
 		default:
 			// continues below
 		}
-		// not myself
 		if peer.ID == ps.Host.ID() {
-			break
+			continue // this is us; skip
 		}
 
-		// if already connected
 		if ps.connectedPeer(peer.ID) {
 			log.Debugf("peer %s already connected", peer.ID)
-			break
+			continue
 		}
-		// if new peer, let's connect to it
+		// new peer; let's connect to it
 		log.Debugf("found peer: %s", peer.ID)
 
 		stream, err := ps.Host.NewStream(ctx, peer.ID, protocol.ID(ps.Topic))
-		if err == nil {
-			ps.addConnectedPeer(peer.ID)
-			log.Infof("connected to peer %s", peer.ID)
-			rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
-			go ps.broadcastHandler(rw)
-			go ps.readHandler(rw)
+		if err != nil {
+			// Since this error is pretty common in p2p networks.
+			log.Debugf("could not connect to peer %s: %v", peer.ID, err)
+			continue
 		}
+		ps.addConnectedPeer(peer.ID)
+		log.Infof("connected to peer %s", peer.ID)
+		rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+		go ps.broadcastHandler(rw)
+		go ps.readHandler(rw)
 	}
 }
 

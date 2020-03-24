@@ -2,6 +2,7 @@ package net
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"time"
 
@@ -30,15 +31,16 @@ func (p *SubPubHandle) Init(c *types.Connection) error {
 		p.Conn.Port = 45678
 	}
 	private := p.Conn.Encryption == "private"
-	sp := subpub.NewSubPub(s.Private, p.Conn.TransportKey, int32(p.Conn.Port), private)
+	sp := subpub.NewSubPub(s.Private, p.Conn.TransportKey, p.Conn.Port, private)
 	c.Address = sp.PubKey
 	p.SubPub = sp
 	return nil
 }
 
 func (s *SubPubHandle) Listen(reciever chan<- types.Message) {
-	s.SubPub.Connect()
-	go s.SubPub.Subcribe()
+	ctx := context.TODO()
+	s.SubPub.Connect(ctx)
+	go s.SubPub.Subscribe(ctx)
 	var msg types.Message
 	for {
 		msg.Data = <-s.SubPub.Reader

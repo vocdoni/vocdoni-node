@@ -124,8 +124,8 @@ func NewMockEthereum(logLevel, dataDir string, pxy *dnet.Proxy) (*chain.EthChain
 		HTTPAPI:  true,
 		WSAPI:    true,
 		// TODO(mvdan): use 0 to grab a random unused port instead.
-		HTTPPort: 1000 + rand.Intn(10000),
-		WsPort:   1000 + rand.Intn(10000),
+		HTTPPort: 1025 + rand.Intn(50000),
+		WsPort:   1025 + rand.Intn(50000),
 	}
 	// init node
 	w3cfg, err := chain.NewConfig(ethConfig, w3Config)
