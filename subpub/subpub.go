@@ -350,10 +350,15 @@ func (ps *SubPub) peersManager() {
 		default:
 			ps.GroupMu.Lock()
 			for i, p := range ps.GroupPeers {
+				// Remove peer if no active connection
 				if len(ps.Host.Network().ConnsToPeer(p)) == 0 {
-					ps.GroupPeers[i] = ps.GroupPeers[len(ps.GroupPeers)-1]
-					ps.GroupPeers[len(ps.GroupPeers)-1] = ""
-					ps.GroupPeers = ps.GroupPeers[:len(ps.GroupPeers)-1]
+					if len(ps.GroupPeers) > 1 {
+						ps.GroupPeers[i] = ps.GroupPeers[len(ps.GroupPeers)-1]
+						ps.GroupPeers[len(ps.GroupPeers)-1] = ""
+						ps.GroupPeers = ps.GroupPeers[:len(ps.GroupPeers)-1]
+					} else {
+						ps.GroupPeers = []peer.ID{}
+					}
 				}
 			}
 			ps.GroupMu.Unlock()
