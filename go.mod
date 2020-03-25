@@ -20,7 +20,6 @@ require (
 	github.com/iden3/go-iden3-crypto v0.0.4
 	github.com/ipfs/go-filestore v1.0.0 // indirect
 	github.com/ipfs/go-ipfs v0.4.22-0.20200313001058-457b6e79ff3c
-	github.com/ipfs/go-ipfs-api v0.0.3
 	github.com/ipfs/go-ipfs-config v0.2.1
 	github.com/ipfs/go-ipfs-files v0.0.6
 	github.com/ipfs/go-log v1.0.2

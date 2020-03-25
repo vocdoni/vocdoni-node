@@ -4,15 +4,6 @@ type MessageContext interface {
 	ConnectionType() string
 }
 
-type PubSubContext struct {
-	Topic       string
-	PeerAddress string
-}
-
-func (c PubSubContext) ConnectionType() string {
-	return "PubSub"
-}
-
 // Message is a wrapper for messages from various net transport modules
 type Message struct {
 	Data      []byte
@@ -36,32 +27,4 @@ type Connection struct {
 
 type DataStore struct {
 	Datadir string
-}
-
-// Ballot represents the choices of one user in one voting process
-type Ballot struct {
-	Type      string
-	PID       string
-	Nullifier []byte
-	Vote      []byte
-	Franchise []byte
-}
-
-// Envelope contains a Ballot, and additional metadata for processing
-type Envelope struct {
-	Type      string
-	Nonce     uint64
-	KeyProof  []byte
-	Ballot    []byte
-	Timestamp int32
-}
-
-// Batch contains a number of Ballots, ready to be counted
-type Batch struct {
-	Type       string
-	Nullifiers []string
-	URL        string
-	TXID       string
-	Nonce      []byte
-	Signature  string
 }
