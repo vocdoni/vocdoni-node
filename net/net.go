@@ -19,7 +19,6 @@ type TransportID int
 
 const (
 	PubSub TransportID = iota + 1
-	PSS
 	SubPub
 )
 
@@ -27,8 +26,6 @@ func TransportIDFromString(i string) TransportID {
 	switch i {
 	case "PubSub":
 		return PubSub
-	case "PSS":
-		return PSS
 	case "SubPub":
 		return SubPub
 	default:
@@ -40,10 +37,6 @@ func Init(t TransportID, c *types.Connection) (Transport, error) {
 	switch t {
 	case PubSub:
 		p := new(PubSubHandle)
-		p.Init(c)
-		return p, nil
-	case PSS:
-		p := new(PSSHandle)
 		p.Init(c)
 		return p, nil
 	case SubPub:
@@ -60,12 +53,6 @@ func InitDefault(t TransportID) (Transport, error) {
 	case PubSub:
 		defaultConnection := new(types.Connection)
 		defaultConnection.Topic = "vocdoni"
-		return Init(t, defaultConnection)
-	case PSS:
-		defaultConnection := new(types.Connection)
-		defaultConnection.Topic = "vocdoni"
-		defaultConnection.Encryption = "sym"
-		defaultConnection.TransportKey = "vocdoni"
 		return Init(t, defaultConnection)
 	case SubPub:
 		defaultConnection := new(types.Connection)

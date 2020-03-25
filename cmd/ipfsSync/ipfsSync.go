@@ -23,7 +23,7 @@ func main() {
 	port := flag.Int16("port", 4171, "port for the sync network")
 	helloTime := flag.Int("helloTime", 40, "period in seconds for sending hello messages")
 	updateTime := flag.Int("updateTime", 20, "period in seconds for sending update messages")
-	p2pType := flag.String("transport", "libp2p", "p2p transport network to use: libp2p, privlibp2p or pss")
+	p2pType := flag.String("transport", "libp2p", "p2p transport network to use: libp2p or privlibp2p")
 	bootnodes := flag.StringArray("bootnodes", []string{}, "list of bootnodes (multiaddress separated by commas)")
 
 	flag.Parse()

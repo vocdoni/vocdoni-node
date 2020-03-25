@@ -249,7 +249,7 @@ type IPFSsync struct {
 	private     bool
 }
 
-// NewIPFSsync creates a new IPFSsync instance. Transports supported are "libp2p" and "pss"
+// NewIPFSsync creates a new IPFSsync instance. Transports supported are "libp2p" or "privlibp2p"
 func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.Storage) IPFSsync {
 	is := IPFSsync{
 		DataDir:         dataDir,
@@ -269,8 +269,6 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 	switch transport {
 	case "libp2p":
 		is.Transport = &net.SubPubHandle{}
-	case "pss":
-		is.Transport = &net.PSSHandle{}
 	default:
 		is.Transport = &net.SubPubHandle{}
 	}

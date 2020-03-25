@@ -35,18 +35,6 @@ transport.Send(exampleMessage, sendErrors)
 ## Supported protocols
 Currently supported are PSS and PubSub. Websocket support is planned in the near future.
 
-### PSS
-The relevant Connection specifier fields for PSS are Topic, Kind, Key, and Address:
-```
-exampleConnection := new(types.Connection)
-exampleConnection.Topic = "exampleTopic"
-exampleConnection.Encryption = "sym" //options are "sym" or "asym"
-exampleConnection.Key = "exampleKey" //symmetric key if "sym", recipient pubkey if "asym"
-exampleTransport, err := net.Init(transportType, exampleConnection)
-//use as above
-```
-
-
 ### Pubsub
 The relevant Connection specifier field for PubSub is the Topic:
 ```

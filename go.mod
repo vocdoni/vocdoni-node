@@ -10,8 +10,6 @@ require (
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.10
-	github.com/ethersphere/go-sw3 v0.2.1 // indirect
-	github.com/ethersphere/swarm v0.5.4
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-chi/cors v1.0.0
@@ -31,6 +29,7 @@ require (
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/klauspost/compress v1.10.3
+	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/libp2p/go-libp2p v0.6.0
 	github.com/libp2p/go-libp2p-autonat-svc v0.1.0
 	github.com/libp2p/go-libp2p-core v0.5.0
@@ -38,15 +37,15 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.5.1
 	github.com/libp2p/go-reuseport v0.0.1
 	github.com/mailru/easyjson v0.7.1 // indirect
-	github.com/marcusolsson/tui-go v0.4.0
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/miekg/dns v1.1.16 // indirect
 	github.com/multiformats/go-multiaddr v0.2.1
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/polydawn/refmt v0.0.0-20190807091052-3d65705ee9f1 // indirect
-	github.com/robertkrimen/otto v0.0.0-20191219234010-c382bd3c16ff // indirect
+	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/smartystreets/assertions v1.0.1 // indirect
+	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.1
@@ -56,8 +55,6 @@ require (
 	github.com/tendermint/iavl v0.12.4
 	github.com/tendermint/tendermint v0.32.8
 	github.com/tendermint/tm-db v0.2.0
-	github.com/uber/jaeger-client-go v2.21.1+incompatible // indirect
-	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200223203819-95cdfde1438f // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.uber.org/multierr v1.5.0 // indirect

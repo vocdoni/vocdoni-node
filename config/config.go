@@ -78,28 +78,6 @@ type IPFSCfg struct {
 	SyncPeers []string
 }
 
-// PssCfg stores global configs for Pss chat
-type PssCfg struct {
-	Encryption string
-	Key        string
-	Topic      string
-	Address    string
-	Nick       string
-	Datadir    string
-	Light      bool
-	PingMode   bool
-	LogLevel   string
-	Bootnode   string
-}
-
-// PssMetaCfg pss meta configuration
-type PssMetaCfg struct {
-	LogLevel   string
-	Datadir    string
-	ListenHost string
-	ListenPort int16
-}
-
 // EthCfg stores global configs for ethereum bockchain
 type EthCfg struct {
 	// ChainType chain to connect with
