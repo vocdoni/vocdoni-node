@@ -18,8 +18,8 @@ require (
 	github.com/google/go-cmp v0.4.0
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect
 	github.com/gorilla/websocket v1.4.1
-	github.com/iden3/go-iden3-core v0.0.7-0.20200306161755-b1ca8370e595
-	github.com/iden3/go-iden3-crypto v0.0.3
+	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
+	github.com/iden3/go-iden3-crypto v0.0.4
 	github.com/ipfs/go-filestore v1.0.0 // indirect
 	github.com/ipfs/go-ipfs v0.4.22-0.20200313001058-457b6e79ff3c
 	github.com/ipfs/go-ipfs-api v0.0.3

@@ -96,7 +96,11 @@ func (t *Tree) GenProof(data []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	mp, err := t.Tree.GenerateProof(e.Entry().HIndex(), nil)
+	hash, err := e.Entry().HIndex()
+	if err != nil {
+		return "", err
+	}
+	mp, err := t.Tree.GenerateProof(hash, nil)
 	if err != nil {
 		return "", err
 	}
@@ -125,8 +129,16 @@ func CheckProof(root, mpHex string, data []byte) (bool, error) {
 		doPadding(&data)
 	}
 	e := getClaimFromData(data)
+	hvalue, err := e.Entry().HValue()
+	if err != nil {
+		return false, err
+	}
+	hindex, err := e.Entry().HIndex()
+	if err != nil {
+		return false, err
+	}
 	return merkletree.VerifyProof(&rootHash, mp,
-		e.Entry().HIndex(), e.Entry().HValue()), nil
+		hindex, hvalue), nil
 }
 
 func (t *Tree) CheckProof(data []byte, mpHex string) (bool, error) {
@@ -142,7 +154,11 @@ func (t *Tree) Index(data []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	index, err := t.Tree.GetDataByIndex(e.Entry().HIndex())
+	hash, err := e.Entry().HIndex()
+	if err != nil {
+		return "", err
+	}
+	index, err := t.Tree.GetDataByIndex(hash)
 	return index.String(), err
 }
 
