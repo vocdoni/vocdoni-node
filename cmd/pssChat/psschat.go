@@ -34,7 +34,7 @@ func newConfig() (config.PssCfg, error) {
 	flag.String("datadir", "", "datadir directory for swarm/pss files")
 	flag.Bool("light", false, "use light mode (less consumption)")
 	flag.Bool("pingmode", false, "use non interactive ping mode")
-	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	flag.String("loglevel", "warn", "Log level. Valid values are: debug, info, warn, error, fatal.")
 	flag.Parse()
 
 	viper := viper.New()
@@ -97,7 +97,7 @@ func main() {
 	// setup config
 	globalCfg, err := newConfig()
 	// setup logger
-	log.InitLogger(globalCfg.LogLevel, "stdout")
+	log.Init(globalCfg.LogLevel, "stdout")
 	if err != nil {
 		log.Fatalf("Could not load config: %v", err)
 	}

@@ -2,17 +2,9 @@ package census
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
-
-	"gitlab.com/vocdoni/go-dvote/log"
 )
-
-func TestMain(m *testing.M) {
-	log.InitLogger("error", "stdout")
-	os.Exit(m.Run())
-}
 
 func TestCompressor(t *testing.T) {
 	t.Parallel()

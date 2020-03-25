@@ -45,7 +45,7 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	globalCfg.SeedMode = *flag.Bool("seedMode", false, "act as a seed node")
 	globalCfg.Peers = *flag.StringArray("peers", []string{}, "coma separated list of p2p peers")
 	globalCfg.Seeds = *flag.StringArray("seeds", []string{}, "coma separated list of p2p seed nodes")
-	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
+	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.PublicAddr = *flag.String("publicAddr", "", "IP address where the node will be exposed, guessed automatically if empty")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
@@ -134,7 +134,7 @@ func main() {
 	}
 
 	fmt.Println(globalCfg.LogLevel)
-	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
+	log.Init(globalCfg.LogLevel, globalCfg.LogOutput)
 
 	// check if errors during config creation and determine if Critical
 	if cfgErr.Critical && cfgErr.Message != "" {

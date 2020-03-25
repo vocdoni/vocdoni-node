@@ -64,7 +64,7 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
 	flag.BoolVar(&globalCfg.Dev, "dev", false, "run and connect to the development network")
 	globalCfg.SubscribeOnly = *flag.Bool("subscribeOnly", true, "oracle can read all ethereum logs or just subscribe to the new ones, by default only subscribe")
-	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
+	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
 	globalCfg.EthProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
@@ -195,7 +195,7 @@ func main() {
 		panic("cannot read configuration")
 	}
 	fmt.Println(globalCfg.LogLevel)
-	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
+	log.Init(globalCfg.LogLevel, globalCfg.LogOutput)
 
 	// check if errors during config creation and determine if Critical
 	if cfgErr.Critical && cfgErr.Message != "" {
@@ -273,7 +273,7 @@ func main() {
 	}
 	node, err := chain.Init(w3cfg)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	// Add signing private key if exist in configuration or flags

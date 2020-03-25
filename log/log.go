@@ -1,6 +1,7 @@
 package log
 
 import (
+	"os"
 	"time"
 
 	"go.uber.org/zap"
@@ -9,8 +10,20 @@ import (
 
 var log *zap.SugaredLogger
 
-// InitLogger initializes the logger. Output can be either "stdout/stderr/filePath"
-func InitLogger(logLevel string, output string) {
+func init() {
+	// Allow overriding the default log level via $LOG_LEVEL, so that the
+	// environment variable can be set globally even when running tests.
+	// Always initializing the logger is also useful to avoid panics when
+	// logging if the logger is nil.
+	level := "error"
+	if s := os.Getenv("LOG_LEVEL"); s != "" {
+		level = s
+	}
+	Init(level, "stderr")
+}
+
+// Init initializes the logger. Output can be either "stdout/stderr/filePath"
+func Init(logLevel string, output string) {
 	cfg := newConfig(logLevel, output)
 
 	logger, err := cfg.Build()
@@ -33,10 +46,6 @@ func levelFromString(logLevel string) zapcore.Level {
 		return zap.WarnLevel
 	case "error":
 		return zap.ErrorLevel
-	case "dpanic":
-		return zap.DPanicLevel
-	case "panic":
-		return zap.PanicLevel
 	case "fatal":
 		return zap.FatalLevel
 	default:
@@ -95,16 +104,6 @@ func Error(args ...interface{}) {
 	log.Error(args...)
 }
 
-// DPanic sends a dpanic level log message
-func DPanic(args ...interface{}) {
-	log.DPanic(args...)
-}
-
-// Panic sends a panic level log message
-func Panic(args ...interface{}) {
-	log.Panic(args...)
-}
-
 // Fatal sends a fatal level log message
 func Fatal(args ...interface{}) {
 	log.Fatal(args...)
@@ -130,16 +129,6 @@ func Errorf(template string, args ...interface{}) {
 	log.Errorf(template, args...)
 }
 
-// DPanicf sends a formatted dpanic level log message
-func DPanicf(template string, args ...interface{}) {
-	log.DPanicf(template, args...)
-}
-
-// Panicf sends a formatted panic level log message
-func Panicf(template string, args ...interface{}) {
-	log.Panicf(template, args...)
-}
-
 // Fatalf sends a formatted fatal level log message
 func Fatalf(template string, args ...interface{}) {
 	log.Fatalf(template, args...)
@@ -163,16 +152,6 @@ func Warnw(msg string, keysAndValues ...interface{}) {
 // Errorw sends a key-value formatted error level log message
 func Errorw(msg string, keysAndValues ...interface{}) {
 	log.Errorw(msg, keysAndValues...)
-}
-
-// DPanicw sends a key-value formatted dpanic level log message
-func DPanicw(msg string, keysAndValues ...interface{}) {
-	log.DPanicw(msg, keysAndValues...)
-}
-
-// Panicw sends a key-value formatted panic level log message
-func Panicw(msg string, keysAndValues ...interface{}) {
-	log.Panicw(msg, keysAndValues...)
 }
 
 // Fatalw sends a key-value formatted fatal level log message

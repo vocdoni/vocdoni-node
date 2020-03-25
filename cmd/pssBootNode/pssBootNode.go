@@ -25,7 +25,7 @@ func newConfig() (config.PssMetaCfg, error) {
 	flag.String("listenHost", "0.0.0.0", "address host to listen")
 	flag.Int16("listenPort", 4171, "address port to listen")
 	flag.String("datadir", "", "datadir directory for swarm/pss files")
-	flag.String("logLevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	flag.String("logLevel", "info", "Log level. Valid values are: debug, info, warn, error, fatal.")
 
 	flag.Parse()
 
@@ -70,7 +70,7 @@ func main() {
 	// setup config
 	globalCfg, err := newConfig()
 	// setup logger
-	log.InitLogger(globalCfg.LogLevel, "stdout")
+	log.Init(globalCfg.LogLevel, "stdout")
 	if err != nil {
 		log.Fatalf("could not load config: %v", err)
 	}

@@ -8,12 +8,9 @@ import (
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
-	"gitlab.com/vocdoni/go-dvote/log"
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
-
-func init() { log.InitLogger("error", "stdout") }
 
 func TestSubPub(t *testing.T) {
 	var s1 signature.SignKeys

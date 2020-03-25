@@ -25,7 +25,7 @@ func newConfig() (config.CensusCfg, error) {
 	defaultDirPath := home + "/.dvote/censushttp"
 	// setup flags
 	path := flag.String("cfgpath", defaultDirPath+"/config.yaml", "cfgpath. Specify filepath for censushttp config")
-	flag.String("logLevel", "info", "Log level. Valid values are: debug, info, warn, error, dpanic, panic, fatal.")
+	flag.String("logLevel", "info", "Log level. Valid values are: debug, info, warn, error, fatal.")
 	flag.Int("port", 8080, "HTTP port to listen")
 	flag.String("signKey", "", "Private key for signing API response messages (ECDSA)")
 	flag.String("sslDomain", "", "Enables HTTPs using a LetsEncrypt certificate")
@@ -79,7 +79,7 @@ func main() {
 	// setup config
 	globalCfg, err := newConfig()
 	// setup logger
-	log.InitLogger(globalCfg.LogLevel, "stdout")
+	log.Init(globalCfg.LogLevel, "stdout")
 	if err != nil {
 		log.Fatalf("Could not load config: %v", err)
 	}

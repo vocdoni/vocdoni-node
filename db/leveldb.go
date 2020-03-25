@@ -39,7 +39,7 @@ func (l *LevelDbStorage) Count() int {
 	}
 	iter.Release()
 	if err := iter.Error(); err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 	return keycount
 }
@@ -79,7 +79,7 @@ func (l *LevelDbStorage) Delete(key []byte) error {
 // Close closes a database instance
 func (l *LevelDbStorage) Close() {
 	if err := l.ldb.Close(); err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 }
 

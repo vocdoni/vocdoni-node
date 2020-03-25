@@ -45,7 +45,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	// create the proxy
 	pxy := testcommon.NewMockProxy(t)
 	// create ethereum node
-	node, err := NewMockEthereum(*logLevel, testcommon.TempDir(t, "ethereum"), pxy)
+	node, err := NewMockEthereum(testcommon.TempDir(t, "ethereum"), pxy)
 	if err != nil {
 		t.Fatalf("cannot create ethereum node: %s", err)
 	}
@@ -109,10 +109,10 @@ func TestWeb3WSEndpoint(t *testing.T) {
 }
 
 // NewMockEthereum creates an ethereum node, attaches a signing key and adds a http or ws endpoint to a given proxy
-func NewMockEthereum(logLevel, dataDir string, pxy *dnet.Proxy) (*chain.EthChainContext, error) {
+func NewMockEthereum(dataDir string, pxy *dnet.Proxy) (*chain.EthChainContext, error) {
 	// create base config
 	ethConfig := &config.EthCfg{
-		LogLevel:  logLevel,
+		LogLevel:  "error",
 		DataDir:   dataDir,
 		ChainType: "goerli",
 	}

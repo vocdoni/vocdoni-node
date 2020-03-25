@@ -18,6 +18,8 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
+func init() { rand.Seed(time.Now().UnixNano()) }
+
 // THIS BENCH DOES NOT PROVIDE ANY CONSENSUS GUARANTEES
 
 const (
@@ -33,9 +35,6 @@ var (
 )
 
 func BenchmarkVochain(b *testing.B) {
-	rand.Seed(time.Now().UnixNano())
-	flag.Parse()
-	log.InitLogger(*logLevel, "stdout")
 	var dvoteServer testcommon.DvoteAPIServer
 	rint := rand.Int()
 	if *host == "" {

@@ -56,7 +56,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	// gateway
 	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
 	flag.BoolVar(&globalCfg.Dev, "dev", false, "run and connect to the development network")
-	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
+	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
 	globalCfg.ListenPort = *flag.Int("listenPort", 9090, "API endpoint http port")
@@ -240,7 +240,7 @@ func main() {
 	if globalCfg == nil {
 		panic("cannot read configuration")
 	}
-	log.InitLogger(globalCfg.LogLevel, globalCfg.LogOutput)
+	log.Init(globalCfg.LogLevel, globalCfg.LogOutput)
 
 	log.Debugf("initializing gateway config %+v", *globalCfg)
 
@@ -303,7 +303,7 @@ func main() {
 	}
 	node, err := chain.Init(w3cfg)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	// Add signing private key if exist in configuration or flags

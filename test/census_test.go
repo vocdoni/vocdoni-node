@@ -32,7 +32,6 @@ import (
 	"encoding/base64"
 	"flag"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -43,18 +42,9 @@ import (
 	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 )
 
-var (
-	logLevel   = flag.String("logLevel", "error", "logging level")
-	censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")
-)
+var censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")
 
 func init() { rand.Seed(time.Now().UnixNano()) }
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-	log.InitLogger(*logLevel, "stdout")
-	os.Exit(m.Run())
-}
 
 func TestCensus(t *testing.T) {
 	t.Parallel()

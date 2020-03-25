@@ -16,16 +16,14 @@ import (
 	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 )
 
+func init() { rand.Seed(time.Now().UnixNano()) }
+
 var (
-	logLevel   = flag.String("logLevel", "error", "logging level (debug, info, warning, error)")
 	host       = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
 	censusSize = flag.Int("censusSize", 100, "number of census entries to add")
 )
 
 func BenchmarkCensus(b *testing.B) {
-	rand.Seed(time.Now().UnixNano())
-	flag.Parse()
-	log.InitLogger(*logLevel, "stdout")
 	if *host == "" {
 		var server common.DvoteAPIServer
 		server.Start(b, "file", "census")

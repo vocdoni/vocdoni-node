@@ -177,7 +177,6 @@ func (ps *SubPub) Connect(ctx context.Context) {
 	ps.Host, err = c.NewNode(ctx)
 	if err != nil {
 		log.Fatal(err)
-		return
 	}
 
 	ip, err := util.PublicIP()
@@ -205,7 +204,6 @@ func (ps *SubPub) Connect(ctx context.Context) {
 	ps.dht, err = dht.New(ctx, ps.Host, opts...)
 	if err != nil {
 		log.Fatal(err)
-		return
 	}
 
 	if !ps.NoBootStrap {
@@ -214,7 +212,6 @@ func (ps *SubPub) Connect(ctx context.Context) {
 		log.Info("bootstrapping the DHT")
 		if err := ps.dht.Bootstrap(ctx); err != nil {
 			log.Fatal(err)
-			return
 		}
 
 		// Let's connect to the bootstrap nodes first. They will tell us about the
@@ -389,7 +386,6 @@ func (ps *SubPub) discover(ctx context.Context) {
 	peerChan, err := ps.routing.FindPeers(ctx, ps.Topic)
 	if err != nil {
 		log.Fatal(err)
-		return
 	}
 	for peer := range peerChan {
 		select {

@@ -27,7 +27,7 @@ func main() {
 	bootnodes := flag.StringArray("bootnodes", []string{}, "list of bootnodes (multiaddress separated by commas)")
 
 	flag.Parse()
-	log.InitLogger(*logLevel, "stdout")
+	log.Init(*logLevel, "stdout")
 	ipfsStore := data.IPFSNewConfig(*dataDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {

@@ -46,7 +46,7 @@ func newConfig() (*ethereumStandaloneCfgWrapper, config.Error) {
 
 	// general
 	flag.StringVar(&ethereumCfgWrapper.dataDir, "dataDir", home+"/.dvote", "directory where data is stored")
-	ethereumCfgWrapper.logLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, dpanic, panic, fatal)")
+	ethereumCfgWrapper.logLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	ethereumCfgWrapper.logOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	// ethereum node
 	ethereumCfgWrapper.ethConfig.SigningKey = *flag.String("ethSigningKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
@@ -134,7 +134,7 @@ func main() {
 		panic("cannot read configuration")
 	}
 	fmt.Println(globalCfg.logLevel)
-	log.InitLogger(globalCfg.logLevel, globalCfg.logOutput)
+	log.Init(globalCfg.logLevel, globalCfg.logOutput)
 
 	log.Debugf("initializing gateway config %+v", globalCfg)
 
@@ -151,12 +151,12 @@ func main() {
 
 	cfg, err := chain.NewConfig(globalCfg.ethConfig, globalCfg.w3Config)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	node, err := chain.Init(cfg)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	node.Start()
