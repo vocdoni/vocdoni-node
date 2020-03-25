@@ -96,6 +96,7 @@ func BenchmarkVochain(b *testing.B) {
 	log.Debug("add bulk claims")
 	var claims []string
 	req.Method = "addClaimBulk"
+	req.Digested = true
 	req.ClaimData = ""
 	for i := 0; i < len(poseidonHashes); i++ {
 		claims = append(claims, poseidonHashes[i])

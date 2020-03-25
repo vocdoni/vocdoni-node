@@ -79,6 +79,7 @@ func censusBench(b *testing.B, c *common.APIConnection) {
 	var claims []string
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
+	req.Digested = true
 	for i := 0; i < *censusSize; i++ {
 		log.Infof("%d0123456789abcdef0123456789%d", rint, i)
 		claims = append(claims, base64.StdEncoding.EncodeToString([]byte(
