@@ -20,7 +20,8 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
-	"github.com/tendermint/tendermint/libs/common"
+	tmkv "github.com/tendermint/tendermint/libs/kv"
+	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -149,12 +150,12 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 		events := []abcitypes.Event{
 			{
 				Type: "processCreated",
-				Attributes: common.KVPairs{
-					common.KVPair{
+				Attributes: tmkv.Pairs{
+					tmkv.Pair{
 						Key:   []byte("entityId"),
 						Value: []byte(newProcess.EntityID),
 					},
-					common.KVPair{
+					tmkv.Pair{
 						Key:   []byte("processId"),
 						Value: []byte(tx.ProcessID),
 					},
@@ -385,7 +386,7 @@ func NewPrivateValidator(cfg *config.VochainCfg, tconfig *cfg.Config) (*privval.
 		} else {
 			minerKeyFile = cfg.MinerKeyFile
 		}
-		if !common.FileExists(tconfig.PrivValidatorKeyFile()) {
+		if !tmos.FileExists(tconfig.PrivValidatorKeyFile()) {
 			filePV := privval.LoadFilePVEmptyState(minerKeyFile, tconfig.PrivValidatorStateFile())
 			filePV.Save()
 		}

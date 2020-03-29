@@ -317,9 +317,9 @@ func main() {
 	go node.PrintInfo(time.Second * 20)
 
 	// initializing Vochain connection
-	vochainConn := voclient.NewHTTP(globalCfg.VochainConfig.RPCListen, "/websocket")
-	if vochainConn == nil {
-		log.Fatal("cannot connect to vochain HTTP endpoint")
+	vochainConn, err := voclient.NewHTTP(globalCfg.VochainConfig.RPCListen, "/websocket")
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	// Wait for Vochain to be ready

@@ -66,11 +66,18 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
-	vs := State{
-		AppTree:     iavl.NewMutableTree(appTree, PrefixDBCacheSize),
-		ProcessTree: iavl.NewMutableTree(processTree, PrefixDBCacheSize),
-		VoteTree:    iavl.NewMutableTree(voteTree, PrefixDBCacheSize),
-		Codec:       codec,
+	vs := State{Codec: codec}
+	vs.AppTree, err = iavl.NewMutableTree(appTree, PrefixDBCacheSize)
+	if err != nil {
+		return nil, err
+	}
+	vs.ProcessTree, err = iavl.NewMutableTree(processTree, PrefixDBCacheSize)
+	if err != nil {
+		return nil, err
+	}
+	vs.VoteTree, err = iavl.NewMutableTree(voteTree, PrefixDBCacheSize)
+	if err != nil {
+		return nil, err
 	}
 
 	version, err := vs.AppTree.Load()

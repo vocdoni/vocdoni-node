@@ -148,7 +148,7 @@ func (r *Router) getBlockHeight(request routerRequest) {
 }
 
 func (r *Router) getProcessList(request routerRequest) {
-	queryResult, err := r.tmclient.TxSearch(fmt.Sprintf("processCreated.entityId='%s'", util.TrimHex(request.EntityId)), false, 1, 30)
+	queryResult, err := r.tmclient.TxSearch(fmt.Sprintf("processCreated.entityId='%s'", util.TrimHex(request.EntityId)), false, 1, 30, "asc")
 	if err != nil {
 		log.Errorf("cannot query: %s", err)
 		r.sendError(request, err.Error())

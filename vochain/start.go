@@ -10,10 +10,10 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/config"
 
-	cfg "github.com/tendermint/tendermint/config"
+	tmcfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
-	cmn "github.com/tendermint/tendermint/libs/common"
-	tlog "github.com/tendermint/tendermint/libs/log"
+	tmlog "github.com/tendermint/tendermint/libs/log"
+	tmos "github.com/tendermint/tendermint/libs/os"
 	nm "github.com/tendermint/tendermint/node"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
@@ -63,7 +63,7 @@ type tenderLogger struct {
 	keyvals []interface{}
 }
 
-var _ tlog.Logger = (*tenderLogger)(nil)
+var _ tmlog.Logger = (*tenderLogger)(nil)
 
 // TODO(mvdan): use zap's WithCallerSkip so that we show the position
 // information corresponding to where tenderLogger was called, instead of just
@@ -81,7 +81,7 @@ func (l *tenderLogger) Error(msg string, keyvals ...interface{}) {
 	log.Debugw("[tendermint error] "+msg, keyvals...)
 }
 
-func (l *tenderLogger) With(keyvals ...interface{}) tlog.Logger {
+func (l *tenderLogger) With(keyvals ...interface{}) tmlog.Logger {
 	// Make sure we copy the values, to avoid modifying the parent.
 	// TODO(mvdan): use zap's With method directly.
 	l2 := &tenderLogger{}
@@ -95,7 +95,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	// create node config
 	var err error
 
-	tconfig := cfg.DefaultConfig()
+	tconfig := tmcfg.DefaultConfig()
 	tconfig.FastSyncMode = true
 	tconfig.SetRoot(localConfig.DataDir)
 	os.MkdirAll(localConfig.DataDir+"/config", 0755)
@@ -139,8 +139,8 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig.Consensus.TimeoutCommit = time.Second * 10
 
 	// tx events
-	tconfig.TxIndex.IndexTags = "tx.hash,processCreated.entityId"
-	tconfig.TxIndex.IndexAllTags = true
+	tconfig.TxIndex.IndexKeys = "tx.hash,processCreated.entityId"
+	tconfig.TxIndex.IndexAllKeys = true
 
 	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
@@ -162,9 +162,9 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	}
 
 	// create logger
-	logger := tlog.Logger(&tenderLogger{})
+	logger := tmlog.Logger(&tenderLogger{})
 
-	logger, err = tmflags.ParseLogLevel(tconfig.LogLevel, logger, cfg.DefaultLogLevel())
+	logger, err = tmflags.ParseLogLevel(tconfig.LogLevel, logger, tmcfg.DefaultLogLevel())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse log level: %w", err)
 	}
@@ -197,7 +197,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	log.Infof("my vochain ID: %s", nodeKey.ID())
 
 	// read or create genesis file
-	if cmn.FileExists(tconfig.Genesis) {
+	if tmos.FileExists(tconfig.Genesis) {
 		log.Infof("found genesis file %s", tconfig.Genesis)
 	} else {
 		log.Debugf("loaded genesis: %s", string(genesis))

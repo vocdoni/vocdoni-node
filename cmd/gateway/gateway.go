@@ -500,7 +500,10 @@ func main() {
 		}
 		if globalCfg.API.Vote {
 			// creating the RPC calls client
-			rpcClient := voclient.NewHTTP(globalCfg.VochainConfig.RPCListen, "/websocket")
+			rpcClient, err := voclient.NewHTTP(globalCfg.VochainConfig.RPCListen, "/websocket")
+			if err != nil {
+				log.Fatal(err)
+			}
 			// todo: client params as cli flags
 			log.Info("enabling vote API")
 			routerAPI.Scrutinizer = sc
