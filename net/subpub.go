@@ -63,7 +63,7 @@ func (s *SubPubHandle) Send(msg types.Message) {
 
 func (s *SubPubHandle) SendUnicast(address string, msg types.Message) {
 	s.SubPub.PeerConnect(address, func(rw *bufio.ReadWriter) {
-		if err := s.SubPub.SendMessage(rw, msg.Data); err != nil {
+		if err := s.SubPub.SendMessage(rw.Writer, msg.Data); err != nil {
 			log.Warnf("cannot send message to %s: %s", address, err)
 		}
 		rw.Flush()

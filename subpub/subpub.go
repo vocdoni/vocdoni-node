@@ -21,7 +21,7 @@ import (
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
+	libpeer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -49,9 +49,12 @@ type SubPub struct {
 	MultiAddr       string
 	Port            int
 	Host            host.Host
-	GroupPeers      []peer.ID
-	DiscoveryPeriod time.Duration
-	GroupMu         sync.RWMutex
+
+	PeersMu sync.RWMutex
+	Peers   []peerSub
+
+	DiscoveryPeriod  time.Duration
+	CollectionPeriod time.Duration
 
 	// TODO(mvdan): replace with a context
 	close   chan bool
@@ -60,47 +63,67 @@ type SubPub struct {
 	routing *discovery.RoutingDiscovery
 }
 
-// TODO(mvdan): we probably don't want to hard-code bufio in the API this much.
+type peerSub struct {
+	id    libpeer.ID
+	write chan []byte
+}
 
 func (ps *SubPub) handleStream(stream network.Stream) {
 	log.Info("got a new stream!")
 
-	// Create a buffer stream for non blocking read and write.
-	rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+	// First, ensure that any messages read from the stream are sent to the
+	// SubPub.Reader channel.
+	go ps.readHandler(bufio.NewReader(stream))
 
-	go ps.readHandler(rw)
-	go ps.broadcastHandler(rw)
-	// 'stream' will stay open until you close it (or the other side closes it).
+	// Second, ensure that, from now on, any broadcast message is sent to
+	// this stream as well.
+	// Allow up to 8 queued broadcast messages per peer. This allows us to
+	// concurrently spread broadcast messages without blocking, falling back
+	// to dropping messages if any peer is slow or disconnects.
+	// TODO(mvdan): if another peer opens a stream with us, to just send
+	// us a single message (unicast), it's wasteful to also send broadcasts
+	// back via that stream.
+
+	write := make(chan []byte, 8)
+	pid := stream.Conn().RemotePeer()
+	ps.PeersMu.Lock()
+	defer ps.PeersMu.Unlock()
+	ps.Peers = append(ps.Peers, peerSub{pid, write})
+	log.Infof("connected to peer %s", pid)
+	go ps.broadcastHandler(write, bufio.NewWriter(stream))
 }
 
 // SendMessage encrypts and writes a message on the readwriter buffer
-func (ps *SubPub) SendMessage(rw *bufio.ReadWriter, msg []byte) error {
+func (ps *SubPub) SendMessage(w *bufio.Writer, msg []byte) error {
 	log.Debugf("sending message: %s", msg)
 	if !ps.Private {
 		msg = []byte(ps.encrypt(msg)) // TO-DO find a better way to encapsulate data! byte -> b64 -> byte is not the best...
 	}
-	if _, err := rw.Write(append(msg, byte(delimiter))); err != nil {
+	if _, err := w.Write(append(msg, byte(delimiter))); err != nil {
 		return err
 	}
-	return rw.Flush()
+	return w.Flush()
 }
 
-func (ps *SubPub) broadcastHandler(rw *bufio.ReadWriter) {
+func (ps *SubPub) broadcastHandler(write <-chan []byte, w *bufio.Writer) {
 	for {
 		select {
 		case <-ps.close:
 			return
-		default:
-			if err := ps.SendMessage(rw, <-ps.BroadcastWriter); err != nil {
+		case msg := <-write:
+			if err := ps.SendMessage(w, msg); err != nil {
 				log.Warnf("error writing to buffer: %s", err)
 				return
 			}
-			rw.Flush()
+			if err := w.Flush(); err != nil {
+				log.Warnf("error flushing write buffer: %s", err)
+				return
+			}
 		}
 	}
 }
 
-func (ps *SubPub) readHandler(rw *bufio.ReadWriter) {
+func (ps *SubPub) readHandler(r *bufio.Reader) {
 	for {
 		select {
 		case <-ps.close:
@@ -108,7 +131,7 @@ func (ps *SubPub) readHandler(rw *bufio.ReadWriter) {
 		default:
 			// continues below
 		}
-		message, err := rw.ReadBytes(byte(delimiter))
+		message, err := r.ReadBytes(byte(delimiter))
 		if err != nil {
 			log.Debugf("error reading from buffer: %s", err)
 			return
@@ -140,6 +163,7 @@ func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int, private bool) *
 	ps.Port = port
 	ps.Private = private
 	ps.DiscoveryPeriod = time.Second * 10
+	ps.CollectionPeriod = time.Second * 10
 	ps.close = make(chan bool)
 	return ps
 }
@@ -149,7 +173,6 @@ func (ps *SubPub) Connect(ctx context.Context) {
 	log.Infof("private key: %s", ps.privKey)
 	if len(ps.Topic) == 0 {
 		log.Fatal("no group key provided")
-		return
 	}
 	ipfslog.SetLogLevel("*", "ERROR")
 
@@ -174,7 +197,8 @@ func (ps *SubPub) Connect(ctx context.Context) {
 	c.ListenAddrs = []multiaddr.Multiaddr{sourceMultiAddr}
 
 	log.Debugf("libp2p config: %+v", c)
-	ps.Host, err = c.NewNode(ctx)
+	// Note that we don't use ctx here, since we stop via the Close method.
+	ps.Host, err = c.NewNode(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -201,7 +225,8 @@ func (ps *SubPub) Connect(ctx context.Context) {
 		dhtopts.MaxRecordAge(1 * time.Hour),
 	}
 
-	ps.dht, err = dht.New(ctx, ps.Host, opts...)
+	// Note that we don't use ctx here, since we stop via the Close method.
+	ps.dht, err = dht.New(context.Background(), ps.Host, opts...)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -210,7 +235,8 @@ func (ps *SubPub) Connect(ctx context.Context) {
 		// Bootstrap the DHT. In the default configuration, this spawns a Background
 		// thread that will refresh the peer table every five minutes.
 		log.Info("bootstrapping the DHT")
-		if err := ps.dht.Bootstrap(ctx); err != nil {
+		// Note that we don't use ctx here, since we stop via the Close method.
+		if err := ps.dht.Bootstrap(context.Background()); err != nil {
 			log.Fatal(err)
 		}
 
@@ -225,7 +251,7 @@ func (ps *SubPub) Connect(ctx context.Context) {
 		log.Debugf("bootnodes: %+v", bootnodes)
 		var wg sync.WaitGroup
 		for _, peerAddr := range bootnodes {
-			peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
+			peerinfo, err := libpeer.AddrInfoFromP2pAddr(peerAddr)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -250,9 +276,19 @@ func (ps *SubPub) Connect(ctx context.Context) {
 	ps.routing = discovery.NewRoutingDiscovery(ps.dht)
 }
 
-func (ps *SubPub) Close() {
+func (ps *SubPub) Close() error {
 	log.Debug("received close signal")
-	ps.close <- true
+	select {
+	case <-ps.close:
+		// already closed
+		return nil
+	default:
+		close(ps.close)
+		if err := ps.dht.Close(); err != nil {
+			return err
+		}
+		return ps.Host.Close()
+	}
 }
 
 func (ps *SubPub) advertise(ctx context.Context, topic string) {
@@ -290,6 +326,29 @@ func (ps *SubPub) Subscribe(ctx context.Context) {
 	go ps.advertise(ctx, ps.Topic)
 	go ps.advertise(ctx, ps.PubKey)
 
+	// Distribute broadcast messages to all connected peers.
+	go func() {
+		for {
+			select {
+			case <-ps.close:
+				return
+			case msg := <-ps.BroadcastWriter:
+				ps.PeersMu.Lock()
+				for _, peer := range ps.Peers {
+					if peer.write == nil {
+						continue
+					}
+					select {
+					case peer.write <- msg:
+					default:
+						log.Infof("dropping broadcast message for peer %s", peer.id)
+					}
+				}
+				ps.PeersMu.Unlock()
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-ps.close:
@@ -300,6 +359,8 @@ func (ps *SubPub) Subscribe(ctx context.Context) {
 		}
 	}
 }
+
+// TODO(mvdan): test and refactor this "unicast" method.
 
 func (ps *SubPub) PeerConnect(pubKey string, callback func(*bufio.ReadWriter)) error {
 	ctx := context.TODO()
@@ -321,9 +382,6 @@ func (ps *SubPub) PeerConnect(pubKey string, callback func(*bufio.ReadWriter)) e
 		if err != nil {
 			log.Debugf("connection failed: ", err)
 			continue
-		}
-		if !ps.connectedPeer(peer.ID) {
-			ps.addConnectedPeer(peer.ID)
 		}
 		log.Infof("connected to peer %s", peer.ID)
 		callback(bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream)))
@@ -348,36 +406,29 @@ func (ps *SubPub) peersManager() {
 		case <-ps.close:
 			return
 		default:
-			ps.GroupMu.Lock()
-			for i, p := range ps.GroupPeers {
-				// Remove peer if no active connection
-				if len(ps.Host.Network().ConnsToPeer(p)) == 0 {
-					if len(ps.GroupPeers) > 1 {
-						ps.GroupPeers[i] = ps.GroupPeers[len(ps.GroupPeers)-1]
-						ps.GroupPeers[len(ps.GroupPeers)-1] = ""
-						ps.GroupPeers = ps.GroupPeers[:len(ps.GroupPeers)-1]
-					} else {
-						ps.GroupPeers = []peer.ID{}
-					}
-				}
-			}
-			ps.GroupMu.Unlock()
-			time.Sleep(10 * time.Second)
+			// continues below
 		}
+		ps.PeersMu.Lock()
+		// We can't use a range, since we modify the slice in the loop.
+		for i := 0; i < len(ps.Peers); i++ {
+			peer := ps.Peers[i]
+			if len(ps.Host.Network().ConnsToPeer(peer.id)) > 0 {
+				continue
+			}
+			// Remove peer if no active connection
+			ps.Peers[i] = ps.Peers[len(ps.Peers)-1]
+			ps.Peers = ps.Peers[:len(ps.Peers)-1]
+		}
+		ps.PeersMu.Unlock()
+		time.Sleep(ps.CollectionPeriod)
 	}
 }
 
-func (ps *SubPub) addConnectedPeer(pid peer.ID) {
-	ps.GroupMu.Lock()
-	defer ps.GroupMu.Unlock()
-	ps.GroupPeers = append(ps.GroupPeers, pid)
-}
-
-func (ps *SubPub) connectedPeer(pid peer.ID) bool {
-	ps.GroupMu.Lock()
-	defer ps.GroupMu.Unlock()
-	for _, p := range ps.GroupPeers {
-		if p == pid {
+func (ps *SubPub) connectedPeer(pid libpeer.ID) bool {
+	ps.PeersMu.Lock()
+	defer ps.PeersMu.Unlock()
+	for _, peer := range ps.Peers {
+		if peer.id == pid {
 			return true
 		}
 	}
@@ -385,7 +436,7 @@ func (ps *SubPub) connectedPeer(pid peer.ID) bool {
 }
 
 func (ps *SubPub) discover(ctx context.Context) {
-	// Now, look for others who have announced
+	// Now, look for others who have announced.
 	// This is like your friend telling you the location to meet you.
 	log.Debugf("searching for SubPub group identity %s", ps.Topic)
 	peerChan, err := ps.routing.FindPeers(ctx, ps.Topic)
@@ -416,11 +467,7 @@ func (ps *SubPub) discover(ctx context.Context) {
 			log.Debugf("could not connect to peer %s: %v", peer.ID, err)
 			continue
 		}
-		ps.addConnectedPeer(peer.ID)
-		log.Infof("connected to peer %s", peer.ID)
-		rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
-		go ps.broadcastHandler(rw)
-		go ps.readHandler(rw)
+		ps.handleStream(stream)
 	}
 }
 
