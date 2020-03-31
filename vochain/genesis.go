@@ -13,7 +13,8 @@ const (
       "time_iota_ms": "10000"
     },
     "evidence": {
-      "max_age": "100000"
+      "max_age_num_blocks": "100000",
+      "max_age_duration": "10000"
     },
     "validator": {
       "pub_key_types": [
@@ -117,7 +118,8 @@ const (
       "time_iota_ms": "20000"
     },
     "evidence": {
-      "max_age": "100000"
+      "max_age_num_blocks": "100000",
+      "max_age_duration": "10000"
     },
     "validator": {
       "pub_key_types": [
@@ -200,7 +202,8 @@ const (
       "time_iota_ms": "10000"
     },
     "evidence": {
-      "max_age": "100000"
+      "max_age_num_blocks": "100000",
+      "max_age_duration": "10000"
     },
     "validator": {
       "pub_key_types": [
