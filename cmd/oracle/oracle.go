@@ -18,10 +18,10 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -220,15 +220,15 @@ func main() {
 		if err != nil {
 			log.Warn(err)
 		} else {
-			addrport := strings.Split(globalCfg.VochainConfig.P2PListen, ":")
-			if len(addrport) > 0 {
-				globalCfg.VochainConfig.PublicAddr = fmt.Sprintf("%s:%s", ip, addrport[len(addrport)-1])
+			_, port, err := net.SplitHostPort(globalCfg.VochainConfig.P2PListen)
+			if err == nil {
+				globalCfg.VochainConfig.PublicAddr = net.JoinHostPort(ip.String(), port)
 			}
 		}
 	} else {
-		addrport := strings.Split(globalCfg.VochainConfig.P2PListen, ":")
-		if len(addrport) > 0 {
-			globalCfg.VochainConfig.PublicAddr = fmt.Sprintf("%s:%s", addrport[0], addrport[1])
+		host, port, err := net.SplitHostPort(globalCfg.VochainConfig.P2PListen)
+		if err == nil {
+			globalCfg.VochainConfig.PublicAddr = net.JoinHostPort(host, port)
 		}
 	}
 	if globalCfg.VochainConfig.PublicAddr != "" {

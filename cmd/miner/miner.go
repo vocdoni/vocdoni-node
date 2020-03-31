@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	flag "github.com/spf13/pflag"
@@ -153,15 +153,15 @@ func main() {
 		if err != nil {
 			log.Warn(err)
 		} else {
-			addrport := strings.Split(globalCfg.P2PListen, ":")
-			if len(addrport) > 0 {
-				globalCfg.PublicAddr = fmt.Sprintf("%s:%s", ip, addrport[len(addrport)-1])
+			_, port, err := net.SplitHostPort(globalCfg.P2PListen)
+			if err == nil {
+				globalCfg.PublicAddr = fmt.Sprintf("%s:%s", ip, port)
 			}
 		}
 	} else {
-		addrport := strings.Split(globalCfg.P2PListen, ":")
-		if len(addrport) > 0 {
-			globalCfg.PublicAddr = fmt.Sprintf("%s:%s", addrport[0], addrport[1])
+		host, port, err := net.SplitHostPort(globalCfg.P2PListen)
+		if err == nil {
+			globalCfg.PublicAddr = net.JoinHostPort(host, port)
 		}
 	}
 

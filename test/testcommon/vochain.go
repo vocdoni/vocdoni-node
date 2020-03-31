@@ -14,7 +14,6 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
@@ -189,15 +188,15 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	// run node
 	vnode := vochain.NewVochain(d.VochainCfg, genBytes, validator)
 	// create vochain rpc conection
-	d.VochainRPCClient, err = voclient.NewHTTP(d.VochainCfg.RPCListen, "/websocket")
+	d.VochainRPCClient, err = voclient.NewHTTP("tcp://"+d.VochainCfg.RPCListen, "/websocket")
 	if err != nil {
-		log.Fatal(err)
+		tb.Fatal(err)
 	}
 	return vnode
 }
 
 func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer, vnode *vochain.BaseApplication) *scrutinizer.Scrutinizer {
-	log.Info("starting vochain scrutinizer")
+	tb.Log("starting vochain scrutinizer")
 	d.ScrutinizerDir = TempDir(tb, "scrutinizer")
 	sc, err := scrutinizer.NewScrutinizer(d.ScrutinizerDir, vnode.State)
 	if err != nil {

@@ -10,7 +10,6 @@ import (
 	"github.com/gorilla/websocket"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/log"
 	dnet "gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -78,7 +77,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 			if err != nil {
 				t.Fatalf("cannot marshal request: %s", err)
 			}
-			log.Infof("testing: %s, sending request: %v", tt.name, tt.request)
+			t.Logf("sending request: %v", tt.request)
 			err = c.WriteMessage(websocket.TextMessage, reqBytes)
 			if err != nil {
 				t.Fatalf("cannot write to ws: %s", err)
@@ -88,7 +87,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 			if err != nil {
 				t.Fatalf("cannot read message: %s", err)
 			}
-			log.Infof("response: %s", message)
+			t.Logf("response: %s", message)
 			// check if response == expected
 			var resp map[string]interface{}
 			err = json.Unmarshal(message, &resp)

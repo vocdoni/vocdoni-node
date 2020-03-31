@@ -36,7 +36,6 @@ import (
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
-	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 
 	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
@@ -250,5 +249,5 @@ func TestCensus(t *testing.T) {
 	if len(resp.CensusList) != 3 {
 		t.Fatalf("census list size does not match")
 	}
-	log.Infof("census list: %v", resp.CensusList)
+	t.Logf("census list: %v", resp.CensusList)
 }

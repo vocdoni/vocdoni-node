@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -22,7 +23,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/net"
+	vonet "gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -269,7 +270,7 @@ func main() {
 	}
 
 	// setup listener
-	pxy := net.NewProxy()
+	pxy := vonet.NewProxy()
 	pxy.C.SSLDomain = globalCfg.Ssl.Domain
 	pxy.C.SSLCertDir = globalCfg.Ssl.DirCert
 	if globalCfg.Ssl.Domain != "" {
@@ -394,15 +395,15 @@ func main() {
 			if err != nil {
 				log.Warn(err)
 			} else {
-				addrport := strings.Split(globalCfg.VochainConfig.P2PListen, ":")
-				if len(addrport) > 0 {
-					globalCfg.VochainConfig.PublicAddr = fmt.Sprintf("%s:%s", ip, addrport[len(addrport)-1])
+				_, port, err := net.SplitHostPort(globalCfg.VochainConfig.P2PListen)
+				if err == nil {
+					globalCfg.VochainConfig.PublicAddr = net.JoinHostPort(ip.String(), port)
 				}
 			}
 		} else {
-			addrport := strings.Split(globalCfg.VochainConfig.P2PListen, ":")
-			if len(addrport) > 0 {
-				globalCfg.VochainConfig.PublicAddr = fmt.Sprintf("%s:%s", addrport[0], addrport[1])
+			host, port, err := net.SplitHostPort(globalCfg.VochainConfig.P2PListen)
+			if err == nil {
+				globalCfg.VochainConfig.PublicAddr = net.JoinHostPort(host, port)
 			}
 		}
 		if globalCfg.VochainConfig.PublicAddr != "" {
@@ -482,7 +483,7 @@ func main() {
 
 	// API Endpoint initialization
 	if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
-		ws := new(net.WebsocketHandle)
+		ws := new(vonet.WebsocketHandle)
 		ws.Init(new(types.Connection))
 		ws.SetProxy(pxy)
 
@@ -500,7 +501,7 @@ func main() {
 		}
 		if globalCfg.API.Vote {
 			// creating the RPC calls client
-			rpcClient, err := voclient.NewHTTP(globalCfg.VochainConfig.RPCListen, "/websocket")
+			rpcClient, err := voclient.NewHTTP("tcp://"+globalCfg.VochainConfig.RPCListen, "/websocket")
 			if err != nil {
 				log.Fatal(err)
 			}
