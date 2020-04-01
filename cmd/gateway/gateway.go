@@ -459,13 +459,9 @@ func main() {
 	}
 
 	// Wait for Ethereum to be ready
-	minPeers := 1
-	if globalCfg.EthConfig.LightMode {
-		minPeers = 2
-	}
 	if !ethNoWaitSync {
 		for {
-			if height, synced, peers, _ := node.SyncInfo(); synced && peers >= minPeers && height != "0" {
+			if info, _ := node.SyncInfo(); info.Synced && info.Peers > 1 && info.Height > 0 {
 				log.Infof("ethereum blockchain synchronized")
 				break
 			}
@@ -474,7 +470,8 @@ func main() {
 	}
 
 	// get voting contract
-	votingProcessAddr, err := chain.VotingProcessAddress(ensRegistryAddr, globalCfg.EthProcessDomain, fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort))
+	votingProcessAddr, err := chain.VotingProcessAddress(
+		ensRegistryAddr, globalCfg.EthProcessDomain, fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort))
 	if err != nil || votingProcessAddr == "" {
 		log.Warnf("cannot get voting process contract: %s", err)
 	} else {
@@ -533,16 +530,11 @@ func main() {
 		ev.AddEventHandler(ethevents.HandleCensus)
 
 		go func() {
-			for _, synced, _, _ := node.SyncInfo(); !synced; {
+			var info chain.EthSyncInfo
+			for info, _ = node.SyncInfo(); !info.Synced && info.Peers > 0 && info.Height > 0; {
 				time.Sleep(time.Second * 2)
 			}
-			lastBlock := node.Eth.BlockChain().CurrentBlock().Number().Int64()
-			log.Infof("searching for census from block 0 to %d", lastBlock)
-			ev.ReadEthereumEventLogs(0, lastBlock)
-			// Wait until having some peers
-			for _, _, peers, _ := node.SyncInfo(); peers > 0; {
-				time.Sleep(time.Second * 2)
-			}
+			ev.ReadEthereumEventLogs(0, int64(info.Height))
 			log.Info("subscribing to new ethereum census")
 			ev.SubscribeEthereumEventLogs()
 		}()

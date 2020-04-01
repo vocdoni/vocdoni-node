@@ -21,7 +21,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -337,16 +336,15 @@ func main() {
 	// wait Ethereum to be synced
 	go func() {
 		for {
-			height, synced, peers, _ := node.SyncInfo()
-			if synced && peers > 1 && height != "0" && vnode != nil {
-				log.Info("ethereum node fully synced")
-				log.Info("oracle startup complete")
-				lastBlock, err := strconv.ParseInt(height, 10, 64)
+			info, _ := node.SyncInfo()
+			if info.Synced && info.Peers > 1 && info.Height > 0 && vnode != nil {
+				log.Info("ethereum node fully synced, oracle startup complete")
 				if err != nil {
-					log.Fatalf("cannot read logs, ethereum last block parsing failed: %s at block %d", err, height)
+					log.Fatalf("cannot read logs, ethereum last block parsing failed: %d at block %d", err, info.Height)
 				}
 				// get voting contract
-				votingProcessAddr, err := chain.VotingProcessAddress(ensRegistryAddr, globalCfg.EthProcessDomain, fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort))
+				votingProcessAddr, err := chain.VotingProcessAddress(
+					ensRegistryAddr, globalCfg.EthProcessDomain, fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort))
 				if err != nil || votingProcessAddr == "" {
 					log.Warnf("cannot get voting process contract: %s", err)
 				} else {
@@ -354,18 +352,19 @@ func main() {
 				}
 
 				// Create Ethereum Event Log listener and register oracle handlers
-				ev, err := ethevents.NewEthEvents(votingProcessAddr, signer, fmt.Sprintf("ws://%s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort), nil)
+				ev, err := ethevents.NewEthEvents(
+					votingProcessAddr, signer, fmt.Sprintf("ws://%s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort), nil)
 				if err != nil {
 					log.Fatalf("couldn't create ethereum  events listener: %s", err)
 				}
 				ev.VochainCLI = vochainConn
 				ev.AddEventHandler(ethevents.HandleVochainOracle)
 				if globalCfg.SubscribeOnly {
-					log.Infof("reading ethereum events from current block %d", lastBlock)
+					log.Infof("reading ethereum events from current block %d", info.Height)
 					go ev.SubscribeEthereumEventLogs()
 				} else {
-					log.Infof("reading ethereum events from block 0 to %d", lastBlock)
-					go ev.ReadEthereumEventLogs(0, lastBlock)
+					log.Infof("reading ethereum events from block 0 to %d", info.Height)
+					go ev.ReadEthereumEventLogs(0, int64(info.Height))
 					go ev.SubscribeEthereumEventLogs()
 				}
 				break

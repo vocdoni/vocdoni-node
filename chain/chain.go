@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/core"
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
+	"github.com/ethereum/go-ethereum/rpc"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -231,54 +233,77 @@ func (e *EthChainContext) createAccount() error {
 func (e *EthChainContext) PrintInfo(seconds time.Duration) {
 	for {
 		time.Sleep(seconds)
-		height, synced, peers, err := e.SyncInfo()
+		info, err := e.SyncInfo()
 		if err != nil {
 			log.Warn(err)
 		}
-		log.Infof("[ethereum info] synced:%t height:%s peers:%d mode:%s", synced, height, peers, e.Config.SyncMode)
+		log.Infof("[ethereum info] synced:%t height:%d/%d peers:%d mode:%s",
+			info.Synced, info.Height, info.MaxHeight, info.Peers, info.Mode)
 	}
 }
 
+type EthSyncInfo struct {
+	Height    uint64
+	MaxHeight uint64
+	Synced    bool
+	Peers     int
+	Mode      string
+}
+
 // SyncInfo returns the height and syncing Ethereum blockchain information
-func (e *EthChainContext) SyncInfo() (height string, synced bool, peers int, err error) {
+func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
+	// Light sync
 	if e.DefaultConfig.LightMode {
-		synced = true
-		r, err := e.Node.Attach()
+		info.Mode = "light"
+		info.Synced = true
+		var r *rpc.Client
+		r, err = e.Node.Attach()
 		if r == nil || err != nil {
-			return "0", false, 0, err
+			return
 		}
-		r.Call(&synced, "eth_syncing") // true = syncing / false if synced
-		synced = !synced
-		r.Call(&height, "eth_blockNumber")
-		block := util.Hex2int64(height)
-		if block == 0 {
-			// Workaround
-			synced = false
+
+		r.Call(&info.Synced, "eth_syncing") // true = syncing / false if synced
+		info.Synced = !info.Synced
+		var block string
+		r.Call(&block, "eth_blockNumber")
+		info.Height = uint64(util.Hex2int64(block))
+		if info.Height == 0 {
+			info.Synced = false // Workaround
 		}
-		height = fmt.Sprintf("%d", block)
-		peers = e.Node.Server().PeerCount()
-		return height, synced, peers, err
+		//TODO find a way to get the maxHeight on light mode
+		info.MaxHeight = info.Height
+		info.Peers = e.Node.Server().PeerCount()
+		return
 	}
+	// External Web3
 	if len(e.DefaultConfig.W3external) > 0 {
-		client, err := ethclient.Dial(e.DefaultConfig.W3external)
+		info.Mode = "external"
+		info.Synced = false
+		info.Peers = 1 // force peers=1 if using external web3
+		var client *ethclient.Client
+		var sp *ethereum.SyncProgress
+		client, err = ethclient.Dial(e.DefaultConfig.W3external)
 		if err != nil {
-			return "0", true, 0, err
+			return
 		}
-		sp, err := client.SyncProgress(context.Background())
-		height = fmt.Sprintf("%d", sp.CurrentBlock)
-		return height, true, 1, err
+		sp, err = client.SyncProgress(context.Background())
+		info.MaxHeight = sp.HighestBlock
+		info.Height = sp.CurrentBlock
+		return
 	}
+	// Fast sync
 	if e.Eth != nil {
-		synced = e.Eth.Synced()
-		if synced {
-			height = e.Eth.BlockChain().CurrentBlock().Number().String()
+		info.Mode = "fast"
+		info.Synced = e.Eth.Synced()
+		if info.Synced {
+			info.Height = e.Eth.BlockChain().CurrentBlock().Number().Uint64()
 		} else {
-			height = fmt.Sprintf("%d/%d",
-				e.Eth.Downloader().Progress().CurrentBlock,
-				e.Eth.Downloader().Progress().HighestBlock)
+			info.Height = e.Eth.Downloader().Progress().CurrentBlock
 		}
-		peers = e.Node.Server().PeerCount()
-		return height, synced, peers, nil
+		info.MaxHeight = e.Eth.Downloader().Progress().HighestBlock
+		info.Peers = e.Node.Server().PeerCount()
+		return
 	}
-	return "0", false, 0, fmt.Errorf("cannot get sync info, unknown error")
+	err = fmt.Errorf("cannot get sync info, unknown error")
+	return
 }
