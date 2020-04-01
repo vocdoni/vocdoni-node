@@ -56,7 +56,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 
 	// gateway
 	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
-	flag.BoolVar(&globalCfg.Dev, "dev", false, "run and connect to the development network")
+	flag.BoolVar(&globalCfg.Dev, "dev", true, "run and connect to the development network")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
