@@ -316,7 +316,8 @@ func main() {
 	go node.PrintInfo(time.Second * 20)
 
 	// initializing Vochain connection
-	vochainConn, err := voclient.NewHTTP(globalCfg.VochainConfig.RPCListen, "/websocket")
+	vochainConn, err := voclient.NewHTTP("tcp://"+globalCfg.VochainConfig.RPCListen, "/websocket")
+
 	if err != nil {
 		log.Fatal(err)
 	}
