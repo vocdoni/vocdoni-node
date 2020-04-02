@@ -133,7 +133,7 @@ func (r *Router) getBlockHeight(request routerRequest) {
 	}
 	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil || queryResult.Response.Code != 0 {
-		r.sendError(request, "cannot fetch height")
+		r.sendError(request, fmt.Sprintf("cannot fetch height: (%s)", err))
 		return
 	}
 	var response types.ResponseMessage

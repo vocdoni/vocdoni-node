@@ -535,6 +535,9 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			resp.SetError(err)
 			return resp
 		}
+		if !r.Digested {
+			data = signature.HashPoseidon(fmt.Sprintf("%x", data))
+		}
 		validProof, err := tree.CheckProof(root, r.ProofData, data)
 		if err != nil {
 			resp.SetError(err)
@@ -563,6 +566,9 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			log.Warnf("error decoding base64 string: %s", err)
 			resp.SetError(err)
 			return resp
+		}
+		if !r.Digested {
+			data = signature.HashPoseidon(fmt.Sprintf("%x", data))
 		}
 		resp.Siblings, err = tr.GenProof(data)
 		if err != nil {
