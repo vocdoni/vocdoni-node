@@ -380,7 +380,22 @@ func main() {
 			}
 		}
 		censusManager.Init(globalCfg.DataDir+"/census", "")
-
+		go func() {
+			var imported, local int
+			for {
+				time.Sleep(time.Second * 60)
+				imported = 0
+				local = 0
+				for _, n := range censusManager.Census.Namespaces {
+					if strings.Contains(n.Name, "/") {
+						local++
+					} else {
+						imported++
+					}
+				}
+				log.Infof("[census info] local:%d imported:%d", local, imported)
+			}
+		}()
 	}
 
 	// Initialize and start Vochain
@@ -531,10 +546,10 @@ func main() {
 
 		go func() {
 			var info chain.EthSyncInfo
-			for info, _ = node.SyncInfo(); !info.Synced && info.Peers > 0 && info.Height > 0; {
+			for info, _ = node.SyncInfo(); !info.Synced || info.Peers == 0 || info.Height == 0; {
 				time.Sleep(time.Second * 2)
 			}
-			ev.ReadEthereumEventLogs(0, int64(info.Height))
+			go ev.ReadEthereumEventLogs(0, int64(info.Height))
 			log.Info("subscribing to new ethereum events")
 			ev.SubscribeEthereumEventLogs()
 		}()
