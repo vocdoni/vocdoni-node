@@ -270,7 +270,7 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 		if info.Height == 0 {
 			info.Synced = false // Workaround
 		}
-		//TODO find a way to get the maxHeight on light mode
+		// TODO find a way to get the maxHeight on light mode
 		info.MaxHeight = info.Height
 		info.Peers = e.Node.Server().PeerCount()
 		return

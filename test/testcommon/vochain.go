@@ -187,6 +187,12 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	d.VochainCfg.RPCListen = "0.0.0.0:26657"
 	// run node
 	vnode := vochain.NewVochain(d.VochainCfg, genBytes, validator)
+	tb.Cleanup(func() {
+		if err := vnode.Node.Stop(); err != nil {
+			tb.Error(err)
+		}
+		vnode.Node.Wait()
+	})
 	// create vochain rpc conection
 	d.VochainRPCClient, err = voclient.NewHTTP("tcp://"+d.VochainCfg.RPCListen, "/websocket")
 	if err != nil {

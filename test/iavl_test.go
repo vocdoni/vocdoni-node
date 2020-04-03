@@ -50,10 +50,8 @@ func TestAddOracle(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithOracles(t)
-	if s != nil {
-		if err := s.AddOracle("0x414896B0BC763b8762456DB00F9c76EBd49979C4"); err != nil {
-			t.Error(err)
-		}
+	if err := s.AddOracle("0x414896B0BC763b8762456DB00F9c76EBd49979C4"); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -61,10 +59,8 @@ func TestRemoveOracle(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithOracles(t)
-	if s != nil {
-		if err := s.RemoveOracle(testcommon.OracleListHardcoded[0]); err != nil {
-			t.Error(err)
-		}
+	if err := s.RemoveOracle(testcommon.OracleListHardcoded[0]); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -72,15 +68,13 @@ func TestGetOracles(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithOracles(t)
-	if s != nil {
-		oracles, err := s.Oracles()
-		if err != nil {
-			t.Error(err)
-		}
-		for i, v := range testcommon.OracleListHardcoded {
-			if oracles[i] != v {
-				t.Error("oracle address does not match")
-			}
+	oracles, err := s.Oracles()
+	if err != nil {
+		t.Error(err)
+	}
+	for i, v := range testcommon.OracleListHardcoded {
+		if oracles[i] != v {
+			t.Error("oracle address does not match")
 		}
 	}
 }
@@ -91,10 +85,8 @@ func TestAddValidator(t *testing.T) {
 	s := testcommon.NewVochainStateWithValidators(t)
 	rint := rand.Int()
 	val := privval.GenFilePV(fmt.Sprintf("/tmp/vochainBenchmark%d", rint), fmt.Sprintf("/tmp/vochainBenchmark%d", rint))
-	if s != nil {
-		if err := s.AddValidator(val.GetPubKey(), 10); err != nil {
-			t.Error(err)
-		}
+	if err := s.AddValidator(val.GetPubKey(), 10); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -103,10 +95,8 @@ func TestRemoveValidator(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithValidators(t)
-	if s != nil {
-		if err := s.RemoveValidator(testcommon.ValidatorListHardcoded[1].GetAddress().String()); err != nil {
-			t.Error(err)
-		}
+	if err := s.RemoveValidator(testcommon.ValidatorListHardcoded[1].GetAddress().String()); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -114,15 +104,13 @@ func TestGetValidators(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithValidators(t)
-	if s != nil {
-		validators, err := s.Validators()
-		if err != nil {
-			t.Error(err)
-		}
-		for i, v := range testcommon.ValidatorListHardcoded {
-			if validators[i].PubKey.Equals(v.GetPubKey()) {
-				t.Error("validator pubkey not match")
-			}
+	validators, err := s.Validators()
+	if err != nil {
+		t.Error(err)
+	}
+	for i, v := range testcommon.ValidatorListHardcoded {
+		if validators[i].PubKey.Equals(v.GetPubKey()) {
+			t.Error("validator pubkey not match")
 		}
 	}
 }
@@ -159,10 +147,8 @@ func TestAddVote(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	if s != nil {
-		if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
-			t.Error(err)
-		}
+	if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -170,13 +156,11 @@ func TestGetEnvelope(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	if s != nil {
-		if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
-			t.Error(err)
-		}
-		if _, err := s.Envelope("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
-			t.Error(err)
-		}
+	if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
+		t.Error(err)
+	}
+	if _, err := s.Envelope("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -184,13 +168,11 @@ func TestCountVotes(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	if s != nil {
-		if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
-			t.Error(err)
-		}
-		if _, err := s.Envelope("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
-			t.Error(err)
-		}
+	if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
+		t.Error(err)
+	}
+	if _, err := s.Envelope("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
+		t.Error(err)
 	}
 	c := s.CountVotes("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105")
 	if c != 1 {
@@ -202,13 +184,11 @@ func TestGetEnvelopeList(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	if s != nil {
-		if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
-			t.Error(err)
-		}
-		if _, err := s.Envelope("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
-			t.Error(err)
-		}
+	if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
+		t.Error(err)
+	}
+	if _, err := s.Envelope("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
+		t.Error(err)
 	}
 	nullifiers := s.EnvelopeList("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105", 0, 1)
 	if nullifiers[0] != "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0" {

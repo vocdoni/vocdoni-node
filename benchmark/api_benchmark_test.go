@@ -16,28 +16,32 @@ import (
 	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 )
 
+// The init function and flags are shared with the other benchmark files.
+// These globals can only be read, not modified.
+
 func init() { rand.Seed(time.Now().UnixNano()) }
 
 var (
-	host       = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
+	hostFlag   = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
 	censusSize = flag.Int("censusSize", 100, "number of census entries to add (minimum 100)")
 	onlyCensus = flag.Bool("onlyCreateCensus", false, "perform only create census operations")
 )
 
 func BenchmarkCensus(b *testing.B) {
-	if *host == "" {
+	host := *hostFlag
+	if host == "" {
 		var server common.DvoteAPIServer
 		server.Start(b, "file", "census")
 		b.Cleanup(func() {
 			os.RemoveAll(server.IpfsDir)
 			os.RemoveAll(server.CensusDir)
 		})
-		host = &server.PxyAddr
+		host = server.PxyAddr
 	}
 
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
-		c := common.NewAPIConnection(b, *host)
+		c := common.NewAPIConnection(b, host)
 
 		for pb.Next() {
 			censusBench(b, c)

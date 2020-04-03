@@ -3,7 +3,6 @@ package test
 import (
 	"encoding/base64"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -18,8 +17,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
-func init() { rand.Seed(time.Now().UnixNano()) }
-
 // THIS BENCH DOES NOT PROVIDE ANY CONSENSUS GUARANTEES
 
 const (
@@ -28,18 +25,13 @@ const (
 	processType    = "poll-vote"
 )
 
-var (
-	logLevel   = flag.String("logLevel", "error", "logging level (debug, info, warning, error)")
-	host       = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
-	censusSize = flag.Int("censusSize", 100, "number of census entries to add")
-)
-
 func BenchmarkVochain(b *testing.B) {
 	var dvoteServer testcommon.DvoteAPIServer
 	rint := rand.Int()
-	if *host == "" {
+	host := *hostFlag
+	if host == "" {
 		dvoteServer.Start(b, "file", "census", "vote")
-		host = &dvoteServer.PxyAddr
+		host = dvoteServer.PxyAddr
 	}
 
 	// create random key batch
@@ -63,7 +55,7 @@ func BenchmarkVochain(b *testing.B) {
 	signerPub, _ := dvoteServer.Signer.HexString()
 
 	// check required components
-	c := testcommon.NewAPIConnection(b, *host)
+	c := testcommon.NewAPIConnection(b, host)
 	var req types.MetaRequest
 	log.Info("get info")
 	req.Method = "getGatewayInfo"
@@ -164,7 +156,7 @@ func BenchmarkVochain(b *testing.B) {
 	// send votes in parallel
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
-		c := testcommon.NewAPIConnection(b, *host)
+		c := testcommon.NewAPIConnection(b, host)
 
 		count := 0
 		for pb.Next() {
