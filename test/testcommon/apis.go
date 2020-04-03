@@ -66,7 +66,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	if err != nil {
 		tb.Fatal(err)
 	}
-	routerAPI := router.InitRouter(listenerOutput, storage, ws, d.Signer)
+	routerAPI := router.InitRouter(listenerOutput, storage, ws, d.Signer, true)
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager

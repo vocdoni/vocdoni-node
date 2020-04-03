@@ -356,6 +356,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	resp.Ok = true
 	resp.Timestamp = int32(time.Now().Unix())
 
+	// Special methods not depending on census existence
 	if r.Method == "addCensus" {
 		if isAuth {
 			_, err := m.AddNamespace(censusPrefix+r.CensusID, r.PubKeys)
@@ -365,6 +366,17 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			} else {
 				log.Infof("census %s%s created successfully managed by %s", censusPrefix, r.CensusID, r.PubKeys)
 				resp.CensusID = censusPrefix + r.CensusID
+			}
+		} else {
+			resp.SetError("invalid authentication")
+		}
+		return resp
+	}
+
+	if r.Method == "getCensusList" {
+		if isAuth {
+			for n := range m.Trees {
+				resp.CensusList = append(resp.CensusList, n)
 			}
 		} else {
 			resp.SetError("invalid authentication")
@@ -395,16 +407,6 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	switch r.Method {
 	case "getRoot":
 		resp.Root = tr.Root()
-		return resp
-
-	case "getCensusList":
-		if isAuth && validAuthPrefix {
-			for n := range m.Trees {
-				resp.CensusList = append(resp.CensusList, n)
-			}
-		} else {
-			resp.SetError("invalid authentication")
-		}
 		return resp
 
 	case "addClaimBulk":

@@ -73,6 +73,7 @@ type Router struct {
 	signer       signature.SignKeys
 	census       *census.Manager
 	tmclient     *voclient.HTTP
+	allowPrivate bool
 	Scrutinizer  *scrutinizer.Scrutinizer
 	PrivateCalls uint64
 	PublicCalls  uint64
@@ -81,7 +82,7 @@ type Router struct {
 }
 
 func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
-	signer signature.SignKeys) *Router {
+	signer signature.SignKeys, allowPrivate bool) *Router {
 	cm := new(census.Manager)
 	r := new(Router)
 	r.methods = make(map[string]registeredMethod)
@@ -91,6 +92,7 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net
 	r.transport = transport
 	r.signer = signer
 	r.codec = amino.NewCodec()
+	r.allowPrivate = allowPrivate
 	r.registerPublic("getGatewayInfo", r.info)
 	return r
 }
@@ -131,8 +133,8 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	} else {
 		request.private = true
 		request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.MetaRequest, msgStruct.Signature)
-		// if no authrized keys, authenticate all requests
-		if !request.authenticated && len(r.signer.Authorized) == 0 {
+		// if no authrized keys, authenticate all requests if allowPrivate=true
+		if r.allowPrivate && !request.authenticated && len(r.signer.Authorized) == 0 {
 			request.authenticated = true
 		}
 	}
@@ -144,9 +146,12 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 
 // InitRouter sets up a Router object which can then be used to route requests
 func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
-	signer *signature.SignKeys) *Router {
+	signer *signature.SignKeys, allowPrivate bool) *Router {
 	log.Infof("using signer with address %s", signer.EthAddrString())
-	return NewRouter(inbound, storage, transport, *signer)
+	if allowPrivate {
+		log.Warn("allowing API private methods")
+	}
+	return NewRouter(inbound, storage, transport, *signer, allowPrivate)
 }
 
 func (r *Router) registerPrivate(name string, handler func(routerRequest)) {

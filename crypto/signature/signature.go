@@ -207,9 +207,6 @@ func (k *SignKeys) VerifySender(msg, sigHex string) (bool, string, error) {
 	if err != nil {
 		return false, "", err
 	}
-	if len(k.Authorized) < 1 {
-		return true, recoveredAddr, nil
-	}
 	for _, addr := range k.Authorized {
 		if fmt.Sprintf("%x", addr) == recoveredAddr {
 			return true, recoveredAddr, nil

@@ -487,7 +487,7 @@ func main() {
 		listenerOutput := make(chan types.Message)
 		go ws.Listen(listenerOutput)
 
-		routerAPI := router.InitRouter(listenerOutput, storage, ws, signer)
+		routerAPI := router.InitRouter(listenerOutput, storage, ws, signer, globalCfg.API.AllowPrivate)
 		if globalCfg.API.File {
 			log.Info("enabling file API")
 			routerAPI.EnableFileAPI()
@@ -535,7 +535,7 @@ func main() {
 				time.Sleep(time.Second * 2)
 			}
 			ev.ReadEthereumEventLogs(0, int64(info.Height))
-			log.Info("subscribing to new ethereum census")
+			log.Info("subscribing to new ethereum events")
 			ev.SubscribeEthereumEventLogs()
 		}()
 	}
