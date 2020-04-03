@@ -232,7 +232,6 @@ func (r *Router) Route() {
 		method, ok := r.methods[request.method]
 		if !ok {
 			errMsg := fmt.Sprintf("router has no method %q", request.method)
-			//request.context
 			go r.sendError(request, errMsg)
 			continue
 		}

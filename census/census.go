@@ -579,12 +579,11 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		return resp
 
 	case "getSize":
-		var err error
-		resp.Size = new(int64)
-		*resp.Size, err = tr.Size(tr.Root())
+		size, err := tr.Size(tr.Root())
 		if err != nil {
 			resp.SetError(err)
 		}
+		resp.Size = &size
 		return resp
 
 	case "dump", "dumpPlain":

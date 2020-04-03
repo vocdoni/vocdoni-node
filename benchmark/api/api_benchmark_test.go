@@ -21,7 +21,6 @@ func init() { rand.Seed(time.Now().UnixNano()) }
 var (
 	host       = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
 	censusSize = flag.Int("censusSize", 100, "number of census entries to add (minimum 100)")
-	logLevel   = flag.String("logLevel", "error", "log level <error,info,debug>")
 	onlyCensus = flag.Bool("onlyCreateCensus", false, "perform only create census operations")
 )
 
@@ -35,7 +34,6 @@ func BenchmarkCensus(b *testing.B) {
 		})
 		host = &server.PxyAddr
 	}
-	log.Init(*logLevel, "stdout")
 
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
