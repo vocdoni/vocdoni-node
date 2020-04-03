@@ -83,7 +83,7 @@ func printNice(resp *types.MetaResponse) {
 			output += fmt.Sprintf("%v: %v\n", typeOfS.Field(i).Name, v.Field(i))
 		}
 	}
-	fmt.Print(output)
+	fmt.Print(output + "\n")
 }
 
 func processLine(input []byte) types.MetaRequest {
@@ -98,11 +98,18 @@ func processLine(input []byte) types.MetaRequest {
 func main() {
 	host := flag.String("host", "ws://0.0.0.0:9090/dvote", "host to connect to")
 	logLevel := flag.String("logLevel", "error", "log level <debug, info, warn, error>")
+	privKey := flag.String("key", "", "private key for signature (leave blank for auto-generate)")
 	flag.Parse()
 	log.Init(*logLevel, "stdout")
 
 	signer := new(signature.SignKeys)
-	signer.Generate()
+	if *privKey != "" {
+		if err := signer.AddHexKey(*privKey); err != nil {
+			panic(err)
+		}
+	} else {
+		signer.Generate()
+	}
 	log.Infof("connecting to %s", *host)
 	c := NewAPIConnection(*host)
 	defer c.Conn.Close()
