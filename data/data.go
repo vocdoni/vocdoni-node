@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 
+	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
@@ -17,6 +18,8 @@ type Storage interface {
 	ListPins(ctx context.Context) (map[string]string, error)
 	URIprefix() string
 	Stats(ctx context.Context) (string, error)
+	RegisterMetrics(ma *metrics.Agent)
+	GetMetrics(ctx context.Context) error
 
 	// TODO(mvdan): Temporary until we rethink Init/Start/etc.
 	Stop() error

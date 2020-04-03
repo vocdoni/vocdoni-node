@@ -8,13 +8,14 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 )
 
-func Vochain(vconfig *config.VochainCfg, dev, results bool) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vs *types.VochainStats, err error) {
+func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Agent) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vs *types.VochainStats, err error) {
 	log.Info("creating vochain service")
 	var host, port string
 	var ip net.IP
@@ -55,6 +56,16 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool) (vnode *vochain.Base
 	}
 	vs = new(types.VochainStats)
 	go VochainStatsCollect(vnode, 20, vs)
+	// Grab metrics
+	if metrics != nil {
+		vnode.RegisterMetrics(metrics)
+		go func() {
+			for {
+				vnode.GetMetrics()
+				time.Sleep(metrics.RefreshInterval)
+			}
+		}()
+	}
 	return
 }
 
@@ -132,4 +143,5 @@ func VochainStatsCollect(vnode *vochain.BaseApplication, sleepSecs int64, vs *ty
 		)
 		time.Sleep(time.Duration(sleepSecs) * time.Second)
 	}
+
 }

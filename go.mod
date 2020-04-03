@@ -49,6 +49,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/polydawn/refmt v0.0.0-20190807091052-3d65705ee9f1 // indirect
+	github.com/prometheus/client_golang v1.5.0
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/rogpeppe/rjson v0.0.0-20151026200957-77220b71d327
 	github.com/shirou/gopsutil v2.20.3+incompatible

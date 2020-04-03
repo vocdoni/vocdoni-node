@@ -10,6 +10,7 @@ import (
 	nm "github.com/tendermint/tendermint/node"
 
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
@@ -194,4 +195,20 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	return abcitypes.ResponseEndBlock{}
+}
+
+func (app *BaseApplication) RegisterMetrics(ma *metrics.Agent) {
+	ma.Register(VochainHeight)
+	ma.Register(VochainMempool)
+	ma.Register(VochainAppTree)
+	ma.Register(VochainProcessTree)
+	ma.Register(VochainVoteTree)
+}
+
+func (app *BaseApplication) GetMetrics() {
+	VochainHeight.Set(float64(app.Node.BlockStore().Height()))
+	VochainMempool.Set(float64(app.Node.Mempool().Size()))
+	VochainAppTree.Set(float64(app.State.AppTree.Size()))
+	VochainProcessTree.Set(float64(app.State.ProcessTree.Size()))
+	VochainVoteTree.Set(float64(app.State.VoteTree.Size()))
 }

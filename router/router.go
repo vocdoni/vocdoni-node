@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	psload "github.com/shirou/gopsutil/load"
 	psmem "github.com/shirou/gopsutil/mem"
 	psnet "github.com/shirou/gopsutil/net"
@@ -18,6 +19,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
@@ -83,6 +85,7 @@ type Router struct {
 	census       *census.Manager
 	tmclient     *voclient.HTTP
 	vocstats     *types.VochainStats
+	metricsagent *metrics.Agent
 	allowPrivate bool
 	Scrutinizer  *scrutinizer.Scrutinizer
 	PrivateCalls uint64
@@ -92,7 +95,7 @@ type Router struct {
 }
 
 func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
-	signer signature.SignKeys, allowPrivate bool) *Router {
+	signer signature.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
 	cm := new(census.Manager)
 	r := new(Router)
 	r.methods = make(map[string]registeredMethod)
@@ -102,6 +105,7 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net
 	r.transport = transport
 	r.signer = signer
 	r.codec = amino.NewCodec()
+	r.metricsagent = metricsagent
 	r.allowPrivate = allowPrivate
 	r.registerPublic("getGatewayInfo", r.info)
 	return r
@@ -156,12 +160,13 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 
 // InitRouter sets up a Router object which can then be used to route requests
 func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
-	signer *signature.SignKeys, allowPrivate bool) *Router {
+	signer *signature.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
 	log.Infof("using signer with address %s", signer.EthAddrString())
 	if allowPrivate {
 		log.Warn("allowing API private methods")
 	}
-	return NewRouter(inbound, storage, transport, *signer, allowPrivate)
+
+	return NewRouter(inbound, storage, transport, *signer, metricsagent, allowPrivate)
 }
 
 func (r *Router) registerPrivate(name string, handler func(routerRequest)) {
@@ -260,6 +265,15 @@ func (r *Router) Route() {
 		} else {
 			r.PublicCalls++
 		}
+
+		if r.metricsagent != nil {
+			if request.private {
+				RouterPrivateReqs.With(prometheus.Labels{"method": request.method}).Inc()
+			} else {
+				RouterPublicReqs.With(prometheus.Labels{"method": request.method}).Inc()
+			}
+		}
+
 		go method.handler(request)
 	}
 }

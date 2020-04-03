@@ -10,10 +10,11 @@ import (
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/net"
 )
 
-func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, signer *signature.SignKeys) (node *chain.EthChainContext, err error) {
+func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, signer *signature.SignKeys, ma *metrics.Agent) (node *chain.EthChainContext, err error) {
 	// Ethereum
 	log.Info("creating ethereum service")
 
@@ -38,6 +39,17 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 	// Start Ethereum node
 	node.Start()
 	go node.PrintInfo(time.Second * 20)
+
+	// Grab ethereum metrics loop
+	if ma != nil {
+		node.RegisterMetrics(ma)
+		go func() {
+			for {
+				time.Sleep(ma.RefreshInterval)
+				node.GetMetrics()
+			}
+		}()
+	}
 
 	log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
 	if w3config.Enabled && pxy != nil {

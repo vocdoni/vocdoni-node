@@ -10,9 +10,10 @@ import (
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/metrics"
 )
 
-func IPFS(ipfsconfig *config.IPFSCfg, signer *signature.SignKeys) (storage data.Storage, err error) {
+func IPFS(ipfsconfig *config.IPFSCfg, signer *signature.SignKeys, ma *metrics.Agent) (storage data.Storage, err error) {
 	log.Info("creating ipfs service")
 	var storageSync ipfssync.IPFSsync
 	if !ipfsconfig.NoInit {
@@ -33,6 +34,19 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *signature.SignKeys) (storage data.
 				log.Infof("[ipfs info] %s", stats)
 			}
 		}()
+
+		if ma != nil {
+			storage.RegisterMetrics(ma)
+			go func() {
+				for {
+					time.Sleep(ma.RefreshInterval)
+					err := storage.GetMetrics(context.TODO())
+					if err != nil {
+						log.Warnf("IPFS metrics returned an error: %s", err)
+					}
+				}
+			}()
+		}
 
 		if len(ipfsconfig.SyncKey) > 0 {
 			log.Info("enabling ipfs synchronization")

@@ -9,6 +9,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -16,7 +17,7 @@ import (
 )
 
 func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census.Manager,
-	sc *scrutinizer.Scrutinizer, vs *types.VochainStats, vochainRPCaddr string, signer *signature.SignKeys) (err error) {
+	sc *scrutinizer.Scrutinizer, vs *types.VochainStats, vochainRPCaddr string, signer *signature.SignKeys, ma *metrics.Agent) (err error) {
 	log.Infof("creating API service")
 	// API Endpoint initialization
 	ws := new(net.WebsocketHandle)
@@ -26,7 +27,7 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 	listenerOutput := make(chan types.Message)
 	go ws.Listen(listenerOutput)
 
-	routerAPI := router.InitRouter(listenerOutput, storage, ws, signer, apiconfig.AllowPrivate)
+	routerAPI := router.InitRouter(listenerOutput, storage, ws, signer, ma, apiconfig.AllowPrivate)
 	if apiconfig.File {
 		log.Info("enabling file API")
 		routerAPI.EnableFileAPI()

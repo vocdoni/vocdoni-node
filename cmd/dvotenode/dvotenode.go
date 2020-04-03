@@ -18,6 +18,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/service"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -100,6 +101,9 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.MinerKey = *flag.String("vochainMinerKey", "", "user alternative vochain miner private key (hexstring[64])")
 	globalCfg.VochainConfig.NodeKey = *flag.String("vochainNodeKey", "", "user alternative vochain private key (hexstring[64])")
 	globalCfg.VochainConfig.SeedMode = *flag.Bool("vochainSeedMode", false, "act as a vochain seed node")
+	// metrics
+	globalCfg.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
+	globalCfg.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5, "metrics refresh interval in seconds")
 
 	// parse flags
 	flag.Parse()
@@ -177,6 +181,10 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.seedMode", flag.Lookup("vochainSeedMode"))
 	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
 
+	// metrics
+	viper.BindPFlag("metrics.enabled", flag.Lookup("metricsEnabled"))
+	viper.BindPFlag("metrics.refreshInterval", flag.Lookup("metricsRefreshInterval"))
+
 	// check if config file exists
 	_, err = os.Stat(globalCfg.DataDir + "/dvote.yml")
 	if os.IsNotExist(err) {
@@ -250,6 +258,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	 - census
 	 - vochain
 	 - scrutinizer
+	 - metrics
 
   Oracle needs:
 	 - signing key
@@ -307,6 +316,7 @@ func main() {
 	var vnode *vochain.BaseApplication
 	var vstats *types.VochainStats
 	var sc *scrutinizer.Scrutinizer
+	var ma *metrics.Agent
 
 	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
 		// Signing key
@@ -345,7 +355,7 @@ func main() {
 		}
 
 		// Storage service
-		storage, err = service.IPFS(globalCfg.Ipfs, signer)
+		storage, err = service.IPFS(globalCfg.Ipfs, signer, ma)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -360,9 +370,14 @@ func main() {
 
 	}
 
+	// Enable metrics via proxy
+	if globalCfg.Metrics.Enabled && pxy != nil {
+		ma = metrics.NewAgent("/metrics", time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, pxy)
+	}
+
 	// Ethereum service
 	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
-		node, err = service.Ethereum(globalCfg.EthConfig, globalCfg.W3Config, pxy, signer)
+		node, err = service.Ethereum(globalCfg.EthConfig, globalCfg.W3Config, pxy, signer, ma)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -374,7 +389,7 @@ func main() {
 		if globalCfg.Mode == "gateway" && globalCfg.API.Results {
 			scrutinizer = true
 		}
-		vnode, sc, vstats, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer)
+		vnode, sc, vstats, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, ma)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -448,7 +463,7 @@ func main() {
 	if globalCfg.Mode == "gateway" {
 		// dvote API service
 		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
-			if err := service.API(globalCfg.API, pxy, storage, cm, sc, vstats, globalCfg.VochainConfig.RPCListen, signer); err != nil {
+			if err := service.API(globalCfg.API, pxy, storage, cm, sc, vstats, globalCfg.VochainConfig.RPCListen, signer, ma); err != nil {
 				log.Fatal(err)
 			}
 		}

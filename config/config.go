@@ -14,6 +14,8 @@ type DvoteCfg struct {
 	EthEventConfig *EthEventCfg
 	// API api config options
 	API *API
+	// Metrics config options
+	Metrics *MetricsCfg
 	// Dev indicates we use the gateway development mode
 	Dev bool
 	// LogLevel logging level
@@ -52,6 +54,7 @@ func NewConfig() *DvoteCfg {
 		EthConfig:      new(EthCfg),
 		EthEventConfig: new(EthEventCfg),
 		API:            new(API),
+		Metrics:        new(MetricsCfg),
 	}
 }
 
@@ -215,6 +218,13 @@ func NewOracleCfg() *OracleCfg {
 		W3Config:      new(W3Cfg),
 		VochainConfig: new(VochainCfg),
 	}
+}
+
+// MetricsCfg initializes the metrics config
+type MetricsCfg struct {
+	Enabled         bool
+	Port            int
+	RefreshInterval int
 }
 
 // TODO(mvdan): replace with a special error type

@@ -26,6 +26,8 @@ ${listenPort:+ --listenPort=${listenPort}}\
 ${logLevel:+ --logLevel=${logLevel}}\
 ${logOutput:+ --logOutput=${logOutput}}\
 ${mode:+ --mode=${mode}}\
+${metricsEnabled:+ --metricsEnabled=${metricsEnabled}}\
+${metricsRefreshInterval:+ --metricsRefreshInterval=${metricsRefreshInterval}}\
 ${resultsApi:+ --resultsApi=${resultsApi}}\
 ${saveConfig:+ --saveConfig=${saveConfig}}\
 ${sslDomain:+ --sslDomain=${sslDomain}}\
@@ -52,4 +54,3 @@ ${w3WsPort:+ --w3WsPort=${w3WsPort}}\
 CMD="/app/dvotenode $GWARGS $@"
 echo "Executing $CMD"
 $CMD
-
