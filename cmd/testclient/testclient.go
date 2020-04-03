@@ -1,14 +1,17 @@
 package main
 
 import (
-	"encoding/json"
+	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"math/rand"
+	"os"
 	"reflect"
 	"time"
 
 	"github.com/gorilla/websocket"
+	json "github.com/rogpeppe/rjson"
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -49,11 +52,12 @@ func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKey
 	if err != nil {
 		log.Fatalf("%s: %v", method, err)
 	}
+	log.Infof("sending: %s", rawReq)
 	if err := r.Conn.WriteMessage(websocket.TextMessage, rawReq); err != nil {
 		log.Fatalf("%s: %v", method, err)
 	}
 	_, message, err := r.Conn.ReadMessage()
-	log.Debugf("%s", message)
+	log.Infof("received: %s", message)
 	if err != nil {
 		log.Fatalf("%s: %v", method, err)
 	}
@@ -73,33 +77,54 @@ func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKey
 func printNice(resp *types.MetaResponse) {
 	v := reflect.ValueOf(*resp)
 	typeOfS := v.Type()
-	output := "\n\n"
+	output := "\n"
 	for i := 0; i < v.NumField(); i++ {
 		if v.Field(i).Type().Name() == "bool" || v.Field(i).Type().Name() == "int64" || !v.Field(i).IsZero() {
 			output += fmt.Sprintf("%v: %v\n", typeOfS.Field(i).Name, v.Field(i))
 		}
 	}
-	log.Info(output)
+	fmt.Print(output)
+}
+
+func processLine(input []byte) types.MetaRequest {
+	var req types.MetaRequest
+	err := json.Unmarshal(input, &req)
+	if err != nil {
+		panic(err)
+	}
+	return req
 }
 
 func main() {
 	host := flag.String("host", "ws://0.0.0.0:9090/dvote", "host to connect to")
-	method := flag.String("method", "getGatewayInfo", "method to call")
+	logLevel := flag.String("logLevel", "error", "log level <debug, info, warn, error>")
 	flag.Parse()
-	log.Init("info", "stdout")
+	log.Init(*logLevel, "stdout")
 
 	signer := new(signature.SignKeys)
 	signer.Generate()
-
+	log.Infof("connecting to %s", *host)
 	c := NewAPIConnection(*host)
 	defer c.Conn.Close()
 
 	var req types.MetaRequest
-	req.Method = *method
-	resp := c.Request(req, signer)
-	if !resp.Ok {
-		printNice(resp)
-	} else {
-		printNice(resp)
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		line, _, err := reader.ReadLine()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
+		req = processLine(line)
+
+		resp := c.Request(req, signer)
+		if !resp.Ok {
+			printNice(resp)
+		} else {
+			printNice(resp)
+		}
+
 	}
 }

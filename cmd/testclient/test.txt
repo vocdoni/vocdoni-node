@@ -1,0 +1,4 @@
+{method:"getGatewayInfo"}
+{method:"getCensusList"}
+{method:"getBlockHeight"}
+{method:"getProcListResults"}
