@@ -20,7 +20,9 @@ func init() { rand.Seed(time.Now().UnixNano()) }
 
 var (
 	host       = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
-	censusSize = flag.Int("censusSize", 100, "number of census entries to add")
+	censusSize = flag.Int("censusSize", 100, "number of census entries to add (minimum 100)")
+	logLevel   = flag.String("logLevel", "error", "log level <error,info,debug>")
+	onlyCensus = flag.Bool("onlyCreateCensus", false, "perform only create census operations")
 )
 
 func BenchmarkCensus(b *testing.B) {
@@ -33,6 +35,7 @@ func BenchmarkCensus(b *testing.B) {
 		})
 		host = &server.PxyAddr
 	}
+	log.Init(*logLevel, "stdout")
 
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
@@ -79,16 +82,32 @@ func censusBench(b *testing.B, c *common.APIConnection) {
 	var claims []string
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
-	req.Digested = true
-	for i := 0; i < *censusSize; i++ {
-		log.Infof("%d0123456789abcdef0123456789%d", rint, i)
-		claims = append(claims, base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("%d0123456789abcdef%d", rint, i))))
+	req.Digested = false
+	currentSize := *censusSize
+	i := 0
+	rint2 := 0
+	for currentSize > 0 {
+		iclaims := []string{}
+		rint2 = rand.Int()
+		for j := 0; j < 100; j++ {
+			if currentSize < 1 {
+				break
+			}
+			data := fmt.Sprintf("%d0123456789abcdef0123456789%d%d%d", rint, i, j, rint2)
+			iclaims = append(iclaims, base64.StdEncoding.EncodeToString([]byte(data)))
+			currentSize--
+		}
+		claims = append(claims, iclaims...)
+		req.ClaimsData = iclaims
+		resp = c.Request(req, signer)
+		if !resp.Ok {
+			b.Fatalf("%s failed: %s", req.Method, resp.Message)
+		}
+		i++
 	}
-	req.ClaimsData = claims
-	resp = c.Request(req, signer)
-	if !resp.Ok {
-		b.Fatalf("%s failed: %s", req.Method, resp.Message)
+
+	if *onlyCensus {
+		return
 	}
 
 	// dumpPlain
@@ -106,17 +125,14 @@ func censusBench(b *testing.B, c *common.APIConnection) {
 	req.Method = "genProof"
 	req.RootHash = ""
 	var siblings []string
-	claims = []string{}
 
-	for i := 0; i < *censusSize; i++ {
-		req.ClaimData = base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("%d0123456789abcdef%d", rint, i)))
+	for _, cl := range claims {
+		req.ClaimData = cl
 		resp = c.Request(req, nil)
 		if len(resp.Siblings) == 0 {
 			b.Fatalf("proof not generated while it should be generated correctly")
 		}
 		siblings = append(siblings, resp.Siblings)
-		claims = append(claims, req.ClaimData)
 	}
 
 	// CheckProof valid
@@ -126,7 +142,7 @@ func censusBench(b *testing.B, c *common.APIConnection) {
 		req.ProofData = s
 		req.ClaimData = claims[i]
 		resp = c.Request(req, nil)
-		if !resp.ValidProof {
+		if resp.ValidProof != nil && !*resp.ValidProof {
 			b.Fatalf("proof is invalid but it should be valid")
 		}
 	}
@@ -155,7 +171,7 @@ func censusBench(b *testing.B, c *common.APIConnection) {
 	req.Method = "getSize"
 	req.RootHash = ""
 	resp = c.Request(req, nil)
-	if got := resp.Size; int64(*censusSize) != got {
+	if got := *resp.Size; int64(*censusSize) != got {
 		b.Fatalf("expected size %v, got %v", *censusSize, got)
 	}
 

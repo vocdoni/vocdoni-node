@@ -46,15 +46,9 @@ type ResponseMessage struct {
 	Signature string `json:"signature"`
 }
 
-// ErrorMessage wraps an api error
-type ErrorMessage struct {
-	ID        string       `json:"id"`
-	Error     MetaResponse `json:"error"`
-	Signature string       `json:"signature"`
-}
-
 // MetaResponse contains all of the possible request fields.
 // Fields must be in alphabetical order
+// Those fields with valid zero-values (such as bool) must be pointers
 type MetaResponse struct {
 	APIList       []string   `json:"apiList,omitempty"`
 	CensusID      string     `json:"censusId,omitempty"`
@@ -64,14 +58,14 @@ type MetaResponse struct {
 	EntityID      string     `json:"entityId,omitempty"`
 	EntityIDs     []string   `json:"entityIds,omitempty"`
 	Files         []byte     `json:"files,omitempty"`
-	Finished      bool       `json:"finished,omitempty"`
+	Finished      *bool      `json:"finished,omitempty"`
 	Height        *int64     `json:"height,omitempty"`
 	InvalidClaims []int      `json:"invalidClaims,omitempty"`
 	Message       string     `json:"message,omitempty"`
 	Nullifier     string     `json:"nullifier,omitempty"`
 	Nullifiers    []string   `json:"nullifiers,omitempty"`
 	Ok            bool       `json:"ok"`
-	Paused        bool       `json:"paused,omitempty"`
+	Paused        *bool      `json:"paused,omitempty"`
 	Payload       string     `json:"payload,omitempty"`
 	ProcessIDs    []string   `json:"processIds,omitempty"`
 	ProcessList   []string   `json:"processList,omitempty"`
@@ -80,12 +74,12 @@ type MetaResponse struct {
 	Results       [][]uint32 `json:"results,omitempty"`
 	Root          string     `json:"root,omitempty"`
 	Siblings      string     `json:"siblings,omitempty"`
-	Size          int64      `json:"size,omitempty"`
+	Size          *int64     `json:"size,omitempty"`
 	State         string     `json:"state,omitempty"`
 	Timestamp     int32      `json:"timestamp"`
 	Type          string     `json:"type,omitempty"`
 	URI           string     `json:"uri,omitempty"`
-	ValidProof    bool       `json:"validProof,omitempty"`
+	ValidProof    *bool      `json:"validProof,omitempty"`
 }
 
 // SetError sets the MetaResponse's Ok field to false, and Message to a string

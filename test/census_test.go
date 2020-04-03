@@ -166,7 +166,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "checkProof"
 	req.ProofData = siblings
 	resp = c.Request(req, nil)
-	if !resp.ValidProof {
+	if !*resp.ValidProof {
 		t.Fatal("proof is invalid but it should be valid")
 	}
 
@@ -178,7 +178,7 @@ func TestCensus(t *testing.T) {
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
-	if resp.ValidProof {
+	if *resp.ValidProof {
 		t.Fatalf("proof must be invalid for hash %s but it is valid!", root)
 	}
 	req.RootHash = ""
@@ -239,7 +239,7 @@ func TestCensus(t *testing.T) {
 	req.Method = "getSize"
 	req.RootHash = ""
 	resp = c.Request(req, nil)
-	if exp, got := int64(*censusSize+1), resp.Size; exp != got {
+	if exp, got := int64(*censusSize+1), *resp.Size; exp != got {
 		t.Fatalf("expected size %v, got %v", exp, got)
 	}
 

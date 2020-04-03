@@ -109,11 +109,13 @@ type routerRequest struct {
 // semi-unmarshalls message, returns method name
 func (r *Router) getRequest(payload []byte, context types.MessageContext) (request routerRequest, err error) {
 	var msgStruct types.RequestMessage
+	request.context = context
 	err = json.Unmarshal(payload, &msgStruct)
 	if err != nil {
 		return request, err
 	}
 	request.MetaRequest = msgStruct.MetaRequest
+	request.id = msgStruct.ID
 	request.method = msgStruct.Method
 	if request.method == "" {
 		return request, errors.New("method is empty")
@@ -134,8 +136,6 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 			request.authenticated = true
 		}
 	}
-	request.id = msgStruct.ID
-	request.context = context
 	// assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)
 	// because json.Marshal encodes in lexographic order for map objects.
 	// request.raw, err = json.Marshal(msgStruct.MetaRequest)
@@ -227,6 +227,7 @@ func (r *Router) Route() {
 		method, ok := r.methods[request.method]
 		if !ok {
 			errMsg := fmt.Sprintf("router has no method %q", request.method)
+			//request.context
 			go r.sendError(request, errMsg)
 			continue
 		}
@@ -251,12 +252,12 @@ func (r *Router) Route() {
 func (r *Router) sendError(request routerRequest, errMsg string) {
 	log.Warn(errMsg)
 	var err error
-	var response types.ErrorMessage
+	var response types.ResponseMessage
 	response.ID = request.id
-	response.Error.Request = request.id
-	response.Error.Timestamp = int32(time.Now().Unix())
-	response.Error.SetError(errMsg)
-	response.Signature, err = r.signer.SignJSON(response.Error)
+	response.MetaResponse.Request = request.id
+	response.MetaResponse.Timestamp = int32(time.Now().Unix())
+	response.MetaResponse.SetError(errMsg)
+	response.Signature, err = r.signer.SignJSON(response.MetaResponse)
 	if err != nil {
 		log.Error(err)
 	}

@@ -543,7 +543,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			resp.SetError(err)
 			return resp
 		}
-		resp.ValidProof = validProof
+		resp.ValidProof = &validProof
 		return resp
 	}
 
@@ -578,7 +578,8 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 
 	case "getSize":
 		var err error
-		resp.Size, err = tr.Size(tr.Root())
+		resp.Size = new(int64)
+		*resp.Size, err = tr.Size(tr.Root())
 		if err != nil {
 			resp.SetError(err)
 		}
