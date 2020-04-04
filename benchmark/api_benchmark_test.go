@@ -121,6 +121,9 @@ func censusBench(b *testing.B, c *common.APIConnection) {
 	if !resp.Ok {
 		b.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
+	if len(resp.ClaimsData) != len(claims) {
+		b.Fatalf("missing claims on dumpPlain, %d != %d", len(req.ClaimsData), len(claims))
+	}
 
 	// GenProof valid
 	log.Infof("[%d] generating proofs", rint)

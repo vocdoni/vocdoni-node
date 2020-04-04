@@ -121,6 +121,16 @@ func TestCensus(t *testing.T) {
 		t.Fatalf("got invalid root")
 	}
 
+	// Create census2
+	req.Method = "addCensus"
+	req.CensusID = "test2"
+	resp = c.Request(req, signer2)
+	if !resp.Ok {
+		t.Fatalf("%s failed", req.Method)
+	}
+	censusID = resp.CensusID
+	req.CensusID = censusID
+
 	// addClaimBulk
 	var claims []string
 	req.Method = "addClaimBulk"
@@ -150,6 +160,19 @@ func TestCensus(t *testing.T) {
 	resp = c.Request(req, signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
+	}
+	var found bool
+	for _, c := range claims {
+		found = false
+		for _, c2 := range resp.ClaimsData {
+			if c == c2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("claim not found: %s", c)
+		}
 	}
 
 	// GenProof valid
@@ -239,14 +262,14 @@ func TestCensus(t *testing.T) {
 	req.Method = "getSize"
 	req.RootHash = ""
 	resp = c.Request(req, nil)
-	if exp, got := int64(*censusSize+1), *resp.Size; exp != got {
+	if exp, got := int64(*censusSize), *resp.Size; exp != got {
 		t.Fatalf("expected size %v, got %v", exp, got)
 	}
 
 	// get census list
 	req.Method = "getCensusList"
 	resp = c.Request(req, signer2)
-	if len(resp.CensusList) != 3 {
+	if len(resp.CensusList) != 4 {
 		t.Fatalf("census list size does not match")
 	}
 	t.Logf("census list: %v", resp.CensusList)

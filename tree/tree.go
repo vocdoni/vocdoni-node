@@ -2,9 +2,11 @@
 package tree
 
 import (
-	"bytes"
 	"encoding/base64"
+	"encoding/binary"
+
 	"errors"
+	"fmt"
 	"os"
 
 	common3 "github.com/iden3/go-iden3-core/common"
@@ -21,7 +23,7 @@ type Tree struct {
 	DbStorage  *db.LevelDbStorage
 }
 
-const MaxClaimSize = 120
+const MaxClaimSize = 84 // indexSlot = 112; 28 reserved bytes ; 112-28=84
 
 func (t *Tree) MaxClaimSize() int {
 	return MaxClaimSize
@@ -56,47 +58,65 @@ func (t *Tree) Close() {
 	t.Tree.Storage().Close()
 }
 
-func (t *Tree) Claim(data []byte) (*claims.ClaimBasic, error) {
+func (t *Tree) Entry(data []byte) (*merkletree.Entry, error) {
 	if len(data) > MaxClaimSize {
 		return nil, errors.New("claim data too large")
 	}
-	if len(data) < MaxClaimSize {
-		doPadding(&data)
-	}
-	return getClaimFromData(data), nil
+	return getEntryFromData(data), nil
 }
 
-func getClaimFromData(data []byte) *claims.ClaimBasic {
+// claim goes to index slot between 32-64 bytes
+// claim size goes to data slot between 0-32 bytes
+// function assumes data has a correcth lenght
+func getEntryFromData(data []byte) *merkletree.Entry {
 	var indexSlot [112]byte
-	var dataSlot [MaxClaimSize]byte
-	copy(indexSlot[:], data[:400/8])
-	copy(dataSlot[:], data[:MaxClaimSize])
-	return claims.NewClaimBasic(indexSlot, dataSlot)
+	var dataSlot [120]byte
+	copy(indexSlot[32:], data[:])
+	bs := make([]byte, 32)
+	binary.LittleEndian.PutUint32(bs, uint32(len(data)))
+	copy(dataSlot[:], bs[:])
+	//log.Warnf("adding: %x/%d [%08b]", indexSlot[32:], uint32(len(data)), dataSlot)
+	return claims.NewClaimBasic(indexSlot, dataSlot).Entry()
 }
 
+func getDataFromEntry(e *merkletree.Entry) []byte {
+	sizeBytes := e.Value()[0][4:] // why it is moved to position 4?
+	size := int(binary.LittleEndian.Uint32(sizeBytes[:]))
+	data := make([]byte, MaxClaimSize)
+	copy(data[:], e.Index()[1][13:]) // why it is moved 14 bytes? (index[0] + 14 = 46 bytes lost?)
+	copy(data[18:], e.Index()[2][:])
+	copy(data[50:], e.Index()[3][:])
+	//log.Warnf("recovered: %x/%d", data[:size], size)
+	return data[:size]
+}
+
+// Obsolete
 func doPadding(data *[]byte) {
 	for i := len(*data); i < MaxClaimSize; i++ {
 		*data = append(*data, byte('\x00'))
 	}
 }
 
+// AddClaim adds a new claim to the merkle tree
+// If len(data) is bigger than tree.MaxClaimSize, an error is returned
 func (t *Tree) AddClaim(data []byte) error {
-	if len(data) < MaxClaimSize {
-		doPadding(&data)
+	if len(data) > MaxClaimSize {
+		return fmt.Errorf("claim is too big (%d)", len(data))
 	}
-	e := getClaimFromData(data)
-	return t.Tree.AddEntry(e.Entry())
+	e := getEntryFromData(data)
+	return t.Tree.AddEntry(e)
 }
 
+// GenProof generates a merkle tree proof that can be later used on CheckProof() to validate it
 func (t *Tree) GenProof(data []byte) (string, error) {
-	if len(data) < MaxClaimSize {
-		doPadding(&data)
+	if len(data) > MaxClaimSize {
+		return "", fmt.Errorf("claim data too big (%d)", len(data))
 	}
-	e, err := t.Claim(data)
+	e, err := t.Entry(data)
 	if err != nil {
 		return "", err
 	}
-	hash, err := e.Entry().HIndex()
+	hash, err := e.HIndex()
 	if err != nil {
 		return "", err
 	}
@@ -125,15 +145,15 @@ func CheckProof(root, mpHex string, data []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if len(data) < MaxClaimSize {
-		doPadding(&data)
+	if len(data) > MaxClaimSize {
+		return false, fmt.Errorf("claim too big (%d)", len(data))
 	}
-	e := getClaimFromData(data)
-	hvalue, err := e.Entry().HValue()
+	e := getEntryFromData(data)
+	hvalue, err := e.HValue()
 	if err != nil {
 		return false, err
 	}
-	hindex, err := e.Entry().HIndex()
+	hindex, err := e.HIndex()
 	if err != nil {
 		return false, err
 	}
@@ -141,20 +161,22 @@ func CheckProof(root, mpHex string, data []byte) (bool, error) {
 		hindex, hvalue), nil
 }
 
+// CheckProof validates a merkle proof and its data
 func (t *Tree) CheckProof(data []byte, mpHex string) (bool, error) {
 	return CheckProof(t.Root(), mpHex, data)
 }
 
+// Root returns the current root hash of the merkle tree
 func (t *Tree) Root() string {
 	return common3.HexEncode(t.Tree.RootKey().Bytes())
 }
 
 func (t *Tree) Index(data []byte) (string, error) {
-	e, err := t.Claim(data)
+	e, err := t.Entry(data)
 	if err != nil {
 		return "", err
 	}
-	hash, err := e.Entry().HIndex()
+	hash, err := e.HIndex()
 	if err != nil {
 		return "", err
 	}
@@ -172,6 +194,7 @@ func stringToHash(hash string) (merkletree.Hash, error) {
 	return rootHash, err
 }
 
+// Dump returns the whole merkle tree serialized in a format that can be used on Import
 func (t *Tree) Dump(root string) (claims []string, err error) {
 	var rootHash merkletree.Hash
 	if len(root) > 0 {
@@ -203,6 +226,9 @@ func (t *Tree) Size(root string) (int64, error) {
 	return size, err
 }
 
+// DumpPlain returns the entire list of added claims for a specific root hash
+// If root is not specified, the current one is used
+// If responseBase64 is true, the list will be returned base64 encoded
 func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, error) {
 	var response []string
 	var err error
@@ -215,18 +241,12 @@ func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, error) {
 	}
 	err = t.Tree.Walk(&rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
-			var data [MaxClaimSize + 8]byte
-			i := 0
-			for _, e := range n.Entry.Value() {
-				copy(data[i:i+len(e)], e[:])
-				i = i + len(e)
-			}
-			dataClean := bytes.Replace(data[:], []byte("\x00"), nil, -1)
+			data := getDataFromEntry(n.Entry)
 			if responseBase64 {
-				datab64 := base64.StdEncoding.EncodeToString(dataClean)
+				datab64 := base64.StdEncoding.EncodeToString(data)
 				response = append(response, datab64)
 			} else {
-				response = append(response, string(norm.NFC.Bytes(dataClean)))
+				response = append(response, string(norm.NFC.Bytes(data)))
 			}
 		}
 	})
