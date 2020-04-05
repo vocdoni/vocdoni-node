@@ -1,8 +1,11 @@
 package tree
 
 import (
+	"bytes"
 	"encoding/base64"
 	"testing"
+
+	"github.com/iden3/go-iden3-core/core/claims"
 )
 
 func TestCensus(t *testing.T) {
@@ -21,5 +24,32 @@ func TestCensus(t *testing.T) {
 		t.Errorf("proof is invalid, but should be valid")
 	} else {
 		t.Log("proof valid")
+	}
+}
+
+func TestClaimParsers(t *testing.T) {
+	indexData := []byte("test")
+	valueData := []byte("test")
+
+	var indexSlot [claims.IndexSlotLen]byte
+	var valueSlot [claims.ValueSlotLen]byte
+	copy(indexSlot[:], indexData)
+	valueSlot[0] = byte(len(indexData))
+	valueSlot[1] = byte(len(valueData))
+	copy(valueSlot[2:], valueData)
+
+	claim := claims.NewClaimBasic(indexSlot, valueSlot)
+
+	indexGetted, valueGetted := getDataFromClaim(claim)
+	if !bytes.Equal(indexGetted, indexData) {
+		t.Errorf("index %v not equal to expected %v", indexGetted, indexData)
+	}
+	if !bytes.Equal(valueGetted, valueData) {
+		t.Errorf("value %v not equal to expected %v", valueGetted, valueData)
+	}
+
+	gettedClaim := getClaimFromData(indexData, valueData)
+	if !bytes.Equal(gettedClaim.Entry().Bytes(), claim.Entry().Bytes()) {
+		t.Errorf("getClaimFromData returns an unexpected claim")
 	}
 }

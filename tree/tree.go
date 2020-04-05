@@ -23,8 +23,8 @@ type Tree struct {
 	DbStorage  *db.LevelDbStorage
 }
 
-const MaxIndexSize = 84  // indexSlot = 112; 28 reserved bytes; 112-28 = 84
-const MaxValueSize = 110 // valueSlot = 128; 4 reserver bytes; 14 for size; 128-18 = 110
+const MaxIndexSize = claims.IndexSlotLen
+const MaxValueSize = claims.ValueSlotLen - 2 // -2 because the 2 first bytes are used to store the length of index and value
 
 func (t *Tree) MaxClaimSize() int {
 	return MaxIndexSize
@@ -71,6 +71,7 @@ func (t *Tree) entry(index, value []byte) (*merkletree.Entry, error) {
 	return getClaimFromData(index, value).Entry(), nil
 }
 
+// not used
 // claim goes to index slot between 32-64 bytes
 // claim size goes to data slot between 0-32 bytes
 // function assumes data has a correcth lenght
@@ -96,23 +97,19 @@ func getEntryFromData(claim []byte, extra []byte) *merkletree.Entry {
 }
 
 func getClaimFromData(index []byte, extra []byte) *claims.ClaimBasic {
-	var indexSlot [112]byte
-	var valueSlot [120]byte
-	// save sizes to valueSlot [ [index] [extra] ]
-	bs := make([]byte, 32)
-	binary.LittleEndian.PutUint32(bs, uint32(len(index)))
-	copy(valueSlot[:], bs[:7]) // save only first 7 bytes (2^7 = 128 is enough for the index size)
-	binary.LittleEndian.PutUint32(bs, uint32(len(extra)))
-	copy(valueSlot[7:], bs[:7]) // save only first 7 bytes (2^7 = 128 is enough for the value size)
+	var indexSlot [claims.IndexSlotLen]byte
+	var valueSlot [claims.ValueSlotLen]byte
+	copy(indexSlot[:], index)
+	valueSlot[0] = byte(len(index))
+	valueSlot[1] = byte(len(extra))
+	copy(valueSlot[2:], extra) // [2:] due the 2 first bytes used for saving the length of index & value
 
-	// copy claim and extra data
-	copy(indexSlot[:], index[:])   // do not use first 32 bytes of index (reserver for internal operation)
-	copy(valueSlot[:14], extra[:]) // copy extra data from byte 14
+	// log.Warnf("adding: %x/%d [%08b]", indexSlot[32:], uint32(len(data)), valueSlot)
 
-	//log.Warnf("adding: %x/%d [%08b]", indexSlot[32:], uint32(len(data)), dataSlot)
 	return claims.NewClaimBasic(indexSlot, valueSlot)
 }
 
+// not used
 func getDataFromEntry(e *merkletree.Entry) ([]byte, []byte) {
 	var index, value []byte
 	indexSizeBytes := e.Value()[0][4:11] // why it is moved to position 4?
@@ -136,11 +133,9 @@ func getDataFromEntry(e *merkletree.Entry) ([]byte, []byte) {
 }
 
 func getDataFromClaim(c *claims.ClaimBasic) ([]byte, []byte) {
-	indexSizeBytes := c.ValueSlot[:7]
-	valueSizeBytes := c.ValueSlot[7:14]
-	indexSize := int(binary.LittleEndian.Uint32(indexSizeBytes[:]))
-	valueSize := int(binary.LittleEndian.Uint32(valueSizeBytes[:]))
-	return c.IndexSlot[:indexSize], c.ValueSlot[:valueSize]
+	indexSize := int(c.ValueSlot[0])
+	valueSize := int(c.ValueSlot[1])
+	return c.IndexSlot[:indexSize], c.ValueSlot[2 : valueSize+2]
 }
 
 // AddClaim adds a new claim to the merkle tree
