@@ -68,7 +68,11 @@ func (t *Tree) entry(index, value []byte) (*merkletree.Entry, error) {
 	if len(value) > MaxValueSize {
 		return nil, fmt.Errorf("claim value data too big (%d)", len(value))
 	}
-	return getClaimFromData(index, value).Entry(), nil
+	claim, err := getClaimFromData(index, value)
+	if err != nil {
+		return nil, err
+	}
+	return claim.Entry(), nil
 }
 
 // not used
@@ -96,7 +100,13 @@ func getEntryFromData(claim []byte, extra []byte) *merkletree.Entry {
 	return claims.NewClaimBasic(indexSlot, valueSlot).Entry()
 }
 
-func getClaimFromData(index []byte, extra []byte) *claims.ClaimBasic {
+func getClaimFromData(index []byte, extra []byte) (*claims.ClaimBasic, error) {
+	if len(index) > claims.IndexSlotLen {
+		return nil, fmt.Errorf("index len %v can not be bigger than %v", len(index), claims.IndexSlotLen)
+	}
+	if len(extra) > claims.ValueSlotLen {
+		return nil, fmt.Errorf("extra len %v can not be bigger than %v", len(extra), claims.ValueSlotLen)
+	}
 	var indexSlot [claims.IndexSlotLen]byte
 	var valueSlot [claims.ValueSlotLen]byte
 	copy(indexSlot[:], index)
@@ -106,7 +116,7 @@ func getClaimFromData(index []byte, extra []byte) *claims.ClaimBasic {
 
 	// log.Warnf("adding: %x/%d [%08b]", indexSlot[32:], uint32(len(data)), valueSlot)
 
-	return claims.NewClaimBasic(indexSlot, valueSlot)
+	return claims.NewClaimBasic(indexSlot, valueSlot), nil
 }
 
 // not used
@@ -153,7 +163,10 @@ func (t *Tree) AddClaim(index, value []byte) error {
 	if len(value) > MaxValueSize {
 		return fmt.Errorf("claim value data too big (%d)", len(value))
 	}
-	c := getClaimFromData(index, value)
+	c, err := getClaimFromData(index, value)
+	if err != nil {
+		return err
+	}
 	return t.Tree.AddClaim(c)
 }
 
@@ -198,7 +211,10 @@ func CheckProof(root, mpHex string, index, value []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	c := getClaimFromData(index, value)
+	c, err := getClaimFromData(index, value)
+	if err != nil {
+		return false, err
+	}
 	hvalue, err := c.Entry().HValue()
 	if err != nil {
 		return false, err

@@ -48,8 +48,26 @@ func TestClaimParsers(t *testing.T) {
 		t.Errorf("value %v not equal to expected %v", valueGetted, valueData)
 	}
 
-	gettedClaim := getClaimFromData(indexData, valueData)
+	gettedClaim, err := getClaimFromData(indexData, valueData)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !bytes.Equal(gettedClaim.Entry().Bytes(), claim.Entry().Bytes()) {
 		t.Errorf("getClaimFromData returns an unexpected claim")
+	}
+
+	// check that with a index bigger than maximum allowed, the parser doesn't overflow when setting the len in the valueSlot[0] byte
+	var indexOverflow [300]byte
+	copy(indexOverflow[:], indexData)
+	_, err = getClaimFromData(indexOverflow[:], valueData)
+	if err == nil {
+		t.Errorf("should return error to avoid overflow")
+	}
+	// check that with a value/extra bigger than maximum allowed, the parser doesn't overflow when setting the len in the valueSlot[1] byte
+	var valueOverflow [300]byte
+	copy(indexData, valueOverflow[:])
+	_, err = getClaimFromData(indexOverflow[:], valueData)
+	if err == nil {
+		t.Errorf("should return error to avoid overflow")
 	}
 }
