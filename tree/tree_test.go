@@ -13,7 +13,7 @@ func TestCensus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	valid, err := CheckProof(root, proof, data)
+	valid, err := CheckProof(root, proof, data, []byte{})
 	if err != nil {
 		t.Fatal(err)
 	}

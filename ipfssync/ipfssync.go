@@ -53,7 +53,7 @@ func (is *IPFSsync) updatePinsTree(extraPins []string) {
 			log.Warnf("CID exceeds the claim size %d", len(v))
 			continue
 		}
-		is.hashTree.AddClaim([]byte(v))
+		is.hashTree.AddClaim([]byte(v), []byte{})
 	}
 	if currentRoot != is.hashTree.Root() {
 		is.lastHash = currentRoot
@@ -61,7 +61,7 @@ func (is *IPFSsync) updatePinsTree(extraPins []string) {
 }
 
 func (is *IPFSsync) syncPins() error {
-	mkPins, err := is.hashTree.DumpPlain(is.hashTree.Root(), false)
+	mkPins, _, err := is.hashTree.DumpPlain(is.hashTree.Root(), false)
 	if err != nil {
 		return err
 	}

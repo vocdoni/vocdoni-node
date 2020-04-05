@@ -419,7 +419,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 					if !r.Digested {
 						data = signature.HashPoseidon(fmt.Sprintf("%x", data))
 					}
-					err = tr.AddClaim(data)
+					err = tr.AddClaim(data, []byte{})
 				}
 				if err != nil {
 					log.Warnf("error adding claim: %s", err)
@@ -448,7 +448,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			if !r.Digested {
 				data = signature.HashPoseidon(fmt.Sprintf("%x", data))
 			}
-			err = tr.AddClaim(data)
+			err = tr.AddClaim(data, []byte{})
 			if err != nil {
 				log.Warnf("error adding claim: %s", err)
 				resp.SetError(err)
@@ -540,7 +540,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		if !r.Digested {
 			data = signature.HashPoseidon(fmt.Sprintf("%x", data))
 		}
-		validProof, err := tree.CheckProof(root, r.ProofData, data)
+		validProof, err := tree.CheckProof(root, r.ProofData, data, []byte{})
 		if err != nil {
 			resp.SetError(err)
 			return resp
@@ -572,7 +572,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		if !r.Digested {
 			data = signature.HashPoseidon(fmt.Sprintf("%x", data))
 		}
-		resp.Siblings, err = tr.GenProof(data)
+		resp.Siblings, err = tr.GenProof(data, []byte{})
 		if err != nil {
 			resp.SetError(err)
 		}
@@ -601,7 +601,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		if r.Method == "dump" {
 			dumpValues, err = tr.Dump(root)
 		} else {
-			dumpValues, err = tr.DumpPlain(root, true)
+			dumpValues, _, err = tr.DumpPlain(root, true)
 		}
 		if err != nil {
 			resp.SetError(err)

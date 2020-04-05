@@ -341,7 +341,7 @@ func AdminTxCheck(adminTx types.AdminTx, state *State) error {
 
 // hexproof is the hexadecimal a string. leafData is the claim data in byte format
 func checkMerkleProof(rootHash, hexproof string, leafData []byte) (bool, error) {
-	return tree.CheckProof(rootHash, hexproof, leafData)
+	return tree.CheckProof(rootHash, hexproof, leafData, []byte{})
 }
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
