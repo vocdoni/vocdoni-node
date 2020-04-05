@@ -68,7 +68,7 @@ func (t *Tree) entry(index, value []byte) (*merkletree.Entry, error) {
 	if len(value) > MaxValueSize {
 		return nil, fmt.Errorf("claim value data too big (%d)", len(value))
 	}
-	return getEntryFromData(index, value), nil
+	return getClaimFromData(index, value).Entry(), nil
 }
 
 // claim goes to index slot between 32-64 bytes
@@ -95,6 +95,24 @@ func getEntryFromData(claim []byte, extra []byte) *merkletree.Entry {
 	return claims.NewClaimBasic(indexSlot, valueSlot).Entry()
 }
 
+func getClaimFromData(index []byte, extra []byte) *claims.ClaimBasic {
+	var indexSlot [112]byte
+	var valueSlot [120]byte
+	// save sizes to valueSlot [ [index] [extra] ]
+	bs := make([]byte, 32)
+	binary.LittleEndian.PutUint32(bs, uint32(len(index)))
+	copy(valueSlot[:], bs[:7]) // save only first 7 bytes (2^7 = 128 is enough for the index size)
+	binary.LittleEndian.PutUint32(bs, uint32(len(extra)))
+	copy(valueSlot[7:], bs[:7]) // save only first 7 bytes (2^7 = 128 is enough for the value size)
+
+	// copy claim and extra data
+	copy(indexSlot[:], index[:])   // do not use first 32 bytes of index (reserver for internal operation)
+	copy(valueSlot[:14], extra[:]) // copy extra data from byte 14
+
+	//log.Warnf("adding: %x/%d [%08b]", indexSlot[32:], uint32(len(data)), dataSlot)
+	return claims.NewClaimBasic(indexSlot, valueSlot)
+}
+
 func getDataFromEntry(e *merkletree.Entry) ([]byte, []byte) {
 	var index, value []byte
 	indexSizeBytes := e.Value()[0][4:11] // why it is moved to position 4?
@@ -117,6 +135,14 @@ func getDataFromEntry(e *merkletree.Entry) ([]byte, []byte) {
 	return index[:indexSize], value[:valueSize]
 }
 
+func getDataFromClaim(c *claims.ClaimBasic) ([]byte, []byte) {
+	indexSizeBytes := c.ValueSlot[:7]
+	valueSizeBytes := c.ValueSlot[7:14]
+	indexSize := int(binary.LittleEndian.Uint32(indexSizeBytes[:]))
+	valueSize := int(binary.LittleEndian.Uint32(valueSizeBytes[:]))
+	return c.IndexSlot[:indexSize], c.ValueSlot[:valueSize]
+}
+
 // AddClaim adds a new claim to the merkle tree
 // A claim is composed of two parts: index and value
 //  1.index is mandatory, the data will be used for indexing the claim into to merkle tree
@@ -132,8 +158,8 @@ func (t *Tree) AddClaim(index, value []byte) error {
 	if len(value) > MaxValueSize {
 		return fmt.Errorf("claim value data too big (%d)", len(value))
 	}
-	e := getEntryFromData(index, value)
-	return t.Tree.AddEntry(e)
+	c := getClaimFromData(index, value)
+	return t.Tree.AddClaim(c)
 }
 
 // GenProof generates a merkle tree proof that can be later used on CheckProof() to validate it
@@ -177,12 +203,12 @@ func CheckProof(root, mpHex string, index, value []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	e := getEntryFromData(index, value)
-	hvalue, err := e.HValue()
+	c := getClaimFromData(index, value)
+	hvalue, err := c.Entry().HValue()
 	if err != nil {
 		return false, err
 	}
-	hindex, err := e.HIndex()
+	hindex, err := c.Entry().HIndex()
 	if err != nil {
 		return false, err
 	}
@@ -255,9 +281,12 @@ func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, []string, 
 			return indexes, values, err
 		}
 	}
+	var index, value []byte
 	err = t.Tree.Walk(&rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
-			index, value := getDataFromEntry(n.Entry)
+			c := claims.NewClaimBasicFromEntry(n.Entry)
+
+			index, value = getDataFromClaim(c)
 			if responseBase64 {
 				datab64 := base64.StdEncoding.EncodeToString(index)
 				indexes = append(indexes, datab64)
