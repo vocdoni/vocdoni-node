@@ -25,6 +25,7 @@ var (
 	hostFlag   = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
 	censusSize = flag.Int("censusSize", 100, "number of census entries to add (minimum 100)")
 	onlyCensus = flag.Bool("onlyCreateCensus", false, "perform only create census operations")
+	clean      = flag.Bool("clean", true, "clean/remove data directories")
 )
 
 func BenchmarkCensus(b *testing.B) {
@@ -33,8 +34,10 @@ func BenchmarkCensus(b *testing.B) {
 		var server common.DvoteAPIServer
 		server.Start(b, "file", "census")
 		b.Cleanup(func() {
-			os.RemoveAll(server.IpfsDir)
-			os.RemoveAll(server.CensusDir)
+			if *clean {
+				os.RemoveAll(server.IpfsDir)
+				os.RemoveAll(server.CensusDir)
+			}
 		})
 		host = server.PxyAddr
 	}
@@ -106,6 +109,16 @@ func censusBench(b *testing.B, c *common.APIConnection) {
 			b.Fatalf("%s failed: %s", req.Method, resp.Message)
 		}
 		i++
+		log.Infof("census creation progress: %d%%", int((i*100*100)/(*censusSize)))
+	}
+
+	// getSize
+	log.Infof("[%d] get size", rint)
+	req.Method = "getSize"
+	req.RootHash = ""
+	resp = c.Request(req, nil)
+	if got := *resp.Size; int64(*censusSize) != got {
+		b.Fatalf("expected size %v, got %v", *censusSize, got)
 	}
 
 	if *onlyCensus {
@@ -169,15 +182,6 @@ func censusBench(b *testing.B, c *common.APIConnection) {
 	root := resp.Root
 	if len(root) < 1 {
 		b.Fatalf("got invalid root")
-	}
-
-	// getSize
-	log.Infof("[%d] get size", rint)
-	req.Method = "getSize"
-	req.RootHash = ""
-	resp = c.Request(req, nil)
-	if got := *resp.Size; int64(*censusSize) != got {
-		b.Fatalf("expected size %v, got %v", *censusSize, got)
 	}
 
 	// addFile
