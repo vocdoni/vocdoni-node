@@ -21,14 +21,19 @@ func (r *Router) submitEnvelope(request routerRequest) {
 
 	voteTxBytes, err := json.Marshal(voteTxArgs)
 	if err != nil {
-		log.Errorf("error marshaling voteTx args: %s", err)
+		log.Errorf("error marshaling voteTx args: (%s)", err)
 		r.sendError(request, "cannot marshal voteTx args")
 		return
 	}
 
 	res, err := r.tmclient.BroadcastTxSync(voteTxBytes)
-	if err != nil || res.Code != 0 {
-		log.Warnf("cannot broadcast tx (res.Code=%d): %s || %s", res.Code, err, string(res.Data))
+	if err != nil {
+		log.Warnf("cannot broadcast tx: (%s)", err)
+		r.sendError(request, string(res.Data))
+		return
+	}
+	if res.Code != 0 {
+		log.Warnf("cannot broadcast tx (res.Code=%d): (%s)", res.Code, string(res.Data))
 		r.sendError(request, string(res.Data))
 		return
 	}
@@ -51,7 +56,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	}
 	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
-		log.Warnf("cannot query: %s", err)
+		log.Warnf("cannot query: (%s)", err)
 		r.sendError(request, "cannot query")
 		return
 	}
@@ -77,7 +82,7 @@ func (r *Router) getEnvelope(request routerRequest) {
 	}
 	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
 	if err != nil {
-		log.Warnf("cannot query: %s", err)
+		log.Warnf("cannot query: (%s)", err)
 		r.sendError(request, "cannot query")
 		return
 	}
@@ -87,7 +92,7 @@ func (r *Router) getEnvelope(request routerRequest) {
 	}
 	var response types.ResponseMessage
 	if err := r.codec.UnmarshalBinaryBare(queryResult.Response.Value, &response.Payload); err != nil {
-		log.Errorf("cannot unmarshal vote package: %s", err)
+		log.Errorf("cannot unmarshal vote package: (%s)", err)
 		r.sendError(request, "cannot unmarshal vote package")
 		return
 	}
@@ -101,7 +106,7 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 	}
 	qdataBytes, err := json.Marshal(qdata)
 	if err != nil {
-		log.Errorf("cannot marshal query data: %s", err)
+		log.Errorf("cannot marshal query data: (%s)", err)
 		r.sendError(request, "cannot marshal query")
 		return
 	}
@@ -114,7 +119,7 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 	response.Height = new(int64)
 	err = r.codec.UnmarshalBinaryBare(queryResult.Response.Value, response.Height)
 	if err != nil {
-		log.Errorf("cannot unmarshal height: %s", err)
+		log.Errorf("cannot unmarshal height: (%s)", err)
 		r.sendError(request, "cannot marshal height")
 		return
 	}
@@ -140,7 +145,7 @@ func (r *Router) getBlockHeight(request routerRequest) {
 	response.Height = new(int64)
 	err = r.codec.UnmarshalBinaryBare(queryResult.Response.Value, response.Height)
 	if err != nil {
-		log.Errorf("cannot unmarshal height: %s", err)
+		log.Errorf("cannot unmarshal height: (%s)", err)
 		r.sendError(request, "cannot unmarshal height")
 		return
 	}
@@ -150,8 +155,8 @@ func (r *Router) getBlockHeight(request routerRequest) {
 func (r *Router) getProcessList(request routerRequest) {
 	queryResult, err := r.tmclient.TxSearch(fmt.Sprintf("processCreated.entityId='%s'", util.TrimHex(request.EntityId)), false, 1, 30, "asc")
 	if err != nil {
-		log.Errorf("cannot query: %s", err)
-		r.sendError(request, err.Error())
+		log.Errorf("cannot query: (%s)", err)
+		r.sendError(request, "cannot query")
 		return
 	}
 	var processList []string
@@ -199,7 +204,7 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 		response.Nullifiers = []string{""}
 	}
 	if err != nil {
-		log.Errorf("cannot unmarshal nullifiers: %s", err)
+		log.Errorf("cannot unmarshal nullifiers: (%s)", err)
 		r.sendError(request, "cannot unmarshal nullifiers")
 		return
 	}
