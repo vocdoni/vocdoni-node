@@ -8,7 +8,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
@@ -42,20 +41,13 @@ func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 
 func (s *Scrutinizer) onProcess(v interface{}) {
 	d := v.(*types.ScrutinizerOnProcessData)
-	if util.IsHexWithLength(d.ProcessID, 64) && util.IsHexWithLength(d.EntityID, 64) {
-		s.addProcess(d.ProcessID)
-		s.addEntity(d.EntityID)
-	}
+	s.addProcess(d.ProcessID)
+	s.addEntity(d.EntityID)
 }
 
 func (s *Scrutinizer) onVote(v interface{}) {
 	d := v.(*types.Vote)
-	if util.IsHexWithLength(d.ProcessID, 64) &&
-		util.IsHexWithLength(d.Nullifier, 64) &&
-		util.IsHexWithLength(d.Nonce, 64) &&
-		util.IsHexWithLength(d.Signature, 130) {
-		s.addVote(d)
-	}
+	s.addVote(d)
 }
 
 func (s *Scrutinizer) addEntity(eid string) {

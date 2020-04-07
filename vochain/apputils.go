@@ -27,6 +27,12 @@ import (
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
+const (
+	processIDsize     = 64
+	entityIDsize      = 32
+	voteNullifierSize = 32
+)
+
 // ValidateTx splits a tx into method and args parts and does some basic checks
 func ValidateTx(content []byte, state *State) (interface{}, error) {
 	var txType types.Tx
@@ -170,6 +176,15 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
 func VoteTxCheck(vote types.VoteTx, state *State) error {
+	// check format
+	sanitizedPID := util.TrimHex(vote.ProcessID)
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize/2) {
+		return fmt.Errorf("malformed processId")
+	}
+	sanitizedNullifier := util.TrimHex(vote.Nullifier)
+	if !util.IsHexEncodedStringWithLength(sanitizedNullifier, voteNullifierSize) {
+		return fmt.Errorf("malformed nullifier")
+	}
 	process, _ := state.Process(vote.ProcessID)
 	if process == nil {
 		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
@@ -179,7 +194,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 	if (state.Height() >= process.StartBlock && state.Height() <= endBlock) && !process.Canceled && !process.Paused {
 		switch process.Type {
 		case "snark-vote":
-			voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
+			voteID := fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier)
 			v, _ := state.Envelope(voteID)
 			if v != nil {
 				log.Debugf("vote already exists")
@@ -216,7 +231,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 			voteTmp.Nullifier = nullifier
 			log.Debugf("generated nullifier: %s", voteTmp.Nullifier)
 			// check if vote exists
-			voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(voteTmp.Nullifier))
+			voteID := fmt.Sprintf("%s_%s", sanitizedPID, util.TrimHex(voteTmp.Nullifier))
 			v, _ := state.Envelope(voteID)
 			if v != nil {
 				return fmt.Errorf("vote already exists")
@@ -245,6 +260,16 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
 func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
+	// check format
+	sanitizedPID := util.TrimHex(process.ProcessID)
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize/2) {
+		return fmt.Errorf("malformed processId")
+	}
+	sanitizedEID := util.TrimHex(process.ProcessID)
+	if !util.IsHexEncodedStringWithLength(sanitizedEID, entityIDsize) {
+		return fmt.Errorf("malformed entityId")
+	}
+
 	// get oracles
 	oracles, err := state.Oracles()
 	if err != nil || len(oracles) == 0 {
@@ -287,6 +312,11 @@ func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 
 // CancelProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
 func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) error {
+	// check format
+	sanitizedPID := util.TrimHex(cancelProcessTx.ProcessID)
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize/2) {
+		return fmt.Errorf("malformed processId")
+	}
 	// get oracles
 	oracles, err := state.Oracles()
 	if err != nil || len(oracles) == 0 {
@@ -304,7 +334,7 @@ func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) e
 		return fmt.Errorf("unauthorized to create a process, message: %s, recovered addr: %s", string(processBytes), addr)
 	}
 	// get process
-	process, err := state.Process(util.TrimHex(cancelProcessTx.ProcessID))
+	process, err := state.Process(sanitizedPID)
 	if err != nil {
 		return fmt.Errorf("cannot cancel the process: %s", err)
 	}
