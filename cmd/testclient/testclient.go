@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -123,6 +124,9 @@ func main() {
 		}
 		if err != nil {
 			panic(err)
+		}
+		if len(line) < 7 || strings.HasPrefix(string(line), "#") {
+			continue
 		}
 		req = processLine(line)
 
