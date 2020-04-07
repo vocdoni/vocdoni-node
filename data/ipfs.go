@@ -12,12 +12,15 @@ import (
 	ipfscmds "github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
 	"github.com/ipfs/go-ipfs/core/corehttp"
+	"github.com/ipfs/go-ipfs/core/corerepo"
 	"github.com/ipfs/go-ipfs/core/coreunix"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/ipfs/interface-go-ipfs-core/options"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
+	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr-net"
 	crypto "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/ipfs"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -29,6 +32,10 @@ type IPFSHandle struct {
 	CoreAPI  coreiface.CoreAPI
 	DataDir  string
 	LogLevel string
+
+	// cancel helps us stop extra goroutines and listeners which complement
+	// the IpfsNode above.
+	cancel func()
 }
 
 func (i *IPFSHandle) Init(d *types.DataStore) error {
@@ -47,13 +54,20 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 			log.Errorf("error in IPFS init: %s", err)
 		}
 	}
-	nd, coreAPI, err := ipfs.StartNode()
+	node, coreAPI, err := ipfs.StartNode()
 	if err != nil {
 		return err
 	}
-	log.Infof("IPFS peerID: %s", nd.Identity.Pretty())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	i.cancel = cancel
+
+	// Start garbage collector, with our cancellable context.
+	go corerepo.PeriodicGC(ctx, node)
+
+	log.Infof("IPFS peerID: %s", node.Identity.Pretty())
 	// start http
-	cctx := ipfs.CmdCtx(nd, d.Datadir)
+	cctx := ipfs.CmdCtx(node, d.Datadir)
 	cctx.ReqLog = &ipfscmds.ReqLog{}
 
 	gatewayOpt := corehttp.GatewayOption(true, corehttp.WebUIPaths...)
@@ -63,13 +77,35 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 		gatewayOpt,
 	}
 
-	go corehttp.ListenAndServe(nd, "/ip4/0.0.0.0/tcp/5001", opts...)
+	addr, err := ma.NewMultiaddr("/ip4/0.0.0.0/tcp/5001")
+	if err != nil {
+		return err
+	}
+	list, err := manet.Listen(addr)
+	if err != nil {
+		return err
+	}
+	go func() {
+		<-ctx.Done()
+		list.Close()
+	}()
+	// The address might have changed, if the port was 0; use list.Multiaddr
+	// to fetch the final one.
 
-	i.Node = nd
+	// Avoid corehttp.ListenAndServe, since it doesn't provide the final
+	// address, and always prints to stdout.
+	go corehttp.Serve(node, manet.NetListener(list), opts...)
+
+	i.Node = node
 	i.CoreAPI = coreAPI
 	i.DataDir = d.Datadir
 
 	return nil
+}
+
+func (i *IPFSHandle) Stop() error {
+	i.cancel()
+	return i.Node.Close()
 }
 
 // URIprefix returns the URI prefix which identifies the protocol
@@ -78,14 +114,14 @@ func (i *IPFSHandle) URIprefix() string {
 }
 
 // PublishBytes publishes a file containing msg to ipfs
-func PublishBytes(ctx context.Context, msg []byte, fileDir string, nd *ipfscore.IpfsNode) (string, error) {
+func PublishBytes(ctx context.Context, msg []byte, fileDir string, node *ipfscore.IpfsNode) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
 	log.Infof("publishing file: %s", filePath)
 	err := ioutil.WriteFile(filePath, msg, 0666)
 	if err != nil {
 		return "", err
 	}
-	rootHash, err := addAndPin(ctx, nd, filePath)
+	rootHash, err := addAndPin(ctx, node, filePath)
 	if err != nil {
 		return "", err
 	}
@@ -175,13 +211,13 @@ func (i *IPFSHandle) Retrieve(ctx context.Context, path string) ([]byte, error) 
 	path = strings.TrimPrefix(path, "ipfs://")
 	pth := corepath.New(path)
 
-	nd, err := i.CoreAPI.Unixfs().Get(ctx, pth)
+	node, err := i.CoreAPI.Unixfs().Get(ctx, pth)
 	if err != nil {
 		return nil, err
 	}
-	defer nd.Close()
+	defer node.Close()
 
-	r, ok := nd.(files.File)
+	r, ok := node.(files.File)
 	if !ok {
 		return nil, errors.New("received incorrect type from Unixfs().Get()")
 	}

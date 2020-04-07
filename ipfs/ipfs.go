@@ -13,7 +13,6 @@ import (
 	"github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
 	ipfsapi "github.com/ipfs/go-ipfs/core/coreapi"
-	"github.com/ipfs/go-ipfs/core/corerepo"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 
@@ -46,7 +45,7 @@ func Init() error {
 	}
 
 	InstallDatabasePlugins()
-	_, err = doInit(os.Stdout, ConfigRoot, 2048)
+	_, err = doInit(ioutil.Discard, ConfigRoot, 2048)
 	return err
 }
 
@@ -59,8 +58,6 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 		return nil, nil, err
 	}
 
-	ctx := context.Background()
-
 	cfg := &ipfscore.BuildCfg{
 		Repo:      r,
 		Online:    true,
@@ -70,6 +67,9 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 		// 	"ipnsps": true,
 		// },
 	}
+
+	// We use node.Cancel to stop it instead.
+	ctx := context.Background()
 
 	node, err := ipfscore.NewNode(ctx, cfg)
 	if err != nil {
@@ -90,9 +90,6 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 		log.Warn("error constructing core API")
 		return nil, nil, err
 	}
-
-	// Start garbage collector
-	go corerepo.PeriodicGC(ctx, node)
 
 	return node, api, nil
 }

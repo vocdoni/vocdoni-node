@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 
-	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
+	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 )
 
 // The init function and flags are shared with the other benchmark files.
@@ -25,26 +24,22 @@ var (
 	hostFlag   = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
 	censusSize = flag.Int("censusSize", 100, "number of census entries to add (minimum 100)")
 	onlyCensus = flag.Bool("onlyCreateCensus", false, "perform only create census operations")
-	clean      = flag.Bool("clean", true, "clean/remove data directories")
 )
 
 func BenchmarkCensus(b *testing.B) {
+	b.ReportAllocs()
+
 	host := *hostFlag
 	if host == "" {
-		var server common.DvoteAPIServer
+		var server testcommon.DvoteAPIServer
 		server.Start(b, "file", "census")
-		b.Cleanup(func() {
-			if *clean {
-				os.RemoveAll(server.IpfsDir)
-				os.RemoveAll(server.CensusDir)
-			}
-		})
 		host = server.PxyAddr
 	}
 
+	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
-		c := common.NewAPIConnection(b, host)
+		c := testcommon.NewAPIConnection(b, host)
 
 		for pb.Next() {
 			censusBench(b, c)
@@ -52,7 +47,7 @@ func BenchmarkCensus(b *testing.B) {
 	})
 }
 
-func censusBench(b *testing.B, c *common.APIConnection) {
+func censusBench(b *testing.B, c *testcommon.APIConnection) {
 	// API requets
 	var req types.MetaRequest
 

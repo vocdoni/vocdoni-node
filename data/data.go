@@ -17,6 +17,9 @@ type Storage interface {
 	ListPins(ctx context.Context) (map[string]string, error)
 	URIprefix() string
 	Stats(ctx context.Context) (string, error)
+
+	// TODO(mvdan): Temporary until we rethink Init/Start/etc.
+	Stop() error
 }
 
 type StorageID int
@@ -42,6 +45,8 @@ func IPFSNewConfig(path string) *types.DataStore {
 	datastore.Datadir = path
 	return datastore
 }
+
+// TODO(mvdan): This is really a Start, not an Init. Rethink this.
 
 func Init(t StorageID, d *types.DataStore) (Storage, error) {
 	switch t {

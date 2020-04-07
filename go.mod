@@ -40,6 +40,7 @@ require (
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/miekg/dns v1.1.16 // indirect
 	github.com/multiformats/go-multiaddr v0.2.1
+	github.com/multiformats/go-multiaddr-net v0.1.3
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/polydawn/refmt v0.0.0-20190807091052-3d65705ee9f1 // indirect
