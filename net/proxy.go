@@ -16,6 +16,7 @@ import (
 	reuse "github.com/libp2p/go-reuseport"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 
@@ -59,6 +60,12 @@ func getCertificates(domain string, m *autocert.Manager) [][]byte {
 	return cert.Certificate
 }
 
+type stdLogger struct {
+	log *zap.SugaredLogger
+}
+
+func (l stdLogger) Print(v ...interface{}) { l.log.Info(v...) }
+
 // Init checks if SSL is activated or not and runs a http server consequently
 //
 // When it returns, the server is ready. The returned address is useful if the
@@ -76,7 +83,12 @@ func (p *Proxy) Init() error {
 
 	p.Server = chi.NewRouter()
 	p.Server.Use(middleware.RealIP)
-	p.Server.Use(middleware.Logger)
+	// If we want rich logging (e.g. with fields), we could implement our
+	// own version of DefaultLogFormatter.
+	p.Server.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
+		Logger:  stdLogger{log.Logger()},
+		NoColor: true,
+	}))
 	p.Server.Use(middleware.Recoverer)
 	p.Server.Use(middleware.Throttle(5000))
 	p.Server.Use(middleware.Timeout(30 * time.Second))

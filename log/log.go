@@ -22,6 +22,8 @@ func init() {
 	Init(level, "stderr")
 }
 
+func Logger() *zap.SugaredLogger { return log }
+
 // Init initializes the logger. Output can be either "stdout/stderr/filePath"
 func Init(logLevel string, output string) {
 	cfg := newConfig(logLevel, output)

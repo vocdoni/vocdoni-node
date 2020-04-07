@@ -3,7 +3,6 @@ package tree
 
 import (
 	"encoding/base64"
-
 	"errors"
 	"fmt"
 	"os"
@@ -22,8 +21,10 @@ type Tree struct {
 	DbStorage  *db.LevelDbStorage
 }
 
-const MaxIndexSize = claims.IndexSlotLen
-const MaxValueSize = claims.ValueSlotLen - 2 // -2 because the 2 first bytes are used to store the length of index and value
+const (
+	MaxIndexSize = claims.IndexSlotLen
+	MaxValueSize = claims.ValueSlotLen - 2 // -2 because the 2 first bytes are used to store the length of index and value
+)
 
 func (t *Tree) MaxClaimSize() int {
 	return MaxIndexSize
