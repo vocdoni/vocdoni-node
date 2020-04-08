@@ -1,13 +1,13 @@
-version: "3"
+version: "3.7"
 
 services:
 
   miner0:
-    image: "vocdoni/miner"
-    entrypoint: "dockerfiles/miner/files/minerStart.sh"
-    env_file: "dockerfiles/testsuite/env.miner0"
+    image: "miner"
+    env_file: "dockerfiles/testsuite/composefiles/env.miner0"
     volumes:
       - $PWD/run/miner0:/app/run/
+      - $PWD/dockerfiles/testsuite/composefiles:/app/misc
     networks:
       localnet:
         ipv4_address: 10.17.14.2
@@ -15,11 +15,11 @@ services:
       - "26656-26657:26656-26657"    
 
   miner1:
-    image: "vocdoni/miner"
-    entrypoint: "dockerfiles/miner/files/minerStart.sh"
-    env_file: "dockerfiles/testsuite/env.miner1"
+    image: "miner"
+    env_file: "dockerfiles/testsuite/composefiles/env.miner1"
     volumes:
       - $PWD/run/miner1:/app/run/
+      - $PWD/dockerfiles/testsuite/composefiles:/app/misc
     networks:
       localnet:
         ipv4_address: 10.17.14.3
@@ -27,11 +27,11 @@ services:
       - "26658-26659:26656-26657"    
 
   miner2:
-    image: "vocdoni/miner"
-    entrypoint: "dockerfiles/miner/files/minerStart.sh"
-    env_file: "dockerfiles/testsuite/env.miner2"
+    image: "miner"
+    env_file: "dockerfiles/testsuite/composefiles/env.miner2"
     volumes:
       - $PWD/run/miner2:/app/run/
+      - $PWD/dockerfiles/testsuite/composefiles:/app/misc
     networks:
       localnet:
         ipv4_address: 10.17.14.4
@@ -39,11 +39,11 @@ services:
       - "26660-26661:26656-26657"
 
   oracle:
-    image: "vocdoni/oracle"
-    entrypoint: "dockerfiles/oracle/files/oracleStart.sh"
-    env_file: "dockerfiles/testsuite/env.oracle"
+    image: "oracle"
+    env_file: "dockerfiles/testsuite/composefiles/env.oracle"
     volumes: 
       - $PWD/run/oracle:/app/run/
+      - $PWD/dockerfiles/testsuite/composefiles:/app/misc
     networks:
       localnet:
         ipv4_address: 10.17.14.5
@@ -53,11 +53,11 @@ services:
       - "26662-26663:26656-26657"
 
   gateway:
-    image: "vocdoni/gateway"
-    entrypoint: "dockerfiles/gateway/files/gatewayStart.sh"
-    env_file: "dockerfiles/testsuite/env.gateway"
+    image: "gateway"
+    env_file: "dockerfiles/testsuite/composefiles/env.gateway"
     volumes:
       - $PWD/run/gateway:/app/run/
+      - $PWD/dockerfiles/testsuite/composefiles:/app/misc
     networks:
       localnet:
         ipv4_address: 10.17.14.6
