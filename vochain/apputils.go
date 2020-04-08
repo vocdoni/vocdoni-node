@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	processIDsize     = 64
+	processIDsize     = 32
 	entityIDsize      = 32
 	voteNullifierSize = 32
 )
@@ -178,7 +178,7 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 func VoteTxCheck(vote types.VoteTx, state *State) error {
 	// check format
 	sanitizedPID := util.TrimHex(vote.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize/2) {
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
 	sanitizedNullifier := util.TrimHex(vote.Nullifier)
@@ -262,7 +262,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 	// check format
 	sanitizedPID := util.TrimHex(process.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize/2) {
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
 	sanitizedEID := util.TrimHex(process.ProcessID)
@@ -314,7 +314,7 @@ func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) error {
 	// check format
 	sanitizedPID := util.TrimHex(cancelProcessTx.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize/2) {
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
 	// get oracles
