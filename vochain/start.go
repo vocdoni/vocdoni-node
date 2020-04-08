@@ -25,7 +25,7 @@ import (
 var (
 	// ProdSeedNodes production vochain network seed nodes
 	ProdSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
-	// TestSeedNodes testing vochain network seed nodes
+	// DevSeedNodes testing vochain network seed nodes
 	DevSeedNodes = []string{"7440a5b086e16620ce7b13198479016aa2b07988@116.202.8.150:11715"}
 )
 
@@ -36,17 +36,14 @@ func NewVochain(globalCfg *config.VochainCfg, genesis []byte, pv *privval.FilePV
 	if err != nil {
 		log.Errorf("cannot init vochain application: %s", err)
 	}
-
 	log.Info("creating tendermint node and application")
-	go func() {
-		app.Node, err = newTendermint(app, globalCfg, genesis, pv)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err := app.Node.Start(); err != nil {
-			log.Fatal(err)
-		}
-	}()
+	app.Node, err = newTendermint(app, globalCfg, genesis, pv)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := app.Node.Start(); err != nil {
+		log.Fatal(err)
+	}
 	return app
 }
 
