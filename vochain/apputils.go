@@ -28,8 +28,12 @@ import (
 )
 
 const (
-	processIDsize     = 32
-	entityIDsize      = 32
+	processIDsize = 32
+	// size of eth addr
+	entityIDsize = 20
+	// legacy: in the past we used hash(addr)
+	// this is a temporal work around to support both
+	entityIDsizeV2    = 32
 	voteNullifierSize = 32
 )
 
@@ -265,8 +269,10 @@ func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
-	sanitizedEID := util.TrimHex(process.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedEID, entityIDsize) {
+	sanitizedEID := util.TrimHex(process.EntityID)
+
+	if !util.IsHexEncodedStringWithLength(sanitizedEID, entityIDsize) &&
+		!util.IsHexEncodedStringWithLength(sanitizedEID, entityIDsizeV2) {
 		return fmt.Errorf("malformed entityId")
 	}
 

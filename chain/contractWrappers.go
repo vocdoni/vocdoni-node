@@ -11,6 +11,7 @@ import (
 	"golang.org/x/net/idna"
 
 	"gitlab.com/vocdoni/go-dvote/chain/contracts"
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
@@ -49,7 +50,7 @@ func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error
 
 	processTxArgs := new(types.NewProcessTx)
 	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
-	processTxArgs.EntityID = processMeta.EntityAddress.String()
+	processTxArgs.EntityID = string(signature.HashRaw(processMeta.EntityAddress.String()))
 	processTxArgs.MkRoot = processMeta.CensusMerkleRoot
 	processTxArgs.MkURI = processMeta.CensusMerkleTree
 	if processMeta.NumberOfBlocks != nil {
