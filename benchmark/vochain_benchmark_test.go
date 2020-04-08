@@ -209,7 +209,7 @@ func vochainBench(b *testing.B, c *testcommon.APIConnection, s *signature.SignKe
 	req.Payload.Nonce = strconv.Itoa(rint)
 	req.Payload.ProcessID = processID
 
-	// generate envelope vote-package
+	// generate envelope votePackage
 	votePkg := &types.VotePackageStruct{
 		Nonce: req.Payload.Nonce,
 		Votes: []int{1},

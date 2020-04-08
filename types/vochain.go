@@ -30,10 +30,10 @@ type Vote struct {
 	ProcessID string `json:"processId,omitempty"`
 	// Proof contains the prove indicating that the user is in the census of the process
 	Proof string `json:"proof,omitempty"`
-	// Signature sign( JSON.stringify( { nonce, processId, proof, 'vote-package' } ), privateKey )
+	// Signature sign( JSON.stringify( { nonce, processId, proof, 'votePackage' } ), privateKey )
 	Signature string `json:"signature,omitempty"`
 	// VotePackage base64 encoded vote content
-	VotePackage string `json:"vote-package,omitempty"`
+	VotePackage string `json:"votePackage,omitempty"`
 }
 
 // ________________________ PROCESS ________________________
@@ -85,7 +85,7 @@ type VoteTx struct {
 	Proof       string `json:"proof,omitempty"`
 	Signature   string `json:"signature,omitempty"`
 	Type        string `json:"type,omitempty"`
-	VotePackage string `json:"vote-package,omitempty"`
+	VotePackage string `json:"votePackage,omitempty"`
 }
 
 // NewProcessTx represents the info required for starting a new process
