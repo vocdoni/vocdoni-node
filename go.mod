@@ -8,7 +8,6 @@ require (
 	github.com/davidlazar/go-crypto v0.0.0-20190912175916-7055855a373f // indirect
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.2
 	github.com/elastic/gosigar v0.10.5 // indirect
-	github.com/etcd-io/bbolt v1.3.4 // indirect
 	github.com/ethereum/go-ethereum v1.9.12
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-chi/chi v4.0.3+incompatible
@@ -54,9 +53,9 @@ require (
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/tendermint/go-amino v0.15.1
-	github.com/tendermint/iavl v0.13.2
-	github.com/tendermint/tendermint v0.33.2
-	github.com/tendermint/tm-db v0.5.0
+	github.com/tendermint/iavl v0.13.3
+	github.com/tendermint/tendermint v0.33.3
+	github.com/tendermint/tm-db v0.5.1
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200223203819-95cdfde1438f // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.uber.org/multierr v1.5.0 // indirect
@@ -75,7 +74,3 @@ require (
 // https://github.com/ethereum/go-ethereum/issues/20590 is fixed, stub it out
 // with a replace directive. The stub was hacked together with vim.
 replace gopkg.in/olebedev/go-duktape.v3 => ./duktape-stub
-
-// TODO(mvdan): remove once tendermint/tm-db fixes its dependency on bbolt
-// via the wrong module path.
-replace github.com/etcd-io/bbolt => go.etcd.io/bbolt v1.3.4
