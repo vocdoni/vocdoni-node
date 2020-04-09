@@ -9,16 +9,18 @@ import (
 
 	common3 "github.com/iden3/go-iden3-core/common"
 	"github.com/iden3/go-iden3-core/core/claims"
+	iden3db "github.com/iden3/go-iden3-core/db"
 
-	"github.com/iden3/go-iden3-core/db"
 	"github.com/iden3/go-iden3-core/merkletree"
 	"golang.org/x/text/unicode/norm"
+
+	"gitlab.com/vocdoni/go-dvote/db"
 )
 
 type Tree struct {
 	StorageDir string
 	Tree       *merkletree.MerkleTree
-	DbStorage  *db.LevelDbStorage
+	Storage    iden3db.Storage
 }
 
 const (
@@ -43,15 +45,15 @@ func (t *Tree) Init(namespace string) error {
 			t.StorageDir = "./dvoteTree"
 		}
 	}
-	mtdb, err := db.NewLevelDbStorage(t.StorageDir+"/"+namespace, false)
+	storage, err := db.NewIden3Storage(t.StorageDir + "/" + namespace)
 	if err != nil {
 		return err
 	}
-	mt, err := merkletree.NewMerkleTree(mtdb, 140)
+	mt, err := merkletree.NewMerkleTree(storage, 140)
 	if err != nil {
 		return err
 	}
-	t.DbStorage = mtdb
+	t.Storage = storage
 	t.Tree = mt
 	return nil
 }

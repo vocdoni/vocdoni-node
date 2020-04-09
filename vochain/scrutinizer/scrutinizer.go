@@ -21,7 +21,7 @@ const (
 // Scrutinizer is the component which makes the accounting of the voting processes and keeps it indexed in a local database
 type Scrutinizer struct {
 	VochainState *vochain.State
-	Storage      *db.LevelDbStorage
+	Storage      db.Database
 }
 
 // ProcessVotes represents the results of a voting process using a two dimensions slice [ question1:[option1,option2], question2:[option1,option2], ...]
@@ -33,7 +33,7 @@ func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	var s Scrutinizer
 	var err error
 	s.VochainState = state
-	s.Storage, err = db.NewLevelDbStorage(dbPath, false)
+	s.Storage, err = db.NewBadgerDB(dbPath)
 	s.VochainState.AddCallback("addProcess", s.onProcess)
 	s.VochainState.AddCallback("addVote", s.onVote)
 	return &s, err
@@ -52,6 +52,7 @@ func (s *Scrutinizer) onVote(v interface{}) {
 
 func (s *Scrutinizer) addEntity(eid string) {
 	log.Debugf("add new entity %s to scrutinizer local database", eid)
+	// TODO(mvdan): use a prefixed database
 	entity, err := s.Storage.Get([]byte(types.ScrutinizerEntityPrefix + eid))
 	if err == nil || len(entity) > 0 {
 		log.Debugf("entity %s already exists", eid)
@@ -165,7 +166,7 @@ func (s *Scrutinizer) VoteResult(processID string) ([][]uint32, error) {
 
 // List returns a list of keys matching a given prefix
 func (s *Scrutinizer) List(max int, from, prefix string) (list []string) {
-	iter := s.Storage.LevelDB().NewIterator(nil, nil)
+	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
 	if len(from) > 0 {
 		iter.Seek([]byte(from))
 	}

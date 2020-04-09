@@ -3,10 +3,15 @@ module gitlab.com/vocdoni/go-dvote
 go 1.14
 
 require (
+	github.com/ChainSafe/go-schnorrkel v0.0.0-20200115165343-aa45d48b5ed6 // indirect
+	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200325002354-262bc4f4f592 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20190912175916-7055855a373f // indirect
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.2
+	github.com/dgraph-io/badger/v2 v2.0.1-rc1.0.20200409094109-809725940698
+	github.com/dgraph-io/ristretto v0.0.2 // indirect
+	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.12
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
@@ -16,6 +21,7 @@ require (
 	github.com/google/go-cmp v0.4.0
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect
 	github.com/gorilla/websocket v1.4.1
+	github.com/gtank/merlin v0.1.1 // indirect
 	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
 	github.com/iden3/go-iden3-crypto v0.0.4
 	github.com/ipfs/go-filestore v1.0.0 // indirect
@@ -51,7 +57,6 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
-	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/tendermint/go-amino v0.15.1
 	github.com/tendermint/iavl v0.13.3
 	github.com/tendermint/tendermint v0.33.3
@@ -62,8 +67,8 @@ require (
 	go.uber.org/zap v1.14.0
 	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
-	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
-	golang.org/x/sys v0.0.0-20200327173247-9dae0f8f5775 // indirect
+	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
+	golang.org/x/sys v0.0.0-20200409092240-59c9f1ba88fa // indirect
 	golang.org/x/text v0.3.2
 	golang.org/x/tools v0.0.0-20200312194400-c312e98713c2 // indirect
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
