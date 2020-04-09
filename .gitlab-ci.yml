@@ -19,14 +19,16 @@ cache:
     - .cache/
 
 go-test:
-  image: golang:1.14.1
+  image: golang:1.14.2
   stage: test
   script:
-    - go test -vet=off -timeout=1m ./... # we run vet in another step
-    - go test -vet=off -timeout=5m -race ./...
+    # we run vet in another step
+    - go test -vet=off -timeout=1m ./...
+    # -race can easily make the crypto stuff 10x slower
+    - go test -vet=off -timeout=10m -race ./...
 
 go-analyze:
-  image: golang:1.14.1
+  image: golang:1.14.2
   stage: test
   script:
     - diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
