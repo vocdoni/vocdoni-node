@@ -171,6 +171,9 @@ func HandleCensus(event ethtypes.Log, e *EthereumEvents) error {
 	if err != nil {
 		return err
 	}
+	if processTx == nil {
+		return fmt.Errorf("cannot fetch process metadata")
+	}
 	// Import remote census
 	if !strings.HasPrefix(processTx.MkURI, e.Census.Data().URIprefix()) || len(processTx.MkRoot) == 0 {
 		return fmt.Errorf("process not valid => %+v", processTx)

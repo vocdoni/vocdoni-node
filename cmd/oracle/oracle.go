@@ -363,8 +363,15 @@ func main() {
 					log.Infof("reading ethereum events from current block %d", info.Height)
 					go ev.SubscribeEthereumEventLogs()
 				} else {
-					log.Infof("reading ethereum events from block 0 to %d", info.Height)
-					go ev.ReadEthereumEventLogs(0, int64(info.Height))
+					initBlock := int64(0)
+					chainSpecs, err := chain.SpecsFor(globalCfg.EthConfig.ChainType)
+					if err != nil {
+						log.Warn("cannot get chain block to start looking for events, using 0")
+					} else {
+						initBlock = chainSpecs.StartingBlock
+					}
+					log.Infof("reading ethereum events from block %d to %d", initBlock, info.Height)
+					go ev.ReadEthereumEventLogs(initBlock, int64(info.Height))
 					go ev.SubscribeEthereumEventLogs()
 				}
 				break

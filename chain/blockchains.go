@@ -8,11 +8,12 @@ import (
 
 // Specs defines a set of blockchain network specifications
 type Specs struct {
-	Name        string   // Identity name
-	GenesisB64  string   // Base64 JSON encoded genesis file
-	GenesisHash string   // Genesis Hash
-	NetworkId   int      // Ethereum Like network identification number
-	BootNodes   []string // List of Bootnodes for this network
+	Name          string   // Identity name
+	GenesisB64    string   // Base64 JSON encoded genesis file
+	GenesisHash   string   // Genesis Hash
+	NetworkId     int      // Ethereum Like network identification number
+	BootNodes     []string // List of Bootnodes for this network
+	StartingBlock int64    // Where to start looking for events
 }
 
 var AvailableChains = []string{"mainnet, goerli, vctestnet"}
@@ -30,16 +31,18 @@ func SpecsFor(name string) (*Specs, error) {
 
 // Ethereum MainNet
 var mainnet = Specs{
-	Name:      "mainnet",
-	BootNodes: ethparams.MainnetBootnodes,
+	Name:          "mainnet",
+	BootNodes:     ethparams.MainnetBootnodes,
+	StartingBlock: 90000000,
 }
 
 // Goerli Ethereum PoA Testnet
 var goerli = Specs{
-	Name:        "goerli",
-	NetworkId:   5,
-	BootNodes:   ethparams.GoerliBootnodes,
-	GenesisHash: "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
+	Name:          "goerli",
+	NetworkId:     5,
+	StartingBlock: 1800000,
+	BootNodes:     ethparams.GoerliBootnodes,
+	GenesisHash:   "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog
 ICAgImVpcDE1MEJsb2NrIjowLAogICAgImVpcDE1MEhhc2giOiAiMHhiZjdlMzMxZjdmN2MxZGQy
 ZTA1MTU5NjY2YjNiZjhiYzdhOGEzYTllYjFkNTE4OTY5ZWFiNTI5ZGQ5Yjg4YzFhIiwKICAgICJl

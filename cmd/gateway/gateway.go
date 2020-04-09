@@ -549,8 +549,15 @@ func main() {
 			for info, _ = node.SyncInfo(); !info.Synced || info.Peers == 0 || info.Height == 0; {
 				time.Sleep(time.Second * 2)
 			}
-			go ev.ReadEthereumEventLogs(0, int64(info.Height))
-			log.Info("subscribing to new ethereum events")
+			initBlock := int64(0)
+			chainSpecs, err := chain.SpecsFor(globalCfg.EthConfig.ChainType)
+			if err != nil {
+				log.Warn("cannot get chain block to start looking for events, using 0")
+			} else {
+				initBlock = chainSpecs.StartingBlock
+			}
+			go ev.ReadEthereumEventLogs(initBlock, int64(info.Height))
+			log.Info("subscribing to new ethereum events from block %d", info.Height)
 			ev.SubscribeEthereumEventLogs()
 		}()
 	}
