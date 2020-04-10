@@ -102,7 +102,7 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 		if err != nil {
 			log.Warnf("tx cannot be broadcasted: %s", err)
 		} else {
-			log.Infof("new transaction hash: %s", res.Hash)
+			log.Infof("new transaction hash: %s, data: %s", res.Hash, res.Data)
 		}
 
 	case HashLogProcessCanceled.Hex():
