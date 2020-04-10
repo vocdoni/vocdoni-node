@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
@@ -50,7 +51,11 @@ func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error
 
 	processTxArgs := new(types.NewProcessTx)
 	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
-	processTxArgs.EntityID = fmt.Sprintf("%x", signature.HashRaw(processMeta.EntityAddress.String()))
+	eid, err := hex.DecodeString(processMeta.EntityAddress.String())
+	if err != nil {
+		return nil, fmt.Errorf("error decoding entity address: %s", err)
+	}
+	processTxArgs.EntityID = fmt.Sprintf("%x", signature.HashRaw(string(eid)))
 	processTxArgs.MkRoot = processMeta.CensusMerkleRoot
 	processTxArgs.MkURI = processMeta.CensusMerkleTree
 	if processMeta.NumberOfBlocks != nil {
