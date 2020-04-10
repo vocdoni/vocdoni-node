@@ -50,7 +50,7 @@ func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error
 
 	processTxArgs := new(types.NewProcessTx)
 	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
-	processTxArgs.EntityID = string(signature.HashRaw(processMeta.EntityAddress.String()))
+	processTxArgs.EntityID = fmt.Sprintf("%x", signature.HashRaw(processMeta.EntityAddress.String()))
 	processTxArgs.MkRoot = processMeta.CensusMerkleRoot
 	processTxArgs.MkURI = processMeta.CensusMerkleTree
 	if processMeta.NumberOfBlocks != nil {
