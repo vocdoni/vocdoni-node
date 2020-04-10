@@ -33,6 +33,6 @@ ENVFILE=""
 # RUN DOCKER
 docker run --name `echo $IMAGE_TAG-$RANDOM | tr "/" "-"` -d \
 	-p 26656:26656 -p 26657:26657 -p 31000:31000 \
-	-v $PWD/run:/app/run $EXTRA_OPTS \
+	-v $PWD/run:/app/run -v $PWD/misc:/app/misc $EXTRA_OPTS \
 	`[ -n "$ENVFILE" ] && echo -n "--env-file $ENVFILE"` \
 	$IMAGE_TAG
