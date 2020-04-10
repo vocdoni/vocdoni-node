@@ -15,6 +15,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 // VOTING PROCESS WRAPPER
@@ -51,7 +52,7 @@ func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error
 
 	processTxArgs := new(types.NewProcessTx)
 	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
-	eid, err := hex.DecodeString(processMeta.EntityAddress.String())
+	eid, err := hex.DecodeString(util.TrimHex(processMeta.EntityAddress.String()))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding entity address: %s", err)
 	}
