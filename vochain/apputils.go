@@ -185,10 +185,6 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
-	sanitizedNullifier := util.TrimHex(vote.Nullifier)
-	if !util.IsHexEncodedStringWithLength(sanitizedNullifier, voteNullifierSize) {
-		return fmt.Errorf("malformed nullifier")
-	}
 	process, _ := state.Process(vote.ProcessID)
 	if process == nil {
 		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
@@ -198,6 +194,10 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 	if (state.Height() >= process.StartBlock && state.Height() <= endBlock) && !process.Canceled && !process.Paused {
 		switch process.Type {
 		case "snark-vote":
+			sanitizedNullifier := util.TrimHex(vote.Nullifier)
+			if !util.IsHexEncodedStringWithLength(sanitizedNullifier, voteNullifierSize) {
+				return fmt.Errorf("malformed nullifier")
+			}
 			voteID := fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier)
 			v, _ := state.Envelope(voteID)
 			if v != nil {
