@@ -168,7 +168,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.seeds", flag.Lookup("vochainSeeds"))
 	viper.BindPFlag("vochainConfig.createGenesis", flag.Lookup("vochainCreateGenesis"))
 	viper.BindPFlag("vochainConfig.genesis", flag.Lookup("vochainGenesis"))
-	viper.BindPFlag("vochainConfig.keyFile", flag.Lookup("vochainKeyFile"))
+	viper.BindPFlag("vochainConfig.MinerKey", flag.Lookup("vochainKey"))
 	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
 
 	// check if config file exists

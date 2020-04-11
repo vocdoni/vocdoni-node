@@ -123,7 +123,7 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.genesis", flag.Lookup("vochainGenesis"))
 	viper.BindPFlag("vochainConfig.peers", flag.Lookup("vochainPeers"))
 	viper.BindPFlag("vochainConfig.seeds", flag.Lookup("vochainSeeds"))
-	viper.BindPFlag("vochainConfig.keyFile", flag.Lookup("vochainKeyFile"))
+	viper.BindPFlag("vochainConfig.MinerKey", flag.Lookup("vochainKey"))
 	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
 
 	// ethereum
