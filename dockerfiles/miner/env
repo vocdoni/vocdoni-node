@@ -1,6 +1,6 @@
 miner_dataDir=/app/run
 #miner_dev=
-#miner_genesis=
+#miner_genedebug
 #miner_logLevel=debug
 #miner_logOutput=stdout
 #miner_minerKey=

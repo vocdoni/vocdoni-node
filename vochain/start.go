@@ -2,7 +2,6 @@
 package vochain
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -182,12 +181,12 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 
 	log.Infof("tendermint private key 0x%x", pv.Key.PrivKey)
 	log.Infof("tendermint address: %s", pv.Key.Address)
-	log.Infof("tendermint public key: %s", base64.StdEncoding.EncodeToString(pv.Key.PubKey.Bytes()))
-	aminoPrivKey, err := HexPrivKeyToAmino(fmt.Sprintf("%x", pv.Key.PrivKey))
+	aminoPrivKey, aminoPubKey, err := HexKeyToAmino(fmt.Sprintf("%x", pv.Key.PrivKey))
 	if err != nil {
 		return nil, err
 	}
 	log.Infof("amino private key: %s", aminoPrivKey)
+	log.Infof("amino public key: %s", aminoPubKey)
 	log.Infof("using keyfile %s", tconfig.PrivValidatorKeyFile())
 
 	// read or create node key
@@ -228,23 +227,24 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	return node, nil
 }
 
-// HexPrivKeyToAmino is a helper function that transforms a standard EDDSA hex string key into Tendermint like amino format
+// HexKeyToAmino is a helper function that transforms a standard EDDSA hex string key into Tendermint like amino format
 // usefull for creating genesis files
-func HexPrivKeyToAmino(hexKey string) (string, error) {
+func HexKeyToAmino(hexKey string) (private, public string, err error) {
 	// TO-DO find a better way to to this. Probably amino provides some helpers
 
 	// Needed for recovering the tendermint compatible amino private key format
-	type aminoPrivKey struct {
+	type aminoKey struct {
 		Type  string `json:"type"`
 		Value string `json:"value"`
 	}
 	type aminoKeyFile struct {
-		Privkey aminoPrivKey `json:"priv_key"`
+		Privkey aminoKey `json:"priv_key"`
+		PubKey  aminoKey `json:"pub_key"`
 	}
 
 	key, err := hex.DecodeString(util.TrimHex(hexKey))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	cdc := amino.NewCodec()
@@ -254,7 +254,7 @@ func HexPrivKeyToAmino(hexKey string) (string, error) {
 	var privKey crypto25519.PrivKeyEd25519
 
 	if n := copy(privKey[:], key[:]); n != 64 {
-		return "", fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
+		return "", "", fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
 	}
 
 	pv.Address = privKey.PubKey().Address()
@@ -263,11 +263,11 @@ func HexPrivKeyToAmino(hexKey string) (string, error) {
 
 	jsonBytes, err := cdc.MarshalJSON(pv)
 	if err != nil {
-		return "", fmt.Errorf("cannot encode key to amino: (%s)", err)
+		return "", "", fmt.Errorf("cannot encode key to amino: (%s)", err)
 	}
 	var aminokf aminoKeyFile
 	if err := json.Unmarshal(jsonBytes, &aminokf); err != nil {
-		return "", err
+		return "", "", err
 	}
-	return aminokf.Privkey.Value, nil
+	return aminokf.Privkey.Value, aminokf.PubKey.Value, nil
 }
