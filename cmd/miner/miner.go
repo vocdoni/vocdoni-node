@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -172,6 +173,20 @@ func main() {
 	} else {
 		vnode = vochain.NewVochain(globalCfg, []byte(vochain.TestnetGenesis1))
 	}
+	go func() {
+		for {
+			if vnode.Node != nil {
+				log.Infof("[vochain info] height:%d mempool:%d appTree:%d processTree:%d voteTree:%d",
+					vnode.Node.BlockStore().Height(),
+					vnode.Node.Mempool().Size(),
+					vnode.State.AppTree.Size(),
+					vnode.State.ProcessTree.Size(),
+					vnode.State.VoteTree.Size(),
+				)
+			}
+			time.Sleep(20 * time.Second)
+		}
+	}()
 	defer func() {
 		vnode.Node.Stop()
 		vnode.Node.Wait()
