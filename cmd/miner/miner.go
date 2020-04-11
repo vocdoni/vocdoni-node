@@ -40,8 +40,7 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	globalCfg.P2PListen = *flag.String("p2pListen", "0.0.0.0:26656", "p2p host and port to listen")
 	globalCfg.RPCListen = *flag.String("rpcListen", "0.0.0.0:26657", "rpc host and port to listen")
 	globalCfg.Genesis = *flag.String("genesis", "", "use alternative genesis file")
-	globalCfg.KeyFile = *flag.String("keyFile", "", "user alternative p2p node key file")
-	globalCfg.MinerKeyFile = *flag.String("minerKeyFile", "", "user alternative node key file for mining")
+	globalCfg.MinerKey = *flag.String("minerKey", "", "user alternative node key file for mining")
 	globalCfg.SeedMode = *flag.Bool("seedMode", false, "act as a seed node")
 	globalCfg.Peers = *flag.StringArray("peers", []string{}, "coma separated list of p2p peers")
 	globalCfg.Seeds = *flag.StringArray("seeds", []string{}, "coma separated list of p2p seed nodes")
@@ -68,8 +67,7 @@ func newConfig() (*config.VochainCfg, config.Error) {
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
 	viper.BindPFlag("p2pListen", flag.Lookup("p2pListen"))
 	viper.BindPFlag("rpcListen", flag.Lookup("rpcListen"))
-	viper.BindPFlag("keyFile", flag.Lookup("keyFile"))
-	viper.BindPFlag("minerKeyFile", flag.Lookup("minerKeyFile"))
+	viper.BindPFlag("minerKey", flag.Lookup("minerKey"))
 	viper.BindPFlag("seedMode", flag.Lookup("seedMode"))
 	viper.BindPFlag("peers", flag.Lookup("peers"))
 	viper.BindPFlag("seeds", flag.Lookup("seeds"))
@@ -170,9 +168,9 @@ func main() {
 	// node + app layer
 	var vnode *vochain.BaseApplication
 	if globalCfg.Dev {
-		vnode = vochain.NewVochain(globalCfg, []byte(vochain.DevelopmentGenesis1), nil)
+		vnode = vochain.NewVochain(globalCfg, []byte(vochain.DevelopmentGenesis1))
 	} else {
-		vnode = vochain.NewVochain(globalCfg, []byte(vochain.TestnetGenesis1), nil)
+		vnode = vochain.NewVochain(globalCfg, []byte(vochain.TestnetGenesis1))
 	}
 	defer func() {
 		vnode.Node.Stop()

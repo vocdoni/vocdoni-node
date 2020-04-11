@@ -102,7 +102,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "error", "voting chain node log level")
 	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
-	globalCfg.VochainConfig.KeyFile = *flag.String("vochainKeyFile", "", "user alternative vochain p2p node key file")
+	globalCfg.VochainConfig.MinerKey = *flag.String("vochainKey", "", "user alternative vochain private key (hexstring[64])")
 
 	// parse flags
 	flag.Parse()
@@ -426,9 +426,9 @@ func main() {
 		}
 
 		if globalCfg.Dev {
-			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.DevelopmentGenesis1), nil)
+			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.DevelopmentGenesis1))
 		} else {
-			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1), nil)
+			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1))
 		}
 		if globalCfg.API.Results {
 			log.Info("starting vochain scrutinizer")

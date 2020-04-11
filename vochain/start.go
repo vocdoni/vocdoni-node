@@ -2,6 +2,9 @@
 package vochain
 
 import (
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -9,8 +12,12 @@ import (
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/util"
 
+	amino "github.com/tendermint/go-amino"
 	tmcfg "github.com/tendermint/tendermint/config"
+	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
@@ -30,14 +37,14 @@ var (
 )
 
 // NewVochain starts a node with an ABCI application
-func NewVochain(globalCfg *config.VochainCfg, genesis []byte, pv *privval.FilePV) *BaseApplication {
+func NewVochain(globalCfg *config.VochainCfg, genesis []byte) *BaseApplication {
 	// creating new vochain app
 	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
 	if err != nil {
 		log.Errorf("cannot init vochain application: %s", err)
 	}
 	log.Info("creating tendermint node and application")
-	app.Node, err = newTendermint(app, globalCfg, genesis, pv)
+	app.Node, err = newTendermint(app, globalCfg, genesis)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -88,7 +95,7 @@ func (l *tenderLogger) With(keyvals ...interface{}) tmlog.Logger {
 }
 
 // we need to set init (first time validators and oracles)
-func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis []byte, pv *privval.FilePV) (*nm.Node, error) {
+func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis []byte) (*nm.Node, error) {
 	// create node config
 	var err error
 
@@ -167,31 +174,29 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	}
 
 	// read or create private validator
-	if pv == nil {
-		pv, err = NewPrivateValidator(localConfig, tconfig)
-		if err != nil {
-			return nil, fmt.Errorf("cannot create validator key and state: %w", err)
-		}
-	} else {
-		pv.Save()
+	pv, err := NewPrivateValidator(localConfig.MinerKey, tconfig)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create validator key and state: (%s)", err)
 	}
+	pv.Save()
 
-	log.Infof("using miner key: %s", pv.Key.Address)
+	log.Infof("tendermint private key 0x%x", pv.Key.PrivKey)
+	log.Infof("tendermint address: %s", pv.Key.Address)
+	log.Infof("tendermint public key: %s", base64.StdEncoding.EncodeToString(pv.Key.PubKey.Bytes()))
+	aminoPrivKey, err := HexPrivKeyToAmino(fmt.Sprintf("%x", pv.Key.PrivKey))
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("amino private key: %s", aminoPrivKey)
+	log.Infof("using keyfile %s", tconfig.PrivValidatorKeyFile())
 
 	// read or create node key
 	var nodeKey *p2p.NodeKey
-	if localConfig.KeyFile != "" {
-		nodeKey, err = p2p.LoadOrGenNodeKey(localConfig.KeyFile)
-		log.Infof("using keyfile %s", localConfig.KeyFile)
-	} else {
-		nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile())
-		log.Infof("using keyfile %s", tconfig.NodeKeyFile())
-	}
+	nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load node's key: %w", err)
 	}
-	log.Infof("my vochain address: %s", nodeKey.PubKey().Address())
-	log.Infof("my vochain ID: %s", nodeKey.ID())
+	log.Infof("tendermint node ID: %s", nodeKey.ID())
 
 	// read or create genesis file
 	if tmos.FileExists(tconfig.Genesis) {
@@ -221,4 +226,48 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	log.Debugf("consensus config %+v", *node.Config().Consensus)
 
 	return node, nil
+}
+
+// HexPrivKeyToAmino is a helper function that transforms a standard EDDSA hex string key into Tendermint like amino format
+// usefull for creating genesis files
+func HexPrivKeyToAmino(hexKey string) (string, error) {
+	// TO-DO find a better way to to this. Probably amino provides some helpers
+
+	// Needed for recovering the tendermint compatible amino private key format
+	type aminoPrivKey struct {
+		Type  string `json:"type"`
+		Value string `json:"value"`
+	}
+	type aminoKeyFile struct {
+		Privkey aminoPrivKey `json:"priv_key"`
+	}
+
+	key, err := hex.DecodeString(util.TrimHex(hexKey))
+	if err != nil {
+		return "", err
+	}
+
+	cdc := amino.NewCodec()
+	cryptoamino.RegisterAmino(cdc)
+
+	var pv privval.FilePVKey
+	var privKey crypto25519.PrivKeyEd25519
+
+	if n := copy(privKey[:], key[:]); n != 64 {
+		return "", fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
+	}
+
+	pv.Address = privKey.PubKey().Address()
+	pv.PrivKey = privKey
+	pv.PubKey = privKey.PubKey()
+
+	jsonBytes, err := cdc.MarshalJSON(pv)
+	if err != nil {
+		return "", fmt.Errorf("cannot encode key to amino: (%s)", err)
+	}
+	var aminokf aminoKeyFile
+	if err := json.Unmarshal(jsonBytes, &aminokf); err != nil {
+		return "", err
+	}
+	return aminokf.Privkey.Value, nil
 }

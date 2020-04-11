@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os"
 	"strconv"
-	"strings"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
@@ -19,9 +17,9 @@ import (
 	amino "github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
+	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	tmkv "github.com/tendermint/tendermint/libs/kv"
-	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -407,32 +405,26 @@ func GenerateNullifier(address, processID string) (string, error) {
 	return fmt.Sprintf("%x", signature.HashRaw(fmt.Sprintf("%s%s", addrBytes, pidBytes))), nil
 }
 
-// NewPrivateValidator returns a tendermint file private validator given the required config
-func NewPrivateValidator(cfg *config.VochainCfg, tconfig *cfg.Config) (*privval.FilePV, error) {
-	var minerKeyFile string
-	if cfg.MinerKeyFile == "" {
-		minerKeyFile = tconfig.PrivValidatorKeyFile()
-	} else {
-		if isAbs := strings.HasPrefix(cfg.MinerKeyFile, "/"); !isAbs {
-			dir, err := os.Getwd()
-			if err != nil {
-				return nil, err
-			}
-			minerKeyFile = dir + "/" + cfg.MinerKeyFile
-		} else {
-			minerKeyFile = cfg.MinerKeyFile
-		}
-		if !tmos.FileExists(tconfig.PrivValidatorKeyFile()) {
-			filePV := privval.LoadFilePVEmptyState(minerKeyFile, tconfig.PrivValidatorStateFile())
-			filePV.Save()
-		}
-	}
-
+// NewPrivateValidator returns a tendermint file private validator (key and state)
+// if tmPrivKey not specified, uses the existing one or generates a new one
+func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV, error) {
 	pv := privval.LoadOrGenFilePV(
-		minerKeyFile,
+		tconfig.PrivValidatorKeyFile(),
 		tconfig.PrivValidatorStateFile(),
 	)
-
+	if len(tmPrivKey) > 0 {
+		var privKey crypto25519.PrivKeyEd25519
+		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
+		if err != nil {
+			return nil, fmt.Errorf("cannot decode private key: (%s)", err)
+		}
+		if n := copy(privKey[:], keyBytes[:]); n != 64 {
+			return nil, fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
+		}
+		pv.Key.Address = privKey.PubKey().Address()
+		pv.Key.PrivKey = privKey
+		pv.Key.PubKey = privKey.PubKey()
+	}
 	return pv, nil
 }
 

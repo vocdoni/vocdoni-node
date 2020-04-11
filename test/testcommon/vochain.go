@@ -1,6 +1,7 @@
 package testcommon
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -174,6 +175,7 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	d.VochainCfg.DataDir = TempDir(tb, "vochain-data")
 	// create genesis file
 	consensusParams := tmtypes.DefaultConsensusParams()
+	// TO-DO instead of creating a pv file, just create a random 64 bytes key and use it for the genesis file
 	validator := privval.GenFilePV(d.VochainCfg.DataDir+"/config/priv_validator_key.json", d.VochainCfg.DataDir+"/data/priv_validator_state.json")
 	oracles := []string{d.Signer.EthAddrString()}
 	genBytes, err := vochain.NewGenesis(d.VochainCfg, strconv.Itoa(rand.Int()), consensusParams, []privval.FilePV{*validator}, oracles)
@@ -186,7 +188,8 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	d.VochainCfg.PublicAddr = "0.0.0.0:26656"
 	d.VochainCfg.RPCListen = "0.0.0.0:26657"
 	// run node
-	vnode := vochain.NewVochain(d.VochainCfg, genBytes, validator)
+	d.VochainCfg.MinerKey = fmt.Sprintf("%x", validator.Key.PrivKey)
+	vnode := vochain.NewVochain(d.VochainCfg, genBytes)
 	tb.Cleanup(func() {
 		if err := vnode.Node.Stop(); err != nil {
 			tb.Error(err)

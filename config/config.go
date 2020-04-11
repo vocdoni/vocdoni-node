@@ -157,10 +157,8 @@ type VochainCfg struct {
 	Seeds []string
 	// SeedMode if True the node will act as a seed node
 	SeedMode bool
-	// KeyFile the node key file, needed to identify the node in a P2P network
-	KeyFile string
-	// MinerKeyFile the node private validator key file, needed to sign consensus messages
-	MinerKeyFile string
+	// MinerKey contains the EDDSA private key for signing tendermint blocks
+	MinerKey string
 	// SaveConfig overwrites the config file with the CLI provided flags
 	SaveConfig bool
 }

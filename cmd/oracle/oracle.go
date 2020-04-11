@@ -75,7 +75,7 @@ func newConfig() (*config.OracleCfg, config.Error) {
 	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
 	globalCfg.VochainConfig.RPCListen = *flag.String("vochainRPCListen", "0.0.0.0:26657", "vochain rpc host and port to listen on")
-	globalCfg.VochainConfig.KeyFile = *flag.String("vochainKeyFile", "", "user alternative vochain p2p node key file")
+	globalCfg.VochainConfig.MinerKey = *flag.String("vochainKey", "", "use alternative vochain private key (hexString[64)")
 	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "", "IP address where the vochain node will be exposed, guessed automatically if empty")
 
 	// ethereum
@@ -237,9 +237,9 @@ func main() {
 	log.Infof("starting Vochain synchronization")
 	var vnode *vochain.BaseApplication
 	if globalCfg.Dev {
-		vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.DevelopmentGenesis1), nil)
+		vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.DevelopmentGenesis1))
 	} else {
-		vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1), nil)
+		vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1))
 	}
 	go func() {
 		log.Infof("vochain current height: %d", vnode.State.Height())
