@@ -40,7 +40,7 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 	go node.PrintInfo(time.Second * 20)
 
 	log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
-	if w3config.Enabled {
+	if w3config.Enabled && pxy != nil {
 		pxy.AddHandler(w3config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
 		log.Infof("web3 available at %s", w3config.Route)
 		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))

@@ -10,6 +10,8 @@ type DvoteCfg struct {
 	Ipfs *IPFSCfg
 	// EthConfig ethereum client config options
 	EthConfig *EthCfg
+	// EthEventConfig ethereum even subscription config options
+	EthEventConfig *EthEventCfg
 	// API api config options
 	API *API
 	// Dev indicates we use the gateway development mode
@@ -20,8 +22,6 @@ type DvoteCfg struct {
 	LogOutput string
 	// DataDir path where the gateway files will be stored
 	DataDir string
-	// CensusSync if true census sync will be enabled
-	CensusSync bool
 	// SaveConfig overwrites the config file with the CLI provided flags
 	SaveConfig bool
 	// Mode describes the operation mode of program
@@ -46,11 +46,12 @@ func (c *DvoteCfg) ValidMode() bool {
 // NewGatewayConfig initializes the fields in the gateway config stuct
 func NewConfig() *DvoteCfg {
 	return &DvoteCfg{
-		W3Config:      new(W3Cfg),
-		VochainConfig: new(VochainCfg),
-		Ipfs:          new(IPFSCfg),
-		EthConfig:     new(EthCfg),
-		API:           new(API),
+		W3Config:       new(W3Cfg),
+		VochainConfig:  new(VochainCfg),
+		Ipfs:           new(IPFSCfg),
+		EthConfig:      new(EthCfg),
+		EthEventConfig: new(EthEventCfg),
+		API:            new(API),
 	}
 }
 
@@ -129,6 +130,13 @@ type W3Cfg struct {
 	HTTPAPI bool
 	// WSAPI if true and local node ws api will be available
 	WSAPI bool
+}
+
+type EthEventCfg struct {
+	// CensusSync if true census sync will be enabled
+	CensusSync bool
+	// SubscribeOnly if true only new received events will be processed, otherwise all events of the current chain will be processed
+	SubscribeOnly bool
 }
 
 // CensusCfg stores global configs for censushttp

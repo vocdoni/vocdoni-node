@@ -16,7 +16,9 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/service"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
@@ -48,7 +50,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	flag.BoolVar(&globalCfg.Dev, "dev", true, "run and connect to the development network")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
-	globalCfg.CensusSync = *flag.Bool("censusSync", true, "automatically import new census published on smart contract")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
 	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. One of gateway, oracle or miner")
 	// api
@@ -70,6 +71,9 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.EthConfig.TrustedPeers = *flag.StringArray("ethTrustedPeers", []string{}, "Ethereum p2p trusted peer nodes (enode://<pubKey>@<ip>[:port])")
 	globalCfg.EthConfig.ProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
 	flag.BoolVar(&ethNoWaitSync, "ethNoWaitSync", false, "do not wait for Ethereum to synchronize (for testing only)")
+	// ethereum events
+	globalCfg.EthEventConfig.CensusSync = *flag.Bool("ethCensusSync", true, "automatically import new census published on the smart contract")
+	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", false, "only subscribe to new ethereum events (do not read past log)")
 	// ethereum web3
 	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true web3 will be enabled")
 	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
@@ -113,7 +117,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("mode", flag.Lookup("mode"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
-	viper.BindPFlag("censusSync", flag.Lookup("censusSync"))
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
 	viper.BindPFlag("dev", flag.Lookup("dev"))
 
@@ -139,6 +142,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("ethConfig.bootNodes", flag.Lookup("ethBootNodes"))
 	viper.BindPFlag("ethConfig.trustedPeers", flag.Lookup("ethTrustedPeers"))
 	viper.BindPFlag("ethConfig.processDomain", flag.Lookup("ethProcessDomain"))
+	viper.BindPFlag("ethEventConfig.censusSync", flag.Lookup("ethCensusSync"))
+	viper.BindPFlag("ethEventConfig.subscribeOnly", flag.Lookup("ethSubscribeOnly"))
 
 	// ethereum web3
 	viper.BindPFlag("w3Config.route", flag.Lookup("w3Route"))
@@ -230,6 +235,26 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	return globalCfg, cfgError
 }
 
+/* Gateway needs:
+	 - signing key
+	 - ethereum
+	 - ipfs storage
+	 - proxy
+	 - api
+	 - ethevents
+	 - census
+	 - vochain
+	 - scrutinizer
+
+  Oracle needs:
+	 - signing key
+	 - ethereum
+	 - ethevents
+	 - vochain
+
+  Miner needs:
+     - vochain
+*/
 func main() {
 	// setup config
 	// creating config and init logger
@@ -254,8 +279,6 @@ func main() {
 		log.Infof("config file loaded successfully, remember CLI flags have preference")
 	}
 
-	log.Info("starting vocdoni dvote node")
-
 	// Ensure we can have at least 8k open files. This is necessary, since
 	// many components like IPFS and Tendermint require keeping many active
 	// connections. Some systems have low defaults like 1024, which can make
@@ -264,64 +287,88 @@ func main() {
 		log.Errorf("could not ensure we can have enough open files: %v", err)
 	}
 
-	// Signing key
-	signer := new(signature.SignKeys)
-	// Add Authorized keys for private methods
-	if globalCfg.API.AllowPrivate && globalCfg.API.AllowedAddrs != "" {
-		keys := strings.Split(globalCfg.API.AllowedAddrs, ",")
-		for _, key := range keys {
-			err := signer.AddAuthKey(key)
-			if err != nil {
-				log.Error(err)
-			}
-		}
-	}
-	// Add signing private key if exist in configuration or flags
-	if len(globalCfg.EthConfig.SigningKey) != 32 {
-		log.Infof("adding custom signing key")
-		err := signer.AddHexKey(globalCfg.EthConfig.SigningKey)
-		if err != nil {
-			log.Fatalf("error adding hex key: (%s)", err)
-		}
-		pub, _ := signer.HexString()
-		log.Infof("using custom pubKey %s", pub)
-	} else {
-		log.Fatal("no private key or wrong key (size != 16 bytes)")
+	// Check the mode is valid
+	if !globalCfg.ValidMode() {
+		log.Fatalf("mode %s is invalid", globalCfg.Mode)
 	}
 
-	// Proxy service
-	pxy, err := service.Proxy(globalCfg.API.ListenHost, globalCfg.API.ListenPort,
-		globalCfg.API.Ssl.Domain, globalCfg.API.Ssl.DirCert)
-	if err != nil {
-		log.Fatal(err)
+	log.Infof("starting vocdoni dvote node in %s mode", globalCfg.Mode)
+	var err error
+	var signer *signature.SignKeys
+	var node *chain.EthChainContext
+	var pxy *net.Proxy
+	var storage data.Storage
+	var cm *census.Manager
+	var vnode *vochain.BaseApplication
+	var sc *scrutinizer.Scrutinizer
+
+	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
+		// Signing key
+		signer = new(signature.SignKeys)
+		// Add Authorized keys for private methods
+		if globalCfg.API.AllowPrivate && globalCfg.API.AllowedAddrs != "" {
+			keys := strings.Split(globalCfg.API.AllowedAddrs, ",")
+			for _, key := range keys {
+				err := signer.AddAuthKey(key)
+				if err != nil {
+					log.Error(err)
+				}
+			}
+		}
+
+		// Add signing private key if exist in configuration or flags
+		if len(globalCfg.EthConfig.SigningKey) != 32 {
+			log.Infof("adding custom signing key")
+			err := signer.AddHexKey(globalCfg.EthConfig.SigningKey)
+			if err != nil {
+				log.Fatalf("error adding hex key: (%s)", err)
+			}
+			pub, _ := signer.HexString()
+			log.Infof("using custom pubKey %s", pub)
+		} else {
+			log.Fatal("no private key or wrong key (size != 16 bytes)")
+		}
+	}
+
+	if globalCfg.Mode == "gateway" {
+		// Proxy service
+		pxy, err = service.Proxy(globalCfg.API.ListenHost, globalCfg.API.ListenPort,
+			globalCfg.API.Ssl.Domain, globalCfg.API.Ssl.DirCert)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Storage service
+		storage, err = service.IPFS(globalCfg.Ipfs, signer)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Census service
+		if globalCfg.API.Census {
+			cm, err = service.Census(globalCfg.DataDir)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
 	}
 
 	// Ethereum service
-	node, err := service.Ethereum(globalCfg.EthConfig, globalCfg.W3Config, pxy, signer)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Storage service
-	storage, err := service.IPFS(globalCfg.Ipfs, signer)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Census service
-	var cm *census.Manager
-	if globalCfg.API.Census {
-		cm, err = service.Census(globalCfg.DataDir)
+	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
+		node, err = service.Ethereum(globalCfg.EthConfig, globalCfg.W3Config, pxy, signer)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	// Vochain and Scrutinizer service
-	var vnode *vochain.BaseApplication
-	var sc *scrutinizer.Scrutinizer
 	if globalCfg.API.Vote {
-		vnode, sc, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, globalCfg.API.Results)
+		scrutinizer := false
+		if globalCfg.Mode == "gateway" && globalCfg.API.Results {
+			scrutinizer = true
+		}
+		vnode, sc, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -340,53 +387,63 @@ func main() {
 		}
 	}
 
-	// Wait for Ethereum to be ready
-	if !ethNoWaitSync {
-		for {
-			if info, _ := node.SyncInfo(); info.Synced && info.Peers > 0 && info.Height > 0 {
-				log.Infof("ethereum blockchain synchronized")
-				break
+	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
+		// Wait for Ethereum to be ready
+		if !ethNoWaitSync {
+			for {
+				if info, _ := node.SyncInfo(); info.Synced && info.Peers > 0 && info.Height > 0 {
+					log.Infof("ethereum blockchain synchronized")
+					break
+				}
+				time.Sleep(time.Second * 5)
 			}
-			time.Sleep(time.Second * 5)
+		}
+
+		// Ethereum events service (needs Ethereum synchronized)
+		if (!ethNoWaitSync && globalCfg.Mode == "gateway" && globalCfg.EthEventConfig.CensusSync) || globalCfg.Mode == "oracle" {
+			var evh []ethevents.EventHandler
+
+			if globalCfg.Mode == "gateway" {
+				if globalCfg.EthEventConfig.CensusSync && !globalCfg.API.Census {
+					log.Fatal("censusSync function requires the census API enabled")
+				} else {
+					evh = append(evh, ethevents.HandleCensus)
+				}
+			}
+
+			if globalCfg.Mode == "oracle" {
+				evh = append(evh, ethevents.HandleVochainOracle)
+			}
+
+			initBlock := int64(0)
+			chainSpecs, err := chain.SpecsFor(globalCfg.EthConfig.ChainType)
+			if err != nil {
+				log.Warn("cannot get chain block to start looking for events, using 0")
+			} else {
+				initBlock = chainSpecs.StartingBlock
+			}
+			syncInfo, err := node.SyncInfo()
+			if err != nil {
+				log.Fatal(err)
+			}
+			// Register the event handlers
+			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort,
+				initBlock, int64(syncInfo.Height), globalCfg.EthEventConfig.SubscribeOnly, cm, evh); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
-	// dvote API service
-	if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
-		if err := service.API(globalCfg.API, pxy, storage, cm, sc, globalCfg.VochainConfig.RPCListen, signer); err != nil {
-			log.Fatal(err)
+	if globalCfg.Mode == "gateway" {
+		// dvote API service
+		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
+			if err := service.API(globalCfg.API, pxy, storage, cm, sc, globalCfg.VochainConfig.RPCListen, signer); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
-	log.Info("gateway startup complete")
-
-	// Ethereum events service (needs Ethereum synchronized)
-	if !ethNoWaitSync && globalCfg.CensusSync { // Or other kind of events
-
-		var evh []ethevents.EventHandler
-		if globalCfg.CensusSync && !globalCfg.API.Census {
-			log.Fatal("censusSync function requires the census API enabled")
-		} else {
-			evh = append(evh, ethevents.HandleCensus)
-		}
-
-		initBlock := int64(0)
-		chainSpecs, err := chain.SpecsFor(globalCfg.EthConfig.ChainType)
-		if err != nil {
-			log.Warn("cannot get chain block to start looking for events, using 0")
-		} else {
-			initBlock = chainSpecs.StartingBlock
-		}
-		syncInfo, err := node.SyncInfo()
-		if err != nil {
-			log.Fatal(err)
-		}
-		// Register the event handlers
-		if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, globalCfg.W3Config.WsHost,
-			globalCfg.W3Config.WsPort, initBlock, int64(syncInfo.Height), true, cm, evh); err != nil {
-			log.Fatal(err)
-		}
-	}
+	log.Info("startup complete")
 
 	// close if interrupt received
 	c := make(chan os.Signal, 1)

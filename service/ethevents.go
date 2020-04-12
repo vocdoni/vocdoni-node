@@ -13,8 +13,8 @@ const ensRegistryAddr = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
 
 // EthEvents service registers on the Ethereum smart contract specified in ethProcDomain, the provided event handlers
 // we3host and w3port must point to a working web3 websocket endpoint
-// If subscribe is enabled the service will also subscribe for new blocks
-func EthEvents(ethProcDomain, w3host string, w3port int, startBlock int64, endBlock int64, subscribe bool,
+// If subscribeOnly is enabled the service will only subscribe for new blocks
+func EthEvents(ethProcDomain, w3host string, w3port int, startBlock int64, endBlock int64, subscribeOnly bool,
 	cm *census.Manager, evh []ethevents.EventHandler) error {
 	// TO-DO remove cm (add it on the eventHandler instead)
 	log.Infof("creating ethereum events service")
@@ -35,8 +35,10 @@ func EthEvents(ethProcDomain, w3host string, w3port int, startBlock int64, endBl
 		ev.AddEventHandler(e)
 	}
 	go func() {
-		go ev.ReadEthereumEventLogs(startBlock, endBlock)
-		log.Infof("subscribing to new ethereum events from block %d", endBlock)
+		if !subscribeOnly {
+			go ev.ReadEthereumEventLogs(startBlock, endBlock)
+		}
+		log.Infof("subscribing to new Ethereum events")
 		ev.SubscribeEthereumEventLogs()
 	}()
 
