@@ -1,32 +1,23 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	voclient "github.com/tendermint/tendermint/rpc/client"
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
 	"gitlab.com/vocdoni/go-dvote/config"
-	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
-	"gitlab.com/vocdoni/go-dvote/data"
-	"gitlab.com/vocdoni/go-dvote/ipfssync"
+	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
-	vonet "gitlab.com/vocdoni/go-dvote/net"
-	"gitlab.com/vocdoni/go-dvote/router"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
+	"gitlab.com/vocdoni/go-dvote/service"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 )
@@ -208,7 +199,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 
 	if len(globalCfg.EthConfig.SigningKey) < 32 {
 		fmt.Println("no signing key, generating one...")
-		var signer sig.SignKeys
+		var signer signature.SignKeys
 		err = signer.Generate()
 		if err != nil {
 			cfgError = config.Error{
@@ -242,7 +233,6 @@ func main() {
 		panic("cannot read configuration")
 	}
 	log.Init(globalCfg.LogLevel, globalCfg.LogOutput)
-
 	log.Debugf("initializing gateway config %+v", *globalCfg)
 
 	// using dev mode
@@ -264,28 +254,13 @@ func main() {
 	// Ensure we can have at least 8k open files. This is necessary, since
 	// many components like IPFS and Tendermint require keeping many active
 	// connections. Some systems have low defaults like 1024, which can make
-	// the gateway crash after it's been running for a bit.
+	// the program crash after it's been running for a bit.
 	if err := ensureNumberFiles(8000); err != nil {
 		log.Fatalf("could not ensure we can have enough open files: %v", err)
 	}
 
-	// setup listener
-	pxy := vonet.NewProxy()
-	pxy.C.SSLDomain = globalCfg.Ssl.Domain
-	pxy.C.SSLCertDir = globalCfg.Ssl.DirCert
-	if globalCfg.Ssl.Domain != "" {
-		log.Infof("storing SSL certificate in %s", pxy.C.SSLCertDir)
-	}
-	pxy.C.Address = globalCfg.ListenHost
-	pxy.C.Port = globalCfg.ListenPort
-	if err := pxy.Init(); err != nil {
-		log.Fatal(err)
-	}
-
-	// Ethereum
-	log.Debugf("initializing ethereum")
 	// Signing key
-	signer := new(sig.SignKeys)
+	signer := new(signature.SignKeys)
 	// Add Authorized keys for private methods
 	if globalCfg.API.AllowPrivate && globalCfg.API.AllowedAddrs != "" {
 		keys := strings.Split(globalCfg.API.AllowedAddrs, ",")
@@ -296,17 +271,6 @@ func main() {
 			}
 		}
 	}
-
-	// Set Ethereum node context
-	w3cfg, err := chain.NewConfig(globalCfg.EthConfig, globalCfg.W3Config)
-	if err != nil {
-		log.Fatal(err)
-	}
-	node, err := chain.Init(w3cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// Add signing private key if exist in configuration or flags
 	if len(globalCfg.EthConfig.SigningKey) != 32 {
 		log.Infof("adding custom signing key")
@@ -319,146 +283,43 @@ func main() {
 	} else {
 		log.Fatal("no private key or wrong key (size != 256 bits)")
 	}
-	os.RemoveAll(globalCfg.EthConfig.DataDir + "/keystore/tmp")
-	node.Keys = keystore.NewPlaintextKeyStore(globalCfg.EthConfig.DataDir + "/keyStore/tmp")
-	node.Keys.ImportECDSA(signer.Private, "")
-	defer os.RemoveAll(globalCfg.EthConfig.DataDir + "/keystore/tmp")
 
-	// Start Ethereum Web3 node
-	log.Info("starting Ethereum node")
-	node.Start()
-	go node.PrintInfo(time.Second * 20)
-
-	log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
-	if globalCfg.W3Config.Enabled {
-		pxy.AddHandler(globalCfg.W3Config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
-		pxy.AddWsHandler(globalCfg.W3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
-		log.Infof("web3 available at %s", globalCfg.W3Config.Route)
-		log.Infof("web3 Websocket available at %s", globalCfg.W3Config.Route+"ws")
+	// Proxy service
+	pxy, err := service.Proxy(globalCfg.ListenHost, globalCfg.ListenPort, globalCfg.Ssl.Domain, globalCfg.Ssl.DirCert)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// Storage
-	var storage data.Storage
-	var storageSync ipfssync.IPFSsync
-	if !globalCfg.Ipfs.NoInit {
-		os.Setenv("IPFS_FD_MAX", "1024")
-		ipfsStore := data.IPFSNewConfig(globalCfg.Ipfs.ConfigPath)
-		storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
+	// Ethereum service
+	node, err := service.Ethereum(globalCfg.EthConfig, globalCfg.W3Config, pxy, signer)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Storage service
+	storage, err := service.IPFS(globalCfg.Ipfs, signer)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Census service
+	var cm *census.Manager
+	if globalCfg.API.Census {
+		cm, err = service.Census(globalCfg.DataDir)
 		if err != nil {
 			log.Fatal(err)
 		}
-		go func() {
-			for {
-				time.Sleep(time.Second * 20)
-				stats, err := storage.Stats(context.TODO())
-				if err != nil {
-					log.Warnf("IPFS node returned an error: %s", err)
-				}
-				log.Infof("[ipfs info] %s", stats)
-			}
-		}()
-		if len(globalCfg.Ipfs.SyncKey) > 0 {
-			log.Info("enabling ipfs synchronization")
-			_, priv := signer.HexString()
-			storageSync = ipfssync.NewIPFSsync(globalCfg.Ipfs.ConfigPath+"/.ipfsSync", globalCfg.Ipfs.SyncKey, priv, "libp2p", storage)
-			if len(globalCfg.Ipfs.SyncPeers) > 0 && len(globalCfg.Ipfs.SyncPeers[0]) > 8 {
-				log.Debugf("using custom ipfs sync bootnodes %s", globalCfg.Ipfs.SyncPeers)
-				storageSync.Transport.SetBootnodes(globalCfg.Ipfs.SyncPeers)
-			}
-			go storageSync.Start()
-		}
 	}
 
-	// Census Manager
-	var censusManager census.Manager
-	if globalCfg.API.Census {
-		log.Info("starting census manager")
-		if _, err := os.Stat(globalCfg.DataDir + "/census"); os.IsNotExist(err) {
-			err = os.MkdirAll(globalCfg.DataDir+"/census", os.ModePerm)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-		censusManager.Init(globalCfg.DataDir+"/census", "")
-		go func() {
-			var imported, local int
-			for {
-				time.Sleep(time.Second * 60)
-				imported = 0
-				local = 0
-				for _, n := range censusManager.Census.Namespaces {
-					if strings.Contains(n.Name, "/") {
-						local++
-					} else {
-						imported++
-					}
-				}
-				log.Infof("[census info] local:%d imported:%d", local, imported)
-			}
-		}()
-	}
-
-	// Initialize and start Vochain
+	// Vochain and Scrutinizer service
 	var vnode *vochain.BaseApplication
 	var sc *scrutinizer.Scrutinizer
-
 	if globalCfg.API.Vote {
-		log.Info("initializing vochain")
-		// node + app layer
-		if len(globalCfg.VochainConfig.PublicAddr) == 0 {
-			ip, err := util.PublicIP()
-			if err != nil {
-				log.Warn(err)
-			} else {
-				_, port, err := net.SplitHostPort(globalCfg.VochainConfig.P2PListen)
-				if err == nil {
-					globalCfg.VochainConfig.PublicAddr = net.JoinHostPort(ip.String(), port)
-				}
-			}
-		} else {
-			host, port, err := net.SplitHostPort(globalCfg.VochainConfig.P2PListen)
-			if err == nil {
-				globalCfg.VochainConfig.PublicAddr = net.JoinHostPort(host, port)
-			}
+		vnode, sc, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, globalCfg.API.Results)
+		if err != nil {
+			log.Fatal(err)
 		}
-		if globalCfg.VochainConfig.PublicAddr != "" {
-			log.Infof("vochain exposed IP address: %s", globalCfg.VochainConfig.PublicAddr)
-		}
-
-		if globalCfg.Dev {
-			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.DevelopmentGenesis1))
-		} else {
-			vnode = vochain.NewVochain(globalCfg.VochainConfig, []byte(vochain.TestnetGenesis1))
-		}
-		if globalCfg.API.Results {
-			log.Info("starting vochain scrutinizer")
-			sc, err = scrutinizer.NewScrutinizer(globalCfg.DataDir+"/scrutinizer", vnode.State)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-		go func() {
-			for {
-				if vnode.Node != nil {
-					log.Infof("[vochain info] height:%d mempool:%d appTree:%d processTree:%d voteTree:%d",
-						vnode.Node.BlockStore().Height(),
-						vnode.Node.Mempool().Size(),
-						vnode.State.AppTree.Size(),
-						vnode.State.ProcessTree.Size(),
-						vnode.State.VoteTree.Size(),
-					)
-				}
-				time.Sleep(20 * time.Second)
-			}
-		}()
-		defer func() {
-			vnode.Node.Stop()
-			vnode.Node.Wait()
-		}()
-	}
-
-	// Wait for Vochain to be ready
-	if globalCfg.API.Vote {
+		// Wait for Vochain to be ready
 		var h, hPrev int64
 		for {
 			if vnode.Node != nil {
@@ -484,82 +345,41 @@ func main() {
 		}
 	}
 
-	// get voting contract
-	votingProcessAddr, err := chain.VotingProcessAddress(
-		ensRegistryAddr, globalCfg.EthProcessDomain, fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort))
-	if err != nil || votingProcessAddr == "" {
-		log.Warnf("cannot get voting process contract: %s", err)
-	} else {
-		log.Infof("loaded voting contract at address: %s", votingProcessAddr)
-	}
-
-	// API Endpoint initialization
+	// dvote API service
 	if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
-		ws := new(vonet.WebsocketHandle)
-		ws.Init(new(types.Connection))
-		ws.SetProxy(pxy)
-
-		listenerOutput := make(chan types.Message)
-		go ws.Listen(listenerOutput)
-
-		routerAPI := router.InitRouter(listenerOutput, storage, ws, signer, globalCfg.API.AllowPrivate)
-		if globalCfg.API.File {
-			log.Info("enabling file API")
-			routerAPI.EnableFileAPI()
+		if err := service.API(globalCfg.API, pxy, storage, cm, sc, globalCfg.VochainConfig.RPCListen, signer); err != nil {
+			log.Fatal(err)
 		}
-		if globalCfg.API.Census {
-			log.Info("enabling census API")
-			routerAPI.EnableCensusAPI(&censusManager)
-		}
-		if globalCfg.API.Vote {
-			// creating the RPC calls client
-			rpcClient, err := voclient.NewHTTP("tcp://"+globalCfg.VochainConfig.RPCListen, "/websocket")
-			if err != nil {
-				log.Fatal(err)
-			}
-			// todo: client params as cli flags
-			log.Info("enabling vote API")
-			routerAPI.Scrutinizer = sc
-			routerAPI.EnableVoteAPI(rpcClient)
-		}
-
-		go routerAPI.Route()
-		ws.AddProxyHandler(globalCfg.API.Route)
-		log.Infof("websockets API available at %s", globalCfg.API.Route)
-		go func() {
-			for {
-				time.Sleep(60 * time.Second)
-				log.Infof("[router info] privateReqs:%d publicReqs:%d", routerAPI.PrivateCalls, routerAPI.PublicCalls)
-			}
-		}()
 	}
-	log.Infof("gateway startup complete")
 
-	// Census Oracle
-	if globalCfg.CensusSync && globalCfg.API.Census {
-		log.Infof("starting census import oracle")
-		ev, err := ethevents.NewEthEvents(votingProcessAddr, nil, fmt.Sprintf("ws://%s:%d", globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort), &censusManager)
-		if err != nil {
-			log.Fatalf("couldn't create ethereum events listener: %s", err)
+	log.Info("gateway startup complete")
+
+	// Ethereum events service (needs Ethereum synchronized)
+	if !ethNoWaitSync && globalCfg.CensusSync { // Or other kind of events
+
+		var evh []ethevents.EventHandler
+		if globalCfg.CensusSync && !globalCfg.API.Census {
+			log.Fatal("censusSync function requires the census API enabled")
+		} else {
+			evh = append(evh, ethevents.HandleCensus)
 		}
-		ev.AddEventHandler(ethevents.HandleCensus)
 
-		go func() {
-			var info chain.EthSyncInfo
-			for info, _ = node.SyncInfo(); !info.Synced || info.Peers == 0 || info.Height == 0; {
-				time.Sleep(time.Second * 2)
-			}
-			initBlock := int64(0)
-			chainSpecs, err := chain.SpecsFor(globalCfg.EthConfig.ChainType)
-			if err != nil {
-				log.Warn("cannot get chain block to start looking for events, using 0")
-			} else {
-				initBlock = chainSpecs.StartingBlock
-			}
-			go ev.ReadEthereumEventLogs(initBlock, int64(info.Height))
-			log.Info("subscribing to new ethereum events from block %d", info.Height)
-			ev.SubscribeEthereumEventLogs()
-		}()
+		initBlock := int64(0)
+		chainSpecs, err := chain.SpecsFor(globalCfg.EthConfig.ChainType)
+		if err != nil {
+			log.Warn("cannot get chain block to start looking for events, using 0")
+		} else {
+			initBlock = chainSpecs.StartingBlock
+		}
+		syncInfo, err := node.SyncInfo()
+		if err != nil {
+			log.Fatal(err)
+		}
+		// Register the event handlers
+		if err := service.EthEvents(globalCfg.EthProcessDomain, ensRegistryAddr, globalCfg.W3Config.WsHost,
+			globalCfg.W3Config.WsPort, initBlock, int64(syncInfo.Height), true, cm, evh); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	// close if interrupt received
