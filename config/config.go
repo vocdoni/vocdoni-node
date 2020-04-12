@@ -1,7 +1,7 @@
 package config
 
-// GWCfg stores global configs for gateway
-type GWCfg struct {
+// DvoteCfg stores global configs for dvote
+type DvoteCfg struct {
 	// W3Config ethereum config options
 	W3Config *W3Cfg
 	// VochainConfig vochain config options
@@ -12,45 +12,45 @@ type GWCfg struct {
 	EthConfig *EthCfg
 	// API api config options
 	API *API
-	// Ssl tls related config options
-	Ssl struct {
-		Domain  string
-		DirCert string
-	}
 	// Dev indicates we use the gateway development mode
 	Dev bool
-	// ListenPort port where the gateway will listen on
-	ListenPort int
-	// ListenHost host where the gateway will listen on
-	ListenHost string
 	// LogLevel logging level
 	LogLevel string
 	// LogOutput logging output
 	LogOutput string
 	// DataDir path where the gateway files will be stored
 	DataDir string
-	// W3External ethereum external endpoint to connect with
-	W3External string
 	// CensusSync if true census sync will be enabled
 	CensusSync bool
-	// EthProcessDomain ethereum contract to use as source of truth for some operations
-	EthProcessDomain string
 	// SaveConfig overwrites the config file with the CLI provided flags
 	SaveConfig bool
+	// Mode describes the operation mode of program
+	Mode string
+}
+
+// ValidMode checks if the configured mode is valid
+func (c *DvoteCfg) ValidMode() bool {
+	switch c.Mode {
+	case "gateway":
+		break
+	case "oracle":
+		break
+	case "miner":
+		break
+	default:
+		return false
+	}
+	return true
 }
 
 // NewGatewayConfig initializes the fields in the gateway config stuct
-func NewGatewayConfig() *GWCfg {
-	return &GWCfg{
+func NewConfig() *DvoteCfg {
+	return &DvoteCfg{
 		W3Config:      new(W3Cfg),
 		VochainConfig: new(VochainCfg),
 		Ipfs:          new(IPFSCfg),
 		EthConfig:     new(EthCfg),
 		API:           new(API),
-		Ssl: struct {
-			Domain  string
-			DirCert string
-		}{},
 	}
 }
 
@@ -65,6 +65,15 @@ type API struct {
 	AllowPrivate bool
 	// AllowedAddrs allowed addresses to interact with
 	AllowedAddrs string
+	// ListenPort port where the API server will listen on
+	ListenPort int
+	// ListenHost host where the API server will listen on
+	ListenHost string
+	// Ssl tls related config options
+	Ssl struct {
+		Domain  string
+		DirCert string
+	}
 }
 
 // IPFSCfg includes all possible config params needed by IPFS
@@ -96,6 +105,8 @@ type EthCfg struct {
 	BootNodes []string
 	// TrustedPeers list of p2p Ethereum peers to trust and connect (if possible)
 	TrustedPeers []string
+	// ProcessDomain ethereum contract to use as source of truth for some operations
+	ProcessDomain string
 }
 
 // W3Cfg stores global configs for web3

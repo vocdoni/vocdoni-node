@@ -24,13 +24,11 @@ import (
 
 var ethNoWaitSync bool
 
-const ensRegistryAddr = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
-
-func newConfig() (*config.GWCfg, config.Error) {
+func newConfig() (*config.DvoteCfg, config.Error) {
 	var err error
 	var cfgError config.Error
 	// create base config
-	globalCfg := config.NewGatewayConfig()
+	globalCfg := config.NewConfig()
 	// get current user home dir
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -45,16 +43,14 @@ func newConfig() (*config.GWCfg, config.Error) {
 	// CLI flags have preference over the config file
 	// Booleans should be passed to the CLI as: var=True/false
 
-	// gateway
+	// global
 	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
 	flag.BoolVar(&globalCfg.Dev, "dev", true, "run and connect to the development network")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
-	globalCfg.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
-	globalCfg.ListenPort = *flag.Int("listenPort", 9090, "API endpoint http port")
 	globalCfg.CensusSync = *flag.Bool("censusSync", true, "automatically import new census published on smart contract")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
-	globalCfg.EthProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
+	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. One of gateway, oracle or miner")
 	// api
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable census API")
@@ -63,6 +59,8 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.API.Route = *flag.String("apiRoute", "/dvote", "dvote API route")
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false, "allows private methods over the APIs")
 	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
+	globalCfg.API.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
+	globalCfg.API.ListenPort = *flag.Int("listenPort", 9090, "API endpoint http port")
 	// ethereum node
 	globalCfg.EthConfig.SigningKey = *flag.String("ethSigningKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
 	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
@@ -70,6 +68,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to use")
 	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootNodes", []string{}, "Ethereum p2p custom bootstrap nodes (enode://<pubKey>@<ip>[:port])")
 	globalCfg.EthConfig.TrustedPeers = *flag.StringArray("ethTrustedPeers", []string{}, "Ethereum p2p trusted peer nodes (enode://<pubKey>@<ip>[:port])")
+	globalCfg.EthConfig.ProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
 	flag.BoolVar(&ethNoWaitSync, "ethNoWaitSync", false, "do not wait for Ethereum to synchronize (for testing only)")
 	// ethereum web3
 	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true web3 will be enabled")
@@ -83,7 +82,7 @@ func newConfig() (*config.GWCfg, config.Error) {
 	globalCfg.Ipfs.SyncKey = *flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
 	globalCfg.Ipfs.SyncPeers = *flag.StringArray("ipfsSyncPeers", []string{}, "use custom ipfsSync peers/bootnodes for accessing the DHT")
 	// ssl
-	globalCfg.Ssl.Domain = *flag.String("sslDomain", "", "enable SSL secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
+	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "", "enable TLS secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	// vochain
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
 	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
@@ -106,16 +105,16 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.AddConfigPath(globalCfg.DataDir)
 	viper.SetConfigName("gateway")
 	viper.SetConfigType("yml")
+
 	// binding flags to viper
-	// gateway
+
+	// global
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
+	viper.BindPFlag("mode", flag.Lookup("mode"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
-	viper.BindPFlag("listenHost", flag.Lookup("listenHost"))
-	viper.BindPFlag("listenPort", flag.Lookup("listenPort"))
 	viper.BindPFlag("censusSync", flag.Lookup("censusSync"))
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
-	viper.BindPFlag("ethProcessDomain", flag.Lookup("ethProcessDomain"))
 	viper.BindPFlag("dev", flag.Lookup("dev"))
 
 	// api
@@ -126,6 +125,11 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("api.route", flag.Lookup("apiRoute"))
 	viper.BindPFlag("api.allowPrivate", flag.Lookup("apiAllowPrivate"))
 	viper.BindPFlag("api.allowedAddrs", flag.Lookup("apiAllowedAddrs"))
+	viper.BindPFlag("api.listenHost", flag.Lookup("listenHost"))
+	viper.BindPFlag("api.listenPort", flag.Lookup("listenPort"))
+	viper.Set("api.ssl.dirCert", globalCfg.DataDir+"/tls")
+	viper.BindPFlag("api.ssl.domain", flag.Lookup("sslDomain"))
+
 	// ethereum node
 	viper.Set("ethConfig.datadir", globalCfg.DataDir+"/ethereum")
 	viper.BindPFlag("ethConfig.signingKey", flag.Lookup("ethSigningKey"))
@@ -134,6 +138,8 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("ethConfig.nodePort", flag.Lookup("ethNodePort"))
 	viper.BindPFlag("ethConfig.bootNodes", flag.Lookup("ethBootNodes"))
 	viper.BindPFlag("ethConfig.trustedPeers", flag.Lookup("ethTrustedPeers"))
+	viper.BindPFlag("ethConfig.processDomain", flag.Lookup("ethProcessDomain"))
+
 	// ethereum web3
 	viper.BindPFlag("w3Config.route", flag.Lookup("w3Route"))
 	viper.BindPFlag("w3Config.enabled", flag.Lookup("w3Enabled"))
@@ -141,14 +147,13 @@ func newConfig() (*config.GWCfg, config.Error) {
 	viper.BindPFlag("w3Config.wsHost", flag.Lookup("w3WsHost"))
 	viper.BindPFlag("w3Config.httpPort", flag.Lookup("w3HTTPPort"))
 	viper.BindPFlag("w3Config.httpHost", flag.Lookup("w3HTTPHost"))
-	// ssl
-	viper.Set("ssl.dirCert", globalCfg.DataDir+"/tls")
-	viper.BindPFlag("ssl.domain", flag.Lookup("sslDomain"))
+
 	// ipfs
 	viper.Set("ipfs.configPath", globalCfg.DataDir+"/ipfs")
 	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ipfs.syncKey", flag.Lookup("ipfsSyncKey"))
 	viper.BindPFlag("ipfs.syncPeers", flag.Lookup("ipfsSyncPeers"))
+
 	// vochain
 	viper.Set("vochainConfig.dataDir", globalCfg.DataDir+"/vochain")
 	viper.BindPFlag("vochainConfig.p2pListen", flag.Lookup("vochainP2PListen"))
@@ -233,7 +238,7 @@ func main() {
 		panic("cannot read configuration")
 	}
 	log.Init(globalCfg.LogLevel, globalCfg.LogOutput)
-	log.Debugf("initializing gateway config %+v", *globalCfg)
+	log.Debugf("initializing config %+v", *globalCfg)
 
 	// using dev mode
 	if globalCfg.Dev {
@@ -249,14 +254,14 @@ func main() {
 		log.Infof("config file loaded successfully, remember CLI flags have preference")
 	}
 
-	log.Info("starting gateway")
+	log.Info("starting vocdoni dvote node")
 
 	// Ensure we can have at least 8k open files. This is necessary, since
 	// many components like IPFS and Tendermint require keeping many active
 	// connections. Some systems have low defaults like 1024, which can make
 	// the program crash after it's been running for a bit.
 	if err := ensureNumberFiles(8000); err != nil {
-		log.Fatalf("could not ensure we can have enough open files: %v", err)
+		log.Errorf("could not ensure we can have enough open files: %v", err)
 	}
 
 	// Signing key
@@ -276,16 +281,17 @@ func main() {
 		log.Infof("adding custom signing key")
 		err := signer.AddHexKey(globalCfg.EthConfig.SigningKey)
 		if err != nil {
-			log.Fatalf("error adding hex key: %s", err)
+			log.Fatalf("error adding hex key: (%s)", err)
 		}
 		pub, _ := signer.HexString()
 		log.Infof("using custom pubKey %s", pub)
 	} else {
-		log.Fatal("no private key or wrong key (size != 256 bits)")
+		log.Fatal("no private key or wrong key (size != 16 bytes)")
 	}
 
 	// Proxy service
-	pxy, err := service.Proxy(globalCfg.ListenHost, globalCfg.ListenPort, globalCfg.Ssl.Domain, globalCfg.Ssl.DirCert)
+	pxy, err := service.Proxy(globalCfg.API.ListenHost, globalCfg.API.ListenPort,
+		globalCfg.API.Ssl.Domain, globalCfg.API.Ssl.DirCert)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -376,7 +382,7 @@ func main() {
 			log.Fatal(err)
 		}
 		// Register the event handlers
-		if err := service.EthEvents(globalCfg.EthProcessDomain, ensRegistryAddr, globalCfg.W3Config.WsHost,
+		if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, globalCfg.W3Config.WsHost,
 			globalCfg.W3Config.WsPort, initBlock, int64(syncInfo.Height), true, cm, evh); err != nil {
 			log.Fatal(err)
 		}
