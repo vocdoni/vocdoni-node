@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # INFO
-IMAGE_TAG="vocdoni/gateway"
+IMAGE_TAG="vocdoni/dvotenode"
 API_PORT="${API_PORT:-9090}"
 IN_MEMORY="${IN_MEMORY:-false}"
 
 echo "Using image '$IMAGE_TAG:latest'\n"
 
-docker build -t $IMAGE_TAG --target gateway . || {
+docker build -t $IMAGE_TAG --target dvotenode . || {
 	echo "ERROR: docker image cannot be created, exiting..."
 	exit 2
 }
@@ -23,7 +23,7 @@ COUNT="$(docker ps -a | grep $IMAGE_TAG | wc -l)"
 }
 
 ENVFILE=""
-[ -f dockerfiles/gateway/env ] && ENVFILE="dockerfiles/gateway/env"
+[ -f dockerfiles/dvotenode/env ] && ENVFILE="dockerfiles/dvotenode/env"
 [ -f env ] && ENVFILE="env"
 [ -n "$ENVFILE" ] && echo "using ENV FILE $ENVFILE" 
 

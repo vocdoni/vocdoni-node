@@ -51,7 +51,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
-	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. One of gateway, oracle or miner")
+	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. Available options: [gateway,oracle,miner]")
 	// api
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable census API")
@@ -62,6 +62,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	globalCfg.API.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
 	globalCfg.API.ListenPort = *flag.Int("listenPort", 9090, "API endpoint http port")
+	// ssl
+	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "", "enable TLS secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	// ethereum node
 	globalCfg.EthConfig.SigningKey = *flag.String("ethSigningKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
 	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
@@ -85,8 +87,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
 	globalCfg.Ipfs.SyncKey = *flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
 	globalCfg.Ipfs.SyncPeers = *flag.StringArray("ipfsSyncPeers", []string{}, "use custom ipfsSync peers/bootnodes for accessing the DHT")
-	// ssl
-	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "", "enable TLS secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	// vochain
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
 	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
@@ -97,6 +97,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
 	globalCfg.VochainConfig.MinerKey = *flag.String("vochainKey", "", "user alternative vochain private key (hexstring[64])")
+	globalCfg.VochainConfig.SeedMode = *flag.Bool("vochainSeedMode", false, "act as a vochain seed node")
 
 	// parse flags
 	flag.Parse()
@@ -107,7 +108,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// setting up viper
 	viper := viper.New()
 	viper.AddConfigPath(globalCfg.DataDir)
-	viper.SetConfigName("gateway")
+	viper.SetConfigName("dvote")
 	viper.SetConfigType("yml")
 
 	// binding flags to viper
@@ -170,10 +171,11 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.createGenesis", flag.Lookup("vochainCreateGenesis"))
 	viper.BindPFlag("vochainConfig.genesis", flag.Lookup("vochainGenesis"))
 	viper.BindPFlag("vochainConfig.MinerKey", flag.Lookup("vochainKey"))
+	viper.BindPFlag("vochainConfig.seedMode", flag.Lookup("vochainSeedMode"))
 	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
 
 	// check if config file exists
-	_, err = os.Stat(globalCfg.DataDir + "/gateway.yml")
+	_, err = os.Stat(globalCfg.DataDir + "/dvote.yml")
 	if os.IsNotExist(err) {
 		cfgError = config.Error{
 			Message: fmt.Sprintf("creating new config file in %s", globalCfg.DataDir),

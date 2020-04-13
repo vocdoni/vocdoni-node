@@ -21,11 +21,11 @@ RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/...
 # ca-certificates. Add them, as it's needed for outbound TLS to work, which is a
 # requirement to obtain let's encrypt certificates.
 
-FROM debian:10.3-slim AS gateway
+FROM debian:10.3-slim AS dvotenode
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
-COPY --from=builder /src/gateway /src/dockerfiles/gateway/files/gatewayStart.sh ./
-ENTRYPOINT ["/app/gatewayStart.sh"]
+COPY --from=builder /src/dvotenode /src/dockerfiles/dvotenode/files/dvoteStart.sh ./
+ENTRYPOINT ["/app/dvoteStart.sh"]
 
 FROM debian:10.3-slim AS census
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
