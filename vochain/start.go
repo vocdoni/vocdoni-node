@@ -36,20 +36,21 @@ var (
 )
 
 // NewVochain starts a node with an ABCI application
-func NewVochain(globalCfg *config.VochainCfg, genesis []byte) *BaseApplication {
+func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
 	// creating new vochain app
-	app, err := NewBaseApplication(globalCfg.DataDir + "/data")
+	app, err := NewBaseApplication(vochaincfg.DataDir + "/data")
 	if err != nil {
-		log.Errorf("cannot init vochain application: %s", err)
+		log.Fatalf("cannot init vochain application: %s", err)
 	}
 	log.Info("creating tendermint node and application")
-	app.Node, err = newTendermint(app, globalCfg, genesis)
+	app.Node, err = newTendermint(app, vochaincfg, genesis)
 	if err != nil {
 		log.Fatal(err)
 	}
 	if err := app.Node.Start(); err != nil {
 		log.Fatal(err)
 	}
+
 	return app
 }
 

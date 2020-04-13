@@ -365,7 +365,7 @@ func main() {
 	}
 
 	// Vochain and Scrutinizer service
-	if globalCfg.API.Vote {
+	if globalCfg.API.Vote || globalCfg.Mode == "miner" || globalCfg.Mode == " oracle" {
 		scrutinizer := false
 		if globalCfg.Mode == "gateway" && globalCfg.API.Results {
 			scrutinizer = true
@@ -374,6 +374,10 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		defer func() {
+			vnode.Node.Stop()
+			vnode.Node.Wait()
+		}()
 		// Wait for Vochain to be ready
 		var h, hPrev int64
 		for {

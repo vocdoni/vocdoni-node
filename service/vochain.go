@@ -13,27 +13,29 @@ import (
 
 func Vochain(vconfig *config.VochainCfg, dev, results bool) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, err error) {
 	log.Info("creating vochain service")
-
+	var host, port string
+	var ip net.IP
 	// node + app layer
 	if len(vconfig.PublicAddr) == 0 {
-		ip, err := util.PublicIP()
+		ip, err = util.PublicIP()
 		if err != nil {
 			log.Warn(err)
 		} else {
-			_, port, err := net.SplitHostPort(vconfig.P2PListen)
-			if err == nil {
-				vconfig.PublicAddr = net.JoinHostPort(ip.String(), port)
+			_, port, err = net.SplitHostPort(vconfig.P2PListen)
+			if err != nil {
+				return
 			}
+			vconfig.PublicAddr = net.JoinHostPort(ip.String(), port)
 		}
 	} else {
-		host, port, err := net.SplitHostPort(vconfig.P2PListen)
-		if err == nil {
-			vconfig.PublicAddr = net.JoinHostPort(host, port)
+		host, port, err = net.SplitHostPort(vconfig.P2PListen)
+		if err != nil {
+			return
 		}
+		vconfig.PublicAddr = net.JoinHostPort(host, port)
 	}
-	if vconfig.PublicAddr != "" {
-		log.Infof("vochain exposed IP address: %s", vconfig.PublicAddr)
-	}
+	log.Infof("vochain listening on: %s", vconfig.P2PListen)
+	log.Infof("vochain exposed IP address: %s", vconfig.PublicAddr)
 
 	if dev {
 		vnode = vochain.NewVochain(vconfig, []byte(vochain.DevelopmentGenesis1))
@@ -64,10 +66,6 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool) (vnode *vochain.Base
 			}
 			time.Sleep(20 * time.Second)
 		}
-	}()
-	defer func() {
-		vnode.Node.Stop()
-		vnode.Node.Wait()
 	}()
 	return
 }
