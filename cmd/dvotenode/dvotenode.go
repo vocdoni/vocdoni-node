@@ -434,7 +434,7 @@ func main() {
 			}
 			// Register the event handlers
 			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort,
-				initBlock, int64(syncInfo.Height), globalCfg.EthEventConfig.SubscribeOnly, cm, evh); err != nil {
+				initBlock, int64(syncInfo.Height), globalCfg.EthEventConfig.SubscribeOnly, cm, signer, evh); err != nil {
 				log.Fatal(err)
 			}
 		}
