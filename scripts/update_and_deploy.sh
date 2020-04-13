@@ -1,6 +1,6 @@
 #!/bin/bash
 BRANCH=${BRANCH:-master}
-CMD=${CMD:-gateway}
+CMD=${CMD:-dvotenode}
 
 [ ! -d dockerfiles/$CMD ] && {
   echo "dockerfiles/$CMD does not exist"
