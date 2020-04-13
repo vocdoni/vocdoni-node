@@ -64,6 +64,7 @@ require (
 	github.com/tendermint/tm-db v0.5.1
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200223203819-95cdfde1438f // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
+	go.etcd.io/bbolt v1.3.4 // indirect
 	go.uber.org/multierr v1.5.0 // indirect
 	go.uber.org/zap v1.14.0
 	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59

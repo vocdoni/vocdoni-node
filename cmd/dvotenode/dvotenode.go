@@ -365,7 +365,7 @@ func main() {
 	}
 
 	// Vochain and Scrutinizer service
-	if globalCfg.API.Vote || globalCfg.Mode == "miner" || globalCfg.Mode == " oracle" {
+	if globalCfg.API.Vote || globalCfg.Mode == "miner" || globalCfg.Mode == "oracle" {
 		scrutinizer := false
 		if globalCfg.Mode == "gateway" && globalCfg.API.Results {
 			scrutinizer = true

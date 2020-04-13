@@ -85,22 +85,24 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 		return nil, err
 	}
 
-	vs.AppTree.DeleteVersion(version)
-	vs.ProcessTree.DeleteVersion(version)
-	vs.VoteTree.DeleteVersion(version)
-	atVersion, err := vs.AppTree.LoadVersion(version - 1)
+	var atVersion, ptVersion, vtVersion int64
+	if version > 0 {
+		version--
+	}
+	atVersion, err = vs.AppTree.LoadVersionForOverwriting(version)
 	if err != nil {
 		return nil, err
 	}
-	ptVersion, err := vs.ProcessTree.LoadVersion(version - 1)
+	ptVersion, err = vs.ProcessTree.LoadVersionForOverwriting(version)
 	if err != nil {
 		return nil, err
 	}
-	vtVersion, err := vs.VoteTree.LoadVersion(version - 1)
+	vtVersion, err = vs.VoteTree.LoadVersionForOverwriting(version)
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("application trees successfully loaded. appTree version:%d processTree version:%d voteTree version: %d", atVersion, ptVersion, vtVersion)
+
+	log.Infof("application trees successfully loaded. appTree:%d processTree:%d voteTree: %d", atVersion, ptVersion, vtVersion)
 	vs.Callbacks = make(map[string]EventCallback)
 	return &vs, nil
 }

@@ -69,10 +69,12 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 	// get oracles
 	for _, v := range genesisAppState.Oracles {
+		log.Infof("adding genesis oracle %s", v)
 		app.State.AddOracle(v)
 	}
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
+		log.Infof("adding genesis validator %s", genesisAppState.Validators[i].PubKey.Address())
 		app.State.AddValidator(genesisAppState.Validators[i].PubKey, genesisAppState.Validators[i].Power)
 	}
 
@@ -94,7 +96,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 // The header contains the height, timestamp, and more - it exactly matches the Tendermint block header.
 // The LastCommitInfo and ByzantineValidators can be used to determine rewards and punishments for the validators.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	app.State.Lock.Lock()
+	//app.State.Lock.Lock()
 	// reset app state to latest persistent data
 	app.State.Rollback()
 	headerBytes, err := app.Codec.MarshalBinaryBare(req.Header)
@@ -129,10 +131,9 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 }
 
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
-	defer app.State.Lock.Unlock()
-	hash := app.State.Save()
+	//defer app.State.Lock.Unlock()
 	return abcitypes.ResponseCommit{
-		Data: hash,
+		Data: app.State.Save(),
 	}
 }
 
