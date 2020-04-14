@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/config"
@@ -58,73 +59,77 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool) (vnode *vochain.Base
 }
 
 // VochainStatsCollect initializes the Vochain statistics recollection
-func VochainStatsCollect(vnode *vochain.BaseApplication, sleepTime int64, vs *types.VochainStats) {
+func VochainStatsCollect(vnode *vochain.BaseApplication, sleepSecs int64, vs *types.VochainStats) {
 	var pheight int64
 	var h1, h10, h60, h360 int64
 	var n1, n10, n60, n360 int64
-	heightInfo := ""
 	for {
-		if vnode.Node != nil {
-			heightInfo = ""
-			vs.Height = vnode.Node.BlockStore().Height()
-			// less than 2s per block it's not real. Consider blockchain is synchcing
-			if pheight > 0 && sleepTime/2 > (vs.Height-pheight) {
-				vs.Sync = true
-				n1++
-				n10++
-				n60++
-				n360++
-				h1 += (vs.Height - pheight)
-				h10 += (vs.Height - pheight)
-				h60 += (vs.Height - pheight)
-				h360 += (vs.Height - pheight)
-				if sleepTime*n1 >= 60 && h1 > 0 {
-					vs.Avg1 = (n1 * sleepTime) / h1
-					n1 = 0
-					h1 = 0
-				}
-				if sleepTime*n10 >= 600 && h10 > 0 {
-					vs.Avg10 = (n10 * sleepTime) / h10
-					n10 = 0
-					h10 = 0
-				}
-				if sleepTime*n60 >= 3600 && h60 > 0 {
-					vs.Avg60 = (n60 * sleepTime) / h60
-					n60 = 0
-					h60 = 0
-				}
-				if sleepTime*n360 >= 21600 && h360 > 0 {
-					vs.Avg360 = (n360 * sleepTime) / h360
-					n360 = 0
-					h360 = 0
-				}
-				if vs.Avg1 > 0 {
-					heightInfo += fmt.Sprintf("1m:%d", vs.Avg1)
-				}
-				if vs.Avg10 > 0 {
-					heightInfo += fmt.Sprintf(" 10m:%d", vs.Avg10)
-				}
-				if vs.Avg60 > 0 {
-					heightInfo += fmt.Sprintf(" 1h:%d", vs.Avg60)
-				}
-				if vs.Avg360 > 0 {
-					heightInfo += fmt.Sprintf(" 6h:%d", vs.Avg360)
-				}
-			} else {
-				vs.Sync = false
-			}
-			pheight = vs.Height
-			vs.ProcessTreeSize = vnode.State.ProcessTree.Size()
-			vs.VoteTreeSize = vnode.State.VoteTree.Size()
-			vs.MempoolSize = vnode.Node.Mempool().Size()
-			log.Infof("[vochain info] height:%d mempool:%d processTree:%d voteTree:%d blockTime:{%s}",
-				vs.Height,
-				vs.MempoolSize,
-				vs.ProcessTreeSize,
-				vs.VoteTreeSize,
-				heightInfo,
-			)
+		// TODO(mvdan): this seems racy too
+		if vnode.Node == nil {
+			time.Sleep(time.Duration(sleepSecs) * time.Second)
+			continue
 		}
-		time.Sleep(time.Duration(sleepTime) * time.Second)
+		var b strings.Builder
+		// TODO(mvdan): this seems racy with other goroutines reading
+		// from VochainStats
+		vs.Height = vnode.Node.BlockStore().Height()
+		// less than 2s per block it's not real. Consider blockchain is synchcing
+		if pheight > 0 && sleepSecs/2 > (vs.Height-pheight) {
+			vs.Sync = true
+			n1++
+			n10++
+			n60++
+			n360++
+			h1 += (vs.Height - pheight)
+			h10 += (vs.Height - pheight)
+			h60 += (vs.Height - pheight)
+			h360 += (vs.Height - pheight)
+			if sleepSecs*n1 >= 60 && h1 > 0 {
+				vs.Avg1 = (n1 * sleepSecs) / h1
+				n1 = 0
+				h1 = 0
+			}
+			if sleepSecs*n10 >= 600 && h10 > 0 {
+				vs.Avg10 = (n10 * sleepSecs) / h10
+				n10 = 0
+				h10 = 0
+			}
+			if sleepSecs*n60 >= 3600 && h60 > 0 {
+				vs.Avg60 = (n60 * sleepSecs) / h60
+				n60 = 0
+				h60 = 0
+			}
+			if sleepSecs*n360 >= 21600 && h360 > 0 {
+				vs.Avg360 = (n360 * sleepSecs) / h360
+				n360 = 0
+				h360 = 0
+			}
+			if vs.Avg1 > 0 {
+				fmt.Fprintf(&b, "1m:%d", vs.Avg1)
+			}
+			if vs.Avg10 > 0 {
+				fmt.Fprintf(&b, " 10m:%d", vs.Avg10)
+			}
+			if vs.Avg60 > 0 {
+				fmt.Fprintf(&b, " 1h:%d", vs.Avg60)
+			}
+			if vs.Avg360 > 0 {
+				fmt.Fprintf(&b, " 6h:%d", vs.Avg360)
+			}
+		} else {
+			vs.Sync = false
+		}
+		pheight = vs.Height
+		vs.ProcessTreeSize = vnode.State.ProcessTree.Size()
+		vs.VoteTreeSize = vnode.State.VoteTree.Size()
+		vs.MempoolSize = vnode.Node.Mempool().Size()
+		log.Infof("[vochain info] height:%d mempool:%d processTree:%d voteTree:%d blockTime:{%s}",
+			vs.Height,
+			vs.MempoolSize,
+			vs.ProcessTreeSize,
+			vs.VoteTreeSize,
+			b,
+		)
+		time.Sleep(time.Duration(sleepSecs) * time.Second)
 	}
 }
