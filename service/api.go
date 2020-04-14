@@ -16,7 +16,7 @@ import (
 )
 
 func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census.Manager,
-	sc *scrutinizer.Scrutinizer, vochainRPCaddr string, signer *signature.SignKeys) (err error) {
+	sc *scrutinizer.Scrutinizer, vs *types.VochainStats, vochainRPCaddr string, signer *signature.SignKeys) (err error) {
 	log.Infof("creating API service")
 	// API Endpoint initialization
 	ws := new(net.WebsocketHandle)
@@ -44,7 +44,7 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 		// todo: client params as cli flags
 		log.Info("enabling vote API")
 		routerAPI.Scrutinizer = sc
-		routerAPI.EnableVoteAPI(rpcClient)
+		routerAPI.EnableVoteAPI(rpcClient, vs)
 	}
 
 	go routerAPI.Route()

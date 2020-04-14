@@ -82,6 +82,7 @@ type Router struct {
 	signer       signature.SignKeys
 	census       *census.Manager
 	tmclient     *voclient.HTTP
+	vocstats     *types.VochainStats
 	allowPrivate bool
 	Scrutinizer  *scrutinizer.Scrutinizer
 	PrivateCalls uint64
@@ -207,9 +208,10 @@ func (r *Router) EnableCensusAPI(cm *census.Manager) {
 }
 
 // EnableVoteAPI enabled the Vote API in the Router
-func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP) {
+func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP, vocStats *types.VochainStats) {
 	r.APIs = append(r.APIs, "vote")
 	r.tmclient = rpcClient
+	r.vocstats = vocStats
 	r.registerPublic("submitEnvelope", r.submitEnvelope)
 	r.registerPublic("getEnvelopeStatus", r.getEnvelopeStatus)
 	r.registerPublic("getEnvelope", r.getEnvelope)

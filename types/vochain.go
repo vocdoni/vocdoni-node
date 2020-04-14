@@ -166,3 +166,18 @@ type ScrutinizerOnProcessData struct {
 	EntityID  string
 	ProcessID string
 }
+
+// VochainStats stores some metrics and information regarding the Vochain Blockchain
+// Avg1/10/60/360 are the block time average for 1 minute, 10 minutes, 1 hour and 6 hours
+type VochainStats struct {
+	Sync            bool
+	Height          int64
+	VoteTreeSize    int64
+	ProcessTreeSize int64
+	MempoolSize     int
+
+	Avg1   int64
+	Avg10  int64
+	Avg60  int64
+	Avg360 int64
+}
