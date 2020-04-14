@@ -67,8 +67,8 @@ func VochainStatsCollect(vnode *vochain.BaseApplication, sleepTime int64, vs *ty
 		if vnode.Node != nil {
 			heightInfo = ""
 			vs.Height = vnode.Node.BlockStore().Height()
-			// less than 2s per bolck it's not real. Consider blockchain is synchcing
-			if pheight > 0 && sleepTime/(vs.Height-pheight) > 2 {
+			// less than 2s per block it's not real. Consider blockchain is synchcing
+			if pheight > 0 && sleepTime/2 > (vs.Height-pheight) {
 				vs.Sync = true
 				n1++
 				n10++
