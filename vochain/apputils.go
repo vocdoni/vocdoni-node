@@ -86,7 +86,7 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 	case types.VoteTx:
 		process, _ := state.Process(tx.ProcessID)
 		if process == nil {
-			return nil, fmt.Errorf("process with id (%s) does not exists", tx.ProcessID)
+			return nil, fmt.Errorf("process with id (%s) does not exist", tx.ProcessID)
 		}
 		vote := new(types.Vote)
 		switch process.Type {
@@ -185,7 +185,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 	}
 	process, _ := state.Process(vote.ProcessID)
 	if process == nil {
-		return fmt.Errorf("process with id (%s) does not exists", vote.ProcessID)
+		return fmt.Errorf("process with id (%s) does not exist", vote.ProcessID)
 	}
 	endBlock := process.StartBlock + process.NumberOfBlocks
 	// check if process is enabled

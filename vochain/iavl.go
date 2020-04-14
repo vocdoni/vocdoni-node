@@ -335,11 +335,11 @@ func (v *State) Envelope(voteID string) (*vochaintypes.Vote, error) {
 	var vote *vochaintypes.Vote
 	voteID = util.TrimHex(voteID)
 	if !v.VoteTree.Has([]byte(voteID)) {
-		return nil, fmt.Errorf("vote with id (%s) does not exists", voteID)
+		return nil, fmt.Errorf("vote with id (%s) does not exist", voteID)
 	}
 	_, voteBytes := v.VoteTree.Get([]byte(voteID))
 	if len(voteBytes) == 0 {
-		return nil, fmt.Errorf("vote with id (%s) does not exists", voteID)
+		return nil, fmt.Errorf("vote with id (%s) does not exist", voteID)
 	}
 	// log.Debugf("get envelope votebytes: %b", voteBytes)
 	err := v.Codec.UnmarshalBinaryBare(voteBytes, &vote)
