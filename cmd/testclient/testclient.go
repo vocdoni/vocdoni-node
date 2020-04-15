@@ -79,9 +79,15 @@ func printNice(resp *types.MetaResponse) {
 	v := reflect.ValueOf(*resp)
 	typeOfS := v.Type()
 	output := "\n"
+	var val reflect.Value
 	for i := 0; i < v.NumField(); i++ {
 		if v.Field(i).Type().Name() == "bool" || v.Field(i).Type().Name() == "int64" || !v.Field(i).IsZero() {
-			output += fmt.Sprintf("%v: %v\n", typeOfS.Field(i).Name, v.Field(i))
+			if v.Field(i).Kind() == reflect.Ptr {
+				val = v.Field(i).Elem()
+			} else {
+				val = v.Field(i)
+			}
+			output += fmt.Sprintf("%v: %v\n", typeOfS.Field(i).Name, val)
 		}
 	}
 	fmt.Print(output + "\n")
