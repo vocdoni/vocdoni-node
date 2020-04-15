@@ -21,7 +21,6 @@ import (
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	nm "github.com/tendermint/tendermint/node"
-	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
 
@@ -191,12 +190,12 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	log.Infof("using keyfile %s", tconfig.PrivValidatorKeyFile())
 
 	// read or create node key
-	var nodeKey *p2p.NodeKey
-	nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile())
+	nodeKey, err := NewNodeKey(localConfig.NodeKey, tconfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load node's key: %w", err)
+		return nil, err
 	}
-	log.Infof("tendermint node ID: %s", nodeKey.ID())
+	NodeKeySave(tconfig.NodeKeyFile(), nodeKey)
+	log.Infof("tendermint p2p node ID: %s", nodeKey.ID())
 
 	// read or create genesis file
 	if tmos.FileExists(tconfig.Genesis) {
@@ -213,7 +212,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	node, err := nm.NewNode(
 		tconfig,
 		pv,      // the node val
-		nodeKey, // node val key
+		nodeKey, // node key
 		proxy.NewLocalClientCreator(app),
 		// Note we use proxy.NewLocalClientCreator here to create a local client instead of one communicating through a socket or gRPC.
 		nm.DefaultGenesisDocProviderFunc(tconfig),

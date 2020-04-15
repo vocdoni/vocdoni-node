@@ -97,7 +97,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "error", "voting chain node log level")
 	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
-	globalCfg.VochainConfig.MinerKey = *flag.String("vochainKey", "", "user alternative vochain private key (hexstring[64])")
+	globalCfg.VochainConfig.MinerKey = *flag.String("vochainMinerKey", "", "user alternative vochain miner private key (hexstring[64])")
+	globalCfg.VochainConfig.NodeKey = *flag.String("vochainNodeKey", "", "user alternative vochain private key (hexstring[64])")
 	globalCfg.VochainConfig.SeedMode = *flag.Bool("vochainSeedMode", false, "act as a vochain seed node")
 
 	// parse flags
@@ -171,7 +172,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.seeds", flag.Lookup("vochainSeeds"))
 	viper.BindPFlag("vochainConfig.createGenesis", flag.Lookup("vochainCreateGenesis"))
 	viper.BindPFlag("vochainConfig.genesis", flag.Lookup("vochainGenesis"))
-	viper.BindPFlag("vochainConfig.MinerKey", flag.Lookup("vochainKey"))
+	viper.BindPFlag("vochainConfig.MinerKey", flag.Lookup("vochainMinerKey"))
+	viper.BindPFlag("vochainConfig.NodeKey", flag.Lookup("vochainNodeKey"))
 	viper.BindPFlag("vochainConfig.seedMode", flag.Lookup("vochainSeedMode"))
 	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
 

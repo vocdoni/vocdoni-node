@@ -20,6 +20,8 @@ import (
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	tmkv "github.com/tendermint/tendermint/libs/kv"
+	"github.com/tendermint/tendermint/libs/tempfile"
+	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -426,6 +428,45 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 		pv.Key.PubKey = privKey.PubKey()
 	}
 	return pv, nil
+}
+
+// NewNodeKey returns a tendermint node key
+// if tmPrivKey not specified, uses the existing one or generates a new one
+func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
+	nodeKey, err := p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load node's key: (%s)", err)
+	}
+	if len(tmPrivKey) > 0 {
+		var privKey crypto25519.PrivKeyEd25519
+		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
+		if err != nil {
+			return nil, fmt.Errorf("cannot decode private key: (%s)", err)
+		}
+		if n := copy(privKey[:], keyBytes[:]); n != 64 {
+			return nil, fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
+		}
+		nodeKey.PrivKey = privKey
+	}
+	return nodeKey, nil
+}
+
+// NodeKeySave save a p2p node key on disk
+func NodeKeySave(filePath string, nodeKey *p2p.NodeKey) error {
+	outFile := filePath
+	if outFile == "" {
+		return fmt.Errorf("cannot save NodeKey key: filePath not set")
+	}
+
+	aminoPrivKey, _, err := HexKeyToAmino(fmt.Sprintf("%x", nodeKey.PrivKey))
+	if err != nil {
+		return err
+	}
+	err = tempfile.WriteFileAtomic(outFile, []byte(fmt.Sprintf(`{"priv_key":{"type":"tendermint/PrivKeyEd25519","value":"%s"}}`, aminoPrivKey)), 0600)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // NewGenesis creates a new genesis and return its bytes

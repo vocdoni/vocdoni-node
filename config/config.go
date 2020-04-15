@@ -178,6 +178,8 @@ type VochainCfg struct {
 	SeedMode bool
 	// MinerKey contains the EDDSA private key for signing tendermint blocks
 	MinerKey string
+	// NodeKey contains the EDDSA public key that identifies the node in the P2P network
+	NodeKey string
 	// SaveConfig overwrites the config file with the CLI provided flags
 	SaveConfig bool
 }
