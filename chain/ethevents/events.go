@@ -81,7 +81,7 @@ type EventProcessor struct {
 }
 
 // NewEthEvents creates a new Ethereum events handler
-func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, cens *census.Manager) (*EthereumEvents, error) {
+func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, cens *census.Manager, vclient VochainClient) (*EthereumEvents, error) {
 	if len(w3Endpoint) == 0 {
 		w3Endpoint = "ws://127.0.0.1:9092"
 	}
@@ -94,6 +94,7 @@ func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, c
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	return &EthereumEvents{
 		ContractAddress: contractAddr,
 		ContractABI:     contractABI,
@@ -101,6 +102,7 @@ func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, c
 		Signer:          signer,
 		DialAddr:        w3Endpoint,
 		Census:          cens,
+		VochainCLI:      vclient,
 		EventProcessor: &EventProcessor{
 			Events: make(chan ethtypes.Log),
 		},

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	voclient "github.com/tendermint/tendermint/rpc/client"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
@@ -15,7 +16,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
 
-func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Agent) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
+func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Agent) (vnode *vochain.BaseApplication, vclient *voclient.HTTP, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
 	log.Info("creating vochain service")
 	var host, port string
 	var ip net.IP
@@ -68,6 +69,10 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Age
 	vi = vochaininfo.NewVochainInfo(vnode)
 	go vi.Start(10)
 	go VochainPrintInfo(20, vi)
+
+	// VocClient RPC
+	vclient, err = voclient.NewHTTP("tcp://"+vconfig.RPCListen, "/websocket")
+
 	return
 }
 

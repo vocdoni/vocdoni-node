@@ -11,6 +11,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	voclient "github.com/tendermint/tendermint/rpc/client"
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
@@ -315,6 +316,7 @@ func main() {
 	var cm *census.Manager
 	var vnode *vochain.BaseApplication
 	var vinfo *vochaininfo.VochainInfo
+	var vclient *voclient.HTTP
 	var sc *scrutinizer.Scrutinizer
 	var ma *metrics.Agent
 
@@ -389,7 +391,7 @@ func main() {
 		if globalCfg.Mode == "gateway" && globalCfg.API.Results {
 			scrutinizer = true
 		}
-		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, ma)
+		vnode, vclient, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, ma)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -454,7 +456,7 @@ func main() {
 			}
 			// Register the event handlers
 			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort,
-				initBlock, int64(syncInfo.Height), globalCfg.EthEventConfig.SubscribeOnly, cm, signer, evh); err != nil {
+				initBlock, int64(syncInfo.Height), globalCfg.EthEventConfig.SubscribeOnly, cm, signer, vclient, evh); err != nil {
 				log.Fatal(err)
 			}
 		}
