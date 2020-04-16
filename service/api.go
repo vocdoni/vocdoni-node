@@ -14,10 +14,11 @@ import (
 	"gitlab.com/vocdoni/go-dvote/router"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
+	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
 
 func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census.Manager,
-	sc *scrutinizer.Scrutinizer, vs *types.VochainStats, vochainRPCaddr string, signer *signature.SignKeys, ma *metrics.Agent) (err error) {
+	sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, vochainRPCaddr string, signer *signature.SignKeys, ma *metrics.Agent) (err error) {
 	log.Infof("creating API service")
 	// API Endpoint initialization
 	ws := new(net.WebsocketHandle)
@@ -45,7 +46,7 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 		// todo: client params as cli flags
 		log.Info("enabling vote API")
 		routerAPI.Scrutinizer = sc
-		routerAPI.EnableVoteAPI(rpcClient, vs)
+		routerAPI.EnableVoteAPI(rpcClient, vi)
 	}
 
 	go routerAPI.Route()

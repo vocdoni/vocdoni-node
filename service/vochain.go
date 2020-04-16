@@ -9,13 +9,13 @@ import (
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
+	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
 
-func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Agent) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vs *types.VochainStats, err error) {
+func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Agent) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
 	log.Info("creating vochain service")
 	var host, port string
 	var ip net.IP
@@ -54,8 +54,6 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Age
 			return
 		}
 	}
-	vs = new(types.VochainStats)
-	go VochainStatsCollect(vnode, 20, vs)
 	// Grab metrics
 	if metrics != nil {
 		vnode.RegisterMetrics(metrics)
@@ -66,80 +64,42 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Age
 			}
 		}()
 	}
+	// Vochain info
+	vi = vochaininfo.NewVochainInfo(vnode)
+	go vi.Start(10)
+	go VochainPrintInfo(20, vi)
 	return
 }
 
 // VochainStatsCollect initializes the Vochain statistics recollection
-func VochainStatsCollect(vnode *vochain.BaseApplication, sleepSecs int64, vs *types.VochainStats) {
-	var pheight int64
-	var h1, h10, h60, h360 int64
-	var n1, n10, n60, n360 int64
+func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
+	var a1, a10, a60, a360, a1440 float32
+	var h, p, v int64
+	var m int
+	var b strings.Builder
 	for {
-		// TODO(mvdan): this seems racy too
-		if vnode.Node == nil {
-			time.Sleep(time.Duration(sleepSecs) * time.Second)
-			continue
+		b.Reset()
+		a1, a10, a60, a360, a1440 = vi.BlockTimes()
+		if a1 > 0 {
+			fmt.Fprintf(&b, "1m:%.1f", a1)
 		}
-		var b strings.Builder
-		// TODO(mvdan): this seems racy with other goroutines reading
-		// from VochainStats
-		vs.Height = vnode.Node.BlockStore().Height()
-		// less than 2s per block it's not real. Consider blockchain is synchcing
-		if pheight > 0 && sleepSecs/2 > (vs.Height-pheight) {
-			vs.Sync = true
-			n1++
-			n10++
-			n60++
-			n360++
-			h1 += (vs.Height - pheight)
-			h10 += (vs.Height - pheight)
-			h60 += (vs.Height - pheight)
-			h360 += (vs.Height - pheight)
-			if sleepSecs*n1 >= 60 && h1 > 0 {
-				vs.Avg1 = (n1 * sleepSecs) / h1
-				n1 = 0
-				h1 = 0
-			}
-			if sleepSecs*n10 >= 600 && h10 > 0 {
-				vs.Avg10 = (n10 * sleepSecs) / h10
-				n10 = 0
-				h10 = 0
-			}
-			if sleepSecs*n60 >= 3600 && h60 > 0 {
-				vs.Avg60 = (n60 * sleepSecs) / h60
-				n60 = 0
-				h60 = 0
-			}
-			if sleepSecs*n360 >= 21600 && h360 > 0 {
-				vs.Avg360 = (n360 * sleepSecs) / h360
-				n360 = 0
-				h360 = 0
-			}
-			if vs.Avg1 > 0 {
-				fmt.Fprintf(&b, "1m:%d", vs.Avg1)
-			}
-			if vs.Avg10 > 0 {
-				fmt.Fprintf(&b, " 10m:%d", vs.Avg10)
-			}
-			if vs.Avg60 > 0 {
-				fmt.Fprintf(&b, " 1h:%d", vs.Avg60)
-			}
-			if vs.Avg360 > 0 {
-				fmt.Fprintf(&b, " 6h:%d", vs.Avg360)
-			}
-		} else {
-			vs.Sync = false
+		if a10 > 0 {
+			fmt.Fprintf(&b, " 10m:%.1f", a10)
 		}
-		pheight = vs.Height
-		vs.ProcessTreeSize = vnode.State.ProcessTree.Size()
-		vs.VoteTreeSize = vnode.State.VoteTree.Size()
-		vs.MempoolSize = vnode.Node.Mempool().Size()
+		if a60 > 0 {
+			fmt.Fprintf(&b, " 1h:%.1f", a60)
+		}
+		if a360 > 0 {
+			fmt.Fprintf(&b, " 6h:%.1f", a360)
+		}
+		if a1440 > 0 {
+			fmt.Fprintf(&b, " 24h:%.1f", a1440)
+		}
+		h = vi.Height()
+		m = vi.MempoolSize()
+		p, v = vi.TreeSizes()
 		log.Infof("[vochain info] height:%d mempool:%d processTree:%d voteTree:%d blockTime:{%s}",
-			vs.Height,
-			vs.MempoolSize,
-			vs.ProcessTreeSize,
-			vs.VoteTreeSize,
-			b,
+			h, m, p, v, b.String(),
 		)
 		time.Sleep(time.Duration(sleepSecs) * time.Second)
 	}

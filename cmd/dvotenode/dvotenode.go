@@ -21,9 +21,9 @@ import (
 	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/service"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
+	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
 
 var ethNoWaitSync bool
@@ -314,7 +314,7 @@ func main() {
 	var storage data.Storage
 	var cm *census.Manager
 	var vnode *vochain.BaseApplication
-	var vstats *types.VochainStats
+	var vinfo *vochaininfo.VochainInfo
 	var sc *scrutinizer.Scrutinizer
 	var ma *metrics.Agent
 
@@ -389,7 +389,7 @@ func main() {
 		if globalCfg.Mode == "gateway" && globalCfg.API.Results {
 			scrutinizer = true
 		}
-		vnode, sc, vstats, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, ma)
+		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, ma)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -463,7 +463,7 @@ func main() {
 	if globalCfg.Mode == "gateway" {
 		// dvote API service
 		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
-			if err := service.API(globalCfg.API, pxy, storage, cm, sc, vstats, globalCfg.VochainConfig.RPCListen, signer, ma); err != nil {
+			if err := service.API(globalCfg.API, pxy, storage, cm, sc, vinfo, globalCfg.VochainConfig.RPCListen, signer, ma); err != nil {
 				log.Fatal(err)
 			}
 		}
