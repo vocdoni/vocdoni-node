@@ -354,6 +354,11 @@ func main() {
 			log.Fatal(err)
 		}
 
+		// Enable metrics via proxy
+		if globalCfg.Metrics.Enabled && pxy != nil {
+			ma = metrics.NewAgent("/metrics", time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, pxy)
+		}
+
 		// Storage service
 		storage, err = service.IPFS(globalCfg.Ipfs, signer, ma)
 		if err != nil {
@@ -368,11 +373,6 @@ func main() {
 			}
 		}
 
-	}
-
-	// Enable metrics via proxy
-	if globalCfg.Metrics.Enabled && pxy != nil {
-		ma = metrics.NewAgent("/metrics", time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, pxy)
 	}
 
 	// Ethereum service
