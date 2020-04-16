@@ -128,7 +128,8 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 
 func (r *Router) getBlockHeight(request routerRequest) {
 	var response types.ResponseMessage
-	response.Height = &r.vocstats.Height
+	response.Height = new(int64)
+	*response.Height = r.vocinfo.Height()
 	r.transport.Send(r.buildReply(request, response))
 }
 
