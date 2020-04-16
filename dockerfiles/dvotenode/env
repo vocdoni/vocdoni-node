@@ -44,3 +44,5 @@ dataDir=/app/run
 #w3Route=/web3
 #w3WsHost=0.0.0.0
 #w3WsPort=9092
+#metricsEnabled=False
+#metricsRefreshInterval=5
