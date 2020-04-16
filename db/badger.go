@@ -122,8 +122,11 @@ func (i *BadgerIterator) Released() bool {
 }
 
 func (i *BadgerIterator) Next() bool {
-	i.iter.Next()
-	return i.iter.Valid()
+	v := i.iter.Valid()
+	if v {
+		i.iter.Next()
+	}
+	return v
 }
 
 func (i *BadgerIterator) Seek(key []byte) {
