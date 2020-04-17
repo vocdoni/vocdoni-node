@@ -27,9 +27,9 @@ func (r *Router) submitEnvelope(request routerRequest) {
 	}
 
 	res, err := r.tmclient.BroadcastTxSync(voteTxBytes)
-	if err != nil {
+	if err != nil || res == nil {
 		log.Warnf("cannot broadcast tx: (%s)", err)
-		r.sendError(request, string(res.Data))
+		r.sendError(request, "cannot broadcast TX")
 		return
 	}
 	if res.Code != 0 {
