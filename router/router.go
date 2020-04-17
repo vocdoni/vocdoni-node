@@ -279,6 +279,11 @@ func (r *Router) Route() {
 	}
 }
 
+func (r *Router) RegisterMetrics(ma *metrics.Agent) {
+	ma.Register(RouterPrivateReqs)
+	ma.Register(RouterPublicReqs)
+}
+
 func (r *Router) sendError(request routerRequest, errMsg string) {
 	log.Warn(errMsg)
 	var err error

@@ -58,5 +58,10 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 			log.Infof("[router info] privateReqs:%d publicReqs:%d", routerAPI.PrivateCalls, routerAPI.PublicCalls)
 		}
 	}()
+
+	if ma != nil {
+		routerAPI.RegisterMetrics(ma)
+	}
+
 	return
 }
