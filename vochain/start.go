@@ -141,6 +141,8 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig.Consensus.TimeoutPrecommit = time.Second * 3
 	tconfig.Consensus.TimeoutCommit = time.Second * 10
 
+	tconfig.Mempool.Size = 20000
+
 	// tx events
 	tconfig.TxIndex.IndexKeys = "tx.hash,processCreated.entityId"
 	tconfig.TxIndex.IndexAllKeys = true
