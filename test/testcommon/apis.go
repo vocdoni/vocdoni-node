@@ -92,7 +92,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 			vnode := NewMockVochainNode(tb, d)
 			sc := NewMockScrutinizer(tb, d, vnode)
 			routerAPI.Scrutinizer = sc
-			routerAPI.EnableVoteAPI(d.VochainRPCClient, nil)
+			routerAPI.EnableVoteAPI(vnode, d.VochainRPCClient, nil)
 		default:
 			tb.Fatalf("unknown api: %q", api)
 		}

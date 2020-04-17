@@ -470,7 +470,7 @@ func main() {
 	if globalCfg.Mode == "gateway" {
 		// dvote API service
 		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
-			if err := service.API(globalCfg.API, pxy, storage, cm, sc, vinfo, globalCfg.VochainConfig.RPCListen, signer, ma); err != nil {
+			if err := service.API(globalCfg.API, pxy, storage, cm, vnode, sc, vinfo, globalCfg.VochainConfig.RPCListen, signer, ma); err != nil {
 				log.Fatal(err)
 			}
 		}

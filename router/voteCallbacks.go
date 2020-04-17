@@ -26,7 +26,8 @@ func (r *Router) submitEnvelope(request routerRequest) {
 		return
 	}
 
-	res, err := r.tmclient.BroadcastTxSync(voteTxBytes)
+	//res, err := r.tmclient.BroadcastTxSync(voteTxBytes)
+	res, err := r.vocapp.SendTX(voteTxBytes)
 	if err != nil || res == nil {
 		log.Warnf("cannot broadcast tx: (%s)", err)
 		r.sendError(request, "cannot broadcast TX")

@@ -22,6 +22,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
@@ -85,6 +86,7 @@ type Router struct {
 	signer       signature.SignKeys
 	census       *census.Manager
 	tmclient     *voclient.HTTP
+	vocapp       *vochain.BaseApplication
 	metricsagent *metrics.Agent
 	vocinfo      *vochaininfo.VochainInfo
 	allowPrivate bool
@@ -214,8 +216,9 @@ func (r *Router) EnableCensusAPI(cm *census.Manager) {
 }
 
 // EnableVoteAPI enabled the Vote API in the Router
-func (r *Router) EnableVoteAPI(rpcClient *voclient.HTTP, vocInfo *vochaininfo.VochainInfo) {
+func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, rpcClient *voclient.HTTP, vocInfo *vochaininfo.VochainInfo) {
 	r.APIs = append(r.APIs, "vote")
+	r.vocapp = vocapp
 	r.tmclient = rpcClient
 	r.vocinfo = vocInfo
 	r.registerPublic("submitEnvelope", r.submitEnvelope)

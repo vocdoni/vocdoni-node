@@ -5,9 +5,13 @@ import (
 	"fmt"
 
 	amino "github.com/tendermint/go-amino"
+	abci "github.com/tendermint/tendermint/abci/types"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
+	mempl "github.com/tendermint/tendermint/mempool"
 	nm "github.com/tendermint/tendermint/node"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
@@ -35,6 +39,26 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	return &BaseApplication{
 		State: s,
 		Codec: c,
+	}, nil
+}
+
+func (app *BaseApplication) SendTX(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+	var t tmtypes.Tx
+	t = tx
+	resCh := make(chan *abci.Response, 1)
+	err := app.Node.Mempool().CheckTx(tx, func(res *abci.Response) {
+		resCh <- res
+	}, mempl.TxInfo{})
+	if err != nil {
+		return nil, err
+	}
+	res := <-resCh
+	r := res.GetCheckTx()
+	return &ctypes.ResultBroadcastTx{
+		Code: r.Code,
+		Data: r.Data,
+		Log:  r.Log,
+		Hash: t.Hash(),
 	}, nil
 }
 
