@@ -1,6 +1,7 @@
 package log
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 )
 
 var log *zap.SugaredLogger
+var errorLog *os.File
 
 func init() {
 	// Allow overriding the default log level via $LOG_LEVEL, so that the
@@ -36,6 +38,16 @@ func Init(logLevel string, output string) {
 	withOptions := logger.WithOptions(zap.AddCallerSkip(1))
 	log = withOptions.Sugar()
 	log.Infof("logger construction succeeded at level %s and output %s", logLevel, output)
+}
+
+// SetFileErrorLog if set writes the Warning, Error and Fatal messages to a file
+func SetFileErrorLog(path string) {
+	var err error
+	log.Infof("using file %s for logging warning and errors", path)
+	errorLog, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func levelFromString(logLevel string) zapcore.Level {
@@ -86,6 +98,13 @@ func newConfig(logLevel, output string) zap.Config {
 	return cfg
 }
 
+// Not sure if this is thread safe
+func writeErrorToFile(msg string) {
+	if errorLog != nil {
+		errorLog.WriteString(fmt.Sprintf("[%s] %s\n", time.Now().Format("2006/0102/150405"), msg))
+	}
+}
+
 // Debug sends a debug level log message
 func Debug(args ...interface{}) {
 	log.Debug(args...)
@@ -99,16 +118,19 @@ func Info(args ...interface{}) {
 // Warn sends a warn level log message
 func Warn(args ...interface{}) {
 	log.Warn(args...)
+	go writeErrorToFile(fmt.Sprint(args...))
 }
 
 // Error sends an error level log message
 func Error(args ...interface{}) {
 	log.Error(args...)
+	go writeErrorToFile(fmt.Sprint(args...))
 }
 
 // Fatal sends a fatal level log message
 func Fatal(args ...interface{}) {
 	log.Fatal(args...)
+	go writeErrorToFile(fmt.Sprint(args...))
 }
 
 // Debugf sends a formatted debug level log message
@@ -124,16 +146,19 @@ func Infof(template string, args ...interface{}) {
 // Warnf sends a formatted warn level log message
 func Warnf(template string, args ...interface{}) {
 	log.Warnf(template, args...)
+	go writeErrorToFile(fmt.Sprintf(template, args...))
 }
 
 // Errorf sends a formatted error level log message
 func Errorf(template string, args ...interface{}) {
 	log.Errorf(template, args...)
+	go writeErrorToFile(fmt.Sprintf(template, args...))
 }
 
 // Fatalf sends a formatted fatal level log message
 func Fatalf(template string, args ...interface{}) {
 	log.Fatalf(template, args...)
+	go writeErrorToFile(fmt.Sprintf(template, args...))
 }
 
 // Debugw sends a key-value formatted debug level log message

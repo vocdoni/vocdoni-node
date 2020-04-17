@@ -25,6 +25,7 @@ ${listenHost:+ --listenHost=${listenHost}}\
 ${listenPort:+ --listenPort=${listenPort}}\
 ${logLevel:+ --logLevel=${logLevel}}\
 ${logOutput:+ --logOutput=${logOutput}}\
+${logErrorFile:+ --logErrorFile=${logErrorFile}}\
 ${mode:+ --mode=${mode}}\
 ${metricsEnabled:+ --metricsEnabled=${metricsEnabled}}\
 ${metricsRefreshInterval:+ --metricsRefreshInterval=${metricsRefreshInterval}}\

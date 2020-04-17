@@ -53,6 +53,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	flag.BoolVar(&globalCfg.Dev, "dev", true, "run and connect to the development network")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
+	globalCfg.LogErrorFile = *flag.String("logErrorFile", "", "Log errors and warnings to a file")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
 	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. Available options: [gateway,oracle,miner]")
 	// api
@@ -124,6 +125,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	viper.BindPFlag("mode", flag.Lookup("mode"))
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
+	viper.BindPFlag("logErrorFile", flag.Lookup("logErrorFile"))
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
 	viper.BindPFlag("dev", flag.Lookup("dev"))
@@ -278,6 +280,9 @@ func main() {
 		panic("cannot read configuration")
 	}
 	log.Init(globalCfg.LogLevel, globalCfg.LogOutput)
+	if len(globalCfg.LogErrorFile) > 0 {
+		log.SetFileErrorLog(globalCfg.LogErrorFile)
+	}
 	log.Debugf("initializing config %+v", *globalCfg)
 
 	// using dev mode

@@ -122,7 +122,7 @@ func (s *Scrutinizer) addVote(envelope *types.Vote) {
 	var pv ProcessVotes
 
 	if err := s.VochainState.Codec.UnmarshalBinaryBare(process, &pv); err != nil {
-		log.Error("cannot unmarshal vote (%s)", err.Error())
+		log.Errorf("cannot unmarshal vote (%s)", err.Error())
 		return
 	}
 

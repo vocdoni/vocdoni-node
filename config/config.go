@@ -22,6 +22,8 @@ type DvoteCfg struct {
 	LogLevel string
 	// LogOutput logging output
 	LogOutput string
+	// ErrorLogFile for logging warning, error and fatal messages
+	LogErrorFile string
 	// DataDir path where the gateway files will be stored
 	DataDir string
 	// SaveConfig overwrites the config file with the CLI provided flags
