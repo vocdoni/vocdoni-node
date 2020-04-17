@@ -55,6 +55,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.LogErrorFile = *flag.String("logErrorFile", "", "Log errors and warnings to a file")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
+	// TODO(mvdan): turn this into an enum to avoid human error
 	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. Available options: [gateway,oracle,miner]")
 	// api
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
@@ -251,37 +252,41 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	return globalCfg, cfgError
 }
 
-/* Gateway needs:
-	 - signing key
-	 - ethereum
-	 - ipfs storage
-	 - proxy
-	 - api
-	 - ethevents
-	 - census
-	 - vochain
-	 - scrutinizer
-	 - metrics
+/*
+  Gateway needs:
+	- signing key
+	- ethereum
+	- ipfs storage
+	- proxy
+	- api
+	- ethevents
+	- census
+	- vochain
+	- scrutinizer
+	- metrics
 
   Oracle needs:
-	 - signing key
-	 - ethereum
-	 - ethevents
-	 - vochain
+	- signing key
+	- ethereum
+	- ethevents
+	- vochain
 
   Miner needs:
-     - vochain
+	- vochain
 */
+
 func main() {
 	// setup config
 	// creating config and init logger
 	globalCfg, cfgErr := newConfig()
 	if globalCfg == nil {
-		panic("cannot read configuration")
+		log.Fatal("cannot read configuration")
 	}
 	log.Init(globalCfg.LogLevel, globalCfg.LogOutput)
-	if len(globalCfg.LogErrorFile) > 0 {
-		log.SetFileErrorLog(globalCfg.LogErrorFile)
+	if path := globalCfg.LogErrorFile; path != "" {
+		if err := log.SetFileErrorLog(path); err != nil {
+			log.Fatal(err)
+		}
 	}
 	log.Debugf("initializing config %+v", *globalCfg)
 
