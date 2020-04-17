@@ -187,6 +187,8 @@ type VochainCfg struct {
 	NodeKey string
 	// SaveConfig overwrites the config file with the CLI provided flags
 	SaveConfig bool
+	// MempoolSize is the size of the mempool
+	MempoolSize int
 }
 
 // OracleCfg includes all possible config params needed by the Oracle

@@ -38,6 +38,7 @@ dataDir=/app/run
 #vochainRPCListen=0.0.0.0:26657
 #vochainSeedMode=False
 #vochainSeeds=
+#vochainMempoolSize=20000
 #voteApi=True
 #w3Enabled=True
 #w3HTTPHost=0.0.0.0

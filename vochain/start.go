@@ -104,12 +104,12 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	os.MkdirAll(localConfig.DataDir+"/config", 0755)
 	os.MkdirAll(localConfig.DataDir+"/data", 0755)
 
+	// p2p config
 	tconfig.LogLevel = localConfig.LogLevel
 	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RPCListen
 	tconfig.P2P.ListenAddress = "tcp://" + localConfig.P2PListen
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
-
 	if !localConfig.CreateGenesis {
 		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]\"")
 		if len(tconfig.P2P.Seeds) < 8 && !localConfig.SeedMode {
@@ -128,11 +128,11 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 			log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
 		}
 	}
-
 	tconfig.P2P.AddrBookStrict = false
 	tconfig.P2P.SeedMode = localConfig.SeedMode
 	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
 
+	// consensus config
 	tconfig.Consensus.TimeoutProposeDelta = time.Millisecond * 500
 	tconfig.Consensus.TimeoutPropose = time.Second * 3
 	tconfig.Consensus.TimeoutPrevoteDelta = time.Millisecond * 500
@@ -141,9 +141,10 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig.Consensus.TimeoutPrecommit = time.Second * 3
 	tconfig.Consensus.TimeoutCommit = time.Second * 10
 
-	tconfig.Mempool.Size = 20000
+	// mempool config
+	tconfig.Mempool.Size = localConfig.MempoolSize
 
-	// tx events
+	// tx events config
 	tconfig.TxIndex.IndexKeys = "tx.hash,processCreated.entityId"
 	tconfig.TxIndex.IndexAllKeys = true
 
