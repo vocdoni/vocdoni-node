@@ -31,12 +31,15 @@ type ProcessVotes [][]uint32
 // using the local storage database of dbPath and integrated into the state vochain instance
 func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	var s Scrutinizer
-	var err error
 	s.VochainState = state
+	var err error
 	s.Storage, err = db.NewBadgerDB(dbPath)
+	if err != nil {
+		return nil, err
+	}
 	s.VochainState.AddCallback("addProcess", s.onProcess)
 	s.VochainState.AddCallback("addVote", s.onVote)
-	return &s, err
+	return &s, nil
 }
 
 func (s *Scrutinizer) onProcess(v interface{}) {
@@ -167,9 +170,6 @@ func (s *Scrutinizer) VoteResult(processID string) ([][]uint32, error) {
 // List returns a list of keys matching a given prefix
 func (s *Scrutinizer) List(max int, from, prefix string) (list []string) {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
-	if iter == nil {
-		return []string{}
-	}
 	if len(from) > 0 {
 		iter.Seek([]byte(from))
 	}

@@ -99,6 +99,7 @@ func (db *BadgerDB) Close() error {
 type BadgerIterator struct {
 	txn      *badger.Txn
 	iter     *badger.Iterator
+	first    bool // so that the first Next does a Rewind
 	released bool
 }
 
@@ -106,8 +107,9 @@ func (db *BadgerDB) NewIterator() Iterator {
 	txn := db.db.NewTransaction(false)
 	iter := txn.NewIterator(badger.DefaultIteratorOptions)
 	return &BadgerIterator{
-		txn:  txn,
-		iter: iter,
+		txn:   txn,
+		iter:  iter,
+		first: true,
 	}
 }
 
@@ -122,11 +124,16 @@ func (i *BadgerIterator) Released() bool {
 }
 
 func (i *BadgerIterator) Next() bool {
-	v := i.iter.Valid()
-	if v {
+	if i.first {
+		// For the first element, we only rewind.
+		// Don't call iter.Next, as that would skip the first element
+		// entirely.
+		i.iter.Rewind()
+		i.first = false
+	} else {
 		i.iter.Next()
 	}
-	return v
+	return i.iter.Valid()
 }
 
 func (i *BadgerIterator) Seek(key []byte) {

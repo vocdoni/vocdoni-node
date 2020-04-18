@@ -61,7 +61,7 @@ func (dt *table) Close() error { return dt.db.Close() }
 
 // NewIterator initializes type Iterator
 func (dt *table) NewIterator() Iterator {
-	return nil
+	panic("unimplemented")
 }
 
 // Path returns table prefix
