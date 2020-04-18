@@ -22,6 +22,8 @@ const (
 type Scrutinizer struct {
 	VochainState *vochain.State
 	Storage      db.Database
+	votePool     []*types.Vote
+	processPool  []*types.ScrutinizerOnProcessData
 }
 
 // ProcessVotes represents the results of a voting process using a two dimensions slice [ question1:[option1,option2], question2:[option1,option2], ...]
@@ -37,38 +39,50 @@ func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.VochainState.AddCallback("addProcess", s.onProcess)
-	s.VochainState.AddCallback("addVote", s.onVote)
+	s.VochainState.AddEvent("rollback", &s)
+	s.VochainState.AddEvent("addProcess", &s)
+	s.VochainState.AddEvent("addVote", &s)
+	s.VochainState.AddEvent("commit", &s)
+
 	return &s, nil
 }
 
-func (s *Scrutinizer) onProcess(v interface{}) {
-	d := v.(*types.ScrutinizerOnProcessData)
-	s.addProcess(d.ProcessID)
-	s.addEntity(d.EntityID)
+func (s *Scrutinizer) Commit() {
+	for _, p := range s.processPool {
+		s.addEntity(p.EntityID)
+		s.addProcess(p.ProcessID)
+	}
+	for _, v := range s.votePool {
+		s.addVote(v)
+	}
 }
 
-func (s *Scrutinizer) onVote(v interface{}) {
-	d := v.(*types.Vote)
-	s.addVote(d)
+func (s *Scrutinizer) Rollback() {
+	s.votePool = []*types.Vote{}
+	s.processPool = []*types.ScrutinizerOnProcessData{}
+}
+
+func (s *Scrutinizer) OnProcess(pid, eid string) {
+	var data = types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
+	s.processPool = append(s.processPool, &data)
+}
+
+func (s *Scrutinizer) OnVote(v *types.Vote) {
+	s.votePool = append(s.votePool, v)
 }
 
 func (s *Scrutinizer) addEntity(eid string) {
-	log.Debugf("add new entity %s to scrutinizer local database", eid)
+	log.Debugf("add new entity %s to scrutinizer", eid)
 	// TODO(mvdan): use a prefixed database
 	entity, err := s.Storage.Get([]byte(types.ScrutinizerEntityPrefix + eid))
-	if err == nil || len(entity) > 0 {
-		log.Debugf("entity %s already exists", eid)
-		return
-	}
-
-	entityBytes, err := s.VochainState.Codec.MarshalBinaryBare([]byte{})
-	if err != nil {
+	if err != nil && err.Error() != "Key not found" {
 		log.Error(err)
 		return
 	}
-
-	if err := s.Storage.Put([]byte(types.ScrutinizerEntityPrefix+eid), entityBytes); err != nil {
+	if len(entity) > 0 {
+		return
+	}
+	if err := s.Storage.Put([]byte(types.ScrutinizerEntityPrefix+eid), []byte{}); err != nil {
 		log.Error(err)
 		return
 	}
@@ -76,10 +90,13 @@ func (s *Scrutinizer) addEntity(eid string) {
 }
 
 func (s *Scrutinizer) addProcess(pid string) {
-	log.Debugf("add new process %s to scrutinizer local database", pid)
+	log.Debugf("add new process %s to scrutinizer", pid)
 	process, err := s.Storage.Get([]byte(types.ScrutinizerProcessPrefix + pid))
-	if err == nil || len(process) > 0 {
-		log.Errorf("process %s already exist!", pid)
+	if err != nil && err.Error() != "Key not found" {
+		log.Error(err)
+		return
+	}
+	if len(process) > 0 {
 		return
 	}
 	pv := make([][]uint32, MaxQuestions)

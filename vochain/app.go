@@ -42,6 +42,7 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	}, nil
 }
 
+// SendTX sends a transaction to the mempool (sync)
 func (app *BaseApplication) SendTX(tx []byte) (*ctypes.ResultBroadcastTx, error) {
 	var t tmtypes.Tx
 	t = tx
@@ -121,7 +122,6 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 // The header contains the height, timestamp, and more - it exactly matches the Tendermint block header.
 // The LastCommitInfo and ByzantineValidators can be used to determine rewards and punishments for the validators.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	//app.State.Lock.Lock()
 	// reset app state to latest persistent data
 	app.State.Rollback()
 	headerBytes, err := app.Codec.MarshalBinaryBare(req.Header)

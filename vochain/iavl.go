@@ -38,8 +38,20 @@ var (
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
 var PrefixDBCacheSize = 0
 
-// EventCallback is the function type used by State.Callbacks
-type EventCallback func(interface{})
+// ValidEvents contains the list of valid event names
+var ValidEvents = map[string]bool{"addVote": true, "addProcess": true, "commit": true, "rollback": true}
+
+// VochainEvent is an interface used for executing custom functions during the events of the block creation process
+// The events available can be read on ValidEvents string slice
+// The order in which events are executed is: Rollback(), OnVote() or OnProcess(), Commit()
+// The process is concurrencty safe meaning that there cannot be two sequences happening in paralel
+type VochainEvent interface {
+	OnVote(*types.Vote)
+	OnProcess(pid, eid string)
+
+	Commit()
+	Rollback()
+}
 
 // State represents the state of the vochain application
 type State struct {
@@ -48,7 +60,7 @@ type State struct {
 	VoteTree    *iavl.MutableTree
 	Codec       *amino.Codec
 	Lock        sync.Mutex
-	Callbacks   map[string]EventCallback // addVote, addProcess....
+	Events      map[string][]VochainEvent // addVote, addProcess....
 }
 
 // NewState creates a new State
@@ -103,13 +115,17 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	}
 
 	log.Infof("application trees successfully loaded. appTree:%d processTree:%d voteTree: %d", atVersion, ptVersion, vtVersion)
-	vs.Callbacks = make(map[string]EventCallback)
+	vs.Events = make(map[string][]VochainEvent)
 	return &vs, nil
 }
 
-// AddCallback adds a new callback function of type EventCallback which will be exeuted on event name
-func (v *State) AddCallback(name string, f EventCallback) {
-	v.Callbacks[name] = f
+// AddEvent adds a new callback function of type EventCallback which will be exeuted on event name
+func (v *State) AddEvent(name string, f VochainEvent) error {
+	if _, ok := ValidEvents[name]; ok {
+		v.Events[name] = append(v.Events[name], f)
+		return nil
+	}
+	return fmt.Errorf("vochain event %s not valid", name)
 }
 
 // AddOracle adds a trusted oracle given its address if not exists
@@ -227,11 +243,10 @@ func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 		return errors.New("cannot marshal process bytes")
 	}
 	v.ProcessTree.Set([]byte(pid), newProcessBytes)
-	if callBack, ok := v.Callbacks["addProcess"]; ok {
-		go callBack(&types.ScrutinizerOnProcessData{
-			EntityID:  p.EntityID,
-			ProcessID: pid,
-		})
+	if events, ok := v.Events["addProcess"]; ok {
+		for _, e := range events {
+			e.OnProcess(pid, p.EntityID)
+		}
 	}
 	return nil
 }
@@ -324,8 +339,10 @@ func (v *State) AddVote(vote *vochaintypes.Vote) error {
 		return errors.New("cannot marshal vote")
 	}
 	v.VoteTree.Set([]byte(voteID), newVoteBytes)
-	if callBack, ok := v.Callbacks["addVote"]; ok {
-		go callBack(vote)
+	if events, ok := v.Events["addVote"]; ok {
+		for _, e := range events {
+			e.OnVote(vote)
+		}
 	}
 	return nil
 }
@@ -408,6 +425,11 @@ func (v *State) AppHash() []byte {
 
 // Save persistent save of vochain mem trees
 func (v *State) Save() []byte {
+	if events, ok := v.Events["commit"]; ok {
+		for _, e := range events {
+			e.Commit()
+		}
+	}
 	h1, _, err := v.AppTree.SaveVersion()
 	if err != nil {
 		log.Errorf("cannot save vochain state to disk: %s", err)
@@ -426,6 +448,11 @@ func (v *State) Save() []byte {
 
 // Rollback rollbacks to the last persistent db data version
 func (v *State) Rollback() {
+	if events, ok := v.Events["rollback"]; ok {
+		for _, e := range events {
+			e.Rollback()
+		}
+	}
 	v.AppTree.Rollback()
 	v.ProcessTree.Rollback()
 	v.VoteTree.Rollback()
