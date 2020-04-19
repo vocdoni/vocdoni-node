@@ -11,7 +11,7 @@ CMD=${CMD:-dvotenode}
 check_git() { # 0=no | 1=yes
 	[ -n "$FORCE" ] && echo "Force is enabled" && return 1
 	git fetch origin
-	local is_updated=$(git log HEAD..origin/master --oneline | wc -c) # 0=yes
+	local is_updated=$(git log HEAD..origin/$BRANCH --oneline | wc -c) # 0=yes
 	[ $is_updated -gt 0 ] && git pull origin $BRANCH --force && return 1
 	return 0
 }

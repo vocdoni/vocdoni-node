@@ -1,14 +1,13 @@
 #!/bin/bash
-
-# INFO
 IMAGE_TAG="vocdoni/dvotenode"
 API_PORT="${API_PORT:-9090}"
 IN_MEMORY="${IN_MEMORY:-false}"
+PORTS="${PORTS:-4001 4171 5001 30303 9096 31000 26656 26657}"
 
-echo "Using image '$IMAGE_TAG:latest'\n"
+echo "using image $IMAGE_TAG:latest"
 
 docker build -t $IMAGE_TAG --target dvotenode . || {
-	echo "ERROR: docker image cannot be created, exiting..."
+	echo "Error: docker image cannot be created, exiting..."
 	exit 2
 }
 
@@ -16,24 +15,29 @@ docker build -t $IMAGE_TAG --target dvotenode . || {
 COUNT="$(docker ps -a | grep $IMAGE_TAG | wc -l)"
 
 [ "$COUNT" != "0" ] && {
-	echo -e "\nWARNING: A container with tag $IMAGE_TAG is already running\n"
-	docker ps -a | grep $IMAGE_TAG
-	echo -e "\nSkipping 'docker run'"
+	echo "Error: a container with tag $IMAGE_TAG is already running: $(docker ps -a | grep $IMAGE_TAG)"
 	exit 2
 }
 
 ENVFILE=""
+
+[ -f env.local ] && ENVFILE="env.local" || {
+[ -f dockerfiles/dvotenode/env.local ] && ENVFILE="dockerfiles/dvotenode/env.local" || {
+[ -f env ] && ENVFILE="env" || {
 [ -f dockerfiles/dvotenode/env ] && ENVFILE="dockerfiles/dvotenode/env"
-[ -f env ] && ENVFILE="env"
-[ -n "$ENVFILE" ] && echo "using ENV FILE $ENVFILE" 
+};};}
+
+[ -n "$ENVFILE" ] && echo "using ENV FILE $ENVFILE" || echo "Warning, no ENV file found!"
 
 [ ! -d run ] && mkdir run
 
 [ "$IN_MEMORY" == "true" ] && EXTRA_OPTS="$EXTRA_OPTS --volume-driver memfs"
 
+echo "mapped ports: $API_PORT $PORTS"
+
 # RUN DOCKER
 docker run --name `echo $IMAGE_TAG-$RANDOM | tr "/" "-"` -d \
-	-p 4001:4001 -p 4171:4171 -p 5001:5001 -p $API_PORT:9090 -p 30303:30303 -p 9096:9096 -p 31000:31000 -p 26656:26656 -p 26657:26657 \
+	`for p in $API_PORT $PORTS; do echo -n "-p $p:$p "; done` \
 	-v $PWD/run:/app/run -v $PWD/misc:/app/misc $EXTRA_OPTS \
 	`[ -n "$ENVFILE" ] && echo -n "--env-file $ENVFILE"` \
 	$IMAGE_TAG
