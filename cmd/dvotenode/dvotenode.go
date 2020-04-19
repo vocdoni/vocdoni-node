@@ -185,7 +185,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.NodeKey", flag.Lookup("vochainNodeKey"))
 	viper.BindPFlag("vochainConfig.seedMode", flag.Lookup("vochainSeedMode"))
 	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
-	viper.BindPFlag("vochainConfig.MempoolSize", flag.Lookup("mempoolSize"))
+	viper.BindPFlag("vochainConfig.MempoolSize", flag.Lookup("vochainMempoolSize"))
 
 	// metrics
 	viper.BindPFlag("metrics.enabled", flag.Lookup("metricsEnabled"))
