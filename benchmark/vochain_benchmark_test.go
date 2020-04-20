@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/hashing"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
@@ -79,10 +78,12 @@ func BenchmarkVochain(b *testing.B) {
 
 	// census add claims
 	poseidonHashes := make([]string, len(pubKeys))
+	var hash []byte
 	for count, key := range pubKeys {
-		if poseidonHashes[count], err = hashing.PoseidonHash(key); err != nil {
+		if hash = signature.HashPoseidon(key); len(hash) == 0 {
 			b.Fatalf("cannot create poseidon hash of public key: %+v", pubKeys[count])
 		}
+		poseidonHashes[count] = base64.StdEncoding.EncodeToString(hash)
 	}
 	log.Debugf("poseidon hashes: %s", poseidonHashes)
 	log.Debug("add bulk claims")

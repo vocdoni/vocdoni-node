@@ -3,7 +3,6 @@ package signature
 
 import (
 	"crypto/ecdsa"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,8 +11,8 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/iden3/go-iden3-crypto/poseidon"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/hashing"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
@@ -327,14 +326,31 @@ func HashRaw(data string) []byte {
 	return crypto.Keccak256([]byte(data))
 }
 
-// HashPoseidon hash a hexString using Poseidon hash function
-func HashPoseidon(hexStr string) []byte {
-	b64hash, err := hashing.PoseidonHash(hexStr)
+// HashPoseidon computes the Poseidon hash of the given hex string
+// The hash is padded to 32 bytes with 0 at the begginig
+func HashPoseidon(hexPayload string) []byte {
+	hexPayload = util.TrimHex(hexPayload)
+	if len(hexPayload)%2 != 0 {
+		hexPayload = "0" + hexPayload
+	}
+	hexPayloadBytes, err := hex.DecodeString(hexPayload)
 	if err != nil {
 		return []byte{}
 	}
-	hash, _ := base64.StdEncoding.DecodeString(b64hash)
-	return hash
+
+	hashNum, err := poseidon.HashBytes(hexPayloadBytes)
+	if err != nil {
+		return []byte{}
+	}
+	phash := make([]byte, 32)
+	hash := hashNum.Bytes()
+	var padding []byte
+	for i := len(hash); i < 32; i++ {
+		padding = append(padding, 0)
+	}
+	copy(phash[:], padding[:])
+	copy(phash[len(padding):], hash[:])
+	return phash
 }
 
 // Encrypt uses secp256k1 standard from https://www.secg.org/sec2-v2.pdf to encrypt a message.
