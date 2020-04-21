@@ -174,6 +174,10 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 		}
 		return events, nil
 
+	case types.CancelProcessTx:
+		if err := state.CancelProcess(tx.ProcessID); err != nil {
+			return nil, err
+		}
 	}
 	return nil, fmt.Errorf("invalid type")
 }
@@ -337,7 +341,7 @@ func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) e
 	}
 	authorized, addr := VerifySignatureAgainstOracles(oracles, string(processBytes), sign)
 	if !authorized {
-		return fmt.Errorf("unauthorized to create a process, message: %s, recovered addr: %s", string(processBytes), addr)
+		return fmt.Errorf("unauthorized to cancel a process, message: %s, recovered addr: %s", string(processBytes), addr)
 	}
 	// get process
 	process, err := state.Process(sanitizedPID)
