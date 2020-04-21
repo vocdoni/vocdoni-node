@@ -250,8 +250,8 @@ type IPFSsync struct {
 }
 
 // NewIPFSsync creates a new IPFSsync instance. Transports supported are "libp2p" or "privlibp2p"
-func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.Storage) IPFSsync {
-	is := IPFSsync{
+func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.Storage) *IPFSsync {
+	is := &IPFSsync{
 		DataDir:         dataDir,
 		Topic:           groupKey,
 		PrivKey:         privKeyHex,

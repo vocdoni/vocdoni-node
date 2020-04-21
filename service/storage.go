@@ -51,7 +51,7 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *signature.SignKeys, ma *metrics.Ag
 		if len(ipfsconfig.SyncKey) > 0 {
 			log.Info("enabling ipfs synchronization")
 			_, priv := signer.HexString()
-			storageSync = ipfssync.NewIPFSsync(ipfsconfig.ConfigPath+"/.ipfsSync", ipfsconfig.SyncKey, priv, "libp2p", storage)
+			storageSync = *ipfssync.NewIPFSsync(ipfsconfig.ConfigPath+"/.ipfsSync", ipfsconfig.SyncKey, priv, "libp2p", storage)
 			if len(ipfsconfig.SyncPeers) > 0 && len(ipfsconfig.SyncPeers[0]) > 8 {
 				log.Debugf("using custom ipfs sync bootnodes %s", ipfsconfig.SyncPeers)
 				storageSync.Transport.SetBootnodes(ipfsconfig.SyncPeers)

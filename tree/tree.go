@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
+	"time"
 
 	common3 "github.com/iden3/go-iden3-core/common"
 	"github.com/iden3/go-iden3-core/core/claims"
@@ -18,9 +20,11 @@ import (
 )
 
 type Tree struct {
-	StorageDir string
-	Tree       *merkletree.MerkleTree
-	Storage    iden3db.Storage
+	StorageDir     string
+	Tree           *merkletree.MerkleTree
+	Storage        iden3db.Storage
+	LastAccessTime time.Time
+	timeMu         sync.RWMutex
 }
 
 const (
@@ -55,12 +59,27 @@ func (t *Tree) Init(namespace string) error {
 	}
 	t.Storage = storage
 	t.Tree = mt
+	t.updateAccessTime()
 	return nil
 }
 
 // Close closes the storage of the merkle tree
 func (t *Tree) Close() {
 	t.Tree.Storage().Close()
+}
+
+//LastAccess returns the last time the Tree was accessed
+func (t *Tree) LastAccess() time.Time {
+	t.timeMu.Lock()
+	defer t.timeMu.Unlock()
+	return t.LastAccessTime
+}
+
+// TODO(mvdan): use sync/atomic instead to avoid introducing a bottleneck
+func (t *Tree) updateAccessTime() {
+	t.timeMu.Lock()
+	defer t.timeMu.Unlock()
+	t.LastAccessTime = time.Now()
 }
 
 func (t *Tree) entry(index, value []byte) (*merkletree.Entry, error) {
@@ -99,6 +118,7 @@ func getDataFromClaim(c *claims.ClaimBasic) ([]byte, []byte) {
 //  2.value is optional, the data will not affect the indexing
 // Use value only if index is too small
 func (t *Tree) AddClaim(index, value []byte) error {
+	t.updateAccessTime()
 	if len(index) < 4 {
 		return fmt.Errorf("claim index too small (%d), minimum size is 4 bytes", len(index))
 	}
@@ -111,6 +131,7 @@ func (t *Tree) AddClaim(index, value []byte) error {
 
 // GenProof generates a merkle tree proof that can be later used on CheckProof() to validate it
 func (t *Tree) GenProof(index, value []byte) (string, error) {
+	t.updateAccessTime()
 	e, err := t.entry(index, value)
 	if err != nil {
 		return "", err
@@ -162,11 +183,13 @@ func CheckProof(root, mpHex string, index, value []byte) (bool, error) {
 
 // CheckProof validates a merkle proof and its data
 func (t *Tree) CheckProof(index, value []byte, mpHex string) (bool, error) {
+	t.updateAccessTime()
 	return CheckProof(t.Root(), mpHex, index, value)
 }
 
 // Root returns the current root hash of the merkle tree
 func (t *Tree) Root() string {
+	t.updateAccessTime()
 	return common3.HexEncode(t.Tree.RootKey().Bytes())
 }
 
@@ -183,6 +206,7 @@ func stringToHash(hash string) (merkletree.Hash, error) {
 // Dump returns the whole merkle tree serialized in a format that can be used on Import
 func (t *Tree) Dump(root string) (claims []string, err error) {
 	var rootHash merkletree.Hash
+	t.updateAccessTime()
 	if len(root) > 0 {
 		rootHash, err = stringToHash(root)
 		if err != nil {
@@ -198,6 +222,7 @@ func (t *Tree) Size(root string) (int64, error) {
 	var err error
 	var rootHash merkletree.Hash
 	var size int64
+	t.updateAccessTime()
 	if len(root) > 0 {
 		rootHash, err = stringToHash(root)
 		if err != nil {
@@ -219,6 +244,7 @@ func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, []string, 
 	var indexes, values []string
 	var err error
 	var rootHash merkletree.Hash
+	t.updateAccessTime()
 	if len(root) > 0 {
 		rootHash, err = stringToHash(root)
 		if err != nil {
@@ -247,6 +273,7 @@ func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, []string, 
 
 // ImportDump imports a partial or whole tree previously exported with Dump()
 func (t *Tree) ImportDump(claims []string) error {
+	t.updateAccessTime()
 	return t.Tree.ImportDumpedClaims(claims)
 }
 
@@ -268,6 +295,7 @@ func (t *Tree) Snapshot(root string) (*Tree, error) {
 
 // HashExist checks if a hash exists as a node in the merkle tree
 func (t *Tree) HashExist(hash string) (bool, error) {
+	t.updateAccessTime()
 	h, err := stringToHash(hash)
 	if err != nil {
 		return false, err

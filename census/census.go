@@ -34,10 +34,10 @@ type Namespace struct {
 }
 
 type Manager struct {
-	StorageDir string     // Root storage data dir
-	AuthWindow int32      // Time window (seconds) in which TimeStamp will be accepted if auth enabled
-	Census     Namespaces // Available namespaces
-
+	StorageDir    string        // Root storage data dir
+	AuthWindow    int32         // Time window (seconds) in which TimeStamp will be accepted if auth enabled
+	Census        Namespaces    // Available namespaces
+	LoadThreshold time.Duration // How many time will a Census stay open/loaded since the last access
 	// TODO(mvdan): should we protect Census with the mutex too?
 	TreesMu sync.RWMutex
 	Trees   map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
@@ -61,6 +61,7 @@ func (m *Manager) Init(storage, rootKey string) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storage)
 	m.StorageDir = storage
 	m.Trees = make(map[string]*tree.Tree)
+	m.LoadThreshold = 1200 * time.Second
 
 	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
 	m.importQueue = make(chan censusImport, 32)
@@ -101,6 +102,8 @@ func (m *Manager) Init(storage, rootKey string) error {
 	}
 	// Start daemon for importing remote census
 	go m.importQueueDaemon()
+	// Start daemon for unloading trees
+	go m.unloadManager()
 
 	return nil
 }
@@ -215,6 +218,20 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+// unloadManager is a blocking process that unloads trees if they are not used for some time
+func (m *Manager) unloadManager() {
+	for {
+		time.Sleep(60 * time.Second)
+		m.TreesMu.Lock()
+		for k, tree := range m.Trees {
+			if tree.LastAccess().Add(m.LoadThreshold).Before(time.Now()) {
+				m.UnloadTree(k)
+			}
+		}
+		m.TreesMu.Unlock()
+	}
 }
 
 // CheckAuth check if a census request message is authorized
