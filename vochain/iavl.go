@@ -367,17 +367,23 @@ func (v *State) Envelope(voteID string) (*vochaintypes.Vote, error) {
 	return vote, nil
 }
 
+// The prefix is "processID_", where processID is a stringified hash of fixed length.
+// To iterate over all the keys with said prefix, the start point can simply be "processID_".
+// We don't know what the next processID hash will be, so we use "processID}"
+// as the end point, since "}" comes after "_" when sorting lexicographically.
+func (v *State) iterateProcessID(processID string, fn func(key []byte, value []byte) bool) bool {
+	return v.VoteTree.IterateRange([]byte(processID+"_"), []byte(processID+"}"), true, fn)
+}
+
 // CountVotes returns the number of votes registered for a given process id
 func (v *State) CountVotes(processID string) int64 {
 	processID = util.TrimHex(processID)
 	var count int64
-	v.VoteTree.IterateRange([]byte(processID), nil, true, func(key []byte, value []byte) bool {
-		k := strings.Split(string(key), "_")
-		if k[0] == processID {
-			count++
-		}
+	fn := func(key []byte, value []byte) bool {
+		count++
 		return false
-	})
+	}
+	v.iterateProcessID(processID, fn)
 	return count
 }
 
@@ -386,7 +392,7 @@ func (v *State) EnvelopeList(processID string, from, listSize int64) []string {
 	processID = util.TrimHex(processID)
 	var nullifiers []string
 	idx := int64(0)
-	v.VoteTree.IterateRange([]byte(processID), nil, true, func(key []byte, value []byte) bool {
+	fn := func(key []byte, value []byte) bool {
 		if idx >= listSize {
 			return true
 		}
@@ -396,7 +402,8 @@ func (v *State) EnvelopeList(processID string, from, listSize int64) []string {
 		}
 		idx++
 		return false
-	})
+	}
+	v.iterateProcessID(processID, fn)
 	return nullifiers
 }
 
@@ -458,7 +465,7 @@ func (v *State) Rollback() {
 	v.VoteTree.Rollback()
 }
 
-// Hash returns the hash of the vochain trees mkroots
+// WorkingHash returns the hash of the vochain trees mkroots
 // hash(appTree+processTree+voteTree)
 func (v *State) WorkingHash() []byte {
 	return signature.HashRaw(fmt.Sprintf("%s%s%s", v.AppTree.WorkingHash(), v.ProcessTree.WorkingHash(), v.VoteTree.WorkingHash()))
