@@ -91,26 +91,9 @@ func (k *SignKeys) AddAuthKey(address string) error {
 
 // HexString returns the public compressed and private keys as hex strings
 func (k *SignKeys) HexString() (string, string) {
-	pubHex := fmt.Sprintf("%x", crypto.FromECDSAPub(k.Public))
-	pubHexComp, _ := CompressPubKey(pubHex)
+	pubHexComp := fmt.Sprintf("%x", crypto.CompressPubkey(k.Public))
 	privHex := fmt.Sprintf("%x", crypto.FromECDSA(k.Private))
 	return pubHexComp, privHex
-}
-
-// CompressPubKey returns the compressed public key in hexString format
-func CompressPubKey(pubHex string) (string, error) {
-	if len(pubHex) <= PubKeyLength {
-		return pubHex, nil
-	}
-	pubBytes, err := hex.DecodeString(util.TrimHex(pubHex))
-	if err != nil {
-		return "", err
-	}
-	pub, err := crypto.UnmarshalPubkey(pubBytes)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", crypto.CompressPubkey(pub)), nil
 }
 
 // DecompressPubKey takes a hexString compressed public key and returns it descompressed
