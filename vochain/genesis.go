@@ -2,10 +2,10 @@ package vochain
 
 // Testnet Genesis File for Vocdoni KISS v1
 const (
-	TestnetGenesis1 = `
+	ReleaseGenesis1 = `
 {
-  "genesis_time": "2020-02-04T09:30:50.199392102Z",
-  "chain_id": "0x6",
+  "genesis_time": "2020-04-04T09:30:50.199392102Z",
+  "chain_id": "vocdoni-release-01",
   "consensus_params": {
     "block": {
       "max_bytes": "22020096",
@@ -101,7 +101,7 @@ const (
       }
         ],
     "oracles": [
-      "0xF904848ea36c46817096E94f932A9901E377C8a5"
+      "0x73ab4566b2e404e2be4fe9a8fb007f4014292c0c"
     ]
   }
 }
@@ -110,7 +110,7 @@ const (
 	DevelopmentGenesis1 = `
 {
   "genesis_time": "2020-04-12T20:29:50.512370579Z",
-  "chain_id": "vocdoni-development-06",
+  "chain_id": "vocdoni-development-08",
   "consensus_params": {
     "block": {
       "max_bytes": "22020096",

@@ -45,7 +45,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Age
 	if dev {
 		vnode = vochain.NewVochain(vconfig, []byte(vochain.DevelopmentGenesis1))
 	} else {
-		vnode = vochain.NewVochain(vconfig, []byte(vochain.TestnetGenesis1))
+		vnode = vochain.NewVochain(vconfig, []byte(vochain.ReleaseGenesis1))
 	}
 	// Scrutinizer
 	if results {
