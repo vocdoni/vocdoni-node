@@ -13,10 +13,10 @@ docker build -t $IMAGE_TAG --target dvotenode . || {
 }
 
 # CHECK IF ALREADY RUNNING
-COUNT="$(docker ps -a | grep $IMAGE_TAG | wc -l)"
+COUNT="$(docker ps -a | grep $NAME | wc -l)"
 
 [ "$COUNT" != "0" ] && {
-	echo "Error: a container with tag $IMAGE_TAG is already running: $(docker ps -a | grep $IMAGE_TAG)"
+	echo "Error: a container with tag $NAME is already running: $(docker ps -a | grep $NAME)"
 	exit 2
 }
 
