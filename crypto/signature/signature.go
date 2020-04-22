@@ -310,16 +310,8 @@ func HashPoseidon(hexPayload string) []byte {
 // Encrypt uses secp256k1 standard from https://www.secg.org/sec2-v2.pdf to encrypt a message.
 // The result is a Hexadecimal string
 func (k *SignKeys) Encrypt(message string) (string, error) {
-	pub, _ := k.HexString()
-	pubBytes, err := hex.DecodeString(pub)
-	if err != nil {
-		return "", err
-	}
-	pubKey, err := secp256k1.ParsePubKey(pubBytes)
-	if err != nil {
-		return "", err
-	}
-	ciphertext, err := secp256k1.Encrypt(pubKey, []byte(message))
+	pubKey := secp256k1.PublicKey(*k.Public)
+	ciphertext, err := secp256k1.Encrypt(&pubKey, []byte(message))
 	if err != nil {
 		return "", err
 	}
@@ -329,17 +321,12 @@ func (k *SignKeys) Encrypt(message string) (string, error) {
 // Decrypt uses secp256k1 standard to decrypt a Hexadecimal string message
 // The result is plain text (no hex encoded)
 func (k *SignKeys) Decrypt(hexMessage string) (string, error) {
-	_, priv := k.HexString()
-	pkBytes, err := hex.DecodeString(priv)
-	if err != nil {
-		return "", err
-	}
-	privKey, _ := secp256k1.PrivKeyFromBytes(pkBytes)
 	cipertext, err := hex.DecodeString(util.TrimHex(hexMessage))
 	if err != nil {
 		return "", err
 	}
-	plaintext, err := secp256k1.Decrypt(privKey, cipertext)
+	privKey := secp256k1.PrivateKey(*k.Private)
+	plaintext, err := secp256k1.Decrypt(&privKey, cipertext)
 	if err != nil {
 		return "", err
 	}
