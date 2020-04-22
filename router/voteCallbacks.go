@@ -156,6 +156,36 @@ func (r *Router) getProcessList(request routerRequest) {
 	r.transport.Send(r.buildReply(request, response))
 }
 
+func (r *Router) getProcessKeys(request routerRequest) {
+	qdata := types.QueryData{
+		Method:    "getProcessKeys",
+		ProcessID: request.ProcessID,
+	}
+	qdataBytes, err := json.Marshal(qdata)
+	if err != nil {
+		log.Errorf("cannot marshal query data: (%s)", err)
+		r.sendError(request, "cannot marshal query data")
+		return
+	}
+	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
+	if err != nil {
+		log.Warnf("cannot query: (%s)", err)
+		r.sendError(request, "cannot query")
+		return
+	}
+	if queryResult.Response.Code != 0 {
+		r.sendError(request, queryResult.Response.GetInfo())
+		return
+	}
+	var response types.ResponseMessage
+	if err := r.codec.UnmarshalBinaryBare(queryResult.Response.Value, &response.ProcessKeys); err != nil {
+		log.Errorf("cannot unmarshal process keys: (%s)", err)
+		r.sendError(request, "cannot unmarshal process keys")
+		return
+	}
+	r.transport.Send(r.buildReply(request, response))
+}
+
 func (r *Router) getEnvelopeList(request routerRequest) {
 	// here we can ask to tendermint via query to get the results from the database
 	qdata := types.QueryData{

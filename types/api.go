@@ -69,6 +69,7 @@ type MetaResponse struct {
 	Paused        *bool      `json:"paused,omitempty"`
 	Payload       string     `json:"payload,omitempty"`
 	ProcessIDs    []string   `json:"processIds,omitempty"`
+	ProcessKeys   []string   `json:"processKeys,omitempty"`
 	ProcessList   []string   `json:"processList,omitempty"`
 	Registered    *bool      `json:"registered,omitempty"`
 	Request       string     `json:"request"`

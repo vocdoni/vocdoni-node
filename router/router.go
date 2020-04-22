@@ -228,6 +228,7 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, rpcClient *vocli
 	r.registerPublic("getProcessList", r.getProcessList)
 	r.registerPublic("getEnvelopeList", r.getEnvelopeList)
 	r.registerPublic("getBlockHeight", r.getBlockHeight)
+	r.registerPublic("getProcessKeys", r.getProcessKeys)
 	if r.Scrutinizer != nil {
 		r.APIs = append(r.APIs, "results")
 		r.registerPublic("getResults", r.getResults)

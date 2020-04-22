@@ -209,9 +209,19 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 				return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal envelope list bytes"}
 			}
 			return abcitypes.ResponseQuery{Code: 0, Value: nBytes, Info: "ok"}
-		} else {
-			return abcitypes.ResponseQuery{Code: 0, Value: []byte{}, Info: "any envelope available"}
 		}
+		return abcitypes.ResponseQuery{Code: 0, Value: []byte{}, Info: "any envelope available"}
+	case "getProcessKeys":
+		var p *types.Process
+		var pubKeysBytes []byte
+		var err error
+		if p, err = app.State.Process(reqData.ProcessID); err != nil {
+			return abcitypes.ResponseQuery{Code: 1, Info: err.Error()}
+		}
+		if pubKeysBytes, err = app.State.Codec.MarshalBinaryBare(p.EncryptionPublicKeys); err != nil {
+			return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal process bytes"}
+		}
+		return abcitypes.ResponseQuery{Code: 0, Value: pubKeysBytes}
 	default:
 		return abcitypes.ResponseQuery{Code: 1, Info: "undefined query method"}
 	}
