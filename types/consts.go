@@ -14,4 +14,12 @@ const (
 	ScrutinizerProcessPrefix = "p_"
 	// ScrutinizerEntityPrefix is the prefix for the levelDB entity keys
 	ScrutinizerEntityPrefix = "e_"
+	// PetitionSign contains the string that needs to match with the received vote type for petition-sign
+	PetitionSign = "petition-sign"
+	// PollVote contains the string that needs to match with the received vote type for poll-vote
+	PollVote = "poll-vote"
+	// EncryptedPoll contains the string that needs to match with the received vote type for encrypted-poll
+	EncryptedPoll = "encrypted-poll"
+	// SnarkVote contains the string that needs to match with the received vote type for snark-vote
+	SnarkVote = "snark-vote"
 )

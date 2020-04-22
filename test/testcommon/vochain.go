@@ -33,7 +33,7 @@ var (
 		MkRoot:               "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
 		NumberOfBlocks:       1000,
 		EncryptionPublicKeys: OracleListHardcoded, // reusing oracle keys as encryption pub keys
-		Type:                 "petition-sign",
+		Type:                 types.PetitionSign,
 	}
 
 	VoteHardcoded = &types.Vote{
@@ -51,7 +51,7 @@ var (
 		MkRoot:               "0x0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
 		NumberOfBlocks:       1000,
 		ProcessID:            "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
-		ProcessType:          "petition-sign",
+		ProcessType:          types.PetitionSign,
 		Signature:            "b25259cff9ce3a709e517c6a01e445f216212f58f553fa26d25566b7c731339242ef9a0df0235b53a819a64ebf2c3394fb6b56138c5113cc1905c68ffcebb1971c",
 		Type:                 "newProcess",
 	}

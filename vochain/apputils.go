@@ -92,13 +92,13 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 		}
 		vote := new(types.Vote)
 		switch process.Type {
-		case "snark-vote":
+		case types.SnarkVote:
 			vote.Nullifier = util.TrimHex(tx.Nullifier)
 			vote.Nonce = util.TrimHex(tx.Nonce)
 			vote.ProcessID = util.TrimHex(tx.ProcessID)
 			vote.VotePackage = util.TrimHex(tx.VotePackage)
 			vote.Proof = util.TrimHex(tx.Proof)
-		case "poll-vote", "petition-sign":
+		case types.PollVote, types.PetitionSign, types.EncryptedPoll:
 			vote.Nonce = tx.Nonce
 			vote.ProcessID = tx.ProcessID
 			vote.Proof = tx.Proof
@@ -127,7 +127,6 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 				return nil, fmt.Errorf("cannot generate nullifier")
 			}
 			vote.Nullifier = nullifier
-
 		default:
 			return nil, fmt.Errorf("invalid process type")
 		}
@@ -173,7 +172,6 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 			},
 		}
 		return events, nil
-
 	case types.CancelProcessTx:
 		if err := state.CancelProcess(tx.ProcessID); err != nil {
 			return nil, err
@@ -197,7 +195,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 	// check if process is enabled
 	if (state.Height() >= process.StartBlock && state.Height() <= endBlock) && !process.Canceled && !process.Paused {
 		switch process.Type {
-		case "snark-vote":
+		case types.SnarkVote:
 			sanitizedNullifier := util.TrimHex(vote.Nullifier)
 			if !util.IsHexEncodedStringWithLength(sanitizedNullifier, voteNullifierSize) {
 				return fmt.Errorf("malformed nullifier")
@@ -210,7 +208,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 			}
 			// TODO check snark
 			return nil
-		case "poll-vote", "petition-sign":
+		case types.PollVote, types.PetitionSign, types.EncryptedPoll:
 			var voteTmp types.VoteTx
 			voteTmp.Nonce = vote.Nonce
 			voteTmp.ProcessID = vote.ProcessID
@@ -312,7 +310,7 @@ func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 	}
 	// check type
 	switch process.ProcessType {
-	case "snark-vote", "poll-vote", "petition-sign":
+	case types.SnarkVote, types.PollVote, types.PetitionSign, types.EncryptedPoll:
 		// ok
 	default:
 		return fmt.Errorf("process type (%s) not valid", process.ProcessType)

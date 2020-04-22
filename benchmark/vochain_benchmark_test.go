@@ -21,7 +21,6 @@ import (
 const (
 	numberOfBlocks = 1000
 	processID      = "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"
-	processType    = "poll-vote"
 )
 
 func BenchmarkVochain(b *testing.B) {
@@ -121,7 +120,7 @@ func BenchmarkVochain(b *testing.B) {
 		MkRoot:               mkRoot,
 		NumberOfBlocks:       numberOfBlocks,
 		ProcessID:            processID,
-		ProcessType:          processType,
+		ProcessType:          types.PollVote,
 		StartBlock:           *resp.Height + 1,
 		Type:                 "newProcess",
 	}
@@ -214,7 +213,7 @@ func vochainBench(b *testing.B, c *testcommon.APIConnection, s *signature.SignKe
 	votePkg := &types.VotePackageStruct{
 		Nonce: req.Payload.Nonce,
 		Votes: []int{1},
-		Type:  "poll-vote",
+		Type:  types.PollVote,
 	}
 	voteBytes, err := json.Marshal(votePkg)
 	if err != nil {
