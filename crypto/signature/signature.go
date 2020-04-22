@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	i3utils "github.com/iden3/go-iden3-core/merkletree"
 	"github.com/iden3/go-iden3-crypto/poseidon"
@@ -40,71 +39,54 @@ type SignKeys struct {
 	Authorized []Address
 }
 
-// Address is an Ethereum like adrress
+// Address is an Ethereum like address
 type Address [AddressLength]byte
 
-func (a *Address) String() string {
-	return fmt.Sprintf("%s", a[:])
-}
-
-// AddressFromString gets an string and creates and address with each element
-func AddressFromString(s string) Address {
-	hex, err := hexutil.Decode(s)
+// addrFromString decodes an address from a hex string.
+func addrFromString(s string) (Address, error) {
+	s = util.TrimHex(s)
+	addrBytes, err := hex.DecodeString(s)
 	if err != nil {
-		panic(err)
+		return Address{}, err
 	}
-	var a Address
-	for c, e := range hex {
-		a[c] = e
+	if len(addrBytes) != AddressLength {
+		return Address{}, fmt.Errorf("invalid address length")
 	}
-	return a
-}
-
-// StringFromAddress gets an encoded Address and returns the human readable ASCII string
-func StringFromAddress(a Address) string {
-	out := make([]byte, 20)
-	for c, e := range a {
-		out[c] = e
-	}
-	s := hexutil.Encode(out)
-	return s
+	var addr Address
+	copy(addr[:], addrBytes)
+	return addr, nil
 }
 
 // Generate generates new keys
 func (k *SignKeys) Generate() error {
-	var err error
 	key, err := crypto.GenerateKey()
 	if err != nil {
 		return err
 	}
-	k.Public = &key.PublicKey
 	k.Private = key
+	k.Public = &key.PublicKey
 	return nil
 }
 
 // AddHexKey imports a private hex key
 func (k *SignKeys) AddHexKey(privHex string) error {
-	var err error
-	k.Private, err = crypto.HexToECDSA(util.TrimHex(privHex))
-	if err == nil {
-		k.Public = &k.Private.PublicKey
+	key, err := crypto.HexToECDSA(util.TrimHex(privHex))
+	if err != nil {
+		return err
 	}
-	return err
+	k.Private = key
+	k.Public = &key.PublicKey
+	return nil
 }
 
 // AddAuthKey adds a new authorized address key
 func (k *SignKeys) AddAuthKey(address string) error {
-	addrBytes, err := hex.DecodeString(util.TrimHex(address))
+	addr, err := addrFromString(address)
 	if err != nil {
 		return err
 	}
-	if len(addrBytes) == AddressLength {
-		var addr Address
-		copy(addr[:], addrBytes[:AddressLength])
-		k.Authorized = append(k.Authorized, addr)
-		return nil
-	}
-	return errors.New("invalid address lenght")
+	k.Authorized = append(k.Authorized, addr)
+	return nil
 }
 
 // HexString returns the public compressed and private keys as hex strings

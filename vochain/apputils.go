@@ -384,12 +384,11 @@ func checkMerkleProof(rootHash, hexproof string, leafData []byte) (bool, error) 
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
 func VerifySignatureAgainstOracles(oracles []string, message, signHex string) (bool, string) {
-	oraclesAddr := make([]signature.Address, len(oracles))
-	for i, v := range oracles {
-		oraclesAddr[i] = signature.AddressFromString(fmt.Sprintf("0x%s", v))
-	}
-	signKeys := signature.SignKeys{
-		Authorized: oraclesAddr,
+	signKeys := signature.SignKeys{}
+	for _, oracle := range oracles {
+		if err := signKeys.AddAuthKey(oracle); err != nil {
+			log.Error(err) // TODO: return this error to the user?
+		}
 	}
 	res, addr, _ := signKeys.VerifySender(message, signHex)
 	return res, addr
