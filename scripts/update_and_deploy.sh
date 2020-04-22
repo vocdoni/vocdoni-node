@@ -1,6 +1,7 @@
 #!/bin/bash
 BRANCH=${BRANCH:-master}
 CMD=${CMD:-dvotenode}
+NAME="$CMD-$BRANCH"
 
 [ ! -d dockerfiles/$CMD ] && {
   echo "dockerfiles/$CMD does not exist"
@@ -18,9 +19,9 @@ check_git() { # 0=no | 1=yes
 
 check_git || {
  echo "Updating and deploying container"
- for f in `docker container ls | grep $CMD | awk '{print $1}' | grep -v CONTAINER`; do docker container stop $f; done
+ for f in `docker container ls | grep $NAME | awk '{print $1}' | grep -v CONTAINER`; do docker container stop $f; done
  docker container prune -f
- EXT_OPTS="--restart=always" dockerfiles/$CMD/dockerlaunch.sh
+ NAME="$NAME" EXTRA_OPTS="$EXTRA_OPTS" dockerfiles/$CMD/dockerlaunch.sh
  exit $?
 }
 echo "nothing to do, use FORCE=1 $0 if you want to force the update"

@@ -3,6 +3,7 @@ IMAGE_TAG="vocdoni/dvotenode"
 API_PORT="${API_PORT:-9090}"
 IN_MEMORY="${IN_MEMORY:-false}"
 PORTS="${PORTS:-4001 4171 5001 30303 9096 31000 26656 26657}"
+NAME="${NAME:-$IMAGE_TAG-$RANDOM}"
 
 echo "using image $IMAGE_TAG:latest"
 
@@ -36,7 +37,7 @@ ENVFILE=""
 echo "mapped ports: $API_PORT $PORTS"
 
 # RUN DOCKER
-docker run --name `echo $IMAGE_TAG-$RANDOM | tr "/" "-"` -d \
+docker run --name `echo $NAME | tr "/" "-"` -d \
 	`for p in $API_PORT $PORTS; do echo -n "-p $p:$p "; done` \
 	-v $PWD/run:/app/run -v $PWD/misc:/app/misc $EXTRA_OPTS \
 	`[ -n "$ENVFILE" ] && echo -n "--env-file $ENVFILE"` \
