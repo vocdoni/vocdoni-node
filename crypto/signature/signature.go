@@ -11,6 +11,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	i3utils "github.com/iden3/go-iden3-core/merkletree"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -327,30 +328,18 @@ func HashRaw(data string) []byte {
 }
 
 // HashPoseidon computes the Poseidon hash of the given hex string
-// The hash is padded to 32 bytes with 0 at the begginig
+// If error an empty byte slice is returned
 func HashPoseidon(hexPayload string) []byte {
 	hexPayload = util.TrimHex(hexPayload)
-	if len(hexPayload)%2 != 0 {
-		hexPayload = "0" + hexPayload
-	}
 	hexPayloadBytes, err := hex.DecodeString(hexPayload)
 	if err != nil {
 		return []byte{}
 	}
-
 	hashNum, err := poseidon.HashBytes(hexPayloadBytes)
 	if err != nil {
 		return []byte{}
 	}
-	phash := make([]byte, 32)
-	hash := hashNum.Bytes()
-	var padding []byte
-	for i := len(hash); i < 32; i++ {
-		padding = append(padding, 0)
-	}
-	copy(phash[:], padding[:])
-	copy(phash[len(padding):], hash[:])
-	return phash
+	return i3utils.BigIntToHash(hashNum).Bytes()
 }
 
 // Encrypt uses secp256k1 standard from https://www.secg.org/sec2-v2.pdf to encrypt a message.
