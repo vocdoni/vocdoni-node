@@ -13,29 +13,29 @@ func TestSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 	pub, priv := s.HexString()
-	t.Logf("Generated pub:%s priv:%s\n", pub, priv)
+	t.Logf("Generated pub:%s priv:%s", pub, priv)
 	message := "hello"
-	t.Logf("Message to sign: %s\n", message)
+	t.Logf("Message to sign: %s", message)
 	msgSign, err := s.Sign(message)
 	if err != nil {
-		t.Fatalf("Error while signing %s\n", err)
+		t.Fatalf("Error while signing %s", err)
 	}
-	t.Logf("Signature is %s\n", msgSign)
+	t.Logf("Signature is %s", msgSign)
 
 	var s2 SignKeys
 	if err := s2.AddHexKey(priv); err != nil {
-		t.Fatalf("Error importing hex privKey: %s\n", err)
+		t.Fatalf("Error importing hex privKey: %s", err)
 	}
 	pub, priv = s2.HexString()
-	t.Logf("Imported pub:%s priv:%s\n", pub, priv)
+	t.Logf("Imported pub:%s priv:%s", pub, priv)
 	v, err := s.Verify(message, msgSign)
 	if err != nil {
-		t.Fatalf("Verification error: %s\n", err)
+		t.Fatalf("Verification error: %s", err)
 	}
 	if !v {
 		t.Fatal("Verification failed!")
 	}
-	t.Logf("Testing verification... %t\n", v)
+	t.Logf("Testing verification... %t", v)
 
 	t.Log("Testing compatibility with standard Ethereum signing libraries")
 	hardcodedPriv := "fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19"
@@ -46,18 +46,18 @@ func TestSignature(t *testing.T) {
 	}
 	pub, priv = s3.HexString()
 	if priv != hardcodedPriv {
-		t.Fatalf("PrivKey from %s not match the hardcoded one\nGot %s\nMust have %s\n", hardcodedPriv, priv, hardcodedPriv[2:])
+		t.Fatalf("PrivKey from %s not match the hardcoded one\nGot %s\nMust have %s", hardcodedPriv, priv, hardcodedPriv[2:])
 	}
 	signature, err := s3.Sign(message)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Signature: %s\n", signature)
+	t.Logf("Signature: %s", signature)
 	if signature != hardcodedSignature {
-		t.Fatalf("Hardcoded signature %s do not match\n", hardcodedSignature)
+		t.Fatalf("Hardcoded signature %s do not match", hardcodedSignature)
 	}
 	if _, err := DecompressPubKey(pub); err != nil {
-		t.Fatalf("Failed decompressing key: %s\n", err)
+		t.Fatalf("Failed decompressing key: %s", err)
 	}
 }
 
@@ -69,20 +69,20 @@ func TestEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 	pub, priv := s.HexString()
-	t.Logf("Generated pub:%s priv:%s\n", pub, priv)
+	t.Logf("Generated pub:%s priv:%s", pub, priv)
 	message := "hello"
-	t.Logf("Message to encrypt: %s\n", message)
+	t.Logf("Message to encrypt: %s", message)
 	msgEnc, err := s.Encrypt(message)
 	if err != nil {
-		t.Fatalf("Error while encrypting %s\n", err)
+		t.Fatalf("Error while encrypting %s", err)
 	}
-	t.Logf("Encrypted hexString is %s\n", msgEnc)
+	t.Logf("Encrypted hexString is %s", msgEnc)
 	t.Logf("Testing Decryption")
 	msgPlain, err := s.Decrypt(msgEnc)
 	if err != nil {
-		t.Fatalf("Error while decrypting %s\n", err)
+		t.Fatalf("Error while decrypting %s", err)
 	}
-	t.Logf("Decrypted plain String is %s\n", msgPlain)
+	t.Logf("Decrypted plain String is %s", msgPlain)
 }
 
 func TestAddr(t *testing.T) {
@@ -93,7 +93,7 @@ func TestAddr(t *testing.T) {
 		t.Fatal(err)
 	}
 	pub, priv := s.HexString()
-	t.Logf("Generated pub: %s \npriv: %s\n", pub, priv)
+	t.Logf("Generated pub: %s \npriv: %s", pub, priv)
 	addr1 := s.EthAddrString()
 	addr2, err := AddrFromPublicKey(pub)
 	t.Logf("Recovered address from pubKey %s", addr2)
@@ -101,20 +101,20 @@ func TestAddr(t *testing.T) {
 		t.Fatal(err)
 	}
 	if addr1 != addr2 {
-		t.Fatalf("Calculated address from pubKey do not match: %s != %s\n", addr1, addr2)
+		t.Fatalf("Calculated address from pubKey do not match: %s != %s", addr1, addr2)
 	}
 	signature, err := s.Sign("hello vocdoni")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Signature created: %s\n", signature)
+	t.Logf("Signature created: %s", signature)
 	addr3, err := AddrFromSignature("hello vocdoni", signature)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// addr3s := fmt.Sprintf("%x", addr3)
 	if addr3 != addr2 {
-		t.Fatalf("Extracted signature address do not match: %s != %s\n", addr2, addr3)
+		t.Fatalf("Extracted signature address do not match: %s != %s", addr2, addr3)
 	}
 
 	if err := s.AddAuthKey(addr3); err != nil {

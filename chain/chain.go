@@ -227,7 +227,7 @@ func (e *EthChainContext) createAccount() error {
 		return fmt.Errorf("failed to create account: %v", err)
 	}
 	e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
-	log.Infof("my Ethereum address %x\n", e.Keys.Accounts()[0].Address)
+	log.Infof("my Ethereum address %x", e.Keys.Accounts()[0].Address)
 	return nil
 }
 
