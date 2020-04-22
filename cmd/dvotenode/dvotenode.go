@@ -360,7 +360,7 @@ func main() {
 		}
 	}
 
-	if globalCfg.Mode == "gateway" {
+	if globalCfg.Mode == "gateway" || globalCfg.Metrics.Enabled {
 		// Proxy service
 		pxy, err = service.Proxy(globalCfg.API.ListenHost, globalCfg.API.ListenPort,
 			globalCfg.API.Ssl.Domain, globalCfg.API.Ssl.DirCert)
@@ -372,7 +372,9 @@ func main() {
 		if globalCfg.Metrics.Enabled && pxy != nil {
 			ma = metrics.NewAgent("/metrics", time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, pxy)
 		}
+	}
 
+	if globalCfg.Mode == "gateway" {
 		// Storage service
 		storage, err = service.IPFS(globalCfg.Ipfs, signer, ma)
 		if err != nil {
