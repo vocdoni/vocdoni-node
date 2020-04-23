@@ -39,16 +39,22 @@ var (
 var PrefixDBCacheSize = 0
 
 // ValidEvents contains the list of valid event names
-var ValidEvents = map[string]bool{"addVote": true, "addProcess": true, "endProcess": true, "commit": true, "rollback": true}
+var ValidEvents = map[string]bool{
+	"addVote":       true,
+	"addProcess":    true,
+	"endProcess":    true,
+	"commit":        true,
+	"rollback":      true,
+	"cancelProcess": true}
 
-// VochainEvent is an interface used for executing custom functions during the events of the block creation process
+// Event is an interface used for executing custom functions during the events of the block creation process
 // The events available can be read on ValidEvents string slice
 // The order in which events are executed is: Rollback(), OnVote() or OnProcess(), Commit()
 // The process is concurrencty safe meaning that there cannot be two sequences happening in paralel
-type VochainEvent interface {
+type Event interface {
 	OnVote(*types.Vote)
 	OnProcess(pid, eid string)
-
+	OnCancel(pid string)
 	Commit(height int64)
 	Rollback()
 }
@@ -60,7 +66,7 @@ type State struct {
 	VoteTree    *iavl.MutableTree
 	Codec       *amino.Codec
 	Lock        sync.Mutex
-	Events      map[string][]VochainEvent // addVote, addProcess....
+	Events      map[string][]Event // addVote, addProcess....
 }
 
 // NewState creates a new State
@@ -115,12 +121,12 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	}
 
 	log.Infof("application trees successfully loaded. appTree:%d processTree:%d voteTree: %d", atVersion, ptVersion, vtVersion)
-	vs.Events = make(map[string][]VochainEvent)
+	vs.Events = make(map[string][]Event)
 	return &vs, nil
 }
 
 // AddEvent adds a new callback function of type EventCallback which will be exeuted on event name
-func (v *State) AddEvent(name string, f VochainEvent) error {
+func (v *State) AddEvent(name string, f Event) error {
 	if _, ok := ValidEvents[name]; ok {
 		v.Events[name] = append(v.Events[name], f)
 		return nil
@@ -254,10 +260,9 @@ func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 // CancelProcess sets the process canceled atribute to true
 func (v *State) CancelProcess(pid string) error {
 	pid = util.TrimHex(pid)
-	_, processBytes := v.ProcessTree.Get([]byte(pid))
-	var process vochaintypes.Process
-	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
-		return errors.New("cannot unmarshal process")
+	process, err := v.Process(pid)
+	if err != nil {
+		return err
 	}
 	if process.Canceled {
 		return nil
@@ -268,6 +273,11 @@ func (v *State) CancelProcess(pid string) error {
 		return errors.New("cannot marshal updated process bytes")
 	}
 	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
+	if events, ok := v.Events["cancelProcess"]; ok {
+		for _, e := range events {
+			e.OnCancel(pid)
+		}
+	}
 	return nil
 }
 
@@ -284,12 +294,7 @@ func (v *State) PauseProcess(pid string) error {
 		return nil
 	}
 	process.Paused = true
-	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
-	if err != nil {
-		return errors.New("cannot marshal updated process bytes")
-	}
-	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
-	return nil
+	return v.setProcess(&process, pid)
 }
 
 // ResumeProcess sets the process paused atribute to true
@@ -305,30 +310,35 @@ func (v *State) ResumeProcess(pid string) error {
 		return nil
 	}
 	process.Paused = false
+	return v.setProcess(&process, pid)
+}
+
+// Process returns a process info given a processId if exists
+func (v *State) Process(pid string) (*vochaintypes.Process, error) {
+	var process *vochaintypes.Process
+	pid = util.TrimHex(pid)
+	_, processBytes := v.ProcessTree.Get([]byte(pid))
+	if processBytes == nil {
+		return nil, fmt.Errorf("cannot find process with id (%s)", pid)
+	}
+	err := v.Codec.UnmarshalBinaryBare(processBytes, &process)
+	if err != nil {
+		return nil, fmt.Errorf("cannot unmarshal process with id (%s)", pid)
+	}
+	return process, nil
+}
+
+// set process stores in the database the process
+func (v *State) setProcess(process *vochaintypes.Process, pid string) error {
+	if process == nil {
+		return fmt.Errorf("process is nil")
+	}
 	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
 	if err != nil {
 		return errors.New("cannot marshal updated process bytes")
 	}
 	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
 	return nil
-}
-
-// Process returns a process info given a processId if exists
-func (v *State) Process(pid string) (*vochaintypes.Process, error) {
-	var newProcess *vochaintypes.Process
-	pid = util.TrimHex(pid)
-	if !v.ProcessTree.Has([]byte(pid)) {
-		return nil, fmt.Errorf("cannot find process with id (%s)", pid)
-	}
-	_, processBytes := v.ProcessTree.Get([]byte(pid))
-	if len(processBytes) == 0 {
-		return nil, fmt.Errorf("cannot find process with id (%s)", pid)
-	}
-	err := v.Codec.UnmarshalBinaryBare(processBytes, &newProcess)
-	if err != nil {
-		return nil, fmt.Errorf("cannot unmarshal process with id (%s)", pid)
-	}
-	return newProcess, nil
 }
 
 // AddVote adds a new vote to a process if the process exists and the vote is not already submmited

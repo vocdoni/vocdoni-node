@@ -53,6 +53,7 @@ func NewScrutinizer(dbPath string, state *vochain.State, liveResults bool) (*Scr
 	}
 	s.VochainState.AddEvent("rollback", &s)
 	s.VochainState.AddEvent("addProcess", &s)
+	s.VochainState.AddEvent("cancelProcess", &s)
 	s.VochainState.AddEvent("commit", &s)
 	s.VochainState.AddEvent("addVote", &s)
 	return &s, nil
@@ -104,6 +105,11 @@ func (s *Scrutinizer) Rollback() {
 func (s *Scrutinizer) OnProcess(pid, eid string) {
 	var data = types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
 	s.processPool = append(s.processPool, &data)
+}
+
+// OnCancel scrutinizer stores the processID and entityID
+func (s *Scrutinizer) OnCancel(pid string) {
+	// TBD
 }
 
 // OnVote scrutinizer stores the votes if liveResults enabled
