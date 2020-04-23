@@ -193,7 +193,12 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 	}
 	endBlock := process.StartBlock + process.NumberOfBlocks
 	// check if process is enabled
-	if (state.Height() >= process.StartBlock && state.Height() <= endBlock) && !process.Canceled && !process.Paused {
+	var height int64
+	header := state.Header()
+	if header != nil {
+		height = header.Height
+	}
+	if (height >= process.StartBlock && height <= endBlock) && !process.Canceled && !process.Paused {
 		switch process.Type {
 		case types.SnarkVote:
 			sanitizedNullifier := util.TrimHex(vote.Nullifier)
@@ -288,8 +293,13 @@ func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
 
+	var height int64
+	header := state.Header()
+	if header != nil {
+		height = header.Height
+	}
 	// start and endblock sanity check
-	if process.StartBlock < state.Height() {
+	if process.StartBlock < height {
 		return fmt.Errorf("cannot add process with start block lower or equal than the current tendermint height")
 	}
 	if process.NumberOfBlocks <= 0 {
@@ -355,7 +365,12 @@ func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) e
 		return fmt.Errorf("cannot cancel an already canceled process")
 	}
 	endBlock := process.StartBlock + process.NumberOfBlocks
-	if endBlock < state.Height() {
+	var height int64
+	if h := state.Header(); h != nil {
+		height = h.Height
+	}
+
+	if endBlock < height {
 		return fmt.Errorf("cannot cancel a finalized process")
 	}
 	return nil

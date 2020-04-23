@@ -73,7 +73,11 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	log.Infof("tendermint Core version: %s", req.Version)
 	log.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
 	log.Infof("tendermint Block protocol version: %d", req.BlockVersion)
-	height := app.State.Height()
+	var height int64
+	header := app.State.Header()
+	if header != nil {
+		height = header.Height
+	}
 	hash := app.State.AppHash()
 	log.Infof("current height is %d, current APP hash is %x", height, hash)
 	return abcitypes.ResponseInfo{
@@ -193,7 +197,10 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 		}
 		return abcitypes.ResponseQuery{Code: 0, Value: vBytes}
 	case "getBlockHeight":
-		h := app.State.Height()
+		h := app.State.Header()
+		if h != nil {
+			return abcitypes.ResponseQuery{Code: 1, Info: "cannot get height"}
+		}
 		hbytes, err := app.Codec.MarshalBinaryBare(h)
 		if err != nil {
 			hbytes = []byte{}

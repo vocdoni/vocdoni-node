@@ -405,16 +405,16 @@ func (v *State) EnvelopeList(processID string, from, listSize int64) []string {
 	return nullifiers
 }
 
-// Height returns the blockchain last block commited height
-func (v *State) Height() int64 {
+// Header returns the blockchain last block commited height
+func (v *State) Header() *tmtypes.Header {
 	_, headerBytes := v.AppTree.Get(headerKey)
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
 	if err != nil {
 		log.Errorf("cannot get vochain height: %s", err)
-		return 0
+		return nil
 	}
-	return header.Height
+	return &header
 }
 
 // AppHash returns last hash of the application
