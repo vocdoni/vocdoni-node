@@ -99,6 +99,7 @@ func (k *SignKeys) HexString() (string, string) {
 
 // decompressPubKey takes a hexString compressed public key and returns it descompressed
 func decompressPubKey(pubHexComp string) (string, error) {
+	pubHexComp = util.TrimHex(pubHexComp)
 	if len(pubHexComp) > PubKeyLength {
 		return pubHexComp, nil
 	}
@@ -150,7 +151,7 @@ func (k *SignKeys) SignJSON(message interface{}) (string, error) {
 
 // Verify verifies a message. Signature is HexString
 func (k *SignKeys) Verify(message []byte, signHex string) (bool, error) {
-	pubHex, err := PubKeyFromSignature(message, util.TrimHex(signHex))
+	pubHex, err := PubKeyFromSignature(message, signHex)
 	if err != nil {
 		return false, err
 	}
@@ -201,7 +202,7 @@ func AddrFromPublicKey(pubHex string) (string, error) {
 	var pubHexDesc string
 	var err error
 	if len(pubHex) <= PubKeyLength {
-		pubHexDesc, err = decompressPubKey(util.TrimHex(pubHex))
+		pubHexDesc, err = decompressPubKey(pubHex)
 		if err != nil {
 			return "", err
 		}
@@ -231,10 +232,11 @@ func PubKeyFromPrivateKey(privHex string) (string, error) {
 
 // PubKeyFromSignature recovers the ECDSA public key that created the signature of a message
 func PubKeyFromSignature(msg []byte, sigHex string) (string, error) {
-	if len(util.TrimHex(sigHex)) < SignatureLength || len(util.TrimHex(sigHex)) > SignatureLength+12 {
+	sigHex = util.TrimHex(sigHex)
+	if len(sigHex) < SignatureLength || len(sigHex) > SignatureLength+12 {
 		return "", errors.New("signature length not correct")
 	}
-	sig, err := hex.DecodeString(util.TrimHex(sigHex))
+	sig, err := hex.DecodeString(sigHex)
 	if err != nil {
 		return "", err
 	}
