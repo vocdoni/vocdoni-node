@@ -17,6 +17,7 @@ func TestSubPub(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
+	key := []byte("vocdoni")
 	var bootNodes []*SubPub
 	for i := 0; i < 5; i++ {
 		// TODO(mvdan): use a random unused port instead. note that ports
@@ -27,7 +28,7 @@ func TestSubPub(t *testing.T) {
 		if err := sign0.Generate(); err != nil {
 			t.Fatal(err)
 		}
-		sp0 := NewSubPub(sign0.Private, "vocdoni", port1, false)
+		sp0 := NewSubPub(sign0.Private, key, port1, false)
 		sp0.NoBootStrap = true
 		sp0.Connect(ctx)
 		go sp0.Subscribe(ctx)
@@ -40,7 +41,7 @@ func TestSubPub(t *testing.T) {
 		t.Fatal(err)
 	}
 	// TODO(mvdan): same port fix as above
-	sp := NewSubPub(sign.Private, "vocdoni", 1025+rand.Intn(50000), false)
+	sp := NewSubPub(sign.Private, key, 1025+rand.Intn(50000), false)
 	for _, sp0 := range bootNodes {
 		sp.BootNodes = append(sp.BootNodes, fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", sp0.Port, sp0.Host.ID()))
 	}

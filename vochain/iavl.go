@@ -450,7 +450,7 @@ func (v *State) Save() []byte {
 		log.Errorf("cannot save vochain state to disk: %s", err)
 	}
 
-	return signature.HashRaw(fmt.Sprintf("%s%s%s", h1, h2, h3))
+	return signature.HashRaw([]byte(fmt.Sprintf("%s%s%s", h1, h2, h3)))
 }
 
 // Rollback rollbacks to the last persistent db data version
@@ -468,7 +468,7 @@ func (v *State) Rollback() {
 // WorkingHash returns the hash of the vochain trees mkroots
 // hash(appTree+processTree+voteTree)
 func (v *State) WorkingHash() []byte {
-	return signature.HashRaw(fmt.Sprintf("%s%s%s", v.AppTree.WorkingHash(), v.ProcessTree.WorkingHash(), v.VoteTree.WorkingHash()))
+	return signature.HashRaw([]byte(fmt.Sprintf("%s%s%s", v.AppTree.WorkingHash(), v.ProcessTree.WorkingHash(), v.VoteTree.WorkingHash())))
 }
 
 // ProcessList returns a list of processId given an entityId

@@ -151,11 +151,14 @@ func (ps *SubPub) readHandler(r *bufio.Reader) {
 	}
 }
 
-func NewSubPub(key ecdsa.PrivateKey, groupKey string, port int, private bool) *SubPub {
+func NewSubPub(key ecdsa.PrivateKey, groupKey []byte, port int, private bool) *SubPub {
 	ps := new(SubPub)
 	ps.Key = key
+	if len(groupKey) < 4 {
+		panic("subpub group key is too small; 4 bytes at minimum")
+	}
 	copy(ps.GroupKey[:], signature.HashRaw(groupKey)[:32])
-	ps.Topic = fmt.Sprintf("%x", signature.HashRaw("topic"+groupKey))
+	ps.Topic = fmt.Sprintf("%x", signature.HashRaw([]byte("topic"+string(groupKey))))
 	ps.PubKey = hexutil.Encode(eth.CompressPubkey(&key.PublicKey))
 	ps.privKey = hex.EncodeToString(key.D.Bytes())
 	ps.BroadcastWriter = make(chan []byte)

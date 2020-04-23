@@ -108,7 +108,7 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 			if err != nil {
 				return nil, fmt.Errorf("cannot marshal vote (%s)", err)
 			}
-			pubKey, err := signature.PubKeyFromSignature(string(voteBytes), tx.Signature)
+			pubKey, err := signature.PubKeyFromSignature(voteBytes, tx.Signature)
 			if err != nil {
 				// log.Warnf("cannot extract pubKey: %s", err)
 				return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
@@ -220,7 +220,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 				return fmt.Errorf("cannot marshal vote (%s)", err)
 			}
 			// log.Debugf("executing VoteTxCheck of: %s", voteBytes)
-			pubKey, err := signature.PubKeyFromSignature(string(voteBytes), vote.Signature)
+			pubKey, err := signature.PubKeyFromSignature(voteBytes, vote.Signature)
 			if err != nil {
 				return fmt.Errorf("cannot extract public key from signature (%s)", err)
 			}
@@ -303,7 +303,7 @@ func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal process (%s)", err)
 	}
-	authorized, addr := VerifySignatureAgainstOracles(oracles, string(processBytes), sign)
+	authorized, addr := VerifySignatureAgainstOracles(oracles, processBytes, sign)
 	if !authorized {
 		return fmt.Errorf("unauthorized to create a process, message: %s, recovered addr: %s", string(processBytes), addr)
 	}
@@ -341,7 +341,7 @@ func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) e
 	if err != nil {
 		return fmt.Errorf("cannot marshal cancel process info (%s)", err)
 	}
-	authorized, addr := VerifySignatureAgainstOracles(oracles, string(processBytes), sign)
+	authorized, addr := VerifySignatureAgainstOracles(oracles, processBytes, sign)
 	if !authorized {
 		return fmt.Errorf("unauthorized to cancel a process, message: %s, recovered addr: %s", string(processBytes), addr)
 	}
@@ -374,7 +374,7 @@ func AdminTxCheck(adminTx types.AdminTx, state *State) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal adminTx (%s)", err)
 	}
-	authorized, addr := VerifySignatureAgainstOracles(oracles, string(adminTxBytes), sign)
+	authorized, addr := VerifySignatureAgainstOracles(oracles, adminTxBytes, sign)
 	if !authorized {
 		return fmt.Errorf("unauthorized to perform an adminTx, address: %s, message: %s", addr, string(adminTxBytes))
 	}
@@ -387,7 +387,7 @@ func checkMerkleProof(rootHash, hexproof string, leafData []byte) (bool, error) 
 }
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
-func VerifySignatureAgainstOracles(oracles []string, message, signHex string) (bool, string) {
+func VerifySignatureAgainstOracles(oracles []string, message []byte, signHex string) (bool, string) {
 	signKeys := signature.SignKeys{}
 	for _, oracle := range oracles {
 		if err := signKeys.AddAuthKey(oracle); err != nil {
@@ -409,7 +409,7 @@ func GenerateNullifier(address, processID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%x", signature.HashRaw(fmt.Sprintf("%s%s", addrBytes, pidBytes))), nil
+	return fmt.Sprintf("%x", signature.HashRaw([]byte(fmt.Sprintf("%s%s", addrBytes, pidBytes)))), nil
 }
 
 // NewPrivateValidator returns a tendermint file private validator (key and state)

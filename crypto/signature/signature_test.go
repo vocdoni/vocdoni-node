@@ -17,7 +17,7 @@ func TestSignature(t *testing.T) {
 	}
 	pub, priv := s.HexString()
 	t.Logf("Generated pub:%s priv:%s", pub, priv)
-	message := "hello"
+	message := []byte("hello")
 	t.Logf("Message to sign: %s", message)
 	msgSign, err := s.Sign(message)
 	if err != nil {
@@ -103,12 +103,13 @@ func TestAddr(t *testing.T) {
 	if addr1 != addr2 {
 		t.Fatalf("Calculated address from pubKey do not match: %s != %s", addr1, addr2)
 	}
-	signature, err := s.Sign("hello vocdoni")
+	msg := []byte("hello vocdoni")
+	signature, err := s.Sign(msg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("Signature created: %s", signature)
-	addr3, err := AddrFromSignature("hello vocdoni", signature)
+	addr3, err := AddrFromSignature(msg, signature)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +121,7 @@ func TestAddr(t *testing.T) {
 	if err := s.AddAuthKey(addr3); err != nil {
 		t.Fatal(err)
 	}
-	v, _, err := s.VerifySender("hello vocdoni", signature)
+	v, _, err := s.VerifySender(msg, signature)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +129,7 @@ func TestAddr(t *testing.T) {
 		t.Fatal("Cannot verify sender")
 	}
 
-	v, err = s.Verify("hello vocdoni", signature)
+	v, err = s.Verify(msg, signature)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,11 +137,12 @@ func TestAddr(t *testing.T) {
 		t.Fatal("Cannot verify signature")
 	}
 
-	signature2, err := s.Sign("bye-bye vocdoni")
+	msg = []byte("bye-bye vocdoni")
+	signature2, err := s.Sign(msg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addr4, err := AddrFromSignature("bye-bye vocdoni", signature2)
+	addr4, err := AddrFromSignature(msg, signature2)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -56,7 +56,7 @@ func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error
 	if err != nil {
 		return nil, fmt.Errorf("error decoding entity address: %s", err)
 	}
-	processTxArgs.EntityID = fmt.Sprintf("%x", signature.HashRaw(string(eid)))
+	processTxArgs.EntityID = fmt.Sprintf("%x", signature.HashRaw(eid))
 	processTxArgs.MkRoot = processMeta.CensusMerkleRoot
 	processTxArgs.MkURI = processMeta.CensusMerkleTree
 	if processMeta.NumberOfBlocks != nil {

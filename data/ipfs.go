@@ -116,7 +116,7 @@ func (i *IPFSHandle) URIprefix() string {
 
 // PublishBytes publishes a file containing msg to ipfs
 func PublishBytes(ctx context.Context, msg []byte, fileDir string, node *ipfscore.IpfsNode) (string, error) {
-	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(string(msg)))
+	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(msg))
 	log.Infof("publishing file: %s", filePath)
 	err := ioutil.WriteFile(filePath, msg, 0666)
 	if err != nil {

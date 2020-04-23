@@ -2,6 +2,7 @@
 package signature
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
@@ -122,7 +123,7 @@ func (k *SignKeys) EthAddrString() string {
 func (k *SignKeys) String() string { return k.EthAddrString() }
 
 // Sign signs a message. Message is a normal string (no HexString nor a Hash)
-func (k *SignKeys) Sign(message string) (string, error) {
+func (k *SignKeys) Sign(message []byte) (string, error) {
 	if k.Private.D == nil {
 		return "", errors.New("no private key available")
 	}
@@ -139,7 +140,7 @@ func (k *SignKeys) SignJSON(message interface{}) (string, error) {
 	if err != nil {
 		return "", errors.New("unable to marshal message to sign: %s")
 	}
-	sig, err := k.Sign(string(rawMsg))
+	sig, err := k.Sign(rawMsg)
 	if err != nil {
 		return "", errors.New("error signing response body: %s")
 	}
@@ -148,7 +149,7 @@ func (k *SignKeys) SignJSON(message interface{}) (string, error) {
 }
 
 // Verify verifies a message. Signature is HexString
-func (k *SignKeys) Verify(message, signHex string) (bool, error) {
+func (k *SignKeys) Verify(message []byte, signHex string) (bool, error) {
 	pubHex, err := PubKeyFromSignature(message, util.TrimHex(signHex))
 	if err != nil {
 		return false, err
@@ -167,7 +168,7 @@ func (k *SignKeys) Verify(message, signHex string) (bool, error) {
 }
 
 // VerifySender verifies if a message is sent by some Authorized address key
-func (k *SignKeys) VerifySender(msg, sigHex string) (bool, string, error) {
+func (k *SignKeys) VerifySender(msg []byte, sigHex string) (bool, string, error) {
 	recoveredAddr, err := AddrFromSignature(msg, sigHex)
 	if err != nil {
 		return false, "", err
@@ -186,11 +187,11 @@ func (k *SignKeys) VerifyJSONsender(msg interface{}, sigHex string) (bool, strin
 	if err != nil {
 		return false, "", errors.New("unable to marshal message to sign: %s")
 	}
-	return k.VerifySender(string(rawMsg), sigHex)
+	return k.VerifySender(rawMsg, sigHex)
 }
 
 // Standalone function for verify a message
-func Verify(message, signHex, pubHex string) (bool, error) {
+func Verify(message []byte, signHex, pubHex string) (bool, error) {
 	sk := new(SignKeys)
 	return sk.Verify(message, signHex)
 }
@@ -229,7 +230,7 @@ func PubKeyFromPrivateKey(privHex string) (string, error) {
 }
 
 // PubKeyFromSignature recovers the ECDSA public key that created the signature of a message
-func PubKeyFromSignature(msg, sigHex string) (string, error) {
+func PubKeyFromSignature(msg []byte, sigHex string) (string, error) {
 	if len(util.TrimHex(sigHex)) < SignatureLength || len(util.TrimHex(sigHex)) > SignatureLength+12 {
 		return "", errors.New("signature length not correct")
 	}
@@ -251,7 +252,7 @@ func PubKeyFromSignature(msg, sigHex string) (string, error) {
 }
 
 // AddrFromSignature recovers the Ethereum address that created the signature of a message
-func AddrFromSignature(msg, sigHex string) (string, error) {
+func AddrFromSignature(msg []byte, sigHex string) (string, error) {
 	pubHex, err := PubKeyFromSignature(msg, sigHex)
 	if err != nil {
 		return "", err
@@ -270,7 +271,7 @@ func AddrFromJSONsignature(msg interface{}, sigHex string) (string, error) {
 	if err != nil {
 		return "", errors.New("unable to marshal message to sign: %s")
 	}
-	return AddrFromSignature(string(rawMsg), sigHex)
+	return AddrFromSignature(rawMsg, sigHex)
 }
 
 func hexToPubKey(pubHex string) (*ecdsa.PublicKey, error) {
@@ -282,14 +283,15 @@ func hexToPubKey(pubHex string) (*ecdsa.PublicKey, error) {
 }
 
 // Hash string data adding Ethereum prefix
-func Hash(data string) []byte {
-	payloadToSign := fmt.Sprintf("%s%d%s", SigningPrefix, len(data), data)
-	return crypto.Keccak256([]byte(payloadToSign))
+func Hash(data []byte) []byte {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "%s%d%s", SigningPrefix, len(data), data)
+	return HashRaw(buf.Bytes())
 }
 
 // HashRaw hashes a string with no prefix
-func HashRaw(data string) []byte {
-	return crypto.Keccak256([]byte(data))
+func HashRaw(data []byte) []byte {
+	return crypto.Keccak256(data)
 }
 
 // HashPoseidon computes the Poseidon hash of the given input.

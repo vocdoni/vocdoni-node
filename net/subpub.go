@@ -31,7 +31,7 @@ func (p *SubPubHandle) Init(c *types.Connection) error {
 		p.Conn.Port = 45678
 	}
 	private := p.Conn.Encryption == "private"
-	sp := subpub.NewSubPub(s.Private, p.Conn.TransportKey, p.Conn.Port, private)
+	sp := subpub.NewSubPub(s.Private, []byte(p.Conn.TransportKey), p.Conn.Port, private)
 	c.Address = sp.PubKey
 	p.SubPub = sp
 	return nil

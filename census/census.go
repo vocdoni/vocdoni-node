@@ -279,7 +279,7 @@ func (m *Manager) CheckAuth(rm *types.RequestMessage) error {
 			return errors.New("cannot unmarshal")
 		}
 		for _, n := range ns.Keys {
-			valid, err = signature.Verify(string(msg), rm.Signature, n)
+			valid, err = signature.Verify(msg, rm.Signature, n)
 			if err != nil {
 				log.Warnf("verification error (%s)", err)
 				valid = false
