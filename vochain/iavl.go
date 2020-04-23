@@ -379,11 +379,10 @@ func (v *State) iterateProcessID(processID string, fn func(key []byte, value []b
 func (v *State) CountVotes(processID string) int64 {
 	processID = util.TrimHex(processID)
 	var count int64
-	fn := func(key []byte, value []byte) bool {
+	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
 		count++
 		return false
-	}
-	v.iterateProcessID(processID, fn)
+	})
 	return count
 }
 
@@ -392,7 +391,7 @@ func (v *State) EnvelopeList(processID string, from, listSize int64) []string {
 	processID = util.TrimHex(processID)
 	var nullifiers []string
 	idx := int64(0)
-	fn := func(key []byte, value []byte) bool {
+	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
 		if idx >= listSize {
 			return true
 		}
@@ -402,8 +401,7 @@ func (v *State) EnvelopeList(processID string, from, listSize int64) []string {
 		}
 		idx++
 		return false
-	}
-	v.iterateProcessID(processID, fn)
+	})
 	return nullifiers
 }
 
