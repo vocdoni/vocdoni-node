@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
@@ -37,17 +38,7 @@ func BenchmarkVochain(b *testing.B) {
 	if err != nil {
 		b.Fatalf("cannot create keySet: %s", err)
 	}
-
-	// get public keys of signer set
-	pubKeys := make([]string, len(keySet))
-	for i := 0; i < len(keySet); i++ {
-		pubKeys[i], _ = keySet[i].HexString()
-		pubKeys[i], err = signature.DecompressPubKey(pubKeys[i])
-		if err != nil {
-			b.Fatalf("cannot decompress public key: %+v", pubKeys[i])
-		}
-	}
-	log.Infof("generated %d keys", len(pubKeys))
+	log.Infof("generated %d keys", len(keySet))
 
 	// get signer pubkey
 	signerPub, _ := dvoteServer.Signer.HexString()
@@ -76,13 +67,13 @@ func BenchmarkVochain(b *testing.B) {
 	req.CensusID = resp.CensusID
 
 	// census add claims
-	poseidonHashes := make([]string, len(pubKeys))
-	var hash []byte
-	for count, key := range pubKeys {
-		if hash = signature.HashPoseidon(key); len(hash) == 0 {
-			b.Fatalf("cannot create poseidon hash of public key: %+v", pubKeys[count])
+	poseidonHashes := make([]string, len(keySet))
+	for i, key := range keySet {
+		hash := signature.HashPoseidon(crypto.FromECDSAPub(&key.Public))
+		if len(hash) == 0 {
+			b.Fatalf("cannot create poseidon hash of public key: %#v", key.Public)
 		}
-		poseidonHashes[count] = base64.StdEncoding.EncodeToString(hash)
+		poseidonHashes[i] = base64.StdEncoding.EncodeToString(hash)
 	}
 	log.Debugf("poseidon hashes: %s", poseidonHashes)
 	log.Debug("add bulk claims")

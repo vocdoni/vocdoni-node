@@ -35,6 +35,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/types"
 
@@ -139,13 +140,12 @@ func TestCensus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, k := range keys {
-		pub, _ := k.HexString()
-		pubDesc, err := signature.DecompressPubKey(pub)
-		if err != nil {
-			t.Fatal(err)
+	for _, key := range keys {
+		hash := signature.HashPoseidon(crypto.FromECDSAPub(&key.Public))
+		if len(hash) == 0 {
+			t.Fatalf("cannot create poseidon hash of public key: %#v", key.Public)
 		}
-		claims = append(claims, base64.StdEncoding.EncodeToString(signature.HashPoseidon(pubDesc)))
+		claims = append(claims, base64.StdEncoding.EncodeToString(hash))
 	}
 	req.ClaimsData = claims
 	resp = c.Request(req, signer2)

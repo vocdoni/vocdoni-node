@@ -245,7 +245,11 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 
 			// check merkle proof
 			log.Debugf("extracted pubkey: %s", pubKey)
-			pubKeyHash := signature.HashPoseidon(pubKey)
+			pubKeyDec, err := hex.DecodeString(util.TrimHex(pubKey))
+			if err != nil {
+				return err
+			}
+			pubKeyHash := signature.HashPoseidon(pubKeyDec)
 			if len(pubKeyHash) > 32 || len(pubKeyHash) == 0 { // TO-DO check the exact size of PoseidonHash
 				return fmt.Errorf("wrong Poseidon hash size (%s)", err)
 			}

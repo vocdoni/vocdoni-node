@@ -96,8 +96,8 @@ func (k *SignKeys) HexString() (string, string) {
 	return pubHexComp, privHex
 }
 
-// DecompressPubKey takes a hexString compressed public key and returns it descompressed
-func DecompressPubKey(pubHexComp string) (string, error) {
+// decompressPubKey takes a hexString compressed public key and returns it descompressed
+func decompressPubKey(pubHexComp string) (string, error) {
 	if len(pubHexComp) > PubKeyLength {
 		return pubHexComp, nil
 	}
@@ -200,7 +200,7 @@ func AddrFromPublicKey(pubHex string) (string, error) {
 	var pubHexDesc string
 	var err error
 	if len(pubHex) <= PubKeyLength {
-		pubHexDesc, err = DecompressPubKey(util.TrimHex(pubHex))
+		pubHexDesc, err = decompressPubKey(util.TrimHex(pubHex))
 		if err != nil {
 			return "", err
 		}
@@ -292,15 +292,10 @@ func HashRaw(data string) []byte {
 	return crypto.Keccak256([]byte(data))
 }
 
-// HashPoseidon computes the Poseidon hash of the given hex string
-// If error an empty byte slice is returned
-func HashPoseidon(hexPayload string) []byte {
-	hexPayload = util.TrimHex(hexPayload)
-	hexPayloadBytes, err := hex.DecodeString(hexPayload)
-	if err != nil {
-		return []byte{}
-	}
-	hashNum, err := poseidon.HashBytes(hexPayloadBytes)
+// HashPoseidon computes the Poseidon hash of the given input.
+// If an error happened, an empty byte slice is returned
+func HashPoseidon(input []byte) []byte {
+	hashNum, err := poseidon.HashBytes(input)
 	if err != nil {
 		return []byte{}
 	}

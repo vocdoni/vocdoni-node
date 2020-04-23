@@ -483,7 +483,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 				data, err := base64.StdEncoding.DecodeString(c)
 				if err == nil {
 					if !r.Digested {
-						data = signature.HashPoseidon(fmt.Sprintf("%x", data))
+						data = signature.HashPoseidon(data)
 					}
 					err = tr.AddClaim(data, []byte{})
 				}
@@ -512,7 +512,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 				resp.SetError(err)
 			}
 			if !r.Digested {
-				data = signature.HashPoseidon(fmt.Sprintf("%x", data))
+				data = signature.HashPoseidon(data)
 			}
 			err = tr.AddClaim(data, []byte{})
 			if err != nil {
@@ -604,7 +604,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			return resp
 		}
 		if !r.Digested {
-			data = signature.HashPoseidon(fmt.Sprintf("%x", data))
+			data = signature.HashPoseidon(data)
 		}
 		validProof, err := tree.CheckProof(root, r.ProofData, data, []byte{})
 		if err != nil {
@@ -636,7 +636,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			return resp
 		}
 		if !r.Digested {
-			data = signature.HashPoseidon(fmt.Sprintf("%x", data))
+			data = signature.HashPoseidon(data)
 		}
 		resp.Siblings, err = tr.GenProof(data, []byte{})
 		if err != nil {
