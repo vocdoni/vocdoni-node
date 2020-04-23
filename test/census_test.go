@@ -39,6 +39,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/types"
 
+	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 )
 
@@ -136,10 +137,7 @@ func TestCensus(t *testing.T) {
 	var claims []string
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
-	keys, err := signature.CreateEthRandomKeysBatch(*censusSize)
-	if err != nil {
-		t.Fatal(err)
-	}
+	keys := testcommon.CreateEthRandomKeysBatch(t, *censusSize)
 	for _, key := range keys {
 		hash := signature.HashPoseidon(crypto.FromECDSAPub(&key.Public))
 		if len(hash) == 0 {

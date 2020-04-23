@@ -331,15 +331,3 @@ func (k *SignKeys) Decrypt(hexMessage string) (string, error) {
 	}
 	return string(plaintext), nil
 }
-
-// CreateEthRandomKeysBatch creates a set of eth random signing keys
-func CreateEthRandomKeysBatch(n int) ([]*SignKeys, error) {
-	s := make([]*SignKeys, n)
-	for i := 0; i < n; i++ {
-		s[i] = new(SignKeys)
-		if err := s[i].Generate(); err != nil {
-			return nil, err
-		}
-	}
-	return s, nil
-}

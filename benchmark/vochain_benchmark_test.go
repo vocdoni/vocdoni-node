@@ -34,10 +34,7 @@ func BenchmarkVochain(b *testing.B) {
 	}
 
 	// create random key batch
-	keySet, err := signature.CreateEthRandomKeysBatch(*censusSize)
-	if err != nil {
-		b.Fatalf("cannot create keySet: %s", err)
-	}
+	keySet := testcommon.CreateEthRandomKeysBatch(b, *censusSize)
 	log.Infof("generated %d keys", len(keySet))
 
 	// get signer pubkey
@@ -115,6 +112,7 @@ func BenchmarkVochain(b *testing.B) {
 		StartBlock:           *resp.Height + 1,
 		Type:                 "newProcess",
 	}
+	var err error
 	process.Signature, err = dvoteServer.Signer.SignJSON(process)
 	if err != nil {
 		b.Fatalf("cannot sign oracle tx: %s", err)
