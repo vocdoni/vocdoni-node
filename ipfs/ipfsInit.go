@@ -50,7 +50,7 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 	}
 
 	// Some optimizations to avoid using too much resources
-	conf.Datastore.BloomFilterSize = 1048576
+	conf.Datastore.BloomFilterSize = 1 << 20 // 1MiB
 	conf.Swarm.ConnMgr.LowWater = 20
 	conf.Swarm.ConnMgr.HighWater = 100
 	conf.Swarm.ConnMgr.GracePeriod = "2s"

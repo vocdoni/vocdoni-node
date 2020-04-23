@@ -10,10 +10,14 @@ var (
 )
 
 const (
-	// ScrutinizerProcessPrefix is the prefix for the levelDB process keys
-	ScrutinizerProcessPrefix = "p_"
-	// ScrutinizerEntityPrefix is the prefix for the levelDB entity keys
+	// ScrutinizerProcessPrefix is the prefix for the storage process keys
+	ScrutinizerLiveProcessPrefix = "p_"
+	// ScrutinizerEntityPrefix is the prefix for the storage entity keys
 	ScrutinizerEntityPrefix = "e_"
+	// ScrutinizerResultsPrefix is the prefix of the storage results summary keys
+	ScrutinizerResultsPrefix = "r_"
+	// ScrutinizerProcessEndingPrefix is the prefix for keep track of the processes ending on a specific block
+	ScrutinizerProcessEndingPrefix = "s_"
 	// PetitionSign contains the string that needs to match with the received vote type for petition-sign
 	PetitionSign = "petition-sign"
 	// PollVote contains the string that needs to match with the received vote type for poll-vote

@@ -50,7 +50,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Age
 	// Scrutinizer
 	if results {
 		log.Info("creating vochain scrutinizer service")
-		sc, err = scrutinizer.NewScrutinizer(vconfig.DataDir+"/scrutinizer", vnode.State)
+		sc, err = scrutinizer.NewScrutinizer(vconfig.DataDir+"/scrutinizer", vnode.State, false)
 		if err != nil {
 			return
 		}

@@ -233,6 +233,7 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, rpcClient *vocli
 		r.APIs = append(r.APIs, "results")
 		r.registerPublic("getResults", r.getResults)
 		r.registerPublic("getProcListResults", r.getProcListResults)
+		r.registerPublic("getProcListLiveResults", r.getProcListLiveResults)
 		r.registerPublic("getScrutinizerEntities", r.getScrutinizerEntities)
 	}
 }

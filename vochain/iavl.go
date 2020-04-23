@@ -39,7 +39,7 @@ var (
 var PrefixDBCacheSize = 0
 
 // ValidEvents contains the list of valid event names
-var ValidEvents = map[string]bool{"addVote": true, "addProcess": true, "commit": true, "rollback": true}
+var ValidEvents = map[string]bool{"addVote": true, "addProcess": true, "endProcess": true, "commit": true, "rollback": true}
 
 // VochainEvent is an interface used for executing custom functions during the events of the block creation process
 // The events available can be read on ValidEvents string slice
@@ -49,7 +49,7 @@ type VochainEvent interface {
 	OnVote(*types.Vote)
 	OnProcess(pid, eid string)
 
-	Commit()
+	Commit(height int64)
 	Rollback()
 }
 
@@ -336,7 +336,7 @@ func (v *State) AddVote(vote *vochaintypes.Vote) error {
 	voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
 	newVoteBytes, err := v.Codec.MarshalBinaryBare(vote)
 	if err != nil {
-		return errors.New("cannot marshal vote")
+		return fmt.Errorf("cannot marshal vote")
 	}
 	v.VoteTree.Set([]byte(voteID), newVoteBytes)
 	if events, ok := v.Events["addVote"]; ok {
@@ -347,23 +347,17 @@ func (v *State) AddVote(vote *vochaintypes.Vote) error {
 	return nil
 }
 
-// Envelope returns the info of a vote if already exists
+// Envelope returns the info of a vote if already exists.
+// voteID must be equals to processID_Nullifier
 func (v *State) Envelope(voteID string) (*vochaintypes.Vote, error) {
 	var vote *vochaintypes.Vote
-	voteID = util.TrimHex(voteID)
-	if !v.VoteTree.Has([]byte(voteID)) {
-		return nil, fmt.Errorf("vote with id (%s) does not exist", voteID)
-	}
 	_, voteBytes := v.VoteTree.Get([]byte(voteID))
-	if len(voteBytes) == 0 {
+	if voteBytes == nil {
 		return nil, fmt.Errorf("vote with id (%s) does not exist", voteID)
 	}
-	// log.Debugf("get envelope votebytes: %b", voteBytes)
-	err := v.Codec.UnmarshalBinaryBare(voteBytes, &vote)
-	if err != nil {
+	if err := v.Codec.UnmarshalBinaryBare(voteBytes, &vote); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal vote with id (%s)", voteID)
 	}
-	// log.Debugf("get envelope value: %+v", vote)
 	return vote, nil
 }
 
@@ -431,8 +425,10 @@ func (v *State) AppHash() []byte {
 // Save persistent save of vochain mem trees
 func (v *State) Save() []byte {
 	if events, ok := v.Events["commit"]; ok {
-		for _, e := range events {
-			e.Commit()
+		if h := v.Header(); h != nil {
+			for _, e := range events {
+				e.Commit(h.Height)
+			}
 		}
 	}
 	h1, _, err := v.AppTree.SaveVersion()

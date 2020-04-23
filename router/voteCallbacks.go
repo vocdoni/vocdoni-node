@@ -250,25 +250,25 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 }
 
 func (r *Router) getResults(request routerRequest) {
-	var err error
 	request.ProcessID = util.TrimHex(request.ProcessID)
 	if len(request.ProcessID) != 64 {
 		r.sendError(request, "processID length not valid")
 		return
 	}
 
-	var response types.ResponseMessage
-	response.Results, err = r.Scrutinizer.VoteResult(request.ProcessID)
+	vr, err := r.Scrutinizer.VoteResult(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
-		r.sendError(request, "cannot get results")
+		r.sendError(request, err.Error())
 		return
 	}
+	var response types.ResponseMessage
+	response.Results = vr
 
 	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
-		r.sendError(request, "cannot get process info")
+		r.sendError(request, err.Error())
 		return
 	}
 	response.Type = procInfo.Type
@@ -280,12 +280,21 @@ func (r *Router) getResults(request routerRequest) {
 	r.transport.Send(r.buildReply(request, response))
 }
 
+// finished processes
 func (r *Router) getProcListResults(request routerRequest) {
 	var response types.ResponseMessage
-	response.ProcessIDs = r.Scrutinizer.List(64, util.TrimHex(request.FromID), types.ScrutinizerProcessPrefix)
+	response.ProcessIDs = r.Scrutinizer.List(64, util.TrimHex(request.FromID), types.ScrutinizerResultsPrefix)
 	r.transport.Send(r.buildReply(request, response))
 }
 
+// live processes
+func (r *Router) getProcListLiveResults(request routerRequest) {
+	var response types.ResponseMessage
+	response.ProcessIDs = r.Scrutinizer.List(64, util.TrimHex(request.FromID), types.ScrutinizerLiveProcessPrefix)
+	r.transport.Send(r.buildReply(request, response))
+}
+
+// known entities
 func (r *Router) getScrutinizerEntities(request routerRequest) {
 	var response types.ResponseMessage
 	response.EntityIDs = r.Scrutinizer.List(64, util.TrimHex(request.FromID), types.ScrutinizerEntityPrefix)
