@@ -19,6 +19,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/tree"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
@@ -726,6 +727,34 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	}
 
 	return resp
+}
+
+// Count returns the number of local created, external imported and loaded/active census
+func (m *Manager) Count() (local, imported, loaded int) {
+	for _, n := range m.Census.Namespaces {
+		if strings.Contains(n.Name, "/") {
+			local++
+		} else {
+			imported++
+		}
+	}
+	loaded = len(m.Trees)
+	return
+}
+
+// RegisterMetrics to the prometheus server
+func (m *Manager) RegisterMetrics(ma *metrics.Agent) {
+	ma.Register(CensusLocal)
+	ma.Register(CensusImported)
+	ma.Register(CensusLoaded)
+}
+
+// GetMetrics to the prometheus server
+func (m *Manager) GetMetrics() {
+	local, imported, loaded := m.Count()
+	CensusLocal.Set(float64(local))
+	CensusImported.Set(float64(imported))
+	CensusLoaded.Set(float64(loaded))
 }
 
 type compressor struct {

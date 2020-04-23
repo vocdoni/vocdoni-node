@@ -1,11 +1,13 @@
 package metrics
 
-import "time"
+import (
+	"time"
 
-import "github.com/prometheus/client_golang/prometheus/promhttp"
-import "github.com/prometheus/client_golang/prometheus"
-import "gitlab.com/vocdoni/go-dvote/log"
-import "gitlab.com/vocdoni/go-dvote/net"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/net"
+)
 
 // Agent struct with options
 type Agent struct {
@@ -25,6 +27,6 @@ func NewAgent(path string, interval time.Duration, proxy *net.Proxy) *Agent {
 func (ma *Agent) Register(c prometheus.Collector) {
 	err := prometheus.Register(c)
 	if err != nil {
-		log.Warnf("Cannot register metrics: %s", err)
+		log.Warnf("cannot register metrics: (%s) (%+v)", err, c)
 	}
 }

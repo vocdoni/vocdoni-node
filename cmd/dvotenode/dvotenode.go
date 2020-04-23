@@ -383,12 +383,11 @@ func main() {
 
 		// Census service
 		if globalCfg.API.Census {
-			cm, err = service.Census(globalCfg.DataDir)
+			cm, err = service.Census(globalCfg.DataDir, ma)
 			if err != nil {
 				log.Fatal(err)
 			}
 		}
-
 	}
 
 	// Ethereum service

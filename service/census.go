@@ -2,14 +2,14 @@ package service
 
 import (
 	"os"
-	"strings"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/metrics"
 )
 
-func Census(datadir string) (*census.Manager, error) {
+func Census(datadir string, ma *metrics.Agent) (*census.Manager, error) {
 	log.Info("creating census service")
 	var censusManager census.Manager
 	if _, err := os.Stat(datadir + "/census"); os.IsNotExist(err) {
@@ -21,20 +21,16 @@ func Census(datadir string) (*census.Manager, error) {
 		return nil, err
 	}
 
+	// Collect metrics for prometheus
+	go censusManager.CollectMetrics(ma)
+
+	// Print log info
 	go func() {
-		var imported, local int
+		var local, imported, loaded int
 		for {
 			time.Sleep(time.Second * 60)
-			imported = 0
-			local = 0
-			for _, n := range censusManager.Census.Namespaces {
-				if strings.Contains(n.Name, "/") {
-					local++
-				} else {
-					imported++
-				}
-			}
-			log.Infof("[census info] local:%d imported:%d", local, imported)
+			local, imported, loaded = censusManager.Count()
+			log.Infof("[census info] local:%d imported:%d loaded:%d", local, imported, loaded)
 		}
 	}()
 
