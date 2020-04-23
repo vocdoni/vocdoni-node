@@ -224,9 +224,10 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 func (m *Manager) unloadManager() {
 	for {
 		time.Sleep(60 * time.Second)
+		cutoff := time.Now().Add(-m.LoadThreshold).Unix()
 		m.TreesMu.Lock()
 		for k, tree := range m.Trees {
-			if tree.LastAccess().Add(m.LoadThreshold).Before(time.Now()) {
+			if tree.LastAccess() < cutoff {
 				m.UnloadTree(k)
 			}
 		}

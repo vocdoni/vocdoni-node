@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	common3 "github.com/iden3/go-iden3-core/common"
@@ -20,11 +20,11 @@ import (
 )
 
 type Tree struct {
-	StorageDir     string
-	Tree           *merkletree.MerkleTree
-	Storage        iden3db.Storage
-	LastAccessTime time.Time
-	timeMu         sync.RWMutex
+	StorageDir string
+	Tree       *merkletree.MerkleTree
+	Storage    iden3db.Storage
+
+	lastAccessUnix int64 // a unix timestamp, used via sync/atomic
 }
 
 const (
@@ -68,18 +68,15 @@ func (t *Tree) Close() {
 	t.Tree.Storage().Close()
 }
 
-//LastAccess returns the last time the Tree was accessed
-func (t *Tree) LastAccess() time.Time {
-	t.timeMu.Lock()
-	defer t.timeMu.Unlock()
-	return t.LastAccessTime
+// LastAccess returns the last time the Tree was accessed, in the form of a unix
+// timestamp.
+func (t *Tree) LastAccess() int64 {
+	return atomic.LoadInt64(&t.lastAccessUnix)
 }
 
 // TODO(mvdan): use sync/atomic instead to avoid introducing a bottleneck
 func (t *Tree) updateAccessTime() {
-	t.timeMu.Lock()
-	defer t.timeMu.Unlock()
-	t.LastAccessTime = time.Now()
+	atomic.StoreInt64(&t.lastAccessUnix, time.Now().Unix())
 }
 
 func (t *Tree) entry(index, value []byte) (*merkletree.Entry, error) {
