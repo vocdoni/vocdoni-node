@@ -34,8 +34,8 @@ const SigningPrefix = "\u0019Ethereum Signed Message:\n"
 // SignKeys represents an ECDSA pair of keys for signing.
 // Authorized addresses is a list of Ethereum like addresses which are checked on Verify
 type SignKeys struct {
-	Public     *ecdsa.PublicKey
-	Private    *ecdsa.PrivateKey
+	Public     ecdsa.PublicKey
+	Private    ecdsa.PrivateKey
 	Authorized []Address
 }
 
@@ -63,8 +63,8 @@ func (k *SignKeys) Generate() error {
 	if err != nil {
 		return err
 	}
-	k.Private = key
-	k.Public = &key.PublicKey
+	k.Private = *key
+	k.Public = key.PublicKey
 	return nil
 }
 
@@ -74,8 +74,8 @@ func (k *SignKeys) AddHexKey(privHex string) error {
 	if err != nil {
 		return err
 	}
-	k.Private = key
-	k.Public = &key.PublicKey
+	k.Private = *key
+	k.Public = key.PublicKey
 	return nil
 }
 
@@ -91,8 +91,8 @@ func (k *SignKeys) AddAuthKey(address string) error {
 
 // HexString returns the public compressed and private keys as hex strings
 func (k *SignKeys) HexString() (string, string) {
-	pubHexComp := fmt.Sprintf("%x", crypto.CompressPubkey(k.Public))
-	privHex := fmt.Sprintf("%x", crypto.FromECDSA(k.Private))
+	pubHexComp := fmt.Sprintf("%x", crypto.CompressPubkey(&k.Public))
+	privHex := fmt.Sprintf("%x", crypto.FromECDSA(&k.Private))
 	return pubHexComp, privHex
 }
 
@@ -115,7 +115,7 @@ func DecompressPubKey(pubHexComp string) (string, error) {
 
 // PublicKey return the Ethereum address from the ECDSA public key
 func (k *SignKeys) EthAddrString() string {
-	recoveredAddr := crypto.PubkeyToAddress(*k.Public)
+	recoveredAddr := crypto.PubkeyToAddress(k.Public)
 	return fmt.Sprintf("%x", recoveredAddr)
 }
 
@@ -123,10 +123,10 @@ func (k *SignKeys) String() string { return k.EthAddrString() }
 
 // Sign signs a message. Message is a normal string (no HexString nor a Hash)
 func (k *SignKeys) Sign(message string) (string, error) {
-	if k.Private == nil {
+	if k.Private.D == nil {
 		return "", errors.New("no private key available")
 	}
-	signature, err := crypto.Sign(Hash(message), k.Private)
+	signature, err := crypto.Sign(Hash(message), &k.Private)
 	if err != nil {
 		return "", err
 	}
@@ -310,7 +310,7 @@ func HashPoseidon(hexPayload string) []byte {
 // Encrypt uses secp256k1 standard from https://www.secg.org/sec2-v2.pdf to encrypt a message.
 // The result is a Hexadecimal string
 func (k *SignKeys) Encrypt(message string) (string, error) {
-	pubKey := secp256k1.PublicKey(*k.Public)
+	pubKey := secp256k1.PublicKey(k.Public)
 	ciphertext, err := secp256k1.Encrypt(&pubKey, []byte(message))
 	if err != nil {
 		return "", err
@@ -325,7 +325,7 @@ func (k *SignKeys) Decrypt(hexMessage string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	privKey := secp256k1.PrivateKey(*k.Private)
+	privKey := secp256k1.PrivateKey(k.Private)
 	plaintext, err := secp256k1.Decrypt(&privKey, cipertext)
 	if err != nil {
 		return "", err

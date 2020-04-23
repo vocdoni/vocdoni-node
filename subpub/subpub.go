@@ -37,7 +37,7 @@ import (
 const delimiter = '\x00'
 
 type SubPub struct {
-	Key             *ecdsa.PrivateKey
+	Key             ecdsa.PrivateKey
 	GroupKey        [32]byte
 	Topic           string
 	BroadcastWriter chan []byte
@@ -151,7 +151,7 @@ func (ps *SubPub) readHandler(r *bufio.Reader) {
 	}
 }
 
-func NewSubPub(key *ecdsa.PrivateKey, groupKey string, port int, private bool) *SubPub {
+func NewSubPub(key ecdsa.PrivateKey, groupKey string, port int, private bool) *SubPub {
 	ps := new(SubPub)
 	ps.Key = key
 	copy(ps.GroupKey[:], signature.HashRaw(groupKey)[:32])
