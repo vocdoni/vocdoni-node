@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	libpeer "github.com/libp2p/go-libp2p-core/peer"
+
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 )
 
@@ -18,8 +20,10 @@ func TestSubPub(t *testing.T) {
 	defer cancel()
 
 	key := []byte("vocdoni")
+	const numPeers = 5
 	var bootNodes []*SubPub
-	for i := 0; i < 5; i++ {
+	var wg sync.WaitGroup
+	for i := 0; i < numPeers; i++ {
 		// TODO(mvdan): use a random unused port instead. note that ports
 		// 1-1024 are only available to root.
 		port1 := 1025 + rand.Intn(50000)
@@ -30,16 +34,21 @@ func TestSubPub(t *testing.T) {
 		}
 		sp0 := NewSubPub(sign0.Private, key, port1, false)
 		sp0.NoBootStrap = true
-		sp0.Connect(ctx)
-		go sp0.Subscribe(ctx)
-		defer sp0.Close()
 		bootNodes = append(bootNodes, sp0)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sp0.Connect(ctx)
+			go sp0.Subscribe(ctx)
+		}()
+		defer sp0.Close()
 	}
 
 	var sign signature.SignKeys
 	if err := sign.Generate(); err != nil {
 		t.Fatal(err)
 	}
+	wg.Wait()
 	// TODO(mvdan): same port fix as above
 	sp := NewSubPub(sign.Private, key, 1025+rand.Intn(50000), false)
 	for _, sp0 := range bootNodes {
@@ -48,27 +57,25 @@ func TestSubPub(t *testing.T) {
 
 	// We might discover peers before the first node has advertised. The
 	// default retry period is 10s, far too long for the test. Lower it to
-	// 100ms, so that we can find the other node quickly.
-	sp.DiscoveryPeriod = 100 * time.Millisecond
+	// 50ms, so that we can find the other node quickly.
+	sp.DiscoveryPeriod = 50 * time.Millisecond
+	sp.CollectionPeriod = 50 * time.Millisecond
 
-	sp.CollectionPeriod = 100 * time.Millisecond
+	peerAdded := make(chan libpeer.ID, numPeers)
+	sp.onPeerAdd = func(id libpeer.ID) { peerAdded <- id }
+	peerRemoved := make(chan libpeer.ID, numPeers)
+	sp.onPeerRemove = func(id libpeer.ID) { peerRemoved <- id }
 
 	sp.Connect(ctx)
 	go sp.Subscribe(ctx)
 	defer sp.Close()
 
-	// TODO(mvdan): reimplement without polling/sleeping.
 	t.Log("waiting for all peers to be connected")
-	for {
-		sp.PeersMu.Lock()
-		n := len(sp.Peers)
-		sp.PeersMu.Unlock()
-		if n == 5 {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-		if err := ctx.Err(); err != nil {
-			t.Fatal(err)
+	for i := 0; i < numPeers; i++ {
+		select {
+		case <-peerAdded:
+		case <-ctx.Done():
+			t.Fatal("timed out waiting for peers")
 		}
 	}
 
@@ -80,7 +87,6 @@ func TestSubPub(t *testing.T) {
 	}
 
 	t.Log("waiting for all peers to receive the broadcast")
-	var wg sync.WaitGroup
 	for i, sp0 := range bootNodes {
 		wg.Add(1)
 		i, sp0 := i, sp0 // copy the variables for the goroutine
@@ -99,8 +105,9 @@ func TestSubPub(t *testing.T) {
 	}
 	wg.Wait()
 
-	t.Log("shutting down two random peers")
-	for _, i := range rand.Perm(5)[:2] {
+	const numPeersShutdown = 2
+	t.Logf("shutting down %d random peers", numPeersShutdown)
+	for _, i := range rand.Perm(5)[:numPeersShutdown] {
 		sp0 := bootNodes[i]
 		if err := sp0.Close(); err != nil {
 			t.Fatalf("could not close node %d", i)
@@ -108,18 +115,12 @@ func TestSubPub(t *testing.T) {
 	}
 
 	// Removing peers used to panic, due to bad reslicing.
-	// TODO(mvdan): reimplement without polling/sleeping.
 	t.Log("waiting for the two shut down peers to be dropped")
-	for {
-		sp.PeersMu.Lock()
-		n := len(sp.Peers)
-		sp.PeersMu.Unlock()
-		if n == 3 {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-		if err := ctx.Err(); err != nil {
-			t.Fatal(err)
+	for i := 0; i < numPeersShutdown; i++ {
+		select {
+		case <-peerRemoved:
+		case <-ctx.Done():
+			t.Fatal("timed out waiting for peers to disappear")
 		}
 	}
 }

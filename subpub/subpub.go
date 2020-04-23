@@ -61,6 +61,10 @@ type SubPub struct {
 	privKey string
 	dht     *dht.IpfsDHT
 	routing *discovery.RoutingDiscovery
+
+	// These are useful for testing.
+	onPeerAdd    func(id libpeer.ID)
+	onPeerRemove func(id libpeer.ID)
 }
 
 type peerSub struct {
@@ -89,6 +93,9 @@ func (ps *SubPub) handleStream(stream network.Stream) {
 	ps.PeersMu.Lock()
 	defer ps.PeersMu.Unlock()
 	ps.Peers = append(ps.Peers, peerSub{pid, write})
+	if fn := ps.onPeerAdd; fn != nil {
+		fn(pid)
+	}
 	log.Infof("connected to peer %s", pid)
 	go ps.broadcastHandler(write, bufio.NewWriter(stream))
 }
@@ -421,6 +428,9 @@ func (ps *SubPub) peersManager() {
 			// Remove peer if no active connection
 			ps.Peers[i] = ps.Peers[len(ps.Peers)-1]
 			ps.Peers = ps.Peers[:len(ps.Peers)-1]
+			if fn := ps.onPeerRemove; fn != nil {
+				fn(peer.id)
+			}
 		}
 		ps.PeersMu.Unlock()
 		time.Sleep(ps.CollectionPeriod)
