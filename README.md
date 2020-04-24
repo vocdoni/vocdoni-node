@@ -18,6 +18,7 @@ Our main aim is a trustless voting system, where anyone can speak their voice an
 
 We intend the algorithms, systems, and software that we build to be a useful contribution toward making violence in these cryptonetworks impossible by protecting users privacy with cryptography. In particular, our aim is to provide the necessary tooling for the political will of network participants to translate outwardly into real political capital, without sacrificing privacy.
 
+![vocdoni go-dvote team](https://assets.gitlab-static.net/uploads/-/system/project/avatar/12677379/go-dvote.png)
 
 ## dvotenode
 
