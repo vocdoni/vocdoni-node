@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	tmtypes "github.com/tendermint/tendermint/types"
-
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -130,33 +128,9 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 }
 
 func (r *Router) getBlockHeight(request routerRequest) {
-	qdata := types.QueryData{
-		Method: "getBlockHeight",
-	}
-	qdataBytes, err := json.Marshal(qdata)
-	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err)
-		r.sendError(request, "cannot marshal query")
-		return
-	}
-	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
-	if err != nil || queryResult.Response.Code != 0 {
-		r.sendError(request, "cannot fetch height")
-		return
-	}
 	var response types.ResponseMessage
-	var header tmtypes.Header
-	err = r.codec.UnmarshalBinaryBare(queryResult.Response.Value, header)
-	if err != nil {
-		log.Errorf("cannot unmarshal header: %s", err)
-		r.sendError(request, "cannot get height height")
-		return
-	}
-	response.Height = new(int64)
-	if header.Height != 0 {
-		*response.Height = header.Height
-	}
-	response.BlockTimestamp = int32(header.Time.Unix())
+	response.Height = &r.vocapp.State.Header().Height
+	response.BlockTimestamp = int32(r.vocapp.State.Header().Time.Unix())
 	r.transport.Send(r.buildReply(request, response))
 }
 
