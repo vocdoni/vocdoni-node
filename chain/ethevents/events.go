@@ -16,6 +16,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/vochain"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"gitlab.com/vocdoni/go-dvote/chain"
@@ -36,8 +37,10 @@ type EthereumEvents struct {
 	EventHandlers []EventHandler
 	// ethereum subscribed events
 	Signer Signer
-	// VochainCli is the Vochain HTTP client
-	VochainCLI VochainClient
+	// VochainApp is a pointer to the Vochain BaseApplication
+	// allowing to call SendTx method
+	VochainApp *vochain.BaseApplication
+
 	// Census is the census manager service
 	Census CensusManager
 	// EventProcessor handles events pending to process
@@ -81,7 +84,7 @@ type EventProcessor struct {
 }
 
 // NewEthEvents creates a new Ethereum events handler
-func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, cens *census.Manager, vclient VochainClient) (*EthereumEvents, error) {
+func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication) (*EthereumEvents, error) {
 	if len(w3Endpoint) == 0 {
 		w3Endpoint = "ws://127.0.0.1:9092"
 	}
@@ -102,7 +105,7 @@ func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, c
 		Signer:          signer,
 		DialAddr:        w3Endpoint,
 		Census:          cens,
-		VochainCLI:      vclient,
+		VochainApp:      vocapp,
 		EventProcessor: &EventProcessor{
 			Events: make(chan ethtypes.Log),
 		},
