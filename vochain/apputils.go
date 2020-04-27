@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"strconv"
 
 	"gitlab.com/vocdoni/go-dvote/config"
@@ -142,6 +143,8 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 			return nil, state.AddValidator(tx.PubKey, tx.Power)
 		case "removeValidator":
 			return nil, state.RemoveValidator(tx.Address)
+		case types.AdminTxAddProcessKeys:
+			return nil, state.AddProcessKeys(tx)
 		}
 	case types.NewProcessTx:
 		newProcess := &types.Process{
@@ -392,6 +395,71 @@ func AdminTxCheck(adminTx types.AdminTx, state *State) error {
 	authorized, addr := VerifySignatureAgainstOracles(oracles, adminTxBytes, sign)
 	if !authorized {
 		return fmt.Errorf("unauthorized to perform an adminTx, address: %s, message: %s", addr, string(adminTxBytes))
+	}
+	switch {
+	case adminTx.Type == types.AdminTxAddProcessKeys:
+		// sanitize processID
+		sanitizedPID := util.TrimHex(adminTx.ProcessID)
+		if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize) {
+			return fmt.Errorf("malformed processId")
+		}
+		// if tx commitment key or tx public key are not set tx is not valid
+		// also commitment key should have 32 byte and cannot be 0x0
+		if adminTx.CommitmentKey == nil && len(adminTx.EncryptionPublicKeys) == 0 {
+			return fmt.Errorf("malformed tx, commitmentKey or publicEncryptionKeys must be set")
+		}
+		// if tx encryption public keys, key index cannot be void
+		if len(adminTx.EncryptionPublicKeys) > 0 && adminTx.KeyIndex == nil {
+			return fmt.Errorf("malformed tx, index should exists")
+		}
+		// if commitment key check commitment key format
+		if len(adminTx.EncryptionPublicKeys) == 0 {
+			if len(adminTx.CommitmentKey) != 32 {
+				return fmt.Errorf("malformed tx, commitmentKey length not valid")
+			}
+			// check commitment key is not 0x0
+			fixedCK := [32]byte{}
+			copy(fixedCK[:], adminTx.CommitmentKey)
+			if fixedCK == types.Invalid32ByteAddr {
+				return fmt.Errorf("commitment key cannot be 0x0")
+			}
+		}
+		// check process exists
+		process, _ := state.Process(sanitizedPID)
+		if process == nil {
+			return fmt.Errorf("process with id (%s) does not exist", sanitizedPID)
+		}
+		// if there are encryption public keys sanitize them and check not exist
+		if len(adminTx.EncryptionPublicKeys) > 0 {
+			for idx, i := range adminTx.EncryptionPublicKeys {
+				adminTx.EncryptionPublicKeys[idx] = util.TrimHex(i)
+				for _, j := range process.EncryptionPublicKeys {
+					if j == i {
+						return fmt.Errorf("encryption public key already exists")
+					}
+				}
+			}
+		}
+		// check commitment key does not exist
+		if reflect.DeepEqual(process.CommitmentKey, adminTx.CommitmentKey) {
+			return fmt.Errorf("commitment key already exists")
+		}
+		header := state.Header()
+		if header == nil {
+			return fmt.Errorf("cannot get blockchain header")
+		}
+		// endblock is always greater than start block so that case is also included here
+		if h := header.Height; process.StartBlock >= h {
+			return fmt.Errorf("cannot add process keys in a started or finished process")
+		}
+		// process is not canceled
+		if process.Canceled {
+			return fmt.Errorf("cannot add process keys in a canceled process")
+		}
+		// check valid index
+		if len(process.EncryptionPublicKeys) != *adminTx.KeyIndex {
+			return fmt.Errorf("invalid index")
+		}
 	}
 	return nil
 }

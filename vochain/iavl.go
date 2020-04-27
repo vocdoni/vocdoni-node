@@ -241,6 +241,32 @@ func (v *State) Validators() ([]tmtypes.GenesisValidator, error) {
 	return validators, err
 }
 
+// AddProcessKeys adds keys in a zkSnark or encrypted-poll process
+func (v *State) AddProcessKeys(tx types.AdminTx) error {
+	sanitizedPID := util.TrimHex(tx.ProcessID)
+	process, err := v.Process(sanitizedPID)
+	if err != nil {
+		return err
+	}
+	if tx.CommitmentKey != nil {
+		process.CommitmentKey = tx.CommitmentKey
+	}
+	if len(tx.EncryptionPublicKeys) > 0 {
+		for _, k := range tx.EncryptionPublicKeys {
+			process.EncryptionPublicKeys = append(process.EncryptionPublicKeys, util.TrimHex(k))
+		}
+	}
+	if process.CommitmentKey == nil && len(process.EncryptionPublicKeys) == 0 {
+		return errors.New("no key added")
+	}
+	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
+	if err != nil {
+		return errors.New("cannot marshal updated process bytes")
+	}
+	v.ProcessTree.Set([]byte(sanitizedPID), updatedProcessBytes)
+	return nil
+}
+
 // AddProcess adds a new process to vochain if not already added
 func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 	pid = util.TrimHex(pid)

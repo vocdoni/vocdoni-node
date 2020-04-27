@@ -7,6 +7,8 @@ func Bool(b bool) *bool { return &b }
 var (
 	False = Bool(false)
 	True  = Bool(true)
+	// invalid 32 byte address
+	Invalid32ByteAddr = [...]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 )
 
 const (
@@ -26,4 +28,6 @@ const (
 	EncryptedPoll = "encrypted-poll"
 	// SnarkVote contains the string that needs to match with the received vote type for snark-vote
 	SnarkVote = "snark-vote"
+	// AdminTxAddProcessKeys contains the string that needs to match with the received adminTx.Type for adding process keys
+	AdminTxAddProcessKeys = "addProcessKeys"
 )

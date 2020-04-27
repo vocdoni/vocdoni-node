@@ -42,12 +42,16 @@ type Vote struct {
 type Process struct {
 	// Canceled if true process is canceled
 	Canceled bool `json:"canceled,omitempty"`
+	// CommitmentKey is Poseidon hash of the reveal key
+	CommitmentKey []byte `json:"commitmentKey,omitempty"`
 	// Paused if true process is paused and cannot add or modify any vote
 	Paused bool `json:"paused,omitempty"`
 	// EncryptionPublicKey are the keys required to encrypt the votes
 	EncryptionPublicKeys []string `json:"encryptionPublicKeys,omitempty"`
 	// EntityID identifies unequivocally a process
 	EntityID string `json:"entityId,omitempty"`
+	// KeyIndex
+	KeyIndex *int `json:"keyIndex,omitempty"`
 	// MkRoot merkle root of all the census in the process
 	MkRoot string `json:"mkRoot,omitempty"`
 	// NumberOfBlocks represents the amount of tendermint blocks that the process will last
@@ -62,13 +66,14 @@ type Process struct {
 
 // ValidTypes represents an allowed specific tx type
 var ValidTypes = map[string]string{
-	"vote":            "VoteTx",
-	"newProcess":      "NewProcessTx",
-	"cancelProcess":   "CancelProcessTx",
-	"addValidator":    "AdminTx",
-	"removeValidator": "AdminTx",
-	"addOracle":       "AdminTx",
-	"removeOracle":    "AdminTx",
+	"vote":                "VoteTx",
+	"newProcess":          "NewProcessTx",
+	"cancelProcess":       "CancelProcessTx",
+	"addValidator":        "AdminTx",
+	"removeValidator":     "AdminTx",
+	"addOracle":           "AdminTx",
+	"removeOracle":        "AdminTx",
+	AdminTxAddProcessKeys: "AdminTx",
 }
 
 // Tx is an abstraction for any specific tx which is primarly defined by its type
@@ -118,12 +123,16 @@ type CancelProcessTx struct {
 
 // AdminTx represents a Tx that can be only executed by some authorized addresses
 type AdminTx struct {
-	Address   string        `json:"address"`
-	Nonce     string        `json:"nonce"`
-	Power     int64         `json:"power,omitempty"`
-	PubKey    crypto.PubKey `json:"pub_key,omitempty"`
-	Signature string        `json:"signature,omitempty"`
-	Type      string        `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
+	Address              string        `json:"address"`
+	CommitmentKey        []byte        `json:"commitmentKey,omitempty"`
+	EncryptionPublicKeys []string      `json:"encryptionPublicKeys,omitempty"`
+	KeyIndex             *int          `json:"keyIndex,omitempty"`
+	Nonce                string        `json:"nonce"`
+	Power                int64         `json:"power,omitempty"`
+	ProcessID            string        `json:"processId,omitempty"`
+	PubKey               crypto.PubKey `json:"pub_key,omitempty"`
+	Signature            string        `json:"signature,omitempty"`
+	Type                 string        `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
 }
 
 // ValidateType a valid Tx type specified in ValidTypes
