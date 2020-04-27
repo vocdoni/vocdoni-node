@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -13,6 +14,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/tree"
@@ -290,11 +292,21 @@ func (is *IPFSsync) unicastMsg(address string, ipfsmsg Message) error {
 // Start initializes and start an IPFSsync instance
 func (is *IPFSsync) Start() {
 	log.Infof("initializing new pin storage")
-	os.RemoveAll(is.DataDir + "/ipfsSync.db")
-	is.hashTree.StorageDir = is.DataDir
-	if err := is.hashTree.Init("ipfsSync.db"); err != nil {
+	dbDir := filepath.Join(is.DataDir, "db")
+	if err := os.RemoveAll(dbDir); err != nil {
 		log.Fatal(err)
 	}
+	storage, err := db.NewIden3Storage(dbDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tr, err := tree.NewTree(storage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	is.hashTree = *tr
+
 	is.updatePinsTree([]string{})
 	log.Infof("current hash %s", is.hashTree.Root())
 
@@ -318,7 +330,6 @@ func (is *IPFSsync) Start() {
 	go is.Transport.Listen(msg)
 	is.myAddress = is.Transport.Address()
 	is.myNodeID = is.Storage.Node.PeerHost.ID().String()
-	var err error
 	is.myMultiAddr, err = ma.NewMultiaddr(guessMyAddress(4001, is.myNodeID))
 	if err != nil {
 		log.Fatal(err)
