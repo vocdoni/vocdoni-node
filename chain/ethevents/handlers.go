@@ -101,6 +101,7 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 		res, err := e.VochainApp.SendTX(tx)
 		if err != nil || res == nil {
 			log.Warnf("cannot broadcast tx: (%s)", err)
+			return fmt.Errorf("cannot broadcast tx: (%s), res: (%+v)", err, res)
 		} else {
 			log.Infof("new transaction hash: %s, data: %s", res.Hash, res.Data)
 		}
@@ -126,6 +127,7 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 		res, err := e.VochainApp.SendTX(tx)
 		if err != nil || res == nil {
 			log.Warnf("cannot broadcast tx: (%s)", err)
+			return fmt.Errorf("cannot broadcast tx: (%s), res: (%+v)", err, res)
 		} else {
 			log.Infof("new transaction hash: %s", res.Hash)
 		}

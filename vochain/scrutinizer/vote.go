@@ -66,7 +66,7 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
 func (s *Scrutinizer) ComputeResult(processID string) error {
 	log.Debugf("computing results for %s", processID)
 	// Check if process exist
-	_, err := s.VochainState.Process(processID)
+	_, err := s.VochainState.Process(processID, false)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (s *Scrutinizer) ComputeResult(processID string) error {
 func (s *Scrutinizer) VoteResult(processID string) (ProcessVotes, error) {
 	processID = util.TrimHex(processID)
 	// Check if process exist
-	_, err := s.VochainState.Process(processID)
+	_, err := s.VochainState.Process(processID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -166,8 +166,8 @@ func (s *Scrutinizer) computeLiveResults(processID string) (pv ProcessVotes, err
 func (s *Scrutinizer) computeNonLiveResults(processID string) (pv ProcessVotes, err error) {
 	pv = emptyProcess()
 	var nvotes int
-	for _, e := range s.VochainState.EnvelopeList(processID, 0, 32<<20) { // 32K seems enough for now
-		v, err := s.VochainState.Envelope(fmt.Sprintf("%s_%s", processID, e))
+	for _, e := range s.VochainState.EnvelopeList(processID, 0, 32<<20, false) { // 32K seems enough for now
+		v, err := s.VochainState.Envelope(fmt.Sprintf("%s_%s", processID, e), false)
 		if err != nil {
 			log.Warn(err)
 			continue

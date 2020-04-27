@@ -68,7 +68,7 @@ func TestGetOracles(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithOracles(t)
-	oracles, err := s.Oracles()
+	oracles, err := s.Oracles(false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -129,7 +129,7 @@ func TestGetProcess(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	if _, err := s.Process("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"); err != nil {
+	if _, err := s.Process("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105", false); err != nil {
 		t.Error(err)
 	}
 }
@@ -159,7 +159,7 @@ func TestGetEnvelope(t *testing.T) {
 	if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
 		t.Error(err)
 	}
-	if _, err := s.Envelope("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
+	if _, err := s.Envelope("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0", false); err != nil {
 		t.Error(err)
 	}
 }
@@ -171,10 +171,10 @@ func TestCountVotes(t *testing.T) {
 	if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
 		t.Error(err)
 	}
-	if _, err := s.Envelope("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
+	if _, err := s.Envelope("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0", false); err != nil {
 		t.Error(err)
 	}
-	c := s.CountVotes("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105")
+	c := s.CountVotes("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105", false)
 	if c != 1 {
 		t.Errorf("number of votes should be 1, received %d", c)
 	}
@@ -187,10 +187,10 @@ func TestGetEnvelopeList(t *testing.T) {
 	if err := s.AddVote(testcommon.VoteHardcoded); err != nil {
 		t.Error(err)
 	}
-	if _, err := s.Envelope("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"); err != nil {
+	if _, err := s.Envelope("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105_5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0", false); err != nil {
 		t.Error(err)
 	}
-	nullifiers := s.EnvelopeList("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105", 0, 1)
+	nullifiers := s.EnvelopeList("0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105", 0, 1, false)
 	if nullifiers[0] != "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0" {
 		t.Errorf("bad nullifier recovered, expected: 5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0, got: %s", nullifiers[0])
 	}

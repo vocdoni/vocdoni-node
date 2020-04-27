@@ -9,7 +9,7 @@ import (
 
 // ProcessInfo returns the available information regarding an election process id
 func (s *Scrutinizer) ProcessInfo(processID string) (*types.Process, error) {
-	return s.VochainState.Process(processID)
+	return s.VochainState.Process(processID, false)
 }
 
 // Return whether a process must have live results or not
@@ -67,7 +67,7 @@ func (s *Scrutinizer) newEmptyLiveProcess(pid string) (ProcessVotes, error) {
 // active processes are those processes which are not yet finished
 // on the database we are storing: height=>{proceess1, process2, process3}
 func (s *Scrutinizer) registerActiveProcess(pid string) {
-	process, err := s.VochainState.Process(pid)
+	process, err := s.VochainState.Process(pid, false)
 	if err != nil {
 		log.Error(err)
 		return

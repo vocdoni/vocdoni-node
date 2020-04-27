@@ -45,7 +45,8 @@ var ValidEvents = map[string]bool{
 	"endProcess":    true,
 	"commit":        true,
 	"rollback":      true,
-	"cancelProcess": true}
+	"cancelProcess": true,
+}
 
 // Event is an interface used for executing custom functions during the events of the block creation process
 // The events available can be read on ValidEvents string slice
@@ -64,9 +65,17 @@ type State struct {
 	AppTree     *iavl.MutableTree
 	ProcessTree *iavl.MutableTree
 	VoteTree    *iavl.MutableTree
-	Codec       *amino.Codec
-	Lock        sync.Mutex
-	Events      map[string][]Event // addVote, addProcess....
+	ImmutableState
+	Codec  *amino.Codec
+	Events map[string][]Event // addVote, addProcess....
+}
+
+// ImmutableState holds the latest trees version saved on disk
+type ImmutableState struct {
+	IAppTree     *iavl.ImmutableTree
+	IProcessTree *iavl.ImmutableTree
+	IVoteTree    *iavl.ImmutableTree
+	ILock        sync.RWMutex
 }
 
 // NewState creates a new State
@@ -84,7 +93,7 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
-	vs := State{Codec: codec}
+	vs := State{}
 	vs.AppTree, err = iavl.NewMutableTree(appTree, PrefixDBCacheSize)
 	if err != nil {
 		return nil, err
@@ -119,6 +128,11 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	vs.Codec = codec
+	vs.IAppTree = vs.AppTree.ImmutableTree
+	vs.IProcessTree = vs.ProcessTree.ImmutableTree
+	vs.IVoteTree = vs.VoteTree.ImmutableTree
 
 	log.Infof("application trees successfully loaded. appTree:%d processTree:%d voteTree: %d", atVersion, ptVersion, vtVersion)
 	vs.Events = make(map[string][]Event)
@@ -178,8 +192,15 @@ func (v *State) RemoveOracle(address string) error {
 }
 
 // Oracles returns the current oracle list
-func (v *State) Oracles() ([]string, error) {
-	_, oraclesBytes := v.AppTree.Get(oracleKey)
+func (v *State) Oracles(isQuery bool) ([]string, error) {
+	var oraclesBytes []byte
+	if isQuery {
+		v.ILock.RLock()
+		_, oraclesBytes = v.IAppTree.Get(oracleKey)
+		v.ILock.RUnlock()
+	} else {
+		_, oraclesBytes = v.AppTree.Get(oracleKey)
+	}
 	var oracles []string
 	err := v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	return oracles, err
@@ -234,8 +255,15 @@ func (v *State) RemoveValidator(address string) error {
 }
 
 // Validators returns a list of the validators saved on persistent storage
-func (v *State) Validators() ([]tmtypes.GenesisValidator, error) {
-	_, validatorBytes := v.AppTree.Get(validatorKey)
+func (v *State) Validators(isQuery bool) ([]tmtypes.GenesisValidator, error) {
+	var validatorBytes []byte
+	if isQuery {
+		v.ILock.RLock()
+		_, validatorBytes = v.IAppTree.Get(validatorKey)
+		v.ILock.RUnlock()
+	} else {
+		_, validatorBytes = v.AppTree.Get(validatorKey)
+	}
 	var validators []tmtypes.GenesisValidator
 	err := v.Codec.UnmarshalBinaryBare(validatorBytes, &validators)
 	return validators, err
@@ -260,7 +288,7 @@ func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 // CancelProcess sets the process canceled atribute to true
 func (v *State) CancelProcess(pid string) error {
 	pid = util.TrimHex(pid)
-	process, err := v.Process(pid)
+	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
 	}
@@ -314,10 +342,17 @@ func (v *State) ResumeProcess(pid string) error {
 }
 
 // Process returns a process info given a processId if exists
-func (v *State) Process(pid string) (*vochaintypes.Process, error) {
+func (v *State) Process(pid string, isQuery bool) (*vochaintypes.Process, error) {
 	var process *vochaintypes.Process
+	var processBytes []byte
 	pid = util.TrimHex(pid)
-	_, processBytes := v.ProcessTree.Get([]byte(pid))
+	if isQuery {
+		v.ILock.RLock()
+		_, processBytes = v.IProcessTree.Get([]byte(pid))
+		v.ILock.RUnlock()
+	} else {
+		_, processBytes = v.ProcessTree.Get([]byte(pid))
+	}
 	if processBytes == nil {
 		return nil, fmt.Errorf("cannot find process with id (%s)", pid)
 	}
@@ -359,9 +394,16 @@ func (v *State) AddVote(vote *vochaintypes.Vote) error {
 
 // Envelope returns the info of a vote if already exists.
 // voteID must be equals to processID_Nullifier
-func (v *State) Envelope(voteID string) (*vochaintypes.Vote, error) {
+func (v *State) Envelope(voteID string, isQuery bool) (*vochaintypes.Vote, error) {
 	var vote *vochaintypes.Vote
-	_, voteBytes := v.VoteTree.Get([]byte(voteID))
+	var voteBytes []byte
+	if isQuery {
+		v.ILock.RLock()
+		_, voteBytes = v.IVoteTree.Get([]byte(voteID))
+		v.ILock.RUnlock()
+	} else {
+		_, voteBytes = v.VoteTree.Get([]byte(voteID))
+	}
 	if voteBytes == nil {
 		return nil, fmt.Errorf("vote with id (%s) does not exist", voteID)
 	}
@@ -375,23 +417,29 @@ func (v *State) Envelope(voteID string) (*vochaintypes.Vote, error) {
 // To iterate over all the keys with said prefix, the start point can simply be "processID_".
 // We don't know what the next processID hash will be, so we use "processID}"
 // as the end point, since "}" comes after "_" when sorting lexicographically.
-func (v *State) iterateProcessID(processID string, fn func(key []byte, value []byte) bool) bool {
+func (v *State) iterateProcessID(processID string, fn func(key []byte, value []byte) bool, isQuery bool) bool {
+	if isQuery {
+		v.ILock.RLock()
+		b := v.IVoteTree.IterateRange([]byte(processID+"_"), []byte(processID+"}"), true, fn)
+		v.ILock.RUnlock()
+		return b
+	}
 	return v.VoteTree.IterateRange([]byte(processID+"_"), []byte(processID+"}"), true, fn)
 }
 
 // CountVotes returns the number of votes registered for a given process id
-func (v *State) CountVotes(processID string) int64 {
+func (v *State) CountVotes(processID string, isQuery bool) int64 {
 	processID = util.TrimHex(processID)
 	var count int64
 	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
 		count++
 		return false
-	})
+	}, isQuery)
 	return count
 }
 
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
-func (v *State) EnvelopeList(processID string, from, listSize int64) []string {
+func (v *State) EnvelopeList(processID string, from, listSize int64, isQuery bool) []string {
 	processID = util.TrimHex(processID)
 	var nullifiers []string
 	idx := int64(0)
@@ -405,13 +453,20 @@ func (v *State) EnvelopeList(processID string, from, listSize int64) []string {
 		}
 		idx++
 		return false
-	})
+	}, isQuery)
 	return nullifiers
 }
 
 // Header returns the blockchain last block commited height
-func (v *State) Header() *tmtypes.Header {
-	_, headerBytes := v.AppTree.Get(headerKey)
+func (v *State) Header(isQuery bool) *tmtypes.Header {
+	var headerBytes []byte
+	if isQuery {
+		v.ILock.RLock()
+		_, headerBytes = v.IAppTree.Get(headerKey)
+		v.ILock.RUnlock()
+	} else {
+		_, headerBytes = v.AppTree.Get(headerKey)
+	}
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
 	if err != nil {
@@ -422,8 +477,15 @@ func (v *State) Header() *tmtypes.Header {
 }
 
 // AppHash returns last hash of the application
-func (v *State) AppHash() []byte {
-	_, headerBytes := v.AppTree.Get(headerKey)
+func (v *State) AppHash(isQuery bool) []byte {
+	var headerBytes []byte
+	if isQuery {
+		v.ILock.RLock()
+		_, headerBytes = v.IAppTree.Get(headerKey)
+		v.ILock.RUnlock()
+	} else {
+		_, headerBytes = v.AppTree.Get(headerKey)
+	}
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
 	if err != nil {
@@ -435,7 +497,7 @@ func (v *State) AppHash() []byte {
 // Save persistent save of vochain mem trees
 func (v *State) Save() []byte {
 	if events, ok := v.Events["commit"]; ok {
-		if h := v.Header(); h != nil {
+		if h := v.Header(false); h != nil {
 			for _, e := range events {
 				e.Commit(h.Height)
 			}

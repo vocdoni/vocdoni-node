@@ -76,7 +76,7 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 	}
 	switch tx := tx.(type) {
 	case types.VoteTx:
-		process, _ := state.Process(tx.ProcessID)
+		process, _ := state.Process(tx.ProcessID, false)
 		if process == nil {
 			return nil, fmt.Errorf("process with id (%s) does not exist", tx.ProcessID)
 		}
@@ -177,14 +177,14 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
-	process, _ := state.Process(vote.ProcessID)
+	process, _ := state.Process(vote.ProcessID, false)
 	if process == nil {
 		return fmt.Errorf("process with id (%s) does not exist", vote.ProcessID)
 	}
 	endBlock := process.StartBlock + process.NumberOfBlocks
 	// check if process is enabled
 	var height int64
-	header := state.Header()
+	header := state.Header(false)
 	if header != nil {
 		height = header.Height
 	}
@@ -196,7 +196,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 				return fmt.Errorf("malformed nullifier")
 			}
 			voteID := fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier)
-			v, _ := state.Envelope(voteID)
+			v, _ := state.Envelope(voteID, false)
 			if v != nil {
 				log.Debugf("vote already exists")
 				return fmt.Errorf("vote already exists")
@@ -233,7 +233,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 			log.Debugf("generated nullifier: %s", voteTmp.Nullifier)
 			// check if vote exists
 			voteID := fmt.Sprintf("%s_%s", sanitizedPID, util.TrimHex(voteTmp.Nullifier))
-			v, _ := state.Envelope(voteID)
+			v, _ := state.Envelope(voteID, false)
 			if v != nil {
 				return fmt.Errorf("vote already exists")
 			}
@@ -278,13 +278,13 @@ func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 	}
 
 	// get oracles
-	oracles, err := state.Oracles()
+	oracles, err := state.Oracles(false)
 	if err != nil || len(oracles) == 0 {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
 
 	var height int64
-	header := state.Header()
+	header := state.Header(false)
 	if header != nil {
 		height = header.Height
 	}
@@ -308,7 +308,7 @@ func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 		return fmt.Errorf("unauthorized to create a process, message: %s, recovered addr: %s", string(processBytes), addr)
 	}
 	// get process
-	_, err = state.Process(process.ProcessID)
+	_, err = state.Process(process.ProcessID, false)
 	if err == nil {
 		return fmt.Errorf("process with id (%s) already exists", process.ProcessID)
 	}
@@ -330,7 +330,7 @@ func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) e
 		return fmt.Errorf("malformed processId")
 	}
 	// get oracles
-	oracles, err := state.Oracles()
+	oracles, err := state.Oracles(false)
 	if err != nil || len(oracles) == 0 {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
@@ -346,7 +346,7 @@ func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) e
 		return fmt.Errorf("unauthorized to cancel a process, message: %s, recovered addr: %s", string(processBytes), addr)
 	}
 	// get process
-	process, err := state.Process(sanitizedPID)
+	process, err := state.Process(sanitizedPID, false)
 	if err != nil {
 		return fmt.Errorf("cannot cancel the process: %s", err)
 	}
@@ -356,7 +356,7 @@ func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) e
 	}
 	endBlock := process.StartBlock + process.NumberOfBlocks
 	var height int64
-	if h := state.Header(); h != nil {
+	if h := state.Header(false); h != nil {
 		height = h.Height
 	}
 
@@ -369,7 +369,7 @@ func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) e
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
 func AdminTxCheck(adminTx types.AdminTx, state *State) error {
 	// get oracles
-	oracles, err := state.Oracles()
+	oracles, err := state.Oracles(false)
 	if err != nil || len(oracles) == 0 {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}

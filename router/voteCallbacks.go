@@ -48,15 +48,18 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	sanitizedPID := util.TrimHex(request.ProcessID)
 	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope status: (malformed processId)")
+		return
 	}
 	// check nullifier
 	sanitizedNullifier := util.TrimHex(request.Nullifier)
 	if !util.IsHexEncodedStringWithLength(sanitizedNullifier, types.VoteNullifierSize) {
 		r.sendError(request, "cannot get envelope status: (malformed nullifier)")
+		return
 	}
-	_, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier))
+	_, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier), true)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope status: (%s)", err))
+		return
 	}
 	var response types.ResponseMessage
 	response.Registered = types.True
@@ -68,15 +71,18 @@ func (r *Router) getEnvelope(request routerRequest) {
 	sanitizedPID := util.TrimHex(request.ProcessID)
 	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope: (malformed processId)")
+		return
 	}
 	// check nullifier
 	sanitizedNullifier := util.TrimHex(request.Nullifier)
 	if !util.IsHexEncodedStringWithLength(sanitizedNullifier, types.VoteNullifierSize) {
 		r.sendError(request, "cannot get envelope: (malformed nullifier)")
+		return
 	}
-	envelope, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier))
+	envelope, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier), true)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope: (%s)", err))
+		return
 	}
 	var response types.ResponseMessage
 	response.Registered = types.True
@@ -89,8 +95,9 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 	sanitizedPID := util.TrimHex(request.ProcessID)
 	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope height: (malformed processId)")
+		return
 	}
-	votes := r.vocapp.State.CountVotes(sanitizedPID)
+	votes := r.vocapp.State.CountVotes(sanitizedPID, true)
 	var response types.ResponseMessage
 	response.Height = new(int64)
 	*response.Height = votes
@@ -99,8 +106,8 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 
 func (r *Router) getBlockHeight(request routerRequest) {
 	var response types.ResponseMessage
-	response.Height = &r.vocapp.State.Header().Height
-	response.BlockTimestamp = int32(r.vocapp.State.Header().Time.Unix())
+	response.Height = &r.vocapp.State.Header(true).Height
+	response.BlockTimestamp = int32(r.vocapp.State.Header(true).Time.Unix())
 	r.transport.Send(r.buildReply(request, response))
 }
 
@@ -110,6 +117,7 @@ func (r *Router) getProcessList(request routerRequest) {
 	if !util.IsHexEncodedStringWithLength(sanitizedEID, types.EntityIDsize) &&
 		!util.IsHexEncodedStringWithLength(sanitizedEID, types.EntityIDsizeV2) {
 		r.sendError(request, "cannot get process list: (malformed entityId)")
+		return
 	}
 	queryResult, err := r.vocapp.Client.TxSearch(fmt.Sprintf("processCreated.entityId='%s'", sanitizedEID), false, 1, 30, "asc")
 
@@ -134,32 +142,19 @@ func (r *Router) getProcessList(request routerRequest) {
 }
 
 func (r *Router) getProcessKeys(request routerRequest) {
-	qdata := types.QueryData{
-		Method:    "getProcessKeys",
-		ProcessID: request.ProcessID,
-	}
-	qdataBytes, err := json.Marshal(qdata)
-	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err)
-		r.sendError(request, "cannot marshal query data")
+	// check pid
+	sanitizedPID := util.TrimHex(request.ProcessID)
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+		r.sendError(request, "cannot get envelope height: (malformed processId)")
 		return
 	}
-	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
+	process, err := r.vocapp.State.Process(sanitizedPID, true)
 	if err != nil {
-		log.Warnf("cannot query: (%s)", err)
-		r.sendError(request, "cannot query")
-		return
-	}
-	if queryResult.Response.Code != 0 {
-		r.sendError(request, queryResult.Response.GetInfo())
+		r.sendError(request, fmt.Sprintf("cannot get process encryption public keys: (%s)", err))
 		return
 	}
 	var response types.ResponseMessage
-	if err := r.codec.UnmarshalBinaryBare(queryResult.Response.Value, &response.ProcessKeys); err != nil {
-		log.Errorf("cannot unmarshal process keys: (%s)", err)
-		r.sendError(request, "cannot unmarshal process keys")
-		return
-	}
+	response.ProcessKeys = process.EncryptionPublicKeys
 	r.transport.Send(r.buildReply(request, response))
 }
 
@@ -167,11 +162,14 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	sanitizedPID := util.TrimHex(request.ProcessID)
 	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope list: (malformed processId)")
+		return
 	}
-	n := r.vocapp.State.EnvelopeList(sanitizedPID, request.From, request.ListSize)
-
+	n := r.vocapp.State.EnvelopeList(sanitizedPID, request.From, request.ListSize, true)
 	var response types.ResponseMessage
 	response.Nullifiers = n
+	if len(n) == 0 {
+		response.Nullifiers = []string{""}
+	}
 	r.transport.Send(r.buildReply(request, response))
 }
 
@@ -180,6 +178,7 @@ func (r *Router) getResults(request routerRequest) {
 	sanitizedPID := util.TrimHex(request.ProcessID)
 	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get results: (malformed processId)")
+		return
 	}
 	request.ProcessID = sanitizedPID
 	if len(request.ProcessID) != 64 {

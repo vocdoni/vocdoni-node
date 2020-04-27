@@ -74,11 +74,11 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	log.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
 	log.Infof("tendermint Block protocol version: %d", req.BlockVersion)
 	var height int64
-	header := app.State.Header()
+	header := app.State.Header(false)
 	if header != nil {
 		height = header.Height
 	}
-	hash := app.State.AppHash()
+	hash := app.State.AppHash(false)
 	log.Infof("current height is %d, current APP hash is %x", height, hash)
 	return abcitypes.ResponseInfo{
 		LastBlockHeight:  height,
@@ -128,6 +128,14 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	// reset app state to latest persistent data
 	app.State.Rollback()
+	// set immutable state
+
+	app.State.ILock.Lock()
+	app.State.IAppTree = app.State.AppTree.ImmutableTree
+	app.State.IProcessTree = app.State.ProcessTree.ImmutableTree
+	app.State.IVoteTree = app.State.VoteTree.ImmutableTree
+	app.State.ILock.Unlock()
+
 	headerBytes, err := app.Codec.MarshalBinaryBare(req.Header)
 	if err != nil {
 		log.Warnf("cannot marshal header in BeginBlock")
