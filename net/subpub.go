@@ -1,7 +1,6 @@
 package net
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"time"
@@ -39,7 +38,7 @@ func (p *SubPubHandle) Init(c *types.Connection) error {
 
 func (s *SubPubHandle) Listen(reciever chan<- types.Message) {
 	ctx := context.TODO()
-	s.SubPub.Connect(ctx)
+	s.SubPub.Start(ctx)
 	go s.SubPub.Subscribe(ctx)
 	var msg types.Message
 	for {
@@ -50,11 +49,19 @@ func (s *SubPubHandle) Listen(reciever chan<- types.Message) {
 }
 
 func (s *SubPubHandle) Address() string {
-	return s.SubPub.PubKey
+	return s.SubPub.NodeID
 }
 
 func (s *SubPubHandle) SetBootnodes(bootnodes []string) {
 	s.SubPub.BootNodes = bootnodes
+}
+
+func (s *SubPubHandle) AddPeer(peer string) error {
+	return s.SubPub.TransportConnectPeer(peer)
+}
+
+func (s *SubPubHandle) String() string {
+	return s.String()
 }
 
 func (s *SubPubHandle) Send(msg types.Message) {
@@ -62,10 +69,7 @@ func (s *SubPubHandle) Send(msg types.Message) {
 }
 
 func (s *SubPubHandle) SendUnicast(address string, msg types.Message) {
-	s.SubPub.PeerConnect(address, func(rw *bufio.ReadWriter) {
-		if err := s.SubPub.SendMessage(rw.Writer, msg.Data); err != nil {
-			log.Warnf("cannot send message to %s: %s", address, err)
-		}
-		rw.Flush()
-	})
+	if err := s.SubPub.PeerStreamWrite(address, msg.Data); err != nil {
+		log.Warnf("cannot send message to %s: (%s)", address, err)
+	}
 }

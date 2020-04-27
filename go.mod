@@ -20,7 +20,7 @@ require (
 	github.com/golang/protobuf v1.3.5 // indirect
 	github.com/google/go-cmp v0.4.0
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect
-	github.com/gorilla/websocket v1.4.1
+	github.com/gorilla/websocket v1.4.2
 	github.com/gtank/merlin v0.1.1 // indirect
 	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
 	github.com/iden3/go-iden3-crypto v0.0.4
@@ -28,24 +28,32 @@ require (
 	github.com/ipfs/go-ipfs v0.4.22-0.20200313001058-457b6e79ff3c
 	github.com/ipfs/go-ipfs-config v0.2.1
 	github.com/ipfs/go-ipfs-files v0.0.6
-	github.com/ipfs/go-log v1.0.2
+	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/interface-go-ipfs-core v0.2.6
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/klauspost/compress v1.10.3
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
-	github.com/libp2p/go-libp2p v0.6.0
+	github.com/libp2p/go-addr-util v0.0.2 // indirect
+	github.com/libp2p/go-conn-security-multistream v0.2.0 // indirect
+	github.com/libp2p/go-libp2p v0.8.2
 	github.com/libp2p/go-libp2p-autonat-svc v0.1.0
-	github.com/libp2p/go-libp2p-core v0.5.0
-	github.com/libp2p/go-libp2p-discovery v0.2.0
+	github.com/libp2p/go-libp2p-circuit v0.2.2 // indirect
+	github.com/libp2p/go-libp2p-connmgr v0.2.1
+	github.com/libp2p/go-libp2p-core v0.5.2
+	github.com/libp2p/go-libp2p-discovery v0.4.0
 	github.com/libp2p/go-libp2p-kad-dht v0.5.1
+	github.com/libp2p/go-libp2p-peerstore v0.2.3 // indirect
 	github.com/libp2p/go-reuseport v0.0.1
+	github.com/libp2p/go-stream-muxer-multistream v0.3.0 // indirect
+	github.com/libp2p/go-ws-transport v0.3.1 // indirect
+	github.com/libp2p/go-yamux v1.3.6 // indirect
 	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/mattn/go-colorable v0.1.6 // indirect
-	github.com/miekg/dns v1.1.16 // indirect
 	github.com/multiformats/go-multiaddr v0.2.1
-	github.com/multiformats/go-multiaddr-net v0.1.3
+	github.com/multiformats/go-multiaddr-net v0.1.4
+	github.com/multiformats/go-multibase v0.0.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/polydawn/refmt v0.0.0-20190807091052-3d65705ee9f1 // indirect
@@ -67,10 +75,10 @@ require (
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.etcd.io/bbolt v1.3.4 // indirect
 	go.uber.org/multierr v1.5.0 // indirect
-	go.uber.org/zap v1.14.0
+	go.uber.org/zap v1.15.0
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
+	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
 	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f // indirect
 	golang.org/x/text v0.3.2
 	golang.org/x/tools v0.0.0-20200312194400-c312e98713c2 // indirect

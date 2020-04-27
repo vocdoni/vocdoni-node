@@ -38,7 +38,7 @@ func TestSubPub(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			sp0.Connect(ctx)
+			sp0.Start(ctx)
 			go sp0.Subscribe(ctx)
 		}()
 		defer sp0.Close()
@@ -66,7 +66,7 @@ func TestSubPub(t *testing.T) {
 	peerRemoved := make(chan libpeer.ID, numPeers)
 	sp.onPeerRemove = func(id libpeer.ID) { peerRemoved <- id }
 
-	sp.Connect(ctx)
+	sp.Start(ctx)
 	go sp.Subscribe(ctx)
 	defer sp.Close()
 

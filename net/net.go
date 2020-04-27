@@ -13,6 +13,8 @@ type Transport interface {
 	Init(c *types.Connection) error
 	Address() string
 	SetBootnodes(bootnodes []string)
+	AddPeer(peer string) error
+	String() string
 }
 
 type TransportID int

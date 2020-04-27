@@ -56,7 +56,7 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *signature.SignKeys, ma *metrics.Ag
 				log.Debugf("using custom ipfs sync bootnodes %s", ipfsconfig.SyncPeers)
 				storageSync.Transport.SetBootnodes(ipfsconfig.SyncPeers)
 			}
-			go storageSync.Start()
+			storageSync.Start()
 		}
 	}
 	return

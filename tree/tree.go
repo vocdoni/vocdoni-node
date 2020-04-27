@@ -174,7 +174,7 @@ func CheckProof(root, mpHex string, index, value []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return merkletree.VerifyProof(&rootHash, mp,
+	return merkletree.VerifyProof(rootHash, mp,
 		hindex, hvalue), nil
 }
 
@@ -190,19 +190,19 @@ func (t *Tree) Root() string {
 	return common3.HexEncode(t.Tree.RootKey().Bytes())
 }
 
-func stringToHash(hash string) (merkletree.Hash, error) {
+func stringToHash(hash string) (*merkletree.Hash, error) {
 	var rootHash merkletree.Hash
 	rootBytes, err := common3.HexDecode(hash)
 	if err != nil {
-		return rootHash, err
+		return &rootHash, err
 	}
 	copy(rootHash[:32], rootBytes)
-	return rootHash, err
+	return &rootHash, err
 }
 
 // Dump returns the whole merkle tree serialized in a format that can be used on Import
 func (t *Tree) Dump(root string) (claims []string, err error) {
-	var rootHash merkletree.Hash
+	var rootHash *merkletree.Hash
 	t.updateAccessTime()
 	if len(root) > 0 {
 		rootHash, err = stringToHash(root)
@@ -210,14 +210,14 @@ func (t *Tree) Dump(root string) (claims []string, err error) {
 			return
 		}
 	}
-	claims, err = t.Tree.DumpClaims(&rootHash)
+	claims, err = t.Tree.DumpClaims(rootHash)
 	return
 }
 
 // Size returns the number of leaf nodes on the merkle tree
 func (t *Tree) Size(root string) (int64, error) {
 	var err error
-	var rootHash merkletree.Hash
+	var rootHash *merkletree.Hash
 	var size int64
 	t.updateAccessTime()
 	if len(root) > 0 {
@@ -226,7 +226,7 @@ func (t *Tree) Size(root string) (int64, error) {
 			return size, err
 		}
 	}
-	err = t.Tree.Walk(&rootHash, func(n *merkletree.Node) {
+	err = t.Tree.Walk(rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
 			size++
 		}
@@ -235,12 +235,13 @@ func (t *Tree) Size(root string) (int64, error) {
 }
 
 // DumpPlain returns the entire list of added claims for a specific root hash
+// First return parametre are the indexes and second the values
 // If root is not specified, the current one is used
 // If responseBase64 is true, the list will be returned base64 encoded
 func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, []string, error) {
 	var indexes, values []string
 	var err error
-	var rootHash merkletree.Hash
+	var rootHash *merkletree.Hash
 	t.updateAccessTime()
 	if len(root) > 0 {
 		rootHash, err = stringToHash(root)
@@ -249,7 +250,7 @@ func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, []string, 
 		}
 	}
 	var index, value []byte
-	err = t.Tree.Walk(&rootHash, func(n *merkletree.Node) {
+	err = t.Tree.Walk(rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
 			c := claims.NewClaimBasicFromEntry(n.Entry)
 
@@ -276,11 +277,11 @@ func (t *Tree) ImportDump(claims []string) error {
 
 // Snapshot returns a Tree instance of a exiting merkle root
 func (t *Tree) Snapshot(root string) (*Tree, error) {
-	rootHash := new(merkletree.Hash)
+	var rootHash *merkletree.Hash
 	snapshotTree := new(Tree)
 	var err error
 	if len(root) > 0 {
-		*rootHash, err = stringToHash(root)
+		rootHash, err = stringToHash(root)
 		if err != nil || rootHash == nil {
 			return snapshotTree, err
 		}
@@ -297,7 +298,7 @@ func (t *Tree) HashExist(hash string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	n, err := t.Tree.GetNode(&h)
+	n, err := t.Tree.GetNode(h)
 	if err != nil || n == nil {
 		return false, nil
 	}

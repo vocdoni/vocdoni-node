@@ -3,9 +3,11 @@ package ipfssync
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -22,207 +24,12 @@ import (
 
 type Message struct {
 	Type      string   `json:"type"`
-	Address   string   `json:"address"`
-	Maddress  string   `json:"mAddress"`
-	NodeID    string   `json:"nodeId"`
-	Hash      string   `json:"hash"`
-	PinList   []string `json:"pinList"`
+	Address   string   `json:"address,omitempty"`
+	Maddress  string   `json:"mAddress,omitempty"`
+	NodeID    string   `json:"nodeId,omitempty"`
+	Hash      string   `json:"hash,omitempty"`
+	PinList   []string `json:"pinList,omitempty"`
 	Timestamp int32    `json:"timestamp"`
-}
-
-// shity function to workaround NAT problems (hope it's temporary)
-func guessMyAddress(port int, id string) string {
-	ip, err := util.PublicIP()
-	if err != nil {
-		log.Warn(err)
-		return ""
-	}
-	if ip4 := ip.To4(); ip4 != nil {
-		return fmt.Sprintf("/ip4/%s/tcp/%d/ipfs/%s", ip4, port, id)
-	}
-	if ip6 := ip.To16(); ip6 != nil {
-		return fmt.Sprintf("/ip6/[%s]/tcp/%d/ipfs/%s", ip6, port, id)
-	}
-	return ""
-}
-
-func (is *IPFSsync) updatePinsTree(extraPins []string) {
-	currentRoot := is.hashTree.Root()
-	for _, v := range append(is.listPins(), extraPins...) {
-		if len(v) > is.hashTree.MaxClaimSize() {
-			log.Warnf("CID exceeds the claim size %d", len(v))
-			continue
-		}
-		is.hashTree.AddClaim([]byte(v), []byte{})
-	}
-	if currentRoot != is.hashTree.Root() {
-		is.lastHash = currentRoot
-	}
-}
-
-func (is *IPFSsync) syncPins() error {
-	mkPins, _, err := is.hashTree.DumpPlain(is.hashTree.Root(), false)
-	if err != nil {
-		return err
-	}
-	ctx := context.TODO() // the caller should probably provide it
-	pins, err := is.Storage.ListPins(ctx)
-	if err != nil {
-		return err
-	}
-	for _, v := range mkPins {
-		if _, e := pins[v]; e {
-			continue
-		}
-
-		log.Infof("pinning %s", v)
-		ctx, cancel := context.WithTimeout(ctx, is.Timeout)
-		defer cancel()
-		if err := is.Storage.Pin(ctx, v); err != nil {
-			log.Warn(err)
-		}
-	}
-	return nil
-}
-
-func (is *IPFSsync) askPins(address string, hash string) error {
-	var msg Message
-	msg.Type = "fetch"
-	msg.Address = is.myAddress
-	msg.Hash = hash
-	msg.Timestamp = int32(time.Now().Unix())
-	return is.unicastMsg(address, msg)
-}
-
-func (is *IPFSsync) sendPins(address string) error {
-	var msg Message
-	msg.Type = "fetchReply"
-	msg.Address = is.myAddress
-	msg.Hash = is.hashTree.Root()
-	msg.PinList = is.listPins()
-	msg.Timestamp = int32(time.Now().Unix())
-
-	return is.unicastMsg(address, msg)
-}
-
-func (is *IPFSsync) broadcastMsg(ipfsmsg Message) error {
-	d, err := json.Marshal(ipfsmsg)
-	if err != nil {
-		return err
-	}
-	is.Transport.Send(types.Message{
-		Data:      d,
-		TimeStamp: int32(time.Now().Unix()),
-	})
-	return nil
-}
-
-// Handle handles an Message
-func (is *IPFSsync) Handle(msg Message) error {
-	if msg.Address == is.myAddress {
-		return nil
-	}
-	if int32(time.Now().Unix())-msg.Timestamp > is.TimestampWindow {
-		log.Debug("discarting old message")
-		return nil
-	}
-	switch msg.Type {
-	case "hello":
-		peers, err := is.Storage.CoreAPI.Swarm().Peers(is.Storage.Node.Context())
-		if err != nil {
-			return err
-		}
-		found := false
-		for _, p := range peers {
-			if p.ID().String() == msg.NodeID {
-				found = true
-			}
-		}
-		if !found {
-			log.Infof("connecting to peer %s", msg.Maddress)
-			multiAddr, err := ma.NewMultiaddr(msg.Maddress)
-			if err != nil {
-				return err
-			}
-			peerInfo, err := peer.AddrInfoFromP2pAddr(multiAddr)
-			if err != nil {
-				return err
-			}
-			return is.Storage.CoreAPI.Swarm().Connect(is.Storage.Node.Context(), *peerInfo)
-		}
-
-	case "update":
-		if len(msg.Hash) > 31 && len(msg.Address) > 31 && !is.updateLock && len(is.askLock) == 0 {
-			if exist, err := is.hashTree.HashExist(msg.Hash); err == nil && !exist && is.lastHash != msg.Hash {
-				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
-				is.askLock = msg.Hash
-				return is.askPins(msg.Address, msg.Hash)
-			}
-		}
-
-	case "fetchReply":
-		if len(msg.Hash) > 31 && len(msg.Address) > 31 && !is.updateLock {
-			if msg.Hash != is.hashTree.Root() {
-				is.updateLock = true
-				log.Infof("got new pin list %s from %s", msg.Hash, msg.Address)
-				is.updatePinsTree(msg.PinList)
-				is.updateLock = false
-				if is.askLock == msg.Hash {
-					is.askLock = ""
-				}
-				return nil
-			}
-		}
-
-	case "fetch":
-		if len(msg.Hash) > 31 && len(msg.Address) > 31 {
-			if msg.Hash == is.hashTree.Root() {
-				log.Infof("got fetch query, sending pin list to %s", msg.Address)
-				return is.sendPins(msg.Address)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (is *IPFSsync) sendUpdate() {
-	var msg Message
-	msg.Type = "update"
-	msg.Address = is.myAddress
-	msg.Hash = is.hashTree.Root()
-	msg.Timestamp = int32(time.Now().Unix())
-	if len(is.listPins()) > 0 {
-		log.Debugf("current hash %s", msg.Hash)
-		err := is.broadcastMsg(msg)
-		if err != nil {
-			log.Warn(err)
-		}
-	}
-}
-
-func (is *IPFSsync) sendHello() {
-	var msg Message
-	msg.Type = "hello"
-	msg.Address = is.myAddress
-	msg.Maddress = is.myMultiAddr.String()
-	msg.NodeID = is.myNodeID
-	msg.Timestamp = int32(time.Now().Unix())
-	err := is.broadcastMsg(msg)
-	if err != nil {
-		log.Warn(err)
-	}
-}
-
-func (is *IPFSsync) listPins() (pins []string) {
-	list, err := is.Storage.ListPins(context.TODO())
-	if err != nil {
-		log.Error(err)
-	}
-	for i := range list {
-		pins = append(pins, i)
-	}
-	return
 }
 
 type IPFSsync struct {
@@ -240,11 +47,9 @@ type IPFSsync struct {
 	TimestampWindow int32
 
 	hashTree    tree.Tree
-	updateLock  bool   // TODO(mvdan): this is super racy
-	askLock     string // TODO(mvdan): this is super racy
-	myAddress   string
-	myNodeID    string
-	myMultiAddr ma.Multiaddr
+	askLock     sync.RWMutex
+	updateLock  sync.RWMutex
+	myMultiAddr ma.Multiaddr // The IPFS multiaddress
 	lastHash    string
 	private     bool
 }
@@ -275,6 +80,264 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 	return is
 }
 
+// shity function to workaround NAT problems (hope it's temporary)
+func guessMyAddress(port int, id string) string {
+	ip, err := util.PublicIP()
+	if err != nil {
+		log.Warn(err)
+		return ""
+	}
+	if ip4 := ip.To4(); ip4 != nil {
+		return fmt.Sprintf("/ip4/%s/tcp/%d/ipfs/%s", ip4, port, id)
+	}
+	if ip6 := ip.To16(); ip6 != nil {
+		return fmt.Sprintf("/ip6/[%s]/tcp/%d/ipfs/%s", ip6, port, id)
+	}
+	return ""
+}
+
+// myPins return the list of local stored pins base64 encoded
+func (is *IPFSsync) myPins() (pins []string) {
+	list, err := is.Storage.ListPins(context.TODO())
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	for i := range list {
+		pins = append(pins, i)
+	}
+	return pins
+}
+
+// updateLocalPins gets the local IPFS pin list and add them to the Merkle Tree
+func (is *IPFSsync) updateLocalPins() {
+	for _, p := range is.myPins() {
+		is.hashTree.AddClaim([]byte(p), []byte{}) // errror is ignored, should be fine
+	}
+}
+
+// addPins adds to the MerkleTree the new pins and updates the Root
+func (is *IPFSsync) addPins(pins []string) {
+	var err error
+	var pin []byte
+	currentRoot := is.hashTree.Root()
+	for _, v := range pins {
+		pin, err = base64.StdEncoding.DecodeString(v)
+		if err != nil {
+			log.Warnf("cannot decode pin %s: (%s)", v, err)
+			continue
+		}
+		if len(pin) > is.hashTree.MaxClaimSize() {
+			log.Warnf("CID exceeds the claim size %d", len(v))
+			continue
+		}
+		is.hashTree.AddClaim(pin, []byte{})
+	}
+	if currentRoot != is.hashTree.Root() {
+		is.lastHash = currentRoot
+	}
+}
+
+// syncPins get the list of pins stored in the merkle tree and pin all of them
+func (is *IPFSsync) syncPins() error {
+	mkPins, _, err := is.hashTree.DumpPlain("", false)
+	if err != nil {
+		return err
+	}
+	ctx := context.TODO() // the caller should probably provide it
+	pins, err := is.Storage.ListPins(ctx)
+	if err != nil {
+		return err
+	}
+	for _, v := range mkPins {
+		if _, e := pins[v]; e {
+			continue
+		}
+
+		log.Infof("pinning %s", v)
+		ctx, cancel := context.WithTimeout(ctx, is.Timeout)
+		defer cancel()
+		if err := is.Storage.Pin(ctx, v); err != nil {
+			log.Warn(err)
+		}
+	}
+	return nil
+}
+
+func (is *IPFSsync) askPins(address string, hash string) error {
+	var msg Message
+	msg.Type = "fetch"
+	msg.Address = is.Transport.Address()
+	msg.Hash = hash
+	msg.Timestamp = int32(time.Now().Unix())
+	return is.unicastMsg(address, msg)
+}
+
+func (is *IPFSsync) sendPins(address string, theirHash string) error {
+	var msg Message
+	msg.Type = "fetchReply"
+	msg.Address = is.Transport.Address()
+	msg.Hash = is.hashTree.Root()
+	msg.PinList = is.listPins(theirHash)
+	msg.Timestamp = int32(time.Now().Unix())
+	return is.unicastMsg(address, msg)
+}
+
+func (is *IPFSsync) broadcastMsg(ipfsmsg Message) error {
+	d, err := json.Marshal(ipfsmsg)
+	if err != nil {
+		return err
+	}
+	is.Transport.Send(types.Message{
+		Data:      d,
+		TimeStamp: int32(time.Now().Unix()),
+	})
+	return nil
+}
+
+// Handle handles an Message
+func (is *IPFSsync) Handle(msg Message) error {
+	if msg.Address == is.Transport.Address() {
+		return nil
+	}
+	if int32(time.Now().Unix())-msg.Timestamp > is.TimestampWindow {
+		log.Debug("discarting old message")
+		return nil
+	}
+	switch msg.Type {
+	case "hello":
+		peers, err := is.Storage.CoreAPI.Swarm().Peers(is.Storage.Node.Context())
+		if err != nil {
+			return err
+		}
+		found := false
+		for _, p := range peers {
+			if p.ID().String() == msg.Address {
+				found = true
+			}
+		}
+		if !found {
+			log.Infof("connecting to peer %s", msg.Maddress)
+			multiAddr, err := ma.NewMultiaddr(msg.Maddress)
+			if err != nil {
+				return err
+			}
+			peerInfo, err := peer.AddrInfoFromP2pAddr(multiAddr)
+			if err != nil {
+				return err
+			}
+			is.Storage.Node.PeerHost.ConnManager().Protect(peerInfo.ID, "ipfsPeer")
+			return is.Storage.Node.PeerHost.Connect(context.TODO(), *peerInfo)
+			//return is.Storage.CoreAPI.Swarm().Connect(is.Storage.Node.Context(), *peerInfo)
+		}
+
+	case "update":
+		if len(msg.Hash) > 31 && len(msg.Address) > 31 {
+			is.updateLock.RLock()
+			defer is.updateLock.RUnlock()
+			if exist, err := is.hashTree.HashExist(msg.Hash); err == nil && !exist && is.lastHash != msg.Hash {
+				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
+				return is.askPins(msg.Address, is.hashTree.Root())
+			}
+		}
+
+		// received a fetchReply, adding new pins
+	case "fetchReply":
+		if len(msg.Hash) > 31 && len(msg.Address) > 31 {
+			is.updateLock.Lock()
+			defer is.updateLock.Unlock()
+			if msg.Hash != is.hashTree.Root() {
+				log.Infof("got new pin list %s from %s", msg.Hash, msg.Address)
+				is.addPins(msg.PinList)
+				return nil
+			}
+		}
+
+	case "fetch":
+		if len(msg.Hash) > 31 && len(msg.Address) > 31 {
+			is.updateLock.RLock()
+			defer is.updateLock.RUnlock()
+			if msg.Hash != is.hashTree.Root() {
+				log.Infof("got fetch query, sending pin list to %s", msg.Address)
+				return is.sendPins(msg.Address, msg.Hash)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (is *IPFSsync) sendUpdate() {
+	var msg Message
+	msg.Type = "update"
+	msg.Address = is.Transport.Address()
+	msg.Hash = is.hashTree.Root()
+	msg.Timestamp = int32(time.Now().Unix())
+	if s, err := is.hashTree.Size(is.hashTree.Root()); err == nil && s > 0 {
+		log.Infof("[ipfsSync info] pins:%d hash:%s", s, msg.Hash)
+		err := is.broadcastMsg(msg)
+		if err != nil {
+			log.Warn(err)
+		}
+	} else if err != nil {
+		log.Error(err)
+	}
+}
+
+func (is *IPFSsync) sendHello() {
+	var msg Message
+	msg.Type = "hello"
+	msg.Address = is.Transport.Address()
+	msg.Maddress = is.myMultiAddr.String()
+	msg.Timestamp = int32(time.Now().Unix())
+	err := is.broadcastMsg(msg)
+	if err != nil {
+		log.Warn(err)
+	}
+}
+
+// difference returns the elements in `a` that aren't in `b`.
+func diff(a, b []string) []string {
+	mb := make(map[string]struct{}, len(b))
+	for _, x := range b {
+		mb[x] = struct{}{}
+	}
+	var diff []string
+	for _, x := range a {
+		if _, found := mb[x]; !found {
+			diff = append(diff, x)
+		}
+	}
+	return diff
+}
+
+// listPins return the current pins of the Merkle Tree
+// if fromHash is a valid hash, returns only the difference between the root and the provided hash
+func (is *IPFSsync) listPins(fromHash string) []string {
+	myClaims, _, err := is.hashTree.DumpPlain("", true)
+	if err != nil {
+		log.Error(err)
+		return []string{}
+	}
+	if fromHash == "" || fromHash == "0x0000000000000000000000000000000000000000000000000000000000000000" {
+		return myClaims
+	}
+
+	if exist, err := is.hashTree.HashExist(fromHash); !exist {
+		if err != nil {
+			log.Error(err)
+		}
+		return myClaims
+	}
+
+	theirClaims, _, err := is.hashTree.DumpPlain(fromHash, true)
+	if err != nil {
+		log.Error(err)
+		return []string{}
+	}
+	return diff(myClaims, theirClaims)
+}
+
 func (is *IPFSsync) unicastMsg(address string, ipfsmsg Message) error {
 	var msg types.Message
 	d, err := json.Marshal(ipfsmsg)
@@ -295,7 +358,7 @@ func (is *IPFSsync) Start() {
 	if err := is.hashTree.Init("ipfsSync.db"); err != nil {
 		log.Fatal(err)
 	}
-	is.updatePinsTree([]string{})
+	is.updateLocalPins()
 	log.Infof("current hash %s", is.hashTree.Root())
 
 	conn := types.Connection{
@@ -316,15 +379,15 @@ func (is *IPFSsync) Start() {
 
 	msg := make(chan types.Message)
 	go is.Transport.Listen(msg)
-	is.myAddress = is.Transport.Address()
-	is.myNodeID = is.Storage.Node.PeerHost.ID().String()
+
 	var err error
-	is.myMultiAddr, err = ma.NewMultiaddr(guessMyAddress(4001, is.myNodeID))
+	is.myMultiAddr, err = ma.NewMultiaddr(guessMyAddress(4001, is.Storage.Node.PeerHost.ID().String()))
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("my multiaddress: %s", is.myMultiAddr)
 
+	// receive messages and handle them
 	go func() {
 		for {
 			d := <-msg
@@ -338,46 +401,32 @@ func (is *IPFSsync) Start() {
 		}
 	}()
 
+	// send hello messages
 	go func() {
 		for {
 			is.sendHello()
-			time.Sleep(time.Second * time.Duration(is.HelloTime))
+			time.Sleep(time.Second * time.Duration(is.HelloTime)) // CHECK THIS
+		}
+	}()
+
+	// send update messages
+	go func() {
+		for {
+			time.Sleep(time.Duration(is.UpdateTime) * time.Second) //CHECK THIS
+			is.updateLock.Lock()
+			is.updateLocalPins()
+			is.sendUpdate()
+			is.updateLock.Unlock()
 		}
 	}()
 
 	go func() {
 		for {
-			time.Sleep(time.Second * time.Duration(is.UpdateTime))
-			if !is.updateLock {
-				is.updatePinsTree([]string{})
-				is.sendUpdate()
+			err = is.syncPins()
+			if err != nil {
+				log.Warn(err)
 			}
+			time.Sleep(time.Second * 32)
 		}
 	}()
-
-	go func() {
-		for {
-			if len(is.askLock) > 0 {
-				for i := 0; i < 100; i++ {
-					if len(is.askLock) == 0 {
-						break
-					}
-					time.Sleep(time.Millisecond * 100)
-				}
-				if len(is.askLock) > 0 {
-					is.askLock = ""
-					log.Warn("ask lock released due timeout")
-				}
-			}
-			time.Sleep(time.Millisecond * 200)
-		}
-	}()
-
-	for {
-		err = is.syncPins()
-		if err != nil {
-			log.Warn(err)
-		}
-		time.Sleep(time.Second * 32)
-	}
 }
