@@ -44,86 +44,56 @@ func (r *Router) submitEnvelope(request routerRequest) {
 }
 
 func (r *Router) getEnvelopeStatus(request routerRequest) {
-	qdata := types.QueryData{
-		Method:    "getEnvelopeStatus",
-		ProcessID: request.ProcessID,
-		Nullifier: request.Nullifier,
+	// check pid
+	sanitizedPID := util.TrimHex(request.ProcessID)
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+		r.sendError(request, "cannot get envelope status: (malformed processId)")
 	}
-	qdataBytes, err := json.Marshal(qdata)
-	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err)
-		r.sendError(request, "cannot marshal query data")
-		return
+	// check nullifier
+	sanitizedNullifier := util.TrimHex(request.Nullifier)
+	if !util.IsHexEncodedStringWithLength(sanitizedNullifier, types.VoteNullifierSize) {
+		r.sendError(request, "cannot get envelope status: (malformed nullifier)")
 	}
-	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
+	_, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier))
 	if err != nil {
-		log.Warnf("cannot query: (%s)", err)
-		r.sendError(request, "cannot query")
-		return
+		r.sendError(request, fmt.Sprintf("cannot get envelope status: (%s)", err))
 	}
 	var response types.ResponseMessage
 	response.Registered = types.True
-	if queryResult.Response.Code != 0 {
-		response.Registered = types.False
-	}
 	r.transport.Send(r.buildReply(request, response))
 }
 
 func (r *Router) getEnvelope(request routerRequest) {
-	qdata := types.QueryData{
-		Method:    "getEnvelope",
-		ProcessID: request.ProcessID,
-		Nullifier: request.Nullifier,
+	// check pid
+	sanitizedPID := util.TrimHex(request.ProcessID)
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+		r.sendError(request, "cannot get envelope: (malformed processId)")
 	}
-	qdataBytes, err := json.Marshal(qdata)
+	// check nullifier
+	sanitizedNullifier := util.TrimHex(request.Nullifier)
+	if !util.IsHexEncodedStringWithLength(sanitizedNullifier, types.VoteNullifierSize) {
+		r.sendError(request, "cannot get envelope: (malformed nullifier)")
+	}
+	envelope, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier))
 	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err)
-		r.sendError(request, "cannot marshal query data")
-		return
-	}
-	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
-	if err != nil {
-		log.Warnf("cannot query: (%s)", err)
-		r.sendError(request, "cannot query")
-		return
-	}
-	if queryResult.Response.Code != 0 {
-		r.sendError(request, queryResult.Response.GetInfo())
-		return
+		r.sendError(request, fmt.Sprintf("cannot get envelope: (%s)", err))
 	}
 	var response types.ResponseMessage
-	if err := r.codec.UnmarshalBinaryBare(queryResult.Response.Value, &response.Payload); err != nil {
-		log.Errorf("cannot unmarshal vote package: (%s)", err)
-		r.sendError(request, "cannot unmarshal vote package")
-		return
-	}
+	response.Registered = types.True
+	response.Payload = envelope.VotePackage
 	r.transport.Send(r.buildReply(request, response))
 }
 
 func (r *Router) getEnvelopeHeight(request routerRequest) {
-	qdata := types.QueryData{
-		Method:    "getEnvelopeHeight",
-		ProcessID: request.ProcessID,
+	// check pid
+	sanitizedPID := util.TrimHex(request.ProcessID)
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+		r.sendError(request, "cannot get envelope height: (malformed processId)")
 	}
-	qdataBytes, err := json.Marshal(qdata)
-	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err)
-		r.sendError(request, "cannot marshal query")
-		return
-	}
-	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
-	if err != nil || queryResult.Response.Code != 0 {
-		r.sendError(request, queryResult.Response.GetInfo())
-		return
-	}
+	votes := r.vocapp.State.CountVotes(sanitizedPID)
 	var response types.ResponseMessage
 	response.Height = new(int64)
-	err = r.codec.UnmarshalBinaryBare(queryResult.Response.Value, response.Height)
-	if err != nil {
-		log.Errorf("cannot unmarshal height: (%s)", err)
-		r.sendError(request, "cannot marshal height")
-		return
-	}
+	*response.Height = votes
 	r.transport.Send(r.buildReply(request, response))
 }
 
@@ -135,10 +105,17 @@ func (r *Router) getBlockHeight(request routerRequest) {
 }
 
 func (r *Router) getProcessList(request routerRequest) {
-	queryResult, err := r.tmclient.TxSearch(fmt.Sprintf("processCreated.entityId='%s'", util.TrimHex(request.EntityId)), false, 1, 30, "asc")
+	// check eid
+	sanitizedEID := util.TrimHex(request.EntityId)
+	if !util.IsHexEncodedStringWithLength(sanitizedEID, types.EntityIDsize) &&
+		!util.IsHexEncodedStringWithLength(sanitizedEID, types.EntityIDsizeV2) {
+		r.sendError(request, "cannot get process list: (malformed entityId)")
+	}
+	queryResult, err := r.vocapp.Client.TxSearch(fmt.Sprintf("processCreated.entityId='%s'", sanitizedEID), false, 1, 30, "asc")
+
 	if err != nil {
 		log.Errorf("cannot query: (%s)", err)
-		r.sendError(request, "cannot query")
+		r.sendError(request, fmt.Sprintf("cannot query: (%s)", err))
 		return
 	}
 	var processList []string
@@ -187,44 +164,24 @@ func (r *Router) getProcessKeys(request routerRequest) {
 }
 
 func (r *Router) getEnvelopeList(request routerRequest) {
-	// here we can ask to tendermint via query to get the results from the database
-	qdata := types.QueryData{
-		Method:    "getEnvelopeList",
-		ProcessID: request.ProcessID,
-		From:      request.From,
-		ListSize:  request.ListSize,
+	sanitizedPID := util.TrimHex(request.ProcessID)
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+		r.sendError(request, "cannot get envelope list: (malformed processId)")
 	}
-	qdataBytes, err := json.Marshal(qdata)
-	if err != nil {
-		log.Errorf("cannot marshal query data: (%s)", err)
-		r.sendError(request, "cannot marshal query")
-		return
-	}
-	queryResult, err := r.tmclient.ABCIQuery("", qdataBytes)
-	if queryResult.Response.Code != 0 {
-		r.sendError(request, queryResult.Response.GetInfo())
-		return
-	}
+	n := r.vocapp.State.EnvelopeList(sanitizedPID, request.From, request.ListSize)
+
 	var response types.ResponseMessage
-	response.Nullifiers = []string{}
-	if err != nil {
-		response.Nullifiers = []string{""}
-	}
-	if len(queryResult.Response.Value) != 0 {
-		err = r.codec.UnmarshalBinaryBare(queryResult.Response.Value, &response.Nullifiers)
-	} else {
-		response.Nullifiers = []string{""}
-	}
-	if err != nil {
-		log.Errorf("cannot unmarshal nullifiers: (%s)", err)
-		r.sendError(request, "cannot unmarshal nullifiers")
-		return
-	}
+	response.Nullifiers = n
 	r.transport.Send(r.buildReply(request, response))
 }
 
 func (r *Router) getResults(request routerRequest) {
-	request.ProcessID = util.TrimHex(request.ProcessID)
+	var err error
+	sanitizedPID := util.TrimHex(request.ProcessID)
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+		r.sendError(request, "cannot get results: (malformed processId)")
+	}
+	request.ProcessID = sanitizedPID
 	if len(request.ProcessID) != 64 {
 		r.sendError(request, "processID length not valid")
 		return

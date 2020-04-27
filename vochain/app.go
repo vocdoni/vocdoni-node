@@ -1,7 +1,6 @@
 package vochain
 
 import (
-	"encoding/json"
 	"fmt"
 
 	amino "github.com/tendermint/go-amino"
@@ -10,20 +9,21 @@ import (
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	mempl "github.com/tendermint/tendermint/mempool"
 	nm "github.com/tendermint/tendermint/node"
+	voclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
-	State *State
-	Codec *amino.Codec
-	Node  *nm.Node
+	State  *State
+	Codec  *amino.Codec
+	Node   *nm.Node
+	Client *voclient.HTTP
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
@@ -167,71 +167,7 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 }
 
 func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
-	var reqData types.QueryData
-	err := json.Unmarshal(req.GetData(), &reqData)
-	if err != nil {
-		return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot unmarshal request in app query: %s", err)}
-	}
-	switch reqData.Method {
-	case "getEnvelopeStatus":
-		_, err := app.State.Envelope(fmt.Sprintf("%s_%s", util.TrimHex(reqData.ProcessID), util.TrimHex(reqData.Nullifier)))
-		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1}
-		}
-		return abcitypes.ResponseQuery{Code: 0}
-	case "getEnvelope":
-		e, err := app.State.Envelope(fmt.Sprintf("%s_%s", util.TrimHex(reqData.ProcessID), util.TrimHex(reqData.Nullifier))) // nullifier hash(addr+pid), processId by pid_nullifier
-		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: fmt.Sprintf("cannot get envelope: %s", err)}
-		}
-		eBytes, err := app.State.Codec.MarshalBinaryBare(e.VotePackage)
-		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal processBytes"}
-		}
-		return abcitypes.ResponseQuery{Code: 0, Value: eBytes}
-	case "getEnvelopeHeight":
-		votes := app.State.CountVotes(reqData.ProcessID)
-		vBytes, err := app.State.Codec.MarshalBinaryBare(votes)
-		if err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal votes count bytes"}
-		}
-		return abcitypes.ResponseQuery{Code: 0, Value: vBytes}
-	case "getBlockHeight":
-		h := app.State.Header()
-		if h != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: "cannot get height"}
-		}
-		hbytes, err := app.Codec.MarshalBinaryBare(h)
-		if err != nil {
-			hbytes = []byte{}
-		}
-		return abcitypes.ResponseQuery{Code: 0, Value: hbytes}
-	case "getProcessList":
-		return abcitypes.ResponseQuery{Code: 1, Info: "not implemented"}
-	case "getEnvelopeList":
-		n := app.State.EnvelopeList(reqData.ProcessID, reqData.From, reqData.ListSize)
-		if len(n) != 0 {
-			nBytes, err := app.State.Codec.MarshalBinaryBare(n)
-			if err != nil {
-				return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal envelope list bytes"}
-			}
-			return abcitypes.ResponseQuery{Code: 0, Value: nBytes, Info: "ok"}
-		}
-		return abcitypes.ResponseQuery{Code: 0, Value: []byte{}, Info: "any envelope available"}
-	case "getProcessKeys":
-		var p *types.Process
-		var pubKeysBytes []byte
-		var err error
-		if p, err = app.State.Process(reqData.ProcessID); err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: err.Error()}
-		}
-		if pubKeysBytes, err = app.State.Codec.MarshalBinaryBare(p.EncryptionPublicKeys); err != nil {
-			return abcitypes.ResponseQuery{Code: 1, Info: "cannot marshal process bytes"}
-		}
-		return abcitypes.ResponseQuery{Code: 0, Value: pubKeysBytes}
-	default:
-		return abcitypes.ResponseQuery{Code: 1, Info: "undefined query method"}
-	}
+	return abcitypes.ResponseQuery{}
 }
 
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {

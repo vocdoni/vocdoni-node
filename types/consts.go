@@ -10,6 +10,13 @@ var (
 )
 
 const (
+	ProcessIDsize = 32
+	// size of eth addr
+	EntityIDsize = 20
+	// legacy: in the past we used hash(addr)
+	// this is a temporal work around to support both
+	EntityIDsizeV2    = 32
+	VoteNullifierSize = 32
 	// ScrutinizerProcessPrefix is the prefix for the storage process keys
 	ScrutinizerLiveProcessPrefix = "p_"
 	// ScrutinizerEntityPrefix is the prefix for the storage entity keys

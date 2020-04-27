@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	voclient "github.com/tendermint/tendermint/rpc/client"
+
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
@@ -69,6 +71,10 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Age
 	go vi.Start(10)
 	go VochainPrintInfo(20, vi)
 
+	// Vochain RPC client
+	vnode.Client, err = voclient.NewHTTP("tcp://"+vconfig.RPCListen, "/websocket")
+	go voclientCheck(vnode.Client, vconfig.RPCListen)
+
 	return
 }
 
@@ -103,5 +109,20 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 			h, m, p, v, b.String(),
 		)
 		time.Sleep(time.Duration(sleepSecs) * time.Second)
+	}
+}
+
+// Try to keep the RPC connection alive
+// Dislaimer: not sure if this mechanism really works, should be deeply checked
+func voclientCheck(vc *voclient.HTTP, rpc string) {
+	for {
+		if s, err := vc.Status(); s == nil || err != nil {
+			log.Warnf("tendermint RPC is dead, trying to recover")
+			vc, err = voclient.NewHTTP("tcp://"+rpc, "/websocket")
+			if err != nil {
+				log.Errorf("tendermint RPC connection cannot be recovered")
+			}
+		}
+		time.Sleep(time.Second * 2)
 	}
 }

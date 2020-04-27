@@ -27,16 +27,6 @@ import (
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
-const (
-	processIDsize = 32
-	// size of eth addr
-	entityIDsize = 20
-	// legacy: in the past we used hash(addr)
-	// this is a temporal work around to support both
-	entityIDsizeV2    = 32
-	voteNullifierSize = 32
-)
-
 // ValidateTx splits a tx into method and args parts and does some basic checks
 func ValidateTx(content []byte, state *State) (interface{}, error) {
 	var txType types.Tx
@@ -184,7 +174,7 @@ func ValidateAndDeliverTx(content []byte, state *State) ([]abcitypes.Event, erro
 func VoteTxCheck(vote types.VoteTx, state *State) error {
 	// check format
 	sanitizedPID := util.TrimHex(vote.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize) {
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
 	process, _ := state.Process(vote.ProcessID)
@@ -202,7 +192,7 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 		switch process.Type {
 		case types.SnarkVote:
 			sanitizedNullifier := util.TrimHex(vote.Nullifier)
-			if !util.IsHexEncodedStringWithLength(sanitizedNullifier, voteNullifierSize) {
+			if !util.IsHexEncodedStringWithLength(sanitizedNullifier, types.VoteNullifierSize) {
 				return fmt.Errorf("malformed nullifier")
 			}
 			voteID := fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier)
@@ -277,13 +267,13 @@ func VoteTxCheck(vote types.VoteTx, state *State) error {
 func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 	// check format
 	sanitizedPID := util.TrimHex(process.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize) {
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
 	sanitizedEID := util.TrimHex(process.EntityID)
 
-	if !util.IsHexEncodedStringWithLength(sanitizedEID, entityIDsize) &&
-		!util.IsHexEncodedStringWithLength(sanitizedEID, entityIDsizeV2) {
+	if !util.IsHexEncodedStringWithLength(sanitizedEID, types.EntityIDsize) &&
+		!util.IsHexEncodedStringWithLength(sanitizedEID, types.EntityIDsizeV2) {
 		return fmt.Errorf("malformed entityId")
 	}
 
@@ -336,7 +326,7 @@ func NewProcessTxCheck(process types.NewProcessTx, state *State) error {
 func CancelProcessTxCheck(cancelProcessTx types.CancelProcessTx, state *State) error {
 	// check format
 	sanitizedPID := util.TrimHex(cancelProcessTx.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, processIDsize) {
+	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
 	// get oracles

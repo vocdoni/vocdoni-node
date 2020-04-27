@@ -13,7 +13,6 @@ import (
 	psmem "github.com/shirou/gopsutil/mem"
 	psnet "github.com/shirou/gopsutil/net"
 	amino "github.com/tendermint/go-amino"
-	voclient "github.com/tendermint/tendermint/rpc/client"
 
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
@@ -85,7 +84,6 @@ type Router struct {
 	transport    net.Transport
 	signer       signature.SignKeys
 	census       *census.Manager
-	tmclient     *voclient.HTTP
 	vocapp       *vochain.BaseApplication
 	metricsagent *metrics.Agent
 	vocinfo      *vochaininfo.VochainInfo
@@ -216,10 +214,9 @@ func (r *Router) EnableCensusAPI(cm *census.Manager) {
 }
 
 // EnableVoteAPI enabled the Vote API in the Router
-func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, rpcClient *voclient.HTTP, vocInfo *vochaininfo.VochainInfo) {
+func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, vocInfo *vochaininfo.VochainInfo) {
 	r.APIs = append(r.APIs, "vote")
 	r.vocapp = vocapp
-	r.tmclient = rpcClient
 	r.vocinfo = vocInfo
 	r.registerPublic("submitEnvelope", r.submitEnvelope)
 	r.registerPublic("getEnvelopeStatus", r.getEnvelopeStatus)

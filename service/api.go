@@ -3,7 +3,6 @@ package service
 import (
 	"time"
 
-	voclient "github.com/tendermint/tendermint/rpc/client"
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
@@ -39,15 +38,10 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 		routerAPI.EnableCensusAPI(cm)
 	}
 	if apiconfig.Vote {
-		// creating the RPC calls client
-		rpcClient, err := voclient.NewHTTP("tcp://"+vochainRPCaddr, "/websocket")
-		if err != nil {
-			log.Fatal(err)
-		}
 		// todo: client params as cli flags
 		log.Info("enabling vote API")
 		routerAPI.Scrutinizer = sc
-		routerAPI.EnableVoteAPI(vapp, rpcClient, vi)
+		routerAPI.EnableVoteAPI(vapp, vi)
 	}
 
 	go routerAPI.Route()
