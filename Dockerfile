@@ -12,7 +12,7 @@ COPY duktape-stub duktape-stub
 RUN go mod download
 
 COPY . .
-RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/dvotenode ./cmd/censushttp
+RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/dvotenode
 
 # These multiple targets can be used to obtain each of the images, such as
 # --target=miner.
@@ -26,9 +26,3 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certifi
 WORKDIR /app
 COPY --from=builder /src/dvotenode /src/dockerfiles/dvotenode/files/dvoteStart.sh ./
 ENTRYPOINT ["/app/dvoteStart.sh"]
-
-FROM debian:10.3-slim AS census
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-WORKDIR /app
-COPY --from=builder /src/censushttp /src/dockerfiles/census/files/censusStart.sh ./
-ENTRYPOINT ["/app/censusStart.sh"]

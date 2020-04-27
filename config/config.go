@@ -144,16 +144,6 @@ type EthEventCfg struct {
 	SubscribeOnly bool
 }
 
-// CensusCfg stores global configs for censushttp
-type CensusCfg struct {
-	LogLevel  string
-	Port      int
-	SignKey   string
-	DataDir   string
-	SslDomain string
-	RootKey   string
-}
-
 // VochainCfg includes all possible config params needed by the Vochain
 type VochainCfg struct {
 	// Dev indicates we use the Vochain development mode
