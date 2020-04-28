@@ -332,8 +332,17 @@ func (w *WebsocketHandle) SetBootnodes(bootnodes []string) {
 	// No bootnodes on websockets handler
 }
 
+func (w *WebsocketHandle) AddPeer(peer string) error {
+	// No peers on websockets handler
+	return nil
+}
+
 func (w *WebsocketHandle) Address() string {
 	return w.Connection.Address
+}
+
+func (w *WebsocketHandle) String() string {
+	return w.WsProxy.Addr.String()
 }
 
 func wshandler(w http.ResponseWriter, r *http.Request, ph ProxyWsHandler) {
