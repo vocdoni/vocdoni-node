@@ -3,9 +3,7 @@ package tree
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
-	"os"
 	"sync/atomic"
 	"time"
 
@@ -15,14 +13,10 @@ import (
 
 	"github.com/iden3/go-iden3-core/merkletree"
 	"golang.org/x/text/unicode/norm"
-
-	"gitlab.com/vocdoni/go-dvote/db"
 )
 
 type Tree struct {
-	StorageDir string
-	Tree       *merkletree.MerkleTree
-	Storage    iden3db.Storage
+	Tree *merkletree.MerkleTree
 
 	lastAccessUnix int64 // a unix timestamp, used via sync/atomic
 }
@@ -32,40 +26,21 @@ const (
 	MaxValueSize = claims.ValueSlotLen - 2 // -2 because the 2 first bytes are used to store the length of index and value
 )
 
-func (t *Tree) MaxClaimSize() int {
-	return MaxIndexSize
-}
-
-// Init opens or creates a merkle tree indexed under the namespace name
-func (t *Tree) Init(namespace string) error {
-	if len(t.StorageDir) < 1 {
-		if len(namespace) < 1 {
-			return errors.New("namespace not valid")
-		}
-		home, err := os.UserHomeDir()
-		if err == nil {
-			t.StorageDir = home + "/.dvote/census"
-		} else {
-			t.StorageDir = "./dvoteTree"
-		}
-	}
-	storage, err := db.NewIden3Storage(t.StorageDir + "/" + namespace)
-	if err != nil {
-		return err
-	}
+// NewTree opens or creates a merkle tree under the given storage.
+// Note that the storage should be prefixed, since each tree should use an
+// entirely separate namespace for its database keys.
+func NewTree(storage iden3db.Storage) (*Tree, error) {
 	mt, err := merkletree.NewMerkleTree(storage, 140)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	t.Storage = storage
-	t.Tree = mt
-	t.updateAccessTime()
-	return nil
+	tr := &Tree{Tree: mt}
+	tr.updateAccessTime()
+	return tr, nil
 }
 
-// Close closes the storage of the merkle tree
-func (t *Tree) Close() {
-	t.Tree.Storage().Close()
+func (t *Tree) MaxClaimSize() int {
+	return MaxIndexSize
 }
 
 // LastAccess returns the last time the Tree was accessed, in the form of a unix

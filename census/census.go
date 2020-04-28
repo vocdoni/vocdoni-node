@@ -14,10 +14,12 @@ import (
 	"sync"
 	"time"
 
+	iden3db "github.com/iden3/go-iden3-core/db"
 	"github.com/klauspost/compress/zstd"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/tree"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -34,15 +36,17 @@ type Namespace struct {
 }
 
 type Manager struct {
-	StorageDir    string        // Root storage data dir
+	StorageDir    string        // Root storage data dir for LocalStorage
 	AuthWindow    int32         // Time window (seconds) in which TimeStamp will be accepted if auth enabled
 	Census        Namespaces    // Available namespaces
 	LoadThreshold time.Duration // How many time will a Census stay open/loaded since the last access
+
 	// TODO(mvdan): should we protect Census with the mutex too?
 	TreesMu sync.RWMutex
 	Trees   map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
 
-	Storage data.Storage
+	RemoteStorage data.Storage    // e.g. IPFS
+	LocalStorage  iden3db.Storage // e.g. Badger
 
 	importQueue chan censusImport
 
@@ -54,14 +58,20 @@ type censusImport struct {
 }
 
 // Data helps satisfy an ethevents interface.
-func (m *Manager) Data() data.Storage { return m.Storage }
+func (m *Manager) Data() data.Storage { return m.RemoteStorage }
 
 // Init creates a new census manager
-func (m *Manager) Init(storage, rootKey string) error {
-	nsConfig := fmt.Sprintf("%s/namespaces.json", storage)
-	m.StorageDir = storage
+func (m *Manager) Init(storageDir, rootKey string) error {
+	nsConfig := fmt.Sprintf("%s/namespaces.json", storageDir)
+	m.StorageDir = storageDir
 	m.Trees = make(map[string]*tree.Tree)
 	m.LoadThreshold = 1200 * time.Second
+
+	var err error
+	m.LocalStorage, err = db.NewIden3Storage(storageDir)
+	if err != nil {
+		return err
+	}
 
 	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
 	m.importQueue = make(chan censusImport, 32)
@@ -114,9 +124,8 @@ func (m *Manager) LoadTree(name string) (*tree.Tree, error) {
 	if _, exist := m.Trees[name]; exist {
 		return m.Trees[name], nil
 	}
-	tr := &tree.Tree{}
-	tr.StorageDir = m.StorageDir
-	if err := tr.Init(name); err != nil {
+	tr, err := tree.NewTree(m.LocalStorage.WithPrefix([]byte(name)))
+	if err != nil {
 		return nil, err
 	}
 	log.Infof("load merkle tree %s", name)
@@ -128,9 +137,7 @@ func (m *Manager) LoadTree(name string) (*tree.Tree, error) {
 // Not thread safe
 func (m *Manager) UnloadTree(name string) {
 	log.Debugf("unload merkle tree %s", name)
-	m.Trees[name].Close()
 	delete(m.Trees, name)
-	return
 }
 
 // Exists returns true if a given census exists on disk
@@ -154,10 +161,8 @@ func (m *Manager) AddNamespace(name string, pubKeys []string) (*tree.Tree, error
 	if m.Exists(name) {
 		return nil, errors.New("namespace already exist")
 	}
-	tr := &tree.Tree{
-		StorageDir: m.StorageDir,
-	}
-	if err := tr.Init(name); err != nil {
+	tr, err := tree.NewTree(m.LocalStorage.WithPrefix([]byte(name)))
+	if err != nil {
 		return nil, err
 	}
 	m.Trees[name] = tr
@@ -179,9 +184,10 @@ func (m *Manager) DelNamespace(name string) error {
 		return nil
 	}
 	m.UnloadTree(name)
-	if err := os.RemoveAll(m.StorageDir + "/" + name); err != nil {
-		return fmt.Errorf("cannot remove census: (%s)", err)
-	}
+	// TODO(mvdan): re-implement with the prefixed database
+	// if err := os.RemoveAll(m.StorageDir + "/" + name); err != nil {
+	// 	return fmt.Errorf("cannot remove census: (%s)", err)
+	// }
 
 	for i, ns := range m.Census.Namespaces {
 		if ns.Name == name {
@@ -356,7 +362,7 @@ func (m *Manager) importQueueDaemon() {
 			continue
 		}
 		log.Infof("retrieving remote census %s", uri)
-		censusRaw, err := m.Storage.Retrieve(context.TODO(), uri[len(m.Storage.URIprefix()):])
+		censusRaw, err := m.RemoteStorage.Retrieve(context.TODO(), uri[len(m.RemoteStorage.URIprefix()):])
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
 			continue
@@ -548,18 +554,18 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			resp.SetError("invalid authentication")
 			return resp
 		}
-		if m.Storage == nil {
+		if m.RemoteStorage == nil {
 			resp.SetError("not supported")
 			return resp
 		}
-		if !strings.HasPrefix(r.URI, m.Storage.URIprefix()) ||
-			len(r.URI) <= len(m.Storage.URIprefix()) {
-			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, m.Storage.URIprefix())
+		if !strings.HasPrefix(r.URI, m.RemoteStorage.URIprefix()) ||
+			len(r.URI) <= len(m.RemoteStorage.URIprefix()) {
+			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, m.RemoteStorage.URIprefix())
 			resp.SetError("URI not supported")
 			return resp
 		}
 		log.Infof("retrieving remote census %s", r.CensusURI)
-		censusRaw, err := m.Storage.Retrieve(context.TODO(), r.URI[len(m.Storage.URIprefix()):])
+		censusRaw, err := m.RemoteStorage.Retrieve(context.TODO(), r.URI[len(m.RemoteStorage.URIprefix()):])
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
 			resp.SetError("cannot retrieve census")
@@ -682,7 +688,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			resp.SetError("invalid authentication")
 			return resp
 		}
-		if m.Storage == nil {
+		if m.RemoteStorage == nil {
 			resp.SetError("not supported")
 			return resp
 		}
@@ -702,13 +708,13 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			return resp
 		}
 		dumpBytes = m.compressBytes(dumpBytes)
-		cid, err := m.Storage.Publish(context.TODO(), dumpBytes)
+		cid, err := m.RemoteStorage.Publish(context.TODO(), dumpBytes)
 		if err != nil {
 			resp.SetError(err)
 			log.Warnf("cannot publish census dump: %s", err)
 			return resp
 		}
-		resp.URI = m.Storage.URIprefix() + cid
+		resp.URI = m.RemoteStorage.URIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
 		resp.Root = tr.Root()
 
