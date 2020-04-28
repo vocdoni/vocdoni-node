@@ -15,7 +15,7 @@ Pins can only be added but not deleted. So once a new pin enters into the networ
 
 Available options:
 
-```
+```shell
       --bootnode                act as a bootstrap node (will not try to connect with other bootnodes)
       --bootnodes stringArray   list of bootnodes (multiaddress separated by commas)
       --dataDir string          directory for storing data (default "/home/p4u/.ipfs")
@@ -33,7 +33,7 @@ Available options:
 
 On the first computer (A) start ipfsSync with the following options.
 
-```
+```shell
 ipfsSync --key mySecretKey --dataDir=/tmp/example
 
     logger construction succeeded at level info and output stdout
@@ -63,7 +63,7 @@ ipfsSync --key mySecretKey --dataDir=/tmp/example
 Lets do the same (using the same secret key) on the second computer (B). 
 Once the bootstrap is done, the computers should find each other and print a message such as:
 
-```
+```shell
   connected to peer QmYESWwhd2EWyhkMBTDwX8UEtGJVYHnh39eeizUoKoEE6a
   [subPub info] dhtPeers:39 dhtKnown:994 clusterPeers:1
 ```
@@ -72,19 +72,19 @@ Then they start to exchange some messages, the most common ones will be **hello*
 
 The hello message is used to let the other peers know about yourself, the multiaddress is announced in order to allow the peers create a direct IPFS connection.
 
-```
+```shell
 sending message: {"type":"hello","address":"QmdvQZAG4KqRRJXFf93ftwRzkeqsjHde5tfmj9Z7WWM9Np","mAddress":"/ip4/18.10.12.11/tcp/4001/p2p/QmPkG4yUMm49v7VrubjoRYf9q11C59TxVYapJxdDW8bmc8","timestamp":1588016502}
 ```
 
 The update message is used to announce the current local hash of the pining merkle tree. In the current stage we do not have yet any file so the hash will be the empty hash (0x000...).
 
-```
+```shell
 sending messages: {"type":"update","address":"QmPymFbKAuPu87KzD7vZe8rQSi92fwASyFGayN9Wy5nK72","hash":""0x0000000000000000000000000000000000000000000000000000000000000000,"timestamp":1588016495}
 ```
 
 Let's add a new file to the computer A using the standard `ìpfs` tool.
 
-```
+```shell
 ipfs --api=/ip4/127.0.0.1/tcp/5001 add file.png
 
     added QmZe5QrhFhuUkMmvBuLrTBfHcr7LeA1azGRzH2y7z5Mhdi file.png
@@ -93,7 +93,7 @@ ipfs --api=/ip4/127.0.0.1/tcp/5001 add file.png
 
 The log output of computer A will show the new pin and Merkle Root hash. The next periodic update message will then let known the other peers its hash has changed.
 
-```
+```shell
  [ipfsSync info] pins:1 hash:0x2ee216bbb3d3dbd12f173f3dba584d0e055e8697e6c3214a1ab9082c13845701
 
  sending messages: {"type":"update","address":"QmPymFbKAuPu87KzD7vZe8rQSi92fwASyFGayN9Wy5nK72","hash":"0x2ee216bbb3d3dbd12f173f3dba584d0e055e8697e6c3214a1ab9082c13845701","timestamp":1588016495}
@@ -101,8 +101,10 @@ The log output of computer A will show the new pin and Merkle Root hash. The nex
 
 When computer B receive the new update, a `fetch` message will be send in order to receive the new list of files to pin. As B attach its current hash to the query, A is able to send only the difference between both Merkle Trees.
 
-```
+```shell
 sending message: {"type":"fetch","address":"QmdvQZAG4KqRRJXFf93ftwRzkeqsjHde5tfmj9Z7WWM9Np","hash":"0x0000000000000000000000000000000000000000000000000000000000000000","timestamp":1588016496}
+```
 
+```shell
 message received: {"type":"fetchReply","address":"QmPymFbKAuPu87KzD7vZe8rQSi92fwASyFGayN9Wy5nK72","hash":"0x2ee216bbb3d3dbd12f173f3dba584d0e055e8697e6c3214a1ab9082c13845701","pinList":["L2lwbGQvUW1iQkhNcGJCSzRHQ3BxYk1ieXU1eWVVWFhNQ040MlplVVRrd0FyOVJCZTgzbQ=="],"timestamp":1588016496}
 ```

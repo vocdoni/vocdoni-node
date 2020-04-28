@@ -66,7 +66,7 @@ Compile from source in a golang environment (Go>1.14 required):
 ```
 git clone https://gitlab.com/vocdoni/go-dvote.git
 cd go-dvote
-go build cmd/dvotenode
+go build ./cmd/dvotenode
 ./dvotenode --help
 ```
 
