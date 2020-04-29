@@ -250,7 +250,7 @@ func PubKeyFromSignature(msg []byte, sigHex string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%x", crypto.FromECDSAPub(pubKey)), nil
+	return fmt.Sprintf("%x", crypto.CompressPubkey(pubKey)), nil
 }
 
 // AddrFromSignature recovers the Ethereum address that created the signature of a message
@@ -280,6 +280,9 @@ func hexToPubKey(pubHex string) (*ecdsa.PublicKey, error) {
 	pubBytes, err := hex.DecodeString(util.TrimHex(pubHex))
 	if err != nil {
 		return new(ecdsa.PublicKey), err
+	}
+	if len(pubHex) <= PubKeyLength {
+		return crypto.DecompressPubkey(pubBytes)
 	}
 	return crypto.UnmarshalPubkey(pubBytes)
 }
