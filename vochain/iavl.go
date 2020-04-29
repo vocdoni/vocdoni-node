@@ -461,6 +461,13 @@ func (v *State) Envelope(voteID string, isQuery bool) (*vochaintypes.Vote, error
 	return vote, nil
 }
 
+// EnvelopeExists returns true if the envelope identified with voteID exists
+func (v *State) EnvelopeExists(voteID string) bool {
+	v.ILock.RLock()
+	defer v.ILock.RUnlock()
+	return v.IVoteTree.Has([]byte(voteID))
+}
+
 // The prefix is "processID_", where processID is a stringified hash of fixed length.
 // To iterate over all the keys with said prefix, the start point can simply be "processID_".
 // We don't know what the next processID hash will be, so we use "processID}"

@@ -155,16 +155,16 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			vote.ProcessID = tx.ProcessID
 			vote.Proof = tx.Proof
 			vote.VotePackage = tx.VotePackage
+			vote.KeyIndexes = tx.KeyIndexes
 
 			voteBytes, err := json.Marshal(vote)
 			if err != nil {
 				return nil, fmt.Errorf("cannot marshal vote (%s)", err)
 			}
-			pubKey, err := signature.PubKeyFromSignature(voteBytes, vote.Signature)
+			pubKey, err := signature.PubKeyFromSignature(voteBytes, tx.Signature)
 			if err != nil {
 				return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
 			}
-
 			addr, err := signature.AddrFromPublicKey(pubKey)
 			if err != nil {
 				return nil, fmt.Errorf("cannot extract address from public key: (%s)", err)
@@ -178,12 +178,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			log.Debugf("generated nullifier: %s", vote.Nullifier)
 
 			// check if vote exists
-			voteID := fmt.Sprintf("%s_%s", vote.ProcessID, vote.Nullifier)
-			v, err := state.Envelope(voteID, false)
-			if err != nil {
-				return nil, err
-			}
-			if v != nil {
+			if state.EnvelopeExists(fmt.Sprintf("%s_%s", vote.ProcessID, vote.Nullifier)) {
 				return nil, fmt.Errorf("vote already exists")
 			}
 
