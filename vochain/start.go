@@ -21,6 +21,7 @@ import (
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	nm "github.com/tendermint/tendermint/node"
+	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
 
@@ -192,12 +193,18 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	log.Infof("amino public key: %s", aminoPubKey)
 	log.Infof("using keyfile %s", tconfig.PrivValidatorKeyFile())
 
-	// read or create node key
-	nodeKey, err := NewNodeKey(localConfig.NodeKey, tconfig)
-	if err != nil {
-		return nil, err
+	// nodekey is used for the p2p transport layer
+	var nodeKey *p2p.NodeKey
+	if len(localConfig.NodeKey) > 0 {
+		nodeKey, err = NewNodeKey(localConfig.NodeKey, tconfig)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile()); err != nil {
+			return nil, err
+		}
 	}
-	NodeKeySave(tconfig.NodeKeyFile(), nodeKey)
 	log.Infof("tendermint p2p node ID: %s", nodeKey.ID())
 
 	// read or create genesis file

@@ -108,6 +108,7 @@ func main() {
 	privKey := flag.String("key", "", "private key for signature (leave blank for auto-generate)")
 	flag.Parse()
 	log.Init(*logLevel, "stdout")
+	rand.Seed(time.Now().UnixNano())
 
 	signer := new(signature.SignKeys)
 	if *privKey != "" {

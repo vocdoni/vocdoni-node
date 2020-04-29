@@ -172,7 +172,6 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	//defer app.State.Lock.Unlock()
-	log.Warnf("COMMIT")
 	return abcitypes.ResponseCommit{
 		Data: app.State.Save(),
 	}

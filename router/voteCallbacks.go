@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -8,6 +9,32 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
+
+func (r *Router) submitRawTx(request routerRequest) {
+	tx, err := base64.StdEncoding.DecodeString(request.RawTx)
+	if err != nil {
+		log.Warnf("error decoding base64 raw tx: (%s)", err)
+		r.sendError(request, err.Error())
+		return
+	}
+	res, err := r.vocapp.SendTX(tx)
+	if err != nil {
+		r.sendError(request, err.Error())
+		return
+	}
+	if res == nil {
+		r.sendError(request, "no reply from Vochain")
+		return
+	}
+	if res.Code != 0 {
+		log.Warnf("cannot broadcast tx (res.Code=%d): (%s)", res.Code, string(res.Data))
+		r.sendError(request, string(res.Data))
+		return
+	}
+	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
+	var response types.ResponseMessage
+	r.transport.Send(r.buildReply(request, response))
+}
 
 func (r *Router) submitEnvelope(request routerRequest) {
 	voteTxArgs := new(types.VoteTx)
