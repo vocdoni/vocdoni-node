@@ -115,10 +115,16 @@ func main() {
 	// Create process
 	pid := randomHex(32)
 
-	if err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, "poll-vote", 50); err != nil {
+	start, err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, "poll-vote", 50)
+	if err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("created process with ID: %s", pid)
+	log.Infof("waiting for process to start...")
+	for cb := getCurrentBlock(c); cb <= start; cb = getCurrentBlock(c) {
+		time.Sleep(10 * time.Second)
+		log.Infof("remaining blocks: %d", start-cb)
+	}
 
 	if err := sendVotes(c, pid, censusRoot, censusKeys); err != nil {
 		log.Fatal(err)
@@ -129,8 +135,8 @@ func getProof(c *APIConnection, pubkey, root string) (string, error) {
 	var req types.MetaRequest
 	req.Method = "genProof"
 	req.CensusID = root
-	req.Digested = false
-	req.ClaimData = base64.StdEncoding.EncodeToString([]byte(pubkey))
+	req.Digested = true
+	req.ClaimData = base64.StdEncoding.EncodeToString(signature.HashPoseidon(hexutils.HexToBytes(pubkey)))
 
 	resp := c.Request(req, nil)
 	if len(resp.Siblings) == 0 || !resp.Ok {
@@ -143,20 +149,27 @@ func getProof(c *APIConnection, pubkey, root string) (string, error) {
 func sendVotes(c *APIConnection, pid, root string, signers []*signature.SignKeys) error {
 	var pub, proof string
 	var err error
-	voption := "[1,2,3]"
+	vp := types.VotePackage{
+		Votes: []int{1, 2, 3},
+	}
+	vpBytes, err := json.Marshal(vp)
+	if err != nil {
+		return err
+	}
+
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
-	for _, s := range signers {
+	for i, s := range signers {
+		log.Infof("sending vote %d", i)
 		pub, _ = s.HexString()
 		if proof, err = getProof(c, pub, root); err != nil {
 			return err
 		}
 		v := types.VoteTx{
-			Type:        "vote",
 			Nonce:       randomHex(32),
 			ProcessID:   pid,
 			Proof:       proof,
-			VotePackage: base64.StdEncoding.EncodeToString([]byte(voption)),
+			VotePackage: base64.StdEncoding.EncodeToString(vpBytes),
 		}
 		txBytes, err := json.Marshal(v)
 		if err != nil {
@@ -165,6 +178,7 @@ func sendVotes(c *APIConnection, pid, root string, signers []*signature.SignKeys
 		if v.Signature, err = s.Sign(txBytes); err != nil {
 			return err
 		}
+		v.Type = "vote"
 		if txBytes, err = json.Marshal(v); err != nil {
 			return err
 		}
@@ -179,7 +193,7 @@ func sendVotes(c *APIConnection, pid, root string, signers []*signature.SignKeys
 	return nil
 }
 
-func createProcess(c *APIConnection, oracle *signature.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) error {
+func createProcess(c *APIConnection, oracle *signature.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (int64, error) {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
 	p := types.NewProcessTx{
@@ -190,17 +204,17 @@ func createProcess(c *APIConnection, oracle *signature.SignKeys, entityID, mkroo
 		NumberOfBlocks: int64(duration),
 		ProcessID:      pid,
 		ProcessType:    ptype,
-		StartBlock:     getCurrentBlock(c) + 4,
+		StartBlock:     getCurrentBlock(c) + 2,
 	}
 	txBytes, err := json.Marshal(p)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if p.Signature, err = oracle.Sign(txBytes); err != nil {
-		return err
+		return 0, err
 	}
 	if txBytes, err = json.Marshal(p); err != nil {
-		return err
+		return 0, err
 	}
 	req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
 
@@ -208,7 +222,7 @@ func createProcess(c *APIConnection, oracle *signature.SignKeys, entityID, mkroo
 	if !resp.Ok {
 		log.Fatalf("%s failed: %s", req.Method, resp.Message)
 	}
-	return nil
+	return p.StartBlock, nil
 }
 
 func getCurrentBlock(c *APIConnection) int64 {
@@ -255,11 +269,11 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 	var claims []string
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
-	req.Digested = false
+	req.Digested = true
 	currentSize := censusSize
 	i := 0
 	var pub string
-	var data []byte
+	var data string
 	for currentSize > 0 {
 		iclaims := []string{}
 		for j := 0; j < 100; j++ {
@@ -267,8 +281,8 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 				break
 			}
 			pub, _ = censusSigners[currentSize-1].HexString()
-			data = hexutils.HexToBytes(pub)
-			iclaims = append(iclaims, base64.StdEncoding.EncodeToString([]byte(data)))
+			data = base64.StdEncoding.EncodeToString(signature.HashPoseidon(hexutils.HexToBytes(pub)))
+			iclaims = append(iclaims, data)
 			currentSize--
 		}
 		claims = append(claims, iclaims...)
