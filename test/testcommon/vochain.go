@@ -27,7 +27,7 @@ var (
 		"00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
 		"237B54D0163Aa131254fA260Fc12DB0E6DC76FC7",
 		"F904848ea36c46817096E94f932A9901E377C8a5",
-		"b926be24a9ca606b515a835e91298c7cf0f2846f",
+		"06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0",
 	}
 
 	ProcessHardcoded = &types.Process{
@@ -47,15 +47,15 @@ var (
 		Signature:   "8ee76647eb9a5639c776aff4e0452410edc50fe5b3d0a6d619383effc02daa4b2f00e74105d84eb016bf424a0e4bfcee1045db13b97ae2c4d484c8fdff541bce1b",
 	}
 
+	// privKey e0aa6db5a833531da4d259fb5df210bae481b276dc4c2ab6ab9771569375aed5 for address 06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0
 	HardcodedNewProcessTx = &types.NewProcessTx{
-		EncryptionPublicKeys: []string{"a", "b"},
-		EntityID:             "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85",
-		MkRoot:               "0x0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
-		NumberOfBlocks:       1000,
-		ProcessID:            "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
-		ProcessType:          types.PetitionSign,
-		Signature:            "b35821689ff1c3cbc42d8e8c45e8182163c382dafeb699f9e4438f1c100e7b89314945c8c30fcf03a736514c67bb0852263203250845c9e528ddf91caae40ff801",
-		Type:                 "newProcess",
+		EntityID:       "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85",
+		MkRoot:         "0x0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
+		NumberOfBlocks: 1000,
+		ProcessID:      "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
+		ProcessType:    types.PetitionSign,
+		Signature:      "845289a58a4d5292f8353cc29055f5f5ca92579ec4afc5c589107023f8c0d87055f75e2b91a47a15e7d4cc8294de422cf229a5b5731d989a7b439fffa2ee141b01",
+		Type:           "newProcess",
 	}
 
 	HardcodedCancelProcessTx = &types.CancelProcessTx{

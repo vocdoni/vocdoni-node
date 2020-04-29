@@ -1,7 +1,6 @@
 package types
 
 import (
-	"github.com/tendermint/tendermint/crypto"
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
@@ -20,8 +19,9 @@ type VotePackageStruct struct {
 	Votes []int `json:"votes"`
 }
 
-// Vote represents a signle Vote
+// Vote represents a single Vote
 type Vote struct {
+	KeyIndexes []int `json:"keyIndexes,omitempty"`
 	// Nonce unique number per vote attempt, so that replay attacks can't reuse this payload
 	Nonce string `json:"nonce,omitempty"`
 	// Nullifier is the hash of the private key
@@ -42,20 +42,24 @@ type Vote struct {
 type Process struct {
 	// Canceled if true process is canceled
 	Canceled bool `json:"canceled,omitempty"`
-	// CommitmentKey is Poseidon hash of the reveal key
-	CommitmentKey []byte `json:"commitmentKey,omitempty"`
-	// Paused if true process is paused and cannot add or modify any vote
-	Paused bool `json:"paused,omitempty"`
-	// EncryptionPublicKey are the keys required to encrypt the votes
+	// CommitmentKeys are the reveal keys hashed
+	CommitmentKeys []string `json:"commitmentKeys,omitempty"`
+	// EncryptionPrivateKeys are the keys required to decrypt the votes
+	EncryptionPrivateKeys []string `json:"encryptionPrivateKeys,omitempty"`
+	// EncryptionPublicKeys are the keys required to encrypt the votes
 	EncryptionPublicKeys []string `json:"encryptionPublicKeys,omitempty"`
 	// EntityID identifies unequivocally a process
 	EntityID string `json:"entityId,omitempty"`
 	// KeyIndex
-	KeyIndex *int `json:"keyIndex,omitempty"`
+	KeyIndex int `json:"keyIndex,omitempty"`
 	// MkRoot merkle root of all the census in the process
 	MkRoot string `json:"mkRoot,omitempty"`
 	// NumberOfBlocks represents the amount of tendermint blocks that the process will last
 	NumberOfBlocks int64 `json:"numberOfBlocks,omitempty"`
+	// Paused if true process is paused and cannot add or modify any vote
+	Paused bool `json:"paused,omitempty"`
+	// RevealKeys are the seed of the CommitmentKeys
+	RevealKeys []string `json:"revealKeys,omitempty"`
 	// StartBlock represents the tendermint block where the process goes from scheduled to active
 	StartBlock int64 `json:"startBlock,omitempty"`
 	// Type represents the process type
@@ -84,6 +88,7 @@ type Tx struct {
 
 // VoteTx represents the info required for submmiting a vote
 type VoteTx struct {
+	KeyIndexes  []int  `json:"keyIndexes,omitempty"`
 	Nonce       string `json:"nonce,omitempty"`
 	Nullifier   string `json:"nullifier,omitempty"`
 	ProcessID   string `json:"processId"`
@@ -99,8 +104,6 @@ func (tx *VoteTx) TxType() string {
 
 // NewProcessTx represents the info required for starting a new process
 type NewProcessTx struct {
-	// EncryptionPublicKeys are the keys required to encrypt the votes
-	EncryptionPublicKeys []string `json:"encryptionPublicKeys,omitempty"`
 	// EntityID the process belongs to
 	EntityID string `json:"entityId"`
 	// MkRoot merkle root of all the census in the process
@@ -135,16 +138,18 @@ func (tx *CancelProcessTx) TxType() string {
 
 // AdminTx represents a Tx that can be only executed by some authorized addresses
 type AdminTx struct {
-	Address              string        `json:"address"`
-	CommitmentKey        []byte        `json:"commitmentKey,omitempty"`
-	EncryptionPublicKeys []string      `json:"encryptionPublicKeys,omitempty"`
-	KeyIndex             *int          `json:"keyIndex,omitempty"`
-	Nonce                string        `json:"nonce"`
-	Power                int64         `json:"power,omitempty"`
-	ProcessID            string        `json:"processId,omitempty"`
-	PubKey               crypto.PubKey `json:"pub_key,omitempty"`
-	Signature            string        `json:"signature,omitempty"`
-	Type                 string        `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
+	Address              string `json:"address"`
+	CommitmentKey        string `json:"commitmentKey,omitempty"`
+	EncryptionPrivateKey string `json:"encryptionPrivateKey,omitempty"`
+	EncryptionPublicKey  string `json:"encryptionPublicKey,omitempty"`
+	KeyIndex             int    `json:"keyIndex,omitempty"`
+	Nonce                string `json:"nonce"`
+	Power                int64  `json:"power,omitempty"`
+	ProcessID            string `json:"processId,omitempty"`
+	PubKey               string `json:"publicKey,omitempty"`
+	RevealKey            string `json:"revealKey,omitempty"`
+	Signature            string `json:"signature,omitempty"`
+	Type                 string `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
 }
 
 func (tx *AdminTx) TxType() string {

@@ -65,7 +65,6 @@ func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error
 	if processMeta.StartBlock != nil {
 		processTxArgs.StartBlock = processMeta.StartBlock.Int64()
 	}
-	processTxArgs.EncryptionPublicKeys = []string{processMeta.VoteEncryptionPrivateKey}
 	switch processMeta.ProcessType {
 	case types.SnarkVote, types.PollVote, types.PetitionSign, types.EncryptedPoll:
 		processTxArgs.ProcessType = processMeta.ProcessType

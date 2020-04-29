@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -51,7 +50,11 @@ func AddTx(gtx GenericTX, state *State, commit bool) error {
 			case "removeOracle":
 				return state.RemoveOracle(tx.Address)
 			case "addValidator":
-				return state.AddValidator(tx.PubKey, tx.Power)
+				if pk, err := hexPubKeyToTendermintEd25519(tx.PubKey); err == nil {
+					return state.AddValidator(pk, tx.Power)
+				} else {
+					return err
+				}
 			case "removeValidator":
 				return state.RemoveValidator(tx.Address)
 			case types.AdminTxAddProcessKeys:
@@ -268,12 +271,15 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 		return nil, fmt.Errorf("process type (%s) not valid", tx.ProcessType)
 	}
 	return &types.Process{
-		EntityID:             tx.EntityID,
-		EncryptionPublicKeys: tx.EncryptionPublicKeys,
-		MkRoot:               tx.MkRoot,
-		NumberOfBlocks:       tx.NumberOfBlocks,
-		StartBlock:           tx.StartBlock,
-		Type:                 tx.ProcessType,
+		EntityID:              tx.EntityID,
+		EncryptionPublicKeys:  make([]string, types.MaxKeyIndex+1),
+		EncryptionPrivateKeys: make([]string, types.MaxKeyIndex+1),
+		CommitmentKeys:        make([]string, types.MaxKeyIndex+1),
+		RevealKeys:            make([]string, types.MaxKeyIndex+1),
+		MkRoot:                tx.MkRoot,
+		NumberOfBlocks:        tx.NumberOfBlocks,
+		StartBlock:            tx.StartBlock,
+		Type:                  tx.ProcessType,
 	}, nil
 }
 
@@ -340,75 +346,38 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal adminTx (%s)", err)
 	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, adminTxBytes, sign)
-	if err != nil {
+
+	if authorized, addr, err := verifySignatureAgainstOracles(oracles, adminTxBytes, sign); err != nil {
 		return err
+	} else if !authorized {
+		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr)
 	}
-	if !authorized {
-		return fmt.Errorf("unauthorized to perform an adminTx, address: %s, message: %s", addr, string(adminTxBytes))
-	}
+
 	switch {
 	case tx.Type == types.AdminTxAddProcessKeys:
-		// sanitize processID
-		if !util.IsHexEncodedStringWithLength(tx.ProcessID, processIDsize) {
-			return fmt.Errorf("malformed processId")
-		}
-		// if tx commitment key or tx public key are not set tx is not valid
-		// also commitment key should have 32 byte and cannot be 0x0
-		if tx.CommitmentKey == nil && len(tx.EncryptionPublicKeys) == 0 {
-			return fmt.Errorf("malformed tx, commitmentKey or publicEncryptionKeys must be set")
-		}
-		// if tx encryption public keys, key index cannot be void
-		if len(tx.EncryptionPublicKeys) > 0 && tx.KeyIndex == nil {
-			return fmt.Errorf("malformed tx, index should exists")
-		}
-		// if commitment key check commitment key format
-		if len(tx.EncryptionPublicKeys) == 0 {
-			if len(tx.CommitmentKey) != 32 {
-				return fmt.Errorf("malformed tx, commitmentKey length not valid")
-			}
-			// check commitment key is not 0x0
-			fixedCK := [32]byte{}
-			copy(fixedCK[:], tx.CommitmentKey)
-			if fixedCK == types.Invalid32ByteAddr {
-				return fmt.Errorf("commitment key cannot be 0x0")
-			}
-		}
 		// check process exists
-		process, _ := state.Process(tx.ProcessID)
+		process, err := state.Process(tx.ProcessID)
+		if err != nil {
+			return err
+		}
 		if process == nil {
 			return fmt.Errorf("process with id (%s) does not exist", tx.ProcessID)
-		}
-		// if there are encryption public keys sanitize them and check not exist
-		if len(tx.EncryptionPublicKeys) > 0 {
-			for idx, i := range tx.EncryptionPublicKeys {
-				tx.EncryptionPublicKeys[idx] = util.TrimHex(i)
-				for _, j := range process.EncryptionPublicKeys {
-					if j == i {
-						return fmt.Errorf("encryption public key already exists")
-					}
-				}
-			}
-		}
-		// check commitment key does not exist
-		if reflect.DeepEqual(process.CommitmentKey, tx.CommitmentKey) {
-			return fmt.Errorf("commitment key already exists")
 		}
 		header := state.Header()
 		if header == nil {
 			return fmt.Errorf("cannot get blockchain header")
 		}
 		// endblock is always greater than start block so that case is also included here
-		if h := header.Height; process.StartBlock >= h {
+		if process.StartBlock >= header.Height {
 			return fmt.Errorf("cannot add process keys in a started or finished process")
 		}
 		// process is not canceled
 		if process.Canceled {
 			return fmt.Errorf("cannot add process keys in a canceled process")
 		}
-		// check valid index
-		if len(process.EncryptionPublicKeys) != *tx.KeyIndex {
-			return fmt.Errorf("invalid index")
+		// check included keys and keyindex are valid
+		if err := checkAddProcessKeys(tx, process); err != nil {
+			return err
 		}
 	}
 	return nil

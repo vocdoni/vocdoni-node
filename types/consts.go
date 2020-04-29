@@ -30,4 +30,6 @@ const (
 	SnarkVote = "snark-vote"
 	// AdminTxAddProcessKeys contains the string that needs to match with the received adminTx.Type for adding process keys
 	AdminTxAddProcessKeys = "addProcessKeys"
+	// MaxKeyIndex is the maxim number of allowed Encryption or Commitment keys
+	MaxKeyIndex = 16
 )
