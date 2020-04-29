@@ -14,7 +14,7 @@ func TestNewProcessTxCheck(t *testing.T) {
 	// t.Parallel()
 
 	s := testcommon.NewVochainStateWithOracles(t)
-	if err := vochain.NewProcessTxCheck(*testcommon.HardcodedNewProcessTx, s); err != nil {
+	if _, err := vochain.NewProcessTxCheck(testcommon.HardcodedNewProcessTx, s); err != nil {
 		t.Errorf("cannot validate new process tx: %s", err)
 	}
 }
@@ -76,13 +76,16 @@ func TestCreateProcess(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", *testcommon.HardcodedNewProcessTx)
 	}
-	_, err = vochain.ValidateAndDeliverTx(bytes, s)
+	var gtx vochain.GenericTX
+	if gtx, err = vochain.UnmarshalTx(bytes); err != nil {
+		t.Errorf("cannot unmarshal tx")
+	}
+	err = vochain.AddTx(gtx, s, true)
 	if err != nil {
 		t.Errorf("cannot create process: %s", err)
 	}
 	// cannot add same process
-	_, err = vochain.ValidateAndDeliverTx(bytes, s)
-	if err == nil {
+	if err = vochain.AddTx(gtx, s, true); err == nil {
 		t.Errorf("same process added: %s", err)
 	}
 	// cannot add process if not oracle
@@ -92,8 +95,10 @@ func TestCreateProcess(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", badoracle)
 	}
-	_, err = vochain.ValidateAndDeliverTx(bytes, s)
-	if err == nil {
+	if gtx, err = vochain.UnmarshalTx(bytes); err != nil {
+		t.Errorf("cannot unmarshal tx")
+	}
+	if err = vochain.AddTx(gtx, s, true); err == nil {
 		t.Errorf("process added by non oracle: %s", err)
 	}
 }

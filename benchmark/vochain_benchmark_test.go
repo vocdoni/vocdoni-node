@@ -103,14 +103,13 @@ func BenchmarkVochain(b *testing.B) {
 
 	// create process
 	process := &types.NewProcessTx{
-		EncryptionPublicKeys: []string{""},
-		EntityID:             signerPub,
-		MkRoot:               mkRoot,
-		NumberOfBlocks:       numberOfBlocks,
-		ProcessID:            processID,
-		ProcessType:          types.PollVote,
-		StartBlock:           *resp.Height + 1,
-		Type:                 "newProcess",
+		EntityID:       signerPub,
+		MkRoot:         mkRoot,
+		NumberOfBlocks: numberOfBlocks,
+		ProcessID:      processID,
+		ProcessType:    types.PollVote,
+		StartBlock:     *resp.Height + 1,
+		Type:           "newProcess",
 	}
 	var err error
 	process.Signature, err = dvoteServer.Signer.SignJSON(process)

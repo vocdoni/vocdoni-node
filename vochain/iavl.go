@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -8,7 +9,8 @@ import (
 
 	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/iavl"
-	"github.com/tendermint/tendermint/crypto"
+	crypto "github.com/tendermint/tendermint/crypto"
+	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmdb "github.com/tendermint/tm-db"
 
@@ -206,6 +208,19 @@ func (v *State) Oracles(isQuery bool) ([]string, error) {
 	return oracles, err
 }
 
+func hexPubKeyToTendermintEd25519(pubKey string) (crypto.PubKey, error) {
+	var tmkey ed25519.PubKeyEd25519
+	pubKeyBytes, err := hex.DecodeString(pubKey)
+	if err != nil {
+		return nil, err
+	}
+	if len(pubKeyBytes) != 32 {
+		return nil, fmt.Errorf("pubKey lenght is invalid")
+	}
+	copy(tmkey[:], pubKeyBytes[:])
+	return tmkey, nil
+}
+
 // AddValidator adds a tendemint validator if it is not already added
 func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
 	addr := pubKey.Address().String()
@@ -269,6 +284,38 @@ func (v *State) Validators(isQuery bool) ([]tmtypes.GenesisValidator, error) {
 	return validators, err
 }
 
+// AddProcessKeys adds the keys to the process
+func checkAddProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) error {
+	// check if at leat 1 key is provided and the keyIndex do not over/under flow
+	if len(tx.CommitmentKey)+len(tx.EncryptionPrivateKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
+		return fmt.Errorf("no keys provided or invalid key index")
+	}
+	// check if provided keyIndex is not already used
+	if len(process.EncryptionPublicKeys[tx.KeyIndex]) > 0 || len(process.CommitmentKeys[tx.KeyIndex]) > 0 {
+		return fmt.Errorf("key index %d alrady exist", tx.KeyIndex)
+	}
+	return nil
+}
+
+// AddProcessKeys adds the keys to the process
+func (v *State) AddProcessKeys(tx *types.AdminTx) error {
+	pid := util.TrimHex(tx.ProcessID)
+	process, err := v.Process(pid, false)
+	if err != nil {
+		return err
+	}
+	if err := checkAddProcessKeys(tx, process); err != nil {
+		return err
+	}
+	if len(tx.CommitmentKey) > 0 {
+		process.CommitmentKeys[tx.KeyIndex] = util.TrimHex(tx.CommitmentKey)
+	}
+	if len(tx.EncryptionPublicKey) > 0 {
+		process.EncryptionPublicKeys[tx.KeyIndex] = util.TrimHex(tx.EncryptionPublicKey)
+	}
+	return v.setProcess(process, pid)
+}
+
 // AddProcess adds a new process to vochain if not already added
 func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 	pid = util.TrimHex(pid)
@@ -282,6 +329,7 @@ func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 			e.OnProcess(pid, p.EntityID)
 		}
 	}
+	log.Warnf("add process: %s {%+v}", pid, p)
 	return nil
 }
 

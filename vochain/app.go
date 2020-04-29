@@ -149,26 +149,30 @@ func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Respo
 }
 
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
-	if _, err := ValidateTx(req.Tx, app.State); err != nil {
+	if tx, err := UnmarshalTx(req.Tx); err == nil {
+		if err := AddTx(tx, app.State, false); err != nil { // TBD use inmutable state
+			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte(err.Error())}
+		}
+	} else {
 		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte(err.Error())}
 	}
 	return abcitypes.ResponseCheckTx{Code: 0}
 }
 
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	// ValidateAndDeliverTx should return events
-	events, err := ValidateAndDeliverTx(req.Tx, app.State)
-	if err != nil {
+	if tx, err := UnmarshalTx(req.Tx); err == nil {
+		if err := AddTx(tx, app.State, true); err != nil { // TBD use inmutable state
+			return abcitypes.ResponseDeliverTx{Code: 1}
+		}
+	} else {
 		return abcitypes.ResponseDeliverTx{Code: 1}
-	}
-	if events != nil {
-		return abcitypes.ResponseDeliverTx{Code: 0, Events: events}
 	}
 	return abcitypes.ResponseDeliverTx{Code: 0}
 }
 
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	//defer app.State.Lock.Unlock()
+	log.Warnf("COMMIT")
 	return abcitypes.ResponseCommit{
 		Data: app.State.Save(),
 	}
