@@ -27,6 +27,7 @@ var (
 		"00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
 		"237B54D0163Aa131254fA260Fc12DB0E6DC76FC7",
 		"F904848ea36c46817096E94f932A9901E377C8a5",
+		"b926be24a9ca606b515a835e91298c7cf0f2846f",
 	}
 
 	ProcessHardcoded = &types.Process{
@@ -38,7 +39,7 @@ var (
 	}
 
 	VoteHardcoded = &types.Vote{
-		ProcessID:   "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
+		ProcessID:   "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
 		Proof:       "0x00030000000000000000000000000000000000000000000000000000000000070ab34471caaefc9bb249cb178335f367988c159f3907530ef7daa1e1bf0c9c7a218f981be7c0c46ffa345d291abb36a17c22722814fb0110240b8640fd1484a6268dc2f0fc2152bf83c06566fbf155f38b8293033d4779a63bba6c7157fd10c8",
 		Nullifier:   "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0", // nullifier and nonce are the same here
 		VotePackage: "eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19",
@@ -48,17 +49,17 @@ var (
 
 	HardcodedNewProcessTx = &types.NewProcessTx{
 		EncryptionPublicKeys: []string{"a", "b"},
-		EntityID:             "0x180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85",
+		EntityID:             "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85",
 		MkRoot:               "0x0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
 		NumberOfBlocks:       1000,
-		ProcessID:            "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
+		ProcessID:            "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
 		ProcessType:          types.PetitionSign,
-		Signature:            "b25259cff9ce3a709e517c6a01e445f216212f58f553fa26d25566b7c731339242ef9a0df0235b53a819a64ebf2c3394fb6b56138c5113cc1905c68ffcebb1971c",
+		Signature:            "b35821689ff1c3cbc42d8e8c45e8182163c382dafeb699f9e4438f1c100e7b89314945c8c30fcf03a736514c67bb0852263203250845c9e528ddf91caae40ff801",
 		Type:                 "newProcess",
 	}
 
 	HardcodedCancelProcessTx = &types.CancelProcessTx{
-		ProcessID: "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
+		ProcessID: "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
 		Signature: "685707c15ed3c0ab71bdf75157a724f340ffaba716cc9d7d9a317acd7f62e9fa739c201f270cced59c405d18dc945360a498a8a84132f9920b83ba08673996e01c",
 		Type:      "cancelProcess",
 	}
@@ -66,7 +67,7 @@ var (
 	HardcodedNewVoteTx = &types.VoteTx{
 		Nonce:       "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0",
 		Nullifier:   "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0",
-		ProcessID:   "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
+		ProcessID:   "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
 		Proof:       "00030000000000000000000000000000000000000000000000000000000000070ab34471caaefc9bb249cb178335f367988c159f3907530ef7daa1e1bf0c9c7a218f981be7c0c46ffa345d291abb36a17c22722814fb0110240b8640fd1484a6268dc2f0fc2152bf83c06566fbf155f38b8293033d4779a63bba6c7157fd10c8",
 		Signature:   "773de3c55da3e355337ab0632ebd3da0b0eecc3dfa01149460b18df46b2a3a7e1ac8168e2db134e2e6abcb1dd3c328cabfdbd047aa602187992250128d24397e1b",
 		Type:        "vote",
@@ -74,14 +75,14 @@ var (
 	}
 
 	HardcodedAdminTxAddOracle = &types.AdminTx{
-		Address:   "0x39106af1fF18bD60a38a296fd81B1f28f315852B", // oracle address or pubkey validator
+		Address:   "39106af1fF18bD60a38a296fd81B1f28f315852B", // oracle address or pubkey validator
 		Nonce:     "0x1",
 		Signature: "11ccdaacd6b6c2c832ea51b4dc695ce9f3c31b7fecd81a2509e7daf183a126e974f1b68060dd406c83ea2db1147d7a56fd6033e8cf7834ce0cf5ec504f09f2ee1b",
 		Type:      "addOracle",
 	}
 
 	HardcodedAdminTxRemoveOracle = &types.AdminTx{
-		Address:   "0x00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
+		Address:   "00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
 		Nonce:     "0x1",
 		Signature: "70f89a73f2b7a712e1281e49758ea7fa32769666b38773eeff5a3a0f0e20b6c46b5bb05d9257c9156bf7e7b7334b0af9cb38bc0ae19c70d4f64633529a49585d1b",
 		Type:      "removeOracle",

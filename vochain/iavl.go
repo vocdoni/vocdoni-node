@@ -242,7 +242,7 @@ func (v *State) Validators() ([]tmtypes.GenesisValidator, error) {
 }
 
 // AddProcessKeys adds keys in a zkSnark or encrypted-poll process
-func (v *State) AddProcessKeys(tx types.AdminTx) error {
+func (v *State) AddProcessKeys(tx *types.AdminTx) error {
 	sanitizedPID := util.TrimHex(tx.ProcessID)
 	process, err := v.Process(sanitizedPID)
 	if err != nil {

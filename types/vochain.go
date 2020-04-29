@@ -93,6 +93,10 @@ type VoteTx struct {
 	VotePackage string `json:"votePackage,omitempty"`
 }
 
+func (tx *VoteTx) TxType() string {
+	return "VoteTx"
+}
+
 // NewProcessTx represents the info required for starting a new process
 type NewProcessTx struct {
 	// EncryptionPublicKeys are the keys required to encrypt the votes
@@ -113,12 +117,20 @@ type NewProcessTx struct {
 	Type       string `json:"type,omitempty"`
 }
 
+func (tx *NewProcessTx) TxType() string {
+	return "NewProcessTx"
+}
+
 // CancelProcessTx represents a tx for canceling a valid process
 type CancelProcessTx struct {
 	// EntityID the process belongs to
 	ProcessID string `json:"processId"`
 	Signature string `json:"signature,omitempty"`
 	Type      string `json:"type,omitempty"`
+}
+
+func (tx *CancelProcessTx) TxType() string {
+	return "CancelProcessTx"
 }
 
 // AdminTx represents a Tx that can be only executed by some authorized addresses
@@ -135,7 +147,11 @@ type AdminTx struct {
 	Type                 string        `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
 }
 
-// ValidateType a valid Tx type specified in ValidTypes
+func (tx *AdminTx) TxType() string {
+	return "AdminTx"
+}
+
+// ValidateType a valid Tx type specified in ValidTypes. Returns empty string if invalid type.
 func ValidateType(t string) string {
 	val, ok := ValidTypes[t]
 	if !ok {
