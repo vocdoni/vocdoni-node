@@ -16,7 +16,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
 
-func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Agent) (vnode *vochain.BaseApplication, vclient *voclient.HTTP, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
+func Vochain(vconfig *config.VochainCfg, dev, results bool, ma *metrics.Agent) (vnode *vochain.BaseApplication, vclient *voclient.HTTP, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
 	log.Info("creating vochain service")
 	var host, port string
 	var ip net.IP
@@ -56,15 +56,8 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, metrics *metrics.Age
 		}
 	}
 	// Grab metrics
-	if metrics != nil {
-		vnode.RegisterMetrics(metrics)
-		go func() {
-			for {
-				vnode.GetMetrics()
-				time.Sleep(metrics.RefreshInterval)
-			}
-		}()
-	}
+	go vnode.CollectMetrics(ma)
+
 	// Vochain info
 	vi = vochaininfo.NewVochainInfo(vnode)
 	go vi.Start(10)

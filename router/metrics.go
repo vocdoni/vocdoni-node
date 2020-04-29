@@ -1,6 +1,10 @@
 package router
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+
+	"gitlab.com/vocdoni/go-dvote/metrics"
+)
 
 // Router collectors
 var (
@@ -17,3 +21,8 @@ var (
 		Help:      "The number of public requests processed",
 	}, []string{"method"})
 )
+
+func (r *Router) registerMetrics(ma *metrics.Agent) {
+	ma.Register(RouterPrivateReqs)
+	ma.Register(RouterPublicReqs)
+}

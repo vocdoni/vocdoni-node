@@ -245,32 +245,6 @@ func (e *EthChainContext) PrintInfo(seconds time.Duration) {
 	}
 }
 
-// RegisterMetrics to the prometheus server
-func (e *EthChainContext) RegisterMetrics(ma *metrics.Agent) {
-	ma.Register(EthereumSynced)
-	ma.Register(EthereumHeight)
-	ma.Register(EthereumMaxHeight)
-	ma.Register(EthereumPeers)
-}
-
-// GetMetrics grabs diferent metrics about etheruem chain.
-func (e *EthChainContext) GetMetrics() {
-	info, err := e.SyncInfo()
-	if err != nil {
-		log.Warn(err)
-		return
-	}
-	if info.Synced {
-		EthereumSynced.Set(1)
-	} else {
-		EthereumSynced.Set(0)
-	}
-	EthereumHeight.Set(float64(info.Height))
-	EthereumMaxHeight.Set(float64(info.MaxHeight))
-	EthereumPeers.Set(float64(info.Peers))
-
-}
-
 type EthSyncInfo struct {
 	Height    uint64
 	MaxHeight uint64

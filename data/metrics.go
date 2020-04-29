@@ -1,6 +1,13 @@
 package data
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"context"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"gitlab.com/vocdoni/go-dvote/metrics"
+)
 
 // File collectors
 var (
@@ -23,3 +30,47 @@ var (
 		Help:      "The number of pinned files",
 	})
 )
+
+// RegisterMetrics to initialize the metrics to the agent
+func (i *IPFSHandle) registerMetrics(ma *metrics.Agent) {
+	ma.Register(FilePeers)
+	ma.Register(FileAddresses)
+	ma.Register(FilePins)
+}
+
+// GetMetrics to be called as a loop and grab metrics
+func (i *IPFSHandle) getMetrics(ctx context.Context) error {
+	peers, err := i.CoreAPI.Swarm().Peers(ctx)
+	if err != nil {
+		return err
+	}
+	FilePeers.Set(float64(len(peers)))
+	addresses, err := i.CoreAPI.Swarm().KnownAddrs(ctx)
+	if err != nil {
+		return err
+	}
+	FileAddresses.Set(float64(len(addresses)))
+	pins, err := i.CoreAPI.Pin().Ls(ctx)
+	if err != nil {
+		return err
+	}
+	FilePins.Set(float64(len(pins)))
+	return nil
+}
+
+// CollectMetrics constantly updates the metric values for prometheus
+// The function is blocking, should be called in a go routine
+// If the metrics Agent is nil, do nothing
+func (i *IPFSHandle) CollectMetrics(ma *metrics.Agent, ctx context.Context) error {
+	if ma != nil {
+		i.registerMetrics(ma)
+		for {
+			time.Sleep(ma.RefreshInterval)
+			err := i.getMetrics(ctx)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

@@ -111,6 +111,9 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net
 	r.metricsagent = metricsagent
 	r.allowPrivate = allowPrivate
 	r.registerPublic("getGatewayInfo", r.info)
+	if metricsagent != nil {
+		r.registerMetrics(metricsagent)
+	}
 	return r
 }
 
@@ -282,11 +285,6 @@ func (r *Router) Route() {
 
 		go method.handler(request)
 	}
-}
-
-func (r *Router) RegisterMetrics(ma *metrics.Agent) {
-	ma.Register(RouterPrivateReqs)
-	ma.Register(RouterPublicReqs)
 }
 
 func (r *Router) sendError(request routerRequest, errMsg string) {
