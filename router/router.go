@@ -221,6 +221,7 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, rpcClient *vocli
 	r.vocapp = vocapp
 	r.tmclient = rpcClient
 	r.vocinfo = vocInfo
+	r.registerPrivate("submitRawTx", r.submitRawTx)
 	r.registerPublic("submitEnvelope", r.submitEnvelope)
 	r.registerPublic("getEnvelopeStatus", r.getEnvelopeStatus)
 	r.registerPublic("getEnvelope", r.getEnvelope)
