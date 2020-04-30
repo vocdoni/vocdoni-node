@@ -84,14 +84,18 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 		r.sendError(request, "cannot get envelope status: (malformed nullifier)")
 		return
 	}
-	_, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier), true)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get envelope status: (%s)", err))
-		return
-	}
+
+	// Check envelpe status and send reply
 	var response types.ResponseMessage
-	response.Registered = types.True
-	response.Nullifier = sanitizedNullifier
+	response.Registered = types.False
+
+	e, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier), true)
+	// Warning, error is ignored. We should find a better way to check the envelope status
+	if err == nil && e != nil {
+		response.Registered = types.True
+		response.Nullifier = sanitizedNullifier
+	}
+
 	r.transport.Send(r.buildReply(request, response))
 }
 

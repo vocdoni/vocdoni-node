@@ -342,7 +342,6 @@ func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 			e.OnProcess(pid, p.EntityID)
 		}
 	}
-	log.Warnf("add process: %s {%+v}", pid, p)
 	return nil
 }
 
