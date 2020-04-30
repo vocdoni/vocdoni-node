@@ -35,18 +35,7 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *signature.SignKeys, ma *metrics.Ag
 			}
 		}()
 
-		if ma != nil {
-			storage.RegisterMetrics(ma)
-			go func() {
-				for {
-					time.Sleep(ma.RefreshInterval)
-					err := storage.GetMetrics(context.TODO())
-					if err != nil {
-						log.Warnf("IPFS metrics returned an error: %s", err)
-					}
-				}
-			}()
-		}
+		go storage.CollectMetrics(ma, context.TODO())
 
 		if len(ipfsconfig.SyncKey) > 0 {
 			log.Info("enabling ipfs synchronization")

@@ -1,6 +1,11 @@
 package vochain
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"gitlab.com/vocdoni/go-dvote/metrics"
+)
 
 // Vochain collectors
 var (
@@ -35,3 +40,32 @@ var (
 		Help:      "Size of the vote tree",
 	})
 )
+
+func (app *BaseApplication) registerMetrics(ma *metrics.Agent) {
+	ma.Register(VochainHeight)
+	ma.Register(VochainMempool)
+	ma.Register(VochainAppTree)
+	ma.Register(VochainProcessTree)
+	ma.Register(VochainVoteTree)
+}
+
+func (app *BaseApplication) getMetrics() {
+	VochainHeight.Set(float64(app.Node.BlockStore().Height()))
+	VochainMempool.Set(float64(app.Node.Mempool().Size()))
+	VochainAppTree.Set(float64(app.State.AppTree.Size()))
+	VochainProcessTree.Set(float64(app.State.ProcessTree.Size()))
+	VochainVoteTree.Set(float64(app.State.VoteTree.Size()))
+}
+
+// CollectMetrics constantly updates the metric values for prometheus
+// The function is blocking, should be called in a go routine
+// If the metrics Agent is nil, do nothing
+func (app *BaseApplication) CollectMetrics(ma *metrics.Agent) {
+	if ma != nil {
+		app.registerMetrics(ma)
+		for {
+			time.Sleep(ma.RefreshInterval)
+			app.getMetrics()
+		}
+	}
+}

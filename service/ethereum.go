@@ -41,15 +41,7 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 	go node.PrintInfo(time.Second * 20)
 
 	// Grab ethereum metrics loop
-	if ma != nil {
-		node.RegisterMetrics(ma)
-		go func() {
-			for {
-				time.Sleep(ma.RefreshInterval)
-				node.GetMetrics()
-			}
-		}()
-	}
+	go node.CollectMetrics(ma)
 
 	log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
 	if w3config.Enabled && pxy != nil {

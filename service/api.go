@@ -54,9 +54,5 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 		}
 	}()
 
-	if ma != nil {
-		routerAPI.RegisterMetrics(ma)
-	}
-
 	return
 }

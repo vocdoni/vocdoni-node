@@ -24,7 +24,6 @@ import (
 	crypto "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/ipfs"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
@@ -194,33 +193,6 @@ func (i *IPFSHandle) Stats(ctx context.Context) (string, error) {
 		return response, err
 	}
 	return fmt.Sprintf("peers:%d addresses:%d pins:%d", len(peers), len(addresses), len(pins)), nil
-}
-
-// RegisterMetrics to initialize the metrics to the agent
-func (i *IPFSHandle) RegisterMetrics(ma *metrics.Agent) {
-	ma.Register(FilePeers)
-	ma.Register(FileAddresses)
-	ma.Register(FilePins)
-}
-
-// GetMetrics to be called as a loop and grab metrics
-func (i *IPFSHandle) GetMetrics(ctx context.Context) error {
-	peers, err := i.CoreAPI.Swarm().Peers(ctx)
-	if err != nil {
-		return err
-	}
-	FilePeers.Set(float64(len(peers)))
-	addresses, err := i.CoreAPI.Swarm().KnownAddrs(ctx)
-	if err != nil {
-		return err
-	}
-	FileAddresses.Set(float64(len(addresses)))
-	pins, err := i.CoreAPI.Pin().Ls(ctx)
-	if err != nil {
-		return err
-	}
-	FilePins.Set(float64(len(pins)))
-	return nil
 }
 
 func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
