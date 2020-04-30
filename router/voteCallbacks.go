@@ -90,6 +90,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	}
 	var response types.ResponseMessage
 	response.Registered = types.True
+	response.Nullifier = sanitizedNullifier
 	r.transport.Send(r.buildReply(request, response))
 }
 
