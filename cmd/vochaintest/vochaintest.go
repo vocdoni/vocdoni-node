@@ -131,6 +131,18 @@ func main() {
 	}
 }
 
+func getEnvelopeStatus(c *APIConnection, nullifier, pid string) (bool, error) {
+	var req types.MetaRequest
+	req.Method = "getEnvelopeStatus"
+	req.ProcessID = pid
+	req.Nullifier = nullifier
+	resp := c.Request(req, nil)
+	if !resp.Ok || resp.Registered == nil {
+		return false, fmt.Errorf("cannot check envelope (%s)", resp.Message)
+	}
+	return *resp.Registered, nil
+}
+
 func getProof(c *APIConnection, pubkey, root string) (string, error) {
 	var req types.MetaRequest
 	req.Method = "genProof"
@@ -157,18 +169,27 @@ func sendVotes(c *APIConnection, pid, root string, signers []*signature.SignKeys
 		return err
 	}
 
-	var req types.MetaRequest
-	req.Method = "submitRawTx"
+	proofs := []string{}
+	log.Infof("generating proofs...")
 	for i, s := range signers {
-		log.Infof("sending vote %d", i)
 		pub, _ = s.HexString()
 		if proof, err = getProof(c, pub, root); err != nil {
 			return err
 		}
+		proofs = append(proofs, proof)
+		log.Infof("proof generation progress: %d%%", int((i*100)/(len(signers))))
+	}
+
+	var req types.MetaRequest
+	var nullifier string
+	req.Method = "submitRawTx"
+	start := time.Now()
+	for i, s := range signers {
+		log.Infof("sending vote %d", i)
 		v := types.VoteTx{
 			Nonce:       randomHex(32),
 			ProcessID:   pid,
-			Proof:       proof,
+			Proof:       proofs[i],
 			VotePackage: base64.StdEncoding.EncodeToString(vpBytes),
 		}
 		txBytes, err := json.Marshal(v)
@@ -188,8 +209,22 @@ func sendVotes(c *APIConnection, pid, root string, signers []*signature.SignKeys
 		if !resp.Ok {
 			return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 		}
-
+		nullifier = resp.Nullifier
 	}
+	log.Infof("last nullifier %s", nullifier)
+
+	for {
+		time.Sleep(500 * time.Millisecond)
+		es, err := getEnvelopeStatus(c, nullifier, pid)
+		if err != nil {
+			log.Error(err)
+			break
+		}
+		if es {
+			break
+		}
+	}
+	log.Infof("the voting computation took %s", time.Since(start))
 	return nil
 }
 
