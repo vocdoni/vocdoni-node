@@ -17,17 +17,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-func createEthRandomKeysBatch(n int) []*signature.SignKeys {
-	s := make([]*signature.SignKeys, n)
-	for i := 0; i < n; i++ {
-		s[i] = new(signature.SignKeys)
-		if err := s[i].Generate(); err != nil {
-			log.Fatal(err)
-		}
-	}
-	return s
-}
-
 // APIConnection holds an API websocket connection
 type APIConnection struct {
 	Conn *websocket.Conn
@@ -114,21 +103,27 @@ func main() {
 
 	// Create process
 	pid := randomHex(32)
-
 	start, err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, "poll-vote", 50)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("created process with ID: %s", pid)
-	log.Infof("waiting for process to start...")
-	for cb := getCurrentBlock(c); cb <= start; cb = getCurrentBlock(c) {
-		time.Sleep(10 * time.Second)
-		log.Infof("remaining blocks: %d", start-cb)
-	}
 
-	if err := sendVotes(c, pid, censusRoot, censusKeys); err != nil {
+	// Send votes
+	if err := sendVotes(c, pid, censusRoot, start, censusKeys); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func createEthRandomKeysBatch(n int) []*signature.SignKeys {
+	s := make([]*signature.SignKeys, n)
+	for i := 0; i < n; i++ {
+		s[i] = new(signature.SignKeys)
+		if err := s[i].Generate(); err != nil {
+			log.Fatal(err)
+		}
+	}
+	return s
 }
 
 func getEnvelopeStatus(c *APIConnection, nullifier, pid string) (bool, error) {
@@ -158,7 +153,7 @@ func getProof(c *APIConnection, pubkey, root string) (string, error) {
 	return resp.Siblings, nil
 }
 
-func sendVotes(c *APIConnection, pid, root string, signers []*signature.SignKeys) error {
+func sendVotes(c *APIConnection, pid, root string, startBlock int64, signers []*signature.SignKeys) error {
 	var pub, proof string
 	var err error
 	vp := types.VotePackage{
@@ -177,15 +172,20 @@ func sendVotes(c *APIConnection, pid, root string, signers []*signature.SignKeys
 			return err
 		}
 		proofs = append(proofs, proof)
-		log.Infof("proof generation progress: %d%%", int((i*100)/(len(signers))))
+		if i%100 == 0 {
+			log.Infof("proof generation progress: %d%%", int((i*100)/(len(signers))))
+		}
 	}
 
+	waitUntilBlock(c, startBlock)
+
 	var req types.MetaRequest
-	var nullifier string
+	var nullifiers []string
 	req.Method = "submitRawTx"
 	start := time.Now()
+	log.Infof("sending votes")
+
 	for i, s := range signers {
-		log.Infof("sending vote %d", i)
 		v := types.VoteTx{
 			Nonce:       randomHex(32),
 			ProcessID:   pid,
@@ -209,18 +209,33 @@ func sendVotes(c *APIConnection, pid, root string, signers []*signature.SignKeys
 		if !resp.Ok {
 			return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 		}
-		nullifier = resp.Payload
-	}
-	log.Infof("last nullifier %s", nullifier)
-
-	for {
-		time.Sleep(500 * time.Millisecond)
-		es, _ := getEnvelopeStatus(c, nullifier, pid)
-		if es {
-			break
+		nullifiers = append(nullifiers, resp.Payload)
+		if i%100 == 0 {
+			log.Infof("voting progress: %d%%", int((i*100)/(len(signers))))
 		}
 	}
-	log.Infof("the voting computation took %s", time.Since(start))
+	log.Infof("Votes submited! took %s", time.Since(start))
+	checkStart := time.Now()
+	registered := 0
+	for {
+		for i, n := range nullifiers {
+			if n == "registered" {
+				registered++
+				continue
+			}
+			if es, _ := getEnvelopeStatus(c, n, pid); es {
+				nullifiers[i] = "registered"
+			}
+		}
+		if registered == len(nullifiers) {
+			break
+		}
+		registered = 0
+		if time.Since(checkStart) > time.Minute*10 {
+			return fmt.Errorf("check nullifier time took more than 10 minutes, skipping")
+		}
+	}
+	log.Infof("Election is finished! The voting and the checking took %s", time.Since(start))
 	return nil
 }
 
@@ -256,6 +271,14 @@ func createProcess(c *APIConnection, oracle *signature.SignKeys, entityID, mkroo
 	return p.StartBlock, nil
 }
 
+func waitUntilBlock(c *APIConnection, block int64) {
+	log.Infof("waiting for process to start...")
+	for cb := getCurrentBlock(c); cb <= block; cb = getCurrentBlock(c) {
+		time.Sleep(10 * time.Second)
+		log.Infof("remaining blocks: %d", block-cb)
+	}
+}
+
 func getCurrentBlock(c *APIConnection) int64 {
 	var req types.MetaRequest
 	req.Method = "getBlockHeight"
@@ -275,7 +298,7 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 	rint := rand.Int()
 	censusSize := len(censusSigners)
 
-	log.Infof("[%d] get info", rint)
+	log.Infof("get info")
 	req.Method = "getGatewayInfo"
 	resp := c.Request(req, nil)
 	if !resp.Ok {
@@ -284,7 +307,7 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 	log.Infof("apis available: %v", resp.APIList)
 
 	// Create census
-	log.Infof("[%d] Create census", rint)
+	log.Infof("Create census")
 	req.Method = "addCensus"
 	req.CensusID = fmt.Sprintf("test%d", rint)
 	resp = c.Request(req, signer)
@@ -296,7 +319,7 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 	req.CensusID = resp.CensusID
 
 	// addClaimBulk
-	log.Infof("[%d] add bulk claims (size %d)", rint, censusSize)
+	log.Infof("add bulk claims (size %d)", censusSize)
 	var claims []string
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
@@ -327,7 +350,7 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 	}
 
 	// getSize
-	log.Infof("[%d] get size", rint)
+	log.Infof("get size")
 	req.Method = "getSize"
 	req.RootHash = ""
 	resp = c.Request(req, nil)
@@ -336,7 +359,7 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 	}
 
 	// publish
-	log.Infof("[%d] publish census", rint)
+	log.Infof("publish census")
 	req.Method = "publish"
 	req.ClaimsData = []string{}
 	resp = c.Request(req, signer)
@@ -349,7 +372,7 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 	}
 
 	// getRoot
-	log.Infof("[%d] get root", rint)
+	log.Infof("get root")
 	req.Method = "getRoot"
 	resp = c.Request(req, nil)
 	root = resp.Root
