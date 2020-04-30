@@ -58,7 +58,7 @@ func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 				}
 			case "removeValidator":
 				return []byte{}, state.RemoveValidator(tx.Address)
-			case types.AdminTxAddProcessKeys:
+			case types.TxAddProcessKeys:
 				return []byte{}, state.AddProcessKeys(tx)
 			}
 		}
@@ -266,17 +266,21 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 	default:
 		return nil, fmt.Errorf("process type (%s) not valid", tx.ProcessType)
 	}
-	return &types.Process{
-		EntityID:              tx.EntityID,
-		EncryptionPublicKeys:  make([]string, types.MaxKeyIndex+1),
-		EncryptionPrivateKeys: make([]string, types.MaxKeyIndex+1),
-		CommitmentKeys:        make([]string, types.MaxKeyIndex+1),
-		RevealKeys:            make([]string, types.MaxKeyIndex+1),
-		MkRoot:                tx.MkRoot,
-		NumberOfBlocks:        tx.NumberOfBlocks,
-		StartBlock:            tx.StartBlock,
-		Type:                  tx.ProcessType,
-	}, nil
+	p := &types.Process{
+		EntityID:       tx.EntityID,
+		MkRoot:         tx.MkRoot,
+		NumberOfBlocks: tx.NumberOfBlocks,
+		StartBlock:     tx.StartBlock,
+		Type:           tx.ProcessType,
+	}
+
+	if p.RequireKeys() {
+		p.EncryptionPublicKeys = make([]string, types.MaxKeyIndex+1)
+		p.EncryptionPrivateKeys = make([]string, types.MaxKeyIndex+1)
+		p.CommitmentKeys = make([]string, types.MaxKeyIndex+1)
+		p.RevealKeys = make([]string, types.MaxKeyIndex+1)
+	}
+	return p, nil
 }
 
 // CancelProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
@@ -350,7 +354,7 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 	}
 
 	switch {
-	case tx.Type == types.AdminTxAddProcessKeys:
+	case tx.Type == types.TxAddProcessKeys:
 		// check process exists
 		process, err := state.Process(tx.ProcessID, false)
 		if err != nil {
@@ -358,6 +362,9 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 		}
 		if process == nil {
 			return fmt.Errorf("process with id (%s) does not exist", tx.ProcessID)
+		}
+		if !process.RequireKeys() {
+			return fmt.Errorf("process does not require keys")
 		}
 		header := state.Header(false)
 		if header == nil {

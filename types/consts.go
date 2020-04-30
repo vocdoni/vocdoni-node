@@ -10,6 +10,8 @@ var (
 )
 
 const (
+	// All
+
 	ProcessIDsize = 32
 	// size of eth addr
 	EntityIDsize = 20
@@ -17,7 +19,10 @@ const (
 	// this is a temporal work around to support both
 	EntityIDsizeV2    = 32
 	VoteNullifierSize = 32
-	// ScrutinizerProcessPrefix is the prefix for the storage process keys
+
+	// Scrutinizer
+
+	// ScrutinizerLiveProcessPrefix is used for sotring temporary results on live
 	ScrutinizerLiveProcessPrefix = "p_"
 	// ScrutinizerEntityPrefix is the prefix for the storage entity keys
 	ScrutinizerEntityPrefix = "e_"
@@ -25,6 +30,9 @@ const (
 	ScrutinizerResultsPrefix = "r_"
 	// ScrutinizerProcessEndingPrefix is the prefix for keep track of the processes ending on a specific block
 	ScrutinizerProcessEndingPrefix = "s_"
+
+	// Vochain
+
 	// PetitionSign contains the string that needs to match with the received vote type for petition-sign
 	PetitionSign = "petition-sign"
 	// PollVote contains the string that needs to match with the received vote type for poll-vote
@@ -33,8 +41,18 @@ const (
 	EncryptedPoll = "encrypted-poll"
 	// SnarkVote contains the string that needs to match with the received vote type for snark-vote
 	SnarkVote = "snark-vote"
-	// AdminTxAddProcessKeys contains the string that needs to match with the received adminTx.Type for adding process keys
-	AdminTxAddProcessKeys = "addProcessKeys"
+
+	// List of transation names
+	TxVote              = "vote"
+	TxNewProcess        = "newProcess"
+	TxCancelProcess     = "cancelProcess"
+	TxAddValidator      = "addValidator"
+	TxRemoveValidator   = "removeValidator"
+	TxAddOracle         = "addOracle"
+	TxRemoveOracle      = "removeOracle"
+	TxAddProcessKeys    = "addProcessKeys"
+	TxRevealProcessKeys = "revealProcessKeys"
+
 	// MaxKeyIndex is the maxim number of allowed Encryption or Commitment keys
 	MaxKeyIndex = 16
 )

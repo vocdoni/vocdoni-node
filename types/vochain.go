@@ -66,18 +66,43 @@ type Process struct {
 	Type string `json:"type,omitempty"`
 }
 
+// RequireKeys indicates wheter a process require Encryption or Commitment keys
+func (p *Process) RequireKeys() bool {
+	return processRequireKeys[p.Type]
+}
+
+// IsEncrypted indicates wheter a process has an encrypted payload or not
+func (p *Process) IsEncrypted() bool {
+	return processIsEncrypted[p.Type]
+}
+
+var processRequireKeys = map[string]bool{
+	PollVote:      false,
+	PetitionSign:  false,
+	EncryptedPoll: true,
+	SnarkVote:     true,
+}
+
+var processIsEncrypted = map[string]bool{
+	PollVote:      false,
+	PetitionSign:  false,
+	EncryptedPoll: true,
+	SnarkVote:     true,
+}
+
 // ________________________ TX ________________________
 
 // ValidTypes represents an allowed specific tx type
 var ValidTypes = map[string]string{
-	"vote":                "VoteTx",
-	"newProcess":          "NewProcessTx",
-	"cancelProcess":       "CancelProcessTx",
-	"addValidator":        "AdminTx",
-	"removeValidator":     "AdminTx",
-	"addOracle":           "AdminTx",
-	"removeOracle":        "AdminTx",
-	AdminTxAddProcessKeys: "AdminTx",
+	TxVote:              "VoteTx",
+	TxNewProcess:        "NewProcessTx",
+	TxCancelProcess:     "CancelProcessTx",
+	TxAddValidator:      "AdminTx",
+	TxRemoveValidator:   "AdminTx",
+	TxAddOracle:         "AdminTx",
+	TxRemoveOracle:      "AdminTx",
+	TxAddProcessKeys:    "AdminTx",
+	TxRevealProcessKeys: "AdminTx",
 }
 
 // Tx is an abstraction for any specific tx which is primarly defined by its type

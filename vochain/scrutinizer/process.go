@@ -18,10 +18,7 @@ func (s *Scrutinizer) isLiveResultsProcess(processID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if p.Type == types.PollVote || p.Type == types.PetitionSign {
-		return true, nil
-	}
-	return false, nil
+	return !p.IsEncrypted(), nil
 }
 
 // checks if the current heigh has scheduled ending processes, if so compute and store results
