@@ -149,29 +149,36 @@ func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Respo
 }
 
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
-	if tx, err := UnmarshalTx(req.Tx); err == nil {
-		if err := AddTx(tx, app.State, false); err != nil { // TBD use inmutable state
+	var data []byte
+	var err error
+	var tx GenericTX
+
+	if tx, err = UnmarshalTx(req.Tx); err == nil {
+		if data, err = AddTx(tx, app.State, false); err != nil {
 			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte(err.Error())}
 		}
 	} else {
 		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte(err.Error())}
 	}
-	return abcitypes.ResponseCheckTx{Code: 0}
+	return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 }
 
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	if tx, err := UnmarshalTx(req.Tx); err == nil {
-		if err := AddTx(tx, app.State, true); err != nil { // TBD use inmutable state
-			return abcitypes.ResponseDeliverTx{Code: 1}
+	var data []byte
+	var err error
+	var tx GenericTX
+
+	if tx, err = UnmarshalTx(req.Tx); err == nil {
+		if data, err = AddTx(tx, app.State, true); err != nil {
+			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
 	} else {
-		return abcitypes.ResponseDeliverTx{Code: 1}
+		return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 	}
-	return abcitypes.ResponseDeliverTx{Code: 0}
+	return abcitypes.ResponseDeliverTx{Code: 0, Data: data}
 }
 
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
-	//defer app.State.Lock.Unlock()
 	return abcitypes.ResponseCommit{
 		Data: app.State.Save(),
 	}

@@ -33,6 +33,7 @@ func (r *Router) submitRawTx(request routerRequest) {
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
 	var response types.ResponseMessage
+	response.Payload = string(res.Data) // return nullifier
 	r.transport.Send(r.buildReply(request, response))
 }
 

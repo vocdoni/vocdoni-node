@@ -209,17 +209,13 @@ func sendVotes(c *APIConnection, pid, root string, signers []*signature.SignKeys
 		if !resp.Ok {
 			return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 		}
-		nullifier = resp.Nullifier
+		nullifier = resp.Payload
 	}
 	log.Infof("last nullifier %s", nullifier)
 
 	for {
 		time.Sleep(500 * time.Millisecond)
-		es, err := getEnvelopeStatus(c, nullifier, pid)
-		if err != nil {
-			log.Error(err)
-			break
-		}
+		es, _ := getEnvelopeStatus(c, nullifier, pid)
 		if es {
 			break
 		}

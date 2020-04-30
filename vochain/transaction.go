@@ -27,62 +27,63 @@ type GenericTX interface {
 }
 
 // AddTx check the validity of a transaction and adds it to the state if commit=true
-func AddTx(gtx GenericTX, state *State, commit bool) error {
+func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 	switch gtx.TxType() {
 	case "VoteTx":
 		tx := gtx.(*types.VoteTx)
 		v, err := VoteTxCheck(tx, state)
 		if err != nil {
-			return err
+			return []byte{}, err
 		}
 		if commit {
-			return state.AddVote(v)
+			return []byte(v.Nullifier), state.AddVote(v)
 		}
+		return []byte(v.Nullifier), nil
 	case "AdminTx":
 		tx := gtx.(*types.AdminTx)
 		if err := AdminTxCheck(tx, state); err != nil {
-			return err
+			return []byte{}, err
 		}
 		if commit {
 			switch tx.Type {
 			case "addOracle":
-				return state.AddOracle(tx.Address)
+				return []byte{}, state.AddOracle(tx.Address)
 			case "removeOracle":
-				return state.RemoveOracle(tx.Address)
+				return []byte{}, state.RemoveOracle(tx.Address)
 			case "addValidator":
 				if pk, err := hexPubKeyToTendermintEd25519(tx.PubKey); err == nil {
-					return state.AddValidator(pk, tx.Power)
+					return []byte{}, state.AddValidator(pk, tx.Power)
 				} else {
-					return err
+					return []byte{}, err
 				}
 			case "removeValidator":
-				return state.RemoveValidator(tx.Address)
+				return []byte{}, state.RemoveValidator(tx.Address)
 			case types.AdminTxAddProcessKeys:
-				return state.AddProcessKeys(tx)
+				return []byte{}, state.AddProcessKeys(tx)
 			}
 		}
 	case "CancelProcessTx":
 		tx := gtx.(*types.CancelProcessTx)
 		if err := CancelProcessTxCheck(tx, state); err != nil {
-			return err
+			return []byte{}, err
 		}
 		if commit {
-			return state.CancelProcess(tx.ProcessID)
+			return []byte{}, state.CancelProcess(tx.ProcessID)
 		}
 
 	case "NewProcessTx":
 		tx := gtx.(*types.NewProcessTx)
 		if p, err := NewProcessTxCheck(tx, state); err == nil {
 			if commit {
-				return state.AddProcess(p, tx.ProcessID)
+				return []byte{}, state.AddProcess(p, tx.ProcessID)
 			}
 		} else {
-			return err
+			return []byte{}, err
 		}
 	default:
-		return fmt.Errorf("transaction type invalid")
+		return []byte{}, fmt.Errorf("transaction type invalid")
 	}
-	return nil
+	return []byte{}, nil
 }
 
 // UnmarshalTx splits a tx into method and args parts and does some basic checks

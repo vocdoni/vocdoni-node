@@ -80,12 +80,12 @@ func TestCreateProcess(t *testing.T) {
 	if gtx, err = vochain.UnmarshalTx(bytes); err != nil {
 		t.Errorf("cannot unmarshal tx")
 	}
-	err = vochain.AddTx(gtx, s, true)
+	_, err = vochain.AddTx(gtx, s, true)
 	if err != nil {
 		t.Errorf("cannot create process: %s", err)
 	}
 	// cannot add same process
-	if err = vochain.AddTx(gtx, s, true); err == nil {
+	if _, err = vochain.AddTx(gtx, s, true); err == nil {
 		t.Errorf("same process added: %s", err)
 	}
 	// cannot add process if not oracle
@@ -98,7 +98,7 @@ func TestCreateProcess(t *testing.T) {
 	if gtx, err = vochain.UnmarshalTx(bytes); err != nil {
 		t.Errorf("cannot unmarshal tx")
 	}
-	if err = vochain.AddTx(gtx, s, true); err == nil {
+	if _, err = vochain.AddTx(gtx, s, true); err == nil {
 		t.Errorf("process added by non oracle: %s", err)
 	}
 }
