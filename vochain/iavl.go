@@ -284,16 +284,29 @@ func (v *State) Validators(isQuery bool) ([]tmtypes.GenesisValidator, error) {
 	return validators, err
 }
 
-// AddProcessKeys adds the keys to the process
 func checkAddProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) error {
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if len(tx.CommitmentKey)+len(tx.EncryptionPrivateKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
+	if len(tx.CommitmentKey)+len(tx.EncryptionPublicKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex is not already used
 	if len(process.EncryptionPublicKeys[tx.KeyIndex]) > 0 || len(process.CommitmentKeys[tx.KeyIndex]) > 0 {
 		return fmt.Errorf("key index %d alrady exist", tx.KeyIndex)
 	}
+	// TBD check that provided keys are correct (ed25519 for encryption and size for Commitment)
+	return nil
+}
+
+func checkRevealProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) error {
+	// check if at leat 1 key is provided and the keyIndex do not over/under flow
+	if len(tx.RevealKey)+len(tx.EncryptionPrivateKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
+		return fmt.Errorf("no keys provided or invalid key index")
+	}
+	// check if provided keyIndex exists
+	if len(process.EncryptionPrivateKeys[tx.KeyIndex]) < 1 || len(process.RevealKeys[tx.KeyIndex]) < 1 {
+		return fmt.Errorf("key index %d does not exist", tx.KeyIndex)
+	}
+	// TBD check that the provided keys atually work
 	return nil
 }
 

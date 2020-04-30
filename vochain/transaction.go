@@ -354,7 +354,7 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 	}
 
 	switch {
-	case tx.Type == types.TxAddProcessKeys:
+	case tx.Type == types.TxAddProcessKeys || tx.Type == types.TxRevealProcessKeys:
 		// check process exists
 		process, err := state.Process(tx.ProcessID, false)
 		if err != nil {
@@ -363,24 +363,38 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 		if process == nil {
 			return fmt.Errorf("process with id (%s) does not exist", tx.ProcessID)
 		}
+		// check process actually requires keys
 		if !process.RequireKeys() {
 			return fmt.Errorf("process does not require keys")
 		}
+		// get the current blockchain header
 		header := state.Header(false)
 		if header == nil {
 			return fmt.Errorf("cannot get blockchain header")
 		}
-		// endblock is always greater than start block so that case is also included here
-		if process.StartBlock >= header.Height {
-			return fmt.Errorf("cannot add process keys in a started or finished process")
+		// Specific checks
+		if tx.Type == types.TxAddProcessKeys {
+			// endblock is always greater than start block so that case is also included here
+			if process.StartBlock >= header.Height {
+				return fmt.Errorf("cannot add process keys in a started or finished process")
+			}
+			// process is not canceled
+			if process.Canceled {
+				return fmt.Errorf("cannot add process keys in a canceled process")
+			}
+			// check included keys and keyindex are valid
+			if err := checkAddProcessKeys(tx, process); err != nil {
+				return err
+			}
 		}
-		// process is not canceled
-		if process.Canceled {
-			return fmt.Errorf("cannot add process keys in a canceled process")
-		}
-		// check included keys and keyindex are valid
-		if err := checkAddProcessKeys(tx, process); err != nil {
-			return err
+		if tx.Type == types.TxRevealProcessKeys {
+			if process.StartBlock+process.NumberOfBlocks < header.Height && !process.Canceled {
+				return fmt.Errorf("cannot reveal keys before the process is finished")
+			}
+			// check the keys are valid
+			if err := checkRevealProcessKeys(tx, process); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
