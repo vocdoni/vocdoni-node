@@ -110,17 +110,15 @@ func (s *Scrutinizer) addLiveResultsProcess(pid string) {
 	}
 }
 
-func (s *Scrutinizer) addEntity(eid string) {
+func (s *Scrutinizer) addEntity(eid string, pid string) {
 	// TODO(mvdan): use a prefixed database
-	entity, err := s.Storage.Has([]byte(types.ScrutinizerEntityPrefix + eid))
+	storagekey := []byte(types.ScrutinizerEntityPrefix + eid)
+	processList, err := s.Storage.Get(storagekey)
 	if err != nil && err.Error() != NoKeyStorageError {
 		log.Error(err)
 		return
 	}
-	if entity {
-		return
-	}
-	if err := s.Storage.Put([]byte(types.ScrutinizerEntityPrefix+eid), []byte{}); err != nil {
+	if err := s.Storage.Put(storagekey, append(processList, []byte(pid+types.ScrutinizerEntityProcessSeparator)...)); err != nil {
 		log.Error(err)
 		return
 	}

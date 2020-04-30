@@ -70,7 +70,7 @@ func (s *Scrutinizer) Commit(height int64) {
 	var err error
 	var nvotes int64
 	for _, p := range s.processPool {
-		s.addEntity(p.EntityID)
+		s.addEntity(p.EntityID, p.ProcessID)
 		s.registerActiveProcess(p.ProcessID)
 		isLive, err = s.isLiveResultsProcess(p.ProcessID)
 		if err != nil {

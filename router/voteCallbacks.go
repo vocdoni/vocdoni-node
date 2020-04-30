@@ -1,6 +1,7 @@
 package router
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -146,30 +147,34 @@ func (r *Router) getBlockHeight(request routerRequest) {
 
 func (r *Router) getProcessList(request routerRequest) {
 	// check eid
-	sanitizedEID := util.TrimHex(request.EntityId)
-	if !util.IsHexEncodedStringWithLength(sanitizedEID, types.EntityIDsize) &&
-		!util.IsHexEncodedStringWithLength(sanitizedEID, types.EntityIDsizeV2) {
+	request.EntityId = util.TrimHex(request.EntityId)
+	if !util.IsHexEncodedStringWithLength(request.EntityId, types.EntityIDsize) &&
+		!util.IsHexEncodedStringWithLength(request.EntityId, types.EntityIDsizeV2) {
 		r.sendError(request, "cannot get process list: (malformed entityId)")
 		return
 	}
-	queryResult, err := r.vocapp.Client.TxSearch(fmt.Sprintf("processCreated.entityId='%s'", sanitizedEID), false, 1, 30, "asc")
-
+	storageKey := []byte(types.ScrutinizerEntityPrefix + request.EntityId)
+	var response types.ResponseMessage
+	exists, err := r.Scrutinizer.Storage.Has(storageKey)
 	if err != nil {
-		log.Errorf("cannot query: (%s)", err)
-		r.sendError(request, fmt.Sprintf("cannot query: (%s)", err))
+		r.sendError(request, fmt.Sprintf("cannot get entity (%s)", err))
 		return
 	}
-	var processList []string
-	for _, res := range queryResult.Txs {
-		for _, evt := range res.TxResult.Events {
-			processList = append(processList, string(evt.Attributes[1].Value))
-		}
-	}
-	var response types.ResponseMessage
-	if len(processList) == 0 {
+	if !exists {
 		response.ProcessList = []string{""}
-	} else {
-		response.ProcessList = processList
+		response.Message = fmt.Sprintf("the entity with id (%s) does not have any process", request.EntityId)
+		r.transport.Send(r.buildReply(request, response))
+		return
+	}
+	processList, err := r.Scrutinizer.Storage.Get(storageKey)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get entity process list: (%s)", err))
+		return
+	}
+	for _, process := range bytes.Split(processList, []byte(types.ScrutinizerEntityProcessSeparator)) {
+		if len(process) > 0 {
+			response.ProcessList = append(response.ProcessList, string(process))
+		}
 	}
 	r.transport.Send(r.buildReply(request, response))
 }

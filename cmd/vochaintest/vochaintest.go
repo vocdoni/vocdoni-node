@@ -77,6 +77,7 @@ func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKey
 func main() {
 	loglevel := flag.String("logLevel", "info", "log level")
 	oraclePrivKey := flag.String("oracleKey", "", "oracle private key (hex)")
+	entityPrivKey := flag.String("entityKey", "", "entity private key (hex)")
 	host := flag.String("gwHost", "ws://127.0.0.1:9090/dvote", "gateway websockets endpoint")
 	electionSize := flag.Int("electionSize", 100, "election census size")
 	flag.Parse()
@@ -90,8 +91,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := entityKey.Generate(); err != nil {
-		log.Fatal(err)
+	// create entity key
+	if len(*entityPrivKey) > 0 {
+		if err := entityKey.AddHexKey(*entityPrivKey); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		if err := entityKey.Generate(); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	// Create census
@@ -103,6 +111,7 @@ func main() {
 
 	// Create process
 	pid := randomHex(32)
+	log.Infof("creating process with entityID: %s", entityKey.EthAddrString())
 	start, err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, "poll-vote", 50)
 	if err != nil {
 		log.Fatal(err)

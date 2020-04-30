@@ -145,10 +145,6 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 
-	// tx events config
-	tconfig.TxIndex.IndexKeys = "tx.hash,processCreated.entityId"
-	tconfig.TxIndex.IndexAllKeys = true
-
 	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
 			dir, err := os.Getwd()
