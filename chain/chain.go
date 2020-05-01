@@ -121,6 +121,9 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	nodeConfig.IPCPath = c.IPCPath
 	nodeConfig.DataDir = c.DataDir
 	nodeConfig.P2P.DiscoveryV5 = true
+	log.Infof("listening on 0.0.0.0:%d", c.NodePort)
+	nodeConfig.P2P.ListenAddr = fmt.Sprintf(":%d", c.NodePort)
+
 	myPublicIP, err := util.PublicIP()
 	if err != nil {
 		log.Warn("cannot get external public IPv4 address")
