@@ -154,6 +154,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 
 	if tx, err = UnmarshalTx(req.Tx); err == nil {
 		if data, err = AddTx(tx, app.State, false); err != nil {
+			log.Debugf("checkTx error: %s", err)
 			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte(err.Error())}
 		}
 	} else {

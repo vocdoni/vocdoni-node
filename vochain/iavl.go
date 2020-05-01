@@ -329,6 +329,25 @@ func (v *State) AddProcessKeys(tx *types.AdminTx) error {
 	return v.setProcess(process, pid)
 }
 
+// RevealProcessKeys reveals the keys of a process
+func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
+	pid := util.TrimHex(tx.ProcessID)
+	process, err := v.Process(pid, false)
+	if err != nil {
+		return err
+	}
+	if err := checkRevealProcessKeys(tx, process); err != nil {
+		return err
+	}
+	if len(tx.RevealKey) > 0 {
+		process.RevealKeys[tx.KeyIndex] = util.TrimHex(tx.RevealKey)
+	}
+	if len(tx.EncryptionPrivateKey) > 0 {
+		process.EncryptionPrivateKeys[tx.KeyIndex] = util.TrimHex(tx.EncryptionPrivateKey)
+	}
+	return v.setProcess(process, pid)
+}
+
 // AddProcess adds a new process to vochain if not already added
 func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
 	pid = util.TrimHex(pid)

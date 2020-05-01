@@ -25,6 +25,7 @@ import (
 
 const (
 	commitmentKeySize = 32
+	encryptionKeySize = 32
 	dbPrefixProcess   = "p_"
 	dbPrefixBlock     = "b_"
 )
@@ -39,10 +40,42 @@ type KeyKeeper struct {
 }
 
 type processKeys struct {
-	encryptionKey *nacl.KeyPair
-	commitmentKey []byte
-	index         int
+	pubKey        [encryptionKeySize]byte
+	privKey       [encryptionKeySize]byte
+	revealKey     [commitmentKeySize]byte
+	commitmentKey [commitmentKeySize]byte
+	index         int8
 }
+
+func (pk *processKeys) Encode() []byte {
+	data := make([]byte, commitmentKeySize*2+encryptionKeySize*2+1)
+	copy(data[:], pk.pubKey[:])
+	copy(data[encryptionKeySize:], pk.privKey[:])
+	i := encryptionKeySize * 2
+	copy(data[i:], pk.revealKey[:])
+	i = i + commitmentKeySize
+	copy(data[i:], pk.commitmentKey[:])
+	i = i + commitmentKeySize
+	data[128] = byte(pk.index)
+	return data
+}
+
+func (pk *processKeys) Decode(data []byte) error {
+	if len(data) < commitmentKeySize*2+encryptionKeySize*2+1 {
+		return fmt.Errorf("cannot decode, data too small")
+	}
+	copy(pk.pubKey[:], data[:])
+	copy(pk.privKey[:], data[encryptionKeySize:])
+	i := encryptionKeySize * 2
+	copy(pk.revealKey[:], data[i:])
+	i = i + commitmentKeySize
+	copy(pk.commitmentKey[:], data[i:])
+	i = i + commitmentKeySize
+	pk.index = int8(data[i])
+	return nil
+}
+
+// TBD garbage collector function run at init for revealing all these keys that should have beeen revealed
 
 func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *signature.SignKeys) (*KeyKeeper, error) {
 	var err error
@@ -56,6 +89,8 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *signature.S
 	if err != nil {
 		return nil, err
 	}
+	//k.vochain.Codec.RegisterConcrete(&processKeys{}, "vocdoni/keykeeper.processKeys", nil)
+	//k.vochain.Codec.RegisterConcrete(processKeys{}, "processKeys", nil)
 	k.vochain.State.AddEvent("rollback", &k)
 	k.vochain.State.AddEvent("addProcess", &k)
 	k.vochain.State.AddEvent("cancelProcess", &k)
@@ -72,6 +107,7 @@ func (k *KeyKeeper) PrintInfo(wait time.Duration) {
 		nprocs := 0
 		for iter.Next() {
 			if strings.HasPrefix(string(iter.Key()), dbPrefixProcess) {
+				log.Warnf("> %x", iter.Value())
 				nprocs++
 			}
 		}
@@ -106,18 +142,24 @@ func (k *KeyKeeper) OnProcess(pid, eid string) {
 		log.Errorf("cannot generate encryption key: (%s)", err)
 		return
 	}
-	log.Infof("generated process encryption pubkey: %x", ek.Public)
-
-	ck := make([]byte, commitmentKeySize)
-	if n, err := rand.Read(ck); n != commitmentKeySize || err != nil {
+	pub, _ := ek.Hex()
+	log.Infof("generated process encryption pubkey: %s", pub)
+	var ck [commitmentKeySize]byte
+	ckb := make([]byte, commitmentKeySize)
+	if n, err := rand.Read(ckb); n != commitmentKeySize || err != nil {
 		log.Errorf("cannot generate commitment key: (%s)", err)
 	}
-	log.Infof("generated commitment key: %x", ck)
+	copy(ck[:], ckb[:])
+	var ckhash [commitmentKeySize]byte
+	copy(ckhash[:], signature.HashRaw(ckb)[:])
+	log.Infof("generated commitment key: %x", ckhash)
 
 	k.keyPool[pid] = &processKeys{
-		encryptionKey: ek,
-		commitmentKey: ck,
-		index:         util.RandomInt(1, 16), // TBD check index key does not exist
+		privKey:       ek.Public,
+		pubKey:        ek.Private,
+		revealKey:     ck,
+		commitmentKey: ckhash,
+		index:         int8(util.RandomInt(1, 16)), // TBD check index key does not exist
 	}
 	// Add keys to the pool queue
 	k.blockPool[pid] = p.StartBlock + p.NumberOfBlocks
@@ -167,12 +209,12 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 				log.Errorf("cannot get existing list of scheduled reveal processes for block %d", height)
 				continue
 			}
-			if err = k.unmarshal(data, pids); err != nil {
+			if err = k.vochain.State.Codec.UnmarshalBinaryBare(data, &pids); err != nil {
 				log.Errorf("cannot unmarshal process pids for block %d: (%s)", height, err)
 			}
 		}
 		pids = append(pids, pid)
-		data, err = k.marshal(pids)
+		data, err = k.vochain.Codec.MarshalBinaryBare(pids)
 		if err != nil {
 			log.Errorf("cannot marshal new pid list for scheduling on block %d: (%s)", height, err)
 			continue
@@ -188,6 +230,7 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 // checkRevealProcess check if keys should be revealed for height and deletes the entry from the storage
 func (k *KeyKeeper) checkRevealProcess(height int64) {
 	k.lock.Lock()
+	defer k.lock.Unlock()
 	pKey := []byte(dbPrefixBlock + fmt.Sprintf("%d", height))
 	if has, err := k.storage.Has(pKey); !has {
 		return
@@ -200,11 +243,10 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 		log.Errorf("cannot get revel process for block %d", height)
 		return
 	}
-	k.lock.Unlock()
 
 	var pids []string
-	if err := k.unmarshal(data, pids); err != nil {
-		log.Errorf("cannot unmarshal process pids for block %d", height)
+	if err := k.vochain.Codec.UnmarshalBinaryBare(data, &pids); err != nil {
+		log.Errorf("cannot unmarshal process pids for block %d: (%s)", height, err)
 		return
 	}
 	for _, p := range pids {
@@ -213,11 +255,9 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 			log.Errorf("cannot reveal proces keys for %s: (%s)", p, err)
 		}
 	}
-	k.lock.Lock()
 	if err := k.storage.Del(pKey); err != nil {
 		log.Errorf("cannot delete revealed keys for block %d: (%s)", height, err)
 	}
-	k.lock.Unlock()
 }
 
 func (k *KeyKeeper) publishPendingKeys() {
@@ -234,10 +274,10 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	log.Infof("publishing keys for process %s", pid)
 	tx := &types.AdminTx{
 		Type:                types.TxAddProcessKeys,
-		KeyIndex:            pk.index, // TBD check it does not exist
+		KeyIndex:            int(pk.index), // TBD check it does not exist
 		Nonce:               util.RandomHex(32),
 		ProcessID:           pid,
-		EncryptionPublicKey: fmt.Sprintf("%x", pk.encryptionKey.Public),
+		EncryptionPublicKey: fmt.Sprintf("%x", pk.pubKey),
 		CommitmentKey:       fmt.Sprintf("%x", pk.commitmentKey),
 	}
 	if err := k.signAndSendTx(tx); err != nil {
@@ -249,41 +289,40 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	if exists, err := k.storage.Has(dbKey); exists || err != nil {
 		return fmt.Errorf("keys for process %s already exist or error fetching storage: (%s)", pid, err)
 	}
-	data, err := k.marshal(pk)
-	if err != nil {
-		return err
-	}
+	log.Warnf("before: %+v", pk)
+	data := pk.Encode()
+	log.Warnf("after: %x", data)
 	return k.storage.Put(dbKey, data)
 }
 
+// Insecure
 func (k *KeyKeeper) revealKeys(pid string) error {
-	k.lock.Lock()
 	dbKey := []byte(dbPrefixProcess + pid)
 	data, err := k.storage.Get(dbKey)
-	k.lock.Unlock()
 	if err != nil {
 		return fmt.Errorf("cannot fetch reveal keys from storage: (%s)", err)
 	}
 	if len(data) == 0 {
 		return fmt.Errorf("no keys data found on storage")
 	}
-	var pk *processKeys
-	if err := k.unmarshal(data, pk); err != nil {
+	var pk processKeys
+	if err := pk.Decode(data); err != nil {
 		return fmt.Errorf("cannot unmarshal process keys: (%s)", err)
 	}
+	if len(pk.privKey) < 32 && len(pk.revealKey) < commitmentKeySize {
+		return fmt.Errorf("empty process keys")
+	}
 	tx := &types.AdminTx{
-		Type:                types.TxRevealProcessKeys,
-		KeyIndex:            pk.index,
-		Nonce:               util.RandomHex(32),
-		ProcessID:           pid,
-		EncryptionPublicKey: fmt.Sprintf("%x", pk.encryptionKey.Public),
-		CommitmentKey:       fmt.Sprintf("%x", pk.commitmentKey),
+		Type:                 types.TxRevealProcessKeys,
+		KeyIndex:             int(pk.index),
+		Nonce:                util.RandomHex(32),
+		ProcessID:            pid,
+		EncryptionPrivateKey: fmt.Sprintf("%x", pk.privKey),
+		RevealKey:            fmt.Sprintf("%x", pk.revealKey),
 	}
 	if err := k.signAndSendTx(tx); err != nil {
 		return err
 	}
-	k.lock.Lock()
-	defer k.lock.Unlock()
 	return k.storage.Del(dbKey)
 }
 
@@ -308,12 +347,4 @@ func (k *KeyKeeper) signAndSendTx(tx *types.AdminTx) error {
 		return fmt.Errorf("error sending addProcessKeys transaction: (%s)", result.Data)
 	}
 	return nil
-}
-
-func (k *KeyKeeper) marshal(data interface{}) ([]byte, error) {
-	return k.vochain.State.Codec.MarshalBinaryBare(data)
-}
-
-func (k *KeyKeeper) unmarshal(data []byte, container interface{}) error {
-	return k.vochain.State.Codec.UnmarshalBinaryBare(data, container)
 }

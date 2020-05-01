@@ -60,6 +60,8 @@ func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 				return []byte{}, state.RemoveValidator(tx.Address)
 			case types.TxAddProcessKeys:
 				return []byte{}, state.AddProcessKeys(tx)
+			case types.TxRevealProcessKeys:
+				return []byte{}, state.RevealProcessKeys(tx)
 			}
 		}
 	case "CancelProcessTx":
@@ -275,6 +277,7 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 	}
 
 	if p.RequireKeys() {
+		// Size+1 because we are considering the zero value as nil for security
 		p.EncryptionPublicKeys = make([]string, types.MaxKeyIndex+1)
 		p.EncryptionPrivateKeys = make([]string, types.MaxKeyIndex+1)
 		p.CommitmentKeys = make([]string, types.MaxKeyIndex+1)
@@ -375,7 +378,7 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 		// Specific checks
 		if tx.Type == types.TxAddProcessKeys {
 			// endblock is always greater than start block so that case is also included here
-			if process.StartBlock >= header.Height {
+			if header.Height > process.StartBlock {
 				return fmt.Errorf("cannot add process keys in a started or finished process")
 			}
 			// process is not canceled
