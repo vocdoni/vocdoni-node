@@ -2,8 +2,10 @@ package util
 
 import (
 	"encoding/hex"
+	"math/rand"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 var validHexRegex = regexp.MustCompile("^([0-9a-fA-F])+$")
@@ -30,4 +32,18 @@ func TrimHex(s string) string {
 		return s[2:]
 	}
 	return s
+}
+
+func RandomHex(n int) string {
+	rand.Seed(time.Now().UnixNano())
+	bytes := make([]byte, n)
+	if _, err := rand.Read(bytes); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(bytes)
+}
+
+func RandomInt(min, max int) int {
+	rand.Seed(time.Now().UnixNano())
+	return rand.Intn(max-min) + min
 }

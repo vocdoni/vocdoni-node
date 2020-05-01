@@ -22,6 +22,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/service"
 	"gitlab.com/vocdoni/go-dvote/vochain"
+	"gitlab.com/vocdoni/go-dvote/vochain/keykeeper"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
@@ -328,6 +329,7 @@ func main() {
 	var vnode *vochain.BaseApplication
 	var vinfo *vochaininfo.VochainInfo
 	var sc *scrutinizer.Scrutinizer
+	var kk *keykeeper.KeyKeeper
 	var ma *metrics.Agent
 
 	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
@@ -426,6 +428,15 @@ func main() {
 			log.Infof("[vochain info] replaying block %d at %d b/s",
 				h, (h-hPrev)/5)
 		}
+	}
+
+	// Start keykeeper service
+	if globalCfg.Mode == "oracle" {
+		kk, err = keykeeper.NewKeyKeeper(globalCfg.VochainConfig.DataDir+"/keykeeper", vnode, signer)
+		if err != nil {
+			log.Fatal(err)
+		}
+		go kk.PrintInfo(time.Second * 20)
 	}
 
 	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
