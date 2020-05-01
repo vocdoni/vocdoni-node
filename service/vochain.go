@@ -2,7 +2,9 @@ package service
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -44,6 +46,25 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, ma *metrics.Agent) (
 	log.Infof("vochain exposed IP address: %s", vconfig.PublicAddr)
 
 	if dev {
+		filepath := vconfig.DataDir + "/config/genesis.json"
+		if _, err = os.Stat(filepath); os.IsNotExist(err) {
+			log.Debug("genesis does not exist, using hardcoded genesis")
+		} else {
+			var genesisBytes []byte
+			if genesisBytes, err = ioutil.ReadFile(filepath); err != nil {
+				return
+			}
+			log.Debug("found genesis file, comparing with hardcoded genesis")
+			// compare genesis
+			if string(genesisBytes) != vochain.DevelopmentGenesis1 {
+				log.Warn("genesis found is different from the hardcoded genesis, cleaning and restarting vochain")
+				if err = os.RemoveAll(vconfig.DataDir); err != nil {
+					return
+				}
+			} else {
+				log.Debug("genesis are the same, you have the latest dev genesis")
+			}
+		}
 		vnode = vochain.NewVochain(vconfig, []byte(vochain.DevelopmentGenesis1))
 	} else {
 		vnode = vochain.NewVochain(vconfig, []byte(vochain.ReleaseGenesis1))
