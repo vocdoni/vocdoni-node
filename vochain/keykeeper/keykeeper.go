@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -107,11 +108,46 @@ func (k *KeyKeeper) PrintInfo(wait time.Duration) {
 		nprocs := 0
 		for iter.Next() {
 			if strings.HasPrefix(string(iter.Key()), dbPrefixProcess) {
-				log.Warnf("> %x", iter.Value())
 				nprocs++
 			}
 		}
 		log.Infof("[keykeeper] stored keys %d", nprocs)
+	}
+}
+
+// RevealUnpublished is a rescue function for revealing keys that should be already revealed.
+// It should be callend once the Vochain is syncronized in order to have the correct height.
+func (k *KeyKeeper) RevealUnpublished() {
+	// wait for vochain sync?
+	// This function can be probably deleted because the replay of blocks do this job automatically.
+	header := k.vochain.State.Header(true)
+	if header == nil {
+		log.Errorf("cannot get blockchain header, skipping reveal unpublished operation")
+		return
+	}
+	k.lock.Lock()
+	defer k.lock.Unlock()
+	iter := k.storage.NewIterator()
+	defer iter.Release()
+	var pids []string
+	for iter.Next() {
+		if strings.HasPrefix(string(iter.Key()), dbPrefixBlock) {
+			h, err := strconv.ParseInt(string(iter.Key()[len(dbPrefixBlock):]), 10, 64)
+			if err != nil {
+				log.Errorf("cannot fetch block number from keykeeper database: (%s)", err)
+				continue
+			}
+			if header.Height > h+2 { // give some extra blocks to avoid collition with normal operation
+				k.vochain.State.Codec.UnmarshalBinaryBare(iter.Value(), &pids)
+				log.Warnf("found pending keys for reveal on process %s", pids)
+				for _, p := range pids {
+					if err := k.revealKeys(p); err != nil {
+						log.Error(err)
+					}
+				}
+
+			}
+		}
 	}
 }
 
@@ -289,9 +325,7 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	if exists, err := k.storage.Has(dbKey); exists || err != nil {
 		return fmt.Errorf("keys for process %s already exist or error fetching storage: (%s)", pid, err)
 	}
-	log.Warnf("before: %+v", pk)
 	data := pk.Encode()
-	log.Warnf("after: %x", data)
 	return k.storage.Put(dbKey, data)
 }
 
@@ -323,6 +357,12 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 	if err := k.signAndSendTx(tx); err != nil {
 		return err
 	}
+	if len(pk.privKey) > 0 {
+		log.Infof("revealing encryption key for process %s", pid)
+	}
+	if len(pk.revealKey) > 0 {
+		log.Infof("revealing commitment key for process %s", pid)
+	}
 	return k.storage.Del(dbKey)
 }
 
@@ -344,7 +384,7 @@ func (k *KeyKeeper) signAndSendTx(tx *types.AdminTx) error {
 		return err
 	}
 	if result.Code != 0 {
-		return fmt.Errorf("error sending addProcessKeys transaction: (%s)", result.Data)
+		return fmt.Errorf("error sending transaction: (%s)", result.Data.Bytes())
 	}
 	return nil
 }

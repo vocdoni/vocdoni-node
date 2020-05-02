@@ -284,32 +284,6 @@ func (v *State) Validators(isQuery bool) ([]tmtypes.GenesisValidator, error) {
 	return validators, err
 }
 
-func checkAddProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) error {
-	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if len(tx.CommitmentKey)+len(tx.EncryptionPublicKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
-		return fmt.Errorf("no keys provided or invalid key index")
-	}
-	// check if provided keyIndex is not already used
-	if len(process.EncryptionPublicKeys[tx.KeyIndex]) > 0 || len(process.CommitmentKeys[tx.KeyIndex]) > 0 {
-		return fmt.Errorf("key index %d alrady exist", tx.KeyIndex)
-	}
-	// TBD check that provided keys are correct (ed25519 for encryption and size for Commitment)
-	return nil
-}
-
-func checkRevealProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) error {
-	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if len(tx.RevealKey)+len(tx.EncryptionPrivateKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
-		return fmt.Errorf("no keys provided or invalid key index")
-	}
-	// check if provided keyIndex exists
-	if len(process.EncryptionPrivateKeys[tx.KeyIndex]) < 1 || len(process.RevealKeys[tx.KeyIndex]) < 1 {
-		return fmt.Errorf("key index %d does not exist", tx.KeyIndex)
-	}
-	// TBD check that the provided keys atually work
-	return nil
-}
-
 // AddProcessKeys adds the keys to the process
 func (v *State) AddProcessKeys(tx *types.AdminTx) error {
 	pid := util.TrimHex(tx.ProcessID)
@@ -317,15 +291,15 @@ func (v *State) AddProcessKeys(tx *types.AdminTx) error {
 	if err != nil {
 		return err
 	}
-	if err := checkAddProcessKeys(tx, process); err != nil {
-		return err
-	}
 	if len(tx.CommitmentKey) > 0 {
 		process.CommitmentKeys[tx.KeyIndex] = util.TrimHex(tx.CommitmentKey)
+		log.Debugf("added commitment key for process %s: %x", pid, tx.CommitmentKey)
 	}
 	if len(tx.EncryptionPublicKey) > 0 {
 		process.EncryptionPublicKeys[tx.KeyIndex] = util.TrimHex(tx.EncryptionPublicKey)
+		log.Debugf("added encryption key for process %s: %x", pid, tx.EncryptionPublicKey)
 	}
+	process.KeyIndex++
 	return v.setProcess(process, pid)
 }
 
@@ -336,14 +310,13 @@ func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
 	if err != nil {
 		return err
 	}
-	if err := checkRevealProcessKeys(tx, process); err != nil {
-		return err
-	}
 	if len(tx.RevealKey) > 0 {
 		process.RevealKeys[tx.KeyIndex] = util.TrimHex(tx.RevealKey)
+		log.Debugf("revealed commitment key for process %s: %x", pid, tx.RevealKey)
 	}
 	if len(tx.EncryptionPrivateKey) > 0 {
 		process.EncryptionPrivateKeys[tx.KeyIndex] = util.TrimHex(tx.EncryptionPrivateKey)
+		log.Debugf("revealed encryption key for process %s: %x", pid, tx.EncryptionPrivateKey)
 	}
 	return v.setProcess(process, pid)
 }

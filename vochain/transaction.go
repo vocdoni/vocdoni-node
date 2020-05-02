@@ -8,6 +8,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
@@ -148,6 +149,12 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 	endBlock := process.StartBlock + process.NumberOfBlocks
 
 	if (height >= process.StartBlock && height <= endBlock) && !process.Canceled && !process.Paused {
+
+		// Check in case of keys required, they have been sent by some keykeeper
+		if process.RequireKeys() && process.KeyIndex < 1 {
+			return nil, fmt.Errorf("no keys available, voting is not possible")
+		}
+
 		switch process.Type {
 		case types.SnarkVote:
 			// TODO check snark
@@ -178,7 +185,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			if err != nil {
 				return nil, fmt.Errorf("cannot generate nullifier: (%s)", err)
 			}
-			log.Debugf("generated nullifier: %s", vote.Nullifier)
+			log.Debugf("generated new vote nullifier: %s", vote.Nullifier)
 
 			// check if vote exists
 			if state.EnvelopeExists(fmt.Sprintf("%s_%s", vote.ProcessID, vote.Nullifier)) {
@@ -186,7 +193,6 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			}
 
 			// check merkle proof
-			log.Debugf("extracted pubkey: %s", pubKey)
 			pubKeyDec, err := hex.DecodeString(pubKey)
 			if err != nil {
 				return nil, err
@@ -207,7 +213,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			return nil, fmt.Errorf("invalid process type")
 		}
 	}
-	return nil, fmt.Errorf("cannot add vote, invalid blocks frame or process canceled/paused")
+	return nil, fmt.Errorf("cannot add vote, invalid block frame or process canceled/paused")
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
@@ -277,11 +283,11 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 	}
 
 	if p.RequireKeys() {
-		// Size+1 because we are considering the zero value as nil for security
-		p.EncryptionPublicKeys = make([]string, types.MaxKeyIndex+1)
-		p.EncryptionPrivateKeys = make([]string, types.MaxKeyIndex+1)
-		p.CommitmentKeys = make([]string, types.MaxKeyIndex+1)
-		p.RevealKeys = make([]string, types.MaxKeyIndex+1)
+		// We consider the zero value as nil for security
+		p.EncryptionPublicKeys = make([]string, types.MaxKeyIndex)
+		p.EncryptionPrivateKeys = make([]string, types.MaxKeyIndex)
+		p.CommitmentKeys = make([]string, types.MaxKeyIndex)
+		p.RevealKeys = make([]string, types.MaxKeyIndex)
 	}
 	return p, nil
 }
@@ -391,8 +397,8 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 			}
 		}
 		if tx.Type == types.TxRevealProcessKeys {
-			if process.StartBlock+process.NumberOfBlocks < header.Height && !process.Canceled {
-				return fmt.Errorf("cannot reveal keys before the process is finished")
+			if header.Height < process.StartBlock+process.NumberOfBlocks && !process.Canceled {
+				return fmt.Errorf("cannot reveal keys before the process is finished (%d < %d)", header.Height, process.StartBlock+process.NumberOfBlocks)
 			}
 			// check the keys are valid
 			if err := checkRevealProcessKeys(tx, process); err != nil {
@@ -400,5 +406,31 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 			}
 		}
 	}
+	return nil
+}
+
+func checkAddProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) error {
+	// check if at leat 1 key is provided and the keyIndex do not over/under flow
+	if len(tx.CommitmentKey)+len(tx.EncryptionPublicKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
+		return fmt.Errorf("no keys provided or invalid key index")
+	}
+	// check if provided keyIndex is not already used
+	if len(process.EncryptionPublicKeys[tx.KeyIndex]) > 0 || len(process.CommitmentKeys[tx.KeyIndex]) > 0 {
+		return fmt.Errorf("key index %d alrady exist", tx.KeyIndex)
+	}
+	// TBD check that provided keys are correct (ed25519 for encryption and size for Commitment)
+	return nil
+}
+
+func checkRevealProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) error {
+	// check if at leat 1 key is provided and the keyIndex do not over/under flow
+	if len(tx.RevealKey)+len(tx.EncryptionPrivateKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
+		return fmt.Errorf("no keys provided or invalid key index")
+	}
+	// check if provided keyIndex exists
+	if len(process.EncryptionPublicKeys[tx.KeyIndex]) < 1 || len(process.CommitmentKeys[tx.KeyIndex]) < 1 {
+		return fmt.Errorf("key index %d does not exist", tx.KeyIndex)
+	}
+	// TBD check that the provided keys atually work
 	return nil
 }
