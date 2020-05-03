@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 
+	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/box"
 )
 
@@ -28,15 +29,7 @@ func Generate(randReader io.Reader) (*KeyPair, error) {
 	return &KeyPair{Public: *pub, Private: *priv}, nil
 }
 
-func FromHex(pubHex, privHex string) (*KeyPair, error) {
-	pub, err := hex.DecodeString(pubHex)
-	if err != nil {
-		return nil, err
-	}
-	if len(pub) != keyLength {
-		return nil, fmt.Errorf("public key length must be %d, not %d", keyLength, len(pub))
-	}
-
+func FromHex(privHex string) (*KeyPair, error) {
 	priv, err := hex.DecodeString(privHex)
 	if err != nil {
 		return nil, err
@@ -46,8 +39,13 @@ func FromHex(pubHex, privHex string) (*KeyPair, error) {
 	}
 
 	kp := &KeyPair{}
-	copy(kp.Public[:], pub)
 	copy(kp.Private[:], priv)
+	pub, err := curve25519.X25519(priv, curve25519.Basepoint)
+	if err != nil {
+		return kp, err
+	}
+	copy(kp.Public[:], pub)
+
 	return kp, nil
 }
 

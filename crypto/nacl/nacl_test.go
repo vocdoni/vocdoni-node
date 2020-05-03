@@ -2,6 +2,7 @@ package nacl
 
 import (
 	"encoding/base64"
+	"fmt"
 	"testing"
 )
 
@@ -51,10 +52,14 @@ var inputs = []struct {
 }
 
 func TestDecryptCiphersFromJS(t *testing.T) {
-	keys, err := FromHex(jsPub, jsPriv)
+	keys, err := FromHex(jsPriv)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if jsPub != fmt.Sprintf("%x", keys.Public[:]) {
+		t.Fatalf("wrong public key derivated from priv key: %s != %x", jsPub, keys.Public[:])
+	}
+
 	for _, test := range inputs {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
