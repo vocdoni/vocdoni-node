@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -431,6 +432,28 @@ func checkRevealProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) er
 	if len(process.EncryptionPublicKeys[tx.KeyIndex]) < 1 || len(process.CommitmentKeys[tx.KeyIndex]) < 1 {
 		return fmt.Errorf("key index %d does not exist", tx.KeyIndex)
 	}
-	// TBD check that the provided keys atually work
+	// check keys actually work
+	if len(tx.EncryptionPrivateKey) > 0 {
+		if kp, err := nacl.FromHex(tx.EncryptionPrivateKey); err == nil {
+			if fmt.Sprintf("%x", kp.Public) != process.EncryptionPublicKeys[tx.KeyIndex] {
+				log.Debugf("%x != %s", kp.Public, process.EncryptionPublicKeys[tx.KeyIndex])
+				return fmt.Errorf("the provided private key does not match with the stored public key on index %d", tx.KeyIndex)
+			}
+		} else {
+			return err
+		}
+	}
+	if len(tx.RevealKey) > 0 {
+		rb, err := hex.DecodeString(tx.RevealKey)
+		if err != nil {
+			return err
+		}
+		commitment := signature.HashPoseidon(rb)
+		if fmt.Sprintf("%x", commitment) != process.CommitmentKeys[tx.KeyIndex] {
+			log.Debugf("%x != %s", commitment, process.CommitmentKeys[tx.KeyIndex])
+			return fmt.Errorf("the provided commitment reveal key does not match with the stored on index %d", tx.KeyIndex)
+		}
+
+	}
 	return nil
 }

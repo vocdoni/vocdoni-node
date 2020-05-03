@@ -293,11 +293,11 @@ func (v *State) AddProcessKeys(tx *types.AdminTx) error {
 	}
 	if len(tx.CommitmentKey) > 0 {
 		process.CommitmentKeys[tx.KeyIndex] = util.TrimHex(tx.CommitmentKey)
-		log.Debugf("added commitment key for process %s: %x", pid, tx.CommitmentKey)
+		log.Debugf("added commitment key for process %s: %s", pid, tx.CommitmentKey)
 	}
 	if len(tx.EncryptionPublicKey) > 0 {
 		process.EncryptionPublicKeys[tx.KeyIndex] = util.TrimHex(tx.EncryptionPublicKey)
-		log.Debugf("added encryption key for process %s: %x", pid, tx.EncryptionPublicKey)
+		log.Debugf("added encryption key for process %s: %s", pid, tx.EncryptionPublicKey)
 	}
 	process.KeyIndex++
 	return v.setProcess(process, pid)
@@ -312,12 +312,16 @@ func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
 	}
 	if len(tx.RevealKey) > 0 {
 		process.RevealKeys[tx.KeyIndex] = util.TrimHex(tx.RevealKey)
-		log.Debugf("revealed commitment key for process %s: %x", pid, tx.RevealKey)
+		log.Debugf("revealed commitment key for process %s: %s", pid, tx.RevealKey)
 	}
 	if len(tx.EncryptionPrivateKey) > 0 {
 		process.EncryptionPrivateKeys[tx.KeyIndex] = util.TrimHex(tx.EncryptionPrivateKey)
-		log.Debugf("revealed encryption key for process %s: %x", pid, tx.EncryptionPrivateKey)
+		log.Debugf("revealed encryption key for process %s: %s", pid, tx.EncryptionPrivateKey)
 	}
+	if process.KeyIndex < 1 {
+		return fmt.Errorf("no more keys to reveal, keyIndex is < 1")
+	}
+	process.KeyIndex--
 	return v.setProcess(process, pid)
 }
 

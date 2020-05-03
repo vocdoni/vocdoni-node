@@ -178,8 +178,6 @@ func (k *KeyKeeper) OnProcess(pid, eid string) {
 		log.Errorf("cannot generate encryption key: (%s)", err)
 		return
 	}
-	pub, _ := ek.Hex()
-	log.Infof("generated process encryption pubkey: %s", pub)
 	var ck [commitmentKeySize]byte
 	ckb := make([]byte, commitmentKeySize)
 	if n, err := rand.Read(ckb); n != commitmentKeySize || err != nil {
@@ -187,12 +185,10 @@ func (k *KeyKeeper) OnProcess(pid, eid string) {
 	}
 	copy(ck[:], ckb[:])
 	var ckhash [commitmentKeySize]byte
-	copy(ckhash[:], signature.HashRaw(ckb)[:])
-	log.Infof("generated commitment key: %x", ckhash)
-
+	copy(ckhash[:], signature.HashPoseidon(ckb)[:])
 	k.keyPool[pid] = &processKeys{
-		privKey:       ek.Public,
-		pubKey:        ek.Private,
+		privKey:       ek.Private,
+		pubKey:        ek.Public,
 		revealKey:     ck,
 		commitmentKey: ckhash,
 		index:         int8(util.RandomInt(1, 16)), // TBD check index key does not exist
