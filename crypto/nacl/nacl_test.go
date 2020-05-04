@@ -103,3 +103,26 @@ func TestGenerateEncryptDecrypt(t *testing.T) {
 		})
 	}
 }
+
+// TestEncryptRandomNonce verifies that encrypting the same message for the same
+// recipient public key multiple times doesn't generate the same ciphertext.
+// This is because a random encrypting key pair is used each time, and the
+// encryption nonce is derived from that random key pair.
+func TestEncryptRandomNonce(t *testing.T) {
+	recipient, err := DecodeKey(jsPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	message := []byte("hello world")
+	seen := make(map[string]bool)
+	for i := 0; i < 10; i++ {
+		cipher, err := Encrypt(message, recipient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if seen[string(cipher)] {
+			t.Errorf("cipher seen before: %x", cipher)
+		}
+		seen[string(cipher)] = true
+	}
+}
