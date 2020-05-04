@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -213,7 +214,13 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 		if pkeys, err := getKeys(c, pid, eid); err != nil {
 			return fmt.Errorf("cannot get process keys: (%s)", err)
 		} else {
-			keys = pkeys.pub
+			for _, k := range pkeys.pub {
+				if s := strings.Split(k, types.KeyIndexSeparator); len(s) < 2 {
+					return fmt.Errorf("malformed encryption public key %v", k)
+				} else {
+					keys = append(keys, s[1])
+				}
+			}
 		}
 		if len(keys) == 0 {
 			return fmt.Errorf("process keys is empty")
