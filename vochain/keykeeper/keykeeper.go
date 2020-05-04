@@ -25,8 +25,8 @@ import (
 */
 
 const (
-	commitmentKeySize = 32
-	encryptionKeySize = 32
+	commitmentKeySize = nacl.KeyLength
+	encryptionKeySize = nacl.KeyLength
 	dbPrefixProcess   = "p_"
 	dbPrefixBlock     = "b_"
 )
@@ -85,18 +85,18 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *signature.S
 	if v == nil || signer == nil || len(dbPath) < 1 {
 		return nil, fmt.Errorf("missing values for creating a key keeper")
 	}
+	if index == 0 {
+		return nil, fmt.Errorf("index 0 cannot be used")
+	}
 	k.vochain = v
 	k.signer = signer
 	k.storage, err = db.NewBadgerDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	if index == 0 {
-		return nil, fmt.Errorf("index 0 cannot be used")
-	}
 	k.myIndex = index
-	//k.vochain.Codec.RegisterConcrete(&processKeys{}, "vocdoni/keykeeper.processKeys", nil)
-	//k.vochain.Codec.RegisterConcrete(processKeys{}, "processKeys", nil)
+	// k.vochain.Codec.RegisterConcrete(&processKeys{}, "vocdoni/keykeeper.processKeys", nil)
+	// k.vochain.Codec.RegisterConcrete(processKeys{}, "processKeys", nil)
 	k.vochain.State.AddEvent("rollback", &k)
 	k.vochain.State.AddEvent("addProcess", &k)
 	k.vochain.State.AddEvent("cancelProcess", &k)
@@ -109,13 +109,13 @@ func (k *KeyKeeper) PrintInfo(wait time.Duration) {
 	for {
 		time.Sleep(wait)
 		iter := k.storage.NewIterator()
-		defer iter.Release()
 		nprocs := 0
 		for iter.Next() {
 			if strings.HasPrefix(string(iter.Key()), dbPrefixProcess) {
 				nprocs++
 			}
 		}
+		iter.Release()
 		log.Infof("[keykeeper] stored keys %d", nprocs)
 	}
 }
@@ -136,21 +136,27 @@ func (k *KeyKeeper) RevealUnpublished() {
 	defer iter.Release()
 	var pids []string
 	for iter.Next() {
-		if strings.HasPrefix(string(iter.Key()), dbPrefixBlock) {
-			h, err := strconv.ParseInt(string(iter.Key()[len(dbPrefixBlock):]), 10, 64)
-			if err != nil {
-				log.Errorf("cannot fetch block number from keykeeper database: (%s)", err)
-				continue
-			}
-			if header.Height > h+2 { // give some extra blocks to avoid collition with normal operation
-				k.vochain.State.Codec.UnmarshalBinaryBare(iter.Value(), &pids)
-				log.Warnf("found pending keys for reveal on process %s", pids)
-				for _, p := range pids {
-					if err := k.revealKeys(p); err != nil {
-						log.Error(err)
-					}
-				}
-
+		// TODO(mvdan): use a prefixed iterator
+		if !strings.HasPrefix(string(iter.Key()), dbPrefixBlock) {
+			continue
+		}
+		h, err := strconv.ParseInt(string(iter.Key()[len(dbPrefixBlock):]), 10, 64)
+		if err != nil {
+			log.Errorf("cannot fetch block number from keykeeper database: (%s)", err)
+			continue
+		}
+		if header.Height <= h+2 {
+			// give some extra blocks to avoid collition with normal operation
+			continue
+		}
+		if err := k.vochain.State.Codec.UnmarshalBinaryBare(iter.Value(), &pids); err != nil {
+			log.Errorf("could not unmarshal value: %s", err)
+			continue
+		}
+		log.Warnf("found pending keys for reveal on process %s", pids)
+		for _, p := range pids {
+			if err := k.revealKeys(p); err != nil {
+				log.Error(err)
 			}
 		}
 	}
@@ -203,7 +209,7 @@ func (k *KeyKeeper) OnCancel(pid string) {
 	if !p.RequireKeys() {
 		return
 	}
-	if err = k.revealKeys(pid); err != nil {
+	if err := k.revealKeys(pid); err != nil {
 		log.Error(err)
 	}
 }
@@ -263,22 +269,21 @@ func (k *KeyKeeper) generateKeys(pid string) (*processKeys, error) {
 
 // scheduleRevealKeys takes the pids from the blockPool and add them to the schedule storage
 func (k *KeyKeeper) scheduleRevealKeys() {
-	var err error
-	var has bool
-	var pkey, data []byte
-	var pids []string
 	k.lock.Lock()
 	defer k.lock.Unlock()
 	for pid, height := range k.blockPool {
-		pids = []string{}
-		pkey = []byte(dbPrefixBlock + fmt.Sprintf("%d", height))
-		if has, err = k.storage.Has(pkey); has {
+		pids := []string{}
+		pkey := []byte(dbPrefixBlock + fmt.Sprintf("%d", height))
+		var data []byte
+		var err error
+		// TODO(mvdan): replace Has+Get with just Get
+		if has, _ := k.storage.Has(pkey); has {
 			data, err = k.storage.Get(pkey)
 			if err != nil {
 				log.Errorf("cannot get existing list of scheduled reveal processes for block %d", height)
 				continue
 			}
-			if err = k.vochain.State.Codec.UnmarshalBinaryBare(data, &pids); err != nil {
+			if err := k.vochain.State.Codec.UnmarshalBinaryBare(data, &pids); err != nil {
 				log.Errorf("cannot unmarshal process pids for block %d: (%s)", height, err)
 			}
 		}
@@ -288,7 +293,7 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 			log.Errorf("cannot marshal new pid list for scheduling on block %d: (%s)", height, err)
 			continue
 		}
-		if err = k.storage.Put(pkey, data); err != nil {
+		if err := k.storage.Put(pkey, data); err != nil {
 			log.Errorf("cannot save scheduled list of pids for block %d: (%s)", height, err)
 			continue
 		}
@@ -301,6 +306,7 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 	k.lock.Lock()
 	defer k.lock.Unlock()
 	pKey := []byte(dbPrefixBlock + fmt.Sprintf("%d", height))
+	// TODO(mvdan): replace Has+Get with just Get
 	if has, err := k.storage.Has(pKey); !has {
 		return
 	} else if err != nil {
@@ -330,9 +336,8 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 }
 
 func (k *KeyKeeper) publishPendingKeys() {
-	var err error
 	for pid, pk := range k.keyPool {
-		if err = k.publishKeys(pk, pid); err != nil {
+		if err := k.publishKeys(pk, pid); err != nil {
 			log.Errorf("cannot execute commit on publish keys for process %s: (%s)", pid, err)
 		}
 	}
@@ -355,6 +360,7 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	k.lock.Lock()
 	defer k.lock.Unlock()
 	dbKey := []byte(dbPrefixProcess + pid)
+	// TODO(mvdan): replace Has with just Get
 	if exists, err := k.storage.Has(dbKey); exists || err != nil {
 		return fmt.Errorf("keys for process %s already exist or error fetching storage: (%s)", pid, err)
 	}
