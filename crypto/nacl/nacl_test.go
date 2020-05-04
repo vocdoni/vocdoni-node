@@ -56,8 +56,8 @@ func TestDecryptCiphersFromJS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if jsPub != fmt.Sprintf("%x", keys.Public[:]) {
-		t.Fatalf("wrong public key derivated from priv key: %s != %x", jsPub, keys.Public[:])
+	if pub := fmt.Sprintf("%x", keys.Public); pub != jsPub {
+		t.Fatalf("wrong public key derivated from priv key: got %s, want %s", pub, jsPub)
 	}
 
 	for _, test := range inputs {
