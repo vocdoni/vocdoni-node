@@ -80,6 +80,7 @@ func main() {
 	oraclePrivKey := flag.String("oracleKey", "", "oracle private key (hex)")
 	entityPrivKey := flag.String("entityKey", "", "entity private key (hex)")
 	host := flag.String("gwHost", "ws://127.0.0.1:9090/dvote", "gateway websockets endpoint")
+	electionType := flag.String("electionType", "encrypted-poll", "encrypted-poll or poll-vote")
 	electionSize := flag.Int("electionSize", 100, "election census size")
 	flag.Parse()
 	log.Init(*loglevel, "stdout")
@@ -113,14 +114,16 @@ func main() {
 	// Create process
 	pid := randomHex(32)
 	log.Infof("creating process with entityID: %s", entityKey.EthAddrString())
-	start, err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, "encrypted-poll", 7)
+	start, err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, *electionType, 7)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	log.Infof("created process with ID: %s", pid)
+	encrypted, _ := types.ProcessIsEncrypted[*electionType]
 
 	// Send votes
-	if err := sendVotes(c, pid, entityKey.EthAddrString(), censusRoot, start, censusKeys, true); err != nil {
+	if err := sendVotes(c, pid, entityKey.EthAddrString(), censusRoot, start, censusKeys, encrypted); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -178,11 +181,9 @@ func getKeys(c *APIConnection, pid, eid string) ([]string, error) {
 func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signers []*signature.SignKeys, encrypted bool) error {
 	var pub, proof string
 	var err error
-	vp := types.VotePackage{
-		Votes: []int{1, 2, 3},
-	}
+	var keys []string
+	var proofs []string
 
-	proofs := []string{}
 	log.Infof("generating proofs...")
 	for i, s := range signers {
 		pub, _ = s.HexString()
@@ -197,13 +198,8 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 
 	waitUntilBlock(c, startBlock)
 
-	vpBytes, err := json.Marshal(vp)
-	if err != nil {
-		return err
-	}
-
 	if encrypted {
-		keys, err := getKeys(c, pid, eid)
+		keys, err = getKeys(c, pid, eid)
 		if err != nil {
 			return fmt.Errorf("cannot get process keys: (%s)", err)
 		}
@@ -211,36 +207,24 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 			return fmt.Errorf("process keys is empty")
 		}
 		log.Infof("got encryption keys!")
-		for i, k := range keys {
-			if len(k) > 0 {
-				log.Debugf("encrypting with key %s", k)
-				pubk, err := hex.DecodeString(k)
-				if err != nil {
-					return fmt.Errorf("cannot decode encryption key with index %d: (%s)", i, err)
-				}
-				var pubkb [nacl.KeyLength]byte
-				if n := copy(pubkb[:], pubk[:]); n != nacl.KeyLength {
-					return fmt.Errorf("wrong encryption key size %d", n)
-				}
-				if vpBytes, err = nacl.Encrypt(vpBytes, &pubkb); err != nil {
-					return fmt.Errorf("cannot encrypt: (%s)", err)
-				}
-			}
-		}
 	}
 
 	var req types.MetaRequest
 	var nullifiers []string
+	var vpb string
 	req.Method = "submitRawTx"
 	start := time.Now()
 	log.Infof("sending votes")
 
 	for i, s := range signers {
+		if vpb, err = genVote(encrypted, keys); err != nil {
+			return err
+		}
 		v := types.VoteTx{
-			Nonce:       randomHex(32),
+			Nonce:       randomHex(16),
 			ProcessID:   pid,
 			Proof:       proofs[i],
-			VotePackage: base64.StdEncoding.EncodeToString(vpBytes),
+			VotePackage: vpb,
 		}
 		txBytes, err := json.Marshal(v)
 		if err != nil {
@@ -254,7 +238,7 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 			return err
 		}
 		req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
-		//log.Debugf("vote: %s", txBytes)
+		log.Infof("vote: %s", txBytes)
 		resp := c.Request(req, nil)
 		if !resp.Ok {
 			return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
@@ -287,6 +271,48 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 	}
 	log.Infof("Election is finished! The voting and the checking took %s", time.Since(start))
 	return nil
+}
+
+func genVote(encrypted bool, keys []string) (string, error) {
+	vp := &types.VotePackage{
+		Votes: []int{1, 2, 3, 4, 5, 6},
+	}
+	var vpBytes []byte
+	var err error
+	if encrypted {
+		first := true
+		for i, k := range keys {
+			if len(k) > 0 {
+				log.Debugf("encrypting with key %s", k)
+				pubk, err := hex.DecodeString(k)
+				if err != nil {
+					return "", fmt.Errorf("cannot decode encryption key with index %d: (%s)", i, err)
+				}
+				var pubkb [nacl.KeyLength]byte
+				if n := copy(pubkb[:], pubk[:]); n != nacl.KeyLength {
+					return "", fmt.Errorf("wrong encryption key size %d", n)
+				}
+				if first {
+					vp.Nonce = randomHex(rand.Intn(16) + 16)
+					vpBytes, err = json.Marshal(vp)
+					if err != nil {
+						return "", err
+					}
+					first = false
+				}
+				if vpBytes, err = nacl.Encrypt(vpBytes, &pubkb); err != nil {
+					return "", fmt.Errorf("cannot encrypt: (%s)", err)
+				}
+			}
+		}
+	} else {
+		vpBytes, err = json.Marshal(vp)
+		if err != nil {
+			return "", err
+		}
+
+	}
+	return base64.StdEncoding.EncodeToString(vpBytes), nil
 }
 
 func createProcess(c *APIConnection, oracle *signature.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (int64, error) {
