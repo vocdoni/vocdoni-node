@@ -162,16 +162,16 @@ func getProof(c *APIConnection, pubkey, root string) (string, error) {
 	return resp.Siblings, nil
 }
 
-func getKeys(c *APIConnection, pid, eid string) ([]string, error) {
+func getKeys(c *APIConnection, pid, eid string) (pubk, privk, comk, revk []string, err error) {
 	var req types.MetaRequest
 	req.Method = "getProcessKeys"
 	req.ProcessID = pid
 	req.EntityId = eid
 	resp := c.Request(req, nil)
 	if !resp.Ok {
-		return []string{}, fmt.Errorf("cannot get keys for process %s: (%s)", pid, resp.Message)
+		return []string{}, []string{}, []string{}, []string{}, fmt.Errorf("cannot get keys for process %s: (%s)", pid, resp.Message)
 	}
-	return resp.ProcessKeys, nil
+	return resp.EncryptionPublicKeys, resp.EncryptionPrivKeys, resp.CommitmentKeys, resp.RevealKeys, nil
 }
 
 func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signers []*signature.SignKeys, encrypted bool) error {
@@ -197,14 +197,16 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 	waitUntilBlock(c, startBlock)
 
 	if encrypted {
-		keys, err := getKeys(c, pid, eid)
+		pubk, privk, comk, revk, err := getKeys(c, pid, eid)
 		if err != nil {
 			return fmt.Errorf("cannot get process keys: (%s)", err)
 		}
-		if len(keys) == 0 {
-			return fmt.Errorf("process keys is empty")
-		}
-		log.Infof("received keys: %v", keys)
+		/*
+			if len(keys) == 0 {
+				return fmt.Errorf("process keys is empty")
+			}
+		*/
+		log.Infof("received keys: public: %s\n private: %s\n commitment: %s\n reveal: %s\n", pubk, privk, comk, revk)
 		/*
 			for i, k := range keys {
 
