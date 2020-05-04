@@ -43,6 +43,7 @@ ${vochainPublicAddr:+ --vochainPublicAddr=${vochainPublicAddr}}\
 ${vochainRPCListen:+ --vochainRPCListen=${vochainRPCListen}}\
 ${vochainSeedMode:+ --vochainSeedMode=${vochainSeedMode}}\
 ${vochainSeeds:+ --vochainSeeds=${vochainSeeds}}\
+${keyKeeperIndex:+ --keyKeeperIndex=${keyKeeperIndex}}\
 ${voteApi:+ --voteApi=${voteApi}}\
 ${w3Enabled:+ --w3Enabled=${w3Enabled}}\
 ${w3HTTPHost:+ --w3HTTPHost=${w3HTTPHost}}\

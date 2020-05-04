@@ -19,6 +19,7 @@ const (
 	// this is a temporal work around to support both
 	EntityIDsizeV2    = 32
 	VoteNullifierSize = 32
+	KeyIndexSeparator = ":"
 
 	// Scrutinizer
 

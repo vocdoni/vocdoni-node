@@ -166,16 +166,27 @@ func getProof(c *APIConnection, pubkey, root string) (string, error) {
 	return resp.Siblings, nil
 }
 
-func getKeys(c *APIConnection, pid, eid string) ([]string, error) {
+type pkeys struct {
+	pub  []string
+	priv []string
+	comm []string
+	rev  []string
+}
+
+func getKeys(c *APIConnection, pid, eid string) (*pkeys, error) {
 	var req types.MetaRequest
 	req.Method = "getProcessKeys"
 	req.ProcessID = pid
 	req.EntityId = eid
 	resp := c.Request(req, nil)
 	if !resp.Ok {
-		return []string{}, fmt.Errorf("cannot get keys for process %s: (%s)", pid, resp.Message)
+		return nil, fmt.Errorf("cannot get keys for process %s: (%s)", pid, resp.Message)
 	}
-	return resp.ProcessKeys, nil
+	return &pkeys{
+		pub:  resp.EncryptionPublicKeys,
+		priv: resp.EncryptionPrivKeys,
+		comm: resp.CommitmentKeys,
+		rev:  resp.RevealKeys}, nil
 }
 
 func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signers []*signature.SignKeys, encrypted bool) error {
@@ -199,9 +210,10 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 	waitUntilBlock(c, startBlock)
 
 	if encrypted {
-		keys, err = getKeys(c, pid, eid)
-		if err != nil {
+		if pkeys, err := getKeys(c, pid, eid); err != nil {
 			return fmt.Errorf("cannot get process keys: (%s)", err)
+		} else {
+			keys = pkeys.pub
 		}
 		if len(keys) == 0 {
 			return fmt.Errorf("process keys is empty")
