@@ -12,6 +12,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/status-im/keycard-go/hexutils"
 
+	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -189,12 +190,17 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 			return err
 		}
 		proofs = append(proofs, proof)
-		if i%100 == 0 {
-			log.Infof("proof generation progress: %d%%", int((i*100)/(len(signers))))
+		if (i+1)%100 == 0 {
+			log.Infof("proof generation progress: %d%%", int(((i+1)*100)/(len(signers))))
 		}
 	}
 
 	waitUntilBlock(c, startBlock)
+
+	vpBytes, err := json.Marshal(vp)
+	if err != nil {
+		return err
+	}
 
 	if encrypted {
 		keys, err := getKeys(c, pid, eid)
@@ -204,17 +210,23 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 		if len(keys) == 0 {
 			return fmt.Errorf("process keys is empty")
 		}
-		log.Infof("received keys: %v", keys)
-		/*
-			for i, k := range keys {
-
+		log.Infof("got encryption keys!")
+		for i, k := range keys {
+			if len(k) > 0 {
+				log.Debugf("encrypting with key %s", k)
+				pubk, err := hex.DecodeString(k)
+				if err != nil {
+					return fmt.Errorf("cannot decode encryption key with index %d: (%s)", i, err)
+				}
+				var pubkb [nacl.KeyLength]byte
+				if n := copy(pubkb[:], pubk[:]); n != nacl.KeyLength {
+					return fmt.Errorf("wrong encryption key size %d", n)
+				}
+				if vpBytes, err = nacl.Encrypt(vpBytes, &pubkb); err != nil {
+					return fmt.Errorf("cannot encrypt: (%s)", err)
+				}
 			}
-		*/
-	}
-
-	vpBytes, err := json.Marshal(vp)
-	if err != nil {
-		return err
+		}
 	}
 
 	var req types.MetaRequest
@@ -242,7 +254,7 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 			return err
 		}
 		req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
-
+		//log.Debugf("vote: %s", txBytes)
 		resp := c.Request(req, nil)
 		if !resp.Ok {
 			return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
