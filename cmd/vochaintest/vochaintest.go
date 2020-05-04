@@ -112,14 +112,14 @@ func main() {
 	// Create process
 	pid := randomHex(32)
 	log.Infof("creating process with entityID: %s", entityKey.EthAddrString())
-	start, err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, "poll-vote", 50)
+	start, err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, "encrypted-poll", 7)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("created process with ID: %s", pid)
 
 	// Send votes
-	if err := sendVotes(c, pid, censusRoot, start, censusKeys); err != nil {
+	if err := sendVotes(c, pid, entityKey.EthAddrString(), censusRoot, start, censusKeys, true); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -162,15 +162,23 @@ func getProof(c *APIConnection, pubkey, root string) (string, error) {
 	return resp.Siblings, nil
 }
 
-func sendVotes(c *APIConnection, pid, root string, startBlock int64, signers []*signature.SignKeys) error {
+func getKeys(c *APIConnection, pid, eid string) ([]string, error) {
+	var req types.MetaRequest
+	req.Method = "getProcessKeys"
+	req.ProcessID = pid
+	req.EntityId = eid
+	resp := c.Request(req, nil)
+	if !resp.Ok {
+		return []string{}, fmt.Errorf("cannot get keys for process %s: (%s)", pid, resp.Message)
+	}
+	return resp.ProcessKeys, nil
+}
+
+func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signers []*signature.SignKeys, encrypted bool) error {
 	var pub, proof string
 	var err error
 	vp := types.VotePackage{
 		Votes: []int{1, 2, 3},
-	}
-	vpBytes, err := json.Marshal(vp)
-	if err != nil {
-		return err
 	}
 
 	proofs := []string{}
@@ -187,6 +195,27 @@ func sendVotes(c *APIConnection, pid, root string, startBlock int64, signers []*
 	}
 
 	waitUntilBlock(c, startBlock)
+
+	if encrypted {
+		keys, err := getKeys(c, pid, eid)
+		if err != nil {
+			return fmt.Errorf("cannot get process keys: (%s)", err)
+		}
+		if len(keys) == 0 {
+			return fmt.Errorf("process keys is empty")
+		}
+		log.Infof("received keys: %v", keys)
+		/*
+			for i, k := range keys {
+
+			}
+		*/
+	}
+
+	vpBytes, err := json.Marshal(vp)
+	if err != nil {
+		return err
+	}
 
 	var req types.MetaRequest
 	var nullifiers []string
