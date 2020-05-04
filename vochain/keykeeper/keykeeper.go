@@ -1,7 +1,7 @@
 package keykeeper
 
 import (
-	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -38,6 +38,7 @@ type KeyKeeper struct {
 	blockPool map[string]int64
 	signer    *signature.SignKeys
 	lock      sync.Mutex
+	myIndex   int8
 }
 
 type processKeys struct {
@@ -78,7 +79,7 @@ func (pk *processKeys) Decode(data []byte) error {
 
 // TBD garbage collector function run at init for revealing all these keys that should have beeen revealed
 
-func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *signature.SignKeys) (*KeyKeeper, error) {
+func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *signature.SignKeys, index int8) (*KeyKeeper, error) {
 	var err error
 	var k KeyKeeper
 	if v == nil || signer == nil || len(dbPath) < 1 {
@@ -90,6 +91,10 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *signature.S
 	if err != nil {
 		return nil, err
 	}
+	if index == 0 {
+		return nil, fmt.Errorf("index 0 cannot be used")
+	}
+	k.myIndex = index
 	//k.vochain.Codec.RegisterConcrete(&processKeys{}, "vocdoni/keykeeper.processKeys", nil)
 	//k.vochain.Codec.RegisterConcrete(processKeys{}, "processKeys", nil)
 	k.vochain.State.AddEvent("rollback", &k)
@@ -168,31 +173,22 @@ func (k *KeyKeeper) OnProcess(pid, eid string) {
 	if !p.RequireKeys() {
 		return
 	}
+	// If keys already exist, do nothing (this happends on the start-up block replay)
+	if len(p.EncryptionPublicKeys[k.myIndex])+len(p.CommitmentKeys[k.myIndex]) > 0 {
+		return
+	}
+	// Check if already created on this block process
 	if _, exist := k.keyPool[pid]; exist {
 		log.Errorf("keys for process %s already exist in the pool queue", pid)
 		return
 	}
+
 	// Generate keys
-	ek, err := nacl.Generate(rand.Reader)
-	if err != nil {
-		log.Errorf("cannot generate encryption key: (%s)", err)
+	if k.keyPool[pid], err = k.generateKeys(pid); err != nil {
+		log.Errorf("cannot generate process keys: (%s)", err)
 		return
 	}
-	var ck [commitmentKeySize]byte
-	ckb := make([]byte, commitmentKeySize)
-	if n, err := rand.Read(ckb); n != commitmentKeySize || err != nil {
-		log.Errorf("cannot generate commitment key: (%s)", err)
-	}
-	copy(ck[:], ckb[:])
-	var ckhash [commitmentKeySize]byte
-	copy(ckhash[:], signature.HashPoseidon(ckb)[:])
-	k.keyPool[pid] = &processKeys{
-		privKey:       ek.Private,
-		pubKey:        ek.Public,
-		revealKey:     ck,
-		commitmentKey: ckhash,
-		index:         int8(util.RandomInt(1, 16)), // TBD check index key does not exist
-	}
+
 	// Add keys to the pool queue
 	k.blockPool[pid] = p.StartBlock + p.NumberOfBlocks
 }
@@ -222,6 +218,47 @@ func (k *KeyKeeper) Commit(height int64) {
 // OnVote is not used by the KeyKeeper
 func (k *KeyKeeper) OnVote(v *types.Vote) {
 	// do nothing
+}
+
+func (k *KeyKeeper) OnProcessKeys(pid, pub, com string) {
+	// do nothing
+}
+
+func (k *KeyKeeper) OnRevealKeys(pid, priv, rev string) {
+	// do nothing
+}
+
+// Generate Keys generates a set of encryption/commitment keys for a process.
+// Encryption private key = hash(signer.privKey + processId + keyIndex).
+// Reveal key is hashPoseidon(key).
+// Commitment key is hashPoseidon(revealKey)
+func (k *KeyKeeper) generateKeys(pid string) (*processKeys, error) {
+	// Generate keys
+	pb, err := hex.DecodeString(pid)
+	if err != nil {
+		return nil, err
+	}
+	// Add the index in order to win some extra entropy
+	pb = append(pb, byte(k.myIndex))
+	// Private ed25519 key
+	ek, err := nacl.FromHex(fmt.Sprintf("%x", signature.HashRaw(append(k.signer.Private.D.Bytes()[:], pb[:]...))))
+	if err != nil {
+		return nil, fmt.Errorf("cannot generate encryption key: (%s)", err)
+	}
+	// Reveal and commitment keys
+	var ck [commitmentKeySize]byte
+	ckb := signature.HashPoseidon(ek.Private[:])
+	copy(ck[:], ckb[:])
+	var ckhash [commitmentKeySize]byte
+	copy(ckhash[:], signature.HashPoseidon(ckb)[:])
+
+	return &processKeys{
+		privKey:       ek.Private,
+		pubKey:        ek.Public,
+		revealKey:     ck,
+		commitmentKey: ckhash,
+		index:         k.myIndex,
+	}, nil
 }
 
 // scheduleRevealKeys takes the pids from the blockPool and add them to the schedule storage
@@ -306,7 +343,7 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	log.Infof("publishing keys for process %s", pid)
 	tx := &types.AdminTx{
 		Type:                types.TxAddProcessKeys,
-		KeyIndex:            int(pk.index), // TBD check it does not exist
+		KeyIndex:            int(pk.index),
 		Nonce:               util.RandomHex(32),
 		ProcessID:           pid,
 		EncryptionPublicKey: fmt.Sprintf("%x", pk.pubKey),

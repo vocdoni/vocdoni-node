@@ -5,17 +5,34 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
-func unmarshalVote(votePackage string) (*types.VotePackage, error) {
+func unmarshalVote(votePackage string, keys []string) (*types.VotePackage, error) {
 	rawVote, err := base64.StdEncoding.DecodeString(votePackage)
 	if err != nil {
 		return nil, err
 	}
 	var vote types.VotePackage
+	// if encryption keys, decrypt the vote
+	if len(keys) > 0 {
+		var kp *nacl.KeyPair
+		for i, k := range keys {
+			if len(k) < 1 {
+				continue
+			}
+			if kp, err = nacl.FromHex(k); err != nil {
+				log.Warnf("cannot create private key cipher: (%s)", err)
+				continue
+			}
+			if rawVote, err = kp.Decrypt(rawVote); err != nil {
+				log.Warnf("cannot decrypt vote with index key %d", i)
+			}
+		}
+	}
 	if err := json.Unmarshal(rawVote, &vote); err != nil {
 		return nil, err
 	}
@@ -23,7 +40,7 @@ func unmarshalVote(votePackage string) (*types.VotePackage, error) {
 }
 
 func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
-	vote, err := unmarshalVote(envelope.VotePackage)
+	vote, err := unmarshalVote(envelope.VotePackage, []string{})
 	if err != nil {
 		return err
 	}
@@ -66,7 +83,7 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
 func (s *Scrutinizer) ComputeResult(processID string) error {
 	log.Debugf("computing results for %s", processID)
 	// Check if process exist
-	_, err := s.VochainState.Process(processID, false)
+	p, err := s.VochainState.Process(processID, false)
 	if err != nil {
 		return err
 	}
@@ -96,7 +113,7 @@ func (s *Scrutinizer) ComputeResult(processID string) error {
 			return err
 		}
 	} else {
-		if pv, err = s.computeNonLiveResults(processID); err != nil {
+		if pv, err = s.computeNonLiveResults(processID, p); err != nil {
 			return err
 		}
 	}
@@ -163,16 +180,25 @@ func (s *Scrutinizer) computeLiveResults(processID string) (pv ProcessVotes, err
 	return
 }
 
-func (s *Scrutinizer) computeNonLiveResults(processID string) (pv ProcessVotes, err error) {
+func (s *Scrutinizer) computeNonLiveResults(processID string, p *types.Process) (pv ProcessVotes, err error) {
 	pv = emptyProcess()
 	var nvotes int
-	for _, e := range s.VochainState.EnvelopeList(processID, 0, 32<<20, false) { // 32K seems enough for now
+	for _, e := range s.VochainState.EnvelopeList(processID, 0, 32<<18, false) { // 8.3M seems enough for now
 		v, err := s.VochainState.Envelope(fmt.Sprintf("%s_%s", processID, e), false)
 		if err != nil {
 			log.Warn(err)
 			continue
 		}
-		vp, err := unmarshalVote(v.VotePackage)
+		var vp *types.VotePackage
+		if p.IsEncrypted() {
+			vp, err = unmarshalVote(v.VotePackage, p.EncryptionPrivateKeys)
+		} else {
+			vp, err = unmarshalVote(v.VotePackage, []string{})
+		}
+		if err != nil {
+			log.Warn(err)
+			continue
+		}
 		for question, opt := range vp.Votes {
 			if opt > MaxOptions {
 				log.Warn("option overflow on computeResult, skipping vote...")

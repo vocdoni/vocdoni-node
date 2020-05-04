@@ -61,17 +61,12 @@ func (s *Scrutinizer) newEmptyLiveProcess(pid string) (ProcessVotes, error) {
 	return pv, nil
 }
 
-// active processes are those processes which are not yet finished
-// on the database we are storing: height=>{proceess1, process2, process3}
-func (s *Scrutinizer) registerActiveProcess(pid string) {
-	process, err := s.VochainState.Process(pid, false)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	endBlock := fmt.Sprintf("%d", process.StartBlock+process.NumberOfBlocks)
+// Pending processes are those processes which are scheduled for being computed.
+// On the database we are storing: height=>{proceess1, process2, process3}
+func (s *Scrutinizer) registerPendingProcess(pid string, height int64) {
+	scheduledBlock := fmt.Sprintf("%d", height)
 
-	pidListBytes, err := s.Storage.Get([]byte(types.ScrutinizerProcessEndingPrefix + endBlock))
+	pidListBytes, err := s.Storage.Get([]byte(types.ScrutinizerProcessEndingPrefix + scheduledBlock))
 	if err != nil && err.Error() != NoKeyStorageError {
 		log.Error(err)
 		return
@@ -87,11 +82,11 @@ func (s *Scrutinizer) registerActiveProcess(pid string) {
 		log.Error(err)
 		return
 	}
-	if err = s.Storage.Put([]byte(types.ScrutinizerProcessEndingPrefix+endBlock), pidListBytes); err != nil {
+	if err = s.Storage.Put([]byte(types.ScrutinizerProcessEndingPrefix+scheduledBlock), pidListBytes); err != nil {
 		log.Error(err)
 		return
 	}
-	log.Infof("process %s scheduled for block %s", pid, endBlock)
+	log.Infof("process %s results computation scheduled for block %s", pid, scheduledBlock)
 }
 
 func (s *Scrutinizer) addLiveResultsProcess(pid string) {

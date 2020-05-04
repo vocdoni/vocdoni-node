@@ -179,6 +179,8 @@ type VochainCfg struct {
 	SaveConfig bool
 	// MempoolSize is the size of the mempool
 	MempoolSize int
+	// KeyKeeperIndex is the index used by the key keeper (usualy and oracle)
+	KeyKeeperIndex int8
 }
 
 // OracleCfg includes all possible config params needed by the Oracle

@@ -42,12 +42,14 @@ var PrefixDBCacheSize = 0
 
 // ValidEvents contains the list of valid event names
 var ValidEvents = map[string]bool{
-	"addVote":       true,
-	"addProcess":    true,
-	"endProcess":    true,
-	"commit":        true,
-	"rollback":      true,
-	"cancelProcess": true,
+	"addVote":           true,
+	"addProcess":        true,
+	"endProcess":        true,
+	"commit":            true,
+	"rollback":          true,
+	"cancelProcess":     true,
+	"addProcessKeys":    true,
+	"revealProcessKeys": true,
 }
 
 // Event is an interface used for executing custom functions during the events of the block creation process
@@ -58,6 +60,8 @@ type Event interface {
 	OnVote(*types.Vote)
 	OnProcess(pid, eid string)
 	OnCancel(pid string)
+	OnProcessKeys(pid, encryptionPub, commitment string)
+	OnRevealKeys(pid, encryptionPriv, reveal string)
 	Commit(height int64)
 	Rollback()
 }
@@ -300,7 +304,15 @@ func (v *State) AddProcessKeys(tx *types.AdminTx) error {
 		log.Debugf("added encryption key for process %s: %s", pid, tx.EncryptionPublicKey)
 	}
 	process.KeyIndex++
-	return v.setProcess(process, pid)
+	if err := v.setProcess(process, pid); err != nil {
+		return err
+	}
+	if events, ok := v.Events["addProcessKeys"]; ok {
+		for _, e := range events {
+			e.OnProcessKeys(pid, tx.EncryptionPublicKey, tx.CommitmentKey)
+		}
+	}
+	return nil
 }
 
 // RevealProcessKeys reveals the keys of a process
@@ -322,7 +334,15 @@ func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
 		return fmt.Errorf("no more keys to reveal, keyIndex is < 1")
 	}
 	process.KeyIndex--
-	return v.setProcess(process, pid)
+	if err := v.setProcess(process, pid); err != nil {
+		return err
+	}
+	if events, ok := v.Events["revealProcessKeys"]; ok {
+		for _, e := range events {
+			e.OnRevealKeys(pid, tx.EncryptionPrivateKey, tx.RevealKey)
+		}
+	}
+	return nil
 }
 
 // AddProcess adds a new process to vochain if not already added

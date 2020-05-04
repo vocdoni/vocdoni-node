@@ -392,6 +392,9 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 			if process.Canceled {
 				return fmt.Errorf("cannot add process keys in a canceled process")
 			}
+			if len(process.EncryptionPublicKeys[tx.KeyIndex])+len(process.CommitmentKeys[tx.KeyIndex]) > 0 {
+				return fmt.Errorf("keys for process %s already revealed", tx.ProcessID)
+			}
 			// check included keys and keyindex are valid
 			if err := checkAddProcessKeys(tx, process); err != nil {
 				return err
@@ -400,6 +403,9 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 		if tx.Type == types.TxRevealProcessKeys {
 			if header.Height < process.StartBlock+process.NumberOfBlocks && !process.Canceled {
 				return fmt.Errorf("cannot reveal keys before the process is finished (%d < %d)", header.Height, process.StartBlock+process.NumberOfBlocks)
+			}
+			if len(process.EncryptionPrivateKeys[tx.KeyIndex])+len(process.RevealKeys[tx.KeyIndex]) > 0 {
+				return fmt.Errorf("keys for process %s already revealed", tx.ProcessID)
 			}
 			// check the keys are valid
 			if err := checkRevealProcessKeys(tx, process); err != nil {

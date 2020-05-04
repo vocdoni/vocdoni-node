@@ -33,6 +33,7 @@ type Scrutinizer struct {
 	Storage      db.Database
 	votePool     []*types.Vote
 	processPool  []*types.ScrutinizerOnProcessData
+	resultsPool  []*types.ScrutinizerOnProcessData
 }
 
 // ProcessVotes represents the results of a voting process using a two dimensions slice [ question1:[option1,option2], question2:[option1,option2], ...]
@@ -53,6 +54,7 @@ func NewScrutinizer(dbPath string, state *vochain.State, liveResults bool) (*Scr
 	}
 	s.VochainState.AddEvent("rollback", &s)
 	s.VochainState.AddEvent("addProcess", &s)
+	s.VochainState.AddEvent("revealProcessKeys", &s)
 	s.VochainState.AddEvent("cancelProcess", &s)
 	s.VochainState.AddEvent("commit", &s)
 	s.VochainState.AddEvent("addVote", &s)
@@ -71,15 +73,17 @@ func (s *Scrutinizer) Commit(height int64) {
 	var nvotes int64
 	for _, p := range s.processPool {
 		s.addEntity(p.EntityID, p.ProcessID)
-		s.registerActiveProcess(p.ProcessID)
-		isLive, err = s.isLiveResultsProcess(p.ProcessID)
-		if err != nil {
+		if isLive, err = s.isLiveResultsProcess(p.ProcessID); err != nil {
 			log.Errorf("cannot check if process is live results: (%s)", err)
 			continue
 		}
 		if isLive {
 			s.addLiveResultsProcess(p.ProcessID)
 		}
+	}
+
+	for i, p := range s.resultsPool {
+		s.registerPendingProcess(p.ProcessID, height+int64(i+1))
 	}
 
 	// Add votes collected by onVote (live results)
@@ -99,17 +103,13 @@ func (s *Scrutinizer) Commit(height int64) {
 func (s *Scrutinizer) Rollback() {
 	s.votePool = []*types.Vote{}
 	s.processPool = []*types.ScrutinizerOnProcessData{}
+	s.resultsPool = []*types.ScrutinizerOnProcessData{}
 }
 
 // OnProcess scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnProcess(pid, eid string) {
 	var data = types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
 	s.processPool = append(s.processPool, &data)
-}
-
-// OnCancel scrutinizer stores the processID and entityID
-func (s *Scrutinizer) OnCancel(pid string) {
-	// TBD
 }
 
 // OnVote scrutinizer stores the votes if liveResults enabled
@@ -121,6 +121,30 @@ func (s *Scrutinizer) OnVote(v *types.Vote) {
 	}
 	if isLive {
 		s.votePool = append(s.votePool, v)
+	}
+}
+
+// OnCancel scrutinizer stores the processID and entityID
+func (s *Scrutinizer) OnCancel(pid string) {
+	// TBD: compute final live results?
+}
+
+// OnProcessKeys does nothing
+func (s *Scrutinizer) OnProcessKeys(pid, pub, com string) {
+	// do nothing
+}
+
+// OnRevealKeys checks if all keys have been revealed and in such case add the process to the results queue
+func (s *Scrutinizer) OnRevealKeys(pid, pub, com string) {
+	p, err := s.VochainState.Process(pid, false)
+	if err != nil {
+		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)
+		return
+	}
+	// if all keys have been revealed, compute the results
+	if p.KeyIndex < 1 {
+		data := types.ScrutinizerOnProcessData{EntityID: p.EntityID, ProcessID: pid}
+		s.resultsPool = append(s.resultsPool, &data)
 	}
 }
 
