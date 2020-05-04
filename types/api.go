@@ -100,5 +100,6 @@ type CensusDump struct {
 
 // VotePackage represents the payload of a vote (usually base64 encoded)
 type VotePackage struct {
-	Votes []int `json:"votes"`
+	Nonce string `json:"nonce,omitempty"`
+	Votes []int  `json:"votes"`
 }

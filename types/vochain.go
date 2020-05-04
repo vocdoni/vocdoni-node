@@ -68,22 +68,22 @@ type Process struct {
 
 // RequireKeys indicates wheter a process require Encryption or Commitment keys
 func (p *Process) RequireKeys() bool {
-	return processRequireKeys[p.Type]
+	return ProcessRequireKeys[p.Type]
 }
 
 // IsEncrypted indicates wheter a process has an encrypted payload or not
 func (p *Process) IsEncrypted() bool {
-	return processIsEncrypted[p.Type]
+	return ProcessIsEncrypted[p.Type]
 }
 
-var processRequireKeys = map[string]bool{
+var ProcessRequireKeys = map[string]bool{
 	PollVote:      false,
 	PetitionSign:  false,
 	EncryptedPoll: true,
 	SnarkVote:     true,
 }
 
-var processIsEncrypted = map[string]bool{
+var ProcessIsEncrypted = map[string]bool{
 	PollVote:      false,
 	PetitionSign:  false,
 	EncryptedPoll: true,
