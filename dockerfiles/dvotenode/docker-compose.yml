@@ -1,0 +1,33 @@
+version: "3.4"
+
+services:
+  dvotenode:
+    build:
+      context: ../../
+    image: "vocdoni/dvotenode"
+    volumes:
+      - "run:/app/run"
+    ports:
+      - "9090:9090"
+      - "9091:9091"
+      - "9092:9092"
+      - "4001:4001"
+      - "4171:4171"
+      - "5001:5001"
+      - "30303:30303"
+      - "30303:30303/udp"
+      - "9096:9096"
+      - "26656:26656"
+      - "26657:26657"
+    env_file:
+      - ./env
+    # environment:
+    #   EXTRA_OPTS: "$EXTRA_OPTS --volume-driver memfs"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+volumes:
+  run: {}

@@ -14,14 +14,7 @@ RUN go mod download
 COPY . .
 RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/dvotenode
 
-# These multiple targets can be used to obtain each of the images, such as
-# --target=miner.
-
-# Note that debian slim images are very minimal, so they don't contain
-# ca-certificates. Add them, as it's needed for outbound TLS to work, which is a
-# requirement to obtain let's encrypt certificates.
-
-FROM debian:10.3-slim AS dvotenode
+FROM debian:10.3-slim
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY --from=builder /src/dvotenode /src/dockerfiles/dvotenode/files/dvoteStart.sh ./

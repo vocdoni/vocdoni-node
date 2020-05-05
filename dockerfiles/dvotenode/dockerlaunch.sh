@@ -7,7 +7,7 @@ NAME="${NAME:-$IMAGE_TAG-$RANDOM}"
 
 echo "using image $IMAGE_TAG:latest"
 
-docker build -t $IMAGE_TAG --target dvotenode . || {
+docker build -t $IMAGE_TAG . || {
 	echo "Error: docker image cannot be created, exiting..."
 	exit 2
 }
@@ -23,10 +23,12 @@ COUNT="$(docker ps -a | grep $NAME | wc -l)"
 ENVFILE=""
 
 [ -f env.local ] && ENVFILE="env.local" || {
-[ -f dockerfiles/dvotenode/env.local ] && ENVFILE="dockerfiles/dvotenode/env.local" || {
-[ -f env ] && ENVFILE="env" || {
-[ -f dockerfiles/dvotenode/env ] && ENVFILE="dockerfiles/dvotenode/env"
-};};}
+	[ -f dockerfiles/dvotenode/env.local ] && ENVFILE="dockerfiles/dvotenode/env.local" || {
+		[ -f env ] && ENVFILE="env" || {
+			[ -f dockerfiles/dvotenode/env ] && ENVFILE="dockerfiles/dvotenode/env"
+		}
+	}
+}
 
 [ -n "$ENVFILE" ] && echo "using ENV FILE $ENVFILE" || echo "Warning, no ENV file found!"
 
@@ -37,8 +39,8 @@ ENVFILE=""
 echo "mapped ports: $API_PORT $PORTS"
 
 # RUN DOCKER
-docker run --name `echo $NAME | tr "/" "-"` -d \
-	`for p in $API_PORT $PORTS; do echo -n "-p $p:$p "; done` \
+docker run --name $(echo $NAME | tr "/" "-") -d \
+	$(for p in $API_PORT $PORTS; do echo -n "-p $p:$p "; done) \
 	-v $PWD/run:/app/run -v $PWD/misc:/app/misc $EXTRA_OPTS \
-	`[ -n "$ENVFILE" ] && echo -n "--env-file $ENVFILE"` \
+	$([ -n "$ENVFILE" ] && echo -n "--env-file $ENVFILE") \
 	$IMAGE_TAG

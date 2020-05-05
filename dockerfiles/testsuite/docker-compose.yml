@@ -1,0 +1,85 @@
+version: "3.7"
+
+services:
+  miner0:
+    image: "dvotenode"
+    build:
+      context: ../../
+    env_file: "./env.miner0"
+    volumes:
+      - ./run/miner0:/app/run/
+      - ./genesis.json:/app/misc/genesis.json
+    networks:
+      localnet:
+        ipv4_address: 10.17.14.2
+    ports:
+      - "26656-26657:26656-26657"
+
+  miner1:
+    image: "dvotenode"
+    build:
+      context: ../../
+    env_file: "./env.miner1"
+    volumes:
+      - ./run/miner1:/app/run/
+      - ./genesis.json:/app/misc/genesis.json
+    networks:
+      localnet:
+        ipv4_address: 10.17.14.3
+    ports:
+      - "26658-26659:26656-26657"
+
+  miner2:
+    image: "dvotenode"
+    build:
+      context: ../../
+    env_file: "./env.miner2"
+    volumes:
+      - ./run/miner2:/app/run/
+      - ./genesis.json:/app/misc/genesis.json
+    networks:
+      localnet:
+        ipv4_address: 10.17.14.4
+    ports:
+      - "26660-26661:26656-26657"
+
+  oracle:
+    image: "dvotenode"
+    build:
+      context: ../../
+    env_file: "./env.oracle"
+    volumes:
+      - ./run/oracle:/app/run/
+      - ./genesis.json:/app/misc/genesis.json
+    networks:
+      localnet:
+        ipv4_address: 10.17.14.5
+    ports:
+      - "30304:30303"
+      - "32001:32000"
+      - "26662-26663:26656-26657"
+
+  gateway:
+    image: "dvotenode"
+    build:
+      context: ../../
+    env_file: "./env.gateway"
+    volumes:
+      - ./run/gateway:/app/run/
+      - ./genesis.json:/app/misc/genesis.json
+    networks:
+      localnet:
+        ipv4_address: 10.17.14.6
+    ports:
+      - "30303:30303"
+      - "32000:32000"
+      - "9090-9092:9090-9092"
+      - "26664-26665:26656-26657"
+
+networks:
+  localnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.17.14.0/24

@@ -1,0 +1,24 @@
+version: "3.4"
+
+services:
+  census:
+    build:
+      context: ../../
+    image: "vocdoni/census"
+    volumes:
+      - "run:/app/run"
+    ports:
+      - "8080:443"
+    env_file:
+      - ./env
+    environment:
+      mode: census
+      #EXTRA_OPTS: "$EXTRA_OPTS --volume-driver memfs"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+volumes:
+  run: {}

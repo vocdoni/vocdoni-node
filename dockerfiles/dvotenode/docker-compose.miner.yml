@@ -1,0 +1,25 @@
+version: "3.4"
+
+services:
+  miner:
+    build:
+      context: ../../
+    image: "vocdoni/dvotenode"
+    volumes:
+      - "run:/app/run"
+    ports:
+      - "26656:26656"
+      - "26657:26657"
+    env_file:
+      - ./env
+    environment:
+      mode: miner
+      # EXTRA_OPTS: "$EXTRA_OPTS --volume-driver memfs"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+volumes:
+  run: {}
