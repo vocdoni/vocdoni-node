@@ -178,6 +178,17 @@ func getResults(c *APIConnection, pid string) ([][]uint32, error) {
 	return resp.Results, nil
 }
 
+func getEnvelopeHeight(c *APIConnection, pid string) (int64, error) {
+	var req types.MetaRequest
+	req.Method = "getEnvelopeHeight"
+	req.ProcessID = pid
+	resp := c.Request(req, nil)
+	if !resp.Ok {
+		return 0, fmt.Errorf(resp.Message)
+	}
+	return *resp.Height, nil
+}
+
 type pkeys struct {
 	pub  []types.Key
 	priv []types.Key
@@ -275,9 +286,24 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int
 			log.Infof("voting progress: %d%%", int((i*100)/(len(signers))))
 		}
 	}
-	log.Infof("Votes submited! took %s", time.Since(start))
+	log.Infof("votes submited! took %s", time.Since(start))
 	checkStart := time.Now()
 	registered := 0
+	log.Infof("waiting for votes to be validated...")
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h, err := getEnvelopeHeight(c, pid); err != nil {
+			log.Warnf("error getting envelope height")
+			continue
+		} else {
+			if h == int64(len(signers)) {
+				break
+			}
+		}
+		if time.Since(checkStart) > time.Minute*10 {
+			return fmt.Errorf("wait for envelope height took more than 10 minutes, skipping")
+		}
+	}
 	for {
 		for i, n := range nullifiers {
 			if n == "registered" {
@@ -296,8 +322,8 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int
 			return fmt.Errorf("check nullifier time took more than 10 minutes, skipping")
 		}
 	}
-	log.Infof("Election is finished! The voting and the checking took %s", time.Since(start))
-	log.Infof("Waiting for results...")
+	log.Infof("election is finished! The voting and the checking took %s", time.Since(start))
+	log.Infof("waiting for results...")
 	waitUntilBlock(c, startBlock+duration+2)
 	if results, err := getResults(c, pid); err != nil {
 		return err
@@ -306,7 +332,7 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int
 		if results[0][1] != total || results[1][2] != total || results[2][3] != total || results[3][4] != total {
 			log.Fatal("invalid results")
 		}
-		log.Infof("Results: %v", results)
+		log.Infof("results: %v", results)
 	}
 
 	return nil
