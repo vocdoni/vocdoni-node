@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	libpeer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	multiaddr "github.com/multiformats/go-multiaddr"
@@ -68,7 +67,7 @@ func (ps *SubPub) TransportConnectPeer(maddr string) error {
 	if err != nil {
 		return err
 	}
-	ai, err := peer.AddrInfoFromP2pAddr(m)
+	ai, err := libpeer.AddrInfoFromP2pAddr(m)
 	if err != nil {
 		return err
 	}

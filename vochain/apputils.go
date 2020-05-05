@@ -16,7 +16,6 @@ import (
 	amino "github.com/tendermint/go-amino"
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
@@ -118,7 +117,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *tmtypes
 
 	appState.Oracles = oracles
 	cdc := amino.NewCodec()
-	cryptoAmino.RegisterAmino(cdc)
+	cryptoamino.RegisterAmino(cdc)
 
 	appStateBytes, err := cdc.MarshalJSON(appState)
 	if err != nil {

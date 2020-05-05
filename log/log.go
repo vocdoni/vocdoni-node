@@ -130,6 +130,10 @@ func Error(args ...interface{}) {
 // Fatal sends a fatal level log message
 func Fatal(args ...interface{}) {
 	log.Fatal(args...)
+	// We don't support log levels lower than "fatal". Help analyzers like
+	// staticcheck see that, in this package, Fatal will always exit the
+	// entire program.
+	panic("unreachable")
 }
 
 // Debugf sends a formatted debug level log message

@@ -9,7 +9,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
@@ -416,7 +415,7 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 	return nil
 }
 
-func checkAddProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) error {
+func checkAddProcessKeys(tx *types.AdminTx, process *types.Process) error {
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
 	if len(tx.CommitmentKey)+len(tx.EncryptionPublicKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
@@ -429,7 +428,7 @@ func checkAddProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) error
 	return nil
 }
 
-func checkRevealProcessKeys(tx *types.AdminTx, process *vochaintypes.Process) error {
+func checkRevealProcessKeys(tx *types.AdminTx, process *types.Process) error {
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
 	if len(tx.RevealKey)+len(tx.EncryptionPrivateKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")

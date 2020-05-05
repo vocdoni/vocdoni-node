@@ -17,7 +17,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	vochaintypes "gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
@@ -346,7 +345,7 @@ func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
 }
 
 // AddProcess adds a new process to vochain if not already added
-func (v *State) AddProcess(p *vochaintypes.Process, pid string) error {
+func (v *State) AddProcess(p *types.Process, pid string) error {
 	pid = util.TrimHex(pid)
 	newProcessBytes, err := v.Codec.MarshalBinaryBare(p)
 	if err != nil {
@@ -389,7 +388,7 @@ func (v *State) CancelProcess(pid string) error {
 func (v *State) PauseProcess(pid string) error {
 	pid = util.TrimHex(pid)
 	_, processBytes := v.ProcessTree.Get([]byte(pid))
-	var process vochaintypes.Process
+	var process types.Process
 	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
 		return errors.New("cannot unmarshal process")
 	}
@@ -405,7 +404,7 @@ func (v *State) PauseProcess(pid string) error {
 func (v *State) ResumeProcess(pid string) error {
 	pid = util.TrimHex(pid)
 	_, processBytes := v.ProcessTree.Get([]byte(pid))
-	var process vochaintypes.Process
+	var process types.Process
 	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
 		return errors.New("cannot unmarshal process")
 	}
@@ -418,8 +417,8 @@ func (v *State) ResumeProcess(pid string) error {
 }
 
 // Process returns a process info given a processId if exists
-func (v *State) Process(pid string, isQuery bool) (*vochaintypes.Process, error) {
-	var process *vochaintypes.Process
+func (v *State) Process(pid string, isQuery bool) (*types.Process, error) {
+	var process *types.Process
 	var processBytes []byte
 	pid = util.TrimHex(pid)
 	if isQuery {
@@ -440,7 +439,7 @@ func (v *State) Process(pid string, isQuery bool) (*vochaintypes.Process, error)
 }
 
 // set process stores in the database the process
-func (v *State) setProcess(process *vochaintypes.Process, pid string) error {
+func (v *State) setProcess(process *types.Process, pid string) error {
 	if process == nil {
 		return fmt.Errorf("process is nil")
 	}
@@ -453,7 +452,7 @@ func (v *State) setProcess(process *vochaintypes.Process, pid string) error {
 }
 
 // AddVote adds a new vote to a process if the process exists and the vote is not already submmited
-func (v *State) AddVote(vote *vochaintypes.Vote) error {
+func (v *State) AddVote(vote *types.Vote) error {
 	voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
 	newVoteBytes, err := v.Codec.MarshalBinaryBare(vote)
 	if err != nil {
@@ -470,8 +469,8 @@ func (v *State) AddVote(vote *vochaintypes.Vote) error {
 
 // Envelope returns the info of a vote if already exists.
 // voteID must be equals to processID_Nullifier
-func (v *State) Envelope(voteID string, isQuery bool) (*vochaintypes.Vote, error) {
-	var vote *vochaintypes.Vote
+func (v *State) Envelope(voteID string, isQuery bool) (*types.Vote, error) {
+	var vote *types.Vote
 	var voteBytes []byte
 	if isQuery {
 		v.ILock.RLock()

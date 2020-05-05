@@ -23,6 +23,7 @@ func (s *Scrutinizer) isLiveResultsProcess(processID string) (bool, error) {
 
 // checks if the current heigh has scheduled ending processes, if so compute and store results
 func (s *Scrutinizer) checkFinishedProcesses(height int64) {
+	// TODO(mvdan): replace Has+get with just Get
 	exists, err := s.Storage.Has([]byte(types.ScrutinizerProcessEndingPrefix + fmt.Sprintf("%d", height)))
 	if err != nil {
 		log.Error(err)
@@ -34,7 +35,14 @@ func (s *Scrutinizer) checkFinishedProcesses(height int64) {
 
 	var pidList ProcessEndingList
 	pidListBytes, err := s.Storage.Get([]byte(types.ScrutinizerProcessEndingPrefix + fmt.Sprintf("%d", height)))
-	err = s.VochainState.Codec.UnmarshalBinaryBare(pidListBytes, &pidList)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	if err := s.VochainState.Codec.UnmarshalBinaryBare(pidListBytes, &pidList); err != nil {
+		log.Error(err)
+		return
+	}
 	for _, p := range pidList {
 		if err := s.ComputeResult(p); err != nil {
 			log.Errorf("cannot compute results for %s: (%s)", p, err)
@@ -73,7 +81,10 @@ func (s *Scrutinizer) registerPendingProcess(pid string, height int64) {
 	}
 	var pidList ProcessEndingList
 	if len(pidListBytes) > 0 {
-		err = s.VochainState.Codec.UnmarshalBinaryBare(pidListBytes, &pidList)
+		if err := s.VochainState.Codec.UnmarshalBinaryBare(pidListBytes, &pidList); err != nil {
+			log.Error(err)
+			return
+		}
 	}
 	pidList = append(pidList, pid)
 

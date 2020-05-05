@@ -121,7 +121,7 @@ func main() {
 	}
 
 	log.Infof("created process with ID: %s", pid)
-	encrypted, _ := types.ProcessIsEncrypted[*electionType]
+	encrypted := types.ProcessIsEncrypted[*electionType]
 
 	// Send votes
 	if err := sendVotes(c, pid, entityKey.EthAddrString(), censusRoot, start, int64(duration), censusKeys, encrypted); err != nil {
@@ -435,7 +435,6 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 
 	// addClaimBulk
 	log.Infof("add bulk claims (size %d)", censusSize)
-	var claims []string
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""
 	req.Digested = true
@@ -444,18 +443,17 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 	var pub string
 	var data string
 	for currentSize > 0 {
-		iclaims := []string{}
+		claims := []string{}
 		for j := 0; j < 100; j++ {
 			if currentSize < 1 {
 				break
 			}
 			pub, _ = censusSigners[currentSize-1].HexString()
 			data = base64.StdEncoding.EncodeToString(signature.HashPoseidon(hexutils.HexToBytes(pub)))
-			iclaims = append(iclaims, data)
+			claims = append(claims, data)
 			currentSize--
 		}
-		claims = append(claims, iclaims...)
-		req.ClaimsData = iclaims
+		req.ClaimsData = claims
 		resp = c.Request(req, signer)
 		if !resp.Ok {
 			log.Fatalf("%s failed: %s", req.Method, resp.Message)

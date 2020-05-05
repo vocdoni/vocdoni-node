@@ -244,5 +244,4 @@ func pruneVoteResult(pv *ProcessVotes) {
 		}
 	}
 	*pv = pvc
-	return
 }

@@ -47,7 +47,7 @@ func TestSignature(t *testing.T) {
 	if err := s3.AddHexKey(hardcodedPriv); err != nil {
 		t.Fatal(err)
 	}
-	pub, priv = s3.HexString()
+	_, priv = s3.HexString()
 	if priv != hardcodedPriv {
 		t.Fatalf("PrivKey from %s not match the hardcoded one\nGot %s\nMust have %s", hardcodedPriv, priv, hardcodedPriv[2:])
 	}

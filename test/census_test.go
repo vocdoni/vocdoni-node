@@ -40,7 +40,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
-	common "gitlab.com/vocdoni/go-dvote/test/testcommon"
 )
 
 var censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")
@@ -50,7 +49,7 @@ func init() { rand.Seed(time.Now().UnixNano()) }
 func TestCensus(t *testing.T) {
 	t.Parallel()
 
-	var server common.DvoteAPIServer
+	var server testcommon.DvoteAPIServer
 	server.Start(t, "file", "census")
 
 	signer1 := new(signature.SignKeys)
@@ -64,7 +63,7 @@ func TestCensus(t *testing.T) {
 
 	// Create websocket client
 	t.Logf("connecting to %s", server.PxyAddr)
-	c := common.NewAPIConnection(t, server.PxyAddr)
+	c := testcommon.NewAPIConnection(t, server.PxyAddr)
 
 	// Send the API requets
 	var req types.MetaRequest

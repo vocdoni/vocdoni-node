@@ -61,7 +61,7 @@ func (s *SubPubHandle) AddPeer(peer string) error {
 }
 
 func (s *SubPubHandle) String() string {
-	return s.String()
+	return s.SubPub.String()
 }
 
 func (s *SubPubHandle) Send(msg types.Message) {

@@ -49,7 +49,6 @@ type IPFSsync struct {
 	TimestampWindow int32
 
 	hashTree    tree.Tree
-	askLock     sync.RWMutex
 	updateLock  sync.RWMutex
 	myMultiAddr ma.Multiaddr // The IPFS multiaddress
 	lastHash    string
