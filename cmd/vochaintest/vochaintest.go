@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -113,9 +112,10 @@ func main() {
 	log.Infof("creaed census %s of size %d", censusRoot, len(censusKeys))
 
 	// Create process
+	duration := 7
 	pid := randomHex(32)
 	log.Infof("creating process with entityID: %s", entityKey.EthAddrString())
-	start, err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, *electionType, 7)
+	start, err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, *electionType, duration)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func main() {
 	encrypted, _ := types.ProcessIsEncrypted[*electionType]
 
 	// Send votes
-	if err := sendVotes(c, pid, entityKey.EthAddrString(), censusRoot, start, censusKeys, encrypted); err != nil {
+	if err := sendVotes(c, pid, entityKey.EthAddrString(), censusRoot, start, int64(duration), censusKeys, encrypted); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -167,11 +167,22 @@ func getProof(c *APIConnection, pubkey, root string) (string, error) {
 	return resp.Siblings, nil
 }
 
+func getResults(c *APIConnection, pid string) ([][]uint32, error) {
+	var req types.MetaRequest
+	req.Method = "getResults"
+	req.ProcessID = pid
+	resp := c.Request(req, nil)
+	if !resp.Ok {
+		return nil, fmt.Errorf("cannot get results: (%s)", resp.Message)
+	}
+	return resp.Results, nil
+}
+
 type pkeys struct {
-	pub  []string
-	priv []string
-	comm []string
-	rev  []string
+	pub  []types.Key
+	priv []types.Key
+	comm []types.Key
+	rev  []types.Key
 }
 
 func getKeys(c *APIConnection, pid, eid string) (*pkeys, error) {
@@ -190,7 +201,7 @@ func getKeys(c *APIConnection, pid, eid string) (*pkeys, error) {
 		rev:  resp.RevealKeys}, nil
 }
 
-func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signers []*signature.SignKeys, encrypted bool) error {
+func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int64, signers []*signature.SignKeys, encrypted bool) error {
 	var pub, proof string
 	var err error
 	var keys []string
@@ -215,10 +226,8 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 			return fmt.Errorf("cannot get process keys: (%s)", err)
 		} else {
 			for _, k := range pkeys.pub {
-				if s := strings.Split(k, types.KeyIndexSeparator); len(s) < 2 {
-					return fmt.Errorf("malformed encryption public key %v", k)
-				} else {
-					keys = append(keys, s[1])
+				if len(k.Key) > 0 {
+					keys = append(keys, k.Key)
 				}
 			}
 		}
@@ -257,7 +266,6 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 			return err
 		}
 		req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
-		log.Infof("vote: %s", txBytes)
 		resp := c.Request(req, nil)
 		if !resp.Ok {
 			return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
@@ -289,6 +297,18 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock int64, signer
 		}
 	}
 	log.Infof("Election is finished! The voting and the checking took %s", time.Since(start))
+	log.Infof("Waiting for results...")
+	waitUntilBlock(c, startBlock+duration+2)
+	if results, err := getResults(c, pid); err != nil {
+		return err
+	} else {
+		total := uint32(len(signers))
+		if results[0][1] != total || results[1][2] != total || results[2][3] != total || results[3][4] != total {
+			log.Fatal("invalid results")
+		}
+		log.Infof("Results: %v", results)
+	}
+
 	return nil
 }
 
@@ -367,7 +387,7 @@ func createProcess(c *APIConnection, oracle *signature.SignKeys, entityID, mkroo
 }
 
 func waitUntilBlock(c *APIConnection, block int64) {
-	log.Infof("waiting for process to start...")
+	log.Infof("waiting for block %d...", block)
 	for cb := getCurrentBlock(c); cb <= block; cb = getCurrentBlock(c) {
 		time.Sleep(10 * time.Second)
 		log.Infof("remaining blocks: %d", block-cb)

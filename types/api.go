@@ -56,10 +56,10 @@ type MetaResponse struct {
 	CensusID             string     `json:"censusId,omitempty"`
 	CensusList           []string   `json:"censusList,omitempty"`
 	ClaimsData           []string   `json:"claimsData,omitempty"`
-	CommitmentKeys       []string   `json:"commitmentKeys,omitempty"`
+	CommitmentKeys       []Key      `json:"commitmentKeys,omitempty"`
 	Content              string     `json:"content,omitempty"`
-	EncryptionPublicKeys []string   `json:"encryptionPubKeys,omitempty"`
-	EncryptionPrivKeys   []string   `json:"encryptionPrivKeys,omitempty"`
+	EncryptionPublicKeys []Key      `json:"encryptionPubKeys,omitempty"`
+	EncryptionPrivKeys   []Key      `json:"encryptionPrivKeys,omitempty"`
 	EntityID             string     `json:"entityId,omitempty"`
 	EntityIDs            []string   `json:"entityIds,omitempty"`
 	Files                []byte     `json:"files,omitempty"`
@@ -78,7 +78,7 @@ type MetaResponse struct {
 	Registered           *bool      `json:"registered,omitempty"`
 	Request              string     `json:"request"`
 	Results              [][]uint32 `json:"results,omitempty"`
-	RevealKeys           []string   `json:"revealKeys,omitempty"`
+	RevealKeys           []Key      `json:"revealKeys,omitempty"`
 	Root                 string     `json:"root,omitempty"`
 	Siblings             string     `json:"siblings,omitempty"`
 	Size                 *int64     `json:"size,omitempty"`
@@ -105,4 +105,9 @@ type CensusDump struct {
 type VotePackage struct {
 	Nonce string `json:"nonce,omitempty"`
 	Votes []int  `json:"votes"`
+}
+
+type Key struct {
+	Idx int    `json:"idx"`
+	Key string `json:"key"`
 }

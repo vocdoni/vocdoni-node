@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -193,26 +192,31 @@ func (r *Router) getProcessKeys(request routerRequest) {
 		return
 	}
 	var response types.ResponseMessage
+	var pubs, privs, coms, revs []types.Key
 	for idx, pubk := range process.EncryptionPublicKeys {
 		if len(pubk) > 0 {
-			response.EncryptionPublicKeys = append(response.EncryptionPublicKeys, strconv.Itoa(idx)+types.KeyIndexSeparator+pubk)
+			pubs = append(pubs, types.Key{Idx: idx, Key: pubk})
 		}
 	}
 	for idx, privk := range process.EncryptionPrivateKeys {
 		if len(privk) > 0 {
-			response.EncryptionPrivKeys = append(response.EncryptionPrivKeys, strconv.Itoa(idx)+types.KeyIndexSeparator+privk)
+			privs = append(privs, types.Key{Idx: idx, Key: privk})
 		}
 	}
 	for idx, comk := range process.CommitmentKeys {
 		if len(comk) > 0 {
-			response.CommitmentKeys = append(response.CommitmentKeys, strconv.Itoa(idx)+types.KeyIndexSeparator+comk)
+			coms = append(coms, types.Key{Idx: idx, Key: comk})
 		}
 	}
 	for idx, revk := range process.RevealKeys {
 		if len(revk) > 0 {
-			response.RevealKeys = append(response.RevealKeys, strconv.Itoa(idx)+types.KeyIndexSeparator+revk)
+			revs = append(revs, types.Key{Idx: idx, Key: revk})
 		}
 	}
+	response.EncryptionPublicKeys = pubs
+	response.EncryptionPrivKeys = privs
+	response.CommitmentKeys = coms
+	response.RevealKeys = revs
 	r.transport.Send(r.buildReply(request, response))
 }
 
