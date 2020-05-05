@@ -20,11 +20,11 @@ func unmarshalVote(votePackage string, keys []string) (*types.VotePackage, error
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
 		var kp *nacl.KeyPair
-		for i, k := range keys {
-			if len(k) < 1 {
+		for i := len(keys) - 1; i > 0; i-- {
+			if len(keys[i]) < 1 {
 				continue
 			}
-			if kp, err = nacl.FromHex(k); err != nil {
+			if kp, err = nacl.FromHex(keys[i]); err != nil {
 				log.Warnf("cannot create private key cipher: (%s)", err)
 				continue
 			}
