@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -213,8 +214,9 @@ func (is *IPFSsync) Handle(msg Message) error {
 		}
 		found := false
 		for _, p := range peers {
-			if p.ID().String() == msg.Address {
+			if strings.Contains(msg.Maddress, p.ID().String()) {
 				found = true
+				break
 			}
 		}
 		if !found {
