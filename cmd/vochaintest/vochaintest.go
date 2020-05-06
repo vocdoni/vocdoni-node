@@ -112,7 +112,7 @@ func main() {
 	log.Infof("creaed census %s of size %d", censusRoot, len(censusKeys))
 
 	// Create process
-	duration := 7
+	duration := 5
 	pid := randomHex(32)
 	log.Infof("creating process with entityID: %s", entityKey.EthAddrString())
 	start, err := createProcess(c, &oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, *electionType, duration)
@@ -231,13 +231,14 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int
 	}
 
 	waitUntilBlock(c, startBlock)
-
+	keyIndexes := []int{}
 	if encrypted {
-		if pkeys, err := getKeys(c, pid, eid); err != nil {
+		if pk, err := getKeys(c, pid, eid); err != nil {
 			return fmt.Errorf("cannot get process keys: (%s)", err)
 		} else {
-			for _, k := range pkeys.pub {
+			for _, k := range pk.pub {
 				if len(k.Key) > 0 {
+					keyIndexes = append(keyIndexes, k.Idx)
 					keys = append(keys, k.Key)
 				}
 			}
@@ -260,11 +261,13 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int
 			return err
 		}
 		v := types.VoteTx{
-			Nonce:       randomHex(16),
-			ProcessID:   pid,
-			Proof:       proofs[i],
-			VotePackage: vpb,
+			Nonce:                randomHex(16),
+			ProcessID:            pid,
+			Proof:                proofs[i],
+			VotePackage:          vpb,
+			EncryptionKeyIndexes: keyIndexes,
 		}
+
 		txBytes, err := json.Marshal(v)
 		if err != nil {
 			return err
@@ -282,8 +285,8 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int
 			return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 		}
 		nullifiers = append(nullifiers, resp.Payload)
-		if i%100 == 0 {
-			log.Infof("voting progress: %d%%", int((i*100)/(len(signers))))
+		if (i+1)%100 == 0 {
+			log.Infof("voting progress: %d%%", int(((i+1)*100)/(len(signers))))
 		}
 	}
 	log.Infof("votes submited! took %s", time.Since(start))

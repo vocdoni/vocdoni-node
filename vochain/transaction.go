@@ -165,7 +165,13 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			vote.ProcessID = tx.ProcessID
 			vote.Proof = tx.Proof
 			vote.VotePackage = tx.VotePackage
-			vote.KeyIndexes = tx.KeyIndexes
+
+			if types.ProcessIsEncrypted[process.Type] {
+				if len(tx.EncryptionKeyIndexes) == 0 {
+					return nil, fmt.Errorf("no key indexes provided on vote package")
+				}
+				vote.EncryptionKeyIndexes = tx.EncryptionKeyIndexes
+			}
 
 			voteBytes, err := json.Marshal(vote)
 			if err != nil {

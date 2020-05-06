@@ -11,6 +11,10 @@ import (
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
+// unmarshalVote decodes the base64 payload to a VotePackage struct type.
+// If the votePackage is encrypted the list of keys to decrypt it should be provided.
+// The order of the Keys must be as it was encrypted.
+// The function will reverse the order and use the decryption keys starting from the last one provided.
 func unmarshalVote(votePackage string, keys []string) (*types.VotePackage, error) {
 	rawVote, err := base64.StdEncoding.DecodeString(votePackage)
 	if err != nil {
@@ -20,10 +24,7 @@ func unmarshalVote(votePackage string, keys []string) (*types.VotePackage, error
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
 		var kp *nacl.KeyPair
-		for i := len(keys) - 1; i > 0; i-- {
-			if len(keys[i]) < 1 {
-				continue
-			}
+		for i := len(keys) - 1; i >= 0; i-- {
 			if kp, err = nacl.FromHex(keys[i]); err != nil {
 				log.Warnf("cannot create private key cipher: (%s)", err)
 				continue
@@ -190,8 +191,25 @@ func (s *Scrutinizer) computeNonLiveResults(processID string, p *types.Process) 
 			continue
 		}
 		var vp *types.VotePackage
+		err = nil
 		if p.IsEncrypted() {
-			vp, err = unmarshalVote(v.VotePackage, p.EncryptionPrivateKeys)
+			if len(p.EncryptionPrivateKeys) < len(v.EncryptionKeyIndexes) {
+				err = fmt.Errorf("encryptionKeyIndexes has too many fields")
+			} else {
+				keys := []string{}
+				for _, k := range v.EncryptionKeyIndexes {
+					if k >= types.MaxKeyIndex {
+						err = fmt.Errorf("key index overflow")
+						break
+					}
+					keys = append(keys, p.EncryptionPrivateKeys[k])
+				}
+				if len(keys) == 0 || err != nil {
+					err = fmt.Errorf("no keys provided or wrong index")
+				} else {
+					vp, err = unmarshalVote(v.VotePackage, keys)
+				}
+			}
 		} else {
 			vp, err = unmarshalVote(v.VotePackage, []string{})
 		}

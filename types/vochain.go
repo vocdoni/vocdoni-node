@@ -21,7 +21,7 @@ type VotePackageStruct struct {
 
 // Vote represents a single Vote
 type Vote struct {
-	KeyIndexes []int `json:"keyIndexes,omitempty"`
+	EncryptionKeyIndexes []int `json:"encryptionKeyIndexes,omitempty"`
 	// Nonce unique number per vote attempt, so that replay attacks can't reuse this payload
 	Nonce string `json:"nonce,omitempty"`
 	// Nullifier is the hash of the private key
@@ -113,14 +113,14 @@ type Tx struct {
 
 // VoteTx represents the info required for submmiting a vote
 type VoteTx struct {
-	KeyIndexes  []int  `json:"keyIndexes,omitempty"`
-	Nonce       string `json:"nonce,omitempty"`
-	Nullifier   string `json:"nullifier,omitempty"`
-	ProcessID   string `json:"processId"`
-	Proof       string `json:"proof,omitempty"`
-	Signature   string `json:"signature,omitempty"`
-	Type        string `json:"type,omitempty"`
-	VotePackage string `json:"votePackage,omitempty"`
+	EncryptionKeyIndexes []int  `json:"encryptionKeyIndexes,omitempty"`
+	Nonce                string `json:"nonce,omitempty"`
+	Nullifier            string `json:"nullifier,omitempty"`
+	ProcessID            string `json:"processId"`
+	Proof                string `json:"proof,omitempty"`
+	Signature            string `json:"signature,omitempty"`
+	Type                 string `json:"type,omitempty"`
+	VotePackage          string `json:"votePackage,omitempty"`
 }
 
 func (tx *VoteTx) TxType() string {
