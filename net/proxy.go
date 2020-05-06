@@ -2,6 +2,7 @@ package net
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
@@ -9,7 +10,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -24,7 +24,7 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
 
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
 )
 
 const desiredSoMaxConn = 4096
@@ -219,20 +219,19 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 	return func(c *websocket.Conn) {
 		for {
-			msgType, msg, err := c.ReadMessage()
+			msgType, msg, err := c.Reader(context.TODO())
 			if err != nil {
 				log.Debugf("websocket closed by the client: %s", err)
-				c.Close()
+				c.Close(websocket.StatusAbnormalClosure, "ws closed by client")
 				return
 			}
-			req, err := http.NewRequest("POST", url, bytes.NewReader(msg))
+			req, err := http.NewRequest("POST", url, msg)
 			if err != nil {
 				log.Warnf("invalid request: %s", err)
 				continue
 			}
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Accept", "application/json")
-			req.Header.Set("Content-Length", strconv.Itoa(len(msg)))
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				log.Warnf("request failed: %s", err)
@@ -243,7 +242,7 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 				log.Warnf("cannot read response: %s", err)
 				continue
 			}
-			if err := c.WriteMessage(msgType, respBody); err != nil {
+			if err := c.Write(context.TODO(), msgType, respBody); err != nil {
 				log.Warnf("cannot write message: %s", err)
 			}
 		}
@@ -254,10 +253,8 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 type WebsocketHandle struct {
 	Connection *types.Connection // the ws connection
 	WsProxy    *Proxy            // proxy where the ws will be associated
-	Upgrader   *websocket.Upgrader
 
 	internalReceiver chan types.Message
-	mu               sync.Mutex
 }
 
 type WebsocketContext struct {
@@ -275,11 +272,6 @@ func (w *WebsocketHandle) SetProxy(p *Proxy) {
 
 // Init initializes the websockets handler and the internal channel to communicate with other go-dvote components
 func (w *WebsocketHandle) Init(c *types.Connection) error {
-	w.Upgrader = &websocket.Upgrader{
-		ReadBufferSize:  4096,
-		WriteBufferSize: 8192,
-		CheckOrigin:     func(r *http.Request) bool { return true },
-	}
 	w.internalReceiver = make(chan types.Message, 1)
 	return nil
 }
@@ -291,9 +283,9 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 		// handlers are run in new goroutines, so we don't need to spawn
 		// another goroutine.
 		for {
-			_, payload, err := conn.ReadMessage()
+			_, payload, err := conn.Read(context.TODO())
 			if err != nil {
-				conn.Close()
+				conn.Close(websocket.StatusAbnormalClosure, "ws closed by client")
 				break
 			}
 			msg := types.Message{
@@ -317,10 +309,8 @@ func (w *WebsocketHandle) Listen(receiver chan<- types.Message) {
 
 // Send sends the response given a message
 func (w *WebsocketHandle) Send(msg types.Message) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	clientConn := msg.Context.(*WebsocketContext).Conn
-	clientConn.WriteMessage(websocket.BinaryMessage, msg.Data)
+	clientConn.Write(context.TODO(), websocket.MessageBinary, msg.Data)
 }
 
 func (w *WebsocketHandle) SendUnicast(address string, msg types.Message) {
@@ -346,12 +336,7 @@ func (w *WebsocketHandle) String() string {
 }
 
 func wshandler(w http.ResponseWriter, r *http.Request, ph ProxyWsHandler) {
-	upgrader := &websocket.Upgrader{
-		ReadBufferSize:  8192,
-		WriteBufferSize: 8192,
-		CheckOrigin:     func(r *http.Request) bool { return true },
-	}
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		log.Errorf("failed to set websocket upgrade: %s", err)
 		return

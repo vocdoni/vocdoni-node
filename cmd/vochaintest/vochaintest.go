@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -8,9 +9,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/gorilla/websocket"
 	flag "github.com/spf13/pflag"
 	"github.com/status-im/keycard-go/hexutils"
+	"nhooyr.io/websocket"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
@@ -28,7 +29,7 @@ type APIConnection struct {
 func NewAPIConnection(addr string) *APIConnection {
 	r := &APIConnection{}
 	var err error
-	r.Conn, _, err = websocket.DefaultDialer.Dial(addr, nil)
+	r.Conn, _, err = websocket.Dial(context.TODO(), addr, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -54,10 +55,10 @@ func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKey
 		log.Fatalf("%s: %v", method, err)
 	}
 	log.Debugf("sending: %s", rawReq)
-	if err := r.Conn.WriteMessage(websocket.TextMessage, rawReq); err != nil {
+	if err := r.Conn.Write(context.TODO(), websocket.MessageText, rawReq); err != nil {
 		log.Fatalf("%s: %v", method, err)
 	}
-	_, message, err := r.Conn.ReadMessage()
+	_, message, err := r.Conn.Read(context.TODO())
 	log.Debugf("received: %s", message)
 	if err != nil {
 		log.Fatalf("%s: %v", method, err)
@@ -107,7 +108,7 @@ func main() {
 	// Create census
 	log.Infof("connecting to %s", *host)
 	c := NewAPIConnection(*host)
-	defer c.Conn.Close()
+	defer c.Conn.Close(websocket.StatusNormalClosure, "")
 	censusRoot, censusURI := createCensus(c, &entityKey, censusKeys)
 	log.Infof("creaed census %s of size %d", censusRoot, len(censusKeys))
 

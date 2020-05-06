@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -11,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/websocket"
 	json "github.com/rogpeppe/rjson"
 	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"nhooyr.io/websocket"
 )
 
 // APIConnection holds an API websocket connection
@@ -28,7 +29,7 @@ type APIConnection struct {
 func NewAPIConnection(addr string) *APIConnection {
 	r := &APIConnection{}
 	var err error
-	r.Conn, _, err = websocket.DefaultDialer.Dial(addr, nil)
+	r.Conn, _, err = websocket.Dial(context.TODO(), addr, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -54,10 +55,10 @@ func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKey
 		log.Fatalf("%s: %v", method, err)
 	}
 	log.Infof("sending: %s", rawReq)
-	if err := r.Conn.WriteMessage(websocket.TextMessage, rawReq); err != nil {
+	if err := r.Conn.Write(context.TODO(), websocket.MessageText, rawReq); err != nil {
 		log.Fatalf("%s: %v", method, err)
 	}
-	_, message, err := r.Conn.ReadMessage()
+	_, message, err := r.Conn.Read(context.TODO())
 	log.Infof("received: %s", message)
 	if err != nil {
 		log.Fatalf("%s: %v", method, err)
@@ -120,8 +121,7 @@ func main() {
 	}
 	log.Infof("connecting to %s", *host)
 	c := NewAPIConnection(*host)
-	defer c.Conn.Close()
-
+	defer c.Conn.Close(websocket.StatusNormalClosure, "")
 	var req types.MetaRequest
 	reader := bufio.NewReader(os.Stdin)
 	for {

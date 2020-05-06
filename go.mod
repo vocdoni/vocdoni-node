@@ -10,17 +10,14 @@ require (
 	github.com/davidlazar/go-crypto v0.0.0-20190912175916-7055855a373f // indirect
 	github.com/decred/dcrd/dcrec/secp256k1 v1.0.2
 	github.com/dgraph-io/badger/v2 v2.0.1-rc1.0.20200409094109-809725940698
-	github.com/dgraph-io/ristretto v0.0.2 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-chi/cors v1.0.0
-	github.com/golang/protobuf v1.3.5 // indirect
 	github.com/google/go-cmp v0.4.0
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect
-	github.com/gorilla/websocket v1.4.2
 	github.com/gtank/merlin v0.1.1 // indirect
 	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
 	github.com/iden3/go-iden3-crypto v0.0.4
@@ -30,7 +27,6 @@ require (
 	github.com/ipfs/go-ipfs-files v0.0.6
 	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/interface-go-ipfs-core v0.2.6
-	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/klauspost/compress v1.10.3
@@ -49,7 +45,6 @@ require (
 	github.com/libp2p/go-stream-muxer-multistream v0.3.0 // indirect
 	github.com/libp2p/go-ws-transport v0.3.1 // indirect
 	github.com/libp2p/go-yamux v1.3.6 // indirect
-	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/multiformats/go-multiaddr v0.2.1
 	github.com/multiformats/go-multiaddr-net v0.1.4
@@ -74,7 +69,6 @@ require (
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200223203819-95cdfde1438f // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.etcd.io/bbolt v1.3.4 // indirect
-	go.uber.org/multierr v1.5.0 // indirect
 	go.uber.org/zap v1.15.0
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
@@ -83,6 +77,7 @@ require (
 	golang.org/x/text v0.3.2
 	golang.org/x/tools v0.0.0-20200312194400-c312e98713c2 // indirect
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
+	nhooyr.io/websocket v1.8.5
 )
 
 // Duktape is very slow to build, and can't be built with multiple cores since
