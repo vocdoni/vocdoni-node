@@ -42,11 +42,11 @@ func verifySignatureAgainstOracles(oracles []string, message []byte, signHex str
 // GenerateNullifier generates the nullifier of a vote (hash(address+processId))
 func GenerateNullifier(address, processID string) (string, error) {
 	var err error
-	addrBytes, err := hex.DecodeString(address)
+	addrBytes, err := hex.DecodeString(util.TrimHex(address))
 	if err != nil {
 		return "", err
 	}
-	pidBytes, err := hex.DecodeString(processID)
+	pidBytes, err := hex.DecodeString(util.TrimHex(processID))
 	if err != nil {
 		return "", err
 	}
