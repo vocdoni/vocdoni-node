@@ -14,6 +14,11 @@ RUN go mod download
 COPY . .
 RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/dvotenode
 
+FROM builder AS test
+
+WORKDIR /src
+RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/vochaintest
+
 FROM debian:10.3-slim
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
