@@ -25,6 +25,9 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
+// ErrNamespaceExist is the error returned when trying to add a namespace that already exist
+const ErrNamespaceExist string = "namespace already exist"
+
 type Namespaces struct {
 	RootKey    string      `json:"rootKey"` // Public key allowed to created new census
 	Namespaces []Namespace `json:"namespaces"`
@@ -159,7 +162,7 @@ func (m *Manager) AddNamespace(name string, pubKeys []string) (*tree.Tree, error
 	m.TreesMu.Lock()
 	defer m.TreesMu.Unlock()
 	if m.Exists(name) {
-		return nil, errors.New("namespace already exist")
+		return nil, errors.New(ErrNamespaceExist)
 	}
 	tr, err := tree.NewTree(m.LocalStorage.WithPrefix([]byte(name)))
 	if err != nil {
@@ -721,13 +724,15 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %s", resp.Root)
 		tr2, err := m.AddNamespace(resp.Root, r.PubKeys)
-		if err != nil {
+		if err != nil && err.Error() != ErrNamespaceExist {
 			log.Warnf("error creating local published census: %s", err)
-		} else {
+		} else if err == nil {
 			log.Infof("import claims to new census")
 			err = tr2.ImportDump(dump.ClaimsData)
 			if err != nil {
 				log.Warn(err)
+				resp.SetError(err)
+				return resp
 			}
 		}
 	}
