@@ -250,7 +250,8 @@ func PubKeyFromSignature(msg []byte, sigHex string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%x", crypto.CompressPubkey(pubKey)), nil
+	// Temporary until the client side changes to compressed keys
+	return decompressPubKey(fmt.Sprintf("%x", crypto.CompressPubkey(pubKey)))
 }
 
 // AddrFromSignature recovers the Ethereum address that created the signature of a message

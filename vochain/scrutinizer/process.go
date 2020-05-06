@@ -5,6 +5,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 // ProcessInfo returns the available information regarding an election process id
@@ -14,7 +15,7 @@ func (s *Scrutinizer) ProcessInfo(processID string) (*types.Process, error) {
 
 // Return whether a process must have live results or not
 func (s *Scrutinizer) isLiveResultsProcess(processID string) (bool, error) {
-	p, err := s.ProcessInfo(processID)
+	p, err := s.ProcessInfo(util.TrimHex(processID))
 	if err != nil {
 		return false, err
 	}

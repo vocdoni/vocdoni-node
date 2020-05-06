@@ -174,7 +174,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			if err != nil {
 				return nil, fmt.Errorf("cannot marshal vote (%s)", err)
 			}
-			log.Debugf("Vote Payload: %s", voteBytes)
+			log.Debugf("vote Payload: %s", voteBytes)
 			pubKey, err := signature.PubKeyFromSignature(voteBytes, tx.Signature)
 			if err != nil {
 				return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
@@ -183,6 +183,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			if err != nil {
 				return nil, fmt.Errorf("cannot extract address from public key: (%s)", err)
 			}
+			log.Debugf("extracted public key: %s", pubKey)
 
 			// assign a nullifier
 			vote.Nullifier, err = GenerateNullifier(addr, vote.ProcessID)
