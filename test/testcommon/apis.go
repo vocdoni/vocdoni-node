@@ -1,14 +1,15 @@
 package testcommon
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
 	voclient "github.com/tendermint/tendermint/rpc/client"
+	"nhooyr.io/websocket"
 
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/config"
@@ -114,11 +115,11 @@ func NewAPIConnection(tb testing.TB, addr string) *APIConnection {
 	tb.Helper()
 	r := &APIConnection{tb: tb}
 	var err error
-	r.Conn, _, err = websocket.DefaultDialer.Dial(addr, nil)
+	r.Conn, _, err = websocket.Dial(context.TODO(), addr, nil)
 	if err != nil {
 		tb.Fatal(err)
 	}
-	r.tb.Cleanup(func() { r.Conn.Close() })
+	r.tb.Cleanup(func() { r.Conn.Close(websocket.StatusNormalClosure, "") })
 	return r
 }
 
@@ -142,10 +143,10 @@ func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKey
 	if err != nil {
 		r.tb.Fatalf("%s: %v", method, err)
 	}
-	if err := r.Conn.WriteMessage(websocket.TextMessage, rawReq); err != nil {
+	if err := r.Conn.Write(context.TODO(), websocket.MessageText, rawReq); err != nil {
 		r.tb.Fatalf("%s: %v", method, err)
 	}
-	_, message, err := r.Conn.ReadMessage()
+	_, message, err := r.Conn.Read(context.TODO())
 	if err != nil {
 		r.tb.Fatalf("%s: %v", method, err)
 	}
