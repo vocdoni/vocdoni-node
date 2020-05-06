@@ -489,7 +489,8 @@ func (v *State) Envelope(voteID string, isQuery bool) (*types.Vote, error) {
 }
 
 // EnvelopeExists returns true if the envelope identified with voteID exists
-func (v *State) EnvelopeExists(voteID string) bool {
+func (v *State) EnvelopeExists(processID, nullifier string) bool {
+	voteID := fmt.Sprintf("%s_%s", util.TrimHex(processID), util.TrimHex(nullifier))
 	v.ILock.RLock()
 	defer v.ILock.RUnlock()
 	return v.IVoteTree.Has([]byte(voteID))

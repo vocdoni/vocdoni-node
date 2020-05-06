@@ -138,9 +138,6 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 	if process == nil {
 		return nil, fmt.Errorf("process with id (%s) does not exist", tx.ProcessID)
 	}
-	if !util.IsHexEncodedStringWithLength(tx.ProcessID, processIDsize) {
-		return nil, fmt.Errorf("malformed processId")
-	}
 	header := state.Header(false)
 	if header == nil {
 		return nil, fmt.Errorf("cannot obtain state header")
@@ -177,6 +174,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			if err != nil {
 				return nil, fmt.Errorf("cannot marshal vote (%s)", err)
 			}
+			log.Debugf("Vote Payload: %s", voteBytes)
 			pubKey, err := signature.PubKeyFromSignature(voteBytes, tx.Signature)
 			if err != nil {
 				return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
@@ -194,7 +192,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			log.Debugf("generated new vote nullifier: %s", vote.Nullifier)
 
 			// check if vote exists
-			if state.EnvelopeExists(fmt.Sprintf("%s_%s", vote.ProcessID, vote.Nullifier)) {
+			if state.EnvelopeExists(vote.ProcessID, vote.Nullifier) {
 				return nil, fmt.Errorf("vote already exists")
 			}
 
