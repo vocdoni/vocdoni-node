@@ -166,8 +166,7 @@ func (r *Router) getProcessList(request routerRequest) {
 		return
 	}
 	if !exists {
-		response.ProcessList = []string{""}
-		response.Message = fmt.Sprintf("the entity with id (%s) does not have any process", request.EntityId)
+		response.Message = "entity does not exist or has not yet created a process"
 		r.transport.Send(r.buildReply(request, response))
 		return
 	}
