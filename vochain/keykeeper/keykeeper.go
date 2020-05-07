@@ -208,9 +208,8 @@ func (k *KeyKeeper) OnCancel(pid string) {
 	if !p.RequireKeys() {
 		return
 	}
-	if err := k.revealKeys(pid); err != nil {
-		log.Error(err)
-	}
+	log.Infof("process canceled, scheduling reveal keys for next block")
+	k.blockPool[pid] = k.vochain.State.Header(false).Height + 1
 }
 
 // Commit saves the pending operation
