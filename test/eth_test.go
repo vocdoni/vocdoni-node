@@ -1,19 +1,18 @@
 package test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/gorilla/websocket"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
 	dnet "gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"nhooyr.io/websocket"
 )
 
 type jsonrpcRequestWrapper struct {
@@ -64,11 +63,11 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	listenerOutput := make(chan types.Message)
 	go ws.Listen(listenerOutput)
 	// create ws client
-	c, _, err := websocket.Dial(context.TODO(), pxyAddr, nil)
+	c, _, err := websocket.DefaultDialer.Dial(pxyAddr, nil)
 	if err != nil {
 		t.Fatalf("cannot dial web3ws: %s", err)
 	}
-	defer c.Close(websocket.StatusNormalClosure, "")
+	defer c.Close()
 	// send requests
 	for _, tt := range testRequests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -79,12 +78,12 @@ func TestWeb3WSEndpoint(t *testing.T) {
 				t.Fatalf("cannot marshal request: %s", err)
 			}
 			t.Logf("sending request: %v", tt.request)
-			err = c.Write(context.TODO(), websocket.MessageText, reqBytes)
+			err = c.WriteMessage(websocket.TextMessage, reqBytes)
 			if err != nil {
 				t.Fatalf("cannot write to ws: %s", err)
 			}
 			// read message
-			_, message, err := c.Read(context.TODO())
+			_, message, err := c.ReadMessage()
 			if err != nil {
 				t.Fatalf("cannot read message: %s", err)
 			}
@@ -100,6 +99,11 @@ func TestWeb3WSEndpoint(t *testing.T) {
 				t.Fatalf("result not expected, diff is: %s", diff)
 			}
 		})
+	}
+	// send close message
+	err = c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	if err != nil {
+		t.Fatalf("write close: %s", err)
 	}
 }
 
