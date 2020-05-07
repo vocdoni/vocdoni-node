@@ -40,12 +40,17 @@ func (r *Router) submitRawTx(request routerRequest) {
 
 func (r *Router) submitEnvelope(request routerRequest) {
 	voteTxArgs := new(types.VoteTx)
+	if request.Payload == nil {
+		r.sendError(request, "payload is empty")
+		return
+	}
 	voteTxArgs.ProcessID = request.Payload.ProcessID
 	voteTxArgs.Nonce = request.Payload.Nonce
 	voteTxArgs.Nullifier = request.Payload.Nullifier
 	voteTxArgs.VotePackage = request.Payload.VotePackage
 	voteTxArgs.Proof = request.Payload.Proof
 	voteTxArgs.Type = "vote"
+	voteTxArgs.EncryptionKeyIndexes = request.Payload.EncryptionKeyIndexes
 	voteTxArgs.Signature = request.Payload.Signature
 
 	voteTxBytes, err := json.Marshal(voteTxArgs)
