@@ -261,7 +261,7 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 	// Light sync
 	if e.DefaultConfig.LightMode {
 		info.Mode = "light"
-		info.Synced = true
+		info.Synced = false
 		var r *rpc.Client
 		r, err = e.Node.Attach()
 		if r == nil || err != nil {
