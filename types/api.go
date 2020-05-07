@@ -57,8 +57,8 @@ type MetaResponse struct {
 	ClaimsData           []string   `json:"claimsData,omitempty"`
 	CommitmentKeys       []Key      `json:"commitmentKeys,omitempty"`
 	Content              string     `json:"content,omitempty"`
-	EncryptionPublicKeys []Key      `json:"encryptionPubKeys,omitempty"`
 	EncryptionPrivKeys   []Key      `json:"encryptionPrivKeys,omitempty"`
+	EncryptionPublicKeys []Key      `json:"encryptionPubKeys,omitempty"`
 	EntityID             string     `json:"entityId,omitempty"`
 	EntityIDs            []string   `json:"entityIds,omitempty"`
 	Files                []byte     `json:"files,omitempty"`
