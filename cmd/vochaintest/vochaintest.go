@@ -221,6 +221,7 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int
 	log.Infof("generating proofs...")
 	for i, s := range signers {
 		pub, _ = s.HexString()
+		pub, _ = signature.DecompressPubKey(pub) // Temporary until everything is compressed
 		if proof, err = getProof(c, pub, root); err != nil {
 			return err
 		}
@@ -478,6 +479,7 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 				break
 			}
 			pub, _ = censusSigners[currentSize-1].HexString()
+			pub, _ = signature.DecompressPubKey(pub) // Temporary until everything is compressed only
 			data = base64.StdEncoding.EncodeToString(signature.HashPoseidon(hexutils.HexToBytes(pub)))
 			claims = append(claims, data)
 			currentSize--

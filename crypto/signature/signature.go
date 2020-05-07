@@ -98,7 +98,7 @@ func (k *SignKeys) HexString() (string, string) {
 }
 
 // decompressPubKey takes a hexString compressed public key and returns it descompressed
-func decompressPubKey(pubHexComp string) (string, error) {
+func DecompressPubKey(pubHexComp string) (string, error) {
 	pubHexComp = util.TrimHex(pubHexComp)
 	if len(pubHexComp) > PubKeyLength {
 		return pubHexComp, nil
@@ -202,7 +202,7 @@ func AddrFromPublicKey(pubHex string) (string, error) {
 	var pubHexDesc string
 	var err error
 	if len(pubHex) <= PubKeyLength {
-		pubHexDesc, err = decompressPubKey(pubHex)
+		pubHexDesc, err = DecompressPubKey(pubHex)
 		if err != nil {
 			return "", err
 		}
@@ -251,7 +251,7 @@ func PubKeyFromSignature(msg []byte, sigHex string) (string, error) {
 		return "", err
 	}
 	// Temporary until the client side changes to compressed keys
-	return decompressPubKey(fmt.Sprintf("%x", crypto.CompressPubkey(pubKey)))
+	return DecompressPubKey(fmt.Sprintf("%x", crypto.CompressPubkey(pubKey)))
 }
 
 // AddrFromSignature recovers the Ethereum address that created the signature of a message
