@@ -41,6 +41,7 @@ func unmarshalVote(votePackage string, keys []string) (*types.VotePackage, error
 }
 
 func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
+	pid := util.TrimHex(envelope.ProcessID)
 	vote, err := unmarshalVote(envelope.VotePackage, []string{})
 	if err != nil {
 		return err
@@ -49,9 +50,9 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
 		return fmt.Errorf("too many questions on addVote")
 	}
 
-	process, err := s.Storage.Get([]byte(types.ScrutinizerLiveProcessPrefix + envelope.ProcessID))
+	process, err := s.Storage.Get([]byte(types.ScrutinizerLiveProcessPrefix + pid))
 	if err != nil {
-		return fmt.Errorf("error adding vote to process %s, skipping addVote: (%s)", envelope.ProcessID, err)
+		return fmt.Errorf("error adding vote to process %s, skipping addVote: (%s)", pid, err)
 	}
 
 	var pv ProcessVotes
@@ -72,11 +73,11 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
 		return err
 	}
 
-	if err := s.Storage.Put([]byte(types.ScrutinizerLiveProcessPrefix+envelope.ProcessID), process); err != nil {
+	if err := s.Storage.Put([]byte(types.ScrutinizerLiveProcessPrefix+pid), process); err != nil {
 		return err
 	}
 
-	log.Debugf("addVote on process %s", envelope.ProcessID)
+	log.Debugf("addVote on process %s", pid)
 	return nil
 }
 
