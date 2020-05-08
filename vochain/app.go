@@ -111,9 +111,11 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	if err != nil {
 		log.Errorf("cannot marshal header: %s", err)
 	}
+	app.State.Lock()
 	app.State.AppTree.Set(headerKey, headerBytes)
-	app.State.Save()
+	app.State.Unlock()
 
+	app.State.Save()
 	// TBD: using empty list here, should return validatorsUpdate to use the validators obtained here
 	return abcitypes.ResponseInitChain{}
 }
@@ -122,21 +124,23 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 // The header contains the height, timestamp, and more - it exactly matches the Tendermint block header.
 // The LastCommitInfo and ByzantineValidators can be used to determine rewards and punishments for the validators.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	// reset app state to latest persistent data
-	app.State.Rollback()
-	// set immutable state
-
-	app.State.ILock.Lock()
-	app.State.IAppTree = app.State.AppTree.ImmutableTree
-	app.State.IProcessTree = app.State.ProcessTree.ImmutableTree
-	app.State.IVoteTree = app.State.VoteTree.ImmutableTree
-	app.State.ILock.Unlock()
-
 	headerBytes, err := app.Codec.MarshalBinaryBare(req.Header)
 	if err != nil {
 		log.Warnf("cannot marshal header in BeginBlock")
 	}
+
+	// reset app state to latest persistent data
+	app.State.Rollback()
+
+	app.State.Lock()
+	// set immutable state
+	app.State.IAppTree = app.State.AppTree.ImmutableTree
+	app.State.IProcessTree = app.State.ProcessTree.ImmutableTree
+	app.State.IVoteTree = app.State.VoteTree.ImmutableTree
+
 	app.State.AppTree.Set(headerKey, headerBytes)
+	app.State.Unlock()
+
 	return abcitypes.ResponseBeginBlock{}
 }
 

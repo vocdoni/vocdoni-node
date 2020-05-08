@@ -77,10 +77,14 @@ type State struct {
 
 // ImmutableState holds the latest trees version saved on disk
 type ImmutableState struct {
+	// Note that the mutex locks the entirety of the three IAVL trees, both
+	// their mutable and immutable components. An immutable tree is not safe
+	// for concurrent use with its parent mutable tree.
+	sync.RWMutex
+
 	IAppTree     *iavl.ImmutableTree
 	IProcessTree *iavl.ImmutableTree
 	IVoteTree    *iavl.ImmutableTree
-	ILock        sync.RWMutex
 }
 
 // NewState creates a new State
@@ -156,7 +160,9 @@ func (v *State) AddEvent(name string, f Event) error {
 // AddOracle adds a trusted oracle given its address if not exists
 func (v *State) AddOracle(address string) error {
 	address = util.TrimHex(address)
+	v.RLock()
 	_, oraclesBytes := v.AppTree.Get(oracleKey)
+	v.RUnlock()
 	var oracles []string
 	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	for _, v := range oracles {
@@ -169,14 +175,18 @@ func (v *State) AddOracle(address string) error {
 	if err != nil {
 		return errors.New("cannot marshal oracles")
 	}
+	v.Lock()
 	v.AppTree.Set(oracleKey, newOraclesBytes)
+	v.Unlock()
 	return nil
 }
 
 // RemoveOracle removes a trusted oracle given its address if exists
 func (v *State) RemoveOracle(address string) error {
 	address = util.TrimHex(address)
+	v.RLock()
 	_, oraclesBytes := v.AppTree.Get(oracleKey)
+	v.RUnlock()
 	var oracles []string
 	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	for i, o := range oracles {
@@ -189,7 +199,9 @@ func (v *State) RemoveOracle(address string) error {
 			if err != nil {
 				return errors.New("cannot marshal oracles")
 			}
+			v.Lock()
 			v.AppTree.Set(oracleKey, newOraclesBytes)
+			v.Unlock()
 			return nil
 		}
 	}
@@ -199,13 +211,13 @@ func (v *State) RemoveOracle(address string) error {
 // Oracles returns the current oracle list
 func (v *State) Oracles(isQuery bool) ([]string, error) {
 	var oraclesBytes []byte
+	v.RLock()
 	if isQuery {
-		v.ILock.RLock()
 		_, oraclesBytes = v.IAppTree.Get(oracleKey)
-		v.ILock.RUnlock()
 	} else {
 		_, oraclesBytes = v.AppTree.Get(oracleKey)
 	}
+	v.RUnlock()
 	var oracles []string
 	err := v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	return oracles, err
@@ -227,7 +239,9 @@ func hexPubKeyToTendermintEd25519(pubKey string) (crypto.PubKey, error) {
 // AddValidator adds a tendemint validator if it is not already added
 func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
 	addr := pubKey.Address().String()
+	v.RLock()
 	_, validatorsBytes := v.AppTree.Get(validatorKey)
+	v.RUnlock()
 	var validators []tmtypes.GenesisValidator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
 	for _, v := range validators {
@@ -246,13 +260,17 @@ func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
 	if err != nil {
 		return errors.New("cannot marshal validator")
 	}
+	v.Lock()
 	v.AppTree.Set(validatorKey, validatorsBytes)
+	v.Unlock()
 	return nil
 }
 
 // RemoveValidator removes a tendermint validator if exists
 func (v *State) RemoveValidator(address string) error {
+	v.RLock()
 	_, validatorsBytes := v.AppTree.Get(validatorKey)
+	v.RUnlock()
 	var validators []tmtypes.GenesisValidator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
 	for i, val := range validators {
@@ -265,7 +283,9 @@ func (v *State) RemoveValidator(address string) error {
 			if err != nil {
 				return errors.New("cannot marshal validators")
 			}
+			v.Lock()
 			v.AppTree.Set(validatorKey, validatorsBytes)
+			v.Unlock()
 			return nil
 		}
 	}
@@ -275,13 +295,13 @@ func (v *State) RemoveValidator(address string) error {
 // Validators returns a list of the validators saved on persistent storage
 func (v *State) Validators(isQuery bool) ([]tmtypes.GenesisValidator, error) {
 	var validatorBytes []byte
+	v.RLock()
 	if isQuery {
-		v.ILock.RLock()
 		_, validatorBytes = v.IAppTree.Get(validatorKey)
-		v.ILock.RUnlock()
 	} else {
 		_, validatorBytes = v.AppTree.Get(validatorKey)
 	}
+	v.RUnlock()
 	var validators []tmtypes.GenesisValidator
 	err := v.Codec.UnmarshalBinaryBare(validatorBytes, &validators)
 	return validators, err
@@ -351,7 +371,9 @@ func (v *State) AddProcess(p *types.Process, pid string) error {
 	if err != nil {
 		return errors.New("cannot marshal process bytes")
 	}
+	v.Lock()
 	v.ProcessTree.Set([]byte(pid), newProcessBytes)
+	v.Unlock()
 	if events, ok := v.Events["addProcess"]; ok {
 		for _, e := range events {
 			e.OnProcess(pid, p.EntityID)
@@ -375,7 +397,9 @@ func (v *State) CancelProcess(pid string) error {
 	if err != nil {
 		return errors.New("cannot marshal updated process bytes")
 	}
+	v.Lock()
 	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
+	v.Unlock()
 	if events, ok := v.Events["cancelProcess"]; ok {
 		for _, e := range events {
 			e.OnCancel(pid)
@@ -387,7 +411,9 @@ func (v *State) CancelProcess(pid string) error {
 // PauseProcess sets the process paused atribute to true
 func (v *State) PauseProcess(pid string) error {
 	pid = util.TrimHex(pid)
+	v.RLock()
 	_, processBytes := v.ProcessTree.Get([]byte(pid))
+	v.RUnlock()
 	var process types.Process
 	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
 		return errors.New("cannot unmarshal process")
@@ -403,7 +429,9 @@ func (v *State) PauseProcess(pid string) error {
 // ResumeProcess sets the process paused atribute to true
 func (v *State) ResumeProcess(pid string) error {
 	pid = util.TrimHex(pid)
+	v.RLock()
 	_, processBytes := v.ProcessTree.Get([]byte(pid))
+	v.RUnlock()
 	var process types.Process
 	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
 		return errors.New("cannot unmarshal process")
@@ -421,13 +449,13 @@ func (v *State) Process(pid string, isQuery bool) (*types.Process, error) {
 	var process *types.Process
 	var processBytes []byte
 	pid = util.TrimHex(pid)
+	v.RLock()
 	if isQuery {
-		v.ILock.RLock()
 		_, processBytes = v.IProcessTree.Get([]byte(pid))
-		v.ILock.RUnlock()
 	} else {
 		_, processBytes = v.ProcessTree.Get([]byte(pid))
 	}
+	v.RUnlock()
 	if processBytes == nil {
 		return nil, fmt.Errorf("cannot find process with id (%s)", pid)
 	}
@@ -447,7 +475,9 @@ func (v *State) setProcess(process *types.Process, pid string) error {
 	if err != nil {
 		return errors.New("cannot marshal updated process bytes")
 	}
+	v.Lock()
 	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
+	v.Unlock()
 	return nil
 }
 
@@ -458,7 +488,9 @@ func (v *State) AddVote(vote *types.Vote) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal vote")
 	}
+	v.Lock()
 	v.VoteTree.Set([]byte(voteID), newVoteBytes)
+	v.Unlock()
 	if events, ok := v.Events["addVote"]; ok {
 		for _, e := range events {
 			e.OnVote(vote)
@@ -472,13 +504,13 @@ func (v *State) AddVote(vote *types.Vote) error {
 func (v *State) Envelope(voteID string, isQuery bool) (*types.Vote, error) {
 	var vote *types.Vote
 	var voteBytes []byte
+	v.RLock()
 	if isQuery {
-		v.ILock.RLock()
 		_, voteBytes = v.IVoteTree.Get([]byte(voteID))
-		v.ILock.RUnlock()
 	} else {
 		_, voteBytes = v.VoteTree.Get([]byte(voteID))
 	}
+	v.RUnlock()
 	if voteBytes == nil {
 		return nil, fmt.Errorf("vote with id (%s) does not exist", voteID)
 	}
@@ -491,8 +523,8 @@ func (v *State) Envelope(voteID string, isQuery bool) (*types.Vote, error) {
 // EnvelopeExists returns true if the envelope identified with voteID exists
 func (v *State) EnvelopeExists(processID, nullifier string) bool {
 	voteID := fmt.Sprintf("%s_%s", util.TrimHex(processID), util.TrimHex(nullifier))
-	v.ILock.RLock()
-	defer v.ILock.RUnlock()
+	v.RLock()
+	defer v.RUnlock()
 	return v.IVoteTree.Has([]byte(voteID))
 }
 
@@ -502,9 +534,9 @@ func (v *State) EnvelopeExists(processID, nullifier string) bool {
 // as the end point, since "}" comes after "_" when sorting lexicographically.
 func (v *State) iterateProcessID(processID string, fn func(key []byte, value []byte) bool, isQuery bool) bool {
 	if isQuery {
-		v.ILock.RLock()
+		v.RLock()
 		b := v.IVoteTree.IterateRange([]byte(processID+"_"), []byte(processID+"}"), true, fn)
-		v.ILock.RUnlock()
+		v.RUnlock()
 		return b
 	}
 	return v.VoteTree.IterateRange([]byte(processID+"_"), []byte(processID+"}"), true, fn)
@@ -543,13 +575,13 @@ func (v *State) EnvelopeList(processID string, from, listSize int64, isQuery boo
 // Header returns the blockchain last block commited height
 func (v *State) Header(isQuery bool) *tmtypes.Header {
 	var headerBytes []byte
+	v.RLock()
 	if isQuery {
-		v.ILock.RLock()
 		_, headerBytes = v.IAppTree.Get(headerKey)
-		v.ILock.RUnlock()
 	} else {
 		_, headerBytes = v.AppTree.Get(headerKey)
 	}
+	v.RUnlock()
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
 	if err != nil {
@@ -562,13 +594,13 @@ func (v *State) Header(isQuery bool) *tmtypes.Header {
 // AppHash returns last hash of the application
 func (v *State) AppHash(isQuery bool) []byte {
 	var headerBytes []byte
+	v.RLock()
 	if isQuery {
-		v.ILock.RLock()
 		_, headerBytes = v.IAppTree.Get(headerKey)
-		v.ILock.RUnlock()
 	} else {
 		_, headerBytes = v.AppTree.Get(headerKey)
 	}
+	v.RUnlock()
 	var header tmtypes.Header
 	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
 	if err != nil {
@@ -586,6 +618,7 @@ func (v *State) Save() []byte {
 			}
 		}
 	}
+	v.Lock()
 	h1, _, err := v.AppTree.SaveVersion()
 	if err != nil {
 		log.Errorf("cannot save vochain state to disk: %s", err)
@@ -598,6 +631,7 @@ func (v *State) Save() []byte {
 	if err != nil {
 		log.Errorf("cannot save vochain state to disk: %s", err)
 	}
+	v.Unlock()
 
 	return signature.HashRaw([]byte(fmt.Sprintf("%s%s%s", h1, h2, h3)))
 }
@@ -609,15 +643,22 @@ func (v *State) Rollback() {
 			e.Rollback()
 		}
 	}
+	v.Lock()
 	v.AppTree.Rollback()
 	v.ProcessTree.Rollback()
 	v.VoteTree.Rollback()
+	v.Unlock()
 }
 
 // WorkingHash returns the hash of the vochain trees mkroots
 // hash(appTree+processTree+voteTree)
 func (v *State) WorkingHash() []byte {
-	return signature.HashRaw([]byte(fmt.Sprintf("%s%s%s", v.AppTree.WorkingHash(), v.ProcessTree.WorkingHash(), v.VoteTree.WorkingHash())))
+	v.RLock()
+	appHash := v.AppTree.WorkingHash()
+	procHash := v.ProcessTree.WorkingHash()
+	voteHash := v.VoteTree.WorkingHash()
+	v.RUnlock()
+	return signature.HashRaw([]byte(fmt.Sprintf("%s%s%s", appHash, procHash, voteHash)))
 }
 
 // ProcessList returns a list of processId given an entityId

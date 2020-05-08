@@ -142,8 +142,10 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			vi.avg60 = a60
 			vi.avg360 = a360
 			vi.avg1440 = a1440
+			vi.vnode.State.RLock()
 			vi.processTreeSize = vi.vnode.State.ProcessTree.Size()
 			vi.voteTreeSize = vi.vnode.State.VoteTree.Size()
+			vi.vnode.State.RUnlock()
 			vi.mempoolSize = vi.vnode.Node.Mempool().Size()
 			vi.lock.Unlock()
 
