@@ -4,8 +4,8 @@ package vochain
 const (
 	ReleaseGenesis1 = `
 {
-  "genesis_time": "2020-04-04T09:30:50.199392102Z",
-  "chain_id": "vocdoni-release-01",
+  "genesis_time": "2020-05-08T09:30:50.199392102Z",
+  "chain_id": "vocdoni-release-03",
   "consensus_params": {
     "block": {
       "max_bytes": "22020096",
