@@ -501,16 +501,23 @@ func (v *State) AddVote(vote *types.Vote) error {
 
 // Envelope returns the info of a vote if already exists.
 // voteID must be equals to processID_Nullifier
-func (v *State) Envelope(voteID string, isQuery bool) (*types.Vote, error) {
+func (v *State) Envelope(voteID string, isQuery bool) (_ *types.Vote, err error) {
+	// TODO(mvdan): remove the recover once
+	// https://github.com/tendermint/iavl/issues/212 is fixed
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recovered panic: %v", r)
+		}
+	}()
 	var vote *types.Vote
 	var voteBytes []byte
 	v.RLock()
+	defer v.RUnlock() // needs to be deferred due to the recover above
 	if isQuery {
 		_, voteBytes = v.IVoteTree.Get([]byte(voteID))
 	} else {
 		_, voteBytes = v.VoteTree.Get([]byte(voteID))
 	}
-	v.RUnlock()
 	if voteBytes == nil {
 		return nil, fmt.Errorf("vote with id (%s) does not exist", voteID)
 	}
@@ -533,11 +540,10 @@ func (v *State) EnvelopeExists(processID, nullifier string) bool {
 // We don't know what the next processID hash will be, so we use "processID}"
 // as the end point, since "}" comes after "_" when sorting lexicographically.
 func (v *State) iterateProcessID(processID string, fn func(key []byte, value []byte) bool, isQuery bool) bool {
+	v.RLock()
+	defer v.RUnlock()
 	if isQuery {
-		v.RLock()
-		b := v.IVoteTree.IterateRange([]byte(processID+"_"), []byte(processID+"}"), true, fn)
-		v.RUnlock()
-		return b
+		return v.IVoteTree.IterateRange([]byte(processID+"_"), []byte(processID+"}"), true, fn)
 	}
 	return v.VoteTree.IterateRange([]byte(processID+"_"), []byte(processID+"}"), true, fn)
 }
@@ -555,6 +561,15 @@ func (v *State) CountVotes(processID string, isQuery bool) int64 {
 
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
 func (v *State) EnvelopeList(processID string, from, listSize int64, isQuery bool) []string {
+	// TODO(mvdan): remove the recover once
+	// https://github.com/tendermint/iavl/issues/212 is fixed
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("recovered panic: %v", r)
+			// TODO(mvdan): this func should return an error instead
+			// err = fmt.Errorf("recovered panic: %v", r)
+		}
+	}()
 	processID = util.TrimHex(processID)
 	var nullifiers []string
 	idx := int64(0)
@@ -660,9 +675,3 @@ func (v *State) WorkingHash() []byte {
 	v.RUnlock()
 	return signature.HashRaw([]byte(fmt.Sprintf("%s%s%s", appHash, procHash, voteHash)))
 }
-
-// ProcessList returns a list of processId given an entityId
-// func (v *State) ProcessList(entityId string) []Process
-
-// EnvelopeList returns a list of envelopes given a processId
-// func (v *State) EnvelopeList(processId string) []Vote
