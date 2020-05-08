@@ -30,9 +30,9 @@ import (
 
 var (
 	// ProdSeedNodes production vochain network seed nodes
-	ProdSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:11714"}
+	ProdSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@116.202.8.150:26656"}
 	// DevSeedNodes testing vochain network seed nodes
-	DevSeedNodes = []string{"7440a5b086e16620ce7b13198479016aa2b07988@116.202.8.150:11715"}
+	DevSeedNodes = []string{"7440a5b086e16620ce7b13198479016aa2b07988@116.203.205.187:26656"}
 )
 
 // NewVochain starts a node with an ABCI application
