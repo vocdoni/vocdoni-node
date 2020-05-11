@@ -113,6 +113,8 @@ type EthCfg struct {
 	TrustedPeers []string
 	// ProcessDomain ethereum contract to use as source of truth for some operations
 	ProcessDomain string
+	// NoWaitSync do not wait for Ethereum to synchronize
+	NoWaitSync bool
 }
 
 // W3Cfg stores global configs for web3
@@ -219,7 +221,6 @@ func NewOracleCfg() *OracleCfg {
 // MetricsCfg initializes the metrics config
 type MetricsCfg struct {
 	Enabled         bool
-	Port            int
 	RefreshInterval int
 }
 

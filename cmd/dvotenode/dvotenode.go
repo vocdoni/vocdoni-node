@@ -77,7 +77,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootNodes", []string{}, "Ethereum p2p custom bootstrap nodes (enode://<pubKey>@<ip>[:port])")
 	globalCfg.EthConfig.TrustedPeers = *flag.StringArray("ethTrustedPeers", []string{}, "Ethereum p2p trusted peer nodes (enode://<pubKey>@<ip>[:port])")
 	globalCfg.EthConfig.ProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
-	flag.BoolVar(&ethNoWaitSync, "ethNoWaitSync", false, "do not wait for Ethereum to synchronize (for testing only)")
+	globalCfg.EthConfig.NoWaitSync = *flag.Bool("ethNoWaitSync", false, "do not wait for Ethereum to synchronize (for testing only)")
 	// ethereum events
 	globalCfg.EthEventConfig.CensusSync = *flag.Bool("ethCensusSync", true, "automatically import new census published on the smart contract")
 	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", false, "only subscribe to new ethereum events (do not read past log)")
@@ -121,6 +121,9 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.AddConfigPath(globalCfg.DataDir)
 	viper.SetConfigName("dvote")
 	viper.SetConfigType("yml")
+	viper.SetEnvPrefix("DVOTE")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// binding flags to viper
 
@@ -155,6 +158,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("ethConfig.bootNodes", flag.Lookup("ethBootNodes"))
 	viper.BindPFlag("ethConfig.trustedPeers", flag.Lookup("ethTrustedPeers"))
 	viper.BindPFlag("ethConfig.processDomain", flag.Lookup("ethProcessDomain"))
+	viper.BindPFlag("ethConfig.noWaitSync", flag.Lookup("ethNoWaitSync"))
 	viper.BindPFlag("ethEventConfig.censusSync", flag.Lookup("ethCensusSync"))
 	viper.BindPFlag("ethEventConfig.subscribeOnly", flag.Lookup("ethSubscribeOnly"))
 
@@ -443,7 +447,7 @@ func main() {
 
 	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
 		// Wait for Ethereum to be ready
-		if !ethNoWaitSync {
+		if !globalCfg.EthConfig.NoWaitSync {
 			for {
 				if info, err := node.SyncInfo(); err == nil && info.Synced && info.Peers > 1 && info.Height > 0 {
 					log.Infof("ethereum blockchain synchronized (%+v)", info)
@@ -454,7 +458,7 @@ func main() {
 		}
 
 		// Ethereum events service (needs Ethereum synchronized)
-		if (!ethNoWaitSync && globalCfg.Mode == "gateway" && globalCfg.EthEventConfig.CensusSync) || globalCfg.Mode == "oracle" {
+		if (!globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == "gateway" && globalCfg.EthEventConfig.CensusSync) || globalCfg.Mode == "oracle" {
 			var evh []ethevents.EventHandler
 
 			if globalCfg.Mode == "gateway" {

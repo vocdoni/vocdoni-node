@@ -9,11 +9,8 @@ services:
       - "run:/app/run"
     ports:
       - "8080:443"
-    env_file:
-      - ./env
     environment:
-      mode: census
-      #EXTRA_OPTS: "$EXTRA_OPTS --volume-driver memfs"
+      DVOTE_MODE: census
     logging:
       driver: json-file
       options:

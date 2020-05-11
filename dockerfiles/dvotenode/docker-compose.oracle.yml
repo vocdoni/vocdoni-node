@@ -14,11 +14,8 @@ services:
       - "30303:30303/udp"
       - "26656:26656"
       - "26657:26657"
-    env_file:
-      - ./env
     environment:
-      mode: oracle
-      #EXTRA_OPTS: "$EXTRA_OPTS --volume-driver memfs"
+      DVOTE_MODE: oracle
     logging:
       driver: json-file
       options:

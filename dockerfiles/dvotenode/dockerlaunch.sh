@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# DEPRECATED (use docker-compose files)
+
 IMAGE_TAG="vocdoni/dvotenode"
 API_PORT="${API_PORT:-9090}"
 IN_MEMORY="${IN_MEMORY:-false}"

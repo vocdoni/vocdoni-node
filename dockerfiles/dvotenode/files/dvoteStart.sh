@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# DEPRECATED
+
 GWARGS="\
 ${apiAllowPrivate:+ --apiAllowPrivate=${apiAllowPrivate}}\
 ${apiAllowedAddrs:+ --apiAllowedAddrs=${apiAllowedAddrs}}\

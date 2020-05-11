@@ -10,11 +10,8 @@ services:
     ports:
       - "26656:26656"
       - "26657:26657"
-    env_file:
-      - ./env
     environment:
-      mode: miner
-      # EXTRA_OPTS: "$EXTRA_OPTS --volume-driver memfs"
+      DVOTE_MODE: miner
     logging:
       driver: json-file
       options:
