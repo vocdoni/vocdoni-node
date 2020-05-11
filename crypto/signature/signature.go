@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/ethereum/go-ethereum/crypto"
 	i3utils "github.com/iden3/go-iden3-core/merkletree"
 	"github.com/iden3/go-iden3-crypto/poseidon"
@@ -308,30 +307,4 @@ func HashPoseidon(input []byte) []byte {
 		return []byte{}
 	}
 	return i3utils.BigIntToHash(hashNum).Bytes()
-}
-
-// Encrypt uses secp256k1 standard from https://www.secg.org/sec2-v2.pdf to encrypt a message.
-// The result is a Hexadecimal string
-func (k *SignKeys) Encrypt(message string) (string, error) {
-	pubKey := secp256k1.PublicKey(k.Public)
-	ciphertext, err := secp256k1.Encrypt(&pubKey, []byte(message))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", ciphertext), nil
-}
-
-// Decrypt uses secp256k1 standard to decrypt a Hexadecimal string message
-// The result is plain text (no hex encoded)
-func (k *SignKeys) Decrypt(hexMessage string) (string, error) {
-	cipertext, err := hex.DecodeString(util.TrimHex(hexMessage))
-	if err != nil {
-		return "", err
-	}
-	privKey := secp256k1.PrivateKey(k.Private)
-	plaintext, err := secp256k1.Decrypt(&privKey, cipertext)
-	if err != nil {
-		return "", err
-	}
-	return string(plaintext), nil
 }

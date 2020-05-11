@@ -8,7 +8,6 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200423211322-0b5ff220aee9 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20190912175916-7055855a373f // indirect
-	github.com/decred/dcrd/dcrec/secp256k1 v1.0.2
 	github.com/dgraph-io/badger/v2 v2.0.1-rc1.0.20200409094109-809725940698
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/elastic/gosigar v0.10.5 // indirect

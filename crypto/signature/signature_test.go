@@ -61,30 +61,6 @@ func TestSignature(t *testing.T) {
 	}
 }
 
-func TestEncryption(t *testing.T) {
-	t.Parallel()
-
-	var s SignKeys
-	if err := s.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	pub, priv := s.HexString()
-	t.Logf("Generated pub:%s priv:%s", pub, priv)
-	message := "hello"
-	t.Logf("Message to encrypt: %s", message)
-	msgEnc, err := s.Encrypt(message)
-	if err != nil {
-		t.Fatalf("Error while encrypting %s", err)
-	}
-	t.Logf("Encrypted hexString is %s", msgEnc)
-	t.Logf("Testing Decryption")
-	msgPlain, err := s.Decrypt(msgEnc)
-	if err != nil {
-		t.Fatalf("Error while decrypting %s", err)
-	}
-	t.Logf("Decrypted plain String is %s", msgPlain)
-}
-
 func TestAddr(t *testing.T) {
 	t.Parallel()
 
