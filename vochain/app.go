@@ -134,10 +134,11 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 
 	app.State.Lock()
 	// set immutable state
-	app.State.IAppTree = app.State.AppTree.ImmutableTree
-	app.State.IProcessTree = app.State.ProcessTree.ImmutableTree
-	app.State.IVoteTree = app.State.VoteTree.ImmutableTree
-
+	if req.Header.Height > 0 {
+		if err := app.State.Immutable(); err != nil {
+			log.Errorf("cannot set immutable tree")
+		}
+	}
 	app.State.AppTree.Set(headerKey, headerBytes)
 	app.State.Unlock()
 

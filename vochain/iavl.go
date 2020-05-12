@@ -139,13 +139,33 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	}
 
 	vs.Codec = codec
-	vs.IAppTree = vs.AppTree.ImmutableTree
-	vs.IProcessTree = vs.ProcessTree.ImmutableTree
-	vs.IVoteTree = vs.VoteTree.ImmutableTree
 
 	log.Infof("application trees successfully loaded. appTree:%d processTree:%d voteTree: %d", atVersion, ptVersion, vtVersion)
 	vs.Events = make(map[string][]Event)
 	return &vs, nil
+}
+
+// Immutable creates immutable state
+func (v *State) Immutable() error {
+	var err error
+	// get immutable app tree of the latest app tree version saved
+	v.IAppTree, err = v.AppTree.GetImmutable(v.AppTree.Version())
+	if err != nil {
+		return err
+	}
+
+	// get immutable process tree of the latest process tree version saved
+	v.IProcessTree, err = v.ProcessTree.GetImmutable(v.ProcessTree.Version())
+	if err != nil {
+		return err
+	}
+
+	// get immutable vote tree of the latest vote tree version saved
+	v.IVoteTree, err = v.VoteTree.GetImmutable(v.VoteTree.Version())
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // AddEvent adds a new callback function of type EventCallback which will be exeuted on event name
