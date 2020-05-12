@@ -53,6 +53,15 @@
       },
       "power": "10",
       "name": ""
+    },
+    {
+      "address": "D96C74AEC40A747E26D95A00BF4F0A3699204574",
+      "pub_key": {
+        "type": "tendermint/PubKeyEd25519",
+        "value": "L9A9XLcLntzrSYLCbGIEFA7nhJepkyJf0Q9h2M3feWM="
+      },
+      "power": "10",
+      "name": ""
     }
   ],
   "app_hash": "",
@@ -93,7 +102,16 @@
         },
         "power": "10",
         "name": ""
-      }
+      },
+    {
+      "address": "D96C74AEC40A747E26D95A00BF4F0A3699204574",
+      "pub_key": {
+        "type": "tendermint/PubKeyEd25519",
+        "value": "L9A9XLcLntzrSYLCbGIEFA7nhJepkyJf0Q9h2M3feWM="
+      },
+      "power": "10",
+      "name": ""
+    }
 	],
     "oracles": [
       "0xf7FB77ee1F309D9468fB6DCB71aDD0f934a33c6B"

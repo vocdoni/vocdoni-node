@@ -36,7 +36,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, ma *metrics.Agent) (
 			vconfig.PublicAddr = net.JoinHostPort(ip.String(), port)
 		}
 	} else {
-		host, port, err = net.SplitHostPort(vconfig.P2PListen)
+		host, port, err = net.SplitHostPort(vconfig.PublicAddr)
 		if err != nil {
 			return
 		}

@@ -1,6 +1,20 @@
 version: "3.7"
 
 services:
+  seed:
+    image: "dvotenode"
+    build:
+      context: ../../
+    env_file: "${COMPOSE_HOST_PATH:-.}/env.seed"
+    volumes:
+      - data-seed:/app/run/
+      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+    networks:
+      localnet:
+        ipv4_address: 10.17.14.15
+    ports:
+      - "26656-26657:26656-26657"
+
   miner0:
     image: "dvotenode"
     build:
@@ -13,7 +27,7 @@ services:
       localnet:
         ipv4_address: 10.17.14.2
     ports:
-      - "26656-26657:26656-26657"
+      - "26673-26674:26656-26657"
 
   miner1:
     image: "dvotenode"
@@ -42,6 +56,20 @@ services:
         ipv4_address: 10.17.14.4
     ports:
       - "26660-26661:26656-26657"
+
+  miner3:
+    image: "dvotenode"
+    build:
+      context: ../../
+    env_file: "${COMPOSE_HOST_PATH:-.}/env.miner3"
+    volumes:
+      - data-miner3:/app/run/
+      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+    networks:
+      localnet:
+        ipv4_address: 10.17.14.7
+    ports:
+      - "26670-26671:26656-26657"
 
   oracle:
     image: "dvotenode"
@@ -95,8 +123,10 @@ networks:
         - subnet: 10.17.14.0/24
 
 volumes:
+  data-seed: {}
   data-miner0: {}
   data-miner1: {}
   data-miner2: {}
+  data-miner3: {}
   data-oracle: {}
   data-gateway: {}
