@@ -77,6 +77,7 @@ func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKey
 }
 
 func main() {
+	// starting test
 	loglevel := flag.String("logLevel", "info", "log level")
 	oraclePrivKey := flag.String("oracleKey", "", "oracle private key (hex)")
 	entityPrivKey := flag.String("entityKey", "", "entity private key (hex)")
