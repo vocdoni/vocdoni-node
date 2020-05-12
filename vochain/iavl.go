@@ -646,13 +646,6 @@ func (v *State) AppHash(isQuery bool) []byte {
 
 // Save persistent save of vochain mem trees
 func (v *State) Save() []byte {
-	if events, ok := v.Events["commit"]; ok {
-		if h := v.Header(false); h != nil {
-			for _, e := range events {
-				e.Commit(h.Height)
-			}
-		}
-	}
 	v.Lock()
 	h1, _, err := v.AppTree.SaveVersion()
 	if err != nil {
@@ -666,7 +659,17 @@ func (v *State) Save() []byte {
 	if err != nil {
 		log.Errorf("cannot save vochain state to disk: %s", err)
 	}
+	if err := v.Immutable(); err != nil {
+		log.Errorf("cannot set immutable tree")
+	}
 	v.Unlock()
+	if events, ok := v.Events["commit"]; ok {
+		if h := v.Header(false); h != nil {
+			for _, e := range events {
+				e.Commit(h.Height)
+			}
+		}
+	}
 
 	return signature.HashRaw([]byte(fmt.Sprintf("%s%s%s", h1, h2, h3)))
 }

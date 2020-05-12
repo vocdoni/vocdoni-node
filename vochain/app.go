@@ -133,12 +133,6 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	app.State.Rollback()
 
 	app.State.Lock()
-	// set immutable state
-	if req.Header.Height > 0 {
-		if err := app.State.Immutable(); err != nil {
-			log.Errorf("cannot set immutable tree")
-		}
-	}
 	app.State.AppTree.Set(headerKey, headerBytes)
 	app.State.Unlock()
 
