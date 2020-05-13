@@ -48,7 +48,7 @@ compose-test:
     # TODO: Better way of waiting for initialization
     - sleep 5
     - docker-compose logs
-    - docker-compose run test ./vochaintest --oracleKey 6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223 --electionSize=1000 --gwHost ws://10.17.14.6:9090/dvote
+    - docker-compose run test timeout 300 ./vochaintest --oracleKey 6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223 --electionSize=1000 --gwHost ws://10.17.14.6:9090/dvote
   after_script:
     - cd dockerfiles/testsuite
     - docker-compose down -v --remove-orphans
