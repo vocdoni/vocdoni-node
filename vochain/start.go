@@ -109,6 +109,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig.LogLevel = localConfig.LogLevel
 	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RPCListen
 	tconfig.P2P.ListenAddress = "tcp://" + localConfig.P2PListen
+	tconfig.P2P.AllowDuplicateIP = true // TBD make this a flag or dependent on dev mode, because it might imply some security issues
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 	if !localConfig.CreateGenesis {
@@ -229,7 +230,6 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}
 	log.Debugf("consensus config %+v", *node.Config().Consensus)
-
 	return node, nil
 }
 

@@ -1,6 +1,7 @@
 package vochaininfo
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -70,6 +71,14 @@ func (vi *VochainInfo) MempoolSize() int {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
 	return vi.mempoolSize
+}
+
+// Peers returns the current list of connected peers
+func (vi *VochainInfo) Peers() (peers []string) {
+	for _, p := range vi.vnode.Node.Switch().Peers().List() {
+		peers = append(peers, fmt.Sprintf("%s", p.ID()))
+	}
+	return
 }
 
 // Start initializes the Vochain statistics recollection
