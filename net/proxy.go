@@ -292,6 +292,7 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 				Data:      payload,
 				TimeStamp: int32(time.Now().Unix()),
 				Context:   &WebsocketContext{Conn: conn},
+				Namespace: path,
 			}
 			w.internalReceiver <- msg
 		}
@@ -305,6 +306,11 @@ func (w *WebsocketHandle) Listen(receiver chan<- types.Message) {
 		msg := <-w.internalReceiver
 		receiver <- msg
 	}
+}
+
+// Listen will listen the websockets handler and write the received data into the channel
+func (w *WebsocketHandle) AddNamespace(namespace string) {
+	w.AddProxyHandler(namespace)
 }
 
 // Send sends the response given a message

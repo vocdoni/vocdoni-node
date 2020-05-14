@@ -17,6 +17,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
 
+// TBD: user the net.Transport interface
 func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census.Manager, vapp *vochain.BaseApplication,
 	sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, vochainRPCaddr string, signer *signature.SignKeys, ma *metrics.Agent) (err error) {
 	log.Infof("creating API service")
@@ -43,9 +44,8 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 		routerAPI.Scrutinizer = sc
 		routerAPI.EnableVoteAPI(vapp, vi)
 	}
-
+	ws.AddNamespace(apiconfig.Route)
 	go routerAPI.Route()
-	ws.AddProxyHandler(apiconfig.Route)
 	log.Infof("websockets API available at %s", apiconfig.Route)
 	go func() {
 		for {

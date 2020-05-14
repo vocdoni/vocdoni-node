@@ -68,6 +68,10 @@ func (s *SubPubHandle) Send(msg types.Message) {
 	s.SubPub.BroadcastWriter <- msg.Data
 }
 
+func (s *SubPubHandle) AddNamespace(namespace string) {
+	// TBD (could subscrive to a specific topic)
+}
+
 func (s *SubPubHandle) SendUnicast(address string, msg types.Message) {
 	if err := s.SubPub.PeerStreamWrite(address, msg.Data); err != nil {
 		log.Warnf("cannot send message to %s: (%s)", address, err)

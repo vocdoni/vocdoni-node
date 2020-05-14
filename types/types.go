@@ -9,6 +9,7 @@ type Message struct {
 	Data      []byte
 	TimeStamp int32
 	Context   MessageContext
+	Namespace string
 }
 
 // Connection describes the settings for any of the transports defined in the net module, note that not all

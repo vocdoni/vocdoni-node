@@ -9,6 +9,7 @@ import (
 type Transport interface {
 	Listen(reciever chan<- types.Message)
 	Send(msg types.Message)
+	AddNamespace(namespace string)
 	SendUnicast(address string, msg types.Message)
 	Init(c *types.Connection) error
 	Address() string
