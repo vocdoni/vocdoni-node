@@ -26,14 +26,14 @@ type APIConnection struct {
 
 // NewAPIConnection starts a connection with the given endpoint address. The
 // connection is closed automatically when the test or benchmark finishes.
-func NewAPIConnection(addr string) *APIConnection {
+func NewAPIConnection(addr string) (*APIConnection, error) {
 	r := &APIConnection{}
 	var err error
 	r.Conn, _, err = websocket.Dial(context.TODO(), addr, nil)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return r
+	return r, nil
 }
 
 // Request makes a request to the previously connected endpoint
@@ -108,7 +108,20 @@ func main() {
 
 	// Create census
 	log.Infof("connecting to %s", *host)
-	c := NewAPIConnection(*host)
+
+	var c *APIConnection
+	var err error
+	for tries := 13; tries > 0; tries-- {
+		c, err = NewAPIConnection(*host)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	defer c.Conn.Close(websocket.StatusNormalClosure, "")
 	censusRoot, censusURI := createCensus(c, &entityKey, censusKeys)
 	log.Infof("creaed census %s of size %d", censusRoot, len(censusKeys))
