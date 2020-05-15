@@ -2,18 +2,16 @@ version: "3.7"
 
 services:
   seed:
-    image: "dvotenode"
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     build:
       context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.seed"
     volumes:
       - data-seed:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-    ports:
-      - "26680-26681:26656-26657"
 
   miner0:
-    image: "dvotenode"
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     build:
       context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner0"
@@ -22,11 +20,9 @@ services:
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
     links:
       - seed
-    ports:
-      - "26673-26674:26656-26657"
 
   miner1:
-    image: "dvotenode"
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     build:
       context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner1"
@@ -35,11 +31,9 @@ services:
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
     links:
       - seed
-    ports:
-      - "26658-26659:26656-26657"
 
   miner2:
-    image: "dvotenode"
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     build:
       context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner2"
@@ -48,11 +42,9 @@ services:
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
     links:
       - seed
-    ports:
-      - "26660-26661:26656-26657"
 
   miner3:
-    image: "dvotenode"
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     build:
       context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner3"
@@ -61,11 +53,9 @@ services:
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
     links:
       - seed
-    ports:
-      - "26670-26671:26656-26657"
 
   oracle:
-    image: "dvotenode"
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     build:
       context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.oracle"
@@ -74,13 +64,9 @@ services:
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
     links:
       - seed
-    ports:
-      - "30304:30303"
-      - "32001:32000"
-      - "26662-26663:26656-26657"
 
   gateway:
-    image: "dvotenode"
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     build:
       context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.gateway"
@@ -89,14 +75,9 @@ services:
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
     links:
       - seed
-    ports:
-      - "30303:30303"
-      - "32000:32000"
-      - "9090-9092:9090-9092"
-      - "26664-26665:26656-26657"
 
   test:
-    image: "dvotenode-test"
+    image: "dvotenode-test:${TESTSUITE_BUILD_TAG:-latest}"
     build:
       context: ../../
       target: test

@@ -13,6 +13,9 @@ variables:
   GOCACHE: ${CI_PROJECT_DIR}/.cache/gocache # to cache Go build archives
   GOFLAGS: -mod=readonly
 
+  TESTSUITE_ORACLE_KEY: 6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223
+  TESTSUITE_ELECTION_SIZE: 1000
+
 cache:
   key: ${CI_JOB_NAME} # separate caches by job, but not by branch
   paths:
@@ -43,13 +46,17 @@ compose-test:
   tags:
     - hetzner
   script:
+    # Avoid compose project collisions in parallel runs
+    - export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
+    - export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
+    - export COMPOSE_HOST_PATH=${CI_PROJECT_DIR}/dockerfiles/testsuite
     - cd dockerfiles/testsuite
     - docker-compose build
-    - COMPOSE_HOST_PATH=$CI_PROJECT_DIR/dockerfiles/testsuite docker-compose up -d
+    - docker-compose up -d
     # TODO: Better way of waiting for initialization
     - sleep 5
     - docker-compose logs
-    - docker-compose run test timeout 300 ./vochaintest --oracleKey 6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223 --electionSize=1000 --gwHost ws://gateway:9090/dvote
+    - docker-compose run test timeout 300 ./vochaintest --oracleKey=$TESTSUITE_ORACLE_KEY --electionSize=$TESTSUITE_ELECTION_SIZE --gwHost ws://gateway:9090/dvote
   after_script:
     - cd dockerfiles/testsuite
     - docker-compose down -v --remove-orphans
