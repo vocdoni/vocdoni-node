@@ -22,5 +22,5 @@ RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/vochaintest
 FROM debian:10.3-slim
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
-COPY --from=builder /src/dvotenode ./
-ENTRYPOINT ["/app/dvotenode"]
+COPY --from=builder /src/dvotenode /src/dockerfiles/dvotenode/files/dvoteStart.sh ./
+ENTRYPOINT ["/app/dvoteStart.sh"]
