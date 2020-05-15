@@ -39,10 +39,9 @@ type Namespace struct {
 }
 
 type Manager struct {
-	StorageDir    string        // Root storage data dir for LocalStorage
-	AuthWindow    int32         // Time window (seconds) in which TimeStamp will be accepted if auth enabled
-	Census        Namespaces    // Available namespaces
-	LoadThreshold time.Duration // How many time will a Census stay open/loaded since the last access
+	StorageDir string     // Root storage data dir for LocalStorage
+	AuthWindow int32      // Time window (seconds) in which TimeStamp will be accepted if auth enabled
+	Census     Namespaces // Available namespaces
 
 	// TODO(mvdan): should we protect Census with the mutex too?
 	TreesMu sync.RWMutex
@@ -68,7 +67,6 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storageDir)
 	m.StorageDir = storageDir
 	m.Trees = make(map[string]*tree.Tree)
-	m.LoadThreshold = 1200 * time.Second
 
 	var err error
 	m.LocalStorage, err = db.NewIden3Storage(storageDir)
@@ -115,8 +113,6 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 	}
 	// Start daemon for importing remote census
 	go m.importQueueDaemon()
-	// Start daemon for unloading trees
-	go m.unloadManager()
 
 	return nil
 }
@@ -227,21 +223,6 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 		return false
 	}
 	return true
-}
-
-// unloadManager is a blocking process that unloads trees if they are not used for some time
-func (m *Manager) unloadManager() {
-	for {
-		time.Sleep(60 * time.Second)
-		cutoff := time.Now().Add(-m.LoadThreshold).Unix()
-		m.TreesMu.Lock()
-		for k, tree := range m.Trees {
-			if tree.LastAccess() < cutoff {
-				m.UnloadTree(k)
-			}
-		}
-		m.TreesMu.Unlock()
-	}
 }
 
 // CheckAuth check if a census request message is authorized
