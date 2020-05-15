@@ -17,9 +17,10 @@ const (
 	EntityIDsize = 20
 	// legacy: in the past we used hash(addr)
 	// this is a temporal work around to support both
-	EntityIDsizeV2    = 32
-	VoteNullifierSize = 32
-	KeyIndexSeparator = ":"
+	EntityIDsizeV2                 = 32
+	VoteNullifierSize              = 32
+	KeyIndexSeparator              = ":"
+	EthereumConfirmationsThreshold = 6
 
 	// Scrutinizer
 

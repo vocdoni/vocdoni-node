@@ -16,6 +16,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -166,7 +167,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs() {
 		log.Fatal(err)
 	}
 
-	go ev.runEventProcessor(12, client)
+	go ev.runEventProcessor(types.EthereumConfirmationsThreshold, client)
 
 	for {
 		select {
