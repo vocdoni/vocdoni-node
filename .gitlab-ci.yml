@@ -50,15 +50,13 @@ compose-test:
     - export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
     - export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
     - export COMPOSE_HOST_PATH=${CI_PROJECT_DIR}/dockerfiles/testsuite
+    - export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
     - cd dockerfiles/testsuite
     - docker-compose build
     - docker-compose up -d
-    # TODO: Better way of waiting for initialization
-    - sleep 5
+    - sleep 5 # TODO: Better way of waiting for initialization
     - docker-compose logs
     - docker-compose run test timeout 300 ./vochaintest --oracleKey=$TESTSUITE_ORACLE_KEY --electionSize=$TESTSUITE_ELECTION_SIZE --gwHost ws://gateway:9090/dvote
-  after_script:
-    - cd dockerfiles/testsuite
     - docker-compose down -v --remove-orphans
   only:
     - merge_requests
