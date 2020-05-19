@@ -6,8 +6,8 @@ stages:
 variables:
   # DOCKER_HOST: tcp://docker:2375
   DOCKER_DRIVER: overlay2
-  DVOTE_NODE_BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/vocdoni-dvote:${CI_COMMIT_REF_SLUG}
-  DVOTE_NODE_RELEASE_IMAGE: ${CI_REGISTRY_IMAGE}/vocdoni-dvote:latest
+  DVOTE_NODE_BUILD_IMAGE: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}
+  DVOTE_NODE_RELEASE_IMAGE: ${CI_REGISTRY_IMAGE}:latest
 
   GOPATH: ${CI_PROJECT_DIR}/.cache/gopath # to cache Go module downloads
   GOCACHE: ${CI_PROJECT_DIR}/.cache/gocache # to cache Go build archives
@@ -67,11 +67,14 @@ docker-release:
   services:
     - docker:dind
   stage: release
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
     - docker build -t ${DVOTE_NODE_BUILD_IMAGE} .
     - docker tag ${DVOTE_NODE_BUILD_IMAGE} ${DVOTE_NODE_RELEASE_IMAGE}
-    - docker login -u gitlab-ci-token -p ${CI_BUILD_TOKEN} ${CI_REGISTRY}
+    #- docker login -u gitlab-ci-token -p ${CI_BUILD_TOKEN} ${CI_REGISTRY}
     - docker push ${DVOTE_NODE_BUILD_IMAGE}
     - docker push ${DVOTE_NODE_RELEASE_IMAGE}
   only:
     - master
+    - /^release-*$/
