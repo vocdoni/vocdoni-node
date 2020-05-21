@@ -17,6 +17,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
@@ -259,7 +260,7 @@ func getProof(c *APIConnection, pubkey, root string) (string, error) {
 	req.Method = "genProof"
 	req.CensusID = root
 	req.Digested = true
-	req.ClaimData = base64.StdEncoding.EncodeToString(signature.HashPoseidon(hexutils.HexToBytes(pubkey)))
+	req.ClaimData = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(hexutils.HexToBytes(pubkey)))
 
 	resp := c.Request(req, nil)
 	if len(resp.Siblings) == 0 || !resp.Ok {
@@ -630,7 +631,7 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 			}
 			pub, _ = censusSigners[currentSize-1].HexString()
 			pub, _ = signature.DecompressPubKey(pub) // Temporary until everything is compressed only
-			data = base64.StdEncoding.EncodeToString(signature.HashPoseidon(hexutils.HexToBytes(pub)))
+			data = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(hexutils.HexToBytes(pub)))
 			claims = append(claims, data)
 			currentSize--
 		}

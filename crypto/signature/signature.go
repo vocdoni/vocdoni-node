@@ -10,8 +10,6 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	i3utils "github.com/iden3/go-iden3-core/merkletree"
-	"github.com/iden3/go-iden3-crypto/poseidon"
 
 	"gitlab.com/vocdoni/go-dvote/util"
 )
@@ -297,14 +295,4 @@ func Hash(data []byte) []byte {
 // HashRaw hashes a string with no prefix
 func HashRaw(data []byte) []byte {
 	return crypto.Keccak256(data)
-}
-
-// HashPoseidon computes the Poseidon hash of the given input.
-// If an error happened, an empty byte slice is returned
-func HashPoseidon(input []byte) []byte {
-	hashNum, err := poseidon.HashBytes(input)
-	if err != nil {
-		return []byte{}
-	}
-	return i3utils.BigIntToHash(hashNum).Bytes()
 }

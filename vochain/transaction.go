@@ -7,6 +7,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -202,7 +203,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 			if err != nil {
 				return nil, err
 			}
-			pubKeyHash := signature.HashPoseidon(pubKeyDec)
+			pubKeyHash := snarks.Poseidon.Hash(pubKeyDec)
 			if len(pubKeyHash) != 32 {
 				return nil, fmt.Errorf("cannot compute Poseidon hash: (%s)", err)
 			}
@@ -458,7 +459,7 @@ func checkRevealProcessKeys(tx *types.AdminTx, process *types.Process) error {
 		if err != nil {
 			return err
 		}
-		commitment := signature.HashPoseidon(rb)
+		commitment := snarks.Poseidon.Hash(rb)
 		if fmt.Sprintf("%x", commitment) != process.CommitmentKeys[tx.KeyIndex] {
 			log.Debugf("%x != %s", commitment, process.CommitmentKeys[tx.KeyIndex])
 			return fmt.Errorf("the provided commitment reveal key does not match with the stored on index %d", tx.KeyIndex)

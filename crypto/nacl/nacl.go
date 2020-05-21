@@ -35,7 +35,7 @@ type KeyPair struct {
 	public, private [KeyLength]byte
 }
 
-// Ensure we implement the interface.
+// Ensure that we implement the interface.
 var _ crypto.Cipher = (*KeyPair)(nil)
 
 // Generate creates a new random KeyPair. If randReader is nil,
@@ -74,7 +74,7 @@ func Encrypt(message []byte, public *[KeyLength]byte) ([]byte, error) {
 	return box.SealAnonymous(nil, message, public, cryptorand.Reader)
 }
 
-func (k *KeyPair) Public() []byte { return k.public[:] }
+func (k *KeyPair) Public() []byte  { return k.public[:] }
 func (k *KeyPair) Private() []byte { return k.private[:] }
 
 func (k *KeyPair) Encrypt(message []byte) ([]byte, error) {

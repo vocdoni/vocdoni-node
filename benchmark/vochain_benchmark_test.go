@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -66,7 +67,7 @@ func BenchmarkVochain(b *testing.B) {
 	// census add claims
 	poseidonHashes := make([]string, len(keySet))
 	for i, key := range keySet {
-		hash := signature.HashPoseidon(crypto.FromECDSAPub(&key.Public))
+		hash := snarks.Poseidon.Hash(crypto.FromECDSAPub(&key.Public))
 		if len(hash) == 0 {
 			b.Fatalf("cannot create poseidon hash of public key: %#v", key.Public)
 		}

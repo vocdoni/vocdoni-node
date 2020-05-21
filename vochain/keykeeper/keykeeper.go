@@ -11,6 +11,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -265,13 +266,13 @@ func (k *KeyKeeper) generateKeys(pid string) (*processKeys, error) {
 		return nil, fmt.Errorf("cannot generate encryption key: (%s)", err)
 	}
 	// Reveal and commitment keys
-	ckb := signature.HashPoseidon(ek.Private())
+	ckb := snarks.Poseidon.Hash(ek.Private())
 	ck := ckb[:commitmentKeySize]
-	ckhash := signature.HashPoseidon(ckb)[:commitmentKeySize]
+	ckhash := snarks.Poseidon.Hash(ckb)[:commitmentKeySize]
 
 	pk := &processKeys{
-		privKey: ek.Private(),
-		pubKey: ek.Public(),
+		privKey:       ek.Private(),
+		pubKey:        ek.Public(),
 		revealKey:     ck,
 		commitmentKey: ckhash,
 		index:         k.myIndex,

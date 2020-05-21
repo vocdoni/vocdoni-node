@@ -37,6 +37,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/types"
 
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
@@ -138,7 +139,7 @@ func TestCensus(t *testing.T) {
 	req.ClaimData = ""
 	keys := testcommon.CreateEthRandomKeysBatch(t, *censusSize)
 	for _, key := range keys {
-		hash := signature.HashPoseidon(crypto.FromECDSAPub(&key.Public))
+		hash := snarks.Poseidon.Hash(crypto.FromECDSAPub(&key.Public))
 		if len(hash) == 0 {
 			t.Fatalf("cannot create poseidon hash of public key: %#v", key.Public)
 		}
