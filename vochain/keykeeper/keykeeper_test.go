@@ -21,10 +21,10 @@ func TestEncodeDecode(t *testing.T) {
 	}
 
 	pk := processKeys{
-		pubKey:        k1.Public,
-		privKey:       k1.Private,
-		revealKey:     k2.Public,
-		commitmentKey: k2.Private,
+		pubKey:        k1.Public(),
+		privKey:       k1.Private(),
+		revealKey:     k2.Public(),
+		commitmentKey: k2.Private(),
 		index:         5,
 	}
 	data := pk.Encode()

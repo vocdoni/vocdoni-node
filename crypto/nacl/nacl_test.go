@@ -56,7 +56,7 @@ func TestDecryptCiphersFromJS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pub := fmt.Sprintf("%x", keys.Public); pub != jsPub {
+	if pub := fmt.Sprintf("%x", keys.Public()); pub != jsPub {
 		t.Fatalf("wrong public key derivated from priv key: got %s, want %s", pub, jsPub)
 	}
 

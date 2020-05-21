@@ -10,6 +10,8 @@ import (
 
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/box"
+
+	"gitlab.com/vocdoni/go-dvote/crypto"
 )
 
 const KeyLength = 32
@@ -30,8 +32,11 @@ func DecodeKey(hexkey string) (*[KeyLength]byte, error) {
 
 // KeyPair holds pair of public and private keys.
 type KeyPair struct {
-	Public, Private [KeyLength]byte
+	public, private [KeyLength]byte
 }
+
+// Ensure we implement the interface.
+var _ crypto.Cipher = (*KeyPair)(nil)
 
 // Generate creates a new random KeyPair. If randReader is nil,
 // crypto/rand.Reader is used.
@@ -43,7 +48,7 @@ func Generate(randReader io.Reader) (*KeyPair, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &KeyPair{Public: *pub, Private: *priv}, nil
+	return &KeyPair{public: *pub, private: *priv}, nil
 }
 
 // FromHex creates a KeyPair from the provided hexadecimal private key.
@@ -52,13 +57,13 @@ func FromHex(privHex string) (*KeyPair, error) {
 	if err != nil {
 		return nil, err
 	}
-	kp := &KeyPair{Private: *priv}
+	kp := &KeyPair{private: *priv}
 
-	pub, err := curve25519.X25519(kp.Private[:], curve25519.Basepoint)
+	pub, err := curve25519.X25519(kp.private[:], curve25519.Basepoint)
 	if err != nil {
 		return kp, err
 	}
-	copy(kp.Public[:], pub)
+	copy(kp.public[:], pub)
 
 	return kp, nil
 }
@@ -69,16 +74,15 @@ func Encrypt(message []byte, public *[KeyLength]byte) ([]byte, error) {
 	return box.SealAnonymous(nil, message, public, cryptorand.Reader)
 }
 
-func (k *KeyPair) Hex() (string, string) {
-	return hex.EncodeToString(k.Public[:]), hex.EncodeToString(k.Private[:])
-}
+func (k *KeyPair) Public() []byte { return k.public[:] }
+func (k *KeyPair) Private() []byte { return k.private[:] }
 
 func (k *KeyPair) Encrypt(message []byte) ([]byte, error) {
-	return Encrypt(message, &k.Public)
+	return Encrypt(message, &k.public)
 }
 
 func (k *KeyPair) Decrypt(cipher []byte) ([]byte, error) {
-	message, ok := box.OpenAnonymous(nil, cipher, &k.Public, &k.Private)
+	message, ok := box.OpenAnonymous(nil, cipher, &k.public, &k.private)
 	if !ok {
 		return nil, fmt.Errorf("could not open box")
 	}

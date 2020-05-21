@@ -42,21 +42,29 @@ type KeyKeeper struct {
 }
 
 type processKeys struct {
-	pubKey        [encryptionKeySize]byte
-	privKey       [encryptionKeySize]byte
-	revealKey     [commitmentKeySize]byte
-	commitmentKey [commitmentKeySize]byte
+	pubKey        []byte
+	privKey       []byte
+	revealKey     []byte
+	commitmentKey []byte
 	index         int8
 }
 
 func (pk *processKeys) Encode() []byte {
 	data := make([]byte, commitmentKeySize*2+encryptionKeySize*2+1)
-	copy(data[:], pk.pubKey[:])
-	copy(data[encryptionKeySize:], pk.privKey[:])
-	i := encryptionKeySize * 2
-	copy(data[i:], pk.revealKey[:])
-	i = i + commitmentKeySize
-	copy(data[i:], pk.commitmentKey[:])
+	i := 0
+
+	copy(data[:], pk.pubKey)
+	i += encryptionKeySize
+
+	copy(data[i:], pk.privKey)
+	i += encryptionKeySize
+
+	copy(data[i:], pk.revealKey)
+	i += commitmentKeySize
+
+	copy(data[i:], pk.commitmentKey)
+	i += commitmentKeySize
+
 	data[128] = byte(pk.index)
 	return data
 }
@@ -65,13 +73,20 @@ func (pk *processKeys) Decode(data []byte) error {
 	if len(data) < commitmentKeySize*2+encryptionKeySize*2+1 {
 		return fmt.Errorf("cannot decode, data too small")
 	}
-	copy(pk.pubKey[:], data[:])
-	copy(pk.privKey[:], data[encryptionKeySize:])
-	i := encryptionKeySize * 2
-	copy(pk.revealKey[:], data[i:])
-	i = i + commitmentKeySize
-	copy(pk.commitmentKey[:], data[i:])
-	i = i + commitmentKeySize
+	i := 0
+
+	pk.pubKey = append([]byte(nil), data[i:i+encryptionKeySize]...)
+	i += encryptionKeySize
+
+	pk.privKey = append([]byte(nil), data[i:i+encryptionKeySize]...)
+	i += encryptionKeySize
+
+	pk.revealKey = append([]byte(nil), data[i:i+commitmentKeySize]...)
+	i += commitmentKeySize
+
+	pk.commitmentKey = append([]byte(nil), data[i:i+commitmentKeySize]...)
+	i += commitmentKeySize
+
 	pk.index = int8(data[i])
 	return nil
 }
@@ -250,19 +265,18 @@ func (k *KeyKeeper) generateKeys(pid string) (*processKeys, error) {
 		return nil, fmt.Errorf("cannot generate encryption key: (%s)", err)
 	}
 	// Reveal and commitment keys
-	var ck [commitmentKeySize]byte
-	ckb := signature.HashPoseidon(ek.Private[:])
-	copy(ck[:], ckb[:])
-	var ckhash [commitmentKeySize]byte
-	copy(ckhash[:], signature.HashPoseidon(ckb)[:])
+	ckb := signature.HashPoseidon(ek.Private())
+	ck := ckb[:commitmentKeySize]
+	ckhash := signature.HashPoseidon(ckb)[:commitmentKeySize]
 
-	return &processKeys{
-		privKey:       ek.Private,
-		pubKey:        ek.Public,
+	pk := &processKeys{
+		privKey: ek.Private(),
+		pubKey: ek.Public(),
 		revealKey:     ck,
 		commitmentKey: ckhash,
 		index:         k.myIndex,
-	}, nil
+	}
+	return pk, nil
 }
 
 // scheduleRevealKeys takes the pids from the blockPool and add them to the schedule storage
