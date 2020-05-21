@@ -1,5 +1,6 @@
-// Package signature provides the cryptographic operations used in go-dvote
-package signature
+// Package ethereum provides cryptographic operations used in go-dvote related
+// to ethereum.
+package ethereum
 
 import (
 	"bytes"

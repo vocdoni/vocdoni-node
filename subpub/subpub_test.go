@@ -10,7 +10,7 @@ import (
 
 	libpeer "github.com/libp2p/go-libp2p-core/peer"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -28,7 +28,7 @@ func TestSubPub(t *testing.T) {
 		// 1-1024 are only available to root.
 		port1 := 1025 + rand.Intn(50000)
 
-		var sign0 signature.SignKeys
+		var sign0 ethereum.SignKeys
 		if err := sign0.Generate(); err != nil {
 			t.Fatal(err)
 		}
@@ -44,7 +44,7 @@ func TestSubPub(t *testing.T) {
 		defer sp0.Close()
 	}
 
-	var sign signature.SignKeys
+	var sign ethereum.SignKeys
 	if err := sign.Generate(); err != nil {
 		t.Fatal(err)
 	}

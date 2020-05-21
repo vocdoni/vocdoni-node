@@ -15,7 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -377,10 +377,10 @@ func (is *IPFSsync) Start() {
 	conn := types.Connection{
 		Port:         int(is.Port),
 		Key:          is.PrivKey,
-		Topic:        fmt.Sprintf("%x", signature.HashRaw([]byte(is.Topic))),
+		Topic:        fmt.Sprintf("%x", ethereum.HashRaw([]byte(is.Topic))),
 		TransportKey: is.Topic,
 	}
-	// conn.Address, _ = signature.PubKeyFromPrivateKey(is.PrivKey)
+	// conn.Address, _ = ethereum.PubKeyFromPrivateKey(is.PrivKey)
 	if is.private {
 		conn.Encryption = "private"
 	}

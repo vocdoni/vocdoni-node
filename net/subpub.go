@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/subpub"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -19,7 +19,7 @@ type SubPubHandle struct {
 
 func (p *SubPubHandle) Init(c *types.Connection) error {
 	p.Conn = c
-	var s signature.SignKeys
+	var s ethereum.SignKeys
 	if err := s.AddHexKey(p.Conn.Key); err != nil {
 		return fmt.Errorf("cannot import privkey %s: %s", p.Conn.Key, err)
 	}

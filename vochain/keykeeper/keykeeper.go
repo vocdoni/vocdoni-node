@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -37,7 +37,7 @@ type KeyKeeper struct {
 	storage   db.Database
 	keyPool   map[string]*processKeys
 	blockPool map[string]int64
-	signer    *signature.SignKeys
+	signer    *ethereum.SignKeys
 	lock      sync.Mutex
 	myIndex   int8
 }
@@ -94,7 +94,7 @@ func (pk *processKeys) Decode(data []byte) error {
 
 // TBD garbage collector function run at init for revealing all these keys that should have beeen revealed
 
-func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *signature.SignKeys, index int8) (*KeyKeeper, error) {
+func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *ethereum.SignKeys, index int8) (*KeyKeeper, error) {
 	var err error
 	var k KeyKeeper
 	if v == nil || signer == nil || len(dbPath) < 1 {
@@ -261,7 +261,7 @@ func (k *KeyKeeper) generateKeys(pid string) (*processKeys, error) {
 	// Add the index in order to win some extra entropy
 	pb = append(pb, byte(k.myIndex))
 	// Private ed25519 key
-	ek, err := nacl.FromHex(fmt.Sprintf("%x", signature.HashRaw(append(k.signer.Private.D.Bytes()[:], pb[:]...))))
+	ek, err := nacl.FromHex(fmt.Sprintf("%x", ethereum.HashRaw(append(k.signer.Private.D.Bytes()[:], pb[:]...))))
 	if err != nil {
 		return nil, fmt.Errorf("cannot generate encryption key: (%s)", err)
 	}

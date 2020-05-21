@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
@@ -170,7 +170,7 @@ func BenchmarkVochain(b *testing.B) {
 	log.Infof("created entities: %+v", resp.EntityIDs)
 }
 
-func vochainBench(b *testing.B, c *testcommon.APIConnection, s *signature.SignKeys, poseidon, mkRoot, processID, censusID string) {
+func vochainBench(b *testing.B, c *testcommon.APIConnection, s *ethereum.SignKeys, poseidon, mkRoot, processID, censusID string) {
 	rint := rand.Int()
 	// API requests
 	var req types.MetaRequest

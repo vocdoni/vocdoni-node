@@ -14,7 +14,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	tmdb "github.com/tendermint/tm-db"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -671,7 +671,7 @@ func (v *State) Save() []byte {
 		}
 	}
 
-	return signature.HashRaw([]byte(fmt.Sprintf("%s%s%s", h1, h2, h3)))
+	return ethereum.HashRaw([]byte(fmt.Sprintf("%s%s%s", h1, h2, h3)))
 }
 
 // Rollback rollbacks to the last persistent db data version
@@ -696,5 +696,5 @@ func (v *State) WorkingHash() []byte {
 	procHash := v.ProcessTree.WorkingHash()
 	voteHash := v.VoteTree.WorkingHash()
 	v.RUnlock()
-	return signature.HashRaw([]byte(fmt.Sprintf("%s%s%s", appHash, procHash, voteHash)))
+	return ethereum.HashRaw([]byte(fmt.Sprintf("%s%s%s", appHash, procHash, voteHash)))
 }

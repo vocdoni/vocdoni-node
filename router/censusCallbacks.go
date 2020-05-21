@@ -1,7 +1,7 @@
 package router
 
 import (
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
@@ -12,7 +12,7 @@ func (r *Router) censusLocal(request routerRequest) {
 	addr := request.address
 	log.Debugf("client authorization %t. Recovered address is [%s]", auth, addr)
 	if auth {
-		if len(addr) < signature.AddressLength {
+		if len(addr) < ethereum.AddressLength {
 			r.sendError(request, "cannot recover address")
 			return
 		}

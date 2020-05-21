@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -176,11 +176,11 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 				return nil, fmt.Errorf("cannot marshal vote (%s)", err)
 			}
 			log.Debugf("vote Payload: %s", voteBytes)
-			pubKey, err := signature.PubKeyFromSignature(voteBytes, tx.Signature)
+			pubKey, err := ethereum.PubKeyFromSignature(voteBytes, tx.Signature)
 			if err != nil {
 				return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
 			}
-			addr, err := signature.AddrFromPublicKey(pubKey)
+			addr, err := ethereum.AddrFromPublicKey(pubKey)
 			if err != nil {
 				return nil, fmt.Errorf("cannot extract address from public key: (%s)", err)
 			}

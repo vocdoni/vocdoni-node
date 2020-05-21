@@ -15,7 +15,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
 	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
@@ -234,7 +234,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 
 	if len(globalCfg.EthConfig.SigningKey) < 32 {
 		fmt.Println("no signing key, generating one...")
-		var signer signature.SignKeys
+		var signer ethereum.SignKeys
 		err = signer.Generate()
 		if err != nil {
 			cfgError = config.Error{
@@ -327,7 +327,7 @@ func main() {
 
 	log.Infof("starting vocdoni dvote node in %s mode", globalCfg.Mode)
 	var err error
-	var signer *signature.SignKeys
+	var signer *ethereum.SignKeys
 	var node *chain.EthChainContext
 	var pxy *net.Proxy
 	var storage data.Storage
@@ -340,7 +340,7 @@ func main() {
 
 	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
 		// Signing key
-		signer = new(signature.SignKeys)
+		signer = new(ethereum.SignKeys)
 		// Add Authorized keys for private methods
 		if globalCfg.API.AllowPrivate && globalCfg.API.AllowedAddrs != "" {
 			keys := strings.Split(globalCfg.API.AllowedAddrs, ",")

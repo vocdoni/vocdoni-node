@@ -17,7 +17,7 @@ import (
 	iden3db "github.com/iden3/go-iden3-core/db"
 	"github.com/klauspost/compress/zstd"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/db"
@@ -85,7 +85,7 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 	if _, err := os.Stat(nsConfig); os.IsNotExist(err) {
 		log.Info("creating new config file")
 		var cns Namespaces
-		if len(rootKey) < signature.PubKeyLength {
+		if len(rootKey) < ethereum.PubKeyLength {
 			// log.Warn("no root key provided or invalid, anyone will be able to create new census")
 		} else {
 			cns.RootKey = rootKey
@@ -104,7 +104,7 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 		log.Warn("could not unmarshal json config file, probably empty. Skipping")
 		return nil
 	}
-	if len(rootKey) >= signature.PubKeyLength {
+	if len(rootKey) >= ethereum.PubKeyLength {
 		log.Infof("updating root key to %s", rootKey)
 		m.Census.RootKey = rootKey
 	} else {
@@ -228,7 +228,7 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 
 // CheckAuth check if a census request message is authorized
 func (m *Manager) CheckAuth(rm *types.RequestMessage) error {
-	if len(rm.Signature) < signature.SignatureLength || len(rm.CensusID) < 1 {
+	if len(rm.Signature) < ethereum.SignatureLength || len(rm.CensusID) < 1 {
 		return errors.New("signature or censusId not provided or invalid")
 	}
 	ns := new(Namespace)
@@ -240,7 +240,7 @@ func (m *Manager) CheckAuth(rm *types.RequestMessage) error {
 
 	// Add root key, if method is addCensus
 	if rm.Method == "addCensus" {
-		if len(m.Census.RootKey) < signature.PubKeyLength {
+		if len(m.Census.RootKey) < ethereum.PubKeyLength {
 			log.Warn("root key does not exist, considering addCensus valid for any request")
 			return nil
 		}
@@ -261,7 +261,7 @@ func (m *Manager) CheckAuth(rm *types.RequestMessage) error {
 	// Check signature with existing namespace keys
 	log.Debugf("namespace keys %s", ns.Keys)
 	if len(ns.Keys) > 0 {
-		if len(ns.Keys) == 1 && len(ns.Keys[0]) < signature.PubKeyLength {
+		if len(ns.Keys) == 1 && len(ns.Keys[0]) < ethereum.PubKeyLength {
 			log.Warnf("namespace %s does have management public key configured, allowing all", ns.Name)
 			return nil
 		}
@@ -271,7 +271,7 @@ func (m *Manager) CheckAuth(rm *types.RequestMessage) error {
 			return errors.New("cannot unmarshal")
 		}
 		for _, n := range ns.Keys {
-			valid, err = signature.Verify(msg, rm.Signature, n)
+			valid, err = ethereum.Verify(msg, rm.Signature, n)
 			if err != nil {
 				log.Warnf("verification error (%s)", err)
 				valid = false
@@ -289,7 +289,7 @@ func (m *Manager) CheckAuth(rm *types.RequestMessage) error {
 }
 
 // HTTPhandler handles an API census manager request via HTTP
-func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *signature.SignKeys) {
+func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *ethereum.SignKeys) {
 	log.Debug("new request received")
 	if ok := checkRequest(w, req); !ok {
 		return

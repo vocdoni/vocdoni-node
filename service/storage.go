@@ -6,14 +6,14 @@ import (
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
 )
 
-func IPFS(ipfsconfig *config.IPFSCfg, signer *signature.SignKeys, ma *metrics.Agent) (storage data.Storage, err error) {
+func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys, ma *metrics.Agent) (storage data.Storage, err error) {
 	log.Info("creating ipfs service")
 	var storageSync ipfssync.IPFSsync
 	if !ipfsconfig.NoInit {

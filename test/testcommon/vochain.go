@@ -15,7 +15,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
@@ -217,10 +217,10 @@ func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer, vnode *vochain.BaseApp
 }
 
 // CreateEthRandomKeysBatch creates a set of eth random signing keys
-func CreateEthRandomKeysBatch(tb testing.TB, n int) []*signature.SignKeys {
-	s := make([]*signature.SignKeys, n)
+func CreateEthRandomKeysBatch(tb testing.TB, n int) []*ethereum.SignKeys {
+	s := make([]*ethereum.SignKeys, n)
 	for i := 0; i < n; i++ {
-		s[i] = new(signature.SignKeys)
+		s[i] = new(ethereum.SignKeys)
 		if err := s[i].Generate(); err != nil {
 			tb.Fatal(err)
 		}

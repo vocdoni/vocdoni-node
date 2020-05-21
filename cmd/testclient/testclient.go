@@ -13,7 +13,7 @@ import (
 	"time"
 
 	json "github.com/rogpeppe/rjson"
-	signature "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"nhooyr.io/websocket"
@@ -37,7 +37,7 @@ func NewAPIConnection(addr string) *APIConnection {
 }
 
 // Request makes a request to the previously connected endpoint
-func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKeys) *types.MetaResponse {
+func (r *APIConnection) Request(req types.MetaRequest, signer *ethereum.SignKeys) *types.MetaResponse {
 	method := req.Method
 	var cmReq types.RequestMessage
 	cmReq.MetaRequest = req
@@ -111,7 +111,7 @@ func main() {
 	log.Init(*logLevel, "stdout")
 	rand.Seed(time.Now().UnixNano())
 
-	signer := new(signature.SignKeys)
+	signer := new(ethereum.SignKeys)
 	if *privKey != "" {
 		if err := signer.AddHexKey(*privKey); err != nil {
 			panic(err)

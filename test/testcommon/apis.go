@@ -13,7 +13,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
 	dnet "gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/router"
@@ -23,7 +23,7 @@ import (
 
 // DvoteAPIServer contains all the required pieces for running a go-dvote api server
 type DvoteAPIServer struct {
-	Signer           *signature.SignKeys
+	Signer           *ethereum.SignKeys
 	VochainCfg       *config.VochainCfg
 	VochainRPCClient *voclient.HTTP
 	CensusDir        string
@@ -44,7 +44,7 @@ Start starts a basic dvote server
 */
 func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// create signer
-	d.Signer = new(signature.SignKeys)
+	d.Signer = new(ethereum.SignKeys)
 	d.Signer.Generate()
 
 	// create the proxy to handle HTTP queries
@@ -124,7 +124,7 @@ func NewAPIConnection(tb testing.TB, addr string) *APIConnection {
 }
 
 // Request makes a request to the previously connected endpoint
-func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKeys) *types.MetaResponse {
+func (r *APIConnection) Request(req types.MetaRequest, signer *ethereum.SignKeys) *types.MetaResponse {
 	r.tb.Helper()
 	method := req.Method
 

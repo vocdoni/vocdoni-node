@@ -7,7 +7,7 @@ import (
 
 	flag "github.com/spf13/pflag"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/ipfssync"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -39,7 +39,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var sk signature.SignKeys
+	var sk ethereum.SignKeys
 	var privKey string
 
 	if len(*nodeKey) > 0 {

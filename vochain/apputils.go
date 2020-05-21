@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/tree"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -30,7 +30,7 @@ func checkMerkleProof(rootHash, hexproof string, leafData []byte) (bool, error) 
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
 func verifySignatureAgainstOracles(oracles []string, message []byte, signHex string) (bool, string, error) {
-	signKeys := signature.SignKeys{}
+	signKeys := ethereum.SignKeys{}
 	for _, oracle := range oracles {
 		if err := signKeys.AddAuthKey(oracle); err != nil {
 			return false, "", err
@@ -50,7 +50,7 @@ func GenerateNullifier(address, processID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%x", signature.HashRaw([]byte(fmt.Sprintf("%s%s", addrBytes, pidBytes)))), nil
+	return fmt.Sprintf("%x", ethereum.HashRaw([]byte(fmt.Sprintf("%s%s", addrBytes, pidBytes)))), nil
 }
 
 // NewPrivateValidator returns a tendermint file private validator (key and state)

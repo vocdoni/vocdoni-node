@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	sig "gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 
@@ -52,7 +52,7 @@ func censusBench(b *testing.B, c *testcommon.APIConnection) {
 	var req types.MetaRequest
 
 	// Create client signer
-	signer := new(sig.SignKeys)
+	signer := new(ethereum.SignKeys)
 	signer.Generate()
 
 	// getInfo

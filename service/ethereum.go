@@ -8,13 +8,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
 	"gitlab.com/vocdoni/go-dvote/net"
 )
 
-func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, signer *signature.SignKeys, ma *metrics.Agent) (node *chain.EthChainContext, err error) {
+func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, signer *ethereum.SignKeys, ma *metrics.Agent) (node *chain.EthChainContext, err error) {
 	// Ethereum
 	log.Info("creating ethereum service")
 

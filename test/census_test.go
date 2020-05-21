@@ -36,7 +36,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/types"
 
@@ -53,9 +53,9 @@ func TestCensus(t *testing.T) {
 	var server testcommon.DvoteAPIServer
 	server.Start(t, "file", "census")
 
-	signer1 := new(signature.SignKeys)
+	signer1 := new(ethereum.SignKeys)
 	signer1.Generate()
-	signer2 := new(signature.SignKeys)
+	signer2 := new(ethereum.SignKeys)
 	signer2.Generate()
 	if err := server.Signer.AddAuthKey(signer2.EthAddrString()); err != nil {
 		t.Fatalf("cannot add authorized address %s", err)

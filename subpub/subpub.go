@@ -23,7 +23,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	multiaddr "github.com/multiformats/go-multiaddr"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
@@ -75,8 +75,8 @@ func NewSubPub(key ecdsa.PrivateKey, groupKey []byte, port int, private bool) *S
 	if len(groupKey) < 4 {
 		panic("subpub group key is too small; 4 bytes at minimum")
 	}
-	copy(ps.GroupKey[:], signature.HashRaw(groupKey)[:32])
-	ps.Topic = fmt.Sprintf("%x", signature.HashRaw([]byte("topic"+string(groupKey))))
+	copy(ps.GroupKey[:], ethereum.HashRaw(groupKey)[:32])
+	ps.Topic = fmt.Sprintf("%x", ethereum.HashRaw([]byte("topic"+string(groupKey))))
 	ps.PubKey = hexutil.Encode(eth.CompressPubkey(&key.PublicKey))
 	ps.privKey = hex.EncodeToString(key.D.Bytes())
 	ps.BroadcastWriter = make(chan []byte)

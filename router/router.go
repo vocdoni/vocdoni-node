@@ -15,7 +15,7 @@ import (
 	amino "github.com/tendermint/go-amino"
 
 	"gitlab.com/vocdoni/go-dvote/census"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
@@ -82,7 +82,7 @@ type Router struct {
 	inbound      <-chan types.Message
 	storage      data.Storage
 	transport    net.Transport
-	signer       signature.SignKeys
+	signer       ethereum.SignKeys
 	census       *census.Manager
 	vocapp       *vochain.BaseApplication
 	metricsagent *metrics.Agent
@@ -96,7 +96,7 @@ type Router struct {
 }
 
 func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
-	signer signature.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
+	signer ethereum.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
 	cm := new(census.Manager)
 	r := new(Router)
 	r.methods = make(map[string]registeredMethod)
@@ -164,7 +164,7 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 
 // InitRouter sets up a Router object which can then be used to route requests
 func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
-	signer *signature.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
+	signer *ethereum.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
 	log.Infof("using signer with address %s", signer.EthAddrString())
 	if allowPrivate {
 		log.Warn("allowing API private methods")

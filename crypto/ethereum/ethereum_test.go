@@ -1,4 +1,4 @@
-package signature
+package ethereum
 
 import (
 	"encoding/base64"

@@ -15,8 +15,8 @@ import (
 	"github.com/status-im/keycard-go/hexutils"
 	"nhooyr.io/websocket"
 
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
-	"gitlab.com/vocdoni/go-dvote/crypto/signature"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -44,7 +44,7 @@ func NewAPIConnection(addr string, id int) (*APIConnection, error) {
 }
 
 // Request makes a request to the previously connected endpoint
-func (r *APIConnection) Request(req types.MetaRequest, signer *signature.SignKeys) *types.MetaResponse {
+func (r *APIConnection) Request(req types.MetaRequest, signer *ethereum.SignKeys) *types.MetaResponse {
 	method := req.Method
 	var cmReq types.RequestMessage
 	cmReq.MetaRequest = req
@@ -100,8 +100,8 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	censusKeys := createEthRandomKeysBatch(*electionSize)
-	entityKey := signature.SignKeys{}
-	oracleKey := signature.SignKeys{}
+	entityKey := ethereum.SignKeys{}
+	oracleKey := ethereum.SignKeys{}
 	if err := oracleKey.AddHexKey(*oraclePrivKey); err != nil {
 		log.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func main() {
 	var wg sync.WaitGroup
 	votingTimes := make([]time.Duration, len(conns))
 	for gw, con := range conns {
-		signers := make([]*signature.SignKeys, p)
+		signers := make([]*ethereum.SignKeys, p)
 		copy(signers[:], censusKeys[i:i+p])
 		log.Infof("voters from %d to %d will be sent to %s", i, i+p-1, con.Addr)
 		gw, con := gw, con
@@ -232,10 +232,10 @@ func main() {
 	log.Infof("all done!")
 }
 
-func createEthRandomKeysBatch(n int) []*signature.SignKeys {
-	s := make([]*signature.SignKeys, n)
+func createEthRandomKeysBatch(n int) []*ethereum.SignKeys {
+	s := make([]*ethereum.SignKeys, n)
 	for i := 0; i < n; i++ {
-		s[i] = new(signature.SignKeys)
+		s[i] = new(ethereum.SignKeys)
 		if err := s[i].Generate(); err != nil {
 			log.Fatal(err)
 		}
@@ -292,7 +292,7 @@ func getEnvelopeHeight(c *APIConnection, pid string) (int64, error) {
 	return *resp.Height, nil
 }
 
-func importCensus(c *APIConnection, signer *signature.SignKeys, uri string) (string, error) {
+func importCensus(c *APIConnection, signer *ethereum.SignKeys, uri string) (string, error) {
 	var req types.MetaRequest
 	req.Method = "addCensus"
 	req.CensusID = randomHex(16)
@@ -351,7 +351,7 @@ func results(c *APIConnection, pid string, totalVotes int, startBlock, duration 
 	return results, nil
 }
 
-func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int64, signers []*signature.SignKeys, encrypted bool) (time.Duration, error) {
+func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int64, signers []*ethereum.SignKeys, encrypted bool) (time.Duration, error) {
 	var pub, proof string
 	var err error
 	var keys []string
@@ -360,7 +360,7 @@ func sendVotes(c *APIConnection, pid, eid, root string, startBlock, duration int
 	log.Infof("generating proofs...")
 	for i, s := range signers {
 		pub, _ = s.HexString()
-		pub, _ = signature.DecompressPubKey(pub) // Temporary until everything is compressed
+		pub, _ = ethereum.DecompressPubKey(pub) // Temporary until everything is compressed
 		if proof, err = getProof(c, pub, root); err != nil {
 			return 0, err
 		}
@@ -518,7 +518,7 @@ func genVote(encrypted bool, keys []string) (string, error) {
 	return base64.StdEncoding.EncodeToString(vpBytes), nil
 }
 
-func createProcess(c *APIConnection, oracle *signature.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (int64, error) {
+func createProcess(c *APIConnection, oracle *ethereum.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (int64, error) {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
 	p := types.NewProcessTx{
@@ -550,7 +550,7 @@ func createProcess(c *APIConnection, oracle *signature.SignKeys, entityID, mkroo
 	return p.StartBlock, nil
 }
 
-func cancelProcess(c *APIConnection, oracle *signature.SignKeys, pid string) error {
+func cancelProcess(c *APIConnection, oracle *ethereum.SignKeys, pid string) error {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
 	p := types.NewProcessTx{
@@ -598,7 +598,7 @@ func getCurrentBlock(c *APIConnection) int64 {
 
 }
 
-func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []*signature.SignKeys) (root, uri string) {
+func createCensus(c *APIConnection, signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys) (root, uri string) {
 	var req types.MetaRequest
 	rint := rand.Int()
 	censusSize := len(censusSigners)
@@ -630,7 +630,7 @@ func createCensus(c *APIConnection, signer *signature.SignKeys, censusSigners []
 				break
 			}
 			pub, _ = censusSigners[currentSize-1].HexString()
-			pub, _ = signature.DecompressPubKey(pub) // Temporary until everything is compressed only
+			pub, _ = ethereum.DecompressPubKey(pub) // Temporary until everything is compressed only
 			data = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(hexutils.HexToBytes(pub)))
 			claims = append(claims, data)
 			currentSize--
