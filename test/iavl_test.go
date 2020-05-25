@@ -18,16 +18,21 @@ func TestVochainState(t *testing.T) {
 	c := amino.NewCodec()
 	s, err := vochain.NewState(testcommon.TempDir(t, "vochain-db"), c)
 	if err != nil {
-		t.Errorf("cannot create vochain state (%s)", err)
+		t.Fatalf("cannot create vochain state (%s)", err)
 	}
+
+	// This used to panic due to nil *ImmutableTree fields.
+	exists := s.EnvelopeExists("foo", "bar")
+	if exists {
+		t.Errorf("expected EnvelopeExists to return false")
+	}
+
 	for i := 0; i < 10; i++ {
 		s.AppTree.Set([]byte(fmt.Sprintf("%d", i)), []byte(fmt.Sprintf("number %d", i)))
 		s.ProcessTree.Set([]byte(fmt.Sprintf("%d", i+1)), []byte(fmt.Sprintf("number %d", i+1)))
 		s.VoteTree.Set([]byte(fmt.Sprintf("%d", i+2)), []byte(fmt.Sprintf("number %d", i+2)))
 	}
-	s.AppTree.SaveVersion()
-	s.ProcessTree.SaveVersion()
-	s.VoteTree.SaveVersion()
+	s.Save()
 
 	appHash := fmt.Sprintf("%x", s.AppTree.Hash())
 	processHash := fmt.Sprintf("%x", s.ProcessTree.Hash())

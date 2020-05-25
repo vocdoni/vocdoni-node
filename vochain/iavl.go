@@ -102,7 +102,7 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
-	vs := State{}
+	vs := &State{}
 	vs.AppTree, err = iavl.NewMutableTree(appTree, PrefixDBCacheSize)
 	if err != nil {
 		return nil, err
@@ -138,11 +138,22 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 		return nil, err
 	}
 
+	// We set the mutable tree fields; ensure that, for consistency, the
+	// immutable tree fields aren't nil.
+	// This is important in the case an endpoint call comes in while we're
+	// still initializing, and InitChain hasn't run yet. In that scenario,
+	// we would get a nil pointer dereference panic.
+	// TODO(mvdan): this is still racy, since we can't use GetImmutable, but
+	// at least we won't panic every single time.
+	vs.IAppTree = vs.AppTree.ImmutableTree
+	vs.IProcessTree = vs.ProcessTree.ImmutableTree
+	vs.IVoteTree = vs.VoteTree.ImmutableTree
+
 	vs.Codec = codec
 
 	log.Infof("application trees successfully loaded. appTree:%d processTree:%d voteTree: %d", atVersion, ptVersion, vtVersion)
 	vs.Events = make(map[string][]Event)
-	return &vs, nil
+	return vs, nil
 }
 
 // Immutable creates immutable state
