@@ -19,11 +19,14 @@ import (
 
 // TBD: user the net.Transport interface
 func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census.Manager, vapp *vochain.BaseApplication,
-	sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, vochainRPCaddr string, signer *ethereum.SignKeys, ma *metrics.Agent) (err error) {
+	sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, vochainRPCaddr string, signer *ethereum.SignKeys, ma *metrics.Agent,
+) error {
 	log.Infof("creating API service")
 	// API Endpoint initialization
 	ws := new(net.WebsocketHandle)
-	ws.Init(new(types.Connection))
+	if err := ws.Init(new(types.Connection)); err != nil {
+		return err
+	}
 	ws.SetProxy(pxy)
 
 	listenerOutput := make(chan types.Message)
@@ -53,6 +56,5 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 			log.Infof("[router info] privateReqs:%d publicReqs:%d", routerAPI.PrivateCalls, routerAPI.PublicCalls)
 		}
 	}()
-
-	return
+	return nil
 }
