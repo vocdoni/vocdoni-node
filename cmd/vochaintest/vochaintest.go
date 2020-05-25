@@ -12,7 +12,6 @@ import (
 	"time"
 
 	flag "github.com/spf13/pflag"
-	"github.com/status-im/keycard-go/hexutils"
 	"nhooyr.io/websocket"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
@@ -255,12 +254,16 @@ func getEnvelopeStatus(c *APIConnection, nullifier, pid string) (bool, error) {
 	return *resp.Registered, nil
 }
 
-func getProof(c *APIConnection, pubkey, root string) (string, error) {
+func getProof(c *APIConnection, hexpubkey, root string) (string, error) {
 	var req types.MetaRequest
 	req.Method = "genProof"
 	req.CensusID = root
 	req.Digested = true
-	req.ClaimData = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(hexutils.HexToBytes(pubkey)))
+	pubkey, err := hex.DecodeString(hexpubkey)
+	if err != nil {
+		return "", err
+	}
+	req.ClaimData = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(pubkey))
 
 	resp := c.Request(req, nil)
 	if len(resp.Siblings) == 0 || !resp.Ok {
@@ -268,6 +271,15 @@ func getProof(c *APIConnection, pubkey, root string) (string, error) {
 	}
 
 	return resp.Siblings, nil
+}
+
+func hexToBytes(s string) []byte {
+	b := make([]byte, hex.DecodedLen(len(s)))
+	_, err := hex.Decode(b, []byte(s))
+	if err != nil {
+		log.Fatal(err)
+	}
+	return b[:]
 }
 
 func getResults(c *APIConnection, pid string) ([][]uint32, error) {
@@ -621,7 +633,6 @@ func createCensus(c *APIConnection, signer *ethereum.SignKeys, censusSigners []*
 	req.Digested = true
 	currentSize := censusSize
 	i := 0
-	var pub string
 	var data string
 	for currentSize > 0 {
 		claims := []string{}
@@ -629,9 +640,13 @@ func createCensus(c *APIConnection, signer *ethereum.SignKeys, censusSigners []*
 			if currentSize < 1 {
 				break
 			}
-			pub, _ = censusSigners[currentSize-1].HexString()
-			pub, _ = ethereum.DecompressPubKey(pub) // Temporary until everything is compressed only
-			data = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(hexutils.HexToBytes(pub)))
+			hexpub, _ := censusSigners[currentSize-1].HexString()
+			hexpub, _ = ethereum.DecompressPubKey(hexpub) // Temporary until everything is compressed only
+			pub, err := hex.DecodeString(hexpub)
+			if err != nil {
+				log.Fatal(err)
+			}
+			data = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(pub))
 			claims = append(claims, data)
 			currentSize--
 		}

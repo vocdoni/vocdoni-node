@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	eth "github.com/ethereum/go-ethereum/crypto"
 	ipfslog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
@@ -77,7 +75,7 @@ func NewSubPub(key ecdsa.PrivateKey, groupKey []byte, port int, private bool) *S
 	}
 	copy(ps.GroupKey[:], ethereum.HashRaw(groupKey)[:32])
 	ps.Topic = fmt.Sprintf("%x", ethereum.HashRaw([]byte("topic"+string(groupKey))))
-	ps.PubKey = hexutil.Encode(eth.CompressPubkey(&key.PublicKey))
+	ps.PubKey = hex.EncodeToString(eth.CompressPubkey(&key.PublicKey))
 	ps.privKey = hex.EncodeToString(key.D.Bytes())
 	ps.BroadcastWriter = make(chan []byte)
 	ps.Reader = make(chan []byte)
