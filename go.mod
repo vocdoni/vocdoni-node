@@ -3,7 +3,6 @@ module gitlab.com/vocdoni/go-dvote
 go 1.14
 
 require (
-	github.com/ChainSafe/go-schnorrkel v0.0.0-20200115165343-aa45d48b5ed6 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200423211322-0b5ff220aee9 // indirect
@@ -13,9 +12,9 @@ require (
 	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
-	github.com/go-chi/chi v4.0.3+incompatible
-	github.com/go-chi/cors v1.0.0
-	github.com/google/go-cmp v0.4.0
+	github.com/go-chi/chi v4.1.1+incompatible
+	github.com/go-chi/cors v1.1.1
+	github.com/google/go-cmp v0.4.1
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect
 	github.com/gtank/merlin v0.1.1 // indirect
 	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
@@ -28,7 +27,7 @@ require (
 	github.com/ipfs/interface-go-ipfs-core v0.2.6
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
-	github.com/klauspost/compress v1.10.3
+	github.com/klauspost/compress v1.10.6
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/libp2p/go-addr-util v0.0.2 // indirect
 	github.com/libp2p/go-conn-security-multistream v0.2.0 // indirect
@@ -51,15 +50,15 @@ require (
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/polydawn/refmt v0.0.0-20190807091052-3d65705ee9f1 // indirect
-	github.com/prometheus/client_golang v1.5.0
+	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/rogpeppe/rjson v0.0.0-20151026200957-77220b71d327
-	github.com/shirou/gopsutil v2.20.3+incompatible
+	github.com/shirou/gopsutil v2.20.4+incompatible
 	github.com/smartystreets/assertions v1.0.1 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.6.2
+	github.com/spf13/viper v1.6.3
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0
 	github.com/tendermint/go-amino v0.15.1
 	github.com/tendermint/iavl v0.13.3
@@ -69,14 +68,14 @@ require (
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.etcd.io/bbolt v1.3.4 // indirect
 	go.uber.org/zap v1.15.0
-	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
+	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
-	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
+	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2
 	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f // indirect
 	golang.org/x/text v0.3.2
 	golang.org/x/tools v0.0.0-20200312194400-c312e98713c2 // indirect
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
-	nhooyr.io/websocket v1.8.5
+	nhooyr.io/websocket v1.8.6
 )
 
 // Duktape is very slow to build, and can't be built with multiple cores since
