@@ -45,20 +45,14 @@ type ProcessEndingList []string
 // NewScrutinizer returns an instance of the Scrutinizer
 // using the local storage database of dbPath and integrated into the state vochain instance
 func NewScrutinizer(dbPath string, state *vochain.State, liveResults bool) (*Scrutinizer, error) {
-	var s Scrutinizer
-	s.VochainState = state
+	s := &Scrutinizer{VochainState: state}
 	var err error
 	s.Storage, err = db.NewBadgerDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	s.VochainState.AddEvent("rollback", &s)
-	s.VochainState.AddEvent("addProcess", &s)
-	s.VochainState.AddEvent("revealProcessKeys", &s)
-	s.VochainState.AddEvent("cancelProcess", &s)
-	s.VochainState.AddEvent("commit", &s)
-	s.VochainState.AddEvent("addVote", &s)
-	return &s, nil
+	s.VochainState.AddEventListener(s)
+	return s, nil
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain

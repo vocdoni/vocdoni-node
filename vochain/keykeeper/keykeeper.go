@@ -95,16 +95,17 @@ func (pk *processKeys) Decode(data []byte) error {
 // TBD garbage collector function run at init for revealing all these keys that should have beeen revealed
 
 func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *ethereum.SignKeys, index int8) (*KeyKeeper, error) {
-	var err error
-	var k KeyKeeper
 	if v == nil || signer == nil || len(dbPath) < 1 {
 		return nil, fmt.Errorf("missing values for creating a key keeper")
 	}
 	if index == 0 {
 		return nil, fmt.Errorf("index 0 cannot be used")
 	}
-	k.vochain = v
-	k.signer = signer
+	k := &KeyKeeper{
+		vochain: v,
+		signer:  signer,
+	}
+	var err error
 	k.storage, err = db.NewBadgerDB(dbPath)
 	if err != nil {
 		return nil, err
@@ -112,11 +113,8 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *ethereum.Si
 	k.myIndex = index
 	// k.vochain.Codec.RegisterConcrete(&processKeys{}, "vocdoni/keykeeper.processKeys", nil)
 	// k.vochain.Codec.RegisterConcrete(processKeys{}, "processKeys", nil)
-	k.vochain.State.AddEvent("rollback", &k)
-	k.vochain.State.AddEvent("addProcess", &k)
-	k.vochain.State.AddEvent("cancelProcess", &k)
-	k.vochain.State.AddEvent("commit", &k)
-	return &k, nil
+	k.vochain.State.AddEventListener(k)
+	return k, nil
 }
 
 // PrintInfo print some log information every wait duration

@@ -39,23 +39,12 @@ var (
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
 var PrefixDBCacheSize = 0
 
-// ValidEvents contains the list of valid event names
-var ValidEvents = map[string]bool{
-	"addVote":           true,
-	"addProcess":        true,
-	"endProcess":        true,
-	"commit":            true,
-	"rollback":          true,
-	"cancelProcess":     true,
-	"addProcessKeys":    true,
-	"revealProcessKeys": true,
-}
-
-// Event is an interface used for executing custom functions during the events of the block creation process
-// The events available can be read on ValidEvents string slice
-// The order in which events are executed is: Rollback(), OnVote() or OnProcess(), Commit()
-// The process is concurrencty safe meaning that there cannot be two sequences happening in paralel
-type Event interface {
+// EventListener is an interface used for executing custom functions during the
+// events of the block creation process.
+// The order in which events are executed is: Rollback, OnVote or OnProcess, Commit.
+// The process is concurrency safe, meaning that there cannot be two sequences
+// happening in parallel.
+type EventListener interface {
 	OnVote(*types.Vote)
 	OnProcess(pid, eid string)
 	OnCancel(pid string)
@@ -71,8 +60,9 @@ type State struct {
 	ProcessTree *iavl.MutableTree
 	VoteTree    *iavl.MutableTree
 	ImmutableState
-	Codec  *amino.Codec
-	Events map[string][]Event // addVote, addProcess....
+	Codec *amino.Codec
+
+	eventListeners []EventListener
 }
 
 // ImmutableState holds the latest trees version saved on disk
@@ -152,7 +142,6 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	vs.Codec = codec
 
 	log.Infof("application trees successfully loaded. appTree:%d processTree:%d voteTree: %d", atVersion, ptVersion, vtVersion)
-	vs.Events = make(map[string][]Event)
 	return vs, nil
 }
 
@@ -179,13 +168,10 @@ func (v *State) Immutable() error {
 	return nil
 }
 
-// AddEvent adds a new callback function of type EventCallback which will be exeuted on event name
-func (v *State) AddEvent(name string, f Event) error {
-	if _, ok := ValidEvents[name]; ok {
-		v.Events[name] = append(v.Events[name], f)
-		return nil
-	}
-	return fmt.Errorf("vochain event %s not valid", name)
+// AddEventListener adds a new event listener, to receive method calls on block
+// events as documented in EventListener.
+func (v *State) AddEventListener(l EventListener) {
+	v.eventListeners = append(v.eventListeners, l)
 }
 
 // AddOracle adds a trusted oracle given its address if not exists
@@ -357,10 +343,8 @@ func (v *State) AddProcessKeys(tx *types.AdminTx) error {
 	if err := v.setProcess(process, pid); err != nil {
 		return err
 	}
-	if events, ok := v.Events["addProcessKeys"]; ok {
-		for _, e := range events {
-			e.OnProcessKeys(pid, tx.EncryptionPublicKey, tx.CommitmentKey)
-		}
+	for _, l := range v.eventListeners {
+		l.OnProcessKeys(pid, tx.EncryptionPublicKey, tx.CommitmentKey)
 	}
 	return nil
 }
@@ -387,10 +371,8 @@ func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
 	if err := v.setProcess(process, pid); err != nil {
 		return err
 	}
-	if events, ok := v.Events["revealProcessKeys"]; ok {
-		for _, e := range events {
-			e.OnRevealKeys(pid, tx.EncryptionPrivateKey, tx.RevealKey)
-		}
+	for _, l := range v.eventListeners {
+		l.OnRevealKeys(pid, tx.EncryptionPrivateKey, tx.RevealKey)
 	}
 	return nil
 }
@@ -405,10 +387,8 @@ func (v *State) AddProcess(p *types.Process, pid string) error {
 	v.Lock()
 	v.ProcessTree.Set([]byte(pid), newProcessBytes)
 	v.Unlock()
-	if events, ok := v.Events["addProcess"]; ok {
-		for _, e := range events {
-			e.OnProcess(pid, p.EntityID)
-		}
+	for _, l := range v.eventListeners {
+		l.OnProcess(pid, p.EntityID)
 	}
 	return nil
 }
@@ -431,10 +411,8 @@ func (v *State) CancelProcess(pid string) error {
 	v.Lock()
 	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
 	v.Unlock()
-	if events, ok := v.Events["cancelProcess"]; ok {
-		for _, e := range events {
-			e.OnCancel(pid)
-		}
+	for _, l := range v.eventListeners {
+		l.OnCancel(pid)
 	}
 	return nil
 }
@@ -522,10 +500,8 @@ func (v *State) AddVote(vote *types.Vote) error {
 	v.Lock()
 	v.VoteTree.Set([]byte(voteID), newVoteBytes)
 	v.Unlock()
-	if events, ok := v.Events["addVote"]; ok {
-		for _, e := range events {
-			e.OnVote(vote)
-		}
+	for _, l := range v.eventListeners {
+		l.OnVote(vote)
 	}
 	return nil
 }
@@ -674,11 +650,9 @@ func (v *State) Save() []byte {
 		log.Errorf("cannot set immutable tree")
 	}
 	v.Unlock()
-	if events, ok := v.Events["commit"]; ok {
-		if h := v.Header(false); h != nil {
-			for _, e := range events {
-				e.Commit(h.Height)
-			}
+	if h := v.Header(false); h != nil {
+		for _, l := range v.eventListeners {
+			l.Commit(h.Height)
 		}
 	}
 
@@ -687,10 +661,8 @@ func (v *State) Save() []byte {
 
 // Rollback rollbacks to the last persistent db data version
 func (v *State) Rollback() {
-	if events, ok := v.Events["rollback"]; ok {
-		for _, e := range events {
-			e.Rollback()
-		}
+	for _, l := range v.eventListeners {
+		l.Rollback()
 	}
 	v.Lock()
 	v.AppTree.Rollback()
