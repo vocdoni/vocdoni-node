@@ -4,6 +4,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"testing"
+
+	"gitlab.com/vocdoni/go-dvote/crypto"
+	"gitlab.com/vocdoni/go-dvote/crypto/internal/cryptotest"
 )
 
 func b64dec(in string) []byte {
@@ -75,33 +78,9 @@ func TestDecryptCiphersFromJS(t *testing.T) {
 }
 
 func TestGenerateEncryptDecrypt(t *testing.T) {
-	keys, err := Generate(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	otherKeys, err := Generate(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, test := range inputs {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			cipher, err := keys.Encrypt(test.message)
-			if err != nil {
-				t.Fatalf("Encrypt error: %v", err)
-			}
-			if _, err := otherKeys.Decrypt(cipher); err == nil {
-				t.Fatalf("Decrypt with different keys should error")
-			}
-			got, err := keys.Decrypt(cipher)
-			if err != nil {
-				t.Fatalf("Decrypt error: %v", err)
-			}
-			if want := test.message; string(got) != string(want) {
-				t.Fatalf("Decrypt got %q, want %q", got, want)
-			}
-		})
-	}
+	cryptotest.TestGenerateEncryptDecrypt(t, func() (crypto.Cipher, error) {
+		return Generate(nil)
+	})
 }
 
 // TestEncryptRandomNonce verifies that encrypting the same message for the same
