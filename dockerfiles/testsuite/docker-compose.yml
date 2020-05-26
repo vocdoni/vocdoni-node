@@ -3,7 +3,7 @@ version: "3.7"
 services:
   seed:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    build:
+    build: # reused by the other services
       context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.seed"
     volumes:
@@ -12,8 +12,6 @@ services:
 
   miner0:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    build:
-      context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner0"
     volumes:
       - data-miner0:/app/run/
@@ -23,8 +21,6 @@ services:
 
   miner1:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    build:
-      context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner1"
     volumes:
       - data-miner1:/app/run/
@@ -34,8 +30,6 @@ services:
 
   miner2:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    build:
-      context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner2"
     volumes:
       - data-miner2:/app/run/
@@ -45,8 +39,6 @@ services:
 
   miner3:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    build:
-      context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner3"
     volumes:
       - data-miner3:/app/run/
@@ -56,8 +48,6 @@ services:
 
   oracle:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    build:
-      context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.oracle"
     volumes:
       - data-oracle:/app/run/
@@ -67,8 +57,6 @@ services:
 
   gateway:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    build:
-      context: ../../
     env_file: "${COMPOSE_HOST_PATH:-.}/env.gateway"
     ports:
       - "${COMPOSE_DVOTE_PORT_MAPPING:-9090:9090}"

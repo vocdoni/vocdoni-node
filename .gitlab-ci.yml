@@ -51,6 +51,7 @@ compose-test:
     - export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
     - export COMPOSE_HOST_PATH=${CI_PROJECT_DIR}/dockerfiles/testsuite
     - export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
+    - export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 # faster builds
     - cd dockerfiles/testsuite
     - docker-compose build
     - docker-compose up -d
