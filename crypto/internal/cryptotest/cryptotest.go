@@ -67,22 +67,38 @@ func TestGenerateEncryptDecrypt(t *testing.T, gen func() (crypto.Cipher, error))
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			enc, err := cipher1.Encrypt(test.message)
+			enc1, err := cipher1.Encrypt(test.message, nil)
+			if err != nil {
+				t.Fatalf("Encrypt error: %v", err)
+			}
+			enc2, err := cipher1.Encrypt(test.message, cipher2.Public())
 			if err != nil {
 				t.Fatalf("Encrypt error: %v", err)
 			}
 
-			if _, err := cipher2.Decrypt(enc); err == nil {
+			if _, err := cipher2.Decrypt(enc1); err == nil {
+				t.Fatalf("Decrypt with different keys should error")
+			}
+			if _, err := cipher1.Decrypt(enc2); err == nil {
 				t.Fatalf("Decrypt with different keys should error")
 			}
 
-			dec, err := cipher1.Decrypt(enc)
+			dec1, err := cipher1.Decrypt(enc1)
 			if err != nil {
 				t.Fatalf("Decrypt error: %v", err)
 			}
 
-			if !bytes.Equal(dec, test.message) {
-				t.Fatalf("encrypt-decrypt got %q, want %q", dec, test.message)
+			if !bytes.Equal(dec1, test.message) {
+				t.Fatalf("encrypt-decrypt got %q, want %q", dec1, test.message)
+			}
+
+			dec2, err := cipher2.Decrypt(enc2)
+			if err != nil {
+				t.Fatalf("Decrypt error: %v", err)
+			}
+
+			if !bytes.Equal(dec2, test.message) {
+				t.Fatalf("encrypt-decrypt got %q, want %q", dec2, test.message)
 			}
 		})
 	}

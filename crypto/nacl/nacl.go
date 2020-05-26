@@ -104,14 +104,23 @@ func Generate(randReader io.Reader) (crypto.Cipher, error) {
 	return &privkey, nil
 }
 
+// Anonymous is a convenience to encrypt anonymous sealed boxes for an explicit
+// recipient public key, without having a private key at all.
+var Anonymous crypto.Cipher = (*privateKey)(nil)
+
 // Encrypt is a standalone version of KeyPair.Encrypt, since the recipient's
 // private key isn't needed to encrypt.
-func Encrypt(message []byte, public *[KeyLength]byte) ([]byte, error) {
-	return box.SealAnonymous(nil, message, public, cryptorand.Reader)
-}
-
-func (priv *privateKey) Encrypt(message []byte) ([]byte, error) {
-	return Encrypt(message, priv.pub.array())
+func (priv *privateKey) Encrypt(message []byte, recipient crypto.PublicKey) ([]byte, error) {
+	var pub *publicKey
+	if recipient == nil {
+		pub = &priv.pub
+	} else {
+		pub, _ = recipient.(*publicKey)
+		if pub == nil {
+			return nil, fmt.Errorf("invalid recipient key: %#v", recipient)
+		}
+	}
+	return box.SealAnonymous(nil, message, pub.array(), cryptorand.Reader)
 }
 
 func (priv *privateKey) Decrypt(cipher []byte) ([]byte, error) {

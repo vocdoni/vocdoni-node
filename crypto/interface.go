@@ -33,21 +33,30 @@ type PrivateKey interface {
 	Public() PublicKey
 }
 
-// Cipher represents public key cryptography algorithm to encrypt and decrypt
-// messages.
+// Cipher represents a private key which can encrypt and decrypt messages.
 type Cipher interface {
 	PrivateKey
 
-	Encrypt(message []byte) ([]byte, error)
+	// Encrypt encrypts message for a given recipient. If recipient is nil,
+	// the message is encrypted for the encryption key itself.
+	Encrypt(message []byte, recipient PublicKey) ([]byte, error)
+
+	// Decrypt decryptes a message, assuming that it was encrypted for this
+	// key.
 	Decrypt(cipher []byte) ([]byte, error)
 }
 
-// Cipher represents public key cryptography algorithm to sign and verify
-// messages.
+// Cipher represents a private key which can sign messages.
 type Signer interface {
 	PrivateKey
 
 	Sign(message []byte) ([]byte, error)
+}
+
+// Verifier represents a public key which can verify signed messages.
+type Verifier interface {
+	PublicKey
+
 	Verify(message, signature []byte) error
 }
 

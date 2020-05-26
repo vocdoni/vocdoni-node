@@ -499,13 +499,9 @@ func genVote(encrypted bool, keys []string) (string, error) {
 		for i, k := range keys {
 			if len(k) > 0 {
 				log.Debugf("encrypting with key %s", k)
-				pubk, err := hex.DecodeString(k)
+				pub, err := nacl.DecodePublic(k)
 				if err != nil {
 					return "", fmt.Errorf("cannot decode encryption key with index %d: (%s)", i, err)
-				}
-				var pubkb [nacl.KeyLength]byte
-				if n := copy(pubkb[:], pubk[:]); n != nacl.KeyLength {
-					return "", fmt.Errorf("wrong encryption key size %d", n)
 				}
 				if first {
 					vp.Nonce = randomHex(rand.Intn(16) + 16)
@@ -515,7 +511,7 @@ func genVote(encrypted bool, keys []string) (string, error) {
 					}
 					first = false
 				}
-				if vpBytes, err = nacl.Encrypt(vpBytes, &pubkb); err != nil {
+				if vpBytes, err = nacl.Anonymous.Encrypt(vpBytes, pub); err != nil {
 					return "", fmt.Errorf("cannot encrypt: (%s)", err)
 				}
 			}
