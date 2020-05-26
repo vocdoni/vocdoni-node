@@ -11,20 +11,20 @@ import (
 )
 
 func TestEncodeDecode(t *testing.T) {
-	k1, err := nacl.Generate(rand.Reader)
+	priv1, err := nacl.Generate(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	k2, err := nacl.Generate(rand.Reader)
+	priv2, err := nacl.Generate(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	pk := processKeys{
-		pubKey:        k1.Public(),
-		privKey:       k1.Private(),
-		revealKey:     k2.Public(),
-		commitmentKey: k2.Private(),
+		pubKey:        priv1.Public().Bytes(),
+		privKey:       priv1.Bytes(),
+		revealKey:     priv2.Public().Bytes(),
+		commitmentKey: priv2.Bytes(),
 		index:         5,
 	}
 	data := pk.Encode()

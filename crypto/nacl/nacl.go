@@ -16,56 +16,92 @@ import (
 
 const KeyLength = 32
 
-// DecodeKey decodes a public or private key from a hexadecimal string.
-func DecodeKey(hexkey string) (*[KeyLength]byte, error) {
+// key represents a single nacl key, public or private. It contains common
+// methods to represent the key as a byte slice or as a byte array, as well as
+// decodig from hex.
+type key [KeyLength]byte
+
+func (k *key) Bytes() []byte { return k[:] }
+
+func (k *key) array() *[KeyLength]byte { return (*[KeyLength]byte)(k) }
+
+func (k *key) decode(hexkey string) error {
 	b, err := hex.DecodeString(hexkey)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if len(b) != KeyLength {
-		return nil, fmt.Errorf("key length must be %d, not %d", KeyLength, len(b))
+		return fmt.Errorf("key length must be %d, not %d", KeyLength, len(b))
 	}
-	key := new([KeyLength]byte)
-	copy(key[:], b)
-	return key, nil
+	copy(k.Bytes(), b)
+	return nil
 }
 
-// KeyPair holds pair of public and private keys.
-type KeyPair struct {
-	public, private [KeyLength]byte
+// publicKey implements crypto.PublicKey.
+type publicKey struct {
+	key
 }
 
-// Ensure that we implement the interface.
-var _ crypto.Cipher = (*KeyPair)(nil)
+// privateKey implements crypto.PrivateKey.
+type privateKey struct {
+	key
 
-// Generate creates a new random KeyPair. If randReader is nil,
+	pub publicKey
+}
+
+func (priv *privateKey) Public() crypto.PublicKey { return &priv.pub }
+
+func (priv *privateKey) derivePublic() error {
+	pub, err := curve25519.X25519(priv.Bytes(), curve25519.Basepoint)
+	if err != nil {
+		return err
+	}
+	copy(priv.pub.Bytes(), pub)
+	return nil
+}
+
+// DecodePrivate decodes a private key from a hexadecimal string.
+//
+// Since this package supports encryption and decryption, we return a
+// crypto.Cipher instead of just a crypto.PrivateKey.
+func DecodePrivate(hexkey string) (crypto.Cipher, error) {
+	var privkey privateKey
+	if err := privkey.decode(hexkey); err != nil {
+		return nil, err
+	}
+	if err := privkey.derivePublic(); err != nil {
+		return nil, err
+	}
+	return &privkey, nil
+}
+
+// DecodePublic decodes a public key from a hexadecimal string.
+func DecodePublic(hexkey string) (crypto.PublicKey, error) {
+	var pubkey publicKey
+	if err := pubkey.decode(hexkey); err != nil {
+		return nil, err
+	}
+	return &pubkey, nil
+}
+
+// Generate creates a new random private key. If randReader is nil,
 // crypto/rand.Reader is used.
-func Generate(randReader io.Reader) (*KeyPair, error) {
+//
+// Since this package supports encryption and decryption, we return a
+// crypto.Cipher instead of just a crypto.PrivateKey.
+func Generate(randReader io.Reader) (crypto.Cipher, error) {
 	if randReader == nil {
 		randReader = cryptorand.Reader
 	}
-	pub, priv, err := box.GenerateKey(randReader)
-	if err != nil {
+	var privkey privateKey
+	if _, err := io.ReadFull(randReader, privkey.Bytes()); err != nil {
 		return nil, err
 	}
-	return &KeyPair{public: *pub, private: *priv}, nil
-}
 
-// FromHex creates a KeyPair from the provided hexadecimal private key.
-func FromHex(privHex string) (*KeyPair, error) {
-	priv, err := DecodeKey(privHex)
-	if err != nil {
+	if err := privkey.derivePublic(); err != nil {
 		return nil, err
 	}
-	kp := &KeyPair{private: *priv}
-
-	pub, err := curve25519.X25519(kp.private[:], curve25519.Basepoint)
-	if err != nil {
-		return kp, err
-	}
-	copy(kp.public[:], pub)
-
-	return kp, nil
+	return &privkey, nil
 }
 
 // Encrypt is a standalone version of KeyPair.Encrypt, since the recipient's
@@ -74,15 +110,12 @@ func Encrypt(message []byte, public *[KeyLength]byte) ([]byte, error) {
 	return box.SealAnonymous(nil, message, public, cryptorand.Reader)
 }
 
-func (k *KeyPair) Public() []byte  { return k.public[:] }
-func (k *KeyPair) Private() []byte { return k.private[:] }
-
-func (k *KeyPair) Encrypt(message []byte) ([]byte, error) {
-	return Encrypt(message, &k.public)
+func (priv *privateKey) Encrypt(message []byte) ([]byte, error) {
+	return Encrypt(message, priv.pub.array())
 }
 
-func (k *KeyPair) Decrypt(cipher []byte) ([]byte, error) {
-	message, ok := box.OpenAnonymous(nil, cipher, &k.public, &k.private)
+func (priv *privateKey) Decrypt(cipher []byte) ([]byte, error) {
+	message, ok := box.OpenAnonymous(nil, cipher, priv.pub.array(), priv.array())
 	if !ok {
 		return nil, fmt.Errorf("could not open box")
 	}

@@ -445,9 +445,10 @@ func checkRevealProcessKeys(tx *types.AdminTx, process *types.Process) error {
 	}
 	// check keys actually work
 	if len(tx.EncryptionPrivateKey) > 0 {
-		if kp, err := nacl.FromHex(tx.EncryptionPrivateKey); err == nil {
-			if fmt.Sprintf("%x", kp.Public()) != process.EncryptionPublicKeys[tx.KeyIndex] {
-				log.Debugf("%x != %s", kp.Public(), process.EncryptionPublicKeys[tx.KeyIndex])
+		if priv, err := nacl.DecodePrivate(tx.EncryptionPrivateKey); err == nil {
+			pub := priv.Public().Bytes()
+			if fmt.Sprintf("%x", pub) != process.EncryptionPublicKeys[tx.KeyIndex] {
+				log.Debugf("%x != %s", pub, process.EncryptionPublicKeys[tx.KeyIndex])
 				return fmt.Errorf("the provided private key does not match with the stored public key on index %d", tx.KeyIndex)
 			}
 		} else {

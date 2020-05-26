@@ -15,17 +15,28 @@
 // increase the memory and cpu overhead.
 package crypto
 
-// KeyPair is common to any public key cryptography algorithm, which at the
-// moment are represented as Cipher or Signer.
-type KeyPair interface {
-	Public() []byte
-	Private() []byte
+// PublicKey represents a single public key.
+type PublicKey interface {
+	// Bytes represents a public key as a byte slice, which can be useful to
+	// then print it in hex or base64.
+	Bytes() []byte
+}
+
+// PrivateKey represents a single private key, along with its derived public
+// key. Note that the public key is derived when the private key is created.
+type PrivateKey interface {
+	// Bytes represents a private key as a byte slice, which can be useful to
+	// then print it in hex or base64.
+	Bytes() []byte
+
+	// Public returns the public key that was derived from this private key.
+	Public() PublicKey
 }
 
 // Cipher represents public key cryptography algorithm to encrypt and decrypt
 // messages.
 type Cipher interface {
-	KeyPair
+	PrivateKey
 
 	Encrypt(message []byte) ([]byte, error)
 	Decrypt(cipher []byte) ([]byte, error)
@@ -34,7 +45,7 @@ type Cipher interface {
 // Cipher represents public key cryptography algorithm to sign and verify
 // messages.
 type Signer interface {
-	KeyPair
+	PrivateKey
 
 	Sign(message []byte) ([]byte, error)
 	Verify(message, signature []byte) error

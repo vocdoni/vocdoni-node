@@ -23,13 +23,13 @@ func unmarshalVote(votePackage string, keys []string) (*types.VotePackage, error
 	var vote types.VotePackage
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
-		var kp *nacl.KeyPair
 		for i := len(keys) - 1; i >= 0; i-- {
-			if kp, err = nacl.FromHex(keys[i]); err != nil {
+			priv, err := nacl.DecodePrivate(keys[i])
+			if err != nil {
 				log.Warnf("cannot create private key cipher: (%s)", err)
 				continue
 			}
-			if rawVote, err = kp.Decrypt(rawVote); err != nil {
+			if rawVote, err = priv.Decrypt(rawVote); err != nil {
 				log.Warnf("cannot decrypt vote with index key %d", i)
 			}
 		}

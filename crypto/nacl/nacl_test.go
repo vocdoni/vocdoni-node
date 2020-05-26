@@ -55,18 +55,18 @@ var inputs = []struct {
 }
 
 func TestDecryptCiphersFromJS(t *testing.T) {
-	keys, err := FromHex(jsPriv)
+	priv, err := DecodePrivate(jsPriv)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pub := fmt.Sprintf("%x", keys.Public()); pub != jsPub {
+	if pub := fmt.Sprintf("%x", priv.Public().Bytes()); pub != jsPub {
 		t.Fatalf("wrong public key derivated from priv key: got %s, want %s", pub, jsPub)
 	}
 
 	for _, test := range inputs {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			got, err := keys.Decrypt(test.jsCipher)
+			got, err := priv.Decrypt(test.jsCipher)
 			if err != nil {
 				t.Fatalf("Decrypt error: %v", err)
 			}
@@ -88,14 +88,14 @@ func TestGenerateEncryptDecrypt(t *testing.T) {
 // This is because a random encrypting key pair is used each time, and the
 // encryption nonce is derived from that random key pair.
 func TestEncryptRandomNonce(t *testing.T) {
-	recipient, err := DecodeKey(jsPub)
+	recipient, err := DecodePublic(jsPub)
 	if err != nil {
 		t.Fatal(err)
 	}
 	message := []byte("hello world")
 	seen := make(map[string]bool)
 	for i := 0; i < 10; i++ {
-		cipher, err := Encrypt(message, recipient)
+		cipher, err := Encrypt(message, recipient.(*publicKey).array())
 		if err != nil {
 			t.Fatal(err)
 		}

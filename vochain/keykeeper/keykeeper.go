@@ -259,18 +259,18 @@ func (k *KeyKeeper) generateKeys(pid string) (*processKeys, error) {
 	// Add the index in order to win some extra entropy
 	pb = append(pb, byte(k.myIndex))
 	// Private ed25519 key
-	ek, err := nacl.FromHex(fmt.Sprintf("%x", ethereum.HashRaw(append(k.signer.Private.D.Bytes()[:], pb[:]...))))
+	priv, err := nacl.DecodePrivate(fmt.Sprintf("%x", ethereum.HashRaw(append(k.signer.Private.D.Bytes()[:], pb[:]...))))
 	if err != nil {
 		return nil, fmt.Errorf("cannot generate encryption key: (%s)", err)
 	}
 	// Reveal and commitment keys
-	ckb := snarks.Poseidon.Hash(ek.Private())
+	ckb := snarks.Poseidon.Hash(priv.Bytes())
 	ck := ckb[:commitmentKeySize]
 	ckhash := snarks.Poseidon.Hash(ckb)[:commitmentKeySize]
 
 	pk := &processKeys{
-		privKey:       ek.Private(),
-		pubKey:        ek.Public(),
+		privKey:       priv.Bytes(),
+		pubKey:        priv.Public().Bytes(),
 		revealKey:     ck,
 		commitmentKey: ckhash,
 		index:         k.myIndex,

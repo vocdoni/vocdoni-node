@@ -30,14 +30,18 @@ var tests = []struct {
 	},
 }
 
-func testKeyPair(t *testing.T, keypair crypto.KeyPair) {
+func testPrivateKey(t *testing.T, key crypto.PrivateKey) {
 	t.Helper()
 
-	pub := keypair.Public()
-	priv := keypair.Private()
+	priv := key.Bytes()
+	pub := key.Public().Bytes()
 
 	if len(pub) == 0 || len(priv) == 0 || bytes.Equal(pub, priv) {
 		t.Fatalf("invalid keypair: pub=%x priv=%x", pub, priv)
+	}
+
+	if pub2 := key.Public().Bytes(); !bytes.Equal(pub, pub2) {
+		t.Fatalf("two Public calls got different keys: %x %x", pub, pub2)
 	}
 }
 
@@ -52,9 +56,9 @@ func TestGenerateEncryptDecrypt(t *testing.T, gen func() (crypto.Cipher, error))
 	if err != nil {
 		t.Fatal(err)
 	}
-	testKeyPair(t, cipher1)
-	testKeyPair(t, cipher2)
-	if bytes.Equal(cipher1.Private(), cipher2.Private()) {
+	testPrivateKey(t, cipher1)
+	testPrivateKey(t, cipher2)
+	if bytes.Equal(cipher1.Bytes(), cipher2.Bytes()) {
 		t.Fatal("cipher1 and cipher2 must be different")
 	}
 
