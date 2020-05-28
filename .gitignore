@@ -14,6 +14,7 @@
 # Docker files and dirs
 env.local
 run
+env
 
 # VSCode
 .vscode
