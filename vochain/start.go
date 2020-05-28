@@ -109,7 +109,12 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig.LogLevel = localConfig.LogLevel
 	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RPCListen
 	tconfig.P2P.ListenAddress = "tcp://" + localConfig.P2PListen
-	tconfig.P2P.AllowDuplicateIP = true // TBD make this a flag or dependent on dev mode, because it might imply some security issues
+	tconfig.P2P.AllowDuplicateIP = false
+	tconfig.P2P.AddrBookStrict = true
+	if localConfig.Dev {
+		tconfig.P2P.AllowDuplicateIP = true
+		tconfig.P2P.AddrBookStrict = false
+	}
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 	if !localConfig.CreateGenesis {
@@ -130,7 +135,6 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 			log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
 		}
 	}
-	tconfig.P2P.AddrBookStrict = false
 	tconfig.P2P.SeedMode = localConfig.SeedMode
 	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
 
