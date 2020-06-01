@@ -24,7 +24,7 @@ const SignatureLength = 130
 // PubKeyLength is the size of a Public Key
 const PubKeyLength = 66
 
-// PubKeyCompLength is the size of a uncompressed Public Key
+// PubKeyLengthUncompressed is the size of a uncompressed Public Key
 const PubKeyLengthUncompressed = 130
 
 // SigningPrefix is the prefix added when hashing
@@ -95,7 +95,7 @@ func (k *SignKeys) HexString() (string, string) {
 	return pubHexComp, privHex
 }
 
-// decompressPubKey takes a hexString compressed public key and returns it descompressed
+// DecompressPubKey takes a hexString compressed public key and returns it descompressed
 func DecompressPubKey(pubHexComp string) (string, error) {
 	pubHexComp = util.TrimHex(pubHexComp)
 	if len(pubHexComp) > PubKeyLength {
@@ -113,7 +113,24 @@ func DecompressPubKey(pubHexComp string) (string, error) {
 	return pubHex, nil
 }
 
-// PublicKey return the Ethereum address from the ECDSA public key
+// CompressPubKey returns the compressed public key in hexString format
+func CompressPubKey(pubHexDec string) (string, error) {
+	pubHexDec = util.TrimHex(pubHexDec)
+	if len(pubHexDec) < PubKeyLengthUncompressed {
+		return pubHexDec, nil
+	}
+	pubBytes, err := hex.DecodeString(pubHexDec)
+	if err != nil {
+		return "", err
+	}
+	pub, err := crypto.UnmarshalPubkey(pubBytes)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", crypto.CompressPubkey(pub)), nil
+}
+
+// EthAddrString return the Ethereum address from the ECDSA public key
 func (k *SignKeys) EthAddrString() string {
 	recoveredAddr := crypto.PubkeyToAddress(k.Public)
 	return fmt.Sprintf("%x", recoveredAddr)
