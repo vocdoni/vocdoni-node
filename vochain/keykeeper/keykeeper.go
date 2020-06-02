@@ -137,7 +137,6 @@ func (k *KeyKeeper) PrintInfo(wait time.Duration) {
 // It should be callend once the Vochain is syncronized in order to have the correct height.
 func (k *KeyKeeper) RevealUnpublished() {
 	// wait for vochain sync?
-	// This function can be probably deleted because the replay of blocks do this job automatically.
 	header := k.vochain.State.Header(true)
 	if header == nil {
 		log.Errorf("cannot get blockchain header, skipping reveal unpublished operation")
@@ -148,6 +147,8 @@ func (k *KeyKeeper) RevealUnpublished() {
 	iter := k.storage.NewIterator()
 	defer iter.Release()
 	var pids []string
+	log.Infof("starting keykeeper reveal recovery")
+	// First get the scheduled reveal key process from the storage
 	for iter.Next() {
 		// TODO(mvdan): use a prefixed iterator
 		if !strings.HasPrefix(string(iter.Key()), dbPrefixBlock) {
@@ -158,8 +159,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 			log.Errorf("cannot fetch block number from keykeeper database: (%s)", err)
 			continue
 		}
-		if header.Height <= h+2 {
-			// give some extra blocks to avoid collition with normal operation
+		if header.Height <= h+1 {
 			continue
 		}
 		if err := k.vochain.State.Codec.UnmarshalBinaryBare(iter.Value(), &pids); err != nil {
@@ -172,7 +172,32 @@ func (k *KeyKeeper) RevealUnpublished() {
 				log.Error(err)
 			}
 		}
+		if err := k.storage.Del(iter.Key()); err != nil {
+			log.Error(err)
+		}
 	}
+	iter.Release()
+	iter = k.storage.NewIterator()
+	var pid string
+	// Second take all existing processes and check if keys should be revealed (if canceled)
+	for iter.Next() {
+		if !strings.HasPrefix(string(iter.Key()), dbPrefixProcess) {
+			continue
+		}
+		pid = string(iter.Key()[len(dbPrefixProcess):])
+		process, err := k.vochain.State.Process(pid, true)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		if process.Canceled {
+			log.Warnf("found pending keys for reveal on process %s", pid)
+			if err := k.revealKeys(pid); err != nil {
+				log.Error(err)
+			}
+		}
+	}
+	log.Infof("keykeeper reveal recovery finished")
 }
 
 // Rollback removes the non commited pending operations.

@@ -236,15 +236,25 @@ func (e *EthChainContext) createAccount() error {
 
 // PrintInfo prints every N seconds some ethereum information (sync and height). It's blocking!
 func (e *EthChainContext) PrintInfo(seconds time.Duration) {
+	var lastHeight uint64
+	var info EthSyncInfo
+	var err error
+	var syncingInfo string
 	for {
 		time.Sleep(seconds)
-		info, err := e.SyncInfo()
+		info, err = e.SyncInfo()
 		if err != nil {
 			log.Warn(err)
 			continue
 		}
-		log.Infof("[ethereum info] synced:%t height:%d/%d peers:%d mode:%s",
-			info.Synced, info.Height, info.MaxHeight, info.Peers, info.Mode)
+		if !info.Synced {
+			syncingInfo = fmt.Sprintf("syncSpeed:%d b/s", (info.Height-lastHeight)/uint64(seconds.Seconds()))
+		} else {
+			syncingInfo = ""
+		}
+		log.Infof("[ethereum info] synced:%t height:%d/%d peers:%d mode:%s %s",
+			info.Synced, info.Height, info.MaxHeight, info.Peers, info.Mode, syncingInfo)
+		lastHeight = info.Height
 	}
 }
 

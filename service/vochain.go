@@ -19,7 +19,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
 
-func Vochain(vconfig *config.VochainCfg, dev, results bool, ma *metrics.Agent) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
+func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma *metrics.Agent) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
 	log.Info("creating vochain service")
 	var host, port string
 	var ip net.IP
@@ -99,6 +99,17 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, ma *metrics.Agent) (
 	// Vochain info
 	vi = vochaininfo.NewVochainInfo(vnode)
 	go vi.Start(10)
+
+	if waitForSync {
+		log.Infof("waiting for vochain to finish synchronization")
+		var lastHeight int64
+		for !vi.Sync() {
+			lastHeight = vi.Height()
+			time.Sleep(time.Second * 20)
+			log.Infof("[vochain info] fastsync running at block %d (%d blocks/s), peers %d", vi.Height(), (vi.Height()-lastHeight)/20, len(vi.Peers()))
+		}
+		log.Infof("vochain fastsync done!")
+	}
 	go VochainPrintInfo(20, vi)
 
 	// Vochain RPC client

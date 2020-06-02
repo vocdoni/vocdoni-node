@@ -410,7 +410,7 @@ func main() {
 		if globalCfg.Mode == "gateway" && globalCfg.API.Results {
 			scrutinizer = true
 		}
-		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, ma)
+		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, true, ma)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -442,6 +442,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		go kk.RevealUnpublished()
 		go kk.PrintInfo(time.Second * 20)
 	}
 

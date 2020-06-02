@@ -41,7 +41,7 @@ func (vi *VochainInfo) Height() int64 {
 	return vi.height
 }
 
-// BLockTimes returns the average block time for 1, 10, 60, 360 and 1440 minutes
+// BlockTimes returns the average block time for 1, 10, 60, 360 and 1440 minutes
 // Value 0 means there is not yet an average
 func (vi *VochainInfo) BlockTimes() (float32, float32, float32, float32, float32) {
 	vi.lock.RLock()
@@ -52,12 +52,10 @@ func (vi *VochainInfo) BlockTimes() (float32, float32, float32, float32, float32
 // Sync returns true if the Vochain is considered up-to-date
 // Dislaimer: this method is not 100% accurated. Use it just for non-critical operations
 func (vi *VochainInfo) Sync() bool {
-	vi.lock.RLock()
-	defer vi.lock.RUnlock()
-	return (vi.height != 0 && vi.sync)
+	return !vi.vnode.Node.ConsensusReactor().FastSync()
 }
 
-// TreeSizes() returns the current size of the ProcessTree and VoteTree
+// TreeSizes returns the current size of the ProcessTree and VoteTree
 // ProcessTree: total number of created voting processes in the blockchain
 // VoteTree: total number of votes registered in the blockchain
 func (vi *VochainInfo) TreeSizes() (int64, int64) {
