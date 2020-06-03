@@ -220,6 +220,7 @@ func (e *EthChainContext) Start() {
 			e.Node.Server().AddPeer(p)
 			e.Node.Server().AddTrustedPeer(p)
 		}
+		go e.SyncGuard()
 	}
 }
 
@@ -322,4 +323,21 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 	}
 	err = fmt.Errorf("cannot get sync info, unknown error")
 	return
+}
+
+func (e *EthChainContext) SyncGuard() {
+	log.Infof("starting ethereum sync guard")
+	for {
+		time.Sleep(time.Second * 120)
+		si, err := e.SyncInfo()
+		if err != nil {
+			continue
+		}
+		if si.Synced && si.Height+200 < si.MaxHeight {
+			log.Warn("ethereum is experiencing sync problems, restarting node...")
+			if err = e.Node.Restart(); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
 }
