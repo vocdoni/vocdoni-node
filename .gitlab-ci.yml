@@ -53,11 +53,7 @@ compose-test:
     - export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 # faster builds
     - cd dockerfiles/testsuite
     - docker-compose build
-    - docker-compose up -d
-    - sleep 5 # TODO: Better way of waiting for initialization
-    - docker-compose logs
-    - docker-compose run test timeout 300 ./vochaintest --oracleKey=$TESTSUITE_ORACLE_KEY --electionSize=$TESTSUITE_ELECTION_SIZE --gwHost ws://gateway:9090/dvote
-    - docker-compose down -v --remove-orphans
+    - sh start_test.sh
   only:
     - merge_requests
     - master

@@ -20,6 +20,7 @@ FROM debian:10.4-slim AS test
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
+RUN apt update && apt install -y curl 
 COPY --from=builder /src/vochaintest ./
 
 FROM debian:10.4-slim
