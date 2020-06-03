@@ -100,7 +100,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	if err == nil && e != nil {
 		response.Registered = types.True
 		response.Nullifier = e.Nullifier
-		*response.Height = e.Height
+		response.Height = &e.Height
 		block := r.vocapp.Node.BlockStore().LoadBlock(e.Height)
 		if block == nil {
 			r.sendError(request, "failed getting envelope block timestamp")
