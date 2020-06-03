@@ -429,11 +429,7 @@ func main() {
 
 		// Wait for Vochain to be ready
 		var h, hPrev int64
-		for {
-			if vnode.Node != nil {
-				log.Infof("replay of vochain local blocks finished")
-				break
-			}
+		for vnode.Node == nil {
 			hPrev = h
 			time.Sleep(time.Second * 5)
 			if header := vnode.State.Header(true); header != nil {

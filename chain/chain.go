@@ -193,9 +193,7 @@ func (e *EthChainContext) Start() {
 		log.Infof("my Ethereum address %x", e.Keys.Accounts()[0].Address)
 	}
 	if len(e.DefaultConfig.W3external) == 0 {
-		if err := e.Node.Start(); err != nil {
-			log.Fatalf("error starting ethereum node: %v", err)
-		}
+		utils.StartNode(e.Node)
 
 		log.Infof("started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
 		if e.DefaultConfig.WSPort > 0 {
