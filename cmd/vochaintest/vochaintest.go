@@ -21,6 +21,8 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
+const retries = 10
+
 // APIConnection holds an API websocket connection
 type APIConnection struct {
 	Conn *websocket.Conn
@@ -33,7 +35,13 @@ type APIConnection struct {
 func NewAPIConnection(addr string, id int) (*APIConnection, error) {
 	r := &APIConnection{}
 	var err error
-	r.Conn, _, err = websocket.Dial(context.TODO(), addr, nil)
+	for i := 0; i < retries; i++ {
+		r.Conn, _, err = websocket.Dial(context.TODO(), addr, nil)
+		if err == nil {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil {
 		return nil, err
 	}

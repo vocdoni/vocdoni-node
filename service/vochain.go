@@ -101,14 +101,18 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma
 	go vi.Start(10)
 
 	if waitForSync {
-		log.Infof("waiting for vochain to finish synchronization")
+		log.Infof("waiting for vochain to synchronize")
 		var lastHeight int64
+		i := 0
 		for !vi.Sync() {
 			lastHeight = vi.Height()
-			time.Sleep(time.Second * 20)
-			log.Infof("[vochain info] fastsync running at block %d (%d blocks/s), peers %d", vi.Height(), (vi.Height()-lastHeight)/20, len(vi.Peers()))
+			time.Sleep(time.Second * 1)
+			if i%20 == 0 {
+				log.Infof("[vochain info] fastsync running at block %d (%d blocks/s), peers %d", vi.Height(), (vi.Height()-lastHeight)/20, len(vi.Peers()))
+			}
+			i++
 		}
-		log.Infof("vochain fastsync done!")
+		log.Infof("vochain fastsync completed!")
 	}
 	go VochainPrintInfo(20, vi)
 
