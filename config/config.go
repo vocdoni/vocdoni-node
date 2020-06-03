@@ -177,6 +177,8 @@ type VochainCfg struct {
 	MinerKey string
 	// NodeKey contains the EDDSA public key that identifies the node in the P2P network
 	NodeKey string
+	// NoWaitSync if enabled the Vochain synchronization won't be blocking
+	NoWaitSync bool
 	// SaveConfig overwrites the config file with the CLI provided flags
 	SaveConfig bool
 	// MempoolSize is the size of the mempool

@@ -103,6 +103,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
 	globalCfg.VochainConfig.MinerKey = *flag.String("vochainMinerKey", "", "user alternative vochain miner private key (hexstring[64])")
 	globalCfg.VochainConfig.NodeKey = *flag.String("vochainNodeKey", "", "user alternative vochain private key (hexstring[64])")
+	globalCfg.VochainConfig.NoWaitSync = *flag.Bool("vochainNoWaitSync", false, "do not wait for Vochain to synchronize (for testing only)")
 	globalCfg.VochainConfig.SeedMode = *flag.Bool("vochainSeedMode", false, "act as a vochain seed node")
 	globalCfg.VochainConfig.MempoolSize = *flag.Int("vochainMempoolSize", 200000, "vochain mempool size")
 	globalCfg.VochainConfig.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0, "if this node is a key keeper, use this index slot")
@@ -194,6 +195,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.genesis", flag.Lookup("vochainGenesis"))
 	viper.BindPFlag("vochainConfig.MinerKey", flag.Lookup("vochainMinerKey"))
 	viper.BindPFlag("vochainConfig.NodeKey", flag.Lookup("vochainNodeKey"))
+	viper.BindPFlag("vochainConfig.NoWaitSync", flag.Lookup("vochainNoWaitSync"))
 	viper.BindPFlag("vochainConfig.seedMode", flag.Lookup("vochainSeedMode"))
 	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
 	viper.BindPFlag("vochainConfig.MempoolSize", flag.Lookup("vochainMempoolSize"))
@@ -416,7 +418,7 @@ func main() {
 		if globalCfg.Mode == "gateway" && globalCfg.API.Results {
 			scrutinizer = true
 		}
-		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, true, ma)
+		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma)
 		if err != nil {
 			log.Fatal(err)
 		}
