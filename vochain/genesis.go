@@ -110,7 +110,7 @@ const (
 	DevelopmentGenesis1 = `
 {
    "genesis_time":"2020-05-27T20:29:50.512370579Z",
-   "chain_id":"vocdoni-development-11",
+   "chain_id":"vocdoni-development-12",
    "consensus_params":{
       "block":{
          "max_bytes":"22020096",
