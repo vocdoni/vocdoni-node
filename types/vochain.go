@@ -22,6 +22,8 @@ type VotePackageStruct struct {
 // Vote represents a single Vote
 type Vote struct {
 	EncryptionKeyIndexes []int `json:"encryptionKeyIndexes,omitempty"`
+	// Height the Terndemint block number where the vote is added
+	Height int64 `json:"height,omitempty"`
 	// Nonce unique number per vote attempt, so that replay attacks can't reuse this payload
 	Nonce string `json:"nonce,omitempty"`
 	// Nullifier is the hash of the private key

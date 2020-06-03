@@ -493,6 +493,8 @@ func (v *State) setProcess(process *types.Process, pid string) error {
 // AddVote adds a new vote to a process if the process exists and the vote is not already submmited
 func (v *State) AddVote(vote *types.Vote) error {
 	voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
+	// save block number
+	vote.Height = v.Header(false).Height
 	newVoteBytes, err := v.Codec.MarshalBinaryBare(vote)
 	if err != nil {
 		return fmt.Errorf("cannot marshal vote")

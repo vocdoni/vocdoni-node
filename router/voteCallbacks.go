@@ -79,29 +79,35 @@ func (r *Router) submitEnvelope(request routerRequest) {
 
 func (r *Router) getEnvelopeStatus(request routerRequest) {
 	// check pid
-	sanitizedPID := util.TrimHex(request.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+	request.ProcessID = util.TrimHex(request.ProcessID)
+	if !util.IsHexEncodedStringWithLength(request.ProcessID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope status: (malformed processId)")
 		return
 	}
 	// check nullifier
-	sanitizedNullifier := util.TrimHex(request.Nullifier)
-	if !util.IsHexEncodedStringWithLength(sanitizedNullifier, types.VoteNullifierSize) {
+	request.Nullifier = util.TrimHex(request.Nullifier)
+	if !util.IsHexEncodedStringWithLength(request.Nullifier, types.VoteNullifierSize) {
 		r.sendError(request, "cannot get envelope status: (malformed nullifier)")
 		return
 	}
 
-	// Check envelpe status and send reply
+	// Check envelope status and send reply
 	var response types.ResponseMessage
 	response.Registered = types.False
 
-	e, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier), true)
+	e, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", request.ProcessID, request.Nullifier), true)
 	// Warning, error is ignored. We should find a better way to check the envelope status
 	if err == nil && e != nil {
 		response.Registered = types.True
-		response.Nullifier = sanitizedNullifier
+		response.Nullifier = e.Nullifier
+		*response.Height = e.Height
+		block := r.vocapp.Node.BlockStore().LoadBlock(e.Height)
+		if block == nil {
+			r.sendError(request, "failed getting envelope block timestamp")
+			return
+		}
+		response.BlockTimestamp = int32(block.Time.Unix())
 	}
-
 	r.transport.Send(r.buildReply(request, response))
 }
 
