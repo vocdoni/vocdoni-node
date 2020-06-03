@@ -124,9 +124,9 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 
 	// Set FlagVars first
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
-	globalCfg.DataDir = viper.Get("dataDir").(string)
+	globalCfg.DataDir = viper.GetString("dataDir")
 	viper.BindPFlag("dev", flag.Lookup("dev"))
-	globalCfg.Dev = viper.Get("dev").(bool)
+	globalCfg.Dev = viper.GetBool("dev")
 
 	// If dev enabled, modify dataDir
 	if globalCfg.Dev {
