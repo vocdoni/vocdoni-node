@@ -48,11 +48,9 @@ ${vochainSeeds:+ --vochainSeeds=${vochainSeeds}}\
 ${keyKeeperIndex:+ --keyKeeperIndex=${keyKeeperIndex}}\
 ${voteApi:+ --voteApi=${voteApi}}\
 ${w3Enabled:+ --w3Enabled=${w3Enabled}}\
-${w3HTTPHost:+ --w3HTTPHost=${w3HTTPHost}}\
-${w3HTTPPort:+ --w3HTTPPort=${w3HTTPPort}}\
+${w3RPCHost:+ --w3RPCHost=${w3RPCHost}}\
+${w3RPCPort:+ --w3RPCPort=${w3RPCPort}}\
 ${w3Route:+ --w3Route=${w3Route}}\
-${w3WsHost:+ --w3WsHost=${w3WsHost}}\
-${w3WsPort:+ --w3WsPort=${w3WsPort}}\
 "
 
 CMD="/app/dvotenode $GWARGS $@"

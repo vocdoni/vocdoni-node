@@ -86,8 +86,9 @@ type EventProcessor struct {
 
 // NewEthEvents creates a new Ethereum events handler
 func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication) (*EthereumEvents, error) {
+	// try to connect to default addr if w3Endpoint is empty
 	if len(w3Endpoint) == 0 {
-		w3Endpoint = "ws://127.0.0.1:9092"
+		w3Endpoint = "ws://127.0.0.1:9091"
 	}
 	contractAddr := common.HexToAddress(contractAddressHex)
 	ph, err := chain.NewVotingProcessHandle(contractAddressHex, w3Endpoint)

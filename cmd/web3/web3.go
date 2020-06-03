@@ -55,10 +55,9 @@ func newConfig() (*ethereumStandaloneCfgWrapper, config.Error) {
 	ethereumCfgWrapper.ethConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to use")
 	ethereumCfgWrapper.ethConfig.DataDir = ethereumCfgWrapper.dataDir + "/ethereum"
 	// ethereum web3
-	ethereumCfgWrapper.w3Config.WsPort = *flag.Int("w3WsPort", 9092, "web3 websocket port")
-	ethereumCfgWrapper.w3Config.WsHost = *flag.String("w3WsHost", "0.0.0.0", "web3 websocket host")
-	ethereumCfgWrapper.w3Config.HTTPPort = *flag.Int("w3HTTPPort", 9091, "ethereum http server port")
-	ethereumCfgWrapper.w3Config.HTTPHost = *flag.String("w3HTTPHost", "0.0.0.0", "ethereum http server host")
+	ethereumCfgWrapper.w3Config.RPCPort = *flag.Int("w3RPCPort", 9091, "web3 RPC port")
+	ethereumCfgWrapper.w3Config.RPCHost = *flag.String("w3RPCHost", "127.0.0.1", "web3 RPC host")
+
 	// parse flags
 	flag.Parse()
 	// setting up viper
@@ -77,10 +76,8 @@ func newConfig() (*ethereumStandaloneCfgWrapper, config.Error) {
 	viper.BindPFlag("ethConfig.lightMode", flag.Lookup("ethChainLightMode"))
 	viper.BindPFlag("ethConfig.nodePort", flag.Lookup("ethNodePort"))
 	// ethereum web3
-	viper.BindPFlag("w3Config.wsPort", flag.Lookup("w3WsPort"))
-	viper.BindPFlag("w3Config.wsHost", flag.Lookup("w3WsHost"))
-	viper.BindPFlag("w3Config.httpPort", flag.Lookup("w3HTTPPort"))
-	viper.BindPFlag("w3Config.httpHost", flag.Lookup("w3HTTPHost"))
+	viper.BindPFlag("w3Config.RPCPort", flag.Lookup("w3RPCPort"))
+	viper.BindPFlag("w3Config.RPCHost", flag.Lookup("w3RPCHost"))
 
 	// check if config file exists
 	_, err = os.Stat(ethereumCfgWrapper.dataDir + "/web3-standalone.yml")

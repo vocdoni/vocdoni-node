@@ -84,10 +84,9 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// ethereum web3
 	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true web3 will be enabled")
 	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
-	globalCfg.W3Config.WsPort = *flag.Int("w3WsPort", 9092, "web3 websocket port")
-	globalCfg.W3Config.WsHost = *flag.String("w3WsHost", "0.0.0.0", "web3 websocket host")
-	globalCfg.W3Config.HTTPPort = *flag.Int("w3HTTPPort", 9091, "ethereum http server port")
-	globalCfg.W3Config.HTTPHost = *flag.String("w3HTTPHost", "0.0.0.0", "ethereum http server host")
+	globalCfg.W3Config.RPCPort = *flag.Int("w3RPCPort", 9091, "web3 RPC port")
+	globalCfg.W3Config.RPCHost = *flag.String("w3RPCHost", "127.0.0.1", "web3 RPC host")
+
 	// ipfs
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
 	globalCfg.Ipfs.SyncKey = *flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
@@ -172,10 +171,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// ethereum web3
 	viper.BindPFlag("w3Config.route", flag.Lookup("w3Route"))
 	viper.BindPFlag("w3Config.enabled", flag.Lookup("w3Enabled"))
-	viper.BindPFlag("w3Config.wsPort", flag.Lookup("w3WsPort"))
-	viper.BindPFlag("w3Config.wsHost", flag.Lookup("w3WsHost"))
-	viper.BindPFlag("w3Config.httpPort", flag.Lookup("w3HTTPPort"))
-	viper.BindPFlag("w3Config.httpHost", flag.Lookup("w3HTTPHost"))
+	viper.BindPFlag("w3Config.RPCPort", flag.Lookup("w3RPCPort"))
+	viper.BindPFlag("w3Config.RPCHost", flag.Lookup("w3RPCHost"))
 
 	// ipfs
 	viper.Set("ipfs.configPath", globalCfg.DataDir+"/ipfs")
@@ -490,7 +487,7 @@ func main() {
 				log.Fatal(err)
 			}
 			// Register the event handlers
-			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, globalCfg.W3Config.WsHost, globalCfg.W3Config.WsPort,
+			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, globalCfg.W3Config.RPCHost, globalCfg.W3Config.RPCPort,
 				initBlock, int64(syncInfo.Height), globalCfg.EthEventConfig.SubscribeOnly, cm, signer, vnode, evh); err != nil {
 				log.Fatal(err)
 			}

@@ -112,15 +112,11 @@ func NewMockEthereum(dataDir string, pxy *dnet.Proxy) (*chain.EthChainContext, e
 		ChainType: "goerli",
 	}
 	w3Config := &config.W3Cfg{
-		HTTPHost: "0.0.0.0",
-		WsHost:   "0.0.0.0",
-		Route:    "/web3",
-		Enabled:  true,
-		HTTPAPI:  true,
-		WSAPI:    true,
+		RPCHost: "127.0.0.1",
+		Route:   "/web3",
+		Enabled: true,
 		// TODO(mvdan): use 0 to grab a random unused port instead.
-		HTTPPort: 1025 + rand.Intn(50000),
-		WsPort:   1025 + rand.Intn(50000),
+		RPCPort: 1025 + rand.Intn(50000),
 	}
 	// init node
 	w3cfg, err := chain.NewConfig(ethConfig, w3Config)
@@ -132,7 +128,7 @@ func NewMockEthereum(dataDir string, pxy *dnet.Proxy) (*chain.EthChainContext, e
 		return nil, err
 	}
 	// register node endpoint
-	pxy.AddHandler(w3Config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
-	pxy.AddWsHandler(w3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3cfg.HTTPHost, w3cfg.HTTPPort)))
+	pxy.AddHandler(w3Config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)))
+	pxy.AddWsHandler(w3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)))
 	return node, nil
 }
