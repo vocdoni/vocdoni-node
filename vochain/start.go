@@ -137,7 +137,6 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	}
 	tconfig.P2P.SeedMode = localConfig.SeedMode
 	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
-
 	// consensus config
 	tconfig.Consensus.TimeoutProposeDelta = time.Millisecond * 500
 	tconfig.Consensus.TimeoutPropose = time.Second * 3

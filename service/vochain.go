@@ -46,7 +46,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma
 	}
 	log.Infof("vochain listening on: %s", vconfig.P2PListen)
 	log.Infof("vochain exposed IP address: %s", vconfig.PublicAddr)
-
+	log.Infof("vochain RPC listening on: %s", vconfig.RPCListen)
 	// Genesis file
 	var genesisBytes []byte
 
