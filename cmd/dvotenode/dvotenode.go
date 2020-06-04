@@ -451,7 +451,7 @@ func main() {
 		go kk.PrintInfo(time.Second * 20)
 	}
 
-	if globalCfg.W3Config.Enabled || globalCfg.Mode == "oracle" {
+	if (globalCfg.Mode == "gateway" && globalCfg.W3Config.Enabled) || globalCfg.Mode == "oracle" {
 		// Wait for Ethereum to be ready
 		if !globalCfg.EthConfig.NoWaitSync {
 			for {
