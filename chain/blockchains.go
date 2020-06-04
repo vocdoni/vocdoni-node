@@ -40,7 +40,7 @@ var mainnet = Specs{
 var goerli = Specs{
 	Name:          "goerli",
 	NetworkId:     5,
-	StartingBlock: 1800000,
+	StartingBlock: 2814315,
 	BootNodes:     ethparams.GoerliBootnodes,
 	GenesisHash:   "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog

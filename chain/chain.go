@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -33,6 +34,7 @@ type EthChainContext struct {
 	DefaultConfig *EthChainConfig
 	ProcessHandle *ProcessHandle
 	MetricsAgent  *metrics.Agent
+	RestartLock   sync.RWMutex
 }
 
 type EthChainConfig struct {
@@ -267,6 +269,8 @@ type EthSyncInfo struct {
 
 // SyncInfo returns the height and syncing Ethereum blockchain information
 func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
+	e.RestartLock.RLock()
+	defer e.RestartLock.RUnlock()
 	// Light sync
 	if e.DefaultConfig.LightMode {
 		info.Mode = "light"
@@ -333,9 +337,11 @@ func (e *EthChainContext) SyncGuard() {
 		}
 		if si.Synced && si.Height+200 < si.MaxHeight {
 			log.Warn("ethereum is experiencing sync problems, restarting node...")
+			e.RestartLock.Lock()
 			if err = e.Node.Restart(); err != nil {
 				log.Fatal(err)
 			}
+			e.RestartLock.Unlock()
 		}
 	}
 }
