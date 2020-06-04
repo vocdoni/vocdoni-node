@@ -1,6 +1,8 @@
 package types
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // MessageRequest holds a decoded request but does not decode the body
 type RequestMessage struct {
@@ -51,6 +53,7 @@ type ResponseMessage struct {
 // Those fields with valid zero-values (such as bool) must be pointers
 type MetaResponse struct {
 	APIList              []string   `json:"apiList,omitempty"`
+	AverageBlockTime     []int32    `json:"averageBlockTime,omitempty"`
 	BlockTimestamp       int32      `json:"blockTimestamp,omitempty"`
 	CensusID             string     `json:"censusId,omitempty"`
 	CensusList           []string   `json:"censusList,omitempty"`
