@@ -209,7 +209,7 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer, vnode *vochain.BaseApplication) *scrutinizer.Scrutinizer {
 	tb.Log("starting vochain scrutinizer")
 	d.ScrutinizerDir = TempDir(tb, "scrutinizer")
-	sc, err := scrutinizer.NewScrutinizer(d.ScrutinizerDir, vnode.State, true)
+	sc, err := scrutinizer.NewScrutinizer(d.ScrutinizerDir, vnode.State)
 	if err != nil {
 		tb.Fatal(err)
 	}

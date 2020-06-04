@@ -44,7 +44,7 @@ type ProcessEndingList []string
 
 // NewScrutinizer returns an instance of the Scrutinizer
 // using the local storage database of dbPath and integrated into the state vochain instance
-func NewScrutinizer(dbPath string, state *vochain.State, liveResults bool) (*Scrutinizer, error) {
+func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	s := &Scrutinizer{VochainState: state}
 	var err error
 	s.Storage, err = db.NewBadgerDB(dbPath)

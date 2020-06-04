@@ -88,7 +88,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma
 	// Scrutinizer
 	if results {
 		log.Info("creating vochain scrutinizer service")
-		sc, err = scrutinizer.NewScrutinizer(vconfig.DataDir+"/scrutinizer", vnode.State, false)
+		sc, err = scrutinizer.NewScrutinizer(vconfig.DataDir+"/scrutinizer", vnode.State)
 		if err != nil {
 			return
 		}
@@ -100,7 +100,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma
 	vi = vochaininfo.NewVochainInfo(vnode)
 	go vi.Start(10)
 
-	if waitForSync {
+	if waitForSync && !vconfig.SeedMode {
 		log.Infof("waiting for vochain to synchronize")
 		var lastHeight int64
 		i := 0
