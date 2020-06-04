@@ -46,7 +46,7 @@ func NewProxy() *Proxy {
 	return p
 }
 
-func getCertificates(domain string, m *autocert.Manager) [][]byte {
+func getCertificates(domain string, m *autocert.Manager) ([][]byte, error) {
 	hello := &tls.ClientHelloInfo{
 		ServerName:   domain,
 		CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305},
@@ -55,9 +55,9 @@ func getCertificates(domain string, m *autocert.Manager) [][]byte {
 
 	cert, err := m.GetCertificate(hello)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return cert.Certificate
+	return cert.Certificate, nil
 }
 
 type stdLogger struct {
@@ -117,12 +117,12 @@ func (p *Proxy) Init() error {
 		go func() {
 			log.Fatal(s.ServeTLS(ln, "", ""))
 		}()
-		certs := getCertificates(p.C.SSLDomain, m)
-		if len(certs) == 0 {
+		certs, err := getCertificates(p.C.SSLDomain, m)
+		if len(certs) == 0 || err != nil {
 			log.Warnf(`letsencrypt TLS certificate cannot be obtained. Maybe port 443 is not accessible or domain name is wrong.
 							You might want to redirect port 443 with iptables using the following command:
 							sudo iptables -t nat -I PREROUTING -p tcp --dport 443 -j REDIRECT --to-ports %d`, p.C.Port)
-			return fmt.Errorf("cannot get letsencrypt TLS certificate")
+			return fmt.Errorf("cannot get letsencrypt TLS certificate: (%s)", err)
 		}
 		log.Infof("proxy ready at https://%s", ln.Addr())
 
