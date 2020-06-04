@@ -56,7 +56,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.LogErrorFile = *flag.String("logErrorFile", "", "Log errors and warnings to a file")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
 	// TODO(mvdan): turn this into an enum to avoid human error
-	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. Available options: [gateway,oracle,miner]")
+	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. Available options: [gateway,web3,oracle,miner]")
 	// api
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable census API")
@@ -345,7 +345,7 @@ func main() {
 	var kk *keykeeper.KeyKeeper
 	var ma *metrics.Agent
 
-	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
+	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" || globalCfg.Mode == "web3" {
 		// Signing key
 		signer = new(ethereum.SignKeys)
 		// Add Authorized keys for private methods
@@ -373,7 +373,8 @@ func main() {
 		}
 	}
 
-	if globalCfg.Mode == "gateway" || globalCfg.Metrics.Enabled {
+	// Websockets and HTTPs proxy
+	if globalCfg.Mode == "gateway" || globalCfg.Mode == "web3" || globalCfg.Metrics.Enabled {
 		// Proxy service
 		pxy, err = service.Proxy(globalCfg.API.ListenHost, globalCfg.API.ListenPort,
 			globalCfg.API.Ssl.Domain, globalCfg.API.Ssl.DirCert)
@@ -405,7 +406,7 @@ func main() {
 	}
 
 	// Ethereum service
-	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
+	if (globalCfg.Mode == "gateway" && globalCfg.W3Config.Enabled) || globalCfg.Mode == "oracle" || globalCfg.Mode == "web3" {
 		node, err = service.Ethereum(globalCfg.EthConfig, globalCfg.W3Config, pxy, signer, ma)
 		if err != nil {
 			log.Fatal(err)
@@ -416,9 +417,8 @@ func main() {
 	if !globalCfg.API.Vote && globalCfg.API.Census {
 		log.Fatal("census API needs the vote API enabled")
 	}
-	if globalCfg.API.Vote || globalCfg.Mode == "miner" || globalCfg.Mode == "oracle" {
+	if (globalCfg.Mode == "gateway" && globalCfg.API.Vote) || globalCfg.Mode == "miner" || globalCfg.Mode == "oracle" {
 		scrutinizer := (globalCfg.Mode == "gateway" && globalCfg.API.Results)
-
 		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma, cm)
 		if err != nil {
 			log.Fatal(err)
@@ -442,7 +442,7 @@ func main() {
 	}
 
 	// Start keykeeper service
-	if globalCfg.Mode == "oracle" {
+	if globalCfg.Mode == "oracle" && globalCfg.VochainConfig.KeyKeeperIndex > 0 {
 		kk, err = keykeeper.NewKeyKeeper(globalCfg.VochainConfig.DataDir+"/keykeeper", vnode, signer, globalCfg.VochainConfig.KeyKeeperIndex)
 		if err != nil {
 			log.Fatal(err)
@@ -451,7 +451,7 @@ func main() {
 		go kk.PrintInfo(time.Second * 20)
 	}
 
-	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" {
+	if globalCfg.W3Config.Enabled || globalCfg.Mode == "oracle" {
 		// Wait for Ethereum to be ready
 		if !globalCfg.EthConfig.NoWaitSync {
 			for {
@@ -464,7 +464,7 @@ func main() {
 		}
 
 		// Ethereum events service (needs Ethereum synchronized)
-		if (!globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == "gateway" && globalCfg.EthEventConfig.CensusSync) || globalCfg.Mode == "oracle" {
+		if !globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == "oracle" {
 			var evh []ethevents.EventHandler
 
 			if globalCfg.Mode == "oracle" {

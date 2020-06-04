@@ -41,6 +41,8 @@ func (c *DvoteCfg) ValidMode() bool {
 		break
 	case "miner":
 		break
+	case "web3":
+		break
 	default:
 		return false
 	}
