@@ -106,6 +106,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.SeedMode = *flag.Bool("vochainSeedMode", false, "act as a vochain seed node")
 	globalCfg.VochainConfig.MempoolSize = *flag.Int("vochainMempoolSize", 200000, "vochain mempool size")
 	globalCfg.VochainConfig.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0, "if this node is a key keeper, use this index slot")
+	globalCfg.VochainConfig.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false, "if enabled the census downloader will import all existing census")
 	// metrics
 	globalCfg.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
 	globalCfg.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5, "metrics refresh interval in seconds")
@@ -197,6 +198,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
 	viper.BindPFlag("vochainConfig.MempoolSize", flag.Lookup("vochainMempoolSize"))
 	viper.BindPFlag("vochainConfig.KeyKeeperIndex", flag.Lookup("keyKeeperIndex"))
+	viper.BindPFlag("vochainConfig.ImportPreviousCensus", flag.Lookup("importPreviousCensus"))
 
 	// metrics
 	viper.BindPFlag("metrics.enabled", flag.Lookup("metricsEnabled"))
@@ -398,6 +400,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+			cm.RemoteStorage = storage
 		}
 	}
 
@@ -410,12 +413,13 @@ func main() {
 	}
 
 	// Vochain and Scrutinizer service
+	if !globalCfg.API.Vote && globalCfg.API.Census {
+		log.Fatal("census API needs the vote API enabled")
+	}
 	if globalCfg.API.Vote || globalCfg.Mode == "miner" || globalCfg.Mode == "oracle" {
-		scrutinizer := false
-		if globalCfg.Mode == "gateway" && globalCfg.API.Results {
-			scrutinizer = true
-		}
-		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma)
+		scrutinizer := (globalCfg.Mode == "gateway" && globalCfg.API.Results)
+
+		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma, cm)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -462,14 +466,6 @@ func main() {
 		// Ethereum events service (needs Ethereum synchronized)
 		if (!globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == "gateway" && globalCfg.EthEventConfig.CensusSync) || globalCfg.Mode == "oracle" {
 			var evh []ethevents.EventHandler
-
-			if globalCfg.Mode == "gateway" {
-				if globalCfg.EthEventConfig.CensusSync && !globalCfg.API.Census {
-					log.Fatal("censusSync function requires the census API enabled")
-				} else {
-					evh = append(evh, ethevents.HandleCensus)
-				}
-			}
 
 			if globalCfg.Mode == "oracle" {
 				evh = append(evh, ethevents.HandleVochainOracle)

@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	iden3db "github.com/iden3/go-iden3-core/db"
@@ -28,6 +29,9 @@ import (
 
 // ErrNamespaceExist is the error returned when trying to add a namespace that already exist
 const ErrNamespaceExist string = "namespace already exist"
+
+// ImportQueueRoutines is the number of paralel routines processing the remote census download queue
+const ImportQueueRoutines = 10
 
 type Namespaces struct {
 	RootKey    string      `json:"rootKey"` // Public key allowed to created new census
@@ -51,8 +55,10 @@ type Manager struct {
 	RemoteStorage data.Storage    // e.g. IPFS
 	LocalStorage  iden3db.Storage // e.g. Badger
 
-	importQueue chan censusImport
-
+	importQueue     chan censusImport
+	queueSize       int32
+	failedQueueLock sync.RWMutex
+	failedQueue     []censusImport
 	compressor
 }
 
@@ -78,8 +84,13 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
 	m.importQueue = make(chan censusImport, 32)
 	m.AuthWindow = 10
-
 	m.compressor = newCompressor()
+
+	// Start daemon for importing remote census
+	log.Infof("starting %d import queue routines", ImportQueueRoutines)
+	for i := 0; i < ImportQueueRoutines; i++ {
+		go m.importQueueDaemon()
+	}
 
 	log.Infof("loading namespaces and keys from %s", nsConfig)
 	if _, err := os.Stat(nsConfig); os.IsNotExist(err) {
@@ -112,8 +123,6 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 			log.Infof("current root key %s", rootKey)
 		}
 	}
-	// Start daemon for importing remote census
-	go m.importQueueDaemon()
 
 	return nil
 }
@@ -200,7 +209,7 @@ func (m *Manager) DelNamespace(name string) error {
 }
 
 func (m *Manager) save() error {
-	log.Info("saving namespaces")
+	log.Debug("saving namespaces")
 	nsConfig := fmt.Sprintf("%s/namespaces.json", m.StorageDir)
 	data, err := json.Marshal(m.Census)
 	if err != nil {
@@ -326,6 +335,31 @@ func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *
 	httpReply(respMsg, w)
 }
 
+// ImportQueueSize returns the size of the import census queue
+func (m *Manager) ImportQueueSize() int32 {
+	return atomic.LoadInt32(&m.queueSize)
+}
+
+func (m *Manager) queueAdd(i int32) {
+	atomic.AddInt32(&m.queueSize, i)
+}
+
+// ImportFailedQueue is the list of remote census imported that failed
+func (m *Manager) ImportFailedQueue() []censusImport {
+	m.failedQueueLock.RLock()
+	defer m.failedQueueLock.RUnlock()
+	pq := make([]censusImport, len(m.failedQueue))
+	copy(pq, m.failedQueue)
+	return pq
+}
+
+// ImportFailedQueueSize is the size of the list of remote census imported that failed
+func (m *Manager) ImportFailedQueueSize() int {
+	m.failedQueueLock.RLock()
+	defer m.failedQueueLock.RUnlock()
+	return len(m.failedQueue)
+}
+
 // AddToImportQueue adds a new census to the queue for being imported remotelly
 func (m *Manager) AddToImportQueue(censusID, censusURI string) {
 	m.importQueue <- censusImport{censusID: censusID, censusURI: censusURI}
@@ -333,7 +367,7 @@ func (m *Manager) AddToImportQueue(censusID, censusURI string) {
 
 // ImportQueueDaemon fetches and imports remote census added via importQueue.
 func (m *Manager) importQueueDaemon() {
-	log.Info("starting import queue daemon")
+	log.Debug("starting import queue daemon")
 	for imp := range m.importQueue {
 		cid, uri := imp.censusID, imp.censusURI
 		// TODO(mvdan): this lock is separate from the one
@@ -347,34 +381,52 @@ func (m *Manager) importQueueDaemon() {
 			continue
 		}
 		log.Infof("retrieving remote census %s", uri)
-		censusRaw, err := m.RemoteStorage.Retrieve(context.TODO(), uri[len(m.RemoteStorage.URIprefix()):])
+		m.queueAdd(1)
+		// TBD: this timeout context is not working
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+		censusRaw, err := m.RemoteStorage.Retrieve(ctx, uri[len(m.RemoteStorage.URIprefix()):])
+		cancel()
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
+			m.queueAdd(-1)
+			if err.Error() == "timeout" {
+				log.Warnf("timeout when importing census %s, adding it to failed queue", uri)
+				m.failedQueueLock.Lock()
+				m.failedQueue = append(m.failedQueue, imp)
+				m.failedQueueLock.Unlock()
+			}
 			continue
 		}
 		censusRaw = m.decompressBytes(censusRaw)
 		var dump types.CensusDump
 		if err := json.Unmarshal(censusRaw, &dump); err != nil {
 			log.Warnf("retrieved census does not have a valid format: %s", err)
+			m.queueAdd(-1)
 			continue
 		}
-		log.Infof("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
+		log.Debugf("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
 		if dump.RootHash != cid {
 			log.Warn("dump root Hash and Ethereum root hash do not match, aborting import")
+			m.queueAdd(-1)
 			continue
 		}
 		if len(dump.ClaimsData) == 0 {
 			log.Warnf("no claims found on the retreived census")
+			m.queueAdd(-1)
 			continue
 		}
 		tr, err := m.AddNamespace(cid, []string{})
 		if err != nil {
-			log.Errorf("cannot create new census namespace: %s", err)
+			if err.Error() != "namespace already exist" {
+				log.Errorf("cannot create new census namespace: %s", err)
+			}
+			m.queueAdd(-1)
 			continue
 		}
 		err = tr.ImportDump(dump.ClaimsData)
 		if err != nil {
 			log.Warnf("error importing dump: %s", err)
+			m.queueAdd(-1)
 			continue
 		}
 		log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
@@ -389,6 +441,7 @@ func (m *Manager) importQueueDaemon() {
 			m.UnloadTree(cid)
 			m.TreesMu.Unlock()
 		}
+		m.queueAdd(-1)
 	}
 }
 

@@ -46,7 +46,7 @@ var PrefixDBCacheSize = 0
 // happening in parallel.
 type EventListener interface {
 	OnVote(*types.Vote)
-	OnProcess(pid, eid string)
+	OnProcess(pid, eid, mkroot, mkuri string)
 	OnCancel(pid string)
 	OnProcessKeys(pid, encryptionPub, commitment string)
 	OnRevealKeys(pid, encryptionPriv, reveal string)
@@ -378,7 +378,7 @@ func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
 }
 
 // AddProcess adds a new process to vochain if not already added
-func (v *State) AddProcess(p *types.Process, pid string) error {
+func (v *State) AddProcess(p *types.Process, pid, mkuri string) error {
 	pid = util.TrimHex(pid)
 	newProcessBytes, err := v.Codec.MarshalBinaryBare(p)
 	if err != nil {
@@ -388,7 +388,7 @@ func (v *State) AddProcess(p *types.Process, pid string) error {
 	v.ProcessTree.Set([]byte(pid), newProcessBytes)
 	v.Unlock()
 	for _, l := range v.eventListeners {
-		l.OnProcess(pid, p.EntityID)
+		l.OnProcess(pid, p.EntityID, p.MkRoot, mkuri)
 	}
 	return nil
 }

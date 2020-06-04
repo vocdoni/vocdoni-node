@@ -24,6 +24,16 @@ var (
 		Name:      "loaded",
 		Help:      "Loaded and active census",
 	})
+	CensusQueue = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "census",
+		Name:      "queue",
+		Help:      "Active queued census for importing",
+	})
+	CensusRetryQueue = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "census",
+		Name:      "retryQueue",
+		Help:      "Active queued census that failed but will be retried",
+	})
 )
 
 // RegisterMetrics to the prometheus server
@@ -31,6 +41,8 @@ func (m *Manager) registerMetrics(ma *metrics.Agent) {
 	ma.Register(CensusLocal)
 	ma.Register(CensusImported)
 	ma.Register(CensusLoaded)
+	ma.Register(CensusQueue)
+	ma.Register(CensusRetryQueue)
 }
 
 // GetMetrics to the prometheus server
@@ -39,6 +51,8 @@ func (m *Manager) getMetrics() {
 	CensusLocal.Set(float64(local))
 	CensusImported.Set(float64(imported))
 	CensusLoaded.Set(float64(loaded))
+	CensusQueue.Set(float64(m.ImportQueueSize()))
+	CensusQueue.Set(float64(m.ImportFailedQueueSize()))
 }
 
 // CollectMetrics constantly updates the metric values for prometheus

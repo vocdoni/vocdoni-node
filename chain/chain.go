@@ -323,7 +323,7 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 		return
 	}
 	// Fast sync
-	if e.Eth != nil {
+	if e.Eth != nil && e.Node != nil {
 		info.Mode = "fast"
 		info.Synced = e.Eth.Synced()
 		if info.Synced {

@@ -28,9 +28,10 @@ func Census(datadir string, ma *metrics.Agent) (*census.Manager, error) {
 	go func() {
 		var local, imported, loaded int
 		for {
-			time.Sleep(time.Second * 60)
+			time.Sleep(time.Second * 20)
 			local, imported, loaded = censusManager.Count()
-			log.Infof("[census info] local:%d imported:%d loaded:%d", local, imported, loaded)
+			log.Infof("[census info] local:%d imported:%d loaded:%d queue:%d/%d toRetry:%d", local, imported,
+				loaded, censusManager.ImportQueueSize(), census.ImportQueueRoutines, censusManager.ImportFailedQueueSize())
 		}
 	}()
 

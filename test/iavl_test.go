@@ -125,7 +125,7 @@ func TestAddProcess(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	if err := s.AddProcess(testcommon.ProcessHardcoded, "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"); err != nil {
+	if err := s.AddProcess(testcommon.ProcessHardcoded, "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105", ""); err != nil {
 		t.Error(err)
 	}
 }

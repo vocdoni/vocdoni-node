@@ -213,6 +213,9 @@ func (i *IPFSHandle) Retrieve(ctx context.Context, path string) ([]byte, error) 
 
 	node, err := i.CoreAPI.Unixfs().Get(ctx, pth)
 	if err != nil {
+		if d, ok := ctx.Deadline(); ok && d.Second() < 1 {
+			return nil, fmt.Errorf("timeout")
+		}
 		return nil, err
 	}
 	defer node.Close()

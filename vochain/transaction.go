@@ -79,7 +79,7 @@ func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 		tx := gtx.(*types.NewProcessTx)
 		if p, err := NewProcessTxCheck(tx, state); err == nil {
 			if commit {
-				return []byte{}, state.AddProcess(p, tx.ProcessID)
+				return []byte{}, state.AddProcess(p, tx.ProcessID, tx.MkURI)
 			}
 		} else {
 			return []byte{}, err
