@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -24,36 +23,43 @@ func (r *Router) fetchFile(request routerRequest) {
 
 	found := false
 	for idx, t := range transportTypes {
-		if found {
-			break
-		}
 		switch t {
 		case "http:", "https:":
+			found = true
 			resp, err = http.Get(parsedURIs[idx])
 			if err == nil {
 				defer resp.Body.Close()
 				content, err = ioutil.ReadAll(resp.Body)
-				if len(content) > 0 {
-					found = true
+				if len(content) == 0 {
+					err = fmt.Errorf("no content fetched")
 				}
 			}
 		case "ipfs:":
+			found = true
 			splt := strings.Split(parsedURIs[idx], "/")
 			hash := splt[len(splt)-1]
 			content, err = r.storage.Retrieve(context.TODO(), hash)
-			if len(content) > 0 {
-				found = true
+			if len(content) == 0 {
+				err = fmt.Errorf("no content fetched")
 			}
 		case "bzz:", "bzz-feed":
-			err = errors.New("bzz and bzz-feed not implemented yet")
+			found = true
+			err = fmt.Errorf("bzz and bzz-feed not implemented yet")
+		}
+		if found {
+			break
 		}
 	}
 
 	if err != nil {
-		errMsg := fmt.Sprintf("error fetching uri %s", request.URI)
-		r.sendError(request, errMsg)
+		r.sendError(request, fmt.Sprintf("error fetching uri %s: (%s)", request.URI, err))
 		return
 	}
+	if !found {
+		r.sendError(request, fmt.Sprintf("error fetching uri %s: (not supported)", request.URI))
+		return
+	}
+
 	b64content := base64.StdEncoding.EncodeToString(content)
 	log.Debugf("file fetched, b64 size %d", len(b64content))
 	var response types.ResponseMessage
@@ -66,8 +72,7 @@ func (r *Router) addFile(request routerRequest) {
 	reqType := request.Type
 	b64content, err := base64.StdEncoding.DecodeString(request.Content)
 	if err != nil {
-		errMsg := "could not decode base64 content"
-		r.sendError(request, errMsg)
+		r.sendError(request, "could not decode base64 content")
 		return
 	}
 	switch reqType {
@@ -91,14 +96,12 @@ func (r *Router) pinList(request routerRequest) {
 	log.Debug("calling PinList")
 	pins, err := r.storage.ListPins(context.TODO())
 	if err != nil {
-		errMsg := fmt.Sprintf("internal error fetching pins (%s)", err)
-		r.sendError(request, errMsg)
+		r.sendError(request, fmt.Sprintf("internal error fetching pins (%s)", err))
 		return
 	}
 	pinsJSONArray, err := json.Marshal(pins)
 	if err != nil {
-		errMsg := fmt.Sprintf("internal error parsing pins (%s)", err)
-		r.sendError(request, errMsg)
+		r.sendError(request, fmt.Sprintf("internal error parsing pins (%s)", err))
 		return
 	}
 	var response types.ResponseMessage
