@@ -194,7 +194,14 @@ func (e *EthChainContext) Start() {
 		log.Infof("my Ethereum address %x", e.Keys.Accounts()[0].Address)
 	}
 	if len(e.DefaultConfig.W3external) == 0 {
-		utils.StartNode(e.Node)
+
+		// Don't use ethereum's utils.StartNode. It sets up a signal
+		// handler for SIGINT, which interferes with the signal handler
+		// we set up in our own main func. We want to use ethereum as a
+		// "pure" library, so it shouldn't be using signals.
+		if err := e.Node.Start(); err != nil {
+			log.Fatalf("error starting ethereum node: %v", err)
+		}
 
 		log.Infof("started Ethereum Blockchain service with Network ID %d", e.DefaultConfig.NetworkId)
 		if e.DefaultConfig.RPCPort >= 0 && e.DefaultConfig.RPCHost != "" { // if host == "" RPC API is not initialized
