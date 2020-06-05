@@ -382,14 +382,14 @@ func (m *Manager) importQueueDaemon() {
 		}
 		log.Infof("retrieving remote census %s", uri)
 		m.queueAdd(1)
-		// TBD: this timeout context is not working
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		censusRaw, err := m.RemoteStorage.Retrieve(ctx, uri[len(m.RemoteStorage.URIprefix()):])
 		cancel()
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
 			m.queueAdd(-1)
-			if err.Error() == "timeout" {
+
+			if os.IsTimeout(err) {
 				log.Warnf("timeout when importing census %s, adding it to failed queue", uri)
 				m.failedQueueLock.Lock()
 				m.failedQueue = append(m.failedQueue, imp)
