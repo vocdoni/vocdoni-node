@@ -1,11 +1,7 @@
 package ethereum
 
 import (
-	"encoding/base64"
-	"encoding/hex"
 	"testing"
-
-	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 func TestSignature(t *testing.T) {
@@ -126,18 +122,4 @@ func TestAddr(t *testing.T) {
 		t.Fatal("extracted address from second message do not match")
 	}
 	t.Logf("%s == %s", addr3, addr4)
-}
-
-func b64enc(b []byte) string {
-	return base64.StdEncoding.EncodeToString(b)
-}
-
-func hexdec(t *testing.T, s string) []byte {
-	t.Helper()
-	s = util.TrimHex(s)
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
 }

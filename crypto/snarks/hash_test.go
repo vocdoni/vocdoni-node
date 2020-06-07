@@ -11,10 +11,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
-func b64enc(b []byte) string {
-	return base64.StdEncoding.EncodeToString(b)
-}
-
 func b64dec(t *testing.T, s string) []byte {
 	t.Helper()
 	b, err := base64.StdEncoding.DecodeString(s)

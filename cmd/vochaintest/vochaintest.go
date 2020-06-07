@@ -218,11 +218,12 @@ func main() {
 
 	// Wait until all votes sent and check the results
 	wg.Wait()
-	/*	log.Infof("canceling process in order to fetch the results")
+	if false {
+		log.Infof("canceling process in order to fetch the results")
 		if err := cancelProcess(mainCon, &oracleKey, pid); err != nil {
 			log.Fatal(err)
 		}
-	*/
+	}
 	maxVotingTime := time.Duration(0)
 	for _, t := range votingTimes {
 		if t > maxVotingTime {
@@ -279,15 +280,6 @@ func getProof(c *APIConnection, hexpubkey, root string) (string, error) {
 	}
 
 	return resp.Siblings, nil
-}
-
-func hexToBytes(s string) []byte {
-	b := make([]byte, hex.DecodedLen(len(s)))
-	_, err := hex.Decode(b, []byte(s))
-	if err != nil {
-		log.Fatal(err)
-	}
-	return b[:]
 }
 
 func getResults(c *APIConnection, pid string) ([][]uint32, error) {
@@ -616,13 +608,12 @@ func getCurrentBlock(c *APIConnection) int64 {
 
 func createCensus(c *APIConnection, signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys) (root, uri string) {
 	var req types.MetaRequest
-	rint := rand.Int()
-	censusSize := len(censusSigners)
-	resp := c.Request(req, nil)
+	var resp *types.MetaResponse
+
 	// Create census
 	log.Infof("Create census")
 	req.Method = "addCensus"
-	req.CensusID = fmt.Sprintf("test%d", rint)
+	req.CensusID = fmt.Sprintf("test%d", rand.Int())
 	resp = c.Request(req, signer)
 	if !resp.Ok {
 		log.Fatalf("%s failed: %s", req.Method, resp.Message)
@@ -631,6 +622,7 @@ func createCensus(c *APIConnection, signer *ethereum.SignKeys, censusSigners []*
 	req.CensusID = resp.CensusID
 
 	// addClaimBulk
+	censusSize := len(censusSigners)
 	log.Infof("add bulk claims (size %d)", censusSize)
 	req.Method = "addClaimBulk"
 	req.ClaimData = ""

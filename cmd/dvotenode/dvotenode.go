@@ -27,8 +27,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
 
-var ethNoWaitSync bool
-
 func newConfig() (*config.DvoteCfg, config.Error) {
 	var err error
 	var cfgError config.Error
