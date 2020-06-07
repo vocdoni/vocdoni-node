@@ -2,29 +2,22 @@
 package census
 
 import (
-	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	iden3db "github.com/iden3/go-iden3-core/db"
-	"github.com/klauspost/compress/zstd"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/tree"
-	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 // ErrNamespaceExist is the error returned when trying to add a namespace that already exist
@@ -32,6 +25,9 @@ const ErrNamespaceExist string = "namespace already exist"
 
 // ImportQueueRoutines is the number of paralel routines processing the remote census download queue
 const ImportQueueRoutines = 10
+
+// ImportRetrieveTimeout the maximum duration the import queue will wait for retreiving a remote census
+const ImportRetrieveTimeout = 1 * time.Minute
 
 type Namespaces struct {
 	RootKey    string      `json:"rootKey"` // Public key allowed to created new census
@@ -43,6 +39,7 @@ type Namespace struct {
 	Keys []string `json:"keys"`
 }
 
+// Manager is the type representing the census manager component
 type Manager struct {
 	StorageDir string     // Root storage data dir for LocalStorage
 	AuthWindow int32      // Time window (seconds) in which TimeStamp will be accepted if auth enabled
@@ -58,12 +55,8 @@ type Manager struct {
 	importQueue     chan censusImport
 	queueSize       int32
 	failedQueueLock sync.RWMutex
-	failedQueue     []censusImport
+	failedQueue     map[string]string
 	compressor
-}
-
-type censusImport struct {
-	censusID, censusURI string
 }
 
 // Data helps satisfy an ethevents interface.
@@ -74,6 +67,7 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storageDir)
 	m.StorageDir = storageDir
 	m.Trees = make(map[string]*tree.Tree)
+	m.failedQueue = make(map[string]string)
 
 	var err error
 	m.LocalStorage, err = db.NewIden3Storage(storageDir)
@@ -123,7 +117,6 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 			log.Infof("current root key %s", rootKey)
 		}
 	}
-
 	return nil
 }
 
@@ -218,563 +211,6 @@ func (m *Manager) save() error {
 	return ioutil.WriteFile(nsConfig, data, 0644)
 }
 
-func httpReply(resp *types.ResponseMessage, w http.ResponseWriter) {
-	err := json.NewEncoder(w).Encode(resp)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-	} else {
-		w.Header().Set("content-type", "application/json")
-	}
-}
-
-func checkRequest(w http.ResponseWriter, req *http.Request) bool {
-	if req.Body == nil {
-		http.Error(w, "Please send a request body", 400)
-		return false
-	}
-	return true
-}
-
-// CheckAuth check if a census request message is authorized
-func (m *Manager) CheckAuth(rm *types.RequestMessage) error {
-	if len(rm.Signature) < ethereum.SignatureLength || len(rm.CensusID) < 1 {
-		return errors.New("signature or censusId not provided or invalid")
-	}
-	ns := new(Namespace)
-	for _, n := range m.Census.Namespaces {
-		if n.Name == rm.CensusID {
-			ns = &n
-		}
-	}
-
-	// Add root key, if method is addCensus
-	if rm.Method == "addCensus" {
-		if len(m.Census.RootKey) < ethereum.PubKeyLength {
-			log.Warn("root key does not exist, considering addCensus valid for any request")
-			return nil
-		}
-		ns.Keys = []string{m.Census.RootKey}
-	}
-
-	if ns == nil {
-		return errors.New("censusId not valid")
-	}
-
-	// Check timestamp
-	currentTime := int32(time.Now().Unix())
-	if rm.Timestamp > currentTime+m.AuthWindow ||
-		rm.Timestamp < currentTime-m.AuthWindow {
-		return errors.New("timestamp is not valid")
-	}
-
-	// Check signature with existing namespace keys
-	log.Debugf("namespace keys %s", ns.Keys)
-	if len(ns.Keys) > 0 {
-		if len(ns.Keys) == 1 && len(ns.Keys[0]) < ethereum.PubKeyLength {
-			log.Warnf("namespace %s does have management public key configured, allowing all", ns.Name)
-			return nil
-		}
-		valid := false
-		msg, err := json.Marshal(rm.MetaRequest)
-		if err != nil {
-			return errors.New("cannot unmarshal")
-		}
-		for _, n := range ns.Keys {
-			valid, err = ethereum.Verify(msg, rm.Signature, n)
-			if err != nil {
-				log.Warnf("verification error (%s)", err)
-				valid = false
-			} else if valid {
-				return nil
-			}
-		}
-		if !valid {
-			return errors.New("unauthorized")
-		}
-	} else {
-		log.Warnf("namespace %s does have management public key configured, allowing all", ns.Name)
-	}
-	return nil
-}
-
-// HTTPhandler handles an API census manager request via HTTP
-func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *ethereum.SignKeys) {
-	log.Debug("new request received")
-	if ok := checkRequest(w, req); !ok {
-		return
-	}
-	// Decode JSON
-	log.Debug("decoding JSON")
-	var rm types.RequestMessage
-	err := json.NewDecoder(req.Body).Decode(&rm)
-	if err != nil {
-		log.Warnf("cannot decode JSON: %s", err)
-		http.Error(w, err.Error(), 400)
-		return
-	}
-	if len(rm.Method) < 1 {
-		http.Error(w, "method must be specified", 400)
-		return
-	}
-	log.Debugf("found method %s", rm.Method)
-	auth := true
-	err = m.CheckAuth(&rm)
-	if err != nil {
-		log.Warnf("authorization error: %s", err)
-		auth = false
-	}
-	resp := m.Handler(&rm.MetaRequest, auth, "")
-	respMsg := new(types.ResponseMessage)
-	respMsg.MetaResponse = *resp
-	respMsg.ID = rm.ID
-	respMsg.Request = rm.ID
-	respMsg.Signature, err = signer.SignJSON(respMsg.MetaResponse)
-	if err != nil {
-		log.Warn(err)
-	}
-	httpReply(respMsg, w)
-}
-
-// ImportQueueSize returns the size of the import census queue
-func (m *Manager) ImportQueueSize() int32 {
-	return atomic.LoadInt32(&m.queueSize)
-}
-
-func (m *Manager) queueAdd(i int32) {
-	atomic.AddInt32(&m.queueSize, i)
-}
-
-// ImportFailedQueue is the list of remote census imported that failed
-func (m *Manager) ImportFailedQueue() []censusImport {
-	m.failedQueueLock.RLock()
-	defer m.failedQueueLock.RUnlock()
-	pq := make([]censusImport, len(m.failedQueue))
-	copy(pq, m.failedQueue)
-	return pq
-}
-
-// ImportFailedQueueSize is the size of the list of remote census imported that failed
-func (m *Manager) ImportFailedQueueSize() int {
-	m.failedQueueLock.RLock()
-	defer m.failedQueueLock.RUnlock()
-	return len(m.failedQueue)
-}
-
-// AddToImportQueue adds a new census to the queue for being imported remotelly
-func (m *Manager) AddToImportQueue(censusID, censusURI string) {
-	m.importQueue <- censusImport{censusID: censusID, censusURI: censusURI}
-}
-
-// ImportQueueDaemon fetches and imports remote census added via importQueue.
-func (m *Manager) importQueueDaemon() {
-	log.Debug("starting import queue daemon")
-	for imp := range m.importQueue {
-		cid, uri := imp.censusID, imp.censusURI
-		// TODO(mvdan): this lock is separate from the one
-		// from AddNamespace below. The namespace might appear
-		// in between the two pieces of code.
-		m.TreesMu.RLock()
-		exists := m.Exists(cid)
-		m.TreesMu.RUnlock()
-		if exists {
-			log.Debugf("census %s already exist, skipping", cid)
-			continue
-		}
-		log.Infof("retrieving remote census %s", uri)
-		m.queueAdd(1)
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		censusRaw, err := m.RemoteStorage.Retrieve(ctx, uri[len(m.RemoteStorage.URIprefix()):])
-		cancel()
-		if err != nil {
-			log.Warnf("cannot retrieve census: %s", err)
-			m.queueAdd(-1)
-
-			if os.IsTimeout(err) {
-				log.Warnf("timeout when importing census %s, adding it to failed queue", uri)
-				m.failedQueueLock.Lock()
-				m.failedQueue = append(m.failedQueue, imp)
-				m.failedQueueLock.Unlock()
-			}
-			continue
-		}
-		censusRaw = m.decompressBytes(censusRaw)
-		var dump types.CensusDump
-		if err := json.Unmarshal(censusRaw, &dump); err != nil {
-			log.Warnf("retrieved census does not have a valid format: %s", err)
-			m.queueAdd(-1)
-			continue
-		}
-		log.Debugf("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
-		if dump.RootHash != cid {
-			log.Warn("dump root Hash and Ethereum root hash do not match, aborting import")
-			m.queueAdd(-1)
-			continue
-		}
-		if len(dump.ClaimsData) == 0 {
-			log.Warnf("no claims found on the retreived census")
-			m.queueAdd(-1)
-			continue
-		}
-		tr, err := m.AddNamespace(cid, []string{})
-		if err != nil {
-			if err.Error() != "namespace already exist" {
-				log.Errorf("cannot create new census namespace: %s", err)
-			}
-			m.queueAdd(-1)
-			continue
-		}
-		err = tr.ImportDump(dump.ClaimsData)
-		if err != nil {
-			log.Warnf("error importing dump: %s", err)
-			m.queueAdd(-1)
-			continue
-		}
-		log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
-		if tr.Root() != dump.RootHash {
-			log.Warnf("root hash does not match on imported census, aborting import")
-			if err := m.DelNamespace(cid); err != nil {
-				log.Error(err)
-			}
-		} else {
-			// Unload until we need it
-			m.TreesMu.Lock()
-			m.UnloadTree(cid)
-			m.TreesMu.Unlock()
-		}
-		m.queueAdd(-1)
-	}
-}
-
-// Handler handles an API census manager request.
-// isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
-// censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
-func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string) *types.MetaResponse {
-	var err error
-	resp := new(types.MetaResponse)
-
-	// Process data
-	log.Debugf("processing data %+v", *r)
-	resp.Ok = true
-	resp.Timestamp = int32(time.Now().Unix())
-
-	// Special methods not depending on census existence
-	if r.Method == "addCensus" {
-		if isAuth {
-			_, err := m.AddNamespace(censusPrefix+r.CensusID, r.PubKeys)
-			if err != nil {
-				log.Warnf("error creating census: %s", err)
-				resp.SetError(err)
-			} else {
-				log.Infof("census %s%s created successfully managed by %s", censusPrefix, r.CensusID, r.PubKeys)
-				resp.CensusID = censusPrefix + r.CensusID
-			}
-		} else {
-			resp.SetError("invalid authentication")
-		}
-		return resp
-	}
-
-	if r.Method == "getCensusList" {
-		if isAuth {
-			for n := range m.Trees {
-				resp.CensusList = append(resp.CensusList, n)
-			}
-		} else {
-			resp.SetError("invalid authentication")
-		}
-		return resp
-	}
-
-	// check if census exist
-	m.TreesMu.RLock()
-	exists := m.Exists(r.CensusID)
-	m.TreesMu.RUnlock()
-	if !exists {
-		resp.SetError("censusId not valid or not found")
-		return resp
-	}
-
-	// validAuthPrefix is true: either censusPrefix is not used or censusID contains the prefix
-	validAuthPrefix := false
-	if len(censusPrefix) == 0 {
-		validAuthPrefix = true
-		log.Debugf("prefix not specified, allowing access to all census IDs if pubkey validation correct")
-	} else {
-		validAuthPrefix = strings.HasPrefix(r.CensusID, censusPrefix)
-		log.Debugf("prefix allowed for %s", r.CensusID)
-	}
-
-	// Load the merkle tree
-	var tr *tree.Tree
-	m.TreesMu.Lock()
-	tr, err = m.LoadTree(r.CensusID)
-	m.TreesMu.Unlock()
-	if err != nil {
-		resp.SetError("censusId cannot be loaded")
-		return resp
-	}
-
-	// Methods without rootHash
-	switch r.Method {
-	case "getRoot":
-		resp.Root = tr.Root()
-		return resp
-
-	case "addClaimBulk":
-		if isAuth && validAuthPrefix {
-			addedClaims := 0
-			var invalidClaims []int
-			for i, c := range r.ClaimsData {
-				data, err := base64.StdEncoding.DecodeString(c)
-				if err == nil {
-					if !r.Digested {
-						data = snarks.Poseidon.Hash(data)
-					}
-					err = tr.AddClaim(data, []byte{})
-				}
-				if err != nil {
-					log.Warnf("error adding claim: %s", err)
-					invalidClaims = append(invalidClaims, i)
-				} else {
-					log.Debugf("claim added %x", data)
-					addedClaims++
-				}
-			}
-			if len(invalidClaims) > 0 {
-				resp.InvalidClaims = invalidClaims
-			}
-			log.Infof("%d claims addedd successfully", addedClaims)
-		} else {
-			resp.SetError("invalid authentication")
-		}
-		return resp
-
-	case "addClaim":
-		if isAuth && validAuthPrefix {
-			data, err := base64.StdEncoding.DecodeString(r.ClaimData)
-			if err != nil {
-				log.Warnf("error decoding base64 string: %s", err)
-				resp.SetError(err)
-			}
-			if !r.Digested {
-				data = snarks.Poseidon.Hash(data)
-			}
-			err = tr.AddClaim(data, []byte{})
-			if err != nil {
-				log.Warnf("error adding claim: %s", err)
-				resp.SetError(err)
-			} else {
-				log.Debugf("claim added %x", data)
-			}
-		} else {
-			resp.SetError("invalid authentication")
-		}
-		return resp
-
-	case "importDump":
-		if isAuth && validAuthPrefix {
-			if len(r.ClaimsData) > 0 {
-				err := tr.ImportDump(r.ClaimsData)
-				if err != nil {
-					log.Warnf("error importing dump: %s", err)
-					resp.SetError(err)
-				} else {
-					log.Infof("dump imported successfully, %d claims", len(r.ClaimsData))
-				}
-			}
-		} else {
-			resp.SetError("invalid authentication")
-		}
-		return resp
-
-	case "importRemote":
-		if !isAuth || !validAuthPrefix {
-			resp.SetError("invalid authentication")
-			return resp
-		}
-		if m.RemoteStorage == nil {
-			resp.SetError("not supported")
-			return resp
-		}
-		if !strings.HasPrefix(r.URI, m.RemoteStorage.URIprefix()) ||
-			len(r.URI) <= len(m.RemoteStorage.URIprefix()) {
-			log.Warnf("uri not supported %s (supported prefix %s)", r.URI, m.RemoteStorage.URIprefix())
-			resp.SetError("URI not supported")
-			return resp
-		}
-		log.Infof("retrieving remote census %s", r.CensusURI)
-		censusRaw, err := m.RemoteStorage.Retrieve(context.TODO(), r.URI[len(m.RemoteStorage.URIprefix()):])
-		if err != nil {
-			log.Warnf("cannot retrieve census: %s", err)
-			resp.SetError("cannot retrieve census")
-			return resp
-		}
-		censusRaw = m.decompressBytes(censusRaw)
-		var dump types.CensusDump
-		err = json.Unmarshal(censusRaw, &dump)
-		if err != nil {
-			log.Warnf("retrieved census do not have a correct format: %s", err)
-			resp.SetError("retrieved census do not have a correct format")
-			return resp
-		}
-		log.Infof("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
-		if len(dump.ClaimsData) > 0 {
-			err = tr.ImportDump(dump.ClaimsData)
-			if err != nil {
-				log.Warnf("error importing dump: %s", err)
-				resp.SetError("error importing census")
-			} else {
-				log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
-			}
-		} else {
-			log.Warnf("no claims found on the retreived census")
-			resp.SetError("no claims found")
-		}
-		return resp
-
-	case "checkProof":
-		if len(r.ProofData) < 1 {
-			resp.SetError("proofData not provided")
-			return resp
-		}
-		root := r.RootHash
-		if len(root) < 1 {
-			root = tr.Root()
-		}
-		// Generate proof and return it
-		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
-		if err != nil {
-			log.Warnf("error decoding base64 string: %s", err)
-			resp.SetError(err)
-			return resp
-		}
-		if !r.Digested {
-			data = snarks.Poseidon.Hash(data)
-		}
-		validProof, err := tree.CheckProof(root, r.ProofData, data, []byte{})
-		if err != nil {
-			resp.SetError(err)
-			return resp
-		}
-		resp.ValidProof = &validProof
-		return resp
-	}
-
-	// Methods with rootHash, if rootHash specified snapshot the tree.
-	// Otherwise, we use the same tree.
-	if len(r.RootHash) > 1 {
-		var err error
-		tr, err = tr.Snapshot(r.RootHash)
-		if err != nil {
-			log.Warnf("snapshot error: %s", err)
-			resp.SetError("invalid root hash")
-			return resp
-		}
-	}
-
-	switch r.Method {
-	case "genProof":
-		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
-		if err != nil {
-			log.Warnf("error decoding base64 string: %s", err)
-			resp.SetError(err)
-			return resp
-		}
-		if !r.Digested {
-			data = snarks.Poseidon.Hash(data)
-		}
-		resp.Siblings, err = tr.GenProof(data, []byte{})
-		if err != nil {
-			resp.SetError(err)
-		}
-		return resp
-
-	case "getSize":
-		size, err := tr.Size(tr.Root())
-		if err != nil {
-			resp.SetError(err)
-		}
-		resp.Size = &size
-		return resp
-
-	case "dump", "dumpPlain":
-		if !isAuth || !validAuthPrefix {
-			resp.SetError("invalid authentication")
-			return resp
-		}
-		// dump the claim data and return it
-		var dumpValues []string
-		root := r.RootHash
-		if len(root) < 1 {
-			root = tr.Root()
-		}
-		var err error
-		if r.Method == "dump" {
-			dumpValues, err = tr.Dump(root)
-		} else {
-			dumpValues, _, err = tr.DumpPlain(root, true)
-		}
-		if err != nil {
-			resp.SetError(err)
-		} else {
-			resp.ClaimsData = dumpValues
-		}
-		return resp
-
-	case "publish":
-		if !isAuth || !validAuthPrefix {
-			resp.SetError("invalid authentication")
-			return resp
-		}
-		if m.RemoteStorage == nil {
-			resp.SetError("not supported")
-			return resp
-		}
-		var dump types.CensusDump
-		dump.RootHash = tr.Root()
-		var err error
-		dump.ClaimsData, err = tr.Dump(tr.Root())
-		if err != nil {
-			resp.SetError(err)
-			log.Warnf("cannot dump census with root %s: %s", tr.Root(), err)
-			return resp
-		}
-		dumpBytes, err := json.Marshal(dump)
-		if err != nil {
-			resp.SetError(err)
-			log.Warnf("cannot marshal census dump: %s", err)
-			return resp
-		}
-		dumpBytes = m.compressBytes(dumpBytes)
-		cid, err := m.RemoteStorage.Publish(context.TODO(), dumpBytes)
-		if err != nil {
-			resp.SetError(err)
-			log.Warnf("cannot publish census dump: %s", err)
-			return resp
-		}
-		resp.URI = m.RemoteStorage.URIprefix() + cid
-		log.Infof("published census at %s", resp.URI)
-		resp.Root = tr.Root()
-
-		// adding published census with censusID = rootHash
-		log.Infof("adding new namespace for published census %s", resp.Root)
-		tr2, err := m.AddNamespace(resp.Root, r.PubKeys)
-		if err != nil && err.Error() != ErrNamespaceExist {
-			log.Warnf("error creating local published census: %s", err)
-		} else if err == nil {
-			log.Infof("import claims to new census")
-			err = tr2.ImportDump(dump.ClaimsData)
-			if err != nil {
-				log.Warn(err)
-				resp.SetError(err)
-				return resp
-			}
-		}
-	}
-
-	return resp
-}
-
 // Count returns the number of local created, external imported and loaded/active census
 func (m *Manager) Count() (local, imported, loaded int) {
 	for _, n := range m.Census.Namespaces {
@@ -786,78 +222,4 @@ func (m *Manager) Count() (local, imported, loaded int) {
 	}
 	loaded = len(m.Trees)
 	return
-}
-
-type compressor struct {
-	encoder *zstd.Encoder
-	decoder *zstd.Decoder
-}
-
-func newCompressor() compressor {
-	var c compressor
-	var err error
-	c.encoder, err = zstd.NewWriter(nil)
-	if err != nil {
-		panic(err) // we don't use options, this shouldn't happen
-	}
-	c.decoder, err = zstd.NewReader(nil)
-	if err != nil {
-		panic(err) // we don't use options, this shouldn't happen
-	}
-	return c
-}
-
-// compressBytes compresses the input via zstd.
-func (c compressor) compressBytes(src []byte) []byte {
-	// ~50KiB of JSON containing base64 tends to compress to ~10% of its
-	// original size. This size also seems like a good starting point for
-	// most realistic compression ratios.
-	estimate := len(src) / 10
-	start := time.Now()
-	dst := c.encoder.EncodeAll(src, make([]byte, 0, estimate))
-	elapsed := time.Since(start)
-	log.Debugf("compressed %.2f KiB to %.2f KiB in %s with zstd, %.1f%% of the original size",
-		float64(len(src))/1000,
-		float64(len(dst))/1000,
-		elapsed,
-		float64(len(dst)*100)/float64(len(src)))
-	return dst
-}
-
-// isZstd reports whether the input bytes begin with zstd's magic number,
-// 0xFD2FB528 in little-endian format.
-//
-// There are "magic number detection" modules, but most are pretty heavy and
-// unnecessary, and we only need to detect zstd v1.
-func isZstd(src []byte) bool {
-	return len(src) >= 4 &&
-		src[0] == 0x28 && src[1] == 0xB5 &&
-		src[2] == 0x2f && src[3] == 0xFD
-}
-
-// decompressBytes tries to decompress the input as best it can. If it detects
-// the input to be zstd, it decompresses using that algorithm. Otherwise, it
-// assumes the input bytes aren't compressed and returns them as-is.
-func (c compressor) decompressBytes(src []byte) []byte {
-	if !isZstd(src) {
-		// We assume that no compression is used, e.g. before we started
-		// compressing census dumps when publishing to ipfs.
-		return src
-	}
-	// We use a compressione stimate of 1/10th the size. Let's use 5x as a
-	// starting point, following the same rule while being conservative.
-	estimate := len(src) * 5
-	start := time.Now()
-	dst, err := c.decoder.DecodeAll(src, make([]byte, 0, estimate))
-	if err != nil {
-		log.Errorf("could not decompress zstd: %v", err)
-		return nil
-	}
-	elapsed := time.Since(start)
-	log.Debugf("decompressed %.2f KiB to %.2f KiB in %s with zstd, %.1f%% of the original size",
-		float64(len(src))/1000,
-		float64(len(dst))/1000,
-		elapsed,
-		float64(len(dst)*100)/float64(len(src)))
-	return dst
 }
