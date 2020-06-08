@@ -1,7 +1,7 @@
 # This first chunk downloads dependencies and builds the binaries, in a way that
 # can easily be cached and reused.
 
-FROM golang:1.14.2 AS builder
+FROM golang:1.14.4 AS builder
 
 WORKDIR /src
 

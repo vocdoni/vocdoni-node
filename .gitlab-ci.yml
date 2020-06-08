@@ -22,7 +22,7 @@ cache:
     - .cache/
 
 go-test:
-  image: golang:1.14.2
+  image: golang:1.14.4
   stage: test
   script:
     # we run vet in another step
@@ -31,7 +31,7 @@ go-test:
     - go test -vet=off -timeout=10m -race ./...
 
 go-analyze:
-  image: golang:1.14.2
+  image: golang:1.14.4
   stage: test
   script:
     - diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
