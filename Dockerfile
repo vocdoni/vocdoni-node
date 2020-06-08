@@ -11,15 +11,19 @@ COPY go.mod go.sum ./
 COPY duktape-stub duktape-stub
 RUN go mod download
 
+# Build all the binaries at once, so that the final targets don't require having
+# Go installed to build each of them.
 COPY . .
-RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/dvotenode
+RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/dvotenode ./cmd/vochaintest
 
-FROM builder AS test
+FROM debian:10.4-slim AS test
 
-WORKDIR /src
-RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/vochaintest
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+WORKDIR /app
+COPY --from=builder /src/vochaintest ./
 
-FROM debian:10.3-slim
+FROM debian:10.4-slim
+
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY --from=builder /src/dvotenode /src/dockerfiles/dvotenode/files/dvoteStart.sh ./
