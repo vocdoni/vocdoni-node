@@ -77,8 +77,6 @@ github.com/aristanetworks/fsnotify v1.4.2/go.mod h1:D/rtu7LpjYM8tRJphJ0hUBYpjai8
 github.com/aristanetworks/glog v0.0.0-20191112221043-67e8567f59f3/go.mod h1:KASm+qXFKs/xjSoWn30NrWBBvdTTQq+UjkhjEJHfSFA=
 github.com/aristanetworks/goarista v0.0.0-20170210015632-ea17b1a17847/go.mod h1:D/tb0zPVXnP7fmsLZjtdUhSsumbK/ij54UXjjVgMGxQ=
 github.com/aristanetworks/goarista v0.0.0-20190712234253-ed1100a1c015/go.mod h1:D/tb0zPVXnP7fmsLZjtdUhSsumbK/ij54UXjjVgMGxQ=
-github.com/aristanetworks/goarista v0.0.0-20200521140103-6c3304613b30 h1:cgk6xsRVshE29qzHDCQ+tqmu7ny8GnjPQhAw/RTk/Co=
-github.com/aristanetworks/goarista v0.0.0-20200521140103-6c3304613b30/go.mod h1:QZe5Yh80Hp1b6JxQdpfSEEe8X7hTyTEZSosSrFf/oJE=
 github.com/aristanetworks/goarista v0.0.0-20200602234848-db8a79a18e4a h1:SLrT2O2v0QGaH1JSte1vJ2HtreWZa0MjdGSfXp25qlc=
 github.com/aristanetworks/goarista v0.0.0-20200602234848-db8a79a18e4a/go.mod h1:QZe5Yh80Hp1b6JxQdpfSEEe8X7hTyTEZSosSrFf/oJE=
 github.com/aristanetworks/splunk-hec-go v0.3.3/go.mod h1:1VHO9r17b0K7WmOlLb9nTk/2YanvOEnLMUgsFrxBROc=
@@ -213,10 +211,7 @@ github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712 h1:aaQcKT9WumO6JEJc
 github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712/go.mod h1:YO35OhQPt3KJa3ryjFM5Bs14WD66h8eGKpfaBNrHW5M=
 github.com/edsrzf/mmap-go v1.0.0 h1:CEBF7HpRnUCSJgGUb5h1Gm7e3VkmVDrR8lvWVLtrOFw=
 github.com/edsrzf/mmap-go v1.0.0/go.mod h1:YO35OhQPt3KJa3ryjFM5Bs14WD66h8eGKpfaBNrHW5M=
-github.com/elastic/gosigar v0.8.1-0.20180330100440-37f05ff46ffa/go.mod h1:cdorVVzy1fhmEqmtgqkoE3bYtCfSCkVyjTyCIo22xvs=
 github.com/elastic/gosigar v0.10.4/go.mod h1:cdorVVzy1fhmEqmtgqkoE3bYtCfSCkVyjTyCIo22xvs=
-github.com/elastic/gosigar v0.10.5 h1:GzPQ+78RaAb4J63unidA/JavQRKrB6s8IOzN6Ib59jo=
-github.com/elastic/gosigar v0.10.5/go.mod h1:cdorVVzy1fhmEqmtgqkoE3bYtCfSCkVyjTyCIo22xvs=
 github.com/elgris/jsondiff v0.0.0-20160530203242-765b5c24c302 h1:QV0ZrfBLpFc2KDk+a4LJefDczXnonRwrYrQJY/9L4dA=
 github.com/elgris/jsondiff v0.0.0-20160530203242-765b5c24c302/go.mod h1:qBlWZqWeVx9BjvqBsnC/8RUlAYpIFmPvgROcw0n1scE=
 github.com/emirpasic/gods v1.12.0/go.mod h1:YfzfFFoVP/catgzJb4IKIqXjX78Ha8FMSDh3ymbK86o=
@@ -228,8 +223,6 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7
 github.com/etcd-io/bbolt v1.3.3/go.mod h1:ZF2nL25h33cCyBtcyWeZ2/I3HQOfTP+0PIEvHjkjCrw=
 github.com/ethereum/go-ethereum v1.8.27/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
 github.com/ethereum/go-ethereum v1.9.3/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
-github.com/ethereum/go-ethereum v1.9.14 h1:/rGoPYujLeajAHyDs8aZKYcLrurLdUJP9AzHk73QNr0=
-github.com/ethereum/go-ethereum v1.9.14/go.mod h1:oP8FC5+TbICUyftkTWs+8JryntjIJLJvWvApK3z2AYw=
 github.com/ethereum/go-ethereum v1.9.15 h1:wrWl+QrtutRUJ9LZXdUqBoGoo2b1tOCYRDrAOQhCY3A=
 github.com/ethereum/go-ethereum v1.9.15/go.mod h1:slT8bPPRhXsyNTwHQxrOnjuTZ1sDXRajW11EkJ84QJ0=
 github.com/facebookgo/atomicfile v0.0.0-20151019160806-2de1f203e7d5 h1:BBso6MBKW8ncyZLv37o+KNyy0HrrHgfnOaGQC2qvN+A=
@@ -1343,8 +1336,6 @@ github.com/samuel/go-zookeeper v0.0.0-20190923202752-2cc03de413da/go.mod h1:gi+0
 github.com/satori/go.uuid v1.2.0/go.mod h1:dA0hQrYB0VpLJoorglMZABFdXlWrHn1NEOzdhQKdks0=
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529/go.mod h1:DxrIzT+xaE7yg65j358z/aeFdxmN0P9QXhEzd20vsDc=
 github.com/sergi/go-diff v1.0.0/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=
-github.com/shirou/gopsutil v2.20.4+incompatible h1:cMT4rxS55zx9NVUnCkrmXCsEB/RNfG9SwHY9evtX8Ng=
-github.com/shirou/gopsutil v2.20.4+incompatible/go.mod h1:5b4v6he4MtMOwMlS0TUMTu2PcXUg8+E1lC7eC3UO/RA=
 github.com/shirou/gopsutil v2.20.5-0.20200531151128-663af789c085+incompatible h1:+gAR1bMhuoQnZMTWFIvp7ukynULPsteLzG+siZKLtD8=
 github.com/shirou/gopsutil v2.20.5-0.20200531151128-663af789c085+incompatible/go.mod h1:5b4v6he4MtMOwMlS0TUMTu2PcXUg8+E1lC7eC3UO/RA=
 github.com/shirou/gopsutil v2.20.5+incompatible h1:tYH07UPoQt0OCQdgWWMgYHy3/a9bcxNpBIysykNIP7I=
@@ -1610,8 +1601,6 @@ golang.org/x/crypto v0.0.0-20200204104054-c9f3fb736b72/go.mod h1:LzIPMQfyMNhhGPh
 golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4 h1:QmwruyY+bKbDDL0BaglrbZABEali68eoMFhTZpCjYVA=
 golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
-golang.org/x/crypto v0.0.0-20200602180216-279210d13fed h1:g4KENRiCMEx58Q7/ecwfT0N2o8z35Fnbsjig/Alf2T4=
-golang.org/x/crypto v0.0.0-20200602180216-279210d13fed/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.0.0-20200604202706-70a84ac30bf9 h1:vEg9joUBmeBcK9iSJftGNf3coIG4HqZElCPehJsfAYM=
 golang.org/x/crypto v0.0.0-20200604202706-70a84ac30bf9/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=

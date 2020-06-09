@@ -10,7 +10,6 @@ require (
 	github.com/davidlazar/go-crypto v0.0.0-20190912175916-7055855a373f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.1-rc1.0.20200409094109-809725940698
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
-	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.15
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-chi/chi v4.1.1+incompatible
