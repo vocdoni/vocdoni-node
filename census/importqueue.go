@@ -30,11 +30,10 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 		return fmt.Errorf("no claims found on the retreived census")
 	}
 	tr, err := m.AddNamespace(cid, []string{})
-	if err != nil {
-		if err.Error() != "namespace already exist" {
-			return fmt.Errorf("cannot create new census namespace: (%s)", err)
-		}
+	if err == ErrNamespaceExist {
 		return nil
+	} else if err != nil {
+		return fmt.Errorf("cannot create new census namespace: (%s)", err)
 	}
 	err = tr.ImportDump(dump.ClaimsData)
 	if err != nil {

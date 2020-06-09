@@ -384,7 +384,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %s", resp.Root)
 		tr2, err := m.AddNamespace(resp.Root, r.PubKeys)
-		if err != nil && err.Error() != ErrNamespaceExist {
+		if err != nil && err != ErrNamespaceExist {
 			log.Warnf("error creating local published census: %s", err)
 		} else if err == nil {
 			log.Infof("import claims to new census")

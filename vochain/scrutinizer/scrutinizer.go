@@ -23,8 +23,6 @@ const (
 	MaxQuestions = 64
 	// MaxOptions is the maximum number of options allowed in a VotePackage question
 	MaxOptions = 64
-	//NoKeyStorageError is the database error returned if a key is not found
-	NoKeyStorageError = "Key not found"
 )
 
 // Scrutinizer is the component which makes the accounting of the voting processes and keeps it indexed in a local database

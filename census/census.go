@@ -21,7 +21,7 @@ import (
 )
 
 // ErrNamespaceExist is the error returned when trying to add a namespace that already exist
-const ErrNamespaceExist string = "namespace already exist"
+var ErrNamespaceExist = errors.New("namespace already exists")
 
 // ImportQueueRoutines is the number of paralel routines processing the remote census download queue
 const ImportQueueRoutines = 10
@@ -161,7 +161,7 @@ func (m *Manager) AddNamespace(name string, pubKeys []string) (*tree.Tree, error
 	m.TreesMu.Lock()
 	defer m.TreesMu.Unlock()
 	if m.Exists(name) {
-		return nil, errors.New(ErrNamespaceExist)
+		return nil, ErrNamespaceExist
 	}
 	tr, err := tree.NewTree(m.LocalStorage.WithPrefix([]byte(name)))
 	if err != nil {

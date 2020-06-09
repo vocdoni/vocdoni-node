@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -57,7 +59,7 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
 
 	var pv ProcessVotes
 	if err := s.VochainState.Codec.UnmarshalBinaryBare(process, &pv); err != nil {
-		return fmt.Errorf("cannot unmarshal vote (%s)", err.Error())
+		return fmt.Errorf("cannot unmarshal vote (%s)", err)
 	}
 
 	for question, opt := range vote.Votes {
@@ -95,7 +97,7 @@ func (s *Scrutinizer) ComputeResult(processID string) error {
 	if err == nil {
 		return fmt.Errorf("process %s already computed", processID)
 	}
-	if err != nil && err.Error() != NoKeyStorageError {
+	if err != nil && err != badger.ErrKeyNotFound {
 		return err
 	}
 
@@ -145,7 +147,7 @@ func (s *Scrutinizer) VoteResult(processID string) (ProcessVotes, error) {
 	// If exist a summary of the voting process, just return it
 	var pv ProcessVotes
 	processBytes, err := s.Storage.Get([]byte(types.ScrutinizerResultsPrefix + processID))
-	if err != nil && err.Error() != NoKeyStorageError {
+	if err != nil && err != badger.ErrKeyNotFound {
 		return nil, err
 	}
 	if err == nil {

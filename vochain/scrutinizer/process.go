@@ -3,6 +3,8 @@ package scrutinizer
 import (
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -76,7 +78,8 @@ func (s *Scrutinizer) registerPendingProcess(pid string, height int64) {
 	scheduledBlock := fmt.Sprintf("%d", height)
 
 	pidListBytes, err := s.Storage.Get([]byte(types.ScrutinizerProcessEndingPrefix + scheduledBlock))
-	if err != nil && err.Error() != NoKeyStorageError {
+	// TODO(mvdan): use a generic "key not found" database error instead
+	if err != nil && err != badger.ErrKeyNotFound {
 		log.Error(err)
 		return
 	}
@@ -104,7 +107,7 @@ func (s *Scrutinizer) registerPendingProcess(pid string, height int64) {
 func (s *Scrutinizer) addLiveResultsProcess(pid string) {
 	log.Infof("add new process %s to live results", pid)
 	process, err := s.Storage.Get([]byte(types.ScrutinizerLiveProcessPrefix + pid))
-	if err != nil && err.Error() != NoKeyStorageError {
+	if err != nil && err != badger.ErrKeyNotFound {
 		log.Error(err)
 		return
 	}
@@ -121,7 +124,7 @@ func (s *Scrutinizer) addEntity(eid string, pid string) {
 	// TODO(mvdan): use a prefixed database
 	storagekey := []byte(types.ScrutinizerEntityPrefix + eid)
 	processList, err := s.Storage.Get(storagekey)
-	if err != nil && err.Error() != NoKeyStorageError {
+	if err != nil && err != badger.ErrKeyNotFound {
 		log.Error(err)
 		return
 	}
