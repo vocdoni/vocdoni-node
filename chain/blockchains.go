@@ -33,7 +33,7 @@ func SpecsFor(name string) (*Specs, error) {
 var mainnet = Specs{
 	Name:          "mainnet",
 	BootNodes:     ethparams.MainnetBootnodes,
-	StartingBlock: 90000000,
+	StartingBlock: 10230300, //2020 jun 09 10:00h
 }
 
 // Goerli Ethereum PoA Testnet
