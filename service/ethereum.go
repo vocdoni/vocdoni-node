@@ -31,7 +31,7 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 	os.RemoveAll(ethconfig.DataDir + "/keystore/tmp")
 	node.Keys = keystore.NewPlaintextKeyStore(ethconfig.DataDir + "/keyStore/tmp")
 	if _, err := node.Keys.ImportECDSA(&signer.Private, ""); err != nil {
-		if err.Error() != "account already exists" {
+		if err != keystore.ErrAccountAlreadyExists {
 			return nil, err
 		}
 	}
