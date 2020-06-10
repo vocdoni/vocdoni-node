@@ -455,8 +455,12 @@ func main() {
 	if (globalCfg.Mode == "gateway" && globalCfg.W3Config.Enabled) || globalCfg.Mode == "oracle" {
 		// Wait for Ethereum to be ready
 		if !globalCfg.EthConfig.NoWaitSync {
+			requiredPeers := 2
+			if len(globalCfg.W3Config.W3External) > 0 {
+				requiredPeers = 1
+			}
 			for {
-				if info, err := node.SyncInfo(); err == nil && info.Synced && info.Peers > 1 && info.Height > 0 {
+				if info, err := node.SyncInfo(); err == nil && info.Synced && info.Peers >= requiredPeers && info.Height > 0 {
 					log.Infof("ethereum blockchain synchronized (%+v)", info)
 					break
 				}
