@@ -240,6 +240,19 @@ func (e *EthChainContext) Start() {
 			e.Node.Server().AddTrustedPeer(p)
 		}
 		go e.SyncGuard()
+	} else {
+		client, err := ethclient.Dial(e.DefaultConfig.W3external)
+		if err != nil || client == nil {
+			log.Fatalf("cannot create a client connection: (%s)", err)
+		}
+		nid, err := client.NetworkID(context.Background())
+		if err != nil || nid == nil {
+			log.Fatalf("cannot get network ID from external web3: (%s)", err)
+		}
+		if nid.Int64() != int64(e.DefaultConfig.NetworkId) {
+			log.Fatalf("web3 external network ID do not match the expected %d != %d", nid.Int64(), e.DefaultConfig.NetworkId)
+		}
+		log.Infof("connected to external web3 endpoint on network ID %d", nid.Int64())
 	}
 }
 
@@ -321,12 +334,30 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 		var client *ethclient.Client
 		var sp *ethereum.SyncProgress
 		client, err = ethclient.Dial(e.DefaultConfig.W3external)
-		if err != nil {
+		defer client.Close()
+		if err != nil || client == nil {
+			log.Warnf("cannot retrieve information from external web3 endpoint: (%s)", err)
 			return
 		}
 		sp, err = client.SyncProgress(context.Background())
-		info.MaxHeight = sp.HighestBlock
-		info.Height = sp.CurrentBlock
+		if err != nil {
+			log.Warn(err)
+			return
+		}
+		if sp != nil {
+			info.MaxHeight = sp.HighestBlock
+			info.Height = sp.CurrentBlock
+		} else {
+			info.Synced = true
+			header, err2 := client.HeaderByNumber(context.Background(), nil)
+			if err2 != nil {
+				err = err2
+				log.Warn(err)
+				return
+			}
+			info.Height = uint64(header.Number.Int64())
+			info.MaxHeight = info.Height
+		}
 		return
 	}
 	// Fast sync
