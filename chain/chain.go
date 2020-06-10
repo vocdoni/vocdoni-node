@@ -334,11 +334,11 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 		var client *ethclient.Client
 		var sp *ethereum.SyncProgress
 		client, err = ethclient.Dial(e.DefaultConfig.W3external)
-		defer client.Close()
 		if err != nil || client == nil {
 			log.Warnf("cannot retrieve information from external web3 endpoint: (%s)", err)
 			return
 		}
+		defer client.Close()
 		sp, err = client.SyncProgress(context.Background())
 		if err != nil {
 			log.Warn(err)
