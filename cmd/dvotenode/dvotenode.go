@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -19,7 +20,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
-	"gitlab.com/vocdoni/go-dvote/net"
+	vnet "gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/service"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/keykeeper"
@@ -80,6 +81,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.EthEventConfig.CensusSync = *flag.Bool("ethCensusSync", true, "automatically import new census published on the smart contract")
 	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", false, "only subscribe to new ethereum events (do not read past log)")
 	// ethereum web3
+	globalCfg.W3Config.W3External = *flag.String("w3External", "", "use an external web3 endpoint (if set, local Ethereum node will not be started)")
 	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true web3 will be enabled")
 	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
 	globalCfg.W3Config.RPCPort = *flag.Int("w3RPCPort", 9091, "web3 RPC port")
@@ -168,6 +170,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("ethEventConfig.subscribeOnly", flag.Lookup("ethSubscribeOnly"))
 
 	// ethereum web3
+	viper.BindPFlag("w3Config.w3External", flag.Lookup("w3External"))
 	viper.BindPFlag("w3Config.route", flag.Lookup("w3Route"))
 	viper.BindPFlag("w3Config.enabled", flag.Lookup("w3Enabled"))
 	viper.BindPFlag("w3Config.RPCPort", flag.Lookup("w3RPCPort"))
@@ -334,7 +337,7 @@ func main() {
 	var err error
 	var signer *ethereum.SignKeys
 	var node *chain.EthChainContext
-	var pxy *net.Proxy
+	var pxy *vnet.Proxy
 	var storage data.Storage
 	var cm *census.Manager
 	var vnode *vochain.BaseApplication
@@ -465,10 +468,13 @@ func main() {
 		if !globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == "oracle" {
 			var evh []ethevents.EventHandler
 
+			w3uri := globalCfg.W3Config.W3External
+			if w3uri == "" {
+				w3uri = "ws://" + net.JoinHostPort(globalCfg.W3Config.RPCHost, fmt.Sprintf("%d", globalCfg.W3Config.RPCPort))
+			}
 			if globalCfg.Mode == "oracle" {
 				evh = append(evh, ethevents.HandleVochainOracle)
 			}
-
 			initBlock := int64(0)
 			chainSpecs, err := chain.SpecsFor(globalCfg.EthConfig.ChainType)
 			if err != nil {
@@ -480,9 +486,10 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+
 			// Register the event handlers
-			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, globalCfg.W3Config.RPCHost, globalCfg.W3Config.RPCPort,
-				initBlock, int64(syncInfo.Height), globalCfg.EthEventConfig.SubscribeOnly, cm, signer, vnode, evh); err != nil {
+			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, w3uri, initBlock, int64(syncInfo.Height),
+				globalCfg.EthEventConfig.SubscribeOnly, cm, signer, vnode, evh); err != nil {
 				log.Fatal(err)
 			}
 		}

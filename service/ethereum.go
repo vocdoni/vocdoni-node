@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -37,16 +38,23 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 	// Start Ethereum node
 	node.Start()
 	go node.PrintInfo(time.Second * 20)
+	w3uri := w3cfg.W3external
+	if w3uri == "" {
+		// Grab ethereum metrics loop
+		go node.CollectMetrics(ma)
+		log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
+		w3uri = fmt.Sprintf("http://%s:%d", w3cfg.RPCHost, w3cfg.RPCPort)
+	}
 
-	// Grab ethereum metrics loop
-	go node.CollectMetrics(ma)
-
-	log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
 	if w3config.Enabled && pxy != nil {
-		pxy.AddHandler(w3config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3cfg.RPCHost, w3cfg.RPCPort)))
-		log.Infof("web3 endpoint available at %s", w3config.Route)
-		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("ws://%s:%d", w3cfg.RPCHost, w3cfg.RPCPort)))
-		log.Infof("web3 endpoint available at %s", w3config.Route+"ws")
+		if !strings.HasPrefix(w3uri, "http") {
+			log.Warnf("web3 external protocol not supported (only http and https) %s", w3uri)
+			return
+		}
+		pxy.AddHandler(w3config.Route, pxy.AddEndpoint(w3uri))
+		log.Infof("web3 http endpoint available at %s", w3config.Route)
+		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsHTTPBridge(w3uri))
+		log.Infof("web3 websocket endpoint available at %s", w3config.Route+"ws")
 	}
 	return
 }
