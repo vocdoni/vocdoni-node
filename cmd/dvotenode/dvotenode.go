@@ -375,7 +375,8 @@ func main() {
 	}
 
 	// Websockets and HTTPs proxy
-	if globalCfg.Mode == "gateway" || globalCfg.Mode == "web3" || globalCfg.Metrics.Enabled {
+	if globalCfg.Mode == "gateway" || globalCfg.Mode == "web3" || globalCfg.Metrics.Enabled ||
+		(globalCfg.Mode == "oracle" && len(globalCfg.W3Config.W3External) > 0) {
 		// Proxy service
 		pxy, err = service.Proxy(globalCfg.API.ListenHost, globalCfg.API.ListenPort,
 			globalCfg.API.Ssl.Domain, globalCfg.API.Ssl.DirCert)
@@ -471,9 +472,19 @@ func main() {
 		// Ethereum events service (needs Ethereum synchronized)
 		if !globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == "oracle" {
 			var evh []ethevents.EventHandler
-
-			w3uri := globalCfg.W3Config.W3External
-			if w3uri == "" {
+			var w3uri string
+			if globalCfg.W3Config.W3External != "" {
+				// If w3 external is enabled, use the local websockets proxy
+				if !strings.HasPrefix(globalCfg.W3Config.W3External, "ws") {
+					log.Fatal("web3 external muts be websocket for event subscription")
+				}
+				prefix := "ws"
+				if globalCfg.API.Ssl.Domain != "" {
+					prefix = "wss"
+				}
+				w3uri = fmt.Sprintf("%s://127.0.0.1:%d%s", prefix, globalCfg.API.ListenPort, globalCfg.W3Config.Route+"ws")
+			} else {
+				// If local ethereum node enabled, use the Go-Ethereum websockets endpoint
 				w3uri = "ws://" + net.JoinHostPort(globalCfg.W3Config.RPCHost, fmt.Sprintf("%d", globalCfg.W3Config.RPCPort))
 			}
 			if globalCfg.Mode == "oracle" {
@@ -492,8 +503,10 @@ func main() {
 			}
 
 			// Register the event handlers
-			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, w3uri, initBlock, int64(syncInfo.Height),
-				globalCfg.EthEventConfig.SubscribeOnly, cm, signer, vnode, evh); err != nil {
+			if globalCfg.EthEventConfig.SubscribeOnly {
+				syncInfo.Height = 0
+			}
+			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, w3uri, initBlock, int64(syncInfo.Height), cm, signer, vnode, evh); err != nil {
 				log.Fatal(err)
 			}
 		}

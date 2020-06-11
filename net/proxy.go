@@ -92,7 +92,6 @@ func (p *Proxy) Init() error {
 	p.Server.Use(middleware.Recoverer)
 	p.Server.Use(middleware.Throttle(5000))
 	p.Server.Use(middleware.Timeout(30 * time.Second))
-
 	cors := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
@@ -245,6 +244,51 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 			if err := c.Write(context.TODO(), msgType, respBody); err != nil {
 				log.Warnf("cannot write message: %s", err)
 			}
+		}
+	}
+}
+
+// AddWsWsBridge adds a WS endpoint to interact with the underlying web3
+func (p *Proxy) AddWsWsBridge(url string) ProxyWsHandler {
+	return func(wslocal *websocket.Conn) {
+		wsremote := newWsPoll()
+		wsremote.addServer(url)
+		if err := wsremote.dial(); err != nil {
+			log.Errorf("dial failed: (%s)", err)
+			return
+		}
+		go wsremote.read()
+		go func() {
+			for {
+				msgType, msg, err := wslocal.Reader(context.TODO())
+				if err != nil {
+					log.Debugf("websocket closed by the client: %s", err)
+					wslocal.Close(websocket.StatusAbnormalClosure, "ws closed by client")
+					return
+				}
+				respBody, err := ioutil.ReadAll(msg)
+				if err != nil {
+					log.Warnf("cannot read response: %s", err)
+					continue
+				}
+				if err := wsremote.write(msgType, respBody); err != nil {
+					log.Fatal(err)
+					return
+				}
+			}
+		}()
+		for {
+			wsData := <-wsremote.readChan
+			respBody, err := ioutil.ReadAll(wsData.reader)
+			if err != nil {
+				log.Warnf("cannot read response: %s", err)
+				continue
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			if err := wslocal.Write(ctx, wsData.msgType, respBody); err != nil {
+				log.Warnf("cannot write message to local websocket: (%s)", err)
+			}
+			cancel()
 		}
 	}
 }
