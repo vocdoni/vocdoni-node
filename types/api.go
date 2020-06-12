@@ -68,7 +68,7 @@ type MetaResponse struct {
 	InvalidClaims        []int      `json:"invalidClaims,omitempty"`
 	Message              string     `json:"message,omitempty"`
 	Nullifier            string     `json:"nullifier,omitempty"`
-	Nullifiers           []string   `json:"nullifiers,omitempty"`
+	Nullifiers           *[]string  `json:"nullifiers,omitempty"`
 	Ok                   bool       `json:"ok"`
 	Paused               *bool      `json:"paused,omitempty"`
 	Payload              string     `json:"payload,omitempty"`

@@ -246,10 +246,7 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	}
 	n := r.vocapp.State.EnvelopeList(request.ProcessID, request.From, request.ListSize, true)
 	var response types.ResponseMessage
-	response.Nullifiers = n
-	if len(n) == 0 {
-		response.Nullifiers = []string{}
-	}
+	response.Nullifiers = &n
 	r.transport.Send(r.buildReply(request, response))
 }
 
