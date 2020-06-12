@@ -16,9 +16,9 @@ type wsPool struct {
 	index      int
 	servers    []string
 	readChan   chan (wsReader)
-	readCancel context.CancelFunc
-	lock       sync.RWMutex
-	readWait   sync.WaitGroup
+	readCancel context.CancelFunc // TODO(mvdan): probably racy
+	lock       sync.RWMutex       // TODO: what is this protecting?
+	readWait   sync.WaitGroup     // TODO(mvdan): probably racy too; we mix Add/Done and Wait
 }
 
 type wsReader struct {
@@ -39,11 +39,14 @@ func (w *wsPool) read() {
 		if err == nil {
 			w.readChan <- wsReader{msgType: msgType, reader: msg}
 		} else {
+			// TODO: this needs to be documented. both the reader
+			// and writer can dial if they encounter an error?
 			if err := w.dial(); err != nil {
 				log.Fatal(err)
 				return
 			}
 		}
+		// Use a sleep to avoid busy looping.
 		time.Sleep(time.Millisecond * 200)
 	}
 }
@@ -70,12 +73,11 @@ func (w *wsPool) dial() (err error) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		w.wsc, _, err = websocket.Dial(ctx, w.servers[w.index], nil)
+		cancel()
 		w.wsc.SetReadLimit(1024 * 1024)
 		if err == nil {
-			cancel()
 			break
 		}
-		cancel()
 		if initialIndex == w.index {
 			err = fmt.Errorf("no more servers in pool")
 			break
@@ -87,20 +89,18 @@ func (w *wsPool) dial() (err error) {
 
 func (w *wsPool) write(mt websocket.MessageType, rb []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	if err := w.wsc.Write(ctx, mt, rb); err == nil {
-		cancel()
 		return nil
 	}
 	log.Warnf("websocket connection lost, retrying...")
-	cancel()
 	if err := w.dial(); err != nil {
 		return err
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	if err := w.wsc.Write(ctx, mt, rb); err == nil {
-		cancel()
 		return nil
 	}
-	cancel()
 	return fmt.Errorf("websocket connection cannot be recovered")
 }
