@@ -15,6 +15,7 @@ func IsHex(str string) bool { return validHexRegex.MatchString(str) }
 
 // IsHexEncodedStringWithLength checks if the given string contains only valid hex symbols and have the desired length
 func IsHexEncodedStringWithLength(str string, length int) bool {
+	str = TrimHex(str)
 	return hex.DecodedLen(len(str)) == length && IsHex(str)
 }
 
