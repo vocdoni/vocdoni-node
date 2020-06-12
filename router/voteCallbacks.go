@@ -11,6 +11,8 @@ import (
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
+const MaxListSize = 256
+
 func (r *Router) submitRawTx(request routerRequest) {
 	tx, err := base64.StdEncoding.DecodeString(request.RawTx)
 	if err != nil {
@@ -231,16 +233,22 @@ func (r *Router) getProcessKeys(request routerRequest) {
 }
 
 func (r *Router) getEnvelopeList(request routerRequest) {
-	sanitizedPID := util.TrimHex(request.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+	if !util.IsHexEncodedStringWithLength(request.ProcessID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope list: (malformed processId)")
 		return
 	}
-	n := r.vocapp.State.EnvelopeList(sanitizedPID, request.From, request.ListSize, true)
+	if request.ListSize > MaxListSize {
+		r.sendError(request, fmt.Sprintf("listSize overflow, maximum is %d", MaxListSize))
+		return
+	}
+	if request.ListSize == 0 {
+		request.ListSize = 64
+	}
+	n := r.vocapp.State.EnvelopeList(request.ProcessID, request.From, request.ListSize, true)
 	var response types.ResponseMessage
 	response.Nullifiers = n
 	if len(n) == 0 {
-		response.Nullifiers = []string{""}
+		response.Nullifiers = []string{}
 	}
 	r.transport.Send(r.buildReply(request, response))
 }

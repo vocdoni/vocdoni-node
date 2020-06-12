@@ -583,7 +583,7 @@ func (v *State) EnvelopeList(processID string, from, listSize int64, isQuery boo
 	var nullifiers []string
 	idx := int64(0)
 	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
-		if idx >= listSize {
+		if idx >= from+listSize {
 			return true
 		}
 		if idx >= from {
