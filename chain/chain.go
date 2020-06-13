@@ -303,31 +303,6 @@ type EthSyncInfo struct {
 
 // SyncInfo returns the height and syncing Ethereum blockchain information
 func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
-	e.RestartLock.RLock()
-	defer e.RestartLock.RUnlock()
-	// Light sync
-	if e.DefaultConfig.LightMode {
-		info.Mode = "light"
-		info.Synced = false
-		var r *rpc.Client
-		r, err = e.Node.Attach()
-		if r == nil || err != nil {
-			return
-		}
-
-		r.Call(&info.Synced, "eth_syncing") // true = syncing / false if synced
-		info.Synced = !info.Synced
-		var block string
-		r.Call(&block, "eth_blockNumber")
-		info.Height = uint64(util.Hex2int64(block))
-		if info.Height == 0 {
-			info.Synced = false // Workaround
-		}
-		// TODO find a way to get the maxHeight on light mode
-		info.MaxHeight = info.Height
-		info.Peers = e.Node.Server().PeerCount()
-		return
-	}
 	// External Web3
 	if len(e.DefaultConfig.W3external) > 0 {
 		info.Mode = "external"
@@ -360,6 +335,31 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 			info.Height = uint64(header.Number.Int64())
 			info.MaxHeight = info.Height
 		}
+		return
+	}
+	e.RestartLock.RLock()
+	defer e.RestartLock.RUnlock()
+	// Light sync
+	if e.DefaultConfig.LightMode {
+		info.Mode = "light"
+		info.Synced = false
+		var r *rpc.Client
+		r, err = e.Node.Attach()
+		if r == nil || err != nil {
+			return
+		}
+
+		r.Call(&info.Synced, "eth_syncing") // true = syncing / false if synced
+		info.Synced = !info.Synced
+		var block string
+		r.Call(&block, "eth_blockNumber")
+		info.Height = uint64(util.Hex2int64(block))
+		if info.Height == 0 {
+			info.Synced = false // Workaround
+		}
+		// TODO find a way to get the maxHeight on light mode
+		info.MaxHeight = info.Height
+		info.Peers = e.Node.Server().PeerCount()
 		return
 	}
 	// Fast sync
