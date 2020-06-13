@@ -152,7 +152,9 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	}
 	ethConfig := eth.DefaultConfig
 
-	if c.NetworkId > 0 {
+	// network id 1 is mainet, the default go-ethereum network
+	// only if network id is bigger than 1, we try to fetch the genesis file from our code
+	if c.NetworkId > 1 {
 		ethConfig.NetworkId = uint64(c.NetworkId)
 		g := new(core.Genesis)
 		err = g.UnmarshalJSON(c.NetworkGenesis)
