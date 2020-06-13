@@ -1,0 +1,15 @@
+version: "3.4"
+
+services:
+  eth:
+    image: openethereum/openethereum:latest
+    ports:
+      - "9080:9080"
+      - "37671:37671"
+      - "9081:9081"
+    user: root
+    volumes:
+      - "eth:/app/run"
+    command: --chain ${CHAIN:-ethereum} --base-path /app/run --port=37671 --jsonrpc-port=9080 --jsonrpc-interface=0.0.0.0 --jsonrpc-apis=web3,eth,net --jsonrpc-cors=all --ws-port=9081 --ws-interface=0.0.0.0
+volumes:
+  eth: {}
