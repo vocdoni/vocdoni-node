@@ -32,6 +32,7 @@ func SpecsFor(name string) (*Specs, error) {
 // Ethereum MainNet
 var mainnet = Specs{
 	Name:          "mainnet",
+	NetworkId:     1,
 	BootNodes:     ethparams.MainnetBootnodes,
 	StartingBlock: 10230300, //2020 jun 09 10:00h
 }
