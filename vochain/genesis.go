@@ -4,8 +4,8 @@ package vochain
 const (
 	ReleaseGenesis1 = `
 {
-  "genesis_time": "2020-05-08T09:30:50.199392102Z",
-  "chain_id": "vocdoni-release-03",
+  "genesis_time": "2020-06-15T09:30:50.199392102Z",
+  "chain_id": "vocdoni-release-04",
   "consensus_params": {
     "block": {
       "max_bytes": "22020096",
@@ -24,13 +24,13 @@ const (
   },
   "validators": [
     {
-      "address": "243A633E60AAFB177018D76C5AA0A3DF0ACC13D1",
+      "address": "85CD8C680EC27712EC83FEA63C16BE97115EBA97",
       "pub_key": {
         "type": "tendermint/PubKeyEd25519",
-        "value": "MlOJMC1nwAYDmaju+2VJijoIO6cBF36Ygmsdc4gKZtk="
+        "value": "BpIfgz39GAuFSPSExT/TdJxm/UhoF1L1YxOY+pcbJzc="
       },
       "power": "10",
-      "name": ""
+      "name": "miner4"
     },
     {
       "address": "5DC922017285EC24415F3E7ECD045665EADA8B5A",
@@ -39,7 +39,7 @@ const (
         "value": "4MlhCW62N/5bj5tD66//h9RnsAh+xjAdMU8lGiEwvyM="
       },
       "power": "10",
-      "name": ""
+      "name": "miner1"
     },
     {
       "address": "77EA441EA0EB29F049FC57DE524C55833A7FF575",
@@ -48,7 +48,7 @@ const (
         "value": "GyZfKNK3lT5AQXQ4pwrVdgG3rRisx9tS4bM9EIZ0zYY="
       },
       "power": "10",
-      "name": ""
+      "name": "miner2"
     },
     {
       "address": "D8C253A41C7D8EE0E2AD04B2A1B6AED37FAE18E7",
@@ -57,20 +57,20 @@ const (
         "value": "zNYNrEVl0tGegjLgq8ZQOHUC+glzpHnmOs9x+9n9UgQ="
       },
       "power": "10",
-      "name": ""
+      "name": "miner3"
     }
   ],
   "app_hash": "",
   "app_state": {
     "validators": [
       {
-        "address": "243A633E60AAFB177018D76C5AA0A3DF0ACC13D1",
+        "address": "85CD8C680EC27712EC83FEA63C16BE97115EBA97",
         "pub_key": {
           "type": "tendermint/PubKeyEd25519",
-          "value": "MlOJMC1nwAYDmaju+2VJijoIO6cBF36Ygmsdc4gKZtk="
+          "value": "BpIfgz39GAuFSPSExT/TdJxm/UhoF1L1YxOY+pcbJzc="
         },
         "power": "10",
-        "name": ""
+        "name": "miner4"
       },
       {
         "address": "5DC922017285EC24415F3E7ECD045665EADA8B5A",
@@ -79,7 +79,7 @@ const (
           "value": "4MlhCW62N/5bj5tD66//h9RnsAh+xjAdMU8lGiEwvyM="
         },
         "power": "10",
-        "name": ""
+        "name": "miner1"
       },
       {
         "address": "77EA441EA0EB29F049FC57DE524C55833A7FF575",
@@ -88,7 +88,7 @@ const (
           "value": "GyZfKNK3lT5AQXQ4pwrVdgG3rRisx9tS4bM9EIZ0zYY="
         },
         "power": "10",
-        "name": ""
+        "name": "miner2"
       },
       {
         "address": "D8C253A41C7D8EE0E2AD04B2A1B6AED37FAE18E7",
@@ -97,11 +97,12 @@ const (
           "value": "zNYNrEVl0tGegjLgq8ZQOHUC+glzpHnmOs9x+9n9UgQ="
         },
         "power": "10",
-        "name": ""
+        "name": "miner3"
       }
         ],
     "oracles": [
-      "0x73ab4566b2e404e2be4fe9a8fb007f4014292c0c"
+      "0x73ab4566b2e404e2be4fe9a8fb007f4014292c0c",
+	  "0x28696305c434dd4e962677d77c719ab460c73325"
     ]
   }
 }
