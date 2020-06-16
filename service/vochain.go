@@ -111,10 +111,10 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma
 		var lastHeight int64
 		i := 0
 		for !vi.Sync() {
-			lastHeight = vi.Height()
 			time.Sleep(time.Second * 1)
 			if i%20 == 0 {
 				log.Infof("[vochain info] fastsync running at block %d (%d blocks/s), peers %d", vi.Height(), (vi.Height()-lastHeight)/20, len(vi.Peers()))
+				lastHeight = vi.Height()
 			}
 			i++
 		}
@@ -129,29 +129,29 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma
 	return
 }
 
-// VochainStatsCollect initializes the Vochain statistics recollection
+// VochainPrintInfo initializes the Vochain statistics recollection
 func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
-	var a1, a10, a60, a360, a1440 float32
+	var a [5]int32
 	var h, p, v int64
 	var m int
 	var b strings.Builder
 	for {
 		b.Reset()
-		a1, a10, a60, a360, a1440 = vi.BlockTimes()
-		if a1 > 0 {
-			fmt.Fprintf(&b, "1m:%.1f", a1)
+		a = vi.BlockTimes()
+		if a[0] > 0 {
+			fmt.Fprintf(&b, "1m:%.2f", float32(a[0]/1000))
 		}
-		if a10 > 0 {
-			fmt.Fprintf(&b, " 10m:%.1f", a10)
+		if a[1] > 0 {
+			fmt.Fprintf(&b, " 10m:%d", a[1]/1000)
 		}
-		if a60 > 0 {
-			fmt.Fprintf(&b, " 1h:%.1f", a60)
+		if a[2] > 0 {
+			fmt.Fprintf(&b, " 1h:%d", a[2]/1000)
 		}
-		if a360 > 0 {
-			fmt.Fprintf(&b, " 6h:%.1f", a360)
+		if a[3] > 0 {
+			fmt.Fprintf(&b, " 6h:%d", a[3]/1000)
 		}
-		if a1440 > 0 {
-			fmt.Fprintf(&b, " 24h:%.1f", a1440)
+		if a[4] > 0 {
+			fmt.Fprintf(&b, " 24h:%d", a[4]/1000)
 		}
 		h = vi.Height()
 		m = vi.MempoolSize()

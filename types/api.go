@@ -53,7 +53,7 @@ type ResponseMessage struct {
 // Those fields with valid zero-values (such as bool) must be pointers
 type MetaResponse struct {
 	APIList              []string   `json:"apiList,omitempty"`
-	AverageBlockTime     []int32    `json:"averageBlockTime,omitempty"`
+	BlockTime            [5]int32   `json:"blockTime,omitempty"`
 	BlockTimestamp       int32      `json:"blockTimestamp,omitempty"`
 	CensusID             string     `json:"censusId,omitempty"`
 	CensusList           []string   `json:"censusList,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
@@ -15,11 +16,11 @@ type VochainInfo struct {
 	voteTreeSize    int64
 	processTreeSize int64
 	mempoolSize     int
-	avg1            float32
-	avg10           float32
-	avg60           float32
-	avg360          float32
-	avg1440         float32
+	avg1            int32
+	avg10           int32
+	avg60           int32
+	avg360          int32
+	avg1440         int32
 	vnode           *vochain.BaseApplication
 	close           chan bool
 	lock            sync.RWMutex
@@ -42,14 +43,14 @@ func (vi *VochainInfo) Height() int64 {
 
 // BlockTimes returns the average block time for 1, 10, 60, 360 and 1440 minutes
 // Value 0 means there is not yet an average
-func (vi *VochainInfo) BlockTimes() (float32, float32, float32, float32, float32) {
+func (vi *VochainInfo) BlockTimes() [5]int32 {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
-	return vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440
+	return [5]int32{vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}
 }
 
 // Sync returns true if the Vochain is considered up-to-date
-// Dislaimer: this method is not 100% accurated. Use it just for non-critical operations
+// Disclaimer: this method is not 100% accurated. Use it just for non-critical operations
 func (vi *VochainInfo) Sync() bool {
 	return !vi.vnode.Node.ConsensusReactor().FastSync()
 }
@@ -80,11 +81,12 @@ func (vi *VochainInfo) Peers() (peers []string) {
 
 // Start initializes the Vochain statistics recollection
 func (vi *VochainInfo) Start(sleepSecs int64) {
+	log.Infof("starting vochain info service every %d seconds", sleepSecs)
 	var duration time.Duration
 	var pheight, height int64
 	var h1, h10, h60, h360, h1440 int64
 	var n1, n10, n60, n360, n1440 int64
-	var a1, a10, a60, a360, a1440 float32
+	var a1, a10, a60, a360, a1440 int32
 	var sync bool
 	duration = time.Second * time.Duration(sleepSecs)
 	for {
@@ -111,27 +113,27 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 				h1440 += (height - pheight)
 
 				if sleepSecs*n1 >= 60 && h1 > 0 {
-					a1 = float32((n1 * sleepSecs) / h1)
+					a1 = int32((n1 * sleepSecs * 1000) / h1)
 					n1 = 0
 					h1 = 0
 				}
 				if sleepSecs*n10 >= 600 && h10 > 0 {
-					a10 = float32((n10 * sleepSecs) / h10)
+					a10 = int32((n10 * sleepSecs * 1000) / h10)
 					n10 = 0
 					h10 = 0
 				}
 				if sleepSecs*n60 >= 3600 && h60 > 0 {
-					a60 = float32((n60 * sleepSecs) / h60)
+					a60 = int32((n60 * sleepSecs * 1000) / h60)
 					n60 = 0
 					h60 = 0
 				}
 				if sleepSecs*n360 >= 21600 && h360 > 0 {
-					a360 = float32((n360 * sleepSecs) / h360)
+					a360 = int32((n360 * sleepSecs * 1000) / h360)
 					n360 = 0
 					h360 = 0
 				}
 				if sleepSecs*n1440 >= 86400 && h1440 > 0 {
-					a1440 = float32((n1440 * sleepSecs) / h1440)
+					a1440 = int32((n1440 * sleepSecs * 1000) / h1440)
 					n1440 = 0
 					h1440 = 0
 				}

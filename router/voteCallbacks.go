@@ -312,13 +312,8 @@ func (r *Router) getScrutinizerEntities(request routerRequest) {
 	r.transport.Send(r.buildReply(request, response))
 }
 
-func (r *Router) getAverageBlockTime(request routerRequest) {
+func (r *Router) getBlockTime(request routerRequest) {
 	var response types.ResponseMessage
-	response.AverageBlockTime = make([]int32, 5)
-	blkTime := make([]float32, 5)
-	blkTime[0], blkTime[1], blkTime[2], blkTime[3], blkTime[4] = r.vocinfo.BlockTimes()
-	for idx, elm := range blkTime {
-		response.AverageBlockTime[idx] = int32(elm * float32(1000))
-	}
+	response.BlockTime = r.vocinfo.BlockTimes()
 	r.transport.Send(r.buildReply(request, response))
 }
