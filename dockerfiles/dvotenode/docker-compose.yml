@@ -8,6 +8,7 @@ services:
     env_file: env
     volumes:
       - "run:/app/run"
+      - "eth:/app/eth:ro"
     ports:
       - "9090:9090"
       - "9091:9091"
@@ -25,6 +26,18 @@ services:
       options:
         max-size: "20m"
         max-file: "10"
+  eth:
+    image: openethereum/openethereum:latest
+    ports:
+      - "9080:9080"
+      - "37671:37671"
+      - "9081:9081"
+    restart: ${RESTART:-always}
+    user: root
+    volumes:
+      - "eth:/app/eth"
+    command: --chain ${CHAIN:-ethereum} --base-path /app/eth --port=37671 --jsonrpc-port=9080 --jsonrpc-interface=0.0.0.0 --jsonrpc-apis=web3,eth,net --jsonrpc-cors=all --ws-port=9081 --ws-interface=0.0.0.0 --no-ancient-blocks
 
 volumes:
   run: {}
+  eth: {}
