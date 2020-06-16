@@ -4,12 +4,47 @@ services:
   eth:
     image: openethereum/openethereum:latest
     ports:
-      - "9080:9080"
       - "37671:37671"
-      - "9081:9081"
     user: root
     volumes:
       - "eth:/app/run"
     command: --chain ${CHAIN:-ethereum} --base-path /app/run --port=37671 --jsonrpc-port=9080 --jsonrpc-interface=0.0.0.0 --jsonrpc-apis=web3,eth,net --jsonrpc-cors=all --ws-port=9081 --ws-interface=0.0.0.0
+    restart: always
+    labels:
+      traefik.enable: true
+      traefik.frontend.rule: "PathPrefix:/web3;Host:${SERVER_NAME}"
+      traefik.default.port: 9080
+      traefik.default.protocol: http
+      traefik.wss.frontend.rule: "PathPrefix:/web3ws;Host:${SERVER_NAME}"
+      traefik.wss.protocol: ws
+      traefik.wss.port: 9081
+  traefik:
+    image: traefik:1.7
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      #- ./traefik:/etc/traefik
+      - traefik:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: 
+      - "--debug=true"
+      - "--logLevel=ERROR"
+      - "--defaultentrypoints=https,http"
+      - "--entryPoints=Name:http Address::80 Redirect.EntryPoint:https"
+      - "--entryPoints=Name:https Address::443 TLS"
+      - "--retry"
+      - "--docker.endpoint=unix:///var/run/docker.sock"
+      - "--docker.domain=${SERVER_NAME}"
+      - "--docker.watch=true"
+      - "--docker.exposedbydefault=false"
+      - "--acme.email=${LETSENCRYPT_EMAIL}"
+      - "--acme.storage=/data/acme.json"
+      - "--acme.entryPoint=https"
+      - "--acme.onHostRule=true"
+      - "--acme.httpchallenge.entrypoint=http"
+    restart: always
+
 volumes:
   eth: {}
+  traefik: {}
