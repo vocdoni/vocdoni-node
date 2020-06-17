@@ -81,8 +81,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.EthEventConfig.CensusSync = *flag.Bool("ethCensusSync", true, "automatically import new census published on the smart contract")
 	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", false, "only subscribe to new ethereum events (do not read past log)")
 	// ethereum web3
-	globalCfg.W3Config.W3External = *flag.String("w3External", "", "use an external web3 endpoint (if set, local Ethereum node will not be started)")
-	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true web3 will be enabled")
+	globalCfg.W3Config.W3External = *flag.String("w3External", "", "use an external web3 endpoint. Supported protocols: http/s, ws/s and ipc filepath. Local Ethereum node will not be started")
+	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true, a web3 public endpoint will be enabled")
 	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
 	globalCfg.W3Config.RPCPort = *flag.Int("w3RPCPort", 9091, "web3 RPC port")
 	globalCfg.W3Config.RPCHost = *flag.String("w3RPCHost", "127.0.0.1", "web3 RPC host")

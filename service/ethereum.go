@@ -55,12 +55,13 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 		}
 		if strings.HasPrefix(w3uri, "http") {
 			pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsHTTPBridge(w3uri))
+			log.Infof("web3 websocket endpoint available at %s", w3config.Route+"ws")
 		} else if strings.HasPrefix(w3uri, "ws") {
 			pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri))
+			log.Infof("web3 websocket endpoint available at %s", w3config.Route+"ws")
 		} else {
-			return nil, fmt.Errorf("no valid web3 protocol")
+			log.Warnf("external web3 protocol is not http or ws, clients won't be able to use the web3 endpoint")
 		}
-		log.Infof("web3 websocket endpoint available at %s", w3config.Route+"ws")
 	}
 	return
 }

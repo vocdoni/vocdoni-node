@@ -196,7 +196,6 @@ func (e *EthChainContext) Start() {
 		log.Infof("my Ethereum address %x", e.Keys.Accounts()[0].Address)
 	}
 	if len(e.DefaultConfig.W3external) == 0 {
-
 		// Don't use ethereum's utils.StartNode. It sets up a signal
 		// handler for SIGINT, which interferes with the signal handler
 		// we set up in our own main func. We want to use ethereum as a
@@ -242,6 +241,7 @@ func (e *EthChainContext) Start() {
 			e.Node.Server().AddTrustedPeer(p)
 		}
 		go e.SyncGuard()
+
 	} else {
 		client, err := ethclient.Dial(e.DefaultConfig.W3external)
 		if err != nil || client == nil {
@@ -325,7 +325,6 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 			info.MaxHeight = sp.HighestBlock
 			info.Height = sp.CurrentBlock
 		} else {
-			info.Synced = true
 			header, err2 := client.HeaderByNumber(context.Background(), nil)
 			if err2 != nil {
 				err = err2
@@ -334,6 +333,7 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 			}
 			info.Height = uint64(header.Number.Int64())
 			info.MaxHeight = info.Height
+			info.Synced = info.Height > 0
 		}
 		return
 	}
