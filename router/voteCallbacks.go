@@ -312,8 +312,10 @@ func (r *Router) getScrutinizerEntities(request routerRequest) {
 	r.transport.Send(r.buildReply(request, response))
 }
 
-func (r *Router) getBlockTime(request routerRequest) {
+func (r *Router) getBlockStatus(request routerRequest) {
 	var response types.ResponseMessage
 	response.BlockTime = r.vocinfo.BlockTimes()
+	response.Height = &r.vocapp.State.Header(true).Height
+	response.BlockTimestamp = int32(r.vocapp.State.Header(true).Time.Unix())
 	r.transport.Send(r.buildReply(request, response))
 }

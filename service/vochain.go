@@ -131,7 +131,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma
 
 // VochainPrintInfo initializes the Vochain statistics recollection
 func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
-	var a [5]int32
+	var a *[5]int32
 	var h, p, v int64
 	var m int
 	var b strings.Builder

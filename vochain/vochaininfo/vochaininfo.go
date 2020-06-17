@@ -43,10 +43,10 @@ func (vi *VochainInfo) Height() int64 {
 
 // BlockTimes returns the average block time for 1, 10, 60, 360 and 1440 minutes
 // Value 0 means there is not yet an average
-func (vi *VochainInfo) BlockTimes() [5]int32 {
+func (vi *VochainInfo) BlockTimes() *[5]int32 {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
-	return [5]int32{vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}
+	return &[5]int32{vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}
 }
 
 // Sync returns true if the Vochain is considered up-to-date
