@@ -35,9 +35,9 @@ func (r *Router) submitRawTx(request routerRequest) {
 		return
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.Payload = string(res.Data) // return nullifier
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) submitEnvelope(request routerRequest) {
@@ -75,8 +75,8 @@ func (r *Router) submitEnvelope(request routerRequest) {
 		return
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
-	var response types.ResponseMessage
-	r.transport.Send(r.buildReply(request, response))
+	var response types.MetaResponse
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getEnvelopeStatus(request routerRequest) {
@@ -94,7 +94,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	}
 
 	// Check envelope status and send reply
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.Registered = types.False
 
 	e, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", request.ProcessID, request.Nullifier), true)
@@ -110,7 +110,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 		}
 		response.BlockTimestamp = int32(block.Time.Unix())
 	}
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getEnvelope(request routerRequest) {
@@ -131,10 +131,10 @@ func (r *Router) getEnvelope(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get envelope: (%s)", err))
 		return
 	}
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.Registered = types.True
 	response.Payload = envelope.VotePackage
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getEnvelopeHeight(request routerRequest) {
@@ -145,17 +145,17 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 		return
 	}
 	votes := r.vocapp.State.CountVotes(sanitizedPID, true)
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.Height = new(int64)
 	*response.Height = votes
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getBlockHeight(request routerRequest) {
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.Height = &r.vocapp.State.Header(true).Height
 	response.BlockTimestamp = int32(r.vocapp.State.Header(true).Time.Unix())
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getProcessList(request routerRequest) {
@@ -167,7 +167,7 @@ func (r *Router) getProcessList(request routerRequest) {
 		return
 	}
 	storageKey := []byte(types.ScrutinizerEntityPrefix + request.EntityId)
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	exists, err := r.Scrutinizer.Storage.Has(storageKey)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get entity (%s)", err))
@@ -175,7 +175,7 @@ func (r *Router) getProcessList(request routerRequest) {
 	}
 	if !exists {
 		response.Message = "entity does not exist or has not yet created a process"
-		r.transport.Send(r.buildReply(request, response))
+		r.transport.Send(r.buildReply(request, &response))
 		return
 	}
 	processList, err := r.Scrutinizer.Storage.Get(storageKey)
@@ -188,7 +188,7 @@ func (r *Router) getProcessList(request routerRequest) {
 			response.ProcessList = append(response.ProcessList, string(process))
 		}
 	}
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getProcessKeys(request routerRequest) {
@@ -203,7 +203,7 @@ func (r *Router) getProcessKeys(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get process encryption public keys: (%s)", err))
 		return
 	}
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	var pubs, privs, coms, revs []types.Key
 	for idx, pubk := range process.EncryptionPublicKeys {
 		if len(pubk) > 0 {
@@ -229,7 +229,7 @@ func (r *Router) getProcessKeys(request routerRequest) {
 	response.EncryptionPrivKeys = privs
 	response.CommitmentKeys = coms
 	response.RevealKeys = revs
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getEnvelopeList(request routerRequest) {
@@ -245,13 +245,13 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 		request.ListSize = 64
 	}
 	n := r.vocapp.State.EnvelopeList(request.ProcessID, request.From, request.ListSize, true)
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	if len(n) == 0 {
 		response.Nullifiers = &[]string{}
 	} else {
 		response.Nullifiers = &n
 	}
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getResults(request routerRequest) {
@@ -273,7 +273,7 @@ func (r *Router) getResults(request routerRequest) {
 		r.sendError(request, err.Error())
 		return
 	}
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.Results = vr
 
 	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
@@ -288,34 +288,34 @@ func (r *Router) getResults(request routerRequest) {
 	} else {
 		response.State = "active"
 	}
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 // finished processes
 func (r *Router) getProcListResults(request routerRequest) {
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.ProcessIDs = r.Scrutinizer.List(64, util.TrimHex(request.FromID), types.ScrutinizerResultsPrefix)
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 // live processes
 func (r *Router) getProcListLiveResults(request routerRequest) {
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.ProcessIDs = r.Scrutinizer.List(64, util.TrimHex(request.FromID), types.ScrutinizerLiveProcessPrefix)
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 // known entities
 func (r *Router) getScrutinizerEntities(request routerRequest) {
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.EntityIDs = r.Scrutinizer.List(64, util.TrimHex(request.FromID), types.ScrutinizerEntityPrefix)
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getBlockStatus(request routerRequest) {
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.BlockTime = r.vocinfo.BlockTimes()
 	response.Height = &r.vocapp.State.Header(true).Height
 	response.BlockTimestamp = int32(r.vocapp.State.Header(true).Time.Unix())
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }

@@ -22,19 +22,22 @@ type pkeys struct {
 	rev  []types.Key
 }
 
-func (c *APIConnection) GetEnvelopeStatus(nullifier, pid string) (bool, error) {
+func (c *Client) GetEnvelopeStatus(nullifier, pid string) (bool, error) {
 	var req types.MetaRequest
 	req.Method = "getEnvelopeStatus"
 	req.ProcessID = pid
 	req.Nullifier = nullifier
-	resp := c.Request(req, nil)
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return false, err
+	}
 	if !resp.Ok || resp.Registered == nil {
 		return false, fmt.Errorf("cannot check envelope (%s)", resp.Message)
 	}
 	return *resp.Registered, nil
 }
 
-func (c *APIConnection) GetProof(hexpubkey, root string) (string, error) {
+func (c *Client) GetProof(hexpubkey, root string) (string, error) {
 	var req types.MetaRequest
 	req.Method = "genProof"
 	req.CensusID = root
@@ -45,7 +48,10 @@ func (c *APIConnection) GetProof(hexpubkey, root string) (string, error) {
 	}
 	req.ClaimData = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(pubkey))
 
-	resp := c.Request(req, nil)
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return "", err
+	}
 	if len(resp.Siblings) == 0 || !resp.Ok {
 		return "", fmt.Errorf("cannot get merkle proof: (%s)", resp.Message)
 	}
@@ -53,57 +59,78 @@ func (c *APIConnection) GetProof(hexpubkey, root string) (string, error) {
 	return resp.Siblings, nil
 }
 
-func (c *APIConnection) GetResults(pid string) ([][]uint32, error) {
+func (c *Client) GetResults(pid string) ([][]uint32, error) {
 	var req types.MetaRequest
 	req.Method = "getResults"
 	req.ProcessID = pid
-	resp := c.Request(req, nil)
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return nil, err
+	}
 	if !resp.Ok {
 		return nil, fmt.Errorf("cannot get results: (%s)", resp.Message)
 	}
 	return resp.Results, nil
 }
 
-func (c *APIConnection) GetEnvelopeHeight(pid string) (int64, error) {
+func (c *Client) GetEnvelopeHeight(pid string) (int64, error) {
 	var req types.MetaRequest
 	req.Method = "getEnvelopeHeight"
 	req.ProcessID = pid
-	resp := c.Request(req, nil)
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return 0, err
+	}
 	if !resp.Ok {
 		return 0, fmt.Errorf(resp.Message)
 	}
 	return *resp.Height, nil
 }
 
-func (c *APIConnection) ImportCensus(signer *ethereum.SignKeys, uri string) (string, error) {
+func (c *Client) ImportCensus(signer *ethereum.SignKeys, uri string) (string, error) {
 	var req types.MetaRequest
 	req.Method = "addCensus"
 	req.CensusID = RandomHex(16)
-	resp := c.Request(req, signer)
+	resp, err := c.Request(req, signer)
+	if err != nil {
+		return "", err
+	}
+	if err != nil {
+		return "", err
+	}
 
 	req.Method = "importRemote"
 	req.CensusID = resp.CensusID
 	req.URI = uri
-	resp = c.Request(req, signer)
+	resp, err = c.Request(req, signer)
+	if err != nil {
+		return "", err
+	}
 	if !resp.Ok {
 		return "", fmt.Errorf(resp.Message)
 	}
 
 	req.Method = "publish"
 	req.URI = ""
-	resp = c.Request(req, signer)
+	resp, err = c.Request(req, signer)
+	if err != nil {
+		return "", err
+	}
 	if !resp.Ok {
 		return "", fmt.Errorf(resp.Message)
 	}
 	return resp.Root, nil
 }
 
-func (c *APIConnection) GetKeys(pid, eid string) (*pkeys, error) {
+func (c *Client) GetKeys(pid, eid string) (*pkeys, error) {
 	var req types.MetaRequest
 	req.Method = "getProcessKeys"
 	req.ProcessID = pid
 	req.EntityId = eid
-	resp := c.Request(req, nil)
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return nil, err
+	}
 	if !resp.Ok {
 		return nil, fmt.Errorf("cannot get keys for process %s: (%s)", pid, resp.Message)
 	}
@@ -114,7 +141,7 @@ func (c *APIConnection) GetKeys(pid, eid string) (*pkeys, error) {
 		rev:  resp.RevealKeys}, nil
 }
 
-func (c *APIConnection) Results(pid string, totalVotes int, startBlock, duration int64) (results [][]uint32, err error) {
+func (c *Client) Results(pid string, totalVotes int, startBlock, duration int64) (results [][]uint32, err error) {
 	log.Infof("waiting for results...")
 	c.WaitUntilBlock(startBlock + duration + 2)
 	if results, err = c.GetResults(pid); err != nil {
@@ -127,7 +154,7 @@ func (c *APIConnection) Results(pid string, totalVotes int, startBlock, duration
 	return results, nil
 }
 
-func (c *APIConnection) SendVotes(pid, eid, root string, startBlock, duration int64, signers []*ethereum.SignKeys, encrypted bool, doubleVoting bool) (time.Duration, error) {
+func (c *Client) SendVotes(pid, eid, root string, startBlock, duration int64, signers []*ethereum.SignKeys, encrypted bool, doubleVoting bool) (time.Duration, error) {
 	var pub, proof string
 	var err error
 	var keys []string
@@ -200,8 +227,10 @@ func (c *APIConnection) SendVotes(pid, eid, root string, startBlock, duration in
 		pubd, _ := ethereum.DecompressPubKey(pub)
 		log.Debugf("voting with pubKey:%s", pubd)
 		req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
-		resp := c.Request(req, nil)
-
+		resp, err := c.Request(req, nil)
+		if err != nil {
+			return 0, err
+		}
 		if !resp.Ok {
 			if strings.Contains(resp.Message, "mempool is full") {
 				log.Warnf("mempool is full, wait and retry")
@@ -218,8 +247,11 @@ func (c *APIConnection) SendVotes(pid, eid, root string, startBlock, duration in
 
 		//Try double voting (should fail)
 		if doubleVoting {
-			r := c.Request(req, nil)
-			if r.Ok {
+			resp, err := c.Request(req, nil)
+			if err != nil {
+				return 0, err
+			}
+			if resp.Ok {
 				return 0, fmt.Errorf("double voting detected")
 			}
 		}
@@ -264,9 +296,13 @@ func (c *APIConnection) SendVotes(pid, eid, root string, startBlock, duration in
 	return votingElapsedTime, nil
 }
 
-func (c *APIConnection) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (int64, error) {
+func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (int64, error) {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
+	block, err := c.GetCurrentBlock()
+	if err != nil {
+		return 0, err
+	}
 	p := types.NewProcessTx{
 		Type:           "newProcess",
 		EntityID:       entityID,
@@ -275,7 +311,7 @@ func (c *APIConnection) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroo
 		NumberOfBlocks: int64(duration),
 		ProcessID:      pid,
 		ProcessType:    ptype,
-		StartBlock:     c.GetCurrentBlock() + 4,
+		StartBlock:     block + 4,
 	}
 	txBytes, err := json.Marshal(p)
 	if err != nil {
@@ -289,14 +325,17 @@ func (c *APIConnection) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroo
 	}
 	req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
 
-	resp := c.Request(req, nil)
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return 0, err
+	}
 	if !resp.Ok {
-		log.Fatalf("%s failed: %s", req.Method, resp.Message)
+		return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	return p.StartBlock, nil
 }
 
-func (c *APIConnection) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
+func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
 	p := types.NewProcessTx{
@@ -315,41 +354,49 @@ func (c *APIConnection) CancelProcess(oracle *ethereum.SignKeys, pid string) err
 	}
 	req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
 
-	resp := c.Request(req, nil)
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return err
+	}
 	if !resp.Ok {
-		log.Fatalf("%s failed: %s", req.Method, resp.Message)
+		return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	return nil
 }
 
-func (c *APIConnection) GetCurrentBlock() int64 {
+func (c *Client) GetCurrentBlock() (int64, error) {
 	var req types.MetaRequest
 	req.Method = "getBlockHeight"
-	resp := c.Request(req, nil)
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return 0, err
+	}
 	if !resp.Ok {
-		log.Fatalf("%s failed: %s", req.Method, resp.Message)
+		return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	if resp.Height == nil {
-		log.Fatalf("height is nil!")
+		return 0, fmt.Errorf("height is nil!")
 	}
-	return *resp.Height
+	return *resp.Height, nil
 
 }
 
 // CreateCensus creates a new census on the remote gateway and publishes it.
 // Users public keys can be added using censusSigner (ethereum.SignKeys) or censusPubKeys (raw hex public keys).
 // First has preference.
-func (c *APIConnection) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys, censusPubKeys []string) (root, uri string) {
+func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys, censusPubKeys []string) (root, uri string, _ error) {
 	var req types.MetaRequest
-	var resp *types.MetaResponse
 
 	// Create census
 	log.Infof("Create census")
 	req.Method = "addCensus"
 	req.CensusID = fmt.Sprintf("test%d", rand.Int())
-	resp = c.Request(req, signer)
+	resp, err := c.Request(req, signer)
+	if err != nil {
+		return "", "", err
+	}
 	if !resp.Ok {
-		log.Fatalf("%s failed: %s", req.Method, resp.Message)
+		return "", "", fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	// Set correct censusID for commint requests
 	req.CensusID = resp.CensusID
@@ -382,16 +429,19 @@ func (c *APIConnection) CreateCensus(signer *ethereum.SignKeys, censusSigners []
 			hexpub, _ = ethereum.DecompressPubKey(hexpub) // Temporary until everything is compressed only
 			pub, err := hex.DecodeString(hexpub)
 			if err != nil {
-				log.Fatal(err)
+				return "", "", err
 			}
 			data = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(pub))
 			claims = append(claims, data)
 			currentSize--
 		}
 		req.ClaimsData = claims
-		resp = c.Request(req, signer)
+		resp, err := c.Request(req, signer)
+		if err != nil {
+			return "", "", err
+		}
 		if !resp.Ok {
-			log.Fatalf("%s failed: %s", req.Method, resp.Message)
+			return "", "", fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 		}
 		i++
 		log.Infof("census creation progress: %d%%", int((i*100*100)/(censusSize)))
@@ -401,32 +451,41 @@ func (c *APIConnection) CreateCensus(signer *ethereum.SignKeys, censusSigners []
 	log.Infof("get size")
 	req.Method = "getSize"
 	req.RootHash = ""
-	resp = c.Request(req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		return "", "", err
+	}
 	if got := *resp.Size; int64(censusSize) != got {
-		log.Fatalf("expected size %v, got %v", censusSize, got)
+		return "", "", fmt.Errorf("expected size %v, got %v", censusSize, got)
 	}
 
 	// publish
 	log.Infof("publish census")
 	req.Method = "publish"
 	req.ClaimsData = []string{}
-	resp = c.Request(req, signer)
+	resp, err = c.Request(req, signer)
+	if err != nil {
+		return "", "", err
+	}
 	if !resp.Ok {
-		log.Fatalf("%s failed: %s", req.Method, resp.Message)
+		return "", "", fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	uri = resp.URI
 	if len(uri) < 40 {
-		log.Fatalf("got invalid URI")
+		return "", "", fmt.Errorf("got invalid URI")
 	}
 
 	// getRoot
 	log.Infof("get root")
 	req.Method = "getRoot"
-	resp = c.Request(req, nil)
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		return "", "", err
+	}
 	root = resp.Root
 	if len(root) < 1 {
-		log.Fatalf("got invalid root")
+		return "", "", fmt.Errorf("got invalid root")
 	}
 
-	return root, uri
+	return root, uri, nil
 }

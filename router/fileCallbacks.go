@@ -62,9 +62,9 @@ func (r *Router) fetchFile(request routerRequest) {
 
 	b64content := base64.StdEncoding.EncodeToString(content)
 	log.Debugf("file fetched, b64 size %d", len(b64content))
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.Content = b64content
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) addFile(request routerRequest) {
@@ -86,9 +86,9 @@ func (r *Router) addFile(request routerRequest) {
 			return
 		}
 		log.Debugf("added file %s, b64 size of %d", cid, len(b64content))
-		var response types.ResponseMessage
+		var response types.MetaResponse
 		response.URI = r.storage.URIprefix() + cid
-		r.transport.Send(r.buildReply(request, response))
+		r.transport.Send(r.buildReply(request, &response))
 	}
 }
 
@@ -104,9 +104,9 @@ func (r *Router) pinList(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("internal error parsing pins (%s)", err))
 		return
 	}
-	var response types.ResponseMessage
+	var response types.MetaResponse
 	response.Files = pinsJSONArray
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) pinFile(request routerRequest) {
@@ -116,8 +116,8 @@ func (r *Router) pinFile(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("error pinning file (%s)", err))
 		return
 	}
-	var response types.ResponseMessage
-	r.transport.Send(r.buildReply(request, response))
+	var response types.MetaResponse
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) unpinFile(request routerRequest) {
@@ -127,6 +127,6 @@ func (r *Router) unpinFile(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("could not unpin file (%s)", err))
 		return
 	}
-	var response types.ResponseMessage
-	r.transport.Send(r.buildReply(request, response))
+	var response types.MetaResponse
+	r.transport.Send(r.buildReply(request, &response))
 }

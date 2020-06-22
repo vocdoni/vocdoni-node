@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/crypto"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -40,34 +41,48 @@ func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *
 	}
 	// Decode JSON
 	log.Debug("decoding JSON")
-	var rm types.RequestMessage
-	err := json.NewDecoder(req.Body).Decode(&rm)
-	if err != nil {
+	var reqOuter types.RequestMessage
+	if err := json.NewDecoder(req.Body).Decode(&reqOuter); err != nil {
 		log.Warnf("cannot decode JSON: %s", err)
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	if len(rm.Method) < 1 {
+	var reqInner types.MetaRequest
+	if err := json.Unmarshal(reqOuter.MetaRequest, &reqInner); err != nil {
+		log.Warnf("cannot decode JSON: %s", err)
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	if len(reqInner.Method) < 1 {
 		http.Error(w, "method must be specified", 400)
 		return
 	}
-	log.Debugf("found method %s", rm.Method)
+	log.Debugf("found method %s", reqInner.Method)
 	auth := true
-	err = m.CheckAuth(&rm)
-	if err != nil {
+	if err := m.CheckAuth(&reqOuter, &reqInner); err != nil {
 		log.Warnf("authorization error: %s", err)
 		auth = false
 	}
-	resp := m.Handler(&rm.MetaRequest, auth, "")
-	respMsg := new(types.ResponseMessage)
-	respMsg.MetaResponse = *resp
-	respMsg.ID = rm.ID
-	respMsg.Request = rm.ID
-	respMsg.Signature, err = signer.SignJSON(respMsg.MetaResponse)
+	resp := m.Handler(&reqInner, auth, "")
+	resp.Request = reqOuter.ID
+
+	respInner, err := crypto.SortedMarshalJSON(resp)
 	if err != nil {
-		log.Warn(err)
+		log.Errorf("cannot encode JSON: %s", err)
+		http.Error(w, err.Error(), 500)
+		return
 	}
-	httpReply(respMsg, w)
+	signature, err := signer.Sign(respInner)
+	if err != nil {
+		log.Error(err)
+	}
+
+	respOuter := &types.ResponseMessage{
+		ID:           reqOuter.ID,
+		Signature:    signature,
+		MetaResponse: respInner,
+	}
+	httpReply(respOuter, w)
 }
 
 // Handler handles an API census manager request.

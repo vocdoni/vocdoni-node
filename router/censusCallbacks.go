@@ -3,11 +3,9 @@ package router
 import (
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 func (r *Router) censusLocal(request routerRequest) {
-	var cresponse *types.MetaResponse
 	auth := request.authenticated
 	addr := request.address
 	log.Debugf("client authorization %t. Recovered address is [%s]", auth, addr)
@@ -17,12 +15,10 @@ func (r *Router) censusLocal(request routerRequest) {
 			return
 		}
 	}
-	cresponse = r.census.Handler(&request.MetaRequest, auth, "0x"+addr+"/")
-	if !cresponse.Ok {
-		r.sendError(request, cresponse.Message)
+	resp := r.census.Handler(&request.MetaRequest, auth, "0x"+addr+"/")
+	if !resp.Ok {
+		r.sendError(request, resp.Message)
 		return
 	}
-	var response types.ResponseMessage
-	response.MetaResponse = *cresponse
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, resp))
 }

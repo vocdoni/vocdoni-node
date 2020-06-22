@@ -14,9 +14,19 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-func (c *APIConnection) WaitUntilBlock(block int64) {
+func (c *Client) WaitUntilBlock(block int64) {
 	log.Infof("waiting for block %d...", block)
-	for cb := c.GetCurrentBlock(); cb <= block; cb = c.GetCurrentBlock() {
+	for {
+		cb, err := c.GetCurrentBlock()
+		if err != nil {
+			log.Error(err)
+			time.Sleep(10 * time.Second)
+			continue
+		}
+		// TODO: why was this just ">"?
+		if cb >= block {
+			break
+		}
 		time.Sleep(10 * time.Second)
 		log.Infof("remaining blocks: %d", block-cb)
 	}

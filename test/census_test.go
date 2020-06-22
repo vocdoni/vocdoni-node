@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"gitlab.com/vocdoni/go-dvote/client"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -64,15 +65,18 @@ func TestCensus(t *testing.T) {
 
 	// Create websocket client
 	t.Logf("connecting to %s", server.PxyAddr)
-	c := testcommon.NewAPIConnection(t, server.PxyAddr)
+	cl, err := client.New(server.PxyAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Send the API requets
 	var req types.MetaRequest
+	doRequest := cl.ForTest(t, &req)
 
 	// Create census
-	req.Method = "addCensus"
 	req.CensusID = "test"
-	resp := c.Request(req, signer2)
+	resp := doRequest("addCensus", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -80,53 +84,51 @@ func TestCensus(t *testing.T) {
 
 	// addClaim
 	req.CensusID = censusID
-	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
 	req.Digested = true
-	resp = c.Request(req, signer2)
+	resp = doRequest("addClaim", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
-	// addClaim not authorized
+	// addClaim not authorized; use Request directly
 	req.CensusID = censusID
 	req.Method = "addClaim"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello2"))
-	resp = c.Request(req, signer1)
+	resp, err = cl.Request(req, signer1)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if resp.Ok {
-		t.Fatalf("%s failed", req.Method)
+		t.Fatalf("%s didn't fail", req.Method)
 	}
 
 	// GenProof valid
 	req.CensusID = censusID
-	req.Method = "genProof"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
-	resp = c.Request(req, nil)
+	resp = doRequest("genProof", nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
 	// GenProof not valid
 	req.CensusID = censusID
-	req.Method = "genProof"
 	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello3"))
-	resp = c.Request(req, nil)
+	resp = doRequest("genProof", nil)
 	if len(resp.Siblings) > 1 {
 		t.Fatalf("proof should not exist!")
 	}
 
 	// getRoot
-	req.Method = "getRoot"
-	resp = c.Request(req, nil)
+	resp = doRequest("getRoot", nil)
 	root := resp.Root
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
 	}
 
 	// Create census2
-	req.Method = "addCensus"
 	req.CensusID = "test2"
-	resp = c.Request(req, signer2)
+	resp = doRequest("addCensus", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -135,7 +137,6 @@ func TestCensus(t *testing.T) {
 
 	// addClaimBulk
 	var claims []string
-	req.Method = "addClaimBulk"
 	req.ClaimData = ""
 	keys := testcommon.CreateEthRandomKeysBatch(t, *censusSize)
 	for _, key := range keys {
@@ -146,16 +147,15 @@ func TestCensus(t *testing.T) {
 		claims = append(claims, base64.StdEncoding.EncodeToString(hash))
 	}
 	req.ClaimsData = claims
-	resp = c.Request(req, signer2)
+	resp = doRequest("addClaimBulk", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
 	// dumpPlain
-	req.Method = "dumpPlain"
 	req.ClaimData = ""
 	req.ClaimsData = []string{}
-	resp = c.Request(req, signer2)
+	resp = doRequest("dumpPlain", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -174,28 +174,25 @@ func TestCensus(t *testing.T) {
 	}
 
 	// GenProof valid
-	req.Method = "genProof"
 	req.RootHash = ""
 	req.ClaimData = claims[1]
-	resp = c.Request(req, nil)
+	resp = doRequest("genProof", nil)
 	siblings := resp.Siblings
 	if len(siblings) == 0 {
 		t.Fatalf("proof not generated while it should be generated correctly")
 	}
 
 	// CheckProof valid
-	req.Method = "checkProof"
 	req.ProofData = siblings
-	resp = c.Request(req, nil)
+	resp = doRequest("checkProof", nil)
 	if !*resp.ValidProof {
 		t.Fatal("proof is invalid but it should be valid")
 	}
 
 	// CheckProof invalid (old root)
 	req.ProofData = siblings
-	req.Method = "checkProof"
 	req.RootHash = root
-	resp = c.Request(req, nil)
+	resp = doRequest("checkProof", nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -205,26 +202,23 @@ func TestCensus(t *testing.T) {
 	req.RootHash = ""
 
 	// publish
-	req.Method = "publish"
 	req.ClaimsData = []string{}
-	resp = c.Request(req, signer2)
+	resp = doRequest("publish", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 	uri := resp.URI
 
 	// getRoot
-	req.Method = "getRoot"
-	resp = c.Request(req, nil)
+	resp = doRequest("getRoot", nil)
 	root = resp.Root
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
 	}
 
 	// getRoot from published census and check censusID=root
-	req.Method = "getRoot"
 	req.CensusID = root
-	resp = c.Request(req, nil)
+	resp = doRequest("getRoot", nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
@@ -233,40 +227,35 @@ func TestCensus(t *testing.T) {
 	}
 
 	// add second census
-	req.Method = "addCensus"
 	req.CensusID = "importTest"
-	resp = c.Request(req, signer2)
+	resp = doRequest("addCensus", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
 	// importRemote
-	req.Method = "importRemote"
 	req.CensusID = resp.CensusID
 	req.URI = uri
-	resp = c.Request(req, signer2)
+	resp = doRequest("importRemote", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
 	// getRoot
-	req.Method = "getRoot"
-	resp = c.Request(req, nil)
+	resp = doRequest("getRoot", nil)
 	if root != resp.Root {
 		t.Fatalf("root is different after importing! %s != %s", root, resp.Root)
 	}
 
 	// getSize
-	req.Method = "getSize"
 	req.RootHash = ""
-	resp = c.Request(req, nil)
+	resp = doRequest("getSize", nil)
 	if exp, got := int64(*censusSize), *resp.Size; exp != got {
 		t.Fatalf("expected size %v, got %v", exp, got)
 	}
 
 	// get census list
-	req.Method = "getCensusList"
-	resp = c.Request(req, signer2)
+	resp = doRequest("getCensusList", signer2)
 	if len(resp.CensusList) != 4 {
 		t.Fatalf("census list size does not match")
 	}

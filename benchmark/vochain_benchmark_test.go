@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"gitlab.com/vocdoni/go-dvote/client"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -42,24 +43,22 @@ func BenchmarkVochain(b *testing.B) {
 	signerPub, _ := dvoteServer.Signer.HexString()
 
 	// check required components
-	c := testcommon.NewAPIConnection(b, host)
-	var req types.MetaRequest
-	log.Info("get info")
-	req.Method = "getGatewayInfo"
-	resp := c.Request(req, nil)
-	if !resp.Ok {
-		b.Fatalf("%s failed: %s", req.Method, resp.Message)
+	cl, err := client.New(host)
+	if err != nil {
+		b.Fatal(err)
 	}
+
+	var req types.MetaRequest
+	doRequest := cl.ForTest(b, &req)
+
+	log.Info("get info")
+	resp := doRequest("getGatewayInfo", nil)
 	log.Infof("apis available: %v", resp.APIList)
 
 	// create census
 	log.Infof("creating census")
-	req.Method = "addCensus"
 	req.CensusID = fmt.Sprintf("test%d", rint)
-	resp = c.Request(req, dvoteServer.Signer)
-	if !resp.Ok {
-		b.Fatalf("%s failed: %s", req.Method, resp.Message)
-	}
+	resp = doRequest("addCensus", dvoteServer.Signer)
 
 	// Set correct censusID for comming requests
 	req.CensusID = resp.CensusID
@@ -76,31 +75,24 @@ func BenchmarkVochain(b *testing.B) {
 	log.Debugf("poseidon hashes: %s", poseidonHashes)
 	log.Debug("add bulk claims")
 	var claims []string
-	req.Method = "addClaimBulk"
 	req.Digested = true
 	req.ClaimData = ""
 	for i := 0; i < len(poseidonHashes); i++ {
 		claims = append(claims, poseidonHashes[i])
 	}
 	req.ClaimsData = claims
-	resp = c.Request(req, dvoteServer.Signer)
-	if !resp.Ok {
-		b.Fatalf("%s failed: %s", req.Method, resp.Message)
-	}
+	resp = doRequest("addClaimBulk", dvoteServer.Signer)
 
 	// get census root
 	log.Infof("get root")
-	req.Method = "getRoot"
-	resp = c.Request(req, nil)
+	resp = doRequest("getRoot", nil)
 	mkRoot := resp.Root
 	if len(mkRoot) < 1 {
 		b.Fatalf("got invalid root")
 	}
 
 	log.Infof("check block height is not less than process start block")
-	req.Method = "getBlockHeight"
-	req.Timestamp = int32(time.Now().Unix())
-	resp = c.Request(req, nil)
+	resp = doRequest("getBlockHeight", nil)
 
 	// create process
 	process := &types.NewProcessTx{
@@ -112,7 +104,6 @@ func BenchmarkVochain(b *testing.B) {
 		StartBlock:     *resp.Height + 1,
 		Type:           "newProcess",
 	}
-	var err error
 	process.Signature, err = dvoteServer.Signer.SignJSON(process)
 	if err != nil {
 		b.Fatalf("cannot sign oracle tx: %s", err)
@@ -130,12 +121,10 @@ func BenchmarkVochain(b *testing.B) {
 
 	// check if process is created
 	log.Infof("check if process created")
-	req.Method = "getProcessList"
 	req.EntityId = process.EntityID
-	req.Timestamp = int32(time.Now().Unix())
 
 	for {
-		resp = c.Request(req, nil)
+		resp = doRequest("getProcessList", nil)
 		if resp.ProcessList[0] == "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105" {
 			break
 		}
@@ -145,35 +134,35 @@ func BenchmarkVochain(b *testing.B) {
 	// send votes in parallel
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
-		c := testcommon.NewAPIConnection(b, host)
+		cl, err := client.New(host)
+		if err != nil {
+			b.Fatal(err)
+		}
 
 		count := 0
 		for pb.Next() {
-			vochainBench(b, c, keySet[count], poseidonHashes[count], mkRoot, process.ProcessID, req.CensusID)
+			vochainBench(b, cl, keySet[count], poseidonHashes[count], mkRoot, process.ProcessID, req.CensusID)
 			count++
 		}
 	})
 
 	// scrutiny of the submited envelopes
 	log.Infof("get results")
-	req.Method = "getResults"
 	req.ProcessID = process.ProcessID
-	req.Timestamp = int32(time.Now().Unix())
-	resp = c.Request(req, nil)
+	resp = doRequest("getResults", nil)
 	log.Infof("submited votes: %+v", resp.Results)
 
 	// get entities that created at least ones process
 	log.Infof("get entities")
-	req.Method = "getScrutinizerEntities"
-	req.Timestamp = int32(time.Now().Unix())
-	resp = c.Request(req, nil)
+	resp = doRequest("getScrutinizerEntities", nil)
 	log.Infof("created entities: %+v", resp.EntityIDs)
 }
 
-func vochainBench(b *testing.B, c *testcommon.APIConnection, s *ethereum.SignKeys, poseidon, mkRoot, processID, censusID string) {
+func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon, mkRoot, processID, censusID string) {
 	rint := rand.Int()
 	// API requests
 	var req types.MetaRequest
+	doRequest := cl.ForTest(b, &req)
 
 	// create envelope
 	log.Infof("adding vote using key [%s]", s.EthAddrString())
@@ -181,11 +170,10 @@ func vochainBench(b *testing.B, c *testcommon.APIConnection, s *ethereum.SignKey
 	pub, _ := s.HexString()
 	// generate envelope proof
 	log.Infof("generating proof for key %s with poseidon hash: %s", pub, poseidon)
-	req.Method = "genProof"
 	req.CensusID = censusID
 	req.RootHash = mkRoot
 	req.ClaimData = poseidon
-	resp := c.Request(req, nil)
+	resp := doRequest("genProof", nil)
 	if len(resp.Siblings) == 0 {
 		b.Fatalf("proof not generated while it should be generated correctly")
 	}
@@ -193,8 +181,6 @@ func vochainBench(b *testing.B, c *testcommon.APIConnection, s *ethereum.SignKey
 	req = types.MetaRequest{}
 	req.Payload = new(types.VoteTx)
 	req.Payload.Proof = resp.Siblings
-	req.Method = "submitEnvelope"
-	req.Timestamp = int32(time.Now().Unix())
 	req.Payload.Nonce = strconv.Itoa(rint)
 	req.Payload.ProcessID = processID
 
@@ -218,23 +204,18 @@ func vochainBench(b *testing.B, c *testcommon.APIConnection, s *ethereum.SignKey
 	// sending submitEnvelope request
 	log.Info("vote payload: %+v,", req.Payload)
 	log.Infof("request: %+v", req)
-	resp = c.Request(req, nil)
-	if !resp.Ok {
-		b.Fatalf("%s failed: %s", req.Method, resp.Message)
-	}
+	resp = doRequest("submitEnvelope", nil)
 	log.Infof("response: %+v", resp)
 
 	// check vote added
 	req = types.MetaRequest{}
-	req.Method = "getEnvelopeStatus"
-	req.Timestamp = int32(time.Now().Unix())
 	req.ProcessID = processID
 	req.Nullifier, err = vochain.GenerateNullifier(s.EthAddrString(), processID)
 	if err != nil {
 		b.Fatal(err)
 	}
 	for {
-		resp = c.Request(req, nil)
+		resp = doRequest("getEnvelopeStatus", nil)
 		if *resp.Registered {
 			break
 		}

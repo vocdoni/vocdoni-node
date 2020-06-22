@@ -3,7 +3,6 @@ package router
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 	amino "github.com/tendermint/go-amino"
 
 	"gitlab.com/vocdoni/go-dvote/census"
+	"gitlab.com/vocdoni/go-dvote/crypto"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -32,18 +32,13 @@ const (
 	healthSocksMax = 10000
 )
 
-func (r *Router) buildReply(request routerRequest, response types.ResponseMessage) types.Message {
-	response.ID = request.id
-	response.Ok = true
-	response.Request = request.id
-	response.Timestamp = int32(time.Now().Unix())
-	var err error
-	response.Signature, err = r.signer.SignJSON(response.MetaResponse)
-	if err != nil {
-		log.Error(err)
-		// continue without the signature
-	}
-	respData, err := json.Marshal(response)
+func (r *Router) buildReply(request routerRequest, resp *types.MetaResponse) types.Message {
+	// Add any last fields to the inner response, and marshal it with sorted
+	// fields for signing.
+	resp.Ok = true
+	resp.Request = request.id
+	resp.Timestamp = int32(time.Now().Unix())
+	respInner, err := crypto.SortedMarshalJSON(resp)
 	if err != nil {
 		// This should never happen. If it does, return a very simple
 		// plaintext error, and log the error.
@@ -54,7 +49,35 @@ func (r *Router) buildReply(request routerRequest, response types.ResponseMessag
 			Data:      []byte(err.Error()),
 		}
 	}
-	log.Debugf("response %s", respData)
+
+	// Sign the marshaled inner response.
+	signature, err := r.signer.Sign(respInner)
+	if err != nil {
+		log.Error(err)
+		// continue without the signature
+	}
+
+	// Build the outer response with the already-marshaled inner response
+	// and its signature.
+	respOuter := types.ResponseMessage{
+		ID:           request.id,
+		Signature:    signature,
+		MetaResponse: respInner,
+	}
+	// We don't need to use crypto.SortedMarshalJSON here, since we don't
+	// sign these bytes.
+	respData, err := json.Marshal(respOuter)
+	if err != nil {
+		// This should never happen. If it does, return a very simple
+		// plaintext error, and log the error.
+		log.Error(err)
+		return types.Message{
+			TimeStamp: int32(time.Now().Unix()),
+			Context:   request.context,
+			Data:      []byte(err.Error()),
+		}
+	}
+	log.Debugf("response: %s", respData)
 	return types.Message{
 		TimeStamp: int32(time.Now().Unix()),
 		Context:   request.context,
@@ -128,18 +151,25 @@ type routerRequest struct {
 
 // semi-unmarshalls message, returns method name
 func (r *Router) getRequest(payload []byte, context types.MessageContext) (request routerRequest, err error) {
-	var msgStruct types.RequestMessage
-	request.context = context
-	err = json.Unmarshal(payload, &msgStruct)
-	if err != nil {
+	// First unmarshal the outer layer, to obtain the request ID, the signed
+	// request, and the signature.
+	var reqOuter types.RequestMessage
+	if err := json.Unmarshal(payload, &reqOuter); err != nil {
 		return request, err
 	}
-	request.MetaRequest = msgStruct.MetaRequest
-	request.id = msgStruct.ID
-	request.method = msgStruct.Method
-	if request.method == "" {
-		return request, errors.New("method is empty")
+	request.id = reqOuter.ID
+	request.context = context
+
+	var reqInner types.MetaRequest
+	if err := json.Unmarshal(reqOuter.MetaRequest, &reqInner); err != nil {
+		return request, err
 	}
+	request.MetaRequest = reqInner
+	request.method = reqInner.Method
+	if request.method == "" {
+		return request, fmt.Errorf("method is empty")
+	}
+
 	method, ok := r.methods[request.method]
 	if !ok {
 		return request, fmt.Errorf("method not valid [%s]", request.method)
@@ -150,15 +180,12 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 		request.address = "00000000000000000000"
 	} else {
 		request.private = true
-		request.authenticated, request.address, err = r.signer.VerifyJSONsender(msgStruct.MetaRequest, msgStruct.Signature)
+		request.authenticated, request.address, err = r.signer.VerifySender(reqOuter.MetaRequest, reqOuter.Signature)
 		// if no authrized keys, authenticate all requests if allowPrivate=true
 		if r.allowPrivate && !request.authenticated && len(r.signer.Authorized) == 0 {
 			request.authenticated = true
 		}
 	}
-	// assign rawRequest by calling json.Marshal on the Request field. This works (tested against marshalling requestMap)
-	// because json.Marshal encodes in lexographic order for map objects.
-	// request.raw, err = json.Marshal(msgStruct.MetaRequest)
 	return request, err
 }
 
@@ -290,20 +317,34 @@ func (r *Router) Route() {
 
 func (r *Router) sendError(request routerRequest, errMsg string) {
 	log.Warn(errMsg)
-	var err error
-	var response types.ResponseMessage
-	response.ID = request.id
-	response.MetaResponse.Request = request.id
-	response.MetaResponse.Timestamp = int32(time.Now().Unix())
-	response.MetaResponse.SetError(errMsg)
-	response.Signature, err = r.signer.SignJSON(response.MetaResponse)
+
+	// Add any last fields to the inner response, and marshal it with sorted
+	// fields for signing.
+	response := types.MetaResponse{
+		Request:   request.id,
+		Timestamp: int32(time.Now().Unix()),
+	}
+	response.SetError(errMsg)
+	respInner, err := crypto.SortedMarshalJSON(response)
 	if err != nil {
 		log.Error(err)
+		return
+	}
+
+	// Sign the marshaled inner response.
+	signature, err := r.signer.Sign(respInner)
+	if err != nil {
+		log.Error(err)
+		// continue without the signature
+	}
+
+	respOuter := types.ResponseMessage{
+		ID:           request.id,
+		Signature:    signature,
+		MetaResponse: respInner,
 	}
 	if request.context != nil {
-		// TODO(mvdan): consolidate with Router.buildReply once we
-		// simplify the api types.
-		data, err := json.Marshal(response)
+		data, err := json.Marshal(respOuter)
 		if err != nil {
 			log.Warnf("error marshaling response body: %s", err)
 		}
@@ -317,16 +358,16 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 }
 
 func (r *Router) info(request routerRequest) {
-	var response types.ResponseMessage
-	response.MetaResponse.APIList = r.APIs
-	response.MetaResponse.Request = request.id
+	var response types.MetaResponse
+	response.APIList = r.APIs
+	response.Request = request.id
 	if health, err := getHealth(); err == nil {
-		response.MetaResponse.Health = health
+		response.Health = health
 	} else {
-		response.MetaResponse.Health = -1
+		response.Health = -1
 		log.Errorf("cannot get health status: (%s)", err)
 	}
-	r.transport.Send(r.buildReply(request, response))
+	r.transport.Send(r.buildReply(request, &response))
 }
 
 // Health is a number between 0 and 99 that represents the status of the node, as bigger the better

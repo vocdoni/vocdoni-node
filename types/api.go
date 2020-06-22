@@ -1,12 +1,13 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
 // MessageRequest holds a decoded request but does not decode the body
 type RequestMessage struct {
-	MetaRequest `json:"request"`
+	MetaRequest json.RawMessage `json:"request"`
 
 	ID        string `json:"id"`
 	Signature string `json:"signature"`
@@ -42,7 +43,7 @@ type MetaRequest struct {
 
 // ResponseMessage wraps an api response
 type ResponseMessage struct {
-	MetaResponse `json:"response"`
+	MetaResponse json.RawMessage `json:"response"`
 
 	ID        string `json:"id"`
 	Signature string `json:"signature"`

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/client"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -39,15 +40,18 @@ func BenchmarkCensus(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		// Create websocket client
-		c := testcommon.NewAPIConnection(b, host)
+		cl, err := client.New(host)
+		if err != nil {
+			b.Fatal(err)
+		}
 
 		for pb.Next() {
-			censusBench(b, c)
+			censusBench(b, cl)
 		}
 	})
 }
 
-func censusBench(b *testing.B, c *testcommon.APIConnection) {
+func censusBench(b *testing.B, cl *client.Client) {
 	// API requets
 	var req types.MetaRequest
 
@@ -55,24 +59,18 @@ func censusBench(b *testing.B, c *testcommon.APIConnection) {
 	signer := new(ethereum.SignKeys)
 	signer.Generate()
 
+	doRequest := cl.ForTest(b, &req)
+
 	// getInfo
 	rint := rand.Int()
 	log.Infof("[%d] get info", rint)
-	req.Method = "getGatewayInfo"
-	resp := c.Request(req, nil)
-	if !resp.Ok {
-		b.Fatalf("%s failed: %s", req.Method, resp.Message)
-	}
+	resp := doRequest("getGatewayInfo", nil)
 	log.Infof("apis available: %v", resp.APIList)
 
 	// Create census
 	log.Infof("[%d] Create census", rint)
-	req.Method = "addCensus"
 	req.CensusID = fmt.Sprintf("test%d", rint)
-	resp = c.Request(req, signer)
-	if !resp.Ok {
-		b.Fatalf("%s failed: %s", req.Method, resp.Message)
-	}
+	resp = doRequest("addCensus", signer)
 
 	// Set correct censusID for commint requests
 	req.CensusID = resp.CensusID
@@ -80,7 +78,6 @@ func censusBench(b *testing.B, c *testcommon.APIConnection) {
 	// addClaimBulk
 	log.Infof("[%d] add bulk claims (size %d)", rint, *censusSize)
 	var claims []string
-	req.Method = "addClaimBulk"
 	req.ClaimData = ""
 	req.Digested = false
 	currentSize := *censusSize
@@ -99,19 +96,15 @@ func censusBench(b *testing.B, c *testcommon.APIConnection) {
 		}
 		claims = append(claims, iclaims...)
 		req.ClaimsData = iclaims
-		resp = c.Request(req, signer)
-		if !resp.Ok {
-			b.Fatalf("%s failed: %s", req.Method, resp.Message)
-		}
+		resp = doRequest("addClaimBulk", signer)
 		i++
 		log.Infof("census creation progress: %d%%", int((i*100*100)/(*censusSize)))
 	}
 
 	// getSize
 	log.Infof("[%d] get size", rint)
-	req.Method = "getSize"
 	req.RootHash = ""
-	resp = c.Request(req, nil)
+	resp = doRequest("getSize", nil)
 	if got := *resp.Size; int64(*censusSize) != got {
 		b.Fatalf("expected size %v, got %v", *censusSize, got)
 	}
@@ -122,26 +115,21 @@ func censusBench(b *testing.B, c *testcommon.APIConnection) {
 
 	// dumpPlain
 	log.Infof("[%d] dump claims", rint)
-	req.Method = "dumpPlain"
 	req.ClaimData = ""
 	req.ClaimsData = []string{}
-	resp = c.Request(req, signer)
-	if !resp.Ok {
-		b.Fatalf("%s failed: %s", req.Method, resp.Message)
-	}
+	resp = doRequest("dumpPlain", signer)
 	if len(resp.ClaimsData) != len(claims) {
 		b.Fatalf("missing claims on dumpPlain, %d != %d", len(req.ClaimsData), len(claims))
 	}
 
 	// GenProof valid
 	log.Infof("[%d] generating proofs", rint)
-	req.Method = "genProof"
 	req.RootHash = ""
 	var siblings []string
 
 	for _, cl := range claims {
 		req.ClaimData = cl
-		resp = c.Request(req, nil)
+		resp = doRequest("genProof", nil)
 		if len(resp.Siblings) == 0 {
 			b.Fatalf("proof not generated while it should be generated correctly")
 		}
@@ -150,11 +138,10 @@ func censusBench(b *testing.B, c *testcommon.APIConnection) {
 
 	// CheckProof valid
 	log.Infof("[%d] checking proofs", rint)
-	req.Method = "checkProof"
 	for i, s := range siblings {
 		req.ProofData = s
 		req.ClaimData = claims[i]
-		resp = c.Request(req, nil)
+		resp = doRequest("checkProof", nil)
 		if resp.ValidProof != nil && !*resp.ValidProof {
 			b.Fatalf("proof is invalid but it should be valid")
 		}
@@ -163,17 +150,12 @@ func censusBench(b *testing.B, c *testcommon.APIConnection) {
 
 	// publish
 	log.Infof("[%d] publish census", rint)
-	req.Method = "publish"
 	req.ClaimsData = []string{}
-	resp = c.Request(req, signer)
-	if !resp.Ok {
-		b.Fatalf("%s failed: %s", req.Method, resp.Message)
-	}
+	resp = doRequest("publish", signer)
 
 	// getRoot
 	log.Infof("[%d] get root", rint)
-	req.Method = "getRoot"
-	resp = c.Request(req, nil)
+	resp = doRequest("getRoot", nil)
 	root := resp.Root
 	if len(root) < 1 {
 		b.Fatalf("got invalid root")
@@ -181,17 +163,13 @@ func censusBench(b *testing.B, c *testcommon.APIConnection) {
 
 	// addFile
 	log.Infof("[%d] add files", rint)
-	req.Method = "addFile"
 	req.Type = "ipfs"
 	var uris []string
 	for i := 0; i < 100; i++ {
 		req.Name = fmt.Sprintf("%d_%d", rint, i)
 		req.Content = base64.StdEncoding.EncodeToString([]byte(
 			fmt.Sprintf("%d0123456789abcdef0123456789abc%d", rint, i)))
-		resp = c.Request(req, nil)
-		if !resp.Ok {
-			b.Fatalf("%s failed: %s", req.Method, resp.Message)
-		}
+		resp = doRequest("addFile", nil)
 		if len(resp.URI) < 1 {
 			b.Fatalf("%s wrong URI received", req.Method)
 		}
@@ -201,13 +179,9 @@ func censusBench(b *testing.B, c *testcommon.APIConnection) {
 
 	// fetchFile
 	log.Infof("[%d] fetching files", rint)
-	req.Method = "fetchFile"
 	for _, u := range uris {
 		req.URI = u
-		resp = c.Request(req, nil)
-		if !resp.Ok {
-			b.Fatalf("%s failed: %s", req.Method, resp.Message)
-		}
+		resp = doRequest("fetchFile", nil)
 		if len(resp.Content) < 32 {
 			b.Fatalf("%s wrong content received", req.Method)
 		}
