@@ -196,8 +196,12 @@ func (c *APIConnection) SendVotes(pid, eid, root string, startBlock, duration in
 		if txBytes, err = json.Marshal(v); err != nil {
 			return 0, err
 		}
+		pub, _ := s.HexString()
+		pubd, _ := ethereum.DecompressPubKey(pub)
+		log.Debugf("voting with pubKey:%s", pubd)
 		req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
 		resp := c.Request(req, nil)
+
 		if !resp.Ok {
 			if strings.Contains(resp.Message, "mempool is full") {
 				log.Warnf("mempool is full, wait and retry")
@@ -211,6 +215,12 @@ func (c *APIConnection) SendVotes(pid, eid, root string, startBlock, duration in
 		if (i+1)%100 == 0 {
 			log.Infof("voting progress: %d%%", int(((i+1)*100)/(len(signers))))
 		}
+
+		// Try double voting (should fail)
+		//r := c.Request(req, nil)
+		//if r.Ok {
+		//	return 0, fmt.Errorf("double voting detected!")
+		//}
 	}
 	log.Infof("votes submited! took %s", time.Since(start))
 	checkStart := time.Now()

@@ -16,6 +16,7 @@ type VochainInfo struct {
 	voteTreeSize    int64
 	processTreeSize int64
 	mempoolSize     int
+	voteCacheSize   int
 	avg1            int32
 	avg10           int32
 	avg60           int32
@@ -69,6 +70,13 @@ func (vi *VochainInfo) MempoolSize() int {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
 	return vi.mempoolSize
+}
+
+// VoteCacheSize returns the current number of validated votes waiting to be included in the blockchain
+func (vi *VochainInfo) VoteCacheSize() int {
+	vi.lock.RLock()
+	defer vi.lock.RUnlock()
+	return vi.voteCacheSize
 }
 
 // Peers returns the current list of connected peers
@@ -153,6 +161,7 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			vi.vnode.State.RLock()
 			vi.processTreeSize = vi.vnode.State.ProcessTree.Size()
 			vi.voteTreeSize = vi.vnode.State.VoteTree.Size()
+			vi.voteCacheSize = vi.vnode.State.VoteCacheSize()
 			vi.vnode.State.RUnlock()
 			vi.mempoolSize = vi.vnode.Node.Mempool().Size()
 			vi.lock.Unlock()

@@ -128,14 +128,12 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	if err != nil {
 		log.Warnf("cannot marshal header in BeginBlock")
 	}
-
 	// reset app state to latest persistent data
 	app.State.Rollback()
-
 	app.State.Lock()
 	app.State.AppTree.Set(headerKey, headerBytes)
 	app.State.Unlock()
-
+	app.State.VoteCachePurge(app.State.Header(true).Height)
 	return abcitypes.ResponseBeginBlock{}
 }
 

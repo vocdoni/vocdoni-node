@@ -39,6 +39,12 @@ var (
 		Name:      "vote_tree",
 		Help:      "Size of the vote tree",
 	})
+	// VochainAppTree ...
+	VochainVoteCache = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "vochain",
+		Name:      "vote_cache",
+		Help:      "Size of the current vote cache",
+	})
 )
 
 func (app *BaseApplication) registerMetrics(ma *metrics.Agent) {
@@ -47,6 +53,8 @@ func (app *BaseApplication) registerMetrics(ma *metrics.Agent) {
 	ma.Register(VochainAppTree)
 	ma.Register(VochainProcessTree)
 	ma.Register(VochainVoteTree)
+	ma.Register(VochainVoteCache)
+
 }
 
 func (app *BaseApplication) getMetrics() {
@@ -55,6 +63,7 @@ func (app *BaseApplication) getMetrics() {
 	VochainAppTree.Set(float64(app.State.AppTree.Size()))
 	VochainProcessTree.Set(float64(app.State.ProcessTree.Size()))
 	VochainVoteTree.Set(float64(app.State.VoteTree.Size()))
+	VochainVoteCache.Set(float64(app.State.VoteCacheSize()))
 }
 
 // CollectMetrics constantly updates the metric values for prometheus

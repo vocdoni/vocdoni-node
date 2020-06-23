@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
@@ -33,7 +34,7 @@ func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 	switch gtx.TxType() {
 	case "VoteTx":
 		tx := gtx.(*types.VoteTx)
-		v, err := VoteTxCheck(tx, state)
+		v, err := VoteTxCheck(tx, state, commit)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -131,7 +132,7 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
 // All hexadecimal strings should be already sanitized (without 0x)
-func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
+func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, error) {
 	process, err := state.Process(tx.ProcessID, false)
 	if err != nil {
 		return nil, err
@@ -154,14 +155,14 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 		}
 
 		switch process.Type {
+
 		case types.SnarkVote:
 			// TODO check snark
 			return nil, fmt.Errorf("snark vote not implemented")
+
 		case types.PollVote, types.PetitionSign, types.EncryptedPoll:
 			var vote types.Vote
-			vote.Nonce = tx.Nonce
 			vote.ProcessID = tx.ProcessID
-			vote.Proof = tx.Proof
 			vote.VotePackage = tx.VotePackage
 
 			if types.ProcessIsEncrypted[process.Type] {
@@ -171,50 +172,82 @@ func VoteTxCheck(tx *types.VoteTx, state *State) (*types.Vote, error) {
 				vote.EncryptionKeyIndexes = tx.EncryptionKeyIndexes
 			}
 
-			voteBytes, err := json.Marshal(vote)
-			if err != nil {
-				return nil, fmt.Errorf("cannot marshal vote (%s)", err)
-			}
-			log.Debugf("vote Payload: %s", voteBytes)
-			pubKey, err := ethereum.PubKeyFromSignature(voteBytes, tx.Signature)
-			if err != nil {
-				return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
-			}
-			addr, err := ethereum.AddrFromPublicKey(pubKey)
-			if err != nil {
-				return nil, fmt.Errorf("cannot extract address from public key: (%s)", err)
-			}
-			log.Debugf("extracted public key: %s", pubKey)
+			// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
+			// An element can only be added to the vote cache during checkTx.
+			// Every 60 seconds (6 blocks) the old votes which are not yet in the blockchain will be removed from the cache.
+			// If the same vote (but different transaction) is send to the mempool, the cache will detect it and vote will be discarted.
+			uid := tx.UniqID(process.Type)
+			vp := state.VoteCacheGet(uid)
 
-			// assign a nullifier
-			vote.Nullifier, err = GenerateNullifier(addr, vote.ProcessID)
-			if err != nil {
-				return nil, fmt.Errorf("cannot generate nullifier: (%s)", err)
-			}
-			log.Debugf("generated new vote nullifier: %s", vote.Nullifier)
+			if forCommit && vp != nil {
+				// if vote is in cache, lazy check and remove it from cache
+				defer state.VoteCacheDel(uid)
+				if state.EnvelopeExists(vote.ProcessID, vp.Nullifier) {
+					return nil, fmt.Errorf("vote already exists")
+				}
+			} else {
+				if vp != nil {
+					return nil, fmt.Errorf("vote already exist in cache")
+				}
+				// if not in cache, extract pubKey, generate nullifier and check merkle proof
+				vp = new(types.VoteProof)
 
-			// check if vote exists
-			if state.EnvelopeExists(vote.ProcessID, vote.Nullifier) {
-				return nil, fmt.Errorf("vote already exists")
-			}
+				// remove signature from the TX for extracting publicKey and verify
+				signature := tx.Signature
+				tx.Signature = ""
+				txtype := tx.Type
+				tx.Type = ""
+				defer func() { tx.Signature = signature; tx.Type = txtype }() // restore original TX
+				voteBytes, err := json.Marshal(tx)
+				if err != nil {
+					return nil, fmt.Errorf("cannot marshal vote (%s)", err)
+				}
+				log.Debugf("vote Payload: %s", voteBytes)
+				vp.PubKey, err = ethereum.PubKeyFromSignature(voteBytes, signature)
+				if err != nil {
+					return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
+				}
+				addr, err := ethereum.AddrFromPublicKey(vp.PubKey)
+				if err != nil {
+					return nil, fmt.Errorf("cannot extract address from public key: (%s)", err)
+				}
+				log.Debugf("extracted public key: %s", vp.PubKey)
 
-			// check merkle proof
-			pubKeyDec, err := hex.DecodeString(pubKey)
-			if err != nil {
-				return nil, err
+				// assign a nullifier
+				vp.Nullifier, err = GenerateNullifier(addr, vote.ProcessID)
+				if err != nil {
+					return nil, fmt.Errorf("cannot generate nullifier: (%s)", err)
+				}
+				log.Debugf("generated new vote nullifier: %s", vp.Nullifier)
+
+				// check if vote exists
+				if state.EnvelopeExists(vote.ProcessID, vp.Nullifier) {
+					return nil, fmt.Errorf("vote already exists")
+				}
+
+				// check merkle proof
+				vp.Proof = tx.Proof
+				pubKeyDec, err := hex.DecodeString(vp.PubKey)
+				if err != nil {
+					return nil, err
+				}
+				vp.PubKeyDigest = snarks.Poseidon.Hash(pubKeyDec)
+				if len(vp.PubKeyDigest) != 32 {
+					return nil, fmt.Errorf("cannot compute Poseidon hash: (%s)", err)
+				}
+				valid, err := checkMerkleProof(process.MkRoot, vp.Proof, vp.PubKeyDigest)
+				if err != nil {
+					return nil, fmt.Errorf("cannot check merkle proof: (%s)", err)
+				}
+				if !valid {
+					return nil, fmt.Errorf("proof not valid")
+				}
+				vp.Created = time.Now()
+				state.VoteCacheAdd(uid, vp)
 			}
-			pubKeyHash := snarks.Poseidon.Hash(pubKeyDec)
-			if len(pubKeyHash) != 32 {
-				return nil, fmt.Errorf("cannot compute Poseidon hash: (%s)", err)
-			}
-			valid, err := checkMerkleProof(process.MkRoot, vote.Proof, pubKeyHash)
-			if err != nil {
-				return nil, fmt.Errorf("cannot check merkle proof: (%s)", err)
-			}
-			if !valid {
-				return nil, fmt.Errorf("proof not valid")
-			}
+			vote.Nullifier = vp.Nullifier
 			return &vote, nil
+
 		default:
 			return nil, fmt.Errorf("invalid process type")
 		}

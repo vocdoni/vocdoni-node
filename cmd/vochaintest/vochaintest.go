@@ -184,6 +184,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	p := len(censusKeys) / len(conns)
 	var wg sync.WaitGroup
 	votingTimes := make([]time.Duration, len(conns))
+
 	for gw, con := range conns {
 		signers := make([]*ethereum.SignKeys, p)
 		copy(signers[:], censusKeys[i:i+p])

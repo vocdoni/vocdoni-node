@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/iavl"
@@ -26,7 +27,8 @@ const (
 	processTreeName = "processTree"
 	voteTreeName    = "voteTree"
 	// validators default power
-	validatorPower = 0
+	validatorPower          = 0
+	voteCachePurgeThreshold = time.Duration(time.Second * 60)
 )
 
 var (
@@ -56,9 +58,11 @@ type EventListener interface {
 
 // State represents the state of the vochain application
 type State struct {
-	AppTree     *iavl.MutableTree
-	ProcessTree *iavl.MutableTree
-	VoteTree    *iavl.MutableTree
+	AppTree       *iavl.MutableTree
+	ProcessTree   *iavl.MutableTree
+	VoteTree      *iavl.MutableTree
+	voteCache     map[string]*types.VoteProof
+	voteCacheLock sync.RWMutex
 	ImmutableState
 	Codec *amino.Codec
 
@@ -140,7 +144,7 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 	vs.IVoteTree = vs.VoteTree.ImmutableTree
 
 	vs.Codec = codec
-
+	vs.voteCache = make(map[string]*types.VoteProof)
 	log.Infof("application trees successfully loaded. appTree:%d processTree:%d voteTree: %d", atVersion, ptVersion, vtVersion)
 	return vs, nil
 }

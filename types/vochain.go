@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
@@ -24,18 +26,21 @@ type Vote struct {
 	EncryptionKeyIndexes []int `json:"encryptionKeyIndexes,omitempty"`
 	// Height the Terndemint block number where the vote is added
 	Height int64 `json:"height,omitempty"`
-	// Nonce unique number per vote attempt, so that replay attacks can't reuse this payload
-	Nonce string `json:"nonce,omitempty"`
-	// Nullifier is the hash of the private key
+	// Nullifier is the unique identifier of the vote
 	Nullifier string `json:"nullifier,omitempty"`
-	// ProcessID contains the vote itself
+	// ProcessID contains the unique voting process identifier
 	ProcessID string `json:"processId,omitempty"`
-	// Proof contains the prove indicating that the user is in the census of the process
-	Proof string `json:"proof,omitempty"`
-	// Signature sign( JSON.stringify( { nonce, processId, proof, 'votePackage' } ), privateKey )
-	Signature string `json:"signature,omitempty"`
 	// VotePackage base64 encoded vote content
 	VotePackage string `json:"votePackage,omitempty"`
+}
+
+// VoteProof contains the proof indicating that the user is in the census of the process
+type VoteProof struct {
+	Proof        string    `json:"proof,omitempty"`
+	PubKey       string    `json:"pubKey,omitempty"`
+	PubKeyDigest []byte    `json:"pubKeyDigest,omitempty"`
+	Nullifier    string    `json:"nullifier,omitempty"`
+	Created      time.Time `json:"timestamp"`
 }
 
 // ________________________ PROCESS ________________________
@@ -127,6 +132,17 @@ type VoteTx struct {
 
 func (tx *VoteTx) TxType() string {
 	return "VoteTx"
+}
+
+// UniqID returns a uniq identifier for the VoteTX. It depends on the Type.
+func (tx *VoteTx) UniqID(processType string) string {
+	switch processType {
+	case PollVote, PetitionSign, EncryptedPoll:
+		if len(tx.Signature) > 32 {
+			return tx.Signature[:32]
+		}
+	}
+	return ""
 }
 
 // NewProcessTx represents the info required for starting a new process
