@@ -193,7 +193,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if votingTimes[gw], err = con.SendVotes(pid, entityKey.EthAddrString(), censusRoot, start, int64(procDuration), signers, encrypted); err != nil {
+			if votingTimes[gw], err = con.SendVotes(pid, entityKey.EthAddrString(), censusRoot, start, int64(procDuration), signers, encrypted, true); err != nil {
 				log.Fatal(err)
 			}
 			log.Infof("gateway %d has ended its job", con.ID)

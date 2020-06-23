@@ -127,7 +127,7 @@ func (c *APIConnection) Results(pid string, totalVotes int, startBlock, duration
 	return results, nil
 }
 
-func (c *APIConnection) SendVotes(pid, eid, root string, startBlock, duration int64, signers []*ethereum.SignKeys, encrypted bool) (time.Duration, error) {
+func (c *APIConnection) SendVotes(pid, eid, root string, startBlock, duration int64, signers []*ethereum.SignKeys, encrypted bool, doubleVoting bool) (time.Duration, error) {
 	var pub, proof string
 	var err error
 	var keys []string
@@ -216,11 +216,13 @@ func (c *APIConnection) SendVotes(pid, eid, root string, startBlock, duration in
 			log.Infof("voting progress: %d%%", int(((i+1)*100)/(len(signers))))
 		}
 
-		// Try double voting (should fail)
-		//r := c.Request(req, nil)
-		//if r.Ok {
-		//	return 0, fmt.Errorf("double voting detected!")
-		//}
+		//Try double voting (should fail)
+		if doubleVoting {
+			r := c.Request(req, nil)
+			if r.Ok {
+				return 0, fmt.Errorf("double voting detected")
+			}
+		}
 	}
 	log.Infof("votes submited! took %s", time.Since(start))
 	checkStart := time.Now()
