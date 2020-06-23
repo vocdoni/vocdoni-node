@@ -86,6 +86,11 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma
 			genesisBytes = []byte(vochain.ReleaseGenesis1)
 		}
 	}
+
+	if ma != nil {
+		vconfig.TendermintMetrics = true
+	}
+
 	vnode = vochain.NewVochain(vconfig, genesisBytes)
 	// Scrutinizer
 	if results {

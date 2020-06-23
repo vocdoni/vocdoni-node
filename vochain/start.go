@@ -220,6 +220,15 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		log.Infof("new genesis created, stored at %s", tconfig.Genesis)
 	}
 
+	if localConfig.TendermintMetrics {
+		tconfig.Instrumentation = &tmcfg.InstrumentationConfig{
+			Prometheus:           true,
+			PrometheusListenAddr: "",
+			MaxOpenConnections:   1,
+			Namespace:            "tendermint",
+		}
+	}
+
 	// create node
 	node, err := nm.NewNode(
 		tconfig,

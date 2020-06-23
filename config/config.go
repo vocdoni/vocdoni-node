@@ -181,6 +181,8 @@ type VochainCfg struct {
 	KeyKeeperIndex int8
 	// ImportPreviousCensus if true the census downloader will try to download all census (not only the new ones)
 	ImportPreviousCensus bool
+	// Enable Prometheus metrics from tendermint
+	TendermintMetrics bool
 }
 
 // OracleCfg includes all possible config params needed by the Oracle
