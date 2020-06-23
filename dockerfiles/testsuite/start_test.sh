@@ -11,9 +11,12 @@ for i in {1..5}; do docker-compose run test curl --fail http://gateway:9090/ping
 
 echo "### Running test ###"
 docker-compose run test timeout 300 ./vochaintest --oracleKey=$TESTSUITE_ORACLE_KEY --electionSize=$TESTSUITE_ELECTION_SIZE --gwHost ws://gateway:9090/dvote
+RETVAL=$?
 
 echo "### Post run logs ###"
 docker-compose logs --tail 50
 
 echo "### Cleaning environment ###"
 docker-compose down -v --remove-orphans
+
+exit $RETVAL
