@@ -375,7 +375,7 @@ func (c *Client) GetCurrentBlock() (int64, error) {
 		return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	if resp.Height == nil {
-		return 0, fmt.Errorf("height is nil!")
+		return 0, fmt.Errorf("height is nil")
 	}
 	return *resp.Height, nil
 

@@ -96,7 +96,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 		}
 		claims = append(claims, iclaims...)
 		req.ClaimsData = iclaims
-		resp = doRequest("addClaimBulk", signer)
+		doRequest("addClaimBulk", signer)
 		i++
 		log.Infof("census creation progress: %d%%", int((i*100*100)/(*censusSize)))
 	}
@@ -151,7 +151,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 	// publish
 	log.Infof("[%d] publish census", rint)
 	req.ClaimsData = []string{}
-	resp = doRequest("publish", signer)
+	doRequest("publish", signer)
 
 	// getRoot
 	log.Infof("[%d] get root", rint)

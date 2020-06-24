@@ -81,7 +81,7 @@ func BenchmarkVochain(b *testing.B) {
 		claims = append(claims, poseidonHashes[i])
 	}
 	req.ClaimsData = claims
-	resp = doRequest("addClaimBulk", dvoteServer.Signer)
+	doRequest("addClaimBulk", dvoteServer.Signer)
 
 	// get census root
 	log.Infof("get root")
