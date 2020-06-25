@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"net"
+	"net/http"
+	_ "net/http/pprof" // for the pprof endpoints
 	"os"
 	"os/signal"
 	"strings"
@@ -332,6 +334,22 @@ func main() {
 	if !globalCfg.ValidMode() {
 		log.Fatalf("mode %s is invalid", globalCfg.Mode)
 	}
+
+	// Expose debugging profiles to localhost under a random unassigned
+	// port. This way, we never leak this information to the internet, and
+	// the feature will work no matter what ports are taken.
+	//
+	// We log what port is being used near the start of the logs, so it can
+	// be easily grabbed. Start this before the rest of the node, since it
+	// is helpful to debug if some other component hangs.
+	go func() {
+		ln, err := net.Listen("tcp", "localhost:0")
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Infof("started pprof http endpoints at http://%s/debug/pprof", ln.Addr())
+		log.Error(http.Serve(ln, nil))
+	}()
 
 	log.Infof("starting vocdoni dvote node in %s mode", globalCfg.Mode)
 	var err error
