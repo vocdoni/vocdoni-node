@@ -27,6 +27,9 @@ services:
       options:
         max-size: "20m"
         max-file: "10"
+    depends_on:
+      - "eth"
+
   eth:
     image: openethereum/openethereum:latest
     ports:

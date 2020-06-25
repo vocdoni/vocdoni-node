@@ -315,8 +315,10 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 			log.Warnf("cannot retrieve information from external web3 endpoint: (%s)", err)
 			return
 		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
 		defer client.Close()
-		sp, err = client.SyncProgress(context.Background())
+		sp, err = client.SyncProgress(ctx)
 		if err != nil {
 			log.Warn(err)
 			return
@@ -325,7 +327,7 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 			info.MaxHeight = sp.HighestBlock
 			info.Height = sp.CurrentBlock
 		} else {
-			header, err2 := client.HeaderByNumber(context.Background(), nil)
+			header, err2 := client.HeaderByNumber(ctx, nil)
 			if err2 != nil {
 				err = err2
 				log.Warn(err)

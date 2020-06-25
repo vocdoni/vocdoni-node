@@ -81,7 +81,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.EthEventConfig.CensusSync = *flag.Bool("ethCensusSync", true, "automatically import new census published on the smart contract")
 	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", false, "only subscribe to new ethereum events (do not read past log)")
 	// ethereum web3
-	globalCfg.W3Config.W3External = *flag.String("w3External", "", "use an external web3 endpoint. Supported protocols: http/s, ws/s and ipc filepath. Local Ethereum node will not be started")
+	globalCfg.W3Config.W3External = *flag.String("w3External", "", "use an external web3 endpoint instead of the local one. Supported protocols: http(s)://, ws(s):// and IPC filepath")
 	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true, a web3 public endpoint will be enabled")
 	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
 	globalCfg.W3Config.RPCPort = *flag.Int("w3RPCPort", 9091, "web3 RPC port")
@@ -473,20 +473,26 @@ func main() {
 		if !globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == "oracle" {
 			var evh []ethevents.EventHandler
 			var w3uri string
-			if globalCfg.W3Config.W3External != "" {
-				// If w3 external is enabled, use the local websockets proxy
-				if !strings.HasPrefix(globalCfg.W3Config.W3External, "ws") {
-					log.Fatal("web3 external muts be websocket for event subscription")
-				}
-				prefix := "ws"
-				if globalCfg.API.Ssl.Domain != "" {
-					prefix = "wss"
-				}
-				w3uri = fmt.Sprintf("%s://127.0.0.1:%d%s", prefix, globalCfg.API.ListenPort, globalCfg.W3Config.Route+"ws")
-			} else {
+			switch {
+			case globalCfg.W3Config.W3External == "":
 				// If local ethereum node enabled, use the Go-Ethereum websockets endpoint
 				w3uri = "ws://" + net.JoinHostPort(globalCfg.W3Config.RPCHost, fmt.Sprintf("%d", globalCfg.W3Config.RPCPort))
+				break
+			case strings.HasPrefix(globalCfg.W3Config.W3External, "ws"):
+				// If w3 external is enabled, use the local websockets proxy
+				if globalCfg.API.Ssl.Domain != "" {
+					w3uri = fmt.Sprintf("wss://127.0.0.1:%d%s", globalCfg.API.ListenPort, globalCfg.W3Config.Route+"ws")
+				} else {
+					w3uri = fmt.Sprintf("ws://127.0.0.1:%d%s", globalCfg.API.ListenPort, globalCfg.W3Config.Route+"ws")
+				}
+
+			case strings.HasSuffix(globalCfg.W3Config.W3External, "ipc"):
+				w3uri = globalCfg.W3Config.W3External
+
+			default:
+				log.Fatal("web3 external must be websocket or IPC for event subscription")
 			}
+
 			if globalCfg.Mode == "oracle" {
 				evh = append(evh, ethevents.HandleVochainOracle)
 			}
