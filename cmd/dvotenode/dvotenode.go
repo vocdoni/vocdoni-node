@@ -495,7 +495,6 @@ func main() {
 			case globalCfg.W3Config.W3External == "":
 				// If local ethereum node enabled, use the Go-Ethereum websockets endpoint
 				w3uri = "ws://" + net.JoinHostPort(globalCfg.W3Config.RPCHost, fmt.Sprintf("%d", globalCfg.W3Config.RPCPort))
-				break
 			case strings.HasPrefix(globalCfg.W3Config.W3External, "ws"):
 				// If w3 external is enabled, use the local websockets proxy
 				if globalCfg.API.Ssl.Domain != "" {

@@ -29,6 +29,9 @@ go-test:
     - go test -vet=off -timeout=1m ./...
     # -race can easily make the crypto stuff 10x slower
     - go test -vet=off -timeout=10m -race ./...
+  only:
+    - merge_requests
+    - branches
 
 go-analyze:
   image: golang:1.14.4
@@ -38,6 +41,9 @@ go-analyze:
     - go vet ./...
     - curl -L https://github.com/dominikh/go-tools/releases/download/2020.1.4/staticcheck_linux_amd64.tar.gz | tar -xzf -
     - ./staticcheck/staticcheck ./...
+  only:
+    - merge_requests
+    - branches
 
 compose-test:
   image: docker/compose:1.25.5
