@@ -60,7 +60,7 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
 
-	log.Infof("request: %s", reqBody)
+	log.Debugf("request: %s", reqBody)
 	if err := c.Conn.Write(context.TODO(), websocket.MessageText, reqBody); err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
@@ -68,7 +68,7 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
-	log.Infof("response: %s", message)
+	log.Debugf("response: %s", message)
 	var respOuter types.ResponseMessage
 	if err := json.Unmarshal(message, &respOuter); err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
