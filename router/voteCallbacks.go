@@ -9,6 +9,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
+	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 )
 
 const MaxListSize = 256
@@ -267,15 +268,9 @@ func (r *Router) getResults(request routerRequest) {
 		return
 	}
 
-	vr, err := r.Scrutinizer.VoteResult(request.ProcessID)
-	if err != nil {
-		log.Warn(err)
-		r.sendError(request, err.Error())
-		return
-	}
 	var response types.MetaResponse
-	response.Results = vr
 
+	// Get process info
 	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
@@ -288,6 +283,24 @@ func (r *Router) getResults(request routerRequest) {
 	} else {
 		response.State = "active"
 	}
+
+	// Get results info
+	vr, err := r.Scrutinizer.VoteResult(request.ProcessID)
+	if err != nil && err != scrutinizer.ErrNoResultsYet {
+		log.Warn(err)
+		r.sendError(request, err.Error())
+		return
+	}
+	if err == scrutinizer.ErrNoResultsYet {
+		response.Message = scrutinizer.ErrNoResultsYet.Error()
+	}
+	response.Results = vr
+
+	// Get number of votes
+	votes := r.vocapp.State.CountVotes(request.ProcessID, true)
+	response.Height = new(int64)
+	*response.Height = votes
+
 	r.transport.Send(r.buildReply(request, &response))
 }
 

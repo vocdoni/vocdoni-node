@@ -13,6 +13,9 @@ import (
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
+// ErrNoResultsYet is an error returned to indicate the process exist but it does not have yet reuslts
+var ErrNoResultsYet = fmt.Errorf("no results yet")
+
 // unmarshalVote decodes the base64 payload to a VotePackage struct type.
 // If the votePackage is encrypted the list of keys to decrypt it should be provided.
 // The order of the Keys must be as it was encrypted.
@@ -163,7 +166,7 @@ func (s *Scrutinizer) VoteResult(processID string) (ProcessVotes, error) {
 		return nil, err
 	}
 	if !isLive {
-		return nil, fmt.Errorf("no results yet")
+		return nil, ErrNoResultsYet
 	}
 
 	// Return live results
