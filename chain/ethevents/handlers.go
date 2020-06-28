@@ -11,6 +11,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 var ethereumEventList = []string{
@@ -51,7 +52,7 @@ type (
 
 // HandleVochainOracle handles the new process creation on ethereum for the Oracle.
 // Once a new process is created, the Oracle sends a transaction on the Vochain to create such process
-func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
+func HandleVochainOracle(event *ethtypes.Log, e *EthereumEvents) error {
 	logGenesisChanged := []byte(ethereumEventList[0])
 	logChainIDChanged := []byte(ethereumEventList[1])
 	logProcessCreated := []byte(ethereumEventList[2])
@@ -85,25 +86,35 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 		if err != nil {
 			return err
 		}
-		log.Infof("process meta: %+v", processTx)
 
-		log.Debugf("signing with key: %s", e.Signer)
+		// Check if process already exist
+		log.Infof("found new process on Ethereum\n\t%+v", *processTx)
+		_, err = e.VochainApp.State.Process(processTx.ProcessID, true)
+		if err != nil {
+			if err != vochain.ErrProcessNotFound {
+				return err
+			}
+		} else {
+			log.Infof("process already exist, skipping")
+			return nil
+		}
+
 		processTx.Signature, err = e.Signer.SignJSON(processTx)
 		if err != nil {
-			return fmt.Errorf("cannot sign oracle tx: %s", err)
+			return fmt.Errorf("cannot sign oracle tx: (%s)", err)
 		}
 		tx, err := json.Marshal(processTx)
 		if err != nil {
-			return fmt.Errorf("error marshaling process tx: %s", err)
+			return fmt.Errorf("error marshaling process tx: (%s)", err)
 		}
-		log.Debugf("broadcasting Vochain TX: %s", string(tx))
+		log.Debugf("broadcasting Vochain TX: %s", tx)
 
 		res, err := e.VochainApp.SendTX(tx)
 		if err != nil || res == nil {
 			log.Warnf("cannot broadcast tx: (%s)", err)
 			return fmt.Errorf("cannot broadcast tx: (%s), res: (%+v)", err, res)
 		} else {
-			log.Infof("new transaction hash: %s, data: %s", res.Hash, res.Data)
+			log.Infof("oracle transaction sent, hash:%s", res.Hash)
 		}
 
 	case HashLogProcessCanceled.Hex():
@@ -111,25 +122,32 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 		if err != nil {
 			return err
 		}
-		log.Infof("cancel process meta: %+v", cancelProcessTx)
 
-		log.Debugf("signing with key: %s", e.Signer)
+		log.Infof("found new cancel process order from ethereum\n\t%+v", *cancelProcessTx)
+		p, err := e.VochainApp.State.Process(cancelProcessTx.ProcessID, true)
+		if err != nil {
+			return err
+		}
+		if p.Canceled {
+			log.Infof("process already canceled, skipping")
+			return nil
+		}
 		cancelProcessTx.Signature, err = e.Signer.SignJSON(cancelProcessTx)
 		if err != nil {
-			return fmt.Errorf("cannot sign oracle tx: %s", err)
+			return fmt.Errorf("cannot sign oracle tx: (%s)", err)
 		}
 		tx, err := json.Marshal(cancelProcessTx)
 		if err != nil {
 			return fmt.Errorf("error marshaling process tx: %s", err)
 		}
-		log.Debugf("broadcasting Vochain TX: %s", string(tx))
+		log.Debugf("broadcasting Vochain tx\n\t%s", string(tx))
 
 		res, err := e.VochainApp.SendTX(tx)
 		if err != nil || res == nil {
 			log.Warnf("cannot broadcast tx: (%s)", err)
 			return fmt.Errorf("cannot broadcast tx: (%s), res: (%+v)", err, res)
 		} else {
-			log.Infof("new transaction hash: %s", res.Hash)
+			log.Infof("oracle transaction sent, hash:%s", res.Hash)
 		}
 	case HashLogValidatorAdded.Hex():
 		// stub
@@ -162,7 +180,7 @@ func HandleVochainOracle(event ethtypes.Log, e *EthereumEvents) error {
 }
 
 // HandleCensus handles the import of census merkle trees published in Ethereum
-func HandleCensus(event ethtypes.Log, e *EthereumEvents) error {
+func HandleCensus(event *ethtypes.Log, e *EthereumEvents) error {
 	logProcessCreated := []byte(ethereumEventList[2])
 	// Only handle processCreated event
 	if event.Topics[0].Hex() != crypto.Keccak256Hash(logProcessCreated).Hex() {

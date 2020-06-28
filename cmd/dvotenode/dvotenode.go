@@ -81,7 +81,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.EthConfig.NoWaitSync = *flag.Bool("ethNoWaitSync", false, "do not wait for Ethereum to synchronize (for testing only)")
 	// ethereum events
 	globalCfg.EthEventConfig.CensusSync = *flag.Bool("ethCensusSync", true, "automatically import new census published on the smart contract")
-	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", false, "only subscribe to new ethereum events (do not read past log)")
+	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", true, "only subscribe to new ethereum events (do not read past log)")
 	// ethereum web3
 	globalCfg.W3Config.W3External = *flag.String("w3External", "", "use an external web3 endpoint instead of the local one. Supported protocols: http(s)://, ws(s):// and IPC filepath")
 	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true, a web3 public endpoint will be enabled")
@@ -496,13 +496,7 @@ func main() {
 				// If local ethereum node enabled, use the Go-Ethereum websockets endpoint
 				w3uri = "ws://" + net.JoinHostPort(globalCfg.W3Config.RPCHost, fmt.Sprintf("%d", globalCfg.W3Config.RPCPort))
 			case strings.HasPrefix(globalCfg.W3Config.W3External, "ws"):
-				// If w3 external is enabled, use the local websockets proxy
-				if globalCfg.API.Ssl.Domain != "" {
-					w3uri = fmt.Sprintf("wss://127.0.0.1:%d%s", globalCfg.API.ListenPort, globalCfg.W3Config.Route+"ws")
-				} else {
-					w3uri = fmt.Sprintf("ws://127.0.0.1:%d%s", globalCfg.API.ListenPort, globalCfg.W3Config.Route+"ws")
-				}
-
+				w3uri = globalCfg.W3Config.W3External
 			case strings.HasSuffix(globalCfg.W3Config.W3External, "ipc"):
 				w3uri = globalCfg.W3Config.W3External
 
@@ -513,23 +507,20 @@ func main() {
 			if globalCfg.Mode == "oracle" {
 				evh = append(evh, ethevents.HandleVochainOracle)
 			}
-			initBlock := int64(0)
-			chainSpecs, err := chain.SpecsFor(globalCfg.EthConfig.ChainType)
-			if err != nil {
-				log.Warn("cannot get chain block to start looking for events, using 0")
-			} else {
-				initBlock = chainSpecs.StartingBlock
-			}
-			syncInfo, err := node.SyncInfo()
-			if err != nil {
-				log.Fatal(err)
+
+			var initBlock *int64
+			if !globalCfg.EthEventConfig.SubscribeOnly {
+				initBlock = new(int64)
+				chainSpecs, err := chain.SpecsFor(globalCfg.EthConfig.ChainType)
+				if err != nil {
+					log.Warn("cannot get chain block to start looking for events, using 0")
+					*initBlock = 0
+				} else {
+					*initBlock = chainSpecs.StartingBlock
+				}
 			}
 
-			// Register the event handlers
-			if globalCfg.EthEventConfig.SubscribeOnly {
-				syncInfo.Height = 0
-			}
-			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, w3uri, initBlock, int64(syncInfo.Height), cm, signer, vnode, evh); err != nil {
+			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, w3uri, initBlock, cm, signer, vnode, evh); err != nil {
 				log.Fatal(err)
 			}
 		}

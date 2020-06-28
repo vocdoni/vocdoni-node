@@ -38,6 +38,10 @@ var (
 	validatorKey = []byte("validator")
 )
 
+var (
+	ErrProcessNotFound = fmt.Errorf("process not found")
+)
+
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
 var PrefixDBCacheSize = 0
 
@@ -442,19 +446,16 @@ func (v *State) PauseProcess(pid string) error {
 // ResumeProcess sets the process paused atribute to true
 func (v *State) ResumeProcess(pid string) error {
 	pid = util.TrimHex(pid)
-	v.RLock()
-	_, processBytes := v.ProcessTree.Get([]byte(pid))
-	v.RUnlock()
-	var process types.Process
-	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
-		return errors.New("cannot unmarshal process")
+	process, err := v.Process(pid, false)
+	if err != nil {
+		return err
 	}
 	// non paused process cannot be resumed
 	if !process.Paused {
 		return nil
 	}
 	process.Paused = false
-	return v.setProcess(&process, pid)
+	return v.setProcess(process, pid)
 }
 
 // Process returns a process info given a processId if exists
@@ -470,7 +471,7 @@ func (v *State) Process(pid string, isQuery bool) (*types.Process, error) {
 	}
 	v.RUnlock()
 	if processBytes == nil {
-		return nil, fmt.Errorf("cannot find process with id (%s)", pid)
+		return nil, ErrProcessNotFound
 	}
 	err := v.Codec.UnmarshalBinaryBare(processBytes, &process)
 	if err != nil {
@@ -482,7 +483,7 @@ func (v *State) Process(pid string, isQuery bool) (*types.Process, error) {
 // set process stores in the database the process
 func (v *State) setProcess(process *types.Process, pid string) error {
 	if process == nil {
-		return fmt.Errorf("process is nil")
+		return ErrProcessNotFound
 	}
 	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
 	if err != nil {
