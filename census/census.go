@@ -157,7 +157,7 @@ func (m *Manager) Exists(name string) bool {
 
 // AddNamespace adds a new merkletree identified by a censusId (name), and
 // returns the new tree.
-func (m *Manager) AddNamespace(name string, pubKeys []string) (*tree.Tree, error) {
+func (m *Manager) AddNamespace(name string, pubKeys []string, public bool) (*tree.Tree, error) {
 	m.TreesMu.Lock()
 	defer m.TreesMu.Unlock()
 	if m.Exists(name) {
@@ -167,6 +167,7 @@ func (m *Manager) AddNamespace(name string, pubKeys []string) (*tree.Tree, error
 	if err != nil {
 		return nil, err
 	}
+	tr.Public = public
 	m.Trees[name] = tr
 	m.Census.Namespaces = append(m.Census.Namespaces, Namespace{
 		Name: name,

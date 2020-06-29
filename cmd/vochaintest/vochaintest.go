@@ -163,28 +163,31 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	}
 
 	// Make sure all gateways have the census
-	gwsWithCensus := []string{mainClient.Addr}
+	log.Infof("waiting for gateways to import the census")
+
+	workingGateways := make(map[string]bool)
+	workingGateways[mainClient.Addr] = true
 	for _, cl := range clients {
-		found := false
-		for _, gw := range gwsWithCensus {
-			if gw == cl.Addr {
-				found = true
-				break
-			}
-		}
-		if !found {
-			log.Infof("importing census to gateway %s", cl.Addr)
-			gwsWithCensus = append(gwsWithCensus, cl.Addr)
-			if root, err := cl.ImportCensus(entityKey, censusURI); err != nil {
-				log.Fatal(err)
-			} else {
-				if root != censusRoot {
-					log.Fatalf("imported census root does not match (%s != %s)", root, censusRoot)
-				}
-			}
-		}
+		workingGateways[cl.Addr] = true
 	}
 
+	gatewaysWithCensus := make(map[string]bool)
+	gatewaysWithCensus[mainClient.Addr] = true
+	for len(gatewaysWithCensus) < len(workingGateways) {
+		for _, cl := range clients {
+			if _, ok := gatewaysWithCensus[cl.Addr]; !ok {
+				if size, err := cl.CensusSize(censusRoot); err == nil {
+					if size != int64(electionSize) {
+						log.Fatalf("gateway %s has an incorrect census size (got:%d expected%d)", cl.Addr, size, electionSize)
+					}
+					log.Infof("gateway %s got the census!", cl.Addr)
+					gatewaysWithCensus[cl.Addr] = true
+				}
+			}
+			time.Sleep(time.Second * 2)
+		}
+	}
+	log.Infof("all gateways got the census! let's start voting")
 	// Send votes
 	i := 0
 	p := len(censusKeys) / len(clients)

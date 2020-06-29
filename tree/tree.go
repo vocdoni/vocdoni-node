@@ -16,8 +16,8 @@ import (
 )
 
 type Tree struct {
-	Tree *merkletree.MerkleTree
-
+	Tree           *merkletree.MerkleTree
+	Public         bool
 	lastAccessUnix int64 // a unix timestamp, used via sync/atomic
 }
 

@@ -87,6 +87,20 @@ func (c *Client) GetEnvelopeHeight(pid string) (int64, error) {
 	return *resp.Height, nil
 }
 
+func (c *Client) CensusSize(cid string) (int64, error) {
+	var req types.MetaRequest
+	req.Method = "getSize"
+	req.CensusID = cid
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return 0, err
+	}
+	if !resp.Ok {
+		return 0, fmt.Errorf(resp.Message)
+	}
+	return *resp.Size, nil
+}
+
 func (c *Client) ImportCensus(signer *ethereum.SignKeys, uri string) (string, error) {
 	var req types.MetaRequest
 	req.Method = "addCensus"
