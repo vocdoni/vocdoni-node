@@ -150,6 +150,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = false
+	tconfig.Mempool.CacheSize = 0
 
 	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
