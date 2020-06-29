@@ -90,7 +90,11 @@ func TestAddValidator(t *testing.T) {
 	s := testcommon.NewVochainStateWithValidators(t)
 	rint := rand.Int()
 	val := privval.GenFilePV(fmt.Sprintf("/tmp/vochainBenchmark%d", rint), fmt.Sprintf("/tmp/vochainBenchmark%d", rint))
-	if err := s.AddValidator(val.GetPubKey(), 10); err != nil {
+	pubk, err := val.GetPubKey()
+	if err != nil {
+		t.Error(err)
+	}
+	if err := s.AddValidator(pubk, 10); err != nil {
 		t.Error(err)
 	}
 }

@@ -106,7 +106,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.NodeKey = *flag.String("vochainNodeKey", "", "user alternative vochain private key (hexstring[64])")
 	globalCfg.VochainConfig.NoWaitSync = *flag.Bool("vochainNoWaitSync", false, "do not wait for Vochain to synchronize (for testing only)")
 	globalCfg.VochainConfig.SeedMode = *flag.Bool("vochainSeedMode", false, "act as a vochain seed node")
-	globalCfg.VochainConfig.MempoolSize = *flag.Int("vochainMempoolSize", 200000, "vochain mempool size")
+	globalCfg.VochainConfig.MempoolSize = *flag.Int("vochainMempoolSize", 20000, "vochain mempool size")
 	globalCfg.VochainConfig.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0, "if this node is a key keeper, use this index slot")
 	globalCfg.VochainConfig.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false, "if enabled the census downloader will import all existing census")
 	// metrics

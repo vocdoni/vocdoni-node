@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	voclient "github.com/tendermint/tendermint/rpc/client"
-
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
@@ -18,13 +16,12 @@ import (
 
 // DvoteAPIServer contains all the required pieces for running a go-dvote api server
 type DvoteAPIServer struct {
-	Signer           *ethereum.SignKeys
-	VochainCfg       *config.VochainCfg
-	VochainRPCClient *voclient.HTTP
-	CensusDir        string
-	IpfsDir          string
-	ScrutinizerDir   string
-	PxyAddr          string
+	Signer         *ethereum.SignKeys
+	VochainCfg     *config.VochainCfg
+	CensusDir      string
+	IpfsDir        string
+	ScrutinizerDir string
+	PxyAddr        string
 }
 
 /*

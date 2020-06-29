@@ -11,7 +11,6 @@ import (
 	amino "github.com/tendermint/go-amino"
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"github.com/tendermint/tendermint/privval"
-	voclient "github.com/tendermint/tendermint/rpc/client"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"gitlab.com/vocdoni/go-dvote/config"
@@ -199,11 +198,6 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 		}
 		vnode.Node.Wait()
 	})
-	// create vochain rpc conection
-	d.VochainRPCClient, err = voclient.NewHTTP("tcp://"+d.VochainCfg.RPCListen, "/websocket")
-	if err != nil {
-		tb.Fatal(err)
-	}
 	return vnode
 }
 

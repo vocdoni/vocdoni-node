@@ -82,6 +82,8 @@ func BenchmarkVochain(b *testing.B) {
 	}
 	req.ClaimsData = claims
 	doRequest("addClaimBulk", dvoteServer.Signer)
+	req.ClaimsData = nil
+	req.Digested = false
 
 	// get census root
 	log.Infof("get root")
@@ -112,11 +114,16 @@ func BenchmarkVochain(b *testing.B) {
 	if err != nil {
 		b.Fatalf("error marshaling process tx: %s", err)
 	}
-	res, err := dvoteServer.VochainRPCClient.BroadcastTxSync(tx)
-	if err != nil {
-		b.Fatalf("error broadcasting process tx: %s", err)
+
+	//	res, err := dvoteServer.VochainRPCClient.BroadcastTxSync(tx)
+	//req.Method = "submitRawTx"
+	req.RawTx = base64.StdEncoding.EncodeToString(tx)
+	resp = doRequest("submitRawTx", nil)
+
+	if !resp.Ok {
+		b.Fatalf("error broadcasting process tx: %s", resp.Message)
 	} else {
-		log.Infof("new transaction hash: %s", res.Hash)
+		log.Info("process transaction sent")
 	}
 
 	// check if process is created
