@@ -28,7 +28,7 @@ const (
 	voteTreeName    = "voteTree"
 	// validators default power
 	validatorPower          = 0
-	voteCachePurgeThreshold = time.Duration(time.Second * 60)
+	voteCachePurgeThreshold = time.Duration(time.Second * 600)
 )
 
 var (
