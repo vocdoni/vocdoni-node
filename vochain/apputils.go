@@ -107,9 +107,13 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *tmtypes
 	appState := new(types.GenesisAppState)
 	appState.Validators = make([]tmtypes.GenesisValidator, len(validators))
 	for idx, val := range validators {
+		pubk, err := val.GetPubKey()
+		if err != nil {
+			return []byte{}, err
+		}
 		appState.Validators[idx] = tmtypes.GenesisValidator{
 			Address: val.GetAddress(),
-			PubKey:  val.GetPubKey(),
+			PubKey:  pubk,
 			Power:   10,
 			Name:    strconv.Itoa(rand.Int()),
 		}

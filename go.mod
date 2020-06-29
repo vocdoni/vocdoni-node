@@ -62,7 +62,7 @@ require (
 	github.com/spf13/viper v1.6.3
 	github.com/tendermint/go-amino v0.15.1
 	github.com/tendermint/iavl v0.13.3
-	github.com/tendermint/tendermint v0.33.3
+	github.com/tendermint/tendermint v0.33.5
 	github.com/tendermint/tm-db v0.5.1
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200223203819-95cdfde1438f // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da

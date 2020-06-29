@@ -8,7 +8,6 @@ import (
 	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	mempl "github.com/tendermint/tendermint/mempool"
 	nm "github.com/tendermint/tendermint/node"
-	voclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 
@@ -18,10 +17,9 @@ import (
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
-	State  *State
-	Codec  *amino.Codec
-	Node   *nm.Node
-	Client *voclient.HTTP
+	State *State
+	Codec *amino.Codec
+	Node  *nm.Node
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
