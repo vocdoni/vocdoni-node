@@ -100,11 +100,12 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	// Special methods not depending on census existence
 	if r.Method == "addCensus" {
 		if isAuth {
-			_, err := m.AddNamespace(censusPrefix+r.CensusID, r.PubKeys, true)
+			t, err := m.AddNamespace(censusPrefix+r.CensusID, r.PubKeys)
 			if err != nil {
 				log.Warnf("error creating census: %s", err)
 				resp.SetError(err)
 			} else {
+				t.Publish()
 				log.Infof("census %s%s created successfully managed by %s", censusPrefix, r.CensusID, r.PubKeys)
 				resp.CensusID = censusPrefix + r.CensusID
 			}
@@ -149,7 +150,8 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	m.TreesMu.Lock()
 	tr, err = m.LoadTree(r.CensusID)
 	m.TreesMu.Unlock()
-	if err != nil || !tr.Public {
+	if err != nil || !tr.IsPublic() {
+		m.UnloadTree(r.CensusID)
 		resp.SetError("censusId cannot be loaded")
 		return resp
 	}
@@ -398,7 +400,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %s", resp.Root)
-		tr2, err := m.AddNamespace(resp.Root, r.PubKeys, false)
+		tr2, err := m.AddNamespace(resp.Root, r.PubKeys)
 		if err != nil && err != ErrNamespaceExist {
 			log.Warnf("error creating local published census: %s", err)
 		} else if err == nil {
@@ -410,7 +412,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 				resp.SetError(err)
 				return resp
 			}
-			tr2.Public = true
+			tr2.Publish()
 		}
 	}
 

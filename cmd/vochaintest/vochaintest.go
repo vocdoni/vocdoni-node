@@ -166,13 +166,11 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	log.Infof("waiting for gateways to import the census")
 
 	workingGateways := make(map[string]bool)
-	workingGateways[mainClient.Addr] = true
 	for _, cl := range clients {
 		workingGateways[cl.Addr] = true
 	}
 
 	gatewaysWithCensus := make(map[string]bool)
-	gatewaysWithCensus[mainClient.Addr] = true
 	for len(gatewaysWithCensus) < len(workingGateways) {
 		for _, cl := range clients {
 			if _, ok := gatewaysWithCensus[cl.Addr]; !ok {
@@ -182,6 +180,8 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 					}
 					log.Infof("gateway %s got the census!", cl.Addr)
 					gatewaysWithCensus[cl.Addr] = true
+				} else {
+					log.Debug(err)
 				}
 			}
 			time.Sleep(time.Second * 2)

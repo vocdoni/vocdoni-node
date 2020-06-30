@@ -17,7 +17,7 @@ import (
 
 type Tree struct {
 	Tree           *merkletree.MerkleTree
-	Public         bool
+	public         uint32
 	lastAccessUnix int64 // a unix timestamp, used via sync/atomic
 }
 
@@ -52,6 +52,22 @@ func (t *Tree) LastAccess() int64 {
 // TODO(mvdan): use sync/atomic instead to avoid introducing a bottleneck
 func (t *Tree) updateAccessTime() {
 	atomic.StoreInt64(&t.lastAccessUnix, time.Now().Unix())
+}
+
+// Publish makes a merkle tree available for queries.
+// Application layer should check IsPublish() before considering the Tree available.
+func (t *Tree) Publish() {
+	atomic.StoreUint32(&t.public, 1)
+}
+
+// UnPublish makes a merkle tree not available for queries
+func (t *Tree) UnPublish() {
+	atomic.StoreUint32(&t.public, 0)
+}
+
+// IsPublic returns true if the tree is available
+func (t *Tree) IsPublic() bool {
+	return atomic.LoadUint32(&t.public) == 1
 }
 
 func (t *Tree) entry(index, value []byte) (*merkletree.Entry, error) {

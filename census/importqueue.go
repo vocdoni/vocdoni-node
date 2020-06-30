@@ -29,7 +29,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 	if len(dump.ClaimsData) == 0 {
 		return fmt.Errorf("no claims found on the retreived census")
 	}
-	tr, err := m.AddNamespace(cid, []string{}, false)
+	tr, err := m.AddNamespace(cid, []string{})
 	if err == ErrNamespaceExist {
 		return nil
 	} else if err != nil {
@@ -46,7 +46,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 		return fmt.Errorf("root hash does not match on imported census, aborting import")
 	}
 	log.Infof("census imported successfully, %d claims", len(dump.ClaimsData))
-	tr.Public = true
+	tr.Publish()
 	return nil
 }
 
