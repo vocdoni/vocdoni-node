@@ -30,8 +30,10 @@ func main() {
 	electionType := flag.String("electionType", "encrypted-poll", "encrypted-poll or poll-vote")
 	electionSize := flag.Int("electionSize", 100, "election census size")
 	parallelCons := flag.Int("parallelCons", 1, "parallel API connections")
-	procDuration := flag.Int("processDuration", 5, "voting process duration in blocks")
+	procDuration := flag.Int("processDuration", 500, "voting process duration in blocks")
+	doubleVote := flag.Bool("doubleVote", true, "send every vote twice")
 	gateways := flag.StringSlice("gwExtra", []string{}, "list of extra gateways to be used in addition to gwHost for sending votes")
+	keysfile := flag.String("keysFile", "cache-keys.json", "file to store and reuse keys and census")
 
 	flag.Usage = func() {
 		flag.PrintDefaults()
@@ -60,7 +62,7 @@ func main() {
 
 	switch *opmode {
 	case "vtest":
-		vtest(*host, *oraclePrivKey, *electionType, &entityKey, *electionSize, *procDuration, *parallelCons, *gateways)
+		vtest(*host, *oraclePrivKey, *electionType, &entityKey, *electionSize, *procDuration, *parallelCons, *doubleVote, *gateways, *keysfile, true)
 	case "censusImport":
 		censusImport(*host, &entityKey)
 	default:
@@ -104,8 +106,22 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 
 }
 
-func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKeys, electionSize, procDuration, parallelCons int, gateways []string) {
-	censusKeys := client.CreateEthRandomKeysBatch(electionSize)
+func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKeys, electionSize, procDuration,
+	parallelCons int, doubleVote bool, gateways []string, keysfile string, useLastCensus bool) {
+
+	var censusKeys []*ethereum.SignKeys
+	var err error
+	censusRoot := ""
+	censusURI := ""
+
+	censusKeys, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
+	if err != nil || len(censusKeys) != electionSize {
+		log.Infof("generating new keys census batch")
+		censusKeys = client.CreateEthRandomKeysBatch(electionSize)
+	} else {
+		log.Infof("loaded cache census %s with size %d", censusRoot, len(censusKeys))
+	}
+
 	oracleKey := ethereum.SignKeys{}
 	if err := oracleKey.AddHexKey(oraclePrivKey); err != nil {
 		log.Fatal(err)
@@ -118,8 +134,8 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 
 	// Add the first connection, this will be the main connection
 	var mainClient *client.Client
-	var err error
-	for tries := 13; tries > 0; tries-- {
+
+	for tries := 10; tries > 0; tries-- {
 		mainClient, err = client.New(host)
 		if err == nil {
 			break
@@ -131,11 +147,20 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	}
 	defer mainClient.Conn.Close(websocket.StatusNormalClosure, "")
 
-	censusRoot, censusURI, err := mainClient.CreateCensus(entityKey, censusKeys, nil)
-	if err != nil {
-		log.Fatal(err)
+	if !useLastCensus {
+		censusRoot, censusURI, err = mainClient.CreateCensus(entityKey, censusKeys, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Infof("created new census %s of size %d", censusRoot, len(censusKeys))
 	}
-	log.Infof("creaed census %s of size %d", censusRoot, len(censusKeys))
+	// Save census to a cache file to be reused in the future
+	if keysfile != "" {
+		log.Infof("saving keys batch and census to %s", keysfile)
+		if err := client.SaveKeysBatch(keysfile, censusRoot, censusURI, censusKeys); err != nil {
+			log.Warnf("could not save keys batch: (%s)", err)
+		}
+	}
 
 	// Create process
 	pid := client.RandomHex(32)
@@ -187,36 +212,46 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 			time.Sleep(time.Second * 2)
 		}
 	}
+
 	log.Infof("all gateways got the census! let's start voting")
 	// Send votes
 	i := 0
 	p := len(censusKeys) / len(clients)
 	var wg sync.WaitGroup
+	var proofsReadyWG sync.WaitGroup
 	votingTimes := make([]time.Duration, len(clients))
 
 	for gw, cl := range clients {
-		signers := make([]*ethereum.SignKeys, p)
-		copy(signers[:], censusKeys[i:i+p])
-		log.Infof("voters from %d to %d will be sent to %s", i, i+p-1, cl.Addr)
+		var signers []*ethereum.SignKeys
+		if len(clients) == gw+1 {
+			// if last client, add all remaining keys
+			signers = make([]*ethereum.SignKeys, len(censusKeys)-i)
+			copy(signers[:], censusKeys[i:])
+		} else {
+			signers = make([]*ethereum.SignKeys, p)
+			copy(signers[:], censusKeys[i:i+p])
+		}
+		log.Infof("%s will receive %d votes", cl.Addr, len(signers))
 		gw, cl := gw, cl
 		wg.Add(1)
+		proofsReadyWG.Add(1)
 		go func() {
 			defer wg.Done()
-			if votingTimes[gw], err = cl.SendVotes(pid, entityKey.EthAddrString(), censusRoot, start, int64(procDuration), signers, encrypted, true); err != nil {
-				log.Fatal(err)
+			if votingTimes[gw], err = cl.TestSendVotes(pid, entityKey.EthAddrString(), censusRoot, start, signers, encrypted, doubleVote, &proofsReadyWG); err != nil {
+				log.Fatalf("[%s] %s", cl.Addr, err)
 			}
-			log.Infof("gateway %d has ended its job", gw)
+			log.Infof("gateway %d %s has ended its job", gw, cl.Addr)
 		}()
 		i += p
 	}
 
 	// Wait until all votes sent and check the results
+	log.Info("all vote work started, waiting for gateways to finalize")
 	wg.Wait()
-	if false {
-		log.Infof("canceling process in order to fetch the results")
-		if err := mainClient.CancelProcess(&oracleKey, pid); err != nil {
-			log.Fatal(err)
-		}
+
+	log.Infof("canceling process in order to fetch the results")
+	if err := mainClient.CancelProcess(&oracleKey, pid); err != nil {
+		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)
 	for _, t := range votingTimes {
@@ -226,7 +261,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	}
 	log.Infof("the voting process took %s", maxVotingTime)
 	log.Infof("checking results....")
-	if r, err := mainClient.Results(pid, len(censusKeys), start, int64(procDuration)); err != nil {
+	if r, err := mainClient.TestResults(pid, len(censusKeys)); err != nil {
 		log.Fatal(err)
 	} else {
 		log.Infof("results: %+v", r)

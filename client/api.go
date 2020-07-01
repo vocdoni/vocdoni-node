@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
@@ -59,18 +60,21 @@ func (c *Client) GetProof(hexpubkey, root string) (string, error) {
 	return resp.Siblings, nil
 }
 
-func (c *Client) GetResults(pid string) ([][]uint32, error) {
+func (c *Client) GetResults(pid string) ([][]uint32, string, error) {
 	var req types.MetaRequest
 	req.Method = "getResults"
 	req.ProcessID = pid
 	resp, err := c.Request(req, nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if !resp.Ok {
-		return nil, fmt.Errorf("cannot get results: (%s)", resp.Message)
+		return nil, "", fmt.Errorf("cannot get results: (%s)", resp.Message)
 	}
-	return resp.Results, nil
+	if resp.Message == "no results yet" {
+		return nil, resp.State, nil
+	}
+	return resp.Results, resp.State, nil
 }
 
 func (c *Client) GetEnvelopeHeight(pid string) (int64, error) {
@@ -155,25 +159,40 @@ func (c *Client) GetKeys(pid, eid string) (*pkeys, error) {
 		rev:  resp.RevealKeys}, nil
 }
 
-func (c *Client) Results(pid string, totalVotes int, startBlock, duration int64) (results [][]uint32, err error) {
+func (c *Client) TestResults(pid string, totalVotes int) ([][]uint32, error) {
 	log.Infof("waiting for results...")
-	c.WaitUntilBlock(startBlock + duration + 2)
-	if results, err = c.GetResults(pid); err != nil {
-		return nil, err
+	var err error
+	var results [][]uint32
+	var block int64
+	for {
+		block, err = c.GetCurrentBlock()
+		if err != nil {
+			return nil, err
+		}
+		c.WaitUntilBlock(block + 1)
+		results, _, err = c.GetResults(pid)
+		if err != nil {
+			return nil, err
+		}
+		if results != nil {
+			break
+		}
+		log.Infof("no results yet at block %d", block+2)
 	}
 	total := uint32(totalVotes)
 	if results[0][1] != total || results[1][2] != total || results[2][3] != total || results[3][4] != total {
-		return nil, fmt.Errorf("invalid results")
+		return nil, fmt.Errorf("invalid results: %v", results)
 	}
 	return results, nil
 }
 
-func (c *Client) SendVotes(pid, eid, root string, startBlock, duration int64, signers []*ethereum.SignKeys, encrypted bool, doubleVoting bool) (time.Duration, error) {
+func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers []*ethereum.SignKeys, encrypted bool, doubleVoting bool, wg *sync.WaitGroup) (time.Duration, error) {
 	var pub, proof string
 	var err error
 	var keys []string
 	var proofs []string
 
+	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, s := range signers {
 		pub, _ = s.HexString()
@@ -183,11 +202,17 @@ func (c *Client) SendVotes(pid, eid, root string, startBlock, duration int64, si
 		}
 		proofs = append(proofs, proof)
 		if (i+1)%100 == 0 {
-			log.Infof("proof generation progress: %d%%", int(((i+1)*100)/(len(signers))))
+			log.Infof("proof generation progress for %s: %d%%", c.Addr, int(((i+1)*100)/(len(signers))))
 		}
 	}
 
+	// Wait until all gateway connections are ready
+	wg.Done()
+	log.Infof("%s is waiting other gateways to be ready before start voting", c.Addr)
 	c.WaitUntilBlock(startBlock)
+	wg.Wait()
+
+	// Get encryption keys
 	keyIndexes := []int{}
 	if encrypted {
 		if pk, err := c.GetKeys(pid, eid); err != nil {
@@ -206,12 +231,17 @@ func (c *Client) SendVotes(pid, eid, root string, startBlock, duration int64, si
 		log.Infof("got encryption keys!")
 	}
 
-	var req types.MetaRequest
-	var nullifiers []string
-	var vpb string
-	req.Method = "submitRawTx"
-	start := time.Now()
+	// Send votes
 	log.Infof("sending votes")
+	timeDeadLine := time.Second * 200
+	if len(signers) > 1000 {
+		timeDeadLine = time.Duration(len(signers)/5) * time.Second
+	}
+	log.Infof("time deadline set to %d seconds", timeDeadLine/time.Second)
+	req := types.MetaRequest{Method: "submitRawTx"}
+	nullifiers := []string{}
+	vpb := ""
+	start := time.Now()
 
 	for i := 0; i < len(signers); i++ {
 		s := signers[i]
@@ -256,7 +286,7 @@ func (c *Client) SendVotes(pid, eid, root string, startBlock, duration int64, si
 		}
 		nullifiers = append(nullifiers, resp.Payload)
 		if (i+1)%100 == 0 {
-			log.Infof("voting progress: %d%%", int(((i+1)*100)/(len(signers))))
+			log.Infof("voting progress for %s: %d%%", c.Addr, int(((i+1)*100)/(len(signers))))
 		}
 
 		//Try double voting (should fail)
@@ -284,8 +314,8 @@ func (c *Client) SendVotes(pid, eid, root string, startBlock, duration int64, si
 				break
 			}
 		}
-		if time.Since(checkStart) > time.Minute*10 {
-			return 0, fmt.Errorf("wait for envelope height took more than 10 minutes, skipping")
+		if time.Since(checkStart) > timeDeadLine {
+			return 0, fmt.Errorf("wait for envelope height took more than deadline, skipping")
 		}
 	}
 	votingElapsedTime := time.Since(start)
@@ -303,8 +333,8 @@ func (c *Client) SendVotes(pid, eid, root string, startBlock, duration int64, si
 			break
 		}
 		registered = 0
-		if time.Since(checkStart) > time.Minute*10 {
-			return 0, fmt.Errorf("check nullifier time took more than 10 minutes, skipping")
+		if time.Since(checkStart) > timeDeadLine {
+			return 0, fmt.Errorf("check nullifier time took more than deadline, skipping")
 		}
 	}
 	return votingElapsedTime, nil
@@ -352,7 +382,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkur
 func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
-	p := types.NewProcessTx{
+	p := types.CancelProcessTx{
 		Type:      "cancelProcess",
 		ProcessID: pid,
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"time"
 
@@ -20,14 +21,13 @@ func (c *Client) WaitUntilBlock(block int64) {
 		cb, err := c.GetCurrentBlock()
 		if err != nil {
 			log.Error(err)
-			time.Sleep(10 * time.Second)
+			time.Sleep(5 * time.Second)
 			continue
 		}
-		// TODO: why was this just ">"?
 		if cb >= block {
 			break
 		}
-		time.Sleep(10 * time.Second)
+		time.Sleep(5 * time.Second)
 		log.Infof("remaining blocks: %d", block-cb)
 	}
 }
@@ -41,6 +41,59 @@ func CreateEthRandomKeysBatch(n int) []*ethereum.SignKeys {
 		}
 	}
 	return s
+}
+
+type keysBatch struct {
+	Keys      []signKey `json:"keys"`
+	CensusID  string    `json:"censusId"`
+	CensusURI string    `json:"censusUri"`
+}
+type signKey struct {
+	PrivKey string `json:"privKey"`
+	PubKey  string `json:"pubKey"`
+}
+
+func SaveKeysBatch(filepath string, censusID, censusURI string, keys []*ethereum.SignKeys) error {
+	var kb keysBatch
+	for _, k := range keys {
+		pub, priv := k.HexString()
+		kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub})
+	}
+	kb.CensusID = censusID
+	kb.CensusURI = censusURI
+	j, err := json.Marshal(kb)
+	if err != nil {
+		return err
+	}
+	log.Infof("saved census cache file has %d bytes, got %d keys", len(j), len(keys))
+	return ioutil.WriteFile(filepath, j, 0644)
+}
+
+func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, string, string, error) {
+	jb, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	var kb keysBatch
+	if err = json.Unmarshal(jb, &kb); err != nil {
+		return nil, "", "", err
+	}
+
+	if len(kb.Keys) == 0 || kb.CensusID == "" || kb.CensusURI == "" {
+		return nil, "", "", fmt.Errorf("keybatch file is empty or missing data")
+	}
+
+	keys := make([]*ethereum.SignKeys, len(kb.Keys))
+
+	for i, k := range kb.Keys {
+		var s ethereum.SignKeys
+		if err = s.AddHexKey(k.PrivKey); err != nil {
+			return nil, "", "", err
+		}
+		keys[i] = &s
+	}
+	return keys, kb.CensusID, kb.CensusURI, nil
 }
 
 func RandomHex(n int) string {
