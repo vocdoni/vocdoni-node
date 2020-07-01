@@ -89,7 +89,6 @@ func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *
 // isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
 // censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
 func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string) *types.MetaResponse {
-	var err error
 	resp := new(types.MetaResponse)
 
 	// Process data
@@ -146,13 +145,15 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	}
 
 	// Load the merkle tree
-	var tr *tree.Tree
 	m.TreesMu.Lock()
-	tr, err = m.LoadTree(r.CensusID)
+	tr, ok := m.Trees[r.CensusID]
 	m.TreesMu.Unlock()
-	if err != nil || !tr.IsPublic() {
-		m.UnloadTree(r.CensusID)
+	if !ok {
 		resp.SetError("censusId cannot be loaded")
+		return resp
+	}
+	if !tr.IsPublic() {
+		resp.SetError("census not yet published")
 		return resp
 	}
 

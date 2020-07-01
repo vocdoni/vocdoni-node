@@ -45,8 +45,8 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 		}
 		return fmt.Errorf("root hash does not match on imported census, aborting import")
 	}
-	log.Infof("census imported successfully, %d claims", len(dump.ClaimsData))
 	tr.Publish()
+	log.Infof("census imported successfully, %d claims. Status is public:%t", len(dump.ClaimsData), tr.IsPublic())
 	return nil
 }
 
@@ -140,11 +140,6 @@ func (m *Manager) importQueueDaemon() {
 		censusRaw = m.decompressBytes(censusRaw)
 		if err = m.importTree(censusRaw, cid); err != nil {
 			log.Warnf("cannot import census %s: (%s)", cid, err)
-		} else {
-			// Unload until we need it
-			m.TreesMu.Lock()
-			m.UnloadTree(cid)
-			m.TreesMu.Unlock()
 		}
 		m.queueAdd(-1)
 	}

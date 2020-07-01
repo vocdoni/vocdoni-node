@@ -120,28 +120,6 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 	return nil
 }
 
-// LoadTree opens the database containing the merkle tree or returns nil if already loaded
-// Not thread safe
-func (m *Manager) LoadTree(name string) (*tree.Tree, error) {
-	if _, exist := m.Trees[name]; exist {
-		return m.Trees[name], nil
-	}
-	tr, err := tree.NewTree(m.LocalStorage.WithPrefix([]byte(name)))
-	if err != nil {
-		return nil, err
-	}
-	log.Infof("load merkle tree %s", name)
-	m.Trees[name] = tr
-	return tr, nil
-}
-
-// UnloadTree closes the database containing the merkle tree
-// Not thread safe
-func (m *Manager) UnloadTree(name string) {
-	log.Debugf("unload merkle tree %s", name)
-	delete(m.Trees, name)
-}
-
 // Exists returns true if a given census exists on disk
 // While Exists() means there is a tree database with such name,
 //  Load() reads the tree from disk and create the required memory structure in order to use it
@@ -185,7 +163,6 @@ func (m *Manager) DelNamespace(name string) error {
 	if !m.Exists(name) {
 		return nil
 	}
-	m.UnloadTree(name)
 	// TODO(mvdan): re-implement with the prefixed database
 	// if err := os.RemoveAll(m.StorageDir + "/" + name); err != nil {
 	// 	return fmt.Errorf("cannot remove census: (%s)", err)
