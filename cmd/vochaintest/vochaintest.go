@@ -113,11 +113,12 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	var err error
 	censusRoot := ""
 	censusURI := ""
-
+	isCensusNew := false
 	censusKeys, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
 	if err != nil || len(censusKeys) != electionSize {
 		log.Infof("generating new keys census batch")
 		censusKeys = client.CreateEthRandomKeysBatch(electionSize)
+		isCensusNew = true
 	} else {
 		log.Infof("loaded cache census %s with size %d", censusRoot, len(censusKeys))
 	}
@@ -147,7 +148,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	}
 	defer mainClient.Conn.Close(websocket.StatusNormalClosure, "")
 
-	if !useLastCensus {
+	if !useLastCensus || isCensusNew {
 		censusRoot, censusURI, err = mainClient.CreateCensus(entityKey, censusKeys, nil)
 		if err != nil {
 			log.Fatal(err)
@@ -155,7 +156,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 		log.Infof("created new census %s of size %d", censusRoot, len(censusKeys))
 	}
 	// Save census to a cache file to be reused in the future
-	if keysfile != "" {
+	if keysfile != "" && isCensusNew {
 		log.Infof("saving keys batch and census to %s", keysfile)
 		if err := client.SaveKeysBatch(keysfile, censusRoot, censusURI, censusKeys); err != nil {
 			log.Warnf("could not save keys batch: (%s)", err)
