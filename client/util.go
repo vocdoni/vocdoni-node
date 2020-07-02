@@ -51,13 +51,22 @@ type keysBatch struct {
 type signKey struct {
 	PrivKey string `json:"privKey"`
 	PubKey  string `json:"pubKey"`
+	Proof   string `json:"proof"`
 }
 
-func SaveKeysBatch(filepath string, censusID, censusURI string, keys []*ethereum.SignKeys) error {
+func SaveKeysBatch(filepath string, censusID, censusURI string, keys []*ethereum.SignKeys, proofs []string) error {
+	if proofs != nil && (len(proofs) != len(keys)) {
+		return fmt.Errorf("lenght of Proof is different from lenght of Signers")
+	}
 	var kb keysBatch
-	for _, k := range keys {
+	for i, k := range keys {
 		pub, priv := k.HexString()
-		kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub})
+		if proofs != nil {
+			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub, Proof: proofs[i]})
+		} else {
+			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub})
+
+		}
 	}
 	kb.CensusID = censusID
 	kb.CensusURI = censusURI
@@ -69,31 +78,32 @@ func SaveKeysBatch(filepath string, censusID, censusURI string, keys []*ethereum
 	return ioutil.WriteFile(filepath, j, 0644)
 }
 
-func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, string, string, error) {
+func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, []string, string, string, error) {
 	jb, err := ioutil.ReadFile(filepath)
 	if err != nil {
-		return nil, "", "", err
+		return nil, nil, "", "", err
 	}
 
 	var kb keysBatch
 	if err = json.Unmarshal(jb, &kb); err != nil {
-		return nil, "", "", err
+		return nil, nil, "", "", err
 	}
 
 	if len(kb.Keys) == 0 || kb.CensusID == "" || kb.CensusURI == "" {
-		return nil, "", "", fmt.Errorf("keybatch file is empty or missing data")
+		return nil, nil, "", "", fmt.Errorf("keybatch file is empty or missing data")
 	}
 
 	keys := make([]*ethereum.SignKeys, len(kb.Keys))
-
+	proofs := []string{}
 	for i, k := range kb.Keys {
 		var s ethereum.SignKeys
 		if err = s.AddHexKey(k.PrivKey); err != nil {
-			return nil, "", "", err
+			return nil, nil, "", "", err
 		}
+		proofs = append(proofs, k.Proof)
 		keys[i] = &s
 	}
-	return keys, kb.CensusID, kb.CensusURI, nil
+	return keys, proofs, kb.CensusID, kb.CensusURI, nil
 }
 
 func RandomHex(n int) string {

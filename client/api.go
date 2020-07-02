@@ -186,26 +186,50 @@ func (c *Client) TestResults(pid string, totalVotes int) ([][]uint32, error) {
 	return results, nil
 }
 
-func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers []*ethereum.SignKeys, encrypted bool, doubleVoting bool, wg *sync.WaitGroup) (time.Duration, error) {
+func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root string, tolerateError bool) ([]string, error) {
+	var proofs []string
 	var pub, proof string
 	var err error
-	var keys []string
-	var proofs []string
-
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, s := range signers {
-		pub, _ = s.HexString()
-		pub, _ = ethereum.DecompressPubKey(pub) // Temporary until everything is compressed
+		if pub, _ = s.HexString(); pub == "" {
+			if tolerateError {
+				continue
+			}
+			return proofs, err
+		}
+		if pub, err = ethereum.DecompressPubKey(pub); err != nil {
+			if tolerateError {
+				continue
+			}
+			return proofs, err
+		} // Temporary until everything is compressed
+
 		if proof, err = c.GetProof(pub, root); err != nil {
-			return 0, err
+			if tolerateError {
+				continue
+			}
+			return proofs, err
 		}
 		proofs = append(proofs, proof)
 		if (i+1)%100 == 0 {
 			log.Infof("proof generation progress for %s: %d%%", c.Addr, int(((i+1)*100)/(len(signers))))
 		}
 	}
+	return proofs, nil
+}
 
+func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers []*ethereum.SignKeys, proofs []string, encrypted bool, doubleVoting bool, wg *sync.WaitGroup) (time.Duration, error) {
+	var err error
+	var keys []string
+	// Generate merkle proofs
+	if proofs == nil {
+		proofs, err = c.GetProofBatch(signers, root, false)
+	}
+	if err != nil {
+		return 0, err
+	}
 	// Wait until all gateway connections are ready
 	wg.Done()
 	log.Infof("%s is waiting other gateways to be ready before start voting", c.Addr)
