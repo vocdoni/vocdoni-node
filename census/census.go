@@ -117,7 +117,35 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 			log.Infof("current root key %s", rootKey)
 		}
 	}
+	for _, v := range m.Census.Namespaces {
+		if _, err := m.LoadTree(v.Name); err != nil {
+			log.Warnf("census %s cannot be loaded: (%s)", v.Name, err)
+		}
+	}
 	return nil
+}
+
+// LoadTree opens the database containing the merkle tree or returns nil if already loaded
+// Not thread safe
+func (m *Manager) LoadTree(name string) (*tree.Tree, error) {
+	if _, exist := m.Trees[name]; exist {
+		return m.Trees[name], nil
+	}
+	tr, err := tree.NewTree(m.LocalStorage.WithPrefix([]byte(name)))
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("load merkle tree %s", name)
+	m.Trees[name] = tr
+	m.Trees[name].Publish()
+	return tr, nil
+}
+
+// UnloadTree closes the database containing the merkle tree
+// Not thread safe
+func (m *Manager) UnloadTree(name string) {
+	log.Debugf("unload merkle tree %s", name)
+	delete(m.Trees, name)
 }
 
 // Exists returns true if a given census exists on disk
