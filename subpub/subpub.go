@@ -143,9 +143,9 @@ func (ps *SubPub) Start(ctx context.Context) {
 
 	// Let's try to apply some tunning for reducing the DHT fingerprint
 	opts := []dhtopts.Option{
-		dhtopts.RoutingTableLatencyTolerance(time.Second * 20),
-		dhtopts.BucketSize(5),
-		dhtopts.MaxRecordAge(1 * time.Hour),
+		dht.RoutingTableLatencyTolerance(time.Second * 20),
+		dht.BucketSize(20),
+		dht.MaxRecordAge(1 * time.Hour),
 	}
 
 	// Note that we don't use ctx here, since we stop via the Close method.

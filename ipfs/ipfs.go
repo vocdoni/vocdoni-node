@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 
-	autonat "github.com/libp2p/go-libp2p-autonat-svc"
-
 	ipfsconfig "github.com/ipfs/go-ipfs-config"
 	"github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
@@ -78,12 +76,6 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 	}
 	node.IsDaemon = true
 	node.IsOnline = true
-
-	auts, err := autonat.NewAutoNATService(node.Context(), node.PeerHost)
-	if err != nil {
-		log.Warn(err)
-	}
-	node.AutoNAT = auts
 
 	api, err := ipfsapi.NewCoreAPI(node)
 	if err != nil {

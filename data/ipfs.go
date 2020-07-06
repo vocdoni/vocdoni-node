@@ -196,12 +196,12 @@ func (i *IPFSHandle) Stats(ctx context.Context) (string, error) {
 }
 
 func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
-	pins, err := i.CoreAPI.Pin().Ls(ctx, options.Pin.Type.All())
+	pins, err := i.CoreAPI.Pin().Ls(ctx, options.Pin.Ls.All())
 	if err != nil {
 		return nil, err
 	}
 	pinMap := make(map[string]string)
-	for _, p := range pins {
+	for p := range pins {
 		pinMap[p.Path().String()] = p.Type()
 	}
 	return pinMap, nil
