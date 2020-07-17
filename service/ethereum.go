@@ -46,22 +46,33 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 		w3uri = fmt.Sprintf("http://%s:%d", w3cfg.RPCHost, w3cfg.RPCPort)
 	}
 
-	if w3config.Enabled && pxy != nil {
-		if !strings.HasPrefix(w3uri, "http") {
-			log.Warnf("web3 http API requires http or https web3 external, disabling it")
-		} else {
-			pxy.AddHandler(w3config.Route, pxy.AddEndpoint(w3uri))
-			log.Infof("web3 http endpoint available at %s", w3config.Route)
+	if !w3config.Enabled || pxy == nil {
+		return
+	}
+	if strings.HasPrefix(w3uri, "http") {
+		pxy.AddHandler(w3config.Route, pxy.AddEndpoint(w3uri))
+		log.Infof("web3 http endpoint available at %s", w3config.Route)
+	} else if strings.HasSuffix(w3uri, ".ipc") {
+		info, err := os.Stat(w3uri)
+		if err != nil {
+			return nil, fmt.Errorf("could not stat IPC path: %v", err)
 		}
-		if strings.HasPrefix(w3uri, "http") {
-			pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsHTTPBridge(w3uri))
-			log.Infof("web3 websocket endpoint available at %s", w3config.Route+"ws")
-		} else if strings.HasPrefix(w3uri, "ws") {
-			pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri))
-			log.Infof("web3 websocket endpoint available at %s", w3config.Route+"ws")
-		} else {
-			log.Warnf("external web3 protocol is not http or ws, clients won't be able to use the web3 endpoint")
+		if info.Mode()&os.ModeSocket == 0 {
+			return nil, fmt.Errorf("IPC path is not a socket: %s", w3uri)
 		}
+		pxy.AddHandler(w3config.Route, pxy.ProxyIPC(w3uri))
+		log.Infof("web3 http endpoint available at %s", w3config.Route)
+	} else {
+		log.Warnf("web3 http API requires http/https/ipc web3 external, disabling it")
+	}
+	if strings.HasPrefix(w3uri, "http") {
+		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsHTTPBridge(w3uri))
+		log.Infof("web3 websocket endpoint available at %s", w3config.Route+"ws")
+	} else if strings.HasPrefix(w3uri, "ws") {
+		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri))
+		log.Infof("web3 websocket endpoint available at %s", w3config.Route+"ws")
+	} else {
+		log.Warnf("external web3 protocol is not http or ws, clients won't be able to use the web3 ws endpoint")
 	}
 	return
 }

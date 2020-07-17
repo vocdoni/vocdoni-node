@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -178,6 +179,7 @@ func (p *Proxy) AddHandler(path string, handler http.HandlerFunc) {
 
 // AddEndpoint adds an endpoint representing the url where the request will be handled
 func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader *http.Request) {
+	// TODO(mvdan): this should just be a reverse proxy
 	fn := func(writer http.ResponseWriter, reader *http.Request) {
 		body, err := ioutil.ReadAll(reader.Body)
 		if err != nil {
@@ -212,6 +214,44 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 		log.Debugf("response: %s", respBody)
 	}
 	return fn
+}
+
+func (p *Proxy) ProxyIPC(path string) http.HandlerFunc {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		log.Debugf("%s", path)
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(rw, "", http.StatusInternalServerError)
+			log.Errorf("failed to read request body: %v", err)
+			return
+		}
+		log.Debugf("request: %s", body)
+		conn, err := net.Dial("unix", path)
+		if err != nil {
+			http.Error(rw, "could not dial IPC socket", http.StatusInternalServerError)
+			log.Errorf("could not dial IPC socket: %v", err)
+			return
+		}
+		if _, err := conn.Write(body); err != nil {
+			http.Error(rw, "could not write to IPC socket", http.StatusInternalServerError)
+			log.Errorf("could not write to IPC socket: %v", err)
+			return
+		}
+		// We can't use ioutil.ReadAll, because the server keeps the
+		// connection open for more requests. Read a single json object.
+		var respBody json.RawMessage
+		if err := json.NewDecoder(conn).Decode(&respBody); err != nil {
+			http.Error(rw, "could not read response from IPC socket", http.StatusInternalServerError)
+			log.Errorf("could not read response from IPC socket: %v", err)
+			return
+		}
+		rw.Header().Set("Access-Control-Allow-Origin", "*")
+		rw.Header().Set("Access-Control-Allow-Methods", "POST, GET")
+		rw.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token")
+		rw.Write(respBody)
+		rw.Write([]byte("\n")) // a json object doesn't include a newline
+		log.Debugf("response: %s", respBody)
+	})
 }
 
 // AddWsHTTPBridge adds a WS endpoint to interact with the underlying web3
