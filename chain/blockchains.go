@@ -8,15 +8,16 @@ import (
 
 // Specs defines a set of blockchain network specifications
 type Specs struct {
-	Name          string   // Identity name
-	GenesisB64    string   // Base64 JSON encoded genesis file
-	GenesisHash   string   // Genesis Hash
-	NetworkId     int      // Ethereum Like network identification number
-	BootNodes     []string // List of Bootnodes for this network
-	StartingBlock int64    // Where to start looking for events
+	Name            string   // Identity name
+	GenesisB64      string   // Base64 JSON encoded genesis file
+	GenesisHash     string   // Genesis Hash
+	NetworkId       int      // Ethereum Like network identification number
+	BootNodes       []string // List of Bootnodes for this network
+	StartingBlock   int64    // Where to start looking for events
+	ENSregistryAddr string
 }
 
-var AvailableChains = []string{"mainnet, goerli, vctestnet"}
+var AvailableChains = []string{"mainnet", "goerli", "xdai"}
 
 func SpecsFor(name string) (*Specs, error) {
 	switch name {
@@ -24,6 +25,8 @@ func SpecsFor(name string) (*Specs, error) {
 		return &mainnet, nil
 	case "goerli":
 		return &goerli, nil
+	case "xdai":
+		return &xdai, nil
 	default:
 		return nil, errors.New("chain name not found")
 	}
@@ -31,19 +34,29 @@ func SpecsFor(name string) (*Specs, error) {
 
 // Ethereum MainNet
 var mainnet = Specs{
-	Name:          "mainnet",
-	NetworkId:     1,
-	BootNodes:     ethparams.MainnetBootnodes,
-	StartingBlock: 10230300, //2020 jun 09 10:00h
+	Name:            "mainnet",
+	NetworkId:       1,
+	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
+	BootNodes:       ethparams.MainnetBootnodes,
+	StartingBlock:   10230300, //2020 jun 09 10:00h
+}
+
+var xdai = Specs{
+	Name:            "xdai",
+	NetworkId:       100,
+	ENSregistryAddr: "0xC323087054a2E6b99C579A40b486B27f319D870C",
+	BootNodes:       nil,
+	StartingBlock:   11035933, //2020 jul 19 16:55h
 }
 
 // Goerli Ethereum PoA Testnet
 var goerli = Specs{
-	Name:          "goerli",
-	NetworkId:     5,
-	StartingBlock: 2814315,
-	BootNodes:     ethparams.GoerliBootnodes,
-	GenesisHash:   "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
+	Name:            "goerli",
+	NetworkId:       5,
+	StartingBlock:   2814315,
+	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
+	BootNodes:       ethparams.GoerliBootnodes,
+	GenesisHash:     "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog
 ICAgImVpcDE1MEJsb2NrIjowLAogICAgImVpcDE1MEhhc2giOiAiMHhiZjdlMzMxZjdmN2MxZGQy
 ZTA1MTU5NjY2YjNiZjhiYzdhOGEzYTllYjFkNTE4OTY5ZWFiNTI5ZGQ5Yjg4YzFhIiwKICAgICJl

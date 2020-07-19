@@ -520,7 +520,7 @@ func main() {
 				}
 			}
 
-			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, w3uri, initBlock, cm, signer, vnode, evh); err != nil {
+			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh); err != nil {
 				log.Fatal(err)
 			}
 		}
