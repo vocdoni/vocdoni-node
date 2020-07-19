@@ -72,7 +72,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "", "enable TLS secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	// ethereum node
 	globalCfg.EthConfig.SigningKey = *flag.String("ethSigningKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
-	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
+	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "xdai", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
 	globalCfg.EthConfig.LightMode = *flag.Bool("ethChainLightMode", false, "synchronize Ethereum blockchain in light mode")
 	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to use")
 	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootNodes", []string{}, "Ethereum p2p custom bootstrap nodes (enode://<pubKey>@<ip>[:port])")
@@ -84,7 +84,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", true, "only subscribe to new ethereum events (do not read past log)")
 	// ethereum web3
 	globalCfg.W3Config.W3External = *flag.String("w3External", "", "use an external web3 endpoint instead of the local one. Supported protocols: http(s)://, ws(s):// and IPC filepath")
-	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", true, "if true, a web3 public endpoint will be enabled")
+	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", false, "if true, a web3 public endpoint will be enabled")
 	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
 	globalCfg.W3Config.RPCPort = *flag.Int("w3RPCPort", 9091, "web3 RPC port")
 	globalCfg.W3Config.RPCHost = *flag.String("w3RPCHost", "127.0.0.1", "web3 RPC host")
