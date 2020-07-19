@@ -152,31 +152,31 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	}
 	ethConfig := eth.DefaultConfig
 
-	// network id 1 is mainet, the default go-ethereum network
-	// only if network id is bigger than 1, we try to fetch the genesis file from our code
-	if c.NetworkId > 1 {
-		ethConfig.NetworkId = uint64(c.NetworkId)
-		g := new(core.Genesis)
-		err = g.UnmarshalJSON(c.NetworkGenesis)
-		if err != nil {
-			log.Errorf("cannot read genesis")
-			return err
-		}
-		ethConfig.Genesis = g
-	}
-	if c.LightMode {
-		log.Info("using chain light mode synchronization")
-		ethConfig.SyncMode = downloader.LightSync
-	} else {
-		log.Info("using chain fast mode synchronization")
-		ethConfig.SyncMode = downloader.FastSync
-	}
 	if len(c.W3external) > 0 {
 		log.Infof("using external web3 endpoint %s", c.W3external)
+	} else {
+		// network id 1 is mainet, the default go-ethereum network
+		// only if network id is bigger than 1, we try to fetch the genesis file from our code
+		if c.NetworkId > 1 {
+			ethConfig.NetworkId = uint64(c.NetworkId)
+			g := new(core.Genesis)
+			err = g.UnmarshalJSON(c.NetworkGenesis)
+			if err != nil {
+				log.Errorf("cannot read genesis")
+				return err
+			}
+			ethConfig.Genesis = g
+		}
+		if c.LightMode {
+			log.Info("using chain light mode synchronization")
+			ethConfig.SyncMode = downloader.LightSync
+		} else {
+			log.Info("using chain fast mode synchronization")
+			ethConfig.SyncMode = downloader.FastSync
+		}
 	}
 
 	ks := keystore.NewKeyStore(c.KeyStore, keystore.StandardScryptN, keystore.StandardScryptP)
-
 	e.Node = n
 	e.Config = &ethConfig
 	e.Keys = ks

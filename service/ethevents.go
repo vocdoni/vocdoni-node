@@ -13,17 +13,20 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
-const ensRegistryAddr = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
 const maxRetries = 30
 
 // EthEvents service registers on the Ethereum smart contract specified in ethProcDomain, the provided event handlers
 // we3host and w3port must point to a working web3 websocket endpoint.
 // If endBlock=0 is enabled the service will only subscribe for new blocks
-func EthEvents(ethProcDomain, w3uri string, startBlock *int64,
+func EthEvents(ethProcDomain, w3uri string, networkName string, startBlock *int64,
 	cm *census.Manager, signer *ethereum.SignKeys, vocapp *vochain.BaseApplication, evh []ethevents.EventHandler) error {
 	// TO-DO remove cm (add it on the eventHandler instead)
 	log.Infof("creating ethereum events service")
-	contractAddr, err := ensResolve(ensRegistryAddr, ethProcDomain, w3uri)
+	specs, err := chain.SpecsFor(networkName)
+	if err != nil {
+		return err
+	}
+	contractAddr, err := ensResolve(specs.ENSregistryAddr, ethProcDomain, w3uri)
 	if err != nil {
 		return err
 	}
