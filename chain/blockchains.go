@@ -44,7 +44,7 @@ var mainnet = Specs{
 var xdai = Specs{
 	Name:            "xdai",
 	NetworkId:       100,
-	ENSregistryAddr: "0xC323087054a2E6b99C579A40b486B27f319D870C",
+	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
 	StartingBlock:   11035933, //2020 jul 19 16:55h
 }
