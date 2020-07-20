@@ -244,7 +244,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 
 	if len(globalCfg.EthConfig.SigningKey) < 32 {
 		fmt.Println("no signing key, generating one...")
-		var signer ethereum.SignKeys
+		signer := ethereum.NewSignKeys()
 		err = signer.Generate()
 		if err != nil {
 			cfgError = config.Error{
@@ -366,7 +366,7 @@ func main() {
 
 	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" || globalCfg.Mode == "web3" {
 		// Signing key
-		signer = new(ethereum.SignKeys)
+		signer = ethereum.NewSignKeys()
 		// Add Authorized keys for private methods
 		if globalCfg.API.AllowPrivate && globalCfg.API.AllowedAddrs != "" {
 			keys := strings.Split(globalCfg.API.AllowedAddrs, ",")

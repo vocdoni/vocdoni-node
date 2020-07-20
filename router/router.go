@@ -105,7 +105,7 @@ type Router struct {
 	inbound      <-chan types.Message
 	storage      data.Storage
 	transport    net.Transport
-	signer       ethereum.SignKeys
+	signer       *ethereum.SignKeys
 	census       *census.Manager
 	vocapp       *vochain.BaseApplication
 	metricsagent *metrics.Agent
@@ -119,7 +119,7 @@ type Router struct {
 }
 
 func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
-	signer ethereum.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
+	signer *ethereum.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
 	cm := new(census.Manager)
 	r := new(Router)
 	r.methods = make(map[string]registeredMethod)
@@ -197,7 +197,7 @@ func InitRouter(inbound <-chan types.Message, storage data.Storage, transport ne
 		log.Warn("allowing API private methods")
 	}
 
-	return NewRouter(inbound, storage, transport, *signer, metricsagent, allowPrivate)
+	return NewRouter(inbound, storage, transport, signer, metricsagent, allowPrivate)
 }
 
 func (r *Router) registerPrivate(name string, handler func(routerRequest)) {

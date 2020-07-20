@@ -36,7 +36,7 @@ Start starts a basic dvote server
 */
 func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// create signer
-	d.Signer = new(ethereum.SignKeys)
+	d.Signer = ethereum.NewSignKeys()
 	d.Signer.Generate()
 
 	// create the proxy to handle HTTP queries

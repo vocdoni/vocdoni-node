@@ -215,7 +215,7 @@ func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer, vnode *vochain.BaseApp
 func CreateEthRandomKeysBatch(tb testing.TB, n int) []*ethereum.SignKeys {
 	s := make([]*ethereum.SignKeys, n)
 	for i := 0; i < n; i++ {
-		s[i] = new(ethereum.SignKeys)
+		s[i] = ethereum.NewSignKeys()
 		if err := s[i].Generate(); err != nil {
 			tb.Fatal(err)
 		}

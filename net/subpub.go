@@ -19,7 +19,7 @@ type SubPubHandle struct {
 
 func (p *SubPubHandle) Init(c *types.Connection) error {
 	p.Conn = c
-	var s ethereum.SignKeys
+	s := ethereum.NewSignKeys()
 	if err := s.AddHexKey(p.Conn.Key); err != nil {
 		return fmt.Errorf("cannot import privkey %s: %s", p.Conn.Key, err)
 	}

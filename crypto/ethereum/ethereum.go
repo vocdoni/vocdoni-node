@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
@@ -35,7 +36,14 @@ const SigningPrefix = "\u0019Ethereum Signed Message:\n"
 type SignKeys struct {
 	Public     ecdsa.PublicKey
 	Private    ecdsa.PrivateKey
-	Authorized []Address
+	Authorized map[string]bool
+	Lock       sync.RWMutex
+}
+
+// NewSignKeys creates an ECDSA pair of keys for signing
+// and initializes the map for authorized keys
+func NewSignKeys() *SignKeys {
+	return &SignKeys{Authorized: make(map[string]bool)}
 }
 
 // Address is an Ethereum like address
@@ -80,11 +88,11 @@ func (k *SignKeys) AddHexKey(privHex string) error {
 
 // AddAuthKey adds a new authorized address key
 func (k *SignKeys) AddAuthKey(address string) error {
-	addr, err := addrFromString(address)
-	if err != nil {
-		return err
+	k.Lock.Lock()
+	if !k.Authorized[address] {
+		k.Authorized[address] = true
 	}
-	k.Authorized = append(k.Authorized, addr)
+	k.Lock.Unlock()
 	return nil
 }
 
@@ -189,11 +197,11 @@ func (k *SignKeys) VerifySender(msg []byte, sigHex string) (bool, string, error)
 	if err != nil {
 		return false, "", err
 	}
-	for _, addr := range k.Authorized {
-		if fmt.Sprintf("%x", addr) == recoveredAddr {
-			return true, recoveredAddr, nil
-		}
+	k.Lock.RLock()
+	if k.Authorized[recoveredAddr] {
+		return true, recoveredAddr, nil
 	}
+	k.Lock.RUnlock()
 	return false, recoveredAddr, nil
 }
 
@@ -208,7 +216,7 @@ func (k *SignKeys) VerifyJSONsender(msg interface{}, sigHex string) (bool, strin
 
 // Standalone function for verify a message
 func Verify(message []byte, signHex, pubHex string) (bool, error) {
-	sk := new(SignKeys)
+	sk := NewSignKeys()
 	return sk.Verify(message, signHex)
 }
 
@@ -237,7 +245,7 @@ func AddrFromPublicKey(pubHex string) (string, error) {
 }
 
 func PubKeyFromPrivateKey(privHex string) (string, error) {
-	var s SignKeys
+	s := NewSignKeys()
 	if err := s.AddHexKey(privHex); err != nil {
 		return "", err
 	}
