@@ -5,43 +5,35 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strings"
+	"time"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
+const fetchFileTimeout = time.Second * 10
+
 func (r *Router) fetchFile(request routerRequest) {
 	log.Debugf("calling FetchFile %s", request.URI)
 	parsedURIs := strings.Split(request.URI, ",")
 	transportTypes := parseTransportFromURI(parsedURIs)
-	var resp *http.Response
 	var content []byte
 	var err error
 
 	found := false
 	for idx, t := range transportTypes {
 		switch t {
-		case "http:", "https:":
-			found = true
-			resp, err = http.Get(parsedURIs[idx])
-			if err == nil {
-				defer resp.Body.Close()
-				content, err = ioutil.ReadAll(resp.Body)
-				if len(content) == 0 {
-					err = fmt.Errorf("no content fetched")
-				}
-			}
 		case "ipfs:":
 			found = true
 			splt := strings.Split(parsedURIs[idx], "/")
 			hash := splt[len(splt)-1]
-			content, err = r.storage.Retrieve(context.TODO(), hash)
-			if len(content) == 0 {
+			ctx, cancel := context.WithTimeout(context.Background(), fetchFileTimeout)
+			content, err = r.storage.Retrieve(ctx, hash)
+			if err == nil && len(content) == 0 {
 				err = fmt.Errorf("no content fetched")
 			}
+			cancel()
 		case "bzz:", "bzz-feed":
 			found = true
 			err = fmt.Errorf("bzz and bzz-feed not implemented yet")
@@ -52,11 +44,11 @@ func (r *Router) fetchFile(request routerRequest) {
 	}
 
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("error fetching uri %s: (%s)", request.URI, err))
+		r.sendError(request, fmt.Sprintf("error fetching file: (%s)", err))
 		return
 	}
 	if !found {
-		r.sendError(request, fmt.Sprintf("error fetching uri %s: (not supported)", request.URI))
+		r.sendError(request, "error fetching file: (not supported)")
 		return
 	}
 

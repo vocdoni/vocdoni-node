@@ -27,6 +27,8 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
+const MaxFileSizeBytes = 1024 * 1024 * 50 // 50 MB
+
 type IPFSHandle struct {
 	Node     *ipfscore.IpfsNode
 	CoreAPI  coreiface.CoreAPI
@@ -216,11 +218,12 @@ func (i *IPFSHandle) Retrieve(ctx context.Context, path string) ([]byte, error) 
 		return nil, err
 	}
 	defer node.Close()
-
+	if s, err := node.Size(); s > int64(MaxFileSizeBytes) || err != nil {
+		return nil, fmt.Errorf("file too big or size cannot be obtained")
+	}
 	r, ok := node.(files.File)
 	if !ok {
 		return nil, errors.New("received incorrect type from Unixfs().Get()")
 	}
-
 	return ioutil.ReadAll(r)
 }
