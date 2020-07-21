@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -371,10 +372,7 @@ func main() {
 		if globalCfg.API.AllowPrivate && globalCfg.API.AllowedAddrs != "" {
 			keys := strings.Split(globalCfg.API.AllowedAddrs, ",")
 			for _, key := range keys {
-				err := signer.AddAuthKey(key)
-				if err != nil {
-					log.Error(err)
-				}
+				signer.AddAuthKey(ethcommon.HexToAddress(key))
 			}
 		}
 

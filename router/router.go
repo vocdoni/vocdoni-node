@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 	psload "github.com/shirou/gopsutil/load"
 	psmem "github.com/shirou/gopsutil/mem"
@@ -180,7 +181,9 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 		request.address = "00000000000000000000"
 	} else {
 		request.private = true
-		request.authenticated, request.address, err = r.signer.VerifySender(reqOuter.MetaRequest, reqOuter.Signature)
+		var addr ethcommon.Address
+		request.authenticated, addr, err = r.signer.VerifySender(reqOuter.MetaRequest, reqOuter.Signature)
+		request.address = addr.String()
 		// if no authrized keys, authenticate all requests if allowPrivate=true
 		if r.allowPrivate && !request.authenticated && len(r.signer.Authorized) == 0 {
 			request.authenticated = true
@@ -192,7 +195,7 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 // InitRouter sets up a Router object which can then be used to route requests
 func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
 	signer *ethereum.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
-	log.Infof("using signer with address %s", signer.EthAddrString())
+	log.Infof("using signer with address %s", signer.AddressString())
 	if allowPrivate {
 		log.Warn("allowing API private methods")
 	}

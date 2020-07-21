@@ -66,13 +66,13 @@ func TestAddr(t *testing.T) {
 	}
 	pub, priv := s.HexString()
 	t.Logf("Generated pub: %s \npriv: %s", pub, priv)
-	addr1 := s.EthAddrString()
+	addr1 := s.AddressString()
 	addr2, err := AddrFromPublicKey(pub)
 	t.Logf("Recovered address from pubKey %s", addr2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if addr1 != addr2 {
+	if addr1 != addr2.String() {
 		t.Fatalf("Calculated address from pubKey do not match: %s != %s", addr1, addr2)
 	}
 	msg := []byte("hello vocdoni")
@@ -90,9 +90,7 @@ func TestAddr(t *testing.T) {
 		t.Fatalf("Extracted signature address do not match: %s != %s", addr2, addr3)
 	}
 
-	if err := s.AddAuthKey(addr3); err != nil {
-		t.Fatal(err)
-	}
+	s.AddAuthKey(addr3)
 	v, _, err := s.VerifySender(msg, signature)
 	if err != nil {
 		t.Fatal(err)

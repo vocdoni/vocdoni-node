@@ -35,7 +35,9 @@ import (
 	"testing"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"gitlab.com/vocdoni/go-dvote/client"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
@@ -55,15 +57,13 @@ func TestCensus(t *testing.T) {
 	server.Start(t, "file", "census")
 
 	signer1 := ethereum.NewSignKeys()
-	signer1.Authorized = make(map[string]bool)
+	signer1.Authorized = make(map[ethcommon.Address]bool)
 	signer1.Generate()
 	signer2 := ethereum.NewSignKeys()
-	signer2.Authorized = make(map[string]bool)
+	signer2.Authorized = make(map[ethcommon.Address]bool)
 	signer2.Generate()
-	if err := server.Signer.AddAuthKey(signer2.EthAddrString()); err != nil {
-		t.Fatalf("cannot add authorized address %s", err)
-	}
-	t.Logf("added authorized address %s", signer2.EthAddrString())
+	server.Signer.AddAuthKey(signer2.Address())
+	t.Logf("added authorized address %s", signer2.AddressString())
 
 	// Create websocket client
 	t.Logf("connecting to %s", server.PxyAddr)

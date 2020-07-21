@@ -192,8 +192,8 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 
 	// Create process
 	pid := client.RandomHex(32)
-	log.Infof("creating process with entityID: %s", entityKey.EthAddrString())
-	start, err := mainClient.CreateProcess(oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, electionType, procDuration)
+	log.Infof("creating process with entityID: %s", entityKey.AddressString())
+	start, err := mainClient.CreateProcess(oracleKey, entityKey.AddressString(), censusRoot, censusURI, pid, electionType, procDuration)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 		proofsReadyWG.Add(1)
 		go func() {
 			defer wg.Done()
-			if votingTimes[gw], err = cl.TestSendVotes(pid, entityKey.EthAddrString(), censusRoot, start, gwSigners, gwProofs, encrypted, doubleVote, &proofsReadyWG); err != nil {
+			if votingTimes[gw], err = cl.TestSendVotes(pid, entityKey.AddressString(), censusRoot, start, gwSigners, gwProofs, encrypted, doubleVote, &proofsReadyWG); err != nil {
 				log.Fatalf("[%s] %s", cl.Addr, err)
 			}
 			log.Infof("gateway %d %s has ended its job", gw, cl.Addr)

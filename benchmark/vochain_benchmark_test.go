@@ -172,7 +172,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	doRequest := cl.ForTest(b, &req)
 
 	// create envelope
-	log.Infof("adding vote using key [%s]", s.EthAddrString())
+	log.Infof("adding vote using key [%s]", s.AddressString())
 
 	pub, _ := s.HexString()
 	// generate envelope proof
@@ -217,7 +217,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	// check vote added
 	req = types.MetaRequest{}
 	req.ProcessID = processID
-	req.Nullifier, err = vochain.GenerateNullifier(s.EthAddrString(), processID)
+	req.Nullifier, err = vochain.GenerateNullifier(s.Address(), processID)
 	if err != nil {
 		b.Fatal(err)
 	}

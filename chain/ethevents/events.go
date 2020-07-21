@@ -16,6 +16,7 @@ import (
 	ttypes "github.com/tendermint/tendermint/types"
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain/contracts"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 
@@ -37,7 +38,7 @@ type EthereumEvents struct {
 	// list of handler functions that will be called on events
 	EventHandlers []EventHandler
 	// ethereum subscribed events
-	Signer Signer
+	Signer *ethereum.SignKeys
 	// VochainApp is a pointer to the Vochain BaseApplication allowing to call SendTx method
 	VochainApp *vochain.BaseApplication
 	// Census is the census manager service
@@ -49,14 +50,6 @@ type EthereumEvents struct {
 type logEvent struct {
 	event *ethtypes.Log
 	added time.Time
-}
-
-type Signer interface {
-	// TODO(mvdan): expose Sign, not SignJSON
-	// TODO(mvdan): the result should be []byte, not string
-	SignJSON(message interface{}) (string, error)
-
-	fmt.Stringer
 }
 
 type VochainClient interface {
@@ -85,7 +78,7 @@ type EventProcessor struct {
 }
 
 // NewEthEvents creates a new Ethereum events handler
-func NewEthEvents(contractAddressHex string, signer Signer, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication) (*EthereumEvents, error) {
+func NewEthEvents(contractAddressHex string, signer *ethereum.SignKeys, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication) (*EthereumEvents, error) {
 	// try to connect to default addr if w3Endpoint is empty
 	if len(w3Endpoint) == 0 {
 		return nil, fmt.Errorf("no w3Endpoint specified on Ethereum Events")
