@@ -64,6 +64,10 @@ func (s *SubPubHandle) String() string {
 	return s.SubPub.String()
 }
 
+func (s *SubPubHandle) ConnectionType() string {
+	return "SubPub"
+}
+
 func (s *SubPubHandle) Send(msg types.Message) {
 	s.SubPub.BroadcastWriter <- msg.Data
 }

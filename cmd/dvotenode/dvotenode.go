@@ -60,6 +60,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// TODO(mvdan): turn this into an enum to avoid human error
 	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. Available options: [gateway,web3,oracle,miner]")
 	// api
+	globalCfg.API.Websockets = *flag.Bool("ws", true, "use websockets transport for the API")
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable census API")
 	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable vote API")
@@ -147,6 +148,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
 
 	// api
+	viper.BindPFlag("api.websockets", flag.Lookup("ws"))
 	viper.BindPFlag("api.file", flag.Lookup("fileApi"))
 	viper.BindPFlag("api.census", flag.Lookup("censusApi"))
 	viper.BindPFlag("api.vote", flag.Lookup("voteApi"))
