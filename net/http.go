@@ -2,7 +2,6 @@ package net
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -19,6 +18,8 @@ type HttpHandler struct {
 type HttpContext struct {
 	Writer  http.ResponseWriter
 	Request *http.Request
+
+	sent chan struct{}
 }
 
 func (h *HttpHandler) Init(c *types.Connection) error {
@@ -33,18 +34,29 @@ func (h *HttpHandler) SetProxy(p *Proxy) {
 // AddProxyHandler adds the current websocket handler into the Proxy
 func (h *HttpHandler) AddProxyHandler(path string) {
 	h.Proxy.AddHandler(path, func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 		respBody, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			log.Warnf("HTTP connection closed: (%s)", err)
 			return
 		}
+		hc := &HttpContext{Request: r, Writer: w, sent: make(chan struct{})}
 		msg := types.Message{
 			Data:      respBody,
 			TimeStamp: int32(time.Now().Unix()),
-			Context:   &HttpContext{Request: r, Writer: w},
+			Context:   hc,
 			Namespace: path,
 		}
 		h.internalReceiver <- msg
+
+		// Don't return this func until a response is sent, because the
+		// connection is closed when the handler returns.
+		select {
+		case <-hc.sent:
+			// a response was sent.
+		case <-r.Context().Done():
+			// we hit chi's timeout.
+		}
 	})
 }
 
@@ -70,14 +82,15 @@ func (h *HttpHandler) SendUnicast(address string, msg types.Message) {
 
 func (h *HttpHandler) Send(msg types.Message) {
 	ctx := msg.Context.(*HttpContext)
-	ctx.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg.Data)))
-	//log.Warnf("writing %d bytes", len(msg.Data))
+	defer close(ctx.sent)
+
+	ctx.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg.Data)+1))
 	ctx.Writer.Header().Set("Content-Type", "application/json")
-	//ctx.Writer.WriteHeader(http.StatusOK)
-	if _, err := io.WriteString(ctx.Writer, string(msg.Data)); err != nil {
-		//if i, err := ctx.Writer.Write(msg.Data); err != nil {
+	if _, err := ctx.Writer.Write(msg.Data); err != nil {
 		log.Warn(err)
 	}
+	// Ensure we end the response with a newline, to be nice.
+	ctx.Writer.Write([]byte("\n"))
 }
 
 func (h *HttpHandler) SetBootnodes(bootnodes []string) {
