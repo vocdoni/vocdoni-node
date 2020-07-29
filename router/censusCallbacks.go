@@ -14,7 +14,7 @@ func (r *Router) censusLocal(request routerRequest) {
 			return
 		}
 	}
-	resp := r.census.Handler(&request.MetaRequest, auth, addr+"/")
+	resp := r.census.Handler(&request.MetaRequest, auth, addr.String()+"/")
 	if !resp.Ok {
 		r.sendError(request, resp.Message)
 		return
