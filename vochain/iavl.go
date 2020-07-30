@@ -517,6 +517,8 @@ func (v *State) CountEntityProcesses(entityID string, isQuery bool) int64 {
 
 // CountProcesses returns the overall number of processes the vochain has
 func (v *State) CountProcesses(isQuery bool) int64 {
+	v.RLock()
+	defer v.RUnlock()
 	if isQuery {
 		return v.IProcessTree.Size()
 	}
