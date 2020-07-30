@@ -21,7 +21,6 @@ const (
 	VoteNullifierSize              = 32
 	KeyIndexSeparator              = ":"
 	EthereumConfirmationsThreshold = 6
-	MaxInt                         = int(^uint(0) >> 1)
 
 	// Scrutinizer
 

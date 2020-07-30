@@ -189,42 +189,8 @@ func (r *Router) getProcessList(request routerRequest) {
 			response.ProcessList = append(response.ProcessList, string(process))
 		}
 	}
-	request.Send(r.buildReply(request, &response))
-}
-
-func (r *Router) getProcessCount(request routerRequest) {
-	// check eid
-	request.EntityId = util.TrimHex(request.EntityId)
-	if !util.IsHexEncodedStringWithLength(request.EntityId, types.EntityIDsize) &&
-		!util.IsHexEncodedStringWithLength(request.EntityId, types.EntityIDsizeV2) {
-		r.sendError(request, "cannot get process list: (malformed entityId)")
-		return
-	}
-	storageKey := []byte(types.ScrutinizerEntityPrefix + request.EntityId)
-	var response types.MetaResponse
-	exists, err := r.Scrutinizer.Storage.Has(storageKey)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get entity (%s)", err))
-		return
-	}
-	if !exists {
-		response.Message = "entity does not exist or has not yet created a process"
-		r.transport.Send(r.buildReply(request, &response))
-		return
-	}
-	processList, err := r.Scrutinizer.Storage.Get(storageKey)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get entity process list: (%s)", err))
-		return
-	}
-	var count int64
-	for _, process := range bytes.Split(processList, []byte(types.ScrutinizerEntityProcessSeparator)) {
-		if len(process) > 0 {
-			count++
-		}
-	}
 	response.Size = new(int64)
-	*response.Size = count
+	*response.Size = int64(len(response.ProcessList))
 	r.transport.Send(r.buildReply(request, &response))
 }
 
@@ -239,7 +205,7 @@ func (r *Router) getAllProcessCount(request routerRequest) {
 func (r *Router) getEntityCount(request routerRequest) {
 	var response types.MetaResponse
 	response.Size = new(int64)
-	*response.Size = int64(len(r.Scrutinizer.List(types.MaxInt, "", types.ScrutinizerEntityPrefix)))
+	*response.Size = r.vocapp.State.CountEntities(true)
 	r.transport.Send(r.buildReply(request, &response))
 }
 
