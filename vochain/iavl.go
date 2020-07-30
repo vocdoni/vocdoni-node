@@ -480,6 +480,73 @@ func (v *State) Process(pid string, isQuery bool) (*types.Process, error) {
 	return process, nil
 }
 
+// Iterates over all the process tree
+func (v *State) iterateProcessTree(fn func(key []byte, value []byte) bool, isQuery bool) bool {
+	v.RLock()
+	defer v.RUnlock()
+	if isQuery {
+		return v.IProcessTree.Iterate(fn)
+	}
+	return v.ProcessTree.Iterate(fn)
+}
+
+// CountEntityProcesses returns the number of processes that an entity has given an entityID
+// TBD: index processes on processTree by (entityID_ProcessID)
+// This method is very uneficient.
+func (v *State) CountEntityProcesses(entityID string, isQuery bool) int64 {
+	eIDLength := len(entityID)
+	if eIDLength != types.EntityIDsize && eIDLength != types.EntityIDsizeV2 {
+		log.Errorf("invalid entityID: %s", entityID)
+		return 0
+	}
+	var count int64
+	v.iterateProcessTree(func(key []byte, value []byte) bool {
+		var process *types.Process
+		err := v.Codec.UnmarshalBinaryBare(value, process)
+		if err != nil {
+			log.Errorf("cannot decode process: %s", err)
+			return true
+		}
+		if process.EntityID == entityID {
+			count++
+		}
+		return false
+	}, isQuery)
+	return count
+}
+
+// CountProcesses returns the overall number of processes the vochain has
+func (v *State) CountProcesses(isQuery bool) int64 {
+	if isQuery {
+		return v.IProcessTree.Size()
+	}
+	return v.ProcessTree.Size()
+}
+
+// CountEntities returns to overall number of entities the vochain has
+// TDB: maintain a list of entities
+// This method is very uneficient
+func (v *State) CountEntities(isQuery bool) int64 {
+	var entities = make(map[string]byte)
+	var count int64
+	v.iterateProcessTree(func(key []byte, value []byte) bool {
+		var process *types.Process
+		err := v.Codec.UnmarshalBinaryBare(value, process)
+		if err != nil {
+			log.Errorf("cannot decode process: %s", err)
+			return true
+		}
+		// if entity not found on the map add it and count
+		// else do nothing because it is already counted
+		if _, ok := entities[process.EntityID]; !ok {
+			entities[process.EntityID] = '0'
+			count++
+		}
+		return false
+	}, isQuery)
+	return count
+}
+
 // set process stores in the database the process
 func (v *State) setProcess(process *types.Process, pid string) error {
 	if process == nil {
