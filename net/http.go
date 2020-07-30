@@ -64,6 +64,18 @@ func (h *HttpContext) ConnectionType() string {
 	return "HTTP"
 }
 
+func (h *HttpContext) Send(msg types.Message) {
+	defer close(h.sent)
+
+	h.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg.Data)+1))
+	h.Writer.Header().Set("Content-Type", "application/json")
+	if _, err := h.Writer.Write(msg.Data); err != nil {
+		log.Warn(err)
+	}
+	// Ensure we end the response with a newline, to be nice.
+	h.Writer.Write([]byte("\n"))
+}
+
 func (h *HttpHandler) ConnectionType() string {
 	return "HTTP"
 }
@@ -81,16 +93,8 @@ func (h *HttpHandler) SendUnicast(address string, msg types.Message) {
 }
 
 func (h *HttpHandler) Send(msg types.Message) {
-	ctx := msg.Context.(*HttpContext)
-	defer close(ctx.sent)
-
-	ctx.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg.Data)+1))
-	ctx.Writer.Header().Set("Content-Type", "application/json")
-	if _, err := ctx.Writer.Write(msg.Data); err != nil {
-		log.Warn(err)
-	}
-	// Ensure we end the response with a newline, to be nice.
-	ctx.Writer.Write([]byte("\n"))
+	// TODO(mvdan): this extra abstraction layer is probably useless
+	msg.Context.(*HttpContext).Send(msg)
 }
 
 func (h *HttpHandler) SetBootnodes(bootnodes []string) {

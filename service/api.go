@@ -23,27 +23,31 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 ) error {
 	log.Infof("creating API service")
 	// API Endpoint initialization
-	var transport net.Transport
 	listenerOutput := make(chan types.Message)
 
-	// WebSocket transport
-	if apiconfig.Websockets {
-		transport = new(net.WebsocketHandle)
-		if err := transport.Init(new(types.Connection)); err != nil {
-			return err
-		}
-		transport.(*net.WebsocketHandle).SetProxy(pxy)
-		go transport.Listen(listenerOutput)
-	} else {
-		// HTTP transport
-		transport = new(net.HttpHandler)
-		if err := transport.Init(new(types.Connection)); err != nil {
-			return err
-		}
-		transport.(*net.HttpHandler).SetProxy(pxy)
-		go transport.Listen(listenerOutput)
+	// HTTP transport (always enabled)
+	transport := new(net.HttpHandler)
+	if err := transport.Init(new(types.Connection)); err != nil {
+		return err
 	}
-	routerAPI := router.InitRouter(listenerOutput, storage, transport, signer, ma, apiconfig.AllowPrivate)
+	transport.SetProxy(pxy)
+	go transport.Listen(listenerOutput)
+	transport.AddNamespace(apiconfig.Route)
+	log.Infof("%s API available at %s", transport.ConnectionType(), apiconfig.Route)
+
+	// WebSocket transport (enabled if config flag true)
+	if apiconfig.Websockets {
+		wsTransport := net.WebsocketHandle{}
+		if err := wsTransport.Init(new(types.Connection)); err != nil {
+			return err
+		}
+		wsTransport.SetProxy(pxy)
+		go wsTransport.Listen(listenerOutput)
+		wsTransport.AddNamespace(apiconfig.Route + "ws")
+		log.Infof("%s API available at %s", wsTransport.ConnectionType(), apiconfig.Route+"ws")
+	}
+
+	routerAPI := router.InitRouter(listenerOutput, storage, signer, ma, apiconfig.AllowPrivate)
 	if apiconfig.File {
 		log.Info("enabling file API")
 		routerAPI.EnableFileAPI()
@@ -58,9 +62,9 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 		routerAPI.Scrutinizer = sc
 		routerAPI.EnableVoteAPI(vapp, vi)
 	}
-	transport.AddNamespace(apiconfig.Route)
+
 	go routerAPI.Route()
-	log.Infof("%s API available at %s", transport.String(), apiconfig.Route)
+
 	go func() {
 		for {
 			time.Sleep(60 * time.Second)

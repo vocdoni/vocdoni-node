@@ -31,6 +31,10 @@ func (c WebsocketContext) ConnectionType() string {
 	return "Websocket"
 }
 
+func (c *WebsocketContext) Send(msg types.Message) {
+	c.Conn.Write(context.TODO(), websocket.MessageBinary, msg.Data)
+}
+
 // SetProxy sets the proxy for the ws
 func (w *WebsocketHandle) SetProxy(p *Proxy) {
 	w.WsProxy = p
@@ -86,8 +90,8 @@ func (w *WebsocketHandle) AddNamespace(namespace string) {
 
 // Send sends the response given a message
 func (w *WebsocketHandle) Send(msg types.Message) {
-	clientConn := msg.Context.(*WebsocketContext).Conn
-	clientConn.Write(context.TODO(), websocket.MessageBinary, msg.Data)
+	// TODO(mvdan): this extra abstraction layer is probably useless
+	msg.Context.(*WebsocketContext).Send(msg)
 }
 
 func (w *WebsocketHandle) SendUnicast(address string, msg types.Message) {

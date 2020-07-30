@@ -20,7 +20,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
-	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
@@ -46,7 +45,7 @@ func (r *Router) buildReply(request routerRequest, resp *types.MetaResponse) typ
 		log.Error(err)
 		return types.Message{
 			TimeStamp: int32(time.Now().Unix()),
-			Context:   request.context,
+			Context:   request.MessageContext,
 			Data:      []byte(err.Error()),
 		}
 	}
@@ -74,14 +73,14 @@ func (r *Router) buildReply(request routerRequest, resp *types.MetaResponse) typ
 		log.Error(err)
 		return types.Message{
 			TimeStamp: int32(time.Now().Unix()),
-			Context:   request.context,
+			Context:   request.MessageContext,
 			Data:      []byte(err.Error()),
 		}
 	}
 	log.Debugf("response: %s", respData)
 	return types.Message{
 		TimeStamp: int32(time.Now().Unix()),
-		Context:   request.context,
+		Context:   request.MessageContext,
 		Data:      respData,
 	}
 }
@@ -105,7 +104,6 @@ type Router struct {
 	methods      map[string]registeredMethod
 	inbound      <-chan types.Message
 	storage      data.Storage
-	transport    net.Transport
 	signer       *ethereum.SignKeys
 	census       *census.Manager
 	vocapp       *vochain.BaseApplication
@@ -119,7 +117,7 @@ type Router struct {
 	APIs         []string
 }
 
-func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
+func NewRouter(inbound <-chan types.Message, storage data.Storage,
 	signer *ethereum.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
 	cm := new(census.Manager)
 	r := new(Router)
@@ -127,7 +125,6 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net
 	r.census = cm
 	r.inbound = inbound
 	r.storage = storage
-	r.transport = transport
 	r.signer = signer
 	r.codec = amino.NewCodec()
 	r.metricsagent = metricsagent
@@ -141,12 +138,12 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage, transport net
 
 type routerRequest struct {
 	types.MetaRequest
+	types.MessageContext
 
 	method        string
 	id            string
 	authenticated bool
 	address       string
-	context       types.MessageContext
 	private       bool
 }
 
@@ -159,7 +156,7 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 		return request, err
 	}
 	request.id = reqOuter.ID
-	request.context = context
+	request.MessageContext = context
 
 	var reqInner types.MetaRequest
 	if err := json.Unmarshal(reqOuter.MetaRequest, &reqInner); err != nil {
@@ -193,14 +190,14 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 }
 
 // InitRouter sets up a Router object which can then be used to route requests
-func InitRouter(inbound <-chan types.Message, storage data.Storage, transport net.Transport,
+func InitRouter(inbound <-chan types.Message, storage data.Storage,
 	signer *ethereum.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
 	log.Infof("using signer with address %s", signer.AddressString())
 	if allowPrivate {
 		log.Warn("allowing API private methods")
 	}
 
-	return NewRouter(inbound, storage, transport, signer, metricsagent, allowPrivate)
+	return NewRouter(inbound, storage, signer, metricsagent, allowPrivate)
 }
 
 func (r *Router) registerPrivate(name string, handler func(routerRequest)) {
@@ -274,6 +271,7 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, vocInfo *vochain
 
 // Route routes requests through the Router object
 func (r *Router) Route() {
+	log.Infof("starting router mux")
 	if len(r.methods) == 0 {
 		log.Warnf("router methods are not properly initialized: %+v", r)
 		return
@@ -346,17 +344,17 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 		Signature:    signature,
 		MetaResponse: respInner,
 	}
-	if request.context != nil {
+	if request.MessageContext != nil {
 		data, err := json.Marshal(respOuter)
 		if err != nil {
 			log.Warnf("error marshaling response body: %s", err)
 		}
 		msg := types.Message{
 			TimeStamp: int32(time.Now().Unix()),
-			Context:   request.context,
+			Context:   request.MessageContext,
 			Data:      data,
 		}
-		r.transport.Send(msg)
+		request.Send(msg)
 	}
 }
 
@@ -370,7 +368,7 @@ func (r *Router) info(request routerRequest) {
 		response.Health = -1
 		log.Errorf("cannot get health status: (%s)", err)
 	}
-	r.transport.Send(r.buildReply(request, &response))
+	request.Send(r.buildReply(request, &response))
 }
 
 // Health is a number between 0 and 99 that represents the status of the node, as bigger the better

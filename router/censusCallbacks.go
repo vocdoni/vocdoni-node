@@ -19,5 +19,5 @@ func (r *Router) censusLocal(request routerRequest) {
 		r.sendError(request, resp.Message)
 		return
 	}
-	r.transport.Send(r.buildReply(request, resp))
+	request.Send(r.buildReply(request, resp))
 }
