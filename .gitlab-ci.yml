@@ -6,7 +6,7 @@ stages:
 variables:
   # DOCKER_HOST: tcp://docker:2375
   DOCKER_DRIVER: overlay2
-  DVOTE_NODE_BUILD_IMAGE: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}
+  DVOTE_NODE_BUILD_IMAGE: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}
   DVOTE_NODE_RELEASE_IMAGE: ${CI_REGISTRY_IMAGE}:latest
 
   GOPATH: ${CI_PROJECT_DIR}/.cache/gopath # to cache Go module downloads
@@ -79,4 +79,4 @@ docker-release:
     - docker push ${DVOTE_NODE_RELEASE_IMAGE}
   only:
     - master
-    - /^release-*$/
+    - /^release-.*$/

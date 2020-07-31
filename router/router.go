@@ -143,7 +143,7 @@ type routerRequest struct {
 	method        string
 	id            string
 	authenticated bool
-	address       string
+	address       ethcommon.Address
 	private       bool
 }
 
@@ -175,12 +175,10 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 	if method.public {
 		request.private = false
 		request.authenticated = true
-		request.address = "00000000000000000000"
+		request.address = ethcommon.Address{}
 	} else {
 		request.private = true
-		var addr ethcommon.Address
-		request.authenticated, addr, err = r.signer.VerifySender(reqOuter.MetaRequest, reqOuter.Signature)
-		request.address = addr.String()
+		request.authenticated, request.address, err = r.signer.VerifySender(reqOuter.MetaRequest, reqOuter.Signature)
 		// if no authrized keys, authenticate all requests if allowPrivate=true
 		if r.allowPrivate && !request.authenticated && len(r.signer.Authorized) == 0 {
 			request.authenticated = true
