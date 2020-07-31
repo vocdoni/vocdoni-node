@@ -1,29 +1,23 @@
-# This first chunk downloads dependencies and builds the binaries, in a way that
-# can easily be cached and reused.
+# syntax=docker/dockerfile:experimental
 
-FROM golang:1.14.4 AS builder
-
-WORKDIR /src
-
-# We also need the duktape stub for the 'go mod download'. Note that we need two
-# COPY lines, since otherwise we do the equivalent of 'cp duktape-stub/* .'.
-COPY go.mod go.sum ./
-COPY duktape-stub duktape-stub
-RUN go mod download
+FROM golang:1.14.7 AS builder
 
 # Build all the binaries at once, so that the final targets don't require having
 # Go installed to build each of them.
+WORKDIR /src
 COPY . .
-RUN go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/dvotenode ./cmd/vochaintest
+RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
+	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
+	go build -o=. -ldflags='-w -s' -mod=readonly ./cmd/dvotenode ./cmd/vochaintest
 
-FROM debian:10.4-slim AS test
+FROM debian:10.5-slim AS test
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 RUN apt update && apt install -y curl 
 COPY --from=builder /src/vochaintest ./
 
-FROM debian:10.4-slim
+FROM debian:10.5-slim
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app

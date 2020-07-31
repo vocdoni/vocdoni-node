@@ -8,6 +8,8 @@ IN_MEMORY="${IN_MEMORY:-false}"
 PORTS="${PORTS:-4001 4171 5001 30303 9096 31000 26656 26657}"
 NAME="${NAME:-$IMAGE_TAG-$RANDOM}"
 
+export DOCKER_BUILDKIT=1
+
 echo "using image $IMAGE_TAG:latest"
 
 docker build -t $IMAGE_TAG . || {

@@ -3,6 +3,8 @@ BRANCH=${BRANCH:-master}
 CMD=${CMD:-dvotenode}
 NAME="$CMD-$BRANCH"
 
+export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
+
 [ ! -d dockerfiles/$CMD ] && {
 	echo "dockerfiles/$CMD does not exist"
 	echo "please execute this script from repository root: bash scripts/update_and_deploy_compose.sh"
