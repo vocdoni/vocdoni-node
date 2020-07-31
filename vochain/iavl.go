@@ -490,31 +490,6 @@ func (v *State) iterateProcessTree(fn func(key []byte, value []byte) bool, isQue
 	return v.ProcessTree.Iterate(fn)
 }
 
-// CountEntityProcesses returns the number of processes that an entity has given an entityID
-// TBD: index processes on processTree by (entityID_ProcessID)
-// This method is very uneficient.
-func (v *State) CountEntityProcesses(entityID string, isQuery bool) int64 {
-	eIDLength := len(entityID)
-	if eIDLength != types.EntityIDsize && eIDLength != types.EntityIDsizeV2 {
-		log.Errorf("invalid entityID: %s", entityID)
-		return 0
-	}
-	var count int64
-	v.iterateProcessTree(func(key []byte, value []byte) bool {
-		var process *types.Process
-		err := v.Codec.UnmarshalBinaryBare(value, process)
-		if err != nil {
-			log.Errorf("cannot decode process: %s", err)
-			return true
-		}
-		if process.EntityID == entityID {
-			count++
-		}
-		return false
-	}, isQuery)
-	return count
-}
-
 // CountProcesses returns the overall number of processes the vochain has
 func (v *State) CountProcesses(isQuery bool) int64 {
 	v.RLock()

@@ -13,6 +13,7 @@ import (
 )
 
 const MaxListSize = 256
+const MaxListIterations = 64
 
 func (r *Router) submitRawTx(request routerRequest) {
 	tx, err := base64.StdEncoding.DecodeString(request.RawTx)
@@ -194,7 +195,7 @@ func (r *Router) getProcessList(request routerRequest) {
 	r.transport.Send(r.buildReply(request, &response))
 }
 
-func (r *Router) getAllProcessCount(request routerRequest) {
+func (r *Router) getProcessCount(request routerRequest) {
 	var response types.MetaResponse
 	response.Size = new(int64)
 	count := r.vocapp.State.CountProcesses(true)
@@ -202,7 +203,7 @@ func (r *Router) getAllProcessCount(request routerRequest) {
 	r.transport.Send(r.buildReply(request, &response))
 }
 
-func (r *Router) getEntityCount(request routerRequest) {
+func (r *Router) getScrutinizerEntityCount(request routerRequest) {
 	var response types.MetaResponse
 	response.Size = new(int64)
 	*response.Size = r.vocapp.State.CountEntities(true)
@@ -324,21 +325,21 @@ func (r *Router) getResults(request routerRequest) {
 // finished processes
 func (r *Router) getProcListResults(request routerRequest) {
 	var response types.MetaResponse
-	response.ProcessIDs = r.Scrutinizer.List(int(request.ListSize), util.TrimHex(request.FromID), types.ScrutinizerResultsPrefix)
+	response.ProcessIDs = r.Scrutinizer.List(MaxListIterations, int(request.ListSize), util.TrimHex(request.FromID), types.ScrutinizerResultsPrefix)
 	r.transport.Send(r.buildReply(request, &response))
 }
 
 // live processes
 func (r *Router) getProcListLiveResults(request routerRequest) {
 	var response types.MetaResponse
-	response.ProcessIDs = r.Scrutinizer.List(int(request.ListSize), util.TrimHex(request.FromID), types.ScrutinizerLiveProcessPrefix)
+	response.ProcessIDs = r.Scrutinizer.List(MaxListIterations, int(request.ListSize), util.TrimHex(request.FromID), types.ScrutinizerLiveProcessPrefix)
 	r.transport.Send(r.buildReply(request, &response))
 }
 
 // known entities
 func (r *Router) getScrutinizerEntities(request routerRequest) {
 	var response types.MetaResponse
-	response.EntityIDs = r.Scrutinizer.List(int(request.ListSize), util.TrimHex(request.FromID), types.ScrutinizerEntityPrefix)
+	response.EntityIDs = r.Scrutinizer.List(MaxListIterations, int(request.ListSize), util.TrimHex(request.FromID), types.ScrutinizerEntityPrefix)
 	r.transport.Send(r.buildReply(request, &response))
 }
 

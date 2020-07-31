@@ -23,8 +23,6 @@ const (
 	MaxQuestions = 64
 	// MaxOptions is the maximum number of options allowed in a VotePackage question
 	MaxOptions = 64
-	// ListMaxIterations is the maximum number of iterations when List() is called
-	ListMaxIterations = 64
 )
 
 // Scrutinizer is the component which makes the accounting of the voting processes and keeps it indexed in a local database
@@ -143,12 +141,14 @@ func (s *Scrutinizer) OnRevealKeys(pid, pub, com string) {
 }
 
 // List returns a list of keys matching a given prefix
-// iterations limited by ListMaxIterations const
-func (s *Scrutinizer) List(listSize int, from, prefix string) (list []string) {
-	max := listSize
-	if listSize > ListMaxIterations || listSize <= 0 {
-		max = ListMaxIterations
+func (s *Scrutinizer) List(max, listSize int, from, prefix string) (list []string) {
+	if listSize > max || listSize <= 0 {
+		return s.list(max, from, prefix)
 	}
+	return s.list(listSize, from, prefix)
+}
+
+func (s *Scrutinizer) list(max int, from, prefix string) (list []string) {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
 	if len(from) > 0 {
 		iter.Seek([]byte(from))
