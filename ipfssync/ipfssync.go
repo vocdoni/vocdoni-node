@@ -100,7 +100,9 @@ func guessMyAddress(port int, id string) string {
 
 // myPins return the list of local stored pins base64 encoded
 func (is *IPFSsync) myPins() (pins []string) {
-	list, err := is.Storage.ListPins(context.TODO())
+	ctx, cancel := context.WithTimeout(context.Background(), is.Timeout)
+	defer cancel()
+	list, err := is.Storage.ListPins(ctx)
 	if err != nil {
 		log.Error(err)
 		return
@@ -146,7 +148,8 @@ func (is *IPFSsync) syncPins() error {
 	if err != nil {
 		return err
 	}
-	ctx := context.TODO() // the caller should probably provide it
+	ctx, cancel := context.WithTimeout(context.Background(), is.Timeout)
+	defer cancel()
 	pins, err := is.Storage.ListPins(ctx)
 	if err != nil {
 		return err
@@ -157,8 +160,6 @@ func (is *IPFSsync) syncPins() error {
 		}
 
 		log.Infof("pinning %s", v)
-		ctx, cancel := context.WithTimeout(ctx, is.Timeout)
-		defer cancel()
 		if err := is.Storage.Pin(ctx, v); err != nil {
 			log.Warn(err)
 		}
@@ -434,8 +435,7 @@ func (is *IPFSsync) Start() {
 
 	go func() {
 		for {
-			err = is.syncPins()
-			if err != nil {
+			if err := is.syncPins(); err != nil {
 				log.Warn(err)
 			}
 			time.Sleep(time.Second * 32)
