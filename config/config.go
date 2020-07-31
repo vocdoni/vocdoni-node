@@ -82,8 +82,10 @@ type API struct {
 		Domain  string
 		DirCert string
 	}
-	// Use WebSockets
+	// Enable WebSockets API
 	Websockets bool
+	// Enable HTTP API
+	HTTP bool
 }
 
 // IPFSCfg includes all possible config params needed by IPFS

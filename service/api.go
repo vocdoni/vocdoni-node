@@ -25,17 +25,19 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 	// API Endpoint initialization
 	listenerOutput := make(chan types.Message)
 
-	// HTTP transport (always enabled)
-	transport := new(net.HttpHandler)
-	if err := transport.Init(new(types.Connection)); err != nil {
-		return err
+	// HTTP transport
+	if apiconfig.HTTP {
+		htransport := new(net.HttpHandler)
+		if err := htransport.Init(new(types.Connection)); err != nil {
+			return err
+		}
+		htransport.SetProxy(pxy)
+		go htransport.Listen(listenerOutput)
+		htransport.AddNamespace(apiconfig.Route + "dvoterest")
+		log.Infof("%s API available at %s", htransport.ConnectionType(), apiconfig.Route+"dvoterest")
 	}
-	transport.SetProxy(pxy)
-	go transport.Listen(listenerOutput)
-	transport.AddNamespace(apiconfig.Route)
-	log.Infof("%s API available at %s", transport.ConnectionType(), apiconfig.Route)
 
-	// WebSocket transport (enabled if config flag true)
+	// WebSocket transport
 	if apiconfig.Websockets {
 		wsTransport := net.WebsocketHandle{}
 		if err := wsTransport.Init(new(types.Connection)); err != nil {
@@ -43,8 +45,8 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 		}
 		wsTransport.SetProxy(pxy)
 		go wsTransport.Listen(listenerOutput)
-		wsTransport.AddNamespace(apiconfig.Route + "ws")
-		log.Infof("%s API available at %s", wsTransport.ConnectionType(), apiconfig.Route+"ws")
+		wsTransport.AddNamespace(apiconfig.Route + "dvote")
+		log.Infof("%s API available at %s", wsTransport.ConnectionType(), apiconfig.Route+"dvote")
 	}
 
 	routerAPI := router.InitRouter(listenerOutput, storage, signer, ma, apiconfig.AllowPrivate)
