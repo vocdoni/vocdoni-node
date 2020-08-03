@@ -141,14 +141,7 @@ func (s *Scrutinizer) OnRevealKeys(pid, pub, com string) {
 }
 
 // List returns a list of keys matching a given prefix
-func (s *Scrutinizer) List(max, listSize int, from, prefix string) (list []string) {
-	if listSize > max || listSize <= 0 {
-		return s.list(max, from, prefix)
-	}
-	return s.list(listSize, from, prefix)
-}
-
-func (s *Scrutinizer) list(max int, from, prefix string) (list []string) {
+func (s *Scrutinizer) List(max int64, from, prefix string) (list []string) {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
 	if len(from) > 0 {
 		iter.Seek([]byte(from))

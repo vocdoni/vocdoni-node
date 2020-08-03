@@ -13,7 +13,7 @@ import (
 )
 
 const MaxListSize = 256
-const MaxListIterations = 64
+const MaxListIterations = int64(64)
 
 func (r *Router) submitRawTx(request routerRequest) {
 	tx, err := base64.StdEncoding.DecodeString(request.RawTx)
@@ -192,7 +192,7 @@ func (r *Router) getProcessList(request routerRequest) {
 	}
 	response.Size = new(int64)
 	*response.Size = int64(len(response.ProcessList))
-	r.transport.Send(r.buildReply(request, &response))
+	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getProcessCount(request routerRequest) {
@@ -200,14 +200,14 @@ func (r *Router) getProcessCount(request routerRequest) {
 	response.Size = new(int64)
 	count := r.vocapp.State.CountProcesses(true)
 	*response.Size = count
-	r.transport.Send(r.buildReply(request, &response))
+	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getScrutinizerEntityCount(request routerRequest) {
 	var response types.MetaResponse
 	response.Size = new(int64)
-	*response.Size = r.vocapp.State.CountEntities(true)
-	r.transport.Send(r.buildReply(request, &response))
+	*response.Size = int64(len(r.Scrutinizer.List(int64(^uint(0)>>1), "", types.ScrutinizerEntityPrefix)))
+	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getProcessKeys(request routerRequest) {
@@ -325,22 +325,31 @@ func (r *Router) getResults(request routerRequest) {
 // finished processes
 func (r *Router) getProcListResults(request routerRequest) {
 	var response types.MetaResponse
-	response.ProcessIDs = r.Scrutinizer.List(MaxListIterations, int(request.ListSize), util.TrimHex(request.FromID), types.ScrutinizerResultsPrefix)
-	r.transport.Send(r.buildReply(request, &response))
+	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
+		request.ListSize = MaxListIterations
+	}
+	response.ProcessIDs = r.Scrutinizer.List(request.ListSize, util.TrimHex(request.FromID), types.ScrutinizerResultsPrefix)
+	request.Send(r.buildReply(request, &response))
 }
 
 // live processes
 func (r *Router) getProcListLiveResults(request routerRequest) {
 	var response types.MetaResponse
-	response.ProcessIDs = r.Scrutinizer.List(MaxListIterations, int(request.ListSize), util.TrimHex(request.FromID), types.ScrutinizerLiveProcessPrefix)
-	r.transport.Send(r.buildReply(request, &response))
+	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
+		request.ListSize = MaxListIterations
+	}
+	response.ProcessIDs = r.Scrutinizer.List(request.ListSize, util.TrimHex(request.FromID), types.ScrutinizerLiveProcessPrefix)
+	request.Send(r.buildReply(request, &response))
 }
 
 // known entities
 func (r *Router) getScrutinizerEntities(request routerRequest) {
 	var response types.MetaResponse
-	response.EntityIDs = r.Scrutinizer.List(MaxListIterations, int(request.ListSize), util.TrimHex(request.FromID), types.ScrutinizerEntityPrefix)
-	r.transport.Send(r.buildReply(request, &response))
+	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
+		request.ListSize = MaxListIterations
+	}
+	response.EntityIDs = r.Scrutinizer.List(request.ListSize, util.TrimHex(request.FromID), types.ScrutinizerEntityPrefix)
+	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getBlockStatus(request routerRequest) {
