@@ -77,11 +77,11 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		signer := ethereum.SignKeys{}
+		signer := ethereum.NewSignKeys()
 		if err = signer.AddHexKey(osp[0]); err != nil {
 			log.Fatal(err)
 		}
-		pk, err := generateKeys(*pid, int8(index), &signer)
+		pk, err := generateKeys(*pid, int8(index), signer)
 		if err != nil {
 			log.Fatal(err)
 		}

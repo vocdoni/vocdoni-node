@@ -480,6 +480,16 @@ func (v *State) Process(pid string, isQuery bool) (*types.Process, error) {
 	return process, nil
 }
 
+// CountProcesses returns the overall number of processes the vochain has
+func (v *State) CountProcesses(isQuery bool) int64 {
+	v.RLock()
+	defer v.RUnlock()
+	if isQuery {
+		return v.IProcessTree.Size()
+	}
+	return v.ProcessTree.Size()
+}
+
 // set process stores in the database the process
 func (v *State) setProcess(process *types.Process, pid string) error {
 	if process == nil {

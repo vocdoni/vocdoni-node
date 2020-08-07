@@ -51,7 +51,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	// create entity key
-	entityKey := ethereum.SignKeys{}
+	entityKey := ethereum.NewSignKeys()
 	if len(*entityPrivKey) > 0 {
 		if err := entityKey.AddHexKey(*entityPrivKey); err != nil {
 			log.Fatal(err)
@@ -64,11 +64,11 @@ func main() {
 
 	switch *opmode {
 	case "vtest":
-		vtest(*host, *oraclePrivKey, *electionType, &entityKey, *electionSize, *procDuration, *parallelCons, *doubleVote, *gateways, *keysfile, true)
+		vtest(*host, *oraclePrivKey, *electionType, entityKey, *electionSize, *procDuration, *parallelCons, *doubleVote, *gateways, *keysfile, true)
 	case "censusImport":
-		censusImport(*host, &entityKey)
+		censusImport(*host, entityKey)
 	case "censusGenerate":
-		censusGenerate(*host, &entityKey, *electionSize, *keysfile)
+		censusGenerate(*host, entityKey, *electionSize, *keysfile)
 	default:
 		log.Warnf("no valid operation mode specified")
 	}
@@ -151,7 +151,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	censusRoot := ""
 	censusURI := ""
 
-	oracleKey := ethereum.SignKeys{}
+	oracleKey := ethereum.NewSignKeys()
 	if err := oracleKey.AddHexKey(oraclePrivKey); err != nil {
 		log.Fatal(err)
 	}
@@ -192,8 +192,8 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 
 	// Create process
 	pid := client.RandomHex(32)
-	log.Infof("creating process with entityID: %s", entityKey.EthAddrString())
-	start, err := mainClient.CreateProcess(&oracleKey, entityKey.EthAddrString(), censusRoot, censusURI, pid, electionType, procDuration)
+	log.Infof("creating process with entityID: %s", entityKey.AddressString())
+	start, err := mainClient.CreateProcess(oracleKey, entityKey.AddressString(), censusRoot, censusURI, pid, electionType, procDuration)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 		proofsReadyWG.Add(1)
 		go func() {
 			defer wg.Done()
-			if votingTimes[gw], err = cl.TestSendVotes(pid, entityKey.EthAddrString(), censusRoot, start, gwSigners, gwProofs, encrypted, doubleVote, &proofsReadyWG); err != nil {
+			if votingTimes[gw], err = cl.TestSendVotes(pid, entityKey.AddressString(), censusRoot, start, gwSigners, gwProofs, encrypted, doubleVote, &proofsReadyWG); err != nil {
 				log.Fatalf("[%s] %s", cl.Addr, err)
 			}
 			log.Infof("gateway %d %s has ended its job", gw, cl.Addr)
@@ -283,7 +283,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	wg.Wait()
 
 	log.Infof("canceling process in order to fetch the results")
-	if err := mainClient.CancelProcess(&oracleKey, pid); err != nil {
+	if err := mainClient.CancelProcess(oracleKey, pid); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)

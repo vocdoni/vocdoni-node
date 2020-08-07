@@ -13,6 +13,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	amino "github.com/tendermint/go-amino"
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -29,28 +30,21 @@ func checkMerkleProof(rootHash, hexproof string, leafData []byte) (bool, error) 
 }
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
-func verifySignatureAgainstOracles(oracles []string, message []byte, signHex string) (bool, string, error) {
-	signKeys := ethereum.SignKeys{}
+func verifySignatureAgainstOracles(oracles []string, message []byte, signHex string) (bool, ethcommon.Address, error) {
+	signKeys := ethereum.NewSignKeys()
 	for _, oracle := range oracles {
-		if err := signKeys.AddAuthKey(oracle); err != nil {
-			return false, "", err
-		}
+		signKeys.AddAuthKey(ethcommon.HexToAddress(oracle))
 	}
 	return signKeys.VerifySender(message, signHex)
 }
 
 // GenerateNullifier generates the nullifier of a vote (hash(address+processId))
-func GenerateNullifier(address, processID string) (string, error) {
-	var err error
-	addrBytes, err := hex.DecodeString(util.TrimHex(address))
-	if err != nil {
-		return "", err
-	}
+func GenerateNullifier(address ethcommon.Address, processID string) (string, error) {
 	pidBytes, err := hex.DecodeString(util.TrimHex(processID))
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%x", ethereum.HashRaw([]byte(fmt.Sprintf("%s%s", addrBytes, pidBytes)))), nil
+	return fmt.Sprintf("%x", ethereum.HashRaw([]byte(fmt.Sprintf("%s%s", address.Bytes(), pidBytes)))), nil
 }
 
 // NewPrivateValidator returns a tendermint file private validator (key and state)

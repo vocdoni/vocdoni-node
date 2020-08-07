@@ -39,7 +39,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var sk ethereum.SignKeys
+	sk := ethereum.NewSignKeys()
 	var privKey string
 
 	if len(*nodeKey) > 0 {

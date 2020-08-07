@@ -2,14 +2,16 @@ package types
 
 type MessageContext interface {
 	ConnectionType() string
+	Send(Message)
 }
 
 // Message is a wrapper for messages from various net transport modules
 type Message struct {
 	Data      []byte
 	TimeStamp int32
-	Context   MessageContext
 	Namespace string
+
+	Context MessageContext
 }
 
 // Connection describes the settings for any of the transports defined in the net module, note that not all

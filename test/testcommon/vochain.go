@@ -179,7 +179,7 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	consensusParams := tmtypes.DefaultConsensusParams()
 	// TO-DO instead of creating a pv file, just create a random 64 bytes key and use it for the genesis file
 	validator := privval.GenFilePV(d.VochainCfg.DataDir+"/config/priv_validator_key.json", d.VochainCfg.DataDir+"/data/priv_validator_state.json")
-	oracles := []string{d.Signer.EthAddrString()}
+	oracles := []string{d.Signer.AddressString()}
 	genBytes, err := vochain.NewGenesis(d.VochainCfg, strconv.Itoa(rand.Int()), consensusParams, []privval.FilePV{*validator}, oracles)
 	if err != nil {
 		tb.Fatal(err)
@@ -215,7 +215,7 @@ func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer, vnode *vochain.BaseApp
 func CreateEthRandomKeysBatch(tb testing.TB, n int) []*ethereum.SignKeys {
 	s := make([]*ethereum.SignKeys, n)
 	for i := 0; i < n; i++ {
-		s[i] = new(ethereum.SignKeys)
+		s[i] = ethereum.NewSignKeys()
 		if err := s[i].Generate(); err != nil {
 			tb.Fatal(err)
 		}

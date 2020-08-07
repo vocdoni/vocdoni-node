@@ -56,7 +56,7 @@ func (r *Router) fetchFile(request routerRequest) {
 	log.Debugf("file fetched, b64 size %d", len(b64content))
 	var response types.MetaResponse
 	response.Content = b64content
-	r.transport.Send(r.buildReply(request, &response))
+	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) addFile(request routerRequest) {
@@ -80,7 +80,7 @@ func (r *Router) addFile(request routerRequest) {
 		log.Debugf("added file %s, b64 size of %d", cid, len(b64content))
 		var response types.MetaResponse
 		response.URI = r.storage.URIprefix() + cid
-		r.transport.Send(r.buildReply(request, &response))
+		request.Send(r.buildReply(request, &response))
 	}
 }
 
@@ -98,7 +98,7 @@ func (r *Router) pinList(request routerRequest) {
 	}
 	var response types.MetaResponse
 	response.Files = pinsJSONArray
-	r.transport.Send(r.buildReply(request, &response))
+	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) pinFile(request routerRequest) {
@@ -109,7 +109,7 @@ func (r *Router) pinFile(request routerRequest) {
 		return
 	}
 	var response types.MetaResponse
-	r.transport.Send(r.buildReply(request, &response))
+	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) unpinFile(request routerRequest) {
@@ -120,5 +120,5 @@ func (r *Router) unpinFile(request routerRequest) {
 		return
 	}
 	var response types.MetaResponse
-	r.transport.Send(r.buildReply(request, &response))
+	request.Send(r.buildReply(request, &response))
 }

@@ -56,7 +56,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 	var req types.MetaRequest
 
 	// Create client signer
-	signer := new(ethereum.SignKeys)
+	signer := ethereum.NewSignKeys()
 	signer.Generate()
 
 	doRequest := cl.ForTest(b, &req)

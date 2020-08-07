@@ -7,7 +7,7 @@ import (
 func TestSignature(t *testing.T) {
 	t.Parallel()
 
-	var s SignKeys
+	s := NewSignKeys()
 	if err := s.Generate(); err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +21,7 @@ func TestSignature(t *testing.T) {
 	}
 	t.Logf("Signature is %s", msgSign)
 
-	var s2 SignKeys
+	s2 := NewSignKeys()
 	if err := s2.AddHexKey(priv); err != nil {
 		t.Fatalf("Error importing hex privKey: %s", err)
 	}
@@ -39,7 +39,7 @@ func TestSignature(t *testing.T) {
 	t.Log("Testing compatibility with standard Ethereum signing libraries")
 	hardcodedPriv := "fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19"
 	hardcodedSignature := "a0d0ebc374d2a4d6357eaca3da2f5f3ff547c3560008206bc234f9032a866ace6279ffb4093fb39c8bbc39021f6a5c36ef0e813c8c94f325a53f4f395a5c82de01"
-	var s3 SignKeys
+	s3 := NewSignKeys()
 	if err := s3.AddHexKey(hardcodedPriv); err != nil {
 		t.Fatal(err)
 	}
@@ -60,19 +60,19 @@ func TestSignature(t *testing.T) {
 func TestAddr(t *testing.T) {
 	t.Parallel()
 
-	var s SignKeys
+	s := NewSignKeys()
 	if err := s.Generate(); err != nil {
 		t.Fatal(err)
 	}
 	pub, priv := s.HexString()
 	t.Logf("Generated pub: %s \npriv: %s", pub, priv)
-	addr1 := s.EthAddrString()
+	addr1 := s.AddressString()
 	addr2, err := AddrFromPublicKey(pub)
 	t.Logf("Recovered address from pubKey %s", addr2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if addr1 != addr2 {
+	if addr1 != addr2.String() {
 		t.Fatalf("Calculated address from pubKey do not match: %s != %s", addr1, addr2)
 	}
 	msg := []byte("hello vocdoni")
@@ -90,9 +90,7 @@ func TestAddr(t *testing.T) {
 		t.Fatalf("Extracted signature address do not match: %s != %s", addr2, addr3)
 	}
 
-	if err := s.AddAuthKey(addr3); err != nil {
-		t.Fatal(err)
-	}
+	s.AddAuthKey(addr3)
 	v, _, err := s.VerifySender(msg, signature)
 	if err != nil {
 		t.Fatal(err)

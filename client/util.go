@@ -35,7 +35,7 @@ func (c *Client) WaitUntilBlock(block int64) {
 func CreateEthRandomKeysBatch(n int) []*ethereum.SignKeys {
 	s := make([]*ethereum.SignKeys, n)
 	for i := 0; i < n; i++ {
-		s[i] = new(ethereum.SignKeys)
+		s[i] = ethereum.NewSignKeys()
 		if err := s[i].Generate(); err != nil {
 			log.Fatal(err)
 		}
@@ -96,12 +96,12 @@ func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, []string, string, str
 	keys := make([]*ethereum.SignKeys, len(kb.Keys))
 	proofs := []string{}
 	for i, k := range kb.Keys {
-		var s ethereum.SignKeys
+		s := ethereum.NewSignKeys()
 		if err = s.AddHexKey(k.PrivKey); err != nil {
 			return nil, nil, "", "", err
 		}
 		proofs = append(proofs, k.Proof)
-		keys[i] = &s
+		keys[i] = s
 	}
 	return keys, proofs, kb.CensusID, kb.CensusURI, nil
 }

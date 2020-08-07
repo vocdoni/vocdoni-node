@@ -23,16 +23,33 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 ) error {
 	log.Infof("creating API service")
 	// API Endpoint initialization
-	ws := new(net.WebsocketHandle)
-	if err := ws.Init(new(types.Connection)); err != nil {
-		return err
-	}
-	ws.SetProxy(pxy)
-
 	listenerOutput := make(chan types.Message)
-	go ws.Listen(listenerOutput)
 
-	routerAPI := router.InitRouter(listenerOutput, storage, ws, signer, ma, apiconfig.AllowPrivate)
+	// HTTP transport
+	if apiconfig.HTTP {
+		htransport := new(net.HttpHandler)
+		if err := htransport.Init(new(types.Connection)); err != nil {
+			return err
+		}
+		htransport.SetProxy(pxy)
+		go htransport.Listen(listenerOutput)
+		htransport.AddNamespace(apiconfig.Route + "dvoterest")
+		log.Infof("%s API available at %s", htransport.ConnectionType(), apiconfig.Route+"dvoterest")
+	}
+
+	// WebSocket transport
+	if apiconfig.Websockets {
+		wsTransport := net.WebsocketHandle{}
+		if err := wsTransport.Init(new(types.Connection)); err != nil {
+			return err
+		}
+		wsTransport.SetProxy(pxy)
+		go wsTransport.Listen(listenerOutput)
+		wsTransport.AddNamespace(apiconfig.Route + "dvote")
+		log.Infof("%s API available at %s", wsTransport.ConnectionType(), apiconfig.Route+"dvote")
+	}
+
+	routerAPI := router.InitRouter(listenerOutput, storage, signer, ma, apiconfig.AllowPrivate)
 	if apiconfig.File {
 		log.Info("enabling file API")
 		routerAPI.EnableFileAPI()
@@ -47,9 +64,9 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 		routerAPI.Scrutinizer = sc
 		routerAPI.EnableVoteAPI(vapp, vi)
 	}
-	ws.AddNamespace(apiconfig.Route)
+
 	go routerAPI.Route()
-	log.Infof("websockets API available at %s", apiconfig.Route)
+
 	go func() {
 		for {
 			time.Sleep(60 * time.Second)

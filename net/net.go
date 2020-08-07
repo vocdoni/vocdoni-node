@@ -7,6 +7,7 @@ import (
 )
 
 type Transport interface {
+	ConnectionType() string
 	Listen(reciever chan<- types.Message)
 	Send(msg types.Message)
 	AddNamespace(namespace string)

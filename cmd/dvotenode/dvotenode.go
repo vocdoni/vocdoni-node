@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -59,11 +60,13 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// TODO(mvdan): turn this into an enum to avoid human error
 	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. Available options: [gateway,web3,oracle,miner]")
 	// api
-	globalCfg.API.File = *flag.Bool("fileApi", true, "enable file API")
-	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable census API")
-	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable vote API")
-	globalCfg.API.Results = *flag.Bool("resultsApi", true, "enable results API")
-	globalCfg.API.Route = *flag.String("apiRoute", "/dvote", "dvote API route")
+	globalCfg.API.Websockets = *flag.Bool("apiws", true, "enable websockets transport for the API")
+	globalCfg.API.HTTP = *flag.Bool("apihttp", true, "enable http transport for the API")
+	globalCfg.API.File = *flag.Bool("fileApi", true, "enable the file API")
+	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable the census API")
+	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable the vote API")
+	globalCfg.API.Results = *flag.Bool("resultsApi", true, "enable the results API")
+	globalCfg.API.Route = *flag.String("apiRoute", "/", "dvote API base route for HTTP and Websockets")
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false, "allows private methods over the APIs")
 	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	globalCfg.API.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
@@ -146,6 +149,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
 
 	// api
+	viper.BindPFlag("api.websockets", flag.Lookup("apiws"))
+	viper.BindPFlag("api.http", flag.Lookup("apihttp"))
 	viper.BindPFlag("api.file", flag.Lookup("fileApi"))
 	viper.BindPFlag("api.census", flag.Lookup("censusApi"))
 	viper.BindPFlag("api.vote", flag.Lookup("voteApi"))
@@ -244,7 +249,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 
 	if len(globalCfg.EthConfig.SigningKey) < 32 {
 		fmt.Println("no signing key, generating one...")
-		var signer ethereum.SignKeys
+		signer := ethereum.NewSignKeys()
 		err = signer.Generate()
 		if err != nil {
 			cfgError = config.Error{
@@ -366,15 +371,12 @@ func main() {
 
 	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" || globalCfg.Mode == "web3" {
 		// Signing key
-		signer = new(ethereum.SignKeys)
+		signer = ethereum.NewSignKeys()
 		// Add Authorized keys for private methods
 		if globalCfg.API.AllowPrivate && globalCfg.API.AllowedAddrs != "" {
 			keys := strings.Split(globalCfg.API.AllowedAddrs, ",")
 			for _, key := range keys {
-				err := signer.AddAuthKey(key)
-				if err != nil {
-					log.Error(err)
-				}
+				signer.AddAuthKey(ethcommon.HexToAddress(key))
 			}
 		}
 
