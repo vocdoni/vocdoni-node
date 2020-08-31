@@ -10,8 +10,6 @@ package scrutinizer
 */
 
 import (
-	"strings"
-
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -143,16 +141,19 @@ func (s *Scrutinizer) OnRevealKeys(pid, pub, com string) {
 // List returns a list of keys matching a given prefix
 func (s *Scrutinizer) List(max int64, from, prefix string) (list []string) {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
-	if len(from) > 0 {
-		iter.Seek([]byte(from))
-	}
-	for iter.Next() {
+	fromLock := len(from) > 0                            // true if from field specified, will be false when from found in database
+
+	// TBD: iter.Seek([]byte(prefix+from)) does not work as expected. Find why and apply a fix if possible.
+	for iter.Seek([]byte(prefix)); iter.Iter.ValidForPrefix([]byte(prefix)); iter.Next() {
 		if max < 1 {
 			break
 		}
-		if strings.HasPrefix(string(iter.Key()), prefix) {
+		if !fromLock {
 			list = append(list, string(iter.Key()[2:]))
 			max--
+		}
+		if fromLock && string(iter.Key()) == prefix+from {
+			fromLock = false
 		}
 	}
 	iter.Release()
