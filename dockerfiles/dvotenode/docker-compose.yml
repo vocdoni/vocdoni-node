@@ -1,6 +1,4 @@
 version: "3.4"
-#envfile: env
-
 services:
   dvotenode:
     build:
@@ -27,23 +25,6 @@ services:
       options:
         max-size: "20m"
         max-file: "10"
-    depends_on:
-      - "eth"
-
-  eth:
-    image: openethereum/openethereum:latest
-    ports:
-      - "9080:9080"
-      - "37671:37671"
-      - "9081:9081"
-    restart: ${RESTART:-no}
-    env_file: env
-    user: root
-    volumes:
-      - "eth:/app/eth"
-      - ./files:/app/files
-    entrypoint: /app/files/openethereum.sh $RESTART
-
 volumes:
   run: {}
   eth: {}
