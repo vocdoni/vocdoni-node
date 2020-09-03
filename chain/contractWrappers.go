@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -160,7 +161,7 @@ func (e *ENSCallerHandler) Resolve(nameHash [32]byte, resolvePublicRegistry bool
 }
 
 // VotingProcessAddress gets the Voting process main contract address
-func VotingProcessAddress(publicRegistryAddr, domain string, ethEndpoint string) (string, error) {
+func VotingProcessAddress(publicRegistryAddr, domain, ethEndpoint string) (string, error) {
 	// normalize voting process domain name
 	nh, err := nameHash(domain)
 	if err != nil {
@@ -234,4 +235,58 @@ func nameHash(name string) (hash [32]byte, err error) {
 		}
 	}
 	return
+}
+
+const maxRetries = 30
+
+// EnsResolve resolves the voting process contract address through the stardard ENS
+func EnsResolve(ensRegistryAddr, ethDomain, w3uri string) (contractAddr string, err error) {
+	for i := 0; i < maxRetries; i++ {
+		contractAddr, err = VotingProcessAddress(ensRegistryAddr, ethDomain, w3uri)
+		if err != nil {
+			if strings.Contains(err.Error(), "no suitable peers available") {
+				time.Sleep(time.Second)
+				continue
+			}
+			err = fmt.Errorf("cannot get voting process contract: %s", err)
+			return
+		}
+		log.Infof("loaded voting contract at address: %s", contractAddr)
+		break
+	}
+	return
+}
+
+// ResolveEntityMetadataURL returns the metadata URL given an entityID
+func ResolveEntityMetadataURL(ensRegistryAddr, entityID, w3uri string) (string, error) {
+	// normalize entity resolver domain name
+	nh, err := nameHash(types.EntityResolverDomain)
+	if err != nil {
+		return "", err
+	}
+	ensCallerHandler := &ENSCallerHandler{
+		EthEndpoint:        w3uri,
+		PublicRegistryAddr: ensRegistryAddr,
+	}
+	// create registry contract instance
+	ensCallerHandler.NewENSRegistryWithFallbackHandle()
+	// get resolver address from public registry
+	ensCallerHandler.ResolverAddr, err = ensCallerHandler.Resolve(nh, true)
+	if err != nil {
+		return "", err
+	}
+	// create resolver contract instance
+	ensCallerHandler.NewEntityResolverHandle()
+	// get entity metadata url from resolver
+	eIDBytes, err := hex.DecodeString(entityID)
+	if err != nil {
+		return "", err
+	}
+	var eIDBytes32 [32]byte
+	copy(eIDBytes32[:], eIDBytes)
+	metaURL, err := ensCallerHandler.Resolver.Text(nil, eIDBytes32, types.EntityMetaKey)
+	if err != nil {
+		return "", err
+	}
+	return metaURL, nil
 }

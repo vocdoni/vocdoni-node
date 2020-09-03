@@ -2,8 +2,6 @@ package service
 
 import (
 	"fmt"
-	"strings"
-	"time"
 
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/chain"
@@ -12,8 +10,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
-
-const maxRetries = 30
 
 // EthEvents service registers on the Ethereum smart contract specified in ethProcDomain, the provided event handlers
 // we3host and w3port must point to a working web3 websocket endpoint.
@@ -26,7 +22,7 @@ func EthEvents(ethProcDomain, w3uri string, networkName string, startBlock *int6
 	if err != nil {
 		return err
 	}
-	contractAddr, err := ensResolve(specs.ENSregistryAddr, ethProcDomain, w3uri)
+	contractAddr, err := chain.EnsResolve(specs.ENSregistryAddr, ethProcDomain, w3uri)
 	if err != nil {
 		return err
 	}
@@ -42,21 +38,4 @@ func EthEvents(ethProcDomain, w3uri string, networkName string, startBlock *int6
 	}()
 
 	return nil
-}
-
-func ensResolve(ensRegistryAddr, ethDomain, w3uri string) (contractAddr string, err error) {
-	for i := 0; i < maxRetries; i++ {
-		contractAddr, err = chain.VotingProcessAddress(ensRegistryAddr, ethDomain, w3uri)
-		if err != nil {
-			if strings.Contains(err.Error(), "no suitable peers available") {
-				time.Sleep(time.Second)
-				continue
-			}
-			err = fmt.Errorf("cannot get voting process contract: %s", err)
-			return
-		}
-		log.Infof("loaded voting contract at address: %s", contractAddr)
-		break
-	}
-	return
 }

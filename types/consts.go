@@ -21,6 +21,8 @@ const (
 	VoteNullifierSize              = 32
 	KeyIndexSeparator              = ":"
 	EthereumConfirmationsThreshold = 6
+	EntityResolverDomain           = "entity-resolver.vocdoni.eth"
+	EntityMetaKey                  = "vnd.vocdoni.meta"
 
 	// Scrutinizer
 
