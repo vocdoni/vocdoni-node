@@ -17,7 +17,7 @@ type Specs struct {
 	ENSregistryAddr string
 }
 
-var AvailableChains = []string{"mainnet", "goerli", "xdai"}
+var AvailableChains = []string{"mainnet", "goerli", "xdai", "sokol"}
 
 func SpecsFor(name string) (*Specs, error) {
 	switch name {
@@ -27,6 +27,8 @@ func SpecsFor(name string) (*Specs, error) {
 		return &goerli, nil
 	case "xdai":
 		return &xdai, nil
+	case "sokol":
+		return &sokol, nil
 	default:
 		return nil, errors.New("chain name not found")
 	}
@@ -47,6 +49,14 @@ var xdai = Specs{
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
 	StartingBlock:   11035933, //2020 jul 19 16:55h
+}
+
+var sokol = Specs{
+	Name:            "sokol",
+	NetworkId:       77,
+	ENSregistryAddr: "0x43541c49308bF2956d3893836F5AF866fd78A295",
+	BootNodes:       nil,
+	StartingBlock:   16506649, // 2020 aug 29 03:44h
 }
 
 // Goerli Ethereum PoA Testnet
