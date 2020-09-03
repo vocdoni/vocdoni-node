@@ -161,33 +161,48 @@ func (r *Router) getBlockHeight(request routerRequest) {
 }
 
 func (r *Router) getProcessList(request routerRequest) {
-	// check eid
+	// check/sanitize eid and fromId
 	request.EntityId = util.TrimHex(request.EntityId)
 	if !util.IsHexEncodedStringWithLength(request.EntityId, types.EntityIDsize) &&
 		!util.IsHexEncodedStringWithLength(request.EntityId, types.EntityIDsizeV2) {
 		r.sendError(request, "cannot get process list: (malformed entityId)")
 		return
 	}
-	storageKey := []byte(types.ScrutinizerEntityPrefix + request.EntityId)
+	if len(request.FromID) > 0 {
+		request.FromID = util.TrimHex(request.FromID)
+		if !util.IsHexEncodedStringWithLength(request.FromID, types.ProcessIDsize) {
+			r.sendError(request, "cannot get process list: (malformed fromId)")
+			return
+		}
+	}
+
 	var response types.MetaResponse
-	exists, err := r.Scrutinizer.Storage.Has(storageKey)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get entity (%s)", err))
-		return
-	}
-	if !exists {
-		response.Message = "entity does not exist or has not yet created a process"
-		request.Send(r.buildReply(request, &response))
-		return
-	}
-	processList, err := r.Scrutinizer.Storage.Get(storageKey)
+	processList, err := r.Scrutinizer.Storage.Get([]byte(types.ScrutinizerEntityPrefix + request.EntityId))
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get entity process list: (%s)", err))
 		return
 	}
+	if len(processList) == 0 {
+		response.Message = "entity does not exist or has not yet created a process"
+		request.Send(r.buildReply(request, &response))
+		return
+	}
+
+	max := request.ListSize
+	if max > MaxListIterations || max <= 0 {
+		max = MaxListIterations
+	}
+	fromLock := len(request.FromID) > 0
 	for _, process := range bytes.Split(processList, []byte(types.ScrutinizerEntityProcessSeparator)) {
-		if len(process) > 0 {
+		if max < 1 || len(process) < 1 {
+			break
+		}
+		if !fromLock {
 			response.ProcessList = append(response.ProcessList, string(process))
+			max--
+		}
+		if fromLock && request.FromID == string(process) {
+			fromLock = false
 		}
 	}
 	response.Size = new(int64)
