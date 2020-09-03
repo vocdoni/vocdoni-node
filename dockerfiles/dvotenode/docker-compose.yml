@@ -9,6 +9,7 @@ services:
       - "run:/app/run"
       - "eth:/app/eth:ro"
     ports:
+      - "443:9090"
       - "9090:9090"
       - "9091:9091"
       - "4001:4001"
