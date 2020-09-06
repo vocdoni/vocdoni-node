@@ -64,6 +64,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma
 			filepath := vconfig.DataDir + "/config/genesis.json"
 			if _, err = os.Stat(filepath); os.IsNotExist(err) {
 				log.Debug("genesis does not exist, using hardcoded genesis")
+				err = nil
 			} else {
 				if genesisBytes, err = ioutil.ReadFile(filepath); err != nil {
 					return
@@ -76,7 +77,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma
 						return
 					}
 				} else {
-					log.Debug("genesis are the same, you have the latest dev genesis")
+					log.Debug("genesis is updated")
 				}
 			}
 			genesisBytes = []byte(vochain.DevelopmentGenesis1)
