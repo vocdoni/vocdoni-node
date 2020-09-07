@@ -15,10 +15,14 @@ import (
 	"gitlab.com/vocdoni/go-dvote/net"
 )
 
+var ValidChains = map[string]bool{"goerli": true, "mainnet": true}
+
 func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, signer *ethereum.SignKeys, ma *metrics.Agent) (node *chain.EthChainContext, err error) {
 	// Ethereum
 	log.Info("creating ethereum service")
-
+	if _, ok := ValidChains[ethconfig.ChainType]; !ok {
+		return nil, fmt.Errorf("ethereum chain type %s is not supported in native mode by go-ethereum. A web3 compatible external endpoint should be used instead", ethconfig.ChainType)
+	}
 	// Set Ethereum node context
 	w3cfg, err := chain.NewConfig(ethconfig, w3config)
 	if err != nil {

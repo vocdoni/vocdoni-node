@@ -52,7 +52,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 
 	// global
 	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
-	flag.BoolVar(&globalCfg.Dev, "dev", true, "run and connect to the development network")
+	flag.BoolVar(&globalCfg.Dev, "dev", false, "run and connect to the development network")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.LogErrorFile = *flag.String("logErrorFile", "", "Log errors and warnings to a file")
@@ -75,7 +75,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "", "enable TLS secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	// ethereum node
 	globalCfg.EthConfig.SigningKey = *flag.String("ethSigningKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
-	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
+	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "xdai", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
 	globalCfg.EthConfig.LightMode = *flag.Bool("ethChainLightMode", false, "synchronize Ethereum blockchain in light mode")
 	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to use")
 	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootNodes", []string{}, "Ethereum p2p custom bootstrap nodes (enode://<pubKey>@<ip>[:port])")

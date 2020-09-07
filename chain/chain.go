@@ -31,7 +31,7 @@ import (
 
 type EthChainContext struct {
 	Node          *node.Node
-	Eth           *eth.Ethereum
+	API           *eth.EthAPIBackend
 	Config        *eth.Config
 	Keys          *keystore.KeyStore
 	DefaultConfig *EthChainConfig
@@ -180,12 +180,15 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 	e.Node = n
 	e.Config = &ethConfig
 	e.Keys = ks
+
 	return nil
 }
 
 // Start starts an Ethereum blockchain connection and web3 APIs
 func (e *EthChainContext) Start() {
-	utils.RegisterEthService(e.Node, e.Config)
+	api := utils.RegisterEthService(e.Node, e.Config)
+	e.API = api.(*eth.EthAPIBackend)
+
 	if len(e.Keys.Accounts()) < 1 {
 		if err := e.createAccount(); err != nil {
 			log.Error(err)
@@ -225,14 +228,6 @@ func (e *EthChainContext) Start() {
 			log.Infof("web3 http rpc api endpoint initialized at http://%s:%d", e.DefaultConfig.RPCHost, e.DefaultConfig.RPCPort)
 		}
 
-		if !e.DefaultConfig.LightMode {
-			var et *eth.Ethereum
-			err := e.Node.Service(&et)
-			if err != nil {
-				log.Fatal(err)
-			}
-			e.Eth = et
-		}
 		log.Infof("my enode address: %s", e.Node.Server().NodeInfo().Enode)
 		for _, p := range e.DefaultConfig.TrustedPeers {
 			log.Infof("adding tusted peer %s", p)
@@ -365,15 +360,18 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 		return
 	}
 	// Fast sync
-	if e.Eth != nil && e.Node != nil {
+	if e.API != nil && e.Node != nil {
 		info.Mode = "fast"
-		info.Synced = e.Eth.Synced()
+		info.Synced = !e.API.Downloader().Synchronising()
+		info.MaxHeight = e.API.Downloader().Progress().HighestBlock
 		if info.Synced {
-			info.Height = e.Eth.BlockChain().CurrentBlock().Number().Uint64()
+			info.Height = e.API.CurrentBlock().Number().Uint64()
 		} else {
-			info.Height = e.Eth.Downloader().Progress().CurrentBlock
+			info.Height = e.API.Downloader().Progress().CurrentBlock
 		}
-		info.MaxHeight = e.Eth.Downloader().Progress().HighestBlock
+		if info.Synced && (info.MaxHeight == 0 || info.Height == 0) {
+			info.Synced = false
+		}
 		info.Peers = e.Node.Server().PeerCount()
 		return
 	}
@@ -392,7 +390,10 @@ func (e *EthChainContext) SyncGuard() {
 		if si.Synced && si.Height+200 < si.MaxHeight {
 			log.Warn("ethereum is experiencing sync problems, restarting node...")
 			e.RestartLock.Lock()
-			if err = e.Node.Restart(); err != nil {
+			if err = e.Node.Close(); err != nil {
+				log.Fatal(err)
+			}
+			if err = e.Node.Start(); err != nil {
 				log.Fatal(err)
 			}
 			e.RestartLock.Unlock()
