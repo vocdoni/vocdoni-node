@@ -19,10 +19,10 @@ import (
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	"github.com/ethereum/go-ethereum/rpc"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
@@ -31,7 +31,8 @@ import (
 
 type EthChainContext struct {
 	Node          *node.Node
-	API           *eth.EthAPIBackend
+	API           *eth.EthAPIBackend // Ethereum backend API (if fastmode enabled)
+	LAPI          *les.LesApiBackend // Ethereum Light API (if lightmode enabled)
 	Config        *eth.Config
 	Keys          *keystore.KeyStore
 	DefaultConfig *EthChainConfig
@@ -187,7 +188,12 @@ func (e *EthChainContext) init(c *EthChainConfig) error {
 // Start starts an Ethereum blockchain connection and web3 APIs
 func (e *EthChainContext) Start() {
 	api := utils.RegisterEthService(e.Node, e.Config)
-	e.API = api.(*eth.EthAPIBackend)
+	if e.Config.SyncMode == downloader.FastSync {
+		e.API = api.(*eth.EthAPIBackend)
+	}
+	if e.Config.SyncMode == downloader.LightSync {
+		e.LAPI = api.(*les.LesApiBackend)
+	}
 
 	if len(e.Keys.Accounts()) < 1 {
 		if err := e.createAccount(); err != nil {
@@ -339,24 +345,17 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 	// Light sync
 	if e.DefaultConfig.LightMode {
 		info.Mode = "light"
-		info.Synced = false
-		var r *rpc.Client
-		r, err = e.Node.Attach()
-		if r == nil || err != nil {
-			return
+		info.Synced = !e.LAPI.Downloader().Synchronising()
+		info.MaxHeight = e.LAPI.Downloader().Progress().HighestBlock
+		if info.Synced {
+			info.Height = e.LAPI.CurrentBlock().Number().Uint64()
+		} else {
+			info.Height = e.LAPI.Downloader().Progress().CurrentBlock
 		}
-
-		r.Call(&info.Synced, "eth_syncing") // true = syncing / false if synced
-		info.Synced = !info.Synced
-		var block string
-		r.Call(&block, "eth_blockNumber")
-		info.Height = uint64(util.Hex2int64(block))
-		if info.Height == 0 {
-			info.Synced = false // Workaround
-		}
-		// TODO find a way to get the maxHeight on light mode
-		info.MaxHeight = info.Height
 		info.Peers = e.Node.Server().PeerCount()
+		if info.Synced && (info.MaxHeight == 0 || info.Height == 0 || info.Peers == 0) {
+			info.Synced = false
+		}
 		return
 	}
 	// Fast sync
@@ -369,10 +368,10 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 		} else {
 			info.Height = e.API.Downloader().Progress().CurrentBlock
 		}
-		if info.Synced && (info.MaxHeight == 0 || info.Height == 0) {
+		info.Peers = e.Node.Server().PeerCount()
+		if info.Synced && (info.MaxHeight == 0 || info.Height == 0 || info.Peers == 0) {
 			info.Synced = false
 		}
-		info.Peers = e.Node.Server().PeerCount()
 		return
 	}
 	err = fmt.Errorf("cannot get sync info, unknown error")
