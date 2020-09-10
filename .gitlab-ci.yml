@@ -22,7 +22,7 @@ cache:
     - .cache/
 
 go-test:
-  image: golang:1.14.7
+  image: golang:1.15.2
   stage: test
   script:
     # we run vet in another step
@@ -34,7 +34,7 @@ go-test:
     - branches
 
 go-analyze:
-  image: golang:1.14.7
+  image: golang:1.15.2
   stage: test
   script:
     - diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))

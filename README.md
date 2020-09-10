@@ -60,7 +60,7 @@ For running dvotenode in gateway mode, 8GB of ram is recommended (4GB works but 
 
 #### Compile and run
 
-Compile from source in a golang environment (Go>1.14 required):
+Compile from source in a golang environment (Go>1.15 required):
 
 ```
 git clone https://gitlab.com/vocdoni/go-dvote.git
