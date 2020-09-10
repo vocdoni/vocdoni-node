@@ -450,6 +450,10 @@ func main() {
 			vnode.Node.Wait()
 		}()
 
+		// Enable Tendermint RPC proxy endpoint on /tendermint
+		pxy.AddHandler("/tendermint", pxy.AddEndpoint("http://"+globalCfg.VochainConfig.RPCListen))
+		log.Infof("tendermint http API endpoint available at %s", "/tendermint")
+
 		// Wait for Vochain to be ready
 		var h, hPrev int64
 		for vnode.Node == nil {

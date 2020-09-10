@@ -19,7 +19,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
 
-func Vochain(vconfig *config.VochainCfg, dev, results bool, waitForSync bool, ma *metrics.Agent, cm *census.Manager) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
+func Vochain(vconfig *config.VochainCfg, dev, results, waitForSync bool, ma *metrics.Agent, cm *census.Manager) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
 	log.Info("creating vochain service")
 	var host, port string
 	var ip net.IP
