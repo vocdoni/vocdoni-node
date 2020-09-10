@@ -452,8 +452,13 @@ func main() {
 
 		if globalCfg.Mode == "gateway" {
 			// Enable Tendermint RPC proxy endpoint on /tendermint
-			pxy.AddHandler("/tendermint", pxy.AddEndpoint("http://"+globalCfg.VochainConfig.RPCListen))
-			log.Infof("tendermint http API endpoint available at %s", "/tendermint")
+			tp := strings.Split(globalCfg.VochainConfig.RPCListen, ":")
+			if len(tp) != 2 {
+				log.Warnf("cannot get port from vochain RPC listen: %s", globalCfg.VochainConfig.RPCListen)
+			} else {
+				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket"))
+				log.Infof("tendermint WS API endpoint available at %s", "/tendermint")
+			}
 		}
 
 		// Wait for Vochain to be ready
