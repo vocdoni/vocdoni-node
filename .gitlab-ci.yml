@@ -24,6 +24,8 @@ cache:
 go-test:
   image: golang:1.15.2
   stage: test
+  tags:
+    - vocdoni
   script:
     # we run vet in another step
     - go test -vet=off -timeout=1m ./...
@@ -36,6 +38,8 @@ go-test:
 go-analyze:
   image: golang:1.15.2
   stage: test
+  tags:
+    - vocdoni
   script:
     - diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
     - go vet ./...
@@ -49,7 +53,7 @@ compose-test:
   image: docker/compose:1.25.5
   stage: test
   tags:
-    - hetzner
+    - vocdoni
   script:
     # Avoid compose project collisions in parallel runs
     - export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
@@ -69,6 +73,8 @@ docker-release:
   services:
     - docker:dind
   stage: release
+  tags:
+    - vocdoni
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
