@@ -48,7 +48,7 @@ var xdai = Specs{
 	NetworkId:       100,
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
-	StartingBlock:   11035933, //2020 jul 19 16:55h
+	StartingBlock:   12017322, //2020 Sep 15 16:14h
 }
 
 var sokol = Specs{
