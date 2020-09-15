@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/census"
@@ -25,29 +26,29 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 	// API Endpoint initialization
 	listenerOutput := make(chan types.Message)
 
-	// HTTP transport
-	if apiconfig.HTTP {
-		htransport := new(net.HttpHandler)
-		if err := htransport.Init(new(types.Connection)); err != nil {
-			return err
+	var htransport net.Transport
+
+	if apiconfig.Websockets && apiconfig.HTTP {
+		htransport = new(net.HttpWsHandler)
+		htransport.(*net.HttpWsHandler).SetProxy(pxy)
+	} else {
+		if apiconfig.Websockets {
+			htransport = new(net.WebsocketHandle)
+			htransport.(*net.WebsocketHandle).SetProxy(pxy)
+		} else if apiconfig.HTTP {
+			htransport = new(net.HttpHandler)
+			htransport.(*net.HttpHandler).SetProxy(pxy)
+		} else {
+			return fmt.Errorf("no transports available. At least one of HTTP and WS should be enabled")
 		}
-		htransport.SetProxy(pxy)
-		go htransport.Listen(listenerOutput)
-		htransport.AddNamespace(apiconfig.Route + "dvoterest")
-		log.Infof("%s API available at %s", htransport.ConnectionType(), apiconfig.Route+"dvoterest")
 	}
 
-	// WebSocket transport
-	if apiconfig.Websockets {
-		wsTransport := net.WebsocketHandle{}
-		if err := wsTransport.Init(new(types.Connection)); err != nil {
-			return err
-		}
-		wsTransport.SetProxy(pxy)
-		go wsTransport.Listen(listenerOutput)
-		wsTransport.AddNamespace(apiconfig.Route + "dvote")
-		log.Infof("%s API available at %s", wsTransport.ConnectionType(), apiconfig.Route+"dvote")
+	if err := htransport.Init(new(types.Connection)); err != nil {
+		return err
 	}
+	go htransport.Listen(listenerOutput)
+	htransport.AddNamespace(apiconfig.Route + "dvote")
+	log.Infof("%s API available at %s", htransport.ConnectionType(), apiconfig.Route+"dvote")
 
 	routerAPI := router.InitRouter(listenerOutput, storage, signer, ma, apiconfig.AllowPrivate)
 	if apiconfig.File {

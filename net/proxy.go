@@ -163,11 +163,26 @@ func (p *Proxy) GenerateSSLCertificate() (*http.Server, *autocert.Manager) {
 // AddWsHandler adds a websocket handler in the proxy
 func (p *Proxy) AddWsHandler(path string, handler ProxyWsHandler) {
 	p.Server.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		wshandler(w, r, handler)
+		if r.Header.Get("Upgrade") == "websocket" {
+			wshandler(w, r, handler)
+		} else {
+			log.Warn("receied a non upgrade websockets connection to a only WS endpoint")
+		}
 	})
 }
 
-// AddHandler adds a handler in the proxy
+// AddMixedHandler adds a mixed (websockets and HTTP) handler in the proxy
+func (p *Proxy) AddMixedHandler(path string, HTTPhandler http.HandlerFunc, WShandler ProxyWsHandler) {
+	p.Server.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Upgrade") == "websocket" {
+			wshandler(w, r, WShandler)
+		} else {
+			HTTPhandler(w, r)
+		}
+	})
+}
+
+// AddHandler adds a HTTP handler in the proxy
 func (p *Proxy) AddHandler(path string, handler http.HandlerFunc) {
 	p.Server.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		handler(w, r)

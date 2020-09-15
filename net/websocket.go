@@ -46,9 +46,8 @@ func (w *WebsocketHandle) Init(c *types.Connection) error {
 	return nil
 }
 
-// AddProxyHandler adds the current websocket handler into the Proxy
-func (w *WebsocketHandle) AddProxyHandler(path string) {
-	serveWs := func(conn *websocket.Conn) {
+func getWsHandler(path string, receiver chan types.Message) func(conn *websocket.Conn) {
+	return func(conn *websocket.Conn) {
 		// Read websocket messages until the connection is closed. HTTP
 		// handlers are run in new goroutines, so we don't need to spawn
 		// another goroutine.
@@ -64,10 +63,14 @@ func (w *WebsocketHandle) AddProxyHandler(path string) {
 				Context:   &WebsocketContext{Conn: conn},
 				Namespace: path,
 			}
-			w.internalReceiver <- msg
+			receiver <- msg
 		}
 	}
-	w.WsProxy.AddWsHandler(path, serveWs)
+}
+
+// AddProxyHandler adds the current websocket handler into the Proxy
+func (w *WebsocketHandle) AddProxyHandler(path string) {
+	w.WsProxy.AddWsHandler(path, getWsHandler(path, w.internalReceiver))
 }
 
 // ConnectionType returns a string identifying the transport connection type

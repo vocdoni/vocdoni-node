@@ -456,8 +456,8 @@ func main() {
 			if len(tp) != 2 {
 				log.Warnf("cannot get port from vochain RPC listen: %s", globalCfg.VochainConfig.RPCListen)
 			} else {
-				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket"))
-				log.Infof("tendermint WS API endpoint available at %s", "/tendermint")
+				pxy.AddMixedHandler("/tendermint", pxy.AddEndpoint("http://127.0.0.1:"+tp[1]), pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket"))
+				log.Infof("tendermint API endpoint available at %s", "/tendermint")
 			}
 		}
 

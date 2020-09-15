@@ -31,9 +31,8 @@ func (h *HttpHandler) SetProxy(p *Proxy) {
 	h.Proxy = p
 }
 
-// AddProxyHandler adds the current websocket handler into the Proxy
-func (h *HttpHandler) AddProxyHandler(path string) {
-	h.Proxy.AddHandler(path, func(w http.ResponseWriter, r *http.Request) {
+func getHTTPhandler(path string, receiver chan types.Message) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		respBody, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -47,7 +46,7 @@ func (h *HttpHandler) AddProxyHandler(path string) {
 			Context:   hc,
 			Namespace: path,
 		}
-		h.internalReceiver <- msg
+		receiver <- msg
 
 		// Don't return this func until a response is sent, because the
 		// connection is closed when the handler returns.
@@ -57,7 +56,12 @@ func (h *HttpHandler) AddProxyHandler(path string) {
 		case <-r.Context().Done():
 			// we hit chi's timeout.
 		}
-	})
+	}
+}
+
+// AddProxyHandler adds the current websocket handler into the Proxy
+func (h *HttpHandler) AddProxyHandler(path string) {
+	h.Proxy.AddHandler(path, getHTTPhandler(path, h.internalReceiver))
 }
 
 func (h *HttpContext) ConnectionType() string {
@@ -106,7 +110,7 @@ func (h *HttpHandler) AddPeer(peer string) error {
 	return nil
 }
 
-// Listen will listen the websockets handler and write the received data into the channel
+// AddNamespace adds a new namespace to the transport
 func (h *HttpHandler) AddNamespace(namespace string) {
 	h.AddProxyHandler(namespace)
 }
