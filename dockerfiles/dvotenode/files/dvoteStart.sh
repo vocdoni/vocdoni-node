@@ -7,6 +7,7 @@ ${apiAllowPrivate:+ --apiAllowPrivate=${apiAllowPrivate}}\
 ${apiAllowedAddrs:+ --apiAllowedAddrs=${apiAllowedAddrs}}\
 ${apiRoute:+ --apiRoute=${apiRoute}}\
 ${censusApi:+ --censusApi=${censusApi}}\
+${tendermintApi:+ --tendermintApi=${tendermintApi}}\
 ${dataDir:+ --dataDir=${dataDir}}\
 ${dev:+ --dev=${dev}}\
 ${ethBootNodes:+ --ethBootNodes=${ethBootNodes}}\

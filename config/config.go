@@ -64,11 +64,12 @@ func NewConfig() *DvoteCfg {
 
 // API includes information required by the api, which modules are enabled and the route
 type API struct {
-	Route   string
-	File    bool
-	Census  bool
-	Vote    bool
-	Results bool
+	Route      string
+	File       bool
+	Census     bool
+	Tendermint bool
+	Vote       bool
+	Results    bool
 	// AllowPrivate allow to use private methods
 	AllowPrivate bool
 	// AllowedAddrs allowed addresses to interact with

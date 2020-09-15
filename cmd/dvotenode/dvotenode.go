@@ -65,6 +65,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable the file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable the census API")
 	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable the vote API")
+	globalCfg.API.Tendermint = *flag.Bool("tendermintApi", true, "make the Tendermint API public available")
 	globalCfg.API.Results = *flag.Bool("resultsApi", true, "enable the results API")
 	globalCfg.API.Route = *flag.String("apiRoute", "/", "dvote API base route for HTTP and Websockets")
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false, "allows private methods over the APIs")
@@ -155,6 +156,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("api.census", flag.Lookup("censusApi"))
 	viper.BindPFlag("api.vote", flag.Lookup("voteApi"))
 	viper.BindPFlag("api.results", flag.Lookup("resultsApi"))
+	viper.BindPFlag("api.tendermint", flag.Lookup("tendermintApi"))
 	viper.BindPFlag("api.route", flag.Lookup("apiRoute"))
 	viper.BindPFlag("api.allowPrivate", flag.Lookup("apiAllowPrivate"))
 	viper.BindPFlag("api.allowedAddrs", flag.Lookup("apiAllowedAddrs"))
@@ -450,7 +452,7 @@ func main() {
 			vnode.Node.Wait()
 		}()
 
-		if globalCfg.Mode == "gateway" {
+		if globalCfg.Mode == "gateway" && globalCfg.API.Tendermint {
 			// Enable Tendermint RPC proxy endpoint on /tendermint
 			tp := strings.Split(globalCfg.VochainConfig.RPCListen, ":")
 			if len(tp) != 2 {
