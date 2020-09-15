@@ -8,7 +8,9 @@ variables:
   DOCKER_DRIVER: overlay2
   DVOTE_NODE_BUILD_IMAGE: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}
   DVOTE_NODE_RELEASE_IMAGE: ${CI_REGISTRY_IMAGE}:latest
-
+  DOCKER_CLI_EXPERIMENTAL: enabled
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  DOCKER_BUILDKIT: 1
   GOPATH: ${CI_PROJECT_DIR}/.cache/gopath # to cache Go module downloads
   GOCACHE: ${CI_PROJECT_DIR}/.cache/gocache # to cache Go build archives
   GOFLAGS: -mod=readonly
@@ -60,7 +62,6 @@ compose-test:
     - export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
     - export COMPOSE_HOST_PATH=${CI_PROJECT_DIR}/dockerfiles/testsuite
     - export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
-    - export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 # faster builds
     - cd dockerfiles/testsuite
     - docker-compose build
     - sh start_test.sh
