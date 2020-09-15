@@ -21,7 +21,9 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 	// Ethereum
 	log.Info("creating ethereum service")
 	if _, ok := ValidChains[ethconfig.ChainType]; !ok {
-		return nil, fmt.Errorf("ethereum chain type %s is not supported in native mode by go-ethereum. A web3 compatible external endpoint should be used instead", ethconfig.ChainType)
+		if w3config.W3External == "" {
+			return nil, fmt.Errorf("ethereum chain type %s is not supported in native mode by go-ethereum. A web3 compatible external endpoint should be used instead", ethconfig.ChainType)
+		}
 	}
 	// Set Ethereum node context
 	w3cfg, err := chain.NewConfig(ethconfig, w3config)
@@ -54,8 +56,11 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 		return
 	}
 	if strings.HasPrefix(w3uri, "http") {
-		pxy.AddHandler(w3config.Route, pxy.AddEndpoint(w3uri))
-		log.Infof("web3 http endpoint available at %s", w3config.Route)
+		pxy.AddMixedHandler(w3config.Route, pxy.AddEndpoint(w3uri), pxy.AddWsHTTPBridge(w3uri))
+		log.Infof("web3 http/websocket endpoint available at %s", w3config.Route)
+	} else if strings.HasPrefix(w3uri, "ws") {
+		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri))
+		log.Infof("web3 websocket endpoint available at %s", w3config.Route)
 	} else if strings.HasSuffix(w3uri, ".ipc") {
 		info, err := os.Stat(w3uri)
 		if err != nil {
@@ -67,16 +72,7 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 		pxy.AddHandler(w3config.Route, pxy.ProxyIPC(w3uri))
 		log.Infof("web3 http endpoint available at %s", w3config.Route)
 	} else {
-		log.Warnf("web3 http API requires http/https/ipc web3 external, disabling it")
-	}
-	if strings.HasPrefix(w3uri, "http") {
-		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsHTTPBridge(w3uri))
-		log.Infof("web3 websocket endpoint available at %s", w3config.Route+"ws")
-	} else if strings.HasPrefix(w3uri, "ws") {
-		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri))
-		log.Infof("web3 websocket endpoint available at %s", w3config.Route+"ws")
-	} else {
-		log.Warnf("external web3 protocol is not http or ws, clients won't be able to use the web3 ws endpoint")
+		log.Warnf("web3 http API requires http/https/ipc web3 external")
 	}
 	return
 }
