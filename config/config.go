@@ -16,8 +16,6 @@ type DvoteCfg struct {
 	API *API
 	// Metrics config options
 	Metrics *MetricsCfg
-	// Dev indicates we use the gateway development mode
-	Dev bool
 	// LogLevel logging level
 	LogLevel string
 	// LogOutput logging output
@@ -30,6 +28,8 @@ type DvoteCfg struct {
 	SaveConfig bool
 	// Mode describes the operation mode of program
 	Mode string
+	// Dev enables the development mode (less security)
+	Dev bool
 }
 
 // ValidMode checks if the configured mode is valid
@@ -147,8 +147,9 @@ type EthEventCfg struct {
 
 // VochainCfg includes all possible config params needed by the Vochain
 type VochainCfg struct {
-	// Dev indicates we use the Vochain development mode
-	// currently only changes the seed nodes to connect with
+	// Chain is the network name to connect with
+	Chain string
+	// Dev indicates we use the Vochain development mode (low security is accepted)
 	Dev bool
 	// LogLevel logging level
 	LogLevel string

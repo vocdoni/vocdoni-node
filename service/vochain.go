@@ -19,8 +19,8 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
 )
 
-func Vochain(vconfig *config.VochainCfg, dev, results, waitForSync bool, ma *metrics.Agent, cm *census.Manager) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
-	log.Info("creating vochain service")
+func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.Agent, cm *census.Manager) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
+	log.Infof("creating vochain service for network %s", vconfig.Chain)
 	var host, port string
 	var ip net.IP
 	// node + app layer
@@ -45,6 +45,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results, waitForSync bool, ma *met
 	log.Infof("vochain listening on: %s", vconfig.P2PListen)
 	log.Infof("vochain exposed IP address: %s", vconfig.PublicAddr)
 	log.Infof("vochain RPC listening on: %s", vconfig.RPCListen)
+
 	// Genesis file
 	var genesisBytes []byte
 
@@ -57,35 +58,43 @@ func Vochain(vconfig *config.VochainCfg, dev, results, waitForSync bool, ma *met
 		if genesisBytes, err = ioutil.ReadFile(vconfig.Genesis); err != nil {
 			return
 		}
+		// If genesis file not provide use local or hardcoded
 	} else {
-		// If genesis flag not defined, use either dev or release genesis
-		if dev {
-			// If dev mode enabled, auto-update genesis file
-			filepath := vconfig.DataDir + "/config/genesis.json"
-			if _, err = os.Stat(filepath); os.IsNotExist(err) {
-				log.Debug("genesis does not exist, using hardcoded genesis")
-				err = nil
-			} else {
-				if genesisBytes, err = ioutil.ReadFile(filepath); err != nil {
-					return
-				}
-				log.Debug("found genesis file, comparing with hardcoded genesis")
-				// compare genesis
-				if string(genesisBytes) != vochain.DevelopmentGenesis1 {
-					log.Warn("genesis found is different from the hardcoded genesis, cleaning and restarting vochain")
+		// If genesis flag not defined, use a hardcoded or local genesis
+		genesisBytes, err = ioutil.ReadFile(vconfig.DataDir + "/config/genesis.json")
+
+		if err == nil { // If genesis file found
+			log.Info("found genesis file, comparing with the hardcoded one")
+			// compare genesis
+			if string(genesisBytes) != vochain.Genesis[vconfig.Chain].Genesis {
+				// if using a development chain, restore vochain
+				if vochain.Genesis[vconfig.Chain].AutoUpdateGenesis || vconfig.Dev {
+					log.Warn("local genesis is different from the hardcoded, cleaning and restarting Vochain")
 					if err = os.RemoveAll(vconfig.DataDir); err != nil {
 						return
 					}
 				} else {
-					log.Debug("genesis is updated")
+					log.Warn("local genesis is different from the hardcoded! this will probably end in a consensus failure :(")
 				}
+			} else {
+				log.Info("local genesis match with the hardcoded genesis")
 			}
-			genesisBytes = []byte(vochain.DevelopmentGenesis1)
-		} else {
-			genesisBytes = []byte(vochain.ReleaseGenesis1)
+		} else { // If genesis file not found
+			if !os.IsNotExist(err) {
+				return
+			}
+			// If dev mode enabled, auto-update genesis file
+			log.Debug("genesis does not exist, using hardcoded genesis")
+			err = nil
+			if _, ok := vochain.Genesis[vconfig.Chain]; !ok {
+				err = fmt.Errorf("cannot find a valid genesis for the %s network", vconfig.Chain)
+				return
+			}
+			genesisBytes = []byte(vochain.Genesis[vconfig.Chain].Genesis)
 		}
 	}
 
+	// Metrics agent (Prometheus)
 	if ma != nil {
 		vconfig.TendermintMetrics = true
 	}

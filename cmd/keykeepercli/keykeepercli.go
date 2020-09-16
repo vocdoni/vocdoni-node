@@ -90,7 +90,7 @@ func main() {
 	}
 
 	// Create Vochain service
-	vnode, _, _, err := service.Vochain(&vconfig, vconfig.Dev, false, true, nil, nil)
+	vnode, _, _, err := service.Vochain(&vconfig, false, true, nil, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

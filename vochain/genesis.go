@@ -1,8 +1,19 @@
 package vochain
 
-// Testnet Genesis File for Vocdoni KISS v1
-const (
-	ReleaseGenesis1 = `
+type VochainGenesis struct {
+	SeedNodes         []string
+	Genesis           string
+	AutoUpdateGenesis bool
+}
+
+// Genesis is a map containing the defaut Genesis details
+var Genesis = map[string]VochainGenesis{
+
+	// Production Network
+	"main": {
+		AutoUpdateGenesis: false,
+		SeedNodes:         []string{"121e65eb5994874d9c05cd8d584a54669d23f294@seed.vocdoni.net:26656"},
+		Genesis: `
    {
       "genesis_time":"2020-09-15T15:38:33.672114557Z",
       "chain_id":"vocdoni-release-06",
@@ -124,8 +135,13 @@ const (
          ]
       }
    }
- `
-	DevelopmentGenesis1 = `
+ `},
+
+	// Development network
+	"dev": {
+		AutoUpdateGenesis: true,
+		SeedNodes:         []string{"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656"},
+		Genesis: `
 {
    "genesis_time":"2020-09-06T10:29:50.512370579Z",
    "chain_id":"vocdoni-development-17",
@@ -265,11 +281,15 @@ const (
       ]
    }
 }
-`
-	StagingGenesis1 = `
+`},
+
+	"stage": {
+		AutoUpdateGenesis: true,
+		SeedNodes:         []string{"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656"},
+		Genesis: `
 {
    "genesis_time":"2020-09-15T12:41:19.055210151Z",                
-   "chain_id":"vocdoni-staging-1",
+   "chain_id":"vocdoni-stage-1",
    "consensus_params":{
       "block":{
          "max_bytes":"22020096",
@@ -369,5 +389,4 @@ const (
       ]
    }
 }
-`
-)
+`}}

@@ -28,13 +28,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 
-var (
-	// ProdSeedNodes production vochain network seed nodes
-	ProdSeedNodes = []string{"121e65eb5994874d9c05cd8d584a54669d23f294@seed.vocdoni.net:26656"}
-	// DevSeedNodes testing vochain network seed nodes
-	DevSeedNodes = []string{"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656"}
-)
-
 // NewVochain starts a node with an ABCI application
 func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
 	// creating new vochain app
@@ -119,22 +112,19 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 	if !localConfig.CreateGenesis {
 		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]\"")
-		if len(tconfig.P2P.Seeds) < 8 && !localConfig.SeedMode {
-			if !localConfig.Dev {
-				tconfig.P2P.Seeds = strings.Join(ProdSeedNodes[:], ",")
-			} else {
-				tconfig.P2P.Seeds = strings.Join(DevSeedNodes[:], ",")
-			}
+		if _, ok := Genesis[localConfig.Chain]; len(tconfig.P2P.Seeds) < 8 && !localConfig.SeedMode && ok {
+			tconfig.P2P.Seeds = strings.Join(Genesis[localConfig.Chain].SeedNodes[:], ",")
 		}
 		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
-
-		if len(localConfig.Peers) > 0 {
-			tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]\"")
-		}
-		if len(tconfig.P2P.PersistentPeers) > 0 {
-			log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
-		}
 	}
+
+	if len(localConfig.Peers) > 0 {
+		tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]\"")
+	}
+	if len(tconfig.P2P.PersistentPeers) > 0 {
+		log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
+	}
+
 	tconfig.P2P.SeedMode = localConfig.SeedMode
 	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
 

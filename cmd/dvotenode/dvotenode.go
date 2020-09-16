@@ -52,7 +52,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 
 	// global
 	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
-	flag.BoolVar(&globalCfg.Dev, "dev", false, "run and connect to the development network")
+	flag.StringVar(&globalCfg.VochainConfig.Chain, "vochain", "main", "vocdoni blokchain network to connect with")
+	flag.BoolVar(&globalCfg.Dev, "dev", false, "use developer mode (less security)")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
 	globalCfg.LogErrorFile = *flag.String("logErrorFile", "", "Log errors and warnings to a file")
@@ -92,7 +93,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
 	globalCfg.W3Config.RPCPort = *flag.Int("w3RPCPort", 9091, "web3 RPC port")
 	globalCfg.W3Config.RPCHost = *flag.String("w3RPCHost", "127.0.0.1", "web3 RPC host")
-
 	// ipfs
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
 	globalCfg.Ipfs.SyncKey = *flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
@@ -117,6 +117,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
 	globalCfg.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5, "metrics refresh interval in seconds")
 
+	flag.CommandLine.SortFlags = false
 	// parse flags
 	flag.Parse()
 
@@ -131,13 +132,16 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// Set FlagVars first
 	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
 	globalCfg.DataDir = viper.GetString("dataDir")
+	viper.BindPFlag("vochain", flag.Lookup("vochain"))
+	globalCfg.VochainConfig.Chain = viper.GetString("vochain")
 	viper.BindPFlag("dev", flag.Lookup("dev"))
 	globalCfg.Dev = viper.GetBool("dev")
 
-	// If dev enabled, modify dataDir
-	if globalCfg.Dev {
-		globalCfg.DataDir += "/dev"
+	// Use diferent datadirs for non main chains
+	if globalCfg.VochainConfig.Chain != "main" {
+		globalCfg.DataDir += "/" + globalCfg.VochainConfig.Chain
 	}
+
 	// Add viper config path (now we know it)
 	viper.AddConfigPath(globalCfg.DataDir)
 
@@ -150,69 +154,69 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
 
 	// api
-	viper.BindPFlag("api.websockets", flag.Lookup("apiws"))
-	viper.BindPFlag("api.http", flag.Lookup("apihttp"))
-	viper.BindPFlag("api.file", flag.Lookup("fileApi"))
-	viper.BindPFlag("api.census", flag.Lookup("censusApi"))
-	viper.BindPFlag("api.vote", flag.Lookup("voteApi"))
-	viper.BindPFlag("api.results", flag.Lookup("resultsApi"))
-	viper.BindPFlag("api.tendermint", flag.Lookup("tendermintApi"))
-	viper.BindPFlag("api.route", flag.Lookup("apiRoute"))
-	viper.BindPFlag("api.allowPrivate", flag.Lookup("apiAllowPrivate"))
-	viper.BindPFlag("api.allowedAddrs", flag.Lookup("apiAllowedAddrs"))
-	viper.BindPFlag("api.listenHost", flag.Lookup("listenHost"))
-	viper.BindPFlag("api.listenPort", flag.Lookup("listenPort"))
-	viper.Set("api.ssl.dirCert", globalCfg.DataDir+"/tls")
-	viper.BindPFlag("api.ssl.domain", flag.Lookup("sslDomain"))
+	viper.BindPFlag("api.Websockets", flag.Lookup("apiws"))
+	viper.BindPFlag("api.Http", flag.Lookup("apihttp"))
+	viper.BindPFlag("api.File", flag.Lookup("fileApi"))
+	viper.BindPFlag("api.Census", flag.Lookup("censusApi"))
+	viper.BindPFlag("api.Vote", flag.Lookup("voteApi"))
+	viper.BindPFlag("api.Results", flag.Lookup("resultsApi"))
+	viper.BindPFlag("api.Tendermint", flag.Lookup("tendermintApi"))
+	viper.BindPFlag("api.Route", flag.Lookup("apiRoute"))
+	viper.BindPFlag("api.AllowPrivate", flag.Lookup("apiAllowPrivate"))
+	viper.BindPFlag("api.AllowedAddrs", flag.Lookup("apiAllowedAddrs"))
+	viper.BindPFlag("api.ListenHost", flag.Lookup("listenHost"))
+	viper.BindPFlag("api.ListenPort", flag.Lookup("listenPort"))
+	viper.Set("api.Ssl.DirCert", globalCfg.DataDir+"/tls")
+	viper.BindPFlag("api.Ssl.Domain", flag.Lookup("sslDomain"))
 
 	// ethereum node
-	viper.Set("ethConfig.datadir", globalCfg.DataDir+"/ethereum")
-	viper.BindPFlag("ethConfig.signingKey", flag.Lookup("ethSigningKey"))
-	viper.BindPFlag("ethConfig.chainType", flag.Lookup("ethChain"))
-	viper.BindPFlag("ethConfig.lightMode", flag.Lookup("ethChainLightMode"))
-	viper.BindPFlag("ethConfig.nodePort", flag.Lookup("ethNodePort"))
-	viper.BindPFlag("ethConfig.bootNodes", flag.Lookup("ethBootNodes"))
-	viper.BindPFlag("ethConfig.trustedPeers", flag.Lookup("ethTrustedPeers"))
-	viper.BindPFlag("ethConfig.processDomain", flag.Lookup("ethProcessDomain"))
-	viper.BindPFlag("ethConfig.noWaitSync", flag.Lookup("ethNoWaitSync"))
-	viper.BindPFlag("ethEventConfig.censusSync", flag.Lookup("ethCensusSync"))
-	viper.BindPFlag("ethEventConfig.subscribeOnly", flag.Lookup("ethSubscribeOnly"))
+	viper.Set("ethConfig.Datadir", globalCfg.DataDir+"/ethereum")
+	viper.BindPFlag("ethConfig.SigningKey", flag.Lookup("ethSigningKey"))
+	viper.BindPFlag("ethConfig.ChainType", flag.Lookup("ethChain"))
+	viper.BindPFlag("ethConfig.LightMode", flag.Lookup("ethChainLightMode"))
+	viper.BindPFlag("ethConfig.NodePort", flag.Lookup("ethNodePort"))
+	viper.BindPFlag("ethConfig.BootNodes", flag.Lookup("ethBootNodes"))
+	viper.BindPFlag("ethConfig.TrustedPeers", flag.Lookup("ethTrustedPeers"))
+	viper.BindPFlag("ethConfig.ProcessDomain", flag.Lookup("ethProcessDomain"))
+	viper.BindPFlag("ethConfig.NoWaitSync", flag.Lookup("ethNoWaitSync"))
+	viper.BindPFlag("ethEventConfig.CensusSync", flag.Lookup("ethCensusSync"))
+	viper.BindPFlag("ethEventConfig.SubscribeOnly", flag.Lookup("ethSubscribeOnly"))
 
 	// ethereum web3
-	viper.BindPFlag("w3Config.w3External", flag.Lookup("w3External"))
-	viper.BindPFlag("w3Config.route", flag.Lookup("w3Route"))
+	viper.BindPFlag("w3Config.W3External", flag.Lookup("w3External"))
+	viper.BindPFlag("w3Config.Route", flag.Lookup("w3Route"))
 	viper.BindPFlag("w3Config.enabled", flag.Lookup("w3Enabled"))
 	viper.BindPFlag("w3Config.RPCPort", flag.Lookup("w3RPCPort"))
 	viper.BindPFlag("w3Config.RPCHost", flag.Lookup("w3RPCHost"))
 
 	// ipfs
-	viper.Set("ipfs.configPath", globalCfg.DataDir+"/ipfs")
-	viper.BindPFlag("ipfs.noInit", flag.Lookup("ipfsNoInit"))
-	viper.BindPFlag("ipfs.syncKey", flag.Lookup("ipfsSyncKey"))
-	viper.BindPFlag("ipfs.syncPeers", flag.Lookup("ipfsSyncPeers"))
+	viper.Set("ipfs.ConfigPath", globalCfg.DataDir+"/ipfs")
+	viper.BindPFlag("ipfs.NoInit", flag.Lookup("ipfsNoInit"))
+	viper.BindPFlag("ipfs.SyncKey", flag.Lookup("ipfsSyncKey"))
+	viper.BindPFlag("ipfs.SyncPeers", flag.Lookup("ipfsSyncPeers"))
 
 	// vochain
-	viper.Set("vochainConfig.dataDir", globalCfg.DataDir+"/vochain")
-	viper.BindPFlag("vochainConfig.p2pListen", flag.Lookup("vochainP2PListen"))
-	viper.BindPFlag("vochainConfig.publicAddr", flag.Lookup("vochainPublicAddr"))
-	viper.BindPFlag("vochainConfig.rpcListen", flag.Lookup("vochainRPCListen"))
-	viper.BindPFlag("vochainConfig.logLevel", flag.Lookup("vochainLogLevel"))
-	viper.BindPFlag("vochainConfig.peers", flag.Lookup("vochainPeers"))
-	viper.BindPFlag("vochainConfig.seeds", flag.Lookup("vochainSeeds"))
-	viper.BindPFlag("vochainConfig.createGenesis", flag.Lookup("vochainCreateGenesis"))
-	viper.BindPFlag("vochainConfig.genesis", flag.Lookup("vochainGenesis"))
+	viper.Set("vochainConfig.DataDir", globalCfg.DataDir+"/vochain")
+	viper.Set("vochainConfig.Dev", globalCfg.Dev)
+	viper.BindPFlag("vochainConfig.P2PListen", flag.Lookup("vochainP2PListen"))
+	viper.BindPFlag("vochainConfig.PublicAddr", flag.Lookup("vochainPublicAddr"))
+	viper.BindPFlag("vochainConfig.RPCListen", flag.Lookup("vochainRPCListen"))
+	viper.BindPFlag("vochainConfig.LogLevel", flag.Lookup("vochainLogLevel"))
+	viper.BindPFlag("vochainConfig.Peers", flag.Lookup("vochainPeers"))
+	viper.BindPFlag("vochainConfig.Seeds", flag.Lookup("vochainSeeds"))
+	viper.BindPFlag("vochainConfig.CreateGenesis", flag.Lookup("vochainCreateGenesis"))
+	viper.BindPFlag("vochainConfig.Genesis", flag.Lookup("vochainGenesis"))
 	viper.BindPFlag("vochainConfig.MinerKey", flag.Lookup("vochainMinerKey"))
 	viper.BindPFlag("vochainConfig.NodeKey", flag.Lookup("vochainNodeKey"))
 	viper.BindPFlag("vochainConfig.NoWaitSync", flag.Lookup("vochainNoWaitSync"))
-	viper.BindPFlag("vochainConfig.seedMode", flag.Lookup("vochainSeedMode"))
-	viper.BindPFlag("vochainConfig.Dev", flag.Lookup("dev"))
+	viper.BindPFlag("vochainConfig.SeedMode", flag.Lookup("vochainSeedMode"))
 	viper.BindPFlag("vochainConfig.MempoolSize", flag.Lookup("vochainMempoolSize"))
 	viper.BindPFlag("vochainConfig.KeyKeeperIndex", flag.Lookup("keyKeeperIndex"))
 	viper.BindPFlag("vochainConfig.ImportPreviousCensus", flag.Lookup("importPreviousCensus"))
 
 	// metrics
-	viper.BindPFlag("metrics.enabled", flag.Lookup("metricsEnabled"))
-	viper.BindPFlag("metrics.refreshInterval", flag.Lookup("metricsRefreshInterval"))
+	viper.BindPFlag("metrics.Enabled", flag.Lookup("metricsEnabled"))
+	viper.BindPFlag("metrics.RefreshInterval", flag.Lookup("metricsRefreshInterval"))
 
 	// check if config file exists
 	_, err = os.Stat(globalCfg.DataDir + "/dvote.yml")
@@ -315,11 +319,6 @@ func main() {
 	}
 	log.Debugf("initializing config %+v", *globalCfg)
 
-	// using dev mode
-	if globalCfg.Dev {
-		log.Infof("using development mode, datadir %s", globalCfg.DataDir)
-	}
-
 	// check if errors during config creation and determine if Critical
 	if cfgErr.Critical && cfgErr.Message != "" {
 		log.Fatalf("critical error loading config: %s", cfgErr.Message)
@@ -371,6 +370,9 @@ func main() {
 	var kk *keykeeper.KeyKeeper
 	var ma *metrics.Agent
 
+	if globalCfg.Dev {
+		log.Warn("developer mode is enabled, I hope you know what you are doing ;)")
+	}
 	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" || globalCfg.Mode == "web3" {
 		// Signing key
 		signer = ethereum.NewSignKeys()
@@ -443,7 +445,7 @@ func main() {
 	}
 	if (globalCfg.Mode == "gateway" && globalCfg.API.Vote) || globalCfg.Mode == "miner" || globalCfg.Mode == "oracle" {
 		scrutinizer := (globalCfg.Mode == "gateway" && globalCfg.API.Results)
-		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, globalCfg.Dev, scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma, cm)
+		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma, cm)
 		if err != nil {
 			log.Fatal(err)
 		}
