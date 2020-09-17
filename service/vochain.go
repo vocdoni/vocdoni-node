@@ -58,9 +58,7 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.
 		if genesisBytes, err = ioutil.ReadFile(vconfig.Genesis); err != nil {
 			return
 		}
-		// If genesis file not provide use local or hardcoded
-	} else {
-		// If genesis flag not defined, use a hardcoded or local genesis
+	} else { // If genesis flag not defined, use a hardcoded or local genesis
 		genesisBytes, err = ioutil.ReadFile(vconfig.DataDir + "/config/genesis.json")
 
 		if err == nil { // If genesis file found
@@ -73,6 +71,11 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.
 					if err = os.RemoveAll(vconfig.DataDir); err != nil {
 						return
 					}
+					if _, ok := vochain.Genesis[vconfig.Chain]; !ok {
+						err = fmt.Errorf("cannot find a valid genesis for the %s network", vconfig.Chain)
+						return
+					}
+					genesisBytes = []byte(vochain.Genesis[vconfig.Chain].Genesis)
 				} else {
 					log.Warn("local genesis is different from the hardcoded! this will probably end in a consensus failure :(")
 				}
