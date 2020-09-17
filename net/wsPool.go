@@ -19,6 +19,7 @@ import (
 // If a remote server fails for some reason, the wsPool will automatically try the next one.
 // Only if all remote server fail on a Dial round the wsPool will fail.
 type wsPool struct {
+	ReadLimit  int64 // ReadLimit is the number of bytes that the websocket will be able to read (default 2MB)
 	wsc        *websocket.Conn
 	index      int
 	servers    []string
@@ -34,7 +35,7 @@ type wsReader struct {
 }
 
 func newWsPoll() *wsPool {
-	return &wsPool{wsc: new(websocket.Conn), readChan: make(chan wsReader)}
+	return &wsPool{wsc: new(websocket.Conn), readChan: make(chan wsReader), ReadLimit: 1024 * 1024 * 2}
 }
 
 // read is a blocking routine that will continuously wait for websocket input messages and will put it into the readChan channel.
@@ -87,7 +88,7 @@ func (w *wsPool) dial() (err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		w.wsc, _, err = websocket.Dial(ctx, w.servers[w.index], nil)
 		cancel()
-		w.wsc.SetReadLimit(1024 * 1024) // 1MByte should be enough
+		w.wsc.SetReadLimit(w.ReadLimit)
 		if err == nil {
 			break
 		}

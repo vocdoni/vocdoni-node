@@ -304,6 +304,7 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 func (p *Proxy) AddWsWsBridge(url string) ProxyWsHandler {
 	return func(wslocal *websocket.Conn) {
 		wsremote := newWsPoll()
+		wsremote.ReadLimit = 22 * 1024 * 1024 // 22 MB, Tendermint websocket needs at least 21
 		wsremote.addServer(url)
 		if err := wsremote.dial(); err != nil {
 			log.Errorf("dial failed: (%s)", err)
