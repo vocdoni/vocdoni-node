@@ -299,7 +299,7 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 		return nil, err
 	}
 	if !authorized {
-		return nil, fmt.Errorf("unauthorized to create a process, recovered addr: %s", addr)
+		return nil, fmt.Errorf("unauthorized to create a process, recovered addr: %s\nProcessTX: %s", addr.Hex(), processBytes)
 	}
 	// get process
 	_, err = state.Process(tx.ProcessID, false)
@@ -355,7 +355,7 @@ func CancelProcessTxCheck(tx *types.CancelProcessTx, state *State) error {
 		return err
 	}
 	if !authorized {
-		return fmt.Errorf("unauthorized to cancel a process, message: %s, recovered addr: %s", string(processBytes), addr)
+		return fmt.Errorf("unauthorized to cancel a process, recovered addr: %s\nProcessTx: %s", addr.Hex(), processBytes)
 	}
 	// get process
 	process, err := state.Process(tx.ProcessID, false)
@@ -398,7 +398,7 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 	if authorized, addr, err := verifySignatureAgainstOracles(oracles, adminTxBytes, sign); err != nil {
 		return err
 	} else if !authorized {
-		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr)
+		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())
 	}
 
 	switch {
