@@ -72,8 +72,9 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	if header != nil {
 		height = header.Height
 	}
+	app.State.Rollback()
 	hash := app.State.AppHash(false)
-	log.Infof("current height is %d, current APP hash is %x", height, hash)
+	log.Infof("replaying blocks. Current height %d, current APP hash %x", height, hash)
 	return abcitypes.ResponseInfo{
 		LastBlockHeight:  height,
 		LastBlockAppHash: hash,
@@ -99,7 +100,9 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
 		log.Infof("adding genesis validator %s", genesisAppState.Validators[i].PubKey.Address())
-		app.State.AddValidator(genesisAppState.Validators[i].PubKey, genesisAppState.Validators[i].Power)
+		if err = app.State.AddValidator(genesisAppState.Validators[i].PubKey, genesisAppState.Validators[i].Power); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	var header abcitypes.Header
@@ -107,13 +110,14 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	header.AppHash = []byte{}
 	headerBytes, err := app.Codec.MarshalBinaryBare(header)
 	if err != nil {
-		log.Errorf("cannot marshal header: %s", err)
+		log.Fatalf("cannot marshal header: %s", err)
 	}
 	app.State.Lock()
-	app.State.AppTree.Set(headerKey, headerBytes)
+	if err = app.State.Store.Tree(AppTree).Add(headerKey, headerBytes); err != nil {
+		log.Fatal(err)
+	}
 	app.State.Unlock()
-
-	app.State.Save()
+	app.State.Save() // Is this save needed?
 	// TBD: using empty list here, should return validatorsUpdate to use the validators obtained here
 	return abcitypes.ResponseInitChain{}
 }
@@ -129,7 +133,9 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	// reset app state to latest persistent data
 	app.State.Rollback()
 	app.State.Lock()
-	app.State.AppTree.Set(headerKey, headerBytes)
+	if err = app.State.Store.Tree(AppTree).Add(headerKey, headerBytes); err != nil {
+		log.Fatal(err)
+	}
 	app.State.Unlock()
 	app.State.VoteCachePurge(app.State.Header(true).Height)
 	return abcitypes.ResponseBeginBlock{}
@@ -143,7 +149,9 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 	var data []byte
 	var err error
 	var tx GenericTX
-
+	if req.Type == abcitypes.CheckTxType_Recheck {
+		return abcitypes.ResponseCheckTx{Code: 0, Data: data}
+	}
 	if tx, err = UnmarshalTx(req.Tx); err == nil {
 		if data, err = AddTx(tx, app.State, false); err != nil {
 			log.Debugf("checkTx error: %s", err)

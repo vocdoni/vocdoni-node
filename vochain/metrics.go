@@ -60,9 +60,9 @@ func (app *BaseApplication) registerMetrics(ma *metrics.Agent) {
 func (app *BaseApplication) getMetrics() {
 	VochainHeight.Set(float64(app.Node.BlockStore().Height()))
 	VochainMempool.Set(float64(app.Node.Mempool().Size()))
-	VochainAppTree.Set(float64(app.State.AppTree.Size()))
-	VochainProcessTree.Set(float64(app.State.ProcessTree.Size()))
-	VochainVoteTree.Set(float64(app.State.VoteTree.Size()))
+	//	VochainAppTree.Set(float64(app.State.AppTree.Size()))
+	//	VochainProcessTree.Set(float64(app.State.ProcessTree.Size()))
+	//	VochainVoteTree.Set(float64(app.State.VoteTree.Size()))
 	VochainVoteCache.Set(float64(app.State.VoteCacheSize()))
 }
 

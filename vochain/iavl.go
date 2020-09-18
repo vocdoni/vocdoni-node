@@ -9,23 +9,21 @@ import (
 	"time"
 
 	amino "github.com/tendermint/go-amino"
-	"github.com/tendermint/iavl"
 	crypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmtypes "github.com/tendermint/tendermint/types"
-	tmdb "github.com/tendermint/tm-db"
-
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/statedb"
+	"gitlab.com/vocdoni/go-dvote/statedb/iavlstate"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 const (
 	// db names
-	appTreeName     = "appTree"
-	processTreeName = "processTree"
-	voteTreeName    = "voteTree"
+	AppTree     = "app"
+	ProcessTree = "process"
+	VoteTree    = "vote"
 	// validators default power
 	validatorPower          = 0
 	voteCachePurgeThreshold = time.Duration(time.Second * 600)
@@ -62,9 +60,7 @@ type EventListener interface {
 
 // State represents the state of the vochain application
 type State struct {
-	AppTree       *iavl.MutableTree
-	ProcessTree   *iavl.MutableTree
-	VoteTree      *iavl.MutableTree
+	Store         statedb.StateDB
 	voteCache     map[string]*types.VoteProof
 	voteCacheLock sync.RWMutex
 	ImmutableState
@@ -79,101 +75,38 @@ type ImmutableState struct {
 	// their mutable and immutable components. An immutable tree is not safe
 	// for concurrent use with its parent mutable tree.
 	sync.RWMutex
-
-	IAppTree     *iavl.ImmutableTree
-	IProcessTree *iavl.ImmutableTree
-	IVoteTree    *iavl.ImmutableTree
 }
 
 // NewState creates a new State
 func NewState(dataDir string, codec *amino.Codec) (*State, error) {
-	appTree, err := tmdb.NewGoLevelDB(appTreeName, dataDir)
-	if err != nil {
-		return nil, err
-	}
-
-	processTree, err := tmdb.NewGoLevelDB(processTreeName, dataDir)
-	if err != nil {
-		return nil, err
-	}
-	voteTree, err := tmdb.NewGoLevelDB(voteTreeName, dataDir)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 	vs := &State{}
-	vs.AppTree, err = iavl.NewMutableTree(appTree, PrefixDBCacheSize)
-	if err != nil {
-		return nil, err
-	}
-	vs.ProcessTree, err = iavl.NewMutableTree(processTree, PrefixDBCacheSize)
-	if err != nil {
-		return nil, err
-	}
-	vs.VoteTree, err = iavl.NewMutableTree(voteTree, PrefixDBCacheSize)
-	if err != nil {
+	//vs.Store = new(gravitonstate.GravitonState)
+	vs.Store = new(iavlstate.IavlState)
+
+	if err = vs.Store.Init(dataDir, "disk"); err != nil {
 		return nil, err
 	}
 
-	version, err := vs.AppTree.Load()
-	if err != nil {
+	if err := vs.Store.AddTree(AppTree); err != nil {
+		return nil, err
+	}
+	if err := vs.Store.AddTree(ProcessTree); err != nil {
+		return nil, err
+	}
+	if err := vs.Store.AddTree(VoteTree); err != nil {
 		return nil, err
 	}
 
-	var atVersion, ptVersion, vtVersion int64
-	if version > 0 {
-		version--
-	}
-	atVersion, err = vs.AppTree.LoadVersionForOverwriting(version)
-	if err != nil {
+	// Must be -1 in order to get the last commited block state, if not block replay will fail
+	if err = vs.Store.LoadVersion(-1); err != nil {
 		return nil, err
 	}
-	ptVersion, err = vs.ProcessTree.LoadVersionForOverwriting(version)
-	if err != nil {
-		return nil, err
-	}
-	vtVersion, err = vs.VoteTree.LoadVersionForOverwriting(version)
-	if err != nil {
-		return nil, err
-	}
-
-	// We set the mutable tree fields; ensure that, for consistency, the
-	// immutable tree fields aren't nil.
-	// This is important in the case an endpoint call comes in while we're
-	// still initializing, and InitChain hasn't run yet. In that scenario,
-	// we would get a nil pointer dereference panic.
-	// TODO(mvdan): this is still racy, since we can't use GetImmutable, but
-	// at least we won't panic every single time.
-	vs.IAppTree = vs.AppTree.ImmutableTree
-	vs.IProcessTree = vs.ProcessTree.ImmutableTree
-	vs.IVoteTree = vs.VoteTree.ImmutableTree
 
 	vs.Codec = codec
 	vs.voteCache = make(map[string]*types.VoteProof)
-	log.Infof("application trees successfully loaded. appTree:%d processTree:%d voteTree: %d", atVersion, ptVersion, vtVersion)
+	log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
 	return vs, nil
-}
-
-// Immutable creates immutable state
-func (v *State) Immutable() error {
-	var err error
-	// get immutable app tree of the latest app tree version saved
-	v.IAppTree, err = v.AppTree.GetImmutable(v.AppTree.Version())
-	if err != nil {
-		return err
-	}
-
-	// get immutable process tree of the latest process tree version saved
-	v.IProcessTree, err = v.ProcessTree.GetImmutable(v.ProcessTree.Version())
-	if err != nil {
-		return err
-	}
-
-	// get immutable vote tree of the latest vote tree version saved
-	v.IVoteTree, err = v.VoteTree.GetImmutable(v.VoteTree.Version())
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // AddEventListener adds a new event listener, to receive method calls on block
@@ -184,10 +117,11 @@ func (v *State) AddEventListener(l EventListener) {
 
 // AddOracle adds a trusted oracle given its address if not exists
 func (v *State) AddOracle(address string) error {
+	var err error
 	address = util.TrimHex(address)
-	v.RLock()
-	_, oraclesBytes := v.AppTree.Get(oracleKey)
-	v.RUnlock()
+	v.Lock()
+	defer v.Unlock()
+	oraclesBytes := v.Store.Tree(AppTree).Get(oracleKey)
 	var oracles []string
 	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	for _, v := range oracles {
@@ -200,19 +134,16 @@ func (v *State) AddOracle(address string) error {
 	if err != nil {
 		return errors.New("cannot marshal oracles")
 	}
-	v.Lock()
-	v.AppTree.Set(oracleKey, newOraclesBytes)
-	v.Unlock()
-	return nil
+	return v.Store.Tree(AppTree).Add(oracleKey, newOraclesBytes)
 }
 
 // RemoveOracle removes a trusted oracle given its address if exists
 func (v *State) RemoveOracle(address string) error {
-	address = util.TrimHex(address)
-	v.RLock()
-	_, oraclesBytes := v.AppTree.Get(oracleKey)
-	v.RUnlock()
 	var oracles []string
+	address = util.TrimHex(address)
+	v.Lock()
+	defer v.Unlock()
+	oraclesBytes := v.Store.Tree(AppTree).Get(oracleKey)
 	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	for i, o := range oracles {
 		if o == address {
@@ -224,10 +155,7 @@ func (v *State) RemoveOracle(address string) error {
 			if err != nil {
 				return errors.New("cannot marshal oracles")
 			}
-			v.Lock()
-			v.AppTree.Set(oracleKey, newOraclesBytes)
-			v.Unlock()
-			return nil
+			return v.Store.Tree(AppTree).Add(oracleKey, newOraclesBytes)
 		}
 	}
 	return errors.New("oracle not found")
@@ -236,15 +164,16 @@ func (v *State) RemoveOracle(address string) error {
 // Oracles returns the current oracle list
 func (v *State) Oracles(isQuery bool) ([]string, error) {
 	var oraclesBytes []byte
+	var err error
 	v.RLock()
+	defer v.RUnlock()
 	if isQuery {
-		_, oraclesBytes = v.IAppTree.Get(oracleKey)
+		oraclesBytes = v.Store.ImmutableTree(AppTree).Get(oracleKey)
 	} else {
-		_, oraclesBytes = v.AppTree.Get(oracleKey)
+		oraclesBytes = v.Store.Tree(AppTree).Get(oracleKey)
 	}
-	v.RUnlock()
 	var oracles []string
-	err := v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
+	err = v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	return oracles, err
 }
 
@@ -263,10 +192,11 @@ func hexPubKeyToTendermintEd25519(pubKey string) (crypto.PubKey, error) {
 
 // AddValidator adds a tendemint validator if it is not already added
 func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
+	var err error
 	addr := pubKey.Address().String()
-	v.RLock()
-	_, validatorsBytes := v.AppTree.Get(validatorKey)
-	v.RUnlock()
+	v.Lock()
+	defer v.Unlock()
+	validatorsBytes := v.Store.Tree(AppTree).Get(validatorKey)
 	var validators []tmtypes.GenesisValidator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
 	for _, v := range validators {
@@ -281,20 +211,17 @@ func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
 	}
 	validators = append(validators, newVal)
 
-	validatorsBytes, err := v.Codec.MarshalBinaryBare(validators)
+	validatorsBytes, err = v.Codec.MarshalBinaryBare(validators)
 	if err != nil {
 		return errors.New("cannot marshal validator")
 	}
-	v.Lock()
-	v.AppTree.Set(validatorKey, validatorsBytes)
-	v.Unlock()
-	return nil
+	return v.Store.Tree(AppTree).Add(validatorKey, validatorsBytes)
 }
 
 // RemoveValidator removes a tendermint validator if exists
 func (v *State) RemoveValidator(address string) error {
 	v.RLock()
-	_, validatorsBytes := v.AppTree.Get(validatorKey)
+	validatorsBytes := v.Store.Tree(AppTree).Get(validatorKey)
 	v.RUnlock()
 	var validators []tmtypes.GenesisValidator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
@@ -309,9 +236,8 @@ func (v *State) RemoveValidator(address string) error {
 				return errors.New("cannot marshal validators")
 			}
 			v.Lock()
-			v.AppTree.Set(validatorKey, validatorsBytes)
-			v.Unlock()
-			return nil
+			defer v.Unlock()
+			return v.Store.Tree(AppTree).Add(validatorKey, validatorsBytes)
 		}
 	}
 	return errors.New("validator not found")
@@ -320,15 +246,16 @@ func (v *State) RemoveValidator(address string) error {
 // Validators returns a list of the validators saved on persistent storage
 func (v *State) Validators(isQuery bool) ([]tmtypes.GenesisValidator, error) {
 	var validatorBytes []byte
+	var err error
 	v.RLock()
 	if isQuery {
-		_, validatorBytes = v.IAppTree.Get(validatorKey)
+		validatorBytes = v.Store.ImmutableTree(AppTree).Get(validatorKey)
 	} else {
-		_, validatorBytes = v.AppTree.Get(validatorKey)
+		validatorBytes = v.Store.Tree(AppTree).Get(validatorKey)
 	}
 	v.RUnlock()
 	var validators []tmtypes.GenesisValidator
-	err := v.Codec.UnmarshalBinaryBare(validatorBytes, &validators)
+	err = v.Codec.UnmarshalBinaryBare(validatorBytes, &validators)
 	return validators, err
 }
 
@@ -394,8 +321,11 @@ func (v *State) AddProcess(p *types.Process, pid, mkuri string) error {
 		return errors.New("cannot marshal process bytes")
 	}
 	v.Lock()
-	v.ProcessTree.Set([]byte(pid), newProcessBytes)
+	err = v.Store.Tree(ProcessTree).Add([]byte(pid), newProcessBytes)
 	v.Unlock()
+	if err != nil {
+		return err
+	}
 	for _, l := range v.eventListeners {
 		l.OnProcess(pid, p.EntityID, p.MkRoot, mkuri)
 	}
@@ -418,8 +348,11 @@ func (v *State) CancelProcess(pid string) error {
 		return errors.New("cannot marshal updated process bytes")
 	}
 	v.Lock()
-	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
+	err = v.Store.Tree(ProcessTree).Add([]byte(pid), updatedProcessBytes)
 	v.Unlock()
+	if err != nil {
+		return err
+	}
 	for _, l := range v.eventListeners {
 		l.OnCancel(pid)
 	}
@@ -430,7 +363,7 @@ func (v *State) CancelProcess(pid string) error {
 func (v *State) PauseProcess(pid string) error {
 	pid = util.TrimHex(pid)
 	v.RLock()
-	_, processBytes := v.ProcessTree.Get([]byte(pid))
+	processBytes := v.Store.Tree(ProcessTree).Get([]byte(pid))
 	v.RUnlock()
 	var process types.Process
 	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
@@ -463,18 +396,19 @@ func (v *State) ResumeProcess(pid string) error {
 func (v *State) Process(pid string, isQuery bool) (*types.Process, error) {
 	var process *types.Process
 	var processBytes []byte
+	var err error
 	pid = util.TrimHex(pid)
 	v.RLock()
 	if isQuery {
-		_, processBytes = v.IProcessTree.Get([]byte(pid))
+		processBytes = v.Store.ImmutableTree(ProcessTree).Get([]byte(pid))
 	} else {
-		_, processBytes = v.ProcessTree.Get([]byte(pid))
+		processBytes = v.Store.Tree(ProcessTree).Get([]byte(pid))
 	}
 	v.RUnlock()
 	if processBytes == nil {
 		return nil, ErrProcessNotFound
 	}
-	err := v.Codec.UnmarshalBinaryBare(processBytes, &process)
+	err = v.Codec.UnmarshalBinaryBare(processBytes, &process)
 	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal process with id (%s)", pid)
 	}
@@ -486,9 +420,10 @@ func (v *State) CountProcesses(isQuery bool) int64 {
 	v.RLock()
 	defer v.RUnlock()
 	if isQuery {
-		return v.IProcessTree.Size()
+		return int64(v.Store.ImmutableTree(ProcessTree).Count())
 	}
-	return v.ProcessTree.Size()
+	return int64(v.Store.Tree(ProcessTree).Count())
+
 }
 
 // set process stores in the database the process
@@ -501,8 +436,10 @@ func (v *State) setProcess(process *types.Process, pid string) error {
 		return errors.New("cannot marshal updated process bytes")
 	}
 	v.Lock()
-	v.ProcessTree.Set([]byte(pid), updatedProcessBytes)
-	v.Unlock()
+	defer v.Unlock()
+	if err := v.Store.Tree(ProcessTree).Add([]byte(pid), updatedProcessBytes); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -516,8 +453,11 @@ func (v *State) AddVote(vote *types.Vote) error {
 		return fmt.Errorf("cannot marshal vote")
 	}
 	v.Lock()
-	v.VoteTree.Set([]byte(voteID), newVoteBytes)
+	err = v.Store.Tree(VoteTree).Add([]byte(voteID), newVoteBytes)
 	v.Unlock()
+	if err != nil {
+		return err
+	}
 	for _, l := range v.eventListeners {
 		l.OnVote(vote)
 	}
@@ -539,9 +479,9 @@ func (v *State) Envelope(voteID string, isQuery bool) (_ *types.Vote, err error)
 	v.RLock()
 	defer v.RUnlock() // needs to be deferred due to the recover above
 	if isQuery {
-		_, voteBytes = v.IVoteTree.Get([]byte(voteID))
+		voteBytes = v.Store.ImmutableTree(VoteTree).Get([]byte(voteID))
 	} else {
-		_, voteBytes = v.VoteTree.Get([]byte(voteID))
+		voteBytes = v.Store.Tree(VoteTree).Get([]byte(voteID))
 	}
 	if voteBytes == nil {
 		return nil, fmt.Errorf("vote with id (%s) does not exist", voteID)
@@ -557,7 +497,8 @@ func (v *State) EnvelopeExists(processID, nullifier string) bool {
 	voteID := fmt.Sprintf("%s_%s", util.TrimHex(processID), util.TrimHex(nullifier))
 	v.RLock()
 	defer v.RUnlock()
-	return v.IVoteTree.Has([]byte(voteID))
+	b := v.Store.ImmutableTree(VoteTree).Get([]byte(voteID)) // TBD: This is quite dirty, should be changed
+	return len(b) > 0
 }
 
 // The prefix is "processID_", where processID is a stringified hash of fixed length.
@@ -568,9 +509,11 @@ func (v *State) iterateProcessID(processID string, fn func(key []byte, value []b
 	v.RLock()
 	defer v.RUnlock()
 	if isQuery {
-		return v.IVoteTree.IterateRange([]byte(processID+"_"), []byte(processID+"}"), true, fn)
+		v.Store.ImmutableTree(VoteTree).Iterate(processID+"_", processID+"}", fn)
+	} else {
+		v.Store.Tree(VoteTree).Iterate(processID+"_", processID+"}", fn)
 	}
-	return v.VoteTree.IterateRange([]byte(processID+"_"), []byte(processID+"}"), true, fn)
+	return true
 }
 
 // CountVotes returns the number of votes registered for a given process id
@@ -617,9 +560,9 @@ func (v *State) Header(isQuery bool) *tmtypes.Header {
 	var headerBytes []byte
 	v.RLock()
 	if isQuery {
-		_, headerBytes = v.IAppTree.Get(headerKey)
+		headerBytes = v.Store.ImmutableTree(AppTree).Get(headerKey)
 	} else {
-		_, headerBytes = v.AppTree.Get(headerKey)
+		headerBytes = v.Store.Tree(AppTree).Get(headerKey)
 	}
 	v.RUnlock()
 	var header tmtypes.Header
@@ -636,9 +579,9 @@ func (v *State) AppHash(isQuery bool) []byte {
 	var headerBytes []byte
 	v.RLock()
 	if isQuery {
-		_, headerBytes = v.IAppTree.Get(headerKey)
+		headerBytes = v.Store.ImmutableTree(AppTree).Get(headerKey)
 	} else {
-		_, headerBytes = v.AppTree.Get(headerKey)
+		headerBytes = v.Store.Tree(AppTree).Get(headerKey)
 	}
 	v.RUnlock()
 	var header tmtypes.Header
@@ -652,29 +595,18 @@ func (v *State) AppHash(isQuery bool) []byte {
 // Save persistent save of vochain mem trees
 func (v *State) Save() []byte {
 	v.Lock()
-	h1, _, err := v.AppTree.SaveVersion()
+	hash, err := v.Store.Commit()
 	if err != nil {
-		log.Errorf("cannot save vochain state to disk: %s", err)
+		panic(fmt.Sprintf("cannot commit state trees: (%s)", err))
 	}
-	h2, _, err := v.ProcessTree.SaveVersion()
-	if err != nil {
-		log.Errorf("cannot save vochain state to disk: %s", err)
-	}
-	h3, _, err := v.VoteTree.SaveVersion()
-	if err != nil {
-		log.Errorf("cannot save vochain state to disk: %s", err)
-	}
-	if err := v.Immutable(); err != nil {
-		log.Errorf("cannot set immutable tree")
-	}
+	log.Debugf("commited state tree version %d, hash %x", v.Store.Version(), hash)
 	v.Unlock()
 	if h := v.Header(false); h != nil {
 		for _, l := range v.eventListeners {
 			l.Commit(h.Height)
 		}
 	}
-
-	return ethereum.HashRaw([]byte(fmt.Sprintf("%s%s%s", h1, h2, h3)))
+	return hash
 }
 
 // Rollback rollbacks to the last persistent db data version
@@ -683,19 +615,16 @@ func (v *State) Rollback() {
 		l.Rollback()
 	}
 	v.Lock()
-	v.AppTree.Rollback()
-	v.ProcessTree.Rollback()
-	v.VoteTree.Rollback()
-	v.Unlock()
+	defer v.Unlock()
+	if err := v.Store.Rollback(); err != nil {
+		panic(fmt.Sprintf("cannot rollback state tree: (%s)", err))
+	}
 }
 
 // WorkingHash returns the hash of the vochain trees mkroots
 // hash(appTree+processTree+voteTree)
 func (v *State) WorkingHash() []byte {
 	v.RLock()
-	appHash := v.AppTree.WorkingHash()
-	procHash := v.ProcessTree.WorkingHash()
-	voteHash := v.VoteTree.WorkingHash()
-	v.RUnlock()
-	return ethereum.HashRaw([]byte(fmt.Sprintf("%s%s%s", appHash, procHash, voteHash)))
+	defer v.RUnlock()
+	return v.Store.Hash()
 }

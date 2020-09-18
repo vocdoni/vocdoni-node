@@ -124,7 +124,7 @@ func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 	if err != nil {
 		tb.Fatal(err)
 	}
-	s.AppTree.Set([]byte("oracle"), oraclesBytes)
+	s.Store.Tree(vochain.AppTree).Add([]byte("oracle"), oraclesBytes)
 	return s
 }
 
@@ -144,12 +144,16 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 	if err != nil {
 		tb.Fatal(err)
 	}
-	s.AppTree.Set([]byte("validator"), validatorsBytes)
+	if err = s.Store.Tree(vochain.AppTree).Add([]byte("validator"), validatorsBytes); err != nil {
+		tb.Fatal(err)
+	}
 	oraclesBytes, err := s.Codec.MarshalBinaryBare(OracleListHardcoded)
 	if err != nil {
 		tb.Fatal(err)
 	}
-	s.AppTree.Set([]byte("oracle"), oraclesBytes)
+	if err = s.Store.Tree(vochain.AppTree).Add([]byte("oracle"), oraclesBytes); err != nil {
+		tb.Fatal(err)
+	}
 	return s
 }
 
@@ -164,7 +168,9 @@ func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 	if err != nil {
 		tb.Fatal(err)
 	}
-	s.ProcessTree.Set([]byte("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), processBytes)
+	if err = s.Store.Tree(vochain.ProcessTree).Add([]byte("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), processBytes); err != nil {
+		tb.Fatal(err)
+	}
 	return s
 }
 

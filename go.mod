@@ -8,6 +8,7 @@ require (
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200602234848-db8a79a18e4a // indirect
 	github.com/btcsuite/btcd v0.21.0-beta // indirect
+	github.com/deroproject/graviton v0.0.0-20200906044921-89e9e09f9601
 	github.com/dgraph-io/badger/v2 v2.0.1-rc1.0.20200409094109-809725940698
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/ethereum/go-ethereum v1.9.20

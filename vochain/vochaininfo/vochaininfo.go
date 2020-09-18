@@ -13,8 +13,8 @@ import (
 type VochainInfo struct {
 	sync            bool
 	height          int64
-	voteTreeSize    int64
-	processTreeSize int64
+	voteTreeSize    uint64
+	processTreeSize uint64
 	mempoolSize     int
 	voteCacheSize   int
 	avg1            int32
@@ -59,7 +59,7 @@ func (vi *VochainInfo) Sync() bool {
 // TreeSizes returns the current size of the ProcessTree and VoteTree
 // ProcessTree: total number of created voting processes in the blockchain
 // VoteTree: total number of votes registered in the blockchain
-func (vi *VochainInfo) TreeSizes() (int64, int64) {
+func (vi *VochainInfo) TreeSizes() (uint64, uint64) {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
 	return vi.processTreeSize, vi.voteTreeSize
@@ -159,8 +159,8 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			vi.avg360 = a360
 			vi.avg1440 = a1440
 			vi.vnode.State.RLock()
-			vi.processTreeSize = vi.vnode.State.ProcessTree.Size()
-			vi.voteTreeSize = vi.vnode.State.VoteTree.Size()
+			vi.processTreeSize = vi.vnode.State.Store.Tree(vochain.ProcessTree).Count()
+			vi.voteTreeSize = vi.vnode.State.Store.Tree(vochain.VoteTree).Count()
 			vi.voteCacheSize = vi.vnode.State.VoteCacheSize()
 			vi.vnode.State.RUnlock()
 			vi.mempoolSize = vi.vnode.Node.Mempool().Size()
