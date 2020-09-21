@@ -188,8 +188,7 @@ func (i *IavlState) Hash() []byte {
 	return i.getHash()
 }
 
-func (t *IavlTree) Get(key []byte) []byte {
-	r := []byte{}
+func (t *IavlTree) Get(key []byte) (r []byte) {
 	if t.isImmutable {
 		_, r = t.itree.Get(key)
 	} else {

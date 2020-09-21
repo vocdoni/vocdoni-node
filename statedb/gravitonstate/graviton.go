@@ -30,7 +30,9 @@ type GravitonTree struct {
 }
 
 func (g *GravitonState) Init(storagePath, sorageType string) (err error) {
-	g.store, err = graviton.NewDiskStore(storagePath)
+	if g.store, err = graviton.NewDiskStore(storagePath); err != nil {
+		return err
+	}
 	g.trees = make(map[string]*GravitonTree, 32)
 	g.imTrees = make(map[string]*GravitonTree, 32)
 	if err := g.LoadVersion(0); err != nil {
@@ -188,7 +190,7 @@ func (g *GravitonState) getHash() []byte {
 		if err != nil {
 			return nil
 		}
-		hash = fmt.Sprintf("%s%s", hash, gh)
+		hash = fmt.Sprintf("%s%s", hash, gh[:])
 	}
 	return ethereum.HashRaw([]byte(hash))
 }
