@@ -67,21 +67,23 @@ func (i *IavlState) LoadVersion(v int64) error { // zero means last version, -1 
 			if v > 0 {
 				v--
 			}
-		} else if v < -1 {
+		} else if v > 0 {
+			_, err = i.versionTree.LoadVersion(v)
+			if err != nil {
+				return fmt.Errorf("cannot load last version tree state: (%s)", err)
+			}
+		} else {
 			return fmt.Errorf("loading versions below -1 is not supported")
 		}
 
 		for name, t := range i.trees {
-			if _, err = i.versionTree.LoadVersionForOverwriting(v); err != nil {
-				return fmt.Errorf("cannot load version number %d: (%s)", v, err)
-			}
 			_, vb := i.versionTree.Get([]byte(name))
-			vt, err := strconv.ParseUint(string(vb), 10, 64)
-			if err == nil {
-				t.tree.LoadVersionForOverwriting(int64(vt))
-			} else {
-				v = 0
-			}
+			vt, _ := strconv.ParseUint(string(vb), 10, 64)
+			t.tree.LoadVersionForOverwriting(int64(vt))
+		}
+
+		if _, err = i.versionTree.LoadVersionForOverwriting(v); err != nil {
+			return fmt.Errorf("cannot load version number %d: (%s)", v, err)
 		}
 	}
 
@@ -100,9 +102,17 @@ func (i *IavlState) LoadVersion(v int64) error { // zero means last version, -1 
 	return i.updateImmutables()
 }
 
-func (i *IavlState) updateImmutables() error {
+func (i *IavlState) updateImmutables() (err error) {
 	for _, t := range i.trees {
-		t.itree = t.tree.ImmutableTree
+		v := t.tree.Version()
+		if v > 0 {
+			t.itree, err = t.tree.GetImmutable(v)
+			if err != nil {
+				return err
+			}
+		} else {
+			t.itree = t.tree.ImmutableTree
+		}
 	}
 	return nil
 }
