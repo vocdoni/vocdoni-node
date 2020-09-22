@@ -88,10 +88,10 @@ func (w *wsPool) dial() (err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		w.wsc, _, err = websocket.Dial(ctx, w.servers[w.index], nil)
 		cancel()
-		w.wsc.SetReadLimit(w.ReadLimit)
-		if err == nil {
+		if err == nil || w.wsc == nil {
 			break
 		}
+		w.wsc.SetReadLimit(w.ReadLimit)
 		if initialIndex == w.index {
 			err = fmt.Errorf("no more servers in pool")
 			break
