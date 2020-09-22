@@ -68,6 +68,8 @@ compose-test:
   only:
     - merge_requests
     - master
+    - /^release-.*$/
+    - stage
 
 docker-release:
   image: docker:stable
