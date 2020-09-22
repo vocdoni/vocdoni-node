@@ -1,4 +1,4 @@
-package vochain
+package vochaininfo
 
 import (
 	"time"
@@ -47,7 +47,7 @@ var (
 	})
 )
 
-func (app *BaseApplication) registerMetrics(ma *metrics.Agent) {
+func (vi *VochainInfo) registerMetrics(ma *metrics.Agent) {
 	ma.Register(VochainHeight)
 	ma.Register(VochainMempool)
 	ma.Register(VochainAppTree)
@@ -57,24 +57,24 @@ func (app *BaseApplication) registerMetrics(ma *metrics.Agent) {
 
 }
 
-func (app *BaseApplication) getMetrics() {
-	VochainHeight.Set(float64(app.Node.BlockStore().Height()))
-	VochainMempool.Set(float64(app.Node.Mempool().Size()))
-	//	VochainAppTree.Set(float64(app.State.AppTree.Size()))
-	//	VochainProcessTree.Set(float64(app.State.ProcessTree.Size()))
-	//	VochainVoteTree.Set(float64(app.State.VoteTree.Size()))
-	VochainVoteCache.Set(float64(app.State.VoteCacheSize()))
+func (vi *VochainInfo) getMetrics() {
+	VochainHeight.Set(float64(vi.Height()))
+	VochainMempool.Set(float64(vi.MempoolSize()))
+	p, v := vi.TreeSizes()
+	VochainProcessTree.Set(float64(p))
+	VochainVoteTree.Set(float64(v))
+	VochainVoteCache.Set(float64(vi.VoteCacheSize()))
 }
 
 // CollectMetrics constantly updates the metric values for prometheus
 // The function is blocking, should be called in a go routine
 // If the metrics Agent is nil, do nothing
-func (app *BaseApplication) CollectMetrics(ma *metrics.Agent) {
+func (vi *VochainInfo) CollectMetrics(ma *metrics.Agent) {
 	if ma != nil {
-		app.registerMetrics(ma)
+		vi.registerMetrics(ma)
 		for {
 			time.Sleep(ma.RefreshInterval)
-			app.getMetrics()
+			vi.getMetrics()
 		}
 	}
 }

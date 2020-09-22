@@ -115,12 +115,13 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.
 		log.Infof("starting census downloader service")
 		censusdownloader.NewCensusDownloader(vnode, cm, !vconfig.ImportPreviousCensus)
 	}
-	// Grab metrics
-	go vnode.CollectMetrics(ma)
 
 	// Vochain info
 	vi = vochaininfo.NewVochainInfo(vnode)
 	go vi.Start(10)
+
+	// Grab metrics
+	go vi.CollectMetrics(ma)
 
 	if waitForSync && !vconfig.SeedMode {
 		log.Infof("waiting for vochain to synchronize")
