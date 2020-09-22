@@ -13,7 +13,6 @@ import (
 )
 
 const PrefixDBCacheSize = 1024
-const versionTree = "version"
 
 type IavlState struct {
 	dataDir     string
@@ -21,6 +20,7 @@ type IavlState struct {
 	trees       map[string]*IavlTree
 	lock        sync.RWMutex
 	versionTree *iavl.MutableTree // For each tree, saves its last commited version
+	storageType string            // mem or disk
 }
 
 type IavlTree struct {
@@ -30,17 +30,29 @@ type IavlTree struct {
 	lastCommitedVersion uint64
 }
 
+// Init initializes a iavlstate storage.
+// storageType can be disk or mem, default is disk.
 func (i *IavlState) Init(storagePath, storageType string) error {
 	i.dataDir = storagePath
 	i.dataType = storageType
 	i.trees = make(map[string]*IavlTree, 32)
+	var db tmdb.DB
+	var err error
 
-	// Create/Open version tree
-	st, err := tmdb.NewGoLevelDB(versionTree, storagePath)
-	if err != nil {
-		return err
+	if storageType == "disk" || storageType == "" {
+		db, err = tmdb.NewGoLevelDB("versions", storagePath)
+		if err != nil {
+			return err
+		}
+		i.storageType = "disk"
+	} else if storageType == "mem" {
+		db = tmdb.NewMemDB()
+		i.storageType = "mem"
+	} else {
+		return fmt.Errorf("storageType %s not supported", storageType)
 	}
-	if i.versionTree, err = iavl.NewMutableTree(st, PrefixDBCacheSize); err != nil {
+
+	if i.versionTree, err = iavl.NewMutableTree(db, PrefixDBCacheSize); err != nil {
 		return err
 	}
 	return i.LoadVersion(0)
@@ -120,10 +132,18 @@ func (i *IavlState) updateImmutables() (err error) {
 func (i *IavlState) AddTree(name string) error {
 	i.lock.Lock()
 	defer i.lock.Unlock()
-	st, err := tmdb.NewGoLevelDB(name, i.dataDir)
-	if err != nil {
-		return err
+	var st tmdb.DB
+	var err error
+
+	if i.storageType == "disk" {
+		st, err = tmdb.NewGoLevelDB(name, i.dataDir)
+		if err != nil {
+			return err
+		}
+	} else {
+		st = tmdb.NewMemDB()
 	}
+
 	var t *iavl.MutableTree
 	if t, err = iavl.NewMutableTree(st, PrefixDBCacheSize); err != nil {
 		return err

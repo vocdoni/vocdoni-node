@@ -90,9 +90,17 @@ func (v *VersionTree) String() (s string) {
 	return s
 }
 
-func (g *GravitonState) Init(storagePath, sorageType string) (err error) {
-	if g.store, err = graviton.NewDiskStore(storagePath); err != nil {
-		return err
+func (g *GravitonState) Init(storagePath, storageType string) (err error) {
+	if storageType == "disk" || storageType == "" {
+		if g.store, err = graviton.NewDiskStore(storagePath); err != nil {
+			return err
+		}
+	} else if storageType == "mem" {
+		if g.store, err = graviton.NewMemStore(); err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("storageType %s not supported", storageType)
 	}
 	g.trees = make(map[string]*GravitonTree, 32)
 	g.imTrees = make(map[string]*GravitonTree, 32)
