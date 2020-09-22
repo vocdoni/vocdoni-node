@@ -12,21 +12,82 @@ import (
 	"gitlab.com/vocdoni/go-dvote/statedb"
 )
 
-const versionTree = "version"
-
 type GravitonState struct {
 	store             *graviton.Store
 	hash              []byte
 	trees             map[string]*GravitonTree
 	imTrees           map[string]*GravitonTree
 	treeLock          sync.RWMutex
-	versionTree       *graviton.Tree
 	lastCommitVersion uint64
+	vTree             *VersionTree
 }
 
 type GravitonTree struct {
 	tree    *graviton.Tree
 	version uint64
+}
+
+type VersionTree struct {
+	Name  string
+	tree  *graviton.Tree
+	store *graviton.Store
+}
+
+func (v *VersionTree) Init(g *graviton.Store) error {
+	s, err := g.LoadSnapshot(0)
+	if err != nil {
+		return err
+	}
+	if v.Name == "" {
+		v.Name = "versions"
+	}
+	v.tree, err = s.GetTree(v.Name)
+	v.store = g
+	return err
+}
+
+func (v *VersionTree) Commit() error {
+	return v.tree.Commit()
+}
+
+func (v *VersionTree) Version() uint64 {
+	return v.tree.GetVersion()
+}
+
+func (v *VersionTree) LoadVersion(version int64) error {
+	s, err := v.store.LoadSnapshot(0)
+	if err != nil {
+		return err
+	}
+	if version == -1 {
+		version = int64(v.tree.GetParentVersion())
+	}
+	v.tree, err = s.GetTreeWithVersion(v.Name, uint64(version))
+	if err != nil {
+		v.tree, err = s.GetTree(v.Name)
+	}
+	return err
+}
+
+func (v *VersionTree) Add(name string, version uint64) error {
+	return v.tree.Put([]byte(name), []byte(strconv.FormatUint(version, 10)))
+}
+
+func (v *VersionTree) Get(name string) (uint64, error) {
+	vb, err := v.tree.Get([]byte(name))
+	if err != nil {
+		return 0, nil
+	}
+	return strconv.ParseUint(string(vb), 10, 64)
+}
+
+func (v *VersionTree) String() (s string) {
+	c := v.tree.Cursor()
+	for k, _, err := c.First(); err == nil; k, _, err = c.Next() {
+		vt, _ := v.Get(string(k))
+		s = fmt.Sprintf("%s %s:%d ", s, k, vt)
+	}
+	return s
 }
 
 func (g *GravitonState) Init(storagePath, sorageType string) (err error) {
@@ -35,10 +96,8 @@ func (g *GravitonState) Init(storagePath, sorageType string) (err error) {
 	}
 	g.trees = make(map[string]*GravitonTree, 32)
 	g.imTrees = make(map[string]*GravitonTree, 32)
-	if err := g.LoadVersion(0); err != nil {
-		return err
-	}
-	if err := g.LoadVersion(0); err != nil {
+	g.vTree = &VersionTree{}
+	if err = g.vTree.Init(g.store); err != nil {
 		return err
 	}
 	return nil
@@ -48,51 +107,40 @@ func (g *GravitonState) Version() uint64 {
 	return g.lastCommitVersion
 }
 
-func (g *GravitonState) LoadVersion(v int64) error { // zero means last version
+// LoadVersion loads a current version.
+// Zero means last version, -1 means previous version.
+// Values under -1 are not supported.
+// Versions are obtained from a version Tree which stores the version of all existing trees.
+func (g *GravitonState) LoadVersion(v int64) error {
 	var err error
 	g.treeLock.Lock()
 	defer g.treeLock.Unlock()
 
-	version := uint64(v)
-
-	if v == -1 {
-		vb, _ := g.versionTree.Get([]byte(versionTree))
-		if vb == nil {
-			version = 0
-		} else {
-			version, err = strconv.ParseUint(string(vb), 10, 64)
-			if err != nil {
-				return err
-			}
-		}
+	if err = g.vTree.LoadVersion(v); err != nil {
+		return err
 	}
 
-	sn, err := g.store.LoadSnapshot(version)
+	sn, err := g.store.LoadSnapshot(0)
 	if err != nil {
 		return err
 	}
 
-	sn2, err := g.store.LoadSnapshot(version) // Do we need to create a separated snapshot for keep it immutable?
-	if err != nil {
-		return err
-	}
-
-	if g.versionTree, err = sn.GetTree(versionTree); err != nil {
-		return err
-	}
-
+	// Update each tree to its version
 	for k := range g.trees {
-		g.trees[k].tree, err = sn.GetTree(k)
+		vt, err := g.vTree.Get(k)
 		if err != nil {
 			return err
 		}
-		g.imTrees[k].tree, err = sn2.GetTree(k)
+		t2, err := sn.GetTreeWithVersion(k, vt)
 		if err != nil {
 			return err
 		}
+		g.trees[k].tree = t2
+		g.trees[k].version = g.vTree.Version()
 	}
-	g.lastCommitVersion = sn.GetVersion()
-	return nil
+
+	g.lastCommitVersion = g.vTree.Version()
+	return g.updateImmutable()
 }
 
 func (g *GravitonState) AddTree(name string) error {
@@ -105,18 +153,7 @@ func (g *GravitonState) AddTree(name string) error {
 		return err
 	}
 	g.trees[name] = &GravitonTree{tree: t}
-
-	sn2, err := g.store.LoadSnapshot(0)
-	if err != nil {
-		return err
-	}
-	t2, err := sn2.GetTree(name)
-	if err != nil {
-		return err
-	}
-	g.imTrees[name] = &GravitonTree{tree: t2}
-
-	return nil
+	return g.updateImmutable()
 }
 
 func (g *GravitonState) Tree(name string) statedb.StateTree {
@@ -126,51 +163,54 @@ func (g *GravitonState) Tree(name string) statedb.StateTree {
 }
 
 func (g *GravitonState) updateImmutable() error {
-	sn, err := g.store.LoadSnapshot(g.lastCommitVersion)
+	sn, err := g.store.LoadSnapshot(0)
 	if err != nil {
 		return err
 	}
-	for k := range g.imTrees {
-		t, err := sn.GetTree(k)
+	for k := range g.trees {
+		t, err := sn.GetTreeWithVersion(k, g.trees[k].tree.GetVersion())
 		if err != nil {
 			return err
 		}
-		g.imTrees[k] = &GravitonTree{tree: t}
+		g.imTrees[k] = &GravitonTree{tree: t, version: g.lastCommitVersion}
 	}
 	return nil
 }
 
+// ImmutableTree is a tree snapshot that won't change, useful for making queries on a state changing environment
 func (g *GravitonState) ImmutableTree(name string) statedb.StateTree {
 	g.treeLock.RLock()
 	defer g.treeLock.RUnlock()
 	return g.imTrees[name]
-} // a tree version that won't change
+}
 
-func (g *GravitonState) Commit() ([]byte, error) { // Returns New Hash
+// Commit saves the current state of the trees and updates versions.
+// Returns New Hash
+func (g *GravitonState) Commit() ([]byte, error) {
 	var err error
 	g.treeLock.Lock()
 	defer g.treeLock.Unlock()
 
-	// Save the last commited version
-	g.versionTree.Put([]byte(versionTree), []byte(strconv.FormatUint(g.lastCommitVersion, 10)))
-	if err = g.versionTree.Commit(); err != nil {
-		return nil, err
-	}
-
-	// First update immutable tree to last stored version
-	if err = g.updateImmutable(); err != nil {
-		return nil, err
-	}
-	for _, t := range g.trees {
+	// Commit current trees and save versions to the version Tree
+	for name, t := range g.trees {
 		if err = t.tree.Commit(); err != nil {
 			return nil, err
 		}
+		if err = g.vTree.Add(name, t.tree.GetVersion()); err != nil {
+			return nil, err
+		}
 	}
-	sn, err := g.store.LoadSnapshot(0) // Not sure if it's needed to load the snapshot to get the version, I cannot find another way
-	if err != nil {
+	// Las commmit version is the versions-tree Version number
+	if err = g.vTree.Commit(); err != nil {
 		return nil, err
 	}
-	g.lastCommitVersion = sn.GetVersion()
+	g.lastCommitVersion = g.vTree.Version()
+
+	// Update immutable tree to last commited version, this tree should not change until next Commit
+	if err = g.updateImmutable(); err != nil {
+		return nil, err
+	}
+
 	g.hash = g.getHash()
 	return g.hash, nil
 }
@@ -195,6 +235,7 @@ func (g *GravitonState) getHash() []byte {
 	return ethereum.HashRaw([]byte(hash))
 }
 
+// Rollback discards the non-commited changes of the tree
 func (g *GravitonState) Rollback() error {
 	for _, t := range g.trees {
 		if err := t.tree.Discard(); err != nil {
@@ -204,6 +245,7 @@ func (g *GravitonState) Rollback() error {
 	return nil
 }
 
+// Hash returns the merkle root hash of all trees hash(hashTree1+hashTree2+...)
 func (g *GravitonState) Hash() []byte {
 	return g.getHash()
 }
@@ -225,6 +267,9 @@ func (t *GravitonTree) Iterate(prefix string, until string, callback func(key, v
 	c := t.tree.Cursor()
 	for k, v, err := c.First(); err == nil; k, v, err = c.Next() { // TBD: This is horrible from the performance point of view...
 		if strings.HasPrefix(string(k), prefix) {
+			if string(k) == until {
+				break
+			}
 			if callback(k, v) {
 				break
 			}
