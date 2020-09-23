@@ -313,7 +313,7 @@ func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
 }
 
 // AddProcess adds a new process to vochain if not already added
-func (v *State) AddProcess(p *types.Process, pid, mkuri string) error {
+func (v *State) AddProcess(p types.Process, pid, mkuri string) error {
 	pid = util.TrimHex(pid)
 	p.EntityID = util.TrimHex(p.EntityID)
 	newProcessBytes, err := v.Codec.MarshalBinaryBare(p)

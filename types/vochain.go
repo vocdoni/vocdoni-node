@@ -128,6 +128,7 @@ type VoteTx struct {
 	Signature            string `json:"signature,omitempty"`
 	Type                 string `json:"type,omitempty"`
 	VotePackage          string `json:"votePackage,omitempty"`
+	SignedBytes          []byte `json:"-"`
 }
 
 func (tx *VoteTx) TxType() string {

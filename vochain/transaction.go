@@ -80,7 +80,7 @@ func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 		tx := gtx.(*types.NewProcessTx)
 		if p, err := NewProcessTxCheck(tx, state); err == nil {
 			if commit {
-				return []byte{}, state.AddProcess(p, tx.ProcessID, tx.MkURI)
+				return []byte{}, state.AddProcess(*p, tx.ProcessID, tx.MkURI)
 			}
 		} else {
 			return []byte{}, err
@@ -105,6 +105,18 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 		if err := json.Unmarshal(content, &tx); err != nil {
 			return nil, fmt.Errorf("cannot parse VoteTX")
 		}
+		// In order to extract the signed bytes we need to remove the signature and txtype fields
+		signature := tx.Signature
+		tx.Signature = ""
+		txtype := tx.Type
+		tx.Type = ""
+		signedBytes, err := json.Marshal(tx)
+		if err != nil {
+			return nil, fmt.Errorf("cannot marshal voteTX (%s)", err)
+		}
+		tx.SignedBytes = signedBytes
+		tx.Signature = signature
+		tx.Type = txtype
 		return &tx, nil
 
 	case "AdminTx":
@@ -192,18 +204,8 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 				// if not in cache, extract pubKey, generate nullifier and check merkle proof
 				vp = new(types.VoteProof)
 
-				// remove signature from the TX for extracting publicKey and verify
-				signature := tx.Signature
-				tx.Signature = ""
-				txtype := tx.Type
-				tx.Type = ""
-				defer func() { tx.Signature = signature; tx.Type = txtype }() // restore original TX
-				voteBytes, err := json.Marshal(tx)
-				if err != nil {
-					return nil, fmt.Errorf("cannot marshal vote (%s)", err)
-				}
-				log.Debugf("vote Payload: %s", voteBytes)
-				vp.PubKey, err = ethereum.PubKeyFromSignature(voteBytes, signature)
+				log.Debugf("vote Payload: %s", tx.SignedBytes)
+				vp.PubKey, err = ethereum.PubKeyFromSignature(tx.SignedBytes, tx.Signature)
 				if err != nil {
 					return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
 				}

@@ -58,7 +58,7 @@ func TestCheckTX(t *testing.T) {
 	}
 	pid := randomHex(processIDsize)
 	t.Logf("adding process %+v", process)
-	app.State.AddProcess(process, pid, "ipfs://123456789")
+	app.State.AddProcess(*process, pid, "ipfs://123456789")
 
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
