@@ -24,6 +24,7 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
+	db "github.com/tendermint/tm-db"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 )
@@ -87,6 +88,23 @@ func (l *tenderLogger) With(keyvals ...interface{}) tmlog.Logger {
 	return l2
 }
 
+func checkDBavailable(name string) bool {
+	available := true
+	defer func() {
+		if r := recover(); r != nil {
+			available = false
+		}
+	}()
+	dbdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		log.Warn(err)
+		return false
+	}
+	defer os.RemoveAll(dbdir)
+	db.NewDB("checkdb", db.BackendType(name), dbdir)
+	return available
+}
+
 // we need to set init (first time validators and oracles)
 func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis []byte) (*nm.Node, error) {
 	// create node config
@@ -140,6 +158,12 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = false
+
+	// enable cleveldb if available
+	if checkDBavailable(string(db.CLevelDBBackend)) {
+		tconfig.DBBackend = string(db.CLevelDBBackend)
+		log.Infof("%s is available, using it as storage for Tendermint", tconfig.DBBackend)
+	}
 
 	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {

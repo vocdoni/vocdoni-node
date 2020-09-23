@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:experimental
+
+FROM golang:1.15.2 AS builder
+
+# Build all the binaries at once, so that the final targets don't require having
+# Go installed to build each of them.
+WORKDIR /src
+COPY . .
+
+RUN apt update && apt install -y build-essential libsnappy-dev libleveldb-dev libleveldb1d
+
+RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
+	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
+	CGO_ENABLED=1 go build -tags=cleveldb -o=. -ldflags='-w -s' -mod=readonly ./cmd/dvotenode ./cmd/vochaintest
+
+FROM debian:10.5-slim AS test
+WORKDIR /app
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+
+RUN apt update && apt install -y curl
+COPY --from=builder /src/vochaintest ./
+
+FROM debian:10.5-slim
+WORKDIR /app
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /src/dvotenode /src/dockerfiles/dvotenode/files/dvoteStart.sh ./
+
+RUN apt update && apt install -y libsnappy-dev libleveldb1d && ldconfig && rm -rf /var/lib/apt/lists/* /var/cache/apt
+
+ENTRYPOINT ["/app/dvoteStart.sh"]
