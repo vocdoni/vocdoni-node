@@ -7,7 +7,7 @@ import (
 func (r *Router) censusLocal(request routerRequest) {
 	auth := request.authenticated
 	addr := request.address
-	log.Debugf("client authorization %t. Recovered address is [%s]", auth, addr)
+	log.Debugf("client authorization %t. Recovered address is [%s]", auth, addr.Hex())
 	if auth {
 		if len(addr) < 20 {
 			r.sendError(request, "cannot recover address")

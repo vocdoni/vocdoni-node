@@ -17,7 +17,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/tree"
+	tree "gitlab.com/vocdoni/go-dvote/trie"
 )
 
 // ErrNamespaceExist is the error returned when trying to add a namespace that already exist
@@ -131,7 +131,8 @@ func (m *Manager) LoadTree(name string) (*tree.Tree, error) {
 	if _, exist := m.Trees[name]; exist {
 		return m.Trees[name], nil
 	}
-	tr, err := tree.NewTree(m.LocalStorage.WithPrefix([]byte(name)))
+
+	tr, err := tree.NewTree(name, m.StorageDir)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +170,7 @@ func (m *Manager) AddNamespace(name string, pubKeys []string) (*tree.Tree, error
 	if m.Exists(name) {
 		return nil, ErrNamespaceExist
 	}
-	tr, err := tree.NewTree(m.LocalStorage.WithPrefix([]byte(name)))
+	tr, err := tree.NewTree(name, m.StorageDir)
 	if err != nil {
 		return nil, err
 	}

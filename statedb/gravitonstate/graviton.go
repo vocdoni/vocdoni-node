@@ -9,6 +9,7 @@ import (
 
 	"github.com/deroproject/graviton"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
+	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/statedb"
 )
 
@@ -170,6 +171,20 @@ func (g *GravitonState) Tree(name string) statedb.StateTree {
 	return g.trees[name]
 }
 
+func (g *GravitonState) TreeWithRoot(root []byte) statedb.StateTree {
+	g.treeLock.RLock()
+	defer g.treeLock.RUnlock()
+	sn, err := g.store.LoadSnapshot(0)
+	if err != nil {
+		return nil
+	}
+	gt, err := sn.GetTreeWithRootHash(root)
+	if err != nil {
+		log.Warn(err)
+	}
+	return &GravitonTree{tree: gt, version: g.Version()}
+}
+
 func (g *GravitonState) updateImmutable() error {
 	sn, err := g.store.LoadSnapshot(0)
 	if err != nil {
@@ -310,15 +325,21 @@ func (t *GravitonTree) Proof(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return proof.Marshal(), nil
+	proofBytes := proof.Marshal()
+	if !t.Verify(key, proofBytes, nil) {
+		return nil, nil
+	}
+	return proofBytes, nil
 }
 
 func (t *GravitonTree) Verify(key, proof, root []byte) bool {
 	var p graviton.Proof
 	var err error
 	var r [32]byte
-
-	p.Unmarshal(proof)
+	if err = p.Unmarshal(proof); err != nil {
+		log.Error(err)
+		return false
+	}
 	if root == nil {
 		r, err = t.tree.Hash()
 		if err != nil {
@@ -328,4 +349,18 @@ func (t *GravitonTree) Verify(key, proof, root []byte) bool {
 		copy(r[:], root[:32])
 	}
 	return p.VerifyMembership(r, key)
+}
+
+func Verify(key, proof, root []byte) (bool, error) {
+	var p graviton.Proof
+	var r [32]byte
+	if err := p.Unmarshal(proof); err != nil {
+		log.Error(err)
+		return false, err
+	}
+	if len(root) != 32 {
+		return false, fmt.Errorf("root hash size is not correct")
+	}
+	copy(r[:], root[:32])
+	return p.VerifyMembership(r, key), nil
 }

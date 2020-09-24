@@ -6,6 +6,7 @@ type StateDB interface {
 	LoadVersion(int64) error // zero means last version, -1 is the previous to the last version
 	AddTree(name string) error
 	Tree(name string) StateTree
+	TreeWithRoot(root []byte) StateTree
 	ImmutableTree(name string) StateTree // a tree version that won't change
 	Commit() ([]byte, error)             // Returns New Hash
 	Rollback() error
@@ -20,5 +21,5 @@ type StateTree interface {
 	Count() uint64
 	Version() uint64
 	Proof(key []byte) ([]byte, error)
-	Verify(key, proot, root []byte) bool
+	Verify(key, proof, root []byte) bool
 }

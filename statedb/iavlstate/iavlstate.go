@@ -163,6 +163,11 @@ func (i *IavlState) Tree(name string) statedb.StateTree {
 	return &IavlTree{tree: i.trees[name].tree, isImmutable: false}
 }
 
+func (g *IavlState) TreeWithRoot(root []byte) statedb.StateTree {
+	// TO-DO
+	return nil
+}
+
 func (i *IavlState) ImmutableTree(name string) statedb.StateTree { // a tree version that won't change
 	i.lock.RLock()
 	defer i.lock.RUnlock()

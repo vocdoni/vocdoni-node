@@ -12,8 +12,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
-	"gitlab.com/vocdoni/go-dvote/db"
-	"gitlab.com/vocdoni/go-dvote/tree"
+	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
@@ -23,12 +22,7 @@ func TestCheckTX(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	treeStorage, err := db.NewIden3Storage(tempDir(t, "vochain_checkTxTest_db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tr, err := tree.NewTree(treeStorage)
+	tr, err := tree.NewTree("testchecktx", tempDir(t, "vochain_checkTxTest_db"))
 	if err != nil {
 		t.Fatal(err)
 	}
