@@ -292,7 +292,7 @@ func (t *GravitonTree) Hash() []byte {
 	if err != nil {
 		return nil
 	}
-	var b []byte
+	b := make([]byte, 32)
 	copy(b, h[:])
 	return b
 }
@@ -303,4 +303,29 @@ func (t *GravitonTree) Count() (count uint64) {
 		count++
 	}
 	return
+}
+
+func (t *GravitonTree) Proof(key []byte) ([]byte, error) {
+	proof, err := t.tree.GenerateProof(key)
+	if err != nil {
+		return nil, err
+	}
+	return proof.Marshal(), nil
+}
+
+func (t *GravitonTree) Verify(key, proof, root []byte) bool {
+	var p graviton.Proof
+	var err error
+	var r [32]byte
+
+	p.Unmarshal(proof)
+	if root == nil {
+		r, err = t.tree.Hash()
+		if err != nil {
+			return false
+		}
+	} else {
+		copy(r[:], root[:32])
+	}
+	return p.VerifyMembership(r, key)
 }

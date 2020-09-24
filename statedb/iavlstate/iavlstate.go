@@ -269,3 +269,20 @@ func (t *IavlTree) Version() uint64 {
 		return uint64(t.tree.Version())
 	}
 }
+
+func (t *IavlTree) Proof(key []byte) ([]byte, error) {
+	var p *iavl.RangeProof
+	var err error
+	if t.isImmutable {
+		_, p, err = t.itree.GetWithProof(key)
+	} else {
+		_, p, err = t.tree.GetWithProof(key)
+	}
+
+	return []byte(p.String()), err
+}
+
+func (t *IavlTree) Verify(key, proof, root []byte) bool {
+	// TO-DO
+	return false
+}

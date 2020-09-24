@@ -19,4 +19,6 @@ type StateTree interface {
 	Hash() []byte
 	Count() uint64
 	Version() uint64
+	Proof(key []byte) ([]byte, error)
+	Verify(key, proot, root []byte) bool
 }

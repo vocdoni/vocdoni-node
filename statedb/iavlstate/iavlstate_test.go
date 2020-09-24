@@ -147,3 +147,53 @@ func TestState(t *testing.T) {
 	})
 
 }
+
+func TestOrder(t *testing.T) {
+	t.Parallel()
+
+	s := &IavlState{}
+	if err := s.Init(TempDir(t, "iavldb"), "disk"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Lets create two state trees
+	if err := s.AddTree("t3"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddTree("t4"); err != nil {
+		t.Fatal(err)
+	}
+
+	// No previous version available, but this should be supported
+	if err := s.LoadVersion(0); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add 10 identical entries to both trees but reversed order
+	for i := 0; i < 1000; i++ {
+		s.Tree("t3").Add([]byte(fmt.Sprintf("%d", i)), []byte(fmt.Sprintf("number %d", i)))
+	}
+	for i := 999; i >= 0; i-- {
+		s.Tree("t4").Add([]byte(fmt.Sprintf("%d", i)), []byte(fmt.Sprintf("number %d", i)))
+	}
+
+	// Compare hash
+	if string(s.Tree("t3").Hash()) != string(s.Tree("t4").Hash()) {
+		t.Errorf("hash between two identical trees tree is different when using different order")
+	}
+
+	// Check Proof generation and validation
+	_, err := s.Tree("t3").Proof([]byte("5"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	/*	if ok := s.Tree("t3").Verify([]byte("5"), proof, nil); !ok {
+			t.Errorf("proof is invalid, should be valid")
+		}
+
+		if ok := s.Tree("t3").Verify([]byte("_"), proof, nil); ok {
+			t.Errorf("proof is valid, should be invalid")
+		}
+	*/
+}
