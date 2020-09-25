@@ -250,6 +250,8 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	var wg sync.WaitGroup
 	var proofsReadyWG sync.WaitGroup
 	votingTimes := make([]time.Duration, len(clients))
+	wg.Add(len(clients))
+	proofsReadyWG.Add(len(clients))
 
 	for gw, cl := range clients {
 		var gwSigners []*ethereum.SignKeys
@@ -269,8 +271,6 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 		}
 		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl
-		wg.Add(1)
-		proofsReadyWG.Add(1)
 		go func() {
 			defer wg.Done()
 			if votingTimes[gw], err = cl.TestSendVotes(pid, entityKey.AddressString(), censusRoot, start, gwSigners, gwProofs, encrypted, doubleVote, &proofsReadyWG); err != nil {
