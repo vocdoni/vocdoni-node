@@ -1,13 +1,11 @@
 package vochain
 
-// go test -benchmem -run=^$ -bench=. -cpu=4 -benchtime=50x -parallel=50
+// go test -benchmem -run=^$ -bench=. -cpu=10
 
 import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"sync/atomic"
@@ -15,14 +13,13 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
-	"gitlab.com/vocdoni/go-dvote/db"
-	tree "gitlab.com/vocdoni/go-dvote/tree"
+	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 func BenchmarkCheckTx(b *testing.B) {
 	b.ReportAllocs()
-	app, err := NewBaseApplication(tmpDirBench(b, "vochain_checkTxTest"))
+	app, err := NewBaseApplication(tempDir(b, "vochain_checkTxTest"))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -35,18 +32,14 @@ func BenchmarkCheckTx(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			benchCheckTx(b, app, voters[atomic.AddInt32(&i, 1)])
 			b.Logf("Running vote %d", i)
+			benchCheckTx(b, app, voters[atomic.AddInt32(&i, 1)])
 		}
 	})
 }
 
 func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voters []*types.VoteTx) {
-	treeStorage, err := db.NewIden3Storage(tempDir(t, "vochain_checkTxTest_db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	tr, err := tree.NewTree(treeStorage)
+	tr, err := tree.NewTree("checkTXbench", tempDir(t, "vochain_checkTxTest_db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,14 +131,4 @@ func benchCheckTx(t *testing.B, app *BaseApplication, voters []*types.VoteTx) {
 		}
 	}
 	app.Commit()
-}
-
-func tmpDirBench(tb *testing.B, name string) string {
-	tb.Helper()
-	dir, err := ioutil.TempDir("", name)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	tb.Cleanup(func() { os.RemoveAll(dir) })
-	return dir
 }
