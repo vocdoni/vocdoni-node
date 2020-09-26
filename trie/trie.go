@@ -11,6 +11,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/statedb"
 	"gitlab.com/vocdoni/go-dvote/statedb/gravitonstate"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 type Tree struct {
@@ -139,7 +140,11 @@ func (t *Tree) CheckProof(index, value []byte, mpHex string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return t.Tree.Verify(index, proof, nil), nil
+	tr := t.Tree
+	if tr == nil {
+		return false, fmt.Errorf("tree %s does not exist", t.name)
+	}
+	return tr.Verify(index, proof, nil), nil
 }
 
 // Root returns the current root hash of the merkle tree
@@ -220,13 +225,11 @@ func (t *Tree) ImportDump(claims []string) error {
 	var cb []byte
 	var err error
 	for _, c := range claims {
-		cb, err = hex.DecodeString(c)
+		cb, err = hex.DecodeString(util.TrimHex(c))
 		if err != nil {
-			t.store.Rollback()
 			return err
 		}
 		if err = t.Tree.Add(cb, []byte{}); err != nil {
-			t.store.Rollback()
 			return err
 		}
 	}
@@ -240,7 +243,7 @@ func (t *Tree) Snapshot(root string) (*Tree, error) {
 	if tree == nil {
 		return nil, fmt.Errorf("snapshot: root not valid or not found %s", root)
 	}
-	return &Tree{Tree: tree, public: t.public}, nil
+	return &Tree{store: t.store, Tree: tree, public: t.public}, nil
 }
 
 // HashExist checks if a hash exists as a node in the merkle tree

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"sync/atomic"
+
 	"github.com/deroproject/graviton"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -26,6 +28,7 @@ type GravitonState struct {
 type GravitonTree struct {
 	tree    *graviton.Tree
 	version uint64
+	size    uint64
 }
 
 type VersionTree struct {
@@ -136,9 +139,17 @@ func (g *GravitonState) LoadVersion(v int64) error {
 
 	// Update each tree to its version
 	for k := range g.trees {
-		vt, err := g.vTree.Get(k)
-		if err != nil {
-			return err
+		vt := uint64(0)
+		if v != 0 {
+			vt, err = g.vTree.Get(k)
+			if err != nil {
+				return err
+			}
+		} else {
+			vt, err = sn.GetTreeHighestVersion(k)
+			if err != nil {
+				vt = 0
+			}
 		}
 		t2, err := sn.GetTreeWithVersion(k, vt)
 		if err != nil {
@@ -181,6 +192,7 @@ func (g *GravitonState) TreeWithRoot(root []byte) statedb.StateTree {
 	gt, err := sn.GetTreeWithRootHash(root)
 	if err != nil {
 		log.Warn(err)
+		return nil
 	}
 	return &GravitonTree{tree: gt, version: g.Version()}
 }
@@ -273,13 +285,27 @@ func (g *GravitonState) Hash() []byte {
 	return g.getHash()
 }
 
+func (g *GravitonState) Close() error {
+	g.store.Close()
+	return nil
+}
+
 func (t *GravitonTree) Get(key []byte) []byte {
 	b, _ := t.tree.Get(key)
 	return b
 }
 
 func (t *GravitonTree) Add(key, value []byte) error {
-	return t.tree.Put(key, value)
+	// if already exist, just return
+	if v, err := t.tree.Get(key); err == nil && string(v) == string(value) {
+		return nil
+	}
+	// if it does not exist, add, increase size counter and return
+	err := t.tree.Put(key, value)
+	if err == nil {
+		atomic.AddUint64(&t.size, 1)
+	}
+	return err
 }
 
 func (t *GravitonTree) Version() uint64 {
@@ -312,12 +338,22 @@ func (t *GravitonTree) Hash() []byte {
 	return b
 }
 
-func (t *GravitonTree) Count() (count uint64) {
+func (t *GravitonTree) count() (count uint64) {
 	c := t.tree.Cursor()
-	for _, _, err := c.First(); err == nil; _, _, err = c.Next() { // TBD: This is horrible from the performance point of view...
+	for _, _, err := c.First(); err == nil; _, _, err = c.Next() {
+		// TBD: This is horrible from the performance point of view...
 		count++
 	}
 	return
+}
+
+func (t *GravitonTree) Count() uint64 {
+	c := atomic.LoadUint64(&t.size)
+	if c == 0 {
+		c = t.count()
+		atomic.StoreUint64(&t.size, c)
+	}
+	return c
 }
 
 func (t *GravitonTree) Proof(key []byte) ([]byte, error) {

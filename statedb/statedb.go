@@ -11,6 +11,7 @@ type StateDB interface {
 	Commit() ([]byte, error)             // Returns New Hash
 	Rollback() error
 	Hash() []byte
+	Close() error
 }
 
 type StateTree interface {

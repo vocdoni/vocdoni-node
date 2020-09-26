@@ -21,6 +21,7 @@ type IavlState struct {
 	lock        sync.RWMutex
 	versionTree *iavl.MutableTree // For each tree, saves its last commited version
 	storageType string            // mem or disk
+	db          tmdb.DB
 }
 
 type IavlTree struct {
@@ -36,23 +37,22 @@ func (i *IavlState) Init(storagePath, storageType string) error {
 	i.dataDir = storagePath
 	i.dataType = storageType
 	i.trees = make(map[string]*IavlTree, 32)
-	var db tmdb.DB
 	var err error
 
 	if storageType == "disk" || storageType == "" {
-		db, err = tmdb.NewGoLevelDB("versions", storagePath)
+		i.db, err = tmdb.NewGoLevelDB("versions", storagePath)
 		if err != nil {
 			return err
 		}
 		i.storageType = "disk"
 	} else if storageType == "mem" {
-		db = tmdb.NewMemDB()
+		i.db = tmdb.NewMemDB()
 		i.storageType = "mem"
 	} else {
 		return fmt.Errorf("storageType %s not supported", storageType)
 	}
 
-	if i.versionTree, err = iavl.NewMutableTree(db, PrefixDBCacheSize); err != nil {
+	if i.versionTree, err = iavl.NewMutableTree(i.db, PrefixDBCacheSize); err != nil {
 		return err
 	}
 	return i.LoadVersion(0)
@@ -221,6 +221,10 @@ func (i *IavlState) Hash() []byte {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 	return i.getHash()
+}
+
+func (t *IavlState) Close() error {
+	return t.db.Close()
 }
 
 func (t *IavlTree) Get(key []byte) (r []byte) {
