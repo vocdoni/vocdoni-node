@@ -64,7 +64,7 @@ func main() {
 
 	switch *opmode {
 	case "vtest":
-		vtest(*host, *oraclePrivKey, *electionType, entityKey, *electionSize, *procDuration, *parallelCons, *doubleVote, *gateways, *keysfile, true)
+		vtest(*host, *oraclePrivKey, *electionType, entityKey, *electionSize, *procDuration, *parallelCons, *doubleVote, *gateways, *keysfile, true, false)
 	case "censusImport":
 		censusImport(*host, entityKey)
 	case "censusGenerate":
@@ -143,7 +143,7 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 }
 
 func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKeys, electionSize, procDuration,
-	parallelCons int, doubleVote bool, gateways []string, keysfile string, useLastCensus bool) {
+	parallelCons int, doubleVote bool, gateways []string, keysfile string, useLastCensus bool, forceGatewaysGotCensus bool) {
 
 	var censusKeys []*ethereum.SignKeys
 	var proofs []string
@@ -215,33 +215,35 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 		clients = append(clients, cl)
 	}
 
-	// Make sure all gateways have the census
-	log.Infof("waiting for gateways to import the census")
+	if forceGatewaysGotCensus {
+		// Make sure all gateways have the census
+		log.Infof("waiting for gateways to import the census")
 
-	workingGateways := make(map[string]bool)
-	for _, cl := range clients {
-		workingGateways[cl.Addr] = true
-	}
-
-	gatewaysWithCensus := make(map[string]bool)
-	for len(gatewaysWithCensus) < len(workingGateways) {
+		workingGateways := make(map[string]bool)
 		for _, cl := range clients {
-			if _, ok := gatewaysWithCensus[cl.Addr]; !ok {
-				if size, err := cl.CensusSize(censusRoot); err == nil {
-					if size < int64(electionSize) {
-						log.Fatalf("gateway %s has an incorrect census size (got:%d expected%d)", cl.Addr, size, electionSize)
-					}
-					log.Infof("gateway %s got the census!", cl.Addr)
-					gatewaysWithCensus[cl.Addr] = true
-				} else {
-					log.Debug(err)
-				}
-			}
-			time.Sleep(time.Second * 2)
+			workingGateways[cl.Addr] = true
 		}
-	}
 
-	log.Infof("all gateways got the census! let's start voting")
+		gatewaysWithCensus := make(map[string]bool)
+		for len(gatewaysWithCensus) < len(workingGateways) {
+			for _, cl := range clients {
+				if _, ok := gatewaysWithCensus[cl.Addr]; !ok {
+					if size, err := cl.CensusSize(censusRoot); err == nil {
+						if size < int64(electionSize) {
+							log.Fatalf("gateway %s has an incorrect census size (got:%d expected%d)", cl.Addr, size, electionSize)
+						}
+						log.Infof("gateway %s got the census!", cl.Addr)
+						gatewaysWithCensus[cl.Addr] = true
+					} else {
+						log.Debug(err)
+					}
+				}
+				time.Sleep(time.Second * 2)
+			}
+		}
+
+		log.Infof("all gateways got the census! let's start voting")
+	}
 	// Send votes
 	i := 0
 	p := len(censusKeys) / len(clients)
