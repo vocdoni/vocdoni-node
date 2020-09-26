@@ -1,39 +1,60 @@
 package vochain
 
+// go test -benchmem -run=^$ -bench=. -cpu=4 -benchtime=50x -parallel=50
+
 import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"testing"
+
+	"sync/atomic"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/db"
-	"gitlab.com/vocdoni/go-dvote/tree"
+	tree "gitlab.com/vocdoni/go-dvote/tree"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-func TestCheckTX(t *testing.T) {
-	app, err := NewBaseApplication(tempDir(t, "vochain_checkTxTest"))
+func BenchmarkCheckTx(b *testing.B) {
+	b.ReportAllocs()
+	app, err := NewBaseApplication(tmpDirBench(b, "vochain_checkTxTest"))
 	if err != nil {
-		t.Fatal(err)
+		b.Fatal(err)
 	}
+	var voters [][]*types.VoteTx
+	for i := 0; i < b.N+1; i++ {
+		voters = append(voters, prepareBenchCheckTx(b, app, 1000))
+		b.Logf("creating process %s", voters[i][0].ProcessID)
+	}
+	var i int32
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			benchCheckTx(b, app, voters[atomic.AddInt32(&i, 1)])
+			b.Logf("Running vote %d", i)
+		}
+	})
+}
 
+func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voters []*types.VoteTx) {
 	treeStorage, err := db.NewIden3Storage(tempDir(t, "vochain_checkTxTest_db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	tr, err := tree.NewTree(treeStorage)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	keys := createEthRandomKeysBatch(1000)
+	keys := createEthRandomKeysBatch(nvoters)
+	if keys == nil {
+		t.Fatal("cannot create keys batch")
+	}
 	claims := []string{}
 	for _, k := range keys {
 		pub, _ := k.HexString()
@@ -57,16 +78,8 @@ func TestCheckTX(t *testing.T) {
 		NumberOfBlocks: 1024,
 	}
 	pid := randomHex(processIDsize)
-	t.Logf("adding process %+v", process)
 	app.State.AddProcess(*process, pid, "ipfs://123456789")
 
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
-
-	var tx types.VoteTx
 	var proof string
 
 	for i, s := range keys {
@@ -74,7 +87,7 @@ func TestCheckTX(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tx = types.VoteTx{
+		tx := types.VoteTx{
 			Nonce:     randomHex(16),
 			ProcessID: pid,
 			Proof:     proof,
@@ -88,6 +101,23 @@ func TestCheckTX(t *testing.T) {
 			t.Fatal(err)
 		}
 		tx.Type = "vote"
+		voters = append(voters, &tx)
+	}
+	return voters
+}
+
+func benchCheckTx(t *testing.B, app *BaseApplication, voters []*types.VoteTx) {
+	var cktx abcitypes.RequestCheckTx
+	var detx abcitypes.RequestDeliverTx
+
+	var cktxresp abcitypes.ResponseCheckTx
+	var detxresp abcitypes.ResponseDeliverTx
+
+	var err error
+	var txBytes []byte
+
+	i := 0
+	for _, tx := range voters {
 		if txBytes, err = json.Marshal(tx); err != nil {
 			t.Fatal(err)
 		}
@@ -95,43 +125,27 @@ func TestCheckTX(t *testing.T) {
 		cktxresp = app.CheckTx(cktx)
 		if cktxresp.Code != 0 {
 			t.Fatalf(fmt.Sprintf("checkTX failed: %s", cktxresp.Data))
+		} else {
+			detx.Tx = txBytes
+			detxresp = app.DeliverTx(detx)
+			if detxresp.Code != 0 {
+				t.Fatalf(fmt.Sprintf("deliverTX failed: %s", detxresp.Data))
+			}
 		}
-		detx.Tx = txBytes
-		detxresp = app.DeliverTx(detx)
-		if detxresp.Code != 0 {
-			t.Fatalf(fmt.Sprintf("deliverTX failed: %s", detxresp.Data))
+		i++
+		if i%100 == 0 {
+			app.Commit()
 		}
-		app.Commit()
 	}
-
+	app.Commit()
 }
 
-func tempDir(tb testing.TB, name string) string {
+func tmpDirBench(tb *testing.B, name string) string {
 	tb.Helper()
-	dir, err := ioutil.TempDir("", name+"*")
+	dir, err := ioutil.TempDir("", name)
 	if err != nil {
 		tb.Fatal(err)
 	}
 	tb.Cleanup(func() { os.RemoveAll(dir) })
 	return dir
-}
-
-func randomHex(n int) string {
-	bytes := make([]byte, n)
-	if _, err := rand.Read(bytes); err != nil {
-		return ""
-	}
-	return hex.EncodeToString(bytes)
-}
-
-// CreateEthRandomKeysBatch creates a set of eth random signing keys
-func createEthRandomKeysBatch(n int) []*ethereum.SignKeys {
-	s := make([]*ethereum.SignKeys, n)
-	for i := 0; i < n; i++ {
-		s[i] = ethereum.NewSignKeys()
-		if err := s[i].Generate(); err != nil {
-			panic(err)
-		}
-	}
-	return s
 }
