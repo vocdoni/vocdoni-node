@@ -148,12 +148,12 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 
 	// consensus config
 	tconfig.Consensus.TimeoutProposeDelta = time.Millisecond * 500
-	tconfig.Consensus.TimeoutPropose = time.Second * 3
+	tconfig.Consensus.TimeoutPropose = time.Second * 1
 	tconfig.Consensus.TimeoutPrevoteDelta = time.Millisecond * 500
-	tconfig.Consensus.TimeoutPrevote = time.Second * 3
+	tconfig.Consensus.TimeoutPrevote = time.Second * 1
 	tconfig.Consensus.TimeoutPrecommitDelta = time.Millisecond * 500
-	tconfig.Consensus.TimeoutPrecommit = time.Second * 3
-	tconfig.Consensus.TimeoutCommit = time.Second * 10
+	tconfig.Consensus.TimeoutPrecommit = time.Second * 1
+	tconfig.Consensus.TimeoutCommit = time.Second * 1
 
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
