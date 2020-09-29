@@ -1,8 +1,8 @@
 package router
 
 import (
-	"bytes"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -99,7 +99,12 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	var response types.MetaResponse
 	response.Registered = types.False
 
-	e, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", request.ProcessID, request.Nullifier), true)
+	pid, err := hex.DecodeString(request.ProcessID)
+	if err != nil {
+		r.sendError(request, "cannot decode processID")
+		return
+	}
+	e, err := r.vocapp.State.Envelope(pid, request.Nullifier, true)
 	// Warning, error is ignored. We should find a better way to check the envelope status
 	if err == nil && e != nil {
 		response.Registered = types.True
@@ -117,18 +122,22 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 
 func (r *Router) getEnvelope(request routerRequest) {
 	// check pid
-	sanitizedPID := util.TrimHex(request.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+	if !util.IsHexEncodedStringWithLength(request.ProcessID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope: (malformed processId)")
 		return
 	}
 	// check nullifier
-	sanitizedNullifier := util.TrimHex(request.Nullifier)
-	if !util.IsHexEncodedStringWithLength(sanitizedNullifier, types.VoteNullifierSize) {
+	request.Nullifier = util.TrimHex(request.Nullifier)
+	if !util.IsHexEncodedStringWithLength(request.Nullifier, types.VoteNullifierSize) {
 		r.sendError(request, "cannot get envelope: (malformed nullifier)")
 		return
 	}
-	envelope, err := r.vocapp.State.Envelope(fmt.Sprintf("%s_%s", sanitizedPID, sanitizedNullifier), true)
+	pid, err := hex.DecodeString(util.TrimHex(request.ProcessID))
+	if err != nil {
+		r.sendError(request, "cannot decode processID")
+		return
+	}
+	envelope, err := r.vocapp.State.Envelope(pid, request.Nullifier, true)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope: (%s)", err))
 		return
@@ -141,12 +150,17 @@ func (r *Router) getEnvelope(request routerRequest) {
 
 func (r *Router) getEnvelopeHeight(request routerRequest) {
 	// check pid
-	sanitizedPID := util.TrimHex(request.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+	request.ProcessID = util.TrimHex(request.ProcessID)
+	if !util.IsHexEncodedStringWithLength(request.ProcessID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope height: (malformed processId)")
 		return
 	}
-	votes := r.vocapp.State.CountVotes(sanitizedPID, true)
+	pid, err := hex.DecodeString(request.ProcessID)
+	if err != nil {
+		r.sendError(request, "cannot decode processID")
+		return
+	}
+	votes := r.vocapp.State.CountVotes(pid, true)
 	var response types.MetaResponse
 	response.Height = new(int64)
 	*response.Height = votes
@@ -175,36 +189,36 @@ func (r *Router) getProcessList(request routerRequest) {
 			return
 		}
 	}
+	eid, err := hex.DecodeString(request.EntityId)
+	if err != nil {
+		r.sendError(request, "cannot decode entityID")
+		return
+	}
+	fromID := []byte{}
+	if request.FromID != "" {
+		fromID, err = hex.DecodeString(request.FromID)
+		if err != nil {
+			r.sendError(request, "cannot decode fromID")
+			return
+		}
+	}
 
 	var response types.MetaResponse
-	processList, err := r.Scrutinizer.Storage.Get([]byte(types.ScrutinizerEntityPrefix + request.EntityId))
+	max := request.ListSize
+	if max > MaxListIterations || max <= 0 {
+		max = MaxListIterations
+	}
+	response.ProcessList, err = r.Scrutinizer.ProcessList(eid, fromID, max)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get entity process list: (%s)", err))
 		return
 	}
-	if len(processList) == 0 {
+	if len(response.ProcessList) == 0 {
 		response.Message = "entity does not exist or has not yet created a process"
 		request.Send(r.buildReply(request, &response))
 		return
 	}
 
-	max := request.ListSize
-	if max > MaxListIterations || max <= 0 {
-		max = MaxListIterations
-	}
-	fromLock := len(request.FromID) > 0
-	for _, process := range bytes.Split(processList, []byte(types.ScrutinizerEntityProcessSeparator)) {
-		if max < 1 || len(process) < 1 {
-			break
-		}
-		if !fromLock {
-			response.ProcessList = append(response.ProcessList, string(process))
-			max--
-		}
-		if fromLock && request.FromID == string(process) {
-			fromLock = false
-		}
-	}
 	response.Size = new(int64)
 	*response.Size = int64(len(response.ProcessList))
 	request.Send(r.buildReply(request, &response))
@@ -221,18 +235,23 @@ func (r *Router) getProcessCount(request routerRequest) {
 func (r *Router) getScrutinizerEntityCount(request routerRequest) {
 	var response types.MetaResponse
 	response.Size = new(int64)
-	*response.Size = int64(len(r.Scrutinizer.List(int64(^uint(0)>>1), "", types.ScrutinizerEntityPrefix)))
+	*response.Size = r.Scrutinizer.EntityCount()
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getProcessKeys(request routerRequest) {
 	// check pid
-	sanitizedPID := util.TrimHex(request.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+	request.ProcessID = util.TrimHex(request.ProcessID)
+	if !util.IsHexEncodedStringWithLength(request.ProcessID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope height: (malformed processId)")
 		return
 	}
-	process, err := r.vocapp.State.Process(sanitizedPID, true)
+	pid, err := hex.DecodeString(request.ProcessID)
+	if err != nil {
+		r.sendError(request, "cannot decode processID")
+		return
+	}
+	process, err := r.vocapp.State.Process(pid, true)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get process encryption public keys: (%s)", err))
 		return
@@ -267,6 +286,7 @@ func (r *Router) getProcessKeys(request routerRequest) {
 }
 
 func (r *Router) getEnvelopeList(request routerRequest) {
+	request.ProcessID = util.TrimHex(request.ProcessID)
 	if !util.IsHexEncodedStringWithLength(request.ProcessID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope list: (malformed processId)")
 		return
@@ -278,7 +298,12 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	if request.ListSize == 0 {
 		request.ListSize = 64
 	}
-	n := r.vocapp.State.EnvelopeList(request.ProcessID, request.From, request.ListSize, true)
+	pid, err := hex.DecodeString(request.ProcessID)
+	if err != nil {
+		r.sendError(request, "cannot decode processID")
+		return
+	}
+	n := r.vocapp.State.EnvelopeList(pid, request.From, request.ListSize, true)
 	var response types.MetaResponse
 	if len(n) == 0 {
 		response.Nullifiers = &[]string{}
@@ -290,21 +315,21 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 
 func (r *Router) getResults(request routerRequest) {
 	var err error
-	sanitizedPID := util.TrimHex(request.ProcessID)
-	if !util.IsHexEncodedStringWithLength(sanitizedPID, types.ProcessIDsize) {
+	request.ProcessID = util.TrimHex(request.ProcessID)
+	if !util.IsHexEncodedStringWithLength(request.ProcessID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get results: (malformed processId)")
-		return
-	}
-	request.ProcessID = sanitizedPID
-	if len(request.ProcessID) != 64 {
-		r.sendError(request, "processID length not valid")
 		return
 	}
 
 	var response types.MetaResponse
 
 	// Get process info
-	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
+	pid, err := hex.DecodeString(request.ProcessID)
+	if err != nil {
+		r.sendError(request, "cannot decode processID")
+		return
+	}
+	procInfo, err := r.Scrutinizer.ProcessInfo(pid)
 	if err != nil {
 		log.Warn(err)
 		r.sendError(request, err.Error())
@@ -318,7 +343,7 @@ func (r *Router) getResults(request routerRequest) {
 	}
 
 	// Get results info
-	vr, err := r.Scrutinizer.VoteResult(request.ProcessID)
+	vr, err := r.Scrutinizer.VoteResult(pid)
 	if err != nil && err != scrutinizer.ErrNoResultsYet {
 		log.Warn(err)
 		r.sendError(request, err.Error())
@@ -330,7 +355,7 @@ func (r *Router) getResults(request routerRequest) {
 	response.Results = vr
 
 	// Get number of votes
-	votes := r.vocapp.State.CountVotes(request.ProcessID, true)
+	votes := r.vocapp.State.CountVotes(pid, true)
 	response.Height = new(int64)
 	*response.Height = votes
 
@@ -343,7 +368,16 @@ func (r *Router) getProcListResults(request routerRequest) {
 	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
 		request.ListSize = MaxListIterations
 	}
-	response.ProcessIDs = r.Scrutinizer.List(request.ListSize, util.TrimHex(request.FromID), types.ScrutinizerResultsPrefix)
+	var err error
+	fid := []byte{}
+	if len(request.FromID) > 0 {
+		fid, err = hex.DecodeString(util.TrimHex(request.FromID))
+		if err != nil {
+			r.sendError(request, "cannot decode fromID")
+			return
+		}
+	}
+	response.ProcessIDs = r.Scrutinizer.ProcessListWithResults(request.ListSize, fid)
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -353,7 +387,16 @@ func (r *Router) getProcListLiveResults(request routerRequest) {
 	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
 		request.ListSize = MaxListIterations
 	}
-	response.ProcessIDs = r.Scrutinizer.List(request.ListSize, util.TrimHex(request.FromID), types.ScrutinizerLiveProcessPrefix)
+	var err error
+	fid := []byte{}
+	if len(request.FromID) > 0 {
+		fid, err = hex.DecodeString(util.TrimHex(request.FromID))
+		if err != nil {
+			r.sendError(request, "cannot decode fromID")
+			return
+		}
+	}
+	response.ProcessIDs = r.Scrutinizer.ProcessListWithLiveResults(request.ListSize, fid)
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -363,7 +406,16 @@ func (r *Router) getScrutinizerEntities(request routerRequest) {
 	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
 		request.ListSize = MaxListIterations
 	}
-	response.EntityIDs = r.Scrutinizer.List(request.ListSize, util.TrimHex(request.FromID), types.ScrutinizerEntityPrefix)
+	var err error
+	fid := []byte{}
+	if len(request.FromID) > 0 {
+		fid, err = hex.DecodeString(util.TrimHex(request.FromID))
+		if err != nil {
+			r.sendError(request, "cannot decode fromID")
+			return
+		}
+	}
+	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, fid)
 	request.Send(r.buildReply(request, &response))
 }
 

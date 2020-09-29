@@ -1,6 +1,7 @@
 package ethevents
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -89,7 +90,11 @@ func HandleVochainOracle(event *ethtypes.Log, e *EthereumEvents) error {
 
 		// Check if process already exist
 		log.Infof("found new process on Ethereum\n\t%+v", *processTx)
-		_, err = e.VochainApp.State.Process(processTx.ProcessID, true)
+		pid, err := hex.DecodeString(processTx.ProcessID)
+		if err != nil {
+			return err
+		}
+		_, err = e.VochainApp.State.Process(pid, true)
 		if err != nil {
 			if err != vochain.ErrProcessNotFound {
 				return err
@@ -124,7 +129,11 @@ func HandleVochainOracle(event *ethtypes.Log, e *EthereumEvents) error {
 		}
 
 		log.Infof("found new cancel process order from ethereum\n\t%+v", *cancelProcessTx)
-		p, err := e.VochainApp.State.Process(cancelProcessTx.ProcessID, true)
+		pid, err := hex.DecodeString(cancelProcessTx.ProcessID)
+		if err != nil {
+			return err
+		}
+		p, err := e.VochainApp.State.Process(pid, true)
 		if err != nil {
 			return err
 		}

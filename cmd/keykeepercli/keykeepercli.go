@@ -110,8 +110,11 @@ func main() {
 		log.Infof("[vochain info] replaying block %d at %d b/s",
 			h, (h-hPrev)/5)
 	}
-
-	process, err := vnode.State.Process(*pid, true)
+	pidb, err := hex.DecodeString(*pid)
+	if err != nil {
+		log.Fatal(err)
+	}
+	process, err := vnode.State.Process(pidb, true)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -167,8 +170,12 @@ func emptyProcess() ProcessVotes {
 func computeNonLiveResults(processID string, p *types.Process, s *vochain.State) (pv ProcessVotes, err error) {
 	pv = emptyProcess()
 	var nvotes int
-	for _, e := range s.EnvelopeList(processID, 0, 32<<18, false) { // 8.3M seems enough for now
-		v, err := s.Envelope(fmt.Sprintf("%s_%s", processID, e), false)
+	pid, err := hex.DecodeString(processID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot decode processID: (%s)", err)
+	}
+	for _, e := range s.EnvelopeList(pid, 0, 32<<18, false) { // 8.3M seems enough for now
+		v, err := s.Envelope(pid, e, false)
 		if err != nil {
 			log.Warn(err)
 			continue

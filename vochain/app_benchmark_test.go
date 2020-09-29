@@ -15,6 +15,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 func BenchmarkCheckTx(b *testing.B) {
@@ -66,12 +67,12 @@ func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voter
 	process := &types.Process{
 		StartBlock:     0,
 		Type:           types.PollVote,
-		EntityID:       randomHex(entityIDsize),
+		EntityID:       util.Hex2byte(t, randomHex(entityIDsize)),
 		MkRoot:         tr.Root(),
 		NumberOfBlocks: 1024,
 	}
 	pid := randomHex(processIDsize)
-	app.State.AddProcess(*process, pid, "ipfs://123456789")
+	app.State.AddProcess(*process, util.Hex2byte(t, pid), "ipfs://123456789")
 
 	var proof string
 

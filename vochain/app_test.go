@@ -14,6 +14,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 func TestCheckTX(t *testing.T) {
@@ -46,13 +47,13 @@ func TestCheckTX(t *testing.T) {
 	process := &types.Process{
 		StartBlock:     0,
 		Type:           types.PollVote,
-		EntityID:       randomHex(entityIDsize),
+		EntityID:       util.Hex2byte(t, randomHex(entityIDsize)),
 		MkRoot:         tr.Root(),
 		NumberOfBlocks: 1024,
 	}
 	pid := randomHex(processIDsize)
 	t.Logf("adding process %+v", process)
-	app.State.AddProcess(*process, pid, "ipfs://123456789")
+	app.State.AddProcess(*process, util.Hex2byte(t, pid), "ipfs://123456789")
 
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx

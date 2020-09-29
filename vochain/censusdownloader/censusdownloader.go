@@ -55,7 +55,7 @@ func (c *CensusDownloader) Commit(height int64) {
 	}
 }
 
-func (c *CensusDownloader) OnProcess(pid, eid, mkroot, mkuri string) {
+func (c *CensusDownloader) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 	c.queueLock.Lock()
 	defer c.queueLock.Unlock()
 	if !c.importOnlyNew || !c.isFastSync {
@@ -63,7 +63,7 @@ func (c *CensusDownloader) OnProcess(pid, eid, mkroot, mkuri string) {
 	}
 }
 
-func (c *CensusDownloader) OnCancel(pid string)                {}
-func (c *CensusDownloader) OnVote(v *types.Vote)               {}
-func (c *CensusDownloader) OnProcessKeys(pid, pub, com string) {}
-func (c *CensusDownloader) OnRevealKeys(pid, priv, rev string) {}
+func (c *CensusDownloader) OnCancel(pid []byte)                       {}
+func (c *CensusDownloader) OnVote(v *types.Vote)                      {}
+func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string) {}
+func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string) {}

@@ -29,7 +29,7 @@ type Vote struct {
 	// Nullifier is the unique identifier of the vote
 	Nullifier string `json:"nullifier,omitempty"`
 	// ProcessID contains the unique voting process identifier
-	ProcessID string `json:"processId,omitempty"`
+	ProcessID []byte `json:"processId,omitempty"`
 	// VotePackage base64 encoded vote content
 	VotePackage string `json:"votePackage,omitempty"`
 }
@@ -56,7 +56,7 @@ type Process struct {
 	// EncryptionPublicKeys are the keys required to encrypt the votes
 	EncryptionPublicKeys []string `json:"encryptionPublicKeys,omitempty"`
 	// EntityID identifies unequivocally a process
-	EntityID string `json:"entityId,omitempty"`
+	EntityID []byte `json:"entityId,omitempty"`
 	// KeyIndex
 	KeyIndex int `json:"keyIndex,omitempty"`
 	// MkRoot merkle root of all the census in the process
@@ -160,8 +160,9 @@ type NewProcessTx struct {
 	ProcessType    string `json:"processType"`
 	Signature      string `json:"signature,omitempty"`
 	// StartBlock represents the tendermint block where the process goes from scheduled to active
-	StartBlock int64  `json:"startBlock"`
-	Type       string `json:"type,omitempty"`
+	StartBlock  int64  `json:"startBlock"`
+	Type        string `json:"type,omitempty"`
+	SignedBytes []byte `json:"-"`
 }
 
 func (tx *NewProcessTx) TxType() string {
@@ -171,9 +172,10 @@ func (tx *NewProcessTx) TxType() string {
 // CancelProcessTx represents a tx for canceling a valid process
 type CancelProcessTx struct {
 	// EntityID the process belongs to
-	ProcessID string `json:"processId"`
-	Signature string `json:"signature,omitempty"`
-	Type      string `json:"type,omitempty"`
+	ProcessID   string `json:"processId"`
+	Signature   string `json:"signature,omitempty"`
+	Type        string `json:"type,omitempty"`
+	SignedBytes []byte `json:"-"`
 }
 
 func (tx *CancelProcessTx) TxType() string {
@@ -194,6 +196,7 @@ type AdminTx struct {
 	RevealKey            string `json:"revealKey,omitempty"`
 	Signature            string `json:"signature,omitempty"`
 	Type                 string `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
+	SignedBytes          []byte `json:"-"`
 }
 
 func (tx *AdminTx) TxType() string {
@@ -237,6 +240,6 @@ type GenesisAppState struct {
 // ScrutinizerOnProcessData holds the required data for callbacks when
 // a new process is added into the vochain.
 type ScrutinizerOnProcessData struct {
-	EntityID  string
-	ProcessID string
+	EntityID  []byte
+	ProcessID []byte
 }

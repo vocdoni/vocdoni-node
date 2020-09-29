@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"regexp"
 	"strconv"
+	"testing"
 	"time"
 )
 
@@ -47,4 +48,9 @@ func RandomHex(n int) string {
 func RandomInt(min, max int) int {
 	rand.Seed(time.Now().UnixNano())
 	return rand.Intn(max-min) + min
+}
+
+func Hex2byte(tb testing.TB, s string) []byte {
+	b, _ := hex.DecodeString(TrimHex(s))
+	return b
 }

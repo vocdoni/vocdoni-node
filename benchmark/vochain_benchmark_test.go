@@ -16,6 +16,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
@@ -217,10 +218,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	// check vote added
 	req = types.MetaRequest{}
 	req.ProcessID = processID
-	req.Nullifier, err = vochain.GenerateNullifier(s.Address(), processID)
-	if err != nil {
-		b.Fatal(err)
-	}
+	req.Nullifier = vochain.GenerateNullifier(s.Address(), util.Hex2byte(b, processID))
 	for {
 		resp = doRequest("getEnvelopeStatus", nil)
 		if *resp.Registered {

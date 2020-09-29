@@ -54,11 +54,12 @@ func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 			case "removeOracle":
 				return []byte{}, state.RemoveOracle(tx.Address)
 			case "addValidator":
-				if pk, err := hexPubKeyToTendermintEd25519(tx.PubKey); err == nil {
+				pk, err := hexPubKeyToTendermintEd25519(tx.PubKey)
+				if err == nil {
 					return []byte{}, state.AddValidator(pk, tx.Power)
-				} else {
-					return []byte{}, err
 				}
+				return []byte{}, err
+
 			case "removeValidator":
 				return []byte{}, state.RemoveValidator(tx.Address)
 			case types.TxAddProcessKeys:
@@ -73,14 +74,22 @@ func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 			return []byte{}, err
 		}
 		if commit {
-			return []byte{}, state.CancelProcess(tx.ProcessID)
+			pid, err := hex.DecodeString(util.TrimHex(tx.ProcessID))
+			if err != nil {
+				return []byte{}, err
+			}
+			return []byte{}, state.CancelProcess(pid)
 		}
 
 	case "NewProcessTx":
 		tx := gtx.(*types.NewProcessTx)
 		if p, err := NewProcessTxCheck(tx, state); err == nil {
 			if commit {
-				return []byte{}, state.AddProcess(*p, tx.ProcessID, tx.MkURI)
+				pid, err := hex.DecodeString(tx.ProcessID)
+				if err != nil {
+					return []byte{}, err
+				}
+				return []byte{}, state.AddProcess(*p, pid, tx.MkURI)
 			}
 		} else {
 			return []byte{}, err
@@ -98,8 +107,7 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 	if err != nil || len(txType.Type) < 1 {
 		return nil, fmt.Errorf("cannot extract type (%s)", err)
 	}
-	structType := types.ValidateType(txType.Type)
-	switch structType {
+	switch types.ValidateType(txType.Type) {
 	case "VoteTx":
 		var tx types.VoteTx
 		if err := json.Unmarshal(content, &tx); err != nil {
@@ -117,6 +125,8 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 		tx.SignedBytes = signedBytes
 		tx.Signature = signature
 		tx.Type = txtype
+		tx.Nullifier = util.TrimHex(tx.Nullifier)
+		tx.ProcessID = util.TrimHex(tx.ProcessID)
 		return &tx, nil
 
 	case "AdminTx":
@@ -124,12 +134,37 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 		if err := json.Unmarshal(content, &tx); err != nil {
 			return nil, fmt.Errorf("cannot parse AdminTx")
 		}
+		signature := tx.Signature
+		tx.Signature = ""
+		signedBytes, err := json.Marshal(tx)
+		if err != nil {
+			return nil, fmt.Errorf("cannot marshal voteTX (%s)", err)
+		}
+		tx.SignedBytes = signedBytes
+		tx.Signature = signature
+		tx.EncryptionPrivateKey = util.TrimHex(tx.EncryptionPrivateKey)
+		tx.ProcessID = util.TrimHex(tx.ProcessID)
+		tx.EncryptionPublicKey = util.TrimHex(tx.EncryptionPublicKey)
+		tx.RevealKey = util.TrimHex(tx.RevealKey)
+		tx.CommitmentKey = util.TrimHex(tx.CommitmentKey)
 		return &tx, nil
+
 	case "NewProcessTx":
 		var tx types.NewProcessTx
 		if err := json.Unmarshal(content, &tx); err != nil {
 			return nil, fmt.Errorf("cannot parse NewProcessTx")
 		}
+		signature := tx.Signature
+		tx.Signature = ""
+		signedBytes, err := json.Marshal(tx)
+		if err != nil {
+			return nil, fmt.Errorf("cannot marshal: (%s)", err)
+		}
+		tx.SignedBytes = signedBytes
+		tx.Signature = signature
+		tx.EntityID = util.TrimHex(tx.EntityID)
+		tx.ProcessID = util.TrimHex(tx.ProcessID)
+		tx.MkRoot = util.TrimHex(tx.MkRoot)
 		return &tx, nil
 
 	case "CancelProcessTx":
@@ -137,6 +172,15 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 		if err := json.Unmarshal(content, &tx); err != nil {
 			return nil, fmt.Errorf("cannot parse CancelProcessTx")
 		}
+		signature := tx.Signature
+		tx.Signature = ""
+		signedBytes, err := json.Marshal(tx)
+		if err != nil {
+			return nil, fmt.Errorf("cannot marshal: (%s)", err)
+		}
+		tx.SignedBytes = signedBytes
+		tx.Signature = signature
+		tx.ProcessID = util.TrimHex(tx.ProcessID)
 		return &tx, nil
 	}
 	return nil, fmt.Errorf("invalid transaction type")
@@ -145,12 +189,16 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
 // All hexadecimal strings should be already sanitized (without 0x)
 func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, error) {
-	process, err := state.Process(tx.ProcessID, false)
+	pid, err := hex.DecodeString(tx.ProcessID)
+	if err != nil {
+		return nil, err
+	}
+	process, err := state.Process(pid, false)
 	if err != nil {
 		return nil, err
 	}
 	if process == nil {
-		return nil, fmt.Errorf("process with id (%s) does not exist", tx.ProcessID)
+		return nil, fmt.Errorf("process with id (%x) does not exist", pid)
 	}
 	header := state.Header(false)
 	if header == nil {
@@ -174,7 +222,10 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 
 		case types.PollVote, types.PetitionSign, types.EncryptedPoll:
 			var vote types.Vote
-			vote.ProcessID = tx.ProcessID
+			vote.ProcessID, err = hex.DecodeString(tx.ProcessID)
+			if err != nil {
+				return nil, err
+			}
 			vote.VotePackage = tx.VotePackage
 
 			if types.ProcessIsEncrypted[process.Type] {
@@ -216,10 +267,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 				log.Debugf("extracted public key: %s", vp.PubKey)
 
 				// assign a nullifier
-				vp.Nullifier, err = GenerateNullifier(addr, vote.ProcessID)
-				if err != nil {
-					return nil, fmt.Errorf("cannot generate nullifier: (%s)", err)
-				}
+				vp.Nullifier = GenerateNullifier(addr, vote.ProcessID)
 				log.Debugf("generated new vote nullifier: %s", vp.Nullifier)
 
 				// check if vote exists
@@ -267,6 +315,14 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 		!util.IsHexEncodedStringWithLength(tx.EntityID, entityIDsizeV2) {
 		return nil, fmt.Errorf("malformed entityId")
 	}
+	pid, err := hex.DecodeString(tx.ProcessID)
+	if err != nil {
+		return nil, err
+	}
+	eid, err := hex.DecodeString(tx.EntityID)
+	if err != nil {
+		return nil, err
+	}
 
 	// get oracles
 	oracles, err := state.Oracles(false)
@@ -286,27 +342,17 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 		return nil, fmt.Errorf("cannot add process with duration lower or equal than the current tendermint height")
 	}
 
-	// for checking the signature we need to remove the Signature from the transaction
-	sign := tx.Signature
-	tx.Signature = ""
-	defer func() { tx.Signature = sign }() // in order to not modify the original tx, put signature back
-
-	processBytes, err := json.Marshal(tx)
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal process (%s)", err)
-	}
-
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, processBytes, sign)
+	authorized, addr, err := verifySignatureAgainstOracles(oracles, tx.SignedBytes, tx.Signature)
 	if err != nil {
 		return nil, err
 	}
 	if !authorized {
-		return nil, fmt.Errorf("unauthorized to create a process, recovered addr: %s\nProcessTX: %s", addr.Hex(), processBytes)
+		return nil, fmt.Errorf("unauthorized to create a process, recovered addr: %s\nProcessTX: %s", addr.Hex(), tx.SignedBytes)
 	}
 	// get process
-	_, err = state.Process(tx.ProcessID, false)
+	_, err = state.Process(pid, false)
 	if err == nil {
-		return nil, fmt.Errorf("process with id (%s) already exists", tx.ProcessID)
+		return nil, fmt.Errorf("process with id (%x) already exists", pid)
 	}
 	// check type
 	switch tx.ProcessType {
@@ -316,7 +362,7 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 		return nil, fmt.Errorf("process type (%s) not valid", tx.ProcessType)
 	}
 	p := &types.Process{
-		EntityID:       tx.EntityID,
+		EntityID:       eid,
 		MkRoot:         tx.MkRoot,
 		NumberOfBlocks: tx.NumberOfBlocks,
 		StartBlock:     tx.StartBlock,
@@ -339,28 +385,25 @@ func CancelProcessTxCheck(tx *types.CancelProcessTx, state *State) error {
 	if !util.IsHexEncodedStringWithLength(tx.ProcessID, processIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
+	pid, err := hex.DecodeString(tx.ProcessID)
+	if err != nil {
+		return err
+	}
 	// get oracles
 	oracles, err := state.Oracles(false)
 	if err != nil || len(oracles) == 0 {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
 	// check signature
-	sign := tx.Signature
-	tx.Signature = ""
-	defer func() { tx.Signature = sign }() // in order to not modify the original tx, put signature back
-	processBytes, err := json.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("cannot marshal cancel process info (%s)", err)
-	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, processBytes, sign)
+	authorized, addr, err := verifySignatureAgainstOracles(oracles, tx.SignedBytes, tx.Signature)
 	if err != nil {
 		return err
 	}
 	if !authorized {
-		return fmt.Errorf("unauthorized to cancel a process, recovered addr: %s\nProcessTx: %s", addr.Hex(), processBytes)
+		return fmt.Errorf("unauthorized to cancel a process, recovered addr: %s\nProcessTx: %s", addr.Hex(), tx.SignedBytes)
 	}
 	// get process
-	process, err := state.Process(tx.ProcessID, false)
+	process, err := state.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("cannot cancel the process: %s", err)
 	}
@@ -388,16 +431,7 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
 
-	sign := tx.Signature
-	tx.Signature = ""
-	defer func() { tx.Signature = sign }() // in order to not modify the original tx, put signature back
-
-	adminTxBytes, err := json.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("cannot marshal adminTx (%s)", err)
-	}
-
-	if authorized, addr, err := verifySignatureAgainstOracles(oracles, adminTxBytes, sign); err != nil {
+	if authorized, addr, err := verifySignatureAgainstOracles(oracles, tx.SignedBytes, tx.Signature); err != nil {
 		return err
 	} else if !authorized {
 		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())
@@ -405,13 +439,17 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 
 	switch {
 	case tx.Type == types.TxAddProcessKeys || tx.Type == types.TxRevealProcessKeys:
+		pid, err := hex.DecodeString(tx.ProcessID)
+		if err != nil {
+			return err
+		}
 		// check process exists
-		process, err := state.Process(tx.ProcessID, false)
+		process, err := state.Process(pid, false)
 		if err != nil {
 			return err
 		}
 		if process == nil {
-			return fmt.Errorf("process with id (%s) does not exist", tx.ProcessID)
+			return fmt.Errorf("process with id (%x) does not exist", pid)
 		}
 		// check process actually requires keys
 		if !process.RequireKeys() {

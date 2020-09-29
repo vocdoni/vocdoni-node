@@ -10,7 +10,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 // ErrNoResultsYet is an error returned to indicate the process exist but it does not have yet reuslts
@@ -46,7 +45,10 @@ func unmarshalVote(votePackage string, keys []string) (*types.VotePackage, error
 }
 
 func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
-	pid := util.TrimHex(envelope.ProcessID)
+	pid := envelope.ProcessID
+	if pid == nil {
+		return fmt.Errorf("cannot find process for envelope")
+	}
 	vote, err := unmarshalVote(envelope.VotePackage, []string{})
 	if err != nil {
 		return err
@@ -55,9 +57,9 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
 		return fmt.Errorf("too many questions on addVote")
 	}
 
-	process, err := s.Storage.Get([]byte(types.ScrutinizerLiveProcessPrefix + pid))
+	process, err := s.Storage.Get(s.encode("liveProcess", pid))
 	if err != nil {
-		return fmt.Errorf("error adding vote to process %s, skipping addVote: (%s)", pid, err)
+		return fmt.Errorf("error adding vote to process %x, skipping addVote: (%s)", pid, err)
 	}
 
 	var pv ProcessVotes
@@ -78,17 +80,17 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
 		return err
 	}
 
-	if err := s.Storage.Put([]byte(types.ScrutinizerLiveProcessPrefix+pid), process); err != nil {
+	if err := s.Storage.Put(s.encode("process", pid), process); err != nil {
 		return err
 	}
 
-	log.Debugf("addVote on process %s", pid)
+	log.Debugf("addVote on process %x", pid)
 	return nil
 }
 
 // ComputeResult process a finished voting, compute the results and saves it in the Storage
-func (s *Scrutinizer) ComputeResult(processID string) error {
-	log.Debugf("computing results for %s", processID)
+func (s *Scrutinizer) ComputeResult(processID []byte) error {
+	log.Debugf("computing results for %x", processID)
 	// Check if process exist
 	p, err := s.VochainState.Process(processID, false)
 	if err != nil {
@@ -96,9 +98,9 @@ func (s *Scrutinizer) ComputeResult(processID string) error {
 	}
 
 	// If result already exist, skipping
-	_, err = s.Storage.Get([]byte(types.ScrutinizerResultsPrefix + processID))
+	_, err = s.Storage.Get(s.encode("results", processID))
 	if err == nil {
-		return fmt.Errorf("process %s already computed", processID)
+		return fmt.Errorf("process %x already computed", processID)
 	}
 	if err != nil && err != badger.ErrKeyNotFound {
 		return err
@@ -116,7 +118,7 @@ func (s *Scrutinizer) ComputeResult(processID string) error {
 			return err
 		}
 		// Delete liveResults temporary storage
-		if err = s.Storage.Del([]byte(types.ScrutinizerLiveProcessPrefix + processID)); err != nil {
+		if err = s.Storage.Del(s.encode("liveProcess", processID)); err != nil {
 			return err
 		}
 	} else {
@@ -130,26 +132,21 @@ func (s *Scrutinizer) ComputeResult(processID string) error {
 		return err
 	}
 
-	if err := s.Storage.Put([]byte(types.ScrutinizerResultsPrefix+processID), result); err != nil {
-		return err
-	}
-
-	return nil
+	return s.Storage.Put(s.encode("results", processID), result)
 }
 
 // VoteResult returns the current result for a processId summarized in a two dimension int slice
-func (s *Scrutinizer) VoteResult(processID string) (ProcessVotes, error) {
-	processID = util.TrimHex(processID)
+func (s *Scrutinizer) VoteResult(processID []byte) (ProcessVotes, error) {
 	// Check if process exist
 	_, err := s.VochainState.Process(processID, false)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Debugf("finding results for %s", processID)
+	log.Debugf("finding results for %x", processID)
 	// If exist a summary of the voting process, just return it
 	var pv ProcessVotes
-	processBytes, err := s.Storage.Get([]byte(types.ScrutinizerResultsPrefix + processID))
+	processBytes, err := s.Storage.Get(s.encode("results", processID))
 	if err != nil && err != badger.ErrKeyNotFound {
 		return nil, err
 	}
@@ -173,9 +170,9 @@ func (s *Scrutinizer) VoteResult(processID string) (ProcessVotes, error) {
 	return s.computeLiveResults(processID)
 }
 
-func (s *Scrutinizer) computeLiveResults(processID string) (pv ProcessVotes, err error) {
+func (s *Scrutinizer) computeLiveResults(processID []byte) (pv ProcessVotes, err error) {
 	var pb []byte
-	pb, err = s.Storage.Get([]byte(types.ScrutinizerLiveProcessPrefix + processID))
+	pb, err = s.Storage.Get(s.encode("liveProcess", processID))
 	if err != nil {
 		return
 	}
@@ -183,15 +180,15 @@ func (s *Scrutinizer) computeLiveResults(processID string) (pv ProcessVotes, err
 		return
 	}
 	pruneVoteResult(&pv)
-	log.Debugf("computed live results for %s", processID)
+	log.Debugf("computed live results for %x", processID)
 	return
 }
 
-func (s *Scrutinizer) computeNonLiveResults(processID string, p *types.Process) (pv ProcessVotes, err error) {
+func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *types.Process) (pv ProcessVotes, err error) {
 	pv = emptyProcess()
 	var nvotes int
 	for _, e := range s.VochainState.EnvelopeList(processID, 0, 32<<18, false) { // 8.3M seems enough for now
-		v, err := s.VochainState.Envelope(fmt.Sprintf("%s_%s", processID, e), false)
+		v, err := s.VochainState.Envelope(processID, e, false)
 		if err != nil {
 			log.Warn(err)
 			continue

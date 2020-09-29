@@ -27,15 +27,15 @@ const (
 	// Scrutinizer
 
 	// ScrutinizerLiveProcessPrefix is used for sotring temporary results on live
-	ScrutinizerLiveProcessPrefix = "p_"
+	ScrutinizerLiveProcessPrefix = byte(0x21)
 	// ScrutinizerEntityPrefix is the prefix for the storage entity keys
-	ScrutinizerEntityPrefix = "e_"
+	ScrutinizerEntityPrefix = byte(0x22)
 	// ScrutinizerEntityProcessSeparator char for spliting process ID's in the scrutinizer entities
-	ScrutinizerEntityProcessSeparator = "_"
+	ScrutinizerEntityProcessSeparator = byte(0x23)
 	// ScrutinizerResultsPrefix is the prefix of the storage results summary keys
-	ScrutinizerResultsPrefix = "r_"
+	ScrutinizerResultsPrefix = byte(0x24)
 	// ScrutinizerProcessEndingPrefix is the prefix for keep track of the processes ending on a specific block
-	ScrutinizerProcessEndingPrefix = "s_"
+	ScrutinizerProcessEndingPrefix = byte(0x25)
 
 	// Vochain
 

@@ -27,6 +27,7 @@ const (
 	// validators default power
 	validatorPower          = 0
 	voteCachePurgeThreshold = time.Duration(time.Second * 600)
+	dbSeparator             = byte(0x5f)
 )
 
 var (
@@ -50,10 +51,10 @@ var PrefixDBCacheSize = 0
 // happening in parallel.
 type EventListener interface {
 	OnVote(*types.Vote)
-	OnProcess(pid, eid, mkroot, mkuri string)
-	OnCancel(pid string)
-	OnProcessKeys(pid, encryptionPub, commitment string)
-	OnRevealKeys(pid, encryptionPriv, reveal string)
+	OnProcess(pid, eid []byte, mkroot, mkuri string)
+	OnCancel(pid []byte)
+	OnProcessKeys(pid []byte, encryptionPub, commitment string)
+	OnRevealKeys(pid []byte, encryptionPriv, reveal string)
 	Commit(height int64)
 	Rollback()
 }
@@ -261,18 +262,21 @@ func (v *State) Validators(isQuery bool) ([]tmtypes.GenesisValidator, error) {
 
 // AddProcessKeys adds the keys to the process
 func (v *State) AddProcessKeys(tx *types.AdminTx) error {
-	pid := util.TrimHex(tx.ProcessID)
+	pid, err := hex.DecodeString(tx.ProcessID)
+	if err != nil {
+		return err
+	}
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
 	}
 	if len(tx.CommitmentKey) > 0 {
-		process.CommitmentKeys[tx.KeyIndex] = util.TrimHex(tx.CommitmentKey)
-		log.Debugf("added commitment key for process %s: %s", pid, tx.CommitmentKey)
+		process.CommitmentKeys[tx.KeyIndex] = tx.CommitmentKey
+		log.Debugf("added commitment key for process %x: %s", pid, tx.CommitmentKey)
 	}
 	if len(tx.EncryptionPublicKey) > 0 {
-		process.EncryptionPublicKeys[tx.KeyIndex] = util.TrimHex(tx.EncryptionPublicKey)
-		log.Debugf("added encryption key for process %s: %s", pid, tx.EncryptionPublicKey)
+		process.EncryptionPublicKeys[tx.KeyIndex] = tx.EncryptionPublicKey
+		log.Debugf("added encryption key for process %x: %s", pid, tx.EncryptionPublicKey)
 	}
 	process.KeyIndex++
 	if err := v.setProcess(process, pid); err != nil {
@@ -286,18 +290,21 @@ func (v *State) AddProcessKeys(tx *types.AdminTx) error {
 
 // RevealProcessKeys reveals the keys of a process
 func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
-	pid := util.TrimHex(tx.ProcessID)
+	pid, err := hex.DecodeString(tx.ProcessID)
+	if err != nil {
+		return err
+	}
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
 	}
 	if len(tx.RevealKey) > 0 {
-		process.RevealKeys[tx.KeyIndex] = util.TrimHex(tx.RevealKey)
-		log.Debugf("revealed commitment key for process %s: %s", pid, tx.RevealKey)
+		process.RevealKeys[tx.KeyIndex] = tx.RevealKey
+		log.Debugf("revealed commitment key for process %x: %s", pid, tx.RevealKey)
 	}
 	if len(tx.EncryptionPrivateKey) > 0 {
-		process.EncryptionPrivateKeys[tx.KeyIndex] = util.TrimHex(tx.EncryptionPrivateKey)
-		log.Debugf("revealed encryption key for process %s: %s", pid, tx.EncryptionPrivateKey)
+		process.EncryptionPrivateKeys[tx.KeyIndex] = tx.EncryptionPrivateKey
+		log.Debugf("revealed encryption key for process %x: %s", pid, tx.EncryptionPrivateKey)
 	}
 	if process.KeyIndex < 1 {
 		return fmt.Errorf("no more keys to reveal, keyIndex is < 1")
@@ -312,16 +319,14 @@ func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
 	return nil
 }
 
-// AddProcess adds a new process to vochain if not already added
-func (v *State) AddProcess(p types.Process, pid, mkuri string) error {
-	pid = util.TrimHex(pid)
-	p.EntityID = util.TrimHex(p.EntityID)
+// AddProcess adds a new process to vochain
+func (v *State) AddProcess(p types.Process, pid []byte, mkuri string) error {
 	newProcessBytes, err := v.Codec.MarshalBinaryBare(p)
 	if err != nil {
 		return errors.New("cannot marshal process bytes")
 	}
 	v.Lock()
-	err = v.Store.Tree(ProcessTree).Add([]byte(pid), newProcessBytes)
+	err = v.Store.Tree(ProcessTree).Add(pid, newProcessBytes)
 	v.Unlock()
 	if err != nil {
 		return err
@@ -333,8 +338,7 @@ func (v *State) AddProcess(p types.Process, pid, mkuri string) error {
 }
 
 // CancelProcess sets the process canceled atribute to true
-func (v *State) CancelProcess(pid string) error {
-	pid = util.TrimHex(pid)
+func (v *State) CancelProcess(pid []byte) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
@@ -360,10 +364,9 @@ func (v *State) CancelProcess(pid string) error {
 }
 
 // PauseProcess sets the process paused atribute to true
-func (v *State) PauseProcess(pid string) error {
-	pid = util.TrimHex(pid)
+func (v *State) PauseProcess(pid []byte) error {
 	v.RLock()
-	processBytes := v.Store.Tree(ProcessTree).Get([]byte(pid))
+	processBytes := v.Store.Tree(ProcessTree).Get(pid)
 	v.RUnlock()
 	var process types.Process
 	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
@@ -378,8 +381,7 @@ func (v *State) PauseProcess(pid string) error {
 }
 
 // ResumeProcess sets the process paused atribute to true
-func (v *State) ResumeProcess(pid string) error {
-	pid = util.TrimHex(pid)
+func (v *State) ResumeProcess(pid []byte) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
@@ -393,16 +395,15 @@ func (v *State) ResumeProcess(pid string) error {
 }
 
 // Process returns a process info given a processId if exists
-func (v *State) Process(pid string, isQuery bool) (*types.Process, error) {
+func (v *State) Process(pid []byte, isQuery bool) (*types.Process, error) {
 	var process *types.Process
 	var processBytes []byte
 	var err error
-	pid = util.TrimHex(pid)
 	v.RLock()
 	if isQuery {
-		processBytes = v.Store.ImmutableTree(ProcessTree).Get([]byte(pid))
+		processBytes = v.Store.ImmutableTree(ProcessTree).Get(pid)
 	} else {
-		processBytes = v.Store.Tree(ProcessTree).Get([]byte(pid))
+		processBytes = v.Store.Tree(ProcessTree).Get(pid)
 	}
 	v.RUnlock()
 	if processBytes == nil {
@@ -427,7 +428,7 @@ func (v *State) CountProcesses(isQuery bool) int64 {
 }
 
 // set process stores in the database the process
-func (v *State) setProcess(process *types.Process, pid string) error {
+func (v *State) setProcess(process *types.Process, pid []byte) error {
 	if process == nil {
 		return ErrProcessNotFound
 	}
@@ -437,7 +438,7 @@ func (v *State) setProcess(process *types.Process, pid string) error {
 	}
 	v.Lock()
 	defer v.Unlock()
-	if err := v.Store.Tree(ProcessTree).Add([]byte(pid), updatedProcessBytes); err != nil {
+	if err := v.Store.Tree(ProcessTree).Add(pid, updatedProcessBytes); err != nil {
 		return err
 	}
 	return nil
@@ -445,7 +446,7 @@ func (v *State) setProcess(process *types.Process, pid string) error {
 
 // AddVote adds a new vote to a process if the process exists and the vote is not already submmited
 func (v *State) AddVote(vote *types.Vote) error {
-	voteID := fmt.Sprintf("%s_%s", util.TrimHex(vote.ProcessID), util.TrimHex(vote.Nullifier))
+	vid := v.voteID(vote.ProcessID, vote.Nullifier)
 	// save block number
 	vote.Height = v.Header(false).Height
 	newVoteBytes, err := v.Codec.MarshalBinaryBare(vote)
@@ -453,7 +454,7 @@ func (v *State) AddVote(vote *types.Vote) error {
 		return fmt.Errorf("cannot marshal vote")
 	}
 	v.Lock()
-	err = v.Store.Tree(VoteTree).Add([]byte(voteID), newVoteBytes)
+	err = v.Store.Tree(VoteTree).Add(vid, newVoteBytes)
 	v.Unlock()
 	if err != nil {
 		return err
@@ -464,9 +465,16 @@ func (v *State) AddVote(vote *types.Vote) error {
 	return nil
 }
 
+// voteID = byte( processID_nullifier )
+func (v *State) voteID(pid []byte, nullifier string) []byte {
+	voteID := append(pid, dbSeparator)
+	voteID = append(voteID, []byte(nullifier)...)
+	return voteID
+}
+
 // Envelope returns the info of a vote if already exists.
 // voteID must be equals to processID_Nullifier
-func (v *State) Envelope(voteID string, isQuery bool) (_ *types.Vote, err error) {
+func (v *State) Envelope(processID []byte, nullifier string, isQuery bool) (_ *types.Vote, err error) {
 	// TODO(mvdan): remove the recover once
 	// https://github.com/tendermint/iavl/issues/212 is fixed
 	defer func() {
@@ -476,28 +484,29 @@ func (v *State) Envelope(voteID string, isQuery bool) (_ *types.Vote, err error)
 	}()
 	var vote *types.Vote
 	var voteBytes []byte
+	vid := v.voteID(processID, nullifier)
 	v.RLock()
 	defer v.RUnlock() // needs to be deferred due to the recover above
 	if isQuery {
-		voteBytes = v.Store.ImmutableTree(VoteTree).Get([]byte(voteID))
+		voteBytes = v.Store.ImmutableTree(VoteTree).Get(vid)
 	} else {
-		voteBytes = v.Store.Tree(VoteTree).Get([]byte(voteID))
+		voteBytes = v.Store.Tree(VoteTree).Get(vid)
 	}
 	if voteBytes == nil {
-		return nil, fmt.Errorf("vote with id (%s) does not exist", voteID)
+		return nil, fmt.Errorf("vote with id (%x) does not exist", vid)
 	}
 	if err := v.Codec.UnmarshalBinaryBare(voteBytes, &vote); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal vote with id (%s)", voteID)
+		return nil, fmt.Errorf("cannot unmarshal vote with id (%x)", vid)
 	}
 	return vote, nil
 }
 
 // EnvelopeExists returns true if the envelope identified with voteID exists
-func (v *State) EnvelopeExists(processID, nullifier string) bool {
-	voteID := fmt.Sprintf("%s_%s", util.TrimHex(processID), util.TrimHex(nullifier))
+func (v *State) EnvelopeExists(processID []byte, nullifier string) bool {
+	voteID := v.voteID(processID, nullifier)
 	v.RLock()
 	defer v.RUnlock()
-	b := v.Store.ImmutableTree(VoteTree).Get([]byte(voteID)) // TBD: This is quite dirty, should be changed
+	b := v.Store.ImmutableTree(VoteTree).Get(voteID)
 	return len(b) > 0
 }
 
@@ -505,20 +514,22 @@ func (v *State) EnvelopeExists(processID, nullifier string) bool {
 // To iterate over all the keys with said prefix, the start point can simply be "processID_".
 // We don't know what the next processID hash will be, so we use "processID}"
 // as the end point, since "}" comes after "_" when sorting lexicographically.
-func (v *State) iterateProcessID(processID string, fn func(key []byte, value []byte) bool, isQuery bool) bool {
+func (v *State) iterateProcessID(processID []byte, fn func(key []byte, value []byte) bool, isQuery bool) bool {
+	pid1 := fmt.Sprintf("%s%s", processID, string(dbSeparator))
+	pid2 := fmt.Sprintf("%s}", processID)
+
 	v.RLock()
 	defer v.RUnlock()
 	if isQuery {
-		v.Store.ImmutableTree(VoteTree).Iterate(processID+"_", processID+"}", fn)
+		v.Store.ImmutableTree(VoteTree).Iterate(pid1, pid2, fn)
 	} else {
-		v.Store.Tree(VoteTree).Iterate(processID+"_", processID+"}", fn)
+		v.Store.Tree(VoteTree).Iterate(pid1, pid2, fn)
 	}
 	return true
 }
 
 // CountVotes returns the number of votes registered for a given process id
-func (v *State) CountVotes(processID string, isQuery bool) int64 {
-	processID = util.TrimHex(processID)
+func (v *State) CountVotes(processID []byte, isQuery bool) int64 {
 	var count int64
 	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
 		count++
@@ -528,7 +539,7 @@ func (v *State) CountVotes(processID string, isQuery bool) int64 {
 }
 
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
-func (v *State) EnvelopeList(processID string, from, listSize int64, isQuery bool) []string {
+func (v *State) EnvelopeList(processID []byte, from, listSize int64, isQuery bool) []string {
 	// TODO(mvdan): remove the recover once
 	// https://github.com/tendermint/iavl/issues/212 is fixed
 	defer func() {
@@ -538,7 +549,6 @@ func (v *State) EnvelopeList(processID string, from, listSize int64, isQuery boo
 			// err = fmt.Errorf("recovered panic: %v", r)
 		}
 	}()
-	processID = util.TrimHex(processID)
 	var nullifiers []string
 	idx := int64(0)
 	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
@@ -546,7 +556,7 @@ func (v *State) EnvelopeList(processID string, from, listSize int64, isQuery boo
 			return true
 		}
 		if idx >= from {
-			k := strings.Split(string(key), "_")
+			k := strings.Split(string(key), string(dbSeparator))
 			nullifiers = append(nullifiers, k[1])
 		}
 		idx++
@@ -599,7 +609,6 @@ func (v *State) Save() []byte {
 	if err != nil {
 		panic(fmt.Sprintf("cannot commit state trees: (%s)", err))
 	}
-	log.Debugf("commited state tree version %d, hash %x", v.Store.Version(), hash)
 	v.Unlock()
 	if h := v.Header(false); h != nil {
 		for _, l := range v.eventListeners {

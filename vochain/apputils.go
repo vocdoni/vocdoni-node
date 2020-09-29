@@ -39,12 +39,8 @@ func verifySignatureAgainstOracles(oracles []string, message []byte, signHex str
 }
 
 // GenerateNullifier generates the nullifier of a vote (hash(address+processId))
-func GenerateNullifier(address ethcommon.Address, processID string) (string, error) {
-	pidBytes, err := hex.DecodeString(util.TrimHex(processID))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", ethereum.HashRaw([]byte(fmt.Sprintf("%s%s", address.Bytes(), pidBytes)))), nil
+func GenerateNullifier(address ethcommon.Address, processID []byte) string {
+	return fmt.Sprintf("%x", ethereum.HashRaw([]byte(fmt.Sprintf("%s%s", address.Bytes(), processID))))
 }
 
 // NewPrivateValidator returns a tendermint file private validator (key and state)

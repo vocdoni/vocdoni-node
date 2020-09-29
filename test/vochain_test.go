@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
+	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
@@ -14,7 +15,16 @@ func TestNewProcessTxCheck(t *testing.T) {
 	// t.Parallel()
 
 	s := testcommon.NewVochainStateWithOracles(t)
-	if _, err := vochain.NewProcessTxCheck(testcommon.HardcodedNewProcessTx, s); err != nil {
+	txb, err := json.Marshal(testcommon.HardcodedNewProcessTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gtx, err := vochain.UnmarshalTx(txb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := gtx.(*types.NewProcessTx)
+	if _, err := vochain.NewProcessTxCheck(tx, s); err != nil {
 		t.Errorf("cannot validate new process tx: %s", err)
 	}
 }

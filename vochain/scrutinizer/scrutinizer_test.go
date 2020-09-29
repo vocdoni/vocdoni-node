@@ -5,7 +5,6 @@ import (
 
 	"github.com/tendermint/go-amino"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
@@ -23,16 +22,16 @@ func TestList(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 100; i++ {
-		sc.addEntity(util.RandomHex(20), util.RandomHex(32))
+		sc.addEntity(util.Hex2byte(t, util.RandomHex(20)), util.Hex2byte(t, util.RandomHex(32)))
 	}
 
 	entities := make(map[string]bool)
 	last := ""
 	iterations := 0
 	for len(entities) < 100 {
-		list := sc.List(10, last, types.ScrutinizerEntityPrefix)
+		list := sc.EntityList(10, []byte(last))
 		if len(list) < 1 {
-			t.Fatalf("list size smaller than 1")
+			t.Fatalf("list size is smaller than 1")
 		}
 		for _, e := range list {
 			entities[e] = true

@@ -30,13 +30,14 @@ type Scrutinizer struct {
 	votePool     []*types.Vote
 	processPool  []*types.ScrutinizerOnProcessData
 	resultsPool  []*types.ScrutinizerOnProcessData
+	entityCount  int64
 }
 
 // ProcessVotes represents the results of a voting process using a two dimensions slice [ question1:[option1,option2], question2:[option1,option2], ...]
 type ProcessVotes [][]uint32
 
 // ProcessEndingList represents a list of ending voting processes
-type ProcessEndingList []string
+type ProcessEndingList [][]byte
 
 // NewScrutinizer returns an instance of the Scrutinizer
 // using the local storage database of dbPath and integrated into the state vochain instance
@@ -47,6 +48,7 @@ func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.entityCount = int64(len(s.List(int64(^uint(0)>>1), "", string(types.ScrutinizerEntityPrefix))))
 	s.VochainState.AddEventListener(s)
 	return s, nil
 }
@@ -97,7 +99,7 @@ func (s *Scrutinizer) Rollback() {
 }
 
 // OnProcess scrutinizer stores the processID and entityID
-func (s *Scrutinizer) OnProcess(pid, eid, mkroot, mkuri string) {
+func (s *Scrutinizer) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 	var data = types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
 	s.processPool = append(s.processPool, &data)
 }
@@ -115,17 +117,17 @@ func (s *Scrutinizer) OnVote(v *types.Vote) {
 }
 
 // OnCancel scrutinizer stores the processID and entityID
-func (s *Scrutinizer) OnCancel(pid string) {
+func (s *Scrutinizer) OnCancel(pid []byte) {
 	// TBD: compute final live results?
 }
 
 // OnProcessKeys does nothing
-func (s *Scrutinizer) OnProcessKeys(pid, pub, com string) {
+func (s *Scrutinizer) OnProcessKeys(pid []byte, pub, com string) {
 	// do nothing
 }
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the process to the results queue
-func (s *Scrutinizer) OnRevealKeys(pid, pub, com string) {
+func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 	p, err := s.VochainState.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)
@@ -142,14 +144,13 @@ func (s *Scrutinizer) OnRevealKeys(pid, pub, com string) {
 func (s *Scrutinizer) List(max int64, from, prefix string) (list []string) {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
 	fromLock := len(from) > 0                            // true if from field specified, will be false when from found in database
-
 	// TBD: iter.Seek([]byte(prefix+from)) does not work as expected. Find why and apply a fix if possible.
 	for iter.Seek([]byte(prefix)); iter.Iter.ValidForPrefix([]byte(prefix)); iter.Next() {
 		if max < 1 {
 			break
 		}
 		if !fromLock {
-			list = append(list, string(iter.Key()[2:]))
+			list = append(list, string(iter.Key()[len(prefix):]))
 			max--
 		}
 		if fromLock && string(iter.Key()) == prefix+from {

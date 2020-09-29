@@ -1,7 +1,6 @@
 package keykeeper
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -24,6 +23,8 @@ import (
    p_{processId} = {[]processKeys} // index and stores the process keys by process ID
    b_{#block} = {[]processId} // index by block in order to reveal keys of the finished processes
 */
+
+// TBD: Remove the ProcessKeys storage, we do not need it since the keys are deterministic and can be re-created at any time.
 
 const (
 	commitmentKeySize = nacl.KeyLength
@@ -92,8 +93,6 @@ func (pk *processKeys) Decode(data []byte) error {
 	return nil
 }
 
-// TBD garbage collector function run at init for revealing all these keys that should have beeen revealed
-
 func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *ethereum.SignKeys, index int8) (*KeyKeeper, error) {
 	if v == nil || signer == nil || len(dbPath) < 1 {
 		return nil, fmt.Errorf("missing values for creating a key keeper")
@@ -124,12 +123,12 @@ func (k *KeyKeeper) PrintInfo(wait time.Duration) {
 		iter := k.storage.NewIterator()
 		nprocs := 0
 		for iter.Next() {
-			if strings.HasPrefix(string(iter.Key()), dbPrefixProcess) {
+			if strings.HasPrefix(string(iter.Key()), dbPrefixBlock) {
 				nprocs++
 			}
 		}
 		iter.Release()
-		log.Infof("[keykeeper] stored keys %d", nprocs)
+		log.Infof("[keykeeper] scheduled keys %d", nprocs)
 	}
 }
 
@@ -166,7 +165,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 			log.Errorf("could not unmarshal value: %s", err)
 			continue
 		}
-		log.Warnf("found pending keys for reveal on process %s", pids)
+		log.Warnf("found pending keys for reveal")
 		for _, p := range pids {
 			if err := k.revealKeys(p); err != nil {
 				log.Error(err)
@@ -178,21 +177,23 @@ func (k *KeyKeeper) RevealUnpublished() {
 	}
 	iter.Release()
 	iter = k.storage.NewIterator()
-	var pid string
+	var pid []byte
+	var err error
+	var process *types.Process
 	// Second take all existing processes and check if keys should be revealed (if canceled)
 	for iter.Next() {
 		if !strings.HasPrefix(string(iter.Key()), dbPrefixProcess) {
 			continue
 		}
-		pid = string(iter.Key()[len(dbPrefixProcess):])
-		process, err := k.vochain.State.Process(pid, true)
+		pid = iter.Key()[len(dbPrefixProcess):]
+		process, err = k.vochain.State.Process(pid, true)
 		if err != nil {
 			log.Error(err)
 			continue
 		}
 		if process.Canceled {
-			log.Warnf("found pending keys for reveal on process %s", pid)
-			if err := k.revealKeys(pid); err != nil {
+			log.Warnf("found pending keys for reveal on process %x", pid)
+			if err := k.revealKeys(string(pid)); err != nil {
 				log.Error(err)
 			}
 		}
@@ -208,7 +209,7 @@ func (k *KeyKeeper) Rollback() {
 }
 
 // OnProcess creates the keys and add them to the pool queue, if the process requires it
-func (k *KeyKeeper) OnProcess(pid, eid, mkroot, mkuri string) {
+func (k *KeyKeeper) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
@@ -221,24 +222,25 @@ func (k *KeyKeeper) OnProcess(pid, eid, mkroot, mkuri string) {
 	if len(p.EncryptionPublicKeys[k.myIndex])+len(p.CommitmentKeys[k.myIndex]) > 0 {
 		return
 	}
+	log.Debugf("generating key for process %x", pid)
 	// Check if already created on this block process
-	if _, exist := k.keyPool[pid]; exist {
-		log.Errorf("keys for process %s already exist in the pool queue", pid)
+	if _, exist := k.keyPool[string(pid)]; exist {
+		log.Errorf("keys for process %x already exist in the pool queue", pid)
 		return
 	}
 
 	// Generate keys
-	if k.keyPool[pid], err = k.generateKeys(pid); err != nil {
+	if k.keyPool[string(pid)], err = k.generateKeys(pid); err != nil {
 		log.Errorf("cannot generate process keys: (%s)", err)
 		return
 	}
 
 	// Add keys to the pool queue
-	k.blockPool[pid] = p.StartBlock + p.NumberOfBlocks
+	k.blockPool[string(pid)] = p.StartBlock + p.NumberOfBlocks
 }
 
 // OnCancel will publish the private and reveal keys of the canceled process, if required
-func (k *KeyKeeper) OnCancel(pid string) {
+func (k *KeyKeeper) OnCancel(pid []byte) {
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
@@ -247,8 +249,11 @@ func (k *KeyKeeper) OnCancel(pid string) {
 	if !p.RequireKeys() {
 		return
 	}
-	log.Infof("process canceled, scheduling reveal keys for next block")
-	k.blockPool[pid] = k.vochain.State.Header(false).Height + 1
+
+	if p.EncryptionPublicKeys[k.myIndex] != "" {
+		log.Infof("process canceled, scheduling reveal keys for next block")
+		k.blockPool[string(pid)] = k.vochain.State.Header(false).Height + 1
+	}
 }
 
 // Commit saves the pending operation
@@ -263,11 +268,11 @@ func (k *KeyKeeper) OnVote(v *types.Vote) {
 	// do nothing
 }
 
-func (k *KeyKeeper) OnProcessKeys(pid, pub, com string) {
+func (k *KeyKeeper) OnProcessKeys(pid []byte, pub, com string) {
 	// do nothing
 }
 
-func (k *KeyKeeper) OnRevealKeys(pid, priv, rev string) {
+func (k *KeyKeeper) OnRevealKeys(pid []byte, priv, rev string) {
 	// do nothing
 }
 
@@ -275,14 +280,10 @@ func (k *KeyKeeper) OnRevealKeys(pid, priv, rev string) {
 // Encryption private key = hash(signer.privKey + processId + keyIndex).
 // Reveal key is hashPoseidon(key).
 // Commitment key is hashPoseidon(revealKey)
-func (k *KeyKeeper) generateKeys(pid string) (*processKeys, error) {
+func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {
 	// Generate keys
-	pb, err := hex.DecodeString(pid)
-	if err != nil {
-		return nil, err
-	}
 	// Add the index in order to win some extra entropy
-	pb = append(pb, byte(k.myIndex))
+	pb := append(pid, byte(k.myIndex))
 	// Private ed25519 key
 	priv, err := nacl.DecodePrivate(fmt.Sprintf("%x", ethereum.HashRaw(append(k.signer.Private.D.Bytes()[:], pb[:]...))))
 	if err != nil {
@@ -333,7 +334,7 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 			log.Errorf("cannot save scheduled list of pids for block %d: (%s)", height, err)
 			continue
 		}
-		log.Infof("scheduled reveal keys of process %s for block %d", pid, height)
+		log.Infof("scheduled reveal keys of process %x for block %d", pid, height)
 	}
 }
 
@@ -361,9 +362,19 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 		return
 	}
 	for _, p := range pids {
-		log.Infof("revealing keys for process %s on block %d", p, height)
-		if err := k.revealKeys(p); err != nil {
-			log.Errorf("cannot reveal proces keys for %s: (%s)", p, err)
+		process, err := k.vochain.State.Process([]byte(p), false)
+		if err != nil {
+			log.Errorf("cannot get process from state: (%s)", err)
+			continue
+		}
+		if !process.RequireKeys() {
+			return
+		}
+		if process.EncryptionPublicKeys[k.myIndex] != "" {
+			log.Infof("revealing keys for process %x on block %d", p, height)
+			if err := k.revealKeys(p); err != nil {
+				log.Errorf("cannot reveal proces keys for %x: (%s)", p, err)
+			}
 		}
 	}
 	if err := k.storage.Del(pKey); err != nil {
@@ -374,19 +385,19 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 func (k *KeyKeeper) publishPendingKeys() {
 	for pid, pk := range k.keyPool {
 		if err := k.publishKeys(pk, pid); err != nil {
-			log.Errorf("cannot execute commit on publish keys for process %s: (%s)", pid, err)
+			log.Errorf("cannot execute commit on publish keys for process %x: (%s)", pid, err)
 		}
 	}
 }
 
 // This functions must be async in order to avoid a deadlock on the block creation
 func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
-	log.Infof("publishing keys for process %s", pid)
+	log.Infof("publishing keys for process %x", []byte(pid))
 	tx := &types.AdminTx{
 		Type:                types.TxAddProcessKeys,
 		KeyIndex:            int(pk.index),
 		Nonce:               util.RandomHex(32),
-		ProcessID:           pid,
+		ProcessID:           fmt.Sprintf("%x", []byte(pid)),
 		EncryptionPublicKey: fmt.Sprintf("%x", pk.pubKey),
 		CommitmentKey:       fmt.Sprintf("%x", pk.commitmentKey),
 	}
@@ -398,7 +409,7 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	dbKey := []byte(dbPrefixProcess + pid)
 	// TODO(mvdan): replace Has with just Get
 	if exists, err := k.storage.Has(dbKey); exists || err != nil {
-		return fmt.Errorf("keys for process %s already exist or error fetching storage: (%s)", pid, err)
+		return fmt.Errorf("keys for process %x already exist or error fetching storage: (%s)", pid, err)
 	}
 	data := pk.Encode()
 	return k.storage.Put(dbKey, data)
@@ -406,26 +417,32 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 
 // Insecure
 func (k *KeyKeeper) revealKeys(pid string) error {
-	dbKey := []byte(dbPrefixProcess + pid)
-	data, err := k.storage.Get(dbKey)
+	/*	dbKey := []byte(dbPrefixProcess + pid)
+		data, err := k.storage.Get(dbKey)
+		if err != nil {
+			return fmt.Errorf("cannot fetch reveal keys from storage: (%s)", err)
+		}
+		if len(data) == 0 {
+			return fmt.Errorf("no keys data found on storage")
+		}
+		var pk processKeys
+		if err := pk.Decode(data); err != nil {
+			return fmt.Errorf("cannot unmarshal process keys: (%s)", err)
+		}
+		if len(pk.privKey) < 32 && len(pk.revealKey) < commitmentKeySize {
+			return fmt.Errorf("empty process keys")
+		}
+	*/
+	pk, err := k.generateKeys([]byte(pid))
 	if err != nil {
-		return fmt.Errorf("cannot fetch reveal keys from storage: (%s)", err)
+		return err
 	}
-	if len(data) == 0 {
-		return fmt.Errorf("no keys data found on storage")
-	}
-	var pk processKeys
-	if err := pk.Decode(data); err != nil {
-		return fmt.Errorf("cannot unmarshal process keys: (%s)", err)
-	}
-	if len(pk.privKey) < 32 && len(pk.revealKey) < commitmentKeySize {
-		return fmt.Errorf("empty process keys")
-	}
+
 	tx := &types.AdminTx{
 		Type:                 types.TxRevealProcessKeys,
 		KeyIndex:             int(pk.index),
 		Nonce:                util.RandomHex(32),
-		ProcessID:            pid,
+		ProcessID:            fmt.Sprintf("%x", []byte(pid)),
 		EncryptionPrivateKey: fmt.Sprintf("%x", pk.privKey),
 		RevealKey:            fmt.Sprintf("%x", pk.revealKey),
 	}
@@ -433,12 +450,15 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 		return err
 	}
 	if len(pk.privKey) > 0 {
-		log.Infof("revealing encryption key for process %s", pid)
+		log.Infof("revealing encryption key for process %x", pid)
 	}
 	if len(pk.revealKey) > 0 {
-		log.Infof("revealing commitment key for process %s", pid)
+		log.Infof("revealing commitment key for process %x", pid)
 	}
-	return k.storage.Del(dbKey)
+	if err = k.storage.Del([]byte(dbPrefixProcess + pid)); err != nil {
+		log.Warnf("cannot delete pid %x, for some reason it does not exist", pid)
+	}
+	return nil
 }
 
 func (k *KeyKeeper) signAndSendTx(tx *types.AdminTx) error {

@@ -16,6 +16,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 )
@@ -29,22 +30,22 @@ var (
 		"06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0",
 	}
 
-	ProcessHardcoded = &types.Process{
-		EntityID:             "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85",
-		MkRoot:               "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
-		NumberOfBlocks:       1000,
-		EncryptionPublicKeys: OracleListHardcoded, // reusing oracle keys as encryption pub keys
-		Type:                 types.PetitionSign,
-	}
-
 	// VoteHardcoded needs to be a constructor, since multiple tests will
 	// modify its value. We need a different pointer for each test.
 	VoteHardcoded = func() *types.Vote {
 		return &types.Vote{
-			ProcessID:   "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
+			ProcessID:   util.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 			Nullifier:   "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0", // nullifier and nonce are the same here
 			VotePackage: "eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19",
 		}
+	}
+
+	ProcessHardcoded = &types.Process{
+		EntityID:             util.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
+		MkRoot:               "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
+		NumberOfBlocks:       1000,
+		EncryptionPublicKeys: OracleListHardcoded, // reusing oracle keys as encryption pub keys
+		Type:                 types.PetitionSign,
 	}
 
 	// privKey e0aa6db5a833531da4d259fb5df210bae481b276dc4c2ab6ab9771569375aed5 for address 06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0
@@ -168,7 +169,7 @@ func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 	if err != nil {
 		tb.Fatal(err)
 	}
-	if err = s.Store.Tree(vochain.ProcessTree).Add([]byte("e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), processBytes); err != nil {
+	if err = s.Store.Tree(vochain.ProcessTree).Add(util.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), processBytes); err != nil {
 		tb.Fatal(err)
 	}
 	return s

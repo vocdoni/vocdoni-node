@@ -1,23 +1,66 @@
 package scrutinizer
 
 import (
+	"bytes"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 // ProcessInfo returns the available information regarding an election process id
-func (s *Scrutinizer) ProcessInfo(processID string) (*types.Process, error) {
-	return s.VochainState.Process(processID, false)
+func (s *Scrutinizer) ProcessInfo(pid []byte) (*types.Process, error) {
+	return s.VochainState.Process(pid, false)
+}
+
+func (s *Scrutinizer) ProcessList(entityID []byte, fromID []byte, max int64) ([]string, error) {
+	plistkey := []byte{types.ScrutinizerEntityPrefix}
+	plistkey = append(plistkey, entityID...)
+	processList, err := s.Storage.Get(plistkey)
+	if err != nil {
+		return nil, err
+	}
+
+	processListString := []string{}
+	fromLock := len(fromID) > 0
+	for _, process := range bytes.Split(processList, []byte{types.ScrutinizerEntityProcessSeparator}) {
+		if max < 1 || len(process) < 1 {
+			break
+		}
+		if !fromLock {
+			processListString = append(processListString, fmt.Sprintf("%x", process))
+			max--
+		}
+		if fromLock && string(fromID) == string(process) {
+			fromLock = false
+		}
+	}
+
+	return processListString, nil
+}
+
+func (s *Scrutinizer) ProcessListWithResults(max int64, fromID []byte) []string {
+	return s.List(max, string(fromID), string(types.ScrutinizerResultsPrefix))
+}
+
+func (s *Scrutinizer) ProcessListWithLiveResults(max int64, fromID []byte) []string {
+	return s.List(max, string(fromID), string(types.ScrutinizerLiveProcessPrefix))
+}
+
+func (s *Scrutinizer) EntityList(max int64, fromID []byte) []string {
+	return s.List(max, string(fromID), string(types.ScrutinizerEntityPrefix))
+}
+
+func (s *Scrutinizer) EntityCount() int64 {
+	return atomic.LoadInt64(&s.entityCount)
 }
 
 // Return whether a process must have live results or not
-func (s *Scrutinizer) isLiveResultsProcess(processID string) (bool, error) {
-	p, err := s.ProcessInfo(util.TrimHex(processID))
+func (s *Scrutinizer) isLiveResultsProcess(processID []byte) (bool, error) {
+	p, err := s.ProcessInfo(processID)
 	if err != nil {
 		return false, err
 	}
@@ -26,22 +69,11 @@ func (s *Scrutinizer) isLiveResultsProcess(processID string) (bool, error) {
 
 // checks if the current heigh has scheduled ending processes, if so compute and store results
 func (s *Scrutinizer) checkFinishedProcesses(height int64) {
-	// TODO(mvdan): replace Has+get with just Get
-	exists, err := s.Storage.Has([]byte(types.ScrutinizerProcessEndingPrefix + fmt.Sprintf("%d", height)))
-	if err != nil {
-		log.Error(err)
+	pidListBytes, err := s.Storage.Get(s.encode("processEnding", []byte(fmt.Sprintf("%d", height))))
+	if err != nil || pidListBytes == nil {
 		return
 	}
-	if !exists {
-		return
-	}
-
 	var pidList ProcessEndingList
-	pidListBytes, err := s.Storage.Get([]byte(types.ScrutinizerProcessEndingPrefix + fmt.Sprintf("%d", height)))
-	if err != nil {
-		log.Error(err)
-		return
-	}
 	if err := s.VochainState.Codec.UnmarshalBinaryBare(pidListBytes, &pidList); err != nil {
 		log.Error(err)
 		return
@@ -51,22 +83,20 @@ func (s *Scrutinizer) checkFinishedProcesses(height int64) {
 			log.Errorf("cannot compute results for %s: (%s)", p, err)
 		}
 	}
-
 	// Remove entry from storage
-	if err = s.Storage.Del([]byte(types.ScrutinizerProcessEndingPrefix + fmt.Sprintf("%d", height))); err != nil {
+	if err := s.Storage.Del(s.encode("processEnding", []byte(fmt.Sprintf("%d", height)))); err != nil {
 		log.Error(err)
 	}
-
 }
 
 // creates a new empty process and stores it into the database
-func (s *Scrutinizer) newEmptyLiveProcess(pid string) (ProcessVotes, error) {
+func (s *Scrutinizer) newEmptyLiveProcess(pid []byte) (ProcessVotes, error) {
 	pv := emptyProcess()
 	process, err := s.VochainState.Codec.MarshalBinaryBare(&pv)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.Storage.Put([]byte(types.ScrutinizerLiveProcessPrefix+pid), process); err != nil {
+	if err := s.Storage.Put(s.encode("liveProcess", pid), process); err != nil {
 		return nil, err
 	}
 	return pv, nil
@@ -74,10 +104,10 @@ func (s *Scrutinizer) newEmptyLiveProcess(pid string) (ProcessVotes, error) {
 
 // Pending processes are those processes which are scheduled for being computed.
 // On the database we are storing: height=>{proceess1, process2, process3}
-func (s *Scrutinizer) registerPendingProcess(pid string, height int64) {
-	scheduledBlock := fmt.Sprintf("%d", height)
+func (s *Scrutinizer) registerPendingProcess(pid []byte, height int64) {
+	scheduledBlock := []byte(fmt.Sprintf("%d", height))
 
-	pidListBytes, err := s.Storage.Get([]byte(types.ScrutinizerProcessEndingPrefix + scheduledBlock))
+	pidListBytes, err := s.Storage.Get(s.encode("processEnding", scheduledBlock))
 	// TODO(mvdan): use a generic "key not found" database error instead
 	if err != nil && err != badger.ErrKeyNotFound {
 		log.Error(err)
@@ -97,16 +127,16 @@ func (s *Scrutinizer) registerPendingProcess(pid string, height int64) {
 		log.Error(err)
 		return
 	}
-	if err = s.Storage.Put([]byte(types.ScrutinizerProcessEndingPrefix+scheduledBlock), pidListBytes); err != nil {
+	if err = s.Storage.Put(s.encode("processEnding", scheduledBlock), pidListBytes); err != nil {
 		log.Error(err)
 		return
 	}
-	log.Infof("process %s results computation scheduled for block %s", pid, scheduledBlock)
+	log.Infof("process %x results computation scheduled for block %s", pid, scheduledBlock)
 }
 
-func (s *Scrutinizer) addLiveResultsProcess(pid string) {
-	log.Infof("add new process %s to live results", pid)
-	process, err := s.Storage.Get([]byte(types.ScrutinizerLiveProcessPrefix + pid))
+func (s *Scrutinizer) addLiveResultsProcess(pid []byte) {
+	log.Infof("add new process %x to live results", pid)
+	process, err := s.Storage.Get(s.encode("liveProcess", pid))
 	if err != nil && err != badger.ErrKeyNotFound {
 		log.Error(err)
 		return
@@ -120,19 +150,37 @@ func (s *Scrutinizer) addLiveResultsProcess(pid string) {
 	}
 }
 
-func (s *Scrutinizer) addEntity(eid string, pid string) {
+func (s *Scrutinizer) encode(t string, data []byte) []byte {
+	switch t {
+	case "entity":
+		return append([]byte{types.ScrutinizerEntityPrefix}, data...)
+	case "liveProcess":
+		return append([]byte{types.ScrutinizerLiveProcessPrefix}, data...)
+	case "processSeparator":
+		return append(data, types.ScrutinizerEntityProcessSeparator)
+	case "results":
+		return append([]byte{types.ScrutinizerResultsPrefix}, data...)
+	case "processEnding":
+		return append([]byte{types.ScrutinizerProcessEndingPrefix}, data...)
+	}
+	panic("scrutinizer encode type not known")
+}
+
+func (s *Scrutinizer) addEntity(eid, pid []byte) {
 	// TODO(mvdan): use a prefixed database
-	storagekey := []byte(types.ScrutinizerEntityPrefix + eid)
+	storagekey := s.encode("entity", eid)
 	processList, err := s.Storage.Get(storagekey)
 	if err != nil && err != badger.ErrKeyNotFound {
 		log.Error(err)
 		return
 	}
-	if err := s.Storage.Put(storagekey, append(processList, []byte(pid+types.ScrutinizerEntityProcessSeparator)...)); err != nil {
+	processList = append(processList, s.encode("processSeparator", pid)...)
+	if err := s.Storage.Put(storagekey, processList); err != nil {
 		log.Error(err)
 		return
 	}
-	log.Debugf("add new entity %s to scrutinizer", eid)
+	log.Debugf("added new entity %x to scrutinizer", eid)
+	atomic.AddInt64(&s.entityCount, 1)
 }
 
 func emptyProcess() ProcessVotes {
