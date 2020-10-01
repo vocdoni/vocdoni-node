@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	amino "github.com/tendermint/go-amino"
-	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
 
@@ -117,6 +116,7 @@ func TempDir(tb testing.TB, name string) string {
 
 func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 	c := amino.NewCodec()
+	vochain.RegisterAmino(c)
 	s, err := vochain.NewState(TempDir(tb, "vochain-db"), c)
 	if err != nil {
 		tb.Fatal(err)
@@ -131,7 +131,7 @@ func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 
 func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 	c := amino.NewCodec()
-	cryptoAmino.RegisterAmino(c)
+	vochain.RegisterAmino(c)
 	s, err := vochain.NewState(TempDir(tb, "vochain-db"), c)
 	if err != nil {
 		tb.Fatal(err)
@@ -160,6 +160,7 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 
 func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 	c := amino.NewCodec()
+	vochain.RegisterAmino(c)
 	s, err := vochain.NewState(TempDir(tb, "vochain-db"), c)
 	if err != nil {
 		tb.Fatal(err)
@@ -177,13 +178,20 @@ func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 
 func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplication {
 	cdc := amino.NewCodec()
-	cryptoAmino.RegisterAmino(cdc)
+	vochain.RegisterAmino(cdc)
 	// start vochain node
 	// create config
 	d.VochainCfg = new(config.VochainCfg)
 	d.VochainCfg.DataDir = TempDir(tb, "vochain-data")
+
 	// create genesis file
-	consensusParams := tmtypes.DefaultConsensusParams()
+	tmConsensusParams := tmtypes.DefaultConsensusParams()
+	consensusParams := &types.ConsensusParams{
+		Block:     types.BlockParams(tmConsensusParams.Block),
+		Evidence:  types.EvidenceParams(tmConsensusParams.Evidence),
+		Validator: types.ValidatorParams(tmConsensusParams.Validator),
+	}
+
 	// TO-DO instead of creating a pv file, just create a random 64 bytes key and use it for the genesis file
 	validator := privval.GenFilePV(d.VochainCfg.DataDir+"/config/priv_validator_key.json", d.VochainCfg.DataDir+"/data/priv_validator_state.json")
 	oracles := []string{d.Signer.AddressString()}

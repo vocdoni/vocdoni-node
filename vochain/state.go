@@ -9,7 +9,6 @@ import (
 	"time"
 
 	amino "github.com/tendermint/go-amino"
-	crypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -178,7 +177,7 @@ func (v *State) Oracles(isQuery bool) ([]string, error) {
 	return oracles, err
 }
 
-func hexPubKeyToTendermintEd25519(pubKey string) (crypto.PubKey, error) {
+func hexPubKeyToTendermintEd25519(pubKey string) (types.PubKey, error) {
 	var tmkey ed25519.PubKeyEd25519
 	pubKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
@@ -192,20 +191,20 @@ func hexPubKeyToTendermintEd25519(pubKey string) (crypto.PubKey, error) {
 }
 
 // AddValidator adds a tendemint validator if it is not already added
-func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
+func (v *State) AddValidator(pubKey types.PubKey, power int64) error {
 	var err error
 	addr := pubKey.Address().String()
 	v.Lock()
 	defer v.Unlock()
 	validatorsBytes := v.Store.Tree(AppTree).Get(validatorKey)
-	var validators []tmtypes.GenesisValidator
+	var validators []types.GenesisValidator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
 	for _, v := range validators {
 		if v.PubKey.Address().String() == addr {
 			return errors.New("validator already added")
 		}
 	}
-	newVal := tmtypes.GenesisValidator{
+	newVal := types.GenesisValidator{
 		Address: pubKey.Address(),
 		PubKey:  pubKey,
 		Power:   validatorPower,
@@ -214,7 +213,7 @@ func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
 
 	validatorsBytes, err = v.Codec.MarshalBinaryBare(validators)
 	if err != nil {
-		return errors.New("cannot marshal validator")
+		return fmt.Errorf("cannot marshal validators: %v", err)
 	}
 	return v.Store.Tree(AppTree).Add(validatorKey, validatorsBytes)
 }
@@ -224,13 +223,13 @@ func (v *State) RemoveValidator(address string) error {
 	v.RLock()
 	validatorsBytes := v.Store.Tree(AppTree).Get(validatorKey)
 	v.RUnlock()
-	var validators []tmtypes.GenesisValidator
+	var validators []types.GenesisValidator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
 	for i, val := range validators {
 		if val.Address.String() == address {
 			// remove validator
 			copy(validators[i:], validators[i+1:])
-			validators[len(validators)-1] = tmtypes.GenesisValidator{}
+			validators[len(validators)-1] = types.GenesisValidator{}
 			validators = validators[:len(validators)-1]
 			validatorsBytes, err := v.Codec.MarshalBinaryBare(validators)
 			if err != nil {
@@ -245,7 +244,7 @@ func (v *State) RemoveValidator(address string) error {
 }
 
 // Validators returns a list of the validators saved on persistent storage
-func (v *State) Validators(isQuery bool) ([]tmtypes.GenesisValidator, error) {
+func (v *State) Validators(isQuery bool) ([]types.GenesisValidator, error) {
 	var validatorBytes []byte
 	var err error
 	v.RLock()
@@ -255,7 +254,7 @@ func (v *State) Validators(isQuery bool) ([]tmtypes.GenesisValidator, error) {
 		validatorBytes = v.Store.Tree(AppTree).Get(validatorKey)
 	}
 	v.RUnlock()
-	var validators []tmtypes.GenesisValidator
+	var validators []types.GenesisValidator
 	err = v.Codec.UnmarshalBinaryBare(validatorBytes, &validators)
 	return validators, err
 }

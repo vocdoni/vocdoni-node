@@ -16,7 +16,6 @@ import (
 	amino "github.com/tendermint/go-amino"
 	tmcfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
@@ -282,7 +281,7 @@ func HexKeyToAmino(hexKey string) (private, public string, err error) {
 	}
 
 	cdc := amino.NewCodec()
-	cryptoamino.RegisterAmino(cdc)
+	RegisterAmino(cdc)
 
 	var pv privval.FilePVKey
 	var privKey crypto25519.PrivKeyEd25519

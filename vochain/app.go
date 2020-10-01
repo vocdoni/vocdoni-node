@@ -5,7 +5,7 @@ import (
 
 	amino "github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
+	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	mempl "github.com/tendermint/tendermint/mempool"
 	nm "github.com/tendermint/tendermint/node"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -24,17 +24,24 @@ type BaseApplication struct {
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
+func RegisterAmino(cdc *amino.Codec) {
+	cryptoamino.RegisterAmino(cdc)
+
+	cdc.RegisterInterface((*types.PubKey)(nil), nil)
+}
+
 // NewBaseApplication creates a new BaseApplication given a name an a DB backend
 func NewBaseApplication(dbpath string) (*BaseApplication, error) {
-	c := amino.NewCodec()
-	cryptoAmino.RegisterAmino(c)
-	s, err := NewState(dbpath, c)
+	cdc := amino.NewCodec()
+	RegisterAmino(cdc)
+
+	state, err := NewState(dbpath, cdc)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}
 	return &BaseApplication{
-		State: s,
-		Codec: c,
+		State: state,
+		Codec: cdc,
 	}, nil
 }
 

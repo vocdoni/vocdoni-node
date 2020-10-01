@@ -1,9 +1,13 @@
 package types
 
 import (
+	"encoding/json"
 	"time"
 
-	tmtypes "github.com/tendermint/tendermint/types"
+	// Don't import tendermint/types, because that pulls in lots of indirect
+	// dependencies which are too heavy for our low-level "types" package.
+	// libs/bytes is okay, because it only pulls in std deps.
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 )
 
 // ________________________ STATE ________________________
@@ -231,8 +235,63 @@ type QueryData struct {
 
 // GenesisAppState application state in genesis
 type GenesisAppState struct {
-	Validators []tmtypes.GenesisValidator `json:"validators"`
-	Oracles    []string                   `json:"oracles"`
+	Validators []GenesisValidator `json:"validators"`
+	Oracles    []string           `json:"oracles"`
+}
+
+// The rest of these genesis app state types are copied from
+// github.com/tendermint/tendermint/types, for the sake of making this package
+// lightweight and not have it import heavy indirect dependencies like grpc or
+// crypto/*.
+
+type GenesisDoc struct {
+	GenesisTime     time.Time          `json:"genesis_time"`
+	ChainID         string             `json:"chain_id"`
+	ConsensusParams *ConsensusParams   `json:"consensus_params,omitempty"`
+	Validators      []GenesisValidator `json:"validators,omitempty"`
+	AppHash         tmbytes.HexBytes   `json:"app_hash"`
+	AppState        json.RawMessage    `json:"app_state,omitempty"`
+}
+
+type ConsensusParams struct {
+	Block     BlockParams     `json:"block"`
+	Evidence  EvidenceParams  `json:"evidence"`
+	Validator ValidatorParams `json:"validator"`
+}
+
+type BlockParams struct {
+	MaxBytes int64 `json:"max_bytes"`
+	MaxGas   int64 `json:"max_gas"`
+	// Minimum time increment between consecutive blocks (in milliseconds)
+	// Not exposed to the application.
+	TimeIotaMs int64 `json:"time_iota_ms"`
+}
+
+type EvidenceParams struct {
+	MaxAgeNumBlocks int64         `json:"max_age_num_blocks"` // only accept new evidence more recent than this
+	MaxAgeDuration  time.Duration `json:"max_age_duration"`
+}
+
+type ValidatorParams struct {
+	PubKeyTypes []string `json:"pub_key_types"`
+}
+
+type GenesisValidator struct {
+	Address tmbytes.HexBytes `json:"address"`
+	PubKey  PubKey           `json:"pub_key"`
+	Power   int64            `json:"power"`
+	Name    string           `json:"name"`
+}
+
+type PubKey interface {
+	Address() tmbytes.HexBytes
+	Bytes() []byte
+	VerifyBytes(msg []byte, sig []byte) bool
+
+	// Note that we can't keep Equals, because that would forcibly pull in
+	// tmtypes.PubKey again. Two named interfaces can't be used
+	// interchangeably, even if the underlying interface is identical.
+	// Equals(PubKey) bool
 }
 
 // ________________________ CALLBACKS DATA STRUCTS ________________________

@@ -17,10 +17,8 @@ import (
 	amino "github.com/tendermint/go-amino"
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
-	tmtypes "github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 )
 
@@ -79,7 +77,7 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
 	}
 
 	cdc := amino.NewCodec()
-	cryptoamino.RegisterAmino(cdc)
+	RegisterAmino(cdc)
 
 	jsonBytes, err := cdc.MarshalJSON(nodeKey)
 	if err != nil {
@@ -92,16 +90,16 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
 }
 
 // NewGenesis creates a new genesis and return its bytes
-func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *tmtypes.ConsensusParams, validators []privval.FilePV, oracles []string) ([]byte, error) {
+func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.ConsensusParams, validators []privval.FilePV, oracles []string) ([]byte, error) {
 	// default consensus params
 	appState := new(types.GenesisAppState)
-	appState.Validators = make([]tmtypes.GenesisValidator, len(validators))
+	appState.Validators = make([]types.GenesisValidator, len(validators))
 	for idx, val := range validators {
 		pubk, err := val.GetPubKey()
 		if err != nil {
 			return []byte{}, err
 		}
-		appState.Validators[idx] = tmtypes.GenesisValidator{
+		appState.Validators[idx] = types.GenesisValidator{
 			Address: val.GetAddress(),
 			PubKey:  pubk,
 			Power:   10,
@@ -111,13 +109,13 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *tmtypes
 
 	appState.Oracles = oracles
 	cdc := amino.NewCodec()
-	cryptoamino.RegisterAmino(cdc)
+	RegisterAmino(cdc)
 
 	appStateBytes, err := cdc.MarshalJSON(appState)
 	if err != nil {
 		return []byte{}, err
 	}
-	genDoc := tmtypes.GenesisDoc{
+	genDoc := types.GenesisDoc{
 		ChainID:         chainID,
 		GenesisTime:     tmtime.Now(),
 		ConsensusParams: consensusParams,
