@@ -23,7 +23,7 @@ func TestVochainState(t *testing.T) {
 	}
 
 	// This used to panic due to nil *ImmutableTree fields.
-	exists := s.EnvelopeExists([]byte("foo"), "bar")
+	exists := s.EnvelopeExists([]byte("foo"), []byte("bar"))
 	if exists {
 		t.Errorf("expected EnvelopeExists to return false")
 	}
@@ -158,7 +158,8 @@ func TestGetEnvelope(t *testing.T) {
 	if err := s.AddVote(testcommon.VoteHardcoded()); err != nil {
 		t.Error(err)
 	}
-	if _, err := s.Envelope(util.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0", false); err != nil {
+	if _, err := s.Envelope(util.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+		util.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), false); err != nil {
 		t.Error(err)
 	}
 }
@@ -170,7 +171,8 @@ func TestCountVotes(t *testing.T) {
 	if err := s.AddVote(testcommon.VoteHardcoded()); err != nil {
 		t.Error(err)
 	}
-	if _, err := s.Envelope(util.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0", false); err != nil {
+	if _, err := s.Envelope(util.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+		util.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), false); err != nil {
 		t.Error(err)
 	}
 	c := s.CountVotes(util.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), false)
@@ -186,11 +188,12 @@ func TestGetEnvelopeList(t *testing.T) {
 	if err := s.AddVote(testcommon.VoteHardcoded()); err != nil {
 		t.Error(err)
 	}
-	if _, err := s.Envelope(util.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0", false); err != nil {
+	if _, err := s.Envelope(util.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+		util.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), false); err != nil {
 		t.Error(err)
 	}
 	nullifiers := s.EnvelopeList(util.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), 0, 1, false)
-	if nullifiers[0] != "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0" {
+	if string(nullifiers[0]) != string(util.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0")) {
 		t.Errorf("bad nullifier recovered, expected: 5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0, got: %s", nullifiers[0])
 	}
 }

@@ -465,15 +465,15 @@ func (v *State) AddVote(vote *types.Vote) error {
 }
 
 // voteID = byte( processID_nullifier )
-func (v *State) voteID(pid []byte, nullifier string) []byte {
+func (v *State) voteID(pid, nullifier []byte) []byte {
 	voteID := append(pid, dbSeparator)
-	voteID = append(voteID, []byte(nullifier)...)
+	voteID = append(voteID, nullifier...)
 	return voteID
 }
 
 // Envelope returns the info of a vote if already exists.
 // voteID must be equals to processID_Nullifier
-func (v *State) Envelope(processID []byte, nullifier string, isQuery bool) (_ *types.Vote, err error) {
+func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *types.Vote, err error) {
 	// TODO(mvdan): remove the recover once
 	// https://github.com/tendermint/iavl/issues/212 is fixed
 	defer func() {
@@ -501,7 +501,7 @@ func (v *State) Envelope(processID []byte, nullifier string, isQuery bool) (_ *t
 }
 
 // EnvelopeExists returns true if the envelope identified with voteID exists
-func (v *State) EnvelopeExists(processID []byte, nullifier string) bool {
+func (v *State) EnvelopeExists(processID, nullifier []byte) bool {
 	voteID := v.voteID(processID, nullifier)
 	v.RLock()
 	defer v.RUnlock()
@@ -538,7 +538,7 @@ func (v *State) CountVotes(processID []byte, isQuery bool) int64 {
 }
 
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
-func (v *State) EnvelopeList(processID []byte, from, listSize int64, isQuery bool) []string {
+func (v *State) EnvelopeList(processID []byte, from, listSize int64, isQuery bool) (nullifiers [][]byte) {
 	// TODO(mvdan): remove the recover once
 	// https://github.com/tendermint/iavl/issues/212 is fixed
 	defer func() {
@@ -548,7 +548,6 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int64, isQuery boo
 			// err = fmt.Errorf("recovered panic: %v", r)
 		}
 	}()
-	var nullifiers []string
 	idx := int64(0)
 	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
 		if idx >= from+listSize {
@@ -556,7 +555,7 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int64, isQuery boo
 		}
 		if idx >= from {
 			k := strings.Split(string(key), string(dbSeparator))
-			nullifiers = append(nullifiers, k[1])
+			nullifiers = append(nullifiers, []byte(k[1]))
 		}
 		idx++
 		return false

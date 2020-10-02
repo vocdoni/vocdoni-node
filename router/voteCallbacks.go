@@ -32,13 +32,13 @@ func (r *Router) submitRawTx(request routerRequest) {
 		return
 	}
 	if res.Code != 0 {
-		log.Warnf("cannot broadcast tx (res.Code=%d): (%s)", res.Code, string(res.Data))
-		r.sendError(request, string(res.Data))
+		log.Warnf("cannot broadcast tx (res.Code=%d): (%s)", res.Code, res.Data)
+		r.sendError(request, fmt.Sprintf("%x", res.Data))
 		return
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
 	var response types.MetaResponse
-	response.Payload = string(res.Data) // return nullifier
+	response.Payload = fmt.Sprintf("%s", res.Data) // return nullifier
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -64,20 +64,20 @@ func (r *Router) submitEnvelope(request routerRequest) {
 		return
 	}
 
-	//res, err := r.tmclient.BroadcastTxSync(voteTxBytes)
 	res, err := r.vocapp.SendTX(voteTxBytes)
 	if err != nil || res == nil {
 		log.Warnf("cannot broadcast tx: (%s)", err)
-		r.sendError(request, "cannot broadcast TX")
+		r.sendError(request, fmt.Sprintf("cannot broadcast tx: %s", err))
 		return
 	}
 	if res.Code != 0 {
-		log.Warnf("cannot broadcast tx (res.Code=%d): (%s)", res.Code, string(res.Data))
-		r.sendError(request, string(res.Data))
+		log.Warnf("cannot broadcast tx (res.Code=%d): (%s)", res.Code, res.Data)
+		r.sendError(request, fmt.Sprintf("%s", res.Data))
 		return
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
 	var response types.MetaResponse
+	//response.Nullifier = fmt.Sprintf("%x", res.Data)
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -104,11 +104,16 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 		r.sendError(request, "cannot decode processID")
 		return
 	}
-	e, err := r.vocapp.State.Envelope(pid, request.Nullifier, true)
+	nullifier, err := hex.DecodeString(request.Nullifier)
+	if err != nil {
+		r.sendError(request, "cannot decode nullifier")
+		return
+	}
+	e, err := r.vocapp.State.Envelope(pid, nullifier, true)
 	// Warning, error is ignored. We should find a better way to check the envelope status
 	if err == nil && e != nil {
 		response.Registered = types.True
-		response.Nullifier = e.Nullifier
+		response.Nullifier = fmt.Sprintf("%x", e.Nullifier)
 		response.Height = &e.Height
 		block := r.vocapp.Node.BlockStore().LoadBlock(e.Height)
 		if block == nil {
@@ -137,7 +142,12 @@ func (r *Router) getEnvelope(request routerRequest) {
 		r.sendError(request, "cannot decode processID")
 		return
 	}
-	envelope, err := r.vocapp.State.Envelope(pid, request.Nullifier, true)
+	nullifier, err := hex.DecodeString(util.TrimHex(request.Nullifier))
+	if err != nil {
+		r.sendError(request, "cannot decode nullifier")
+		return
+	}
+	envelope, err := r.vocapp.State.Envelope(pid, nullifier, true)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope: (%s)", err))
 		return
@@ -303,13 +313,13 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 		r.sendError(request, "cannot decode processID")
 		return
 	}
-	n := r.vocapp.State.EnvelopeList(pid, request.From, request.ListSize, true)
+	nullifiers := r.vocapp.State.EnvelopeList(pid, request.From, request.ListSize, true)
 	var response types.MetaResponse
-	if len(n) == 0 {
-		response.Nullifiers = &[]string{}
-	} else {
-		response.Nullifiers = &n
+	strnull := []string{}
+	for _, n := range nullifiers {
+		strnull = append(strnull, fmt.Sprintf("%x", n))
 	}
+	response.Nullifiers = &strnull
 	request.Send(r.buildReply(request, &response))
 }
 

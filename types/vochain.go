@@ -31,7 +31,7 @@ type Vote struct {
 	// Height the Terndemint block number where the vote is added
 	Height int64 `json:"height,omitempty"`
 	// Nullifier is the unique identifier of the vote
-	Nullifier string `json:"nullifier,omitempty"`
+	Nullifier []byte `json:"nullifier,omitempty"`
 	// ProcessID contains the unique voting process identifier
 	ProcessID []byte `json:"processId,omitempty"`
 	// VotePackage base64 encoded vote content
@@ -43,7 +43,7 @@ type VoteProof struct {
 	Proof        string    `json:"proof,omitempty"`
 	PubKey       string    `json:"pubKey,omitempty"`
 	PubKeyDigest []byte    `json:"pubKeyDigest,omitempty"`
-	Nullifier    string    `json:"nullifier,omitempty"`
+	Nullifier    []byte    `json:"nullifier,omitempty"`
 	Created      time.Time `json:"timestamp"`
 }
 

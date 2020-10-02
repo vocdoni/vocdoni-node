@@ -230,7 +230,7 @@ func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *types.Process) 
 		nvotes++
 	}
 	pruneVoteResult(&pv)
-	log.Infof("computed results for process %s with %d votes", processID, nvotes)
+	log.Infof("computed results for process %x with %d votes", processID, nvotes)
 	return
 }
 

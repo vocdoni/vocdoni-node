@@ -39,9 +39,9 @@ func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 			return []byte{}, err
 		}
 		if commit {
-			return []byte(v.Nullifier), state.AddVote(v)
+			return v.Nullifier, state.AddVote(v)
 		}
-		return []byte(v.Nullifier), nil
+		return v.Nullifier, nil
 	case "AdminTx":
 		tx := gtx.(*types.AdminTx)
 		if err := AdminTxCheck(tx, state); err != nil {
@@ -268,7 +268,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 
 				// assign a nullifier
 				vp.Nullifier = GenerateNullifier(addr, vote.ProcessID)
-				log.Debugf("generated new vote nullifier: %s", vp.Nullifier)
+				log.Debugf("generated new vote nullifier: %x", vp.Nullifier)
 
 				// check if vote exists
 				if state.EnvelopeExists(vote.ProcessID, vp.Nullifier) {
