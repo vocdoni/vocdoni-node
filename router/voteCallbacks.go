@@ -369,15 +369,11 @@ func (r *Router) getProcListResults(request routerRequest) {
 		request.ListSize = MaxListIterations
 	}
 	var err error
-	fid := []byte{}
-	if len(request.FromID) > 0 {
-		fid, err = hex.DecodeString(util.TrimHex(request.FromID))
-		if err != nil {
-			r.sendError(request, "cannot decode fromID")
-			return
-		}
+	response.ProcessIDs, err = r.Scrutinizer.ProcessListWithResults(request.ListSize, request.FromID)
+	if err != nil {
+		r.sendError(request, "cannot decode fromID")
+		return
 	}
-	response.ProcessIDs = r.Scrutinizer.ProcessListWithResults(request.ListSize, fid)
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -388,15 +384,12 @@ func (r *Router) getProcListLiveResults(request routerRequest) {
 		request.ListSize = MaxListIterations
 	}
 	var err error
-	fid := []byte{}
-	if len(request.FromID) > 0 {
-		fid, err = hex.DecodeString(util.TrimHex(request.FromID))
-		if err != nil {
-			r.sendError(request, "cannot decode fromID")
-			return
-		}
+	response.ProcessIDs, err = r.Scrutinizer.ProcessListWithLiveResults(request.ListSize, request.FromID)
+	if err != nil {
+		r.sendError(request, "cannot decode fromID")
+		return
 	}
-	response.ProcessIDs = r.Scrutinizer.ProcessListWithLiveResults(request.ListSize, fid)
+
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -407,15 +400,12 @@ func (r *Router) getScrutinizerEntities(request routerRequest) {
 		request.ListSize = MaxListIterations
 	}
 	var err error
-	fid := []byte{}
-	if len(request.FromID) > 0 {
-		fid, err = hex.DecodeString(util.TrimHex(request.FromID))
-		if err != nil {
-			r.sendError(request, "cannot decode fromID")
-			return
-		}
+	response.EntityIDs, err = r.Scrutinizer.EntityList(request.ListSize, request.FromID)
+	if err != nil {
+		r.sendError(request, "cannot decode fromID")
+		return
 	}
-	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, fid)
+
 	request.Send(r.buildReply(request, &response))
 }
 

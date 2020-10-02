@@ -2,6 +2,7 @@ package scrutinizer
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"sync/atomic"
 
@@ -42,16 +43,40 @@ func (s *Scrutinizer) ProcessList(entityID []byte, fromID []byte, max int64) ([]
 	return processListString, nil
 }
 
-func (s *Scrutinizer) ProcessListWithResults(max int64, fromID []byte) []string {
-	return s.List(max, string(fromID), string(types.ScrutinizerResultsPrefix))
+func (s *Scrutinizer) ProcessListWithResults(max int64, fromID string) ([]string, error) {
+	from, err := hex.DecodeString(fromID)
+	if err != nil {
+		return nil, err
+	}
+	process := []string{}
+	for _, p := range s.List(max, from, []byte{types.ScrutinizerResultsPrefix}) {
+		process = append(process, fmt.Sprintf("%x", p))
+	}
+	return process, nil
 }
 
-func (s *Scrutinizer) ProcessListWithLiveResults(max int64, fromID []byte) []string {
-	return s.List(max, string(fromID), string(types.ScrutinizerLiveProcessPrefix))
+func (s *Scrutinizer) ProcessListWithLiveResults(max int64, fromID string) ([]string, error) {
+	from, err := hex.DecodeString(fromID)
+	if err != nil {
+		return nil, err
+	}
+	process := []string{}
+	for _, p := range s.List(max, from, []byte{types.ScrutinizerLiveProcessPrefix}) {
+		process = append(process, fmt.Sprintf("%x", p))
+	}
+	return process, nil
 }
 
-func (s *Scrutinizer) EntityList(max int64, fromID []byte) []string {
-	return s.List(max, string(fromID), string(types.ScrutinizerEntityPrefix))
+func (s *Scrutinizer) EntityList(max int64, fromID string) ([]string, error) {
+	from, err := hex.DecodeString(fromID)
+	if err != nil {
+		return nil, err
+	}
+	entities := []string{}
+	for _, e := range s.List(max, from, []byte{types.ScrutinizerEntityPrefix}) {
+		entities = append(entities, fmt.Sprintf("%x", e))
+	}
+	return entities, nil
 }
 
 func (s *Scrutinizer) EntityCount() int64 {

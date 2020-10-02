@@ -29,7 +29,10 @@ func TestList(t *testing.T) {
 	last := ""
 	iterations := 0
 	for len(entities) < 100 {
-		list := sc.EntityList(10, []byte(last))
+		list, err := sc.EntityList(10, last)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if len(list) < 1 {
 			t.Fatalf("list size is smaller than 1")
 		}

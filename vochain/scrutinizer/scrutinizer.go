@@ -48,7 +48,7 @@ func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.entityCount = int64(len(s.List(int64(^uint(0)>>1), "", string(types.ScrutinizerEntityPrefix))))
+	s.entityCount = int64(len(s.List(int64(^uint(0)>>1), []byte{}, []byte{types.ScrutinizerEntityPrefix})))
 	s.VochainState.AddEventListener(s)
 	return s, nil
 }
@@ -141,19 +141,19 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 }
 
 // List returns a list of keys matching a given prefix
-func (s *Scrutinizer) List(max int64, from, prefix string) (list []string) {
+func (s *Scrutinizer) List(max int64, from, prefix []byte) (list [][]byte) {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
 	fromLock := len(from) > 0                            // true if from field specified, will be false when from found in database
 	// TBD: iter.Seek([]byte(prefix+from)) does not work as expected. Find why and apply a fix if possible.
-	for iter.Seek([]byte(prefix)); iter.Iter.ValidForPrefix([]byte(prefix)); iter.Next() {
+	for iter.Seek(prefix); iter.Iter.ValidForPrefix(prefix); iter.Next() {
 		if max < 1 {
 			break
 		}
 		if !fromLock {
-			list = append(list, string(iter.Key()[len(prefix):]))
+			list = append(list, iter.Key()[len(prefix):])
 			max--
 		}
-		if fromLock && string(iter.Key()) == prefix+from {
+		if fromLock && string(iter.Key()) == string(prefix)+string(from) {
 			fromLock = false
 		}
 	}
