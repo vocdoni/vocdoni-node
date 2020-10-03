@@ -163,7 +163,7 @@ func (e *ENSCallerHandler) Resolve(nameHash [32]byte, resolvePublicRegistry bool
 // VotingProcessAddress gets the Voting process main contract address
 func VotingProcessAddress(publicRegistryAddr, domain, ethEndpoint string) (string, error) {
 	// normalize voting process domain name
-	nh, err := nameHash(domain)
+	nh, err := NameHash(domain)
 	if err != nil {
 		return "", err
 	}
@@ -189,7 +189,7 @@ func VotingProcessAddress(publicRegistryAddr, domain, ethEndpoint string) (strin
 }
 
 // normalize normalizes a name according to the ENS standard
-func normalize(input string) (output string, err error) {
+func Normalize(input string) (output string, err error) {
 	p := idna.New(idna.MapForLookup(), idna.StrictDomainName(false), idna.Transitional(false))
 	output, err = p.ToUnicode(input)
 	if err != nil {
@@ -202,7 +202,7 @@ func normalize(input string) (output string, err error) {
 	return
 }
 
-func nameHashPart(currentHash [32]byte, name string) (hash [32]byte, err error) {
+func NameHashPart(currentHash [32]byte, name string) (hash [32]byte, err error) {
 	sha := sha3.NewLegacyKeccak256()
 	if _, err = sha.Write(currentHash[:]); err != nil {
 		return
@@ -220,17 +220,17 @@ func nameHashPart(currentHash [32]byte, name string) (hash [32]byte, err error) 
 }
 
 // nameHash generates a hash from a name that can be used to look up the name in ENS
-func nameHash(name string) (hash [32]byte, err error) {
+func NameHash(name string) (hash [32]byte, err error) {
 	if name == "" {
 		return
 	}
-	normalizedName, err := normalize(name)
+	normalizedName, err := Normalize(name)
 	if err != nil {
 		return
 	}
 	parts := strings.Split(normalizedName, ".")
 	for i := len(parts) - 1; i >= 0; i-- {
-		if hash, err = nameHashPart(hash, parts[i]); err != nil {
+		if hash, err = NameHashPart(hash, parts[i]); err != nil {
 			return
 		}
 	}
@@ -260,7 +260,7 @@ func EnsResolve(ensRegistryAddr, ethDomain, w3uri string) (contractAddr string, 
 // ResolveEntityMetadataURL returns the metadata URL given an entityID
 func ResolveEntityMetadataURL(ensRegistryAddr, entityID, w3uri string) (string, error) {
 	// normalize entity resolver domain name
-	nh, err := nameHash(types.EntityResolverDomain)
+	nh, err := NameHash(types.EntityResolverDomain)
 	if err != nil {
 		return "", err
 	}
