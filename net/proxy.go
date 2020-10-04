@@ -12,6 +12,7 @@ import (
 	"time"
 
 	reuse "github.com/libp2p/go-reuseport"
+	"github.com/p4u/recws"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"go.uber.org/zap"
@@ -303,45 +304,54 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 // AddWsWsBridge adds a WS endpoint to interact with the underlying web3
 func (p *Proxy) AddWsWsBridge(url string) ProxyWsHandler {
 	return func(wslocal *websocket.Conn) {
-		wsremote := newWsPoll()
-		wsremote.ReadLimit = 22 * 1024 * 1024 // 22 MB, Tendermint websocket needs at least 21
-		wsremote.addServer(url)
-		if err := wsremote.dial(); err != nil {
-			log.Errorf("dial failed: (%s)", err)
-			return
+		ws := recws.RecConn{
+			KeepAliveTimeout: 10 * time.Second,
 		}
-		go wsremote.read()
+		ws.Dial(url, nil)
+		ws.SetReadLimit(int64(22 * 1024 * 1024)) // tendermint needs up to 20 MB
+		ctx, cancel := context.WithCancel(context.Background())
+		// Read from remote and write to local
 		go func() {
 			for {
-				msgType, msg, err := wslocal.Reader(context.TODO())
-				if err != nil {
-					log.Debugf("websocket closed by the client: %s", err)
-					wslocal.Close(websocket.StatusAbnormalClosure, "ws closed by client")
+				select {
+				case <-ctx.Done():
+					log.Debugf("websocket connection to %s closed, received context Done", url)
 					return
-				}
-				respBody, err := ioutil.ReadAll(msg)
-				if err != nil {
-					log.Warnf("cannot read response: %s", err)
-					continue
-				}
-				if err := wsremote.write(msgType, respBody); err != nil {
-					log.Fatal(err)
-					return
+				default:
+					t, data, err := ws.ReadMessage()
+					if err != nil {
+						log.Debugf("websocket connection to %s closed", url)
+						return
+					}
+					ctx2, cancel := context.WithTimeout(ctx, time.Second*10)
+					if err := wslocal.Write(ctx2, websocket.MessageType(t), data); err != nil {
+						log.Warnf("cannot write message to local websocket: (%s)", err)
+						cancel()
+						return
+					}
+					cancel()
 				}
 			}
 		}()
+
+		// Read local messages and write to remote
 		for {
-			wsData := <-wsremote.readChan
-			respBody, err := ioutil.ReadAll(wsData.reader)
+			msgType, msg, err := wslocal.Reader(context.TODO())
+			if err != nil {
+				log.Debugf("websocket closed by the client: %s", err)
+				break
+			}
+			respBody, err := ioutil.ReadAll(msg)
 			if err != nil {
 				log.Warnf("cannot read response: %s", err)
 				continue
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			if err := wslocal.Write(ctx, wsData.msgType, respBody); err != nil {
-				log.Warnf("cannot write message to local websocket: (%s)", err)
+			if err := ws.WriteMessage(int(msgType), respBody); err != nil {
+				break
 			}
-			cancel()
 		}
+		cancel()
+		wslocal.Close(websocket.StatusAbnormalClosure, "ws closed by client")
+		ws.Close()
 	}
 }

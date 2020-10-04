@@ -27,6 +27,7 @@ require (
 	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/go-log/v2 v2.1.1 // indirect
 	github.com/ipfs/interface-go-ipfs-core v0.3.0
+	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/klauspost/compress v1.10.6
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
@@ -42,6 +43,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
+	github.com/p4u/recws v1.2.2-0.20201005083112-7be7f9397e75
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/polydawn/refmt v0.0.0-20190807091052-3d65705ee9f1 // indirect
 	github.com/prometheus/client_golang v1.6.0

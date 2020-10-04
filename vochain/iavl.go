@@ -271,7 +271,7 @@ func (v *State) AddValidator(pubKey crypto.PubKey, power int64) error {
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
 	for _, v := range validators {
 		if v.PubKey.Address().String() == addr {
-			return errors.New("validator already added")
+			return nil
 		}
 	}
 	newVal := tmtypes.GenesisValidator{
