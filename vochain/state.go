@@ -201,7 +201,7 @@ func (v *State) AddValidator(pubKey types.PubKey, power int64) error {
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
 	for _, v := range validators {
 		if v.PubKey.Address().String() == addr {
-			return errors.New("validator already added")
+			return nil
 		}
 	}
 	newVal := types.GenesisValidator{
