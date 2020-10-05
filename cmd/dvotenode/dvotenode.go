@@ -21,6 +21,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/internal"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
 	vnet "gitlab.com/vocdoni/go-dvote/net"
@@ -305,6 +306,13 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 */
 
 func main() {
+	// Don't use the log package here, because we want to report the version
+	// before loading the config. This is because something could go wrong
+	// while loading the config, and because the logger isn't set up yet.
+	// For the sake of including the version in the log, it's also included
+	// in a log line later on.
+	fmt.Fprintf(os.Stderr, "vocdoni dvote version %q\n", internal.Version)
+
 	// setup config
 	// creating config and init logger
 	globalCfg, cfgErr := newConfig()
@@ -357,7 +365,7 @@ func main() {
 		log.Error(http.Serve(ln, nil))
 	}()
 
-	log.Infof("starting vocdoni dvote node in %s mode", globalCfg.Mode)
+	log.Infof("starting vocdoni dvote node version %q in %s mode", internal.Version, globalCfg.Mode)
 	var err error
 	var signer *ethereum.SignKeys
 	var node *chain.EthChainContext
