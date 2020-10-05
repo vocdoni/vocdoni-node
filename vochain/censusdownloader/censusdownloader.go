@@ -7,6 +7,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
@@ -56,6 +57,7 @@ func (c *CensusDownloader) Commit(height int64) {
 }
 
 func (c *CensusDownloader) OnProcess(pid, eid []byte, mkroot, mkuri string) {
+	mkroot = util.TrimHex(mkroot)
 	c.queueLock.Lock()
 	defer c.queueLock.Unlock()
 	if !c.importOnlyNew || !c.isFastSync {
