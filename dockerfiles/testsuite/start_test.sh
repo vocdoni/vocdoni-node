@@ -7,6 +7,7 @@ ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-1000}
 echo "### Starting test suite ###"
 docker-compose up -d
 
+sleep 5
 echo "### Waiting for test suite to be ready ###"
 for i in {1..5}; do docker-compose run test curl --fail http://gateway:9090/ping && break || sleep 5; done
 
