@@ -2,6 +2,7 @@ package router
 
 import (
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 func (r *Router) censusLocal(request routerRequest) {
@@ -14,7 +15,7 @@ func (r *Router) censusLocal(request routerRequest) {
 			return
 		}
 	}
-	resp := r.census.Handler(&request.MetaRequest, auth, addr.String()+"/")
+	resp := r.census.Handler(&request.MetaRequest, auth, util.TrimHex(addr.String())+"/")
 	if !resp.Ok {
 		r.sendError(request, resp.Message)
 		return

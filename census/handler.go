@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 func httpReply(resp *types.ResponseMessage, w http.ResponseWriter) {
@@ -96,6 +98,14 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	resp.Ok = true
 	resp.Timestamp = int32(time.Now().Unix())
 
+	// Trim Hex on censusID and RootHash
+	if len(r.CensusID) > 0 {
+		r.CensusID = util.TrimHex(r.CensusID)
+	}
+	if len(r.RootHash) > 0 {
+		r.RootHash = util.TrimHex(r.RootHash)
+	}
+
 	// Special methods not depending on census existence
 	if r.Method == "addCensus" {
 		if isAuth {
@@ -130,7 +140,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 	exists := m.Exists(r.CensusID)
 	m.TreesMu.RUnlock()
 	if !exists {
-		resp.SetError("censusId not valid or not found")
+		resp.SetError(fmt.Sprintf("censusId not valid or not found %s", r.CensusID))
 		return resp
 	}
 
