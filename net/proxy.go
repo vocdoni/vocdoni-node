@@ -308,6 +308,16 @@ func (p *Proxy) AddWsWsBridge(url string) ProxyWsHandler {
 			KeepAliveTimeout: 10 * time.Second,
 		}
 		ws.Dial(url, nil)
+		attempts := 50
+		for ws.Conn == nil && attempts > 0 {
+			time.Sleep(time.Millisecond * 100)
+			attempts--
+		}
+		if ws.Conn == nil {
+			log.Errorf("websocket bridge cannot connect with %s", url)
+			wslocal.Close(websocket.StatusAbnormalClosure, "cannot reach destination")
+			return
+		}
 		ws.SetReadLimit(int64(22 * 1024 * 1024)) // tendermint needs up to 20 MB
 		ctx, cancel := context.WithCancel(context.Background())
 		// Read from remote and write to local
