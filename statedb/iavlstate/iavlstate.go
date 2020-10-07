@@ -247,11 +247,11 @@ func (t *IavlTree) Add(key, value []byte) error {
 	return nil
 }
 
-func (t *IavlTree) Iterate(prefix string, until string, callback func(key, value []byte) bool) {
+func (t *IavlTree) Iterate(prefix, until []byte, callback func(key, value []byte) bool) {
 	if t.isImmutable {
-		t.itree.IterateRange([]byte(prefix), []byte(until), true, callback)
+		t.itree.IterateRange(prefix, until, true, callback)
 	} else {
-		t.tree.IterateRange([]byte(prefix), []byte(until), true, callback)
+		t.tree.IterateRange(prefix, until, true, callback)
 	}
 }
 

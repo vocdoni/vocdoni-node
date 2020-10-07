@@ -17,7 +17,7 @@ type StateDB interface {
 type StateTree interface {
 	Get(key []byte) []byte
 	Add(key, value []byte) error
-	Iterate(prefix string, until string, callback func(key, value []byte) bool)
+	Iterate(prefix, until []byte, callback func(key, value []byte) bool)
 	Hash() []byte
 	Count() uint64
 	Version() uint64

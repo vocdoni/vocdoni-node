@@ -5,8 +5,9 @@ func Bool(b bool) *bool { return &b }
 // These exported variables should be treated as constants, to be used in API
 // responses which require *bool fields.
 var (
-	False = Bool(false)
-	True  = Bool(true)
+	False     = Bool(false)
+	True      = Bool(true)
+	FF32Bytes = []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
 )
 
 const (
@@ -23,7 +24,6 @@ const (
 	EthereumConfirmationsThreshold = 6
 	EntityResolverDomain           = "entity-resolver.vocdoni.eth"
 	EntityMetaKey                  = "vnd.vocdoni.meta"
-
 	// Scrutinizer
 
 	// ScrutinizerLiveProcessPrefix is used for sotring temporary results on live

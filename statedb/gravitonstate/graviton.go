@@ -1,10 +1,10 @@
 package gravitonstate
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 
 	"sync/atomic"
@@ -312,11 +312,11 @@ func (t *GravitonTree) Version() uint64 {
 	return t.version
 }
 
-func (t *GravitonTree) Iterate(prefix string, until string, callback func(key, value []byte) bool) {
+func (t *GravitonTree) Iterate(prefix, until []byte, callback func(key, value []byte) bool) {
 	c := t.tree.Cursor()
 	for k, v, err := c.First(); err == nil; k, v, err = c.Next() { // TBD: This is horrible from the performance point of view...
-		if strings.HasPrefix(string(k), prefix) {
-			if string(k) == until {
+		if bytes.HasPrefix(k, prefix) {
+			if string(k) == string(until) {
 				break
 			}
 			if callback(k, v) {

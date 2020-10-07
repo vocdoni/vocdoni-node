@@ -1,10 +1,10 @@
 package vochain
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -26,7 +26,6 @@ const (
 	// validators default power
 	validatorPower          = 0
 	voteCachePurgeThreshold = time.Duration(time.Second * 600)
-	dbSeparator             = byte(0x5f)
 )
 
 var (
@@ -445,7 +444,10 @@ func (v *State) setProcess(process *types.Process, pid []byte) error {
 
 // AddVote adds a new vote to a process if the process exists and the vote is not already submmited
 func (v *State) AddVote(vote *types.Vote) error {
-	vid := v.voteID(vote.ProcessID, vote.Nullifier)
+	vid, err := v.voteID(vote.ProcessID, vote.Nullifier)
+	if err != nil {
+		return err
+	}
 	// save block number
 	vote.Height = v.Header(false).Height
 	newVoteBytes, err := v.Codec.MarshalBinaryBare(vote)
@@ -464,11 +466,15 @@ func (v *State) AddVote(vote *types.Vote) error {
 	return nil
 }
 
-// voteID = byte( processID_nullifier )
-func (v *State) voteID(pid, nullifier []byte) []byte {
-	voteID := append(pid, dbSeparator)
-	voteID = append(voteID, nullifier...)
-	return voteID
+// voteID = byte( processID+nullifier )
+func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
+	if len(pid) != types.ProcessIDsize {
+		return nil, fmt.Errorf("wrong processID size %d", len(pid))
+	}
+	if len(nullifier) != types.VoteNullifierSize {
+		return nil, fmt.Errorf("wrong nullifier size %d", len(nullifier))
+	}
+	return append(pid, nullifier...), nil
 }
 
 // Envelope returns the info of a vote if already exists.
@@ -483,7 +489,10 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *types.Vo
 	}()
 	var vote *types.Vote
 	var voteBytes []byte
-	vid := v.voteID(processID, nullifier)
+	vid, err := v.voteID(processID, nullifier)
+	if err != nil {
+		return nil, err
+	}
 	v.RLock()
 	defer v.RUnlock() // needs to be deferred due to the recover above
 	if isQuery {
@@ -502,7 +511,10 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *types.Vo
 
 // EnvelopeExists returns true if the envelope identified with voteID exists
 func (v *State) EnvelopeExists(processID, nullifier []byte) bool {
-	voteID := v.voteID(processID, nullifier)
+	voteID, err := v.voteID(processID, nullifier)
+	if err != nil {
+		return false
+	}
 	v.RLock()
 	defer v.RUnlock()
 	b := v.Store.ImmutableTree(VoteTree).Get(voteID)
@@ -514,15 +526,24 @@ func (v *State) EnvelopeExists(processID, nullifier []byte) bool {
 // We don't know what the next processID hash will be, so we use "processID}"
 // as the end point, since "}" comes after "_" when sorting lexicographically.
 func (v *State) iterateProcessID(processID []byte, fn func(key []byte, value []byte) bool, isQuery bool) bool {
-	pid1 := fmt.Sprintf("%s%s", processID, string(dbSeparator))
-	pid2 := fmt.Sprintf("%s}", processID)
+	/*
+		TBD: test this actually work and if so use it
+		until := make([]byte, types.ProcessIDsize)
+		copy(until, processID[:])
 
+		for i := len(until) - 1; i >= 0; i-- {
+			if until[i] != byte(0xFF) {
+				until[i] = byte(0xFF)
+				break
+			}
+		}
+	*/
 	v.RLock()
 	defer v.RUnlock()
 	if isQuery {
-		v.Store.ImmutableTree(VoteTree).Iterate(pid1, pid2, fn)
+		v.Store.ImmutableTree(VoteTree).Iterate(processID, nil, fn)
 	} else {
-		v.Store.Tree(VoteTree).Iterate(pid1, pid2, fn)
+		v.Store.Tree(VoteTree).Iterate(processID, nil, fn)
 	}
 	return true
 }
@@ -531,6 +552,9 @@ func (v *State) iterateProcessID(processID []byte, fn func(key []byte, value []b
 func (v *State) CountVotes(processID []byte, isQuery bool) int64 {
 	var count int64
 	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
+		if !bytes.HasPrefix(key, processID) {
+			return true
+		}
 		count++
 		return false
 	}, isQuery)
@@ -554,8 +578,7 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int64, isQuery boo
 			return true
 		}
 		if idx >= from {
-			k := strings.Split(string(key), string(dbSeparator))
-			nullifiers = append(nullifiers, []byte(k[1]))
+			nullifiers = append(nullifiers, key[32:])
 		}
 		idx++
 		return false

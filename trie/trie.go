@@ -175,7 +175,7 @@ func (t *Tree) Dump(root string) (claims []string, err error) {
 	if tree == nil {
 		return nil, fmt.Errorf("dump: root not found %s", root)
 	}
-	tree.Iterate("", "", func(k, v []byte) bool {
+	tree.Iterate(nil, nil, func(k, v []byte) bool {
 		claims = append(claims, fmt.Sprintf("%x", k))
 		return false
 	})
@@ -204,7 +204,7 @@ func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, []string, 
 	if tree == nil {
 		return nil, nil, fmt.Errorf("dumpplain: root not found %s", root)
 	}
-	tree.Iterate("", "", func(k, v []byte) bool {
+	tree.Iterate(nil, nil, func(k, v []byte) bool {
 		if !responseBase64 {
 			indexes = append(indexes, string(k))
 			values = append(values, string(v))
