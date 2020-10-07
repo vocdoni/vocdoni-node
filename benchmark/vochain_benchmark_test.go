@@ -2,6 +2,7 @@ package test
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -218,7 +219,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	// check vote added
 	req = types.MetaRequest{}
 	req.ProcessID = processID
-	req.Nullifier = fmt.Sprintf("%x", vochain.GenerateNullifier(s.Address(), util.Hex2byte(b, processID)))
+	req.Nullifier = hex.EncodeToString(vochain.GenerateNullifier(s.Address(), util.Hex2byte(b, processID)))
 	for {
 		resp = doRequest("getEnvelopeStatus", nil)
 		if *resp.Registered {

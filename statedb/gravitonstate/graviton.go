@@ -312,13 +312,12 @@ func (t *GravitonTree) Version() uint64 {
 	return t.version
 }
 
-func (t *GravitonTree) Iterate(prefix, until []byte, callback func(key, value []byte) bool) {
+func (t *GravitonTree) Iterate(prefix []byte, callback func(key, value []byte) bool) {
 	c := t.tree.Cursor()
-	for k, v, err := c.First(); err == nil; k, v, err = c.Next() { // TBD: This is horrible from the performance point of view...
+	for k, v, err := c.First(); err == nil; k, v, err = c.Next() {
+		// This is horrible from the performance point of view...
+		// TBD: Find better ways to to this iteration over the whole tree
 		if bytes.HasPrefix(k, prefix) {
-			if string(k) == string(until) {
-				break
-			}
 			if callback(k, v) {
 				break
 			}

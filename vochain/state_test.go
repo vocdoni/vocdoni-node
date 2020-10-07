@@ -51,21 +51,6 @@ func TestState(t *testing.T) {
 		t.Errorf("process must not exist")
 	}
 
-	/*	log.Warnf("PROCESS TREE")
-		s.Store.Tree(ProcessTree).Iterate(nil, nil, func(k, v []byte) bool {
-			fmt.Printf("%x | %x\n", k, v)
-			return false
-		})
-
-		log.Warnf("VOTE TREE")
-		i := 0
-		s.Store.Tree(VoteTree).Iterate(nil, nil, func(k, v []byte) bool {
-			fmt.Printf("[%d] %x | %x\n", i, k, v)
-			i++
-			return false
-		})
-	*/
-
 	votes := s.CountVotes(pids[40], false)
 	if votes != 10 {
 		t.Errorf("missing votes for process %x (got %d expected %d)", pids[40], votes, 10)

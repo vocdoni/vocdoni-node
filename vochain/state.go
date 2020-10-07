@@ -1,7 +1,6 @@
 package vochain
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -524,29 +523,13 @@ func (v *State) EnvelopeExists(processID, nullifier []byte) bool {
 	return len(b) > 0
 }
 
-// The prefix is "processID_", where processID is a stringified hash of fixed length.
-// To iterate over all the keys with said prefix, the start point can simply be "processID_".
-// We don't know what the next processID hash will be, so we use "processID}"
-// as the end point, since "}" comes after "_" when sorting lexicographically.
 func (v *State) iterateProcessID(processID []byte, fn func(key []byte, value []byte) bool, isQuery bool) bool {
-	/*
-		TBD: test this actually work and if so use it
-		until := make([]byte, types.ProcessIDsize)
-		copy(until, processID[:])
-
-		for i := len(until) - 1; i >= 0; i-- {
-			if until[i] != byte(0xFF) {
-				until[i] = byte(0xFF)
-				break
-			}
-		}
-	*/
 	v.RLock()
 	defer v.RUnlock()
 	if isQuery {
-		v.Store.ImmutableTree(VoteTree).Iterate(processID, nil, fn)
+		v.Store.ImmutableTree(VoteTree).Iterate(processID, fn)
 	} else {
-		v.Store.Tree(VoteTree).Iterate(processID, nil, fn)
+		v.Store.Tree(VoteTree).Iterate(processID, fn)
 	}
 	return true
 }
@@ -555,9 +538,6 @@ func (v *State) iterateProcessID(processID []byte, fn func(key []byte, value []b
 func (v *State) CountVotes(processID []byte, isQuery bool) int64 {
 	var count int64
 	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
-		if !bytes.HasPrefix(key, processID) {
-			return true
-		}
 		count++
 		return false
 	}, isQuery)

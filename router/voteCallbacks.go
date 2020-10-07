@@ -38,7 +38,7 @@ func (r *Router) submitRawTx(request routerRequest) {
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
 	var response types.MetaResponse
-	response.Payload = fmt.Sprintf("%s", res.Data) // return nullifier
+	response.Payload = fmt.Sprintf("%x", res.Data) // return nullifier or other info
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -72,12 +72,12 @@ func (r *Router) submitEnvelope(request routerRequest) {
 	}
 	if res.Code != 0 {
 		log.Warnf("cannot broadcast tx (res.Code=%d): (%s)", res.Code, res.Data)
-		r.sendError(request, fmt.Sprintf("%s", res.Data))
+		r.sendError(request, string(res.Data))
 		return
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
 	var response types.MetaResponse
-	//response.Nullifier = fmt.Sprintf("%x", res.Data)
+	response.Nullifier = fmt.Sprintf("%x", res.Data)
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -106,7 +106,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	}
 	nullifier, err := hex.DecodeString(request.Nullifier)
 	if err != nil {
-		r.sendError(request, "cannot decode nullifier")
+		r.sendError(request, fmt.Sprintf("cannot decode nullifier: (%s)", err))
 		return
 	}
 	e, err := r.vocapp.State.Envelope(pid, nullifier, true)
@@ -144,7 +144,7 @@ func (r *Router) getEnvelope(request routerRequest) {
 	}
 	nullifier, err := hex.DecodeString(util.TrimHex(request.Nullifier))
 	if err != nil {
-		r.sendError(request, "cannot decode nullifier")
+		r.sendError(request, fmt.Sprintf("cannot decode nullifier: (%s)", err))
 		return
 	}
 	envelope, err := r.vocapp.State.Envelope(pid, nullifier, true)

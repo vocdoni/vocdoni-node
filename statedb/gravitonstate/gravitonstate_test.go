@@ -133,15 +133,10 @@ func TestState(t *testing.T) {
 		s.Tree("t1").Add([]byte(fmt.Sprintf("PREFIXED_%d", i)), []byte(fmt.Sprintf("number %d", i)))
 	}
 
-	count := 5
-	s.Tree("t1").Iterate("PREFIXED_", "PREFIXED_5", func(k, v []byte) bool {
+	s.Tree("t1").Iterate([]byte("PREFIXED_"), func(k, v []byte) bool {
 		if !strings.HasPrefix(string(k), "PREFIXED_") {
 			t.Errorf("prefix on iterate is not filtering")
 			return true
-		}
-		count--
-		if count == -1 {
-			t.Errorf("until value on iterate is not stopping iteration")
 		}
 		return false
 	})
