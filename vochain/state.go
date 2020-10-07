@@ -474,7 +474,10 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 	if len(nullifier) != types.VoteNullifierSize {
 		return nil, fmt.Errorf("wrong nullifier size %d", len(nullifier))
 	}
-	return append(pid, nullifier...), nil
+	vid := make([]byte, 0, len(pid)+len(nullifier))
+	vid = append(vid, pid...)
+	vid = append(vid, nullifier...)
+	return vid, nil
 }
 
 // Envelope returns the info of a vote if already exists.
