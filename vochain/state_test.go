@@ -20,15 +20,15 @@ func TestState(t *testing.T) {
 
 	var pids [][]byte
 	for i := 0; i < 100; i++ {
-		pids = append(pids, util.Hex2byte(t, randomHex(32)))
-		p := types.Process{EntityID: util.Hex2byte(t, randomHex(32))}
+		pids = append(pids, util.RandomBytes(32))
+		p := types.Process{EntityID: util.RandomBytes(32)}
 		s.AddProcess(p, pids[i], "ipfs://foobar")
 
 		for j := 0; j < 10; j++ {
 			//t.Logf("adding vote %d for process %d", j, i)
 			v := types.Vote{
 				ProcessID:   pids[i],
-				Nullifier:   util.Hex2byte(t, randomHex(32)),
+				Nullifier:   util.RandomBytes(32),
 				VotePackage: fmt.Sprintf("%d%d", i, j),
 			}
 			if err := s.AddVote(&v); err != nil {
@@ -46,7 +46,7 @@ func TestState(t *testing.T) {
 		t.Errorf("entityID is not correct")
 	}
 
-	_, err = s.Process(util.Hex2byte(t, util.RandomHex(32)), false)
+	_, err = s.Process(util.RandomBytes(32), false)
 	if err == nil {
 		t.Errorf("process must not exist")
 	}

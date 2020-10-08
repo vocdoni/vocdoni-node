@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"testing"
 
@@ -47,11 +46,11 @@ func TestCheckTX(t *testing.T) {
 	process := &types.Process{
 		StartBlock:     0,
 		Type:           types.PollVote,
-		EntityID:       util.Hex2byte(t, randomHex(entityIDsize)),
+		EntityID:       util.RandomBytes(types.EntityIDsize),
 		MkRoot:         tr.Root(),
 		NumberOfBlocks: 1024,
 	}
-	pid := randomHex(processIDsize)
+	pid := util.RandomHex(types.ProcessIDsize)
 	t.Logf("adding process %+v", process)
 	app.State.AddProcess(*process, util.Hex2byte(t, pid), "ipfs://123456789")
 
@@ -70,7 +69,7 @@ func TestCheckTX(t *testing.T) {
 			t.Fatal(err)
 		}
 		tx = types.VoteTx{
-			Nonce:     randomHex(16),
+			Nonce:     util.RandomHex(16),
 			ProcessID: pid,
 			Proof:     proof,
 		}
@@ -109,14 +108,6 @@ func tempDir(tb testing.TB, name string) string {
 	}
 	tb.Cleanup(func() { os.RemoveAll(dir) })
 	return dir
-}
-
-func randomHex(n int) string {
-	bytes := make([]byte, n)
-	if _, err := rand.Read(bytes); err != nil {
-		return ""
-	}
-	return hex.EncodeToString(bytes)
 }
 
 // CreateEthRandomKeysBatch creates a set of eth random signing keys

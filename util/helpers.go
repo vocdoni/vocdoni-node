@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/hex"
+	"io"
 	"math/rand"
 	"regexp"
 	"strconv"
@@ -36,18 +37,22 @@ func TrimHex(s string) string {
 	return s
 }
 
-func RandomHex(n int) string {
-	rand.Seed(time.Now().UnixNano())
+var randReader = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+func RandomBytes(n int) []byte {
 	bytes := make([]byte, n)
-	if _, err := rand.Read(bytes); err != nil {
-		return ""
+	if _, err := io.ReadFull(randReader, bytes); err != nil {
+		panic(err)
 	}
-	return hex.EncodeToString(bytes)
+	return bytes
+}
+
+func RandomHex(n int) string {
+	return hex.EncodeToString(RandomBytes(n))
 }
 
 func RandomInt(min, max int) int {
-	rand.Seed(time.Now().UnixNano())
-	return rand.Intn(max-min) + min
+	return randReader.Intn(max-min) + min
 }
 
 func Hex2byte(tb testing.TB, s string) []byte {

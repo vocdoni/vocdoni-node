@@ -67,12 +67,12 @@ func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voter
 	process := &types.Process{
 		StartBlock:     0,
 		Type:           types.PollVote,
-		EntityID:       util.Hex2byte(t, randomHex(entityIDsize)),
+		EntityID:       util.RandomBytes(types.EntityIDsize),
 		MkRoot:         tr.Root(),
 		NumberOfBlocks: 1024,
 	}
-	pid := randomHex(processIDsize)
-	app.State.AddProcess(*process, util.Hex2byte(t, pid), "ipfs://123456789")
+	pid := util.RandomBytes(types.ProcessIDsize)
+	app.State.AddProcess(*process, pid, "ipfs://123456789")
 
 	var proof string
 
@@ -82,8 +82,8 @@ func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voter
 			t.Fatal(err)
 		}
 		tx := types.VoteTx{
-			Nonce:     randomHex(16),
-			ProcessID: pid,
+			Nonce:     util.RandomHex(16),
+			ProcessID: hex.EncodeToString(pid),
 			Proof:     proof,
 		}
 

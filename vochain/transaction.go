@@ -14,16 +14,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
-const (
-	processIDsize = 32
-	// size of eth addr
-	entityIDsize = 20
-	// legacy: in the past we used hash(addr)
-	// this is a temporal work around to support both
-	entityIDsizeV2    = 32
-	voteNullifierSize = 32
-)
-
 // GenericTX represents any valid transaction
 type GenericTX interface {
 	TxType() string
@@ -308,11 +298,11 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
 func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, error) {
 	// check format
-	if !util.IsHexEncodedStringWithLength(tx.ProcessID, processIDsize) {
+	if !util.IsHexEncodedStringWithLength(tx.ProcessID, types.ProcessIDsize) {
 		return nil, fmt.Errorf("malformed processId")
 	}
-	if !util.IsHexEncodedStringWithLength(tx.EntityID, entityIDsize) &&
-		!util.IsHexEncodedStringWithLength(tx.EntityID, entityIDsizeV2) {
+	if !util.IsHexEncodedStringWithLength(tx.EntityID, types.EntityIDsize) &&
+		!util.IsHexEncodedStringWithLength(tx.EntityID, types.EntityIDsizeV2) {
 		return nil, fmt.Errorf("malformed entityId")
 	}
 	pid, err := hex.DecodeString(tx.ProcessID)
@@ -382,7 +372,7 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 // CancelProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
 func CancelProcessTxCheck(tx *types.CancelProcessTx, state *State) error {
 	// check format
-	if !util.IsHexEncodedStringWithLength(tx.ProcessID, processIDsize) {
+	if !util.IsHexEncodedStringWithLength(tx.ProcessID, types.ProcessIDsize) {
 		return fmt.Errorf("malformed processId")
 	}
 	pid, err := hex.DecodeString(tx.ProcessID)
