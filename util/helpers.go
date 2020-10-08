@@ -51,6 +51,12 @@ func RandomInt(min, max int) int {
 }
 
 func Hex2byte(tb testing.TB, s string) []byte {
-	b, _ := hex.DecodeString(TrimHex(s))
+	b, err := hex.DecodeString(TrimHex(s))
+	if err != nil {
+		if tb == nil {
+			panic(err)
+		}
+		tb.Fatal(err)
+	}
 	return b
 }
