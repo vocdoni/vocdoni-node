@@ -17,7 +17,7 @@ type Specs struct {
 	ENSregistryAddr string
 }
 
-var AvailableChains = []string{"mainnet", "goerli", "xdai", "sokol"}
+var AvailableChains = []string{"mainnet", "goerli", "xdai", "xdaistage", "sokol"}
 
 func SpecsFor(name string) (*Specs, error) {
 	switch name {
@@ -27,6 +27,8 @@ func SpecsFor(name string) (*Specs, error) {
 		return &goerli, nil
 	case "xdai":
 		return &xdai, nil
+	case "xdaistage":
+		return &xdaistage, nil
 	case "sokol":
 		return &sokol, nil
 	default:
@@ -47,6 +49,14 @@ var xdai = Specs{
 	Name:            "xdai",
 	NetworkId:       100,
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
+	BootNodes:       nil,
+	StartingBlock:   12017322, //2020 Sep 15 16:14h
+}
+
+var xdaistage = Specs{
+	Name:            "xdaistage",
+	NetworkId:       100,
+	ENSregistryAddr: "0x9e638E90c8CdFaC1297EF261859E25c9d8438F1a",
 	BootNodes:       nil,
 	StartingBlock:   12017322, //2020 Sep 15 16:14h
 }
