@@ -42,6 +42,7 @@ require (
 	github.com/libp2p/go-libp2p-quic-transport v0.8.0 // indirect
 	github.com/libp2p/go-netroute v0.1.3 // indirect
 	github.com/libp2p/go-reuseport v0.0.1
+	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
@@ -55,6 +56,7 @@ require (
 	github.com/shirou/gopsutil v2.20.5+incompatible
 	github.com/smartystreets/assertions v1.0.1 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
+	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.3
