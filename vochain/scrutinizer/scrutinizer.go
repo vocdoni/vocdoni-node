@@ -145,7 +145,8 @@ func (s *Scrutinizer) List(max int64, from, prefix []byte) (list [][]byte) {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
 	fromLock := len(from) > 0                            // true if from field specified, will be false when from found in database
 	// TBD: iter.Seek([]byte(prefix+from)) does not work as expected. Find why and apply a fix if possible.
-	for iter.Seek(prefix); iter.Iter.ValidForPrefix(prefix); iter.Next() {
+	iter.Seek(prefix)
+	for iter.Next(); iter.Iter.ValidForPrefix(prefix); iter.Next() {
 		if max < 1 {
 			break
 		}

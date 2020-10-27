@@ -42,8 +42,8 @@ func TestList(t *testing.T) {
 		last = list[len(list)-1]
 		iterations++
 	}
-	if iterations != 11 {
-		t.Fatalf("needed more iterations than expected")
+	if iterations != 10 {
+		t.Fatalf("expected  10 iterations, got %d", iterations)
 	}
 	t.Logf("got complete list of entities with %d iterations", iterations)
 }
