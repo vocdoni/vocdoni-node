@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 func Bool(b bool) *bool { return &b }
 
 // These exported variables should be treated as constants, to be used in API
@@ -23,6 +25,8 @@ const (
 	EthereumConfirmationsThreshold = 6
 	EntityResolverDomain           = "entity-resolver.vocdoni.eth"
 	EntityMetaKey                  = "vnd.vocdoni.meta"
+	EthereumReadTimeout            = 2 * time.Second
+	EthereumWriteTimeout           = 5 * time.Second
 	// Scrutinizer
 
 	// ScrutinizerLiveProcessPrefix is used for sotring temporary results on live

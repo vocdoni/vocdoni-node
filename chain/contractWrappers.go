@@ -1,12 +1,14 @@
 package chain
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
+	ethbind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"golang.org/x/crypto/sha3"
@@ -45,8 +47,11 @@ func NewVotingProcessHandle(contractAddressHex string, dialEndpoint string) (*Pr
 	return PH, nil
 }
 
-func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error) {
-	processMeta, err := ph.VotingProcess.Get(nil, pid)
+func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*types.NewProcessTx, error) {
+	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	defer cancel()
+	opts := &ethbind.CallOpts{Context: timeout}
+	processMeta, err := ph.VotingProcess.Get(opts, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
 	}
@@ -74,8 +79,11 @@ func (ph *ProcessHandle) ProcessTxArgs(pid [32]byte) (*types.NewProcessTx, error
 	return processTxArgs, nil
 }
 
-func (ph *ProcessHandle) CancelProcessTxArgs(pid [32]byte) (*types.CancelProcessTx, error) {
-	_, err := ph.VotingProcess.Get(nil, pid)
+func (ph *ProcessHandle) CancelProcessTxArgs(ctx context.Context, pid [32]byte) (*types.CancelProcessTx, error) {
+	ctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	defer cancel()
+	opts := &ethbind.CallOpts{Context: ctx}
+	_, err := ph.VotingProcess.Get(opts, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
 	}
@@ -85,20 +93,32 @@ func (ph *ProcessHandle) CancelProcessTxArgs(pid [32]byte) (*types.CancelProcess
 	return cancelProcessTxArgs, nil
 }
 
-func (ph *ProcessHandle) ProcessIndex(pid [32]byte) (*big.Int, error) {
-	return ph.VotingProcess.GetProcessIndex(nil, pid)
+func (ph *ProcessHandle) ProcessIndex(ctx context.Context, pid [32]byte) (*big.Int, error) {
+	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	defer cancel()
+	opts := &ethbind.CallOpts{Context: timeout}
+	return ph.VotingProcess.GetProcessIndex(opts, pid)
 }
 
-func (ph *ProcessHandle) Oracles() ([]string, error) {
-	return ph.VotingProcess.GetOracles(nil)
+func (ph *ProcessHandle) Oracles(ctx context.Context) ([]string, error) {
+	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	defer cancel()
+	opts := &ethbind.CallOpts{Context: timeout}
+	return ph.VotingProcess.GetOracles(opts)
 }
 
-func (ph *ProcessHandle) Validators() ([]string, error) {
-	return ph.VotingProcess.GetValidators(nil)
+func (ph *ProcessHandle) Validators(ctx context.Context) ([]string, error) {
+	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	defer cancel()
+	opts := &ethbind.CallOpts{Context: timeout}
+	return ph.VotingProcess.GetValidators(opts)
 }
 
-func (ph *ProcessHandle) Genesis() (string, error) {
-	return ph.VotingProcess.GetGenesis(nil)
+func (ph *ProcessHandle) Genesis(ctx context.Context) (string, error) {
+	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	defer cancel()
+	opts := &ethbind.CallOpts{Context: timeout}
+	return ph.VotingProcess.GetGenesis(opts)
 }
 
 // ENS WRAPPER
@@ -146,13 +166,16 @@ func (e *ENSCallerHandler) NewEntityResolverHandle() {
 // Resolve if resolvePublicRegistry is set to true it will resolve
 // the given namehash on the public registry. If false it will
 // resolve the given namehash on a standard resolver
-func (e *ENSCallerHandler) Resolve(nameHash [32]byte, resolvePublicRegistry bool) (string, error) {
+func (e *ENSCallerHandler) Resolve(ctx context.Context, nameHash [32]byte, resolvePublicRegistry bool) (string, error) {
 	var err error
 	var resolvedAddr common.Address
+	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	defer cancel()
+	opts := &ethbind.CallOpts{Context: timeout}
 	if resolvePublicRegistry {
-		resolvedAddr, err = e.Registry.Resolver(nil, nameHash)
+		resolvedAddr, err = e.Registry.Resolver(opts, nameHash)
 	} else {
-		resolvedAddr, err = e.Resolver.Addr(nil, nameHash)
+		resolvedAddr, err = e.Resolver.Addr(opts, nameHash)
 	}
 	if err != nil {
 		return "", err
@@ -161,7 +184,7 @@ func (e *ENSCallerHandler) Resolve(nameHash [32]byte, resolvePublicRegistry bool
 }
 
 // VotingProcessAddress gets the Voting process main contract address
-func VotingProcessAddress(publicRegistryAddr, domain, ethEndpoint string) (string, error) {
+func VotingProcessAddress(ctx context.Context, publicRegistryAddr, domain, ethEndpoint string) (string, error) {
 	// normalize voting process domain name
 	nh, err := NameHash(domain)
 	if err != nil {
@@ -174,14 +197,14 @@ func VotingProcessAddress(publicRegistryAddr, domain, ethEndpoint string) (strin
 	// create registry contract instance
 	ensCallerHandler.NewENSRegistryWithFallbackHandle()
 	// get resolver address from public registry
-	ensCallerHandler.ResolverAddr, err = ensCallerHandler.Resolve(nh, true)
+	ensCallerHandler.ResolverAddr, err = ensCallerHandler.Resolve(ctx, nh, true)
 	if err != nil {
 		return "", err
 	}
 	// create resolver contract instance
 	ensCallerHandler.NewEntityResolverHandle()
 	// get voting process addr from resolver
-	votingProcessAddr, err := ensCallerHandler.Resolve(nh, false)
+	votingProcessAddr, err := ensCallerHandler.Resolve(ctx, nh, false)
 	if err != nil {
 		return "", err
 	}
@@ -240,9 +263,9 @@ func NameHash(name string) (hash [32]byte, err error) {
 const maxRetries = 30
 
 // EnsResolve resolves the voting process contract address through the stardard ENS
-func EnsResolve(ensRegistryAddr, ethDomain, w3uri string) (contractAddr string, err error) {
+func EnsResolve(ctx context.Context, ensRegistryAddr, ethDomain, w3uri string) (contractAddr string, err error) {
 	for i := 0; i < maxRetries; i++ {
-		contractAddr, err = VotingProcessAddress(ensRegistryAddr, ethDomain, w3uri)
+		contractAddr, err = VotingProcessAddress(ctx, ensRegistryAddr, ethDomain, w3uri)
 		if err != nil {
 			if strings.Contains(err.Error(), "no suitable peers available") {
 				time.Sleep(time.Second)
@@ -258,7 +281,7 @@ func EnsResolve(ensRegistryAddr, ethDomain, w3uri string) (contractAddr string, 
 }
 
 // ResolveEntityMetadataURL returns the metadata URL given an entityID
-func ResolveEntityMetadataURL(ensRegistryAddr, entityID, w3uri string) (string, error) {
+func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, w3uri string) (string, error) {
 	// normalize entity resolver domain name
 	nh, err := NameHash(types.EntityResolverDomain)
 	if err != nil {
@@ -271,7 +294,7 @@ func ResolveEntityMetadataURL(ensRegistryAddr, entityID, w3uri string) (string, 
 	// create registry contract instance
 	ensCallerHandler.NewENSRegistryWithFallbackHandle()
 	// get resolver address from public registry
-	ensCallerHandler.ResolverAddr, err = ensCallerHandler.Resolve(nh, true)
+	ensCallerHandler.ResolverAddr, err = ensCallerHandler.Resolve(ctx, nh, true)
 	if err != nil {
 		return "", err
 	}
@@ -284,7 +307,10 @@ func ResolveEntityMetadataURL(ensRegistryAddr, entityID, w3uri string) (string, 
 	}
 	var eIDBytes32 [32]byte
 	copy(eIDBytes32[:], eIDBytes)
-	metaURL, err := ensCallerHandler.Resolver.Text(nil, eIDBytes32, types.EntityMetaKey)
+	timeout, cancel := context.WithTimeout(ctx, types.EthereumWriteTimeout)
+	defer cancel()
+	opts := &ethbind.CallOpts{Context: timeout}
+	metaURL, err := ensCallerHandler.Resolver.Text(opts, eIDBytes32, types.EntityMetaKey)
 	if err != nil {
 		return "", err
 	}

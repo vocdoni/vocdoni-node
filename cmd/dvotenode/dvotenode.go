@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -545,7 +546,7 @@ func main() {
 				}
 			}
 
-			if err := service.EthEvents(globalCfg.EthConfig.ProcessDomain, w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh); err != nil {
+			if err := service.EthEvents(context.Background(), globalCfg.EthConfig.ProcessDomain, w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh); err != nil {
 				log.Fatal(err)
 			}
 		}
