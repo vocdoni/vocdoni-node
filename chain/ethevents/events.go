@@ -64,7 +64,7 @@ type CensusManager interface {
 }
 
 // EventHandler function type is executed on each Ethereum event
-type EventHandler func(event *ethtypes.Log, ethEvents *EthereumEvents) error
+type EventHandler func(ctx context.Context, event *ethtypes.Log, ethEvents *EthereumEvents) error
 
 // EventProcessor is in charge of processing Ethereum event logs asynchronously.
 // Uses a Queue mechanism and waits for EventProcessThreshold before processing a queued event.
@@ -162,7 +162,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(fromBlock *int64) {
 	}
 
 	if !ev.EventProcessor.eventProcessorRunning {
-		go ev.runEventProcessor()
+		go ev.runEventProcessor(ctx)
 	}
 
 	for {
@@ -195,7 +195,7 @@ func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context, from, to i
 	for _, event := range logs {
 		log.Infof("processing event log from block %d", event.BlockNumber)
 		for _, h := range ev.EventHandlers {
-			if err := h(&event, ev); err != nil {
+			if err := h(ctx, &event, ev); err != nil {
 				log.Warn(err)
 			}
 		}
@@ -230,7 +230,7 @@ func (ep *EventProcessor) next() *ethtypes.Log {
 	return nil
 }
 
-func (ev *EthereumEvents) runEventProcessor() {
+func (ev *EthereumEvents) runEventProcessor(ctx context.Context) {
 	ev.EventProcessor.eventProcessorRunning = true
 	go func() {
 		var evt ethtypes.Log
@@ -257,7 +257,7 @@ func (ev *EthereumEvents) runEventProcessor() {
 		if e := ev.EventProcessor.next(); e != nil {
 			log.Infof("processing event log: (txhash:%x txid:%d)", e.TxHash, e.TxIndex)
 			for _, h := range ev.EventHandlers {
-				if err := h(e, ev); err != nil {
+				if err := h(ctx, e, ev); err != nil {
 					log.Error(err)
 				}
 			}

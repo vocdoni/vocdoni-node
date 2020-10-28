@@ -1,6 +1,7 @@
 package ethevents
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -52,7 +53,7 @@ type (
 
 // HandleVochainOracle handles the new process creation on ethereum for the Oracle.
 // Once a new process is created, the Oracle sends a transaction on the Vochain to create such process
-func HandleVochainOracle(event *ethtypes.Log, e *EthereumEvents) error {
+func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEvents) error {
 	logGenesisChanged := []byte(ethereumEventList[0])
 	logChainIDChanged := []byte(ethereumEventList[1])
 	logProcessCreated := []byte(ethereumEventList[2])
@@ -82,7 +83,7 @@ func HandleVochainOracle(event *ethtypes.Log, e *EthereumEvents) error {
 		// return nil
 	case HashLogProcessCreated.Hex():
 		// Get process metadata
-		processTx, err := processMeta(&e.ContractABI, event.Data, e.ProcessHandle)
+		processTx, err := processMeta(ctx, &e.ContractABI, event.Data, e.ProcessHandle)
 		if err != nil {
 			return err
 		}
@@ -118,7 +119,7 @@ func HandleVochainOracle(event *ethtypes.Log, e *EthereumEvents) error {
 		}
 
 	case HashLogProcessCanceled.Hex():
-		cancelProcessTx, err := cancelProcessMeta(&e.ContractABI, event.Data, e.ProcessHandle)
+		cancelProcessTx, err := cancelProcessMeta(ctx, &e.ContractABI, event.Data, e.ProcessHandle)
 		if err != nil {
 			return err
 		}
@@ -180,14 +181,14 @@ func HandleVochainOracle(event *ethtypes.Log, e *EthereumEvents) error {
 }
 
 // HandleCensus handles the import of census merkle trees published in Ethereum
-func HandleCensus(event *ethtypes.Log, e *EthereumEvents) error {
+func HandleCensus(ctx context.Context, event *ethtypes.Log, e *EthereumEvents) error {
 	logProcessCreated := []byte(ethereumEventList[2])
 	// Only handle processCreated event
 	if event.Topics[0].Hex() != crypto.Keccak256Hash(logProcessCreated).Hex() {
 		return nil
 	}
 	// Get process metadata
-	processTx, err := processMeta(&e.ContractABI, event.Data, e.ProcessHandle)
+	processTx, err := processMeta(ctx, &e.ContractABI, event.Data, e.ProcessHandle)
 	if err != nil {
 		return err
 	}
@@ -202,20 +203,20 @@ func HandleCensus(event *ethtypes.Log, e *EthereumEvents) error {
 	return nil
 }
 
-func processMeta(contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*types.NewProcessTx, error) {
+func processMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*types.NewProcessTx, error) {
 	var eventProcessCreated eventProcessCreated
 	err := contractABI.Unpack(&eventProcessCreated, "ProcessCreated", eventData)
 	if err != nil {
 		return nil, err
 	}
-	return ph.ProcessTxArgs(eventProcessCreated.ProcessId)
+	return ph.ProcessTxArgs(ctx, eventProcessCreated.ProcessId)
 }
 
-func cancelProcessMeta(contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*types.CancelProcessTx, error) {
+func cancelProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*types.CancelProcessTx, error) {
 	var eventProcessCanceled eventProcessCanceled
 	err := contractABI.Unpack(&eventProcessCanceled, "ProcessCanceled", eventData)
 	if err != nil {
 		return nil, err
 	}
-	return ph.CancelProcessTxArgs(eventProcessCanceled.ProcessId)
+	return ph.CancelProcessTxArgs(ctx, eventProcessCanceled.ProcessId)
 }
