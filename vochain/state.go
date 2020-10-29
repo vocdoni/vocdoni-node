@@ -19,11 +19,9 @@ import (
 
 const (
 	// db names
-	AppTree     = "app"
-	ProcessTree = "process"
-	VoteTree    = "vote"
-	// validators default power
-	validatorPower          = 0
+	AppTree                 = "app"
+	ProcessTree             = "process"
+	VoteTree                = "vote"
 	voteCachePurgeThreshold = time.Duration(time.Second * 600)
 )
 
@@ -205,7 +203,7 @@ func (v *State) AddValidator(pubKey types.PubKey, power int64) error {
 	newVal := types.GenesisValidator{
 		Address: pubKey.Address(),
 		PubKey:  pubKey,
-		Power:   validatorPower,
+		Power:   power,
 	}
 	validators = append(validators, newVal)
 
