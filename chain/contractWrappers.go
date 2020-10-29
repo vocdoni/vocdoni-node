@@ -26,23 +26,26 @@ import (
 // These methods represent an exportable abstraction over raw contract bindings`
 // Use these methods, rather than those present in the contracts folder
 type ProcessHandle struct {
-	VotingProcess *contracts.VotingProcess
+	VotingProcess  *contracts.VotingProcess
+	EthereumClient *ethclient.Client
 }
 
 // Constructor for proc_transactor on node
 func NewVotingProcessHandle(contractAddressHex string, dialEndpoint string) (*ProcessHandle, error) {
-	client, err := ethclient.Dial(dialEndpoint)
+	var err error
+	PH := new(ProcessHandle)
+
+	PH.EthereumClient, err = ethclient.Dial(dialEndpoint)
 	if err != nil {
 		log.Error(err)
 	}
 	address := common.HexToAddress(contractAddressHex)
 
-	votingProcess, err := contracts.NewVotingProcess(address, client)
+	votingProcess, err := contracts.NewVotingProcess(address, PH.EthereumClient)
 	if err != nil {
 		log.Errorf("error constructing contracts handle: %s", err)
 		return new(ProcessHandle), err
 	}
-	PH := new(ProcessHandle)
 	PH.VotingProcess = votingProcess
 	return PH, nil
 }
@@ -129,38 +132,49 @@ type ENSCallerHandler struct {
 	Registry *contracts.EnsRegistryWithFallbackCaller
 	// Resolver resolver contract instance
 	Resolver *contracts.EntityResolverCaller
-	// EthEndpoint ethereum web3 endpoint to dial
-	EthEndpoint string
+	// EthereumClient is the client interacting with the ethereum node
+	EthereumClient *ethclient.Client
 	// PublicRegistryAddr public registry contract address
 	PublicRegistryAddr string
 	// ResolverAddr address resolved by calling Resolve() on Registry contract
 	ResolverAddr string
 }
 
+func (e *ENSCallerHandler) dial(endpoint string) (err error) {
+	e.EthereumClient, err = ethclient.Dial(endpoint)
+	return err
+}
+
+func (e *ENSCallerHandler) close() {
+	e.EthereumClient.Close()
+}
+
 // NewENSRegistryWithFallbackHandle connects to a web3 endpoint and creates an ENS public registry read only contact instance
-func (e *ENSCallerHandler) NewENSRegistryWithFallbackHandle() {
-	ethclient, err := ethclient.Dial(e.EthEndpoint)
-	if err != nil {
+func (e *ENSCallerHandler) NewENSRegistryWithFallbackHandle(endpoint string) (err error) {
+	if err := e.dial(endpoint); err != nil {
 		log.Warnf("cannot connect to ethereum web3 endpoint: %s", err)
+		return err
 	}
 	address := common.HexToAddress(e.PublicRegistryAddr)
-	e.Registry, err = contracts.NewEnsRegistryWithFallbackCaller(address, ethclient)
-	if err != nil {
+	if e.Registry, err = contracts.NewEnsRegistryWithFallbackCaller(address, e.EthereumClient); err != nil {
 		log.Errorf("error constructing contracts handle: %s", err)
+		return err
 	}
+	return nil
 }
 
 // NewEntityResolverHandle connects to a web3 endpoint and creates an EntityResolver read only contact instance
-func (e *ENSCallerHandler) NewEntityResolverHandle() {
-	ethclient, err := ethclient.Dial(e.EthEndpoint)
-	if err != nil {
+func (e *ENSCallerHandler) NewEntityResolverHandle(endpoint string) (err error) {
+	if err := e.dial(endpoint); err != nil {
 		log.Warnf("cannot connect to ethereum web3 endpoint: %s", err)
+		return err
 	}
 	address := common.HexToAddress(e.ResolverAddr)
-	e.Resolver, err = contracts.NewEntityResolverCaller(address, ethclient)
-	if err != nil {
+	if e.Resolver, err = contracts.NewEntityResolverCaller(address, e.EthereumClient); err != nil {
 		log.Errorf("error constructing contracts handle: %s", err)
+		return err
 	}
+	return nil
 }
 
 // Resolve if resolvePublicRegistry is set to true it will resolve
@@ -191,18 +205,22 @@ func VotingProcessAddress(ctx context.Context, publicRegistryAddr, domain, ethEn
 		return "", err
 	}
 	ensCallerHandler := &ENSCallerHandler{
-		EthEndpoint:        ethEndpoint,
 		PublicRegistryAddr: publicRegistryAddr,
 	}
+	defer ensCallerHandler.close()
 	// create registry contract instance
-	ensCallerHandler.NewENSRegistryWithFallbackHandle()
+	if err := ensCallerHandler.NewENSRegistryWithFallbackHandle(ethEndpoint); err != nil {
+		return "", err
+	}
 	// get resolver address from public registry
 	ensCallerHandler.ResolverAddr, err = ensCallerHandler.Resolve(ctx, nh, true)
 	if err != nil {
 		return "", err
 	}
 	// create resolver contract instance
-	ensCallerHandler.NewEntityResolverHandle()
+	if err := ensCallerHandler.NewEntityResolverHandle(ethEndpoint); err != nil {
+		return "", err
+	}
 	// get voting process addr from resolver
 	votingProcessAddr, err := ensCallerHandler.Resolve(ctx, nh, false)
 	if err != nil {
@@ -281,25 +299,29 @@ func EnsResolve(ctx context.Context, ensRegistryAddr, ethDomain, w3uri string) (
 }
 
 // ResolveEntityMetadataURL returns the metadata URL given an entityID
-func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, w3uri string) (string, error) {
+func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, ethEndpoint string) (string, error) {
 	// normalize entity resolver domain name
 	nh, err := NameHash(types.EntityResolverDomain)
 	if err != nil {
 		return "", err
 	}
 	ensCallerHandler := &ENSCallerHandler{
-		EthEndpoint:        w3uri,
 		PublicRegistryAddr: ensRegistryAddr,
 	}
+	defer ensCallerHandler.close()
 	// create registry contract instance
-	ensCallerHandler.NewENSRegistryWithFallbackHandle()
+	if err := ensCallerHandler.NewENSRegistryWithFallbackHandle(ethEndpoint); err != nil {
+		return "", err
+	}
 	// get resolver address from public registry
 	ensCallerHandler.ResolverAddr, err = ensCallerHandler.Resolve(ctx, nh, true)
 	if err != nil {
 		return "", err
 	}
 	// create resolver contract instance
-	ensCallerHandler.NewEntityResolverHandle()
+	if err := ensCallerHandler.NewEntityResolverHandle(ethEndpoint); err != nil {
+		return "", err
+	}
 	// get entity metadata url from resolver
 	eIDBytes, err := hex.DecodeString(entityID)
 	if err != nil {
