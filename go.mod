@@ -46,11 +46,11 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
-	github.com/p4u/recws v1.2.2-0.20201005083112-7be7f9397e75
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/polydawn/refmt v0.0.0-20190807091052-3d65705ee9f1 // indirect
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
+	github.com/recws-org/recws v1.2.2
 	github.com/rogpeppe/rjson v0.0.0-20151026200957-77220b71d327
 	github.com/shirou/gopsutil v2.20.5+incompatible
 	github.com/smartystreets/assertions v1.0.1 // indirect
