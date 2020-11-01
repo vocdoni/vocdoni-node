@@ -2,9 +2,7 @@ package testcommon
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"strconv"
 	"testing"
 
@@ -104,20 +102,10 @@ var (
 	}
 )
 
-func TempDir(tb testing.TB, name string) string {
-	tb.Helper()
-	dir, err := ioutil.TempDir("", name)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	tb.Cleanup(func() { os.RemoveAll(dir) })
-	return dir
-}
-
 func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 	c := amino.NewCodec()
 	vochain.RegisterAmino(c)
-	s, err := vochain.NewState(TempDir(tb, "vochain-db"), c)
+	s, err := vochain.NewState(tb.TempDir(), c)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -132,7 +120,7 @@ func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 	c := amino.NewCodec()
 	vochain.RegisterAmino(c)
-	s, err := vochain.NewState(TempDir(tb, "vochain-db"), c)
+	s, err := vochain.NewState(tb.TempDir(), c)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -161,7 +149,7 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 	c := amino.NewCodec()
 	vochain.RegisterAmino(c)
-	s, err := vochain.NewState(TempDir(tb, "vochain-db"), c)
+	s, err := vochain.NewState(tb.TempDir(), c)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -182,7 +170,7 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	// start vochain node
 	// create config
 	d.VochainCfg = new(config.VochainCfg)
-	d.VochainCfg.DataDir = TempDir(tb, "vochain-data")
+	d.VochainCfg.DataDir = tb.TempDir()
 
 	// create genesis file
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
@@ -218,7 +206,7 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 
 func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer, vnode *vochain.BaseApplication) *scrutinizer.Scrutinizer {
 	tb.Log("starting vochain scrutinizer")
-	d.ScrutinizerDir = TempDir(tb, "scrutinizer")
+	d.ScrutinizerDir = tb.TempDir()
 	sc, err := scrutinizer.NewScrutinizer(d.ScrutinizerDir, vnode.State)
 	if err != nil {
 		tb.Fatal(err)

@@ -45,7 +45,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	// create the proxy
 	pxy := testcommon.NewMockProxy(t)
 	// create ethereum node
-	node, err := NewMockEthereum(testcommon.TempDir(t, "ethereum"), pxy)
+	node, err := NewMockEthereum(t.TempDir(), pxy)
 	if err != nil {
 		t.Fatalf("cannot create ethereum node: %s", err)
 	}

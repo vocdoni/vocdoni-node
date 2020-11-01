@@ -2,13 +2,11 @@ package trie
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 )
 
 func TestTree(t *testing.T) {
-	storage := tempDir(t, "trie_test")
+	storage := t.TempDir()
 	tr1, err := NewTree("test1", storage)
 	if err != nil {
 		t.Fatal(err)
@@ -82,14 +80,4 @@ func TestTree(t *testing.T) {
 		t.Errorf("proof is invalid on tree2")
 	}
 
-}
-
-func tempDir(tb testing.TB, name string) string {
-	tb.Helper()
-	dir, err := ioutil.TempDir("", name+"*")
-	if err != nil {
-		tb.Fatal(err)
-	}
-	tb.Cleanup(func() { os.RemoveAll(dir) })
-	return dir
 }

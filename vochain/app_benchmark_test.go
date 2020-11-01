@@ -20,7 +20,7 @@ import (
 
 func BenchmarkCheckTx(b *testing.B) {
 	b.ReportAllocs()
-	app, err := NewBaseApplication(tempDir(b, "vochain_checkTxTest"))
+	app, err := NewBaseApplication(b.TempDir())
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -39,26 +39,26 @@ func BenchmarkCheckTx(b *testing.B) {
 	})
 }
 
-func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voters []*types.VoteTx) {
-	tr, err := tree.NewTree("checkTXbench", tempDir(t, "vochain_checkTxTest_db"))
+func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voters []*types.VoteTx) {
+	tr, err := tree.NewTree("checkTXbench", b.TempDir())
 	if err != nil {
-		t.Fatal(err)
+		b.Fatal(err)
 	}
 
 	keys := createEthRandomKeysBatch(nvoters)
 	if keys == nil {
-		t.Fatal("cannot create keys batch")
+		b.Fatal("cannot create keys batch")
 	}
 	claims := []string{}
 	for _, k := range keys {
 		pub, _ := k.HexString()
 		pub, err = ethereum.DecompressPubKey(pub)
 		if err != nil {
-			t.Fatal(err)
+			b.Fatal(err)
 		}
 		pubb, err := hex.DecodeString(pub)
 		if err != nil {
-			t.Fatal(err)
+			b.Fatal(err)
 		}
 		c := snarks.Poseidon.Hash(pubb)
 		tr.AddClaim(c, nil)
@@ -79,7 +79,7 @@ func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voter
 	for i, s := range keys {
 		proof, err = tr.GenProof([]byte(claims[i]), nil)
 		if err != nil {
-			t.Fatal(err)
+			b.Fatal(err)
 		}
 		tx := types.VoteTx{
 			Nonce:     util.RandomHex(16),
@@ -89,10 +89,10 @@ func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voter
 
 		txBytes, err := json.Marshal(tx)
 		if err != nil {
-			t.Fatal(err)
+			b.Fatal(err)
 		}
 		if tx.Signature, err = s.Sign(txBytes); err != nil {
-			t.Fatal(err)
+			b.Fatal(err)
 		}
 		tx.Type = "vote"
 		voters = append(voters, &tx)
@@ -100,7 +100,7 @@ func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voter
 	return voters
 }
 
-func benchCheckTx(t *testing.B, app *BaseApplication, voters []*types.VoteTx) {
+func benchCheckTx(b *testing.B, app *BaseApplication, voters []*types.VoteTx) {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 
@@ -113,17 +113,17 @@ func benchCheckTx(t *testing.B, app *BaseApplication, voters []*types.VoteTx) {
 	i := 0
 	for _, tx := range voters {
 		if txBytes, err = json.Marshal(tx); err != nil {
-			t.Fatal(err)
+			b.Fatal(err)
 		}
 		cktx.Tx = txBytes
 		cktxresp = app.CheckTx(cktx)
 		if cktxresp.Code != 0 {
-			t.Fatalf(fmt.Sprintf("checkTX failed: %s", cktxresp.Data))
+			b.Fatalf(fmt.Sprintf("checkTX failed: %s", cktxresp.Data))
 		} else {
 			detx.Tx = txBytes
 			detxresp = app.DeliverTx(detx)
 			if detxresp.Code != 0 {
-				t.Fatalf(fmt.Sprintf("deliverTX failed: %s", detxresp.Data))
+				b.Fatalf(fmt.Sprintf("deliverTX failed: %s", detxresp.Data))
 			}
 		}
 		i++

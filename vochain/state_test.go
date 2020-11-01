@@ -13,7 +13,7 @@ import (
 func TestState(t *testing.T) {
 	log.Init("info", "stdout")
 	c := amino.NewCodec()
-	s, err := NewState(tempDir(t, "state"), c)
+	s, err := NewState(t.TempDir(), c)
 	if err != nil {
 		t.Fatal(err)
 	}

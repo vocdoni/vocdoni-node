@@ -53,7 +53,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	go ws.Listen(listenerOutput)
 
 	// Create the API router
-	d.IpfsDir = TempDir(tb, "dvote-ipfs")
+	d.IpfsDir = tb.TempDir()
 	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {
@@ -69,7 +69,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
-	d.CensusDir = TempDir(tb, "census")
+	d.CensusDir = tb.TempDir()
 
 	if err := cm.Init(d.CensusDir, ""); err != nil {
 		tb.Fatal(err)

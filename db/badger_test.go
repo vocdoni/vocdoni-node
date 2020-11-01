@@ -1,8 +1,6 @@
 package db
 
 import (
-	"io/ioutil"
-	"os"
 	"strconv"
 	"testing"
 )
@@ -57,19 +55,9 @@ func TestIterEmpty(t *testing.T) {
 }
 
 func NewTestDB(tb testing.TB) *BadgerDB {
-	db, err := NewBadgerDB(tempDir(tb, "badgertest"))
+	db, err := NewBadgerDB(tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
 	return db
-}
-
-func tempDir(tb testing.TB, name string) string {
-	tb.Helper()
-	dir, err := ioutil.TempDir("", name)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	tb.Cleanup(func() { os.RemoveAll(dir) })
-	return dir
 }

@@ -2,27 +2,15 @@ package iavlstate
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"strings"
 	"testing"
 )
-
-func TempDir(tb testing.TB, name string) string {
-	tb.Helper()
-	dir, err := ioutil.TempDir("", name)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	tb.Cleanup(func() { os.RemoveAll(dir) })
-	return dir
-}
 
 func TestState(t *testing.T) {
 	t.Parallel()
 
 	s := &IavlState{}
-	if err := s.Init(TempDir(t, "iavlstatedb"), "disk"); err != nil {
+	if err := s.Init(t.TempDir(), "disk"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -147,7 +135,7 @@ func TestOrder(t *testing.T) {
 	t.Parallel()
 
 	s := &IavlState{}
-	if err := s.Init(TempDir(t, "iavldb"), "disk"); err != nil {
+	if err := s.Init(t.TempDir(), "disk"); err != nil {
 		t.Fatal(err)
 	}
 
