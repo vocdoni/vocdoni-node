@@ -2,12 +2,12 @@ package vochain
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	bare "git.sr.ht/~sircmpwn/go-bare"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
@@ -73,8 +73,7 @@ func TestCheckTX(t *testing.T) {
 			ProcessID: pid,
 			Proof:     proof,
 		}
-
-		txBytes, err := json.Marshal(tx)
+		txBytes, err := bare.Marshal(&tx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -82,7 +81,7 @@ func TestCheckTX(t *testing.T) {
 			t.Fatal(err)
 		}
 		tx.Type = "vote"
-		if txBytes, err = json.Marshal(tx); err != nil {
+		if txBytes, err = bare.Marshal(&tx); err != nil {
 			t.Fatal(err)
 		}
 		cktx.Tx = txBytes

@@ -3,6 +3,7 @@ module gitlab.com/vocdoni/go-dvote
 go 1.14
 
 require (
+	git.sr.ht/~sircmpwn/go-bare v0.0.0-20201009180350-cb0704728ca1
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect

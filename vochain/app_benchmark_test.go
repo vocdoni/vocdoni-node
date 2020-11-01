@@ -4,12 +4,12 @@ package vochain
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"testing"
 
 	"sync/atomic"
 
+	bare "git.sr.ht/~sircmpwn/go-bare"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
@@ -87,7 +87,7 @@ func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voter
 			Proof:     proof,
 		}
 
-		txBytes, err := json.Marshal(tx)
+		txBytes, err := bare.Marshal(&tx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,7 +112,7 @@ func benchCheckTx(t *testing.B, app *BaseApplication, voters []*types.VoteTx) {
 
 	i := 0
 	for _, tx := range voters {
-		if txBytes, err = json.Marshal(tx); err != nil {
+		if txBytes, err = bare.Marshal(&tx); err != nil {
 			t.Fatal(err)
 		}
 		cktx.Tx = txBytes

@@ -1,13 +1,13 @@
 package keykeeper
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"git.sr.ht/~sircmpwn/go-bare"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
@@ -463,14 +463,14 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 
 func (k *KeyKeeper) signAndSendTx(tx *types.AdminTx) error {
 	// sign the transaction
-	txBytes, err := json.Marshal(tx)
+	txBytes, err := bare.Marshal(tx)
 	if err != nil {
 		return err
 	}
 	if tx.Signature, err = k.signer.Sign(txBytes); err != nil {
 		return err
 	}
-	if txBytes, err = json.Marshal(tx); err != nil {
+	if txBytes, err = bare.Marshal(tx); err != nil {
 		return err
 	}
 	// Send the transaction to the mempool

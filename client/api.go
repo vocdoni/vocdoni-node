@@ -3,13 +3,13 @@ package client
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
 
+	bare "git.sr.ht/~sircmpwn/go-bare"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -280,7 +280,7 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 			EncryptionKeyIndexes: keyIndexes,
 		}
 
-		txBytes, err := json.Marshal(v)
+		txBytes, err := bare.Marshal(&v)
 		if err != nil {
 			return 0, err
 		}
@@ -288,7 +288,7 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 			return 0, err
 		}
 		v.Type = "vote"
-		if txBytes, err = json.Marshal(v); err != nil {
+		if txBytes, err = bare.Marshal(&v); err != nil {
 			return 0, err
 		}
 		pub, _ := s.HexString()
@@ -381,14 +381,14 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkur
 		ProcessType:    ptype,
 		StartBlock:     block + 4,
 	}
-	txBytes, err := json.Marshal(p)
+	txBytes, err := bare.Marshal(&p)
 	if err != nil {
 		return 0, err
 	}
 	if p.Signature, err = oracle.Sign(txBytes); err != nil {
 		return 0, err
 	}
-	if txBytes, err = json.Marshal(p); err != nil {
+	if txBytes, err = bare.Marshal(&p); err != nil {
 		return 0, err
 	}
 	req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
@@ -410,14 +410,14 @@ func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
 		Type:      "cancelProcess",
 		ProcessID: pid,
 	}
-	txBytes, err := json.Marshal(p)
+	txBytes, err := bare.Marshal(&p)
 	if err != nil {
 		return err
 	}
 	if p.Signature, err = oracle.Sign(txBytes); err != nil {
 		return err
 	}
-	if txBytes, err = json.Marshal(p); err != nil {
+	if txBytes, err = bare.Marshal(&p); err != nil {
 		return err
 	}
 	req.RawTx = base64.StdEncoding.EncodeToString(txBytes)

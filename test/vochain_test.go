@@ -1,9 +1,9 @@
 package test
 
 import (
-	"encoding/json"
 	"testing"
 
+	"git.sr.ht/~sircmpwn/go-bare"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
@@ -13,9 +13,16 @@ func TestNewProcessTxCheck(t *testing.T) {
 	// TODO(mvdan): re-enable once
 	// https://gitlab.com/vocdoni/go-dvote/-/issues/172 is fixed.
 	// t.Parallel()
-
+	var err error
 	s := testcommon.NewVochainStateWithOracles(t)
-	txb, err := json.Marshal(testcommon.HardcodedNewProcessTx)
+	tx := testcommon.HardcodedNewProcessTx
+	tx.Signature = ""
+
+	tx.Signature, err = testcommon.SignTx(tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txb, err := testcommon.EncodeTx(testcommon.HardcodedNewProcessTx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,7 +30,7 @@ func TestNewProcessTxCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx := gtx.(*types.NewProcessTx)
+	tx = gtx.(*types.NewProcessTx)
 	if _, err := vochain.NewProcessTxCheck(tx, s); err != nil {
 		t.Errorf("cannot validate new process tx: %s", err)
 	}
@@ -31,10 +38,16 @@ func TestNewProcessTxCheck(t *testing.T) {
 
 /*
 func TestVoteTxCheck(t *testing.T) {
+	var err error
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	if err := vochain.VoteTxCheck(*testcommon.HardcodedNewVoteTx, s); err != nil {
+	tx := testcommon.HardcodedNewVoteTx
+	tx.Signature, err = testcommon.SignTx(tx)
+	if err != nil {
+		t.Error(err)
+	}
+	if _, err := vochain.VoteTxCheck(tx, s, false); err != nil {
 		t.Errorf("cannot validate vote: %s", err)
 	}
 }
@@ -82,7 +95,7 @@ func TestCreateProcess(t *testing.T) {
 	// t.Parallel()
 
 	s := testcommon.NewVochainStateWithOracles(t)
-	bytes, err := json.Marshal(*testcommon.HardcodedNewProcessTx)
+	bytes, err := bare.Marshal(testcommon.HardcodedNewProcessTx)
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", *testcommon.HardcodedNewProcessTx)
 	}
@@ -101,7 +114,7 @@ func TestCreateProcess(t *testing.T) {
 	// cannot add process if not oracle
 	badoracle := testcommon.HardcodedNewProcessTx
 	badoracle.Signature = "a25259cff9ce3a709e517c6a01e445f216212f58f553fa26d25566b7c731339242ef9a0df0235b53a819a64ebf2c3394fb6b56138c5113cc1905c68ffcebb1971c"
-	bytes, err = json.Marshal(badoracle)
+	bytes, err = bare.Marshal(badoracle)
 	if err != nil {
 		t.Errorf("cannot mashal process: %+v", badoracle)
 	}

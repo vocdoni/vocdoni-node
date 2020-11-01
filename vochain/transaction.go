@@ -2,10 +2,10 @@ package vochain
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"time"
 
+	bare "git.sr.ht/~sircmpwn/go-bare"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
@@ -93,14 +93,14 @@ func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 // UnmarshalTx splits a tx into method and args parts and does some basic checks
 func UnmarshalTx(content []byte) (GenericTX, error) {
 	var txType types.Tx
-	err := json.Unmarshal(content, &txType)
+	err := bare.Unmarshal(content, &txType)
 	if err != nil || len(txType.Type) < 1 {
-		return nil, fmt.Errorf("cannot extract type (%s)", err)
+		return nil, fmt.Errorf("cannot extract type %+v: %v", txType, err)
 	}
 	switch types.ValidateType(txType.Type) {
 	case "VoteTx":
 		var tx types.VoteTx
-		if err := json.Unmarshal(content, &tx); err != nil {
+		if err := bare.Unmarshal(content, &tx); err != nil {
 			return nil, fmt.Errorf("cannot parse VoteTX")
 		}
 		// In order to extract the signed bytes we need to remove the signature and txtype fields
@@ -108,7 +108,7 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 		tx.Signature = ""
 		txtype := tx.Type
 		tx.Type = ""
-		signedBytes, err := json.Marshal(tx)
+		signedBytes, err := bare.Marshal(&tx)
 		if err != nil {
 			return nil, fmt.Errorf("cannot marshal voteTX (%s)", err)
 		}
@@ -121,12 +121,12 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 
 	case "AdminTx":
 		var tx types.AdminTx
-		if err := json.Unmarshal(content, &tx); err != nil {
+		if err := bare.Unmarshal(content, &tx); err != nil {
 			return nil, fmt.Errorf("cannot parse AdminTx")
 		}
 		signature := tx.Signature
 		tx.Signature = ""
-		signedBytes, err := json.Marshal(tx)
+		signedBytes, err := bare.Marshal(&tx)
 		if err != nil {
 			return nil, fmt.Errorf("cannot marshal voteTX (%s)", err)
 		}
@@ -141,12 +141,12 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 
 	case "NewProcessTx":
 		var tx types.NewProcessTx
-		if err := json.Unmarshal(content, &tx); err != nil {
+		if err := bare.Unmarshal(content, &tx); err != nil {
 			return nil, fmt.Errorf("cannot parse NewProcessTx")
 		}
 		signature := tx.Signature
 		tx.Signature = ""
-		signedBytes, err := json.Marshal(tx)
+		signedBytes, err := bare.Marshal(&tx)
 		if err != nil {
 			return nil, fmt.Errorf("cannot marshal: (%s)", err)
 		}
@@ -159,12 +159,12 @@ func UnmarshalTx(content []byte) (GenericTX, error) {
 
 	case "CancelProcessTx":
 		var tx types.CancelProcessTx
-		if err := json.Unmarshal(content, &tx); err != nil {
+		if err := bare.Unmarshal(content, &tx); err != nil {
 			return nil, fmt.Errorf("cannot parse CancelProcessTx")
 		}
 		signature := tx.Signature
 		tx.Signature = ""
-		signedBytes, err := json.Marshal(tx)
+		signedBytes, err := bare.Marshal(&tx)
 		if err != nil {
 			return nil, fmt.Errorf("cannot marshal: (%s)", err)
 		}

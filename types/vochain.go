@@ -17,12 +17,12 @@ import (
 
 // VotePackageStruct represents a vote package
 type VotePackageStruct struct {
-	// Nonce vote nonce
-	Nonce string `json:"nonce"`
 	// Type vote type
-	Type string `json:"type"`
+	Type string `json:"type" bare:"type"`
+	// Nonce vote nonce
+	Nonce string `json:"nonce" bare:"nonce"`
 	// Votes directly mapped to the `questions` field of the process metadata
-	Votes []int `json:"votes"`
+	Votes []int `json:"votes" bare:"votes"`
 }
 
 // Vote represents a single Vote
@@ -124,15 +124,15 @@ type Tx struct {
 
 // VoteTx represents the info required for submmiting a vote
 type VoteTx struct {
-	EncryptionKeyIndexes []int  `json:"encryptionKeyIndexes,omitempty"`
-	Nonce                string `json:"nonce,omitempty"`
-	Nullifier            string `json:"nullifier,omitempty"`
-	ProcessID            string `json:"processId"`
-	Proof                string `json:"proof,omitempty"`
-	Signature            string `json:"signature,omitempty"`
-	Type                 string `json:"type,omitempty"`
-	VotePackage          string `json:"votePackage,omitempty"`
-	SignedBytes          []byte `json:"-"`
+	Type                 string `json:"type,omitempty" bare:"type"`
+	EncryptionKeyIndexes []int  `json:"encryptionKeyIndexes,omitempty" bare:"encryptionKeyIndexes"`
+	Nonce                string `json:"nonce,omitempty" bare:"nonce"`
+	Nullifier            string `json:"nullifier,omitempty" bare:"nullifier"`
+	ProcessID            string `json:"processId" bare:"processId"`
+	Proof                string `json:"proof,omitempty" bare:"proof"`
+	Signature            string `json:"signature,omitempty" bare:"signature"`
+	VotePackage          string `json:"votePackage,omitempty" bare:"votePackage"`
+	SignedBytes          []byte `json:"-" bare:"-"`
 }
 
 func (tx *VoteTx) TxType() string {
@@ -144,7 +144,7 @@ func (tx *VoteTx) UniqID(processType string) string {
 	switch processType {
 	case PollVote, PetitionSign, EncryptedPoll:
 		if len(tx.Signature) > 32 {
-			return tx.Signature[:32]
+			return string(tx.Signature[:32])
 		}
 	}
 	return ""
@@ -152,21 +152,21 @@ func (tx *VoteTx) UniqID(processType string) string {
 
 // NewProcessTx represents the info required for starting a new process
 type NewProcessTx struct {
+	Type string `json:"type,omitempty" bare:"type"`
 	// EntityID the process belongs to
-	EntityID string `json:"entityId"`
+	EntityID string `json:"entityId" bare:"entityId"`
 	// MkRoot merkle root of all the census in the process
-	MkRoot string `json:"mkRoot,omitempty"`
+	MkRoot string `json:"mkRoot,omitempty" bare:"mkRoot"`
 	// MkURI merkle tree URI
-	MkURI string `json:"mkURI,omitempty"`
+	MkURI string `json:"mkURI,omitempty" bare:"mrURI"`
 	// NumberOfBlocks represents the tendermint block where the process goes from active to finished
-	NumberOfBlocks int64  `json:"numberOfBlocks"`
-	ProcessID      string `json:"processId"`
-	ProcessType    string `json:"processType"`
-	Signature      string `json:"signature,omitempty"`
+	NumberOfBlocks int64  `json:"numberOfBlocks" bare:"numberOfBlocks"`
+	ProcessID      string `json:"processId" bare:"processId"`
+	ProcessType    string `json:"processType" bare:"processType"`
+	Signature      string `json:"signature,omitempty" bare:"signature"`
 	// StartBlock represents the tendermint block where the process goes from scheduled to active
-	StartBlock  int64  `json:"startBlock"`
-	Type        string `json:"type,omitempty"`
-	SignedBytes []byte `json:"-"`
+	StartBlock  int64  `json:"startBlock" bare:"startBlock"`
+	SignedBytes []byte `json:"-" bare:"-"`
 }
 
 func (tx *NewProcessTx) TxType() string {
@@ -175,11 +175,11 @@ func (tx *NewProcessTx) TxType() string {
 
 // CancelProcessTx represents a tx for canceling a valid process
 type CancelProcessTx struct {
+	Type string `json:"type,omitempty" bare:"type"`
 	// EntityID the process belongs to
-	ProcessID   string `json:"processId"`
-	Signature   string `json:"signature,omitempty"`
-	Type        string `json:"type,omitempty"`
-	SignedBytes []byte `json:"-"`
+	ProcessID   string `json:"processId" bare:"processId"`
+	Signature   string `json:"signature,omitempty" bare:"signature"`
+	SignedBytes []byte `json:"-" bare:"-"`
 }
 
 func (tx *CancelProcessTx) TxType() string {
@@ -188,19 +188,19 @@ func (tx *CancelProcessTx) TxType() string {
 
 // AdminTx represents a Tx that can be only executed by some authorized addresses
 type AdminTx struct {
-	Address              string `json:"address"`
-	CommitmentKey        string `json:"commitmentKey,omitempty"`
-	EncryptionPrivateKey string `json:"encryptionPrivateKey,omitempty"`
-	EncryptionPublicKey  string `json:"encryptionPublicKey,omitempty"`
-	KeyIndex             int    `json:"keyIndex,omitempty"`
-	Nonce                string `json:"nonce"`
-	Power                int64  `json:"power,omitempty"`
-	ProcessID            string `json:"processId,omitempty"`
-	PubKey               string `json:"publicKey,omitempty"`
-	RevealKey            string `json:"revealKey,omitempty"`
-	Signature            string `json:"signature,omitempty"`
-	Type                 string `json:"type"` // addValidator, removeValidator, addOracle, removeOracle
-	SignedBytes          []byte `json:"-"`
+	Type                 string `json:"type" bare:"type"` // addValidator, removeValidator, addOracle, removeOracle
+	Address              string `json:"address" bare:"address"`
+	CommitmentKey        string `json:"commitmentKey,omitempty" bare:"commitmentKey"`
+	EncryptionPrivateKey string `json:"encryptionPrivateKey,omitempty" bare:"encryptionPrivateKey"`
+	EncryptionPublicKey  string `json:"encryptionPublicKey,omitempty" bare:"encryptionPublicKey"`
+	KeyIndex             int    `json:"keyIndex,omitempty" bare:"keyIndex"`
+	Nonce                string `json:"nonce" bare:"nonce"`
+	Power                int64  `json:"power,omitempty" bare:"power"`
+	ProcessID            string `json:"processId,omitempty" bare:"processId"`
+	PubKey               string `json:"publicKey,omitempty" bare:"publicKey"`
+	RevealKey            string `json:"revealKey,omitempty" bare:"revealKey"`
+	Signature            string `json:"signature,omitempty" bare:"signature"`
+	SignedBytes          []byte `json:"-" bare:"-"`
 }
 
 func (tx *AdminTx) TxType() string {
