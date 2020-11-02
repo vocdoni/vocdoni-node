@@ -152,7 +152,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig.Consensus.TimeoutPrevote = time.Second * 1
 	tconfig.Consensus.TimeoutPrecommitDelta = time.Millisecond * 500
 	tconfig.Consensus.TimeoutPrecommit = time.Second * 1
-	tconfig.Consensus.TimeoutCommit = time.Second * 1
+	tconfig.Consensus.TimeoutCommit = time.Second * 10
 
 	// indexing
 	tconfig.TxIndex.IndexAllKeys = true
