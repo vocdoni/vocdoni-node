@@ -18,6 +18,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
@@ -50,7 +51,7 @@ func NewVotingProcessHandle(contractAddressHex string, dialEndpoint string) (*Pr
 	return PH, nil
 }
 
-func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*types.NewProcessTx, error) {
+func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*models.NewProcessTx, error) {
 	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer cancel()
 	opts := &ethbind.CallOpts{Context: timeout}
@@ -59,30 +60,33 @@ func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*type
 		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
 	}
 
-	processTxArgs := new(types.NewProcessTx)
-	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
+	processTxArgs := new(models.NewProcessTx)
+	processTxArgs.ProcessId = pid[:]
 	eid, err := hex.DecodeString(util.TrimHex(processMeta.EntityAddress.String()))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding entity address: %s", err)
 	}
-	processTxArgs.EntityID = fmt.Sprintf("%x", ethereum.HashRaw(eid))
-	processTxArgs.MkRoot = processMeta.CensusMerkleRoot
-	processTxArgs.MkURI = processMeta.CensusMerkleTree
+	processTxArgs.EntityId = ethereum.HashRaw(eid)
+	processTxArgs.MkRoot, err = hex.DecodeString(processMeta.CensusMerkleRoot)
+	if err != nil {
+		return nil, fmt.Errorf("cannot decode merkle root: (%s)", err)
+	}
+	processTxArgs.MkURI = &processMeta.CensusMerkleTree
 	if processMeta.NumberOfBlocks != nil {
-		processTxArgs.NumberOfBlocks = processMeta.NumberOfBlocks.Int64()
+		processTxArgs.NumberOfBlocks = uint64(processMeta.NumberOfBlocks.Int64())
 	}
 	if processMeta.StartBlock != nil {
-		processTxArgs.StartBlock = processMeta.StartBlock.Int64()
+		processTxArgs.StartBlock = uint64(processMeta.StartBlock.Int64())
 	}
 	switch processMeta.ProcessType {
 	case types.SnarkVote, types.PollVote, types.PetitionSign, types.EncryptedPoll:
 		processTxArgs.ProcessType = processMeta.ProcessType
 	}
-	processTxArgs.Type = "newProcess"
+	processTxArgs.Txtype = models.TxType_NEWPROCESS
 	return processTxArgs, nil
 }
 
-func (ph *ProcessHandle) CancelProcessTxArgs(ctx context.Context, pid [32]byte) (*types.CancelProcessTx, error) {
+func (ph *ProcessHandle) CancelProcessTxArgs(ctx context.Context, pid [32]byte) (*models.CancelProcessTx, error) {
 	ctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer cancel()
 	opts := &ethbind.CallOpts{Context: ctx}
@@ -90,9 +94,9 @@ func (ph *ProcessHandle) CancelProcessTxArgs(ctx context.Context, pid [32]byte) 
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
 	}
-	cancelProcessTxArgs := new(types.CancelProcessTx)
-	cancelProcessTxArgs.ProcessID = fmt.Sprintf("%x", pid)
-	cancelProcessTxArgs.Type = "cancelProcess"
+	cancelProcessTxArgs := new(models.CancelProcessTx)
+	cancelProcessTxArgs.ProcessId = pid[:]
+	cancelProcessTxArgs.Txtype = models.TxType_CANCELPROCESS
 	return cancelProcessTxArgs, nil
 }
 

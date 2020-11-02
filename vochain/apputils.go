@@ -28,10 +28,10 @@ func checkMerkleProof(rootHash, hexproof string, leafData []byte) (bool, error) 
 }
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
-func verifySignatureAgainstOracles(oracles []string, message []byte, signHex string) (bool, ethcommon.Address, error) {
+func verifySignatureAgainstOracles(oracles []ethcommon.Address, message []byte, signHex string) (bool, ethcommon.Address, error) {
 	signKeys := ethereum.NewSignKeys()
 	for _, oracle := range oracles {
-		signKeys.AddAuthKey(ethcommon.HexToAddress(oracle))
+		signKeys.AddAuthKey(oracle)
 	}
 	return signKeys.VerifySender(message, signHex)
 }

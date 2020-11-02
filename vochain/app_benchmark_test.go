@@ -9,14 +9,17 @@ import (
 
 	"sync/atomic"
 
-	bare "git.sr.ht/~sircmpwn/go-bare"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/util"
+	"google.golang.org/protobuf/proto"
 )
+
+const benchmarkVoters = 20
 
 func BenchmarkCheckTx(b *testing.B) {
 	b.ReportAllocs()
@@ -24,10 +27,10 @@ func BenchmarkCheckTx(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	var voters [][]*types.VoteTx
+	var voters [][]*models.Tx
 	for i := 0; i < b.N+1; i++ {
-		voters = append(voters, prepareBenchCheckTx(b, app, 1000))
-		b.Logf("creating process %s", voters[i][0].ProcessID)
+		voters = append(voters, prepareBenchCheckTx(b, app, benchmarkVoters))
+		b.Logf("creating process %x", voters[i][0].GetVote().ProcessId)
 	}
 	var i int32
 	b.ResetTimer()
@@ -39,7 +42,7 @@ func BenchmarkCheckTx(b *testing.B) {
 	})
 }
 
-func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voters []*types.VoteTx) {
+func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voters []*models.Tx) {
 	tr, err := tree.NewTree("checkTXbench", tempDir(t, "vochain_checkTxTest_db"))
 	if err != nil {
 		t.Fatal(err)
@@ -81,26 +84,32 @@ func prepareBenchCheckTx(t *testing.B, app *BaseApplication, nvoters int) (voter
 		if err != nil {
 			t.Fatal(err)
 		}
-		tx := types.VoteTx{
+		tx := &models.VoteEnvelope{
 			Nonce:     util.RandomHex(16),
-			ProcessID: hex.EncodeToString(pid),
-			Proof:     proof,
+			ProcessId: pid,
+			Proof:     &models.Proof{Proof: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: util.Hex2byte(t, proof)}}},
 		}
 
-		txBytes, err := bare.Marshal(&tx)
+		txBytes, err := proto.Marshal(tx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tx.Signature, err = s.Sign(txBytes); err != nil {
+		signHex := ""
+		if signHex, err = s.Sign(txBytes); err != nil {
 			t.Fatal(err)
 		}
-		tx.Type = "vote"
-		voters = append(voters, &tx)
+		vtx := models.Tx{}
+		vtx.Signature, err = hex.DecodeString(signHex)
+		if err != nil {
+			t.Fatal(err)
+		}
+		vtx.Tx = &models.Tx_Vote{Vote: tx}
+		voters = append(voters, &vtx)
 	}
 	return voters
 }
 
-func benchCheckTx(t *testing.B, app *BaseApplication, voters []*types.VoteTx) {
+func benchCheckTx(t *testing.B, app *BaseApplication, voters []*models.Tx) {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 
@@ -112,18 +121,18 @@ func benchCheckTx(t *testing.B, app *BaseApplication, voters []*types.VoteTx) {
 
 	i := 0
 	for _, tx := range voters {
-		if txBytes, err = bare.Marshal(&tx); err != nil {
+		if txBytes, err = proto.Marshal(tx); err != nil {
 			t.Fatal(err)
 		}
 		cktx.Tx = txBytes
 		cktxresp = app.CheckTx(cktx)
 		if cktxresp.Code != 0 {
-			t.Fatalf(fmt.Sprintf("checkTX failed: %s", cktxresp.Data))
+			t.Fatalf(fmt.Sprintf("checkTX failed: %s\n%s", cktxresp.Data, tx.String()))
 		} else {
 			detx.Tx = txBytes
 			detxresp = app.DeliverTx(detx)
 			if detxresp.Code != 0 {
-				t.Fatalf(fmt.Sprintf("deliverTX failed: %s", detxresp.Data))
+				t.Fatalf(fmt.Sprintf("deliverTX failed: %s\n%s", detxresp.Data, tx.String()))
 			}
 		}
 		i++

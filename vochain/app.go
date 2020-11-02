@@ -3,6 +3,7 @@ package vochain
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	amino "github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
@@ -13,6 +14,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
 )
 
 // BaseApplication reflects the ABCI application implementation.
@@ -102,7 +104,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	// get oracles
 	for _, v := range genesisAppState.Oracles {
 		log.Infof("adding genesis oracle %s", v)
-		app.State.AddOracle(v)
+		app.State.AddOracle(common.HexToAddress(v))
 	}
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
@@ -155,17 +157,17 @@ func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Respo
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	var data []byte
 	var err error
-	var tx GenericTX
+	var tx *models.Tx
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 	}
 	if tx, err = UnmarshalTx(req.Tx); err == nil {
 		if data, err = AddTx(tx, app.State, false); err != nil {
 			log.Debugf("checkTx error: %s", err)
-			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte(err.Error())}
+			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("addTx " + err.Error())}
 		}
 	} else {
-		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte(err.Error())}
+		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}
 	}
 	return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 }
@@ -173,7 +175,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	var data []byte
 	var err error
-	var tx GenericTX
+	var tx *models.Tx
 
 	if tx, err = UnmarshalTx(req.Tx); err == nil {
 		if data, err = AddTx(tx, app.State, true); err != nil {

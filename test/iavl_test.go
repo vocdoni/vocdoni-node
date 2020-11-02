@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/privval"
 
@@ -43,16 +44,14 @@ func TestVochainState(t *testing.T) {
 
 func TestAddOracle(t *testing.T) {
 	t.Parallel()
-
 	s := testcommon.NewVochainStateWithOracles(t)
-	if err := s.AddOracle("0x414896B0BC763b8762456DB00F9c76EBd49979C4"); err != nil {
+	if err := s.AddOracle(common.HexToAddress("414896B0BC763b8762456DB00F9c76EBd49979C4")); err != nil {
 		t.Error(err)
 	}
 }
 
 func TestRemoveOracle(t *testing.T) {
 	t.Parallel()
-
 	s := testcommon.NewVochainStateWithOracles(t)
 	if err := s.RemoveOracle(testcommon.OracleListHardcoded[0]); err != nil {
 		t.Error(err)

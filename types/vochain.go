@@ -8,6 +8,7 @@ import (
 	// dependencies which are too heavy for our low-level "types" package.
 	// libs/bytes is okay, because it only pulls in std deps.
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
 )
 
 // ________________________ STATE ________________________
@@ -27,7 +28,7 @@ type VotePackageStruct struct {
 
 // Vote represents a single Vote
 type Vote struct {
-	EncryptionKeyIndexes []int `json:"encryptionKeyIndexes,omitempty"`
+	EncryptionKeyIndexes []uint32 `json:"encryptionKeyIndexes,omitempty"`
 	// Height the Terndemint block number where the vote is added
 	Height int64 `json:"height,omitempty"`
 	// Nullifier is the unique identifier of the vote
@@ -35,7 +36,7 @@ type Vote struct {
 	// ProcessID contains the unique voting process identifier
 	ProcessID []byte `json:"processId,omitempty"`
 	// VotePackage base64 encoded vote content
-	VotePackage string `json:"votePackage,omitempty"`
+	VotePackage []byte `json:"votePackage,omitempty"`
 }
 
 // VoteProof contains the proof indicating that the user is in the census of the process
@@ -103,44 +104,8 @@ var ProcessIsEncrypted = map[string]bool{
 
 // ________________________ TX ________________________
 
-// ValidTypes represents an allowed specific tx type
-var ValidTypes = map[string]string{
-	TxVote:              "VoteTx",
-	TxNewProcess:        "NewProcessTx",
-	TxCancelProcess:     "CancelProcessTx",
-	TxAddValidator:      "AdminTx",
-	TxRemoveValidator:   "AdminTx",
-	TxAddOracle:         "AdminTx",
-	TxRemoveOracle:      "AdminTx",
-	TxAddProcessKeys:    "AdminTx",
-	TxRevealProcessKeys: "AdminTx",
-}
-
-// Tx is an abstraction for any specific tx which is primarly defined by its type
-// For now we have 3 tx types {voteTx, newProcessTx, adminTx}
-type Tx struct {
-	Type string `json:"type"`
-}
-
-// VoteTx represents the info required for submmiting a vote
-type VoteTx struct {
-	Type                 string `json:"type,omitempty" bare:"type"`
-	EncryptionKeyIndexes []int  `json:"encryptionKeyIndexes,omitempty" bare:"encryptionKeyIndexes"`
-	Nonce                string `json:"nonce,omitempty" bare:"nonce"`
-	Nullifier            string `json:"nullifier,omitempty" bare:"nullifier"`
-	ProcessID            string `json:"processId" bare:"processId"`
-	Proof                string `json:"proof,omitempty" bare:"proof"`
-	Signature            string `json:"signature,omitempty" bare:"signature"`
-	VotePackage          string `json:"votePackage,omitempty" bare:"votePackage"`
-	SignedBytes          []byte `json:"-" bare:"-"`
-}
-
-func (tx *VoteTx) TxType() string {
-	return "VoteTx"
-}
-
 // UniqID returns a uniq identifier for the VoteTX. It depends on the Type.
-func (tx *VoteTx) UniqID(processType string) string {
+func UniqID(tx *models.Tx, processType string) string {
 	switch processType {
 	case PollVote, PetitionSign, EncryptedPoll:
 		if len(tx.Signature) > 32 {
@@ -148,72 +113,6 @@ func (tx *VoteTx) UniqID(processType string) string {
 		}
 	}
 	return ""
-}
-
-// NewProcessTx represents the info required for starting a new process
-type NewProcessTx struct {
-	Type string `json:"type,omitempty" bare:"type"`
-	// EntityID the process belongs to
-	EntityID string `json:"entityId" bare:"entityId"`
-	// MkRoot merkle root of all the census in the process
-	MkRoot string `json:"mkRoot,omitempty" bare:"mkRoot"`
-	// MkURI merkle tree URI
-	MkURI string `json:"mkURI,omitempty" bare:"mrURI"`
-	// NumberOfBlocks represents the tendermint block where the process goes from active to finished
-	NumberOfBlocks int64  `json:"numberOfBlocks" bare:"numberOfBlocks"`
-	ProcessID      string `json:"processId" bare:"processId"`
-	ProcessType    string `json:"processType" bare:"processType"`
-	Signature      string `json:"signature,omitempty" bare:"signature"`
-	// StartBlock represents the tendermint block where the process goes from scheduled to active
-	StartBlock  int64  `json:"startBlock" bare:"startBlock"`
-	SignedBytes []byte `json:"-" bare:"-"`
-}
-
-func (tx *NewProcessTx) TxType() string {
-	return "NewProcessTx"
-}
-
-// CancelProcessTx represents a tx for canceling a valid process
-type CancelProcessTx struct {
-	Type string `json:"type,omitempty" bare:"type"`
-	// EntityID the process belongs to
-	ProcessID   string `json:"processId" bare:"processId"`
-	Signature   string `json:"signature,omitempty" bare:"signature"`
-	SignedBytes []byte `json:"-" bare:"-"`
-}
-
-func (tx *CancelProcessTx) TxType() string {
-	return "CancelProcessTx"
-}
-
-// AdminTx represents a Tx that can be only executed by some authorized addresses
-type AdminTx struct {
-	Type                 string `json:"type" bare:"type"` // addValidator, removeValidator, addOracle, removeOracle
-	Address              string `json:"address" bare:"address"`
-	CommitmentKey        string `json:"commitmentKey,omitempty" bare:"commitmentKey"`
-	EncryptionPrivateKey string `json:"encryptionPrivateKey,omitempty" bare:"encryptionPrivateKey"`
-	EncryptionPublicKey  string `json:"encryptionPublicKey,omitempty" bare:"encryptionPublicKey"`
-	KeyIndex             int    `json:"keyIndex,omitempty" bare:"keyIndex"`
-	Nonce                string `json:"nonce" bare:"nonce"`
-	Power                int64  `json:"power,omitempty" bare:"power"`
-	ProcessID            string `json:"processId,omitempty" bare:"processId"`
-	PubKey               string `json:"publicKey,omitempty" bare:"publicKey"`
-	RevealKey            string `json:"revealKey,omitempty" bare:"revealKey"`
-	Signature            string `json:"signature,omitempty" bare:"signature"`
-	SignedBytes          []byte `json:"-" bare:"-"`
-}
-
-func (tx *AdminTx) TxType() string {
-	return "AdminTx"
-}
-
-// ValidateType a valid Tx type specified in ValidTypes. Returns empty string if invalid type.
-func ValidateType(t string) string {
-	val, ok := ValidTypes[t]
-	if !ok {
-		return ""
-	}
-	return val
 }
 
 // ________________________ VALIDATORS ________________________

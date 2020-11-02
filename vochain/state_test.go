@@ -29,7 +29,7 @@ func TestState(t *testing.T) {
 			v := types.Vote{
 				ProcessID:   pids[i],
 				Nullifier:   util.RandomBytes(32),
-				VotePackage: fmt.Sprintf("%d%d", i, j),
+				VotePackage: []byte(fmt.Sprintf("%d%d", i, j)),
 			}
 			if err := s.AddVote(&v); err != nil {
 				t.Error(err)

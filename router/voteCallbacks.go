@@ -3,26 +3,21 @@ package router
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
+	"google.golang.org/protobuf/proto"
 )
 
 const MaxListSize = 256
 const MaxListIterations = int64(64)
 
 func (r *Router) submitRawTx(request routerRequest) {
-	tx, err := base64.StdEncoding.DecodeString(request.RawTx)
-	if err != nil {
-		log.Warnf("error decoding base64 raw tx: (%s)", err)
-		r.sendError(request, err.Error())
-		return
-	}
-	res, err := r.vocapp.SendTX(tx)
+	res, err := r.vocapp.SendTX(request.Payload)
 	if err != nil {
 		r.sendError(request, err.Error())
 		return
@@ -32,46 +27,55 @@ func (r *Router) submitRawTx(request routerRequest) {
 		return
 	}
 	if res.Code != 0 {
-		log.Warnf("cannot broadcast tx (res.Code=%d): (%s)", res.Code, res.Data)
-		r.sendError(request, fmt.Sprintf("%x", res.Data))
+		r.sendError(request, string(res.Data))
 		return
 	}
-	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
+	log.Infof("broadcasting tx hash:%s", res.Hash)
 	var response types.MetaResponse
 	response.Payload = fmt.Sprintf("%x", res.Data) // return nullifier or other info
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) submitEnvelope(request routerRequest) {
-	voteTxArgs := new(types.VoteTx)
+	var err error
 	if request.Payload == nil {
 		r.sendError(request, "payload is empty")
 		return
 	}
-	voteTxArgs.ProcessID = request.Payload.ProcessID
-	voteTxArgs.Nonce = request.Payload.Nonce
-	voteTxArgs.Nullifier = request.Payload.Nullifier
-	voteTxArgs.VotePackage = request.Payload.VotePackage
-	voteTxArgs.Proof = request.Payload.Proof
-	voteTxArgs.Type = "vote"
-	voteTxArgs.EncryptionKeyIndexes = request.Payload.EncryptionKeyIndexes
-	voteTxArgs.Signature = request.Payload.Signature
+	// Decode vote envelope
+	tx := &models.VoteEnvelope{}
+	if err := proto.Unmarshal(request.Payload, tx); err != nil {
+		r.sendError(request, fmt.Sprintf("cannot unmarshal payload: (%s)", err))
+		return
+	}
 
-	voteTxBytes, err := json.Marshal(voteTxArgs)
+	// Prepare Vote transaction
+	vtx := models.Tx{}
+
+	// Signature if available
+	if request.Signature != "" {
+		vtx.Signature, err = hex.DecodeString(util.TrimHex(request.Signature))
+		if err != nil {
+			r.sendError(request, fmt.Sprintf("cannot unmarshal signature: (%s)", err))
+			return
+		}
+	}
+
+	// Encode and forward the transaction to the Vochain mempool
+	txBytes, err := proto.Marshal(&vtx)
 	if err != nil {
-		log.Errorf("error marshaling voteTx args: (%s)", err)
-		r.sendError(request, "cannot marshal voteTx args")
+		r.sendError(request, fmt.Sprintf("cannot marshal vote transaction: (%s)", err))
 		return
 	}
 
-	res, err := r.vocapp.SendTX(voteTxBytes)
+	res, err := r.vocapp.SendTX(txBytes)
 	if err != nil || res == nil {
-		log.Warnf("cannot broadcast tx: (%s)", err)
-		r.sendError(request, fmt.Sprintf("cannot broadcast tx: %s", err))
+		r.sendError(request, fmt.Sprintf("cannot broadcast transaction: (%s)", err))
 		return
 	}
+
+	// Get mempool checkTx reply
 	if res.Code != 0 {
-		log.Warnf("cannot broadcast tx (res.Code=%d): (%s)", res.Code, res.Data)
 		r.sendError(request, string(res.Data))
 		return
 	}
@@ -154,7 +158,7 @@ func (r *Router) getEnvelope(request routerRequest) {
 	}
 	var response types.MetaResponse
 	response.Registered = types.True
-	response.Payload = envelope.VotePackage
+	response.Payload = base64.StdEncoding.EncodeToString(envelope.VotePackage)
 	request.Send(r.buildReply(request, &response))
 }
 

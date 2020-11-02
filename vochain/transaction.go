@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	bare "git.sr.ht/~sircmpwn/go-bare"
+	"github.com/ethereum/go-ethereum/common"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // GenericTX represents any valid transaction
@@ -20,69 +21,71 @@ type GenericTX interface {
 }
 
 // AddTx check the validity of a transaction and adds it to the state if commit=true
-func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
-	switch gtx.TxType() {
-	case "VoteTx":
-		tx := gtx.(*types.VoteTx)
-		v, err := VoteTxCheck(tx, state, commit)
+func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
+	if vtx == nil || state == nil || vtx.Tx == nil {
+		return nil, fmt.Errorf("transaction, transaction type or state are nil")
+	}
+	switch vtx.Tx.(type) {
+	case *models.Tx_Vote:
+		v, err := VoteTxCheck(vtx, state, commit)
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("voteTxCheck %w", err)
 		}
 		if commit {
 			return v.Nullifier, state.AddVote(v)
 		}
 		return v.Nullifier, nil
-	case "AdminTx":
-		tx := gtx.(*types.AdminTx)
-		if err := AdminTxCheck(tx, state); err != nil {
-			return []byte{}, err
+	case *models.Tx_Admin:
+		if err := AdminTxCheck(vtx, state); err != nil {
+			return []byte{}, fmt.Errorf("adminTxChek %w", err)
 		}
+		tx := vtx.GetAdmin()
 		if commit {
-			switch tx.Type {
-			case "addOracle":
-				return []byte{}, state.AddOracle(tx.Address)
-			case "removeOracle":
-				return []byte{}, state.RemoveOracle(tx.Address)
-			case "addValidator":
-				pk, err := hexPubKeyToTendermintEd25519(tx.PubKey)
+			switch tx.Txtype {
+			case models.TxType_ADDORACLE:
+				return []byte{}, state.AddOracle(common.BytesToAddress(tx.Address))
+			case models.TxType_REMOVEORACLE:
+				return []byte{}, state.RemoveOracle(common.BytesToAddress(tx.Address))
+			case models.TxType_ADDVALIDATOR:
+				pk, err := hexPubKeyToTendermintEd25519(fmt.Sprintf("%x", tx.PublicKey))
 				if err == nil {
-					return []byte{}, state.AddValidator(pk, tx.Power)
-				}
-				return []byte{}, err
+					if tx.Power == nil {
+						return []byte{}, fmt.Errorf("power not specified on add validator transaction")
+					}
+					return []byte{}, state.AddValidator(pk, int64(*tx.Power))
 
-			case "removeValidator":
+				}
+				return []byte{}, fmt.Errorf("addValidator %w", err)
+
+			case models.TxType_REMOVEVALIDATOR:
 				return []byte{}, state.RemoveValidator(tx.Address)
-			case types.TxAddProcessKeys:
+			case models.TxType_ADDPROCESSKEYS:
 				return []byte{}, state.AddProcessKeys(tx)
-			case types.TxRevealProcessKeys:
+			case models.TxType_REVEALPROCESSKEYS:
 				return []byte{}, state.RevealProcessKeys(tx)
 			}
 		}
-	case "CancelProcessTx":
-		tx := gtx.(*types.CancelProcessTx)
-		if err := CancelProcessTxCheck(tx, state); err != nil {
-			return []byte{}, err
+	case *models.Tx_CancelProcess:
+		if err := CancelProcessTxCheck(vtx, state); err != nil {
+			return []byte{}, fmt.Errorf("cancelProcess %w", err)
 		}
 		if commit {
-			pid, err := hex.DecodeString(util.TrimHex(tx.ProcessID))
-			if err != nil {
-				return []byte{}, err
-			}
-			return []byte{}, state.CancelProcess(pid)
+			tx := vtx.GetCancelProcess()
+			return []byte{}, state.CancelProcess(tx.ProcessId)
 		}
 
-	case "NewProcessTx":
-		tx := gtx.(*types.NewProcessTx)
-		if p, err := NewProcessTxCheck(tx, state); err == nil {
+	case *models.Tx_NewProcess:
+		if p, err := NewProcessTxCheck(vtx, state); err == nil {
 			if commit {
-				pid, err := hex.DecodeString(tx.ProcessID)
-				if err != nil {
-					return []byte{}, err
+				tx := vtx.GetNewProcess()
+				mkuri := ""
+				if tx.MkURI != nil {
+					mkuri = *tx.MkURI
 				}
-				return []byte{}, state.AddProcess(*p, pid, tx.MkURI)
+				return []byte{}, state.AddProcess(*p, tx.ProcessId, mkuri)
 			}
 		} else {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("newProcess %w", err)
 		}
 	default:
 		return []byte{}, fmt.Errorf("transaction type invalid")
@@ -91,104 +94,21 @@ func AddTx(gtx GenericTX, state *State, commit bool) ([]byte, error) {
 }
 
 // UnmarshalTx splits a tx into method and args parts and does some basic checks
-func UnmarshalTx(content []byte) (GenericTX, error) {
-	var txType types.Tx
-	err := bare.Unmarshal(content, &txType)
-	if err != nil || len(txType.Type) < 1 {
-		return nil, fmt.Errorf("cannot extract type %+v: %v", txType, err)
-	}
-	switch types.ValidateType(txType.Type) {
-	case "VoteTx":
-		var tx types.VoteTx
-		if err := bare.Unmarshal(content, &tx); err != nil {
-			return nil, fmt.Errorf("cannot parse VoteTX")
-		}
-		// In order to extract the signed bytes we need to remove the signature and txtype fields
-		signature := tx.Signature
-		tx.Signature = ""
-		txtype := tx.Type
-		tx.Type = ""
-		signedBytes, err := bare.Marshal(&tx)
-		if err != nil {
-			return nil, fmt.Errorf("cannot marshal voteTX (%s)", err)
-		}
-		tx.SignedBytes = signedBytes
-		tx.Signature = signature
-		tx.Type = txtype
-		tx.Nullifier = util.TrimHex(tx.Nullifier)
-		tx.ProcessID = util.TrimHex(tx.ProcessID)
-		return &tx, nil
-
-	case "AdminTx":
-		var tx types.AdminTx
-		if err := bare.Unmarshal(content, &tx); err != nil {
-			return nil, fmt.Errorf("cannot parse AdminTx")
-		}
-		signature := tx.Signature
-		tx.Signature = ""
-		signedBytes, err := bare.Marshal(&tx)
-		if err != nil {
-			return nil, fmt.Errorf("cannot marshal voteTX (%s)", err)
-		}
-		tx.SignedBytes = signedBytes
-		tx.Signature = signature
-		tx.EncryptionPrivateKey = util.TrimHex(tx.EncryptionPrivateKey)
-		tx.ProcessID = util.TrimHex(tx.ProcessID)
-		tx.EncryptionPublicKey = util.TrimHex(tx.EncryptionPublicKey)
-		tx.RevealKey = util.TrimHex(tx.RevealKey)
-		tx.CommitmentKey = util.TrimHex(tx.CommitmentKey)
-		return &tx, nil
-
-	case "NewProcessTx":
-		var tx types.NewProcessTx
-		if err := bare.Unmarshal(content, &tx); err != nil {
-			return nil, fmt.Errorf("cannot parse NewProcessTx")
-		}
-		signature := tx.Signature
-		tx.Signature = ""
-		signedBytes, err := bare.Marshal(&tx)
-		if err != nil {
-			return nil, fmt.Errorf("cannot marshal: (%s)", err)
-		}
-		tx.SignedBytes = signedBytes
-		tx.Signature = signature
-		tx.EntityID = util.TrimHex(tx.EntityID)
-		tx.ProcessID = util.TrimHex(tx.ProcessID)
-		tx.MkRoot = util.TrimHex(tx.MkRoot)
-		return &tx, nil
-
-	case "CancelProcessTx":
-		var tx types.CancelProcessTx
-		if err := bare.Unmarshal(content, &tx); err != nil {
-			return nil, fmt.Errorf("cannot parse CancelProcessTx")
-		}
-		signature := tx.Signature
-		tx.Signature = ""
-		signedBytes, err := bare.Marshal(&tx)
-		if err != nil {
-			return nil, fmt.Errorf("cannot marshal: (%s)", err)
-		}
-		tx.SignedBytes = signedBytes
-		tx.Signature = signature
-		tx.ProcessID = util.TrimHex(tx.ProcessID)
-		return &tx, nil
-	}
-	return nil, fmt.Errorf("invalid transaction type")
+func UnmarshalTx(content []byte) (*models.Tx, error) {
+	vtx := models.Tx{}
+	return &vtx, proto.Unmarshal(content, &vtx)
 }
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
 // All hexadecimal strings should be already sanitized (without 0x)
-func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, error) {
-	pid, err := hex.DecodeString(tx.ProcessID)
+func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*types.Vote, error) {
+	tx := vtx.GetVote()
+	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
-		return nil, err
-	}
-	process, err := state.Process(pid, false)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot fetch processId: %w", err)
 	}
 	if process == nil {
-		return nil, fmt.Errorf("process with id (%x) does not exist", pid)
+		return nil, fmt.Errorf("process with id (%x) does not exist", tx.ProcessId)
 	}
 	header := state.Header(false)
 	if header == nil {
@@ -198,7 +118,6 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 	endBlock := process.StartBlock + process.NumberOfBlocks
 
 	if (height >= process.StartBlock && height <= endBlock) && !process.Canceled && !process.Paused {
-
 		// Check in case of keys required, they have been sent by some keykeeper
 		if process.RequireKeys() && process.KeyIndex < 1 {
 			return nil, fmt.Errorf("no keys available, voting is not possible")
@@ -212,11 +131,13 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 
 		case types.PollVote, types.PetitionSign, types.EncryptedPoll:
 			var vote types.Vote
-			vote.ProcessID, err = hex.DecodeString(tx.ProcessID)
-			if err != nil {
-				return nil, err
+			vote.ProcessID = tx.ProcessId
+			if vtx.Signature == nil {
+				return nil, fmt.Errorf("signature missing on voteTx")
 			}
 			vote.VotePackage = tx.VotePackage
+			//vote.VotePackage = make([]byte, len(tx.VotePackage))
+			//copy(vote.VotePackage, tx.VotePackage)
 
 			if types.ProcessIsEncrypted[process.Type] {
 				if len(tx.EncryptionKeyIndexes) == 0 {
@@ -229,7 +150,7 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 			// An element can only be added to the vote cache during checkTx.
 			// Every 60 seconds (6 blocks) the old votes which are not yet in the blockchain will be removed from the cache.
 			// If the same vote (but different transaction) is send to the mempool, the cache will detect it and vote will be discarted.
-			uid := tx.UniqID(process.Type)
+			uid := types.UniqID(vtx, process.Type)
 			vp := state.VoteCacheGet(uid)
 
 			if forCommit && vp != nil {
@@ -244,15 +165,22 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 				}
 				// if not in cache, extract pubKey, generate nullifier and check merkle proof
 				vp = new(types.VoteProof)
-
-				log.Debugf("vote Payload: %s", tx.SignedBytes)
-				vp.PubKey, err = ethereum.PubKeyFromSignature(tx.SignedBytes, tx.Signature)
+				log.Debugf("vote signature: %x", vtx.Signature)
+				tx := vtx.GetVote()
+				if tx == nil {
+					return nil, fmt.Errorf("vote envelope transaction not found")
+				}
+				signedBytes, err := proto.Marshal(tx)
 				if err != nil {
-					return nil, fmt.Errorf("cannot extract public key from signature (%s)", err)
+					return nil, fmt.Errorf("cannot marshal vote transaction: %w", err)
+				}
+				vp.PubKey, err = ethereum.PubKeyFromSignature(signedBytes, fmt.Sprintf("%x", vtx.Signature))
+				if err != nil {
+					return nil, fmt.Errorf("cannot extract public key from signature: (%w)", err)
 				}
 				addr, err := ethereum.AddrFromPublicKey(vp.PubKey)
 				if err != nil {
-					return nil, fmt.Errorf("cannot extract address from public key: (%s)", err)
+					return nil, fmt.Errorf("cannot extract address from public key: (%w)", err)
 				}
 				log.Debugf("extracted public key: %s", vp.PubKey)
 
@@ -266,7 +194,11 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 				}
 
 				// check merkle proof
-				vp.Proof = tx.Proof
+				proof := tx.Proof.GetGraviton()
+				if proof == nil {
+					return nil, fmt.Errorf("proof Graviton not found on vote transaction")
+				}
+				vp.Proof = fmt.Sprintf("%x", proof.Siblings)
 				pubKeyDec, err := hex.DecodeString(vp.PubKey)
 				if err != nil {
 					return nil, err
@@ -296,24 +228,12 @@ func VoteTxCheck(tx *types.VoteTx, state *State, forCommit bool) (*types.Vote, e
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
-func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, error) {
-	// check format
-	if !util.IsHexEncodedStringWithLength(tx.ProcessID, types.ProcessIDsize) {
-		return nil, fmt.Errorf("malformed processId")
+func NewProcessTxCheck(vtx *models.Tx, state *State) (*types.Process, error) {
+	tx := vtx.GetNewProcess()
+	// check signature available
+	if vtx.Signature == nil || tx == nil {
+		return nil, fmt.Errorf("missing signature or new process transaction")
 	}
-	if !util.IsHexEncodedStringWithLength(tx.EntityID, types.EntityIDsize) &&
-		!util.IsHexEncodedStringWithLength(tx.EntityID, types.EntityIDsizeV2) {
-		return nil, fmt.Errorf("malformed entityId")
-	}
-	pid, err := hex.DecodeString(tx.ProcessID)
-	if err != nil {
-		return nil, err
-	}
-	eid, err := hex.DecodeString(tx.EntityID)
-	if err != nil {
-		return nil, err
-	}
-
 	// get oracles
 	oracles, err := state.Oracles(false)
 	if err != nil || len(oracles) == 0 {
@@ -325,24 +245,27 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 		return nil, fmt.Errorf("cannot fetch state header")
 	}
 	// start and endblock sanity check
-	if tx.StartBlock < header.Height {
+	if int64(tx.StartBlock) < header.Height {
 		return nil, fmt.Errorf("cannot add process with start block lower or equal than the current tendermint height")
 	}
 	if tx.NumberOfBlocks <= 0 {
 		return nil, fmt.Errorf("cannot add process with duration lower or equal than the current tendermint height")
 	}
-
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, tx.SignedBytes, tx.Signature)
+	signedBytes, err := proto.Marshal(tx)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal new process transaction")
+	}
+	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, fmt.Sprintf("%x", vtx.Signature))
 	if err != nil {
 		return nil, err
 	}
 	if !authorized {
-		return nil, fmt.Errorf("unauthorized to create a process, recovered addr: %s\nProcessTX: %s", addr.Hex(), tx.SignedBytes)
+		return nil, fmt.Errorf("unauthorized to create a process, recovered addr is %s", addr.Hex())
 	}
 	// get process
-	_, err = state.Process(pid, false)
+	_, err = state.Process(tx.ProcessId, false)
 	if err == nil {
-		return nil, fmt.Errorf("process with id (%x) already exists", pid)
+		return nil, fmt.Errorf("process with id (%x) already exists", tx.ProcessId)
 	}
 	// check type
 	switch tx.ProcessType {
@@ -352,10 +275,10 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 		return nil, fmt.Errorf("process type (%s) not valid", tx.ProcessType)
 	}
 	p := &types.Process{
-		EntityID:       eid,
-		MkRoot:         tx.MkRoot,
-		NumberOfBlocks: tx.NumberOfBlocks,
-		StartBlock:     tx.StartBlock,
+		EntityID:       tx.ProcessId[:],
+		MkRoot:         fmt.Sprintf("%x", tx.MkRoot), // TBD use []byte
+		NumberOfBlocks: int64(tx.NumberOfBlocks),
+		StartBlock:     int64(tx.StartBlock),
 		Type:           tx.ProcessType,
 	}
 
@@ -370,14 +293,11 @@ func NewProcessTxCheck(tx *types.NewProcessTx, state *State) (*types.Process, er
 }
 
 // CancelProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
-func CancelProcessTxCheck(tx *types.CancelProcessTx, state *State) error {
-	// check format
-	if !util.IsHexEncodedStringWithLength(tx.ProcessID, types.ProcessIDsize) {
-		return fmt.Errorf("malformed processId")
-	}
-	pid, err := hex.DecodeString(tx.ProcessID)
-	if err != nil {
-		return err
+func CancelProcessTxCheck(vtx *models.Tx, state *State) error {
+	tx := vtx.GetCancelProcess()
+	// check signature available
+	if vtx.Signature == nil || tx == nil {
+		return fmt.Errorf("missing signature or cancel transaction")
 	}
 	// get oracles
 	oracles, err := state.Oracles(false)
@@ -385,17 +305,21 @@ func CancelProcessTxCheck(tx *types.CancelProcessTx, state *State) error {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
 	// check signature
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, tx.SignedBytes, tx.Signature)
+	signedBytes, err := proto.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("cannot marshal new process transaction")
+	}
+	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, fmt.Sprintf("%x", vtx.Signature))
 	if err != nil {
 		return err
 	}
 	if !authorized {
-		return fmt.Errorf("unauthorized to cancel a process, recovered addr: %s\nProcessTx: %s", addr.Hex(), tx.SignedBytes)
+		return fmt.Errorf("unauthorized to cancel a process, recovered addr is %s", addr.Hex())
 	}
 	// get process
-	process, err := state.Process(pid, false)
+	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
-		return fmt.Errorf("cannot cancel the process: %s", err)
+		return fmt.Errorf("cannot cancel process %x: %s", tx.ProcessId, err)
 	}
 	// check process not already canceled or finalized
 	if process.Canceled {
@@ -414,32 +338,46 @@ func CancelProcessTxCheck(tx *types.CancelProcessTx, state *State) error {
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
-func AdminTxCheck(tx *types.AdminTx, state *State) error {
+func AdminTxCheck(vtx *models.Tx, state *State) error {
+	tx := vtx.GetAdmin()
+	// check signature available
+	if vtx.Signature == nil || tx == nil {
+		return fmt.Errorf("missing signature or admin transaction")
+	}
 	// get oracles
 	oracles, err := state.Oracles(false)
 	if err != nil || len(oracles) == 0 {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
 
-	if authorized, addr, err := verifySignatureAgainstOracles(oracles, tx.SignedBytes, tx.Signature); err != nil {
+	switch vtx.Tx.(type) {
+	case *models.Tx_Admin:
+
+	}
+
+	signedBytes, err := proto.Marshal(tx)
+	if err != nil {
+		return fmt.Errorf("cannot marshal new process transaction")
+	}
+
+	if authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, fmt.Sprintf("%x", vtx.Signature)); err != nil {
 		return err
 	} else if !authorized {
 		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())
 	}
 
 	switch {
-	case tx.Type == types.TxAddProcessKeys || tx.Type == types.TxRevealProcessKeys:
-		pid, err := hex.DecodeString(tx.ProcessID)
-		if err != nil {
-			return err
+	case tx.Txtype == models.TxType_ADDPROCESSKEYS || tx.Txtype == models.TxType_REVEALPROCESSKEYS:
+		if tx.ProcessId == nil {
+			return fmt.Errorf("missing processId on AdminTxCheck")
 		}
 		// check process exists
-		process, err := state.Process(pid, false)
+		process, err := state.Process(tx.ProcessId, false)
 		if err != nil {
 			return err
 		}
 		if process == nil {
-			return fmt.Errorf("process with id (%x) does not exist", pid)
+			return fmt.Errorf("process with id (%x) does not exist", tx.ProcessId)
 		}
 		// check process actually requires keys
 		if !process.RequireKeys() {
@@ -451,7 +389,10 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 			return fmt.Errorf("cannot get blockchain header")
 		}
 		// Specific checks
-		if tx.Type == types.TxAddProcessKeys {
+		if tx.Txtype == models.TxType_ADDPROCESSKEYS {
+			if tx.KeyIndex == nil {
+				return fmt.Errorf("missing keyIndex on AdminTxCheck")
+			}
 			// endblock is always greater than start block so that case is also included here
 			if header.Height > process.StartBlock {
 				return fmt.Errorf("cannot add process keys in a started or finished process")
@@ -460,20 +401,23 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 			if process.Canceled {
 				return fmt.Errorf("cannot add process keys in a canceled process")
 			}
-			if len(process.EncryptionPublicKeys[tx.KeyIndex])+len(process.CommitmentKeys[tx.KeyIndex]) > 0 {
-				return fmt.Errorf("keys for process %s already revealed", tx.ProcessID)
+			if len(process.EncryptionPublicKeys[*tx.KeyIndex])+len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
+				return fmt.Errorf("keys for process %s already revealed", tx.ProcessId)
 			}
 			// check included keys and keyindex are valid
 			if err := checkAddProcessKeys(tx, process); err != nil {
 				return err
 			}
 		}
-		if tx.Type == types.TxRevealProcessKeys {
+		if tx.Txtype == models.TxType_REVEALPROCESSKEYS {
+			if tx.KeyIndex == nil {
+				return fmt.Errorf("missing keyIndexon AdminTxCheck")
+			}
 			if header.Height < process.StartBlock+process.NumberOfBlocks && !process.Canceled {
 				return fmt.Errorf("cannot reveal keys before the process is finished (%d < %d)", header.Height, process.StartBlock+process.NumberOfBlocks)
 			}
-			if len(process.EncryptionPrivateKeys[tx.KeyIndex])+len(process.RevealKeys[tx.KeyIndex]) > 0 {
-				return fmt.Errorf("keys for process %s already revealed", tx.ProcessID)
+			if len(process.EncryptionPrivateKeys[*tx.KeyIndex])+len(process.RevealKeys[*tx.KeyIndex]) > 0 {
+				return fmt.Errorf("keys for process %s already revealed", tx.ProcessId)
 			}
 			// check the keys are valid
 			if err := checkRevealProcessKeys(tx, process); err != nil {
@@ -484,49 +428,45 @@ func AdminTxCheck(tx *types.AdminTx, state *State) error {
 	return nil
 }
 
-func checkAddProcessKeys(tx *types.AdminTx, process *types.Process) error {
+func checkAddProcessKeys(tx *models.AdminTx, process *types.Process) error {
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if len(tx.CommitmentKey)+len(tx.EncryptionPublicKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
+	if (tx.CommitmentKey == nil && tx.EncryptionPublicKey == nil) || *tx.KeyIndex < 1 || *tx.KeyIndex > types.MaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex is not already used
-	if len(process.EncryptionPublicKeys[tx.KeyIndex]) > 0 || len(process.CommitmentKeys[tx.KeyIndex]) > 0 {
+	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) > 0 || len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
 		return fmt.Errorf("key index %d alrady exist", tx.KeyIndex)
 	}
 	// TBD check that provided keys are correct (ed25519 for encryption and size for Commitment)
 	return nil
 }
 
-func checkRevealProcessKeys(tx *types.AdminTx, process *types.Process) error {
+func checkRevealProcessKeys(tx *models.AdminTx, process *types.Process) error {
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if len(tx.RevealKey)+len(tx.EncryptionPrivateKey) == 0 || tx.KeyIndex < 1 || tx.KeyIndex > types.MaxKeyIndex {
+	if (tx.RevealKey == nil && tx.EncryptionPrivateKey == nil) || *tx.KeyIndex < 1 || *tx.KeyIndex > types.MaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex exists
-	if len(process.EncryptionPublicKeys[tx.KeyIndex]) < 1 || len(process.CommitmentKeys[tx.KeyIndex]) < 1 {
-		return fmt.Errorf("key index %d does not exist", tx.KeyIndex)
+	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) < 1 || len(process.CommitmentKeys[*tx.KeyIndex]) < 1 {
+		return fmt.Errorf("key index %d does not exist", *tx.KeyIndex)
 	}
 	// check keys actually work
-	if len(tx.EncryptionPrivateKey) > 0 {
-		if priv, err := nacl.DecodePrivate(tx.EncryptionPrivateKey); err == nil {
+	if tx.EncryptionPrivateKey != nil {
+		if priv, err := nacl.DecodePrivate(fmt.Sprintf("%x", tx.EncryptionPrivateKey)); err == nil {
 			pub := priv.Public().Bytes()
-			if fmt.Sprintf("%x", pub) != process.EncryptionPublicKeys[tx.KeyIndex] {
-				log.Debugf("%x != %s", pub, process.EncryptionPublicKeys[tx.KeyIndex])
-				return fmt.Errorf("the provided private key does not match with the stored public key on index %d", tx.KeyIndex)
+			if fmt.Sprintf("%x", pub) != process.EncryptionPublicKeys[*tx.KeyIndex] {
+				log.Debugf("%x != %s", pub, process.EncryptionPublicKeys[*tx.KeyIndex])
+				return fmt.Errorf("the provided private key does not match with the stored public key on index %d", *tx.KeyIndex)
 			}
 		} else {
 			return err
 		}
 	}
-	if len(tx.RevealKey) > 0 {
-		rb, err := hex.DecodeString(tx.RevealKey)
-		if err != nil {
-			return err
-		}
-		commitment := snarks.Poseidon.Hash(rb)
-		if fmt.Sprintf("%x", commitment) != process.CommitmentKeys[tx.KeyIndex] {
-			log.Debugf("%x != %s", commitment, process.CommitmentKeys[tx.KeyIndex])
-			return fmt.Errorf("the provided commitment reveal key does not match with the stored on index %d", tx.KeyIndex)
+	if tx.RevealKey != nil {
+		commitment := snarks.Poseidon.Hash(tx.RevealKey[:])
+		if fmt.Sprintf("%x", commitment) != process.CommitmentKeys[*tx.KeyIndex] {
+			log.Debugf("%x != %s", commitment, process.CommitmentKeys[*tx.KeyIndex])
+			return fmt.Errorf("the provided commitment reveal key does not match with the stored on index %d", *tx.KeyIndex)
 		}
 
 	}

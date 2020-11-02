@@ -29,11 +29,10 @@ type MetaRequest struct {
 	Method     string   `json:"method"`
 	Name       string   `json:"name,omitempty"`
 	Nullifier  string   `json:"nullifier,omitempty"`
-	Payload    *VoteTx  `json:"payload,omitempty"`
+	Payload    []byte   `json:"payload,omitempty"`
 	ProcessID  string   `json:"processId,omitempty"`
 	ProofData  string   `json:"proofData,omitempty"`
 	PubKeys    []string `json:"pubKeys,omitempty"`
-	RawTx      string   `json:"rawTx,omitempty"`
 	RootHash   string   `json:"rootHash,omitempty"`
 	Signature  string   `json:"signature,omitempty"`
 	Timestamp  int32    `json:"timestamp"`

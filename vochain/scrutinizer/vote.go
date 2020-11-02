@@ -1,7 +1,6 @@
 package scrutinizer
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -19,27 +18,24 @@ var ErrNoResultsYet = fmt.Errorf("no results yet")
 // If the votePackage is encrypted the list of keys to decrypt it should be provided.
 // The order of the Keys must be as it was encrypted.
 // The function will reverse the order and use the decryption keys starting from the last one provided.
-func unmarshalVote(votePackage string, keys []string) (*types.VotePackage, error) {
-	rawVote, err := base64.StdEncoding.DecodeString(votePackage)
-	if err != nil {
-		return nil, err
-	}
+func unmarshalVote(votePackage []byte, keys []string) (*types.VotePackage, error) {
 	var vote types.VotePackage
+	rawVote := make([]byte, len(votePackage))
+	copy(rawVote, votePackage)
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
 		for i := len(keys) - 1; i >= 0; i-- {
 			priv, err := nacl.DecodePrivate(keys[i])
 			if err != nil {
-				log.Warnf("cannot create private key cipher: (%s)", err)
-				continue
+				return nil, fmt.Errorf("cannot create private key cipher: (%s)", err)
 			}
 			if rawVote, err = priv.Decrypt(rawVote); err != nil {
-				log.Warnf("cannot decrypt vote with index key %d", i)
+				return nil, fmt.Errorf("cannot decrypt vote with index key %d: %w", i, err)
 			}
 		}
 	}
 	if err := json.Unmarshal(rawVote, &vote); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot unmarshal vote: %w", err)
 	}
 	return &vote, nil
 }

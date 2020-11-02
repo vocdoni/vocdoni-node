@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	amino "github.com/tendermint/go-amino"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -14,7 +15,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/statedb"
 	"gitlab.com/vocdoni/go-dvote/statedb/iavlstate"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
 )
 
 const (
@@ -112,13 +113,12 @@ func (v *State) AddEventListener(l EventListener) {
 }
 
 // AddOracle adds a trusted oracle given its address if not exists
-func (v *State) AddOracle(address string) error {
+func (v *State) AddOracle(address common.Address) error {
 	var err error
-	address = util.TrimHex(address)
 	v.Lock()
 	defer v.Unlock()
 	oraclesBytes := v.Store.Tree(AppTree).Get(oracleKey)
-	var oracles []string
+	var oracles []common.Address
 	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	for _, v := range oracles {
 		if v == address {
@@ -128,15 +128,14 @@ func (v *State) AddOracle(address string) error {
 	oracles = append(oracles, address)
 	newOraclesBytes, err := v.Codec.MarshalBinaryBare(oracles)
 	if err != nil {
-		return errors.New("cannot marshal oracles")
+		return fmt.Errorf("cannot marshal oracles: (%s)", err)
 	}
 	return v.Store.Tree(AppTree).Add(oracleKey, newOraclesBytes)
 }
 
 // RemoveOracle removes a trusted oracle given its address if exists
-func (v *State) RemoveOracle(address string) error {
-	var oracles []string
-	address = util.TrimHex(address)
+func (v *State) RemoveOracle(address common.Address) error {
+	var oracles []common.Address
 	v.Lock()
 	defer v.Unlock()
 	oraclesBytes := v.Store.Tree(AppTree).Get(oracleKey)
@@ -145,20 +144,20 @@ func (v *State) RemoveOracle(address string) error {
 		if o == address {
 			// remove oracle
 			copy(oracles[i:], oracles[i+1:])
-			oracles[len(oracles)-1] = ""
+			oracles[len(oracles)-1] = common.Address{}
 			oracles = oracles[:len(oracles)-1]
 			newOraclesBytes, err := v.Codec.MarshalBinaryBare(oracles)
 			if err != nil {
-				return errors.New("cannot marshal oracles")
+				return fmt.Errorf("cannot marshal oracles: (%s)", err)
 			}
 			return v.Store.Tree(AppTree).Add(oracleKey, newOraclesBytes)
 		}
 	}
-	return errors.New("oracle not found")
+	return fmt.Errorf("oracle not found")
 }
 
 // Oracles returns the current oracle list
-func (v *State) Oracles(isQuery bool) ([]string, error) {
+func (v *State) Oracles(isQuery bool) ([]common.Address, error) {
 	var oraclesBytes []byte
 	var err error
 	v.RLock()
@@ -168,7 +167,7 @@ func (v *State) Oracles(isQuery bool) ([]string, error) {
 	} else {
 		oraclesBytes = v.Store.Tree(AppTree).Get(oracleKey)
 	}
-	var oracles []string
+	var oracles []common.Address
 	err = v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
 	return oracles, err
 }
@@ -215,14 +214,15 @@ func (v *State) AddValidator(pubKey types.PubKey, power int64) error {
 }
 
 // RemoveValidator removes a tendermint validator if exists
-func (v *State) RemoveValidator(address string) error {
+func (v *State) RemoveValidator(address []byte) error {
+	hexaddr := fmt.Sprintf("%x", address)
 	v.RLock()
 	validatorsBytes := v.Store.Tree(AppTree).Get(validatorKey)
 	v.RUnlock()
 	var validators []types.GenesisValidator
 	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
 	for i, val := range validators {
-		if val.Address.String() == address {
+		if val.Address.String() == hexaddr {
 			// remove validator
 			copy(validators[i:], validators[i+1:])
 			validators[len(validators)-1] = types.GenesisValidator{}
@@ -256,60 +256,62 @@ func (v *State) Validators(isQuery bool) ([]types.GenesisValidator, error) {
 }
 
 // AddProcessKeys adds the keys to the process
-func (v *State) AddProcessKeys(tx *types.AdminTx) error {
-	pid, err := hex.DecodeString(tx.ProcessID)
+func (v *State) AddProcessKeys(tx *models.AdminTx) error {
+	if tx.ProcessId == nil || tx.KeyIndex == nil {
+		return fmt.Errorf("no processId or keyIndex provided on AddProcessKeys")
+	}
+	process, err := v.Process(tx.ProcessId, false)
 	if err != nil {
 		return err
 	}
-	process, err := v.Process(pid, false)
-	if err != nil {
-		return err
+	if tx.CommitmentKey != nil {
+		process.CommitmentKeys[*tx.KeyIndex] = fmt.Sprintf("%x", tx.CommitmentKey)
+		log.Debugf("added commitment key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.CommitmentKey)
 	}
-	if len(tx.CommitmentKey) > 0 {
-		process.CommitmentKeys[tx.KeyIndex] = tx.CommitmentKey
-		log.Debugf("added commitment key for process %x: %s", pid, tx.CommitmentKey)
-	}
-	if len(tx.EncryptionPublicKey) > 0 {
-		process.EncryptionPublicKeys[tx.KeyIndex] = tx.EncryptionPublicKey
-		log.Debugf("added encryption key for process %x: %s", pid, tx.EncryptionPublicKey)
+	if tx.EncryptionPublicKey != nil {
+		process.EncryptionPublicKeys[*tx.KeyIndex] = fmt.Sprintf("%x", tx.EncryptionPublicKey)
+		log.Debugf("added encryption key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.EncryptionPublicKey)
 	}
 	process.KeyIndex++
-	if err := v.setProcess(process, pid); err != nil {
+	if err := v.setProcess(process, tx.ProcessId); err != nil {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnProcessKeys(pid, tx.EncryptionPublicKey, tx.CommitmentKey)
+		l.OnProcessKeys(tx.ProcessId, fmt.Sprintf("%x", tx.EncryptionPublicKey), fmt.Sprintf("%x", tx.CommitmentKey))
 	}
 	return nil
 }
 
 // RevealProcessKeys reveals the keys of a process
-func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
-	pid, err := hex.DecodeString(tx.ProcessID)
+func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
+	if tx.ProcessId == nil || tx.KeyIndex == nil {
+		return fmt.Errorf("no processId or keyIndex provided on AddProcessKeys")
+	}
+	process, err := v.Process(tx.ProcessId, false)
 	if err != nil {
 		return err
 	}
-	process, err := v.Process(pid, false)
-	if err != nil {
-		return err
+	rkey := ""
+	if tx.RevealKey != nil {
+		rkey = fmt.Sprintf("%x", tx.RevealKey)
+		process.RevealKeys[*tx.KeyIndex] = rkey // TBD: Change hex strings for []byte
+		log.Debugf("revealed commitment key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.RevealKey)
 	}
-	if len(tx.RevealKey) > 0 {
-		process.RevealKeys[tx.KeyIndex] = tx.RevealKey
-		log.Debugf("revealed commitment key for process %x: %s", pid, tx.RevealKey)
-	}
-	if len(tx.EncryptionPrivateKey) > 0 {
-		process.EncryptionPrivateKeys[tx.KeyIndex] = tx.EncryptionPrivateKey
-		log.Debugf("revealed encryption key for process %x: %s", pid, tx.EncryptionPrivateKey)
+	ekey := ""
+	if tx.EncryptionPrivateKey != nil {
+		ekey = fmt.Sprintf("%x", tx.EncryptionPrivateKey)
+		process.EncryptionPrivateKeys[*tx.KeyIndex] = ekey
+		log.Debugf("revealed encryption key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.EncryptionPrivateKey)
 	}
 	if process.KeyIndex < 1 {
 		return fmt.Errorf("no more keys to reveal, keyIndex is < 1")
 	}
 	process.KeyIndex--
-	if err := v.setProcess(process, pid); err != nil {
+	if err := v.setProcess(process, tx.ProcessId); err != nil {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnRevealKeys(pid, tx.EncryptionPrivateKey, tx.RevealKey)
+		l.OnRevealKeys(tx.ProcessId, ekey, rkey)
 	}
 	return nil
 }

@@ -1,6 +1,8 @@
 package testcommon
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -8,14 +10,16 @@ import (
 	"strconv"
 	"testing"
 
-	"git.sr.ht/~sircmpwn/go-bare"
+	"github.com/ethereum/go-ethereum/common"
 	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
+	"google.golang.org/protobuf/proto"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/types"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
@@ -24,94 +28,114 @@ import (
 var (
 	SignerPrivKey = "e0aa6db5a833531da4d259fb5df210bae481b276dc4c2ab6ab9771569375aed5"
 
-	OracleListHardcoded = []string{
-		"0fA7A3FdB5C7C611646a535BDDe669Db64DC03d2",
-		"00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
-		"237B54D0163Aa131254fA260Fc12DB0E6DC76FC7",
-		"F904848ea36c46817096E94f932A9901E377C8a5",
-		"06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0",
+	OracleListHardcoded = []common.Address{
+		common.HexToAddress("0fA7A3FdB5C7C611646a535BDDe669Db64DC03d2"),
+		common.HexToAddress("00192Fb10dF37c9FB26829eb2CC623cd1BF599E8"),
+		common.HexToAddress("237B54D0163Aa131254fA260Fc12DB0E6DC76FC7"),
+		common.HexToAddress("F904848ea36c46817096E94f932A9901E377C8a5"),
+		common.HexToAddress("06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0"),
 	}
 
 	// VoteHardcoded needs to be a constructor, since multiple tests will
 	// modify its value. We need a different pointer for each test.
 	VoteHardcoded = func() *types.Vote {
+		vp, _ := base64.StdEncoding.DecodeString("eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19")
 		return &types.Vote{
 			ProcessID:   util.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 			Nullifier:   util.Hex2byte(nil, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), // nullifier and nonce are the same here
-			VotePackage: "eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19",
+			VotePackage: vp,
 		}
 	}
 
 	ProcessHardcoded = &types.Process{
-		EntityID:             util.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
-		MkRoot:               "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
-		NumberOfBlocks:       1000,
-		EncryptionPublicKeys: OracleListHardcoded, // reusing oracle keys as encryption pub keys
-		Type:                 types.PetitionSign,
+		EntityID:       util.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
+		MkRoot:         "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
+		NumberOfBlocks: 1000,
+		Type:           types.PetitionSign,
 	}
 
 	// privKey e0aa6db5a833531da4d259fb5df210bae481b276dc4c2ab6ab9771569375aed5 for address 06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0
-	HardcodedNewProcessTx = &types.NewProcessTx{
-		EntityID:       "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85",
-		MkRoot:         "0x0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
-		NumberOfBlocks: 1000,
-		ProcessID:      "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
+	HardcodedNewProcessTx = &models.NewProcessTx{
+		Txtype:         models.TxType_NEWPROCESS,
+		EntityId:       util.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
+		MkRoot:         util.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
+		ProcessId:      util.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		ProcessType:    types.PetitionSign,
-		Type:           "newProcess",
+		NumberOfBlocks: 1000,
 	}
 
-	HardcodedCancelProcessTx = &types.CancelProcessTx{
-		ProcessID: "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
-		Type:      "cancelProcess",
+	HardcodedCancelProcessTx = &models.CancelProcessTx{
+		Txtype:    models.TxType_CANCELPROCESS,
+		ProcessId: util.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 	}
 
-	HardcodedNewVoteTx = &types.VoteTx{
-		Nonce:       "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0",
-		Nullifier:   "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0",
-		ProcessID:   "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105",
-		Proof:       "00030000000000000000000000000000000000000000000000000000000000070ab34471caaefc9bb249cb178335f367988c159f3907530ef7daa1e1bf0c9c7a218f981be7c0c46ffa345d291abb36a17c22722814fb0110240b8640fd1484a6268dc2f0fc2152bf83c06566fbf155f38b8293033d4779a63bba6c7157fd10c8",
-		Type:        "vote",
-		VotePackage: "eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19",
+	HardcodedNewVoteTx = &models.VoteEnvelope{
+		Nonce:     "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0",
+		Nullifier: util.Hex2byte(nil, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"),
+		ProcessId: util.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+		Proof: &models.Proof{Proof: &models.Proof_Graviton{Graviton: &models.ProofGraviton{
+			Siblings: util.Hex2byte(nil, "00030000000000000000000000000000000000000000000000000000000000070ab34471caaefc9bb249cb178335f367988c159f3907530ef7daa1e1bf0c9c7a218f981be7c0c46ffa345d291abb36a17c22722814fb0110240b8640fd1484a6268dc2f0fc2152bf83c06566fbf155f38b8293033d4779a63bba6c7157fd10c8"),
+		}}},
+		VotePackage: util.B642byte(nil, "eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19"),
 	}
 
-	HardcodedAdminTxAddOracle = &types.AdminTx{
-		Address: "39106af1fF18bD60a38a296fd81B1f28f315852B", // oracle address or pubkey validator
+	HardcodedAdminTxAddOracle = &models.AdminTx{
+		Txtype:  models.TxType_ADDORACLE,
+		Address: util.Hex2byte(nil, "39106af1fF18bD60a38a296fd81B1f28f315852B"), // oracle address or pubkey validator
 		Nonce:   "0x1",
-		Type:    "addOracle",
 	}
 
-	HardcodedAdminTxRemoveOracle = &types.AdminTx{
-		Address: "00192Fb10dF37c9FB26829eb2CC623cd1BF599E8",
+	HardcodedAdminTxRemoveOracle = &models.AdminTx{
+		Txtype:  models.TxType_REMOVEORACLE,
+		Address: util.Hex2byte(nil, "00192Fb10dF37c9FB26829eb2CC623cd1BF599E8"),
 		Nonce:   "0x1",
-		Type:    "removeOracle",
+	}
+	power                        = uint64(10)
+	HardcodedAdminTxAddValidator = &models.AdminTx{
+		Txtype:  models.TxType_ADDVALIDATOR,
+		Address: util.Hex2byte(nil, "5DC922017285EC24415F3E7ECD045665EADA8B5A"),
+		Nonce:   "0x1",
+		Power:   &power,
 	}
 
-	HardcodedAdminTxAddValidator = &types.AdminTx{
-		Address: "GyZfKNK3lT5AQXQ4pwrVdgG3rRisx9tS4bM9EIZ0zYY=",
+	HardcodedAdminTxRemoveValidator = &models.AdminTx{
+		Txtype:  models.TxType_REMOVEVALIDATOR,
+		Address: util.Hex2byte(nil, "5DC922017285EC24415F3E7ECD045665EADA8B5A"),
 		Nonce:   "0x1",
-		Power:   10,
-		Type:    "addValidator",
-	}
-
-	HardcodedAdminTxRemoveValidator = &types.AdminTx{
-		Address: "5DC922017285EC24415F3E7ECD045665EADA8B5A",
-		Nonce:   "0x1",
-		Type:    "removeValidator",
 	}
 )
 
-func EncodeTx(tx interface{}) ([]byte, error) {
-	return bare.Marshal(tx)
-}
-
-func SignTx(tx interface{}) (string, error) {
+func SignAndPrepareTx(vtx *models.Tx) error {
+	// Signature
 	signer := ethereum.SignKeys{}
 	signer.AddHexKey(SignerPrivKey)
-	txb, err := bare.Marshal(tx)
-	if err != nil {
-		return "", err
+	var err error
+	txb := []byte{}
+	switch vtx.Tx.(type) {
+	case *models.Tx_Vote:
+		tx := vtx.GetVote()
+		txb, err = proto.Marshal(tx)
+	case *models.Tx_Admin:
+		tx := vtx.GetAdmin()
+		txb, err = proto.Marshal(tx)
+	case *models.Tx_NewProcess:
+		tx := vtx.GetNewProcess()
+		txb, err = proto.Marshal(tx)
+	case *models.Tx_CancelProcess:
+		tx := vtx.GetCancelProcess()
+		txb, err = proto.Marshal(tx)
+	default:
+		err = fmt.Errorf("transaction type unknown")
 	}
-	return signer.Sign(txb)
+	if err != nil {
+		return err
+	}
+	hexsign, err := signer.Sign(txb)
+	if err != nil {
+		return err
+	}
+	vtx.Signature, err = hex.DecodeString(hexsign)
+	return err
 }
 
 func TempDir(tb testing.TB, name string) string {
@@ -131,11 +155,11 @@ func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 	if err != nil {
 		tb.Fatal(err)
 	}
-	oraclesBytes, err := s.Codec.MarshalBinaryBare(OracleListHardcoded)
-	if err != nil {
-		tb.Fatal(err)
+	for _, o := range OracleListHardcoded {
+		if err := s.AddOracle(o); err != nil {
+			tb.Fatal(err)
+		}
 	}
-	s.Store.Tree(vochain.AppTree).Add([]byte("oracle"), oraclesBytes)
 	return s
 }
 

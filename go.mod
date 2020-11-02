@@ -3,7 +3,6 @@ module gitlab.com/vocdoni/go-dvote
 go 1.14
 
 require (
-	git.sr.ht/~sircmpwn/go-bare v0.0.0-20201009180350-cb0704728ca1
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
@@ -18,6 +17,7 @@ require (
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/cors v1.1.1
 	github.com/go-ole/go-ole v1.2.4 // indirect
+	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/go-cmp v0.5.2
 	github.com/google/gopacket v1.1.18 // indirect
@@ -73,7 +73,7 @@ require (
 	golang.org/x/net v0.0.0-20201002202402-0a1ea396d57c
 	golang.org/x/sys v0.0.0-20201005065044-765f4ea38db3 // indirect
 	golang.org/x/text v0.3.3
-	google.golang.org/protobuf v1.25.0 // indirect
+	google.golang.org/protobuf v1.25.0
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
 	nhooyr.io/websocket v1.8.6
 )
@@ -83,3 +83,5 @@ require (
 // https://github.com/ethereum/go-ethereum/issues/20590 is fixed, stub it out
 // with a replace directive. The stub was hacked together with vim.
 replace gopkg.in/olebedev/go-duktape.v3 => ./duktape-stub
+
+replace git.sr.ht/~sircmpwn/go-bare => git.sr.ht/~mvdan/go-bare v0.0.0-20201103151300-d72d2724d2e1

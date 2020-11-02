@@ -3,7 +3,6 @@ package ethevents
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,8 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/vochain"
+	"google.golang.org/protobuf/proto"
 )
 
 var ethereumEventList = []string{
@@ -90,12 +90,8 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 
 		// Check if process already exist
-		log.Infof("found new process on Ethereum\n\t%+v", *processTx)
-		pid, err := hex.DecodeString(processTx.ProcessID)
-		if err != nil {
-			return err
-		}
-		_, err = e.VochainApp.State.Process(pid, true)
+		log.Infof("found new process on Ethereum\n\t%+s", processTx.String)
+		_, err = e.VochainApp.State.Process(processTx.ProcessId, true)
 		if err != nil {
 			if err != vochain.ErrProcessNotFound {
 				return err
@@ -104,37 +100,40 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			log.Infof("process already exist, skipping")
 			return nil
 		}
-
-		processTx.Signature, err = e.Signer.SignJSON(processTx)
+		vtx := models.Tx{}
+		processTxBytes, err := proto.Marshal(processTx)
 		if err != nil {
-			return fmt.Errorf("cannot sign oracle tx: (%s)", err)
+			return fmt.Errorf("cannot marshal new process tx: %w", err)
 		}
-		tx, err := json.Marshal(processTx)
+		signature, err := e.Signer.Sign(processTxBytes)
+		if err != nil {
+			return fmt.Errorf("cannot sign oracle tx: %w", err)
+		}
+		vtx.Signature, err = hex.DecodeString(signature)
+		if err != nil {
+			return fmt.Errorf("cannot decode signature: %w", err)
+		}
+		vtx.Tx = &models.Tx_NewProcess{NewProcess: processTx}
+		txb, err := proto.Marshal(&vtx)
 		if err != nil {
 			return fmt.Errorf("error marshaling process tx: (%s)", err)
 		}
-		log.Debugf("broadcasting Vochain TX: %s", tx)
+		log.Debugf("broadcasting Vochain Tx: %s", processTx.String())
 
-		res, err := e.VochainApp.SendTX(tx)
+		res, err := e.VochainApp.SendTX(txb)
 		if err != nil || res == nil {
 			log.Warnf("cannot broadcast tx: (%s)", err)
 			return fmt.Errorf("cannot broadcast tx: (%s), res: (%+v)", err, res)
-		} else {
-			log.Infof("oracle transaction sent, hash:%s", res.Hash)
 		}
+		log.Infof("oracle transaction sent, hash:%s", res.Hash)
 
 	case HashLogProcessCanceled.Hex():
 		cancelProcessTx, err := cancelProcessMeta(ctx, &e.ContractABI, event.Data, e.ProcessHandle)
 		if err != nil {
 			return err
 		}
-
-		log.Infof("found new cancel process order from ethereum\n\t%+v", *cancelProcessTx)
-		pid, err := hex.DecodeString(cancelProcessTx.ProcessID)
-		if err != nil {
-			return err
-		}
-		p, err := e.VochainApp.State.Process(pid, true)
+		log.Infof("found new cancel process order from ethereum\n\t%+v", cancelProcessTx)
+		p, err := e.VochainApp.State.Process(cancelProcessTx.ProcessId, true)
 		if err != nil {
 			return err
 		}
@@ -142,15 +141,26 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			log.Infof("process already canceled, skipping")
 			return nil
 		}
-		cancelProcessTx.Signature, err = e.Signer.SignJSON(cancelProcessTx)
+		vtx := models.Tx{}
+		cancelTxBytes, err := proto.Marshal(cancelProcessTx)
 		if err != nil {
-			return fmt.Errorf("cannot sign oracle tx: (%s)", err)
+			return fmt.Errorf("cannot marshal cancel process tx: %w", err)
 		}
-		tx, err := json.Marshal(cancelProcessTx)
+		signature, err := e.Signer.Sign(cancelTxBytes)
 		if err != nil {
-			return fmt.Errorf("error marshaling process tx: %s", err)
+			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
-		log.Debugf("broadcasting Vochain tx\n\t%s", string(tx))
+		vtx.Signature, err = hex.DecodeString(signature)
+		if err != nil {
+			return fmt.Errorf("cannot decode signature: %w", err)
+		}
+		vtx.Tx = &models.Tx_CancelProcess{CancelProcess: cancelProcessTx}
+
+		tx, err := proto.Marshal(&vtx)
+		if err != nil {
+			return fmt.Errorf("error marshaling process tx: %w", err)
+		}
+		log.Debugf("broadcasting Vochain tx\n\t%s", cancelProcessTx.String())
 
 		res, err := e.VochainApp.SendTX(tx)
 		if err != nil || res == nil {
@@ -201,18 +211,18 @@ func HandleCensus(ctx context.Context, event *ethtypes.Log, e *EthereumEvents) e
 	if err != nil {
 		return err
 	}
-	if processTx == nil {
-		return fmt.Errorf("cannot fetch process metadata")
+	if processTx == nil || processTx.MkURI == nil {
+		return fmt.Errorf("cannot fetch process metadata (processTx or MkURI not found)")
 	}
 	// Import remote census
-	if !strings.HasPrefix(processTx.MkURI, e.Census.Data().URIprefix()) || len(processTx.MkRoot) == 0 {
+	if !strings.HasPrefix(*processTx.MkURI, e.Census.Data().URIprefix()) || len(processTx.MkRoot) == 0 {
 		return fmt.Errorf("process not valid => %+v", processTx)
 	}
-	e.Census.AddToImportQueue(processTx.MkRoot, processTx.MkURI)
+	e.Census.AddToImportQueue(hex.EncodeToString(processTx.MkRoot), *processTx.MkURI)
 	return nil
 }
 
-func processMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*types.NewProcessTx, error) {
+func processMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*models.NewProcessTx, error) {
 	var eventProcessCreated eventProcessCreated
 	err := contractABI.Unpack(&eventProcessCreated, "ProcessCreated", eventData)
 	if err != nil {
@@ -221,7 +231,7 @@ func processMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph
 	return ph.ProcessTxArgs(ctx, eventProcessCreated.ProcessId)
 }
 
-func cancelProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*types.CancelProcessTx, error) {
+func cancelProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*models.CancelProcessTx, error) {
 	var eventProcessCanceled eventProcessCanceled
 	err := contractABI.Unpack(&eventProcessCanceled, "ProcessCanceled", eventData)
 	if err != nil {

@@ -7,13 +7,14 @@ import (
 	"os"
 	"testing"
 
-	bare "git.sr.ht/~sircmpwn/go-bare"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/util"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestCheckTX(t *testing.T) {
@@ -50,9 +51,9 @@ func TestCheckTX(t *testing.T) {
 		MkRoot:         tr.Root(),
 		NumberOfBlocks: 1024,
 	}
-	pid := util.RandomHex(types.ProcessIDsize)
+	pid := util.Hex2byte(t, util.RandomHex(types.ProcessIDsize))
 	t.Logf("adding process %+v", process)
-	app.State.AddProcess(*process, util.Hex2byte(t, pid), "ipfs://123456789")
+	app.State.AddProcess(*process, pid, "ipfs://123456789")
 
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
@@ -60,36 +61,41 @@ func TestCheckTX(t *testing.T) {
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
 
-	var tx types.VoteTx
+	var vtx models.Tx
 	var proof string
-
+	var hexsignature string
+	vp := []byte("[1,2,3,4]")
 	for i, s := range keys {
 		proof, err = tr.GenProof([]byte(claims[i]), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		tx = types.VoteTx{
-			Nonce:     util.RandomHex(16),
-			ProcessID: pid,
-			Proof:     proof,
+		tx := &models.VoteEnvelope{
+			Nonce:       util.RandomHex(16),
+			ProcessId:   pid,
+			Proof:       &models.Proof{Proof: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: util.Hex2byte(t, proof)}}},
+			VotePackage: vp,
 		}
-		txBytes, err := bare.Marshal(&tx)
+		txBytes, err := proto.Marshal(tx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tx.Signature, err = s.Sign(txBytes); err != nil {
+		if hexsignature, err = s.Sign(txBytes); err != nil {
 			t.Fatal(err)
 		}
-		tx.Type = "vote"
-		if txBytes, err = bare.Marshal(&tx); err != nil {
+		vtx.Tx = &models.Tx_Vote{Vote: tx}
+		vtx.Signature = util.Hex2byte(t, hexsignature)
+
+		if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
 			t.Fatal(err)
 		}
-		cktx.Tx = txBytes
 		cktxresp = app.CheckTx(cktx)
 		if cktxresp.Code != 0 {
 			t.Fatalf(fmt.Sprintf("checkTX failed: %s", cktxresp.Data))
 		}
-		detx.Tx = txBytes
+		if detx.Tx, err = proto.Marshal(&vtx); err != nil {
+			t.Fatal(err)
+		}
 		detxresp = app.DeliverTx(detx)
 		if detxresp.Code != 0 {
 			t.Fatalf(fmt.Sprintf("deliverTX failed: %s", detxresp.Data))

@@ -3,38 +3,11 @@ package test
 import (
 	"testing"
 
-	"git.sr.ht/~sircmpwn/go-bare"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
+
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
-
-func TestNewProcessTxCheck(t *testing.T) {
-	// TODO(mvdan): re-enable once
-	// https://gitlab.com/vocdoni/go-dvote/-/issues/172 is fixed.
-	// t.Parallel()
-	var err error
-	s := testcommon.NewVochainStateWithOracles(t)
-	tx := testcommon.HardcodedNewProcessTx
-	tx.Signature = ""
-
-	tx.Signature, err = testcommon.SignTx(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	txb, err := testcommon.EncodeTx(testcommon.HardcodedNewProcessTx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gtx, err := vochain.UnmarshalTx(txb)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx = gtx.(*types.NewProcessTx)
-	if _, err := vochain.NewProcessTxCheck(tx, s); err != nil {
-		t.Errorf("cannot validate new process tx: %s", err)
-	}
-}
 
 /*
 func TestVoteTxCheck(t *testing.T) {
@@ -95,33 +68,32 @@ func TestCreateProcess(t *testing.T) {
 	// t.Parallel()
 
 	s := testcommon.NewVochainStateWithOracles(t)
-	bytes, err := bare.Marshal(testcommon.HardcodedNewProcessTx)
+	vtx := models.Tx{}
+	vtx.Tx = &models.Tx_NewProcess{NewProcess: testcommon.HardcodedNewProcessTx}
+	err := testcommon.SignAndPrepareTx(&vtx)
 	if err != nil {
-		t.Errorf("cannot mashal process: %+v", *testcommon.HardcodedNewProcessTx)
+		t.Fatal(err)
 	}
-	var gtx vochain.GenericTX
-	if gtx, err = vochain.UnmarshalTx(bytes); err != nil {
-		t.Errorf("cannot unmarshal tx")
+	if _, err := vochain.NewProcessTxCheck(&vtx, s); err != nil {
+		t.Errorf("cannot validate new process tx: %s", err)
 	}
-	_, err = vochain.AddTx(gtx, s, true)
+
+	// add process
+	_, err = vochain.AddTx(&vtx, s, true)
 	if err != nil {
 		t.Errorf("cannot create process: %s", err)
 	}
+
 	// cannot add same process
-	if _, err = vochain.AddTx(gtx, s, true); err == nil {
+	if _, err = vochain.AddTx(&vtx, s, true); err == nil {
 		t.Errorf("same process added: %s", err)
 	}
-	// cannot add process if not oracle
-	badoracle := testcommon.HardcodedNewProcessTx
-	badoracle.Signature = "a25259cff9ce3a709e517c6a01e445f216212f58f553fa26d25566b7c731339242ef9a0df0235b53a819a64ebf2c3394fb6b56138c5113cc1905c68ffcebb1971c"
-	bytes, err = bare.Marshal(badoracle)
-	if err != nil {
-		t.Errorf("cannot mashal process: %+v", badoracle)
-	}
-	if gtx, err = vochain.UnmarshalTx(bytes); err != nil {
-		t.Errorf("cannot unmarshal tx")
-	}
-	if _, err = vochain.AddTx(gtx, s, true); err == nil {
+
+	// bad oracle signature
+	vtx.Signature[12] = byte(0xFF)
+	vtx.Signature[14] = byte(0xFF)
+	vtx.Signature[16] = byte(0xFF)
+	if _, err = vochain.AddTx(&vtx, s, true); err == nil {
 		t.Errorf("process added by non oracle: %s", err)
 	}
 }

@@ -1,21 +1,23 @@
 package keykeeper
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"git.sr.ht/~sircmpwn/go-bare"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
+	"google.golang.org/protobuf/proto"
 )
 
 /*
@@ -393,13 +395,15 @@ func (k *KeyKeeper) publishPendingKeys() {
 // This functions must be async in order to avoid a deadlock on the block creation
 func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	log.Infof("publishing keys for process %x", []byte(pid))
-	tx := &types.AdminTx{
-		Type:                types.TxAddProcessKeys,
-		KeyIndex:            int(pk.index),
+	kindex := new(uint32)
+	*kindex = uint32(pk.index)
+	tx := &models.AdminTx{
+		Txtype:              models.TxType_ADDPROCESSKEYS,
+		KeyIndex:            kindex,
 		Nonce:               util.RandomHex(32),
-		ProcessID:           fmt.Sprintf("%x", []byte(pid)),
-		EncryptionPublicKey: fmt.Sprintf("%x", pk.pubKey),
-		CommitmentKey:       fmt.Sprintf("%x", pk.commitmentKey),
+		ProcessId:           []byte(pid),
+		EncryptionPublicKey: pk.pubKey,
+		CommitmentKey:       pk.commitmentKey,
 	}
 	if err := k.signAndSendTx(tx); err != nil {
 		return err
@@ -437,14 +441,15 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 	if err != nil {
 		return err
 	}
-
-	tx := &types.AdminTx{
-		Type:                 types.TxRevealProcessKeys,
-		KeyIndex:             int(pk.index),
+	kindex := new(uint32)
+	*kindex = uint32(pk.index)
+	tx := &models.AdminTx{
+		Txtype:               models.TxType_REVEALPROCESSKEYS,
+		KeyIndex:             kindex,
 		Nonce:                util.RandomHex(32),
-		ProcessID:            fmt.Sprintf("%x", []byte(pid)),
-		EncryptionPrivateKey: fmt.Sprintf("%x", pk.privKey),
-		RevealKey:            fmt.Sprintf("%x", pk.revealKey),
+		ProcessId:            []byte(pid),
+		EncryptionPrivateKey: pk.privKey,
+		RevealKey:            pk.revealKey,
 	}
 	if err := k.signAndSendTx(tx); err != nil {
 		return err
@@ -461,20 +466,28 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 	return nil
 }
 
-func (k *KeyKeeper) signAndSendTx(tx *types.AdminTx) error {
+func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
 	// sign the transaction
-	txBytes, err := bare.Marshal(tx)
+	txBytes, err := proto.Marshal(tx)
 	if err != nil {
 		return err
 	}
-	if tx.Signature, err = k.signer.Sign(txBytes); err != nil {
+	vtx := models.Tx{Tx: &models.Tx_Admin{Admin: tx}}
+	var signHex string
+	if signHex, err = k.signer.Sign(txBytes); err != nil {
 		return err
 	}
-	if txBytes, err = bare.Marshal(tx); err != nil {
+	signature, err := hex.DecodeString(signHex)
+	if err != nil {
+		return err
+	}
+	vtx.Signature = signature
+	vtxBytes, err := proto.Marshal(&vtx)
+	if err != nil {
 		return err
 	}
 	// Send the transaction to the mempool
-	result, err := k.vochain.SendTX(txBytes)
+	result, err := k.vochain.SendTX(vtxBytes)
 	if err != nil {
 		return err
 	}
