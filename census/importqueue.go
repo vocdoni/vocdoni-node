@@ -87,8 +87,8 @@ func (m *Manager) importFailedQueueDaemon() {
 		for cid, uri := range m.ImportFailedQueue() {
 			log.Debugf("retrying census import %s/%s", cid, uri)
 			ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout*2)
+			defer cancel()
 			censusRaw, err := m.RemoteStorage.Retrieve(ctx, uri[len(m.RemoteStorage.URIprefix()):])
-			cancel()
 			if err != nil {
 				continue
 			}
@@ -123,8 +123,8 @@ func (m *Manager) importQueueDaemon() {
 		log.Infof("retrieving remote census %s", uri)
 		m.queueAdd(1)
 		ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
+		defer cancel()
 		censusRaw, err := m.RemoteStorage.Retrieve(ctx, uri[len(m.RemoteStorage.URIprefix()):])
-		cancel()
 		if err != nil {
 			if os.IsTimeout(err) {
 				log.Warnf("timeout importing census %s, adding it to failed queue for retry", uri)
