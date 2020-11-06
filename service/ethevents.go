@@ -35,7 +35,7 @@ func EthEvents(ctx context.Context, ethProcDomain, w3uri string, networkName str
 		ev.AddEventHandler(e)
 	}
 	go func() {
-		ev.SubscribeEthereumEventLogs(startBlock)
+		ev.SubscribeEthereumEventLogs(ctx, startBlock)
 	}()
 
 	return nil
