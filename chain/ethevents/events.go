@@ -18,6 +18,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
+	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -119,16 +120,18 @@ func (ev *EthereumEvents) AddEventHandler(h EventHandler) {
 // Events are Queued for 60 seconds before processed in order to avoid possible blockchain reversions.
 // If fromBlock nil, subscription will start on current block
 // Blocking function (use go routine).
-func (ev *EthereumEvents) SubscribeEthereumEventLogs(fromBlock *int64) {
+func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBlock *int64) {
 	log.Debugf("dialing for %s", ev.DialAddr)
-	ctx := context.Background()
 	client, err := ethclient.Dial(ev.DialAddr)
+	defer client.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Get current block
-	blk, err := client.BlockByNumber(ctx, nil)
+	getBlockTimeout, getBlockCancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	defer getBlockCancel()
+	blk, err := client.BlockByNumber(getBlockTimeout, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -138,7 +141,9 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(fromBlock *int64) {
 		startBlock := blk.Number().Int64()
 		ev.processEventLogsFromTo(ctx, *fromBlock, startBlock, client)
 		// Update block number
-		if blk, err = client.BlockByNumber(ctx, nil); err != nil {
+		updateBlockTimeout, updateBlockCancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+		defer updateBlockCancel()
+		if blk, err = client.BlockByNumber(updateBlockTimeout, nil); err != nil {
 			log.Fatal(err)
 		}
 		// For security, read also the new passed blocks before subscribing
@@ -187,7 +192,9 @@ func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context, from, to i
 		},
 	}
 
-	logs, err := client.FilterLogs(ctx, query)
+	filterContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	logs, err := client.FilterLogs(filterContext, query)
 	if err != nil {
 		return err
 	}
