@@ -16,6 +16,11 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
+const (
+	censusHTTPhandlerTimeout   = time.Second * 10
+	censusRemoteStorageTimeout = time.Minute * 1
+)
+
 func httpReply(resp *types.ResponseMessage, w http.ResponseWriter) {
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
@@ -34,7 +39,7 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 }
 
 // HTTPhandler handles an API census manager request via HTTP
-func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *ethereum.SignKeys) {
+func (m *Manager) HTTPhandler(ctx context.Context, w http.ResponseWriter, req *http.Request, signer *ethereum.SignKeys) {
 	log.Debug("new request received")
 	if ok := checkRequest(w, req); !ok {
 		return
@@ -63,7 +68,14 @@ func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *
 		log.Warnf("authorization error: %s", err)
 		auth = false
 	}
-	resp := m.Handler(&reqInner, auth, "")
+	var toWait = censusHTTPhandlerTimeout
+	// use a bigger timeout for remote storage operations
+	if req.Method == "importRemove" || req.Method == "publish" {
+		toWait = censusRemoteStorageTimeout
+	}
+	timeout, cancel := context.WithTimeout(ctx, toWait)
+	defer cancel()
+	resp := m.Handler(timeout, &reqInner, auth, "")
 	resp.Request = reqOuter.ID
 
 	respInner, err := crypto.SortedMarshalJSON(resp)
@@ -88,7 +100,7 @@ func (m *Manager) HTTPhandler(w http.ResponseWriter, req *http.Request, signer *
 // Handler handles an API census manager request.
 // isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
 // censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
-func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string) *types.MetaResponse {
+func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool, censusPrefix string) *types.MetaResponse {
 	resp := new(types.MetaResponse)
 
 	// Process data
@@ -246,7 +258,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			return resp
 		}
 		log.Infof("retrieving remote census %s", r.CensusURI)
-		censusRaw, err := m.RemoteStorage.Retrieve(context.TODO(), r.URI[len(m.RemoteStorage.URIprefix()):])
+		censusRaw, err := m.RemoteStorage.Retrieve(ctx, r.URI[len(m.RemoteStorage.URIprefix()):])
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
 			resp.SetError("cannot retrieve census")
@@ -389,7 +401,7 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			return resp
 		}
 		dumpBytes = m.compressBytes(dumpBytes)
-		cid, err := m.RemoteStorage.Publish(context.TODO(), dumpBytes)
+		cid, err := m.RemoteStorage.Publish(ctx, dumpBytes)
 		if err != nil {
 			resp.SetError(err)
 			log.Warnf("cannot publish census dump: %s", err)
@@ -416,6 +428,5 @@ func (m *Manager) Handler(r *types.MetaRequest, isAuth bool, censusPrefix string
 			tr2.Publish()
 		}
 	}
-
 	return resp
 }
