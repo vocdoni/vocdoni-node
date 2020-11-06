@@ -29,11 +29,11 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 	var htransport net.Transport
 
 	if apiconfig.Websockets && apiconfig.HTTP {
-		htransport = new(net.HttpWsHandler)
+		htransport = net.NewHttpWsHandleWithWsReadLimit(apiconfig.WebsocketsReadLimit)
 		htransport.(*net.HttpWsHandler).SetProxy(pxy)
 	} else {
 		if apiconfig.Websockets {
-			htransport = new(net.WebsocketHandle)
+			htransport = net.NewWebSocketHandleWithReadLimit(apiconfig.WebsocketsReadLimit)
 			htransport.(*net.WebsocketHandle).SetProxy(pxy)
 		} else if apiconfig.HTTP {
 			htransport = new(net.HttpHandler)

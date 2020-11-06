@@ -21,6 +21,7 @@ type WebsocketHandle struct {
 	WsProxy    *Proxy            // proxy where the ws will be associated
 
 	internalReceiver chan types.Message
+	ReadLimit        int64
 }
 
 type WebsocketContext struct {
@@ -40,8 +41,17 @@ func (w *WebsocketHandle) SetProxy(p *Proxy) {
 	w.WsProxy = p
 }
 
+func NewWebSocketHandleWithReadLimit(readLimit int64) *WebsocketHandle {
+	return &WebsocketHandle{
+		ReadLimit: readLimit,
+	}
+}
+
 // Init initializes the websockets handler and the internal channel to communicate with other go-dvote components
 func (w *WebsocketHandle) Init(c *types.Connection) error {
+	if w.ReadLimit == 0 {
+		w.ReadLimit = 32768 // default by ws client
+	}
 	w.internalReceiver = make(chan types.Message, 1)
 	return nil
 }
@@ -63,6 +73,7 @@ func getWsHandler(path string, receiver chan types.Message) func(conn *websocket
 				Context:   &WebsocketContext{Conn: conn},
 				Namespace: path,
 			}
+
 			receiver <- msg
 		}
 	}
@@ -70,7 +81,7 @@ func getWsHandler(path string, receiver chan types.Message) func(conn *websocket
 
 // AddProxyHandler adds the current websocket handler into the Proxy
 func (w *WebsocketHandle) AddProxyHandler(path string) {
-	w.WsProxy.AddWsHandler(path, getWsHandler(path, w.internalReceiver))
+	w.WsProxy.AddWsHandler(path, getWsHandler(path, w.internalReceiver), w.ReadLimit)
 }
 
 // ConnectionType returns a string identifying the transport connection type
@@ -119,12 +130,13 @@ func (w *WebsocketHandle) String() string {
 	return w.WsProxy.Addr.String()
 }
 
-func wshandler(w http.ResponseWriter, r *http.Request, ph ProxyWsHandler) {
+func wshandler(w http.ResponseWriter, r *http.Request, ph ProxyWsHandler, readLimit int64) {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
 	if err != nil {
 		log.Errorf("failed to set websocket upgrade: %s", err)
 		return
 	}
+	conn.SetReadLimit(readLimit)
 	ph(conn)
 }
 

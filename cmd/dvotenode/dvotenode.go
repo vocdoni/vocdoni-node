@@ -73,6 +73,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	globalCfg.API.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
 	globalCfg.API.ListenPort = *flag.Int("listenPort", 9090, "API endpoint http port")
+	globalCfg.API.WebsocketsReadLimit = *flag.Int64("apiWsReadLimit", vnet.Web3WsReadLimit, "dvote websocket API read size limit in bytes")
 	// ssl
 	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "", "enable TLS secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	// ethereum node
@@ -151,20 +152,21 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
 
 	// api
-	viper.BindPFlag("api.websockets", flag.Lookup("apiws"))
-	viper.BindPFlag("api.http", flag.Lookup("apihttp"))
-	viper.BindPFlag("api.file", flag.Lookup("fileApi"))
-	viper.BindPFlag("api.census", flag.Lookup("censusApi"))
-	viper.BindPFlag("api.vote", flag.Lookup("voteApi"))
-	viper.BindPFlag("api.results", flag.Lookup("resultsApi"))
-	viper.BindPFlag("api.tendermint", flag.Lookup("tendermintApi"))
-	viper.BindPFlag("api.route", flag.Lookup("apiRoute"))
-	viper.BindPFlag("api.allowPrivate", flag.Lookup("apiAllowPrivate"))
-	viper.BindPFlag("api.allowedAddrs", flag.Lookup("apiAllowedAddrs"))
-	viper.BindPFlag("api.listenHost", flag.Lookup("listenHost"))
-	viper.BindPFlag("api.listenPort", flag.Lookup("listenPort"))
-	viper.Set("api.ssl.dirCert", globalCfg.DataDir+"/tls")
-	viper.BindPFlag("api.ssl.domain", flag.Lookup("sslDomain"))
+	viper.BindPFlag("api.Websockets", flag.Lookup("apiws"))
+	viper.BindPFlag("api.WebsocketsReadLimit", flag.Lookup("apiWsReadLimit"))
+	viper.BindPFlag("api.Http", flag.Lookup("apihttp"))
+	viper.BindPFlag("api.File", flag.Lookup("fileApi"))
+	viper.BindPFlag("api.Census", flag.Lookup("censusApi"))
+	viper.BindPFlag("api.Vote", flag.Lookup("voteApi"))
+	viper.BindPFlag("api.Results", flag.Lookup("resultsApi"))
+	viper.BindPFlag("api.Tendermint", flag.Lookup("tendermintApi"))
+	viper.BindPFlag("api.Route", flag.Lookup("apiRoute"))
+	viper.BindPFlag("api.AllowPrivate", flag.Lookup("apiAllowPrivate"))
+	viper.BindPFlag("api.AllowedAddrs", flag.Lookup("apiAllowedAddrs"))
+	viper.BindPFlag("api.ListenHost", flag.Lookup("listenHost"))
+	viper.BindPFlag("api.ListenPort", flag.Lookup("listenPort"))
+	viper.Set("api.Ssl.DirCert", globalCfg.DataDir+"/tls")
+	viper.BindPFlag("api.Ssl.Domain", flag.Lookup("sslDomain"))
 
 	// ethereum node
 	viper.Set("ethConfig.datadir", globalCfg.DataDir+"/ethereum")
@@ -459,7 +461,7 @@ func main() {
 			if len(tp) != 2 {
 				log.Warnf("cannot get port from vochain RPC listen: %s", globalCfg.VochainConfig.RPCListen)
 			} else {
-				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket"))
+				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket", vnet.VochainWsReadLimit), vnet.VochainWsReadLimit) // tendermint needs up to 20 MB
 				log.Infof("tendermint API endpoint available at %s", "/tendermint")
 			}
 		}

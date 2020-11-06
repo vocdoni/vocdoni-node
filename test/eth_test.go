@@ -10,7 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
-	dnet "gitlab.com/vocdoni/go-dvote/net"
+	vnet "gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"nhooyr.io/websocket"
@@ -57,7 +57,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	// proxy websocket handle
 	pxyAddr := fmt.Sprintf("ws://%s/web3ws", pxy.Addr)
 	// Create WebSocket endpoint
-	ws := new(dnet.WebsocketHandle)
+	ws := new(vnet.WebsocketHandle)
 	ws.Init(new(types.Connection))
 	ws.SetProxy(pxy)
 	// Create the listener for routing messages
@@ -104,7 +104,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 }
 
 // NewMockEthereum creates an ethereum node, attaches a signing key and adds a http or ws endpoint to a given proxy
-func NewMockEthereum(dataDir string, pxy *dnet.Proxy) (*chain.EthChainContext, error) {
+func NewMockEthereum(dataDir string, pxy *vnet.Proxy) (*chain.EthChainContext, error) {
 	// create base config
 	ethConfig := &config.EthCfg{
 		LogLevel:  "error",
@@ -129,6 +129,6 @@ func NewMockEthereum(dataDir string, pxy *dnet.Proxy) (*chain.EthChainContext, e
 	}
 	// register node endpoint
 	pxy.AddHandler(w3Config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)))
-	pxy.AddWsHandler(w3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)))
+	pxy.AddWsHandler(w3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)), vnet.Web3WsReadLimit)
 	return node, nil
 }

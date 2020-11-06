@@ -84,7 +84,8 @@ type API struct {
 		DirCert string
 	}
 	// Enable WebSockets API
-	Websockets bool
+	Websockets          bool
+	WebsocketsReadLimit int64
 	// Enable HTTP API
 	HTTP bool
 }
