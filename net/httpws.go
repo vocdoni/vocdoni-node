@@ -9,9 +9,19 @@ type HttpWsHandler struct {
 	Proxy            *Proxy            // proxy where the ws will be associated
 	Connection       *types.Connection // the ws connection
 	internalReceiver chan types.Message
+	WsReadLimit      int64
+}
+
+func NewHttpWsHandleWithWsReadLimit(readLimit int64) *HttpWsHandler {
+	return &HttpWsHandler{
+		WsReadLimit: readLimit,
+	}
 }
 
 func (h *HttpWsHandler) Init(c *types.Connection) error {
+	if h.WsReadLimit == 0 {
+		h.WsReadLimit = 32768 // default
+	}
 	h.internalReceiver = make(chan types.Message, 1)
 	return nil
 }
@@ -22,7 +32,7 @@ func (h *HttpWsHandler) SetProxy(p *Proxy) {
 
 // AddProxyHandler adds the current websocket handler into the Proxy
 func (h *HttpWsHandler) AddProxyHandler(path string) {
-	h.Proxy.AddMixedHandler(path, getHTTPhandler(path, h.internalReceiver), getWsHandler(path, h.internalReceiver))
+	h.Proxy.AddMixedHandler(path, getHTTPhandler(path, h.internalReceiver), getWsHandler(path, h.internalReceiver), h.WsReadLimit)
 }
 
 func (h *HttpWsHandler) ConnectionType() string {

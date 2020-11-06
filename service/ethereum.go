@@ -56,10 +56,10 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 		return
 	}
 	if strings.HasPrefix(w3uri, "http") {
-		pxy.AddMixedHandler(w3config.Route, pxy.AddEndpoint(w3uri), pxy.AddWsHTTPBridge(w3uri))
+		pxy.AddMixedHandler(w3config.Route, pxy.AddEndpoint(w3uri), pxy.AddWsHTTPBridge(w3uri), net.Web3WsReadLimit) // 5MB read limit
 		log.Infof("web3 http/websocket endpoint available at %s", w3config.Route)
 	} else if strings.HasPrefix(w3uri, "ws") {
-		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri))
+		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri, net.Web3WsReadLimit), net.Web3WsReadLimit) // 5MB read limit
 		log.Infof("web3 websocket endpoint available at %s", w3config.Route)
 	} else if strings.HasSuffix(w3uri, ".ipc") {
 		info, err := os.Stat(w3uri)
