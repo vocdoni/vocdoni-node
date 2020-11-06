@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -43,7 +44,7 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 
 	// Start Ethereum node
 	node.Start()
-	go node.PrintInfo(time.Second * 20)
+	go node.PrintInfo(context.Background(), time.Second*20)
 	w3uri := w3cfg.W3external
 	if w3uri == "" {
 		// Grab ethereum metrics loop

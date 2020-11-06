@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"context"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -43,7 +44,7 @@ func (e *EthChainContext) registerMetrics(ma *metrics.Agent) {
 
 // GetMetrics grabs diferent metrics about ethereum chain.
 func (e *EthChainContext) getMetrics() {
-	info, err := e.SyncInfo()
+	info, err := e.SyncInfo(context.Background())
 	if err != nil {
 		log.Warn(err)
 		return

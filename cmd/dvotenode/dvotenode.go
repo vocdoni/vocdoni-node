@@ -507,7 +507,7 @@ func main() {
 				requiredPeers = 1
 			}
 			for {
-				if info, err := node.SyncInfo(); err == nil && info.Synced && info.Peers >= requiredPeers && info.Height > 0 {
+				if info, err := node.SyncInfo(context.Background()); err == nil && info.Synced && info.Peers >= requiredPeers && info.Height > 0 {
 					log.Infof("ethereum blockchain synchronized (%+v)", info)
 					break
 				}
