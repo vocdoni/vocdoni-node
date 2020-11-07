@@ -61,12 +61,12 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 	}
 
 	log.Debugf("request: %s", reqBody)
-	writeTimeout, writeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	writeTimeout, writeCancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer writeCancel()
 	if err := c.Conn.Write(writeTimeout, websocket.MessageText, reqBody); err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
-	readTimeout, readCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	readTimeout, readCancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer readCancel()
 	_, message, err := c.Conn.Read(readTimeout)
 	if err != nil {

@@ -246,7 +246,6 @@ func (e *EthChainContext) Start() {
 
 	} else {
 		client, err := ethclient.Dial(e.DefaultConfig.W3external)
-		defer client.Close()
 		if err != nil || client == nil {
 			log.Fatalf("cannot create a client connection: (%s)", err)
 		}
@@ -316,11 +315,11 @@ func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err e
 		var client *ethclient.Client
 		var sp *ethereum.SyncProgress
 		client, err = ethclient.Dial(e.DefaultConfig.W3external)
-		defer client.Close()
 		if err != nil || client == nil {
 			log.Warnf("cannot retrieve information from external web3 endpoint: (%s)", err)
 			return
 		}
+		defer client.Close()
 		timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 		defer cancel()
 		sp, err = client.SyncProgress(timeout)

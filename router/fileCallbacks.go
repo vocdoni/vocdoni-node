@@ -12,7 +12,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-const storageTimeout = time.Second * 10
+const storageTimeout = time.Minute * 1
 
 func (r *Router) fetchFile(request routerRequest) {
 	log.Debugf("calling FetchFile %s", request.URI)

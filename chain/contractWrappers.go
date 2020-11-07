@@ -140,11 +140,6 @@ type ENSCallerHandler struct {
 	ResolverAddr string
 }
 
-func (e *ENSCallerHandler) dial(endpoint string) (err error) {
-	e.EthereumClient, err = ethclient.Dial(endpoint)
-	return err
-}
-
 func (e *ENSCallerHandler) close() {
 	e.EthereumClient.Close()
 }

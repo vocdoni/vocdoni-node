@@ -109,7 +109,7 @@ func (ps *SubPub) peersManager() {
 			}
 		}
 		ps.PeersMu.Unlock()
-		timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		timeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		ps.Host.ConnManager().TrimOpenConns(timeout) // Not sure if it works
 		time.Sleep(ps.CollectionPeriod)

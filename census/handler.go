@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	censusHTTPhandlerTimeout   = time.Second * 10
-	censusRemoteStorageTimeout = time.Minute * 1
+	censusHTTPhandlerTimeout   = 30 * time.Second
+	censusRemoteStorageTimeout = 1 * time.Minute
 )
 
 func httpReply(resp *types.ResponseMessage, w http.ResponseWriter) {

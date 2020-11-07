@@ -33,7 +33,7 @@ func (c WebsocketContext) ConnectionType() string {
 }
 
 func (c *WebsocketContext) Send(msg types.Message) {
-	timeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	timeout, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 	// close connection ?
 	err := c.Conn.Write(timeout, websocket.MessageBinary, msg.Data)
@@ -68,10 +68,10 @@ func getWsHandler(path string, receiver chan types.Message) func(conn *websocket
 		// handlers are run in new goroutines, so we don't need to spawn
 		// another goroutine.
 		for {
-			timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
+			timeout, cancel := context.WithCancel(context.Background())
 			_, payload, err := conn.Read(timeout)
 			if err != nil {
+				defer cancel()
 				conn.Close(websocket.StatusAbnormalClosure, "ws closed by client")
 				break
 			}

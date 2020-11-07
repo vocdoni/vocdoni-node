@@ -123,11 +123,10 @@ func (ev *EthereumEvents) AddEventHandler(h EventHandler) {
 func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBlock *int64) {
 	log.Debugf("dialing for %s", ev.DialAddr)
 	client, err := ethclient.Dial(ev.DialAddr)
-	defer client.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	defer client.Close()
 	// Get current block
 	getBlockTimeout, getBlockCancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer getBlockCancel()
