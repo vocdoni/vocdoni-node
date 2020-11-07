@@ -25,8 +25,8 @@ const (
 	EthereumConfirmationsThreshold = 6
 	EntityResolverDomain           = "entity-resolver.vocdoni.eth"
 	EntityMetaKey                  = "vnd.vocdoni.meta"
-	EthereumReadTimeout            = 2 * time.Second
-	EthereumWriteTimeout           = 5 * time.Second
+	EthereumReadTimeout            = 1 * time.Minute
+	EthereumWriteTimeout           = 1 * time.Minute
 	// Scrutinizer
 
 	// ScrutinizerLiveProcessPrefix is used for sotring temporary results on live

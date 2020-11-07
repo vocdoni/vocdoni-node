@@ -110,10 +110,10 @@ func (p *Proxy) Init() error {
 	if len(p.C.SSLDomain) > 0 {
 		log.Infof("fetching letsencrypt TLS certificate for %s", p.C.SSLDomain)
 		s, m := p.GenerateSSLCertificate()
-		s.ReadTimeout = 5 * time.Second
-		s.WriteTimeout = 10 * time.Second
+		s.ReadTimeout = 10 * time.Second
+		s.WriteTimeout = 20 * time.Second
 		s.IdleTimeout = 30 * time.Second
-		s.ReadHeaderTimeout = 2 * time.Second
+		s.ReadHeaderTimeout = 3 * time.Second
 		s.Handler = p.Server
 		log.Info("starting go-chi https server")
 		go func() {
@@ -131,10 +131,10 @@ func (p *Proxy) Init() error {
 	} else {
 		log.Info("starting go-chi http server")
 		s := &http.Server{
-			ReadTimeout:       5 * time.Second, // @jordipainan enough ??
-			WriteTimeout:      10 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      20 * time.Second,
 			IdleTimeout:       60 * time.Second,
-			ReadHeaderTimeout: 2 * time.Second,
+			ReadHeaderTimeout: 3 * time.Second,
 			Handler:           p.Server,
 		}
 		go func() {
@@ -275,9 +275,7 @@ func (p *Proxy) ProxyIPC(path string) http.HandlerFunc {
 func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 	return func(c *websocket.Conn) {
 		for {
-			timeout, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
-			defer cancel()
-			msgType, msg, err := c.Reader(timeout)
+			msgType, msg, err := c.Reader(context.Background())
 			if err != nil {
 				log.Debugf("websocket closed by the client: %s", err)
 				c.Close(websocket.StatusAbnormalClosure, "ws closed by client")
@@ -300,9 +298,7 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 				log.Warnf("cannot read response: %s", err)
 				continue
 			}
-			writeTimeout, cancelTimeout := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancelTimeout()
-			if err := c.Write(writeTimeout, msgType, respBody); err != nil {
+			if err := c.Write(context.Background(), msgType, respBody); err != nil {
 				log.Warnf("cannot write message: %s", err)
 			}
 		}
@@ -329,13 +325,13 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 		}
 		wsClient.SetReadLimit(readLimit)
 		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		// Read from remote and write to local
 		go func() {
 			for {
 				select {
 				case <-ctx.Done():
 					log.Debugf("websocket connection to %s closed, received context Done", url)
+					cancel()
 					return
 				default:
 					t, data, err := wsClient.ReadMessage()
@@ -358,6 +354,7 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 			msgType, msg, err := wsServer.Reader(context.TODO())
 			if err != nil {
 				log.Debugf("websocket closed by the client: %s", err)
+				cancelRead()
 				break
 			}
 			respBody, err := ioutil.ReadAll(msg)
