@@ -231,7 +231,7 @@ func (is *IPFSsync) Handle(msg Message) error {
 				return err
 			}
 			is.Storage.Node.PeerHost.ConnManager().Protect(peerInfo.ID, "ipfsPeer")
-			return is.Storage.Node.PeerHost.Connect(context.TODO(), *peerInfo)
+			return is.Storage.Node.PeerHost.Connect(context.Background(), *peerInfo)
 			//return is.Storage.CoreAPI.Swarm().Connect(is.Storage.Node.Context(), *peerInfo)
 		}
 

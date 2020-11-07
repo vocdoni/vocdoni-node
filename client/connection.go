@@ -23,7 +23,7 @@ type Client struct {
 
 // New starts a connection with the given endpoint address.
 func New(addr string) (*Client, error) {
-	conn, _, err := websocket.Dial(context.TODO(), addr, nil)
+	conn, _, err := websocket.Dial(context.Background(), addr, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -61,10 +61,14 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 	}
 
 	log.Debugf("request: %s", reqBody)
-	if err := c.Conn.Write(context.TODO(), websocket.MessageText, reqBody); err != nil {
+	writeTimeout, writeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer writeCancel()
+	if err := c.Conn.Write(writeTimeout, websocket.MessageText, reqBody); err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
-	_, message, err := c.Conn.Read(context.TODO())
+	readTimeout, readCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer readCancel()
+	_, message, err := c.Conn.Read(readTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}

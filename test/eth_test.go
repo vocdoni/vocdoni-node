@@ -64,7 +64,8 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	listenerOutput := make(chan types.Message)
 	go ws.Listen(listenerOutput)
 	// create ws client
-	c, _, err := websocket.Dial(context.TODO(), pxyAddr, nil)
+	ctx := context.Background()
+	c, _, err := websocket.Dial(ctx, pxyAddr, nil)
 	if err != nil {
 		t.Fatalf("cannot dial web3ws: %s", err)
 	}
@@ -79,12 +80,16 @@ func TestWeb3WSEndpoint(t *testing.T) {
 				t.Fatalf("cannot marshal request: %s", err)
 			}
 			t.Logf("sending request: %v", tt.request)
-			err = c.Write(context.TODO(), websocket.MessageText, reqBytes)
+			writeTimeout, writeCancel := context.WithCancel(ctx)
+			err = c.Write(writeTimeout, websocket.MessageText, reqBytes)
+			defer writeCancel()
 			if err != nil {
 				t.Fatalf("cannot write to ws: %s", err)
 			}
 			// read message
-			_, message, err := c.Read(context.TODO())
+			readTimeout, readCancel := context.WithCancel(ctx)
+			_, message, err := c.Read(readTimeout)
+			defer readCancel()
 			if err != nil {
 				t.Fatalf("cannot read message: %s", err)
 			}
