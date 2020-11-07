@@ -51,9 +51,9 @@ func NewVotingProcessHandle(contractAddressHex string, dialEndpoint string) (*Pr
 }
 
 func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*types.NewProcessTx, error) {
-	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer cancel()
-	opts := &ethbind.CallOpts{Context: timeout}
+	opts := &ethbind.CallOpts{Context: tctx}
 	processMeta, err := ph.VotingProcess.Get(opts, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
@@ -97,30 +97,30 @@ func (ph *ProcessHandle) CancelProcessTxArgs(ctx context.Context, pid [32]byte) 
 }
 
 func (ph *ProcessHandle) ProcessIndex(ctx context.Context, pid [32]byte) (*big.Int, error) {
-	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer cancel()
-	opts := &ethbind.CallOpts{Context: timeout}
+	opts := &ethbind.CallOpts{Context: tctx}
 	return ph.VotingProcess.GetProcessIndex(opts, pid)
 }
 
 func (ph *ProcessHandle) Oracles(ctx context.Context) ([]string, error) {
-	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer cancel()
-	opts := &ethbind.CallOpts{Context: timeout}
+	opts := &ethbind.CallOpts{Context: tctx}
 	return ph.VotingProcess.GetOracles(opts)
 }
 
 func (ph *ProcessHandle) Validators(ctx context.Context) ([]string, error) {
-	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer cancel()
-	opts := &ethbind.CallOpts{Context: timeout}
+	opts := &ethbind.CallOpts{Context: tctx}
 	return ph.VotingProcess.GetValidators(opts)
 }
 
 func (ph *ProcessHandle) Genesis(ctx context.Context) (string, error) {
-	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer cancel()
-	opts := &ethbind.CallOpts{Context: timeout}
+	opts := &ethbind.CallOpts{Context: tctx}
 	return ph.VotingProcess.GetGenesis(opts)
 }
 
@@ -170,9 +170,9 @@ func (e *ENSCallerHandler) NewEntityResolverHandle() (err error) {
 func (e *ENSCallerHandler) Resolve(ctx context.Context, nameHash [32]byte, resolvePublicRegistry bool) (string, error) {
 	var err error
 	var resolvedAddr common.Address
-	timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer cancel()
-	opts := &ethbind.CallOpts{Context: timeout}
+	opts := &ethbind.CallOpts{Context: tctx}
 	if resolvePublicRegistry {
 		resolvedAddr, err = e.Registry.Resolver(opts, nameHash)
 	} else {
@@ -191,7 +191,7 @@ func VotingProcessAddress(ctx context.Context, publicRegistryAddr, domain, ethEn
 	if err != nil {
 		return "", err
 	}
-	client, err := ethclient.Dial(ethEndpoint)
+	client, err := ethclient.DialContext(ctx, ethEndpoint)
 	if err != nil {
 		log.Error(err)
 	}
@@ -297,7 +297,7 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, et
 	if err != nil {
 		return "", err
 	}
-	client, err := ethclient.Dial(ethEndpoint)
+	client, err := ethclient.DialContext(ctx, ethEndpoint)
 	if err != nil {
 		log.Error(err)
 	}
@@ -326,9 +326,9 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, et
 	}
 	var eIDBytes32 [32]byte
 	copy(eIDBytes32[:], eIDBytes)
-	timeout, cancel := context.WithTimeout(ctx, types.EthereumWriteTimeout)
+	tctx, cancel := context.WithTimeout(ctx, types.EthereumWriteTimeout)
 	defer cancel()
-	opts := &ethbind.CallOpts{Context: timeout}
+	opts := &ethbind.CallOpts{Context: tctx}
 	metaURL, err := ensCallerHandler.Resolver.Text(opts, eIDBytes32, types.EntityMetaKey)
 	if err != nil {
 		return "", err

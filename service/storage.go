@@ -27,7 +27,9 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys, ma *metrics.Age
 		go func() {
 			for {
 				time.Sleep(time.Second * 20)
-				stats, err := storage.Stats(context.Background())
+				tctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				stats, err := storage.Stats(tctx)
+				cancel()
 				if err != nil {
 					log.Warnf("IPFS node returned an error: %s", err)
 				}

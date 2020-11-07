@@ -249,9 +249,9 @@ func (e *EthChainContext) Start() {
 		if err != nil || client == nil {
 			log.Fatalf("cannot create a client connection: (%s)", err)
 		}
-		timeout, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
+		tctx, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
 		defer cancel()
-		nid, err := client.NetworkID(timeout)
+		nid, err := client.NetworkID(tctx)
 		if err != nil || nid == nil {
 			log.Fatalf("cannot get network ID from external web3: (%s)", err)
 		}
@@ -314,15 +314,15 @@ func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err e
 		info.Peers = 1 // force peers=1 if using external web3
 		var client *ethclient.Client
 		var sp *ethereum.SyncProgress
-		client, err = ethclient.Dial(e.DefaultConfig.W3external)
+		client, err = ethclient.DialContext(ctx, e.DefaultConfig.W3external)
 		if err != nil || client == nil {
 			log.Warnf("cannot retrieve information from external web3 endpoint: (%s)", err)
 			return
 		}
 		defer client.Close()
-		timeout, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+		tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 		defer cancel()
-		sp, err = client.SyncProgress(timeout)
+		sp, err = client.SyncProgress(tctx)
 		if err != nil {
 			log.Warn(err)
 			return
@@ -331,9 +331,9 @@ func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err e
 			info.MaxHeight = sp.HighestBlock
 			info.Height = sp.CurrentBlock
 		} else {
-			headerTimeout, headerCancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+			headerTctx, headerCancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 			defer headerCancel()
-			header, err2 := client.HeaderByNumber(headerTimeout, nil)
+			header, err2 := client.HeaderByNumber(headerTctx, nil)
 			if err2 != nil {
 				err = err2
 				log.Warn(err)

@@ -122,15 +122,15 @@ func (ev *EthereumEvents) AddEventHandler(h EventHandler) {
 // Blocking function (use go routine).
 func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBlock *int64) {
 	log.Debugf("dialing for %s", ev.DialAddr)
-	client, err := ethclient.Dial(ev.DialAddr)
+	client, err := ethclient.DialContext(ctx, ev.DialAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer client.Close()
 	// Get current block
-	getBlockTimeout, getBlockCancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-	defer getBlockCancel()
-	blk, err := client.BlockByNumber(getBlockTimeout, nil)
+	blockTctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout*2)
+	defer cancel()
+	blk, err := client.BlockByNumber(blockTctx, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -140,9 +140,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 		startBlock := blk.Number().Int64()
 		ev.processEventLogsFromTo(ctx, *fromBlock, startBlock, client)
 		// Update block number
-		updateBlockTimeout, updateBlockCancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-		defer updateBlockCancel()
-		if blk, err = client.BlockByNumber(updateBlockTimeout, nil); err != nil {
+		if blk, err = client.BlockByNumber(blockTctx, nil); err != nil {
 			log.Fatal(err)
 		}
 		// For security, read also the new passed blocks before subscribing
@@ -191,9 +189,7 @@ func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context, from, to i
 		},
 	}
 
-	filterContext, cancel := context.WithCancel(ctx)
-	defer cancel()
-	logs, err := client.FilterLogs(filterContext, query)
+	logs, err := client.FilterLogs(ctx, query)
 	if err != nil {
 		return err
 	}
