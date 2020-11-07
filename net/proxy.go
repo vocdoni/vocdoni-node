@@ -275,10 +275,12 @@ func (p *Proxy) ProxyIPC(path string) http.HandlerFunc {
 func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 	return func(c *websocket.Conn) {
 		for {
-			msgType, msg, err := c.Reader(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			msgType, msg, err := c.Reader(ctx)
 			if err != nil {
 				log.Debugf("websocket closed by the client: %s", err)
 				c.Close(websocket.StatusAbnormalClosure, "ws closed by client")
+				cancel()
 				return
 			}
 			req, err := http.NewRequest("POST", url, msg)
@@ -298,9 +300,10 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 				log.Warnf("cannot read response: %s", err)
 				continue
 			}
-			if err := c.Write(context.Background(), msgType, respBody); err != nil {
+			if err := c.Write(ctx, msgType, respBody); err != nil {
 				log.Warnf("cannot write message: %s", err)
 			}
+			cancel()
 		}
 	}
 }
@@ -324,37 +327,31 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 			return
 		}
 		wsClient.SetReadLimit(readLimit)
-		ctx, cancel := context.WithCancel(context.Background())
 		// Read from remote and write to local
 		go func() {
 			for {
-				select {
-				case <-ctx.Done():
-					log.Debugf("websocket connection to %s closed, received context Done", url)
-					cancel()
+				// TODO: ReadMessage acepting context
+				t, data, err := wsClient.ReadMessage()
+				if err != nil {
+					log.Debugf("websocket connection to %s closed", url)
 					return
-				default:
-					t, data, err := wsClient.ReadMessage()
-					if err != nil {
-						log.Debugf("websocket connection to %s closed", url)
-						cancel()
-						return
-					}
-					ctx2, cancel := context.WithTimeout(ctx, time.Second*10)
-					if err := wsServer.Write(ctx2, websocket.MessageType(t), data); err != nil {
-						log.Warnf("cannot write message to local websocket: (%s)", err)
-						return
-					}
+				}
+				ctx2, cancel2 := context.WithTimeout(context.Background(), time.Minute)
+				defer cancel2()
+				if err := wsServer.Write(ctx2, websocket.MessageType(t), data); err != nil {
+					log.Warnf("cannot write message to local websocket: (%s)", err)
+					return
 				}
 			}
 		}()
 
 		// Read local messages and write to remote
 		for {
-			msgType, msg, err := wsServer.Reader(context.TODO())
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			msgType, msg, err := wsServer.Reader(ctx)
 			if err != nil {
 				log.Debugf("websocket closed by the client: %s", err)
-				cancelRead()
+				cancel()
 				break
 			}
 			respBody, err := ioutil.ReadAll(msg)
@@ -363,10 +360,10 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 				continue
 			}
 			if err := wsClient.WriteMessage(int(msgType), respBody); err != nil {
+				cancel()
 				break
 			}
 		}
-		cancel()
 		wsServer.Close(websocket.StatusAbnormalClosure, "ws closed by client")
 		wsClient.Close()
 	}

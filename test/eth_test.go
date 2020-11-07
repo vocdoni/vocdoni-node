@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"gitlab.com/vocdoni/go-dvote/chain"
@@ -64,8 +65,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	listenerOutput := make(chan types.Message)
 	go ws.Listen(listenerOutput)
 	// create ws client
-	ctx := context.Background()
-	c, _, err := websocket.Dial(ctx, pxyAddr, nil)
+	c, _, err := websocket.Dial(context.Background(), pxyAddr, nil)
 	if err != nil {
 		t.Fatalf("cannot dial web3ws: %s", err)
 	}
@@ -80,16 +80,14 @@ func TestWeb3WSEndpoint(t *testing.T) {
 				t.Fatalf("cannot marshal request: %s", err)
 			}
 			t.Logf("sending request: %v", tt.request)
-			writeTimeout, writeCancel := context.WithCancel(ctx)
-			err = c.Write(writeTimeout, websocket.MessageText, reqBytes)
-			defer writeCancel()
+			tctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+			err = c.Write(tctx, websocket.MessageText, reqBytes)
 			if err != nil {
 				t.Fatalf("cannot write to ws: %s", err)
 			}
 			// read message
-			readTimeout, readCancel := context.WithCancel(ctx)
-			_, message, err := c.Read(readTimeout)
-			defer readCancel()
+			_, message, err := c.Read(tctx)
 			if err != nil {
 				t.Fatalf("cannot read message: %s", err)
 			}

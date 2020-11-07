@@ -72,12 +72,12 @@ func (m *Manager) HTTPhandler(ctx context.Context, w http.ResponseWriter, req *h
 	}
 	var toWait = censusHTTPhandlerTimeout
 	// use a bigger timeout for remote storage operations
-	if req.Method == "importRemove" || req.Method == "publish" {
+	if req.Method == "importRemote" || req.Method == "publish" {
 		toWait = censusRemoteStorageTimeout
 	}
-	timeout, cancel := context.WithTimeout(ctx, toWait)
+	tctx, cancel := context.WithTimeout(ctx, toWait)
 	defer cancel()
-	resp := m.Handler(timeout, &reqInner, auth, "")
+	resp := m.Handler(tctx, &reqInner, auth, "")
 	resp.Request = reqOuter.ID
 
 	respInner, err := crypto.SortedMarshalJSON(resp)

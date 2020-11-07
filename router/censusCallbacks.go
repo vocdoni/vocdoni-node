@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"time"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -17,7 +18,7 @@ func (r *Router) censusLocal(request routerRequest) {
 			return
 		}
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	resp := r.census.Handler(ctx, &request.MetaRequest, auth, util.TrimHex(addr.String())+"/")
 	if !resp.Ok {
