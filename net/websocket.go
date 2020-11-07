@@ -33,7 +33,13 @@ func (c WebsocketContext) ConnectionType() string {
 }
 
 func (c *WebsocketContext) Send(msg types.Message) {
-	c.Conn.Write(context.TODO(), websocket.MessageBinary, msg.Data)
+	timeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// close connection ?
+	err := c.Conn.Write(timeout, websocket.MessageBinary, msg.Data)
+	if err != nil {
+		log.Warnf("failed sending ws message: %s", err)
+	}
 }
 
 // SetProxy sets the proxy for the ws
@@ -62,7 +68,9 @@ func getWsHandler(path string, receiver chan types.Message) func(conn *websocket
 		// handlers are run in new goroutines, so we don't need to spawn
 		// another goroutine.
 		for {
-			_, payload, err := conn.Read(context.TODO())
+			timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_, payload, err := conn.Read(timeout)
 			if err != nil {
 				conn.Close(websocket.StatusAbnormalClosure, "ws closed by client")
 				break

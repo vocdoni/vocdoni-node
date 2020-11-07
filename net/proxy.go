@@ -131,7 +131,7 @@ func (p *Proxy) Init() error {
 	} else {
 		log.Info("starting go-chi http server")
 		s := &http.Server{
-			ReadTimeout:       5 * time.Second,
+			ReadTimeout:       5 * time.Second, // @jordipainan enough ??
 			WriteTimeout:      10 * time.Second,
 			IdleTimeout:       60 * time.Second,
 			ReadHeaderTimeout: 2 * time.Second,
@@ -275,7 +275,9 @@ func (p *Proxy) ProxyIPC(path string) http.HandlerFunc {
 func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 	return func(c *websocket.Conn) {
 		for {
-			msgType, msg, err := c.Reader(context.TODO())
+			timeout, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
+			defer cancel()
+			msgType, msg, err := c.Reader(timeout)
 			if err != nil {
 				log.Debugf("websocket closed by the client: %s", err)
 				c.Close(websocket.StatusAbnormalClosure, "ws closed by client")
@@ -298,7 +300,9 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 				log.Warnf("cannot read response: %s", err)
 				continue
 			}
-			if err := c.Write(context.TODO(), msgType, respBody); err != nil {
+			writeTimeout, cancelTimeout := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancelTimeout()
+			if err := c.Write(writeTimeout, msgType, respBody); err != nil {
 				log.Warnf("cannot write message: %s", err)
 			}
 		}
@@ -325,6 +329,7 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 		}
 		wsClient.SetReadLimit(readLimit)
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		// Read from remote and write to local
 		go func() {
 			for {
@@ -336,15 +341,14 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 					t, data, err := wsClient.ReadMessage()
 					if err != nil {
 						log.Debugf("websocket connection to %s closed", url)
+						cancel()
 						return
 					}
 					ctx2, cancel := context.WithTimeout(ctx, time.Second*10)
 					if err := wsServer.Write(ctx2, websocket.MessageType(t), data); err != nil {
 						log.Warnf("cannot write message to local websocket: (%s)", err)
-						cancel()
 						return
 					}
-					cancel()
 				}
 			}
 		}()
