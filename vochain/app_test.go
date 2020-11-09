@@ -3,8 +3,6 @@ package vochain
 import (
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -18,12 +16,12 @@ import (
 )
 
 func TestCheckTX(t *testing.T) {
-	app, err := NewBaseApplication(tempDir(t, "vochain_checkTxTest"))
+	app, err := NewBaseApplication(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tr, err := tree.NewTree("testchecktx", tempDir(t, "vochain_checkTxTest_db"))
+	tr, err := tree.NewTree("testchecktx", t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,16 +101,6 @@ func TestCheckTX(t *testing.T) {
 		app.Commit()
 	}
 
-}
-
-func tempDir(tb testing.TB, name string) string {
-	tb.Helper()
-	dir, err := ioutil.TempDir("", name+"*")
-	if err != nil {
-		tb.Fatal(err)
-	}
-	tb.Cleanup(func() { os.RemoveAll(dir) })
-	return dir
 }
 
 // CreateEthRandomKeysBatch creates a set of eth random signing keys

@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"gitlab.com/vocdoni/go-dvote/chain"
 	"gitlab.com/vocdoni/go-dvote/config"
-	dnet "gitlab.com/vocdoni/go-dvote/net"
+	vnet "gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"nhooyr.io/websocket"
@@ -45,7 +46,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	// create the proxy
 	pxy := testcommon.NewMockProxy(t)
 	// create ethereum node
-	node, err := NewMockEthereum(testcommon.TempDir(t, "ethereum"), pxy)
+	node, err := NewMockEthereum(t.TempDir(), pxy)
 	if err != nil {
 		t.Fatalf("cannot create ethereum node: %s", err)
 	}
@@ -57,14 +58,14 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	// proxy websocket handle
 	pxyAddr := fmt.Sprintf("ws://%s/web3ws", pxy.Addr)
 	// Create WebSocket endpoint
-	ws := new(dnet.WebsocketHandle)
+	ws := new(vnet.WebsocketHandle)
 	ws.Init(new(types.Connection))
 	ws.SetProxy(pxy)
 	// Create the listener for routing messages
 	listenerOutput := make(chan types.Message)
 	go ws.Listen(listenerOutput)
 	// create ws client
-	c, _, err := websocket.Dial(context.TODO(), pxyAddr, nil)
+	c, _, err := websocket.Dial(context.Background(), pxyAddr, nil)
 	if err != nil {
 		t.Fatalf("cannot dial web3ws: %s", err)
 	}
@@ -79,12 +80,14 @@ func TestWeb3WSEndpoint(t *testing.T) {
 				t.Fatalf("cannot marshal request: %s", err)
 			}
 			t.Logf("sending request: %v", tt.request)
-			err = c.Write(context.TODO(), websocket.MessageText, reqBytes)
+			tctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+			err = c.Write(tctx, websocket.MessageText, reqBytes)
 			if err != nil {
 				t.Fatalf("cannot write to ws: %s", err)
 			}
 			// read message
-			_, message, err := c.Read(context.TODO())
+			_, message, err := c.Read(tctx)
 			if err != nil {
 				t.Fatalf("cannot read message: %s", err)
 			}
@@ -104,7 +107,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 }
 
 // NewMockEthereum creates an ethereum node, attaches a signing key and adds a http or ws endpoint to a given proxy
-func NewMockEthereum(dataDir string, pxy *dnet.Proxy) (*chain.EthChainContext, error) {
+func NewMockEthereum(dataDir string, pxy *vnet.Proxy) (*chain.EthChainContext, error) {
 	// create base config
 	ethConfig := &config.EthCfg{
 		LogLevel:  "error",
@@ -129,6 +132,6 @@ func NewMockEthereum(dataDir string, pxy *dnet.Proxy) (*chain.EthChainContext, e
 	}
 	// register node endpoint
 	pxy.AddHandler(w3Config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)))
-	pxy.AddWsHandler(w3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)))
+	pxy.AddWsHandler(w3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)), vnet.Web3WsReadLimit)
 	return node, nil
 }

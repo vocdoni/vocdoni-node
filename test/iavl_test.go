@@ -18,7 +18,7 @@ func TestVochainState(t *testing.T) {
 	t.Parallel()
 
 	c := amino.NewCodec()
-	s, err := vochain.NewState(testcommon.TempDir(t, "vochain-db"), c)
+	s, err := vochain.NewState(t.TempDir(), c)
 	if err != nil {
 		t.Fatalf("cannot create vochain state (%s)", err)
 	}

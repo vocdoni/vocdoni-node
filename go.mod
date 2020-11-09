@@ -83,5 +83,3 @@ require (
 // https://github.com/ethereum/go-ethereum/issues/20590 is fixed, stub it out
 // with a replace directive. The stub was hacked together with vim.
 replace gopkg.in/olebedev/go-duktape.v3 => ./duktape-stub
-
-replace git.sr.ht/~sircmpwn/go-bare => git.sr.ht/~mvdan/go-bare v0.0.0-20201103151300-d72d2724d2e1

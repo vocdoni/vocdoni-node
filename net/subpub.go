@@ -37,9 +37,8 @@ func (p *SubPubHandle) Init(c *types.Connection) error {
 }
 
 func (s *SubPubHandle) Listen(reciever chan<- types.Message) {
-	ctx := context.TODO()
-	s.SubPub.Start(ctx)
-	go s.SubPub.Subscribe(ctx)
+	s.SubPub.Start(context.Background())
+	go s.SubPub.Subscribe(context.Background())
 	var msg types.Message
 	for {
 		msg.Data = <-s.SubPub.Reader

@@ -18,7 +18,7 @@ type Storage interface {
 	ListPins(ctx context.Context) (map[string]string, error)
 	URIprefix() string
 	Stats(ctx context.Context) (string, error)
-	CollectMetrics(ma *metrics.Agent, ctx context.Context) error
+	CollectMetrics(ctx context.Context, ma *metrics.Agent) error
 
 	// TODO(mvdan): Temporary until we rethink Init/Start/etc.
 	Stop() error

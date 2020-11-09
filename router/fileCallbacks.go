@@ -12,7 +12,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-const fetchFileTimeout = time.Second * 10
+const storageTimeout = time.Minute
 
 func (r *Router) fetchFile(request routerRequest) {
 	log.Debugf("calling FetchFile %s", request.URI)
@@ -28,7 +28,7 @@ func (r *Router) fetchFile(request routerRequest) {
 			found = true
 			splt := strings.Split(parsedURIs[idx], "/")
 			hash := splt[len(splt)-1]
-			ctx, cancel := context.WithTimeout(context.Background(), fetchFileTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
 			content, err = r.storage.Retrieve(ctx, hash)
 			if err == nil && len(content) == 0 {
 				err = fmt.Errorf("no content fetched")
@@ -67,11 +67,13 @@ func (r *Router) addFile(request routerRequest) {
 		r.sendError(request, "could not decode base64 content")
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
+	defer cancel()
 	switch reqType {
 	case "swarm":
 		// TODO
 	case "ipfs":
-		cid, err := r.storage.Publish(context.TODO(), b64content)
+		cid, err := r.storage.Publish(ctx, b64content)
 		if err != nil {
 			r.sendError(request,
 				fmt.Sprintf("cannot add file (%s)", err))
@@ -86,7 +88,9 @@ func (r *Router) addFile(request routerRequest) {
 
 func (r *Router) pinList(request routerRequest) {
 	log.Debug("calling PinList")
-	pins, err := r.storage.ListPins(context.TODO())
+	ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
+	defer cancel()
+	pins, err := r.storage.ListPins(ctx)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("internal error fetching pins (%s)", err))
 		return
@@ -103,7 +107,9 @@ func (r *Router) pinList(request routerRequest) {
 
 func (r *Router) pinFile(request routerRequest) {
 	log.Debugf("calling PinFile %s", request.URI)
-	err := r.storage.Pin(context.TODO(), request.URI)
+	ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
+	defer cancel()
+	err := r.storage.Pin(ctx, request.URI)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("error pinning file (%s)", err))
 		return
@@ -114,7 +120,9 @@ func (r *Router) pinFile(request routerRequest) {
 
 func (r *Router) unpinFile(request routerRequest) {
 	log.Debugf("calling UnPinFile %s", request.URI)
-	err := r.storage.Unpin(context.TODO(), request.URI)
+	ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
+	defer cancel()
+	err := r.storage.Unpin(ctx, request.URI)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("could not unpin file (%s)", err))
 		return

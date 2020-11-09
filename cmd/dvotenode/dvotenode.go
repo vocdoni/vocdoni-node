@@ -75,6 +75,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	globalCfg.API.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
 	globalCfg.API.ListenPort = *flag.Int("listenPort", 9090, "API endpoint http port")
+	globalCfg.API.WebsocketsReadLimit = *flag.Int64("apiWsReadLimit", vnet.Web3WsReadLimit, "dvote websocket API read size limit in bytes")
 	// ssl
 	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "", "enable TLS secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	// ethereum node
@@ -157,6 +158,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 
 	// api
 	viper.BindPFlag("api.Websockets", flag.Lookup("apiws"))
+	viper.BindPFlag("api.WebsocketsReadLimit", flag.Lookup("apiWsReadLimit"))
 	viper.BindPFlag("api.Http", flag.Lookup("apihttp"))
 	viper.BindPFlag("api.File", flag.Lookup("fileApi"))
 	viper.BindPFlag("api.Census", flag.Lookup("censusApi"))
@@ -469,7 +471,7 @@ func main() {
 			if len(tp) != 2 {
 				log.Warnf("cannot get port from vochain RPC listen: %s", globalCfg.VochainConfig.RPCListen)
 			} else {
-				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket"))
+				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket", vnet.VochainWsReadLimit), vnet.VochainWsReadLimit) // tendermint needs up to 20 MB
 				log.Infof("tendermint API endpoint available at %s", "/tendermint")
 			}
 		}
@@ -505,7 +507,9 @@ func main() {
 				requiredPeers = 1
 			}
 			for {
-				if info, err := node.SyncInfo(); err == nil && info.Synced && info.Peers >= requiredPeers && info.Height > 0 {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				defer cancel()
+				if info, err := node.SyncInfo(ctx); err == nil && info.Synced && info.Peers >= requiredPeers && info.Height > 0 {
 					log.Infof("ethereum blockchain synchronized (%+v)", info)
 					break
 				}

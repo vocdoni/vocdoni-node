@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -43,11 +44,11 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 
 	// Start Ethereum node
 	node.Start()
-	go node.PrintInfo(time.Second * 20)
+	go node.PrintInfo(context.Background(), time.Second*20)
 	w3uri := w3cfg.W3external
 	if w3uri == "" {
 		// Grab ethereum metrics loop
-		go node.CollectMetrics(ma)
+		go node.CollectMetrics(context.Background(), ma)
 		log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
 		w3uri = fmt.Sprintf("http://%s:%d", w3cfg.RPCHost, w3cfg.RPCPort)
 	}
@@ -56,10 +57,10 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 		return
 	}
 	if strings.HasPrefix(w3uri, "http") {
-		pxy.AddMixedHandler(w3config.Route, pxy.AddEndpoint(w3uri), pxy.AddWsHTTPBridge(w3uri))
+		pxy.AddMixedHandler(w3config.Route, pxy.AddEndpoint(w3uri), pxy.AddWsHTTPBridge(w3uri), net.Web3WsReadLimit) // 5MB read limit
 		log.Infof("web3 http/websocket endpoint available at %s", w3config.Route)
 	} else if strings.HasPrefix(w3uri, "ws") {
-		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri))
+		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri, net.Web3WsReadLimit), net.Web3WsReadLimit) // 5MB read limit
 		log.Infof("web3 websocket endpoint available at %s", w3config.Route)
 	} else if strings.HasSuffix(w3uri, ".ipc") {
 		info, err := os.Stat(w3uri)

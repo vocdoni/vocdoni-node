@@ -26,6 +26,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
+	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
@@ -241,14 +242,16 @@ func (e *EthChainContext) Start() {
 			e.Node.Server().AddPeer(p)
 			e.Node.Server().AddTrustedPeer(p)
 		}
-		go e.SyncGuard()
+		go e.SyncGuard(context.Background())
 
 	} else {
 		client, err := ethclient.Dial(e.DefaultConfig.W3external)
 		if err != nil || client == nil {
 			log.Fatalf("cannot create a client connection: (%s)", err)
 		}
-		nid, err := client.NetworkID(context.Background())
+		tctx, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
+		defer cancel()
+		nid, err := client.NetworkID(tctx)
 		if err != nil || nid == nil {
 			log.Fatalf("cannot get network ID from external web3: (%s)", err)
 		}
@@ -271,14 +274,16 @@ func (e *EthChainContext) createAccount() error {
 }
 
 // PrintInfo prints every N seconds some ethereum information (sync and height). It's blocking!
-func (e *EthChainContext) PrintInfo(seconds time.Duration) {
+func (e *EthChainContext) PrintInfo(ctx context.Context, seconds time.Duration) {
 	var lastHeight uint64
 	var info EthSyncInfo
 	var err error
 	var syncingInfo string
 	for {
 		time.Sleep(seconds)
-		info, err = e.SyncInfo()
+		tctx, cancel := context.WithTimeout(ctx, time.Minute)
+		info, err = e.SyncInfo(tctx)
+		cancel()
 		if err != nil {
 			log.Warn(err)
 			continue
@@ -303,7 +308,7 @@ type EthSyncInfo struct {
 }
 
 // SyncInfo returns the height and syncing Ethereum blockchain information
-func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
+func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err error) {
 	// External Web3
 	if len(e.DefaultConfig.W3external) > 0 {
 		info.Mode = "external"
@@ -311,13 +316,11 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 		info.Peers = 1 // force peers=1 if using external web3
 		var client *ethclient.Client
 		var sp *ethereum.SyncProgress
-		client, err = ethclient.Dial(e.DefaultConfig.W3external)
+		client, err = ethclient.DialContext(ctx, e.DefaultConfig.W3external)
 		if err != nil || client == nil {
 			log.Warnf("cannot retrieve information from external web3 endpoint: (%s)", err)
 			return
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
 		defer client.Close()
 		sp, err = client.SyncProgress(ctx)
 		if err != nil {
@@ -378,11 +381,11 @@ func (e *EthChainContext) SyncInfo() (info EthSyncInfo, err error) {
 	return
 }
 
-func (e *EthChainContext) SyncGuard() {
+func (e *EthChainContext) SyncGuard(ctx context.Context) {
 	log.Infof("starting ethereum sync guard")
 	for {
 		time.Sleep(time.Second * 120)
-		si, err := e.SyncInfo()
+		si, err := e.SyncInfo(ctx)
 		if err != nil {
 			continue
 		}

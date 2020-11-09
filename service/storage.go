@@ -27,7 +27,9 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys, ma *metrics.Age
 		go func() {
 			for {
 				time.Sleep(time.Second * 20)
-				stats, err := storage.Stats(context.TODO())
+				tctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				stats, err := storage.Stats(tctx)
+				cancel()
 				if err != nil {
 					log.Warnf("IPFS node returned an error: %s", err)
 				}
@@ -35,7 +37,7 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys, ma *metrics.Age
 			}
 		}()
 
-		go storage.CollectMetrics(ma, context.TODO())
+		go storage.CollectMetrics(context.Background(), ma)
 
 		if len(ipfsconfig.SyncKey) > 0 {
 			log.Info("enabling ipfs synchronization")

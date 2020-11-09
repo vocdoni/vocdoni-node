@@ -38,9 +38,8 @@ func (ps *SubPub) PeerStreamWrite(peerID string, msg []byte) error {
 // FindTopic opens one or multiple new streams with the peers announcing the namespace.
 // The callback function is executed once a new stream connection is created
 func (ps *SubPub) FindTopic(namespace string, callback func(*bufio.ReadWriter)) error {
-	ctx := context.TODO()
 	log.Infof("searching for topic %s", namespace)
-	peerChan, err := ps.routing.FindPeers(ctx, namespace)
+	peerChan, err := ps.routing.FindPeers(context.Background(), namespace)
 	if err != nil {
 		return err
 	}
@@ -50,7 +49,7 @@ func (ps *SubPub) FindTopic(namespace string, callback func(*bufio.ReadWriter)) 
 			continue
 		}
 		log.Infof("found peer: %s", peer.ID)
-		stream, err := ps.Host.NewStream(ctx, peer.ID, protocol.ID(ps.Topic))
+		stream, err := ps.Host.NewStream(context.Background(), peer.ID, protocol.ID(ps.Topic))
 		if err != nil {
 			log.Debugf("connection failed: ", err)
 			continue
@@ -72,7 +71,7 @@ func (ps *SubPub) TransportConnectPeer(maddr string) error {
 		return err
 	}
 	ps.Host.ConnManager().Protect(ai.ID, "customPeer")
-	return ps.Host.Connect(context.TODO(), *ai)
+	return ps.Host.Connect(context.Background(), *ai)
 }
 
 func parseMultiaddress(maddress []string) (ma []multiaddr.Multiaddr) {
@@ -110,7 +109,9 @@ func (ps *SubPub) peersManager() {
 			}
 		}
 		ps.PeersMu.Unlock()
-		ps.Host.ConnManager().TrimOpenConns(context.TODO()) // Not sure if it works
+		tctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ps.Host.ConnManager().TrimOpenConns(tctx) // Not sure if it works
+		cancel()
 		time.Sleep(ps.CollectionPeriod)
 	}
 }
