@@ -37,7 +37,7 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys, ma *metrics.Age
 			}
 		}()
 
-		go storage.CollectMetrics(ma, context.Background())
+		go storage.CollectMetrics(context.Background(), ma)
 
 		if len(ipfsconfig.SyncKey) > 0 {
 			log.Info("enabling ipfs synchronization")

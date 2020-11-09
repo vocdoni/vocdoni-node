@@ -70,7 +70,7 @@ func (m *Manager) HTTPhandler(ctx context.Context, w http.ResponseWriter, req *h
 		log.Warnf("authorization error: %s", err)
 		auth = false
 	}
-	var toWait = censusHTTPhandlerTimeout
+	toWait := censusHTTPhandlerTimeout
 	// use a bigger timeout for remote storage operations
 	if req.Method == "importRemote" || req.Method == "publish" {
 		toWait = censusRemoteStorageTimeout

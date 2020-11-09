@@ -281,7 +281,9 @@ func (e *EthChainContext) PrintInfo(ctx context.Context, seconds time.Duration) 
 	var syncingInfo string
 	for {
 		time.Sleep(seconds)
-		info, err = e.SyncInfo(ctx)
+		tctx, cancel := context.WithTimeout(ctx, time.Minute)
+		info, err = e.SyncInfo(tctx)
+		cancel()
 		if err != nil {
 			log.Warn(err)
 			continue
@@ -320,9 +322,7 @@ func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err e
 			return
 		}
 		defer client.Close()
-		tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-		defer cancel()
-		sp, err = client.SyncProgress(tctx)
+		sp, err = client.SyncProgress(ctx)
 		if err != nil {
 			log.Warn(err)
 			return
@@ -331,9 +331,7 @@ func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err e
 			info.MaxHeight = sp.HighestBlock
 			info.Height = sp.CurrentBlock
 		} else {
-			headerTctx, headerCancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-			defer headerCancel()
-			header, err2 := client.HeaderByNumber(headerTctx, nil)
+			header, err2 := client.HeaderByNumber(ctx, nil)
 			if err2 != nil {
 				err = err2
 				log.Warn(err)

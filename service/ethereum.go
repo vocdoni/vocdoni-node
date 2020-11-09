@@ -48,7 +48,7 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 	w3uri := w3cfg.W3external
 	if w3uri == "" {
 		// Grab ethereum metrics loop
-		go node.CollectMetrics(ma)
+		go node.CollectMetrics(context.Background(), ma)
 		log.Infof("ethereum node listening on %s", node.Node.Server().NodeInfo().ListenAddr)
 		w3uri = fmt.Sprintf("http://%s:%d", w3cfg.RPCHost, w3cfg.RPCPort)
 	}

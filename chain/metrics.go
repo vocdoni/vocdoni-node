@@ -42,9 +42,9 @@ func (e *EthChainContext) registerMetrics(ma *metrics.Agent) {
 	ma.Register(EthereumPeers)
 }
 
-// GetMetrics grabs diferent metrics about ethereum chain.
-func (e *EthChainContext) getMetrics() {
-	info, err := e.SyncInfo(context.Background())
+// getMetrics grabs diferent metrics about ethereum chain.
+func (e *EthChainContext) getMetrics(ctx context.Context) {
+	info, err := e.SyncInfo(ctx)
 	if err != nil {
 		log.Warn(err)
 		return
@@ -63,12 +63,14 @@ func (e *EthChainContext) getMetrics() {
 // CollectMetrics constantly updates the metric values for prometheus
 // The function is blocking, should be called in a go routine
 // If the metrics Agent is nil, do nothing
-func (e *EthChainContext) CollectMetrics(ma *metrics.Agent) {
+func (e *EthChainContext) CollectMetrics(ctx context.Context, ma *metrics.Agent) {
 	if ma != nil {
 		e.registerMetrics(ma)
 		for {
 			time.Sleep(ma.RefreshInterval)
-			e.getMetrics()
+			tctx, cancel := context.WithTimeout(ctx, time.Minute)
+			e.getMetrics(tctx)
+			cancel()
 		}
 	}
 }
