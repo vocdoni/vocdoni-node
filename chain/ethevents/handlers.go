@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -83,7 +84,9 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		// return nil
 	case HashLogProcessCreated.Hex():
 		// Get process metadata
-		processTx, err := processMeta(ctx, &e.ContractABI, event.Data, e.ProcessHandle)
+		tctx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+		processTx, err := processMeta(tctx, &e.ContractABI, event.Data, e.ProcessHandle)
 		if err != nil {
 			return err
 		}
@@ -119,7 +122,9 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 
 	case HashLogProcessCanceled.Hex():
-		cancelProcessTx, err := cancelProcessMeta(ctx, &e.ContractABI, event.Data, e.ProcessHandle)
+		tctx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+		cancelProcessTx, err := cancelProcessMeta(tctx, &e.ContractABI, event.Data, e.ProcessHandle)
 		if err != nil {
 			return err
 		}
@@ -188,7 +193,9 @@ func HandleCensus(ctx context.Context, event *ethtypes.Log, e *EthereumEvents) e
 		return nil
 	}
 	// Get process metadata
-	processTx, err := processMeta(ctx, &e.ContractABI, event.Data, e.ProcessHandle)
+	tctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	processTx, err := processMeta(tctx, &e.ContractABI, event.Data, e.ProcessHandle)
 	if err != nil {
 		return err
 	}

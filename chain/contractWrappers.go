@@ -51,9 +51,7 @@ func NewVotingProcessHandle(contractAddressHex string, dialEndpoint string) (*Pr
 }
 
 func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*types.NewProcessTx, error) {
-	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-	defer cancel()
-	opts := &ethbind.CallOpts{Context: tctx}
+	opts := &ethbind.CallOpts{Context: ctx}
 	processMeta, err := ph.VotingProcess.Get(opts, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
@@ -83,8 +81,6 @@ func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*type
 }
 
 func (ph *ProcessHandle) CancelProcessTxArgs(ctx context.Context, pid [32]byte) (*types.CancelProcessTx, error) {
-	ctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-	defer cancel()
 	opts := &ethbind.CallOpts{Context: ctx}
 	_, err := ph.VotingProcess.Get(opts, pid)
 	if err != nil {
@@ -97,30 +93,22 @@ func (ph *ProcessHandle) CancelProcessTxArgs(ctx context.Context, pid [32]byte) 
 }
 
 func (ph *ProcessHandle) ProcessIndex(ctx context.Context, pid [32]byte) (*big.Int, error) {
-	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-	defer cancel()
-	opts := &ethbind.CallOpts{Context: tctx}
+	opts := &ethbind.CallOpts{Context: ctx}
 	return ph.VotingProcess.GetProcessIndex(opts, pid)
 }
 
 func (ph *ProcessHandle) Oracles(ctx context.Context) ([]string, error) {
-	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-	defer cancel()
-	opts := &ethbind.CallOpts{Context: tctx}
+	opts := &ethbind.CallOpts{Context: ctx}
 	return ph.VotingProcess.GetOracles(opts)
 }
 
 func (ph *ProcessHandle) Validators(ctx context.Context) ([]string, error) {
-	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-	defer cancel()
-	opts := &ethbind.CallOpts{Context: tctx}
+	opts := &ethbind.CallOpts{Context: ctx}
 	return ph.VotingProcess.GetValidators(opts)
 }
 
 func (ph *ProcessHandle) Genesis(ctx context.Context) (string, error) {
-	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-	defer cancel()
-	opts := &ethbind.CallOpts{Context: tctx}
+	opts := &ethbind.CallOpts{Context: ctx}
 	return ph.VotingProcess.GetGenesis(opts)
 }
 
