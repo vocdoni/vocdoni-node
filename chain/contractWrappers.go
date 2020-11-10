@@ -14,11 +14,11 @@ import (
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/net/idna"
 
+	models "github.com/vocdoni/dvote-protobuf/go-vocdonitypes"
 	"gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 

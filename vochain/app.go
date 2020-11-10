@@ -3,7 +3,7 @@ package vochain
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	amino "github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
@@ -12,9 +12,9 @@ import (
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 
+	models "github.com/vocdoni/dvote-protobuf/go-vocdonitypes"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	models "gitlab.com/vocdoni/go-dvote/types/proto"
 )
 
 // BaseApplication reflects the ABCI application implementation.
@@ -104,7 +104,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	// get oracles
 	for _, v := range genesisAppState.Oracles {
 		log.Infof("adding genesis oracle %s", v)
-		app.State.AddOracle(common.HexToAddress(v))
+		app.State.AddOracle(ethcommon.HexToAddress(v))
 	}
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {

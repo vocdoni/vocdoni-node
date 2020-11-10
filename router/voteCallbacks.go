@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	models "github.com/vocdoni/dvote-protobuf/go-vocdonitypes"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
-	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
 	"google.golang.org/protobuf/proto"

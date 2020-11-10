@@ -14,10 +14,10 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
 
+	models "github.com/vocdoni/dvote-protobuf/go-vocdonitypes"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/types"
-	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"

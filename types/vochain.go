@@ -8,7 +8,7 @@ import (
 	// dependencies which are too heavy for our low-level "types" package.
 	// libs/bytes is okay, because it only pulls in std deps.
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	models "gitlab.com/vocdoni/go-dvote/types/proto"
+	models "github.com/vocdoni/dvote-protobuf/go-vocdonitypes"
 )
 
 // ________________________ STATE ________________________

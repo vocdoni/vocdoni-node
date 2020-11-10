@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	models "github.com/vocdoni/dvote-protobuf/go-vocdonitypes"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
-	models "gitlab.com/vocdoni/go-dvote/types/proto"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"google.golang.org/protobuf/proto"
 )

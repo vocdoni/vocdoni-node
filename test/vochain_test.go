@@ -3,8 +3,7 @@ package test
 import (
 	"testing"
 
-	models "gitlab.com/vocdoni/go-dvote/types/proto"
-
+	models "github.com/vocdoni/dvote-protobuf/go-vocdonitypes"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
