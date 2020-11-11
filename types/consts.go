@@ -27,6 +27,7 @@ const (
 	EntityMetaKey                  = "vnd.vocdoni.meta"
 	EthereumReadTimeout            = 1 * time.Minute
 	EthereumWriteTimeout           = 1 * time.Minute
+	EthDialMaxRetry                = 10
 	// Scrutinizer
 
 	// ScrutinizerLiveProcessPrefix is used for sotring temporary results on live

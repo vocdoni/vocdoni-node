@@ -245,9 +245,18 @@ func (e *EthChainContext) Start() {
 		go e.SyncGuard(context.Background())
 
 	} else {
-		client, err := ethclient.Dial(e.DefaultConfig.W3external)
+
+		var client *ethclient.Client
+		var err error
+		for i := 0; i < types.EthDialMaxRetry; i++ {
+			client, err = ethclient.Dial(e.DefaultConfig.W3external)
+			if err != nil || client == nil {
+				log.Warnf("cannot create a client connection: (%s), trying again (%d of %d)", err, i+1, types.EthDialMaxRetry)
+			}
+			time.Sleep(time.Second * 2)
+		}
 		if err != nil || client == nil {
-			log.Fatalf("cannot create a client connection: (%s)", err)
+			log.Fatalf("cannot create a client connection: (%s), tried %d times.", err, types.EthDialMaxRetry)
 		}
 		tctx, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
 		defer cancel()
@@ -316,11 +325,18 @@ func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err e
 		info.Peers = 1 // force peers=1 if using external web3
 		var client *ethclient.Client
 		var sp *ethereum.SyncProgress
-		client, err = ethclient.DialContext(ctx, e.DefaultConfig.W3external)
-		if err != nil || client == nil {
-			log.Warnf("cannot retrieve information from external web3 endpoint: (%s)", err)
-			return
+
+		for i := 0; i < types.EthDialMaxRetry; i++ {
+			client, err = ethclient.DialContext(ctx, e.DefaultConfig.W3external)
+			if err != nil || client == nil {
+				log.Warnf("cannot retrieve information from external web3 endpoint: (%s), trying again (%d of %d)", err, i+1, types.EthDialMaxRetry)
+			}
+			time.Sleep(time.Second * 2)
 		}
+		if err != nil || client == nil {
+			log.Fatalf("cannot retrieve information from external web3 endpoint: (%s), tried %d times.", err, types.EthDialMaxRetry)
+		}
+
 		defer client.Close()
 		sp, err = client.SyncProgress(ctx)
 		if err != nil {
