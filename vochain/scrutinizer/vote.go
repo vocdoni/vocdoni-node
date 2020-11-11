@@ -80,7 +80,7 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
 		return err
 	}
 
-	if err := s.Storage.Put(s.encode("process", pid), process); err != nil {
+	if err := s.Storage.Put(s.encode("liveProcess", pid), process); err != nil {
 		return err
 	}
 
