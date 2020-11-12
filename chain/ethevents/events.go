@@ -276,5 +276,4 @@ func (ev *EthereumEvents) runEventProcessor(ctx context.Context) {
 
 		}
 	}
-
 }
