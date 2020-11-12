@@ -298,11 +298,9 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 				log.Warnf("cannot read response: %s", err)
 				continue
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			if err := c.Write(ctx, msgType, respBody); err != nil {
+			if err := c.Write(context.TODO(), msgType, respBody); err != nil {
 				log.Warnf("cannot write message: %s", err)
 			}
-			cancel()
 		}
 	}
 }
@@ -335,23 +333,18 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 					log.Debugf("websocket connection to %s closed", url)
 					return
 				}
-				tctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-				if err := wsServer.Write(tctx, websocket.MessageType(t), data); err != nil {
+				if err := wsServer.Write(context.TODO(), websocket.MessageType(t), data); err != nil {
 					log.Warnf("cannot write message to local websocket: (%s)", err)
-					cancel()
 					return
 				}
-				cancel()
 			}
 		}()
 
 		// Read local messages and write to remote
 		for {
-			tctx, cancel := context.WithCancel(context.TODO())
-			msgType, msg, err := wsServer.Reader(tctx)
+			msgType, msg, err := wsServer.Reader(context.TODO())
 			if err != nil {
 				log.Debugf("websocket closed by the client: %s", err)
-				cancel()
 				break
 			}
 			respBody, err := ioutil.ReadAll(msg)
@@ -360,7 +353,6 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 				continue
 			}
 			if err := wsClient.WriteMessage(int(msgType), respBody); err != nil {
-				cancel()
 				break
 			}
 		}
