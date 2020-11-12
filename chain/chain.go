@@ -248,15 +248,17 @@ func (e *EthChainContext) Start() {
 
 		var client *ethclient.Client
 		var err error
-		for i := 0; i < types.EthDialMaxRetry; i++ {
+		for i := 0; i < types.EthereumDialMaxRetry; i++ {
 			client, err = ethclient.Dial(e.DefaultConfig.W3external)
 			if err != nil || client == nil {
-				log.Warnf("cannot create a client connection: (%s), trying again (%d of %d)", err, i+1, types.EthDialMaxRetry)
+				log.Warnf("cannot create a client connection: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
+				time.Sleep(time.Second * 2)
+				continue
 			}
-			time.Sleep(time.Second * 2)
+			break
 		}
 		if err != nil || client == nil {
-			log.Fatalf("cannot create a client connection: (%s), tried %d times.", err, types.EthDialMaxRetry)
+			log.Fatalf("cannot create a client connection: (%s), tried %d times.", err, types.EthereumDialMaxRetry)
 		}
 		tctx, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
 		defer cancel()
@@ -326,15 +328,17 @@ func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err e
 		var client *ethclient.Client
 		var sp *ethereum.SyncProgress
 
-		for i := 0; i < types.EthDialMaxRetry; i++ {
+		for i := 0; i < types.EthereumDialMaxRetry; i++ {
 			client, err = ethclient.DialContext(ctx, e.DefaultConfig.W3external)
 			if err != nil || client == nil {
-				log.Warnf("cannot retrieve information from external web3 endpoint: (%s), trying again (%d of %d)", err, i+1, types.EthDialMaxRetry)
+				log.Warnf("cannot retrieve information from external web3 endpoint: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
+				time.Sleep(time.Second * 2)
+				continue
 			}
-			time.Sleep(time.Second * 2)
+			break
 		}
 		if err != nil || client == nil {
-			log.Fatalf("cannot retrieve information from external web3 endpoint: (%s), tried %d times.", err, types.EthDialMaxRetry)
+			log.Fatalf("cannot retrieve information from external web3 endpoint: (%s), tried %d times.", err, types.EthereumDialMaxRetry)
 		}
 
 		defer client.Close()
