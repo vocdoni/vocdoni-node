@@ -143,8 +143,7 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 	}
 }
 
-// List returns a list of keys matching a given prefix.
-// The result slice is not converted to hexadecimal, it is the raw string data stored in the database.
+// List returns a list of keys matching a given prefix. If from is specified, it will seek to the prefix+form key (if found).
 func (s *Scrutinizer) List(max int64, from, prefix []byte) [][]byte {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
 	list := [][]byte{}

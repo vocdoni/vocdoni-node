@@ -18,30 +18,31 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*types.Process, error) {
 	return s.VochainState.Process(pid, false)
 }
 
-func (s *Scrutinizer) ProcessList(entityID []byte, fromID []byte, max int64) ([]string, error) {
+// ProcessList returns the list of processes (finished or not) for a specific entity.
+func (s *Scrutinizer) ProcessList(entityID []byte, fromID []byte, max int64) ([][]byte, error) {
 	plistkey := []byte{types.ScrutinizerEntityPrefix}
 	plistkey = append(plistkey, entityID...)
 	processList, err := s.Storage.Get(plistkey)
 	if err != nil {
 		return nil, err
 	}
-
-	processListString := []string{}
+	processListResult := [][]byte{}
 	fromLock := len(fromID) > 0
-	for _, process := range bytes.Split(processList, []byte{types.ScrutinizerEntityProcessSeparator}) {
+	for _, process := range util.SplitBytes(processList, types.ProcessIDsize) {
 		if max < 1 || len(process) < 1 {
 			break
 		}
 		if !fromLock {
-			processListString = append(processListString, fmt.Sprintf("%x", process))
+			keyCopy := make([]byte, len(process))
+			copy(keyCopy, process)
+			processListResult = append(processListResult, keyCopy)
 			max--
 		}
-		if fromLock && string(fromID) == string(process) {
+		if fromLock && bytes.Equal(fromID, process) {
 			fromLock = false
 		}
 	}
-
-	return processListString, nil
+	return processListResult, nil
 }
 
 func (s *Scrutinizer) ProcessListWithResults(max int64, fromID string) ([]string, error) {
@@ -186,8 +187,6 @@ func (s *Scrutinizer) encode(t string, data []byte) []byte {
 		return append([]byte{types.ScrutinizerEntityPrefix}, data...)
 	case "liveProcess":
 		return append([]byte{types.ScrutinizerLiveProcessPrefix}, data...)
-	case "processSeparator":
-		return append(data, types.ScrutinizerEntityProcessSeparator)
 	case "results":
 		return append([]byte{types.ScrutinizerResultsPrefix}, data...)
 	case "processEnding":
@@ -201,15 +200,22 @@ func (s *Scrutinizer) addEntity(eid, pid []byte) {
 	storagekey := s.encode("entity", eid)
 	processList, err := s.Storage.Get(storagekey)
 	if err != nil && err != badger.ErrKeyNotFound {
-		log.Error(err)
+		log.Errorf("addEntity: %s", err)
 		return
 	}
-	processList = append(processList, s.encode("processSeparator", pid)...)
+	if err == badger.ErrKeyNotFound {
+		log.Infof("added new entity %x to scrutinizer", eid)
+	}
+	if len(pid) != types.ProcessIDsize {
+		log.Errorf("addEntity: pid size is not correct, got %d", len(pid))
+		return
+	}
+	processList = append(processList, pid...)
 	if err := s.Storage.Put(storagekey, processList); err != nil {
 		log.Error(err)
 		return
 	}
-	log.Infof("added new entity %x to scrutinizer", eid)
+	log.Infof("added new process %x to scrutinizer", pid)
 	atomic.AddInt64(&s.entityCount, 1)
 }
 

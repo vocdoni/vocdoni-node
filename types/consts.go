@@ -34,8 +34,6 @@ const (
 	ScrutinizerLiveProcessPrefix = byte(0x21)
 	// ScrutinizerEntityPrefix is the prefix for the storage entity keys
 	ScrutinizerEntityPrefix = byte(0x22)
-	// ScrutinizerEntityProcessSeparator char for spliting process ID's in the scrutinizer entities
-	ScrutinizerEntityProcessSeparator = byte(0x23)
 	// ScrutinizerResultsPrefix is the prefix of the storage results summary keys
 	ScrutinizerResultsPrefix = byte(0x24)
 	// ScrutinizerProcessEndingPrefix is the prefix for keep track of the processes ending on a specific block
