@@ -10,6 +10,7 @@ package scrutinizer
 */
 
 import (
+	"bytes"
 	"fmt"
 
 	"gitlab.com/vocdoni/go-dvote/db"
@@ -144,17 +145,19 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 
 // List returns a list of keys matching a given prefix.
 // The result slice is not converted to hexadecimal, it is the raw string data stored in the database.
-func (s *Scrutinizer) List(max int64, from, prefix []byte) []string {
+func (s *Scrutinizer) List(max int64, from, prefix []byte) [][]byte {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
-	list := []string{}
+	list := [][]byte{}
 	for iter.Iter.Seek([]byte(fmt.Sprintf("%s%s", prefix, from))); iter.Iter.ValidForPrefix(prefix); iter.Iter.Next() {
-		k := string(iter.Key()[len(prefix):])
-		if len(from) > 0 && k == string(from) {
+		key := iter.Key()[len(prefix):]
+		if len(from) > 0 && bytes.Equal(key, from) {
+			// We don't include "from" in the result.
 			continue
 		}
-		list = append(list, k)
-		max--
-		if max < 1 {
+		keyCopy := make([]byte, len(key))
+		copy(keyCopy, key)
+		list = append(list, keyCopy)
+		if max--; max < 1 {
 			break
 		}
 	}
