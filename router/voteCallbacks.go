@@ -396,7 +396,7 @@ func (r *Router) getProcListLiveResults(request routerRequest) {
 	var err error
 	response.ProcessIDs, err = r.Scrutinizer.ProcessListWithLiveResults(request.ListSize, request.FromID)
 	if err != nil {
-		r.sendError(request, "cannot decode fromID")
+		r.sendError(request, err.Error())
 		return
 	}
 
@@ -412,7 +412,7 @@ func (r *Router) getScrutinizerEntities(request routerRequest) {
 	var err error
 	response.EntityIDs, err = r.Scrutinizer.EntityList(request.ListSize, request.FromID)
 	if err != nil {
-		r.sendError(request, "cannot decode fromID")
+		r.sendError(request, err.Error())
 		return
 	}
 

@@ -10,6 +10,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 // ProcessInfo returns the available information regarding an election process id
@@ -68,9 +69,13 @@ func (s *Scrutinizer) ProcessListWithLiveResults(max int64, fromID string) ([]st
 }
 
 func (s *Scrutinizer) EntityList(max int64, fromID string) ([]string, error) {
-	from, err := hex.DecodeString(fromID)
-	if err != nil {
-		return nil, err
+	var err error
+	var from []byte
+	if len(fromID) > 0 {
+		from, err = hex.DecodeString(util.TrimHex(fromID))
+		if err != nil {
+			return nil, err
+		}
 	}
 	entities := []string{}
 	for _, e := range s.List(max, from, []byte{types.ScrutinizerEntityPrefix}) {
@@ -204,7 +209,7 @@ func (s *Scrutinizer) addEntity(eid, pid []byte) {
 		log.Error(err)
 		return
 	}
-	log.Debugf("added new entity %x to scrutinizer", eid)
+	log.Infof("added new entity %x to scrutinizer", eid)
 	atomic.AddInt64(&s.entityCount, 1)
 }
 

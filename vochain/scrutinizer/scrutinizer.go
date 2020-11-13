@@ -10,6 +10,8 @@ package scrutinizer
 */
 
 import (
+	"fmt"
+
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -140,24 +142,22 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 	}
 }
 
-// List returns a list of keys matching a given prefix
-func (s *Scrutinizer) List(max int64, from, prefix []byte) (list [][]byte) {
+// List returns a list of keys matching a given prefix.
+// The result slice is not converted to hexadecimal, it is the raw string data stored in the database.
+func (s *Scrutinizer) List(max int64, from, prefix []byte) []string {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
-	fromLock := len(from) > 0                            // true if from field specified, will be false when from found in database
-	// TBD: iter.Seek([]byte(prefix+from)) does not work as expected. Find why and apply a fix if possible.
-	iter.Seek(prefix)
-	for iter.Next(); iter.Iter.ValidForPrefix(prefix); iter.Next() {
+	list := []string{}
+	for iter.Iter.Seek([]byte(fmt.Sprintf("%s%s", prefix, from))); iter.Iter.ValidForPrefix(prefix); iter.Iter.Next() {
+		k := string(iter.Key()[len(prefix):])
+		if len(from) > 0 && k == string(from) {
+			continue
+		}
+		list = append(list, k)
+		max--
 		if max < 1 {
 			break
 		}
-		if !fromLock {
-			list = append(list, iter.Key()[len(prefix):])
-			max--
-		}
-		if fromLock && string(iter.Key()) == string(prefix)+string(from) {
-			fromLock = false
-		}
 	}
 	iter.Release()
-	return
+	return list
 }
