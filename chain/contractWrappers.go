@@ -36,9 +36,17 @@ func NewVotingProcessHandle(contractAddressHex string, dialEndpoint string) (*Pr
 	var err error
 	PH := new(ProcessHandle)
 
-	PH.EthereumClient, err = ethclient.Dial(dialEndpoint)
-	if err != nil {
-		log.Error(err)
+	for i := 0; i < types.EthereumDialMaxRetry; i++ {
+		PH.EthereumClient, err = ethclient.Dial(dialEndpoint)
+		if err != nil || PH.EthereumClient == nil {
+			log.Warnf("cannot create a client connection: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
+			time.Sleep(time.Second * 2)
+			continue
+		}
+		break
+	}
+	if err != nil || PH.EthereumClient == nil {
+		log.Fatalf("cannot create a client connection: (%s), tried %d times.", err, types.EthereumDialMaxRetry)
 	}
 	address := common.HexToAddress(contractAddressHex)
 
@@ -185,10 +193,20 @@ func VotingProcessAddress(ctx context.Context, publicRegistryAddr, domain, ethEn
 	if err != nil {
 		return "", err
 	}
-	client, err := ethclient.DialContext(ctx, ethEndpoint)
-	if err != nil {
-		log.Error(err)
+	var client *ethclient.Client
+	for i := 0; i < types.EthereumDialMaxRetry; i++ {
+		client, err = ethclient.Dial(ethEndpoint)
+		if err != nil || client == nil {
+			log.Warnf("cannot create a client connection: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
+			time.Sleep(time.Second * 2)
+			continue
+		}
+		break
 	}
+	if err != nil || client == nil {
+		log.Fatalf("cannot create a client connection: (%s), tried %d times.", err, types.EthereumDialMaxRetry)
+	}
+
 	ensCallerHandler := &ENSCallerHandler{
 		PublicRegistryAddr: publicRegistryAddr,
 		EthereumClient:     client,
@@ -291,9 +309,18 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, et
 	if err != nil {
 		return "", err
 	}
-	client, err := ethclient.DialContext(ctx, ethEndpoint)
-	if err != nil {
-		log.Error(err)
+	var client *ethclient.Client
+	for i := 0; i < types.EthereumDialMaxRetry; i++ {
+		client, err = ethclient.Dial(ethEndpoint)
+		if err != nil || client == nil {
+			log.Warnf("cannot create a client connection: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
+			time.Sleep(time.Second * 2)
+			continue
+		}
+		break
+	}
+	if err != nil || client == nil {
+		log.Fatalf("cannot create a client connection: (%s), tried %d times.", err, types.EthereumDialMaxRetry)
 	}
 	ensCallerHandler := &ENSCallerHandler{
 		PublicRegistryAddr: ensRegistryAddr,

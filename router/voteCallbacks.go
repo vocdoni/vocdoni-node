@@ -131,6 +131,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 
 func (r *Router) getEnvelope(request routerRequest) {
 	// check pid
+	request.ProcessID = util.TrimHex(request.ProcessID)
 	if !util.IsHexEncodedStringWithLength(request.ProcessID, types.ProcessIDsize) {
 		r.sendError(request, "cannot get envelope: (malformed processId)")
 		return
@@ -141,7 +142,7 @@ func (r *Router) getEnvelope(request routerRequest) {
 		r.sendError(request, "cannot get envelope: (malformed nullifier)")
 		return
 	}
-	pid, err := hex.DecodeString(util.TrimHex(request.ProcessID))
+	pid, err := hex.DecodeString(request.ProcessID)
 	if err != nil {
 		r.sendError(request, "cannot decode processID")
 		return
@@ -222,10 +223,13 @@ func (r *Router) getProcessList(request routerRequest) {
 	if max > MaxListIterations || max <= 0 {
 		max = MaxListIterations
 	}
-	response.ProcessList, err = r.Scrutinizer.ProcessList(eid, fromID, max)
+	processList, err := r.Scrutinizer.ProcessList(eid, fromID, max)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get entity process list: (%s)", err))
 		return
+	}
+	for _, p := range processList {
+		response.ProcessList = append(response.ProcessList, fmt.Sprintf("%x", p))
 	}
 	if len(response.ProcessList) == 0 {
 		response.Message = "entity does not exist or has not yet created a process"
@@ -400,7 +404,7 @@ func (r *Router) getProcListLiveResults(request routerRequest) {
 	var err error
 	response.ProcessIDs, err = r.Scrutinizer.ProcessListWithLiveResults(request.ListSize, request.FromID)
 	if err != nil {
-		r.sendError(request, "cannot decode fromID")
+		r.sendError(request, err.Error())
 		return
 	}
 
@@ -416,7 +420,7 @@ func (r *Router) getScrutinizerEntities(request routerRequest) {
 	var err error
 	response.EntityIDs, err = r.Scrutinizer.EntityList(request.ListSize, request.FromID)
 	if err != nil {
-		r.sendError(request, "cannot decode fromID")
+		r.sendError(request, err.Error())
 		return
 	}
 

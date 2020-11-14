@@ -50,6 +50,7 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 // SendTX sends a transaction to the mempool (sync)
 func (app *BaseApplication) SendTX(tx []byte) (*ctypes.ResultBroadcastTx, error) {
 	resCh := make(chan *abcitypes.Response, 1)
+	defer close(resCh)
 	err := app.Node.Mempool().CheckTx(tx, func(res *abcitypes.Response) {
 		resCh <- res
 	}, mempl.TxInfo{})

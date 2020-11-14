@@ -10,6 +10,9 @@ package scrutinizer
 */
 
 import (
+	"bytes"
+	"fmt"
+
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -140,24 +143,23 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 	}
 }
 
-// List returns a list of keys matching a given prefix
-func (s *Scrutinizer) List(max int64, from, prefix []byte) (list [][]byte) {
+// List returns a list of keys matching a given prefix. If from is specified, it will seek to the prefix+form key (if found).
+func (s *Scrutinizer) List(max int64, from, prefix []byte) [][]byte {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
-	fromLock := len(from) > 0                            // true if from field specified, will be false when from found in database
-	// TBD: iter.Seek([]byte(prefix+from)) does not work as expected. Find why and apply a fix if possible.
-	iter.Seek(prefix)
-	for iter.Next(); iter.Iter.ValidForPrefix(prefix); iter.Next() {
-		if max < 1 {
+	list := [][]byte{}
+	for iter.Iter.Seek([]byte(fmt.Sprintf("%s%s", prefix, from))); iter.Iter.ValidForPrefix(prefix); iter.Iter.Next() {
+		key := iter.Key()[len(prefix):]
+		if len(from) > 0 && bytes.Equal(key, from) {
+			// We don't include "from" in the result.
+			continue
+		}
+		keyCopy := make([]byte, len(key))
+		copy(keyCopy, key)
+		list = append(list, keyCopy)
+		if max--; max < 1 {
 			break
-		}
-		if !fromLock {
-			list = append(list, iter.Key()[len(prefix):])
-			max--
-		}
-		if fromLock && string(iter.Key()) == string(prefix)+string(from) {
-			fromLock = false
 		}
 	}
 	iter.Release()
-	return
+	return list
 }

@@ -275,12 +275,10 @@ func (p *Proxy) ProxyIPC(path string) http.HandlerFunc {
 func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 	return func(c *websocket.Conn) {
 		for {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			msgType, msg, err := c.Reader(ctx)
+			msgType, msg, err := c.Reader(context.TODO())
 			if err != nil {
 				log.Debugf("websocket closed by the client: %s", err)
 				c.Close(websocket.StatusAbnormalClosure, "ws closed by client")
-				cancel()
 				return
 			}
 			req, err := http.NewRequest("POST", url, msg)
@@ -300,10 +298,9 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 				log.Warnf("cannot read response: %s", err)
 				continue
 			}
-			if err := c.Write(ctx, msgType, respBody); err != nil {
+			if err := c.Write(context.TODO(), msgType, respBody); err != nil {
 				log.Warnf("cannot write message: %s", err)
 			}
-			cancel()
 		}
 	}
 }
@@ -336,9 +333,7 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 					log.Debugf("websocket connection to %s closed", url)
 					return
 				}
-				ctx2, cancel2 := context.WithTimeout(context.Background(), time.Minute)
-				defer cancel2()
-				if err := wsServer.Write(ctx2, websocket.MessageType(t), data); err != nil {
+				if err := wsServer.Write(context.TODO(), websocket.MessageType(t), data); err != nil {
 					log.Warnf("cannot write message to local websocket: (%s)", err)
 					return
 				}
@@ -347,11 +342,9 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 
 		// Read local messages and write to remote
 		for {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			msgType, msg, err := wsServer.Reader(ctx)
+			msgType, msg, err := wsServer.Reader(context.TODO())
 			if err != nil {
 				log.Debugf("websocket closed by the client: %s", err)
-				cancel()
 				break
 			}
 			respBody, err := ioutil.ReadAll(msg)
@@ -360,7 +353,6 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 				continue
 			}
 			if err := wsClient.WriteMessage(int(msgType), respBody); err != nil {
-				cancel()
 				break
 			}
 		}

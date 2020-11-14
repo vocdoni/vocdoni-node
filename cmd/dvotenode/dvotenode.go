@@ -508,11 +508,12 @@ func main() {
 			}
 			for {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-				defer cancel()
 				if info, err := node.SyncInfo(ctx); err == nil && info.Synced && info.Peers >= requiredPeers && info.Height > 0 {
 					log.Infof("ethereum blockchain synchronized (%+v)", info)
+					cancel()
 					break
 				}
+				cancel()
 				time.Sleep(time.Second * 5)
 			}
 		}

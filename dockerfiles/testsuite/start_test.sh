@@ -2,7 +2,12 @@
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
 ORACLE_KEY=${TESTSUITE_ORACLE_KEY:-6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223}
-ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-1000}
+ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
+
+test() {
+	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost ws://gateway:9090/dvote --logLevel=INFO --electionType=$1
+	echo $? > $2
+}
 
 echo "### Starting test suite ###"
 docker-compose build
@@ -12,24 +17,17 @@ sleep 5
 echo "### Waiting for test suite to be ready ###"
 for i in {1..5}; do docker-compose run test curl --fail http://gateway:9090/ping && break || sleep 5; done
 
-(
+testid="/tmp/.vochaintest$RANDOM"
+
 echo "### Running test 1 ###"
-docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost ws://gateway:9090/dvote --logLevel=INFO
-RETVAL1=$?
-) &
+test poll-vote ${testid}1 &
 
-(
+
 echo "### Running test 2 ###"
-docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost ws://gateway:9090/dvote --logLevel=INFO --electionType=poll-vote
-RETVAL2=$?
-) &
+test encrypted-poll ${testid}2 &
 
-sleep 10
-echo "### Waiting for tests to finish ###"
-while true; do 
-	[ -n "$RETVAL1" -a -n "$RETVAL2" ] && break
-	sleep 2
-done
+echo "### Waiting for tests ###"
+wait
 
 #echo "### Post run logs ###"
 #docker-compose logs --tail 300
@@ -37,10 +35,12 @@ done
 echo "### Cleaning environment ###"
 docker-compose down -v --remove-orphans
 
-[ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ] && {
+[ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" ] && {
 	echo "Vochain test finished correctly!"
-	exit 0
+	RET=0
 } || {
 	echo "Vochain test failed!"
-	exit 1
+	RET=1
 }
+rm -f ${testid}1 ${testid}2
+exit $RET
