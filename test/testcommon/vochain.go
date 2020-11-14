@@ -54,21 +54,25 @@ var (
 
 	// privKey e0aa6db5a833531da4d259fb5df210bae481b276dc4c2ab6ab9771569375aed5 for address 06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0
 	HardcodedNewProcessTx = &models.NewProcessTx{
-		Txtype:         models.TxType_NEWPROCESS,
-		EntityId:       util.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
-		MkRoot:         util.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
-		ProcessId:      util.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
-		ProcessType:    types.PetitionSign,
-		NumberOfBlocks: 1000,
+		Txtype: models.TxType_NEW_PROCESS,
+		Process: &models.Process{
+			EntityId:     util.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
+			CensusMkRoot: util.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
+			ProcessId:    util.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+			ProcessType:  types.PetitionSign,
+			BlockCount:   1000,
+		},
+		Nonce: util.RandomHex(32),
 	}
 
 	HardcodedCancelProcessTx = &models.CancelProcessTx{
-		Txtype:    models.TxType_CANCELPROCESS,
+		Txtype:    models.TxType_CANCEL_PROCESS,
 		ProcessId: util.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+		Nonce:     util.RandomHex(32),
 	}
 
 	HardcodedNewVoteTx = &models.VoteEnvelope{
-		Nonce:     "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0",
+		Nonce:     util.RandomHex(32),
 		Nullifier: util.Hex2byte(nil, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"),
 		ProcessId: util.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		Proof: &models.Proof{Proof: &models.Proof_Graviton{Graviton: &models.ProofGraviton{
@@ -78,28 +82,28 @@ var (
 	}
 
 	HardcodedAdminTxAddOracle = &models.AdminTx{
-		Txtype:  models.TxType_ADDORACLE,
+		Txtype:  models.TxType_ADD_ORACLE,
 		Address: util.Hex2byte(nil, "39106af1fF18bD60a38a296fd81B1f28f315852B"), // oracle address or pubkey validator
-		Nonce:   "0x1",
+		Nonce:   util.RandomHex(32),
 	}
 
 	HardcodedAdminTxRemoveOracle = &models.AdminTx{
-		Txtype:  models.TxType_REMOVEORACLE,
+		Txtype:  models.TxType_REMOVE_ORACLE,
 		Address: util.Hex2byte(nil, "00192Fb10dF37c9FB26829eb2CC623cd1BF599E8"),
-		Nonce:   "0x1",
+		Nonce:   util.RandomHex(32),
 	}
 	power                        = uint64(10)
 	HardcodedAdminTxAddValidator = &models.AdminTx{
-		Txtype:  models.TxType_ADDVALIDATOR,
+		Txtype:  models.TxType_ADD_VALIDATOR,
 		Address: util.Hex2byte(nil, "5DC922017285EC24415F3E7ECD045665EADA8B5A"),
-		Nonce:   "0x1",
+		Nonce:   util.RandomHex(32),
 		Power:   &power,
 	}
 
 	HardcodedAdminTxRemoveValidator = &models.AdminTx{
-		Txtype:  models.TxType_REMOVEVALIDATOR,
+		Txtype:  models.TxType_REMOVE_VALIDATOR,
 		Address: util.Hex2byte(nil, "5DC922017285EC24415F3E7ECD045665EADA8B5A"),
-		Nonce:   "0x1",
+		Nonce:   util.RandomHex(32),
 	}
 )
 

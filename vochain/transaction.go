@@ -15,11 +15,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// GenericTX represents any valid transaction
-type GenericTX interface {
-	TxType() string
-}
-
 // AddTx check the validity of a transaction and adds it to the state if commit=true
 func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
 	if vtx == nil || state == nil || vtx.Tx == nil {
@@ -42,11 +37,11 @@ func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
 		tx := vtx.GetAdmin()
 		if commit {
 			switch tx.Txtype {
-			case models.TxType_ADDORACLE:
+			case models.TxType_ADD_ORACLE:
 				return []byte{}, state.AddOracle(common.BytesToAddress(tx.Address))
-			case models.TxType_REMOVEORACLE:
+			case models.TxType_REMOVE_ORACLE:
 				return []byte{}, state.RemoveOracle(common.BytesToAddress(tx.Address))
-			case models.TxType_ADDVALIDATOR:
+			case models.TxType_ADD_VALIDATOR:
 				pk, err := hexPubKeyToTendermintEd25519(fmt.Sprintf("%x", tx.PublicKey))
 				if err == nil {
 					if tx.Power == nil {
@@ -57,11 +52,11 @@ func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
 				}
 				return []byte{}, fmt.Errorf("addValidator %w", err)
 
-			case models.TxType_REMOVEVALIDATOR:
+			case models.TxType_REMOVE_VALIDATOR:
 				return []byte{}, state.RemoveValidator(tx.Address)
-			case models.TxType_ADDPROCESSKEYS:
+			case models.TxType_ADD_PROCESS_KEYS:
 				return []byte{}, state.AddProcessKeys(tx)
-			case models.TxType_REVEALPROCESSKEYS:
+			case models.TxType_REVEAL_PROCESS_KEYS:
 				return []byte{}, state.RevealProcessKeys(tx)
 			}
 		}
@@ -78,11 +73,14 @@ func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
 		if p, err := NewProcessTxCheck(vtx, state); err == nil {
 			if commit {
 				tx := vtx.GetNewProcess()
-				mkuri := ""
-				if tx.MkURI != nil {
-					mkuri = *tx.MkURI
+				if tx.Process == nil {
+					return []byte{}, fmt.Errorf("newprocess process is empty")
 				}
-				return []byte{}, state.AddProcess(*p, tx.ProcessId, mkuri)
+				mkuri := ""
+				if tx.Process.CensusMkURI != nil {
+					mkuri = *tx.Process.CensusMkURI
+				}
+				return []byte{}, state.AddProcess(*p, tx.Process.ProcessId, mkuri)
 			}
 		} else {
 			return []byte{}, fmt.Errorf("newProcess %w", err)
@@ -230,6 +228,9 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*types.Vote, err
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
 func NewProcessTxCheck(vtx *models.Tx, state *State) (*types.Process, error) {
 	tx := vtx.GetNewProcess()
+	if tx.Process == nil {
+		return nil, fmt.Errorf("process data is empty")
+	}
 	// check signature available
 	if vtx.Signature == nil || tx == nil {
 		return nil, fmt.Errorf("missing signature or new process transaction")
@@ -245,10 +246,10 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*types.Process, error) {
 		return nil, fmt.Errorf("cannot fetch state header")
 	}
 	// start and endblock sanity check
-	if int64(tx.StartBlock) < header.Height {
+	if int64(tx.Process.StartBlock) < header.Height {
 		return nil, fmt.Errorf("cannot add process with start block lower or equal than the current tendermint height")
 	}
-	if tx.NumberOfBlocks <= 0 {
+	if tx.Process.BlockCount <= 0 {
 		return nil, fmt.Errorf("cannot add process with duration lower or equal than the current tendermint height")
 	}
 	signedBytes, err := proto.Marshal(tx)
@@ -263,23 +264,23 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*types.Process, error) {
 		return nil, fmt.Errorf("unauthorized to create a process, recovered addr is %s", addr.Hex())
 	}
 	// get process
-	_, err = state.Process(tx.ProcessId, false)
+	_, err = state.Process(tx.Process.ProcessId, false)
 	if err == nil {
-		return nil, fmt.Errorf("process with id (%x) already exists", tx.ProcessId)
+		return nil, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
 	}
 	// check type
-	switch tx.ProcessType {
+	switch tx.Process.ProcessType {
 	case types.SnarkVote, types.PollVote, types.PetitionSign, types.EncryptedPoll:
 		// ok
 	default:
-		return nil, fmt.Errorf("process type (%s) not valid", tx.ProcessType)
+		return nil, fmt.Errorf("process type (%s) not valid", tx.Process.ProcessType)
 	}
 	p := &types.Process{
-		EntityID:       tx.ProcessId[:],
-		MkRoot:         fmt.Sprintf("%x", tx.MkRoot), // TBD use []byte
-		NumberOfBlocks: int64(tx.NumberOfBlocks),
-		StartBlock:     int64(tx.StartBlock),
-		Type:           tx.ProcessType,
+		EntityID:       tx.Process.ProcessId[:],
+		MkRoot:         fmt.Sprintf("%x", tx.Process.CensusMkRoot), // TBD use []byte
+		NumberOfBlocks: int64(tx.Process.BlockCount),
+		StartBlock:     int64(tx.Process.StartBlock),
+		Type:           tx.Process.ProcessType,
 	}
 
 	if p.RequireKeys() {
@@ -367,7 +368,7 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 	}
 
 	switch {
-	case tx.Txtype == models.TxType_ADDPROCESSKEYS || tx.Txtype == models.TxType_REVEALPROCESSKEYS:
+	case tx.Txtype == models.TxType_ADD_PROCESS_KEYS || tx.Txtype == models.TxType_REVEAL_PROCESS_KEYS:
 		if tx.ProcessId == nil {
 			return fmt.Errorf("missing processId on AdminTxCheck")
 		}
@@ -389,7 +390,7 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 			return fmt.Errorf("cannot get blockchain header")
 		}
 		// Specific checks
-		if tx.Txtype == models.TxType_ADDPROCESSKEYS {
+		if tx.Txtype == models.TxType_ADD_PROCESS_KEYS {
 			if tx.KeyIndex == nil {
 				return fmt.Errorf("missing keyIndex on AdminTxCheck")
 			}
@@ -409,7 +410,7 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 				return err
 			}
 		}
-		if tx.Txtype == models.TxType_REVEALPROCESSKEYS {
+		if tx.Txtype == models.TxType_REVEAL_PROCESS_KEYS {
 			if tx.KeyIndex == nil {
 				return fmt.Errorf("missing keyIndexon AdminTxCheck")
 			}

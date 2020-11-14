@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -91,10 +90,12 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return err
 		}
-
+		if processTx.Process == nil {
+			return fmt.Errorf("process is nil")
+		}
 		// Check if process already exist
-		log.Infof("found new process on Ethereum\n\t%+s", processTx.String)
-		_, err = e.VochainApp.State.Process(processTx.ProcessId, true)
+		log.Infof("found new process on Ethereum\n\t%+s", processTx.Process.String)
+		_, err = e.VochainApp.State.Process(processTx.Process.ProcessId, true)
 		if err != nil {
 			if err != vochain.ErrProcessNotFound {
 				return err
@@ -201,31 +202,6 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		// stub
 		// return nil
 	}
-	return nil
-}
-
-// HandleCensus handles the import of census merkle trees published in Ethereum
-func HandleCensus(ctx context.Context, event *ethtypes.Log, e *EthereumEvents) error {
-	logProcessCreated := []byte(ethereumEventList[2])
-	// Only handle processCreated event
-	if event.Topics[0].Hex() != crypto.Keccak256Hash(logProcessCreated).Hex() {
-		return nil
-	}
-	// Get process metadata
-	tctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-	processTx, err := processMeta(tctx, &e.ContractABI, event.Data, e.ProcessHandle)
-	if err != nil {
-		return err
-	}
-	if processTx == nil || processTx.MkURI == nil {
-		return fmt.Errorf("cannot fetch process metadata (processTx or MkURI not found)")
-	}
-	// Import remote census
-	if !strings.HasPrefix(*processTx.MkURI, e.Census.Data().URIprefix()) || len(processTx.MkRoot) == 0 {
-		return fmt.Errorf("process not valid => %+v", processTx)
-	}
-	e.Census.AddToImportQueue(hex.EncodeToString(processTx.MkRoot), *processTx.MkURI)
 	return nil
 }
 

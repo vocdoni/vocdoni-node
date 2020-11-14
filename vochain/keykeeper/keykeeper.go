@@ -398,7 +398,7 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	kindex := new(uint32)
 	*kindex = uint32(pk.index)
 	tx := &models.AdminTx{
-		Txtype:              models.TxType_ADDPROCESSKEYS,
+		Txtype:              models.TxType_ADD_PROCESS_KEYS,
 		KeyIndex:            kindex,
 		Nonce:               util.RandomHex(32),
 		ProcessId:           []byte(pid),
@@ -444,7 +444,7 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 	kindex := new(uint32)
 	*kindex = uint32(pk.index)
 	tx := &models.AdminTx{
-		Txtype:               models.TxType_REVEALPROCESSKEYS,
+		Txtype:               models.TxType_REVEAL_PROCESS_KEYS,
 		KeyIndex:             kindex,
 		Nonce:                util.RandomHex(32),
 		ProcessId:            []byte(pid),

@@ -399,16 +399,19 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkur
 	if err != nil {
 		return 0, err
 	}
+	processData := &models.Process{
+		EntityId:     txEid,
+		CensusMkRoot: txMkRoot,
+		CensusMkURI:  &mkuri,
+		BlockCount:   uint64(duration),
+		ProcessId:    txPid,
+		ProcessType:  ptype,
+		StartBlock:   uint64(block + 4),
+	}
 	p := &models.NewProcessTx{
-		Txtype:         models.TxType_NEWPROCESS,
-		EntityId:       txEid,
-		MkRoot:         txMkRoot,
-		MkURI:          &mkuri,
-		NumberOfBlocks: uint64(duration),
-		ProcessId:      txPid,
-		ProcessType:    ptype,
-		StartBlock:     uint64(block + 4),
-		Nonce:          util.RandomHex(32),
+		Txtype:  models.TxType_NEW_PROCESS,
+		Nonce:   util.RandomHex(32),
+		Process: processData,
 	}
 	txBytes, err := proto.Marshal(p)
 	if err != nil {
@@ -434,7 +437,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkur
 	if !resp.Ok {
 		return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
-	return int64(p.StartBlock), nil
+	return int64(p.Process.StartBlock), nil
 }
 
 func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
@@ -445,7 +448,7 @@ func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
 		return err
 	}
 	p := &models.CancelProcessTx{
-		Txtype:    models.TxType_CANCELPROCESS,
+		Txtype:    models.TxType_CANCEL_PROCESS,
 		ProcessId: txPid,
 		Nonce:     util.RandomHex(32),
 	}

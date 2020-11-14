@@ -59,28 +59,30 @@ func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*mode
 	}
 
 	processTxArgs := new(models.NewProcessTx)
-	processTxArgs.ProcessId = pid[:]
+	processData := new(models.Process)
+	processData.ProcessId = pid[:]
 	eid, err := hex.DecodeString(util.TrimHex(processMeta.EntityAddress.String()))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding entity address: %s", err)
 	}
-	processTxArgs.EntityId = ethereum.HashRaw(eid)
-	processTxArgs.MkRoot, err = hex.DecodeString(processMeta.CensusMerkleRoot)
+	processData.EntityId = ethereum.HashRaw(eid)
+	processData.CensusMkRoot, err = hex.DecodeString(processMeta.CensusMerkleRoot)
 	if err != nil {
 		return nil, fmt.Errorf("cannot decode merkle root: (%s)", err)
 	}
-	processTxArgs.MkURI = &processMeta.CensusMerkleTree
+	processData.CensusMkURI = &processMeta.CensusMerkleTree
 	if processMeta.NumberOfBlocks != nil {
-		processTxArgs.NumberOfBlocks = uint64(processMeta.NumberOfBlocks.Int64())
+		processData.BlockCount = uint64(processMeta.NumberOfBlocks.Int64())
 	}
 	if processMeta.StartBlock != nil {
-		processTxArgs.StartBlock = uint64(processMeta.StartBlock.Int64())
+		processData.StartBlock = uint64(processMeta.StartBlock.Int64())
 	}
 	switch processMeta.ProcessType {
 	case types.SnarkVote, types.PollVote, types.PetitionSign, types.EncryptedPoll:
-		processTxArgs.ProcessType = processMeta.ProcessType
+		processData.ProcessType = processMeta.ProcessType
 	}
-	processTxArgs.Txtype = models.TxType_NEWPROCESS
+	processTxArgs.Txtype = models.TxType_NEW_PROCESS
+	processTxArgs.Process = processData
 	return processTxArgs, nil
 }
 
@@ -92,7 +94,7 @@ func (ph *ProcessHandle) CancelProcessTxArgs(ctx context.Context, pid [32]byte) 
 	}
 	cancelProcessTxArgs := new(models.CancelProcessTx)
 	cancelProcessTxArgs.ProcessId = pid[:]
-	cancelProcessTxArgs.Txtype = models.TxType_CANCELPROCESS
+	cancelProcessTxArgs.Txtype = models.TxType_CANCEL_PROCESS
 	return cancelProcessTxArgs, nil
 }
 

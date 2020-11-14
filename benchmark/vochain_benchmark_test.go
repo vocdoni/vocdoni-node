@@ -104,15 +104,18 @@ func BenchmarkVochain(b *testing.B) {
 	txEid, _ := hex.DecodeString(util.TrimHex(signerPub))
 	txPid, _ := hex.DecodeString(util.TrimHex(processID))
 	txMkRoot, _ := hex.DecodeString(util.TrimHex(mkRoot))
-
+	processData := &models.Process{
+		EntityId:     txEid,
+		CensusMkRoot: txMkRoot,
+		BlockCount:   numberOfBlocks,
+		ProcessId:    txPid,
+		ProcessType:  types.PollVote,
+		StartBlock:   uint64(*resp.Height + 1),
+	}
 	process := &models.NewProcessTx{
-		EntityId:       txEid,
-		MkRoot:         txMkRoot,
-		NumberOfBlocks: numberOfBlocks,
-		ProcessId:      txPid,
-		ProcessType:    types.PollVote,
-		StartBlock:     uint64(*resp.Height + 1),
-		Txtype:         models.TxType_NEWPROCESS,
+		Txtype:  models.TxType_NEW_PROCESS,
+		Nonce:   util.RandomHex(32),
+		Process: processData,
 	}
 
 	txBytes, err := proto.Marshal(process)
