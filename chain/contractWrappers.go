@@ -14,7 +14,7 @@ import (
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/net/idna"
 
-	models "github.com/vocdoni/dvote-protobuf/go-vocdonitypes"
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"

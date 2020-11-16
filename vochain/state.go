@@ -11,7 +11,7 @@ import (
 	amino "github.com/tendermint/go-amino"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmtypes "github.com/tendermint/tendermint/types"
-	models "github.com/vocdoni/dvote-protobuf/go-vocdonitypes"
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/statedb"
 	"gitlab.com/vocdoni/go-dvote/statedb/iavlstate"
