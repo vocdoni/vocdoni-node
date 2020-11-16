@@ -285,9 +285,9 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 			return 0, err
 		}
 		v := &models.VoteEnvelope{
-			Nonce:                RandomHex(16),
+			Nonce:                util.RandomHex(32),
 			ProcessId:            pidb,
-			Proof:                &models.Proof{Proof: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proofs[i]}}},
+			Proof:                &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proofs[i]}}},
 			VotePackage:          vpb,
 			EncryptionKeyIndexes: keyIndexes,
 		}
@@ -296,8 +296,8 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 		if err != nil {
 			return 0, err
 		}
-		vtx := models.Tx{Tx: &models.Tx_Vote{Vote: v}}
-		var signHex string
+		vtx := models.Tx{Payload: &models.Tx_Vote{Vote: v}}
+		signHex := ""
 		if signHex, err = s.Sign(txBytes); err != nil {
 			return 0, err
 		}
@@ -417,7 +417,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkur
 	if err != nil {
 		return 0, err
 	}
-	vtx := models.Tx{Tx: &models.Tx_NewProcess{NewProcess: p}}
+	vtx := models.Tx{Payload: &models.Tx_NewProcess{NewProcess: p}}
 	signHex := ""
 	if signHex, err = oracle.Sign(txBytes); err != nil {
 		return 0, err
@@ -456,7 +456,7 @@ func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
 	if err != nil {
 		return err
 	}
-	vtx := models.Tx{Tx: &models.Tx_CancelProcess{CancelProcess: p}}
+	vtx := models.Tx{Payload: &models.Tx_CancelProcess{CancelProcess: p}}
 	signHex := ""
 	if signHex, err = oracle.Sign(txBytes); err != nil {
 		return err

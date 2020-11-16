@@ -17,10 +17,10 @@ import (
 
 // AddTx check the validity of a transaction and adds it to the state if commit=true
 func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
-	if vtx == nil || state == nil || vtx.Tx == nil {
-		return nil, fmt.Errorf("transaction, transaction type or state are nil")
+	if vtx == nil || state == nil || vtx.Payload == nil {
+		return nil, fmt.Errorf("transaction, state or transaction payload are nil")
 	}
-	switch vtx.Tx.(type) {
+	switch vtx.Payload.(type) {
 	case *models.Tx_Vote:
 		v, err := VoteTxCheck(vtx, state, commit)
 		if err != nil {
@@ -134,9 +134,6 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*types.Vote, err
 				return nil, fmt.Errorf("signature missing on voteTx")
 			}
 			vote.VotePackage = tx.VotePackage
-			//vote.VotePackage = make([]byte, len(tx.VotePackage))
-			//copy(vote.VotePackage, tx.VotePackage)
-
 			if types.ProcessIsEncrypted[process.Type] {
 				if len(tx.EncryptionKeyIndexes) == 0 {
 					return nil, fmt.Errorf("no key indexes provided on vote package")
@@ -351,11 +348,6 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
 
-	switch vtx.Tx.(type) {
-	case *models.Tx_Admin:
-
-	}
-
 	signedBytes, err := proto.Marshal(tx)
 	if err != nil {
 		return fmt.Errorf("cannot marshal new process transaction")
@@ -390,7 +382,8 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 			return fmt.Errorf("cannot get blockchain header")
 		}
 		// Specific checks
-		if tx.Txtype == models.TxType_ADD_PROCESS_KEYS {
+		switch tx.Txtype {
+		case models.TxType_ADD_PROCESS_KEYS:
 			if tx.KeyIndex == nil {
 				return fmt.Errorf("missing keyIndex on AdminTxCheck")
 			}
@@ -409,8 +402,7 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 			if err := checkAddProcessKeys(tx, process); err != nil {
 				return err
 			}
-		}
-		if tx.Txtype == models.TxType_REVEAL_PROCESS_KEYS {
+		case models.TxType_REVEAL_PROCESS_KEYS:
 			if tx.KeyIndex == nil {
 				return fmt.Errorf("missing keyIndexon AdminTxCheck")
 			}

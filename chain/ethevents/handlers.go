@@ -117,7 +117,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot decode signature: %w", err)
 		}
-		vtx.Tx = &models.Tx_NewProcess{NewProcess: processTx}
+		vtx.Payload = &models.Tx_NewProcess{NewProcess: processTx}
 		txb, err := proto.Marshal(&vtx)
 		if err != nil {
 			return fmt.Errorf("error marshaling process tx: (%s)", err)
@@ -160,7 +160,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot decode signature: %w", err)
 		}
-		vtx.Tx = &models.Tx_CancelProcess{CancelProcess: cancelProcessTx}
+		vtx.Payload = &models.Tx_CancelProcess{CancelProcess: cancelProcessTx}
 
 		tx, err := proto.Marshal(&vtx)
 		if err != nil {

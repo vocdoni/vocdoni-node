@@ -472,7 +472,7 @@ func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
 	if err != nil {
 		return err
 	}
-	vtx := models.Tx{Tx: &models.Tx_Admin{Admin: tx}}
+	vtx := models.Tx{Payload: &models.Tx_Admin{Admin: tx}}
 	var signHex string
 	if signHex, err = k.signer.Sign(txBytes); err != nil {
 		return err

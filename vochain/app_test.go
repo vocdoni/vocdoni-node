@@ -9,6 +9,7 @@ import (
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
+	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -49,7 +50,7 @@ func TestCheckTX(t *testing.T) {
 		MkRoot:         tr.Root(),
 		NumberOfBlocks: 1024,
 	}
-	pid := util.Hex2byte(t, util.RandomHex(types.ProcessIDsize))
+	pid := util.RandomHex(types.ProcessIDsize)
 	t.Logf("adding process %+v", process)
 	app.State.AddProcess(*process, pid, "ipfs://123456789")
 
@@ -69,9 +70,9 @@ func TestCheckTX(t *testing.T) {
 			t.Fatal(err)
 		}
 		tx := &models.VoteEnvelope{
-			Nonce:       util.RandomHex(16),
+			Nonce:       util.RandomHex(32),
 			ProcessId:   pid,
-			Proof:       &models.Proof{Proof: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: util.Hex2byte(t, proof)}}},
+			Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: testutil.Hex2byte(t, proof)}}},
 			VotePackage: vp,
 		}
 		txBytes, err := proto.Marshal(tx)
@@ -81,8 +82,8 @@ func TestCheckTX(t *testing.T) {
 		if hexsignature, err = s.Sign(txBytes); err != nil {
 			t.Fatal(err)
 		}
-		vtx.Tx = &models.Tx_Vote{Vote: tx}
-		vtx.Signature = util.Hex2byte(t, hexsignature)
+		vtx.Payload = &models.Tx_Vote{Vote: tx}
+		vtx.Signature = testutil.Hex2byte(t, hexsignature)
 
 		if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
 			t.Fatal(err)
@@ -100,7 +101,6 @@ func TestCheckTX(t *testing.T) {
 		}
 		app.Commit()
 	}
-
 }
 
 // CreateEthRandomKeysBatch creates a set of eth random signing keys

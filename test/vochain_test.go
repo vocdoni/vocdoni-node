@@ -8,59 +8,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
-/*
-func TestVoteTxCheck(t *testing.T) {
-	var err error
-	t.Parallel()
-
-	s := testcommon.NewVochainStateWithProcess(t)
-	tx := testcommon.HardcodedNewVoteTx
-	tx.Signature, err = testcommon.SignTx(tx)
-	if err != nil {
-		t.Error(err)
-	}
-	if _, err := vochain.VoteTxCheck(tx, s, false); err != nil {
-		t.Errorf("cannot validate vote: %s", err)
-	}
-}
-
-func TestAdminTxCheckAddOracle(t *testing.T) {
-	t.Parallel()
-
-	s := testcommon.NewVochainStateWithOracles(t)
-	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxAddOracle, s); err != nil {
-		t.Errorf("cannot add oracle: %s", err)
-	}
-}
-
-func TestAdminTxCheckRemoveOracle(t *testing.T) {
-	t.Parallel()
-
-	s := testcommon.NewVochainStateWithOracles(t)
-	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxRemoveOracle, s); err != nil {
-		t.Errorf("cannot remove oracle: %s", err)
-	}
-}
-
-func TestAdminTxCheckAddValidator(t *testing.T) {
-	t.Parallel()
-
-	s := testcommon.NewVochainStateWithValidators(t)
-	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxAddValidator, s); err != nil {
-		t.Errorf("cannot add validator: %s", err)
-	}
-}
-
-func TestAdminTxCheckRemoveValidator(t *testing.T) {
-	t.Parallel()
-
-	s := testcommon.NewVochainStateWithValidators(t)
-	if err := vochain.AdminTxCheck(*testcommon.HardcodedAdminTxRemoveValidator, s); err != nil {
-		t.Errorf("cannot remove validator: %s", err)
-	}
-}
-*/
-
 func TestCreateProcess(t *testing.T) {
 	// TODO(mvdan): re-enable once
 	// https://gitlab.com/vocdoni/go-dvote/-/issues/172 is fixed.
@@ -68,7 +15,7 @@ func TestCreateProcess(t *testing.T) {
 
 	s := testcommon.NewVochainStateWithOracles(t)
 	vtx := models.Tx{}
-	vtx.Tx = &models.Tx_NewProcess{NewProcess: testcommon.HardcodedNewProcessTx}
+	vtx.Payload = &models.Tx_NewProcess{NewProcess: testcommon.HardcodedNewProcessTx}
 	err := testcommon.SignAndPrepareTx(&vtx)
 	if err != nil {
 		t.Fatal(err)

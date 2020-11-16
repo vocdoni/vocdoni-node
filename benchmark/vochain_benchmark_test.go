@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"strconv"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
+	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
@@ -101,9 +101,18 @@ func BenchmarkVochain(b *testing.B) {
 	resp = doRequest("getBlockHeight", nil)
 
 	// create process
-	txEid, _ := hex.DecodeString(util.TrimHex(signerPub))
-	txPid, _ := hex.DecodeString(util.TrimHex(processID))
-	txMkRoot, _ := hex.DecodeString(util.TrimHex(mkRoot))
+	txEid, err := hex.DecodeString(util.TrimHex(signerPub))
+	if err != nil {
+		b.Fatal(err)
+	}
+	txPid, err := hex.DecodeString(util.TrimHex(processID))
+	if err != nil {
+		b.Fatal(err)
+	}
+	txMkRoot, err := hex.DecodeString(util.TrimHex(mkRoot))
+	if err != nil {
+		b.Fatal(err)
+	}
 	processData := &models.Process{
 		EntityId:     txEid,
 		CensusMkRoot: txMkRoot,
@@ -187,7 +196,6 @@ func BenchmarkVochain(b *testing.B) {
 }
 
 func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon, mkRoot, processID, censusID string) {
-	rint := rand.Int()
 	// API requests
 	var req types.MetaRequest
 	doRequest := cl.ForTest(b, &req)
@@ -208,7 +216,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 
 	// generate envelope votePackage
 	votePkg := &types.VotePackageStruct{
-		Nonce: util.RandomHex(32),
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1},
 		Type:  types.PollVote,
 	}
@@ -220,9 +228,9 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	txPid, _ := hex.DecodeString(util.TrimHex(processID))
 	siblings, _ := hex.DecodeString(util.TrimHex(resp.Siblings))
 	tx := models.VoteEnvelope{
-		Nonce:       strconv.Itoa(rint),
+		Nonce:       util.RandomHex(32),
 		ProcessId:   txPid,
-		Proof:       &models.Proof{Proof: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: siblings}}},
+		Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: siblings}}},
 		VotePackage: voteBytes,
 	}
 
@@ -246,7 +254,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	// check vote added
 	req = types.MetaRequest{}
 	req.ProcessID = processID
-	req.Nullifier = hex.EncodeToString(vochain.GenerateNullifier(s.Address(), util.Hex2byte(b, processID)))
+	req.Nullifier = hex.EncodeToString(vochain.GenerateNullifier(s.Address(), testutil.Hex2byte(b, processID)))
 	for {
 		resp = doRequest("getEnvelopeStatus", nil)
 		if *resp.Registered {

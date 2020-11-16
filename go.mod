@@ -2,7 +2,8 @@ module gitlab.com/vocdoni/go-dvote
 
 go 1.14
 
-// replace github.com/vocdoni/dvote-protobuf  => ./dvote-protobuf
+// For testing purposes while dvote-protobuf becomes stable
+// replace github.com/vocdoni/dvote-protobuf  => ../dvote-protobuf
 
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect
@@ -67,7 +68,7 @@ require (
 	github.com/tendermint/iavl v0.13.3
 	github.com/tendermint/tendermint v0.33.5
 	github.com/tendermint/tm-db v0.5.1
-	github.com/vocdoni/dvote-protobuf v0.0.0-20201115194402-2437721dce1b
+	github.com/vocdoni/dvote-protobuf v0.0.0-20201116122219-5f49c14064e7
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200223203819-95cdfde1438f // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.etcd.io/bbolt v1.3.4 // indirect

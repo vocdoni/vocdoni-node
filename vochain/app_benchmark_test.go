@@ -13,6 +13,7 @@ import (
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
+	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -87,7 +88,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		tx := &models.VoteEnvelope{
 			Nonce:     util.RandomHex(16),
 			ProcessId: pid,
-			Proof:     &models.Proof{Proof: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: util.Hex2byte(b, proof)}}},
+			Proof:     &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: testutil.Hex2byte(b, proof)}}},
 		}
 
 		txBytes, err := proto.Marshal(tx)
@@ -103,7 +104,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		if err != nil {
 			b.Fatal(err)
 		}
-		vtx.Tx = &models.Tx_Vote{Vote: tx}
+		vtx.Payload = &models.Tx_Vote{Vote: tx}
 		voters = append(voters, &vtx)
 	}
 	return voters
