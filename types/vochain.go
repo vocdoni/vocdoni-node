@@ -58,8 +58,6 @@ func UniqID(tx *models.Tx, isAnonymous bool) string {
 		if len(tx.Signature) > 32 {
 			return string(tx.Signature[:32])
 		}
-	} else {
-		// TBD: uniq ID for SNARK vote
 	}
 	return ""
 }
