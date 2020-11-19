@@ -136,9 +136,13 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)
 		return
 	}
+	if p.KeyIndex == nil {
+		log.Errorf("keyindex is nil")
+		return
+	}
 	// if all keys have been revealed, compute the results
-	if p.KeyIndex < 1 {
-		data := types.ScrutinizerOnProcessData{EntityID: p.EntityID, ProcessID: pid}
+	if *p.KeyIndex < 1 {
+		data := types.ScrutinizerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
 		s.resultsPool = append(s.resultsPool, &data)
 	}
 }

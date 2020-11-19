@@ -43,16 +43,22 @@ func TestCheckTX(t *testing.T) {
 		tr.AddClaim(c, nil)
 		claims = append(claims, string(c))
 	}
-	process := &types.Process{
-		StartBlock:     0,
-		Type:           types.PollVote,
-		EntityID:       util.RandomBytes(types.EntityIDsize),
-		MkRoot:         tr.Root(),
-		NumberOfBlocks: 1024,
-	}
+	mkuri := "ipfs://123456789"
 	pid := util.RandomHex(types.ProcessIDsize)
-	t.Logf("adding process %+v", process)
-	app.State.AddProcess(*process, pid, "ipfs://123456789")
+	process := &models.Process{
+		ProcessId:    pid,
+		StartBlock:   0,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Mode:         &models.ProcessMode{},
+		Status:       models.ProcessStatus_READY,
+		EntityId:     util.RandomBytes(types.EntityIDsize),
+		CensusMkRoot: testutil.Hex2byte(t, tr.Root()),
+		CensusMkURI:  &mkuri,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		BlockCount:   1024,
+	}
+	t.Logf("adding process %s", process.String())
+	app.State.AddProcess(process, pid)
 
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx

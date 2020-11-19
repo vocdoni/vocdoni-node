@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -180,7 +181,7 @@ func (s *Scrutinizer) computeLiveResults(processID []byte) (pv ProcessVotes, err
 	return
 }
 
-func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *types.Process) (pv ProcessVotes, err error) {
+func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *models.Process) (pv ProcessVotes, err error) {
 	pv = emptyProcess()
 	var nvotes int
 	for _, e := range s.VochainState.EnvelopeList(processID, 0, 32<<18, false) { // 8.3M seems enough for now
@@ -191,7 +192,7 @@ func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *types.Process) 
 		}
 		var vp *types.VotePackage
 		err = nil
-		if p.IsEncrypted() {
+		if p.EnvelopeType.EncryptedVotes {
 			if len(p.EncryptionPrivateKeys) < len(v.EncryptionKeyIndexes) {
 				err = fmt.Errorf("encryptionKeyIndexes has too many fields")
 			} else {

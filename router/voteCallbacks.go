@@ -353,12 +353,23 @@ func (r *Router) getResults(request routerRequest) {
 		r.sendError(request, err.Error())
 		return
 	}
-	response.Type = procInfo.Type
-	if procInfo.Canceled {
-		response.State = "canceled"
+
+	if procInfo.EnvelopeType.Anonymous {
+		response.Type = "anonymous"
 	} else {
-		response.State = "active"
+		response.Type = "poll"
 	}
+	if procInfo.EnvelopeType.EncryptedVotes {
+		response.Type = response.Type + " encrypted"
+	} else {
+		response.Type = response.Type + " open"
+	}
+	if procInfo.EnvelopeType.Serial {
+		response.Type = response.Type + " serial-process"
+	} else {
+		response.Type = response.Type + " process"
+	}
+	response.State = procInfo.Status.String()
 
 	// Get results info
 	vr, err := r.Scrutinizer.VoteResult(pid)

@@ -8,7 +8,7 @@ import (
 	// dependencies which are too heavy for our low-level "types" package.
 	// libs/bytes is okay, because it only pulls in std deps.
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
 )
 
 // ________________________ STATE ________________________
@@ -41,76 +41,25 @@ type Vote struct {
 
 // VoteProof contains the proof indicating that the user is in the census of the process
 type VoteProof struct {
-	Proof        string    `json:"proof,omitempty"`
-	PubKey       string    `json:"pubKey,omitempty"`
-	PubKeyDigest []byte    `json:"pubKeyDigest,omitempty"`
-	Nullifier    []byte    `json:"nullifier,omitempty"`
-	Created      time.Time `json:"timestamp"`
+	Proof        *models.Proof `json:"proof,omitempty"`
+	PubKey       []byte        `json:"pubKey,omitempty"`
+	PubKeyDigest []byte        `json:"pubKeyDigest,omitempty"`
+	Nullifier    []byte        `json:"nullifier,omitempty"`
+	Created      time.Time     `json:"timestamp"`
 }
 
 // ________________________ PROCESS ________________________
 
-// Process represents a state per process
-type Process struct {
-	// Canceled if true process is canceled
-	Canceled bool `json:"canceled,omitempty"`
-	// CommitmentKeys are the reveal keys hashed
-	CommitmentKeys []string `json:"commitmentKeys,omitempty"`
-	// EncryptionPrivateKeys are the keys required to decrypt the votes
-	EncryptionPrivateKeys []string `json:"encryptionPrivateKeys,omitempty"`
-	// EncryptionPublicKeys are the keys required to encrypt the votes
-	EncryptionPublicKeys []string `json:"encryptionPublicKeys,omitempty"`
-	// EntityID identifies unequivocally a process
-	EntityID []byte `json:"entityId,omitempty"`
-	// KeyIndex
-	KeyIndex int `json:"keyIndex,omitempty"`
-	// MkRoot merkle root of all the census in the process
-	MkRoot string `json:"mkRoot,omitempty"`
-	// NumberOfBlocks represents the amount of tendermint blocks that the process will last
-	NumberOfBlocks int64 `json:"numberOfBlocks,omitempty"`
-	// Paused if true process is paused and cannot add or modify any vote
-	Paused bool `json:"paused,omitempty"`
-	// RevealKeys are the seed of the CommitmentKeys
-	RevealKeys []string `json:"revealKeys,omitempty"`
-	// StartBlock represents the tendermint block where the process goes from scheduled to active
-	StartBlock int64 `json:"startBlock,omitempty"`
-	// Type represents the process type
-	Type string `json:"type,omitempty"`
-}
-
-// RequireKeys indicates wheter a process require Encryption or Commitment keys
-func (p *Process) RequireKeys() bool {
-	return ProcessRequireKeys[p.Type]
-}
-
-// IsEncrypted indicates wheter a process has an encrypted payload or not
-func (p *Process) IsEncrypted() bool {
-	return ProcessIsEncrypted[p.Type]
-}
-
-var ProcessRequireKeys = map[string]bool{
-	PollVote:      false,
-	PetitionSign:  false,
-	EncryptedPoll: true,
-	SnarkVote:     true,
-}
-
-var ProcessIsEncrypted = map[string]bool{
-	PollVote:      false,
-	PetitionSign:  false,
-	EncryptedPoll: true,
-	SnarkVote:     true,
-}
-
 // ________________________ TX ________________________
 
 // UniqID returns a uniq identifier for the VoteTX. It depends on the Type.
-func UniqID(tx *models.Tx, processType string) string {
-	switch processType {
-	case PollVote, PetitionSign, EncryptedPoll:
+func UniqID(tx *models.Tx, isAnonymous bool) string {
+	if !isAnonymous {
 		if len(tx.Signature) > 32 {
 			return string(tx.Signature[:32])
 		}
+	} else {
+		// TBD: uniq ID for SNARK vote
 	}
 	return ""
 }

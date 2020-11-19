@@ -3,6 +3,7 @@
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
 ORACLE_KEY=${TESTSUITE_ORACLE_KEY:-6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223}
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
+TEST=${TEST:-3}
 
 test() {
 	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost ws://gateway:9090/dvote --logLevel=INFO --electionType=$1
@@ -19,12 +20,15 @@ for i in {1..5}; do docker-compose run test curl --fail http://gateway:9090/ping
 
 testid="/tmp/.vochaintest$RANDOM"
 
-echo "### Running test 1 ###"
-test poll-vote ${testid}1 &
+[ $TEST -eq 1 -o $TEST -eq 3 ] && {
+  echo "### Running test 1 ###"
+  test poll-vote ${testid}1 &
+} || echo 0 > ${testid}1
 
-
-echo "### Running test 2 ###"
-test encrypted-poll ${testid}2 &
+[ $TEST -eq 2 -o $TEST -eq 3 ] && {
+  echo "### Running test 2 ###"
+  test encrypted-poll ${testid}2 &
+} || echo 0 > ${testid}2
 
 echo "### Waiting for tests ###"
 wait

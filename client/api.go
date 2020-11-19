@@ -403,10 +403,14 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkur
 		EntityId:     txEid,
 		CensusMkRoot: txMkRoot,
 		CensusMkURI:  &mkuri,
-		BlockCount:   uint64(duration),
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		BlockCount:   uint32(duration),
 		ProcessId:    txPid,
 		ProcessType:  ptype,
-		StartBlock:   uint64(block + 4),
+		StartBlock:   uint32(block + 4),
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: ptype == "encrypted-poll"},
+		Mode:         &models.ProcessMode{AutoStart: true},
+		Status:       models.ProcessStatus_READY,
 	}
 	p := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,

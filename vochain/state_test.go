@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	amino "github.com/tendermint/go-amino"
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
@@ -21,8 +22,9 @@ func TestState(t *testing.T) {
 	var pids [][]byte
 	for i := 0; i < 100; i++ {
 		pids = append(pids, util.RandomBytes(32))
-		p := types.Process{EntityID: util.RandomBytes(32)}
-		s.AddProcess(p, pids[i], "ipfs://foobar")
+		mkuri := "ipfs://foobar"
+		p := &models.Process{EntityId: util.RandomBytes(32), CensusMkURI: &mkuri}
+		s.AddProcess(p, pids[i])
 
 		for j := 0; j < 10; j++ {
 			//t.Logf("adding vote %d for process %d", j, i)
@@ -42,7 +44,7 @@ func TestState(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(p.EntityID) != 32 {
+	if len(p.EntityId) != 32 {
 		t.Errorf("entityID is not correct")
 	}
 

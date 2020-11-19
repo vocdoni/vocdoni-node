@@ -10,6 +10,7 @@ import (
 	"time"
 
 	flag "github.com/spf13/pflag"
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
@@ -166,7 +167,7 @@ func emptyProcess() ProcessVotes {
 	return pv
 }
 
-func computeNonLiveResults(processID string, p *types.Process, s *vochain.State) (pv ProcessVotes, err error) {
+func computeNonLiveResults(processID string, p *models.Process, s *vochain.State) (pv ProcessVotes, err error) {
 	pv = emptyProcess()
 	var nvotes int
 	pid, err := hex.DecodeString(processID)
@@ -181,7 +182,7 @@ func computeNonLiveResults(processID string, p *types.Process, s *vochain.State)
 		}
 		var vp *types.VotePackage
 		err = nil
-		if p.IsEncrypted() {
+		if p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes {
 			if len(p.EncryptionPrivateKeys) < len(v.EncryptionKeyIndexes) {
 				err = fmt.Errorf("encryptionKeyIndexes has too many fields")
 			} else {

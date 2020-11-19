@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -14,7 +15,7 @@ import (
 )
 
 // ProcessInfo returns the available information regarding an election process id
-func (s *Scrutinizer) ProcessInfo(pid []byte) (*types.Process, error) {
+func (s *Scrutinizer) ProcessInfo(pid []byte) (*models.Process, error) {
 	return s.VochainState.Process(pid, false)
 }
 
@@ -95,7 +96,7 @@ func (s *Scrutinizer) isLiveResultsProcess(processID []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return !p.IsEncrypted(), nil
+	return !p.EnvelopeType.EncryptedVotes, nil
 }
 
 // checks if the current heigh has scheduled ending processes, if so compute and store results

@@ -20,11 +20,24 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	tmtime "github.com/tendermint/tendermint/types/time"
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
 )
 
 // hexproof is the hexadecimal a string. leafData is the claim data in byte format
-func checkMerkleProof(rootHash, hexproof string, leafData []byte) (bool, error) {
-	return tree.CheckProof(rootHash, hexproof, leafData, []byte{})
+func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRootHash, leafData []byte) (bool, error) {
+	switch censusOrigin {
+	case models.CensusOrigin_OFF_CHAIN:
+		switch proof.Payload.(type) {
+		case *models.Proof_Graviton:
+			p := proof.GetGraviton()
+			return tree.CheckProof(fmt.Sprintf("%x", censusRootHash), fmt.Sprintf("%x", p.Siblings), leafData, []byte{}) // TBD do not use hex strings
+		case *models.Proof_Iden3:
+			// NOT IMPLEMENTED
+		}
+	case models.CensusOrigin_ERC20:
+		// NOT IMPLEMENTED
+	}
+	return false, fmt.Errorf("proof type not supported for census origin %d", censusOrigin)
 }
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles

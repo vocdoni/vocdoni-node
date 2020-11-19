@@ -16,7 +16,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/client"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 func main() {
@@ -199,8 +198,13 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	}
 
 	log.Infof("created process with ID: %s", pid)
-	encrypted := types.ProcessIsEncrypted[electionType]
-
+	encrypted := false
+	switch electionType {
+	case "encrypted-poll":
+		encrypted = true
+	case "poll-vote":
+		encrypted = false
+	}
 	// Create the websockets connections for sending the votes
 	gwList := append(gateways, host)
 

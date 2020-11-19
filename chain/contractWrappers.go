@@ -80,10 +80,10 @@ func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*mode
 	}
 	processData.CensusMkURI = &processMeta.CensusMerkleTree
 	if processMeta.NumberOfBlocks != nil {
-		processData.BlockCount = uint64(processMeta.NumberOfBlocks.Int64())
+		processData.BlockCount = uint32(processMeta.NumberOfBlocks.Int64())
 	}
 	if processMeta.StartBlock != nil {
-		processData.StartBlock = uint64(processMeta.StartBlock.Int64())
+		processData.StartBlock = uint32(processMeta.StartBlock.Int64())
 	}
 	switch processMeta.ProcessType {
 	case types.SnarkVote, types.PollVote, types.PetitionSign, types.EncryptedPoll:

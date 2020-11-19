@@ -119,7 +119,7 @@ func BenchmarkVochain(b *testing.B) {
 		BlockCount:   numberOfBlocks,
 		ProcessId:    txPid,
 		ProcessType:  types.PollVote,
-		StartBlock:   uint64(*resp.Height + 1),
+		StartBlock:   uint32(*resp.Height + 1),
 	}
 	process := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,

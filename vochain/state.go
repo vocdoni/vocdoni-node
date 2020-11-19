@@ -16,6 +16,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/statedb"
 	"gitlab.com/vocdoni/go-dvote/statedb/iavlstate"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -272,7 +273,10 @@ func (v *State) AddProcessKeys(tx *models.AdminTx) error {
 		process.EncryptionPublicKeys[*tx.KeyIndex] = fmt.Sprintf("%x", tx.EncryptionPublicKey)
 		log.Debugf("added encryption key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.EncryptionPublicKey)
 	}
-	process.KeyIndex++
+	if process.KeyIndex == nil {
+		process.KeyIndex = new(uint32)
+	}
+	*process.KeyIndex++
 	if err := v.setProcess(process, tx.ProcessId); err != nil {
 		return err
 	}
@@ -291,6 +295,9 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	if err != nil {
 		return err
 	}
+	if process.KeyIndex == nil || *process.KeyIndex < 1 {
+		return fmt.Errorf("no keys to reveal, keyIndex is < 1")
+	}
 	rkey := ""
 	if tx.RevealKey != nil {
 		rkey = fmt.Sprintf("%x", tx.RevealKey)
@@ -303,10 +310,7 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 		process.EncryptionPrivateKeys[*tx.KeyIndex] = ekey
 		log.Debugf("revealed encryption key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.EncryptionPrivateKey)
 	}
-	if process.KeyIndex < 1 {
-		return fmt.Errorf("no more keys to reveal, keyIndex is < 1")
-	}
-	process.KeyIndex--
+	*process.KeyIndex--
 	if err := v.setProcess(process, tx.ProcessId); err != nil {
 		return err
 	}
@@ -317,8 +321,8 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 }
 
 // AddProcess adds a new process to vochain
-func (v *State) AddProcess(p types.Process, pid []byte, mkuri string) error {
-	newProcessBytes, err := v.Codec.MarshalBinaryBare(p)
+func (v *State) AddProcess(p *models.Process, pid []byte) error {
+	newProcessBytes, err := proto.Marshal(p)
 	if err != nil {
 		return errors.New("cannot marshal process bytes")
 	}
@@ -328,8 +332,12 @@ func (v *State) AddProcess(p types.Process, pid []byte, mkuri string) error {
 	if err != nil {
 		return err
 	}
+	mkuri := ""
+	if p.CensusMkURI != nil {
+		mkuri = *p.CensusMkURI
+	}
 	for _, l := range v.eventListeners {
-		l.OnProcess(pid, p.EntityID, p.MkRoot, mkuri)
+		l.OnProcess(pid, p.EntityId, fmt.Sprintf("%x", p.CensusMkRoot), mkuri)
 	}
 	return nil
 }
@@ -340,10 +348,10 @@ func (v *State) CancelProcess(pid []byte) error {
 	if err != nil {
 		return err
 	}
-	if process.Canceled {
+	if process.Status == models.ProcessStatus_CANCELED {
 		return nil
 	}
-	process.Canceled = true
+	process.Status = models.ProcessStatus_CANCELED
 	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
 	if err != nil {
 		return errors.New("cannot marshal updated process bytes")
@@ -362,19 +370,16 @@ func (v *State) CancelProcess(pid []byte) error {
 
 // PauseProcess sets the process paused atribute to true
 func (v *State) PauseProcess(pid []byte) error {
-	v.RLock()
-	processBytes := v.Store.Tree(ProcessTree).Get(pid)
-	v.RUnlock()
-	var process types.Process
-	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
-		return errors.New("cannot unmarshal process")
+	process, err := v.Process(pid, false)
+	if err != nil {
+		return err
 	}
 	// already paused
-	if process.Paused {
-		return nil
+	if process.Status == models.ProcessStatus_PAUSED {
+		return fmt.Errorf("process already paused")
 	}
-	process.Paused = true
-	return v.setProcess(&process, pid)
+	process.Status = models.ProcessStatus_PAUSED
+	return v.setProcess(process, pid)
 }
 
 // ResumeProcess sets the process paused atribute to true
@@ -384,16 +389,15 @@ func (v *State) ResumeProcess(pid []byte) error {
 		return err
 	}
 	// non paused process cannot be resumed
-	if !process.Paused {
-		return nil
+	if process.Status != models.ProcessStatus_PAUSED {
+		return fmt.Errorf("process is not paused")
 	}
-	process.Paused = false
+	process.Status = models.ProcessStatus_READY
 	return v.setProcess(process, pid)
 }
 
 // Process returns a process info given a processId if exists
-func (v *State) Process(pid []byte, isQuery bool) (*types.Process, error) {
-	var process *types.Process
+func (v *State) Process(pid []byte, isQuery bool) (*models.Process, error) {
 	var processBytes []byte
 	var err error
 	v.RLock()
@@ -406,9 +410,10 @@ func (v *State) Process(pid []byte, isQuery bool) (*types.Process, error) {
 	if processBytes == nil {
 		return nil, ErrProcessNotFound
 	}
-	err = v.Codec.UnmarshalBinaryBare(processBytes, &process)
+	process := new(models.Process)
+	err = proto.Unmarshal(processBytes, process)
 	if err != nil {
-		return nil, fmt.Errorf("cannot unmarshal process with id (%s)", pid)
+		return nil, fmt.Errorf("cannot unmarshal process (%s): %w", pid, err)
 	}
 	return process, nil
 }
@@ -425,11 +430,11 @@ func (v *State) CountProcesses(isQuery bool) int64 {
 }
 
 // set process stores in the database the process
-func (v *State) setProcess(process *types.Process, pid []byte) error {
-	if process == nil {
+func (v *State) setProcess(process *models.Process, pid []byte) error {
+	if process == nil || len(process.ProcessId) != types.ProcessIDsize {
 		return ErrProcessNotFound
 	}
-	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
+	updatedProcessBytes, err := proto.Marshal(process)
 	if err != nil {
 		return errors.New("cannot marshal updated process bytes")
 	}

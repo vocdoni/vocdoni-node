@@ -181,7 +181,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 	iter = k.storage.NewIterator()
 	var pid []byte
 	var err error
-	var process *types.Process
+	var process *models.Process
 	// Second take all existing processes and check if keys should be revealed (if canceled)
 	for iter.Next() {
 		if !strings.HasPrefix(string(iter.Key()), dbPrefixProcess) {
@@ -193,7 +193,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 			log.Error(err)
 			continue
 		}
-		if process.Canceled {
+		if process.Status == models.ProcessStatus_CANCELED || process.Status == models.ProcessStatus_ENDED {
 			log.Warnf("found pending keys for reveal on process %x", pid)
 			if err := k.revealKeys(string(pid)); err != nil {
 				log.Error(err)
@@ -217,7 +217,7 @@ func (k *KeyKeeper) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 		log.Errorf("cannot get process from state: (%s)", err)
 		return
 	}
-	if !p.RequireKeys() {
+	if !(p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes) {
 		return
 	}
 	// If keys already exist, do nothing (this happends on the start-up block replay)
@@ -238,7 +238,7 @@ func (k *KeyKeeper) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 	}
 
 	// Add keys to the pool queue
-	k.blockPool[string(pid)] = p.StartBlock + p.NumberOfBlocks
+	k.blockPool[string(pid)] = int64(p.StartBlock + p.BlockCount)
 }
 
 // OnCancel will publish the private and reveal keys of the canceled process, if required
@@ -248,7 +248,7 @@ func (k *KeyKeeper) OnCancel(pid []byte) {
 		log.Errorf("cannot get process from state: (%s)", err)
 		return
 	}
-	if !p.RequireKeys() {
+	if !(p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes) {
 		return
 	}
 
@@ -369,7 +369,7 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 			log.Errorf("cannot get process from state: (%s)", err)
 			continue
 		}
-		if !process.RequireKeys() {
+		if !(process.EnvelopeType.Anonymous || process.EnvelopeType.EncryptedVotes) {
 			return
 		}
 		if process.EncryptionPublicKeys[k.myIndex] != "" {

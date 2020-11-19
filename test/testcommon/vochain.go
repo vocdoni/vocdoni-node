@@ -46,24 +46,22 @@ var (
 		}
 	}
 
-	ProcessHardcoded = &types.Process{
-		EntityID:       testutil.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
-		MkRoot:         "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe",
-		NumberOfBlocks: 1000,
-		Type:           types.PetitionSign,
+	ProcessHardcoded = &models.Process{
+		ProcessId:    testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+		EntityId:     testutil.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
+		CensusMkRoot: testutil.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		BlockCount:   1000,
+		EnvelopeType: &models.EnvelopeType{},
+		Mode:         &models.ProcessMode{},
+		Status:       models.ProcessStatus_READY,
 	}
 
 	// privKey e0aa6db5a833531da4d259fb5df210bae481b276dc4c2ab6ab9771569375aed5 for address 06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0
 	HardcodedNewProcessTx = &models.NewProcessTx{
-		Txtype: models.TxType_NEW_PROCESS,
-		Process: &models.Process{
-			EntityId:     testutil.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
-			CensusMkRoot: testutil.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
-			ProcessId:    testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
-			ProcessType:  types.PetitionSign,
-			BlockCount:   1000,
-		},
-		Nonce: util.RandomHex(32),
+		Txtype:  models.TxType_NEW_PROCESS,
+		Process: ProcessHardcoded,
+		Nonce:   util.RandomHex(32),
 	}
 
 	HardcodedCancelProcessTx = &models.CancelProcessTx{

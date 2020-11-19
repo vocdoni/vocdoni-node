@@ -143,8 +143,8 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return err
 		}
-		if p.Canceled {
-			log.Infof("process already canceled, skipping")
+		if p.Status == models.ProcessStatus_CANCELED || p.Status == models.ProcessStatus_ENDED {
+			log.Infof("process already canceled or ended, skipping")
 			return nil
 		}
 		vtx := models.Tx{}

@@ -68,15 +68,21 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		tr.AddClaim(c, nil)
 		claims = append(claims, string(c))
 	}
-	process := &types.Process{
-		StartBlock:     0,
-		Type:           types.PollVote,
-		EntityID:       util.RandomBytes(types.EntityIDsize),
-		MkRoot:         tr.Root(),
-		NumberOfBlocks: 1024,
+	mkuri := "ipfs://123456789"
+	pid := util.RandomHex(types.ProcessIDsize)
+	process := &models.Process{
+		ProcessId:    pid,
+		StartBlock:   0,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: true},
+		Mode:         &models.ProcessMode{},
+		Status:       models.ProcessStatus_READY,
+		EntityId:     util.RandomBytes(types.EntityIDsize),
+		CensusMkRoot: testutil.Hex2byte(b, tr.Root()),
+		CensusMkURI:  &mkuri,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		BlockCount:   1024,
 	}
-	pid := util.RandomBytes(types.ProcessIDsize)
-	app.State.AddProcess(*process, pid, "ipfs://123456789")
+	app.State.AddProcess(process, pid)
 
 	var proof string
 
