@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
@@ -37,10 +36,10 @@ var (
 
 	// VoteHardcoded needs to be a constructor, since multiple tests will
 	// modify its value. We need a different pointer for each test.
-	VoteHardcoded = func() *types.Vote {
+	VoteHardcoded = func() *models.Vote {
 		vp, _ := base64.StdEncoding.DecodeString("eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19")
-		return &types.Vote{
-			ProcessID:   testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+		return &models.Vote{
+			ProcessId:   testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 			Nullifier:   testutil.Hex2byte(nil, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), // nullifier and nonce are the same here
 			VotePackage: vp,
 		}
@@ -140,9 +139,7 @@ func SignAndPrepareTx(vtx *models.Tx) error {
 }
 
 func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
-	c := amino.NewCodec()
-	vochain.RegisterAmino(c)
-	s, err := vochain.NewState(tb.TempDir(), c)
+	s, err := vochain.NewState(tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -155,9 +152,7 @@ func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 }
 
 func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
-	c := amino.NewCodec()
-	vochain.RegisterAmino(c)
-	s, err := vochain.NewState(tb.TempDir(), c)
+	s, err := vochain.NewState(tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -166,32 +161,37 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 	vals[0] = *privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
 	rint = rand.Int()
 	vals[1] = *privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
-	validatorsBytes, err := c.MarshalJSON(vals)
-	if err != nil {
+	validator0 := &models.Validator{
+		Address: vals[0].Key.Address.Bytes(),
+		PubKey:  vals[0].Key.PubKey.Bytes(),
+		Power:   10,
+	}
+	validator1 := &models.Validator{
+		Address: vals[0].Key.Address.Bytes(),
+		PubKey:  vals[0].Key.PubKey.Bytes(),
+		Power:   10,
+	}
+	if err := s.AddValidator(validator0); err != nil {
 		tb.Fatal(err)
 	}
-	if err = s.Store.Tree(vochain.AppTree).Add([]byte("validator"), validatorsBytes); err != nil {
+	if err := s.AddValidator(validator1); err != nil {
 		tb.Fatal(err)
 	}
-	oraclesBytes, err := s.Codec.MarshalBinaryBare(OracleListHardcoded)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	if err = s.Store.Tree(vochain.AppTree).Add([]byte("oracle"), oraclesBytes); err != nil {
-		tb.Fatal(err)
+	for _, o := range OracleListHardcoded {
+		if err := s.AddOracle(o); err != nil {
+			tb.Fatal(err)
+		}
 	}
 	return s
 }
 
 func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
-	c := amino.NewCodec()
-	vochain.RegisterAmino(c)
-	s, err := vochain.NewState(tb.TempDir(), c)
+	s, err := vochain.NewState(tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
 	// add process
-	processBytes, err := s.Codec.MarshalBinaryBare(ProcessHardcoded)
+	processBytes, err := proto.Marshal(ProcessHardcoded)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -202,8 +202,6 @@ func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 }
 
 func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplication {
-	cdc := amino.NewCodec()
-	vochain.RegisterAmino(cdc)
 	// start vochain node
 	// create config
 	d.VochainCfg = new(config.VochainCfg)

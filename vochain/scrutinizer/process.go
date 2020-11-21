@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
+	"google.golang.org/protobuf/proto"
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -105,14 +106,14 @@ func (s *Scrutinizer) checkFinishedProcesses(height int64) {
 	if err != nil || pidListBytes == nil {
 		return
 	}
-	var pidList ProcessEndingList
-	if err := s.VochainState.Codec.UnmarshalBinaryBare(pidListBytes, &pidList); err != nil {
+	var pidList models.ProcessEndingList
+	if err := proto.Unmarshal(pidListBytes, &pidList); err != nil {
 		log.Error(err)
 		return
 	}
-	for _, p := range pidList {
+	for _, p := range pidList.GetProcessList() {
 		if err := s.ComputeResult(p); err != nil {
-			log.Errorf("cannot compute results for %s: (%s)", p, err)
+			log.Errorf("cannot compute results for %x: (%s)", p, err)
 		}
 	}
 	// Remove entry from storage
@@ -122,9 +123,9 @@ func (s *Scrutinizer) checkFinishedProcesses(height int64) {
 }
 
 // creates a new empty process and stores it into the database
-func (s *Scrutinizer) newEmptyLiveProcess(pid []byte) (ProcessVotes, error) {
-	pv := emptyProcess()
-	process, err := s.VochainState.Codec.MarshalBinaryBare(&pv)
+func (s *Scrutinizer) newEmptyLiveProcess(pid []byte) (*models.ProcessResult, error) {
+	pv := emptyProcess(0, 0)
+	process, err := proto.Marshal(pv)
 	if err != nil {
 		return nil, err
 	}
@@ -145,16 +146,16 @@ func (s *Scrutinizer) registerPendingProcess(pid []byte, height int64) {
 		log.Error(err)
 		return
 	}
-	var pidList ProcessEndingList
+	var pidList models.ProcessEndingList
 	if len(pidListBytes) > 0 {
-		if err := s.VochainState.Codec.UnmarshalBinaryBare(pidListBytes, &pidList); err != nil {
+		if err := proto.Unmarshal(pidListBytes, &pidList); err != nil {
 			log.Error(err)
 			return
 		}
 	}
-	pidList = append(pidList, pid)
+	pidList.ProcessList = append(pidList.ProcessList, pid)
 
-	pidListBytes, err = s.VochainState.Codec.MarshalBinaryBare(pidList)
+	pidListBytes, err = proto.Marshal(&pidList)
 	if err != nil {
 		log.Error(err)
 		return
@@ -220,10 +221,17 @@ func (s *Scrutinizer) addEntity(eid, pid []byte) {
 	atomic.AddInt64(&s.entityCount, 1)
 }
 
-func emptyProcess() ProcessVotes {
-	pv := make(ProcessVotes, MaxQuestions)
-	for i := range pv {
-		pv[i] = make([]uint32, MaxOptions)
+func emptyProcess(questions, options int) *models.ProcessResult {
+	if questions == 0 {
+		questions = MaxQuestions
+	}
+	if options == 0 {
+		options = MaxOptions
+	}
+	pv := new(models.ProcessResult)
+	pv.Votes = make([]*models.QuestionResult, questions)
+	for i := range pv.Votes {
+		pv.Votes[i].Question = make([]uint32, options)
 	}
 	return pv
 }

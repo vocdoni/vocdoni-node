@@ -6,6 +6,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
+	"google.golang.org/protobuf/proto"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -41,8 +42,8 @@ func unmarshalVote(votePackage []byte, keys []string) (*types.VotePackage, error
 	return &vote, nil
 }
 
-func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
-	pid := envelope.ProcessID
+func (s *Scrutinizer) addLiveResultsVote(envelope *models.Vote) error {
+	pid := envelope.ProcessId
 	if pid == nil {
 		return fmt.Errorf("cannot find process for envelope")
 	}
@@ -53,31 +54,30 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *types.Vote) error {
 	if len(vote.Votes) > MaxQuestions {
 		return fmt.Errorf("too many questions on addVote")
 	}
-
-	process, err := s.Storage.Get(s.encode("liveProcess", pid))
+	processBytes, err := s.Storage.Get(s.encode("liveProcess", pid))
 	if err != nil {
 		return fmt.Errorf("error adding vote to process %x, skipping addVote: (%s)", pid, err)
 	}
 
-	var pv ProcessVotes
-	if err := s.VochainState.Codec.UnmarshalBinaryBare(process, &pv); err != nil {
+	var pv models.ProcessResult
+	if err := proto.Unmarshal(processBytes, &pv); err != nil {
 		return fmt.Errorf("cannot unmarshal vote (%s)", err)
 	}
 
-	for question, opt := range vote.Votes {
+	for q, opt := range vote.Votes {
 		if opt > MaxOptions {
 			log.Warn("option overflow on addVote")
 			continue
 		}
-		pv[question][opt]++
+		pv.Votes[q].Question[opt]++
 	}
 
-	process, err = s.VochainState.Codec.MarshalBinaryBare(pv)
+	processBytes, err = proto.Marshal(&pv)
 	if err != nil {
 		return err
 	}
 
-	if err := s.Storage.Put(s.encode("liveProcess", pid), process); err != nil {
+	if err := s.Storage.Put(s.encode("liveProcess", pid), processBytes); err != nil {
 		return err
 	}
 
@@ -109,7 +109,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	if err != nil {
 		return err
 	}
-	var pv ProcessVotes
+	var pv *models.ProcessResult
 	if isLive {
 		if pv, err = s.computeLiveResults(processID); err != nil {
 			return err
@@ -124,7 +124,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 		}
 	}
 
-	result, err := s.VochainState.Codec.MarshalBinaryBare(pv)
+	result, err := proto.Marshal(pv)
 	if err != nil {
 		return err
 	}
@@ -133,25 +133,24 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 }
 
 // VoteResult returns the current result for a processId summarized in a two dimension int slice
-func (s *Scrutinizer) VoteResult(processID []byte) (ProcessVotes, error) {
+func (s *Scrutinizer) VoteResult(processID []byte) (*models.ProcessResult, error) {
 	// Check if process exist
 	_, err := s.VochainState.Process(processID, false)
 	if err != nil {
 		return nil, err
 	}
-
 	log.Debugf("finding results for %x", processID)
 	// If exist a summary of the voting process, just return it
-	var pv ProcessVotes
+	var pv models.ProcessResult
 	processBytes, err := s.Storage.Get(s.encode("results", processID))
 	if err != nil && err != badger.ErrKeyNotFound {
 		return nil, err
 	}
 	if err == nil {
-		if err := s.VochainState.Codec.UnmarshalBinaryBare(processBytes, &pv); err != nil {
+		if err := proto.Unmarshal(processBytes, &pv); err != nil {
 			return nil, err
 		}
-		return pv, nil
+		return &pv, nil
 	}
 
 	// If results are not available, check if the process is PollVote (live)
@@ -167,22 +166,23 @@ func (s *Scrutinizer) VoteResult(processID []byte) (ProcessVotes, error) {
 	return s.computeLiveResults(processID)
 }
 
-func (s *Scrutinizer) computeLiveResults(processID []byte) (pv ProcessVotes, err error) {
+func (s *Scrutinizer) computeLiveResults(processID []byte) (*models.ProcessResult, error) {
 	var pb []byte
-	pb, err = s.Storage.Get(s.encode("liveProcess", processID))
+	var pv models.ProcessResult
+	pb, err := s.Storage.Get(s.encode("liveProcess", processID))
 	if err != nil {
-		return
+		return nil, err
 	}
-	if err = s.VochainState.Codec.UnmarshalBinaryBare(pb, &pv); err != nil {
-		return
+	if err = proto.Unmarshal(pb, &pv); err != nil {
+		return nil, err
 	}
 	pruneVoteResult(&pv)
 	log.Debugf("computed live results for %x", processID)
-	return
+	return &pv, nil
 }
 
-func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *models.Process) (pv ProcessVotes, err error) {
-	pv = emptyProcess()
+func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *models.Process) (*models.ProcessResult, error) {
+	pv := emptyProcess(0, 0)
 	var nvotes int
 	for _, e := range s.VochainState.EnvelopeList(processID, 0, 32<<18, false) { // 8.3M seems enough for now
 		v, err := s.VochainState.Envelope(processID, e, false)
@@ -222,24 +222,24 @@ func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *models.Process)
 				log.Warn("option overflow on computeResult, skipping vote...")
 				continue
 			}
-			pv[question][opt]++
+			pv.Votes[question].Question[opt]++
 		}
 		nvotes++
 	}
-	pruneVoteResult(&pv)
+	pruneVoteResult(pv)
 	log.Infof("computed results for process %x with %d votes", processID, nvotes)
-	return
+	return pv, nil
 }
 
 // To-be-improved
-func pruneVoteResult(pv *ProcessVotes) {
-	pvv := *pv
-	var pvc ProcessVotes
+func pruneVoteResult(pv *models.ProcessResult) {
+	pvv := proto.Clone(pv).(*models.ProcessResult)
+	var pvc models.ProcessResult
 	min := MaxQuestions - 1
 	for ; min >= 0; min-- { // find the real size of first dimension (questions with some answer)
 		j := 0
 		for ; j < MaxOptions; j++ {
-			if pvv[min][j] != 0 {
+			if pvv.Votes[min].Question[j] != 0 {
 				break
 			}
 		}
@@ -249,17 +249,18 @@ func pruneVoteResult(pv *ProcessVotes) {
 	}
 
 	for i := 0; i <= min; i++ { // copy the options for each question but pruning options too
-		pvc = make([][]uint32, i+1)
+		pvc.Votes = make([]*models.QuestionResult, i+1)
 		for i2 := 0; i2 <= i; i2++ { // copy only the first non-zero values
 			j2 := MaxOptions - 1
 			for ; j2 >= 0; j2-- {
-				if pvv[i2][j2] != 0 {
+				if pvv.Votes[i2].Question[j2] != 0 {
 					break
 				}
 			}
-			pvc[i2] = make([]uint32, j2+1)
-			copy(pvc[i2], pvv[i2])
+			pvc.Votes[i2].Question = make([]uint32, j2+1)
+			copy(pvc.Votes[i2].Question, pvv.Votes[i2].Question)
+
 		}
 	}
-	*pv = pvc
+	pv = proto.Clone(&pvc).(*models.ProcessResult)
 }

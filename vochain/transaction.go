@@ -47,7 +47,12 @@ func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
 					if tx.Power == nil {
 						return []byte{}, fmt.Errorf("power not specified on add validator transaction")
 					}
-					return []byte{}, state.AddValidator(pk, int64(*tx.Power))
+					validator := &models.Validator{
+						Address: pk.Address().Bytes(),
+						PubKey:  pk.Bytes(),
+						Power:   *tx.Power,
+					}
+					return []byte{}, state.AddValidator(validator)
 
 				}
 				return []byte{}, fmt.Errorf("addValidator %w", err)
@@ -95,7 +100,7 @@ func UnmarshalTx(content []byte) (*models.Tx, error) {
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
 // All hexadecimal strings should be already sanitized (without 0x)
-func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*types.Vote, error) {
+func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*models.Vote, error) {
 	tx := vtx.GetVote()
 	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
@@ -122,8 +127,8 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*types.Vote, err
 			// TODO check snark
 			return nil, fmt.Errorf("snark vote not implemented")
 		default:
-			var vote types.Vote
-			vote.ProcessID = tx.ProcessId
+			var vote models.Vote
+			vote.ProcessId = tx.ProcessId
 			if vtx.Signature == nil {
 				return nil, fmt.Errorf("signature missing on voteTx")
 			}
@@ -145,7 +150,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*types.Vote, err
 			if forCommit && vp != nil {
 				// if vote is in cache, lazy check and remove it from cache
 				defer state.VoteCacheDel(uid)
-				if state.EnvelopeExists(vote.ProcessID, vp.Nullifier) {
+				if state.EnvelopeExists(vote.ProcessId, vp.Nullifier) {
 					return nil, fmt.Errorf("vote already exists")
 				}
 			} else {
@@ -182,11 +187,11 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*types.Vote, err
 				log.Debugf("extracted public key: %x", vp.PubKey)
 
 				// assign a nullifier
-				vp.Nullifier = GenerateNullifier(addr, vote.ProcessID)
+				vp.Nullifier = GenerateNullifier(addr, vote.ProcessId)
 				log.Debugf("generated new vote nullifier: %x", vp.Nullifier)
 
 				// check if vote exists
-				if state.EnvelopeExists(vote.ProcessID, vp.Nullifier) {
+				if state.EnvelopeExists(vote.ProcessId, vp.Nullifier) {
 					return nil, fmt.Errorf("vote already exists")
 				}
 

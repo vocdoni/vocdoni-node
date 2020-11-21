@@ -11,11 +11,13 @@ import (
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/config"
+	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 
 	amino "github.com/tendermint/go-amino"
 	tmcfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
@@ -24,7 +26,6 @@ import (
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
 	db "github.com/tendermint/tm-db"
-
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 
@@ -283,8 +284,10 @@ func HexKeyToAmino(hexKey string) (private, public string, err error) {
 		return "", "", err
 	}
 
+	// Temporary until Tendermint is updated
 	cdc := amino.NewCodec()
-	RegisterAmino(cdc)
+	cryptoamino.RegisterAmino(cdc)
+	cdc.RegisterInterface((*types.PubKey)(nil), nil)
 
 	var pv privval.FilePVKey
 	var privKey crypto25519.PrivKeyEd25519

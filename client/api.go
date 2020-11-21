@@ -79,7 +79,7 @@ func (c *Client) GetResults(pid string) ([][]uint32, string, error) {
 	return resp.Results, resp.State, nil
 }
 
-func (c *Client) GetEnvelopeHeight(pid string) (int64, error) {
+func (c *Client) GetEnvelopeHeight(pid string) (uint32, error) {
 	var req types.MetaRequest
 	req.Method = "getEnvelopeHeight"
 	req.ProcessID = pid
@@ -165,7 +165,7 @@ func (c *Client) TestResults(pid string, totalVotes int) ([][]uint32, error) {
 	log.Infof("waiting for results...")
 	var err error
 	var results [][]uint32
-	var block int64
+	var block uint32
 	for {
 		block, err = c.GetCurrentBlock()
 		if err != nil {
@@ -229,7 +229,7 @@ func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root string, tolera
 	return proofs, nil
 }
 
-func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers []*ethereum.SignKeys, proofs [][]byte, encrypted bool, doubleVoting bool, wg *sync.WaitGroup) (time.Duration, error) {
+func (c *Client) TestSendVotes(pid, eid, root string, startBlock uint32, signers []*ethereum.SignKeys, proofs [][]byte, encrypted bool, doubleVoting bool, wg *sync.WaitGroup) (time.Duration, error) {
 	var err error
 	var keys []string
 	// Generate merkle proofs
@@ -350,7 +350,7 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 			log.Warnf("error getting envelope height")
 			continue
 		} else {
-			if h >= int64(len(signers)) {
+			if h >= uint32(len(signers)) {
 				break
 			}
 		}
@@ -380,7 +380,7 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 	return votingElapsedTime, nil
 }
 
-func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (int64, error) {
+func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (uint32, error) {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
 	block, err := c.GetCurrentBlock()
@@ -441,7 +441,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkur
 	if !resp.Ok {
 		return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
-	return int64(p.Process.StartBlock), nil
+	return p.Process.StartBlock, nil
 }
 
 func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
@@ -483,7 +483,7 @@ func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
 	return nil
 }
 
-func (c *Client) GetCurrentBlock() (int64, error) {
+func (c *Client) GetCurrentBlock() (uint32, error) {
 	var req types.MetaRequest
 	req.Method = "getBlockHeight"
 	resp, err := c.Request(req, nil)

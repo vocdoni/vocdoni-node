@@ -14,7 +14,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"google.golang.org/protobuf/proto"
@@ -147,7 +146,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 	defer k.lock.Unlock()
 	iter := k.storage.NewIterator()
 	defer iter.Release()
-	var pids []string
+	var pids models.StoredKeys
 	log.Infof("starting keykeeper reveal recovery")
 	// First get the scheduled reveal key process from the storage
 	for iter.Next() {
@@ -163,12 +162,12 @@ func (k *KeyKeeper) RevealUnpublished() {
 		if header.Height <= h+1 {
 			continue
 		}
-		if err := k.vochain.State.Codec.UnmarshalBinaryBare(iter.Value(), &pids); err != nil {
+		if err := proto.Unmarshal(iter.Value(), &pids); err != nil {
 			log.Errorf("could not unmarshal value: %s", err)
 			continue
 		}
 		log.Warnf("found pending keys for reveal")
-		for _, p := range pids {
+		for _, p := range pids.GetPids() {
 			if err := k.revealKeys(p); err != nil {
 				log.Error(err)
 			}
@@ -266,7 +265,7 @@ func (k *KeyKeeper) Commit(height int64) {
 }
 
 // OnVote is not used by the KeyKeeper
-func (k *KeyKeeper) OnVote(v *types.Vote) {
+func (k *KeyKeeper) OnVote(v *models.Vote) {
 	// do nothing
 }
 
@@ -311,7 +310,7 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 	k.lock.Lock()
 	defer k.lock.Unlock()
 	for pid, height := range k.blockPool {
-		pids := []string{}
+		pids := models.StoredKeys{}
 		pkey := []byte(dbPrefixBlock + fmt.Sprintf("%d", height))
 		var data []byte
 		var err error
@@ -322,12 +321,12 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 				log.Errorf("cannot get existing list of scheduled reveal processes for block %d", height)
 				continue
 			}
-			if err := k.vochain.State.Codec.UnmarshalBinaryBare(data, &pids); err != nil {
+			if err := proto.Unmarshal(data, &pids); err != nil {
 				log.Errorf("cannot unmarshal process pids for block %d: (%s)", height, err)
 			}
 		}
-		pids = append(pids, pid)
-		data, err = k.vochain.Codec.MarshalBinaryBare(pids)
+		pids.Pids = append(pids.Pids, pid)
+		data, err = proto.Marshal(&pids)
 		if err != nil {
 			log.Errorf("cannot marshal new pid list for scheduling on block %d: (%s)", height, err)
 			continue
@@ -358,12 +357,12 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 		return
 	}
 
-	var pids []string
-	if err := k.vochain.Codec.UnmarshalBinaryBare(data, &pids); err != nil {
+	var pids models.StoredKeys
+	if err := proto.Unmarshal(data, &pids); err != nil {
 		log.Errorf("cannot unmarshal process pids for block %d: (%s)", height, err)
 		return
 	}
-	for _, p := range pids {
+	for _, p := range pids.GetPids() {
 		process, err := k.vochain.State.Process([]byte(p), false)
 		if err != nil {
 			log.Errorf("cannot get process from state: (%s)", err)

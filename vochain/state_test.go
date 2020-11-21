@@ -4,17 +4,14 @@ import (
 	"fmt"
 	"testing"
 
-	amino "github.com/tendermint/go-amino"
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 func TestState(t *testing.T) {
 	log.Init("info", "stdout")
-	c := amino.NewCodec()
-	s, err := NewState(t.TempDir(), c)
+	s, err := NewState(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,12 +25,12 @@ func TestState(t *testing.T) {
 
 		for j := 0; j < 10; j++ {
 			//t.Logf("adding vote %d for process %d", j, i)
-			v := types.Vote{
-				ProcessID:   pids[i],
+			v := &models.Vote{
+				ProcessId:   pids[i],
 				Nullifier:   util.RandomBytes(32),
 				VotePackage: []byte(fmt.Sprintf("%d%d", i, j)),
 			}
-			if err := s.AddVote(&v); err != nil {
+			if err := s.AddVote(v); err != nil {
 				t.Error(err)
 			}
 		}

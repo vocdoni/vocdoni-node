@@ -14,7 +14,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-func (c *Client) WaitUntilBlock(block int64) {
+func (c *Client) WaitUntilBlock(block uint32) {
 	log.Infof("waiting for block %d...", block)
 	for {
 		cb, err := c.GetCurrentBlock()

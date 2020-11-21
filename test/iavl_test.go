@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/privval"
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
@@ -17,8 +17,7 @@ import (
 func TestVochainState(t *testing.T) {
 	t.Parallel()
 
-	c := amino.NewCodec()
-	s, err := vochain.NewState(t.TempDir(), c)
+	s, err := vochain.NewState(t.TempDir())
 	if err != nil {
 		t.Fatalf("cannot create vochain state (%s)", err)
 	}
@@ -83,7 +82,12 @@ func TestAddValidator(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if err := s.AddValidator(pubk, 10); err != nil {
+	validator := &models.Validator{
+		Address: pubk.Address(),
+		PubKey:  pubk.Bytes(),
+		Power:   10,
+	}
+	if err := s.AddValidator(validator); err != nil {
 		t.Error(err)
 	}
 }

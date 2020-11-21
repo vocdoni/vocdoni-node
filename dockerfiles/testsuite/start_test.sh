@@ -12,6 +12,10 @@ test() {
 
 echo "### Starting test suite ###"
 docker-compose build
+
+echo "### Cleaning environment ###"
+docker-compose down -v --remove-orphans
+
 docker-compose up -d
 
 sleep 5
@@ -35,9 +39,6 @@ wait
 
 #echo "### Post run logs ###"
 #docker-compose logs --tail 300
-
-echo "### Cleaning environment ###"
-docker-compose down -v --remove-orphans
 
 [ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" ] && {
 	echo "Vochain test finished correctly!"

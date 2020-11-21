@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -30,17 +31,11 @@ const (
 type Scrutinizer struct {
 	VochainState *vochain.State
 	Storage      db.Database
-	votePool     []*types.Vote
+	votePool     []*models.Vote
 	processPool  []*types.ScrutinizerOnProcessData
 	resultsPool  []*types.ScrutinizerOnProcessData
 	entityCount  int64
 }
-
-// ProcessVotes represents the results of a voting process using a two dimensions slice [ question1:[option1,option2], question2:[option1,option2], ...]
-type ProcessVotes [][]uint32
-
-// ProcessEndingList represents a list of ending voting processes
-type ProcessEndingList [][]byte
 
 // NewScrutinizer returns an instance of the Scrutinizer
 // using the local storage database of dbPath and integrated into the state vochain instance
@@ -96,7 +91,7 @@ func (s *Scrutinizer) Commit(height int64) {
 
 //Rollback removes the non commited pending operations
 func (s *Scrutinizer) Rollback() {
-	s.votePool = []*types.Vote{}
+	s.votePool = []*models.Vote{}
 	s.processPool = []*types.ScrutinizerOnProcessData{}
 	s.resultsPool = []*types.ScrutinizerOnProcessData{}
 }
@@ -108,8 +103,8 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 }
 
 // OnVote scrutinizer stores the votes if liveResults enabled
-func (s *Scrutinizer) OnVote(v *types.Vote) {
-	isLive, err := s.isLiveResultsProcess(v.ProcessID)
+func (s *Scrutinizer) OnVote(v *models.Vote) {
+	isLive, err := s.isLiveResultsProcess(v.ProcessId)
 	if err != nil {
 		log.Errorf("cannot check if process is live results: (%s)", err)
 		return

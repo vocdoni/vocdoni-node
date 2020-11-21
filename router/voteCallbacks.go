@@ -119,7 +119,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 		response.Registered = types.True
 		response.Nullifier = fmt.Sprintf("%x", e.Nullifier)
 		response.Height = &e.Height
-		block := r.vocapp.Node.BlockStore().LoadBlock(e.Height)
+		block := r.vocapp.Node.BlockStore().LoadBlock(int64(e.Height))
 		if block == nil {
 			r.sendError(request, "failed getting envelope block timestamp")
 			return
@@ -177,15 +177,16 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 	}
 	votes := r.vocapp.State.CountVotes(pid, true)
 	var response types.MetaResponse
-	response.Height = new(int64)
+	response.Height = new(uint32)
 	*response.Height = votes
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getBlockHeight(request routerRequest) {
 	var response types.MetaResponse
-	response.Height = &r.vocapp.State.Header(true).Height
-	response.BlockTimestamp = int32(r.vocapp.State.Header(true).Time.Unix())
+	h := uint32(r.vocapp.State.Header(true).Height)
+	response.Height = &h
+	response.BlockTimestamp = int32(r.vocapp.State.Header(true).Timestamp)
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -381,11 +382,19 @@ func (r *Router) getResults(request routerRequest) {
 	if err == scrutinizer.ErrNoResultsYet {
 		response.Message = scrutinizer.ErrNoResultsYet.Error()
 	}
-	response.Results = vr
+
+	// Temporary until we use Protobuf for the API
+	response.Results = make([][]uint32, len(vr.Votes))
+	for i, v := range vr.Votes {
+		response.Results = append(response.Results, make([]uint32, len(v.Question)))
+		for j, q := range v.Question {
+			response.Results[i][j] = q
+		}
+	}
 
 	// Get number of votes
 	votes := r.vocapp.State.CountVotes(pid, true)
-	response.Height = new(int64)
+	response.Height = new(uint32)
 	*response.Height = votes
 
 	request.Send(r.buildReply(request, &response))
@@ -440,8 +449,9 @@ func (r *Router) getScrutinizerEntities(request routerRequest) {
 
 func (r *Router) getBlockStatus(request routerRequest) {
 	var response types.MetaResponse
+	h := uint32(r.vocapp.State.Header(true).Height)
 	response.BlockTime = r.vocinfo.BlockTimes()
-	response.Height = &r.vocapp.State.Header(true).Height
-	response.BlockTimestamp = int32(r.vocapp.State.Header(true).Time.Unix())
+	response.Height = &h
+	response.BlockTimestamp = int32(r.vocapp.State.Header(true).Timestamp)
 	request.Send(r.buildReply(request, &response))
 }

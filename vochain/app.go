@@ -4,46 +4,33 @@ import (
 	"fmt"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	amino "github.com/tendermint/go-amino"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	mempl "github.com/tendermint/tendermint/mempool"
 	nm "github.com/tendermint/tendermint/node"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
+	"google.golang.org/protobuf/proto"
 
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
 	State *State
-	Codec *amino.Codec
 	Node  *nm.Node
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
-func RegisterAmino(cdc *amino.Codec) {
-	cryptoamino.RegisterAmino(cdc)
-
-	cdc.RegisterInterface((*types.PubKey)(nil), nil)
-}
-
 // NewBaseApplication creates a new BaseApplication given a name an a DB backend
 func NewBaseApplication(dbpath string) (*BaseApplication, error) {
-	cdc := amino.NewCodec()
-	RegisterAmino(cdc)
-
-	state, err := NewState(dbpath, cdc)
+	state, err := NewState(dbpath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}
 	return &BaseApplication{
 		State: state,
-		Codec: cdc,
 	}, nil
 }
 
@@ -97,28 +84,29 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
 	// setting the app initial state with validators, oracles, height = 0 and empty apphash
 	// unmarshal app state from genesis
-	var genesisAppState types.GenesisAppState
-	err := app.Codec.UnmarshalJSON(req.AppStateBytes, &genesisAppState)
+	var genesisAppState models.AppState
+	err := proto.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
 		log.Errorf("cannot unmarshal app state bytes: %s", err)
 	}
 	// get oracles
-	for _, v := range genesisAppState.Oracles {
+	for _, v := range genesisAppState.GetOracles() {
 		log.Infof("adding genesis oracle %s", v)
-		app.State.AddOracle(ethcommon.HexToAddress(v))
+		app.State.AddOracle(ethcommon.BytesToAddress(v))
 	}
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
-		log.Infof("adding genesis validator %s", genesisAppState.Validators[i].PubKey.Address())
-		if err = app.State.AddValidator(genesisAppState.Validators[i].PubKey, genesisAppState.Validators[i].Power); err != nil {
+		log.Infof("adding genesis validator %s", genesisAppState.Validators[i].Address)
+		if err = app.State.AddValidator(genesisAppState.Validators[i]); err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	var header abcitypes.Header
+	var header models.TendermintHeader
 	header.Height = 0
 	header.AppHash = []byte{}
-	headerBytes, err := app.Codec.MarshalBinaryBare(header)
+	header.ChainId = req.ChainId
+	headerBytes, err := proto.Marshal(&header)
 	if err != nil {
 		log.Fatalf("cannot marshal header: %s", err)
 	}
@@ -136,7 +124,17 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 // The header contains the height, timestamp, and more - it exactly matches the Tendermint block header.
 // The LastCommitInfo and ByzantineValidators can be used to determine rewards and punishments for the validators.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	headerBytes, err := app.Codec.MarshalBinaryBare(req.Header)
+	header := &models.TendermintHeader{
+		Height:         req.Header.GetHeight(),
+		ConsensusHash:  req.Header.GetConsensusHash(),
+		AppHash:        req.Header.GetAppHash(),
+		BlockID:        req.Header.LastBlockId.GetHash(),
+		DataHash:       req.Header.GetDataHash(),
+		EvidenceHash:   req.Header.GetEvidenceHash(),
+		LastCommitHash: req.Header.GetLastCommitHash(),
+		Timestamp:      req.Header.GetTime().Unix(),
+	}
+	headerBytes, err := proto.Marshal(header)
 	if err != nil {
 		log.Warnf("cannot marshal header in BeginBlock")
 	}

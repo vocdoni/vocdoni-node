@@ -3,7 +3,6 @@ package scrutinizer
 import (
 	"testing"
 
-	"github.com/tendermint/go-amino"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
@@ -17,8 +16,7 @@ func TestEntityList(t *testing.T) {
 
 func testEntityList(t *testing.T, entityCount int) {
 	log.Init("info", "stdout")
-	c := amino.NewCodec()
-	state, err := vochain.NewState(t.TempDir(), c)
+	state, err := vochain.NewState(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,8 +65,7 @@ func TestProcessList(t *testing.T) {
 
 func testProcessList(t *testing.T, procsCount int) {
 	log.Init("info", "stdout")
-	c := amino.NewCodec()
-	state, err := vochain.NewState(t.TempDir(), c)
+	state, err := vochain.NewState(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

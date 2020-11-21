@@ -90,7 +90,6 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
 	}
 
 	cdc := amino.NewCodec()
-	RegisterAmino(cdc)
 
 	jsonBytes, err := cdc.MarshalJSON(nodeKey)
 	if err != nil {
@@ -122,7 +121,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.C
 
 	appState.Oracles = oracles
 	cdc := amino.NewCodec()
-	RegisterAmino(cdc)
+	cdc.RegisterInterface((*types.PubKey)(nil), nil)
 
 	appStateBytes, err := cdc.MarshalJSON(appState)
 	if err != nil {

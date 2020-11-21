@@ -11,7 +11,6 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
 const minersPower = 10
@@ -75,7 +74,6 @@ func generate(cmd *cobra.Command, args []string) error {
 
 	appState.Oracles = oracles
 	cdc := amino.NewCodec()
-	vochain.RegisterAmino(cdc)
 
 	appState.Validators = make([]types.GenesisValidator, mCount)
 	for idx, val := range minerPVs {
