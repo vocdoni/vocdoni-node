@@ -82,7 +82,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
 		BlockCount:   1024,
 	}
-	app.State.AddProcess(process, pid)
+	app.State.AddProcess(process)
 
 	var proof string
 

@@ -98,8 +98,8 @@ func (s *Scrutinizer) Rollback() {
 
 // OnProcess scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnProcess(pid, eid []byte, mkroot, mkuri string) {
-	var data = types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
-	s.processPool = append(s.processPool, &data)
+	data := &types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
+	s.processPool = append(s.processPool, data)
 }
 
 // OnVote scrutinizer stores the votes if liveResults enabled
@@ -161,4 +161,14 @@ func (s *Scrutinizer) List(max int64, from, prefix []byte) [][]byte {
 	}
 	iter.Release()
 	return list
+}
+
+// Temporary until we use Protobuf for the API
+func (s *Scrutinizer) GetFriendlyResults(result *models.ProcessResult) [][]uint32 {
+	r := [][]uint32{}
+	for i, v := range result.Votes {
+		r = append(r, []uint32{})
+		r[i] = append(r[i], v.Question...)
+	}
+	return r
 }

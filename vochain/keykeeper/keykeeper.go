@@ -168,7 +168,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 		}
 		log.Warnf("found pending keys for reveal")
 		for _, p := range pids.GetPids() {
-			if err := k.revealKeys(p); err != nil {
+			if err := k.revealKeys(string(p)); err != nil {
 				log.Error(err)
 			}
 		}
@@ -325,7 +325,7 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 				log.Errorf("cannot unmarshal process pids for block %d: (%s)", height, err)
 			}
 		}
-		pids.Pids = append(pids.Pids, pid)
+		pids.Pids = append(pids.Pids, []byte(pid))
 		data, err = proto.Marshal(&pids)
 		if err != nil {
 			log.Errorf("cannot marshal new pid list for scheduling on block %d: (%s)", height, err)
@@ -373,7 +373,7 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 		}
 		if process.EncryptionPublicKeys[k.myIndex] != "" {
 			log.Infof("revealing keys for process %x on block %d", p, height)
-			if err := k.revealKeys(p); err != nil {
+			if err := k.revealKeys(string(p)); err != nil {
 				log.Errorf("cannot reveal proces keys for %x: (%s)", p, err)
 			}
 		}

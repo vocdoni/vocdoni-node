@@ -58,7 +58,7 @@ func TestCheckTX(t *testing.T) {
 		BlockCount:   1024,
 	}
 	t.Logf("adding process %s", process.String())
-	app.State.AddProcess(process, pid)
+	app.State.AddProcess(process)
 
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx

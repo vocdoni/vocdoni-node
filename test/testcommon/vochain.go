@@ -210,8 +210,8 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	// create genesis file
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
 	consensusParams := &types.ConsensusParams{
-		Block:     types.BlockParams(tmConsensusParams.Block),
-		Evidence:  types.EvidenceParams(tmConsensusParams.Evidence),
+		Block: types.BlockParams(tmConsensusParams.Block),
+		//Evidence:  types.EvidenceParams(tmConsensusParams.Evidence),
 		Validator: types.ValidatorParams(tmConsensusParams.Validator),
 	}
 

@@ -10,7 +10,7 @@ require (
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200602234848-db8a79a18e4a // indirect
-	github.com/btcsuite/btcd v0.21.0-beta // indirect
+	github.com/cosmos/iavl v0.15.0-rc5
 	github.com/deroproject/graviton v0.0.0-20200906044921-89e9e09f9601
 	github.com/dgraph-io/badger/v2 v2.2007.2
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
@@ -20,7 +20,6 @@ require (
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/cors v1.1.1
 	github.com/go-ole/go-ole v1.2.4 // indirect
-	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/go-cmp v0.5.2
 	github.com/google/gopacket v1.1.18 // indirect
@@ -34,10 +33,8 @@ require (
 	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/go-log/v2 v2.1.1 // indirect
 	github.com/ipfs/interface-go-ipfs-core v0.3.0
-	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/klauspost/compress v1.11.1
-	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/libp2p/go-libp2p v0.10.0
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
 	github.com/libp2p/go-libp2p-core v0.6.1
@@ -53,29 +50,27 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/polydawn/refmt v0.0.0-20190807091052-3d65705ee9f1 // indirect
-	github.com/prometheus/client_golang v1.7.1
+	github.com/prometheus/client_golang v1.8.0
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/recws-org/recws v1.2.2
 	github.com/rogpeppe/rjson v0.0.0-20151026200957-77220b71d327
 	github.com/shirou/gopsutil v2.20.5+incompatible
 	github.com/smartystreets/assertions v1.0.1 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
-	github.com/spf13/cobra v1.0.0
+	github.com/spf13/cobra v1.1.1
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.6.3
-	github.com/tendermint/go-amino v0.15.1
-	github.com/tendermint/iavl v0.13.3
-	github.com/tendermint/tendermint v0.33.5
-	github.com/tendermint/tm-db v0.5.1
-	github.com/vocdoni/dvote-protobuf v0.0.0-20201120173459-6bc6ef8e65cd
+	github.com/spf13/viper v1.7.1
+	github.com/tendermint/go-amino v0.16.0
+	github.com/tendermint/tendermint v0.34.0
+	github.com/tendermint/tm-db v0.6.3
+	github.com/vocdoni/dvote-protobuf v0.1.0
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200223203819-95cdfde1438f // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
-	go.etcd.io/bbolt v1.3.4 // indirect
 	go.uber.org/zap v1.15.0
-	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
-	golang.org/x/net v0.0.0-20201002202402-0a1ea396d57c
-	golang.org/x/sys v0.0.0-20201005065044-765f4ea38db3 // indirect
+	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
+	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/sys v0.0.0-20201119102817-f84b799fce68 // indirect
 	golang.org/x/text v0.3.3
 	google.golang.org/protobuf v1.25.0
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect

@@ -53,7 +53,7 @@ func (vi *VochainInfo) BlockTimes() *[5]int32 {
 // Sync returns true if the Vochain is considered up-to-date
 // Disclaimer: this method is not 100% accurated. Use it just for non-critical operations
 func (vi *VochainInfo) Sync() bool {
-	return !vi.vnode.Node.ConsensusReactor().FastSync()
+	return !vi.vnode.Node.ConsensusReactor().WaitSync()
 }
 
 // TreeSizes returns the current size of the ProcessTree and VoteTree

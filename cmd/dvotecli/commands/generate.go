@@ -65,8 +65,8 @@ func generate(cmd *cobra.Command, args []string) error {
 	// Generate genesis
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
 	consensusParams := &types.ConsensusParams{
-		Block:     types.BlockParams(tmConsensusParams.Block),
-		Evidence:  types.EvidenceParams(tmConsensusParams.Evidence),
+		Block: types.BlockParams(tmConsensusParams.Block),
+		//Evidence:  types.EvidenceParams(tmConsensusParams.Evidence),
 		Validator: types.ValidatorParams(tmConsensusParams.Validator),
 	}
 	chainID, _ := cmd.Flags().GetString("chainId")
@@ -84,9 +84,9 @@ func generate(cmd *cobra.Command, args []string) error {
 
 		appState.Validators[idx] = types.GenesisValidator{
 			Address: pubk.Address(),
-			PubKey:  pubk,
-			Power:   minersPower,
-			Name:    "miner-" + fmt.Sprint(idx+1),
+			//PubKey:  pubk,
+			Power: fmt.Sprintf("%d", minersPower),
+			Name:  "miner-" + fmt.Sprint(idx+1),
 		}
 	}
 

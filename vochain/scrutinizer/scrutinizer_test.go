@@ -1,9 +1,15 @@
 package scrutinizer
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
+	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
+	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
@@ -108,5 +114,167 @@ func testProcessList(t *testing.T, procsCount int) {
 	}
 	if len(procs) != procsCount {
 		t.Fatalf("expected %d processes, got %d", procsCount, len(procs))
+	}
+}
+func TestResults(t *testing.T) {
+	log.Init("info", "stdout")
+	state, err := vochain.NewState(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sc, err := NewScrutinizer(t.TempDir(), state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid := util.RandomBytes(32)
+	state.AddProcess(&models.Process{
+		ProcessId:             pid,
+		EnvelopeType:          &models.EnvelopeType{EncryptedVotes: true},
+		Status:                models.ProcessStatus_READY,
+		EncryptionPrivateKeys: make([]string, 16),
+		EncryptionPublicKeys:  make([]string, 16),
+	})
+
+	priv, err := nacl.DecodePrivate(fmt.Sprintf("%x", ethereum.HashRaw(util.RandomBytes(32))))
+	if err != nil {
+		t.Fatalf("cannot generate encryption key: (%s)", err)
+	}
+	ki := uint32(1)
+	if err := state.AddProcessKeys(&models.AdminTx{
+		Txtype:              models.TxType_ADD_PROCESS_KEYS,
+		ProcessId:           pid,
+		EncryptionPublicKey: priv.Public().Bytes(),
+		KeyIndex:            &ki,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.RevealProcessKeys(&models.AdminTx{
+		Txtype:               models.TxType_ADD_PROCESS_KEYS,
+		ProcessId:            pid,
+		EncryptionPrivateKey: priv.Bytes(),
+		KeyIndex:             &ki,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add 100 votes
+	vp, err := json.Marshal(types.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomBytes(32)),
+		Votes: []int{1, 1, 1, 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	vp, err = priv.Encrypt(vp, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 300; i++ {
+		if err := state.AddVote(&models.Vote{
+			ProcessId:            pid,
+			VotePackage:          vp,
+			EncryptionKeyIndexes: []uint32{1},
+			Nullifier:            util.RandomBytes(32),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := sc.ComputeResult(pid); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test results
+	result, err := sc.VoteResult(pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("Results: %v", result)
+	for _, q := range result.GetVotes() {
+		for qi, v1 := range q.Question {
+			if qi > 3 {
+				t.Fatalf("found more questions that expected")
+			}
+			if qi != 1 && v1 != 0 {
+				t.Fatalf("result is not correct, %d is not 0 as expected", v1)
+			}
+			if qi == 1 && v1 != 300 {
+				t.Fatalf("result is not correct, %d is not 300 as expected", v1)
+			}
+		}
+	}
+	for _, q := range sc.GetFriendlyResults(result) {
+		for qi, v1 := range q {
+			if qi > 3 {
+				t.Fatalf("found more questions that expected")
+			}
+			if qi != 1 && v1 != 0 {
+				t.Fatalf("result is not correct, %d is not 0 as expected", v1)
+			}
+			if qi == 1 && v1 != 300 {
+				t.Fatalf("result is not correct, %d is not 300 as expected", v1)
+			}
+		}
+	}
+
+}
+
+func TestLiveResults(t *testing.T) {
+	log.Init("info", "stdout")
+	state, err := vochain.NewState(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sc, err := NewScrutinizer(t.TempDir(), state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid := util.RandomBytes(32)
+	state.AddProcess(&models.Process{
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+	})
+	sc.addLiveResultsProcess(pid)
+
+	// Add 100 votes
+	vp, err := json.Marshal(types.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: []int{1, 1, 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := &models.Vote{ProcessId: pid, VotePackage: vp}
+	for i := 0; i < 100; i++ {
+		if err := sc.addLiveResultsVote(v); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if live, err := sc.isLiveResultsProcess(pid); !live || err != nil {
+		t.Fatal(fmt.Errorf("isLiveResultsProcess returned false while true is expected or some other error: %v", err))
+	}
+
+	// Test results
+	result, err := sc.VoteResult(pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, q := range result.GetVotes() {
+		for qi, v1 := range q.Question {
+			if qi > 2 {
+				t.Fatalf("found more questions that expected")
+			}
+			if qi == 0 && v1 != 0 {
+				t.Fatalf("result is not correct, %d is not 0 as expected", v1)
+			}
+			if qi == 1 && v1 != 100 {
+				t.Fatalf("result is not correct, %d is not 100 as expected", v1)
+			}
+		}
 	}
 }

@@ -1,7 +1,9 @@
 package vochain
 
 import (
+	"encoding/json"
 	"fmt"
+	"strconv"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -13,6 +15,7 @@ import (
 
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/log"
+	"gitlab.com/vocdoni/go-dvote/types"
 )
 
 // BaseApplication reflects the ABCI application implementation.
@@ -84,20 +87,30 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
 	// setting the app initial state with validators, oracles, height = 0 and empty apphash
 	// unmarshal app state from genesis
-	var genesisAppState models.AppState
-	err := proto.Unmarshal(req.AppStateBytes, &genesisAppState)
+	var genesisAppState types.GenesisAppState
+	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
+		fmt.Printf("%s\n", req.AppStateBytes)
 		log.Errorf("cannot unmarshal app state bytes: %s", err)
 	}
 	// get oracles
-	for _, v := range genesisAppState.GetOracles() {
+	for _, v := range genesisAppState.Oracles {
 		log.Infof("adding genesis oracle %s", v)
-		app.State.AddOracle(ethcommon.BytesToAddress(v))
+		app.State.AddOracle(ethcommon.HexToAddress(v))
 	}
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
-		log.Infof("adding genesis validator %s", genesisAppState.Validators[i].Address)
-		if err = app.State.AddValidator(genesisAppState.Validators[i]); err != nil {
+		log.Infof("adding genesis validator %x", genesisAppState.Validators[i].Address)
+		pwr, err := strconv.Atoi(genesisAppState.Validators[i].Power)
+		if err != nil {
+			log.Fatal("cannot decode validator power: %s", err)
+		}
+		v := &models.Validator{
+			Address: genesisAppState.Validators[i].Address,
+			PubKey:  genesisAppState.Validators[i].PubKey.Value,
+			Power:   uint64(pwr),
+		}
+		if err = app.State.AddValidator(v); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -198,4 +211,16 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	return abcitypes.ResponseEndBlock{}
+}
+func (app *BaseApplication) ApplySnapshotChunk(req abcitypes.RequestApplySnapshotChunk) abcitypes.ResponseApplySnapshotChunk {
+	return abcitypes.ResponseApplySnapshotChunk{}
+}
+func (app *BaseApplication) ListSnapshots(req abcitypes.RequestListSnapshots) abcitypes.ResponseListSnapshots {
+	return abcitypes.ResponseListSnapshots{}
+}
+func (app *BaseApplication) LoadSnapshotChunk(req abcitypes.RequestLoadSnapshotChunk) abcitypes.ResponseLoadSnapshotChunk {
+	return abcitypes.ResponseLoadSnapshotChunk{}
+}
+func (app *BaseApplication) OfferSnapshot(req abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
+	return abcitypes.ResponseOfferSnapshot{}
 }

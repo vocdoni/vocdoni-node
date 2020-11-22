@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/tendermint/iavl"
+	"github.com/cosmos/iavl"
 	tmdb "github.com/tendermint/tm-db"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/statedb"

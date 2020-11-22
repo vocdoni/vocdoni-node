@@ -47,6 +47,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte, fromID []byte, max int64) ([]
 	return processListResult, nil
 }
 
+// ProcessListWithResults returns the list of process ID with already computed results
 func (s *Scrutinizer) ProcessListWithResults(max int64, fromID string) ([]string, error) {
 	from, err := hex.DecodeString(fromID)
 	if err != nil {
@@ -59,6 +60,7 @@ func (s *Scrutinizer) ProcessListWithResults(max int64, fromID string) ([]string
 	return process, nil
 }
 
+// ProcessListWithLiveResults returns the list of process ID which have live results (not encrypted)
 func (s *Scrutinizer) ProcessListWithLiveResults(max int64, fromID string) ([]string, error) {
 	from, err := hex.DecodeString(fromID)
 	if err != nil {
@@ -71,6 +73,7 @@ func (s *Scrutinizer) ProcessListWithLiveResults(max int64, fromID string) ([]st
 	return process, nil
 }
 
+// EntityList returns the list of entities indexed by the scrutinizer
 func (s *Scrutinizer) EntityList(max int64, fromID string) ([]string, error) {
 	var err error
 	var from []byte
@@ -87,6 +90,7 @@ func (s *Scrutinizer) EntityList(max int64, fromID string) ([]string, error) {
 	return entities, nil
 }
 
+// EntityCount return the number of entities indexed by the scrutinizer
 func (s *Scrutinizer) EntityCount() int64 {
 	return atomic.LoadInt64(&s.entityCount)
 }
@@ -231,6 +235,7 @@ func emptyProcess(questions, options int) *models.ProcessResult {
 	pv := new(models.ProcessResult)
 	pv.Votes = make([]*models.QuestionResult, questions)
 	for i := range pv.Votes {
+		pv.Votes[i] = new(models.QuestionResult)
 		pv.Votes[i].Question = make([]uint32, options)
 	}
 	return pv

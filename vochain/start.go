@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 
 	amino "github.com/tendermint/go-amino"
 	tmcfg "github.com/tendermint/tendermint/config"
+	tmcrypto "github.com/tendermint/tendermint/crypto"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
+
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
@@ -25,7 +25,6 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
-	db "github.com/tendermint/tm-db"
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 
@@ -41,6 +40,7 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if err := app.Node.Start(); err != nil {
 		log.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func (l *tenderLogger) With(keyvals ...interface{}) tmlog.Logger {
 	return l2
 }
 
-func checkDBavailable(name string) bool {
+/*func checkDBavailable(name string) bool {
 	available := true
 	defer func() {
 		if r := recover(); r != nil {
@@ -104,6 +104,7 @@ func checkDBavailable(name string) bool {
 	db.NewDB("checkdb", db.BackendType(name), dbdir)
 	return available
 }
+*/
 
 // we need to set init (first time validators and oracles)
 func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis []byte) (*nm.Node, error) {
@@ -156,17 +157,19 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig.Consensus.TimeoutCommit = time.Second * 10
 
 	// indexing
-	tconfig.TxIndex.IndexAllKeys = true
+	tconfig.TxIndex.Indexer = "kv"
 
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = false
 
+	// TBD: check why it does not work anymore
 	// enable cleveldb if available
-	if checkDBavailable(string(db.CLevelDBBackend)) {
-		tconfig.DBBackend = string(db.CLevelDBBackend)
-		log.Infof("%s is available, using it as storage for Tendermint", tconfig.DBBackend)
-	}
+	//	if checkDBavailable(string(db.CLevelDBBackend)) {
+	//		tconfig.DBBackend = string(db.CLevelDBBackend)
+	//		log.Infof("%s is available, using it as storage for Tendermint", tconfig.DBBackend)
+	//	}
+	//tconfig.DBBackend = string(db.BadgerDBBackend)
 
 	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
@@ -202,7 +205,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	}
 	pv.Save()
 
-	log.Infof("tendermint private key 0x%x", pv.Key.PrivKey)
+	log.Infof("tendermint private key %x", pv.Key.PrivKey)
 	log.Infof("tendermint address: %s", pv.Key.Address)
 	aminoPrivKey, aminoPubKey, err := HexKeyToAmino(fmt.Sprintf("%x", pv.Key.PrivKey))
 	if err != nil {
@@ -217,11 +220,11 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	if len(localConfig.NodeKey) > 0 {
 		nodeKey, err = NewNodeKey(localConfig.NodeKey, tconfig)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot create node key: %w", err)
 		}
 	} else {
 		if nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile()); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot create or load node key: %w", err)
 		}
 	}
 	log.Infof("tendermint p2p node ID: %s", nodeKey.ID())
@@ -267,7 +270,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 // HexKeyToAmino is a helper function that transforms a standard EDDSA hex string key into Tendermint like amino format
 // usefull for creating genesis files
 func HexKeyToAmino(hexKey string) (private, public string, err error) {
-	// TO-DO find a better way to to this. Probably amino provides some helpers
+	// TO-DO find a way to get rid of this
 
 	// Needed for recovering the tendermint compatible amino private key format
 	type aminoKey struct {
@@ -284,14 +287,9 @@ func HexKeyToAmino(hexKey string) (private, public string, err error) {
 		return "", "", err
 	}
 
-	// Temporary until Tendermint is updated
-	cdc := amino.NewCodec()
-	cryptoamino.RegisterAmino(cdc)
-	cdc.RegisterInterface((*types.PubKey)(nil), nil)
-
+	cdc := AminoCodec()
 	var pv privval.FilePVKey
-	var privKey crypto25519.PrivKeyEd25519
-
+	privKey := crypto25519.PrivKey(make([]byte, 64))
 	if n := copy(privKey[:], key[:]); n != 64 {
 		return "", "", fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
 	}
@@ -309,4 +307,15 @@ func HexKeyToAmino(hexKey string) (private, public string, err error) {
 		return "", "", err
 	}
 	return aminokf.Privkey.Value, aminokf.PubKey.Value, nil
+}
+
+// AminoCodec creates and amino coded and registers the tendermint crypto types
+func AminoCodec() *amino.Codec {
+	// Temporary until Tendermint is updated
+	cdc := amino.NewCodec()
+	cdc.RegisterInterface((*tmcrypto.PubKey)(nil), nil)
+	cdc.RegisterInterface((*tmcrypto.PrivKey)(nil), nil)
+	cdc.RegisterConcrete(crypto25519.PubKey{}, "com.tendermint/PubKey", nil)
+	cdc.RegisterConcrete(crypto25519.PrivKey{}, "com.tendermint/PrivKey", nil)
+	return cdc
 }

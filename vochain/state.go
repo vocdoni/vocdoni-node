@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	tmcrypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -188,8 +189,8 @@ func (v *State) Oracles(isQuery bool) ([]common.Address, error) {
 	return oracles, err
 }
 
-func hexPubKeyToTendermintEd25519(pubKey string) (types.PubKey, error) {
-	var tmkey ed25519.PubKeyEd25519
+func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
+	var tmkey ed25519.PubKey
 	pubKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
 		return nil, err
@@ -338,14 +339,14 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	return nil
 }
 
-// AddProcess adds a new process to vochain
-func (v *State) AddProcess(p *models.Process, pid []byte) error {
+// AddProcess adds or overides a new process to vochain
+func (v *State) AddProcess(p *models.Process) error {
 	newProcessBytes, err := proto.Marshal(p)
 	if err != nil {
 		return errors.New("cannot marshal process bytes")
 	}
 	v.Lock()
-	err = v.Store.Tree(ProcessTree).Add(pid, newProcessBytes)
+	err = v.Store.Tree(ProcessTree).Add(p.ProcessId, newProcessBytes)
 	v.Unlock()
 	if err != nil {
 		return err
@@ -355,7 +356,7 @@ func (v *State) AddProcess(p *models.Process, pid []byte) error {
 		mkuri = *p.CensusMkURI
 	}
 	for _, l := range v.eventListeners {
-		l.OnProcess(pid, p.EntityId, fmt.Sprintf("%x", p.CensusMkRoot), mkuri)
+		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusMkRoot), mkuri)
 	}
 	return nil
 }

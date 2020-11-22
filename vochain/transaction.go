@@ -81,7 +81,7 @@ func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
 				if tx.Process == nil {
 					return []byte{}, fmt.Errorf("newprocess process is empty")
 				}
-				return []byte{}, state.AddProcess(p, tx.Process.ProcessId)
+				return []byte{}, state.AddProcess(p)
 			}
 		} else {
 			return []byte{}, fmt.Errorf("newProcess %w", err)

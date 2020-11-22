@@ -62,11 +62,12 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 		tconfig.PrivValidatorStateFile(),
 	)
 	if len(tmPrivKey) > 0 {
-		var privKey crypto25519.PrivKeyEd25519
+		var privKey crypto25519.PrivKey
 		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
 		if err != nil {
 			return nil, fmt.Errorf("cannot decode private key: (%s)", err)
 		}
+		privKey = make([]byte, 64)
 		if n := copy(privKey[:], keyBytes[:]); n != 64 {
 			return nil, fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
 		}
@@ -79,18 +80,18 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 
 // NewNodeKey returns and saves to the disk storage a tendermint node key
 func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
-	var privKey crypto25519.PrivKeyEd25519
+	var privKey crypto25519.PrivKey
 	keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
 	if err != nil {
 		return nil, fmt.Errorf("cannot decode private key: (%s)", err)
 	}
+	privKey = make([]byte, len(keyBytes))
 	copy(privKey[:], keyBytes[:])
 	nodeKey := &p2p.NodeKey{
 		PrivKey: privKey,
 	}
 
-	cdc := amino.NewCodec()
-
+	cdc := AminoCodec()
 	jsonBytes, err := cdc.MarshalJSON(nodeKey)
 	if err != nil {
 		return nil, err
@@ -113,16 +114,13 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.C
 		}
 		appState.Validators[idx] = types.GenesisValidator{
 			Address: val.GetAddress(),
-			PubKey:  pubk,
-			Power:   10,
+			PubKey:  types.TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
+			Power:   "10",
 			Name:    strconv.Itoa(rand.Int()),
 		}
 	}
-
 	appState.Oracles = oracles
 	cdc := amino.NewCodec()
-	cdc.RegisterInterface((*types.PubKey)(nil), nil)
-
 	appStateBytes, err := cdc.MarshalJSON(appState)
 	if err != nil {
 		return []byte{}, err

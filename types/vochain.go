@@ -7,6 +7,7 @@ import (
 	// Don't import tendermint/types, because that pulls in lots of indirect
 	// dependencies which are too heavy for our low-level "types" package.
 	// libs/bytes is okay, because it only pulls in std deps.
+
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
 )
@@ -123,13 +124,18 @@ type ValidatorParams struct {
 }
 
 type GenesisValidator struct {
-	Address tmbytes.HexBytes `json:"address"`
-	PubKey  PubKey           `json:"pub_key"`
-	Power   int64            `json:"power"`
+	Address []byte           `json:"address"`
+	PubKey  TendermintPubKey `json:"pub_key"`
+	Power   string           `json:"power"`
 	Name    string           `json:"name"`
 }
 
-type PubKey interface {
+type TendermintPubKey struct {
+	Type  string `json:"type"`
+	Value []byte `json:"value"`
+}
+
+/*type PubKey interface {
 	Address() tmbytes.HexBytes
 	Bytes() []byte
 	VerifyBytes(msg []byte, sig []byte) bool
@@ -139,6 +145,7 @@ type PubKey interface {
 	// interchangeably, even if the underlying interface is identical.
 	// Equals(PubKey) bool
 }
+*/
 
 // ________________________ CALLBACKS DATA STRUCTS ________________________
 

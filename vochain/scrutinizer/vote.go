@@ -167,18 +167,15 @@ func (s *Scrutinizer) VoteResult(processID []byte) (*models.ProcessResult, error
 }
 
 func (s *Scrutinizer) computeLiveResults(processID []byte) (*models.ProcessResult, error) {
-	var pb []byte
-	var pv models.ProcessResult
+	pv := new(models.ProcessResult)
 	pb, err := s.Storage.Get(s.encode("liveProcess", processID))
 	if err != nil {
 		return nil, err
 	}
-	if err = proto.Unmarshal(pb, &pv); err != nil {
+	if err = proto.Unmarshal(pb, pv); err != nil {
 		return nil, err
 	}
-	pruneVoteResult(&pv)
-	log.Debugf("computed live results for %x", processID)
-	return &pv, nil
+	return pruneVoteResult(pv), nil
 }
 
 func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *models.Process) (*models.ProcessResult, error) {
@@ -226,13 +223,12 @@ func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *models.Process)
 		}
 		nvotes++
 	}
-	pruneVoteResult(pv)
 	log.Infof("computed results for process %x with %d votes", processID, nvotes)
-	return pv, nil
+	return pruneVoteResult(pv), nil
 }
 
 // To-be-improved
-func pruneVoteResult(pv *models.ProcessResult) {
+func pruneVoteResult(pv *models.ProcessResult) *models.ProcessResult {
 	pvv := proto.Clone(pv).(*models.ProcessResult)
 	var pvc models.ProcessResult
 	min := MaxQuestions - 1
@@ -257,10 +253,11 @@ func pruneVoteResult(pv *models.ProcessResult) {
 					break
 				}
 			}
+			pvc.Votes[i2] = new(models.QuestionResult)
 			pvc.Votes[i2].Question = make([]uint32, j2+1)
 			copy(pvc.Votes[i2].Question, pvv.Votes[i2].Question)
 
 		}
 	}
-	pv = proto.Clone(&pvc).(*models.ProcessResult)
+	return &pvc
 }

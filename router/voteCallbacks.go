@@ -366,31 +366,28 @@ func (r *Router) getResults(request routerRequest) {
 		response.Type = response.Type + " open"
 	}
 	if procInfo.EnvelopeType.Serial {
-		response.Type = response.Type + " serial-process"
+		response.Type = response.Type + " serial"
 	} else {
-		response.Type = response.Type + " process"
+		response.Type = response.Type + " single"
 	}
 	response.State = procInfo.Status.String()
 
 	// Get results info
 	vr, err := r.Scrutinizer.VoteResult(pid)
 	if err != nil && err != scrutinizer.ErrNoResultsYet {
-		log.Warn(err)
 		r.sendError(request, err.Error())
 		return
 	}
 	if err == scrutinizer.ErrNoResultsYet {
 		response.Message = scrutinizer.ErrNoResultsYet.Error()
+		request.Send(r.buildReply(request, &response))
+		return
 	}
-
-	// Temporary until we use Protobuf for the API
-	response.Results = make([][]uint32, len(vr.Votes))
-	for i, v := range vr.Votes {
-		response.Results = append(response.Results, make([]uint32, len(v.Question)))
-		for j, q := range v.Question {
-			response.Results[i][j] = q
-		}
+	if vr == nil {
+		r.sendError(request, "unknown problem fetching results")
+		return
 	}
+	response.Results = r.Scrutinizer.GetFriendlyResults(vr)
 
 	// Get number of votes
 	votes := r.vocapp.State.CountVotes(pid, true)
