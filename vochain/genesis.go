@@ -144,7 +144,7 @@ var Genesis = map[string]VochainGenesis{
 		Genesis: `
 {
    "genesis_time":"2020-11-18T09:40:50.512370579Z",
-   "chain_id":"vocdoni-development-26",
+   "chain_id":"vocdoni-development-27",
    "consensus_params":{
       "block":{
          "max_bytes":"22020096",
@@ -197,24 +197,6 @@ var Genesis = map[string]VochainGenesis{
          },
          "power":"10",
          "name":"miner3"
-      },
-      {
-         "address":"3272B3046C31D87F92E26D249B97CC144D835DA6",
-         "pub_key":{
-            "type":"tendermint/PubKeyEd25519",
-            "value":"hUz8jCePBfG4Bi9s13IdleWq5MZ5upe03M+BX2ah7c4="
-         },
-         "power":"10",
-         "name":"miner4"
-      },
-      {
-         "address":"05BA8FCBEA4A4EDCFD49081B42CA3F9ED13246C1",
-         "pub_key":{
-            "type":"tendermint/PubKeyEd25519",
-            "value":"1FGNernnvg4QpV7psYFQPeIFZJm32yN1SjZULbliidg="
-         },
-         "power":"10",
-         "name":"miner5"
       }
    ],
    "app_hash":"",
@@ -255,24 +237,6 @@ var Genesis = map[string]VochainGenesis{
             },
             "power":"10",
             "name":"miner3"
-         },
-         {
-            "address":"3272B3046C31D87F92E26D249B97CC144D835DA6",
-            "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
-               "value":"hUz8jCePBfG4Bi9s13IdleWq5MZ5upe03M+BX2ah7c4="
-            },
-            "power":"10",
-            "name":"miner4"
-         },
-         {
-            "address":"05BA8FCBEA4A4EDCFD49081B42CA3F9ED13246C1",
-            "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
-               "value":"1FGNernnvg4QpV7psYFQPeIFZJm32yN1SjZULbliidg="
-            },
-            "power":"10",
-            "name":"miner5"
          }
       ],
       "oracles":[
