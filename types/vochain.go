@@ -111,7 +111,7 @@ type ValidatorParams struct {
 }
 
 type GenesisValidator struct {
-	Address []byte           `json:"address"`
+	Address tmbytes.HexBytes `json:"address"`
 	PubKey  TendermintPubKey `json:"pub_key"`
 	Power   string           `json:"power"`
 	Name    string           `json:"name"`
