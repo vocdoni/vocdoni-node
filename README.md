@@ -3,7 +3,7 @@
 [![GoDoc](https://godoc.org/gitlab.com/vocdoni/go-dvote?status.svg)](https://godoc.org/gitlab.com/vocdoni/go-dvote)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ethereum/go-ethereum)](https://goreportcard.com/report/gitlab.com/vocdoni/go-dvote)
 
-[![Join keybase](https://img.shields.io/badge/keybase-join%20community-orange)](https://keybase.io/team/vocdoni.public)
+[![Join Discord](https://img.shields.io/badge/discord-join%20chat-blue.svg)](https://discord.gg/4hKeArDaU2)
 [![Twitter Follow](https://img.shields.io/twitter/follow/vocdoni.svg?style=social&label=Follow)](https://twitter.com/vocdoni)
 
 This repository contains a set of libraries and tools for the **Vocdoni** decentralized backend infrastrucutre, as described [in the documentation](http://vocdoni.io/docs/#/).
