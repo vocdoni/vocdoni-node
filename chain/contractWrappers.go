@@ -113,7 +113,15 @@ func (ph *ProcessHandle) ProcessIndex(ctx context.Context, pid [32]byte) (*big.I
 
 func (ph *ProcessHandle) Oracles(ctx context.Context) ([]string, error) {
 	opts := &ethbind.CallOpts{Context: ctx}
-	return ph.VotingProcess.GetOracles(opts)
+	oracles, err := ph.VotingProcess.GetOracles(opts)
+	if err != nil {
+		return []string{}, err
+	}
+	oraclesStr := []string{}
+	for _, oracle := range oracles {
+		oraclesStr = append(oraclesStr, oracle.Hex())
+	}
+	return oraclesStr, nil
 }
 
 func (ph *ProcessHandle) Validators(ctx context.Context) ([]string, error) {
@@ -179,6 +187,7 @@ func (e *ENSCallerHandler) Resolve(ctx context.Context, nameHash [32]byte, resol
 		resolvedAddr, err = e.Registry.Resolver(opts, nameHash)
 	} else {
 		resolvedAddr, err = e.Resolver.Addr(opts, nameHash)
+
 	}
 	if err != nil {
 		return "", err

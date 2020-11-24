@@ -181,14 +181,16 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 	case HashLogValidatorRemoved.Hex():
 		// stub
 	case HashLogOracleAdded.Hex():
+		var err error
 		log.Debug("new log event: AddOracle")
-		var eventAddOracle oracleAdded
+		//var eventAddOracle oracleAdded
 		log.Debugf("added event data: %v", event.Data)
-		err := e.ContractABI.Unpack(&eventAddOracle, "OracleAdded", event.Data)
+		eventAddOracle, err := e.ContractABI.Unpack("OracleAdded", event.Data)
+		ea := eventAddOracle[0].(oracleAdded)
 		if err != nil {
 			return err
 		}
-		log.Debugf("addOracleEvent: %v", eventAddOracle.OraclePublicKey)
+		log.Debugf("addOracleEvent: %v", ea.OraclePublicKey)
 		// stub
 	case HashLogOracleRemoved.Hex():
 		// stub
@@ -206,8 +208,11 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 }
 
 func processMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*models.NewProcessTx, error) {
-	var eventProcessCreated eventProcessCreated
-	err := contractABI.Unpack(&eventProcessCreated, "ProcessCreated", eventData)
+	pc, err := contractABI.Unpack("ProcessCreated", eventData)
+	if len(pc) == 0 {
+		return nil, fmt.Errorf("cannot parse processMeta log")
+	}
+	eventProcessCreated := pc[0].(eventProcessCreated)
 	if err != nil {
 		return nil, err
 	}
@@ -215,8 +220,12 @@ func processMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph
 }
 
 func cancelProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*models.CancelProcessTx, error) {
-	var eventProcessCanceled eventProcessCanceled
-	err := contractABI.Unpack(&eventProcessCanceled, "ProcessCanceled", eventData)
+	pc, err := contractABI.Unpack("ProcessCanceled", eventData)
+	if len(pc) == 0 {
+		return nil, fmt.Errorf("cannot parse processMeta log")
+	}
+	eventProcessCanceled := pc[0].(eventProcessCanceled)
+
 	if err != nil {
 		return nil, err
 	}

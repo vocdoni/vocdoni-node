@@ -126,7 +126,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*models.Vote, er
 		case process.EnvelopeType.Anonymous:
 			// TODO check snark
 			return nil, fmt.Errorf("snark vote not implemented")
-		default:
+		default: // Signature based voting
 			var vote models.Vote
 			vote.ProcessId = tx.ProcessId
 			if vtx.Signature == nil {
@@ -142,7 +142,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*models.Vote, er
 
 			// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
 			// An element can only be added to the vote cache during checkTx.
-			// Every 60 seconds (6 blocks) the old votes which are not yet in the blockchain will be removed from the cache.
+			// Every N seconds the old votes which are not yet in the blockchain will be removed from the cache.
 			// If the same vote (but different transaction) is send to the mempool, the cache will detect it and vote will be discarted.
 			uid := types.UniqID(vtx, process.EnvelopeType.Anonymous)
 			vp := state.VoteCacheGet(uid)

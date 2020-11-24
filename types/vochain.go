@@ -27,19 +27,6 @@ type VotePackageStruct struct {
 	Votes []int `json:"votes" bare:"votes"`
 }
 
-// Vote represents a single Vote
-type Vote struct {
-	EncryptionKeyIndexes []uint32 `json:"encryptionKeyIndexes,omitempty"`
-	// Height the Terndemint block number where the vote is added
-	Height int64 `json:"height,omitempty"`
-	// Nullifier is the unique identifier of the vote
-	Nullifier []byte `json:"nullifier,omitempty"`
-	// ProcessID contains the unique voting process identifier
-	ProcessID []byte `json:"processId,omitempty"`
-	// VotePackage base64 encoded vote content
-	VotePackage []byte `json:"votePackage,omitempty"`
-}
-
 // VoteProof contains the proof indicating that the user is in the census of the process
 type VoteProof struct {
 	Proof        *models.Proof `json:"proof,omitempty"`
@@ -134,18 +121,6 @@ type TendermintPubKey struct {
 	Type  string `json:"type"`
 	Value []byte `json:"value"`
 }
-
-/*type PubKey interface {
-	Address() tmbytes.HexBytes
-	Bytes() []byte
-	VerifyBytes(msg []byte, sig []byte) bool
-
-	// Note that we can't keep Equals, because that would forcibly pull in
-	// tmtypes.PubKey again. Two named interfaces can't be used
-	// interchangeably, even if the underlying interface is identical.
-	// Equals(PubKey) bool
-}
-*/
 
 // ________________________ CALLBACKS DATA STRUCTS ________________________
 

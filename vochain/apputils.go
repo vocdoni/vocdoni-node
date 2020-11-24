@@ -9,11 +9,13 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
+	"gitlab.com/vocdoni/go-dvote/log"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	amino "github.com/tendermint/go-amino"
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -21,6 +23,7 @@ import (
 	"github.com/tendermint/tendermint/privval"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
+	"github.com/vocdoni/eth-storage-proof/ethstorageproof"
 )
 
 // hexproof is the hexadecimal a string. leafData is the claim data in byte format
@@ -35,7 +38,20 @@ func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, cen
 			// NOT IMPLEMENTED
 		}
 	case models.CensusOrigin_ERC20:
-		// NOT IMPLEMENTED
+		p := proof.GetEthereumStorage()
+		hexproof := []string{}
+		for s := range p.Siblings {
+			hexproof = append(hexproof, fmt.Sprintf("%x", s))
+		}
+		amount := hexutil.Big{}
+		if err := amount.UnmarshalText(p.Value); err != nil {
+			return false, fmt.Errorf("erc20 proof check: cannot unmarshal amount value: %w", err)
+		}
+		log.Debugf("validating erc20 storage proof for key %x and amount %s", p.Key, amount.String())
+		return ethstorageproof.VerifyEthStorageProof(
+			&ethstorageproof.StorageResult{Key: fmt.Sprintf("%x", p.Key), Proof: hexproof, Value: &amount},
+			ethcommon.BytesToHash(censusRootHash),
+		)
 	}
 	return false, fmt.Errorf("proof type not supported for census origin %d", censusOrigin)
 }
