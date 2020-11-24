@@ -26,8 +26,8 @@ FROM debian:10.5-slim
 WORKDIR /app
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=builder /src/dvotenode /src/dockerfiles/dvotenode/files/dvoteStart.sh ./
+COPY --from=builder /src/dvotenode ./
 
 RUN apt update && apt install -y libsnappy-dev libleveldb1d && ldconfig && rm -rf /var/lib/apt/lists/* /var/cache/apt
 
-ENTRYPOINT ["/app/dvoteStart.sh"]
+ENTRYPOINT ["/app/dvotenode"]

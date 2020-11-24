@@ -20,6 +20,8 @@ services:
       - "9096:9096"
       - "26656:26656"
       - "26657:26657"
+    sysctls:
+      net.core.somaxconn: 8128
     restart: ${RESTART:-no}
     logging:
       driver: json-file
