@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
+	ethtoken "github.com/vocdoni/eth-storage-proof/token"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
@@ -195,11 +196,27 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*models.Vote, er
 					return nil, fmt.Errorf("vote already exists")
 				}
 
-				// check merkle proof
-				vp.PubKeyDigest = snarks.Poseidon.Hash(vp.PubKey)
-				if len(vp.PubKeyDigest) != 32 {
-					return nil, fmt.Errorf("cannot compute Poseidon hash: (%s)", err)
+				// check census origin and compute vote digest identifier
+				switch process.CensusOrigin {
+				case models.CensusOrigin_OFF_CHAIN:
+					vp.PubKeyDigest = snarks.Poseidon.Hash(vp.PubKey)
+				case models.CensusOrigin_ERC20:
+					if process.EthIndexSlot == nil {
+						return nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
+					}
+					slot, err := ethtoken.GetSlot(addr.Hex(), int(*process.EthIndexSlot))
+					if err != nil {
+						return nil, fmt.Errorf("cannot fetch slot: %w", err)
+					}
+					vp.PubKeyDigest = slot[:]
+				default:
+					return nil, fmt.Errorf("census origin not compatible")
 				}
+				if len(vp.PubKeyDigest) < 20 {
+					return nil, fmt.Errorf("cannot digest public key: (%s)", err)
+				}
+
+				// check merkle proof
 				valid, err := checkMerkleProof(tx.Proof, process.CensusOrigin, process.CensusMkRoot, vp.PubKeyDigest)
 				if err != nil {
 					return nil, fmt.Errorf("cannot check merkle proof: (%s)", err)

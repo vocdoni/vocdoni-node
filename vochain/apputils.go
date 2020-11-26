@@ -1,9 +1,11 @@
 package vochain
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"math/rand"
 	"strconv"
 
@@ -39,17 +41,19 @@ func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, cen
 		}
 	case models.CensusOrigin_ERC20:
 		p := proof.GetEthereumStorage()
+		if !bytes.Equal(p.Key, leafData) {
+			return false, nil
+		}
 		hexproof := []string{}
-		for s := range p.Siblings {
+		for _, s := range p.Siblings {
 			hexproof = append(hexproof, fmt.Sprintf("%x", s))
 		}
-		amount := hexutil.Big{}
-		if err := amount.UnmarshalText(p.Value); err != nil {
-			return false, fmt.Errorf("erc20 proof check: cannot unmarshal amount value: %w", err)
-		}
+		amount := big.Int{}
+		amount.SetBytes(p.Value)
+		hexamount := hexutil.Big(amount)
 		log.Debugf("validating erc20 storage proof for key %x and amount %s", p.Key, amount.String())
 		return ethstorageproof.VerifyEthStorageProof(
-			&ethstorageproof.StorageResult{Key: fmt.Sprintf("%x", p.Key), Proof: hexproof, Value: &amount},
+			&ethstorageproof.StorageResult{Key: fmt.Sprintf("%x", p.Key), Proof: hexproof, Value: &hexamount},
 			ethcommon.BytesToHash(censusRootHash),
 		)
 	}

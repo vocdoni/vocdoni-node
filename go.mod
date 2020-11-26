@@ -16,6 +16,7 @@ require (
 	github.com/ethereum/go-ethereum v1.9.24
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/cors v1.1.1
+	github.com/gobuffalo/packr/v2 v2.8.1
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/go-cmp v0.5.2
 	github.com/google/gopacket v1.1.18 // indirect
@@ -56,8 +57,8 @@ require (
 	github.com/tendermint/go-amino v0.16.0
 	github.com/tendermint/tendermint v0.34.0
 	github.com/tendermint/tm-db v0.6.3
-	github.com/vocdoni/dvote-protobuf v0.1.0
-	github.com/vocdoni/eth-storage-proof v0.1.2
+	github.com/vocdoni/dvote-protobuf v0.1.1
+	github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200223203819-95cdfde1438f // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.uber.org/zap v1.15.0
