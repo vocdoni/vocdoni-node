@@ -108,7 +108,7 @@ func Vochain(vconfig *config.VochainCfg, dev, results, waitForSync bool, ma *met
 
 	// Vochain info
 	vi = vochaininfo.NewVochainInfo(vnode)
-	go vi.Start(10)
+	go vi.Start(60)
 
 	if waitForSync && !vconfig.SeedMode {
 		log.Infof("waiting for vochain to synchronize")
@@ -142,16 +142,16 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 			fmt.Fprintf(&b, "1m:%.2f", float32(a[0]/1000))
 		}
 		if a[1] > 0 {
-			fmt.Fprintf(&b, " 10m:%d", a[1]/1000)
+			fmt.Fprintf(&b, " 10m:%.2f", float32(a[1]/1000))
 		}
 		if a[2] > 0 {
-			fmt.Fprintf(&b, " 1h:%d", a[2]/1000)
+			fmt.Fprintf(&b, " 1h:%.2f", float32(a[2]/1000))
 		}
 		if a[3] > 0 {
-			fmt.Fprintf(&b, " 6h:%d", a[3]/1000)
+			fmt.Fprintf(&b, " 6h:%.2f", float32(a[3]/1000))
 		}
 		if a[4] > 0 {
-			fmt.Fprintf(&b, " 24h:%d", a[4]/1000)
+			fmt.Fprintf(&b, " 24h:%.2f", float32(a[4]/1000))
 		}
 		h = vi.Height()
 		m = vi.MempoolSize()
