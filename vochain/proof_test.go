@@ -156,8 +156,8 @@ var testSmartContractHolders = []string{
 	"aa16366cd207782dc4b2a9b8c9f82f3970c31540dd5c182acce12905ef9e272b",
 }
 
-var testEthVotingSmartContract = "0x2b7222146a805bba0dbb61869c4b3a03209dffba"
-var testEthHeight = uint32(3833670)
+//var testEthVotingSmartContract = "0x2b7222146a805bba0dbb61869c4b3a03209dffba"
+//var testEthHeight = uint32(3833670)
 var testEthIndexSlot = uint32(4)
 var testEthStorageRoot = testutil.Hex2byte(nil, "0xe338061cd5d5fa8a452dc950e336a838ff2ca79bef04fe48c5a3a071cc7e0c55")
 
