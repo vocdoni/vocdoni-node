@@ -36,6 +36,7 @@ require (
 	github.com/ipfs/go-ipld-cbor v0.0.5 // indirect
 	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/interface-go-ipfs-core v0.4.0
+	github.com/ipld/go-car v0.1.1-0.20201119040259-8fe0b741ece2 // indirect
 	github.com/klauspost/compress v1.11.1
 	github.com/koron/go-ssdp v0.0.2 // indirect
 	github.com/libp2p/go-libp2p v0.12.0
