@@ -8,6 +8,8 @@ variables:
   DOCKER_DRIVER: overlay2
   DVOTE_NODE_BUILD_IMAGE: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}
   DVOTE_NODE_RELEASE_IMAGE: ${CI_REGISTRY_IMAGE}:latest
+  GH_DVOTE_NODE_BUILD_IMAGE: ${GH_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}
+  GH_DVOTE_NODE_RELEASE_IMAGE: ${GH_REGISTRY_IMAGE}:latest
   DOCKER_CLI_EXPERIMENTAL: enabled
   COMPOSE_DOCKER_CLI_BUILD: 1
   DOCKER_BUILDKIT: 1
@@ -80,12 +82,16 @@ docker-release:
     - vocdoni
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - docker login -u "$GH_REGISTRY_USER" -p "$GH_REGISTRY_PASSWORD" $GH_REGISTRY
   script:
     - docker build -t ${DVOTE_NODE_BUILD_IMAGE} -f Dockerfile.release .
     - docker tag ${DVOTE_NODE_BUILD_IMAGE} ${DVOTE_NODE_RELEASE_IMAGE}
-    #- docker login -u gitlab-ci-token -p ${CI_BUILD_TOKEN} ${CI_REGISTRY}
+    - docker tag ${DVOTE_NODE_BUILD_IMAGE} ${GH_DVOTE_NODE_BUILD_IMAGE}
+    - docker tag ${DVOTE_NODE_BUILD_IMAGE} ${GH_DVOTE_NODE_RELEASE_IMAGE}
     - docker push ${DVOTE_NODE_BUILD_IMAGE}
     - docker push ${DVOTE_NODE_RELEASE_IMAGE}
+    - docker push ${GH_DVOTE_NODE_BUILD_IMAGE}
+    - docker push ${GH_DVOTE_NODE_RELEASE_IMAGE}
   only:
     - master
     - /^release-.*$/
