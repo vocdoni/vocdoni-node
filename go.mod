@@ -26,10 +26,9 @@ require (
 	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
 	github.com/iden3/go-iden3-crypto v0.0.4
 	github.com/ipfs/go-bitswap v0.3.3 // indirect
-	github.com/ipfs/go-blockservice v0.1.4 // indirect
 	github.com/ipfs/go-filestore v1.0.0 // indirect
 	github.com/ipfs/go-graphsync v0.5.1 // indirect
-	github.com/ipfs/go-ipfs v0.7.0
+	github.com/ipfs/go-ipfs v0.7.1-0.20201201031203-895b340e08b9
 	github.com/ipfs/go-ipfs-blockstore v1.0.3 // indirect
 	github.com/ipfs/go-ipfs-config v0.10.0
 	github.com/ipfs/go-ipfs-files v0.0.8
@@ -44,11 +43,8 @@ require (
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
 	github.com/libp2p/go-libp2p-core v0.7.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
-	github.com/libp2p/go-libp2p-gostream v0.3.0 // indirect
 	github.com/libp2p/go-libp2p-kad-dht v0.11.0
 	github.com/libp2p/go-libp2p-noise v0.1.2 // indirect
-	github.com/libp2p/go-libp2p-pubsub-router v0.4.0 // indirect
-	github.com/libp2p/go-libp2p-quic-transport v0.9.2 // indirect
 	github.com/libp2p/go-libp2p-yamux v0.4.1 // indirect
 	github.com/libp2p/go-netroute v0.1.4 // indirect
 	github.com/libp2p/go-reuseport v0.0.2
