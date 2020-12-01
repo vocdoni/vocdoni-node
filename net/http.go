@@ -69,6 +69,11 @@ func (h *HttpContext) ConnectionType() string {
 }
 
 func (h *HttpContext) Send(msg types.Message) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warnf("recovered http send panic: %v", r)
+		}
+	}()
 	defer close(h.sent)
 
 	h.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg.Data)+1))
@@ -92,7 +97,7 @@ func (h *HttpHandler) Listen(receiver chan<- types.Message) {
 }
 
 func (h *HttpHandler) SendUnicast(address string, msg types.Message) {
-	// WebSocket is not p2p so sendUnicast makes the same of Send()
+	// HTTP is not p2p, so sendUnicast makes the same of Send()
 	h.Send(msg)
 }
 
