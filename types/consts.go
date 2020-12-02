@@ -41,14 +41,14 @@ const (
 
 	// Vochain
 
-	// PetitionSign contains the string that needs to match with the received vote type for petition-sign
-	PetitionSign = "petition-sign"
-	// PollVote contains the string that needs to match with the received vote type for poll-vote
-	PollVote = "poll-vote"
-	// EncryptedPoll contains the string that needs to match with the received vote type for encrypted-poll
-	EncryptedPoll = "encrypted-poll"
-	// SnarkVote contains the string that needs to match with the received vote type for snark-vote
-	SnarkVote = "snark-vote"
+	// PetitionSignStr contains the string that needs to match with the received vote type for petition-sign
+	PetitionSignStr = "petition-sign"
+	// PollVoteStr contains the string that needs to match with the received vote type for poll-vote
+	PollVoteStr = "poll-vote"
+	// EncryptedPollStr contains the string that needs to match with the received vote type for encrypted-poll
+	EncryptedPollStr = "encrypted-poll"
+	// SnarkVoteStr contains the string that needs to match with the received vote type for snark-vote
+	SnarkVoteStr = "snark-vote"
 
 	// List of transation names
 	TxVote              = "vote"
@@ -63,4 +63,15 @@ const (
 
 	// MaxKeyIndex is the maxim number of allowed Encryption or Commitment keys
 	MaxKeyIndex = 16
+)
+
+var (
+	// PetitionSign contains the string that needs to match with the received vote type for petition-sign
+	PetitionSign = [...]uint8{3, 0}
+	// PollVote contains the string that needs to match with the received vote type for poll-vote
+	PollVote = [...]uint8{3, 0}
+	// EncryptedPoll contains the string that needs to match with the received vote type for encrypted-poll
+	EncryptedPoll = [...]uint8{3, 4}
+	// SnarkVote contains the string that needs to match with the received vote type for snark-vote
+	SnarkVote = [...]uint8{3, 6}
 )
