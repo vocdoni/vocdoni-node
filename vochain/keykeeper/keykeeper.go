@@ -269,6 +269,10 @@ func (k *KeyKeeper) OnVote(v *models.Vote) {
 	// do nothing
 }
 
+func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {
+	// do nothing
+}
+
 func (k *KeyKeeper) OnProcessKeys(pid []byte, pub, com string) {
 	// do nothing
 }

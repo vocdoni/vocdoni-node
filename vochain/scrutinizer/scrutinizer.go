@@ -124,6 +124,10 @@ func (s *Scrutinizer) OnProcessKeys(pid []byte, pub, com string) {
 	// do nothing
 }
 
+func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {
+	// do nothing
+}
+
 // OnRevealKeys checks if all keys have been revealed and in such case add the process to the results queue
 func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 	p, err := s.VochainState.Process(pid, false)

@@ -66,6 +66,7 @@ func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
 				return []byte{}, state.RevealProcessKeys(tx)
 			}
 		}
+
 	case *models.Tx_CancelProcess:
 		if err := CancelProcessTxCheck(vtx, state); err != nil {
 			return []byte{}, fmt.Errorf("cancelProcess %w", err)
@@ -87,6 +88,19 @@ func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
 		} else {
 			return []byte{}, fmt.Errorf("newProcess %w", err)
 		}
+
+	case *models.Tx_SetProcess:
+		if err := SetProcessTxCheck(vtx, state); err != nil {
+			return []byte{}, fmt.Errorf("cancelProcess %w", err)
+		}
+		if commit {
+			tx := vtx.GetSetProcess()
+			if tx.Status == nil {
+				return []byte{}, fmt.Errorf("set process status, status is nil")
+			}
+			return []byte{}, state.SetProcessStatus(tx.ProcessID, *tx.Status, true)
+		}
+
 	default:
 		return []byte{}, fmt.Errorf("transaction type invalid")
 	}
@@ -232,112 +246,6 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*models.Vote, er
 		}
 	}
 	return nil, fmt.Errorf("cannot add vote, invalid block frame or process canceled/paused")
-}
-
-// NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
-func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
-	tx := vtx.GetNewProcess()
-	if tx.Process == nil {
-		return nil, fmt.Errorf("process data is empty")
-	}
-	// check signature available
-	if vtx.Signature == nil || tx == nil {
-		return nil, fmt.Errorf("missing signature or new process transaction")
-	}
-	// get oracles
-	oracles, err := state.Oracles(false)
-	if err != nil || len(oracles) == 0 {
-		return nil, fmt.Errorf("cannot check authorization against a nil or empty oracle list")
-	}
-
-	header := state.Header(false)
-	if header == nil {
-		return nil, fmt.Errorf("cannot fetch state header")
-	}
-	// start and endblock sanity check
-	if int64(tx.Process.StartBlock) < header.Height {
-		return nil, fmt.Errorf("cannot add process with start block lower or equal than the current tendermint height")
-	}
-	if tx.Process.BlockCount <= 0 {
-		return nil, fmt.Errorf("cannot add process with duration lower or equal than the current tendermint height")
-	}
-	signedBytes, err := proto.Marshal(tx)
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal new process transaction")
-	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, fmt.Sprintf("%x", vtx.Signature))
-	if err != nil {
-		return nil, err
-	}
-	if !authorized {
-		return nil, fmt.Errorf("unauthorized to create a process, recovered addr is %s", addr.Hex())
-	}
-	// get process
-	_, err = state.Process(tx.Process.ProcessId, false)
-	if err == nil {
-		return nil, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
-	}
-
-	// check valid/implemented process types
-	switch {
-	case tx.Process.EnvelopeType.Anonymous:
-		return nil, fmt.Errorf("anonymous process not yet implemented")
-	case tx.Process.EnvelopeType.Serial:
-		return nil, fmt.Errorf("serial process not yet implemented")
-	}
-
-	if tx.Process.EnvelopeType.EncryptedVotes || tx.Process.EnvelopeType.Anonymous {
-		// We consider the zero value as nil for security
-		tx.Process.EncryptionPublicKeys = make([]string, types.MaxKeyIndex)
-		tx.Process.EncryptionPrivateKeys = make([]string, types.MaxKeyIndex)
-		tx.Process.CommitmentKeys = make([]string, types.MaxKeyIndex)
-		tx.Process.RevealKeys = make([]string, types.MaxKeyIndex)
-	}
-	return tx.Process, nil
-}
-
-// CancelProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
-func CancelProcessTxCheck(vtx *models.Tx, state *State) error {
-	tx := vtx.GetCancelProcess()
-	// check signature available
-	if vtx.Signature == nil || tx == nil {
-		return fmt.Errorf("missing signature or cancel transaction")
-	}
-	// get oracles
-	oracles, err := state.Oracles(false)
-	if err != nil || len(oracles) == 0 {
-		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
-	}
-	// check signature
-	signedBytes, err := proto.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("cannot marshal new process transaction")
-	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, fmt.Sprintf("%x", vtx.Signature))
-	if err != nil {
-		return err
-	}
-	if !authorized {
-		return fmt.Errorf("unauthorized to cancel a process, recovered addr is %s", addr.Hex())
-	}
-	// get process
-	process, err := state.Process(tx.ProcessId, false)
-	if err != nil {
-		return fmt.Errorf("cannot cancel process %x: %s", tx.ProcessId, err)
-	}
-	// check process not already canceled or finalized
-	if process.Status != models.ProcessStatus_READY {
-		return fmt.Errorf("cannot cancel a not ready process")
-	}
-	endBlock := process.StartBlock + process.BlockCount
-	var height int64
-	if h := state.Header(false); h != nil {
-		height = h.Height
-	}
-	if int64(endBlock) < height {
-		return fmt.Errorf("cannot cancel a finalized process")
-	}
-	return nil
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction

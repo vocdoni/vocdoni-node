@@ -65,7 +65,8 @@ func (c *CensusDownloader) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 	}
 }
 
-func (c *CensusDownloader) OnCancel(pid []byte)                       {}
-func (c *CensusDownloader) OnVote(v *models.Vote)                     {}
-func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string) {}
-func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string) {}
+func (c *CensusDownloader) OnCancel(pid []byte)                                           {}
+func (c *CensusDownloader) OnVote(v *models.Vote)                                         {}
+func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string)                     {}
+func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string)                     {}
+func (c *CensusDownloader) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {}

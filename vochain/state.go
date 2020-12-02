@@ -49,6 +49,7 @@ var PrefixDBCacheSize = 0
 type EventListener interface {
 	OnVote(*models.Vote)
 	OnProcess(pid, eid []byte, mkroot, mkuri string)
+	OnProcessStatusChange(pid []byte, status models.ProcessStatus)
 	OnCancel(pid []byte)
 	OnProcessKeys(pid []byte, encryptionPub, commitment string)
 	OnRevealKeys(pid []byte, encryptionPriv, reveal string)
@@ -335,132 +336,6 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	}
 	for _, l := range v.eventListeners {
 		l.OnRevealKeys(tx.ProcessId, ekey, rkey)
-	}
-	return nil
-}
-
-// AddProcess adds or overides a new process to vochain
-func (v *State) AddProcess(p *models.Process) error {
-	newProcessBytes, err := proto.Marshal(p)
-	if err != nil {
-		return errors.New("cannot marshal process bytes")
-	}
-	v.Lock()
-	err = v.Store.Tree(ProcessTree).Add(p.ProcessId, newProcessBytes)
-	v.Unlock()
-	if err != nil {
-		return err
-	}
-	mkuri := ""
-	if p.CensusMkURI != nil {
-		mkuri = *p.CensusMkURI
-	}
-	for _, l := range v.eventListeners {
-		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusMkRoot), mkuri)
-	}
-	return nil
-}
-
-// CancelProcess sets the process canceled atribute to true
-func (v *State) CancelProcess(pid []byte) error {
-	process, err := v.Process(pid, false)
-	if err != nil {
-		return err
-	}
-	if process.Status == models.ProcessStatus_CANCELED {
-		return nil
-	}
-	process.Status = models.ProcessStatus_CANCELED
-	updatedProcessBytes, err := proto.Marshal(process)
-	if err != nil {
-		return errors.New("cannot marshal updated process bytes")
-	}
-	v.Lock()
-	err = v.Store.Tree(ProcessTree).Add([]byte(pid), updatedProcessBytes)
-	v.Unlock()
-	if err != nil {
-		return err
-	}
-	for _, l := range v.eventListeners {
-		l.OnCancel(pid)
-	}
-	return nil
-}
-
-// PauseProcess sets the process paused atribute to true
-func (v *State) PauseProcess(pid []byte) error {
-	process, err := v.Process(pid, false)
-	if err != nil {
-		return err
-	}
-	// already paused
-	if process.Status == models.ProcessStatus_PAUSED {
-		return fmt.Errorf("process already paused")
-	}
-	process.Status = models.ProcessStatus_PAUSED
-	return v.setProcess(process, pid)
-}
-
-// ResumeProcess sets the process paused atribute to true
-func (v *State) ResumeProcess(pid []byte) error {
-	process, err := v.Process(pid, false)
-	if err != nil {
-		return err
-	}
-	// non paused process cannot be resumed
-	if process.Status != models.ProcessStatus_PAUSED {
-		return fmt.Errorf("process is not paused")
-	}
-	process.Status = models.ProcessStatus_READY
-	return v.setProcess(process, pid)
-}
-
-// Process returns a process info given a processId if exists
-func (v *State) Process(pid []byte, isQuery bool) (*models.Process, error) {
-	var processBytes []byte
-	var err error
-	v.RLock()
-	if isQuery {
-		processBytes = v.Store.ImmutableTree(ProcessTree).Get(pid)
-	} else {
-		processBytes = v.Store.Tree(ProcessTree).Get(pid)
-	}
-	v.RUnlock()
-	if processBytes == nil {
-		return nil, ErrProcessNotFound
-	}
-	process := new(models.Process)
-	err = proto.Unmarshal(processBytes, process)
-	if err != nil {
-		return nil, fmt.Errorf("cannot unmarshal process (%s): %w", pid, err)
-	}
-	return process, nil
-}
-
-// CountProcesses returns the overall number of processes the vochain has
-func (v *State) CountProcesses(isQuery bool) int64 {
-	v.RLock()
-	defer v.RUnlock()
-	if isQuery {
-		return int64(v.Store.ImmutableTree(ProcessTree).Count())
-	}
-	return int64(v.Store.Tree(ProcessTree).Count())
-
-}
-
-// set process stores in the database the process
-func (v *State) setProcess(process *models.Process, pid []byte) error {
-	if process == nil || len(process.ProcessId) != types.ProcessIDsize {
-		return ErrProcessNotFound
-	}
-	updatedProcessBytes, err := proto.Marshal(process)
-	if err != nil {
-		return errors.New("cannot marshal updated process bytes")
-	}
-	v.Lock()
-	defer v.Unlock()
-	if err := v.Store.Tree(ProcessTree).Add(pid, updatedProcessBytes); err != nil {
-		return err
 	}
 	return nil
 }
