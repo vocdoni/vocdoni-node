@@ -3,7 +3,7 @@ services:
   dvotenode:
     build:
       context: ../../
-    image: "vocdoni/go-dvote"
+    image: "ghcr.io/vocdoni/go-dvote:master"
     env_file: env
     volumes:
       - "run:/app/run"
