@@ -24,7 +24,6 @@ func TestState(t *testing.T) {
 		s.AddProcess(p)
 
 		for j := 0; j < 10; j++ {
-			//t.Logf("adding vote %d for process %d", j, i)
 			v := &models.Vote{
 				ProcessId:   pids[i],
 				Nullifier:   util.RandomBytes(32),

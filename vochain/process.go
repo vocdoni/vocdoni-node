@@ -129,7 +129,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return fmt.Errorf("process %x can only be ended from ready status", pid)
 		}
 		if !process.Mode.Interruptible {
-			if int64(process.BlockCount+process.StartBlock) < v.Header(false).Height {
+			if v.Header(false).Height <= int64(process.BlockCount+process.StartBlock) {
 				return fmt.Errorf("process %x is not interruptible, cannot change state to %s", pid, newstatus.String())
 			}
 		}
@@ -304,12 +304,12 @@ func SetProcessTxCheck(vtx *models.Tx, state *State) error {
 		return err
 	}
 	if !authorized {
-		return fmt.Errorf("unauthorized to cancel a process, recovered addr is %s", addr.Hex())
+		return fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
 	}
 	// get process
 	process, err := state.Process(tx.ProcessID, false)
 	if err != nil {
-		return fmt.Errorf("cannot cancel process %x: %s", tx.ProcessID, err)
+		return fmt.Errorf("cannot get process %x: %w", tx.ProcessID, err)
 	}
 
 	return state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)

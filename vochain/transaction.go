@@ -91,7 +91,7 @@ func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
 
 	case *models.Tx_SetProcess:
 		if err := SetProcessTxCheck(vtx, state); err != nil {
-			return []byte{}, fmt.Errorf("cancelProcess %w", err)
+			return []byte{}, fmt.Errorf("setProcess %w", err)
 		}
 		if commit {
 			tx := vtx.GetSetProcess()
