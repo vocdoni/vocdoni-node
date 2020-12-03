@@ -241,7 +241,7 @@ func (k *KeyKeeper) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 }
 
 // OnCancel will publish the private and reveal keys of the canceled process, if required
-func (k *KeyKeeper) OnCancel(pid []byte) {
+func (k *KeyKeeper) OnCancel(pid []byte) { // LEGACY
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
@@ -269,8 +269,22 @@ func (k *KeyKeeper) OnVote(v *models.Vote) {
 	// do nothing
 }
 
+// OnProcessStatusChange will publish the private and reveal keys of the ended process, if required
 func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {
-	// do nothing
+	p, err := k.vochain.State.Process(pid, false)
+	if err != nil {
+		log.Errorf("cannot get process from state: (%s)", err)
+		return
+	}
+	if !(p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes) {
+		return
+	}
+	if p.EncryptionPublicKeys[k.myIndex] != "" {
+		if status == models.ProcessStatus_ENDED {
+			log.Infof("process canceled, scheduling reveal keys for next block")
+			k.blockPool[string(pid)] = k.vochain.State.Header(false).Height + 1
+		}
+	}
 }
 
 func (k *KeyKeeper) OnProcessKeys(pid []byte, pub, com string) {
