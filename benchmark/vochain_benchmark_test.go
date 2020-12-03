@@ -6,19 +6,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/client"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
+	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
+	"google.golang.org/protobuf/proto"
 )
 
 // THIS BENCH DOES NOT PROVIDE ANY CONSENSUS GUARANTEES
@@ -99,27 +101,53 @@ func BenchmarkVochain(b *testing.B) {
 	resp = doRequest("getBlockHeight", nil)
 
 	// create process
-	process := &types.NewProcessTx{
-		EntityID:       signerPub,
-		MkRoot:         mkRoot,
-		NumberOfBlocks: numberOfBlocks,
-		ProcessID:      processID,
-		ProcessType:    types.PollVote,
-		StartBlock:     *resp.Height + 1,
-		Type:           "newProcess",
+	txEid, err := hex.DecodeString(util.TrimHex(signerPub))
+	if err != nil {
+		b.Fatal(err)
 	}
-	process.Signature, err = dvoteServer.Signer.SignJSON(process)
+	txPid, err := hex.DecodeString(util.TrimHex(processID))
+	if err != nil {
+		b.Fatal(err)
+	}
+	txMkRoot, err := hex.DecodeString(util.TrimHex(mkRoot))
+	if err != nil {
+		b.Fatal(err)
+	}
+	processData := &models.Process{
+		EntityId:     txEid,
+		CensusMkRoot: txMkRoot,
+		BlockCount:   numberOfBlocks,
+		ProcessId:    txPid,
+		ProcessType:  types.PollVote,
+		StartBlock:   uint32(*resp.Height + 1),
+	}
+	process := &models.NewProcessTx{
+		Txtype:  models.TxType_NEW_PROCESS,
+		Nonce:   util.RandomHex(32),
+		Process: processData,
+	}
+
+	txBytes, err := proto.Marshal(process)
+	if err != nil {
+		b.Fatal("cannot marshal process")
+	}
+
+	vtx := models.Tx{}
+	signHex, err := dvoteServer.Signer.Sign(txBytes)
 	if err != nil {
 		b.Fatalf("cannot sign oracle tx: %s", err)
 	}
-	tx, err := json.Marshal(process)
+	vtx.Signature, err = hex.DecodeString(signHex)
 	if err != nil {
-		b.Fatalf("error marshaling process tx: %s", err)
+		b.Fatalf("cannot decode signature")
+	}
+	req.Payload, err = proto.Marshal(&vtx)
+	if err != nil {
+		b.Fatalf("error marshaling process tx: %v", err)
 	}
 
 	//	res, err := dvoteServer.VochainRPCClient.BroadcastTxSync(tx)
 	//req.Method = "submitRawTx"
-	req.RawTx = base64.StdEncoding.EncodeToString(tx)
 	resp = doRequest("submitRawTx", nil)
 
 	if !resp.Ok {
@@ -130,7 +158,7 @@ func BenchmarkVochain(b *testing.B) {
 
 	// check if process is created
 	log.Infof("check if process created")
-	req.EntityId = process.EntityID
+	req.EntityId = signerPub
 
 	for {
 		resp = doRequest("getProcessList", nil)
@@ -150,14 +178,14 @@ func BenchmarkVochain(b *testing.B) {
 
 		count := 0
 		for pb.Next() {
-			vochainBench(b, cl, keySet[count], poseidonHashes[count], mkRoot, process.ProcessID, req.CensusID)
+			vochainBench(b, cl, keySet[count], poseidonHashes[count], mkRoot, processID, req.CensusID)
 			count++
 		}
 	})
 
 	// scrutiny of the submited envelopes
 	log.Infof("get results")
-	req.ProcessID = process.ProcessID
+	req.ProcessID = processID
 	resp = doRequest("getResults", nil)
 	log.Infof("submited votes: %+v", resp.Results)
 
@@ -168,7 +196,6 @@ func BenchmarkVochain(b *testing.B) {
 }
 
 func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon, mkRoot, processID, censusID string) {
-	rint := rand.Int()
 	// API requests
 	var req types.MetaRequest
 	doRequest := cl.ForTest(b, &req)
@@ -187,15 +214,9 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 		b.Fatalf("proof not generated while it should be generated correctly")
 	}
 
-	req = types.MetaRequest{}
-	req.Payload = new(types.VoteTx)
-	req.Payload.Proof = resp.Siblings
-	req.Payload.Nonce = strconv.Itoa(rint)
-	req.Payload.ProcessID = processID
-
 	// generate envelope votePackage
 	votePkg := &types.VotePackageStruct{
-		Nonce: req.Payload.Nonce,
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1},
 		Type:  types.PollVote,
 	}
@@ -203,15 +224,29 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	if err != nil {
 		b.Fatalf("cannot marshal vote: %s", err)
 	}
-	req.Payload.VotePackage = base64.StdEncoding.EncodeToString(voteBytes)
-	// generate signature
-	req.Payload.Signature, err = s.SignJSON(*req.Payload)
+	// Generate VoteEnvelope package
+	txPid, _ := hex.DecodeString(util.TrimHex(processID))
+	siblings, _ := hex.DecodeString(util.TrimHex(resp.Siblings))
+	tx := models.VoteEnvelope{
+		Nonce:       util.RandomHex(32),
+		ProcessId:   txPid,
+		Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: siblings}}},
+		VotePackage: voteBytes,
+	}
+
+	req = types.MetaRequest{}
+	req.Payload, err = proto.Marshal(&tx)
 	if err != nil {
-		b.Fatalf("cannot sign vote: %s", err)
+		b.Fatal(err)
+	}
+
+	req.Signature, err = s.Sign(req.Payload)
+	if err != nil {
+		b.Fatal(err)
 	}
 
 	// sending submitEnvelope request
-	log.Info("vote payload: %+v,", req.Payload)
+	log.Info("vote payload: %s", tx.String())
 	log.Infof("request: %+v", req)
 	resp = doRequest("submitEnvelope", nil)
 	log.Infof("response: %+v", resp)
@@ -219,7 +254,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	// check vote added
 	req = types.MetaRequest{}
 	req.ProcessID = processID
-	req.Nullifier = hex.EncodeToString(vochain.GenerateNullifier(s.Address(), util.Hex2byte(b, processID)))
+	req.Nullifier = hex.EncodeToString(vochain.GenerateNullifier(s.Address(), testutil.Hex2byte(b, processID)))
 	for {
 		resp = doRequest("getEnvelopeStatus", nil)
 		if *resp.Registered {

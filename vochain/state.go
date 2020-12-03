@@ -1,20 +1,22 @@
 package vochain
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
-	amino "github.com/tendermint/go-amino"
+	"github.com/ethereum/go-ethereum/common"
+	tmcrypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmtypes "github.com/tendermint/tendermint/types"
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/statedb"
 	"gitlab.com/vocdoni/go-dvote/statedb/iavlstate"
 	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -45,8 +47,9 @@ var PrefixDBCacheSize = 0
 // The process is concurrency safe, meaning that there cannot be two sequences
 // happening in parallel.
 type EventListener interface {
-	OnVote(*types.Vote)
+	OnVote(*models.Vote)
 	OnProcess(pid, eid []byte, mkroot, mkuri string)
+	OnProcessStatusChange(pid []byte, status models.ProcessStatus)
 	OnCancel(pid []byte)
 	OnProcessKeys(pid []byte, encryptionPub, commitment string)
 	OnRevealKeys(pid []byte, encryptionPriv, reveal string)
@@ -60,7 +63,6 @@ type State struct {
 	voteCache     map[string]*types.VoteProof
 	voteCacheLock sync.RWMutex
 	ImmutableState
-	Codec *amino.Codec
 
 	eventListeners []EventListener
 }
@@ -74,7 +76,7 @@ type ImmutableState struct {
 }
 
 // NewState creates a new State
-func NewState(dataDir string, codec *amino.Codec) (*State, error) {
+func NewState(dataDir string) (*State, error) {
 	var err error
 	vs := &State{}
 	//vs.Store = new(gravitonstate.GravitonState)
@@ -99,7 +101,6 @@ func NewState(dataDir string, codec *amino.Codec) (*State, error) {
 		return nil, err
 	}
 
-	vs.Codec = codec
 	vs.voteCache = make(map[string]*types.VoteProof)
 	log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
 	return vs, nil
@@ -112,53 +113,63 @@ func (v *State) AddEventListener(l EventListener) {
 }
 
 // AddOracle adds a trusted oracle given its address if not exists
-func (v *State) AddOracle(address string) error {
+func (v *State) AddOracle(address common.Address) error {
 	var err error
-	address = util.TrimHex(address)
 	v.Lock()
 	defer v.Unlock()
 	oraclesBytes := v.Store.Tree(AppTree).Get(oracleKey)
-	var oracles []string
-	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
+	var oracleList models.OracleList
+	if len(oraclesBytes) > 0 {
+		if err = proto.Unmarshal(oraclesBytes, &oracleList); err != nil {
+			return err
+		}
+	}
+	oracles := oracleList.GetOracles()
 	for _, v := range oracles {
-		if v == address {
+		if bytes.Equal(v, address.Bytes()) {
 			return errors.New("oracle already added")
 		}
 	}
-	oracles = append(oracles, address)
-	newOraclesBytes, err := v.Codec.MarshalBinaryBare(oracles)
+	oracles = append(oracles, address.Bytes())
+	oracleList.Oracles = oracles
+	newOraclesBytes, err := proto.Marshal(&oracleList)
 	if err != nil {
-		return errors.New("cannot marshal oracles")
+		return fmt.Errorf("cannot marshal oracles: (%s)", err)
 	}
 	return v.Store.Tree(AppTree).Add(oracleKey, newOraclesBytes)
 }
 
 // RemoveOracle removes a trusted oracle given its address if exists
-func (v *State) RemoveOracle(address string) error {
-	var oracles []string
-	address = util.TrimHex(address)
+func (v *State) RemoveOracle(address common.Address) error {
 	v.Lock()
 	defer v.Unlock()
 	oraclesBytes := v.Store.Tree(AppTree).Get(oracleKey)
-	v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
+	var oracleList models.OracleList
+
+	if err := proto.Unmarshal(oraclesBytes, &oracleList); err != nil {
+		return err
+	}
+	oracles := oracleList.GetOracles()
+
 	for i, o := range oracles {
-		if o == address {
+		if bytes.Equal(o, address.Bytes()) {
 			// remove oracle
 			copy(oracles[i:], oracles[i+1:])
-			oracles[len(oracles)-1] = ""
+			oracles[len(oracles)-1] = []byte{}
 			oracles = oracles[:len(oracles)-1]
-			newOraclesBytes, err := v.Codec.MarshalBinaryBare(oracles)
+			oracleList.Oracles = oracles
+			newOraclesBytes, err := proto.Marshal(&oracleList)
 			if err != nil {
-				return errors.New("cannot marshal oracles")
+				return fmt.Errorf("cannot marshal oracles: (%s)", err)
 			}
 			return v.Store.Tree(AppTree).Add(oracleKey, newOraclesBytes)
 		}
 	}
-	return errors.New("oracle not found")
+	return fmt.Errorf("oracle not found")
 }
 
 // Oracles returns the current oracle list
-func (v *State) Oracles(isQuery bool) ([]string, error) {
+func (v *State) Oracles(isQuery bool) ([]common.Address, error) {
 	var oraclesBytes []byte
 	var err error
 	v.RLock()
@@ -168,13 +179,19 @@ func (v *State) Oracles(isQuery bool) ([]string, error) {
 	} else {
 		oraclesBytes = v.Store.Tree(AppTree).Get(oracleKey)
 	}
-	var oracles []string
-	err = v.Codec.UnmarshalBinaryBare(oraclesBytes, &oracles)
+	var oracleList models.OracleList
+	if err = proto.Unmarshal(oraclesBytes, &oracleList); err != nil {
+		return nil, err
+	}
+	var oracles []common.Address
+	for _, o := range oracleList.GetOracles() {
+		oracles = append(oracles, common.BytesToAddress(o))
+	}
 	return oracles, err
 }
 
-func hexPubKeyToTendermintEd25519(pubKey string) (types.PubKey, error) {
-	var tmkey ed25519.PubKeyEd25519
+func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
+	var tmkey ed25519.PubKey
 	pubKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
 		return nil, err
@@ -187,47 +204,51 @@ func hexPubKeyToTendermintEd25519(pubKey string) (types.PubKey, error) {
 }
 
 // AddValidator adds a tendemint validator if it is not already added
-func (v *State) AddValidator(pubKey types.PubKey, power int64) error {
+func (v *State) AddValidator(validator *models.Validator) error {
 	var err error
-	addr := pubKey.Address().String()
 	v.Lock()
 	defer v.Unlock()
 	validatorsBytes := v.Store.Tree(AppTree).Get(validatorKey)
-	var validators []types.GenesisValidator
-	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
-	for _, v := range validators {
-		if v.PubKey.Address().String() == addr {
+	var validatorsList models.ValidatorList
+	if len(validatorsBytes) > 0 {
+		if err = proto.Unmarshal(validatorsBytes, &validatorsList); err != nil {
+			return err
+		}
+	}
+	for _, v := range validatorsList.Validators {
+		if bytes.Equal(v.Address, validator.Address) {
 			return nil
 		}
 	}
-	newVal := types.GenesisValidator{
-		Address: pubKey.Address(),
-		PubKey:  pubKey,
-		Power:   power,
+	newVal := &models.Validator{
+		Address: validator.GetAddress(),
+		PubKey:  validator.GetPubKey(),
+		Power:   validator.GetPower(),
 	}
-	validators = append(validators, newVal)
-
-	validatorsBytes, err = v.Codec.MarshalBinaryBare(validators)
+	validatorsList.Validators = append(validatorsList.Validators, newVal)
+	validatorsBytes, err = proto.Marshal(&validatorsList)
 	if err != nil {
 		return fmt.Errorf("cannot marshal validators: %v", err)
 	}
 	return v.Store.Tree(AppTree).Add(validatorKey, validatorsBytes)
 }
 
-// RemoveValidator removes a tendermint validator if exists
-func (v *State) RemoveValidator(address string) error {
+// RemoveValidator removes a tendermint validator identified by its address
+func (v *State) RemoveValidator(address []byte) error {
 	v.RLock()
 	validatorsBytes := v.Store.Tree(AppTree).Get(validatorKey)
 	v.RUnlock()
-	var validators []types.GenesisValidator
-	v.Codec.UnmarshalBinaryBare(validatorsBytes, &validators)
-	for i, val := range validators {
-		if val.Address.String() == address {
+	var validators models.ValidatorList
+	if err := proto.Unmarshal(validatorsBytes, &validators); err != nil {
+		return err
+	}
+	for i, val := range validators.Validators {
+		if bytes.Equal(val.Address, address) {
 			// remove validator
-			copy(validators[i:], validators[i+1:])
-			validators[len(validators)-1] = types.GenesisValidator{}
-			validators = validators[:len(validators)-1]
-			validatorsBytes, err := v.Codec.MarshalBinaryBare(validators)
+			copy(validators.Validators[i:], validators.Validators[i+1:])
+			validators.Validators[len(validators.Validators)-1] = &models.Validator{}
+			validators.Validators = validators.Validators[:len(validators.Validators)-1]
+			validatorsBytes, err := proto.Marshal(&validators)
 			if err != nil {
 				return errors.New("cannot marshal validators")
 			}
@@ -240,7 +261,7 @@ func (v *State) RemoveValidator(address string) error {
 }
 
 // Validators returns a list of the validators saved on persistent storage
-func (v *State) Validators(isQuery bool) ([]types.GenesisValidator, error) {
+func (v *State) Validators(isQuery bool) ([]*models.Validator, error) {
 	var validatorBytes []byte
 	var err error
 	v.RLock()
@@ -250,204 +271,84 @@ func (v *State) Validators(isQuery bool) ([]types.GenesisValidator, error) {
 		validatorBytes = v.Store.Tree(AppTree).Get(validatorKey)
 	}
 	v.RUnlock()
-	var validators []types.GenesisValidator
-	err = v.Codec.UnmarshalBinaryBare(validatorBytes, &validators)
-	return validators, err
+	var validators models.ValidatorList
+	err = proto.Unmarshal(validatorBytes, &validators)
+	return validators.Validators, err
 }
 
 // AddProcessKeys adds the keys to the process
-func (v *State) AddProcessKeys(tx *types.AdminTx) error {
-	pid, err := hex.DecodeString(tx.ProcessID)
+func (v *State) AddProcessKeys(tx *models.AdminTx) error {
+	if tx.ProcessId == nil || tx.KeyIndex == nil {
+		return fmt.Errorf("no processId or keyIndex provided on AddProcessKeys")
+	}
+	process, err := v.Process(tx.ProcessId, false)
 	if err != nil {
 		return err
 	}
-	process, err := v.Process(pid, false)
-	if err != nil {
-		return err
+	if tx.CommitmentKey != nil {
+		process.CommitmentKeys[*tx.KeyIndex] = fmt.Sprintf("%x", tx.CommitmentKey)
+		log.Debugf("added commitment key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.CommitmentKey)
 	}
-	if len(tx.CommitmentKey) > 0 {
-		process.CommitmentKeys[tx.KeyIndex] = tx.CommitmentKey
-		log.Debugf("added commitment key for process %x: %s", pid, tx.CommitmentKey)
+	if tx.EncryptionPublicKey != nil {
+		process.EncryptionPublicKeys[*tx.KeyIndex] = fmt.Sprintf("%x", tx.EncryptionPublicKey)
+		log.Debugf("added encryption key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.EncryptionPublicKey)
 	}
-	if len(tx.EncryptionPublicKey) > 0 {
-		process.EncryptionPublicKeys[tx.KeyIndex] = tx.EncryptionPublicKey
-		log.Debugf("added encryption key for process %x: %s", pid, tx.EncryptionPublicKey)
+	if process.KeyIndex == nil {
+		process.KeyIndex = new(uint32)
 	}
-	process.KeyIndex++
-	if err := v.setProcess(process, pid); err != nil {
+	*process.KeyIndex++
+	if err := v.setProcess(process, tx.ProcessId); err != nil {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnProcessKeys(pid, tx.EncryptionPublicKey, tx.CommitmentKey)
+		l.OnProcessKeys(tx.ProcessId, fmt.Sprintf("%x", tx.EncryptionPublicKey), fmt.Sprintf("%x", tx.CommitmentKey))
 	}
 	return nil
 }
 
 // RevealProcessKeys reveals the keys of a process
-func (v *State) RevealProcessKeys(tx *types.AdminTx) error {
-	pid, err := hex.DecodeString(tx.ProcessID)
+func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
+	if tx.ProcessId == nil || tx.KeyIndex == nil {
+		return fmt.Errorf("no processId or keyIndex provided on AddProcessKeys")
+	}
+	process, err := v.Process(tx.ProcessId, false)
 	if err != nil {
 		return err
 	}
-	process, err := v.Process(pid, false)
-	if err != nil {
-		return err
+	if process.KeyIndex == nil || *process.KeyIndex < 1 {
+		return fmt.Errorf("no keys to reveal, keyIndex is < 1")
 	}
-	if len(tx.RevealKey) > 0 {
-		process.RevealKeys[tx.KeyIndex] = tx.RevealKey
-		log.Debugf("revealed commitment key for process %x: %s", pid, tx.RevealKey)
+	rkey := ""
+	if tx.RevealKey != nil {
+		rkey = fmt.Sprintf("%x", tx.RevealKey)
+		process.RevealKeys[*tx.KeyIndex] = rkey // TBD: Change hex strings for []byte
+		log.Debugf("revealed commitment key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.RevealKey)
 	}
-	if len(tx.EncryptionPrivateKey) > 0 {
-		process.EncryptionPrivateKeys[tx.KeyIndex] = tx.EncryptionPrivateKey
-		log.Debugf("revealed encryption key for process %x: %s", pid, tx.EncryptionPrivateKey)
+	ekey := ""
+	if tx.EncryptionPrivateKey != nil {
+		ekey = fmt.Sprintf("%x", tx.EncryptionPrivateKey)
+		process.EncryptionPrivateKeys[*tx.KeyIndex] = ekey
+		log.Debugf("revealed encryption key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.EncryptionPrivateKey)
 	}
-	if process.KeyIndex < 1 {
-		return fmt.Errorf("no more keys to reveal, keyIndex is < 1")
-	}
-	process.KeyIndex--
-	if err := v.setProcess(process, pid); err != nil {
-		return err
-	}
-	for _, l := range v.eventListeners {
-		l.OnRevealKeys(pid, tx.EncryptionPrivateKey, tx.RevealKey)
-	}
-	return nil
-}
-
-// AddProcess adds a new process to vochain
-func (v *State) AddProcess(p types.Process, pid []byte, mkuri string) error {
-	newProcessBytes, err := v.Codec.MarshalBinaryBare(p)
-	if err != nil {
-		return errors.New("cannot marshal process bytes")
-	}
-	v.Lock()
-	err = v.Store.Tree(ProcessTree).Add(pid, newProcessBytes)
-	v.Unlock()
-	if err != nil {
+	*process.KeyIndex--
+	if err := v.setProcess(process, tx.ProcessId); err != nil {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnProcess(pid, p.EntityID, p.MkRoot, mkuri)
-	}
-	return nil
-}
-
-// CancelProcess sets the process canceled atribute to true
-func (v *State) CancelProcess(pid []byte) error {
-	process, err := v.Process(pid, false)
-	if err != nil {
-		return err
-	}
-	if process.Canceled {
-		return nil
-	}
-	process.Canceled = true
-	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
-	if err != nil {
-		return errors.New("cannot marshal updated process bytes")
-	}
-	v.Lock()
-	err = v.Store.Tree(ProcessTree).Add([]byte(pid), updatedProcessBytes)
-	v.Unlock()
-	if err != nil {
-		return err
-	}
-	for _, l := range v.eventListeners {
-		l.OnCancel(pid)
-	}
-	return nil
-}
-
-// PauseProcess sets the process paused atribute to true
-func (v *State) PauseProcess(pid []byte) error {
-	v.RLock()
-	processBytes := v.Store.Tree(ProcessTree).Get(pid)
-	v.RUnlock()
-	var process types.Process
-	if err := v.Codec.UnmarshalBinaryBare(processBytes, &process); err != nil {
-		return errors.New("cannot unmarshal process")
-	}
-	// already paused
-	if process.Paused {
-		return nil
-	}
-	process.Paused = true
-	return v.setProcess(&process, pid)
-}
-
-// ResumeProcess sets the process paused atribute to true
-func (v *State) ResumeProcess(pid []byte) error {
-	process, err := v.Process(pid, false)
-	if err != nil {
-		return err
-	}
-	// non paused process cannot be resumed
-	if !process.Paused {
-		return nil
-	}
-	process.Paused = false
-	return v.setProcess(process, pid)
-}
-
-// Process returns a process info given a processId if exists
-func (v *State) Process(pid []byte, isQuery bool) (*types.Process, error) {
-	var process *types.Process
-	var processBytes []byte
-	var err error
-	v.RLock()
-	if isQuery {
-		processBytes = v.Store.ImmutableTree(ProcessTree).Get(pid)
-	} else {
-		processBytes = v.Store.Tree(ProcessTree).Get(pid)
-	}
-	v.RUnlock()
-	if processBytes == nil {
-		return nil, ErrProcessNotFound
-	}
-	err = v.Codec.UnmarshalBinaryBare(processBytes, &process)
-	if err != nil {
-		return nil, fmt.Errorf("cannot unmarshal process with id (%s)", pid)
-	}
-	return process, nil
-}
-
-// CountProcesses returns the overall number of processes the vochain has
-func (v *State) CountProcesses(isQuery bool) int64 {
-	v.RLock()
-	defer v.RUnlock()
-	if isQuery {
-		return int64(v.Store.ImmutableTree(ProcessTree).Count())
-	}
-	return int64(v.Store.Tree(ProcessTree).Count())
-
-}
-
-// set process stores in the database the process
-func (v *State) setProcess(process *types.Process, pid []byte) error {
-	if process == nil {
-		return ErrProcessNotFound
-	}
-	updatedProcessBytes, err := v.Codec.MarshalBinaryBare(process)
-	if err != nil {
-		return errors.New("cannot marshal updated process bytes")
-	}
-	v.Lock()
-	defer v.Unlock()
-	if err := v.Store.Tree(ProcessTree).Add(pid, updatedProcessBytes); err != nil {
-		return err
+		l.OnRevealKeys(tx.ProcessId, ekey, rkey)
 	}
 	return nil
 }
 
 // AddVote adds a new vote to a process if the process exists and the vote is not already submmited
-func (v *State) AddVote(vote *types.Vote) error {
-	vid, err := v.voteID(vote.ProcessID, vote.Nullifier)
+func (v *State) AddVote(vote *models.Vote) error {
+	vid, err := v.voteID(vote.ProcessId, vote.Nullifier)
 	if err != nil {
 		return err
 	}
 	// save block number
-	vote.Height = v.Header(false).Height
-	newVoteBytes, err := v.Codec.MarshalBinaryBare(vote)
+	vote.Height = uint32(v.Header(false).Height)
+	newVoteBytes, err := proto.Marshal(vote)
 	if err != nil {
 		return fmt.Errorf("cannot marshal vote")
 	}
@@ -479,7 +380,7 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 
 // Envelope returns the info of a vote if already exists.
 // voteID must be equals to processID_Nullifier
-func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *types.Vote, err error) {
+func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *models.Vote, err error) {
 	// TODO(mvdan): remove the recover once
 	// https://github.com/tendermint/iavl/issues/212 is fixed
 	defer func() {
@@ -487,7 +388,8 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *types.Vo
 			err = fmt.Errorf("recovered panic: %v", r)
 		}
 	}()
-	var vote *types.Vote
+
+	vote := new(models.Vote)
 	var voteBytes []byte
 	vid, err := v.voteID(processID, nullifier)
 	if err != nil {
@@ -503,7 +405,7 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *types.Vo
 	if voteBytes == nil {
 		return nil, fmt.Errorf("vote with id (%x) does not exist", vid)
 	}
-	if err := v.Codec.UnmarshalBinaryBare(voteBytes, &vote); err != nil {
+	if err := proto.Unmarshal(voteBytes, vote); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal vote with id (%x)", vid)
 	}
 	return vote, nil
@@ -533,8 +435,8 @@ func (v *State) iterateProcessID(processID []byte, fn func(key []byte, value []b
 }
 
 // CountVotes returns the number of votes registered for a given process id
-func (v *State) CountVotes(processID []byte, isQuery bool) int64 {
-	var count int64
+func (v *State) CountVotes(processID []byte, isQuery bool) uint32 {
+	var count uint32
 	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
 		count++
 		return false
@@ -568,7 +470,7 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int64, isQuery boo
 }
 
 // Header returns the blockchain last block commited height
-func (v *State) Header(isQuery bool) *tmtypes.Header {
+func (v *State) Header(isQuery bool) *models.TendermintHeader {
 	var headerBytes []byte
 	v.RLock()
 	if isQuery {
@@ -577,8 +479,8 @@ func (v *State) Header(isQuery bool) *tmtypes.Header {
 		headerBytes = v.Store.Tree(AppTree).Get(headerKey)
 	}
 	v.RUnlock()
-	var header tmtypes.Header
-	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
+	var header models.TendermintHeader
+	err := proto.Unmarshal(headerBytes, &header)
 	if err != nil {
 		log.Errorf("cannot get vochain height: %s", err)
 		return nil
@@ -596,8 +498,8 @@ func (v *State) AppHash(isQuery bool) []byte {
 		headerBytes = v.Store.Tree(AppTree).Get(headerKey)
 	}
 	v.RUnlock()
-	var header tmtypes.Header
-	err := v.Codec.UnmarshalBinaryBare(headerBytes, &header)
+	var header models.TendermintHeader
+	err := proto.Unmarshal(headerBytes, &header)
 	if err != nil {
 		return []byte{}
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	flag "github.com/spf13/pflag"
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
@@ -167,7 +167,7 @@ func emptyProcess() ProcessVotes {
 	return pv
 }
 
-func computeNonLiveResults(processID string, p *types.Process, s *vochain.State) (pv ProcessVotes, err error) {
+func computeNonLiveResults(processID string, p *models.Process, s *vochain.State) (pv ProcessVotes, err error) {
 	pv = emptyProcess()
 	var nvotes int
 	pid, err := hex.DecodeString(processID)
@@ -182,7 +182,7 @@ func computeNonLiveResults(processID string, p *types.Process, s *vochain.State)
 		}
 		var vp *types.VotePackage
 		err = nil
-		if p.IsEncrypted() {
+		if p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes {
 			if len(p.EncryptionPrivateKeys) < len(v.EncryptionKeyIndexes) {
 				err = fmt.Errorf("encryptionKeyIndexes has too many fields")
 			} else {
@@ -221,12 +221,9 @@ func computeNonLiveResults(processID string, p *types.Process, s *vochain.State)
 	return
 }
 
-func unmarshalVote(votePackage string, keys []string) (*types.VotePackage, error) {
-	rawVote, err := base64.StdEncoding.DecodeString(votePackage)
-	if err != nil {
-		return nil, err
-	}
+func unmarshalVote(votePackage []byte, keys []string) (*types.VotePackage, error) {
 	var vote types.VotePackage
+	var decvote []byte
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
 		for i := len(keys) - 1; i >= 0; i-- {
@@ -235,12 +232,12 @@ func unmarshalVote(votePackage string, keys []string) (*types.VotePackage, error
 				log.Warnf("cannot create private key cipher: (%s)", err)
 				continue
 			}
-			if rawVote, err = priv.Decrypt(rawVote); err != nil {
+			if decvote, err = priv.Decrypt(votePackage); err != nil {
 				log.Warnf("cannot decrypt vote with index key %d", i)
 			}
 		}
 	}
-	if err := json.Unmarshal(rawVote, &vote); err != nil {
+	if err := json.Unmarshal(decvote, &vote); err != nil {
 		return nil, err
 	}
 	return &vote, nil

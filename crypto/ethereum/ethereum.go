@@ -80,7 +80,7 @@ func (k *SignKeys) HexString() (string, string) {
 	return pubHexComp, privHex
 }
 
-// DecompressPubKey takes a hexString compressed public key and returns it descompressed
+// DecompressPubKey takes a hexString compressed public key and returns it descompressed. If already decompressed, returns the same key.
 func DecompressPubKey(pubHexComp string) (string, error) {
 	pubHexComp = util.TrimHex(pubHexComp)
 	if len(pubHexComp) > PubKeyLength {
@@ -92,7 +92,7 @@ func DecompressPubKey(pubHexComp string) (string, error) {
 	}
 	pub, err := ethcrypto.DecompressPubkey(pubBytes)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("decompress pubKey %w", err)
 	}
 	pubHex := fmt.Sprintf("%x", ethcrypto.FromECDSAPub(pub))
 	return pubHex, nil
@@ -235,7 +235,7 @@ func PubKeyFromPrivateKey(privHex string) (string, error) {
 func PubKeyFromSignature(msg []byte, sigHex string) (string, error) {
 	sigHex = util.TrimHex(sigHex)
 	if len(sigHex) < SignatureLength || len(sigHex) > SignatureLength+12 {
-		return "", errors.New("signature length not correct")
+		return "", fmt.Errorf("signature length not correct (%d)", len(sigHex))
 	}
 	sig, err := hex.DecodeString(sigHex)
 	if err != nil {
@@ -249,7 +249,7 @@ func PubKeyFromSignature(msg []byte, sigHex string) (string, error) {
 	}
 	pubKey, err := ethcrypto.SigToPub(Hash(msg), sig)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("sigToPub %w", err)
 	}
 	// Temporary until the client side changes to compressed keys
 	return DecompressPubKey(fmt.Sprintf("%x", ethcrypto.CompressPubkey(pubKey)))

@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"regexp"
 	"strconv"
-	"testing"
 	"time"
 )
 
@@ -47,23 +46,12 @@ func RandomBytes(n int) []byte {
 	return bytes
 }
 
-func RandomHex(n int) string {
-	return hex.EncodeToString(RandomBytes(n))
+func RandomHex(n int) []byte {
+	return RandomBytes(n)
 }
 
 func RandomInt(min, max int) int {
 	return randReader.Intn(max-min) + min
-}
-
-func Hex2byte(tb testing.TB, s string) []byte {
-	b, err := hex.DecodeString(TrimHex(s))
-	if err != nil {
-		if tb == nil {
-			panic(err)
-		}
-		tb.Fatal(err)
-	}
-	return b
 }
 
 func SplitBytes(buf []byte, lim int) [][]byte {

@@ -1,37 +1,70 @@
 package vochain
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"math/rand"
 	"strconv"
 
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
+	"gitlab.com/vocdoni/go-dvote/log"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	amino "github.com/tendermint/go-amino"
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	tmtime "github.com/tendermint/tendermint/types/time"
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
+	"github.com/vocdoni/eth-storage-proof/ethstorageproof"
 )
 
 // hexproof is the hexadecimal a string. leafData is the claim data in byte format
-func checkMerkleProof(rootHash, hexproof string, leafData []byte) (bool, error) {
-	return tree.CheckProof(rootHash, hexproof, leafData, []byte{})
+func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRootHash, leafData []byte) (bool, error) {
+	switch censusOrigin {
+	case models.CensusOrigin_OFF_CHAIN:
+		switch proof.Payload.(type) {
+		case *models.Proof_Graviton:
+			p := proof.GetGraviton()
+			return tree.CheckProof(fmt.Sprintf("%x", censusRootHash), fmt.Sprintf("%x", p.Siblings), leafData, []byte{}) // TBD do not use hex strings
+		case *models.Proof_Iden3:
+			// NOT IMPLEMENTED
+		}
+	case models.CensusOrigin_ERC20:
+		p := proof.GetEthereumStorage()
+		if !bytes.Equal(p.Key, leafData) {
+			return false, nil
+		}
+		hexproof := []string{}
+		for _, s := range p.Siblings {
+			hexproof = append(hexproof, fmt.Sprintf("%x", s))
+		}
+		amount := big.Int{}
+		amount.SetBytes(p.Value)
+		hexamount := hexutil.Big(amount)
+		log.Debugf("validating erc20 storage proof for key %x and amount %s", p.Key, amount.String())
+		return ethstorageproof.VerifyEthStorageProof(
+			&ethstorageproof.StorageResult{Key: fmt.Sprintf("%x", p.Key), Proof: hexproof, Value: &hexamount},
+			ethcommon.BytesToHash(censusRootHash),
+		)
+	}
+	return false, fmt.Errorf("proof type not supported for census origin %d", censusOrigin)
 }
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
-func verifySignatureAgainstOracles(oracles []string, message []byte, signHex string) (bool, ethcommon.Address, error) {
+func verifySignatureAgainstOracles(oracles []ethcommon.Address, message []byte, signHex string) (bool, ethcommon.Address, error) {
 	signKeys := ethereum.NewSignKeys()
 	for _, oracle := range oracles {
-		signKeys.AddAuthKey(ethcommon.HexToAddress(oracle))
+		signKeys.AddAuthKey(oracle)
 	}
 	return signKeys.VerifySender(message, signHex)
 }
@@ -49,11 +82,12 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 		tconfig.PrivValidatorStateFile(),
 	)
 	if len(tmPrivKey) > 0 {
-		var privKey crypto25519.PrivKeyEd25519
+		var privKey crypto25519.PrivKey
 		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
 		if err != nil {
 			return nil, fmt.Errorf("cannot decode private key: (%s)", err)
 		}
+		privKey = make([]byte, 64)
 		if n := copy(privKey[:], keyBytes[:]); n != 64 {
 			return nil, fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
 		}
@@ -66,19 +100,18 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 
 // NewNodeKey returns and saves to the disk storage a tendermint node key
 func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
-	var privKey crypto25519.PrivKeyEd25519
+	var privKey crypto25519.PrivKey
 	keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
 	if err != nil {
 		return nil, fmt.Errorf("cannot decode private key: (%s)", err)
 	}
+	privKey = make([]byte, len(keyBytes))
 	copy(privKey[:], keyBytes[:])
 	nodeKey := &p2p.NodeKey{
 		PrivKey: privKey,
 	}
 
-	cdc := amino.NewCodec()
-	RegisterAmino(cdc)
-
+	cdc := AminoCodec()
 	jsonBytes, err := cdc.MarshalJSON(nodeKey)
 	if err != nil {
 		return nil, err
@@ -101,16 +134,13 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.C
 		}
 		appState.Validators[idx] = types.GenesisValidator{
 			Address: val.GetAddress(),
-			PubKey:  pubk,
-			Power:   10,
+			PubKey:  types.TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
+			Power:   "10",
 			Name:    strconv.Itoa(rand.Int()),
 		}
 	}
-
 	appState.Oracles = oracles
 	cdc := amino.NewCodec()
-	RegisterAmino(cdc)
-
 	appStateBytes, err := cdc.MarshalJSON(appState)
 	if err != nil {
 		return []byte{}, err

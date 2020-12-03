@@ -1,16 +1,19 @@
 package vochain
 
 import (
+	"encoding/json"
 	"fmt"
+	"strconv"
 
-	amino "github.com/tendermint/go-amino"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	mempl "github.com/tendermint/tendermint/mempool"
 	nm "github.com/tendermint/tendermint/node"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
+	"google.golang.org/protobuf/proto"
 
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
@@ -18,30 +21,19 @@ import (
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
 	State *State
-	Codec *amino.Codec
 	Node  *nm.Node
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
-func RegisterAmino(cdc *amino.Codec) {
-	cryptoamino.RegisterAmino(cdc)
-
-	cdc.RegisterInterface((*types.PubKey)(nil), nil)
-}
-
 // NewBaseApplication creates a new BaseApplication given a name an a DB backend
 func NewBaseApplication(dbpath string) (*BaseApplication, error) {
-	cdc := amino.NewCodec()
-	RegisterAmino(cdc)
-
-	state, err := NewState(dbpath, cdc)
+	state, err := NewState(dbpath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}
 	return &BaseApplication{
 		State: state,
-		Codec: cdc,
 	}, nil
 }
 
@@ -96,27 +88,38 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	// setting the app initial state with validators, oracles, height = 0 and empty apphash
 	// unmarshal app state from genesis
 	var genesisAppState types.GenesisAppState
-	err := app.Codec.UnmarshalJSON(req.AppStateBytes, &genesisAppState)
+	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
+		fmt.Printf("%s\n", req.AppStateBytes)
 		log.Errorf("cannot unmarshal app state bytes: %s", err)
 	}
 	// get oracles
 	for _, v := range genesisAppState.Oracles {
 		log.Infof("adding genesis oracle %s", v)
-		app.State.AddOracle(v)
+		app.State.AddOracle(ethcommon.HexToAddress(v))
 	}
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
-		log.Infof("adding genesis validator %s", genesisAppState.Validators[i].PubKey.Address())
-		if err = app.State.AddValidator(genesisAppState.Validators[i].PubKey, genesisAppState.Validators[i].Power); err != nil {
+		log.Infof("adding genesis validator %x", genesisAppState.Validators[i].Address)
+		pwr, err := strconv.Atoi(genesisAppState.Validators[i].Power)
+		if err != nil {
+			log.Fatal("cannot decode validator power: %s", err)
+		}
+		v := &models.Validator{
+			Address: genesisAppState.Validators[i].Address,
+			PubKey:  genesisAppState.Validators[i].PubKey.Value,
+			Power:   uint64(pwr),
+		}
+		if err = app.State.AddValidator(v); err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	var header abcitypes.Header
+	var header models.TendermintHeader
 	header.Height = 0
 	header.AppHash = []byte{}
-	headerBytes, err := app.Codec.MarshalBinaryBare(header)
+	header.ChainId = req.ChainId
+	headerBytes, err := proto.Marshal(&header)
 	if err != nil {
 		log.Fatalf("cannot marshal header: %s", err)
 	}
@@ -134,7 +137,17 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 // The header contains the height, timestamp, and more - it exactly matches the Tendermint block header.
 // The LastCommitInfo and ByzantineValidators can be used to determine rewards and punishments for the validators.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	headerBytes, err := app.Codec.MarshalBinaryBare(req.Header)
+	header := &models.TendermintHeader{
+		Height:         req.Header.GetHeight(),
+		ConsensusHash:  req.Header.GetConsensusHash(),
+		AppHash:        req.Header.GetAppHash(),
+		BlockID:        req.Header.LastBlockId.GetHash(),
+		DataHash:       req.Header.GetDataHash(),
+		EvidenceHash:   req.Header.GetEvidenceHash(),
+		LastCommitHash: req.Header.GetLastCommitHash(),
+		Timestamp:      req.Header.GetTime().Unix(),
+	}
+	headerBytes, err := proto.Marshal(header)
 	if err != nil {
 		log.Warnf("cannot marshal header in BeginBlock")
 	}
@@ -156,17 +169,17 @@ func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Respo
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	var data []byte
 	var err error
-	var tx GenericTX
+	var tx *models.Tx
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 	}
 	if tx, err = UnmarshalTx(req.Tx); err == nil {
 		if data, err = AddTx(tx, app.State, false); err != nil {
 			log.Debugf("checkTx error: %s", err)
-			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte(err.Error())}
+			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("addTx " + err.Error())}
 		}
 	} else {
-		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte(err.Error())}
+		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}
 	}
 	return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 }
@@ -174,7 +187,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	var data []byte
 	var err error
-	var tx GenericTX
+	var tx *models.Tx
 
 	if tx, err = UnmarshalTx(req.Tx); err == nil {
 		if data, err = AddTx(tx, app.State, true); err != nil {
@@ -198,4 +211,16 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	return abcitypes.ResponseEndBlock{}
+}
+func (app *BaseApplication) ApplySnapshotChunk(req abcitypes.RequestApplySnapshotChunk) abcitypes.ResponseApplySnapshotChunk {
+	return abcitypes.ResponseApplySnapshotChunk{}
+}
+func (app *BaseApplication) ListSnapshots(req abcitypes.RequestListSnapshots) abcitypes.ResponseListSnapshots {
+	return abcitypes.ResponseListSnapshots{}
+}
+func (app *BaseApplication) LoadSnapshotChunk(req abcitypes.RequestLoadSnapshotChunk) abcitypes.ResponseLoadSnapshotChunk {
+	return abcitypes.ResponseLoadSnapshotChunk{}
+}
+func (app *BaseApplication) OfferSnapshot(req abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
+	return abcitypes.ResponseOfferSnapshot{}
 }

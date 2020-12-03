@@ -27,10 +27,38 @@ var (
 )
 
 // VotingProcessABI is the input ABI used to generate the binding from.
-const VotingProcessABI = "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"chainIdValue\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"chainId\",\"type\":\"uint256\"}],\"name\":\"ChainIdChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"genesis\",\"type\":\"string\"}],\"name\":\"GenesisChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"oraclePublicKey\",\"type\":\"string\"}],\"name\":\"OracleAdded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"oraclePublicKey\",\"type\":\"string\"}],\"name\":\"OracleRemoved\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"privateKey\",\"type\":\"string\"}],\"name\":\"PrivateKeyPublished\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"ProcessCanceled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"merkleTree\",\"type\":\"string\"}],\"name\":\"ProcessCreated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"results\",\"type\":\"string\"}],\"name\":\"ResultsPublished\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"validatorPublicKey\",\"type\":\"string\"}],\"name\":\"ValidatorAdded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"validatorPublicKey\",\"type\":\"string\"}],\"name\":\"ValidatorRemoved\",\"type\":\"event\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"string\",\"name\":\"oraclePublicKey\",\"type\":\"string\"}],\"name\":\"addOracle\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"string\",\"name\":\"validatorPublicKey\",\"type\":\"string\"}],\"name\":\"addValidator\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"cancel\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"string\",\"name\":\"processType\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"metadata\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"merkleRoot\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"merkleTree\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"numberOfBlocks\",\"type\":\"uint256\"}],\"name\":\"create\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"entityProcessCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"string\",\"name\":\"str1\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"str2\",\"type\":\"string\"}],\"name\":\"equalStrings\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"get\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"processType\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"numberOfBlocks\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"metadata\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"censusMerkleRoot\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"censusMerkleTree\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"voteEncryptionPrivateKey\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"canceled\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getChainId\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"}],\"name\":\"getEntityProcessCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getGenesis\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"}],\"name\":\"getNextProcessId\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getOracles\",\"outputs\":[{\"internalType\":\"string[]\",\"name\":\"\",\"type\":\"string[]\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"getPrivateKey\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"privateKey\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"processCountIndex\",\"type\":\"uint256\"}],\"name\":\"getProcessId\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"getProcessIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"getResults\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"results\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getValidators\",\"outputs\":[{\"internalType\":\"string[]\",\"name\":\"\",\"type\":\"string[]\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"processes\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"processType\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"numberOfBlocks\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"metadata\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"censusMerkleRoot\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"censusMerkleTree\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"voteEncryptionPrivateKey\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"canceled\",\"type\":\"bool\"},{\"internalType\":\"string\",\"name\":\"results\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"privateKey\",\"type\":\"string\"}],\"name\":\"publishPrivateKey\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"results\",\"type\":\"string\"}],\"name\":\"publishResults\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"idx\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"oraclePublicKey\",\"type\":\"string\"}],\"name\":\"removeOracle\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"idx\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"validatorPublicKey\",\"type\":\"string\"}],\"name\":\"removeValidator\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"newValue\",\"type\":\"uint256\"}],\"name\":\"setChainId\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"string\",\"name\":\"newValue\",\"type\":\"string\"}],\"name\":\"setGenesis\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+const VotingProcessABI = "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"chainIdValue\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"chainId\",\"type\":\"uint256\"}],\"name\":\"ChainIdChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"genesis\",\"type\":\"string\"}],\"name\":\"GenesisChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"oracleAddress\",\"type\":\"address\"}],\"name\":\"OracleAdded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"oracleAddress\",\"type\":\"address\"}],\"name\":\"OracleRemoved\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"privateKey\",\"type\":\"string\"}],\"name\":\"PrivateKeyPublished\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"ProcessCanceled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"merkleTree\",\"type\":\"string\"}],\"name\":\"ProcessCreated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint32[][]\",\"name\":\"results\",\"type\":\"uint32[][]\"}],\"name\":\"ResultsPublished\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"validatorPublicKey\",\"type\":\"string\"}],\"name\":\"ValidatorAdded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"validatorPublicKey\",\"type\":\"string\"}],\"name\":\"ValidatorRemoved\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"oracleAddress\",\"type\":\"address\"}],\"name\":\"addOracle\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"validatorPublicKey\",\"type\":\"string\"}],\"name\":\"addValidator\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"cancel\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"processType\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"metadata\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"merkleRoot\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"merkleTree\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"numberOfBlocks\",\"type\":\"uint256\"}],\"name\":\"create\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"entityProcessCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"str1\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"str2\",\"type\":\"string\"}],\"name\":\"equalStrings\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"get\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"processType\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"numberOfBlocks\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"metadata\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"censusMerkleRoot\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"censusMerkleTree\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"voteEncryptionPrivateKey\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"canceled\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getChainId\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"}],\"name\":\"getEntityProcessCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getGenesis\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"}],\"name\":\"getNextProcessId\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOracles\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"getPrivateKey\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"privateKey\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"processCountIndex\",\"type\":\"uint256\"}],\"name\":\"getProcessId\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"getProcessIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"}],\"name\":\"getResults\",\"outputs\":[{\"internalType\":\"uint32[][]\",\"name\":\"results\",\"type\":\"uint32[][]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getValidators\",\"outputs\":[{\"internalType\":\"string[]\",\"name\":\"\",\"type\":\"string[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"processes\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"processType\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entityAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"numberOfBlocks\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"metadata\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"censusMerkleRoot\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"censusMerkleTree\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"voteEncryptionPrivateKey\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"canceled\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"privateKey\",\"type\":\"string\"}],\"name\":\"publishPrivateKey\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"processId\",\"type\":\"bytes32\"},{\"internalType\":\"uint32[][]\",\"name\":\"results\",\"type\":\"uint32[][]\"}],\"name\":\"publishResults\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"idx\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"oracleAddress\",\"type\":\"address\"}],\"name\":\"removeOracle\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"idx\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"validatorPublicKey\",\"type\":\"string\"}],\"name\":\"removeValidator\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"newValue\",\"type\":\"uint256\"}],\"name\":\"setChainId\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"newValue\",\"type\":\"string\"}],\"name\":\"setGenesis\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+
+// VotingProcessFuncSigs maps the 4-byte function signature to its string representation.
+var VotingProcessFuncSigs = map[string]string{
+	"df5dd1a5": "addOracle(address)",
+	"b5da04f5": "addValidator(string)",
+	"c4d252f5": "cancel(bytes32)",
+	"7142bc83": "create(string,string,string,string,uint256,uint256)",
+	"7c09faeb": "entityProcessCount(address)",
+	"791f0333": "equalStrings(string,string)",
+	"8eaa6ac0": "get(bytes32)",
+	"3408e470": "getChainId()",
+	"f2bcb15e": "getEntityProcessCount(address)",
+	"1a43bcb5": "getGenesis()",
+	"68141f2c": "getNextProcessId(address)",
+	"40884c52": "getOracles()",
+	"18208792": "getPrivateKey(bytes32)",
+	"f3b86c99": "getProcessId(address,uint256)",
+	"c585ad91": "getProcessIndex(bytes32)",
+	"46475c4c": "getResults(bytes32)",
+	"b7ab4db5": "getValidators()",
+	"579e51c7": "processes(uint256)",
+	"a803dc4c": "publishPrivateKey(bytes32,string)",
+	"9ed480c9": "publishResults(bytes32,uint32[][])",
+	"014643ce": "removeOracle(uint256,address)",
+	"8ceb30c2": "removeValidator(uint256,string)",
+	"ef0e2ff4": "setChainId(uint256)",
+	"47bb3da7": "setGenesis(string)",
+}
 
 // VotingProcessBin is the compiled bytecode used for deploying new contracts.
-var VotingProcessBin = "0x60806040523480156200001157600080fd5b50604051620039983803806200399883398181016040526200003791908101906200009c565b336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508060048190555050620000ec565b6000815190506200009681620000d2565b92915050565b600060208284031215620000af57600080fd5b6000620000bf8482850162000085565b91505092915050565b6000819050919050565b620000dd81620000c8565b8114620000e957600080fd5b50565b61389c80620000fc6000396000f3fe608060405234801561001057600080fd5b50600436106101585760003560e01c80638ceb30c2116100c3578063c585ad911161007c578063c585ad91146103fa578063c994bc861461042a578063ec8f670e14610446578063ef0e2ff414610462578063f2bcb15e1461047e578063f3b86c99146104ae57610158565b80638ceb30c2146103345780638eaa6ac014610350578063a803dc4c14610388578063b5da04f5146103a4578063b7ab4db5146103c0578063c4d252f5146103de57610158565b8063579e51c711610115578063579e51c71461023357806368141f2c1461026c5780637142bc831461029c578063791f0333146102b85780637c09faeb146102e85780637f07492d1461031857610158565b8063182087921461015d5780631a43bcb51461018d5780633408e470146101ab57806340884c52146101c957806346475c4c146101e757806347bb3da714610217575b600080fd5b6101776004803603610172919081019061297e565b6104de565b6040516101849190613315565b60405180910390f35b6101956105ac565b6040516101a29190613315565b60405180910390f35b6101b361064e565b6040516101c0919061362f565b60405180910390f35b6101d1610658565b6040516101de919061328d565b60405180910390f35b61020160048036036101fc919081019061297e565b610741565b60405161020e9190613315565b60405180910390f35b610231600480360361022c91908101906129fb565b61080f565b005b61024d60048036036102489190810190612b91565b6109da565b6040516102639a999897969594939291906133e7565b60405180910390f35b61028660048036036102819190810190612919565b610df8565b60405161029391906132ca565b60405180910390f35b6102b660048036036102b19190810190612aa8565b610e18565b005b6102d260048036036102cd9190810190612a3c565b6111a3565b6040516102df91906132af565b60405180910390f35b61030260048036036102fd9190810190612919565b6111fc565b60405161030f919061362f565b60405180910390f35b610332600480360361032d9190810190612bba565b611214565b005b61034e60048036036103499190810190612bba565b611442565b005b61036a6004803603610365919081019061297e565b61166e565b60405161037f99989796959493929190613337565b60405180910390f35b6103a2600480360361039d91908101906129a7565b611af0565b005b6103be60048036036103b991908101906129fb565b611c9b565b005b6103c8611da3565b6040516103d5919061328d565b60405180910390f35b6103f860048036036103f3919081019061297e565b611e8c565b005b610414600480360361040f919081019061297e565b612050565b604051610421919061362f565b60405180910390f35b610444600480360361043f91908101906129fb565b61206d565b005b610460600480360361045b91908101906129a7565b612175565b005b61047c60048036036104779190810190612b91565b612435565b005b61049860048036036104939190810190612919565b61254c565b6040516104a5919061362f565b60405180910390f35b6104c860048036036104c39190810190612942565b612595565b6040516104d591906132ca565b60405180910390f35b606060006104eb83612050565b9050600581815481106104fa57fe5b90600052602060002090600a02016007018054600181600116156101000203166002900480601f01602080910402602001604051908101604052809291908181526020018280546001816001161561010002031660029004801561059f5780601f106105745761010080835404028352916020019161059f565b820191906000526020600020905b81548152906001019060200180831161058257829003601f168201915b5050505050915050919050565b606060038054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156106445780601f1061061957610100808354040283529160200191610644565b820191906000526020600020905b81548152906001019060200180831161062757829003601f168201915b5050505050905090565b6000600454905090565b60606002805480602002602001604051908101604052809291908181526020016000905b82821015610738578382906000526020600020018054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156107245780601f106106f957610100808354040283529160200191610724565b820191906000526020600020905b81548152906001019060200180831161070757829003601f168201915b50505050508152602001906001019061067c565b50505050905090565b6060600061074e83612050565b90506005818154811061075d57fe5b90600052602060002090600a02016009018054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156108025780601f106107d757610100808354040283529160200191610802565b820191906000526020600020905b8154815290600101906020018083116107e557829003601f168201915b5050505050915050919050565b6000809054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161461089e576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016108959061352f565b60405180910390fd5b6000151561094660038054600181600116156101000203166002900480601f01602080910402602001604051908101604052809291908181526020018280546001816001161561010002031660029004801561093b5780601f106109105761010080835404028352916020019161093b565b820191906000526020600020905b81548152906001019060200180831161091e57829003601f168201915b5050505050836111a3565b151514610988576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161097f906134ef565b60405180910390fd5b806003908051906020019061099e9291906125cf565b507fb07272e5a32a7a57581e0409555209cb59b02e13b62da30135eb3b3431078e3660036040516109cf91906134ad565b60405180910390a150565b600581815481106109e757fe5b90600052602060002090600a0201600091509050806000018054600181600116156101000203166002900480601f016020809104026020016040519081016040528092919081815260200182805460018160011615610100020316600290048015610a935780601f10610a6857610100808354040283529160200191610a93565b820191906000526020600020905b815481529060010190602001808311610a7657829003601f168201915b5050505050908060010160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690806002015490806003015490806004018054600181600116156101000203166002900480601f016020809104026020016040519081016040528092919081815260200182805460018160011615610100020316600290048015610b635780601f10610b3857610100808354040283529160200191610b63565b820191906000526020600020905b815481529060010190602001808311610b4657829003601f168201915b505050505090806005018054600181600116156101000203166002900480601f016020809104026020016040519081016040528092919081815260200182805460018160011615610100020316600290048015610c015780601f10610bd657610100808354040283529160200191610c01565b820191906000526020600020905b815481529060010190602001808311610be457829003601f168201915b505050505090806006018054600181600116156101000203166002900480601f016020809104026020016040519081016040528092919081815260200182805460018160011615610100020316600290048015610c9f5780601f10610c7457610100808354040283529160200191610c9f565b820191906000526020600020905b815481529060010190602001808311610c8257829003601f168201915b505050505090806007018054600181600116156101000203166002900480601f016020809104026020016040519081016040528092919081815260200182805460018160011615610100020316600290048015610d3d5780601f10610d1257610100808354040283529160200191610d3d565b820191906000526020600020905b815481529060010190602001808311610d2057829003601f168201915b5050505050908060080160009054906101000a900460ff1690806009018054600181600116156101000203166002900480601f016020809104026020016040519081016040528092919081815260200182805460018160011615610100020316600290048015610dee5780601f10610dc357610100808354040283529160200191610dee565b820191906000526020600020905b815481529060010190602001808311610dd157829003601f168201915b505050505090508a565b600080610e048361254c565b9050610e108382612595565b915050919050565b6000855111610e5c576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610e539061358f565b60405180910390fd5b6000845111610ea0576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610e97906135af565b60405180910390fd5b6000835111610ee4576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610edb9061356f565b60405180910390fd5b60003390506000610ef482610df8565b9050610efe61264f565b6040518061014001604052808a81526020018473ffffffffffffffffffffffffffffffffffffffff1681526020018681526020018581526020018981526020018881526020018781526020016040518060200160405280600081525081526020016000151581526020016040518060200160405280600081525081525090506005819080600181540180825580915050906001820390600052602060002090600a0201600090919290919091506000820151816000019080519060200190610fc79291906126ba565b5060208201518160010160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506040820151816002015560608201518160030155608082015181600401908051906020019061103f9291906126ba565b5060a082015181600501908051906020019061105c9291906126ba565b5060c08201518160060190805190602001906110799291906126ba565b5060e08201518160070190805190602001906110969291906126ba565b506101008201518160080160006101000a81548160ff0219169083151502179055506101208201518160090190805190602001906110d59291906126ba565b505050506001600580549050036006600084815260200190815260200160002081905550600760008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600081548092919060010191905055508273ffffffffffffffffffffffffffffffffffffffff167f809f6d7403f260d87e5e9820dce1cbd03ed43803c14182fc7c466e6e86c5c50483886040516111909291906132e5565b60405180910390a2505050505050505050565b6000816040516020016111b69190613276565b60405160208183030381529060405280519060200120836040516020016111dd9190613276565b6040516020818303038152906040528051906020012014905092915050565b60076020528060005260406000206000915090505481565b6000809054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146112a3576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161129a9061352f565b60405180910390fd5b61135c600283815481106112b357fe5b906000526020600020018054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156113515780601f1061132657610100808354040283529160200191611351565b820191906000526020600020905b81548152906001019060200180831161133457829003601f168201915b5050505050826111a3565b61139b576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016113929061360f565b60405180910390fd5b6002600160028054905003815481106113b057fe5b90600052602060002001600283815481106113c757fe5b9060005260206000200190805460018160011615610100020316600290046113f092919061273a565b50600280548091906001900361140691906127c1565b507fa28dc34059cd4716d51da651406dc8ff96399e3cf46725143a7f2855c68cf394816040516114369190613315565b60405180910390a15050565b6000809054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146114d1576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016114c89061352f565b60405180910390fd5b61158a600183815481106114e157fe5b906000526020600020018054600181600116156101000203166002900480601f01602080910402602001604051908101604052809291908181526020018280546001816001161561010002031660029004801561157f5780601f106115545761010080835404028352916020019161157f565b820191906000526020600020905b81548152906001019060200180831161156257829003601f168201915b5050505050826111a3565b6115c9576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016115c09061350f565b60405180910390fd5b600180808054905003815481106115dc57fe5b90600052602060002001600183815481106115f357fe5b90600052602060002001908054600181600116156101000203166002900461161c92919061273a565b50600180548091906001900361163291906127c1565b507f53344ca00b011ca20d3dc9f1bb71ed60e097b598b9f35482879138cc15f28ef9816040516116629190613315565b60405180910390a15050565b60606000806000606080606080600080600660008c8152602001908152602001600020549050600581815481106116a157fe5b90600052602060002090600a02016000018054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156117465780601f1061171b57610100808354040283529160200191611746565b820191906000526020600020905b81548152906001019060200180831161172957829003601f168201915b505050505099506005818154811061175a57fe5b90600052602060002090600a020160010160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1698506005818154811061179b57fe5b90600052602060002090600a0201600201549750600581815481106117bc57fe5b90600052602060002090600a0201600301549650600581815481106117dd57fe5b90600052602060002090600a02016004018054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156118825780601f1061185757610100808354040283529160200191611882565b820191906000526020600020905b81548152906001019060200180831161186557829003601f168201915b505050505095506005818154811061189657fe5b90600052602060002090600a02016005018054600181600116156101000203166002900480601f01602080910402602001604051908101604052809291908181526020018280546001816001161561010002031660029004801561193b5780601f106119105761010080835404028352916020019161193b565b820191906000526020600020905b81548152906001019060200180831161191e57829003601f168201915b505050505094506005818154811061194f57fe5b90600052602060002090600a02016006018054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156119f45780601f106119c9576101008083540402835291602001916119f4565b820191906000526020600020905b8154815290600101906020018083116119d757829003601f168201915b5050505050935060058181548110611a0857fe5b90600052602060002090600a02016007018054600181600116156101000203166002900480601f016020809104026020016040519081016040528092919081815260200182805460018160011615610100020316600290048015611aad5780601f10611a8257610100808354040283529160200191611aad565b820191906000526020600020905b815481529060010190602001808311611a9057829003601f168201915b5050505050925060058181548110611ac157fe5b90600052602060002090600a020160080160009054906101000a900460ff169150509193959799909294969850565b816000611afc82612050565b90503373ffffffffffffffffffffffffffffffffffffffff1660058281548110611b2257fe5b90600052602060002090600a020160010160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1614611baa576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401611ba19061354f565b60405180910390fd5b6000611bb585612050565b90506000151560058281548110611bc857fe5b90600052602060002090600a020160080160009054906101000a900460ff16151514611c29576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401611c20906135ef565b60405180910390fd5b8360058281548110611c3757fe5b90600052602060002090600a02016007019080519060200190611c5b9291906125cf565b50847f16e81256ba7e41ceea97db602f7c59414ba5110c3a6641245f6621279f62630185604051611c8c9190613315565b60405180910390a25050505050565b6000809054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614611d2a576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401611d219061352f565b60405180910390fd5b6001819080600181540180825580915050906001820390600052602060002001600090919290919091509080519060200190611d679291906125cf565b50507f0eb17eb6d7f643e1f1a79af44e460fffabb6b2a8beff44bff08160d8d3403d3f81604051611d989190613315565b60405180910390a150565b60606001805480602002602001604051908101604052809291908181526020016000905b82821015611e83578382906000526020600020018054600181600116156101000203166002900480601f016020809104026020016040519081016040528092919081815260200182805460018160011615610100020316600290048015611e6f5780601f10611e4457610100808354040283529160200191611e6f565b820191906000526020600020905b815481529060010190602001808311611e5257829003601f168201915b505050505081526020019060010190611dc7565b50505050905090565b806000611e9882612050565b90503373ffffffffffffffffffffffffffffffffffffffff1660058281548110611ebe57fe5b90600052602060002090600a020160010160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1614611f46576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401611f3d9061354f565b60405180910390fd5b6000611f5184612050565b90506000151560058281548110611f6457fe5b90600052602060002090600a020160080160009054906101000a900460ff16151514611fc5576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401611fbc906135ef565b60405180910390fd5b600160058281548110611fd457fe5b90600052602060002090600a020160080160006101000a81548160ff0219169083151502179055503373ffffffffffffffffffffffffffffffffffffffff167fa8a2eafb1f78e64e1c3921d10b28aad02d1fa21cba6bbc76b7e8601b19a9c08d8560405161204291906132ca565b60405180910390a250505050565b600060066000838152602001908152602001600020549050919050565b6000809054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146120fc576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016120f39061352f565b60405180910390fd5b60028190806001815401808255809150509060018203906000526020600020016000909192909190915090805190602001906121399291906125cf565b50507ff2cf567db3ebcbfcad45b1da586f6b7f795e01cad81a993c3cea865f259eec798160405161216a9190613315565b60405180910390a150565b81600061218182612050565b90503373ffffffffffffffffffffffffffffffffffffffff16600582815481106121a757fe5b90600052602060002090600a020160010160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461222f576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016122269061354f565b60405180910390fd5b600061223a85612050565b9050600015156005828154811061224d57fe5b90600052602060002090600a020160080160009054906101000a900460ff161515146122ae576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016122a5906135ef565b60405180910390fd5b60001515612381600583815481106122c257fe5b90600052602060002090600a02016007018054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156123675780601f1061233c57610100808354040283529160200191612367565b820191906000526020600020905b81548152906001019060200180831161234a57829003601f168201915b5050505050604051806020016040528060008152506111a3565b1515146123c3576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016123ba906134cf565b60405180910390fd5b83600582815481106123d157fe5b90600052602060002090600a020160090190805190602001906123f59291906125cf565b50847f8b7614f77555532e6b033ab6da00ac40495940598b8916b1c77a44351428ae0a856040516124269190613315565b60405180910390a25050505050565b6000809054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146124c4576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016124bb9061352f565b60405180910390fd5b806004541415612509576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401612500906135cf565b60405180910390fd5b806004819055507f5a4bfdb771a9b72401d824fd5b321058c7c69fbe4a7c209c37af285e6d061a8c600454604051612541919061362f565b60405180910390a150565b6000600760008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020549050919050565b6000828260036004546040516020016125b1949392919061322c565b60405160208183030381529060405280519060200120905092915050565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f1061261057805160ff191683800117855561263e565b8280016001018555821561263e579182015b8281111561263d578251825591602001919060010190612622565b5b50905061264b91906127ed565b5090565b60405180610140016040528060608152602001600073ffffffffffffffffffffffffffffffffffffffff168152602001600081526020016000815260200160608152602001606081526020016060815260200160608152602001600015158152602001606081525090565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f106126fb57805160ff1916838001178555612729565b82800160010185558215612729579182015b8281111561272857825182559160200191906001019061270d565b5b50905061273691906127ed565b5090565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f1061277357805485556127b0565b828001600101855582156127b057600052602060002091601f016020900482015b828111156127af578254825591600101919060010190612794565b5b5090506127bd91906127ed565b5090565b8154818355818111156127e8578183600052602060002091820191016127e79190612812565b5b505050565b61280f91905b8082111561280b5760008160009055506001016127f3565b5090565b90565b61283b91905b80821115612837576000818161282e919061283e565b50600101612818565b5090565b90565b50805460018160011615610100020316600290046000825580601f106128645750612883565b601f01602090049060005260206000209081019061288291906127ed565b5b50565b60008135905061289581613814565b92915050565b6000813590506128aa8161382b565b92915050565b600082601f8301126128c157600080fd5b81356128d46128cf82613677565b61364a565b915080825260208301602083018583830111156128f057600080fd5b6128fb838284613786565b50505092915050565b60008135905061291381613842565b92915050565b60006020828403121561292b57600080fd5b600061293984828501612886565b91505092915050565b6000806040838503121561295557600080fd5b600061296385828601612886565b925050602061297485828601612904565b9150509250929050565b60006020828403121561299057600080fd5b600061299e8482850161289b565b91505092915050565b600080604083850312156129ba57600080fd5b60006129c88582860161289b565b925050602083013567ffffffffffffffff8111156129e557600080fd5b6129f1858286016128b0565b9150509250929050565b600060208284031215612a0d57600080fd5b600082013567ffffffffffffffff811115612a2757600080fd5b612a33848285016128b0565b91505092915050565b60008060408385031215612a4f57600080fd5b600083013567ffffffffffffffff811115612a6957600080fd5b612a75858286016128b0565b925050602083013567ffffffffffffffff811115612a9257600080fd5b612a9e858286016128b0565b9150509250929050565b60008060008060008060c08789031215612ac157600080fd5b600087013567ffffffffffffffff811115612adb57600080fd5b612ae789828a016128b0565b965050602087013567ffffffffffffffff811115612b0457600080fd5b612b1089828a016128b0565b955050604087013567ffffffffffffffff811115612b2d57600080fd5b612b3989828a016128b0565b945050606087013567ffffffffffffffff811115612b5657600080fd5b612b6289828a016128b0565b9350506080612b7389828a01612904565b92505060a0612b8489828a01612904565b9150509295509295509295565b600060208284031215612ba357600080fd5b6000612bb184828501612904565b91505092915050565b60008060408385031215612bcd57600080fd5b6000612bdb85828601612904565b925050602083013567ffffffffffffffff811115612bf857600080fd5b612c04858286016128b0565b9150509250929050565b6000612c1a8383612d45565b905092915050565b612c2b81613734565b82525050565b612c42612c3d82613734565b6137c8565b82525050565b6000612c53826136c8565b612c5d81856136f6565b935083602082028501612c6f856136a3565b8060005b85811015612cab5784840389528151612c8c8582612c0e565b9450612c97836136e9565b925060208a01995050600181019050612c73565b50829750879550505050505092915050565b612cc681613746565b82525050565b612cd581613752565b82525050565b6000612ce6826136de565b612cf08185613718565b9350612d00818560208601613795565b612d09816137f6565b840191505092915050565b6000612d1f826136de565b612d298185613729565b9350612d39818560208601613795565b80840191505092915050565b6000612d50826136d3565b612d5a8185613707565b9350612d6a818560208601613795565b612d73816137f6565b840191505092915050565b6000612d89826136d3565b612d938185613718565b9350612da3818560208601613795565b612dac816137f6565b840191505092915050565b600081546001811660008114612dd45760018114612dfa57612e3e565b607f6002830416612de58187613718565b955060ff198316865260208601935050612e3e565b60028204612e088187613718565b9550612e13856136b3565b60005b82811015612e3557815481890152600182019150602081019050612e16565b80880195505050505b505092915050565b600081546001811660008114612e635760018114612e8857612ecc565b607f6002830416612e748187613729565b955060ff1983168652808601935050612ecc565b60028204612e968187613729565b9550612ea1856136b3565b60005b82811015612ec357815481890152600182019150602081019050612ea4565b82880195505050505b505092915050565b6000612ee1602983613718565b91507f5468652070726976617465206b657920686173206e6f74206265656e2072657660008301527f65616c65642079657400000000000000000000000000000000000000000000006020830152604082019050919050565b6000612f47601d83613718565b91507f4e65772067656e657369732063616e2774206265207468652073616d650000006000830152602082019050919050565b6000612f87602883613718565b91507f56616c696461746f7220746f2072656d6f766520646f6573206e6f74206d617460008301527f636820696e6465780000000000000000000000000000000000000000000000006020830152604082019050919050565b6000612fed601383613718565b91507f4f6e6c7920636f6e7472616374206f776e6572000000000000000000000000006000830152602082019050919050565b600061302d600e83613718565b91507f496e76616c696420656e746974790000000000000000000000000000000000006000830152602082019050919050565b600061306d601083613718565b91507f456d707479206d65726b6c6554726565000000000000000000000000000000006000830152602082019050919050565b60006130ad600e83613718565b91507f456d707479206d657461646174610000000000000000000000000000000000006000830152602082019050919050565b60006130ed601083613718565b91507f456d707479206d65726b6c65526f6f74000000000000000000000000000000006000830152602082019050919050565b600061312d601d83613718565b91507f4e657720636861696e49642063616e2774206265207468652073616d650000006000830152602082019050919050565b600061316d601c83613718565b91507f50726f63657373206d757374206e6f742062652063616e63656c6564000000006000830152602082019050919050565b60006131ad602583613718565b91507f4f7261636c6520746f2072656d6f766520646f6573206e6f74206d617463682060008301527f696e6465780000000000000000000000000000000000000000000000000000006020830152604082019050919050565b61320f8161377c565b82525050565b6132266132218261377c565b6137ec565b82525050565b60006132388287612c31565b6014820191506132488286613215565b6020820191506132588285612e46565b91506132648284613215565b60208201915081905095945050505050565b60006132828284612d14565b915081905092915050565b600060208201905081810360008301526132a78184612c48565b905092915050565b60006020820190506132c46000830184612cbd565b92915050565b60006020820190506132df6000830184612ccc565b92915050565b60006040820190506132fa6000830185612ccc565b818103602083015261330c8184612cdb565b90509392505050565b6000602082019050818103600083015261332f8184612cdb565b905092915050565b6000610120820190508181036000830152613352818c612cdb565b9050613361602083018b612c22565b61336e604083018a613206565b61337b6060830189613206565b818103608083015261338d8188612cdb565b905081810360a08301526133a18187612cdb565b905081810360c08301526133b58186612cdb565b905081810360e08301526133c98185612cdb565b90506133d9610100830184612cbd565b9a9950505050505050505050565b6000610140820190508181036000830152613402818d612d7e565b9050613411602083018c612c22565b61341e604083018b613206565b61342b606083018a613206565b818103608083015261343d8189612d7e565b905081810360a08301526134518188612d7e565b905081810360c08301526134658187612d7e565b905081810360e08301526134798186612d7e565b9050613489610100830185612cbd565b81810361012083015261349c8184612d7e565b90509b9a5050505050505050505050565b600060208201905081810360008301526134c78184612db7565b905092915050565b600060208201905081810360008301526134e881612ed4565b9050919050565b6000602082019050818103600083015261350881612f3a565b9050919050565b6000602082019050818103600083015261352881612f7a565b9050919050565b6000602082019050818103600083015261354881612fe0565b9050919050565b6000602082019050818103600083015261356881613020565b9050919050565b6000602082019050818103600083015261358881613060565b9050919050565b600060208201905081810360008301526135a8816130a0565b9050919050565b600060208201905081810360008301526135c8816130e0565b9050919050565b600060208201905081810360008301526135e881613120565b9050919050565b6000602082019050818103600083015261360881613160565b9050919050565b60006020820190508181036000830152613628816131a0565b9050919050565b60006020820190506136446000830184613206565b92915050565b6000604051905081810181811067ffffffffffffffff8211171561366d57600080fd5b8060405250919050565b600067ffffffffffffffff82111561368e57600080fd5b601f19601f8301169050602081019050919050565b6000819050602082019050919050565b60008190508160005260206000209050919050565b600081519050919050565b600081519050919050565b600081519050919050565b6000602082019050919050565b600082825260208201905092915050565b600082825260208201905092915050565b600082825260208201905092915050565b600081905092915050565b600061373f8261375c565b9050919050565b60008115159050919050565b6000819050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000819050919050565b82818337600083830152505050565b60005b838110156137b3578082015181840152602081019050613798565b838111156137c2576000848401525b50505050565b60006137d3826137da565b9050919050565b60006137e582613807565b9050919050565b6000819050919050565b6000601f19601f8301169050919050565b60008160601b9050919050565b61381d81613734565b811461382857600080fd5b50565b61383481613752565b811461383f57600080fd5b50565b61384b8161377c565b811461385657600080fd5b5056fea365627a7a7231582047d6d2eab971e8e7427c2203885a8480504967a031737491dfd37ac898418a6f6c6578706572696d656e74616cf564736f6c634300050d0040"
+var VotingProcessBin = "0x608060405234801561001057600080fd5b5060405162002848380380620028488339810160408190526100319161004b565b600080546001600160a01b03191633179055600455610063565b60006020828403121561005c578081fd5b5051919050565b6127d580620000736000396000f3fe608060405234801561001057600080fd5b50600436106101585760003560e01c80638ceb30c2116100c3578063c4d252f51161007c578063c4d252f5146102f5578063c585ad9114610308578063df5dd1a51461031b578063ef0e2ff41461032e578063f2bcb15e14610341578063f3b86c991461035457610158565b80638ceb30c2146102815780638eaa6ac0146102945780639ed480c9146102a7578063a803dc4c146102ba578063b5da04f5146102cd578063b7ab4db5146102e057610158565b806347bb3da71161011557806347bb3da7146101ed578063579e51c71461020057806368141f2c146102285780637142bc831461023b578063791f03331461024e5780637c09faeb1461026e57610158565b8063014643ce1461015d57806318208792146101725780631a43bcb51461019b5780633408e470146101a357806340884c52146101b857806346475c4c146101cd575b600080fd5b61017061016b366004612141565b610367565b005b610185610180366004611e96565b6104b2565b60405161019291906123c0565b60405180910390f35b610185610571565b6101ab610607565b604051610192919061239e565b6101c061060d565b6040516101929190612267565b6101e06101db366004611e96565b61066e565b60405161019291906122b4565b6101706101fb366004611ff5565b61075f565b61021361020e366004611e96565b61088d565b604051610192999897969594939291906123d3565b6101ab610236366004611e4c565b610ba9565b610170610249366004612087565b610bca565b61026161025c366004612030565b610ea2565b6040516101929190612393565b6101ab61027c366004611e4c565b610efb565b61017061028f366004611fb0565b610f0d565b6102136102a2366004611e96565b611071565b6101706102b5366004611eae565b611498565b6101706102c8366004611fb0565b6115b3565b6101706102db366004611ff5565b6116a2565b6102e861173e565b6040516101929190612340565b610170610303366004611e96565b611816565b6101ab610316366004611e96565b611934565b610170610329366004611e4c565b611946565b61017061033c366004611e96565b6119ea565b6101ab61034f366004611e4c565b611a6b565b6101ab610362366004611e6d565b611a86565b6000546001600160a01b0316331461039a5760405162461bcd60e51b815260040161039190612577565b60405180910390fd5b806001600160a01b0316600283815481106103b157fe5b6000918252602090912001546001600160a01b0316146103e35760405162461bcd60e51b8152600401610391906126dc565b6002805460001981019081106103f557fe5b600091825260209091200154600280546001600160a01b03909216918490811061041b57fe5b9060005260206000200160006101000a8154816001600160a01b0302191690836001600160a01b03160217905550600280548061045457fe5b600082815260209020810160001990810180546001600160a01b03191690550190556040517f9c8e7d83025bef8a04c664b2f753f64b8814bdb7e27291d7e50935f18cc3c712906104a6908390612253565b60405180910390a15050565b606060006104bf83611934565b9050600581815481106104ce57fe5b60009182526020918290206007600a9092020101805460408051601f60026000196101006001871615020190941693909304928301859004850281018501909152818152928301828280156105645780601f1061053957610100808354040283529160200191610564565b820191906000526020600020905b81548152906001019060200180831161054757829003601f168201915b5050505050915050919050565b60038054604080516020601f60026000196101006001881615020190951694909404938401819004810282018101909252828152606093909290918301828280156105fd5780601f106105d2576101008083540402835291602001916105fd565b820191906000526020600020905b8154815290600101906020018083116105e057829003601f168201915b5050505050905090565b60045490565b606060028054806020026020016040519081016040528092919081815260200182805480156105fd57602002820191906000526020600020905b81546001600160a01b03168152600190910190602001808311610647575050505050905090565b6060600061067b83611934565b90506005818154811061068a57fe5b90600052602060002090600a0201600901805480602002602001604051908101604052809291908181526020016000905b828210156107535760008481526020908190208301805460408051828502810185019091528181529283018282801561073f57602002820191906000526020600020906000905b82829054906101000a900463ffffffff1663ffffffff16815260200190600401906020826003010492830192600103820291508084116107025790505b5050505050815260200190600101906106bb565b50505050915050919050565b6000546001600160a01b031633146107895760405162461bcd60e51b815260040161039190612577565b60038054604080516020601f6002600019610100600188161502019095169490940493840181900481028201810190925282815261082193909290918301828280156108165780601f106107eb57610100808354040283529160200191610816565b820191906000526020600020905b8154815290600101906020018083116107f957829003601f168201915b505050505082610ea2565b1561083e5760405162461bcd60e51b8152600401610391906124f8565b8051610851906003906020840190611ac0565b507fb07272e5a32a7a57581e0409555209cb59b02e13b62da30135eb3b3431078e366003604051610882919061246e565b60405180910390a150565b6005818154811061089d57600080fd5b6000918252602091829020600a919091020180546040805160026001841615610100026000190190931692909204601f8101859004850283018501909152808252919350918391908301828280156109365780601f1061090b57610100808354040283529160200191610936565b820191906000526020600020905b81548152906001019060200180831161091957829003601f168201915b505050506001838101546002808601546003870154600488018054604080516020601f6000199a851615610100029a909a0190931696909604978801829004820286018201905286855297986001600160a01b0390951697929650909490918301828280156109e65780601f106109bb576101008083540402835291602001916109e6565b820191906000526020600020905b8154815290600101906020018083116109c957829003601f168201915b5050505060058301805460408051602060026001851615610100026000190190941693909304601f8101849004840282018401909252818152949594935090830182828015610a765780601f10610a4b57610100808354040283529160200191610a76565b820191906000526020600020905b815481529060010190602001808311610a5957829003601f168201915b5050505060068301805460408051602060026001851615610100026000190190941693909304601f8101849004840282018401909252818152949594935090830182828015610b065780601f10610adb57610100808354040283529160200191610b06565b820191906000526020600020905b815481529060010190602001808311610ae957829003601f168201915b5050505060078301805460408051602060026001851615610100026000190190941693909304601f8101849004840282018401909252818152949594935090830182828015610b965780601f10610b6b57610100808354040283529160200191610b96565b820191906000526020600020905b815481529060010190602001808311610b7957829003601f168201915b5050506008909301549192505060ff1689565b600080610bb583611a6b565b9050610bc18382611a86565b9150505b919050565b6000855111610beb5760405162461bcd60e51b8152600401610391906125f6565b6000845111610c0c5760405162461bcd60e51b81526004016103919061261e565b6000835111610c2d5760405162461bcd60e51b8152600401610391906125cc565b336000610c3982610ba9565b9050610c43611b4c565b6040518061014001604052808a8152602001846001600160a01b03168152602001868152602001858152602001898152602001888152602001878152602001604051806020016040528060008152508152602001600015158152602001600067ffffffffffffffff81118015610cb857600080fd5b50604051908082528060200260200182016040528015610cec57816020015b6060815260200190600190039081610cd75790505b50905260058054600181018255600091909152815180519293508392600a9092027f036b6384b5eca791c62761152d0c79bb0604c104a5fb6f4eb0703f3154bb3db00191610d4291839160209190910190611ac0565b506020828101516001830180546001600160a01b0319166001600160a01b03909216919091179055604083015160028301556060830151600383015560808301518051610d959260048501920190611ac0565b5060a08201518051610db1916005840191602090910190611ac0565b5060c08201518051610dcd916006840191602090910190611ac0565b5060e08201518051610de9916007840191602090910190611ac0565b5061010082015160088201805460ff19169115159190911790556101208201518051610e1f916009840191602090910190611baa565b505060055460008481526006602090815260408083206000199094019093556001600160a01b0387168083526007909152908290208054600101905590519091507f809f6d7403f260d87e5e9820dce1cbd03ed43803c14182fc7c466e6e86c5c50490610e8f9085908a906123a7565b60405180910390a2505050505050505050565b600081604051602001610eb59190612237565b6040516020818303038152906040528051906020012083604051602001610edc9190612237565b6040516020818303038152906040528051906020012014905092915050565b60076020526000908152604090205481565b6000546001600160a01b03163314610f375760405162461bcd60e51b815260040161039190612577565b610faa60018381548110610f4757fe5b600091825260209182902001805460408051601f60026000196101006001871615020190941693909304928301859004850281018501909152818152928301828280156108165780601f106107eb57610100808354040283529160200191610816565b610fc65760405162461bcd60e51b81526004016103919061252f565b600180546000198101908110610fd857fe5b9060005260206000200160018381548110610fef57fe5b906000526020600020019080546001816001161561010002031660029004611018929190611c03565b50600180548061102457fe5b6001900381819060005260206000200160006110409190611c86565b90557f53344ca00b011ca20d3dc9f1bb71ed60e097b598b9f35482879138cc15f28ef9816040516104a691906123c0565b60606000806000606080606080600080600660008c8152602001908152602001600020549050600581815481106110a457fe5b6000918252602091829020600a90910201805460408051601f60026000196101006001871615020190941693909304928301859004850281018501909152818152928301828280156111375780601f1061110c57610100808354040283529160200191611137565b820191906000526020600020905b81548152906001019060200180831161111a57829003601f168201915b505050505099506005818154811061114b57fe5b90600052602060002090600a020160010160009054906101000a90046001600160a01b031698506005818154811061117f57fe5b90600052602060002090600a0201600201549750600581815481106111a057fe5b90600052602060002090600a0201600301549650600581815481106111c157fe5b60009182526020918290206004600a9092020101805460408051601f60026000196101006001871615020190941693909304928301859004850281018501909152818152928301828280156112575780601f1061122c57610100808354040283529160200191611257565b820191906000526020600020905b81548152906001019060200180831161123a57829003601f168201915b505050505095506005818154811061126b57fe5b60009182526020918290206005600a9092020101805460408051601f60026000196101006001871615020190941693909304928301859004850281018501909152818152928301828280156113015780601f106112d657610100808354040283529160200191611301565b820191906000526020600020905b8154815290600101906020018083116112e457829003601f168201915b505050505094506005818154811061131557fe5b60009182526020918290206006600a9092020101805460408051601f60026000196101006001871615020190941693909304928301859004850281018501909152818152928301828280156113ab5780601f10611380576101008083540402835291602001916113ab565b820191906000526020600020905b81548152906001019060200180831161138e57829003601f168201915b50505050509350600581815481106113bf57fe5b60009182526020918290206007600a9092020101805460408051601f60026000196101006001871615020190941693909304928301859004850281018501909152818152928301828280156114555780601f1061142a57610100808354040283529160200191611455565b820191906000526020600020905b81548152906001019060200180831161143857829003601f168201915b505050505092506005818154811061146957fe5b90600052602060002090600a020160080160009054906101000a900460ff169150509193959799909294969850565b60005b60025481101561159657600281815481106114b257fe5b6000918252602090912001546001600160a01b031633141561158e5760006114d984611934565b9050600581815481106114e857fe5b600091825260209091206008600a90920201015460ff161561151c5760405162461bcd60e51b8152600401610391906126a5565b826005828154811061152a57fe5b90600052602060002090600a0201600901908051906020019061154e929190611baa565b50837fd82ac7ddf89648ce31f759794ebe3ef53185405575ce20dcd72f4a176cf95e458460405161157f91906122b4565b60405180910390a250506115af565b60010161149b565b5060405162461bcd60e51b815260040161039190612648565b5050565b60005b60025481101561159657600281815481106115cd57fe5b6000918252602090912001546001600160a01b031633141561169a5760006115f484611934565b90506005818154811061160357fe5b600091825260209091206008600a90920201015460ff16156116375760405162461bcd60e51b8152600401610391906126a5565b826005828154811061164557fe5b90600052602060002090600a02016007019080519060200190611669929190611ac0565b50837f16e81256ba7e41ceea97db602f7c59414ba5110c3a6641245f6621279f6263018460405161157f91906123c0565b6001016115b6565b6000546001600160a01b031633146116cc5760405162461bcd60e51b815260040161039190612577565b600180548082018255600091909152815161170e917fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf601906020840190611ac0565b507f0eb17eb6d7f643e1f1a79af44e460fffabb6b2a8beff44bff08160d8d3403d3f8160405161088291906123c0565b60606001805480602002602001604051908101604052809291908181526020016000905b8282101561180d5760008481526020908190208301805460408051601f60026000196101006001871615020190941693909304928301859004850281018501909152818152928301828280156117f95780601f106117ce576101008083540402835291602001916117f9565b820191906000526020600020905b8154815290600101906020018083116117dc57829003601f168201915b505050505081526020019060010190611762565b50505050905090565b80600061182282611934565b9050336001600160a01b03166005828154811061183b57fe5b600091825260209091206001600a9092020101546001600160a01b0316146118755760405162461bcd60e51b8152600401610391906125a4565b600061188084611934565b90506005818154811061188f57fe5b600091825260209091206008600a90920201015460ff16156118c35760405162461bcd60e51b8152600401610391906126a5565b6001600582815481106118d257fe5b60009182526020909120600a90910201600801805460ff191691151591909117905560405133907fa8a2eafb1f78e64e1c3921d10b28aad02d1fa21cba6bbc76b7e8601b19a9c08d9061192690879061239e565b60405180910390a250505050565b60009081526006602052604090205490565b6000546001600160a01b031633146119705760405162461bcd60e51b815260040161039190612577565b600280546001810182556000919091527f405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace0180546001600160a01b0319166001600160a01b0383161790556040517e47706786c922d17b39285dc59d696bafea72c0b003d3841ae1202076f4c2e490610882908390612253565b6000546001600160a01b03163314611a145760405162461bcd60e51b815260040161039190612577565b806004541415611a365760405162461bcd60e51b81526004016103919061266e565b60048190556040517f5a4bfdb771a9b72401d824fd5b321058c7c69fbe4a7c209c37af285e6d061a8c9061088290839061239e565b6001600160a01b031660009081526007602052604090205490565b600082826003600454604051602001611aa29493929190612198565b60405160208183030381529060405280519060200120905092915050565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282611af65760008555611b3c565b82601f10611b0f57805160ff1916838001178555611b3c565b82800160010185558215611b3c579182015b82811115611b3c578251825591602001919060010190611b21565b50611b48929150611ccd565b5090565b6040518061014001604052806060815260200160006001600160a01b03168152602001600081526020016000815260200160608152602001606081526020016060815260200160608152602001600015158152602001606081525090565b828054828255906000526020600020908101928215611bf7579160200282015b82811115611bf75782518051611be7918491602090910190611ce2565b5091602001919060010190611bca565b50611b48929150611d8c565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282611c395760008555611b3c565b82601f10611c4a5780548555611b3c565b82800160010185558215611b3c57600052602060002091601f016020900482015b82811115611b3c578254825591600101919060010190611c6b565b50805460018160011615610100020316600290046000825580601f10611cac5750611cca565b601f016020900490600052602060002090810190611cca9190611ccd565b50565b5b80821115611b485760008155600101611cce565b82805482825590600052602060002090600701600890048101928215611b3c5791602002820160005b83821115611d4f57835183826101000a81548163ffffffff021916908363ffffffff1602179055509260200192600401602081600301049283019260010302611d0b565b8015611d7f5782816101000a81549063ffffffff0219169055600401602081600301049283019260010302611d4f565b5050611b48929150611ccd565b80821115611b48576000611da08282611da9565b50600101611d8c565b508054600082556007016008900490600052602060002090810190611cca9190611ccd565b80356001600160a01b0381168114610bc557600080fd5b600082601f830112611df5578081fd5b813567ffffffffffffffff811115611e0957fe5b611e1c601f8201601f1916602001612721565b9150808252836020828501011115611e3357600080fd5b8060208401602084013760009082016020015292915050565b600060208284031215611e5d578081fd5b611e6682611dce565b9392505050565b60008060408385031215611e7f578081fd5b611e8883611dce565b946020939093013593505050565b600060208284031215611ea7578081fd5b5035919050565b60008060408385031215611ec0578182fd5b8235915060208084013567ffffffffffffffff811115611ede578283fd5b8401601f81018613611eee578283fd5b8035611f01611efc82612745565b612721565b81815283810190838501865b84811015611fa057813586018b603f820112611f27578889fd5b87810135611f37611efc82612745565b808282528a82019150604084018f60408d86028701011115611f57578c8dfd5b8c94505b83851015611f8a57803563ffffffff81168114611f76578d8efd5b835260019490940193918b01918b01611f5b565b5087525050509286019290860190600101611f0d565b5096999098509650505050505050565b60008060408385031215611fc2578182fd5b82359150602083013567ffffffffffffffff811115611fdf578182fd5b611feb85828601611de5565b9150509250929050565b600060208284031215612006578081fd5b813567ffffffffffffffff81111561201c578182fd5b61202884828501611de5565b949350505050565b60008060408385031215612042578182fd5b823567ffffffffffffffff80821115612059578384fd5b61206586838701611de5565b9350602085013591508082111561207a578283fd5b50611feb85828601611de5565b60008060008060008060c0878903121561209f578182fd5b863567ffffffffffffffff808211156120b6578384fd5b6120c28a838b01611de5565b975060208901359150808211156120d7578384fd5b6120e38a838b01611de5565b965060408901359150808211156120f8578384fd5b6121048a838b01611de5565b95506060890135915080821115612119578384fd5b5061212689828a01611de5565b9350506080870135915060a087013590509295509295509295565b60008060408385031215612153578182fd5b8235915061216360208401611dce565b90509250929050565b6000815180845261218481602086016020860161276f565b601f01601f19169290920160200192915050565b60006bffffffffffffffffffffffff198660601b16825284601483015260348185546001808216600081146121d457600181146121ef57612222565b60ff1983168786015260028304607f16870185019350612222565b600283048987526020808820885b838110156122185781548b82018a01529085019082016121fd565b5050508701850193505b50505093845250506020909101949350505050565b6000825161224981846020870161276f565b9190910192915050565b6001600160a01b0391909116815260200190565b6020808252825182820181905260009190848201906040850190845b818110156122a85783516001600160a01b031683529284019291840191600101612283565b50909695505050505050565b6000602080830181845280855180835260408601915060408482028701019250838701855b8281101561233357878503603f19018452815180518087529087019087870190895b8181101561231d57835163ffffffff16835292890192918901916001016122fb565b50909650505092850192908501906001016122d9565b5092979650505050505050565b6000602080830181845280855180835260408601915060408482028701019250838701855b8281101561233357603f1988860301845261238185835161216c565b94509285019290850190600101612365565b901515815260200190565b90815260200190565b600083825260406020830152612028604083018461216c565b600060208252611e66602083018461216c565b60006101208083526123e78184018d61216c565b6001600160a01b038c166020850152604084018b9052606084018a905283810360808501529050612418818961216c565b905082810360a084015261242c818861216c565b905082810360c0840152612440818761216c565b905082810360e0840152612454818661216c565b9150508215156101008301529a9950505050505050505050565b6000602080830181845282855460018082166000811461249557600181146124b3576124eb565b60028304607f16855260ff19831660408901526060880193506124eb565b600283048086526124c38a612763565b885b828110156124e15781548b8201604001529084019088016124c5565b8a01604001955050505b5091979650505050505050565b6020808252601d908201527f4e65772067656e657369732063616e2774206265207468652073616d65000000604082015260600190565b60208082526028908201527f56616c696461746f7220746f2072656d6f766520646f6573206e6f74206d61746040820152670c6d040d2dcc8caf60c31b606082015260800190565b60208082526013908201527227b7363c9031b7b73a3930b1ba1037bbb732b960691b604082015260600190565b6020808252600e908201526d496e76616c696420656e7469747960901b604082015260600190565b60208082526010908201526f456d707479206d65726b6c655472656560801b604082015260600190565b6020808252600e908201526d456d707479206d6574616461746160901b604082015260600190565b60208082526010908201526f115b5c1d1e481b595c9adb19549bdbdd60821b604082015260600190565b6020808252600c908201526b1d5b985d5d1a1bdc9a5e995960a21b604082015260600190565b6020808252601d908201527f4e657720636861696e49642063616e2774206265207468652073616d65000000604082015260600190565b6020808252601c908201527f50726f63657373206d757374206e6f742062652063616e63656c656400000000604082015260600190565b60208082526025908201527f4f7261636c6520746f2072656d6f766520646f6573206e6f74206d61746368206040820152640d2dcc8caf60db1b606082015260800190565b60405181810167ffffffffffffffff8111828210171561273d57fe5b604052919050565b600067ffffffffffffffff82111561275957fe5b5060209081020190565b60009081526020902090565b60005b8381101561278a578181015183820152602001612772565b83811115612799576000848401525b5050505056fea26469706673582212208e0043a8de3d52a1b4d368dfe82056908716ca0740ceba368219c93fcde9030464736f6c63430007040033"
 
 // DeployVotingProcess deploys a new Ethereum contract, binding an instance of VotingProcess to it.
 func DeployVotingProcess(auth *bind.TransactOpts, backend bind.ContractBackend, chainIdValue *big.Int) (common.Address, *types.Transaction, *VotingProcess, error) {
@@ -154,7 +182,7 @@ func bindVotingProcess(address common.Address, caller bind.ContractCaller, trans
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_VotingProcess *VotingProcessRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_VotingProcess *VotingProcessRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _VotingProcess.Contract.VotingProcessCaller.contract.Call(opts, result, method, params...)
 }
 
@@ -173,7 +201,7 @@ func (_VotingProcess *VotingProcessRaw) Transact(opts *bind.TransactOpts, method
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_VotingProcess *VotingProcessCallerRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_VotingProcess *VotingProcessCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _VotingProcess.Contract.contract.Call(opts, result, method, params...)
 }
 
@@ -190,55 +218,69 @@ func (_VotingProcess *VotingProcessTransactorRaw) Transact(opts *bind.TransactOp
 
 // EntityProcessCount is a free data retrieval call binding the contract method 0x7c09faeb.
 //
-// Solidity: function entityProcessCount(address ) constant returns(uint256)
+// Solidity: function entityProcessCount(address ) view returns(uint256)
 func (_VotingProcess *VotingProcessCaller) EntityProcessCount(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
-	ret0 := new(*big.Int)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "entityProcessCount", arg0)
-	return *ret0, err
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "entityProcessCount", arg0)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // EntityProcessCount is a free data retrieval call binding the contract method 0x7c09faeb.
 //
-// Solidity: function entityProcessCount(address ) constant returns(uint256)
+// Solidity: function entityProcessCount(address ) view returns(uint256)
 func (_VotingProcess *VotingProcessSession) EntityProcessCount(arg0 common.Address) (*big.Int, error) {
 	return _VotingProcess.Contract.EntityProcessCount(&_VotingProcess.CallOpts, arg0)
 }
 
 // EntityProcessCount is a free data retrieval call binding the contract method 0x7c09faeb.
 //
-// Solidity: function entityProcessCount(address ) constant returns(uint256)
+// Solidity: function entityProcessCount(address ) view returns(uint256)
 func (_VotingProcess *VotingProcessCallerSession) EntityProcessCount(arg0 common.Address) (*big.Int, error) {
 	return _VotingProcess.Contract.EntityProcessCount(&_VotingProcess.CallOpts, arg0)
 }
 
 // EqualStrings is a free data retrieval call binding the contract method 0x791f0333.
 //
-// Solidity: function equalStrings(string str1, string str2) constant returns(bool)
+// Solidity: function equalStrings(string str1, string str2) pure returns(bool)
 func (_VotingProcess *VotingProcessCaller) EqualStrings(opts *bind.CallOpts, str1 string, str2 string) (bool, error) {
-	ret0 := new(bool)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "equalStrings", str1, str2)
-	return *ret0, err
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "equalStrings", str1, str2)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
 // EqualStrings is a free data retrieval call binding the contract method 0x791f0333.
 //
-// Solidity: function equalStrings(string str1, string str2) constant returns(bool)
+// Solidity: function equalStrings(string str1, string str2) pure returns(bool)
 func (_VotingProcess *VotingProcessSession) EqualStrings(str1 string, str2 string) (bool, error) {
 	return _VotingProcess.Contract.EqualStrings(&_VotingProcess.CallOpts, str1, str2)
 }
 
 // EqualStrings is a free data retrieval call binding the contract method 0x791f0333.
 //
-// Solidity: function equalStrings(string str1, string str2) constant returns(bool)
+// Solidity: function equalStrings(string str1, string str2) pure returns(bool)
 func (_VotingProcess *VotingProcessCallerSession) EqualStrings(str1 string, str2 string) (bool, error) {
 	return _VotingProcess.Contract.EqualStrings(&_VotingProcess.CallOpts, str1, str2)
 }
 
 // Get is a free data retrieval call binding the contract method 0x8eaa6ac0.
 //
-// Solidity: function get(bytes32 processId) constant returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled)
+// Solidity: function get(bytes32 processId) view returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled)
 func (_VotingProcess *VotingProcessCaller) Get(opts *bind.CallOpts, processId [32]byte) (struct {
 	ProcessType              string
 	EntityAddress            common.Address
@@ -250,7 +292,10 @@ func (_VotingProcess *VotingProcessCaller) Get(opts *bind.CallOpts, processId [3
 	VoteEncryptionPrivateKey string
 	Canceled                 bool
 }, error) {
-	ret := new(struct {
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "get", processId)
+
+	outstruct := new(struct {
 		ProcessType              string
 		EntityAddress            common.Address
 		StartBlock               *big.Int
@@ -261,14 +306,24 @@ func (_VotingProcess *VotingProcessCaller) Get(opts *bind.CallOpts, processId [3
 		VoteEncryptionPrivateKey string
 		Canceled                 bool
 	})
-	out := ret
-	err := _VotingProcess.contract.Call(opts, out, "get", processId)
-	return *ret, err
+
+	outstruct.ProcessType = out[0].(string)
+	outstruct.EntityAddress = out[1].(common.Address)
+	outstruct.StartBlock = out[2].(*big.Int)
+	outstruct.NumberOfBlocks = out[3].(*big.Int)
+	outstruct.Metadata = out[4].(string)
+	outstruct.CensusMerkleRoot = out[5].(string)
+	outstruct.CensusMerkleTree = out[6].(string)
+	outstruct.VoteEncryptionPrivateKey = out[7].(string)
+	outstruct.Canceled = out[8].(bool)
+
+	return *outstruct, err
+
 }
 
 // Get is a free data retrieval call binding the contract method 0x8eaa6ac0.
 //
-// Solidity: function get(bytes32 processId) constant returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled)
+// Solidity: function get(bytes32 processId) view returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled)
 func (_VotingProcess *VotingProcessSession) Get(processId [32]byte) (struct {
 	ProcessType              string
 	EntityAddress            common.Address
@@ -285,7 +340,7 @@ func (_VotingProcess *VotingProcessSession) Get(processId [32]byte) (struct {
 
 // Get is a free data retrieval call binding the contract method 0x8eaa6ac0.
 //
-// Solidity: function get(bytes32 processId) constant returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled)
+// Solidity: function get(bytes32 processId) view returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled)
 func (_VotingProcess *VotingProcessCallerSession) Get(processId [32]byte) (struct {
 	ProcessType              string
 	EntityAddress            common.Address
@@ -302,247 +357,317 @@ func (_VotingProcess *VotingProcessCallerSession) Get(processId [32]byte) (struc
 
 // GetChainId is a free data retrieval call binding the contract method 0x3408e470.
 //
-// Solidity: function getChainId() constant returns(uint256)
+// Solidity: function getChainId() view returns(uint256)
 func (_VotingProcess *VotingProcessCaller) GetChainId(opts *bind.CallOpts) (*big.Int, error) {
-	ret0 := new(*big.Int)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "getChainId")
-	return *ret0, err
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "getChainId")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // GetChainId is a free data retrieval call binding the contract method 0x3408e470.
 //
-// Solidity: function getChainId() constant returns(uint256)
+// Solidity: function getChainId() view returns(uint256)
 func (_VotingProcess *VotingProcessSession) GetChainId() (*big.Int, error) {
 	return _VotingProcess.Contract.GetChainId(&_VotingProcess.CallOpts)
 }
 
 // GetChainId is a free data retrieval call binding the contract method 0x3408e470.
 //
-// Solidity: function getChainId() constant returns(uint256)
+// Solidity: function getChainId() view returns(uint256)
 func (_VotingProcess *VotingProcessCallerSession) GetChainId() (*big.Int, error) {
 	return _VotingProcess.Contract.GetChainId(&_VotingProcess.CallOpts)
 }
 
 // GetEntityProcessCount is a free data retrieval call binding the contract method 0xf2bcb15e.
 //
-// Solidity: function getEntityProcessCount(address entityAddress) constant returns(uint256)
+// Solidity: function getEntityProcessCount(address entityAddress) view returns(uint256)
 func (_VotingProcess *VotingProcessCaller) GetEntityProcessCount(opts *bind.CallOpts, entityAddress common.Address) (*big.Int, error) {
-	ret0 := new(*big.Int)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "getEntityProcessCount", entityAddress)
-	return *ret0, err
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "getEntityProcessCount", entityAddress)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // GetEntityProcessCount is a free data retrieval call binding the contract method 0xf2bcb15e.
 //
-// Solidity: function getEntityProcessCount(address entityAddress) constant returns(uint256)
+// Solidity: function getEntityProcessCount(address entityAddress) view returns(uint256)
 func (_VotingProcess *VotingProcessSession) GetEntityProcessCount(entityAddress common.Address) (*big.Int, error) {
 	return _VotingProcess.Contract.GetEntityProcessCount(&_VotingProcess.CallOpts, entityAddress)
 }
 
 // GetEntityProcessCount is a free data retrieval call binding the contract method 0xf2bcb15e.
 //
-// Solidity: function getEntityProcessCount(address entityAddress) constant returns(uint256)
+// Solidity: function getEntityProcessCount(address entityAddress) view returns(uint256)
 func (_VotingProcess *VotingProcessCallerSession) GetEntityProcessCount(entityAddress common.Address) (*big.Int, error) {
 	return _VotingProcess.Contract.GetEntityProcessCount(&_VotingProcess.CallOpts, entityAddress)
 }
 
 // GetGenesis is a free data retrieval call binding the contract method 0x1a43bcb5.
 //
-// Solidity: function getGenesis() constant returns(string)
+// Solidity: function getGenesis() view returns(string)
 func (_VotingProcess *VotingProcessCaller) GetGenesis(opts *bind.CallOpts) (string, error) {
-	ret0 := new(string)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "getGenesis")
-	return *ret0, err
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "getGenesis")
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
 }
 
 // GetGenesis is a free data retrieval call binding the contract method 0x1a43bcb5.
 //
-// Solidity: function getGenesis() constant returns(string)
+// Solidity: function getGenesis() view returns(string)
 func (_VotingProcess *VotingProcessSession) GetGenesis() (string, error) {
 	return _VotingProcess.Contract.GetGenesis(&_VotingProcess.CallOpts)
 }
 
 // GetGenesis is a free data retrieval call binding the contract method 0x1a43bcb5.
 //
-// Solidity: function getGenesis() constant returns(string)
+// Solidity: function getGenesis() view returns(string)
 func (_VotingProcess *VotingProcessCallerSession) GetGenesis() (string, error) {
 	return _VotingProcess.Contract.GetGenesis(&_VotingProcess.CallOpts)
 }
 
 // GetNextProcessId is a free data retrieval call binding the contract method 0x68141f2c.
 //
-// Solidity: function getNextProcessId(address entityAddress) constant returns(bytes32)
+// Solidity: function getNextProcessId(address entityAddress) view returns(bytes32)
 func (_VotingProcess *VotingProcessCaller) GetNextProcessId(opts *bind.CallOpts, entityAddress common.Address) ([32]byte, error) {
-	ret0 := new([32]byte)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "getNextProcessId", entityAddress)
-	return *ret0, err
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "getNextProcessId", entityAddress)
+
+	if err != nil {
+		return *new([32]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+
+	return out0, err
+
 }
 
 // GetNextProcessId is a free data retrieval call binding the contract method 0x68141f2c.
 //
-// Solidity: function getNextProcessId(address entityAddress) constant returns(bytes32)
+// Solidity: function getNextProcessId(address entityAddress) view returns(bytes32)
 func (_VotingProcess *VotingProcessSession) GetNextProcessId(entityAddress common.Address) ([32]byte, error) {
 	return _VotingProcess.Contract.GetNextProcessId(&_VotingProcess.CallOpts, entityAddress)
 }
 
 // GetNextProcessId is a free data retrieval call binding the contract method 0x68141f2c.
 //
-// Solidity: function getNextProcessId(address entityAddress) constant returns(bytes32)
+// Solidity: function getNextProcessId(address entityAddress) view returns(bytes32)
 func (_VotingProcess *VotingProcessCallerSession) GetNextProcessId(entityAddress common.Address) ([32]byte, error) {
 	return _VotingProcess.Contract.GetNextProcessId(&_VotingProcess.CallOpts, entityAddress)
 }
 
 // GetOracles is a free data retrieval call binding the contract method 0x40884c52.
 //
-// Solidity: function getOracles() constant returns(string[])
-func (_VotingProcess *VotingProcessCaller) GetOracles(opts *bind.CallOpts) ([]string, error) {
-	ret0 := new([]string)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "getOracles")
-	return *ret0, err
+// Solidity: function getOracles() view returns(address[])
+func (_VotingProcess *VotingProcessCaller) GetOracles(opts *bind.CallOpts) ([]common.Address, error) {
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "getOracles")
+
+	if err != nil {
+		return *new([]common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
+
+	return out0, err
+
 }
 
 // GetOracles is a free data retrieval call binding the contract method 0x40884c52.
 //
-// Solidity: function getOracles() constant returns(string[])
-func (_VotingProcess *VotingProcessSession) GetOracles() ([]string, error) {
+// Solidity: function getOracles() view returns(address[])
+func (_VotingProcess *VotingProcessSession) GetOracles() ([]common.Address, error) {
 	return _VotingProcess.Contract.GetOracles(&_VotingProcess.CallOpts)
 }
 
 // GetOracles is a free data retrieval call binding the contract method 0x40884c52.
 //
-// Solidity: function getOracles() constant returns(string[])
-func (_VotingProcess *VotingProcessCallerSession) GetOracles() ([]string, error) {
+// Solidity: function getOracles() view returns(address[])
+func (_VotingProcess *VotingProcessCallerSession) GetOracles() ([]common.Address, error) {
 	return _VotingProcess.Contract.GetOracles(&_VotingProcess.CallOpts)
 }
 
 // GetPrivateKey is a free data retrieval call binding the contract method 0x18208792.
 //
-// Solidity: function getPrivateKey(bytes32 processId) constant returns(string privateKey)
+// Solidity: function getPrivateKey(bytes32 processId) view returns(string privateKey)
 func (_VotingProcess *VotingProcessCaller) GetPrivateKey(opts *bind.CallOpts, processId [32]byte) (string, error) {
-	ret0 := new(string)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "getPrivateKey", processId)
-	return *ret0, err
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "getPrivateKey", processId)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
 }
 
 // GetPrivateKey is a free data retrieval call binding the contract method 0x18208792.
 //
-// Solidity: function getPrivateKey(bytes32 processId) constant returns(string privateKey)
+// Solidity: function getPrivateKey(bytes32 processId) view returns(string privateKey)
 func (_VotingProcess *VotingProcessSession) GetPrivateKey(processId [32]byte) (string, error) {
 	return _VotingProcess.Contract.GetPrivateKey(&_VotingProcess.CallOpts, processId)
 }
 
 // GetPrivateKey is a free data retrieval call binding the contract method 0x18208792.
 //
-// Solidity: function getPrivateKey(bytes32 processId) constant returns(string privateKey)
+// Solidity: function getPrivateKey(bytes32 processId) view returns(string privateKey)
 func (_VotingProcess *VotingProcessCallerSession) GetPrivateKey(processId [32]byte) (string, error) {
 	return _VotingProcess.Contract.GetPrivateKey(&_VotingProcess.CallOpts, processId)
 }
 
 // GetProcessId is a free data retrieval call binding the contract method 0xf3b86c99.
 //
-// Solidity: function getProcessId(address entityAddress, uint256 processCountIndex) constant returns(bytes32)
+// Solidity: function getProcessId(address entityAddress, uint256 processCountIndex) view returns(bytes32)
 func (_VotingProcess *VotingProcessCaller) GetProcessId(opts *bind.CallOpts, entityAddress common.Address, processCountIndex *big.Int) ([32]byte, error) {
-	ret0 := new([32]byte)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "getProcessId", entityAddress, processCountIndex)
-	return *ret0, err
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "getProcessId", entityAddress, processCountIndex)
+
+	if err != nil {
+		return *new([32]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+
+	return out0, err
+
 }
 
 // GetProcessId is a free data retrieval call binding the contract method 0xf3b86c99.
 //
-// Solidity: function getProcessId(address entityAddress, uint256 processCountIndex) constant returns(bytes32)
+// Solidity: function getProcessId(address entityAddress, uint256 processCountIndex) view returns(bytes32)
 func (_VotingProcess *VotingProcessSession) GetProcessId(entityAddress common.Address, processCountIndex *big.Int) ([32]byte, error) {
 	return _VotingProcess.Contract.GetProcessId(&_VotingProcess.CallOpts, entityAddress, processCountIndex)
 }
 
 // GetProcessId is a free data retrieval call binding the contract method 0xf3b86c99.
 //
-// Solidity: function getProcessId(address entityAddress, uint256 processCountIndex) constant returns(bytes32)
+// Solidity: function getProcessId(address entityAddress, uint256 processCountIndex) view returns(bytes32)
 func (_VotingProcess *VotingProcessCallerSession) GetProcessId(entityAddress common.Address, processCountIndex *big.Int) ([32]byte, error) {
 	return _VotingProcess.Contract.GetProcessId(&_VotingProcess.CallOpts, entityAddress, processCountIndex)
 }
 
 // GetProcessIndex is a free data retrieval call binding the contract method 0xc585ad91.
 //
-// Solidity: function getProcessIndex(bytes32 processId) constant returns(uint256)
+// Solidity: function getProcessIndex(bytes32 processId) view returns(uint256)
 func (_VotingProcess *VotingProcessCaller) GetProcessIndex(opts *bind.CallOpts, processId [32]byte) (*big.Int, error) {
-	ret0 := new(*big.Int)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "getProcessIndex", processId)
-	return *ret0, err
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "getProcessIndex", processId)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // GetProcessIndex is a free data retrieval call binding the contract method 0xc585ad91.
 //
-// Solidity: function getProcessIndex(bytes32 processId) constant returns(uint256)
+// Solidity: function getProcessIndex(bytes32 processId) view returns(uint256)
 func (_VotingProcess *VotingProcessSession) GetProcessIndex(processId [32]byte) (*big.Int, error) {
 	return _VotingProcess.Contract.GetProcessIndex(&_VotingProcess.CallOpts, processId)
 }
 
 // GetProcessIndex is a free data retrieval call binding the contract method 0xc585ad91.
 //
-// Solidity: function getProcessIndex(bytes32 processId) constant returns(uint256)
+// Solidity: function getProcessIndex(bytes32 processId) view returns(uint256)
 func (_VotingProcess *VotingProcessCallerSession) GetProcessIndex(processId [32]byte) (*big.Int, error) {
 	return _VotingProcess.Contract.GetProcessIndex(&_VotingProcess.CallOpts, processId)
 }
 
 // GetResults is a free data retrieval call binding the contract method 0x46475c4c.
 //
-// Solidity: function getResults(bytes32 processId) constant returns(string results)
-func (_VotingProcess *VotingProcessCaller) GetResults(opts *bind.CallOpts, processId [32]byte) (string, error) {
-	ret0 := new(string)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "getResults", processId)
-	return *ret0, err
+// Solidity: function getResults(bytes32 processId) view returns(uint32[][] results)
+func (_VotingProcess *VotingProcessCaller) GetResults(opts *bind.CallOpts, processId [32]byte) ([][]uint32, error) {
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "getResults", processId)
+
+	if err != nil {
+		return *new([][]uint32), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([][]uint32)).(*[][]uint32)
+
+	return out0, err
+
 }
 
 // GetResults is a free data retrieval call binding the contract method 0x46475c4c.
 //
-// Solidity: function getResults(bytes32 processId) constant returns(string results)
-func (_VotingProcess *VotingProcessSession) GetResults(processId [32]byte) (string, error) {
+// Solidity: function getResults(bytes32 processId) view returns(uint32[][] results)
+func (_VotingProcess *VotingProcessSession) GetResults(processId [32]byte) ([][]uint32, error) {
 	return _VotingProcess.Contract.GetResults(&_VotingProcess.CallOpts, processId)
 }
 
 // GetResults is a free data retrieval call binding the contract method 0x46475c4c.
 //
-// Solidity: function getResults(bytes32 processId) constant returns(string results)
-func (_VotingProcess *VotingProcessCallerSession) GetResults(processId [32]byte) (string, error) {
+// Solidity: function getResults(bytes32 processId) view returns(uint32[][] results)
+func (_VotingProcess *VotingProcessCallerSession) GetResults(processId [32]byte) ([][]uint32, error) {
 	return _VotingProcess.Contract.GetResults(&_VotingProcess.CallOpts, processId)
 }
 
 // GetValidators is a free data retrieval call binding the contract method 0xb7ab4db5.
 //
-// Solidity: function getValidators() constant returns(string[])
+// Solidity: function getValidators() view returns(string[])
 func (_VotingProcess *VotingProcessCaller) GetValidators(opts *bind.CallOpts) ([]string, error) {
-	ret0 := new([]string)
-	out := ret0
-	err := _VotingProcess.contract.Call(opts, out, "getValidators")
-	return *ret0, err
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "getValidators")
+
+	if err != nil {
+		return *new([]string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]string)).(*[]string)
+
+	return out0, err
+
 }
 
 // GetValidators is a free data retrieval call binding the contract method 0xb7ab4db5.
 //
-// Solidity: function getValidators() constant returns(string[])
+// Solidity: function getValidators() view returns(string[])
 func (_VotingProcess *VotingProcessSession) GetValidators() ([]string, error) {
 	return _VotingProcess.Contract.GetValidators(&_VotingProcess.CallOpts)
 }
 
 // GetValidators is a free data retrieval call binding the contract method 0xb7ab4db5.
 //
-// Solidity: function getValidators() constant returns(string[])
+// Solidity: function getValidators() view returns(string[])
 func (_VotingProcess *VotingProcessCallerSession) GetValidators() ([]string, error) {
 	return _VotingProcess.Contract.GetValidators(&_VotingProcess.CallOpts)
 }
 
 // Processes is a free data retrieval call binding the contract method 0x579e51c7.
 //
-// Solidity: function processes(uint256 ) constant returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled, string results)
+// Solidity: function processes(uint256 ) view returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled)
 func (_VotingProcess *VotingProcessCaller) Processes(opts *bind.CallOpts, arg0 *big.Int) (struct {
 	ProcessType              string
 	EntityAddress            common.Address
@@ -553,9 +678,11 @@ func (_VotingProcess *VotingProcessCaller) Processes(opts *bind.CallOpts, arg0 *
 	CensusMerkleTree         string
 	VoteEncryptionPrivateKey string
 	Canceled                 bool
-	Results                  string
 }, error) {
-	ret := new(struct {
+	var out []interface{}
+	err := _VotingProcess.contract.Call(opts, &out, "processes", arg0)
+
+	outstruct := new(struct {
 		ProcessType              string
 		EntityAddress            common.Address
 		StartBlock               *big.Int
@@ -565,16 +692,25 @@ func (_VotingProcess *VotingProcessCaller) Processes(opts *bind.CallOpts, arg0 *
 		CensusMerkleTree         string
 		VoteEncryptionPrivateKey string
 		Canceled                 bool
-		Results                  string
 	})
-	out := ret
-	err := _VotingProcess.contract.Call(opts, out, "processes", arg0)
-	return *ret, err
+
+	outstruct.ProcessType = out[0].(string)
+	outstruct.EntityAddress = out[1].(common.Address)
+	outstruct.StartBlock = out[2].(*big.Int)
+	outstruct.NumberOfBlocks = out[3].(*big.Int)
+	outstruct.Metadata = out[4].(string)
+	outstruct.CensusMerkleRoot = out[5].(string)
+	outstruct.CensusMerkleTree = out[6].(string)
+	outstruct.VoteEncryptionPrivateKey = out[7].(string)
+	outstruct.Canceled = out[8].(bool)
+
+	return *outstruct, err
+
 }
 
 // Processes is a free data retrieval call binding the contract method 0x579e51c7.
 //
-// Solidity: function processes(uint256 ) constant returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled, string results)
+// Solidity: function processes(uint256 ) view returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled)
 func (_VotingProcess *VotingProcessSession) Processes(arg0 *big.Int) (struct {
 	ProcessType              string
 	EntityAddress            common.Address
@@ -585,14 +721,13 @@ func (_VotingProcess *VotingProcessSession) Processes(arg0 *big.Int) (struct {
 	CensusMerkleTree         string
 	VoteEncryptionPrivateKey string
 	Canceled                 bool
-	Results                  string
 }, error) {
 	return _VotingProcess.Contract.Processes(&_VotingProcess.CallOpts, arg0)
 }
 
 // Processes is a free data retrieval call binding the contract method 0x579e51c7.
 //
-// Solidity: function processes(uint256 ) constant returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled, string results)
+// Solidity: function processes(uint256 ) view returns(string processType, address entityAddress, uint256 startBlock, uint256 numberOfBlocks, string metadata, string censusMerkleRoot, string censusMerkleTree, string voteEncryptionPrivateKey, bool canceled)
 func (_VotingProcess *VotingProcessCallerSession) Processes(arg0 *big.Int) (struct {
 	ProcessType              string
 	EntityAddress            common.Address
@@ -603,30 +738,29 @@ func (_VotingProcess *VotingProcessCallerSession) Processes(arg0 *big.Int) (stru
 	CensusMerkleTree         string
 	VoteEncryptionPrivateKey string
 	Canceled                 bool
-	Results                  string
 }, error) {
 	return _VotingProcess.Contract.Processes(&_VotingProcess.CallOpts, arg0)
 }
 
-// AddOracle is a paid mutator transaction binding the contract method 0xc994bc86.
+// AddOracle is a paid mutator transaction binding the contract method 0xdf5dd1a5.
 //
-// Solidity: function addOracle(string oraclePublicKey) returns()
-func (_VotingProcess *VotingProcessTransactor) AddOracle(opts *bind.TransactOpts, oraclePublicKey string) (*types.Transaction, error) {
-	return _VotingProcess.contract.Transact(opts, "addOracle", oraclePublicKey)
+// Solidity: function addOracle(address oracleAddress) returns()
+func (_VotingProcess *VotingProcessTransactor) AddOracle(opts *bind.TransactOpts, oracleAddress common.Address) (*types.Transaction, error) {
+	return _VotingProcess.contract.Transact(opts, "addOracle", oracleAddress)
 }
 
-// AddOracle is a paid mutator transaction binding the contract method 0xc994bc86.
+// AddOracle is a paid mutator transaction binding the contract method 0xdf5dd1a5.
 //
-// Solidity: function addOracle(string oraclePublicKey) returns()
-func (_VotingProcess *VotingProcessSession) AddOracle(oraclePublicKey string) (*types.Transaction, error) {
-	return _VotingProcess.Contract.AddOracle(&_VotingProcess.TransactOpts, oraclePublicKey)
+// Solidity: function addOracle(address oracleAddress) returns()
+func (_VotingProcess *VotingProcessSession) AddOracle(oracleAddress common.Address) (*types.Transaction, error) {
+	return _VotingProcess.Contract.AddOracle(&_VotingProcess.TransactOpts, oracleAddress)
 }
 
-// AddOracle is a paid mutator transaction binding the contract method 0xc994bc86.
+// AddOracle is a paid mutator transaction binding the contract method 0xdf5dd1a5.
 //
-// Solidity: function addOracle(string oraclePublicKey) returns()
-func (_VotingProcess *VotingProcessTransactorSession) AddOracle(oraclePublicKey string) (*types.Transaction, error) {
-	return _VotingProcess.Contract.AddOracle(&_VotingProcess.TransactOpts, oraclePublicKey)
+// Solidity: function addOracle(address oracleAddress) returns()
+func (_VotingProcess *VotingProcessTransactorSession) AddOracle(oracleAddress common.Address) (*types.Transaction, error) {
+	return _VotingProcess.Contract.AddOracle(&_VotingProcess.TransactOpts, oracleAddress)
 }
 
 // AddValidator is a paid mutator transaction binding the contract method 0xb5da04f5.
@@ -713,46 +847,46 @@ func (_VotingProcess *VotingProcessTransactorSession) PublishPrivateKey(processI
 	return _VotingProcess.Contract.PublishPrivateKey(&_VotingProcess.TransactOpts, processId, privateKey)
 }
 
-// PublishResults is a paid mutator transaction binding the contract method 0xec8f670e.
+// PublishResults is a paid mutator transaction binding the contract method 0x9ed480c9.
 //
-// Solidity: function publishResults(bytes32 processId, string results) returns()
-func (_VotingProcess *VotingProcessTransactor) PublishResults(opts *bind.TransactOpts, processId [32]byte, results string) (*types.Transaction, error) {
+// Solidity: function publishResults(bytes32 processId, uint32[][] results) returns()
+func (_VotingProcess *VotingProcessTransactor) PublishResults(opts *bind.TransactOpts, processId [32]byte, results [][]uint32) (*types.Transaction, error) {
 	return _VotingProcess.contract.Transact(opts, "publishResults", processId, results)
 }
 
-// PublishResults is a paid mutator transaction binding the contract method 0xec8f670e.
+// PublishResults is a paid mutator transaction binding the contract method 0x9ed480c9.
 //
-// Solidity: function publishResults(bytes32 processId, string results) returns()
-func (_VotingProcess *VotingProcessSession) PublishResults(processId [32]byte, results string) (*types.Transaction, error) {
+// Solidity: function publishResults(bytes32 processId, uint32[][] results) returns()
+func (_VotingProcess *VotingProcessSession) PublishResults(processId [32]byte, results [][]uint32) (*types.Transaction, error) {
 	return _VotingProcess.Contract.PublishResults(&_VotingProcess.TransactOpts, processId, results)
 }
 
-// PublishResults is a paid mutator transaction binding the contract method 0xec8f670e.
+// PublishResults is a paid mutator transaction binding the contract method 0x9ed480c9.
 //
-// Solidity: function publishResults(bytes32 processId, string results) returns()
-func (_VotingProcess *VotingProcessTransactorSession) PublishResults(processId [32]byte, results string) (*types.Transaction, error) {
+// Solidity: function publishResults(bytes32 processId, uint32[][] results) returns()
+func (_VotingProcess *VotingProcessTransactorSession) PublishResults(processId [32]byte, results [][]uint32) (*types.Transaction, error) {
 	return _VotingProcess.Contract.PublishResults(&_VotingProcess.TransactOpts, processId, results)
 }
 
-// RemoveOracle is a paid mutator transaction binding the contract method 0x7f07492d.
+// RemoveOracle is a paid mutator transaction binding the contract method 0x014643ce.
 //
-// Solidity: function removeOracle(uint256 idx, string oraclePublicKey) returns()
-func (_VotingProcess *VotingProcessTransactor) RemoveOracle(opts *bind.TransactOpts, idx *big.Int, oraclePublicKey string) (*types.Transaction, error) {
-	return _VotingProcess.contract.Transact(opts, "removeOracle", idx, oraclePublicKey)
+// Solidity: function removeOracle(uint256 idx, address oracleAddress) returns()
+func (_VotingProcess *VotingProcessTransactor) RemoveOracle(opts *bind.TransactOpts, idx *big.Int, oracleAddress common.Address) (*types.Transaction, error) {
+	return _VotingProcess.contract.Transact(opts, "removeOracle", idx, oracleAddress)
 }
 
-// RemoveOracle is a paid mutator transaction binding the contract method 0x7f07492d.
+// RemoveOracle is a paid mutator transaction binding the contract method 0x014643ce.
 //
-// Solidity: function removeOracle(uint256 idx, string oraclePublicKey) returns()
-func (_VotingProcess *VotingProcessSession) RemoveOracle(idx *big.Int, oraclePublicKey string) (*types.Transaction, error) {
-	return _VotingProcess.Contract.RemoveOracle(&_VotingProcess.TransactOpts, idx, oraclePublicKey)
+// Solidity: function removeOracle(uint256 idx, address oracleAddress) returns()
+func (_VotingProcess *VotingProcessSession) RemoveOracle(idx *big.Int, oracleAddress common.Address) (*types.Transaction, error) {
+	return _VotingProcess.Contract.RemoveOracle(&_VotingProcess.TransactOpts, idx, oracleAddress)
 }
 
-// RemoveOracle is a paid mutator transaction binding the contract method 0x7f07492d.
+// RemoveOracle is a paid mutator transaction binding the contract method 0x014643ce.
 //
-// Solidity: function removeOracle(uint256 idx, string oraclePublicKey) returns()
-func (_VotingProcess *VotingProcessTransactorSession) RemoveOracle(idx *big.Int, oraclePublicKey string) (*types.Transaction, error) {
-	return _VotingProcess.Contract.RemoveOracle(&_VotingProcess.TransactOpts, idx, oraclePublicKey)
+// Solidity: function removeOracle(uint256 idx, address oracleAddress) returns()
+func (_VotingProcess *VotingProcessTransactorSession) RemoveOracle(idx *big.Int, oracleAddress common.Address) (*types.Transaction, error) {
+	return _VotingProcess.Contract.RemoveOracle(&_VotingProcess.TransactOpts, idx, oracleAddress)
 }
 
 // RemoveValidator is a paid mutator transaction binding the contract method 0x8ceb30c2.
@@ -895,6 +1029,7 @@ type VotingProcessChainIdChanged struct {
 //
 // Solidity: event ChainIdChanged(uint256 chainId)
 func (_VotingProcess *VotingProcessFilterer) FilterChainIdChanged(opts *bind.FilterOpts) (*VotingProcessChainIdChangedIterator, error) {
+
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "ChainIdChanged")
 	if err != nil {
 		return nil, err
@@ -906,6 +1041,7 @@ func (_VotingProcess *VotingProcessFilterer) FilterChainIdChanged(opts *bind.Fil
 //
 // Solidity: event ChainIdChanged(uint256 chainId)
 func (_VotingProcess *VotingProcessFilterer) WatchChainIdChanged(opts *bind.WatchOpts, sink chan<- *VotingProcessChainIdChanged) (event.Subscription, error) {
+
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "ChainIdChanged")
 	if err != nil {
 		return nil, err
@@ -1026,6 +1162,7 @@ type VotingProcessGenesisChanged struct {
 //
 // Solidity: event GenesisChanged(string genesis)
 func (_VotingProcess *VotingProcessFilterer) FilterGenesisChanged(opts *bind.FilterOpts) (*VotingProcessGenesisChangedIterator, error) {
+
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "GenesisChanged")
 	if err != nil {
 		return nil, err
@@ -1037,6 +1174,7 @@ func (_VotingProcess *VotingProcessFilterer) FilterGenesisChanged(opts *bind.Fil
 //
 // Solidity: event GenesisChanged(string genesis)
 func (_VotingProcess *VotingProcessFilterer) WatchGenesisChanged(opts *bind.WatchOpts, sink chan<- *VotingProcessGenesisChanged) (event.Subscription, error) {
+
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "GenesisChanged")
 	if err != nil {
 		return nil, err
@@ -1149,14 +1287,15 @@ func (it *VotingProcessOracleAddedIterator) Close() error {
 
 // VotingProcessOracleAdded represents a OracleAdded event raised by the VotingProcess contract.
 type VotingProcessOracleAdded struct {
-	OraclePublicKey string
-	Raw             types.Log // Blockchain specific contextual infos
+	OracleAddress common.Address
+	Raw           types.Log // Blockchain specific contextual infos
 }
 
-// FilterOracleAdded is a free log retrieval operation binding the contract event 0xf2cf567db3ebcbfcad45b1da586f6b7f795e01cad81a993c3cea865f259eec79.
+// FilterOracleAdded is a free log retrieval operation binding the contract event 0x0047706786c922d17b39285dc59d696bafea72c0b003d3841ae1202076f4c2e4.
 //
-// Solidity: event OracleAdded(string oraclePublicKey)
+// Solidity: event OracleAdded(address oracleAddress)
 func (_VotingProcess *VotingProcessFilterer) FilterOracleAdded(opts *bind.FilterOpts) (*VotingProcessOracleAddedIterator, error) {
+
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "OracleAdded")
 	if err != nil {
 		return nil, err
@@ -1164,10 +1303,11 @@ func (_VotingProcess *VotingProcessFilterer) FilterOracleAdded(opts *bind.Filter
 	return &VotingProcessOracleAddedIterator{contract: _VotingProcess.contract, event: "OracleAdded", logs: logs, sub: sub}, nil
 }
 
-// WatchOracleAdded is a free log subscription operation binding the contract event 0xf2cf567db3ebcbfcad45b1da586f6b7f795e01cad81a993c3cea865f259eec79.
+// WatchOracleAdded is a free log subscription operation binding the contract event 0x0047706786c922d17b39285dc59d696bafea72c0b003d3841ae1202076f4c2e4.
 //
-// Solidity: event OracleAdded(string oraclePublicKey)
+// Solidity: event OracleAdded(address oracleAddress)
 func (_VotingProcess *VotingProcessFilterer) WatchOracleAdded(opts *bind.WatchOpts, sink chan<- *VotingProcessOracleAdded) (event.Subscription, error) {
+
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "OracleAdded")
 	if err != nil {
 		return nil, err
@@ -1200,9 +1340,9 @@ func (_VotingProcess *VotingProcessFilterer) WatchOracleAdded(opts *bind.WatchOp
 	}), nil
 }
 
-// ParseOracleAdded is a log parse operation binding the contract event 0xf2cf567db3ebcbfcad45b1da586f6b7f795e01cad81a993c3cea865f259eec79.
+// ParseOracleAdded is a log parse operation binding the contract event 0x0047706786c922d17b39285dc59d696bafea72c0b003d3841ae1202076f4c2e4.
 //
-// Solidity: event OracleAdded(string oraclePublicKey)
+// Solidity: event OracleAdded(address oracleAddress)
 func (_VotingProcess *VotingProcessFilterer) ParseOracleAdded(log types.Log) (*VotingProcessOracleAdded, error) {
 	event := new(VotingProcessOracleAdded)
 	if err := _VotingProcess.contract.UnpackLog(event, "OracleAdded", log); err != nil {
@@ -1280,14 +1420,15 @@ func (it *VotingProcessOracleRemovedIterator) Close() error {
 
 // VotingProcessOracleRemoved represents a OracleRemoved event raised by the VotingProcess contract.
 type VotingProcessOracleRemoved struct {
-	OraclePublicKey string
-	Raw             types.Log // Blockchain specific contextual infos
+	OracleAddress common.Address
+	Raw           types.Log // Blockchain specific contextual infos
 }
 
-// FilterOracleRemoved is a free log retrieval operation binding the contract event 0xa28dc34059cd4716d51da651406dc8ff96399e3cf46725143a7f2855c68cf394.
+// FilterOracleRemoved is a free log retrieval operation binding the contract event 0x9c8e7d83025bef8a04c664b2f753f64b8814bdb7e27291d7e50935f18cc3c712.
 //
-// Solidity: event OracleRemoved(string oraclePublicKey)
+// Solidity: event OracleRemoved(address oracleAddress)
 func (_VotingProcess *VotingProcessFilterer) FilterOracleRemoved(opts *bind.FilterOpts) (*VotingProcessOracleRemovedIterator, error) {
+
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "OracleRemoved")
 	if err != nil {
 		return nil, err
@@ -1295,10 +1436,11 @@ func (_VotingProcess *VotingProcessFilterer) FilterOracleRemoved(opts *bind.Filt
 	return &VotingProcessOracleRemovedIterator{contract: _VotingProcess.contract, event: "OracleRemoved", logs: logs, sub: sub}, nil
 }
 
-// WatchOracleRemoved is a free log subscription operation binding the contract event 0xa28dc34059cd4716d51da651406dc8ff96399e3cf46725143a7f2855c68cf394.
+// WatchOracleRemoved is a free log subscription operation binding the contract event 0x9c8e7d83025bef8a04c664b2f753f64b8814bdb7e27291d7e50935f18cc3c712.
 //
-// Solidity: event OracleRemoved(string oraclePublicKey)
+// Solidity: event OracleRemoved(address oracleAddress)
 func (_VotingProcess *VotingProcessFilterer) WatchOracleRemoved(opts *bind.WatchOpts, sink chan<- *VotingProcessOracleRemoved) (event.Subscription, error) {
+
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "OracleRemoved")
 	if err != nil {
 		return nil, err
@@ -1331,9 +1473,9 @@ func (_VotingProcess *VotingProcessFilterer) WatchOracleRemoved(opts *bind.Watch
 	}), nil
 }
 
-// ParseOracleRemoved is a log parse operation binding the contract event 0xa28dc34059cd4716d51da651406dc8ff96399e3cf46725143a7f2855c68cf394.
+// ParseOracleRemoved is a log parse operation binding the contract event 0x9c8e7d83025bef8a04c664b2f753f64b8814bdb7e27291d7e50935f18cc3c712.
 //
-// Solidity: event OracleRemoved(string oraclePublicKey)
+// Solidity: event OracleRemoved(address oracleAddress)
 func (_VotingProcess *VotingProcessFilterer) ParseOracleRemoved(log types.Log) (*VotingProcessOracleRemoved, error) {
 	event := new(VotingProcessOracleRemoved)
 	if err := _VotingProcess.contract.UnpackLog(event, "OracleRemoved", log); err != nil {
@@ -1420,6 +1562,7 @@ type VotingProcessPrivateKeyPublished struct {
 //
 // Solidity: event PrivateKeyPublished(bytes32 indexed processId, string privateKey)
 func (_VotingProcess *VotingProcessFilterer) FilterPrivateKeyPublished(opts *bind.FilterOpts, processId [][32]byte) (*VotingProcessPrivateKeyPublishedIterator, error) {
+
 	var processIdRule []interface{}
 	for _, processIdItem := range processId {
 		processIdRule = append(processIdRule, processIdItem)
@@ -1436,6 +1579,7 @@ func (_VotingProcess *VotingProcessFilterer) FilterPrivateKeyPublished(opts *bin
 //
 // Solidity: event PrivateKeyPublished(bytes32 indexed processId, string privateKey)
 func (_VotingProcess *VotingProcessFilterer) WatchPrivateKeyPublished(opts *bind.WatchOpts, sink chan<- *VotingProcessPrivateKeyPublished, processId [][32]byte) (event.Subscription, error) {
+
 	var processIdRule []interface{}
 	for _, processIdItem := range processId {
 		processIdRule = append(processIdRule, processIdItem)
@@ -1562,6 +1706,7 @@ type VotingProcessProcessCanceled struct {
 //
 // Solidity: event ProcessCanceled(address indexed entityAddress, bytes32 processId)
 func (_VotingProcess *VotingProcessFilterer) FilterProcessCanceled(opts *bind.FilterOpts, entityAddress []common.Address) (*VotingProcessProcessCanceledIterator, error) {
+
 	var entityAddressRule []interface{}
 	for _, entityAddressItem := range entityAddress {
 		entityAddressRule = append(entityAddressRule, entityAddressItem)
@@ -1578,6 +1723,7 @@ func (_VotingProcess *VotingProcessFilterer) FilterProcessCanceled(opts *bind.Fi
 //
 // Solidity: event ProcessCanceled(address indexed entityAddress, bytes32 processId)
 func (_VotingProcess *VotingProcessFilterer) WatchProcessCanceled(opts *bind.WatchOpts, sink chan<- *VotingProcessProcessCanceled, entityAddress []common.Address) (event.Subscription, error) {
+
 	var entityAddressRule []interface{}
 	for _, entityAddressItem := range entityAddress {
 		entityAddressRule = append(entityAddressRule, entityAddressItem)
@@ -1705,6 +1851,7 @@ type VotingProcessProcessCreated struct {
 //
 // Solidity: event ProcessCreated(address indexed entityAddress, bytes32 processId, string merkleTree)
 func (_VotingProcess *VotingProcessFilterer) FilterProcessCreated(opts *bind.FilterOpts, entityAddress []common.Address) (*VotingProcessProcessCreatedIterator, error) {
+
 	var entityAddressRule []interface{}
 	for _, entityAddressItem := range entityAddress {
 		entityAddressRule = append(entityAddressRule, entityAddressItem)
@@ -1721,6 +1868,7 @@ func (_VotingProcess *VotingProcessFilterer) FilterProcessCreated(opts *bind.Fil
 //
 // Solidity: event ProcessCreated(address indexed entityAddress, bytes32 processId, string merkleTree)
 func (_VotingProcess *VotingProcessFilterer) WatchProcessCreated(opts *bind.WatchOpts, sink chan<- *VotingProcessProcessCreated, entityAddress []common.Address) (event.Subscription, error) {
+
 	var entityAddressRule []interface{}
 	for _, entityAddressItem := range entityAddress {
 		entityAddressRule = append(entityAddressRule, entityAddressItem)
@@ -1839,14 +1987,15 @@ func (it *VotingProcessResultsPublishedIterator) Close() error {
 // VotingProcessResultsPublished represents a ResultsPublished event raised by the VotingProcess contract.
 type VotingProcessResultsPublished struct {
 	ProcessId [32]byte
-	Results   string
+	Results   [][]uint32
 	Raw       types.Log // Blockchain specific contextual infos
 }
 
-// FilterResultsPublished is a free log retrieval operation binding the contract event 0x8b7614f77555532e6b033ab6da00ac40495940598b8916b1c77a44351428ae0a.
+// FilterResultsPublished is a free log retrieval operation binding the contract event 0xd82ac7ddf89648ce31f759794ebe3ef53185405575ce20dcd72f4a176cf95e45.
 //
-// Solidity: event ResultsPublished(bytes32 indexed processId, string results)
+// Solidity: event ResultsPublished(bytes32 indexed processId, uint32[][] results)
 func (_VotingProcess *VotingProcessFilterer) FilterResultsPublished(opts *bind.FilterOpts, processId [][32]byte) (*VotingProcessResultsPublishedIterator, error) {
+
 	var processIdRule []interface{}
 	for _, processIdItem := range processId {
 		processIdRule = append(processIdRule, processIdItem)
@@ -1859,10 +2008,11 @@ func (_VotingProcess *VotingProcessFilterer) FilterResultsPublished(opts *bind.F
 	return &VotingProcessResultsPublishedIterator{contract: _VotingProcess.contract, event: "ResultsPublished", logs: logs, sub: sub}, nil
 }
 
-// WatchResultsPublished is a free log subscription operation binding the contract event 0x8b7614f77555532e6b033ab6da00ac40495940598b8916b1c77a44351428ae0a.
+// WatchResultsPublished is a free log subscription operation binding the contract event 0xd82ac7ddf89648ce31f759794ebe3ef53185405575ce20dcd72f4a176cf95e45.
 //
-// Solidity: event ResultsPublished(bytes32 indexed processId, string results)
+// Solidity: event ResultsPublished(bytes32 indexed processId, uint32[][] results)
 func (_VotingProcess *VotingProcessFilterer) WatchResultsPublished(opts *bind.WatchOpts, sink chan<- *VotingProcessResultsPublished, processId [][32]byte) (event.Subscription, error) {
+
 	var processIdRule []interface{}
 	for _, processIdItem := range processId {
 		processIdRule = append(processIdRule, processIdItem)
@@ -1900,9 +2050,9 @@ func (_VotingProcess *VotingProcessFilterer) WatchResultsPublished(opts *bind.Wa
 	}), nil
 }
 
-// ParseResultsPublished is a log parse operation binding the contract event 0x8b7614f77555532e6b033ab6da00ac40495940598b8916b1c77a44351428ae0a.
+// ParseResultsPublished is a log parse operation binding the contract event 0xd82ac7ddf89648ce31f759794ebe3ef53185405575ce20dcd72f4a176cf95e45.
 //
-// Solidity: event ResultsPublished(bytes32 indexed processId, string results)
+// Solidity: event ResultsPublished(bytes32 indexed processId, uint32[][] results)
 func (_VotingProcess *VotingProcessFilterer) ParseResultsPublished(log types.Log) (*VotingProcessResultsPublished, error) {
 	event := new(VotingProcessResultsPublished)
 	if err := _VotingProcess.contract.UnpackLog(event, "ResultsPublished", log); err != nil {
@@ -1988,6 +2138,7 @@ type VotingProcessValidatorAdded struct {
 //
 // Solidity: event ValidatorAdded(string validatorPublicKey)
 func (_VotingProcess *VotingProcessFilterer) FilterValidatorAdded(opts *bind.FilterOpts) (*VotingProcessValidatorAddedIterator, error) {
+
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "ValidatorAdded")
 	if err != nil {
 		return nil, err
@@ -1999,6 +2150,7 @@ func (_VotingProcess *VotingProcessFilterer) FilterValidatorAdded(opts *bind.Fil
 //
 // Solidity: event ValidatorAdded(string validatorPublicKey)
 func (_VotingProcess *VotingProcessFilterer) WatchValidatorAdded(opts *bind.WatchOpts, sink chan<- *VotingProcessValidatorAdded) (event.Subscription, error) {
+
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "ValidatorAdded")
 	if err != nil {
 		return nil, err
@@ -2119,6 +2271,7 @@ type VotingProcessValidatorRemoved struct {
 //
 // Solidity: event ValidatorRemoved(string validatorPublicKey)
 func (_VotingProcess *VotingProcessFilterer) FilterValidatorRemoved(opts *bind.FilterOpts) (*VotingProcessValidatorRemovedIterator, error) {
+
 	logs, sub, err := _VotingProcess.contract.FilterLogs(opts, "ValidatorRemoved")
 	if err != nil {
 		return nil, err
@@ -2130,6 +2283,7 @@ func (_VotingProcess *VotingProcessFilterer) FilterValidatorRemoved(opts *bind.F
 //
 // Solidity: event ValidatorRemoved(string validatorPublicKey)
 func (_VotingProcess *VotingProcessFilterer) WatchValidatorRemoved(opts *bind.WatchOpts, sink chan<- *VotingProcessValidatorRemoved) (event.Subscription, error) {
+
 	logs, sub, err := _VotingProcess.contract.WatchLogs(opts, "ValidatorRemoved")
 	if err != nil {
 		return nil, err

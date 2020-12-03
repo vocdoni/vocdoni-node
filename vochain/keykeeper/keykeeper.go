@@ -1,21 +1,22 @@
 package keykeeper
 
 import (
-	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
+	"google.golang.org/protobuf/proto"
 )
 
 /*
@@ -145,7 +146,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 	defer k.lock.Unlock()
 	iter := k.storage.NewIterator()
 	defer iter.Release()
-	var pids []string
+	var pids models.StoredKeys
 	log.Infof("starting keykeeper reveal recovery")
 	// First get the scheduled reveal key process from the storage
 	for iter.Next() {
@@ -161,13 +162,13 @@ func (k *KeyKeeper) RevealUnpublished() {
 		if header.Height <= h+1 {
 			continue
 		}
-		if err := k.vochain.State.Codec.UnmarshalBinaryBare(iter.Value(), &pids); err != nil {
+		if err := proto.Unmarshal(iter.Value(), &pids); err != nil {
 			log.Errorf("could not unmarshal value: %s", err)
 			continue
 		}
 		log.Warnf("found pending keys for reveal")
-		for _, p := range pids {
-			if err := k.revealKeys(p); err != nil {
+		for _, p := range pids.GetPids() {
+			if err := k.revealKeys(string(p)); err != nil {
 				log.Error(err)
 			}
 		}
@@ -179,7 +180,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 	iter = k.storage.NewIterator()
 	var pid []byte
 	var err error
-	var process *types.Process
+	var process *models.Process
 	// Second take all existing processes and check if keys should be revealed (if canceled)
 	for iter.Next() {
 		if !strings.HasPrefix(string(iter.Key()), dbPrefixProcess) {
@@ -191,7 +192,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 			log.Error(err)
 			continue
 		}
-		if process.Canceled {
+		if process.Status == models.ProcessStatus_CANCELED || process.Status == models.ProcessStatus_ENDED {
 			log.Warnf("found pending keys for reveal on process %x", pid)
 			if err := k.revealKeys(string(pid)); err != nil {
 				log.Error(err)
@@ -215,7 +216,7 @@ func (k *KeyKeeper) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 		log.Errorf("cannot get process from state: (%s)", err)
 		return
 	}
-	if !p.RequireKeys() {
+	if !(p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes) {
 		return
 	}
 	// If keys already exist, do nothing (this happends on the start-up block replay)
@@ -236,17 +237,17 @@ func (k *KeyKeeper) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 	}
 
 	// Add keys to the pool queue
-	k.blockPool[string(pid)] = p.StartBlock + p.NumberOfBlocks
+	k.blockPool[string(pid)] = int64(p.StartBlock + p.BlockCount)
 }
 
 // OnCancel will publish the private and reveal keys of the canceled process, if required
-func (k *KeyKeeper) OnCancel(pid []byte) {
+func (k *KeyKeeper) OnCancel(pid []byte) { // LEGACY
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
 		return
 	}
-	if !p.RequireKeys() {
+	if !(p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes) {
 		return
 	}
 
@@ -264,8 +265,26 @@ func (k *KeyKeeper) Commit(height int64) {
 }
 
 // OnVote is not used by the KeyKeeper
-func (k *KeyKeeper) OnVote(v *types.Vote) {
+func (k *KeyKeeper) OnVote(v *models.Vote) {
 	// do nothing
+}
+
+// OnProcessStatusChange will publish the private and reveal keys of the ended process, if required
+func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {
+	p, err := k.vochain.State.Process(pid, false)
+	if err != nil {
+		log.Errorf("cannot get process from state: (%s)", err)
+		return
+	}
+	if !(p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes) {
+		return
+	}
+	if p.EncryptionPublicKeys[k.myIndex] != "" {
+		if status == models.ProcessStatus_ENDED {
+			log.Infof("process canceled, scheduling reveal keys for next block")
+			k.blockPool[string(pid)] = k.vochain.State.Header(false).Height + 1
+		}
+	}
 }
 
 func (k *KeyKeeper) OnProcessKeys(pid []byte, pub, com string) {
@@ -309,7 +328,7 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 	k.lock.Lock()
 	defer k.lock.Unlock()
 	for pid, height := range k.blockPool {
-		pids := []string{}
+		pids := models.StoredKeys{}
 		pkey := []byte(dbPrefixBlock + fmt.Sprintf("%d", height))
 		var data []byte
 		var err error
@@ -320,12 +339,12 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 				log.Errorf("cannot get existing list of scheduled reveal processes for block %d", height)
 				continue
 			}
-			if err := k.vochain.State.Codec.UnmarshalBinaryBare(data, &pids); err != nil {
+			if err := proto.Unmarshal(data, &pids); err != nil {
 				log.Errorf("cannot unmarshal process pids for block %d: (%s)", height, err)
 			}
 		}
-		pids = append(pids, pid)
-		data, err = k.vochain.Codec.MarshalBinaryBare(pids)
+		pids.Pids = append(pids.Pids, []byte(pid))
+		data, err = proto.Marshal(&pids)
 		if err != nil {
 			log.Errorf("cannot marshal new pid list for scheduling on block %d: (%s)", height, err)
 			continue
@@ -356,23 +375,23 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 		return
 	}
 
-	var pids []string
-	if err := k.vochain.Codec.UnmarshalBinaryBare(data, &pids); err != nil {
+	var pids models.StoredKeys
+	if err := proto.Unmarshal(data, &pids); err != nil {
 		log.Errorf("cannot unmarshal process pids for block %d: (%s)", height, err)
 		return
 	}
-	for _, p := range pids {
+	for _, p := range pids.GetPids() {
 		process, err := k.vochain.State.Process([]byte(p), false)
 		if err != nil {
 			log.Errorf("cannot get process from state: (%s)", err)
 			continue
 		}
-		if !process.RequireKeys() {
+		if !(process.EnvelopeType.Anonymous || process.EnvelopeType.EncryptedVotes) {
 			return
 		}
 		if process.EncryptionPublicKeys[k.myIndex] != "" {
 			log.Infof("revealing keys for process %x on block %d", p, height)
-			if err := k.revealKeys(p); err != nil {
+			if err := k.revealKeys(string(p)); err != nil {
 				log.Errorf("cannot reveal proces keys for %x: (%s)", p, err)
 			}
 		}
@@ -393,13 +412,15 @@ func (k *KeyKeeper) publishPendingKeys() {
 // This functions must be async in order to avoid a deadlock on the block creation
 func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	log.Infof("publishing keys for process %x", []byte(pid))
-	tx := &types.AdminTx{
-		Type:                types.TxAddProcessKeys,
-		KeyIndex:            int(pk.index),
+	kindex := new(uint32)
+	*kindex = uint32(pk.index)
+	tx := &models.AdminTx{
+		Txtype:              models.TxType_ADD_PROCESS_KEYS,
+		KeyIndex:            kindex,
 		Nonce:               util.RandomHex(32),
-		ProcessID:           fmt.Sprintf("%x", []byte(pid)),
-		EncryptionPublicKey: fmt.Sprintf("%x", pk.pubKey),
-		CommitmentKey:       fmt.Sprintf("%x", pk.commitmentKey),
+		ProcessId:           []byte(pid),
+		EncryptionPublicKey: pk.pubKey,
+		CommitmentKey:       pk.commitmentKey,
 	}
 	if err := k.signAndSendTx(tx); err != nil {
 		return err
@@ -437,14 +458,15 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 	if err != nil {
 		return err
 	}
-
-	tx := &types.AdminTx{
-		Type:                 types.TxRevealProcessKeys,
-		KeyIndex:             int(pk.index),
+	kindex := new(uint32)
+	*kindex = uint32(pk.index)
+	tx := &models.AdminTx{
+		Txtype:               models.TxType_REVEAL_PROCESS_KEYS,
+		KeyIndex:             kindex,
 		Nonce:                util.RandomHex(32),
-		ProcessID:            fmt.Sprintf("%x", []byte(pid)),
-		EncryptionPrivateKey: fmt.Sprintf("%x", pk.privKey),
-		RevealKey:            fmt.Sprintf("%x", pk.revealKey),
+		ProcessId:            []byte(pid),
+		EncryptionPrivateKey: pk.privKey,
+		RevealKey:            pk.revealKey,
 	}
 	if err := k.signAndSendTx(tx); err != nil {
 		return err
@@ -461,20 +483,28 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 	return nil
 }
 
-func (k *KeyKeeper) signAndSendTx(tx *types.AdminTx) error {
+func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
 	// sign the transaction
-	txBytes, err := json.Marshal(tx)
+	txBytes, err := proto.Marshal(tx)
 	if err != nil {
 		return err
 	}
-	if tx.Signature, err = k.signer.Sign(txBytes); err != nil {
+	vtx := models.Tx{Payload: &models.Tx_Admin{Admin: tx}}
+	var signHex string
+	if signHex, err = k.signer.Sign(txBytes); err != nil {
 		return err
 	}
-	if txBytes, err = json.Marshal(tx); err != nil {
+	signature, err := hex.DecodeString(signHex)
+	if err != nil {
+		return err
+	}
+	vtx.Signature = signature
+	vtxBytes, err := proto.Marshal(&vtx)
+	if err != nil {
 		return err
 	}
 	// Send the transaction to the mempool
-	result, err := k.vochain.SendTX(txBytes)
+	result, err := k.vochain.SendTX(vtxBytes)
 	if err != nil {
 		return err
 	}

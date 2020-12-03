@@ -4,9 +4,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/census"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
@@ -43,7 +43,7 @@ func (c *CensusDownloader) importCensus(root, uri string) {
 func (c *CensusDownloader) Rollback() {
 	c.queueLock.Lock()
 	c.queue = make(map[string]string)
-	c.isFastSync = c.vochain.Node.ConsensusReactor().FastSync()
+	c.isFastSync = c.vochain.Node.ConsensusReactor().WaitSync()
 	c.queueLock.Unlock()
 }
 
@@ -65,7 +65,8 @@ func (c *CensusDownloader) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 	}
 }
 
-func (c *CensusDownloader) OnCancel(pid []byte)                       {}
-func (c *CensusDownloader) OnVote(v *types.Vote)                      {}
-func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string) {}
-func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string) {}
+func (c *CensusDownloader) OnCancel(pid []byte)                                           {}
+func (c *CensusDownloader) OnVote(v *models.Vote)                                         {}
+func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string)                     {}
+func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string)                     {}
+func (c *CensusDownloader) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {}

@@ -1,20 +1,18 @@
 package commands
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
-	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
-	tmtime "github.com/tendermint/tendermint/types/time"
 
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
-
-const minersPower = 10
 
 var generateCmd = &cobra.Command{
 	Use:   "generate",
@@ -35,9 +33,9 @@ func generate(cmd *cobra.Command, args []string) error {
 	// Generate miners
 	mCount, _ := cmd.Flags().GetInt("miners")
 
-	minerPVs := make([]*privval.FilePV, mCount)
+	minerPVs := make([]privval.FilePV, mCount)
 	for i := range minerPVs {
-		minerPVs[i] = privval.GenFilePV("", "")
+		minerPVs[i] = *privval.GenFilePV("", "")
 		prettyHeader(fmt.Sprintf("Miner #%d", i+1))
 		fmt.Printf("Address: %s\n", au.Yellow(minerPVs[i].Key.Address))
 		fmt.Printf("Private Key: %x\n", au.Yellow(minerPVs[i].Key.PrivKey))
@@ -67,43 +65,16 @@ func generate(cmd *cobra.Command, args []string) error {
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
 	consensusParams := &types.ConsensusParams{
 		Block:     types.BlockParams(tmConsensusParams.Block),
-		Evidence:  types.EvidenceParams(tmConsensusParams.Evidence),
 		Validator: types.ValidatorParams(tmConsensusParams.Validator),
 	}
 	chainID, _ := cmd.Flags().GetString("chainId")
-	appState := new(types.GenesisAppState)
 
-	appState.Oracles = oracles
-	cdc := amino.NewCodec()
-	vochain.RegisterAmino(cdc)
-
-	appState.Validators = make([]types.GenesisValidator, mCount)
-	for idx, val := range minerPVs {
-		pubk, err := val.GetPubKey()
-		if err != nil {
-			return err
-		}
-
-		appState.Validators[idx] = types.GenesisValidator{
-			Address: pubk.Address(),
-			PubKey:  pubk,
-			Power:   minersPower,
-			Name:    "miner-" + fmt.Sprint(idx+1),
-		}
-	}
-
-	appStateBytes, err := cdc.MarshalJSON(appState)
+	genesisBytes, err := vochain.NewGenesis(nil, chainID, consensusParams, minerPVs, oracles)
 	if err != nil {
 		return err
 	}
-	genDoc := types.GenesisDoc{
-		ChainID:         chainID,
-		GenesisTime:     tmtime.Now(),
-		ConsensusParams: consensusParams,
-		Validators:      appState.Validators,
-		AppState:        appStateBytes,
-	}
-	data, err := cdc.MarshalJSONIndent(genDoc, "", "  ")
+	data := new(bytes.Buffer)
+	err = json.Indent(data, genesisBytes, "", "  ")
 	if err != nil {
 		return err
 	}

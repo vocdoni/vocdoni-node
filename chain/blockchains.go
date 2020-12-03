@@ -73,8 +73,8 @@ var sokol = Specs{
 var goerli = Specs{
 	Name:            "goerli",
 	NetworkId:       5,
-	StartingBlock:   2814315,
-	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
+	StartingBlock:   3000000,
+	ENSregistryAddr: "0xDA49dD1B5c62018C4F33ff2e39B30A21644E4EE8",
 	BootNodes:       ethparams.GoerliBootnodes,
 	GenesisHash:     "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog

@@ -3,17 +3,19 @@ package client
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
 
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
+	"google.golang.org/protobuf/proto"
 )
 
 type pkeys struct {
@@ -77,7 +79,7 @@ func (c *Client) GetResults(pid string) ([][]uint32, string, error) {
 	return resp.Results, resp.State, nil
 }
 
-func (c *Client) GetEnvelopeHeight(pid string) (int64, error) {
+func (c *Client) GetEnvelopeHeight(pid string) (uint32, error) {
 	var req types.MetaRequest
 	req.Method = "getEnvelopeHeight"
 	req.ProcessID = pid
@@ -163,7 +165,7 @@ func (c *Client) TestResults(pid string, totalVotes int) ([][]uint32, error) {
 	log.Infof("waiting for results...")
 	var err error
 	var results [][]uint32
-	var block int64
+	var block uint32
 	for {
 		block, err = c.GetCurrentBlock()
 		if err != nil {
@@ -186,8 +188,8 @@ func (c *Client) TestResults(pid string, totalVotes int) ([][]uint32, error) {
 	return results, nil
 }
 
-func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root string, tolerateError bool) ([]string, error) {
-	var proofs []string
+func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root string, tolerateError bool) ([][]byte, error) {
+	var proofs [][]byte
 	var pub, proof string
 	var err error
 	// Generate merkle proofs
@@ -212,7 +214,14 @@ func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root string, tolera
 			}
 			return proofs, err
 		}
-		proofs = append(proofs, proof)
+		proofb, err := hex.DecodeString(proof)
+		if err != nil {
+			if tolerateError {
+				continue
+			}
+			return proofs, err
+		}
+		proofs = append(proofs, proofb)
 		if (i+1)%100 == 0 {
 			log.Infof("proof generation progress for %s: %d%%", c.Addr, int(((i+1)*100)/(len(signers))))
 		}
@@ -220,7 +229,7 @@ func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root string, tolera
 	return proofs, nil
 }
 
-func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers []*ethereum.SignKeys, proofs []string, encrypted bool, doubleVoting bool, wg *sync.WaitGroup) (time.Duration, error) {
+func (c *Client) TestSendVotes(pid, eid, root string, startBlock uint32, signers []*ethereum.SignKeys, proofs [][]byte, encrypted bool, doubleVoting bool, wg *sync.WaitGroup) (time.Duration, error) {
 	var err error
 	var keys []string
 	// Generate merkle proofs
@@ -237,14 +246,14 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 	wg.Wait()
 
 	// Get encryption keys
-	keyIndexes := []int{}
+	keyIndexes := []uint32{}
 	if encrypted {
 		if pk, err := c.GetKeys(pid, eid); err != nil {
 			return 0, fmt.Errorf("cannot get process keys: (%s)", err)
 		} else {
 			for _, k := range pk.pub {
 				if len(k.Key) > 0 {
-					keyIndexes = append(keyIndexes, k.Idx)
+					keyIndexes = append(keyIndexes, uint32(k.Idx))
 					keys = append(keys, k.Key)
 				}
 			}
@@ -254,7 +263,10 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 		}
 		log.Infof("got encryption keys!")
 	}
-
+	pidb, err := hex.DecodeString(pid)
+	if err != nil {
+		return 0, fmt.Errorf("cannot decode process Id: %w", err)
+	}
 	// Send votes
 	log.Infof("sending votes")
 	timeDeadLine := time.Second * 200
@@ -264,7 +276,7 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 	log.Infof("time deadline set to %d seconds", timeDeadLine/time.Second)
 	req := types.MetaRequest{Method: "submitRawTx"}
 	nullifiers := []string{}
-	vpb := ""
+	var vpb []byte
 	start := time.Now()
 
 	for i := 0; i < len(signers); i++ {
@@ -272,29 +284,33 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 		if vpb, err = genVote(encrypted, keys); err != nil {
 			return 0, err
 		}
-		v := types.VoteTx{
-			Nonce:                RandomHex(16),
-			ProcessID:            pid,
-			Proof:                proofs[i],
+		v := &models.VoteEnvelope{
+			Nonce:                util.RandomHex(32),
+			ProcessId:            pidb,
+			Proof:                &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proofs[i]}}},
 			VotePackage:          vpb,
 			EncryptionKeyIndexes: keyIndexes,
 		}
 
-		txBytes, err := json.Marshal(v)
+		txBytes, err := proto.Marshal(v)
 		if err != nil {
 			return 0, err
 		}
-		if v.Signature, err = s.Sign(txBytes); err != nil {
+		vtx := models.Tx{Payload: &models.Tx_Vote{Vote: v}}
+		signHex := ""
+		if signHex, err = s.Sign(txBytes); err != nil {
 			return 0, err
 		}
-		v.Type = "vote"
-		if txBytes, err = json.Marshal(v); err != nil {
+		vtx.Signature, err = hex.DecodeString(signHex)
+		if err != nil {
+			return 0, err
+		}
+		if req.Payload, err = proto.Marshal(&vtx); err != nil {
 			return 0, err
 		}
 		pub, _ := s.HexString()
 		pubd, _ := ethereum.DecompressPubKey(pub)
 		log.Debugf("voting with pubKey:%s", pubd)
-		req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
 		resp, err := c.Request(req, nil)
 		if err != nil {
 			return 0, err
@@ -334,7 +350,7 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 			log.Warnf("error getting envelope height")
 			continue
 		} else {
-			if h >= int64(len(signers)) {
+			if h >= uint32(len(signers)) {
 				break
 			}
 		}
@@ -364,34 +380,59 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock int64, signers 
 	return votingElapsedTime, nil
 }
 
-func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (int64, error) {
+func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (uint32, error) {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
 	block, err := c.GetCurrentBlock()
 	if err != nil {
 		return 0, err
 	}
-	p := types.NewProcessTx{
-		Type:           "newProcess",
-		EntityID:       entityID,
-		MkRoot:         mkroot,
-		MkURI:          mkuri,
-		NumberOfBlocks: int64(duration),
-		ProcessID:      pid,
-		ProcessType:    ptype,
-		StartBlock:     block + 4,
-	}
-	txBytes, err := json.Marshal(p)
+	txPid, err := hex.DecodeString(util.TrimHex(pid))
 	if err != nil {
 		return 0, err
 	}
-	if p.Signature, err = oracle.Sign(txBytes); err != nil {
+	txEid, err := hex.DecodeString(util.TrimHex(entityID))
+	if err != nil {
 		return 0, err
 	}
-	if txBytes, err = json.Marshal(p); err != nil {
+	txMkRoot, err := hex.DecodeString(util.TrimHex(mkroot))
+	if err != nil {
 		return 0, err
 	}
-	req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
+	processData := &models.Process{
+		EntityId:     txEid,
+		CensusMkRoot: txMkRoot,
+		CensusMkURI:  &mkuri,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		BlockCount:   uint32(duration),
+		ProcessId:    txPid,
+		ProcessType:  ptype,
+		StartBlock:   uint32(block + 4),
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: ptype == "encrypted-poll"},
+		Mode:         &models.ProcessMode{AutoStart: true},
+		Status:       models.ProcessStatus_READY,
+	}
+	p := &models.NewProcessTx{
+		Txtype:  models.TxType_NEW_PROCESS,
+		Nonce:   util.RandomHex(32),
+		Process: processData,
+	}
+	txBytes, err := proto.Marshal(p)
+	if err != nil {
+		return 0, err
+	}
+	vtx := models.Tx{Payload: &models.Tx_NewProcess{NewProcess: p}}
+	signHex := ""
+	if signHex, err = oracle.Sign(txBytes); err != nil {
+		return 0, err
+	}
+	vtx.Signature, err = hex.DecodeString(signHex)
+	if err != nil {
+		return 0, err
+	}
+	if req.Payload, err = proto.Marshal(&vtx); err != nil {
+		return 0, err
+	}
 
 	resp, err := c.Request(req, nil)
 	if err != nil {
@@ -400,27 +441,37 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkur
 	if !resp.Ok {
 		return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
-	return p.StartBlock, nil
+	return p.Process.StartBlock, nil
 }
 
 func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
-	p := types.CancelProcessTx{
-		Type:      "cancelProcess",
-		ProcessID: pid,
-	}
-	txBytes, err := json.Marshal(p)
+	txPid, err := hex.DecodeString(util.TrimHex(pid))
 	if err != nil {
 		return err
 	}
-	if p.Signature, err = oracle.Sign(txBytes); err != nil {
+	p := &models.CancelProcessTx{
+		Txtype:    models.TxType_CANCEL_PROCESS,
+		ProcessId: txPid,
+		Nonce:     util.RandomHex(32),
+	}
+	txBytes, err := proto.Marshal(p)
+	if err != nil {
 		return err
 	}
-	if txBytes, err = json.Marshal(p); err != nil {
+	vtx := models.Tx{Payload: &models.Tx_CancelProcess{CancelProcess: p}}
+	signHex := ""
+	if signHex, err = oracle.Sign(txBytes); err != nil {
 		return err
 	}
-	req.RawTx = base64.StdEncoding.EncodeToString(txBytes)
+	vtx.Signature, err = hex.DecodeString(signHex)
+	if err != nil {
+		return err
+	}
+	if req.Payload, err = proto.Marshal(&vtx); err != nil {
+		return err
+	}
 
 	resp, err := c.Request(req, nil)
 	if err != nil {
@@ -432,7 +483,7 @@ func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
 	return nil
 }
 
-func (c *Client) GetCurrentBlock() (int64, error) {
+func (c *Client) GetCurrentBlock() (uint32, error) {
 	var req types.MetaRequest
 	req.Method = "getBlockHeight"
 	resp, err := c.Request(req, nil)

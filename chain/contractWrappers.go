@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/net/idna"
 
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -58,45 +59,50 @@ func NewVotingProcessHandle(contractAddressHex string, dialEndpoint string) (*Pr
 	return PH, nil
 }
 
-func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*types.NewProcessTx, error) {
+func (ph *ProcessHandle) ProcessTxArgs(ctx context.Context, pid [32]byte) (*models.NewProcessTx, error) {
 	opts := &ethbind.CallOpts{Context: ctx}
 	processMeta, err := ph.VotingProcess.Get(opts, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
 	}
 
-	processTxArgs := new(types.NewProcessTx)
-	processTxArgs.ProcessID = fmt.Sprintf("%x", pid)
+	processTxArgs := new(models.NewProcessTx)
+	processData := new(models.Process)
+	processData.ProcessId = pid[:]
 	eid, err := hex.DecodeString(util.TrimHex(processMeta.EntityAddress.String()))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding entity address: %s", err)
 	}
-	processTxArgs.EntityID = fmt.Sprintf("%x", ethereum.HashRaw(eid))
-	processTxArgs.MkRoot = processMeta.CensusMerkleRoot
-	processTxArgs.MkURI = processMeta.CensusMerkleTree
+	processData.EntityId = ethereum.HashRaw(eid)
+	processData.CensusMkRoot, err = hex.DecodeString(processMeta.CensusMerkleRoot)
+	if err != nil {
+		return nil, fmt.Errorf("cannot decode merkle root: (%s)", err)
+	}
+	processData.CensusMkURI = &processMeta.CensusMerkleTree
 	if processMeta.NumberOfBlocks != nil {
-		processTxArgs.NumberOfBlocks = processMeta.NumberOfBlocks.Int64()
+		processData.BlockCount = uint32(processMeta.NumberOfBlocks.Int64())
 	}
 	if processMeta.StartBlock != nil {
-		processTxArgs.StartBlock = processMeta.StartBlock.Int64()
+		processData.StartBlock = uint32(processMeta.StartBlock.Int64())
 	}
 	switch processMeta.ProcessType {
 	case types.SnarkVote, types.PollVote, types.PetitionSign, types.EncryptedPoll:
-		processTxArgs.ProcessType = processMeta.ProcessType
+		processData.ProcessType = processMeta.ProcessType
 	}
-	processTxArgs.Type = "newProcess"
+	processTxArgs.Txtype = models.TxType_NEW_PROCESS
+	processTxArgs.Process = processData
 	return processTxArgs, nil
 }
 
-func (ph *ProcessHandle) CancelProcessTxArgs(ctx context.Context, pid [32]byte) (*types.CancelProcessTx, error) {
+func (ph *ProcessHandle) CancelProcessTxArgs(ctx context.Context, pid [32]byte) (*models.CancelProcessTx, error) {
 	opts := &ethbind.CallOpts{Context: ctx}
 	_, err := ph.VotingProcess.Get(opts, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
 	}
-	cancelProcessTxArgs := new(types.CancelProcessTx)
-	cancelProcessTxArgs.ProcessID = fmt.Sprintf("%x", pid)
-	cancelProcessTxArgs.Type = "cancelProcess"
+	cancelProcessTxArgs := new(models.CancelProcessTx)
+	cancelProcessTxArgs.ProcessId = pid[:]
+	cancelProcessTxArgs.Txtype = models.TxType_CANCEL_PROCESS
 	return cancelProcessTxArgs, nil
 }
 
@@ -107,7 +113,15 @@ func (ph *ProcessHandle) ProcessIndex(ctx context.Context, pid [32]byte) (*big.I
 
 func (ph *ProcessHandle) Oracles(ctx context.Context) ([]string, error) {
 	opts := &ethbind.CallOpts{Context: ctx}
-	return ph.VotingProcess.GetOracles(opts)
+	oracles, err := ph.VotingProcess.GetOracles(opts)
+	if err != nil {
+		return []string{}, err
+	}
+	oraclesStr := []string{}
+	for _, oracle := range oracles {
+		oraclesStr = append(oraclesStr, oracle.Hex())
+	}
+	return oraclesStr, nil
 }
 
 func (ph *ProcessHandle) Validators(ctx context.Context) ([]string, error) {
@@ -173,6 +187,7 @@ func (e *ENSCallerHandler) Resolve(ctx context.Context, nameHash [32]byte, resol
 		resolvedAddr, err = e.Registry.Resolver(opts, nameHash)
 	} else {
 		resolvedAddr, err = e.Resolver.Addr(opts, nameHash)
+
 	}
 	if err != nil {
 		return "", err

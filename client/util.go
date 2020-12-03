@@ -1,7 +1,6 @@
 package client
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -15,7 +14,7 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-func (c *Client) WaitUntilBlock(block int64) {
+func (c *Client) WaitUntilBlock(block uint32) {
 	log.Infof("waiting for block %d...", block)
 	for {
 		cb, err := c.GetCurrentBlock()
@@ -51,10 +50,10 @@ type keysBatch struct {
 type signKey struct {
 	PrivKey string `json:"privKey"`
 	PubKey  string `json:"pubKey"`
-	Proof   string `json:"proof"`
+	Proof   []byte `json:"proof"`
 }
 
-func SaveKeysBatch(filepath string, censusID, censusURI string, keys []*ethereum.SignKeys, proofs []string) error {
+func SaveKeysBatch(filepath string, censusID, censusURI string, keys []*ethereum.SignKeys, proofs [][]byte) error {
 	if proofs != nil && (len(proofs) != len(keys)) {
 		return fmt.Errorf("lenght of Proof is different from lenght of Signers")
 	}
@@ -78,7 +77,7 @@ func SaveKeysBatch(filepath string, censusID, censusURI string, keys []*ethereum
 	return ioutil.WriteFile(filepath, j, 0644)
 }
 
-func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, []string, string, string, error) {
+func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, string, string, error) {
 	jb, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		return nil, nil, "", "", err
@@ -94,7 +93,7 @@ func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, []string, string, str
 	}
 
 	keys := make([]*ethereum.SignKeys, len(kb.Keys))
-	proofs := []string{}
+	proofs := [][]byte{}
 	for i, k := range kb.Keys {
 		s := ethereum.NewSignKeys()
 		if err = s.AddHexKey(k.PrivKey); err != nil {
@@ -114,7 +113,7 @@ func RandomHex(n int) string {
 	return hex.EncodeToString(bytes)
 }
 
-func genVote(encrypted bool, keys []string) (string, error) {
+func genVote(encrypted bool, keys []string) ([]byte, error) {
 	vp := &types.VotePackage{
 		Votes: []int{1, 2, 3, 4, 5, 6},
 	}
@@ -127,27 +126,27 @@ func genVote(encrypted bool, keys []string) (string, error) {
 				log.Debugf("encrypting with key %s", k)
 				pub, err := nacl.DecodePublic(k)
 				if err != nil {
-					return "", fmt.Errorf("cannot decode encryption key with index %d: (%s)", i, err)
+					return nil, fmt.Errorf("cannot decode encryption key with index %d: (%s)", i, err)
 				}
 				if first {
 					vp.Nonce = RandomHex(rand.Intn(16) + 16)
 					vpBytes, err = json.Marshal(vp)
 					if err != nil {
-						return "", err
+						return nil, err
 					}
 					first = false
 				}
 				if vpBytes, err = nacl.Anonymous.Encrypt(vpBytes, pub); err != nil {
-					return "", fmt.Errorf("cannot encrypt: (%s)", err)
+					return nil, fmt.Errorf("cannot encrypt: (%s)", err)
 				}
 			}
 		}
 	} else {
 		vpBytes, err = json.Marshal(vp)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 	}
-	return base64.StdEncoding.EncodeToString(vpBytes), nil
+	return vpBytes, nil
 }

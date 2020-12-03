@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -30,17 +31,11 @@ const (
 type Scrutinizer struct {
 	VochainState *vochain.State
 	Storage      db.Database
-	votePool     []*types.Vote
+	votePool     []*models.Vote
 	processPool  []*types.ScrutinizerOnProcessData
 	resultsPool  []*types.ScrutinizerOnProcessData
 	entityCount  int64
 }
-
-// ProcessVotes represents the results of a voting process using a two dimensions slice [ question1:[option1,option2], question2:[option1,option2], ...]
-type ProcessVotes [][]uint32
-
-// ProcessEndingList represents a list of ending voting processes
-type ProcessEndingList [][]byte
 
 // NewScrutinizer returns an instance of the Scrutinizer
 // using the local storage database of dbPath and integrated into the state vochain instance
@@ -96,20 +91,20 @@ func (s *Scrutinizer) Commit(height int64) {
 
 //Rollback removes the non commited pending operations
 func (s *Scrutinizer) Rollback() {
-	s.votePool = []*types.Vote{}
+	s.votePool = []*models.Vote{}
 	s.processPool = []*types.ScrutinizerOnProcessData{}
 	s.resultsPool = []*types.ScrutinizerOnProcessData{}
 }
 
 // OnProcess scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnProcess(pid, eid []byte, mkroot, mkuri string) {
-	var data = types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
-	s.processPool = append(s.processPool, &data)
+	data := &types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
+	s.processPool = append(s.processPool, data)
 }
 
 // OnVote scrutinizer stores the votes if liveResults enabled
-func (s *Scrutinizer) OnVote(v *types.Vote) {
-	isLive, err := s.isLiveResultsProcess(v.ProcessID)
+func (s *Scrutinizer) OnVote(v *models.Vote) {
+	isLive, err := s.isLiveResultsProcess(v.ProcessId)
 	if err != nil {
 		log.Errorf("cannot check if process is live results: (%s)", err)
 		return
@@ -129,6 +124,10 @@ func (s *Scrutinizer) OnProcessKeys(pid []byte, pub, com string) {
 	// do nothing
 }
 
+func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {
+	// do nothing
+}
+
 // OnRevealKeys checks if all keys have been revealed and in such case add the process to the results queue
 func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 	p, err := s.VochainState.Process(pid, false)
@@ -136,9 +135,13 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)
 		return
 	}
+	if p.KeyIndex == nil {
+		log.Errorf("keyindex is nil")
+		return
+	}
 	// if all keys have been revealed, compute the results
-	if p.KeyIndex < 1 {
-		data := types.ScrutinizerOnProcessData{EntityID: p.EntityID, ProcessID: pid}
+	if *p.KeyIndex < 1 {
+		data := types.ScrutinizerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
 		s.resultsPool = append(s.resultsPool, &data)
 	}
 }
@@ -162,4 +165,14 @@ func (s *Scrutinizer) List(max int64, from, prefix []byte) [][]byte {
 	}
 	iter.Release()
 	return list
+}
+
+// Temporary until we use Protobuf for the API
+func (s *Scrutinizer) GetFriendlyResults(result *models.ProcessResult) [][]uint32 {
+	r := [][]uint32{}
+	for i, v := range result.Votes {
+		r = append(r, []uint32{})
+		r[i] = append(r[i], v.Question...)
+	}
+	return r
 }

@@ -4,19 +4,23 @@ package vochain
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"testing"
 
 	"sync/atomic"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
+	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
 	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
+	"google.golang.org/protobuf/proto"
 )
+
+const benchmarkVoters = 20
 
 func BenchmarkCheckTx(b *testing.B) {
 	b.ReportAllocs()
@@ -24,10 +28,10 @@ func BenchmarkCheckTx(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	var voters [][]*types.VoteTx
+	var voters [][]*models.Tx
 	for i := 0; i < b.N+1; i++ {
-		voters = append(voters, prepareBenchCheckTx(b, app, 1000))
-		b.Logf("creating process %s", voters[i][0].ProcessID)
+		voters = append(voters, prepareBenchCheckTx(b, app, benchmarkVoters))
+		b.Logf("creating process %x", voters[i][0].GetVote().ProcessId)
 	}
 	var i int32
 	b.ResetTimer()
@@ -39,7 +43,7 @@ func BenchmarkCheckTx(b *testing.B) {
 	})
 }
 
-func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voters []*types.VoteTx) {
+func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voters []*models.Tx) {
 	tr, err := tree.NewTree("checkTXbench", b.TempDir())
 	if err != nil {
 		b.Fatal(err)
@@ -64,15 +68,21 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		tr.AddClaim(c, nil)
 		claims = append(claims, string(c))
 	}
-	process := &types.Process{
-		StartBlock:     0,
-		Type:           types.PollVote,
-		EntityID:       util.RandomBytes(types.EntityIDsize),
-		MkRoot:         tr.Root(),
-		NumberOfBlocks: 1024,
+	mkuri := "ipfs://123456789"
+	pid := util.RandomHex(types.ProcessIDsize)
+	process := &models.Process{
+		ProcessId:    pid,
+		StartBlock:   0,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: true},
+		Mode:         &models.ProcessMode{},
+		Status:       models.ProcessStatus_READY,
+		EntityId:     util.RandomBytes(types.EntityIDsize),
+		CensusMkRoot: testutil.Hex2byte(b, tr.Root()),
+		CensusMkURI:  &mkuri,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		BlockCount:   1024,
 	}
-	pid := util.RandomBytes(types.ProcessIDsize)
-	app.State.AddProcess(*process, pid, "ipfs://123456789")
+	app.State.AddProcess(process)
 
 	var proof string
 
@@ -81,26 +91,32 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		if err != nil {
 			b.Fatal(err)
 		}
-		tx := types.VoteTx{
+		tx := &models.VoteEnvelope{
 			Nonce:     util.RandomHex(16),
-			ProcessID: hex.EncodeToString(pid),
-			Proof:     proof,
+			ProcessId: pid,
+			Proof:     &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: testutil.Hex2byte(b, proof)}}},
 		}
 
-		txBytes, err := json.Marshal(tx)
+		txBytes, err := proto.Marshal(tx)
 		if err != nil {
 			b.Fatal(err)
 		}
-		if tx.Signature, err = s.Sign(txBytes); err != nil {
+		signHex := ""
+		if signHex, err = s.Sign(txBytes); err != nil {
 			b.Fatal(err)
 		}
-		tx.Type = "vote"
-		voters = append(voters, &tx)
+		vtx := models.Tx{}
+		vtx.Signature, err = hex.DecodeString(signHex)
+		if err != nil {
+			b.Fatal(err)
+		}
+		vtx.Payload = &models.Tx_Vote{Vote: tx}
+		voters = append(voters, &vtx)
 	}
 	return voters
 }
 
-func benchCheckTx(b *testing.B, app *BaseApplication, voters []*types.VoteTx) {
+func benchCheckTx(b *testing.B, app *BaseApplication, voters []*models.Tx) {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 
@@ -112,7 +128,7 @@ func benchCheckTx(b *testing.B, app *BaseApplication, voters []*types.VoteTx) {
 
 	i := 0
 	for _, tx := range voters {
-		if txBytes, err = json.Marshal(tx); err != nil {
+		if txBytes, err = proto.Marshal(tx); err != nil {
 			b.Fatal(err)
 		}
 		cktx.Tx = txBytes
