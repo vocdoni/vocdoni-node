@@ -20,6 +20,7 @@ services:
       - "9096:9096"
       - "26656:26656"
       - "26657:26657"
+      - "61000-61100:61000-61100"
     sysctls:
       net.core.somaxconn: 8128
     restart: ${RESTART:-no}

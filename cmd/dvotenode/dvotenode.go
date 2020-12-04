@@ -68,7 +68,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable the file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable the census API")
 	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable the vote API")
-	globalCfg.API.Tendermint = *flag.Bool("tendermintApi", true, "make the Tendermint API public available")
+	globalCfg.API.Tendermint = *flag.Bool("tendermintApi", false, "make the Tendermint API public available")
 	globalCfg.API.Results = *flag.Bool("resultsApi", true, "enable the results API")
 	globalCfg.API.Route = *flag.String("apiRoute", "/", "dvote API base route for HTTP and Websockets")
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false, "allows private methods over the APIs")
@@ -352,21 +352,21 @@ func main() {
 		log.Fatalf("mode %s is invalid", globalCfg.Mode)
 	}
 
-	// Expose debugging profiles to localhost under a random unassigned
-	// port. This way, we never leak this information to the internet, and
-	// the feature will work no matter what ports are taken.
-	//
+	// If dev enabled, expose debugging profiles under a port between 61000 and 61100.
 	// We log what port is being used near the start of the logs, so it can
 	// be easily grabbed. Start this before the rest of the node, since it
 	// is helpful to debug if some other component hangs.
-	go func() {
-		ln, err := net.Listen("tcp", "localhost:0")
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Infof("started pprof http endpoints at http://%s/debug/pprof", ln.Addr())
-		log.Error(http.Serve(ln, nil))
-	}()
+	if globalCfg.Dev {
+		go func() {
+			port := (time.Now().Unix() % 100) + 61000
+			ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Warnf("started pprof http endpoints at http://%s/debug/pprof", ln.Addr())
+			log.Error(http.Serve(ln, nil))
+		}()
+	}
 
 	log.Infof("starting vocdoni dvote node version %q in %s mode", internal.Version, globalCfg.Mode)
 	var err error
