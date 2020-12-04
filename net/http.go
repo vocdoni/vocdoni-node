@@ -50,12 +50,9 @@ func getHTTPhandler(path string, receiver chan types.Message) func(w http.Respon
 
 		// Don't return this func until a response is sent, because the
 		// connection is closed when the handler returns.
-		select {
-		case <-hc.sent:
-			// a response was sent.
-		case <-r.Context().Done():
-			// we hit chi's timeout.
-		}
+		// The contract is that every handled request must send a
+		// response, even when they fail or time out.
+		<-hc.sent
 	}
 }
 
@@ -75,6 +72,10 @@ func (h *HttpContext) Send(msg types.Message) {
 		}
 	}()
 	defer close(h.sent)
+	if h.Request.Context().Err() != nil {
+		// The connection was closed, so don't try to write to it.
+		return
+	}
 
 	h.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg.Data)+1))
 	h.Writer.Header().Set("Content-Type", "application/json")
