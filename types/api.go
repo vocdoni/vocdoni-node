@@ -46,22 +46,28 @@ func (r MetaRequest) String() string {
 	v := reflect.ValueOf(r)
 	t := v.Type()
 	var b strings.Builder
-	b.WriteString("{")
+	b.WriteString(fmt.Sprintf("%s:{", r.Method))
+	first := true
 	for i := 0; i < t.NumField(); i++ {
 		fv := v.Field(i)
 		if fv.IsZero() {
 			// omit zero values
 			continue
 		}
-		if b.Len() > 1 {
+		ft := t.Field(i)
+		if ft.Name == "Method" {
+			continue
+		}
+		if first {
+			first = false
+		} else {
 			b.WriteString(" ")
 		}
-		ft := t.Field(i)
 		b.WriteString(ft.Name)
 		b.WriteString(":")
 		if ft.Type.Kind() == reflect.Slice && ft.Type.Elem().Kind() == reflect.Uint8 {
 			// print []byte as hexadecimal
-			fmt.Fprintf(&b, "%X", fv.Bytes())
+			fmt.Fprintf(&b, "%x", fv.Bytes())
 		} else {
 			fv = reflect.Indirect(fv) // print *T as T
 			fmt.Fprintf(&b, "%v", fv.Interface())
@@ -120,6 +126,35 @@ type MetaResponse struct {
 	Type                 string     `json:"type,omitempty"`
 	URI                  string     `json:"uri,omitempty"`
 	ValidProof           *bool      `json:"validProof,omitempty"`
+}
+
+func (r MetaResponse) String() string {
+	v := reflect.ValueOf(r)
+	t := v.Type()
+	var b strings.Builder
+	b.WriteString("{")
+	for i := 0; i < t.NumField(); i++ {
+		fv := v.Field(i)
+		if fv.IsZero() {
+			// omit zero values
+			continue
+		}
+		if b.Len() > 1 {
+			b.WriteString(" ")
+		}
+		ft := t.Field(i)
+		b.WriteString(ft.Name)
+		b.WriteString(":")
+		if ft.Type.Kind() == reflect.Slice && ft.Type.Elem().Kind() == reflect.Uint8 {
+			// print []byte as hexadecimal
+			fmt.Fprintf(&b, "%x", fv.Bytes())
+		} else {
+			fv = reflect.Indirect(fv) // print *T as T
+			fmt.Fprintf(&b, "%v", fv.Interface())
+		}
+	}
+	b.WriteString("}")
+	return b.String()
 }
 
 // SetError sets the MetaResponse's Ok field to false, and Message to a string

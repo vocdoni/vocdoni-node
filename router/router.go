@@ -77,7 +77,7 @@ func (r *Router) buildReply(request routerRequest, resp *types.MetaResponse) typ
 			Data:      []byte(err.Error()),
 		}
 	}
-	log.Debugf("response: %s", respData)
+	log.Debugf("api response %s", respOuter.MetaResponse)
 	return types.Message{
 		TimeStamp: int32(time.Now().Unix()),
 		Context:   request.MessageContext,
@@ -294,10 +294,7 @@ func (r *Router) Route() {
 			go r.sendError(request, errMsg)
 			continue
 		}
-
-		log.Infof("api method %s", request.method)
-		log.Debugf("received: %+v", request.MetaRequest)
-
+		log.Debugf("api query %s", request.MetaRequest.String())
 		if request.private {
 			r.PrivateCalls++
 		} else {
