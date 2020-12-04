@@ -3,6 +3,8 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
 )
 
 // MessageRequest holds a decoded request but does not decode the body
@@ -38,6 +40,35 @@ type MetaRequest struct {
 	Timestamp  int32    `json:"timestamp"`
 	Type       string   `json:"type,omitempty"`
 	URI        string   `json:"uri,omitempty"`
+}
+
+func (r MetaRequest) String() string {
+	v := reflect.ValueOf(r)
+	t := v.Type()
+	var b strings.Builder
+	b.WriteString("{")
+	for i := 0; i < t.NumField(); i++ {
+		fv := v.Field(i)
+		if fv.IsZero() {
+			// omit zero values
+			continue
+		}
+		if b.Len() > 1 {
+			b.WriteString(" ")
+		}
+		ft := t.Field(i)
+		b.WriteString(ft.Name)
+		b.WriteString(":")
+		if ft.Type.Kind() == reflect.Slice && ft.Type.Elem().Kind() == reflect.Uint8 {
+			// print []byte as hexadecimal
+			fmt.Fprintf(&b, "%X", fv.Bytes())
+		} else {
+			fv = reflect.Indirect(fv) // print *T as T
+			fmt.Fprintf(&b, "%v", fv.Interface())
+		}
+	}
+	b.WriteString("}")
+	return b.String()
 }
 
 // ResponseMessage wraps an api response
