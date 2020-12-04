@@ -181,24 +181,41 @@ func (i *IPFSHandle) Unpin(ctx context.Context, path string) error {
 }
 
 func (i *IPFSHandle) Stats(ctx context.Context) (string, error) {
-	response := ""
 	peers, err := i.CoreAPI.Swarm().Peers(ctx)
 	if err != nil {
-		return response, err
+		return "", err
 	}
 	addresses, err := i.CoreAPI.Swarm().KnownAddrs(ctx)
 	if err != nil {
-		return response, err
+		return "", err
 	}
+	pins, err := i.countPins(ctx)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("peers:%d addresses:%d pins:%d", len(peers), len(addresses), pins), nil
+}
+
+func (i *IPFSHandle) countPins(ctx context.Context) (int, error) {
+	// Note that pins is a channel that gets closed when finished.
+	// We MUST range over the entire channel to not leak goroutines.
+	// Maybe there is a way to get the total number of pins without
+	// iterating over them?
 	pins, err := i.CoreAPI.Pin().Ls(ctx)
 	if err != nil {
-		return response, err
+		return 0, err
 	}
-	return fmt.Sprintf("peers:%d addresses:%d pins:%d", len(peers), len(addresses), len(pins)), nil
+	count := 0
+	for range pins {
+		count++
+	}
+	return count, nil
 }
 
 func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
-	pins, err := i.CoreAPI.Pin().Ls(ctx, options.Pin.Ls.All())
+	// Note that pins is a channel that gets closed when finished.
+	// We MUST range over the entire channel to not leak goroutines.
+	pins, err := i.CoreAPI.Pin().Ls(ctx)
 	if err != nil {
 		return nil, err
 	}

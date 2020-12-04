@@ -50,11 +50,11 @@ func (i *IPFSHandle) getMetrics(ctx context.Context) error {
 		return err
 	}
 	FileAddresses.Set(float64(len(addresses)))
-	pins, err := i.CoreAPI.Pin().Ls(ctx)
+	pins, err := i.countPins(ctx)
 	if err != nil {
 		return err
 	}
-	FilePins.Set(float64(len(pins)))
+	FilePins.Set(float64(pins))
 	return nil
 }
 
