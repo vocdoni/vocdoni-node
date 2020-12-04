@@ -85,7 +85,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to use")
 	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootNodes", []string{}, "Ethereum p2p custom bootstrap nodes (enode://<pubKey>@<ip>[:port])")
 	globalCfg.EthConfig.TrustedPeers = *flag.StringArray("ethTrustedPeers", []string{}, "Ethereum p2p trusted peer nodes (enode://<pubKey>@<ip>[:port])")
-	globalCfg.EthConfig.ProcessDomain = *flag.String("ethProcessDomain", "voting-process.vocdoni.eth", "voting contract ENS domain")
+	globalCfg.EthConfig.Domains = *flag.StringArray("ethDomains", []string{"processes.vocdoni.eth", "namespaces.vocdoni.eth", "erc20.proofs.vocdoni.eth"}, "contracts ENS domains")
 	globalCfg.EthConfig.NoWaitSync = *flag.Bool("ethNoWaitSync", false, "do not wait for Ethereum to synchronize (for testing only)")
 	// ethereum events
 	globalCfg.EthEventConfig.CensusSync = *flag.Bool("ethCensusSync", true, "automatically import new census published on the smart contract")
@@ -182,7 +182,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("ethConfig.NodePort", flag.Lookup("ethNodePort"))
 	viper.BindPFlag("ethConfig.BootNodes", flag.Lookup("ethBootNodes"))
 	viper.BindPFlag("ethConfig.TrustedPeers", flag.Lookup("ethTrustedPeers"))
-	viper.BindPFlag("ethConfig.ProcessDomain", flag.Lookup("ethProcessDomain"))
+	viper.BindPFlag("ethConfig.Domains", flag.Lookup("ethDomains"))
 	viper.BindPFlag("ethConfig.NoWaitSync", flag.Lookup("ethNoWaitSync"))
 	viper.BindPFlag("ethEventConfig.CensusSync", flag.Lookup("ethCensusSync"))
 	viper.BindPFlag("ethEventConfig.SubscribeOnly", flag.Lookup("ethSubscribeOnly"))
@@ -553,7 +553,7 @@ func main() {
 				}
 			}
 
-			if err := service.EthEvents(context.Background(), globalCfg.EthConfig.ProcessDomain, w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh); err != nil {
+			if err := service.EthEvents(context.Background(), globalCfg.EthConfig.Domains, w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh); err != nil {
 				log.Fatal(err)
 			}
 		}

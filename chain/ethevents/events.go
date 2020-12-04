@@ -29,8 +29,14 @@ import (
 // EthereumEvents type is used to monitorize Ethereum smart contracts and call custom EventHandler functions
 type EthereumEvents struct {
 	// contracts addresses
+	// [0] -> Processes contract
+	// [1] -> Namespace contract
+	// [2] -> TokenStorageProof contract
 	ContractsAddress []common.Address
 	// contracts ABI
+	// [0] -> Processes contract
+	// [1] -> Namespace contract
+	// [2] -> TokenStorageProof contract
 	ContractsABI []abi.ABI
 	// contracts handle
 	VotingHandle *chain.VotingHandle
@@ -81,12 +87,13 @@ type EventProcessor struct {
 }
 
 // NewEthEvents creates a new Ethereum events handler
-func NewEthEvents(contractsAddress []common.Address, signer *ethereum.SignKeys, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication) (*EthereumEvents, error) {
+// contractsAddresses: [0] -> Processes contract, [1] -> Namespace contract, [2] -> TokenStorageProof contract
+func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication) (*EthereumEvents, error) {
 	// try to connect to default addr if w3Endpoint is empty
 	if len(w3Endpoint) == 0 {
 		return nil, fmt.Errorf("no w3Endpoint specified on Ethereum Events")
 	}
-	ph, err := chain.NewVotingHandle(contractsAddress, w3Endpoint)
+	ph, err := chain.NewVotingHandle(contractsAddresses, w3Endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +111,10 @@ func NewEthEvents(contractsAddress []common.Address, signer *ethereum.SignKeys, 
 		return nil, err
 	}
 	return &EthereumEvents{
-		ContractsAddress: contractsAddress,
+		// [0] -> Processes contract
+		// [1] -> Namespace contract
+		// [2] -> TokenStorageProof contract
+		ContractsAddress: contractsAddresses,
 		ContractsABI:     abis,
 		VotingHandle:     ph,
 		Signer:           signer,
@@ -173,7 +183,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 	log.Infof("subscribing to Ethereum Events from block %d", blk.Number().Int64())
 	query := eth.FilterQuery{
 		Addresses: ev.ContractsAddress,
-		FromBlock: blk.Number(), // not sure it works
+		FromBlock: blk.Number(),
 	}
 
 	logs := make(chan ethtypes.Log, 10) // give it some buffer as recommended by the package library
@@ -236,7 +246,7 @@ func (ep *EventProcessor) del(e *ethtypes.Log) {
 	delete(ep.eventQueue, eventID)
 }
 
-// next returns the frist log event rady to be processed
+// next returns the first log event rady to be processed
 func (ep *EventProcessor) next() *ethtypes.Log {
 	ep.eventQueueLock.Lock()
 	defer ep.eventQueueLock.Unlock()

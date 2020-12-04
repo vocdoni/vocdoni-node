@@ -8,85 +8,66 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/chain"
+	"gitlab.com/vocdoni/go-dvote/chain/contracts"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 	"google.golang.org/protobuf/proto"
 )
 
-var ethereumEventList = []string{
-	"GenesisChanged(string)",
-	"ChainIdChanged(uint)",
-	"ProcessCreated(address,bytes32,string)",
-	"ProcessCanceled(address,bytes32)",
-	"ValidatorAdded(string)",
-	"ValidatorRemoved(string)",
-	"OracleAdded(string)",
-	"OracleRemoved(string)",
-	"PrivateKeyPublished(bytes32,string)",
-	"ResultsPublished(bytes32,string)",
+var ethereumEventList = map[string]string{
+	// PROCESSES
+
+	// Activated(uint256 blockNumber)
+	"processesActivated": "0x3ec796be1be7d03bff3a62b9fa594a60e947c1809bced06d929f145308ae57ce",
+	// ActivatedSuccessor(uint256 blockNumber, address successor)
+	"processesActivatedSuccessor": "0x1f8bdb9825a71b7560200e2279fd4b503ac6814e369318e761928502882ee11a",
+	// CensusUpdated(bytes32 processId, uint16 namespace)
+	"processesCensusUpdated": "0xe54b983ab80f8982da0bb83c59ca327de698b5d0780451eba9706b4ffe069211",
+	// NamespaceAddressUpdated(address namespaceAddr)
+	"processesNamespaceAddressUpdated": "0x215ba443e028811c105c1bb484176ce9d9eec24ea7fb85c67a6bff78a04302b3",
+	// NewProcess(bytes32 processId, uint16 namespace)
+	"processesNewProcess": "0x2399440b5a42cbc7ba215c9c176f7cd16b511a8727c1f277635f3fce4649156e",
+	// QuestionIndexUpdated(bytes32 processId, uint16 namespace, uint8 newIndex)
+	"processesQuestionIndexUpdated": "0x2e4d6a3a868975a1e47c2ddc05451ebdececff07e59871dbc6cbaf9364aa06c6",
+	// ResultsAvailable(bytes32 processId)
+	"processesResultsAvailable": "0x5aff397e0d9bfad4e73dfd9c2da1d146ce7fe8cfd1a795dbf6b95b417236fa4c",
+	// StatusUpdated(bytes32 processId, uint16 namespace, uint8 status)
+	"processesStatusUpdated": "0xe64955704069c81c54f3fcca4da180a400f40da1bac10b68a9b42c753aa7a7f8",
+
+	// NAMESPACE
+
+	// ChainIdUpdated(string chainId, uint16 namespace)
+	"namespaceChainIdUpdated": "0xe3d9869f91cf391b3bf911c3a1467e4195d49417ea46a46edc8ffb59edb2faa1",
+	// GenesisUpdated(string genesis, uint16 namespace)
+	"namespaceGenegisUpdated": "0x09b915de2907fa8b732e1b8549d1d8748d1f6365789bacd8bfc1c2b13321f1e9",
+	// NamespaceUpdated(uint16 namespace)
+	"namespaceUpdated": "0x06500a9a8bac2497581b3067d4076b05a0485705bdc05a53983cdbb9185fc8f1",
+	// OracleAdded(address oracleAddress, uint16 namespace)
+	"namespaceOracleAdded": "0x46046a89d1b1ddc11139d795a177db8e9b123e25c07e8d7b3b537aefc994b6ad",
+	// OracleRemoved(address oracleAddress, uint16 namespace)
+	"namespaceOracleRemoved": "0xeb7308698004c0bfb1007fb03df3d23b5ec8704e43aaeca3bfce122db656e09f",
+	//  ValidatorAdded(string validatorPublicKey, uint16 namespace)
+	"namespaceValidatorAdded": "0xaa457f0c02f923a1498e47a5c9d4b832e998fcf5b391974fc0c6a946794a8134",
+	// ValidatorRemoved(string validatorPublicKey, uint16 namespace)
+	"namespaceValidatorRemoved": "0x443f0e063aa676cbc61e749911d0c2652869c9ec48c4bb503eed9f19a44c250f",
+
+	// TOKEN STORAGE PROOF
+
+	// TokenRegistered(address indexed token, address indexed registrar)
+	"tokenStorageProofTokenRegistered": "0x487c37289624c10056468f1f98ebffbad01edce11374975179672e32e2543bf0",
 }
 
-type (
-	eventProcessCreated struct {
-		EntityAddress [20]byte
-		ProcessId     [32]byte
-		MerkleTree    string
-	}
-	eventProcessCanceled struct {
-		EntityAddress [20]byte
-		ProcessId     [32]byte
-	}
-	oracleAdded struct {
-		OraclePublicKey string
-	}
-	privateKeyPublished struct {
-		ProcessId  [32]byte
-		PrivateKey string
-	}
-	resultsPublished struct {
-		ProcessId [32]byte
-		Results   string
-	}
-)
-
-// HandleVochainOracle handles the new process creation on ethereum for the Oracle.
-// Once a new process is created, the Oracle sends a transaction on the Vochain to create such process
+// HandleVochainOracle handles the events on ethereum for the Oracle.
 func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEvents) error {
-	logGenesisChanged := []byte(ethereumEventList[0])
-	logChainIDChanged := []byte(ethereumEventList[1])
-	logProcessCreated := []byte(ethereumEventList[2])
-	logProcessCanceled := []byte(ethereumEventList[3])
-	logValidatorAdded := []byte(ethereumEventList[4])
-	logValidatorRemoved := []byte(ethereumEventList[5])
-	logOracleAdded := []byte(ethereumEventList[6])
-	logOracleRemoved := []byte(ethereumEventList[7])
-	logPrivateKeyPublished := []byte(ethereumEventList[8])
-	logResultsPublished := []byte(ethereumEventList[9])
-
-	HashLogGenesisChanged := crypto.Keccak256Hash(logGenesisChanged)
-	HashLogChainIDChanged := crypto.Keccak256Hash(logChainIDChanged)
-	HashLogProcessCreated := crypto.Keccak256Hash(logProcessCreated)
-	HashLogProcessCanceled := crypto.Keccak256Hash(logProcessCanceled)
-	HashLogValidatorAdded := crypto.Keccak256Hash(logValidatorAdded)
-	HashLogValidatorRemoved := crypto.Keccak256Hash(logValidatorRemoved)
-	HashLogOracleAdded := crypto.Keccak256Hash(logOracleAdded)
-	HashLogOracleRemoved := crypto.Keccak256Hash(logOracleRemoved)
-	HashLogPrivateKeyPublished := crypto.Keccak256Hash(logPrivateKeyPublished)
-	HashLogResultsPublished := crypto.Keccak256Hash(logResultsPublished)
-
 	switch event.Topics[0].Hex() {
-	case HashLogGenesisChanged.Hex():
-		// return nil
-	case HashLogChainIDChanged.Hex():
-		// return nil
-	case HashLogProcessCreated.Hex():
+
+	case ethereumEventList["processesNewProcess"]:
 		// Get process metadata
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		processTx, err := processMeta(tctx, &e.ContractABI, event.Data, e.VotingHandle)
+		processTx, err := newProcessMeta(tctx, &e.ContractsABI[0], event.Data, e.VotingHandle)
 		if err != nil {
 			return err
 		}
@@ -131,15 +112,15 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 		log.Infof("oracle transaction sent, hash:%s", res.Hash)
 
-	case HashLogProcessCanceled.Hex():
+	case ethereumEventList["processesStatusUpdated"]:
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		cancelProcessTx, err := cancelProcessMeta(tctx, &e.ContractABI, event.Data, e.VotingHandle)
+		setProcessTx, err := processStatusUpdatedMeta(tctx, &e.ContractsABI[0], event.Data, e.VotingHandle)
 		if err != nil {
 			return err
 		}
-		log.Infof("found new cancel process order from ethereum\n\t%+v", cancelProcessTx)
-		p, err := e.VochainApp.State.Process(cancelProcessTx.ProcessId, true)
+		log.Infof("found process status update on ethereum\n\t%+v", setProcessTx)
+		p, err := e.VochainApp.State.Process(setProcessTx.ProcessId, true)
 		if err != nil {
 			return err
 		}
@@ -148,11 +129,11 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			return nil
 		}
 		vtx := models.Tx{}
-		cancelTxBytes, err := proto.Marshal(cancelProcessTx)
+		setStatusTxBytes, err := proto.Marshal(setProcessTx)
 		if err != nil {
-			return fmt.Errorf("cannot marshal cancel process tx: %w", err)
+			return fmt.Errorf("cannot marshal setProcess tx: %w", err)
 		}
-		signature, err := e.Signer.Sign(cancelTxBytes)
+		signature, err := e.Signer.Sign(setStatusTxBytes)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
@@ -160,74 +141,43 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot decode signature: %w", err)
 		}
-		vtx.Payload = &models.Tx_CancelProcess{CancelProcess: cancelProcessTx}
-
+		vtx.Payload = &models.Tx_SetProcess{SetProcess: setProcessTx}
 		tx, err := proto.Marshal(&vtx)
 		if err != nil {
 			return fmt.Errorf("error marshaling process tx: %w", err)
 		}
-		log.Debugf("broadcasting Vochain tx\n\t%s", cancelProcessTx.String())
+		log.Debugf("broadcasting Vochain tx\n\t%s", setProcessTx.String())
 
 		res, err := e.VochainApp.SendTX(tx)
 		if err != nil || res == nil {
 			log.Warnf("cannot broadcast tx: (%s)", err)
 			return fmt.Errorf("cannot broadcast tx: (%s), res: (%+v)", err, res)
-		} else {
-			log.Infof("oracle transaction sent, hash:%s", res.Hash)
 		}
-	case HashLogValidatorAdded.Hex():
-		// stub
-		// return nil
-	case HashLogValidatorRemoved.Hex():
-		// stub
-	case HashLogOracleAdded.Hex():
-		var err error
-		log.Debug("new log event: AddOracle")
-		//var eventAddOracle oracleAdded
-		log.Debugf("added event data: %v", event.Data)
-		eventAddOracle, err := e.ContractABI.Unpack("OracleAdded", event.Data)
-		ea := eventAddOracle[0].(oracleAdded)
-		if err != nil {
-			return err
-		}
-		log.Debugf("addOracleEvent: %v", ea.OraclePublicKey)
-		// stub
-	case HashLogOracleRemoved.Hex():
-		// stub
-		// return nil
-	case HashLogPrivateKeyPublished.Hex():
-		var _ privateKeyPublished
-		// stub
-		// return nil
-	case HashLogResultsPublished.Hex():
-		var _ resultsPublished
-		// stub
-		// return nil
+		log.Infof("oracle transaction sent, hash:%s", res.Hash)
 	}
 	return nil
 }
 
-func processMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.NewProcessTx, error) {
-	pc, err := contractABI.Unpack("ProcessCreated", eventData)
+func newProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.NewProcessTx, error) {
+	pc, err := contractABI.Unpack("NewProcess", eventData)
 	if len(pc) == 0 {
 		return nil, fmt.Errorf("cannot parse processMeta log")
 	}
-	eventProcessCreated := pc[0].(eventProcessCreated)
+	eventProcessCreated := pc[0].(contracts.VotingProcessNewProcess)
 	if err != nil {
 		return nil, err
 	}
-	return ph.NewProcessTxArgs(ctx, eventProcessCreated.ProcessId)
+	return ph.NewProcessTxArgs(ctx, eventProcessCreated.ProcessId, eventProcessCreated.Namespace)
 }
 
-func cancelProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.CancelProcessTx, error) {
-	pc, err := contractABI.Unpack("ProcessCanceled", eventData)
+func processStatusUpdatedMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.SetProcessTx, error) {
+	pc, err := contractABI.Unpack("StatusUpdated", eventData)
 	if len(pc) == 0 {
 		return nil, fmt.Errorf("cannot parse processMeta log")
 	}
-	eventProcessCanceled := pc[0].(eventProcessCanceled)
-
+	eventProcessStatusUpdated := pc[0].(contracts.VotingProcessStatusUpdated)
 	if err != nil {
 		return nil, err
 	}
-	return ph.CancelProcessTxArgs(ctx, eventProcessCanceled.ProcessId)
+	return ph.SetStatusTxArgs(ctx, eventProcessStatusUpdated.ProcessId, eventProcessStatusUpdated.Namespace, eventProcessStatusUpdated.Status)
 }

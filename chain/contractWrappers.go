@@ -52,68 +52,70 @@ type Namespace struct {
 // contractsAddress[2] -> TokenStorageProof contract
 func NewVotingHandle(contractsAddress []common.Address, dialEndpoint string) (*VotingHandle, error) {
 	var err error
-	PH := new(VotingHandle)
+	ph := new(VotingHandle)
 	// try connect to the client
 	for i := 0; i < types.EthereumDialMaxRetry; i++ {
-		PH.EthereumClient, err = ethclient.Dial(dialEndpoint)
-		if err != nil || PH.EthereumClient == nil {
+		ph.EthereumClient, err = ethclient.Dial(dialEndpoint)
+		if err != nil || ph.EthereumClient == nil {
 			log.Warnf("cannot create a client connection: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
 			time.Sleep(time.Second * 2)
 			continue
 		}
 		break
 	}
-	if err != nil || PH.EthereumClient == nil {
-		log.Fatalf("cannot create a client connection: (%s), tried %d times.", err, types.EthereumDialMaxRetry)
+	if err != nil || ph.EthereumClient == nil {
+		return nil, fmt.Errorf("cannot create a client connection: (%s), tried %d times", err, types.EthereumDialMaxRetry)
 	}
 	// processes contract transactor
-	votingProcess, err := contracts.NewVotingProcess(contractsAddress[0], PH.EthereumClient)
+	votingProcess, err := contracts.NewVotingProcess(contractsAddress[0], ph.EthereumClient)
 	if err != nil {
-		log.Errorf("error constructing processes contract transactor: %s", err)
-		return new(VotingHandle), err
+		return new(VotingHandle), fmt.Errorf("error constructing processes contract transactor: %s", err)
 	}
 	// namespace contract transactor
-	namespace, err := contracts.NewNamespace(contractsAddress[1], PH.EthereumClient)
+	namespace, err := contracts.NewNamespace(contractsAddress[1], ph.EthereumClient)
 	if err != nil {
-		log.Errorf("error constructing namespace contract transactor: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("error constructing namespace contract transactor: %s", err)
 	}
 	// token storage proof transactor
-	tokenStorageProof, err := contracts.NewTokenStorageProof(contractsAddress[2], PH.EthereumClient)
+	tokenStorageProof, err := contracts.NewTokenStorageProof(contractsAddress[2], ph.EthereumClient)
 	if err != nil {
-		log.Errorf("error constructing token storage proof contract transactor: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("error constructing token storage proof contract transactor: %s", err)
 	}
 
-	PH.VotingProcess = votingProcess
-	PH.Namespace = namespace
-	PH.TokenStorageProof = tokenStorageProof
+	ph.VotingProcess = votingProcess
+	ph.Namespace = namespace
+	ph.TokenStorageProof = tokenStorageProof
 
-	return PH, nil
+	return ph, nil
 }
 
 // PROCESSES WRAPPER
 
 // NewProcessTxArgs gets the info of a created process on the processes contract and creates a NewProcessTx instance
-func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [32]byte) (*models.NewProcessTx, error) {
+func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [32]byte, namespace uint16) (*models.NewProcessTx, error) {
+	// TODO: @jordipainan What to do with namespace?
 	// get process info from the processes contract
-	opts := &ethbind.CallOpts{Context: ctx}
-	processMeta, err := ph.VotingProcess.Get(opts, pid)
+	processMeta, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
 	}
 	// create NewProcessTx
 	processTxArgs := new(models.NewProcessTx)
 	processData := new(models.Process)
+
+	// check status ready or paused
+	status := models.ProcessStatus(processMeta.Status + 1) // +1 required to match with solidity enum
+	if status != models.ProcessStatus_READY && status != models.ProcessStatus_PAUSED {
+		return nil, fmt.Errorf("invalid process status on process creation: %d", status)
+	}
+	processData.Status = status
 	// process id
 	processData.ProcessId = pid[:]
-	eid, err := hex.DecodeString(util.TrimHex(processMeta.EntityAddress.String()))
-	if err != nil {
-		return nil, fmt.Errorf("error decoding entity address: %s", err)
-	}
 	// entity id
 	// for evm censuses the entity id is the snapshoted contract address
-	processData.EntityId = eid
+	if processData.EntityId, err = hex.DecodeString(util.TrimHex(processMeta.EntityAddress.String())); err != nil {
+		return nil, fmt.Errorf("error decoding entity address: %s", err)
+	}
 	// census mkroot
 	processData.CensusMkRoot, err = hex.DecodeString(processMeta.MetadataCensusMerkleRootCensusMerkleTree[1])
 	if err != nil {
@@ -121,67 +123,37 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [32]byte) (*mo
 	}
 	// census origin
 	cOrigin := processMeta.ModeEnvelopeTypeCensusOrigin[2] + 1 // +1 required to match with solidity enum
-	if cOrigin > 7 {
+	if cOrigin > types.MaxCensusOrigins {
 		return nil, fmt.Errorf("invalid census origin: (%d)", processMeta.ModeEnvelopeTypeCensusOrigin[2])
 	}
 	processData.CensusOrigin = models.CensusOrigin(cOrigin)
-	// census mkuri
-	// if evm census not required for the process
-	if processData.CensusOrigin.Number() != 1 {
+	evmCensus := processData.CensusOrigin == models.CensusOrigin_OFF_CHAIN
+	// census mkuri, only for off chain censuses
+	if evmCensus {
 		processData.CensusMkURI = &processMeta.MetadataCensusMerkleRootCensusMerkleTree[2]
 	}
 	// start and end blocks
-	if processMeta.StartBlockBlockCount[0] > 0 {
+	if processMeta.StartBlockBlockCount[0] > types.MinStartBlock {
 		processData.StartBlock = processMeta.StartBlockBlockCount[0]
 	}
-	if processMeta.StartBlockBlockCount[1] > 0 {
+	if processMeta.StartBlockBlockCount[1] > types.MinBlockCount {
 		processData.BlockCount = processMeta.StartBlockBlockCount[1]
 	}
 	// supported last 4 chars as the smart contract does
 	// process mode
-	var pMode uint8 = processMeta.ModeEnvelopeTypeCensusOrigin[0]
-	if pMode > 15 {
-		return nil, fmt.Errorf("invalid process mode: (%d)", pMode)
+	if processData.Mode, err = extractProcessMode(processMeta.ModeEnvelopeTypeCensusOrigin[0]); err != nil {
+		return nil, err
 	}
-	processData.Mode = new(models.ProcessMode)
-	switch {
-	case (pMode & byte(0b00000001)) > 0:
-		processData.Mode.AutoStart = true
-	case (pMode & byte(0b00000010)) > 0:
-		processData.Mode.Interruptible = true
-	case (pMode & byte(0b00000100)) > 0:
-		processData.Mode.DynamicCensus = true
-	case (pMode & byte(0b00001000)) > 0:
-		processData.Mode.EncryptedMetaData = true
-	}
-
 	// envelope type
-	var eType uint8 = processMeta.ModeEnvelopeTypeCensusOrigin[1]
-	if eType > 15 {
-		return nil, fmt.Errorf("invalid process mode: (%d)", eType)
+	if processData.EnvelopeType, err = extractEnvelopeType(processMeta.ModeEnvelopeTypeCensusOrigin[1]); err != nil {
+		return nil, err
 	}
-	processData.EnvelopeType = new(models.EnvelopeType)
-	switch {
-	case (eType & byte(0b00000001)) > 0:
-		processData.EnvelopeType.Serial = true
-	case (eType & byte(0b00000010)) > 0:
-		processData.EnvelopeType.Anonymous = true
-	case (eType & byte(0b00000100)) > 0:
-		processData.EnvelopeType.EncryptedVotes = true
-	case (eType & byte(0b00001000)) > 0:
-		processData.EnvelopeType.UniqueValues = true
-	}
-
-	// status
-	processData.Status = models.ProcessStatus(processMeta.Status)
 	// question index
-	var qIndex = new(uint32)
-	*qIndex = uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[0])
-	processData.QuestionIndex = qIndex
+	qIndex := uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[0])
+	processData.QuestionIndex = &qIndex
 	// question count
-	var qCount = new(uint32)
-	*qCount = uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[1])
-	processData.QuestionIndex = qCount
+	qCount := uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[1])
+	processData.QuestionIndex = &qCount
 	// max count
 	processData.VoteOptions.MaxCount = uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[2])
 	// max value
@@ -196,17 +168,15 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [32]byte) (*mo
 	processData.Namespace = uint32(processMeta.MaxTotalCostCostExponentNamespace[2])
 
 	// if EVM census, eth index slot from the ERC20Registry contract
-	if processData.CensusOrigin != 1 {
+	if processData.CensusOrigin != models.CensusOrigin_OFF_CHAIN {
 		// evm block height not required here, will be fetched by each user when generating the vote
 		// index slot
-		opts2 := &ethbind.CallOpts{Context: ctx}
-		idxSlot, err := ph.TokenStorageProof.GetBalanceMappingPosition(opts2, processMeta.EntityAddress)
+		idxSlot, err := ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, processMeta.EntityAddress)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching token index slot from Ethereum: %s", err)
 		}
-		var iSlot32 = new(uint32)
-		*iSlot32 = uint32(idxSlot.Uint64())
-		processData.EthIndexSlot = iSlot32
+		iSlot32 := uint32(idxSlot.Uint64())
+		processData.EthIndexSlot = &iSlot32
 	}
 
 	// set tx type (outer type used by the vochain tx type)
@@ -215,9 +185,51 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [32]byte) (*mo
 	return processTxArgs, nil
 }
 
-// SetStatusTxArgs
-func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [32]byte) (*models.SetProcessTx, error) {
-	return nil, nil
+func extractEnvelopeType(et uint8) (*models.EnvelopeType, error) {
+	if et > types.MaxEnvelopeType {
+		return nil, fmt.Errorf("invalid process mode: (%d)", et)
+	}
+	return &models.EnvelopeType{
+		Serial:         et&byte(0b00000001) > 0,
+		Anonymous:      et&byte(0b00000010) > 0,
+		EncryptedVotes: et&byte(0b00000100) > 0,
+		UniqueValues:   et&byte(0b00001000) > 0,
+	}, nil
+}
+
+func extractProcessMode(pm uint8) (*models.ProcessMode, error) {
+	if pm > types.MaxProcessMode {
+		return nil, fmt.Errorf("invalid process mode: (%d)", pm)
+	}
+	return &models.ProcessMode{
+		AutoStart:         pm&byte(0b00000001) > 0,
+		Interruptible:     pm&byte(0b00000010) > 0,
+		DynamicCensus:     pm&byte(0b00000100) > 0,
+		EncryptedMetaData: pm&byte(0b00001000) > 0,
+	}, nil
+}
+
+// SetStatusTxArgs returns a SetProcessTx instance
+func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [32]byte, namespace uint16, status uint8) (*models.SetProcessTx, error) {
+	processData, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching process from Ethereum: %s", err)
+	}
+	if processData.Status == status {
+		return nil, fmt.Errorf("status should differ: %s", err)
+	}
+	// create setProcessTx
+	setprocessTxArgs := new(models.SetProcessTx)
+	// process id
+	setprocessTxArgs.ProcessId = pid[:]
+	// process status
+	processStatus := new(models.ProcessStatus)
+	*processStatus = models.ProcessStatus(uint32(status + 1))
+	setprocessTxArgs.Status = processStatus
+	// TODO: @jordipainan namespace not used
+	setprocessTxArgs.Txtype = models.TxType_SET_PROCESS_STATUS
+
+	return setprocessTxArgs, nil
 }
 
 // SetCensusTxArgs
@@ -242,40 +254,34 @@ func (ph *VotingHandle) SetNamespaceAddressTxArgs(ctx context.Context) (*models.
 
 // EntityProcessCount returns the entity process count given an entity address
 func (ph *VotingHandle) EntityProcessCount(ctx context.Context, eid common.Address) (*big.Int, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	return ph.VotingProcess.GetEntityProcessCount(opts, eid)
+	return ph.VotingProcess.GetEntityProcessCount(&ethbind.CallOpts{Context: ctx}, eid)
 }
 
 // EntityNextProcessID returns the next process id of a given entity address
 func (ph *VotingHandle) EntityNextProcessID(ctx context.Context, eid common.Address, namespace uint16) ([32]byte, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	return ph.VotingProcess.GetNextProcessId(opts, eid, namespace)
+	return ph.VotingProcess.GetNextProcessId(&ethbind.CallOpts{Context: ctx}, eid, namespace)
 }
 
 // ProcessParamsSignature returns the signature of the process parameters
 func (ph *VotingHandle) ProcessParamsSignature(ctx context.Context, pid [32]byte) ([32]byte, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	return ph.VotingProcess.GetParamsSignature(opts, pid)
+	return ph.VotingProcess.GetParamsSignature(&ethbind.CallOpts{Context: ctx}, pid)
 }
 
 // ProcessResults returns the results for a given process
 func (ph *VotingHandle) ProcessResults(ctx context.Context, pid [32]byte) (Results, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	return ph.VotingProcess.GetResults(opts, pid)
+	return ph.VotingProcess.GetResults(&ethbind.CallOpts{Context: ctx}, pid)
 }
 
 // ProcessCreationInstance returns the address of the processes contract instance where the process was created
 func (ph *VotingHandle) ProcessCreationInstance(ctx context.Context, pid [32]byte) (common.Address, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	return ph.VotingProcess.GetCreationInstance(opts, pid)
+	return ph.VotingProcess.GetCreationInstance(&ethbind.CallOpts{Context: ctx}, pid)
 }
 
 // NAMESPACE WRAPPER
 
 // GetNamespace returns the chainID, genesis, validators and oracles of a given namespace
 func (ph *VotingHandle) GetNamespace(ctx context.Context, namespace uint16) (*Namespace, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	ns, err := ph.Namespace.GetNamespace(opts, namespace)
+	ns, err := ph.Namespace.GetNamespace(&ethbind.CallOpts{Context: ctx}, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -289,8 +295,7 @@ func (ph *VotingHandle) GetNamespace(ctx context.Context, namespace uint16) (*Na
 
 // ChainID returns the chain number of a given namespace
 func (ph *VotingHandle) ChainID(ctx context.Context, namespace uint16) (string, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	ns, err := ph.Namespace.GetNamespace(opts, namespace)
+	ns, err := ph.Namespace.GetNamespace(&ethbind.CallOpts{Context: ctx}, namespace)
 	if err != nil {
 		return "", err
 	}
@@ -299,8 +304,7 @@ func (ph *VotingHandle) ChainID(ctx context.Context, namespace uint16) (string, 
 
 // Oracles returns the list of oracles of a given namespace
 func (ph *VotingHandle) Oracles(ctx context.Context, namespace uint16) ([]common.Address, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	ns, err := ph.Namespace.GetNamespace(opts, namespace)
+	ns, err := ph.Namespace.GetNamespace(&ethbind.CallOpts{Context: ctx}, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -309,8 +313,7 @@ func (ph *VotingHandle) Oracles(ctx context.Context, namespace uint16) ([]common
 
 // Validators returns the list of Tendermint validators of a given namespace
 func (ph *VotingHandle) Validators(ctx context.Context, namespace uint16) ([]string, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	ns, err := ph.Namespace.GetNamespace(opts, namespace)
+	ns, err := ph.Namespace.GetNamespace(&ethbind.CallOpts{Context: ctx}, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -319,8 +322,7 @@ func (ph *VotingHandle) Validators(ctx context.Context, namespace uint16) ([]str
 
 // Genesis returns the Tendemint genesis of a given namespace
 func (ph *VotingHandle) Genesis(ctx context.Context, namespace uint16) (string, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	ns, err := ph.Namespace.GetNamespace(opts, namespace)
+	ns, err := ph.Namespace.GetNamespace(&ethbind.CallOpts{Context: ctx}, namespace)
 	if err != nil {
 		return "", err
 	}
@@ -331,14 +333,12 @@ func (ph *VotingHandle) Genesis(ctx context.Context, namespace uint16) (string, 
 
 // IsTokenRegistered returns true if a token represented by the given address is registered on the token storage proof contract
 func (ph *VotingHandle) IsTokenRegistered(ctx context.Context, address common.Address) (bool, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	return ph.TokenStorageProof.IsRegistered(opts, address)
+	return ph.TokenStorageProof.IsRegistered(&ethbind.CallOpts{Context: ctx}, address)
 }
 
 // GetTokenBalanceMappingPosition returns the balance mapping position given a token address
 func (ph *VotingHandle) GetTokenBalanceMappingPosition(ctx context.Context, address common.Address) (*big.Int, error) {
-	opts := &ethbind.CallOpts{Context: ctx}
-	return ph.TokenStorageProof.GetBalanceMappingPosition(opts, address)
+	return ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, address)
 }
 
 // ENS WRAPPER
@@ -389,11 +389,10 @@ func (e *ENSCallerHandler) Resolve(ctx context.Context, nameHash [32]byte, resol
 	var resolvedAddr common.Address
 	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer cancel()
-	opts := &ethbind.CallOpts{Context: tctx}
 	if resolvePublicRegistry {
-		resolvedAddr, err = e.Registry.Resolver(opts, nameHash)
+		resolvedAddr, err = e.Registry.Resolver(&ethbind.CallOpts{Context: tctx}, nameHash)
 	} else {
-		resolvedAddr, err = e.Resolver.Addr(opts, nameHash)
+		resolvedAddr, err = e.Resolver.Addr(&ethbind.CallOpts{Context: tctx}, nameHash)
 
 	}
 	if err != nil {
@@ -402,8 +401,8 @@ func (e *ENSCallerHandler) Resolve(ctx context.Context, nameHash [32]byte, resol
 	return resolvedAddr.String(), nil
 }
 
-// VotingProcessAddress gets the Voting process main contract address
-func VotingProcessAddress(ctx context.Context, publicRegistryAddr, domain, ethEndpoint string) (string, error) {
+// ENSAddress gets a smart contract address trough the ENS given a public regitry address and its domain
+func ENSAddress(ctx context.Context, publicRegistryAddr, domain, ethEndpoint string) (string, error) {
 	// normalize voting process domain name
 	nh, err := NameHash(domain)
 	if err != nil {
@@ -442,11 +441,11 @@ func VotingProcessAddress(ctx context.Context, publicRegistryAddr, domain, ethEn
 		return "", err
 	}
 	// get voting process addr from resolver
-	votingProcessAddr, err := ensCallerHandler.Resolve(ctx, nh, false)
+	contractAddr, err := ensCallerHandler.Resolve(ctx, nh, false)
 	if err != nil {
 		return "", err
 	}
-	return votingProcessAddr, nil
+	return contractAddr, nil
 }
 
 // normalize normalizes a name according to the ENS standard
@@ -500,10 +499,10 @@ func NameHash(name string) (hash [32]byte, err error) {
 
 const maxRetries = 30
 
-// EnsResolve resolves the voting process contract address through the stardard ENS
+// EnsResolve resolves smart contract addresses through the stardard ENS
 func EnsResolve(ctx context.Context, ensRegistryAddr, ethDomain, w3uri string) (contractAddr string, err error) {
 	for i := 0; i < maxRetries; i++ {
-		contractAddr, err = VotingProcessAddress(ctx, ensRegistryAddr, ethDomain, w3uri)
+		contractAddr, err = ENSAddress(ctx, ensRegistryAddr, ethDomain, w3uri)
 		if err != nil {
 			if strings.Contains(err.Error(), "no suitable peers available") {
 				time.Sleep(time.Second)
@@ -565,8 +564,7 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, et
 	copy(eIDBytes32[:], eIDBytes)
 	tctx, cancel := context.WithTimeout(ctx, types.EthereumWriteTimeout)
 	defer cancel()
-	opts := &ethbind.CallOpts{Context: tctx}
-	metaURL, err := ensCallerHandler.Resolver.Text(opts, eIDBytes32, types.EntityMetaKey)
+	metaURL, err := ensCallerHandler.Resolver.Text(&ethbind.CallOpts{Context: tctx}, eIDBytes32, types.EntityMetaKey)
 	if err != nil {
 		return "", err
 	}
