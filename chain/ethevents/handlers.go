@@ -86,7 +86,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		// Get process metadata
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		processTx, err := processMeta(tctx, &e.ContractABI, event.Data, e.ProcessHandle)
+		processTx, err := processMeta(tctx, &e.ContractABI, event.Data, e.VotingHandle)
 		if err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 	case HashLogProcessCanceled.Hex():
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		cancelProcessTx, err := cancelProcessMeta(tctx, &e.ContractABI, event.Data, e.ProcessHandle)
+		cancelProcessTx, err := cancelProcessMeta(tctx, &e.ContractABI, event.Data, e.VotingHandle)
 		if err != nil {
 			return err
 		}
@@ -207,7 +207,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 	return nil
 }
 
-func processMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*models.NewProcessTx, error) {
+func processMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.NewProcessTx, error) {
 	pc, err := contractABI.Unpack("ProcessCreated", eventData)
 	if len(pc) == 0 {
 		return nil, fmt.Errorf("cannot parse processMeta log")
@@ -216,10 +216,10 @@ func processMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph
 	if err != nil {
 		return nil, err
 	}
-	return ph.ProcessTxArgs(ctx, eventProcessCreated.ProcessId)
+	return ph.NewProcessTxArgs(ctx, eventProcessCreated.ProcessId)
 }
 
-func cancelProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.ProcessHandle) (*models.CancelProcessTx, error) {
+func cancelProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.CancelProcessTx, error) {
 	pc, err := contractABI.Unpack("ProcessCanceled", eventData)
 	if len(pc) == 0 {
 		return nil, fmt.Errorf("cannot parse processMeta log")

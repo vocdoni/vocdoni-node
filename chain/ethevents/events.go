@@ -26,14 +26,14 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 )
 
-// EthereumEvents type is used to monitorize an Ethereum smart contract and call custom EventHandler functions
+// EthereumEvents type is used to monitorize Ethereum smart contracts and call custom EventHandler functions
 type EthereumEvents struct {
-	// voting process contract address
-	ContractAddress common.Address
-	// voting process contract abi
-	ContractABI abi.ABI
-	// voting process contract handle
-	ProcessHandle *chain.ProcessHandle
+	// contracts addresses
+	ContractsAddress []common.Address
+	// contracts ABI
+	ContractsABI []abi.ABI
+	// contracts handle
+	VotingHandle *chain.VotingHandle
 	// dial web3 address
 	DialAddr string
 	// list of handler functions that will be called on events
@@ -53,11 +53,13 @@ type logEvent struct {
 	added time.Time
 }
 
+// VochainClient is the interface that any vochain client should fullfy
 type VochainClient interface {
 	// TODO(mvdan): do we want a more generic API?
 	BroadcastTxSync(tx ttypes.Tx) (*cttypes.ResultBroadcastTx, error)
 }
 
+// CensusManager is the interface that any census manager should fullfy
 type CensusManager interface {
 	AddToImportQueue(censusID, censusURI string)
 	// TODO(mvdan): is this too wide? maybe just URIprefix?
@@ -79,29 +81,36 @@ type EventProcessor struct {
 }
 
 // NewEthEvents creates a new Ethereum events handler
-func NewEthEvents(contractAddressHex string, signer *ethereum.SignKeys, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication) (*EthereumEvents, error) {
+func NewEthEvents(contractsAddress []common.Address, signer *ethereum.SignKeys, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication) (*EthereumEvents, error) {
 	// try to connect to default addr if w3Endpoint is empty
 	if len(w3Endpoint) == 0 {
 		return nil, fmt.Errorf("no w3Endpoint specified on Ethereum Events")
 	}
-	contractAddr := common.HexToAddress(contractAddressHex)
-	ph, err := chain.NewVotingProcessHandle(contractAddressHex, w3Endpoint)
+	ph, err := chain.NewVotingHandle(contractsAddress, w3Endpoint)
 	if err != nil {
 		return nil, err
 	}
-	contractABI, err := abi.JSON(strings.NewReader(contracts.VotingProcessABI))
+	var abis []abi.ABI
+	abis[0], err = abi.JSON(strings.NewReader(contracts.VotingProcessABI))
 	if err != nil {
 		return nil, err
 	}
-
+	abis[1], err = abi.JSON(strings.NewReader(contracts.NamespaceABI))
+	if err != nil {
+		return nil, err
+	}
+	abis[2], err = abi.JSON(strings.NewReader(contracts.TokenStorageProofABI))
+	if err != nil {
+		return nil, err
+	}
 	return &EthereumEvents{
-		ContractAddress: contractAddr,
-		ContractABI:     contractABI,
-		ProcessHandle:   ph,
-		Signer:          signer,
-		DialAddr:        w3Endpoint,
-		Census:          cens,
-		VochainApp:      vocapp,
+		ContractsAddress: contractsAddress,
+		ContractsABI:     abis,
+		VotingHandle:     ph,
+		Signer:           signer,
+		DialAddr:         w3Endpoint,
+		Census:           cens,
+		VochainApp:       vocapp,
 		EventProcessor: &EventProcessor{
 			Events:                make(chan ethtypes.Log),
 			EventProcessThreshold: time.Duration(60 * time.Second),
@@ -163,7 +172,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 	// And then subscribe to new events
 	log.Infof("subscribing to Ethereum Events from block %d", blk.Number().Int64())
 	query := eth.FilterQuery{
-		Addresses: []common.Address{ev.ContractAddress},
+		Addresses: ev.ContractsAddress,
 		FromBlock: blk.Number(), // not sure it works
 	}
 
@@ -194,9 +203,7 @@ func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context, from, to i
 	query := eth.FilterQuery{
 		FromBlock: big.NewInt(from),
 		ToBlock:   big.NewInt(to),
-		Addresses: []common.Address{
-			ev.ContractAddress,
-		},
+		Addresses: ev.ContractsAddress,
 	}
 
 	logs, err := client.FilterLogs(ctx, query)

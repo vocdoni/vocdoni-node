@@ -37,7 +37,7 @@ type EthChainContext struct {
 	Config        *eth.Config
 	Keys          *keystore.KeyStore
 	DefaultConfig *EthChainConfig
-	ProcessHandle *ProcessHandle
+	VotingHandle  *VotingHandle
 	MetricsAgent  *metrics.Agent
 	RestartLock   sync.RWMutex
 }
