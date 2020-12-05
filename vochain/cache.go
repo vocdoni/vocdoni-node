@@ -17,12 +17,12 @@ func (v *State) CacheAdd(id [32]byte, vc *types.CacheTx) {
 }
 
 // CacheDel deletes an existing vote proof from the local cache
-func (v *State) CacheDel(id [32]byte) {
+func (v *State) CacheDel(id [32]byte, fromMempoolCache bool) {
 	v.voteCacheLock.Lock()
 	defer v.voteCacheLock.Unlock()
 	delete(v.voteCache, id)
 	if v.MemPoolRemoveTxKey != nil {
-		v.MemPoolRemoveTxKey(id, false)
+		v.MemPoolRemoveTxKey(id, fromMempoolCache)
 	}
 }
 
@@ -46,6 +46,9 @@ func (v *State) CachePurge(height int64) {
 	for id, vp := range v.voteCache {
 		if time.Since(vp.Created) > voteCachePurgeThreshold {
 			delete(v.voteCache, id)
+			if v.MemPoolRemoveTxKey != nil {
+				v.MemPoolRemoveTxKey(id, true)
+			}
 		}
 	}
 }

@@ -163,7 +163,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 
 			if forCommit && vp != nil {
 				// if vote is in cache, lazy check and remove it from cache
-				defer state.CacheDel(txID)
+				defer state.CacheDel(txID, false)
 				if state.EnvelopeExists(vote.ProcessId, vp.Nullifier) {
 					return nil, fmt.Errorf("vote already exists")
 				}
