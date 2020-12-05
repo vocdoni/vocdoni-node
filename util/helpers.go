@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/hex"
+	"fmt"
 	"io"
 	"math/rand"
 	"regexp"
@@ -46,8 +47,8 @@ func RandomBytes(n int) []byte {
 	return bytes
 }
 
-func RandomHex(n int) []byte {
-	return RandomBytes(n)
+func RandomHex(n int) string {
+	return fmt.Sprintf("%x", RandomBytes(n))
 }
 
 func RandomInt(min, max int) int {

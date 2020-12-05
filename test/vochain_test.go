@@ -5,6 +5,8 @@ import (
 
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon"
+	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
+	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
@@ -25,13 +27,13 @@ func TestCreateProcess(t *testing.T) {
 	}
 
 	// add process
-	_, err = vochain.AddTx(&vtx, s, true)
+	_, err = vochain.AddTx(&vtx, s, testutil.Hex2byte32(t, util.RandomHex(32)), true)
 	if err != nil {
 		t.Errorf("cannot create process: %s", err)
 	}
 
 	// cannot add same process
-	if _, err = vochain.AddTx(&vtx, s, true); err == nil {
+	if _, err = vochain.AddTx(&vtx, s, testutil.Hex2byte32(t, util.RandomHex(32)), true); err == nil {
 		t.Errorf("same process added: %s", err)
 	}
 
@@ -39,7 +41,7 @@ func TestCreateProcess(t *testing.T) {
 	vtx.Signature[12] = byte(0xFF)
 	vtx.Signature[14] = byte(0xFF)
 	vtx.Signature[16] = byte(0xFF)
-	if _, err = vochain.AddTx(&vtx, s, true); err == nil {
+	if _, err = vochain.AddTx(&vtx, s, testutil.Hex2byte32(t, util.RandomHex(32)), true); err == nil {
 		t.Errorf("process added by non oracle: %s", err)
 	}
 }

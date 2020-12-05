@@ -17,13 +17,13 @@ import (
 )
 
 // AddTx check the validity of a transaction and adds it to the state if commit=true
-func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
+func AddTx(vtx *models.Tx, state *State, txID [32]byte, commit bool) ([]byte, error) {
 	if vtx == nil || state == nil || vtx.Payload == nil {
 		return nil, fmt.Errorf("transaction, state or transaction payload are nil")
 	}
 	switch vtx.Payload.(type) {
 	case *models.Tx_Vote:
-		v, err := VoteTxCheck(vtx, state, commit)
+		v, err := VoteTxCheck(vtx, state, txID, commit)
 		if err != nil {
 			return []byte{}, fmt.Errorf("voteTxCheck %w", err)
 		}
@@ -98,7 +98,7 @@ func AddTx(vtx *models.Tx, state *State, commit bool) ([]byte, error) {
 			if tx.Status == nil {
 				return []byte{}, fmt.Errorf("set process status, status is nil")
 			}
-			return []byte{}, state.SetProcessStatus(tx.ProcessID, *tx.Status, true)
+			return []byte{}, state.SetProcessStatus(tx.ProcessId, *tx.Status, true)
 		}
 
 	default:
@@ -115,7 +115,7 @@ func UnmarshalTx(content []byte) (*models.Tx, error) {
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
 // All hexadecimal strings should be already sanitized (without 0x)
-func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*models.Vote, error) {
+func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*models.Vote, error) {
 	tx := vtx.GetVote()
 	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
@@ -159,12 +159,11 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*models.Vote, er
 			// An element can only be added to the vote cache during checkTx.
 			// Every N seconds the old votes which are not yet in the blockchain will be removed from the cache.
 			// If the same vote (but different transaction) is send to the mempool, the cache will detect it and vote will be discarted.
-			uid := types.UniqID(vtx, process.EnvelopeType.Anonymous)
-			vp := state.VoteCacheGet(uid)
+			vp := state.CacheGet(txID)
 
 			if forCommit && vp != nil {
 				// if vote is in cache, lazy check and remove it from cache
-				defer state.VoteCacheDel(uid)
+				defer state.CacheDel(txID)
 				if state.EnvelopeExists(vote.ProcessId, vp.Nullifier) {
 					return nil, fmt.Errorf("vote already exists")
 				}
@@ -176,7 +175,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*models.Vote, er
 				if tx.Proof == nil {
 					return nil, fmt.Errorf("proof not found on transaction")
 				}
-				vp = new(types.VoteProof)
+				vp = new(types.CacheTx)
 				log.Debugf("vote signature: %x", vtx.Signature)
 				tx := vtx.GetVote()
 				if tx == nil {
@@ -238,8 +237,9 @@ func VoteTxCheck(vtx *models.Tx, state *State, forCommit bool) (*models.Vote, er
 				if !valid {
 					return nil, fmt.Errorf("proof not valid")
 				}
+				//vp.Type = models.TxType_VOTE
 				vp.Created = time.Now()
-				state.VoteCacheAdd(uid, vp)
+				state.CacheAdd(txID, vp)
 			}
 			vote.Nullifier = vp.Nullifier
 			return &vote, nil

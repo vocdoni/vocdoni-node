@@ -45,7 +45,7 @@ func TestCheckTX(t *testing.T) {
 		claims = append(claims, string(c))
 	}
 	mkuri := "ipfs://123456789"
-	pid := util.RandomHex(types.ProcessIDsize)
+	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
@@ -77,7 +77,7 @@ func TestCheckTX(t *testing.T) {
 			t.Fatal(err)
 		}
 		tx := &models.VoteEnvelope{
-			Nonce:       util.RandomHex(32),
+			Nonce:       util.RandomBytes(32),
 			ProcessId:   pid,
 			Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: testutil.Hex2byte(t, proof)}}},
 			VotePackage: vp,
@@ -125,7 +125,7 @@ func TestProcessTransition(t *testing.T) {
 
 	// Add a process with status=READY and interruptible=true
 	mkuri := "ipfs://123456789"
-	pid := util.RandomHex(types.ProcessIDsize)
+	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
@@ -173,7 +173,7 @@ func TestProcessTransition(t *testing.T) {
 
 	// Add a process with status=PAUSED and interruptible=true
 	mkuri = "ipfs://123456789"
-	pid = util.RandomHex(types.ProcessIDsize)
+	pid = util.RandomBytes(types.ProcessIDsize)
 	process = &models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
@@ -221,7 +221,7 @@ func TestProcessTransition(t *testing.T) {
 
 	// Add a process with status=PAUSE and interruptible=false
 	mkuri = "ipfs://123456789"
-	pid = util.RandomHex(types.ProcessIDsize)
+	pid = util.RandomBytes(types.ProcessIDsize)
 	process = &models.Process{
 		ProcessId:    pid,
 		StartBlock:   10,
@@ -267,8 +267,8 @@ func testSetProcess(t *testing.T, pid []byte, oracle *ethereum.SignKeys, app *Ba
 
 	tx := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_STATUS,
-		Nonce:     util.RandomHex(32),
-		ProcessID: pid,
+		Nonce:     util.RandomBytes(32),
+		ProcessId: pid,
 		Status:    status,
 	}
 	txBytes, err := proto.Marshal(tx)

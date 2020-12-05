@@ -161,7 +161,7 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			vi.vnode.State.RLock()
 			vi.processTreeSize = vi.vnode.State.Store.Tree(vochain.ProcessTree).Count()
 			vi.voteTreeSize = vi.vnode.State.Store.Tree(vochain.VoteTree).Count()
-			vi.voteCacheSize = vi.vnode.State.VoteCacheSize()
+			vi.voteCacheSize = vi.vnode.State.CacheSize()
 			vi.vnode.State.RUnlock()
 			vi.mempoolSize = vi.vnode.Node.Mempool().Size()
 			vi.lock.Unlock()

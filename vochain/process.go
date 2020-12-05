@@ -307,9 +307,9 @@ func SetProcessTxCheck(vtx *models.Tx, state *State) error {
 		return fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
 	}
 	// get process
-	process, err := state.Process(tx.ProcessID, false)
+	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
-		return fmt.Errorf("cannot get process %x: %w", tx.ProcessID, err)
+		return fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
 	}
 
 	return state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)

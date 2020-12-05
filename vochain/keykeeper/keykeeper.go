@@ -417,7 +417,7 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	tx := &models.AdminTx{
 		Txtype:              models.TxType_ADD_PROCESS_KEYS,
 		KeyIndex:            kindex,
-		Nonce:               util.RandomHex(32),
+		Nonce:               util.RandomBytes(32),
 		ProcessId:           []byte(pid),
 		EncryptionPublicKey: pk.pubKey,
 		CommitmentKey:       pk.commitmentKey,
@@ -463,7 +463,7 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 	tx := &models.AdminTx{
 		Txtype:               models.TxType_REVEAL_PROCESS_KEYS,
 		KeyIndex:             kindex,
-		Nonce:                util.RandomHex(32),
+		Nonce:                util.RandomBytes(32),
 		ProcessId:            []byte(pid),
 		EncryptionPrivateKey: pk.privKey,
 		RevealKey:            pk.revealKey,

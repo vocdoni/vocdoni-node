@@ -285,7 +285,7 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock uint32, signers
 			return 0, err
 		}
 		v := &models.VoteEnvelope{
-			Nonce:                util.RandomHex(32),
+			Nonce:                util.RandomBytes(32),
 			ProcessId:            pidb,
 			Proof:                &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proofs[i]}}},
 			VotePackage:          vpb,
@@ -414,7 +414,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkur
 	}
 	p := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
-		Nonce:   util.RandomHex(32),
+		Nonce:   util.RandomBytes(32),
 		Process: processData,
 	}
 	txBytes, err := proto.Marshal(p)
@@ -454,7 +454,7 @@ func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
 	p := &models.CancelProcessTx{
 		Txtype:    models.TxType_CANCEL_PROCESS,
 		ProcessId: txPid,
-		Nonce:     util.RandomHex(32),
+		Nonce:     util.RandomBytes(32),
 	}
 	txBytes, err := proto.Marshal(p)
 	if err != nil {

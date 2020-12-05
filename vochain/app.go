@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -158,7 +159,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 		log.Fatal(err)
 	}
 	app.State.Unlock()
-	app.State.VoteCachePurge(app.State.Header(true).Height)
+	app.State.CachePurge(app.State.Header(true).Height)
 	return abcitypes.ResponseBeginBlock{}
 }
 
@@ -174,7 +175,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 		return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 	}
 	if tx, err = UnmarshalTx(req.Tx); err == nil {
-		if data, err = AddTx(tx, app.State, false); err != nil {
+		if data, err = AddTx(tx, app.State, TxKey(req.Tx), false); err != nil {
 			log.Debugf("checkTx error: %s", err)
 			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("addTx " + err.Error())}
 		}
@@ -190,7 +191,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	var tx *models.Tx
 
 	if tx, err = UnmarshalTx(req.Tx); err == nil {
-		if data, err = AddTx(tx, app.State, true); err != nil {
+		if data, err = AddTx(tx, app.State, TxKey(req.Tx), true); err != nil {
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
 	} else {
@@ -223,4 +224,8 @@ func (app *BaseApplication) LoadSnapshotChunk(req abcitypes.RequestLoadSnapshotC
 }
 func (app *BaseApplication) OfferSnapshot(req abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
 	return abcitypes.ResponseOfferSnapshot{}
+}
+
+func TxKey(tx tmtypes.Tx) [32]byte {
+	return sha256.Sum256(tx)
 }

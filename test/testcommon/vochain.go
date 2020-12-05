@@ -60,17 +60,17 @@ var (
 	HardcodedNewProcessTx = &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
 		Process: ProcessHardcoded,
-		Nonce:   util.RandomHex(32),
+		Nonce:   util.RandomBytes(32),
 	}
 
 	HardcodedCancelProcessTx = &models.CancelProcessTx{
 		Txtype:    models.TxType_CANCEL_PROCESS,
 		ProcessId: testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
-		Nonce:     util.RandomHex(32),
+		Nonce:     util.RandomBytes(32),
 	}
 
 	HardcodedNewVoteTx = &models.VoteEnvelope{
-		Nonce:     util.RandomHex(32),
+		Nonce:     util.RandomBytes(32),
 		Nullifier: testutil.Hex2byte(nil, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"),
 		ProcessId: testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		Proof: &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{
@@ -82,26 +82,26 @@ var (
 	HardcodedAdminTxAddOracle = &models.AdminTx{
 		Txtype:  models.TxType_ADD_ORACLE,
 		Address: testutil.Hex2byte(nil, "39106af1fF18bD60a38a296fd81B1f28f315852B"), // oracle address or pubkey validator
-		Nonce:   util.RandomHex(32),
+		Nonce:   util.RandomBytes(32),
 	}
 
 	HardcodedAdminTxRemoveOracle = &models.AdminTx{
 		Txtype:  models.TxType_REMOVE_ORACLE,
 		Address: testutil.Hex2byte(nil, "00192Fb10dF37c9FB26829eb2CC623cd1BF599E8"),
-		Nonce:   util.RandomHex(32),
+		Nonce:   util.RandomBytes(32),
 	}
 	power                        = uint64(10)
 	HardcodedAdminTxAddValidator = &models.AdminTx{
 		Txtype:  models.TxType_ADD_VALIDATOR,
 		Address: testutil.Hex2byte(nil, "5DC922017285EC24415F3E7ECD045665EADA8B5A"),
-		Nonce:   util.RandomHex(32),
+		Nonce:   util.RandomBytes(32),
 		Power:   &power,
 	}
 
 	HardcodedAdminTxRemoveValidator = &models.AdminTx{
 		Txtype:  models.TxType_REMOVE_VALIDATOR,
 		Address: testutil.Hex2byte(nil, "5DC922017285EC24415F3E7ECD045665EADA8B5A"),
-		Nonce:   util.RandomHex(32),
+		Nonce:   util.RandomBytes(32),
 	}
 )
 

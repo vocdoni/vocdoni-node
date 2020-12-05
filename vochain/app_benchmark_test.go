@@ -69,7 +69,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		claims = append(claims, string(c))
 	}
 	mkuri := "ipfs://123456789"
-	pid := util.RandomHex(types.ProcessIDsize)
+	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
@@ -92,7 +92,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 			b.Fatal(err)
 		}
 		tx := &models.VoteEnvelope{
-			Nonce:     util.RandomHex(16),
+			Nonce:     util.RandomBytes(16),
 			ProcessId: pid,
 			Proof:     &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: testutil.Hex2byte(b, proof)}}},
 		}

@@ -123,7 +123,7 @@ func BenchmarkVochain(b *testing.B) {
 	}
 	process := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
-		Nonce:   util.RandomHex(32),
+		Nonce:   util.RandomBytes(32),
 		Process: processData,
 	}
 
@@ -228,7 +228,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	txPid, _ := hex.DecodeString(util.TrimHex(processID))
 	siblings, _ := hex.DecodeString(util.TrimHex(resp.Siblings))
 	tx := models.VoteEnvelope{
-		Nonce:       util.RandomHex(32),
+		Nonce:       util.RandomBytes(32),
 		ProcessId:   txPid,
 		Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: siblings}}},
 		VotePackage: voteBytes,

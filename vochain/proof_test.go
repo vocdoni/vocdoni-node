@@ -27,7 +27,7 @@ func TestEthProof(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pid := util.RandomHex(types.ProcessIDsize)
+	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
@@ -86,7 +86,7 @@ func testSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, app 
 	}
 	proof := models.ProofEthereumStorage{Key: k, Value: s.StorageProof.Value.ToInt().Bytes(), Siblings: siblings}
 	tx := &models.VoteEnvelope{
-		Nonce:       util.RandomHex(32),
+		Nonce:       util.RandomBytes(32),
 		ProcessId:   pid,
 		Proof:       &models.Proof{Payload: &models.Proof_EthereumStorage{EthereumStorage: &proof}},
 		VotePackage: vp,

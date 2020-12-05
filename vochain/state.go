@@ -24,7 +24,7 @@ const (
 	AppTree                 = "app"
 	ProcessTree             = "process"
 	VoteTree                = "vote"
-	voteCachePurgeThreshold = time.Duration(time.Second * 600)
+	voteCachePurgeThreshold = time.Duration(time.Second * 300)
 )
 
 var (
@@ -60,11 +60,11 @@ type EventListener interface {
 // State represents the state of the vochain application
 type State struct {
 	Store         statedb.StateDB
-	voteCache     map[string]*types.VoteProof
+	voteCache     map[[32]byte]*types.CacheTx
 	voteCacheLock sync.RWMutex
 	ImmutableState
-
-	eventListeners []EventListener
+	MemPoolRemoveTxKey func([32]byte, bool)
+	eventListeners     []EventListener
 }
 
 // ImmutableState holds the latest trees version saved on disk
@@ -101,7 +101,7 @@ func NewState(dataDir string) (*State, error) {
 		return nil, err
 	}
 
-	vs.voteCache = make(map[string]*types.VoteProof)
+	vs.voteCache = make(map[[32]byte]*types.CacheTx)
 	log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
 	return vs, nil
 }

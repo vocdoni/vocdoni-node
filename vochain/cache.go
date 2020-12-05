@@ -6,8 +6,8 @@ import (
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
-// VoteCacheAdd adds a new vote proof to the local cache
-func (v *State) VoteCacheAdd(id string, vc *types.VoteProof) {
+// CacheAdd adds a new vote proof to the local cache
+func (v *State) CacheAdd(id [32]byte, vc *types.CacheTx) {
 	if len(id) == 0 {
 		return
 	}
@@ -16,18 +16,18 @@ func (v *State) VoteCacheAdd(id string, vc *types.VoteProof) {
 	v.voteCache[id] = vc
 }
 
-// VoteCacheDel deletes an existing vote proof from the local cache
-func (v *State) VoteCacheDel(id string) {
-	if id == "" {
-		return
-	}
+// CacheDel deletes an existing vote proof from the local cache
+func (v *State) CacheDel(id [32]byte) {
 	v.voteCacheLock.Lock()
 	defer v.voteCacheLock.Unlock()
 	delete(v.voteCache, id)
+	if v.MemPoolRemoveTxKey != nil {
+		v.MemPoolRemoveTxKey(id, false)
+	}
 }
 
-// VoteCacheGet fetch an existing vote proof from the local cache
-func (v *State) VoteCacheGet(id string) *types.VoteProof {
+// CacheGet fetch an existing vote proof from the local cache
+func (v *State) CacheGet(id [32]byte) *types.CacheTx {
 	if len(id) == 0 {
 		return nil
 	}
@@ -36,8 +36,8 @@ func (v *State) VoteCacheGet(id string) *types.VoteProof {
 	return v.voteCache[id]
 }
 
-// VoteCachePurge removes the old cache saved votes
-func (v *State) VoteCachePurge(height int64) {
+// CachePurge removes the old cache saved votes
+func (v *State) CachePurge(height int64) {
 	if height%6 != 0 {
 		return
 	}
@@ -50,8 +50,8 @@ func (v *State) VoteCachePurge(height int64) {
 	}
 }
 
-// VoteCacheSize returns the current size of the vote cache
-func (v *State) VoteCacheSize() int {
+// CacheSize returns the current size of the vote cache
+func (v *State) CacheSize() int {
 	v.voteCacheLock.RLock()
 	defer v.voteCacheLock.RUnlock()
 	return len(v.voteCache)

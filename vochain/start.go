@@ -17,6 +17,7 @@ import (
 	tmcfg "github.com/tendermint/tendermint/config"
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	mempl "github.com/tendermint/tendermint/mempool"
 
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -40,11 +41,11 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	if err := app.Node.Start(); err != nil {
 		log.Fatal(err)
 	}
-
+	// Set mempool function for removing transactions
+	app.State.MemPoolRemoveTxKey = app.Node.Mempool().(*mempl.CListMempool).RemoveTxByKey
 	return app
 }
 

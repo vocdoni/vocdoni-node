@@ -32,7 +32,7 @@ func testEntityList(t *testing.T, entityCount int) {
 		t.Fatal(err)
 	}
 	for i := 0; i < entityCount; i++ {
-		sc.addEntity(util.RandomHex(20), util.RandomHex(32))
+		sc.addEntity(util.RandomBytes(20), util.RandomBytes(32))
 	}
 
 	entities := make(map[string]bool)
@@ -83,13 +83,13 @@ func testProcessList(t *testing.T, procsCount int) {
 
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
-		sc.addEntity(util.RandomHex(20), util.RandomHex(32))
+		sc.addEntity(util.RandomBytes(20), util.RandomBytes(32))
 	}
 
 	// For a entity, add 25 processes (this will be the queried entity)
-	eidTest := util.RandomHex(20)
+	eidTest := util.RandomBytes(20)
 	for i := 0; i < procsCount; i++ {
-		sc.addEntity(eidTest, util.RandomHex(32))
+		sc.addEntity(eidTest, util.RandomBytes(32))
 	}
 
 	procs := make(map[string]bool)
