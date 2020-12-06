@@ -5,11 +5,14 @@ go 1.14
 // For testing purposes while dvote-protobuf becomes stable
 // replace github.com/vocdoni/dvote-protobuf  => ../dvote-protobuf
 
+// Temporary until there is a solution for https://github.com/tendermint/tendermint/issues/5751 
+replace github.com/tendermint/tendermint => github.com/vocdoni/tendermint v0.34.0-rc4.0.20201206155208-c0e17250900b
+
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
-	github.com/cosmos/iavl v0.15.0-rc5
+	github.com/cosmos/iavl v0.15.0
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/deroproject/graviton v0.0.0-20200906044921-89e9e09f9601
 	github.com/dgraph-io/badger/v2 v2.2007.2
@@ -76,6 +79,7 @@ require (
 	golang.org/x/sys v0.0.0-20201130171929-760e229fe7c5 // indirect
 	golang.org/x/text v0.3.4
 	google.golang.org/protobuf v1.25.0
+	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
 	nhooyr.io/websocket v1.8.6
 )

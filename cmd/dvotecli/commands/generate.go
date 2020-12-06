@@ -35,7 +35,11 @@ func generate(cmd *cobra.Command, args []string) error {
 
 	minerPVs := make([]privval.FilePV, mCount)
 	for i := range minerPVs {
-		minerPVs[i] = *privval.GenFilePV("", "")
+		pv, err := privval.GenFilePV("", "", tmtypes.ABCIPubKeyTypeEd25519)
+		if err != nil {
+			return err
+		}
+		minerPVs[i] = *pv
 		prettyHeader(fmt.Sprintf("Miner #%d", i+1))
 		fmt.Printf("Address: %s\n", au.Yellow(minerPVs[i].Key.Address))
 		fmt.Printf("Private Key: %x\n", au.Yellow(minerPVs[i].Key.PrivKey))

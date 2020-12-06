@@ -77,10 +77,13 @@ func GenerateNullifier(address ethcommon.Address, processID []byte) []byte {
 // NewPrivateValidator returns a tendermint file private validator (key and state)
 // if tmPrivKey not specified, uses the existing one or generates a new one
 func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV, error) {
-	pv := privval.LoadOrGenFilePV(
+	pv, err := privval.LoadOrGenFilePV(
 		tconfig.PrivValidatorKeyFile(),
 		tconfig.PrivValidatorStateFile(),
 	)
+	if err != nil {
+		return nil, err
+	}
 	if len(tmPrivKey) > 0 {
 		var privKey crypto25519.PrivKey
 		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
