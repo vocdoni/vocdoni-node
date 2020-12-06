@@ -188,6 +188,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = false
+	tconfig.Mempool.CacheKeepCheckTxInvalid = true
 
 	// TBD: check why it does not work anymore
 	// enable cleveldb if available
