@@ -5,8 +5,8 @@ go 1.14
 // For testing purposes while dvote-protobuf becomes stable
 // replace github.com/vocdoni/dvote-protobuf  => ../dvote-protobuf
 
-// Temporary until there is a solution for https://github.com/tendermint/tendermint/issues/5751 
-replace github.com/tendermint/tendermint => github.com/vocdoni/tendermint v0.34.0-rc4.0.20201206155208-c0e17250900b
+// Temporary until there is a solution for https://github.com/tendermint/tendermint/issues/5751
+replace github.com/tendermint/tendermint => github.com/vocdoni/tendermint v0.34.0-rc4.0.20201206190008-0095d0f38d31
 
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect
@@ -54,7 +54,9 @@ require (
 	github.com/libp2p/go-sockaddr v0.1.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/multiformats/go-multiaddr v0.3.1
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
+	github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5 // indirect
 	github.com/prometheus/client_golang v1.8.0
 	github.com/recws-org/recws v1.2.2
 	github.com/rogpeppe/rjson v0.0.0-20151026200957-77220b71d327
