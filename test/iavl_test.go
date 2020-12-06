@@ -24,7 +24,7 @@ func TestVochainState(t *testing.T) {
 	}
 
 	// This used to panic due to nil *ImmutableTree fields.
-	exists := s.EnvelopeExists([]byte("foo"), []byte("bar"))
+	exists := s.EnvelopeExists([]byte("foo"), []byte("bar"), false)
 	if exists {
 		t.Errorf("expected EnvelopeExists to return false")
 	}

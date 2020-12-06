@@ -24,7 +24,7 @@ const (
 	AppTree                 = "app"
 	ProcessTree             = "process"
 	VoteTree                = "vote"
-	voteCachePurgeThreshold = time.Duration(time.Second * 300)
+	voteCachePurgeThreshold = time.Duration(time.Minute * 10)
 )
 
 var (
@@ -412,15 +412,17 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *models.V
 }
 
 // EnvelopeExists returns true if the envelope identified with voteID exists
-func (v *State) EnvelopeExists(processID, nullifier []byte) bool {
+func (v *State) EnvelopeExists(processID, nullifier []byte, isQuery bool) bool {
 	voteID, err := v.voteID(processID, nullifier)
 	if err != nil {
 		return false
 	}
 	v.RLock()
 	defer v.RUnlock()
-	b := v.Store.ImmutableTree(VoteTree).Get(voteID)
-	return len(b) > 0
+	if isQuery {
+		return len(v.Store.ImmutableTree(VoteTree).Get(voteID)) > 0
+	}
+	return len(v.Store.Tree(VoteTree).Get(voteID)) > 0
 }
 
 func (v *State) iterateProcessID(processID []byte, fn func(key []byte, value []byte) bool, isQuery bool) bool {

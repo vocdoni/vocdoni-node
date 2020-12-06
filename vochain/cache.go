@@ -3,6 +3,7 @@ package vochain
 import (
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
 )
 
@@ -28,9 +29,6 @@ func (v *State) CacheDel(id [32]byte, fromMempoolCache bool) {
 
 // CacheGet fetch an existing vote proof from the local cache
 func (v *State) CacheGet(id [32]byte) *types.CacheTx {
-	if len(id) == 0 {
-		return nil
-	}
 	v.voteCacheLock.RLock()
 	defer v.voteCacheLock.RUnlock()
 	return v.voteCache[id]
@@ -43,13 +41,19 @@ func (v *State) CachePurge(height int64) {
 	}
 	v.voteCacheLock.Lock()
 	defer v.voteCacheLock.Unlock()
+	purged := 0
 	for id, vp := range v.voteCache {
 		if time.Since(vp.Created) > voteCachePurgeThreshold {
 			delete(v.voteCache, id)
 			if v.MemPoolRemoveTxKey != nil {
 				v.MemPoolRemoveTxKey(id, true)
+				purged++
+			} else {
 			}
 		}
+	}
+	if purged > 0 {
+		log.Infof("[txcache] purged %d transactions", purged)
 	}
 }
 
