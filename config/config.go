@@ -152,8 +152,10 @@ type VochainCfg struct {
 	Chain string
 	// Dev indicates we use the Vochain development mode (low security is accepted)
 	Dev bool
-	// LogLevel logging level
+	// LogLevel logging level for tendermint
 	LogLevel string
+	// LogLevelMempool logging level for tendermint mempool
+	LogLevelMemPool string
 	// LogOutput logging output
 	LogOutput string
 	// RPCListen address for the RPC server tp listen on

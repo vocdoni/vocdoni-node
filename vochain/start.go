@@ -46,10 +46,22 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	}
 	// Set mempool function for removing transactions
 	app.State.MemPoolRemoveTxKey = app.Node.Mempool().(*mempl.CListMempool).RemoveTxByKey
+	// Create custom logger for mempool
+	logDisable := false
+	if vochaincfg.LogLevelMemPool == "none" {
+		logDisable = true
+		vochaincfg.LogLevelMemPool = "error"
+	}
+	logger, err := tmflags.ParseLogLevel(vochaincfg.LogLevelMemPool, NewTenderLogger("mempool", logDisable), tmcfg.DefaultLogLevel())
+	if err != nil {
+		log.Errorf("failed to parse log level: %v", err)
+	}
+	app.Node.Mempool().(*mempl.CListMempool).SetLogger(logger)
+
 	return app
 }
 
-// tenderLogger implements tendermint's Logger interface, with a couple of
+// TenderLogger implements tendermint's Logger interface, with a couple of
 // modifications.
 //
 // First, it routes the logs to go-dvote's logger, so that we don't end up with
@@ -58,35 +70,48 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 // Second, because we generally don't care about tendermint errors such as
 // failures to connect to peers, we route all log levels to our debug level.
 // They will only surface if dvote's log level is "debug".
-type tenderLogger struct {
-	keyvals []interface{}
+type TenderLogger struct {
+	keyvals  []interface{}
+	Artifact string
+	Disabled bool
 }
 
-var _ tmlog.Logger = (*tenderLogger)(nil)
+var _ tmlog.Logger = (*TenderLogger)(nil)
 
 // TODO(mvdan): use zap's WithCallerSkip so that we show the position
 // information corresponding to where tenderLogger was called, instead of just
 // the pointless positions here.
 
-func (l *tenderLogger) Debug(msg string, keyvals ...interface{}) {
-	log.Debugw("[tendermint debug] "+msg, keyvals...)
+func (l *TenderLogger) Debug(msg string, keyvals ...interface{}) {
+	if !l.Disabled {
+		log.Debugw(fmt.Sprintf("[%s] %s", l.Artifact, msg), keyvals...)
+	}
 }
 
-func (l *tenderLogger) Info(msg string, keyvals ...interface{}) {
-	log.Debugw("[tendermint info] "+msg, keyvals...)
+func (l *TenderLogger) Info(msg string, keyvals ...interface{}) {
+	if !l.Disabled {
+		log.Infow(fmt.Sprintf("[%s] %s", l.Artifact, msg), keyvals...)
+	}
 }
 
-func (l *tenderLogger) Error(msg string, keyvals ...interface{}) {
-	log.Debugw("[tendermint error] "+msg, keyvals...)
+func (l *TenderLogger) Error(msg string, keyvals ...interface{}) {
+	if !l.Disabled {
+		log.Warnw(fmt.Sprintf("[%s] %s", l.Artifact, msg), keyvals...)
+	}
 }
 
-func (l *tenderLogger) With(keyvals ...interface{}) tmlog.Logger {
+func (l *TenderLogger) With(keyvals ...interface{}) tmlog.Logger {
 	// Make sure we copy the values, to avoid modifying the parent.
 	// TODO(mvdan): use zap's With method directly.
-	l2 := &tenderLogger{}
+	l2 := &TenderLogger{Artifact: l.Artifact, Disabled: l.Disabled}
 	l2.keyvals = append(l2.keyvals, l.keyvals...)
 	l2.keyvals = append(l2.keyvals, keyvals...)
 	return l2
+}
+
+// NewTenderLogger creates a Tenderming compatible logger for specified artifact
+func NewTenderLogger(artifact string, disabled bool) *TenderLogger {
+	return &TenderLogger{Artifact: artifact, Disabled: disabled}
 }
 
 /*func checkDBavailable(name string) bool {
@@ -191,18 +216,21 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
 
-	// create logger
-	logger := tmlog.Logger(&tenderLogger{})
-
-	logger, err = tmflags.ParseLogLevel(tconfig.LogLevel, logger, tmcfg.DefaultLogLevel())
+	// create tendermint logger
+	logDisable := false
+	if tconfig.LogLevel == "none" {
+		logDisable = true
+		tconfig.LogLevel = "error"
+	}
+	logger, err := tmflags.ParseLogLevel(tconfig.LogLevel, NewTenderLogger("tendermint", logDisable), tmcfg.DefaultLogLevel())
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse log level: %w", err)
+		log.Errorf("failed to parse log level: %v", err)
 	}
 
 	// read or create private validator
 	pv, err := NewPrivateValidator(localConfig.MinerKey, tconfig)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create validator key and state: (%s)", err)
+		return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
 	}
 	pv.Save()
 
