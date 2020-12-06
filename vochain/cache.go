@@ -48,7 +48,6 @@ func (v *State) CachePurge(height int64) {
 			if v.MemPoolRemoveTxKey != nil {
 				v.MemPoolRemoveTxKey(id, true)
 				purged++
-			} else {
 			}
 		}
 	}
