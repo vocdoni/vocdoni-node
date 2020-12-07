@@ -206,7 +206,10 @@ func (i *IPFSHandle) countPins(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	count := 0
-	for range pins {
+	for pin := range pins {
+		if err := pin.Err(); err != nil {
+			return 0, err
+		}
 		count++
 	}
 	return count, nil
@@ -220,8 +223,11 @@ func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
 		return nil, err
 	}
 	pinMap := make(map[string]string)
-	for p := range pins {
-		pinMap[p.Path().String()] = p.Type()
+	for pin := range pins {
+		if err := pin.Err(); err != nil {
+			return nil, err
+		}
+		pinMap[pin.Path().String()] = pin.Type()
 	}
 	return pinMap, nil
 }
