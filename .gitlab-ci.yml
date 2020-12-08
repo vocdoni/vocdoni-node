@@ -72,7 +72,7 @@ compose-test:
     - master
     - /^release-.*$/
     - stage
-    - v2
+    - dev
 
 docker-release:
   image: docker:stable
@@ -97,4 +97,4 @@ docker-release:
     - master
     - /^release-.*$/
     - stage
-    - v2
+    - dev
