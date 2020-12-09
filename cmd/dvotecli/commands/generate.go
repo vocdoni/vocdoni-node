@@ -2,10 +2,12 @@ package commands
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
 
@@ -22,6 +24,7 @@ var generateCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(generateCmd)
+	generateCmd.Flags().Int("seeds", 1, "number of seed keys")
 	generateCmd.Flags().Int("miners", 4, "number of miner keys")
 	generateCmd.Flags().Int("oracles", 2, "number of oracle keys")
 	generateCmd.Flags().String("chainId", "", "an ID name for the genesis chain to generate (required)")
@@ -29,6 +32,19 @@ func init() {
 }
 
 func generate(cmd *cobra.Command, args []string) error {
+
+	// Generate seeds
+	sCount, _ := cmd.Flags().GetInt("seeds")
+
+	seedPKs := make([]ed25519.PrivKey, sCount)
+	for i := range seedPKs {
+		pk := ed25519.GenPrivKey()
+		seedPKs[i] = pk
+		prettyHeader(fmt.Sprintf("Seed #%d", i+1))
+		fmt.Printf("Address: %s\n", au.Yellow(hex.EncodeToString(seedPKs[i].PubKey().Address())))
+		fmt.Printf("Private Key: %s\n", au.Yellow(hex.EncodeToString(seedPKs[i])))
+	}
+	fmt.Println()
 
 	// Generate miners
 	mCount, _ := cmd.Flags().GetInt("miners")
