@@ -6,7 +6,7 @@ go 1.14
 // replace github.com/vocdoni/dvote-protobuf  => ../dvote-protobuf
 
 // Temporary until there is a solution for https://github.com/tendermint/tendermint/issues/5751
-replace github.com/tendermint/tendermint => github.com/vocdoni/tendermint v0.34.0-rc4.0.20201206190008-0095d0f38d31
+replace github.com/tendermint/tendermint => github.com/vocdoni/tendermint v0.34.0-rc4.0.20201208194111-8692cf82776d
 
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect

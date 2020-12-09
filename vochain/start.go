@@ -84,7 +84,7 @@ var _ tmlog.Logger = (*TenderLogger)(nil)
 
 func (l *TenderLogger) Debug(msg string, keyvals ...interface{}) {
 	if !l.Disabled {
-		log.Debugw(fmt.Sprintf("[%s] %s", l.Artifact, msg), keyvals...)
+		log.Infow(fmt.Sprintf("[%s] %s", l.Artifact, msg), keyvals...)
 	}
 }
 
@@ -189,6 +189,11 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = false
 	tconfig.Mempool.CacheKeepCheckTxInvalid = true
+	tconfig.Mempool.Broadcast = true
+	tconfig.Mempool.MaxTxBytes = 1024 * 256 // 256 KB
+	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
+	tconfig.Mempool.CacheSize = 100000
+	tconfig.Mempool.MaxBatchBytes = 500 * tconfig.Mempool.MaxTxBytes // maximum 500 txs
 
 	// TBD: check why it does not work anymore
 	// enable cleveldb if available
