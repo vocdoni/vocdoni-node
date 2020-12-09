@@ -341,7 +341,7 @@ func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		return fmt.Errorf("key index is nil")
 	}
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if (tx.CommitmentKey == nil && tx.EncryptionPublicKey == nil) || *tx.KeyIndex < 1 || *tx.KeyIndex > types.MaxKeyIndex {
+	if (tx.CommitmentKey == nil && tx.EncryptionPublicKey == nil) || *tx.KeyIndex < 1 || *tx.KeyIndex > types.KeyKeeperMaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex is not already used
@@ -357,7 +357,7 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		return fmt.Errorf("key index is nil")
 	}
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if (tx.RevealKey == nil && tx.EncryptionPrivateKey == nil) || *tx.KeyIndex < 1 || *tx.KeyIndex > types.MaxKeyIndex {
+	if (tx.RevealKey == nil && tx.EncryptionPrivateKey == nil) || *tx.KeyIndex < 1 || *tx.KeyIndex > types.KeyKeeperMaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex exists

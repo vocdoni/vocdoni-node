@@ -28,6 +28,7 @@ const (
 	EthereumReadTimeout            = 1 * time.Minute
 	EthereumWriteTimeout           = 1 * time.Minute
 	EthereumDialMaxRetry           = 10
+
 	// Scrutinizer
 
 	// ScrutinizerLiveProcessPrefix is used for sotring temporary results on live
@@ -50,6 +51,11 @@ const (
 	// SnarkVote contains the string that needs to match with the received vote type for snark-vote
 	SnarkVote = "snark-vote"
 
+	// KeyKeeper
+
+	// KeyKeeperMaxKeyIndex is the maxim number of allowed Encryption or Commitment keys
+	KeyKeeperMaxKeyIndex = 16
+
 	// List of transation names
 	TxVote              = "vote"
 	TxNewProcess        = "newProcess"
@@ -61,13 +67,12 @@ const (
 	TxAddProcessKeys    = "addProcessKeys"
 	TxRevealProcessKeys = "revealProcessKeys"
 
-	// MaxKeyIndex is the maxim number of allowed Encryption or Commitment keys
-	MaxKeyIndex = 16
+	ProcessesContractMaxCensusOrigins = 7
+	ProcessesContractMaxProcessMode   = 15
+	ProcessesContractMaxEnvelopeType  = 15
 
-	MaxCensusOrigins = 7
-	MaxProcessMode   = 15
-	MaxEnvelopeType  = 15
+	ProcessesContractMinStartBlock = 0
+	ProcessesContractMinBlockCount = 0
 
-	MinStartBlock = 0
-	MinBlockCount = 0
+	ProcessesParamsSignatureSize = 32
 )

@@ -119,8 +119,8 @@ type EthCfg struct {
 	BootNodes []string
 	// TrustedPeers list of p2p Ethereum peers to trust and connect (if possible)
 	TrustedPeers []string
-	// ENS domains pointing to ethereum contracts to use as source of truth for some operations
-	Domains []string
+	// Vocdoni contracts ENS domains pointing to ethereum contracts to use as source of truth for some operations
+	VocdoniDomains []string
 	// NoWaitSync do not wait for Ethereum to synchronize
 	NoWaitSync bool
 }

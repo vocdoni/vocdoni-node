@@ -95,20 +95,20 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 	}
 	ph, err := chain.NewVotingHandle(contractsAddresses, w3Endpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot create voting handle: %w", err)
 	}
 	var abis []abi.ABI
 	abis[0], err = abi.JSON(strings.NewReader(contracts.VotingProcessABI))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot read processes contract abi: %w", err)
 	}
 	abis[1], err = abi.JSON(strings.NewReader(contracts.NamespaceABI))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot read namespace contract abi: %w", err)
 	}
 	abis[2], err = abi.JSON(strings.NewReader(contracts.TokenStorageProofABI))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot read token storage proof contract abi: %w", err)
 	}
 	return &EthereumEvents{
 		// [0] -> Processes contract

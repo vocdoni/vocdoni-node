@@ -230,10 +230,10 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 
 	if tx.Process.EnvelopeType.EncryptedVotes || tx.Process.EnvelopeType.Anonymous {
 		// We consider the zero value as nil for security
-		tx.Process.EncryptionPublicKeys = make([]string, types.MaxKeyIndex)
-		tx.Process.EncryptionPrivateKeys = make([]string, types.MaxKeyIndex)
-		tx.Process.CommitmentKeys = make([]string, types.MaxKeyIndex)
-		tx.Process.RevealKeys = make([]string, types.MaxKeyIndex)
+		tx.Process.EncryptionPublicKeys = make([]string, types.KeyKeeperMaxKeyIndex)
+		tx.Process.EncryptionPrivateKeys = make([]string, types.KeyKeeperMaxKeyIndex)
+		tx.Process.CommitmentKeys = make([]string, types.KeyKeeperMaxKeyIndex)
+		tx.Process.RevealKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 	}
 	return tx.Process, nil
 }

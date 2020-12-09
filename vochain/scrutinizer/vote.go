@@ -195,7 +195,7 @@ func (s *Scrutinizer) computeNonLiveResults(processID []byte, p *models.Process)
 			} else {
 				keys := []string{}
 				for _, k := range v.EncryptionKeyIndexes {
-					if k >= types.MaxKeyIndex {
+					if k >= types.KeyKeeperMaxKeyIndex {
 						err = fmt.Errorf("key index overflow")
 						break
 					}

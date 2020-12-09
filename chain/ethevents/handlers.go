@@ -101,14 +101,14 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		vtx.Payload = &models.Tx_NewProcess{NewProcess: processTx}
 		txb, err := proto.Marshal(&vtx)
 		if err != nil {
-			return fmt.Errorf("error marshaling process tx: (%s)", err)
+			return fmt.Errorf("error marshaling process tx: %s", err)
 		}
 		log.Debugf("broadcasting Vochain Tx: %s", processTx.String())
 
 		res, err := e.VochainApp.SendTX(txb)
 		if err != nil || res == nil {
-			log.Warnf("cannot broadcast tx: (%s)", err)
-			return fmt.Errorf("cannot broadcast tx: (%s), res: (%+v)", err, res)
+			log.Warnf("cannot broadcast tx: %s", err)
+			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
 		log.Infof("oracle transaction sent, hash:%s", res.Hash)
 
@@ -119,7 +119,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return err
 		}
-		log.Infof("found process status update on ethereum\n\t%+v", setProcessTx)
+		log.Infof("found process %x status update on ethereum, new status is %s", setProcessTx.ProcessId, setProcessTx.Status)
 		p, err := e.VochainApp.State.Process(setProcessTx.ProcessId, true)
 		if err != nil {
 			return err
@@ -151,9 +151,9 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		res, err := e.VochainApp.SendTX(tx)
 		if err != nil || res == nil {
 			log.Warnf("cannot broadcast tx: (%s)", err)
-			return fmt.Errorf("cannot broadcast tx: (%s), res: (%+v)", err, res)
+			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
-		log.Infof("oracle transaction sent, hash:%s", res.Hash)
+		log.Infof("oracle transaction sent, hash: %s", res.Hash)
 	}
 	return nil
 }
