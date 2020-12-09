@@ -188,12 +188,12 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = false
-	tconfig.Mempool.CacheKeepCheckTxInvalid = true
+	//	tconfig.Mempool.CacheKeepCheckTxInvalid = true
 	tconfig.Mempool.Broadcast = true
 	tconfig.Mempool.MaxTxBytes = 1024 * 256 // 256 KB
 	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
 	tconfig.Mempool.CacheSize = 100000
-	tconfig.Mempool.MaxBatchBytes = 500 * tconfig.Mempool.MaxTxBytes // maximum 500 txs
+	//	tconfig.Mempool.MaxBatchBytes = 500 * tconfig.Mempool.MaxTxBytes // maximum 500 full-size txs
 
 	// TBD: check why it does not work anymore
 	// enable cleveldb if available

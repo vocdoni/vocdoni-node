@@ -1521,10 +1521,8 @@ github.com/vocdoni/dvote-protobuf v0.1.2 h1:0OU4Pvs9qV4+NYfu4ya9i8hjxii9ZwBvLtNU
 github.com/vocdoni/dvote-protobuf v0.1.2/go.mod h1:D7tOUAb8CV7FG57vYxny1b9aghbL7xPgbv2oXd+hgDA=
 github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25 h1:UIkbnhAxwQ1Y368UsDsEXV4ue2MwFkmD6pfLF14+Qy4=
 github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25/go.mod h1:NLA1A55raZ1VNMmKulPUm+Lu9CVetCDVuDCYk5bSYrE=
-github.com/vocdoni/tendermint v0.34.0-rc4.0.20201206190008-0095d0f38d31 h1:ILhVVUDM0RLFGusTkDs6QN8i9pjbIM1MlWOqV5Xn7fU=
-github.com/vocdoni/tendermint v0.34.0-rc4.0.20201206190008-0095d0f38d31/go.mod h1:PonpYDVfcLDTAeQh3xIqLQw8vi2Yg0HZvxqUZO4m3Gk=
-github.com/vocdoni/tendermint v0.34.0-rc4.0.20201208194111-8692cf82776d h1:h1eCdA0k8VHWxDO3S55DeaX/kMPVsR/47lsR8gvMtkA=
-github.com/vocdoni/tendermint v0.34.0-rc4.0.20201208194111-8692cf82776d/go.mod h1:PonpYDVfcLDTAeQh3xIqLQw8vi2Yg0HZvxqUZO4m3Gk=
+github.com/vocdoni/tendermint v0.34.0-rc4.0.20201209151525-75721cb94a61 h1:6e4wH6WsumgDwLdBZ7LOtubvcbQgtjKEDXptrlQPqW0=
+github.com/vocdoni/tendermint v0.34.0-rc4.0.20201209151525-75721cb94a61/go.mod h1:PonpYDVfcLDTAeQh3xIqLQw8vi2Yg0HZvxqUZO4m3Gk=
 github.com/warpfork/go-wish v0.0.0-20180510122957-5ad1f5abf436/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
 github.com/warpfork/go-wish v0.0.0-20190328234359-8b3e70f8e830/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
 github.com/warpfork/go-wish v0.0.0-20200122115046-b9ea61034e4a h1:G++j5e0OC488te356JvdhaM8YS6nMsjLAYF7JxCv07w=

@@ -5,8 +5,8 @@ go 1.14
 // For testing purposes while dvote-protobuf becomes stable
 // replace github.com/vocdoni/dvote-protobuf  => ../dvote-protobuf
 
-// Temporary until there is a solution for https://github.com/tendermint/tendermint/issues/5751
-replace github.com/tendermint/tendermint => github.com/vocdoni/tendermint v0.34.0-rc4.0.20201208194111-8692cf82776d
+// Temporary until there is a solution for the batch tx weird behavior
+replace github.com/tendermint/tendermint => github.com/vocdoni/tendermint v0.34.0-rc4.0.20201209151525-75721cb94a61
 
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect
