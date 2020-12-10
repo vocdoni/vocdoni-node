@@ -97,7 +97,7 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 	if err != nil {
 		return nil, fmt.Errorf("cannot create voting handle: %w", err)
 	}
-	var abis []abi.ABI
+	abis := make([]abi.ABI, len(contractsAddresses))
 	abis[0], err = abi.JSON(strings.NewReader(contracts.VotingProcessABI))
 	if err != nil {
 		return nil, fmt.Errorf("cannot read processes contract abi: %w", err)

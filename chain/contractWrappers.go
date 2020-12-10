@@ -336,7 +336,7 @@ func (e *ENSCallerHandler) NewENSRegistryWithFallbackHandle() (err error) {
 	address := common.HexToAddress(e.PublicRegistryAddr)
 	if e.Registry, err = contracts.NewEnsRegistryWithFallbackCaller(address, e.EthereumClient); err != nil {
 		log.Errorf("error constructing contracts handle: %s", err)
-		return err
+		return fmt.Errorf("cannot create ENS Registry contract instance: %w", err)
 	}
 	return nil
 }
@@ -346,7 +346,7 @@ func (e *ENSCallerHandler) NewEntityResolverHandle() (err error) {
 	address := common.HexToAddress(e.ResolverAddr)
 	if e.Resolver, err = contracts.NewEntityResolverCaller(address, e.EthereumClient); err != nil {
 		log.Errorf("error constructing contracts handle: %s", err)
-		return err
+		return fmt.Errorf("cannot create ENS Resolver contract instance: %w", err)
 	}
 	return nil
 }
@@ -366,7 +366,7 @@ func (e *ENSCallerHandler) Resolve(ctx context.Context, nameHash [32]byte, resol
 
 	}
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot resolve contract address: %w", err)
 	}
 	return resolvedAddr.String(), nil
 }
@@ -376,7 +376,7 @@ func ENSAddress(ctx context.Context, publicRegistryAddr, domain, ethEndpoint str
 	// normalize voting process domain name
 	nh, err := NameHash(domain)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot get ENS address of the given domain: %w", err)
 	}
 	var client *ethclient.Client
 	for i := 0; i < types.EthereumDialMaxRetry; i++ {
@@ -400,31 +400,31 @@ func ENSAddress(ctx context.Context, publicRegistryAddr, domain, ethEndpoint str
 	defer ensCallerHandler.close()
 	// create registry contract instance
 	if err := ensCallerHandler.NewENSRegistryWithFallbackHandle(); err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot get ENS address of the given domain: %w", err)
 	}
 	// get resolver address from public registry
 	ensCallerHandler.ResolverAddr, err = ensCallerHandler.Resolve(ctx, nh, true)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot get ENS address of the given domain: %w", err)
 	}
 	// create resolver contract instance
 	if err := ensCallerHandler.NewEntityResolverHandle(); err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot get ENS address of the given domain: %w", err)
 	}
 	// get voting process addr from resolver
 	contractAddr, err := ensCallerHandler.Resolve(ctx, nh, false)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot get ENS address of the given domain: %w", err)
 	}
 	return contractAddr, nil
 }
 
-// normalize normalizes a name according to the ENS standard
+// Normalize normalizes a name according to the ENS standard
 func Normalize(input string) (output string, err error) {
 	p := idna.New(idna.MapForLookup(), idna.StrictDomainName(false), idna.Transitional(false))
 	output, err = p.ToUnicode(input)
 	if err != nil {
-		return
+		err = fmt.Errorf("cannot convert input to Unicode: %w", err)
 	}
 	// If the name started with a period then ToUnicode() removes it, but we want to keep it
 	if strings.HasPrefix(input, ".") && !strings.HasPrefix(output, ".") {
@@ -433,35 +433,42 @@ func Normalize(input string) (output string, err error) {
 	return
 }
 
+// NameHashPart returns a unique hash generated for any valid domain name
 func NameHashPart(currentHash [32]byte, name string) (hash [32]byte, err error) {
 	sha := sha3.NewLegacyKeccak256()
 	if _, err = sha.Write(currentHash[:]); err != nil {
+		err = fmt.Errorf("nameHashPart: cannot generate sha3 of the given hash: %w", err)
 		return
 	}
 	nameSha := sha3.NewLegacyKeccak256()
 	if _, err = nameSha.Write([]byte(name)); err != nil {
+		err = fmt.Errorf("nameHashPart: cannot generate sha3 of the given name: %w", err)
 		return
 	}
 	nameHash := nameSha.Sum(nil)
 	if _, err = sha.Write(nameHash); err != nil {
+		err = fmt.Errorf("nameHashPart: cannot generate sha3 of the computed namehash: %w", err)
 		return
 	}
 	sha.Sum(hash[:0])
 	return
 }
 
-// nameHash generates a hash from a name that can be used to look up the name in ENS
+// NameHash generates a hash from a name that can be used to look up the name in ENS
 func NameHash(name string) (hash [32]byte, err error) {
 	if name == "" {
+		err = fmt.Errorf("nameHash: cannot create namehash of the given name")
 		return
 	}
 	normalizedName, err := Normalize(name)
 	if err != nil {
+		err = fmt.Errorf("nameHash: cannot normalize the given name: %w", err)
 		return
 	}
 	parts := strings.Split(normalizedName, ".")
 	for i := len(parts) - 1; i >= 0; i-- {
 		if hash, err = NameHashPart(hash, parts[i]); err != nil {
+			err = fmt.Errorf("nameHash: cannot generate name hash part: %w", err)
 			return
 		}
 	}
@@ -479,10 +486,10 @@ func EnsResolve(ctx context.Context, ensRegistryAddr, ethDomain, w3uri string) (
 				time.Sleep(time.Second)
 				continue
 			}
-			err = fmt.Errorf("cannot get voting process contract: %w", err)
+			err = fmt.Errorf("cannot get contract address: %w", err)
 			return
 		}
-		log.Infof("loaded voting contract at address: %s", contractAddr)
+		log.Infof("loaded contract at address: %s", contractAddr)
 		break
 	}
 	return
@@ -493,7 +500,7 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, et
 	// normalize entity resolver domain name
 	nh, err := NameHash(types.EntityResolverDomain)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}
 	var client *ethclient.Client
 	for i := 0; i < types.EthereumDialMaxRetry; i++ {
@@ -506,7 +513,8 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, et
 		break
 	}
 	if err != nil || client == nil {
-		log.Fatalf("cannot create a client connection: %w, tried %d times.", err, types.EthereumDialMaxRetry)
+		log.Errorf("cannot create a client connection: %s, tried %d times.", err, types.EthereumDialMaxRetry)
+		return "", fmt.Errorf("cannot resolve entity metadata URL, cannot create a client connection: %w", err)
 	}
 	ensCallerHandler := &ENSCallerHandler{
 		PublicRegistryAddr: ensRegistryAddr,
@@ -515,21 +523,21 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, et
 	defer ensCallerHandler.close()
 	// create registry contract instance
 	if err := ensCallerHandler.NewENSRegistryWithFallbackHandle(); err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}
 	// get resolver address from public registry
 	ensCallerHandler.ResolverAddr, err = ensCallerHandler.Resolve(ctx, nh, true)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}
 	// create resolver contract instance
 	if err := ensCallerHandler.NewEntityResolverHandle(); err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}
 	// get entity metadata url from resolver
 	eIDBytes, err := hex.DecodeString(entityID)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}
 	var eIDBytes32 [32]byte
 	copy(eIDBytes32[:], eIDBytes)
@@ -537,7 +545,7 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, et
 	defer cancel()
 	metaURL, err := ensCallerHandler.Resolver.Text(&ethbind.CallOpts{Context: tctx}, eIDBytes32, types.EntityMetaKey)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}
 	return metaURL, nil
 }
