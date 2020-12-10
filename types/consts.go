@@ -14,20 +14,34 @@ var (
 const (
 	// All
 
+	// ProcessIDsize is the size of a process id
 	ProcessIDsize = 32
-	// size of eth addr
+	// EntityIDsize is the size of an entity id which is the same of an ethereum address
 	EntityIDsize = 20
-	// legacy: in the past we used hash(addr)
+
+	// EntityIDsizeV2 legacy: in the past we used hash(addr)
 	// this is a temporal work around to support both
-	EntityIDsizeV2                 = 32
-	VoteNullifierSize              = 32
-	KeyIndexSeparator              = ":"
+	EntityIDsizeV2 = 32
+	// VoteNullifierSize is the size of a vote nullifier
+	VoteNullifierSize = 32
+	// KeyIndexSeparator is the default char used to split keys
+	KeyIndexSeparator = ":"
+	// EthereumConfirmationsThreshold is the minimum amout of blocks
+	// that should pass before considering a tx final
 	EthereumConfirmationsThreshold = 6
-	EntityResolverDomain           = "entity-resolver.vocdoni.eth"
-	EntityMetaKey                  = "vnd.vocdoni.meta"
-	EthereumReadTimeout            = 1 * time.Minute
-	EthereumWriteTimeout           = 1 * time.Minute
-	EthereumDialMaxRetry           = 10
+	// EntityResolverDomain is the default entity resolver ENS domain
+	EntityResolverDomain = "entity-resolver.vocdoni.eth"
+	// EntityMetaKey is the key of an ENS text record for the entity metadata
+	EntityMetaKey = "vnd.vocdoni.meta"
+	// EthereumReadTimeout is the max amount of time for reading anything on
+	// the Ethereum network to wait until canceling it's context
+	EthereumReadTimeout = 1 * time.Minute
+	// EthereumWriteTimeout is the max amount of time for writing anything on
+	// the Ethereum network to wait until canceling it's context
+	EthereumWriteTimeout = 1 * time.Minute
+	// EthereumDialMaxRetry is the max number of attempts an ethereum client will
+	// make in order to dial to an endpoint before considering the endpoint unreachable
+	EthereumDialMaxRetry = 10
 
 	// Scrutinizer
 
@@ -57,9 +71,10 @@ const (
 	KeyKeeperMaxKeyIndex = 16
 
 	// List of transation names
+
 	TxVote              = "vote"
 	TxNewProcess        = "newProcess"
-	TxCancelProcess     = "cancelProcess"
+	TxCancelProcess     = "cancelProcess" // legacy
 	TxAddValidator      = "addValidator"
 	TxRemoveValidator   = "removeValidator"
 	TxAddOracle         = "addOracle"
@@ -67,12 +82,25 @@ const (
 	TxAddProcessKeys    = "addProcessKeys"
 	TxRevealProcessKeys = "revealProcessKeys"
 
+	// ProcessesContractMaxCensusOrigins represents the max value that a uint8 can have
+	// with the current smart contract bitmask describing the supported census origins
 	ProcessesContractMaxCensusOrigins = 7
-	ProcessesContractMaxProcessMode   = 15
-	ProcessesContractMaxEnvelopeType  = 15
+	// ProcessesContractMaxProcessMode represents the max value that a uint8 can have
+	// with the current smart contract bitmask describing the supported process mode
+	ProcessesContractMaxProcessMode = 15
+	// ProcessesContractMaxEnvelopeType represents the max value that a uint8 can have
+	// with the current smart contract bitmask describing the supported envelope types
+	ProcessesContractMaxEnvelopeType = 15
 
+	// TODO: @jordipainan this values are tricky
+
+	// ProcessesContractMinStartBlock represents the minimum vochain block number
+	// can be started where a process
 	ProcessesContractMinStartBlock = 0
+	// ProcessesContractMinBlockCount represents the minimum number of vochain blocks
+	// that a process should last
 	ProcessesContractMinBlockCount = 0
 
+	// ProcessesParamsSignatureSize represents the size of a signature on ethereum
 	ProcessesParamsSignatureSize = 32
 )
