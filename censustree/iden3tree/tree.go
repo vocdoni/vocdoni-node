@@ -1,15 +1,20 @@
 // Package tree provides the functions for creating and managing an iden3 merkletree
-package tree
+package iden3tree
 
 import (
 	"encoding/base64"
 	"fmt"
+	"log"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	common3 "github.com/iden3/go-iden3-core/common"
 	"github.com/iden3/go-iden3-core/core/claims"
 	iden3db "github.com/iden3/go-iden3-core/db"
+	"gitlab.com/vocdoni/go-dvote/censustree"
+	"gitlab.com/vocdoni/go-dvote/db"
 
 	"github.com/iden3/go-iden3-core/merkletree"
 	"golang.org/x/text/unicode/norm"
@@ -26,10 +31,10 @@ const (
 	MaxValueSize = claims.ValueSlotLen - 2 // -2 because the 2 first bytes are used to store the length of index and value
 )
 
-// NewTree opens or creates a merkle tree under the given storage.
+// NewTreeWithStorage opens or creates a merkle tree under the given storage.
 // Note that the storage should be prefixed, since each tree should use an
 // entirely separate namespace for its database keys.
-func NewTree(storage iden3db.Storage) (*Tree, error) {
+func NewTreeWithStorage(storage iden3db.Storage) (*Tree, error) {
 	mt, err := merkletree.NewMerkleTree(storage, 140)
 	if err != nil {
 		return nil, err
@@ -37,6 +42,30 @@ func NewTree(storage iden3db.Storage) (*Tree, error) {
 	tr := &Tree{Tree: mt}
 	tr.updateAccessTime()
 	return tr, nil
+}
+
+func NewTree(name, storageDir string) (censustree.Tree, error) {
+	tr := Tree{}
+	if err := tr.Init(name, storageDir); err != nil {
+		return nil, err
+	}
+	return &tr, nil
+}
+
+func (t *Tree) Init(name, storageDir string) error {
+	dbDir := filepath.Join(storageDir, "iden3tree.db."+strings.TrimSpace(name))
+	storage, err := db.NewIden3Storage(dbDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mt, err := merkletree.NewMerkleTree(storage, 140)
+	if err != nil {
+		return err
+	}
+	t.Tree = mt
+	t.updateAccessTime()
+	return nil
 }
 
 func (t *Tree) MaxClaimSize() int {
@@ -170,15 +199,18 @@ func CheckProof(root, mpHex string, index, value []byte) (bool, error) {
 }
 
 // CheckProof validates a merkle proof and its data
-func (t *Tree) CheckProof(index, value []byte, mpHex string) (bool, error) {
+func (t *Tree) CheckProof(index, value, root []byte, mpHex string) (bool, error) {
 	t.updateAccessTime()
-	return CheckProof(t.Root(), mpHex, index, value)
+	if root == nil {
+		root = t.Root()
+	}
+	return CheckProof(fmt.Sprintf("%x", root), mpHex, index, value)
 }
 
 // Root returns the current root hash of the merkle tree
-func (t *Tree) Root() string {
+func (t *Tree) Root() []byte {
 	t.updateAccessTime()
-	return common3.HexEncode(t.Tree.RootKey().Bytes())
+	return t.Tree.RootKey().Bytes()
 }
 
 func stringToHash(hash string) (*merkletree.Hash, error) {
@@ -192,11 +224,11 @@ func stringToHash(hash string) (*merkletree.Hash, error) {
 }
 
 // Dump returns the whole merkle tree serialized in a format that can be used on Import
-func (t *Tree) Dump(root string) (claims []string, err error) {
+func (t *Tree) Dump(root []byte) (claims []string, err error) {
 	var rootHash *merkletree.Hash
 	t.updateAccessTime()
 	if len(root) > 0 {
-		rootHash, err = stringToHash(root)
+		rootHash, err = stringToHash(fmt.Sprintf("%x", root))
 		if err != nil {
 			return
 		}
@@ -206,13 +238,13 @@ func (t *Tree) Dump(root string) (claims []string, err error) {
 }
 
 // Size returns the number of leaf nodes on the merkle tree
-func (t *Tree) Size(root string) (int64, error) {
+func (t *Tree) Size(root []byte) (int64, error) {
 	var err error
 	var rootHash *merkletree.Hash
 	var size int64
 	t.updateAccessTime()
 	if len(root) > 0 {
-		rootHash, err = stringToHash(root)
+		rootHash, err = stringToHash(fmt.Sprintf("%x", root))
 		if err != nil {
 			return size, err
 		}
@@ -229,13 +261,13 @@ func (t *Tree) Size(root string) (int64, error) {
 // First return parametre are the indexes and second the values
 // If root is not specified, the current one is used
 // If responseBase64 is true, the list will be returned base64 encoded
-func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, []string, error) {
+func (t *Tree) DumpPlain(root []byte, responseBase64 bool) ([]string, []string, error) {
 	var indexes, values []string
 	var err error
 	var rootHash *merkletree.Hash
 	t.updateAccessTime()
 	if len(root) > 0 {
-		rootHash, err = stringToHash(root)
+		rootHash, err = stringToHash(fmt.Sprintf("%x", root))
 		if err != nil {
 			return indexes, values, err
 		}
@@ -267,12 +299,12 @@ func (t *Tree) ImportDump(claims []string) error {
 }
 
 // Snapshot returns a Tree instance of a exiting merkle root
-func (t *Tree) Snapshot(root string) (*Tree, error) {
+func (t *Tree) Snapshot(root []byte) (censustree.Tree, error) {
 	var rootHash *merkletree.Hash
 	snapshotTree := new(Tree)
 	var err error
 	if len(root) > 0 {
-		rootHash, err = stringToHash(root)
+		rootHash, err = stringToHash(fmt.Sprintf("%x", root))
 		if err != nil || rootHash == nil {
 			return snapshotTree, err
 		}
@@ -283,9 +315,9 @@ func (t *Tree) Snapshot(root string) (*Tree, error) {
 }
 
 // HashExist checks if a hash exists as a node in the merkle tree
-func (t *Tree) HashExist(hash string) (bool, error) {
+func (t *Tree) HashExist(hash []byte) (bool, error) {
 	t.updateAccessTime()
-	h, err := stringToHash(hash)
+	h, err := stringToHash(fmt.Sprintf("%x", hash))
 	if err != nil {
 		return false, err
 	}

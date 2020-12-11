@@ -71,7 +71,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	var cm census.Manager
 	d.CensusDir = tb.TempDir()
 
-	if err := cm.Init(d.CensusDir, ""); err != nil {
+	if err := cm.Init(d.CensusDir, "", "graviton"); err != nil {
 		tb.Fatal(err)
 	}
 

@@ -10,6 +10,7 @@ import (
 
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/types"
+	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 type censusImport struct {
@@ -39,7 +40,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 	if err != nil {
 		return fmt.Errorf("error importing dump: %s", err)
 	}
-	if tr.Root() != dump.RootHash {
+	if fmt.Sprintf("%x", tr.Root()) != util.TrimHex(dump.RootHash) {
 		if err := m.DelNamespace(cid); err != nil {
 			log.Error(err)
 		}

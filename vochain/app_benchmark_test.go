@@ -11,10 +11,10 @@ import (
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
+	tree "gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
-	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"google.golang.org/protobuf/proto"
@@ -77,7 +77,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		Mode:         &models.ProcessMode{},
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EntityIDsize),
-		CensusMkRoot: testutil.Hex2byte(b, tr.Root()),
+		CensusMkRoot: tr.Root(),
 		CensusMkURI:  &mkuri,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
 		BlockCount:   1024,

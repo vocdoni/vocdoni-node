@@ -1,5 +1,5 @@
 // Package tree provides the functions for creating and managing an iden3 merkletree
-package trie
+package gravitontree
 
 import (
 	"encoding/base64"
@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"gitlab.com/vocdoni/go-dvote/censustree"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/statedb"
 	"gitlab.com/vocdoni/go-dvote/statedb/gravitonstate"
@@ -31,10 +32,8 @@ const (
 // NewTree opens or creates a merkle tree under the given storage.
 // Note that the storage should be prefixed, since each tree should use an
 // entirely separate namespace for its database keys.
-func NewTree(name, storageDir string) (*Tree, error) {
+func NewTree(name, storageDir string) (censustree.Tree, error) {
 	gs := new(gravitonstate.GravitonState)
-
-	//name = strings.ReplaceAll(name, "/", "_")
 	iname := name
 	if len(iname) > 32 {
 		iname = iname[:32]
@@ -54,6 +53,32 @@ func NewTree(name, storageDir string) (*Tree, error) {
 	tr := &Tree{store: gs, Tree: gs.Tree(iname), name: iname, dataDir: dir}
 	tr.updateAccessTime()
 	return tr, nil
+}
+
+func (t *Tree) Init(name, storageDir string) error {
+	gs := new(gravitonstate.GravitonState)
+	iname := name
+	if len(iname) > 32 {
+		iname = iname[:32]
+	}
+	dir := fmt.Sprintf("%s/%s", storageDir, name)
+	log.Debugf("creating census tree %s on %s", iname, dir)
+
+	if err := gs.Init(dir, "disk"); err != nil {
+		return err
+	}
+	if err := gs.AddTree(iname); err != nil {
+		return err
+	}
+	if err := gs.LoadVersion(0); err != nil {
+		return err
+	}
+	t.store = gs
+	t.Tree = gs.Tree(iname)
+	t.name = iname
+	t.dataDir = dir
+	t.updateAccessTime()
+	return nil
 }
 
 func (t *Tree) MaxClaimSize() int {
@@ -121,20 +146,31 @@ func (t *Tree) GenProof(index, value []byte) (string, error) {
 }
 
 // CheckProof standalone function for checking a merkle proof
-func CheckProof(root, mpHex string, index, value []byte) (bool, error) {
+func CheckProof(index, value, root []byte, mpHex string) (bool, error) {
+	if len(index) > gravitonstate.GravitonMaxKeySize {
+		return false, fmt.Errorf("index is too big, maximum allow is %d", gravitonstate.GravitonMaxKeySize)
+	}
+	if len(value) > gravitonstate.GravitonMaxValueSize {
+		return false, fmt.Errorf("value is too big, maximum allow is %d", gravitonstate.GravitonMaxValueSize)
+	}
+	if len(root) != gravitonstate.GravitonHashSizeBytes {
+		return false, fmt.Errorf("root hash lenght is incorrect (expected %d)", gravitonstate.GravitonHashSizeBytes)
+	}
 	p, err := hex.DecodeString(mpHex)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("cannot decode merkle proof: %w", err)
 	}
-	r, err := hex.DecodeString(root)
-	if err != nil {
-		return false, err
-	}
-	return gravitonstate.Verify(index, p, r)
+	return gravitonstate.Verify(index, p, root)
 }
 
 // CheckProof validates a merkle proof and its data
-func (t *Tree) CheckProof(index, value []byte, mpHex string) (bool, error) {
+func (t *Tree) CheckProof(index, value, root []byte, mpHex string) (bool, error) {
+	if len(index) > gravitonstate.GravitonMaxKeySize {
+		return false, fmt.Errorf("index is too big, maximum allow is %d", gravitonstate.GravitonMaxKeySize)
+	}
+	if len(value) > gravitonstate.GravitonMaxValueSize {
+		return false, fmt.Errorf("value is too big, maximum allow is %d", gravitonstate.GravitonMaxValueSize)
+	}
 	t.updateAccessTime()
 	proof, err := hex.DecodeString(mpHex)
 	if err != nil {
@@ -144,13 +180,13 @@ func (t *Tree) CheckProof(index, value []byte, mpHex string) (bool, error) {
 	if tr == nil {
 		return false, fmt.Errorf("tree %s does not exist", t.name)
 	}
-	return tr.Verify(index, proof, nil), nil
+	return tr.Verify(index, proof, root), nil
 }
 
 // Root returns the current root hash of the merkle tree
-func (t *Tree) Root() string {
+func (t *Tree) Root() []byte {
 	t.updateAccessTime()
-	return fmt.Sprintf("%x", t.Tree.Hash())
+	return t.Tree.Hash()
 }
 
 func (t *Tree) treeWithRoot(root string) statedb.StateTree {
@@ -169,11 +205,11 @@ func (t *Tree) treeWithRoot(root string) statedb.StateTree {
 }
 
 // Dump returns the whole merkle tree serialized in a format that can be used on Import
-func (t *Tree) Dump(root string) (claims []string, err error) {
+func (t *Tree) Dump(root []byte) (claims []string, err error) {
 	t.updateAccessTime()
-	tree := t.treeWithRoot(root)
+	tree := t.treeWithRoot(fmt.Sprintf("%x", root))
 	if tree == nil {
-		return nil, fmt.Errorf("dump: root not found %s", root)
+		return nil, fmt.Errorf("dump: root not found %x", root)
 	}
 	tree.Iterate(nil, func(k, v []byte) bool {
 		claims = append(claims, fmt.Sprintf("%x", k))
@@ -183,10 +219,10 @@ func (t *Tree) Dump(root string) (claims []string, err error) {
 }
 
 // Size returns the number of leaf nodes on the merkle tree
-func (t *Tree) Size(root string) (int64, error) {
-	tree := t.treeWithRoot(root)
+func (t *Tree) Size(root []byte) (int64, error) {
+	tree := t.treeWithRoot(fmt.Sprintf("%x", root))
 	if tree == nil {
-		return 0, fmt.Errorf("size: root not found %s", root)
+		return 0, fmt.Errorf("size: root not found %x", root)
 	}
 	return int64(tree.Count()), nil
 }
@@ -195,14 +231,14 @@ func (t *Tree) Size(root string) (int64, error) {
 // First return parametre are the indexes and second the values
 // If root is not specified, the current one is used
 // If responseBase64 is true, the list will be returned base64 encoded
-func (t *Tree) DumpPlain(root string, responseBase64 bool) ([]string, []string, error) {
+func (t *Tree) DumpPlain(root []byte, responseBase64 bool) ([]string, []string, error) {
 	var indexes, values []string
 	var err error
 	t.updateAccessTime()
 
-	tree := t.treeWithRoot(root)
+	tree := t.treeWithRoot(fmt.Sprintf("%x", root))
 	if tree == nil {
-		return nil, nil, fmt.Errorf("dumpplain: root not found %s", root)
+		return nil, nil, fmt.Errorf("dumpplain: root not found %x", root)
 	}
 	tree.Iterate(nil, func(k, v []byte) bool {
 		if !responseBase64 {
@@ -238,8 +274,8 @@ func (t *Tree) ImportDump(claims []string) error {
 }
 
 // Snapshot returns a Tree instance of a exiting merkle root
-func (t *Tree) Snapshot(root string) (*Tree, error) {
-	tree := t.treeWithRoot(root)
+func (t *Tree) Snapshot(root []byte) (censustree.Tree, error) {
+	tree := t.treeWithRoot(fmt.Sprintf("%x", root))
 	if tree == nil {
 		return nil, fmt.Errorf("snapshot: root not valid or not found %s", root)
 	}
@@ -247,9 +283,9 @@ func (t *Tree) Snapshot(root string) (*Tree, error) {
 }
 
 // HashExist checks if a hash exists as a node in the merkle tree
-func (t *Tree) HashExist(hash string) (bool, error) {
+func (t *Tree) HashExist(hash []byte) (bool, error) {
 	t.updateAccessTime()
-	tree := t.treeWithRoot(hash)
+	tree := t.treeWithRoot(fmt.Sprintf("%x", hash))
 	if tree == nil {
 		return false, nil
 	}

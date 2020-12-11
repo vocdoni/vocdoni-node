@@ -3,6 +3,7 @@ package census
 import (
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,7 +14,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
 	"gitlab.com/vocdoni/go-dvote/log"
-	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
@@ -182,7 +182,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 	// Methods without rootHash
 	switch r.Method {
 	case "getRoot":
-		resp.Root = tr.Root()
+		resp.Root = fmt.Sprintf("%x", tr.Root())
 		return resp
 
 	case "addClaimBulk":
@@ -302,9 +302,16 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			resp.SetError("proofData not provided")
 			return resp
 		}
-		root := r.RootHash
-		if len(root) < 1 {
+		var err error
+		var root []byte
+		if len(r.RootHash) < 1 {
 			root = tr.Root()
+		} else {
+			root, err = hex.DecodeString(util.TrimHex(r.RootHash))
+			if err != nil {
+				resp.SetError("cannot decode root hash: " + err.Error())
+				return resp
+			}
 		}
 		// Generate proof and return it
 		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
@@ -316,7 +323,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		if !r.Digested {
 			data = snarks.Poseidon.Hash(data)
 		}
-		validProof, err := tree.CheckProof(root, r.ProofData, data, []byte{})
+		validProof, err := tr.CheckProof(data, []byte{}, root, r.ProofData)
 		if err != nil {
 			resp.SetError(err)
 			return resp
@@ -329,10 +336,14 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 	// Otherwise, we use the same tree.
 	if len(r.RootHash) > 1 {
 		var err error
-		tr, err = tr.Snapshot(r.RootHash)
+		root, err := hex.DecodeString(util.TrimHex(r.RootHash))
 		if err != nil {
-			log.Warnf("snapshot error: %s", err)
-			resp.SetError("invalid root hash")
+			resp.SetError("cannot decode root hash")
+			return resp
+		}
+		tr, err = tr.Snapshot(root)
+		if err != nil {
+			resp.SetError("cannot fetch snapshot for root")
 			return resp
 		}
 	}
@@ -369,11 +380,17 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		}
 		// dump the claim data and return it
 		var dumpValues []string
-		root := r.RootHash
-		if len(root) < 1 {
-			root = tr.Root()
-		}
 		var err error
+		var root []byte
+		if len(r.RootHash) < 1 {
+			root = tr.Root()
+		} else {
+			root, err = hex.DecodeString(util.TrimHex(r.RootHash))
+			if err != nil {
+				resp.SetError("cannot decode root hash: " + err.Error())
+				return resp
+			}
+		}
 		if r.Method == "dump" {
 			dumpValues, err = tr.Dump(root)
 		} else {
@@ -396,7 +413,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			return resp
 		}
 		var dump types.CensusDump
-		dump.RootHash = tr.Root()
+		dump.RootHash = fmt.Sprintf("%x", tr.Root())
 		var err error
 		dump.ClaimsData, err = tr.Dump(tr.Root())
 		if err != nil {
@@ -419,7 +436,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		}
 		resp.URI = m.RemoteStorage.URIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
-		resp.Root = tr.Root()
+		resp.Root = fmt.Sprintf("%x", tr.Root())
 
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %s", resp.Root)

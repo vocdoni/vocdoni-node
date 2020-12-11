@@ -1,4 +1,4 @@
-package tree
+package iden3tree
 
 import (
 	"bytes"

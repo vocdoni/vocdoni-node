@@ -1,6 +1,7 @@
-package trie
+package gravitontree
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 )
@@ -30,20 +31,20 @@ func TestTree(t *testing.T) {
 		t.Fatal(err)
 	}
 	root2 := tr2.Root()
-	if root1 != root2 {
-		t.Errorf("roots are diferent but they should be equals (%s != %s)", root1, root2)
+	if !bytes.Equal(root1, root2) {
+		t.Errorf("roots are diferent but they should be equals (%x != %x)", root1, root2)
 	}
-	tr2.store.Commit()
+	tr2.(*Tree).store.Commit()
 
 	// Try closing the storage and creating the tree again
-	tr2.store.Close()
+	tr2.(*Tree).store.Close()
 	tr2, err = NewTree("test2", storage)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Get the size
-	s, err := tr2.Size("")
+	s, err := tr2.Size(nil)
 	if err != nil {
 		t.Errorf("cannot get te size of the tree after reopen: (%s)", err)
 	}
@@ -52,7 +53,7 @@ func TestTree(t *testing.T) {
 	}
 
 	// Check Root is still the same
-	if tr2.Root() != root2 {
+	if !bytes.Equal(tr2.Root(), root2) {
 		t.Fatalf("after closing and opening the tree, the root is diferent")
 	}
 
@@ -65,14 +66,14 @@ func TestTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	valid, err := tr1s.CheckProof([]byte("number 5"), []byte{}, proof1)
+	valid, err := tr1s.CheckProof([]byte("number 5"), []byte{}, nil, proof1)
 	if err != nil {
 		t.Error(err)
 	}
 	if !valid {
 		t.Errorf("proof is invalid on snapshot")
 	}
-	valid, err = tr2.CheckProof([]byte("number 5"), []byte{}, proof1)
+	valid, err = tr2.CheckProof([]byte("number 5"), []byte{}, nil, proof1)
 	if err != nil {
 		t.Error(err)
 	}

@@ -9,10 +9,10 @@ import (
 	"math/rand"
 	"strconv"
 
+	"gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
-	tree "gitlab.com/vocdoni/go-dvote/trie"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 
@@ -35,7 +35,7 @@ func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, cen
 		switch proof.Payload.(type) {
 		case *models.Proof_Graviton:
 			p := proof.GetGraviton()
-			return tree.CheckProof(fmt.Sprintf("%x", censusRootHash), fmt.Sprintf("%x", p.Siblings), leafData, []byte{}) // TBD do not use hex strings
+			return gravitontree.CheckProof(leafData, []byte{}, censusRootHash, fmt.Sprintf("%x", p.Siblings)) // TBD do not use hex strings
 		case *models.Proof_Iden3:
 			// NOT IMPLEMENTED
 		}

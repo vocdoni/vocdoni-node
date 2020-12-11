@@ -15,6 +15,10 @@ import (
 	"gitlab.com/vocdoni/go-dvote/statedb"
 )
 
+const GravitonHashSizeBytes = graviton.HASHSIZE_BYTES
+const GravitonMaxKeySize = graviton.MAX_KEYSIZE
+const GravitonMaxValueSize = graviton.MAX_VALUE_SIZE
+
 type GravitonState struct {
 	store             *graviton.Store
 	hash              []byte
@@ -371,6 +375,13 @@ func (t *GravitonTree) Verify(key, proof, root []byte) bool {
 	var p graviton.Proof
 	var err error
 	var r [32]byte
+	// Unmarshal() will generate a panic if the proof size is incorrect. See https://gitlab.com/vocdoni/go-dvote/-/issues/333
+	// While this is not fixed upstream, we need to recover the panic.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warnf("recovered graviton verify panic: %v", r)
+		}
+	}()
 	if err = p.Unmarshal(proof); err != nil {
 		log.Error(err)
 		return false

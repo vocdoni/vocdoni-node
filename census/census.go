@@ -11,13 +11,12 @@ import (
 	"sync"
 	"time"
 
-	iden3db "github.com/iden3/go-iden3-core/db"
-
+	"gitlab.com/vocdoni/go-dvote/censustree"
+	"gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
+	"gitlab.com/vocdoni/go-dvote/censustree/iden3tree"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
-	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
-	tree "gitlab.com/vocdoni/go-dvote/trie"
 )
 
 // ErrNamespaceExist is the error returned when trying to add a namespace that already exist
@@ -47,32 +46,36 @@ type Manager struct {
 
 	// TODO(mvdan): should we protect Census with the mutex too?
 	TreesMu sync.RWMutex
-	Trees   map[string]*tree.Tree // MkTrees map of merkle trees indexed by censusId
+	Trees   map[string]censustree.Tree // MkTrees map of merkle trees indexed by censusId
 
-	RemoteStorage data.Storage    // e.g. IPFS
-	LocalStorage  iden3db.Storage // e.g. Badger
+	RemoteStorage data.Storage // e.g. IPFS
 
 	importQueue     chan censusImport
 	queueSize       int32
 	failedQueueLock sync.RWMutex
 	failedQueue     map[string]string
 	compressor
+	newTreeFunc func(name, storage string) (censustree.Tree, error)
 }
 
 // Data helps satisfy an ethevents interface.
 func (m *Manager) Data() data.Storage { return m.RemoteStorage }
 
-// Init creates a new census manager
-func (m *Manager) Init(storageDir, rootKey string) error {
+// Init creates a new census manager.
+// Available treeImpl are graviton and iden3
+func (m *Manager) Init(storageDir, rootKey string, treeImpl string) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storageDir)
 	m.StorageDir = storageDir
-	m.Trees = make(map[string]*tree.Tree)
+	m.Trees = make(map[string]censustree.Tree)
 	m.failedQueue = make(map[string]string)
 
-	var err error
-	m.LocalStorage, err = db.NewIden3Storage(storageDir)
-	if err != nil {
-		return err
+	switch treeImpl {
+	case "graviton":
+		m.newTreeFunc = gravitontree.NewTree
+	case "iden3":
+		m.newTreeFunc = iden3tree.NewTree
+	default:
+		return fmt.Errorf("census tree implementation %s now known", treeImpl)
 	}
 
 	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
@@ -127,12 +130,11 @@ func (m *Manager) Init(storageDir, rootKey string) error {
 
 // LoadTree opens the database containing the merkle tree or returns nil if already loaded
 // Not thread safe
-func (m *Manager) LoadTree(name string) (*tree.Tree, error) {
+func (m *Manager) LoadTree(name string) (censustree.Tree, error) {
 	if _, exist := m.Trees[name]; exist {
 		return m.Trees[name], nil
 	}
-
-	tr, err := tree.NewTree(name, m.StorageDir)
+	tr, err := m.newTreeFunc(name, m.StorageDir)
 	if err != nil {
 		return nil, err
 	}
@@ -164,13 +166,13 @@ func (m *Manager) Exists(name string) bool {
 
 // AddNamespace adds a new merkletree identified by a censusId (name), and
 // returns the new tree.
-func (m *Manager) AddNamespace(name string, pubKeys []string) (*tree.Tree, error) {
+func (m *Manager) AddNamespace(name string, pubKeys []string) (censustree.Tree, error) {
 	m.TreesMu.Lock()
 	defer m.TreesMu.Unlock()
 	if m.Exists(name) {
 		return nil, ErrNamespaceExist
 	}
-	tr, err := tree.NewTree(name, m.StorageDir)
+	tr, err := m.newTreeFunc(name, m.StorageDir)
 	if err != nil {
 		return nil, err
 	}
