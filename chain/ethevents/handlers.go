@@ -159,25 +159,19 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 }
 
 func newProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.NewProcessTx, error) {
-	pc, err := contractABI.Unpack("NewProcess", eventData)
-	if len(pc) == 0 {
-		return nil, fmt.Errorf("cannot parse processMeta log")
+	structuredData := &contracts.ProcessesNewProcess{}
+	if err := contractABI.UnpackIntoInterface(structuredData, "NewProcess", eventData); err != nil {
+		return nil, fmt.Errorf("cannot unpack NewProcess event: %w", err)
 	}
-	eventProcessCreated := pc[0].(contracts.VotingProcessNewProcess)
-	if err != nil {
-		return nil, err
-	}
-	return ph.NewProcessTxArgs(ctx, eventProcessCreated.ProcessId, eventProcessCreated.Namespace)
+	log.Debugf("newProcessMeta eventData: %+v", structuredData)
+	return ph.NewProcessTxArgs(ctx, structuredData.ProcessId, structuredData.Namespace)
 }
 
 func processStatusUpdatedMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.SetProcessTx, error) {
-	pc, err := contractABI.Unpack("StatusUpdated", eventData)
-	if len(pc) == 0 {
-		return nil, fmt.Errorf("cannot parse processMeta log")
+	structuredData := &contracts.ProcessesStatusUpdated{}
+	if err := contractABI.UnpackIntoInterface(structuredData, "StatusUpdated", eventData); err != nil {
+		return nil, fmt.Errorf("cannot unpack StatusUpdated event: %w", err)
 	}
-	eventProcessStatusUpdated := pc[0].(contracts.VotingProcessStatusUpdated)
-	if err != nil {
-		return nil, err
-	}
-	return ph.SetStatusTxArgs(ctx, eventProcessStatusUpdated.ProcessId, eventProcessStatusUpdated.Namespace, eventProcessStatusUpdated.Status)
+	log.Debugf("processStatusUpdated eventData: %+v", structuredData)
+	return ph.SetStatusTxArgs(ctx, structuredData.ProcessId, structuredData.Namespace, structuredData.Status)
 }

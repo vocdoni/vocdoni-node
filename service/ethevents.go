@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -11,7 +10,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/util"
 	"gitlab.com/vocdoni/go-dvote/vochain"
 )
 
@@ -27,17 +25,14 @@ func EthEvents(ctx context.Context, ensDomains []string, w3uri string, networkNa
 		return fmt.Errorf("cannot get specs for the selected network: %w", err)
 	}
 	contractsAddresses := make([]common.Address, len(ensDomains))
-	for _, domain := range ensDomains {
+	for idx, domain := range ensDomains {
 		addr, err := chain.EnsResolve(ctx, specs.ENSregistryAddr, domain, w3uri)
 		if err != nil {
 			return fmt.Errorf("cannot resolve domain: %s, error: %w", domain, err)
 		}
-		bAddr, err := hex.DecodeString(util.TrimHex(addr))
-		if err != nil {
-			return fmt.Errorf("cannot decode domain resolved address: %s, error: %w", addr, err)
-		}
-		contractsAddresses = append(contractsAddresses, common.BytesToAddress(bAddr))
+		contractsAddresses[idx] = common.HexToAddress(addr)
 	}
+	log.Debugf("contracts addresses on eth events: %+v", contractsAddresses)
 
 	ev, err := ethevents.NewEthEvents(contractsAddresses, signer, w3uri, cm, vocapp)
 	if err != nil {

@@ -98,11 +98,11 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 		return nil, fmt.Errorf("cannot create voting handle: %w", err)
 	}
 	abis := make([]abi.ABI, len(contractsAddresses))
-	abis[0], err = abi.JSON(strings.NewReader(contracts.VotingProcessABI))
+	abis[0], err = abi.JSON(strings.NewReader(contracts.ProcessesABI))
 	if err != nil {
 		return nil, fmt.Errorf("cannot read processes contract abi: %w", err)
 	}
-	abis[1], err = abi.JSON(strings.NewReader(contracts.NamespaceABI))
+	abis[1], err = abi.JSON(strings.NewReader(contracts.NamespacesABI))
 	if err != nil {
 		return nil, fmt.Errorf("cannot read namespace contract abi: %w", err)
 	}

@@ -26,8 +26,8 @@ import (
 
 // VotingHandle wraps the Processes, Namespace and TokenStorageProof contracts and holds a reference to an ethereum client
 type VotingHandle struct {
-	VotingProcess     *contracts.VotingProcess
-	Namespace         *contracts.Namespace
+	VotingProcess     *contracts.Processes
+	Namespace         *contracts.Namespaces
 	TokenStorageProof *contracts.TokenStorageProof
 	EthereumClient    *ethclient.Client
 }
@@ -67,10 +67,10 @@ func NewVotingHandle(contractsAddress []common.Address, dialEndpoint string) (*V
 		return nil, fmt.Errorf("cannot create a client connection: (%w), tried %d times", err, types.EthereumDialMaxRetry)
 	}
 
-	if ph.VotingProcess, err = contracts.NewVotingProcess(contractsAddress[0], ph.EthereumClient); err != nil {
+	if ph.VotingProcess, err = contracts.NewProcesses(contractsAddress[0], ph.EthereumClient); err != nil {
 		return new(VotingHandle), fmt.Errorf("error constructing processes contract transactor: %w", err)
 	}
-	if ph.Namespace, err = contracts.NewNamespace(contractsAddress[1], ph.EthereumClient); err != nil {
+	if ph.Namespace, err = contracts.NewNamespaces(contractsAddress[1], ph.EthereumClient); err != nil {
 		return nil, fmt.Errorf("error constructing namespace contract transactor: %w", err)
 	}
 	if ph.TokenStorageProof, err = contracts.NewTokenStorageProof(contractsAddress[2], ph.EthereumClient); err != nil {
@@ -108,7 +108,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 		return nil, fmt.Errorf("error decoding entity address: %w", err)
 	}
 	// census mkroot
-	processData.CensusMkRoot, err = hex.DecodeString(processMeta.MetadataCensusMerkleRootCensusMerkleTree[1])
+	processData.CensusMkRoot, err = hex.DecodeString(util.TrimHex(processMeta.MetadataCensusMerkleRootCensusMerkleTree[1]))
 	if err != nil {
 		return nil, fmt.Errorf("cannot decode merkle root: %w", err)
 	}
@@ -147,15 +147,18 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	qCount := uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[1])
 	processData.QuestionIndex = &qCount
 	// max count
-	processData.VoteOptions.MaxCount = uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[2])
-	// max value
-	processData.VoteOptions.MaxValue = uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[3])
-	// max vote overwrites
-	processData.VoteOptions.MaxVoteOverwrites = uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[4])
-	// max total cost
-	processData.VoteOptions.MaxTotalCost = uint32(processMeta.MaxTotalCostCostExponentNamespace[0])
-	// cost exponent
-	processData.VoteOptions.CostExponent = uint32(processMeta.MaxTotalCostCostExponentNamespace[1])
+	processData.VoteOptions = &models.ProcessVoteOptions{
+		// mac count
+		MaxCount: uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[2]),
+		// max value
+		MaxValue: uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[3]),
+		// max vote overwrites
+		MaxVoteOverwrites: uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[4]),
+		// max total cost
+		MaxTotalCost: uint32(processMeta.MaxTotalCostCostExponentNamespace[0]),
+		// cost exponent
+		CostExponent: uint32(processMeta.MaxTotalCostCostExponentNamespace[1]),
+	}
 	// namespace
 	processData.Namespace = uint32(processMeta.MaxTotalCostCostExponentNamespace[2])
 
