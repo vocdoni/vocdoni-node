@@ -197,7 +197,6 @@ func (g *GravitonState) TreeWithRoot(root []byte) statedb.StateTree {
 	}
 	gt, err := sn.GetTreeWithRootHash(root)
 	if err != nil {
-		log.Warn(err)
 		return nil
 	}
 	return &GravitonTree{tree: gt, version: g.Version()}

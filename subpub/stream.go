@@ -74,7 +74,6 @@ func (ps *SubPub) readHandler(r *bufio.Reader) {
 				continue
 			}
 		}
-		log.Debugf("message received: %s", message)
 		go func() { ps.Reader <- message }()
 	}
 }

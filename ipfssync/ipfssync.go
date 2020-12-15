@@ -4,9 +4,6 @@ package ipfssync
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -16,22 +13,28 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/vocdoni/dvote-protobuf/build/go/models"
+	"google.golang.org/protobuf/proto"
 
-	"gitlab.com/vocdoni/go-dvote/censustree"
-	tree "gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
+	"gitlab.com/vocdoni/go-dvote/statedb"
+	"gitlab.com/vocdoni/go-dvote/statedb/gravitonstate"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 )
 
+const (
+	MaxKeySize = 64
+)
+
 type Message struct {
-	Type      string   `json:"type"`
-	Address   string   `json:"address,omitempty"`
-	Maddress  string   `json:"mAddress,omitempty"`
-	NodeID    string   `json:"nodeId,omitempty"`
+	Type     string `json:"type"`
+	Address  string `json:"address,omitempty"`
+	Maddress string `json:"mAddress,omitempty"`
+	//NodeID    string   `json:"nodeId,omitempty"`
 	Hash      string   `json:"hash,omitempty"`
 	PinList   []string `json:"pinList,omitempty"`
 	Timestamp int32    `json:"timestamp"`
@@ -51,10 +54,11 @@ type IPFSsync struct {
 	Timeout         time.Duration
 	TimestampWindow int32
 
-	hashTree    censustree.Tree
+	hashTree    statedb.StateTree
+	state       statedb.StateDB
 	updateLock  sync.RWMutex
 	myMultiAddr ma.Multiaddr // The IPFS multiaddress
-	lastHash    string
+	lastHash    []byte
 	private     bool
 }
 
@@ -69,7 +73,7 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 		UpdateTime:      20,
 		Timeout:         time.Second * 600,
 		Storage:         storage.(*data.IPFSHandle),
-		TimestampWindow: 30,
+		TimestampWindow: 180,
 	}
 	if transport == "privlibp2p" {
 		transport = "libp2p"
@@ -81,6 +85,7 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 	default:
 		is.Transport = &net.SubPubHandle{}
 	}
+
 	return is
 }
 
@@ -88,7 +93,7 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 func guessMyAddress(port int, id string) string {
 	ip, err := util.PublicIP()
 	if err != nil {
-		log.Warn(err)
+		log.Warnf("guessMyAddress: %v", err)
 		return ""
 	}
 	if ip4 := ip.To4(); ip4 != nil {
@@ -100,99 +105,106 @@ func guessMyAddress(port int, id string) string {
 	return ""
 }
 
-// myPins return the list of local stored pins base64 encoded
-func (is *IPFSsync) myPins() (pins []string) {
+// myPins return the list of local stored pins
+func (is *IPFSsync) myPins() (pins []string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), is.Timeout)
 	defer cancel()
 	list, err := is.Storage.ListPins(ctx)
 	if err != nil {
-		log.Error(err)
-		return
+		return nil, fmt.Errorf("myPins: %w", err)
 	}
 	for i := range list {
 		pins = append(pins, i)
 	}
-	return pins
+	return pins, nil
 }
 
 // updateLocalPins gets the local IPFS pin list and add them to the Merkle Tree
 func (is *IPFSsync) updateLocalPins() {
-	for _, p := range is.myPins() {
+	pins, err := is.myPins()
+	if err != nil {
+		log.Errorf("updateLocalPins: %v", err)
+	}
+	for _, p := range pins {
 		is.hashTree.Add([]byte(p), []byte{}) // errror is ignored, should be fine
 	}
 }
 
 // addPins adds to the MerkleTree the new pins and updates the Root
-func (is *IPFSsync) addPins(pins []string) {
-	var err error
-	var pin []byte
-	currentRoot := is.hashTree.Root()
+func (is *IPFSsync) addPins(pins []*models.IpfsPin) {
+	currentRoot := is.hashTree.Hash()
 	for _, v := range pins {
-		pin, err = base64.StdEncoding.DecodeString(v)
-		if err != nil {
-			log.Warnf("cannot decode pin %s: (%s)", v, err)
+		if len(v.Uri) > gravitonstate.GravitonMaxKeySize {
+			log.Warnf("CID exceeds the max size (got %d)", len(v.Uri))
 			continue
 		}
-		if len(pin) > is.hashTree.MaxKeySize() {
-			log.Warnf("CID exceeds the claim size %d", len(v))
-			continue
-		}
-		is.hashTree.Add(pin, []byte{})
+		is.hashTree.Add([]byte(v.Uri), []byte{})
 	}
-	if !bytes.Equal(currentRoot, is.hashTree.Root()) {
-		is.lastHash = fmt.Sprintf("%x", currentRoot)
+	if !bytes.Equal(currentRoot, is.hashTree.Hash()) {
+		is.lastHash = currentRoot
 	}
+}
+
+func (is *IPFSsync) getMyPins() [][]byte {
+	var mkPins [][]byte
+	is.hashTree.Iterate(nil, func(key, value []byte) bool {
+		mkPins = append(mkPins, key)
+		return false
+	})
+	return mkPins
 }
 
 // syncPins get the list of pins stored in the merkle tree and pin all of them
 func (is *IPFSsync) syncPins() error {
-	mkPins, _, err := is.hashTree.DumpPlain(nil, false)
-	if err != nil {
-		return err
-	}
+	mkPins := is.getMyPins()
 	ctx, cancel := context.WithTimeout(context.Background(), is.Timeout)
 	defer cancel()
 	pins, err := is.Storage.ListPins(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("syncPins: %w", err)
 	}
 	for _, v := range mkPins {
-		if _, e := pins[v]; e {
+		if _, e := pins[string(v)]; e {
 			continue
 		}
 
 		log.Infof("pinning %s", v)
-		if err := is.Storage.Pin(ctx, v); err != nil {
-			log.Warn(err)
+		if err := is.Storage.Pin(ctx, string(v)); err != nil {
+			return fmt.Errorf("syncPins: %w", err)
 		}
 	}
 	return nil
 }
 
 func (is *IPFSsync) askPins(address string, hash []byte) error {
-	var msg Message
-	msg.Type = "fetch"
+	var msg models.IpfsSync
+	msg.Msgtype = models.IpfsSyncType_FETCH
 	msg.Address = is.Transport.Address()
-	msg.Hash = fmt.Sprintf("%x", hash)
-	msg.Timestamp = int32(time.Now().Unix())
-	return is.unicastMsg(address, msg)
+	msg.Hash = hash
+	return is.unicastMsg(address, &msg)
 }
 
-func (is *IPFSsync) sendPins(address string, theirHash string) error {
-	var msg Message
-	msg.Type = "fetchReply"
+func (is *IPFSsync) sendPins(address string, theirHash []byte) error {
+	var msg models.IpfsSync
+	var err error
+	msg.Msgtype = models.IpfsSyncType_FETCHREPLY
 	msg.Address = is.Transport.Address()
-	msg.Hash = fmt.Sprintf("%x", is.hashTree.Root())
-	msg.PinList = is.listPins(theirHash)
-	msg.Timestamp = int32(time.Now().Unix())
-	return is.unicastMsg(address, msg)
-}
-
-func (is *IPFSsync) broadcastMsg(ipfsmsg Message) error {
-	d, err := json.Marshal(ipfsmsg)
+	msg.Hash = is.hashTree.Hash()
+	msg.PinList, err = is.listPins(theirHash)
 	if err != nil {
-		return err
+		return fmt.Errorf("sendPins: %w", err)
 	}
+	return is.unicastMsg(address, &msg)
+}
+
+func (is *IPFSsync) broadcastMsg(imsg *models.IpfsSync) error {
+	imsg.Timestamp = uint32(time.Now().Unix())
+	d, err := proto.Marshal(imsg)
+	if err != nil {
+		return fmt.Errorf("broadcastMsg: %w", err)
+	}
+	log.Debugf("broadcasting message %s {Address:%s Hash:%x MA:%s PL:%v Ts:%d}",
+		imsg.Msgtype.String(), imsg.Address, imsg.Hash, imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
 	is.Transport.Send(types.Message{
 		Data:      d,
 		TimeStamp: int32(time.Now().Unix()),
@@ -201,30 +213,30 @@ func (is *IPFSsync) broadcastMsg(ipfsmsg Message) error {
 }
 
 // Handle handles an Message
-func (is *IPFSsync) Handle(msg Message) error {
+func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 	if msg.Address == is.Transport.Address() {
 		return nil
 	}
-	if int32(time.Now().Unix())-msg.Timestamp > is.TimestampWindow {
-		log.Debug("discarting old message")
+	if since := int32(time.Now().Unix()) - int32(msg.Timestamp); since > is.TimestampWindow {
+		log.Debugf("discarting old message from %d seconds ago", since)
 		return nil
 	}
-	switch msg.Type {
-	case "hello":
+	switch msg.Msgtype {
+	case models.IpfsSyncType_HELLO:
 		peers, err := is.Storage.CoreAPI.Swarm().Peers(is.Storage.Node.Context())
 		if err != nil {
 			return err
 		}
 		found := false
 		for _, p := range peers {
-			if strings.Contains(msg.Maddress, p.ID().String()) {
+			if strings.Contains(msg.Multiaddress, p.ID().String()) {
 				found = true
 				break
 			}
 		}
 		if !found {
-			log.Infof("connecting to peer %s", msg.Maddress)
-			multiAddr, err := ma.NewMultiaddr(msg.Maddress)
+			log.Infof("connecting to peer %s", msg.Multiaddress)
+			multiAddr, err := ma.NewMultiaddr(msg.Multiaddress)
 			if err != nil {
 				return err
 			}
@@ -234,87 +246,78 @@ func (is *IPFSsync) Handle(msg Message) error {
 			}
 			is.Storage.Node.PeerHost.ConnManager().Protect(peerInfo.ID, "ipfsPeer")
 			return is.Storage.Node.PeerHost.Connect(context.Background(), *peerInfo)
-			//return is.Storage.CoreAPI.Swarm().Connect(is.Storage.Node.Context(), *peerInfo)
 		}
 
-	case "update":
-		if len(msg.Hash) > 31 && len(msg.Address) > 31 {
+	case models.IpfsSyncType_UPDATE:
+		if len(msg.Hash) == gravitonstate.GravitonHashSizeBytes && len(msg.Address) > 31 {
 			is.updateLock.RLock()
 			defer is.updateLock.RUnlock()
-			hash, err := hex.DecodeString(msg.Hash)
-			if err != nil {
-				return err
-			}
-			if exist, err := is.hashTree.HashExists(hash); err == nil && !exist && is.lastHash != msg.Hash {
-				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
-				return is.askPins(msg.Address, is.hashTree.Root())
+			tree := is.state.TreeWithRoot(msg.Hash)
+			if tree == nil && !bytes.Equal(is.lastHash, msg.Hash) {
+				log.Infof("found new hash %x from %s", msg.Hash, msg.Address)
+				return is.askPins(msg.Address, is.hashTree.Hash())
 			}
 		}
 
-		// received a fetchReply, adding new pins
-	case "fetchReply":
-		if len(msg.Hash) > 31 && len(msg.Address) > 31 {
+	// received a fetchReply, adding new pins
+	case models.IpfsSyncType_FETCHREPLY:
+		if len(msg.Hash) == gravitonstate.GravitonHashSizeBytes && len(msg.Address) > 31 {
 			is.updateLock.Lock()
 			defer is.updateLock.Unlock()
-			if util.TrimHex(msg.Hash) != fmt.Sprintf("%x", is.hashTree.Root()) {
-				log.Infof("got new pin list %s from %s", msg.Hash, msg.Address)
+			if !bytes.Equal(msg.Hash, is.hashTree.Hash()) {
+				log.Infof("got new pin list %x from %s", msg.Hash, msg.Address)
 				is.addPins(msg.PinList)
 				return nil
 			}
 		}
 
-	case "fetch":
-		if len(msg.Hash) > 31 && len(msg.Address) > 31 {
+	case models.IpfsSyncType_FETCH:
+		if len(msg.Hash) == gravitonstate.GravitonHashSizeBytes && len(msg.Address) > 31 {
 			is.updateLock.RLock()
 			defer is.updateLock.RUnlock()
-			if util.TrimHex(msg.Hash) != fmt.Sprintf("%x", is.hashTree.Root()) {
+			if bytes.Equal(msg.Hash, is.hashTree.Hash()) {
 				log.Infof("got fetch query, sending pin list to %s", msg.Address)
 				return is.sendPins(msg.Address, msg.Hash)
 			}
 		}
 	}
-
 	return nil
 }
 
 func (is *IPFSsync) sendUpdate() {
-	var msg Message
-	msg.Type = "update"
+	var msg models.IpfsSync
+	msg.Msgtype = models.IpfsSyncType_UPDATE
 	msg.Address = is.Transport.Address()
-	msg.Hash = fmt.Sprintf("%x", is.hashTree.Root())
-	msg.Timestamp = int32(time.Now().Unix())
-	if s, err := is.hashTree.Size(is.hashTree.Root()); err == nil && s > 0 {
-		log.Infof("[ipfsSync info] pins:%d hash:%s", s, msg.Hash)
-		err := is.broadcastMsg(msg)
+	msg.Hash = is.hashTree.Hash()
+	if s := is.hashTree.Count(); s > 0 {
+		log.Infof("[ipfsSync info] pins:%d hash:%x", s, msg.Hash)
+		err := is.broadcastMsg(&msg)
 		if err != nil {
-			log.Warn(err)
+			log.Warnf("sendUpdate: %v", err)
 		}
-	} else if err != nil {
-		log.Error(err)
 	}
 }
 
 func (is *IPFSsync) sendHello() {
-	var msg Message
-	msg.Type = "hello"
+	var msg models.IpfsSync
+	msg.Msgtype = models.IpfsSyncType_HELLO
 	msg.Address = is.Transport.Address()
-	msg.Maddress = is.myMultiAddr.String()
-	msg.Timestamp = int32(time.Now().Unix())
-	err := is.broadcastMsg(msg)
+	msg.Multiaddress = is.myMultiAddr.String()
+	err := is.broadcastMsg(&msg)
 	if err != nil {
-		log.Warn(err)
+		log.Warnf("sendHello: %v", err)
 	}
 }
 
 // difference returns the elements in `a` that aren't in `b`.
-func diff(a, b []string) []string {
+func diff(a, b [][]byte) [][]byte {
 	mb := make(map[string]struct{}, len(b))
 	for _, x := range b {
-		mb[x] = struct{}{}
+		mb[string(x)] = struct{}{}
 	}
-	var diff []string
+	var diff [][]byte
 	for _, x := range a {
-		if _, found := mb[x]; !found {
+		if _, found := mb[string(x)]; !found {
 			diff = append(diff, x)
 		}
 	}
@@ -323,43 +326,40 @@ func diff(a, b []string) []string {
 
 // listPins return the current pins of the Merkle Tree
 // if fromHash is a valid hash, returns only the difference between the root and the provided hash
-func (is *IPFSsync) listPins(fromHash string) []string {
-	myClaims, _, err := is.hashTree.DumpPlain(nil, true)
-	if err != nil {
-		log.Error(err)
-		return []string{}
-	}
-	if fromHash == "" || fromHash == "0x0000000000000000000000000000000000000000000000000000000000000000" {
-		return myClaims
-	}
-	fromHashBytes, err := hex.DecodeString(util.TrimHex(fromHash))
-	if err != nil {
-		log.Error(err)
-		return []string{}
-	}
-	if exist, err := is.hashTree.HashExists(fromHashBytes); !exist {
-		if err != nil {
-			log.Error(err)
+func (is *IPFSsync) listPins(fromHash []byte) ([]*models.IpfsPin, error) {
+	var pins []*models.IpfsPin
+	myClaims := is.getMyPins()
+	stateFromHash := is.state.TreeWithRoot(fromHash)
+	if stateFromHash == nil {
+		log.Debugf("listPins: hash %x not known, sending my whole list", fromHash)
+		for _, c := range myClaims {
+			pins = append(pins, &models.IpfsPin{Uri: string(c)})
 		}
-		return myClaims
+		return pins, nil
 	}
-
-	theirClaims, _, err := is.hashTree.DumpPlain(fromHashBytes, true)
-	if err != nil {
-		log.Error(err)
-		return []string{}
+	var theirClaims [][]byte
+	stateFromHash.Iterate(nil, func(key, value []byte) bool {
+		theirClaims = append(theirClaims, key)
+		return false
+	})
+	for _, c := range diff(myClaims, theirClaims) {
+		pins = append(pins, &models.IpfsPin{Uri: string(c)})
 	}
-	return diff(myClaims, theirClaims)
+	log.Debugf("listPins: hash %x is known, sending the difference")
+	return pins, nil
 }
 
-func (is *IPFSsync) unicastMsg(address string, ipfsmsg Message) error {
+func (is *IPFSsync) unicastMsg(address string, imsg *models.IpfsSync) error {
 	var msg types.Message
-	d, err := json.Marshal(ipfsmsg)
+	imsg.Timestamp = uint32(time.Now().Unix())
+	d, err := proto.Marshal(imsg)
 	if err != nil {
-		return err
+		return fmt.Errorf("unicastMsg: %w", err)
 	}
 	msg.Data = d
 	msg.TimeStamp = int32(time.Now().Unix())
+	log.Debugf("sending message %s {Addr:%s Hash:%x MA:%s PL:%v Ts:%d}",
+		imsg.Msgtype.String(), imsg.Address, imsg.Hash, imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
 	go is.Transport.SendUnicast(address, msg)
 	return nil
 }
@@ -372,12 +372,16 @@ func (is *IPFSsync) Start() {
 	if err := os.RemoveAll(dbDir); err != nil {
 		log.Fatal(err)
 	}
-	is.hashTree, err = tree.NewTree("ipfsSync", dbDir)
-	if err != nil {
+	is.state = &gravitonstate.GravitonState{}
+	if err = is.state.Init(dbDir, "disk"); err != nil {
 		log.Fatal(err)
 	}
+	if err = is.state.AddTree("ipfsSync"); err != nil {
+		log.Fatal(err)
+	}
+	is.hashTree = is.state.Tree("ipfsSync")
 	is.updateLocalPins()
-	log.Infof("current hash %s", is.hashTree.Root())
+	log.Infof("current hash %x", is.hashTree.Hash())
 
 	conn := types.Connection{
 		Port:         int(is.Port),
@@ -408,12 +412,14 @@ func (is *IPFSsync) Start() {
 	go func() {
 		for {
 			d := <-msg
-			var syncMsg Message
-			err := json.Unmarshal(d.Data, &syncMsg)
+			var imsg models.IpfsSync
+			err := proto.Unmarshal(d.Data, &imsg)
 			if err != nil {
 				log.Warnf("cannot unmarshal message %s", err)
 			} else {
-				go is.Handle(syncMsg)
+				log.Debugf("received message %s {Address:%s Hash:%x MA:%s PL:%v Ts:%d}",
+					imsg.Msgtype.String(), imsg.Address, imsg.Hash, imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
+				go is.Handle(&imsg)
 			}
 		}
 	}()
@@ -422,14 +428,14 @@ func (is *IPFSsync) Start() {
 	go func() {
 		for {
 			is.sendHello()
-			time.Sleep(time.Second * time.Duration(is.HelloTime)) // CHECK THIS
+			time.Sleep(time.Second * time.Duration(is.HelloTime))
 		}
 	}()
 
 	// send update messages
 	go func() {
 		for {
-			time.Sleep(time.Duration(is.UpdateTime) * time.Second) //CHECK THIS
+			time.Sleep(time.Duration(is.UpdateTime) * time.Second)
 			is.updateLock.Lock()
 			is.updateLocalPins()
 			is.sendUpdate()
@@ -440,9 +446,9 @@ func (is *IPFSsync) Start() {
 	go func() {
 		for {
 			if err := is.syncPins(); err != nil {
-				log.Warn(err)
+				log.Warnf("syncPins: %v", err)
 			}
-			time.Sleep(time.Second * 32)
+			time.Sleep(time.Second * 10)
 		}
 	}()
 }

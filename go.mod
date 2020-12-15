@@ -68,7 +68,7 @@ require (
 	github.com/tendermint/go-amino v0.16.0
 	github.com/tendermint/tendermint v0.34.0
 	github.com/tendermint/tm-db v0.6.3
-	github.com/vocdoni/dvote-protobuf v0.1.2
+	github.com/vocdoni/dvote-protobuf v0.1.3
 	github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200826160007-0b9f6c5fb163 // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
