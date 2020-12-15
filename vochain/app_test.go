@@ -68,7 +68,7 @@ func TestCheckTX(t *testing.T) {
 	var detxresp abcitypes.ResponseDeliverTx
 
 	var vtx models.Tx
-	var proof string
+	var proof []byte
 	var hexsignature string
 	vp := []byte("[1,2,3,4]")
 	for i, s := range keys {
@@ -79,7 +79,7 @@ func TestCheckTX(t *testing.T) {
 		tx := &models.VoteEnvelope{
 			Nonce:       util.RandomBytes(32),
 			ProcessId:   pid,
-			Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: testutil.Hex2byte(t, proof)}}},
+			Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proof}}},
 			VotePackage: vp,
 		}
 		txBytes, err := proto.Marshal(tx)

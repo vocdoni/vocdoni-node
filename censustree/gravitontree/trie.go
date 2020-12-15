@@ -133,20 +133,17 @@ func (t *Tree) AddClaim(index, value []byte) error {
 }
 
 // GenProof generates a merkle tree proof that can be later used on CheckProof() to validate it
-func (t *Tree) GenProof(index, value []byte) (string, error) {
+func (t *Tree) GenProof(index, value []byte) ([]byte, error) {
 	t.updateAccessTime()
 	proof, err := t.Tree.Proof(index)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if proof == nil {
-		return "", nil
-	}
-	return fmt.Sprintf("%x", proof), nil
+	return proof, nil
 }
 
 // CheckProof standalone function for checking a merkle proof
-func CheckProof(index, value, root []byte, mpHex string) (bool, error) {
+func CheckProof(index, value, root []byte, mproof []byte) (bool, error) {
 	if len(index) > gravitonstate.GravitonMaxKeySize {
 		return false, fmt.Errorf("index is too big, maximum allow is %d", gravitonstate.GravitonMaxKeySize)
 	}
@@ -156,31 +153,22 @@ func CheckProof(index, value, root []byte, mpHex string) (bool, error) {
 	if len(root) != gravitonstate.GravitonHashSizeBytes {
 		return false, fmt.Errorf("root hash lenght is incorrect (expected %d)", gravitonstate.GravitonHashSizeBytes)
 	}
-	p, err := hex.DecodeString(mpHex)
-	if err != nil {
-		return false, fmt.Errorf("cannot decode merkle proof: %w", err)
-	}
-	return gravitonstate.Verify(index, p, root)
+	return gravitonstate.Verify(index, mproof, root)
 }
 
 // CheckProof validates a merkle proof and its data
-func (t *Tree) CheckProof(index, value, root []byte, mpHex string) (bool, error) {
+func (t *Tree) CheckProof(index, value, root, mproof []byte) (bool, error) {
 	if len(index) > gravitonstate.GravitonMaxKeySize {
 		return false, fmt.Errorf("index is too big, maximum allow is %d", gravitonstate.GravitonMaxKeySize)
 	}
 	if len(value) > gravitonstate.GravitonMaxValueSize {
 		return false, fmt.Errorf("value is too big, maximum allow is %d", gravitonstate.GravitonMaxValueSize)
 	}
-	t.updateAccessTime()
-	proof, err := hex.DecodeString(mpHex)
-	if err != nil {
-		return false, err
-	}
-	tr := t.Tree
-	if tr == nil {
+	if t.Tree == nil {
 		return false, fmt.Errorf("tree %s does not exist", t.name)
 	}
-	return tr.Verify(index, proof, root), nil
+	t.updateAccessTime()
+	return t.Tree.Verify(index, mproof, root), nil
 }
 
 // Root returns the current root hash of the merkle tree

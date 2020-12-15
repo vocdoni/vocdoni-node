@@ -35,7 +35,7 @@ func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, cen
 		switch proof.Payload.(type) {
 		case *models.Proof_Graviton:
 			p := proof.GetGraviton()
-			return gravitontree.CheckProof(leafData, []byte{}, censusRootHash, fmt.Sprintf("%x", p.Siblings)) // TBD do not use hex strings
+			return gravitontree.CheckProof(leafData, []byte{}, censusRootHash, p.Siblings)
 		case *models.Proof_Iden3:
 			// NOT IMPLEMENTED
 		}

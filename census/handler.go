@@ -316,14 +316,18 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		// Generate proof and return it
 		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
 		if err != nil {
-			log.Warnf("error decoding base64 string: %s", err)
 			resp.SetError(err)
 			return resp
 		}
 		if !r.Digested {
 			data = snarks.Poseidon.Hash(data)
 		}
-		validProof, err := tr.CheckProof(data, []byte{}, root, r.ProofData)
+		proof, err := hex.DecodeString(r.ProofData)
+		if err != nil {
+			resp.SetError(err)
+			return resp
+		}
+		validProof, err := tr.CheckProof(data, []byte{}, root, proof)
 		if err != nil {
 			resp.SetError(err)
 			return resp
@@ -359,10 +363,11 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		if !r.Digested {
 			data = snarks.Poseidon.Hash(data)
 		}
-		resp.Siblings, err = tr.GenProof(data, []byte{})
+		siblings, err := tr.GenProof(data, []byte{})
 		if err != nil {
 			resp.SetError(err)
 		}
+		resp.Siblings = fmt.Sprintf("%x", siblings)
 		return resp
 
 	case "getSize":

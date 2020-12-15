@@ -14,7 +14,6 @@ import (
 	tree "gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
-	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
 	"gitlab.com/vocdoni/go-dvote/types"
 	"gitlab.com/vocdoni/go-dvote/util"
 	"google.golang.org/protobuf/proto"
@@ -84,7 +83,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 	}
 	app.State.AddProcess(process)
 
-	var proof string
+	var proof []byte
 
 	for i, s := range keys {
 		proof, err = tr.GenProof([]byte(claims[i]), nil)
@@ -94,7 +93,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		tx := &models.VoteEnvelope{
 			Nonce:     util.RandomBytes(16),
 			ProcessId: pid,
-			Proof:     &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: testutil.Hex2byte(b, proof)}}},
+			Proof:     &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proof}}},
 		}
 
 		txBytes, err := proto.Marshal(tx)

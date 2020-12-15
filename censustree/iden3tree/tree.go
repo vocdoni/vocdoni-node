@@ -147,40 +147,35 @@ func (t *Tree) AddClaim(index, value []byte) error {
 }
 
 // GenProof generates a merkle tree proof that can be later used on CheckProof() to validate it
-func (t *Tree) GenProof(index, value []byte) (string, error) {
+func (t *Tree) GenProof(index, value []byte) ([]byte, error) {
 	t.updateAccessTime()
 	e, err := t.entry(index, value)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	hash, err := e.HIndex()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	mp, err := t.Tree.GenerateProof(hash, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !mp.Existence {
-		return "", nil
+		return nil, nil
 	}
-	mpHex := common3.HexEncode(mp.Bytes())
-	return mpHex, nil
+	return mp.Bytes(), nil
 }
 
 // CheckProof standalone function for checking a merkle proof
-func CheckProof(root, mpHex string, index, value []byte) (bool, error) {
-	mpBytes, err := common3.HexDecode(mpHex)
+func CheckProof(root, mproof, index, value []byte) (bool, error) {
+	mp, err := merkletree.NewProofFromBytes(mproof)
 	if err != nil {
 		return false, err
 	}
-	mp, err := merkletree.NewProofFromBytes(mpBytes)
-	if err != nil {
-		return false, err
-	}
-	rootHash, err := stringToHash(root)
-	if err != nil {
-		return false, err
+	rootHash := new(merkletree.Hash)
+	if n := copy(rootHash[:], root); n < 32 {
+		return false, fmt.Errorf("root hash size is not correct (got %d expected 32)", n)
 	}
 	c, err := getClaimFromData(index, value)
 	if err != nil {
@@ -199,12 +194,12 @@ func CheckProof(root, mpHex string, index, value []byte) (bool, error) {
 }
 
 // CheckProof validates a merkle proof and its data
-func (t *Tree) CheckProof(index, value, root []byte, mpHex string) (bool, error) {
+func (t *Tree) CheckProof(index, value, root, mproof []byte) (bool, error) {
 	t.updateAccessTime()
 	if root == nil {
 		root = t.Root()
 	}
-	return CheckProof(fmt.Sprintf("%x", root), mpHex, index, value)
+	return CheckProof(root, mproof, index, value)
 }
 
 // Root returns the current root hash of the merkle tree
