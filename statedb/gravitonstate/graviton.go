@@ -15,9 +15,11 @@ import (
 	"gitlab.com/vocdoni/go-dvote/statedb"
 )
 
-const GravitonHashSizeBytes = graviton.HASHSIZE_BYTES
-const GravitonMaxKeySize = graviton.MAX_KEYSIZE
-const GravitonMaxValueSize = graviton.MAX_VALUE_SIZE
+const (
+	GravitonHashSizeBytes = graviton.HASHSIZE_BYTES
+	GravitonMaxKeySize    = graviton.MAX_KEYSIZE
+	GravitonMaxValueSize  = graviton.MAX_VALUE_SIZE
+)
 
 type GravitonState struct {
 	store             *graviton.Store

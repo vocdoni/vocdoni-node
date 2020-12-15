@@ -195,7 +195,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 					if !r.Digested {
 						data = snarks.Poseidon.Hash(data)
 					}
-					err = tr.AddClaim(data, []byte{})
+					err = tr.Add(data, []byte{})
 				}
 				if err != nil {
 					log.Warnf("error adding claim: %s", err)
@@ -224,7 +224,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			if !r.Digested {
 				data = snarks.Poseidon.Hash(data)
 			}
-			err = tr.AddClaim(data, []byte{})
+			err = tr.Add(data, []byte{})
 			if err != nil {
 				log.Warnf("error adding claim: %s", err)
 				resp.SetError(err)

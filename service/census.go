@@ -2,9 +2,11 @@ package service
 
 import (
 	"os"
+	"path"
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/census"
+	"gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/metrics"
 )
@@ -12,12 +14,13 @@ import (
 func Census(datadir string, ma *metrics.Agent) (*census.Manager, error) {
 	log.Info("creating census service")
 	var censusManager census.Manager
-	if _, err := os.Stat(datadir + "/census"); os.IsNotExist(err) {
-		if err := os.MkdirAll(datadir+"/census", os.ModePerm); err != nil {
+	stdir := path.Join(datadir, "census")
+	if _, err := os.Stat(stdir); os.IsNotExist(err) {
+		if err := os.MkdirAll(stdir, os.ModePerm); err != nil {
 			return nil, err
 		}
 	}
-	if err := censusManager.Init(datadir+"/census", "", "graviton"); err != nil {
+	if err := censusManager.Init(stdir, "", gravitontree.NewTree); err != nil {
 		return nil, err
 	}
 

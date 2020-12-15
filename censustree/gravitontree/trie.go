@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"path"
 	"sync/atomic"
 	"time"
 
@@ -61,7 +62,7 @@ func (t *Tree) Init(name, storageDir string) error {
 	if len(iname) > 32 {
 		iname = iname[:32]
 	}
-	dir := fmt.Sprintf("%s/%s", storageDir, name)
+	dir := path.Join(storageDir, name)
 	log.Debugf("creating census tree %s on %s", iname, dir)
 
 	if err := gs.Init(dir, "disk"); err != nil {
@@ -81,7 +82,7 @@ func (t *Tree) Init(name, storageDir string) error {
 	return nil
 }
 
-func (t *Tree) MaxClaimSize() int {
+func (t *Tree) MaxKeySize() int {
 	return MaxIndexSize
 }
 
@@ -117,7 +118,7 @@ func (t *Tree) IsPublic() bool {
 //  1.index is mandatory, the data will be used for indexing the claim into to merkle tree
 //  2.value is optional, the data will not affect the indexing
 // Use value only if index is too small
-func (t *Tree) AddClaim(index, value []byte) error {
+func (t *Tree) Add(index, value []byte) error {
 	t.updateAccessTime()
 	if len(index) < 4 {
 		return fmt.Errorf("claim index too small (%d), minimum size is 4 bytes", len(index))
@@ -177,25 +178,17 @@ func (t *Tree) Root() []byte {
 	return t.Tree.Hash()
 }
 
-func (t *Tree) treeWithRoot(root string) statedb.StateTree {
-	if root == "" {
+func (t *Tree) treeWithRoot(root []byte) statedb.StateTree {
+	if root == nil {
 		return t.Tree
 	}
-	if len(root) >= 2 && root[0] == '0' && (root[1] == 'x' || root[1] == 'X') {
-		root = root[2:]
-	}
-	r, err := hex.DecodeString(root)
-	if err != nil {
-		log.Warn(err)
-		return nil
-	}
-	return t.store.TreeWithRoot(r)
+	return t.store.TreeWithRoot(root)
 }
 
 // Dump returns the whole merkle tree serialized in a format that can be used on Import
 func (t *Tree) Dump(root []byte) (claims []string, err error) {
 	t.updateAccessTime()
-	tree := t.treeWithRoot(fmt.Sprintf("%x", root))
+	tree := t.treeWithRoot(root)
 	if tree == nil {
 		return nil, fmt.Errorf("dump: root not found %x", root)
 	}
@@ -208,7 +201,7 @@ func (t *Tree) Dump(root []byte) (claims []string, err error) {
 
 // Size returns the number of leaf nodes on the merkle tree
 func (t *Tree) Size(root []byte) (int64, error) {
-	tree := t.treeWithRoot(fmt.Sprintf("%x", root))
+	tree := t.treeWithRoot(root)
 	if tree == nil {
 		return 0, fmt.Errorf("size: root not found %x", root)
 	}
@@ -224,7 +217,7 @@ func (t *Tree) DumpPlain(root []byte, responseBase64 bool) ([]string, []string, 
 	var err error
 	t.updateAccessTime()
 
-	tree := t.treeWithRoot(fmt.Sprintf("%x", root))
+	tree := t.treeWithRoot(root)
 	if tree == nil {
 		return nil, nil, fmt.Errorf("dumpplain: root not found %x", root)
 	}
@@ -263,7 +256,7 @@ func (t *Tree) ImportDump(claims []string) error {
 
 // Snapshot returns a Tree instance of a exiting merkle root
 func (t *Tree) Snapshot(root []byte) (censustree.Tree, error) {
-	tree := t.treeWithRoot(fmt.Sprintf("%x", root))
+	tree := t.treeWithRoot(root)
 	if tree == nil {
 		return nil, fmt.Errorf("snapshot: root not valid or not found %s", root)
 	}
@@ -271,9 +264,9 @@ func (t *Tree) Snapshot(root []byte) (censustree.Tree, error) {
 }
 
 // HashExist checks if a hash exists as a node in the merkle tree
-func (t *Tree) HashExist(hash []byte) (bool, error) {
+func (t *Tree) HashExists(hash []byte) (bool, error) {
 	t.updateAccessTime()
-	tree := t.treeWithRoot(fmt.Sprintf("%x", hash))
+	tree := t.treeWithRoot(hash)
 	if tree == nil {
 		return false, nil
 	}

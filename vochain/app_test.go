@@ -41,7 +41,7 @@ func TestCheckTX(t *testing.T) {
 			t.Fatal(err)
 		}
 		c := snarks.Poseidon.Hash(pubb)
-		tr.AddClaim(c, nil)
+		tr.Add(c, nil)
 		claims = append(claims, string(c))
 	}
 	mkuri := "ipfs://123456789"

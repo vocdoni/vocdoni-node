@@ -64,7 +64,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 			b.Fatal(err)
 		}
 		c := snarks.Poseidon.Hash(pubb)
-		tr.AddClaim(c, nil)
+		tr.Add(c, nil)
 		claims = append(claims, string(c))
 	}
 	mkuri := "ipfs://123456789"

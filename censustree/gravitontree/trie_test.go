@@ -13,7 +13,7 @@ func TestTree(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 100; i++ {
-		if err = tr1.AddClaim([]byte(fmt.Sprintf("number %d", i)), []byte{}); err != nil {
+		if err = tr1.Add([]byte(fmt.Sprintf("number %d", i)), []byte{}); err != nil {
 			t.Fatal(err)
 		}
 	}

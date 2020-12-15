@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"gitlab.com/vocdoni/go-dvote/censustree"
-	"gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
-	"gitlab.com/vocdoni/go-dvote/censustree/iden3tree"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
 	"gitlab.com/vocdoni/go-dvote/log"
@@ -62,22 +60,16 @@ type Manager struct {
 func (m *Manager) Data() data.Storage { return m.RemoteStorage }
 
 // Init creates a new census manager.
-// Available treeImpl are graviton and iden3
-func (m *Manager) Init(storageDir, rootKey string, treeImpl string) error {
+// A constructor function for the interface censustree.Tree must be provided.
+func (m *Manager) Init(storageDir, rootKey string, newTreeImpl func(name, storageDir string) (censustree.Tree, error)) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storageDir)
 	m.StorageDir = storageDir
 	m.Trees = make(map[string]censustree.Tree)
 	m.failedQueue = make(map[string]string)
-
-	switch treeImpl {
-	case "graviton":
-		m.newTreeFunc = gravitontree.NewTree
-	case "iden3":
-		m.newTreeFunc = iden3tree.NewTree
-	default:
-		return fmt.Errorf("census tree implementation %s now known", treeImpl)
+	if newTreeImpl == nil {
+		return fmt.Errorf("missing census tree implementation")
 	}
-
+	m.newTreeFunc = newTreeImpl
 	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
 	m.importQueue = make(chan censusImport, 32)
 	m.AuthWindow = 10

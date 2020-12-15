@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"gitlab.com/vocdoni/go-dvote/census"
+	"gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
 	"gitlab.com/vocdoni/go-dvote/config"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
@@ -71,7 +72,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	var cm census.Manager
 	d.CensusDir = tb.TempDir()
 
-	if err := cm.Init(d.CensusDir, "", "graviton"); err != nil {
+	if err := cm.Init(d.CensusDir, "", gravitontree.NewTree); err != nil {
 		tb.Fatal(err)
 	}
 
