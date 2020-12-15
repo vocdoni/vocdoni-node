@@ -203,7 +203,7 @@ func (t *Tree) Dump(root []byte) (claims []string, err error) {
 func (t *Tree) Size(root []byte) (int64, error) {
 	tree := t.treeWithRoot(root)
 	if tree == nil {
-		return 0, fmt.Errorf("size: root not found %x", root)
+		return 0, nil
 	}
 	return int64(tree.Count()), nil
 }

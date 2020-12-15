@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -17,10 +17,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
-	tree "gitlab.com/vocdoni/go-dvote/censustree/iden3tree"
+	"gitlab.com/vocdoni/go-dvote/censustree"
+	tree "gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
 	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
 	"gitlab.com/vocdoni/go-dvote/data"
-	"gitlab.com/vocdoni/go-dvote/db"
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/net"
 	"gitlab.com/vocdoni/go-dvote/types"
@@ -51,7 +51,7 @@ type IPFSsync struct {
 	Timeout         time.Duration
 	TimestampWindow int32
 
-	hashTree    tree.Tree
+	hashTree    censustree.Tree
 	updateLock  sync.RWMutex
 	myMultiAddr ma.Multiaddr // The IPFS multiaddress
 	lastHash    string
@@ -118,7 +118,7 @@ func (is *IPFSsync) myPins() (pins []string) {
 // updateLocalPins gets the local IPFS pin list and add them to the Merkle Tree
 func (is *IPFSsync) updateLocalPins() {
 	for _, p := range is.myPins() {
-		is.hashTree.AddClaim([]byte(p), []byte{}) // errror is ignored, should be fine
+		is.hashTree.Add([]byte(p), []byte{}) // errror is ignored, should be fine
 	}
 }
 
@@ -133,11 +133,11 @@ func (is *IPFSsync) addPins(pins []string) {
 			log.Warnf("cannot decode pin %s: (%s)", v, err)
 			continue
 		}
-		if len(pin) > is.hashTree.MaxClaimSize() {
+		if len(pin) > is.hashTree.MaxKeySize() {
 			log.Warnf("CID exceeds the claim size %d", len(v))
 			continue
 		}
-		is.hashTree.AddClaim(pin, []byte{})
+		is.hashTree.Add(pin, []byte{})
 	}
 	if !bytes.Equal(currentRoot, is.hashTree.Root()) {
 		is.lastHash = fmt.Sprintf("%x", currentRoot)
@@ -245,7 +245,7 @@ func (is *IPFSsync) Handle(msg Message) error {
 			if err != nil {
 				return err
 			}
-			if exist, err := is.hashTree.HashExist(hash); err == nil && !exist && is.lastHash != msg.Hash {
+			if exist, err := is.hashTree.HashExists(hash); err == nil && !exist && is.lastHash != msg.Hash {
 				log.Infof("found new hash %s from %s", msg.Hash, msg.Address)
 				return is.askPins(msg.Address, is.hashTree.Root())
 			}
@@ -337,7 +337,7 @@ func (is *IPFSsync) listPins(fromHash string) []string {
 		log.Error(err)
 		return []string{}
 	}
-	if exist, err := is.hashTree.HashExist(fromHashBytes); !exist {
+	if exist, err := is.hashTree.HashExists(fromHashBytes); !exist {
 		if err != nil {
 			log.Error(err)
 		}
@@ -366,22 +366,16 @@ func (is *IPFSsync) unicastMsg(address string, ipfsmsg Message) error {
 
 // Start initializes and start an IPFSsync instance
 func (is *IPFSsync) Start() {
+	var err error
 	log.Infof("initializing new pin storage")
-	dbDir := filepath.Join(is.DataDir, "db")
+	dbDir := path.Join(is.DataDir, "db")
 	if err := os.RemoveAll(dbDir); err != nil {
 		log.Fatal(err)
 	}
-	storage, err := db.NewIden3Storage(dbDir)
+	is.hashTree, err = tree.NewTree("ipfsSync", dbDir)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	tr, err := tree.NewTreeWithStorage(storage)
-	if err != nil {
-		log.Fatal(err)
-	}
-	is.hashTree = *tr
-
 	is.updateLocalPins()
 	log.Infof("current hash %s", is.hashTree.Root())
 
