@@ -10,6 +10,7 @@ type StateDB interface {
 	ImmutableTree(name string) StateTree // a tree version that won't change
 	Commit() ([]byte, error)             // Returns New Hash
 	Rollback() error
+	KeyDiff(root1, root2 []byte) ([][]byte, error) // list of inserted keys on root2 that are not present in root1
 	Hash() []byte
 	Close() error
 }

@@ -128,21 +128,27 @@ func (is *IPFSsync) updateLocalPins() {
 	for _, p := range pins {
 		is.hashTree.Add([]byte(p), []byte{}) // errror is ignored, should be fine
 	}
+	is.state.Commit()
 }
 
 // addPins adds to the MerkleTree the new pins and updates the Root
-func (is *IPFSsync) addPins(pins []*models.IpfsPin) {
+func (is *IPFSsync) addPins(pins []*models.IpfsPin) error {
 	currentRoot := is.hashTree.Hash()
 	for _, v := range pins {
 		if len(v.Uri) > gravitonstate.GravitonMaxKeySize {
 			log.Warnf("CID exceeds the max size (got %d)", len(v.Uri))
 			continue
 		}
-		is.hashTree.Add([]byte(v.Uri), []byte{})
+		if err := is.hashTree.Add([]byte(v.Uri), []byte{}); err != nil {
+			log.Warnf("cannot add pin %s", v.Uri)
+		}
+		log.Debugf("added pin %s", v.Uri)
 	}
 	if !bytes.Equal(currentRoot, is.hashTree.Hash()) {
 		is.lastHash = currentRoot
 	}
+	_, err := is.state.Commit()
+	return err
 }
 
 func (is *IPFSsync) getMyPins() [][]byte {
@@ -193,6 +199,9 @@ func (is *IPFSsync) sendPins(address string, theirHash []byte) error {
 	msg.PinList, err = is.listPins(theirHash)
 	if err != nil {
 		return fmt.Errorf("sendPins: %w", err)
+	}
+	if len(msg.PinList) == 0 {
+		return nil
 	}
 	return is.unicastMsg(address, &msg)
 }
@@ -266,8 +275,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 			defer is.updateLock.Unlock()
 			if !bytes.Equal(msg.Hash, is.hashTree.Hash()) {
 				log.Infof("got new pin list %x from %s", msg.Hash, msg.Address)
-				is.addPins(msg.PinList)
-				return nil
+				return is.addPins(msg.PinList)
 			}
 		}
 
@@ -309,43 +317,18 @@ func (is *IPFSsync) sendHello() {
 	}
 }
 
-// difference returns the elements in `a` that aren't in `b`.
-func diff(a, b [][]byte) [][]byte {
-	mb := make(map[string]struct{}, len(b))
-	for _, x := range b {
-		mb[string(x)] = struct{}{}
-	}
-	var diff [][]byte
-	for _, x := range a {
-		if _, found := mb[string(x)]; !found {
-			diff = append(diff, x)
-		}
-	}
-	return diff
-}
-
 // listPins return the current pins of the Merkle Tree
 // if fromHash is a valid hash, returns only the difference between the root and the provided hash
 func (is *IPFSsync) listPins(fromHash []byte) ([]*models.IpfsPin, error) {
 	var pins []*models.IpfsPin
-	myClaims := is.getMyPins()
-	stateFromHash := is.state.TreeWithRoot(fromHash)
-	if stateFromHash == nil {
-		log.Debugf("listPins: hash %x not known, sending my whole list", fromHash)
-		for _, c := range myClaims {
-			pins = append(pins, &models.IpfsPin{Uri: string(c)})
-		}
-		return pins, nil
+	diff, err := is.state.KeyDiff(fromHash, is.hashTree.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("listPins, failed KeyDiff: %w", err)
 	}
-	var theirClaims [][]byte
-	stateFromHash.Iterate(nil, func(key, value []byte) bool {
-		theirClaims = append(theirClaims, key)
-		return false
-	})
-	for _, c := range diff(myClaims, theirClaims) {
+	for _, c := range diff {
 		pins = append(pins, &models.IpfsPin{Uri: string(c)})
 	}
-	log.Debugf("listPins: hash %x is known, sending the difference")
+	log.Debugf("listPins: sending %d pins out of %d", len(diff), is.hashTree.Count())
 	return pins, nil
 }
 

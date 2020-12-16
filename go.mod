@@ -78,7 +78,7 @@ require (
 	golang.org/x/crypto v0.0.0-20201124201722-c8d3bf9c5392
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	golang.org/x/sys v0.0.0-20201130171929-760e229fe7c5 // indirect
-	golang.org/x/text v0.3.4
+	golang.org/x/text v0.3.4 // indirect
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect

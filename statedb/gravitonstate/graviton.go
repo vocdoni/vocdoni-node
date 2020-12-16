@@ -202,6 +202,30 @@ func (g *GravitonState) TreeWithRoot(root []byte) statedb.StateTree {
 	return &GravitonTree{tree: gt, version: g.Version()}
 }
 
+// KeyDiff returns the list of inserted keys on rootBig not present in rootSmall
+func (g *GravitonState) KeyDiff(rootSmall, rootBig []byte) ([][]byte, error) {
+	t1 := g.TreeWithRoot(rootSmall)
+	t2 := g.TreeWithRoot(rootBig)
+	diff := [][]byte{}
+	if t1 == nil && t2 == nil {
+		return diff, fmt.Errorf("tree with specified root not found")
+	}
+	if t2 == nil {
+		return nil, nil
+	}
+	if t1 == nil {
+		t2.Iterate(nil, func(k, v []byte) bool {
+			diff = append(diff, k)
+			return false
+		})
+		return diff, nil
+	}
+	err := graviton.Diff(t1.(*GravitonTree).tree, t2.(*GravitonTree).tree, nil, nil, func(k, v []byte) {
+		diff = append(diff, k)
+	})
+	return diff, err
+}
+
 func (g *GravitonState) updateImmutable() error {
 	sn, err := g.store.LoadSnapshot(0)
 	if err != nil {

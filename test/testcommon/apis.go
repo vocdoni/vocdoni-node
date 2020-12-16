@@ -23,6 +23,7 @@ type DvoteAPIServer struct {
 	IpfsDir        string
 	ScrutinizerDir string
 	PxyAddr        string
+	Storage        data.Storage
 }
 
 /*
@@ -54,19 +55,20 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	go ws.Listen(listenerOutput)
 
 	// Create the API router
+	var err error
 	d.IpfsDir = tb.TempDir()
 	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
-	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
+	d.Storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {
 		tb.Fatal(err)
 	}
 	tb.Cleanup(func() {
-		if err := storage.Stop(); err != nil {
+		if err := d.Storage.Stop(); err != nil {
 			tb.Error(err)
 		}
 	})
 
-	routerAPI := router.InitRouter(listenerOutput, storage, d.Signer, nil, true)
+	routerAPI := router.InitRouter(listenerOutput, d.Storage, d.Signer, nil, true)
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
