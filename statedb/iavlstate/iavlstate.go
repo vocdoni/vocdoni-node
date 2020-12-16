@@ -174,6 +174,11 @@ func (i *IavlState) ImmutableTree(name string) statedb.StateTree { // a tree ver
 	return &IavlTree{itree: i.trees[name].itree, isImmutable: true}
 }
 
+func (i *IavlState) KeyDiff(root1, root2 []byte) ([][]byte, error) {
+	// TO-DO
+	return nil, nil
+}
+
 func (i *IavlState) Commit() ([]byte, error) { // Returns New Hash
 	i.lock.Lock()
 	defer i.lock.Unlock()
