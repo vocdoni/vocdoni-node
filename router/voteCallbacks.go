@@ -50,7 +50,7 @@ func (r *Router) submitEnvelope(request routerRequest) {
 	}
 
 	// Prepare Vote transaction
-	vtx := models.Tx{}
+	vtx := models.Tx{Payload: &models.Tx_Vote{Vote: tx}}
 
 	// Signature if available
 	if request.Signature != "" {
