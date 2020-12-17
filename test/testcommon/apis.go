@@ -2,6 +2,7 @@ package testcommon
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"go.vocdoni.io/dvote/census"
@@ -24,6 +25,7 @@ type DvoteAPIServer struct {
 	ScrutinizerDir string
 	PxyAddr        string
 	Storage        data.Storage
+	IpfsPort       int
 }
 
 /*
@@ -58,10 +60,15 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	var err error
 	d.IpfsDir = tb.TempDir()
 	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
-	d.Storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
-	if err != nil {
+	ipfs := data.IPFSHandle{}
+	d.IpfsPort = 14000 + rand.Intn(2048)
+	if err = ipfs.SetMultiAddress(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", d.IpfsPort)); err != nil {
 		tb.Fatal(err)
 	}
+	if err = ipfs.Init(ipfsStore); err != nil {
+		tb.Fatal(err)
+	}
+	d.Storage = &ipfs
 	tb.Cleanup(func() {
 		if err := d.Storage.Stop(); err != nil {
 			tb.Error(err)

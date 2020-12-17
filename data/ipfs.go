@@ -38,6 +38,7 @@ type IPFSHandle struct {
 	// cancel helps us stop extra goroutines and listeners which complement
 	// the IpfsNode above.
 	cancel func()
+	maddr  ma.Multiaddr
 }
 
 func (i *IPFSHandle) Init(d *types.DataStore) error {
@@ -79,11 +80,13 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 		gatewayOpt,
 	}
 
-	addr, err := ma.NewMultiaddr("/ip4/0.0.0.0/tcp/5001")
-	if err != nil {
-		return err
+	if i.maddr == nil {
+		if err := i.SetMultiAddress("/ip4/0.0.0.0/tcp/5001"); err != nil {
+			return err
+		}
 	}
-	list, err := manet.Listen(addr)
+
+	list, err := manet.Listen(i.maddr)
 	if err != nil {
 		return err
 	}
@@ -108,6 +111,11 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 func (i *IPFSHandle) Stop() error {
 	i.cancel()
 	return i.Node.Close()
+}
+
+func (i *IPFSHandle) SetMultiAddress(addr string) (err error) {
+	i.maddr, err = ma.NewMultiaddr(addr)
+	return err
 }
 
 // URIprefix returns the URI prefix which identifies the protocol
