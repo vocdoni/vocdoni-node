@@ -2,7 +2,7 @@
 package iden3tree
 
 import (
-	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -16,7 +16,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/db"
 
 	"github.com/iden3/go-iden3-core/merkletree"
-	"golang.org/x/text/unicode/norm"
 )
 
 type Tree struct {
@@ -209,12 +208,22 @@ func (t *Tree) Root() []byte {
 }
 
 // Dump returns the whole merkle tree serialized in a format that can be used on Import
-func (t *Tree) Dump(root []byte) (claims []string, err error) {
+func (t *Tree) Dump(root []byte) (keys [][]byte, err error) {
 	rootHash := new(merkletree.Hash)
 	copy(rootHash[:], root)
 	t.updateAccessTime()
-	claims, err = t.Tree.DumpClaims(rootHash)
-	return
+	claims, err := t.Tree.DumpClaims(rootHash)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range claims {
+		cb, err := hex.DecodeString(c)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, cb)
+	}
+	return keys, nil
 }
 
 // Size returns the number of leaf nodes on the merkle tree
@@ -240,8 +249,8 @@ func (t *Tree) Size(root []byte) (int64, error) {
 // First return parametre are the indexes and second the values
 // If root is not specified, the current one is used
 // If responseBase64 is true, the list will be returned base64 encoded
-func (t *Tree) DumpPlain(root []byte, responseBase64 bool) ([]string, []string, error) {
-	var indexes, values []string
+func (t *Tree) DumpPlain(root []byte) ([][]byte, [][]byte, error) {
+	var indexes, values [][]byte
 	var err error
 	rootHash := new(merkletree.Hash)
 	t.updateAccessTime()
@@ -254,25 +263,21 @@ func (t *Tree) DumpPlain(root []byte, responseBase64 bool) ([]string, []string, 
 	err = t.Tree.Walk(rootHash, func(n *merkletree.Node) {
 		if n.Type == merkletree.NodeTypeLeaf {
 			c := claims.NewClaimBasicFromEntry(n.Entry)
-
 			index, value = getDataFromClaim(c)
-			if responseBase64 {
-				datab64 := base64.StdEncoding.EncodeToString(index)
-				indexes = append(indexes, datab64)
-				datab64 = base64.StdEncoding.EncodeToString(value)
-				values = append(values, datab64)
-			} else {
-				indexes = append(indexes, string(norm.NFC.Bytes(index)))
-				values = append(values, string(norm.NFC.Bytes(value)))
-			}
+			indexes = append(indexes, index)
+			values = append(values, value)
 		}
 	})
 	return indexes, values, err
 }
 
 // ImportDump imports a partial or whole tree previously exported with Dump()
-func (t *Tree) ImportDump(claims []string) error {
+func (t *Tree) ImportDump(keys [][]byte) error {
 	t.updateAccessTime()
+	claims := []string{}
+	for _, c := range claims {
+		claims = append(claims, fmt.Sprintf("%x", c))
+	}
 	return t.Tree.ImportDumpedClaims(claims)
 }
 

@@ -1,7 +1,6 @@
 package test
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -68,19 +67,19 @@ func BenchmarkVochain(b *testing.B) {
 	req.CensusID = resp.CensusID
 
 	// census add claims
-	poseidonHashes := make([]string, len(keySet))
-	for i, key := range keySet {
+	poseidonHashes := [][]byte{}
+	for _, key := range keySet {
 		hash := snarks.Poseidon.Hash(crypto.FromECDSAPub(&key.Public))
 		if len(hash) == 0 {
 			b.Fatalf("cannot create poseidon hash of public key: %#v", key.Public)
 		}
-		poseidonHashes[i] = base64.StdEncoding.EncodeToString(hash)
+		poseidonHashes = append(poseidonHashes, hash)
 	}
 	log.Debugf("poseidon hashes: %s", poseidonHashes)
 	log.Debug("add bulk claims")
-	var claims []string
+	var claims [][]byte
 	req.Digested = true
-	req.ClaimData = ""
+	req.ClaimData = []byte{}
 	for i := 0; i < len(poseidonHashes); i++ {
 		claims = append(claims, poseidonHashes[i])
 	}
@@ -195,7 +194,7 @@ func BenchmarkVochain(b *testing.B) {
 	log.Infof("created entities: %+v", resp.EntityIDs)
 }
 
-func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon, mkRoot, processID, censusID string) {
+func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon []byte, mkRoot, processID, censusID string) {
 	// API requests
 	var req types.MetaRequest
 	doRequest := cl.ForTest(b, &req)

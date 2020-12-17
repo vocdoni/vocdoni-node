@@ -29,7 +29,7 @@ Run it executing `go test -v test/census_test.go`
 */
 
 import (
-	"encoding/base64"
+	"bytes"
 	"flag"
 	"math/rand"
 	"testing"
@@ -86,7 +86,7 @@ func TestCensus(t *testing.T) {
 
 	// addClaim
 	req.CensusID = censusID
-	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
+	req.ClaimData = []byte("hello")
 	req.Digested = true
 	resp = doRequest("addClaim", signer2)
 	if !resp.Ok {
@@ -96,7 +96,7 @@ func TestCensus(t *testing.T) {
 	// addClaim not authorized; use Request directly
 	req.CensusID = censusID
 	req.Method = "addClaim"
-	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello2"))
+	req.ClaimData = []byte("hello2")
 	resp, err = cl.Request(req, signer1)
 	if err != nil {
 		t.Fatal(err)
@@ -107,7 +107,7 @@ func TestCensus(t *testing.T) {
 
 	// GenProof valid
 	req.CensusID = censusID
-	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello"))
+	req.ClaimData = []byte("hello")
 	resp = doRequest("genProof", nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
@@ -115,7 +115,7 @@ func TestCensus(t *testing.T) {
 
 	// GenProof not valid
 	req.CensusID = censusID
-	req.ClaimData = base64.StdEncoding.EncodeToString([]byte("hello3"))
+	req.ClaimData = []byte("hello3")
 	resp = doRequest("genProof", nil)
 	if len(resp.Siblings) > 1 {
 		t.Fatalf("proof should not exist!")
@@ -138,15 +138,15 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 
 	// addClaimBulk
-	var claims []string
-	req.ClaimData = ""
+	var claims [][]byte
+	req.ClaimData = []byte{}
 	keys := testcommon.CreateEthRandomKeysBatch(t, *censusSize)
 	for _, key := range keys {
 		hash := snarks.Poseidon.Hash(crypto.FromECDSAPub(&key.Public))
 		if len(hash) == 0 {
 			t.Fatalf("cannot create poseidon hash of public key: %#v", key.Public)
 		}
-		claims = append(claims, base64.StdEncoding.EncodeToString(hash))
+		claims = append(claims, hash)
 	}
 	req.ClaimsData = claims
 	resp = doRequest("addClaimBulk", signer2)
@@ -155,8 +155,8 @@ func TestCensus(t *testing.T) {
 	}
 
 	// dumpPlain
-	req.ClaimData = ""
-	req.ClaimsData = []string{}
+	req.ClaimData = []byte{}
+	req.ClaimsData = [][]byte{}
 	resp = doRequest("dumpPlain", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
@@ -165,7 +165,7 @@ func TestCensus(t *testing.T) {
 	for _, c := range claims {
 		found = false
 		for _, c2 := range resp.ClaimsData {
-			if c == c2 {
+			if bytes.Equal(c, c2) {
 				found = true
 				break
 			}
@@ -204,7 +204,7 @@ func TestCensus(t *testing.T) {
 	req.RootHash = ""
 
 	// publish
-	req.ClaimsData = []string{}
+	req.ClaimsData = [][]byte{}
 	resp = doRequest("publish", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)

@@ -20,8 +20,8 @@ type RequestMessage struct {
 type MetaRequest struct {
 	CensusID   string   `json:"censusId,omitempty"`
 	CensusURI  string   `json:"censusUri,omitempty"`
-	ClaimData  string   `json:"claimData,omitempty"`
-	ClaimsData []string `json:"claimsData,omitempty"`
+	ClaimData  []byte   `json:"claimData,omitempty"`
+	ClaimsData [][]byte `json:"claimsData,omitempty"`
 	Content    string   `json:"content,omitempty"`
 	Digested   bool     `json:"digested,omitempty"`
 	EntityId   string   `json:"entityId,omitempty"`
@@ -94,7 +94,7 @@ type MetaResponse struct {
 	BlockTimestamp       int32      `json:"blockTimestamp,omitempty"`
 	CensusID             string     `json:"censusId,omitempty"`
 	CensusList           []string   `json:"censusList,omitempty"`
-	ClaimsData           []string   `json:"claimsData,omitempty"`
+	ClaimsData           [][]byte   `json:"claimsData,omitempty"`
 	CommitmentKeys       []Key      `json:"commitmentKeys,omitempty"`
 	Content              string     `json:"content,omitempty"`
 	EncryptionPrivKeys   []Key      `json:"encryptionPrivKeys,omitempty"`
@@ -165,8 +165,8 @@ func (r *MetaResponse) SetError(v interface{}) {
 }
 
 type CensusDump struct {
-	RootHash   string   `json:"rootHash"`
-	ClaimsData []string `json:"claimsData"`
+	RootHash   []byte   `json:"rootHash"`
+	ClaimsData [][]byte `json:"claimsData"`
 }
 
 // VotePackage represents the payload of a vote (usually base64 encoded)

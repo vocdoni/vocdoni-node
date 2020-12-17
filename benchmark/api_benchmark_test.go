@@ -77,21 +77,21 @@ func censusBench(b *testing.B, cl *client.Client) {
 
 	// addClaimBulk
 	log.Infof("[%d] add bulk claims (size %d)", rint, *censusSize)
-	var claims []string
-	req.ClaimData = ""
+	var claims [][]byte
+	req.ClaimData = []byte{}
 	req.Digested = false
 	currentSize := *censusSize
 	i := 0
 	rint2 := 0
 	for currentSize > 0 {
-		iclaims := []string{}
+		iclaims := [][]byte{}
 		rint2 = rand.Int()
 		for j := 0; j < 100; j++ {
 			if currentSize < 1 {
 				break
 			}
 			data := fmt.Sprintf("%d0123456789abcdef0123456789%d%d%d", rint, i, j, rint2)
-			iclaims = append(iclaims, base64.StdEncoding.EncodeToString([]byte(data)))
+			iclaims = append(iclaims, []byte(data))
 			currentSize--
 		}
 		claims = append(claims, iclaims...)
@@ -115,8 +115,8 @@ func censusBench(b *testing.B, cl *client.Client) {
 
 	// dumpPlain
 	log.Infof("[%d] dump claims", rint)
-	req.ClaimData = ""
-	req.ClaimsData = []string{}
+	req.ClaimData = []byte{}
+	req.ClaimsData = [][]byte{}
 	resp = doRequest("dumpPlain", signer)
 	if len(resp.ClaimsData) != len(claims) {
 		b.Fatalf("missing claims on dumpPlain, %d != %d", len(req.ClaimsData), len(claims))
@@ -150,7 +150,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 
 	// publish
 	log.Infof("[%d] publish census", rint)
-	req.ClaimsData = []string{}
+	req.ClaimsData = [][]byte{}
 	doRequest("publish", signer)
 
 	// getRoot
