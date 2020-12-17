@@ -35,6 +35,7 @@ type GravitonTree struct {
 	tree    *graviton.Tree
 	version uint64
 	size    uint64
+	addLock sync.RWMutex
 }
 
 type VersionTree struct {
@@ -325,6 +326,8 @@ func (t *GravitonTree) Get(key []byte) []byte {
 }
 
 func (t *GravitonTree) Add(key, value []byte) error {
+	t.addLock.Lock()
+	defer t.addLock.Unlock()
 	// if already exist, just return
 	if v, err := t.tree.Get(key); err == nil && string(v) == string(value) {
 		return nil
@@ -342,6 +345,8 @@ func (t *GravitonTree) Version() uint64 {
 }
 
 func (t *GravitonTree) Iterate(prefix []byte, callback func(key, value []byte) bool) {
+	t.addLock.RLock()
+	defer t.addLock.RUnlock()
 	c := t.tree.Cursor()
 	for k, v, err := c.First(); err == nil; k, v, err = c.Next() {
 		// This is horrible from the performance point of view...
