@@ -46,7 +46,7 @@ jobs:
           # export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
           cd dockerfiles/testsuite
           docker-compose build
-          sh start_test.sh
+          ./start_test.sh
 
   docker-release:
     runs-on: ubuntu-latest
