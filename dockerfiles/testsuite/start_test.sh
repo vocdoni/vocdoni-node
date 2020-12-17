@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # bash start_test.sh <0|1|2>
 #  0: run all tests <default>
 #  1: run poll vote test
@@ -11,7 +11,7 @@ TEST=${1:-0}
 
 test() {
 	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost ws://gateway:9090/dvote --logLevel=INFO --electionType=$1
-	echo $? > $2
+	echo $? >$2
 }
 
 echo "### Starting test suite ###"
@@ -25,14 +25,14 @@ for i in {1..5}; do docker-compose run test curl --fail http://gateway:9090/ping
 testid="/tmp/.vochaintest$RANDOM"
 
 [ $TEST -eq 1 -o $TEST -eq 0 ] && {
-  echo "### Running test 1 ###"
-  test poll-vote ${testid}1 &
-} || echo 0 > ${testid}1
+	echo "### Running test 1 ###"
+	test poll-vote ${testid}1 &
+} || echo 0 >${testid}1
 
 [ $TEST -eq 2 -o $TEST -eq 0 ] && {
-  echo "### Running test 2 ###"
-  test encrypted-poll ${testid}2 &
-} || echo 0 > ${testid}2
+	echo "### Running test 2 ###"
+	test encrypted-poll ${testid}2 &
+} || echo 0 >${testid}2
 
 echo "### Waiting for tests ###"
 wait
