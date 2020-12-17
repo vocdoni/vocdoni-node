@@ -14,7 +14,7 @@ import (
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 
-	"gitlab.com/vocdoni/go-dvote/log"
+	"go.vocdoni.io/dvote/log"
 )
 
 var ConfigRoot string

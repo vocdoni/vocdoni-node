@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
-	"gitlab.com/vocdoni/go-dvote/log"
+	"go.vocdoni.io/dvote/log"
 )
 
 type compressor struct {

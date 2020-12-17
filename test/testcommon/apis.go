@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"testing"
 
-	"gitlab.com/vocdoni/go-dvote/census"
-	"gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
-	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/data"
-	dnet "gitlab.com/vocdoni/go-dvote/net"
-	"gitlab.com/vocdoni/go-dvote/router"
+	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/censustree/gravitontree"
+	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
+	dnet "go.vocdoni.io/dvote/net"
+	"go.vocdoni.io/dvote/router"
 
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/types"
 )
 
 // DvoteAPIServer contains all the required pieces for running a go-dvote api server

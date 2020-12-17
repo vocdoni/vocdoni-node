@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/box"
 
-	"gitlab.com/vocdoni/go-dvote/crypto"
+	"go.vocdoni.io/dvote/crypto"
 )
 
 const KeyLength = 32

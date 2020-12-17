@@ -6,8 +6,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/metrics"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/metrics"
 )
 
 // Ethereum collectors

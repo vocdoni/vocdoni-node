@@ -5,10 +5,10 @@ import (
 	"path"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/census"
-	"gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/metrics"
+	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/censustree/gravitontree"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/metrics"
 )
 
 func Census(datadir string, ma *metrics.Agent) (*census.Manager, error) {

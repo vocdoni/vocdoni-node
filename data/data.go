@@ -5,8 +5,8 @@ import (
 	"context"
 	"errors"
 
-	"gitlab.com/vocdoni/go-dvote/metrics"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/metrics"
+	"go.vocdoni.io/dvote/types"
 )
 
 type Storage interface {

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gitlab.com/vocdoni/go-dvote/cmd/dvotecli/commands"
+	"go.vocdoni.io/dvote/cmd/dvotecli/commands"
 )
 
 func main() {

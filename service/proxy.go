@@ -1,8 +1,8 @@
 package service
 
 import (
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/net"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/net"
 )
 
 // Proxy creates a new service for routing HTTP connections using go-chi server

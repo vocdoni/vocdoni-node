@@ -12,8 +12,8 @@ import (
 
 	"github.com/iden3/go-iden3-core/core/claims"
 	iden3db "github.com/iden3/go-iden3-core/db"
-	"gitlab.com/vocdoni/go-dvote/censustree"
-	"gitlab.com/vocdoni/go-dvote/db"
+	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/db"
 
 	"github.com/iden3/go-iden3-core/merkletree"
 )

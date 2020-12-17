@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/client"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/client"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 
-	"gitlab.com/vocdoni/go-dvote/test/testcommon"
+	"go.vocdoni.io/dvote/test/testcommon"
 )
 
 // The init function and flags are shared with the other benchmark files.

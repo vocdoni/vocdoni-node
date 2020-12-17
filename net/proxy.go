@@ -13,9 +13,9 @@ import (
 
 	reuse "github.com/libp2p/go-reuseport"
 	"github.com/recws-org/recws"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
 	"go.uber.org/zap"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 

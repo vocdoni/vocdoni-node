@@ -5,8 +5,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/net"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/net"
 )
 
 // Agent struct with options

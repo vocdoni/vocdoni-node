@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/subpub"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/subpub"
+	"go.vocdoni.io/dvote/types"
 )
 
 type SubPubHandle struct {

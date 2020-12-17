@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"io"
 
-	"gitlab.com/vocdoni/go-dvote/log"
+	"go.vocdoni.io/dvote/log"
 	"golang.org/x/crypto/nacl/secretbox"
 )
 

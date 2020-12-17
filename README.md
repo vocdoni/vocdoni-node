@@ -1,7 +1,7 @@
 # go-dvote
 
-[![GoDoc](https://godoc.org/gitlab.com/vocdoni/go-dvote?status.svg)](https://godoc.org/gitlab.com/vocdoni/go-dvote)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ethereum/go-ethereum)](https://goreportcard.com/report/gitlab.com/vocdoni/go-dvote)
+[![GoDoc](https://godoc.org/go.vocdoni.io/dvote?status.svg)](https://godoc.org/go.vocdoni.io/dvote)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ethereum/go-ethereum)](https://goreportcard.com/report/go.vocdoni.io/dvote)
 
 [![Join Discord](https://img.shields.io/badge/discord-join%20chat-blue.svg)](https://discord.gg/4hKeArDaU2)
 [![Twitter Follow](https://img.shields.io/twitter/follow/vocdoni.svg?style=social&label=Follow)](https://twitter.com/vocdoni)
@@ -63,7 +63,7 @@ For running dvotenode in gateway mode, 8GB of ram is recommended (4GB works but 
 Compile from source in a golang environment (Go>1.15 required):
 
 ```
-git clone https://gitlab.com/vocdoni/go-dvote.git
+git clone https://go.vocdoni.io/dvote.git
 cd go-dvote
 go build ./cmd/dvotenode
 ./dvotenode --help

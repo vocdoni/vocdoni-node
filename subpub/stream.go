@@ -4,7 +4,7 @@ import (
 	"bufio"
 
 	"github.com/libp2p/go-libp2p-core/network"
-	"gitlab.com/vocdoni/go-dvote/log"
+	"go.vocdoni.io/dvote/log"
 )
 
 func (ps *SubPub) handleStream(stream network.Stream) {

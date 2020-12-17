@@ -5,7 +5,7 @@ import (
 	i3utils "github.com/iden3/go-iden3-core/merkletree"
 	"github.com/iden3/go-iden3-crypto/poseidon"
 
-	"gitlab.com/vocdoni/go-dvote/crypto"
+	"go.vocdoni.io/dvote/crypto"
 )
 
 // Also ensure that we implement the interface.

@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"nhooyr.io/websocket"
 )
 

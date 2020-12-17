@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"gitlab.com/vocdoni/go-dvote/chain"
-	"gitlab.com/vocdoni/go-dvote/config"
-	vnet "gitlab.com/vocdoni/go-dvote/net"
-	"gitlab.com/vocdoni/go-dvote/test/testcommon"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/chain"
+	"go.vocdoni.io/dvote/config"
+	vnet "go.vocdoni.io/dvote/net"
+	"go.vocdoni.io/dvote/test/testcommon"
+	"go.vocdoni.io/dvote/types"
 	"nhooyr.io/websocket"
 )
 

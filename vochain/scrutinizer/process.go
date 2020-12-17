@@ -10,9 +10,9 @@ import (
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"google.golang.org/protobuf/proto"
 
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 )
 
 // ProcessInfo returns the available information regarding an election process id

@@ -14,16 +14,16 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	cttypes "github.com/tendermint/tendermint/rpc/core/types"
 	ttypes "github.com/tendermint/tendermint/types"
-	"gitlab.com/vocdoni/go-dvote/census"
-	"gitlab.com/vocdoni/go-dvote/chain/contracts"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/data"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/vochain"
+	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/chain/contracts"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 
 	"github.com/ethereum/go-ethereum/ethclient"
-	"gitlab.com/vocdoni/go-dvote/chain"
-	"gitlab.com/vocdoni/go-dvote/log"
+	"go.vocdoni.io/dvote/chain"
+	"go.vocdoni.io/dvote/log"
 )
 
 // EthereumEvents type is used to monitorize Ethereum smart contracts and call custom EventHandler functions

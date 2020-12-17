@@ -21,10 +21,10 @@ import (
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
-	crypto "gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/ipfs"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
+	crypto "go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/ipfs"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 )
 
 const MaxFileSizeBytes = 1024 * 1024 * 50 // 50 MB

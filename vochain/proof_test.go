@@ -9,10 +9,10 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"github.com/vocdoni/eth-storage-proof/ethstorageproof"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"google.golang.org/protobuf/proto"
 )
 

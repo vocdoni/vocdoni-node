@@ -8,8 +8,8 @@ import (
 
 	"github.com/cosmos/iavl"
 	tmdb "github.com/tendermint/tm-db"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/statedb"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/statedb"
 )
 
 const PrefixDBCacheSize = 1024

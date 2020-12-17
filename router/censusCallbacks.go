@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/util"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/util"
 )
 
 func (r *Router) censusLocal(request routerRequest) {

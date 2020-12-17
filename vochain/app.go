@@ -15,8 +15,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 )
 
 // BaseApplication reflects the ABCI application implementation.

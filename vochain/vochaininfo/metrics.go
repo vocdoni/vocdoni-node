@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"gitlab.com/vocdoni/go-dvote/metrics"
+	"go.vocdoni.io/dvote/metrics"
 )
 
 // Vochain collectors

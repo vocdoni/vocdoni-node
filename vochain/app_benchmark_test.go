@@ -11,11 +11,11 @@ import (
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
-	tree "gitlab.com/vocdoni/go-dvote/censustree/gravitontree"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
+	tree "go.vocdoni.io/dvote/censustree/gravitontree"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/snarks"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"google.golang.org/protobuf/proto"
 )
 

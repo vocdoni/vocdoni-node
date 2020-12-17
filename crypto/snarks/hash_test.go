@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"testing"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/internal/cryptotest"
-	"gitlab.com/vocdoni/go-dvote/util"
+	"go.vocdoni.io/dvote/crypto/internal/cryptotest"
+	"go.vocdoni.io/dvote/util"
 )
 
 func b64dec(t *testing.T, s string) []byte {
