@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	"gitlab.com/vocdoni/go-dvote/census"
-	"gitlab.com/vocdoni/go-dvote/chain"
-	"gitlab.com/vocdoni/go-dvote/chain/ethevents"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/vochain"
+	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/chain"
+	"go.vocdoni.io/dvote/chain/ethevents"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 // EthEvents service registers on the Ethereum smart contract specified in ethProcDomain, the provided event handlers

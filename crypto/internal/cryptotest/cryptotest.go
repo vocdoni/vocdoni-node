@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"gitlab.com/vocdoni/go-dvote/crypto"
+	"go.vocdoni.io/dvote/crypto"
 )
 
 var tests = []struct {

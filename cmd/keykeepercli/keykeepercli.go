@@ -12,14 +12,14 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
 
-	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
-	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/service"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/vochain"
+	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/nacl"
+	"go.vocdoni.io/dvote/crypto/snarks"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/service"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 const (

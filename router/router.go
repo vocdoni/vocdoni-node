@@ -14,16 +14,16 @@ import (
 	psnet "github.com/shirou/gopsutil/net"
 	amino "github.com/tendermint/go-amino"
 
-	"gitlab.com/vocdoni/go-dvote/census"
-	"gitlab.com/vocdoni/go-dvote/crypto"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/data"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/metrics"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/vochain"
-	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
-	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
+	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/crypto"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/metrics"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
 const (

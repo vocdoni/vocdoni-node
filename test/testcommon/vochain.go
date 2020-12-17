@@ -14,13 +14,13 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
-	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
-	"gitlab.com/vocdoni/go-dvote/vochain"
-	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/scrutinizer"
 )
 
 var (

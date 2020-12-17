@@ -13,9 +13,9 @@ import (
 	flag "github.com/spf13/pflag"
 	"nhooyr.io/websocket"
 
-	"gitlab.com/vocdoni/go-dvote/client"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/log"
+	"go.vocdoni.io/dvote/client"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/log"
 )
 
 func main() {

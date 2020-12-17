@@ -15,10 +15,10 @@ import (
 	"golang.org/x/net/idna"
 
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
-	"gitlab.com/vocdoni/go-dvote/chain/contracts"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
+	"go.vocdoni.io/dvote/chain/contracts"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 )
 
 // The following methods and structures represent an exportable abstraction over raw contract bindings

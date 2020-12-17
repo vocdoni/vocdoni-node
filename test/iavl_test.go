@@ -10,9 +10,9 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 
-	"gitlab.com/vocdoni/go-dvote/test/testcommon"
-	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
-	"gitlab.com/vocdoni/go-dvote/vochain"
+	"go.vocdoni.io/dvote/test/testcommon"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 func TestVochainState(t *testing.T) {

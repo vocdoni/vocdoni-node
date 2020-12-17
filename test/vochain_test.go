@@ -4,15 +4,15 @@ import (
 	"testing"
 
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
-	"gitlab.com/vocdoni/go-dvote/test/testcommon"
-	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
-	"gitlab.com/vocdoni/go-dvote/util"
-	"gitlab.com/vocdoni/go-dvote/vochain"
+	"go.vocdoni.io/dvote/test/testcommon"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 func TestCreateProcess(t *testing.T) {
 	// TODO(mvdan): re-enable once
-	// https://gitlab.com/vocdoni/go-dvote/-/issues/172 is fixed.
+	// https://go.vocdoni.io/dvote/-/issues/172 is fixed.
 	// t.Parallel()
 
 	s := testcommon.NewVochainStateWithOracles(t)

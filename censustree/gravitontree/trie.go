@@ -7,10 +7,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/censustree"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/statedb"
-	"gitlab.com/vocdoni/go-dvote/statedb/gravitonstate"
+	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/statedb"
+	"go.vocdoni.io/dvote/statedb/gravitonstate"
 )
 
 type Tree struct {

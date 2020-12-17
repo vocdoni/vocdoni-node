@@ -38,12 +38,12 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"gitlab.com/vocdoni/go-dvote/client"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/crypto/snarks"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/client"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/snarks"
+	"go.vocdoni.io/dvote/types"
 
-	"gitlab.com/vocdoni/go-dvote/test/testcommon"
+	"go.vocdoni.io/dvote/test/testcommon"
 )
 
 var censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")

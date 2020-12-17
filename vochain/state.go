@@ -12,10 +12,10 @@ import (
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/statedb"
-	"gitlab.com/vocdoni/go-dvote/statedb/iavlstate"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/statedb"
+	"go.vocdoni.io/dvote/statedb/iavlstate"
+	"go.vocdoni.io/dvote/types"
 	"google.golang.org/protobuf/proto"
 )
 

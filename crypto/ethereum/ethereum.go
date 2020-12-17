@@ -13,8 +13,8 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	"gitlab.com/vocdoni/go-dvote/crypto"
-	"gitlab.com/vocdoni/go-dvote/util"
+	"go.vocdoni.io/dvote/crypto"
+	"go.vocdoni.io/dvote/util"
 )
 
 // SignatureLength is the size of an ECDSA signature in hexString format

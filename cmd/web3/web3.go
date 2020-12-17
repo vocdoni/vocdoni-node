@@ -10,9 +10,9 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"gitlab.com/vocdoni/go-dvote/chain"
-	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/log"
+	"go.vocdoni.io/dvote/chain"
+	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/log"
 )
 
 type ethereumStandaloneCfgWrapper struct {

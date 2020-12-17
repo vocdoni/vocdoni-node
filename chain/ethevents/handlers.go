@@ -9,10 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
-	"gitlab.com/vocdoni/go-dvote/chain"
-	"gitlab.com/vocdoni/go-dvote/chain/contracts"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/vochain"
+	"go.vocdoni.io/dvote/chain"
+	"go.vocdoni.io/dvote/chain/contracts"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/vochain"
 	"google.golang.org/protobuf/proto"
 )
 

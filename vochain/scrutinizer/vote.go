@@ -8,9 +8,9 @@ import (
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"google.golang.org/protobuf/proto"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/crypto/nacl"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 )
 
 // ErrNoResultsYet is an error returned to indicate the process exist but it does not have yet reuslts

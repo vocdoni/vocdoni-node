@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/vochain"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 // VochainInfo stores some metrics and information regarding the Vochain Blockchain

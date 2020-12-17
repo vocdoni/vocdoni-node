@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/iden3/go-iden3-core/core/claims"
-	"gitlab.com/vocdoni/go-dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
 )
 
 func TestCheckProof(t *testing.T) {

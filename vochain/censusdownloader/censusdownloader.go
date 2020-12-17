@@ -5,10 +5,10 @@ import (
 	"sync"
 
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
-	"gitlab.com/vocdoni/go-dvote/census"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/util"
-	"gitlab.com/vocdoni/go-dvote/vochain"
+	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 // TBD: A startup process for importing on-going processe census

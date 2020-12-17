@@ -7,10 +7,10 @@ import (
 
 	flag "github.com/spf13/pflag"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/data"
-	"gitlab.com/vocdoni/go-dvote/ipfssync"
-	"gitlab.com/vocdoni/go-dvote/log"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/ipfssync"
+	"go.vocdoni.io/dvote/log"
 )
 
 func main() {

@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
-	"gitlab.com/vocdoni/go-dvote/vochain"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/nacl"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 func TestEntityList(t *testing.T) {

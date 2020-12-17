@@ -1,7 +1,7 @@
 package net
 
 import (
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/types"
 )
 
 // HttpWsHandler is a Mixed handler websockets/http

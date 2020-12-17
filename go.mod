@@ -1,4 +1,4 @@
-module gitlab.com/vocdoni/go-dvote
+module go.vocdoni.io/dvote
 
 go 1.14
 

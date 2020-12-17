@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/censustree"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/data"
-	"gitlab.com/vocdoni/go-dvote/log"
+	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/log"
 )
 
 // ErrNamespaceExist is the error returned when trying to add a namespace that already exist

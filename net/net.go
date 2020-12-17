@@ -3,7 +3,7 @@ package net
 import (
 	"errors"
 
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/types"
 )
 
 type Transport interface {

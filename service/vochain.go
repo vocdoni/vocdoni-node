@@ -8,15 +8,15 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/census"
-	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/metrics"
-	"gitlab.com/vocdoni/go-dvote/util"
-	"gitlab.com/vocdoni/go-dvote/vochain"
-	"gitlab.com/vocdoni/go-dvote/vochain/censusdownloader"
-	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
-	"gitlab.com/vocdoni/go-dvote/vochain/vochaininfo"
+	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/metrics"
+	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/censusdownloader"
+	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
 func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.Agent, cm *census.Manager) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {

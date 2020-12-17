@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
-	"gitlab.com/vocdoni/go-dvote/types"
+	"go.vocdoni.io/dvote/types"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"gitlab.com/vocdoni/go-dvote/crypto/nacl"
+	"go.vocdoni.io/dvote/crypto/nacl"
 )
 
 func TestEncodeDecode(t *testing.T) {

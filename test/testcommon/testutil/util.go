@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"gitlab.com/vocdoni/go-dvote/util"
+	"go.vocdoni.io/dvote/util"
 )
 
 func Hex2byte(tb testing.TB, s string) []byte {

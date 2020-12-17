@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 
 	"github.com/deroproject/graviton"
-	"gitlab.com/vocdoni/go-dvote/crypto/ethereum"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/statedb"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/statedb"
 )
 
 const (
@@ -376,7 +376,7 @@ func (t *GravitonTree) Verify(key, proof, root []byte) bool {
 	var p graviton.Proof
 	var err error
 	var r [32]byte
-	// Unmarshal() will generate a panic if the proof size is incorrect. See https://gitlab.com/vocdoni/go-dvote/-/issues/333
+	// Unmarshal() will generate a panic if the proof size is incorrect. See https://go.vocdoni.io/dvote/-/issues/333
 	// While this is not fixed upstream, we need to recover the panic.
 	defer func() {
 		if r := recover(); r != nil {

@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	models "github.com/vocdoni/dvote-protobuf/build/go/models"
-	"gitlab.com/vocdoni/go-dvote/log"
-	"gitlab.com/vocdoni/go-dvote/types"
-	"gitlab.com/vocdoni/go-dvote/util"
-	"gitlab.com/vocdoni/go-dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"google.golang.org/protobuf/proto"
 )
 

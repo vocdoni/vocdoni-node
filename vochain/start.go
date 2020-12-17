@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/vocdoni/go-dvote/config"
-	"gitlab.com/vocdoni/go-dvote/util"
+	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/util"
 
 	amino "github.com/tendermint/go-amino"
 	tmcfg "github.com/tendermint/tendermint/config"
@@ -26,7 +26,7 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
-	"gitlab.com/vocdoni/go-dvote/log"
+	"go.vocdoni.io/dvote/log"
 )
 
 // NewVochain starts a node with an ABCI application

@@ -3,7 +3,7 @@ package router
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"gitlab.com/vocdoni/go-dvote/metrics"
+	"go.vocdoni.io/dvote/metrics"
 )
 
 // Router collectors
