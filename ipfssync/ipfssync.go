@@ -280,7 +280,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 		}
 
 	case models.IpfsSyncType_FETCH:
-		if len(msg.Hash) == gravitonstate.GravitonHashSizeBytes && len(msg.Address) > 31 {
+		if len(msg.Address) > 31 {
 			is.updateLock.RLock()
 			defer is.updateLock.RUnlock()
 			if bytes.Equal(msg.Hash, is.hashTree.Hash()) {
