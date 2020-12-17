@@ -1,7 +1,6 @@
 package client
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
@@ -49,7 +48,7 @@ func (c *Client) GetProof(hexpubkey, root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.ClaimData = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(pubkey))
+	req.ClaimData = snarks.Poseidon.Hash(pubkey)
 
 	resp, err := c.Request(req, nil)
 	if err != nil {
@@ -529,13 +528,13 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	}
 	log.Infof("add bulk claims (size %d)", censusSize)
 	req.Method = "addClaimBulk"
-	req.ClaimData = ""
+	req.ClaimData = []byte{}
 	req.Digested = true
 	currentSize := censusSize
 	i := 0
-	var data, hexpub string
+	var hexpub string
 	for currentSize > 0 {
-		claims := []string{}
+		claims := [][]byte{}
 		for j := 0; j < 100; j++ {
 			if currentSize < 1 {
 				break
@@ -550,8 +549,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 			if err != nil {
 				return "", "", err
 			}
-			data = base64.StdEncoding.EncodeToString(snarks.Poseidon.Hash(pub))
-			claims = append(claims, data)
+			claims = append(claims, snarks.Poseidon.Hash(pub))
 			currentSize--
 		}
 		req.ClaimsData = claims
@@ -581,7 +579,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	// publish
 	log.Infof("publish census")
 	req.Method = "publish"
-	req.ClaimsData = []string{}
+	req.ClaimsData = [][]byte{}
 	resp, err = c.Request(req, signer)
 	if err != nil {
 		return "", "", err

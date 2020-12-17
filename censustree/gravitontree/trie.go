@@ -2,8 +2,6 @@
 package gravitontree
 
 import (
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"path"
 	"sync/atomic"
@@ -13,7 +11,6 @@ import (
 	"gitlab.com/vocdoni/go-dvote/log"
 	"gitlab.com/vocdoni/go-dvote/statedb"
 	"gitlab.com/vocdoni/go-dvote/statedb/gravitonstate"
-	"gitlab.com/vocdoni/go-dvote/util"
 )
 
 type Tree struct {
@@ -186,14 +183,14 @@ func (t *Tree) treeWithRoot(root []byte) statedb.StateTree {
 }
 
 // Dump returns the whole merkle tree serialized in a format that can be used on Import
-func (t *Tree) Dump(root []byte) (claims []string, err error) {
+func (t *Tree) Dump(root []byte) (claims [][]byte, err error) {
 	t.updateAccessTime()
 	tree := t.treeWithRoot(root)
 	if tree == nil {
 		return nil, fmt.Errorf("dump: root not found %x", root)
 	}
 	tree.Iterate(nil, func(k, v []byte) bool {
-		claims = append(claims, fmt.Sprintf("%x", k))
+		claims = append(claims, k)
 		return false
 	})
 	return
@@ -212,24 +209,18 @@ func (t *Tree) Size(root []byte) (int64, error) {
 // First return parametre are the indexes and second the values
 // If root is not specified, the current one is used
 // If responseBase64 is true, the list will be returned base64 encoded
-func (t *Tree) DumpPlain(root []byte, responseBase64 bool) ([]string, []string, error) {
-	var indexes, values []string
+func (t *Tree) DumpPlain(root []byte) ([][]byte, [][]byte, error) {
+	var indexes, values [][]byte
 	var err error
 	t.updateAccessTime()
 
 	tree := t.treeWithRoot(root)
 	if tree == nil {
-		return nil, nil, fmt.Errorf("dumpplain: root not found %x", root)
+		return nil, nil, fmt.Errorf("DumpPlain: root not found %x", root)
 	}
 	tree.Iterate(nil, func(k, v []byte) bool {
-		if !responseBase64 {
-			indexes = append(indexes, string(k))
-			values = append(values, string(v))
-		} else {
-			indexes = append(indexes, base64.StdEncoding.EncodeToString(k))
-			values = append(values, base64.StdEncoding.EncodeToString(v))
-
-		}
+		indexes = append(indexes, k)
+		values = append(values, v)
 		return false
 	})
 
@@ -237,15 +228,10 @@ func (t *Tree) DumpPlain(root []byte, responseBase64 bool) ([]string, []string, 
 }
 
 // ImportDump imports a partial or whole tree previously exported with Dump()
-func (t *Tree) ImportDump(claims []string) error {
+func (t *Tree) ImportDump(keys [][]byte) error {
 	t.updateAccessTime()
-	var cb []byte
 	var err error
-	for _, c := range claims {
-		cb, err = hex.DecodeString(util.TrimHex(c))
-		if err != nil {
-			return err
-		}
+	for _, cb := range keys {
 		if err = t.Tree.Add(cb, []byte{}); err != nil {
 			return err
 		}

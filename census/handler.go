@@ -2,7 +2,6 @@ package census
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -189,14 +188,12 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		if isAuth && validAuthPrefix {
 			addedClaims := 0
 			var invalidClaims []int
-			for i, c := range r.ClaimsData {
-				data, err := base64.StdEncoding.DecodeString(c)
-				if err == nil {
-					if !r.Digested {
-						data = snarks.Poseidon.Hash(data)
-					}
-					err = tr.Add(data, []byte{})
+			var err error
+			for i, data := range r.ClaimsData {
+				if !r.Digested {
+					data = snarks.Poseidon.Hash(data)
 				}
+				err = tr.Add(data, []byte{})
 				if err != nil {
 					log.Warnf("error adding claim: %s", err)
 					invalidClaims = append(invalidClaims, i)
@@ -216,17 +213,16 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 
 	case "addClaim":
 		if isAuth && validAuthPrefix {
-			data, err := base64.StdEncoding.DecodeString(r.ClaimData)
-			if err != nil {
-				log.Warnf("error decoding base64 string: %s", err)
-				resp.SetError(err)
+			if r.ClaimData == nil {
+				resp.SetError("error decoding claim data")
+				return resp
 			}
+			data := r.ClaimData
 			if !r.Digested {
 				data = snarks.Poseidon.Hash(data)
 			}
-			err = tr.Add(data, []byte{})
+			err := tr.Add(data, []byte{})
 			if err != nil {
-				log.Warnf("error adding claim: %s", err)
 				resp.SetError(err)
 			} else {
 				log.Debugf("claim added %x", data)
@@ -314,11 +310,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			}
 		}
 		// Generate proof and return it
-		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
-		if err != nil {
-			resp.SetError(err)
-			return resp
-		}
+		data := r.ClaimData
 		if !r.Digested {
 			data = snarks.Poseidon.Hash(data)
 		}
@@ -354,12 +346,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 
 	switch r.Method {
 	case "genProof":
-		data, err := base64.StdEncoding.DecodeString(r.ClaimData)
-		if err != nil {
-			log.Warnf("error decoding base64 string: %s", err)
-			resp.SetError(err)
-			return resp
-		}
+		data := r.ClaimData
 		if !r.Digested {
 			data = snarks.Poseidon.Hash(data)
 		}
@@ -384,7 +371,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			return resp
 		}
 		// dump the claim data and return it
-		var dumpValues []string
+		var dumpValues [][]byte
 		var err error
 		var root []byte
 		if len(r.RootHash) < 1 {
@@ -399,7 +386,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		if r.Method == "dump" {
 			dumpValues, err = tr.Dump(root)
 		} else {
-			dumpValues, _, err = tr.DumpPlain(root, true)
+			dumpValues, _, err = tr.DumpPlain(root)
 		}
 		if err != nil {
 			resp.SetError(err)
@@ -418,7 +405,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			return resp
 		}
 		var dump types.CensusDump
-		dump.RootHash = fmt.Sprintf("%x", tr.Root())
+		dump.RootHash = tr.Root()
 		var err error
 		dump.ClaimsData, err = tr.Dump(tr.Root())
 		if err != nil {

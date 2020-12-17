@@ -1,6 +1,7 @@
 package census
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,8 +25,8 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 		return fmt.Errorf("retrieved census does not have a valid format: (%s)", err)
 	}
 	log.Debugf("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(tree))
-	if dump.RootHash != cid {
-		return fmt.Errorf("dump root Hash and Ethereum root hash do not match, aborting import")
+	if fmt.Sprintf("%x", dump.RootHash) != util.TrimHex(cid) {
+		return fmt.Errorf("dump root Hash and census ID root hash do not match, aborting import")
 	}
 	if len(dump.ClaimsData) == 0 {
 		return fmt.Errorf("no claims found on the retreived census")
@@ -40,7 +41,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 	if err != nil {
 		return fmt.Errorf("error importing dump: %s", err)
 	}
-	if fmt.Sprintf("%x", tr.Root()) != util.TrimHex(dump.RootHash) {
+	if !bytes.Equal(tr.Root(), dump.RootHash) {
 		if err := m.DelNamespace(cid); err != nil {
 			log.Error(err)
 		}
