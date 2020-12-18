@@ -151,10 +151,15 @@ func (is *IPFSsync) addPins(pins []*models.IpfsPin) error {
 	return err
 }
 
-func (is *IPFSsync) getMyPins() [][]byte {
-	var mkPins [][]byte
+func (is *IPFSsync) getMyPins() []string {
+	// Note that we return []string instead of [][]byte since we need to
+	// make copies of the keys; the key parameter in the callback isn't safe
+	// for use after the callback returns, nor can it be modified.
+	// We could make []byte copies, but since all users want strings, this
+	// is easier.
+	var mkPins []string
 	is.hashTree.Iterate(nil, func(key, value []byte) bool {
-		mkPins = append(mkPins, key)
+		mkPins = append(mkPins, string(key))
 		return false
 	})
 	return mkPins
@@ -169,13 +174,13 @@ func (is *IPFSsync) syncPins() error {
 	if err != nil {
 		return fmt.Errorf("syncPins: %w", err)
 	}
-	for _, v := range mkPins {
-		if _, e := pins[string(v)]; e {
+	for _, pin := range mkPins {
+		if _, e := pins[pin]; e {
 			continue
 		}
 
-		log.Infof("pinning %s", v)
-		if err := is.Storage.Pin(ctx, string(v)); err != nil {
+		log.Infof("pinning %s", pin)
+		if err := is.Storage.Pin(ctx, pin); err != nil {
 			return fmt.Errorf("syncPins: %w", err)
 		}
 	}
