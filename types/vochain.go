@@ -8,7 +8,6 @@ import (
 	// dependencies which are too heavy for our low-level "types" package.
 	// libs/bytes is okay, because it only pulls in std deps.
 
-	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/vocdoni/dvote-protobuf/build/go/models"
 )
 
@@ -84,7 +83,7 @@ type GenesisDoc struct {
 	ChainID         string             `json:"chain_id"`
 	ConsensusParams *ConsensusParams   `json:"consensus_params,omitempty"`
 	Validators      []GenesisValidator `json:"validators,omitempty"`
-	AppHash         tmbytes.HexBytes   `json:"app_hash"`
+	AppHash         HexBytes           `json:"app_hash"`
 	AppState        json.RawMessage    `json:"app_state,omitempty"`
 }
 
@@ -112,7 +111,7 @@ type ValidatorParams struct {
 }
 
 type GenesisValidator struct {
-	Address tmbytes.HexBytes `json:"address"`
+	Address HexBytes         `json:"address"`
 	PubKey  TendermintPubKey `json:"pub_key"`
 	Power   string           `json:"power"`
 	Name    string           `json:"name"`

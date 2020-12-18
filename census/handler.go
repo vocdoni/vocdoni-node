@@ -2,7 +2,6 @@ package census
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -112,9 +111,6 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 	// Trim Hex on censusID and RootHash
 	if len(r.CensusID) > 0 {
 		r.CensusID = util.TrimHex(r.CensusID)
-	}
-	if len(r.RootHash) > 0 {
-		r.RootHash = util.TrimHex(r.RootHash)
 	}
 
 	// Special methods not depending on census existence
@@ -303,23 +299,14 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		if len(r.RootHash) < 1 {
 			root = tr.Root()
 		} else {
-			root, err = hex.DecodeString(util.TrimHex(r.RootHash))
-			if err != nil {
-				resp.SetError("cannot decode root hash: " + err.Error())
-				return resp
-			}
+			root = r.RootHash
 		}
 		// Generate proof and return it
 		data := r.ClaimData
 		if !r.Digested {
 			data = snarks.Poseidon.Hash(data)
 		}
-		proof, err := hex.DecodeString(r.ProofData)
-		if err != nil {
-			resp.SetError(err)
-			return resp
-		}
-		validProof, err := tr.CheckProof(data, []byte{}, root, proof)
+		validProof, err := tr.CheckProof(data, []byte{}, root, r.ProofData)
 		if err != nil {
 			resp.SetError(err)
 			return resp
@@ -332,12 +319,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 	// Otherwise, we use the same tree.
 	if len(r.RootHash) > 1 {
 		var err error
-		root, err := hex.DecodeString(util.TrimHex(r.RootHash))
-		if err != nil {
-			resp.SetError("cannot decode root hash")
-			return resp
-		}
-		tr, err = tr.Snapshot(root)
+		tr, err = tr.Snapshot(r.RootHash)
 		if err != nil {
 			resp.SetError("cannot fetch snapshot for root")
 			return resp
@@ -372,17 +354,13 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		}
 		// dump the claim data and return it
 		var dumpValues [][]byte
-		var err error
 		var root []byte
 		if len(r.RootHash) < 1 {
 			root = tr.Root()
 		} else {
-			root, err = hex.DecodeString(util.TrimHex(r.RootHash))
-			if err != nil {
-				resp.SetError("cannot decode root hash: " + err.Error())
-				return resp
-			}
+			root = r.RootHash
 		}
+		var err error
 		if r.Method == "dump" {
 			dumpValues, err = tr.Dump(root)
 		} else {

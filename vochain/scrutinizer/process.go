@@ -2,7 +2,6 @@ package scrutinizer
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"sync/atomic"
 
@@ -48,46 +47,30 @@ func (s *Scrutinizer) ProcessList(entityID []byte, fromID []byte, max int64) ([]
 }
 
 // ProcessListWithResults returns the list of process ID with already computed results
-func (s *Scrutinizer) ProcessListWithResults(max int64, fromID string) ([]string, error) {
-	from, err := hex.DecodeString(fromID)
-	if err != nil {
-		return nil, err
-	}
+func (s *Scrutinizer) ProcessListWithResults(max int64, fromID []byte) []string {
 	process := []string{}
-	for _, p := range s.List(max, from, []byte{types.ScrutinizerResultsPrefix}) {
+	for _, p := range s.List(max, fromID, []byte{types.ScrutinizerResultsPrefix}) {
 		process = append(process, fmt.Sprintf("%x", p))
 	}
-	return process, nil
+	return process
 }
 
 // ProcessListWithLiveResults returns the list of process ID which have live results (not encrypted)
-func (s *Scrutinizer) ProcessListWithLiveResults(max int64, fromID string) ([]string, error) {
-	from, err := hex.DecodeString(fromID)
-	if err != nil {
-		return nil, err
-	}
+func (s *Scrutinizer) ProcessListWithLiveResults(max int64, fromID []byte) []string {
 	process := []string{}
-	for _, p := range s.List(max, from, []byte{types.ScrutinizerLiveProcessPrefix}) {
+	for _, p := range s.List(max, fromID, []byte{types.ScrutinizerLiveProcessPrefix}) {
 		process = append(process, fmt.Sprintf("%x", p))
 	}
-	return process, nil
+	return process
 }
 
 // EntityList returns the list of entities indexed by the scrutinizer
-func (s *Scrutinizer) EntityList(max int64, fromID string) ([]string, error) {
-	var err error
-	var from []byte
-	if len(fromID) > 0 {
-		from, err = hex.DecodeString(util.TrimHex(fromID))
-		if err != nil {
-			return nil, err
-		}
-	}
+func (s *Scrutinizer) EntityList(max int64, fromID []byte) []string {
 	entities := []string{}
-	for _, e := range s.List(max, from, []byte{types.ScrutinizerEntityPrefix}) {
+	for _, e := range s.List(max, fromID, []byte{types.ScrutinizerEntityPrefix}) {
 		entities = append(entities, fmt.Sprintf("%x", e))
 	}
-	return entities, nil
+	return entities
 }
 
 // EntityCount return the number of entities indexed by the scrutinizer

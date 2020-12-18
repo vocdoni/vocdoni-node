@@ -30,6 +30,7 @@ Run it executing `go test -v test/census_test.go`
 
 import (
 	"bytes"
+	"encoding/hex"
 	"flag"
 	"math/rand"
 	"testing"
@@ -44,6 +45,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 
 	"go.vocdoni.io/dvote/test/testcommon"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
 )
 
 var censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")
@@ -123,7 +125,7 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	resp = doRequest("getRoot", nil)
-	root := resp.Root
+	root := testutil.Hex2byte(t, resp.Root)
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
 	}
@@ -176,10 +178,10 @@ func TestCensus(t *testing.T) {
 	}
 
 	// GenProof valid
-	req.RootHash = ""
+	req.RootHash = nil
 	req.ClaimData = claims[1]
 	resp = doRequest("genProof", nil)
-	siblings := resp.Siblings
+	siblings := testutil.Hex2byte(t, resp.Siblings)
 	if len(siblings) == 0 {
 		t.Fatalf("proof not generated while it should be generated correctly")
 	}
@@ -201,7 +203,7 @@ func TestCensus(t *testing.T) {
 	if *resp.ValidProof {
 		t.Fatalf("proof must be invalid for hash %s but it is valid!", root)
 	}
-	req.RootHash = ""
+	req.RootHash = nil
 
 	// publish
 	req.ClaimsData = [][]byte{}
@@ -213,18 +215,18 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	resp = doRequest("getRoot", nil)
-	root = resp.Root
+	root = testutil.Hex2byte(t, resp.Root)
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
 	}
 
 	// getRoot from published census and check censusID=root
-	req.CensusID = root
+	req.CensusID = hex.EncodeToString(root)
 	resp = doRequest("getRoot", nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
-	if root != resp.Root {
+	if hex.EncodeToString(root) != resp.Root {
 		t.Fatalf("got invalid root from published census")
 	}
 
@@ -245,12 +247,12 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	resp = doRequest("getRoot", nil)
-	if root != resp.Root {
+	if hex.EncodeToString(root) != resp.Root {
 		t.Fatalf("root is different after importing! %s != %s", root, resp.Root)
 	}
 
 	// getSize
-	req.RootHash = ""
+	req.RootHash = nil
 	resp = doRequest("getSize", nil)
 	if exp, got := int64(*censusSize), *resp.Size; exp != got {
 		t.Fatalf("expected size %v, got %v", exp, got)

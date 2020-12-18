@@ -136,7 +136,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.C
 			return []byte{}, err
 		}
 		appState.Validators[idx] = types.GenesisValidator{
-			Address: val.GetAddress(),
+			Address: val.GetAddress().Bytes(),
 			PubKey:  types.TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
 			Power:   "10",
 			Name:    strconv.Itoa(rand.Int()),
