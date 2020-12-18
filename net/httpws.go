@@ -40,10 +40,12 @@ func (h *HttpWsHandler) ConnectionType() string {
 }
 
 func (h *HttpWsHandler) Listen(receiver chan<- types.Message) {
-	for {
-		msg := <-h.internalReceiver
-		receiver <- msg
-	}
+	go func() {
+		for {
+			msg := <-h.internalReceiver
+			receiver <- msg
+		}
+	}()
 }
 
 func (h *HttpWsHandler) SendUnicast(address string, msg types.Message) {

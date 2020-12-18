@@ -22,7 +22,7 @@ listenerErrors := make(chan error)
 
 To concurrently ingest a stream:
 ```
-go transport.Listen(listenerOutput, listenerErrors)
+transport.Listen(listenerOutput, listenerErrors)
 ```
 
 The Transport Send method expect a slice of bytes, and a channel to which it can send any errors:

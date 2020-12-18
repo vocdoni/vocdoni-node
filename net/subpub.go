@@ -39,12 +39,14 @@ func (p *SubPubHandle) Init(c *types.Connection) error {
 func (s *SubPubHandle) Listen(reciever chan<- types.Message) {
 	s.SubPub.Start(context.Background())
 	go s.SubPub.Subscribe(context.Background())
-	var msg types.Message
-	for {
-		msg.Data = <-s.SubPub.Reader
-		msg.TimeStamp = int32(time.Now().Unix())
-		reciever <- msg
-	}
+	go func() {
+		for {
+			var msg types.Message
+			msg.Data = <-s.SubPub.Reader
+			msg.TimeStamp = int32(time.Now().Unix())
+			reciever <- msg
+		}
+	}()
 }
 
 func (s *SubPubHandle) Address() string {

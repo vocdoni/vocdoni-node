@@ -383,7 +383,7 @@ func (is *IPFSsync) Start() {
 	is.Transport.SetBootnodes(is.Bootnodes)
 
 	msg := make(chan types.Message)
-	go is.Transport.Listen(msg)
+	is.Transport.Listen(msg)
 
 	is.myMultiAddr, err = ma.NewMultiaddr(guessMyAddress(4001, is.Storage.Node.PeerHost.ID().String()))
 	if err != nil {

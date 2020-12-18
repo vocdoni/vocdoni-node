@@ -97,10 +97,12 @@ func (w *WebsocketHandle) ConnectionType() string {
 
 // Listen will listen the websockets handler and write the received data into the channel
 func (w *WebsocketHandle) Listen(receiver chan<- types.Message) {
-	for {
-		msg := <-w.internalReceiver
-		receiver <- msg
-	}
+	go func() {
+		for {
+			msg := <-w.internalReceiver
+			receiver <- msg
+		}
+	}()
 }
 
 // Listen will listen the websockets handler and write the received data into the channel
