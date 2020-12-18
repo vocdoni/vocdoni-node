@@ -27,16 +27,11 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
 	github.com/iden3/go-iden3-crypto v0.0.4
-	github.com/ipfs/go-bitswap v0.3.3 // indirect
-	github.com/ipfs/go-blockservice v0.1.4 // indirect
-	github.com/ipfs/go-ds-badger v0.2.5 // indirect
 	github.com/ipfs/go-filestore v1.0.0 // indirect
-	github.com/ipfs/go-graphsync v0.5.1 // indirect
-	github.com/ipfs/go-ipfs v0.7.0
+	github.com/ipfs/go-ipfs v0.7.1-0.20201209185450-2ed9254426e9
 	github.com/ipfs/go-ipfs-blockstore v1.0.3 // indirect
-	github.com/ipfs/go-ipfs-config v0.10.0
+	github.com/ipfs/go-ipfs-config v0.11.0
 	github.com/ipfs/go-ipfs-files v0.0.8
-	github.com/ipfs/go-ipld-cbor v0.0.5 // indirect
 	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/interface-go-ipfs-core v0.4.0
 	github.com/ipld/go-car v0.1.1-0.20201119040259-8fe0b741ece2 // indirect
@@ -47,11 +42,7 @@ require (
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
 	github.com/libp2p/go-libp2p-core v0.7.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
-	github.com/libp2p/go-libp2p-http v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-kad-dht v0.11.1
-	github.com/libp2p/go-libp2p-noise v0.1.2 // indirect
-	github.com/libp2p/go-libp2p-pubsub-router v0.4.0 // indirect
-	github.com/libp2p/go-libp2p-quic-transport v0.9.2 // indirect
 	github.com/libp2p/go-libp2p-yamux v0.4.1 // indirect
 	github.com/libp2p/go-netroute v0.1.4 // indirect
 	github.com/libp2p/go-reuseport v0.0.2
@@ -77,7 +68,6 @@ require (
 	github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200826160007-0b9f6c5fb163 // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
-	go.opencensus.io v0.22.5 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20201217014255-9d1352758620
