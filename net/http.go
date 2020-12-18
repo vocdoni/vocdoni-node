@@ -91,10 +91,12 @@ func (h *HttpHandler) ConnectionType() string {
 }
 
 func (h *HttpHandler) Listen(receiver chan<- types.Message) {
-	for {
-		msg := <-h.internalReceiver
-		receiver <- msg
-	}
+	go func() {
+		for {
+			msg := <-h.internalReceiver
+			receiver <- msg
+		}
+	}()
 }
 
 func (h *HttpHandler) SendUnicast(address string, msg types.Message) {

@@ -63,7 +63,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	ws.SetProxy(pxy)
 	// Create the listener for routing messages
 	listenerOutput := make(chan types.Message)
-	go ws.Listen(listenerOutput)
+	ws.Listen(listenerOutput)
 	// create ws client
 	c, _, err := websocket.Dial(context.Background(), pxyAddr, nil)
 	if err != nil {

@@ -8,7 +8,12 @@ import (
 
 type Transport interface {
 	ConnectionType() string
+
+	// Listen starts the transport synchronously and starts a few goroutines
+	// asynchronously. Do not call in a goroutine, as that would generally
+	// be racy since the transport might not have started completely.
 	Listen(reciever chan<- types.Message)
+
 	Send(msg types.Message)
 	AddNamespace(namespace string)
 	SendUnicast(address string, msg types.Message)

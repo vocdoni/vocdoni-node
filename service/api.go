@@ -46,7 +46,7 @@ func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census
 	if err := htransport.Init(new(types.Connection)); err != nil {
 		return err
 	}
-	go htransport.Listen(listenerOutput)
+	htransport.Listen(listenerOutput)
 	htransport.AddNamespace(apiconfig.Route + "dvote")
 	log.Infof("%s API available at %s", htransport.ConnectionType(), apiconfig.Route+"dvote")
 

@@ -54,7 +54,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 
 	// Create the listener for routing messages
 	listenerOutput := make(chan types.Message)
-	go ws.Listen(listenerOutput)
+	ws.Listen(listenerOutput)
 
 	// Create the API router
 	var err error
