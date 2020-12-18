@@ -9,6 +9,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -42,10 +43,8 @@ func testEntityList(t *testing.T, entityCount int) {
 	}
 	var list []string
 	for len(entities) <= entityCount {
-		list, err = sc.EntityList(10, last)
-		if err != nil {
-			t.Fatal(err)
-		}
+		lastBytes := testutil.Hex2byte(t, last)
+		list = sc.EntityList(10, lastBytes)
 		if len(list) < 1 {
 			t.Log("list is empty")
 			break

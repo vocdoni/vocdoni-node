@@ -14,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 
 	"go.vocdoni.io/dvote/test/testcommon"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
 )
 
 // The init function and flags are shared with the other benchmark files.
@@ -103,7 +104,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 
 	// getSize
 	log.Infof("[%d] get size", rint)
-	req.RootHash = ""
+	req.RootHash = nil
 	resp = doRequest("getSize", nil)
 	if got := *resp.Size; int64(*censusSize) != got {
 		b.Fatalf("expected size %v, got %v", *censusSize, got)
@@ -124,7 +125,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 
 	// GenProof valid
 	log.Infof("[%d] generating proofs", rint)
-	req.RootHash = ""
+	req.RootHash = nil
 	var siblings []string
 
 	for _, cl := range claims {
@@ -139,14 +140,14 @@ func censusBench(b *testing.B, cl *client.Client) {
 	// CheckProof valid
 	log.Infof("[%d] checking proofs", rint)
 	for i, s := range siblings {
-		req.ProofData = s
+		req.ProofData = testutil.Hex2byte(b, s)
 		req.ClaimData = claims[i]
 		resp = doRequest("checkProof", nil)
 		if resp.ValidProof != nil && !*resp.ValidProof {
 			b.Fatalf("proof is invalid but it should be valid")
 		}
 	}
-	req.ProofData = ""
+	req.ProofData = nil
 
 	// publish
 	log.Infof("[%d] publish census", rint)

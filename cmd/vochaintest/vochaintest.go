@@ -147,7 +147,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	var censusKeys []*ethereum.SignKeys
 	var proofs [][]byte
 	var err error
-	censusRoot := ""
+	var censusRoot []byte
 	censusURI := ""
 
 	oracleKey := ethereum.NewSignKeys()
@@ -164,7 +164,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 			log.Fatal(err)
 		}
 	} else {
-		log.Infof("loaded cache census %s with size %d", censusRoot, len(censusKeys))
+		log.Infof("loaded cache census %x with size %d", censusRoot, len(censusKeys))
 		if len(censusKeys) > electionSize {
 			log.Infof("truncating census from %d to %d", len(censusKeys), electionSize)
 			censusKeys = censusKeys[:electionSize]
@@ -190,9 +190,9 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	defer mainClient.Conn.Close(websocket.StatusNormalClosure, "")
 
 	// Create process
-	pid := client.RandomHex(32)
+	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := mainClient.CreateProcess(oracleKey, entityKey.AddressString(), censusRoot, censusURI, pid, electionType, procDuration)
+	start, err := mainClient.CreateProcess(oracleKey, entityKey.Address().Bytes(), censusRoot, censusURI, pid, electionType, procDuration)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -277,7 +277,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 		gw, cl := gw, cl
 		go func() {
 			defer wg.Done()
-			if votingTimes[gw], err = cl.TestSendVotes(pid, entityKey.AddressString(), censusRoot, start, gwSigners, gwProofs, encrypted, doubleVote, &proofsReadyWG); err != nil {
+			if votingTimes[gw], err = cl.TestSendVotes(pid, entityKey.Address().Bytes(), censusRoot, start, gwSigners, gwProofs, encrypted, doubleVote, &proofsReadyWG); err != nil {
 				log.Fatalf("[%s] %s", cl.Addr, err)
 			}
 			log.Infof("gateway %d %s has ended its job", gw, cl.Addr)

@@ -43,9 +43,9 @@ func CreateEthRandomKeysBatch(n int) []*ethereum.SignKeys {
 }
 
 type keysBatch struct {
-	Keys      []signKey `json:"keys"`
-	CensusID  string    `json:"censusId"`
-	CensusURI string    `json:"censusUri"`
+	Keys      []signKey      `json:"keys"`
+	CensusID  types.HexBytes `json:"censusId"`
+	CensusURI string         `json:"censusUri"`
 }
 type signKey struct {
 	PrivKey string `json:"privKey"`
@@ -53,7 +53,7 @@ type signKey struct {
 	Proof   []byte `json:"proof"`
 }
 
-func SaveKeysBatch(filepath string, censusID, censusURI string, keys []*ethereum.SignKeys, proofs [][]byte) error {
+func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*ethereum.SignKeys, proofs [][]byte) error {
 	if proofs != nil && (len(proofs) != len(keys)) {
 		return fmt.Errorf("lenght of Proof is different from lenght of Signers")
 	}
@@ -77,19 +77,19 @@ func SaveKeysBatch(filepath string, censusID, censusURI string, keys []*ethereum
 	return ioutil.WriteFile(filepath, j, 0644)
 }
 
-func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, string, string, error) {
+func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, []byte, string, error) {
 	jb, err := ioutil.ReadFile(filepath)
 	if err != nil {
-		return nil, nil, "", "", err
+		return nil, nil, nil, "", err
 	}
 
 	var kb keysBatch
 	if err = json.Unmarshal(jb, &kb); err != nil {
-		return nil, nil, "", "", err
+		return nil, nil, nil, "", err
 	}
 
-	if len(kb.Keys) == 0 || kb.CensusID == "" || kb.CensusURI == "" {
-		return nil, nil, "", "", fmt.Errorf("keybatch file is empty or missing data")
+	if len(kb.Keys) == 0 || len(kb.CensusID) == 0 || kb.CensusURI == "" {
+		return nil, nil, nil, "", fmt.Errorf("keybatch file is empty or missing data")
 	}
 
 	keys := make([]*ethereum.SignKeys, len(kb.Keys))
@@ -97,7 +97,7 @@ func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, string, str
 	for i, k := range kb.Keys {
 		s := ethereum.NewSignKeys()
 		if err = s.AddHexKey(k.PrivKey); err != nil {
-			return nil, nil, "", "", err
+			return nil, nil, nil, "", err
 		}
 		proofs = append(proofs, k.Proof)
 		keys[i] = s
@@ -105,12 +105,16 @@ func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, string, str
 	return keys, proofs, kb.CensusID, kb.CensusURI, nil
 }
 
-func RandomHex(n int) string {
+func Random(n int) []byte {
 	bytes := make([]byte, n)
 	if _, err := rand.Read(bytes); err != nil {
-		return ""
+		panic(err)
 	}
-	return hex.EncodeToString(bytes)
+	return bytes
+}
+
+func RandomHex(n int) string {
+	return hex.EncodeToString(Random(n))
 }
 
 func genVote(encrypted bool, keys []string) ([]byte, error) {

@@ -24,19 +24,19 @@ type MetaRequest struct {
 	ClaimsData [][]byte `json:"claimsData,omitempty"`
 	Content    string   `json:"content,omitempty"`
 	Digested   bool     `json:"digested,omitempty"`
-	EntityId   string   `json:"entityId,omitempty"`
+	EntityId   HexBytes `json:"entityId,omitempty"`
 	From       int64    `json:"from,omitempty"`
-	FromID     string   `json:"fromId,omitempty"`
+	FromID     HexBytes `json:"fromId,omitempty"`
 	ListSize   int64    `json:"listSize,omitempty"`
 	Method     string   `json:"method"`
 	Name       string   `json:"name,omitempty"`
-	Nullifier  string   `json:"nullifier,omitempty"`
+	Nullifier  HexBytes `json:"nullifier,omitempty"`
 	Payload    []byte   `json:"payload,omitempty"`
-	ProcessID  string   `json:"processId,omitempty"`
-	ProofData  string   `json:"proofData,omitempty"`
+	ProcessID  HexBytes `json:"processId,omitempty"`
+	ProofData  HexBytes `json:"proofData,omitempty"`
 	PubKeys    []string `json:"pubKeys,omitempty"`
-	RootHash   string   `json:"rootHash,omitempty"`
-	Signature  string   `json:"signature,omitempty"`
+	RootHash   HexBytes `json:"rootHash,omitempty"`
+	Signature  HexBytes `json:"signature,omitempty"`
 	Timestamp  int32    `json:"timestamp"`
 	Type       string   `json:"type,omitempty"`
 	URI        string   `json:"uri,omitempty"`
@@ -111,7 +111,7 @@ type MetaResponse struct {
 	Nullifiers           *[]string  `json:"nullifiers,omitempty"`
 	Ok                   bool       `json:"ok"`
 	Paused               *bool      `json:"paused,omitempty"`
-	Payload              string     `json:"payload,omitempty"`
+	Payload              string     `json:"payload,omitempty"` // TODO: sometimes hex, sometimes base64?
 	ProcessIDs           []string   `json:"processIds,omitempty"`
 	ProcessList          []string   `json:"processList,omitempty"`
 	Registered           *bool      `json:"registered,omitempty"`

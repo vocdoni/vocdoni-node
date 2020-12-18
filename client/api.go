@@ -24,7 +24,7 @@ type pkeys struct {
 	rev  []types.Key
 }
 
-func (c *Client) GetEnvelopeStatus(nullifier, pid string) (bool, error) {
+func (c *Client) GetEnvelopeStatus(nullifier, pid []byte) (bool, error) {
 	var req types.MetaRequest
 	req.Method = "getEnvelopeStatus"
 	req.ProcessID = pid
@@ -39,15 +39,11 @@ func (c *Client) GetEnvelopeStatus(nullifier, pid string) (bool, error) {
 	return *resp.Registered, nil
 }
 
-func (c *Client) GetProof(hexpubkey, root string) (string, error) {
+func (c *Client) GetProof(pubkey, root []byte) (string, error) {
 	var req types.MetaRequest
 	req.Method = "genProof"
-	req.CensusID = root
+	req.CensusID = hex.EncodeToString(root)
 	req.Digested = true
-	pubkey, err := hex.DecodeString(hexpubkey)
-	if err != nil {
-		return "", err
-	}
 	req.ClaimData = snarks.Poseidon.Hash(pubkey)
 
 	resp, err := c.Request(req, nil)
@@ -61,7 +57,7 @@ func (c *Client) GetProof(hexpubkey, root string) (string, error) {
 	return resp.Siblings, nil
 }
 
-func (c *Client) GetResults(pid string) ([][]uint32, string, error) {
+func (c *Client) GetResults(pid []byte) ([][]uint32, string, error) {
 	var req types.MetaRequest
 	req.Method = "getResults"
 	req.ProcessID = pid
@@ -78,7 +74,7 @@ func (c *Client) GetResults(pid string) ([][]uint32, string, error) {
 	return resp.Results, resp.State, nil
 }
 
-func (c *Client) GetEnvelopeHeight(pid string) (uint32, error) {
+func (c *Client) GetEnvelopeHeight(pid []byte) (uint32, error) {
 	var req types.MetaRequest
 	req.Method = "getEnvelopeHeight"
 	req.ProcessID = pid
@@ -92,10 +88,10 @@ func (c *Client) GetEnvelopeHeight(pid string) (uint32, error) {
 	return *resp.Height, nil
 }
 
-func (c *Client) CensusSize(cid string) (int64, error) {
+func (c *Client) CensusSize(cid []byte) (int64, error) {
 	var req types.MetaRequest
 	req.Method = "getSize"
-	req.CensusID = cid
+	req.CensusID = hex.EncodeToString(cid)
 	resp, err := c.Request(req, nil)
 	if err != nil {
 		return 0, err
@@ -141,7 +137,7 @@ func (c *Client) ImportCensus(signer *ethereum.SignKeys, uri string) (string, er
 	return resp.Root, nil
 }
 
-func (c *Client) GetKeys(pid, eid string) (*pkeys, error) {
+func (c *Client) GetKeys(pid, eid []byte) (*pkeys, error) {
 	var req types.MetaRequest
 	req.Method = "getProcessKeys"
 	req.ProcessID = pid
@@ -160,7 +156,7 @@ func (c *Client) GetKeys(pid, eid string) (*pkeys, error) {
 		rev:  resp.RevealKeys}, nil
 }
 
-func (c *Client) TestResults(pid string, totalVotes int) ([][]uint32, error) {
+func (c *Client) TestResults(pid []byte, totalVotes int) ([][]uint32, error) {
 	log.Infof("waiting for results...")
 	var err error
 	var results [][]uint32
@@ -187,26 +183,31 @@ func (c *Client) TestResults(pid string, totalVotes int) ([][]uint32, error) {
 	return results, nil
 }
 
-func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root string, tolerateError bool) ([][]byte, error) {
+func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root []byte, tolerateError bool) ([][]byte, error) {
 	var proofs [][]byte
-	var pub, proof string
+	var proof string
 	var err error
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, s := range signers {
-		if pub, _ = s.HexString(); pub == "" {
+		hexpub, _ := s.HexString()
+		if hexpub == "" {
 			if tolerateError {
 				continue
 			}
 			return proofs, err
 		}
-		if pub, err = ethereum.DecompressPubKey(pub); err != nil {
+		if hexpub, err = ethereum.DecompressPubKey(hexpub); err != nil {
 			if tolerateError {
 				continue
 			}
 			return proofs, err
 		} // Temporary until everything is compressed
 
+		pub, err := hex.DecodeString(hexpub)
+		if err != nil {
+			return proofs, err
+		}
 		if proof, err = c.GetProof(pub, root); err != nil {
 			if tolerateError {
 				continue
@@ -228,7 +229,7 @@ func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root string, tolera
 	return proofs, nil
 }
 
-func (c *Client) TestSendVotes(pid, eid, root string, startBlock uint32, signers []*ethereum.SignKeys, proofs [][]byte, encrypted bool, doubleVoting bool, wg *sync.WaitGroup) (time.Duration, error) {
+func (c *Client) TestSendVotes(pid, eid, root []byte, startBlock uint32, signers []*ethereum.SignKeys, proofs [][]byte, encrypted bool, doubleVoting bool, wg *sync.WaitGroup) (time.Duration, error) {
 	var err error
 	var keys []string
 	// Generate merkle proofs
@@ -262,10 +263,6 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock uint32, signers
 		}
 		log.Infof("got encryption keys!")
 	}
-	pidb, err := hex.DecodeString(pid)
-	if err != nil {
-		return 0, fmt.Errorf("cannot decode process Id: %w", err)
-	}
 	// Send votes
 	log.Infof("sending votes")
 	timeDeadLine := time.Second * 200
@@ -285,7 +282,7 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock uint32, signers
 		}
 		v := &models.VoteEnvelope{
 			Nonce:                util.RandomBytes(32),
-			ProcessId:            pidb,
+			ProcessId:            pid,
 			Proof:                &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proofs[i]}}},
 			VotePackage:          vpb,
 			EncryptionKeyIndexes: keyIndexes,
@@ -359,12 +356,16 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock uint32, signers
 	}
 	votingElapsedTime := time.Since(start)
 	for {
-		for i, n := range nullifiers {
-			if n == "registered" {
+		for i, nullHex := range nullifiers {
+			if nullHex == "registered" {
 				registered++
 				continue
 			}
-			if es, _ := c.GetEnvelopeStatus(n, pid); es {
+			null, err := hex.DecodeString(nullHex)
+			if err != nil {
+				return 0, err
+			}
+			if es, _ := c.GetEnvelopeStatus(null, pid); es {
 				nullifiers[i] = "registered"
 			}
 		}
@@ -379,32 +380,20 @@ func (c *Client) TestSendVotes(pid, eid, root string, startBlock uint32, signers
 	return votingElapsedTime, nil
 }
 
-func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkuri, pid, ptype string, duration int) (uint32, error) {
+func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot []byte, mkuri string, pid []byte, ptype string, duration int) (uint32, error) {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
 	block, err := c.GetCurrentBlock()
 	if err != nil {
 		return 0, err
 	}
-	txPid, err := hex.DecodeString(util.TrimHex(pid))
-	if err != nil {
-		return 0, err
-	}
-	txEid, err := hex.DecodeString(util.TrimHex(entityID))
-	if err != nil {
-		return 0, err
-	}
-	txMkRoot, err := hex.DecodeString(util.TrimHex(mkroot))
-	if err != nil {
-		return 0, err
-	}
 	processData := &models.Process{
-		EntityId:     txEid,
-		CensusMkRoot: txMkRoot,
+		EntityId:     entityID,
+		CensusMkRoot: mkroot,
 		CensusMkURI:  &mkuri,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
 		BlockCount:   uint32(duration),
-		ProcessId:    txPid,
+		ProcessId:    pid,
 		ProcessType:  ptype,
 		StartBlock:   uint32(block + 4),
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: ptype == "encrypted-poll"},
@@ -443,16 +432,12 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot, mkur
 	return p.Process.StartBlock, nil
 }
 
-func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid string) error {
+func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid []byte) error {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
-	txPid, err := hex.DecodeString(util.TrimHex(pid))
-	if err != nil {
-		return err
-	}
 	p := &models.CancelProcessTx{
 		Txtype:    models.TxType_CANCEL_PROCESS,
-		ProcessId: txPid,
+		ProcessId: pid,
 		Nonce:     util.RandomBytes(32),
 	}
 	txBytes, err := proto.Marshal(p)
@@ -502,7 +487,7 @@ func (c *Client) GetCurrentBlock() (uint32, error) {
 // CreateCensus creates a new census on the remote gateway and publishes it.
 // Users public keys can be added using censusSigner (ethereum.SignKeys) or censusPubKeys (raw hex public keys).
 // First has preference.
-func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys, censusPubKeys []string) (root, uri string, _ error) {
+func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys, censusPubKeys []string) (root []byte, uri string, _ error) {
 	var req types.MetaRequest
 
 	// Create census
@@ -511,10 +496,10 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	req.CensusID = fmt.Sprintf("test%d", rand.Int())
 	resp, err := c.Request(req, signer)
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
 	if !resp.Ok {
-		return "", "", fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+		return nil, "", fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	// Set correct censusID for commint requests
 	req.CensusID = resp.CensusID
@@ -547,7 +532,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 			hexpub, _ = ethereum.DecompressPubKey(hexpub) // Temporary until everything is compressed only
 			pub, err := hex.DecodeString(hexpub)
 			if err != nil {
-				return "", "", err
+				return nil, "", err
 			}
 			claims = append(claims, snarks.Poseidon.Hash(pub))
 			currentSize--
@@ -555,10 +540,10 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 		req.ClaimsData = claims
 		resp, err := c.Request(req, signer)
 		if err != nil {
-			return "", "", err
+			return nil, "", err
 		}
 		if !resp.Ok {
-			return "", "", fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+			return nil, "", fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 		}
 		i++
 		log.Infof("census creation progress: %d%%", int((i*100*100)/(censusSize)))
@@ -567,13 +552,13 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	// getSize
 	log.Infof("get size")
 	req.Method = "getSize"
-	req.RootHash = ""
+	req.RootHash = nil
 	resp, err = c.Request(req, nil)
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
 	if got := *resp.Size; int64(censusSize) != got {
-		return "", "", fmt.Errorf("expected size %v, got %v", censusSize, got)
+		return nil, "", fmt.Errorf("expected size %v, got %v", censusSize, got)
 	}
 
 	// publish
@@ -582,14 +567,14 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	req.ClaimsData = [][]byte{}
 	resp, err = c.Request(req, signer)
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
 	if !resp.Ok {
-		return "", "", fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+		return nil, "", fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	uri = resp.URI
 	if len(uri) < 40 {
-		return "", "", fmt.Errorf("got invalid URI")
+		return nil, "", fmt.Errorf("got invalid URI")
 	}
 
 	// getRoot
@@ -597,11 +582,11 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	req.Method = "getRoot"
 	resp, err = c.Request(req, nil)
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
-	root = resp.Root
+	root, _ = hex.DecodeString(resp.Root)
 	if len(root) < 1 {
-		return "", "", fmt.Errorf("got invalid root")
+		return nil, "", fmt.Errorf("got invalid root")
 	}
 
 	return root, uri, nil

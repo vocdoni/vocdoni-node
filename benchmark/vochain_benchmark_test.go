@@ -26,7 +26,7 @@ import (
 
 const (
 	numberOfBlocks = 1000
-	processID      = "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"
+	hexProcessID   = "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"
 )
 
 func BenchmarkVochain(b *testing.B) {
@@ -43,7 +43,8 @@ func BenchmarkVochain(b *testing.B) {
 	log.Infof("generated %d keys", len(keySet))
 
 	// get signer pubkey
-	signerPub, _ := dvoteServer.Signer.HexString()
+	signerPubHex, _ := dvoteServer.Signer.HexString()
+	signerPub := testutil.Hex2byte(b, signerPubHex)
 
 	// check required components
 	cl, err := client.New(host)
@@ -91,7 +92,7 @@ func BenchmarkVochain(b *testing.B) {
 	// get census root
 	log.Infof("get root")
 	resp = doRequest("getRoot", nil)
-	mkRoot := resp.Root
+	mkRoot := testutil.Hex2byte(b, resp.Root)
 	if len(mkRoot) < 1 {
 		b.Fatalf("got invalid root")
 	}
@@ -100,23 +101,13 @@ func BenchmarkVochain(b *testing.B) {
 	resp = doRequest("getBlockHeight", nil)
 
 	// create process
-	txEid, err := hex.DecodeString(util.TrimHex(signerPub))
-	if err != nil {
-		b.Fatal(err)
-	}
-	txPid, err := hex.DecodeString(util.TrimHex(processID))
-	if err != nil {
-		b.Fatal(err)
-	}
-	txMkRoot, err := hex.DecodeString(util.TrimHex(mkRoot))
-	if err != nil {
-		b.Fatal(err)
-	}
+	entityID := signerPub
+	processID := testutil.Hex2byte(b, hexProcessID)
 	processData := &models.Process{
-		EntityId:     txEid,
-		CensusMkRoot: txMkRoot,
+		EntityId:     entityID,
+		CensusMkRoot: mkRoot,
 		BlockCount:   numberOfBlocks,
-		ProcessId:    txPid,
+		ProcessId:    processID,
 		ProcessType:  types.PollVote,
 		StartBlock:   uint32(*resp.Height + 1),
 	}
@@ -194,7 +185,7 @@ func BenchmarkVochain(b *testing.B) {
 	log.Infof("created entities: %+v", resp.EntityIDs)
 }
 
-func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon []byte, mkRoot, processID, censusID string) {
+func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon, mkRoot, processID []byte, censusID string) {
 	// API requests
 	var req types.MetaRequest
 	doRequest := cl.ForTest(b, &req)
@@ -224,11 +215,10 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 		b.Fatalf("cannot marshal vote: %s", err)
 	}
 	// Generate VoteEnvelope package
-	txPid, _ := hex.DecodeString(util.TrimHex(processID))
-	siblings, _ := hex.DecodeString(util.TrimHex(resp.Siblings))
+	siblings := testutil.Hex2byte(b, resp.Siblings)
 	tx := models.VoteEnvelope{
 		Nonce:       util.RandomBytes(32),
-		ProcessId:   txPid,
+		ProcessId:   processID,
 		Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: siblings}}},
 		VotePackage: voteBytes,
 	}
@@ -239,10 +229,11 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 		b.Fatal(err)
 	}
 
-	req.Signature, err = s.Sign(req.Payload)
+	signHex, err := s.Sign(req.Payload)
 	if err != nil {
 		b.Fatal(err)
 	}
+	req.Signature = testutil.Hex2byte(b, signHex)
 
 	// sending submitEnvelope request
 	log.Info("vote payload: %s", tx.String())
@@ -253,7 +244,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	// check vote added
 	req = types.MetaRequest{}
 	req.ProcessID = processID
-	req.Nullifier = hex.EncodeToString(vochain.GenerateNullifier(s.Address(), testutil.Hex2byte(b, processID)))
+	req.Nullifier = vochain.GenerateNullifier(s.Address(), processID)
 	for {
 		resp = doRequest("getEnvelopeStatus", nil)
 		if *resp.Registered {
