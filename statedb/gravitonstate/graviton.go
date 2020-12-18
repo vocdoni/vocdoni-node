@@ -26,21 +26,71 @@ type GravitonState struct {
 	hash              []byte
 	trees             map[string]*GravitonTree
 	imTrees           map[string]*GravitonTree
-	treeLock          sync.RWMutex
 	lastCommitVersion uint64
 	vTree             *VersionTree
 }
 
+// safeTree is a wrapper around graviton.Tree which uses a RWMutex to ensure its
+// methods are safe for concurrent use. The methods chosen to use the lock were
+// found via the race detector.
+//
+// Note that Cursor is special, because we should not let go of the read lock
+// until we are done using the cursor entirely.
+type safeTree struct {
+	gtreeMu sync.RWMutex
+	gtree   *graviton.Tree
+}
+
+func (t *safeTree) Put(key, value []byte) error {
+	t.gtreeMu.Lock()
+	defer t.gtreeMu.Unlock()
+	return t.gtree.Put(key, value)
+}
+func (t *safeTree) Commit(tags ...string) error {
+	t.gtreeMu.Lock()
+	defer t.gtreeMu.Unlock()
+	return t.gtree.Commit(tags...)
+}
+func (t *safeTree) Cursor() (_ graviton.Cursor, deferFn func()) {
+	t.gtreeMu.RLock()
+	return t.gtree.Cursor(), t.gtreeMu.RUnlock
+}
+func (t *safeTree) Delete(key []byte) error {
+	t.gtreeMu.Lock()
+	defer t.gtreeMu.Unlock()
+	return t.gtree.Delete(key)
+}
+func (t *safeTree) Discard() error {
+	return t.gtree.Discard()
+}
+func (t *safeTree) GenerateProof(key []byte) (*graviton.Proof, error) {
+	return t.gtree.GenerateProof(key)
+}
+func (t *safeTree) Get(key []byte) ([]byte, error) {
+	return t.gtree.Get(key)
+}
+func (t *safeTree) GetParentVersion() uint64 {
+	return t.gtree.GetParentVersion()
+}
+func (t *safeTree) GetVersion() uint64 {
+	return t.gtree.GetVersion()
+}
+func (t *safeTree) Hash() (h [graviton.HASHSIZE]byte, err error) {
+	return t.gtree.Hash()
+}
+func (t *safeTree) IsDirty() bool {
+	return t.gtree.IsDirty()
+}
+
 type GravitonTree struct {
-	tree    *graviton.Tree
+	tree    safeTree
 	version uint64
 	size    uint64
-	addLock sync.RWMutex
 }
 
 type VersionTree struct {
 	Name  string
-	tree  *graviton.Tree
+	tree  safeTree
 	store *graviton.Store
 }
 
@@ -52,7 +102,7 @@ func (v *VersionTree) Init(g *graviton.Store) error {
 	if v.Name == "" {
 		v.Name = "versions"
 	}
-	v.tree, err = s.GetTree(v.Name)
+	v.tree.gtree, err = s.GetTree(v.Name)
 	v.store = g
 	return err
 }
@@ -73,9 +123,9 @@ func (v *VersionTree) LoadVersion(version int64) error {
 	if version == -1 {
 		version = int64(v.tree.GetParentVersion())
 	}
-	v.tree, err = s.GetTreeWithVersion(v.Name, uint64(version))
+	v.tree.gtree, err = s.GetTreeWithVersion(v.Name, uint64(version))
 	if err != nil {
-		v.tree, err = s.GetTree(v.Name)
+		v.tree.gtree, err = s.GetTree(v.Name)
 	}
 	return err
 }
@@ -93,7 +143,8 @@ func (v *VersionTree) Get(name string) (uint64, error) {
 }
 
 func (v *VersionTree) String() (s string) {
-	c := v.tree.Cursor()
+	c, deferFn := v.tree.Cursor()
+	defer deferFn()
 	for k, _, err := c.First(); err == nil; k, _, err = c.Next() {
 		vt, _ := v.Get(string(k))
 		s = fmt.Sprintf("%s %s:%d ", s, k, vt)
@@ -132,8 +183,6 @@ func (g *GravitonState) Version() uint64 {
 // Versions are obtained from a version Tree which stores the version of all existing trees.
 func (g *GravitonState) LoadVersion(v int64) error {
 	var err error
-	g.treeLock.Lock()
-	defer g.treeLock.Unlock()
 
 	if err = g.vTree.LoadVersion(v); err != nil {
 		return err
@@ -162,7 +211,7 @@ func (g *GravitonState) LoadVersion(v int64) error {
 		if err != nil {
 			return err
 		}
-		g.trees[k].tree = t2
+		g.trees[k].tree.gtree = t2
 		g.trees[k].version = g.vTree.Version()
 	}
 
@@ -179,19 +228,15 @@ func (g *GravitonState) AddTree(name string) error {
 	if err != nil {
 		return err
 	}
-	g.trees[name] = &GravitonTree{tree: t}
+	g.trees[name] = &GravitonTree{tree: safeTree{gtree: t}}
 	return g.updateImmutable()
 }
 
 func (g *GravitonState) Tree(name string) statedb.StateTree {
-	g.treeLock.RLock()
-	defer g.treeLock.RUnlock()
 	return g.trees[name]
 }
 
 func (g *GravitonState) TreeWithRoot(root []byte) statedb.StateTree {
-	g.treeLock.RLock()
-	defer g.treeLock.RUnlock()
 	sn, err := g.store.LoadSnapshot(0)
 	if err != nil {
 		return nil
@@ -200,7 +245,7 @@ func (g *GravitonState) TreeWithRoot(root []byte) statedb.StateTree {
 	if err != nil {
 		return nil
 	}
-	return &GravitonTree{tree: gt, version: g.Version()}
+	return &GravitonTree{tree: safeTree{gtree: gt}, version: g.Version()}
 }
 
 // KeyDiff returns the list of inserted keys on rootBig not present in rootSmall
@@ -221,7 +266,7 @@ func (g *GravitonState) KeyDiff(rootSmall, rootBig []byte) ([][]byte, error) {
 		})
 		return diff, nil
 	}
-	err := graviton.Diff(t1.(*GravitonTree).tree, t2.(*GravitonTree).tree, nil, nil, func(k, v []byte) {
+	err := graviton.Diff(t1.(*GravitonTree).tree.gtree, t2.(*GravitonTree).tree.gtree, nil, nil, func(k, v []byte) {
 		diff = append(diff, k)
 	})
 	return diff, err
@@ -237,15 +282,13 @@ func (g *GravitonState) updateImmutable() error {
 		if err != nil {
 			return err
 		}
-		g.imTrees[k] = &GravitonTree{tree: t, version: g.lastCommitVersion}
+		g.imTrees[k] = &GravitonTree{tree: safeTree{gtree: t}, version: g.lastCommitVersion}
 	}
 	return nil
 }
 
 // ImmutableTree is a tree snapshot that won't change, useful for making queries on a state changing environment
 func (g *GravitonState) ImmutableTree(name string) statedb.StateTree {
-	g.treeLock.RLock()
-	defer g.treeLock.RUnlock()
 	return g.imTrees[name]
 }
 
@@ -253,8 +296,6 @@ func (g *GravitonState) ImmutableTree(name string) statedb.StateTree {
 // Returns New Hash
 func (g *GravitonState) Commit() ([]byte, error) {
 	var err error
-	g.treeLock.Lock()
-	defer g.treeLock.Unlock()
 
 	// Commit current trees and save versions to the version Tree
 	for name, t := range g.trees {
@@ -326,8 +367,6 @@ func (t *GravitonTree) Get(key []byte) []byte {
 }
 
 func (t *GravitonTree) Add(key, value []byte) error {
-	t.addLock.Lock()
-	defer t.addLock.Unlock()
 	// if already exist, just return
 	if v, err := t.tree.Get(key); err == nil && string(v) == string(value) {
 		return nil
@@ -345,9 +384,8 @@ func (t *GravitonTree) Version() uint64 {
 }
 
 func (t *GravitonTree) Iterate(prefix []byte, callback func(key, value []byte) bool) {
-	t.addLock.RLock()
-	defer t.addLock.RUnlock()
-	c := t.tree.Cursor()
+	c, deferFn := t.tree.Cursor()
+	defer deferFn()
 	for k, v, err := c.First(); err == nil; k, v, err = c.Next() {
 		// This is horrible from the performance point of view...
 		// TBD: Find better ways to to this iteration over the whole tree
@@ -372,7 +410,8 @@ func (t *GravitonTree) Hash() []byte {
 }
 
 func (t *GravitonTree) count() (count uint64) {
-	c := t.tree.Cursor()
+	c, deferFn := t.tree.Cursor()
+	defer deferFn()
 	for _, _, err := c.First(); err == nil; _, _, err = c.Next() {
 		// TBD: This is horrible from the performance point of view...
 		count++
