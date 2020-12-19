@@ -2,13 +2,8 @@ package types
 
 import (
 	"encoding/json"
+	"go.vocdoni.io/proto/build/go/models"
 	"time"
-
-	// Don't import tendermint/types, because that pulls in lots of indirect
-	// dependencies which are too heavy for our low-level "types" package.
-	// libs/bytes is okay, because it only pulls in std deps.
-
-	"github.com/vocdoni/dvote-protobuf/build/go/models"
 )
 
 // ________________________ STATE ________________________

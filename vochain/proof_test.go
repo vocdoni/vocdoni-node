@@ -7,12 +7,12 @@ import (
 
 	"github.com/gobuffalo/packr/v2/file/resolver/encoding/hex"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"github.com/vocdoni/eth-storage-proof/ethstorageproof"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 

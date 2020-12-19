@@ -3,11 +3,11 @@ package test
 import (
 	"testing"
 
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	models "go.vocdoni.io/proto/build/go/models"
 )
 
 func TestCreateProcess(t *testing.T) {

@@ -24,8 +24,8 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	tmtime "github.com/tendermint/tendermint/types/time"
-	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"github.com/vocdoni/eth-storage-proof/ethstorageproof"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // hexproof is the hexadecimal a string. leafData is the claim data in byte format

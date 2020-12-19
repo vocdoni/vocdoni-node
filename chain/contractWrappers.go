@@ -14,11 +14,11 @@ import (
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/net/idna"
 
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/chain/contracts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	models "go.vocdoni.io/proto/build/go/models"
 )
 
 // The following methods and structures represent an exportable abstraction over raw contract bindings

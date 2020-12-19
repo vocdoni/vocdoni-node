@@ -10,7 +10,7 @@ import (
 	"time"
 
 	flag "github.com/spf13/pflag"
-	"github.com/vocdoni/dvote-protobuf/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"

@@ -3,8 +3,8 @@ package vochain
 import (
 	"fmt"
 
-	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 

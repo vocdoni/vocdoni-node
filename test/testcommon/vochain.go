@@ -13,7 +13,6 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
 
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
@@ -21,6 +20,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	models "go.vocdoni.io/proto/build/go/models"
 )
 
 var (

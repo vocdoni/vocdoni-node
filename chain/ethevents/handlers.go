@@ -8,11 +8,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/chain/contracts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
+	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
