@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 

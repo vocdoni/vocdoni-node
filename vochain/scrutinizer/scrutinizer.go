@@ -13,11 +13,11 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 const (

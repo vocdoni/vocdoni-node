@@ -14,9 +14,9 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
 
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	models "go.vocdoni.io/proto/build/go/models"
 )
 
 // BaseApplication reflects the ABCI application implementation.

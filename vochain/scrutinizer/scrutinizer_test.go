@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -13,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 func TestEntityList(t *testing.T) {

@@ -10,12 +10,12 @@ import (
 	"sync/atomic"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 

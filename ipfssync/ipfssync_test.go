@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 func TestInternalPins(t *testing.T) {

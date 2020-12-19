@@ -4,11 +4,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // TBD: A startup process for importing on-going processe census

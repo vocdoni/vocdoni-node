@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/vocdoni/dvote-protobuf/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/log"

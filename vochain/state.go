@@ -11,11 +11,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/statedb/iavlstate"
 	"go.vocdoni.io/dvote/types"
+	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	ethtoken "github.com/vocdoni/eth-storage-proof/token"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 

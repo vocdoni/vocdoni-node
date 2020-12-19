@@ -4,10 +4,10 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 

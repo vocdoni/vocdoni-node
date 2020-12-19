@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	models "github.com/vocdoni/dvote-protobuf/build/go/models"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
+	models "go.vocdoni.io/proto/build/go/models"
 )
 
 func TestState(t *testing.T) {

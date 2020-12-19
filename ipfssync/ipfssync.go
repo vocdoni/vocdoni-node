@@ -13,7 +13,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/vocdoni/dvote-protobuf/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
