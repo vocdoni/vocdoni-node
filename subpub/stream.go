@@ -10,7 +10,7 @@ import (
 func (ps *SubPub) handleStream(stream network.Stream) {
 	// First, ensure that any messages read from the stream are sent to the
 	// SubPub.Reader channel.
-	go ps.readHandler(bufio.NewReader(stream))
+	go ps.readHandler(stream)
 
 	// Second, ensure that, from now on, any broadcast message is sent to
 	// this stream as well.
@@ -29,7 +29,7 @@ func (ps *SubPub) handleStream(stream network.Stream) {
 	if fn := ps.onPeerAdd; fn != nil {
 		fn(pid)
 	}
-	log.Infof("connected to peer %s", pid)
+	log.Infof("connected to peer %s: %+v", pid, stream.Conn().RemoteMultiaddr())
 	go ps.broadcastHandler(write, bufio.NewWriter(stream))
 }
 
@@ -51,7 +51,8 @@ func (ps *SubPub) broadcastHandler(write <-chan []byte, w *bufio.Writer) {
 	}
 }
 
-func (ps *SubPub) readHandler(r *bufio.Reader) {
+func (ps *SubPub) readHandler(stream network.Stream) {
+	r := bufio.NewReader(stream)
 	for {
 		select {
 		case <-ps.close:
@@ -61,8 +62,12 @@ func (ps *SubPub) readHandler(r *bufio.Reader) {
 		}
 		message, err := r.ReadBytes(byte(delimiter))
 		if err != nil {
-			log.Debugf("error reading from buffer: %s", err)
+			stream.Close()
+			log.Debugf("error reading from buffer %s: %s", stream.Conn().RemotePeer().Pretty(), err)
 			return
+		} else if len(message) == 0 {
+			log.Debugf("no data could be read from stream: %s (%+v)", stream.Conn().RemotePeer().Pretty(), stream.Stat())
+			continue
 		}
 		// Remove delimiter
 		message = message[:len(message)-1]

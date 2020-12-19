@@ -88,7 +88,7 @@ func NewSubPub(key ecdsa.PrivateKey, groupKey []byte, port int, private bool) *S
 	return ps
 }
 
-// Connect starts the SubPub networking stack
+// Start connects  the SubPub networking stack
 func (ps *SubPub) Start(ctx context.Context) {
 	log.Infof("public address: %s", ps.PubKey)
 	log.Infof("private key: %s", ps.privKey)

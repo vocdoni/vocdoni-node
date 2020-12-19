@@ -33,7 +33,7 @@ func (ps *SubPub) discover(ctx context.Context) {
 		}
 		// new peer; let's connect to it
 		if err := peer.ID.Validate(); err == nil {
-			stream, err := ps.Host.NewStream(ctx, peer.ID, protocol.ID(ps.Topic))
+			stream, err := ps.Host.NewStream(context.Background(), peer.ID, protocol.ID(ps.Topic))
 			if err != nil {
 				// Since this error is pretty common in p2p networks.
 				continue

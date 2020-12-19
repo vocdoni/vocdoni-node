@@ -288,10 +288,8 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 		if len(msg.Address) > 31 {
 			is.updateLock.RLock()
 			defer is.updateLock.RUnlock()
-			if bytes.Equal(msg.Hash, is.hashTree.Hash()) {
-				log.Infof("got fetch query, sending pin list to %s", msg.Address)
-				return is.sendPins(msg.Address, msg.Hash)
-			}
+			log.Infof("got fetch query, sending pin list to %s", msg.Address)
+			return is.sendPins(msg.Address, msg.Hash)
 		}
 	}
 	return nil
