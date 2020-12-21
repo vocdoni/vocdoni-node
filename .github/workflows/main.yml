@@ -6,7 +6,7 @@ on: [push, pull_request]
 
 jobs:
   go-tests:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
     - name: Install Go
       uses: actions/setup-go@v2
@@ -31,7 +31,7 @@ jobs:
         ./staticcheck/staticcheck ./...
 
   compose-test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -49,7 +49,7 @@ jobs:
           ./start_test.sh
 
   docker-release:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [go-tests, compose-test]
     if:
       github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || github.ref == 'refs/heads/release-*' || github.ref == 'refs/heads/dev' 
