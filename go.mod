@@ -3,16 +3,13 @@ module go.vocdoni.io/dvote
 go 1.14
 
 // For testing purposes while dvote-protobuf becomes stable
-// replace github.com/vocdoni/dvote-protobuf  => ../dvote-protobuf
-
-// Temporary until there is a solution for the batch tx weird behavior
-replace github.com/tendermint/tendermint => github.com/vocdoni/tendermint v0.34.0-rc4.0.20201209151525-75721cb94a61
+// replace go.vocdoni.io/proto  => ../dvote-protobuf
 
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
-	github.com/cosmos/iavl v0.15.0
+	github.com/cosmos/iavl v0.15.3
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/deroproject/graviton v0.0.0-20200906044921-89e9e09f9601
 	github.com/dgraph-io/badger/v2 v2.2007.2
@@ -49,10 +46,8 @@ require (
 	github.com/libp2p/go-sockaddr v0.1.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
-	github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5 // indirect
-	github.com/prometheus/client_golang v1.8.0
+	github.com/prometheus/client_golang v1.9.0
 	github.com/recws-org/recws v1.2.2
 	github.com/rogpeppe/rjson v0.0.0-20151026200957-77220b71d327
 	github.com/shirou/gopsutil v2.20.5+incompatible
@@ -62,7 +57,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.1
 	github.com/tendermint/go-amino v0.16.0
-	github.com/tendermint/tendermint v0.34.0
+	github.com/tendermint/tendermint v0.34.1-dev1.0.20201222081633-c4730bb46a0c
 	github.com/tendermint/tm-db v0.6.3
 	github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200826160007-0b9f6c5fb163 // indirect
@@ -75,7 +70,6 @@ require (
 	golang.org/x/sys v0.0.0-20201218084310-7d0127a74742 // indirect
 	golang.org/x/text v0.3.4 // indirect
 	google.golang.org/protobuf v1.25.0
-	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
 	nhooyr.io/websocket v1.8.6
 )

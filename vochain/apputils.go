@@ -102,25 +102,25 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 }
 
 // NewNodeKey returns and saves to the disk storage a tendermint node key
-func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
+func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (p2p.NodeKey, error) {
 	var privKey crypto25519.PrivKey
+	var nodeKey p2p.NodeKey
 	keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
 	if err != nil {
-		return nil, fmt.Errorf("cannot decode private key: (%s)", err)
+		return nodeKey, fmt.Errorf("cannot decode private key: (%s)", err)
 	}
 	privKey = make([]byte, len(keyBytes))
 	copy(privKey[:], keyBytes[:])
-	nodeKey := &p2p.NodeKey{
-		PrivKey: privKey,
-	}
-
+	nodeKey.PrivKey = privKey
+	nodeKey.ID = p2p.PubKeyToID(nodeKey.PrivKey.PubKey())
+	// Write nodeKey to disk
 	cdc := AminoCodec()
 	jsonBytes, err := cdc.MarshalJSON(nodeKey)
 	if err != nil {
-		return nil, err
+		return nodeKey, err
 	}
 	if err := ioutil.WriteFile(tconfig.NodeKeyFile(), jsonBytes, 0600); err != nil {
-		return nil, err
+		return nodeKey, err
 	}
 	return nodeKey, nil
 }

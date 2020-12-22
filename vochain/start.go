@@ -188,11 +188,10 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = false
-	//	tconfig.Mempool.CacheKeepCheckTxInvalid = true
-	tconfig.Mempool.Broadcast = true
-	tconfig.Mempool.MaxTxBytes = 1024 * 256 // 256 KB
+	tconfig.Mempool.KeepInvalidTxsInCache = true
 	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
 	tconfig.Mempool.CacheSize = 100000
+
 	//	tconfig.Mempool.MaxBatchBytes = 500 * tconfig.Mempool.MaxTxBytes // maximum 500 full-size txs
 
 	// TBD: check why it does not work anymore
@@ -251,7 +250,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	log.Infof("using keyfile %s", tconfig.PrivValidatorKeyFile())
 
 	// nodekey is used for the p2p transport layer
-	var nodeKey *p2p.NodeKey
+	var nodeKey p2p.NodeKey
 	if len(localConfig.NodeKey) > 0 {
 		nodeKey, err = NewNodeKey(localConfig.NodeKey, tconfig)
 		if err != nil {
@@ -262,7 +261,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 			return nil, fmt.Errorf("cannot create or load node key: %w", err)
 		}
 	}
-	log.Infof("tendermint p2p node ID: %s", nodeKey.ID())
+	log.Infof("tendermint p2p node ID: %s", nodeKey.ID)
 
 	// read or create genesis file
 	if tmos.FileExists(tconfig.Genesis) {
