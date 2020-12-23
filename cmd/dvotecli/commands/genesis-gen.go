@@ -16,22 +16,22 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 )
 
-var generateCmd = &cobra.Command{
-	Use:   "generate",
+var genesisGenCmd = &cobra.Command{
+	Use:   "genesis-gen",
 	Short: "Generate keys and genesis for vochain",
-	RunE:  generate,
+	RunE:  genesisGen,
 }
 
 func init() {
-	rootCmd.AddCommand(generateCmd)
-	generateCmd.Flags().Int("seeds", 1, "number of seed keys")
-	generateCmd.Flags().Int("miners", 4, "number of miner keys")
-	generateCmd.Flags().Int("oracles", 2, "number of oracle keys")
-	generateCmd.Flags().String("chainId", "", "an ID name for the genesis chain to generate (required)")
-	generateCmd.MarkFlagRequired("chainId")
+	rootCmd.AddCommand(genesisGenCmd)
+	genesisGenCmd.Flags().Int("seeds", 1, "number of seed keys")
+	genesisGenCmd.Flags().Int("miners", 4, "number of miner keys")
+	genesisGenCmd.Flags().Int("oracles", 2, "number of oracle keys")
+	genesisGenCmd.Flags().String("chainId", "", "an ID name for the genesis chain to generate (required)")
+	genesisGenCmd.MarkFlagRequired("chainId")
 }
 
-func generate(cmd *cobra.Command, args []string) error {
+func genesisGen(cmd *cobra.Command, args []string) error {
 
 	// Generate seeds
 	sCount, _ := cmd.Flags().GetInt("seeds")
