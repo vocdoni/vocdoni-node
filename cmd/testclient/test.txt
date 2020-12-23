@@ -1,4 +1,0 @@
-#{method:"dumpPlain",censusId:"0x16c0feec71ab17f603bb8053802c745f77e75e65cd65e3b1bc92e8c6443be820"}
-#{method:"genProof",censusId:"0x16c0feec71ab17f603bb8053802c745f77e75e65cd65e3b1bc92e8c6443be820",digested:true,claimData:"IutkMaMqFvU+VSNd6DRQs/SHoBxPqPjHZc90/rE/HDw="}
-#{method: "getProcessList", entityId:"0xF904848ea36c46817096E94f932A9901E377C8a5"}
-{method:"getProcListResults", fromId:"" }

@@ -16,9 +16,13 @@ var rootCmd = &cobra.Command{
 
 var au aurora.Aurora
 var colorize bool
+var host string
+var privKey string
 
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&colorize, "color", "c", true, "colorize output")
+	rootCmd.PersistentFlags().StringVarP(&host, "host", "", "ws://127.0.0.1:9090/dvote", "host to connect to")
+	rootCmd.PersistentFlags().StringVarP(&privKey, "key", "", "", "private key for signature (leave blank for auto-generate)")
 	au = aurora.NewAurora(true)
 }
 
