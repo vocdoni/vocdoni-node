@@ -1,7 +1,6 @@
 package keykeeper
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -490,15 +489,9 @@ func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
 		return err
 	}
 	vtx := models.Tx{Payload: &models.Tx_Admin{Admin: tx}}
-	var signHex string
-	if signHex, err = k.signer.Sign(txBytes); err != nil {
+	if vtx.Signature, err = k.signer.Sign(txBytes); err != nil {
 		return err
 	}
-	signature, err := hex.DecodeString(signHex)
-	if err != nil {
-		return err
-	}
-	vtx.Signature = signature
 	vtxBytes, err := proto.Marshal(&vtx)
 	if err != nil {
 		return err

@@ -2,8 +2,9 @@ package types
 
 import (
 	"encoding/json"
-	"go.vocdoni.io/proto/build/go/models"
 	"time"
+
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // ________________________ STATE ________________________

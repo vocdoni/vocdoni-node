@@ -10,7 +10,6 @@ import (
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/snarks"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -69,7 +68,6 @@ func TestCheckTX(t *testing.T) {
 
 	var vtx models.Tx
 	var proof []byte
-	var hexsignature string
 	vp := []byte("[1,2,3,4]")
 	for i, s := range keys {
 		proof, err = tr.GenProof([]byte(claims[i]), nil)
@@ -86,11 +84,10 @@ func TestCheckTX(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if hexsignature, err = s.Sign(txBytes); err != nil {
+		if vtx.Signature, err = s.Sign(txBytes); err != nil {
 			t.Fatal(err)
 		}
 		vtx.Payload = &models.Tx_Vote{Vote: tx}
-		vtx.Signature = testutil.Hex2byte(t, hexsignature)
 
 		if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
 			t.Fatal(err)
@@ -263,7 +260,6 @@ func testSetProcess(t *testing.T, pid []byte, oracle *ethereum.SignKeys, app *Ba
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
 	var vtx models.Tx
-	var hexsignature string
 
 	tx := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_STATUS,
@@ -276,11 +272,10 @@ func testSetProcess(t *testing.T, pid []byte, oracle *ethereum.SignKeys, app *Ba
 		t.Fatal(err)
 	}
 
-	if hexsignature, err = oracle.Sign(txBytes); err != nil {
+	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
 		t.Fatal(err)
 	}
 	vtx.Payload = &models.Tx_SetProcess{SetProcess: tx}
-	vtx.Signature = testutil.Hex2byte(t, hexsignature)
 
 	if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
 		t.Fatal(err)

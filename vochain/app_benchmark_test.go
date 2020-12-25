@@ -100,13 +100,8 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		if err != nil {
 			b.Fatal(err)
 		}
-		signHex := ""
-		if signHex, err = s.Sign(txBytes); err != nil {
-			b.Fatal(err)
-		}
 		vtx := models.Tx{}
-		vtx.Signature, err = hex.DecodeString(signHex)
-		if err != nil {
+		if vtx.Signature, err = s.Sign(txBytes); err != nil {
 			b.Fatal(err)
 		}
 		vtx.Payload = &models.Tx_Vote{Vote: tx}

@@ -18,7 +18,7 @@ import (
 )
 
 // SignatureLength is the size of an ECDSA signature in hexString format
-const SignatureLength = 130
+const SignatureLength = ethcrypto.SignatureLength
 
 // PubKeyLength is the size of a Public Key
 const PubKeyLength = 66
@@ -124,38 +124,29 @@ func (k *SignKeys) Address() ethcommon.Address {
 func (k *SignKeys) AddressString() string { return ethcrypto.PubkeyToAddress(k.Public).String() }
 
 // Sign signs a message. Message is a normal string (no HexString nor a Hash)
-func (k *SignKeys) Sign(message []byte) (string, error) {
+func (k *SignKeys) Sign(message []byte) ([]byte, error) {
 	if k.Private.D == nil {
-		return "", errors.New("no private key available")
+		return nil, errors.New("no private key available")
 	}
 	signature, err := ethcrypto.Sign(Hash(message), &k.Private)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return fmt.Sprintf("%x", signature), nil
+	return signature, nil
 }
 
 // SignJSON signs a JSON message. Message is a struct interface
-func (k *SignKeys) SignJSON(message interface{}) (string, error) {
-	rawMsg, err := crypto.SortedMarshalJSON(message)
+func (k *SignKeys) SignJSON(message interface{}) ([]byte, error) {
+	encMsg, err := crypto.SortedMarshalJSON(message)
 	if err != nil {
-		return "", errors.New("unable to marshal message to sign: %s")
+		return nil, errors.New("unable to marshal message to sign: %s")
 	}
-	sig, err := k.Sign(rawMsg)
-	if err != nil {
-		return "", errors.New("error signing response body: %s")
-	}
-	prefixedSig := "0x" + util.TrimHex(sig)
-	return prefixedSig, nil
+	return k.Sign(encMsg)
 }
 
 // Verify verifies a message. Signature is HexString
-func (k *SignKeys) Verify(message []byte, signHex string) (bool, error) {
-	pubHex, err := PubKeyFromSignature(message, signHex)
-	if err != nil {
-		return false, err
-	}
-	signature, err := hex.DecodeString(signHex)
+func (k *SignKeys) Verify(message, signature []byte) (bool, error) {
+	pubHex, err := PubKeyFromSignature(message, signature)
 	if err != nil {
 		return false, err
 	}
@@ -169,8 +160,8 @@ func (k *SignKeys) Verify(message []byte, signHex string) (bool, error) {
 }
 
 // VerifySender verifies if a message is sent by some Authorized address key
-func (k *SignKeys) VerifySender(msg []byte, sigHex string) (bool, ethcommon.Address, error) {
-	recoveredAddr, err := AddrFromSignature(msg, sigHex)
+func (k *SignKeys) VerifySender(message, signature []byte) (bool, ethcommon.Address, error) {
+	recoveredAddr, err := AddrFromSignature(message, signature)
 	if err != nil {
 		return false, ethcommon.Address{}, err
 	}
@@ -183,18 +174,19 @@ func (k *SignKeys) VerifySender(msg []byte, sigHex string) (bool, ethcommon.Addr
 }
 
 // VerifyJSONsender verifies if a JSON message is sent by some Authorized address key
-func (k *SignKeys) VerifyJSONsender(msg interface{}, sigHex string) (bool, ethcommon.Address, error) {
-	rawMsg, err := crypto.SortedMarshalJSON(msg)
+func (k *SignKeys) VerifyJSONsender(message interface{}, signature []byte) (bool, ethcommon.Address, error) {
+	encMsg, err := crypto.SortedMarshalJSON(message)
 	if err != nil {
 		return false, ethcommon.Address{}, errors.New("unable to marshal message to sign: %s")
 	}
-	return k.VerifySender(rawMsg, sigHex)
+	return k.VerifySender(encMsg, signature)
 }
 
 // Verify standalone function for verify a message
-func Verify(message []byte, signHex, pubHex string) (bool, error) {
+func Verify(message, signature, pub []byte) (bool, error) {
+	// TODO(mvdan): pub is unused?
 	sk := NewSignKeys()
-	return sk.Verify(message, signHex)
+	return sk.Verify(message, signature)
 }
 
 // AddrFromPublicKey standaolone function to obtain the Ethereum address from a ECDSA public key
@@ -232,22 +224,17 @@ func PubKeyFromPrivateKey(privHex string) (string, error) {
 
 // PubKeyFromSignature recovers the ECDSA public key that created the signature of a message
 // public key is hex encoded
-func PubKeyFromSignature(msg []byte, sigHex string) (string, error) {
-	sigHex = util.TrimHex(sigHex)
-	if len(sigHex) < SignatureLength || len(sigHex) > SignatureLength+12 {
-		return "", fmt.Errorf("signature length not correct (%d)", len(sigHex))
+func PubKeyFromSignature(message, signature []byte) (string, error) {
+	if len(signature) < SignatureLength || len(signature) > SignatureLength+12 {
+		return "", fmt.Errorf("signature length not correct (%d)", len(signature))
 	}
-	sig, err := hex.DecodeString(sigHex)
-	if err != nil {
-		return "", err
+	if signature[64] > 1 {
+		signature[64] -= 27
 	}
-	if sig[64] > 1 {
-		sig[64] -= 27
-	}
-	if sig[64] > 1 {
+	if signature[64] > 1 {
 		return "", errors.New("bad recover ID byte")
 	}
-	pubKey, err := ethcrypto.SigToPub(Hash(msg), sig)
+	pubKey, err := ethcrypto.SigToPub(Hash(message), signature)
 	if err != nil {
 		return "", fmt.Errorf("sigToPub %w", err)
 	}
@@ -256,8 +243,8 @@ func PubKeyFromSignature(msg []byte, sigHex string) (string, error) {
 }
 
 // AddrFromSignature recovers the Ethereum address that created the signature of a message
-func AddrFromSignature(msg []byte, sigHex string) (ethcommon.Address, error) {
-	pubHex, err := PubKeyFromSignature(msg, sigHex)
+func AddrFromSignature(message, signature []byte) (ethcommon.Address, error) {
+	pubHex, err := PubKeyFromSignature(message, signature)
 	if err != nil {
 		return ethcommon.Address{}, err
 	}
@@ -269,12 +256,12 @@ func AddrFromSignature(msg []byte, sigHex string) (ethcommon.Address, error) {
 }
 
 // AddrFromJSONsignature recovers the Ethereum address that created the signature of a JSON message
-func AddrFromJSONsignature(msg interface{}, sigHex string) (ethcommon.Address, error) {
-	rawMsg, err := crypto.SortedMarshalJSON(msg)
+func AddrFromJSONsignature(message interface{}, signature []byte) (ethcommon.Address, error) {
+	encMsg, err := crypto.SortedMarshalJSON(message)
 	if err != nil {
 		return ethcommon.Address{}, errors.New("unable to marshal message to sign: %s")
 	}
-	return AddrFromSignature(rawMsg, sigHex)
+	return AddrFromSignature(encMsg, signature)
 }
 
 func hexToPubKey(pubHex string) (*ecdsa.PublicKey, error) {
