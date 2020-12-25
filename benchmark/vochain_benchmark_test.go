@@ -1,7 +1,6 @@
 package test
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -123,13 +122,9 @@ func BenchmarkVochain(b *testing.B) {
 	}
 
 	vtx := models.Tx{}
-	signHex, err := dvoteServer.Signer.Sign(txBytes)
+	vtx.Signature, err = dvoteServer.Signer.Sign(txBytes)
 	if err != nil {
 		b.Fatalf("cannot sign oracle tx: %s", err)
-	}
-	vtx.Signature, err = hex.DecodeString(signHex)
-	if err != nil {
-		b.Fatalf("cannot decode signature")
 	}
 	req.Payload, err = proto.Marshal(&vtx)
 	if err != nil {
@@ -229,11 +224,10 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 		b.Fatal(err)
 	}
 
-	signHex, err := s.Sign(req.Payload)
+	req.Signature, err = s.Sign(req.Payload)
 	if err != nil {
 		b.Fatal(err)
 	}
-	req.Signature = testutil.Hex2byte(b, signHex)
 
 	// sending submitEnvelope request
 	log.Info("vote payload: %s", tx.String())

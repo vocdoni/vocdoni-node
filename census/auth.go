@@ -1,12 +1,14 @@
 package census
 
 import (
+	"encoding/hex"
 	"errors"
 	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 )
 
 // CheckAuth check if a census request message is authorized
@@ -49,9 +51,13 @@ func (m *Manager) CheckAuth(reqOuter *types.RequestMessage, reqInner *types.Meta
 			return nil
 		}
 		valid := false
-		for _, n := range ns.Keys {
+		for _, keyHex := range ns.Keys {
 			var err error
-			valid, err = ethereum.Verify(reqOuter.MetaRequest, reqOuter.Signature, n)
+			key, err := hex.DecodeString(util.TrimHex(keyHex))
+			if err != nil {
+				return err
+			}
+			valid, err = ethereum.Verify(reqOuter.MetaRequest, reqOuter.Signature, key)
 			if err != nil {
 				log.Warnf("verification error (%s)", err)
 				valid = false

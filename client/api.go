@@ -293,12 +293,7 @@ func (c *Client) TestSendVotes(pid, eid, root []byte, startBlock uint32, signers
 			return 0, err
 		}
 		vtx := models.Tx{Payload: &models.Tx_Vote{Vote: v}}
-		signHex := ""
-		if signHex, err = s.Sign(txBytes); err != nil {
-			return 0, err
-		}
-		vtx.Signature, err = hex.DecodeString(signHex)
-		if err != nil {
+		if vtx.Signature, err = s.Sign(txBytes); err != nil {
 			return 0, err
 		}
 		if req.Payload, err = proto.Marshal(&vtx); err != nil {
@@ -410,12 +405,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot []byt
 		return 0, err
 	}
 	vtx := models.Tx{Payload: &models.Tx_NewProcess{NewProcess: p}}
-	signHex := ""
-	if signHex, err = oracle.Sign(txBytes); err != nil {
-		return 0, err
-	}
-	vtx.Signature, err = hex.DecodeString(signHex)
-	if err != nil {
+	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
 		return 0, err
 	}
 	if req.Payload, err = proto.Marshal(&vtx); err != nil {
@@ -445,12 +435,7 @@ func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid []byte) error {
 		return err
 	}
 	vtx := models.Tx{Payload: &models.Tx_CancelProcess{CancelProcess: p}}
-	signHex := ""
-	if signHex, err = oracle.Sign(txBytes); err != nil {
-		return err
-	}
-	vtx.Signature, err = hex.DecodeString(signHex)
-	if err != nil {
+	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
 		return err
 	}
 	if req.Payload, err = proto.Marshal(&vtx); err != nil {

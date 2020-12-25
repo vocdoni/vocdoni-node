@@ -110,12 +110,10 @@ func testSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, app 
 	if !found {
 		t.Fatalf("signer for address %s not found", s.Address)
 	}
-	hexsignature := ""
-	if hexsignature, err = signer.Sign(txBytes); err != nil {
+	if vtx.Signature, err = signer.Sign(txBytes); err != nil {
 		t.Fatal(err)
 	}
 	vtx.Payload = &models.Tx_Vote{Vote: tx}
-	vtx.Signature = testutil.Hex2byte(t, hexsignature)
 
 	if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
 		t.Fatal(err)

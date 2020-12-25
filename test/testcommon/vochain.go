@@ -2,7 +2,6 @@ package testcommon
 
 import (
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -130,12 +129,11 @@ func SignAndPrepareTx(vtx *models.Tx) error {
 	if err != nil {
 		return err
 	}
-	hexsign, err := signer.Sign(txb)
+	vtx.Signature, err = signer.Sign(txb)
 	if err != nil {
 		return err
 	}
-	vtx.Signature, err = hex.DecodeString(hexsign)
-	return err
+	return nil
 }
 
 func NewVochainStateWithOracles(tb testing.TB) *vochain.State {

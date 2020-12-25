@@ -42,7 +42,7 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
-	var signature string
+	var signature []byte
 	if signer != nil {
 		signature, err = signer.Sign(reqInner)
 		if err != nil {
@@ -80,7 +80,7 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 	if respOuter.ID != reqOuter.ID {
 		return nil, fmt.Errorf("%s: %v", method, "request ID doesn'tb match")
 	}
-	if respOuter.Signature == "" {
+	if len(respOuter.Signature) == 0 {
 		return nil, fmt.Errorf("%s: empty signature in response: %s", method, message)
 	}
 	var respInner types.MetaResponse

@@ -207,7 +207,7 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal new process transaction")
 	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, fmt.Sprintf("%x", vtx.Signature))
+	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, vtx.Signature)
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +255,7 @@ func CancelProcessTxCheck(vtx *models.Tx, state *State) error { // LEGACY
 	if err != nil {
 		return fmt.Errorf("cannot marshal new process transaction")
 	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, fmt.Sprintf("%x", vtx.Signature))
+	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, vtx.Signature)
 	if err != nil {
 		return err
 	}
@@ -299,7 +299,7 @@ func SetProcessTxCheck(vtx *models.Tx, state *State) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal new process transaction")
 	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, fmt.Sprintf("%x", vtx.Signature))
+	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, vtx.Signature)
 	if err != nil {
 		return err
 	}

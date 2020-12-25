@@ -61,12 +61,12 @@ func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, cen
 }
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
-func verifySignatureAgainstOracles(oracles []ethcommon.Address, message []byte, signHex string) (bool, ethcommon.Address, error) {
+func verifySignatureAgainstOracles(oracles []ethcommon.Address, message, signature []byte) (bool, ethcommon.Address, error) {
 	signKeys := ethereum.NewSignKeys()
 	for _, oracle := range oracles {
 		signKeys.AddAuthKey(oracle)
 	}
-	return signKeys.VerifySender(message, signHex)
+	return signKeys.VerifySender(message, signature)
 }
 
 // GenerateNullifier generates the nullifier of a vote (hash(address+processId))

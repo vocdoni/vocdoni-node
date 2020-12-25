@@ -2,7 +2,6 @@ package ethevents
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -90,13 +89,9 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot marshal new process tx: %w", err)
 		}
-		signature, err := e.Signer.Sign(processTxBytes)
+		vtx.Signature, err = e.Signer.Sign(processTxBytes)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
-		}
-		vtx.Signature, err = hex.DecodeString(signature)
-		if err != nil {
-			return fmt.Errorf("cannot decode signature: %w", err)
 		}
 		vtx.Payload = &models.Tx_NewProcess{NewProcess: processTx}
 		txb, err := proto.Marshal(&vtx)
@@ -133,13 +128,9 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot marshal setProcess tx: %w", err)
 		}
-		signature, err := e.Signer.Sign(setStatusTxBytes)
+		vtx.Signature, err = e.Signer.Sign(setStatusTxBytes)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
-		}
-		vtx.Signature, err = hex.DecodeString(signature)
-		if err != nil {
-			return fmt.Errorf("cannot decode signature: %w", err)
 		}
 		vtx.Payload = &models.Tx_SetProcess{SetProcess: setProcessTx}
 		tx, err := proto.Marshal(&vtx)

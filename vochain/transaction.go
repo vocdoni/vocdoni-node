@@ -186,7 +186,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 				if err != nil {
 					return nil, fmt.Errorf("cannot marshal vote transaction: %w", err)
 				}
-				pubk, err := ethereum.PubKeyFromSignature(signedBytes, fmt.Sprintf("%x", vtx.Signature))
+				pubk, err := ethereum.PubKeyFromSignature(signedBytes, vtx.Signature)
 				if err != nil {
 					return nil, fmt.Errorf("cannot extract public key from signature: (%w)", err)
 				}
@@ -266,7 +266,7 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 		return fmt.Errorf("cannot marshal new process transaction")
 	}
 
-	if authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, fmt.Sprintf("%x", vtx.Signature)); err != nil {
+	if authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, vtx.Signature); err != nil {
 		return err
 	} else if !authorized {
 		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())
