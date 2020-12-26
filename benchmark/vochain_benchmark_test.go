@@ -91,7 +91,7 @@ func BenchmarkVochain(b *testing.B) {
 	// get census root
 	log.Infof("get root")
 	resp = doRequest("getRoot", nil)
-	mkRoot := testutil.Hex2byte(b, resp.Root)
+	mkRoot := resp.Root
 	if len(mkRoot) < 1 {
 		b.Fatalf("got invalid root")
 	}
@@ -195,7 +195,8 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	req.RootHash = mkRoot
 	req.ClaimData = poseidon
 	resp := doRequest("genProof", nil)
-	if len(resp.Siblings) == 0 {
+	siblings := resp.Siblings
+	if len(siblings) == 0 {
 		b.Fatalf("proof not generated while it should be generated correctly")
 	}
 
@@ -210,7 +211,6 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 		b.Fatalf("cannot marshal vote: %s", err)
 	}
 	// Generate VoteEnvelope package
-	siblings := testutil.Hex2byte(b, resp.Siblings)
 	tx := models.VoteEnvelope{
 		Nonce:       util.RandomBytes(32),
 		ProcessId:   processID,

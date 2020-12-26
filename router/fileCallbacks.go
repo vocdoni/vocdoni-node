@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -52,34 +51,27 @@ func (r *Router) fetchFile(request routerRequest) {
 		return
 	}
 
-	b64content := base64.StdEncoding.EncodeToString(content)
-	log.Debugf("file fetched, b64 size %d", len(b64content))
+	log.Debugf("file fetched, size %d", len(content))
 	var response types.MetaResponse
-	response.Content = b64content
+	response.Content = content
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) addFile(request routerRequest) {
 	log.Debugf("calling addFile")
-	reqType := request.Type
-	b64content, err := base64.StdEncoding.DecodeString(request.Content)
-	if err != nil {
-		r.sendError(request, "could not decode base64 content")
-		return
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
 	defer cancel()
-	switch reqType {
+	switch request.Type {
 	case "swarm":
 		// TODO
 	case "ipfs":
-		cid, err := r.storage.Publish(ctx, b64content)
+		cid, err := r.storage.Publish(ctx, request.Content)
 		if err != nil {
 			r.sendError(request,
 				fmt.Sprintf("cannot add file (%s)", err))
 			return
 		}
-		log.Debugf("added file %s, b64 size of %d", cid, len(b64content))
+		log.Debugf("added file %s, size %d", cid, len(request.Content))
 		var response types.MetaResponse
 		response.URI = r.storage.URIprefix() + cid
 		request.Send(r.buildReply(request, &response))

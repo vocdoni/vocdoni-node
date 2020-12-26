@@ -39,7 +39,7 @@ func (c *Client) GetEnvelopeStatus(nullifier, pid []byte) (bool, error) {
 	return *resp.Registered, nil
 }
 
-func (c *Client) GetProof(pubkey, root []byte) (string, error) {
+func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
 	var req types.MetaRequest
 	req.Method = "genProof"
 	req.CensusID = hex.EncodeToString(root)
@@ -48,10 +48,10 @@ func (c *Client) GetProof(pubkey, root []byte) (string, error) {
 
 	resp, err := c.Request(req, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(resp.Siblings) == 0 || !resp.Ok {
-		return "", fmt.Errorf("cannot get merkle proof: (%s)", resp.Message)
+		return nil, fmt.Errorf("cannot get merkle proof: (%s)", resp.Message)
 	}
 
 	return resp.Siblings, nil
@@ -102,16 +102,16 @@ func (c *Client) CensusSize(cid []byte) (int64, error) {
 	return *resp.Size, nil
 }
 
-func (c *Client) ImportCensus(signer *ethereum.SignKeys, uri string) (string, error) {
+func (c *Client) ImportCensus(signer *ethereum.SignKeys, uri string) ([]byte, error) {
 	var req types.MetaRequest
 	req.Method = "addCensus"
 	req.CensusID = RandomHex(16)
 	resp, err := c.Request(req, signer)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	req.Method = "importRemote"
@@ -119,20 +119,20 @@ func (c *Client) ImportCensus(signer *ethereum.SignKeys, uri string) (string, er
 	req.URI = uri
 	resp, err = c.Request(req, signer)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !resp.Ok {
-		return "", fmt.Errorf(resp.Message)
+		return nil, fmt.Errorf(resp.Message)
 	}
 
 	req.Method = "publish"
 	req.URI = ""
 	resp, err = c.Request(req, signer)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !resp.Ok {
-		return "", fmt.Errorf(resp.Message)
+		return nil, fmt.Errorf(resp.Message)
 	}
 	return resp.Root, nil
 }
@@ -185,7 +185,6 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]uint32, error) {
 
 func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root []byte, tolerateError bool) ([][]byte, error) {
 	var proofs [][]byte
-	var proof string
 	var err error
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
@@ -208,20 +207,14 @@ func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root []byte, tolera
 		if err != nil {
 			return proofs, err
 		}
-		if proof, err = c.GetProof(pub, root); err != nil {
-			if tolerateError {
-				continue
-			}
-			return proofs, err
-		}
-		proofb, err := hex.DecodeString(proof)
+		proof, err := c.GetProof(pub, root)
 		if err != nil {
 			if tolerateError {
 				continue
 			}
 			return proofs, err
 		}
-		proofs = append(proofs, proofb)
+		proofs = append(proofs, proof)
 		if (i+1)%100 == 0 {
 			log.Infof("proof generation progress for %s: %d%%", c.Addr, int(((i+1)*100)/(len(signers))))
 		}
@@ -569,10 +562,5 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	if err != nil {
 		return nil, "", err
 	}
-	root, _ = hex.DecodeString(resp.Root)
-	if len(root) < 1 {
-		return nil, "", fmt.Errorf("got invalid root")
-	}
-
-	return root, uri, nil
+	return resp.Root, uri, nil
 }
