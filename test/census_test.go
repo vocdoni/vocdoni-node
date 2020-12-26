@@ -45,7 +45,6 @@ import (
 	"go.vocdoni.io/dvote/types"
 
 	"go.vocdoni.io/dvote/test/testcommon"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 )
 
 var censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")
@@ -125,7 +124,7 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	resp = doRequest("getRoot", nil)
-	root := testutil.Hex2byte(t, resp.Root)
+	root := resp.Root
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
 	}
@@ -181,7 +180,7 @@ func TestCensus(t *testing.T) {
 	req.RootHash = nil
 	req.ClaimData = claims[1]
 	resp = doRequest("genProof", nil)
-	siblings := testutil.Hex2byte(t, resp.Siblings)
+	siblings := resp.Siblings
 	if len(siblings) == 0 {
 		t.Fatalf("proof not generated while it should be generated correctly")
 	}
@@ -215,7 +214,7 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	resp = doRequest("getRoot", nil)
-	root = testutil.Hex2byte(t, resp.Root)
+	root = resp.Root
 	if len(root) < 1 {
 		t.Fatalf("got invalid root")
 	}
@@ -226,7 +225,7 @@ func TestCensus(t *testing.T) {
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
-	if hex.EncodeToString(root) != resp.Root {
+	if !bytes.Equal(root, resp.Root) {
 		t.Fatalf("got invalid root from published census")
 	}
 
@@ -247,7 +246,7 @@ func TestCensus(t *testing.T) {
 
 	// getRoot
 	resp = doRequest("getRoot", nil)
-	if hex.EncodeToString(root) != resp.Root {
+	if !bytes.Equal(root, resp.Root) {
 		t.Fatalf("root is different after importing! %s != %s", root, resp.Root)
 	}
 

@@ -1,7 +1,6 @@
 package test
 
 import (
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -14,7 +13,6 @@ import (
 	"go.vocdoni.io/dvote/types"
 
 	"go.vocdoni.io/dvote/test/testcommon"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 )
 
 // The init function and flags are shared with the other benchmark files.
@@ -126,7 +124,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 	// GenProof valid
 	log.Infof("[%d] generating proofs", rint)
 	req.RootHash = nil
-	var siblings []string
+	var siblings [][]byte
 
 	for _, cl := range claims {
 		req.ClaimData = cl
@@ -139,8 +137,8 @@ func censusBench(b *testing.B, cl *client.Client) {
 
 	// CheckProof valid
 	log.Infof("[%d] checking proofs", rint)
-	for i, s := range siblings {
-		req.ProofData = testutil.Hex2byte(b, s)
+	for i, sibl := range siblings {
+		req.ProofData = sibl
 		req.ClaimData = claims[i]
 		resp = doRequest("checkProof", nil)
 		if resp.ValidProof != nil && !*resp.ValidProof {
@@ -168,8 +166,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 	var uris []string
 	for i := 0; i < 100; i++ {
 		req.Name = fmt.Sprintf("%d_%d", rint, i)
-		req.Content = base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("%d0123456789abcdef0123456789abc%d", rint, i)))
+		req.Content = []byte(fmt.Sprintf("%d0123456789abcdef0123456789abc%d", rint, i))
 		resp = doRequest("addFile", nil)
 		if len(resp.URI) < 1 {
 			b.Fatalf("%s wrong URI received", req.Method)

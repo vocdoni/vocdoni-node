@@ -2,6 +2,7 @@ package census
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -177,7 +178,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 	// Methods without rootHash
 	switch r.Method {
 	case "getRoot":
-		resp.Root = fmt.Sprintf("%x", tr.Root())
+		resp.Root = tr.Root()
 		return resp
 
 	case "addClaimBulk":
@@ -336,7 +337,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		if err != nil {
 			resp.SetError(err)
 		}
-		resp.Siblings = fmt.Sprintf("%x", siblings)
+		resp.Siblings = siblings
 		return resp
 
 	case "getSize":
@@ -406,18 +407,19 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		}
 		resp.URI = m.RemoteStorage.URIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
-		resp.Root = fmt.Sprintf("%x", tr.Root())
+		resp.Root = tr.Root()
 
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %s", resp.Root)
-		tr2, err := m.AddNamespace(resp.Root, r.PubKeys)
+		namespace := hex.EncodeToString(resp.Root)
+		tr2, err := m.AddNamespace(namespace, r.PubKeys)
 		if err != nil && err != ErrNamespaceExist {
 			log.Warnf("error creating local published census: %s", err)
 		} else if err == nil {
 			log.Infof("import claims to new census")
 			err = tr2.ImportDump(dump.ClaimsData)
 			if err != nil {
-				m.DelNamespace(resp.Root)
+				m.DelNamespace(namespace)
 				log.Warn(err)
 				resp.SetError(err)
 				return resp

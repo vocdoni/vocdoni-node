@@ -22,7 +22,7 @@ type MetaRequest struct {
 	CensusURI  string   `json:"censusUri,omitempty"`
 	ClaimData  []byte   `json:"claimData,omitempty"`
 	ClaimsData [][]byte `json:"claimsData,omitempty"`
-	Content    string   `json:"content,omitempty"`
+	Content    []byte   `json:"content,omitempty"`
 	Digested   bool     `json:"digested,omitempty"`
 	EntityId   HexBytes `json:"entityId,omitempty"`
 	From       int64    `json:"from,omitempty"`
@@ -96,7 +96,7 @@ type MetaResponse struct {
 	CensusList           []string   `json:"censusList,omitempty"`
 	ClaimsData           [][]byte   `json:"claimsData,omitempty"`
 	CommitmentKeys       []Key      `json:"commitmentKeys,omitempty"`
-	Content              string     `json:"content,omitempty"`
+	Content              []byte     `json:"content,omitempty"`
 	EncryptionPrivKeys   []Key      `json:"encryptionPrivKeys,omitempty"`
 	EncryptionPublicKeys []Key      `json:"encryptionPubKeys,omitempty"`
 	EntityID             string     `json:"entityId,omitempty"`
@@ -111,15 +111,15 @@ type MetaResponse struct {
 	Nullifiers           *[]string  `json:"nullifiers,omitempty"`
 	Ok                   bool       `json:"ok"`
 	Paused               *bool      `json:"paused,omitempty"`
-	Payload              string     `json:"payload,omitempty"` // TODO: sometimes hex, sometimes base64?
+	Payload              string     `json:"payload,omitempty"` // TODO(mvdan): sometimes hex, sometimes base64?
 	ProcessIDs           []string   `json:"processIds,omitempty"`
 	ProcessList          []string   `json:"processList,omitempty"`
 	Registered           *bool      `json:"registered,omitempty"`
 	Request              string     `json:"request"`
 	Results              [][]uint32 `json:"results,omitempty"`
 	RevealKeys           []Key      `json:"revealKeys,omitempty"`
-	Root                 string     `json:"root,omitempty"`
-	Siblings             string     `json:"siblings,omitempty"`
+	Root                 HexBytes   `json:"root,omitempty"`
+	Siblings             HexBytes   `json:"siblings,omitempty"`
 	Size                 *int64     `json:"size,omitempty"`
 	State                string     `json:"state,omitempty"`
 	Timestamp            int32      `json:"timestamp"`
