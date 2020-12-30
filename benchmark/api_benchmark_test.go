@@ -77,7 +77,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 	// addClaimBulk
 	log.Infof("[%d] add bulk claims (size %d)", rint, *censusSize)
 	var claims [][]byte
-	req.ClaimData = []byte{}
+	req.CensusKey = []byte{}
 	req.Digested = false
 	currentSize := *censusSize
 	i := 0
@@ -94,7 +94,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 			currentSize--
 		}
 		claims = append(claims, iclaims...)
-		req.ClaimsData = iclaims
+		req.CensusKeys = iclaims
 		doRequest("addClaimBulk", signer)
 		i++
 		log.Infof("census creation progress: %d%%", int((i*100*100)/(*censusSize)))
@@ -114,11 +114,11 @@ func censusBench(b *testing.B, cl *client.Client) {
 
 	// dumpPlain
 	log.Infof("[%d] dump claims", rint)
-	req.ClaimData = []byte{}
-	req.ClaimsData = [][]byte{}
+	req.CensusKey = []byte{}
+	req.CensusKeys = [][]byte{}
 	resp = doRequest("dumpPlain", signer)
-	if len(resp.ClaimsData) != len(claims) {
-		b.Fatalf("missing claims on dumpPlain, %d != %d", len(req.ClaimsData), len(claims))
+	if len(resp.CensusKeys) != len(claims) {
+		b.Fatalf("missing claims on dumpPlain, %d != %d", len(req.CensusKeys), len(claims))
 	}
 
 	// GenProof valid
@@ -127,7 +127,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 	var siblings [][]byte
 
 	for _, cl := range claims {
-		req.ClaimData = cl
+		req.CensusKey = cl
 		resp = doRequest("genProof", nil)
 		if len(resp.Siblings) == 0 {
 			b.Fatalf("proof not generated while it should be generated correctly")
@@ -139,7 +139,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 	log.Infof("[%d] checking proofs", rint)
 	for i, sibl := range siblings {
 		req.ProofData = sibl
-		req.ClaimData = claims[i]
+		req.CensusKey = claims[i]
 		resp = doRequest("checkProof", nil)
 		if resp.ValidProof != nil && !*resp.ValidProof {
 			b.Fatalf("proof is invalid but it should be valid")
@@ -149,7 +149,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 
 	// publish
 	log.Infof("[%d] publish census", rint)
-	req.ClaimsData = [][]byte{}
+	req.CensusKeys = [][]byte{}
 	doRequest("publish", signer)
 
 	// getRoot

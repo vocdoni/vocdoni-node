@@ -7,32 +7,34 @@ import (
 )
 
 func TestTree(t *testing.T) {
+	censusSize := 1000
 	storage := t.TempDir()
 	tr1, err := NewTree("test1", storage)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 100; i++ {
-		if err = tr1.Add([]byte(fmt.Sprintf("number %d", i)), []byte{}); err != nil {
+	for i := 0; i < censusSize; i++ {
+		if err = tr1.Add([]byte(fmt.Sprintf("number %d", i)), []byte(fmt.Sprintf("number %d", i))); err != nil {
 			t.Fatal(err)
 		}
 	}
 	root1 := tr1.Root()
-	claims, err := tr1.Dump(root1)
+	data, err := tr1.Dump(root1)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("dumped data size is: %d bytes", len(data))
 
 	tr2, err := NewTree("test2", storage)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = tr2.ImportDump(claims); err != nil {
+	if err = tr2.ImportDump(data); err != nil {
 		t.Fatal(err)
 	}
 	root2 := tr2.Root()
 	if !bytes.Equal(root1, root2) {
-		t.Errorf("roots are diferent but they should be equals (%x != %x)", root1, root2)
+		t.Errorf("roots are diferent but they should be equal (%x != %x)", root1, root2)
 	}
 	tr2.(*Tree).store.Commit()
 
@@ -48,8 +50,8 @@ func TestTree(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot get te size of the tree after reopen: (%s)", err)
 	}
-	if s != 100 {
-		t.Errorf("Size is wrong (%d != 100)", s)
+	if s != int64(censusSize) {
+		t.Errorf("Size is wrong (have %d, expexted %d)", s, censusSize)
 	}
 
 	// Check Root is still the same

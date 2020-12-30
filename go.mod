@@ -6,6 +6,7 @@ go 1.14
 // replace go.vocdoni.io/proto  => ../dvote-protobuf
 
 require (
+	git.sr.ht/~sircmpwn/go-bare v0.0.0-20201210182351-86af428a8287
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect

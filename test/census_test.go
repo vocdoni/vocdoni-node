@@ -87,7 +87,7 @@ func TestCensus(t *testing.T) {
 
 	// addClaim
 	req.CensusID = censusID
-	req.ClaimData = []byte("hello")
+	req.CensusKey = []byte("hello")
 	req.Digested = true
 	resp = doRequest("addClaim", signer2)
 	if !resp.Ok {
@@ -97,7 +97,7 @@ func TestCensus(t *testing.T) {
 	// addClaim not authorized; use Request directly
 	req.CensusID = censusID
 	req.Method = "addClaim"
-	req.ClaimData = []byte("hello2")
+	req.CensusKey = []byte("hello2")
 	resp, err = cl.Request(req, signer1)
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestCensus(t *testing.T) {
 
 	// GenProof valid
 	req.CensusID = censusID
-	req.ClaimData = []byte("hello")
+	req.CensusKey = []byte("hello")
 	resp = doRequest("genProof", nil)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
@@ -116,7 +116,7 @@ func TestCensus(t *testing.T) {
 
 	// GenProof not valid
 	req.CensusID = censusID
-	req.ClaimData = []byte("hello3")
+	req.CensusKey = []byte("hello3")
 	resp = doRequest("genProof", nil)
 	if len(resp.Siblings) > 1 {
 		t.Fatalf("proof should not exist!")
@@ -140,7 +140,7 @@ func TestCensus(t *testing.T) {
 
 	// addClaimBulk
 	var claims [][]byte
-	req.ClaimData = []byte{}
+	req.CensusKey = []byte{}
 	keys := testcommon.CreateEthRandomKeysBatch(t, *censusSize)
 	for _, key := range keys {
 		hash := snarks.Poseidon.Hash(crypto.FromECDSAPub(&key.Public))
@@ -149,15 +149,15 @@ func TestCensus(t *testing.T) {
 		}
 		claims = append(claims, hash)
 	}
-	req.ClaimsData = claims
+	req.CensusKeys = claims
 	resp = doRequest("addClaimBulk", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
 	}
 
 	// dumpPlain
-	req.ClaimData = []byte{}
-	req.ClaimsData = [][]byte{}
+	req.CensusKey = []byte{}
+	req.CensusKeys = [][]byte{}
 	resp = doRequest("dumpPlain", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)
@@ -165,7 +165,7 @@ func TestCensus(t *testing.T) {
 	var found bool
 	for _, c := range claims {
 		found = false
-		for _, c2 := range resp.ClaimsData {
+		for _, c2 := range resp.CensusKeys {
 			if bytes.Equal(c, c2) {
 				found = true
 				break
@@ -178,7 +178,7 @@ func TestCensus(t *testing.T) {
 
 	// GenProof valid
 	req.RootHash = nil
-	req.ClaimData = claims[1]
+	req.CensusKey = claims[1]
 	resp = doRequest("genProof", nil)
 	siblings := resp.Siblings
 	if len(siblings) == 0 {
@@ -205,7 +205,7 @@ func TestCensus(t *testing.T) {
 	req.RootHash = nil
 
 	// publish
-	req.ClaimsData = [][]byte{}
+	req.CensusKeys = [][]byte{}
 	resp = doRequest("publish", signer2)
 	if !resp.Ok {
 		t.Fatalf("%s failed", req.Method)

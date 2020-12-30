@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"git.sr.ht/~sircmpwn/go-bare"
 	"github.com/iden3/go-iden3-core/core/claims"
 	iden3db "github.com/iden3/go-iden3-core/db"
 	"go.vocdoni.io/dvote/censustree"
@@ -24,9 +25,18 @@ type Tree struct {
 	lastAccessUnix int64 // a unix timestamp, used via sync/atomic
 }
 
+type exportElement struct {
+	Key   []byte `bare:"key"`
+	Value []byte `bare:"value"`
+}
+
+type exportData struct {
+	Elements []exportElement `bare:"elements"`
+}
+
 const (
 	HashSize     = 32
-	MaxIndexSize = claims.IndexSlotLen
+	MaxKeySize   = claims.IndexSlotLen
 	MaxValueSize = claims.ValueSlotLen - 2 // -2 because the 2 first bytes are used to store the length of index and value
 )
 
@@ -68,7 +78,7 @@ func (t *Tree) Init(name, storageDir string) error {
 }
 
 func (t *Tree) MaxKeySize() int {
-	return MaxIndexSize
+	return MaxKeySize
 }
 
 // LastAccess returns the last time the Tree was accessed, in the form of a unix
@@ -207,8 +217,9 @@ func (t *Tree) Root() []byte {
 	return t.Tree.RootKey().Bytes()
 }
 
-// Dump returns the whole merkle tree serialized in a format that can be used on Import
-func (t *Tree) Dump(root []byte) (keys [][]byte, err error) {
+// Dump returns the whole merkle tree serialized in a format that can be used on Import.
+// TO-DO dump also Values (currently just keys are dumped).
+func (t *Tree) Dump(root []byte) (keys []byte, err error) {
 	rootHash := new(merkletree.Hash)
 	copy(rootHash[:], root)
 	t.updateAccessTime()
@@ -216,14 +227,16 @@ func (t *Tree) Dump(root []byte) (keys [][]byte, err error) {
 	if err != nil {
 		return nil, err
 	}
+	dump := exportData{}
 	for _, c := range claims {
 		cb, err := hex.DecodeString(c)
 		if err != nil {
 			return nil, err
 		}
-		keys = append(keys, cb)
+		ee := exportElement{Key: cb}
+		dump.Elements = append(dump.Elements, ee)
 	}
-	return keys, nil
+	return bare.Marshal(&dump)
 }
 
 // Size returns the number of leaf nodes on the merkle tree
@@ -271,12 +284,18 @@ func (t *Tree) DumpPlain(root []byte) ([][]byte, [][]byte, error) {
 	return indexes, values, err
 }
 
-// ImportDump imports a partial or whole tree previously exported with Dump()
-func (t *Tree) ImportDump(keys [][]byte) error {
+// ImportDump imports a partial or whole tree previously exported with Dump().
+// TO-DO import also values (currently only keys are imported)
+func (t *Tree) ImportDump(data []byte) error {
 	t.updateAccessTime()
 	claims := []string{}
-	for _, c := range claims {
-		claims = append(claims, fmt.Sprintf("%x", c))
+	census := new(exportData)
+	if err := bare.Unmarshal(data, census); err != nil {
+		return fmt.Errorf("importDump cannot unmarshal data: %w", err)
+	}
+	for _, ee := range census.Elements {
+		claims = append(claims, fmt.Sprintf("%x", ee.Key))
+
 	}
 	return t.Tree.ImportDumpedClaims(claims)
 }

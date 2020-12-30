@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"git.sr.ht/~sircmpwn/go-bare"
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
@@ -22,14 +23,22 @@ type Tree struct {
 	lastAccessUnix int64 // a unix timestamp, used via sync/atomic
 }
 
+type exportElement struct {
+	Key   []byte `bare:"key"`
+	Value []byte `bare:"value"`
+}
+
+type exportData struct {
+	Elements []exportElement `bare:"elements"`
+}
+
 const (
-	MaxIndexSize = 128
+	MaxKeySize   = 128
 	MaxValueSize = 256
 )
 
 // NewTree opens or creates a merkle tree under the given storage.
-// Note that the storage should be prefixed, since each tree should use an
-// entirely separate namespace for its database keys.
+// Note that each tree should use an entirely separate namespace for its database keys.
 func NewTree(name, storageDir string) (censustree.Tree, error) {
 	gs := new(gravitonstate.GravitonState)
 	iname := name
@@ -80,7 +89,7 @@ func (t *Tree) Init(name, storageDir string) error {
 }
 
 func (t *Tree) MaxKeySize() int {
-	return MaxIndexSize
+	return MaxKeySize
 }
 
 // LastAccess returns the last time the Tree was accessed, in the form of a unix
@@ -89,7 +98,6 @@ func (t *Tree) LastAccess() int64 {
 	return atomic.LoadInt64(&t.lastAccessUnix)
 }
 
-// TODO(mvdan): use sync/atomic instead to avoid introducing a bottleneck
 func (t *Tree) updateAccessTime() {
 	atomic.StoreInt64(&t.lastAccessUnix, time.Now().Unix())
 }
@@ -110,17 +118,16 @@ func (t *Tree) IsPublic() bool {
 	return atomic.LoadUint32(&t.public) == 1
 }
 
-// AddClaim adds a new claim to the merkle tree
+// Add adds a new claim to the merkle tree
 // A claim is composed of two parts: index and value
 //  1.index is mandatory, the data will be used for indexing the claim into to merkle tree
 //  2.value is optional, the data will not affect the indexing
-// Use value only if index is too small
 func (t *Tree) Add(index, value []byte) error {
 	t.updateAccessTime()
 	if len(index) < 4 {
 		return fmt.Errorf("claim index too small (%d), minimum size is 4 bytes", len(index))
 	}
-	if len(index) > MaxIndexSize || len(value) > MaxValueSize {
+	if len(index) > MaxKeySize || len(value) > MaxValueSize {
 		return fmt.Errorf("index or value claim data too big")
 	}
 	if err := t.Tree.Add(index, value); err != nil {
@@ -182,18 +189,24 @@ func (t *Tree) treeWithRoot(root []byte) statedb.StateTree {
 	return t.store.TreeWithRoot(root)
 }
 
-// Dump returns the whole merkle tree serialized in a format that can be used on Import
-func (t *Tree) Dump(root []byte) (claims [][]byte, err error) {
+// Dump returns the whole merkle tree serialized in a format that can be used on Import.
+// Byte seralization is performed using bare message protocol, it is a 40% size win over JSON
+func (t *Tree) Dump(root []byte) ([]byte, error) {
 	t.updateAccessTime()
 	tree := t.treeWithRoot(root)
 	if tree == nil {
 		return nil, fmt.Errorf("dump: root not found %x", root)
 	}
+	dump := exportData{}
 	tree.Iterate(nil, func(k, v []byte) bool {
-		claims = append(claims, k)
+		ee := exportElement{Key: make([]byte, len(k)), Value: make([]byte, len(v))}
+		// Copy elements since it's not safe to hold on to the []byte values from Iterate
+		copy(ee.Key, k[:])
+		copy(ee.Value, v[:])
+		dump.Elements = append(dump.Elements, ee)
 		return false
 	})
-	return
+	return bare.Marshal(&dump)
 }
 
 // Size returns the number of leaf nodes on the merkle tree
@@ -228,15 +241,18 @@ func (t *Tree) DumpPlain(root []byte) ([][]byte, [][]byte, error) {
 }
 
 // ImportDump imports a partial or whole tree previously exported with Dump()
-func (t *Tree) ImportDump(keys [][]byte) error {
+func (t *Tree) ImportDump(data []byte) error {
 	t.updateAccessTime()
-	var err error
-	for _, cb := range keys {
-		if err = t.Tree.Add(cb, []byte{}); err != nil {
+	census := new(exportData)
+	if err := bare.Unmarshal(data, census); err != nil {
+		return fmt.Errorf("importdump cannot unmarshal data: %w", err)
+	}
+	for _, ee := range census.Elements {
+		if err := t.Tree.Add(ee.Key, ee.Value); err != nil {
 			return err
 		}
 	}
-	_, err = t.store.Commit()
+	_, err := t.store.Commit()
 	return err
 }
 
@@ -249,7 +265,7 @@ func (t *Tree) Snapshot(root []byte) (censustree.Tree, error) {
 	return &Tree{store: t.store, Tree: tree, public: t.public}, nil
 }
 
-// HashExist checks if a hash exists as a node in the merkle tree
+// HashExists checks if a hash exists as a node in the merkle tree
 func (t *Tree) HashExists(hash []byte) (bool, error) {
 	t.updateAccessTime()
 	tree := t.treeWithRoot(hash)

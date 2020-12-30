@@ -11,9 +11,9 @@ type Tree interface {
 	GenProof(key, value []byte) (mproof []byte, err error)
 	CheckProof(key, value, root, mproof []byte) (included bool, err error)
 	Root() []byte
-	Dump(root []byte) (keys [][]byte, err error) // Dump must return a format compatible with ImportDump
+	Dump(root []byte) (data []byte, err error) // Dump must return a format compatible with ImportDump
 	DumpPlain(root []byte) (keys [][]byte, values [][]byte, err error)
-	ImportDump(keys [][]byte) error
+	ImportDump(data []byte) error
 	Size(root []byte) (int64, error)
 	Snapshot(root []byte) (Tree, error)
 	HashExists(hash []byte) (bool, error)

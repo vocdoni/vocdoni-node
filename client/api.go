@@ -44,7 +44,7 @@ func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
 	req.Method = "genProof"
 	req.CensusID = hex.EncodeToString(root)
 	req.Digested = true
-	req.ClaimData = snarks.Poseidon.Hash(pubkey)
+	req.CensusKey = snarks.Poseidon.Hash(pubkey)
 
 	resp, err := c.Request(req, nil)
 	if err != nil {
@@ -523,7 +523,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	}
 	log.Infof("add bulk claims (size %d)", censusSize)
 	req.Method = "addClaimBulk"
-	req.ClaimData = []byte{}
+	req.CensusKey = []byte{}
 	req.Digested = true
 	currentSize := censusSize
 	i := 0
@@ -547,7 +547,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 			claims = append(claims, snarks.Poseidon.Hash(pub))
 			currentSize--
 		}
-		req.ClaimsData = claims
+		req.CensusKeys = claims
 		resp, err := c.Request(req, signer)
 		if err != nil {
 			return nil, "", err
@@ -574,7 +574,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	// publish
 	log.Infof("publish census")
 	req.Method = "publish"
-	req.ClaimsData = [][]byte{}
+	req.CensusKeys = [][]byte{}
 	resp, err = c.Request(req, signer)
 	if err != nil {
 		return nil, "", err

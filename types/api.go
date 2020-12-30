@@ -18,28 +18,31 @@ type RequestMessage struct {
 // MetaRequest contains all of the possible request fields.
 // Fields must be in alphabetical order
 type MetaRequest struct {
-	CensusID   string   `json:"censusId,omitempty"`
-	CensusURI  string   `json:"censusUri,omitempty"`
-	ClaimData  []byte   `json:"claimData,omitempty"`
-	ClaimsData [][]byte `json:"claimsData,omitempty"`
-	Content    []byte   `json:"content,omitempty"`
-	Digested   bool     `json:"digested,omitempty"`
-	EntityId   HexBytes `json:"entityId,omitempty"`
-	From       int64    `json:"from,omitempty"`
-	FromID     HexBytes `json:"fromId,omitempty"`
-	ListSize   int64    `json:"listSize,omitempty"`
-	Method     string   `json:"method"`
-	Name       string   `json:"name,omitempty"`
-	Nullifier  HexBytes `json:"nullifier,omitempty"`
-	Payload    []byte   `json:"payload,omitempty"`
-	ProcessID  HexBytes `json:"processId,omitempty"`
-	ProofData  HexBytes `json:"proofData,omitempty"`
-	PubKeys    []string `json:"pubKeys,omitempty"`
-	RootHash   HexBytes `json:"rootHash,omitempty"`
-	Signature  HexBytes `json:"signature,omitempty"`
-	Timestamp  int32    `json:"timestamp"`
-	Type       string   `json:"type,omitempty"`
-	URI        string   `json:"uri,omitempty"`
+	CensusID     string     `json:"censusId,omitempty"`
+	CensusURI    string     `json:"censusUri,omitempty"`
+	CensusKey    []byte     `json:"censusKey,omitempty"`
+	CensusKeys   [][]byte   `json:"censusKeys,omitempty"`
+	CensusValue  HexBytes   `json:"censusValue,omitempty"`
+	CensusValues []HexBytes `json:"censusValues,omitempty"`
+	CensusDump   []byte     `json:"censusDump,omitempty"`
+	Content      []byte     `json:"content,omitempty"`
+	Digested     bool       `json:"digested,omitempty"`
+	EntityId     HexBytes   `json:"entityId,omitempty"`
+	From         int64      `json:"from,omitempty"`
+	FromID       HexBytes   `json:"fromId,omitempty"`
+	ListSize     int64      `json:"listSize,omitempty"`
+	Method       string     `json:"method"`
+	Name         string     `json:"name,omitempty"`
+	Nullifier    HexBytes   `json:"nullifier,omitempty"`
+	Payload      []byte     `json:"payload,omitempty"`
+	ProcessID    HexBytes   `json:"processId,omitempty"`
+	ProofData    HexBytes   `json:"proofData,omitempty"`
+	PubKeys      []string   `json:"pubKeys,omitempty"`
+	RootHash     HexBytes   `json:"rootHash,omitempty"`
+	Signature    HexBytes   `json:"signature,omitempty"`
+	Timestamp    int32      `json:"timestamp"`
+	Type         string     `json:"type,omitempty"`
+	URI          string     `json:"uri,omitempty"`
 }
 
 func (r MetaRequest) String() string {
@@ -94,7 +97,9 @@ type MetaResponse struct {
 	BlockTimestamp       int32      `json:"blockTimestamp,omitempty"`
 	CensusID             string     `json:"censusId,omitempty"`
 	CensusList           []string   `json:"censusList,omitempty"`
-	ClaimsData           [][]byte   `json:"claimsData,omitempty"`
+	CensusKeys           [][]byte   `json:"censusKeys,omitempty"`
+	CensusValues         []HexBytes `json:"censusValues,omitempty"`
+	CensusDump           []byte     `json:"censusDump,omitempty"`
 	CommitmentKeys       []Key      `json:"commitmentKeys,omitempty"`
 	Content              []byte     `json:"content,omitempty"`
 	EncryptionPrivKeys   []Key      `json:"encryptionPrivKeys,omitempty"`
@@ -165,8 +170,8 @@ func (r *MetaResponse) SetError(v interface{}) {
 }
 
 type CensusDump struct {
-	RootHash   []byte   `json:"rootHash"`
-	ClaimsData [][]byte `json:"claimsData"`
+	RootHash []byte `json:"rootHash"`
+	Data     []byte `json:"data"`
 }
 
 // VotePackage represents the payload of a vote (usually base64 encoded)

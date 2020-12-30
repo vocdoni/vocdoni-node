@@ -28,7 +28,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 	if fmt.Sprintf("%x", dump.RootHash) != util.TrimHex(cid) {
 		return fmt.Errorf("dump root Hash and census ID root hash do not match, aborting import")
 	}
-	if len(dump.ClaimsData) == 0 {
+	if len(dump.Data) == 0 {
 		return fmt.Errorf("no claims found on the retreived census")
 	}
 	tr, err := m.AddNamespace(cid, []string{})
@@ -37,7 +37,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 	} else if err != nil {
 		return fmt.Errorf("cannot create new census namespace: (%s)", err)
 	}
-	err = tr.ImportDump(dump.ClaimsData)
+	err = tr.ImportDump(dump.Data)
 	if err != nil {
 		return fmt.Errorf("error importing dump: %s", err)
 	}
@@ -48,7 +48,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 		return fmt.Errorf("root hash does not match on imported census, aborting import")
 	}
 	tr.Publish()
-	log.Infof("census imported successfully, %d claims. Status is public:%t", len(dump.ClaimsData), tr.IsPublic())
+	log.Infof("census imported successfully, %d claims. Status is public:%t", len(dump.Data), tr.IsPublic())
 	return nil
 }
 

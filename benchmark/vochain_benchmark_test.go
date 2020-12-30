@@ -79,13 +79,13 @@ func BenchmarkVochain(b *testing.B) {
 	log.Debug("add bulk claims")
 	var claims [][]byte
 	req.Digested = true
-	req.ClaimData = []byte{}
+	req.CensusKey = []byte{}
 	for i := 0; i < len(poseidonHashes); i++ {
 		claims = append(claims, poseidonHashes[i])
 	}
-	req.ClaimsData = claims
+	req.CensusKeys = claims
 	doRequest("addClaimBulk", dvoteServer.Signer)
-	req.ClaimsData = nil
+	req.CensusKeys = nil
 	req.Digested = false
 
 	// get census root
@@ -193,7 +193,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	log.Infof("generating proof for key %s with poseidon hash: %s", pub, poseidon)
 	req.CensusID = censusID
 	req.RootHash = mkRoot
-	req.ClaimData = poseidon
+	req.CensusKey = poseidon
 	resp := doRequest("genProof", nil)
 	siblings := resp.Siblings
 	if len(siblings) == 0 {

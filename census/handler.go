@@ -186,16 +186,22 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			addedClaims := 0
 			var invalidClaims []int
 			var err error
-			for i, data := range r.ClaimsData {
+			var value types.HexBytes
+			for i, key := range r.CensusKeys {
 				if !r.Digested {
-					data = snarks.Poseidon.Hash(data)
+					key = snarks.Poseidon.Hash(key)
 				}
-				err = tr.Add(data, []byte{})
+				if i < len(r.CensusValues) {
+					value = r.CensusValues[i]
+				} else {
+					value = []byte{}
+				}
+				err = tr.Add(key, value)
 				if err != nil {
 					log.Warnf("error adding claim: %s", err)
 					invalidClaims = append(invalidClaims, i)
 				} else {
-					log.Debugf("claim added %x", data)
+					log.Debugf("claim added %x/%x", key, value)
 					addedClaims++
 				}
 			}
@@ -210,19 +216,19 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 
 	case "addClaim":
 		if isAuth && validAuthPrefix {
-			if r.ClaimData == nil {
+			if r.CensusKey == nil {
 				resp.SetError("error decoding claim data")
 				return resp
 			}
-			data := r.ClaimData
+			data := r.CensusKey
 			if !r.Digested {
 				data = snarks.Poseidon.Hash(data)
 			}
-			err := tr.Add(data, []byte{})
+			err := tr.Add(data, r.CensusValue)
 			if err != nil {
 				resp.SetError(err)
 			} else {
-				log.Debugf("claim added %x", data)
+				log.Debugf("claim added %x/%x", data, r.CensusValue)
 			}
 		} else {
 			resp.SetError("invalid authentication")
@@ -231,13 +237,13 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 
 	case "importDump":
 		if isAuth && validAuthPrefix {
-			if len(r.ClaimsData) > 0 {
-				err := tr.ImportDump(r.ClaimsData)
+			if len(r.CensusKeys) > 0 {
+				err := tr.ImportDump(r.CensusDump)
 				if err != nil {
 					log.Warnf("error importing dump: %s", err)
 					resp.SetError(err)
 				} else {
-					log.Infof("dump imported successfully, %d claims", len(r.ClaimsData))
+					log.Infof("dump imported successfully, %d claims", len(r.CensusKeys))
 				}
 			}
 		} else {
@@ -276,16 +282,16 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			return resp
 		}
 		log.Infof("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
-		if len(dump.ClaimsData) > 0 {
-			err = tr.ImportDump(dump.ClaimsData)
+		if len(dump.Data) > 0 {
+			err = tr.ImportDump(dump.Data)
 			if err != nil {
 				log.Warnf("error importing dump: %s", err)
 				resp.SetError("error importing census")
 			} else {
-				log.Infof("dump imported successfully, %d claims", len(dump.ClaimsData))
+				log.Infof("dump imported successfully, %d bytes", len(dump.Data))
 			}
 		} else {
-			log.Warnf("no claims found on the retreived census")
+			log.Warnf("no data found on the retreived census")
 			resp.SetError("no claims found")
 		}
 		return resp
@@ -303,11 +309,11 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			root = r.RootHash
 		}
 		// Generate proof and return it
-		data := r.ClaimData
+		data := r.CensusKey
 		if !r.Digested {
 			data = snarks.Poseidon.Hash(data)
 		}
-		validProof, err := tr.CheckProof(data, []byte{}, root, r.ProofData)
+		validProof, err := tr.CheckProof(data, r.CensusValue, root, r.ProofData)
 		if err != nil {
 			resp.SetError(err)
 			return resp
@@ -329,11 +335,11 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 
 	switch r.Method {
 	case "genProof":
-		data := r.ClaimData
+		data := r.CensusKey
 		if !r.Digested {
 			data = snarks.Poseidon.Hash(data)
 		}
-		siblings, err := tr.GenProof(data, []byte{})
+		siblings, err := tr.GenProof(data, r.CensusValue)
 		if err != nil {
 			resp.SetError(err)
 		}
@@ -354,7 +360,6 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			return resp
 		}
 		// dump the claim data and return it
-		var dumpValues [][]byte
 		var root []byte
 		if len(r.RootHash) < 1 {
 			root = tr.Root()
@@ -363,14 +368,17 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		}
 		var err error
 		if r.Method == "dump" {
-			dumpValues, err = tr.Dump(root)
+			resp.CensusDump, err = tr.Dump(root)
+
 		} else {
-			dumpValues, _, err = tr.DumpPlain(root)
+			var vals [][]byte
+			resp.CensusKeys, vals, err = tr.DumpPlain(root)
+			for _, v := range vals {
+				resp.CensusValues = append(resp.CensusValues, types.HexBytes(v))
+			}
 		}
 		if err != nil {
 			resp.SetError(err)
-		} else {
-			resp.ClaimsData = dumpValues
 		}
 		return resp
 
@@ -386,7 +394,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		var dump types.CensusDump
 		dump.RootHash = tr.Root()
 		var err error
-		dump.ClaimsData, err = tr.Dump(tr.Root())
+		dump.Data, err = tr.Dump(tr.Root())
 		if err != nil {
 			resp.SetError(err)
 			log.Warnf("cannot dump census with root %s: %s", tr.Root(), err)
@@ -417,7 +425,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			log.Warnf("error creating local published census: %s", err)
 		} else if err == nil {
 			log.Infof("import claims to new census")
-			err = tr2.ImportDump(dump.ClaimsData)
+			err = tr2.ImportDump(dump.Data)
 			if err != nil {
 				m.DelNamespace(namespace)
 				log.Warn(err)
