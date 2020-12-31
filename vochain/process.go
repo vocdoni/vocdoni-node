@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"bytes"
 	"fmt"
 
 	"go.vocdoni.io/dvote/types"
@@ -176,6 +177,47 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 	return nil
 }
 
+// SetProcessResults sets the results for a given process. Only if the process status
+// allows and the format of the results allows to do so
+func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, commit bool) error {
+	process, err := v.Process(pid, false)
+	if err != nil {
+		return err
+	}
+	// Check if the state transition is valid
+	switch process.Status {
+	case models.ProcessStatus_ENDED:
+		break
+	case models.ProcessStatus_RESULTS:
+		return fmt.Errorf("results already added")
+	default:
+		return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
+	}
+
+	if process.Results != nil {
+		if len(process.Results.Votes) > 0 {
+			return fmt.Errorf("results already added: %+v", process.Results)
+		}
+	}
+
+	if !bytes.Equal(result.ProcessId, process.ProcessId) {
+		return fmt.Errorf("invalid process id on result provided, expected: %x got: %x", process.ProcessId, result.ProcessId)
+	}
+
+	if !bytes.Equal(result.EntityId, process.EntityId) {
+		return fmt.Errorf("invalid entity id on result provided, expected: %x got: %x", process.EntityId, result.EntityId)
+	}
+
+	if commit {
+		process.Results = result
+		process.Status = models.ProcessStatus_RESULTS
+		if err := v.setProcess(process, process.ProcessId); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
 func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 	tx := vtx.GetNewProcess()
@@ -312,5 +354,12 @@ func SetProcessTxCheck(vtx *models.Tx, state *State) error {
 		return fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
 	}
 
-	return state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
+	switch tx.Txtype {
+	case models.TxType_SET_PROCESS_RESULTS:
+		return state.SetProcessResults(process.ProcessId, tx.GetResults(), false)
+	case models.TxType_SET_PROCESS_STATUS:
+		return state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
+	default:
+		return fmt.Errorf("unknown set process tx type: %s", tx.Txtype)
+	}
 }

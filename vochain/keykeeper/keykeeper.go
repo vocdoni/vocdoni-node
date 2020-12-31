@@ -280,7 +280,7 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 	}
 	if p.EncryptionPublicKeys[k.myIndex] != "" {
 		if status == models.ProcessStatus_ENDED {
-			log.Infof("process canceled, scheduling reveal keys for next block")
+			log.Infof("process ended, scheduling reveal keys for next block")
 			k.blockPool[string(pid)] = k.vochain.State.Header(false).Height + 1
 		}
 	}

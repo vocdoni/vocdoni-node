@@ -27,14 +27,27 @@ const (
 	MaxOptions = 64
 )
 
+// EventListener is an interface used for executing custom functions during the
+// events of the tally of a process.
+type EventListener interface {
+	OnComputeResults(pid []byte, results *models.ProcessResult)
+}
+
+// AddEventListener adds a new event listener, to receive method calls on block
+// events as documented in EventListener.
+func (s *Scrutinizer) AddEventListener(l EventListener) {
+	s.eventListeners = append(s.eventListeners, l)
+}
+
 // Scrutinizer is the component which makes the accounting of the voting processes and keeps it indexed in a local database
 type Scrutinizer struct {
-	VochainState *vochain.State
-	Storage      db.Database
-	votePool     []*models.Vote
-	processPool  []*types.ScrutinizerOnProcessData
-	resultsPool  []*types.ScrutinizerOnProcessData
-	entityCount  int64
+	VochainState   *vochain.State
+	Storage        db.Database
+	votePool       []*models.Vote
+	processPool    []*types.ScrutinizerOnProcessData
+	resultsPool    []*types.ScrutinizerOnProcessData
+	entityCount    int64
+	eventListeners []EventListener
 }
 
 // NewScrutinizer returns an instance of the Scrutinizer

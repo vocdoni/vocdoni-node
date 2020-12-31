@@ -11,13 +11,14 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/scrutinizer"
 )
 
 // EthEvents service registers on the Ethereum smart contract specified in ethProcDomain, the provided event handlers
 // w3host and w3port must point to a working web3 websocket endpoint.
 // If endBlock=0 is enabled the service will only subscribe for new blocks
 func EthEvents(ctx context.Context, ensDomains []string, w3uri string, networkName string, startBlock *int64,
-	cm *census.Manager, signer *ethereum.SignKeys, vocapp *vochain.BaseApplication, evh []ethevents.EventHandler) error {
+	cm *census.Manager, signer *ethereum.SignKeys, vocapp *vochain.BaseApplication, evh []ethevents.EventHandler, sc *scrutinizer.Scrutinizer) error {
 	// TO-DO remove cm (add it on the eventHandler instead)
 	log.Infof("creating ethereum events service")
 	specs, err := chain.SpecsFor(networkName)
@@ -34,7 +35,7 @@ func EthEvents(ctx context.Context, ensDomains []string, w3uri string, networkNa
 	}
 	log.Debugf("contracts addresses on eth events: %+v", contractsAddresses)
 
-	ev, err := ethevents.NewEthEvents(contractsAddresses, signer, w3uri, cm, vocapp)
+	ev, err := ethevents.NewEthEvents(contractsAddresses, signer, w3uri, cm, vocapp, sc)
 	if err != nil {
 		return fmt.Errorf("couldn't create ethereum events listener: %w", err)
 	}
