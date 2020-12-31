@@ -10,6 +10,7 @@ import (
 
 	eth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	ethbind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	cttypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -20,6 +21,9 @@ import (
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	models "go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"go.vocdoni.io/dvote/chain"
@@ -52,6 +56,8 @@ type EthereumEvents struct {
 	Census CensusManager
 	// EventProcessor handles events pending to process
 	EventProcessor *EventProcessor
+	// Scrutinizer
+	Scrutinizer *scrutinizer.Scrutinizer
 }
 
 type logEvent struct {
@@ -88,7 +94,7 @@ type EventProcessor struct {
 
 // NewEthEvents creates a new Ethereum events handler
 // contractsAddresses: [0] -> Processes contract, [1] -> Namespace contract, [2] -> TokenStorageProof contract
-func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication) (*EthereumEvents, error) {
+func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication, scrutinizer *scrutinizer.Scrutinizer) (*EthereumEvents, error) {
 	// try to connect to default addr if w3Endpoint is empty
 	if len(w3Endpoint) == 0 {
 		return nil, fmt.Errorf("no w3Endpoint specified on Ethereum Events")
@@ -110,7 +116,7 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 	if err != nil {
 		return nil, fmt.Errorf("cannot read token storage proof contract abi: %w", err)
 	}
-	return &EthereumEvents{
+	ethev := &EthereumEvents{
 		// [0] -> Processes contract
 		// [1] -> Namespace contract
 		// [2] -> TokenStorageProof contract
@@ -127,7 +133,108 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 			eventQueue:            make(map[string]*logEvent),
 			eventProcessorRunning: false,
 		},
-	}, nil
+	}
+
+	if scrutinizer != nil {
+		log.Infof("starting ethevents with scrutinizer enabled")
+		ethev.Scrutinizer = scrutinizer
+		ethev.Scrutinizer.AddEventListener(ethev)
+	}
+
+	return ethev, nil
+}
+
+// OnComputeResults is called once a process result is computed by the scrutinizer.
+func (ev *EthereumEvents) OnComputeResults(pid []byte, results *models.ProcessResult) {
+	tctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
+	// check ethereum
+	// check ethereum process status
+	var fixedSizePID [types.ProcessIDsize]byte
+	copy(fixedSizePID[:], pid)
+	ethProcessData, err := ev.VotingHandle.VotingProcess.Get(&ethbind.CallOpts{Context: tctx}, fixedSizePID)
+	if err != nil {
+		log.Errorf("error fetching process %x from Ethereum: %s", pid, err)
+		return
+	}
+	if models.ProcessStatus(ethProcessData.Status) == models.ProcessStatus_RESULTS {
+		// check ethereum process results
+		ethResultsData, err := ev.VotingHandle.VotingProcess.GetResults(&ethbind.CallOpts{Context: tctx}, fixedSizePID)
+		if err != nil {
+			log.Errorf("error fetching process %x from Ethereum: %s", pid, err)
+			return
+		}
+		if ethResultsData.Height > 0 {
+			log.Errorf("process %x results already added to ethereum", pid)
+			return
+		}
+	} else if models.ProcessStatus(ethProcessData.Status) != models.ProcessStatus_ENDED {
+		log.Errorf("invalid process %x status for setting the results", pid)
+		return
+	} else {
+		// valid eth
+		// check vochain
+		// check vochain process status
+		vocProcessData, err := ev.VochainApp.State.Process(pid, true)
+		if err != nil {
+			log.Errorf("error fetching process %x from the Vochain: %s", pid, err)
+			return
+		}
+		if models.ProcessStatus(vocProcessData.Status) == models.ProcessStatus_RESULTS {
+			// check vochain process results
+			if len(vocProcessData.Results.Votes) > 0 {
+				log.Errorf("process %x results already added on the Vochain", pid)
+				return
+			}
+		} else if models.ProcessStatus(vocProcessData.Status) != models.ProcessStatus_ENDED {
+			log.Errorf("invalid process %x status %s for setting the results", pid, vocProcessData.Status)
+			return
+		} else {
+			// check scrutinizer
+			_, err = ev.Scrutinizer.Storage.Get(ev.Scrutinizer.Encode("results", pid))
+			if err == nil {
+				log.Errorf("process %x already computed", pid)
+				return
+			}
+			// not results found on ethereum, vochain or scrutinizer
+			// create setProcessTx
+			setprocessTxArgs := new(models.SetProcessTx)
+			// process id
+			setprocessTxArgs.ProcessId = pid
+			// process results
+			setprocessTxArgs.Results = results
+			// set also process status
+			setprocessTxArgs.Status = models.ProcessStatus_RESULTS.Enum()
+			setprocessTxArgs.Txtype = models.TxType_SET_PROCESS_RESULTS
+
+			vtx := models.Tx{}
+			resultsTxBytes, err := proto.Marshal(setprocessTxArgs)
+			if err != nil {
+				log.Errorf("cannot marshal set process results tx: %s", err)
+				return
+			}
+			vtx.Signature, err = ev.Signer.Sign(resultsTxBytes)
+			if err != nil {
+				log.Errorf("cannot sign oracle tx: %s", err)
+				return
+			}
+
+			vtx.Payload = &models.Tx_SetProcess{SetProcess: setprocessTxArgs}
+			txb, err := proto.Marshal(&vtx)
+			if err != nil {
+				log.Errorf("error marshaling set process results tx: %s", err)
+				return
+			}
+			log.Debugf("broadcasting Vochain Tx: %s", setprocessTxArgs.String())
+
+			res, err := ev.VochainApp.SendTX(txb)
+			if err != nil || res == nil {
+				log.Errorf("cannot broadcast tx: %s, res: %+v", err, res)
+				return
+			}
+			log.Infof("oracle transaction sent, hash:%s", res.Hash)
+		}
+	}
 }
 
 // AddEventHandler adds a new handler even log function

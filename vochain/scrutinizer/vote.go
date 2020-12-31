@@ -124,6 +124,12 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 		}
 	}
 
+	for _, l := range s.eventListeners {
+		pv.EntityId = p.EntityId
+		pv.ProcessId = p.ProcessId
+		l.OnComputeResults(processID, pv)
+	}
+
 	result, err := proto.Marshal(pv)
 	if err != nil {
 		return err

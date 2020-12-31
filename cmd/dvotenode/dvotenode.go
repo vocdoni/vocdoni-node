@@ -457,7 +457,7 @@ func main() {
 		log.Fatal("census API needs the vote API enabled")
 	}
 	if (globalCfg.Mode == "gateway" && globalCfg.API.Vote) || globalCfg.Mode == "miner" || globalCfg.Mode == "oracle" {
-		scrutinizer := (globalCfg.Mode == "gateway" && globalCfg.API.Results)
+		scrutinizer := (globalCfg.Mode == "gateway" && globalCfg.API.Results) || (globalCfg.Mode == "oracle")
 		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma, cm)
 		if err != nil {
 			log.Fatal(err)
@@ -553,7 +553,7 @@ func main() {
 				}
 			}
 
-			if err := service.EthEvents(context.Background(), globalCfg.EthConfig.VocdoniDomains, w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh); err != nil {
+			if err := service.EthEvents(context.Background(), globalCfg.EthConfig.VocdoniDomains, w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh, sc); err != nil {
 				log.Fatal(err)
 			}
 		}

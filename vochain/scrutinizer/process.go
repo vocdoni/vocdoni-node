@@ -184,6 +184,10 @@ func (s *Scrutinizer) encode(t string, data []byte) []byte {
 	panic("scrutinizer encode type not known")
 }
 
+func (s *Scrutinizer) Encode(t string, data []byte) []byte {
+	return s.encode(t, data)
+}
+
 func (s *Scrutinizer) addEntity(eid, pid []byte) {
 	// TODO(mvdan): use a prefixed database
 	storagekey := s.encode("entity", eid)

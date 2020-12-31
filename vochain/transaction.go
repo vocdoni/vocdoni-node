@@ -95,14 +95,24 @@ func AddTx(vtx *models.Tx, state *State, txID [32]byte, commit bool) ([]byte, er
 		}
 		if commit {
 			tx := vtx.GetSetProcess()
-			if tx.Status == nil {
-				return []byte{}, fmt.Errorf("set process status, status is nil")
+			switch tx.Txtype {
+			case models.TxType_SET_PROCESS_STATUS:
+				if tx.Status == nil {
+					return []byte{}, fmt.Errorf("set process status, status is nil")
+				}
+				return []byte{}, state.SetProcessStatus(tx.ProcessId, *tx.Status, true)
+			case models.TxType_SET_PROCESS_RESULTS:
+				if tx.Results == nil {
+					return []byte{}, fmt.Errorf("set process results, results is nil")
+				}
+				return []byte{}, state.SetProcessResults(tx.ProcessId, tx.Results, true)
+			default:
+				return []byte{}, fmt.Errorf("unknown set process tx type")
 			}
-			return []byte{}, state.SetProcessStatus(tx.ProcessId, *tx.Status, true)
 		}
 
 	default:
-		return []byte{}, fmt.Errorf("transaction type invalid")
+		return []byte{}, fmt.Errorf("invalid transaction type")
 	}
 	return []byte{}, nil
 }
