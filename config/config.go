@@ -1,5 +1,7 @@
 package config
 
+import "go.vocdoni.io/dvote/types"
+
 // DvoteCfg stores global configs for dvote
 type DvoteCfg struct {
 	// W3Config ethereum config options
@@ -35,13 +37,13 @@ type DvoteCfg struct {
 // ValidMode checks if the configured mode is valid
 func (c *DvoteCfg) ValidMode() bool {
 	switch c.Mode {
-	case "gateway":
+	case types.ModeGateway:
 		break
-	case "oracle":
+	case types.ModeOracle:
 		break
-	case "miner":
+	case types.ModeMiner:
 		break
-	case "web3":
+	case types.ModeWeb3:
 		break
 	default:
 		return false

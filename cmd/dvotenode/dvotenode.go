@@ -27,6 +27,7 @@ import (
 	"go.vocdoni.io/dvote/metrics"
 	vnet "go.vocdoni.io/dvote/net"
 	"go.vocdoni.io/dvote/service"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -61,7 +62,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.LogErrorFile = *flag.String("logErrorFile", "", "Log errors and warnings to a file")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
 	// TODO(mvdan): turn this into an enum to avoid human error
-	globalCfg.Mode = *flag.String("mode", "gateway", "global operation mode. Available options: [gateway,web3,oracle,miner]")
+	globalCfg.Mode = *flag.String("mode", types.ModeGateway, "global operation mode. Available options: [gateway,web3,oracle,miner]")
 	// api
 	globalCfg.API.Websockets = *flag.Bool("apiws", true, "enable websockets transport for the API")
 	globalCfg.API.HTTP = *flag.Bool("apihttp", true, "enable http transport for the API")
@@ -386,7 +387,7 @@ func main() {
 	if globalCfg.Dev {
 		log.Warn("developer mode is enabled, I hope you know what you are doing ;)")
 	}
-	if globalCfg.Mode == "gateway" || globalCfg.Mode == "oracle" || globalCfg.Mode == "web3" {
+	if globalCfg.Mode == types.ModeGateway || globalCfg.Mode == types.ModeOracle || globalCfg.Mode == types.ModeWeb3 {
 		// Signing key
 		signer = ethereum.NewSignKeys()
 		// Add Authorized keys for private methods
@@ -412,8 +413,8 @@ func main() {
 	}
 
 	// Websockets and HTTPs proxy
-	if globalCfg.Mode == "gateway" || globalCfg.Mode == "web3" || globalCfg.Metrics.Enabled ||
-		(globalCfg.Mode == "oracle" && len(globalCfg.W3Config.W3External) > 0) {
+	if globalCfg.Mode == types.ModeGateway || globalCfg.Mode == types.ModeWeb3 || globalCfg.Metrics.Enabled ||
+		(globalCfg.Mode == types.ModeOracle && len(globalCfg.W3Config.W3External) > 0) {
 		// Proxy service
 		pxy, err = service.Proxy(globalCfg.API.ListenHost, globalCfg.API.ListenPort,
 			globalCfg.API.Ssl.Domain, globalCfg.API.Ssl.DirCert)
@@ -427,7 +428,7 @@ func main() {
 		}
 	}
 
-	if globalCfg.Mode == "gateway" {
+	if globalCfg.Mode == types.ModeGateway {
 		// Storage service
 		storage, err = service.IPFS(globalCfg.Ipfs, signer, ma)
 		if err != nil {
@@ -445,7 +446,7 @@ func main() {
 	}
 
 	// Ethereum service
-	if (globalCfg.Mode == "gateway" && globalCfg.W3Config.Enabled) || globalCfg.Mode == "oracle" || globalCfg.Mode == "web3" {
+	if (globalCfg.Mode == types.ModeGateway && globalCfg.W3Config.Enabled) || globalCfg.Mode == types.ModeOracle || globalCfg.Mode == types.ModeWeb3 {
 		node, err = service.Ethereum(globalCfg.EthConfig, globalCfg.W3Config, pxy, signer, ma)
 		if err != nil {
 			log.Fatal(err)
@@ -456,8 +457,8 @@ func main() {
 	if !globalCfg.API.Vote && globalCfg.API.Census {
 		log.Fatal("census API needs the vote API enabled")
 	}
-	if (globalCfg.Mode == "gateway" && globalCfg.API.Vote) || globalCfg.Mode == "miner" || globalCfg.Mode == "oracle" {
-		scrutinizer := (globalCfg.Mode == "gateway" && globalCfg.API.Results) || (globalCfg.Mode == "oracle")
+	if (globalCfg.Mode == types.ModeGateway && globalCfg.API.Vote) || globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle {
+		scrutinizer := (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) || (globalCfg.Mode == types.ModeOracle)
 		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma, cm)
 		if err != nil {
 			log.Fatal(err)
@@ -467,7 +468,7 @@ func main() {
 			vnode.Node.Wait()
 		}()
 
-		if globalCfg.Mode == "gateway" && globalCfg.API.Tendermint {
+		if globalCfg.Mode == types.ModeGateway && globalCfg.API.Tendermint {
 			// Enable Tendermint RPC proxy endpoint on /tendermint
 			tp := strings.Split(globalCfg.VochainConfig.RPCListen, ":")
 			if len(tp) != 2 {
@@ -492,7 +493,7 @@ func main() {
 	}
 
 	// Start keykeeper service
-	if globalCfg.Mode == "oracle" && globalCfg.VochainConfig.KeyKeeperIndex > 0 {
+	if globalCfg.Mode == types.ModeOracle && globalCfg.VochainConfig.KeyKeeperIndex > 0 {
 		kk, err = keykeeper.NewKeyKeeper(globalCfg.VochainConfig.DataDir+"/keykeeper", vnode, signer, globalCfg.VochainConfig.KeyKeeperIndex)
 		if err != nil {
 			log.Fatal(err)
@@ -501,7 +502,7 @@ func main() {
 		go kk.PrintInfo(time.Second * 20)
 	}
 
-	if (globalCfg.Mode == "gateway" && globalCfg.W3Config.Enabled) || globalCfg.Mode == "oracle" {
+	if (globalCfg.Mode == types.ModeGateway && globalCfg.W3Config.Enabled) || globalCfg.Mode == types.ModeOracle {
 		// Wait for Ethereum to be ready
 		if !globalCfg.EthConfig.NoWaitSync {
 			requiredPeers := 2
@@ -521,7 +522,7 @@ func main() {
 		}
 
 		// Ethereum events service (needs Ethereum synchronized)
-		if !globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == "oracle" {
+		if !globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == types.ModeOracle {
 			var evh []ethevents.EventHandler
 			var w3uri string
 			switch {
@@ -537,7 +538,7 @@ func main() {
 				log.Fatal("web3 external must be websocket or IPC for event subscription")
 			}
 
-			if globalCfg.Mode == "oracle" {
+			if globalCfg.Mode == types.ModeOracle {
 				evh = append(evh, ethevents.HandleVochainOracle)
 			}
 
@@ -559,7 +560,7 @@ func main() {
 		}
 	}
 
-	if globalCfg.Mode == "gateway" {
+	if globalCfg.Mode == types.ModeGateway {
 		// dvote API service
 		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
 			if err := service.API(globalCfg.API, pxy, storage, cm, vnode, sc, vinfo, globalCfg.VochainConfig.RPCListen, signer, ma); err != nil {

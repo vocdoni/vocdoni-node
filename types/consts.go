@@ -14,6 +14,17 @@ var (
 const (
 	// All
 
+	// The mode defines the behaviour of the dvotenode
+
+	// ModeOracle start dvotenode as an oracle
+	ModeOracle = "oracle"
+	// ModeMiner start dvotenode as a miner
+	ModeMiner = "miner"
+	// ModeGateway start the dvotenode as a gateway
+	ModeGateway = "gateway"
+	// ModeWeb3 start the dvotenode as a web3 gateway
+	ModeWeb3 = "web3"
+
 	// ProcessIDsize is the size of a process id
 	ProcessIDsize = 32
 	// EntityIDsize is the size of an entity id which is the same of an ethereum address
