@@ -145,96 +145,93 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 }
 
 // OnComputeResults is called once a process result is computed by the scrutinizer.
-func (ev *EthereumEvents) OnComputeResults(pid []byte, results *models.ProcessResult) {
+func (ev *EthereumEvents) OnComputeResults(results *models.ProcessResult) {
 	tctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
 	// check ethereum
 	// check ethereum process status
 	var fixedSizePID [types.ProcessIDsize]byte
-	copy(fixedSizePID[:], pid)
+	copy(fixedSizePID[:], results.ProcessId)
 	ethProcessData, err := ev.VotingHandle.VotingProcess.Get(&ethbind.CallOpts{Context: tctx}, fixedSizePID)
 	if err != nil {
-		log.Errorf("error fetching process %x from Ethereum: %s", pid, err)
+		log.Errorf("error fetching process %x from Ethereum: %s", results.ProcessId, err)
 		return
 	}
 	if models.ProcessStatus(ethProcessData.Status) == models.ProcessStatus_RESULTS {
 		// check ethereum process results
 		ethResultsData, err := ev.VotingHandle.VotingProcess.GetResults(&ethbind.CallOpts{Context: tctx}, fixedSizePID)
 		if err != nil {
-			log.Errorf("error fetching process %x from Ethereum: %s", pid, err)
+			log.Errorf("error fetching process %x from Ethereum: %s", results.ProcessId, err)
 			return
 		}
 		if ethResultsData.Height > 0 {
-			log.Errorf("process %x results already added to ethereum", pid)
+			log.Errorf("process %x results already added to ethereum", results.ProcessId)
 			return
 		}
 	} else if models.ProcessStatus(ethProcessData.Status) != models.ProcessStatus_ENDED {
-		log.Errorf("invalid process %x status for setting the results", pid)
+		log.Errorf("invalid process %x status for setting the results", results.ProcessId)
 		return
-	} else {
-		// valid eth
-		// check vochain
-		// check vochain process status
-		vocProcessData, err := ev.VochainApp.State.Process(pid, true)
-		if err != nil {
-			log.Errorf("error fetching process %x from the Vochain: %s", pid, err)
-			return
-		}
-		if models.ProcessStatus(vocProcessData.Status) == models.ProcessStatus_RESULTS {
-			// check vochain process results
-			if len(vocProcessData.Results.Votes) > 0 {
-				log.Errorf("process %x results already added on the Vochain", pid)
-				return
-			}
-		} else if models.ProcessStatus(vocProcessData.Status) != models.ProcessStatus_ENDED {
-			log.Errorf("invalid process %x status %s for setting the results", pid, vocProcessData.Status)
-			return
-		} else {
-			// check scrutinizer
-			_, err = ev.Scrutinizer.Storage.Get(ev.Scrutinizer.Encode("results", pid))
-			if err == nil {
-				log.Errorf("process %x already computed", pid)
-				return
-			}
-			// not results found on ethereum, vochain or scrutinizer
-			// create setProcessTx
-			setprocessTxArgs := new(models.SetProcessTx)
-			// process id
-			setprocessTxArgs.ProcessId = pid
-			// process results
-			setprocessTxArgs.Results = results
-			// set also process status
-			setprocessTxArgs.Status = models.ProcessStatus_RESULTS.Enum()
-			setprocessTxArgs.Txtype = models.TxType_SET_PROCESS_RESULTS
-
-			vtx := models.Tx{}
-			resultsTxBytes, err := proto.Marshal(setprocessTxArgs)
-			if err != nil {
-				log.Errorf("cannot marshal set process results tx: %s", err)
-				return
-			}
-			vtx.Signature, err = ev.Signer.Sign(resultsTxBytes)
-			if err != nil {
-				log.Errorf("cannot sign oracle tx: %s", err)
-				return
-			}
-
-			vtx.Payload = &models.Tx_SetProcess{SetProcess: setprocessTxArgs}
-			txb, err := proto.Marshal(&vtx)
-			if err != nil {
-				log.Errorf("error marshaling set process results tx: %s", err)
-				return
-			}
-			log.Debugf("broadcasting Vochain Tx: %s", setprocessTxArgs.String())
-
-			res, err := ev.VochainApp.SendTX(txb)
-			if err != nil || res == nil {
-				log.Errorf("cannot broadcast tx: %s, res: %+v", err, res)
-				return
-			}
-			log.Infof("oracle transaction sent, hash:%s", res.Hash)
-		}
 	}
+
+	// valid eth
+	// check vochain
+	// check vochain process status
+	vocProcessData, err := ev.VochainApp.State.Process(results.ProcessId, true)
+	if err != nil {
+		log.Errorf("error fetching process %x from the Vochain: %s", results.ProcessId, err)
+		return
+	}
+	if models.ProcessStatus(vocProcessData.Status) == models.ProcessStatus_RESULTS {
+		// check vochain process results
+		if len(vocProcessData.Results.Votes) > 0 {
+			log.Errorf("process %x results already added on the Vochain", results.ProcessId)
+			return
+		}
+	} else if models.ProcessStatus(vocProcessData.Status) != models.ProcessStatus_ENDED {
+		log.Errorf("invalid process %x status %s for setting the results", results.ProcessId, vocProcessData.Status)
+		return
+	}
+	// check scrutinizer
+	_, err = ev.Scrutinizer.Storage.Get(ev.Scrutinizer.Encode("results", results.ProcessId))
+	if err == nil {
+		log.Errorf("process %x already computed", results.ProcessId)
+		return
+	}
+	// not results found on ethereum, vochain or scrutinizer
+	// create setProcessTx
+	setprocessTxArgs := &models.SetProcessTx{
+		ProcessId: results.ProcessId,
+		Results:   results,
+		Status:    models.ProcessStatus_RESULTS.Enum(),
+		Txtype:    models.TxType_SET_PROCESS_RESULTS,
+	}
+
+	vtx := models.Tx{}
+	resultsTxBytes, err := proto.Marshal(setprocessTxArgs)
+	if err != nil {
+		log.Errorf("cannot marshal set process results tx: %s", err)
+		return
+	}
+	vtx.Signature, err = ev.Signer.Sign(resultsTxBytes)
+	if err != nil {
+		log.Errorf("cannot sign oracle tx: %s", err)
+		return
+	}
+
+	vtx.Payload = &models.Tx_SetProcess{SetProcess: setprocessTxArgs}
+	txb, err := proto.Marshal(&vtx)
+	if err != nil {
+		log.Errorf("error marshaling set process results tx: %s", err)
+		return
+	}
+	log.Debugf("broadcasting Vochain Tx: %s", setprocessTxArgs.String())
+
+	res, err := ev.VochainApp.SendTX(txb)
+	if err != nil || res == nil {
+		log.Errorf("cannot broadcast tx: %s, res: %+v", err, res)
+		return
+	}
+	log.Infof("oracle transaction sent, hash:%s", res.Hash)
 }
 
 // AddEventHandler adds a new handler even log function
