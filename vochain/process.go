@@ -187,17 +187,15 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 	// Check if the state transition is valid
 	switch process.Status {
 	case models.ProcessStatus_ENDED:
-		break
+		// process must be ended for setting the results
 	case models.ProcessStatus_RESULTS:
 		return fmt.Errorf("results already added")
 	default:
 		return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
 	}
 
-	if process.Results != nil {
-		if len(process.Results.Votes) > 0 {
-			return fmt.Errorf("results already added: %+v", process.Results)
-		}
+	if process.Results != nil && len(process.Results.Votes) > 0 {
+		return fmt.Errorf("results already added: %+v", process.Results)
 	}
 
 	if !bytes.Equal(result.ProcessId, process.ProcessId) {

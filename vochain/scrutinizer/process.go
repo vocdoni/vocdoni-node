@@ -89,7 +89,7 @@ func (s *Scrutinizer) isLiveResultsProcess(processID []byte) (bool, error) {
 
 // checks if the current heigh has scheduled ending processes, if so compute and store results
 func (s *Scrutinizer) checkFinishedProcesses(height int64) {
-	pidListBytes, err := s.Storage.Get(s.encode("processEnding", []byte(fmt.Sprintf("%d", height))))
+	pidListBytes, err := s.Storage.Get(s.Encode("processEnding", []byte(fmt.Sprintf("%d", height))))
 	if err != nil || pidListBytes == nil {
 		return
 	}
@@ -104,7 +104,7 @@ func (s *Scrutinizer) checkFinishedProcesses(height int64) {
 		}
 	}
 	// Remove entry from storage
-	if err := s.Storage.Del(s.encode("processEnding", []byte(fmt.Sprintf("%d", height)))); err != nil {
+	if err := s.Storage.Del(s.Encode("processEnding", []byte(fmt.Sprintf("%d", height)))); err != nil {
 		log.Error(err)
 	}
 }
@@ -116,7 +116,7 @@ func (s *Scrutinizer) newEmptyLiveProcess(pid []byte) (*models.ProcessResult, er
 	if err != nil {
 		return nil, err
 	}
-	if err := s.Storage.Put(s.encode("liveProcess", pid), process); err != nil {
+	if err := s.Storage.Put(s.Encode("liveProcess", pid), process); err != nil {
 		return nil, err
 	}
 	return pv, nil
@@ -127,7 +127,7 @@ func (s *Scrutinizer) newEmptyLiveProcess(pid []byte) (*models.ProcessResult, er
 func (s *Scrutinizer) registerPendingProcess(pid []byte, height int64) {
 	scheduledBlock := []byte(fmt.Sprintf("%d", height))
 
-	pidListBytes, err := s.Storage.Get(s.encode("processEnding", scheduledBlock))
+	pidListBytes, err := s.Storage.Get(s.Encode("processEnding", scheduledBlock))
 	// TODO(mvdan): use a generic "key not found" database error instead
 	if err != nil && err != badger.ErrKeyNotFound {
 		log.Error(err)
@@ -147,7 +147,7 @@ func (s *Scrutinizer) registerPendingProcess(pid []byte, height int64) {
 		log.Error(err)
 		return
 	}
-	if err = s.Storage.Put(s.encode("processEnding", scheduledBlock), pidListBytes); err != nil {
+	if err = s.Storage.Put(s.Encode("processEnding", scheduledBlock), pidListBytes); err != nil {
 		log.Error(err)
 		return
 	}
@@ -156,7 +156,7 @@ func (s *Scrutinizer) registerPendingProcess(pid []byte, height int64) {
 
 func (s *Scrutinizer) addLiveResultsProcess(pid []byte) {
 	log.Infof("add new process %x to live results", pid)
-	process, err := s.Storage.Get(s.encode("liveProcess", pid))
+	process, err := s.Storage.Get(s.Encode("liveProcess", pid))
 	if err != nil && err != badger.ErrKeyNotFound {
 		log.Error(err)
 		return
@@ -170,7 +170,8 @@ func (s *Scrutinizer) addLiveResultsProcess(pid []byte) {
 	}
 }
 
-func (s *Scrutinizer) encode(t string, data []byte) []byte {
+// Encode encodes scrutinizer specific data adding a prefix for its inner database
+func (s *Scrutinizer) Encode(t string, data []byte) []byte {
 	switch t {
 	case "entity":
 		return append([]byte{types.ScrutinizerEntityPrefix}, data...)
@@ -184,13 +185,9 @@ func (s *Scrutinizer) encode(t string, data []byte) []byte {
 	panic("scrutinizer encode type not known")
 }
 
-func (s *Scrutinizer) Encode(t string, data []byte) []byte {
-	return s.encode(t, data)
-}
-
 func (s *Scrutinizer) addEntity(eid, pid []byte) {
 	// TODO(mvdan): use a prefixed database
-	storagekey := s.encode("entity", eid)
+	storagekey := s.Encode("entity", eid)
 	processList, err := s.Storage.Get(storagekey)
 	if err != nil && err != badger.ErrKeyNotFound {
 		log.Errorf("addEntity: %s", err)
