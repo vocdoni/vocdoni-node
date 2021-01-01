@@ -12,7 +12,6 @@ import (
 	psload "github.com/shirou/gopsutil/load"
 	psmem "github.com/shirou/gopsutil/mem"
 	psnet "github.com/shirou/gopsutil/net"
-	amino "github.com/tendermint/go-amino"
 
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/crypto"
@@ -113,7 +112,6 @@ type Router struct {
 	Scrutinizer  *scrutinizer.Scrutinizer
 	PrivateCalls uint64
 	PublicCalls  uint64
-	codec        *amino.Codec
 	APIs         []string
 }
 
@@ -126,7 +124,6 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage,
 	r.inbound = inbound
 	r.storage = storage
 	r.signer = signer
-	r.codec = amino.NewCodec()
 	r.metricsagent = metricsagent
 	r.allowPrivate = allowPrivate
 	r.registerPublic("getGatewayInfo", r.info)
