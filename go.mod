@@ -55,7 +55,6 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.1
-	github.com/tendermint/go-amino v0.16.0
 	github.com/tendermint/tendermint v0.34.1-dev1.0.20201222081633-c4730bb46a0c
 	github.com/tendermint/tm-db v0.6.3
 	github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"strconv"
@@ -18,9 +17,9 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	amino "github.com/tendermint/go-amino"
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -103,23 +102,15 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 
 // NewNodeKey returns and saves to the disk storage a tendermint node key
 func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (p2p.NodeKey, error) {
-	var privKey crypto25519.PrivKey
 	var nodeKey p2p.NodeKey
 	keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
 	if err != nil {
 		return nodeKey, fmt.Errorf("cannot decode private key: (%s)", err)
 	}
-	privKey = make([]byte, len(keyBytes))
-	copy(privKey[:], keyBytes[:])
-	nodeKey.PrivKey = privKey
+	nodeKey.PrivKey = crypto25519.PrivKey(keyBytes)
 	nodeKey.ID = p2p.PubKeyToID(nodeKey.PrivKey.PubKey())
 	// Write nodeKey to disk
-	cdc := AminoCodec()
-	jsonBytes, err := cdc.MarshalJSON(nodeKey)
-	if err != nil {
-		return nodeKey, err
-	}
-	if err := ioutil.WriteFile(tconfig.NodeKeyFile(), jsonBytes, 0600); err != nil {
+	if err := nodeKey.SaveAs(tconfig.NodeKeyFile()); err != nil {
 		return nodeKey, err
 	}
 	return nodeKey, nil
@@ -143,8 +134,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.C
 		}
 	}
 	appState.Oracles = oracles
-	cdc := amino.NewCodec()
-	appStateBytes, err := cdc.MarshalJSON(appState)
+	appStateBytes, err := tmjson.Marshal(appState)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -156,7 +146,9 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.C
 		AppState:        appStateBytes,
 	}
 
-	genBytes, err := cdc.MarshalJSON(genDoc)
+	// Note that the genesis doc bytes are later consumed by tendermint,
+	// which expects amino-flavored json. We can't use encoding/json.
+	genBytes, err := tmjson.Marshal(genDoc)
 	if err != nil {
 		return []byte{}, err
 	}

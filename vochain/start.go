@@ -2,8 +2,6 @@
 package vochain
 
 import (
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -11,20 +9,17 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/config"
-	"go.vocdoni.io/dvote/util"
 
-	amino "github.com/tendermint/go-amino"
 	tmcfg "github.com/tendermint/tendermint/config"
-	tmcrypto "github.com/tendermint/tendermint/crypto"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	mempl "github.com/tendermint/tendermint/mempool"
 
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
+	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
 	nm "github.com/tendermint/tendermint/node"
 	"github.com/tendermint/tendermint/p2p"
-	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
 	"go.vocdoni.io/dvote/log"
 )
@@ -241,7 +236,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 
 	log.Infof("tendermint private key %x", pv.Key.PrivKey)
 	log.Infof("tendermint address: %s", pv.Key.Address)
-	aminoPrivKey, aminoPubKey, err := HexKeyToAmino(fmt.Sprintf("%x", pv.Key.PrivKey))
+	aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
 	if err != nil {
 		return nil, err
 	}
@@ -301,55 +296,18 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	return node, nil
 }
 
-// HexKeyToAmino is a helper function that transforms a standard EDDSA hex string key into Tendermint like amino format
-// usefull for creating genesis files
-func HexKeyToAmino(hexKey string) (private, public string, err error) {
-	// TO-DO find a way to get rid of this
-
-	// Needed for recovering the tendermint compatible amino private key format
-	type aminoKey struct {
-		Type  string `json:"type"`
-		Value string `json:"value"`
-	}
-	type aminoKeyFile struct {
-		Privkey aminoKey `json:"priv_key"`
-		PubKey  aminoKey `json:"pub_key"`
-	}
-
-	key, err := hex.DecodeString(util.TrimHex(hexKey))
+// AminoKeys is a helper function that transforms a standard EDDSA key into
+// Tendermint like amino format useful for creating genesis files.
+func AminoKeys(key crypto25519.PrivKey) (private, public []byte, err error) {
+	aminoKey, err := tmjson.Marshal(key)
 	if err != nil {
-		return "", "", err
+		return nil, nil, err
 	}
 
-	cdc := AminoCodec()
-	var pv privval.FilePVKey
-	privKey := crypto25519.PrivKey(make([]byte, 64))
-	if n := copy(privKey[:], key[:]); n != 64 {
-		return "", "", fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
-	}
-
-	pv.Address = privKey.PubKey().Address()
-	pv.PrivKey = privKey
-	pv.PubKey = privKey.PubKey()
-
-	jsonBytes, err := cdc.MarshalJSON(pv)
+	aminoPubKey, err := tmjson.Marshal(key.PubKey())
 	if err != nil {
-		return "", "", fmt.Errorf("cannot encode key to amino: (%s)", err)
+		return nil, nil, err
 	}
-	var aminokf aminoKeyFile
-	if err := json.Unmarshal(jsonBytes, &aminokf); err != nil {
-		return "", "", err
-	}
-	return aminokf.Privkey.Value, aminokf.PubKey.Value, nil
-}
 
-// AminoCodec creates and amino coded and registers the tendermint crypto types
-func AminoCodec() *amino.Codec {
-	// Temporary until Tendermint is updated
-	cdc := amino.NewCodec()
-	cdc.RegisterInterface((*tmcrypto.PubKey)(nil), nil)
-	cdc.RegisterInterface((*tmcrypto.PrivKey)(nil), nil)
-	cdc.RegisterConcrete(crypto25519.PubKey{}, "com.tendermint/PubKey", nil)
-	cdc.RegisterConcrete(crypto25519.PrivKey{}, "com.tendermint/PrivKey", nil)
-	return cdc
+	return aminoKey, aminoPubKey, nil
 }
