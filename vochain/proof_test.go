@@ -1,11 +1,11 @@
 package vochain
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/gobuffalo/packr/v2/file/resolver/encoding/hex"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/vocdoni/eth-storage-proof/ethstorageproof"
 	"go.vocdoni.io/dvote/crypto/ethereum"
