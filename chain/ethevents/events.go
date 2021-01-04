@@ -47,6 +47,8 @@ type EthereumEvents struct {
 	// dial web3 address
 	DialAddr string
 	// list of handler functions that will be called on events
+	// TODO: add context on callbacks
+	// TODO: return errors on callbacks
 	EventHandlers []EventHandler
 	// ethereum subscribed events
 	Signer *ethereum.SignKeys
@@ -146,20 +148,18 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 
 // OnComputeResults is called once a process result is computed by the scrutinizer.
 func (ev *EthereumEvents) OnComputeResults(results *models.ProcessResult) {
-	tctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-	defer cancel()
 	// check ethereum
 	// check ethereum process status
 	var fixedSizePID [types.ProcessIDsize]byte
 	copy(fixedSizePID[:], results.ProcessId)
-	ethProcessData, err := ev.VotingHandle.VotingProcess.Get(&ethbind.CallOpts{Context: tctx}, fixedSizePID)
+	ethProcessData, err := ev.VotingHandle.VotingProcess.Get(&ethbind.CallOpts{Context: context.TODO()}, fixedSizePID)
 	if err != nil {
 		log.Errorf("error fetching process %x from Ethereum: %s", results.ProcessId, err)
 		return
 	}
 	if models.ProcessStatus(ethProcessData.Status) == models.ProcessStatus_RESULTS {
 		// check ethereum process results
-		ethResultsData, err := ev.VotingHandle.VotingProcess.GetResults(&ethbind.CallOpts{Context: tctx}, fixedSizePID)
+		ethResultsData, err := ev.VotingHandle.VotingProcess.GetResults(&ethbind.CallOpts{Context: context.TODO()}, fixedSizePID)
 		if err != nil {
 			log.Errorf("error fetching process %x from Ethereum: %s", results.ProcessId, err)
 			return

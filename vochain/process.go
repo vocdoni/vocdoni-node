@@ -179,41 +179,38 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 
 // SetProcessResults sets the results for a given process. Only if the process status
 // allows and the format of the results allows to do so
+// TODO: allow result confirm with another Tx (in order to have N/M oracle signatures)
 func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, commit bool) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
 	}
 	// Check if the state transition is valid
-	switch process.Status {
-	case models.ProcessStatus_ENDED:
-		// process must be ended for setting the results
-	case models.ProcessStatus_RESULTS:
-		return fmt.Errorf("results already added")
-	default:
-		return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
-	}
-
-	if process.Results != nil && len(process.Results.Votes) > 0 {
-		return fmt.Errorf("results already added: %+v", process.Results)
-	}
-
-	if !bytes.Equal(result.ProcessId, process.ProcessId) {
-		return fmt.Errorf("invalid process id on result provided, expected: %x got: %x", process.ProcessId, result.ProcessId)
-	}
-
-	if !bytes.Equal(result.EntityId, process.EntityId) {
-		return fmt.Errorf("invalid entity id on result provided, expected: %x got: %x", process.EntityId, result.EntityId)
-	}
-
-	if commit {
-		process.Results = result
-		process.Status = models.ProcessStatus_RESULTS
-		if err := v.setProcess(process, process.ProcessId); err != nil {
-			return err
+	if process.Status == models.ProcessStatus_RESULTS {
+		if process.Results != result {
+			return fmt.Errorf("results provided differ from already stored results: got: %+v, have: %+v", result, process.Results)
 		}
+		return fmt.Errorf("same results already added")
+	} else if process.Status == models.ProcessStatus_ENDED {
+		// process must be ended for setting the results
+		if !bytes.Equal(result.ProcessId, process.ProcessId) {
+			return fmt.Errorf("invalid process id on result provided, expected: %x got: %x", process.ProcessId, result.ProcessId)
+		}
+
+		if !bytes.Equal(result.EntityId, process.EntityId) {
+			return fmt.Errorf("invalid entity id on result provided, expected: %x got: %x", process.EntityId, result.EntityId)
+		}
+
+		if commit {
+			process.Results = result
+			process.Status = models.ProcessStatus_RESULTS
+			if err := v.setProcess(process, process.ProcessId); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
-	return nil
+	return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
