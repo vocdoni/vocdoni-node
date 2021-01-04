@@ -206,6 +206,7 @@ func extractProcessMode(processMode uint8) (*models.ProcessMode, error) {
 
 // SetStatusTxArgs returns a SetProcessTx instance
 func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint16, status uint8) (*models.SetProcessTx, error) {
+	status++ // +1 for matching with ethevent uint8
 	processData, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
@@ -218,7 +219,7 @@ func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [types.ProcessI
 	// process id
 	setprocessTxArgs.ProcessId = pid[:]
 	// process status
-	processStatus := models.ProcessStatus(uint32(status + 1))
+	processStatus := models.ProcessStatus(uint32(status))
 	setprocessTxArgs.Status = &processStatus
 	// TODO: @jordipainan namespace not used
 	setprocessTxArgs.Txtype = models.TxType_SET_PROCESS_STATUS
