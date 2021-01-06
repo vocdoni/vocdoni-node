@@ -10,7 +10,6 @@ import (
 
 	eth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	ethbind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	cttypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -148,32 +147,6 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 
 // OnComputeResults is called once a process result is computed by the scrutinizer.
 func (ev *EthereumEvents) OnComputeResults(results *models.ProcessResult) {
-	// check ethereum
-	// check ethereum process status
-	var fixedSizePID [types.ProcessIDsize]byte
-	copy(fixedSizePID[:], results.ProcessId)
-	ethProcessData, err := ev.VotingHandle.VotingProcess.Get(&ethbind.CallOpts{Context: context.TODO()}, fixedSizePID)
-	if err != nil {
-		log.Errorf("error fetching process %x from Ethereum: %s", results.ProcessId, err)
-		return
-	}
-	if models.ProcessStatus(ethProcessData.Status) == models.ProcessStatus_RESULTS {
-		// check ethereum process results
-		ethResultsData, err := ev.VotingHandle.VotingProcess.GetResults(&ethbind.CallOpts{Context: context.TODO()}, fixedSizePID)
-		if err != nil {
-			log.Errorf("error fetching process %x from Ethereum: %s", results.ProcessId, err)
-			return
-		}
-		if ethResultsData.Height > 0 {
-			log.Errorf("process %x results already added to ethereum", results.ProcessId)
-			return
-		}
-	} else if models.ProcessStatus(ethProcessData.Status) != models.ProcessStatus_ENDED {
-		log.Errorf("invalid process %x status for setting the results", results.ProcessId)
-		return
-	}
-
-	// valid eth
 	// check vochain
 	// check vochain process status
 	vocProcessData, err := ev.VochainApp.State.Process(results.ProcessId, true)
@@ -191,13 +164,6 @@ func (ev *EthereumEvents) OnComputeResults(results *models.ProcessResult) {
 		log.Errorf("invalid process %x status %s for setting the results", results.ProcessId, vocProcessData.Status)
 		return
 	}
-	// check scrutinizer
-	_, err = ev.Scrutinizer.Storage.Get(ev.Scrutinizer.Encode("results", results.ProcessId))
-	if err == nil {
-		log.Errorf("process %x already computed", results.ProcessId)
-		return
-	}
-	// not results found on ethereum, vochain or scrutinizer
 	// create setProcessTx
 	setprocessTxArgs := &models.SetProcessTx{
 		ProcessId: results.ProcessId,
