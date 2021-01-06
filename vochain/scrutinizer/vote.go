@@ -123,10 +123,13 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 		}
 	}
 
-	for _, l := range s.eventListeners {
-		pv.EntityId = p.EntityId
-		pv.ProcessId = p.ProcessId
-		l.OnComputeResults(pv)
+	// add results if process is not live or isLive and status is ended
+	if !isLive || (isLive && p.Status == models.ProcessStatus_ENDED) {
+		for _, l := range s.eventListeners {
+			pv.EntityId = p.EntityId
+			pv.ProcessId = p.ProcessId
+			l.OnComputeResults(pv)
+		}
 	}
 
 	result, err := proto.Marshal(pv)
