@@ -85,7 +85,7 @@ func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath s
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("census created and published\nRoot: %s\nURI: %s", root, uri)
+	log.Infof("census created and published\nRoot: %x\nURI: %s", root, uri)
 	proofs, err := cl.GetProofBatch(keys, root, false)
 	if err != nil {
 		log.Fatal(err)
@@ -197,7 +197,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 		log.Fatal(err)
 	}
 
-	log.Infof("created process with ID: %s", pid)
+	log.Infof("created process with ID: %x", pid)
 	encrypted := false
 	switch electionType {
 	case "encrypted-poll":
