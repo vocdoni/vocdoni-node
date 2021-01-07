@@ -245,7 +245,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	log.Infof("using keyfile %s", tconfig.PrivValidatorKeyFile())
 
 	// nodekey is used for the p2p transport layer
-	var nodeKey p2p.NodeKey
+	var nodeKey *p2p.NodeKey
 	if len(localConfig.NodeKey) > 0 {
 		nodeKey, err = NewNodeKey(localConfig.NodeKey, tconfig)
 		if err != nil {

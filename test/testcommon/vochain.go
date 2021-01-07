@@ -156,15 +156,9 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 	}
 	vals := make([]*privval.FilePV, 2)
 	rint := rand.Int()
-	vals[0], err = privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint), tmtypes.ABCIPubKeyTypeEd25519)
-	if err != nil {
-		tb.Fatal(err)
-	}
+	vals[0] = privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
 	rint = rand.Int()
-	vals[1], err = privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint), tmtypes.ABCIPubKeyTypeEd25519)
-	if err != nil {
-		tb.Fatal(err)
-	}
+	vals[1] = privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
 	validator0 := &models.Validator{
 		Address: vals[0].Key.Address.Bytes(),
 		PubKey:  vals[0].Key.PubKey.Bytes(),
@@ -220,10 +214,7 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	}
 
 	// TO-DO instead of creating a pv file, just create a random 64 bytes key and use it for the genesis file
-	validator, err := privval.GenFilePV(d.VochainCfg.DataDir+"/config/priv_validator_key.json", d.VochainCfg.DataDir+"/data/priv_validator_state.json", tmtypes.ABCIPubKeyTypeEd25519)
-	if err != nil {
-		tb.Fatal(err)
-	}
+	validator := privval.GenFilePV(d.VochainCfg.DataDir+"/config/priv_validator_key.json", d.VochainCfg.DataDir+"/data/priv_validator_state.json")
 	oracles := []string{d.Signer.AddressString()}
 	genBytes, err := vochain.NewGenesis(d.VochainCfg, strconv.Itoa(rand.Int()), consensusParams, []privval.FilePV{*validator}, oracles)
 	if err != nil {

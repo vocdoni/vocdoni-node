@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/tendermint/tendermint/privval"
-	tmtypes "github.com/tendermint/tendermint/types"
 	models "go.vocdoni.io/proto/build/go/models"
 
 	"go.vocdoni.io/dvote/test/testcommon"
@@ -78,10 +77,7 @@ func TestAddValidator(t *testing.T) {
 
 	s := testcommon.NewVochainStateWithValidators(t)
 	rint := rand.Int()
-	val, err := privval.GenFilePV(fmt.Sprintf("/tmp/vochainBenchmark%d", rint), fmt.Sprintf("/tmp/vochainBenchmark%d", rint), tmtypes.ABCIPubKeyTypeEd25519)
-	if err != nil {
-		t.Fatal(err)
-	}
+	val := privval.GenFilePV(fmt.Sprintf("/tmp/vochainBenchmark%d", rint), fmt.Sprintf("/tmp/vochainBenchmark%d", rint))
 	pubk, err := val.GetPubKey()
 	if err != nil {
 		t.Error(err)
