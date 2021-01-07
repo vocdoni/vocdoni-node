@@ -76,13 +76,10 @@ func GenerateNullifier(address ethcommon.Address, processID []byte) []byte {
 // NewPrivateValidator returns a tendermint file private validator (key and state)
 // if tmPrivKey not specified, uses the existing one or generates a new one
 func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV, error) {
-	pv, err := privval.LoadOrGenFilePV(
+	pv := privval.LoadOrGenFilePV(
 		tconfig.PrivValidatorKeyFile(),
 		tconfig.PrivValidatorStateFile(),
 	)
-	if err != nil {
-		return nil, err
-	}
 	if len(tmPrivKey) > 0 {
 		var privKey crypto25519.PrivKey
 		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
@@ -101,17 +98,17 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 }
 
 // NewNodeKey returns and saves to the disk storage a tendermint node key
-func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (p2p.NodeKey, error) {
-	var nodeKey p2p.NodeKey
+func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
 	keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
 	if err != nil {
-		return nodeKey, fmt.Errorf("cannot decode private key: (%s)", err)
+		return nil, fmt.Errorf("cannot decode private key: (%s)", err)
 	}
-	nodeKey.PrivKey = crypto25519.PrivKey(keyBytes)
-	nodeKey.ID = p2p.PubKeyToID(nodeKey.PrivKey.PubKey())
+	nodeKey := &p2p.NodeKey{
+		PrivKey: crypto25519.PrivKey(keyBytes),
+	}
 	// Write nodeKey to disk
 	if err := nodeKey.SaveAs(tconfig.NodeKeyFile()); err != nil {
-		return nodeKey, err
+		return nil, err
 	}
 	return nodeKey, nil
 }

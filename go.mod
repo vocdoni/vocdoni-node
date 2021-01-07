@@ -54,7 +54,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.1
-	github.com/tendermint/tendermint v0.34.1-dev1.0.20201222081633-c4730bb46a0c
+	github.com/tendermint/tendermint v0.34.1
 	github.com/tendermint/tm-db v0.6.3
 	github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25
 	github.com/whyrusleeping/cbor-gen v0.0.0-20200826160007-0b9f6c5fb163 // indirect
@@ -66,6 +66,7 @@ require (
 	golang.org/x/net v0.0.0-20201216054612-986b41b23924
 	golang.org/x/sys v0.0.0-20201218084310-7d0127a74742 // indirect
 	golang.org/x/text v0.3.4 // indirect
+	google.golang.org/grpc v1.34.0 // indirect
 	google.golang.org/protobuf v1.25.0
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
 	nhooyr.io/websocket v1.8.6
