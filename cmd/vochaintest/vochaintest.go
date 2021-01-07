@@ -289,7 +289,7 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	wg.Wait()
 
 	log.Infof("canceling process in order to fetch the results")
-	if err := mainClient.CancelProcess(oracleKey, pid); err != nil {
+	if err := mainClient.EndProcess(oracleKey, pid); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)

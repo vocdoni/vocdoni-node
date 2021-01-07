@@ -385,7 +385,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot []byt
 		ProcessType:  ptype,
 		StartBlock:   uint32(block + 4),
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: ptype == "encrypted-poll"},
-		Mode:         &models.ProcessMode{AutoStart: true},
+		Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
 		Status:       models.ProcessStatus_READY,
 	}
 	p := &models.NewProcessTx{
@@ -413,6 +413,38 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot []byt
 		return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	return p.Process.StartBlock, nil
+}
+
+func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
+	var req types.MetaRequest
+	req.Method = "submitRawTx"
+	status := models.ProcessStatus_ENDED
+	p := &models.SetProcessTx{
+		Txtype:    models.TxType_SET_PROCESS_STATUS,
+		ProcessId: pid,
+		Status:    &status,
+		Nonce:     util.RandomBytes(32),
+	}
+	txBytes, err := proto.Marshal(p)
+	if err != nil {
+		return err
+	}
+	vtx := models.Tx{Payload: &models.Tx_SetProcess{SetProcess: p}}
+	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
+		return err
+	}
+	if req.Payload, err = proto.Marshal(&vtx); err != nil {
+		return err
+	}
+
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+	}
+	return nil
 }
 
 func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid []byte) error {
