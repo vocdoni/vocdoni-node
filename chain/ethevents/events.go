@@ -157,11 +157,11 @@ func (ev *EthereumEvents) OnComputeResults(results *models.ProcessResult) {
 	if models.ProcessStatus(vocProcessData.Status) == models.ProcessStatus_RESULTS {
 		// check vochain process results
 		if len(vocProcessData.Results.Votes) > 0 {
-			log.Errorf("process %x results already added on the Vochain", results.ProcessId)
+			log.Infof("process %x results already added on the Vochain, skipping", results.ProcessId)
 			return
 		}
 	} else if models.ProcessStatus(vocProcessData.Status) != models.ProcessStatus_ENDED {
-		log.Errorf("invalid process %x status %s for setting the results", results.ProcessId, vocProcessData.Status)
+		log.Infof("invalid process %x status %s for setting the results, skipping", results.ProcessId, vocProcessData.Status)
 		return
 	}
 	// create setProcessTx
