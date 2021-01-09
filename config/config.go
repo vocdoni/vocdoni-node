@@ -14,6 +14,8 @@ type DvoteCfg struct {
 	EthConfig *EthCfg
 	// EthEventConfig ethereum even subscription config options
 	EthEventConfig *EthEventCfg
+	// Events config options
+	Events *EventsCfg
 	// API api config options
 	API *API
 	// Metrics config options
@@ -51,7 +53,7 @@ func (c *DvoteCfg) ValidMode() bool {
 	return true
 }
 
-// NewGatewayConfig initializes the fields in the gateway config stuct
+// NewConfig initializes the fields in the gateway config stuct
 func NewConfig() *DvoteCfg {
 	return &DvoteCfg{
 		W3Config:       new(W3Cfg),
@@ -59,6 +61,7 @@ func NewConfig() *DvoteCfg {
 		Ipfs:           new(IPFSCfg),
 		EthConfig:      new(EthCfg),
 		EthEventConfig: new(EthEventCfg),
+		Events:         new(EventsCfg),
 		API:            new(API),
 		Metrics:        new(MetricsCfg),
 	}
@@ -148,6 +151,11 @@ type EthEventCfg struct {
 	SubscribeOnly bool
 }
 
+// EventsCfg holds the config for the events dispatcher
+type EventsCfg struct {
+	Datadir string
+}
+
 // VochainCfg includes all possible config params needed by the Vochain
 type VochainCfg struct {
 	// Chain is the network name to connect with
@@ -194,39 +202,6 @@ type VochainCfg struct {
 	ImportPreviousCensus bool
 	// Enable Prometheus metrics from tendermint
 	TendermintMetrics bool
-}
-
-// OracleCfg includes all possible config params needed by the Oracle
-type OracleCfg struct {
-	// Dev indicates we use the development mode
-	Dev bool
-	// DataDir directory where data and config files are stored
-	DataDir string
-	// EthereumConfig ethereum node config parameters
-	EthConfig *EthCfg
-	// W3Config Web3 config parameters
-	W3Config *W3Cfg
-	// VochainConfig vochain node config parameters
-	VochainConfig *VochainCfg
-	// LogLevel logging level
-	LogLevel string
-	// LogOutput logging output
-	LogOutput string
-	// SubscribeOnly if true only new received events will be processed, otherwise all events of the current chain will be processed
-	SubscribeOnly bool
-	// EthProcessDomain ethereum contract to use as source of truth for some operations
-	EthProcessDomain string
-	// SaveConfig overwrites the config file with the CLI provided flags
-	SaveConfig bool
-}
-
-// NewOracleCfg initializes the Oracle config
-func NewOracleCfg() *OracleCfg {
-	return &OracleCfg{
-		EthConfig:     new(EthCfg),
-		W3Config:      new(W3Cfg),
-		VochainConfig: new(VochainCfg),
-	}
 }
 
 // MetricsCfg initializes the metrics config

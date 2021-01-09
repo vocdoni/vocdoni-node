@@ -15,6 +15,7 @@ import (
 	"math/big"
 
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/events"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -28,27 +29,15 @@ const (
 	MaxOptions = 64
 )
 
-// EventListener is an interface used for executing custom functions during the
-// events of the tally of a process.
-type EventListener interface {
-	OnComputeResults(results *models.ProcessResult)
-}
-
-// AddEventListener adds a new event listener, to receive method calls on block
-// events as documented in EventListener.
-func (s *Scrutinizer) AddEventListener(l EventListener) {
-	s.eventListeners = append(s.eventListeners, l)
-}
-
 // Scrutinizer is the component which makes the accounting of the voting processes and keeps it indexed in a local database
 type Scrutinizer struct {
-	VochainState   *vochain.State
-	Storage        db.Database
-	votePool       []*models.Vote
-	processPool    []*types.ScrutinizerOnProcessData
-	resultsPool    []*types.ScrutinizerOnProcessData
-	entityCount    int64
-	eventListeners []EventListener
+	VochainState    *vochain.State
+	Storage         db.Database
+	votePool        []*models.Vote
+	processPool     []*types.ScrutinizerOnProcessData
+	resultsPool     []*types.ScrutinizerOnProcessData
+	entityCount     int64
+	EventDispatcher *events.Dispatcher
 }
 
 // NewScrutinizer returns an instance of the Scrutinizer
@@ -63,6 +52,11 @@ func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	s.entityCount = int64(len(s.List(int64(^uint(0)>>1), []byte{}, []byte{types.ScrutinizerEntityPrefix})))
 	s.VochainState.AddEventListener(s)
 	return s, nil
+}
+
+// AttachEventCollector attaches the event collector to the scrutinizer
+func (s *Scrutinizer) AttachEventCollector(d *events.Dispatcher) {
+	s.EventDispatcher = d
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain

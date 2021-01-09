@@ -25,6 +25,7 @@ require (
 	github.com/libp2p/go-libp2p-core v0.8.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/multiformats/go-multiaddr v0.3.1
+	github.com/nsqio/go-diskqueue v1.0.0
 	github.com/prometheus/client_golang v1.9.0
 	github.com/shirou/gopsutil v3.20.12+incompatible
 	github.com/spf13/cobra v1.1.1

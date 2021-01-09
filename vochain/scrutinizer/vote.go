@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/crypto/nacl"
+	"go.vocdoni.io/dvote/events"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 )
@@ -57,12 +58,8 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	}
 
 	// add results if process is not live or isLive and status is ended
-	if !isLive || (isLive && p.Status == models.ProcessStatus_ENDED) {
-		for _, l := range s.eventListeners {
-			pv.EntityId = p.EntityId
-			pv.ProcessId = p.ProcessId
-			l.OnComputeResults(pv)
-		}
+	if (!isLive || (isLive && p.Status == models.ProcessStatus_ENDED)) && s.EventDispatcher != nil {
+		go s.EventDispatcher.Collect(pv, events.ScrutinizerOnprocessresult)
 	}
 
 	result, err := proto.Marshal(pv)

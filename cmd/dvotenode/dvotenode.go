@@ -147,6 +147,9 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		globalCfg.DataDir += "/" + globalCfg.VochainConfig.Chain
 	}
 
+	// set events datadir
+	globalCfg.Events.Datadir = globalCfg.DataDir + "/events"
+
 	// Add viper config path (now we know it)
 	viper.AddConfigPath(globalCfg.DataDir)
 
@@ -305,6 +308,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	- signing key
 	- ethereum
 	- ethevents
+	- events
 	- vochain
 
   Miner needs:
@@ -567,6 +571,12 @@ func main() {
 				log.Fatal(err)
 			}
 		}
+	}
+
+	if globalCfg.Mode == types.ModeOracle {
+		log.Info("starting events service")
+		service.Events(globalCfg.Events, signer, vnode)
+		log.Info("events service started")
 	}
 
 	log.Info("startup complete")
