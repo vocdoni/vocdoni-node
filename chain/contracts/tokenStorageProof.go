@@ -419,9 +419,6 @@ func (_TokenStorageProof *TokenStorageProofCaller) Tokens(opts *bind.CallOpts, a
 		BalanceMappingPosition *big.Int
 		Registered             bool
 	})
-	if err != nil {
-		return *outstruct, err
-	}
 
 	outstruct.BalanceMappingPosition = out[0].(*big.Int)
 	outstruct.Registered = out[1].(bool)
