@@ -48,7 +48,7 @@ func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, cen
 			return false, fmt.Errorf("ethereum proof is empty")
 		}
 		if !bytes.Equal(p.Key, leafData) {
-			return false, nil
+			return false, fmt.Errorf("proof key and leafData do not match (%x != %x)", p.Key, leafData)
 		}
 		hexproof := []string{}
 		for _, s := range p.Siblings {

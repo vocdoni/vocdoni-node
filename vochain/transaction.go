@@ -208,7 +208,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 				if err != nil {
 					return nil, fmt.Errorf("cannot extract address from public key: (%w)", err)
 				}
-				log.Debugf("extracted public key: %x", vp.PubKey)
+				log.Debugf("extracted addr/pubkey: %s/%x", addr.Hex(), vp.PubKey)
 
 				// assign a nullifier
 				vp.Nullifier = GenerateNullifier(addr, vote.ProcessId)
@@ -232,6 +232,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 						return nil, fmt.Errorf("cannot fetch slot: %w", err)
 					}
 					vp.PubKeyDigest = slot[:]
+					log.Debugf("ERC20 index slot %d, storage slot %x", *process.EthIndexSlot, vp.PubKeyDigest)
 				default:
 					return nil, fmt.Errorf("census origin not compatible")
 				}
