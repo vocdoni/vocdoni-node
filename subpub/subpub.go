@@ -116,7 +116,7 @@ func (ps *SubPub) Start(ctx context.Context) {
 		c.PSK = ps.GroupKey[:32]
 	}
 	c.ListenAddrs = []multiaddr.Multiaddr{sourceMultiAddr}
-	c.ConnManager = connmanager.NewConnManager(int(ps.MaxDHTpeers/2), ps.MaxDHTpeers, time.Second*10)
+	c.ConnManager = connmanager.NewConnManager(ps.MaxDHTpeers/2, ps.MaxDHTpeers, time.Second*10)
 
 	log.Debugf("libp2p config: %+v", c)
 	// Note that we don't use ctx here, since we stop via the Close method.

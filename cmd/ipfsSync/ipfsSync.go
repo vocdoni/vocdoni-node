@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -65,7 +64,7 @@ func main() {
 			}
 		} else {
 			log.Info("loaded saved node private key")
-			if err := sk.AddHexKey(fmt.Sprintf("%s", pk)); err != nil {
+			if err := sk.AddHexKey(string(pk)); err != nil {
 				log.Fatal(err)
 			}
 			_, privKey = sk.HexString()

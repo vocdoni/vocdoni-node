@@ -380,7 +380,7 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 		return
 	}
 	for _, p := range pids.GetPids() {
-		process, err := k.vochain.State.Process([]byte(p), false)
+		process, err := k.vochain.State.Process(p, false)
 		if err != nil {
 			log.Errorf("cannot get process from state: (%s)", err)
 			continue
