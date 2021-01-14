@@ -2,7 +2,6 @@ package net
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -153,7 +152,7 @@ func somaxconn() int {
 	if err != nil {
 		return syscall.SOMAXCONN
 	}
-	n, err := strconv.Atoi(strings.Trim(fmt.Sprintf("%s", content), "\n"))
+	n, err := strconv.Atoi(strings.Trim(string(content), "\n"))
 	if err != nil {
 		return syscall.SOMAXCONN
 	}

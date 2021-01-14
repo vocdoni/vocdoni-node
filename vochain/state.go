@@ -24,7 +24,7 @@ const (
 	AppTree                 = "app"
 	ProcessTree             = "process"
 	VoteTree                = "vote"
-	voteCachePurgeThreshold = time.Duration(time.Minute * 10)
+	voteCachePurgeThreshold = time.Minute * 10
 )
 
 var (
