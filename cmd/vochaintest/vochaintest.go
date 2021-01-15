@@ -264,14 +264,14 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 		if len(clients) == gw+1 {
 			// if last client, add all remaining keys
 			gwSigners = make([]*ethereum.SignKeys, len(censusKeys)-i)
-			copy(gwSigners[:], censusKeys[i:])
+			copy(gwSigners, censusKeys[i:])
 			gwProofs = make([][]byte, len(censusKeys)-i)
-			copy(gwProofs[:], proofs[i:])
+			copy(gwProofs, proofs[i:])
 		} else {
 			gwSigners = make([]*ethereum.SignKeys, p)
-			copy(gwSigners[:], censusKeys[i:i+p])
+			copy(gwSigners, censusKeys[i:i+p])
 			gwProofs = make([][]byte, p)
-			copy(gwProofs[:], proofs[i:i+p])
+			copy(gwProofs, proofs[i:i+p])
 		}
 		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl

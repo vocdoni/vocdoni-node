@@ -254,11 +254,11 @@ func (t *IavlTree) Add(key, value []byte) error {
 
 func (t *IavlTree) Iterate(prefix []byte, callback func(key, value []byte) bool) {
 	until := make([]byte, len(prefix))
-	copy(until, prefix[:])
+	copy(until, prefix)
 	// Set until to the next prefix: 0xABCDEF => 0xABCDFF
 	for i := len(until) - 1; i >= 0; i-- {
 		if until[i] != byte(0xFF) {
-			until[i] = until[i] + byte(0x01)
+			until[i] += byte(0x01)
 			break
 		}
 		if i == -1 {

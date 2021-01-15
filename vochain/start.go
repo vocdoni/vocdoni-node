@@ -151,15 +151,15 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 	if !localConfig.CreateGenesis {
-		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds[:], ","), "[]\"")
+		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
 		if _, ok := Genesis[localConfig.Chain]; len(tconfig.P2P.Seeds) < 8 && !localConfig.SeedMode && ok {
-			tconfig.P2P.Seeds = strings.Join(Genesis[localConfig.Chain].SeedNodes[:], ",")
+			tconfig.P2P.Seeds = strings.Join(Genesis[localConfig.Chain].SeedNodes, ",")
 		}
 		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
 	}
 
 	if len(localConfig.Peers) > 0 {
-		tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers[:], ","), "[]\"")
+		tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers, ","), "[]\"")
 	}
 	if len(tconfig.P2P.PersistentPeers) > 0 {
 		log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)

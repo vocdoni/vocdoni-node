@@ -283,8 +283,8 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())
 	}
 
-	switch {
-	case tx.Txtype == models.TxType_ADD_PROCESS_KEYS || tx.Txtype == models.TxType_REVEAL_PROCESS_KEYS:
+	switch tx.Txtype {
+	case models.TxType_ADD_PROCESS_KEYS, models.TxType_REVEAL_PROCESS_KEYS:
 		if tx.ProcessId == nil {
 			return fmt.Errorf("missing processId on AdminTxCheck")
 		}
@@ -388,7 +388,7 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		}
 	}
 	if tx.RevealKey != nil {
-		commitment := snarks.Poseidon.Hash(tx.RevealKey[:])
+		commitment := snarks.Poseidon.Hash(tx.RevealKey)
 		if fmt.Sprintf("%x", commitment) != process.CommitmentKeys[*tx.KeyIndex] {
 			log.Debugf("%x != %s", commitment, process.CommitmentKeys[*tx.KeyIndex])
 			return fmt.Errorf("the provided commitment reveal key does not match with the stored on index %d", *tx.KeyIndex)

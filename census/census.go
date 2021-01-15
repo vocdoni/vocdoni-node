@@ -107,10 +107,8 @@ func (m *Manager) Init(storageDir, rootKey string, newTreeImpl func(name, storag
 	if len(rootKey) >= ethereum.PubKeyLength {
 		log.Infof("updating root key to %s", rootKey)
 		m.Census.RootKey = rootKey
-	} else {
-		if rootKey != "" {
-			log.Infof("current root key %s", rootKey)
-		}
+	} else if rootKey != "" {
+		log.Infof("current root key %s", rootKey)
 	}
 	for _, v := range m.Census.Namespaces {
 		if _, err := m.LoadTree(v.Name); err != nil {
