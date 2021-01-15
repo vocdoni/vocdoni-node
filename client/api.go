@@ -110,9 +110,6 @@ func (c *Client) ImportCensus(signer *ethereum.SignKeys, uri string) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	if err != nil {
-		return nil, err
-	}
 
 	req.Method = "importRemote"
 	req.CensusID = resp.CensusID
