@@ -57,7 +57,7 @@ func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
 	return resp.Siblings, nil
 }
 
-func (c *Client) GetResults(pid []byte) ([][]uint32, string, error) {
+func (c *Client) GetResults(pid []byte) ([][]uint64, string, error) {
 	var req types.MetaRequest
 	req.Method = "getResults"
 	req.ProcessID = pid
@@ -153,10 +153,10 @@ func (c *Client) GetKeys(pid, eid []byte) (*pkeys, error) {
 		rev:  resp.RevealKeys}, nil
 }
 
-func (c *Client) TestResults(pid []byte, totalVotes int) ([][]uint32, error) {
+func (c *Client) TestResults(pid []byte, totalVotes int) ([][]uint64, error) {
 	log.Infof("waiting for results...")
 	var err error
-	var results [][]uint32
+	var results [][]uint64
 	var block uint32
 	for {
 		block, err = c.GetCurrentBlock()
@@ -173,7 +173,7 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]uint32, error) {
 		}
 		log.Infof("no results yet at block %d", block+2)
 	}
-	total := uint32(totalVotes)
+	total := uint64(totalVotes)
 	if results[0][1] != total || results[1][2] != total || results[2][3] != total || results[3][4] != total {
 		return nil, fmt.Errorf("invalid results: %v", results)
 	}
@@ -374,12 +374,11 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot []byt
 	}
 	processData := &models.Process{
 		EntityId:     entityID,
-		CensusMkRoot: mkroot,
-		CensusMkURI:  &mkuri,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		CensusRoot:   mkroot,
+		CensusURI:    &mkuri,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   uint32(duration),
 		ProcessId:    pid,
-		ProcessType:  ptype,
 		StartBlock:   block + 4,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: ptype == "encrypted-poll"},
 		Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
@@ -427,36 +426,6 @@ func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
 		return err
 	}
 	vtx := models.Tx{Payload: &models.Tx_SetProcess{SetProcess: p}}
-	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
-		return err
-	}
-	if req.Payload, err = proto.Marshal(&vtx); err != nil {
-		return err
-	}
-
-	resp, err := c.Request(req, nil)
-	if err != nil {
-		return err
-	}
-	if !resp.Ok {
-		return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
-	}
-	return nil
-}
-
-func (c *Client) CancelProcess(oracle *ethereum.SignKeys, pid []byte) error {
-	var req types.MetaRequest
-	req.Method = "submitRawTx"
-	p := &models.CancelProcessTx{
-		Txtype:    models.TxType_CANCEL_PROCESS,
-		ProcessId: pid,
-		Nonce:     util.RandomBytes(32),
-	}
-	txBytes, err := proto.Marshal(p)
-	if err != nil {
-		return err
-	}
-	vtx := models.Tx{Payload: &models.Tx_CancelProcess{CancelProcess: p}}
 	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
 		return err
 	}

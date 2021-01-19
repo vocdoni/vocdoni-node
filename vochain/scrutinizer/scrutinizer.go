@@ -12,6 +12,7 @@ package scrutinizer
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
@@ -181,11 +182,17 @@ func (s *Scrutinizer) List(max int64, from, prefix []byte) [][]byte {
 }
 
 // Temporary until we use Protobuf for the API
-func (s *Scrutinizer) GetFriendlyResults(result *models.ProcessResult) [][]uint32 {
-	r := [][]uint32{}
+// WARNING: uint64 might overflow!!
+func (s *Scrutinizer) GetFriendlyResults(result *models.ProcessResult) [][]uint64 {
+	r := [][]uint64{}
+	value := new(big.Int)
 	for i, v := range result.Votes {
-		r = append(r, []uint32{})
-		r[i] = append(r[i], v.Question...)
+		r = append(r, []uint64{})
+		for j := range v.Question {
+			value.SetBytes(v.Question[j])
+			value.Uint64()
+			r[i] = append(r[i], value.Uint64())
+		}
 	}
 	return r
 }

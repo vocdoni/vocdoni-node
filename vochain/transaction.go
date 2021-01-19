@@ -67,15 +67,6 @@ func AddTx(vtx *models.Tx, state *State, txID [32]byte, commit bool) ([]byte, er
 			}
 		}
 
-	case *models.Tx_CancelProcess:
-		if err := CancelProcessTxCheck(vtx, state); err != nil {
-			return []byte{}, fmt.Errorf("cancelProcess %w", err)
-		}
-		if commit {
-			tx := vtx.GetCancelProcess()
-			return []byte{}, state.CancelProcess(tx.ProcessId)
-		}
-
 	case *models.Tx_NewProcess:
 		if p, err := NewProcessTxCheck(vtx, state); err == nil {
 			if commit {
@@ -185,6 +176,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 				if tx.Proof == nil {
 					return nil, fmt.Errorf("proof not found on transaction")
 				}
+
 				vp = new(types.CacheTx)
 				log.Debugf("vote signature: %x", vtx.Signature)
 				tx := vtx.GetVote()
@@ -221,7 +213,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 
 				// check census origin and compute vote digest identifier
 				switch process.CensusOrigin {
-				case models.CensusOrigin_OFF_CHAIN:
+				case models.CensusOrigin_OFF_CHAIN_TREE:
 					vp.PubKeyDigest = snarks.Poseidon.Hash(vp.PubKey)
 				case models.CensusOrigin_ERC20:
 					if process.EthIndexSlot == nil {
@@ -237,26 +229,29 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 					return nil, fmt.Errorf("census origin not compatible")
 				}
 				if len(vp.PubKeyDigest) < 20 {
-					return nil, fmt.Errorf("cannot digest public key: (%s)", err)
+					return nil, fmt.Errorf("cannot digest public key: (%w)", err)
 				}
 
 				// check merkle proof
-				valid, err := checkMerkleProof(tx.Proof, process.CensusOrigin, process.CensusMkRoot, vp.PubKeyDigest)
+				var valid bool
+				valid, vp.Weight, err = checkProof(tx.Proof, process.CensusOrigin, process.CensusRoot, vp.PubKeyDigest)
 				if err != nil {
-					return nil, fmt.Errorf("cannot check merkle proof: (%s)", err)
+					return nil, fmt.Errorf("cannot check merkle proof: (%w)", err)
 				}
 				if !valid {
 					return nil, fmt.Errorf("proof not valid")
 				}
-				//vp.Type = models.TxType_VOTE
 				vp.Created = time.Now()
 				state.CacheAdd(txID, vp)
 			}
 			vote.Nullifier = vp.Nullifier
+			if vp.Weight != nil {
+				vote.Weight = vp.Weight.Bytes()
+			}
 			return &vote, nil
 		}
 	}
-	return nil, fmt.Errorf("cannot add vote, invalid block frame or process canceled/paused")
+	return nil, fmt.Errorf("cannot add vote, invalid block frame or process stop/paused/cancel")
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction

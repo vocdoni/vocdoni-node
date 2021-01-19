@@ -108,7 +108,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 		return nil, fmt.Errorf("error decoding entity address: %w", err)
 	}
 	// census mkroot
-	processData.CensusMkRoot, err = hex.DecodeString(util.TrimHex(processMeta.MetadataCensusMerkleRootCensusMerkleTree[1]))
+	processData.CensusRoot, err = hex.DecodeString(util.TrimHex(processMeta.MetadataCensusMerkleRootCensusMerkleTree[1]))
 	if err != nil {
 		return nil, fmt.Errorf("cannot decode merkle root: %w", err)
 	}
@@ -118,11 +118,11 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 		return nil, fmt.Errorf("invalid census origin: %d", processMeta.ModeEnvelopeTypeCensusOrigin[2])
 	}
 	processData.CensusOrigin = models.CensusOrigin(cOrigin)
-	evmCensus := processData.CensusOrigin == models.CensusOrigin_OFF_CHAIN
+	evmCensus := processData.CensusOrigin == models.CensusOrigin_OFF_CHAIN_TREE
 	// census mkuri, only for off chain censuses
 	if evmCensus {
 		processMeta.MetadataCensusMerkleRootCensusMerkleTree[2] = util.TrimHex(processMeta.MetadataCensusMerkleRootCensusMerkleTree[2])
-		processData.CensusMkURI = &processMeta.MetadataCensusMerkleRootCensusMerkleTree[2]
+		processData.CensusURI = &processMeta.MetadataCensusMerkleRootCensusMerkleTree[2]
 	}
 	// start and end blocks
 	if processMeta.StartBlockBlockCount[0] > types.ProcessesContractMinStartBlock {
@@ -163,7 +163,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	processData.Namespace = uint32(processMeta.MaxTotalCostCostExponentNamespace[2])
 
 	// if EVM census, eth index slot from the ERC20Registry contract
-	if processData.CensusOrigin != models.CensusOrigin_OFF_CHAIN {
+	if processData.CensusOrigin != models.CensusOrigin_OFF_CHAIN_TREE {
 		// evm block height not required here, will be fetched by each user when generating the vote
 		// index slot
 		idxSlot, err := ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, processMeta.EntityAddress)

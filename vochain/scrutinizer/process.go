@@ -3,6 +3,7 @@ package scrutinizer
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v2"
@@ -218,9 +219,13 @@ func emptyProcess(questions, options int) *models.ProcessResult {
 	}
 	pv := new(models.ProcessResult)
 	pv.Votes = make([]*models.QuestionResult, questions)
+	zero := big.NewInt(0)
 	for i := range pv.Votes {
 		pv.Votes[i] = new(models.QuestionResult)
-		pv.Votes[i].Question = make([]uint32, options)
+		pv.Votes[i].Question = make([][]byte, options)
+		for j := range pv.Votes[i].Question {
+			pv.Votes[i].Question[j] = zero.Bytes()
+		}
 	}
 	return pv
 }

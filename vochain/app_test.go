@@ -52,9 +52,9 @@ func TestCheckTX(t *testing.T) {
 		Mode:         &models.ProcessMode{},
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EntityIDsize),
-		CensusMkRoot: tr.Root(),
-		CensusMkURI:  &mkuri,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		CensusRoot:   tr.Root(),
+		CensusURI:    &mkuri,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
 	t.Logf("adding process %s", process.String())
@@ -130,9 +130,9 @@ func TestProcessTransition(t *testing.T) {
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EntityIDsize),
-		CensusMkRoot: util.RandomBytes(32),
-		CensusMkURI:  &mkuri,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		CensusRoot:   util.RandomBytes(32),
+		CensusURI:    &mkuri,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
 	t.Logf("adding READY process %x", process.ProcessId)
@@ -178,9 +178,9 @@ func TestProcessTransition(t *testing.T) {
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_PAUSED,
 		EntityId:     util.RandomBytes(types.EntityIDsize),
-		CensusMkRoot: util.RandomBytes(32),
-		CensusMkURI:  &mkuri,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		CensusRoot:   util.RandomBytes(32),
+		CensusURI:    &mkuri,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
 	t.Logf("adding PAUSED process %x", process.ProcessId)
@@ -226,9 +226,9 @@ func TestProcessTransition(t *testing.T) {
 		Mode:         &models.ProcessMode{Interruptible: false, AutoStart: false},
 		Status:       models.ProcessStatus_PAUSED,
 		EntityId:     util.RandomBytes(types.EntityIDsize),
-		CensusMkRoot: util.RandomBytes(32),
-		CensusMkURI:  &mkuri,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		CensusRoot:   util.RandomBytes(32),
+		CensusURI:    &mkuri,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
 	t.Logf("adding PAUSED process %x", process.ProcessId)

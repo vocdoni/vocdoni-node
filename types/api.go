@@ -116,7 +116,7 @@ type MetaResponse struct {
 	ProcessList          []string   `json:"processList,omitempty"`
 	Registered           *bool      `json:"registered,omitempty"`
 	Request              string     `json:"request"`
-	Results              [][]uint32 `json:"results,omitempty"`
+	Results              [][]uint64 `json:"results,omitempty"`
 	RevealKeys           []Key      `json:"revealKeys,omitempty"`
 	Root                 HexBytes   `json:"root,omitempty"`
 	Siblings             HexBytes   `json:"siblings,omitempty"`
