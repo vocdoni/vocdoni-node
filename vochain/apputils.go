@@ -27,28 +27,31 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// hexproof is the hexadecimal a string. leafData is the claim data in byte format
-func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRootHash, leafData []byte) (bool, error) {
+// checkProof checks the validity of a census proof (depending on the origin).
+// key is the data to be proof in behalf the censusRoot.
+// In case of weighted proof, this function will return the weight as second parameter.
+func checkProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoot, key []byte) (bool, *big.Int, error) {
 	switch censusOrigin {
-	case models.CensusOrigin_OFF_CHAIN:
+	case models.CensusOrigin_OFF_CHAIN_TREE:
 		switch proof.Payload.(type) {
 		case *models.Proof_Graviton:
 			p := proof.GetGraviton()
 			if p == nil {
-				return false, fmt.Errorf("graviton proof is empty")
+				return false, nil, fmt.Errorf("graviton proof is empty")
 			}
-			return gravitontree.CheckProof(leafData, []byte{}, censusRootHash, p.Siblings)
+			valid, err := gravitontree.CheckProof(key, []byte{}, censusRoot, p.Siblings)
+			return valid, big.NewInt(1), err
 		case *models.Proof_Iden3:
 			// NOT IMPLEMENTED
-			return false, fmt.Errorf("iden3 proof not implemented")
+			return false, nil, fmt.Errorf("iden3 proof not implemented")
 		}
 	case models.CensusOrigin_ERC20:
 		p := proof.GetEthereumStorage()
 		if p == nil {
-			return false, fmt.Errorf("ethereum proof is empty")
+			return false, nil, fmt.Errorf("ethereum proof is empty")
 		}
-		if !bytes.Equal(p.Key, leafData) {
-			return false, fmt.Errorf("proof key and leafData do not match (%x != %x)", p.Key, leafData)
+		if !bytes.Equal(p.Key, key) {
+			return false, nil, fmt.Errorf("proof key and leafData do not match (%x != %x)", p.Key, key)
 		}
 		hexproof := []string{}
 		for _, s := range p.Siblings {
@@ -58,12 +61,13 @@ func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, cen
 		amount.SetBytes(p.Value)
 		hexamount := hexutil.Big(amount)
 		log.Debugf("validating erc20 storage proof for key %x and amount %s", p.Key, amount.String())
-		return ethstorageproof.VerifyEthStorageProof(
+		valid, err := ethstorageproof.VerifyEthStorageProof(
 			&ethstorageproof.StorageResult{Key: fmt.Sprintf("%x", p.Key), Proof: hexproof, Value: &hexamount},
-			ethcommon.BytesToHash(censusRootHash),
+			ethcommon.BytesToHash(censusRoot),
 		)
+		return valid, &amount, err
 	}
-	return false, fmt.Errorf("proof type not supported for census origin %d", censusOrigin)
+	return false, nil, fmt.Errorf("proof type not supported for census origin %d", censusOrigin)
 }
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles

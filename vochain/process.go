@@ -22,11 +22,11 @@ func (v *State) AddProcess(p *models.Process) error {
 		return err
 	}
 	mkuri := ""
-	if p.CensusMkURI != nil {
-		mkuri = *p.CensusMkURI
+	if p.CensusURI != nil {
+		mkuri = *p.CensusURI
 	}
 	for _, l := range v.eventListeners {
-		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusMkRoot), mkuri)
+		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), mkuri)
 	}
 	return nil
 }
@@ -273,50 +273,6 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 		tx.Process.RevealKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 	}
 	return tx.Process, nil
-}
-
-// CancelProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
-func CancelProcessTxCheck(vtx *models.Tx, state *State) error { // LEGACY
-	tx := vtx.GetCancelProcess()
-	// check signature available
-	if vtx.Signature == nil || tx == nil {
-		return fmt.Errorf("missing signature or setProcess transaction")
-	}
-	// get oracles
-	oracles, err := state.Oracles(false)
-	if err != nil || len(oracles) == 0 {
-		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
-	}
-	// check signature
-	signedBytes, err := proto.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("cannot marshal new process transaction")
-	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, vtx.Signature)
-	if err != nil {
-		return err
-	}
-	if !authorized {
-		return fmt.Errorf("unauthorized to set a process status, recovered addr is %s", addr.Hex())
-	}
-	// get process
-	process, err := state.Process(tx.ProcessId, false)
-	if err != nil {
-		return fmt.Errorf("cannot set process status %x: %s", tx.ProcessId, err)
-	}
-	// check process not already canceled or finalized
-	if process.Status != models.ProcessStatus_READY {
-		return fmt.Errorf("cannot cancel a not ready process")
-	}
-	endBlock := process.StartBlock + process.BlockCount
-	var height int64
-	if h := state.Header(false); h != nil {
-		height = h.Height
-	}
-	if int64(endBlock) < height {
-		return fmt.Errorf("cannot cancel a finalized process")
-	}
-	return nil
 }
 
 // SetProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process

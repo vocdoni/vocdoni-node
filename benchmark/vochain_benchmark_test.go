@@ -103,12 +103,11 @@ func BenchmarkVochain(b *testing.B) {
 	entityID := signerPub
 	processID := testutil.Hex2byte(b, hexProcessID)
 	processData := &models.Process{
-		EntityId:     entityID,
-		CensusMkRoot: mkRoot,
-		BlockCount:   numberOfBlocks,
-		ProcessId:    processID,
-		ProcessType:  types.PollVote,
-		StartBlock:   *resp.Height + 1,
+		EntityId:   entityID,
+		CensusRoot: mkRoot,
+		BlockCount: numberOfBlocks,
+		ProcessId:  processID,
+		StartBlock: *resp.Height + 1,
 	}
 	process := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,

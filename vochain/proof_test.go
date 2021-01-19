@@ -35,7 +35,7 @@ func TestEthProof(t *testing.T) {
 		Mode:         new(models.ProcessMode),
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EntityIDsize),
-		CensusMkRoot: testEthStorageRoot,
+		CensusRoot:   testEthStorageRoot,
 		CensusOrigin: models.CensusOrigin_ERC20,
 		BlockCount:   1024,
 		EthIndexSlot: &testEthIndexSlot,

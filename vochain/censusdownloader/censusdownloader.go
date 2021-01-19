@@ -12,7 +12,10 @@ import (
 )
 
 // CensusOriginsToDownload is the list of census that should be downloaded by the censusdownloader
-var CensusOriginsToDownload = map[models.CensusOrigin]bool{models.CensusOrigin_OFF_CHAIN: true}
+var CensusOriginsToDownload = map[models.CensusOrigin]bool{
+	models.CensusOrigin_OFF_CHAIN_TREE:          true,
+	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: true,
+}
 
 // TBD: A startup process for importing on-going processe census
 // TBD: a mechanism for removing alyready finished census?

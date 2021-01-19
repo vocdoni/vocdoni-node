@@ -3,6 +3,7 @@ package scrutinizer
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -191,16 +192,20 @@ func TestResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	log.Infof("Results: %v", result)
+	v0 := big.NewInt(0)
+	v300 := big.NewInt(300)
+	value := new(big.Int)
 	for _, q := range result.GetVotes() {
 		for qi, v1 := range q.Question {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
 			}
-			if qi != 1 && v1 != 0 {
-				t.Fatalf("result is not correct, %d is not 0 as expected", v1)
+			value.SetBytes(v1)
+			if qi != 1 && value.Cmp(v0) != 0 {
+				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
-			if qi == 1 && v1 != 300 {
-				t.Fatalf("result is not correct, %d is not 300 as expected", v1)
+			if qi == 1 && value.Cmp(v300) != 0 {
+				t.Fatalf("result is not correct, %d is not 300 as expected", value.Uint64())
 			}
 		}
 	}
@@ -263,16 +268,20 @@ func TestLiveResults(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	v0 := big.NewInt(0)
+	v100 := big.NewInt(100)
+	value := new(big.Int)
 	for _, q := range result.GetVotes() {
 		for qi, v1 := range q.Question {
 			if qi > 2 {
 				t.Fatalf("found more questions that expected")
 			}
-			if qi == 0 && v1 != 0 {
-				t.Fatalf("result is not correct, %d is not 0 as expected", v1)
+			value.SetBytes(v1)
+			if qi == 0 && value.Cmp(v0) != 0 {
+				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
-			if qi == 1 && v1 != 100 {
-				t.Fatalf("result is not correct, %d is not 100 as expected", v1)
+			if qi == 1 && value.Cmp(v100) != 100 {
+				t.Fatalf("result is not correct, %d is not 100 as expected", value.Uint64())
 			}
 		}
 	}

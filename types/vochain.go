@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"math/big"
 	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
@@ -29,6 +30,7 @@ type CacheTx struct {
 	PubKey       []byte        `json:"pubKey,omitempty"`
 	PubKeyDigest []byte        `json:"pubKeyDigest,omitempty"`
 	Nullifier    []byte        `json:"nullifier,omitempty"`
+	Weight       *big.Int      `json:"weight,omitempty"`
 	Created      time.Time     `json:"timestamp"`
 }
 

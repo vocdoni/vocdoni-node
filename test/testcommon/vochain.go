@@ -47,8 +47,8 @@ var (
 	ProcessHardcoded = &models.Process{
 		ProcessId:    testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		EntityId:     testutil.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
-		CensusMkRoot: testutil.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		CensusRoot:   testutil.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1000,
 		EnvelopeType: &models.EnvelopeType{},
 		Mode:         &models.ProcessMode{},
@@ -60,12 +60,6 @@ var (
 		Txtype:  models.TxType_NEW_PROCESS,
 		Process: ProcessHardcoded,
 		Nonce:   util.RandomBytes(32),
-	}
-
-	HardcodedCancelProcessTx = &models.CancelProcessTx{
-		Txtype:    models.TxType_CANCEL_PROCESS,
-		ProcessId: testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
-		Nonce:     util.RandomBytes(32),
 	}
 
 	HardcodedNewVoteTx = &models.VoteEnvelope{
@@ -120,8 +114,8 @@ func SignAndPrepareTx(vtx *models.Tx) error {
 	case *models.Tx_NewProcess:
 		tx := vtx.GetNewProcess()
 		txb, err = proto.Marshal(tx)
-	case *models.Tx_CancelProcess:
-		tx := vtx.GetCancelProcess()
+	case *models.Tx_SetProcess:
+		tx := vtx.GetSetProcess()
 		txb, err = proto.Marshal(tx)
 	default:
 		err = fmt.Errorf("transaction type unknown")

@@ -76,9 +76,9 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		Mode:         &models.ProcessMode{},
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EntityIDsize),
-		CensusMkRoot: tr.Root(),
-		CensusMkURI:  &mkuri,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN,
+		CensusRoot:   tr.Root(),
+		CensusURI:    &mkuri,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
 	app.State.AddProcess(process)
