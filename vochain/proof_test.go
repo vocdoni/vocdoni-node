@@ -113,6 +113,8 @@ func testSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, app 
 	if vtx.Signature, err = signer.Sign(txBytes); err != nil {
 		t.Fatal(err)
 	}
+	pub, _ := signer.HexString()
+	t.Logf("addr: %s pubKey: %s", signer.Address(), pub)
 	vtx.Payload = &models.Tx_Vote{Vote: tx}
 
 	if cktx.Tx, err = proto.Marshal(&vtx); err != nil {

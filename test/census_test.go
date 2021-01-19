@@ -38,6 +38,7 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	qt "github.com/frankban/quicktest"
 
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -69,9 +70,7 @@ func TestCensus(t *testing.T) {
 	// Create websocket client
 	t.Logf("connecting to %s", server.PxyAddr)
 	cl, err := client.New(server.PxyAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 
 	// Send the API requets
 	var req types.MetaRequest
@@ -80,9 +79,7 @@ func TestCensus(t *testing.T) {
 	// Create census
 	req.CensusID = "test"
 	resp := doRequest("addCensus", signer2)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
+	qt.Assert(t, err, qt.IsNil)
 	censusID := resp.CensusID
 
 	// addClaim
@@ -90,51 +87,37 @@ func TestCensus(t *testing.T) {
 	req.CensusKey = []byte("hello")
 	req.Digested = true
 	resp = doRequest("addClaim", signer2)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
+	qt.Assert(t, resp.Ok, qt.IsTrue)
 
 	// addClaim not authorized; use Request directly
 	req.CensusID = censusID
 	req.Method = "addClaim"
 	req.CensusKey = []byte("hello2")
 	resp, err = cl.Request(req, signer1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.Ok {
-		t.Fatalf("%s didn't fail", req.Method)
-	}
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, resp.Ok, qt.IsFalse)
 
 	// GenProof valid
 	req.CensusID = censusID
 	req.CensusKey = []byte("hello")
 	resp = doRequest("genProof", nil)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
+	qt.Assert(t, resp.Ok, qt.IsTrue)
 
 	// GenProof not valid
 	req.CensusID = censusID
 	req.CensusKey = []byte("hello3")
 	resp = doRequest("genProof", nil)
-	if len(resp.Siblings) > 1 {
-		t.Fatalf("proof should not exist!")
-	}
+	qt.Assert(t, resp.Siblings, qt.HasLen, 0)
 
 	// getRoot
 	resp = doRequest("getRoot", nil)
 	root := resp.Root
-	if len(root) < 1 {
-		t.Fatalf("got invalid root")
-	}
+	qt.Assert(t, root, qt.Not(qt.HasLen), 0)
 
 	// Create census2
 	req.CensusID = "test2"
 	resp = doRequest("addCensus", signer2)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
+	qt.Assert(t, resp.Ok, qt.IsTrue)
 	censusID = resp.CensusID
 	req.CensusID = censusID
 
@@ -144,36 +127,27 @@ func TestCensus(t *testing.T) {
 	keys := testcommon.CreateEthRandomKeysBatch(t, *censusSize)
 	for _, key := range keys {
 		hash := snarks.Poseidon.Hash(crypto.FromECDSAPub(&key.Public))
-		if len(hash) == 0 {
-			t.Fatalf("cannot create poseidon hash of public key: %#v", key.Public)
-		}
+		qt.Assert(t, hash, qt.Not(qt.HasLen), 0)
 		claims = append(claims, hash)
 	}
 	req.CensusKeys = claims
 	resp = doRequest("addClaimBulk", signer2)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
+	qt.Assert(t, resp.Ok, qt.IsTrue)
 
 	// dumpPlain
 	req.CensusKey = []byte{}
 	req.CensusKeys = [][]byte{}
 	resp = doRequest("dumpPlain", signer2)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
-	var found bool
+	qt.Assert(t, resp.Ok, qt.IsTrue)
 	for _, c := range claims {
-		found = false
+		found := false
 		for _, c2 := range resp.CensusKeys {
 			if bytes.Equal(c, c2) {
 				found = true
 				break
 			}
 		}
-		if !found {
-			t.Fatalf("claim not found: %s", c)
-		}
+		qt.Assert(t, found, qt.IsTrue)
 	}
 
 	// GenProof valid
@@ -181,86 +155,60 @@ func TestCensus(t *testing.T) {
 	req.CensusKey = claims[1]
 	resp = doRequest("genProof", nil)
 	siblings := resp.Siblings
-	if len(siblings) == 0 {
-		t.Fatalf("proof not generated while it should be generated correctly")
-	}
+	qt.Assert(t, siblings, qt.Not(qt.HasLen), 0)
 
 	// CheckProof valid
 	req.ProofData = siblings
 	resp = doRequest("checkProof", nil)
-	if !*resp.ValidProof {
-		t.Fatal("proof is invalid but it should be valid")
-	}
+	qt.Assert(t, *resp.ValidProof, qt.IsTrue)
 
 	// CheckProof invalid (old root)
 	req.ProofData = siblings
 	req.RootHash = root
 	resp = doRequest("checkProof", nil)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
-	if *resp.ValidProof {
-		t.Fatalf("proof must be invalid for hash %s but it is valid!", root)
-	}
+	qt.Assert(t, resp.Ok, qt.IsTrue)
+	qt.Assert(t, *resp.ValidProof, qt.IsFalse)
 	req.RootHash = nil
 
 	// publish
 	req.CensusKeys = [][]byte{}
 	resp = doRequest("publish", signer2)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
+	qt.Assert(t, resp.Ok, qt.IsTrue)
 	uri := resp.URI
 
 	// getRoot
 	resp = doRequest("getRoot", nil)
 	root = resp.Root
-	if len(root) < 1 {
-		t.Fatalf("got invalid root")
-	}
+	qt.Assert(t, root, qt.Not(qt.HasLen), 0)
 
 	// getRoot from published census and check censusID=root
 	req.CensusID = hex.EncodeToString(root)
 	resp = doRequest("getRoot", nil)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
-	if !bytes.Equal(root, resp.Root) {
-		t.Fatalf("got invalid root from published census")
-	}
+	qt.Assert(t, resp.Ok, qt.IsTrue)
+	qt.Assert(t, resp.Root, qt.DeepEquals, root)
 
 	// add second census
 	req.CensusID = "importTest"
 	resp = doRequest("addCensus", signer2)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
+	qt.Assert(t, resp.Ok, qt.IsTrue)
 
 	// importRemote
 	req.CensusID = resp.CensusID
 	req.URI = uri
 	resp = doRequest("importRemote", signer2)
-	if !resp.Ok {
-		t.Fatalf("%s failed", req.Method)
-	}
+	qt.Assert(t, resp.Ok, qt.IsTrue)
 
 	// getRoot
 	resp = doRequest("getRoot", nil)
-	if !bytes.Equal(root, resp.Root) {
-		t.Fatalf("root is different after importing! %s != %s", root, resp.Root)
-	}
+	qt.Assert(t, resp.Root, qt.DeepEquals, root)
 
 	// getSize
 	req.RootHash = nil
 	resp = doRequest("getSize", nil)
-	if exp, got := int64(*censusSize), *resp.Size; exp != got {
-		t.Fatalf("expected size %v, got %v", exp, got)
-	}
+	qt.Assert(t, *resp.Size, qt.Equals, int64(*censusSize))
 
 	// get census list
 	resp = doRequest("getCensusList", signer2)
-	if len(resp.CensusList) != 4 {
-		t.Fatalf("census list size does not match")
-	}
+	qt.Assert(t, resp.CensusList, qt.HasLen, 4)
 	t.Logf("census list: %v", resp.CensusList)
 }

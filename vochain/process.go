@@ -46,7 +46,7 @@ func (v *State) CancelProcess(pid []byte) error { // LEGACY
 		return fmt.Errorf("cannot marshal updated process bytes: %w", err)
 	}
 	v.Lock()
-	err = v.Store.Tree(ProcessTree).Add([]byte(pid), updatedProcessBytes)
+	err = v.Store.Tree(ProcessTree).Add(pid, updatedProcessBytes)
 	v.Unlock()
 	if err != nil {
 		return err

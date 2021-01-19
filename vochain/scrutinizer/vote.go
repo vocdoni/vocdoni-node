@@ -98,7 +98,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	if err == nil {
 		return fmt.Errorf("process %x already computed", processID)
 	}
-	if err != nil && err != badger.ErrKeyNotFound {
+	if err != badger.ErrKeyNotFound {
 		return err
 	}
 

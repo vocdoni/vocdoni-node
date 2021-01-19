@@ -130,9 +130,8 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 		VochainApp:       vocapp,
 		EventProcessor: &EventProcessor{
 			Events:                make(chan ethtypes.Log),
-			EventProcessThreshold: time.Duration(60 * time.Second),
+			EventProcessThreshold: 60 * time.Second,
 			eventQueue:            make(map[string]*logEvent),
-			eventProcessorRunning: false,
 		},
 	}
 
@@ -154,13 +153,14 @@ func (ev *EthereumEvents) OnComputeResults(results *models.ProcessResult) {
 		log.Errorf("error fetching process %x from the Vochain: %s", results.ProcessId, err)
 		return
 	}
-	if models.ProcessStatus(vocProcessData.Status) == models.ProcessStatus_RESULTS {
+	switch vocProcessData.Status {
+	case models.ProcessStatus_RESULTS:
 		// check vochain process results
 		if len(vocProcessData.Results.Votes) > 0 {
 			log.Infof("process %x results already added on the Vochain, skipping", results.ProcessId)
 			return
 		}
-	} else if models.ProcessStatus(vocProcessData.Status) != models.ProcessStatus_ENDED {
+	case models.ProcessStatus_ENDED:
 		log.Infof("invalid process %x status %s for setting the results, skipping", results.ProcessId, vocProcessData.Status)
 		return
 	}

@@ -11,6 +11,9 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+// CensusOriginsToDownload is the list of census that should be downloaded by the censusdownloader
+var CensusOriginsToDownload = map[models.CensusOrigin]bool{models.CensusOrigin_OFF_CHAIN: true}
+
 // TBD: A startup process for importing on-going processe census
 // TBD: a mechanism for removing alyready finished census?
 
@@ -24,6 +27,8 @@ type CensusDownloader struct {
 	isFastSync    bool
 }
 
+// NewCensusDownloader creates a new instance of the census downloader daemon.
+// It will subscribe to Vochain events and perform the census import.
 func NewCensusDownloader(v *vochain.BaseApplication, c *census.Manager, importOnlyNew bool) *CensusDownloader {
 	cd := CensusDownloader{vochain: v, census: c, importOnlyNew: importOnlyNew}
 	cd.queue = make(map[string]string)
@@ -61,10 +66,18 @@ func (c *CensusDownloader) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 	c.queueLock.Lock()
 	defer c.queueLock.Unlock()
 	if !c.importOnlyNew || !c.isFastSync {
-		c.queue[mkroot] = mkuri
+		p, err := c.vochain.State.Process(pid, false)
+		if err != nil || p == nil {
+			log.Errorf("censusDownloader cannot get process from state: (%v)", err)
+			return
+		}
+		if CensusOriginsToDownload[p.CensusOrigin] {
+			c.queue[mkroot] = mkuri
+		}
 	}
 }
 
+// NOT USED but required for implementing the interface
 func (c *CensusDownloader) OnCancel(pid []byte)                                           {}
 func (c *CensusDownloader) OnVote(v *models.Vote)                                         {}
 func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string)                     {}

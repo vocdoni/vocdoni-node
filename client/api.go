@@ -110,9 +110,6 @@ func (c *Client) ImportCensus(signer *ethereum.SignKeys, uri string) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	if err != nil {
-		return nil, err
-	}
 
 	req.Method = "importRemote"
 	req.CensusID = resp.CensusID
@@ -216,7 +213,7 @@ func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root []byte, tolera
 		}
 		proofs = append(proofs, proof)
 		if (i+1)%100 == 0 {
-			log.Infof("proof generation progress for %s: %d%%", c.Addr, int(((i+1)*100)/(len(signers))))
+			log.Infof("proof generation progress for %s: %d%%", c.Addr, ((i+1)*100)/(len(signers)))
 		}
 	}
 	return proofs, nil
@@ -310,7 +307,7 @@ func (c *Client) TestSendVotes(pid, eid, root []byte, startBlock uint32, signers
 		}
 		nullifiers = append(nullifiers, resp.Payload)
 		if (i+1)%100 == 0 {
-			log.Infof("voting progress for %s: %d%%", c.Addr, int(((i+1)*100)/(len(signers))))
+			log.Infof("voting progress for %s: %d%%", c.Addr, ((i+1)*100)/(len(signers)))
 		}
 
 		//Try double voting (should fail)
@@ -383,7 +380,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot []byt
 		BlockCount:   uint32(duration),
 		ProcessId:    pid,
 		ProcessType:  ptype,
-		StartBlock:   uint32(block + 4),
+		StartBlock:   block + 4,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: ptype == "encrypted-poll"},
 		Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
 		Status:       models.ProcessStatus_READY,
@@ -556,7 +553,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 			return nil, "", fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 		}
 		i++
-		log.Infof("census creation progress: %d%%", int((i*100*100)/(censusSize)))
+		log.Infof("census creation progress: %d%%", (i*100*100)/(censusSize))
 	}
 
 	// getSize

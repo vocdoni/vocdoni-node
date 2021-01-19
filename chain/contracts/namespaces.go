@@ -206,9 +206,6 @@ func (_Namespaces *NamespacesCaller) GetNamespace(opts *bind.CallOpts, namespace
 		Validators []string
 		Oracles    []common.Address
 	})
-	if err != nil {
-		return *outstruct, err
-	}
 
 	outstruct.ChainId = out[0].(string)
 	outstruct.Genesis = out[1].(string)

@@ -208,7 +208,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 				if err != nil {
 					return nil, fmt.Errorf("cannot extract address from public key: (%w)", err)
 				}
-				log.Debugf("extracted public key: %x", vp.PubKey)
+				log.Debugf("extracted addr/pubkey: %s/%x", addr.Hex(), vp.PubKey)
 
 				// assign a nullifier
 				vp.Nullifier = GenerateNullifier(addr, vote.ProcessId)
@@ -232,6 +232,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 						return nil, fmt.Errorf("cannot fetch slot: %w", err)
 					}
 					vp.PubKeyDigest = slot[:]
+					log.Debugf("ERC20 index slot %d, storage slot %x", *process.EthIndexSlot, vp.PubKeyDigest)
 				default:
 					return nil, fmt.Errorf("census origin not compatible")
 				}
@@ -282,8 +283,8 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())
 	}
 
-	switch {
-	case tx.Txtype == models.TxType_ADD_PROCESS_KEYS || tx.Txtype == models.TxType_REVEAL_PROCESS_KEYS:
+	switch tx.Txtype {
+	case models.TxType_ADD_PROCESS_KEYS, models.TxType_REVEAL_PROCESS_KEYS:
 		if tx.ProcessId == nil {
 			return fmt.Errorf("missing processId on AdminTxCheck")
 		}
@@ -387,7 +388,7 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		}
 	}
 	if tx.RevealKey != nil {
-		commitment := snarks.Poseidon.Hash(tx.RevealKey[:])
+		commitment := snarks.Poseidon.Hash(tx.RevealKey)
 		if fmt.Sprintf("%x", commitment) != process.CommitmentKeys[*tx.KeyIndex] {
 			log.Debugf("%x != %s", commitment, process.CommitmentKeys[*tx.KeyIndex])
 			return fmt.Errorf("the provided commitment reveal key does not match with the stored on index %d", *tx.KeyIndex)

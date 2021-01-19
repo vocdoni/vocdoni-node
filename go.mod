@@ -17,6 +17,7 @@ require (
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/ethereum/go-ethereum v1.9.26-0.20201212163632-00d10e610f9f
+	github.com/frankban/quicktest v1.11.3
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/cors v1.1.1
 	github.com/google/go-cmp v0.5.4
@@ -34,6 +35,7 @@ require (
 	github.com/ipld/go-car v0.1.1-0.20201119040259-8fe0b741ece2 // indirect
 	github.com/klauspost/compress v1.11.4
 	github.com/koron/go-ssdp v0.0.2 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-libp2p v0.12.0
 	github.com/libp2p/go-libp2p-asn-util v0.0.0-20201026210036-4f868c957324 // indirect
 	github.com/libp2p/go-libp2p-connmgr v0.2.4

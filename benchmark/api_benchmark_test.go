@@ -97,7 +97,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 		req.CensusKeys = iclaims
 		doRequest("addClaimBulk", signer)
 		i++
-		log.Infof("census creation progress: %d%%", int((i*100*100)/(*censusSize)))
+		log.Infof("census creation progress: %d%%", (i*100*100)/(*censusSize))
 	}
 
 	// getSize

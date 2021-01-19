@@ -55,7 +55,7 @@ func (pk *processKeys) Encode() []byte {
 	data := make([]byte, commitmentKeySize*2+encryptionKeySize*2+1)
 	i := 0
 
-	copy(data[:], pk.pubKey)
+	copy(data, pk.pubKey)
 	i += encryptionKeySize
 
 	copy(data[i:], pk.privKey)
@@ -303,7 +303,7 @@ func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {
 	// Add the index in order to win some extra entropy
 	pb := append(pid, byte(k.myIndex))
 	// Private ed25519 key
-	priv, err := nacl.DecodePrivate(fmt.Sprintf("%x", ethereum.HashRaw(append(k.signer.Private.D.Bytes()[:], pb[:]...))))
+	priv, err := nacl.DecodePrivate(fmt.Sprintf("%x", ethereum.HashRaw(append(k.signer.Private.D.Bytes(), pb...))))
 	if err != nil {
 		return nil, fmt.Errorf("cannot generate encryption key: (%s)", err)
 	}
@@ -380,7 +380,7 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 		return
 	}
 	for _, p := range pids.GetPids() {
-		process, err := k.vochain.State.Process([]byte(p), false)
+		process, err := k.vochain.State.Process(p, false)
 		if err != nil {
 			log.Errorf("cannot get process from state: (%s)", err)
 			continue

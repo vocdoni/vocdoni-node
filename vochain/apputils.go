@@ -34,14 +34,21 @@ func checkMerkleProof(proof *models.Proof, censusOrigin models.CensusOrigin, cen
 		switch proof.Payload.(type) {
 		case *models.Proof_Graviton:
 			p := proof.GetGraviton()
+			if p == nil {
+				return false, fmt.Errorf("graviton proof is empty")
+			}
 			return gravitontree.CheckProof(leafData, []byte{}, censusRootHash, p.Siblings)
 		case *models.Proof_Iden3:
 			// NOT IMPLEMENTED
+			return false, fmt.Errorf("iden3 proof not implemented")
 		}
 	case models.CensusOrigin_ERC20:
 		p := proof.GetEthereumStorage()
+		if p == nil {
+			return false, fmt.Errorf("ethereum proof is empty")
+		}
 		if !bytes.Equal(p.Key, leafData) {
-			return false, nil
+			return false, fmt.Errorf("proof key and leafData do not match (%x != %x)", p.Key, leafData)
 		}
 		hexproof := []string{}
 		for _, s := range p.Siblings {

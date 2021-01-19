@@ -289,14 +289,14 @@ func (r *Router) getResults(request routerRequest) {
 		response.Type = "poll"
 	}
 	if procInfo.EnvelopeType.EncryptedVotes {
-		response.Type = response.Type + " encrypted"
+		response.Type += " encrypted"
 	} else {
-		response.Type = response.Type + " open"
+		response.Type += " open"
 	}
 	if procInfo.EnvelopeType.Serial {
-		response.Type = response.Type + " serial"
+		response.Type += " serial"
 	} else {
-		response.Type = response.Type + " single"
+		response.Type += " single"
 	}
 	response.State = procInfo.Status.String()
 
