@@ -208,6 +208,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			if len(invalidClaims) > 0 {
 				resp.InvalidClaims = invalidClaims
 			}
+			resp.Root = tr.Root()
 			log.Infof("%d claims addedd successfully", addedClaims)
 		} else {
 			resp.SetError("invalid authentication")
@@ -228,6 +229,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			if err != nil {
 				resp.SetError(err)
 			} else {
+				resp.Root = tr.Root()
 				log.Debugf("claim added %x/%x", data, r.CensusValue)
 			}
 		} else {
