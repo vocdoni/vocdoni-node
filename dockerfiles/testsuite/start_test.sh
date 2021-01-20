@@ -8,6 +8,7 @@ export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
 ORACLE_KEY=${TESTSUITE_ORACLE_KEY:-6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223}
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
 TEST=${1:-0}
+CLEAN=${CLEAN:-1}
 
 test() {
 	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost ws://gateway:9090/dvote --logLevel=INFO --electionType=$1
@@ -20,7 +21,11 @@ docker-compose up -d
 
 sleep 5
 echo "### Waiting for test suite to be ready ###"
-for i in {1..5}; do docker-compose run test curl --fail http://gateway:9090/ping && break || sleep 5; done
+for i in {1..5}; do
+	docker-compose run test curl --fail http://gateway:9090/dvote \
+		-X POST \
+		-d '{"id": "req00'$RANDOM'", "request": {"method": "getGatewayInfo", "timestamp":'$(date +%s)'}}' && break || sleep 5
+done
 
 testid="/tmp/.vochaintest$RANDOM"
 
@@ -40,8 +45,10 @@ wait
 #echo "### Post run logs ###"
 #docker-compose logs --tail 300
 
-echo "### Cleaning environment ###"
-docker-compose down -v --remove-orphans
+[ $CLEAN -eq 1 ] && {
+ echo "### Cleaning environment ###"
+ docker-compose down -v --remove-orphans
+}
 
 [ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" ] && {
 	echo "Vochain test finished correctly!"
