@@ -93,9 +93,6 @@ const (
 	TxAddProcessKeys    = "addProcessKeys"
 	TxRevealProcessKeys = "revealProcessKeys"
 
-	// ProcessesContractMaxCensusOrigins represents the max value that a uint8 can have
-	// with the current smart contract bitmask describing the supported census origins
-	ProcessesContractMaxCensusOrigins = 7
 	// ProcessesContractMaxProcessMode represents the max value that a uint8 can have
 	// with the current smart contract bitmask describing the supported process mode
 	ProcessesContractMaxProcessMode = 15
