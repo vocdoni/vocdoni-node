@@ -114,16 +114,13 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	}
 	// census origin
 	cOrigin := processMeta.ModeEnvelopeTypeCensusOrigin[2]
-	if cOrigin > types.ProcessesContractMaxCensusOrigins {
-		return nil, fmt.Errorf("invalid census origin: %d", processMeta.ModeEnvelopeTypeCensusOrigin[2])
+	if processData.CensusOrigin = models.CensusOrigin(cOrigin); processData.CensusOrigin == 0 {
+		return nil, fmt.Errorf("invalid census origin: %d", cOrigin)
 	}
-	processData.CensusOrigin = models.CensusOrigin(cOrigin)
-	evmCensus := processData.CensusOrigin == models.CensusOrigin_OFF_CHAIN_TREE
-	// census mkuri, only for off chain censuses
-	if evmCensus {
-		processMeta.MetadataCensusRootCensusUri[2] = util.TrimHex(processMeta.MetadataCensusRootCensusUri[2])
-		processData.CensusURI = &processMeta.MetadataCensusRootCensusUri[2]
-	}
+
+	processMeta.MetadataCensusRootCensusUri[2] = util.TrimHex(processMeta.MetadataCensusRootCensusUri[2])
+	processData.CensusURI = &processMeta.MetadataCensusRootCensusUri[2]
+
 	// start and end blocks
 	if processMeta.StartBlockBlockCount[0] > types.ProcessesContractMinStartBlock {
 		processData.StartBlock = processMeta.StartBlockBlockCount[0]
@@ -163,7 +160,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	processData.Namespace = uint32(processMeta.MaxTotalCostCostExponentNamespace[2])
 
 	// if EVM census, eth index slot from the ERC20Registry contract
-	if processData.CensusOrigin != models.CensusOrigin_OFF_CHAIN_TREE {
+	if CensusOriginsProperties[processData.CensusOrigin].NeedsIndexSlot {
 		// evm block height not required here, will be fetched by each user when generating the vote
 		// index slot
 		idxSlot, err := ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, processMeta.EntityAddress)
