@@ -108,12 +108,12 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 		return nil, fmt.Errorf("error decoding entity address: %w", err)
 	}
 	// census mkroot
-	processData.CensusRoot, err = hex.DecodeString(util.TrimHex(processMeta.MetadataCensusMerkleRootCensusMerkleTree[1]))
+	processData.CensusRoot, err = hex.DecodeString(util.TrimHex(processMeta.MetadataCensusRootCensusUri[1]))
 	if err != nil {
 		return nil, fmt.Errorf("cannot decode merkle root: %w", err)
 	}
 	// census origin
-	cOrigin := processMeta.ModeEnvelopeTypeCensusOrigin[2] + 1 // +1 required to match with solidity enum
+	cOrigin := processMeta.ModeEnvelopeTypeCensusOrigin[2]
 	if cOrigin > types.ProcessesContractMaxCensusOrigins {
 		return nil, fmt.Errorf("invalid census origin: %d", processMeta.ModeEnvelopeTypeCensusOrigin[2])
 	}
@@ -121,8 +121,8 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	evmCensus := processData.CensusOrigin == models.CensusOrigin_OFF_CHAIN_TREE
 	// census mkuri, only for off chain censuses
 	if evmCensus {
-		processMeta.MetadataCensusMerkleRootCensusMerkleTree[2] = util.TrimHex(processMeta.MetadataCensusMerkleRootCensusMerkleTree[2])
-		processData.CensusURI = &processMeta.MetadataCensusMerkleRootCensusMerkleTree[2]
+		processMeta.MetadataCensusRootCensusUri[2] = util.TrimHex(processMeta.MetadataCensusRootCensusUri[2])
+		processData.CensusURI = &processMeta.MetadataCensusRootCensusUri[2]
 	}
 	// start and end blocks
 	if processMeta.StartBlockBlockCount[0] > types.ProcessesContractMinStartBlock {
