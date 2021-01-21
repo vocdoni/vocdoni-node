@@ -128,3 +128,20 @@ type ScrutinizerOnProcessData struct {
 	EntityID  []byte
 	ProcessID []byte
 }
+
+// _________________________ CENSUS ORIGINS __________________________
+
+type CensusProperties struct {
+	Name            string
+	NeedsDownload   bool
+	NeedsIndexSlot  bool
+	NeedsURI        bool
+	WeightedSupport bool
+}
+
+var CensusOrigins = map[models.CensusOrigin]CensusProperties{
+	models.CensusOrigin_OFF_CHAIN_TREE:          {Name: "offchain tree", NeedsDownload: true, NeedsURI: true},
+	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: {Name: "offchain weighted tree", NeedsDownload: true, NeedsURI: true, WeightedSupport: true},
+	models.CensusOrigin_ERC20:                   {Name: "erc20", NeedsDownload: true, WeightedSupport: true},
+	models.CensusOrigin_OFF_CHAIN_CA:            {Name: "ca", WeightedSupport: true, NeedsURI: true},
+}
