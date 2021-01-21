@@ -34,6 +34,12 @@ func (c *Client) Close() error {
 	return c.Conn.Close(websocket.StatusNormalClosure, "")
 }
 
+func (c *Client) CheckClose(err *error) {
+	if clerr := c.Close(); clerr != nil {
+		*err = clerr
+	}
+}
+
 // Request makes a request to the previously connected endpoint
 func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*types.MetaResponse, error) {
 	method := req.Method
