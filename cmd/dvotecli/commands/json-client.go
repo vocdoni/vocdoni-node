@@ -16,7 +16,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"nhooyr.io/websocket"
 )
 
 var jsonClientCmd = &cobra.Command{
@@ -31,25 +30,26 @@ func init() {
 }
 
 func jsonInput(cmd *cobra.Command, args []string) error {
-
 	logLevel, _ := cmd.Flags().GetString("loglevel")
 	log.Init(logLevel, "stdout")
 	rand.Seed(time.Now().UnixNano())
 
 	signer := ethereum.NewSignKeys()
-	if privKey != "" {
-		if err := signer.AddHexKey(privKey); err != nil {
+	if opt.privKey != "" {
+		if err := signer.AddHexKey(opt.privKey); err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		signer.Generate()
+		if err := signer.Generate(); err != nil {
+			log.Fatal(err)
+		}
 	}
-	log.Infof("connecting to %s", host)
-	cl, err := client.New(host)
+	log.Infof("connecting to %s", opt.host)
+	cl, err := client.New(opt.host)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cl.Conn.Close(websocket.StatusNormalClosure, "")
+	defer cl.CheckClose(&err)
 	var req types.MetaRequest
 	reader := bufio.NewReader(os.Stdin)
 	for {
@@ -71,7 +71,7 @@ func jsonInput(cmd *cobra.Command, args []string) error {
 		}
 		printNice(resp)
 	}
-	return nil
+	return err
 }
 
 func processLine(input []byte) types.MetaRequest {
@@ -89,7 +89,8 @@ func printNice(resp *types.MetaResponse) {
 	output := "\n"
 	var val reflect.Value
 	for i := 0; i < v.NumField(); i++ {
-		if v.Field(i).Type().Name() == "bool" || v.Field(i).Type().Name() == "int64" || !v.Field(i).IsZero() {
+		if v.Field(i).Type().Name() == "bool" || v.Field(i).Type().Name() ==
+			"int64" || !v.Field(i).IsZero() {
 			if v.Field(i).Kind() == reflect.Ptr {
 				val = v.Field(i).Elem()
 			} else {

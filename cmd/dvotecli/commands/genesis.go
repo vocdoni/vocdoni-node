@@ -17,7 +17,7 @@ import (
 )
 
 var genesisGenCmd = &cobra.Command{
-	Use:   "genesis-gen",
+	Use:   "genesis",
 	Short: "Generate keys and genesis for vochain",
 	RunE:  genesisGen,
 }
@@ -27,12 +27,12 @@ func init() {
 	genesisGenCmd.Flags().Int("seeds", 1, "number of seed keys")
 	genesisGenCmd.Flags().Int("miners", 4, "number of miner keys")
 	genesisGenCmd.Flags().Int("oracles", 2, "number of oracle keys")
-	genesisGenCmd.Flags().String("chainId", "", "an ID name for the genesis chain to generate (required)")
-	genesisGenCmd.MarkFlagRequired("chainId")
+	genesisGenCmd.Flags().String("chainId", "",
+		"an ID name for the genesis chain to generate (required)")
+	cobra.CheckErr(genesisGenCmd.MarkFlagRequired("chainId"))
 }
 
 func genesisGen(cmd *cobra.Command, args []string) error {
-
 	// Generate seeds
 	sCount, _ := cmd.Flags().GetInt("seeds")
 
