@@ -90,8 +90,6 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
 	}
-	// create NewProcessTx
-	processTxArgs := new(models.NewProcessTx)
 	processData := new(models.Process)
 
 	// check status ready or paused
@@ -119,6 +117,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	if _, ok := types.CensusOrigins[censusOrigin]; !ok {
 		return nil, fmt.Errorf("census origin: %d not supported", censusOrigin)
 	}
+	processData.CensusOrigin = censusOrigin
 
 	// census URI
 	if types.CensusOrigins[censusOrigin].NeedsURI && len(processMeta.MetadataCensusRootCensusUri[2]) == 0 {
@@ -181,6 +180,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	}
 
 	// set tx type (outer type used by the vochain tx type)
+	processTxArgs := new(models.NewProcessTx)
 	processTxArgs.Txtype = models.TxType_NEW_PROCESS
 	processTxArgs.Process = processData
 	return processTxArgs, nil
