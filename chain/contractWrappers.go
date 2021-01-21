@@ -100,49 +100,57 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 		return nil, fmt.Errorf("invalid process status on process creation: %d", status)
 	}
 	processData.Status = status
-	// process id
 	processData.ProcessId = pid[:]
+
 	// entity id
 	// for evm censuses the entity id is the snapshoted contract address
 	if processData.EntityId, err = hex.DecodeString(util.TrimHex(processMeta.EntityAddress.String())); err != nil {
 		return nil, fmt.Errorf("error decoding entity address: %w", err)
 	}
-	// census mkroot
+
+	// census root
 	processData.CensusRoot, err = hex.DecodeString(util.TrimHex(processMeta.MetadataCensusRootCensusUri[1]))
 	if err != nil {
-		return nil, fmt.Errorf("cannot decode merkle root: %w", err)
-	}
-	// census origin
-	cOrigin := processMeta.ModeEnvelopeTypeCensusOrigin[2]
-	if processData.CensusOrigin = models.CensusOrigin(cOrigin); processData.CensusOrigin == 0 {
-		return nil, fmt.Errorf("invalid census origin: %d", cOrigin)
+		return nil, fmt.Errorf("cannot decode census root: %w", err)
 	}
 
-	processMeta.MetadataCensusRootCensusUri[2] = util.TrimHex(processMeta.MetadataCensusRootCensusUri[2])
+	// census origin
+	censusOrigin := models.CensusOrigin(processMeta.ModeEnvelopeTypeCensusOrigin[2])
+	if _, ok := types.CensusOrigins[censusOrigin]; !ok {
+		return nil, fmt.Errorf("census origin: %d not supported", censusOrigin)
+	}
+
+	// census URI
+	if types.CensusOrigins[censusOrigin].NeedsURI && len(processMeta.MetadataCensusRootCensusUri[2]) == 0 {
+		return nil, fmt.Errorf("census %s needs URI but non has been provided", types.CensusOrigins[censusOrigin].Name)
+	}
 	processData.CensusURI = &processMeta.MetadataCensusRootCensusUri[2]
 
 	// start and end blocks
-	if processMeta.StartBlockBlockCount[0] > types.ProcessesContractMinStartBlock {
-		processData.StartBlock = processMeta.StartBlockBlockCount[0]
+	processData.StartBlock = processMeta.StartBlockBlockCount[0]
+	if processMeta.StartBlockBlockCount[1] < types.ProcessesContractMinBlockCount {
+		return nil, fmt.Errorf("block count is too low")
 	}
-	if processMeta.StartBlockBlockCount[1] > types.ProcessesContractMinBlockCount {
-		processData.BlockCount = processMeta.StartBlockBlockCount[1]
-	}
-	// supported last 4 chars as the smart contract does
+	processData.BlockCount = processMeta.StartBlockBlockCount[1]
+
 	// process mode
 	if processData.Mode, err = extractProcessMode(processMeta.ModeEnvelopeTypeCensusOrigin[0]); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot extract process mode: %w", err)
 	}
+
 	// envelope type
 	if processData.EnvelopeType, err = extractEnvelopeType(processMeta.ModeEnvelopeTypeCensusOrigin[1]); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot extract envelope type: %w", err)
 	}
+
 	// question index
 	qIndex := uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[0])
 	processData.QuestionIndex = &qIndex
+
 	// question count
 	qCount := uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[1])
 	processData.QuestionIndex = &qCount
+
 	// max count
 	processData.VoteOptions = &models.ProcessVoteOptions{
 		// mac count
@@ -156,11 +164,12 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 		// cost exponent
 		CostExponent: uint32(processMeta.MaxTotalCostCostExponentNamespace[1]),
 	}
+
 	// namespace
 	processData.Namespace = uint32(processMeta.MaxTotalCostCostExponentNamespace[2])
 
 	// if EVM census, eth index slot from the ERC20Registry contract
-	if CensusOriginsProperties[processData.CensusOrigin].NeedsIndexSlot {
+	if types.CensusOrigins[processData.CensusOrigin].NeedsIndexSlot {
 		// evm block height not required here, will be fetched by each user when generating the vote
 		// index slot
 		idxSlot, err := ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, processMeta.EntityAddress)

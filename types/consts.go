@@ -102,12 +102,9 @@ const (
 
 	// TODO: @jordipainan this values are tricky
 
-	// ProcessesContractMinStartBlock represents the minimum vochain block number
-	// can be started where a process
-	ProcessesContractMinStartBlock = 0
 	// ProcessesContractMinBlockCount represents the minimum number of vochain blocks
 	// that a process should last
-	ProcessesContractMinBlockCount = 0
+	ProcessesContractMinBlockCount = 2
 
 	// ProcessesParamsSignatureSize represents the size of a signature on ethereum
 	ProcessesParamsSignatureSize = 32

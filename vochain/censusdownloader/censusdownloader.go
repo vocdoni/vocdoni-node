@@ -6,16 +6,11 @@ import (
 
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 )
-
-// CensusOriginsToDownload is the list of census that should be downloaded by the censusdownloader
-var CensusOriginsToDownload = map[models.CensusOrigin]bool{
-	models.CensusOrigin_OFF_CHAIN_TREE:          true,
-	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: true,
-}
 
 // TBD: A startup process for importing on-going processe census
 // TBD: a mechanism for removing alyready finished census?
@@ -74,7 +69,7 @@ func (c *CensusDownloader) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 			log.Errorf("censusDownloader cannot get process from state: (%v)", err)
 			return
 		}
-		if CensusOriginsToDownload[p.CensusOrigin] {
+		if types.CensusOrigins[p.CensusOrigin].NeedsDownload && len(mkuri) > 0 {
 			c.queue[mkroot] = mkuri
 		}
 	}
