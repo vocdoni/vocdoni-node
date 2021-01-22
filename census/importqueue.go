@@ -87,7 +87,7 @@ func (m *Manager) AddToImportQueue(censusID, censusURI string) {
 func (m *Manager) importFailedQueueDaemon() {
 	for {
 		for cid, uri := range m.ImportFailedQueue() {
-			log.Debugf("retrying census import %s/%s", cid, uri)
+			log.Debugf("retrying census import %s %s", cid, uri)
 			ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout*2)
 			censusRaw, err := m.RemoteStorage.Retrieve(ctx, uri[len(m.RemoteStorage.URIprefix()):])
 			cancel()
@@ -96,7 +96,7 @@ func (m *Manager) importFailedQueueDaemon() {
 			}
 			censusRaw = m.decompressBytes(censusRaw)
 			if err := m.importTree(censusRaw, cid); err != nil {
-				log.Warnf("cannot import census %s: (%s)", cid, err)
+				log.Warnf("cannot import census %s: (%v)", cid, err)
 			}
 			m.failedQueueLock.Lock()
 			delete(m.failedQueue, cid)
@@ -108,7 +108,6 @@ func (m *Manager) importFailedQueueDaemon() {
 
 // ImportQueueDaemon fetches and imports remote census added via importQueue.
 func (m *Manager) importQueueDaemon() {
-	log.Debug("starting import queue daemon")
 	go m.importFailedQueueDaemon()
 	for imp := range m.importQueue {
 		cid, uri := imp.censusID, imp.censusURI

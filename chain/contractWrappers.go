@@ -188,7 +188,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 
 func extractEnvelopeType(envelopeType uint8) (*models.EnvelopeType, error) {
 	if envelopeType > types.ProcessesContractMaxEnvelopeType {
-		return nil, fmt.Errorf("invalid process mode: (%d)", envelopeType)
+		return nil, fmt.Errorf("invalid envelope type: (%d)", envelopeType)
 	}
 	return &models.EnvelopeType{
 		Serial:         envelopeType&byte(0b00000001) > 0,
