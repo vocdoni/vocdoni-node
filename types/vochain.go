@@ -142,6 +142,6 @@ type CensusProperties struct {
 var CensusOrigins = map[models.CensusOrigin]CensusProperties{
 	models.CensusOrigin_OFF_CHAIN_TREE:          {Name: "offchain tree", NeedsDownload: true, NeedsURI: true},
 	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: {Name: "offchain weighted tree", NeedsDownload: true, NeedsURI: true, WeightedSupport: true},
-	models.CensusOrigin_ERC20:                   {Name: "erc20", NeedsDownload: true, WeightedSupport: true},
+	models.CensusOrigin_ERC20:                   {Name: "erc20", NeedsDownload: true, WeightedSupport: true, NeedsIndexSlot: true},
 	models.CensusOrigin_OFF_CHAIN_CA:            {Name: "ca", WeightedSupport: true, NeedsURI: true},
 }

@@ -74,7 +74,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			return fmt.Errorf("process is nil")
 		}
 		// Check if process already exist
-		log.Infof("found new process on Ethereum\n\t%+s", processTx.Process.String)
+		log.Infof("found new process on Ethereum: %s", log.FormatProto(processTx.Process))
 		_, err = e.VochainApp.State.Process(processTx.Process.ProcessId, true)
 		if err != nil {
 			if err != vochain.ErrProcessNotFound {
@@ -98,7 +98,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("error marshaling process tx: %s", err)
 		}
-		log.Debugf("broadcasting Vochain Tx: %s", processTx.String())
+		log.Debugf("broadcasting tx: %s", log.FormatProto(processTx))
 
 		res, err := e.VochainApp.SendTX(txb)
 		if err != nil || res == nil {
@@ -137,7 +137,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("error marshaling process tx: %w", err)
 		}
-		log.Debugf("broadcasting Vochain tx\n\t%s", setProcessTx.String())
+		log.Debugf("broadcasting tx: %s", log.FormatProto(setProcessTx))
 
 		res, err := e.VochainApp.SendTX(tx)
 		if err != nil || res == nil {

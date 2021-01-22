@@ -7,6 +7,8 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 var log *zap.SugaredLogger
@@ -134,6 +136,14 @@ func Fatal(args ...interface{}) {
 	// staticcheck see that, in this package, Fatal will always exit the
 	// entire program.
 	panic("unreachable")
+}
+
+func FormatProto(arg protoreflect.ProtoMessage) string {
+	pj := protojson.MarshalOptions{
+		AllowPartial: true,
+		Multiline:    false,
+	}
+	return pj.Format(arg)
 }
 
 // Debugf sends a formatted debug level log message

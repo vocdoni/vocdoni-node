@@ -168,11 +168,11 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	processData.Namespace = uint32(processMeta.MaxTotalCostCostExponentNamespace[2])
 
 	// if EVM census, eth index slot from the ERC20Registry contract
-	if types.CensusOrigins[processData.CensusOrigin].NeedsIndexSlot {
+	if types.CensusOrigins[censusOrigin].NeedsIndexSlot {
 		// evm block height not required here, will be fetched by each user when generating the vote
 		// index slot
 		idxSlot, err := ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, processMeta.EntityAddress)
-		if err != nil {
+		if err != nil || idxSlot == nil {
 			return nil, fmt.Errorf("error fetching token index slot from Ethereum: %w", err)
 		}
 		iSlot32 := uint32(idxSlot.Uint64())
