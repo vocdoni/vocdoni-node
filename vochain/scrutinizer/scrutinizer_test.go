@@ -214,11 +214,11 @@ func TestResults(t *testing.T) {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
 			}
-			if qi != 1 && v1 != 0 {
-				t.Fatalf("result is not correct, %d is not 0 as expected", v1)
+			if qi != 1 && v1 != "0" {
+				t.Fatalf("result is not correct, %s is not 0 as expected", v1)
 			}
-			if qi == 1 && v1 != 300 {
-				t.Fatalf("result is not correct, %d is not 300 as expected", v1)
+			if qi == 1 && v1 != "300" {
+				t.Fatalf("result is not correct, %s is not 300 as expected", v1)
 			}
 		}
 	}

@@ -182,16 +182,14 @@ func (s *Scrutinizer) List(max int64, from, prefix []byte) [][]byte {
 }
 
 // Temporary until we use Protobuf for the API
-// WARNING: uint64 might overflow!!
-func (s *Scrutinizer) GetFriendlyResults(result *models.ProcessResult) [][]uint64 {
-	r := [][]uint64{}
+func (s *Scrutinizer) GetFriendlyResults(result *models.ProcessResult) [][]string {
+	r := [][]string{}
 	value := new(big.Int)
 	for i, v := range result.Votes {
-		r = append(r, []uint64{})
+		r = append(r, []string{})
 		for j := range v.Question {
 			value.SetBytes(v.Question[j])
-			value.Uint64()
-			r[i] = append(r[i], value.Uint64())
+			r[i] = append(r[i], value.String())
 		}
 	}
 	return r

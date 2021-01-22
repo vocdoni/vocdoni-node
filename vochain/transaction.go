@@ -202,7 +202,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 
 				// assign a nullifier
 				vp.Nullifier = GenerateNullifier(addr, vote.ProcessId)
-				log.Debugf("generated new vote nullifier %x for address %s and process %x", vp.Nullifier, addr.Hex(), tx.ProcessId)
+				log.Debugf("new vote %x for address %s and process %x", vp.Nullifier, addr.Hex(), tx.ProcessId)
 
 				// check if vote exists
 				if state.EnvelopeExists(vote.ProcessId, vp.Nullifier, false) {
