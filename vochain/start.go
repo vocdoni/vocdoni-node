@@ -256,7 +256,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 			return nil, fmt.Errorf("cannot create or load node key: %w", err)
 		}
 	}
-	log.Infof("tendermint p2p node ID: %s", nodeKey.ID)
+	log.Infof("tendermint p2p node ID: %s", nodeKey.ID())
 
 	// read or create genesis file
 	if tmos.FileExists(tconfig.Genesis) {

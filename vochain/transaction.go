@@ -178,7 +178,6 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 				}
 
 				vp = new(types.CacheTx)
-				log.Debugf("vote signature: %x", vtx.Signature)
 				tx := vtx.GetVote()
 				if tx == nil {
 					return nil, fmt.Errorf("vote envelope transaction not found")
@@ -200,11 +199,10 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 				if err != nil {
 					return nil, fmt.Errorf("cannot extract address from public key: (%w)", err)
 				}
-				log.Debugf("extracted addr/pubkey: %s/%x", addr.Hex(), vp.PubKey)
 
 				// assign a nullifier
 				vp.Nullifier = GenerateNullifier(addr, vote.ProcessId)
-				log.Debugf("generated new vote nullifier: %x", vp.Nullifier)
+				log.Debugf("generated new vote nullifier %x for address %s and process %x", vp.Nullifier, addr.Hex(), tx.ProcessId)
 
 				// check if vote exists
 				if state.EnvelopeExists(vote.ProcessId, vp.Nullifier, false) {

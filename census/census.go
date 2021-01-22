@@ -80,6 +80,7 @@ func (m *Manager) Init(storageDir, rootKey string, newTreeImpl func(name, storag
 	for i := 0; i < ImportQueueRoutines; i++ {
 		go m.importQueueDaemon()
 	}
+	go m.importFailedQueueDaemon()
 
 	log.Infof("loading namespaces and keys from %s", nsConfig)
 	if _, err := os.Stat(nsConfig); os.IsNotExist(err) {
@@ -112,7 +113,7 @@ func (m *Manager) Init(storageDir, rootKey string, newTreeImpl func(name, storag
 	}
 	for _, v := range m.Census.Namespaces {
 		if _, err := m.LoadTree(v.Name); err != nil {
-			log.Warnf("census %s cannot be loaded: (%s)", v.Name, err)
+			log.Warnf("census %s cannot be loaded: (%v)", v.Name, err)
 		}
 	}
 	return nil

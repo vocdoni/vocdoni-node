@@ -140,8 +140,9 @@ func Fatal(args ...interface{}) {
 
 func FormatProto(arg protoreflect.ProtoMessage) string {
 	pj := protojson.MarshalOptions{
-		AllowPartial: true,
-		Multiline:    false,
+		AllowPartial:    true,
+		Multiline:       false,
+		EmitUnpopulated: true,
 	}
 	return pj.Format(arg)
 }
