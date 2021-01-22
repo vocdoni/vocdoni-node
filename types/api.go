@@ -116,7 +116,7 @@ type MetaResponse struct {
 	Nullifiers           *[]string  `json:"nullifiers,omitempty"`
 	Ok                   bool       `json:"ok"`
 	Paused               *bool      `json:"paused,omitempty"`
-	Payload              string     `json:"payload,omitempty"` // TODO(mvdan): sometimes hex, sometimes base64?
+	Payload              string     `json:"payload,omitempty"` // TODO: sometimes hex, sometimes base64 - consolidate with protobuf
 	ProcessIDs           []string   `json:"processIds,omitempty"`
 	ProcessList          []string   `json:"processList,omitempty"`
 	Registered           *bool      `json:"registered,omitempty"`
