@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -11,10 +12,13 @@ import (
 	ethbind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/vocdoni/storage-proofs-eth-go/token"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/net/idna"
 
 	"go.vocdoni.io/dvote/chain/contracts"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -30,6 +34,7 @@ type VotingHandle struct {
 	Namespace         *contracts.Namespaces
 	TokenStorageProof *contracts.TokenStorageProof
 	EthereumClient    *ethclient.Client
+	EthereumRPC       *ethrpc.Client
 }
 
 // Results represents the results received by a call to the processes smart contract getResults function
@@ -53,20 +58,21 @@ type Namespace struct {
 func NewVotingHandle(contractsAddress []common.Address, dialEndpoint string) (*VotingHandle, error) {
 	var err error
 	ph := new(VotingHandle)
-	// try connect to the client
+	// try connect to the w3endpoint using an RPC connection
 	for i := 0; i < types.EthereumDialMaxRetry; i++ {
-		ph.EthereumClient, err = ethclient.Dial(dialEndpoint)
-		if err != nil || ph.EthereumClient == nil {
-			log.Warnf("cannot create a client connection: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
+		ph.EthereumRPC, err = ethrpc.Dial(dialEndpoint)
+		if err != nil || ph.EthereumRPC == nil {
+			log.Warnf("cannot create a ethereum rpc connection: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
 			time.Sleep(time.Second * 2)
 			continue
 		}
 		break
 	}
-	if err != nil || ph.EthereumClient == nil {
-		return nil, fmt.Errorf("cannot create a client connection: (%w), tried %d times", err, types.EthereumDialMaxRetry)
+	if err != nil || ph.EthereumRPC == nil {
+		return nil, fmt.Errorf("cannot create RPC connection: (%w), tried %d times", err, types.EthereumDialMaxRetry)
 	}
-
+	// if RPC connection established, create an ethereum client using the RPC client
+	ph.EthereumClient = ethclient.NewClient(ph.EthereumRPC)
 	if ph.VotingProcess, err = contracts.NewProcesses(contractsAddress[0], ph.EthereumClient); err != nil {
 		return new(VotingHandle), fmt.Errorf("error constructing processes contract transactor: %w", err)
 	}
@@ -167,15 +173,30 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	// namespace
 	processData.Namespace = uint32(processMeta.MaxTotalCostCostExponentNamespace[2])
 
-	// if EVM census, eth index slot from the ERC20Registry contract
+	// if EVM census, check census root provided and get index slot from the token storage proof contract
 	if types.CensusOrigins[censusOrigin].NeedsIndexSlot {
-		// evm block height not required here, will be fetched by each user when generating the vote
-		// index slot
-		idxSlot, err := ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, processMeta.EntityAddress)
-		if err != nil || idxSlot == nil {
-			return nil, fmt.Errorf("error fetching token index slot from Ethereum: %w", err)
+		// check valid storage root provided
+		// the holder address is choosen randomly
+		randSigner := ethereum.NewSignKeys()
+		if err := randSigner.Generate(); err != nil {
+			return nil, fmt.Errorf("cannot check storage root, cannot generate random Ethereum address: %w", err)
 		}
-		iSlot32 := uint32(idxSlot.Uint64())
+		fetchedRoot, err := ph.getStorageRoot(ctx, randSigner.Address(), processMeta.EntityAddress, processMeta.EvmBlockHeight)
+		if err != nil {
+			return nil, fmt.Errorf("cannot check EVM storage root: %w", err)
+		}
+		if bytes.Equal(fetchedRoot.Bytes(), common.Hash{}.Bytes()) {
+			return nil, fmt.Errorf("invalid storage root obtained from Ethereum: %x", fetchedRoot)
+		}
+		if !bytes.Equal(fetchedRoot.Bytes(), processData.CensusRoot) {
+			return nil, fmt.Errorf("invalid storage root, root fetched and provided must be the same. Got: %x expected: %x", fetchedRoot, processData.CensusRoot)
+		}
+		// get index slot from the token storage proof contract
+		islot, err := ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, processMeta.EntityAddress)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get balance mapping position from the contract: %w", err)
+		}
+		iSlot32 := uint32(islot.Uint64())
 		processData.EthIndexSlot = &iSlot32
 	}
 
@@ -184,6 +205,27 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	processTxArgs.Txtype = models.TxType_NEW_PROCESS
 	processTxArgs.Process = processData
 	return processTxArgs, nil
+}
+
+func (ph *VotingHandle) getStorageRoot(ctx context.Context, holder common.Address, contractAddr common.Address, blockNum *big.Int) (hash common.Hash, err error) {
+	// create token storage proof artifact
+	ts := token.ERC20Token{
+		RPCcli: ph.EthereumRPC,
+		Ethcli: ph.EthereumClient,
+	}
+	ts.Init(ctx, "", contractAddr.String())
+	// get block
+	blk, err := ts.GetBlock(ctx, blockNum)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("cannot get block: %w", err)
+	}
+	// get proof
+	sproof, err := ts.GetProof(ctx, holder, blk)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("cannot get storage root: %w", err)
+	}
+	// return the storage root hash
+	return sproof.StorageHash, nil
 }
 
 func extractEnvelopeType(envelopeType uint8) (*models.EnvelopeType, error) {
