@@ -57,7 +57,7 @@ func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
 	return resp.Siblings, nil
 }
 
-func (c *Client) GetResults(pid []byte) ([][]uint64, string, error) {
+func (c *Client) GetResults(pid []byte) ([][]string, string, error) {
 	var req types.MetaRequest
 	req.Method = "getResults"
 	req.ProcessID = pid
@@ -153,10 +153,10 @@ func (c *Client) GetKeys(pid, eid []byte) (*pkeys, error) {
 		rev:  resp.RevealKeys}, nil
 }
 
-func (c *Client) TestResults(pid []byte, totalVotes int) ([][]uint64, error) {
+func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
 	log.Infof("waiting for results...")
 	var err error
-	var results [][]uint64
+	var results [][]string
 	var block uint32
 	for {
 		block, err = c.GetCurrentBlock()
@@ -173,7 +173,7 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]uint64, error) {
 		}
 		log.Infof("no results yet at block %d", block+2)
 	}
-	total := uint64(totalVotes)
+	total := fmt.Sprintf("%d", totalVotes)
 	if results[0][1] != total || results[1][2] != total || results[2][3] != total || results[3][4] != total {
 		return nil, fmt.Errorf("invalid results: %v", results)
 	}

@@ -85,6 +85,7 @@ func (m *Manager) AddToImportQueue(censusID, censusURI string) {
 }
 
 func (m *Manager) importFailedQueueDaemon() {
+	log.Infof("starting import failed queue daemon")
 	for {
 		for cid, uri := range m.ImportFailedQueue() {
 			log.Debugf("retrying census import %s %s", cid, uri)
@@ -108,7 +109,6 @@ func (m *Manager) importFailedQueueDaemon() {
 
 // ImportQueueDaemon fetches and imports remote census added via importQueue.
 func (m *Manager) importQueueDaemon() {
-	go m.importFailedQueueDaemon()
 	for imp := range m.importQueue {
 		cid, uri := imp.censusID, imp.censusURI
 		// TODO(mvdan): this lock is separate from the one
