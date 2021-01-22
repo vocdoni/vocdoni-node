@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
+	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/config"
 	vnet "go.vocdoni.io/dvote/net"
@@ -46,15 +46,10 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	// create the proxy
 	pxy := testcommon.NewMockProxy(t)
 	// create ethereum node
-	node, err := NewMockEthereum(t.TempDir(), pxy)
-	if err != nil {
-		t.Fatalf("cannot create ethereum node: %s", err)
-	}
+	node := mockEthereum(t, pxy)
 	// start node
 	node.Start()
-	// TODO(mvdan): re-enable Node.Stop once
-	// https://github.com/ethereum/go-ethereum/issues/20420 is fixed
-	// defer node.Node.Stop()
+	defer node.Node.Close()
 	// proxy websocket handle
 	pxyAddr := fmt.Sprintf("ws://%s/web3ws", pxy.Addr)
 	// Create WebSocket endpoint
@@ -66,9 +61,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	ws.Listen(listenerOutput)
 	// create ws client
 	c, _, err := websocket.Dial(context.Background(), pxyAddr, nil)
-	if err != nil {
-		t.Fatalf("cannot dial web3ws: %s", err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 	defer c.Close(websocket.StatusNormalClosure, "")
 	// send requests
 	for _, tt := range testRequests {
@@ -76,42 +69,32 @@ func TestWeb3WSEndpoint(t *testing.T) {
 			// write message
 			tt.request.Jsonrpc = "2.0"
 			reqBytes, err := json.Marshal(tt.request)
-			if err != nil {
-				t.Fatalf("cannot marshal request: %s", err)
-			}
+			qt.Assert(t, err, qt.IsNil)
 			t.Logf("sending request: %v", tt.request)
 			tctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()
 			err = c.Write(tctx, websocket.MessageText, reqBytes)
-			if err != nil {
-				t.Fatalf("cannot write to ws: %s", err)
-			}
+			qt.Assert(t, err, qt.IsNil)
 			// read message
 			_, message, err := c.Read(tctx)
-			if err != nil {
-				t.Fatalf("cannot read message: %s", err)
-			}
+			qt.Assert(t, err, qt.IsNil)
 			t.Logf("response: %s", message)
 			// check if response == expected
 			var resp map[string]interface{}
 			err = json.Unmarshal(message, &resp)
-			if err != nil {
-				t.Fatalf("cannot unmarshal response: %s", err)
-			}
+			qt.Assert(t, err, qt.IsNil)
 
-			if diff := cmp.Diff(resp["result"], tt.result); diff != "" {
-				t.Fatalf("result not expected, diff is: %s", diff)
-			}
+			qt.Assert(t, resp["result"], qt.Equals, tt.result)
 		})
 	}
 }
 
-// NewMockEthereum creates an ethereum node, attaches a signing key and adds a http or ws endpoint to a given proxy
-func NewMockEthereum(dataDir string, pxy *vnet.Proxy) (*chain.EthChainContext, error) {
+// mockEthereum creates an ethereum node, attaches a signing key and adds a http or ws endpoint to a given proxy
+func mockEthereum(t *testing.T, pxy *vnet.Proxy) *chain.EthChainContext {
 	// create base config
 	ethConfig := &config.EthCfg{
 		LogLevel:  "error",
-		DataDir:   dataDir,
+		DataDir:   t.TempDir(),
 		ChainType: "goerli",
 	}
 	w3Config := &config.W3Cfg{
@@ -123,15 +106,11 @@ func NewMockEthereum(dataDir string, pxy *vnet.Proxy) (*chain.EthChainContext, e
 	}
 	// init node
 	w3cfg, err := chain.NewConfig(ethConfig, w3Config)
-	if err != nil {
-		return nil, err
-	}
+	qt.Assert(t, err, qt.IsNil)
 	node, err := chain.Init(w3cfg)
-	if err != nil {
-		return nil, err
-	}
+	qt.Assert(t, err, qt.IsNil)
 	// register node endpoint
 	pxy.AddHandler(w3Config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)))
 	pxy.AddWsHandler(w3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)), vnet.Web3WsReadLimit)
-	return node, nil
+	return node
 }

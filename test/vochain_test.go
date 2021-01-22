@@ -10,8 +10,7 @@ import (
 )
 
 func TestCreateProcess(t *testing.T) {
-	// TODO(mvdan): re-enable once
-	// https://go.vocdoni.io/dvote/-/issues/172 is fixed.
+	// TODO(mvdan): re-enable once tests are hermetic
 	// t.Parallel()
 
 	s := testcommon.NewVochainStateWithOracles(t)
