@@ -67,7 +67,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		tr.Add(c, nil)
 		claims = append(claims, string(c))
 	}
-	mkuri := "ipfs://123456789"
+	censusURI := "ipfs://123456789"
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
@@ -77,7 +77,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EntityIDsize),
 		CensusRoot:   tr.Root(),
-		CensusURI:    &mkuri,
+		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}

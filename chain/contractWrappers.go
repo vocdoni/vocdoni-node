@@ -210,7 +210,7 @@ func extractProcessMode(processMode uint8) (*models.ProcessMode, error) {
 	}, nil
 }
 
-// SetStatusTxArgs returns a SetProcessTx instance
+// SetStatusTxArgs returns a SetProcessTx instance with the processStatus set
 func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint16, status uint8) (*models.SetProcessTx, error) {
 	status++ // +1 for matching with ethevent uint8
 	processData, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
@@ -233,9 +233,34 @@ func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [types.ProcessI
 	return setprocessTxArgs, nil
 }
 
-// SetCensusTxArgs
-func (ph *VotingHandle) SetCensusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte) (*models.SetProcessTx, error) {
-	return nil, fmt.Errorf("not implemented")
+// SetCensusTxArgs returns a SetProcess tx instance with census censusRoot and census censusURI set
+func (ph *VotingHandle) SetCensusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint16) (*models.SetProcessTx, error) {
+	processData, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
+	}
+	// create setProcessTx
+	setprocessTxArgs := new(models.SetProcessTx)
+	// process id
+	setprocessTxArgs.ProcessId = pid[:]
+	// process censusRoot
+	if setprocessTxArgs.CensusRoot, err = hex.DecodeString(util.TrimHex(processData.MetadataCensusRootCensusUri[1])); err != nil {
+		return nil, fmt.Errorf("invalid census root: %w", err)
+	}
+
+	censusOrigin := models.CensusOrigin(processData.ModeEnvelopeTypeCensusOrigin[2])
+	if !types.CensusOrigins[censusOrigin].AllowCensusUpdate {
+		return nil, fmt.Errorf("cannot update census, invalid census origin")
+	}
+	if types.CensusOrigins[censusOrigin].NeedsURI && len(processData.MetadataCensusRootCensusUri[2]) == 0 {
+		return nil, fmt.Errorf("census %s needs URI but an empty census URI has been provided", censusOrigin.String())
+	}
+	setprocessTxArgs.CensusURI = &processData.MetadataCensusRootCensusUri[2]
+
+	// TODO: @jordipainan namespace not used
+	setprocessTxArgs.Txtype = models.TxType_SET_PROCESS_CENSUS
+
+	return setprocessTxArgs, nil
 }
 
 // SetResultsTxArgs

@@ -19,8 +19,8 @@ func TestState(t *testing.T) {
 	var pids [][]byte
 	for i := 0; i < 100; i++ {
 		pids = append(pids, util.RandomBytes(32))
-		mkuri := "ipfs://foobar"
-		p := &models.Process{EntityId: util.RandomBytes(32), CensusURI: &mkuri, ProcessId: pids[i]}
+		censusURI := "ipfs://foobar"
+		p := &models.Process{EntityId: util.RandomBytes(32), CensusURI: &censusURI, ProcessId: pids[i]}
 		s.AddProcess(p)
 
 		for j := 0; j < 10; j++ {

@@ -365,7 +365,7 @@ func (c *Client) TestSendVotes(pid, eid, root []byte, startBlock uint32, signers
 	return votingElapsedTime, nil
 }
 
-func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot []byte, mkuri string, pid []byte, ptype string, duration int) (uint32, error) {
+func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, censusRoot []byte, censusURI string, pid []byte, ptype string, duration int) (uint32, error) {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
 	block, err := c.GetCurrentBlock()
@@ -374,8 +374,8 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, mkroot []byt
 	}
 	processData := &models.Process{
 		EntityId:     entityID,
-		CensusRoot:   mkroot,
-		CensusURI:    &mkuri,
+		CensusRoot:   censusRoot,
+		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   uint32(duration),
 		ProcessId:    pid,

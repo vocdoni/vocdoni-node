@@ -88,15 +88,20 @@ func AddTx(vtx *models.Tx, state *State, txID [32]byte, commit bool) ([]byte, er
 			tx := vtx.GetSetProcess()
 			switch tx.Txtype {
 			case models.TxType_SET_PROCESS_STATUS:
-				if tx.Status == nil {
-					return []byte{}, fmt.Errorf("set process status, status is nil")
+				if tx.GetStatus() == models.ProcessStatus_PROCESS_UNKNOWN {
+					return []byte{}, fmt.Errorf("set process status, status unknown")
 				}
 				return []byte{}, state.SetProcessStatus(tx.ProcessId, *tx.Status, true)
 			case models.TxType_SET_PROCESS_RESULTS:
-				if tx.Results == nil {
+				if tx.GetResults() == nil {
 					return []byte{}, fmt.Errorf("set process results, results is nil")
 				}
 				return []byte{}, state.SetProcessResults(tx.ProcessId, tx.Results, true)
+			case models.TxType_SET_PROCESS_CENSUS:
+				if tx.GetCensusRoot() == nil {
+					return []byte{}, fmt.Errorf("set process census, census root is nil")
+				}
+				return []byte{}, state.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true)
 			default:
 				return []byte{}, fmt.Errorf("unknown set process tx type")
 			}

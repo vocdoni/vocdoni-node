@@ -1,6 +1,7 @@
 package ethevents
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/chain/contracts"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -68,17 +70,17 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		defer cancel()
 		processTx, err := newProcessMeta(tctx, &e.ContractsABI[0], event.Data, e.VotingHandle)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot obtain process data for creating the transaction: %w", err)
 		}
 		if processTx.Process == nil {
-			return fmt.Errorf("process is nil")
+			return fmt.Errorf("process obtained from ethereum storage and logs is nil")
 		}
 		// Check if process already exist
 		log.Infof("found new process on Ethereum: %s", log.FormatProto(processTx.Process))
 		_, err = e.VochainApp.State.Process(processTx.Process.ProcessId, true)
 		if err != nil {
 			if err != vochain.ErrProcessNotFound {
-				return err
+				return fmt.Errorf("process not found on the Vochain")
 			}
 		} else {
 			log.Infof("process already exist, skipping")
@@ -102,22 +104,21 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 
 		res, err := e.VochainApp.SendTX(txb)
 		if err != nil || res == nil {
-			log.Warnf("cannot broadcast tx: %s", err)
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
-		log.Infof("oracle transaction sent, hash:%s", res.Hash)
+		log.Infof("oracle transaction sent, hash: %x", res.Hash)
 
 	case ethereumEventList["processesStatusUpdated"]:
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		setProcessTx, err := processStatusUpdatedMeta(tctx, &e.ContractsABI[0], event.Data, e.VotingHandle)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot obtain process data for creating the transaction: %w", err)
 		}
 		log.Infof("found process %x status update on ethereum, new status is %s", setProcessTx.ProcessId, setProcessTx.Status)
 		p, err := e.VochainApp.State.Process(setProcessTx.ProcessId, true)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot fetch the process from the Vochain: %w", err)
 		}
 		if p.Status == models.ProcessStatus_CANCELED || p.Status == models.ProcessStatus_ENDED {
 			log.Infof("process already canceled or ended, skipping")
@@ -141,10 +142,62 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 
 		res, err := e.VochainApp.SendTX(tx)
 		if err != nil || res == nil {
-			log.Warnf("cannot broadcast tx: (%s)", err)
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
-		log.Infof("oracle transaction sent, hash: %s", res.Hash)
+		log.Infof("oracle transaction sent, hash: %x", res.Hash)
+
+	case ethereumEventList["processesCensusUpdated"]:
+		tctx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+		setProcessTx, err := processCensusUpdatedMeta(tctx, &e.ContractsABI[0], event.Data, e.VotingHandle)
+		if err != nil {
+			return fmt.Errorf("cannot obtain process data for creating the transaction: %w", err)
+
+		}
+		log.Infof("found process %x census update on ethereum", setProcessTx.ProcessId)
+		p, err := e.VochainApp.State.Process(setProcessTx.ProcessId, true)
+		if err != nil {
+			return fmt.Errorf("cannot fetch the process from the Vochain: %w", err)
+		}
+
+		// process censusRoot
+		if bytes.Equal(p.CensusRoot, setProcessTx.CensusRoot) {
+			return fmt.Errorf("censusRoot cannot be the same")
+		}
+		// check dynamic census enabled
+		if !p.Mode.DynamicCensus {
+			return fmt.Errorf("process needs dynamic census in order to update its census")
+		}
+		// check status
+		if (p.Status != models.ProcessStatus_READY) && (p.Status != models.ProcessStatus_PAUSED) {
+			return fmt.Errorf("process status %s does not accept census updates", p.Status.String())
+		}
+		// check census origin
+		if !types.CensusOrigins[p.CensusOrigin].AllowCensusUpdate {
+			return fmt.Errorf("process census origin %s does not accept census updates", p.CensusOrigin.String())
+		}
+
+		vtx := models.Tx{}
+		setCensusTxBytes, err := proto.Marshal(setProcessTx)
+		if err != nil {
+			return fmt.Errorf("cannot marshal setProcess tx: %w", err)
+		}
+		vtx.Signature, err = e.Signer.Sign(setCensusTxBytes)
+		if err != nil {
+			return fmt.Errorf("cannot sign oracle tx: %w", err)
+		}
+		vtx.Payload = &models.Tx_SetProcess{SetProcess: setProcessTx}
+		tx, err := proto.Marshal(&vtx)
+		if err != nil {
+			return fmt.Errorf("error marshaling process tx: %w", err)
+		}
+		log.Debugf("broadcasting tx: %s", log.FormatProto(setProcessTx))
+
+		res, err := e.VochainApp.SendTX(tx)
+		if err != nil || res == nil {
+			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
+		}
+		log.Infof("oracle transaction sent, hash: %x", res.Hash)
 	}
 	return nil
 }
@@ -165,4 +218,13 @@ func processStatusUpdatedMeta(ctx context.Context, contractABI *abi.ABI, eventDa
 	}
 	log.Debugf("processStatusUpdated eventData: %+v", structuredData)
 	return ph.SetStatusTxArgs(ctx, structuredData.ProcessId, structuredData.Namespace, structuredData.Status)
+}
+
+func processCensusUpdatedMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.SetProcessTx, error) {
+	structuredData := &contracts.ProcessesCensusUpdated{}
+	if err := contractABI.UnpackIntoInterface(structuredData, "CensusUpdated", eventData); err != nil {
+		return nil, fmt.Errorf("cannot unpack CensusUpdated event: %w", err)
+	}
+	log.Debugf("processCensusUpdated eventData: %+v", structuredData)
+	return ph.SetCensusTxArgs(ctx, structuredData.ProcessId, structuredData.Namespace)
 }

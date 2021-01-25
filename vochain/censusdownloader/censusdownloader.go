@@ -59,8 +59,8 @@ func (c *CensusDownloader) Commit(height int64) {
 	}
 }
 
-func (c *CensusDownloader) OnProcess(pid, eid []byte, mkroot, mkuri string) {
-	mkroot = util.TrimHex(mkroot)
+func (c *CensusDownloader) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
+	censusRoot = util.TrimHex(censusRoot)
 	c.queueLock.Lock()
 	defer c.queueLock.Unlock()
 	if !c.importOnlyNew || !c.isFastSync {
@@ -69,8 +69,8 @@ func (c *CensusDownloader) OnProcess(pid, eid []byte, mkroot, mkuri string) {
 			log.Errorf("censusDownloader cannot get process from state: (%v)", err)
 			return
 		}
-		if types.CensusOrigins[p.CensusOrigin].NeedsDownload && len(mkuri) > 0 {
-			c.queue[mkroot] = mkuri
+		if types.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
+			c.queue[censusRoot] = censusURI
 		}
 	}
 }

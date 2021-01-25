@@ -91,8 +91,8 @@ func BenchmarkVochain(b *testing.B) {
 	// get census root
 	log.Infof("get root")
 	resp = doRequest("getRoot", nil)
-	mkRoot := resp.Root
-	if len(mkRoot) < 1 {
+	censusRoot := resp.Root
+	if len(censusRoot) < 1 {
 		b.Fatalf("got invalid root")
 	}
 
@@ -104,7 +104,7 @@ func BenchmarkVochain(b *testing.B) {
 	processID := testutil.Hex2byte(b, hexProcessID)
 	processData := &models.Process{
 		EntityId:   entityID,
-		CensusRoot: mkRoot,
+		CensusRoot: censusRoot,
 		BlockCount: numberOfBlocks,
 		ProcessId:  processID,
 		StartBlock: *resp.Height + 1,
@@ -162,7 +162,7 @@ func BenchmarkVochain(b *testing.B) {
 
 		count := 0
 		for pb.Next() {
-			vochainBench(b, cl, keySet[count], poseidonHashes[count], mkRoot, processID, req.CensusID)
+			vochainBench(b, cl, keySet[count], poseidonHashes[count], censusRoot, processID, req.CensusID)
 			count++
 		}
 	})
@@ -179,7 +179,7 @@ func BenchmarkVochain(b *testing.B) {
 	log.Infof("created entities: %+v", resp.EntityIDs)
 }
 
-func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon, mkRoot, processID []byte, censusID string) {
+func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon, censusRoot, processID []byte, censusID string) {
 	// API requests
 	var req types.MetaRequest
 	doRequest := cl.ForTest(b, &req)
@@ -191,7 +191,7 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	// generate envelope proof
 	log.Infof("generating proof for key %s with poseidon hash: %s", pub, poseidon)
 	req.CensusID = censusID
-	req.RootHash = mkRoot
+	req.RootHash = censusRoot
 	req.CensusKey = poseidon
 	resp := doRequest("genProof", nil)
 	siblings := resp.Siblings

@@ -21,12 +21,12 @@ func (v *State) AddProcess(p *models.Process) error {
 	if err != nil {
 		return err
 	}
-	mkuri := ""
+	censusURI := ""
 	if p.CensusURI != nil {
-		mkuri = *p.CensusURI
+		censusURI = *p.CensusURI
 	}
 	for _, l := range v.eventListeners {
-		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), mkuri)
+		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI)
 	}
 	return nil
 }
@@ -213,6 +213,44 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 	return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
 }
 
+func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commit bool) error {
+	process, err := v.Process(pid, false)
+	if err != nil {
+		return err
+	}
+	// check valid state transition
+	// dynamic census
+	if !process.Mode.DynamicCensus {
+		return fmt.Errorf("cannot update census, only processes with dynamic census can update its census")
+	}
+	// census origin
+	if !types.CensusOrigins[process.CensusOrigin].AllowCensusUpdate {
+		return fmt.Errorf("cannot update census, invalid census origin: %s", process.CensusOrigin.String())
+	}
+	// status
+	if !(process.Status == models.ProcessStatus_READY) && !(process.Status == models.ProcessStatus_PAUSED) {
+		return fmt.Errorf("cannot update census, process status must be READY or PAUSED and is: %s", process.Status.String())
+	}
+	// check not same censusRoot
+	if bytes.Equal(censusRoot, process.CensusRoot) {
+		return fmt.Errorf("cannot update census, same censusRoot")
+	}
+
+	if types.CensusOrigins[process.CensusOrigin].NeedsURI && censusURI == "" {
+		return fmt.Errorf("process requires URI but an empty one was provided")
+	}
+
+	if commit {
+		process.CensusRoot = censusRoot
+		process.CensusURI = &censusURI
+		if err := v.setProcess(process, process.ProcessId); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
 func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 	tx := vtx.GetNewProcess()
@@ -310,6 +348,8 @@ func SetProcessTxCheck(vtx *models.Tx, state *State) error {
 		return state.SetProcessResults(process.ProcessId, tx.GetResults(), false)
 	case models.TxType_SET_PROCESS_STATUS:
 		return state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
+	case models.TxType_SET_PROCESS_CENSUS:
+		return state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), false)
 	default:
 		return fmt.Errorf("unknown set process tx type: %s", tx.Txtype)
 	}

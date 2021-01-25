@@ -48,7 +48,7 @@ var PrefixDBCacheSize = 0
 // happening in parallel.
 type EventListener interface {
 	OnVote(*models.Vote)
-	OnProcess(pid, eid []byte, mkroot, mkuri string)
+	OnProcess(pid, eid []byte, censusRoot, censusURI string)
 	OnProcessStatusChange(pid []byte, status models.ProcessStatus)
 	OnCancel(pid []byte)
 	OnProcessKeys(pid []byte, encryptionPub, commitment string)
@@ -536,7 +536,7 @@ func (v *State) Rollback() {
 	}
 }
 
-// WorkingHash returns the hash of the vochain trees mkroots
+// WorkingHash returns the hash of the vochain trees censusRoots
 // hash(appTree+processTree+voteTree)
 func (v *State) WorkingHash() []byte {
 	v.RLock()

@@ -209,7 +209,7 @@ func (k *KeyKeeper) Rollback() {
 }
 
 // OnProcess creates the keys and add them to the pool queue, if the process requires it
-func (k *KeyKeeper) OnProcess(pid, eid []byte, mkroot, mkuri string) {
+func (k *KeyKeeper) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
