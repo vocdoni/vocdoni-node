@@ -14,7 +14,6 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"go.vocdoni.io/dvote/crypto"
-	"go.vocdoni.io/dvote/util"
 )
 
 // SignatureLength is the size of an ECDSA signature in hexString format
@@ -57,7 +56,7 @@ func (k *SignKeys) Generate() error {
 
 // AddHexKey imports a private hex key
 func (k *SignKeys) AddHexKey(privHex string) error {
-	key, err := ethcrypto.HexToECDSA(util.TrimHex(privHex))
+	key, err := ethcrypto.HexToECDSA(trimHex(privHex))
 	if err != nil {
 		return err
 	}
@@ -82,7 +81,7 @@ func (k *SignKeys) HexString() (string, string) {
 
 // DecompressPubKey takes a hexString compressed public key and returns it descompressed. If already decompressed, returns the same key.
 func DecompressPubKey(pubHexComp string) (string, error) {
-	pubHexComp = util.TrimHex(pubHexComp)
+	pubHexComp = trimHex(pubHexComp)
 	if len(pubHexComp) > PubKeyLength {
 		return pubHexComp, nil
 	}
@@ -100,7 +99,7 @@ func DecompressPubKey(pubHexComp string) (string, error) {
 
 // CompressPubKey returns the compressed public key in hexString format
 func CompressPubKey(pubHexDec string) (string, error) {
-	pubHexDec = util.TrimHex(pubHexDec)
+	pubHexDec = trimHex(pubHexDec)
 	if len(pubHexDec) < PubKeyLengthUncompressed {
 		return pubHexDec, nil
 	}
@@ -265,7 +264,7 @@ func AddrFromJSONsignature(message interface{}, signature []byte) (ethcommon.Add
 }
 
 func hexToPubKey(pubHex string) (*ecdsa.PublicKey, error) {
-	pubBytes, err := hex.DecodeString(util.TrimHex(pubHex))
+	pubBytes, err := hex.DecodeString(trimHex(pubHex))
 	if err != nil {
 		return new(ecdsa.PublicKey), err
 	}
@@ -285,4 +284,11 @@ func Hash(data []byte) []byte {
 // HashRaw hashes a string with no prefix
 func HashRaw(data []byte) []byte {
 	return ethcrypto.Keccak256(data)
+}
+
+func trimHex(s string) string {
+	if len(s) >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') {
+		return s[2:]
+	}
+	return s
 }

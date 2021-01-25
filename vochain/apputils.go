@@ -14,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"google.golang.org/protobuf/proto"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -30,7 +31,7 @@ import (
 // checkProof checks the validity of a census proof (depending on the origin).
 // key is the data to be proof in behalf the censusRoot.
 // In case of weighted proof, this function will return the weight as second parameter.
-func checkProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoot, key []byte) (bool, *big.Int, error) {
+func checkProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoot, processID, key []byte) (bool, *big.Int, error) {
 	switch censusOrigin {
 	case models.CensusOrigin_OFF_CHAIN_TREE:
 		switch proof.Payload.(type) {
@@ -45,6 +46,33 @@ func checkProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 			// NOT IMPLEMENTED
 			return false, nil, fmt.Errorf("iden3 proof not implemented")
 		}
+	case models.CensusOrigin_OFF_CHAIN_CA:
+		p := proof.GetCa()
+		if !bytes.Equal(p.Bundle.Address, key) {
+			return false, nil, fmt.Errorf("CA bundle address and key do not match: %x != %x", key, p.Bundle.Address)
+		}
+		if len(p.Bundle.Nonce) < 16 {
+			return false, nil, fmt.Errorf("CA bundle nonce smaller than 16")
+		}
+		switch p.GetType() {
+		case models.SignatureType_ECDSA:
+			caBundle, err := proto.Marshal(p.Bundle)
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot marshal ca bundle to protobuf: %w", err)
+			}
+			addr, err := ethereum.AddrFromSignature(caBundle, p.GetSignature())
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot fetch ca address from signature: %w", err)
+
+			}
+			if !bytes.Equal(addr.Bytes(), censusRoot) {
+				return false, nil, fmt.Errorf("ca bundle signature do not match")
+			}
+			return true, big.NewInt(1), nil
+		default:
+			return false, nil, fmt.Errorf("ca proof %s type not supported", p.Type.String())
+		}
+
 	case models.CensusOrigin_ERC20:
 		p := proof.GetEthereumStorage()
 		if p == nil {

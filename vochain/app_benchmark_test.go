@@ -48,7 +48,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		b.Fatal(err)
 	}
 
-	keys := createEthRandomKeysBatch(nvoters)
+	keys := util.CreateEthRandomKeysBatch(nvoters)
 	if keys == nil {
 		b.Fatal("cannot create keys batch")
 	}
