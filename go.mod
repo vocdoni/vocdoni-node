@@ -64,7 +64,7 @@ require (
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0
-	go.vocdoni.io/proto v0.1.6
+	go.vocdoni.io/proto v0.1.7
 	golang.org/x/crypto v0.0.0-20201217014255-9d1352758620
 	golang.org/x/net v0.0.0-20201216054612-986b41b23924
 	golang.org/x/sys v0.0.0-20201218084310-7d0127a74742 // indirect

@@ -5,6 +5,8 @@ import (
 	"io"
 	"math/rand"
 	"time"
+
+	"go.vocdoni.io/dvote/crypto/ethereum"
 )
 
 func TrimHex(s string) string {
@@ -51,4 +53,16 @@ func SplitBytes(buf []byte, lim int) [][]byte {
 		chunks = append(chunks, buf[:])
 	}
 	return chunks
+}
+
+// CreateEthRandomKeysBatch creates a set of eth random signing keys
+func CreateEthRandomKeysBatch(n int) []*ethereum.SignKeys {
+	s := make([]*ethereum.SignKeys, n)
+	for i := 0; i < n; i++ {
+		s[i] = ethereum.NewSignKeys()
+		if err := s[i].Generate(); err != nil {
+			panic(err)
+		}
+	}
+	return s
 }

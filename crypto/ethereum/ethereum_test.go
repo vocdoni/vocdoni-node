@@ -2,9 +2,8 @@ package ethereum
 
 import (
 	"bytes"
+	"encoding/hex"
 	"testing"
-
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 )
 
 func TestSignature(t *testing.T) {
@@ -41,7 +40,10 @@ func TestSignature(t *testing.T) {
 
 	t.Log("Testing compatibility with standard Ethereum signing libraries")
 	hardcodedPriv := "fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19"
-	hardcodedSignature := testutil.Hex2byte(t, "a0d0ebc374d2a4d6357eaca3da2f5f3ff547c3560008206bc234f9032a866ace6279ffb4093fb39c8bbc39021f6a5c36ef0e813c8c94f325a53f4f395a5c82de01")
+	hardcodedSignature, err := hex.DecodeString("a0d0ebc374d2a4d6357eaca3da2f5f3ff547c3560008206bc234f9032a866ace6279ffb4093fb39c8bbc39021f6a5c36ef0e813c8c94f325a53f4f395a5c82de01")
+	if err != nil {
+		t.Fatal(err)
+	}
 	s3 := NewSignKeys()
 	if err := s3.AddHexKey(hardcodedPriv); err != nil {
 		t.Fatal(err)

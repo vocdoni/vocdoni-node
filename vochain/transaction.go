@@ -172,7 +172,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 				if vp != nil {
 					return nil, fmt.Errorf("vote already exist in cache")
 				}
-				// if not in cache, extract pubKey, generate nullifier and check merkle proof
+				// if not in cache, extract pubKey, generate nullifier and check census proof
 				if tx.Proof == nil {
 					return nil, fmt.Errorf("proof not found on transaction")
 				}
@@ -213,6 +213,8 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 				switch process.CensusOrigin {
 				case models.CensusOrigin_OFF_CHAIN_TREE:
 					vp.PubKeyDigest = snarks.Poseidon.Hash(vp.PubKey)
+				case models.CensusOrigin_OFF_CHAIN_CA:
+					vp.PubKeyDigest = addr.Bytes()
 				case models.CensusOrigin_ERC20:
 					if process.EthIndexSlot == nil {
 						return nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
@@ -230,11 +232,11 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 					return nil, fmt.Errorf("cannot digest public key: (%w)", err)
 				}
 
-				// check merkle proof
+				// check census proof
 				var valid bool
-				valid, vp.Weight, err = checkProof(tx.Proof, process.CensusOrigin, process.CensusRoot, vp.PubKeyDigest)
+				valid, vp.Weight, err = checkProof(tx.Proof, process.CensusOrigin, process.CensusRoot, process.ProcessId, vp.PubKeyDigest)
 				if err != nil {
-					return nil, fmt.Errorf("cannot check merkle proof: (%w)", err)
+					return nil, fmt.Errorf("proof not valid: (%w)", err)
 				}
 				if !valid {
 					return nil, fmt.Errorf("proof not valid")
