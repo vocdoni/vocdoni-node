@@ -111,7 +111,7 @@ func (s *Scrutinizer) Rollback() {
 }
 
 // OnProcess scrutinizer stores the processID and entityID
-func (s *Scrutinizer) OnProcess(pid, eid []byte, mkroot, mkuri string) {
+func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
 	data := &types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
 	s.processPool = append(s.processPool, data)
 }
