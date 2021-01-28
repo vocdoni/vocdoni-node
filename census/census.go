@@ -86,7 +86,7 @@ func (m *Manager) Init(storageDir, rootKey string, newTreeImpl func(name, storag
 	if _, err := os.Stat(nsConfig); os.IsNotExist(err) {
 		log.Info("creating new config file")
 		var cns Namespaces
-		if len(rootKey) < ethereum.PubKeyLength {
+		if len(rootKey) < ethereum.PubKeyLengthBytes*2 {
 			// log.Warn("no root key provided or invalid, anyone will be able to create new census")
 		} else {
 			cns.RootKey = rootKey
@@ -105,7 +105,7 @@ func (m *Manager) Init(storageDir, rootKey string, newTreeImpl func(name, storag
 		log.Warn("could not unmarshal json config file, probably empty. Skipping")
 		return nil
 	}
-	if len(rootKey) >= ethereum.PubKeyLength {
+	if len(rootKey) >= ethereum.PubKeyLengthBytes*2 {
 		log.Infof("updating root key to %s", rootKey)
 		m.Census.RootKey = rootKey
 	} else if rootKey != "" {

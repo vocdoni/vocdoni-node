@@ -72,7 +72,7 @@ func TestAddr(t *testing.T) {
 	pub, priv := s.HexString()
 	t.Logf("Generated pub: %s \npriv: %s", pub, priv)
 	addr1 := s.AddressString()
-	addr2, err := AddrFromPublicKey(pub)
+	addr2, err := AddrFromPublicKey(s.PublicKey())
 	t.Logf("Recovered address from pubKey %s", addr2)
 	if err != nil {
 		t.Fatal(err)

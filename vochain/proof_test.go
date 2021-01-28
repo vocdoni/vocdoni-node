@@ -11,6 +11,7 @@ import (
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/snarks"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -32,16 +33,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	keys := util.CreateEthRandomKeysBatch(1000)
 	claims := []string{}
 	for _, k := range keys {
-		pub, _ := k.HexString()
-		pub, err = ethereum.DecompressPubKey(pub)
-		if err != nil {
-			t.Fatal(err)
-		}
-		pubb, err := hex.DecodeString(pub)
-		if err != nil {
-			t.Fatal(err)
-		}
-		c := snarks.Poseidon.Hash(pubb)
+		c := snarks.Poseidon.Hash(k.PublicKey())
 		tr.Add(c, nil)
 		claims = append(claims, string(c))
 	}
@@ -59,7 +51,7 @@ func TestMerkleTreeProof(t *testing.T) {
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
-	t.Logf("adding process %s", process.String())
+	t.Logf("adding process %s", log.FormatProto(process))
 	app.State.AddProcess(process)
 
 	var cktx abcitypes.RequestCheckTx
@@ -126,7 +118,7 @@ func TestCAProof(t *testing.T) {
 		Mode:         new(models.ProcessMode),
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EntityIDsize),
-		CensusRoot:   ca.Address().Bytes(),
+		CensusRoot:   ca.PublicKey(),
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA,
 		BlockCount:   1024,
 	}
@@ -140,8 +132,8 @@ func TestCAProof(t *testing.T) {
 	keys := util.CreateEthRandomKeysBatch(20)
 	for _, k := range keys {
 		bundle := &models.CAbundle{
-			Nonce:   util.RandomBytes(32),
-			Address: k.Address().Bytes(),
+			ProcessId: pid,
+			Address:   k.Address().Bytes(),
 		}
 		bundleBytes, err := proto.Marshal(bundle)
 		if err != nil {
@@ -163,8 +155,8 @@ func TestCAProof(t *testing.T) {
 	k := ethereum.SignKeys{}
 	k.Generate()
 	bundle := &models.CAbundle{
-		Nonce:   util.RandomBytes(32),
-		Address: k.Address().Bytes(),
+		ProcessId: pid,
+		Address:   k.Address().Bytes(),
 	}
 	bundleBytes, err := proto.Marshal(bundle)
 	if err != nil {

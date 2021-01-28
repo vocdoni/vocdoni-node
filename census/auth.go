@@ -25,7 +25,7 @@ func (m *Manager) CheckAuth(reqOuter *types.RequestMessage, reqInner *types.Meta
 
 	// Add root key, if method is addCensus
 	if reqInner.Method == "addCensus" {
-		if len(m.Census.RootKey) < ethereum.PubKeyLength {
+		if len(m.Census.RootKey) < ethereum.PubKeyLengthBytes*2 {
 			log.Warn("root key does not exist, considering addCensus valid for any request")
 			return nil
 		}
@@ -46,7 +46,7 @@ func (m *Manager) CheckAuth(reqOuter *types.RequestMessage, reqInner *types.Meta
 	// Check signature with existing namespace keys
 	log.Debugf("namespace keys %s", ns.Keys)
 	if len(ns.Keys) > 0 {
-		if len(ns.Keys) == 1 && len(ns.Keys[0]) < ethereum.PubKeyLength {
+		if len(ns.Keys) == 1 && len(ns.Keys[0]) < ethereum.PubKeyLengthBytes*2 {
 			log.Warnf("namespace %s does have management public key configured, allowing all", ns.Name)
 			return nil
 		}

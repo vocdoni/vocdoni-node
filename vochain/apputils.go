@@ -51,27 +51,31 @@ func checkProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 		if !bytes.Equal(p.Bundle.Address, key) {
 			return false, nil, fmt.Errorf("CA bundle address and key do not match: %x != %x", key, p.Bundle.Address)
 		}
-		if len(p.Bundle.Nonce) < 16 {
-			return false, nil, fmt.Errorf("CA bundle nonce smaller than 16")
+		if !bytes.Equal(p.Bundle.ProcessId, processID) {
+			return false, nil, fmt.Errorf("CA bundle processID do not match")
 		}
+		caBundle, err := proto.Marshal(p.Bundle)
+		if err != nil {
+			return false, nil, fmt.Errorf("cannot marshal ca bundle to protobuf: %w", err)
+		}
+		var caPubk []byte
+
+		// depending on signature type, use a mechanism for extracting the ca publickey from signature
 		switch p.GetType() {
 		case models.SignatureType_ECDSA:
-			caBundle, err := proto.Marshal(p.Bundle)
-			if err != nil {
-				return false, nil, fmt.Errorf("cannot marshal ca bundle to protobuf: %w", err)
-			}
-			addr, err := ethereum.AddrFromSignature(caBundle, p.GetSignature())
+			caPubk, err = ethereum.PubKeyFromSignature(caBundle, p.GetSignature())
 			if err != nil {
 				return false, nil, fmt.Errorf("cannot fetch ca address from signature: %w", err)
-
 			}
-			if !bytes.Equal(addr.Bytes(), censusRoot) {
-				return false, nil, fmt.Errorf("ca bundle signature do not match")
-			}
-			return true, big.NewInt(1), nil
+		case models.SignatureType_ECDSA_BLIND:
+			// Blind CA check
 		default:
 			return false, nil, fmt.Errorf("ca proof %s type not supported", p.Type.String())
 		}
+		if !bytes.Equal(caPubk, censusRoot) {
+			return false, nil, fmt.Errorf("ca bundle signature do not match")
+		}
+		return true, big.NewInt(1), nil
 
 	case models.CensusOrigin_ERC20:
 		p := proof.GetEthereumStorage()

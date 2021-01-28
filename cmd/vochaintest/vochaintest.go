@@ -125,7 +125,7 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if len(line) < ethereum.PubKeyLength || strings.HasPrefix(string(line), "#") {
+		if len(line) < ethereum.PubKeyLengthBytes || strings.HasPrefix(string(line), "#") {
 			continue
 		}
 		pubk = strings.Trim(string(line), "")
