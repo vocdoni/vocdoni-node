@@ -19,11 +19,11 @@ import (
 // SignatureLength is the size of an ECDSA signature in hexString format
 const SignatureLength = ethcrypto.SignatureLength
 
-// PubKeyLength is the size of a Public Key
-const PubKeyLength = 66
+// PubKeyLengthBytes is the size of a Public Key
+const PubKeyLengthBytes = 33
 
-// PubKeyLengthUncompressed is the size of a uncompressed Public Key
-const PubKeyLengthUncompressed = 130
+// PubKeyLengthBytesUncompressed is the size of a uncompressed Public Key
+const PubKeyLengthBytesUncompressed = 65
 
 // SigningPrefix is the prefix added when hashing
 const SigningPrefix = "\u0019Ethereum Signed Message:\n"
@@ -79,28 +79,27 @@ func (k *SignKeys) HexString() (string, string) {
 	return pubHexComp, privHex
 }
 
+// PublicKey returns the compressed public key
+func (k *SignKeys) PublicKey() []byte {
+	return ethcrypto.CompressPubkey(&k.Public)
+}
+
 // DecompressPubKey takes a hexString compressed public key and returns it descompressed. If already decompressed, returns the same key.
-func DecompressPubKey(pubHexComp string) (string, error) {
-	pubHexComp = trimHex(pubHexComp)
-	if len(pubHexComp) > PubKeyLength {
-		return pubHexComp, nil
+func DecompressPubKey(pubComp []byte) ([]byte, error) {
+	if len(pubComp) > PubKeyLengthBytes {
+		return pubComp, nil
 	}
-	pubBytes, err := hex.DecodeString(pubHexComp)
+	pub, err := ethcrypto.DecompressPubkey(pubComp)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("decompress pubKey %w", err)
 	}
-	pub, err := ethcrypto.DecompressPubkey(pubBytes)
-	if err != nil {
-		return "", fmt.Errorf("decompress pubKey %w", err)
-	}
-	pubHex := fmt.Sprintf("%x", ethcrypto.FromECDSAPub(pub))
-	return pubHex, nil
+	return ethcrypto.FromECDSAPub(pub), nil
 }
 
 // CompressPubKey returns the compressed public key in hexString format
 func CompressPubKey(pubHexDec string) (string, error) {
 	pubHexDec = trimHex(pubHexDec)
-	if len(pubHexDec) < PubKeyLengthUncompressed {
+	if len(pubHexDec) < PubKeyLengthBytesUncompressed*2 {
 		return pubHexDec, nil
 	}
 	pubBytes, err := hex.DecodeString(pubHexDec)
@@ -145,11 +144,7 @@ func (k *SignKeys) SignJSON(message interface{}) ([]byte, error) {
 
 // Verify verifies a message. Signature is HexString
 func (k *SignKeys) Verify(message, signature []byte) (bool, error) {
-	pubHex, err := PubKeyFromSignature(message, signature)
-	if err != nil {
-		return false, err
-	}
-	pub, err := hex.DecodeString(pubHex)
+	pub, err := PubKeyFromSignature(message, signature)
 	if err != nil {
 		return false, err
 	}
@@ -189,26 +184,19 @@ func Verify(message, signature, pub []byte) (bool, error) {
 }
 
 // AddrFromPublicKey standaolone function to obtain the Ethereum address from a ECDSA public key
-func AddrFromPublicKey(pubHex string) (ethcommon.Address, error) {
-	var pubHexDesc string
+func AddrFromPublicKey(pub []byte) (ethcommon.Address, error) {
 	var err error
-	if len(pubHex) <= PubKeyLength {
-		pubHexDesc, err = DecompressPubKey(pubHex)
+	if len(pub) <= PubKeyLengthBytes {
+		pub, err = DecompressPubKey(pub)
 		if err != nil {
 			return ethcommon.Address{}, err
 		}
-	} else {
-		pubHexDesc = pubHex
 	}
-	pubBytes, err := hex.DecodeString(pubHexDesc)
+	pubkey, err := ethcrypto.UnmarshalPubkey(pub)
 	if err != nil {
 		return ethcommon.Address{}, err
 	}
-	pub, err := ethcrypto.UnmarshalPubkey(pubBytes)
-	if err != nil {
-		return ethcommon.Address{}, err
-	}
-	return ethcrypto.PubkeyToAddress(*pub), nil
+	return ethcrypto.PubkeyToAddress(*pubkey), nil
 }
 
 // PubKeyFromPrivateKey returns the hex public key given a hex private key
@@ -223,35 +211,32 @@ func PubKeyFromPrivateKey(privHex string) (string, error) {
 
 // PubKeyFromSignature recovers the ECDSA public key that created the signature of a message
 // public key is hex encoded
-func PubKeyFromSignature(message, signature []byte) (string, error) {
+func PubKeyFromSignature(message, signature []byte) ([]byte, error) {
 	if len(signature) < SignatureLength || len(signature) > SignatureLength+12 {
-		return "", fmt.Errorf("signature length not correct (%d)", len(signature))
+		// TODO: investigate the exact size (and if a marging is required)
+		return nil, fmt.Errorf("signature length not correct (%d)", len(signature))
 	}
 	if signature[64] > 1 {
 		signature[64] -= 27
 	}
 	if signature[64] > 1 {
-		return "", errors.New("bad recover ID byte")
+		return nil, errors.New("bad recover ID byte")
 	}
 	pubKey, err := ethcrypto.SigToPub(Hash(message), signature)
 	if err != nil {
-		return "", fmt.Errorf("sigToPub %w", err)
+		return nil, fmt.Errorf("sigToPub %w", err)
 	}
 	// Temporary until the client side changes to compressed keys
-	return DecompressPubKey(fmt.Sprintf("%x", ethcrypto.CompressPubkey(pubKey)))
+	return ethcrypto.CompressPubkey(pubKey), nil
 }
 
 // AddrFromSignature recovers the Ethereum address that created the signature of a message
 func AddrFromSignature(message, signature []byte) (ethcommon.Address, error) {
-	pubHex, err := PubKeyFromSignature(message, signature)
+	pub, err := PubKeyFromSignature(message, signature)
 	if err != nil {
 		return ethcommon.Address{}, err
 	}
-	pub, err := hexToPubKey(pubHex)
-	if err != nil {
-		return ethcommon.Address{}, err
-	}
-	return ethcrypto.PubkeyToAddress(*pub), nil
+	return AddrFromPublicKey(pub)
 }
 
 // AddrFromJSONsignature recovers the Ethereum address that created the signature of a JSON message
@@ -261,17 +246,6 @@ func AddrFromJSONsignature(message interface{}, signature []byte) (ethcommon.Add
 		return ethcommon.Address{}, errors.New("unable to marshal message to sign: %s")
 	}
 	return AddrFromSignature(encMsg, signature)
-}
-
-func hexToPubKey(pubHex string) (*ecdsa.PublicKey, error) {
-	pubBytes, err := hex.DecodeString(trimHex(pubHex))
-	if err != nil {
-		return new(ecdsa.PublicKey), err
-	}
-	if len(pubHex) <= PubKeyLength {
-		return ethcrypto.DecompressPubkey(pubBytes)
-	}
-	return ethcrypto.UnmarshalPubkey(pubBytes)
 }
 
 // Hash string data adding Ethereum prefix

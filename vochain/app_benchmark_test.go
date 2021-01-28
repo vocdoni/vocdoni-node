@@ -3,7 +3,6 @@ package vochain
 // go test -benchmem -run=^$ -bench=. -cpu=10
 
 import (
-	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -11,7 +10,6 @@ import (
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -54,16 +52,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 	}
 	claims := []string{}
 	for _, k := range keys {
-		pub, _ := k.HexString()
-		pub, err = ethereum.DecompressPubKey(pub)
-		if err != nil {
-			b.Fatal(err)
-		}
-		pubb, err := hex.DecodeString(pub)
-		if err != nil {
-			b.Fatal(err)
-		}
-		c := snarks.Poseidon.Hash(pubb)
+		c := snarks.Poseidon.Hash(k.PublicKey())
 		tr.Add(c, nil)
 		claims = append(claims, string(c))
 	}
