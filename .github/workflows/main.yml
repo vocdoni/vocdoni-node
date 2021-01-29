@@ -7,7 +7,7 @@ on: [push, pull_request]
 jobs:
   go-tests:
     runs-on: self-hosted
-    if: github.repository == 'vocdoni/go-dvote'
+    if: github.repository == 'vocdoni/vocdoni-node'
     steps:
     - name: Install Go
       uses: actions/setup-go@v2
@@ -33,7 +33,7 @@ jobs:
 
   compose-test:
     runs-on: self-hosted
-    if: github.repository == 'vocdoni/go-dvote'
+    if: github.repository == 'vocdoni/vocdoni-node'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
