@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"github.com/vocdoni/eth-storage-proof/ethstorageproof"
+	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/snarks"

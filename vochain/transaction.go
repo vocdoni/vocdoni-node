@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethtoken "github.com/vocdoni/eth-storage-proof/token"
+	ethtoken "github.com/vocdoni/storage-proofs-eth-go/token"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/crypto/snarks"

@@ -36,8 +36,8 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/tendermint/tendermint v0.34.3
 	github.com/tendermint/tm-db v0.6.3
-	github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25
 	github.com/vocdoni/multirpc v0.1.9
+	github.com/vocdoni/storage-proofs-eth-go v0.1.4
 	github.com/whyrusleeping/cbor-gen v0.0.0-20210118024343-169e9d70c0c2 // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.uber.org/zap v1.16.0
