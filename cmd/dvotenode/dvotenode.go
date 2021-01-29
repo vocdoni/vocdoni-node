@@ -16,6 +16,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/vocdoni/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/chain/ethevents"
@@ -25,7 +26,6 @@ import (
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
-	vnet "go.vocdoni.io/dvote/net"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -76,7 +76,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
 	globalCfg.API.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
 	globalCfg.API.ListenPort = *flag.Int("listenPort", 9090, "API endpoint http port")
-	globalCfg.API.WebsocketsReadLimit = *flag.Int64("apiWsReadLimit", vnet.Web3WsReadLimit, "dvote websocket API read size limit in bytes")
+	globalCfg.API.WebsocketsReadLimit = *flag.Int64("apiWsReadLimit", types.Web3WsReadLimit, "dvote websocket API read size limit in bytes")
 	// ssl
 	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "", "enable TLS secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
 	// ethereum node
@@ -375,7 +375,7 @@ func main() {
 	var err error
 	var signer *ethereum.SignKeys
 	var node *chain.EthChainContext
-	var pxy *vnet.Proxy
+	var pxy *mhttp.Proxy
 	var storage data.Storage
 	var cm *census.Manager
 	var vnode *vochain.BaseApplication
@@ -474,7 +474,7 @@ func main() {
 			if len(tp) != 2 {
 				log.Warnf("cannot get port from vochain RPC listen: %s", globalCfg.VochainConfig.RPCListen)
 			} else {
-				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket", vnet.VochainWsReadLimit), vnet.VochainWsReadLimit) // tendermint needs up to 20 MB
+				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket", types.VochainWsReadLimit), types.VochainWsReadLimit) // tendermint needs up to 20 MB
 				log.Infof("tendermint API endpoint available at %s", "/tendermint")
 			}
 		}

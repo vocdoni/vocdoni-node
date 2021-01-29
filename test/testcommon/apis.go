@@ -5,15 +5,14 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/vocdoni/multirpc/transports"
+	"github.com/vocdoni/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
-	dnet "go.vocdoni.io/dvote/net"
 	"go.vocdoni.io/dvote/router"
-
-	"go.vocdoni.io/dvote/types"
 )
 
 // DvoteAPIServer contains all the required pieces for running a go-dvote api server
@@ -48,12 +47,12 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	d.PxyAddr = fmt.Sprintf("ws://%s/dvote", pxy.Addr)
 
 	// Create WebSocket endpoint
-	ws := new(dnet.WebsocketHandle)
-	ws.Init(new(types.Connection))
+	ws := new(mhttp.WebsocketHandle)
+	ws.Init(new(transports.Connection))
 	ws.SetProxy(pxy)
 
 	// Create the listener for routing messages
-	listenerOutput := make(chan types.Message)
+	listenerOutput := make(chan transports.Message)
 	ws.Listen(listenerOutput)
 
 	// Create the API router
@@ -106,10 +105,10 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 }
 
 // NewMockProxy creates a new testing proxy with predefined valudes
-func NewMockProxy(tb testing.TB) *dnet.Proxy {
-	pxy := dnet.NewProxy()
-	pxy.C.Address = "127.0.0.1"
-	pxy.C.Port = 0
+func NewMockProxy(tb testing.TB) *mhttp.Proxy {
+	pxy := mhttp.NewProxy()
+	pxy.Conn.Address = "127.0.0.1"
+	pxy.Conn.Port = 0
 	err := pxy.Init()
 	if err != nil {
 		tb.Fatal(err)

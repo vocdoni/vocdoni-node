@@ -8,17 +8,18 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/vocdoni/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
-	"go.vocdoni.io/dvote/net"
+	"go.vocdoni.io/dvote/types"
 )
 
 var ValidChains = map[string]bool{"goerli": true, "mainnet": true}
 
-func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, signer *ethereum.SignKeys, ma *metrics.Agent) (node *chain.EthChainContext, err error) {
+func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *mhttp.Proxy, signer *ethereum.SignKeys, ma *metrics.Agent) (node *chain.EthChainContext, err error) {
 	// Ethereum
 	log.Info("creating ethereum service")
 	if _, ok := ValidChains[ethconfig.ChainType]; !ok {
@@ -57,10 +58,10 @@ func Ethereum(ethconfig *config.EthCfg, w3config *config.W3Cfg, pxy *net.Proxy, 
 		return
 	}
 	if strings.HasPrefix(w3uri, "http") {
-		pxy.AddMixedHandler(w3config.Route, pxy.AddEndpoint(w3uri), pxy.AddWsHTTPBridge(w3uri), net.Web3WsReadLimit) // 5MB read limit
+		pxy.AddMixedHandler(w3config.Route, pxy.AddEndpoint(w3uri), pxy.AddWsHTTPBridge(w3uri), types.Web3WsReadLimit) // 5MB read limit
 		log.Infof("web3 http/websocket endpoint available at %s", w3config.Route)
 	} else if strings.HasPrefix(w3uri, "ws") {
-		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri, net.Web3WsReadLimit), net.Web3WsReadLimit) // 5MB read limit
+		pxy.AddWsHandler(w3config.Route+"ws", pxy.AddWsWsBridge(w3uri, types.Web3WsReadLimit), types.Web3WsReadLimit) // 5MB read limit
 		log.Infof("web3 websocket endpoint available at %s", w3config.Route)
 	} else if strings.HasSuffix(w3uri, ".ipc") {
 		info, err := os.Stat(w3uri)
