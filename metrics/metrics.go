@@ -5,8 +5,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/vocdoni/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/net"
 )
 
 // Agent struct with options
@@ -16,7 +16,7 @@ type Agent struct {
 }
 
 // NewAgent creates and initializes the metrics agent with a HTTP server
-func NewAgent(path string, interval time.Duration, proxy *net.Proxy) *Agent {
+func NewAgent(path string, interval time.Duration, proxy *mhttp.Proxy) *Agent {
 	ma := Agent{Path: path, RefreshInterval: interval}
 	proxy.AddHandler(path, promhttp.Handler().ServeHTTP)
 	log.Infof("prometheus metrics ready at: %s", path)

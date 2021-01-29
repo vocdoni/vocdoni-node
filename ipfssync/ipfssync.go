@@ -13,16 +13,16 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/vocdoni/multirpc/transports/subpubtransport"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/vocdoni/multirpc/transports"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/net"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/statedb/gravitonstate"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 )
 
@@ -49,7 +49,7 @@ type IPFSsync struct {
 	UpdateTime      int
 	Bootnodes       []string
 	Storage         *data.IPFSHandle
-	Transport       net.Transport
+	Transport       transports.Transport
 	Topic           string
 	Timeout         time.Duration
 	TimestampWindow int32
@@ -81,9 +81,9 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 	}
 	switch transport {
 	case "libp2p":
-		is.Transport = &net.SubPubHandle{}
+		is.Transport = &subpubtransport.SubPubHandle{}
 	default:
-		is.Transport = &net.SubPubHandle{}
+		is.Transport = &subpubtransport.SubPubHandle{}
 	}
 
 	return is
@@ -219,7 +219,7 @@ func (is *IPFSsync) broadcastMsg(imsg *models.IpfsSync) error {
 	}
 	log.Debugf("broadcasting message %s {Address:%s Hash:%x MA:%s PL:%v Ts:%d}",
 		imsg.Msgtype.String(), imsg.Address, imsg.Hash, imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
-	is.Transport.Send(types.Message{
+	is.Transport.Send(transports.Message{
 		Data:      d,
 		TimeStamp: int32(time.Now().Unix()),
 	})
@@ -336,7 +336,7 @@ func (is *IPFSsync) listPins(fromHash []byte) ([]*models.IpfsPin, error) {
 }
 
 func (is *IPFSsync) unicastMsg(address string, imsg *models.IpfsSync) error {
-	var msg types.Message
+	var msg transports.Message
 	imsg.Timestamp = uint32(time.Now().Unix())
 	d, err := proto.Marshal(imsg)
 	if err != nil {
@@ -369,8 +369,8 @@ func (is *IPFSsync) Start() {
 	is.updateLocalPins()
 	log.Infof("current hash %x", is.hashTree.Hash())
 
-	conn := types.Connection{
-		Port:         int(is.Port),
+	conn := transports.Connection{
+		Port:         int32(is.Port),
 		Key:          is.PrivKey,
 		Topic:        fmt.Sprintf("%x", ethereum.HashRaw([]byte(is.Topic))),
 		TransportKey: is.Topic,
@@ -385,7 +385,7 @@ func (is *IPFSsync) Start() {
 	}
 	is.Transport.SetBootnodes(is.Bootnodes)
 
-	msg := make(chan types.Message)
+	msg := make(chan transports.Message)
 	is.Transport.Listen(msg)
 
 	is.myMultiAddr, err = ma.NewMultiaddr(guessMyAddress(4001, is.Storage.Node.PeerHost.ID().String()))

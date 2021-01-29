@@ -9,9 +9,10 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/vocdoni/multirpc/transports"
+	"github.com/vocdoni/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/config"
-	vnet "go.vocdoni.io/dvote/net"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/types"
 	"nhooyr.io/websocket"
@@ -53,11 +54,11 @@ func TestWeb3WSEndpoint(t *testing.T) {
 	// proxy websocket handle
 	pxyAddr := fmt.Sprintf("ws://%s/web3ws", pxy.Addr)
 	// Create WebSocket endpoint
-	ws := new(vnet.WebsocketHandle)
-	ws.Init(new(types.Connection))
+	ws := new(mhttp.WebsocketHandle)
+	ws.Init(new(transports.Connection))
 	ws.SetProxy(pxy)
 	// Create the listener for routing messages
-	listenerOutput := make(chan types.Message)
+	listenerOutput := make(chan transports.Message)
 	ws.Listen(listenerOutput)
 	// create ws client
 	c, _, err := websocket.Dial(context.Background(), pxyAddr, nil)
@@ -90,7 +91,7 @@ func TestWeb3WSEndpoint(t *testing.T) {
 }
 
 // mockEthereum creates an ethereum node, attaches a signing key and adds a http or ws endpoint to a given proxy
-func mockEthereum(t *testing.T, pxy *vnet.Proxy) *chain.EthChainContext {
+func mockEthereum(t *testing.T, pxy *mhttp.Proxy) *chain.EthChainContext {
 	// create base config
 	ethConfig := &config.EthCfg{
 		LogLevel:  "error",
@@ -111,6 +112,6 @@ func mockEthereum(t *testing.T, pxy *vnet.Proxy) *chain.EthChainContext {
 	qt.Assert(t, err, qt.IsNil)
 	// register node endpoint
 	pxy.AddHandler(w3Config.Route, pxy.AddEndpoint(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)))
-	pxy.AddWsHandler(w3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)), vnet.Web3WsReadLimit)
+	pxy.AddWsHandler(w3Config.Route+"ws", pxy.AddWsHTTPBridge(fmt.Sprintf("http://%s:%d", w3Config.RPCHost, w3Config.RPCPort)), types.Web3WsReadLimit)
 	return node
 }
