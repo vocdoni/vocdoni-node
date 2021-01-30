@@ -34,7 +34,7 @@ func TestTree(t *testing.T) {
 	}
 	root2 := tr2.Root()
 	if !bytes.Equal(root1, root2) {
-		t.Errorf("roots are diferent but they should be equal (%x != %x)", root1, root2)
+		t.Errorf("roots are different but they should be equal (%x != %x)", root1, root2)
 	}
 	tr2.(*Tree).store.Commit()
 
@@ -56,7 +56,7 @@ func TestTree(t *testing.T) {
 
 	// Check Root is still the same
 	if !bytes.Equal(tr2.Root(), root2) {
-		t.Fatalf("after closing and opening the tree, the root is diferent")
+		t.Fatalf("after closing and opening the tree, the root is different")
 	}
 
 	// Generate a proof on tr1 and check validity on snapshot and tr2

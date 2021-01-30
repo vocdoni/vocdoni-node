@@ -142,7 +142,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("dev", flag.Lookup("dev"))
 	globalCfg.Dev = viper.GetBool("dev")
 
-	// Use diferent datadirs for non main chains
+	// Use different datadirs for non main chains
 	if globalCfg.VochainConfig.Chain != "main" {
 		globalCfg.DataDir += "/" + globalCfg.VochainConfig.Chain
 	}

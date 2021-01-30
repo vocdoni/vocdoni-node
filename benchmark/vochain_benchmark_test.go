@@ -63,7 +63,7 @@ func BenchmarkVochain(b *testing.B) {
 	req.CensusID = fmt.Sprintf("test%d", rint)
 	resp = doRequest("addCensus", dvoteServer.Signer)
 
-	// Set correct censusID for comming requests
+	// Set correct censusID for coming requests
 	req.CensusID = resp.CensusID
 
 	// census add claims

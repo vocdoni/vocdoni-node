@@ -79,7 +79,7 @@ func (m *Manager) ImportFailedQueueSize() int {
 	return len(m.failedQueue)
 }
 
-// AddToImportQueue adds a new census to the queue for being imported remotelly
+// AddToImportQueue adds a new census to the queue for being imported remotely
 func (m *Manager) AddToImportQueue(censusID, censusURI string) {
 	m.importQueue <- censusImport{censusID: censusID, censusURI: censusURI}
 }

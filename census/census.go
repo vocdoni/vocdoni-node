@@ -20,7 +20,7 @@ import (
 // ErrNamespaceExist is the error returned when trying to add a namespace that already exist
 var ErrNamespaceExist = errors.New("namespace already exists")
 
-// ImportQueueRoutines is the number of paralel routines processing the remote census download queue
+// ImportQueueRoutines is the number of parallel routines processing the remote census download queue
 const ImportQueueRoutines = 10
 
 // ImportRetrieveTimeout the maximum duration the import queue will wait for retreiving a remote census

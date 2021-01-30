@@ -109,7 +109,7 @@ type EthCfg struct {
 	ChainType string
 	// LightMode use ethereum node in light mode
 	LightMode bool
-	// NodePort port annouced for p2p connections
+	// NodePort port announced for p2p connections
 	NodePort int
 	// LogLevel logging level
 	LogLevel string
@@ -188,7 +188,7 @@ type VochainCfg struct {
 	SaveConfig bool
 	// MempoolSize is the size of the mempool
 	MempoolSize int
-	// KeyKeeperIndex is the index used by the key keeper (usualy and oracle)
+	// KeyKeeperIndex is the index used by the key keeper (usually and oracle)
 	KeyKeeperIndex int8
 	// ImportPreviousCensus if true the census downloader will try to download all census (not only the new ones)
 	ImportPreviousCensus bool

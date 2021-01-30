@@ -156,7 +156,7 @@ func CheckProof(index, value, root []byte, mproof []byte) (bool, error) {
 		return false, fmt.Errorf("value is too big, maximum allow is %d", gravitonstate.GravitonMaxValueSize)
 	}
 	if len(root) != gravitonstate.GravitonHashSizeBytes {
-		return false, fmt.Errorf("root hash lenght is incorrect (expected %d)", gravitonstate.GravitonHashSizeBytes)
+		return false, fmt.Errorf("root hash length is incorrect (expected %d)", gravitonstate.GravitonHashSizeBytes)
 	}
 	return gravitonstate.Verify(index, mproof, root)
 }

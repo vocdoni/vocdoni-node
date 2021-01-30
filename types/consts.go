@@ -81,7 +81,7 @@ const (
 	// KeyKeeperMaxKeyIndex is the maxim number of allowed Encryption or Commitment keys
 	KeyKeeperMaxKeyIndex = 16
 
-	// List of transation names
+	// List of transition names
 
 	TxVote              = "vote"
 	TxNewProcess        = "newProcess"

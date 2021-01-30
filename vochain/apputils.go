@@ -131,7 +131,7 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 		}
 		privKey = make([]byte, 64)
 		if n := copy(privKey[:], keyBytes[:]); n != 64 {
-			return nil, fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
+			return nil, fmt.Errorf("incorrect private key length (got %d, need 64)", n)
 		}
 		pv.Key.Address = privKey.PubKey().Address()
 		pv.Key.PrivKey = privKey
