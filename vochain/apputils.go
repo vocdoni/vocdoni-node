@@ -16,7 +16,9 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"google.golang.org/protobuf/proto"
 
+	blind "github.com/arnaucube/go-blindsecp256k1"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -67,13 +69,28 @@ func checkProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 			if err != nil {
 				return false, nil, fmt.Errorf("cannot fetch ca address from signature: %w", err)
 			}
+			if !bytes.Equal(caPubk, censusRoot) {
+				return false, nil, fmt.Errorf("ca bundle signature do not match")
+			}
 		case models.SignatureType_ECDSA_BLIND:
 			// Blind CA check
+			pubdesc, err := ethereum.DecompressPubKey(censusRoot)
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot decompress CA public key: %w", err)
+			}
+			pub, err := blind.NewPublicKeyFromECDSA(pubdesc)
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot compute blind CA public key: %w", err)
+			}
+			signature, err := blind.NewSignatureFromBytes(p.GetSignature())
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot compute blind CA signature: %w", err)
+			}
+			if !blind.Verify(new(big.Int).SetBytes(ethereum.Hash(caBundle)), signature, pub) {
+				return false, nil, fmt.Errorf("blind CA verification failed")
+			}
 		default:
 			return false, nil, fmt.Errorf("ca proof %s type not supported", p.Type.String())
-		}
-		if !bytes.Equal(caPubk, censusRoot) {
-			return false, nil, fmt.Errorf("ca bundle signature do not match")
 		}
 		return true, big.NewInt(1), nil
 
