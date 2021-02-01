@@ -41,7 +41,7 @@ jobs:
 
   compose-test:
     runs-on: self-hosted
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || github.ref == 'refs/heads/release-*' || github.ref == 'refs/heads/dev' 
+    if: github.repository == 'vocdoni/vocdoni-node'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2

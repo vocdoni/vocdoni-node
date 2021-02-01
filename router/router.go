@@ -127,7 +127,7 @@ func NewRouter(inbound <-chan transports.Message, storage data.Storage,
 	r.signer = signer
 	r.metricsagent = metricsagent
 	r.allowPrivate = allowPrivate
-	r.registerPublic("getGatewayInfo", r.info)
+	r.registerPublic("getInfo", r.info)
 	if metricsagent != nil {
 		r.registerMetrics(metricsagent)
 	}
