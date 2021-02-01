@@ -55,7 +55,7 @@ func BenchmarkVochain(b *testing.B) {
 	doRequest := cl.ForTest(b, &req)
 
 	log.Info("get info")
-	resp := doRequest("getGatewayInfo", nil)
+	resp := doRequest("getInfo", nil)
 	log.Infof("apis available: %v", resp.APIList)
 
 	// create census
