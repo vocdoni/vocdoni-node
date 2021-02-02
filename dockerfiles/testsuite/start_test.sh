@@ -46,8 +46,8 @@ wait
 #docker-compose logs --tail 300
 
 [ $CLEAN -eq 1 ] && {
- echo "### Cleaning environment ###"
- docker-compose down -v --remove-orphans
+	echo "### Cleaning environment ###"
+	docker-compose down -v --remove-orphans
 }
 
 [ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" ] && {
