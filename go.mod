@@ -34,7 +34,7 @@ require (
 	github.com/tendermint/tm-db v0.6.3
 	github.com/vocdoni/blind-ca v0.1.2
 	github.com/vocdoni/multirpc v0.1.11
-	github.com/vocdoni/storage-proofs-eth-go v0.1.4
+	github.com/vocdoni/storage-proofs-eth-go v0.1.5
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.uber.org/zap v1.16.0
 	go.vocdoni.io/proto v0.1.8

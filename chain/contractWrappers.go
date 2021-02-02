@@ -220,7 +220,8 @@ func (ph *VotingHandle) getStorageRoot(ctx context.Context, holder common.Addres
 		return common.Hash{}, fmt.Errorf("cannot get block: %w", err)
 	}
 	// get proof
-	sproof, err := ts.GetProof(ctx, holder, blk)
+	log.Debugf("get EVM storage root for address %s and block %d", holder.String(), blk.NumberU64())
+	sproof, err := ts.GetProofWithIndexSlot(ctx, holder, blk, 1)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("cannot get storage root: %w", err)
 	}
