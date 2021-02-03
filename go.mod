@@ -6,9 +6,7 @@ go 1.14
 // replace go.vocdoni.io/proto  => ../dvote-protobuf
 
 require (
-	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05 // indirect
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20201210182351-86af428a8287
-	github.com/bren2010/proquint v0.0.0-20201027163346-95122a84635f // indirect
 	github.com/cosmos/iavl v0.15.3
 	github.com/deroproject/graviton v0.0.0-20200906044921-89e9e09f9601
 	github.com/dgraph-io/badger/v2 v2.2007.2
@@ -28,7 +26,6 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.35 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/polydawn/refmt v0.0.0-20201211092308-30ac6d18308e // indirect
 	github.com/prometheus/client_golang v1.9.0
 	github.com/shirou/gopsutil v3.20.12+incompatible
 	github.com/spf13/cobra v1.1.1
@@ -38,7 +35,6 @@ require (
 	github.com/tendermint/tm-db v0.6.3
 	github.com/vocdoni/multirpc v0.1.9
 	github.com/vocdoni/storage-proofs-eth-go v0.1.4
-	github.com/whyrusleeping/cbor-gen v0.0.0-20210118024343-169e9d70c0c2 // indirect
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.uber.org/zap v1.16.0
 	go.vocdoni.io/proto v0.1.8
