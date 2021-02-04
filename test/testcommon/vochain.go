@@ -100,7 +100,7 @@ var (
 )
 
 func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
-	s, err := vochain.NewState(tb.TempDir())
+	s, err := vochain.NewState(testutil.TmpDir(tb))
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 }
 
 func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
-	s, err := vochain.NewState(tb.TempDir())
+	s, err := vochain.NewState(testutil.TmpDir(tb))
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 }
 
 func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
-	s, err := vochain.NewState(tb.TempDir())
+	s, err := vochain.NewState(testutil.TmpDir(tb))
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -166,28 +166,38 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	// start vochain node
 	// create config
 	d.VochainCfg = new(config.VochainCfg)
-	d.VochainCfg.DataDir = tb.TempDir()
-
+	d.VochainCfg.DataDir = testutil.TmpDir(tb)
 	// create genesis file
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
 	consensusParams := &types.ConsensusParams{
-		Block: types.BlockParams(tmConsensusParams.Block),
-		//Evidence:  types.EvidenceParams(tmConsensusParams.Evidence),
+		Block:     types.BlockParams(tmConsensusParams.Block),
+		Evidence:  types.EvidenceParams{MaxAgeNumBlocks: 1, MaxAgeDuration: 1},
 		Validator: types.ValidatorParams(tmConsensusParams.Validator),
 	}
 
-	// TO-DO instead of creating a pv file, just create a random 64 bytes key and use it for the genesis file
-	validator := privval.GenFilePV(d.VochainCfg.DataDir+"/config/priv_validator_key.json", d.VochainCfg.DataDir+"/data/priv_validator_state.json")
+	validator := privval.GenFilePV(
+		d.VochainCfg.DataDir+"/config/priv_validator_key.json",
+		d.VochainCfg.DataDir+"/data/priv_validator_state.json",
+	)
 	oracles := []string{d.Signer.AddressString()}
-	genBytes, err := vochain.NewGenesis(d.VochainCfg, strconv.Itoa(rand.Int()), consensusParams, []privval.FilePV{*validator}, oracles)
+	genBytes, err := vochain.NewGenesis(
+		d.VochainCfg,
+		strconv.Itoa(rand.Int()),
+		consensusParams,
+		[]privval.FilePV{*validator},
+		oracles,
+	)
 	if err != nil {
 		tb.Fatal(err)
 	}
 	// creating node
 	d.VochainCfg.LogLevel = "error"
+	d.VochainCfg.LogLevelMemPool = "error"
 	d.VochainCfg.P2PListen = "0.0.0.0:26656"
 	d.VochainCfg.PublicAddr = "0.0.0.0:26656"
 	d.VochainCfg.RPCListen = "0.0.0.0:26657"
+	d.VochainCfg.NoWaitSync = true
+
 	// run node
 	d.VochainCfg.MinerKey = fmt.Sprintf("%x", validator.Key.PrivKey)
 	vnode := vochain.NewVochain(d.VochainCfg, genBytes)
@@ -200,9 +210,10 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	return vnode
 }
 
-func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer, vnode *vochain.BaseApplication) *scrutinizer.Scrutinizer {
+func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer,
+	vnode *vochain.BaseApplication) *scrutinizer.Scrutinizer {
 	tb.Log("starting vochain scrutinizer")
-	d.ScrutinizerDir = tb.TempDir()
+	d.ScrutinizerDir = testutil.TmpDir(tb)
 	sc, err := scrutinizer.NewScrutinizer(d.ScrutinizerDir, vnode.State)
 	if err != nil {
 		tb.Fatal(err)

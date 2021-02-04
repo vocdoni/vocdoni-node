@@ -107,7 +107,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 	resp := new(types.MetaResponse)
 
 	// Process data
-	log.Debugf("processing data %+v", *r)
+	log.Debugf("processing data %s", r.String())
 	resp.Ok = true
 	resp.Timestamp = int32(time.Now().Unix())
 

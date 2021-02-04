@@ -3,7 +3,6 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -30,7 +29,7 @@ const (
 
 func BenchmarkVochain(b *testing.B) {
 	var dvoteServer testcommon.DvoteAPIServer
-	rint := rand.Int()
+	rint := util.RandomInt(0, 8192)
 	host := *hostFlag
 	if host == "" {
 		dvoteServer.Start(b, "file", "census", "vote")
@@ -75,7 +74,6 @@ func BenchmarkVochain(b *testing.B) {
 		}
 		poseidonHashes = append(poseidonHashes, hash)
 	}
-	log.Debugf("poseidon hashes: %s", poseidonHashes)
 	log.Debug("add bulk claims")
 	var claims [][]byte
 	req.Digested = true
@@ -103,11 +101,14 @@ func BenchmarkVochain(b *testing.B) {
 	entityID := signerPub
 	processID := testutil.Hex2byte(b, hexProcessID)
 	processData := &models.Process{
-		EntityId:   entityID,
-		CensusRoot: censusRoot,
-		BlockCount: numberOfBlocks,
-		ProcessId:  processID,
-		StartBlock: *resp.Height + 1,
+		EntityId:     entityID,
+		CensusRoot:   censusRoot,
+		BlockCount:   numberOfBlocks,
+		ProcessId:    processID,
+		StartBlock:   *resp.Height + 1,
+		Status:       models.ProcessStatus_READY,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Mode:         &models.ProcessMode{},
 	}
 	process := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
