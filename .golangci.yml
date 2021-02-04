@@ -5,9 +5,18 @@ linters:
         enable:
         - gosec
         - misspell
-        - gomnd
         - gofumpt
         - lll
+        - staticcheck
+        - structcheck
+        - varcheck
+        - unused
+        - typecheck
+        - ineffassign
+        - errcheck
+        - gosimple
+        - goconst
+
 linters-settings:
         lll:
                 line-length: 100
