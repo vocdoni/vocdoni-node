@@ -226,7 +226,7 @@ func TestCABlindProof(t *testing.T) {
 
 		// Perform blind signature with CA
 		r := bca.NewBlindRequestKey()
-		m := new(big.Int).SetBytes(ethereum.Hash(bundleBytes))
+		m := new(big.Int).SetBytes(ethereum.HashRaw(bundleBytes))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -248,7 +248,9 @@ func TestCABlindProof(t *testing.T) {
 
 	// Test invalid vote
 	k := ethereum.SignKeys{}
-	k.Generate()
+	if err := k.Generate(); err != nil {
+		t.Fatal(err)
+	}
 	bundle := &models.CAbundle{
 		ProcessId: pid,
 		Address:   k.Address().Bytes(),
@@ -258,7 +260,9 @@ func TestCABlindProof(t *testing.T) {
 		t.Fatal(err)
 	}
 	ca2 := ethereum.SignKeys{}
-	ca2.Generate()
+	if err := ca2.Generate(); err != nil {
+		t.Fatal(err)
+	}
 	signature, err := ca2.Sign(bundleBytes)
 	if err != nil {
 		t.Fatal(err)

@@ -86,8 +86,8 @@ func checkProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 			if err != nil {
 				return false, nil, fmt.Errorf("cannot compute blind CA signature: %w", err)
 			}
-			if !blind.Verify(new(big.Int).SetBytes(ethereum.Hash(caBundle)), signature, pub) {
-				return false, nil, fmt.Errorf("blind CA verification failed")
+			if !blind.Verify(new(big.Int).SetBytes(ethereum.HashRaw(caBundle)), signature, pub) {
+				return false, nil, fmt.Errorf("blind CA verification failed %s", log.FormatProto(p.Bundle))
 			}
 		default:
 			return false, nil, fmt.Errorf("ca proof %s type not supported", p.Type.String())
