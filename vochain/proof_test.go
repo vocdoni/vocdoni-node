@@ -225,14 +225,17 @@ func TestCABlindProof(t *testing.T) {
 		}
 
 		// Perform blind signature with CA
-		r := bca.NewRequestKey()
+		r := bca.NewBlindRequestKey()
 		m := new(big.Int).SetBytes(ethereum.Hash(bundleBytes))
+		if err != nil {
+			t.Fatal(err)
+		}
 		msgBlinded, secret := blind.Blind(m, r)
-		bsig, err := bca.Sign(r, msgBlinded.Bytes())
+		bsig, err := bca.SignBlind(r, msgBlinded.Bytes())
 		if err != nil {
 			t.Error(err)
 		}
-		signature := blind.Unblind(new(big.Int).SetBytes(bsig), m, secret).Bytes()
+		signature := blind.Unblind(new(big.Int).SetBytes(bsig), secret).Bytes()
 
 		// Pack the proof
 		proof := &models.ProofCA{

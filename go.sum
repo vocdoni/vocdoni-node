@@ -114,6 +114,8 @@ github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210201183224-d09769d51033 h1:FcPnLvyuEiCFzTWEPP4+x+hLm268LxvkEgdARgo0tt0=
 github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210201183224-d09769d51033/go.mod h1:10oM1DQMpukFfSzNsjSQG2rE6UjoGsXT4iIxWIiVbu0=
+github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210203222605-876755a714c3 h1:rj3uUaxO1hlOTD1A04b1Q/cEPf9lyVdwmyujB7etYuA=
+github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210203222605-876755a714c3/go.mod h1:10oM1DQMpukFfSzNsjSQG2rE6UjoGsXT4iIxWIiVbu0=
 github.com/aryann/difflib v0.0.0-20170710044230-e206f873d14a/go.mod h1:DAHtR1m6lCRdSC2Tm3DSWRPvIPr6xNKyeHdqDQSQT+A=
 github.com/aws/aws-lambda-go v1.13.3/go.mod h1:4UKl9IzQMoD+QF79YdCuzCwp8VbmG4VAQwij/eHl5CU=
 github.com/aws/aws-sdk-go v1.25.48/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
@@ -1710,6 +1712,8 @@ github.com/viant/assertly v0.4.8/go.mod h1:aGifi++jvCrUaklKEKT0BU95igDNaqkvz+49u
 github.com/viant/toolbox v0.24.0/go.mod h1:OxMCG57V0PXuIP2HNQrtJf2CjqdmbrOx5EkMILuUhzM=
 github.com/vocdoni/blind-ca v0.1.2 h1:mRSzzex4UrSyykaRw+kapPE6oDlblBbFaBH/yBRGr6E=
 github.com/vocdoni/blind-ca v0.1.2/go.mod h1:64koJe05FmHElrrqO3Zzqlm+16BOezBa4uhKMy9wxBY=
+github.com/vocdoni/blind-ca v0.1.4 h1:4q+Mxm5MA7WZHvQ+/aRYCeX2qaM8DYpHWQUfrmd91Fo=
+github.com/vocdoni/blind-ca v0.1.4/go.mod h1:4ouWDqlvXrrNS0Csf3hKA3cuDTmKh6nP7kSXF39nT4s=
 github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25 h1:UIkbnhAxwQ1Y368UsDsEXV4ue2MwFkmD6pfLF14+Qy4=
 github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25/go.mod h1:NLA1A55raZ1VNMmKulPUm+Lu9CVetCDVuDCYk5bSYrE=
 github.com/vocdoni/multirpc v0.1.9 h1:MtIZKoE8NL/WvVYWcJ20cQ0pN+lLMKQknzwWF3u/YHQ=
@@ -1717,6 +1721,8 @@ github.com/vocdoni/multirpc v0.1.9/go.mod h1:SETFzlLbdZq2YFGy0udT1u2ouQUU2cIesop
 github.com/vocdoni/multirpc v0.1.10/go.mod h1:OYWh2wBX0rztgatZC7VEcPW0Ew4Hm8f/msRAO24mpk0=
 github.com/vocdoni/multirpc v0.1.11 h1:t4tthy/pvZI9YDHekaAzRuIBEb0OlMSr8ukNCAhi1fM=
 github.com/vocdoni/multirpc v0.1.11/go.mod h1:OYWh2wBX0rztgatZC7VEcPW0Ew4Hm8f/msRAO24mpk0=
+github.com/vocdoni/multirpc v0.1.12 h1:L70+fgp6p5gajHIBOlW2V+RN1L4+5Alb4cvI+r9KT7E=
+github.com/vocdoni/multirpc v0.1.12/go.mod h1:OYWh2wBX0rztgatZC7VEcPW0Ew4Hm8f/msRAO24mpk0=
 github.com/vocdoni/storage-proofs-eth-go v0.1.4 h1:lRTSciQ8G2dkbj8Jv3X+dxXqpLMIW00AcY+pr1TNAQo=
 github.com/vocdoni/storage-proofs-eth-go v0.1.4/go.mod h1:8XF/0CpAetwlQJRgQgwBFEbfaYcjrU9gWUBR4F2Aqso=
 github.com/vocdoni/storage-proofs-eth-go v0.1.5 h1:/QTLeM1tkRIruA0LIB9yIMhBTk5++Pm7t2Zp0gCT1Xs=

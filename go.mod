@@ -7,7 +7,7 @@ go 1.14
 
 require (
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20201210182351-86af428a8287
-	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210201183224-d09769d51033
+	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210203222605-876755a714c3
 	github.com/cosmos/iavl v0.15.3
 	github.com/deroproject/graviton v0.0.0-20200906044921-89e9e09f9601
 	github.com/dgraph-io/badger/v2 v2.2007.2
@@ -32,8 +32,8 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/tendermint/tendermint v0.34.3
 	github.com/tendermint/tm-db v0.6.3
-	github.com/vocdoni/blind-ca v0.1.2
-	github.com/vocdoni/multirpc v0.1.11
+	github.com/vocdoni/blind-ca v0.1.4
+	github.com/vocdoni/multirpc v0.1.12
 	github.com/vocdoni/storage-proofs-eth-go v0.1.5
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.uber.org/zap v1.16.0
