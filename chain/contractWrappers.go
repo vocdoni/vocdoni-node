@@ -377,6 +377,24 @@ func (ph *VotingHandle) GetNamespace(ctx context.Context, namespace uint16) (*Na
 	}, nil
 }
 
+// AddOracleTxArgs returns an Admin tx instance with the oracle address to add
+func (ph *VotingHandle) AddOracleTxArgs(ctx context.Context, oracleAddress common.Address, namespace uint16) (tx *models.AdminTx, err error) {
+	ns, err := ph.Namespace.GetNamespace(&ethbind.CallOpts{Context: ctx}, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get namespace: %w", err)
+	}
+	for _, oracle := range ns.Oracles {
+		if oracle == oracleAddress {
+			return nil, fmt.Errorf("cannot add oracle, already added")
+		}
+	}
+	addOracleTxArgs := &models.AdminTx{
+		Address: oracleAddress.Bytes(),
+		Txtype:  models.TxType_ADD_ORACLE,
+	}
+	return addOracleTxArgs, nil
+}
+
 // TOKEN STORAGE PROOF WRAPPER
 
 // IsTokenRegistered returns true if a token represented by the given address is registered on the token storage proof contract

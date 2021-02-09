@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/chain/contracts"
@@ -198,11 +199,57 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
 		log.Infof("oracle transaction sent, hash: %x", res.Hash)
+
+	case ethereumEventList["namespaceOracleAdded"]:
+		tctx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+		addOracleTx, err := namespaceOracleAddedMeta(tctx, &e.ContractsABI[1], event.Data, e.VotingHandle)
+		if err != nil {
+			return fmt.Errorf("cannot obtain process data for creating the transaction: %w", err)
+		}
+		log.Infof("found add oracle %x namespace event on ethereum", addOracleTx.Address)
+		oracles, err := e.VochainApp.State.Oracles(true)
+		if err != nil {
+			return fmt.Errorf("cannot fetch the oracle list from the Vochain: %w", err)
+		}
+		// check oracle not already on the Vochain
+		for idx, o := range oracles {
+			if o == common.BytesToAddress(addOracleTx.Address) {
+				return fmt.Errorf("cannot add oracle, already exists on the Vochain at position: %d", idx)
+			}
+		}
+		// create admin tx
+		vtx := models.Tx{}
+		addOracleTxBytes, err := proto.Marshal(addOracleTx)
+		if err != nil {
+			return fmt.Errorf("cannot marshal admin tx (addOracle): %w", err)
+		}
+		vtx.Signature, err = e.Signer.Sign(addOracleTxBytes)
+		if err != nil {
+			return fmt.Errorf("cannot sign oracle tx: %w", err)
+		}
+		vtx.Payload = &models.Tx_Admin{Admin: addOracleTx}
+		tx, err := proto.Marshal(&vtx)
+		if err != nil {
+			return fmt.Errorf("error marshaling admin tx (addOracle) tx: %w", err)
+		}
+		log.Debugf("broadcasting tx: %s", log.FormatProto(addOracleTx))
+
+		res, err := e.VochainApp.SendTX(tx)
+		if err != nil || res == nil {
+			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
+		}
+		log.Infof("oracle transaction sent, hash: %x", res.Hash)
 	}
 	return nil
 }
 
-func newProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.NewProcessTx, error) {
+func newProcessMeta(
+	ctx context.Context,
+	contractABI *abi.ABI,
+	eventData []byte,
+	ph *chain.VotingHandle,
+) (*models.NewProcessTx, error) {
 	structuredData := &contracts.ProcessesNewProcess{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "NewProcess", eventData); err != nil {
 		return nil, fmt.Errorf("cannot unpack NewProcess event: %w", err)
@@ -211,20 +258,49 @@ func newProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte,
 	return ph.NewProcessTxArgs(ctx, structuredData.ProcessId, structuredData.Namespace)
 }
 
-func processStatusUpdatedMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.SetProcessTx, error) {
+func processStatusUpdatedMeta(
+	ctx context.Context,
+	contractABI *abi.ABI,
+	eventData []byte,
+	ph *chain.VotingHandle,
+) (*models.SetProcessTx, error) {
 	structuredData := &contracts.ProcessesStatusUpdated{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "StatusUpdated", eventData); err != nil {
 		return nil, fmt.Errorf("cannot unpack StatusUpdated event: %w", err)
 	}
 	log.Debugf("processStatusUpdated eventData: %+v", structuredData)
-	return ph.SetStatusTxArgs(ctx, structuredData.ProcessId, structuredData.Namespace, structuredData.Status)
+	return ph.SetStatusTxArgs(
+		ctx,
+		structuredData.ProcessId,
+		structuredData.Namespace,
+		structuredData.Status,
+	)
 }
 
-func processCensusUpdatedMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte, ph *chain.VotingHandle) (*models.SetProcessTx, error) {
+func processCensusUpdatedMeta(
+	ctx context.Context,
+	contractABI *abi.ABI,
+	eventData []byte,
+	ph *chain.VotingHandle,
+) (*models.SetProcessTx, error) {
 	structuredData := &contracts.ProcessesCensusUpdated{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "CensusUpdated", eventData); err != nil {
 		return nil, fmt.Errorf("cannot unpack CensusUpdated event: %w", err)
 	}
 	log.Debugf("processCensusUpdated eventData: %+v", structuredData)
 	return ph.SetCensusTxArgs(ctx, structuredData.ProcessId, structuredData.Namespace)
+}
+
+func namespaceOracleAddedMeta(
+	ctx context.Context,
+	contractABI *abi.ABI,
+	eventData []byte,
+	ph *chain.VotingHandle,
+) (*models.AdminTx, error) {
+	structuredData := &contracts.NamespacesOracleAdded{}
+	if err := contractABI.UnpackIntoInterface(structuredData, "OracleAdded", eventData); err != nil {
+		return nil, fmt.Errorf("cannot unpack OracleAdded event: %w", err)
+	}
+	log.Debugf("namespacesOracleAdded eventData: %+v", structuredData)
+	return ph.AddOracleTxArgs(ctx, structuredData.OracleAddress, structuredData.Namespace)
 }

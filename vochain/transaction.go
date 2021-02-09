@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -336,6 +337,16 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 			// check the keys are valid
 			if err := checkRevealProcessKeys(tx, process); err != nil {
 				return err
+			}
+		}
+	case models.TxType_ADD_ORACLE:
+		// check not empty, correct length and not 0x0 addr
+		if (bytes.Equal(tx.Address, []byte{})) || (len(tx.Address) != types.EthereumAddressSize) || (bytes.Equal(tx.Address, common.Address{}.Bytes())) {
+			return fmt.Errorf("invalid oracle address: %x", tx.Address)
+		}
+		for idx, oracle := range oracles {
+			if oracle == common.BytesToAddress(tx.Address) {
+				return fmt.Errorf("oracle already added at oracle list position %d", idx)
 			}
 		}
 	}
