@@ -574,9 +574,9 @@ func EnsResolve(ctx context.Context, ensRegistryAddr, ethDomain, w3uri string) (
 }
 
 // ResolveEntityMetadataURL returns the metadata URL given an entityID
-func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityID, ethEndpoint string) (string, error) {
+func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityResolverDomain string, entityID, ethEndpoint string) (string, error) {
 	// normalize entity resolver domain name
-	nh, err := NameHash(types.EntityResolverDomain)
+	nh, err := NameHash(entityResolverDomain)
 	if err != nil {
 		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}

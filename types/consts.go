@@ -40,10 +40,44 @@ const (
 	// EthereumConfirmationsThreshold is the minimum amout of blocks
 	// that should pass before considering a tx final
 	EthereumConfirmationsThreshold = 6
+
+	// ENS Domains
+
+	// ENTITY RESOLVER
 	// EntityResolverDomain is the default entity resolver ENS domain
-	EntityResolverDomain = "entity-resolver.vocdoni.eth"
+	EntityResolverDomain = "entities.vocdoni.eth"
+	// EntityResolverStageDomain is the default entity resolver ENS domain
+	EntityResolverStageDomain = "entities.stg.vocdoni.eth"
+	// EntityResolverDevelopmentDomain is the default entity resolver ENS domain
+	EntityResolverDevelopmentDomain = "entities.dev.vocdoni.eth"
+
+	// PROCESSES
+	// ProcessesDomain
+	ProcessesDomain = "processes.vocdoni.eth"
+	// ProcessesStageDomain
+	ProcessesStageDomain = "processes.stg.vocdoni.eth"
+	// ProcessesDevelopmentDomain
+	ProcessesDevelopmentDomain = "processes.dev.vocdoni.eth"
+
+	// NAMESPACES
+	// NamespacesDomain
+	NamespacesDomain = "namespaces.vocdoni.eth"
+	// NamespacesStageDomain
+	NamespacesStageDomain = "namespaces.stg.vocdoni.eth"
+	// NamespacesDevelopmentDomain
+	NamespacesDevelopmentDomain = "namespaces.dev.vocdoni.eth"
+
+	// ERC20 PROOFS
+	// ERC20ProofsDomain
+	ERC20ProofsDomain = "erc20.proofs.vocdoni.eth"
+	// ERC20ProofsStageDomain
+	ERC20ProofsStageDomain = "erc20.proofs.stg.vocdoni.eth"
+	// ERC20ProofsDevelopmentDomain
+	ERC20ProofsDevelopmentDomain = "erc20.proofs.dev.vocdoni.eth"
+
 	// EntityMetaKey is the key of an ENS text record for the entity metadata
 	EntityMetaKey = "vnd.vocdoni.meta"
+
 	// EthereumReadTimeout is the max amount of time for reading anything on
 	// the Ethereum network to wait until canceling it's context
 	EthereumReadTimeout = 1 * time.Minute
