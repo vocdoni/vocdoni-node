@@ -17,7 +17,7 @@ import (
 // EthEvents service registers on the Ethereum smart contract specified in ethProcDomain, the provided event handlers
 // w3host and w3port must point to a working web3 websocket endpoint.
 // If endBlock=0 is enabled the service will only subscribe for new blocks
-func EthEvents(ctx context.Context, ensDomains []string, w3uri string, networkName string, startBlock *int64,
+func EthEvents(ctx context.Context, w3uri string, networkName string, startBlock *int64,
 	cm *census.Manager, signer *ethereum.SignKeys, vocapp *vochain.BaseApplication, evh []ethevents.EventHandler, sc *scrutinizer.Scrutinizer) error {
 	// TO-DO remove cm (add it on the eventHandler instead)
 	log.Infof("creating ethereum events service")
@@ -25,8 +25,8 @@ func EthEvents(ctx context.Context, ensDomains []string, w3uri string, networkNa
 	if err != nil {
 		return fmt.Errorf("cannot get specs for the selected network: %w", err)
 	}
-	contractsAddresses := make([]common.Address, len(ensDomains))
-	for idx, domain := range ensDomains {
+	contractsAddresses := make([]common.Address, len(specs.ENSdomains))
+	for idx, domain := range specs.ENSdomains {
 		addr, err := chain.EnsResolve(ctx, specs.ENSregistryAddr, domain, w3uri)
 		if err != nil {
 			return fmt.Errorf("cannot resolve domain: %s, error: %w", domain, err)

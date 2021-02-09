@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	ethparams "github.com/ethereum/go-ethereum/params"
+	"go.vocdoni.io/dvote/types"
 )
 
 // Specs defines a set of blockchain network specifications
@@ -15,9 +16,11 @@ type Specs struct {
 	BootNodes       []string // List of Bootnodes for this network
 	StartingBlock   int64    // Where to start looking for events
 	ENSregistryAddr string
+	// ENSdomains are ordered as [processes, namespaces, erc20tokenproofs]
+	ENSdomains [3]string // domains for each contract
 }
 
-var AvailableChains = []string{"mainnet", "goerli", "xdai", "xdaistage", "sokol"}
+var AvailableChains = []string{"mainnet", "goerli", "xdai", "xdaistage"}
 
 func SpecsFor(name string) (*Specs, error) {
 	switch name {
@@ -29,8 +32,6 @@ func SpecsFor(name string) (*Specs, error) {
 		return &xdai, nil
 	case "xdaistage":
 		return &xdaistage, nil
-	case "sokol":
-		return &sokol, nil
 	default:
 		return nil, errors.New("chain name not found")
 	}
@@ -51,22 +52,24 @@ var xdai = Specs{
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
 	StartingBlock:   12017322, //2020 Sep 15 16:14h
+	ENSdomains: [3]string{
+		types.ProcessesDomain,
+		types.NamespacesDomain,
+		types.ERC20ProofsDomain,
+	},
 }
 
 var xdaistage = Specs{
 	Name:            "xdaistage",
 	NetworkId:       100,
-	ENSregistryAddr: "0x9e638E90c8CdFaC1297EF261859E25c9d8438F1a",
+	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
 	StartingBlock:   12017322, //2020 Sep 15 16:14h
-}
-
-var sokol = Specs{
-	Name:            "sokol",
-	NetworkId:       77,
-	ENSregistryAddr: "0x43541c49308bF2956d3893836F5AF866fd78A295",
-	BootNodes:       nil,
-	StartingBlock:   16506649, // 2020 aug 29 03:44h
+	ENSdomains: [3]string{
+		types.ProcessesStageDomain,
+		types.NamespacesStageDomain,
+		types.ERC20ProofsStageDomain,
+	},
 }
 
 // Goerli Ethereum PoA Testnet
