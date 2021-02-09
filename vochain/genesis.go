@@ -143,8 +143,8 @@ var Genesis = map[string]VochainGenesis{
 		SeedNodes:         []string{"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656"},
 		Genesis: `
 {
-   "genesis_time":"2021-02-06T19:52:28.668436552Z",
-   "chain_id":"vocdoni-development-34",
+   "genesis_time":"2021-02-09T17:52:28.668436552Z",
+   "chain_id":"vocdoni-development-35",
    "consensus_params":{
       "block":{
          "max_bytes":"10485760",
@@ -252,8 +252,8 @@ var Genesis = map[string]VochainGenesis{
 		SeedNodes:         []string{"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656"},
 		Genesis: `
 {
-   "genesis_time":"2021-01-29T12:41:19.055210151Z",
-   "chain_id":"vocdoni-stage-5",
+   "genesis_time":"2021-02-09T17:41:19.055210151Z",
+   "chain_id":"vocdoni-stage-6",
    "consensus_params":{
       "block":{
          "max_bytes":"22020096",
