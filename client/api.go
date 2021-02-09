@@ -150,7 +150,8 @@ func (c *Client) GetKeys(pid, eid []byte) (*pkeys, error) {
 		pub:  resp.EncryptionPublicKeys,
 		priv: resp.EncryptionPrivKeys,
 		comm: resp.CommitmentKeys,
-		rev:  resp.RevealKeys}, nil
+		rev:  resp.RevealKeys,
+	}, nil
 }
 
 func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
@@ -180,7 +181,10 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
 	return results, nil
 }
 
-func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root []byte, tolerateError bool) ([][]byte, error) {
+func (c *Client) GetProofBatch(signers []*ethereum.SignKeys,
+	root []byte,
+	tolerateError bool) ([][]byte, error) {
+
 	var proofs [][]byte
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
@@ -200,7 +204,51 @@ func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root []byte, tolera
 	return proofs, nil
 }
 
-func (c *Client) TestSendVotes(pid, eid, root []byte, startBlock uint32, signers []*ethereum.SignKeys, proofs [][]byte, encrypted bool, doubleVoting bool, wg *sync.WaitGroup) (time.Duration, error) {
+func (c *Client) GetCAproofBatch(signers []*ethereum.SignKeys,
+	ca *ethereum.SignKeys,
+	pid []byte) ([]*models.ProofCA, error) {
+
+	var proofs []*models.ProofCA
+	// Generate merkle proofs
+	log.Infof("generating proofs...")
+	for i, k := range signers {
+		bundle := &models.CAbundle{
+			ProcessId: pid,
+			Address:   k.Address().Bytes(),
+		}
+		bundleBytes, err := proto.Marshal(bundle)
+		if err != nil {
+			log.Fatal(err)
+		}
+		signature, err := ca.Sign(bundleBytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		proof := &models.ProofCA{
+			Bundle:    bundle,
+			Type:      models.SignatureType_ECDSA,
+			Signature: signature,
+		}
+
+		proofs = append(proofs, proof)
+		if (i+1)%100 == 0 {
+			log.Infof("proof generation progress for %s: %d%%", c.Addr, ((i+1)*100)/(len(signers)))
+		}
+	}
+	return proofs, nil
+}
+
+func (c *Client) TestSendVotes(pid,
+	eid,
+	root []byte,
+	startBlock uint32,
+	signers []*ethereum.SignKeys,
+	proofs [][]byte,
+	encrypted bool,
+	doubleVoting bool,
+	wg *sync.WaitGroup) (time.Duration, error) {
+
 	var err error
 	var keys []string
 	// Generate merkle proofs
@@ -252,9 +300,15 @@ func (c *Client) TestSendVotes(pid, eid, root []byte, startBlock uint32, signers
 			return 0, err
 		}
 		v := &models.VoteEnvelope{
-			Nonce:                util.RandomBytes(32),
-			ProcessId:            pid,
-			Proof:                &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proofs[i]}}},
+			Nonce:     util.RandomBytes(32),
+			ProcessId: pid,
+			Proof: &models.Proof{
+				Payload: &models.Proof_Graviton{
+					Graviton: &models.ProofGraviton{
+						Siblings: proofs[i],
+					},
+				},
+			},
 			VotePackage:          vpb,
 			EncryptionKeyIndexes: keyIndexes,
 		}
@@ -290,7 +344,7 @@ func (c *Client) TestSendVotes(pid, eid, root []byte, startBlock uint32, signers
 			log.Infof("voting progress for %s: %d%%", c.Addr, ((i+1)*100)/(len(signers)))
 		}
 
-		//Try double voting (should fail)
+		// Try double voting (should fail)
 		if doubleVoting {
 			resp, err := c.Request(req, nil)
 			if err != nil {
@@ -345,7 +399,13 @@ func (c *Client) TestSendVotes(pid, eid, root []byte, startBlock uint32, signers
 	return votingElapsedTime, nil
 }
 
-func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, censusRoot []byte, censusURI string, pid []byte, ptype string, duration int) (uint32, error) {
+func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
+	entityID, censusRoot []byte,
+	censusURI string,
+	pid []byte,
+	envelopeType *models.EnvelopeType,
+	censusOrigin models.CensusOrigin,
+	duration int) (uint32, error) {
 	var req types.MetaRequest
 	req.Method = "submitRawTx"
 	block, err := c.GetCurrentBlock()
@@ -356,11 +416,11 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys, entityID, censusRoot [
 		EntityId:     entityID,
 		CensusRoot:   censusRoot,
 		CensusURI:    &censusURI,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin: censusOrigin,
 		BlockCount:   uint32(duration),
 		ProcessId:    pid,
 		StartBlock:   block + 4,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: ptype == "encrypted-poll"},
+		EnvelopeType: envelopeType,
 		Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
 		Status:       models.ProcessStatus_READY,
 	}

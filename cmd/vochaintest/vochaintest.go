@@ -16,6 +16,7 @@ import (
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 func main() {
@@ -31,18 +32,25 @@ func main() {
 	parallelCons := flag.Int("parallelCons", 1, "parallel API connections")
 	procDuration := flag.Int("processDuration", 500, "voting process duration in blocks")
 	doubleVote := flag.Bool("doubleVote", true, "send every vote twice")
-	gateways := flag.StringSlice("gwExtra", []string{}, "list of extra gateways to be used in addition to gwHost for sending votes")
+	gateways := flag.StringSlice("gwExtra", []string{},
+		"list of extra gateways to be used in addition to gwHost for sending votes")
 	keysfile := flag.String("keysFile", "cache-keys.json", "file to store and reuse keys and census")
 
 	flag.Usage = func() {
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nAvailable operation modes:\n")
-		fmt.Fprintf(os.Stderr, "=> vtest\n\tPerforms a complete test, from creating a census to voting and validate votes\n")
-		fmt.Fprintf(os.Stderr, "\t./test --operation=vtest --electionSize=1000 --oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223\n")
-		fmt.Fprintf(os.Stderr, "=> censusImport\n\tReads from stdin line by line to read a list of hex public keys, creates and publishes the census\n")
-		fmt.Fprintf(os.Stderr, "\tcat keys.txt | ./test --operation=censusImport --gwHost wss://gw1test.vocdoni.net/dvote\n")
-		fmt.Fprintf(os.Stderr, "=> censusGenerate\n\tGenerate a list of private/public keys and its merkle Proofs\n")
-		fmt.Fprintf(os.Stderr, "\t./test --operation=censusGenerate --gwHost wss://gw1test.vocdoni.net/dvote --electionSize=10000 --keysFile=keys.json\n")
+		fmt.Fprintf(os.Stderr,
+			"=> vtest\n\tPerforms a complete test, from creating a census to voting and validate votes\n")
+		fmt.Fprintf(os.Stderr,
+			"\t./test --operation=vtest --electionSize=1000 --oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223\n")
+		fmt.Fprintf(os.Stderr,
+			"=> censusImport\n\tReads from stdin line by line to read a list of hex public keys, creates and publishes the census\n")
+		fmt.Fprintf(os.Stderr,
+			"\tcat keys.txt | ./test --operation=censusImport --gwHost wss://gw1test.vocdoni.net/dvote\n")
+		fmt.Fprintf(os.Stderr,
+			"=> censusGenerate\n\tGenerate a list of private/public keys and its merkle Proofs\n")
+		fmt.Fprintf(os.Stderr,
+			"\t./test --operation=censusGenerate --gwHost wss://gw1test.vocdoni.net/dvote --electionSize=10000 --keysFile=keys.json\n")
 	}
 	flag.Parse()
 
@@ -63,7 +71,18 @@ func main() {
 
 	switch *opmode {
 	case "vtest":
-		vtest(*host, *oraclePrivKey, *electionType, entityKey, *electionSize, *procDuration, *parallelCons, *doubleVote, *gateways, *keysfile, true, false)
+		vtest(*host,
+			*oraclePrivKey,
+			*electionType == "encrypted-poll",
+			entityKey,
+			*electionSize,
+			*procDuration,
+			*parallelCons,
+			*doubleVote,
+			*gateways,
+			*keysfile,
+			true,
+			false)
 	case "censusImport":
 		censusImport(*host, entityKey)
 	case "censusGenerate":
@@ -141,8 +160,18 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 
 }
 
-func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKeys, electionSize, procDuration,
-	parallelCons int, doubleVote bool, gateways []string, keysfile string, useLastCensus bool, forceGatewaysGotCensus bool) {
+func vtest(host,
+	oraclePrivKey string,
+	encryptedVotes bool,
+	entityKey *ethereum.SignKeys,
+	electionSize,
+	procDuration,
+	parallelCons int,
+	doubleVote bool,
+	gateways []string,
+	keysfile string,
+	useLastCensus bool,
+	forceGatewaysGotCensus bool) {
 
 	var censusKeys []*ethereum.SignKeys
 	var proofs [][]byte
@@ -192,19 +221,19 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := mainClient.CreateProcess(oracleKey, entityKey.Address().Bytes(), censusRoot, censusURI, pid, electionType, procDuration)
+	start, err := mainClient.CreateProcess(
+		oracleKey,
+		entityKey.Address().Bytes(),
+		censusRoot,
+		censusURI,
+		pid, &models.EnvelopeType{EncryptedVotes: encryptedVotes},
+		models.CensusOrigin_OFF_CHAIN_TREE,
+		procDuration)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.Infof("created process with ID: %x", pid)
-	encrypted := false
-	switch electionType {
-	case "encrypted-poll":
-		encrypted = true
-	case "poll-vote":
-		encrypted = false
-	}
 	// Create the websockets connections for sending the votes
 	gwList := append(gateways, host)
 
@@ -234,7 +263,8 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 				if _, ok := gatewaysWithCensus[cl.Addr]; !ok {
 					if size, err := cl.CensusSize(censusRoot); err == nil {
 						if size < int64(electionSize) {
-							log.Fatalf("gateway %s has an incorrect census size (got:%d expected%d)", cl.Addr, size, electionSize)
+							log.Fatalf("gateway %s has an incorrect census size (got:%d expected%d)",
+								cl.Addr, size, electionSize)
 						}
 						log.Infof("gateway %s got the census!", cl.Addr)
 						gatewaysWithCensus[cl.Addr] = true
@@ -277,7 +307,15 @@ func vtest(host, oraclePrivKey, electionType string, entityKey *ethereum.SignKey
 		gw, cl := gw, cl
 		go func() {
 			defer wg.Done()
-			if votingTimes[gw], err = cl.TestSendVotes(pid, entityKey.Address().Bytes(), censusRoot, start, gwSigners, gwProofs, encrypted, doubleVote, &proofsReadyWG); err != nil {
+			if votingTimes[gw], err = cl.TestSendVotes(pid,
+				entityKey.Address().Bytes(),
+				censusRoot,
+				start,
+				gwSigners,
+				gwProofs,
+				encryptedVotes,
+				doubleVote,
+				&proofsReadyWG); err != nil {
 				log.Fatalf("[%s] %s", cl.Addr, err)
 			}
 			log.Infof("gateway %d %s has ended its job", gw, cl.Addr)
