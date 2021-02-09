@@ -395,6 +395,24 @@ func (ph *VotingHandle) AddOracleTxArgs(ctx context.Context, oracleAddress commo
 	return addOracleTxArgs, nil
 }
 
+// RemoveOracleTxArgs returns an Admin tx instance with the oracle address to remove
+func (ph *VotingHandle) RemoveOracleTxArgs(ctx context.Context, oracleAddress common.Address, namespace uint16) (tx *models.AdminTx, err error) {
+	ns, err := ph.Namespace.GetNamespace(&ethbind.CallOpts{Context: ctx}, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get namespace: %w", err)
+	}
+	for _, oracle := range ns.Oracles {
+		if oracle == oracleAddress {
+			return nil, fmt.Errorf("cannot remove oracle, at this point the oracle should not be on ethereum")
+		}
+	}
+	removeOracleTxArgs := &models.AdminTx{
+		Address: oracleAddress.Bytes(),
+		Txtype:  models.TxType_REMOVE_ORACLE,
+	}
+	return removeOracleTxArgs, nil
+}
+
 // TOKEN STORAGE PROOF WRAPPER
 
 // IsTokenRegistered returns true if a token represented by the given address is registered on the token storage proof contract
