@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -17,20 +18,30 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
-// ErrNamespaceExist is the error returned when trying to add a namespace that already exist
+// ErrNamespaceExist is the error returned when trying to add a namespace
+// that already exist
 var ErrNamespaceExist = errors.New("namespace already exists")
 
-// ImportQueueRoutines is the number of paralel routines processing the remote census download queue
-const ImportQueueRoutines = 10
+const (
+	// ImportQueueRoutines is the number of parallel routines processing the
+	// remote census download queue
+	ImportQueueRoutines = 10
 
-// ImportRetrieveTimeout the maximum duration the import queue will wait for retreiving a remote census
-const ImportRetrieveTimeout = 1 * time.Minute
+	// ImportRetrieveTimeout the maximum duration the import queue will wait
+	// for retreiving a remote census
+	ImportRetrieveTimeout = 1 * time.Minute
 
+	importQueueBuffer = 32
+)
+
+// Namespaces contains a list of existing census namespaces and the root public key
 type Namespaces struct {
 	RootKey    string      `json:"rootKey"` // Public key allowed to created new census
 	Namespaces []Namespace `json:"namespaces"`
 }
 
+// Namespace is composed by a list of keys which are capable to execute private operations
+// on the namespace.
 type Namespace struct {
 	Name string   `json:"name"`
 	Keys []string `json:"keys"`
@@ -61,7 +72,8 @@ func (m *Manager) Data() data.Storage { return m.RemoteStorage }
 
 // Init creates a new census manager.
 // A constructor function for the interface censustree.Tree must be provided.
-func (m *Manager) Init(storageDir, rootKey string, newTreeImpl func(name, storageDir string) (censustree.Tree, error)) error {
+func (m *Manager) Init(storageDir, rootKey string,
+	newTreeImpl func(name, storageDir string) (censustree.Tree, error)) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storageDir)
 	m.StorageDir = storageDir
 	m.Trees = make(map[string]censustree.Tree)
@@ -71,7 +83,7 @@ func (m *Manager) Init(storageDir, rootKey string, newTreeImpl func(name, storag
 	}
 	m.newTreeFunc = newTreeImpl
 	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
-	m.importQueue = make(chan censusImport, 32)
+	m.importQueue = make(chan censusImport, importQueueBuffer)
 	m.AuthWindow = 10
 	m.compressor = newCompressor()
 
@@ -86,18 +98,19 @@ func (m *Manager) Init(storageDir, rootKey string, newTreeImpl func(name, storag
 	if _, err := os.Stat(nsConfig); os.IsNotExist(err) {
 		log.Info("creating new config file")
 		var cns Namespaces
-		if len(rootKey) < ethereum.PubKeyLength {
+		if len(rootKey) < ethereum.PubKeyLengthBytes*2 {
 			// log.Warn("no root key provided or invalid, anyone will be able to create new census")
 		} else {
 			cns.RootKey = rootKey
 		}
 		m.Census = cns
-		ioutil.WriteFile(nsConfig, []byte(""), 0644)
-		err = m.save()
-		return err
+		if err := ioutil.WriteFile(filepath.Clean(nsConfig), []byte(""), 0600); err != nil {
+			return err
+		}
+		return m.save()
 	}
 
-	jsonBytes, err := ioutil.ReadFile(nsConfig)
+	jsonBytes, err := ioutil.ReadFile(filepath.Clean(nsConfig))
 	if err != nil {
 		return err
 	}
@@ -105,7 +118,7 @@ func (m *Manager) Init(storageDir, rootKey string, newTreeImpl func(name, storag
 		log.Warn("could not unmarshal json config file, probably empty. Skipping")
 		return nil
 	}
-	if len(rootKey) >= ethereum.PubKeyLength {
+	if len(rootKey) >= ethereum.PubKeyLengthBytes*2 {
 		log.Infof("updating root key to %s", rootKey)
 		m.Census.RootKey = rootKey
 	} else if rootKey != "" {
@@ -207,7 +220,7 @@ func (m *Manager) save() error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(nsConfig, data, 0644)
+	return ioutil.WriteFile(nsConfig, data, 0600)
 }
 
 // Count returns the number of local created, external imported and loaded/active census

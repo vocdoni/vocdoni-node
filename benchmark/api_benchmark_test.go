@@ -63,7 +63,7 @@ func censusBench(b *testing.B, cl *client.Client) {
 	// getInfo
 	rint := rand.Int()
 	log.Infof("[%d] get info", rint)
-	resp := doRequest("getGatewayInfo", nil)
+	resp := doRequest("getInfo", nil)
 	log.Infof("apis available: %v", resp.APIList)
 
 	// Create census

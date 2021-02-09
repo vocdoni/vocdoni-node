@@ -7,29 +7,36 @@ on: [push, pull_request]
 jobs:
   go-tests:
     runs-on: self-hosted
+    container: 
+      image: golang:1.15
+      options: --user 1000
     if: github.repository == 'vocdoni/vocdoni-node'
+    defaults:
+      run:
+        shell: bash
     steps:
-    - name: Install Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.15.x
-
     - name: Checkout code
       uses: actions/checkout@v2
-
     - name: Go test
       run: |
         # we run vet in another step
         go test -vet=off -timeout=1m ./...
         # -race can easily make the crypto stuff 10x slower
-        go test -vet=off -timeout=15m -race ./...
-
+        go test -vet=off -timeout=15m -race -covermode atomic -coverprofile=covprofile ./...
     - name: Go analyze
       run: |
         diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
         go vet ./...
-        curl -L https://github.com/dominikh/go-tools/releases/download/2020.1.5/staticcheck_linux_amd64.tar.gz | tar -xzf -
+        curl -L https://github.com/dominikh/go-tools/releases/download/2020.2.1/staticcheck_linux_amd64.tar.gz | tar -xzf -
         ./staticcheck/staticcheck ./...
+    - name: Install goveralls
+      env:
+        GO111MODULE: off
+      run: go get github.com/mattn/goveralls
+    - name: Send coverage to coverall.io
+      env:
+        COVERALLS_TOKEN: ${{ secrets.github_token }}
+      run: goveralls -coverprofile=covprofile -service=github
 
   compose-test:
     runs-on: self-hosted

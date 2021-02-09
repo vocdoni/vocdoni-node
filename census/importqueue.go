@@ -48,7 +48,8 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 		return fmt.Errorf("root hash does not match on imported census, aborting import")
 	}
 	tr.Publish()
-	log.Infof("census imported successfully, %d claims. Status is public:%t", len(dump.Data), tr.IsPublic())
+	log.Infof("census imported successfully, %d claims. Status is public:%t",
+		len(dump.Data), tr.IsPublic())
 	return nil
 }
 
@@ -79,7 +80,7 @@ func (m *Manager) ImportFailedQueueSize() int {
 	return len(m.failedQueue)
 }
 
-// AddToImportQueue adds a new census to the queue for being imported remotelly
+// AddToImportQueue adds a new census to the queue for being imported remotely
 func (m *Manager) AddToImportQueue(censusID, censusURI string) {
 	m.importQueue <- censusImport{censusID: censusID, censusURI: censusURI}
 }

@@ -1,12 +1,11 @@
 package vochain
 
 import (
-	"encoding/hex"
 	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethtoken "github.com/vocdoni/eth-storage-proof/token"
+	ethtoken "github.com/vocdoni/storage-proofs-eth-go/token"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/crypto/snarks"
@@ -192,15 +191,11 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 				if err != nil {
 					return nil, fmt.Errorf("cannot marshal vote transaction: %w", err)
 				}
-				pubk, err := ethereum.PubKeyFromSignature(signedBytes, vtx.Signature)
+				vp.PubKey, err = ethereum.PubKeyFromSignature(signedBytes, vtx.Signature)
 				if err != nil {
 					return nil, fmt.Errorf("cannot extract public key from signature: (%w)", err)
 				}
-				vp.PubKey, err = hex.DecodeString(pubk)
-				if err != nil {
-					return nil, fmt.Errorf("cannot unmarshal public key: %w", err)
-				}
-				addr, err := ethereum.AddrFromPublicKey(pubk)
+				addr, err := ethereum.AddrFromPublicKey(vp.PubKey)
 				if err != nil {
 					return nil, fmt.Errorf("cannot extract address from public key: (%w)", err)
 				}

@@ -31,7 +31,7 @@ func (v *State) AddProcess(p *models.Process) error {
 	return nil
 }
 
-// CancelProcess sets the process canceled atribute to true
+// CancelProcess sets the process canceled attribute to true
 func (v *State) CancelProcess(pid []byte) error { // LEGACY
 	process, err := v.Process(pid, false)
 	if err != nil {

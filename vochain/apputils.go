@@ -16,7 +16,9 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"google.golang.org/protobuf/proto"
 
+	blind "github.com/arnaucube/go-blindsecp256k1"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
@@ -24,7 +26,7 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	tmtime "github.com/tendermint/tendermint/types/time"
-	"github.com/vocdoni/eth-storage-proof/ethstorageproof"
+	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -51,27 +53,46 @@ func checkProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 		if !bytes.Equal(p.Bundle.Address, key) {
 			return false, nil, fmt.Errorf("CA bundle address and key do not match: %x != %x", key, p.Bundle.Address)
 		}
-		if len(p.Bundle.Nonce) < 16 {
-			return false, nil, fmt.Errorf("CA bundle nonce smaller than 16")
+		if !bytes.Equal(p.Bundle.ProcessId, processID) {
+			return false, nil, fmt.Errorf("CA bundle processID do not match")
 		}
+		caBundle, err := proto.Marshal(p.Bundle)
+		if err != nil {
+			return false, nil, fmt.Errorf("cannot marshal ca bundle to protobuf: %w", err)
+		}
+		var caPubk []byte
+
+		// depending on signature type, use a mechanism for extracting the ca publickey from signature
 		switch p.GetType() {
 		case models.SignatureType_ECDSA:
-			caBundle, err := proto.Marshal(p.Bundle)
-			if err != nil {
-				return false, nil, fmt.Errorf("cannot marshal ca bundle to protobuf: %w", err)
-			}
-			addr, err := ethereum.AddrFromSignature(caBundle, p.GetSignature())
+			caPubk, err = ethereum.PubKeyFromSignature(caBundle, p.GetSignature())
 			if err != nil {
 				return false, nil, fmt.Errorf("cannot fetch ca address from signature: %w", err)
-
 			}
-			if !bytes.Equal(addr.Bytes(), censusRoot) {
+			if !bytes.Equal(caPubk, censusRoot) {
 				return false, nil, fmt.Errorf("ca bundle signature do not match")
 			}
-			return true, big.NewInt(1), nil
+		case models.SignatureType_ECDSA_BLIND:
+			// Blind CA check
+			pubdesc, err := ethereum.DecompressPubKey(censusRoot)
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot decompress CA public key: %w", err)
+			}
+			pub, err := blind.NewPublicKeyFromECDSA(pubdesc)
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot compute blind CA public key: %w", err)
+			}
+			signature, err := blind.NewSignatureFromBytes(p.GetSignature())
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot compute blind CA signature: %w", err)
+			}
+			if !blind.Verify(new(big.Int).SetBytes(ethereum.HashRaw(caBundle)), signature, pub) {
+				return false, nil, fmt.Errorf("blind CA verification failed %s", log.FormatProto(p.Bundle))
+			}
 		default:
 			return false, nil, fmt.Errorf("ca proof %s type not supported", p.Type.String())
 		}
+		return true, big.NewInt(1), nil
 
 	case models.CensusOrigin_ERC20:
 		p := proof.GetEthereumStorage()
@@ -127,7 +148,7 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 		}
 		privKey = make([]byte, 64)
 		if n := copy(privKey[:], keyBytes[:]); n != 64 {
-			return nil, fmt.Errorf("incorrect private key lenght (got %d, need 64)", n)
+			return nil, fmt.Errorf("incorrect private key length (got %d, need 64)", n)
 		}
 		pv.Key.Address = privKey.PubKey().Address()
 		pv.Key.PrivKey = privKey

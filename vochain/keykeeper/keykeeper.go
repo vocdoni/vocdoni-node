@@ -201,7 +201,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 	log.Infof("keykeeper reveal recovery finished")
 }
 
-// Rollback removes the non commited pending operations.
+// Rollback removes the non committed pending operations.
 // Rollback must be called before any other operation in order to allocate the pool queue memory.
 func (k *KeyKeeper) Rollback() {
 	k.keyPool = make(map[string]*processKeys)
@@ -218,7 +218,7 @@ func (k *KeyKeeper) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
 	if !(p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes) {
 		return
 	}
-	// If keys already exist, do nothing (this happends on the start-up block replay)
+	// If keys already exist, do nothing (this happens on the start-up block replay)
 	if len(p.EncryptionPublicKeys[k.myIndex])+len(p.CommitmentKeys[k.myIndex]) > 0 {
 		return
 	}
@@ -391,7 +391,7 @@ func (k *KeyKeeper) checkRevealProcess(height int64) {
 		if process.EncryptionPublicKeys[k.myIndex] != "" {
 			log.Infof("revealing keys for process %x on block %d", p, height)
 			if err := k.revealKeys(string(p)); err != nil {
-				log.Errorf("cannot reveal proces keys for %x: (%s)", p, err)
+				log.Errorf("cannot reveal process keys for %x: (%s)", p, err)
 			}
 		}
 	}

@@ -12,6 +12,7 @@ import (
 	psload "github.com/shirou/gopsutil/load"
 	psmem "github.com/shirou/gopsutil/mem"
 	psnet "github.com/shirou/gopsutil/net"
+	"github.com/vocdoni/multirpc/transports"
 
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/crypto"
@@ -31,7 +32,7 @@ const (
 	healthSocksMax = 10000
 )
 
-func (r *Router) buildReply(request routerRequest, resp *types.MetaResponse) types.Message {
+func (r *Router) buildReply(request routerRequest, resp *types.MetaResponse) transports.Message {
 	// Add any last fields to the inner response, and marshal it with sorted
 	// fields for signing.
 	resp.Ok = true
@@ -42,7 +43,7 @@ func (r *Router) buildReply(request routerRequest, resp *types.MetaResponse) typ
 		// This should never happen. If it does, return a very simple
 		// plaintext error, and log the error.
 		log.Error(err)
-		return types.Message{
+		return transports.Message{
 			TimeStamp: int32(time.Now().Unix()),
 			Context:   request.MessageContext,
 			Data:      []byte(err.Error()),
@@ -70,14 +71,14 @@ func (r *Router) buildReply(request routerRequest, resp *types.MetaResponse) typ
 		// This should never happen. If it does, return a very simple
 		// plaintext error, and log the error.
 		log.Error(err)
-		return types.Message{
+		return transports.Message{
 			TimeStamp: int32(time.Now().Unix()),
 			Context:   request.MessageContext,
 			Data:      []byte(err.Error()),
 		}
 	}
 	log.Debugf("api response %s", respOuter.MetaResponse)
-	return types.Message{
+	return transports.Message{
 		TimeStamp: int32(time.Now().Unix()),
 		Context:   request.MessageContext,
 		Data:      respData,
@@ -101,7 +102,7 @@ type registeredMethod struct {
 // Router holds a router object
 type Router struct {
 	methods      map[string]registeredMethod
-	inbound      <-chan types.Message
+	inbound      <-chan transports.Message
 	storage      data.Storage
 	signer       *ethereum.SignKeys
 	census       *census.Manager
@@ -115,7 +116,7 @@ type Router struct {
 	APIs         []string
 }
 
-func NewRouter(inbound <-chan types.Message, storage data.Storage,
+func NewRouter(inbound <-chan transports.Message, storage data.Storage,
 	signer *ethereum.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
 	cm := new(census.Manager)
 	r := new(Router)
@@ -126,7 +127,7 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage,
 	r.signer = signer
 	r.metricsagent = metricsagent
 	r.allowPrivate = allowPrivate
-	r.registerPublic("getGatewayInfo", r.info)
+	r.registerPublic("getInfo", r.info)
 	if metricsagent != nil {
 		r.registerMetrics(metricsagent)
 	}
@@ -135,7 +136,7 @@ func NewRouter(inbound <-chan types.Message, storage data.Storage,
 
 type routerRequest struct {
 	types.MetaRequest
-	types.MessageContext
+	transports.MessageContext
 
 	method        string
 	id            string
@@ -145,7 +146,7 @@ type routerRequest struct {
 }
 
 // semi-unmarshalls message, returns method name
-func (r *Router) getRequest(payload []byte, context types.MessageContext) (request routerRequest, err error) {
+func (r *Router) getRequest(payload []byte, context transports.MessageContext) (request routerRequest, err error) {
 	// First unmarshal the outer layer, to obtain the request ID, the signed
 	// request, and the signature.
 	var reqOuter types.RequestMessage
@@ -185,7 +186,7 @@ func (r *Router) getRequest(payload []byte, context types.MessageContext) (reque
 }
 
 // InitRouter sets up a Router object which can then be used to route requests
-func InitRouter(inbound <-chan types.Message, storage data.Storage,
+func InitRouter(inbound <-chan transports.Message, storage data.Storage,
 	signer *ethereum.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
 	log.Infof("using signer with address %s", signer.AddressString())
 	if allowPrivate {
@@ -343,7 +344,7 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 		if err != nil {
 			log.Warnf("error marshaling response body: %s", err)
 		}
-		msg := types.Message{
+		msg := transports.Message{
 			TimeStamp: int32(time.Now().Unix()),
 			Context:   request.MessageContext,
 			Data:      data,

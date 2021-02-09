@@ -182,29 +182,10 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
 
 func (c *Client) GetProofBatch(signers []*ethereum.SignKeys, root []byte, tolerateError bool) ([][]byte, error) {
 	var proofs [][]byte
-	var err error
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, s := range signers {
-		hexpub, _ := s.HexString()
-		if hexpub == "" {
-			if tolerateError {
-				continue
-			}
-			return proofs, err
-		}
-		if hexpub, err = ethereum.DecompressPubKey(hexpub); err != nil {
-			if tolerateError {
-				continue
-			}
-			return proofs, err
-		} // Temporary until everything is compressed
-
-		pub, err := hex.DecodeString(hexpub)
-		if err != nil {
-			return proofs, err
-		}
-		proof, err := c.GetProof(pub, root)
+		proof, err := c.GetProof(s.PublicKey(), root)
 		if err != nil {
 			if tolerateError {
 				continue
@@ -290,8 +271,7 @@ func (c *Client) TestSendVotes(pid, eid, root []byte, startBlock uint32, signers
 			return 0, err
 		}
 		pub, _ := s.HexString()
-		pubd, _ := ethereum.DecompressPubKey(pub)
-		log.Debugf("voting with pubKey:%s", pubd)
+		log.Debugf("voting with pubKey:%s", pub)
 		resp, err := c.Request(req, nil)
 		if err != nil {
 			return 0, err
@@ -505,7 +485,6 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 			} else {
 				hexpub = censusPubKeys[currentSize-1]
 			}
-			hexpub, _ = ethereum.DecompressPubKey(hexpub) // Temporary until everything is compressed only
 			pub, err := hex.DecodeString(hexpub)
 			if err != nil {
 				return nil, "", err

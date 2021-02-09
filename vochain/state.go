@@ -96,7 +96,7 @@ func NewState(dataDir string) (*State, error) {
 		return nil, err
 	}
 
-	// Must be -1 in order to get the last commited block state, if not block replay will fail
+	// Must be -1 in order to get the last committed block state, if not block replay will fail
 	if err = vs.Store.LoadVersion(-1); err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
 		return nil, err
 	}
 	if len(pubKeyBytes) != 32 {
-		return nil, fmt.Errorf("pubKey lenght is invalid")
+		return nil, fmt.Errorf("pubKey length is invalid")
 	}
 	copy(tmkey[:], pubKeyBytes[:])
 	return tmkey, nil
@@ -471,7 +471,7 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int64, isQuery boo
 	return nullifiers
 }
 
-// Header returns the blockchain last block commited height
+// Header returns the blockchain last block committed height
 func (v *State) Header(isQuery bool) *models.TendermintHeader {
 	var headerBytes []byte
 	v.RLock()

@@ -19,7 +19,7 @@ type IavlState struct {
 	dataType    string
 	trees       map[string]*IavlTree
 	lock        sync.RWMutex
-	versionTree *iavl.MutableTree // For each tree, saves its last commited version
+	versionTree *iavl.MutableTree // For each tree, saves its last committed version
 	storageType string            // mem or disk
 	db          tmdb.DB
 }

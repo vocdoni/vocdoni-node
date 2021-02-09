@@ -312,7 +312,7 @@ func (g *GravitonState) Commit() ([]byte, error) {
 	}
 	g.lastCommitVersion = g.vTree.Version()
 
-	// Update immutable tree to last commited version, this tree should not change until next Commit
+	// Update immutable tree to last committed version, this tree should not change until next Commit
 	if err = g.updateImmutable(); err != nil {
 		return nil, err
 	}
@@ -341,7 +341,7 @@ func (g *GravitonState) getHash() []byte {
 	return ethereum.HashRaw([]byte(hash))
 }
 
-// Rollback discards the non-commited changes of the tree
+// Rollback discards the non-committed changes of the tree
 func (g *GravitonState) Rollback() error {
 	for _, t := range g.trees {
 		if err := t.tree.Discard(); err != nil {

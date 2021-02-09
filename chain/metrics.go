@@ -42,7 +42,7 @@ func (e *EthChainContext) registerMetrics(ma *metrics.Agent) {
 	ma.Register(EthereumPeers)
 }
 
-// getMetrics grabs diferent metrics about ethereum chain.
+// getMetrics grabs different metrics about ethereum chain.
 func (e *EthChainContext) getMetrics(ctx context.Context) {
 	info, err := e.SyncInfo(ctx)
 	if err != nil {

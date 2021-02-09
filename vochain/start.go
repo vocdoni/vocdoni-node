@@ -109,24 +109,6 @@ func NewTenderLogger(artifact string, disabled bool) *TenderLogger {
 	return &TenderLogger{Artifact: artifact, Disabled: disabled}
 }
 
-/*func checkDBavailable(name string) bool {
-	available := true
-	defer func() {
-		if r := recover(); r != nil {
-			available = false
-		}
-	}()
-	dbdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		log.Warn(err)
-		return false
-	}
-	defer os.RemoveAll(dbdir)
-	db.NewDB("checkdb", db.BackendType(name), dbdir)
-	return available
-}
-*/
-
 // we need to set init (first time validators and oracles)
 func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis []byte) (*nm.Node, error) {
 	// create node config
@@ -189,13 +171,11 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 
 	//	tconfig.Mempool.MaxBatchBytes = 500 * tconfig.Mempool.MaxTxBytes // maximum 500 full-size txs
 
-	// TBD: check why it does not work anymore
-	// enable cleveldb if available
-	//	if checkDBavailable(string(db.CLevelDBBackend)) {
-	//		tconfig.DBBackend = string(db.CLevelDBBackend)
-	//		log.Infof("%s is available, using it as storage for Tendermint", tconfig.DBBackend)
-	//	}
-	//tconfig.DBBackend = string(db.BadgerDBBackend)
+	// tmdbBackend defaults to goleveldb, but switches to cleveldb if
+	// -tags=cleveldb is used, and switches to badgerdb if -tags=badger is
+	// used. See tmdb_*.go.
+	// TODO: probably switch to just badger after some benchmarking.
+	tconfig.DBBackend = string(tmdbBackend)
 
 	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {

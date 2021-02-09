@@ -10,40 +10,41 @@ import (
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
-	"go.vocdoni.io/dvote/net"
+
+	"github.com/vocdoni/multirpc/transports"
+	"github.com/vocdoni/multirpc/transports/mhttp"
+
 	"go.vocdoni.io/dvote/router"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
-// TBD: user the net.Transport interface
-func API(apiconfig *config.API, pxy *net.Proxy, storage data.Storage, cm *census.Manager, vapp *vochain.BaseApplication,
+func API(apiconfig *config.API, pxy *mhttp.Proxy, storage data.Storage, cm *census.Manager, vapp *vochain.BaseApplication,
 	sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, vochainRPCaddr string, signer *ethereum.SignKeys, ma *metrics.Agent,
 ) error {
 	log.Infof("creating API service")
 	// API Endpoint initialization
-	listenerOutput := make(chan types.Message)
+	listenerOutput := make(chan transports.Message)
 
-	var htransport net.Transport
+	var htransport transports.Transport
 
 	if apiconfig.Websockets && apiconfig.HTTP {
-		htransport = net.NewHttpWsHandleWithWsReadLimit(apiconfig.WebsocketsReadLimit)
-		htransport.(*net.HttpWsHandler).SetProxy(pxy)
+		htransport = mhttp.NewHttpWsHandleWithWsReadLimit(apiconfig.WebsocketsReadLimit)
+		htransport.(*mhttp.HttpWsHandler).SetProxy(pxy)
 	} else {
 		if apiconfig.Websockets {
-			htransport = net.NewWebSocketHandleWithReadLimit(apiconfig.WebsocketsReadLimit)
-			htransport.(*net.WebsocketHandle).SetProxy(pxy)
+			htransport = mhttp.NewWebSocketHandleWithReadLimit(apiconfig.WebsocketsReadLimit)
+			htransport.(*mhttp.WebsocketHandle).SetProxy(pxy)
 		} else if apiconfig.HTTP {
-			htransport = new(net.HttpHandler)
-			htransport.(*net.HttpHandler).SetProxy(pxy)
+			htransport = new(mhttp.HttpHandler)
+			htransport.(*mhttp.HttpHandler).SetProxy(pxy)
 		} else {
 			return fmt.Errorf("no transports available. At least one of HTTP and WS should be enabled")
 		}
 	}
 
-	if err := htransport.Init(new(types.Connection)); err != nil {
+	if err := htransport.Init(new(transports.Connection)); err != nil {
 		return err
 	}
 	htransport.Listen(listenerOutput)

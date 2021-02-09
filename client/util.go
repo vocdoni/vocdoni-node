@@ -55,7 +55,7 @@ type signKey struct {
 
 func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*ethereum.SignKeys, proofs [][]byte) error {
 	if proofs != nil && (len(proofs) != len(keys)) {
-		return fmt.Errorf("lenght of Proof is different from lenght of Signers")
+		return fmt.Errorf("length of Proof is different from length of Signers")
 	}
 	var kb keysBatch
 	for i, k := range keys {

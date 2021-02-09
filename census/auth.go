@@ -3,6 +3,7 @@ package census
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -19,34 +20,35 @@ func (m *Manager) CheckAuth(reqOuter *types.RequestMessage, reqInner *types.Meta
 	ns := new(Namespace)
 	for _, n := range m.Census.Namespaces {
 		if n.Name == reqInner.CensusID {
-			ns = &n
+			*ns = n
+			break
 		}
+	}
+
+	if ns.Name == "" {
+		return fmt.Errorf("censusId not valid")
 	}
 
 	// Add root key, if method is addCensus
 	if reqInner.Method == "addCensus" {
-		if len(m.Census.RootKey) < ethereum.PubKeyLength {
+		if len(m.Census.RootKey) < ethereum.PubKeyLengthBytes*2 {
 			log.Warn("root key does not exist, considering addCensus valid for any request")
 			return nil
 		}
 		ns.Keys = []string{m.Census.RootKey}
 	}
 
-	if ns == nil {
-		return errors.New("censusId not valid")
-	}
-
 	// Check timestamp
 	currentTime := int32(time.Now().Unix())
 	if reqInner.Timestamp > currentTime+m.AuthWindow ||
 		reqInner.Timestamp < currentTime-m.AuthWindow {
-		return errors.New("timestamp is not valid")
+		return fmt.Errorf("timestamp is not valid")
 	}
 
 	// Check signature with existing namespace keys
 	log.Debugf("namespace keys %s", ns.Keys)
 	if len(ns.Keys) > 0 {
-		if len(ns.Keys) == 1 && len(ns.Keys[0]) < ethereum.PubKeyLength {
+		if len(ns.Keys) == 1 && len(ns.Keys[0]) < ethereum.PubKeyLengthBytes*2 {
 			log.Warnf("namespace %s does have management public key configured, allowing all", ns.Name)
 			return nil
 		}
@@ -66,7 +68,7 @@ func (m *Manager) CheckAuth(reqOuter *types.RequestMessage, reqInner *types.Meta
 			}
 		}
 		if !valid {
-			return errors.New("unauthorized")
+			return fmt.Errorf("unauthorized")
 		}
 	} else {
 		log.Warnf("namespace %s does have management public key configured, allowing all", ns.Name)

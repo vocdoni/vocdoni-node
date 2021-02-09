@@ -22,8 +22,8 @@ func (d *Context) CheckTypeMask(index int, mask uint) bool                      
 func (d *Context) Compact(objIndex int)                                                {}
 func (d *Context) Compile(flags uint)                                                  {}
 func (d *Context) CompileFile(flags uint, path string)                                 {}
-func (d *Context) CompileLstring(flags uint, src string, lenght int)                   {}
-func (d *Context) CompileLstringFilename(flags uint, src string, lenght int)           {}
+func (d *Context) CompileLstring(flags uint, src string, length int)                   {}
+func (d *Context) CompileLstringFilename(flags uint, src string, length int)           {}
 func (d *Context) CompileString(flags uint, src string)                                {}
 func (d *Context) CompileStringFilename(flags uint, src string)                        {}
 func (d *Context) Concat(count int)                                                    {}
@@ -49,8 +49,8 @@ func (d *Context) Errorf(errCode int, format string, a ...interface{})          
 func (d *Context) Eval()                                                               {}
 func (d *Context) EvalFile(path string)                                                {}
 func (d *Context) EvalFileNoresult(path string)                                        {}
-func (d *Context) EvalLstring(src string, lenght int)                                  {}
-func (d *Context) EvalLstringNoresult(src string, lenght int)                          {}
+func (d *Context) EvalLstring(src string, length int)                                  {}
+func (d *Context) EvalLstringNoresult(src string, length int)                          {}
 func (d *Context) EvalNoresult()                                                       {}
 func (d *Context) EvalString(src string)                                               {}
 func (d *Context) EvalStringNoresult(src string)                                       {}
@@ -129,15 +129,15 @@ func (d *Context) PcallMethod(nargs int) int                                    
 func (d *Context) PcallProp(objIndex int, nargs int) int                               { return 0 }
 func (d *Context) Pcompile(flags uint) error                                           { return nil }
 func (d *Context) PcompileFile(flags uint, path string) error                          { return nil }
-func (d *Context) PcompileLstring(flags uint, src string, lenght int) error            { return nil }
-func (d *Context) PcompileLstringFilename(flags uint, src string, lenght int) error    { return nil }
+func (d *Context) PcompileLstring(flags uint, src string, length int) error            { return nil }
+func (d *Context) PcompileLstringFilename(flags uint, src string, length int) error    { return nil }
 func (d *Context) PcompileString(flags uint, src string) error                         { return nil }
 func (d *Context) PcompileStringFilename(flags uint, src string) error                 { return nil }
 func (d *Context) Peval() error                                                        { return nil }
 func (d *Context) PevalFile(path string) error                                         { return nil }
 func (d *Context) PevalFileNoresult(path string) int                                   { return 0 }
-func (d *Context) PevalLstring(src string, lenght int) error                           { return nil }
-func (d *Context) PevalLstringNoresult(src string, lenght int) int                     { return 0 }
+func (d *Context) PevalLstring(src string, length int) error                           { return nil }
+func (d *Context) PevalLstringNoresult(src string, length int) int                     { return 0 }
 func (d *Context) PevalNoresult() int                                                  { return 0 }
 func (d *Context) PevalString(src string) error                                        { return nil }
 func (d *Context) PevalStringNoresult(src string) int                                  { return 0 }
@@ -170,7 +170,7 @@ func (d *Context) PushGoFunction(fn func(*Context) int) int                     
 func (d *Context) PushHeapStash()                                                  {}
 func (d *Context) PushHeapptr(ptr unsafe.Pointer)                                  {}
 func (d *Context) PushInt(val int)                                                 {}
-func (d *Context) PushLstring(str string, lenght int) string                       { return "" }
+func (d *Context) PushLstring(str string, length int) string                       { return "" }
 func (d *Context) PushNan()                                                        {}
 func (d *Context) PushNull()                                                       {}
 func (d *Context) PushNumber(val float64)                                          {}

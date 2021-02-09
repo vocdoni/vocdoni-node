@@ -7,11 +7,9 @@ FROM golang:1.15.2 AS builder
 WORKDIR /src
 COPY . .
 
-RUN apt update && apt install -y build-essential libsnappy-dev libleveldb-dev libleveldb1d
-
 RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
-	CGO_ENABLED=1 go build -tags=cleveldb -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" -mod=readonly \
+	CGO_ENABLED=1 go build -tags=badger -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" -mod=readonly \
 	./cmd/dvotenode ./cmd/vochaintest
 
 FROM debian:10.5-slim AS test
@@ -27,7 +25,5 @@ WORKDIR /app
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /src/dvotenode ./
-
-RUN apt update && apt install -y libsnappy-dev libleveldb1d && ldconfig && rm -rf /var/lib/apt/lists/* /var/cache/apt
 
 ENTRYPOINT ["/app/dvotenode"]

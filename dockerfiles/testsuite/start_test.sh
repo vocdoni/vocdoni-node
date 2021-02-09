@@ -24,7 +24,7 @@ echo "### Waiting for test suite to be ready ###"
 for i in {1..5}; do
 	docker-compose run test curl --fail http://gateway:9090/dvote \
 		-X POST \
-		-d '{"id": "req00'$RANDOM'", "request": {"method": "getGatewayInfo", "timestamp":'$(date +%s)'}}' && break || sleep 5
+		-d '{"id": "req00'$RANDOM'", "request": {"method": "getInfo", "timestamp":'$(date +%s)'}}' && break || sleep 5
 done
 
 testid="/tmp/.vochaintest$RANDOM"
@@ -46,8 +46,8 @@ wait
 #docker-compose logs --tail 300
 
 [ $CLEAN -eq 1 ] && {
- echo "### Cleaning environment ###"
- docker-compose down -v --remove-orphans
+	echo "### Cleaning environment ###"
+	docker-compose down -v --remove-orphans
 }
 
 [ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" ] && {

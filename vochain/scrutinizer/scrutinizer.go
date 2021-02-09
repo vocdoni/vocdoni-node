@@ -1,7 +1,7 @@
 package scrutinizer
 
 /*
-	Scrutinizer keeps 4 diferent database entries (splited by key prefix)
+	Scrutinizer keeps 4 different database entries (splited by key prefix)
 
 	+ ProcessEnding: key is block number. Used for schedule results computing
 	+ LiveProcess: key is processId. Temporary storage for live results (poll-vote)
@@ -103,7 +103,7 @@ func (s *Scrutinizer) Commit(height int64) {
 	}
 }
 
-//Rollback removes the non commited pending operations
+//Rollback removes the non committed pending operations
 func (s *Scrutinizer) Rollback() {
 	s.votePool = []*models.Vote{}
 	s.processPool = []*types.ScrutinizerOnProcessData{}

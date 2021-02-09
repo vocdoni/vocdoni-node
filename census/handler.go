@@ -40,7 +40,8 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 }
 
 // HTTPhandler handles an API census manager request via HTTP
-func (m *Manager) HTTPhandler(ctx context.Context, w http.ResponseWriter, req *http.Request, signer *ethereum.SignKeys) {
+func (m *Manager) HTTPhandler(ctx context.Context, w http.ResponseWriter,
+	req *http.Request, signer *ethereum.SignKeys) {
 	log.Debug("new request received")
 	if ok := checkRequest(w, req); !ok {
 		return
@@ -101,7 +102,8 @@ func (m *Manager) HTTPhandler(ctx context.Context, w http.ResponseWriter, req *h
 // Handler handles an API census manager request.
 // isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
 // censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
-func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool, censusPrefix string) *types.MetaResponse {
+func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool,
+	censusPrefix string) *types.MetaResponse {
 	resp := new(types.MetaResponse)
 
 	// Process data
@@ -371,7 +373,6 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		var err error
 		if r.Method == "dump" {
 			resp.CensusDump, err = tr.Dump(root)
-
 		} else {
 			var vals [][]byte
 			resp.CensusKeys, vals, err = tr.DumpPlain(root)
@@ -429,7 +430,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			log.Infof("import claims to new census")
 			err = tr2.ImportDump(dump.Data)
 			if err != nil {
-				m.DelNamespace(namespace)
+				_ = m.DelNamespace(namespace)
 				log.Warn(err)
 				resp.SetError(err)
 				return resp

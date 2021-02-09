@@ -45,7 +45,7 @@ func TestState(t *testing.T) {
 		t.Logf("[v1] version %d hash %x", s.Version(), h)
 	}
 
-	// Add 10 diferent entries to both trees
+	// Add 10 different entries to both trees
 	for i := 0; i < 10; i++ {
 		s.Tree("t1").Add([]byte(fmt.Sprintf("%d", i+10)), []byte(fmt.Sprintf("number %d", i+10)))
 		s.Tree("t2").Add([]byte(fmt.Sprintf("%d", i+20)), []byte(fmt.Sprintf("number %d", i+20)))

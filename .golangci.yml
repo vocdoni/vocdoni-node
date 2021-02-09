@@ -1,0 +1,22 @@
+issues:
+        max-same-issues: 0
+        exclude-use-default: false
+linters:
+        enable:
+        - gosec
+        - misspell
+        - gofumpt
+        - lll
+        - staticcheck
+        - structcheck
+        - varcheck
+        - unused
+        - typecheck
+        - ineffassign
+        - errcheck
+        - gosimple
+        - goconst
+
+linters-settings:
+        lll:
+                line-length: 100

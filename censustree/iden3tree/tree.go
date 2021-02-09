@@ -247,7 +247,7 @@ func (t *Tree) Size(root []byte) (int64, error) {
 	t.updateAccessTime()
 	if len(root) > 0 {
 		if n := copy(rootHash[:], root); n != HashSize {
-			return 0, fmt.Errorf("root hash lenght not correct, expected %d got %d", HashSize, n)
+			return 0, fmt.Errorf("root hash length not correct, expected %d got %d", HashSize, n)
 		}
 	}
 	err = t.Tree.Walk(rootHash, func(n *merkletree.Node) {
@@ -269,7 +269,7 @@ func (t *Tree) DumpPlain(root []byte) ([][]byte, [][]byte, error) {
 	t.updateAccessTime()
 	if len(root) > 0 {
 		if n := copy(rootHash[:], root); n != HashSize {
-			return nil, nil, fmt.Errorf("root hash lenght not correct, expected %d got %d", HashSize, n)
+			return nil, nil, fmt.Errorf("root hash length not correct, expected %d got %d", HashSize, n)
 		}
 	}
 	var index, value []byte
@@ -307,7 +307,7 @@ func (t *Tree) Snapshot(root []byte) (censustree.Tree, error) {
 	rootHash := new(merkletree.Hash)
 	if len(root) > 0 {
 		if n := copy(rootHash[:], root); n != HashSize {
-			return nil, fmt.Errorf("root hash lenght not correct, expected %d got %d", HashSize, n)
+			return nil, fmt.Errorf("root hash length not correct, expected %d got %d", HashSize, n)
 		}
 	}
 	mt, err := t.Tree.Snapshot(rootHash)
@@ -321,7 +321,7 @@ func (t *Tree) HashExists(hash []byte) (bool, error) {
 	rootHash := new(merkletree.Hash)
 	if len(hash) > 0 {
 		if n := copy(rootHash[:], hash); n != HashSize {
-			return false, fmt.Errorf("root hash lenght not correct, expected %d got %d", HashSize, n)
+			return false, fmt.Errorf("root hash length not correct, expected %d got %d", HashSize, n)
 		}
 	}
 	n, err := t.Tree.GetNode(rootHash)

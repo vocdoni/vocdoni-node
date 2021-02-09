@@ -4,13 +4,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"testing"
 
+	blind "github.com/arnaucube/go-blindsecp256k1"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"github.com/vocdoni/eth-storage-proof/ethstorageproof"
+	blindca "github.com/vocdoni/blind-ca/blindca"
+	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/snarks"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -32,16 +36,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	keys := util.CreateEthRandomKeysBatch(1000)
 	claims := []string{}
 	for _, k := range keys {
-		pub, _ := k.HexString()
-		pub, err = ethereum.DecompressPubKey(pub)
-		if err != nil {
-			t.Fatal(err)
-		}
-		pubb, err := hex.DecodeString(pub)
-		if err != nil {
-			t.Fatal(err)
-		}
-		c := snarks.Poseidon.Hash(pubb)
+		c := snarks.Poseidon.Hash(k.PublicKey())
 		tr.Add(c, nil)
 		claims = append(claims, string(c))
 	}
@@ -59,7 +54,7 @@ func TestMerkleTreeProof(t *testing.T) {
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
-	t.Logf("adding process %s", process.String())
+	t.Logf("adding process %s", log.FormatProto(process))
 	app.State.AddProcess(process)
 
 	var cktx abcitypes.RequestCheckTx
@@ -126,7 +121,7 @@ func TestCAProof(t *testing.T) {
 		Mode:         new(models.ProcessMode),
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EntityIDsize),
-		CensusRoot:   ca.Address().Bytes(),
+		CensusRoot:   ca.PublicKey(),
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA,
 		BlockCount:   1024,
 	}
@@ -134,14 +129,13 @@ func TestCAProof(t *testing.T) {
 	if err := app.State.AddProcess(process); err != nil {
 		t.Fatal(err)
 	}
-
 	// Test 20 valid votes
 	vp := []byte("[1,2,3,4]")
 	keys := util.CreateEthRandomKeysBatch(20)
 	for _, k := range keys {
 		bundle := &models.CAbundle{
-			Nonce:   util.RandomBytes(32),
-			Address: k.Address().Bytes(),
+			ProcessId: pid,
+			Address:   k.Address().Bytes(),
 		}
 		bundleBytes, err := proto.Marshal(bundle)
 		if err != nil {
@@ -151,6 +145,7 @@ func TestCAProof(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		proof := &models.ProofCA{
 			Bundle:    bundle,
 			Type:      models.SignatureType_ECDSA,
@@ -163,8 +158,8 @@ func TestCAProof(t *testing.T) {
 	k := ethereum.SignKeys{}
 	k.Generate()
 	bundle := &models.CAbundle{
-		Nonce:   util.RandomBytes(32),
-		Address: k.Address().Bytes(),
+		ProcessId: pid,
+		Address:   k.Address().Bytes(),
 	}
 	bundleBytes, err := proto.Marshal(bundle)
 	if err != nil {
@@ -172,6 +167,102 @@ func TestCAProof(t *testing.T) {
 	}
 	ca2 := ethereum.SignKeys{}
 	ca2.Generate()
+	signature, err := ca2.Sign(bundleBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proof := &models.ProofCA{
+		Bundle:    bundle,
+		Type:      models.SignatureType_ECDSA,
+		Signature: signature,
+	}
+	testCASendVotes(t, pid, vp, &k, proof, app, false)
+}
+func TestCABlindProof(t *testing.T) {
+	app, err := NewBaseApplication(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ca := ethereum.SignKeys{}
+	if err := ca.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	pid := util.RandomBytes(types.ProcessIDsize)
+	process := &models.Process{
+		ProcessId:    pid,
+		StartBlock:   0,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Mode:         new(models.ProcessMode),
+		Status:       models.ProcessStatus_READY,
+		EntityId:     util.RandomBytes(types.EntityIDsize),
+		CensusRoot:   ca.PublicKey(),
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA,
+		BlockCount:   1024,
+	}
+	t.Logf("adding process %x", process.ProcessId)
+	if err := app.State.AddProcess(process); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the CA for generating the proofs
+	_, capriv := ca.HexString()
+	bca := new(blindca.BlindCA)
+	if err := bca.Init(capriv, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test 20 valid votes
+	vp := []byte("[1,2,3,4]")
+	keys := util.CreateEthRandomKeysBatch(20)
+	for _, k := range keys {
+		bundle := &models.CAbundle{
+			ProcessId: pid,
+			Address:   k.Address().Bytes(),
+		}
+		bundleBytes, err := proto.Marshal(bundle)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Perform blind signature with CA
+		r := bca.NewBlindRequestKey()
+		m := new(big.Int).SetBytes(ethereum.HashRaw(bundleBytes))
+		if err != nil {
+			t.Fatal(err)
+		}
+		msgBlinded, secret := blind.Blind(m, r)
+		bsig, err := bca.SignBlind(r, msgBlinded.Bytes())
+		if err != nil {
+			t.Error(err)
+		}
+		signature := blind.Unblind(new(big.Int).SetBytes(bsig), secret).Bytes()
+
+		// Pack the proof
+		proof := &models.ProofCA{
+			Bundle:    bundle,
+			Type:      models.SignatureType_ECDSA_BLIND,
+			Signature: signature,
+		}
+		testCASendVotes(t, pid, vp, k, proof, app, true)
+	}
+
+	// Test invalid vote
+	k := ethereum.SignKeys{}
+	if err := k.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	bundle := &models.CAbundle{
+		ProcessId: pid,
+		Address:   k.Address().Bytes(),
+	}
+	bundleBytes, err := proto.Marshal(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ca2 := ethereum.SignKeys{}
+	if err := ca2.Generate(); err != nil {
+		t.Fatal(err)
+	}
 	signature, err := ca2.Sign(bundleBytes)
 	if err != nil {
 		t.Fatal(err)
