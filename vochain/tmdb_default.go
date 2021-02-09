@@ -1,4 +1,4 @@
-// +build !badger,!cleveldb
+// +build !badgerdb,!cleveldb
 
 // If neither -tags=badger nor -tags=cleveldb are used, we must fall back to
 // something included by tm-db by default. goleveldb is an OK choice, since it's

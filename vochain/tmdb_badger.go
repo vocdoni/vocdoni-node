@@ -1,4 +1,4 @@
-// +build badger
+// +build badgerdb
 
 package vochain
 
