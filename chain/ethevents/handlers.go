@@ -114,7 +114,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		defer cancel()
 		setProcessTx, err := processStatusUpdatedMeta(tctx, &e.ContractsABI[0], event.Data, e.VotingHandle)
 		if err != nil {
-			return fmt.Errorf("cannot obtain process data for creating the transaction: %w", err)
+			return fmt.Errorf("cannot obtain update status data for creating the transaction: %w", err)
 		}
 		log.Infof("found process %x status update on ethereum, new status is %s", setProcessTx.ProcessId, setProcessTx.Status)
 		p, err := e.VochainApp.State.Process(setProcessTx.ProcessId, true)
@@ -152,7 +152,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		defer cancel()
 		setProcessTx, err := processCensusUpdatedMeta(tctx, &e.ContractsABI[0], event.Data, e.VotingHandle)
 		if err != nil {
-			return fmt.Errorf("cannot obtain process data for creating the transaction: %w", err)
+			return fmt.Errorf("cannot obtain census uptade data for creating the transaction: %w", err)
 
 		}
 		log.Infof("found process %x census update on ethereum", setProcessTx.ProcessId)
@@ -205,7 +205,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		defer cancel()
 		addOracleTx, err := namespaceOracleAddedMeta(tctx, &e.ContractsABI[1], event.Data, e.VotingHandle)
 		if err != nil {
-			return fmt.Errorf("cannot obtain process data for creating the transaction: %w", err)
+			return fmt.Errorf("cannot obtain add oracle data for creating the transaction: %w", err)
 		}
 		log.Infof("found add oracle %x namespace event on ethereum", addOracleTx.Address)
 		oracles, err := e.VochainApp.State.Oracles(true)
@@ -234,6 +234,52 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			return fmt.Errorf("error marshaling admin tx (addOracle) tx: %w", err)
 		}
 		log.Debugf("broadcasting tx: %s", log.FormatProto(addOracleTx))
+
+		res, err := e.VochainApp.SendTX(tx)
+		if err != nil || res == nil {
+			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
+		}
+		log.Infof("oracle transaction sent, hash: %x", res.Hash)
+	case ethereumEventList["namespaceOracleRemoved"]:
+		tctx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+		removeOracleTx, err := namespaceOracleRemovedMeta(tctx, &e.ContractsABI[1], event.Data, e.VotingHandle)
+		if err != nil {
+			return fmt.Errorf("cannot obtain remove oracle data for creating the transaction: %w", err)
+		}
+		log.Infof("found remove oracle %x namespace event on ethereum", removeOracleTx.Address)
+		oracles, err := e.VochainApp.State.Oracles(true)
+		if err != nil {
+			return fmt.Errorf("cannot fetch the oracle list from the Vochain: %w", err)
+		}
+		// check oracle is on the Vochain
+		var found bool
+		for idx, o := range oracles {
+			if o == common.BytesToAddress(removeOracleTx.Address) {
+				found = true
+				log.Debugf("found oracle at position %d, creating remove tx", idx)
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("oracle not found, cannot remove")
+		}
+		// create admin tx
+		vtx := models.Tx{}
+		addOracleTxBytes, err := proto.Marshal(removeOracleTx)
+		if err != nil {
+			return fmt.Errorf("cannot marshal admin tx (removeOracle): %w", err)
+		}
+		vtx.Signature, err = e.Signer.Sign(addOracleTxBytes)
+		if err != nil {
+			return fmt.Errorf("cannot sign oracle tx: %w", err)
+		}
+		vtx.Payload = &models.Tx_Admin{Admin: removeOracleTx}
+		tx, err := proto.Marshal(&vtx)
+		if err != nil {
+			return fmt.Errorf("error marshaling admin tx (removeOracle) tx: %w", err)
+		}
+		log.Debugf("broadcasting tx: %s", log.FormatProto(removeOracleTx))
 
 		res, err := e.VochainApp.SendTX(tx)
 		if err != nil || res == nil {
@@ -303,4 +349,18 @@ func namespaceOracleAddedMeta(
 	}
 	log.Debugf("namespacesOracleAdded eventData: %+v", structuredData)
 	return ph.AddOracleTxArgs(ctx, structuredData.OracleAddress, structuredData.Namespace)
+}
+
+func namespaceOracleRemovedMeta(
+	ctx context.Context,
+	contractABI *abi.ABI,
+	eventData []byte,
+	ph *chain.VotingHandle,
+) (*models.AdminTx, error) {
+	structuredData := contracts.NamespacesOracleRemoved{}
+	if err := contractABI.UnpackIntoInterface(structuredData, "OracleRemoved", eventData); err != nil {
+		return nil, fmt.Errorf("cannot unpack OracleRemoved event: %w", err)
+	}
+	log.Debugf("namespaceOracleRemoved eventData: %+v", structuredData)
+	return ph.RemoveOracleTxArgs(ctx, structuredData.OracleAddress, structuredData.Namespace)
 }

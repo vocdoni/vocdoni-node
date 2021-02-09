@@ -349,6 +349,21 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 				return fmt.Errorf("oracle already added at oracle list position %d", idx)
 			}
 		}
+	case models.TxType_REMOVE_ORACLE:
+		// check not empty, correct length and not 0x0 addr
+		if (bytes.Equal(tx.Address, []byte{})) || (len(tx.Address) != types.EthereumAddressSize) || (bytes.Equal(tx.Address, common.Address{}.Bytes())) {
+			return fmt.Errorf("invalid oracle address: %x", tx.Address)
+		}
+		var found bool
+		for _, oracle := range oracles {
+			if oracle == common.BytesToAddress(tx.Address) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("cannot remove oracle, not found")
+		}
 	}
 	return nil
 }
