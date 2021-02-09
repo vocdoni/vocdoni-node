@@ -155,7 +155,7 @@ func (r *Router) getBlockHeight(request routerRequest) {
 func (r *Router) getProcessList(request routerRequest) {
 	// check/sanitize eid and fromId
 	switch len(request.EntityId) {
-	case types.EntityIDsize, types.EntityIDsizeV2:
+	case types.EthereumAddressSize, types.EntityIDsizeV2:
 	default:
 		r.sendError(request, "cannot get process list: (malformed entityId)")
 		return

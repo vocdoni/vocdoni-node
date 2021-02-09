@@ -61,5 +61,4 @@ func TestState(t *testing.T) {
 	if len(nullifiers) != 5 {
 		t.Errorf("missing vote nullifiers (got %d expected %d)", len(nullifiers), 5)
 	}
-
 }

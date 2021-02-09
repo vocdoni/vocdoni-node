@@ -27,8 +27,8 @@ const (
 
 	// ProcessIDsize is the size of a process id
 	ProcessIDsize = 32
-	// EntityIDsize is the size of an entity id which is the same of an ethereum address
-	EntityIDsize = 20
+	// EthereumAddressSize is the size of an ethereum address
+	EthereumAddressSize = 20
 
 	// EntityIDsizeV2 legacy: in the past we used hash(addr)
 	// this is a temporal work around to support both

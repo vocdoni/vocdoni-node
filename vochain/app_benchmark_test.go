@@ -64,7 +64,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: true},
 		Mode:         &models.ProcessMode{},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EntityIDsize),
+		EntityId:     util.RandomBytes(types.EthereumAddressSize),
 		CensusRoot:   tr.Root(),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
