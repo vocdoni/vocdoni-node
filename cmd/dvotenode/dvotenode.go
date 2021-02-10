@@ -117,6 +117,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.MempoolSize = *flag.Int("vochainMempoolSize", 20000, "vochain mempool size")
 	globalCfg.VochainConfig.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0, "if this node is a key keeper, use this index slot")
 	globalCfg.VochainConfig.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false, "if enabled the census downloader will import all existing census")
+	globalCfg.VochainConfig.EthereumWhiteListAddrs = *flag.StringArray("ethereumWhiteListAddrs", []string{}, "list of allowed ethereum address for creating processes on the vochain (oracle mode only)")
 	// metrics
 	globalCfg.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
 	globalCfg.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5, "metrics refresh interval in seconds")
@@ -218,6 +219,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.MempoolSize", flag.Lookup("vochainMempoolSize"))
 	viper.BindPFlag("vochainConfig.KeyKeeperIndex", flag.Lookup("keyKeeperIndex"))
 	viper.BindPFlag("vochainConfig.ImportPreviousCensus", flag.Lookup("importPreviousCensus"))
+	viper.BindPFlag("vochainConfig.EthereumWhiteListAddrs", flag.Lookup("ethereumWhiteListAddrs"))
 
 	// metrics
 	viper.BindPFlag("metrics.Enabled", flag.Lookup("metricsEnabled"))
@@ -552,7 +554,7 @@ func main() {
 				}
 			}
 
-			if err := service.EthEvents(context.Background(), w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh, sc); err != nil {
+			if err := service.EthEvents(context.Background(), w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh, sc, globalCfg.VochainConfig.EthereumWhiteListAddrs); err != nil {
 				log.Fatal(err)
 			}
 		}
