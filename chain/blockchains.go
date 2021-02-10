@@ -44,6 +44,11 @@ var mainnet = Specs{
 	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
 	BootNodes:       ethparams.MainnetBootnodes,
 	StartingBlock:   10230300, //2020 jun 09 10:00h
+	ENSdomains: [3]string{
+		types.ProcessesDomain,
+		types.NamespacesDomain,
+		types.ERC20ProofsDomain,
+	},
 }
 
 var xdai = Specs{
@@ -79,7 +84,12 @@ var goerli = Specs{
 	StartingBlock:   3000000,
 	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
 	BootNodes:       ethparams.GoerliBootnodes,
-	GenesisHash:     "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
+	ENSdomains: [3]string{
+		types.ProcessesDomain,
+		types.NamespacesDomain,
+		types.ERC20ProofsDomain,
+	},
+	GenesisHash: "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog
 ICAgImVpcDE1MEJsb2NrIjowLAogICAgImVpcDE1MEhhc2giOiAiMHhiZjdlMzMxZjdmN2MxZGQy
 ZTA1MTU5NjY2YjNiZjhiYzdhOGEzYTllYjFkNTE4OTY5ZWFiNTI5ZGQ5Yjg4YzFhIiwKICAgICJl
