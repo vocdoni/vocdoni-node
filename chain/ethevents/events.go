@@ -59,6 +59,8 @@ type EthereumEvents struct {
 	EventProcessor *EventProcessor
 	// Scrutinizer
 	Scrutinizer *scrutinizer.Scrutinizer
+	// EthereumWhiteListAddrs
+	EthereumWhiteListAddrs map[common.Address]bool
 }
 
 type logEvent struct {
@@ -95,7 +97,14 @@ type EventProcessor struct {
 
 // NewEthEvents creates a new Ethereum events handler
 // contractsAddresses: [0] -> Processes contract, [1] -> Namespace contract, [2] -> TokenStorageProof contract
-func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys, w3Endpoint string, cens *census.Manager, vocapp *vochain.BaseApplication, scrutinizer *scrutinizer.Scrutinizer) (*EthereumEvents, error) {
+func NewEthEvents(contractsAddresses []common.Address,
+	signer *ethereum.SignKeys,
+	w3Endpoint string,
+	cens *census.Manager,
+	vocapp *vochain.BaseApplication,
+	scrutinizer *scrutinizer.Scrutinizer,
+	ethereumWhiteList []string,
+) (*EthereumEvents, error) {
 	// try to connect to default addr if w3Endpoint is empty
 	if len(w3Endpoint) == 0 {
 		return nil, fmt.Errorf("no w3Endpoint specified on Ethereum Events")
@@ -117,6 +126,16 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 	if err != nil {
 		return nil, fmt.Errorf("cannot read token storage proof contract abi: %w", err)
 	}
+
+	secureAddrList := make(map[common.Address]bool, len(ethereumWhiteList))
+	for _, sAddr := range ethereumWhiteList {
+		addr := common.HexToAddress(sAddr)
+		if (addr == common.Address{} || len(addr) != types.EthereumAddressSize) {
+			return nil, fmt.Errorf("cannot create ethereum whitelist, address %q not valid", sAddr)
+		}
+		secureAddrList[addr] = true
+	}
+
 	ethev := &EthereumEvents{
 		// [0] -> Processes contract
 		// [1] -> Namespace contract
@@ -133,6 +152,7 @@ func NewEthEvents(contractsAddresses []common.Address, signer *ethereum.SignKeys
 			EventProcessThreshold: 60 * time.Second,
 			eventQueue:            make(map[string]*logEvent),
 		},
+		EthereumWhiteListAddrs: secureAddrList,
 	}
 
 	if scrutinizer != nil {

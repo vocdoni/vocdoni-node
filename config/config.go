@@ -1,6 +1,8 @@
 package config
 
-import "go.vocdoni.io/dvote/types"
+import (
+	"go.vocdoni.io/dvote/types"
+)
 
 // DvoteCfg stores global configs for dvote
 type DvoteCfg struct {
@@ -192,6 +194,12 @@ type VochainCfg struct {
 	ImportPreviousCensus bool
 	// Enable Prometheus metrics from tendermint
 	TendermintMetrics bool
+	// EthereumWhiteListAddrs is a map of ethereum addresses able to create oracle txs
+	// If the ethereum address that modified the source of truth
+	// is not on the EthereumWhiteListAddrs the oracle will ignore the event triggered
+	// by that transaction
+	// If the map is empty, any address is accepted
+	EthereumWhiteListAddrs []string
 }
 
 // OracleCfg includes all possible config params needed by the Oracle

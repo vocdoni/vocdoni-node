@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/chain/contracts"
 	"go.vocdoni.io/dvote/log"
@@ -63,6 +64,20 @@ var ethereumEventList = map[string]string{
 
 // HandleVochainOracle handles the events on ethereum for the Oracle.
 func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEvents) error {
+	tctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	if len(e.EthereumWhiteListAddrs) != 0 {
+		if err := checkEthereumTxCreator(tctx,
+			event.TxHash,
+			event.BlockHash,
+			event.TxIndex,
+			e.EthereumWhiteListAddrs,
+			e.VotingHandle.EthereumClient,
+		); err != nil {
+			return fmt.Errorf("cannot process event, error checking Ethereum tx creator: %w", err)
+		}
+	}
+
 	switch event.Topics[0].Hex() {
 
 	case ethereumEventList["processesNewProcess"]:
@@ -363,4 +378,29 @@ func namespaceOracleRemovedMeta(
 	}
 	log.Debugf("namespaceOracleRemoved eventData: %+v", structuredData)
 	return ph.RemoveOracleTxArgs(ctx, structuredData.OracleAddress, structuredData.Namespace)
+}
+
+func checkEthereumTxCreator(
+	ctx context.Context,
+	txHash common.Hash,
+	blockHash common.Hash,
+	txIndex uint,
+	ethereumWhiteList map[common.Address]bool,
+	ethclient *ethclient.Client,
+) error {
+	// get tx from ethereum
+	tx, _, err := ethclient.TransactionByHash(ctx, txHash)
+	if err != nil {
+		return fmt.Errorf("cannot fetch tx by hash: %w", err)
+	}
+	// get from
+	sender, err := ethclient.TransactionSender(ctx, tx, blockHash, txIndex)
+	if err != nil {
+		return fmt.Errorf("cannot fetch tx sender: %w", err)
+	}
+	// check from is whitelisted
+	if !ethereumWhiteList[sender] {
+		return fmt.Errorf("recovered address not in ethereum whitelist")
+	}
+	return fmt.Errorf("cannot check ethereum tx creator, unexpected error")
 }
