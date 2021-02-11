@@ -147,6 +147,7 @@ type routerRequest struct {
 
 // semi-unmarshalls message, returns method name
 func (r *Router) getRequest(payload []byte, context transports.MessageContext) (request routerRequest, err error) {
+	request.MessageContext = context
 	// First unmarshal the outer layer, to obtain the request ID, the signed
 	// request, and the signature.
 	var reqOuter types.RequestMessage
@@ -154,7 +155,6 @@ func (r *Router) getRequest(payload []byte, context transports.MessageContext) (
 		return request, err
 	}
 	request.id = reqOuter.ID
-	request.MessageContext = context
 
 	var reqInner types.MetaRequest
 	if err := json.Unmarshal(reqOuter.MetaRequest, &reqInner); err != nil {
@@ -312,6 +312,10 @@ func (r *Router) Route() {
 }
 
 func (r *Router) sendError(request routerRequest, errMsg string) {
+	if request.MessageContext == nil {
+		log.Errorf("failed to send error as MessageContext==nil: %s", errMsg)
+		return
+	}
 	log.Warn(errMsg)
 
 	// Add any last fields to the inner response, and marshal it with sorted
@@ -339,18 +343,16 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 		Signature:    signature,
 		MetaResponse: respInner,
 	}
-	if request.MessageContext != nil {
-		data, err := json.Marshal(respOuter)
-		if err != nil {
-			log.Warnf("error marshaling response body: %s", err)
-		}
-		msg := transports.Message{
-			TimeStamp: int32(time.Now().Unix()),
-			Context:   request.MessageContext,
-			Data:      data,
-		}
-		request.Send(msg)
+	data, err := json.Marshal(respOuter)
+	if err != nil {
+		log.Warnf("error marshaling response body: %s", err)
 	}
+	msg := transports.Message{
+		TimeStamp: int32(time.Now().Unix()),
+		Context:   request.MessageContext,
+		Data:      data,
+	}
+	request.Send(msg)
 }
 
 func (r *Router) info(request routerRequest) {
