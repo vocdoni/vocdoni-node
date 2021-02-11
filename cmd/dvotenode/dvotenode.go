@@ -554,11 +554,26 @@ func main() {
 				}
 			}
 
-			whitelistLen := len(globalCfg.VochainConfig.EthereumWhiteListAddrs)
-			if whitelistLen == 0 || (whitelistLen == 1 && (globalCfg.VochainConfig.EthereumWhiteListAddrs[0] == "")) {
-				globalCfg.VochainConfig.EthereumWhiteListAddrs = []string{}
+			whiteListedAddr := []string{}
+			for _, addr := range globalCfg.VochainConfig.EthereumWhiteListAddrs {
+				if ethcommon.IsHexAddress(addr) {
+					whiteListedAddr = append(whiteListedAddr, addr)
+				}
 			}
-			if err := service.EthEvents(context.Background(), w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh, sc, globalCfg.VochainConfig.EthereumWhiteListAddrs); err != nil {
+			if len(whiteListedAddr) > 0 {
+				log.Info("ethereum whitelisted addresses %v", whiteListedAddr)
+			}
+			if err := service.EthEvents(
+				context.Background(),
+				w3uri,
+				globalCfg.EthConfig.ChainType,
+				initBlock,
+				cm,
+				signer,
+				vnode,
+				evh,
+				sc,
+				whiteListedAddr); err != nil {
 				log.Fatal(err)
 			}
 		}
