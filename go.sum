@@ -1723,6 +1723,8 @@ github.com/vocdoni/multirpc v0.1.11 h1:t4tthy/pvZI9YDHekaAzRuIBEb0OlMSr8ukNCAhi1
 github.com/vocdoni/multirpc v0.1.11/go.mod h1:OYWh2wBX0rztgatZC7VEcPW0Ew4Hm8f/msRAO24mpk0=
 github.com/vocdoni/multirpc v0.1.12 h1:L70+fgp6p5gajHIBOlW2V+RN1L4+5Alb4cvI+r9KT7E=
 github.com/vocdoni/multirpc v0.1.12/go.mod h1:OYWh2wBX0rztgatZC7VEcPW0Ew4Hm8f/msRAO24mpk0=
+github.com/vocdoni/multirpc v0.1.19 h1:qDplldxeOcsPmd4jRjUI3WMeqUZ7Grm/iBIIJu8gu0c=
+github.com/vocdoni/multirpc v0.1.19/go.mod h1:zCx0l/hu/Vdeav44geFJmK4PAawN+qoo1HYT2icU4GM=
 github.com/vocdoni/storage-proofs-eth-go v0.1.4 h1:lRTSciQ8G2dkbj8Jv3X+dxXqpLMIW00AcY+pr1TNAQo=
 github.com/vocdoni/storage-proofs-eth-go v0.1.4/go.mod h1:8XF/0CpAetwlQJRgQgwBFEbfaYcjrU9gWUBR4F2Aqso=
 github.com/vocdoni/storage-proofs-eth-go v0.1.5 h1:/QTLeM1tkRIruA0LIB9yIMhBTk5++Pm7t2Zp0gCT1Xs=
@@ -1830,6 +1832,7 @@ go.uber.org/zap v1.16.0/go.mod h1:MA8QOfq0BHJwdXa996Y4dYkAqRKB8/1K1QMMZVaNZjQ=
 go.vocdoni.io/dvote v0.6.1-0.20210125120603-df82783bb500/go.mod h1:Kf3LwprU/2MhEXLmgL34N12mn3TmhJZ0EnPPL7LoNXs=
 go.vocdoni.io/dvote v0.6.1-0.20210129144810-e6ce68464ed2/go.mod h1:7yTzMiJiZY3E9djQAuEsjEuDhflLcVJKqd1chYC1GVI=
 go.vocdoni.io/dvote v0.6.1-0.20210130094936-75dbb92de3f0/go.mod h1:NJyERGs2LmEvlevZUtOl36MI0HlOUh0d2I0vJcYh5RE=
+go.vocdoni.io/dvote v0.6.1-0.20210206210936-a0407e833753/go.mod h1:HhMMtdnkLI3ujk+zcL1frzFg5S7SbvxWtis7RZTq1dA=
 go.vocdoni.io/proto v0.1.7/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v0.1.8 h1:WUsshi+7A+RFLd0IbQWmkJiQXPRjxHRbONIg1pDsSHs=
 go.vocdoni.io/proto v0.1.8/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
