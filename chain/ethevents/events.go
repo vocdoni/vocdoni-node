@@ -128,12 +128,14 @@ func NewEthEvents(contractsAddresses []common.Address,
 	}
 
 	secureAddrList := make(map[common.Address]bool, len(ethereumWhiteList))
-	for _, sAddr := range ethereumWhiteList {
-		addr := common.HexToAddress(sAddr)
-		if (addr == common.Address{} || len(addr) != types.EthereumAddressSize) {
-			return nil, fmt.Errorf("cannot create ethereum whitelist, address %q not valid", sAddr)
+	if len(ethereumWhiteList) != 0 {
+		for _, sAddr := range ethereumWhiteList {
+			addr := common.HexToAddress(sAddr)
+			if (addr == common.Address{} || len(addr) != types.EthereumAddressSize) {
+				return nil, fmt.Errorf("cannot create ethereum whitelist, address %q not valid", sAddr)
+			}
+			secureAddrList[addr] = true
 		}
-		secureAddrList[addr] = true
 	}
 
 	ethev := &EthereumEvents{

@@ -398,9 +398,10 @@ func checkEthereumTxCreator(
 	if err != nil {
 		return fmt.Errorf("cannot fetch tx sender: %w", err)
 	}
+	log.Debugf("recovered sender for tx hash: %q is: %s", sender.String())
 	// check from is whitelisted
 	if !ethereumWhiteList[sender] {
 		return fmt.Errorf("recovered address not in ethereum whitelist")
 	}
-	return fmt.Errorf("cannot check ethereum tx creator, unexpected error")
+	return nil
 }
