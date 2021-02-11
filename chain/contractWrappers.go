@@ -383,10 +383,15 @@ func (ph *VotingHandle) AddOracleTxArgs(ctx context.Context, oracleAddress commo
 	if err != nil {
 		return nil, fmt.Errorf("cannot get namespace: %w", err)
 	}
+	var found bool
 	for _, oracle := range ns.Oracles {
 		if oracle == oracleAddress {
-			return nil, fmt.Errorf("cannot add oracle, already added")
+			found = true
+			break
 		}
+	}
+	if !found {
+		return nil, fmt.Errorf("cannot fetch added oracle from ethereum")
 	}
 	addOracleTxArgs := &models.AdminTx{
 		Address: oracleAddress.Bytes(),
