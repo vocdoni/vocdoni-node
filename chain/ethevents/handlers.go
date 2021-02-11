@@ -372,7 +372,7 @@ func namespaceOracleRemovedMeta(
 	eventData []byte,
 	ph *chain.VotingHandle,
 ) (*models.AdminTx, error) {
-	structuredData := contracts.NamespacesOracleRemoved{}
+	structuredData := &contracts.NamespacesOracleRemoved{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "OracleRemoved", eventData); err != nil {
 		return nil, fmt.Errorf("cannot unpack OracleRemoved event: %w", err)
 	}
