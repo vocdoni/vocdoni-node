@@ -554,6 +554,10 @@ func main() {
 				}
 			}
 
+			whitelistLen := len(globalCfg.VochainConfig.EthereumWhiteListAddrs)
+			if whitelistLen == 0 || (whitelistLen == 1 && (globalCfg.VochainConfig.EthereumWhiteListAddrs[0] == "")) {
+				globalCfg.VochainConfig.EthereumWhiteListAddrs = []string{}
+			}
 			if err := service.EthEvents(context.Background(), w3uri, globalCfg.EthConfig.ChainType, initBlock, cm, signer, vnode, evh, sc, globalCfg.VochainConfig.EthereumWhiteListAddrs); err != nil {
 				log.Fatal(err)
 			}
