@@ -56,7 +56,7 @@ var xdai = Specs{
 	NetworkId:       100,
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
-	StartingBlock:   12017322, //2020 Sep 15 16:14h
+	StartingBlock:   14531875, //2021 Feb 13 21:58h
 	ENSdomains: [3]string{
 		types.ProcessesDomain,
 		types.NamespacesDomain,
@@ -69,7 +69,7 @@ var xdaistage = Specs{
 	NetworkId:       100,
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
-	StartingBlock:   12017322, //2020 Sep 15 16:14h
+	StartingBlock:   14531875, //2021 Feb 13 21:58h
 	ENSdomains: [3]string{
 		types.ProcessesStageDomain,
 		types.NamespacesStageDomain,
