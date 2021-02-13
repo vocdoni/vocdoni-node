@@ -183,6 +183,8 @@ func (ev *EthereumEvents) OnComputeResults(results *models.ProcessResult) {
 			return
 		}
 	case models.ProcessStatus_ENDED:
+		break
+	default:
 		log.Infof("invalid process %x status %s for setting the results, skipping", results.ProcessId, vocProcessData.Status)
 		return
 	}
