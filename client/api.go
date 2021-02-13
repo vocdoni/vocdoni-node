@@ -181,7 +181,7 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
 	return results, nil
 }
 
-func (c *Client) GetProofBatch(signers []*ethereum.SignKeys,
+func (c *Client) GetMerkleProofBatch(signers []*ethereum.SignKeys,
 	root []byte,
 	tolerateError bool) ([][]byte, error) {
 
@@ -204,11 +204,11 @@ func (c *Client) GetProofBatch(signers []*ethereum.SignKeys,
 	return proofs, nil
 }
 
-func (c *Client) GetCAproofBatch(signers []*ethereum.SignKeys,
+func (c *Client) GetCSPproofBatch(signers []*ethereum.SignKeys,
 	ca *ethereum.SignKeys,
-	pid []byte) ([]*models.ProofCA, error) {
+	pid []byte) ([][]byte, error) {
 
-	var proofs []*models.ProofCA
+	var proofs [][]byte
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, k := range signers {
@@ -230,8 +230,11 @@ func (c *Client) GetCAproofBatch(signers []*ethereum.SignKeys,
 			Type:      models.SignatureType_ECDSA,
 			Signature: signature,
 		}
-
-		proofs = append(proofs, proof)
+		p, err := proto.Marshal(proof)
+		if err != nil {
+			return nil, err
+		}
+		proofs = append(proofs, p)
 		if (i+1)%100 == 0 {
 			log.Infof("proof generation progress for %s: %d%%", c.Addr, ((i+1)*100)/(len(signers)))
 		}
@@ -239,11 +242,14 @@ func (c *Client) GetCAproofBatch(signers []*ethereum.SignKeys,
 	return proofs, nil
 }
 
-func (c *Client) TestSendVotes(pid,
+func (c *Client) TestSendVotes(
+	pid,
 	eid,
 	root []byte,
 	startBlock uint32,
 	signers []*ethereum.SignKeys,
+	censusOrigin models.CensusOrigin,
+	caSigner *ethereum.SignKeys,
 	proofs [][]byte,
 	encrypted bool,
 	doubleVoting bool,
@@ -253,7 +259,14 @@ func (c *Client) TestSendVotes(pid,
 	var keys []string
 	// Generate merkle proofs
 	if proofs == nil {
-		proofs, err = c.GetProofBatch(signers, root, false)
+		switch censusOrigin {
+		case models.CensusOrigin_OFF_CHAIN_TREE:
+			proofs, err = c.GetMerkleProofBatch(signers, root, false)
+		case models.CensusOrigin_OFF_CHAIN_CA:
+			proofs, err = c.GetCSPproofBatch(signers, caSigner, pid)
+		default:
+			return 0, fmt.Errorf("censusOrigin not supported")
+		}
 	}
 	if err != nil {
 		return 0, err
@@ -300,19 +313,31 @@ func (c *Client) TestSendVotes(pid,
 			return 0, err
 		}
 		v := &models.VoteEnvelope{
-			Nonce:     util.RandomBytes(32),
-			ProcessId: pid,
-			Proof: &models.Proof{
+			Nonce:                util.RandomBytes(32),
+			ProcessId:            pid,
+			VotePackage:          vpb,
+			EncryptionKeyIndexes: keyIndexes,
+		}
+		switch censusOrigin {
+		case models.CensusOrigin_OFF_CHAIN_TREE:
+			v.Proof = &models.Proof{
 				Payload: &models.Proof_Graviton{
 					Graviton: &models.ProofGraviton{
 						Siblings: proofs[i],
 					},
 				},
-			},
-			VotePackage:          vpb,
-			EncryptionKeyIndexes: keyIndexes,
-		}
+			}
 
+		case models.CensusOrigin_OFF_CHAIN_CA:
+			p := &models.ProofCA{}
+			if err := proto.Unmarshal(proofs[i], p); err != nil {
+				log.Fatal(err)
+			}
+			v.Proof = &models.Proof{Payload: &models.Proof_Ca{Ca: p}}
+
+		default:
+			log.Fatal("censusOrigin %s not supported", censusOrigin.String())
+		}
 		txBytes, err := proto.Marshal(v)
 		if err != nil {
 			return 0, err

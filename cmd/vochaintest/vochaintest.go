@@ -19,11 +19,25 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+var ops = map[string]bool{
+	"vtest":          true,
+	"cspvoting":      true,
+	"censusImport":   true,
+	"censusGenerate": true,
+}
+
+func opsAvailable() (opsav []string) {
+	for k, _ := range ops {
+		opsav = append(opsav, k)
+	}
+	return opsav
+}
+
 func main() {
 	// starting test
 
 	loglevel := flag.String("logLevel", "info", "log level")
-	opmode := flag.String("operation", "vtest", "set operation mode")
+	opmode := flag.String("operation", "vtest", fmt.Sprintf("set operation mode: %v", opsAvailable()))
 	oraclePrivKey := flag.String("oracleKey", "", "hexadecimal oracle private key")
 	entityPrivKey := flag.String("entityKey", "", "hexadecimal entity private key")
 	host := flag.String("gwHost", "ws://127.0.0.1:9090/dvote", "gateway websockets endpoint")
@@ -71,7 +85,7 @@ func main() {
 
 	switch *opmode {
 	case "vtest":
-		vtest(*host,
+		mkTreeVoteTest(*host,
 			*oraclePrivKey,
 			*electionType == "encrypted-poll",
 			entityKey,
@@ -83,12 +97,28 @@ func main() {
 			*keysfile,
 			true,
 			false)
+	case "cspvoting":
+		cspKey := ethereum.NewSignKeys()
+		if err := cspKey.Generate(); err != nil {
+			log.Fatal(err)
+		}
+		cspVoteTest(*host,
+			*oraclePrivKey,
+			*electionType == "encrypted-poll",
+			entityKey,
+			cspKey,
+			*electionSize,
+			*procDuration,
+			*parallelCons,
+			*doubleVote,
+			*gateways,
+		)
 	case "censusImport":
 		censusImport(*host, entityKey)
 	case "censusGenerate":
 		censusGenerate(*host, entityKey, *electionSize, *keysfile)
 	default:
-		log.Warnf("no valid operation mode specified")
+		log.Fatal("no valid operation mode specified")
 	}
 }
 
@@ -105,7 +135,7 @@ func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath s
 		log.Fatal(err)
 	}
 	log.Infof("census created and published\nRoot: %x\nURI: %s", root, uri)
-	proofs, err := cl.GetProofBatch(keys, root, false)
+	proofs, err := cl.GetMerkleProofBatch(keys, root, false)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -160,7 +190,7 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 
 }
 
-func vtest(host,
+func mkTreeVoteTest(host,
 	oraclePrivKey string,
 	encryptedVotes bool,
 	entityKey *ethereum.SignKeys,
@@ -278,6 +308,7 @@ func vtest(host,
 
 		log.Infof("all gateways got the census! let's start voting")
 	}
+
 	// Send votes
 	i := 0
 	p := len(censusKeys) / len(clients)
@@ -312,6 +343,8 @@ func vtest(host,
 				censusRoot,
 				start,
 				gwSigners,
+				models.CensusOrigin_OFF_CHAIN_TREE,
+				nil,
 				gwProofs,
 				encryptedVotes,
 				doubleVote,
@@ -326,7 +359,7 @@ func vtest(host,
 	// Wait until all votes sent and check the results
 	wg.Wait()
 
-	log.Infof("canceling process in order to fetch the results")
+	log.Infof("ending process in order to fetch the results")
 	if err := mainClient.EndProcess(oracleKey, pid); err != nil {
 		log.Fatal(err)
 	}
@@ -339,6 +372,148 @@ func vtest(host,
 	log.Infof("the TOTAL voting process took %s", maxVotingTime)
 	log.Infof("checking results....")
 	if r, err := mainClient.TestResults(pid, len(censusKeys)); err != nil {
+		log.Fatal(err)
+	} else {
+		log.Infof("results: %+v", r)
+	}
+	log.Infof("all done!")
+}
+
+func cspVoteTest(
+	host,
+	oraclePrivKey string,
+	encryptedVotes bool,
+	entityKey,
+	cspKey *ethereum.SignKeys,
+	electionSize,
+	procDuration,
+	parallelCons int,
+	doubleVote bool,
+	gateways []string,
+) {
+
+	var voters []*ethereum.SignKeys
+	var err error
+
+	log.Infof("generating signing keys")
+	for i := 0; i < electionSize; i++ {
+		voters = append(voters, ethereum.NewSignKeys())
+		if err := voters[i].Generate(); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	oracleKey := ethereum.NewSignKeys()
+	if err := oracleKey.AddHexKey(oraclePrivKey); err != nil {
+		log.Fatal(err)
+	}
+
+	log.Infof("connecting to main gateway %s", host)
+	// Add the first connection, this will be the main connection
+	var mainClient *client.Client
+	var clients []*client.Client
+
+	for tries := 10; tries > 0; tries-- {
+		mainClient, err = client.New(host)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer mainClient.Conn.Close(websocket.StatusNormalClosure, "")
+
+	// Create process
+	pid := client.Random(32)
+	log.Infof("creating process with entityID: %s", entityKey.AddressString())
+	start, err := mainClient.CreateProcess(
+		oracleKey,
+		entityKey.Address().Bytes(),
+		cspKey.PublicKey(),
+		"https://dumycsp.foo",
+		pid, &models.EnvelopeType{EncryptedVotes: encryptedVotes},
+		models.CensusOrigin_OFF_CHAIN_CA,
+		procDuration)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Infof("created process with ID: %x", pid)
+	// Create the websockets connections for sending the votes
+	gwList := append(gateways, host)
+
+	for i := 0; i < parallelCons; i++ {
+		log.Infof("opening gateway connection to %s", gwList[i%len(gwList)])
+		cl, err := client.New(gwList[i%len(gwList)])
+		if err != nil {
+			log.Warn(err)
+			continue
+		}
+		defer cl.Conn.Close(websocket.StatusNormalClosure, "")
+		clients = append(clients, cl)
+	}
+
+	// Send votes
+	i := 0
+	p := len(voters) / len(clients)
+	var wg sync.WaitGroup
+	var proofsReadyWG sync.WaitGroup
+	votingTimes := make([]time.Duration, len(clients))
+	wg.Add(len(clients))
+	proofsReadyWG.Add(len(clients))
+
+	for gw, cl := range clients {
+		var gwSigners []*ethereum.SignKeys
+		// Split the voters
+		if len(clients) == gw+1 {
+			// if last client, add all remaining keys
+			gwSigners = make([]*ethereum.SignKeys, len(voters)-i)
+			copy(gwSigners, voters[i:])
+		} else {
+			gwSigners = make([]*ethereum.SignKeys, p)
+			copy(gwSigners, voters[i:i+p])
+		}
+		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
+		gw, cl := gw, cl
+		go func() {
+			defer wg.Done()
+			if votingTimes[gw], err = cl.TestSendVotes(
+				pid,
+				entityKey.Address().Bytes(),
+				cspKey.PublicKey(),
+				start,
+				gwSigners,
+				models.CensusOrigin_OFF_CHAIN_CA,
+				cspKey,
+				nil,
+				encryptedVotes,
+				doubleVote,
+				&proofsReadyWG); err != nil {
+				log.Fatalf("[%s] %s", cl.Addr, err)
+			}
+			log.Infof("gateway %d %s has ended its job", gw, cl.Addr)
+		}()
+		i += p
+	}
+
+	// Wait until all votes sent and check the results
+	wg.Wait()
+
+	log.Infof("ending process in order to fetch the results")
+	if err := mainClient.EndProcess(oracleKey, pid); err != nil {
+		log.Fatal(err)
+	}
+	maxVotingTime := time.Duration(0)
+	for _, t := range votingTimes {
+		if t > maxVotingTime {
+			maxVotingTime = t
+		}
+	}
+	log.Infof("the TOTAL voting process took %s", maxVotingTime)
+	log.Infof("checking results....")
+	if r, err := mainClient.TestResults(pid, len(voters)); err != nil {
 		log.Fatal(err)
 	} else {
 		log.Infof("results: %+v", r)
