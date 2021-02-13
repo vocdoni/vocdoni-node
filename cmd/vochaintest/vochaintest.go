@@ -27,7 +27,7 @@ var ops = map[string]bool{
 }
 
 func opsAvailable() (opsav []string) {
-	for k, _ := range ops {
+	for k := range ops {
 		opsav = append(opsav, k)
 	}
 	return opsav
