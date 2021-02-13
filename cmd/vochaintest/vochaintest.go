@@ -455,6 +455,17 @@ func cspVoteTest(
 		clients = append(clients, cl)
 	}
 
+	for i := 0; i < parallelCons; i++ {
+		log.Infof("opening gateway connection to %s", gwList[i%len(gwList)])
+		cl, err := client.New(gwList[i%len(gwList)])
+		if err != nil {
+			log.Warn(err)
+			continue
+		}
+		defer cl.Conn.Close(websocket.StatusNormalClosure, "")
+		clients = append(clients, cl)
+	}
+
 	// Send votes
 	i := 0
 	p := len(voters) / len(clients)
