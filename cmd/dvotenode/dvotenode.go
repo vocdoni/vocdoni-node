@@ -561,7 +561,7 @@ func main() {
 				}
 			}
 			if len(whiteListedAddr) > 0 {
-				log.Info("ethereum whitelisted addresses %v", whiteListedAddr)
+				log.Infof("ethereum whitelisted addresses %+v", whiteListedAddr)
 			}
 			if err := service.EthEvents(
 				context.Background(),
