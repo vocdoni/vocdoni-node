@@ -237,17 +237,14 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 	log.Debugf("dialing for %s", ev.DialAddr)
 	var client *ethclient.Client
 	var err error
-	for i := 0; i < types.EthereumDialMaxRetry; i++ {
+	for {
 		client, err = ethclient.DialContext(ctx, ev.DialAddr)
 		if err != nil || client == nil {
-			log.Warnf("cannot create a client connection: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
-			time.Sleep(time.Second * 2)
+			log.Errorf("cannot create a client connection: (%s), trying again ...", err)
+			time.Sleep(time.Second * 5)
 			continue
 		}
 		break
-	}
-	if err != nil || client == nil {
-		log.Fatalf("cannot create a client connection: (%s), tried %d times.", err, types.EthereumDialMaxRetry)
 	}
 	defer client.Close()
 	// Get current block
@@ -255,7 +252,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 	defer cancel()
 	blk, err := client.BlockByNumber(blockTctx, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Errorf("cannot get ethereum block: %s", err)
 	}
 
 	// If fromBlock not nil, process past events
@@ -264,7 +261,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 		ev.processEventLogsFromTo(ctx, *fromBlock, startBlock, client)
 		// Update block number
 		if blk, err = client.BlockByNumber(blockTctx, nil); err != nil {
-			log.Fatal(err)
+			log.Errorf("cannot upate block number: %s", err)
 		}
 		// For security, read also the new passed blocks before subscribing
 		ev.processEventLogsFromTo(ctx, startBlock, blk.Number().Int64(), client)
@@ -283,7 +280,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 	logs := make(chan ethtypes.Log, 10) // give it some buffer as recommended by the package library
 	sub, err := client.SubscribeFilterLogs(ctx, query, logs)
 	if err != nil {
-		log.Fatal(err)
+		log.Errorf("cannot subscribe to ethereum client log: %s", err)
 	}
 
 	if !ev.EventProcessor.eventProcessorRunning {
@@ -293,7 +290,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 	for {
 		select {
 		case err := <-sub.Err():
-			log.Fatal(err)
+			log.Errorf("ethereum events subscription error on channel: %s", err)
 		case event := <-logs:
 			ev.EventProcessor.Events <- event
 		}
@@ -312,14 +309,14 @@ func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context, from, to i
 
 	logs, err := client.FilterLogs(ctx, query)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot execute ethereum logs filter query: %w", err)
 	}
 
 	for _, event := range logs {
 		log.Infof("processing event log from block %d", event.BlockNumber)
 		for _, h := range ev.EventHandlers {
 			if err := h(ctx, &event, ev); err != nil {
-				log.Warn(err)
+				log.Warnf("cannot handle event (%+v) with error (%s)", event, err)
 			}
 		}
 	}
