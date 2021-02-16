@@ -248,26 +248,24 @@ func (e *EthChainContext) Start() {
 
 		var client *ethclient.Client
 		var err error
-		for i := 0; i < types.EthereumDialMaxRetry; i++ {
+		for {
 			client, err = ethclient.Dial(e.DefaultConfig.W3external)
 			if err != nil || client == nil {
-				log.Warnf("cannot create a client connection: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
-				time.Sleep(time.Second * 2)
+				log.Warnf("cannot create a client connection: (%s), trying again ...", err)
+				time.Sleep(time.Second * 5)
 				continue
 			}
 			break
 		}
-		if err != nil || client == nil {
-			log.Fatalf("cannot create a client connection: (%s), tried %d times.", err, types.EthereumDialMaxRetry)
-		}
+
 		tctx, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
 		defer cancel()
 		nid, err := client.NetworkID(tctx)
 		if err != nil || nid == nil {
-			log.Fatalf("cannot get network ID from external web3: (%s)", err)
+			log.Errorf("cannot get network ID from external web3: (%s)", err)
 		}
 		if nid.Int64() != int64(e.DefaultConfig.NetworkId) {
-			log.Fatalf("web3 external network ID do not match the expected %d != %d", nid.Int64(), e.DefaultConfig.NetworkId)
+			log.Errorf("web3 external network ID do not match the expected %d != %d", nid.Int64(), e.DefaultConfig.NetworkId)
 		}
 		log.Infof("connected to external web3 endpoint on network ID %d", nid.Int64())
 	}
@@ -328,17 +326,14 @@ func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err e
 		var client *ethclient.Client
 		var sp *ethereum.SyncProgress
 
-		for i := 0; i < types.EthereumDialMaxRetry; i++ {
+		for {
 			client, err = ethclient.DialContext(ctx, e.DefaultConfig.W3external)
 			if err != nil || client == nil {
-				log.Warnf("cannot retrieve information from external web3 endpoint: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
+				log.Warnf("cannot retrieve information from external web3 endpoint: (%s), trying again ...", err)
 				time.Sleep(time.Second * 2)
 				continue
 			}
 			break
-		}
-		if err != nil || client == nil {
-			log.Fatalf("cannot retrieve information from external web3 endpoint: (%s), tried %d times.", err, types.EthereumDialMaxRetry)
 		}
 
 		defer client.Close()
@@ -413,10 +408,10 @@ func (e *EthChainContext) SyncGuard(ctx context.Context) {
 			log.Warn("ethereum is experiencing sync problems, restarting node...")
 			e.RestartLock.Lock()
 			if err = e.Node.Close(); err != nil {
-				log.Fatal(err)
+				log.Error(err)
 			}
 			if err = e.Node.Start(); err != nil {
-				log.Fatal(err)
+				log.Error(err)
 			}
 			e.RestartLock.Unlock()
 		}
