@@ -235,42 +235,92 @@ func (ev *EthereumEvents) AddEventHandler(h EventHandler) {
 // Blocking function (use go routine).
 func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBlock *int64) {
 	log.Debugf("dialing for %s", ev.DialAddr)
-	var client *ethclient.Client
+	var sub eth.Subscription
 	var err error
-	for {
-		client, err = ethclient.DialContext(ctx, ev.DialAddr)
-		if err != nil || client == nil {
-			log.Errorf("cannot create a client connection: (%s), trying again ...", err)
-			time.Sleep(time.Second * 5)
-			continue
-		}
-		break
-	}
-	defer client.Close()
+
+	client, _ := chain.EthClientConnect(ev.DialAddr, 0)
 	// Get current block
 	blockTctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout*2)
 	defer cancel()
-	blk, err := client.BlockByNumber(blockTctx, nil)
-	if err != nil {
-		log.Errorf("cannot get ethereum block: %s", err)
+	var lastBlock int64
+	var blk *ethtypes.Block
+	for {
+		if client == nil {
+			client, _ = chain.EthClientConnect(ev.DialAddr, 0)
+		}
+		blk, err = client.BlockByNumber(blockTctx, nil)
+		if err != nil {
+			log.Errorf("cannot get ethereum block: %s", err)
+			// If any error try close the client and reconnect
+			// normally errors are related to connection.
+			// If the error is not related to connections
+			// something very wrong is happening at this point
+			// so the go routine will get stucked here and the
+			// user will be alerted
+			client.Close()
+			client = nil
+			continue
+		}
+		lastBlock = blk.Number().Int64()
+		break
 	}
 
 	// If fromBlock not nil, process past events
 	if fromBlock != nil {
-		startBlock := blk.Number().Int64()
-		ev.processEventLogsFromTo(ctx, *fromBlock, startBlock, client)
+		// do not retry if error processing old logs
+		// Unless this is the first set of oracles, it is almost
+		// sure that the events are already processed so do not
+		// block and do not fatal here
+		if err := ev.processEventLogsFromTo(ctx, *fromBlock, lastBlock, client); err != nil {
+			log.Errorf("cannot process event logs from block %d to block %d with error: %s", *fromBlock, lastBlock, err)
+		}
 		// Update block number
-		if blk, err = client.BlockByNumber(blockTctx, nil); err != nil {
-			log.Errorf("cannot upate block number: %s", err)
+		// Expect the client to be connected here
+		// and the call is successful, if not
+		// block the execution and alert
+		for {
+			if client == nil {
+				client, _ = chain.EthClientConnect(ev.DialAddr, 0)
+			}
+			blk, err = client.BlockByNumber(blockTctx, nil)
+			if err != nil {
+				log.Errorf("cannot update block number: %s", err)
+				// If any error try close the client and reconnect
+				// normally errors are related to connection.
+				// If the error is not related to connections
+				// something very wrong is happening at this point
+				// so the go routine will get stucked here and the
+				// user will be alerted
+				client.Close()
+				client = nil
+				continue
+			}
+			lastBlock = blk.Number().Int64()
+			break
 		}
 		// For security, read also the new passed blocks before subscribing
-		ev.processEventLogsFromTo(ctx, startBlock, blk.Number().Int64(), client)
+		// Same as the last processEventLogsFromTo function call
+		if err := ev.processEventLogsFromTo(ctx, lastBlock, blk.Number().Int64(), client); err != nil {
+			log.Errorf("cannot process event logs from block %d to block %d with error: %s", lastBlock, blk.Number().Int64(), err)
+		}
 	} else {
 		// For security, even if subscribe only, force to process at least the past 1024
-		ev.processEventLogsFromTo(ctx, blk.Number().Int64()-1024, blk.Number().Int64(), client)
+		// Same as the last processEventLogsFromTo function call
+		if err := ev.processEventLogsFromTo(ctx, blk.Number().Int64()-1024, blk.Number().Int64(), client); err != nil {
+			log.Errorf("cannot process event logs from block %d to block %d with error: %s", *fromBlock, blk.Number().Int64(), err)
+		}
 	}
 
+	blockTctx, cancel = context.WithTimeout(ctx, types.EthereumReadTimeout*2)
+	defer cancel()
 	// And then subscribe to new events
+	// Update block number
+	blk, err = client.BlockByNumber(blockTctx, nil)
+	if err != nil {
+		// accept to not update the block number here
+		// if any error, the old blk fetched will be used instead.
+		log.Errorf("cannot upate block number: %s", err)
+	}
 	log.Infof("subscribing to Ethereum Events from block %d", blk.Number().Int64())
 	query := eth.FilterQuery{
 		Addresses: ev.ContractsAddress,
@@ -278,9 +328,22 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 	}
 
 	logs := make(chan ethtypes.Log, 10) // give it some buffer as recommended by the package library
-	sub, err := client.SubscribeFilterLogs(ctx, query, logs)
-	if err != nil {
-		log.Errorf("cannot subscribe to ethereum client log: %s", err)
+	// block here, since it is not acceptable to
+	// start the event processor if the client
+	// cannot be subscribed to the logs.
+	// Use the same policy as processEventsLogsFromTo
+	for {
+		if client == nil {
+			client, _ = chain.EthClientConnect(ev.DialAddr, 0)
+		}
+		sub, err = client.SubscribeFilterLogs(ctx, query, logs)
+		if err != nil {
+			log.Errorf("cannot subscribe to ethereum client log: %s", err)
+			client.Close()
+			client = nil
+			continue
+		}
+		break
 	}
 
 	if !ev.EventProcessor.eventProcessorRunning {
@@ -316,6 +379,7 @@ func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context, from, to i
 		log.Infof("processing event log from block %d", event.BlockNumber)
 		for _, h := range ev.EventHandlers {
 			if err := h(ctx, &event, ev); err != nil {
+				// TODO: handle when event cannot be processed
 				log.Warnf("cannot handle event (%+v) with error (%s)", event, err)
 			}
 		}

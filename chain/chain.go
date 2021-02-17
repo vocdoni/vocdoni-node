@@ -198,11 +198,13 @@ func (e *EthChainContext) Start() {
 
 	if len(e.Keys.Accounts()) < 1 {
 		if err := e.createAccount(); err != nil {
-			log.Error(err)
+			log.Fatalf("cannot create ethereum account: %s", err)
 		}
 	} else {
 		// phrase := getPassPhrase("please provide primary account passphrase", false)
-		e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
+		if err := e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0)); err != nil {
+			log.Fatalf("cannot unlock ethereum account: %s", err)
+		}
 		log.Infof("my Ethereum address %x", e.Keys.Accounts()[0].Address)
 	}
 	if len(e.DefaultConfig.W3external) == 0 {
@@ -246,26 +248,21 @@ func (e *EthChainContext) Start() {
 
 	} else {
 
-		var client *ethclient.Client
 		var err error
-		for {
-			client, err = ethclient.Dial(e.DefaultConfig.W3external)
-			if err != nil || client == nil {
-				log.Warnf("cannot create a client connection: (%s), trying again ...", err)
-				time.Sleep(time.Second * 5)
-				continue
-			}
-			break
+		client, err := EthClientConnect(e.DefaultConfig.W3external, 10)
+		if err != nil {
+			log.Errorf("cannot connect to external web3 endpoint, skipping ethereum initialization")
+			return
 		}
 
 		tctx, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
 		defer cancel()
 		nid, err := client.NetworkID(tctx)
 		if err != nil || nid == nil {
-			log.Errorf("cannot get network ID from external web3: (%s)", err)
+			log.Fatalf("cannot get network ID from external web3: (%s)", err)
 		}
 		if nid.Int64() != int64(e.DefaultConfig.NetworkId) {
-			log.Errorf("web3 external network ID do not match the expected %d != %d", nid.Int64(), e.DefaultConfig.NetworkId)
+			log.Fatalf("web3 external network ID do not match the expected %d != %d", nid.Int64(), e.DefaultConfig.NetworkId)
 		}
 		log.Infof("connected to external web3 endpoint on network ID %d", nid.Int64())
 	}
@@ -275,7 +272,7 @@ func (e *EthChainContext) createAccount() error {
 	// phrase := getPassPhrase("Your new account will be locked with a passphrase. Please give a passphrase. Do not forget it!.", true)
 	_, err := e.Keys.NewAccount("")
 	if err != nil {
-		return fmt.Errorf("failed to create account: %v", err)
+		return fmt.Errorf("failed to create account: %w", err)
 	}
 	e.Keys.TimedUnlock(e.Keys.Accounts()[0], "", time.Duration(0))
 	log.Infof("my Ethereum address %x", e.Keys.Accounts()[0].Address)
@@ -326,15 +323,7 @@ func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err e
 		var client *ethclient.Client
 		var sp *ethereum.SyncProgress
 
-		for {
-			client, err = ethclient.DialContext(ctx, e.DefaultConfig.W3external)
-			if err != nil || client == nil {
-				log.Warnf("cannot retrieve information from external web3 endpoint: (%s), trying again ...", err)
-				time.Sleep(time.Second * 2)
-				continue
-			}
-			break
-		}
+		client, _ = EthClientConnect(e.DefaultConfig.W3external, 0)
 
 		defer client.Close()
 		sp, err = client.SyncProgress(ctx)
@@ -408,12 +397,33 @@ func (e *EthChainContext) SyncGuard(ctx context.Context) {
 			log.Warn("ethereum is experiencing sync problems, restarting node...")
 			e.RestartLock.Lock()
 			if err = e.Node.Close(); err != nil {
-				log.Error(err)
+				log.Fatal(err)
 			}
 			if err = e.Node.Start(); err != nil {
-				log.Error(err)
+				log.Fatal(err)
 			}
 			e.RestartLock.Unlock()
 		}
+	}
+}
+
+// EthClientConnect is a utility blocking function for connecting to an endpoint
+// that will be executed until a connection is established and the client created
+// successfully. If attempts is not 0 the function will return an error
+// and the connection loop will terminate
+func EthClientConnect(dialAddr string, attempts int) (*ethclient.Client, error) {
+	var attemptsCounter int
+	for {
+		if attempts != 0 && attemptsCounter == attempts {
+			return nil, fmt.Errorf("tryied %d to reconnect, connection cannot be established", attemptsCounter)
+		}
+		client, err := ethclient.DialContext(context.Background(), dialAddr)
+		if err != nil || client == nil {
+			log.Errorf("cannot create a client connection: (%s), trying again ...", err)
+			time.Sleep(time.Second * 10)
+			attemptsCounter++
+			continue
+		}
+		return client, nil
 	}
 }
