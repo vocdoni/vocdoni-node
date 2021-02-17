@@ -59,17 +59,14 @@ func NewVotingHandle(contractsAddress []common.Address, dialEndpoint string) (*V
 	var err error
 	ph := new(VotingHandle)
 	// try connect to the w3endpoint using an RPC connection
-	for i := 0; i < types.EthereumDialMaxRetry; i++ {
+	for {
 		ph.EthereumRPC, err = ethrpc.Dial(dialEndpoint)
 		if err != nil || ph.EthereumRPC == nil {
-			log.Warnf("cannot create a ethereum rpc connection: (%s), trying again (%d of %d)", err, i+1, types.EthereumDialMaxRetry)
-			time.Sleep(time.Second * 2)
+			log.Warnf("cannot create a ethereum rpc connection: (%s), trying again ...", err)
+			time.Sleep(time.Second * 10)
 			continue
 		}
 		break
-	}
-	if err != nil || ph.EthereumRPC == nil {
-		return nil, fmt.Errorf("cannot create RPC connection: (%w), tried %d times", err, types.EthereumDialMaxRetry)
 	}
 	// if RPC connection established, create an ethereum client using the RPC client
 	ph.EthereumClient = ethclient.NewClient(ph.EthereumRPC)
@@ -602,7 +599,7 @@ func EnsResolve(ctx context.Context, ensRegistryAddr, ethDomain, w3uri string) (
 		contractAddr, err = ENSAddress(ctx, ensRegistryAddr, ethDomain, w3uri)
 		if err != nil {
 			if strings.Contains(err.Error(), "no suitable peers available") {
-				time.Sleep(time.Second)
+				time.Sleep(time.Second * 2)
 				continue
 			}
 			err = fmt.Errorf("cannot get contract address: %w", err)
@@ -626,7 +623,7 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityResolv
 		client, err = ethclient.Dial(ethEndpoint)
 		if err != nil || client == nil {
 			log.Warnf("cannot create a client connection: %s, trying again... %d of %d", err, i+1, types.EthereumDialMaxRetry)
-			time.Sleep(time.Second * 2)
+			time.Sleep(time.Second * 10)
 			continue
 		}
 		break

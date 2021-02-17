@@ -10,6 +10,7 @@ import (
 	"go.vocdoni.io/dvote/chain/ethevents"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 )
@@ -37,9 +38,17 @@ func EthEvents(
 	}
 	contractsAddresses := make([]common.Address, len(specs.ENSdomains))
 	for idx, domain := range specs.ENSdomains {
-		addr, err := chain.EnsResolve(ctx, specs.ENSregistryAddr, domain, w3uri)
-		if err != nil {
-			return fmt.Errorf("cannot resolve domain: %s, error: %w", domain, err)
+		var addr string
+		for i := 0; i < types.EthereumDialMaxRetry; i++ {
+			addr, err = chain.EnsResolve(ctx, specs.ENSregistryAddr, domain, w3uri)
+			if err != nil {
+				log.Errorf("cannot resolve domain: %s, error: %s, trying again ...", domain, err)
+				continue
+			}
+			break
+		}
+		if addr == "" {
+			return fmt.Errorf("cannot resolve domain address, cannot proceed without resolving contract addresses")
 		}
 		contractsAddresses[idx] = common.HexToAddress(addr)
 	}
