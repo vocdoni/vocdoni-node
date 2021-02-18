@@ -440,6 +440,8 @@ func (t *GravitonTree) Proof(key []byte) ([]byte, error) {
 	return proofBytes, nil
 }
 
+// TODO(mvdan): join the two Verify funcs
+
 func (t *GravitonTree) Verify(key, proof, root []byte) bool {
 	var p graviton.Proof
 	var err error
@@ -469,6 +471,13 @@ func (t *GravitonTree) Verify(key, proof, root []byte) bool {
 func Verify(key, proof, root []byte) (bool, error) {
 	var p graviton.Proof
 	var r [32]byte
+	// Unmarshal() will generate a panic if the proof size is incorrect. See https://go.vocdoni.io/dvote/-/issues/333
+	// While this is not fixed upstream, we need to recover the panic.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warnf("recovered graviton verify panic: %v", r)
+		}
+	}()
 	if err := p.Unmarshal(proof); err != nil {
 		log.Error(err)
 		return false, err
