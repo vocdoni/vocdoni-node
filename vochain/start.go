@@ -243,7 +243,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		log.Infof("found genesis file %s", tconfig.Genesis)
 	} else {
 		log.Debugf("loaded genesis: %s", string(genesis))
-		if err := ioutil.WriteFile(tconfig.Genesis, genesis, 0644); err != nil {
+		if err := ioutil.WriteFile(tconfig.Genesis, genesis, 0600); err != nil {
 			return nil, err
 		}
 		log.Infof("new genesis created, stored at %s", tconfig.Genesis)
@@ -264,7 +264,8 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		pv,      // the node val
 		nodeKey, // node key
 		proxy.NewLocalClientCreator(app),
-		// Note we use proxy.NewLocalClientCreator here to create a local client instead of one communicating through a socket or gRPC.
+		// Note we use proxy.NewLocalClientCreator here to create a local client
+		// instead of one communicating through a socket or gRPC.
 		nm.DefaultGenesisDocProviderFunc(tconfig),
 		nm.DefaultDBProvider,
 		nm.DefaultMetricsProvider(tconfig.Instrumentation),

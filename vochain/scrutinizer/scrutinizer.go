@@ -40,7 +40,8 @@ func (s *Scrutinizer) AddEventListener(l EventListener) {
 	s.eventListeners = append(s.eventListeners, l)
 }
 
-// Scrutinizer is the component which makes the accounting of the voting processes and keeps it indexed in a local database
+// Scrutinizer is the component which makes the accounting of the voting processes
+// and keeps it indexed in a local database.
 type Scrutinizer struct {
 	VochainState   *vochain.State
 	Storage        db.Database
@@ -60,7 +61,9 @@ func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.entityCount = int64(len(s.List(int64(^uint(0)>>1), []byte{}, []byte{types.ScrutinizerEntityPrefix})))
+	s.entityCount = int64(len(s.List(int64(^uint(0)>>1),
+		[]byte{},
+		[]byte{types.ScrutinizerEntityPrefix})))
 	s.VochainState.AddEventListener(s)
 	return s, nil
 }
@@ -103,7 +106,7 @@ func (s *Scrutinizer) Commit(height int64) {
 	}
 }
 
-//Rollback removes the non committed pending operations
+// Rollback removes the non committed pending operations
 func (s *Scrutinizer) Rollback() {
 	s.votePool = []*models.Vote{}
 	s.processPool = []*types.ScrutinizerOnProcessData{}
@@ -142,7 +145,8 @@ func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessSta
 	// do nothing
 }
 
-// OnRevealKeys checks if all keys have been revealed and in such case add the process to the results queue
+// OnRevealKeys checks if all keys have been revealed and in such case add the
+// process to the results queue
 func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 	p, err := s.VochainState.Process(pid, false)
 	if err != nil {
@@ -160,11 +164,13 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 	}
 }
 
-// List returns a list of keys matching a given prefix. If from is specified, it will seek to the prefix+form key (if found).
+// List returns a list of keys matching a given prefix. If from is specified, it will
+// seek to the prefix+form key (if found).
 func (s *Scrutinizer) List(max int64, from, prefix []byte) [][]byte {
 	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
 	list := [][]byte{}
-	for iter.Iter.Seek([]byte(fmt.Sprintf("%s%s", prefix, from))); iter.Iter.ValidForPrefix(prefix); iter.Iter.Next() {
+	for iter.Iter.Seek(
+		[]byte(fmt.Sprintf("%s%s", prefix, from))); iter.Iter.ValidForPrefix(prefix); iter.Iter.Next() {
 		key := iter.Key()[len(prefix):]
 		if len(from) > 0 && bytes.Equal(key, from) {
 			// We don't include "from" in the result.

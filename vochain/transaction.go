@@ -235,7 +235,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 
 				// check census proof
 				var valid bool
-				valid, vp.Weight, err = checkProof(tx.Proof, process.CensusOrigin, process.CensusRoot, process.ProcessId, vp.PubKeyDigest)
+				valid, vp.Weight, err = CheckProof(tx.Proof, process.CensusOrigin, process.CensusRoot, process.ProcessId, vp.PubKeyDigest)
 				if err != nil {
 					return nil, fmt.Errorf("proof not valid: (%w)", err)
 				}

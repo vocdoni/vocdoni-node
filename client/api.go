@@ -175,7 +175,10 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
 		log.Infof("no results yet at block %d", block+2)
 	}
 	total := fmt.Sprintf("%d", totalVotes)
-	if results[0][1] != total || results[1][2] != total || results[2][3] != total || results[3][4] != total {
+	if results[0][1] != total ||
+		results[1][2] != total ||
+		results[2][3] != total ||
+		results[3][4] != total {
 		return nil, fmt.Errorf("invalid results: %v", results)
 	}
 	return results, nil
@@ -448,6 +451,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 		EnvelopeType: envelopeType,
 		Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
 		Status:       models.ProcessStatus_READY,
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 8},
 	}
 	p := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,

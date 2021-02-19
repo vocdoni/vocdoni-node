@@ -112,7 +112,24 @@ func (s *Scrutinizer) checkFinishedProcesses(height int64) {
 
 // creates a new empty process and stores it into the database
 func (s *Scrutinizer) newEmptyLiveProcess(pid []byte) (*models.ProcessResult, error) {
-	pv := emptyProcess(0, 0)
+	p, err := s.VochainState.Process(pid, false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create new empty live process: %w", err)
+	}
+	options := p.GetVoteOptions()
+	if options == nil {
+		return nil, fmt.Errorf("newEmptyLiveProcess: vote options is nil")
+	}
+	if options.MaxCount == 0 || options.MaxValue == 0 {
+		return nil, fmt.Errorf("newEmptyLiveProcess: maxCount or maxValue are zero")
+	}
+
+	// Check for overflows
+	if options.MaxCount > MaxQuestions || options.MaxValue > MaxOptions {
+		return nil, fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
+	}
+	// MaxValue requires +1 since 0 is also an option
+	pv := emptyProcess(int(options.MaxCount), int(options.MaxValue)+1)
 	process, err := proto.Marshal(pv)
 	if err != nil {
 		return nil, err
@@ -211,11 +228,8 @@ func (s *Scrutinizer) addEntity(eid, pid []byte) {
 }
 
 func emptyProcess(questions, options int) *models.ProcessResult {
-	if questions == 0 {
-		questions = MaxQuestions
-	}
-	if options == 0 {
-		options = MaxOptions
+	if questions == 0 || options == 0 {
+		return nil
 	}
 	pv := new(models.ProcessResult)
 	pv.Votes = make([]*models.QuestionResult, questions)
