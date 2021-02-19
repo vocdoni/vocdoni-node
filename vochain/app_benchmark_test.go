@@ -4,9 +4,8 @@ package vochain
 
 import (
 	"fmt"
-	"testing"
-
 	"sync/atomic"
+	"testing"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
@@ -53,7 +52,9 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 	claims := []string{}
 	for _, k := range keys {
 		c := snarks.Poseidon.Hash(k.PublicKey())
-		tr.Add(c, nil)
+		if err := tr.Add(c, nil); err != nil {
+			b.Fatal(err)
+		}
 		claims = append(claims, string(c))
 	}
 	censusURI := "ipfs://123456789"
@@ -63,6 +64,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		StartBlock:   0,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: true},
 		Mode:         &models.ProcessMode{},
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EthereumAddressSize),
 		CensusRoot:   tr.Root(),
@@ -70,7 +72,9 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
-	app.State.AddProcess(process)
+	if err := app.State.AddProcess(process); err != nil {
+		b.Fatal(err)
+	}
 
 	var proof []byte
 

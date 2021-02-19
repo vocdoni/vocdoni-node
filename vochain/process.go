@@ -107,8 +107,10 @@ func (v *State) setProcess(process *models.Process, pid []byte) error {
 	return nil
 }
 
-// SetProcessStatus changes the process status to the one provided. One of ready, ended, canceled, paused, results.
-// Transition checks are handled inside this function, so the caller does not need to worry about it.
+// SetProcessStatus changes the process status to the one provided.
+// One of ready, ended, canceled, paused, results.
+// Transition checks are handled inside this function, so the caller
+// does not need to worry about it.
 func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, commit bool) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
@@ -131,7 +133,8 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 		}
 		if !process.Mode.Interruptible {
 			if v.Header(false).Height <= int64(process.BlockCount+process.StartBlock) {
-				return fmt.Errorf("process %x is not interruptible, cannot change state to %s", pid, newstatus.String())
+				return fmt.Errorf("process %x is not interruptible, cannot change state to %s",
+					pid, newstatus.String())
 			}
 		}
 	case models.ProcessStatus_CANCELED:
@@ -142,7 +145,8 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return fmt.Errorf("cannot set state canceled from ended or results")
 		}
 		if currentStatus != models.ProcessStatus_PAUSED && !process.Mode.Interruptible {
-			return fmt.Errorf("process %x is not interruptible, cannot change state to %s", pid, newstatus.String())
+			return fmt.Errorf("process %x is not interruptible, cannot change state to %s",
+				pid, newstatus.String())
 		}
 	case models.ProcessStatus_PAUSED:
 		if currentStatus != models.ProcessStatus_READY {
@@ -188,17 +192,23 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 	// Check if the state transition is valid
 	if process.Status == models.ProcessStatus_RESULTS {
 		if process.Results != result {
-			return fmt.Errorf("results provided differ from already stored results: got: %+v, have: %+v", result, process.Results)
+			return fmt.Errorf(
+				"results provided differ from already stored results: got: %+v, have: %+v",
+				result, process.Results)
 		}
 		return fmt.Errorf("same results already added")
 	} else if process.Status == models.ProcessStatus_ENDED {
 		// process must be ended for setting the results
 		if !bytes.Equal(result.ProcessId, process.ProcessId) {
-			return fmt.Errorf("invalid process id on result provided, expected: %x got: %x", process.ProcessId, result.ProcessId)
+			return fmt.Errorf(
+				"invalid process id on result provided, expected: %x got: %x",
+				process.ProcessId, result.ProcessId)
 		}
 
 		if !bytes.Equal(result.EntityId, process.EntityId) {
-			return fmt.Errorf("invalid entity id on result provided, expected: %x got: %x", process.EntityId, result.EntityId)
+			return fmt.Errorf(
+				"invalid entity id on result provided, expected: %x got: %x",
+				process.EntityId, result.EntityId)
 		}
 
 		if commit {
@@ -221,15 +231,20 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 	// check valid state transition
 	// dynamic census
 	if !process.Mode.DynamicCensus {
-		return fmt.Errorf("cannot update census, only processes with dynamic census can update its census")
+		return fmt.Errorf(
+			"cannot update census, only processes with dynamic census can update its census")
 	}
 	// census origin
 	if !types.CensusOrigins[process.CensusOrigin].AllowCensusUpdate {
-		return fmt.Errorf("cannot update census, invalid census origin: %s", process.CensusOrigin.String())
+		return fmt.Errorf(
+			"cannot update census, invalid census origin: %s", process.CensusOrigin.String())
 	}
 	// status
-	if !(process.Status == models.ProcessStatus_READY) && !(process.Status == models.ProcessStatus_PAUSED) {
-		return fmt.Errorf("cannot update census, process status must be READY or PAUSED and is: %s", process.Status.String())
+	if !(process.Status == models.ProcessStatus_READY) &&
+		!(process.Status == models.ProcessStatus_PAUSED) {
+		return fmt.Errorf(
+			"cannot update census, process status must be READY or PAUSED and is: %s",
+			process.Status.String())
 	}
 	// check not same censusRoot
 	if bytes.Equal(censusRoot, process.CensusRoot) {
@@ -257,6 +272,13 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 	if tx.Process == nil {
 		return nil, fmt.Errorf("process data is empty")
 	}
+	// basic required fields check
+	if tx.Process.VoteOptions == nil || tx.Process.EnvelopeType == nil || tx.Process.Mode == nil {
+		return nil, fmt.Errorf("missing required fields (voteOptions, envelopeType or processMode)")
+	}
+	if tx.Process.VoteOptions.MaxCount == 0 || tx.Process.VoteOptions.MaxValue == 0 {
+		return nil, fmt.Errorf("missing vote options parameters (maxCount or maxValue)")
+	}
 	// check signature available
 	if vtx.Signature == nil || tx == nil {
 		return nil, fmt.Errorf("missing signature or new process transaction")
@@ -273,10 +295,12 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 	}
 	// start and endblock sanity check
 	if int64(tx.Process.StartBlock) < header.Height {
-		return nil, fmt.Errorf("cannot add process with start block lower or equal than the current tendermint height")
+		return nil, fmt.Errorf(
+			"cannot add process with start block lower or equal than the current height")
 	}
 	if tx.Process.BlockCount <= 0 {
-		return nil, fmt.Errorf("cannot add process with duration lower or equal than the current tendermint height")
+		return nil, fmt.Errorf(
+			"cannot add process with duration lower or equal than the current height")
 	}
 	signedBytes, err := proto.Marshal(tx)
 	if err != nil {

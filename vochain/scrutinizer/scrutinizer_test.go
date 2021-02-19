@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -116,6 +117,7 @@ func testProcessList(t *testing.T, procsCount int) {
 		t.Fatalf("expected %d processes, got %d", procsCount, len(procs))
 	}
 }
+
 func TestResults(t *testing.T) {
 	log.Init("info", "stdout")
 	state, err := vochain.NewState(t.TempDir())
@@ -128,13 +130,17 @@ func TestResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	pid := util.RandomBytes(32)
-	state.AddProcess(&models.Process{
+	if err := state.AddProcess(&models.Process{
 		ProcessId:             pid,
 		EnvelopeType:          &models.EnvelopeType{EncryptedVotes: true},
 		Status:                models.ProcessStatus_READY,
+		Mode:                  &models.ProcessMode{AutoStart: true},
 		EncryptionPrivateKeys: make([]string, 16),
 		EncryptionPublicKeys:  make([]string, 16),
-	})
+		VoteOptions:           &models.ProcessVoteOptions{MaxCount: 4, MaxValue: 1},
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	priv, err := nacl.DecodePrivate(fmt.Sprintf("%x", ethereum.HashRaw(util.RandomBytes(32))))
 	if err != nil {
@@ -177,6 +183,7 @@ func TestResults(t *testing.T) {
 			VotePackage:          vp,
 			EncryptionKeyIndexes: []uint32{1},
 			Nullifier:            util.RandomBytes(32),
+			Weight:               new(big.Int).SetUint64(1).Bytes(),
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -191,7 +198,7 @@ func TestResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Infof("Results: %v", result)
+	log.Infof("results: %s", PrintResults(result))
 	v0 := big.NewInt(0)
 	v300 := big.NewInt(300)
 	value := new(big.Int)
@@ -222,7 +229,6 @@ func TestResults(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestLiveResults(t *testing.T) {
@@ -237,10 +243,15 @@ func TestLiveResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	pid := util.RandomBytes(32)
-	state.AddProcess(&models.Process{
+	if err := state.AddProcess(&models.Process{
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-	})
+		Status:       models.ProcessStatus_READY,
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 1},
+		Mode:         &models.ProcessMode{AutoStart: true},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	sc.addLiveResultsProcess(pid)
 
 	// Add 100 votes
@@ -259,7 +270,7 @@ func TestLiveResults(t *testing.T) {
 	}
 
 	if live, err := sc.isLiveResultsProcess(pid); !live || err != nil {
-		t.Fatal(fmt.Errorf("isLiveResultsProcess returned false while true is expected or some other error: %v", err))
+		t.Fatal(fmt.Errorf("isLiveResultsProcess returned false: %v", err))
 	}
 
 	// Test results
@@ -280,9 +291,66 @@ func TestLiveResults(t *testing.T) {
 			if qi == 0 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
-			if qi == 1 && value.Cmp(v100) != 100 {
+			if qi == 1 && value.Cmp(v100) != 0 {
 				t.Fatalf("result is not correct, %d is not 100 as expected", value.Uint64())
 			}
 		}
 	}
+}
+
+func TestAddVote(t *testing.T) {
+	pr := emptyProcess(8, 8)
+	options := &models.ProcessVoteOptions{
+		MaxCount:     3,
+		MaxValue:     3,
+		MaxTotalCost: 6,
+		CostExponent: 1,
+	}
+	envelopeType := &models.EnvelopeType{}
+
+	// Should be fine
+	err := addVote(pr.Votes, []int{1, 2, 3}, nil, options, envelopeType)
+	qt.Assert(t, err, qt.IsNil)
+
+	// Overflows maxTotalCost
+	err = addVote(pr.Votes, []int{2, 2, 3}, nil, options, envelopeType)
+	qt.Assert(t, err, qt.ErrorMatches, "max total cost overflow.*")
+
+	// Overflows maxValue
+	err = addVote(pr.Votes, []int{1, 1, 4}, nil, options, envelopeType)
+	qt.Assert(t, err, qt.ErrorMatches, "max value overflow.*")
+
+	// Overflows maxCount
+	err = addVote(pr.Votes, []int{1, 1, 1, 1}, nil, options, envelopeType)
+	qt.Assert(t, err, qt.ErrorMatches, "max count overflow.*")
+
+	// Quadratic voting, 10 credits to distribute among 3 options
+	options = &models.ProcessVoteOptions{
+		MaxCount:     3,
+		MaxValue:     0,
+		MaxTotalCost: 10,
+		CostExponent: 2,
+	}
+
+	// Should be fine 2^2 + 2^2 + 1^2 = 9
+	err = addVote(pr.Votes, []int{2, 2, 1}, nil, options, envelopeType)
+	qt.Assert(t, err, qt.IsNil)
+
+	// Should be fine 3^2 + 0 + 0 = 9
+	err = addVote(pr.Votes, []int{3, 0, 0}, nil, options, envelopeType)
+	qt.Assert(t, err, qt.IsNil)
+
+	// Should fail since 2^2 + 2^2 + 2^2 = 12
+	err = addVote(pr.Votes, []int{2, 2, 2}, nil, options, envelopeType)
+	qt.Assert(t, err, qt.ErrorMatches, "max total cost overflow.*")
+
+	// Should fail since 4^2 = 16
+	err = addVote(pr.Votes, []int{4, 0, 0}, nil, options, envelopeType)
+	qt.Assert(t, err, qt.ErrorMatches, "max total cost overflow.*")
+
+	// Check unique values work
+	envelopeType = &models.EnvelopeType{UniqueValues: true}
+	err = addVote(pr.Votes, []int{2, 1, 1}, nil, options, envelopeType)
+	qt.Assert(t, err, qt.ErrorMatches, "values are not unique")
+
 }

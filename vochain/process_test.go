@@ -34,6 +34,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		StartBlock:   0,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true},
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EthereumAddressSize),
 		CensusRoot:   util.RandomBytes(32),
@@ -42,7 +43,9 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		BlockCount:   1024,
 	}
 	t.Logf("adding READY process %x", process.ProcessId)
-	app.State.AddProcess(process)
+	if err := app.State.AddProcess(process); err != nil {
+		t.Fatal(err)
+	}
 
 	// Set it to PAUSE (should work)
 	status := models.ProcessStatus_PAUSED
@@ -378,11 +381,17 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		BlockCount:   1024,
 	}
 	t.Logf("adding READY process %x", process.ProcessId)
-	app.State.AddProcess(process)
+	if err := app.State.AddProcess(process); err != nil {
+		t.Fatal(err)
+	}
 	t.Logf("adding READY process %x", process2.ProcessId)
-	app.State.AddProcess(process2)
+	if err := app.State.AddProcess(process2); err != nil {
+		t.Fatal(err)
+	}
 	t.Logf("adding READY process %x", process3.ProcessId)
-	app.State.AddProcess(process3)
+	if err := app.State.AddProcess(process3); err != nil {
+		t.Fatal(err)
+	}
 
 	// Set census  (should work)
 	if err := testSetProcessCensus(t, pid, &oracle, app, []byte{1, 2, 3}, &censusURI2); err != nil {

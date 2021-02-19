@@ -53,6 +53,7 @@ var (
 		EnvelopeType: &models.EnvelopeType{},
 		Mode:         &models.ProcessMode{},
 		Status:       models.ProcessStatus_READY,
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
 	}
 
 	// privKey e0aa6db5a833531da4d259fb5df210bae481b276dc4c2ab6ab9771569375aed5 for address 06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0

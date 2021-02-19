@@ -30,10 +30,10 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// checkProof checks the validity of a census proof (depending on the origin).
+// CheckProof checks the validity of a census proof (depending on the origin).
 // key is the data to be proof in behalf the censusRoot.
 // In case of weighted proof, this function will return the weight as second parameter.
-func checkProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoot, processID, key []byte) (bool, *big.Int, error) {
+func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoot, processID, key []byte) (bool, *big.Int, error) {
 	switch censusOrigin {
 	case models.CensusOrigin_OFF_CHAIN_TREE:
 		switch proof.Payload.(type) {

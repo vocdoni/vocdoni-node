@@ -44,7 +44,10 @@ func TestAddOracle(t *testing.T) {
 	}
 }
 
-func testAddOracle(t *testing.T, oracle *ethereum.SignKeys, app *BaseApplication, newOracle common.Address) error {
+func testAddOracle(t *testing.T,
+	oracle *ethereum.SignKeys,
+	app *BaseApplication,
+	newOracle common.Address) error {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx

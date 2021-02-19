@@ -65,7 +65,6 @@ func (pk *processKeys) Encode() []byte {
 	i += commitmentKeySize
 
 	copy(data[i:], pk.commitmentKey)
-	i += commitmentKeySize
 
 	data[128] = byte(pk.index)
 	return data

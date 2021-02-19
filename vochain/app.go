@@ -92,12 +92,14 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
 		fmt.Printf("%s\n", req.AppStateBytes)
-		log.Errorf("cannot unmarshal app state bytes: %s", err)
+		log.Fatalf("cannot unmarshal app state bytes: %v", err)
 	}
 	// get oracles
 	for _, v := range genesisAppState.Oracles {
 		log.Infof("adding genesis oracle %s", v)
-		app.State.AddOracle(ethcommon.HexToAddress(v))
+		if err := app.State.AddOracle(ethcommon.HexToAddress(v)); err != nil {
+			log.Fatalf("cannot add oracles: %v", err)
+		}
 	}
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
