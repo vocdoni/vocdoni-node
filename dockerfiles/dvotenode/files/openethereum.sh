@@ -9,6 +9,7 @@
 
 CHAIN=${DVOTE_ETHCONFIG_CHAINTYPE:-goerli}
 [ "$CHAIN" == "mainnet" ] && CHAIN="ethereum"
+[ "$CHAIN" == "xdaistage" ] && CHAIN="xdai"
 
 /home/openethereum/openethereum --chain $CHAIN --base-path /app/eth --port=37671 \
  --ipc-apis=all --jsonrpc-port=9080 --jsonrpc-interface=0.0.0.0 --jsonrpc-apis=safe \
