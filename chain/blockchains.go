@@ -32,6 +32,8 @@ func SpecsFor(name string) (*Specs, error) {
 		return &xdai, nil
 	case "xdaistage":
 		return &xdaistage, nil
+	case "goerlistage":
+		return &goerlistage, nil
 	default:
 		return nil, errors.New("chain name not found")
 	}
@@ -75,6 +77,22 @@ var xdaistage = Specs{
 		types.NamespacesStageDomain,
 		types.ERC20ProofsStageDomain,
 	},
+}
+
+// Goerli Ethereum PoA testned - Staging
+var goerlistage = Specs{
+	Name:            "goerlistage",
+	NetworkId:       goerli.NetworkId,
+	StartingBlock:   goerli.StartingBlock,
+	ENSregistryAddr: goerli.ENSregistryAddr,
+	BootNodes:       ethparams.GoerliBootnodes,
+	ENSdomains: [3]string{
+		types.ProcessesStageDomain,
+		types.NamespacesStageDomain,
+		types.ERC20ProofsStageDomain,
+	},
+	GenesisHash: goerli.GenesisHash,
+	GenesisB64:  goerli.GenesisB64,
 }
 
 // Goerli Ethereum PoA Testnet
