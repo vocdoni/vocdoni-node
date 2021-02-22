@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"go.vocdoni.io/dvote/crypto/nacl"
@@ -12,13 +12,9 @@ import (
 
 func TestEncodeDecode(t *testing.T) {
 	priv1, err := nacl.Generate(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 	priv2, err := nacl.Generate(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 
 	pk := processKeys{
 		pubKey:        priv1.Public().Bytes(),
@@ -30,11 +26,8 @@ func TestEncodeDecode(t *testing.T) {
 	data := pk.Encode()
 	t.Logf("encoded data: %x", data)
 	var pk2 processKeys
-	if err := pk2.Decode(data); err != nil {
-		t.Fatal(err)
-	}
+	err = pk2.Decode(data)
+	qt.Assert(t, err, qt.IsNil)
 
-	if diff := cmp.Diff(pk, pk2, cmpopts.IgnoreUnexported(processKeys{})); diff != "" {
-		t.Fatalf("processKeys mismatch: %s", diff)
-	}
+	qt.Assert(t, pk, qt.CmpEquals(cmpopts.IgnoreUnexported(processKeys{})), pk2)
 }
