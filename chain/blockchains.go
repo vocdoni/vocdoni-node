@@ -103,9 +103,9 @@ var goerli = Specs{
 	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
 	BootNodes:       ethparams.GoerliBootnodes,
 	ENSdomains: [3]string{
-		types.ProcessesDomain,
-		types.NamespacesDomain,
-		types.ERC20ProofsDomain,
+		types.ProcessesDevelopmentDomain,
+		types.NamespacesDevelopmentDomain,
+		types.ERC20ProofsDevelopmentDomain,
 	},
 	GenesisHash: "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog
