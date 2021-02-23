@@ -354,3 +354,111 @@ func TestAddVote(t *testing.T) {
 	qt.Assert(t, err, qt.ErrorMatches, "values are not unique")
 
 }
+
+var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
+	vp, err := json.Marshal(types.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: v,
+	})
+	if err != nil {
+		return err
+	}
+	return sc.addLiveResultsVote(
+		&models.Vote{
+			ProcessId:   pid,
+			VotePackage: vp,
+		})
+}
+
+func TestBallotProtocolRateProduct(t *testing.T) {
+	// Rate a product from 0 to 4
+	state, err := vochain.NewState(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sc, err := NewScrutinizer(t.TempDir(), state)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Rate 2 products from 0 to 4
+	pid := util.RandomBytes(32)
+	if err := state.AddProcess(&models.Process{
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Status:       models.ProcessStatus_READY,
+		Mode:         &models.ProcessMode{AutoStart: true},
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 2, MaxValue: 4},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	sc.addLiveResultsProcess(pid)
+
+	// Rate a product, exepected result: [ [1,0,1,0,2], [0,0,2,0,2] ]
+	qt.Assert(t, vote([]int{4, 2}, sc, pid), qt.IsNil)
+	qt.Assert(t, vote([]int{4, 2}, sc, pid), qt.IsNil)
+	qt.Assert(t, vote([]int{2, 4}, sc, pid), qt.IsNil)
+	qt.Assert(t, vote([]int{0, 4}, sc, pid), qt.IsNil)
+	qt.Assert(t, vote([]int{0, 5}, sc, pid), qt.ErrorMatches, ".*overflow.*")
+	qt.Assert(t, vote([]int{0, 0, 0}, sc, pid), qt.ErrorMatches, ".*overflow.*")
+
+	result, err := sc.VoteResult(pid)
+	qt.Assert(t, err, qt.IsNil)
+	votes := sc.GetFriendlyResults(result)
+	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "0", "1", "0", "2"})
+	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "0", "2", "0", "2"})
+}
+
+func TestBallotProtocolMultiChoice(t *testing.T) {
+	// Choose your 3 favorite colours out of 5
+
+	state, err := vochain.NewState(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sc, err := NewScrutinizer(t.TempDir(), state)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Rate 2 products from 0 to 4
+	pid := util.RandomBytes(32)
+	if err := state.AddProcess(&models.Process{
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Status:       models.ProcessStatus_READY,
+		Mode:         &models.ProcessMode{AutoStart: true},
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount:     5,
+			MaxValue:     1,
+			MaxTotalCost: 3,
+			CostExponent: 1,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	sc.addLiveResultsProcess(pid)
+
+	// Multichoice (choose 3 ouf of 5):
+	// - Vote Envelope: `[1,1,1,0,0]` `[0,1,1,1,0]` `[1,1,0,0,0]`
+	// - Results: `[ [1, 2], [0, 3], [1, 2], [2, 1], [3, 0] ]`
+	qt.Assert(t, vote([]int{1, 1, 1, 0, 0}, sc, pid), qt.IsNil)
+	qt.Assert(t, vote([]int{0, 1, 1, 1, 0}, sc, pid), qt.IsNil)
+	qt.Assert(t, vote([]int{1, 1, 0, 0, 0}, sc, pid), qt.IsNil)
+	qt.Assert(t, vote([]int{2, 1, 0, 0, 0}, sc, pid), qt.ErrorMatches, ".*overflow.*")
+	qt.Assert(t, vote([]int{1, 1, 1, 1, 0}, sc, pid), qt.ErrorMatches, ".*overflow.*")
+
+	result, err := sc.VoteResult(pid)
+	qt.Assert(t, err, qt.IsNil)
+	votes := sc.GetFriendlyResults(result)
+	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "2"})
+	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "3"})
+	qt.Assert(t, votes[2], qt.DeepEquals, []string{"1", "2"})
+	qt.Assert(t, votes[3], qt.DeepEquals, []string{"2", "1"})
+	qt.Assert(t, votes[4], qt.DeepEquals, []string{"3", "0"})
+
+}
