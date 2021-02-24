@@ -21,7 +21,7 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*models.Process, error) {
 }
 
 // ProcessList returns the list of processes (finished or not) for a specific entity.
-func (s *Scrutinizer) ProcessList(entityID []byte, fromID []byte, max int64) ([][]byte, error) {
+func (s *Scrutinizer) ProcessList(entityID []byte, fromID []byte, max int64, namespace *uint32) ([][]byte, error) {
 	plistkey := []byte{types.ScrutinizerEntityPrefix}
 	plistkey = append(plistkey, entityID...)
 	processList, err := s.Storage.Get(plistkey)
@@ -37,8 +37,18 @@ func (s *Scrutinizer) ProcessList(entityID []byte, fromID []byte, max int64) ([]
 		if !fromLock {
 			keyCopy := make([]byte, len(process))
 			copy(keyCopy, process)
-			processListResult = append(processListResult, keyCopy)
-			max--
+			if p, err := s.VochainState.Process(keyCopy, true); err != nil {
+				log.Debugf("error fetching process %x: %s", p.ProcessId, err)
+				continue
+			} else if namespace == nil {
+				processListResult = append(processListResult, keyCopy)
+				max--
+			} else {
+				if p.Namespace == *namespace {
+					processListResult = append(processListResult, keyCopy)
+					max--
+				}
+			}
 		}
 		if fromLock && bytes.Equal(fromID, process) {
 			fromLock = false

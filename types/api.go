@@ -33,6 +33,7 @@ type MetaRequest struct {
 	ListSize     int64      `json:"listSize,omitempty"`
 	Method       string     `json:"method"`
 	Name         string     `json:"name,omitempty"`
+	Namespace    *uint32    `json:"namespace,omitempty"`
 	Nullifier    HexBytes   `json:"nullifier,omitempty"`
 	Payload      []byte     `json:"payload,omitempty"`
 	ProcessID    HexBytes   `json:"processId,omitempty"`

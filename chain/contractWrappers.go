@@ -87,7 +87,6 @@ func NewVotingHandle(contractsAddress []common.Address, dialEndpoint string) (*V
 
 // NewProcessTxArgs gets the info of a created process on the processes contract and creates a NewProcessTx instance
 func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint16) (*models.NewProcessTx, error) {
-	// TODO: @jordipainan What to do with namespace?
 	// get process info from the processes contract
 	processMeta, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
 	if err != nil {

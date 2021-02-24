@@ -337,7 +337,7 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 	return tx.Process, nil
 }
 
-// SetProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
+// SetProcessTxCheck is an abstraction of ABCI checkTx for updating an existing process
 func SetProcessTxCheck(vtx *models.Tx, state *State) error {
 	tx := vtx.GetSetProcess()
 	// check signature available

@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
@@ -71,33 +72,115 @@ func TestProcessList(t *testing.T) {
 }
 
 func testProcessList(t *testing.T, procsCount int) {
-	log.Init("info", "stdout")
-	state, err := vochain.NewState(t.TempDir())
+
+	app, err := vochain.NewBaseApplication(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	oracle := ethereum.SignKeys{}
+	if err := oracle.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
+		t.Fatal(err)
+	}
+
+	sc, err := NewScrutinizer(t.TempDir(), app.State)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), state)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Add 10 entities and process for storing random content
-	for i := 0; i < 10; i++ {
-		sc.addEntity(util.RandomBytes(20), util.RandomBytes(32))
-	}
-
-	// For a entity, add 25 processes (this will be the queried entity)
+	// For a entity, add processes (this will be the queried entity)
 	eidTest := util.RandomBytes(20)
 	for i := 0; i < procsCount; i++ {
-		sc.addEntity(eidTest, util.RandomBytes(32))
+		// Add a process with status=READY and interruptible=true
+		censusURI := "ipfs://123456789"
+		pid := util.RandomBytes(types.ProcessIDsize)
+		process := &models.Process{
+			ProcessId:    pid,
+			StartBlock:   0,
+			EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+			Mode:         &models.ProcessMode{Interruptible: true},
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+			Status:       models.ProcessStatus_READY,
+			EntityId:     eidTest,
+			CensusRoot:   util.RandomBytes(32),
+			CensusURI:    &censusURI,
+			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+			BlockCount:   1024,
+			Namespace:    0,
+		}
+		t.Logf("adding process %x", process.ProcessId)
+		if err := app.State.AddProcess(process); err != nil {
+			t.Fatal(err)
+		}
+		sc.addEntity(eidTest, process.ProcessId)
 	}
 
+	defaultNamespace := new(uint32)
+	*defaultNamespace = 0
+	procs := processList(t, sc, eidTest, procsCount, 155, defaultNamespace)
+	if len(procs) != procsCount {
+		t.Fatalf("expected %d processes, got %d", procsCount, len(procs))
+	}
+
+	// try adding a new with different namespace
+	censusURI := "ipfs://123456789"
+	process := &models.Process{
+		ProcessId:    util.RandomBytes(types.ProcessIDsize),
+		StartBlock:   0,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Mode:         &models.ProcessMode{Interruptible: true},
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		Status:       models.ProcessStatus_READY,
+		EntityId:     eidTest,
+		CensusRoot:   util.RandomBytes(32),
+		CensusURI:    &censusURI,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:   1024,
+		Namespace:    1,
+	}
+	t.Logf("adding process %x", process.ProcessId)
+	if err := app.State.AddProcess(process); err != nil {
+		t.Fatal(err)
+	}
+	sc.addEntity(eidTest, process.ProcessId)
+
+	procs2 := processList(t, sc, eidTest, procsCount, 155, defaultNamespace)
+	if len(procs2) != procsCount {
+		t.Fatalf("expected %d processes, got %d", procsCount, len(procs2))
+	}
+	// add new process
+	process.ProcessId = util.RandomBytes(types.ProcessIDsize)
+	process.Namespace = 0
+	t.Logf("adding process %x", process.ProcessId)
+	if err := app.State.AddProcess(process); err != nil {
+		t.Fatal(err)
+	}
+	sc.addEntity(eidTest, process.ProcessId)
+
+	// try get processList with another max value
+	procs3 := processList(t, sc, eidTest, procsCount+1, 155, defaultNamespace)
+	// should count the last process added as the namespace is the ones matching with the requested
+	if len(procs3) != procsCount+1 {
+		t.Fatalf("expected %d processes, got %d", procsCount+1, len(procs3))
+	}
+
+	// should count all processes
+	procs4 := processList(t, sc, eidTest, procsCount+2, 155, nil)
+	// should count the last process added as the namespace is the ones matching with the requested
+	if len(procs4) != procsCount+2 {
+		t.Fatalf("expected %d processes, got %d", procsCount+2, len(procs4))
+	}
+}
+
+func processList(t *testing.T, sc *Scrutinizer, eid []byte, procsCount int, max int64, namespace *uint32) map[string]bool {
 	procs := make(map[string]bool)
 	last := []byte{}
 	var list [][]byte
+	var err error
 	for len(procs) < procsCount {
-		list, err = sc.ProcessList(eidTest, last, 10)
+		list, err = sc.ProcessList(eid, last, max, namespace)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -113,9 +196,7 @@ func testProcessList(t *testing.T, procsCount int) {
 		}
 		last = list[len(list)-1]
 	}
-	if len(procs) != procsCount {
-		t.Fatalf("expected %d processes, got %d", procsCount, len(procs))
-	}
+	return procs
 }
 
 func TestResults(t *testing.T) {

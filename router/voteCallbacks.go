@@ -170,7 +170,7 @@ func (r *Router) getProcessList(request routerRequest) {
 	if max > MaxListIterations || max <= 0 {
 		max = MaxListIterations
 	}
-	processList, err := r.Scrutinizer.ProcessList(request.EntityId, request.FromID, max)
+	processList, err := r.Scrutinizer.ProcessList(request.EntityId, request.FromID, max, request.Namespace)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get entity process list: (%s)", err))
 		return
