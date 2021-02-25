@@ -5,10 +5,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/cosmos/iavl"
 	"github.com/ethereum/go-ethereum/common"
+	dcopy "github.com/otiai10/copy"
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	"go.vocdoni.io/dvote/log"
@@ -79,31 +83,59 @@ type ImmutableState struct {
 func NewState(dataDir string) (*State, error) {
 	var err error
 	vs := &State{}
-	//vs.Store = new(gravitonstate.GravitonState)
-	vs.Store = new(iavlstate.IavlState)
-
-	if err = vs.Store.Init(dataDir, "disk"); err != nil {
-		return nil, err
+	if err := initStore(dataDir, vs); err != nil {
+		return nil, fmt.Errorf("cannot init db: %s", err)
 	}
-
-	if err := vs.Store.AddTree(AppTree); err != nil {
-		return nil, err
-	}
-	if err := vs.Store.AddTree(ProcessTree); err != nil {
-		return nil, err
-	}
-	if err := vs.Store.AddTree(VoteTree); err != nil {
-		return nil, err
-	}
-
 	// Must be -1 in order to get the last committed block state, if not block replay will fail
 	if err = vs.Store.LoadVersion(-1); err != nil {
-		return nil, err
+		if err == iavl.ErrVersionDoesNotExist {
+			// restart data db
+			log.Errorf("no db version available: %s, restarting vochain database", err)
+			backupDir := filepath.Dir(dataDir) + "/vochain-backup"
+			log.Infof("for security, a backup of the database will be created at: %s", backupDir)
+			dcopy.Copy(
+				dataDir,
+				backupDir,
+				dcopy.Options{
+					Sync:          false,
+					PreserveTimes: true,
+					OnDirExists:   func(src, dest string) dcopy.DirExistsAction { return dcopy.Replace },
+				},
+			)
+			if err := os.RemoveAll(dataDir); err != nil {
+				log.Errorf("%s", err)
+			}
+			vs.Store.Close()
+			if err := initStore(dataDir, vs); err != nil {
+				return nil, fmt.Errorf("cannot init db: %s", err)
+			}
+			vs.voteCache = make(map[[32]byte]*types.CacheTx)
+			log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
+			return vs, nil
+		}
+		return nil, fmt.Errorf("unknown error loading database version: %s try to reset the node manually", err)
 	}
 
 	vs.voteCache = make(map[[32]byte]*types.CacheTx)
 	log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
 	return vs, nil
+}
+
+func initStore(dataDir string, state *State) error {
+	state.Store = new(iavlstate.IavlState)
+	if err := state.Store.Init(dataDir, "disk"); err != nil {
+		return err
+	}
+	if err := state.Store.AddTree(AppTree); err != nil {
+		return err
+	}
+	if err := state.Store.AddTree(ProcessTree); err != nil {
+		return err
+	}
+	if err := state.Store.AddTree(VoteTree); err != nil {
+		return err
+	}
+	return nil
 }
 
 // AddEventListener adds a new event listener, to receive method calls on block
