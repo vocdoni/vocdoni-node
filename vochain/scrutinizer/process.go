@@ -1,233 +1,272 @@
 package scrutinizer
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
-	"sync/atomic"
+	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
 )
 
 // ProcessInfo returns the available information regarding an election process id
-func (s *Scrutinizer) ProcessInfo(pid []byte) (*models.Process, error) {
-	return s.VochainState.Process(pid, false)
+func (s *Scrutinizer) ProcessInfo(pid []byte) (*Process, error) {
+	proc := &Process{}
+	err := s.db.FindOne(proc, badgerhold.Where("ID").Eq(pid))
+	return proc, err
 }
 
 // ProcessList returns the list of processes (finished or not) for a specific entity.
-func (s *Scrutinizer) ProcessList(entityID []byte, fromID []byte, max int64) ([][]byte, error) {
-	plistkey := []byte{types.ScrutinizerEntityPrefix}
-	plistkey = append(plistkey, entityID...)
-	processList, err := s.Storage.Get(plistkey)
-	if err != nil {
-		return nil, err
+func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
+	from, max int) ([][]byte, error) {
+	procs := [][]byte{}
+	var err error
+
+	switch {
+	case namespace == 0 && len(entityID) > 0:
+		err = s.db.ForEach(
+			badgerhold.Where("EntityID").
+				Eq(entityID).
+				Index("EntityID").
+				SortBy("CreationTime").
+				Skip(from).
+				Limit(max),
+			func(p *Process) error {
+				procs = append(procs, p.ID)
+				return nil
+			})
+	case namespace > 0 && len(entityID) == 0:
+		err = s.db.ForEach(
+			badgerhold.Where("Namespace").
+				Eq(namespace).
+				Index("Namespace").
+				SortBy("CreationTime").
+				Skip(from).
+				Limit(max),
+			func(p *Process) error {
+				procs = append(procs, p.ID)
+				return nil
+			})
+	default:
+		err = s.db.ForEach(
+			badgerhold.Where("EntityID").
+				Eq(entityID).
+				And("Namespace").
+				Eq(namespace).
+				Index("EntityID").
+				SortBy("CreationTime").
+				Skip(from).
+				Limit(max),
+			func(p *Process) error {
+				procs = append(procs, p.ID)
+				return nil
+			})
 	}
-	processListResult := [][]byte{}
-	fromLock := len(fromID) > 0
-	for _, process := range util.SplitBytes(processList, types.ProcessIDsize) {
-		if max < 1 || len(process) < 1 {
-			break
-		}
-		if !fromLock {
-			keyCopy := make([]byte, len(process))
-			copy(keyCopy, process)
-			processListResult = append(processListResult, keyCopy)
-			max--
-		}
-		if fromLock && bytes.Equal(fromID, process) {
-			fromLock = false
-		}
-	}
-	return processListResult, nil
+
+	return procs, err
 }
 
-// ProcessListWithResults returns the list of process ID with already computed results
-func (s *Scrutinizer) ProcessListWithResults(max int64, fromID []byte) []string {
-	process := []string{}
-	for _, p := range s.List(max, fromID, []byte{types.ScrutinizerResultsPrefix}) {
-		process = append(process, fmt.Sprintf("%x", p))
+// ProcessListWithResults returns the list of process ID with already computed results.
+// TODO: use [][]byte instead of []string as return value
+func (s *Scrutinizer) ProcessListWithResults(max, from int) []string {
+	procs := []string{}
+	if err := s.db.ForEach(
+		badgerhold.Where("HaveResults").
+			Eq(true).
+			SortBy("CreationTime").
+			Skip(from).
+			Limit(max),
+		func(p *Process) error {
+			procs = append(procs, fmt.Sprintf("%x", p.ID))
+			return nil
+		}); err != nil {
+		log.Warnf("processListWithResults error while iterating: %v", err)
 	}
-	return process
+	return procs
 }
 
 // ProcessListWithLiveResults returns the list of process ID which have live results (not encrypted)
-func (s *Scrutinizer) ProcessListWithLiveResults(max int64, fromID []byte) []string {
-	process := []string{}
-	for _, p := range s.List(max, fromID, []byte{types.ScrutinizerLiveProcessPrefix}) {
-		process = append(process, fmt.Sprintf("%x", p))
+func (s *Scrutinizer) ProcessListWithLiveResults(max, from int) []string {
+	procs := []string{}
+	if err := s.db.ForEach(
+		badgerhold.Where("HaveResults").
+			Eq(true).And("FinalResults").
+			Eq(false).SortBy("CreationTime").
+			Skip(from).
+			Limit(max),
+		func(p *Process) error {
+			procs = append(procs, fmt.Sprintf("%x", p.ID))
+			return nil
+		}); err != nil {
+		log.Warnf("processListWithLiveResults error while iterating: %v", err)
 	}
-	return process
+	return procs
 }
 
 // EntityList returns the list of entities indexed by the scrutinizer
-func (s *Scrutinizer) EntityList(max int64, fromID []byte) []string {
+func (s *Scrutinizer) EntityList(max, from int) []string {
 	entities := []string{}
-	for _, e := range s.List(max, fromID, []byte{types.ScrutinizerEntityPrefix}) {
-		entities = append(entities, fmt.Sprintf("%x", e))
+	if err := s.db.ForEach(
+		badgerhold.Where("ID").
+			Ne(&[]byte{}).
+			SortBy("CreationTime").
+			Skip(from).
+			Limit(max),
+		func(e *Entity) error {
+			entities = append(entities, fmt.Sprintf("%x", e.ID))
+			return nil
+		}); err != nil {
+		log.Warnf("error listing entities: %v", err)
 	}
 	return entities
 }
 
 // EntityCount return the number of entities indexed by the scrutinizer
 func (s *Scrutinizer) EntityCount() int64 {
-	return atomic.LoadInt64(&s.entityCount)
+	c, err := s.db.Count(&Entity{}, nil)
+	if err != nil {
+		log.Warnf("cannot count entities: %v", err)
+	}
+	return int64(c)
 }
 
 // Return whether a process must have live results or not
 func (s *Scrutinizer) isLiveResultsProcess(processID []byte) (bool, error) {
-	p, err := s.ProcessInfo(processID)
+	p, err := s.VochainState.Process(processID, false)
 	if err != nil {
 		return false, err
+	}
+	if p == nil || p.EnvelopeType == nil {
+		return false, fmt.Errorf("cannot fetch process %x or envelope type not defined", processID)
 	}
 	return !p.EnvelopeType.EncryptedVotes, nil
 }
 
-// checks if the current heigh has scheduled ending processes, if so compute and store results
-func (s *Scrutinizer) checkFinishedProcesses(height int64) {
-	pidListBytes, err := s.Storage.Get(s.Encode("processEnding", []byte(fmt.Sprintf("%d", height))))
-	if err != nil || pidListBytes == nil {
-		return
-	}
-	var pidList models.ProcessEndingList
-	if err := proto.Unmarshal(pidListBytes, &pidList); err != nil {
-		log.Error(err)
-		return
-	}
-	for _, p := range pidList.GetProcessList() {
-		if err := s.ComputeResult(p); err != nil {
-			log.Errorf("cannot compute results for %x: (%s)", p, err)
-		}
-	}
-	// Remove entry from storage
-	if err := s.Storage.Del(s.Encode("processEnding", []byte(fmt.Sprintf("%d", height)))); err != nil {
-		log.Error(err)
+// compute results if the current heigh has scheduled ending processes
+func (s *Scrutinizer) computePendingProcesses(height uint32) {
+	if err := s.db.ForEach(badgerhold.Where("ResultsHeight").Eq(height).Index("ResultsHeight"),
+		func(p *Process) error {
+			initT := time.Now()
+			if err := s.ComputeResult(p.ID); err != nil {
+				log.Warnf("cannot compute results for %x: (%v)", p.ID, err)
+				return nil
+			}
+			log.Infof("results compute on %x took %s", p.ID, time.Since(initT).String())
+			p.FinalResults = true
+			p.HaveResults = true
+			if err := s.db.Update(p.ID, p); err != nil {
+				log.Warnf("cannot update results for process %x: %v", p.ID, err)
+			}
+			return nil
+		}); err != nil {
+		log.Warn(err)
 	}
 }
 
-// creates a new empty process and stores it into the database
-func (s *Scrutinizer) newEmptyLiveProcess(pid []byte) (*models.ProcessResult, error) {
+// newEmptyProcess creates a new empty process and stores it into the database.
+// The process must exist on the Vochain state, else an error is returned.
+func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	p, err := s.VochainState.Process(pid, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create new empty live process: %w", err)
+		return fmt.Errorf("cannot create new empty process: %w", err)
 	}
 	options := p.GetVoteOptions()
 	if options == nil {
-		return nil, fmt.Errorf("newEmptyLiveProcess: vote options is nil")
+		return fmt.Errorf("newEmptyProcess: vote options is nil")
 	}
 	if options.MaxCount == 0 || options.MaxValue == 0 {
-		return nil, fmt.Errorf("newEmptyLiveProcess: maxCount or maxValue are zero")
+		return fmt.Errorf("newEmptyProcess: maxCount or maxValue are zero")
 	}
 
 	// Check for overflows
 	if options.MaxCount > MaxQuestions || options.MaxValue > MaxOptions {
-		return nil, fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
+		return fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
 	}
+
 	// MaxValue requires +1 since 0 is also an option
-	pv := emptyProcess(int(options.MaxCount), int(options.MaxValue)+1)
-	process, err := proto.Marshal(pv)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.Storage.Put(s.Encode("liveProcess", pid), process); err != nil {
-		return nil, err
-	}
-	return pv, nil
-}
+	pv := newEmptyResults(int(options.MaxCount), int(options.MaxValue)+1)
 
-// Pending processes are those processes which are scheduled for being computed.
-// On the database we are storing: height=>{proceess1, process2, process3}
-func (s *Scrutinizer) registerPendingProcess(pid []byte, height int64) {
-	scheduledBlock := []byte(fmt.Sprintf("%d", height))
-
-	pidListBytes, err := s.Storage.Get(s.Encode("processEnding", scheduledBlock))
-	// TODO(mvdan): use a generic "key not found" database error instead
-	if err != nil && err != badger.ErrKeyNotFound {
-		log.Error(err)
-		return
+	// Create results in the indexer database
+	if err := s.db.Insert(pid, &Results{
+		ProcessID:  pid,
+		Votes:      pv.GetVotes(),
+		Signatures: [][]byte{},
+	}); err != nil {
+		return err
 	}
-	var pidList models.ProcessEndingList
-	if len(pidListBytes) > 0 {
-		if err := proto.Unmarshal(pidListBytes, &pidList); err != nil {
-			log.Error(err)
-			return
+
+	// Get the block time from the Header
+	currentBlockTime := time.Unix(0, s.VochainState.Header(false).Timestamp)
+
+	// Add the entity to the indexer database
+	eid := p.GetEntityId()
+	if err := s.db.Upsert(eid, &Entity{ID: eid, CreationTime: currentBlockTime}); err != nil {
+		return err
+	}
+
+	compResultsHeight := uint32(0)
+	if live, err := s.isLiveResultsProcess(pid); err != nil {
+		return fmt.Errorf("cannot check if process live: %w", err)
+	} else {
+		if live {
+			compResultsHeight = p.GetBlockCount() + p.GetStartBlock()
 		}
 	}
-	pidList.ProcessList = append(pidList.ProcessList, pid)
 
-	pidListBytes, err = proto.Marshal(&pidList)
+	// Create process in the indexer database
+	return s.db.Insert(pid, &Process{
+		ID:            pid,
+		EntityID:      eid,
+		StartBlock:    p.GetStartBlock(),
+		EndBlock:      p.GetBlockCount() + p.GetStartBlock(),
+		ResultsHeight: compResultsHeight,
+		HaveResults:   compResultsHeight > 0,
+		CensusRoot:    p.GetCensusRoot(),
+		CensusURI:     p.GetCensusURI(),
+		CensusOrigin:  int32(p.GetCensusOrigin()),
+		Status:        int32(p.GetStatus()),
+		Namespace:     p.GetNamespace(),
+		PrivateKeys:   p.EncryptionPrivateKeys,
+		PublicKeys:    p.EncryptionPublicKeys,
+		Envelope:      p.GetEnvelopeType(),
+		Mode:          p.GetMode(),
+		VoteOpts:      p.GetVoteOptions(),
+		CreationTime:  currentBlockTime,
+	})
+}
+
+// updateProcess synchronize those fields that can be updated on a existing process
+// with the information obtained from the Vochain state
+func (s *Scrutinizer) updateProcess(pid []byte) error {
+	p, err := s.VochainState.Process(pid, false)
 	if err != nil {
-		log.Error(err)
-		return
+		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
-	if err = s.Storage.Put(s.Encode("processEnding", scheduledBlock), pidListBytes); err != nil {
-		log.Error(err)
-		return
+	dbProc := &Process{}
+	if err := s.db.FindOne(dbProc, badgerhold.Where("ID").Eq(pid)); err != nil {
+		return err
 	}
-	log.Infof("process %x results computation scheduled for block %s", pid, scheduledBlock)
+	dbProc.EndBlock = p.GetBlockCount() + p.GetStartBlock()
+	dbProc.CensusRoot = p.GetCensusRoot()
+	dbProc.CensusURI = p.GetCensusURI()
+	dbProc.Status = int32(p.GetStatus())
+	dbProc.PrivateKeys = p.EncryptionPrivateKeys
+	dbProc.PublicKeys = p.EncryptionPublicKeys
+	return s.db.Update(pid, dbProc)
 }
 
-func (s *Scrutinizer) addLiveResultsProcess(pid []byte) {
-	log.Infof("add new process %x to live results", pid)
-	process, err := s.Storage.Get(s.Encode("liveProcess", pid))
-	if err != nil && err != badger.ErrKeyNotFound {
-		log.Error(err)
-		return
+func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
+	dbProc := &Process{}
+	if err := s.db.FindOne(dbProc, badgerhold.Where("ID").Eq(pid)); err != nil {
+		return err
 	}
-	if len(process) > 0 {
-		return
-	}
-	// Create empty process and store it
-	if _, err := s.newEmptyLiveProcess(pid); err != nil {
-		log.Error(err)
-	}
+	dbProc.ResultsHeight = height
+	return s.db.Update(pid, dbProc)
 }
 
-// Encode encodes scrutinizer specific data adding a prefix for its inner database
-func (s *Scrutinizer) Encode(t string, data []byte) []byte {
-	switch t {
-	case "entity":
-		return append([]byte{types.ScrutinizerEntityPrefix}, data...)
-	case "liveProcess":
-		return append([]byte{types.ScrutinizerLiveProcessPrefix}, data...)
-	case "results":
-		return append([]byte{types.ScrutinizerResultsPrefix}, data...)
-	case "processEnding":
-		return append([]byte{types.ScrutinizerProcessEndingPrefix}, data...)
-	}
-	panic("scrutinizer encode type not known")
-}
-
-func (s *Scrutinizer) addEntity(eid, pid []byte) {
-	// TODO(mvdan): use a prefixed database
-	storagekey := s.Encode("entity", eid)
-	processList, err := s.Storage.Get(storagekey)
-	if err != nil && err != badger.ErrKeyNotFound {
-		log.Errorf("addEntity: %s", err)
-		return
-	}
-	if err == badger.ErrKeyNotFound {
-		log.Infof("added new entity %x to scrutinizer", eid)
-	}
-	if len(pid) != types.ProcessIDsize {
-		log.Errorf("addEntity: pid size is not correct, got %d", len(pid))
-		return
-	}
-	processList = append(processList, pid...)
-	if err := s.Storage.Put(storagekey, processList); err != nil {
-		log.Error(err)
-		return
-	}
-	log.Infof("added new process %x to scrutinizer", pid)
-	atomic.AddInt64(&s.entityCount, 1)
-}
-
-func emptyProcess(questions, options int) *models.ProcessResult {
+func newEmptyResults(questions, options int) *models.ProcessResult {
 	if questions == 0 || options == 0 {
 		return nil
 	}

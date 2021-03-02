@@ -1,20 +1,9 @@
 package scrutinizer
 
-/*
-	Scrutinizer keeps 4 different database entries (splited by key prefix)
-
-	+ ProcessEnding: key is block number. Used for schedule results computing
-	+ LiveProcess: key is processId. Temporary storage for live results (poll-vote)
-	+ Entity: key is entityId: List of known entities
-	+ Results: key is processId: Final results for a process
-*/
-
 import (
-	"bytes"
-	"fmt"
 	"math/big"
 
-	"go.vocdoni.io/dvote/db"
+	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -43,13 +32,18 @@ func (s *Scrutinizer) AddEventListener(l EventListener) {
 // Scrutinizer is the component which makes the accounting of the voting processes
 // and keeps it indexed in a local database.
 type Scrutinizer struct {
-	VochainState   *vochain.State
-	Storage        db.Database
-	votePool       []*models.Vote
-	processPool    []*types.ScrutinizerOnProcessData
-	resultsPool    []*types.ScrutinizerOnProcessData
-	entityCount    int64
+	VochainState *vochain.State
+	// votePool is the list of votes that will be added on the current block
+	votePool []*models.Vote
+	// newProcessPool is the list of new process IDs on the current block
+	newProcessPool []*types.ScrutinizerOnProcessData
+	// updateProcessPool is the list of process IDs that require sync with the state database
+	updateProcessPool [][]byte
+	// resultsPool is the list of processes that finish on the current block
+	resultsPool []*types.ScrutinizerOnProcessData
+	// eventListeners is the list of external callbacks that will be executed by the scrutinizer
 	eventListeners []EventListener
+	db             *badgerhold.Store
 }
 
 // NewScrutinizer returns an instance of the Scrutinizer
@@ -57,45 +51,27 @@ type Scrutinizer struct {
 func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 	s := &Scrutinizer{VochainState: state}
 	var err error
-	s.Storage, err = db.NewBadgerDB(dbPath)
+	s.db, err = InitDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	s.entityCount = int64(len(s.List(int64(^uint(0)>>1),
-		[]byte{},
-		[]byte{types.ScrutinizerEntityPrefix})))
 	s.VochainState.AddEventListener(s)
 	return s, nil
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain
 func (s *Scrutinizer) Commit(height int64) {
-	// Check if there are processes that need results computing
-	// this can be run async
-	go s.checkFinishedProcesses(height)
-
 	// Add Entity and register new active process
-	var isLive bool
-	var err error
 	var nvotes int64
-	for _, p := range s.processPool {
-		s.addEntity(p.EntityID, p.ProcessID)
-		if isLive, err = s.isLiveResultsProcess(p.ProcessID); err != nil {
-			log.Errorf("cannot check if process is live results: (%s)", err)
-			continue
+	for _, p := range s.newProcessPool {
+		if err := s.newEmptyProcess(p.ProcessID); err != nil {
+			log.Warnf("commit: cannot create new empty process: %v", err)
 		}
-		if isLive {
-			s.addLiveResultsProcess(p.ProcessID)
-		}
-	}
-
-	for i, p := range s.resultsPool {
-		s.registerPendingProcess(p.ProcessID, height+int64(i+1))
 	}
 
 	// Add votes collected by onVote (live results)
 	for _, v := range s.votePool {
-		if err = s.addLiveResultsVote(v); err != nil {
+		if err := s.addLiveResultsVote(v); err != nil {
 			log.Errorf("cannot add live vote: (%s)", err)
 			continue
 		}
@@ -104,19 +80,37 @@ func (s *Scrutinizer) Commit(height int64) {
 	if nvotes > 0 {
 		log.Infof("added %d live votes from block %d", nvotes, height)
 	}
+
+	// Update existing processes
+	for _, p := range s.updateProcessPool {
+		if err := s.updateProcess(p); err != nil {
+			log.Warnf("commit: cannot update process %x: %v", p, err)
+		}
+	}
+	for _, p := range s.resultsPool {
+		if err := s.setResultsHeight(p.ProcessID, uint32(height+1)); err != nil {
+			log.Warnf("commit: cannot update process %x: %v", p.ProcessID, err)
+		}
+		log.Infof("scheduled results computation on next block for %x", p.ProcessID)
+	}
+
+	// Check if there are processes that need results computing
+	// this can be run async
+	go s.computePendingProcesses(uint32(height))
 }
 
 // Rollback removes the non committed pending operations
 func (s *Scrutinizer) Rollback() {
 	s.votePool = []*models.Vote{}
-	s.processPool = []*types.ScrutinizerOnProcessData{}
+	s.newProcessPool = []*types.ScrutinizerOnProcessData{}
 	s.resultsPool = []*types.ScrutinizerOnProcessData{}
+	s.updateProcessPool = [][]byte{}
 }
 
 // OnProcess scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
 	data := &types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
-	s.processPool = append(s.processPool, data)
+	s.newProcessPool = append(s.newProcessPool, data)
 }
 
 // OnVote scrutinizer stores the votes if liveResults enabled
@@ -133,21 +127,29 @@ func (s *Scrutinizer) OnVote(v *models.Vote) {
 
 // OnCancel scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnCancel(pid []byte) {
-	// TBD: compute final live results?
+	s.updateProcessPool = append(s.updateProcessPool, pid)
+	// TODO: if live, should set ResultsHeight to 0 and HaveResults to false
 }
 
 // OnProcessKeys does nothing
-func (s *Scrutinizer) OnProcessKeys(pid []byte, pub, com string) {
-	// do nothing
+func (s *Scrutinizer) OnProcessKeys(pid []byte, pub, commit string) {
+	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
 func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {
-	// do nothing
+	if status == models.ProcessStatus_ENDED {
+		if live, err := s.isLiveResultsProcess(pid); err != nil {
+			log.Warn(err)
+		} else if live {
+			s.resultsPool = append(s.resultsPool, &types.ScrutinizerOnProcessData{ProcessID: pid})
+		}
+	}
+	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
-func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
+func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string) {
 	p, err := s.VochainState.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)
@@ -162,36 +164,14 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, pub, com string) {
 		data := types.ScrutinizerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
 		s.resultsPool = append(s.resultsPool, &data)
 	}
-}
-
-// List returns a list of keys matching a given prefix. If from is specified, it will
-// seek to the prefix+form key (if found).
-func (s *Scrutinizer) List(max int64, from, prefix []byte) [][]byte {
-	iter := s.Storage.NewIterator().(*db.BadgerIterator) // TODO(mvdan): don't type assert
-	list := [][]byte{}
-	for iter.Iter.Seek(
-		[]byte(fmt.Sprintf("%s%s", prefix, from))); iter.Iter.ValidForPrefix(prefix); iter.Iter.Next() {
-		key := iter.Key()[len(prefix):]
-		if len(from) > 0 && bytes.Equal(key, from) {
-			// We don't include "from" in the result.
-			continue
-		}
-		keyCopy := make([]byte, len(key))
-		copy(keyCopy, key)
-		list = append(list, keyCopy)
-		if max--; max < 1 {
-			break
-		}
-	}
-	iter.Release()
-	return list
+	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
 // Temporary until we use Protobuf for the API
-func (s *Scrutinizer) GetFriendlyResults(result *models.ProcessResult) [][]string {
+func (s *Scrutinizer) GetFriendlyResults(votes []*models.QuestionResult) [][]string {
 	r := [][]string{}
 	value := new(big.Int)
-	for i, v := range result.Votes {
+	for i, v := range votes {
 		r = append(r, []string{})
 		for j := range v.Question {
 			value.SetBytes(v.Question[j])

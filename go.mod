@@ -32,6 +32,7 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/tendermint/tendermint v0.34.3
 	github.com/tendermint/tm-db v0.6.3
+	github.com/timshannon/badgerhold/v3 v3.0.0-20210208141506-eb78b03f8097
 	github.com/vocdoni/blind-ca v0.1.4
 	github.com/vocdoni/multirpc v0.1.19
 	github.com/vocdoni/storage-proofs-eth-go v0.1.5
@@ -39,7 +40,8 @@ require (
 	go.uber.org/zap v1.16.0
 	go.vocdoni.io/proto v0.1.8
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
-	golang.org/x/net v0.0.0-20210119194325-5f4716e94777
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
+	golang.org/x/sys v0.0.0-20210301091718-77cc2087c03b // indirect
 	google.golang.org/protobuf v1.25.0
 	nhooyr.io/websocket v1.8.6
 )

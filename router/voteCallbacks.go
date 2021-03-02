@@ -12,7 +12,7 @@ import (
 )
 
 const MaxListSize = 256
-const MaxListIterations = int64(64)
+const MaxListIterations = 64
 
 func (r *Router) submitRawTx(request routerRequest) {
 	res, err := r.vocapp.SendTX(request.Payload)
@@ -153,24 +153,16 @@ func (r *Router) getBlockHeight(request routerRequest) {
 }
 
 func (r *Router) getProcessList(request routerRequest) {
-	// check/sanitize eid and fromId
-	switch len(request.EntityId) {
-	case types.EthereumAddressSize, types.EntityIDsizeV2:
-	default:
-		r.sendError(request, "cannot get process list: (malformed entityId)")
-		return
-	}
-	if len(request.FromID) > 0 && len(request.FromID) != types.ProcessIDsize {
-		r.sendError(request, "cannot get process list: (malformed fromId)")
-		return
-	}
-
 	var response types.MetaResponse
 	max := request.ListSize
 	if max > MaxListIterations || max <= 0 {
 		max = MaxListIterations
 	}
-	processList, err := r.Scrutinizer.ProcessList(request.EntityId, request.FromID, max)
+	processList, err := r.Scrutinizer.ProcessList(
+		request.EntityId,
+		request.Namespace,
+		request.From,
+		max)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get entity process list: (%s)", err))
 		return
@@ -283,25 +275,25 @@ func (r *Router) getResults(request routerRequest) {
 		return
 	}
 
-	if procInfo.EnvelopeType.Anonymous {
+	if procInfo.Envelope.Anonymous {
 		response.Type = "anonymous"
 	} else {
 		response.Type = "poll"
 	}
-	if procInfo.EnvelopeType.EncryptedVotes {
+	if procInfo.Envelope.EncryptedVotes {
 		response.Type += " encrypted"
 	} else {
 		response.Type += " open"
 	}
-	if procInfo.EnvelopeType.Serial {
+	if procInfo.Envelope.Serial {
 		response.Type += " serial"
 	} else {
 		response.Type += " single"
 	}
-	response.State = procInfo.Status.String()
+	response.State = models.ProcessStatus(procInfo.Status).String()
 
 	// Get results info
-	vr, err := r.Scrutinizer.VoteResult(request.ProcessID)
+	vr, err := r.Scrutinizer.GetResults(request.ProcessID)
 	if err != nil && err != scrutinizer.ErrNoResultsYet {
 		r.sendError(request, err.Error())
 		return
@@ -315,7 +307,7 @@ func (r *Router) getResults(request routerRequest) {
 		r.sendError(request, "unknown problem fetching results")
 		return
 	}
-	response.Results = r.Scrutinizer.GetFriendlyResults(vr)
+	response.Results = r.Scrutinizer.GetFriendlyResults(vr.Votes)
 
 	// Get number of votes
 	votes := r.vocapp.State.CountVotes(request.ProcessID, true)
@@ -331,7 +323,7 @@ func (r *Router) getProcListResults(request routerRequest) {
 	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
 		request.ListSize = MaxListIterations
 	}
-	response.ProcessIDs = r.Scrutinizer.ProcessListWithResults(request.ListSize, request.FromID)
+	response.ProcessIDs = r.Scrutinizer.ProcessListWithResults(request.ListSize, request.From)
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -341,17 +333,17 @@ func (r *Router) getProcListLiveResults(request routerRequest) {
 	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
 		request.ListSize = MaxListIterations
 	}
-	response.ProcessIDs = r.Scrutinizer.ProcessListWithLiveResults(request.ListSize, request.FromID)
+	response.ProcessIDs = r.Scrutinizer.ProcessListWithLiveResults(request.ListSize, request.From)
 	request.Send(r.buildReply(request, &response))
 }
 
 // known entities
-func (r *Router) getScrutinizerEntities(request routerRequest) {
+func (r *Router) getEntities(request routerRequest) {
 	var response types.MetaResponse
 	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
 		request.ListSize = MaxListIterations
 	}
-	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, request.FromID)
+	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, request.From)
 	request.Send(r.buildReply(request, &response))
 }
 
