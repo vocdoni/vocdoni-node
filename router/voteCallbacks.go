@@ -1,6 +1,7 @@
 package router
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 
@@ -46,6 +47,18 @@ func (r *Router) submitEnvelope(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot unmarshal payload: (%s)", err))
 		return
 	}
+
+	// DEBUG
+	log.Warnf("SubmitEnvelope, received: %s", log.FormatProto(tx))
+	b, err := proto.Marshal(tx)
+	if err != nil {
+		log.Error(err)
+	}
+	if !bytes.Equal(b, request.Payload) {
+		log.Warnf("PAYLOADS ARE DIFFERENT!")
+	}
+	log.Warnf("COMPARING: go:%x app:%x", b, request.Payload)
+	// END DEBUG
 
 	// Prepare Vote transaction
 	vtx := models.Tx{
