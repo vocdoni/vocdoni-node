@@ -1687,6 +1687,8 @@ github.com/vocdoni/multirpc v0.1.9/go.mod h1:SETFzlLbdZq2YFGy0udT1u2ouQUU2cIesop
 github.com/vocdoni/multirpc v0.1.12/go.mod h1:OYWh2wBX0rztgatZC7VEcPW0Ew4Hm8f/msRAO24mpk0=
 github.com/vocdoni/multirpc v0.1.19 h1:qDplldxeOcsPmd4jRjUI3WMeqUZ7Grm/iBIIJu8gu0c=
 github.com/vocdoni/multirpc v0.1.19/go.mod h1:zCx0l/hu/Vdeav44geFJmK4PAawN+qoo1HYT2icU4GM=
+github.com/vocdoni/multirpc v0.1.21 h1:tghhCQBJKrWV5+3ZgMRoyb6R872KN5AiZI8MojNNQLY=
+github.com/vocdoni/multirpc v0.1.21/go.mod h1:zCx0l/hu/Vdeav44geFJmK4PAawN+qoo1HYT2icU4GM=
 github.com/vocdoni/storage-proofs-eth-go v0.1.4/go.mod h1:8XF/0CpAetwlQJRgQgwBFEbfaYcjrU9gWUBR4F2Aqso=
 github.com/vocdoni/storage-proofs-eth-go v0.1.5 h1:/QTLeM1tkRIruA0LIB9yIMhBTk5++Pm7t2Zp0gCT1Xs=
 github.com/vocdoni/storage-proofs-eth-go v0.1.5/go.mod h1:8XF/0CpAetwlQJRgQgwBFEbfaYcjrU9gWUBR4F2Aqso=
