@@ -102,17 +102,16 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			log.Infof("process already exist, skipping")
 			return nil
 		}
-		vtx := models.Tx{}
-		processTxBytes, err := proto.Marshal(processTx)
+		stx := &models.SignedTx{}
+		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: processTx}})
 		if err != nil {
 			return fmt.Errorf("cannot marshal new process tx: %w", err)
 		}
-		vtx.Signature, err = e.Signer.Sign(processTxBytes)
+		stx.Signature, err = e.Signer.Sign(stx.Tx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
-		vtx.Payload = &models.Tx_NewProcess{NewProcess: processTx}
-		txb, err := proto.Marshal(&vtx)
+		txb, err := proto.Marshal(stx)
 		if err != nil {
 			return fmt.Errorf("error marshaling process tx: %s", err)
 		}
@@ -140,23 +139,22 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			log.Infof("process already canceled or ended, skipping")
 			return nil
 		}
-		vtx := models.Tx{}
-		setStatusTxBytes, err := proto.Marshal(setProcessTx)
+		stx := &models.SignedTx{}
+		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: setProcessTx}})
 		if err != nil {
 			return fmt.Errorf("cannot marshal setProcess tx: %w", err)
 		}
-		vtx.Signature, err = e.Signer.Sign(setStatusTxBytes)
+		stx.Signature, err = e.Signer.Sign(stx.Tx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
-		vtx.Payload = &models.Tx_SetProcess{SetProcess: setProcessTx}
-		tx, err := proto.Marshal(&vtx)
+		txb, err := proto.Marshal(stx)
 		if err != nil {
 			return fmt.Errorf("error marshaling process tx: %w", err)
 		}
 		log.Debugf("broadcasting tx: %s", log.FormatProto(setProcessTx))
 
-		res, err := e.VochainApp.SendTX(tx)
+		res, err := e.VochainApp.SendTX(txb)
 		if err != nil || res == nil {
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
@@ -193,17 +191,16 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			return fmt.Errorf("process census origin %s does not accept census updates", p.CensusOrigin.String())
 		}
 
-		vtx := models.Tx{}
-		setCensusTxBytes, err := proto.Marshal(setProcessTx)
+		stx := &models.SignedTx{}
+		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: setProcessTx}})
 		if err != nil {
 			return fmt.Errorf("cannot marshal setProcess tx: %w", err)
 		}
-		vtx.Signature, err = e.Signer.Sign(setCensusTxBytes)
+		stx.Signature, err = e.Signer.Sign(stx.Tx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
-		vtx.Payload = &models.Tx_SetProcess{SetProcess: setProcessTx}
-		tx, err := proto.Marshal(&vtx)
+		tx, err := proto.Marshal(stx)
 		if err != nil {
 			return fmt.Errorf("error marshaling process tx: %w", err)
 		}
@@ -234,17 +231,16 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			}
 		}
 		// create admin tx
-		vtx := models.Tx{}
-		addOracleTxBytes, err := proto.Marshal(addOracleTx)
+		stx := &models.SignedTx{}
+		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Admin{Admin: addOracleTx}})
 		if err != nil {
 			return fmt.Errorf("cannot marshal admin tx (addOracle): %w", err)
 		}
-		vtx.Signature, err = e.Signer.Sign(addOracleTxBytes)
+		stx.Signature, err = e.Signer.Sign(stx.Tx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
-		vtx.Payload = &models.Tx_Admin{Admin: addOracleTx}
-		tx, err := proto.Marshal(&vtx)
+		tx, err := proto.Marshal(stx)
 		if err != nil {
 			return fmt.Errorf("error marshaling admin tx (addOracle) tx: %w", err)
 		}
@@ -280,17 +276,16 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			return fmt.Errorf("oracle not found, cannot remove")
 		}
 		// create admin tx
-		vtx := models.Tx{}
-		addOracleTxBytes, err := proto.Marshal(removeOracleTx)
+		stx := &models.SignedTx{}
+		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Admin{Admin: removeOracleTx}})
 		if err != nil {
 			return fmt.Errorf("cannot marshal admin tx (removeOracle): %w", err)
 		}
-		vtx.Signature, err = e.Signer.Sign(addOracleTxBytes)
+		stx.Signature, err = e.Signer.Sign(stx.Tx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
-		vtx.Payload = &models.Tx_Admin{Admin: removeOracleTx}
-		tx, err := proto.Marshal(&vtx)
+		tx, err := proto.Marshal(stx)
 		if err != nil {
 			return fmt.Errorf("error marshaling admin tx (removeOracle) tx: %w", err)
 		}
@@ -305,12 +300,8 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 	return nil
 }
 
-func newProcessMeta(
-	ctx context.Context,
-	contractABI *abi.ABI,
-	eventData []byte,
-	ph *chain.VotingHandle,
-) (*models.NewProcessTx, error) {
+func newProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte,
+	ph *chain.VotingHandle) (*models.NewProcessTx, error) {
 	structuredData := &contracts.ProcessesNewProcess{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "NewProcess", eventData); err != nil {
 		return nil, fmt.Errorf("cannot unpack NewProcess event: %w", err)

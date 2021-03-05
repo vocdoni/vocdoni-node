@@ -99,38 +99,6 @@ var (
 	}
 )
 
-func SignAndPrepareTx(vtx *models.Tx) error {
-	// Signature
-	signer := ethereum.SignKeys{}
-	signer.AddHexKey(SignerPrivKey)
-	var err error
-	txb := []byte{}
-	switch vtx.Payload.(type) {
-	case *models.Tx_Vote:
-		tx := vtx.GetVote()
-		txb, err = proto.Marshal(tx)
-	case *models.Tx_Admin:
-		tx := vtx.GetAdmin()
-		txb, err = proto.Marshal(tx)
-	case *models.Tx_NewProcess:
-		tx := vtx.GetNewProcess()
-		txb, err = proto.Marshal(tx)
-	case *models.Tx_SetProcess:
-		tx := vtx.GetSetProcess()
-		txb, err = proto.Marshal(tx)
-	default:
-		err = fmt.Errorf("transaction type unknown")
-	}
-	if err != nil {
-		return err
-	}
-	vtx.Signature, err = signer.Sign(txb)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 	s, err := vochain.NewState(tb.TempDir())
 	if err != nil {
