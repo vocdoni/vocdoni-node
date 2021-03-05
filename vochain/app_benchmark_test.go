@@ -24,10 +24,10 @@ func BenchmarkCheckTx(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	var voters [][]*models.Tx
+	var voters [][]*models.SignedTx
 	for i := 0; i < b.N+1; i++ {
 		voters = append(voters, prepareBenchCheckTx(b, app, benchmarkVoters))
-		b.Logf("creating process %x", voters[i][0].GetVote().ProcessId)
+		b.Logf("creating process %d", i)
 	}
 	var i int32
 	b.ResetTimer()
@@ -39,7 +39,7 @@ func BenchmarkCheckTx(b *testing.B) {
 	})
 }
 
-func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voters []*models.Tx) {
+func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voters []*models.SignedTx) {
 	tr, err := tree.NewTree("checkTXbench", b.TempDir())
 	if err != nil {
 		b.Fatal(err)
@@ -89,21 +89,19 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 			Proof:     &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proof}}},
 		}
 
-		txBytes, err := proto.Marshal(tx)
-		if err != nil {
+		stx := models.SignedTx{}
+		if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: tx}}); err != nil {
 			b.Fatal(err)
 		}
-		vtx := models.Tx{}
-		if vtx.Signature, err = s.Sign(txBytes); err != nil {
+		if stx.Signature, err = s.Sign(stx.Tx); err != nil {
 			b.Fatal(err)
 		}
-		vtx.Payload = &models.Tx_Vote{Vote: tx}
-		voters = append(voters, &vtx)
+		voters = append(voters, &stx)
 	}
 	return voters
 }
 
-func benchCheckTx(b *testing.B, app *BaseApplication, voters []*models.Tx) {
+func benchCheckTx(b *testing.B, app *BaseApplication, voters []*models.SignedTx) {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 

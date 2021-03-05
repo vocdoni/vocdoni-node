@@ -39,7 +39,7 @@ type CacheTx struct {
 // ________________________ TX ________________________
 
 // UniqID returns a uniq identifier for the VoteTX. It depends on the Type.
-func UniqID(tx *models.Tx, isAnonymous bool) string {
+func UniqID(tx *models.SignedTx, isAnonymous bool) string {
 	if !isAnonymous {
 		if len(tx.Signature) > 32 {
 			return string(tx.Signature[:32])

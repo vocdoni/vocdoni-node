@@ -63,7 +63,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
 
-	var vtx models.Tx
+	var stx models.SignedTx
 	var proof []byte
 	vp := []byte("[1,2,3,4]")
 	for i, s := range keys {
@@ -77,23 +77,23 @@ func TestMerkleTreeProof(t *testing.T) {
 			Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proof}}},
 			VotePackage: vp,
 		}
-		txBytes, err := proto.Marshal(tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if vtx.Signature, err = s.Sign(txBytes); err != nil {
-			t.Fatal(err)
-		}
-		vtx.Payload = &models.Tx_Vote{Vote: tx}
 
-		if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
+		if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: tx}}); err != nil {
+			t.Fatal(err)
+		}
+
+		if stx.Signature, err = s.Sign(stx.Tx); err != nil {
+			t.Fatal(err)
+		}
+
+		if cktx.Tx, err = proto.Marshal(&stx); err != nil {
 			t.Fatal(err)
 		}
 		cktxresp = app.CheckTx(cktx)
 		if cktxresp.Code != 0 {
 			t.Fatalf(fmt.Sprintf("checkTX failed: %s", cktxresp.Data))
 		}
-		if detx.Tx, err = proto.Marshal(&vtx); err != nil {
+		if detx.Tx, err = proto.Marshal(&stx); err != nil {
 			t.Fatal(err)
 		}
 		detxresp = app.DeliverTx(detx)
@@ -278,11 +278,10 @@ func TestCABlindProof(t *testing.T) {
 func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys, proof *models.ProofCA, app *BaseApplication, expectedResult bool) {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
-
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
-
-	var vtx models.Tx
+	var stx models.SignedTx
+	var err error
 
 	t.Logf("voting %s", signer.AddressString())
 	tx := &models.VoteEnvelope{
@@ -292,18 +291,18 @@ func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignK
 		VotePackage: vp,
 	}
 
-	txBytes, err := proto.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if vtx.Signature, err = signer.Sign(txBytes); err != nil {
-		t.Fatal(err)
-	}
 	pub, _ := signer.HexString()
 	t.Logf("addr: %s pubKey: %s", signer.Address(), pub)
-	vtx.Payload = &models.Tx_Vote{Vote: tx}
 
-	if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: tx}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+		t.Fatal(err)
+	}
+
+	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
 	cktxresp = app.CheckTx(cktx)
@@ -316,7 +315,7 @@ func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignK
 			t.Fatalf("checkTx success, but expected result is fail")
 		}
 	}
-	if detx.Tx, err = proto.Marshal(&vtx); err != nil {
+	if detx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
 	detxresp = app.DeliverTx(detx)
@@ -386,7 +385,7 @@ func testEthSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, a
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
 
-	var vtx models.Tx
+	var stx models.SignedTx
 
 	t.Logf("voting %s", s.StorageProof.Key)
 	k, err := hex.DecodeString(s.StorageProof.Key)
@@ -409,10 +408,6 @@ func testEthSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, a
 		VotePackage: vp,
 	}
 
-	txBytes, err := proto.Marshal(tx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	signer := &ethereum.SignKeys{}
 	found := false
 	for _, key := range testSmartContractHolders {
@@ -427,14 +422,18 @@ func testEthSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, a
 	if !found {
 		t.Fatalf("signer for address %s not found", s.Address)
 	}
-	if vtx.Signature, err = signer.Sign(txBytes); err != nil {
-		t.Fatal(err)
-	}
 	pub, _ := signer.HexString()
 	t.Logf("addr: %s pubKey: %s", signer.Address(), pub)
-	vtx.Payload = &models.Tx_Vote{Vote: tx}
 
-	if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: tx}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+		t.Fatal(err)
+	}
+
+	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
 	cktxresp = app.CheckTx(cktx)
@@ -447,7 +446,7 @@ func testEthSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, a
 			t.Fatalf("checkTx success, but expected result is fail")
 		}
 	}
-	if detx.Tx, err = proto.Marshal(&vtx); err != nil {
+	if detx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
 	detxresp = app.DeliverTx(detx)

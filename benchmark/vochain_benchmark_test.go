@@ -115,17 +115,16 @@ func BenchmarkVochain(b *testing.B) {
 		Process: processData,
 	}
 
-	txBytes, err := proto.Marshal(process)
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: process}})
 	if err != nil {
 		b.Fatal("cannot marshal process")
 	}
-
-	vtx := models.Tx{}
-	vtx.Signature, err = dvoteServer.Signer.Sign(txBytes)
+	stx.Signature, err = dvoteServer.Signer.Sign(stx.Tx)
 	if err != nil {
 		b.Fatalf("cannot sign oracle tx: %s", err)
 	}
-	req.Payload, err = proto.Marshal(&vtx)
+	req.Payload, err = proto.Marshal(stx)
 	if err != nil {
 		b.Fatalf("error marshaling process tx: %v", err)
 	}

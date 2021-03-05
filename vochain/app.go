@@ -173,11 +173,13 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 	var data []byte
 	var err error
 	var tx *models.Tx
+	var signature []byte
+	var txBytes []byte
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 	}
-	if tx, err = UnmarshalTx(req.Tx); err == nil {
-		if data, err = AddTx(tx, app.State, TxKey(req.Tx), false); err != nil {
+	if tx, txBytes, signature, err = UnmarshalTx(req.Tx); err == nil {
+		if data, err = AddTx(tx, txBytes, signature, app.State, TxKey(req.Tx), false); err != nil {
 			log.Debugf("checkTx error: %s", err)
 			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("addTx " + err.Error())}
 		}
@@ -191,9 +193,11 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	var data []byte
 	var err error
 	var tx *models.Tx
+	var signature []byte
+	var txBytes []byte
 
-	if tx, err = UnmarshalTx(req.Tx); err == nil {
-		if data, err = AddTx(tx, app.State, TxKey(req.Tx), true); err != nil {
+	if tx, txBytes, signature, err = UnmarshalTx(req.Tx); err == nil {
+		if data, err = AddTx(tx, txBytes, signature, app.State, TxKey(req.Tx), true); err != nil {
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
 	} else {

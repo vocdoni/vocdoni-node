@@ -1,7 +1,6 @@
 package router
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
 
@@ -32,7 +31,9 @@ func (r *Router) submitRawTx(request routerRequest) {
 	log.Infof("broadcasting tx hash:%s", res.Hash)
 	var response types.MetaResponse
 	response.Payload = fmt.Sprintf("%x", res.Data) // return nullifier or other info
-	request.Send(r.buildReply(request, &response))
+	if err = request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending raw tx: %v", err)
+	}
 }
 
 func (r *Router) submitEnvelope(request routerRequest) {
@@ -41,33 +42,14 @@ func (r *Router) submitEnvelope(request routerRequest) {
 		r.sendError(request, "payload is empty")
 		return
 	}
-	// Decode vote envelope
-	tx := &models.VoteEnvelope{}
-	if err := proto.Unmarshal(request.Payload, tx); err != nil {
-		r.sendError(request, fmt.Sprintf("cannot unmarshal payload: (%s)", err))
-		return
-	}
-
-	// DEBUG
-	log.Warnf("SubmitEnvelope, received: %s", log.FormatProto(tx))
-	b, err := proto.Marshal(tx)
-	if err != nil {
-		log.Error(err)
-	}
-	if !bytes.Equal(b, request.Payload) {
-		log.Warnf("PAYLOADS ARE DIFFERENT!")
-	}
-	log.Warnf("COMPARING: go:%x app:%x", b, request.Payload)
-	// END DEBUG
-
 	// Prepare Vote transaction
-	vtx := models.Tx{
-		Payload:   &models.Tx_Vote{Vote: tx},
+	stx := &models.SignedTx{
+		Tx:        request.Payload,
 		Signature: request.Signature,
 	}
 
 	// Encode and forward the transaction to the Vochain mempool
-	txBytes, err := proto.Marshal(&vtx)
+	txBytes, err := proto.Marshal(stx)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot marshal vote transaction: (%s)", err))
 		return
@@ -87,7 +69,9 @@ func (r *Router) submitEnvelope(request routerRequest) {
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
 	var response types.MetaResponse
 	response.Nullifier = fmt.Sprintf("%x", res.Data)
-	request.Send(r.buildReply(request, &response))
+	if err = request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error on submitEnvelope: %v", err)
+	}
 }
 
 func (r *Router) getEnvelopeStatus(request routerRequest) {
