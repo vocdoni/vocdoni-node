@@ -447,7 +447,7 @@ func (v *State) CountVotes(processID []byte, isQuery bool) uint32 {
 }
 
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
-func (v *State) EnvelopeList(processID []byte, from, listSize int64, isQuery bool) (nullifiers [][]byte) {
+func (v *State) EnvelopeList(processID []byte, from, listSize int, isQuery bool) (nullifiers [][]byte) {
 	// TODO(mvdan): remove the recover once
 	// https://github.com/tendermint/iavl/issues/212 is fixed
 	defer func() {
@@ -457,7 +457,7 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int64, isQuery boo
 			// err = fmt.Errorf("recovered panic: %v", r)
 		}
 	}()
-	idx := int64(0)
+	idx := 0
 	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
 		if idx >= from+listSize {
 			return true

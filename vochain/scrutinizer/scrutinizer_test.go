@@ -10,7 +10,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -35,18 +34,28 @@ func testEntityList(t *testing.T, entityCount int) {
 		t.Fatal(err)
 	}
 	for i := 0; i < entityCount; i++ {
-		sc.addEntity(util.RandomBytes(20), util.RandomBytes(32))
+		pid := util.RandomBytes(32)
+		if err := state.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     util.RandomBytes(20),
+			BlockCount:   10,
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := sc.newEmptyProcess(pid); err != nil {
+			t.Fatal(err)
+		}
 	}
-
 	entities := make(map[string]bool)
-	last := ""
-	if sc.entityCount != int64(entityCount) {
-		t.Fatalf("entity count is wrong, got %d expected %d", sc.entityCount, entityCount)
+	if ec := sc.EntityCount(); ec != int64(entityCount) {
+		t.Fatalf("entity count is wrong, got %d expected %d", ec, entityCount)
 	}
 	var list []string
+	last := 0
 	for len(entities) <= entityCount {
-		lastBytes := testutil.Hex2byte(t, last)
-		list = sc.EntityList(10, lastBytes)
+		list = sc.EntityList(10, last)
 		if len(list) < 1 {
 			t.Log("list is empty")
 			break
@@ -57,7 +66,7 @@ func testEntityList(t *testing.T, entityCount int) {
 			}
 			entities[e] = true
 		}
-		last = list[len(list)-1]
+		last += 10
 	}
 	if len(entities) < entityCount {
 		t.Fatalf("expected %d entityes, got %d", entityCount, len(entities))
@@ -84,20 +93,38 @@ func testProcessList(t *testing.T, procsCount int) {
 
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
-		sc.addEntity(util.RandomBytes(20), util.RandomBytes(32))
+		pid := util.RandomBytes(32)
+		err := state.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     util.RandomBytes(20),
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+		})
+		qt.Assert(t, err, qt.IsNil)
+		err = sc.newEmptyProcess(pid)
+		qt.Assert(t, err, qt.IsNil)
 	}
 
 	// For a entity, add 25 processes (this will be the queried entity)
 	eidTest := util.RandomBytes(20)
 	for i := 0; i < procsCount; i++ {
-		sc.addEntity(eidTest, util.RandomBytes(32))
+		pid := util.RandomBytes(32)
+		err := state.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     eidTest,
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+		})
+		qt.Assert(t, err, qt.IsNil)
+		err = sc.newEmptyProcess(pid)
+		qt.Assert(t, err, qt.IsNil)
 	}
 
 	procs := make(map[string]bool)
-	last := []byte{}
+	last := 0
 	var list [][]byte
 	for len(procs) < procsCount {
-		list, err = sc.ProcessList(eidTest, last, 10)
+		list, err = sc.ProcessList(eidTest, 0, last, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,7 +138,7 @@ func testProcessList(t *testing.T, procsCount int) {
 			}
 			procs[string(p)] = true
 		}
-		last = list[len(list)-1]
+		last += 10
 	}
 	if len(procs) != procsCount {
 		t.Fatalf("expected %d processes, got %d", procsCount, len(procs))
@@ -130,79 +157,80 @@ func TestResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	pid := util.RandomBytes(32)
-	if err := state.AddProcess(&models.Process{
+	err = state.AddProcess(&models.Process{
 		ProcessId:             pid,
 		EnvelopeType:          &models.EnvelopeType{EncryptedVotes: true},
 		Status:                models.ProcessStatus_READY,
 		Mode:                  &models.ProcessMode{AutoStart: true},
+		BlockCount:            10,
 		EncryptionPrivateKeys: make([]string, 16),
 		EncryptionPublicKeys:  make([]string, 16),
 		VoteOptions:           &models.ProcessVoteOptions{MaxCount: 4, MaxValue: 1},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
+	qt.Assert(t, err, qt.IsNil)
+
+	err = sc.newEmptyProcess(pid)
+	qt.Assert(t, err, qt.IsNil)
 
 	priv, err := nacl.DecodePrivate(fmt.Sprintf("%x", ethereum.HashRaw(util.RandomBytes(32))))
 	if err != nil {
 		t.Fatalf("cannot generate encryption key: (%s)", err)
 	}
 	ki := uint32(1)
-	if err := state.AddProcessKeys(&models.AdminTx{
+	err = state.AddProcessKeys(&models.AdminTx{
 		Txtype:              models.TxType_ADD_PROCESS_KEYS,
 		ProcessId:           pid,
 		EncryptionPublicKey: priv.Public().Bytes(),
 		KeyIndex:            &ki,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := state.RevealProcessKeys(&models.AdminTx{
-		Txtype:               models.TxType_ADD_PROCESS_KEYS,
-		ProcessId:            pid,
-		EncryptionPrivateKey: priv.Bytes(),
-		KeyIndex:             &ki,
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
+	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
 	vp, err := json.Marshal(types.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomBytes(32)),
 		Votes: []int{1, 1, 1, 1},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 	vp, err = priv.Encrypt(vp, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 
 	for i := 0; i < 300; i++ {
-		if err := state.AddVote(&models.Vote{
+		err := state.AddVote(&models.Vote{
 			ProcessId:            pid,
 			VotePackage:          vp,
 			EncryptionKeyIndexes: []uint32{1},
 			Nullifier:            util.RandomBytes(32),
 			Weight:               new(big.Int).SetUint64(1).Bytes(),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		})
+		qt.Assert(t, err, qt.IsNil)
 	}
 
-	if err := sc.ComputeResult(pid); err != nil {
-		t.Fatal(err)
-	}
+	// Reveal process encryption keys
+	err = state.RevealProcessKeys(&models.AdminTx{
+		Txtype:               models.TxType_ADD_PROCESS_KEYS,
+		ProcessId:            pid,
+		EncryptionPrivateKey: priv.Bytes(),
+		KeyIndex:             &ki,
+	})
+	qt.Assert(t, err, qt.IsNil)
+	err = sc.updateProcess(pid)
+	qt.Assert(t, err, qt.IsNil)
+	err = sc.setResultsHeight(pid, uint32(state.Header(false).GetHeight()))
+	qt.Assert(t, err, qt.IsNil)
+	err = sc.ComputeResult(pid)
+	qt.Assert(t, err, qt.IsNil)
 
 	// Test results
-	result, err := sc.VoteResult(pid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	log.Infof("results: %s", PrintResults(result))
+	result, err := sc.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
+	log.Infof("results: %s", PrintResults(&models.ProcessResult{
+		Votes:     result.Votes,
+		ProcessId: pid,
+	}))
 	v0 := big.NewInt(0)
 	v300 := big.NewInt(300)
 	value := new(big.Int)
-	for _, q := range result.GetVotes() {
+	for _, q := range result.Votes {
 		for qi, v1 := range q.Question {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
@@ -216,7 +244,7 @@ func TestResults(t *testing.T) {
 			}
 		}
 	}
-	for _, q := range sc.GetFriendlyResults(result) {
+	for _, q := range sc.GetFriendlyResults(result.Votes) {
 		for qi, v1 := range q {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
@@ -247,21 +275,21 @@ func TestLiveResults(t *testing.T) {
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
+		BlockCount:   10,
 		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 1},
 		Mode:         &models.ProcessMode{AutoStart: true},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	sc.addLiveResultsProcess(pid)
+	err = sc.newEmptyProcess(pid)
+	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
 	vp, err := json.Marshal(types.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1, 1, 1},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 	v := &models.Vote{ProcessId: pid, VotePackage: vp}
 	for i := 0; i < 100; i++ {
 		if err := sc.addLiveResultsVote(v); err != nil {
@@ -274,15 +302,13 @@ func TestLiveResults(t *testing.T) {
 	}
 
 	// Test results
-	result, err := sc.VoteResult(pid)
-	if err != nil {
-		t.Fatal(err)
-	}
+	result, err := sc.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
 
 	v0 := big.NewInt(0)
 	v100 := big.NewInt(100)
 	value := new(big.Int)
-	for _, q := range result.GetVotes() {
+	for _, q := range result.Votes {
 		for qi, v1 := range q.Question {
 			if qi > 2 {
 				t.Fatalf("found more questions that expected")
@@ -299,17 +325,39 @@ func TestLiveResults(t *testing.T) {
 }
 
 func TestAddVote(t *testing.T) {
-	pr := emptyProcess(8, 8)
+	state, err := vochain.NewState(t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+
+	sc, err := NewScrutinizer(t.TempDir(), state)
+	qt.Assert(t, err, qt.IsNil)
+
 	options := &models.ProcessVoteOptions{
 		MaxCount:     3,
 		MaxValue:     3,
 		MaxTotalCost: 6,
 		CostExponent: 1,
 	}
+
+	pid := util.RandomBytes(32)
+	if err := state.AddProcess(&models.Process{
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Status:       models.ProcessStatus_READY,
+		BlockCount:   10,
+		VoteOptions:  options,
+		Mode:         &models.ProcessMode{AutoStart: true},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	err = sc.newEmptyProcess(pid)
+	qt.Assert(t, err, qt.IsNil)
+
 	envelopeType := &models.EnvelopeType{}
 
+	pr, err := sc.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
 	// Should be fine
-	err := addVote(pr.Votes, []int{1, 2, 3}, nil, options, envelopeType)
+	err = addVote(pr.Votes, []int{1, 2, 3}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Overflows maxTotalCost
@@ -352,7 +400,6 @@ func TestAddVote(t *testing.T) {
 	envelopeType = &models.EnvelopeType{UniqueValues: true}
 	err = addVote(pr.Votes, []int{2, 1, 1}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.ErrorMatches, "values are not unique")
-
 }
 
 var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
@@ -373,14 +420,10 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
 func TestBallotProtocolRateProduct(t *testing.T) {
 	// Rate a product from 0 to 4
 	state, err := vochain.NewState(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 
 	sc, err := NewScrutinizer(t.TempDir(), state)
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -388,13 +431,15 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
+		BlockCount:   10,
 		Mode:         &models.ProcessMode{AutoStart: true},
 		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 2, MaxValue: 4},
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	sc.addLiveResultsProcess(pid)
+	err = sc.newEmptyProcess(pid)
+	qt.Assert(t, err, qt.IsNil)
 
 	// Rate a product, exepected result: [ [1,0,1,0,2], [0,0,2,0,2] ]
 	qt.Assert(t, vote([]int{4, 2}, sc, pid), qt.IsNil)
@@ -404,9 +449,9 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	qt.Assert(t, vote([]int{0, 5}, sc, pid), qt.ErrorMatches, ".*overflow.*")
 	qt.Assert(t, vote([]int{0, 0, 0}, sc, pid), qt.ErrorMatches, ".*overflow.*")
 
-	result, err := sc.VoteResult(pid)
+	result, err := sc.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
-	votes := sc.GetFriendlyResults(result)
+	votes := sc.GetFriendlyResults(result.Votes)
 	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "0", "1", "0", "2"})
 	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "0", "2", "0", "2"})
 }
@@ -415,14 +460,10 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	// Choose your 3 favorite colours out of 5
 
 	state, err := vochain.NewState(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 
 	sc, err := NewScrutinizer(t.TempDir(), state)
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -431,6 +472,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
 		Mode:         &models.ProcessMode{AutoStart: true},
+		BlockCount:   10,
 		VoteOptions: &models.ProcessVoteOptions{
 			MaxCount:     5,
 			MaxValue:     1,
@@ -441,7 +483,8 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sc.addLiveResultsProcess(pid)
+	err = sc.newEmptyProcess(pid)
+	qt.Assert(t, err, qt.IsNil)
 
 	// Multichoice (choose 3 ouf of 5):
 	// - Vote Envelope: `[1,1,1,0,0]` `[0,1,1,1,0]` `[1,1,0,0,0]`
@@ -452,13 +495,12 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	qt.Assert(t, vote([]int{2, 1, 0, 0, 0}, sc, pid), qt.ErrorMatches, ".*overflow.*")
 	qt.Assert(t, vote([]int{1, 1, 1, 1, 0}, sc, pid), qt.ErrorMatches, ".*overflow.*")
 
-	result, err := sc.VoteResult(pid)
+	result, err := sc.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
-	votes := sc.GetFriendlyResults(result)
+	votes := sc.GetFriendlyResults(result.Votes)
 	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "2"})
 	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "3"})
 	qt.Assert(t, votes[2], qt.DeepEquals, []string{"1", "2"})
 	qt.Assert(t, votes[3], qt.DeepEquals, []string{"2", "1"})
 	qt.Assert(t, votes[4], qt.DeepEquals, []string{"3", "0"})
-
 }

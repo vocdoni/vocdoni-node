@@ -14,6 +14,12 @@ import (
 	"go.vocdoni.io/dvote/statedb/gravitonstate"
 )
 
+// We use go-bare for export/import the trie. In order to support
+// big census (up to 8 Million entries) we need to increase the maximums.
+const bareMaxArrayLength uint64 = 1024 * 1014 * 8 // 8 Million
+
+const bareMaxUnmarshalBytes uint64 = 1024 * 1024 * 200 // 200 MiB
+
 type Tree struct {
 	Tree           statedb.StateTree
 	store          statedb.StateDB
@@ -150,13 +156,16 @@ func (t *Tree) GenProof(index, value []byte) ([]byte, error) {
 // CheckProof standalone function for checking a merkle proof
 func CheckProof(index, value, root []byte, mproof []byte) (bool, error) {
 	if len(index) > gravitonstate.GravitonMaxKeySize {
-		return false, fmt.Errorf("index is too big, maximum allow is %d", gravitonstate.GravitonMaxKeySize)
+		return false, fmt.Errorf("index is too big, maximum allow is %d",
+			gravitonstate.GravitonMaxKeySize)
 	}
 	if len(value) > gravitonstate.GravitonMaxValueSize {
-		return false, fmt.Errorf("value is too big, maximum allow is %d", gravitonstate.GravitonMaxValueSize)
+		return false, fmt.Errorf("value is too big, maximum allow is %d",
+			gravitonstate.GravitonMaxValueSize)
 	}
 	if len(root) != gravitonstate.GravitonHashSizeBytes {
-		return false, fmt.Errorf("root hash length is incorrect (expected %d)", gravitonstate.GravitonHashSizeBytes)
+		return false, fmt.Errorf("root hash length is incorrect (expected %d)",
+			gravitonstate.GravitonHashSizeBytes)
 	}
 	return gravitonstate.Verify(index, mproof, root)
 }
@@ -164,10 +173,12 @@ func CheckProof(index, value, root []byte, mproof []byte) (bool, error) {
 // CheckProof validates a merkle proof and its data
 func (t *Tree) CheckProof(index, value, root, mproof []byte) (bool, error) {
 	if len(index) > gravitonstate.GravitonMaxKeySize {
-		return false, fmt.Errorf("index is too big, maximum allow is %d", gravitonstate.GravitonMaxKeySize)
+		return false, fmt.Errorf("index is too big, maximum allow is %d",
+			gravitonstate.GravitonMaxKeySize)
 	}
 	if len(value) > gravitonstate.GravitonMaxValueSize {
-		return false, fmt.Errorf("value is too big, maximum allow is %d", gravitonstate.GravitonMaxValueSize)
+		return false, fmt.Errorf("value is too big, maximum allow is %d",
+			gravitonstate.GravitonMaxValueSize)
 	}
 	if t.Tree == nil {
 		return false, fmt.Errorf("tree %s does not exist", t.name)
@@ -206,6 +217,9 @@ func (t *Tree) Dump(root []byte) ([]byte, error) {
 		dump.Elements = append(dump.Elements, ee)
 		return false
 	})
+	bare.MaxArrayLength(bareMaxArrayLength)
+	bare.MaxUnmarshalBytes(bareMaxUnmarshalBytes)
+
 	return bare.Marshal(&dump)
 }
 
@@ -244,6 +258,8 @@ func (t *Tree) DumpPlain(root []byte) ([][]byte, [][]byte, error) {
 func (t *Tree) ImportDump(data []byte) error {
 	t.updateAccessTime()
 	census := new(exportData)
+	bare.MaxArrayLength(bareMaxArrayLength)
+	bare.MaxUnmarshalBytes(bareMaxUnmarshalBytes)
 	if err := bare.Unmarshal(data, census); err != nil {
 		return fmt.Errorf("importdump cannot unmarshal data: %w", err)
 	}

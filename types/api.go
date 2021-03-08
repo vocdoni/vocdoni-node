@@ -28,11 +28,11 @@ type MetaRequest struct {
 	Content      []byte     `json:"content,omitempty"`
 	Digested     bool       `json:"digested,omitempty"`
 	EntityId     HexBytes   `json:"entityId,omitempty"`
-	From         int64      `json:"from,omitempty"`
-	FromID       HexBytes   `json:"fromId,omitempty"`
-	ListSize     int64      `json:"listSize,omitempty"`
+	From         int        `json:"from,omitempty"`
+	ListSize     int        `json:"listSize,omitempty"`
 	Method       string     `json:"method"`
 	Name         string     `json:"name,omitempty"`
+	Namespace    uint32     `json:"namespace,omitempty"`
 	Nullifier    HexBytes   `json:"nullifier,omitempty"`
 	Payload      []byte     `json:"payload,omitempty"`
 	ProcessID    HexBytes   `json:"processId,omitempty"`

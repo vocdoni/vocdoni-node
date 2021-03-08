@@ -6,9 +6,8 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -22,21 +21,11 @@ var ErrNoResultsYet = fmt.Errorf("no results yet")
 // ComputeResult process a finished voting, compute the results and saves it in the Storage
 func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	log.Debugf("computing results for %x", processID)
-	// Check if process exist
-	p, err := s.VochainState.Process(processID, false)
+	// Get process from database
+	p, err := s.ProcessInfo(processID)
 	if err != nil {
-		return err
+		return fmt.Errorf("computeResult: cannot load processID %x from database: %w", processID, err)
 	}
-
-	// If result already exist, skipping
-	_, err = s.Storage.Get(s.Encode("results", processID))
-	if err == nil {
-		return fmt.Errorf("process %x already computed", processID)
-	}
-	if err != badger.ErrKeyNotFound {
-		return err
-	}
-
 	// Compute the results
 	// If poll-vote, results have been computed during their arrival
 	isLive, err := s.isLiveResultsProcess(processID)
@@ -48,10 +37,6 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 		if pv, err = s.computeLiveResults(processID); err != nil {
 			return err
 		}
-		// Delete liveResults temporary storage
-		if err = s.Storage.Del(s.Encode("liveProcess", processID)); err != nil {
-			return err
-		}
 	} else {
 		if pv, err = s.computeNonLiveResults(p); err != nil {
 			return err
@@ -59,54 +44,45 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	}
 
 	// add results if process is not live or isLive and status is ended
-	if !isLive || (isLive && p.Status == models.ProcessStatus_ENDED) {
+	if !isLive || (isLive && p.Status == int32(models.ProcessStatus_ENDED)) {
 		for _, l := range s.eventListeners {
-			pv.EntityId = p.EntityId
-			pv.ProcessId = p.ProcessId
+			pv.EntityId = p.EntityID
+			pv.ProcessId = p.ID
 			l.OnComputeResults(pv)
 		}
 	}
-
-	result, err := proto.Marshal(pv)
-	if err != nil {
-		return err
+	p.HaveResults = true
+	p.FinalResults = true
+	if err := s.db.Update(processID, p); err != nil {
+		return fmt.Errorf("computeResults: cannot update processID %x: %w, ", processID, err)
 	}
-
-	return s.Storage.Put(s.Encode("results", processID), result)
+	return s.db.Update(processID, &Results{
+		Votes:     pv.Votes,
+		ProcessID: processID,
+	})
 }
 
-// VoteResult returns the current result for a processId summarized in a two dimension int slice
-func (s *Scrutinizer) VoteResult(processID []byte) (*models.ProcessResult, error) {
-	// Check if process exist
-	_, err := s.VochainState.Process(processID, false)
-	if err != nil {
-		return nil, err
-	}
+// GetResults returns the current result for a processId aggregated in a two dimension int slice
+// TODO (pau): improve this approach, instead of 2 queries make just 1
+func (s *Scrutinizer) GetResults(processID []byte) (*Results, error) {
 	log.Debugf("finding results for %x", processID)
-	// If exist a summary of the voting process, just return it
-	var pv models.ProcessResult
-	processBytes, err := s.Storage.Get(s.Encode("results", processID))
-	if err != nil && err != badger.ErrKeyNotFound {
+	if n, err := s.db.Count(&Process{},
+		badgerhold.Where("ID").Eq(processID).
+			And("HaveResults").Eq(true).
+			And("Status").Ne(int32(models.ProcessStatus_CANCELED))); err != nil {
 		return nil, err
-	}
-	if err == nil {
-		if err := proto.Unmarshal(processBytes, &pv); err != nil {
-			return nil, err
-		}
-		return &pv, nil
-	}
-
-	// If results are not available, check if the process is PollVote (live)
-	isLive, err := s.isLiveResultsProcess(processID)
-	if err != nil {
-		return nil, err
-	}
-	if !isLive {
+	} else if n == 0 {
 		return nil, ErrNoResultsYet
 	}
 
-	// Return live results
-	return s.computeLiveResults(processID)
+	results := &Results{}
+	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").Eq(processID)); err != nil {
+		if err == badgerhold.ErrNotFound {
+			return nil, ErrNoResultsYet
+		}
+		return nil, err
+	}
+	return results, nil
 }
 
 // PrintResults returns a human friendly interpretation of the results.
@@ -167,78 +143,64 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *models.Vote) error {
 		return err
 	}
 	if len(vote.Votes) > MaxQuestions {
-		return fmt.Errorf("too many questions on addVote")
-	}
-	processBytes, err := s.Storage.Get(s.Encode("liveProcess", pid))
-	if err != nil {
-		return fmt.Errorf("error adding vote to process %x, skipping addVote: (%s)",
-			pid, err)
+		return fmt.Errorf("too many elements on addVote")
 	}
 
-	var pv models.ProcessResult
-	if err := proto.Unmarshal(processBytes, &pv); err != nil {
-		return fmt.Errorf("cannot unmarshal vote (%s)", err)
-	}
-	if err := addVote(pv.Votes,
-		vote.Votes,
-		envelope.GetWeight(),
-		p.GetVoteOptions(),
-		p.GetEnvelopeType()); err != nil {
-		return err
-	}
-
-	processBytes, err = proto.Marshal(&pv)
-	if err != nil {
-		return err
-	}
-
-	if err := s.Storage.Put(s.Encode("liveProcess", pid), processBytes); err != nil {
-		return err
-	}
-
-	log.Debugf("addVote %v on process %x", vote.Votes, pid)
-	return nil
+	return s.db.UpdateMatching(&Results{},
+		badgerhold.Where("ProcessID").Eq(pid),
+		func(record interface{}) error {
+			update, ok := record.(*Results)
+			if !ok {
+				return fmt.Errorf("record isn't the correct type!  Wanted Result, got %T", record)
+			}
+			if err := addVote(update.Votes,
+				vote.Votes,
+				envelope.GetWeight(),
+				p.GetVoteOptions(),
+				p.GetEnvelopeType()); err != nil {
+				return err
+			}
+			log.Debugf("addVote %v on process %x", vote.Votes, pid)
+			return nil
+		})
 }
 
 func (s *Scrutinizer) computeLiveResults(processID []byte) (*models.ProcessResult, error) {
-	pv := new(models.ProcessResult)
-	pb, err := s.Storage.Get(s.Encode("liveProcess", processID))
-	if err != nil {
+	results := &Results{}
+	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").Eq(processID)); err != nil {
 		return nil, err
 	}
-	if err = proto.Unmarshal(pb, pv); err != nil {
-		return nil, err
-	}
-	return pv, nil
+	return &models.ProcessResult{
+		Votes:     results.Votes,
+		ProcessId: processID,
+	}, nil
 }
 
-func (s *Scrutinizer) computeNonLiveResults(p *models.Process) (*models.ProcessResult, error) {
-	options := p.GetVoteOptions()
-	if options == nil {
-		return nil, fmt.Errorf("computeNonLiveResults: vote options is nil")
+func (s *Scrutinizer) computeNonLiveResults(p *Process) (*models.ProcessResult, error) {
+	if p == nil {
+		return nil, fmt.Errorf("process is nil")
 	}
-	if options.MaxCount == 0 || options.MaxValue == 0 {
+	if p.VoteOpts.MaxCount == 0 || p.VoteOpts.MaxValue == 0 {
 		return nil, fmt.Errorf("computeNonLiveResults: maxCount or maxValue are zero")
 	}
 
-	if options.MaxCount > MaxQuestions || options.MaxValue > MaxOptions {
+	if p.VoteOpts.MaxCount > MaxQuestions || p.VoteOpts.MaxValue > MaxOptions {
 		return nil, fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
 	}
-	pv := emptyProcess(int(options.MaxCount), int(options.MaxValue)+1)
+	pv := newEmptyResults(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1)
 
 	var nvotes int
-	pid := p.GetProcessId()
 	// 8.3M seems enough for now
-	for _, e := range s.VochainState.EnvelopeList(pid, 0, 32<<18, false) {
-		vote, err := s.VochainState.Envelope(pid, e, false)
+	for _, e := range s.VochainState.EnvelopeList(p.ID, 0, 32<<18, false) {
+		vote, err := s.VochainState.Envelope(p.ID, e, false)
 		if err != nil {
 			log.Warn(err)
 			continue
 		}
 		var vp *types.VotePackage
 		err = nil
-		if p.EnvelopeType.GetEncryptedVotes() {
-			if len(p.GetEncryptionPrivateKeys()) < len(vote.GetEncryptionKeyIndexes()) {
+		if p.Envelope.GetEncryptedVotes() {
+			if len(p.PrivateKeys) < len(vote.GetEncryptionKeyIndexes()) {
 				err = fmt.Errorf("encryptionKeyIndexes has too many fields")
 			} else {
 				keys := []string{}
@@ -247,7 +209,7 @@ func (s *Scrutinizer) computeNonLiveResults(p *models.Process) (*models.ProcessR
 						err = fmt.Errorf("key index overflow")
 						break
 					}
-					keys = append(keys, p.EncryptionPrivateKeys[k])
+					keys = append(keys, p.PrivateKeys[k])
 				}
 				if len(keys) == 0 || err != nil {
 					err = fmt.Errorf("no keys provided or wrong index")
@@ -265,15 +227,14 @@ func (s *Scrutinizer) computeNonLiveResults(p *models.Process) (*models.ProcessR
 		if err := addVote(pv.Votes,
 			vp.Votes,
 			vote.GetWeight(),
-			p.GetVoteOptions(),
-			p.GetEnvelopeType()); err != nil {
-
+			p.VoteOpts,
+			p.Envelope); err != nil {
 			log.Debugf("vote invalid: %v", err)
 			continue
 		}
 		nvotes++
 	}
-	log.Infof("computed results for process %x with %d votes", pid, nvotes)
+	log.Infof("computed results for process %x with %d votes", p.ID, nvotes)
 	log.Debugf("results: %s", PrintResults(pv))
 	return pv, nil
 }

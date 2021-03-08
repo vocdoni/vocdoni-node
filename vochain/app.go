@@ -197,6 +197,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	var txBytes []byte
 
 	if tx, txBytes, signature, err = UnmarshalTx(req.Tx); err == nil {
+		log.Debugf("delivering tx: %s", log.FormatProto(tx))
 		if data, err = AddTx(tx, txBytes, signature, app.State, TxKey(req.Tx), true); err != nil {
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
