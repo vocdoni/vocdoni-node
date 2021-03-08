@@ -6,13 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/cosmos/iavl"
 	"github.com/ethereum/go-ethereum/common"
-	dcopy "github.com/otiai10/copy"
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	"go.vocdoni.io/dvote/log"
@@ -91,17 +89,6 @@ func NewState(dataDir string) (*State, error) {
 		if err == iavl.ErrVersionDoesNotExist {
 			// restart data db
 			log.Errorf("no db version available: %s, restarting vochain database", err)
-			backupDir := filepath.Dir(dataDir) + "/vochain-backup"
-			log.Infof("for security, a backup of the database will be created at: %s", backupDir)
-			dcopy.Copy(
-				dataDir,
-				backupDir,
-				dcopy.Options{
-					Sync:          false,
-					PreserveTimes: true,
-					OnDirExists:   func(src, dest string) dcopy.DirExistsAction { return dcopy.Replace },
-				},
-			)
 			if err := os.RemoveAll(dataDir); err != nil {
 				log.Errorf("%s", err)
 			}

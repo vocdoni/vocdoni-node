@@ -26,7 +26,6 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/otiai10/copy v1.5.0
 	github.com/prometheus/client_golang v1.9.0
 	github.com/shirou/gopsutil v3.20.12+incompatible
 	github.com/spf13/cobra v1.1.1
