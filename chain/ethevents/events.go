@@ -353,7 +353,8 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 	for {
 		select {
 		case err := <-sub.Err():
-			log.Errorf("ethereum events subscription error on channel: %s", err)
+			// TODO: @jordipainan do not fatal here, handle error on event subscription channel
+			log.Fatalf("ethereum events subscription error on channel: %s", err)
 		case event := <-logs:
 			ev.EventProcessor.Events <- event
 		}
