@@ -24,7 +24,8 @@ import (
    b_{#block} = {[]processId} // index by block in order to reveal keys of the finished processes
 */
 
-// TBD: Remove the ProcessKeys storage, we do not need it since the keys are deterministic and can be re-created at any time.
+// TBD (pau): Remove the ProcessKeys storage, we do not need it since the
+// keys are deterministic and can be re-created at any time.
 
 const (
 	commitmentKeySize = nacl.KeyLength
@@ -92,7 +93,8 @@ func (pk *processKeys) Decode(data []byte) error {
 	return nil
 }
 
-func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *ethereum.SignKeys, index int8) (*KeyKeeper, error) {
+func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
+	signer *ethereum.SignKeys, index int8) (*KeyKeeper, error) {
 	if v == nil || signer == nil || len(dbPath) < 1 {
 		return nil, fmt.Errorf("missing values for creating a key keeper")
 	}
@@ -190,7 +192,8 @@ func (k *KeyKeeper) RevealUnpublished() {
 			log.Error(err)
 			continue
 		}
-		if process.Status == models.ProcessStatus_CANCELED || process.Status == models.ProcessStatus_ENDED {
+		if process.Status == models.ProcessStatus_CANCELED ||
+			process.Status == models.ProcessStatus_ENDED {
 			log.Warnf("found pending keys for reveal on process %x", pid)
 			if err := k.revealKeys(string(pid)); err != nil {
 				log.Error(err)
@@ -267,7 +270,8 @@ func (k *KeyKeeper) OnVote(v *models.Vote) {
 	// do nothing
 }
 
-// OnProcessStatusChange will publish the private and reveal keys of the ended process, if required
+// OnProcessStatusChange will publish the private
+// and reveal keys of the ended process, if required
 func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
@@ -302,7 +306,8 @@ func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {
 	// Add the index in order to win some extra entropy
 	pb := append(pid, byte(k.myIndex))
 	// Private ed25519 key
-	priv, err := nacl.DecodePrivate(fmt.Sprintf("%x", ethereum.HashRaw(append(k.signer.Private.D.Bytes(), pb...))))
+	priv, err := nacl.DecodePrivate(fmt.Sprintf("%x",
+		ethereum.HashRaw(append(k.signer.Private.D.Bytes(), pb...))))
 	if err != nil {
 		return nil, fmt.Errorf("cannot generate encryption key: (%s)", err)
 	}
@@ -355,7 +360,8 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 	}
 }
 
-// checkRevealProcess check if keys should be revealed for height and deletes the entry from the storage
+// checkRevealProcess check if keys should be revealed for height
+// and deletes the entry from the storage
 func (k *KeyKeeper) checkRevealProcess(height int64) {
 	k.lock.Lock()
 	defer k.lock.Unlock()
@@ -482,16 +488,16 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 }
 
 func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
+	var err error
+	stx := &models.SignedTx{}
 	// sign the transaction
-	txBytes, err := proto.Marshal(tx)
-	if err != nil {
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Admin{Admin: tx}}); err != nil {
 		return err
 	}
-	vtx := models.Tx{Payload: &models.Tx_Admin{Admin: tx}}
-	if vtx.Signature, err = k.signer.Sign(txBytes); err != nil {
+	if stx.Signature, err = k.signer.Sign(stx.Tx); err != nil {
 		return err
 	}
-	vtxBytes, err := proto.Marshal(&vtx)
+	vtxBytes, err := proto.Marshal(stx)
 	if err != nil {
 		return err
 	}

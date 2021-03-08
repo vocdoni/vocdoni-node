@@ -17,13 +17,14 @@ import (
 )
 
 // AddTx check the validity of a transaction and adds it to the state if commit=true
-func AddTx(vtx *models.Tx, state *State, txID [32]byte, commit bool) ([]byte, error) {
+func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
+	txID [32]byte, commit bool) ([]byte, error) {
 	if vtx == nil || state == nil || vtx.Payload == nil {
 		return nil, fmt.Errorf("transaction, state or transaction payload are nil")
 	}
 	switch vtx.Payload.(type) {
 	case *models.Tx_Vote:
-		v, err := VoteTxCheck(vtx, state, txID, commit)
+		v, err := VoteTxCheck(vtx, txBytes, signature, state, txID, commit)
 		if err != nil {
 			return []byte{}, fmt.Errorf("voteTxCheck %w", err)
 		}
@@ -32,7 +33,7 @@ func AddTx(vtx *models.Tx, state *State, txID [32]byte, commit bool) ([]byte, er
 		}
 		return v.Nullifier, nil
 	case *models.Tx_Admin:
-		if err := AdminTxCheck(vtx, state); err != nil {
+		if err := AdminTxCheck(vtx, txBytes, signature, state); err != nil {
 			return []byte{}, fmt.Errorf("adminTxChek %w", err)
 		}
 		tx := vtx.GetAdmin()
@@ -68,7 +69,7 @@ func AddTx(vtx *models.Tx, state *State, txID [32]byte, commit bool) ([]byte, er
 		}
 
 	case *models.Tx_NewProcess:
-		if p, err := NewProcessTxCheck(vtx, state); err == nil {
+		if p, err := NewProcessTxCheck(vtx, txBytes, signature, state); err == nil {
 			if commit {
 				tx := vtx.GetNewProcess()
 				if tx.Process == nil {
@@ -81,7 +82,7 @@ func AddTx(vtx *models.Tx, state *State, txID [32]byte, commit bool) ([]byte, er
 		}
 
 	case *models.Tx_SetProcess:
-		if err := SetProcessTxCheck(vtx, state); err != nil {
+		if err := SetProcessTxCheck(vtx, txBytes, signature, state); err != nil {
 			return []byte{}, fmt.Errorf("setProcess %w", err)
 		}
 		if commit {
@@ -113,15 +114,22 @@ func AddTx(vtx *models.Tx, state *State, txID [32]byte, commit bool) ([]byte, er
 	return []byte{}, nil
 }
 
-// UnmarshalTx splits a tx into method and args parts and does some basic checks
-func UnmarshalTx(content []byte) (*models.Tx, error) {
-	vtx := models.Tx{}
-	return &vtx, proto.Unmarshal(content, &vtx)
+// UnmarshalTx unarshal the content of a bytes serialized transaction.
+// Returns the transaction struct, the original bytes and the signature
+// of those bytes.
+func UnmarshalTx(content []byte) (*models.Tx, []byte, []byte, error) {
+	stx := new(models.SignedTx)
+	if err := proto.Unmarshal(content, stx); err != nil {
+		return nil, nil, nil, err
+	}
+	vtx := new(models.Tx)
+	return vtx, stx.GetTx(), stx.GetSignature(), proto.Unmarshal(stx.GetTx(), vtx)
 }
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
 // All hexadecimal strings should be already sanitized (without 0x)
-func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*models.Vote, error) {
+func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
+	txID [32]byte, forCommit bool) (*models.Vote, error) {
 	tx := vtx.GetVote()
 	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
@@ -150,7 +158,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 		default: // Signature based voting
 			var vote models.Vote
 			vote.ProcessId = tx.ProcessId
-			if vtx.Signature == nil {
+			if signature == nil {
 				return nil, fmt.Errorf("signature missing on voteTx")
 			}
 			vote.VotePackage = tx.VotePackage
@@ -188,11 +196,7 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 					return nil, fmt.Errorf("vote envelope transaction not found")
 				}
 				vp.Proof = tx.Proof
-				signedBytes, err := proto.Marshal(tx)
-				if err != nil {
-					return nil, fmt.Errorf("cannot marshal vote transaction: %w", err)
-				}
-				vp.PubKey, err = ethereum.PubKeyFromSignature(signedBytes, vtx.Signature)
+				vp.PubKey, err = ethereum.PubKeyFromSignature(txBytes, signature)
 				if err != nil {
 					return nil, fmt.Errorf("cannot extract public key from signature: (%w)", err)
 				}
@@ -256,10 +260,10 @@ func VoteTxCheck(vtx *models.Tx, state *State, txID [32]byte, forCommit bool) (*
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
-func AdminTxCheck(vtx *models.Tx, state *State) error {
+func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
 	tx := vtx.GetAdmin()
 	// check signature available
-	if vtx.Signature == nil || tx == nil {
+	if signature == nil || tx == nil || txBytes == nil {
 		return fmt.Errorf("missing signature or admin transaction")
 	}
 	// get oracles
@@ -268,12 +272,7 @@ func AdminTxCheck(vtx *models.Tx, state *State) error {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
 
-	signedBytes, err := proto.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("cannot marshal new process transaction")
-	}
-
-	if authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, vtx.Signature); err != nil {
+	if authorized, addr, err := verifySignatureAgainstOracles(oracles, txBytes, signature); err != nil {
 		return err
 	} else if !authorized {
 		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())

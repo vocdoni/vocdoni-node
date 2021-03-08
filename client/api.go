@@ -341,15 +341,17 @@ func (c *Client) TestSendVotes(
 		default:
 			log.Fatal("censusOrigin %s not supported", censusOrigin.String())
 		}
-		txBytes, err := proto.Marshal(v)
+
+		stx := &models.SignedTx{}
+		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: v}})
 		if err != nil {
 			return 0, err
 		}
-		vtx := models.Tx{Payload: &models.Tx_Vote{Vote: v}}
-		if vtx.Signature, err = s.Sign(txBytes); err != nil {
+
+		if stx.Signature, err = s.Sign(stx.Tx); err != nil {
 			return 0, err
 		}
-		if req.Payload, err = proto.Marshal(&vtx); err != nil {
+		if req.Payload, err = proto.Marshal(stx); err != nil {
 			return 0, err
 		}
 		pub, _ := s.HexString()
@@ -458,15 +460,15 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 		Nonce:   util.RandomBytes(32),
 		Process: processData,
 	}
-	txBytes, err := proto.Marshal(p)
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: p}})
 	if err != nil {
 		return 0, err
 	}
-	vtx := models.Tx{Payload: &models.Tx_NewProcess{NewProcess: p}}
-	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
+	if stx.Signature, err = oracle.Sign(stx.Tx); err != nil {
 		return 0, err
 	}
-	if req.Payload, err = proto.Marshal(&vtx); err != nil {
+	if req.Payload, err = proto.Marshal(stx); err != nil {
 		return 0, err
 	}
 
@@ -482,6 +484,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 
 func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
 	var req types.MetaRequest
+	var err error
 	req.Method = "submitRawTx"
 	status := models.ProcessStatus_ENDED
 	p := &models.SetProcessTx{
@@ -490,15 +493,15 @@ func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
 		Status:    &status,
 		Nonce:     util.RandomBytes(32),
 	}
-	txBytes, err := proto.Marshal(p)
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: p}})
 	if err != nil {
 		return err
 	}
-	vtx := models.Tx{Payload: &models.Tx_SetProcess{SetProcess: p}}
-	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
+	if stx.Signature, err = oracle.Sign(stx.Tx); err != nil {
 		return err
 	}
-	if req.Payload, err = proto.Marshal(&vtx); err != nil {
+	if req.Payload, err = proto.Marshal(stx); err != nil {
 		return err
 	}
 
@@ -530,9 +533,10 @@ func (c *Client) GetCurrentBlock() (uint32, error) {
 }
 
 // CreateCensus creates a new census on the remote gateway and publishes it.
-// Users public keys can be added using censusSigner (ethereum.SignKeys) or censusPubKeys (raw hex public keys).
-// First has preference.
-func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys, censusPubKeys []string) (root []byte, uri string, _ error) {
+// Users public keys can be added using censusSigner (ethereum.SignKeys) or
+// censusPubKeys (raw hex public keys).
+func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys,
+	censusPubKeys []string) (root []byte, uri string, _ error) {
 	var req types.MetaRequest
 
 	// Create census

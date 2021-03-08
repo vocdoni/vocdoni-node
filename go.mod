@@ -24,6 +24,7 @@ require (
 	github.com/klauspost/compress v1.11.4
 	github.com/libp2p/go-libp2p-core v0.8.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
+	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/prometheus/client_golang v1.9.0
 	github.com/shirou/gopsutil v3.20.12+incompatible
@@ -34,11 +35,11 @@ require (
 	github.com/tendermint/tm-db v0.6.3
 	github.com/timshannon/badgerhold/v3 v3.0.0-20210208141506-eb78b03f8097
 	github.com/vocdoni/blind-ca v0.1.4
-	github.com/vocdoni/multirpc v0.1.19
+	github.com/vocdoni/multirpc v0.1.21
 	github.com/vocdoni/storage-proofs-eth-go v0.1.5
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.uber.org/zap v1.16.0
-	go.vocdoni.io/proto v0.1.8
+	go.vocdoni.io/proto v0.1.9-0.20210304214308-6f7363b52750
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sys v0.0.0-20210301091718-77cc2087c03b // indirect

@@ -267,7 +267,7 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
-func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
+func NewProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (*models.Process, error) {
 	tx := vtx.GetNewProcess()
 	if tx.Process == nil {
 		return nil, fmt.Errorf("process data is empty")
@@ -280,7 +280,7 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 		return nil, fmt.Errorf("missing vote options parameters (maxCount or maxValue)")
 	}
 	// check signature available
-	if vtx.Signature == nil || tx == nil {
+	if signature == nil || tx == nil || txBytes == nil {
 		return nil, fmt.Errorf("missing signature or new process transaction")
 	}
 	// get oracles
@@ -302,11 +302,7 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 		return nil, fmt.Errorf(
 			"cannot add process with duration lower or equal than the current height")
 	}
-	signedBytes, err := proto.Marshal(tx)
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal new process transaction")
-	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, vtx.Signature)
+	authorized, addr, err := verifySignatureAgainstOracles(oracles, txBytes, signature)
 	if err != nil {
 		return nil, err
 	}
@@ -338,10 +334,10 @@ func NewProcessTxCheck(vtx *models.Tx, state *State) (*models.Process, error) {
 }
 
 // SetProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
-func SetProcessTxCheck(vtx *models.Tx, state *State) error {
+func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
 	tx := vtx.GetSetProcess()
 	// check signature available
-	if vtx.Signature == nil || tx == nil {
+	if signature == nil || tx == nil || txBytes == nil {
 		return fmt.Errorf("missing signature on set process transaction")
 	}
 	// get oracles
@@ -350,11 +346,7 @@ func SetProcessTxCheck(vtx *models.Tx, state *State) error {
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
 	// check signature
-	signedBytes, err := proto.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("cannot marshal new process transaction")
-	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, signedBytes, vtx.Signature)
+	authorized, addr, err := verifySignatureAgainstOracles(oracles, txBytes, signature)
 	if err != nil {
 		return err
 	}

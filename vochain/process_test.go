@@ -168,7 +168,8 @@ func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys, a
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
-	var vtx models.Tx
+	var stx models.SignedTx
+	var err error
 
 	tx := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_STATUS,
@@ -176,24 +177,23 @@ func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys, a
 		ProcessId: pid,
 		Status:    status,
 	}
-	txBytes, err := proto.Marshal(tx)
+
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
+	if stx.Signature, err = oracle.Sign(stx.Tx); err != nil {
 		t.Fatal(err)
 	}
-	vtx.Payload = &models.Tx_SetProcess{SetProcess: tx}
 
-	if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
+	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
 	cktxresp = app.CheckTx(cktx)
 	if cktxresp.Code != 0 {
 		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
 	}
-	if detx.Tx, err = proto.Marshal(&vtx); err != nil {
+	if detx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
 	detxresp = app.DeliverTx(detx)
@@ -287,7 +287,8 @@ func testSetProcessResults(t *testing.T, pid []byte, oracle *ethereum.SignKeys, 
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
-	var vtx models.Tx
+	var stx models.SignedTx
+	var err error
 
 	tx := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_RESULTS,
@@ -295,24 +296,22 @@ func testSetProcessResults(t *testing.T, pid []byte, oracle *ethereum.SignKeys, 
 		ProcessId: pid,
 		Results:   results,
 	}
-	txBytes, err := proto.Marshal(tx)
+
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
+	if stx.Signature, err = oracle.Sign(stx.Tx); err != nil {
 		t.Fatal(err)
 	}
-	vtx.Payload = &models.Tx_SetProcess{SetProcess: tx}
-
-	if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
+	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
 	cktxresp = app.CheckTx(cktx)
 	if cktxresp.Code != 0 {
 		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
 	}
-	if detx.Tx, err = proto.Marshal(&vtx); err != nil {
+	if detx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
 	detxresp = app.DeliverTx(detx)
@@ -418,7 +417,8 @@ func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys, a
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
-	var vtx models.Tx
+	var stx models.SignedTx
+	var err error
 
 	tx := &models.SetProcessTx{
 		Txtype:     models.TxType_SET_PROCESS_CENSUS,
@@ -427,24 +427,23 @@ func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys, a
 		CensusRoot: censusRoot,
 		CensusURI:  censusURI,
 	}
-	txBytes, err := proto.Marshal(tx)
-	if err != nil {
+
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}}); err != nil {
 		t.Fatal(err)
 	}
 
-	if vtx.Signature, err = oracle.Sign(txBytes); err != nil {
+	if stx.Signature, err = oracle.Sign(stx.Tx); err != nil {
 		t.Fatal(err)
 	}
-	vtx.Payload = &models.Tx_SetProcess{SetProcess: tx}
 
-	if cktx.Tx, err = proto.Marshal(&vtx); err != nil {
+	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
 	cktxresp = app.CheckTx(cktx)
 	if cktxresp.Code != 0 {
 		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
 	}
-	if detx.Tx, err = proto.Marshal(&vtx); err != nil {
+	if detx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
 	detxresp = app.DeliverTx(detx)

@@ -196,20 +196,19 @@ func (ev *EthereumEvents) OnComputeResults(results *models.ProcessResult) {
 		Txtype:    models.TxType_SET_PROCESS_RESULTS,
 	}
 
-	vtx := models.Tx{}
-	resultsTxBytes, err := proto.Marshal(setprocessTxArgs)
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: setprocessTxArgs}})
 	if err != nil {
 		log.Errorf("cannot marshal set process results tx: %s", err)
 		return
 	}
-	vtx.Signature, err = ev.Signer.Sign(resultsTxBytes)
+	stx.Signature, err = ev.Signer.Sign(stx.Tx)
 	if err != nil {
 		log.Errorf("cannot sign oracle tx: %s", err)
 		return
 	}
 
-	vtx.Payload = &models.Tx_SetProcess{SetProcess: setprocessTxArgs}
-	txb, err := proto.Marshal(&vtx)
+	txb, err := proto.Marshal(stx)
 	if err != nil {
 		log.Errorf("error marshaling set process results tx: %s", err)
 		return
