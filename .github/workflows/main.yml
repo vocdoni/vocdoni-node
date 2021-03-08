@@ -48,11 +48,10 @@ jobs:
         run: |
           export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
           export DOCKER_CLI_EXPERIMENTAL=enabled
-          # Steps only needed in custom concurrent runner
-          # export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
-          # export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
-          # export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
-          # export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
+          export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
+          export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
+          export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
+          export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
           cd dockerfiles/testsuite
           docker-compose build
           ./start_test.sh
