@@ -16,13 +16,19 @@ require (
 	github.com/google/go-cmp v0.5.4
 	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
 	github.com/iden3/go-iden3-crypto v0.0.4
+	github.com/ipfs/go-bitswap v0.3.4-0.20210226182239-d1d4afa29da4 // indirect
+	github.com/ipfs/go-block-format v0.0.3 // indirect
 	github.com/ipfs/go-ipfs v0.7.1-0.20210129042248-884a5aebd748
 	github.com/ipfs/go-ipfs-config v0.12.0
 	github.com/ipfs/go-ipfs-files v0.0.8
 	github.com/ipfs/go-log v1.0.4
+	github.com/ipfs/go-log/v2 v2.1.2 // indirect
 	github.com/ipfs/interface-go-ipfs-core v0.4.0
 	github.com/klauspost/compress v1.11.4
-	github.com/libp2p/go-libp2p-core v0.8.0
+	github.com/libp2p/go-libp2p v0.13.1-0.20210302020805-6a14d8c23942 // indirect
+	github.com/libp2p/go-libp2p-autonat v0.4.1 // indirect
+	github.com/libp2p/go-libp2p-core v0.8.5
+	github.com/libp2p/go-libp2p-swarm v0.4.3 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
@@ -38,11 +44,12 @@ require (
 	github.com/vocdoni/multirpc v0.1.21
 	github.com/vocdoni/storage-proofs-eth-go v0.1.5
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
+	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/zap v1.16.0
 	go.vocdoni.io/proto v0.1.9-0.20210304214308-6f7363b52750
-	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
+	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
-	golang.org/x/sys v0.0.0-20210301091718-77cc2087c03b // indirect
+	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2 // indirect
 	google.golang.org/protobuf v1.25.0
 	nhooyr.io/websocket v1.8.6
 )
