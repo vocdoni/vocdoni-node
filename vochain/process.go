@@ -190,37 +190,30 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 		return err
 	}
 	// Check if the state transition is valid
-	if process.Status == models.ProcessStatus_RESULTS {
-		if process.Results != result {
-			return fmt.Errorf(
-				"results provided differ from already stored results: got: %+v, have: %+v",
-				result, process.Results)
-		}
-		return fmt.Errorf("same results already added")
-	} else if process.Status == models.ProcessStatus_ENDED {
-		// process must be ended for setting the results
-		if !bytes.Equal(result.ProcessId, process.ProcessId) {
-			return fmt.Errorf(
-				"invalid process id on result provided, expected: %x got: %x",
-				process.ProcessId, result.ProcessId)
-		}
-
-		if !bytes.Equal(result.EntityId, process.EntityId) {
-			return fmt.Errorf(
-				"invalid entity id on result provided, expected: %x got: %x",
-				process.EntityId, result.EntityId)
-		}
-
-		if commit {
-			process.Results = result
-			process.Status = models.ProcessStatus_RESULTS
-			if err := v.setProcess(process, process.ProcessId); err != nil {
-				return err
-			}
-		}
-		return nil
+	// process must be ended for setting the results
+	if process.Status != models.ProcessStatus_ENDED {
+		return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
 	}
-	return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
+	if !bytes.Equal(result.ProcessId, process.ProcessId) {
+		return fmt.Errorf(
+			"invalid process id on result provided, expected: %x got: %x",
+			process.ProcessId, result.ProcessId)
+	}
+
+	if !bytes.Equal(result.EntityId, process.EntityId) {
+		return fmt.Errorf(
+			"invalid entity id on result provided, expected: %x got: %x",
+			process.EntityId, result.EntityId)
+	}
+
+	if commit {
+		process.Results = result
+		process.Status = models.ProcessStatus_RESULTS
+		if err := v.setProcess(process, process.ProcessId); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commit bool) error {
