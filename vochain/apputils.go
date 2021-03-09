@@ -3,9 +3,12 @@ package vochain
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"os"
 	"strconv"
 
 	"go.vocdoni.io/dvote/censustree/gravitontree"
@@ -23,6 +26,7 @@ import (
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"
+	"github.com/tendermint/tendermint/libs/tempfile"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -136,6 +140,30 @@ func GenerateNullifier(address ethcommon.Address, processID []byte) []byte {
 // NewPrivateValidator returns a tendermint file private validator (key and state)
 // if tmPrivKey not specified, uses the existing one or generates a new one
 func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV, error) {
+	stateFile := &privval.FilePVLastSignState{}
+	f, err := os.OpenFile(tconfig.PrivValidatorStateFile(), os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	stateJSONBytes, err := ioutil.ReadFile(tconfig.PrivValidatorStateFile())
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = json.Unmarshal(stateJSONBytes, stateFile)
+	if err != nil || len(stateJSONBytes) == 0 {
+		log.Debugf("priv_validator_state.json is empty, adding default values")
+		jsonBytes, err := tmjson.MarshalIndent(stateFile, "", "  ")
+		if err != nil {
+			log.Fatalf("cannot create priv_validator_state.json: %s", err)
+		}
+		err = tempfile.WriteFileAtomic(tconfig.PrivValidatorStateFile(), jsonBytes, 0600)
+		if err != nil {
+			log.Fatalf("cannot create priv_validator_state.json: %s", err)
+		}
+	}
+
 	pv := privval.LoadOrGenFilePV(
 		tconfig.PrivValidatorKeyFile(),
 		tconfig.PrivValidatorStateFile(),
