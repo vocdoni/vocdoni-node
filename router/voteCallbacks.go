@@ -11,7 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const MaxListSize = 256
+const MaxListSize = 64
 
 func (r *Router) submitRawTx(request routerRequest) {
 	res, err := r.vocapp.SendTX(request.Payload)
