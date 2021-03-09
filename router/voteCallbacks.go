@@ -12,7 +12,6 @@ import (
 )
 
 const MaxListSize = 256
-const MaxListIterations = 64
 
 func (r *Router) submitRawTx(request routerRequest) {
 	res, err := r.vocapp.SendTX(request.Payload)
@@ -152,8 +151,8 @@ func (r *Router) getBlockHeight(request routerRequest) {
 func (r *Router) getProcessList(request routerRequest) {
 	var response types.MetaResponse
 	max := request.ListSize
-	if max > MaxListIterations || max <= 0 {
-		max = MaxListIterations
+	if max > MaxListSize || max <= 0 {
+		max = MaxListSize
 	}
 	processList, err := r.Scrutinizer.ProcessList(
 		request.EntityId,
@@ -244,7 +243,7 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 		return
 	}
 	if request.ListSize == 0 {
-		request.ListSize = 64
+		request.ListSize = MaxListSize
 	}
 	nullifiers := r.vocapp.State.EnvelopeList(request.ProcessID, request.From, request.ListSize, true)
 	var response types.MetaResponse
@@ -317,8 +316,8 @@ func (r *Router) getResults(request routerRequest) {
 // finished processes
 func (r *Router) getProcListResults(request routerRequest) {
 	var response types.MetaResponse
-	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
-		request.ListSize = MaxListIterations
+	if request.ListSize > MaxListSize || request.ListSize <= 0 {
+		request.ListSize = MaxListSize
 	}
 	response.ProcessIDs = r.Scrutinizer.ProcessListWithResults(request.ListSize, request.From)
 	request.Send(r.buildReply(request, &response))
@@ -327,8 +326,8 @@ func (r *Router) getProcListResults(request routerRequest) {
 // live processes
 func (r *Router) getProcListLiveResults(request routerRequest) {
 	var response types.MetaResponse
-	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
-		request.ListSize = MaxListIterations
+	if request.ListSize > MaxListSize || request.ListSize <= 0 {
+		request.ListSize = MaxListSize
 	}
 	response.ProcessIDs = r.Scrutinizer.ProcessListWithLiveResults(request.ListSize, request.From)
 	request.Send(r.buildReply(request, &response))
@@ -337,8 +336,8 @@ func (r *Router) getProcListLiveResults(request routerRequest) {
 // known entities
 func (r *Router) getEntities(request routerRequest) {
 	var response types.MetaResponse
-	if request.ListSize > MaxListIterations || request.ListSize <= 0 {
-		request.ListSize = MaxListIterations
+	if request.ListSize > MaxListSize || request.ListSize <= 0 {
+		request.ListSize = MaxListSize
 	}
 	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, request.From)
 	request.Send(r.buildReply(request, &response))
