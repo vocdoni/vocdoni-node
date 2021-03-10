@@ -18,17 +18,41 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*Process, error) {
 	return proc, err
 }
 
-// ProcessList returns the list of processes (finished or not) for a specific entity.
+// ProcessList returns a list of process identifiers (PIDs) registered in the Vochain.
+// EntityID, namespace and status are optional filters, if declared as zero-values
+// will be ignored. Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
 func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
-	from, max int) ([][]byte, error) {
-	procs := [][]byte{}
-	var err error
+	status string, from, max int) ([][]byte, error) {
+	// For filtering on Status we use a badgerhold match function.
+	// If status is not defined, then the match function will return always true.
+	statusnum := int32(-1)
+	statusfound := false
+	if status != "" {
+		if statusnum, statusfound = models.ProcessStatus_value[status]; !statusfound {
+			return nil, fmt.Errorf("processList: status %s is unknown", status)
+		}
+	}
+	statusMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
+		if statusnum == -1 {
+			return true, nil
+		}
+		if r.Field().(int32) == statusnum {
+			return true, nil
+		}
+		return false, nil
+	}
 
+	// For EntityID and Namespace we use different queries, since they are indexes and the
+	// performance improvement is quite relevant.
+	var err error
+	var procs [][]byte
 	switch {
 	case namespace == 0 && len(entityID) > 0:
 		err = s.db.ForEach(
 			badgerhold.Where("EntityID").
 				Eq(entityID).
+				And("Status").
+				MatchFunc(statusMatchFunc).
 				Index("EntityID").
 				SortBy("CreationTime").
 				Skip(from).
@@ -41,7 +65,22 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 		err = s.db.ForEach(
 			badgerhold.Where("Namespace").
 				Eq(namespace).
+				And("Status").
+				MatchFunc(statusMatchFunc).
 				Index("Namespace").
+				SortBy("CreationTime").
+				Skip(from).
+				Limit(max),
+			func(p *Process) error {
+				procs = append(procs, p.ID)
+				return nil
+			})
+	case namespace == 0 && len(entityID) == 0:
+		err = s.db.ForEach(
+			badgerhold.Where("ID").
+				Ne([]byte{}).
+				And("Status").
+				MatchFunc(statusMatchFunc).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -55,6 +94,8 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 				Eq(entityID).
 				And("Namespace").
 				Eq(namespace).
+				And("Status").
+				MatchFunc(statusMatchFunc).
 				Index("EntityID").
 				SortBy("CreationTime").
 				Skip(from).
