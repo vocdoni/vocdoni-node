@@ -124,7 +124,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	last := 0
 	var list [][]byte
 	for len(procs) < procsCount {
-		list, err = sc.ProcessList(eidTest, 0, last, 10)
+		list, err = sc.ProcessList(eidTest, 0, "", last, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -143,6 +143,76 @@ func testProcessList(t *testing.T, procsCount int) {
 	if len(procs) != procsCount {
 		t.Fatalf("expected %d processes, got %d", procsCount, len(procs))
 	}
+}
+
+func TestProcessListWithNamespaceAndStatus(t *testing.T) {
+	log.Init("info", "stdout")
+	state, err := vochain.NewState(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sc, err := NewScrutinizer(t.TempDir(), state)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add 10 processes with different namespaces (from 10 to 20) and status ENDED
+	for i := 0; i < 10; i++ {
+		pid := util.RandomBytes(32)
+		err := state.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     util.RandomBytes(20),
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+			Namespace:    uint32(10 + i),
+			Status:       models.ProcessStatus_ENDED,
+		})
+		qt.Assert(t, err, qt.IsNil)
+		err = sc.newEmptyProcess(pid)
+		qt.Assert(t, err, qt.IsNil)
+	}
+
+	// For a entity, add 10 processes on namespace 123 and status READY
+	eid20 := util.RandomBytes(20)
+	for i := 0; i < 10; i++ {
+		pid := util.RandomBytes(32)
+		err := state.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     eid20,
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+			Namespace:    123,
+			Status:       models.ProcessStatus_READY,
+		})
+		qt.Assert(t, err, qt.IsNil)
+		err = sc.newEmptyProcess(pid)
+		qt.Assert(t, err, qt.IsNil)
+	}
+
+	// Get the process list for namespace 123
+	list, err := sc.ProcessList(eid20, 123, "", 0, 100)
+	qt.Assert(t, err, qt.IsNil)
+	// Check there are exactly 10
+	qt.Assert(t, len(list), qt.CmpEquals(), 10)
+
+	// Get the process list for all namespaces
+	list, err = sc.ProcessList(nil, 0, "", 0, 100)
+	qt.Assert(t, err, qt.IsNil)
+	// Check there are exactly 10 + 10
+	qt.Assert(t, len(list), qt.CmpEquals(), 20)
+
+	// Get the process list for namespace 10
+	list, err = sc.ProcessList(nil, 10, "", 0, 100)
+	qt.Assert(t, err, qt.IsNil)
+	// Check there is exactly 1
+	qt.Assert(t, len(list), qt.CmpEquals(), 1)
+
+	// Get the process list for namespace 10
+	list, err = sc.ProcessList(nil, 0, "READY", 0, 100)
+	qt.Assert(t, err, qt.IsNil)
+	// Check there is exactly 1
+	qt.Assert(t, len(list), qt.CmpEquals(), 10)
 }
 
 func TestResults(t *testing.T) {

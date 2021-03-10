@@ -157,6 +157,7 @@ func (r *Router) getProcessList(request routerRequest) {
 	processList, err := r.Scrutinizer.ProcessList(
 		request.EntityId,
 		request.Namespace,
+		request.Status,
 		request.From,
 		max)
 	if err != nil {

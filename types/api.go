@@ -40,6 +40,7 @@ type MetaRequest struct {
 	PubKeys      []string   `json:"pubKeys,omitempty"`
 	RootHash     HexBytes   `json:"rootHash,omitempty"`
 	Signature    HexBytes   `json:"signature,omitempty"`
+	Status       string     `json:"status,omitempty"`
 	Timestamp    int32      `json:"timestamp"`
 	Type         string     `json:"type,omitempty"`
 	URI          string     `json:"uri,omitempty"`
