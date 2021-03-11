@@ -482,9 +482,12 @@ func (_EntityResolver *EntityResolverCaller) Pubkey(opts *bind.CallOpts, node [3
 		X [32]byte
 		Y [32]byte
 	})
+	if err != nil {
+		return *outstruct, err
+	}
 
-	outstruct.X = out[0].([32]byte)
-	outstruct.Y = out[1].([32]byte)
+	outstruct.X = *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+	outstruct.Y = *abi.ConvertType(out[1], new([32]byte)).(*[32]byte)
 
 	return *outstruct, err
 
