@@ -35,11 +35,15 @@ type EthereumEvents struct {
 	// [0] -> Processes contract
 	// [1] -> Namespace contract
 	// [2] -> TokenStorageProof contract
+	// [3] -> Genesis contract
+	// [4] -> Results contract
 	ContractsAddress []common.Address
 	// contracts ABI
 	// [0] -> Processes contract
 	// [1] -> Namespace contract
 	// [2] -> TokenStorageProof contract
+	// [3] -> Genesis contract
+	// [4] -> Results contract
 	ContractsABI []abi.ABI
 	// contracts handle
 	VotingHandle *chain.VotingHandle
@@ -126,6 +130,14 @@ func NewEthEvents(contractsAddresses []common.Address,
 	if err != nil {
 		return nil, fmt.Errorf("cannot read token storage proof contract abi: %w", err)
 	}
+	abis[3], err = abi.JSON(strings.NewReader(contracts.GenesisABI))
+	if err != nil {
+		return nil, fmt.Errorf("cannot read genesis contract abi: %w", err)
+	}
+	abis[4], err = abi.JSON(strings.NewReader(contracts.ResultsABI))
+	if err != nil {
+		return nil, fmt.Errorf("cannot read results contract abi: %w", err)
+	}
 
 	secureAddrList := make(map[common.Address]bool, len(ethereumWhiteList))
 	if len(ethereumWhiteList) != 0 {
@@ -139,9 +151,6 @@ func NewEthEvents(contractsAddresses []common.Address,
 	}
 
 	ethev := &EthereumEvents{
-		// [0] -> Processes contract
-		// [1] -> Namespace contract
-		// [2] -> TokenStorageProof contract
 		ContractsAddress: contractsAddresses,
 		ContractsABI:     abis,
 		VotingHandle:     ph,

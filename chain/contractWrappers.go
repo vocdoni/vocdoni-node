@@ -33,21 +33,16 @@ type VotingHandle struct {
 	VotingProcess     *contracts.Processes
 	Namespace         *contracts.Namespaces
 	TokenStorageProof *contracts.TokenStorageProof
+	Genesis           *contracts.Genesis
+	Results           *contracts.Results
 	EthereumClient    *ethclient.Client
 	EthereumRPC       *ethrpc.Client
 }
 
-// Results represents the results received by a call to the processes smart contract getResults function
-type Results struct {
-	Tally  [][]uint32
-	Height uint32
-}
-
-// Namespace represents the namespace received by a call to the processes smart contract getNamespace function
-type Namespace struct {
-	ChainId    string
+// Genesis wraps the info retrieved for a call to genesis.Get(chainId)
+type Genesis struct {
 	Genesis    string
-	Validators []string
+	Validators [][]byte
 	Oracles    []common.Address
 }
 
@@ -79,6 +74,12 @@ func NewVotingHandle(contractsAddress []common.Address, dialEndpoint string) (*V
 	if ph.TokenStorageProof, err = contracts.NewTokenStorageProof(contractsAddress[2], ph.EthereumClient); err != nil {
 		return nil, fmt.Errorf("error constructing token storage proof contract transactor: %w", err)
 	}
+	if ph.Genesis, err = contracts.NewGenesis(contractsAddress[3], ph.EthereumClient); err != nil {
+		return nil, fmt.Errorf("error constructing genesis contract transactor: %w", err)
+	}
+	if ph.Results, err = contracts.NewResults(contractsAddress[4], ph.EthereumClient); err != nil {
+		return nil, fmt.Errorf("error constructing results contract transactor: %w", err)
+	}
 
 	return ph, nil
 }
@@ -86,7 +87,7 @@ func NewVotingHandle(contractsAddress []common.Address, dialEndpoint string) (*V
 // PROCESSES WRAPPER
 
 // NewProcessTxArgs gets the info of a created process on the processes contract and creates a NewProcessTx instance
-func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint16) (*models.NewProcessTx, error) {
+func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint32) (*models.NewProcessTx, error) {
 	// TODO: @jordipainan What to do with namespace?
 	// get process info from the processes contract
 	processMeta, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
@@ -162,13 +163,17 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 		// max vote overwrites
 		MaxVoteOverwrites: uint32(processMeta.QuestionIndexQuestionCountMaxCountMaxValueMaxVoteOverwrites[4]),
 		// max total cost
-		MaxTotalCost: uint32(processMeta.MaxTotalCostCostExponentNamespace[0]),
+		MaxTotalCost: uint32(processMeta.MaxTotalCostCostExponent[0]),
 		// cost exponent
-		CostExponent: uint32(processMeta.MaxTotalCostCostExponentNamespace[1]),
+		CostExponent: uint32(processMeta.MaxTotalCostCostExponent[1]),
 	}
 
+	// TDB: @jordipainan namespaceAddr && ethChainID
 	// namespace
-	processData.Namespace = uint32(processMeta.MaxTotalCostCostExponentNamespace[2])
+	processData.Namespace, err = ph.VotingProcess.NamespaceId(&ethbind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
+	}
 
 	// if EVM census, check census root provided and get index slot from the token storage proof contract
 	if types.CensusOrigins[censusOrigin].NeedsIndexSlot {
@@ -251,7 +256,7 @@ func extractProcessMode(processMode uint8) (*models.ProcessMode, error) {
 }
 
 // SetStatusTxArgs returns a SetProcessTx instance with the processStatus set
-func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint16, status uint8) (*models.SetProcessTx, error) {
+func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint32, status uint8) (*models.SetProcessTx, error) {
 	status++ // +1 for matching with ethevent uint8
 	processData, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
 	if err != nil {
@@ -274,7 +279,7 @@ func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [types.ProcessI
 }
 
 // SetCensusTxArgs returns a SetProcess tx instance with census censusRoot and census censusURI set
-func (ph *VotingHandle) SetCensusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint16) (*models.SetProcessTx, error) {
+func (ph *VotingHandle) SetCensusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint32) (*models.SetProcessTx, error) {
 	processData, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
@@ -327,8 +332,8 @@ func (ph *VotingHandle) EntityProcessCount(ctx context.Context, eid common.Addre
 }
 
 // EntityNextProcessID returns the next process id of a given entity address
-func (ph *VotingHandle) EntityNextProcessID(ctx context.Context, eid common.Address, namespace uint16) (entityNextProcessID [types.EntityIDsizeV2]byte, err error) {
-	if entityNextProcessID, err = ph.VotingProcess.GetNextProcessId(&ethbind.CallOpts{Context: ctx}, eid, namespace); err != nil {
+func (ph *VotingHandle) EntityNextProcessID(ctx context.Context, eid common.Address) (entityNextProcessID [types.EntityIDsizeV2]byte, err error) {
+	if entityNextProcessID, err = ph.VotingProcess.GetNextProcessId(&ethbind.CallOpts{Context: ctx}, eid); err != nil {
 		err = fmt.Errorf("cannot get entity next process id: %w", err)
 	}
 	return
@@ -338,14 +343,6 @@ func (ph *VotingHandle) EntityNextProcessID(ctx context.Context, eid common.Addr
 func (ph *VotingHandle) ProcessParamsSignature(ctx context.Context, pid [types.ProcessIDsize]byte) (processParamsSignature [types.ProcessesParamsSignatureSize]byte, err error) {
 	if processParamsSignature, err = ph.VotingProcess.GetParamsSignature(&ethbind.CallOpts{Context: ctx}, pid); err != nil {
 		err = fmt.Errorf("cannot get process params signature: %w", err)
-	}
-	return
-}
-
-// ProcessResults returns the results for a given process
-func (ph *VotingHandle) ProcessResults(ctx context.Context, pid [types.ProcessIDsize]byte) (processResults Results, err error) {
-	if processResults, err = ph.VotingProcess.GetResults(&ethbind.CallOpts{Context: ctx}, pid); err != nil {
-		err = fmt.Errorf("cannot get process results: %w", err)
 	}
 	return
 }
@@ -360,28 +357,28 @@ func (ph *VotingHandle) ProcessCreationInstance(ctx context.Context, pid [types.
 
 // NAMESPACE WRAPPER
 
-// GetNamespace returns the chainID, genesis, validators and oracles of a given namespace
-func (ph *VotingHandle) GetNamespace(ctx context.Context, namespace uint16) (*Namespace, error) {
-	ns, err := ph.Namespace.GetNamespace(&ethbind.CallOpts{Context: ctx}, namespace)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get namespace: %w", err)
-	}
-	return &Namespace{
-		ChainId:    ns.ChainId,
-		Genesis:    ns.Genesis,
-		Validators: ns.Validators,
-		Oracles:    ns.Oracles,
-	}, nil
+// TOKEN STORAGE PROOF WRAPPER
+
+// IsTokenRegistered returns true if a token represented by the given address is registered on the token storage proof contract
+func (ph *VotingHandle) IsTokenRegistered(ctx context.Context, address common.Address) (bool, error) {
+	return ph.TokenStorageProof.IsRegistered(&ethbind.CallOpts{Context: ctx}, address)
 }
 
+// GetTokenBalanceMappingPosition returns the balance mapping position given a token address
+func (ph *VotingHandle) GetTokenBalanceMappingPosition(ctx context.Context, address common.Address) (*big.Int, error) {
+	return ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, address)
+}
+
+// GENESIS WRAPPER
+
 // AddOracleTxArgs returns an Admin tx instance with the oracle address to add
-func (ph *VotingHandle) AddOracleTxArgs(ctx context.Context, oracleAddress common.Address, namespace uint16) (tx *models.AdminTx, err error) {
-	ns, err := ph.Namespace.GetNamespace(&ethbind.CallOpts{Context: ctx}, namespace)
+func (ph *VotingHandle) AddOracleTxArgs(ctx context.Context, oracleAddress common.Address, chainId uint32) (tx *models.AdminTx, err error) {
+	genesis, err := ph.Genesis.Get(&ethbind.CallOpts{Context: ctx}, chainId)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get namespace: %w", err)
+		return nil, fmt.Errorf("cannot get genesis %d: %w", chainId, err)
 	}
 	var found bool
-	for _, oracle := range ns.Oracles {
+	for _, oracle := range genesis.Oracles {
 		if oracle == oracleAddress {
 			found = true
 			break
@@ -398,12 +395,12 @@ func (ph *VotingHandle) AddOracleTxArgs(ctx context.Context, oracleAddress commo
 }
 
 // RemoveOracleTxArgs returns an Admin tx instance with the oracle address to remove
-func (ph *VotingHandle) RemoveOracleTxArgs(ctx context.Context, oracleAddress common.Address, namespace uint16) (tx *models.AdminTx, err error) {
-	ns, err := ph.Namespace.GetNamespace(&ethbind.CallOpts{Context: ctx}, namespace)
+func (ph *VotingHandle) RemoveOracleTxArgs(ctx context.Context, oracleAddress common.Address, chainId uint32) (tx *models.AdminTx, err error) {
+	genesis, err := ph.Genesis.Get(&ethbind.CallOpts{Context: ctx}, chainId)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get namespace: %w", err)
+		return nil, fmt.Errorf("cannot get genesis %d: %w", chainId, err)
 	}
-	for _, oracle := range ns.Oracles {
+	for _, oracle := range genesis.Oracles {
 		if oracle == oracleAddress {
 			return nil, fmt.Errorf("cannot remove oracle, at this point the oracle should not be on ethereum")
 		}
@@ -415,17 +412,7 @@ func (ph *VotingHandle) RemoveOracleTxArgs(ctx context.Context, oracleAddress co
 	return removeOracleTxArgs, nil
 }
 
-// TOKEN STORAGE PROOF WRAPPER
-
-// IsTokenRegistered returns true if a token represented by the given address is registered on the token storage proof contract
-func (ph *VotingHandle) IsTokenRegistered(ctx context.Context, address common.Address) (bool, error) {
-	return ph.TokenStorageProof.IsRegistered(&ethbind.CallOpts{Context: ctx}, address)
-}
-
-// GetTokenBalanceMappingPosition returns the balance mapping position given a token address
-func (ph *VotingHandle) GetTokenBalanceMappingPosition(ctx context.Context, address common.Address) (*big.Int, error) {
-	return ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, address)
-}
+// RESULTS WRAPPER
 
 // ENS WRAPPER
 

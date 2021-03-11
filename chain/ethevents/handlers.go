@@ -26,40 +26,48 @@ var ethereumEventList = map[string]string{
 	"processesActivated": "0x3ec796be1be7d03bff3a62b9fa594a60e947c1809bced06d929f145308ae57ce",
 	// ActivatedSuccessor(uint256 blockNumber, address successor)
 	"processesActivatedSuccessor": "0x1f8bdb9825a71b7560200e2279fd4b503ac6814e369318e761928502882ee11a",
-	// CensusUpdated(bytes32 processId, uint16 namespace)
-	"processesCensusUpdated": "0xe54b983ab80f8982da0bb83c59ca327de698b5d0780451eba9706b4ffe069211",
-	// NamespaceAddressUpdated(address namespaceAddr)
-	"processesNamespaceAddressUpdated": "0x215ba443e028811c105c1bb484176ce9d9eec24ea7fb85c67a6bff78a04302b3",
-	// NewProcess(bytes32 processId, uint16 namespace)
-	"processesNewProcess": "0x2399440b5a42cbc7ba215c9c176f7cd16b511a8727c1f277635f3fce4649156e",
-	// QuestionIndexUpdated(bytes32 processId, uint16 namespace, uint8 newIndex)
-	"processesQuestionIndexUpdated": "0x2e4d6a3a868975a1e47c2ddc05451ebdececff07e59871dbc6cbaf9364aa06c6",
-	// ResultsAvailable(bytes32 processId)
-	"processesResultsAvailable": "0x5aff397e0d9bfad4e73dfd9c2da1d146ce7fe8cfd1a795dbf6b95b417236fa4c",
-	// StatusUpdated(bytes32 processId, uint16 namespace, uint8 status)
-	"processesStatusUpdated": "0xe64955704069c81c54f3fcca4da180a400f40da1bac10b68a9b42c753aa7a7f8",
+	// CensusUpdated(bytes32 processId, uint32 namespace)
+	"processesCensusUpdated": "0xb290b721dc95d65b8ca629743f4f2e385523708862c8237aa6601dd9a99c238e",
+	// NewProcess(bytes32 processId, uint32 namespace)
+	"processesNewProcess": "0x3b1cc0fc696cbe654bd83494847cc7890f2ae0e05a79dfbd6c1892061fbf3404",
+	// ProcessPriceUpdated(uint256 processPrice)
+	"processPriceUpdated": "0x340b7835e5cad9e69cc8bf06b0b3c3e729f0fe4fd314932f4e4284d6ffc03a71",
+	// QuestionIndexUpdated(bytes32 processId, uint32 namespace, uint8 newIndex)
+	"processesQuestionIndexUpdated": "0xc3c879bd28e24bfa8df84d17ef3cae71077c3610e6167d435cc7e669e4a6b97c",
+	// StatusUpdated(bytes32 processId, uint32 namespace, uint8 status)
+	"processesStatusUpdated": "0x55ab39d22f8c4c97fce480c015b739838aa5b8a4ad0a528159669842a7087b01",
+	// Withdraw(address to, uint256 amount)
+	"processesWithdraw": "0x884edad9ce6fa2440d8a54cc123490eb96d2768479d49ff9c7366125a9424364",
 
-	// NAMESPACE
+	// NAMESPACES
 
-	// ChainIdUpdated(string chainId, uint16 namespace)
-	"namespaceChainIdUpdated": "0xe3d9869f91cf391b3bf911c3a1467e4195d49417ea46a46edc8ffb59edb2faa1",
-	// GenesisUpdated(string genesis, uint16 namespace)
-	"namespaceGenegisUpdated": "0x09b915de2907fa8b732e1b8549d1d8748d1f6365789bacd8bfc1c2b13321f1e9",
-	// NamespaceUpdated(uint16 namespace)
-	"namespaceUpdated": "0x06500a9a8bac2497581b3067d4076b05a0485705bdc05a53983cdbb9185fc8f1",
-	// OracleAdded(address oracleAddress, uint16 namespace)
-	"namespaceOracleAdded": "0x46046a89d1b1ddc11139d795a177db8e9b123e25c07e8d7b3b537aefc994b6ad",
-	// OracleRemoved(address oracleAddress, uint16 namespace)
-	"namespaceOracleRemoved": "0xeb7308698004c0bfb1007fb03df3d23b5ec8704e43aaeca3bfce122db656e09f",
-	//  ValidatorAdded(string validatorPublicKey, uint16 namespace)
-	"namespaceValidatorAdded": "0xaa457f0c02f923a1498e47a5c9d4b832e998fcf5b391974fc0c6a946794a8134",
-	// ValidatorRemoved(string validatorPublicKey, uint16 namespace)
-	"namespaceValidatorRemoved": "0x443f0e063aa676cbc61e749911d0c2652869c9ec48c4bb503eed9f19a44c250f",
+	// NamespaceRegistered(uint32 namespace)
+	"namespaceRegistered": "0x6342a3b1a0f483c8ec694afd510f5f330e4792137228eb79e3e14458f78c5746",
 
 	// TOKEN STORAGE PROOF
 
 	// TokenRegistered(address indexed token, address indexed registrar)
 	"tokenStorageProofTokenRegistered": "0x487c37289624c10056468f1f98ebffbad01edce11374975179672e32e2543bf0",
+
+	// GENESIS
+
+	// ChainRegistered(uint32 chainId)
+	"genesisChainRegistered": "0xced3baa88aa65d52234f5717c8b053dc44bb9df530b1f6784809640ed322b7e9",
+	// GenesisUpdated(uint32 chainId)
+	"genesisUpdated": "0x87f64dce9746fc7da2e672b4aacc82ad148ed5900411894ddcbe532618fa89fb",
+	// OracleAdded(uint32 chainId, address oracleAddress)
+	"genesisOracleAdded": "0x572d29453222865ac78ef8d936cb20aba9368900deb6db64997c1482fe2b30c9",
+	// OracleRemoved(uint32 chainId, address oracleAddress)
+	"genesisOracleRemoved": "0x4b8171862540a056f44154d626c1390fed806ee806026247dc8c19f47b09acbe",
+	// ValidatorAdded(uint32 chainId, bytes validatorPublicKey)
+	"genesisValidatorAdded": "0x3d8adf342e55e97b1f85be8e952d2b473ec50bb2004821559c2b440f0a589e4e",
+	// ValidatorRemoved(uint32 chainId, bytes validatorPublicKey)
+	"genesisValidatorRemoved": "0x7436794ad809d5819bbcbd64a94846c7da193b8280de35e7ce59d3b7b4e6bbe1",
+
+	// RESULTS
+
+	// ResultsAvailable(bytes32 processId)
+	"resultsAvailable": "0x5aff397e0d9bfad4e73dfd9c2da1d146ce7fe8cfd1a795dbf6b95b417236fa4c",
 }
 
 // HandleVochainOracle handles the events on ethereum for the Oracle.
@@ -212,14 +220,14 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 		log.Infof("oracle transaction sent, hash: %x", res.Hash)
 
-	case ethereumEventList["namespaceOracleAdded"]:
+	case ethereumEventList["genesisOracleAdded"]:
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		addOracleTx, err := namespaceOracleAddedMeta(tctx, &e.ContractsABI[1], event.Data, e.VotingHandle)
+		addOracleTx, err := genesisOracleAddedMeta(tctx, &e.ContractsABI[3], event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain add oracle data for creating the transaction: %w", err)
 		}
-		log.Infof("found add oracle %x namespace event on ethereum", addOracleTx.Address)
+		log.Infof("found add oracle %x genesis event on ethereum", addOracleTx.Address)
 		oracles, err := e.VochainApp.State.Oracles(true)
 		if err != nil {
 			return fmt.Errorf("cannot fetch the oracle list from the Vochain: %w", err)
@@ -251,14 +259,14 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
 		log.Infof("oracle transaction sent, hash: %x", res.Hash)
-	case ethereumEventList["namespaceOracleRemoved"]:
+	case ethereumEventList["genesisOracleRemoved"]:
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		removeOracleTx, err := namespaceOracleRemovedMeta(tctx, &e.ContractsABI[1], event.Data, e.VotingHandle)
+		removeOracleTx, err := genesisOracleRemovedMeta(tctx, &e.ContractsABI[3], event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain remove oracle data for creating the transaction: %w", err)
 		}
-		log.Infof("found remove oracle %x namespace event on ethereum", removeOracleTx.Address)
+		log.Infof("found remove oracle %x genesis event on ethereum", removeOracleTx.Address)
 		oracles, err := e.VochainApp.State.Oracles(true)
 		if err != nil {
 			return fmt.Errorf("cannot fetch the oracle list from the Vochain: %w", err)
@@ -343,32 +351,32 @@ func processCensusUpdatedMeta(
 	return ph.SetCensusTxArgs(ctx, structuredData.ProcessId, structuredData.Namespace)
 }
 
-func namespaceOracleAddedMeta(
+func genesisOracleAddedMeta(
 	ctx context.Context,
 	contractABI *abi.ABI,
 	eventData []byte,
 	ph *chain.VotingHandle,
 ) (*models.AdminTx, error) {
-	structuredData := &contracts.NamespacesOracleAdded{}
+	structuredData := &contracts.GenesisOracleAdded{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "OracleAdded", eventData); err != nil {
 		return nil, fmt.Errorf("cannot unpack OracleAdded event: %w", err)
 	}
-	log.Debugf("namespacesOracleAdded eventData: %+v", structuredData)
-	return ph.AddOracleTxArgs(ctx, structuredData.OracleAddress, structuredData.Namespace)
+	log.Debugf("genesisOracleAdded eventData: %+v", structuredData)
+	return ph.AddOracleTxArgs(ctx, structuredData.OracleAddress, structuredData.ChainId)
 }
 
-func namespaceOracleRemovedMeta(
+func genesisOracleRemovedMeta(
 	ctx context.Context,
 	contractABI *abi.ABI,
 	eventData []byte,
 	ph *chain.VotingHandle,
 ) (*models.AdminTx, error) {
-	structuredData := &contracts.NamespacesOracleRemoved{}
+	structuredData := &contracts.GenesisOracleRemoved{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "OracleRemoved", eventData); err != nil {
 		return nil, fmt.Errorf("cannot unpack OracleRemoved event: %w", err)
 	}
-	log.Debugf("namespaceOracleRemoved eventData: %+v", structuredData)
-	return ph.RemoveOracleTxArgs(ctx, structuredData.OracleAddress, structuredData.Namespace)
+	log.Debugf("genesisOracleRemoved eventData: %+v", structuredData)
+	return ph.RemoveOracleTxArgs(ctx, structuredData.OracleAddress, structuredData.ChainId)
 }
 
 func checkEthereumTxCreator(
