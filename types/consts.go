@@ -75,6 +75,22 @@ const (
 	// ERC20ProofsDevelopmentDomain
 	ERC20ProofsDevelopmentDomain = "erc20.proofs.dev.vocdoni.eth"
 
+	// GENESIS
+	// GenesisDomain
+	GenesisDomain = "genesis.vocdoni.eth"
+	// GenesisStageDomain
+	GenesisStageDomain = "genesis.stg.vocdoni.eth"
+	// GenesisDevelopmentDomain
+	GenesisDevelopmentDomain = "genesis.dev.vocdoni.eth"
+
+	// RESULTS
+	// ResultsDomain
+	ResultsDomain = "results.vocdoni.eth"
+	// ResultsStageDomain
+	ResultsStageDomain = "results.stg.vocdoni.eth"
+	// ResultsDevelopmentDomain
+	ResultsDevelopmentDomain = "results.dev.vocdoni.eth"
+
 	// EntityMetaKey is the key of an ENS text record for the entity metadata
 	EntityMetaKey = "vnd.vocdoni.meta"
 
