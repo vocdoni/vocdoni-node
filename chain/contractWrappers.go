@@ -308,18 +308,8 @@ func (ph *VotingHandle) SetCensusTxArgs(ctx context.Context, pid [types.ProcessI
 	return setprocessTxArgs, nil
 }
 
-// SetResultsTxArgs
-func (ph *VotingHandle) SetResultsTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte) (*models.SetProcessTx, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
 // IncrementQuestionIndexTxArgs
 func (ph *VotingHandle) IncrementQuestionIndexTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte) (*models.SetProcessTx, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-// SetNamespaceAddressTxArgs
-func (ph *VotingHandle) SetNamespaceAddressTxArgs(ctx context.Context) (*models.AdminTx, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

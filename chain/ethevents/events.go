@@ -101,6 +101,7 @@ type EventProcessor struct {
 
 // NewEthEvents creates a new Ethereum events handler
 // contractsAddresses: [0] -> Processes contract, [1] -> Namespace contract, [2] -> TokenStorageProof contract
+// 					   [3] -> Genesis contract, [4] -> Results contract
 func NewEthEvents(contractsAddresses []common.Address,
 	signer *ethereum.SignKeys,
 	w3Endpoint string,
