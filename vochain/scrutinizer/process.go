@@ -22,7 +22,7 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*Process, error) {
 // EntityID, namespace and status are optional filters, if declared as zero-values
 // will be ignored. Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
 func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
-	status string, from, max int) ([][]byte, error) {
+	status string, withResults bool, from, max int) ([][]byte, error) {
 	// For filtering on Status we use a badgerhold match function.
 	// If status is not defined, then the match function will return always true.
 	statusnum := int32(-1)
@@ -42,6 +42,14 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 		return false, nil
 	}
 
+	// For filtering on withResults we use also a match function
+	wResultsMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
+		if !withResults {
+			return true, nil
+		}
+		return r.Field().(bool), nil
+	}
+
 	// For EntityID and Namespace we use different queries, since they are indexes and the
 	// performance improvement is quite relevant.
 	var err error
@@ -49,10 +57,9 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 	switch {
 	case namespace == 0 && len(entityID) > 0:
 		err = s.db.ForEach(
-			badgerhold.Where("EntityID").
-				Eq(entityID).
-				And("Status").
-				MatchFunc(statusMatchFunc).
+			badgerhold.Where("EntityID").Eq(entityID).
+				And("Status").MatchFunc(statusMatchFunc).
+				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				Index("EntityID").
 				SortBy("CreationTime").
 				Skip(from).
@@ -63,10 +70,9 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 			})
 	case namespace > 0 && len(entityID) == 0:
 		err = s.db.ForEach(
-			badgerhold.Where("Namespace").
-				Eq(namespace).
-				And("Status").
-				MatchFunc(statusMatchFunc).
+			badgerhold.Where("Namespace").Eq(namespace).
+				And("Status").MatchFunc(statusMatchFunc).
+				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				Index("Namespace").
 				SortBy("CreationTime").
 				Skip(from).
@@ -77,10 +83,9 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 			})
 	case namespace == 0 && len(entityID) == 0:
 		err = s.db.ForEach(
-			badgerhold.Where("ID").
-				Ne([]byte{}).
-				And("Status").
-				MatchFunc(statusMatchFunc).
+			badgerhold.Where("ID").Ne([]byte{}).
+				And("Status").MatchFunc(statusMatchFunc).
+				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -90,12 +95,10 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 			})
 	default:
 		err = s.db.ForEach(
-			badgerhold.Where("EntityID").
-				Eq(entityID).
-				And("Namespace").
-				Eq(namespace).
-				And("Status").
-				MatchFunc(statusMatchFunc).
+			badgerhold.Where("EntityID").Eq(entityID).
+				And("Namespace").Eq(namespace).
+				And("Status").MatchFunc(statusMatchFunc).
+				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				Index("EntityID").
 				SortBy("CreationTime").
 				Skip(from).
@@ -109,41 +112,13 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 	return procs, err
 }
 
-// ProcessListWithResults returns the list of process ID with already computed results.
-// TODO: use [][]byte instead of []string as return value
-func (s *Scrutinizer) ProcessListWithResults(max, from int) []string {
-	procs := []string{}
-	if err := s.db.ForEach(
-		badgerhold.Where("HaveResults").
-			Eq(true).
-			SortBy("CreationTime").
-			Skip(from).
-			Limit(max),
-		func(p *Process) error {
-			procs = append(procs, fmt.Sprintf("%x", p.ID))
-			return nil
-		}); err != nil {
-		log.Warnf("processListWithResults error while iterating: %v", err)
+// ProcessCount return the number of processes indexed
+func (s *Scrutinizer) ProcessCount() int64 {
+	c, err := s.db.Count(&Process{}, nil)
+	if err != nil {
+		log.Warnf("cannot count processes: %v", err)
 	}
-	return procs
-}
-
-// ProcessListWithLiveResults returns the list of process ID which have live results (not encrypted)
-func (s *Scrutinizer) ProcessListWithLiveResults(max, from int) []string {
-	procs := []string{}
-	if err := s.db.ForEach(
-		badgerhold.Where("HaveResults").
-			Eq(true).And("FinalResults").
-			Eq(false).SortBy("CreationTime").
-			Skip(from).
-			Limit(max),
-		func(p *Process) error {
-			procs = append(procs, fmt.Sprintf("%x", p.ID))
-			return nil
-		}); err != nil {
-		log.Warnf("processListWithLiveResults error while iterating: %v", err)
-	}
-	return procs
+	return int64(c)
 }
 
 // EntityList returns the list of entities indexed by the scrutinizer

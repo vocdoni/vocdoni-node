@@ -44,6 +44,7 @@ type MetaRequest struct {
 	Timestamp    int32      `json:"timestamp"`
 	Type         string     `json:"type,omitempty"`
 	URI          string     `json:"uri,omitempty"`
+	WithResults  bool       `json:"withResults,omitempty"`
 }
 
 func (r MetaRequest) String() string {
