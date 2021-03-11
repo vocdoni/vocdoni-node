@@ -14,7 +14,7 @@ import (
 // ProcessInfo returns the available information regarding an election process id
 func (s *Scrutinizer) ProcessInfo(pid []byte) (*Process, error) {
 	proc := &Process{}
-	err := s.db.FindOne(proc, badgerhold.Where("ID").Eq(pid))
+	err := s.db.FindOne(proc, badgerhold.Where(badgerhold.Key).Eq(pid))
 	return proc, err
 }
 
@@ -187,7 +187,7 @@ func (s *Scrutinizer) isLiveResultsProcess(processID []byte) (bool, error) {
 
 // compute results if the current heigh has scheduled ending processes
 func (s *Scrutinizer) computePendingProcesses(height uint32) {
-	if err := s.db.ForEach(badgerhold.Where("ResultsHeight").Eq(height).Index("ResultsHeight"),
+	if err := s.db.ForEach(badgerhold.Where("Rheight").Eq(height).Index("Rheight"),
 		func(p *Process) error {
 			initT := time.Now()
 			if err := s.ComputeResult(p.ID); err != nil {
@@ -239,7 +239,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	}
 
 	// Get the block time from the Header
-	currentBlockTime := time.Unix(0, s.VochainState.Header(false).Timestamp)
+	currentBlockTime := time.Unix(s.VochainState.Header(false).Timestamp, 0)
 
 	// Add the entity to the indexer database
 	eid := p.GetEntityId()
@@ -256,26 +256,28 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		}
 	}
 
-	// Create process in the indexer database
-	return s.db.Insert(pid, &Process{
-		ID:            pid,
-		EntityID:      eid,
-		StartBlock:    p.GetStartBlock(),
-		EndBlock:      p.GetBlockCount() + p.GetStartBlock(),
-		ResultsHeight: compResultsHeight,
-		HaveResults:   compResultsHeight > 0,
-		CensusRoot:    p.GetCensusRoot(),
-		CensusURI:     p.GetCensusURI(),
-		CensusOrigin:  int32(p.GetCensusOrigin()),
-		Status:        int32(p.GetStatus()),
-		Namespace:     p.GetNamespace(),
-		PrivateKeys:   p.EncryptionPrivateKeys,
-		PublicKeys:    p.EncryptionPublicKeys,
-		Envelope:      p.GetEnvelopeType(),
-		Mode:          p.GetMode(),
-		VoteOpts:      p.GetVoteOptions(),
-		CreationTime:  currentBlockTime,
-	})
+	// Create and store process in the indexer database
+	proc := &Process{
+		ID:           pid,
+		EntityID:     eid,
+		StartBlock:   p.GetStartBlock(),
+		EndBlock:     p.GetBlockCount() + p.GetStartBlock(),
+		Rheight:      compResultsHeight,
+		HaveResults:  compResultsHeight > 0,
+		CensusRoot:   p.GetCensusRoot(),
+		CensusURI:    p.GetCensusURI(),
+		CensusOrigin: int32(p.GetCensusOrigin()),
+		Status:       int32(p.GetStatus()),
+		Namespace:    p.GetNamespace(),
+		PrivateKeys:  p.EncryptionPrivateKeys,
+		PublicKeys:   p.EncryptionPublicKeys,
+		Envelope:     p.GetEnvelopeType(),
+		Mode:         p.GetMode(),
+		VoteOpts:     p.GetVoteOptions(),
+		CreationTime: currentBlockTime,
+	}
+	log.Debugf("new indexer process %s", proc.String())
+	return s.db.Insert(pid, proc)
 }
 
 // updateProcess synchronize those fields that can be updated on a existing process
@@ -286,7 +288,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
 	dbProc := &Process{}
-	if err := s.db.FindOne(dbProc, badgerhold.Where("ID").Eq(pid)); err != nil {
+	if err := s.db.FindOne(dbProc, badgerhold.Where(badgerhold.Key).Eq(pid)); err != nil {
 		return err
 	}
 	dbProc.EndBlock = p.GetBlockCount() + p.GetStartBlock()
@@ -300,10 +302,10 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
 	dbProc := &Process{}
-	if err := s.db.FindOne(dbProc, badgerhold.Where("ID").Eq(pid)); err != nil {
+	if err := s.db.FindOne(dbProc, badgerhold.Where(badgerhold.Key).Eq(pid)); err != nil {
 		return err
 	}
-	dbProc.ResultsHeight = height
+	dbProc.Rheight = height
 	return s.db.Update(pid, dbProc)
 }
 
