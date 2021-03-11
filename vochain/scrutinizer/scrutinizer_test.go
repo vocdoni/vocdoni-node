@@ -124,7 +124,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	last := 0
 	var list [][]byte
 	for len(procs) < procsCount {
-		list, err = sc.ProcessList(eidTest, 0, "", last, 10)
+		list, err = sc.ProcessList(eidTest, 0, "", false, last, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -191,25 +191,25 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	}
 
 	// Get the process list for namespace 123
-	list, err := sc.ProcessList(eid20, 123, "", 0, 100)
+	list, err := sc.ProcessList(eid20, 123, "", false, 0, 100)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
 
 	// Get the process list for all namespaces
-	list, err = sc.ProcessList(nil, 0, "", 0, 100)
+	list, err = sc.ProcessList(nil, 0, "", false, 0, 100)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10 + 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 20)
 
 	// Get the process list for namespace 10
-	list, err = sc.ProcessList(nil, 10, "", 0, 100)
+	list, err = sc.ProcessList(nil, 10, "", false, 0, 100)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 1)
 
 	// Get the process list for namespace 10
-	list, err = sc.ProcessList(nil, 0, "READY", 0, 100)
+	list, err = sc.ProcessList(nil, 0, "READY", false, 0, 100)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)

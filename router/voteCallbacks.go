@@ -158,17 +158,18 @@ func (r *Router) getProcessList(request routerRequest) {
 		request.EntityId,
 		request.Namespace,
 		request.Status,
+		request.WithResults,
 		request.From,
 		max)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get entity process list: (%s)", err))
+		r.sendError(request, fmt.Sprintf("cannot get process list: (%s)", err))
 		return
 	}
 	for _, p := range processList {
 		response.ProcessList = append(response.ProcessList, fmt.Sprintf("%x", p))
 	}
 	if len(response.ProcessList) == 0 {
-		response.Message = "entity does not exist or has not yet created a process"
+		response.Message = "no processes found for the query"
 		request.Send(r.buildReply(request, &response))
 		return
 	}
@@ -181,12 +182,12 @@ func (r *Router) getProcessList(request routerRequest) {
 func (r *Router) getProcessCount(request routerRequest) {
 	var response types.MetaResponse
 	response.Size = new(int64)
-	count := r.vocapp.State.CountProcesses(true)
+	count := r.Scrutinizer.ProcessCount()
 	*response.Size = count
 	request.Send(r.buildReply(request, &response))
 }
 
-func (r *Router) getScrutinizerEntityCount(request routerRequest) {
+func (r *Router) getEntityCount(request routerRequest) {
 	var response types.MetaResponse
 	response.Size = new(int64)
 	*response.Size = r.Scrutinizer.EntityCount()
@@ -311,26 +312,6 @@ func (r *Router) getResults(request routerRequest) {
 	response.Height = new(uint32)
 	*response.Height = votes
 
-	request.Send(r.buildReply(request, &response))
-}
-
-// finished processes
-func (r *Router) getProcListResults(request routerRequest) {
-	var response types.MetaResponse
-	if request.ListSize > MaxListSize || request.ListSize <= 0 {
-		request.ListSize = MaxListSize
-	}
-	response.ProcessIDs = r.Scrutinizer.ProcessListWithResults(request.ListSize, request.From)
-	request.Send(r.buildReply(request, &response))
-}
-
-// live processes
-func (r *Router) getProcListLiveResults(request routerRequest) {
-	var response types.MetaResponse
-	if request.ListSize > MaxListSize || request.ListSize <= 0 {
-		request.ListSize = MaxListSize
-	}
-	response.ProcessIDs = r.Scrutinizer.ProcessListWithLiveResults(request.ListSize, request.From)
 	request.Send(r.buildReply(request, &response))
 }
 
