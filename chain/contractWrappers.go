@@ -319,7 +319,7 @@ func (ph *VotingHandle) EntityProcessCount(ctx context.Context, eid common.Addre
 }
 
 // EntityNextProcessID returns the next process id of a given entity address
-func (ph *VotingHandle) EntityNextProcessID(ctx context.Context, eid common.Address) (entityNextProcessID [types.EntityIDsizeV2]byte, err error) {
+func (ph *VotingHandle) EntityNextProcessID(ctx context.Context, eid common.Address) (entityNextProcessID [32]byte, err error) {
 	if entityNextProcessID, err = ph.VotingProcess.GetNextProcessId(&ethbind.CallOpts{Context: ctx}, eid); err != nil {
 		err = fmt.Errorf("cannot get entity next process id: %w", err)
 	}

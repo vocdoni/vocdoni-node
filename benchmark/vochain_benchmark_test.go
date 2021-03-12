@@ -50,8 +50,12 @@ func BenchmarkVochain(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	var req types.MetaRequest
-	doRequest := cl.ForTest(b, &req)
+	req := &types.MetaRequest{}
+	var zeroReq = &types.MetaRequest{}
+	reset := func(r *types.MetaRequest) {
+		*r = *zeroReq
+	}
+	doRequest := cl.ForTest(b, req)
 
 	log.Info("get info")
 	resp := doRequest("getInfo", nil)
@@ -59,11 +63,16 @@ func BenchmarkVochain(b *testing.B) {
 
 	// create census
 	log.Infof("creating census")
+	reset(req)
 	req.CensusID = fmt.Sprintf("test%d", rint)
 	resp = doRequest("addCensus", dvoteServer.Signer)
-
-	// Set correct censusID for coming requests
-	req.CensusID = resp.CensusID
+	if !resp.Ok {
+		b.Fatalf("error on addCensus response: %v", resp.Ok)
+	}
+	if len(resp.CensusID) < 32 {
+		b.Fatalf("addCensus returned an invalid censusId: %x", resp.CensusID)
+	}
+	censusID := resp.CensusID
 
 	// census add claims
 	poseidonHashes := [][]byte{}
@@ -76,18 +85,21 @@ func BenchmarkVochain(b *testing.B) {
 	}
 	log.Debug("add bulk claims")
 	var claims [][]byte
-	req.Digested = true
-	req.CensusKey = []byte{}
 	for i := 0; i < len(poseidonHashes); i++ {
 		claims = append(claims, poseidonHashes[i])
 	}
+
+	reset(req)
+	req.CensusID = censusID
+	req.Digested = true
 	req.CensusKeys = claims
+
 	doRequest("addClaimBulk", dvoteServer.Signer)
-	req.CensusKeys = nil
-	req.Digested = false
 
 	// get census root
 	log.Infof("get root")
+	reset(req)
+	req.CensusID = censusID
 	resp = doRequest("getRoot", nil)
 	censusRoot := resp.Root
 	if len(censusRoot) < 1 {
@@ -95,10 +107,11 @@ func BenchmarkVochain(b *testing.B) {
 	}
 
 	log.Infof("check block height is not less than process start block")
+	reset(req)
 	resp = doRequest("getBlockHeight", nil)
 
 	// create process
-	entityID := signerPub
+	entityID := signerPub[:types.EntityIDsize]
 	processID := testutil.Hex2byte(b, hexProcessID)
 	processData := &models.Process{
 		EntityId:     entityID,
@@ -107,8 +120,9 @@ func BenchmarkVochain(b *testing.B) {
 		ProcessId:    processID,
 		StartBlock:   *resp.Height + 1,
 		Status:       models.ProcessStatus_READY,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         &models.ProcessMode{},
+		EnvelopeType: &models.EnvelopeType{},
+		Mode:         &models.ProcessMode{AutoStart: true},
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
 	}
 	process := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
@@ -125,15 +139,13 @@ func BenchmarkVochain(b *testing.B) {
 	if err != nil {
 		b.Fatalf("cannot sign oracle tx: %s", err)
 	}
+
+	reset(req)
 	req.Payload, err = proto.Marshal(stx)
 	if err != nil {
 		b.Fatalf("error marshaling process tx: %v", err)
 	}
-
-	//	res, err := dvoteServer.VochainRPCClient.BroadcastTxSync(tx)
-	//req.Method = "submitRawTx"
 	resp = doRequest("submitRawTx", nil)
-
 	if !resp.Ok {
 		b.Fatalf("error broadcasting process tx: %s", resp.Message)
 	} else {
@@ -142,12 +154,16 @@ func BenchmarkVochain(b *testing.B) {
 
 	// check if process is created
 	log.Infof("check if process created")
-	req.EntityId = signerPub
-
+	reset(req)
+	failures := 20
 	for {
-		resp = doRequest("getProcessList", nil)
-		if resp.ProcessList[0] == "0xe9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105" {
+		resp = doRequest("getProcessInfo", nil)
+		if resp.Ok {
 			break
+		}
+		failures--
+		if failures == 0 {
+			b.Fatalf("processID does not exist in the blockchain")
 		}
 		time.Sleep(time.Second)
 	}
@@ -162,7 +178,13 @@ func BenchmarkVochain(b *testing.B) {
 
 		count := 0
 		for pb.Next() {
-			vochainBench(b, cl, keySet[count], poseidonHashes[count], censusRoot, processID, req.CensusID)
+			vochainBench(b,
+				cl,
+				keySet[count],
+				poseidonHashes[count],
+				censusRoot,
+				processID,
+				req.CensusID)
 			count++
 		}
 	})
@@ -175,11 +197,12 @@ func BenchmarkVochain(b *testing.B) {
 
 	// get entities that created at least ones process
 	log.Infof("get entities")
-	resp = doRequest("getScrutinizerEntities", nil)
+	resp = doRequest("getEntityList", nil)
 	log.Infof("created entities: %+v", resp.EntityIDs)
 }
 
-func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon, censusRoot, processID []byte, censusID string) {
+func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon,
+	censusRoot, processID []byte, censusID string) {
 	// API requests
 	var req types.MetaRequest
 	doRequest := cl.ForTest(b, &req)
@@ -189,14 +212,14 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 
 	pub, _ := s.HexString()
 	// generate envelope proof
-	log.Infof("generating proof for key %s with poseidon hash: %s", pub, poseidon)
+	log.Infof("generating proof for key %s", pub)
 	req.CensusID = censusID
 	req.RootHash = censusRoot
 	req.CensusKey = poseidon
 	resp := doRequest("genProof", nil)
 	siblings := resp.Siblings
 	if len(siblings) == 0 {
-		b.Fatalf("proof not generated while it should be generated correctly")
+		b.Fatalf("proof not generated while it should be generated correctly: %v", resp.Message)
 	}
 
 	// generate envelope votePackage
@@ -211,9 +234,15 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	}
 	// Generate VoteEnvelope package
 	tx := models.VoteEnvelope{
-		Nonce:       util.RandomBytes(32),
-		ProcessId:   processID,
-		Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: siblings}}},
+		Nonce:     util.RandomBytes(32),
+		ProcessId: processID,
+		Proof: &models.Proof{
+			Payload: &models.Proof_Graviton{
+				Graviton: &models.ProofGraviton{
+					Siblings: siblings,
+				},
+			},
+		},
 		VotePackage: voteBytes,
 	}
 

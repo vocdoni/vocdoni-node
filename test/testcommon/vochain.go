@@ -197,6 +197,7 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	d.VochainCfg.PublicAddr = "0.0.0.0:26656"
 	d.VochainCfg.RPCListen = "0.0.0.0:26657"
 	d.VochainCfg.NoWaitSync = true
+	d.VochainCfg.MempoolSize = 20000
 
 	// run node
 	d.VochainCfg.MinerKey = fmt.Sprintf("%x", validator.Key.PrivKey)
