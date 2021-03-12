@@ -16,8 +16,8 @@ type Specs struct {
 	BootNodes       []string // List of Bootnodes for this network
 	StartingBlock   int64    // Where to start looking for events
 	ENSregistryAddr string
-	// ENSdomains are ordered as [processes, namespaces, erc20tokenproofs, genesis, results]
-	ENSdomains [5]string // domains for each contract
+	// ENSdomains are ordered as [processes, namespaces, erc20tokenproofs, genesis, results, entityResolver]
+	ENSdomains [6]string // domains for each contract
 }
 
 var AvailableChains = []string{"mainnet", "goerli", "xdai", "xdaistage"}
@@ -46,12 +46,13 @@ var mainnet = Specs{
 	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
 	BootNodes:       ethparams.MainnetBootnodes,
 	StartingBlock:   10230300, //2020 jun 09 10:00h
-	ENSdomains: [5]string{
+	ENSdomains: [6]string{
 		types.ProcessesDomain,
 		types.NamespacesDomain,
 		types.ERC20ProofsDomain,
 		types.GenesisDomain,
 		types.ResultsDomain,
+		types.EntityResolverDomain,
 	},
 }
 
@@ -61,12 +62,13 @@ var xdai = Specs{
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
 	StartingBlock:   14531875, //2021 Feb 13 21:58h
-	ENSdomains: [5]string{
+	ENSdomains: [6]string{
 		types.ProcessesDomain,
 		types.NamespacesDomain,
 		types.ERC20ProofsDomain,
 		types.GenesisDomain,
 		types.ResultsDomain,
+		types.EntityResolverDomain,
 	},
 }
 
@@ -76,12 +78,13 @@ var xdaistage = Specs{
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
 	StartingBlock:   14531875, //2021 Feb 13 21:58h
-	ENSdomains: [5]string{
+	ENSdomains: [6]string{
 		types.ProcessesStageDomain,
 		types.NamespacesStageDomain,
 		types.ERC20ProofsStageDomain,
 		types.GenesisStageDomain,
 		types.ResultsStageDomain,
+		types.EntityResolverStageDomain,
 	},
 }
 
@@ -92,12 +95,13 @@ var goerlistage = Specs{
 	StartingBlock:   goerli.StartingBlock,
 	ENSregistryAddr: goerli.ENSregistryAddr,
 	BootNodes:       ethparams.GoerliBootnodes,
-	ENSdomains: [5]string{
+	ENSdomains: [6]string{
 		types.ProcessesStageDomain,
 		types.NamespacesStageDomain,
 		types.ERC20ProofsStageDomain,
 		types.GenesisStageDomain,
 		types.ResultsStageDomain,
+		types.EntityResolverStageDomain,
 	},
 	GenesisHash: goerli.GenesisHash,
 	GenesisB64:  goerli.GenesisB64,
@@ -110,12 +114,13 @@ var goerli = Specs{
 	StartingBlock:   3000000,
 	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
 	BootNodes:       ethparams.GoerliBootnodes,
-	ENSdomains: [5]string{
+	ENSdomains: [6]string{
 		types.ProcessesDevelopmentDomain,
 		types.NamespacesDevelopmentDomain,
 		types.ERC20ProofsDevelopmentDomain,
 		types.GenesisDevelopmentDomain,
 		types.ResultsDevelopmentDomain,
+		types.EntityResolverDevelopmentDomain,
 	},
 	GenesisHash: "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog

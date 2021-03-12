@@ -46,10 +46,7 @@ type Genesis struct {
 	Oracles    []common.Address
 }
 
-// NewVotingHandle initializes the Processes, Namespace and TokenStorageProof contracts creating a transactor using the ethereum client
-// contractsAddress[0] -> Processes contract
-// contractsAddress[1] -> Namespace contract
-// contractsAddress[2] -> TokenStorageProof contract
+// NewVotingHandle initializes contracts creating a transactor using the ethereum client
 func NewVotingHandle(contractsAddress []common.Address, dialEndpoint string) (*VotingHandle, error) {
 	var err error
 	ph := new(VotingHandle)
