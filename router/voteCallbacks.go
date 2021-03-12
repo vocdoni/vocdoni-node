@@ -316,7 +316,7 @@ func (r *Router) getResults(request routerRequest) {
 }
 
 // known entities
-func (r *Router) getEntities(request routerRequest) {
+func (r *Router) getEntityList(request routerRequest) {
 	var response types.MetaResponse
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize

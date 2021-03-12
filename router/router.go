@@ -260,7 +260,7 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, vocInfo *vochain
 		r.registerPublic("getProcessList", r.getProcessList)
 		r.registerPublic("getProcessCount", r.getProcessCount)
 		r.registerPublic("getResults", r.getResults)
-		r.registerPublic("getEntities", r.getEntities)
+		r.registerPublic("getEntityList", r.getEntityList)
 		r.registerPublic("getEntityCount", r.getEntityCount)
 	}
 }
