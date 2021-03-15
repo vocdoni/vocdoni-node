@@ -47,7 +47,7 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 		logDisable = true
 		vochaincfg.LogLevelMemPool = "error"
 	}
-	logger, err := tmflags.ParseLogLevel(vochaincfg.LogLevelMemPool, NewTenderLogger("mempool", logDisable), tmcfg.DefaultLogLevel())
+	logger, err := tmflags.ParseLogLevel(vochaincfg.LogLevelMemPool, NewTenderLogger("mempool", logDisable), tmcfg.DefaultLogLevel)
 	if err != nil {
 		log.Errorf("failed to parse log level: %v", err)
 	}
@@ -202,7 +202,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		logDisable = true
 		tconfig.LogLevel = "error"
 	}
-	logger, err := tmflags.ParseLogLevel(tconfig.LogLevel, NewTenderLogger("tendermint", logDisable), tmcfg.DefaultLogLevel())
+	logger, err := tmflags.ParseLogLevel(tconfig.LogLevel, NewTenderLogger("tendermint", logDisable), tmcfg.DefaultLogLevel)
 	if err != nil {
 		log.Errorf("failed to parse log level: %v", err)
 	}
