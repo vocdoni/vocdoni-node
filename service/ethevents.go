@@ -36,13 +36,15 @@ func EthEvents(
 	if err != nil {
 		return fmt.Errorf("cannot get specs for the selected network: %w", err)
 	}
-	contractsAddresses := make([]common.Address, len(specs.ENSdomains))
-	for idx, domain := range specs.ENSdomains {
+	for k, contract := range specs.Contracts {
+		if !contract.ListenForEvents {
+			continue
+		}
 		var addr string
 		for i := 0; i < types.EthereumDialMaxRetry; i++ {
-			addr, err = chain.EnsResolve(ctx, specs.ENSregistryAddr, domain, w3uri)
+			addr, err = chain.EnsResolve(ctx, specs.ENSregistryAddr, contract.Domain, w3uri)
 			if err != nil {
-				log.Errorf("cannot resolve domain: %s, error: %s, trying again ...", domain, err)
+				log.Errorf("cannot resolve domain: %s, error: %s, trying again ...", contract.Domain, err)
 				continue
 			}
 			break
@@ -50,11 +52,14 @@ func EthEvents(
 		if addr == "" {
 			return fmt.Errorf("cannot resolve domain address, cannot proceed without resolving contract addresses")
 		}
-		contractsAddresses[idx] = common.HexToAddress(addr)
+		contract.Address = common.HexToAddress(addr)
+		if err := contract.SetABI(k); err != nil {
+			return fmt.Errorf("couldn't set contract ABI: %w", err)
+		}
+		log.Infof("loaded contract %s at address: %s", contract.Domain, contract.Address)
 	}
-	log.Debugf("contracts addresses on eth events: %+v", contractsAddresses)
 
-	ev, err := ethevents.NewEthEvents(contractsAddresses, signer, w3uri, cm, vocapp, sc, ethereumWhiteList)
+	ev, err := ethevents.NewEthEvents(specs.Contracts, signer, w3uri, cm, vocapp, sc, ethereumWhiteList)
 	if err != nil {
 		return fmt.Errorf("couldn't create ethereum events listener: %w", err)
 	}
