@@ -1,21 +1,19 @@
 package ethevents
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
-	"strings"
 	"sync"
 	"time"
 
 	eth "github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	cttypes "github.com/tendermint/tendermint/rpc/core/types"
 	ttypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/census"
-	"go.vocdoni.io/dvote/chain/contracts"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/types"
@@ -31,20 +29,6 @@ import (
 
 // EthereumEvents type is used to monitorize Ethereum smart contracts and call custom EventHandler functions
 type EthereumEvents struct {
-	// contracts addresses
-	// [0] -> Processes contract
-	// [1] -> Namespace contract
-	// [2] -> TokenStorageProof contract
-	// [3] -> Genesis contract
-	// [4] -> Results contract
-	ContractsAddress []common.Address
-	// contracts ABI
-	// [0] -> Processes contract
-	// [1] -> Namespace contract
-	// [2] -> TokenStorageProof contract
-	// [3] -> Genesis contract
-	// [4] -> Results contract
-	ContractsABI []abi.ABI
 	// contracts handle
 	VotingHandle *chain.VotingHandle
 	// dial web3 address
@@ -65,6 +49,10 @@ type EthereumEvents struct {
 	Scrutinizer *scrutinizer.Scrutinizer
 	// EthereumWhiteListAddrs
 	EthereumWhiteListAddrs map[common.Address]bool
+	// ContractsAddress
+	ContractsAddress []common.Address
+	// ContractsInfo holds useful info for working with the desired contracts
+	ContractsInfo map[string]*chain.EthereumContract
 }
 
 type logEvent struct {
@@ -100,8 +88,8 @@ type EventProcessor struct {
 }
 
 // NewEthEvents creates a new Ethereum events handler
-// contractsAddresses: [0] -> Processes contract, [1] -> Namespace contract, [2] -> TokenStorageProof contract [3] -> Genesis contract, [4] -> Results contract
-func NewEthEvents(contractsAddresses []common.Address,
+func NewEthEvents(
+	contracts map[string]*chain.EthereumContract,
 	signer *ethereum.SignKeys,
 	w3Endpoint string,
 	cens *census.Manager,
@@ -113,30 +101,9 @@ func NewEthEvents(contractsAddresses []common.Address,
 	if len(w3Endpoint) == 0 {
 		return nil, fmt.Errorf("no w3Endpoint specified on Ethereum Events")
 	}
-	ph, err := chain.NewVotingHandle(contractsAddresses, w3Endpoint)
+	ph, err := chain.NewVotingHandle(contracts, w3Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create voting handle: %w", err)
-	}
-	abis := make([]abi.ABI, len(contractsAddresses))
-	abis[0], err = abi.JSON(strings.NewReader(contracts.ProcessesABI))
-	if err != nil {
-		return nil, fmt.Errorf("cannot read processes contract abi: %w", err)
-	}
-	abis[1], err = abi.JSON(strings.NewReader(contracts.NamespacesABI))
-	if err != nil {
-		return nil, fmt.Errorf("cannot read namespace contract abi: %w", err)
-	}
-	abis[2], err = abi.JSON(strings.NewReader(contracts.TokenStorageProofABI))
-	if err != nil {
-		return nil, fmt.Errorf("cannot read token storage proof contract abi: %w", err)
-	}
-	abis[3], err = abi.JSON(strings.NewReader(contracts.GenesisABI))
-	if err != nil {
-		return nil, fmt.Errorf("cannot read genesis contract abi: %w", err)
-	}
-	abis[4], err = abi.JSON(strings.NewReader(contracts.ResultsABI))
-	if err != nil {
-		return nil, fmt.Errorf("cannot read results contract abi: %w", err)
 	}
 
 	secureAddrList := make(map[common.Address]bool, len(ethereumWhiteList))
@@ -150,20 +117,27 @@ func NewEthEvents(contractsAddresses []common.Address,
 		}
 	}
 
+	contractsAddress := []common.Address{}
+	for _, contract := range contracts {
+		if !bytes.Equal(contract.Address.Bytes(), common.Address{}.Bytes()) {
+			contractsAddress = append(contractsAddress, contract.Address)
+		}
+	}
+
 	ethev := &EthereumEvents{
-		ContractsAddress: contractsAddresses,
-		ContractsABI:     abis,
-		VotingHandle:     ph,
-		Signer:           signer,
-		DialAddr:         w3Endpoint,
-		Census:           cens,
-		VochainApp:       vocapp,
+		VotingHandle: ph,
+		Signer:       signer,
+		DialAddr:     w3Endpoint,
+		Census:       cens,
+		VochainApp:   vocapp,
 		EventProcessor: &EventProcessor{
 			Events:                make(chan ethtypes.Log),
 			EventProcessThreshold: 60 * time.Second,
 			eventQueue:            make(map[string]*logEvent),
 		},
 		EthereumWhiteListAddrs: secureAddrList,
+		ContractsAddress:       contractsAddress,
+		ContractsInfo:          contracts,
 	}
 
 	if scrutinizer != nil {
