@@ -56,16 +56,20 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	if err := s.db.Update(processID, p); err != nil {
 		return fmt.Errorf("computeResults: cannot update processID %x: %w, ", processID, err)
 	}
-	return s.db.Update(processID, &Results{
-		Votes:     pv.Votes,
-		ProcessID: processID,
-	})
+	results := &Results{}
+	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").Eq(processID)); err != nil {
+		if err != badgerhold.ErrNotFound {
+			return err
+		}
+		results.ProcessID = processID
+	}
+	results.Votes = pv.Votes
+	return s.db.Update(processID, results)
 }
 
 // GetResults returns the current result for a processId aggregated in a two dimension int slice
 // TODO (pau): improve this approach, instead of 2 queries make just 1
 func (s *Scrutinizer) GetResults(processID []byte) (*Results, error) {
-	log.Debugf("finding results for %x", processID)
 	if n, err := s.db.Count(&Process{},
 		badgerhold.Where("ID").Eq(processID).
 			And("HaveResults").Eq(true).
@@ -83,6 +87,18 @@ func (s *Scrutinizer) GetResults(processID []byte) (*Results, error) {
 		return nil, err
 	}
 	return results, nil
+}
+
+// GetResultsWeight returns the current weight of cast votes for a processId.
+func (s *Scrutinizer) GetResultsWeight(processID []byte) (*big.Int, error) {
+	results := &Results{}
+	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").Eq(processID)); err != nil {
+		return nil, err
+	}
+	if results.Weight == nil {
+		return new(big.Int).SetUint64(0), nil
+	}
+	return results.Weight, nil
 }
 
 // PrintResults returns a human friendly interpretation of the results.
@@ -129,7 +145,9 @@ func unmarshalVote(votePackage []byte, keys []string) (*types.VotePackage, error
 	return &vote, nil
 }
 
-func (s *Scrutinizer) addLiveResultsVote(envelope *models.Vote) error {
+// addLiveVote is triggered by OnVote callback for each vote added to the blockchain.
+// If encrypted vote, only weight will be updated.
+func (s *Scrutinizer) addLiveVote(envelope *models.Vote) error {
 	pid := envelope.GetProcessId()
 	if pid == nil {
 		return fmt.Errorf("cannot find process for envelope")
@@ -138,12 +156,24 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *models.Vote) error {
 	if err != nil {
 		return fmt.Errorf("cannot get process %x: %w", pid, err)
 	}
-	vote, err := unmarshalVote(envelope.GetVotePackage(), []string{})
-	if err != nil {
-		return err
+
+	if p.EnvelopeType == nil {
+		return fmt.Errorf("envelope type is nil")
 	}
-	if len(vote.Votes) > MaxQuestions {
-		return fmt.Errorf("too many elements on addVote")
+
+	// If live process, add vote to temporary results
+	var vote *types.VotePackage
+	if !p.EnvelopeType.EncryptedVotes {
+		vote, err = unmarshalVote(envelope.GetVotePackage(), []string{})
+		if err != nil {
+			return err
+		}
+		if vote == nil {
+			return fmt.Errorf("unmarshaled vote is nil")
+		}
+		if len(vote.Votes) > MaxQuestions {
+			return fmt.Errorf("too many elements on addVote")
+		}
 	}
 
 	return s.db.UpdateMatching(&Results{},
@@ -151,16 +181,35 @@ func (s *Scrutinizer) addLiveResultsVote(envelope *models.Vote) error {
 		func(record interface{}) error {
 			update, ok := record.(*Results)
 			if !ok {
-				return fmt.Errorf("record isn't the correct type!  Wanted Result, got %T", record)
+				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 			}
-			if err := addVote(update.Votes,
-				vote.Votes,
-				envelope.GetWeight(),
-				p.GetVoteOptions(),
-				p.GetEnvelopeType()); err != nil {
-				return err
+			// Add weight to the process Results (if empty, consider weight=1)
+			weight := new(big.Int).SetUint64(1)
+			if envelope.GetWeight() != nil {
+				weight = new(big.Int).SetBytes(envelope.GetWeight())
 			}
-			log.Debugf("addVote %v on process %x", vote.Votes, pid)
+			if update.Weight == nil {
+				update.Weight = weight
+			} else {
+				update.Weight.Add(update.Weight, weight)
+			}
+			// Add the vote only if the election is unencrypted
+			if vote != nil {
+				if err := addVote(update.Votes,
+					vote.Votes,
+					weight.Bytes(),
+					p.GetVoteOptions(),
+					p.GetEnvelopeType()); err != nil {
+					return err
+				}
+			}
+			// Print some debug info
+			log.Debugf("addVote %v with weight %s on process %x", func() string {
+				if vote == nil {
+					return "encrypted"
+				}
+				return fmt.Sprintf("%v", vote.Votes)
+			}(), weight.String(), pid)
 			return nil
 		})
 }
@@ -239,11 +288,8 @@ func (s *Scrutinizer) computeNonLiveResults(p *Process) (*models.ProcessResult, 
 	return pv, nil
 }
 
-func addVote(currentResults []*models.QuestionResult,
-	voteValues []int,
-	weight []byte,
-	options *models.ProcessVoteOptions,
-	envelopeType *models.EnvelopeType) error {
+func addVote(currentResults []*models.QuestionResult, voteValues []int, weight []byte,
+	options *models.ProcessVoteOptions, envelopeType *models.EnvelopeType) error {
 	if options == nil {
 		return fmt.Errorf("addVote: processVoteOptions is nil")
 	}

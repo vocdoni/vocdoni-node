@@ -179,6 +179,17 @@ func (r *Router) getProcessList(request routerRequest) {
 	request.Send(r.buildReply(request, &response))
 }
 
+func (r *Router) getProcessInfo(request routerRequest) {
+	var response types.MetaResponse
+	var err error
+	response.ProcessInfo, err = r.Scrutinizer.ProcessInfo(request.ProcessID)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get process info: %v", err))
+		return
+	}
+	request.Send(r.buildReply(request, &response))
+}
+
 func (r *Router) getProcessCount(request routerRequest) {
 	var response types.MetaResponse
 	response.Size = new(int64)
@@ -254,6 +265,17 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 		strnull = append(strnull, fmt.Sprintf("%x", n))
 	}
 	response.Nullifiers = &strnull
+	request.Send(r.buildReply(request, &response))
+}
+
+func (r *Router) getResultsWeight(request routerRequest) {
+	var response types.MetaResponse
+	var err error
+	response.Weight, err = r.Scrutinizer.GetResultsWeight(request.ProcessID)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get results weight: %v", err))
+		return
+	}
 	request.Send(r.buildReply(request, &response))
 }
 

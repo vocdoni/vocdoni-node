@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"reflect"
 
 	"github.com/spf13/cobra"
 	"go.vocdoni.io/dvote/client"
@@ -13,14 +14,20 @@ import (
 )
 
 var processCmd = &cobra.Command{
-	Use:   "process list|keys|results|finalresults|liveresults",
+	Use:   "process list|info|keys|results|weight|finalresults|liveresults",
 	Short: "process subcommands",
 }
 
 var processListCmd = &cobra.Command{
 	Use:   "list [entityId]",
-	Short: "list processes of entity",
+	Short: "list processes",
 	RunE:  processList,
+}
+
+var processInfoCmd = &cobra.Command{
+	Use:   "info [processId]",
+	Short: "get process details",
+	RunE:  processInfo,
 }
 
 var processKeysCmd = &cobra.Command{
@@ -35,11 +42,19 @@ var processResultsCmd = &cobra.Command{
 	RunE:  getResults,
 }
 
+var processResultsWeightCmd = &cobra.Command{
+	Use:   "weight [processId]",
+	Short: "get the current accumulated cast votes weight",
+	RunE:  getResultsWeight,
+}
+
 func init() {
 	rootCmd.AddCommand(processCmd)
 	processCmd.AddCommand(processListCmd)
+	processCmd.AddCommand(processInfoCmd)
 	processCmd.AddCommand(processKeysCmd)
 	processCmd.AddCommand(processResultsCmd)
+	processCmd.AddCommand(processResultsWeightCmd)
 }
 
 func processList(cmd *cobra.Command, args []string) error {
@@ -82,6 +97,46 @@ func processList(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Print(buffer.String())
 	return err
+}
+
+func processInfo(cmd *cobra.Command, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("you must provide a process id")
+	}
+
+	cl, err := client.New(opt.host)
+	if err != nil {
+		return err
+	}
+	defer cl.CheckClose(&err)
+
+	req := types.MetaRequest{Method: "getProcessInfo"}
+	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
+	if err != nil {
+		return err
+	}
+	resp, err := cl.Request(req, nil)
+	if err != nil {
+		return err
+	}
+
+	if !resp.Ok {
+		return fmt.Errorf(resp.Message)
+	}
+	buf := new(bytes.Buffer)
+	for k, v := range resp.ProcessInfo.(map[string]interface{}) {
+		value := new(bytes.Buffer)
+		if reflect.TypeOf(v).Kind() == reflect.Map {
+			for vk, vv := range v.(map[string]interface{}) {
+				value.WriteString(fmt.Sprintf("%s=%v ", vk, vv))
+			}
+		} else {
+			value.WriteString(fmt.Sprintf("%v", v))
+		}
+		buf.WriteString(fmt.Sprintf("%s: \t%s\n", k, value))
+	}
+	fmt.Println(buf.String())
+	return nil
 }
 
 func processKeys(cmd *cobra.Command, args []string) error {
@@ -162,5 +217,32 @@ func getResults(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(buffer, "%v\n", res)
 	}
 	fmt.Print(buffer.String())
+	return err
+}
+
+func getResultsWeight(cmd *cobra.Command, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("you must provide a process id")
+	}
+
+	cl, err := client.New(opt.host)
+	if err != nil {
+		return err
+	}
+	defer cl.CheckClose(&err)
+
+	req := types.MetaRequest{Method: "getResultsWeight"}
+	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
+	if err != nil {
+		return err
+	}
+	resp, err := cl.Request(req, nil)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf(resp.Message)
+	}
+	fmt.Println(resp.Weight.String())
 	return err
 }

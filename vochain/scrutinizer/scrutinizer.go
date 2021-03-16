@@ -71,7 +71,7 @@ func (s *Scrutinizer) Commit(height int64) {
 
 	// Add votes collected by onVote (live results)
 	for _, v := range s.votePool {
-		if err := s.addLiveResultsVote(v); err != nil {
+		if err := s.addLiveVote(v); err != nil {
 			log.Errorf("cannot add live vote: (%s)", err)
 			continue
 		}
@@ -115,14 +115,7 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
 
 // OnVote scrutinizer stores the votes if liveResults enabled
 func (s *Scrutinizer) OnVote(v *models.Vote) {
-	isLive, err := s.isLiveResultsProcess(v.ProcessId)
-	if err != nil {
-		log.Errorf("cannot check if process is live results: (%s)", err)
-		return
-	}
-	if isLive {
-		s.votePool = append(s.votePool, v)
-	}
+	s.votePool = append(s.votePool, v)
 }
 
 // OnCancel scrutinizer stores the processID and entityID
