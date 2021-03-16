@@ -55,7 +55,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 
 	// global
 	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
-	flag.StringVar(&globalCfg.VochainConfig.Chain, "vochain", "dev", "vocdoni blokchain network to connect with")
+	flag.StringVar(&globalCfg.VochainConfig.Chain, "vochain", "main", "vocdoni blokchain network to connect with")
 	flag.BoolVar(&globalCfg.Dev, "dev", false, "use developer mode (less security)")
 	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
@@ -474,7 +474,9 @@ func main() {
 			if len(tp) != 2 {
 				log.Warnf("cannot get port from vochain RPC listen: %s", globalCfg.VochainConfig.RPCListen)
 			} else {
-				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket", types.VochainWsReadLimit), types.VochainWsReadLimit) // tendermint needs up to 20 MB
+				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge(
+					"ws://127.0.0.1:"+tp[1]+"/websocket",
+					types.VochainWsReadLimit), types.VochainWsReadLimit) // tendermint needs up to 20 MB
 				log.Infof("tendermint API endpoint available at %s", "/tendermint")
 			}
 		}
@@ -494,7 +496,8 @@ func main() {
 
 	// Start keykeeper service
 	if globalCfg.Mode == types.ModeOracle && globalCfg.VochainConfig.KeyKeeperIndex > 0 {
-		kk, err = keykeeper.NewKeyKeeper(globalCfg.VochainConfig.DataDir+"/keykeeper", vnode, signer, globalCfg.VochainConfig.KeyKeeperIndex)
+		kk, err = keykeeper.NewKeyKeeper(globalCfg.VochainConfig.DataDir+"/keykeeper",
+			vnode, signer, globalCfg.VochainConfig.KeyKeeperIndex)
 		if err != nil {
 			log.Fatal(err)
 		}
