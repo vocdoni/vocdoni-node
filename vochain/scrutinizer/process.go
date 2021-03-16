@@ -9,6 +9,7 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 )
 
 // ProcessInfo returns the available information regarding an election process id
@@ -208,7 +209,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	if err := s.db.Insert(pid, &Results{
 		ProcessID:  pid,
 		Votes:      pv.GetVotes(),
-		Signatures: [][]byte{},
+		Signatures: []types.HexBytes{},
 	}); err != nil {
 		return err
 	}
