@@ -643,15 +643,30 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityResolv
 	if err := ensCallerHandler.NewEntityResolverHandle(); err != nil {
 		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}
+	// resolve entity resolver addr
+	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	defer cancel()
+	rAddr, err := ensCallerHandler.Resolver.Addr(&ethbind.CallOpts{Context: tctx}, nh)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
+	}
+	// assign entity resolver to ensCallerHandler resolver
+	ensCallerHandler.ResolverAddr = rAddr.String()
+	if err := ensCallerHandler.NewEntityResolverHandle(); err != nil {
+		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
+	}
 	// get entity metadata url from resolver
 	eIDBytes, err := hex.DecodeString(entityID)
 	if err != nil {
 		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}
+	// keccak256 entity addr
+	eIDBytes = ethereum.HashRaw(eIDBytes)
 	var eIDBytes32 [32]byte
 	copy(eIDBytes32[:], eIDBytes)
-	tctx, cancel := context.WithTimeout(ctx, types.EthereumWriteTimeout)
+	tctx, cancel = context.WithTimeout(ctx, types.EthereumWriteTimeout)
 	defer cancel()
+	// get stored text
 	metaURL, err := ensCallerHandler.Resolver.Text(&ethbind.CallOpts{Context: tctx}, eIDBytes32, types.EntityMetaKey)
 	if err != nil {
 		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
