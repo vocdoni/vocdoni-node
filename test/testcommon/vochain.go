@@ -193,9 +193,9 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	// creating node
 	d.VochainCfg.LogLevel = "error"
 	d.VochainCfg.LogLevelMemPool = "error"
-	d.VochainCfg.P2PListen = "0.0.0.0:26656"
-	d.VochainCfg.PublicAddr = "0.0.0.0:26656"
-	d.VochainCfg.RPCListen = "0.0.0.0:26657"
+	d.VochainCfg.P2PListen = fmt.Sprintf("0.0.0.0:%d", 29000+rand.Intn(1000))
+	d.VochainCfg.PublicAddr = fmt.Sprintf("0.0.0.0:%d", 28000+rand.Intn(1000))
+	d.VochainCfg.RPCListen = fmt.Sprintf("0.0.0.0:%d", 27000+rand.Intn(1000))
 	d.VochainCfg.NoWaitSync = true
 	d.VochainCfg.MempoolSize = 20000
 

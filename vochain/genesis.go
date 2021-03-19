@@ -15,11 +15,11 @@ var Genesis = map[string]VochainGenesis{
 		SeedNodes:         []string{"121e65eb5994874d9c05cd8d584a54669d23f294@seed.vocdoni.net:26656"},
 		Genesis: `
    {
-      "genesis_time":"2020-09-15T15:38:33.672114557Z",
-      "chain_id":"vocdoni-release-06",
+      "genesis_time":"2021-03-16T15:38:33.672114557Z",
+      "chain_id":"vocdoni-release-1.0",
       "consensus_params":{
          "block":{
-            "max_bytes":"22020096",
+            "max_bytes":"10485760",
             "max_gas":"-1",
             "time_iota_ms":"10000"
          },

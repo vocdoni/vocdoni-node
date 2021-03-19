@@ -14,6 +14,8 @@ import (
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/router"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/scrutinizer"
 )
 
 // DvoteAPIServer contains all the required pieces for running a go-dvote api server
@@ -26,6 +28,9 @@ type DvoteAPIServer struct {
 	PxyAddr        string
 	Storage        data.Storage
 	IpfsPort       int
+
+	VochainAPP  *vochain.BaseApplication
+	Scrutinizer *scrutinizer.Scrutinizer
 }
 
 /*
@@ -97,10 +102,10 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 		case "census":
 			routerAPI.EnableCensusAPI(&cm)
 		case "vote":
-			vnode := NewMockVochainNode(tb, d)
-			sc := NewMockScrutinizer(tb, d, vnode)
-			routerAPI.Scrutinizer = sc
-			routerAPI.EnableVoteAPI(vnode, nil)
+			d.VochainAPP = NewMockVochainNode(tb, d)
+			d.Scrutinizer = NewMockScrutinizer(tb, d, d.VochainAPP)
+			routerAPI.Scrutinizer = d.Scrutinizer
+			routerAPI.EnableVoteAPI(d.VochainAPP, nil)
 		default:
 			tb.Fatalf("unknown api: %q", api)
 		}

@@ -1,4 +1,6 @@
 # Binaries for programs and plugins
+/dvotenode
+/dvotecli
 *.exe
 *.exe~
 *.dll

@@ -29,7 +29,6 @@ func BenchmarkCheckTx(b *testing.B) {
 	var voters [][]*models.SignedTx
 	for i := 0; i < b.N+1; i++ {
 		voters = append(voters, prepareBenchCheckTx(b, app, benchmarkVoters, tmp))
-		//b.Logf("creating process %x", voters[i][0].GetVote().ProcessId)
 	}
 	var i int32
 	b.ResetTimer()

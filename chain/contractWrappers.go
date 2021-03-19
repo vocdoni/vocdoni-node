@@ -47,7 +47,7 @@ type Genesis struct {
 }
 
 // NewVotingHandle initializes contracts creating a transactor using the ethereum client
-func NewVotingHandle(contractsAddress []common.Address, dialEndpoint string) (*VotingHandle, error) {
+func NewVotingHandle(contracts map[string]*EthereumContract, dialEndpoint string) (*VotingHandle, error) {
 	var err error
 	ph := new(VotingHandle)
 	// try connect to the w3endpoint using an RPC connection
@@ -62,23 +62,42 @@ func NewVotingHandle(contractsAddress []common.Address, dialEndpoint string) (*V
 	}
 	// if RPC connection established, create an ethereum client using the RPC client
 	ph.EthereumClient = ethclient.NewClient(ph.EthereumRPC)
-	if ph.VotingProcess, err = contracts.NewProcesses(contractsAddress[0], ph.EthereumClient); err != nil {
-		return new(VotingHandle), fmt.Errorf("error constructing processes contract transactor: %w", err)
-	}
-	if ph.Namespace, err = contracts.NewNamespaces(contractsAddress[1], ph.EthereumClient); err != nil {
-		return nil, fmt.Errorf("error constructing namespace contract transactor: %w", err)
-	}
-	if ph.TokenStorageProof, err = contracts.NewTokenStorageProof(contractsAddress[2], ph.EthereumClient); err != nil {
-		return nil, fmt.Errorf("error constructing token storage proof contract transactor: %w", err)
-	}
-	if ph.Genesis, err = contracts.NewGenesis(contractsAddress[3], ph.EthereumClient); err != nil {
-		return nil, fmt.Errorf("error constructing genesis contract transactor: %w", err)
-	}
-	if ph.Results, err = contracts.NewResults(contractsAddress[4], ph.EthereumClient); err != nil {
-		return nil, fmt.Errorf("error constructing results contract transactor: %w", err)
+	for _, contract := range contracts {
+		if err := ph.SetContractInstance(contract); err != nil {
+			log.Errorf("cannot set contract instance: %s", err)
+		}
 	}
 
 	return ph, nil
+}
+
+// SetContractInstance creates the given contract transactor and returns
+// an object ready to interact with a web3 fashion
+func (ph *VotingHandle) SetContractInstance(ec *EthereumContract) error {
+	var err error
+	switch {
+	case strings.HasPrefix(ec.Domain, "processes"):
+		if ph.VotingProcess, err = contracts.NewProcesses(ec.Address, ph.EthereumClient); err != nil {
+			return fmt.Errorf("error constructing processes contract transactor: %w", err)
+		}
+	case strings.HasPrefix(ec.Domain, "namespaces"):
+		if ph.Namespace, err = contracts.NewNamespaces(ec.Address, ph.EthereumClient); err != nil {
+			return fmt.Errorf("error constructing namespace contract transactor: %w", err)
+		}
+	case strings.HasPrefix(ec.Domain, "erc20"):
+		if ph.TokenStorageProof, err = contracts.NewTokenStorageProof(ec.Address, ph.EthereumClient); err != nil {
+			return fmt.Errorf("error constructing token storage proof contract transactor: %w", err)
+		}
+	case strings.HasPrefix(ec.Domain, "genesis"):
+		if ph.Genesis, err = contracts.NewGenesis(ec.Address, ph.EthereumClient); err != nil {
+			return fmt.Errorf("error constructing genesis contract transactor: %w", err)
+		}
+	case strings.HasPrefix(ec.Domain, "results"):
+		if ph.Results, err = contracts.NewResults(ec.Address, ph.EthereumClient); err != nil {
+			return fmt.Errorf("error constructing results contract transactor: %w", err)
+		}
+	}
+	return nil
 }
 
 // PROCESSES WRAPPER
@@ -579,7 +598,7 @@ func EnsResolve(ctx context.Context, ensRegistryAddr, ethDomain, w3uri string) (
 			err = fmt.Errorf("cannot get contract address: %w", err)
 			return
 		}
-		log.Infof("loaded contract at address: %s", contractAddr)
+		log.Debugf("loaded contract at address: %s", contractAddr)
 		break
 	}
 	return
@@ -624,15 +643,30 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityResolv
 	if err := ensCallerHandler.NewEntityResolverHandle(); err != nil {
 		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}
+	// resolve entity resolver addr
+	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
+	defer cancel()
+	rAddr, err := ensCallerHandler.Resolver.Addr(&ethbind.CallOpts{Context: tctx}, nh)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
+	}
+	// assign entity resolver to ensCallerHandler resolver
+	ensCallerHandler.ResolverAddr = rAddr.String()
+	if err := ensCallerHandler.NewEntityResolverHandle(); err != nil {
+		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
+	}
 	// get entity metadata url from resolver
 	eIDBytes, err := hex.DecodeString(entityID)
 	if err != nil {
 		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)
 	}
+	// keccak256 entity addr
+	eIDBytes = ethereum.HashRaw(eIDBytes)
 	var eIDBytes32 [32]byte
 	copy(eIDBytes32[:], eIDBytes)
-	tctx, cancel := context.WithTimeout(ctx, types.EthereumWriteTimeout)
+	tctx, cancel = context.WithTimeout(ctx, types.EthereumWriteTimeout)
 	defer cancel()
+	// get stored text
 	metaURL, err := ensCallerHandler.Resolver.Text(&ethbind.CallOpts{Context: tctx}, eIDBytes32, types.EntityMetaKey)
 	if err != nil {
 		return "", fmt.Errorf("cannot resolve entity metadata URL: %w", err)

@@ -3,19 +3,17 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -28,6 +26,7 @@ const (
 )
 
 func BenchmarkVochain(b *testing.B) {
+	b.ReportAllocs()
 	var dvoteServer testcommon.DvoteAPIServer
 	rint := util.RandomInt(0, 8192)
 	host := *hostFlag
@@ -51,7 +50,7 @@ func BenchmarkVochain(b *testing.B) {
 	}
 
 	req := &types.MetaRequest{}
-	var zeroReq = &types.MetaRequest{}
+	zeroReq := &types.MetaRequest{}
 	reset := func(r *types.MetaRequest) {
 		*r = *zeroReq
 	}
@@ -75,23 +74,15 @@ func BenchmarkVochain(b *testing.B) {
 	censusID := resp.CensusID
 
 	// census add claims
-	poseidonHashes := [][]byte{}
-	for _, key := range keySet {
-		hash := snarks.Poseidon.Hash(crypto.FromECDSAPub(&key.Public))
-		if len(hash) == 0 {
-			b.Fatalf("cannot create poseidon hash of public key: %#v", key.Public)
-		}
-		poseidonHashes = append(poseidonHashes, hash)
-	}
+	// TODO: split in different calls
 	log.Debug("add bulk claims")
 	var claims [][]byte
-	for i := 0; i < len(poseidonHashes); i++ {
-		claims = append(claims, poseidonHashes[i])
+	for _, k := range keySet {
+		claims = append(claims, k.PublicKey())
 	}
 
 	reset(req)
 	req.CensusID = censusID
-	req.Digested = true
 	req.CensusKeys = claims
 
 	doRequest("addClaimBulk", dvoteServer.Signer)
@@ -101,14 +92,29 @@ func BenchmarkVochain(b *testing.B) {
 	reset(req)
 	req.CensusID = censusID
 	resp = doRequest("getRoot", nil)
+	if !resp.Ok {
+		b.Fatalf("request returned an error: %s", resp.Message)
+	}
+
 	censusRoot := resp.Root
 	if len(censusRoot) < 1 {
 		b.Fatalf("got invalid root")
 	}
 
+	log.Infof("publish census")
+	reset(req)
+	req.CensusID = censusID
+	resp = doRequest("publish", dvoteServer.Signer)
+	if !resp.Ok {
+		b.Fatalf("request returned an error: %s", resp.Message)
+	}
+
 	log.Infof("check block height is not less than process start block")
 	reset(req)
 	resp = doRequest("getBlockHeight", nil)
+	if !resp.Ok {
+		b.Fatalf("request returned an error: %s", resp.Message)
+	}
 
 	// create process
 	entityID := signerPub[:types.EntityIDsize]
@@ -116,6 +122,7 @@ func BenchmarkVochain(b *testing.B) {
 	processData := &models.Process{
 		EntityId:     entityID,
 		CensusRoot:   censusRoot,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   numberOfBlocks,
 		ProcessId:    processID,
 		StartBlock:   *resp.Height + 1,
@@ -155,6 +162,7 @@ func BenchmarkVochain(b *testing.B) {
 	// check if process is created
 	log.Infof("check if process created")
 	reset(req)
+	req.ProcessID = processID
 	failures := 20
 	for {
 		resp = doRequest("getProcessInfo", nil)
@@ -169,43 +177,33 @@ func BenchmarkVochain(b *testing.B) {
 	}
 
 	// send votes in parallel
+	count := int32(0)
+	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
-		// Create websocket client
-		cl, err := client.New(host)
-		if err != nil {
-			b.Fatal(err)
-		}
-
-		count := 0
 		for pb.Next() {
-			vochainBench(b,
+			// Create websocket client
+			cl, err := client.New(host)
+			if err != nil {
+				b.Fatal(err)
+			}
+			voteBench(b,
 				cl,
-				keySet[count],
-				poseidonHashes[count],
+				keySet[atomic.AddInt32(&count, 1)],
 				censusRoot,
-				processID,
-				req.CensusID)
-			count++
+				processID)
 		}
 	})
-
-	// scrutiny of the submited envelopes
-	log.Infof("get results")
-	req.ProcessID = processID
-	resp = doRequest("getResults", nil)
-	log.Infof("submited votes: %+v", resp.Results)
-
-	// get entities that created at least ones process
-	log.Infof("get entities")
-	resp = doRequest("getEntityList", nil)
-	log.Infof("created entities: %+v", resp.EntityIDs)
 }
 
-func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseidon,
-	censusRoot, processID []byte, censusID string) {
+func voteBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys,
+	censusRoot, processID []byte) {
 	// API requests
-	var req types.MetaRequest
-	doRequest := cl.ForTest(b, &req)
+	req := &types.MetaRequest{}
+	zeroReq := &types.MetaRequest{}
+	reset := func(r *types.MetaRequest) {
+		*r = *zeroReq
+	}
+	doRequest := cl.ForTest(b, req)
 
 	// create envelope
 	log.Infof("adding vote using key [%s]", s.AddressString())
@@ -213,65 +211,65 @@ func vochainBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys, poseido
 	pub, _ := s.HexString()
 	// generate envelope proof
 	log.Infof("generating proof for key %s", pub)
-	req.CensusID = censusID
-	req.RootHash = censusRoot
-	req.CensusKey = poseidon
+	req.CensusID = fmt.Sprintf("%x", censusRoot)
+	req.CensusKey = s.PublicKey()
 	resp := doRequest("genProof", nil)
-	siblings := resp.Siblings
-	if len(siblings) == 0 {
+	if len(resp.Siblings) == 0 {
 		b.Fatalf("proof not generated while it should be generated correctly: %v", resp.Message)
 	}
 
 	// generate envelope votePackage
-	votePkg := &types.VotePackageStruct{
+	votePkg := &types.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1},
-		Type:  types.PollVote,
 	}
 	voteBytes, err := json.Marshal(votePkg)
 	if err != nil {
 		b.Fatalf("cannot marshal vote: %s", err)
 	}
 	// Generate VoteEnvelope package
-	tx := models.VoteEnvelope{
+	tx := &models.VoteEnvelope{
 		Nonce:     util.RandomBytes(32),
 		ProcessId: processID,
 		Proof: &models.Proof{
 			Payload: &models.Proof_Graviton{
 				Graviton: &models.ProofGraviton{
-					Siblings: siblings,
+					Siblings: resp.Siblings,
 				},
 			},
 		},
 		VotePackage: voteBytes,
 	}
-
-	req = types.MetaRequest{}
-	req.Payload, err = proto.Marshal(&tx)
+	// Create transaction package and sign it
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: tx}})
+	if err != nil {
+		b.Fatal(err)
+	}
+	stx.Signature, err = s.Sign(stx.Tx)
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	req.Signature, err = s.Sign(req.Payload)
+	reset(req)
+	req.Payload, err = proto.Marshal(stx)
 	if err != nil {
 		b.Fatal(err)
 	}
-
 	// sending submitEnvelope request
-	log.Info("vote payload: %s", tx.String())
-	log.Infof("request: %+v", req)
-	resp = doRequest("submitEnvelope", nil)
-	log.Infof("response: %+v", resp)
+	resp = doRequest("submitRawTx", nil)
+	log.Infof("response: %s", resp.String())
 
 	// check vote added
-	req = types.MetaRequest{}
-	req.ProcessID = processID
-	req.Nullifier = vochain.GenerateNullifier(s.Address(), processID)
-	for {
-		resp = doRequest("getEnvelopeStatus", nil)
-		if *resp.Registered {
-			break
+	/*	reset(req)
+		req.ProcessID = processID
+		req.Nullifier = vochain.GenerateNullifier(s.Address(), processID)
+		for {
+			resp = doRequest("getEnvelopeStatus", nil)
+			if *resp.Registered {
+				break
+			}
+			time.Sleep(time.Second * 2)
 		}
-		time.Sleep(time.Second)
-	}
+	*/
 }

@@ -13,16 +13,6 @@ import (
 
 // ________________________ VOTE ________________________
 
-// VotePackageStruct represents a vote package
-type VotePackageStruct struct {
-	// Type vote type
-	Type string `json:"type"`
-	// Nonce vote nonce
-	Nonce string `json:"nonce"`
-	// Votes directly mapped to the `questions` field of the process metadata
-	Votes []int `json:"votes"`
-}
-
 // CacheTx contains the proof indicating that the user is in the census of the process
 type CacheTx struct {
 	Type         *models.TxType

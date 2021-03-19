@@ -362,7 +362,7 @@ func TestLiveResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	v := &models.Vote{ProcessId: pid, VotePackage: vp}
 	for i := 0; i < 100; i++ {
-		if err := sc.addLiveResultsVote(v); err != nil {
+		if err := sc.addLiveVote(v); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -480,7 +480,7 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
 	if err != nil {
 		return err
 	}
-	return sc.addLiveResultsVote(
+	return sc.addLiveVote(
 		&models.Vote{
 			ProcessId:   pid,
 			VotePackage: vp,
