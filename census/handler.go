@@ -107,7 +107,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 	resp := new(types.MetaResponse)
 
 	// Process data
-	log.Debugf("processing data %+v", *r)
+	log.Debugf("processing data %s", r.String())
 	resp.Ok = true
 	resp.Timestamp = int32(time.Now().Unix())
 
@@ -285,7 +285,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			resp.SetError("retrieved census do not have a correct format")
 			return resp
 		}
-		log.Infof("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(censusRaw))
+		log.Infof("retrieved census with rootHash %x and size %d bytes", dump.RootHash, len(censusRaw))
 		if len(dump.Data) > 0 {
 			err = tr.ImportDump(dump.Data)
 			if err != nil {
@@ -400,7 +400,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		dump.Data, err = tr.Dump(tr.Root())
 		if err != nil {
 			resp.SetError(err)
-			log.Warnf("cannot dump census with root %s: %s", tr.Root(), err)
+			log.Warnf("cannot dump census with root %x: %s", tr.Root(), err)
 			return resp
 		}
 		dumpBytes, err := json.Marshal(dump)
@@ -421,7 +421,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		resp.Root = tr.Root()
 
 		// adding published census with censusID = rootHash
-		log.Infof("adding new namespace for published census %s", resp.Root)
+		log.Infof("adding new namespace for published census %x", resp.Root)
 		namespace := hex.EncodeToString(resp.Root)
 		tr2, err := m.AddNamespace(namespace, r.PubKeys)
 		if err != nil && err != ErrNamespaceExist {

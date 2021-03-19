@@ -10,24 +10,25 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/crypto/snarks"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
-const benchmarkVoters = 20
+const benchmarkVoters = 2000
 
 func BenchmarkCheckTx(b *testing.B) {
 	b.ReportAllocs()
-	app, err := NewBaseApplication(b.TempDir())
+	tmp := testutil.TmpDir(b)
+	app, err := NewBaseApplication(tmp)
 	if err != nil {
 		b.Fatal(err)
 	}
 	var voters [][]*models.SignedTx
 	for i := 0; i < b.N+1; i++ {
-		voters = append(voters, prepareBenchCheckTx(b, app, benchmarkVoters))
-		b.Logf("creating process %d", i)
+		voters = append(voters, prepareBenchCheckTx(b, app, benchmarkVoters, tmp))
 	}
 	var i int32
 	b.ResetTimer()
@@ -39,8 +40,8 @@ func BenchmarkCheckTx(b *testing.B) {
 	})
 }
 
-func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voters []*models.SignedTx) {
-	tr, err := tree.NewTree("checkTXbench", b.TempDir())
+func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int, tmpDir string) (voters []*models.SignedTx) {
+	tr, err := tree.NewTree(util.RandomHex(12), tmpDir)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -53,40 +54,38 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int) (voter
 	for _, k := range keys {
 		c := snarks.Poseidon.Hash(k.PublicKey())
 		if err := tr.Add(c, nil); err != nil {
-			b.Fatal(err)
+			b.Error(err)
 		}
 		claims = append(claims, string(c))
 	}
 	censusURI := "ipfs://123456789"
 	pid := util.RandomBytes(types.ProcessIDsize)
-	process := &models.Process{
+	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: true},
-		Mode:         &models.ProcessMode{},
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Mode:         &models.ProcessMode{Interruptible: true, AutoStart: true},
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EthereumAddressSize),
 		CensusRoot:   tr.Root(),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
-	}
-	if err := app.State.AddProcess(process); err != nil {
-		b.Fatal(err)
+	}); err != nil {
+		b.Error(err)
 	}
 
 	var proof []byte
-
 	for i, s := range keys {
 		proof, err = tr.GenProof([]byte(claims[i]), nil)
 		if err != nil {
 			b.Fatal(err)
 		}
 		tx := &models.VoteEnvelope{
-			Nonce:     util.RandomBytes(16),
-			ProcessId: pid,
-			Proof:     &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proof}}},
+			Nonce:       util.RandomBytes(16),
+			ProcessId:   pid,
+			Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proof}}},
+			VotePackage: []byte("{[\"1\",\"2\",\"3\"]}"),
 		}
 
 		stx := models.SignedTx{}
@@ -110,7 +109,6 @@ func benchCheckTx(b *testing.B, app *BaseApplication, voters []*models.SignedTx)
 
 	var err error
 	var txBytes []byte
-
 	i := 0
 	for _, tx := range voters {
 		if txBytes, err = proto.Marshal(tx); err != nil {

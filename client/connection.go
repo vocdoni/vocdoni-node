@@ -97,16 +97,17 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 }
 
 // Request makes a request to the previously connected endpoint
-func (c *Client) ForTest(tb testing.TB, req *types.MetaRequest) func(method string, signer *ethereum.SignKeys) *types.MetaResponse {
+func (c *Client) ForTest(tb testing.TB, req *types.MetaRequest) func(
+	method string, signer *ethereum.SignKeys) *types.MetaResponse {
 	return func(method string, signer *ethereum.SignKeys) *types.MetaResponse {
+		if req == nil {
+			tb.Fatalf("request is nil")
+		}
 		req.Method = method
 		req.Timestamp = int32(time.Now().Unix())
 		resp, err := c.Request(*req, signer)
 		if err != nil {
 			tb.Fatal(err)
-		}
-		if !resp.Ok {
-			tb.Fatalf("%s failed: %s", req.Method, resp.Message)
 		}
 		return resp
 	}

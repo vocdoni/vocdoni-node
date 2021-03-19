@@ -74,6 +74,11 @@ func (r MetaRequest) String() string {
 		if ft.Type.Kind() == reflect.Slice && ft.Type.Elem().Kind() == reflect.Uint8 {
 			// print []byte as hexadecimal
 			fmt.Fprintf(&b, "%x", fv.Bytes())
+		} else if ft.Type.Kind() == reflect.Slice && ft.Type.Elem().Kind() == reflect.Slice &&
+			ft.Type.Elem().Elem().Kind() == reflect.Uint8 {
+			for _, v := range fv.Interface().([][]byte) {
+				fmt.Fprintf(&b, "%x ", v)
+			}
 		} else {
 			fv = reflect.Indirect(fv) // print *T as T
 			fmt.Fprintf(&b, "%v", fv.Interface())

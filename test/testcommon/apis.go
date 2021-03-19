@@ -13,6 +13,9 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/router"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/scrutinizer"
 )
 
 // DvoteAPIServer contains all the required pieces for running a go-dvote api server
@@ -25,6 +28,9 @@ type DvoteAPIServer struct {
 	PxyAddr        string
 	Storage        data.Storage
 	IpfsPort       int
+
+	VochainAPP  *vochain.BaseApplication
+	Scrutinizer *scrutinizer.Scrutinizer
 }
 
 /*
@@ -40,7 +46,9 @@ Start starts a basic dvote server
 func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// create signer
 	d.Signer = ethereum.NewSignKeys()
-	d.Signer.Generate()
+	if err := d.Signer.Generate(); err != nil {
+		tb.Fatal(err)
+	}
 
 	// create the proxy to handle HTTP queries
 	pxy := NewMockProxy(tb)
@@ -48,7 +56,9 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 
 	// Create WebSocket endpoint
 	ws := new(mhttp.WebsocketHandle)
-	ws.Init(new(transports.Connection))
+	if err := ws.Init(new(transports.Connection)); err != nil {
+		tb.Fatal(err)
+	}
 	ws.SetProxy(pxy)
 
 	// Create the listener for routing messages
@@ -57,7 +67,8 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 
 	// Create the API router
 	var err error
-	d.IpfsDir = tb.TempDir()
+
+	d.IpfsDir = testutil.TmpDir(tb)
 	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
 	ipfs := data.IPFSHandle{}
 	d.IpfsPort = 14000 + rand.Intn(2048)
@@ -78,7 +89,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
-	d.CensusDir = tb.TempDir()
+	d.CensusDir = testutil.TmpDir(tb)
 
 	if err := cm.Init(d.CensusDir, "", gravitontree.NewTree); err != nil {
 		tb.Fatal(err)
@@ -91,10 +102,10 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 		case "census":
 			routerAPI.EnableCensusAPI(&cm)
 		case "vote":
-			vnode := NewMockVochainNode(tb, d)
-			sc := NewMockScrutinizer(tb, d, vnode)
-			routerAPI.Scrutinizer = sc
-			routerAPI.EnableVoteAPI(vnode, nil)
+			d.VochainAPP = NewMockVochainNode(tb, d)
+			d.Scrutinizer = NewMockScrutinizer(tb, d, d.VochainAPP)
+			routerAPI.Scrutinizer = d.Scrutinizer
+			routerAPI.EnableVoteAPI(d.VochainAPP, nil)
 		default:
 			tb.Fatalf("unknown api: %q", api)
 		}
