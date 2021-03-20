@@ -200,6 +200,8 @@ type VochainCfg struct {
 	// by that transaction
 	// If the map is empty, any address is accepted
 	EthereumWhiteListAddrs []string
+	// Target block time in seconds (only for miners)
+	MinerTargetBlockTimeSeconds int
 }
 
 // OracleCfg includes all possible config params needed by the Oracle

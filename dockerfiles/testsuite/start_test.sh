@@ -11,7 +11,7 @@ TEST=${1:-0}
 CLEAN=${CLEAN:-1}
 
 test() {
-	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost ws://gateway:9090/dvote --logLevel=INFO --electionType=$1
+	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway:9090/dvote --logLevel=INFO --electionType=$1
 	echo $? >$2
 }
 

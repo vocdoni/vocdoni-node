@@ -11,7 +11,6 @@ import (
 	"time"
 
 	flag "github.com/spf13/pflag"
-	"nhooyr.io/websocket"
 
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -40,7 +39,7 @@ func main() {
 	opmode := flag.String("operation", "vtest", fmt.Sprintf("set operation mode: %v", opsAvailable()))
 	oraclePrivKey := flag.String("oracleKey", "", "hexadecimal oracle private key")
 	entityPrivKey := flag.String("entityKey", "", "hexadecimal entity private key")
-	host := flag.String("gwHost", "ws://127.0.0.1:9090/dvote", "gateway websockets endpoint")
+	host := flag.String("gwHost", "http://127.0.0.1:9090/dvote", "gateway websockets endpoint")
 	electionType := flag.String("electionType", "encrypted-poll", "encrypted-poll or poll-vote")
 	electionSize := flag.Int("electionSize", 100, "election census size")
 	parallelCons := flag.Int("parallelCons", 1, "parallel API connections")
@@ -127,7 +126,7 @@ func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath s
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cl.Conn.Close(websocket.StatusNormalClosure, "")
+	defer cl.Close()
 	log.Infof("generating new keys census batch")
 	keys := client.CreateEthRandomKeysBatch(size)
 	root, uri, err := cl.CreateCensus(signer, keys, nil)
@@ -160,7 +159,7 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cl.Conn.Close(websocket.StatusNormalClosure, "")
+	defer cl.Close()
 
 	var keys []string
 	reader := bufio.NewReader(os.Stdin)
@@ -246,7 +245,7 @@ func mkTreeVoteTest(host,
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer mainClient.Conn.Close(websocket.StatusNormalClosure, "")
+	defer mainClient.Close()
 
 	// Create process
 	pid := client.Random(32)
@@ -274,7 +273,7 @@ func mkTreeVoteTest(host,
 			log.Warn(err)
 			continue
 		}
-		defer cl.Conn.Close(websocket.StatusNormalClosure, "")
+		defer cl.Close()
 		clients = append(clients, cl)
 	}
 
@@ -423,7 +422,7 @@ func cspVoteTest(
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer mainClient.Conn.Close(websocket.StatusNormalClosure, "")
+	defer mainClient.Close()
 
 	// Create process
 	pid := client.Random(32)
@@ -451,7 +450,7 @@ func cspVoteTest(
 			log.Warn(err)
 			continue
 		}
-		defer cl.Conn.Close(websocket.StatusNormalClosure, "")
+		defer cl.Close()
 		clients = append(clients, cl)
 	}
 
@@ -462,7 +461,7 @@ func cspVoteTest(
 			log.Warn(err)
 			continue
 		}
-		defer cl.Conn.Close(websocket.StatusNormalClosure, "")
+		defer cl.Close()
 		clients = append(clients, cl)
 	}
 

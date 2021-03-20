@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -33,10 +34,12 @@ func info(cmd *cobra.Command, args []string) error {
 	if !resp.Ok {
 		return fmt.Errorf(resp.Message)
 	}
-	fmt.Printf("Health: %v\n", resp.Health)
-	fmt.Print("APIs: ")
+	fmt.Printf("Health:\t%v\n", resp.Health)
+	b := bytes.Buffer{}
+	b.WriteString("APIs:\t")
 	for _, api := range resp.APIList {
-		fmt.Printf("%v ", api)
+		b.WriteString(api + " ")
 	}
+	fmt.Println(b.String())
 	return err
 }
