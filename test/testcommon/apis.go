@@ -52,18 +52,18 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 
 	// create the proxy to handle HTTP queries
 	pxy := NewMockProxy(tb)
-	d.PxyAddr = fmt.Sprintf("ws://%s/dvote", pxy.Addr)
+	d.PxyAddr = fmt.Sprintf("http://%s/dvote", pxy.Addr)
 
 	// Create WebSocket endpoint
-	ws := new(mhttp.WebsocketHandle)
-	if err := ws.Init(new(transports.Connection)); err != nil {
+	httpws := new(mhttp.HttpWsHandler)
+	if err := httpws.Init(new(transports.Connection)); err != nil {
 		tb.Fatal(err)
 	}
-	ws.SetProxy(pxy)
+	httpws.SetProxy(pxy)
 
 	// Create the listener for routing messages
 	listenerOutput := make(chan transports.Message)
-	ws.Listen(listenerOutput)
+	httpws.Listen(listenerOutput)
 
 	// Create the API router
 	var err error
@@ -112,7 +112,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	}
 
 	go routerAPI.Route()
-	ws.AddProxyHandler("/dvote")
+	httpws.AddProxyHandler("/dvote")
 }
 
 // NewMockProxy creates a new testing proxy with predefined valudes

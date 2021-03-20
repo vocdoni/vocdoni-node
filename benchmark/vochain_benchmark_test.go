@@ -36,7 +36,7 @@ func BenchmarkVochain(b *testing.B) {
 	}
 
 	// create random key batch
-	keySet := testcommon.CreateEthRandomKeysBatch(b, *censusSize)
+	keySet := testcommon.CreateEthRandomKeysBatch(b, b.N+1)
 	log.Infof("generated %d keys", len(keySet))
 
 	// get signer pubkey
@@ -73,20 +73,31 @@ func BenchmarkVochain(b *testing.B) {
 	}
 	censusID := resp.CensusID
 
-	// census add claims
-	// TODO: split in different calls
+	// Census add claims
 	log.Debug("add bulk claims")
-	var claims [][]byte
-	for _, k := range keySet {
-		claims = append(claims, k.PublicKey())
-	}
-
 	reset(req)
 	req.CensusID = censusID
-	req.CensusKeys = claims
-
-	doRequest("addClaimBulk", dvoteServer.Signer)
-
+	claims := [][]byte{}
+	// Send claims by batches of 100
+	for i := 0; i < b.N+1; i++ {
+		claims = append(claims, keySet[i].PublicKey())
+		if i%100 == 0 {
+			req.CensusKeys = claims
+			resp := doRequest("addClaimBulk", dvoteServer.Signer)
+			if !resp.Ok {
+				b.Fatalf("error adding claims: %s", resp.Message)
+			}
+			claims = [][]byte{}
+		}
+	}
+	// Send remaining claims
+	if len(claims) > 0 {
+		req.CensusKeys = claims
+		resp = doRequest("addClaimBulk", dvoteServer.Signer)
+		if !resp.Ok {
+			b.Fatalf("error adding claims: %s", resp.Message)
+		}
+	}
 	// get census root
 	log.Infof("get root")
 	reset(req)
@@ -179,13 +190,14 @@ func BenchmarkVochain(b *testing.B) {
 	// send votes in parallel
 	count := int32(0)
 	b.ResetTimer()
+
 	b.RunParallel(func(pb *testing.PB) {
+		// Create websocket client
+		cl, err := client.New(host)
+		if err != nil {
+			b.Fatal(err)
+		}
 		for pb.Next() {
-			// Create websocket client
-			cl, err := client.New(host)
-			if err != nil {
-				b.Fatal(err)
-			}
 			voteBench(b,
 				cl,
 				keySet[atomic.AddInt32(&count, 1)],

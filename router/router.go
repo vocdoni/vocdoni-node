@@ -316,7 +316,7 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 		log.Errorf("failed to send error as MessageContext==nil: %s", errMsg)
 		return
 	}
-	log.Warn(errMsg)
+	log.Debugf("api error: %s", errMsg)
 
 	// Add any last fields to the inner response, and marshal it with sorted
 	// fields for signing.

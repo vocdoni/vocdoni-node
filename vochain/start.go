@@ -151,13 +151,20 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
 
 	// consensus config
+	blockTime := 10
+	if localConfig.MinerTargetBlockTimeSeconds > 0 {
+		blockTime = localConfig.MinerTargetBlockTimeSeconds
+	}
 	tconfig.Consensus.TimeoutProposeDelta = time.Millisecond * 200
-	tconfig.Consensus.TimeoutPropose = time.Second * 6
+	tconfig.Consensus.TimeoutPropose = time.Second * time.Duration(float32(blockTime)*0.6)
 	tconfig.Consensus.TimeoutPrevoteDelta = time.Millisecond * 200
 	tconfig.Consensus.TimeoutPrevote = time.Second * 1
 	tconfig.Consensus.TimeoutPrecommitDelta = time.Millisecond * 200
 	tconfig.Consensus.TimeoutPrecommit = time.Second * 1
-	tconfig.Consensus.TimeoutCommit = time.Second * 10
+	tconfig.Consensus.TimeoutCommit = time.Second * time.Duration(blockTime)
+
+	log.Infof("consensus block time target: commit=%.2fs propose=%.2fs",
+		tconfig.Consensus.TimeoutCommit.Seconds(), tconfig.Consensus.TimeoutPropose.Seconds())
 
 	// indexing
 	tconfig.TxIndex.Indexer = "kv"

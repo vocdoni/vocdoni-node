@@ -120,7 +120,7 @@ func pinList(cmd *cobra.Command, args []string) error {
 	defer cl.CheckClose(&err)
 
 	// Increase the default response size for large lists
-	cl.Conn.SetReadLimit(32768 * 16)
+	cl.WS.SetReadLimit(32768 * 16)
 
 	req := types.MetaRequest{Method: "pinList"}
 	resp, err := cl.Request(req, opt.signKey)

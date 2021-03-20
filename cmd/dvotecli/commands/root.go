@@ -28,7 +28,7 @@ func init() {
 		&opt.colorize, "color", "c", true,
 		"colorize output")
 	rootCmd.PersistentFlags().StringVarP(
-		&opt.host, "host", "", "ws://127.0.0.1:9090/dvote",
+		&opt.host, "host", "", "http://127.0.0.1:9090/dvote",
 		"host to connect to")
 	rootCmd.PersistentFlags().StringVarP(
 		&opt.privKey, "key", "", "",
