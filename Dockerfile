@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:experimental
 
-FROM golang:1.15.8 AS builder
+FROM golang:1.16.2 AS builder
 
 # Build all the binaries at once, so that the final targets don't require having
 # Go installed to build each of them.
