@@ -7,8 +7,8 @@ on: [push, pull_request]
 jobs:
   go-tests:
     runs-on: self-hosted
-    container: 
-      image: golang:1.15
+    container:
+      image: golang:1.16.2
       options: --user 1000
     if: github.repository == 'vocdoni/vocdoni-node'
     defaults:
@@ -104,4 +104,3 @@ jobs:
           tags: |
             vocdoni/go-dvote:latest, vocdoni/go-dvote:${{ steps.var.outputs.branch }},
             ghcr.io/vocdoni/go-dvote:latest,ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch }}
-      
