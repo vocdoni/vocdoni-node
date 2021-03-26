@@ -100,7 +100,7 @@ var (
 )
 
 func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
-	s, err := vochain.NewState(testutil.TmpDir(tb))
+	s, err := vochain.NewState(tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 }
 
 func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
-	s, err := vochain.NewState(testutil.TmpDir(tb))
+	s, err := vochain.NewState(tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 }
 
 func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
-	s, err := vochain.NewState(testutil.TmpDir(tb))
+	s, err := vochain.NewState(tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	// start vochain node
 	// create config
 	d.VochainCfg = new(config.VochainCfg)
-	d.VochainCfg.DataDir = testutil.TmpDir(tb)
+	d.VochainCfg.DataDir = tb.TempDir()
 	// create genesis file
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
 	consensusParams := &types.ConsensusParams{
@@ -215,7 +215,7 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer,
 	vnode *vochain.BaseApplication) *scrutinizer.Scrutinizer {
 	tb.Log("starting vochain scrutinizer")
-	d.ScrutinizerDir = testutil.TmpDir(tb)
+	d.ScrutinizerDir = tb.TempDir()
 	sc, err := scrutinizer.NewScrutinizer(d.ScrutinizerDir, vnode.State)
 	if err != nil {
 		tb.Fatal(err)

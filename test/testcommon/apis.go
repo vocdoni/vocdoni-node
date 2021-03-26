@@ -13,7 +13,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/router"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 )
@@ -68,7 +67,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// Create the API router
 	var err error
 
-	d.IpfsDir = testutil.TmpDir(tb)
+	d.IpfsDir = tb.TempDir()
 	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
 	ipfs := data.IPFSHandle{}
 	d.IpfsPort = 14000 + rand.Intn(2048)
@@ -89,7 +88,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
-	d.CensusDir = testutil.TmpDir(tb)
+	d.CensusDir = tb.TempDir()
 
 	if err := cm.Init(d.CensusDir, "", gravitontree.NewTree); err != nil {
 		tb.Fatal(err)

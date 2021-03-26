@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
@@ -127,7 +127,7 @@ func (i *IPFSHandle) URIprefix() string {
 func PublishBytes(ctx context.Context, msg []byte, fileDir string, node *ipfscore.IpfsNode) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(msg))
 	log.Infof("publishing file: %s", filePath)
-	err := ioutil.WriteFile(filePath, msg, 0666)
+	err := os.WriteFile(filePath, msg, 0666)
 	if err != nil {
 		return "", err
 	}
@@ -256,5 +256,5 @@ func (i *IPFSHandle) Retrieve(ctx context.Context, path string) ([]byte, error) 
 	if !ok {
 		return nil, errors.New("received incorrect type from Unixfs().Get()")
 	}
-	return ioutil.ReadAll(r)
+	return io.ReadAll(r)
 }

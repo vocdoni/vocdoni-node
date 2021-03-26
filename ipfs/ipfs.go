@@ -3,7 +3,7 @@ package ipfs
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -36,14 +36,14 @@ func Init() error {
 		return err
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(ConfigRoot, "version"),
+	if err := os.WriteFile(filepath.Join(ConfigRoot, "version"),
 		[]byte(fmt.Sprintf("%d\n", RepoVersion)), 0666,
 	); err != nil {
 		return err
 	}
 
 	InstallDatabasePlugins()
-	_, err = doInit(ioutil.Discard, ConfigRoot, 2048)
+	_, err = doInit(io.Discard, ConfigRoot, 2048)
 	return err
 }
 

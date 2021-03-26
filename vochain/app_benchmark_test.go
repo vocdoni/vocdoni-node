@@ -10,7 +10,6 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/crypto/snarks"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -21,14 +20,14 @@ const benchmarkVoters = 2000
 
 func BenchmarkCheckTx(b *testing.B) {
 	b.ReportAllocs()
-	tmp := testutil.TmpDir(b)
-	app, err := NewBaseApplication(tmp)
+	tdir := b.TempDir()
+	app, err := NewBaseApplication(tdir)
 	if err != nil {
 		b.Fatal(err)
 	}
 	var voters [][]*models.SignedTx
 	for i := 0; i < b.N+1; i++ {
-		voters = append(voters, prepareBenchCheckTx(b, app, benchmarkVoters, tmp))
+		voters = append(voters, prepareBenchCheckTx(b, app, benchmarkVoters, tdir))
 	}
 	var i int32
 	b.ResetTimer()

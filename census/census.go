@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -104,13 +103,13 @@ func (m *Manager) Init(storageDir, rootKey string,
 			cns.RootKey = rootKey
 		}
 		m.Census = cns
-		if err := ioutil.WriteFile(filepath.Clean(nsConfig), []byte(""), 0600); err != nil {
+		if err := os.WriteFile(filepath.Clean(nsConfig), []byte(""), 0600); err != nil {
 			return err
 		}
 		return m.save()
 	}
 
-	jsonBytes, err := ioutil.ReadFile(filepath.Clean(nsConfig))
+	jsonBytes, err := os.ReadFile(filepath.Clean(nsConfig))
 	if err != nil {
 		return err
 	}
@@ -220,7 +219,7 @@ func (m *Manager) save() error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(nsConfig, data, 0600)
+	return os.WriteFile(nsConfig, data, 0600)
 }
 
 // Count returns the number of local created, external imported and loaded/active census
