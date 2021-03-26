@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"os"
 	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -74,11 +74,11 @@ func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*e
 		return err
 	}
 	log.Infof("saved census cache file has %d bytes, got %d keys", len(j), len(keys))
-	return ioutil.WriteFile(filepath, j, 0644)
+	return os.WriteFile(filepath, j, 0644)
 }
 
 func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, []byte, string, error) {
-	jb, err := ioutil.ReadFile(filepath)
+	jb, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, nil, nil, "", err
 	}

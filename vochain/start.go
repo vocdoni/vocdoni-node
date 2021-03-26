@@ -3,7 +3,6 @@ package vochain
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -250,7 +249,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		log.Infof("found genesis file %s", tconfig.Genesis)
 	} else {
 		log.Debugf("loaded genesis: %s", string(genesis))
-		if err := ioutil.WriteFile(tconfig.Genesis, genesis, 0600); err != nil {
+		if err := os.WriteFile(tconfig.Genesis, genesis, 0600); err != nil {
 			return nil, err
 		}
 		log.Infof("new genesis created, stored at %s", tconfig.Genesis)

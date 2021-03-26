@@ -3,8 +3,6 @@ package testutil
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"go.vocdoni.io/dvote/util"
@@ -30,17 +28,4 @@ func B642byte(tb testing.TB, s string) []byte {
 		tb.Fatal(err)
 	}
 	return b
-}
-
-func TmpDir(tb testing.TB) string {
-	tmp, err := ioutil.TempDir("", "vocdoni-test")
-	if err != nil {
-		tb.Fatal(err)
-	}
-	tb.Cleanup(func() {
-		if err := os.RemoveAll(tmp); err != nil {
-			tb.Error(err)
-		}
-	})
-	return tmp
 }

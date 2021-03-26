@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
@@ -147,7 +146,7 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 	}
 	defer f.Close()
 
-	stateJSONBytes, err := ioutil.ReadFile(tconfig.PrivValidatorStateFile())
+	stateJSONBytes, err := os.ReadFile(tconfig.PrivValidatorStateFile())
 	if err != nil {
 		log.Fatal(err)
 	}

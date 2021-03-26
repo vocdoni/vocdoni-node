@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -55,11 +54,11 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.
 		if _, err = os.Stat(vconfig.Genesis); os.IsNotExist(err) {
 			return
 		}
-		if genesisBytes, err = ioutil.ReadFile(vconfig.Genesis); err != nil {
+		if genesisBytes, err = os.ReadFile(vconfig.Genesis); err != nil {
 			return
 		}
 	} else { // If genesis flag not defined, use a hardcoded or local genesis
-		genesisBytes, err = ioutil.ReadFile(vconfig.DataDir + "/config/genesis.json")
+		genesisBytes, err = os.ReadFile(vconfig.DataDir + "/config/genesis.json")
 
 		if err == nil { // If genesis file found
 			log.Info("found genesis file, comparing with the hardcoded one")

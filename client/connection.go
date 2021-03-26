@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -110,7 +110,7 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 		if err != nil {
 			return nil, err
 		}
-		message, err = ioutil.ReadAll(resp.Body)
+		message, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}
