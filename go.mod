@@ -46,7 +46,7 @@ require (
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/zap v1.16.0
-	go.vocdoni.io/proto v0.1.9-0.20210304214308-6f7363b52750
+	go.vocdoni.io/proto v1.0.2
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2 // indirect
