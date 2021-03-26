@@ -9,6 +9,7 @@ import (
 
 	"git.sr.ht/~sircmpwn/go-bare"
 	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/statedb/gravitonstate"
@@ -18,7 +19,7 @@ import (
 // big census (up to 8 Million entries) we need to increase the maximums.
 const bareMaxArrayLength uint64 = 1024 * 1014 * 8 // 8 Million
 
-const bareMaxUnmarshalBytes uint64 = 1024 * 1024 * 200 // 200 MiB
+const bareMaxUnmarshalBytes uint64 = bareMaxArrayLength * 32 // 256 MiB
 
 type Tree struct {
 	Tree           statedb.StateTree
@@ -39,19 +40,18 @@ type exportData struct {
 }
 
 const (
-	MaxKeySize   = 128
-	MaxValueSize = 256
+	MaxKeySize   = 32
+	MaxValueSize = 64
 )
 
 // NewTree opens or creates a merkle tree under the given storage.
 // Note that each tree should use an entirely separate namespace for its database keys.
 func NewTree(name, storageDir string) (censustree.Tree, error) {
 	gs := new(gravitonstate.GravitonState)
-	iname := name
-	if len(iname) > 32 {
-		iname = iname[:32]
-	}
-	dir := fmt.Sprintf("%s/%s", storageDir, name)
+	// Graviton tree name does not support more than 32 chars
+	// So we make a hash of the provided name and truncate it to 32
+	iname := fmt.Sprintf("%x", ethereum.HashRaw([]byte(name)))[:32]
+	dir := path.Join(storageDir, iname)
 	log.Debugf("creating census tree %s on %s", iname, dir)
 
 	if err := gs.Init(dir, "disk"); err != nil {
@@ -69,27 +69,14 @@ func NewTree(name, storageDir string) (censustree.Tree, error) {
 }
 
 func (t *Tree) Init(name, storageDir string) error {
-	gs := new(gravitonstate.GravitonState)
-	iname := name
-	if len(iname) > 32 {
-		iname = iname[:32]
-	}
-	dir := path.Join(storageDir, name)
-	log.Debugf("creating census tree %s on %s", iname, dir)
-
-	if err := gs.Init(dir, "disk"); err != nil {
+	ct, err := NewTree(name, storageDir)
+	if err != nil {
 		return err
 	}
-	if err := gs.AddTree(iname); err != nil {
-		return err
-	}
-	if err := gs.LoadVersion(0); err != nil {
-		return err
-	}
-	t.store = gs
-	t.Tree = gs.Tree(iname)
-	t.name = iname
-	t.dataDir = dir
+	t.store = ct.(*Tree).store
+	t.name = ct.(*Tree).name
+	t.Tree = ct.(*Tree).Tree
+	t.dataDir = ct.(*Tree).dataDir
 	t.updateAccessTime()
 	return nil
 }
