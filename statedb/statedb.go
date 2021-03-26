@@ -24,4 +24,5 @@ type StateTree interface {
 	Version() uint64
 	Proof(key []byte) ([]byte, error)
 	Verify(key, proof, root []byte) bool
+	Commit() error
 }

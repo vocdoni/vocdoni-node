@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/census"
-	"go.vocdoni.io/dvote/censustree/gravitontree"
+	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
 )
@@ -20,7 +20,7 @@ func Census(datadir string, ma *metrics.Agent) (*census.Manager, error) {
 			return nil, err
 		}
 	}
-	if err := censusManager.Init(stdir, "", gravitontree.NewTree); err != nil {
+	if err := censusManager.Init(stdir, "", tree.NewTree); err != nil {
 		return nil, err
 	}
 

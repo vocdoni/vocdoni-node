@@ -19,33 +19,33 @@ type RequestMessage struct {
 // MetaRequest contains all of the possible request fields.
 // Fields must be in alphabetical order
 type MetaRequest struct {
-	CensusID     string     `json:"censusId,omitempty"`
-	CensusURI    string     `json:"censusUri,omitempty"`
-	CensusKey    []byte     `json:"censusKey,omitempty"`
-	CensusKeys   [][]byte   `json:"censusKeys,omitempty"`
-	CensusValue  HexBytes   `json:"censusValue,omitempty"`
-	CensusValues []HexBytes `json:"censusValues,omitempty"`
-	CensusDump   []byte     `json:"censusDump,omitempty"`
-	Content      []byte     `json:"content,omitempty"`
-	Digested     bool       `json:"digested,omitempty"`
-	EntityId     HexBytes   `json:"entityId,omitempty"`
-	From         int        `json:"from,omitempty"`
-	ListSize     int        `json:"listSize,omitempty"`
-	Method       string     `json:"method"`
-	Name         string     `json:"name,omitempty"`
-	Namespace    uint32     `json:"namespace,omitempty"`
-	Nullifier    HexBytes   `json:"nullifier,omitempty"`
-	Payload      []byte     `json:"payload,omitempty"`
-	ProcessID    HexBytes   `json:"processId,omitempty"`
-	ProofData    HexBytes   `json:"proofData,omitempty"`
-	PubKeys      []string   `json:"pubKeys,omitempty"`
-	RootHash     HexBytes   `json:"rootHash,omitempty"`
-	Signature    HexBytes   `json:"signature,omitempty"`
-	Status       string     `json:"status,omitempty"`
-	Timestamp    int32      `json:"timestamp"`
-	Type         string     `json:"type,omitempty"`
-	URI          string     `json:"uri,omitempty"`
-	WithResults  bool       `json:"withResults,omitempty"`
+	CensusID     string   `json:"censusId,omitempty"`
+	CensusURI    string   `json:"censusUri,omitempty"`
+	CensusKey    []byte   `json:"censusKey,omitempty"`
+	CensusKeys   [][]byte `json:"censusKeys,omitempty"`
+	CensusValue  []byte   `json:"censusValue,omitempty"`
+	CensusValues [][]byte `json:"censusValues,omitempty"`
+	CensusDump   []byte   `json:"censusDump,omitempty"`
+	Content      []byte   `json:"content,omitempty"`
+	Digested     bool     `json:"digested,omitempty"`
+	EntityId     HexBytes `json:"entityId,omitempty"`
+	From         int      `json:"from,omitempty"`
+	ListSize     int      `json:"listSize,omitempty"`
+	Method       string   `json:"method"`
+	Name         string   `json:"name,omitempty"`
+	Namespace    uint32   `json:"namespace,omitempty"`
+	Nullifier    HexBytes `json:"nullifier,omitempty"`
+	Payload      []byte   `json:"payload,omitempty"`
+	ProcessID    HexBytes `json:"processId,omitempty"`
+	ProofData    HexBytes `json:"proofData,omitempty"`
+	PubKeys      []string `json:"pubKeys,omitempty"`
+	RootHash     HexBytes `json:"rootHash,omitempty"`
+	Signature    HexBytes `json:"signature,omitempty"`
+	Status       string   `json:"status,omitempty"`
+	Timestamp    int32    `json:"timestamp"`
+	Type         string   `json:"type,omitempty"`
+	URI          string   `json:"uri,omitempty"`
+	WithResults  bool     `json:"withResults,omitempty"`
 }
 
 func (r MetaRequest) String() string {

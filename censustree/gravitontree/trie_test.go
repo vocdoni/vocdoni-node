@@ -7,17 +7,39 @@ import (
 )
 
 func TestTree(t *testing.T) {
-	censusSize := 1000
+	censusSize := 1089
 	storage := t.TempDir()
 	tr1, err := NewTree("test1", storage)
 	if err != nil {
 		t.Fatal(err)
 	}
+	keys := [][]byte{}
+	values := [][]byte{}
 	for i := 0; i < censusSize; i++ {
-		if err = tr1.Add([]byte(fmt.Sprintf("number %d", i)), []byte(fmt.Sprintf("number %d", i))); err != nil {
+		keys = append(keys, []byte(fmt.Sprintf("number %d", i)))
+		values = append(values, []byte(fmt.Sprintf("number %d value", i)))
+	}
+	i := 0
+	for i < len(keys)-256 {
+		failed, err := tr1.AddBatch(keys[i:i+256], values[i:i+256])
+		if err != nil {
 			t.Fatal(err)
 		}
+		if len(failed) > 0 {
+			t.Fatalf("some census keys failed: %v", failed)
+		}
+		i += 256
 	}
+	if censusSize-i > 0 {
+		failed, err := tr1.AddBatch(keys[i:], values[i:])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(failed) > 0 {
+			t.Fatalf("some census keys failed")
+		}
+	}
+
 	root1 := tr1.Root()
 	data, err := tr1.Dump(root1)
 	if err != nil {
@@ -60,22 +82,23 @@ func TestTree(t *testing.T) {
 	}
 
 	// Generate a proof on tr1 and check validity on snapshot and tr2
-	proof1, err := tr1.GenProof([]byte("number 5"), []byte{})
+	proof1, err := tr1.GenProof([]byte("number 5"), []byte("number 5 value"))
 	if err != nil {
 		t.Error(err)
 	}
+	t.Logf("Proof Length: %d", len(proof1))
 	tr1s, err := tr1.Snapshot(root1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	valid, err := tr1s.CheckProof([]byte("number 5"), []byte{}, nil, proof1)
+	valid, err := tr1s.CheckProof([]byte("number 5"), []byte("number 5 value"), nil, proof1)
 	if err != nil {
 		t.Error(err)
 	}
 	if !valid {
 		t.Errorf("proof is invalid on snapshot")
 	}
-	valid, err = tr2.CheckProof([]byte("number 5"), []byte{}, nil, proof1)
+	valid, err = tr2.CheckProof([]byte("number 5"), []byte("number 5 value"), nil, proof1)
 	if err != nil {
 		t.Error(err)
 	}
