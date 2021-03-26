@@ -8,7 +8,7 @@ import (
 	"github.com/vocdoni/multirpc/transports"
 	"github.com/vocdoni/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/census"
-	"go.vocdoni.io/dvote/censustree/gravitontree"
+	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
@@ -90,7 +90,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	var cm census.Manager
 	d.CensusDir = tb.TempDir()
 
-	if err := cm.Init(d.CensusDir, "", gravitontree.NewTree); err != nil {
+	if err := cm.Init(d.CensusDir, "", tree.NewTree); err != nil {
 		tb.Fatal(err)
 	}
 

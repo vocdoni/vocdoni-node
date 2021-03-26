@@ -419,6 +419,10 @@ func (t *GravitonTree) count() (count uint64) {
 	return
 }
 
+func (t *GravitonTree) Commit() error {
+	return t.tree.Commit()
+}
+
 func (t *GravitonTree) Count() uint64 {
 	c := atomic.LoadUint64(&t.size)
 	if c == 0 {

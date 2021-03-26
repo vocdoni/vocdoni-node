@@ -138,7 +138,7 @@ func getDataFromClaim(c *claims.ClaimBasic) ([]byte, []byte) {
 	return c.IndexSlot[:indexSize], c.ValueSlot[2 : valueSize+2]
 }
 
-// AddClaim adds a new claim to the merkle tree
+// Add adds a new claim to the merkle tree
 // A claim is composed of two parts: index and value
 //  1.index is mandatory, the data will be used for indexing the claim into to merkle tree
 //  2.value is optional, the data will not affect the indexing
@@ -153,6 +153,43 @@ func (t *Tree) Add(index, value []byte) error {
 		return err
 	}
 	return t.Tree.AddClaim(c)
+}
+
+// AddBatch adds list of indexes and values to the tree.
+func (t *Tree) AddBatch(indexes, values [][]byte) ([]int, error) {
+	t.updateAccessTime()
+	var wrongIndexes []int
+	if len(values) > 0 && len(indexes) != len(values) {
+		return wrongIndexes, fmt.Errorf("indexes and values have different size")
+	}
+	for i, key := range indexes {
+		if len(key) < 4 || len(key) > MaxKeySize {
+			wrongIndexes = append(wrongIndexes, i)
+			continue
+		}
+		if len(values) > 0 {
+			c, err := getClaimFromData(key, values[i])
+			if err != nil {
+				wrongIndexes = append(wrongIndexes, i)
+				continue
+			}
+			if err := t.Tree.AddClaim(c); err != nil {
+				wrongIndexes = append(wrongIndexes, i)
+				continue
+			}
+		} else {
+			c, err := getClaimFromData(key, nil)
+			if err != nil {
+				wrongIndexes = append(wrongIndexes, i)
+				continue
+			}
+			if err := t.Tree.AddClaim(c); err != nil {
+				wrongIndexes = append(wrongIndexes, i)
+				continue
+			}
+		}
+	}
+	return wrongIndexes, nil
 }
 
 // GenProof generates a merkle tree proof that can be later used on CheckProof() to validate it

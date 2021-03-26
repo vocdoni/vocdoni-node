@@ -8,6 +8,7 @@ type Tree interface {
 	UnPublish()     // UnPublish will make the tree not available for queries
 	IsPublic() bool // Check if the census tree is available for queries or not
 	Add(key, value []byte) error
+	AddBatch(keys, values [][]byte) (failedIndexes []int, err error) // Must support values=nil
 	GenProof(key, value []byte) (mproof []byte, err error)
 	CheckProof(key, value, root, mproof []byte) (included bool, err error)
 	Root() []byte

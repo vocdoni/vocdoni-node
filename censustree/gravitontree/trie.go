@@ -130,6 +130,36 @@ func (t *Tree) Add(index, value []byte) error {
 	return err
 }
 
+// AddBatch adds a list of indexes and values to the tree. Only commits at the end.
+func (t *Tree) AddBatch(indexes, values [][]byte) ([]int, error) {
+	t.updateAccessTime()
+	var wrongIndexes []int
+	if len(values) > 0 && len(indexes) != len(values) {
+		return wrongIndexes, fmt.Errorf("indexes and values have different size")
+	}
+	for i, key := range indexes {
+		if len(key) < 4 || len(key) > MaxKeySize {
+			log.Debugf("addBatch: invalid key size: %d", len(key))
+			wrongIndexes = append(wrongIndexes, i)
+			continue
+		}
+		if len(values) > 0 {
+			if err := t.Tree.Add(key, values[i]); err != nil {
+				log.Debugf("addBatch: invalid value size: %d", len(key))
+				wrongIndexes = append(wrongIndexes, i)
+				continue
+			}
+		} else {
+			if err := t.Tree.Add(key, nil); err != nil {
+				wrongIndexes = append(wrongIndexes, i)
+				continue
+			}
+		}
+	}
+	_, err := t.store.Commit()
+	return wrongIndexes, err
+}
+
 // GenProof generates a merkle tree proof that can be later used on CheckProof() to validate it
 func (t *Tree) GenProof(index, value []byte) ([]byte, error) {
 	t.updateAccessTime()

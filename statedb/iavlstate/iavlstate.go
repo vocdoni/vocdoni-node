@@ -282,6 +282,11 @@ func (t *IavlTree) Hash() []byte {
 	}
 }
 
+func (t *IavlTree) Commit() error {
+	_, _, err := t.tree.SaveVersion()
+	return err
+}
+
 func (t *IavlTree) Count() uint64 {
 	if t.isImmutable {
 		return uint64(t.itree.Size())

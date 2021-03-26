@@ -185,33 +185,16 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 
 	case "addClaimBulk":
 		if isAuth && validAuthPrefix {
-			addedClaims := 0
-			var invalidClaims []int
-			var err error
-			var value types.HexBytes
-			for i, key := range r.CensusKeys {
-				if !r.Digested {
-					key = snarks.Poseidon.Hash(key)
-				}
-				if i < len(r.CensusValues) {
-					value = r.CensusValues[i]
-				} else {
-					value = []byte{}
-				}
-				err = tr.Add(key, value)
-				if err != nil {
-					log.Warnf("error adding claim: %s", err)
-					invalidClaims = append(invalidClaims, i)
-				} else {
-					log.Debugf("claim added %x/%x", key, value)
-					addedClaims++
-				}
+			invalidClaims, err := tr.AddBatch(r.CensusKeys, r.CensusValues)
+			if err != nil {
+				resp.SetError(err.Error())
+				return resp
 			}
 			if len(invalidClaims) > 0 {
 				resp.InvalidClaims = invalidClaims
 			}
 			resp.Root = tr.Root()
-			log.Infof("%d claims addedd successfully", addedClaims)
+			log.Infof("%d claims addedd successfully", len(r.CensusKeys)-len(invalidClaims))
 		} else {
 			resp.SetError("invalid authentication")
 		}
