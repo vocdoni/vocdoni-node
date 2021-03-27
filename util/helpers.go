@@ -1,10 +1,9 @@
 package util
 
 import (
+	"crypto/rand"
 	"fmt"
-	"io"
-	"math/rand"
-	"time"
+	"math/big"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 )
@@ -16,21 +15,18 @@ func TrimHex(s string) string {
 	return s
 }
 
-var randReader = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 func RandomBytes(n int) []byte {
-	bytes := make([]byte, n)
-	if _, err := io.ReadFull(randReader, bytes); err != nil {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	if err != nil {
 		panic(err)
 	}
-	return bytes
+	return b
 }
 
 func Random32() [32]byte {
 	var bytes [32]byte
-	if _, err := io.ReadFull(randReader, bytes[:]); err != nil {
-		panic(err)
-	}
+	copy(bytes[:], RandomBytes(32))
 	return bytes
 }
 
@@ -39,7 +35,11 @@ func RandomHex(n int) string {
 }
 
 func RandomInt(min, max int) int {
-	return randReader.Intn(max-min) + min
+	num, err := rand.Int(rand.Reader, big.NewInt(int64(max-min)))
+	if err != nil {
+		panic(err)
+	}
+	return int(num.Int64()) + min
 }
 
 func SplitBytes(buf []byte, lim int) [][]byte {
