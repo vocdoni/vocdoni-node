@@ -36,7 +36,7 @@ func BenchmarkVochain(b *testing.B) {
 	}
 
 	// create random key batch
-	keySet := testcommon.CreateEthRandomKeysBatch(b, b.N+1)
+	keySet := testcommon.CreateEthRandomKeysBatch(b, *censusSize)
 	log.Infof("generated %d keys", len(keySet))
 
 	// get signer pubkey
@@ -79,7 +79,7 @@ func BenchmarkVochain(b *testing.B) {
 	req.CensusID = censusID
 	claims := [][]byte{}
 	// Send claims by batches of 100
-	for i := 0; i < b.N+1; i++ {
+	for i := 0; i < *censusSize; i++ {
 		claims = append(claims, keySet[i].PublicKey())
 		if i%100 == 0 {
 			req.CensusKeys = claims

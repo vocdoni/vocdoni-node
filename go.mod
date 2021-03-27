@@ -6,7 +6,7 @@ go 1.16
 // replace go.vocdoni.io/proto  => ../dvote-protobuf
 
 require (
-	git.sr.ht/~sircmpwn/go-bare v0.0.0-20201210182351-86af428a8287
+	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210227202403-5dae5c48f917
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210203222605-876755a714c3
 	github.com/cosmos/iavl v0.15.3
 	github.com/deroproject/graviton v0.0.0-20200906044921-89e9e09f9601
@@ -14,6 +14,7 @@ require (
 	github.com/ethereum/go-ethereum v1.9.26-0.20201212163632-00d10e610f9f
 	github.com/frankban/quicktest v1.11.3
 	github.com/google/go-cmp v0.5.4
+	github.com/hashicorp/hcl v1.0.1-0.20180906183839-65a6292f0157 // indirect
 	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
 	github.com/iden3/go-iden3-crypto v0.0.4
 	github.com/ipfs/go-bitswap v0.3.4-0.20210226182239-d1d4afa29da4 // indirect
@@ -47,7 +48,7 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/zap v1.16.0
 	go.vocdoni.io/proto v1.0.2
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2 // indirect
 	google.golang.org/protobuf v1.25.0

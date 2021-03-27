@@ -8,7 +8,7 @@ import (
 	"github.com/vocdoni/multirpc/transports"
 	"github.com/vocdoni/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/census"
-	tree "go.vocdoni.io/dvote/censustree/gravitontree"
+	graviton "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
@@ -22,6 +22,7 @@ type DvoteAPIServer struct {
 	Signer         *ethereum.SignKeys
 	VochainCfg     *config.VochainCfg
 	CensusDir      string
+	CensusBackend  string // graviton or asmt
 	IpfsDir        string
 	ScrutinizerDir string
 	PxyAddr        string
@@ -89,9 +90,12 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
 	d.CensusDir = tb.TempDir()
-
-	if err := cm.Init(d.CensusDir, "", tree.NewTree); err != nil {
-		tb.Fatal(err)
+	if d.CensusBackend == "" || d.CensusBackend == "graviton" {
+		if err := cm.Init(d.CensusDir, "", graviton.NewTree); err != nil {
+			tb.Fatal(err)
+		}
+	} else {
+		tb.Fatalf("census backend %s is unknown", d.CensusBackend)
 	}
 
 	for _, api := range apis {
