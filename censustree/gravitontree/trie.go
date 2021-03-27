@@ -184,7 +184,7 @@ func CheckProof(index, value, root []byte, mproof []byte) (bool, error) {
 		return false, fmt.Errorf("root hash length is incorrect (expected %d)",
 			gravitonstate.GravitonHashSizeBytes)
 	}
-	return gravitonstate.Verify(index, mproof, root)
+	return gravitonstate.Verify(index, value, mproof, root)
 }
 
 // CheckProof validates a merkle proof and its data
@@ -201,7 +201,7 @@ func (t *Tree) CheckProof(index, value, root, mproof []byte) (bool, error) {
 		return false, fmt.Errorf("tree %s does not exist", t.name)
 	}
 	t.updateAccessTime()
-	return t.Tree.Verify(index, mproof, root), nil
+	return t.Tree.Verify(index, value, mproof, root), nil
 }
 
 // Root returns the current root hash of the merkle tree
