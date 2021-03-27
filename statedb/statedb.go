@@ -23,6 +23,6 @@ type StateTree interface {
 	Count() uint64
 	Version() uint64
 	Proof(key []byte) ([]byte, error)
-	Verify(key, proof, root []byte) bool
+	Verify(key, value, proof, root []byte) bool
 	Commit() error
 }

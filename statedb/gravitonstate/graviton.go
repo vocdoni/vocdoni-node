@@ -433,49 +433,48 @@ func (t *GravitonTree) Count() uint64 {
 }
 
 func (t *GravitonTree) Proof(key []byte) ([]byte, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key is nil")
+	}
 	proof, err := t.tree.GenerateProof(key)
 	if err != nil {
 		return nil, err
 	}
-	proofBytes := proof.Marshal()
-	if !t.Verify(key, proofBytes, nil) {
+	if proof == nil {
 		return nil, nil
 	}
+	proofBytes := proof.Marshal()
+	root, err := t.tree.Hash()
+	if err != nil {
+		return nil, err
+	}
+	if !proof.VerifyMembership(root, key) {
+		return nil, nil
+	}
+
 	return proofBytes, nil
 }
 
-// TODO(mvdan): join the two Verify funcs
-
-func (t *GravitonTree) Verify(key, proof, root []byte) bool {
-	var p graviton.Proof
-	var err error
-	var r [32]byte
-	// Unmarshal() will generate a panic if the proof size is incorrect. See https://go.vocdoni.io/dvote/-/issues/333
-	// While this is not fixed upstream, we need to recover the panic.
-	defer func() {
-		if r := recover(); r != nil {
-			log.Warnf("recovered graviton verify panic: %v", r)
-		}
-	}()
-	if err = p.Unmarshal(proof); err != nil {
-		log.Error(err)
+func (t *GravitonTree) Verify(key, value, proof, root []byte) bool {
+	if root == nil {
+		root = t.Hash()
+	}
+	valid, err := Verify(key, value, proof, root)
+	if err != nil {
+		log.Debugf("graviton verify proof error: %v", err)
 		return false
 	}
-	if root == nil {
-		r, err = t.tree.Hash()
-		if err != nil {
-			return false
-		}
-	} else {
-		copy(r[:], root[:32])
-	}
-	return p.VerifyMembership(r, key)
+	return valid
 }
 
-func Verify(key, proof, root []byte) (bool, error) {
+func Verify(key, value, proof, root []byte) (bool, error) {
 	var p graviton.Proof
-	var r [32]byte
-	// Unmarshal() will generate a panic if the proof size is incorrect. See https://go.vocdoni.io/dvote/-/issues/333
+	var r [GravitonHashSizeBytes]byte
+	if proof == nil || key == nil {
+		return false, fmt.Errorf("proof or key are nil")
+	}
+	// Unmarshal() will generate a panic if the proof size is incorrect.
+	// See https://go.vocdoni.io/dvote/-/issues/333
 	// While this is not fixed upstream, we need to recover the panic.
 	defer func() {
 		if r := recover(); r != nil {
@@ -486,9 +485,12 @@ func Verify(key, proof, root []byte) (bool, error) {
 		log.Error(err)
 		return false, err
 	}
-	if len(root) != 32 {
+	if !bytes.Equal(p.Value(), value) {
+		return false, nil
+	}
+	if len(root) != GravitonHashSizeBytes {
 		return false, fmt.Errorf("root hash size is not correct")
 	}
-	copy(r[:], root[:32])
+	copy(r[:], root[:GravitonHashSizeBytes])
 	return p.VerifyMembership(r, key), nil
 }

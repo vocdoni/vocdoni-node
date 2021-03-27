@@ -77,6 +77,7 @@ func BenchmarkVochain(b *testing.B) {
 	log.Debug("add bulk claims")
 	reset(req)
 	req.CensusID = censusID
+	req.Digested = false
 	claims := [][]byte{}
 	// Send claims by batches of 100
 	for i := 0; i < *censusSize; i++ {
@@ -225,6 +226,7 @@ func voteBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys,
 	log.Infof("generating proof for key %s", pub)
 	req.CensusID = fmt.Sprintf("%x", censusRoot)
 	req.CensusKey = s.PublicKey()
+	req.Digested = false
 	resp := doRequest("genProof", nil)
 	if len(resp.Siblings) == 0 {
 		b.Fatalf("proof not generated while it should be generated correctly: %v", resp.Message)

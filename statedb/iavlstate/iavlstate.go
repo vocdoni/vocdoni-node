@@ -315,7 +315,7 @@ func (t *IavlTree) Proof(key []byte) ([]byte, error) {
 	return []byte(p.String()), err
 }
 
-func (t *IavlTree) Verify(key, proof, root []byte) bool {
+func (t *IavlTree) Verify(key, value, proof, root []byte) bool {
 	// TO-DO
 	return false
 }

@@ -171,12 +171,30 @@ func TestOrderAndProof(t *testing.T) {
 		t.Error(err)
 	}
 
-	if ok := s.Tree("t3").Verify([]byte("5"), proof, nil); !ok {
+	if ok := s.Tree("t3").Verify([]byte("5"), []byte("number 5"), proof, nil); !ok {
 		t.Errorf("proof is invalid, should be valid")
 	}
 
-	if ok := s.Tree("t3").Verify([]byte("_"), proof, nil); ok {
+	if ok := s.Tree("t3").Verify([]byte("5"), []byte("number 4"), proof, nil); ok {
 		t.Errorf("proof is valid, should be invalid")
 	}
 
+	if ok := s.Tree("t3").Verify([]byte("_"), nil, proof, nil); ok {
+		t.Errorf("proof is valid, should be invalid")
+	}
+
+	// Check it suports nil values
+	if err := s.Tree("t4").Add([]byte("this is empty"), nil); err != nil {
+		t.Errorf("nil values not supported: %v", err)
+	}
+	proof, err = s.Tree("t4").Proof([]byte("this is empty"))
+	if err != nil {
+		t.Error(err)
+	}
+	if proof == nil {
+		t.Errorf("proof is nil")
+	}
+	if ok := s.Tree("t4").Verify([]byte("this is empty"), nil, proof, nil); !ok {
+		t.Errorf("proof is invalid, should be valid")
+	}
 }
