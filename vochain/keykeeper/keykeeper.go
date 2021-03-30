@@ -259,10 +259,11 @@ func (k *KeyKeeper) OnCancel(pid []byte) { // LEGACY
 }
 
 // Commit saves the pending operation
-func (k *KeyKeeper) Commit(height int64) {
+func (k *KeyKeeper) Commit(height int64) (error, bool) {
 	k.scheduleRevealKeys()
 	go k.checkRevealProcess(height)
 	go k.publishPendingKeys()
+	return nil, false
 }
 
 // OnVote is not used by the KeyKeeper
@@ -295,6 +296,11 @@ func (k *KeyKeeper) OnProcessKeys(pid []byte, pub, com string) {
 
 func (k *KeyKeeper) OnRevealKeys(pid []byte, priv, rev string) {
 	// do nothing
+}
+
+func (k *KeyKeeper) OnProcessResults(pid []byte, results []*models.QuestionResult) error {
+	// do nothing
+	return nil
 }
 
 // Generate Keys generates a set of encryption/commitment keys for a process.

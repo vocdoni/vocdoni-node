@@ -264,6 +264,7 @@ func TestResults(t *testing.T) {
 	vp, err = priv.Encrypt(vp, nil)
 	qt.Assert(t, err, qt.IsNil)
 
+	sc.Rollback()
 	for i := 0; i < 300; i++ {
 		err := state.AddVote(&models.Vote{
 			ProcessId:            pid,
@@ -293,19 +294,16 @@ func TestResults(t *testing.T) {
 	// Test results
 	result, err := sc.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
-	log.Infof("results: %s", PrintResults(&models.ProcessResult{
-		Votes:     result.Votes,
-		ProcessId: pid,
-	}))
+	log.Infof("results: %s", GetFriendlyResults(result.Votes))
 	v0 := big.NewInt(0)
 	v300 := big.NewInt(300)
 	value := new(big.Int)
-	for _, q := range result.Votes {
-		for qi, v1 := range q.Question {
+	for q := range result.Votes {
+		for qi := range result.Votes[q] {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
 			}
-			value.SetBytes(v1)
+			value = result.Votes[q][qi]
 			if qi != 1 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
@@ -314,7 +312,7 @@ func TestResults(t *testing.T) {
 			}
 		}
 	}
-	for _, q := range sc.GetFriendlyResults(result.Votes) {
+	for _, q := range GetFriendlyResults(result.Votes) {
 		for qi, v1 := range q {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
@@ -361,13 +359,17 @@ func TestLiveResults(t *testing.T) {
 	})
 	qt.Assert(t, err, qt.IsNil)
 	v := &models.Vote{ProcessId: pid, VotePackage: vp}
-	for i := 0; i < 100; i++ {
-		if err := sc.addLiveVote(v); err != nil {
-			t.Fatal(err)
-		}
+	r := &Results{
+		Votes:  newEmptyVotes(3, 2),
+		Weight: new(big.Int).SetUint64(0),
 	}
+	sc.addProcessToLiveResults(pid)
+	for i := 0; i < 100; i++ {
+		qt.Assert(t, sc.addLiveVote(v, r), qt.IsNil)
+	}
+	qt.Assert(t, sc.commitVotes(pid, r), qt.IsNil)
 
-	if live, err := sc.isLiveResultsProcess(pid); !live || err != nil {
+	if live, err := sc.isOpenProcess(pid); !live || err != nil {
 		t.Fatal(fmt.Errorf("isLiveResultsProcess returned false: %v", err))
 	}
 
@@ -377,13 +379,13 @@ func TestLiveResults(t *testing.T) {
 
 	v0 := big.NewInt(0)
 	v100 := big.NewInt(100)
-	value := new(big.Int)
-	for _, q := range result.Votes {
-		for qi, v1 := range q.Question {
+	var value *big.Int
+	for q := range result.Votes {
+		for qi := range result.Votes[q] {
 			if qi > 2 {
 				t.Fatalf("found more questions that expected")
 			}
-			value.SetBytes(v1)
+			value = result.Votes[q][qi]
 			if qi == 0 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
@@ -427,19 +429,19 @@ func TestAddVote(t *testing.T) {
 	pr, err := sc.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	// Should be fine
-	err = addVote(pr.Votes, []int{1, 2, 3}, nil, options, envelopeType)
+	pr.Votes, err = addVote(pr.Votes, []int{1, 2, 3}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Overflows maxTotalCost
-	err = addVote(pr.Votes, []int{2, 2, 3}, nil, options, envelopeType)
+	pr.Votes, err = addVote(pr.Votes, []int{2, 2, 3}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.ErrorMatches, "max total cost overflow.*")
 
 	// Overflows maxValue
-	err = addVote(pr.Votes, []int{1, 1, 4}, nil, options, envelopeType)
+	pr.Votes, err = addVote(pr.Votes, []int{1, 1, 4}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.ErrorMatches, "max value overflow.*")
 
 	// Overflows maxCount
-	err = addVote(pr.Votes, []int{1, 1, 1, 1}, nil, options, envelopeType)
+	pr.Votes, err = addVote(pr.Votes, []int{1, 1, 1, 1}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.ErrorMatches, "max count overflow.*")
 
 	// Quadratic voting, 10 credits to distribute among 3 options
@@ -451,24 +453,24 @@ func TestAddVote(t *testing.T) {
 	}
 
 	// Should be fine 2^2 + 2^2 + 1^2 = 9
-	err = addVote(pr.Votes, []int{2, 2, 1}, nil, options, envelopeType)
+	pr.Votes, err = addVote(pr.Votes, []int{2, 2, 1}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Should be fine 3^2 + 0 + 0 = 9
-	err = addVote(pr.Votes, []int{3, 0, 0}, nil, options, envelopeType)
+	pr.Votes, err = addVote(pr.Votes, []int{3, 0, 0}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Should fail since 2^2 + 2^2 + 2^2 = 12
-	err = addVote(pr.Votes, []int{2, 2, 2}, nil, options, envelopeType)
+	pr.Votes, err = addVote(pr.Votes, []int{2, 2, 2}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.ErrorMatches, "max total cost overflow.*")
 
 	// Should fail since 4^2 = 16
-	err = addVote(pr.Votes, []int{4, 0, 0}, nil, options, envelopeType)
+	pr.Votes, err = addVote(pr.Votes, []int{4, 0, 0}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.ErrorMatches, "max total cost overflow.*")
 
 	// Check unique values work
 	envelopeType = &models.EnvelopeType{UniqueValues: true}
-	err = addVote(pr.Votes, []int{2, 1, 1}, nil, options, envelopeType)
+	pr.Votes, err = addVote(pr.Votes, []int{2, 1, 1}, nil, options, envelopeType)
 	qt.Assert(t, err, qt.ErrorMatches, "values are not unique")
 }
 
@@ -480,11 +482,25 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
 	if err != nil {
 		return err
 	}
-	return sc.addLiveVote(
+	max := 0
+	for _, i := range v {
+		if i > max {
+			max = i
+		}
+	}
+	r := &Results{
+		Votes:  newEmptyVotes(len(v), max+1),
+		Weight: new(big.Int).SetUint64(1),
+	}
+	sc.addProcessToLiveResults(pid)
+	if err := sc.addLiveVote(
 		&models.Vote{
 			ProcessId:   pid,
 			VotePackage: vp,
-		})
+		}, r); err != nil {
+		return err
+	}
+	return sc.commitVotes(pid, r)
 }
 
 func TestBallotProtocolRateProduct(t *testing.T) {
@@ -508,8 +524,7 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = sc.newEmptyProcess(pid)
-	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, sc.newEmptyProcess(pid), qt.IsNil)
 
 	// Rate a product, exepected result: [ [1,0,1,0,2], [0,0,2,0,2] ]
 	qt.Assert(t, vote([]int{4, 2}, sc, pid), qt.IsNil)
@@ -517,11 +532,11 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	qt.Assert(t, vote([]int{2, 4}, sc, pid), qt.IsNil)
 	qt.Assert(t, vote([]int{0, 4}, sc, pid), qt.IsNil)
 	qt.Assert(t, vote([]int{0, 5}, sc, pid), qt.ErrorMatches, ".*overflow.*")
-	qt.Assert(t, vote([]int{0, 0, 0}, sc, pid), qt.ErrorMatches, ".*overflow.*")
+	qt.Assert(t, vote([]int{0, 0, 0}, sc, pid), qt.ErrorMatches, ".*")
 
 	result, err := sc.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
-	votes := sc.GetFriendlyResults(result.Votes)
+	votes := GetFriendlyResults(result.Votes)
 	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "0", "1", "0", "2"})
 	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "0", "2", "0", "2"})
 }
@@ -567,7 +582,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 
 	result, err := sc.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
-	votes := sc.GetFriendlyResults(result.Votes)
+	votes := GetFriendlyResults(result.Votes)
 	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "2"})
 	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "3"})
 	qt.Assert(t, votes[2], qt.DeepEquals, []string{"1", "2"})

@@ -47,9 +47,25 @@ type Entity struct {
 
 type Results struct {
 	ProcessID  types.HexBytes `badgerholdKey:"ProcessID"`
-	Votes      []*models.QuestionResult
+	Votes      [][]*big.Int
 	Weight     *big.Int
 	Signatures []types.HexBytes
+	Final      bool
+}
+
+func (r *Results) String() string {
+	results := ""
+	for _, q := range r.Votes {
+		results += " ["
+		for j, o := range q {
+			results += o.String()
+			if j < len(q)-1 {
+				results += ","
+			}
+		}
+		results += "]"
+	}
+	return results
 }
 
 func InitDB(dataDir string) (*badgerhold.Store, error) {

@@ -150,7 +150,7 @@ func (s *Scrutinizer) EntityCount() int64 {
 }
 
 // Return whether a process must have live results or not
-func (s *Scrutinizer) isLiveResultsProcess(processID []byte) (bool, error) {
+func (s *Scrutinizer) isOpenProcess(processID []byte) (bool, error) {
 	p, err := s.VochainState.Process(processID, false)
 	if err != nil {
 		return false, err
@@ -202,17 +202,19 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		return fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
 	}
 
-	// MaxValue requires +1 since 0 is also an option
-	pv := newEmptyResults(int(options.MaxCount), int(options.MaxValue)+1)
-
 	// Create results in the indexer database
+	s.addVoteLock.Lock()
 	if err := s.db.Insert(pid, &Results{
-		ProcessID:  pid,
-		Votes:      pv.GetVotes(),
+		ProcessID: pid,
+		// MaxValue requires +1 since 0 is also an option
+		Votes:      newEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+		Weight:     new(big.Int).SetUint64(0),
 		Signatures: []types.HexBytes{},
 	}); err != nil {
+		s.addVoteLock.Unlock()
 		return err
 	}
+	s.addVoteLock.Unlock()
 
 	// Get the block time from the Header
 	currentBlockTime := time.Unix(s.VochainState.Header(false).Timestamp, 0)
@@ -224,7 +226,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	}
 
 	compResultsHeight := uint32(0)
-	if live, err := s.isLiveResultsProcess(pid); err != nil {
+	if live, err := s.isOpenProcess(pid); err != nil {
 		return fmt.Errorf("cannot check if process live: %w", err)
 	} else {
 		if live {
@@ -263,41 +265,45 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
-	dbProc := &Process{}
-	if err := s.db.FindOne(dbProc, badgerhold.Where(badgerhold.Key).Eq(pid)); err != nil {
-		return err
-	}
-	dbProc.EndBlock = p.GetBlockCount() + p.GetStartBlock()
-	dbProc.CensusRoot = p.GetCensusRoot()
-	dbProc.CensusURI = p.GetCensusURI()
-	dbProc.Status = int32(p.GetStatus())
-	dbProc.PrivateKeys = p.EncryptionPrivateKeys
-	dbProc.PublicKeys = p.EncryptionPublicKeys
-	return s.db.Update(pid, dbProc)
+	return s.db.UpdateMatching(&Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
+		func(record interface{}) error {
+			update, ok := record.(*Process)
+			if !ok {
+				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+			}
+			update.EndBlock = p.GetBlockCount() + p.GetStartBlock()
+			update.CensusRoot = p.GetCensusRoot()
+			update.CensusURI = p.GetCensusURI()
+			update.Status = int32(p.GetStatus())
+			update.PrivateKeys = p.EncryptionPrivateKeys
+			update.PublicKeys = p.EncryptionPublicKeys
+			return nil
+		})
 }
 
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
-	dbProc := &Process{}
-	if err := s.db.FindOne(dbProc, badgerhold.Where(badgerhold.Key).Eq(pid)); err != nil {
-		return err
-	}
-	dbProc.Rheight = height
-	return s.db.Update(pid, dbProc)
+	return s.db.UpdateMatching(&Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
+		func(record interface{}) error {
+			update, ok := record.(*Process)
+			if !ok {
+				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+			}
+			update.Rheight = height
+			return nil
+		})
 }
 
-func newEmptyResults(questions, options int) *models.ProcessResult {
+func newEmptyVotes(questions, options int) [][]*big.Int {
 	if questions == 0 || options == 0 {
 		return nil
 	}
-	pv := new(models.ProcessResult)
-	pv.Votes = make([]*models.QuestionResult, questions)
-	zero := big.NewInt(0)
-	for i := range pv.Votes {
-		pv.Votes[i] = new(models.QuestionResult)
-		pv.Votes[i].Question = make([][]byte, options)
-		for j := range pv.Votes[i].Question {
-			pv.Votes[i].Question[j] = zero.Bytes()
+	results := [][]*big.Int{}
+	for i := 0; i < questions; i++ {
+		question := []*big.Int{}
+		for j := 0; j < options; j++ {
+			question = append(question, big.NewInt(0))
 		}
+		results = append(results, question)
 	}
-	return pv
+	return results
 }

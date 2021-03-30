@@ -39,6 +39,12 @@ var (
 		Name:      "vote_tree",
 		Help:      "Size of the vote tree",
 	})
+	// VochainVotesPerMinute ...
+	VochainVotesPerMinute = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "vochain",
+		Name:      "vote_tree_increase_last_minute",
+		Help:      "Number of votes included in the vote tree the last 60 seconds",
+	})
 	// VochainAppTree ...
 	VochainVoteCache = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "vochain",
@@ -53,6 +59,7 @@ func (vi *VochainInfo) registerMetrics(ma *metrics.Agent) {
 	ma.Register(VochainAppTree)
 	ma.Register(VochainProcessTree)
 	ma.Register(VochainVoteTree)
+	ma.Register(VochainVotesPerMinute)
 	ma.Register(VochainVoteCache)
 
 }
@@ -60,9 +67,10 @@ func (vi *VochainInfo) registerMetrics(ma *metrics.Agent) {
 func (vi *VochainInfo) getMetrics() {
 	VochainHeight.Set(float64(vi.Height()))
 	VochainMempool.Set(float64(vi.MempoolSize()))
-	p, v := vi.TreeSizes()
+	p, v, vxm := vi.TreeSizes()
 	VochainProcessTree.Set(float64(p))
 	VochainVoteTree.Set(float64(v))
+	VochainVotesPerMinute.Set(float64(vxm))
 	VochainVoteCache.Set(float64(vi.VoteCacheSize()))
 }
 
