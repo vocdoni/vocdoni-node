@@ -207,6 +207,12 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 	}
 
 	if commit {
+		// If some of the event listeners return an error, do not include the transaction
+		for _, l := range v.eventListeners {
+			if err := l.OnProcessResults(process.ProcessId, result.Votes); err != nil {
+				return err
+			}
+		}
 		process.Results = result
 		process.Status = models.ProcessStatus_RESULTS
 		if err := v.setProcess(process, process.ProcessId); err != nil {
