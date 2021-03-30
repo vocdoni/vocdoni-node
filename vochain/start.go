@@ -40,6 +40,8 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	}
 	// Set mempool function for removing transactions
 	app.State.MemPoolRemoveTxKey = app.Node.Mempool().(*mempl.CListMempool).RemoveTxByKey
+	// Set function for informing the State if the blockchain is synchronizing or not
+	app.State.IsSynchronizing = app.Node.ConsensusReactor().WaitSync
 	// Create custom logger for mempool
 	logDisable := false
 	if vochaincfg.LogLevelMemPool == "none" {
@@ -128,6 +130,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	if localConfig.Dev {
 		tconfig.P2P.AllowDuplicateIP = true
 		tconfig.P2P.AddrBookStrict = false
+		tconfig.P2P.HandshakeTimeout = time.Second * 10
 	}
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)

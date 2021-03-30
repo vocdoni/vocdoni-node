@@ -327,7 +327,7 @@ func (r *Router) getResults(request routerRequest) {
 		r.sendError(request, "unknown problem fetching results")
 		return
 	}
-	response.Results = r.Scrutinizer.GetFriendlyResults(vr.Votes)
+	response.Results = scrutinizer.GetFriendlyResults(vr.Votes)
 
 	// Get number of votes
 	votes := r.vocapp.State.CountVotes(request.ProcessID, true)

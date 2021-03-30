@@ -146,7 +146,7 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 	var a *[5]int32
 	var h int64
 	var p, v uint64
-	var m, vc int
+	var m, vc, vxm int
 	var b strings.Builder
 	for {
 		b.Reset()
@@ -168,10 +168,10 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 		}
 		h = vi.Height()
 		m = vi.MempoolSize()
-		p, v = vi.TreeSizes()
+		p, v, vxm = vi.TreeSizes()
 		vc = vi.VoteCacheSize()
-		log.Infof("[vochain info] height:%d mempool:%d peers:%d processes:%d votes:%d voteCache:%d blockTime:{%s}",
-			h, m, len(vi.Peers()), p, v, vc, b.String(),
+		log.Infof("[vochain info] height:%d mempool:%d peers:%d processes:%d votes:%d vxm:%d voteCache:%d blockTime:{%s}",
+			h, m, len(vi.Peers()), p, v, vxm, vc, b.String(),
 		)
 		time.Sleep(time.Duration(sleepSecs) * time.Second)
 	}

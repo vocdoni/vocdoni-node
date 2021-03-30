@@ -50,13 +50,14 @@ func (c *CensusDownloader) Rollback() {
 	c.queueLock.Unlock()
 }
 
-func (c *CensusDownloader) Commit(height int64) {
+func (c *CensusDownloader) Commit(height int64) (error, bool) {
 	c.queueLock.Lock()
 	defer c.queueLock.Unlock()
 	for k, v := range c.queue {
-		log.Debugf("importing remote census %s", v)
+		log.Infof("importing remote census %s", v)
 		c.importCensus(k, v)
 	}
+	return nil, false
 }
 
 func (c *CensusDownloader) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
@@ -81,3 +82,6 @@ func (c *CensusDownloader) OnVote(v *models.Vote)                               
 func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string)                     {}
 func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string)                     {}
 func (c *CensusDownloader) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {}
+func (c *CensusDownloader) OnProcessResults(pid []byte, results []*models.QuestionResult) error {
+	return nil
+}

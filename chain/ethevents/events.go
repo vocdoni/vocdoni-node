@@ -150,60 +150,66 @@ func NewEthEvents(
 }
 
 // OnComputeResults is called once a process result is computed by the scrutinizer.
-func (ev *EthereumEvents) OnComputeResults(results *models.ProcessResult) {
-	// check vochain
+// The Oracle will build and send a RESULTS transaction to the Vochain.
+// The transaction includes the final results for the process.
+func (ev *EthereumEvents) OnComputeResults(results *scrutinizer.Results) {
 	// check vochain process status
-	vocProcessData, err := ev.VochainApp.State.Process(results.ProcessId, true)
+	vocProcessData, err := ev.VochainApp.State.Process(results.ProcessID, true)
 	if err != nil {
-		log.Errorf("error fetching process %x from the Vochain: %s", results.ProcessId, err)
+		log.Errorf("error fetching process %x from the Vochain: %v", results.ProcessID, err)
 		return
 	}
 	switch vocProcessData.Status {
 	case models.ProcessStatus_RESULTS:
 		// check vochain process results
 		if len(vocProcessData.Results.Votes) > 0 {
-			log.Infof("process %x results already added on the Vochain, skipping", results.ProcessId)
+			log.Infof("process %x results already added on the Vochain, skipping",
+				results.ProcessID)
 			return
 		}
 	case models.ProcessStatus_ENDED:
 		break
 	default:
-		log.Infof("invalid process %x status %s for setting the results, skipping", results.ProcessId, vocProcessData.Status)
+		log.Infof("invalid process %x status %s for setting the results, skipping",
+			results.ProcessID, vocProcessData.Status.String())
 		return
 	}
+
 	// create setProcessTx
 	setprocessTxArgs := &models.SetProcessTx{
-		ProcessId: results.ProcessId,
-		Results:   results,
+		ProcessId: results.ProcessID,
+		Results:   scrutinizer.BuildProcessResult(results, vocProcessData.EntityId),
 		Status:    models.ProcessStatus_RESULTS.Enum(),
 		Txtype:    models.TxType_SET_PROCESS_RESULTS,
 	}
 
 	stx := &models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: setprocessTxArgs}})
-	if err != nil {
-		log.Errorf("cannot marshal set process results tx: %s", err)
+	if stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetProcess{
+			SetProcess: setprocessTxArgs,
+		},
+	}); err != nil {
+		log.Errorf("cannot marshal set process results tx: %v", err)
 		return
 	}
-	stx.Signature, err = ev.Signer.Sign(stx.Tx)
-	if err != nil {
-		log.Errorf("cannot sign oracle tx: %s", err)
+	if stx.Signature, err = ev.Signer.Sign(stx.Tx); err != nil {
+		log.Errorf("cannot sign oracle tx: %v", err)
 		return
 	}
 
 	txb, err := proto.Marshal(stx)
 	if err != nil {
-		log.Errorf("error marshaling set process results tx: %s", err)
+		log.Errorf("error marshaling set process results tx: %v", err)
 		return
 	}
-	log.Debugf("broadcasting Vochain Tx: %s", setprocessTxArgs.String())
+	log.Debugf("broadcasting Vochain Tx: %s", log.FormatProto(setprocessTxArgs))
 
 	res, err := ev.VochainApp.SendTX(txb)
 	if err != nil || res == nil {
-		log.Errorf("cannot broadcast tx: %s, res: %+v", err, res)
+		log.Errorf("cannot broadcast tx: %v, res: %+v", err, res)
 		return
 	}
-	log.Infof("oracle transaction sent, hash:%s", res.Hash)
+	log.Infof("oracle transaction sent, hash:%x", res.Hash)
 }
 
 // AddEventHandler adds a new handler even log function

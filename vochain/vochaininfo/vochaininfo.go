@@ -17,6 +17,7 @@ type VochainInfo struct {
 	processTreeSize uint64
 	mempoolSize     int
 	voteCacheSize   int
+	votesPerMinute  int
 	avg1            int32
 	avg10           int32
 	avg60           int32
@@ -56,13 +57,14 @@ func (vi *VochainInfo) Sync() bool {
 	return !vi.vnode.Node.ConsensusReactor().WaitSync()
 }
 
-// TreeSizes returns the current size of the ProcessTree and VoteTree
+// TreeSizes returns the current size of the ProcessTree, VoteTree and the votes per minute
 // ProcessTree: total number of created voting processes in the blockchain
 // VoteTree: total number of votes registered in the blockchain
-func (vi *VochainInfo) TreeSizes() (uint64, uint64) {
+// VotesPerMinute: number of votes included in the last 60 seconds
+func (vi *VochainInfo) TreeSizes() (uint64, uint64, int) {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
-	return vi.processTreeSize, vi.voteTreeSize
+	return vi.processTreeSize, vi.voteTreeSize, vi.votesPerMinute
 }
 
 // MempoolSize returns the current number of transactions waiting to be validated
@@ -93,9 +95,10 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 	var duration time.Duration
 	var pheight, height int64
 	var h1, h10, h60, h360, h1440 int64
-	var n1, n10, n60, n360, n1440 int64
+	var n1, n10, n60, n360, n1440, vm int64
 	var a1, a10, a60, a360, a1440 int32
 	var sync bool
+	var oldVoteTreeSize uint64
 	duration = time.Second * time.Duration(sleepSecs)
 	for {
 		select {
@@ -109,6 +112,7 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			// less than 2s per block it's not real. Consider blockchain is synchcing
 			if pheight > 0 && sleepSecs/2 > (height-pheight) {
 				sync = true
+				vm++
 				n1++
 				n10++
 				n60++
@@ -161,6 +165,11 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			vi.vnode.State.RLock()
 			vi.processTreeSize = vi.vnode.State.Store.Tree(vochain.ProcessTree).Count()
 			vi.voteTreeSize = vi.vnode.State.Store.Tree(vochain.VoteTree).Count()
+			if sleepSecs*vm >= 60 {
+				vi.votesPerMinute = int(vi.voteTreeSize) - int(oldVoteTreeSize)
+				oldVoteTreeSize = vi.voteTreeSize
+				vm = 0
+			}
 			vi.voteCacheSize = vi.vnode.State.CacheSize()
 			vi.vnode.State.RUnlock()
 			vi.mempoolSize = vi.vnode.Node.Mempool().Size()

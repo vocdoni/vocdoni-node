@@ -45,9 +45,16 @@ var PrefixDBCacheSize = 0
 
 // EventListener is an interface used for executing custom functions during the
 // events of the block creation process.
-// The order in which events are executed is: Rollback, OnVote or OnProcess, Commit.
+// The order in which events are executed is: Rollback, OnVote, Onprocess, On..., Commit.
 // The process is concurrency safe, meaning that there cannot be two sequences
 // happening in parallel.
+//
+// If Commit() returns an error and isFatal set tu true, it is considered a consensus
+// failure and the blockchain will halt.
+//
+// If OncProcessResults() returns an error, the results transaction won't be included
+// in the blockchain. This event relays on the event handlers to decide if results are
+// valid or not since the Vochain State do not validate results.
 type EventListener interface {
 	OnVote(*models.Vote)
 	OnProcess(pid, eid []byte, censusRoot, censusURI string)
@@ -55,7 +62,8 @@ type EventListener interface {
 	OnCancel(pid []byte)
 	OnProcessKeys(pid []byte, encryptionPub, commitment string)
 	OnRevealKeys(pid []byte, encryptionPriv, reveal string)
-	Commit(height int64)
+	OnProcessResults(pid []byte, results []*models.QuestionResult) error
+	Commit(height int64) (err error, isFatal bool)
 	Rollback()
 }
 
@@ -66,6 +74,7 @@ type State struct {
 	voteCacheLock sync.RWMutex
 	ImmutableState
 	MemPoolRemoveTxKey func([32]byte, bool)
+	IsSynchronizing    func() bool
 	eventListeners     []EventListener
 }
 
@@ -82,9 +91,10 @@ func NewState(dataDir string) (*State, error) {
 	var err error
 	vs := &State{}
 	if err := initStore(dataDir, vs); err != nil {
-		return nil, fmt.Errorf("cannot init db: %s", err)
+		return nil, fmt.Errorf("cannot init state db: %s", err)
 	}
 	// Must be -1 in order to get the last committed block state, if not block replay will fail
+	log.Infof("loading state db last safe version, this could take a while...")
 	if err = vs.Store.LoadVersion(-1); err != nil {
 		if err == iavl.ErrVersionDoesNotExist {
 			// restart data db
@@ -100,19 +110,24 @@ func NewState(dataDir string) (*State, error) {
 			log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
 			return vs, nil
 		}
-		return nil, fmt.Errorf("unknown error loading database version: %s try to reset the node manually", err)
+		return nil, fmt.Errorf("unknown error loading state db: %v", err)
 	}
 
 	vs.voteCache = make(map[[32]byte]*types.CacheTx)
-	log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
+	log.Infof("state database is ready at version %d with hash %x",
+		vs.Store.Version(), vs.Store.Hash())
+	// Set up an initial dummy function
+	vs.IsSynchronizing = func() bool { return false }
 	return vs, nil
 }
 
 func initStore(dataDir string, state *State) error {
+	log.Infof("initializing state db store")
 	state.Store = new(iavlstate.IavlState)
 	if err := state.Store.Init(dataDir, "disk"); err != nil {
 		return err
 	}
+	timer := time.Now()
 	if err := state.Store.AddTree(AppTree); err != nil {
 		return err
 	}
@@ -122,6 +137,7 @@ func initStore(dataDir string, state *State) error {
 	if err := state.Store.AddTree(VoteTree); err != nil {
 		return err
 	}
+	log.Infof("state tree load took %d ms", time.Since(timer).Milliseconds())
 	return nil
 }
 
@@ -532,12 +548,18 @@ func (v *State) Save() []byte {
 	v.Lock()
 	hash, err := v.Store.Commit()
 	if err != nil {
-		panic(fmt.Sprintf("cannot commit state trees: (%s)", err))
+		panic(fmt.Sprintf("cannot commit state trees: (%v)", err))
 	}
 	v.Unlock()
 	if h := v.Header(false); h != nil {
 		for _, l := range v.eventListeners {
-			l.Commit(h.Height)
+			err, fatal := l.Commit(h.Height)
+			if err != nil {
+				if fatal {
+					panic(err)
+				}
+				log.Warn(err)
+			}
 		}
 	}
 	return hash
