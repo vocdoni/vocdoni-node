@@ -45,6 +45,7 @@ func main() {
 	parallelCons := flag.Int("parallelCons", 1, "parallel API connections")
 	procDuration := flag.Int("processDuration", 500, "voting process duration in blocks")
 	doubleVote := flag.Bool("doubleVote", true, "send every vote twice")
+	checkNullifiers := flag.Bool("checkNullifiers", false, "check all votes are correct one by one (slow)")
 	gateways := flag.StringSlice("gwExtra", []string{},
 		"list of extra gateways to be used in addition to gwHost for sending votes")
 	keysfile := flag.String("keysFile", "cache-keys.json", "file to store and reuse keys and census")
@@ -92,6 +93,7 @@ func main() {
 			*procDuration,
 			*parallelCons,
 			*doubleVote,
+			*checkNullifiers,
 			*gateways,
 			*keysfile,
 			true,
@@ -110,6 +112,7 @@ func main() {
 			*procDuration,
 			*parallelCons,
 			*doubleVote,
+			*checkNullifiers,
 			*gateways,
 		)
 	case "censusImport":
@@ -196,7 +199,7 @@ func mkTreeVoteTest(host,
 	electionSize,
 	procDuration,
 	parallelCons int,
-	doubleVote bool,
+	doubleVote, checkNullifiers bool,
 	gateways []string,
 	keysfile string,
 	useLastCensus bool,
@@ -347,6 +350,7 @@ func mkTreeVoteTest(host,
 				gwProofs,
 				encryptedVotes,
 				doubleVote,
+				checkNullifiers,
 				&proofsReadyWG); err != nil {
 				log.Fatalf("[%s] %s", cl.Addr, err)
 			}
@@ -387,7 +391,7 @@ func cspVoteTest(
 	electionSize,
 	procDuration,
 	parallelCons int,
-	doubleVote bool,
+	doubleVote, checkNullifiers bool,
 	gateways []string,
 ) {
 
@@ -500,6 +504,7 @@ func cspVoteTest(
 				nil,
 				encryptedVotes,
 				doubleVote,
+				checkNullifiers,
 				&proofsReadyWG); err != nil {
 				log.Fatalf("[%s] %s", cl.Addr, err)
 			}

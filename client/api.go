@@ -254,8 +254,7 @@ func (c *Client) TestSendVotes(
 	censusOrigin models.CensusOrigin,
 	caSigner *ethereum.SignKeys,
 	proofs [][]byte,
-	encrypted bool,
-	doubleVoting bool,
+	encrypted, doubleVoting, checkNullifiers bool,
 	wg *sync.WaitGroup) (time.Duration, error) {
 
 	var err error
@@ -392,7 +391,7 @@ func (c *Client) TestSendVotes(
 	for {
 		time.Sleep(time.Millisecond * 500)
 		if h, err := c.GetEnvelopeHeight(pid); err != nil {
-			log.Warnf("error getting envelope height")
+			log.Warnf("error getting envelope height: %v", err)
 			continue
 		} else {
 			if h >= uint32(len(signers)) {
@@ -404,26 +403,28 @@ func (c *Client) TestSendVotes(
 		}
 	}
 	votingElapsedTime := time.Since(start)
-	for {
-		for i, nullHex := range nullifiers {
-			if nullHex == "registered" {
-				registered++
-				continue
+	if checkNullifiers {
+		for {
+			for i, nullHex := range nullifiers {
+				if nullHex == "registered" {
+					registered++
+					continue
+				}
+				null, err := hex.DecodeString(nullHex)
+				if err != nil {
+					return 0, err
+				}
+				if es, _ := c.GetEnvelopeStatus(null, pid); es {
+					nullifiers[i] = "registered"
+				}
 			}
-			null, err := hex.DecodeString(nullHex)
-			if err != nil {
-				return 0, err
+			if registered == len(nullifiers) {
+				break
 			}
-			if es, _ := c.GetEnvelopeStatus(null, pid); es {
-				nullifiers[i] = "registered"
+			registered = 0
+			if time.Since(checkStart) > timeDeadLine {
+				return 0, fmt.Errorf("check nullifier time took more than deadline, skipping")
 			}
-		}
-		if registered == len(nullifiers) {
-			break
-		}
-		registered = 0
-		if time.Since(checkStart) > timeDeadLine {
-			return 0, fmt.Errorf("check nullifier time took more than deadline, skipping")
 		}
 	}
 	return votingElapsedTime, nil
