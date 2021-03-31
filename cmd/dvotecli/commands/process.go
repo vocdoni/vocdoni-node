@@ -243,6 +243,6 @@ func getResultsWeight(cmd *cobra.Command, args []string) error {
 	if !resp.Ok {
 		return fmt.Errorf(resp.Message)
 	}
-	fmt.Println(resp.Weight.String())
+	fmt.Println(resp.Weight)
 	return err
 }

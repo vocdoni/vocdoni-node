@@ -3,7 +3,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"reflect"
 	"strings"
 )
@@ -140,7 +139,7 @@ type MetaResponse struct {
 	Type                 string      `json:"type,omitempty"`
 	URI                  string      `json:"uri,omitempty"`
 	ValidProof           *bool       `json:"validProof,omitempty"`
-	Weight               *big.Int    `json:"weight,omitempty"`
+	Weight               string      `json:"weight,omitempty"`
 }
 
 func (r MetaResponse) String() string {
