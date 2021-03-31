@@ -1,8 +1,10 @@
 package scrutinizer
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/timshannon/badgerhold/v3"
@@ -21,8 +23,9 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*Process, error) {
 
 // ProcessList returns a list of process identifiers (PIDs) registered in the Vochain.
 // EntityID, namespace and status are optional filters, if declared as zero-values
-// will be ignored. Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
-func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
+// will be ignored. SearchTerm is a partial or full PID, and is also optional.
+// Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
+func (s *Scrutinizer) ProcessList(entityID []byte, searchTerm string, namespace uint32,
 	status string, withResults bool, from, max int) ([][]byte, error) {
 	// For filtering on Status we use a badgerhold match function.
 	// If status is not defined, then the match function will return always true.
@@ -32,6 +35,15 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 		if statusnum, statusfound = models.ProcessStatus_value[status]; !statusfound {
 			return nil, fmt.Errorf("processList: status %s is unknown", status)
 		}
+	}
+	searchMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
+		if searchTerm == "" {
+			return true, nil
+		}
+		if strings.Contains(hex.EncodeToString(r.Field().(types.HexBytes)), searchTerm) {
+			return true, nil
+		}
+		return false, nil
 	}
 	statusMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
 		if statusnum == -1 {
@@ -62,6 +74,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 				Index("EntityID").
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -75,6 +88,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 				Index("Namespace").
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -87,6 +101,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 			badgerhold.Where("Status").MatchFunc(statusMatchFunc).
 				Index("Status").
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -101,6 +116,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 				And("Namespace").Eq(namespace).
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -123,11 +139,21 @@ func (s *Scrutinizer) ProcessCount() int64 {
 }
 
 // EntityList returns the list of entities indexed by the scrutinizer
-func (s *Scrutinizer) EntityList(max, from int) []string {
+func (s *Scrutinizer) EntityList(searchTerm string, max, from int) []string {
+	searchMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
+		if searchTerm == "" {
+			return true, nil
+		}
+		if strings.Contains(hex.EncodeToString(r.Field().(types.HexBytes)), searchTerm) {
+			return true, nil
+		}
+		return false, nil
+	}
 	entities := []string{}
 	if err := s.db.ForEach(
 		badgerhold.Where("ID").
 			Ne(&[]byte{}).
+			And("ID").MatchFunc(searchMatchFunc).
 			SortBy("CreationTime").
 			Skip(from).
 			Limit(max),

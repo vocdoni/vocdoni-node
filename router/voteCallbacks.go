@@ -154,7 +154,7 @@ func (r *Router) getProcessList(request routerRequest) {
 		max = MaxListSize
 	}
 	processList, err := r.Scrutinizer.ProcessList(
-		request.EntityId,
+		request.EntityId, "",
 		request.Namespace,
 		request.Status,
 		request.WithResults,
@@ -347,7 +347,7 @@ func (r *Router) getEntityList(request routerRequest) {
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize
 	}
-	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, request.From)
+	response.EntityIDs = r.Scrutinizer.EntityList("", request.ListSize, request.From)
 	request.Send(r.buildReply(request, &response))
 }
 
