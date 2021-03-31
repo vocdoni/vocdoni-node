@@ -270,12 +270,12 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 
 func (r *Router) getResultsWeight(request routerRequest) {
 	var response types.MetaResponse
-	var err error
-	response.Weight, err = r.Scrutinizer.GetResultsWeight(request.ProcessID)
+	w, err := r.Scrutinizer.GetResultsWeight(request.ProcessID)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get results weight: %v", err))
 		return
 	}
+	response.Weight = w.String()
 	request.Send(r.buildReply(request, &response))
 }
 
