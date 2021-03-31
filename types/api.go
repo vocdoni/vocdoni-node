@@ -39,7 +39,7 @@ type MetaRequest struct {
 	ProofData    HexBytes `json:"proofData,omitempty"`
 	PubKeys      []string `json:"pubKeys,omitempty"`
 	RootHash     HexBytes `json:"rootHash,omitempty"`
-	SearchTerm   string   `json:"searchTerm,omitempty"`
+	SearchTerm   []byte   `json:"searchTerm,omitempty"`
 	Signature    HexBytes `json:"signature,omitempty"`
 	Status       string   `json:"status,omitempty"`
 	Timestamp    int32    `json:"timestamp"`

@@ -1,10 +1,9 @@
 package scrutinizer
 
 import (
-	"encoding/hex"
+	"bytes"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 
 	"github.com/timshannon/badgerhold/v3"
@@ -25,7 +24,7 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*Process, error) {
 // EntityID, namespace and status are optional filters, if declared as zero-values
 // will be ignored. SearchTerm is a partial or full PID, and is also optional.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
-func (s *Scrutinizer) ProcessList(entityID []byte, searchTerm string, namespace uint32,
+func (s *Scrutinizer) ProcessList(entityID, searchTerm []byte, namespace uint32,
 	status string, withResults bool, from, max int) ([][]byte, error) {
 	// For filtering on Status we use a badgerhold match function.
 	// If status is not defined, then the match function will return always true.
@@ -37,10 +36,10 @@ func (s *Scrutinizer) ProcessList(entityID []byte, searchTerm string, namespace 
 		}
 	}
 	searchMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
-		if searchTerm == "" {
+		if len(searchTerm) == 0 {
 			return true, nil
 		}
-		if strings.Contains(hex.EncodeToString(r.Field().(types.HexBytes)), searchTerm) {
+		if bytes.Contains(r.Field().(types.HexBytes), searchTerm) {
 			return true, nil
 		}
 		return false, nil
@@ -139,21 +138,19 @@ func (s *Scrutinizer) ProcessCount() int64 {
 }
 
 // EntityList returns the list of entities indexed by the scrutinizer
-func (s *Scrutinizer) EntityList(searchTerm string, max, from int) []string {
+func (s *Scrutinizer) EntityList(searchTerm []byte, max, from int) []string {
 	searchMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
-		if searchTerm == "" {
+		if len(searchTerm) == 0 {
 			return true, nil
 		}
-		if strings.Contains(hex.EncodeToString(r.Field().(types.HexBytes)), searchTerm) {
+		if bytes.Contains(r.Field().(types.HexBytes), searchTerm) {
 			return true, nil
 		}
 		return false, nil
 	}
 	entities := []string{}
 	if err := s.db.ForEach(
-		badgerhold.Where("ID").
-			Ne(&[]byte{}).
-			And("ID").MatchFunc(searchMatchFunc).
+		badgerhold.Where("ID").MatchFunc(searchMatchFunc).
 			SortBy("CreationTime").
 			Skip(from).
 			Limit(max),
