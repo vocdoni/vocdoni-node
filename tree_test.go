@@ -145,6 +145,24 @@ func TestAux(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestGenProof(t *testing.T) {
+	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	require.Nil(t, err)
+
+	defer tree.db.Close()
+	for i := 0; i < 10; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		if err := tree.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	k := BigIntToBytes(big.NewInt(int64(7)))
+	_, err = tree.GenProof(k)
+	assert.Nil(t, err)
+}
+
 func BenchmarkAdd(b *testing.B) {
 	// prepare inputs
 	var ks, vs [][]byte
