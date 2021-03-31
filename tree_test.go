@@ -145,7 +145,7 @@ func TestAux(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestGenProof(t *testing.T) {
+func TestGenProofAndVerify(t *testing.T) {
 	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	require.Nil(t, err)
 
@@ -159,8 +159,14 @@ func TestGenProof(t *testing.T) {
 	}
 
 	k := BigIntToBytes(big.NewInt(int64(7)))
-	_, err = tree.GenProof(k)
+	siblings, err := tree.GenProof(k)
 	assert.Nil(t, err)
+
+	k = BigIntToBytes(big.NewInt(int64(7)))
+	v := BigIntToBytes(big.NewInt(int64(14)))
+	verif, err := CheckProof(tree.hashFunction, k, v, tree.Root(), siblings)
+	require.Nil(t, err)
+	assert.True(t, verif)
 }
 
 func BenchmarkAdd(b *testing.B) {

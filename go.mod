@@ -1,4 +1,4 @@
-module arbo
+module github.com/arnaucube/arbo
 
 go 1.14
 

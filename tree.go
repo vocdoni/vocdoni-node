@@ -388,6 +388,29 @@ func PackSiblings(hashFunc HashFunction, siblings [][]byte) []byte {
 	return res
 }
 
+// UnpackSiblings unpacks the siblings from a byte array.
+func UnpackSiblings(hashFunc HashFunction, b []byte) ([][]byte, error) {
+	l := b[0]
+	bitmapBytes := b[1 : 1+l]
+	bitmap := bytesToBitmap(bitmapBytes)
+	siblingsBytes := b[1+l:]
+	iSibl := 0
+	emptySibl := make([]byte, hashFunc.Len())
+	var siblings [][]byte
+	for i := 0; i < len(bitmap); i++ {
+		if iSibl >= len(siblingsBytes) {
+			break
+		}
+		if bitmap[i] {
+			siblings = append(siblings, siblingsBytes[iSibl:iSibl+hashFunc.Len()])
+			iSibl += hashFunc.Len()
+		} else {
+			siblings = append(siblings, emptySibl)
+		}
+	}
+	return siblings, nil
+}
+
 func bitmapToBytes(bitmap []bool) []byte {
 	bitmapBytesLen := int(math.Ceil(float64(len(bitmap)) / 8)) //nolint:gomnd
 	b := make([]byte, bitmapBytesLen)
@@ -399,14 +422,54 @@ func bitmapToBytes(bitmap []bool) []byte {
 	return b
 }
 
+func bytesToBitmap(b []byte) []bool {
+	var bitmap []bool
+	for i := 0; i < len(b); i++ {
+		for j := 0; j < 8; j++ {
+			bitmap = append(bitmap, b[i]&(1<<j) > 0)
+		}
+	}
+	return bitmap
+}
+
 // Get returns the value for a given key
 func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
 	// unimplemented
 	return nil, nil, fmt.Errorf("unimplemented")
 }
 
-// CheckProof verifies the given proof
-func CheckProof(k, v, root, mproof []byte) (bool, error) {
-	// unimplemented
-	return false, fmt.Errorf("unimplemented")
+// CheckProof verifies the given proof. The proof verification depends on the
+// HashFunction passed as parameter.
+func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool, error) {
+	siblings, err := UnpackSiblings(hashFunc, packedSiblings)
+	if err != nil {
+		return false, err
+	}
+
+	keyPath := make([]byte, hashFunc.Len())
+	copy(keyPath[:], k)
+
+	key, _, err := newLeafValue(hashFunc, k, v)
+	if err != nil {
+		return false, err
+	}
+
+	path := getPath(len(siblings), keyPath)
+	for i := len(siblings) - 1; i >= 0; i-- {
+		if path[i] {
+			key, _, err = newIntermediate(hashFunc, siblings[i], key)
+			if err != nil {
+				return false, err
+			}
+		} else {
+			key, _, err = newIntermediate(hashFunc, key, siblings[i])
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+	if bytes.Equal(key[:], root) {
+		return true, nil
+	}
+	return false, nil
 }
