@@ -434,8 +434,22 @@ func bytesToBitmap(b []byte) []bool {
 
 // Get returns the value for a given key
 func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
-	// unimplemented
-	return nil, nil, fmt.Errorf("unimplemented")
+	keyPath := make([]byte, t.hashFunction.Len())
+	copy(keyPath[:], k)
+
+	path := getPath(t.maxLevels, keyPath)
+	// go down to the leaf
+	var siblings [][]byte
+	_, value, _, err := t.down(k, t.root, siblings, path, 0, true)
+	if err != nil {
+		return nil, nil, err
+	}
+	leafK, leafV := readLeafValue(value)
+	if !bytes.Equal(k, leafK) {
+		panic(fmt.Errorf("%s != %s", BytesToBigInt(k), BytesToBigInt(leafK)))
+	}
+
+	return leafK, leafV, nil
 }
 
 // CheckProof verifies the given proof. The proof verification depends on the
