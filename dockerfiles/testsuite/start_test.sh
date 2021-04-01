@@ -42,9 +42,6 @@ testid="/tmp/.vochaintest$RANDOM"
 echo "### Waiting for tests ###"
 wait
 
-#echo "### Post run logs ###"
-#docker-compose logs --tail 300
-
 [ $CLEAN -eq 1 ] && {
 	echo "### Cleaning environment ###"
 	docker-compose down -v --remove-orphans
@@ -56,6 +53,8 @@ wait
 } || {
 	echo "Vochain test failed!"
 	RET=1
+	echo "### Post run logs ###"
+	docker-compose logs --tail 1000
 }
 rm -f ${testid}1 ${testid}2
 exit $RET
