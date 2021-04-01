@@ -141,6 +141,7 @@ type MetaResponse struct {
 	Timestamp            int32       `json:"timestamp"`
 	Type                 string      `json:"type,omitempty"`
 	URI                  string      `json:"uri,omitempty"`
+	ValidatorList        []byte      `json:"validatorlist,omitempty"`
 	ValidProof           *bool       `json:"validProof,omitempty"`
 	Weight               string      `json:"weight,omitempty"`
 }
