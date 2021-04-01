@@ -151,9 +151,7 @@ func (s *Scrutinizer) EntityList(searchTerm string, max, from int) []string {
 	}
 	entities := []string{}
 	if err := s.db.ForEach(
-		badgerhold.Where("ID").
-			Ne(&[]byte{}).
-			And("ID").MatchFunc(searchMatchFunc).
+		badgerhold.Where("ID").MatchFunc(searchMatchFunc).
 			SortBy("CreationTime").
 			Skip(from).
 			Limit(max),
