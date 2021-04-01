@@ -58,11 +58,11 @@ func testAdd(t *testing.T, hashFunc HashFunction, testVectors []string) {
 	assert.Equal(t, testVectors[3], rootBI.String())
 }
 
-func TestAdd1000(t *testing.T) {
+func TestAddBatch(t *testing.T) {
 	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	require.Nil(t, err)
-
 	defer tree.db.Close()
+
 	for i := 0; i < 1000; i++ {
 		k := BigIntToBytes(big.NewInt(int64(i)))
 		v := BigIntToBytes(big.NewInt(0))
@@ -72,6 +72,26 @@ func TestAdd1000(t *testing.T) {
 	}
 
 	rootBI := BytesToBigInt(tree.Root())
+	assert.Equal(t,
+		"296519252211642170490407814696803112091039265640052570497930797516015811235",
+		rootBI.String())
+
+	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	require.Nil(t, err)
+	defer tree2.db.Close()
+
+	var keys, values [][]byte
+	for i := 0; i < 1000; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(0))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	indexes, err := tree2.AddBatch(keys, values)
+	assert.Nil(t, err)
+	assert.Equal(t, 0, len(indexes))
+
+	rootBI = BytesToBigInt(tree2.Root())
 	assert.Equal(t,
 		"296519252211642170490407814696803112091039265640052570497930797516015811235",
 		rootBI.String())
