@@ -14,6 +14,7 @@ package arbo
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"math"
 	"sync/atomic"
 	"time"
@@ -397,9 +398,11 @@ func (t *Tree) GenProof(k []byte) ([]byte, error) {
 }
 
 // PackSiblings packs the siblings into a byte array.
-// [      1 byte        | L bytes |      32 * N bytes     ]
+// [      1 byte        | L bytes |       S * N bytes     ]
 // [  bitmap length (L) |  bitmap |  N non-zero siblings  ]
-// Where the bitmap indicates if the sibling is 0 or a value from the siblings array.
+// Where the bitmap indicates if the sibling is 0 or a value from the siblings
+// array. And S is the size of the output of the hash function used for the
+// Tree.
 func PackSiblings(hashFunc HashFunction, siblings [][]byte) []byte {
 	var b []byte
 	var bitmap []bool
@@ -532,4 +535,90 @@ func (t *Tree) dbGet(tx db.Tx, k []byte) ([]byte, error) {
 		return tx.Get(k)
 	}
 	return nil, db.ErrNotFound
+}
+
+// Iterate iterates through the full Tree, executing the given function on each
+// node of the Tree.
+func (t *Tree) Iterate(f func([]byte, []byte)) error {
+	return t.iter(t.root, f)
+}
+
+func (t *Tree) iter(k []byte, f func([]byte, []byte)) error {
+	v, err := t.dbGet(nil, k)
+	if err != nil {
+		return err
+	}
+
+	switch v[0] {
+	case PrefixValueEmpty:
+		f(k, v)
+	case PrefixValueLeaf:
+		f(k, v)
+	case PrefixValueIntermediate:
+		f(k, v)
+		l, r := readIntermediateChilds(v)
+		if err = t.iter(l, f); err != nil {
+			return err
+		}
+		if err = t.iter(r, f); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("invalid value")
+	}
+	return nil
+}
+
+// Dump exports all the Tree leafs in a byte array of length:
+// [ N * (2+len(k+v)) ]. Where N is the number of key-values, and for each k+v:
+// [ 1 byte | 1 byte | S bytes | len(v) bytes ]
+// [ len(k) | len(v) |   key   |     value    ]
+// Where S is the size of the output of the hash function used for the Tree.
+func (t *Tree) Dump() ([]byte, error) {
+	// WARNING current encoding only supports key & values of 255 bytes each
+	// (due using only 1 byte for the length headers).
+	var b []byte
+	err := t.Iterate(func(k, v []byte) {
+		if v[0] != PrefixValueLeaf {
+			return
+		}
+		leafK, leafV := readLeafValue(v)
+		kv := make([]byte, 2+len(leafK)+len(leafV))
+		kv[0] = byte(len(leafK))
+		kv[1] = byte(len(leafV))
+		copy(kv[2:2+len(leafK)], leafK)
+		copy(kv[2+len(leafK):], leafV)
+		b = append(b, kv...)
+	})
+	return b, err
+}
+
+// ImportDump imports the leafs (that have been exported with the ExportLeafs
+// method) in the Tree.
+func (t *Tree) ImportDump(b []byte) error {
+	r := bytes.NewReader(b)
+	for {
+		l := make([]byte, 2)
+		_, err := io.ReadFull(r, l)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+		k := make([]byte, l[0])
+		_, err = io.ReadFull(r, k)
+		if err != nil {
+			return err
+		}
+		v := make([]byte, l[1])
+		_, err = io.ReadFull(r, v)
+		if err != nil {
+			return err
+		}
+		err = t.Add(k, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

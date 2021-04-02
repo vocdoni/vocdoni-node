@@ -34,6 +34,7 @@ func testAdd(t *testing.T, hashFunc HashFunction, testVectors []string) {
 	tree, err := NewTree(memory.NewMemoryStorage(), 10, hashFunc)
 	assert.Nil(t, err)
 	defer tree.db.Close()
+
 	assert.Equal(t, testVectors[0], hex.EncodeToString(tree.Root()))
 
 	err = tree.Add(
@@ -100,8 +101,8 @@ func TestAddBatch(t *testing.T) {
 func TestAddDifferentOrder(t *testing.T) {
 	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	require.Nil(t, err)
-
 	defer tree1.db.Close()
+
 	for i := 0; i < 16; i++ {
 		k := SwapEndianness(big.NewInt(int64(i)).Bytes())
 		v := SwapEndianness(big.NewInt(0).Bytes())
@@ -113,6 +114,7 @@ func TestAddDifferentOrder(t *testing.T) {
 	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	require.Nil(t, err)
 	defer tree2.db.Close()
+
 	for i := 16 - 1; i >= 0; i-- {
 		k := big.NewInt(int64(i)).Bytes()
 		v := big.NewInt(0).Bytes()
@@ -131,6 +133,7 @@ func TestAddRepeatedIndex(t *testing.T) {
 	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	require.Nil(t, err)
 	defer tree.db.Close()
+
 	k := big.NewInt(int64(3)).Bytes()
 	v := big.NewInt(int64(12)).Bytes()
 	if err := tree.Add(k, v); err != nil {
@@ -145,6 +148,7 @@ func TestAux(t *testing.T) {
 	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	require.Nil(t, err)
 	defer tree.db.Close()
+
 	k := BigIntToBytes(big.NewInt(int64(1)))
 	v := BigIntToBytes(big.NewInt(int64(0)))
 	err = tree.Add(k, v)
@@ -168,8 +172,8 @@ func TestAux(t *testing.T) {
 func TestGet(t *testing.T) {
 	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	require.Nil(t, err)
-
 	defer tree.db.Close()
+
 	for i := 0; i < 10; i++ {
 		k := BigIntToBytes(big.NewInt(int64(i)))
 		v := BigIntToBytes(big.NewInt(int64(i * 2)))
@@ -188,8 +192,8 @@ func TestGet(t *testing.T) {
 func TestGenProofAndVerify(t *testing.T) {
 	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	require.Nil(t, err)
-
 	defer tree.db.Close()
+
 	for i := 0; i < 10; i++ {
 		k := BigIntToBytes(big.NewInt(int64(i)))
 		v := BigIntToBytes(big.NewInt(int64(i * 2)))
@@ -207,6 +211,33 @@ func TestGenProofAndVerify(t *testing.T) {
 	verif, err := CheckProof(tree.hashFunction, k, v, tree.Root(), siblings)
 	require.Nil(t, err)
 	assert.True(t, verif)
+}
+
+func TestDumpAndImportDump(t *testing.T) {
+	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	require.Nil(t, err)
+	defer tree1.db.Close()
+
+	for i := 0; i < 16; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		if err := tree1.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	e, err := tree1.Dump()
+	require.Nil(t, err)
+
+	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	require.Nil(t, err)
+	defer tree2.db.Close()
+	err = tree2.ImportDump(e)
+	require.Nil(t, err)
+	assert.Equal(t, tree1.Root(), tree2.Root())
+	assert.Equal(t,
+		"0d93aaa3362b2f999f15e15728f123087c2eee716f01c01f56e23aae07f09f08",
+		hex.EncodeToString(tree2.Root()))
 }
 
 func BenchmarkAdd(b *testing.B) {
@@ -230,8 +261,8 @@ func BenchmarkAdd(b *testing.B) {
 func benchmarkAdd(b *testing.B, hashFunc HashFunction, ks, vs [][]byte) {
 	tree, err := NewTree(memory.NewMemoryStorage(), 140, hashFunc)
 	require.Nil(b, err)
-
 	defer tree.db.Close()
+
 	for i := 0; i < len(ks); i++ {
 		if err := tree.Add(ks[i], vs[i]); err != nil {
 			b.Fatal(err)
