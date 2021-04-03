@@ -104,8 +104,8 @@ func TestAddDifferentOrder(t *testing.T) {
 	defer tree1.db.Close()
 
 	for i := 0; i < 16; i++ {
-		k := SwapEndianness(big.NewInt(int64(i)).Bytes())
-		v := SwapEndianness(big.NewInt(0).Bytes())
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(0))
 		if err := tree1.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -116,8 +116,8 @@ func TestAddDifferentOrder(t *testing.T) {
 	defer tree2.db.Close()
 
 	for i := 16 - 1; i >= 0; i-- {
-		k := big.NewInt(int64(i)).Bytes()
-		v := big.NewInt(0).Bytes()
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(0))
 		if err := tree2.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -134,14 +134,64 @@ func TestAddRepeatedIndex(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close()
 
-	k := big.NewInt(int64(3)).Bytes()
-	v := big.NewInt(int64(12)).Bytes()
+	k := BigIntToBytes(big.NewInt(int64(3)))
+	v := BigIntToBytes(big.NewInt(int64(12)))
 	if err := tree.Add(k, v); err != nil {
 		t.Fatal(err)
 	}
 	err = tree.Add(k, v)
 	c.Assert(err, qt.Not(qt.IsNil))
 	c.Check(err, qt.ErrorMatches, "max virtual level 100")
+}
+
+func TestUpdate(t *testing.T) {
+	c := qt.New(t)
+	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close()
+
+	k := BigIntToBytes(big.NewInt(int64(20)))
+	v := BigIntToBytes(big.NewInt(int64(12)))
+	if err := tree.Add(k, v); err != nil {
+		t.Fatal(err)
+	}
+
+	v = BigIntToBytes(big.NewInt(int64(11)))
+	err = tree.Update(k, v)
+	c.Assert(err, qt.IsNil)
+
+	gettedKey, gettedValue, err := tree.Get(k)
+	c.Assert(err, qt.IsNil)
+	c.Check(gettedKey, qt.DeepEquals, k)
+	c.Check(gettedValue, qt.DeepEquals, v)
+
+	// add more leafs to the tree to do another test
+	for i := 0; i < 16; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		if err := tree.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	k = BigIntToBytes(big.NewInt(int64(3)))
+	v = BigIntToBytes(big.NewInt(int64(11)))
+	// check that before the Update, value for 3 is !=11
+	gettedKey, gettedValue, err = tree.Get(k)
+	c.Assert(err, qt.IsNil)
+	c.Check(gettedKey, qt.DeepEquals, k)
+	c.Check(gettedValue, qt.Not(qt.DeepEquals), v)
+	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(big.NewInt(6)))
+
+	err = tree.Update(k, v)
+	c.Assert(err, qt.IsNil)
+
+	// check that after Update, the value for 3 is ==11
+	gettedKey, gettedValue, err = tree.Get(k)
+	c.Assert(err, qt.IsNil)
+	c.Check(gettedKey, qt.DeepEquals, k)
+	c.Check(gettedValue, qt.DeepEquals, v)
+	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(big.NewInt(11)))
 }
 
 func TestAux(t *testing.T) {

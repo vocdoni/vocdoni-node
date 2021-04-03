@@ -13,6 +13,7 @@ package arbo
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -369,6 +370,57 @@ func getPath(numLevels int, k []byte) []bool {
 		path[n] = k[n/8]&(1<<(n%8)) != 0
 	}
 	return path
+}
+
+// Update updates the value for a given existing key. If the given key does not
+// exist, returns an error.
+func (t *Tree) Update(k, v []byte) error {
+	t.updateAccessTime()
+
+	tx, err := t.db.NewTx()
+	if err != nil {
+		return err
+	}
+
+	keyPath := make([]byte, t.hashFunction.Len())
+	copy(keyPath[:], k)
+	path := getPath(t.maxLevels, keyPath)
+
+	var siblings [][]byte
+	_, valueAtBottom, siblings, err := t.down(tx, k, t.root, siblings, path, 0, true)
+	if err != nil {
+		return err
+	}
+	oldKey, _ := readLeafValue(valueAtBottom)
+	if !bytes.Equal(oldKey, k) {
+		return fmt.Errorf("key %s does not exist", hex.EncodeToString(k))
+	}
+
+	leafKey, leafValue, err := newLeafValue(t.hashFunction, k, v)
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Put(leafKey, leafValue); err != nil {
+		return err
+	}
+
+	// go up to the root
+	if len(siblings) == 0 {
+		t.root = leafKey
+		return tx.Commit()
+	}
+	root, err := t.up(tx, leafKey, siblings, path, len(siblings)-1)
+	if err != nil {
+		return err
+	}
+
+	t.root = root
+	// store root to db
+	if err := tx.Put(dbKeyRoot, t.root); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // GenProof generates a MerkleTree proof for the given key. If the key exists in
