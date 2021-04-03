@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	qt "github.com/frankban/quicktest"
 )
 
 func TestHashSha256(t *testing.T) {
@@ -16,9 +16,10 @@ func TestHashSha256(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t,
-		"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-		hex.EncodeToString(h))
+	c := qt.New(t)
+	c.Assert(hex.EncodeToString(h),
+		qt.Equals,
+		"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
 }
 
 func TestHashPoseidon(t *testing.T) {
@@ -32,7 +33,8 @@ func TestHashPoseidon(t *testing.T) {
 	}
 	hBI := BytesToBigInt(h)
 	// value checked with circomlib
-	assert.Equal(t,
-		"7853200120776062878684798364095072458815029376092732009249414926327459813530",
-		hBI.String())
+	c := qt.New(t)
+	c.Assert(hBI.String(),
+		qt.Equals,
+		"7853200120776062878684798364095072458815029376092732009249414926327459813530")
 }

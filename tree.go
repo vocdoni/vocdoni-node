@@ -57,8 +57,8 @@ type Tree struct {
 // will load it.
 func NewTree(storage db.Storage, maxLevels int, hash HashFunction) (*Tree, error) {
 	t := Tree{db: storage, maxLevels: maxLevels, hashFunction: hash}
-
 	t.updateAccessTime()
+
 	root, err := t.dbGet(nil, dbKeyRoot)
 	if err == db.ErrNotFound {
 		// store new root 0
@@ -99,6 +99,7 @@ func (t *Tree) Root() []byte {
 // optimized to do some internal parallelization. Returns an array containing
 // the indexes of the keys failed to add.
 func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
+	t.updateAccessTime()
 	if len(keys) != len(values) {
 		return nil, fmt.Errorf("len(keys)!=len(values) (%d!=%d)",
 			len(keys), len(values))
@@ -131,6 +132,7 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 // is expected that are represented by a Little-Endian byte array (for circom
 // compatibility).
 func (t *Tree) Add(k, v []byte) error {
+	t.updateAccessTime()
 	tx, err := t.db.NewTx()
 	if err != nil {
 		return err
@@ -373,6 +375,7 @@ func getPath(numLevels int, k []byte) []bool {
 // the Tree, the proof will be of existence, if the key does not exist in the
 // tree, the proof will be of non-existence.
 func (t *Tree) GenProof(k []byte) ([]byte, error) {
+	t.updateAccessTime()
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)
 
@@ -540,6 +543,7 @@ func (t *Tree) dbGet(tx db.Tx, k []byte) ([]byte, error) {
 // Iterate iterates through the full Tree, executing the given function on each
 // node of the Tree.
 func (t *Tree) Iterate(f func([]byte, []byte)) error {
+	t.updateAccessTime()
 	return t.iter(t.root, f)
 }
 
@@ -575,6 +579,7 @@ func (t *Tree) iter(k []byte, f func([]byte, []byte)) error {
 // [ len(k) | len(v) |   key   |     value    ]
 // Where S is the size of the output of the hash function used for the Tree.
 func (t *Tree) Dump() ([]byte, error) {
+	t.updateAccessTime()
 	// WARNING current encoding only supports key & values of 255 bytes each
 	// (due using only 1 byte for the length headers).
 	var b []byte
@@ -596,6 +601,7 @@ func (t *Tree) Dump() ([]byte, error) {
 // ImportDump imports the leafs (that have been exported with the ExportLeafs
 // method) in the Tree.
 func (t *Tree) ImportDump(b []byte) error {
+	t.updateAccessTime()
 	r := bytes.NewReader(b)
 	for {
 		l := make([]byte, 2)
