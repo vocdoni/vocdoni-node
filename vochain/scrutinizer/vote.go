@@ -20,7 +20,15 @@ import (
 // it does not have yet reuslts
 var ErrNoResultsYet = fmt.Errorf("no results yet")
 
-// ComputeResult process a finished voting, compute the results and saves it in the Storage
+// The string to search on the KV database error to identify a transaction conflict.
+// If the KV (currently badger) returns this error, it is considered non fatal and the
+// transaction will be retried until it works.
+// This check is made comparing string in order to avoid importing a specific KV
+// implementation, thus let badgerhold abstract it.
+const kvErrorStringForRetry = "Transaction Conflict"
+
+// ComputeResult process a finished voting, compute the results and saves it in the Storage.
+// Once this function is called, any future live vote event for the processId will be discarted.
 func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	log.Debugf("computing results for %x", processID)
 
@@ -48,14 +56,12 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 
 	// Execute callbacks
 	for _, l := range s.eventListeners {
-		// TODO (PAU): switch OnComputeResults to Results or [][]*big.Int
 		go l.OnComputeResults(results)
 	}
 	return nil
 }
 
 // GetResults returns the current result for a processId aggregated in a two dimension int slice
-// TODO (pau): improve this approach, instead of 2 queries make just 1
 func (s *Scrutinizer) GetResults(processID []byte) (*Results, error) {
 	if n, err := s.db.Count(&Process{},
 		badgerhold.Where("ID").Eq(processID).
@@ -191,29 +197,33 @@ func (s *Scrutinizer) commitVotes(pid []byte, results *Results) error {
 		}
 		update.Weight.Add(update.Weight, results.Weight)
 
-		if len(results.Votes) > 0 {
-			if len(results.Votes) != len(update.Votes) {
-				return fmt.Errorf("commitVotes: different length for results.Vote and update.Votes")
+		if len(results.Votes) == 0 {
+			return nil
+		}
+
+		if len(results.Votes) != len(update.Votes) {
+			return fmt.Errorf("commitVotes: different length for results.Vote and update.Votes")
+		}
+		for i := range update.Votes {
+			if len(update.Votes[i]) != len(results.Votes[i]) {
+				return fmt.Errorf("commitVotes: different number of options for question %d", i)
 			}
-			for i := range update.Votes {
-				if len(update.Votes[i]) != len(results.Votes[i]) {
-					return fmt.Errorf("commitVotes: different number of options for question %d", i)
-				}
-				for j := range update.Votes[i] {
-					update.Votes[i][j].Add(update.Votes[i][j], results.Votes[i][j])
-				}
+			for j := range update.Votes[i] {
+				update.Votes[i][j].Add(update.Votes[i][j], results.Votes[i][j])
 			}
 		}
+
 		return nil
 	}
 
 	// TODO (PAU):
 	// Since the Commit() callback is executed on a goroutine, if scrutinizer have pending votes to add
 	// and the program is stoped. The missing votes won't be added on next run.
-	// Either a recovery mechanism or a persistent cache should be used in order to avoid this situation.
+	// Either a recovery mechanism or a persistent cache should be used in order to avoid this problem.
 
 	var err error
-	// If badger returns "Transaction Conflict" we try again until it works
+	// If badgerhold returns a transaction conflict error message, we try again
+	// until it works (while maxTries < 1000)
 	maxTries := 1000
 	for maxTries > 0 {
 		err = s.db.UpdateMatching(&Results{},
@@ -221,7 +231,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, results *Results) error {
 		if err == nil {
 			break
 		}
-		if strings.Contains(err.Error(), "Transaction Conflict") {
+		if strings.Contains(err.Error(), kvErrorStringForRetry) {
 			maxTries--
 			time.Sleep(5 * time.Millisecond)
 			continue
@@ -233,7 +243,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, results *Results) error {
 	}
 	if err != nil {
 		log.Debugf("saved %d votes with total weight of %s on process %x", len(results.Votes),
-			results.Weight.String(), pid)
+			results.Weight, pid)
 	}
 	return err
 }

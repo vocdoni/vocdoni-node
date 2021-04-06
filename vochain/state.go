@@ -49,7 +49,7 @@ var PrefixDBCacheSize = 0
 // The process is concurrency safe, meaning that there cannot be two sequences
 // happening in parallel.
 //
-// If Commit() returns an error and isFatal set tu true, it is considered a consensus
+// If Commit() returns ErrHaltVochain, the error is considered a consensus
 // failure and the blockchain will halt.
 //
 // If OncProcessResults() returns an error, the results transaction won't be included
@@ -63,9 +63,16 @@ type EventListener interface {
 	OnProcessKeys(pid []byte, encryptionPub, commitment string)
 	OnRevealKeys(pid []byte, encryptionPriv, reveal string)
 	OnProcessResults(pid []byte, results []*models.QuestionResult) error
-	Commit(height int64) (err error, isFatal bool)
+	Commit(height int64) (err error)
 	Rollback()
 }
+
+type ErrHaltVochain struct {
+	reason error
+}
+
+func (e ErrHaltVochain) Error() string { return fmt.Sprintf("halting vochain: %v", e.reason) }
+func (e ErrHaltVochain) Unwrap() error { return e.reason }
 
 // State represents the state of the vochain application
 type State struct {
@@ -127,7 +134,7 @@ func initStore(dataDir string, state *State) error {
 	if err := state.Store.Init(dataDir, "disk"); err != nil {
 		return err
 	}
-	timer := time.Now()
+	startTime := time.Now()
 	if err := state.Store.AddTree(AppTree); err != nil {
 		return err
 	}
@@ -137,7 +144,7 @@ func initStore(dataDir string, state *State) error {
 	if err := state.Store.AddTree(VoteTree); err != nil {
 		return err
 	}
-	log.Infof("state tree load took %d ms", time.Since(timer).Milliseconds())
+	log.Infof("state tree load took %d ms", time.Since(startTime).Milliseconds())
 	return nil
 }
 
@@ -553,12 +560,12 @@ func (v *State) Save() []byte {
 	v.Unlock()
 	if h := v.Header(false); h != nil {
 		for _, l := range v.eventListeners {
-			err, fatal := l.Commit(h.Height)
+			err := l.Commit(h.Height)
 			if err != nil {
-				if fatal {
+				if _, fatal := err.(ErrHaltVochain); fatal {
 					panic(err)
 				}
-				log.Warn(err)
+				log.Warnf("event callback error on commit: %v", err)
 			}
 		}
 	}

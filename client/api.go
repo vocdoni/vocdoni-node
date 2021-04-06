@@ -403,30 +403,34 @@ func (c *Client) TestSendVotes(
 		}
 	}
 	votingElapsedTime := time.Since(start)
-	if checkNullifiers {
-		for {
-			for i, nullHex := range nullifiers {
-				if nullHex == "registered" {
-					registered++
-					continue
-				}
-				null, err := hex.DecodeString(nullHex)
-				if err != nil {
-					return 0, err
-				}
-				if es, _ := c.GetEnvelopeStatus(null, pid); es {
-					nullifiers[i] = "registered"
-				}
+
+	if !checkNullifiers {
+		return votingElapsedTime, nil
+	}
+	// If checkNullifiers, wait until all votes have been verified
+	for {
+		for i, nullHex := range nullifiers {
+			if nullHex == "registered" {
+				registered++
+				continue
 			}
-			if registered == len(nullifiers) {
-				break
+			null, err := hex.DecodeString(nullHex)
+			if err != nil {
+				return 0, err
 			}
-			registered = 0
-			if time.Since(checkStart) > timeDeadLine {
-				return 0, fmt.Errorf("check nullifier time took more than deadline, skipping")
+			if es, _ := c.GetEnvelopeStatus(null, pid); es {
+				nullifiers[i] = "registered"
 			}
 		}
+		if registered == len(nullifiers) {
+			break
+		}
+		registered = 0
+		if time.Since(checkStart) > timeDeadLine {
+			return 0, fmt.Errorf("check nullifier time took more than deadline, skipping")
+		}
 	}
+
 	return votingElapsedTime, nil
 }
 

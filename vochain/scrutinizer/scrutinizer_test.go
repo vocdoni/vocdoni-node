@@ -297,7 +297,7 @@ func TestResults(t *testing.T) {
 	log.Infof("results: %s", GetFriendlyResults(result.Votes))
 	v0 := big.NewInt(0)
 	v300 := big.NewInt(300)
-	value := new(big.Int)
+	var value *big.Int
 	for q := range result.Votes {
 		for qi := range result.Votes[q] {
 			if qi > 3 {
