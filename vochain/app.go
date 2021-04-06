@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"sync"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
@@ -23,6 +24,10 @@ import (
 type BaseApplication struct {
 	State *State
 	Node  *nm.Node
+
+	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
+	// data races when querying about the sync status of the blockchain.
+	isSyncLock sync.Mutex
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
@@ -36,6 +41,12 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	return &BaseApplication{
 		State: state,
 	}, nil
+}
+
+func (app *BaseApplication) IsSynchronizing() bool {
+	app.isSyncLock.Lock()
+	defer app.isSyncLock.Unlock()
+	return app.Node.ConsensusReactor().WaitSync()
 }
 
 // SendTX sends a transaction to the mempool (sync)
@@ -64,7 +75,7 @@ func (app *BaseApplication) SendTX(tx []byte) (*ctypes.ResultBroadcastTx, error)
 // Tendermint expects LastBlockAppHash and LastBlockHeight to be updated during Commit,
 // ensuring that Commit is never called twice for the same block height.
 func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
-	// print some basic version info about tendermint components (coreVersion, p2pVersion, blockVersion)
+	// print some basic version info about tendermint components
 	log.Infof("tendermint Core version: %s", req.Version)
 	log.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
 	log.Infof("tendermint Block protocol version: %d", req.BlockVersion)
@@ -165,7 +176,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 	return abcitypes.ResponseBeginBlock{}
 }
 
-func (BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
+func (*BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
 	return abcitypes.ResponseSetOption{}
 }
 

@@ -144,7 +144,7 @@ func initStore(dataDir string, state *State) error {
 	if err := state.Store.AddTree(VoteTree); err != nil {
 		return err
 	}
-	log.Infof("state tree load took %d ms", time.Since(startTime).Milliseconds())
+	log.Infof("state tree load took %s", time.Since(startTime))
 	return nil
 }
 
@@ -421,7 +421,6 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 }
 
 // Envelope returns the info of a vote if already exists.
-// voteID must be equals to processID_Nullifier
 func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *models.Vote, err error) {
 	// TODO(mvdan): remove the recover once
 	// https://github.com/tendermint/iavl/issues/212 is fixed

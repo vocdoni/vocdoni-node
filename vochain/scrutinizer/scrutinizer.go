@@ -2,7 +2,6 @@ package scrutinizer
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -19,6 +18,9 @@ const (
 	MaxQuestions = 64
 	// MaxOptions is the maximum number of options allowed in a VotePackage question
 	MaxOptions = 64
+	// MaxEnvelopeListSize is the maximum number of envelopes a process can store.
+	// 8.3M seems enough for now
+	MaxEnvelopeListSize = 32 << 18
 )
 
 // EventListener is an interface used for executing custom functions during the
@@ -50,7 +52,15 @@ type Scrutinizer struct {
 	// eventListeners is the list of external callbacks that will be executed by the scrutinizer
 	eventListeners []EventListener
 	db             *badgerhold.Store
-	addVoteLock    sync.RWMutex
+
+	// addVoteLock is used to avoid Transaction Conflicts on the KV database.
+	// It is not critical and the code should be able to recover from a Conflict, but we
+	// try to minimize this situations in order to improve performance on the KV.
+	// TODO (pau): remove this mutex and relay on the KV layer
+	addVoteLock sync.RWMutex
+	// recoveryBootLock prevents Commit() to add new votes while the recovery bootstratp is
+	// being executed.
+	recoveryBootLock sync.RWMutex
 }
 
 // NewScrutinizer returns an instance of the Scrutinizer
@@ -63,32 +73,92 @@ func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 		return nil, err
 	}
 	s.VochainState.AddEventListener(s)
-	go s.AfterSyncBootstrap()
+	go s.afterSyncBootstrap()
 	return s, nil
 }
 
-func (s *Scrutinizer) AfterSyncBootstrap() {
-	// Some grace time to avoid false positive on IsSynchronizing()
-	time.Sleep(time.Second * 10)
-	for s.VochainState.IsSynchronizing() {
-		time.Sleep(time.Second * 2)
+// During the first seconds/milliseconds of the Vochain startup, Tendermint might report that
+// the chain is not synchronizing since it still does not have any peer and do not know the
+// actual size of the blockchain. If afterSyncBootStrap is executed on this specific moment,
+// the Wait loop would pass.
+func (s *Scrutinizer) afterSyncBootstrap() {
+	syncSignals := 5
+	for {
+		// Add some grace time to avoid false positive on IsSynchronizing()
+		if !s.VochainState.IsSynchronizing() {
+			syncSignals--
+		} else {
+			syncSignals = 5
+		}
+		if syncSignals == 0 {
+			break
+		}
+		time.Sleep(time.Second * 1)
 	}
 	log.Infof("running scrutinizer after-sync bootstrap")
-	prcs := bytes.Buffer{}
+	// Block the new votes addition until the recovery finishes.
+	s.recoveryBootLock.Lock()
+	defer s.recoveryBootLock.Unlock()
+	// Find those processes which do not have yet final results,
+	// they are considered live so we need to compute the temporary
+	// results (or only its weight in case of Encrypted)
+	prcs := [][]byte{}
 	err := s.db.ForEach(
 		badgerhold.Where("FinalResults").Eq(false),
 		func(p *Process) error {
-			if !p.Envelope.EncryptedVotes {
-				s.addProcessToLiveResults(p.ID)
-				prcs.WriteString(fmt.Sprintf("%x ", p.ID))
-			}
+			prcs = append(prcs, p.ID)
 			return nil
 		})
 	if err != nil {
 		log.Error(err)
 	}
-	log.Infof("current live results processes: %s", prcs.String())
-	// TODO: COUNT ALL PENDING LIVE VOTES
+	log.Infof("recovered %d live results processes", len(prcs))
+	log.Infof("starting live results recovery computation")
+	startTime := time.Now()
+	for _, p := range prcs {
+		// In order to recover the full list of live results, we need
+		// to reset the existing Results and count them again from scratch.
+		// Since we cannot be sure if there are votes missing, we need to
+		// perform the full computation.
+		process, err := s.VochainState.Process(p, false)
+		if err != nil {
+			log.Errorf("cannot fetch process: %v", err)
+			continue
+		}
+		options := process.GetVoteOptions()
+		if err := s.db.Upsert(p, &Results{
+			ProcessID: p,
+			// MaxValue requires +1 since 0 is also an option
+			Votes:      newEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+			Weight:     new(big.Int).SetUint64(0),
+			Signatures: []types.HexBytes{},
+		}); err != nil {
+			log.Errorf("cannot upsert results to db: %v", err)
+			continue
+		}
+
+		// Count the votes, add them to results (in memory, without any db transaction)
+		results := &Results{Weight: new(big.Int).SetUint64(0)}
+		for _, e := range s.VochainState.EnvelopeList(p, 0, MaxEnvelopeListSize, true) {
+			vote, err := s.VochainState.Envelope(p, e, true)
+			if err != nil {
+				log.Warn(err)
+				continue
+			}
+			if err := s.addLiveVote(vote, results); err != nil {
+				log.Warn(err)
+			}
+		}
+
+		// Store the results on the persisten database
+		if err := s.commitVotes(p, results); err != nil {
+			log.Errorf("cannot commit live votes: (%v)", err)
+		}
+
+		// Add process to live results so new votes will be added
+		s.addProcessToLiveResults(p)
+	}
+	log.Infof("live resuts recovery computation finished, took %s", time.Since(startTime))
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain
@@ -111,7 +181,6 @@ func (s *Scrutinizer) Commit(height int64) error {
 	for _, p := range s.updateProcessPool {
 		if err := s.updateProcess(p); err != nil {
 			log.Errorf("commit: cannot update process %x: %v", p, err)
-			continue
 		}
 	}
 
@@ -129,9 +198,11 @@ func (s *Scrutinizer) Commit(height int64) error {
 	// this can be run async
 	go s.computePendingProcesses(uint32(height))
 
-	// Add votes collected by onVote (live results)
-	// this can be run async
+	// Add votes collected by onVote (live results), can be run async
 	go func() {
+		// If the recovery bootstrap is running, wait.
+		s.recoveryBootLock.RLock()
+		defer s.recoveryBootLock.RUnlock()
 		nvotes := 0
 		timer := time.Now()
 		for pid, votes := range s.votePool {
@@ -148,8 +219,8 @@ func (s *Scrutinizer) Commit(height int64) error {
 			}
 		}
 		if nvotes > 0 {
-			log.Infof("added %d live votes on block %d, took %d ms",
-				nvotes, height, time.Since(timer).Milliseconds())
+			log.Infof("added %d live votes on block %d, took %s",
+				nvotes, height, time.Since(timer))
 		}
 	}()
 	return nil
@@ -169,15 +240,17 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
 	s.newProcessPool = append(s.newProcessPool, data)
 }
 
-// OnVote scrutinizer stores the votes if liveResults enabled
+// OnVote scrutinizer stores the votes if the processId is live results (on going)
+// and the blockchain is not synchronizing.
 func (s *Scrutinizer) OnVote(v *models.Vote) {
-	s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
+	if s.isProcessLiveResults(v.ProcessId) {
+		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
+	}
 }
 
 // OnCancel scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnCancel(pid []byte) {
 	s.updateProcessPool = append(s.updateProcessPool, pid)
-	// TODO: if live, should set ResultsHeight to 0 and HaveResults to false
 }
 
 // OnProcessKeys does nothing
@@ -221,30 +294,51 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionRes
 	// This is very dangerous since an Oracle would be able to create a consensus failure,
 	// the validaros (that do not check the results) and the full-nodes (with the scrutinizer enabled)
 	// would compute different state hash.
-	// As a temporary solution, lets compare results but do not return error.
-	myResults, err := s.GetResults(pid)
-	if err != nil || myResults == nil {
-		log.Errorf("cannot validate results: %v", err)
-		return nil
-	}
-	myVotes := BuildProcessResult(myResults, nil).GetVotes()
-	if len(myVotes) != len(results) {
-		log.Errorf("results validation failed: wrong result questions size")
-		return nil
-	}
-	for i, q := range results {
-		if len(q.Question) != len(myVotes[i].Question) {
-			log.Errorf("results validation failed: wrong question size")
-			return nil
+	// As a temporary solution, lets compare results but just print the error.
+
+	// This code must be run async in order to not delay the consensus. The results retreival
+	// could require some time.
+	go func() {
+		var myResults *Results
+		var err error
+		retries := 20
+		for {
+			if retries == 0 {
+				log.Errorf("could not fetch results after max retries")
+				return
+			}
+			myResults, err = s.GetResults(pid)
+			if err == nil {
+				break
+			}
+			if err == ErrNoResultsYet {
+				time.Sleep(2 * time.Second)
+				retries--
+				continue
+			}
+			log.Errorf("cannot validate results: %v", err)
+			return
 		}
-		for j, v := range q.Question {
-			if !bytes.Equal(v, myVotes[i].Question[j]) {
-				log.Errorf("results validation failed: wrong question result")
-				return nil
+
+		myVotes := BuildProcessResult(myResults, nil).GetVotes()
+		if len(myVotes) != len(results) {
+			log.Errorf("results validation failed: wrong result questions size")
+			return
+		}
+		for i, q := range results {
+			if len(q.Question) != len(myVotes[i].Question) {
+				log.Errorf("results validation failed: wrong question size")
+				return
+			}
+			for j, v := range q.Question {
+				if !bytes.Equal(v, myVotes[i].Question[j]) {
+					log.Errorf("results validation failed: wrong question result")
+					return
+				}
 			}
 		}
-	}
-	log.Infof("blockchain results for process %x are correct!", pid)
+		log.Infof("published results for process %x are correct!", pid)
+	}()
 	return nil
 }
 
