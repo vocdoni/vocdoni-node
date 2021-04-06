@@ -141,12 +141,14 @@ func (s *Scrutinizer) addLiveVote(envelope *models.Vote, results *Results) error
 
 	// If live process, add vote to temporary results
 	var vote *types.VotePackage
-	if s.isProcessLiveResults(pid) {
+	if open, err := s.isOpenProcess(pid); open && err == nil {
 		vote, err = unmarshalVote(envelope.GetVotePackage(), []string{})
 		if err != nil {
 			log.Warnf("cannot unmarshal vote: %v", err)
 			vote = nil
 		}
+	} else if err != nil {
+		return fmt.Errorf("cannot check if process is open: %v", err)
 	}
 
 	// Add weight to the process Results (if empty, consider weight=1)
@@ -266,8 +268,7 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 	}
 
 	var nvotes int
-	// 8.3M seems enough for now
-	for _, e := range s.VochainState.EnvelopeList(p.ID, 0, 32<<18, false) {
+	for _, e := range s.VochainState.EnvelopeList(p.ID, 0, MaxEnvelopeListSize, false) {
 		vote, err := s.VochainState.Envelope(p.ID, e, false)
 		if err != nil {
 			log.Warn(err)
@@ -389,7 +390,7 @@ func BuildProcessResult(results *Results, entityID []byte) *models.ProcessResult
 	// build the protobuf type for Results
 	qr := []*models.QuestionResult{}
 	for i := range results.Votes {
-		qr := append(qr, &models.QuestionResult{})
+		qr = append(qr, &models.QuestionResult{})
 		for j := range results.Votes[i] {
 			qr[i].Question = append(qr[i].Question, results.Votes[i][j].Bytes())
 		}
