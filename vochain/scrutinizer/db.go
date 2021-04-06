@@ -1,6 +1,7 @@
 package scrutinizer
 
 import (
+	"bytes"
 	"encoding/json"
 	"math/big"
 	"time"
@@ -54,18 +55,18 @@ type Results struct {
 }
 
 func (r *Results) String() string {
-	results := ""
+	results := bytes.Buffer{}
 	for _, q := range r.Votes {
-		results += " ["
+		results.WriteString(" [")
 		for j, o := range q {
-			results += o.String()
+			results.WriteString(o.String())
 			if j < len(q)-1 {
-				results += ","
+				results.WriteString(",")
 			}
 		}
-		results += "]"
+		results.WriteString("]")
 	}
-	return results
+	return results.String()
 }
 
 func InitDB(dataDir string) (*badgerhold.Store, error) {

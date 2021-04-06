@@ -274,9 +274,22 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 			update.EndBlock = p.GetBlockCount() + p.GetStartBlock()
 			update.CensusRoot = p.GetCensusRoot()
 			update.CensusURI = p.GetCensusURI()
-			update.Status = int32(p.GetStatus())
 			update.PrivateKeys = p.EncryptionPrivateKeys
 			update.PublicKeys = p.EncryptionPublicKeys
+			// If the process is transacting to CANCELED, ensure results are not computed and remove
+			// them from the KV database.
+			if update.Status != int32(models.ProcessStatus_CANCELED) &&
+				p.GetStatus() == models.ProcessStatus_CANCELED {
+				update.HaveResults = false
+				update.FinalResults = true
+				update.Rheight = 0
+				if err := s.db.Delete(pid, &Results{}); err != nil {
+					if err != badgerhold.ErrNotFound {
+						log.Warnf("cannot remove CANCELED results: %v", err)
+					}
+				}
+			}
+			update.Status = int32(p.GetStatus())
 			return nil
 		})
 }
