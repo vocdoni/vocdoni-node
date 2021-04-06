@@ -92,7 +92,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain
-func (s *Scrutinizer) Commit(height int64) (error, bool) {
+func (s *Scrutinizer) Commit(height int64) error {
 	// Add Entity and register new active process
 	for _, p := range s.newProcessPool {
 		if err := s.newEmptyProcess(p.ProcessID); err != nil {
@@ -101,11 +101,9 @@ func (s *Scrutinizer) Commit(height int64) (error, bool) {
 		}
 		if live, err := s.isOpenProcess(p.ProcessID); err != nil {
 			log.Errorf("cannot check if process is live results: %v", err)
-
 		} else if live && !s.VochainState.IsSynchronizing() {
 			// Only add live processes if the vochain is not synchronizing
 			s.addProcessToLiveResults(p.ProcessID)
-
 		}
 	}
 
@@ -154,7 +152,7 @@ func (s *Scrutinizer) Commit(height int64) (error, bool) {
 				nvotes, height, time.Since(timer).Milliseconds())
 		}
 	}()
-	return nil, false
+	return nil
 }
 
 // Rollback removes the non committed pending operations
@@ -173,11 +171,7 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
 
 // OnVote scrutinizer stores the votes if liveResults enabled
 func (s *Scrutinizer) OnVote(v *models.Vote) {
-	if _, ok := s.votePool[string(v.ProcessId)]; ok {
-		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
-	} else {
-		s.votePool[string(v.ProcessId)] = []*models.Vote{v}
-	}
+	s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
 }
 
 // OnCancel scrutinizer stores the processID and entityID

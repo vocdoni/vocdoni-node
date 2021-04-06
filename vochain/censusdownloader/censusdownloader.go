@@ -50,14 +50,14 @@ func (c *CensusDownloader) Rollback() {
 	c.queueLock.Unlock()
 }
 
-func (c *CensusDownloader) Commit(height int64) (error, bool) {
+func (c *CensusDownloader) Commit(height int64) error {
 	c.queueLock.Lock()
 	defer c.queueLock.Unlock()
 	for k, v := range c.queue {
 		log.Infof("importing remote census %s", v)
 		c.importCensus(k, v)
 	}
-	return nil, false
+	return nil
 }
 
 func (c *CensusDownloader) OnProcess(pid, eid []byte, censusRoot, censusURI string) {

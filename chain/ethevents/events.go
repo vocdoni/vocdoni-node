@@ -171,7 +171,7 @@ func (ev *EthereumEvents) OnComputeResults(results *scrutinizer.Results) {
 		break
 	default:
 		log.Infof("invalid process %x status %s for setting the results, skipping",
-			results.ProcessID, vocProcessData.Status.String())
+			results.ProcessID, vocProcessData.Status)
 		return
 	}
 
