@@ -23,7 +23,6 @@ func TestEntityList(t *testing.T) {
 }
 
 func testEntityList(t *testing.T, entityCount int) {
-	log.Init("info", "stdout")
 	state, err := vochain.NewState(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +79,6 @@ func TestProcessList(t *testing.T) {
 }
 
 func testProcessList(t *testing.T, procsCount int) {
-	log.Init("info", "stdout")
 	state, err := vochain.NewState(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -146,7 +144,6 @@ func testProcessList(t *testing.T, procsCount int) {
 }
 
 func TestProcessListWithNamespaceAndStatus(t *testing.T) {
-	log.Init("info", "stdout")
 	state, err := vochain.NewState(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -216,7 +213,6 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 }
 
 func TestResults(t *testing.T) {
-	log.Init("info", "stdout")
 	state, err := vochain.NewState(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -328,7 +324,6 @@ func TestResults(t *testing.T) {
 }
 
 func TestLiveResults(t *testing.T) {
-	log.Init("info", "stdout")
 	state, err := vochain.NewState(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
