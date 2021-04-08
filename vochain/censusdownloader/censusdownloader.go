@@ -50,7 +50,7 @@ func (c *CensusDownloader) Rollback() {
 	c.queueLock.Unlock()
 }
 
-func (c *CensusDownloader) Commit(height int64, txIndex int32) error {
+func (c *CensusDownloader) Commit(height int64) error {
 	c.queueLock.Lock()
 	defer c.queueLock.Unlock()
 	for k, v := range c.queue {
@@ -60,7 +60,7 @@ func (c *CensusDownloader) Commit(height int64, txIndex int32) error {
 	return nil
 }
 
-func (c *CensusDownloader) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
+func (c *CensusDownloader) OnProcess(pid, eid []byte, censusRoot, censusURI string, txindex int32) {
 	censusRoot = util.TrimHex(censusRoot)
 	c.queueLock.Lock()
 	defer c.queueLock.Unlock()
@@ -77,11 +77,12 @@ func (c *CensusDownloader) OnProcess(pid, eid []byte, censusRoot, censusURI stri
 }
 
 // NOT USED but required for implementing the interface
-func (c *CensusDownloader) OnCancel(pid []byte)                                           {}
-func (c *CensusDownloader) OnVote(v *models.Vote)                                         {}
-func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string)                     {}
-func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string)                     {}
-func (c *CensusDownloader) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {}
-func (c *CensusDownloader) OnProcessResults(pid []byte, results []*models.QuestionResult) error {
+func (c *CensusDownloader) OnCancel(pid []byte, txindex int32)                       {}
+func (c *CensusDownloader) OnVote(v *models.Vote, txindex int32)                     {}
+func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string, txindex int32) {}
+func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string, txindex int32) {}
+func (c *CensusDownloader) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
+}
+func (c *CensusDownloader) OnProcessResults(pid []byte, results []*models.QuestionResult, txindex int32) error {
 	return nil
 }

@@ -26,7 +26,7 @@ func (v *State) AddProcess(p *models.Process) error {
 		censusURI = *p.CensusURI
 	}
 	for _, l := range v.eventListeners {
-		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI)
+		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI, v.TxCounter())
 	}
 	return nil
 }
@@ -52,7 +52,7 @@ func (v *State) CancelProcess(pid []byte) error { // LEGACY
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnCancel(pid)
+		l.OnCancel(pid, v.TxCounter())
 	}
 	return nil
 }
@@ -175,7 +175,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return err
 		}
 		for _, l := range v.eventListeners {
-			l.OnProcessStatusChange(process.ProcessId, process.Status)
+			l.OnProcessStatusChange(process.ProcessId, process.Status, v.TxCounter())
 		}
 	}
 	return nil
@@ -209,7 +209,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 	if commit {
 		// If some of the event listeners return an error, do not include the transaction
 		for _, l := range v.eventListeners {
-			if err := l.OnProcessResults(process.ProcessId, result.Votes); err != nil {
+			if err := l.OnProcessResults(process.ProcessId, result.Votes, v.TxCounter()); err != nil {
 				return err
 			}
 		}

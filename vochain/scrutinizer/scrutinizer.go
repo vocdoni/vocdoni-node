@@ -165,7 +165,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain
-func (s *Scrutinizer) Commit(height int64, txIndex int32) error {
+func (s *Scrutinizer) Commit(height int64) error {
 	// Add Entity and register new active process
 	for _, p := range s.newProcessPool {
 		if err := s.newEmptyProcess(p.ProcessID); err != nil {
@@ -238,30 +238,30 @@ func (s *Scrutinizer) Rollback() {
 }
 
 // OnProcess scrutinizer stores the processID and entityID
-func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
+func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
 	data := &types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
 	s.newProcessPool = append(s.newProcessPool, data)
 }
 
 // OnVote scrutinizer stores the votes if the processId is live results (on going)
 // and the blockchain is not synchronizing.
-func (s *Scrutinizer) OnVote(v *models.Vote) {
+func (s *Scrutinizer) OnVote(v *models.Vote, txIndex int32) {
 	if s.isProcessLiveResults(v.ProcessId) {
 		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
 	}
 }
 
 // OnCancel scrutinizer stores the processID and entityID
-func (s *Scrutinizer) OnCancel(pid []byte) {
+func (s *Scrutinizer) OnCancel(pid []byte, txIndex int32) {
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
 // OnProcessKeys does nothing
-func (s *Scrutinizer) OnProcessKeys(pid []byte, pub, commit string) {
+func (s *Scrutinizer) OnProcessKeys(pid []byte, pub, commit string, txIndex int32) {
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
-func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {
+func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32) {
 	if status == models.ProcessStatus_ENDED {
 		if live, err := s.isOpenProcess(pid); err != nil {
 			log.Warn(err)
@@ -274,7 +274,7 @@ func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessSta
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
-func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string) {
+func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string, txIndex int32) {
 	p, err := s.VochainState.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)
@@ -292,7 +292,7 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string) {
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
-func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionResult) error {
+func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionResult, txIndex int32) error {
 	// TODO: check results are valid and return an error if not.
 	// This is very dangerous since an Oracle would be able to create a consensus failure,
 	// the validaros (that do not check the results) and the full-nodes (with the scrutinizer enabled)
