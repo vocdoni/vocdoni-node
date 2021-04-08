@@ -109,6 +109,7 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.
 		if err != nil {
 			return
 		}
+		go sc.AfterSyncBootstrap()
 	}
 	if cm != nil {
 		log.Infof("starting census downloader service")

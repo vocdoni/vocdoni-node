@@ -73,15 +73,18 @@ func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
 		return nil, err
 	}
 	s.VochainState.AddEventListener(s)
-	go s.afterSyncBootstrap()
 	return s, nil
 }
 
-// During the first seconds/milliseconds of the Vochain startup, Tendermint might report that
-// the chain is not synchronizing since it still does not have any peer and do not know the
-// actual size of the blockchain. If afterSyncBootStrap is executed on this specific moment,
-// the Wait loop would pass.
-func (s *Scrutinizer) afterSyncBootstrap() {
+// AfterSyncBootstrap is a blocking function that waits until the Vochain is synchronized
+// and then execute a set of recovery actions. It mainly checks for those processes which are
+// still open (live) and updates all temporary data (current voting weight and live results
+// if unecrypted). This method might be called on a goroutine after initializing the Scrutinizer.
+func (s *Scrutinizer) AfterSyncBootstrap() {
+	// During the first seconds/milliseconds of the Vochain startup, Tendermint might report that
+	// the chain is not synchronizing since it still does not have any peer and do not know the
+	// actual size of the blockchain. If afterSyncBootStrap is executed on this specific moment,
+	// the Wait loop would pass.
 	syncSignals := 5
 	for {
 		// Add some grace time to avoid false positive on IsSynchronizing()
