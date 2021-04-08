@@ -40,7 +40,10 @@ func (s *Scrutinizer) AddEventListener(l EventListener) {
 type Scrutinizer struct {
 	VochainState *vochain.State
 	// votePool is the list of votes that will be added on the current block
-	votePool map[string][]*models.Vote
+	votePool map[string][]struct {
+		vote    *models.Vote
+		txIndex int32
+	}
 	// newProcessPool is the list of new process IDs on the current block
 	newProcessPool []*types.ScrutinizerOnProcessData
 	// updateProcessPool is the list of process IDs that require sync with the state database
@@ -211,11 +214,12 @@ func (s *Scrutinizer) Commit(height int64) error {
 		for pid, votes := range s.votePool {
 			results := &Results{Weight: new(big.Int).SetUint64(0)}
 			for _, v := range votes {
-				if err := s.addLiveVote(v, results); err != nil {
+				if err := s.addLiveVote(v.vote, results); err != nil {
 					log.Warnf("vote cannot be added: %v", err)
 				} else {
 					nvotes++
 				}
+				// TODO: add nullifier, blockheight, txIndex to badgerhold
 			}
 			if err := s.commitVotes([]byte(pid), results); err != nil {
 				log.Errorf("cannot commit live votes: (%v)", err)
@@ -231,7 +235,10 @@ func (s *Scrutinizer) Commit(height int64) error {
 
 // Rollback removes the non committed pending operations
 func (s *Scrutinizer) Rollback() {
-	s.votePool = make(map[string][]*models.Vote)
+	s.votePool = make(map[string][]struct {
+		vote    *models.Vote
+		txIndex int32
+	})
 	s.newProcessPool = []*types.ScrutinizerOnProcessData{}
 	s.resultsPool = []*types.ScrutinizerOnProcessData{}
 	s.updateProcessPool = [][]byte{}
@@ -247,7 +254,10 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, t
 // and the blockchain is not synchronizing.
 func (s *Scrutinizer) OnVote(v *models.Vote, txIndex int32) {
 	if s.isProcessLiveResults(v.ProcessId) {
-		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
+		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], struct {
+			vote    *models.Vote
+			txIndex int32
+		}{v, txIndex})
 	}
 }
 
