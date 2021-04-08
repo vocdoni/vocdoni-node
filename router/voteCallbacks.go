@@ -106,21 +106,31 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 }
 
 func (r *Router) getEnvelope(request routerRequest) {
-	// check pid
-	if len(request.ProcessID) != types.ProcessIDsize {
-		r.sendError(request, "cannot get envelope status: (malformed processId)")
-		return
-	}
 	// check nullifier
 	if len(request.Nullifier) != types.VoteNullifierSize {
 		r.sendError(request, "cannot get envelope status: (malformed nullifier)")
 		return
 	}
-	envelope, err := r.vocapp.State.Envelope(request.ProcessID, request.Nullifier, true)
+	txRef, err := r.Scrutinizer.GetVoteReference(request.Nullifier)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope: (%s)", err))
 		return
 	}
+	block := r.vocapp.Node.BlockStore().LoadBlock(txRef.BlockHeight)
+	if block == nil {
+		r.sendError(request, fmt.Sprintf("cannot get envelope: block %d not found", txRef.BlockHeight))
+		return
+	}
+	if int32(len(block.Txs)) <= txRef.TxIndex {
+		r.sendError(request, fmt.Sprintf("cannot get envelope: tx %d not found on block %d", txRef.TxIndex, txRef.BlockHeight))
+		return
+	}
+	voteTxBytes := block.Txs[txRef.TxIndex]
+
+	tx := &models.Tx{}
+	proto.Unmarshal(voteTxBytes, tx)
+	envelope := tx.GetVote()
+
 	var response types.MetaResponse
 	response.Registered = types.True
 	response.Payload = base64.StdEncoding.EncodeToString(envelope.VotePackage)

@@ -27,6 +27,14 @@ var ErrNoResultsYet = fmt.Errorf("no results yet")
 // implementation, thus let badgerhold abstract it.
 const kvErrorStringForRetry = "Transaction Conflict"
 
+// GetVoteReference gets the reference for an AddVote transaction.
+// This reference can then be used to fetch the vote transaction directly from the BlockStore.
+func (s *Scrutinizer) GetVoteReference(nullifier []byte) (*VoteReference, error) {
+	txRef := &VoteReference{}
+	err := s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
+	return txRef, err
+}
+
 // ComputeResult process a finished voting, compute the results and saves it in the Storage.
 // Once this function is called, any future live vote event for the processId will be discarted.
 func (s *Scrutinizer) ComputeResult(processID []byte) error {
@@ -172,6 +180,17 @@ func (s *Scrutinizer) addLiveVote(envelope *models.Vote, results *Results) error
 		}
 	}
 	return nil
+}
+
+// addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
+// This method is triggered by Commit callback for each vote added to the blockchain.
+func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight int64, txIndex int32) error {
+	_, err := s.VochainState.Process(pid, false)
+	if err != nil {
+		return fmt.Errorf("cannot get process %x: %w", pid, err)
+	}
+	voteRef := &VoteReference{Nullifier: nullifier, ProcessId: pid, BlockHeight: blockHeight, TxIndex: txIndex}
+	return s.db.Insert(nullifier, voteRef)
 }
 
 func (s *Scrutinizer) addProcessToLiveResults(pid []byte) {
