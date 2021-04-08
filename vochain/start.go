@@ -173,8 +173,8 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	log.Infof("consensus block time target: commit=%.2fs propose=%.2fs",
 		tconfig.Consensus.TimeoutCommit.Seconds(), tconfig.Consensus.TimeoutPropose.Seconds())
 
-	// indexing
-	tconfig.TxIndex.Indexer = "kv"
+	// disable transaction indexer (we don't use it)
+	tconfig.TxIndex.Indexer = "null"
 
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
