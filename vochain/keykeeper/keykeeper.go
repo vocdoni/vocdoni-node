@@ -211,7 +211,7 @@ func (k *KeyKeeper) Rollback() {
 }
 
 // OnProcess creates the keys and add them to the pool queue, if the process requires it
-func (k *KeyKeeper) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
+func (k *KeyKeeper) OnProcess(pid, eid []byte, censusRoot, censusURI string, txindex int32) {
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
@@ -242,7 +242,7 @@ func (k *KeyKeeper) OnProcess(pid, eid []byte, censusRoot, censusURI string) {
 }
 
 // OnCancel will publish the private and reveal keys of the canceled process, if required
-func (k *KeyKeeper) OnCancel(pid []byte) { // LEGACY
+func (k *KeyKeeper) OnCancel(pid []byte, txindex int32) { // LEGACY
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
@@ -259,7 +259,7 @@ func (k *KeyKeeper) OnCancel(pid []byte) { // LEGACY
 }
 
 // Commit saves the pending operation
-func (k *KeyKeeper) Commit(height int64, txIndex int32) error {
+func (k *KeyKeeper) Commit(height int64) error {
 	k.scheduleRevealKeys()
 	go k.checkRevealProcess(height)
 	go k.publishPendingKeys()
@@ -267,13 +267,13 @@ func (k *KeyKeeper) Commit(height int64, txIndex int32) error {
 }
 
 // OnVote is not used by the KeyKeeper
-func (k *KeyKeeper) OnVote(v *models.Vote) {
+func (k *KeyKeeper) OnVote(v *models.Vote, txindex int32) {
 	// do nothing
 }
 
 // OnProcessStatusChange will publish the private
 // and reveal keys of the ended process, if required
-func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus) {
+func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
@@ -290,15 +290,15 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 	}
 }
 
-func (k *KeyKeeper) OnProcessKeys(pid []byte, pub, com string) {
+func (k *KeyKeeper) OnProcessKeys(pid []byte, pub, com string, txindex int32) {
 	// do nothing
 }
 
-func (k *KeyKeeper) OnRevealKeys(pid []byte, priv, rev string) {
+func (k *KeyKeeper) OnRevealKeys(pid []byte, priv, rev string, txindex int32) {
 	// do nothing
 }
 
-func (k *KeyKeeper) OnProcessResults(pid []byte, results []*models.QuestionResult) error {
+func (k *KeyKeeper) OnProcessResults(pid []byte, results []*models.QuestionResult, txindex int32) error {
 	// do nothing
 	return nil
 }
