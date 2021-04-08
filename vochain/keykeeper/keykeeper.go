@@ -259,7 +259,7 @@ func (k *KeyKeeper) OnCancel(pid []byte) { // LEGACY
 }
 
 // Commit saves the pending operation
-func (k *KeyKeeper) Commit(height int64) error {
+func (k *KeyKeeper) Commit(height int64, txIndex int32) error {
 	k.scheduleRevealKeys()
 	go k.checkRevealProcess(height)
 	go k.publishPendingKeys()

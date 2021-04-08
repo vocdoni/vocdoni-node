@@ -206,7 +206,8 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	var tx *models.Tx
 	var signature []byte
 	var txBytes []byte
-
+	// Increase Tx counter on return since the index 0 is valid
+	defer app.State.TxCounterAdd()
 	if tx, txBytes, signature, err = UnmarshalTx(req.Tx); err == nil {
 		log.Debugf("deliver tx: %s", log.FormatProto(tx))
 		if data, err = AddTx(tx, txBytes, signature, app.State, TxKey(req.Tx), true); err != nil {

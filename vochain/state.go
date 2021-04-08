@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cosmos/iavl"
@@ -63,7 +64,7 @@ type EventListener interface {
 	OnProcessKeys(pid []byte, encryptionPub, commitment string)
 	OnRevealKeys(pid []byte, encryptionPriv, reveal string)
 	OnProcessResults(pid []byte, results []*models.QuestionResult) error
-	Commit(height int64) (err error)
+	Commit(height int64, txIndex int32) (err error)
 	Rollback()
 }
 
@@ -82,6 +83,7 @@ type State struct {
 	ImmutableState
 	MemPoolRemoveTxKey func([32]byte, bool)
 	IsSynchronizing    func() bool
+	txCounter          *int32
 	eventListeners     []EventListener
 }
 
@@ -125,6 +127,7 @@ func NewState(dataDir string) (*State, error) {
 		vs.Store.Version(), vs.Store.Hash())
 	// Set up an initial dummy function
 	vs.IsSynchronizing = func() bool { return false }
+	vs.txCounter = new(int32)
 	return vs, nil
 }
 
@@ -329,11 +332,13 @@ func (v *State) AddProcessKeys(tx *models.AdminTx) error {
 	}
 	if tx.CommitmentKey != nil {
 		process.CommitmentKeys[*tx.KeyIndex] = fmt.Sprintf("%x", tx.CommitmentKey)
-		log.Debugf("added commitment key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.CommitmentKey)
+		log.Debugf("added commitment key %d for process %x: %x",
+			*tx.KeyIndex, tx.ProcessId, tx.CommitmentKey)
 	}
 	if tx.EncryptionPublicKey != nil {
 		process.EncryptionPublicKeys[*tx.KeyIndex] = fmt.Sprintf("%x", tx.EncryptionPublicKey)
-		log.Debugf("added encryption key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.EncryptionPublicKey)
+		log.Debugf("added encryption key %d for process %x: %x",
+			*tx.KeyIndex, tx.ProcessId, tx.EncryptionPublicKey)
 	}
 	if process.KeyIndex == nil {
 		process.KeyIndex = new(uint32)
@@ -343,7 +348,8 @@ func (v *State) AddProcessKeys(tx *models.AdminTx) error {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnProcessKeys(tx.ProcessId, fmt.Sprintf("%x", tx.EncryptionPublicKey), fmt.Sprintf("%x", tx.CommitmentKey))
+		l.OnProcessKeys(tx.ProcessId, fmt.Sprintf("%x", tx.EncryptionPublicKey),
+			fmt.Sprintf("%x", tx.CommitmentKey))
 	}
 	return nil
 }
@@ -364,13 +370,15 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	if tx.RevealKey != nil {
 		rkey = fmt.Sprintf("%x", tx.RevealKey)
 		process.RevealKeys[*tx.KeyIndex] = rkey // TBD: Change hex strings for []byte
-		log.Debugf("revealed commitment key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.RevealKey)
+		log.Debugf("revealed commitment key %d for process %x: %x",
+			*tx.KeyIndex, tx.ProcessId, tx.RevealKey)
 	}
 	ekey := ""
 	if tx.EncryptionPrivateKey != nil {
 		ekey = fmt.Sprintf("%x", tx.EncryptionPrivateKey)
 		process.EncryptionPrivateKeys[*tx.KeyIndex] = ekey
-		log.Debugf("revealed encryption key %d for process %x: %x", *tx.KeyIndex, tx.ProcessId, tx.EncryptionPrivateKey)
+		log.Debugf("revealed encryption key %d for process %x: %x",
+			*tx.KeyIndex, tx.ProcessId, tx.EncryptionPrivateKey)
 	}
 	*process.KeyIndex--
 	if err := v.setProcess(process, tx.ProcessId); err != nil {
@@ -559,7 +567,7 @@ func (v *State) Save() []byte {
 	v.Unlock()
 	if h := v.Header(false); h != nil {
 		for _, l := range v.eventListeners {
-			err := l.Commit(h.Height)
+			err := l.Commit(h.Height, v.TxCounter())
 			if err != nil {
 				if _, fatal := err.(ErrHaltVochain); fatal {
 					panic(err)
@@ -581,6 +589,7 @@ func (v *State) Rollback() {
 	if err := v.Store.Rollback(); err != nil {
 		panic(fmt.Sprintf("cannot rollback state tree: (%s)", err))
 	}
+	atomic.StoreInt32(v.txCounter, 0)
 }
 
 // WorkingHash returns the hash of the vochain trees censusRoots
@@ -589,4 +598,12 @@ func (v *State) WorkingHash() []byte {
 	v.RLock()
 	defer v.RUnlock()
 	return v.Store.Hash()
+}
+
+func (v *State) TxCounterAdd() {
+	atomic.AddInt32(v.txCounter, 1)
+}
+
+func (v *State) TxCounter() int32 {
+	return atomic.LoadInt32(v.txCounter)
 }

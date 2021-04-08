@@ -50,7 +50,7 @@ func (c *CensusDownloader) Rollback() {
 	c.queueLock.Unlock()
 }
 
-func (c *CensusDownloader) Commit(height int64) error {
+func (c *CensusDownloader) Commit(height int64, txIndex int32) error {
 	c.queueLock.Lock()
 	defer c.queueLock.Unlock()
 	for k, v := range c.queue {
