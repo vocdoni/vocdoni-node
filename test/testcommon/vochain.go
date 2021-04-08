@@ -220,6 +220,7 @@ func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer,
 	if err != nil {
 		tb.Fatal(err)
 	}
+	go sc.AfterSyncBootstrap()
 	return sc
 }
 
