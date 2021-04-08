@@ -219,7 +219,7 @@ func (s *Scrutinizer) Commit(height int64) error {
 				} else {
 					nvotes++
 				}
-				// TODO: add nullifier, blockheight, txIndex to badgerhold
+				s.addVoteIndex(v.vote.Nullifier, v.vote.ProcessId, height, v.txIndex)
 			}
 			if err := s.commitVotes([]byte(pid), results); err != nil {
 				log.Errorf("cannot commit live votes: (%v)", err)
