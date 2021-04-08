@@ -165,7 +165,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain
-func (s *Scrutinizer) Commit(height int64) error {
+func (s *Scrutinizer) Commit(height int64, txIndex int32) error {
 	// Add Entity and register new active process
 	for _, p := range s.newProcessPool {
 		if err := s.newEmptyProcess(p.ProcessID); err != nil {
