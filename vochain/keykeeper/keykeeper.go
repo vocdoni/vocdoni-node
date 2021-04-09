@@ -508,7 +508,7 @@ func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
 		return err
 	}
 	// Send the transaction to the mempool
-	result, err := k.vochain.SendTX(vtxBytes)
+	result, err := k.vochain.SendTx(vtxBytes)
 	if err != nil {
 		return err
 	}

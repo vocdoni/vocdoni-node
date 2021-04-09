@@ -82,7 +82,6 @@ type State struct {
 	voteCacheLock sync.RWMutex
 	ImmutableState
 	MemPoolRemoveTxKey func([32]byte, bool)
-	IsSynchronizing    func() bool
 	txCounter          *int32
 	eventListeners     []EventListener
 }
@@ -125,8 +124,6 @@ func NewState(dataDir string) (*State, error) {
 	vs.voteCache = make(map[[32]byte]*types.CacheTx)
 	log.Infof("state database is ready at version %d with hash %x",
 		vs.Store.Version(), vs.Store.Hash())
-	// Set up an initial dummy function
-	vs.IsSynchronizing = func() bool { return false }
 	vs.txCounter = new(int32)
 	return vs, nil
 }

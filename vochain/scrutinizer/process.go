@@ -151,7 +151,7 @@ func (s *Scrutinizer) EntityCount() int64 {
 
 // Return whether a process must have live results or not
 func (s *Scrutinizer) isOpenProcess(processID []byte) (bool, error) {
-	p, err := s.VochainState.Process(processID, false)
+	p, err := s.App.State.Process(processID, false)
 	if err != nil {
 		return false, err
 	}
@@ -185,7 +185,7 @@ func (s *Scrutinizer) computePendingProcesses(height uint32) {
 // newEmptyProcess creates a new empty process and stores it into the database.
 // The process must exist on the Vochain state, else an error is returned.
 func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
-	p, err := s.VochainState.Process(pid, false)
+	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("cannot create new empty process: %w", err)
 	}
@@ -217,7 +217,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	s.addVoteLock.Unlock()
 
 	// Get the block time from the Header
-	currentBlockTime := time.Unix(s.VochainState.Header(false).Timestamp, 0)
+	currentBlockTime := time.Unix(s.App.State.Header(false).Timestamp, 0)
 
 	// Add the entity to the indexer database
 	eid := p.GetEntityId()
@@ -261,7 +261,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 // updateProcess synchronize those fields that can be updated on a existing process
 // with the information obtained from the Vochain state
 func (s *Scrutinizer) updateProcess(pid []byte) error {
-	p, err := s.VochainState.Process(pid, false)
+	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}

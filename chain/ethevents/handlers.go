@@ -125,7 +125,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 		log.Debugf("broadcasting tx: %s", log.FormatProto(processTx))
 
-		res, err := e.VochainApp.SendTX(txb)
+		res, err := e.VochainApp.SendTx(txb)
 		if err != nil || res == nil {
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
@@ -162,7 +162,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 		log.Debugf("broadcasting tx: %s", log.FormatProto(setProcessTx))
 
-		res, err := e.VochainApp.SendTX(txb)
+		res, err := e.VochainApp.SendTx(txb)
 		if err != nil || res == nil {
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
@@ -214,7 +214,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 		log.Debugf("broadcasting tx: %s", log.FormatProto(setProcessTx))
 
-		res, err := e.VochainApp.SendTX(tx)
+		res, err := e.VochainApp.SendTx(tx)
 		if err != nil || res == nil {
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
@@ -254,7 +254,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 		log.Debugf("broadcasting tx: %s", log.FormatProto(addOracleTx))
 
-		res, err := e.VochainApp.SendTX(tx)
+		res, err := e.VochainApp.SendTx(tx)
 		if err != nil || res == nil {
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
@@ -299,7 +299,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 		log.Debugf("broadcasting tx: %s", log.FormatProto(removeOracleTx))
 
-		res, err := e.VochainApp.SendTX(tx)
+		res, err := e.VochainApp.SendTx(tx)
 		if err != nil || res == nil {
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
