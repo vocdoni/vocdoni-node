@@ -61,7 +61,7 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.VoteEnvelope, []byt
 }
 
 // GetEnvelopeHeight returns the number of envelopes for a processId.
-// If no processId is provided, returns the total number of envelopes.
+// If processId is empty, returns the total number of envelopes.
 func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (int, error) {
 	// TODO: Warning, int can overflow
 	if len(processId) > 0 {
