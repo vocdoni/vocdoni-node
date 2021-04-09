@@ -123,7 +123,7 @@ func (r *Router) getEnvelope(request routerRequest) {
 
 func (r *Router) getEnvelopeHeight(request routerRequest) {
 	// check pid
-	if len(request.ProcessID) != types.ProcessIDsize {
+	if len(request.ProcessID) != types.ProcessIDsize && len(request.ProcessID) != 0 {
 		r.sendError(request, "cannot get envelope height: (malformed processId)")
 		return
 	}
