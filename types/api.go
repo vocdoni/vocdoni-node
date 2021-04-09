@@ -124,6 +124,7 @@ type MetaResponse struct {
 	Ok                   bool        `json:"ok"`
 	Paused               *bool       `json:"paused,omitempty"`
 	Payload              string      `json:"payload,omitempty"`
+	ProcessID            HexBytes    `json:"processId,omitempty"`
 	ProcessIDs           []string    `json:"processIds,omitempty"`
 	ProcessInfo          interface{} `json:"processInfo,omitempty"`
 	ProcessList          []string    `json:"processList,omitempty"`

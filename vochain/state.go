@@ -64,7 +64,7 @@ type EventListener interface {
 	OnProcessKeys(pid []byte, encryptionPub, commitment string, txIndex int32)
 	OnRevealKeys(pid []byte, encryptionPriv, reveal string, txIndex int32)
 	OnProcessResults(pid []byte, results []*models.QuestionResult, txIndex int32) error
-	Commit(height int64) (err error)
+	Commit(height uint32) (err error)
 	Rollback()
 }
 
@@ -564,8 +564,9 @@ func (v *State) Save() []byte {
 	}
 	v.Unlock()
 	if h := v.Header(false); h != nil {
+		height := uint32(h.Height)
 		for _, l := range v.eventListeners {
-			err := l.Commit(h.Height)
+			err := l.Commit(height)
 			if err != nil {
 				if _, fatal := err.(ErrHaltVochain); fatal {
 					panic(err)

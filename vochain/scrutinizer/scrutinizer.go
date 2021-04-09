@@ -168,7 +168,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain
-func (s *Scrutinizer) Commit(height int64) error {
+func (s *Scrutinizer) Commit(height uint32) error {
 	// Add Entity and register new active process
 	for _, p := range s.newProcessPool {
 		if err := s.newEmptyProcess(p.ProcessID); err != nil {
@@ -200,6 +200,21 @@ func (s *Scrutinizer) Commit(height int64) error {
 		log.Infof("scheduled results computation on next block for %x", p.ProcessID)
 	}
 
+	for pid, votes := range s.votePool {
+		startTime := time.Now()
+		for _, v := range votes {
+			// TODO: This should perform a single db Tx
+			if err := s.addVoteIndex(v.vote.Nullifier,
+				v.vote.ProcessId,
+				height,
+				v.txIndex); err != nil {
+				log.Warn(err)
+			}
+		}
+		log.Infof("indexed %d new envelopes for process %x took %s",
+			len(votes), []byte(pid), time.Since(startTime))
+	}
+
 	// Check if there are processes that need results computing
 	// this can be run async
 	go s.computePendingProcesses(uint32(height))
@@ -219,7 +234,6 @@ func (s *Scrutinizer) Commit(height int64) error {
 				} else {
 					nvotes++
 				}
-				s.addVoteIndex(v.vote.Nullifier, v.vote.ProcessId, height, v.txIndex)
 			}
 			if err := s.commitVotes([]byte(pid), results); err != nil {
 				log.Errorf("cannot commit live votes: (%v)", err)
@@ -230,6 +244,7 @@ func (s *Scrutinizer) Commit(height int64) error {
 				nvotes, height, time.Since(timer))
 		}
 	}()
+
 	return nil
 }
 

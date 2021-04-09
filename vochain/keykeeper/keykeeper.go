@@ -259,7 +259,7 @@ func (k *KeyKeeper) OnCancel(pid []byte, txindex int32) { // LEGACY
 }
 
 // Commit saves the pending operation
-func (k *KeyKeeper) Commit(height int64) error {
+func (k *KeyKeeper) Commit(height uint32) error {
 	k.scheduleRevealKeys()
 	go k.checkRevealProcess(height)
 	go k.publishPendingKeys()
@@ -368,7 +368,7 @@ func (k *KeyKeeper) scheduleRevealKeys() {
 
 // checkRevealProcess check if keys should be revealed for height
 // and deletes the entry from the storage
-func (k *KeyKeeper) checkRevealProcess(height int64) {
+func (k *KeyKeeper) checkRevealProcess(height uint32) {
 	k.lock.Lock()
 	defer k.lock.Unlock()
 	pKey := []byte(dbPrefixBlock + fmt.Sprintf("%d", height))
