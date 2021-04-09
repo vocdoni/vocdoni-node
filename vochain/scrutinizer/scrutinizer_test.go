@@ -584,3 +584,52 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	qt.Assert(t, votes[3], qt.DeepEquals, []string{"2", "1"})
 	qt.Assert(t, votes[4], qt.DeepEquals, []string{"3", "0"})
 }
+
+func TestCountVotes(t *testing.T) {
+	app, err := vochain.NewBaseApplication(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sc, err := NewScrutinizer(t.TempDir(), app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid := util.RandomBytes(32)
+
+	// Add 100 votes
+	vp, err := json.Marshal(types.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: []int{1, 1, 1},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	sc.Rollback()
+	for i := 0; i < 100; i++ {
+		v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
+		// Add votes to votePool with i as txIndex
+		sc.OnVote(v, int32(i))
+	}
+	nullifier := util.RandomBytes(32)
+	v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: nullifier}
+	// Add last vote with known nullifier
+	txIndex := int32(100)
+	sc.OnVote(v, txIndex)
+
+	// Vote transactions are on imaginary 2000th block
+	blockHeight := uint32(2000)
+	sc.Commit(blockHeight)
+
+	// Test envelope height for this PID
+	height, err := sc.GetEnvelopeHeight(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, height, qt.CmpEquals(), 101)
+	// Test global envelope height
+	height, err = sc.GetEnvelopeHeight([]byte{})
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, height, qt.CmpEquals(), 101)
+
+	ref, err := sc.GetEnvelopeReference(nullifier)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, ref.Height, qt.CmpEquals(), blockHeight)
+	qt.Assert(t, ref.TxIndex, qt.CmpEquals(), txIndex)
+}
