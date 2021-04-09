@@ -60,10 +60,15 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.VoteEnvelope, []byt
 	return envelope, stx.Signature, nil
 }
 
-// GetEnvelopeHeight returns the number of envelopes for a processId
+// GetEnvelopeHeight returns the number of envelopes for a processId.
+// If no processId is provided, returns the total number of envelopes.
 func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (int, error) {
 	// TODO: Warning, int can overflow
-	return s.db.Count(&VoteReference{}, badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
+	if len(processId) > 0 {
+		return s.db.Count(&VoteReference{}, badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
+	}
+	// If no processId is provided, count all envelopes
+	return s.db.Count(&VoteReference{}, &badgerhold.Query{})
 }
 
 // ComputeResult process a finished voting, compute the results and saves it in the Storage.
