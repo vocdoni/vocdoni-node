@@ -56,6 +56,26 @@ func (app *BaseApplication) MempoolRemoveTx(txKey [32]byte) {
 	app.Node.Mempool().(*mempl.CListMempool).RemoveTxByKey(txKey, false)
 }
 
+// GetBlockByHeight retreies a full Tendermint block indexed by its height
+func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
+	return app.Node.BlockStore().LoadBlock(height)
+}
+
+// GetBlockByHash retreies a full Tendermint block indexed by its Hash
+func (app *BaseApplication) GetBlockByHash(hash []byte) *tmtypes.Block {
+	return app.Node.BlockStore().LoadBlockByHash(hash)
+}
+
+// GetTx retreives a vochain transaction from the blockstore
+func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedTx, error) {
+	block := app.GetBlockByHeight(int64(height))
+	if int32(len(block.Txs)) <= txIndex {
+		return nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
+	}
+	tx := &models.SignedTx{}
+	return tx, proto.Unmarshal(block.Txs[txIndex], tx)
+}
+
 // SendTX sends a transaction to the mempool (sync)
 func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error) {
 	resCh := make(chan *abcitypes.Response, 1)

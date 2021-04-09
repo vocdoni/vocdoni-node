@@ -88,65 +88,54 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	// Check envelope status and send reply
 	var response types.MetaResponse
 	response.Registered = types.False
-
-	e, err := r.vocapp.State.Envelope(request.ProcessID, request.Nullifier, true)
-	// Warning, error is ignored. We should find a better way to check the envelope status
-	if err == nil && e != nil {
-		response.Registered = types.True
-		response.Nullifier = fmt.Sprintf("%x", e.Nullifier)
-		response.Height = &e.Height
-		block := r.vocapp.Node.BlockStore().LoadBlock(int64(e.Height))
-		if block == nil {
-			r.sendError(request, "failed getting envelope block timestamp")
+	vr, err := r.Scrutinizer.GetEnvelopeReference(request.Nullifier)
+	if err != nil {
+		if err == scrutinizer.ErrNotFoundInDatabase {
+			request.Send(r.buildReply(request, &response))
 			return
 		}
-		response.BlockTimestamp = int32(block.Time.Unix())
+		r.sendError(request, fmt.Sprintf("cannot get envelope status: (%v)", err))
+		return
 	}
+	response.Registered = types.True
+	response.Height = &vr.BlockHeight
+	response.BlockTimestamp = int32(vr.CreationTime.Unix())
+	response.ProcessID = vr.ProcessID
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getEnvelope(request routerRequest) {
 	// check nullifier
 	if len(request.Nullifier) != types.VoteNullifierSize {
-		r.sendError(request, "cannot get envelope status: (malformed nullifier)")
+		r.sendError(request, "cannot get envelope: (malformed nullifier)")
 		return
 	}
-	txRef, err := r.Scrutinizer.GetVoteReference(request.Nullifier)
+	env, _, err := r.Scrutinizer.GetEnvelope(request.Nullifier)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get envelope: (%s)", err))
+		r.sendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
 		return
 	}
-	block := r.vocapp.Node.BlockStore().LoadBlock(txRef.BlockHeight)
-	if block == nil {
-		r.sendError(request, fmt.Sprintf("cannot get envelope: block %d not found", txRef.BlockHeight))
-		return
-	}
-	if int32(len(block.Txs)) <= txRef.TxIndex {
-		r.sendError(request, fmt.Sprintf("cannot get envelope: tx %d not found on block %d", txRef.TxIndex, txRef.BlockHeight))
-		return
-	}
-	voteTxBytes := block.Txs[txRef.TxIndex]
-
-	tx := &models.Tx{}
-	proto.Unmarshal(voteTxBytes, tx)
-	envelope := tx.GetVote()
-
 	var response types.MetaResponse
 	response.Registered = types.True
-	response.Payload = base64.StdEncoding.EncodeToString(envelope.VotePackage)
+	response.Payload = base64.StdEncoding.EncodeToString(env.VotePackage)
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getEnvelopeHeight(request routerRequest) {
 	// check pid
 	if len(request.ProcessID) != types.ProcessIDsize {
-		r.sendError(request, "cannot get envelope status: (malformed processId)")
+		r.sendError(request, "cannot get envelope height: (malformed processId)")
 		return
 	}
-	votes := r.vocapp.State.CountVotes(request.ProcessID, true)
+	votes, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get envelope height: (%v)", err))
+		return
+	}
+
 	var response types.MetaResponse
 	response.Height = new(uint32)
-	*response.Height = votes
+	*response.Height = uint32(votes)
 	request.Send(r.buildReply(request, &response))
 }
 

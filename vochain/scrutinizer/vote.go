@@ -10,6 +10,7 @@ import (
 
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -20,6 +21,9 @@ import (
 // it does not have yet reuslts
 var ErrNoResultsYet = fmt.Errorf("no results yet")
 
+// ErrNotFoundIndatabase is raised if a database query returns no results
+var ErrNotFoundInDatabase = badgerhold.ErrNotFound
+
 // The string to search on the KV database error to identify a transaction conflict.
 // If the KV (currently badger) returns this error, it is considered non fatal and the
 // transaction will be retried until it works.
@@ -29,10 +33,37 @@ const kvErrorStringForRetry = "Transaction Conflict"
 
 // GetVoteReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
-func (s *Scrutinizer) GetVoteReference(nullifier []byte) (*VoteReference, error) {
+func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*VoteReference, error) {
 	txRef := &VoteReference{}
-	err := s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
-	return txRef, err
+	return txRef, s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
+}
+
+// GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
+// Returns the envelope and the signature (if any).
+func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.VoteEnvelope, []byte, error) {
+	txRef, err := s.GetEnvelopeReference(nullifier)
+	if err != nil {
+		return nil, nil, err
+	}
+	stx, err := s.App.GetTx(txRef.BlockHeight, txRef.TxIndex)
+	if err != nil {
+		return nil, nil, err
+	}
+	tx := &models.Tx{}
+	if err := proto.Unmarshal(stx.Tx, tx); err != nil {
+		return nil, nil, err
+	}
+	envelope := tx.GetVote()
+	if envelope == nil {
+		return nil, nil, fmt.Errorf("transaction is not an Envelope")
+	}
+	return envelope, stx.Signature, nil
+}
+
+// GetEnvelopeHeight returns the number of envelopes for a processId
+func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (int, error) {
+	// TODO: Warning, int can overflow
+	return s.db.Count(&VoteReference{}, badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
 }
 
 // ComputeResult process a finished voting, compute the results and saves it in the Storage.
@@ -184,13 +215,14 @@ func (s *Scrutinizer) addLiveVote(envelope *models.Vote, results *Results) error
 
 // addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
 // This method is triggered by Commit callback for each vote added to the blockchain.
-func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight int64, txIndex int32) error {
-	_, err := s.App.State.Process(pid, false)
-	if err != nil {
-		return fmt.Errorf("cannot get process %x: %w", pid, err)
-	}
-	voteRef := &VoteReference{Nullifier: nullifier, ProcessId: pid, BlockHeight: blockHeight, TxIndex: txIndex}
-	return s.db.Insert(nullifier, voteRef)
+func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32, txIndex int32) error {
+	return s.db.Insert(nullifier, &VoteReference{
+		Nullifier:    nullifier,
+		ProcessID:    pid,
+		BlockHeight:  blockHeight,
+		TxIndex:      txIndex,
+		CreationTime: time.Now(),
+	})
 }
 
 func (s *Scrutinizer) addProcessToLiveResults(pid []byte) {
