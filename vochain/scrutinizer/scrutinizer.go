@@ -39,8 +39,10 @@ func (s *Scrutinizer) AddEventListener(l EventListener) {
 // and keeps it indexed in a local database.
 type Scrutinizer struct {
 	App *vochain.BaseApplication
-	// votePool is the list of votes that will be added on the current block
-	votePool map[string][]VoteWithIndex
+	// voteIndexPool is the list of votes that will be indexed in the database
+	voteIndexPool []*VoteWithIndex
+	// votePool is the list of votes that should be live counted, grouped by processId
+	votePool map[string][]*models.Vote
 	// newProcessPool is the list of new process IDs on the current block
 	newProcessPool []*types.ScrutinizerOnProcessData
 	// updateProcessPool is the list of process IDs that require sync with the state database
@@ -203,21 +205,20 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		log.Infof("scheduled results computation on next block for %x", p.ProcessID)
 	}
 
-	for pid, votes := range s.votePool {
-		startTime := time.Now()
-		for _, v := range votes {
-			// TODO: This should perform a single db Tx
-			if err := s.addVoteIndex(v.vote.Nullifier,
-				v.vote.ProcessId,
-				height,
-				v.txIndex); err != nil {
-				log.Warn(err)
-			}
+	startTime := time.Now()
+	for _, v := range s.voteIndexPool {
+		// TODO: This should perform a single db Tx
+		if err := s.addVoteIndex(v.vote.Nullifier,
+			v.vote.ProcessId,
+			height,
+			v.txIndex); err != nil {
+			log.Warn(err)
 		}
-		log.Infof("indexed %d new envelopes for process %x took %s",
-			len(votes), []byte(pid), time.Since(startTime))
 	}
-
+	if len(s.voteIndexPool) > 0 {
+		log.Infof("indexed %d new envelopes, took %s",
+			len(s.voteIndexPool), time.Since(startTime))
+	}
 	// Check if there are processes that need results computing
 	// this can be run async
 	go s.computePendingProcesses(uint32(height))
@@ -232,7 +233,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		for pid, votes := range s.votePool {
 			results := &Results{Weight: new(big.Int).SetUint64(0)}
 			for _, v := range votes {
-				if err := s.addLiveVote(v.vote, results); err != nil {
+				if err := s.addLiveVote(v, results); err != nil {
 					log.Warnf("vote cannot be added: %v", err)
 				} else {
 					nvotes++
@@ -253,7 +254,8 @@ func (s *Scrutinizer) Commit(height uint32) error {
 
 // Rollback removes the non committed pending operations
 func (s *Scrutinizer) Rollback() {
-	s.votePool = make(map[string][]VoteWithIndex)
+	s.votePool = make(map[string][]*models.Vote)
+	s.voteIndexPool = []*VoteWithIndex{}
 	s.newProcessPool = []*types.ScrutinizerOnProcessData{}
 	s.resultsPool = []*types.ScrutinizerOnProcessData{}
 	s.updateProcessPool = [][]byte{}
@@ -269,8 +271,9 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, t
 // and the blockchain is not synchronizing.
 func (s *Scrutinizer) OnVote(v *models.Vote, txIndex int32) {
 	if s.isProcessLiveResults(v.ProcessId) {
-		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], VoteWithIndex{v, txIndex})
+		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
 	}
+	s.voteIndexPool = append(s.voteIndexPool, &VoteWithIndex{vote: v, txIndex: txIndex})
 }
 
 // OnCancel scrutinizer stores the processID and entityID
