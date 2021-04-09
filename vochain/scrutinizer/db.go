@@ -49,7 +49,7 @@ type Entity struct {
 type VoteReference struct {
 	Nullifier    types.HexBytes `badgerhold:"key"`
 	ProcessID    types.HexBytes `badgerhold:"index"`
-	BlockHeight  uint32
+	Height       uint32
 	TxIndex      int32
 	CreationTime time.Time
 }

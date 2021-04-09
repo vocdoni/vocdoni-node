@@ -45,7 +45,7 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.VoteEnvelope, []byt
 	if err != nil {
 		return nil, nil, err
 	}
-	stx, err := s.App.GetTx(txRef.BlockHeight, txRef.TxIndex)
+	stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -224,7 +224,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32, tx
 	return s.db.Insert(nullifier, &VoteReference{
 		Nullifier:    nullifier,
 		ProcessID:    pid,
-		BlockHeight:  blockHeight,
+		Height:       blockHeight,
 		TxIndex:      txIndex,
 		CreationTime: time.Now(),
 	})
