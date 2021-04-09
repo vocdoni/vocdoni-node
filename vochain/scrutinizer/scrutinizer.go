@@ -38,7 +38,7 @@ func (s *Scrutinizer) AddEventListener(l EventListener) {
 // Scrutinizer is the component which makes the accounting of the voting processes
 // and keeps it indexed in a local database.
 type Scrutinizer struct {
-	VochainState *vochain.State
+	App *vochain.BaseApplication
 	// votePool is the list of votes that will be added on the current block
 	votePool map[string][]struct {
 		vote    *models.Vote
@@ -68,14 +68,14 @@ type Scrutinizer struct {
 
 // NewScrutinizer returns an instance of the Scrutinizer
 // using the local storage database of dbPath and integrated into the state vochain instance
-func NewScrutinizer(dbPath string, state *vochain.State) (*Scrutinizer, error) {
-	s := &Scrutinizer{VochainState: state}
+func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, error) {
+	s := &Scrutinizer{App: app}
 	var err error
 	s.db, err = InitDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	s.VochainState.AddEventListener(s)
+	s.App.State.AddEventListener(s)
 	return s, nil
 }
 
@@ -91,7 +91,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 	syncSignals := 5
 	for {
 		// Add some grace time to avoid false positive on IsSynchronizing()
-		if !s.VochainState.IsSynchronizing() {
+		if !s.App.IsSynchronizing() {
 			syncSignals--
 		} else {
 			syncSignals = 5
@@ -126,7 +126,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 		// to reset the existing Results and count them again from scratch.
 		// Since we cannot be sure if there are votes missing, we need to
 		// perform the full computation.
-		process, err := s.VochainState.Process(p, false)
+		process, err := s.App.State.Process(p, false)
 		if err != nil {
 			log.Errorf("cannot fetch process: %v", err)
 			continue
@@ -145,8 +145,8 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 
 		// Count the votes, add them to results (in memory, without any db transaction)
 		results := &Results{Weight: new(big.Int).SetUint64(0)}
-		for _, e := range s.VochainState.EnvelopeList(p, 0, MaxEnvelopeListSize, true) {
-			vote, err := s.VochainState.Envelope(p, e, true)
+		for _, e := range s.App.State.EnvelopeList(p, 0, MaxEnvelopeListSize, true) {
+			vote, err := s.App.State.Envelope(p, e, true)
 			if err != nil {
 				log.Warn(err)
 				continue
@@ -177,7 +177,7 @@ func (s *Scrutinizer) Commit(height int64) error {
 		}
 		if live, err := s.isOpenProcess(p.ProcessID); err != nil {
 			log.Errorf("cannot check if process is live results: %v", err)
-		} else if live && !s.VochainState.IsSynchronizing() {
+		} else if live && !s.App.IsSynchronizing() {
 			// Only add live processes if the vochain is not synchronizing
 			s.addProcessToLiveResults(p.ProcessID)
 		}
@@ -285,7 +285,7 @@ func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessSta
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
 func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string, txIndex int32) {
-	p, err := s.VochainState.Process(pid, false)
+	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)
 		return

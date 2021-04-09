@@ -105,7 +105,7 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.
 	// Scrutinizer
 	if results {
 		log.Info("creating vochain scrutinizer service")
-		sc, err = scrutinizer.NewScrutinizer(vconfig.DataDir+"/scrutinizer", vnode.State)
+		sc, err = scrutinizer.NewScrutinizer(vconfig.DataDir+"/scrutinizer", vnode)
 		if err != nil {
 			return
 		}

@@ -43,14 +43,21 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	}, nil
 }
 
+// IsSynchronizing informes if the blockchain is synchronizing or not.
 func (app *BaseApplication) IsSynchronizing() bool {
 	app.isSyncLock.Lock()
 	defer app.isSyncLock.Unlock()
 	return app.Node.ConsensusReactor().WaitSync()
 }
 
+// MempoolRemoveTx removes a transaction (identifier by its vochain.TxKey() hash)
+// from the Tendermint mempool.
+func (app *BaseApplication) MempoolRemoveTx(txKey [32]byte) {
+	app.Node.Mempool().(*mempl.CListMempool).RemoveTxByKey(txKey, false)
+}
+
 // SendTX sends a transaction to the mempool (sync)
-func (app *BaseApplication) SendTX(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error) {
 	resCh := make(chan *abcitypes.Response, 1)
 	defer close(resCh)
 	err := app.Node.Mempool().CheckTx(tx, func(res *abcitypes.Response) {

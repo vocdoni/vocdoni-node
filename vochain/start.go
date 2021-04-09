@@ -38,12 +38,8 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	if err := app.Node.Start(); err != nil {
 		log.Fatal(err)
 	}
-	// Set mempool function for removing transactions
+	// Set mempool function for removing transactions.
 	app.State.MemPoolRemoveTxKey = app.Node.Mempool().(*mempl.CListMempool).RemoveTxByKey
-	// Set function for informing the State if the blockchain is synchronizing or not.
-	// This function needs to be part of the state so modules importing only the state are
-	// able to query on the curret sync state.
-	app.State.IsSynchronizing = app.IsSynchronizing
 	// Create custom logger for mempool
 	logDisable := false
 	if vochaincfg.LogLevelMemPool == "none" {

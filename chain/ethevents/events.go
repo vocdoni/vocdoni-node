@@ -204,7 +204,7 @@ func (ev *EthereumEvents) OnComputeResults(results *scrutinizer.Results) {
 	}
 	log.Debugf("broadcasting Vochain Tx: %s", log.FormatProto(setprocessTxArgs))
 
-	res, err := ev.VochainApp.SendTX(txb)
+	res, err := ev.VochainApp.SendTx(txb)
 	if err != nil || res == nil {
 		log.Errorf("cannot broadcast tx: %v, res: %+v", err, res)
 		return

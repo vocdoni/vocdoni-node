@@ -138,7 +138,7 @@ func (s *Scrutinizer) addLiveVote(envelope *models.Vote, results *Results) error
 	if pid == nil {
 		return fmt.Errorf("cannot find process for envelope")
 	}
-	p, err := s.VochainState.Process(pid, false)
+	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("cannot get process %x: %w", pid, err)
 	}
@@ -185,7 +185,7 @@ func (s *Scrutinizer) addLiveVote(envelope *models.Vote, results *Results) error
 // addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
 // This method is triggered by Commit callback for each vote added to the blockchain.
 func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight int64, txIndex int32) error {
-	_, err := s.VochainState.Process(pid, false)
+	_, err := s.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("cannot get process %x: %w", pid, err)
 	}
@@ -287,8 +287,8 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 	}
 
 	var nvotes int
-	for _, e := range s.VochainState.EnvelopeList(p.ID, 0, MaxEnvelopeListSize, false) {
-		vote, err := s.VochainState.Envelope(p.ID, e, false)
+	for _, e := range s.App.State.EnvelopeList(p.ID, 0, MaxEnvelopeListSize, false) {
+		vote, err := s.App.State.Envelope(p.ID, e, false)
 		if err != nil {
 			log.Warn(err)
 			continue

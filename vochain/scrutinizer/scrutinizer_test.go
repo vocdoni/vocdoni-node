@@ -23,18 +23,18 @@ func TestEntityList(t *testing.T) {
 }
 
 func testEntityList(t *testing.T, entityCount int) {
-	state, err := vochain.NewState(t.TempDir())
+	app, err := vochain.NewBaseApplication(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), state)
+	sc, err := NewScrutinizer(t.TempDir(), app)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < entityCount; i++ {
 		pid := util.RandomBytes(32)
-		if err := state.AddProcess(&models.Process{
+		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     util.RandomBytes(20),
 			BlockCount:   10,
@@ -79,12 +79,12 @@ func TestProcessList(t *testing.T) {
 }
 
 func testProcessList(t *testing.T, procsCount int) {
-	state, err := vochain.NewState(t.TempDir())
+	app, err := vochain.NewBaseApplication(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), state)
+	sc, err := NewScrutinizer(t.TempDir(), app)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
-		err := state.AddProcess(&models.Process{
+		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     util.RandomBytes(20),
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
@@ -107,7 +107,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	eidTest := util.RandomBytes(20)
 	for i := 0; i < procsCount; i++ {
 		pid := util.RandomBytes(32)
-		err := state.AddProcess(&models.Process{
+		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     eidTest,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
@@ -144,12 +144,12 @@ func testProcessList(t *testing.T, procsCount int) {
 }
 
 func TestProcessListWithNamespaceAndStatus(t *testing.T) {
-	state, err := vochain.NewState(t.TempDir())
+	app, err := vochain.NewBaseApplication(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), state)
+	sc, err := NewScrutinizer(t.TempDir(), app)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	// Add 10 processes with different namespaces (from 10 to 20) and status ENDED
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
-		err := state.AddProcess(&models.Process{
+		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     util.RandomBytes(20),
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
@@ -174,7 +174,7 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	eid20 := util.RandomBytes(20)
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
-		err := state.AddProcess(&models.Process{
+		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     eid20,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
@@ -213,17 +213,17 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 }
 
 func TestResults(t *testing.T) {
-	state, err := vochain.NewState(t.TempDir())
+	app, err := vochain.NewBaseApplication(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), state)
+	sc, err := NewScrutinizer(t.TempDir(), app)
 	if err != nil {
 		t.Fatal(err)
 	}
 	pid := util.RandomBytes(32)
-	err = state.AddProcess(&models.Process{
+	err = app.State.AddProcess(&models.Process{
 		ProcessId:             pid,
 		EnvelopeType:          &models.EnvelopeType{EncryptedVotes: true},
 		Status:                models.ProcessStatus_READY,
@@ -243,7 +243,7 @@ func TestResults(t *testing.T) {
 		t.Fatalf("cannot generate encryption key: (%s)", err)
 	}
 	ki := uint32(1)
-	err = state.AddProcessKeys(&models.AdminTx{
+	err = app.State.AddProcessKeys(&models.AdminTx{
 		Txtype:              models.TxType_ADD_PROCESS_KEYS,
 		ProcessId:           pid,
 		EncryptionPublicKey: priv.Public().Bytes(),
@@ -262,7 +262,7 @@ func TestResults(t *testing.T) {
 
 	sc.Rollback()
 	for i := 0; i < 300; i++ {
-		err := state.AddVote(&models.Vote{
+		err := app.State.AddVote(&models.Vote{
 			ProcessId:            pid,
 			VotePackage:          vp,
 			EncryptionKeyIndexes: []uint32{1},
@@ -273,7 +273,7 @@ func TestResults(t *testing.T) {
 	}
 
 	// Reveal process encryption keys
-	err = state.RevealProcessKeys(&models.AdminTx{
+	err = app.State.RevealProcessKeys(&models.AdminTx{
 		Txtype:               models.TxType_ADD_PROCESS_KEYS,
 		ProcessId:            pid,
 		EncryptionPrivateKey: priv.Bytes(),
@@ -282,7 +282,7 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	err = sc.updateProcess(pid)
 	qt.Assert(t, err, qt.IsNil)
-	err = sc.setResultsHeight(pid, uint32(state.Header(false).GetHeight()))
+	err = sc.setResultsHeight(pid, uint32(app.State.Header(false).GetHeight()))
 	qt.Assert(t, err, qt.IsNil)
 	err = sc.ComputeResult(pid)
 	qt.Assert(t, err, qt.IsNil)
@@ -324,17 +324,17 @@ func TestResults(t *testing.T) {
 }
 
 func TestLiveResults(t *testing.T) {
-	state, err := vochain.NewState(t.TempDir())
+	app, err := vochain.NewBaseApplication(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), state)
+	sc, err := NewScrutinizer(t.TempDir(), app)
 	if err != nil {
 		t.Fatal(err)
 	}
 	pid := util.RandomBytes(32)
-	if err := state.AddProcess(&models.Process{
+	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
@@ -392,10 +392,10 @@ func TestLiveResults(t *testing.T) {
 }
 
 func TestAddVote(t *testing.T) {
-	state, err := vochain.NewState(t.TempDir())
+	app, err := vochain.NewBaseApplication(t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
-	sc, err := NewScrutinizer(t.TempDir(), state)
+	sc, err := NewScrutinizer(t.TempDir(), app)
 	qt.Assert(t, err, qt.IsNil)
 
 	options := &models.ProcessVoteOptions{
@@ -406,7 +406,7 @@ func TestAddVote(t *testing.T) {
 	}
 
 	pid := util.RandomBytes(32)
-	if err := state.AddProcess(&models.Process{
+	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
@@ -500,15 +500,15 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
 
 func TestBallotProtocolRateProduct(t *testing.T) {
 	// Rate a product from 0 to 4
-	state, err := vochain.NewState(t.TempDir())
+	app, err := vochain.NewBaseApplication(t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
-	sc, err := NewScrutinizer(t.TempDir(), state)
+	sc, err := NewScrutinizer(t.TempDir(), app)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
-	if err := state.AddProcess(&models.Process{
+	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
@@ -539,15 +539,15 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 func TestBallotProtocolMultiChoice(t *testing.T) {
 	// Choose your 3 favorite colours out of 5
 
-	state, err := vochain.NewState(t.TempDir())
+	app, err := vochain.NewBaseApplication(t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
-	sc, err := NewScrutinizer(t.TempDir(), state)
+	sc, err := NewScrutinizer(t.TempDir(), app)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
-	if err := state.AddProcess(&models.Process{
+	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,

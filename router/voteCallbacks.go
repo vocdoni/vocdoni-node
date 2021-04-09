@@ -14,7 +14,7 @@ import (
 const MaxListSize = 64
 
 func (r *Router) submitRawTx(request routerRequest) {
-	res, err := r.vocapp.SendTX(request.Payload)
+	res, err := r.vocapp.SendTx(request.Payload)
 	if err != nil {
 		r.sendError(request, err.Error())
 		return
@@ -54,7 +54,7 @@ func (r *Router) submitEnvelope(request routerRequest) {
 		return
 	}
 
-	res, err := r.vocapp.SendTX(txBytes)
+	res, err := r.vocapp.SendTx(txBytes)
 	if err != nil || res == nil {
 		r.sendError(request, fmt.Sprintf("cannot broadcast transaction: (%s)", err))
 		return
