@@ -98,7 +98,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 		return
 	}
 	response.Registered = types.True
-	response.Height = &vr.BlockHeight
+	response.Height = &vr.Height
 	response.BlockTimestamp = int32(vr.CreationTime.Unix())
 	response.ProcessID = vr.ProcessID
 	request.Send(r.buildReply(request, &response))

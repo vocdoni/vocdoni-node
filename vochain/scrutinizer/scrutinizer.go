@@ -40,10 +40,7 @@ func (s *Scrutinizer) AddEventListener(l EventListener) {
 type Scrutinizer struct {
 	App *vochain.BaseApplication
 	// votePool is the list of votes that will be added on the current block
-	votePool map[string][]struct {
-		vote    *models.Vote
-		txIndex int32
-	}
+	votePool map[string][]VoteWithIndex
 	// newProcessPool is the list of new process IDs on the current block
 	newProcessPool []*types.ScrutinizerOnProcessData
 	// updateProcessPool is the list of process IDs that require sync with the state database
@@ -64,6 +61,12 @@ type Scrutinizer struct {
 	// recoveryBootLock prevents Commit() to add new votes while the recovery bootstratp is
 	// being executed.
 	recoveryBootLock sync.RWMutex
+}
+
+// VoteWithIndex holds a Vote and a txIndex. Model for the VotePool.
+type VoteWithIndex struct {
+	vote    *models.Vote
+	txIndex int32
 }
 
 // NewScrutinizer returns an instance of the Scrutinizer
@@ -250,10 +253,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 
 // Rollback removes the non committed pending operations
 func (s *Scrutinizer) Rollback() {
-	s.votePool = make(map[string][]struct {
-		vote    *models.Vote
-		txIndex int32
-	})
+	s.votePool = make(map[string][]VoteWithIndex)
 	s.newProcessPool = []*types.ScrutinizerOnProcessData{}
 	s.resultsPool = []*types.ScrutinizerOnProcessData{}
 	s.updateProcessPool = [][]byte{}
@@ -269,10 +269,7 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, t
 // and the blockchain is not synchronizing.
 func (s *Scrutinizer) OnVote(v *models.Vote, txIndex int32) {
 	if s.isProcessLiveResults(v.ProcessId) {
-		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], struct {
-			vote    *models.Vote
-			txIndex int32
-		}{v, txIndex})
+		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], VoteWithIndex{v, txIndex})
 	}
 }
 
