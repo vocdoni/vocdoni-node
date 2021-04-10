@@ -3,7 +3,6 @@ package scrutinizer
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -437,70 +436,6 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 		log.Debugf("results: %s", results)
 	}
 	return results, err
-}
-
-// LEGACY, TO BE REMOVED
-func addVote(currentResults [][]*big.Int, voteValues []int, weight *big.Int,
-	options *models.ProcessVoteOptions, envelopeType *models.EnvelopeType) ([][]*big.Int, error) {
-	if len(currentResults) > 0 && len(currentResults) != int(options.MaxCount) {
-		return currentResults, fmt.Errorf("addVote: currentResults size mismatch %d != %d",
-			len(currentResults), options.MaxCount)
-	}
-	if options == nil {
-		return currentResults, fmt.Errorf("addVote: processVoteOptions is nil")
-	}
-	if envelopeType == nil {
-		return currentResults, fmt.Errorf("addVote: envelopeType is nil")
-	}
-	// MaxCount
-	if len(voteValues) > int(options.MaxCount) || len(voteValues) > MaxOptions {
-		return currentResults, fmt.Errorf("max count overflow %d",
-			len(voteValues))
-	}
-
-	// UniqueValues
-	if envelopeType.UniqueValues {
-		votes := make(map[int]bool, len(voteValues))
-		for _, v := range voteValues {
-			if votes[v] {
-				return currentResults, fmt.Errorf("values are not unique")
-			}
-			votes[v] = true
-		}
-	}
-
-	// Max Value
-	if options.MaxValue > 0 {
-		for _, v := range voteValues {
-			if uint32(v) > options.MaxValue {
-				return currentResults, fmt.Errorf("max value overflow %d", v)
-			}
-		}
-	}
-
-	// Total cost
-	if options.MaxTotalCost > 0 {
-		cost := float64(0)
-		for _, v := range voteValues {
-			cost += math.Pow(float64(v), float64(options.CostExponent))
-		}
-		if cost > float64(options.MaxTotalCost) {
-			return currentResults, fmt.Errorf("max total cost overflow: %f", cost)
-		}
-	}
-
-	// If weight not provided, assume weight = 1
-	if weight == nil {
-		weight = new(big.Int).SetUint64(1)
-	}
-	if len(currentResults) == 0 {
-		currentResults = newEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)
-	}
-	for q, opt := range voteValues {
-		currentResults[q][opt].Add(currentResults[q][opt], weight)
-	}
-
-	return currentResults, nil
 }
 
 // BuildProcessResult takes the indexer Results type and builds the protobuf type ProcessResult.
