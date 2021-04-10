@@ -6,8 +6,10 @@ import (
 	"math"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
+	badger "github.com/dgraph-io/badger/v3"
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -60,12 +62,73 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.VoteEnvelope, []byt
 	return envelope, stx.Signature, nil
 }
 
+// WalkEnvelopesAsync executes callback for each envelopes of the ProcessId.
+// The callback function is executed async (in a goroutine) if async=true.
+// Once the callback function finishes, WaitGroup.Done() must be called, for
+// async and sync calls.
+func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
+	callback func(*models.VoteEnvelope, *big.Int, *sync.WaitGroup)) error {
+	wg := sync.WaitGroup{}
+	err := s.db.ForEach(
+		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
+		func(txRef *VoteReference) error {
+			stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
+			if err != nil {
+				return err
+			}
+			tx := &models.Tx{}
+			if err := proto.Unmarshal(stx.Tx, tx); err != nil {
+				return err
+			}
+			envelope := tx.GetVote()
+			if envelope == nil {
+				return fmt.Errorf("transaction is not an Envelope")
+			}
+			wg.Add(1)
+			if async {
+				go callback(envelope, txRef.Weight, &wg)
+			} else {
+				callback(envelope, txRef.Weight, &wg)
+			}
+			return nil
+		})
+	wg.Wait()
+	return err
+}
+
+// GetEnvelopes retreives all Envelopes of a ProcessId from the Blockchain block store
+func (s *Scrutinizer) GetEnvelopes(processId []byte) ([]*models.VoteEnvelope, []*big.Int, error) {
+	envelopes := []*models.VoteEnvelope{}
+	weights := []*big.Int{}
+	err := s.db.ForEach(
+		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
+		func(txRef *VoteReference) error {
+			stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
+			if err != nil {
+				return err
+			}
+			tx := &models.Tx{}
+			if err := proto.Unmarshal(stx.Tx, tx); err != nil {
+				return err
+			}
+			envelope := tx.GetVote()
+			if envelope == nil {
+				return fmt.Errorf("transaction is not an Envelope")
+			}
+			envelopes = append(envelopes, envelope)
+			weights = append(weights, txRef.Weight)
+			return nil
+		})
+	return envelopes, weights, err
+}
+
 // GetEnvelopeHeight returns the number of envelopes for a processId.
 // If processId is empty, returns the total number of envelopes.
 func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (int, error) {
 	// TODO: Warning, int can overflow
 	if len(processId) > 0 {
-		return s.db.Count(&VoteReference{}, badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
+		return s.db.Count(&VoteReference{},
+			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
 	}
 	// If no processId is provided, count all envelopes
 	return s.db.Count(&VoteReference{}, &badgerhold.Query{})
@@ -169,11 +232,8 @@ func unmarshalVote(votePackage []byte, keys []string) (*types.VotePackage, error
 // addLiveVote adds the envelope vote to the results. It does not commit to the database.
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
-func (s *Scrutinizer) addLiveVote(envelope *models.Vote, results *Results) error {
-	pid := envelope.GetProcessId()
-	if pid == nil {
-		return fmt.Errorf("cannot find process for envelope")
-	}
+func (s *Scrutinizer) addLiveVote(pid []byte, votePackage []byte, weight []byte,
+	results *Results) error {
 	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("cannot get process %x: %w", pid, err)
@@ -186,7 +246,7 @@ func (s *Scrutinizer) addLiveVote(envelope *models.Vote, results *Results) error
 	// If live process, add vote to temporary results
 	var vote *types.VotePackage
 	if open, err := s.isOpenProcess(pid); open && err == nil {
-		vote, err = unmarshalVote(envelope.GetVotePackage(), []string{})
+		vote, err = unmarshalVote(votePackage, []string{})
 		if err != nil {
 			log.Warnf("cannot unmarshal vote: %v", err)
 			vote = nil
@@ -196,35 +256,45 @@ func (s *Scrutinizer) addLiveVote(envelope *models.Vote, results *Results) error
 	}
 
 	// Add weight to the process Results (if empty, consider weight=1)
-	weight := new(big.Int).SetUint64(1)
-	if w := envelope.GetWeight(); w != nil {
-		weight = new(big.Int).SetBytes(w)
+	var iweight *big.Int
+	if weight == nil {
+		iweight = new(big.Int).SetUint64(1)
+	} else {
+		iweight = new(big.Int).SetBytes(weight)
 	}
-	if results.Weight == nil {
-		results.Weight = new(big.Int).SetUint64(0)
-	}
-	results.Weight.Add(results.Weight, weight)
 
 	// Add the vote only if the election is unencrypted
 	if vote != nil {
-		if results.Votes, err = addVote(results.Votes,
-			vote.Votes,
-			weight,
-			p.GetVoteOptions(),
-			p.GetEnvelopeType()); err != nil {
+		if err := results.AddVote(vote.Votes, iweight, nil); err != nil {
 			return err
 		}
+	} else {
+		// If encrypted, just add the weight
+		results.Weight.Add(results.Weight, iweight)
 	}
 	return nil
 }
 
 // addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
 // This method is triggered by Commit callback for each vote added to the blockchain.
-func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32, txIndex int32) error {
+// If txn is provided the vote will be added on the transaction (without performing a commit).
+func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
+	weight []byte, txIndex int32, txn *badger.Txn) error {
+	if txn != nil {
+		return s.db.TxInsert(txn, nullifier, &VoteReference{
+			Nullifier:    nullifier,
+			ProcessID:    pid,
+			Height:       blockHeight,
+			Weight:       new(big.Int).SetBytes(weight),
+			TxIndex:      txIndex,
+			CreationTime: time.Now(),
+		})
+	}
 	return s.db.Insert(nullifier, &VoteReference{
 		Nullifier:    nullifier,
 		ProcessID:    pid,
 		Height:       blockHeight,
+		Weight:       new(big.Int).SetBytes(weight),
 		TxIndex:      txIndex,
 		CreationTime: time.Now(),
 	})
@@ -274,11 +344,6 @@ func (s *Scrutinizer) commitVotes(pid []byte, results *Results) error {
 		return nil
 	}
 
-	// TODO (PAU):
-	// Since the Commit() callback is executed on a goroutine, if scrutinizer have pending votes to add
-	// and the program is stoped. The missing votes won't be added on next run.
-	// Either a recovery mechanism or a persistent cache should be used in order to avoid this problem.
-
 	var err error
 	// If badgerhold returns a transaction conflict error message, we try again
 	// until it works (while maxTries < 1000)
@@ -317,35 +382,39 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 		return nil, fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
 	}
 	results := &Results{
-		Votes:     newEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),
-		ProcessID: p.ID,
-		Weight:    new(big.Int).SetUint64(0),
-		Final:     true,
+		Votes:        newEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),
+		ProcessID:    p.ID,
+		Weight:       new(big.Int).SetUint64(0),
+		Final:        true,
+		VoteOpts:     p.VoteOpts,
+		EnvelopeType: p.Envelope,
 	}
 
 	var nvotes int
-	for _, e := range s.App.State.EnvelopeList(p.ID, 0, MaxEnvelopeListSize, false) {
-		vote, err := s.App.State.Envelope(p.ID, e, false)
-		if err != nil {
-			log.Warn(err)
-			continue
-		}
+	var err error
+	lock := sync.Mutex{}
+
+	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.VoteEnvelope,
+		weight *big.Int, wg *sync.WaitGroup) {
 		var vp *types.VotePackage
-		err = nil
+		var err error
+		defer wg.Done()
 		if p.Envelope.GetEncryptedVotes() {
 			if len(p.PrivateKeys) < len(vote.GetEncryptionKeyIndexes()) {
-				err = fmt.Errorf("encryptionKeyIndexes has too many fields")
+				log.Errorf("encryptionKeyIndexes has too many fields")
+				return
 			} else {
 				keys := []string{}
 				for _, k := range vote.GetEncryptionKeyIndexes() {
 					if k >= types.KeyKeeperMaxKeyIndex {
-						err = fmt.Errorf("key index overflow")
-						break
+						log.Warn("key index overflow")
+						return
 					}
 					keys = append(keys, p.PrivateKeys[k])
 				}
 				if len(keys) == 0 || err != nil {
-					err = fmt.Errorf("no keys provided or wrong index")
+					log.Warn("no keys provided or wrong index")
+					return
 				} else {
 					vp, err = unmarshalVote(vote.GetVotePackage(), keys)
 				}
@@ -355,28 +424,22 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 		}
 		if err != nil {
 			log.Debugf("vote invalid: %v", err)
-			continue
+			return
 		}
-		weight := new(big.Int).SetUint64(1)
-		if vw := vote.GetWeight(); len(vw) > 0 {
-			weight = new(big.Int).SetBytes(vw)
-		}
-		results.Weight.Add(results.Weight, weight)
-		if results.Votes, err = addVote(results.Votes,
-			vp.Votes,
-			weight,
-			p.VoteOpts,
-			p.Envelope); err != nil {
-			log.Debugf("vote invalid: %v", err)
-			continue
+
+		if err = results.AddVote(vp.Votes, weight, &lock); err != nil {
+			log.Warnf("addVote failed: %v", err)
+			return
 		}
 		nvotes++
+	}); err == nil {
+		log.Infof("computed results for process %x with %d votes", p.ID, nvotes)
+		log.Debugf("results: %s", results)
 	}
-	log.Infof("computed results for process %x with %d votes", p.ID, nvotes)
-	log.Debugf("results: %s", results.String())
-	return results, nil
+	return results, err
 }
 
+// LEGACY, TO BE REMOVED
 func addVote(currentResults [][]*big.Int, voteValues []int, weight *big.Int,
 	options *models.ProcessVoteOptions, envelopeType *models.EnvelopeType) ([][]*big.Int, error) {
 	if len(currentResults) > 0 && len(currentResults) != int(options.MaxCount) {

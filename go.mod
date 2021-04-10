@@ -11,6 +11,7 @@ require (
 	github.com/cosmos/iavl v0.15.3
 	github.com/deroproject/graviton v0.0.0-20200906044921-89e9e09f9601
 	github.com/dgraph-io/badger/v2 v2.2007.2
+	github.com/dgraph-io/badger/v3 v3.2011.1
 	github.com/ethereum/go-ethereum v1.9.26-0.20201212163632-00d10e610f9f
 	github.com/frankban/quicktest v1.11.3
 	github.com/google/go-cmp v0.5.4

@@ -3,7 +3,10 @@ package scrutinizer
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"math"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/timshannon/badgerhold/v3"
@@ -50,16 +53,19 @@ type VoteReference struct {
 	Nullifier    types.HexBytes `badgerhold:"key"`
 	ProcessID    types.HexBytes `badgerhold:"index"`
 	Height       uint32
+	Weight       *big.Int
 	TxIndex      int32
 	CreationTime time.Time
 }
 
 type Results struct {
-	ProcessID  types.HexBytes `badgerholdKey:"ProcessID"`
-	Votes      [][]*big.Int
-	Weight     *big.Int
-	Signatures []types.HexBytes
-	Final      bool
+	ProcessID    types.HexBytes `badgerholdKey:"ProcessID"`
+	Votes        [][]*big.Int
+	Weight       *big.Int
+	EnvelopeType *models.EnvelopeType       `json:"envelopeType"`
+	VoteOpts     *models.ProcessVoteOptions `json:"voteOptions"`
+	Signatures   []types.HexBytes
+	Final        bool
 }
 
 func (r *Results) String() string {
@@ -77,10 +83,81 @@ func (r *Results) String() string {
 	return results.String()
 }
 
+func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) error {
+	if len(r.Votes) > 0 && len(r.Votes) != int(r.VoteOpts.MaxCount) {
+		return fmt.Errorf("addVote: currentResults size mismatch %d != %d",
+			len(r.Votes), r.VoteOpts.MaxCount)
+	}
+
+	if r.VoteOpts == nil {
+		return fmt.Errorf("addVote: processVoteOptions is nil")
+	}
+	if r.EnvelopeType == nil {
+		return fmt.Errorf("addVote: envelopeType is nil")
+	}
+	// MaxCount
+	if len(voteValues) > int(r.VoteOpts.MaxCount) || len(voteValues) > MaxOptions {
+		return fmt.Errorf("max count overflow %d", len(voteValues))
+	}
+
+	// UniqueValues
+	if r.EnvelopeType.UniqueValues {
+		votes := make(map[int]bool, len(voteValues))
+		for _, v := range voteValues {
+			if votes[v] {
+				return fmt.Errorf("values are not unique")
+			}
+			votes[v] = true
+		}
+	}
+
+	// Max Value
+	if r.VoteOpts.MaxValue > 0 {
+		for _, v := range voteValues {
+			if uint32(v) > r.VoteOpts.MaxValue {
+				return fmt.Errorf("max value overflow %d", v)
+			}
+		}
+	}
+
+	// Total cost
+	if r.VoteOpts.MaxTotalCost > 0 {
+		cost := float64(0)
+		for _, v := range voteValues {
+			cost += math.Pow(float64(v), float64(r.VoteOpts.CostExponent))
+		}
+		if cost > float64(r.VoteOpts.MaxTotalCost) {
+			return fmt.Errorf("max total cost overflow: %f", cost)
+		}
+	}
+
+	// If weight not provided, assume weight = 1
+	if weight == nil {
+		weight = new(big.Int).SetUint64(1)
+	}
+	if mutex != nil {
+		mutex.Lock()
+		defer mutex.Unlock()
+	}
+	r.Weight.Add(r.Weight, weight)
+	if len(r.Votes) == 0 {
+		r.Votes = newEmptyVotes(int(r.VoteOpts.MaxCount), int(r.VoteOpts.MaxValue)+1)
+	}
+	for q, opt := range voteValues {
+		r.Votes[q][opt].Add(r.Votes[q][opt], weight)
+	}
+
+	return nil
+}
+
 func InitDB(dataDir string) (*badgerhold.Store, error) {
-	options := badgerhold.DefaultOptions
-	options.Dir = dataDir
-	options.ValueDir = dataDir
+	opts := badgerhold.DefaultOptions
+	opts.WithCompression(0)
+	opts.WithBlockCacheSize(0)
+	opts.SequenceBandwith = 10000
+	opts.WithVerifyValueChecksum(false)
+	opts.Dir = dataDir
+	opts.ValueDir = dataDir
 	// TO-DO set custom logger
-	return badgerhold.Open(options)
+	return badgerhold.Open(opts)
 }
