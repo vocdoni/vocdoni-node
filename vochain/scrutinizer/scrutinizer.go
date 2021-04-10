@@ -140,27 +140,32 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 		if err := s.db.Upsert(p, &Results{
 			ProcessID: p,
 			// MaxValue requires +1 since 0 is also an option
-			Votes:      newEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
-			Weight:     new(big.Int).SetUint64(0),
-			Signatures: []types.HexBytes{},
+			Votes:        newEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+			Weight:       new(big.Int).SetUint64(0),
+			VoteOpts:     options,
+			EnvelopeType: process.GetEnvelopeType(),
+			Signatures:   []types.HexBytes{},
 		}); err != nil {
 			log.Errorf("cannot upsert results to db: %v", err)
 			continue
 		}
 
 		// Count the votes, add them to results (in memory, without any db transaction)
-		results := &Results{Weight: new(big.Int).SetUint64(0)}
-		for _, e := range s.App.State.EnvelopeList(p, 0, MaxEnvelopeListSize, true) {
-			vote, err := s.App.State.Envelope(p, e, true)
-			if err != nil {
-				log.Warn(err)
-				continue
-			}
-			if err := s.addLiveVote(vote, results); err != nil {
-				log.Warn(err)
-			}
+		results := &Results{
+			Weight:       new(big.Int).SetUint64(0),
+			VoteOpts:     process.GetVoteOptions(),
+			EnvelopeType: process.EnvelopeType,
 		}
-
+		if err := s.WalkEnvelopes(p, false, func(vote *models.VoteEnvelope,
+			weight *big.Int, wg *sync.WaitGroup) {
+			defer wg.Done()
+			if err := s.addLiveVote(vote.ProcessId, vote.VotePackage,
+				weight.Bytes(), results); err != nil {
+				log.Warn(err)
+			}
+		}); err != nil {
+			log.Error(err)
+		}
 		// Store the results on the persisten database
 		if err := s.commitVotes(p, results); err != nil {
 			log.Errorf("cannot commit live votes: (%v)", err)
@@ -206,19 +211,25 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	}
 
 	startTime := time.Now()
+	txn := s.db.Badger().NewTransaction(true)
 	for _, v := range s.voteIndexPool {
 		// TODO: This should perform a single db Tx
 		if err := s.addVoteIndex(v.vote.Nullifier,
 			v.vote.ProcessId,
 			height,
-			v.txIndex); err != nil {
+			v.vote.Weight,
+			v.txIndex, txn); err != nil {
 			log.Warn(err)
 		}
 	}
 	if len(s.voteIndexPool) > 0 {
+		if err := txn.Commit(); err != nil {
+			log.Error(err)
+		}
 		log.Infof("indexed %d new envelopes, took %s",
 			len(s.voteIndexPool), time.Since(startTime))
 	}
+
 	// Check if there are processes that need results computing
 	// this can be run async
 	go s.computePendingProcesses(uint32(height))
@@ -233,7 +244,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		for pid, votes := range s.votePool {
 			results := &Results{Weight: new(big.Int).SetUint64(0)}
 			for _, v := range votes {
-				if err := s.addLiveVote(v, results); err != nil {
+				if err := s.addLiveVote(v.ProcessId, v.VotePackage, v.GetWeight(), results); err != nil {
 					log.Warnf("vote cannot be added: %v", err)
 				} else {
 					nvotes++
@@ -286,7 +297,8 @@ func (s *Scrutinizer) OnProcessKeys(pid []byte, pub, commit string, txIndex int3
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
-func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32) {
+func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
+	txIndex int32) {
 	if status == models.ProcessStatus_ENDED {
 		if live, err := s.isOpenProcess(pid); err != nil {
 			log.Warn(err)
@@ -317,7 +329,8 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string, txIndex int3
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
-func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionResult, txIndex int32) error {
+func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionResult,
+	txIndex int32) error {
 	// TODO: check results are valid and return an error if not.
 	// This is very dangerous since an Oracle would be able to create a consensus failure,
 	// the validaros (that do not check the results) and the full-nodes (with the scrutinizer enabled)

@@ -360,7 +360,7 @@ func TestLiveResults(t *testing.T) {
 	}
 	sc.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
-		qt.Assert(t, sc.addLiveVote(v, r), qt.IsNil)
+		qt.Assert(t, sc.addLiveVote(v.ProcessId, v.VotePackage, v.Weight, r), qt.IsNil)
 	}
 	qt.Assert(t, sc.commitVotes(pid, r), qt.IsNil)
 
@@ -488,11 +488,7 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
 		Weight: new(big.Int).SetUint64(1),
 	}
 	sc.addProcessToLiveResults(pid)
-	if err := sc.addLiveVote(
-		&models.Vote{
-			ProcessId:   pid,
-			VotePackage: vp,
-		}, r); err != nil {
+	if err := sc.addLiveVote(pid, vp, nil, r); err != nil {
 		return err
 	}
 	return sc.commitVotes(pid, r)
@@ -617,7 +613,8 @@ func TestCountVotes(t *testing.T) {
 
 	// Vote transactions are on imaginary 2000th block
 	blockHeight := uint32(2000)
-	sc.Commit(blockHeight)
+	err = sc.Commit(blockHeight)
+	qt.Assert(t, err, qt.IsNil)
 
 	// Test envelope height for this PID
 	height, err := sc.GetEnvelopeHeight(pid)
