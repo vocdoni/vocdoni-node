@@ -217,7 +217,6 @@ func TestResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	sc, err := NewScrutinizer(t.TempDir(), app)
 	if err != nil {
 		t.Fatal(err)
@@ -419,28 +418,26 @@ func TestAddVote(t *testing.T) {
 	err = sc.newEmptyProcess(pid)
 	qt.Assert(t, err, qt.IsNil)
 
-	envelopeType := &models.EnvelopeType{}
-
 	pr, err := sc.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	// Should be fine
-	pr.Votes, err = addVote(pr.Votes, []int{1, 2, 3}, nil, options, envelopeType)
+	err = pr.AddVote([]int{1, 2, 3}, nil, nil)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Overflows maxTotalCost
-	pr.Votes, err = addVote(pr.Votes, []int{2, 2, 3}, nil, options, envelopeType)
+	err = pr.AddVote([]int{2, 2, 3}, nil, nil)
 	qt.Assert(t, err, qt.ErrorMatches, "max total cost overflow.*")
 
 	// Overflows maxValue
-	pr.Votes, err = addVote(pr.Votes, []int{1, 1, 4}, nil, options, envelopeType)
+	err = pr.AddVote([]int{1, 1, 4}, nil, nil)
 	qt.Assert(t, err, qt.ErrorMatches, "max value overflow.*")
 
 	// Overflows maxCount
-	pr.Votes, err = addVote(pr.Votes, []int{1, 1, 1, 1}, nil, options, envelopeType)
+	err = pr.AddVote([]int{1, 1, 1, 1}, nil, nil)
 	qt.Assert(t, err, qt.ErrorMatches, "max count overflow.*")
 
 	// Quadratic voting, 10 credits to distribute among 3 options
-	options = &models.ProcessVoteOptions{
+	pr.VoteOpts = &models.ProcessVoteOptions{
 		MaxCount:     3,
 		MaxValue:     0,
 		MaxTotalCost: 10,
@@ -448,24 +445,24 @@ func TestAddVote(t *testing.T) {
 	}
 
 	// Should be fine 2^2 + 2^2 + 1^2 = 9
-	pr.Votes, err = addVote(pr.Votes, []int{2, 2, 1}, nil, options, envelopeType)
+	err = pr.AddVote([]int{2, 2, 1}, nil, nil)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Should be fine 3^2 + 0 + 0 = 9
-	pr.Votes, err = addVote(pr.Votes, []int{3, 0, 0}, nil, options, envelopeType)
+	err = pr.AddVote([]int{3, 0, 0}, nil, nil)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Should fail since 2^2 + 2^2 + 2^2 = 12
-	pr.Votes, err = addVote(pr.Votes, []int{2, 2, 2}, nil, options, envelopeType)
+	err = pr.AddVote([]int{2, 2, 2}, nil, nil)
 	qt.Assert(t, err, qt.ErrorMatches, "max total cost overflow.*")
 
 	// Should fail since 4^2 = 16
-	pr.Votes, err = addVote(pr.Votes, []int{4, 0, 0}, nil, options, envelopeType)
+	err = pr.AddVote([]int{4, 0, 0}, nil, nil)
 	qt.Assert(t, err, qt.ErrorMatches, "max total cost overflow.*")
 
 	// Check unique values work
-	envelopeType = &models.EnvelopeType{UniqueValues: true}
-	pr.Votes, err = addVote(pr.Votes, []int{2, 1, 1}, nil, options, envelopeType)
+	pr.EnvelopeType.UniqueValues = true
+	err = pr.AddVote([]int{2, 1, 1}, nil, nil)
 	qt.Assert(t, err, qt.ErrorMatches, "values are not unique")
 }
 
