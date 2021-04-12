@@ -215,7 +215,6 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	startTime := time.Now()
 	txn := s.db.Badger().NewTransaction(true)
 	for _, v := range s.voteIndexPool {
-		// TODO: This should perform a single db Tx
 		if err := s.addVoteIndex(v.vote.Nullifier,
 			v.vote.ProcessId,
 			height,

@@ -26,8 +26,8 @@ type Process struct {
 	CensusRoot    types.HexBytes             `json:"censusRoot"`
 	CensusURI     string                     `json:"censusURI"`
 	CensusOrigin  int32                      `json:"censusOrigin"`
-	Status        int32                      `badgerholdIndex:"Status" json:"status"`
-	Namespace     uint32                     `badgerholdIndex:"Namespace" json:"namespace"`
+	Status        int32                      `json:"status"`
+	Namespace     uint32                     `json:"namespace"`
 	Envelope      *models.EnvelopeType       `json:"envelopeType"`
 	Mode          *models.ProcessMode        `json:"processMode"`
 	VoteOpts      *models.ProcessVoteOptions `json:"voteOptions"`
@@ -50,8 +50,8 @@ type Entity struct {
 }
 
 type VoteReference struct {
-	Nullifier    types.HexBytes `badgerhold:"key"`
-	ProcessID    types.HexBytes `badgerhold:"index"`
+	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
+	ProcessID    types.HexBytes //`badgerhold:"index"`
 	Height       uint32
 	Weight       *big.Int
 	TxIndex      int32
