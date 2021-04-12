@@ -35,6 +35,7 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	if err != nil {
 		log.Fatal(err)
 	}
+	app.SetDefaultBlockGetters()
 	if err := app.Node.Start(); err != nil {
 		log.Fatal(err)
 	}
