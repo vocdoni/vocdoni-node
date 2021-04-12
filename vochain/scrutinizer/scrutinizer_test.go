@@ -223,10 +223,10 @@ func TestResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fakeBlockStore := []*tmtypes.Block{}
+	mockBlockStore := []*tmtypes.Block{}
 
 	app.SetFnGetBlockByHeight(func(height int64) *tmtypes.Block {
-		return fakeBlockStore[height]
+		return mockBlockStore[height]
 	})
 	pid := util.RandomBytes(32)
 	err = app.State.AddProcess(&models.Process{
@@ -282,7 +282,7 @@ func TestResults(t *testing.T) {
 			Signature: []byte{},
 		})
 		qt.Assert(t, err, qt.IsNil)
-		fakeBlockStore = append(fakeBlockStore, &tmtypes.Block{Data: tmtypes.Data{Txs: []tmtypes.Tx{signedTx}}})
+		mockBlockStore = append(mockBlockStore, &tmtypes.Block{Data: tmtypes.Data{Txs: []tmtypes.Tx{signedTx}}})
 		txRef := &VoteWithIndex{
 			vote: &models.Vote{
 				Nullifier: vote.Nullifier,
