@@ -225,9 +225,8 @@ func TestResults(t *testing.T) {
 	}
 	mockBlockStore := []*tmtypes.Block{}
 
-	app.SetFnGetBlockByHeight(func(height int64) *tmtypes.Block {
-		return mockBlockStore[height]
-	})
+	app.SetTestingMethods(mockBlockStore)
+
 	pid := util.RandomBytes(32)
 	err = app.State.AddProcess(&models.Process{
 		ProcessId:             pid,
@@ -282,7 +281,8 @@ func TestResults(t *testing.T) {
 			Signature: []byte{},
 		})
 		qt.Assert(t, err, qt.IsNil)
-		mockBlockStore = append(mockBlockStore, &tmtypes.Block{Data: tmtypes.Data{Txs: []tmtypes.Tx{signedTx}}})
+		app.SendTx(signedTx)
+
 		txRef := &VoteWithIndex{
 			vote: &models.Vote{
 				Nullifier: vote.Nullifier,

@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -31,11 +32,13 @@ type BaseApplication struct {
 
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
+	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
-// NewBaseApplication creates a new BaseApplication given a name an a DB backend
+// NewBaseApplication creates a new BaseApplication given a name an a DB backend.
+// Node & callback functions still need to be initialized, if used.
 func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	state, err := NewState(dbpath)
 	if err != nil {
@@ -46,25 +49,50 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	}, nil
 }
 
-// SetDefaultBlockGetters assigns fnGetBlockByHash and fnGetBlockByHeight to use the
+// SetDefaultMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use the
 // BlockStore from app.Node to load blocks. Assumes app.Node has been set.
-func (app *BaseApplication) SetDefaultBlockGetters() {
+func (app *BaseApplication) SetDefaultMethods() {
 	if app.Node == nil {
 		log.Error("Cannot assign block getters: App Node is not initialized")
 		return
 	}
-	app.SetFnGetBlockByHash(app.Node.BlockStore().LoadBlockByHash)
-	app.SetFnGetBlockByHeight(app.Node.BlockStore().LoadBlock)
+	app.setFnGetBlockByHash(app.Node.BlockStore().LoadBlockByHash)
+	app.setFnGetBlockByHeight(app.Node.BlockStore().LoadBlock)
+	app.setFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+		resCh := make(chan *abcitypes.Response, 1)
+		defer close(resCh)
+		err := app.Node.Mempool().CheckTx(tx, func(res *abcitypes.Response) {
+			resCh <- res
+		}, mempl.TxInfo{})
+		if err != nil {
+			return nil, err
+		}
+		res := <-resCh
+		r := res.GetCheckTx()
+		return &ctypes.ResultBroadcastTx{
+			Code: r.Code,
+			Data: r.Data,
+			Log:  r.Log,
+			Hash: tmtypes.Tx(tx).Hash(),
+		}, nil
+	})
 }
 
-// SetFnGetBlockByHash sets the getter for blocks by hash
-func (app *BaseApplication) SetFnGetBlockByHash(fn func([]byte) *tmtypes.Block) {
-	app.fnGetBlockByHash = fn
-}
-
-// SetFnGetBlockByHash sets the getter for blocks by height
-func (app *BaseApplication) SetFnGetBlockByHeight(fn func(int64) *tmtypes.Block) {
-	app.fnGetBlockByHeight = fn
+// SetDefaultBlockGetters assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use mockBlockStore
+func (app *BaseApplication) SetTestingMethods(mockBlockStore []*tmtypes.Block) {
+	app.setFnGetBlockByHash(func(hash []byte) *tmtypes.Block {
+		for _, block := range mockBlockStore {
+			if bytes.Compare(block.Hash().Bytes(), hash) == 0 {
+				return block
+			}
+		}
+		return nil
+	})
+	app.setFnGetBlockByHeight(func(height int64) *tmtypes.Block { return mockBlockStore[height] })
+	app.setFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+		mockBlockStore = append(mockBlockStore, &tmtypes.Block{Data: tmtypes.Data{Txs: []tmtypes.Tx{tx}}})
+		return nil, nil
+	})
 }
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.
@@ -113,22 +141,11 @@ func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedT
 
 // SendTX sends a transaction to the mempool (sync)
 func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error) {
-	resCh := make(chan *abcitypes.Response, 1)
-	defer close(resCh)
-	err := app.Node.Mempool().CheckTx(tx, func(res *abcitypes.Response) {
-		resCh <- res
-	}, mempl.TxInfo{})
-	if err != nil {
-		return nil, err
+	if app.fnGetBlockByHeight == nil {
+		log.Error("Application sendTx method not assigned")
+		return nil, nil
 	}
-	res := <-resCh
-	r := res.GetCheckTx()
-	return &ctypes.ResultBroadcastTx{
-		Code: r.Code,
-		Data: r.Data,
-		Log:  r.Log,
-		Hash: tmtypes.Tx(tx).Hash(),
-	}, nil
+	return app.fnSendTx(tx)
 }
 
 // Info Return information about the application state.
@@ -310,4 +327,19 @@ func (app *BaseApplication) OfferSnapshot(req abcitypes.RequestOfferSnapshot) ab
 
 func TxKey(tx tmtypes.Tx) [32]byte {
 	return sha256.Sum256(tx)
+}
+
+// SetFnGetBlockByHash sets the getter for blocks by hash
+func (app *BaseApplication) setFnGetBlockByHash(fn func(hash []byte) *tmtypes.Block) {
+	app.fnGetBlockByHash = fn
+}
+
+// SetFnGetBlockByHash sets the getter for blocks by height
+func (app *BaseApplication) setFnGetBlockByHeight(fn func(height int64) *tmtypes.Block) {
+	app.fnGetBlockByHeight = fn
+}
+
+// SetFnGetBlockByHash sets the sendTx method
+func (app *BaseApplication) setFnSendTx(fn func(tx []byte) (*ctypes.ResultBroadcastTx, error)) {
+	app.fnSendTx = fn
 }
