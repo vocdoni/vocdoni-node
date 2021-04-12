@@ -28,6 +28,9 @@ type BaseApplication struct {
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
 	// data races when querying about the sync status of the blockchain.
 	isSyncLock sync.Mutex
+
+	fnGetBlockByHeight func(height int64) *tmtypes.Block
+	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
@@ -41,6 +44,27 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	return &BaseApplication{
 		State: state,
 	}, nil
+}
+
+// SetDefaultBlockGetters assigns fnGetBlockByHash and fnGetBlockByHeight to use the
+// BlockStore from app.Node to load blocks. Assumes app.Node has been set.
+func (app *BaseApplication) SetDefaultBlockGetters() {
+	if app.Node == nil {
+		log.Error("Cannot assign block getters: App Node is not initialized")
+		return
+	}
+	app.SetFnGetBlockByHash(app.Node.BlockStore().LoadBlockByHash)
+	app.SetFnGetBlockByHeight(app.Node.BlockStore().LoadBlock)
+}
+
+// SetFnGetBlockByHash sets the getter for blocks by hash
+func (app *BaseApplication) SetFnGetBlockByHash(fn func([]byte) *tmtypes.Block) {
+	app.fnGetBlockByHash = fn
+}
+
+// SetFnGetBlockByHash sets the getter for blocks by height
+func (app *BaseApplication) SetFnGetBlockByHeight(fn func(int64) *tmtypes.Block) {
+	app.fnGetBlockByHeight = fn
 }
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.
@@ -58,17 +82,28 @@ func (app *BaseApplication) MempoolRemoveTx(txKey [32]byte) {
 
 // GetBlockByHeight retreies a full Tendermint block indexed by its height
 func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
-	return app.Node.BlockStore().LoadBlock(height)
+	if app.fnGetBlockByHeight == nil {
+		log.Error("Application getBlockByHeight method not assigned")
+		return nil
+	}
+	return app.fnGetBlockByHeight(height)
 }
 
 // GetBlockByHash retreies a full Tendermint block indexed by its Hash
 func (app *BaseApplication) GetBlockByHash(hash []byte) *tmtypes.Block {
-	return app.Node.BlockStore().LoadBlockByHash(hash)
+	if app.fnGetBlockByHash == nil {
+		log.Error("Application getBlockByHash method not assigned")
+		return nil
+	}
+	return app.fnGetBlockByHash(hash)
 }
 
 // GetTx retreives a vochain transaction from the blockstore
 func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedTx, error) {
 	block := app.GetBlockByHeight(int64(height))
+	if block == nil {
+		return nil, fmt.Errorf("unable to get block by height: %d", height)
+	}
 	if int32(len(block.Txs)) <= txIndex {
 		return nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
 	}
