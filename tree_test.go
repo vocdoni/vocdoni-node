@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"math/big"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/iden3/go-merkletree/db/memory"
@@ -194,7 +195,7 @@ func TestUpdate(t *testing.T) {
 	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(big.NewInt(11)))
 }
 
-func TestAux(t *testing.T) {
+func TestAux(t *testing.T) { // TMP
 	c := qt.New(t)
 	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -291,6 +292,34 @@ func TestDumpAndImportDump(t *testing.T) {
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 	c.Check(hex.EncodeToString(tree2.Root()), qt.Equals,
 		"0d93aaa3362b2f999f15e15728f123087c2eee716f01c01f56e23aae07f09f08")
+}
+
+func TestRWMutex(t *testing.T) {
+	c := qt.New(t)
+	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close()
+
+	var keys, values [][]byte
+	for i := 0; i < 1000; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(0))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	go func() {
+		_, err = tree.AddBatch(keys, values)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	time.Sleep(500 * time.Millisecond)
+	k := BigIntToBytes(big.NewInt(int64(99999)))
+	v := BigIntToBytes(big.NewInt(int64(99999)))
+	if err := tree.Add(k, v); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func BenchmarkAdd(b *testing.B) {
