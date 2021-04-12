@@ -74,7 +74,6 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 			badgerhold.Where("Namespace").Eq(namespace).
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
-				Index("Namespace").
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
