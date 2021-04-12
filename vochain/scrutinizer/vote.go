@@ -128,7 +128,8 @@ func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (int, error) {
 	// TODO: Warning, int can overflow
 	if len(processId) > 0 {
 		return s.db.Count(&VoteReference{},
-			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
+			badgerhold.Where("ProcessID").Eq(processId))
+		// badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
 	}
 	// If no processId is provided, count all envelopes
 	return s.db.Count(&VoteReference{}, &badgerhold.Query{})
@@ -272,7 +273,6 @@ func (s *Scrutinizer) addLiveVote(pid []byte, votePackage []byte, weight []byte,
 		// If encrypted, just add the weight
 		results.Weight.Add(results.Weight, iweight)
 	}
-	print(fmt.Sprintf("Add live vote: %v, weight: %d\n", vote.Votes, iweight.Int64()))
 	return nil
 }
 
@@ -324,8 +324,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, results *Results) error {
 		if !ok {
 			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 		}
-		update.Weight.Add(update.Weight, results.Weight)
-		print(fmt.Sprintf("Updating votes: %v, weight: %d, \n", update.Votes, update.Weight.Int64()))
+		update.Weight.Set(results.Weight)
 
 		if len(results.Votes) == 0 {
 			return nil
@@ -339,7 +338,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, results *Results) error {
 				return fmt.Errorf("commitVotes: different number of options for question %d", i)
 			}
 			for j := range update.Votes[i] {
-				update.Votes[i][j].Add(update.Votes[i][j], results.Votes[i][j])
+				update.Votes[i][j].Set(results.Votes[i][j])
 			}
 		}
 
