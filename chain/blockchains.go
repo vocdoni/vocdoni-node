@@ -70,7 +70,7 @@ type Specs struct {
 }
 
 // AvailableChains is the list of supported ethereum networks / environments
-var AvailableChains = []string{"mainnet", "goerli", "goerlistage", "xdai", "xdaistage"}
+var AvailableChains = []string{"mainnet", "goerli", "goerlistage", "xdai", "xdaistage", "rinkeby"}
 
 // SpecsFor returns the specs for the given blockchain network name
 func SpecsFor(name string) (*Specs, error) {
@@ -85,6 +85,8 @@ func SpecsFor(name string) (*Specs, error) {
 		return &xdaistage, nil
 	case "goerlistage":
 		return &goerlistage, nil
+	case "rinkeby":
+		return &rinkeby, nil
 	default:
 		return nil, errors.New("chain name not found")
 	}
@@ -136,6 +138,22 @@ var xdaistage = Specs{
 		EthereumContractNames[3]: {Domain: types.GenesisStageDomain, ListenForEvents: true},
 		EthereumContractNames[4]: {Domain: types.ResultsStageDomain, ListenForEvents: true},
 		EthereumContractNames[5]: {Domain: types.EntityResolverStageDomain},
+	},
+}
+
+var rinkeby = Specs{
+	Name:            "rinkeby",
+	NetworkId:       4,
+	StartingBlock:   8399062, // 2021 Apr 12 09:28h
+	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
+	BootNodes:       nil,
+	Contracts: map[string]*EthereumContract{
+		EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
+		EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},
+		EthereumContractNames[2]: {Domain: types.ERC20ProofsDevelopmentDomain, ListenForEvents: true},
+		EthereumContractNames[3]: {Domain: types.GenesisDevelopmentDomain, ListenForEvents: true},
+		EthereumContractNames[4]: {Domain: types.ResultsDevelopmentDomain, ListenForEvents: true},
+		EthereumContractNames[5]: {Domain: types.EntityResolverDevelopmentDomain},
 	},
 }
 
