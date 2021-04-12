@@ -3,9 +3,11 @@ package scrutinizer
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -16,6 +18,13 @@ func BenchmarkCheckTx(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	b.Run("indexTx", benchmarkIndexTx)
+}
+
+// LOG_LEVEL=info go test -v -benchmem -run=- -bench=NewProcess -benchtime=20s
+func BenchmarkNewProcess(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.Run("newProcess", benchmarkNewProcess)
 }
 
 func benchmarkIndexTx(b *testing.B) {
@@ -62,4 +71,38 @@ func benchmarkIndexTx(b *testing.B) {
 		err := sc.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)
 	}
+}
+
+func benchmarkNewProcess(b *testing.B) {
+	app, err := vochain.NewBaseApplication(b.TempDir())
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	sc, err := NewScrutinizer(b.TempDir(), app)
+	if err != nil {
+		b.Fatal(err)
+	}
+	startTime := time.Now()
+	numProcesses := b.N
+	for i := 0; i < numProcesses; i++ {
+
+		pid := util.RandomBytes(32)
+		if err := app.State.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     util.RandomBytes(20),
+			EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+			Status:       models.ProcessStatus_READY,
+			BlockCount:   100000000,
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 1},
+			Mode:         &models.ProcessMode{AutoStart: true},
+		}); err != nil {
+			b.Fatal(err)
+		}
+		err = sc.newEmptyProcess(pid)
+		qt.Assert(b, err, qt.IsNil)
+
+	}
+	log.Infof("indexed %d new processes, took %s",
+		numProcesses, time.Since(startTime))
 }
