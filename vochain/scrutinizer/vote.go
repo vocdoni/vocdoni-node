@@ -69,11 +69,12 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 	callback func(*models.VoteEnvelope, *big.Int, *sync.WaitGroup)) error {
 	wg := sync.WaitGroup{}
 	err := s.db.ForEach(
-		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
+		badgerhold.Where("ProcessID").Eq(processId),
+		// badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
 		func(txRef *VoteReference) error {
 			stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not get tx: %v", err)
 			}
 			tx := &models.Tx{}
 			if err := proto.Unmarshal(stx.Tx, tx); err != nil {
@@ -271,6 +272,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, votePackage []byte, weight []byte,
 		// If encrypted, just add the weight
 		results.Weight.Add(results.Weight, iweight)
 	}
+	print(fmt.Sprintf("Add live vote: %v, weight: %d\n", vote.Votes, iweight.Int64()))
 	return nil
 }
 
@@ -323,6 +325,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, results *Results) error {
 			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 		}
 		update.Weight.Add(update.Weight, results.Weight)
+		print(fmt.Sprintf("Updating votes: %v, weight: %d, \n", update.Votes, update.Weight.Int64()))
 
 		if len(results.Votes) == 0 {
 			return nil

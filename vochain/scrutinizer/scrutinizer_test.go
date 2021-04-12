@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -14,6 +15,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestEntityList(t *testing.T) {
@@ -221,6 +223,11 @@ func TestResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fakeBlockStore := []*tmtypes.Block{}
+
+	app.SetFnGetBlockByHeight(func(height int64) *tmtypes.Block {
+		return fakeBlockStore[height]
+	})
 	pid := util.RandomBytes(32)
 	err = app.State.AddProcess(&models.Process{
 		ProcessId:             pid,
@@ -261,14 +268,31 @@ func TestResults(t *testing.T) {
 
 	sc.Rollback()
 	for i := 0; i < 300; i++ {
-		err := app.State.AddVote(&models.Vote{
+		vote := &models.VoteEnvelope{
+			Nonce:                util.RandomBytes(32),
 			ProcessId:            pid,
 			VotePackage:          vp,
-			EncryptionKeyIndexes: []uint32{1},
 			Nullifier:            util.RandomBytes(32),
-			Weight:               new(big.Int).SetUint64(1).Bytes(),
+			EncryptionKeyIndexes: []uint32{1},
+		}
+		voteTx, err := proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
+		qt.Assert(t, err, qt.IsNil)
+		signedTx, err := proto.Marshal(&models.SignedTx{
+			Tx:        voteTx,
+			Signature: []byte{},
 		})
 		qt.Assert(t, err, qt.IsNil)
+		fakeBlockStore = append(fakeBlockStore, &tmtypes.Block{Data: tmtypes.Data{Txs: []tmtypes.Tx{signedTx}}})
+		txRef := &VoteWithIndex{
+			vote: &models.Vote{
+				Nullifier: vote.Nullifier,
+				ProcessId: pid,
+				Weight:    big.NewInt(1).Bytes(),
+			},
+			txIndex: 0,
+		}
+		sc.voteIndexPool = append(sc.voteIndexPool, txRef)
+		sc.Commit(uint32(i))
 	}
 
 	// Reveal process encryption keys
@@ -354,8 +378,10 @@ func TestLiveResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	v := &models.Vote{ProcessId: pid, VotePackage: vp}
 	r := &Results{
-		Votes:  newEmptyVotes(3, 2),
-		Weight: new(big.Int).SetUint64(0),
+		Votes:        newEmptyVotes(3, 2),
+		Weight:       new(big.Int).SetUint64(0),
+		VoteOpts:     &models.ProcessVoteOptions{MaxCount: 3},
+		EnvelopeType: &models.EnvelopeType{},
 	}
 	sc.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
@@ -480,9 +506,9 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
 			max = i
 		}
 	}
-	r := &Results{
-		Votes:  newEmptyVotes(len(v), max+1),
-		Weight: new(big.Int).SetUint64(1),
+	r, err := sc.GetResults(pid)
+	if err != nil {
+		return err
 	}
 	sc.addProcessToLiveResults(pid)
 	if err := sc.addLiveVote(pid, vp, nil, r); err != nil {
@@ -525,8 +551,8 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	result, err := sc.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	votes := GetFriendlyResults(result.Votes)
-	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "0", "1", "0", "2"})
 	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "0", "2", "0", "2"})
+	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "0", "1", "0", "2"})
 }
 
 func TestBallotProtocolMultiChoice(t *testing.T) {

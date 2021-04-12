@@ -84,14 +84,15 @@ func (r *Results) String() string {
 }
 
 func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) error {
+	if r.VoteOpts == nil {
+		return fmt.Errorf("addVote: processVoteOptions is nil")
+	}
+
 	if len(r.Votes) > 0 && len(r.Votes) != int(r.VoteOpts.MaxCount) {
 		return fmt.Errorf("addVote: currentResults size mismatch %d != %d",
 			len(r.Votes), r.VoteOpts.MaxCount)
 	}
 
-	if r.VoteOpts == nil {
-		return fmt.Errorf("addVote: processVoteOptions is nil")
-	}
 	if r.EnvelopeType == nil {
 		return fmt.Errorf("addVote: envelopeType is nil")
 	}

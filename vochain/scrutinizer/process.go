@@ -206,9 +206,11 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	if err := s.db.Insert(pid, &Results{
 		ProcessID: pid,
 		// MaxValue requires +1 since 0 is also an option
-		Votes:      newEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
-		Weight:     new(big.Int).SetUint64(0),
-		Signatures: []types.HexBytes{},
+		Votes:        newEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+		Weight:       new(big.Int).SetUint64(0),
+		Signatures:   []types.HexBytes{},
+		VoteOpts:     p.GetVoteOptions(),
+		EnvelopeType: p.GetEnvelopeType(),
 	}); err != nil {
 		s.addVoteLock.Unlock()
 		return err
