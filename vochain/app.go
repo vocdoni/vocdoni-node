@@ -1,7 +1,6 @@
 package vochain
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -17,6 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 )
@@ -56,9 +56,9 @@ func (app *BaseApplication) SetDefaultMethods() {
 		log.Error("Cannot assign block getters: App Node is not initialized")
 		return
 	}
-	app.setFnGetBlockByHash(app.Node.BlockStore().LoadBlockByHash)
-	app.setFnGetBlockByHeight(app.Node.BlockStore().LoadBlock)
-	app.setFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+	app.SetFnGetBlockByHash(app.Node.BlockStore().LoadBlockByHash)
+	app.SetFnGetBlockByHeight(app.Node.BlockStore().LoadBlock)
+	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
 		resCh := make(chan *abcitypes.Response, 1)
 		defer close(resCh)
 		err := app.Node.Mempool().CheckTx(tx, func(res *abcitypes.Response) {
@@ -79,18 +79,11 @@ func (app *BaseApplication) SetDefaultMethods() {
 }
 
 // SetDefaultBlockGetters assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use mockBlockStore
-func (app *BaseApplication) SetTestingMethods(mockBlockStore []*tmtypes.Block) {
-	app.setFnGetBlockByHash(func(hash []byte) *tmtypes.Block {
-		for _, block := range mockBlockStore {
-			if bytes.Compare(block.Hash().Bytes(), hash) == 0 {
-				return block
-			}
-		}
-		return nil
-	})
-	app.setFnGetBlockByHeight(func(height int64) *tmtypes.Block { return mockBlockStore[height] })
-	app.setFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
-		mockBlockStore = append(mockBlockStore, &tmtypes.Block{Data: tmtypes.Data{Txs: []tmtypes.Tx{tx}}})
+func (app *BaseApplication) SetTestingMethods(mockBlockStore *testutil.MockBlockStore) {
+	app.SetFnGetBlockByHash(mockBlockStore.GetByHash)
+	app.SetFnGetBlockByHeight(mockBlockStore.Get)
+	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+		mockBlockStore.Add(&tmtypes.Block{Data: tmtypes.Data{Txs: []tmtypes.Tx{tx}}})
 		return nil, nil
 	})
 }
@@ -111,7 +104,7 @@ func (app *BaseApplication) MempoolRemoveTx(txKey [32]byte) {
 // GetBlockByHeight retreies a full Tendermint block indexed by its height
 func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 	if app.fnGetBlockByHeight == nil {
-		log.Error("Application getBlockByHeight method not assigned")
+		log.Error("application getBlockByHeight method not assigned")
 		return nil
 	}
 	return app.fnGetBlockByHeight(height)
@@ -120,7 +113,7 @@ func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 // GetBlockByHash retreies a full Tendermint block indexed by its Hash
 func (app *BaseApplication) GetBlockByHash(hash []byte) *tmtypes.Block {
 	if app.fnGetBlockByHash == nil {
-		log.Error("Application getBlockByHash method not assigned")
+		log.Error("application getBlockByHash method not assigned")
 		return nil
 	}
 	return app.fnGetBlockByHash(hash)
@@ -142,7 +135,7 @@ func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedT
 // SendTX sends a transaction to the mempool (sync)
 func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error) {
 	if app.fnGetBlockByHeight == nil {
-		log.Error("Application sendTx method not assigned")
+		log.Error("application sendTx method not assigned")
 		return nil, nil
 	}
 	return app.fnSendTx(tx)
@@ -330,16 +323,16 @@ func TxKey(tx tmtypes.Tx) [32]byte {
 }
 
 // SetFnGetBlockByHash sets the getter for blocks by hash
-func (app *BaseApplication) setFnGetBlockByHash(fn func(hash []byte) *tmtypes.Block) {
+func (app *BaseApplication) SetFnGetBlockByHash(fn func(hash []byte) *tmtypes.Block) {
 	app.fnGetBlockByHash = fn
 }
 
 // SetFnGetBlockByHash sets the getter for blocks by height
-func (app *BaseApplication) setFnGetBlockByHeight(fn func(height int64) *tmtypes.Block) {
+func (app *BaseApplication) SetFnGetBlockByHeight(fn func(height int64) *tmtypes.Block) {
 	app.fnGetBlockByHeight = fn
 }
 
 // SetFnGetBlockByHash sets the sendTx method
-func (app *BaseApplication) setFnSendTx(fn func(tx []byte) (*ctypes.ResultBroadcastTx, error)) {
+func (app *BaseApplication) SetFnSendTx(fn func(tx []byte) (*ctypes.ResultBroadcastTx, error)) {
 	app.fnSendTx = fn
 }
