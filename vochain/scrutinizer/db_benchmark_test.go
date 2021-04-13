@@ -85,12 +85,14 @@ func benchmarkNewProcess(b *testing.B) {
 	}
 	startTime := time.Now()
 	numProcesses := b.N
+	entityID := util.RandomBytes(20)
 	for i := 0; i < numProcesses; i++ {
 
 		pid := util.RandomBytes(32)
 		if err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
+			ProcessId: pid,
+			// EntityId:     util.RandomBytes(20),
+			EntityId:     entityID,
 			EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 			Status:       models.ProcessStatus_READY,
 			BlockCount:   100000000,

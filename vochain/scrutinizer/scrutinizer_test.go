@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -223,7 +223,8 @@ func TestResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mockBlockStore := []*tmtypes.Block{}
+	mockBlockStore := new(testutil.MockBlockStore)
+	mockBlockStore.Init()
 
 	app.SetTestingMethods(mockBlockStore)
 
