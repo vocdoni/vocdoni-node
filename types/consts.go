@@ -148,7 +148,7 @@ const (
 	ProcessesContractMaxProcessMode = 15
 	// ProcessesContractMaxEnvelopeType represents the max value that a uint8 can have
 	// with the current smart contract bitmask describing the supported envelope types
-	ProcessesContractMaxEnvelopeType = 15
+	ProcessesContractMaxEnvelopeType = 31
 
 	// TODO: @jordipainan this values are tricky
 

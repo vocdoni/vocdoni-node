@@ -256,6 +256,7 @@ func extractEnvelopeType(envelopeType uint8) (*models.EnvelopeType, error) {
 		Anonymous:      envelopeType&byte(0b00000010) > 0,
 		EncryptedVotes: envelopeType&byte(0b00000100) > 0,
 		UniqueValues:   envelopeType&byte(0b00001000) > 0,
+		CostFromWeight: envelopeType&byte(0b00010000) > 0,
 	}, nil
 }
 
