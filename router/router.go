@@ -249,9 +249,7 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, vocInfo *vochain
 	r.registerPublic("submitRawTx", r.submitRawTx)
 	r.registerPublic("submitEnvelope", r.submitEnvelope)
 	r.registerPublic("getEnvelopeStatus", r.getEnvelopeStatus)
-	r.registerPublic("getEnvelope", r.getEnvelope)
 	r.registerPublic("getEnvelopeHeight", r.getEnvelopeHeight)
-	r.registerPublic("getEnvelopeList", r.getEnvelopeList)
 	r.registerPublic("getBlockHeight", r.getBlockHeight)
 	r.registerPublic("getProcessKeys", r.getProcessKeys)
 	r.registerPublic("getBlockStatus", r.getBlockStatus)
@@ -265,6 +263,8 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, vocInfo *vochain
 		r.registerPublic("getEntityList", r.getEntityList)
 		r.registerPublic("getEntityCount", r.getEntityCount)
 		r.registerPublic("getValidatorList", r.getValidatorList)
+		r.registerPublic("getEnvelope", r.getEnvelope)
+		r.registerPublic("getEnvelopeList", r.getEnvelopeList)
 		r.registerPublic("getBlock", r.getBlock)
 	}
 }
