@@ -223,7 +223,6 @@ func (s *Scrutinizer) Commit(height uint32) error {
 			log.Warn(err)
 		}
 	}
-	log.Infof("badgerhold took %s", time.Since(startTime))
 	if len(s.voteIndexPool) > 0 {
 		s.indexTxLock.Lock()
 		wg := sync.WaitGroup{}
@@ -237,19 +236,6 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		wg.Wait()
 		txn.Discard()
 		s.indexTxLock.Unlock()
-		/*		for {
-					if err := txn.Commit(); err != nil {
-						if strings.Contains(err.Error(), kvErrorStringForRetry) {
-							time.Sleep(time.Millisecond * 5)
-							continue
-						}
-						log.Error(err)
-						break
-					}
-					txn.Discard()
-					break
-				}
-		*/
 		log.Infof("indexed %d new envelopes, took %s",
 			len(s.voteIndexPool), time.Since(startTime))
 	}

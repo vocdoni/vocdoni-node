@@ -10,7 +10,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -223,10 +222,7 @@ func TestResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mockBlockStore := new(testutil.MockBlockStore)
-	mockBlockStore.Init()
-
-	app.SetTestingMethods(mockBlockStore)
+	app.SetTestingMethods()
 
 	pid := util.RandomBytes(32)
 	err = app.State.AddProcess(&models.Process{
@@ -282,7 +278,8 @@ func TestResults(t *testing.T) {
 			Signature: []byte{},
 		})
 		qt.Assert(t, err, qt.IsNil)
-		app.SendTx(signedTx)
+		_, err = app.SendTx(signedTx)
+		qt.Assert(t, err, qt.IsNil)
 
 		txRef := &VoteWithIndex{
 			vote: &models.Vote{
@@ -293,7 +290,8 @@ func TestResults(t *testing.T) {
 			txIndex: 0,
 		}
 		sc.voteIndexPool = append(sc.voteIndexPool, txRef)
-		sc.Commit(uint32(i))
+		err = sc.Commit(uint32(i))
+		qt.Assert(t, err, qt.IsNil)
 	}
 
 	// Reveal process encryption keys
@@ -357,6 +355,8 @@ func TestLiveResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.SetTestingMethods()
+
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
@@ -423,6 +423,7 @@ func TestAddVote(t *testing.T) {
 
 	sc, err := NewScrutinizer(t.TempDir(), app)
 	qt.Assert(t, err, qt.IsNil)
+	app.SetTestingMethods()
 
 	options := &models.ProcessVoteOptions{
 		MaxCount:     3,
@@ -525,6 +526,7 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 
 	sc, err := NewScrutinizer(t.TempDir(), app)
 	qt.Assert(t, err, qt.IsNil)
+	app.SetTestingMethods()
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -564,6 +566,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 
 	sc, err := NewScrutinizer(t.TempDir(), app)
 	qt.Assert(t, err, qt.IsNil)
+	app.SetTestingMethods()
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -615,6 +618,7 @@ func TestCountVotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.SetTestingMethods()
 	pid := util.RandomBytes(32)
 
 	// Add 100 votes
