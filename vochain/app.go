@@ -79,7 +79,9 @@ func (app *BaseApplication) SetDefaultMethods() {
 }
 
 // SetDefaultBlockGetters assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use mockBlockStore
-func (app *BaseApplication) SetTestingMethods(mockBlockStore *testutil.MockBlockStore) {
+func (app *BaseApplication) SetTestingMethods() {
+	mockBlockStore := new(testutil.MockBlockStore)
+	mockBlockStore.Init()
 	app.SetFnGetBlockByHash(mockBlockStore.GetByHash)
 	app.SetFnGetBlockByHeight(mockBlockStore.Get)
 	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {

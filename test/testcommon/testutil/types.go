@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"sync"
 
+	"sync/atomic"
+
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
@@ -18,8 +20,8 @@ func (b *MockBlockStore) Init() {
 }
 
 func (b *MockBlockStore) Add(block *tmtypes.Block) {
-	b.set(b.count, block)
-	b.count++
+	c := atomic.AddInt64(&b.count, 1)
+	b.set(c-1, block)
 }
 
 func (b *MockBlockStore) Get(height int64) *tmtypes.Block {
@@ -27,22 +29,15 @@ func (b *MockBlockStore) Get(height int64) *tmtypes.Block {
 	if !ok {
 		return nil
 	}
-	switch val.(type) {
-	case *tmtypes.Block:
-		return val.(*tmtypes.Block)
-	}
-	return nil
+	return val.(*tmtypes.Block)
 }
 
 func (b *MockBlockStore) GetByHash(hash []byte) *tmtypes.Block {
 	var block *tmtypes.Block
 	b.store.Range(func(key, value interface{}) bool {
-		switch value.(type) {
-		case *tmtypes.Block:
-			if bytes.Equal(value.(*tmtypes.Block).Hash().Bytes(), hash) {
-				block = value.(*tmtypes.Block)
-				return false
-			}
+		if bytes.Equal(value.(*tmtypes.Block).Hash().Bytes(), hash) {
+			block = value.(*tmtypes.Block)
+			return false
 		}
 		return true
 	})

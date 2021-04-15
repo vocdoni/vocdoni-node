@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	badger "github.com/dgraph-io/badger/v3"
@@ -391,7 +392,7 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 		EnvelopeType: p.Envelope,
 	}
 
-	var nvotes int
+	var nvotes uint64
 	var err error
 	lock := sync.Mutex{}
 
@@ -432,7 +433,7 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 			log.Warnf("addVote failed: %v", err)
 			return
 		}
-		nvotes++
+		atomic.AddUint64(&nvotes, 1)
 	}); err == nil {
 		log.Infof("computed results for process %x with %d votes", p.ID, nvotes)
 		log.Debugf("results: %s", results)
