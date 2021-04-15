@@ -76,12 +76,12 @@ func testEntityList(t *testing.T, entityCount int) {
 
 func TestEntitySearch(t *testing.T) {
 	log.Init("info", "stdout")
-	state, err := vochain.NewState(t.TempDir())
+
+	app, err := vochain.NewBaseApplication(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	sc, err := NewScrutinizer(t.TempDir(), state)
+	sc, err := NewScrutinizer(t.TempDir(), app)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestEntitySearch(t *testing.T) {
 	// Add random entities before searchable ones
 	for i := 0; i < 5; i++ {
 		pid := util.RandomBytes(32)
-		if err := state.AddProcess(&models.Process{
+		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     util.RandomBytes(20),
 			BlockCount:   10,
@@ -119,7 +119,7 @@ func TestEntitySearch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := state.AddProcess(&models.Process{
+		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     entityId,
 			BlockCount:   10,
@@ -135,7 +135,7 @@ func TestEntitySearch(t *testing.T) {
 	// Add random entities after searchable ones
 	for i := 0; i < 5; i++ {
 		pid := util.RandomBytes(32)
-		if err := state.AddProcess(&models.Process{
+		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     util.RandomBytes(20),
 			BlockCount:   10,
@@ -240,12 +240,11 @@ func testProcessList(t *testing.T, procsCount int) {
 
 func TestProcessSearch(t *testing.T) {
 	log.Init("info", "stdout")
-	state, err := vochain.NewState(t.TempDir())
+	app, err := vochain.NewBaseApplication(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	sc, err := NewScrutinizer(t.TempDir(), state)
+	sc, err := NewScrutinizer(t.TempDir(), app)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +252,7 @@ func TestProcessSearch(t *testing.T) {
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
-		err := state.AddProcess(&models.Process{
+		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     util.RandomBytes(20),
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
@@ -282,7 +281,7 @@ func TestProcessSearch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := state.AddProcess(&models.Process{
+		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     eidTest,
 			BlockCount:   10,
@@ -306,7 +305,7 @@ func TestProcessSearch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := state.AddProcess(&models.Process{
+		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     eidTest,
 			BlockCount:   10,
