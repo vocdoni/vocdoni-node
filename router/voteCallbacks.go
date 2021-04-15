@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 
 	"go.vocdoni.io/dvote/log"
@@ -258,13 +259,22 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	if request.ListSize == 0 {
 		request.ListSize = MaxListSize
 	}
-	nullifiers := r.vocapp.State.EnvelopeList(request.ProcessID, request.From, request.ListSize, true)
-	var response types.MetaResponse
-	strnull := []string{}
-	for _, n := range nullifiers {
-		strnull = append(strnull, fmt.Sprintf("%x", n))
+	envelopes, weights, err := r.Scrutinizer.GetEnvelopes(request.ProcessID)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get envelope list: (%s)", err))
+		return
 	}
-	response.Nullifiers = &strnull
+	envelopeList := &models.VoteEnvelopeList{VoteEnvelopes: envelopes}
+	for _, weight := range weights {
+		envelopeList.Weights = append(envelopeList.Weights, weight.Bytes())
+	}
+	listBytes, err := proto.Marshal(envelopeList)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot marshal vote envelope list: (%s)", err))
+		return
+	}
+	var response types.MetaResponse
+	response.Content = listBytes
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -283,6 +293,18 @@ func (r *Router) getValidatorList(request routerRequest) {
 		return
 	}
 	response.ValidatorList = validatorBytes
+	request.Send(r.buildReply(request, &response))
+}
+
+func (r *Router) getBlock(request routerRequest) {
+	var response types.MetaResponse
+	block := r.Scrutinizer.App.GetBlockByHeight(int64(*response.Height))
+	blockBytes, err := json.Marshal(block)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get block: %v", err))
+		return
+	}
+	response.Content = blockBytes
 	request.Send(r.buildReply(request, &response))
 }
 
