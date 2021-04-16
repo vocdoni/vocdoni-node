@@ -15,6 +15,7 @@ require (
 	github.com/ethereum/go-ethereum v1.9.26-0.20201212163632-00d10e610f9f
 	github.com/frankban/quicktest v1.11.3
 	github.com/google/go-cmp v0.5.4
+	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.1-0.20180906183839-65a6292f0157 // indirect
 	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
 	github.com/iden3/go-iden3-crypto v0.0.4

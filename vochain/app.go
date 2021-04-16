@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	lru "github.com/hashicorp/golang-lru"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	mempl "github.com/tendermint/tendermint/mempool"
 	nm "github.com/tendermint/tendermint/node"
@@ -19,6 +20,10 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
+)
+
+const (
+	blockCacheSize = 128
 )
 
 // BaseApplication reflects the ABCI application implementation.
@@ -33,7 +38,7 @@ type BaseApplication struct {
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
 	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
-	blockCache         sync.Map
+	blockCache         *lru.Cache
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
@@ -45,8 +50,13 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}
+	lruc, err := lru.New(blockCacheSize)
+	if err != nil {
+		return nil, err
+	}
 	return &BaseApplication{
-		State: state,
+		State:      state,
+		blockCache: lruc,
 	}, nil
 }
 
@@ -79,7 +89,7 @@ func (app *BaseApplication) SetDefaultMethods() {
 	})
 }
 
-// SetDefaultBlockGetters assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use mockBlockStore
+// SetTetingMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use mockBlockStore
 func (app *BaseApplication) SetTestingMethods() {
 	mockBlockStore := new(testutil.MockBlockStore)
 	mockBlockStore.Init()
@@ -104,14 +114,21 @@ func (app *BaseApplication) MempoolRemoveTx(txKey [32]byte) {
 	app.Node.Mempool().(*mempl.CListMempool).RemoveTxByKey(txKey, false)
 }
 
-// GetBlockByHeight retreies a full Tendermint block indexed by its height
+// GetBlockByHeight retreies a full Tendermint block indexed by its height.
+// This method uses an LRU cache for the blocks so in general it is more
+// convinient for high load operations than GetBlockByHash(), which does not use cache.
 func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 	if app.fnGetBlockByHeight == nil {
 		log.Error("application getBlockByHeight method not assigned")
 		return nil
 	}
-
-	return app.fnGetBlockByHeight(height)
+	cacheBlk, ok := app.blockCache.Get(height)
+	if ok {
+		return cacheBlk.(*tmtypes.Block)
+	}
+	blk := app.fnGetBlockByHeight(height)
+	app.blockCache.Add(height, blk)
+	return blk
 }
 
 // GetBlockByHash retreies a full Tendermint block indexed by its Hash

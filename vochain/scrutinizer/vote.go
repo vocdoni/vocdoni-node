@@ -62,16 +62,18 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.VoteEnvelope, []byt
 	return envelope, stx.Signature, nil
 }
 
-// WalkEnvelopesAsync executes callback for each envelopes of the ProcessId.
+// WalkEnvelopes executes callback for each envelopes of the ProcessId.
 // The callback function is executed async (in a goroutine) if async=true.
-// WaitGroup.Done() must be called, for both async and sync calls.
+// The method will return once all goroutines have finished the work.
 func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
-	callback func(*models.VoteEnvelope, *big.Int, *sync.WaitGroup)) error {
+	callback func(*models.VoteEnvelope, *big.Int)) error {
 	wg := sync.WaitGroup{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId),
 		func(txRef *VoteReference) error {
+			wg.Add(1)
 			processVote := func() {
+				defer wg.Done()
 				stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
 				if err != nil {
 					log.Errorf("could not get tx: %v", err)
@@ -85,9 +87,9 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 				envelope := tx.GetVote()
 				if envelope == nil {
 					log.Errorf("transaction is not an Envelope")
+					return
 				}
-				wg.Add(1)
-				callback(envelope, txRef.Weight, &wg)
+				callback(envelope, txRef.Weight)
 			}
 			if async {
 				go processVote()
@@ -383,10 +385,9 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 	lock := sync.Mutex{}
 
 	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.VoteEnvelope,
-		weight *big.Int, wg *sync.WaitGroup) {
+		weight *big.Int) {
 		var vp *types.VotePackage
 		var err error
-		defer wg.Done()
 		if p.Envelope.GetEncryptedVotes() {
 			if len(p.PrivateKeys) < len(vote.GetEncryptionKeyIndexes()) {
 				log.Errorf("encryptionKeyIndexes has too many fields")
