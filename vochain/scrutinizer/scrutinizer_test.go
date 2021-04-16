@@ -386,7 +386,10 @@ func TestLiveResults(t *testing.T) {
 	}
 	sc.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
-		qt.Assert(t, sc.addLiveVote(v.ProcessId, v.VotePackage, v.Weight, r), qt.IsNil)
+		qt.Assert(t, sc.addLiveVote(v.ProcessId,
+			v.VotePackage,
+			new(big.Int).SetBytes(v.Weight), r),
+			qt.IsNil)
 	}
 	qt.Assert(t, sc.commitVotes(pid, r), qt.IsNil)
 

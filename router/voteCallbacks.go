@@ -327,7 +327,7 @@ func (r *Router) getResults(request routerRequest) {
 		return
 	}
 	response.Results = scrutinizer.GetFriendlyResults(vr.Votes)
-
+	response.Final = &vr.Final
 	// Get number of votes
 	votes := r.vocapp.State.CountVotes(request.ProcessID, true)
 	response.Height = new(uint32)

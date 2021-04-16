@@ -114,6 +114,7 @@ type MetaResponse struct {
 	EntityID             string      `json:"entityId,omitempty"`
 	EntityIDs            []string    `json:"entityIds,omitempty"`
 	Files                []byte      `json:"files,omitempty"`
+	Final                *bool       `json:"final,omitempty"`
 	Finished             *bool       `json:"finished,omitempty"`
 	Health               int32       `json:"health,omitempty"`
 	Height               *uint32     `json:"height,omitempty"`

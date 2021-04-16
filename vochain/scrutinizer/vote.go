@@ -64,32 +64,35 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.VoteEnvelope, []byt
 
 // WalkEnvelopesAsync executes callback for each envelopes of the ProcessId.
 // The callback function is executed async (in a goroutine) if async=true.
-// Once the callback function finishes, WaitGroup.Done() must be called, for
-// async and sync calls.
+// WaitGroup.Done() must be called, for both async and sync calls.
 func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 	callback func(*models.VoteEnvelope, *big.Int, *sync.WaitGroup)) error {
 	wg := sync.WaitGroup{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId),
-		// badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
 		func(txRef *VoteReference) error {
-			stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
-			if err != nil {
-				return fmt.Errorf("could not get tx: %v", err)
-			}
-			tx := &models.Tx{}
-			if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-				return err
-			}
-			envelope := tx.GetVote()
-			if envelope == nil {
-				return fmt.Errorf("transaction is not an Envelope")
-			}
-			wg.Add(1)
-			if async {
-				go callback(envelope, txRef.Weight, &wg)
-			} else {
+			processVote := func() {
+				stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
+				if err != nil {
+					log.Errorf("could not get tx: %v", err)
+					return
+				}
+				tx := &models.Tx{}
+				if err := proto.Unmarshal(stx.Tx, tx); err != nil {
+					log.Warnf("could not unmarshal tx: %v", err)
+					return
+				}
+				envelope := tx.GetVote()
+				if envelope == nil {
+					log.Errorf("transaction is not an Envelope")
+				}
+				wg.Add(1)
 				callback(envelope, txRef.Weight, &wg)
+			}
+			if async {
+				go processVote()
+			} else {
+				processVote()
 			}
 			return nil
 		})
@@ -234,17 +237,8 @@ func unmarshalVote(votePackage []byte, keys []string) (*types.VotePackage, error
 // addLiveVote adds the envelope vote to the results. It does not commit to the database.
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
-func (s *Scrutinizer) addLiveVote(pid []byte, votePackage []byte, weight []byte,
+func (s *Scrutinizer) addLiveVote(pid []byte, votePackage []byte, weight *big.Int,
 	results *Results) error {
-	p, err := s.App.State.Process(pid, false)
-	if err != nil {
-		return fmt.Errorf("cannot get process %x: %w", pid, err)
-	}
-
-	if p.EnvelopeType == nil {
-		return fmt.Errorf("envelope type is nil")
-	}
-
 	// If live process, add vote to temporary results
 	var vote *types.VotePackage
 	if open, err := s.isOpenProcess(pid); open && err == nil {
@@ -257,22 +251,14 @@ func (s *Scrutinizer) addLiveVote(pid []byte, votePackage []byte, weight []byte,
 		return fmt.Errorf("cannot check if process is open: %v", err)
 	}
 
-	// Add weight to the process Results (if empty, consider weight=1)
-	var iweight *big.Int
-	if weight == nil {
-		iweight = new(big.Int).SetUint64(1)
-	} else {
-		iweight = new(big.Int).SetBytes(weight)
-	}
-
 	// Add the vote only if the election is unencrypted
 	if vote != nil {
-		if err := results.AddVote(vote.Votes, iweight, nil); err != nil {
+		if err := results.AddVote(vote.Votes, weight, nil); err != nil {
 			return err
 		}
 	} else {
 		// If encrypted, just add the weight
-		results.Weight.Add(results.Weight, iweight)
+		results.Weight.Add(results.Weight, weight)
 	}
 	return nil
 }

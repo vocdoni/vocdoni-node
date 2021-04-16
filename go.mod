@@ -41,7 +41,7 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/tendermint/tendermint v0.34.8
 	github.com/tendermint/tm-db v0.6.4
-	github.com/timshannon/badgerhold/v3 v3.0.0-20210208141506-eb78b03f8097
+	github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f
 	github.com/vocdoni/blind-ca v0.1.4
 	github.com/vocdoni/multirpc v0.1.21
 	github.com/vocdoni/storage-proofs-eth-go v0.1.5
