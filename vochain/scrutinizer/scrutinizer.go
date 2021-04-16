@@ -239,50 +239,51 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	}
 	txn.Discard()
 
+	// Add votes collected by onVote (live results), can be run async
+	nvotes := 0
+	startTime = time.Now()
+
+	for pid, votes := range s.votePool {
+		proc, err := s.ProcessInfo([]byte(pid))
+		if err != nil {
+			log.Warnf("cannot get process %x", []byte(pid))
+			continue
+		}
+		// This is a temporary "results" for computing votes
+		// of a single processId for the current block.
+		results := &Results{
+			Weight:       new(big.Int).SetUint64(0),
+			VoteOpts:     proc.VoteOpts,
+			EnvelopeType: proc.Envelope,
+		}
+		for _, v := range votes {
+			if err := s.addLiveVote(v.ProcessId,
+				v.VotePackage,
+				// TBD: Not 100% sure what happens if weight=nil
+				new(big.Int).SetBytes(v.GetWeight()),
+				results); err != nil {
+				log.Warnf("vote cannot be added: %v", err)
+			} else {
+				nvotes++
+			}
+		}
+		p := []byte(pid)
+		go func() {
+			// The commit is run async because it might be blocking (due the Mutex locks)
+			// and since this is the more costly operation, avoids affecting the consensus time.
+			if err := s.commitVotes(p, results); err != nil {
+				log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
+			}
+		}()
+	}
+	if nvotes > 0 {
+		log.Infof("added %d live votes on block %d, took %s",
+			nvotes, height, time.Since(startTime))
+	}
+
 	// Check if there are processes that need results computing
 	// this can be run async
 	go s.computePendingProcesses(uint32(height))
-
-	// Add votes collected by onVote (live results), can be run async
-	go func() {
-		// If the recovery bootstrap is running, wait.
-		s.recoveryBootLock.RLock()
-		defer s.recoveryBootLock.RUnlock()
-		nvotes := 0
-		timer := time.Now()
-		for pid, votes := range s.votePool {
-			proc, err := s.ProcessInfo([]byte(pid))
-			if err != nil {
-				log.Warnf("cannot get process %x", []byte(pid))
-				continue
-			}
-			// This is a temporary "results" for computing votes
-			// of a single processId for the current block.
-			results := &Results{
-				Weight:       new(big.Int).SetUint64(0),
-				VoteOpts:     proc.VoteOpts,
-				EnvelopeType: proc.Envelope,
-			}
-			for _, v := range votes {
-				if err := s.addLiveVote(v.ProcessId,
-					v.VotePackage,
-					// TBD: Not 100% sure what happens if weight=nil
-					new(big.Int).SetBytes(v.GetWeight()),
-					results); err != nil {
-					log.Warnf("vote cannot be added: %v", err)
-				} else {
-					nvotes++
-				}
-			}
-			if err := s.commitVotes([]byte(pid), results); err != nil {
-				log.Errorf("cannot commit live votes: (%v)", err)
-			}
-		}
-		if nvotes > 0 {
-			log.Infof("added %d live votes on block %d, took %s",
-				nvotes, height, time.Since(timer))
-		}
-	}()
 
 	return nil
 }

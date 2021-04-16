@@ -306,6 +306,10 @@ func (s *Scrutinizer) isProcessLiveResults(pid []byte) bool {
 // commitVotes adds the votes and weight from results to the local database.
 // It does not overwrite the stored results but update them by adding the new content.
 func (s *Scrutinizer) commitVotes(pid []byte, results *Results) error {
+	// If the recovery bootstrap is running, wait.
+	s.recoveryBootLock.RLock()
+	defer s.recoveryBootLock.RUnlock()
+	// The next lock avoid Transaction Conflicts
 	s.addVoteLock.Lock()
 	defer s.addVoteLock.Unlock()
 	update := func(record interface{}) error {
