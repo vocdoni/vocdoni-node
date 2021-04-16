@@ -33,6 +33,7 @@ type BaseApplication struct {
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
 	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
+	blockCache         sync.Map
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
@@ -109,6 +110,7 @@ func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 		log.Error("application getBlockByHeight method not assigned")
 		return nil
 	}
+
 	return app.fnGetBlockByHeight(height)
 }
 

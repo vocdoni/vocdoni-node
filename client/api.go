@@ -57,21 +57,21 @@ func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
 	return resp.Siblings, nil
 }
 
-func (c *Client) GetResults(pid []byte) ([][]string, string, error) {
+func (c *Client) GetResults(pid []byte) ([][]string, string, bool, error) {
 	var req types.MetaRequest
 	req.Method = "getResults"
 	req.ProcessID = pid
 	resp, err := c.Request(req, nil)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 	if !resp.Ok {
-		return nil, "", fmt.Errorf("cannot get results: (%s)", resp.Message)
+		return nil, "", false, fmt.Errorf("cannot get results: (%s)", resp.Message)
 	}
 	if resp.Message == "no results yet" {
-		return nil, resp.State, nil
+		return nil, resp.State, false, nil
 	}
-	return resp.Results, resp.State, nil
+	return resp.Results, resp.State, *resp.Final, nil
 }
 
 func (c *Client) GetEnvelopeHeight(pid []byte) (uint32, error) {
@@ -159,17 +159,18 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
 	var err error
 	var results [][]string
 	var block uint32
+	var final bool
 	for {
 		block, err = c.GetCurrentBlock()
 		if err != nil {
 			return nil, err
 		}
 		c.WaitUntilBlock(block + 1)
-		results, _, err = c.GetResults(pid)
+		results, _, final, err = c.GetResults(pid)
 		if err != nil {
 			return nil, err
 		}
-		if results != nil {
+		if final {
 			break
 		}
 		log.Infof("no results yet at block %d", block+2)

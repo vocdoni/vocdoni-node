@@ -136,6 +136,7 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 	if weight == nil {
 		weight = new(big.Int).SetUint64(1)
 	}
+	// If Mutex provided, Lock it
 	if mutex != nil {
 		mutex.Lock()
 		defer mutex.Unlock()

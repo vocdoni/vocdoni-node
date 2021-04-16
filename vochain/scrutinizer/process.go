@@ -222,7 +222,10 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	// Add the entity to the indexer database
 	eid := p.GetEntityId()
-	if err := s.db.Upsert(eid, &Entity{ID: eid, CreationTime: currentBlockTime}); err != nil {
+	if err := s.db.Upsert(eid, &Entity{
+		ID:           eid,
+		CreationTime: currentBlockTime,
+	}); err != nil {
 		return err
 	}
 

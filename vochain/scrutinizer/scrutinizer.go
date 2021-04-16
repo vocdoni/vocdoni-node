@@ -60,7 +60,7 @@ type Scrutinizer struct {
 	// try to minimize this situations in order to improve performance on the KV.
 	// TODO (pau): remove this mutex and relay on the KV layer
 	addVoteLock sync.RWMutex
-	//indexTxLock is used to avoid Transaction Conflicts on the vote index KV database.
+	// indexTxLock is used to avoid Transaction Conflicts on the vote index KV database.
 	indexTxLock sync.RWMutex
 	// recoveryBootLock prevents Commit() to add new votes while the recovery bootstratp is
 	// being executed.
@@ -155,14 +155,14 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 		// Count the votes, add them to results (in memory, without any db transaction)
 		results := &Results{
 			Weight:       new(big.Int).SetUint64(0),
-			VoteOpts:     process.GetVoteOptions(),
+			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
 		}
 		if err := s.WalkEnvelopes(p, false, func(vote *models.VoteEnvelope,
 			weight *big.Int, wg *sync.WaitGroup) {
 			defer wg.Done()
 			if err := s.addLiveVote(vote.ProcessId, vote.VotePackage,
-				weight.Bytes(), results); err != nil {
+				weight, results); err != nil {
 				log.Warn(err)
 			}
 		}); err != nil {
@@ -234,11 +234,11 @@ func (s *Scrutinizer) Commit(height uint32) error {
 			wg.Done()
 		})
 		wg.Wait()
-		txn.Discard()
 		s.indexTxLock.Unlock()
 		log.Infof("indexed %d new envelopes, took %s",
 			len(s.voteIndexPool), time.Since(startTime))
 	}
+	txn.Discard()
 
 	// Check if there are processes that need results computing
 	// this can be run async
@@ -252,9 +252,24 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		nvotes := 0
 		timer := time.Now()
 		for pid, votes := range s.votePool {
-			results := &Results{Weight: new(big.Int).SetUint64(0)}
+			proc, err := s.ProcessInfo([]byte(pid))
+			if err != nil {
+				log.Warnf("cannot get process %x", []byte(pid))
+				continue
+			}
+			// This is a temporary "results" for computing votes
+			// of a single processId for the current block.
+			results := &Results{
+				Weight:       new(big.Int).SetUint64(0),
+				VoteOpts:     proc.VoteOpts,
+				EnvelopeType: proc.Envelope,
+			}
 			for _, v := range votes {
-				if err := s.addLiveVote(v.ProcessId, v.VotePackage, v.GetWeight(), results); err != nil {
+				if err := s.addLiveVote(v.ProcessId,
+					v.VotePackage,
+					// TBD: Not 100% sure what happens if weight=nil
+					new(big.Int).SetBytes(v.GetWeight()),
+					results); err != nil {
 					log.Warnf("vote cannot be added: %v", err)
 				} else {
 					nvotes++

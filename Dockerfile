@@ -8,7 +8,7 @@ WORKDIR /src
 COPY . .
 RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
-	go build -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" -mod=readonly \
+	go build -tags=badgerdb -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" -mod=readonly \
 	./cmd/dvotenode ./cmd/vochaintest
 
 FROM debian:10.8-slim AS test

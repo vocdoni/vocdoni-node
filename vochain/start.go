@@ -187,6 +187,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	// used. See tmdb_*.go.
 	// TODO: probably switch to just badger after some benchmarking.
 	tconfig.DBBackend = string(tmdbBackend)
+	log.Infof("using db backend %s", tconfig.DBBackend)
 
 	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
 		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
