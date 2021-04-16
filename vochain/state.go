@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/statedb/iavlstate"
@@ -401,7 +402,7 @@ func (v *State) AddVote(vote *models.Vote) error {
 	}
 	// TODO: newVoteBytes = hash(newVoteBytes)
 	v.Lock()
-	err = v.Store.Tree(VoteTree).Add(vid, newVoteBytes)
+	err = v.Store.Tree(VoteTree).Add(vid, ethereum.HashRaw(newVoteBytes))
 	v.Unlock()
 	if err != nil {
 		return err
@@ -427,7 +428,7 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 }
 
 // Envelope returns the info of a vote if already exists.
-func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *models.Vote, err error) {
+func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ []byte, err error) {
 	// TODO(mvdan): remove the recover once
 	// https://github.com/tendermint/iavl/issues/212 is fixed
 	defer func() {
@@ -436,8 +437,7 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *models.V
 		}
 	}()
 
-	vote := new(models.Vote)
-	var voteBytes []byte
+	var voteHash []byte
 	vid, err := v.voteID(processID, nullifier)
 	if err != nil {
 		return nil, err
@@ -445,17 +445,14 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ *models.V
 	v.RLock()
 	defer v.RUnlock() // needs to be deferred due to the recover above
 	if isQuery {
-		voteBytes = v.Store.ImmutableTree(VoteTree).Get(vid)
+		voteHash = v.Store.ImmutableTree(VoteTree).Get(vid)
 	} else {
-		voteBytes = v.Store.Tree(VoteTree).Get(vid)
+		voteHash = v.Store.Tree(VoteTree).Get(vid)
 	}
-	if voteBytes == nil {
+	if voteHash == nil {
 		return nil, fmt.Errorf("vote with id (%x) does not exist", vid)
 	}
-	if err := proto.Unmarshal(voteBytes, vote); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal vote with id (%x)", vid)
-	}
-	return vote, nil
+	return voteHash, nil
 }
 
 // EnvelopeExists returns true if the envelope identified with voteID exists
@@ -472,7 +469,8 @@ func (v *State) EnvelopeExists(processID, nullifier []byte, isQuery bool) bool {
 	return len(v.Store.Tree(VoteTree).Get(voteID)) > 0
 }
 
-func (v *State) iterateProcessID(processID []byte, fn func(key []byte, value []byte) bool, isQuery bool) bool {
+func (v *State) iterateProcessID(processID []byte,
+	fn func(key []byte, value []byte) bool, isQuery bool) bool {
 	v.RLock()
 	defer v.RUnlock()
 	if isQuery {
