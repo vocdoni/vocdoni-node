@@ -158,9 +158,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
 		}
-		if err := s.WalkEnvelopes(p, false, func(vote *models.VoteEnvelope,
-			weight *big.Int, wg *sync.WaitGroup) {
-			defer wg.Done()
+		if err := s.WalkEnvelopes(p, false, func(vote *models.VoteEnvelope, weight *big.Int) {
 			if err := s.addLiveVote(vote.ProcessId, vote.VotePackage,
 				weight, results); err != nil {
 				log.Warn(err)

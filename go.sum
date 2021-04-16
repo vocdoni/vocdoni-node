@@ -1695,8 +1695,6 @@ github.com/tendermint/tm-db v0.6.3/go.mod h1:lfA1dL9/Y/Y8wwyPp2NMLyn5P5Ptr/gvDFN
 github.com/tendermint/tm-db v0.6.4 h1:3N2jlnYQkXNQclQwd/eKV/NzlqPlfK21cpRRIx80XXQ=
 github.com/tendermint/tm-db v0.6.4/go.mod h1:dptYhIpJ2M5kUuenLr+Yyf3zQOv1SgBZcl8/BmWlMBw=
 github.com/texttheater/golang-levenshtein v0.0.0-20180516184445-d188e65d659e/go.mod h1:XDKHRm5ThF8YJjx001LtgelzsoaEcvnA7lVWz9EeX3g=
-github.com/timshannon/badgerhold/v3 v3.0.0-20210208141506-eb78b03f8097 h1:sV+a+BTSFE4y60tP+yPLs3GOwiFEfZIZGQKDnpave0I=
-github.com/timshannon/badgerhold/v3 v3.0.0-20210208141506-eb78b03f8097/go.mod h1:czfK/0RM+CHcK9s0n3uH8pYkjPeM7tmnjtR2+BE+JZs=
 github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f h1:GNulbesD8h8DEF/s+a0Q5cEm4c4HnwlTgzZ5KWIA68Y=
 github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f/go.mod h1:czfK/0RM+CHcK9s0n3uH8pYkjPeM7tmnjtR2+BE+JZs=
 github.com/tjfoc/gmsm v1.3.0/go.mod h1:HaUcFuY0auTiaHB9MHFGCPx5IaLhTUd2atbCFBQXn9w=
@@ -1836,8 +1834,6 @@ go.vocdoni.io/dvote v0.6.1-0.20210130094936-75dbb92de3f0/go.mod h1:NJyERGs2LmEvl
 go.vocdoni.io/dvote v0.6.1-0.20210206210936-a0407e833753/go.mod h1:HhMMtdnkLI3ujk+zcL1frzFg5S7SbvxWtis7RZTq1dA=
 go.vocdoni.io/proto v0.1.7/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v0.1.8/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
-go.vocdoni.io/proto v1.0.2 h1:BdA676hy/lNU1PMb4cC+OvAErkeBx8+nRM579SJVpdM=
-go.vocdoni.io/proto v1.0.2/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v1.0.3-0.20210414183906-e76062846007 h1:J9++6inthzEjyCEEY/Opp3RI2ExKbnCP2wdmLHkUUOQ=
 go.vocdoni.io/proto v1.0.3-0.20210414183906-e76062846007/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go4.org v0.0.0-20180809161055-417644f6feb5/go.mod h1:MkTOUMDaeVYJUOUsaDXIhWPZYa1yOyC1qaOBpL57BhE=
