@@ -5,6 +5,8 @@ go 1.16
 // For testing purposes while dvote-protobuf becomes stable
 // replace go.vocdoni.io/proto  => ../dvote-protobuf
 
+replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 v3.0.0-20210416135442-1226c2c2c7d6
+
 require (
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210227202403-5dae5c48f917
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210203222605-876755a714c3
