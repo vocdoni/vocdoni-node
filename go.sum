@@ -1695,8 +1695,6 @@ github.com/tendermint/tm-db v0.6.3/go.mod h1:lfA1dL9/Y/Y8wwyPp2NMLyn5P5Ptr/gvDFN
 github.com/tendermint/tm-db v0.6.4 h1:3N2jlnYQkXNQclQwd/eKV/NzlqPlfK21cpRRIx80XXQ=
 github.com/tendermint/tm-db v0.6.4/go.mod h1:dptYhIpJ2M5kUuenLr+Yyf3zQOv1SgBZcl8/BmWlMBw=
 github.com/texttheater/golang-levenshtein v0.0.0-20180516184445-d188e65d659e/go.mod h1:XDKHRm5ThF8YJjx001LtgelzsoaEcvnA7lVWz9EeX3g=
-github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f h1:GNulbesD8h8DEF/s+a0Q5cEm4c4HnwlTgzZ5KWIA68Y=
-github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f/go.mod h1:czfK/0RM+CHcK9s0n3uH8pYkjPeM7tmnjtR2+BE+JZs=
 github.com/tjfoc/gmsm v1.3.0/go.mod h1:HaUcFuY0auTiaHB9MHFGCPx5IaLhTUd2atbCFBQXn9w=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
@@ -1717,6 +1715,8 @@ github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtX
 github.com/urfave/cli/v2 v2.0.0/go.mod h1:SE9GqnLQmjVa0iPEY0f1w3ygNIYcIJ0OKPMoW2caLfQ=
 github.com/viant/assertly v0.4.8/go.mod h1:aGifi++jvCrUaklKEKT0BU95igDNaqkvz+49uaYMPRU=
 github.com/viant/toolbox v0.24.0/go.mod h1:OxMCG57V0PXuIP2HNQrtJf2CjqdmbrOx5EkMILuUhzM=
+github.com/vocdoni/badgerhold/v3 v3.0.0-20210416135442-1226c2c2c7d6 h1:zIRr1AJTv0ME0qxyjpbbvYNwjXiIN3K+6eW3a5C29lE=
+github.com/vocdoni/badgerhold/v3 v3.0.0-20210416135442-1226c2c2c7d6/go.mod h1:czfK/0RM+CHcK9s0n3uH8pYkjPeM7tmnjtR2+BE+JZs=
 github.com/vocdoni/blind-ca v0.1.4 h1:4q+Mxm5MA7WZHvQ+/aRYCeX2qaM8DYpHWQUfrmd91Fo=
 github.com/vocdoni/blind-ca v0.1.4/go.mod h1:4ouWDqlvXrrNS0Csf3hKA3cuDTmKh6nP7kSXF39nT4s=
 github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25/go.mod h1:NLA1A55raZ1VNMmKulPUm+Lu9CVetCDVuDCYk5bSYrE=

@@ -59,9 +59,9 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 	case namespace == 0 && len(entityID) > 0:
 		err = s.db.ForEach(
 			badgerhold.Where("EntityID").Eq(entityID).
+				Index("EntityID").
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
-				Index("EntityID").
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -72,6 +72,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 	case namespace > 0 && len(entityID) == 0:
 		err = s.db.ForEach(
 			badgerhold.Where("Namespace").Eq(namespace).
+				Index("Namespace").
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				SortBy("CreationTime").
@@ -83,8 +84,8 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 			})
 	case namespace == 0 && len(entityID) == 0:
 		err = s.db.ForEach(
-			badgerhold.Where("ID").Ne([]byte{}).
-				And("Status").MatchFunc(statusMatchFunc).
+			badgerhold.Where("Status").MatchFunc(statusMatchFunc).
+				Index("Status").
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				SortBy("CreationTime").
 				Skip(from).
@@ -96,10 +97,10 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 	default:
 		err = s.db.ForEach(
 			badgerhold.Where("EntityID").Eq(entityID).
+				Index("EntityID").
 				And("Namespace").Eq(namespace).
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
-				Index("EntityID").
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
