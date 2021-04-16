@@ -213,7 +213,8 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	startTime := time.Now()
 	txn := s.db.Badger().NewTransaction(true)
 	for _, v := range s.voteIndexPool {
-		if err := s.addVoteIndex(v.vote.Nullifier,
+		if err := s.addVoteIndex(
+			v.vote.Nullifier,
 			v.vote.ProcessId,
 			height,
 			v.vote.Weight,

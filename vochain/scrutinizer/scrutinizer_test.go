@@ -262,8 +262,8 @@ func TestResults(t *testing.T) {
 	vp, err = priv.Encrypt(vp, nil)
 	qt.Assert(t, err, qt.IsNil)
 
-	sc.Rollback()
-	for i := 0; i < 300; i++ {
+	for i := int32(0); i < 300; i++ {
+		sc.Rollback()
 		vote := &models.VoteEnvelope{
 			Nonce:                util.RandomBytes(32),
 			ProcessId:            pid,
@@ -377,7 +377,6 @@ func TestLiveResults(t *testing.T) {
 		Votes: []int{1, 1, 1},
 	})
 	qt.Assert(t, err, qt.IsNil)
-	v := &models.Vote{ProcessId: pid, VotePackage: vp}
 	r := &Results{
 		Votes:        newEmptyVotes(3, 2),
 		Weight:       new(big.Int).SetUint64(0),
@@ -386,9 +385,11 @@ func TestLiveResults(t *testing.T) {
 	}
 	sc.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
-		qt.Assert(t, sc.addLiveVote(v.ProcessId,
-			v.VotePackage,
-			new(big.Int).SetBytes(v.Weight), r),
+		qt.Assert(t, sc.addLiveVote(
+			pid,
+			vp,
+			new(big.Int).SetUint64(1),
+			r),
 			qt.IsNil)
 	}
 	qt.Assert(t, sc.commitVotes(pid, r), qt.IsNil)
