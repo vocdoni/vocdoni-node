@@ -134,8 +134,7 @@ func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (int, error) {
 	// TODO: Warning, int can overflow
 	if len(processId) > 0 {
 		return s.db.Count(&VoteReference{},
-			badgerhold.Where("ProcessID").Eq(processId))
-		// badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
+			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
 	}
 	// If no processId is provided, count all envelopes
 	return s.db.Count(&VoteReference{}, &badgerhold.Query{})
