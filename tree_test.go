@@ -325,6 +325,54 @@ func TestRWMutex(t *testing.T) {
 	}
 }
 
+func TestSetGetNLeafs(t *testing.T) {
+	c := qt.New(t)
+	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+
+	// 0
+	tree.tx, err = tree.db.NewTx()
+	c.Assert(err, qt.IsNil)
+
+	err = tree.setNLeafs(0)
+	c.Assert(err, qt.IsNil)
+
+	err = tree.tx.Commit()
+	c.Assert(err, qt.IsNil)
+
+	n, err := tree.GetNLeafs()
+	c.Assert(err, qt.IsNil)
+	c.Assert(n, qt.Equals, uint64(0))
+
+	// 1024
+	tree.tx, err = tree.db.NewTx()
+	c.Assert(err, qt.IsNil)
+
+	err = tree.setNLeafs(1024)
+	c.Assert(err, qt.IsNil)
+
+	err = tree.tx.Commit()
+	c.Assert(err, qt.IsNil)
+
+	n, err = tree.GetNLeafs()
+	c.Assert(err, qt.IsNil)
+	c.Assert(n, qt.Equals, uint64(1024))
+
+	// 2**64 -1
+	tree.tx, err = tree.db.NewTx()
+	c.Assert(err, qt.IsNil)
+
+	err = tree.setNLeafs(18446744073709551615)
+	c.Assert(err, qt.IsNil)
+
+	err = tree.tx.Commit()
+	c.Assert(err, qt.IsNil)
+
+	n, err = tree.GetNLeafs()
+	c.Assert(err, qt.IsNil)
+	c.Assert(n, qt.Equals, uint64(18446744073709551615))
+}
+
 func BenchmarkAdd(b *testing.B) {
 	// prepare inputs
 	var ks, vs [][]byte
