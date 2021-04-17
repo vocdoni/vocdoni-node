@@ -195,7 +195,7 @@ func TestUpdate(t *testing.T) {
 	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(big.NewInt(11)))
 }
 
-func TestAux(t *testing.T) { // TMP
+func TestAux(t *testing.T) { // TODO split in proper tests
 	c := qt.New(t)
 	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -219,6 +219,9 @@ func TestAux(t *testing.T) { // TMP
 	k = BigIntToBytes(big.NewInt(int64(770)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
+	//
+	// err = tree.PrintGraphviz(nil)
+	// c.Assert(err, qt.IsNil)
 }
 
 func TestGet(t *testing.T) {

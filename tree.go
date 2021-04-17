@@ -598,6 +598,12 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 }
 
 func (t *Tree) dbGet(k []byte) ([]byte, error) {
+	// if key is empty, return empty as value
+	empty := make([]byte, t.hashFunction.Len())
+	if bytes.Equal(k, empty) {
+		return empty, nil
+	}
+
 	v, err := t.db.Get(k)
 	if err == nil {
 		return v, nil
@@ -694,5 +700,78 @@ func (t *Tree) ImportDump(b []byte) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// Graphviz iterates across the full tree to generate a string Graphviz
+// representation of the tree and writes it to w
+func (t *Tree) Graphviz(w io.Writer, rootKey []byte) error {
+	fmt.Fprintf(w, `digraph hierarchy {
+node [fontname=Monospace,fontsize=10,shape=box]
+`)
+	nChars := 4
+	nEmpties := 0
+	empty := make([]byte, t.hashFunction.Len())
+	err := t.Iterate(func(k, v []byte) {
+		switch v[0] {
+		case PrefixValueEmpty:
+		case PrefixValueLeaf:
+			fmt.Fprintf(w, "\"%v\" [style=filled];\n", hex.EncodeToString(k[:nChars]))
+			// key & value from the leaf
+			kB, vB := readLeafValue(v)
+			fmt.Fprintf(w, "\"%v\" -> {\"k:%v\\nv:%v\"}\n",
+				hex.EncodeToString(k[:nChars]), hex.EncodeToString(kB[:nChars]),
+				hex.EncodeToString(vB[:nChars]))
+			fmt.Fprintf(w, "\"k:%v\\nv:%v\" [style=dashed]\n",
+				hex.EncodeToString(kB[:nChars]), hex.EncodeToString(vB[:nChars]))
+		case PrefixValueIntermediate:
+			l, r := readIntermediateChilds(v)
+			lStr := hex.EncodeToString(l[:nChars])
+			rStr := hex.EncodeToString(r[:nChars])
+			eStr := ""
+			if bytes.Equal(l, empty) {
+				lStr = fmt.Sprintf("empty%v", nEmpties)
+				eStr += fmt.Sprintf("\"%v\" [style=dashed,label=0];\n",
+					lStr)
+				nEmpties++
+			}
+			if bytes.Equal(r, empty) {
+				rStr = fmt.Sprintf("empty%v", nEmpties)
+				eStr += fmt.Sprintf("\"%v\" [style=dashed,label=0];\n",
+					rStr)
+				nEmpties++
+			}
+			fmt.Fprintf(w, "\"%v\" -> {\"%v\" \"%v\"}\n", hex.EncodeToString(k[:nChars]),
+				lStr, rStr)
+			fmt.Fprint(w, eStr)
+		default:
+		}
+	})
+	fmt.Fprintf(w, "}\n")
+	return err
+}
+
+// PrintGraphviz prints the output of Tree.Graphviz
+func (t *Tree) PrintGraphviz(rootKey []byte) error {
+	if rootKey == nil {
+		rootKey = t.Root()
+	}
+	w := bytes.NewBufferString("")
+	fmt.Fprintf(w,
+		"--------\nGraphviz of the Tree with Root "+hex.EncodeToString(rootKey)+":\n")
+	err := t.Graphviz(w, nil)
+	if err != nil {
+		fmt.Println(w)
+		return err
+	}
+	fmt.Fprintf(w,
+		"End of Graphviz of the Tree with Root "+hex.EncodeToString(rootKey)+"\n--------\n")
+
+	fmt.Println(w)
+	return nil
+}
+
+// Purge WIP: unimplemented
+func (t *Tree) Purge(keys [][]byte) error {
 	return nil
 }
