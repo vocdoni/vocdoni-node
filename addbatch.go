@@ -8,7 +8,6 @@ import (
 
 /*
 
-
 AddBatch design
 ===============
 
@@ -18,7 +17,7 @@ CASE A: Empty Tree --> if tree is empty (root==0)
 - Build the full tree from bottom to top (from all the leaf to the root)
 
 
-CASE B: ALMOST CASE A, Almost empty Tree --> if Tree has numLeafs < numBuckets
+CASE B: ALMOST CASE A, Almost empty Tree --> if Tree has numLeafs < minLeafsThreshold
 ==============================================================================
 - Get the Leafs (key & value) (iterate the tree from the current root getting
 the leafs)
@@ -33,7 +32,7 @@ from the original Tree + the new key&values to be added from the AddBatch call
       B   C
 
 
-CASE C: ALMOST CASE B --> if Tree has few Leafs (but numLeafs>=numBuckets)
+CASE C: ALMOST CASE B --> if Tree has few Leafs (but numLeafs>=minLeafsThreshold)
 ==============================================================================
 - Use A, B, G, F as Roots of subtrees
 - Do CASE B for each subtree
@@ -112,8 +111,8 @@ L:    M1   *   M2      *        (where M1 and M2 are empty)
 Algorithm decision
 ==================
 - if nLeafs==0 (root==0): CASE A
-- if nLeafs<nBuckets: CASE B
-- if nLeafs>=nBuckets && nLeafs < minLeafsThreshold: CASE C
+- if nLeafs<minLeafsThreshold: CASE B
+- if nLeafs>=minLeafsThreshold && (nLeafs/nBuckets) < minLeafsThreshold: CASE C
 - else: CASE D & CASE E
 
 
@@ -148,10 +147,31 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 	}
 
 	// if nLeafs==0 (root==0): CASE A
-	e := make([]byte, t.hashFunction.Len())
-	if bytes.Equal(t.root, e) {
-		// CASE A
+	if bytes.Equal(t.root, t.emptyHash) {
 		// sort keys & values by path
+		sortKvs(kvs)
+		return t.buildTreeBottomUp(kvs)
+	}
+
+	// if nLeafs<nBuckets: CASE B
+	nLeafs, err := t.GetNLeafs()
+	if err != nil {
+		return nil, err
+	}
+	minLeafsThreshold := uint64(100) // nolint:gomnd // TMP WIP
+	if nLeafs < minLeafsThreshold {
+		// get already existing keys
+		aKs, aVs, err := t.getLeafs()
+		if err != nil {
+			return nil, err
+		}
+		aKvs, err := t.keysValuesToKvs(aKs, aVs)
+		if err != nil {
+			return nil, err
+		}
+		// add already existing key-values to the inputted key-values
+		kvs = append(kvs, aKvs...)
+		// proceed with CASE A
 		sortKvs(kvs)
 		return t.buildTreeBottomUp(kvs)
 	}
@@ -209,6 +229,18 @@ func (t *Tree) keysValuesToKvs(ks, vs [][]byte) ([]kv, error) {
 	return kvs, nil
 }
 
+/*
+func (t *Tree) kvsToKeysValues(kvs []kv) ([][]byte, [][]byte) {
+	ks := make([][]byte, len(kvs))
+	vs := make([][]byte, len(kvs))
+	for i := 0; i < len(kvs); i++ {
+		ks[i] = kvs[i].k
+		vs[i] = kvs[i].v
+	}
+	return ks, vs
+}
+*/
+
 // keys & values must be sorted by path, and must be length multiple of 2
 // TODO return index of failed keyvaules
 func (t *Tree) buildTreeBottomUp(kvs []kv) ([]int, error) {
@@ -253,4 +285,17 @@ func (t *Tree) upFromKeys(ks [][]byte) ([]byte, error) {
 		rKs = append(rKs, k)
 	}
 	return t.upFromKeys(rKs)
+}
+
+func (t *Tree) getLeafs() ([][]byte, [][]byte, error) {
+	var ks, vs [][]byte
+	err := t.Iterate(func(k, v []byte) {
+		if v[0] != PrefixValueLeaf {
+			return
+		}
+		leafK, leafV := readLeafValue(v)
+		ks = append(ks, leafK)
+		vs = append(vs, leafV)
+	})
+	return ks, vs, err
 }
