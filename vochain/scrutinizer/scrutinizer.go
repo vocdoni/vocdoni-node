@@ -294,7 +294,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		p := []byte(pid) // make a copy
 		go func() {
 			// The commit is run async because it might be blocking (due the Mutex locks)
-			// and since this is the more costly operation, avoids affecting the consensus time.
+			// and since this is the more costly operation, avoid affecting the consensus time.
 			if err := s.commitVotes(p, results); err != nil {
 				log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 			}

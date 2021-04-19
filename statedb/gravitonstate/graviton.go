@@ -86,6 +86,8 @@ type GravitonTree struct {
 	tree    safeTree
 	version uint64
 	size    uint64
+
+	tmpSizeCounter uint64
 }
 
 type VersionTree struct {
@@ -229,6 +231,9 @@ func (g *GravitonState) AddTree(name string) error {
 		return err
 	}
 	g.trees[name] = &GravitonTree{tree: safeTree{gtree: t}}
+	if err := g.trees[name].Init(); err != nil {
+		return err
+	}
 	return g.updateImmutable()
 }
 
@@ -245,7 +250,12 @@ func (g *GravitonState) TreeWithRoot(root []byte) statedb.StateTree {
 	if err != nil {
 		return nil
 	}
-	return &GravitonTree{tree: safeTree{gtree: gt}, version: g.Version()}
+
+	tree := &GravitonTree{tree: safeTree{gtree: gt}, version: g.Version()}
+	if err = tree.Init(); err != nil {
+		return nil
+	}
+	return tree
 }
 
 // KeyDiff returns the list of inserted keys on rootBig not present in rootSmall
@@ -266,9 +276,10 @@ func (g *GravitonState) KeyDiff(rootSmall, rootBig []byte) ([][]byte, error) {
 		})
 		return diff, nil
 	}
-	err := graviton.Diff(t1.(*GravitonTree).tree.gtree, t2.(*GravitonTree).tree.gtree, nil, nil, func(k, v []byte) {
-		diff = append(diff, k)
-	})
+	err := graviton.Diff(t1.(*GravitonTree).tree.gtree, t2.(*GravitonTree).tree.gtree, nil, nil,
+		func(k, v []byte) {
+			diff = append(diff, k)
+		})
 	return diff, err
 }
 
@@ -287,7 +298,8 @@ func (g *GravitonState) updateImmutable() error {
 	return nil
 }
 
-// ImmutableTree is a tree snapshot that won't change, useful for making queries on a state changing environment
+// ImmutableTree is a tree snapshot that won't change, useful for making queries
+// on a state changing environment
 func (g *GravitonState) ImmutableTree(name string) statedb.StateTree {
 	return g.imTrees[name]
 }
@@ -299,7 +311,7 @@ func (g *GravitonState) Commit() ([]byte, error) {
 
 	// Commit current trees and save versions to the version Tree
 	for name, t := range g.trees {
-		if err = t.tree.Commit(); err != nil {
+		if err = t.Commit(); err != nil {
 			return nil, err
 		}
 		if err = g.vTree.Add(name, t.tree.GetVersion()); err != nil {
@@ -361,6 +373,12 @@ func (g *GravitonState) Close() error {
 	return nil
 }
 
+func (t *GravitonTree) Init() error {
+	atomic.StoreUint64(&t.size, t.count())
+	t.tmpSizeCounter = 0
+	return nil
+}
+
 func (t *GravitonTree) Get(key []byte) []byte {
 	b, _ := t.tree.Get(key)
 	return b
@@ -368,13 +386,16 @@ func (t *GravitonTree) Get(key []byte) []byte {
 
 func (t *GravitonTree) Add(key, value []byte) error {
 	// if already exist, just return
-	if v, err := t.tree.Get(key); err == nil && string(v) == string(value) {
+	if v, err := t.tree.Get(key); err == nil {
+		if !bytes.Equal(v, value) {
+			return t.tree.Put(key, value)
+		}
 		return nil
 	}
 	// if it does not exist, add, increase size counter and return
 	err := t.tree.Put(key, value)
 	if err == nil {
-		atomic.AddUint64(&t.size, 1)
+		atomic.AddUint64(&t.tmpSizeCounter, 1)
 	}
 	return err
 }
@@ -413,23 +434,18 @@ func (t *GravitonTree) count() (count uint64) {
 	c, deferFn := t.tree.Cursor()
 	defer deferFn()
 	for _, _, err := c.First(); err == nil; _, _, err = c.Next() {
-		// TBD: This is horrible from the performance point of view...
 		count++
 	}
 	return
 }
 
 func (t *GravitonTree) Commit() error {
+	atomic.AddUint64(&t.size, atomic.SwapUint64(&t.tmpSizeCounter, 0))
 	return t.tree.Commit()
 }
 
 func (t *GravitonTree) Count() uint64 {
-	c := atomic.LoadUint64(&t.size)
-	if c == 0 {
-		c = t.count()
-		atomic.StoreUint64(&t.size, c)
-	}
-	return c
+	return atomic.LoadUint64(&t.size)
 }
 
 func (t *GravitonTree) Proof(key []byte) ([]byte, error) {

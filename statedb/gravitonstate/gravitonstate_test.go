@@ -50,7 +50,9 @@ func TestState(t *testing.T) {
 		s.Tree("t1").Add([]byte(fmt.Sprintf("%d", i+10)), []byte(fmt.Sprintf("number %d", i+10)))
 		s.Tree("t2").Add([]byte(fmt.Sprintf("%d", i+20)), []byte(fmt.Sprintf("number %d", i+20)))
 	}
-
+	if _, err := s.Commit(); err != nil {
+		t.Error(err)
+	}
 	// Check Count
 	if s.Tree("t1").Count() != 20 {
 		t.Errorf("tree size must be 20, but it is %d", s.Tree("t1").Count())
