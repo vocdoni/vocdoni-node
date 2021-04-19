@@ -298,7 +298,18 @@ func (r *Router) getValidatorList(request routerRequest) {
 
 func (r *Router) getBlock(request routerRequest) {
 	var response types.MetaResponse
-	blockHeader := vochain.MirrorTendermintBlock(r.Scrutinizer.App.GetBlockByHeight(int64(*response.Height)))
+	blockHeader := vochain.MirrorTendermintBlock(r.Scrutinizer.App.GetBlockByHeight(int64(request.From)))
+	blockBytes, err := proto.Marshal(blockHeader)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get block: %v", err))
+		return
+	}
+	response.Content = blockBytes
+	request.Send(r.buildReply(request, &response))
+}
+func (r *Router) getBlockByHash(request routerRequest) {
+	var response types.MetaResponse
+	blockHeader := vochain.MirrorTendermintBlock(r.Scrutinizer.App.GetBlockByHash(request.Payload))
 	blockBytes, err := proto.Marshal(blockHeader)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: %v", err))
@@ -312,7 +323,7 @@ func (r *Router) getBlockList(request routerRequest) {
 	var response types.MetaResponse
 	blockList := &models.TendermintHeaderList{}
 	for i := 0; i < request.ListSize; i++ {
-		block := r.Scrutinizer.App.GetBlockByHeight(int64(*response.Height) + int64(i))
+		block := r.Scrutinizer.App.GetBlockByHeight(int64(request.From) + int64(i))
 		if block == nil {
 			break
 		}
