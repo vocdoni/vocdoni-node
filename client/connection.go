@@ -42,7 +42,7 @@ func New(addr string) (*Client, error) {
 			IdleConnTimeout:    10 * time.Second,
 			DisableCompression: false,
 		}
-		cli.HTTP = &http.Client{Transport: tr, Timeout: time.Second * 5}
+		cli.HTTP = &http.Client{Transport: tr, Timeout: time.Second * 20}
 	} else {
 		return nil, fmt.Errorf("address is not websockets nor http: %s", addr)
 	}

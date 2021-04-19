@@ -91,17 +91,19 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 	if err != nil {
 		return nil, err
 	}
-	s.App.State.AddEventListener(s)
-	if s.envelopeHeightCache, err = lru.New(countEnvelopeCacheSize); err != nil {
-		return nil, err
-	}
+	startTime := time.Now()
 	c, err := s.db.Count(&VoteReference{}, &badgerhold.Query{})
 	if err != nil {
 		return nil, fmt.Errorf("could not count the total envelopes: %w", err)
 	}
-	log.Infof("indexer have %d envelopes stored", c)
+	log.Infof("indexer initialization took %s, have %d envelopes stored", time.Since(startTime), c)
 	s.countTotalEnvelopes = new(uint64)
 	*s.countTotalEnvelopes = uint64(c)
+	// Subscrive to events
+	s.App.State.AddEventListener(s)
+	if s.envelopeHeightCache, err = lru.New(countEnvelopeCacheSize); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
