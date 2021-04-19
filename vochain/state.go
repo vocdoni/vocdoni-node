@@ -400,7 +400,6 @@ func (v *State) AddVote(vote *models.Vote) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal vote")
 	}
-	// TODO: newVoteBytes = hash(newVoteBytes)
 	v.Lock()
 	err = v.Store.Tree(VoteTree).Add(vid, ethereum.HashRaw(newVoteBytes))
 	v.Unlock()

@@ -2,10 +2,13 @@ package scrutinizer
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
@@ -21,6 +24,8 @@ const (
 	// MaxEnvelopeListSize is the maximum number of envelopes a process can store.
 	// 8.3M seems enough for now
 	MaxEnvelopeListSize = 32 << 18
+
+	countEnvelopeCacheSize = 1024
 )
 
 // EventListener is an interface used for executing custom functions during the
@@ -54,6 +59,10 @@ type Scrutinizer struct {
 	// eventListeners is the list of external callbacks that will be executed by the scrutinizer
 	eventListeners []EventListener
 	db             *badgerhold.Store
+	// envelopeHeightCache and countTotalEnvelopes are in memory counters that helps reducing the
+	// access time when GenEnvelopeHeight() is called.
+	envelopeHeightCache *lru.Cache
+	countTotalEnvelopes *uint64
 
 	// addVoteLock is used to avoid Transaction Conflicts on the KV database.
 	// It is not critical and the code should be able to recover from a Conflict, but we
@@ -83,6 +92,16 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 		return nil, err
 	}
 	s.App.State.AddEventListener(s)
+	if s.envelopeHeightCache, err = lru.New(countEnvelopeCacheSize); err != nil {
+		return nil, err
+	}
+	c, err := s.db.Count(&VoteReference{}, &badgerhold.Query{})
+	if err != nil {
+		return nil, fmt.Errorf("could not count the total envelopes: %w", err)
+	}
+	log.Infof("indexer have %d envelopes stored", c)
+	s.countTotalEnvelopes = new(uint64)
+	*s.countTotalEnvelopes = uint64(c)
 	return s, nil
 }
 
@@ -185,10 +204,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 			log.Errorf("commit: cannot create new empty process: %v", err)
 			continue
 		}
-		if live, err := s.isOpenProcess(p.ProcessID); err != nil {
-			log.Errorf("cannot check if process is live results: %v", err)
-		} else if live && !s.App.IsSynchronizing() {
-			// Only add live processes if the vochain is not synchronizing
+		if !s.App.IsSynchronizing() {
 			s.addProcessToLiveResults(p.ProcessID)
 		}
 	}
@@ -236,6 +252,8 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		s.indexTxLock.Unlock()
 		log.Infof("indexed %d new envelopes, took %s",
 			len(s.voteIndexPool), time.Since(startTime))
+		// Add the envelopes to the countTotalEnvelopes var
+		atomic.AddUint64(s.countTotalEnvelopes, uint64(len(s.voteIndexPool)))
 	}
 	txn.Discard()
 
@@ -244,6 +262,12 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	startTime = time.Now()
 
 	for pid, votes := range s.votePool {
+		// Update the cache of envelopes height by process ID (if exist)
+		if vcount, ok := s.envelopeHeightCache.Get(pid); ok {
+			c := vcount.(uint64) + uint64(len(votes))
+			s.envelopeHeightCache.Add(pid, c)
+		}
+		// Get the process information
 		proc, err := s.ProcessInfo([]byte(pid))
 		if err != nil {
 			log.Warnf("cannot get process %x", []byte(pid))
@@ -267,7 +291,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 				nvotes++
 			}
 		}
-		p := []byte(pid)
+		p := []byte(pid) // make a copy
 		go func() {
 			// The commit is run async because it might be blocking (due the Mutex locks)
 			// and since this is the more costly operation, avoids affecting the consensus time.

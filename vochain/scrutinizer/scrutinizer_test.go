@@ -625,6 +625,23 @@ func TestCountVotes(t *testing.T) {
 	app.SetTestingMethods()
 	pid := util.RandomBytes(32)
 
+	err = app.State.AddProcess(&models.Process{
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Status:       models.ProcessStatus_READY,
+		Mode:         &models.ProcessMode{AutoStart: true},
+		BlockCount:   10,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount:     5,
+			MaxValue:     1,
+			MaxTotalCost: 3,
+			CostExponent: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	err = sc.newEmptyProcess(pid)
+	qt.Assert(t, err, qt.IsNil)
+
 	// Add 100 votes
 	vp, err := json.Marshal(types.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
@@ -632,6 +649,7 @@ func TestCountVotes(t *testing.T) {
 	})
 	qt.Assert(t, err, qt.IsNil)
 	sc.Rollback()
+	sc.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
 		v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
 		// Add votes to votePool with i as txIndex
@@ -651,11 +669,11 @@ func TestCountVotes(t *testing.T) {
 	// Test envelope height for this PID
 	height, err := sc.GetEnvelopeHeight(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, height, qt.CmpEquals(), 101)
+	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
 	// Test global envelope height
 	height, err = sc.GetEnvelopeHeight([]byte{})
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, height, qt.CmpEquals(), 101)
+	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
 
 	ref, err := sc.GetEnvelopeReference(nullifier)
 	qt.Assert(t, err, qt.IsNil)
