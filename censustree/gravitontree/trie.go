@@ -126,6 +126,7 @@ func (t *Tree) Add(index, value []byte) error {
 	if err := t.Tree.Add(index, value); err != nil {
 		return err
 	}
+
 	_, err := t.store.Commit()
 	return err
 }
