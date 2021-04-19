@@ -268,6 +268,7 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, vocInfo *vochain
 		r.registerPublic("getBlock", r.getBlock)
 		r.registerPublic("getBlockByHash", r.getBlockByHash)
 		r.registerPublic("getBlockList", r.getBlockList)
+		r.registerPublic("getTx", r.getTx)
 		r.registerPublic("getTxListForBlock", r.getTxListForBlock)
 	}
 }

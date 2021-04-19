@@ -75,8 +75,6 @@ func testEntityList(t *testing.T, entityCount int) {
 }
 
 func TestEntitySearch(t *testing.T) {
-	log.Init("info", "stdout")
-
 	app, err := vochain.NewBaseApplication(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -239,7 +237,6 @@ func testProcessList(t *testing.T, procsCount int) {
 }
 
 func TestProcessSearch(t *testing.T) {
-	log.Init("info", "stdout")
 	app, err := vochain.NewBaseApplication(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
