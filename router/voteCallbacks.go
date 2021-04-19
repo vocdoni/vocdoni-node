@@ -27,7 +27,7 @@ func (r *Router) submitRawTx(request routerRequest) {
 		r.sendError(request, string(res.Data))
 		return
 	}
-	log.Infof("broadcasting tx hash:%s", res.Hash)
+	log.Debugf("broadcasting tx hash:%s", res.Hash)
 	var response types.MetaResponse
 	response.Payload = fmt.Sprintf("%x", res.Data) // return nullifier or other info
 	if err = request.Send(r.buildReply(request, &response)); err != nil {
