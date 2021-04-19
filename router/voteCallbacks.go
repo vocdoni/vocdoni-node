@@ -298,7 +298,7 @@ func (r *Router) getValidatorList(request routerRequest) {
 
 func (r *Router) getBlock(request routerRequest) {
 	var response types.MetaResponse
-	blockHeader := vochain.MirrorTendermintBlock(r.Scrutinizer.App.GetBlockByHeight(int64(request.From)))
+	blockHeader := vochain.MirrorTendermintBlock(r.Scrutinizer.App.GetBlockByHeight(int64(request.BlockHeight)))
 	blockBytes, err := proto.Marshal(blockHeader)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: %v", err))
@@ -338,10 +338,26 @@ func (r *Router) getBlockList(request routerRequest) {
 	request.Send(r.buildReply(request, &response))
 }
 
+func (r *Router) getTx(request routerRequest) {
+	var response types.MetaResponse
+	tx, err := r.Scrutinizer.App.GetTx(request.BlockHeight, request.TxIndex)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
+		return
+	}
+	txBytes, err := proto.Marshal(tx)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
+		return
+	}
+	response.Content = txBytes
+	request.Send(r.buildReply(request, &response))
+}
+
 func (r *Router) getTxListForBlock(request routerRequest) {
 	var response types.MetaResponse
 	txList := new(models.SignedTxList)
-	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.From))
+	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.BlockHeight))
 	if block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get tx list: block does not exist"))
 		return
