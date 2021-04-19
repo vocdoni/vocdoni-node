@@ -340,8 +340,12 @@ func (r *Router) getBlockList(request routerRequest) {
 
 func (r *Router) getTxListForBlock(request routerRequest) {
 	var response types.MetaResponse
-	var txList *models.SignedTxList
+	txList := new(models.SignedTxList)
 	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.From))
+	if block == nil {
+		r.sendError(request, fmt.Sprintf("cannot get tx list: block does not exist"))
+		return
+	}
 	for _, tx := range block.Txs {
 		signedTx := new(models.SignedTx)
 		proto.Unmarshal(tx, signedTx)
