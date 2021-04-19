@@ -2,11 +2,11 @@ package router
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -298,10 +298,29 @@ func (r *Router) getValidatorList(request routerRequest) {
 
 func (r *Router) getBlock(request routerRequest) {
 	var response types.MetaResponse
-	block := r.Scrutinizer.App.GetBlockByHeight(int64(*response.Height))
-	blockBytes, err := json.Marshal(block)
+	blockHeader := vochain.MirrorTendermintBlock(r.Scrutinizer.App.GetBlockByHeight(int64(*response.Height)))
+	blockBytes, err := proto.Marshal(blockHeader)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: %v", err))
+		return
+	}
+	response.Content = blockBytes
+	request.Send(r.buildReply(request, &response))
+}
+
+func (r *Router) getBlockList(request routerRequest) {
+	var response types.MetaResponse
+	blockList := &models.TendermintHeaderList{}
+	for i := 0; i < request.ListSize; i++ {
+		block := r.Scrutinizer.App.GetBlockByHeight(int64(*response.Height) + int64(i))
+		if block == nil {
+			break
+		}
+		blockList.BlockHeaders = append(blockList.GetBlockHeaders(), vochain.MirrorTendermintBlock(block))
+	}
+	blockBytes, err := proto.Marshal(blockList)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get block list: %v", err))
 		return
 	}
 	response.Content = blockBytes
