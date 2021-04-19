@@ -338,6 +338,24 @@ func (r *Router) getBlockList(request routerRequest) {
 	request.Send(r.buildReply(request, &response))
 }
 
+func (r *Router) getTxListForBlock(request routerRequest) {
+	var response types.MetaResponse
+	var txList *models.SignedTxList
+	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.From))
+	for _, tx := range block.Txs {
+		signedTx := new(models.SignedTx)
+		proto.Unmarshal(tx, signedTx)
+		txList.TxList = append(txList.GetTxList(), signedTx)
+	}
+	txBytes, err := proto.Marshal(txList)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get tx list: %v", err))
+		return
+	}
+	response.Content = txBytes
+	request.Send(r.buildReply(request, &response))
+}
+
 func (r *Router) getResultsWeight(request routerRequest) {
 	var response types.MetaResponse
 	w, err := r.Scrutinizer.GetResultsWeight(request.ProcessID)
