@@ -103,9 +103,8 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 }
 
 // GetEnvelopes retreives all Envelopes of a ProcessId from the Blockchain block store
-func (s *Scrutinizer) GetEnvelopes(processId []byte) ([]*models.VoteEnvelope, []*big.Int, error) {
-	envelopes := []*models.VoteEnvelope{}
-	weights := []*big.Int{}
+func (s *Scrutinizer) GetEnvelopes(processId []byte) (*models.EnvelopePackageList, error) {
+	envelopes := new(models.EnvelopePackageList)
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
 		func(txRef *VoteReference) error {
@@ -121,11 +120,15 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte) ([]*models.VoteEnvelope, []
 			if envelope == nil {
 				return fmt.Errorf("transaction is not an Envelope")
 			}
-			envelopes = append(envelopes, envelope)
-			weights = append(weights, txRef.Weight)
+			envelopes.Envelopes = append(envelopes.GetEnvelopes(), &models.EnvelopePackage{
+				Envelope: envelope,
+				Weight:   txRef.Weight.Bytes(),
+				TxIndex:  txRef.TxIndex,
+				Height:   txRef.Height,
+			})
 			return nil
 		})
-	return envelopes, weights, err
+	return envelopes, err
 }
 
 // GetEnvelopeHeight returns the number of envelopes for a processId.

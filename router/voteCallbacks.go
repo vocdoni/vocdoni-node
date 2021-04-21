@@ -1,7 +1,6 @@
 package router
 
 import (
-	"encoding/base64"
 	"fmt"
 
 	"go.vocdoni.io/dvote/log"
@@ -116,9 +115,14 @@ func (r *Router) getEnvelope(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
 		return
 	}
+	envBytes, err := proto.Marshal(env)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
+		return
+	}
 	var response types.MetaResponse
 	response.Registered = types.True
-	response.Payload = base64.StdEncoding.EncodeToString(env.VotePackage)
+	response.Content = envBytes
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -259,16 +263,12 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	if request.ListSize == 0 {
 		request.ListSize = MaxListSize
 	}
-	envelopes, weights, err := r.Scrutinizer.GetEnvelopes(request.ProcessID)
+	envelopes, err := r.Scrutinizer.GetEnvelopes(request.ProcessID)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope list: (%s)", err))
 		return
 	}
-	envelopeList := &models.VoteEnvelopeList{VoteEnvelopes: envelopes}
-	for _, weight := range weights {
-		envelopeList.Weights = append(envelopeList.Weights, weight.Bytes())
-	}
-	listBytes, err := proto.Marshal(envelopeList)
+	listBytes, err := proto.Marshal(envelopes)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot marshal vote envelope list: (%s)", err))
 		return
