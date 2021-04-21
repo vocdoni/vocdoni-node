@@ -42,7 +42,7 @@ func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*VoteReference, er
 
 // GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
-func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.VoteEnvelope, []byte, error) {
+func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.EnvelopePackage, []byte, error) {
 	txRef, err := s.GetEnvelopeReference(nullifier)
 	if err != nil {
 		return nil, nil, err
@@ -59,7 +59,12 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.VoteEnvelope, []byt
 	if envelope == nil {
 		return nil, nil, fmt.Errorf("transaction is not an Envelope")
 	}
-	return envelope, stx.Signature, nil
+	return &models.EnvelopePackage{
+		Envelope: envelope,
+		Weight:   txRef.Weight.Bytes(),
+		TxIndex:  txRef.TxIndex,
+		Height:   txRef.Height,
+	}, stx.Signature, nil
 }
 
 // WalkEnvelopes executes callback for each envelopes of the ProcessId.
