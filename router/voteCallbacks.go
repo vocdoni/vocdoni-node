@@ -73,6 +73,37 @@ func (r *Router) submitEnvelope(request routerRequest) {
 	}
 }
 
+func (r *Router) getStats(request routerRequest) {
+	stats := new(models.VochainStats)
+
+	stats.BlockHeight = uint32(r.vocapp.State.Header(true).Height)
+	stats.BlockTimeStamp = int32(r.vocapp.State.Header(true).Timestamp)
+
+	stats.EntityCount = r.Scrutinizer.EntityCount()
+
+	votes, err := r.Scrutinizer.GetEnvelopeHeight([]byte{})
+	if err != nil {
+		log.Warnf("could not count vote envelopes: %s", err)
+	}
+	stats.EnvelopeCount = votes
+
+	stats.ProcessCount = r.Scrutinizer.ProcessCount()
+	vals, _ := r.vocapp.State.Validators(true)
+	stats.ValidatorCount = int32(len(vals))
+	stats.BlockTime = r.vocinfo.BlockTimes()[:]
+
+	stats.ChainID = r.vocapp.Node.GenesisDoc().ChainID
+	stats.GenesisTimeStamp = r.vocapp.Node.GenesisDoc().GenesisTime.Unix()
+	stats.Syncing = r.vocapp.IsSynchronizing()
+
+	var response types.MetaResponse
+	response.Content, err = proto.Marshal(stats)
+	if err != nil {
+		log.Errorf("could not marshal vochainStats: %s", err)
+	}
+	request.Send(r.buildReply(request, &response))
+}
+
 func (r *Router) getEnvelopeStatus(request routerRequest) {
 	// check pid
 	if len(request.ProcessID) != types.ProcessIDsize {
