@@ -446,6 +446,7 @@ func (r *Router) getResults(request routerRequest) {
 	}
 	votes := uint32(eh)
 	response.Height = &votes
+	response.Weight = vr.Weight.String()
 
 	request.Send(r.buildReply(request, &response))
 }
