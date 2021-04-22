@@ -392,7 +392,7 @@ func TestLiveResults(t *testing.T) {
 			r),
 			qt.IsNil)
 	}
-	qt.Assert(t, sc.commitVotes(pid, r), qt.IsNil)
+	qt.Assert(t, sc.commitVotes(pid, r, 1), qt.IsNil)
 
 	if live, err := sc.isOpenProcess(pid); !live || err != nil {
 		t.Fatal(fmt.Errorf("isLiveResultsProcess returned false: %v", err))
@@ -520,7 +520,7 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
 	if err := sc.addLiveVote(pid, vp, nil, r); err != nil {
 		return err
 	}
-	return sc.commitVotes(pid, r)
+	return sc.commitVotes(pid, r, 1)
 }
 
 func TestBallotProtocolRateProduct(t *testing.T) {

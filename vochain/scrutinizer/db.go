@@ -66,6 +66,7 @@ type Results struct {
 	VoteOpts     *models.ProcessVoteOptions `json:"voteOptions"`
 	Signatures   []types.HexBytes
 	Final        bool
+	Height       uint32
 }
 
 func (r *Results) String() string {

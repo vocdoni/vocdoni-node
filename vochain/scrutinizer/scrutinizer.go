@@ -179,6 +179,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
 		}
+		height := uint32(s.App.Node.BlockStore().Height())
 		if err := s.WalkEnvelopes(p, false, func(vote *models.VoteEnvelope, weight *big.Int) {
 			if err := s.addLiveVote(vote.ProcessId, vote.VotePackage,
 				weight, results); err != nil {
@@ -188,7 +189,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 			log.Error(err)
 		}
 		// Store the results on the persisten database
-		if err := s.commitVotes(p, results); err != nil {
+		if err := s.commitVotes(p, results, height); err != nil {
 			log.Errorf("cannot commit live votes: (%v)", err)
 		}
 
@@ -297,7 +298,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		go func() {
 			// The commit is run async because it might be blocking (due the Mutex locks)
 			// and since this is the more costly operation, avoid affecting the consensus time.
-			if err := s.commitVotes(p, results); err != nil {
+			if err := s.commitVotes(p, results, height); err != nil {
 				log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 			}
 		}()
