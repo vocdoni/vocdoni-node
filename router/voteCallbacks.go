@@ -352,7 +352,7 @@ func (r *Router) getBlockByHash(request routerRequest) {
 
 func (r *Router) getBlockList(request routerRequest) {
 	var response types.MetaResponse
-	blockList := &models.TendermintHeaderList{}
+	blockList := &models.BlockHeaderList{}
 	for i := 0; i < request.ListSize; i++ {
 		block := r.Scrutinizer.App.GetBlockByHeight(int64(request.From) + int64(i))
 		if block == nil {
@@ -478,7 +478,6 @@ func (r *Router) getResults(request routerRequest) {
 	votes := uint32(eh)
 	response.Height = &votes
 	response.Weight = vr.Weight.String()
-
 	request.Send(r.buildReply(request, &response))
 }
 
