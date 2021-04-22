@@ -315,7 +315,7 @@ func (s *Scrutinizer) isProcessLiveResults(pid []byte) bool {
 
 // commitVotes adds the votes and weight from results to the local database.
 // It does not overwrite the stored results but update them by adding the new content.
-func (s *Scrutinizer) commitVotes(pid []byte, results *Results) error {
+func (s *Scrutinizer) commitVotes(pid []byte, results *Results, height uint32) error {
 	// If the recovery bootstrap is running, wait.
 	s.recoveryBootLock.RLock()
 	defer s.recoveryBootLock.RUnlock()
@@ -328,6 +328,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, results *Results) error {
 			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 		}
 		update.Weight.Set(results.Weight)
+		update.Height = height
 
 		if len(results.Votes) == 0 {
 			return nil
@@ -392,6 +393,7 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 		Final:        true,
 		VoteOpts:     p.VoteOpts,
 		EnvelopeType: p.Envelope,
+		Height:       uint32(s.App.Node.BlockStore().Height()),
 	}
 
 	var nvotes uint64
