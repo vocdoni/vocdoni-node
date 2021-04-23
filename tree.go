@@ -128,7 +128,7 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 
 	var indexes []int
 	for i := 0; i < len(keys); i++ {
-		err = t.add(keys[i], values[i])
+		err = t.add(0, keys[i], values[i])
 		if err != nil {
 			indexes = append(indexes, i)
 		}
@@ -163,7 +163,7 @@ func (t *Tree) Add(k, v []byte) error {
 		return err
 	}
 
-	err = t.add(k, v)
+	err = t.add(0, k, v) // add from level 0
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (t *Tree) Add(k, v []byte) error {
 	return t.tx.Commit()
 }
 
-func (t *Tree) add(k, v []byte) error {
+func (t *Tree) add(fromLvl int, k, v []byte) error {
 	// TODO check validity of key & value (for the Tree.HashFunction type)
 
 	keyPath := make([]byte, t.hashFunction.Len())
@@ -187,7 +187,7 @@ func (t *Tree) add(k, v []byte) error {
 	path := getPath(t.maxLevels, keyPath)
 	// go down to the leaf
 	var siblings [][]byte
-	_, _, siblings, err := t.down(k, t.root, siblings, path, 0, false)
+	_, _, siblings, err := t.down(k, t.root, siblings, path, fromLvl, false)
 	if err != nil {
 		return err
 	}
@@ -217,9 +217,9 @@ func (t *Tree) add(k, v []byte) error {
 
 // down goes down to the leaf recursively
 func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
-	path []bool, l int, getLeaf bool) (
+	path []bool, currLvl int, getLeaf bool) (
 	[]byte, []byte, [][]byte, error) {
-	if l > t.maxLevels-1 {
+	if currLvl > t.maxLevels-1 {
 		return nil, nil, nil, fmt.Errorf("max level")
 	}
 	var err error
@@ -254,7 +254,7 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 
 			// if currKey is already used, go down until paths diverge
 			oldPath := getPath(t.maxLevels, oldLeafKeyFull)
-			siblings, err = t.downVirtually(siblings, currKey, newKey, oldPath, path, l)
+			siblings, err = t.downVirtually(siblings, currKey, newKey, oldPath, path, currLvl)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -267,16 +267,16 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 					PrefixValueLen+t.hashFunction.Len()*2, len(currValue))
 		}
 		// collect siblings while going down
-		if path[l] {
+		if path[currLvl] {
 			// right
 			lChild, rChild := readIntermediateChilds(currValue)
 			siblings = append(siblings, lChild)
-			return t.down(newKey, rChild, siblings, path, l+1, getLeaf)
+			return t.down(newKey, rChild, siblings, path, currLvl+1, getLeaf)
 		}
 		// left
 		lChild, rChild := readIntermediateChilds(currValue)
 		siblings = append(siblings, rChild)
-		return t.down(newKey, lChild, siblings, path, l+1, getLeaf)
+		return t.down(newKey, lChild, siblings, path, currLvl+1, getLeaf)
 	default:
 		return nil, nil, nil, fmt.Errorf("invalid value")
 	}
@@ -285,16 +285,16 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 // downVirtually is used when in a leaf already exists, and a new leaf which
 // shares the path until the existing leaf is being added
 func (t *Tree) downVirtually(siblings [][]byte, oldKey, newKey []byte, oldPath,
-	newPath []bool, l int) ([][]byte, error) {
+	newPath []bool, currLvl int) ([][]byte, error) {
 	var err error
-	if l > t.maxLevels-1 {
-		return nil, fmt.Errorf("max virtual level %d", l)
+	if currLvl > t.maxLevels-1 {
+		return nil, fmt.Errorf("max virtual level %d", currLvl)
 	}
 
-	if oldPath[l] == newPath[l] {
+	if oldPath[currLvl] == newPath[currLvl] {
 		siblings = append(siblings, t.emptyHash)
 
-		siblings, err = t.downVirtually(siblings, oldKey, newKey, oldPath, newPath, l+1)
+		siblings, err = t.downVirtually(siblings, oldKey, newKey, oldPath, newPath, currLvl+1)
 		if err != nil {
 			return nil, err
 		}
@@ -307,16 +307,16 @@ func (t *Tree) downVirtually(siblings [][]byte, oldKey, newKey []byte, oldPath,
 }
 
 // up goes up recursively updating the intermediate nodes
-func (t *Tree) up(key []byte, siblings [][]byte, path []bool, l int) ([]byte, error) {
+func (t *Tree) up(key []byte, siblings [][]byte, path []bool, currLvl int) ([]byte, error) {
 	var k, v []byte
 	var err error
-	if path[l] {
-		k, v, err = newIntermediate(t.hashFunction, siblings[l], key)
+	if path[currLvl] {
+		k, v, err = newIntermediate(t.hashFunction, siblings[currLvl], key)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		k, v, err = newIntermediate(t.hashFunction, key, siblings[l])
+		k, v, err = newIntermediate(t.hashFunction, key, siblings[currLvl])
 		if err != nil {
 			return nil, err
 		}
@@ -326,12 +326,12 @@ func (t *Tree) up(key []byte, siblings [][]byte, path []bool, l int) ([]byte, er
 		return nil, err
 	}
 
-	if l == 0 {
+	if currLvl == 0 {
 		// reached the root
 		return k, nil
 	}
 
-	return t.up(k, siblings, path, l-1)
+	return t.up(k, siblings, path, currLvl-1)
 }
 
 func newLeafValue(hashFunc HashFunction, k, v []byte) ([]byte, []byte, error) {
@@ -666,30 +666,50 @@ func (t *Tree) Iterate(f func([]byte, []byte)) error {
 	return t.iter(t.root, f)
 }
 
-func (t *Tree) iter(k []byte, f func([]byte, []byte)) error {
+// IterateWithStop does the same than Iterate, but with int for the current
+// level, and a boolean parameter used by the passed function, is to indicate to
+// stop iterating on the branch when the method returns 'true'.
+func (t *Tree) IterateWithStop(f func(int, []byte, []byte) bool) error {
+	t.updateAccessTime()
+	return t.iterWithStop(t.root, 0, f)
+}
+
+func (t *Tree) iterWithStop(k []byte, currLevel int, f func(int, []byte, []byte) bool) error {
 	v, err := t.dbGet(k)
 	if err != nil {
 		return err
 	}
+	currLevel++
 
 	switch v[0] {
 	case PrefixValueEmpty:
-		f(k, v)
+		f(currLevel, k, v)
 	case PrefixValueLeaf:
-		f(k, v)
+		f(currLevel, k, v)
 	case PrefixValueIntermediate:
-		f(k, v)
+		stop := f(currLevel, k, v)
+		if stop {
+			return nil
+		}
 		l, r := readIntermediateChilds(v)
-		if err = t.iter(l, f); err != nil {
+		if err = t.iterWithStop(l, currLevel, f); err != nil {
 			return err
 		}
-		if err = t.iter(r, f); err != nil {
+		if err = t.iterWithStop(r, currLevel, f); err != nil {
 			return err
 		}
 	default:
 		return fmt.Errorf("invalid value")
 	}
 	return nil
+}
+
+func (t *Tree) iter(k []byte, f func([]byte, []byte)) error {
+	f2 := func(currLvl int, k, v []byte) bool {
+		f(k, v)
+		return false
+	}
+	return t.iterWithStop(k, 0, f2)
 }
 
 // Dump exports all the Tree leafs in a byte array of length:
@@ -768,12 +788,22 @@ func (t *Tree) ImportDump(b []byte) error {
 // Graphviz iterates across the full tree to generate a string Graphviz
 // representation of the tree and writes it to w
 func (t *Tree) Graphviz(w io.Writer, rootKey []byte) error {
+	return t.GraphvizFirstNLevels(w, rootKey, t.maxLevels)
+}
+
+// GraphvizFirstNLevels iterates across the first NLevels of the tree to
+// generate a string Graphviz representation of the first NLevels of the tree
+// and writes it to w
+func (t *Tree) GraphvizFirstNLevels(w io.Writer, rootKey []byte, untilLvl int) error {
 	fmt.Fprintf(w, `digraph hierarchy {
 node [fontname=Monospace,fontsize=10,shape=box]
 `)
 	nChars := 4
 	nEmpties := 0
-	err := t.Iterate(func(k, v []byte) {
+	err := t.iterWithStop(t.root, 0, func(currLvl int, k, v []byte) bool {
+		if currLvl == untilLvl {
+			return true // to stop the iter from going down
+		}
 		switch v[0] {
 		case PrefixValueEmpty:
 		case PrefixValueLeaf:
@@ -807,6 +837,7 @@ node [fontname=Monospace,fontsize=10,shape=box]
 			fmt.Fprint(w, eStr)
 		default:
 		}
+		return false
 	})
 	fmt.Fprintf(w, "}\n")
 	return err
@@ -814,13 +845,18 @@ node [fontname=Monospace,fontsize=10,shape=box]
 
 // PrintGraphviz prints the output of Tree.Graphviz
 func (t *Tree) PrintGraphviz(rootKey []byte) error {
+	return t.PrintGraphvizFirstNLevels(rootKey, t.maxLevels)
+}
+
+// PrintGraphvizFirstNLevels prints the output of Tree.GraphvizFirstNLevels
+func (t *Tree) PrintGraphvizFirstNLevels(rootKey []byte, untilLvl int) error {
 	if rootKey == nil {
 		rootKey = t.Root()
 	}
 	w := bytes.NewBufferString("")
 	fmt.Fprintf(w,
 		"--------\nGraphviz of the Tree with Root "+hex.EncodeToString(rootKey)+":\n")
-	err := t.Graphviz(w, nil)
+	err := t.GraphvizFirstNLevels(w, nil, untilLvl)
 	if err != nil {
 		fmt.Println(w)
 		return err
