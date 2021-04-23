@@ -87,7 +87,7 @@ func (r *Router) getStats(request routerRequest) {
 	}
 	stats.EnvelopeCount = votes
 
-	stats.ProcessCount = r.Scrutinizer.ProcessCount()
+	stats.ProcessCount = r.Scrutinizer.ProcessCount([]byte{})
 	vals, _ := r.vocapp.State.Validators(true)
 	stats.ValidatorCount = int32(len(vals))
 	stats.BlockTime = r.vocinfo.BlockTimes()[:]
@@ -229,7 +229,7 @@ func (r *Router) getProcessInfo(request routerRequest) {
 func (r *Router) getProcessCount(request routerRequest) {
 	var response types.MetaResponse
 	response.Size = new(int64)
-	count := r.Scrutinizer.ProcessCount()
+	count := r.Scrutinizer.ProcessCount(request.EntityId)
 	*response.Size = count
 	request.Send(r.buildReply(request, &response))
 }

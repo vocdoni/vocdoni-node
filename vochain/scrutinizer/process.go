@@ -130,8 +130,14 @@ func (s *Scrutinizer) ProcessList(entityID []byte, searchTerm string, namespace 
 }
 
 // ProcessCount return the number of processes indexed
-func (s *Scrutinizer) ProcessCount() int64 {
-	c, err := s.db.Count(&Process{}, nil)
+func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
+	var c int
+	var err error
+	if len(entityID) == 0 {
+		c, err = s.db.Count(&Process{}, nil)
+	} else {
+		c, err = s.db.Count(&Process{}, badgerhold.Where("EntityID").Eq(entityID))
+	}
 	if err != nil {
 		log.Warnf("cannot count processes: %v", err)
 	}
