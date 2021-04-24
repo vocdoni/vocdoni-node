@@ -241,16 +241,18 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 }
 
 // BeginBlock signals the beginning of a new block. Called prior to any DeliverTxs.
-// The header contains the height, timestamp, and more - it exactly matches the Tendermint block header.
-// The LastCommitInfo and ByzantineValidators can be used to determine rewards and punishments for the validators.
-func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
+// The header contains the height, timestamp, and more - it exactly matches the
+// Tendermint block header.
+// The LastCommitInfo and ByzantineValidators can be used to determine rewards and
+// punishments for the validators.
+func (app *BaseApplication) BeginBlock(
+	req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	header := &models.TendermintHeader{
 		Height:         req.Header.GetHeight(),
 		ConsensusHash:  req.Header.GetConsensusHash(),
 		AppHash:        req.Header.GetAppHash(),
 		BlockID:        req.Header.LastBlockId.GetHash(),
 		DataHash:       req.Header.GetDataHash(),
-		EvidenceHash:   req.Header.GetEvidenceHash(),
 		LastCommitHash: req.Header.GetLastCommitHash(),
 		Timestamp:      req.Header.GetTime().Unix(),
 	}
@@ -326,16 +328,20 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	return abcitypes.ResponseEndBlock{}
 }
-func (app *BaseApplication) ApplySnapshotChunk(req abcitypes.RequestApplySnapshotChunk) abcitypes.ResponseApplySnapshotChunk {
+func (app *BaseApplication) ApplySnapshotChunk(
+	req abcitypes.RequestApplySnapshotChunk) abcitypes.ResponseApplySnapshotChunk {
 	return abcitypes.ResponseApplySnapshotChunk{}
 }
-func (app *BaseApplication) ListSnapshots(req abcitypes.RequestListSnapshots) abcitypes.ResponseListSnapshots {
+func (app *BaseApplication) ListSnapshots(
+	req abcitypes.RequestListSnapshots) abcitypes.ResponseListSnapshots {
 	return abcitypes.ResponseListSnapshots{}
 }
-func (app *BaseApplication) LoadSnapshotChunk(req abcitypes.RequestLoadSnapshotChunk) abcitypes.ResponseLoadSnapshotChunk {
+func (app *BaseApplication) LoadSnapshotChunk(
+	req abcitypes.RequestLoadSnapshotChunk) abcitypes.ResponseLoadSnapshotChunk {
 	return abcitypes.ResponseLoadSnapshotChunk{}
 }
-func (app *BaseApplication) OfferSnapshot(req abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
+func (app *BaseApplication) OfferSnapshot(
+	req abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
 	return abcitypes.ResponseOfferSnapshot{}
 }
 

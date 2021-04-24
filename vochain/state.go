@@ -131,7 +131,7 @@ func NewState(dataDir string) (*State, error) {
 
 func initStore(dataDir string, state *State) error {
 	log.Infof("initializing state db store")
-	//state.Store = new(iavlstate.IavlState)
+	// state.Store = new(iavlstate.IavlState)
 	state.Store = new(gravitonstate.GravitonState)
 	if err := state.Store.Init(dataDir, "disk"); err != nil {
 		return err
@@ -427,7 +427,7 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 	return vid, nil
 }
 
-// Envelope returns the info of a vote if already exists.
+// Envelope returns the hash of a stored vote if exists.
 func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ []byte, err error) {
 	// TODO(mvdan): remove the recover once
 	// https://github.com/tendermint/iavl/issues/212 is fixed
@@ -492,7 +492,8 @@ func (v *State) CountVotes(processID []byte, isQuery bool) uint32 {
 }
 
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
-func (v *State) EnvelopeList(processID []byte, from, listSize int, isQuery bool) (nullifiers [][]byte) {
+func (v *State) EnvelopeList(processID []byte, from, listSize int,
+	isQuery bool) (nullifiers [][]byte) {
 	// TODO(mvdan): remove the recover once
 	// https://github.com/tendermint/iavl/issues/212 is fixed
 	defer func() {
