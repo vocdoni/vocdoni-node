@@ -138,7 +138,7 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 		return indexes, err
 	}
 	// update nLeafs
-	if err = t.incNLeafs(uint64(len(keys) - len(indexes))); err != nil {
+	if err = t.incNLeafs(len(keys) - len(indexes)); err != nil {
 		return indexes, err
 	}
 
@@ -629,7 +629,7 @@ func (t *Tree) dbGet(k []byte) ([]byte, error) {
 
 // Warning: should be called with a Tree.tx created, and with a Tree.tx.Commit
 // after the setNLeafs call.
-func (t *Tree) incNLeafs(nLeafs uint64) error {
+func (t *Tree) incNLeafs(nLeafs int) error {
 	oldNLeafs, err := t.GetNLeafs()
 	if err != nil {
 		return err
@@ -640,9 +640,9 @@ func (t *Tree) incNLeafs(nLeafs uint64) error {
 
 // Warning: should be called with a Tree.tx created, and with a Tree.tx.Commit
 // after the setNLeafs call.
-func (t *Tree) setNLeafs(nLeafs uint64) error {
+func (t *Tree) setNLeafs(nLeafs int) error {
 	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, nLeafs)
+	binary.LittleEndian.PutUint64(b, uint64(nLeafs))
 	if err := t.tx.Put(dbKeyNLeafs, b); err != nil {
 		return err
 	}
@@ -650,13 +650,13 @@ func (t *Tree) setNLeafs(nLeafs uint64) error {
 }
 
 // GetNLeafs returns the number of Leafs of the Tree.
-func (t *Tree) GetNLeafs() (uint64, error) {
+func (t *Tree) GetNLeafs() (int, error) {
 	b, err := t.dbGet(dbKeyNLeafs)
 	if err != nil {
 		return 0, err
 	}
 	nLeafs := binary.LittleEndian.Uint64(b)
-	return nLeafs, nil
+	return int(nLeafs), nil
 }
 
 // Iterate iterates through the full Tree, executing the given function on each
@@ -776,7 +776,7 @@ func (t *Tree) ImportDump(b []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := t.incNLeafs(uint64(count)); err != nil {
+	if err := t.incNLeafs(count); err != nil {
 		return err
 	}
 	if err = t.tx.Commit(); err != nil {

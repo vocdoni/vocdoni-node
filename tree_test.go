@@ -342,7 +342,7 @@ func TestSetGetNLeafs(t *testing.T) {
 
 	n, err := tree.GetNLeafs()
 	c.Assert(err, qt.IsNil)
-	c.Assert(n, qt.Equals, uint64(0))
+	c.Assert(n, qt.Equals, 0)
 
 	// 1024
 	tree.tx, err = tree.db.NewTx()
@@ -356,13 +356,16 @@ func TestSetGetNLeafs(t *testing.T) {
 
 	n, err = tree.GetNLeafs()
 	c.Assert(err, qt.IsNil)
-	c.Assert(n, qt.Equals, uint64(1024))
+	c.Assert(n, qt.Equals, 1024)
 
 	// 2**64 -1
 	tree.tx, err = tree.db.NewTx()
 	c.Assert(err, qt.IsNil)
 
-	err = tree.setNLeafs(18446744073709551615)
+	maxUint := ^uint(0)
+	maxInt := int(maxUint >> 1)
+
+	err = tree.setNLeafs(maxInt)
 	c.Assert(err, qt.IsNil)
 
 	err = tree.tx.Commit()
@@ -370,7 +373,7 @@ func TestSetGetNLeafs(t *testing.T) {
 
 	n, err = tree.GetNLeafs()
 	c.Assert(err, qt.IsNil)
-	c.Assert(n, qt.Equals, uint64(18446744073709551615))
+	c.Assert(n, qt.Equals, maxInt)
 }
 
 func BenchmarkAdd(b *testing.B) {

@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"runtime"
 	"sort"
+	"sync"
+
+	"github.com/iden3/go-merkletree/db"
 )
 
 /*
@@ -138,8 +142,7 @@ Algorithm decision
 */
 
 const (
-	minLeafsThreshold = uint64(100) // nolint:gomnd // TMP WIP this will be autocalculated
-	nBuckets          = uint64(4)   // TMP WIP this will be autocalculated from
+	minLeafsThreshold = 100 // nolint:gomnd // TMP WIP this will be autocalculated
 )
 
 // AddBatchOpt is the WIP implementation of the AddBatch method in a more
@@ -165,11 +168,14 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 		return nil, err
 	}
 
+	nCPU := runtime.NumCPU()
+
 	// CASE A: if nLeafs==0 (root==0)
 	if bytes.Equal(t.root, t.emptyHash) {
-		// sort keys & values by path
-		sortKvs(kvs)
-		return t.buildTreeBottomUp(kvs)
+		// TODO if len(kvs) is not a power of 2, cut at the bigger power
+		// of two under len(kvs), build the tree with that, and add
+		// later the excedents
+		return t.buildTreeBottomUp(nCPU, kvs)
 	}
 
 	// CASE B: if nLeafs<nBuckets
@@ -195,8 +201,8 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 	// CASE C: if nLeafs>=minLeafsThreshold && (nLeafs/nBuckets) < minLeafsThreshold
 	// available parallelization, will need to be a power of 2 (2**n)
 	var excedents []kv
-	l := int(math.Log2(float64(nBuckets)))
-	if nLeafs >= minLeafsThreshold && (nLeafs/nBuckets) < minLeafsThreshold {
+	l := int(math.Log2(float64(nCPU)))
+	if nLeafs >= minLeafsThreshold && (nLeafs/nCPU) < minLeafsThreshold {
 		// TODO move to own function
 		// 1. go down until level L (L=log2(nBuckets))
 		keysAtL, err := t.getKeysAtLevel(l + 1)
@@ -204,7 +210,7 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 			return nil, err
 		}
 
-		buckets := splitInBuckets(kvs, nBuckets)
+		buckets := splitInBuckets(kvs, nCPU)
 
 		// 2. use keys at level L as roots of the subtrees under each one
 		var subRoots [][]byte
@@ -264,7 +270,7 @@ func (t *Tree) caseB(l int, kvs []kv) ([]int, []kv, error) {
 
 	// cutPowerOfTwo, the excedent add it as normal Tree.Add
 	kvsP2, kvsNonP2 := cutPowerOfTwo(kvs)
-	invalids, err := t.buildTreeBottomUp(kvsP2)
+	invalids, err := t.buildTreeBottomUpSingleThread(kvsP2)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -272,13 +278,13 @@ func (t *Tree) caseB(l int, kvs []kv) ([]int, []kv, error) {
 	return invalids, kvsNonP2, nil
 }
 
-func splitInBuckets(kvs []kv, nBuckets uint64) [][]kv {
+func splitInBuckets(kvs []kv, nBuckets int) [][]kv {
 	buckets := make([][]kv, nBuckets)
 	// 1. classify the keyvalues into buckets
 	for i := 0; i < len(kvs); i++ {
 		pair := kvs[i]
 
-		bucketnum := keyToBucket(pair.k, int(nBuckets))
+		bucketnum := keyToBucket(pair.k, nBuckets)
 		buckets[bucketnum] = append(buckets[bucketnum], pair)
 	}
 	return buckets
@@ -367,10 +373,56 @@ func (t *Tree) kvsToKeysValues(kvs []kv) ([][]byte, [][]byte) {
 }
 */
 
+// buildTreeBottomUp splits the key-values into n Buckets (where n is the number
+// of CPUs), in parallel builds a subtree for each bucket, once all the subtrees
+// are built, uses the subtrees roots as keys for a new tree, which as result
+// will have the complete Tree build from bottom to up, where until the
+// log2(nCPU) level it has been computed in parallel.
+func (t *Tree) buildTreeBottomUp(nCPU int, kvs []kv) ([]int, error) {
+	buckets := splitInBuckets(kvs, nCPU)
+	subRoots := make([][]byte, nCPU)
+	txs := make([]db.Tx, nCPU)
+
+	var wg sync.WaitGroup
+	wg.Add(nCPU)
+	for i := 0; i < nCPU; i++ {
+		go func(cpu int) {
+			sortKvs(buckets[cpu])
+
+			var err error
+			txs[cpu], err = t.db.NewTx()
+			if err != nil {
+				panic(err) // TODO
+			}
+			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels,
+				hashFunction: t.hashFunction, root: t.emptyHash}
+
+			// TODO use invalids array
+			_, err = bucketTree.buildTreeBottomUpSingleThread(buckets[cpu])
+			if err != nil {
+				panic(err) // TODO
+			}
+
+			subRoots[cpu] = bucketTree.root
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+	newRoot, err := t.upFromKeys(subRoots)
+	if err != nil {
+		return nil, err
+	}
+	t.root = newRoot
+	return nil, err
+}
+
 // keys & values must be sorted by path, and the array ks must be length
 // multiple of 2
 // TODO return index of failed keyvaules
-func (t *Tree) buildTreeBottomUp(kvs []kv) ([]int, error) {
+func (t *Tree) buildTreeBottomUpSingleThread(kvs []kv) ([]int, error) {
+	// TODO check that log2(len(leafs)) < t.maxLevels, if not, maxLevels
+	// would be reached and should return error
+
 	// build the leafs
 	leafKeys := make([][]byte, len(kvs))
 	for i := 0; i < len(kvs); i++ {
