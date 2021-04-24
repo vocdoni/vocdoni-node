@@ -172,10 +172,21 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 
 	// CASE A: if nLeafs==0 (root==0)
 	if bytes.Equal(t.root, t.emptyHash) {
-		// TODO if len(kvs) is not a power of 2, cut at the bigger power
+		// if len(kvs) is not a power of 2, cut at the bigger power
 		// of two under len(kvs), build the tree with that, and add
 		// later the excedents
-		return t.buildTreeBottomUp(nCPU, kvs)
+		kvsP2, kvsNonP2 := cutPowerOfTwo(kvs)
+		invalids, err := t.buildTreeBottomUp(nCPU, kvsP2)
+		if err != nil {
+			return nil, err
+		}
+		for i := 0; i < len(kvsNonP2); i++ {
+			err = t.add(0, kvsNonP2[i].k, kvsNonP2[i].v)
+			if err != nil {
+				invalids = append(invalids, kvsNonP2[i].pos)
+			}
+		}
+		return invalids, nil
 	}
 
 	// CASE B: if nLeafs<nBuckets
@@ -381,6 +392,7 @@ func (t *Tree) kvsToKeysValues(kvs []kv) ([][]byte, [][]byte) {
 func (t *Tree) buildTreeBottomUp(nCPU int, kvs []kv) ([]int, error) {
 	buckets := splitInBuckets(kvs, nCPU)
 	subRoots := make([][]byte, nCPU)
+	invalidsInBucket := make([][]int, nCPU)
 	txs := make([]db.Tx, nCPU)
 
 	var wg sync.WaitGroup
@@ -397,53 +409,60 @@ func (t *Tree) buildTreeBottomUp(nCPU int, kvs []kv) ([]int, error) {
 			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels,
 				hashFunction: t.hashFunction, root: t.emptyHash}
 
-			// TODO use invalids array
-			_, err = bucketTree.buildTreeBottomUpSingleThread(buckets[cpu])
+			currInvalids, err := bucketTree.buildTreeBottomUpSingleThread(buckets[cpu])
 			if err != nil {
 				panic(err) // TODO
 			}
-
+			invalidsInBucket[cpu] = currInvalids
 			subRoots[cpu] = bucketTree.root
 			wg.Done()
 		}(i)
 	}
 	wg.Wait()
+
 	newRoot, err := t.upFromKeys(subRoots)
 	if err != nil {
 		return nil, err
 	}
 	t.root = newRoot
-	return nil, err
+
+	var invalids []int
+	for i := 0; i < len(invalidsInBucket); i++ {
+		invalids = append(invalids, invalidsInBucket[i]...)
+	}
+	return invalids, err
 }
 
-// keys & values must be sorted by path, and the array ks must be length
-// multiple of 2
-// TODO return index of failed keyvaules
+// buildTreeBottomUpSingleThread builds the tree with the given []kv from bottom
+// to the root. keys & values must be sorted by path, and the array ks must be
+// length multiple of 2
 func (t *Tree) buildTreeBottomUpSingleThread(kvs []kv) ([]int, error) {
 	// TODO check that log2(len(leafs)) < t.maxLevels, if not, maxLevels
 	// would be reached and should return error
 
+	var invalids []int
 	// build the leafs
 	leafKeys := make([][]byte, len(kvs))
 	for i := 0; i < len(kvs); i++ {
 		// TODO handle the case where Key&Value == 0
 		leafKey, leafValue, err := newLeafValue(t.hashFunction, kvs[i].k, kvs[i].v)
 		if err != nil {
-			return nil, err
+			// return nil, err
+			invalids = append(invalids, kvs[i].pos)
 		}
 		// store leafKey & leafValue to db
 		if err := t.tx.Put(leafKey, leafValue); err != nil {
-			return nil, err
+			// return nil, err
+			invalids = append(invalids, kvs[i].pos)
 		}
 		leafKeys[i] = leafKey
 	}
-	// TODO parallelize t.upFromKeys until level log2(nBuckets) is reached
 	r, err := t.upFromKeys(leafKeys)
 	if err != nil {
-		return nil, err
+		return invalids, err
 	}
 	t.root = r
-	return nil, nil
+	return invalids, nil
 }
 
 // keys & values must be sorted by path, and the array ks must be length
