@@ -11,6 +11,56 @@ import (
 	"github.com/iden3/go-merkletree/db/memory"
 )
 
+func TestBatchAux(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 16
+
+	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close()
+
+	start := time.Now()
+	for i := 0; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		if err := tree.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fmt.Println(time.Since(start))
+
+	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close()
+
+	for i := 0; i < 8; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		if err := tree2.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// tree.PrintGraphviz(nil)
+	// tree2.PrintGraphviz(nil)
+
+	var keys, values [][]byte
+	for i := 8; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	start = time.Now()
+	indexes, err := tree2.AddBatchOpt(keys, values)
+	c.Assert(err, qt.IsNil)
+	fmt.Println(time.Since(start))
+	c.Check(len(indexes), qt.Equals, 0)
+
+	// check that both trees roots are equal
+	c.Check(tree2.Root(), qt.DeepEquals, tree.Root())
+}
+
 func TestAddBatchCaseA(t *testing.T) {
 	c := qt.New(t)
 
@@ -287,6 +337,58 @@ func TestAddBatchCaseC(t *testing.T) {
 	// printLeafs("t1.txt", tree)
 	// fmt.Println("TREE2")
 	// printLeafs("t2.txt", tree2)
+}
+
+func TestAddBatchCaseD(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 8192
+
+	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close()
+
+	start := time.Now()
+	for i := 0; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		if err := tree.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fmt.Println(time.Since(start))
+
+	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close()
+
+	// add the initial leafs to fill a bit the tree before calling the
+	// AddBatch method
+	for i := 0; i < 900; i++ { // TMP TODO use const minLeafsThreshold-1 once ready
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		if err := tree2.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// tree2.PrintGraphvizFirstNLevels(nil, 4)
+	// tree2.PrintGraphviz(nil)
+
+	var keys, values [][]byte
+	for i := 900; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	start = time.Now()
+	indexes, err := tree2.AddBatchOpt(keys, values)
+	c.Assert(err, qt.IsNil)
+	fmt.Println(time.Since(start))
+	c.Check(len(indexes), qt.Equals, 0)
+
+	// check that both trees roots are equal
+	c.Check(tree2.Root(), qt.DeepEquals, tree.Root())
 }
 
 // func printLeafs(name string, t *Tree) {

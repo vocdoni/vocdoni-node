@@ -206,7 +206,7 @@ func (t *Tree) add(fromLvl int, k, v []byte) error {
 		t.root = leafKey
 		return nil
 	}
-	root, err := t.up(leafKey, siblings, path, len(siblings)-1)
+	root, err := t.up(leafKey, siblings, path, len(siblings)-1, fromLvl)
 	if err != nil {
 		return err
 	}
@@ -307,10 +307,10 @@ func (t *Tree) downVirtually(siblings [][]byte, oldKey, newKey []byte, oldPath,
 }
 
 // up goes up recursively updating the intermediate nodes
-func (t *Tree) up(key []byte, siblings [][]byte, path []bool, currLvl int) ([]byte, error) {
+func (t *Tree) up(key []byte, siblings [][]byte, path []bool, currLvl, toLvl int) ([]byte, error) {
 	var k, v []byte
 	var err error
-	if path[currLvl] {
+	if path[currLvl+toLvl] {
 		k, v, err = newIntermediate(t.hashFunction, siblings[currLvl], key)
 		if err != nil {
 			return nil, err
@@ -331,7 +331,7 @@ func (t *Tree) up(key []byte, siblings [][]byte, path []bool, currLvl int) ([]by
 		return k, nil
 	}
 
-	return t.up(k, siblings, path, currLvl-1)
+	return t.up(k, siblings, path, currLvl-1, toLvl)
 }
 
 func newLeafValue(hashFunc HashFunction, k, v []byte) ([]byte, []byte, error) {
@@ -440,7 +440,7 @@ func (t *Tree) Update(k, v []byte) error {
 		t.root = leafKey
 		return t.tx.Commit()
 	}
-	root, err := t.up(leafKey, siblings, path, len(siblings)-1)
+	root, err := t.up(leafKey, siblings, path, len(siblings)-1, 0)
 	if err != nil {
 		return err
 	}

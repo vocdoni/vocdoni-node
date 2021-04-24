@@ -219,6 +219,13 @@ func TestAux(t *testing.T) { // TODO split in proper tests
 	k = BigIntToBytes(big.NewInt(int64(770)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
+
+	k = BigIntToBytes(big.NewInt(int64(388)))
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
+	k = BigIntToBytes(big.NewInt(int64(900)))
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
 	//
 	// err = tree.PrintGraphviz(nil)
 	// c.Assert(err, qt.IsNil)
