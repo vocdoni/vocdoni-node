@@ -11,7 +11,7 @@ import (
 	"github.com/iden3/go-merkletree/db/memory"
 )
 
-func TestBatchAux(t *testing.T) {
+func TestBatchAux(t *testing.T) { // TODO TMP this test will be delted
 	c := qt.New(t)
 
 	nLeafs := 16
@@ -342,7 +342,7 @@ func TestAddBatchCaseC(t *testing.T) {
 func TestAddBatchCaseD(t *testing.T) {
 	c := qt.New(t)
 
-	nLeafs := 8192
+	nLeafs := 4096
 
 	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -364,15 +364,13 @@ func TestAddBatchCaseD(t *testing.T) {
 
 	// add the initial leafs to fill a bit the tree before calling the
 	// AddBatch method
-	for i := 0; i < 900; i++ { // TMP TODO use const minLeafsThreshold-1 once ready
+	for i := 0; i < 900; i++ { // TMP TODO use const minLeafsThreshold+1 once ready
 		k := BigIntToBytes(big.NewInt(int64(i)))
 		v := BigIntToBytes(big.NewInt(int64(i * 2)))
 		if err := tree2.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
-	// tree2.PrintGraphvizFirstNLevels(nil, 4)
-	// tree2.PrintGraphviz(nil)
 
 	var keys, values [][]byte
 	for i := 900; i < nLeafs; i++ {

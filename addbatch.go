@@ -297,34 +297,50 @@ func (t *Tree) caseB(l int, kvs []kv) ([]int, []kv, error) {
 }
 
 func (t *Tree) caseD(nCPU, l int, kvs []kv) ([]int, error) {
-	fmt.Println("CASE D", nCPU)
 	keysAtL, err := t.getKeysAtLevel(l + 1)
 	if err != nil {
 		return nil, err
 	}
 	buckets := splitInBuckets(kvs, nCPU)
 
-	var subRoots [][]byte
-	var invalids []int
-	for i := 0; i < len(keysAtL); i++ {
-		bucketTree := Tree{tx: t.tx, db: t.db, maxLevels: t.maxLevels, // maxLevels-l
-			hashFunction: t.hashFunction, root: keysAtL[i]}
+	subRoots := make([][]byte, nCPU)
+	invalidsInBucket := make([][]int, nCPU)
+	txs := make([]db.Tx, nCPU)
 
-		for j := 0; j < len(buckets[i]); j++ {
-			if err = bucketTree.add(l, buckets[i][j].k, buckets[i][j].v); err != nil {
-				fmt.Println("failed", buckets[i][j].k[:4])
-
-				panic(err)
-				// invalids = append(invalids, buckets[i][j].pos)
+	var wg sync.WaitGroup
+	wg.Add(nCPU)
+	for i := 0; i < nCPU; i++ {
+		go func(cpu int) {
+			var err error
+			txs[cpu], err = t.db.NewTx()
+			if err != nil {
+				panic(err) // TODO
 			}
-		}
-		subRoots = append(subRoots, bucketTree.root)
+			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels, // maxLevels-l
+				hashFunction: t.hashFunction, root: keysAtL[cpu]}
+
+			for j := 0; j < len(buckets[cpu]); j++ {
+				if err = bucketTree.add(l, buckets[cpu][j].k, buckets[cpu][j].v); err != nil {
+					fmt.Println("failed", buckets[cpu][j].k[:4])
+					invalidsInBucket[cpu] = append(invalidsInBucket[cpu], buckets[cpu][j].pos)
+				}
+			}
+			subRoots[cpu] = bucketTree.root
+			wg.Done()
+		}(i)
 	}
+	wg.Wait()
+
 	newRoot, err := t.upFromKeys(subRoots)
 	if err != nil {
 		return nil, err
 	}
 	t.root = newRoot
+
+	var invalids []int
+	for i := 0; i < len(invalidsInBucket); i++ {
+		invalids = append(invalids, invalidsInBucket[i]...)
+	}
 
 	return invalids, nil
 }
