@@ -3,7 +3,7 @@ package db
 import (
 	"os"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v3"
 )
 
 // BadgerDB implements chainsafe's database interface. The implementation is
@@ -25,7 +25,7 @@ func NewBadgerDB(path string) (*BadgerDB, error) {
 
 	// The default is 64<<20, which means Badger pre-allocates quite a lot
 	// of memory. Lower it a bit.
-	opts.MaxTableSize /= 4
+	// opts.MemTableSize /= 4
 
 	db, err := badger.Open(opts)
 	if err != nil {
