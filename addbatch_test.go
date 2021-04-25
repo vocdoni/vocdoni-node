@@ -78,7 +78,7 @@ func TestAddBatchCaseA(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	fmt.Println(time.Since(start))
+	fmt.Println("time elapsed without CASE A:	", time.Since(start))
 
 	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -94,7 +94,43 @@ func TestAddBatchCaseA(t *testing.T) {
 	start = time.Now()
 	indexes, err := tree2.AddBatchOpt(keys, values)
 	c.Assert(err, qt.IsNil)
-	fmt.Println(time.Since(start))
+	fmt.Println("time elapsed with CASE A:	", time.Since(start))
+	c.Check(len(indexes), qt.Equals, 0)
+
+	// check that both trees roots are equal
+	c.Check(tree2.Root(), qt.DeepEquals, tree.Root())
+}
+
+func TestAddBatchCaseANotPowerOf2(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 1027
+
+	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close()
+
+	for i := 0; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		if err := tree.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close()
+
+	var keys, values [][]byte
+	for i := 0; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	indexes, err := tree2.AddBatchOpt(keys, values)
+	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
@@ -118,7 +154,7 @@ func TestAddBatchCaseB(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	fmt.Println(time.Since(start))
+	fmt.Println("time elapsed without CASE B:	", time.Since(start))
 
 	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -144,7 +180,7 @@ func TestAddBatchCaseB(t *testing.T) {
 	start = time.Now()
 	indexes, err := tree2.AddBatchOpt(keys, values)
 	c.Assert(err, qt.IsNil)
-	fmt.Println(time.Since(start))
+	fmt.Println("time elapsed with CASE B:	", time.Since(start))
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
@@ -296,7 +332,7 @@ func TestAddBatchCaseC(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	fmt.Println(time.Since(start))
+	fmt.Println("time elapsed without CASE C:	", time.Since(start))
 
 	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -311,7 +347,6 @@ func TestAddBatchCaseC(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// tree2.PrintGraphviz(nil)
 
 	var keys, values [][]byte
 	for i := 101; i < nLeafs; i++ {
@@ -323,20 +358,11 @@ func TestAddBatchCaseC(t *testing.T) {
 	start = time.Now()
 	indexes, err := tree2.AddBatchOpt(keys, values)
 	c.Assert(err, qt.IsNil)
-	fmt.Println(time.Since(start))
+	fmt.Println("time elapsed with CASE C:	", time.Since(start))
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
 	c.Check(tree2.Root(), qt.DeepEquals, tree.Root())
-
-	// tree.PrintGraphviz(nil)
-	// tree2.PrintGraphviz(nil)
-	// // tree.PrintGraphvizFirstNLevels(nil, 4)
-	// // tree2.PrintGraphvizFirstNLevels(nil, 4)
-	// fmt.Println("TREE")
-	// printLeafs("t1.txt", tree)
-	// fmt.Println("TREE2")
-	// printLeafs("t2.txt", tree2)
 }
 
 func TestAddBatchCaseD(t *testing.T) {
@@ -356,7 +382,7 @@ func TestAddBatchCaseD(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	fmt.Println(time.Since(start))
+	fmt.Println("time elapsed without CASE D:	", time.Since(start))
 
 	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -382,7 +408,7 @@ func TestAddBatchCaseD(t *testing.T) {
 	start = time.Now()
 	indexes, err := tree2.AddBatchOpt(keys, values)
 	c.Assert(err, qt.IsNil)
-	fmt.Println(time.Since(start))
+	fmt.Println("time elapsed with CASE D:	", time.Since(start))
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal

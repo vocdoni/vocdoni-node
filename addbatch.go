@@ -189,6 +189,13 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 				invalids = append(invalids, kvsNonP2[i].pos)
 			}
 		}
+		// store root to db
+		if err := t.tx.Put(dbKeyRoot, t.root); err != nil {
+			return nil, err
+		}
+		if err = t.tx.Commit(); err != nil {
+			return nil, err
+		}
 		return invalids, nil
 	}
 
@@ -208,6 +215,13 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 			if err != nil {
 				invalids = append(invalids, excedents[i].pos)
 			}
+		}
+		// store root to db
+		if err := t.tx.Put(dbKeyRoot, t.root); err != nil {
+			return nil, err
+		}
+		if err = t.tx.Commit(); err != nil {
+			return nil, err
 		}
 		return invalids, nil
 	}
@@ -247,6 +261,7 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 		}
 		t.root = newRoot
 
+		// add the key-values that have not been used yet
 		var invalids []int
 		for i := 0; i < len(excedents); i++ {
 			// Add until the level L
@@ -255,14 +270,39 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 				invalids = append(invalids, excedents[i].pos) // TODO WIP
 			}
 		}
+		// store root to db
+		if err := t.tx.Put(dbKeyRoot, t.root); err != nil {
+			return nil, err
+		}
 
+		if err = t.tx.Commit(); err != nil {
+			return nil, err
+		}
 		return invalids, nil
 	}
 
-	// CASE D
-	if true { // TODO enter in CASE D if len(keysAtL)=nCPU, if not, CASE E
-		return t.caseD(nCPU, l, kvs)
+	keysAtL, err := t.getKeysAtLevel(l + 1)
+	if err != nil {
+		return nil, err
 	}
+	// CASE D
+	if len(keysAtL) == nCPU { // enter in CASE D if len(keysAtL)=nCPU, if not, CASE E
+		invalids, err := t.caseD(nCPU, l, keysAtL, kvs)
+		if err != nil {
+			return nil, err
+		}
+		// store root to db
+		if err := t.tx.Put(dbKeyRoot, t.root); err != nil {
+			return nil, err
+		}
+
+		if err = t.tx.Commit(); err != nil {
+			return nil, err
+		}
+		return invalids, nil
+	}
+
+	// CASE E: add one key of each bucket, and then do CASE D
 
 	// TODO store t.root into DB
 	// TODO update NLeafs from DB
@@ -296,11 +336,7 @@ func (t *Tree) caseB(l int, kvs []kv) ([]int, []kv, error) {
 	return invalids, kvsNonP2, nil
 }
 
-func (t *Tree) caseD(nCPU, l int, kvs []kv) ([]int, error) {
-	keysAtL, err := t.getKeysAtLevel(l + 1)
-	if err != nil {
-		return nil, err
-	}
+func (t *Tree) caseD(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 	buckets := splitInBuckets(kvs, nCPU)
 
 	subRoots := make([][]byte, nCPU)
@@ -314,14 +350,13 @@ func (t *Tree) caseD(nCPU, l int, kvs []kv) ([]int, error) {
 			var err error
 			txs[cpu], err = t.db.NewTx()
 			if err != nil {
-				panic(err) // TODO
+				panic(err) // TODO WIP
 			}
-			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels, // maxLevels-l
+			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels - l, // maxLevels-l
 				hashFunction: t.hashFunction, root: keysAtL[cpu]}
 
 			for j := 0; j < len(buckets[cpu]); j++ {
 				if err = bucketTree.add(l, buckets[cpu][j].k, buckets[cpu][j].v); err != nil {
-					fmt.Println("failed", buckets[cpu][j].k[:4])
 					invalidsInBucket[cpu] = append(invalidsInBucket[cpu], buckets[cpu][j].pos)
 				}
 			}
@@ -330,6 +365,13 @@ func (t *Tree) caseD(nCPU, l int, kvs []kv) ([]int, error) {
 		}(i)
 	}
 	wg.Wait()
+
+	// merge buckets txs into Tree.tx
+	for i := 0; i < len(txs); i++ {
+		if err := t.tx.Add(txs[i]); err != nil {
+			return nil, err
+		}
+	}
 
 	newRoot, err := t.upFromKeys(subRoots)
 	if err != nil {
@@ -476,6 +518,13 @@ func (t *Tree) buildTreeBottomUp(nCPU int, kvs []kv) ([]int, error) {
 		}(i)
 	}
 	wg.Wait()
+
+	// merge buckets txs into Tree.tx
+	for i := 0; i < len(txs); i++ {
+		if err := t.tx.Add(txs[i]); err != nil {
+			return nil, err
+		}
+	}
 
 	newRoot, err := t.upFromKeys(subRoots)
 	if err != nil {
