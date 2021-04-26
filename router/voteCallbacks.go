@@ -218,11 +218,21 @@ func (r *Router) getProcessList(request routerRequest) {
 func (r *Router) getProcessInfo(request routerRequest) {
 	var response types.MetaResponse
 	var err error
-	response.ProcessInfo, err = r.Scrutinizer.ProcessInfo(request.ProcessID)
+	processInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get process info: %v", err))
 		return
 	}
+	process := processInfo.Mirror()
+	processBytes, err := proto.Marshal(process)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get process info: %v", err))
+		return
+	}
+	response.Content = processBytes
+	response.Height = &processInfo.Rheight
+	response.CreationTime = processInfo.CreationTime.Unix()
+	response.Final = &processInfo.FinalResults
 	request.Send(r.buildReply(request, &response))
 }
 

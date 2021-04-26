@@ -43,6 +43,29 @@ func (p Process) String() string {
 	return string(b)
 }
 
+func (p Process) Mirror() *models.Process {
+	process := &models.Process{
+		ProcessId:             p.ID,
+		EntityId:              p.EntityID,
+		StartBlock:            p.StartBlock,
+		BlockCount:            p.EndBlock - p.StartBlock,
+		CensusRoot:            p.CensusRoot,
+		CensusURI:             &p.CensusURI,
+		EncryptionPrivateKeys: p.PrivateKeys,
+		EncryptionPublicKeys:  p.PublicKeys,
+		Status:                models.ProcessStatus(p.Status),
+		Namespace:             p.Namespace,
+		EnvelopeType:          p.Envelope,
+		Mode:                  p.Mode,
+		QuestionIndex:         &p.QuestionIndex,
+		VoteOptions:           p.VoteOpts,
+		CensusOrigin:          models.CensusOrigin(p.CensusOrigin),
+		Results:               &models.ProcessResult{},
+	}
+
+	return process
+}
+
 type Entity struct {
 	ID           types.HexBytes `badgerholdKey:"ID"`
 	CreationTime time.Time
