@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru"
@@ -39,6 +41,8 @@ type BaseApplication struct {
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
 	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
 	blockCache         *lru.Cache
+	height             *uint32
+	timestamp          *int64
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
@@ -57,6 +61,8 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	return &BaseApplication{
 		State:      state,
 		blockCache: lruc,
+		height:     new(uint32),
+		timestamp:  new(int64),
 	}, nil
 }
 
@@ -106,6 +112,16 @@ func (app *BaseApplication) IsSynchronizing() bool {
 	app.isSyncLock.Lock()
 	defer app.isSyncLock.Unlock()
 	return app.Node.ConsensusReactor().WaitSync()
+}
+
+// Height returns the current blockchain height
+func (app *BaseApplication) Height() uint32 {
+	return atomic.LoadUint32(app.height)
+}
+
+// Timestamp returns the last block timestamp
+func (app *BaseApplication) Timestamp() int64 {
+	return atomic.LoadInt64(app.timestamp)
 }
 
 // MempoolRemoveTx removes a transaction (identifier by its vochain.TxKey() hash)
@@ -326,20 +342,26 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 }
 
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
+	atomic.StoreUint32(app.height, uint32(req.Height))
+	atomic.StoreInt64(app.timestamp, time.Now().Unix())
 	return abcitypes.ResponseEndBlock{}
 }
+
 func (app *BaseApplication) ApplySnapshotChunk(
 	req abcitypes.RequestApplySnapshotChunk) abcitypes.ResponseApplySnapshotChunk {
 	return abcitypes.ResponseApplySnapshotChunk{}
 }
+
 func (app *BaseApplication) ListSnapshots(
 	req abcitypes.RequestListSnapshots) abcitypes.ResponseListSnapshots {
 	return abcitypes.ResponseListSnapshots{}
 }
+
 func (app *BaseApplication) LoadSnapshotChunk(
 	req abcitypes.RequestLoadSnapshotChunk) abcitypes.ResponseLoadSnapshotChunk {
 	return abcitypes.ResponseLoadSnapshotChunk{}
 }
+
 func (app *BaseApplication) OfferSnapshot(
 	req abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
 	return abcitypes.ResponseOfferSnapshot{}
