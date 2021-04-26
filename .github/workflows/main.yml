@@ -29,14 +29,6 @@ jobs:
         go vet ./...
         curl -L https://github.com/dominikh/go-tools/releases/download/2020.2.1/staticcheck_linux_amd64.tar.gz | tar -xzf -
         ./staticcheck/staticcheck ./...
-    - name: Install goveralls
-      env:
-        GO111MODULE: off
-      run: go get github.com/mattn/goveralls
-    - name: Send coverage to coverall.io
-      env:
-        COVERALLS_TOKEN: ${{ secrets.github_token }}
-      run: goveralls -coverprofile=covprofile -service=github
 
   compose-test:
     runs-on: self-hosted
