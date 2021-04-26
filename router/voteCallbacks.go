@@ -141,9 +141,9 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 
 func (r *Router) getBlockHeight(request routerRequest) {
 	var response types.MetaResponse
-	h := uint32(r.vocapp.State.Header(true).Height)
+	h := r.vocapp.Height()
 	response.Height = &h
-	response.BlockTimestamp = int32(r.vocapp.State.Header(true).Timestamp)
+	response.BlockTimestamp = int32(r.vocapp.Timestamp())
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -328,10 +328,15 @@ func (r *Router) getResults(request routerRequest) {
 	}
 	response.Results = scrutinizer.GetFriendlyResults(vr.Votes)
 	response.Final = &vr.Final
-	// Get number of votes
-	votes := r.vocapp.State.CountVotes(request.ProcessID, true)
-	response.Height = new(uint32)
-	*response.Height = votes
+	// Get total number of votes (including invalid/null)
+	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
+	if err != nil {
+		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
+		request.Send(r.buildReply(request, &response))
+		return
+	}
+	votes := uint32(eh)
+	response.Height = &votes
 
 	request.Send(r.buildReply(request, &response))
 }
@@ -348,9 +353,9 @@ func (r *Router) getEntityList(request routerRequest) {
 
 func (r *Router) getBlockStatus(request routerRequest) {
 	var response types.MetaResponse
-	h := uint32(r.vocapp.State.Header(true).Height)
-	response.BlockTime = r.vocinfo.BlockTimes()
+	h := r.vocapp.Height()
 	response.Height = &h
-	response.BlockTimestamp = int32(r.vocapp.State.Header(true).Timestamp)
+	response.BlockTime = r.vocinfo.BlockTimes()
+	response.BlockTimestamp = int32(r.vocapp.Timestamp())
 	request.Send(r.buildReply(request, &response))
 }

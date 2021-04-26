@@ -30,7 +30,7 @@ var ErrNotFoundInDatabase = badgerhold.ErrNotFound
 // If the KV (currently badger) returns this error, it is considered non fatal and the
 // transaction will be retried until it works.
 // This check is made comparing string in order to avoid importing a specific KV
-// implementation, thus let badgerhold abstract it.
+// implementation.
 const kvErrorStringForRetry = "Transaction Conflict"
 
 // GetVoteReference gets the reference for an AddVote transaction.
@@ -393,7 +393,7 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 		Final:        true,
 		VoteOpts:     p.VoteOpts,
 		EnvelopeType: p.Envelope,
-		Height:       uint32(s.App.Node.BlockStore().Height()),
+		Height:       s.App.Height(),
 	}
 
 	var nvotes uint64
