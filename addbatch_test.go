@@ -415,6 +415,72 @@ func TestAddBatchCaseD(t *testing.T) {
 	c.Check(tree2.Root(), qt.DeepEquals, tree.Root())
 }
 
+func TestAddBatchCaseE(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 4096
+
+	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close()
+
+	start := time.Now()
+	for i := 0; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		if err := tree.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fmt.Println("time elapsed without CASE E:	", time.Since(start))
+
+	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close()
+
+	var keys, values [][]byte
+	// add the initial leafs to fill a bit the tree before calling the
+	// AddBatch method
+	for i := 0; i < 900; i++ { // TMP TODO use const minLeafsThreshold+1 once ready
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		// use only the keys of one bucket, store the not used ones for
+		// later
+		if i%4 != 0 {
+			keys = append(keys, k)
+			values = append(values, v)
+			continue
+		}
+		if err := tree2.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for i := 900; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	start = time.Now()
+	indexes, err := tree2.AddBatchOpt(keys, values)
+	c.Assert(err, qt.IsNil)
+	fmt.Println("time elapsed with CASE E:	", time.Since(start))
+	c.Check(len(indexes), qt.Equals, 0)
+
+	// check that both trees roots are equal
+	c.Check(tree2.Root(), qt.DeepEquals, tree.Root())
+}
+
+func TestHighestPowerOfTwo(t *testing.T) {
+	c := qt.New(t)
+	c.Assert(highestPowerOfTwo(31), qt.Equals, 16)
+	c.Assert(highestPowerOfTwo(32), qt.Equals, 32)
+	c.Assert(highestPowerOfTwo(33), qt.Equals, 32)
+	c.Assert(highestPowerOfTwo(63), qt.Equals, 32)
+	c.Assert(highestPowerOfTwo(64), qt.Equals, 64)
+}
+
 // func printLeafs(name string, t *Tree) {
 //         w := bytes.NewBufferString("")
 //
@@ -446,3 +512,8 @@ func TestAddBatchCaseD(t *testing.T) {
 // TODO test tree with nLeafs > minLeafsThreshold, but that at level L, there is
 // less keys than nBuckets (so CASE C could be applied if first few leafs are
 // added to balance the tree)
+
+// TODO for Cases tests, add initial keys, do snapshot, and then measure time of
+// adding the rest of keys with loop over normal Add, and with AddBatch
+
+// TODO test adding batch with repeated keys in the batch
