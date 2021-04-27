@@ -11,7 +11,6 @@ import (
 
 	"go.vocdoni.io/dvote/crypto"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -207,9 +206,10 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 				return resp
 			}
 			data := r.CensusKey
-			if !r.Digested {
-				data = snarks.Poseidon.Hash(data)
-			}
+			// TO-DO: do a poseidon hash if census=snarks
+			//if !r.Digested {
+			// data = snarks.Poseidon.Hash(data)
+			//}
 			err := tr.Add(data, r.CensusValue)
 			if err != nil {
 				resp.SetError(err)
@@ -297,9 +297,10 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 		}
 		// Generate proof and return it
 		data := r.CensusKey
-		if !r.Digested {
-			data = snarks.Poseidon.Hash(data)
-		}
+		// TO-DO: if census=snarks do Poseidon hashing
+		//if !r.Digested {
+		//	data = snarks.Poseidon.Hash(data)
+		//}
 		validProof, err := tr.CheckProof(data, r.CensusValue, root, r.ProofData)
 		if err != nil {
 			resp.SetError(err)
@@ -323,9 +324,10 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 	switch r.Method {
 	case "genProof":
 		data := r.CensusKey
-		if !r.Digested {
-			data = snarks.Poseidon.Hash(data)
-		}
+		// TO-DO: if census=snarks do Poseidon hashing
+		//if !r.Digested {
+		//	data = snarks.Poseidon.Hash(data)
+		//}
 		siblings, err := tr.GenProof(data, r.CensusValue)
 		if err != nil {
 			resp.SetError(err)

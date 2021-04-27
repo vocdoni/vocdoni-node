@@ -13,7 +13,6 @@ import (
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
@@ -36,8 +35,10 @@ func TestMerkleTreeProof(t *testing.T) {
 	keys := util.CreateEthRandomKeysBatch(1000)
 	claims := []string{}
 	for _, k := range keys {
-		c := snarks.Poseidon.Hash(k.PublicKey())
-		tr.Add(c, nil)
+		c := k.PublicKey()
+		if err := tr.Add(c, nil); err != nil {
+			t.Fatal(err)
+		}
 		claims = append(claims, string(c))
 	}
 	censusURI := "ipfs://123456789"

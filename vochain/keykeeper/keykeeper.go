@@ -9,7 +9,6 @@ import (
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
-	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
@@ -318,9 +317,9 @@ func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {
 		return nil, fmt.Errorf("cannot generate encryption key: (%s)", err)
 	}
 	// Reveal and commitment keys
-	ckb := snarks.Poseidon.Hash(priv.Bytes())
+	ckb := ethereum.HashRaw(priv.Bytes())
 	ck := ckb[:commitmentKeySize]
-	ckhash := snarks.Poseidon.Hash(ckb)[:commitmentKeySize]
+	ckhash := ethereum.HashRaw(ckb)[:commitmentKeySize]
 
 	pk := &processKeys{
 		privKey:       priv.Bytes(),

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -43,8 +42,8 @@ func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
 	var req types.MetaRequest
 	req.Method = "genProof"
 	req.CensusID = hex.EncodeToString(root)
-	req.Digested = true
-	req.CensusKey = snarks.Poseidon.Hash(pubkey)
+	req.Digested = false
+	req.CensusKey = pubkey
 
 	resp, err := c.Request(req, nil)
 	if err != nil {
@@ -569,7 +568,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	log.Infof("add bulk claims (size %d)", censusSize)
 	req.Method = "addClaimBulk"
 	req.CensusKey = []byte{}
-	req.Digested = true
+	req.Digested = false
 	currentSize := censusSize
 	i := 0
 	var hexpub string
@@ -588,7 +587,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 			if err != nil {
 				return nil, "", err
 			}
-			claims = append(claims, snarks.Poseidon.Hash(pub))
+			claims = append(claims, pub)
 			currentSize--
 		}
 		req.CensusKeys = claims

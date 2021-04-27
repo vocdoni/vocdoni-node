@@ -9,7 +9,6 @@ import (
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
-	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -51,7 +50,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int, tmpDir
 	}
 	claims := []string{}
 	for _, k := range keys {
-		c := snarks.Poseidon.Hash(k.PublicKey())
+		c := k.PublicKey()
 		if err := tr.Add(c, nil); err != nil {
 			b.Error(err)
 		}

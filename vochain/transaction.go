@@ -216,7 +216,11 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 				// check census origin and compute vote digest identifier
 				switch process.CensusOrigin {
 				case models.CensusOrigin_OFF_CHAIN_TREE:
-					vp.PubKeyDigest = snarks.Poseidon.Hash(vp.PubKey)
+					if process.EnvelopeType.Anonymous {
+						vp.PubKeyDigest = snarks.Poseidon.Hash(vp.PubKey)
+					} else {
+						vp.PubKeyDigest = vp.PubKey
+					}
 				case models.CensusOrigin_OFF_CHAIN_CA:
 					vp.PubKeyDigest = addr.Bytes()
 				case models.CensusOrigin_ERC20:
@@ -232,7 +236,7 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 				default:
 					return nil, fmt.Errorf("census origin not compatible")
 				}
-				if len(vp.PubKeyDigest) < 20 {
+				if len(vp.PubKeyDigest) < 20 { // Minimum size is an Ethereum Address
 					return nil, fmt.Errorf("cannot digest public key: (%w)", err)
 				}
 
@@ -409,7 +413,7 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		}
 	}
 	if tx.RevealKey != nil {
-		commitment := snarks.Poseidon.Hash(tx.RevealKey)
+		commitment := ethereum.HashRaw(tx.RevealKey)
 		if fmt.Sprintf("%x", commitment) != process.CommitmentKeys[*tx.KeyIndex] {
 			log.Debugf("%x != %s", commitment, process.CommitmentKeys[*tx.KeyIndex])
 			return fmt.Errorf("the provided commitment reveal key does not match with the stored on index %d", *tx.KeyIndex)
