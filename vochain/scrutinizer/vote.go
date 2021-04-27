@@ -314,8 +314,9 @@ func (s *Scrutinizer) isProcessLiveResults(pid []byte) bool {
 }
 
 // commitVotes adds the votes and weight from results to the local database.
-// It does not overwrite the stored results but update them by adding the new content.
-func (s *Scrutinizer) commitVotes(pid []byte, results *Results, height uint32) error {
+// Important: it does not overwrite the already stored results but update them
+// by adding the new content to the existing one.
+func (s *Scrutinizer) commitVotes(pid []byte, partialResults *Results, height uint32) error {
 	// If the recovery bootstrap is running, wait.
 	s.recoveryBootLock.RLock()
 	defer s.recoveryBootLock.RUnlock()
@@ -323,30 +324,11 @@ func (s *Scrutinizer) commitVotes(pid []byte, results *Results, height uint32) e
 	s.addVoteLock.Lock()
 	defer s.addVoteLock.Unlock()
 	update := func(record interface{}) error {
-		update, ok := record.(*Results)
+		stored, ok := record.(*Results)
 		if !ok {
 			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 		}
-		update.Weight.Set(results.Weight)
-		update.Height = height
-
-		if len(results.Votes) == 0 {
-			return nil
-		}
-
-		if len(results.Votes) != len(update.Votes) {
-			return fmt.Errorf("commitVotes: different length for results.Vote and update.Votes")
-		}
-		for i := range update.Votes {
-			if len(update.Votes[i]) != len(results.Votes[i]) {
-				return fmt.Errorf("commitVotes: different number of options for question %d", i)
-			}
-			for j := range update.Votes[i] {
-				update.Votes[i][j].Set(results.Votes[i][j])
-			}
-		}
-
-		return nil
+		return stored.Add(partialResults)
 	}
 
 	var err error
@@ -370,8 +352,8 @@ func (s *Scrutinizer) commitVotes(pid []byte, results *Results, height uint32) e
 		err = fmt.Errorf("got too much transaction conflicts")
 	}
 	if err != nil {
-		log.Debugf("saved %d votes with total weight of %s on process %x", len(results.Votes),
-			results.Weight, pid)
+		log.Debugf("saved %d votes with total weight of %s on process %x", len(partialResults.Votes),
+			partialResults.Weight, pid)
 	}
 	return err
 }

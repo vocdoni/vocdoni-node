@@ -363,7 +363,7 @@ func TestLiveResults(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
 		BlockCount:   10,
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 1},
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
 		Mode:         &models.ProcessMode{AutoStart: true},
 	}); err != nil {
 		t.Fatal(err)
@@ -378,9 +378,9 @@ func TestLiveResults(t *testing.T) {
 	})
 	qt.Assert(t, err, qt.IsNil)
 	r := &Results{
-		Votes:        newEmptyVotes(3, 2),
+		Votes:        newEmptyVotes(3, 100),
 		Weight:       new(big.Int).SetUint64(0),
-		VoteOpts:     &models.ProcessVoteOptions{MaxCount: 3},
+		VoteOpts:     &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
 		EnvelopeType: &models.EnvelopeType{},
 	}
 	sc.addProcessToLiveResults(pid)
@@ -407,7 +407,7 @@ func TestLiveResults(t *testing.T) {
 	var value *big.Int
 	for q := range result.Votes {
 		for qi := range result.Votes[q] {
-			if qi > 2 {
+			if qi > 100 {
 				t.Fatalf("found more questions that expected")
 			}
 			value = result.Votes[q][qi]
@@ -498,7 +498,7 @@ func TestAddVote(t *testing.T) {
 	qt.Assert(t, err, qt.ErrorMatches, "values are not unique")
 }
 
-var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
+var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
 	vp, err := json.Marshal(types.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: v,
@@ -512,12 +512,20 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte) error {
 			max = i
 		}
 	}
-	r, err := sc.GetResults(pid)
+	proc, err := sc.ProcessInfo(pid)
 	if err != nil {
 		return err
 	}
+	r := &Results{
+		ProcessID:    pid,
+		Votes:        newEmptyVotes(int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
+		Weight:       new(big.Int).SetUint64(0),
+		Signatures:   []types.HexBytes{},
+		VoteOpts:     proc.VoteOpts,
+		EnvelopeType: proc.Envelope,
+	}
 	sc.addProcessToLiveResults(pid)
-	if err := sc.addLiveVote(pid, vp, nil, r); err != nil {
+	if err := sc.addLiveVote(pid, vp, weight, r); err != nil {
 		return err
 	}
 	return sc.commitVotes(pid, r, 1)
@@ -548,18 +556,70 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	qt.Assert(t, sc.newEmptyProcess(pid), qt.IsNil)
 
 	// Rate a product, exepected result: [ [1,0,1,0,2], [0,0,2,0,2] ]
-	qt.Assert(t, vote([]int{4, 2}, sc, pid), qt.IsNil)
-	qt.Assert(t, vote([]int{4, 2}, sc, pid), qt.IsNil)
-	qt.Assert(t, vote([]int{2, 4}, sc, pid), qt.IsNil)
-	qt.Assert(t, vote([]int{0, 4}, sc, pid), qt.IsNil)
-	qt.Assert(t, vote([]int{0, 5}, sc, pid), qt.ErrorMatches, ".*overflow.*")
-	qt.Assert(t, vote([]int{0, 0, 0}, sc, pid), qt.ErrorMatches, ".*")
+	qt.Assert(t, vote([]int{4, 2}, sc, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{4, 2}, sc, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{2, 4}, sc, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{0, 4}, sc, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{0, 5}, sc, pid, nil), qt.ErrorMatches, ".*overflow.*")
+	qt.Assert(t, vote([]int{0, 0, 0}, sc, pid, nil), qt.ErrorMatches, ".*")
 
 	result, err := sc.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	votes := GetFriendlyResults(result.Votes)
 	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "0", "2", "0", "2"})
 	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "0", "1", "0", "2"})
+}
+
+func TestBallotProtocolQuadratic(t *testing.T) {
+	// Rate a product from 0 to 4
+	app, err := vochain.NewBaseApplication(t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+
+	sc, err := NewScrutinizer(t.TempDir(), app)
+	qt.Assert(t, err, qt.IsNil)
+	app.SetTestingMethods()
+
+	// Rate 2 products from 0 to 4
+	pid := util.RandomBytes(32)
+	if err := app.State.AddProcess(&models.Process{
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false, CostFromWeight: true},
+		Status:       models.ProcessStatus_READY,
+		BlockCount:   10,
+		Mode:         &models.ProcessMode{AutoStart: true},
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 2, MaxValue: 0, CostExponent: 2},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	qt.Assert(t, sc.newEmptyProcess(pid), qt.IsNil)
+
+	// Quadratic voting, exepected result: [ [100016], [100033] ]
+	//
+	//  weight: 1000, votes: 10^2 + 28^2
+	//  weight: 50, votes: 5^2 + 5^2
+	//  weight: 20000000000,  100000^2 + 100000^2
+	//  weight: 1, votes 1^2 + 0^2
+
+	//  weight: 25, votes 5^2 + 1 // wrong
+	//  weight: 20000000000, 100000^2 + 112345^2 // wrong
+
+	// Good
+	qt.Assert(t, vote([]int{10, 28}, sc, pid, new(big.Int).SetUint64(1000)), qt.IsNil)
+	qt.Assert(t, vote([]int{5, 5}, sc, pid, new(big.Int).SetUint64(50)), qt.IsNil)
+	qt.Assert(t, vote([]int{100000, 100000}, sc, pid, new(big.Int).SetUint64(20000000000)), qt.IsNil)
+	qt.Assert(t, vote([]int{1, 0}, sc, pid, new(big.Int).SetUint64(1)), qt.IsNil)
+	// Wrong
+	qt.Assert(t, vote([]int{5, 2}, sc, pid, new(big.Int).SetUint64(25)),
+		qt.ErrorMatches, ".*overflow.*")
+	qt.Assert(t, vote([]int{100000, 112345}, sc, pid, new(big.Int).SetUint64(20000000000)),
+		qt.ErrorMatches, ".*overflow.*")
+
+	result, err := sc.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
+	votes := GetFriendlyResults(result.Votes)
+	qt.Assert(t, votes[0], qt.DeepEquals, []string{"100016"})
+	qt.Assert(t, votes[1], qt.DeepEquals, []string{"100033"})
 }
 
 func TestBallotProtocolMultiChoice(t *testing.T) {
@@ -596,11 +656,11 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	// Multichoice (choose 3 ouf of 5):
 	// - Vote Envelope: `[1,1,1,0,0]` `[0,1,1,1,0]` `[1,1,0,0,0]`
 	// - Results: `[ [1, 2], [0, 3], [1, 2], [2, 1], [3, 0] ]`
-	qt.Assert(t, vote([]int{1, 1, 1, 0, 0}, sc, pid), qt.IsNil)
-	qt.Assert(t, vote([]int{0, 1, 1, 1, 0}, sc, pid), qt.IsNil)
-	qt.Assert(t, vote([]int{1, 1, 0, 0, 0}, sc, pid), qt.IsNil)
-	qt.Assert(t, vote([]int{2, 1, 0, 0, 0}, sc, pid), qt.ErrorMatches, ".*overflow.*")
-	qt.Assert(t, vote([]int{1, 1, 1, 1, 0}, sc, pid), qt.ErrorMatches, ".*overflow.*")
+	qt.Assert(t, vote([]int{1, 1, 1, 0, 0}, sc, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{0, 1, 1, 1, 0}, sc, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{1, 1, 0, 0, 0}, sc, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{2, 1, 0, 0, 0}, sc, pid, nil), qt.ErrorMatches, ".*overflow.*")
+	qt.Assert(t, vote([]int{1, 1, 1, 1, 0}, sc, pid, nil), qt.ErrorMatches, ".*overflow.*")
 
 	result, err := sc.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
