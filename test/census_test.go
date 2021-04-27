@@ -42,7 +42,6 @@ import (
 
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/types"
 
 	"go.vocdoni.io/dvote/test/testcommon"
@@ -124,11 +123,12 @@ func TestCensus(t *testing.T) {
 	// addClaimBulk
 	var claims [][]byte
 	req.CensusKey = []byte{}
+	req.Digested = false
 	keys := testcommon.CreateEthRandomKeysBatch(t, *censusSize)
 	for _, key := range keys {
-		hash := snarks.Poseidon.Hash(crypto.FromECDSAPub(&key.Public))
-		qt.Assert(t, hash, qt.Not(qt.HasLen), 0)
-		claims = append(claims, hash)
+		claim := crypto.FromECDSAPub(&key.Public)
+		qt.Assert(t, claim, qt.Not(qt.HasLen), 0)
+		claims = append(claims, claim)
 	}
 	req.CensusKeys = claims
 	resp = doRequest("addClaimBulk", signer2)
@@ -210,5 +210,4 @@ func TestCensus(t *testing.T) {
 	// get census list
 	resp = doRequest("getCensusList", signer2)
 	qt.Assert(t, resp.CensusList, qt.HasLen, 4)
-	t.Logf("census list: %v", resp.CensusList)
 }

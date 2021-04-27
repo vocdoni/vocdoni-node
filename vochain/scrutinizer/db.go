@@ -213,7 +213,7 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 		}
 	} else {
 		// For the other cases, we use the results matrix index weighted
-		// as described in the Ballot Protocol
+		// as described in the Ballot Protocol.
 		for q, opt := range voteValues {
 			r.Votes[q][opt].Add(r.Votes[q][opt], weight)
 		}

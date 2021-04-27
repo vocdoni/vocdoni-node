@@ -40,8 +40,8 @@ type exportData struct {
 }
 
 const (
-	MaxKeySize   = 32
-	MaxValueSize = 64
+	MaxKeySize   = 65
+	MaxValueSize = 65
 )
 
 // NewTree opens or creates a merkle tree under the given storage.
