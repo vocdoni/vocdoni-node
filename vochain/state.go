@@ -85,6 +85,7 @@ type State struct {
 	MemPoolRemoveTxKey func([32]byte, bool)
 	txCounter          *int32
 	eventListeners     []EventListener
+	height             *uint32
 }
 
 // ImmutableState holds the latest trees version saved on disk
@@ -126,6 +127,7 @@ func NewState(dataDir string) (*State, error) {
 	log.Infof("state database is ready at version %d with hash %x",
 		vs.Store.Version(), vs.Store.Hash())
 	vs.txCounter = new(int32)
+	vs.height = new(uint32)
 	return vs, nil
 }
 
@@ -396,7 +398,7 @@ func (v *State) AddVote(vote *models.Vote) error {
 		return err
 	}
 	// save block number
-	vote.Height = uint32(v.Header(false).Height)
+	vote.Height = v.Height()
 	newVoteBytes, err := proto.Marshal(vote)
 	if err != nil {
 		return fmt.Errorf("cannot marshal vote")
@@ -573,6 +575,7 @@ func (v *State) Save() []byte {
 				log.Warnf("event callback error on commit: %v", err)
 			}
 		}
+		atomic.StoreUint32(v.height, height)
 	}
 	return hash
 }
@@ -588,6 +591,11 @@ func (v *State) Rollback() {
 		panic(fmt.Sprintf("cannot rollback state tree: (%s)", err))
 	}
 	atomic.StoreInt32(v.txCounter, 0)
+}
+
+// Height returns the current state height (block count)
+func (v *State) Height() uint32 {
+	return atomic.LoadUint32(v.height)
 }
 
 // WorkingHash returns the hash of the vochain trees censusRoots

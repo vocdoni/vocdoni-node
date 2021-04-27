@@ -138,14 +138,12 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 	if process == nil || process.EnvelopeType == nil || process.Mode == nil {
 		return nil, fmt.Errorf("process %x malformed", tx.ProcessId)
 	}
-	header := state.Header(false)
-	if header == nil {
-		return nil, fmt.Errorf("cannot obtain state header")
-	}
-	height := uint64(header.Height)
+	height := state.Height()
 	endBlock := process.StartBlock + process.BlockCount
 
-	if (height >= uint64(process.StartBlock) && height <= uint64(endBlock)) && process.Status == models.ProcessStatus_READY {
+	if (height >= process.StartBlock && height <= endBlock) &&
+		process.Status == models.ProcessStatus_READY {
+
 		// Check in case of keys required, they have been sent by some keykeeper
 		if process.EnvelopeType.EncryptedVotes && process.KeyIndex != nil && *process.KeyIndex < 1 {
 			return nil, fmt.Errorf("no keys available, voting is not possible")
@@ -171,8 +169,9 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 
 			// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
 			// An element can only be added to the vote cache during checkTx.
-			// Every N seconds the old votes which are not yet in the blockchain will be removed from the cache.
-			// If the same vote (but different transaction) is send to the mempool, the cache will detect it and vote will be discarted.
+			// Every N seconds the old votes which are not yet in the blockchain will be removed from cache.
+			// If the same vote (but different transaction) is send to the mempool, the cache will detect it
+			// and vote will be discarted.
 			vp := state.CacheGet(txID)
 
 			if forCommit && vp != nil {
@@ -239,7 +238,11 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 
 				// check census proof
 				var valid bool
-				valid, vp.Weight, err = CheckProof(tx.Proof, process.CensusOrigin, process.CensusRoot, process.ProcessId, vp.PubKeyDigest)
+				valid, vp.Weight, err = CheckProof(tx.Proof,
+					process.CensusOrigin,
+					process.CensusRoot,
+					process.ProcessId,
+					vp.PubKeyDigest)
 				if err != nil {
 					return nil, fmt.Errorf("proof not valid: (%w)", err)
 				}
@@ -295,11 +298,8 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 		if !process.EnvelopeType.EncryptedVotes && !process.EnvelopeType.Anonymous {
 			return fmt.Errorf("process does not require keys")
 		}
-		// get the current blockchain header
-		header := state.Header(false)
-		if header == nil {
-			return fmt.Errorf("cannot get blockchain header")
-		}
+
+		height := state.Height()
 		// Specific checks
 		switch tx.Txtype {
 		case models.TxType_ADD_PROCESS_KEYS:
@@ -307,11 +307,12 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 				return fmt.Errorf("missing keyIndex on AdminTxCheck")
 			}
 			// endblock is always greater than start block so that case is also included here
-			if header.Height > int64(process.StartBlock) {
+			if height > process.StartBlock {
 				return fmt.Errorf("cannot add process keys in a started or finished process")
 			}
 			// process is not canceled
-			if process.Status == models.ProcessStatus_CANCELED || process.Status == models.ProcessStatus_ENDED || process.Status == models.ProcessStatus_RESULTS {
+			if process.Status == models.ProcessStatus_CANCELED || process.Status == models.ProcessStatus_ENDED ||
+				process.Status == models.ProcessStatus_RESULTS {
 				return fmt.Errorf("cannot add process keys in a canceled process")
 			}
 			if len(process.EncryptionPublicKeys[*tx.KeyIndex])+len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
@@ -326,7 +327,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 				return fmt.Errorf("missing keyIndexon AdminTxCheck")
 			}
 			// check process is finished
-			if header.Height < int64(process.StartBlock+process.BlockCount) &&
+			if height < process.StartBlock+process.BlockCount &&
 				!(process.Status == models.ProcessStatus_ENDED || process.Status == models.ProcessStatus_CANCELED) {
 				return fmt.Errorf("cannot reveal keys before the process is finished")
 			}
