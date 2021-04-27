@@ -1,0 +1,32 @@
+# my global config
+global:
+  scrape_interval: 2s
+  evaluation_interval: 20s
+  # scrape_timeout is set to the global default (10s).
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager).
+  external_labels:
+    monitor: "vocdoni"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+
+  - job_name: "dvote nodes stage 2"
+    scrape_interval: 20s
+    scheme: http
+    static_configs:
+      - targets:
+          -  gateway:9090
+          -  oracle:9090
+          -  seed:9090
+          -  miner0:9090
+          -  miner1:9090
+          -  miner2:9090
+          -  miner3:9090
+          -  miner4:9090
+          -  miner5:9090
+          -  miner6:9090
+        labels:
+          environment: "test"
