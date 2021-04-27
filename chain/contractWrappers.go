@@ -122,7 +122,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 
 	// entity id
 	// for evm censuses the entity id is the snapshoted contract address
-	if processData.EntityId, err = hex.DecodeString(util.TrimHex(processMeta.EntityAddress.String())); err != nil {
+	if processData.EntityId, err = hex.DecodeString(util.TrimHex(processMeta.EntityAddressOwner[0].String())); err != nil {
 		return nil, fmt.Errorf("error decoding entity address: %w", err)
 	}
 
@@ -199,7 +199,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 		if err := randSigner.Generate(); err != nil {
 			return nil, fmt.Errorf("cannot check storage root, cannot generate random Ethereum address: %w", err)
 		}
-		fetchedRoot, err := ph.getStorageRoot(ctx, randSigner.Address(), processMeta.EntityAddress, processMeta.EvmBlockHeight)
+		fetchedRoot, err := ph.getStorageRoot(ctx, randSigner.Address(), processMeta.EntityAddressOwner[0], processMeta.SourceBlockHeight)
 		if err != nil {
 			return nil, fmt.Errorf("cannot check EVM storage root: %w", err)
 		}
@@ -210,12 +210,22 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 			return nil, fmt.Errorf("invalid storage root, root fetched and provided must be the same. Got: %x expected: %x", fetchedRoot, processData.CensusRoot)
 		}
 		// get index slot from the token storage proof contract
-		islot, err := ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, processMeta.EntityAddress)
+		islot, err := ph.GetTokenBalanceMappingPosition(ctx, processMeta.EntityAddressOwner[0])
 		if err != nil {
 			return nil, fmt.Errorf("cannot get balance mapping position from the contract: %w", err)
 		}
 		iSlot32 := uint32(islot.Uint64())
 		processData.EthIndexSlot = &iSlot32
+		// decode owner
+		if processData.Owner, err = hex.DecodeString(util.TrimHex(processMeta.EntityAddressOwner[1].String())); err != nil {
+			return nil, fmt.Errorf("error decoding owner address: %w", err)
+		}
+		// save sourceBlockHeight
+		sourceBlockHeight64 := uint64(processMeta.SourceBlockHeight.Uint64())
+		if sourceBlockHeight64 == 0 {
+			return nil, fmt.Errorf("source block height must be > 0: %w", err)
+		}
+		processData.SourceBlockHeight = &sourceBlockHeight64
 	}
 
 	// set tx type (outer type used by the vochain tx type)
@@ -373,7 +383,11 @@ func (ph *VotingHandle) IsTokenRegistered(ctx context.Context, address common.Ad
 
 // GetTokenBalanceMappingPosition returns the balance mapping position given a token address
 func (ph *VotingHandle) GetTokenBalanceMappingPosition(ctx context.Context, address common.Address) (*big.Int, error) {
-	return ph.TokenStorageProof.GetBalanceMappingPosition(&ethbind.CallOpts{Context: ctx}, address)
+	tokenInfo, err := ph.TokenStorageProof.Tokens(&ethbind.CallOpts{Context: ctx}, address)
+	if err != nil {
+		return nil, err
+	}
+	return tokenInfo.BalanceMappingPosition, nil
 }
 
 // GENESIS WRAPPER

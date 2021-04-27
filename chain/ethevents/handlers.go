@@ -47,7 +47,7 @@ var ethereumEventList = map[string]string{
 	// TOKEN STORAGE PROOF
 
 	// TokenRegistered(address indexed token, address indexed registrar)
-	"tokenStorageProofTokenRegistered": "0x487c37289624c10056468f1f98ebffbad01edce11374975179672e32e2543bf0",
+	"tokenStorageProofTokenRegistered": "0x158412daecdc1456d01568828bcdb18464cc7f1ce0215ddbc3f3cfede9d1e63d",
 
 	// GENESIS
 
