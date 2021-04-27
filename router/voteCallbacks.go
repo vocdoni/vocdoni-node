@@ -403,9 +403,13 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get tx list: block does not exist"))
 		return
 	}
-	for _, tx := range block.Txs {
+	if request.ListSize > MaxListSize || request.ListSize <= 0 {
+		request.ListSize = MaxListSize
+	}
+	maxIndex := request.From + request.ListSize
+	for i := request.From; i < maxIndex && i < len(block.Txs); i++ {
 		signedTx := new(models.SignedTx)
-		proto.Unmarshal(tx, signedTx)
+		proto.Unmarshal(block.Txs[i], signedTx)
 		txList.TxList = append(txList.GetTxList(), signedTx)
 	}
 	txBytes, err := proto.Marshal(txList)
