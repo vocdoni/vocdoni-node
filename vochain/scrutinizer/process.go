@@ -193,8 +193,8 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	if options == nil {
 		return fmt.Errorf("newEmptyProcess: vote options is nil")
 	}
-	if options.MaxCount == 0 || options.MaxValue == 0 {
-		return fmt.Errorf("newEmptyProcess: maxCount or maxValue are zero")
+	if options.MaxCount == 0 {
+		return fmt.Errorf("newEmptyProcess: maxCount is zero")
 	}
 
 	// Check for overflows

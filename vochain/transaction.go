@@ -313,7 +313,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 			// process is not canceled
 			if process.Status == models.ProcessStatus_CANCELED || process.Status == models.ProcessStatus_ENDED ||
 				process.Status == models.ProcessStatus_RESULTS {
-				return fmt.Errorf("cannot add process keys in a canceled process")
+				return fmt.Errorf("cannot add process keys to a %s process", process.Status)
 			}
 			if len(process.EncryptionPublicKeys[*tx.KeyIndex])+len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
 				return fmt.Errorf("keys for process %x already revealed", tx.ProcessId)

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -84,6 +83,36 @@ func (r *Results) String() string {
 	return results.String()
 }
 
+// Add adds the total weight and votes from the given Results to the containing Results making the method call.
+func (r *Results) Add(new *Results) error {
+	r.Weight.Add(r.Weight, new.Weight)
+	if new.Height > r.Height {
+		r.Height = new.Height
+	}
+	if len(new.Votes) == 0 {
+		return nil
+	}
+	if len(new.Votes) != len(r.Votes) {
+		return fmt.Errorf("results.Add: different number of fields")
+	}
+	for i := range new.Votes {
+		if len(r.Votes[i]) < len(new.Votes[i]) {
+			return fmt.Errorf("results.Add: values overflow (%d)", i)
+		}
+		// Example:
+		//	[ [1,2,3], [0,1,5] ]
+		//	[ [2,1,1], [1,0,2] ]
+		//	+ -----------------
+		//	[ [3,3,4], [1,1,7] ]
+		for j := range new.Votes[i] {
+			r.Votes[i][j].Add(r.Votes[i][j], new.Votes[i][j])
+		}
+	}
+	return nil
+}
+
+// AddVote adds the voteValues and weight to the Results struct.
+// Checks are performed according the Ballot Protocol.
 func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) error {
 	if r.VoteOpts == nil {
 		return fmt.Errorf("addVote: processVoteOptions is nil")
@@ -113,7 +142,7 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 		}
 	}
 
-	// Max Value
+	// Max Value, check it only if greather than zero
 	if r.VoteOpts.MaxValue > 0 {
 		for _, v := range voteValues {
 			if uint32(v) > r.VoteOpts.MaxValue {
@@ -122,34 +151,73 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 		}
 	}
 
-	// Total cost
-	if r.VoteOpts.MaxTotalCost > 0 {
-		cost := float64(0)
+	// Max total cost
+	if r.VoteOpts.MaxTotalCost > 0 || r.EnvelopeType.CostFromWeight {
+		cost := new(big.Int).SetUint64(0)
+		exponent := new(big.Int).SetUint64(uint64(r.VoteOpts.CostExponent))
+		var maxCost *big.Int
+		if r.EnvelopeType.CostFromWeight {
+			maxCost = weight
+		} else {
+			maxCost = new(big.Int).SetUint64(uint64(r.VoteOpts.MaxTotalCost))
+		}
 		for _, v := range voteValues {
-			cost += math.Pow(float64(v), float64(r.VoteOpts.CostExponent))
+			cost.Add(cost, new(big.Int).Exp(new(big.Int).SetUint64(uint64(v)), exponent, nil))
+			if cost.Cmp(maxCost) > 0 {
+				return fmt.Errorf("max total cost overflow: %s", cost)
+			}
 		}
-		if cost > float64(r.VoteOpts.MaxTotalCost) {
-			return fmt.Errorf("max total cost overflow: %f", cost)
-		}
+	}
+
+	// If Mutex provided, Lock it
+	if mutex != nil {
+		mutex.Lock()
+		defer mutex.Unlock()
 	}
 
 	// If weight not provided, assume weight = 1
 	if weight == nil {
 		weight = new(big.Int).SetUint64(1)
 	}
-	// If Mutex provided, Lock it
-	if mutex != nil {
-		mutex.Lock()
-		defer mutex.Unlock()
-	}
+
+	// Add the Election weight (tells how much voting power have already been processed)
 	r.Weight.Add(r.Weight, weight)
 	if len(r.Votes) == 0 {
 		r.Votes = newEmptyVotes(int(r.VoteOpts.MaxCount), int(r.VoteOpts.MaxValue)+1)
 	}
-	for q, opt := range voteValues {
-		r.Votes[q][opt].Add(r.Votes[q][opt], weight)
-	}
 
+	// If MaxValue is zero, consider discrete value couting. So for each questoin, the value
+	// is aggregated. The weight is multiplied for the value if costFromWeight=False.
+	// This is a special case for Quadratic voting where maxValue should be 0 (no limit).
+	// The results are aggregated, so we use only the first column of the results matrix.
+	if r.VoteOpts.MaxValue == 0 {
+		// If CostFromWeight, the Weight is used for computing the cost and not as a value multiplier
+		if r.EnvelopeType.CostFromWeight {
+			weight = new(big.Int).SetUint64(1)
+		}
+		// Example if maxValue=0 and CostFromWeight=false
+		// Vote1: [1, 2, 3] w=10
+		// Vote2: [0, 3, 1] w=5
+		//  [ [1*10+0*5], [2*10+3*5], [3*10+1*5] ]
+		// Results: [ [10], [35], [35] ]
+		//
+		// If CostFromWeight=true then we assume the weight is already represented on the vote value.
+		// This is why we set weight=1.
+		for q, value := range voteValues {
+			r.Votes[q][0].Add(
+				r.Votes[q][0],
+				new(big.Int).Mul(
+					new(big.Int).SetUint64(uint64(value)),
+					weight),
+			)
+		}
+	} else {
+		// For the other cases, we use the results matrix index weighted
+		// as described in the Ballot Protocol
+		for q, opt := range voteValues {
+			r.Votes[q][opt].Add(r.Votes[q][opt], weight)
+		}
+	}
 	return nil
 }
 
