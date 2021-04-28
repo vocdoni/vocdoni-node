@@ -43,11 +43,11 @@ func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*VoteReference, er
 // GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
 func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.EnvelopePackage, []byte, error) {
-	txRef, err := s.GetEnvelopeReference(nullifier)
+	voteRef, err := s.GetEnvelopeReference(nullifier)
 	if err != nil {
 		return nil, nil, err
 	}
-	stx, _, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
+	stx, txHash, err := s.App.GetTx(voteRef.Height, voteRef.TxIndex)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -59,12 +59,13 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.EnvelopePackage, []
 	if envelope == nil {
 		return nil, nil, fmt.Errorf("transaction is not an Envelope")
 	}
-	envelope.Nullifier = txRef.Nullifier
+	envelope.Nullifier = voteRef.Nullifier
 	return &models.EnvelopePackage{
 		Envelope: envelope,
-		Weight:   txRef.Weight.Bytes(),
-		TxIndex:  txRef.TxIndex,
-		Height:   txRef.Height,
+		Weight:   voteRef.Weight.Bytes(),
+		TxIndex:  voteRef.TxIndex,
+		Height:   voteRef.Height,
+		TxHash:   txHash,
 	}, stx.Signature, nil
 }
 
@@ -114,7 +115,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte) (*models.EnvelopePackageLis
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
 		func(txRef *VoteReference) error {
-			stx, _, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
+			stx, txHash, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
 			if err != nil {
 				return err
 			}
@@ -132,6 +133,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte) (*models.EnvelopePackageLis
 				Weight:   txRef.Weight.Bytes(),
 				TxIndex:  txRef.TxIndex,
 				Height:   txRef.Height,
+				TxHash:   txHash,
 			})
 			return nil
 		})
