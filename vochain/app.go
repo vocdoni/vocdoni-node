@@ -157,16 +157,16 @@ func (app *BaseApplication) GetBlockByHash(hash []byte) *tmtypes.Block {
 }
 
 // GetTx retreives a vochain transaction from the blockstore
-func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedTx, error) {
+func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
 	block := app.GetBlockByHeight(int64(height))
 	if block == nil {
-		return nil, fmt.Errorf("unable to get block by height: %d", height)
+		return nil, nil, fmt.Errorf("unable to get block by height: %d", height)
 	}
 	if int32(len(block.Txs)) <= txIndex {
-		return nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
+		return nil, nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
 	}
 	tx := &models.SignedTx{}
-	return tx, proto.Unmarshal(block.Txs[txIndex], tx)
+	return tx, tmtypes.Tx(block.Txs[txIndex]).Hash(), proto.Unmarshal(block.Txs[txIndex], tx)
 }
 
 // SendTX sends a transaction to the mempool (sync)

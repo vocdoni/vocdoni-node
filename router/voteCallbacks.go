@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 
+	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -339,7 +340,12 @@ func (r *Router) getValidatorList(request routerRequest) {
 
 func (r *Router) getBlock(request routerRequest) {
 	var response types.MetaResponse
-	blockHeader := vochain.MirrorTendermintBlock(r.Scrutinizer.App.GetBlockByHeight(int64(request.BlockHeight)))
+	block := r.Scrutinizer.App.GetBlockByHeight(int64(request.BlockHeight))
+	if block == nil {
+		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.BlockHeight))
+		return
+	}
+	blockHeader := vochain.MirrorTendermintBlock(block)
 	blockBytes, err := proto.Marshal(blockHeader)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: %v", err))
@@ -381,12 +387,18 @@ func (r *Router) getBlockList(request routerRequest) {
 
 func (r *Router) getTx(request routerRequest) {
 	var response types.MetaResponse
-	tx, err := r.Scrutinizer.App.GetTx(request.BlockHeight, request.TxIndex)
+	tx, hash, err := r.Scrutinizer.App.GetTx(request.BlockHeight, request.TxIndex)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
 		return
 	}
-	txBytes, err := proto.Marshal(tx)
+
+	txBytes, err := proto.Marshal(&models.TxPackage{
+		Tx:          tx,
+		BlockHeight: request.BlockHeight,
+		Index:       request.TxIndex,
+		Hash:        hash,
+	})
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
 		return
@@ -397,7 +409,7 @@ func (r *Router) getTx(request routerRequest) {
 
 func (r *Router) getTxListForBlock(request routerRequest) {
 	var response types.MetaResponse
-	txList := new(models.SignedTxList)
+	txList := new(models.TxPackageList)
 	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.BlockHeight))
 	if block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get tx list: block does not exist"))
@@ -410,7 +422,12 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 	for i := request.From; i < maxIndex && i < len(block.Txs); i++ {
 		signedTx := new(models.SignedTx)
 		proto.Unmarshal(block.Txs[i], signedTx)
-		txList.TxList = append(txList.GetTxList(), signedTx)
+		txList.TxList = append(txList.GetTxList(), &models.TxPackage{
+			Tx:          signedTx,
+			BlockHeight: request.BlockHeight,
+			Index:       int32(i),
+			Hash:        tmtypes.Tx(block.Txs[i]).Hash(),
+		})
 	}
 	txBytes, err := proto.Marshal(txList)
 	if err != nil {
