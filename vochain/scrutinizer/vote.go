@@ -59,6 +59,7 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.EnvelopePackage, []
 	if envelope == nil {
 		return nil, nil, fmt.Errorf("transaction is not an Envelope")
 	}
+	envelope.Nullifier = txRef.Nullifier
 	return &models.EnvelopePackage{
 		Envelope: envelope,
 		Weight:   txRef.Weight.Bytes(),
@@ -125,6 +126,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte) (*models.EnvelopePackageLis
 			if envelope == nil {
 				return fmt.Errorf("transaction is not an Envelope")
 			}
+			envelope.Nullifier = txRef.Nullifier
 			envelopes.Envelopes = append(envelopes.GetEnvelopes(), &models.EnvelopePackage{
 				Envelope: envelope,
 				Weight:   txRef.Weight.Bytes(),
