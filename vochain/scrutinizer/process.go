@@ -28,6 +28,9 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*Process, error) {
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
 func (s *Scrutinizer) ProcessList(entityID []byte, searchTerm string, namespace uint32,
 	status string, withResults bool, from, max int) ([][]byte, error) {
+	if from < 0 {
+		from = 0
+	}
 	// For filtering on Status we use a badgerhold match function.
 	// If status is not defined, then the match function will return always true.
 	statusnum := int32(-1)
