@@ -29,7 +29,7 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*Process, error) {
 func (s *Scrutinizer) ProcessList(entityID []byte, searchTerm string, namespace uint32,
 	status string, withResults bool, from, max int) ([][]byte, error) {
 	if from < 0 {
-		from = 0
+		return nil, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
 	}
 	// For filtering on Status we use a badgerhold match function.
 	// If status is not defined, then the match function will return always true.
