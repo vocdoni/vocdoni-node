@@ -255,15 +255,15 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	// Add the entity to the indexer database
 	eid := p.GetEntityId()
 	entity := &Entity{}
-	// If entity is not registered in db, add to entity count cache
+	// If entity is not registered in db, add to entity count cache and insert to db
 	if s.db.FindOne(entity, badgerhold.Where("ID").Eq(eid)); entity == nil {
 		atomic.AddInt64(s.countTotalEntities, 1)
-	}
-	if err := s.db.Upsert(eid, &Entity{
-		ID:           eid,
-		CreationTime: currentBlockTime,
-	}); err != nil {
-		return err
+		if err := s.db.Insert(eid, &Entity{
+			ID:           eid,
+			CreationTime: currentBlockTime,
+		}); err != nil {
+			return err
+		}
 	}
 
 	compResultsHeight := uint32(0)
