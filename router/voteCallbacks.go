@@ -75,24 +75,18 @@ func (r *Router) submitEnvelope(request routerRequest) {
 }
 
 func (r *Router) getStats(request routerRequest) {
+	var err error
 	stats := new(models.VochainStats)
-
-	stats.BlockHeight = uint32(r.vocapp.State.Header(true).Height)
+	stats.BlockHeight = r.vocapp.Height()
 	stats.BlockTimeStamp = int32(r.vocapp.State.Header(true).Timestamp)
-
 	stats.EntityCount = r.Scrutinizer.EntityCount()
-
-	votes, err := r.Scrutinizer.GetEnvelopeHeight([]byte{})
-	if err != nil {
+	if stats.EnvelopeCount, err = r.Scrutinizer.GetEnvelopeHeight([]byte{}); err != nil {
 		log.Warnf("could not count vote envelopes: %s", err)
 	}
-	stats.EnvelopeCount = votes
-
 	stats.ProcessCount = r.Scrutinizer.ProcessCount([]byte{})
 	vals, _ := r.vocapp.State.Validators(true)
 	stats.ValidatorCount = int32(len(vals))
 	stats.BlockTime = r.vocinfo.BlockTimes()[:]
-
 	stats.ChainID = r.vocapp.Node.GenesisDoc().ChainID
 	stats.GenesisTimeStamp = r.vocapp.Node.GenesisDoc().GenesisTime.Unix()
 	stats.Syncing = r.vocapp.IsSynchronizing()
@@ -340,18 +334,20 @@ func (r *Router) getValidatorList(request routerRequest) {
 
 func (r *Router) getBlock(request routerRequest) {
 	var response types.MetaResponse
+	if request.BlockHeight > r.vocapp.Height() {
+		r.sendError(request, fmt.Sprintf("block height %d not valid for vochain with height %d", request.BlockHeight, r.vocapp.Height()))
+		return
+	}
 	block := r.Scrutinizer.App.GetBlockByHeight(int64(request.BlockHeight))
 	if block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.BlockHeight))
 		return
 	}
-	blockHeader := vochain.MirrorTendermintBlock(block)
-	blockBytes, err := proto.Marshal(blockHeader)
-	if err != nil {
+	var err error
+	if response.Content, err = proto.Marshal(vochain.MirrorTendermintBlock(block)); err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: %v", err))
 		return
 	}
-	response.Content = blockBytes
 	request.Send(r.buildReply(request, &response))
 }
 func (r *Router) getBlockByHash(request routerRequest) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/timshannon/badgerhold/v3"
@@ -172,11 +173,8 @@ func (s *Scrutinizer) EntityList(searchTerm string, max, from int) []string {
 
 // EntityCount return the number of entities indexed by the scrutinizer
 func (s *Scrutinizer) EntityCount() int64 {
-	c, err := s.db.Count(&Entity{}, nil)
-	if err != nil {
-		log.Warnf("cannot count entities: %v", err)
-	}
-	return int64(c)
+	return atomic.LoadInt64(s.countTotalEntities)
+
 }
 
 // Return whether a process must have live results or not
@@ -253,6 +251,11 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	// Add the entity to the indexer database
 	eid := p.GetEntityId()
+	entity := &Entity{}
+	// If entity is not registered in db, add to entity count cache
+	if s.db.FindOne(entity, badgerhold.Where("ID").Eq(eid)); entity == nil {
+		atomic.AddInt64(s.countTotalEntities, 1)
+	}
 	if err := s.db.Upsert(eid, &Entity{
 		ID:           eid,
 		CreationTime: currentBlockTime,

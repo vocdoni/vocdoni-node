@@ -63,6 +63,7 @@ type Scrutinizer struct {
 	// access time when GenEnvelopeHeight() is called.
 	envelopeHeightCache *lru.Cache
 	countTotalEnvelopes *uint64
+	countTotalEntities  *int64
 
 	// addVoteLock is used to avoid Transaction Conflicts on the KV database.
 	// It is not critical and the code should be able to recover from a Conflict, but we
@@ -92,13 +93,22 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 		return nil, err
 	}
 	startTime := time.Now()
-	c, err := s.db.Count(&VoteReference{}, &badgerhold.Query{})
+	envelopes, err := s.db.Count(&VoteReference{}, &badgerhold.Query{})
 	if err != nil {
 		return nil, fmt.Errorf("could not count the total envelopes: %w", err)
 	}
-	log.Infof("indexer initialization took %s, have %d envelopes stored", time.Since(startTime), c)
+	entities, err := s.db.Count(&Entity{}, &badgerhold.Query{})
+	if err != nil {
+		return nil, fmt.Errorf("could not count the total entities: %w", err)
+	}
+	log.Infof("indexer initialization took %s, have %d envelopes and %d entities stored",
+		time.Since(startTime),
+		envelopes,
+		entities)
 	s.countTotalEnvelopes = new(uint64)
-	*s.countTotalEnvelopes = uint64(c)
+	*s.countTotalEnvelopes = uint64(envelopes)
+	s.countTotalEntities = new(int64)
+	*s.countTotalEntities = int64(entities)
 	// Subscrive to events
 	s.App.State.AddEventListener(s)
 	if s.envelopeHeightCache, err = lru.New(countEnvelopeCacheSize); err != nil {
