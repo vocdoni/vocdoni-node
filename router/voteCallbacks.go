@@ -3,7 +3,6 @@ package router
 import (
 	"fmt"
 
-	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -76,7 +75,7 @@ func (r *Router) submitEnvelope(request routerRequest) {
 
 func (r *Router) getStats(request routerRequest) {
 	var err error
-	stats := new(models.VochainStats)
+	stats := new(types.VochainStats)
 	stats.BlockHeight = r.vocapp.Height()
 	stats.BlockTimeStamp = int32(r.vocapp.State.Header(true).Timestamp)
 	stats.EntityCount = r.Scrutinizer.EntityCount()
@@ -85,14 +84,14 @@ func (r *Router) getStats(request routerRequest) {
 	}
 	stats.ProcessCount = r.Scrutinizer.ProcessCount([]byte{})
 	vals, _ := r.vocapp.State.Validators(true)
-	stats.ValidatorCount = int32(len(vals))
-	stats.BlockTime = r.vocinfo.BlockTimes()[:]
+	stats.ValidatorCount = len(vals)
+	stats.BlockTime = r.vocinfo.BlockTimes()
 	stats.ChainID = r.vocapp.Node.GenesisDoc().ChainID
-	stats.GenesisTimeStamp = r.vocapp.Node.GenesisDoc().GenesisTime.Unix()
+	stats.GenesisTimeStamp = r.vocapp.Node.GenesisDoc().GenesisTime
 	stats.Syncing = r.vocapp.IsSynchronizing()
 
 	var response types.MetaResponse
-	response.Content, err = proto.Marshal(stats)
+	response.Stats = stats
 	if err != nil {
 		log.Errorf("could not marshal vochainStats: %s", err)
 	}
