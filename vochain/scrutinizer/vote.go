@@ -35,8 +35,8 @@ const kvErrorStringForRetry = "Transaction Conflict"
 
 // GetVoteReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
-func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*VoteReference, error) {
-	txRef := &VoteReference{}
+func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*types.VoteReference, error) {
+	txRef := &types.VoteReference{}
 	return txRef, s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
 }
 
@@ -77,7 +77,7 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 	wg := sync.WaitGroup{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId),
-		func(txRef *VoteReference) error {
+		func(txRef *types.VoteReference) error {
 			wg.Add(1)
 			processVote := func() {
 				defer wg.Done()
@@ -114,7 +114,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte) ([]*types.EnvelopePackage, 
 	envelopes := []*types.EnvelopePackage{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
-		func(txRef *VoteReference) error {
+		func(txRef *types.VoteReference) error {
 			stx, txHash, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
 			if err != nil {
 				return err
@@ -149,7 +149,7 @@ func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (uint64, error) {
 			return cc.(uint64), nil
 		}
 		// TODO: Warning, int can overflow
-		c, err := s.db.Count(&VoteReference{},
+		c, err := s.db.Count(&types.VoteReference{},
 			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
 		if err != nil {
 			return 0, err
@@ -199,7 +199,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 
 // GetResults returns the current result for a processId aggregated in a two dimension int slice
 func (s *Scrutinizer) GetResults(processID []byte) (*Results, error) {
-	if n, err := s.db.Count(&Process{},
+	if n, err := s.db.Count(&types.Process{},
 		badgerhold.Where("ID").Eq(processID).
 			And("HaveResults").Eq(true).
 			And("Status").Ne(int32(models.ProcessStatus_CANCELED))); err != nil {
@@ -293,7 +293,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, votePackage []byte, weight *big.In
 func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 	weight []byte, txIndex int32, txn *badger.Txn) error {
 	if txn != nil {
-		return s.db.TxInsert(txn, nullifier, &VoteReference{
+		return s.db.TxInsert(txn, nullifier, &types.VoteReference{
 			Nullifier:    nullifier,
 			ProcessID:    pid,
 			Height:       blockHeight,
@@ -302,7 +302,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 			CreationTime: time.Now(),
 		})
 	}
-	return s.db.Insert(nullifier, &VoteReference{
+	return s.db.Insert(nullifier, &types.VoteReference{
 		Nullifier:    nullifier,
 		ProcessID:    pid,
 		Height:       blockHeight,
@@ -370,7 +370,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, partialResults *Results, height ui
 	return err
 }
 
-func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
+func (s *Scrutinizer) computeFinalResults(p *types.Process) (*Results, error) {
 	if p == nil {
 		return nil, fmt.Errorf("process is nil")
 	}

@@ -139,7 +139,7 @@ type MetaResponse struct {
 	Payload              string             `json:"payload,omitempty"`
 	ProcessID            HexBytes           `json:"processId,omitempty"`
 	ProcessIDs           []string           `json:"processIds,omitempty"`
-	ProcessInfo          interface{}        `json:"processInfo,omitempty"`
+	Process              *Process           `json:"process,omitempty"`
 	ProcessList          []string           `json:"processList,omitempty"`
 	Registered           *bool              `json:"registered,omitempty"`
 	Request              string             `json:"request"`
@@ -250,7 +250,7 @@ type EnvelopePackage struct {
 
 // TxPackage contains a SignedTx and auxilary information for the Transaction api
 type TxPackage struct {
-	Tx          *models.SignedTx
+	Tx          []byte
 	BlockHeight uint32
 	Index       int32
 	Hash        HexBytes

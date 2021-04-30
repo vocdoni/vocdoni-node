@@ -207,21 +207,11 @@ func (r *Router) getProcessList(request routerRequest) {
 func (r *Router) getProcessInfo(request routerRequest) {
 	var response types.MetaResponse
 	var err error
-	processInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
+	response.Process, err = r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get process info: %v", err))
 		return
 	}
-	process := processInfo.Mirror()
-	processBytes, err := proto.Marshal(process)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get process info: %v", err))
-		return
-	}
-	response.Content = processBytes
-	response.Height = &processInfo.Rheight
-	response.CreationTime = processInfo.CreationTime.Unix()
-	response.Final = &processInfo.FinalResults
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -364,7 +354,7 @@ func (r *Router) getTx(request routerRequest) {
 		return
 	}
 	response.Tx = &types.TxPackage{
-		Tx:          tx,
+		Tx:          tx.Tx,
 		BlockHeight: request.BlockHeight,
 		Index:       request.TxIndex,
 		Hash:        hash,
@@ -387,7 +377,7 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 		signedTx := new(models.SignedTx)
 		proto.Unmarshal(block.Txs[i], signedTx)
 		response.TxList = append(response.TxList, &types.TxPackage{
-			Tx:          signedTx,
+			Tx:          signedTx.Tx,
 			BlockHeight: request.BlockHeight,
 			Index:       int32(i),
 			Hash:        tmtypes.Tx(block.Txs[i]).Hash(),

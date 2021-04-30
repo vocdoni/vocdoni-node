@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"reflect"
 
 	"github.com/spf13/cobra"
 	"go.vocdoni.io/dvote/client"
@@ -123,19 +122,7 @@ func processInfo(cmd *cobra.Command, args []string) error {
 	if !resp.Ok {
 		return fmt.Errorf(resp.Message)
 	}
-	buf := new(bytes.Buffer)
-	for k, v := range resp.ProcessInfo.(map[string]interface{}) {
-		value := new(bytes.Buffer)
-		if reflect.TypeOf(v).Kind() == reflect.Map {
-			for vk, vv := range v.(map[string]interface{}) {
-				value.WriteString(fmt.Sprintf("%s=%v ", vk, vv))
-			}
-		} else {
-			value.WriteString(fmt.Sprintf("%v", v))
-		}
-		buf.WriteString(fmt.Sprintf("%s: \t%s\n", k, value))
-	}
-	fmt.Println(buf.String())
+	fmt.Println(resp.Process.String())
 	return nil
 }
 

@@ -93,11 +93,11 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 		return nil, err
 	}
 	startTime := time.Now()
-	envelopes, err := s.db.Count(&VoteReference{}, &badgerhold.Query{})
+	envelopes, err := s.db.Count(&types.VoteReference{}, &badgerhold.Query{})
 	if err != nil {
 		return nil, fmt.Errorf("could not count the total envelopes: %w", err)
 	}
-	entities, err := s.db.Count(&Entity{}, &badgerhold.Query{})
+	entities, err := s.db.Count(&types.Entity{}, &badgerhold.Query{})
 	if err != nil {
 		return nil, fmt.Errorf("could not count the total entities: %w", err)
 	}
@@ -149,7 +149,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 	prcs := [][]byte{}
 	err := s.db.ForEach(
 		badgerhold.Where("FinalResults").Eq(false),
-		func(p *Process) error {
+		func(p *types.Process) error {
 			prcs = append(prcs, p.ID)
 			return nil
 		})
