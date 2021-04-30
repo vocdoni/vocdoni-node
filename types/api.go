@@ -6,6 +6,9 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	tmtypes "github.com/tendermint/tendermint/types"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // MessageRequest holds a decoded request but does not decode the body
@@ -103,52 +106,58 @@ type ResponseMessage struct {
 // Fields must be in alphabetical order
 // Those fields with valid zero-values (such as bool) must be pointers
 type MetaResponse struct {
-	APIList              []string      `json:"apiList,omitempty"`
-	BlockTime            *[5]int32     `json:"blockTime,omitempty"`
-	BlockTimestamp       int32         `json:"blockTimestamp,omitempty"`
-	CensusID             string        `json:"censusId,omitempty"`
-	CensusList           []string      `json:"censusList,omitempty"`
-	CensusKeys           [][]byte      `json:"censusKeys,omitempty"`
-	CensusValues         []HexBytes    `json:"censusValues,omitempty"`
-	CensusDump           []byte        `json:"censusDump,omitempty"`
-	CommitmentKeys       []Key         `json:"commitmentKeys,omitempty"`
-	Content              []byte        `json:"content,omitempty"`
-	CreationTime         int64         `json:"creationTime,omitempty"`
-	EncryptionPrivKeys   []Key         `json:"encryptionPrivKeys,omitempty"`
-	EncryptionPublicKeys []Key         `json:"encryptionPubKeys,omitempty"`
-	EntityID             string        `json:"entityId,omitempty"`
-	EntityIDs            []string      `json:"entityIds,omitempty"`
-	Files                []byte        `json:"files,omitempty"`
-	Final                *bool         `json:"final,omitempty"`
-	Finished             *bool         `json:"finished,omitempty"`
-	Health               int32         `json:"health,omitempty"`
-	Height               *uint32       `json:"height,omitempty"`
-	InvalidClaims        []int         `json:"invalidClaims,omitempty"`
-	Message              string        `json:"message,omitempty"`
-	Nullifier            string        `json:"nullifier,omitempty"`
-	Nullifiers           *[]string     `json:"nullifiers,omitempty"`
-	Ok                   bool          `json:"ok"`
-	Paused               *bool         `json:"paused,omitempty"`
-	Payload              string        `json:"payload,omitempty"`
-	ProcessID            HexBytes      `json:"processId,omitempty"`
-	ProcessIDs           []string      `json:"processIds,omitempty"`
-	ProcessInfo          interface{}   `json:"processInfo,omitempty"`
-	ProcessList          []string      `json:"processList,omitempty"`
-	Registered           *bool         `json:"registered,omitempty"`
-	Request              string        `json:"request"`
-	Results              [][]string    `json:"results,omitempty"`
-	RevealKeys           []Key         `json:"revealKeys,omitempty"`
-	Root                 HexBytes      `json:"root,omitempty"`
-	Siblings             HexBytes      `json:"siblings,omitempty"`
-	Size                 *int64        `json:"size,omitempty"`
-	State                string        `json:"state,omitempty"`
-	Stats                *VochainStats `json:"stats,omitempty"`
-	Timestamp            int32         `json:"timestamp"`
-	Type                 string        `json:"type,omitempty"`
-	URI                  string        `json:"uri,omitempty"`
-	ValidatorList        []byte        `json:"validatorlist,omitempty"`
-	ValidProof           *bool         `json:"validProof,omitempty"`
-	Weight               string        `json:"weight,omitempty"`
+	APIList              []string           `json:"apiList,omitempty"`
+	Block                *tmtypes.Block     `json:"block,omitempty"`
+	BlockList            []*tmtypes.Block   `json:"blockList,omitempty"`
+	BlockTime            *[5]int32          `json:"blockTime,omitempty"`
+	BlockTimestamp       int32              `json:"blockTimestamp,omitempty"`
+	CensusID             string             `json:"censusId,omitempty"`
+	CensusList           []string           `json:"censusList,omitempty"`
+	CensusKeys           [][]byte           `json:"censusKeys,omitempty"`
+	CensusValues         []HexBytes         `json:"censusValues,omitempty"`
+	CensusDump           []byte             `json:"censusDump,omitempty"`
+	CommitmentKeys       []Key              `json:"commitmentKeys,omitempty"`
+	Content              []byte             `json:"content,omitempty"`
+	CreationTime         int64              `json:"creationTime,omitempty"`
+	EncryptionPrivKeys   []Key              `json:"encryptionPrivKeys,omitempty"`
+	EncryptionPublicKeys []Key              `json:"encryptionPubKeys,omitempty"`
+	EntityID             string             `json:"entityId,omitempty"`
+	EntityIDs            []string           `json:"entityIds,omitempty"`
+	Envelope             *EnvelopePackage   `json:"envelope,omitempty"`
+	Envelopes            []*EnvelopePackage `json:"envelopes,omitempty"`
+	Files                []byte             `json:"files,omitempty"`
+	Final                *bool              `json:"final,omitempty"`
+	Finished             *bool              `json:"finished,omitempty"`
+	Health               int32              `json:"health,omitempty"`
+	Height               *uint32            `json:"height,omitempty"`
+	InvalidClaims        []int              `json:"invalidClaims,omitempty"`
+	Message              string             `json:"message,omitempty"`
+	Nullifier            string             `json:"nullifier,omitempty"`
+	Nullifiers           *[]string          `json:"nullifiers,omitempty"`
+	Ok                   bool               `json:"ok"`
+	Paused               *bool              `json:"paused,omitempty"`
+	Payload              string             `json:"payload,omitempty"`
+	ProcessID            HexBytes           `json:"processId,omitempty"`
+	ProcessIDs           []string           `json:"processIds,omitempty"`
+	ProcessInfo          interface{}        `json:"processInfo,omitempty"`
+	ProcessList          []string           `json:"processList,omitempty"`
+	Registered           *bool              `json:"registered,omitempty"`
+	Request              string             `json:"request"`
+	Results              [][]string         `json:"results,omitempty"`
+	RevealKeys           []Key              `json:"revealKeys,omitempty"`
+	Root                 HexBytes           `json:"root,omitempty"`
+	Siblings             HexBytes           `json:"siblings,omitempty"`
+	Size                 *int64             `json:"size,omitempty"`
+	State                string             `json:"state,omitempty"`
+	Stats                *VochainStats      `json:"stats,omitempty"`
+	Timestamp            int32              `json:"timestamp"`
+	Type                 string             `json:"type,omitempty"`
+	Tx                   *TxPackage         `json:"tx,omitempty"`
+	TxList               []*TxPackage       `json:"txList,omitempty"`
+	URI                  string             `json:"uri,omitempty"`
+	ValidatorList        []byte             `json:"validatorlist,omitempty"`
+	ValidProof           *bool              `json:"validProof,omitempty"`
+	Weight               string             `json:"weight,omitempty"`
 }
 
 func (r MetaResponse) String() string {
@@ -228,4 +237,21 @@ type VochainStats struct {
 	// MaxTxsPerMinute int64     `json:"max_txs_per_minute"`
 
 	Syncing bool `json:"syncing"`
+}
+
+// EnvelopePackage contains a VoteEnvelope and auxilary information for the Envelope api
+type EnvelopePackage struct {
+	Envelope *models.VoteEnvelope
+	Weight   []byte
+	TxIndex  int32
+	Height   uint32
+	TxHash   HexBytes
+}
+
+// TxPackage contains a SignedTx and auxilary information for the Transaction api
+type TxPackage struct {
+	Tx          *models.SignedTx
+	BlockHeight uint32
+	Index       int32
+	Hash        HexBytes
 }

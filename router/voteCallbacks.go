@@ -3,9 +3,9 @@ package router
 import (
 	"fmt"
 
+	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -140,14 +140,9 @@ func (r *Router) getEnvelope(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
 		return
 	}
-	envBytes, err := proto.Marshal(env)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
-		return
-	}
 	var response types.MetaResponse
+	response.Envelope = env
 	response.Registered = types.True
-	response.Content = envBytes
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -298,18 +293,13 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	if request.ListSize == 0 {
 		request.ListSize = MaxListSize
 	}
-	envelopes, err := r.Scrutinizer.GetEnvelopes(request.ProcessID)
+	var response types.MetaResponse
+	var err error
+	response.Envelopes, err = r.Scrutinizer.GetEnvelopes(request.ProcessID)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope list: (%s)", err))
 		return
 	}
-	listBytes, err := proto.Marshal(envelopes)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot marshal vote envelope list: (%s)", err))
-		return
-	}
-	var response types.MetaResponse
-	response.Content = listBytes
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -337,46 +327,32 @@ func (r *Router) getBlock(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("block height %d not valid for vochain with height %d", request.BlockHeight, r.vocapp.Height()))
 		return
 	}
-	block := r.Scrutinizer.App.GetBlockByHeight(int64(request.BlockHeight))
-	if block == nil {
+	response.Block = r.Scrutinizer.App.GetBlockByHeight(int64(request.BlockHeight))
+	if response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.BlockHeight))
-		return
-	}
-	var err error
-	if response.Content, err = proto.Marshal(vochain.MirrorTendermintBlock(block)); err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get block: %v", err))
 		return
 	}
 	request.Send(r.buildReply(request, &response))
 }
+
 func (r *Router) getBlockByHash(request routerRequest) {
 	var response types.MetaResponse
-	blockHeader := vochain.MirrorTendermintBlock(r.Scrutinizer.App.GetBlockByHash(request.Payload))
-	blockBytes, err := proto.Marshal(blockHeader)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get block: %v", err))
+	response.Block = r.Scrutinizer.App.GetBlockByHash(request.Payload)
+	if response.Block == nil {
+		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Payload))
 		return
 	}
-	response.Content = blockBytes
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getBlockList(request routerRequest) {
 	var response types.MetaResponse
-	blockList := &models.BlockHeaderList{}
 	for i := 0; i < request.ListSize; i++ {
-		block := r.Scrutinizer.App.GetBlockByHeight(int64(request.From) + int64(i))
-		if block == nil {
+		if int64(request.From)+int64(i) > r.vocinfo.Height() {
 			break
 		}
-		blockList.BlockHeaders = append(blockList.GetBlockHeaders(), vochain.MirrorTendermintBlock(block))
+		response.BlockList = append(response.BlockList, r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i)))
 	}
-	blockBytes, err := proto.Marshal(blockList)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get block list: %v", err))
-		return
-	}
-	response.Content = blockBytes
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -387,24 +363,17 @@ func (r *Router) getTx(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
 		return
 	}
-
-	txBytes, err := proto.Marshal(&models.TxPackage{
+	response.Tx = &types.TxPackage{
 		Tx:          tx,
 		BlockHeight: request.BlockHeight,
 		Index:       request.TxIndex,
 		Hash:        hash,
-	})
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
-		return
 	}
-	response.Content = txBytes
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getTxListForBlock(request routerRequest) {
 	var response types.MetaResponse
-	txList := new(models.TxPackageList)
 	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.BlockHeight))
 	if block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get tx list: block does not exist"))
@@ -417,19 +386,13 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 	for i := request.From; i < maxIndex && i < len(block.Txs); i++ {
 		signedTx := new(models.SignedTx)
 		proto.Unmarshal(block.Txs[i], signedTx)
-		txList.TxList = append(txList.GetTxList(), &models.TxPackage{
+		response.TxList = append(response.TxList, &types.TxPackage{
 			Tx:          signedTx,
 			BlockHeight: request.BlockHeight,
 			Index:       int32(i),
 			Hash:        tmtypes.Tx(block.Txs[i]).Hash(),
 		})
 	}
-	txBytes, err := proto.Marshal(txList)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get tx list: %v", err))
-		return
-	}
-	response.Content = txBytes
 	request.Send(r.buildReply(request, &response))
 }
 

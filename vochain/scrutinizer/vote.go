@@ -42,7 +42,7 @@ func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*VoteReference, er
 
 // GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
-func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.EnvelopePackage, []byte, error) {
+func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*types.EnvelopePackage, []byte, error) {
 	voteRef, err := s.GetEnvelopeReference(nullifier)
 	if err != nil {
 		return nil, nil, err
@@ -60,7 +60,7 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*models.EnvelopePackage, []
 		return nil, nil, fmt.Errorf("transaction is not an Envelope")
 	}
 	envelope.Nullifier = voteRef.Nullifier
-	return &models.EnvelopePackage{
+	return &types.EnvelopePackage{
 		Envelope: envelope,
 		Weight:   voteRef.Weight.Bytes(),
 		TxIndex:  voteRef.TxIndex,
@@ -110,8 +110,8 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 }
 
 // GetEnvelopes retreives all Envelopes of a ProcessId from the Blockchain block store
-func (s *Scrutinizer) GetEnvelopes(processId []byte) (*models.EnvelopePackageList, error) {
-	envelopes := new(models.EnvelopePackageList)
+func (s *Scrutinizer) GetEnvelopes(processId []byte) ([]*types.EnvelopePackage, error) {
+	envelopes := []*types.EnvelopePackage{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
 		func(txRef *VoteReference) error {
@@ -128,7 +128,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte) (*models.EnvelopePackageLis
 				return fmt.Errorf("transaction is not an Envelope")
 			}
 			envelope.Nullifier = txRef.Nullifier
-			envelopes.Envelopes = append(envelopes.GetEnvelopes(), &models.EnvelopePackage{
+			envelopes = append(envelopes, &types.EnvelopePackage{
 				Envelope: envelope,
 				Weight:   txRef.Weight.Bytes(),
 				TxIndex:  txRef.TxIndex,
