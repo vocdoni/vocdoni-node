@@ -295,19 +295,12 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 
 func (r *Router) getValidatorList(request routerRequest) {
 	var response types.MetaResponse
-	validators, err := r.vocapp.State.Validators(true)
+	var err error
+	response.ValidatorList, err = r.vocapp.State.Validators(true)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get validator list: %v", err))
 		return
 	}
-	validatorList := new(models.ValidatorList)
-	validatorList.Validators = validators
-	validatorBytes, err := proto.Marshal(validatorList)
-	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get validator list: %v", err))
-		return
-	}
-	response.ValidatorList = validatorBytes
 	request.Send(r.buildReply(request, &response))
 }
 

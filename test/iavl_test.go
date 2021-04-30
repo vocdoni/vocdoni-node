@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/tendermint/tendermint/privval"
 	models "go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/log"
@@ -111,15 +110,10 @@ func TestValidatorApi(t *testing.T) {
 	req := &types.MetaRequest{}
 	doRequest := cl.ForTest(t, req)
 	resp := doRequest("getValidatorList", nil)
-	list := new(models.ValidatorList)
-	err = proto.Unmarshal(resp.ValidatorList, list)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(list.Validators) == 0 {
+	if len(resp.ValidatorList) == 0 {
 		t.Error("Expected validators, none retrieved")
 	}
-	log.Infof("%d Validators found", len(list.Validators))
+	log.Infof("%d Validators found", len(resp.ValidatorList))
 }
 
 /*
