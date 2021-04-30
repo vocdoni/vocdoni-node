@@ -239,3 +239,14 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.C
 
 	return genBytes, nil
 }
+
+func GetFriendlyResults(results []*models.QuestionResult) [][]string {
+	r := [][]string{}
+	for i := range results {
+		r = append(r, []string{})
+		for j := range results[i].Question {
+			r[i] = append(r[i], new(big.Int).SetBytes(results[i].Question[j]).String())
+		}
+	}
+	return r
+}

@@ -284,6 +284,7 @@ func (app *BaseApplication) BeginBlock(
 	}
 	app.State.Unlock()
 	app.State.CachePurge(app.State.Header(true).Height)
+
 	return abcitypes.ResponseBeginBlock{}
 }
 

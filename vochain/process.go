@@ -162,8 +162,13 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 		if currentStatus == models.ProcessStatus_RESULTS {
 			return fmt.Errorf("process %x already in results state", pid)
 		}
-		if currentStatus != models.ProcessStatus_ENDED {
+		if currentStatus != models.ProcessStatus_ENDED && currentStatus != models.ProcessStatus_READY {
 			return fmt.Errorf("cannot set state results from %s", currentStatus.String())
+		}
+		if currentStatus == models.ProcessStatus_READY &&
+			process.StartBlock+process.BlockCount <= v.Height() {
+			return fmt.Errorf("cannot set state results from %s, process is still alive",
+				currentStatus.String())
 		}
 	default:
 		return fmt.Errorf("process status %s unknown", newstatus.String())
@@ -220,6 +225,18 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 		}
 	}
 	return nil
+}
+
+// GetProcessResults return a friendly representation of the results stored in the State (if any)
+func (v *State) GetProcessResults(pid []byte) ([][]string, error) {
+	process, err := v.Process(pid, true)
+	if err != nil {
+		return nil, err
+	}
+	if process.Results == nil {
+		return nil, fmt.Errorf("no results for process %x", pid)
+	}
+	return GetFriendlyResults(process.Results.GetVotes()), nil
 }
 
 func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commit bool) error {
