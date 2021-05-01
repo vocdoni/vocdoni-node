@@ -12,6 +12,7 @@ linters:
         - goimports
         - lll
         - golint
+        - gocyclo
 linters-settings:
         lll:
                 line-length: 100

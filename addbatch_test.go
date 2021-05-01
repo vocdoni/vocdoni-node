@@ -517,3 +517,4 @@ func TestHighestPowerOfTwo(t *testing.T) {
 // adding the rest of keys with loop over normal Add, and with AddBatch
 
 // TODO test adding batch with repeated keys in the batch
+// TODO test adding batch with multiple invalid keys
