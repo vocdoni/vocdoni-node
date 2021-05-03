@@ -179,10 +179,7 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 			return nil, err
 		}
 
-		if err = t.finalizeAddBatch(); err != nil {
-			return nil, err
-		}
-		return invalids, nil
+		return t.finalizeAddBatch(len(keys), invalids)
 	}
 
 	// CASE B: if nLeafs<nBuckets
@@ -204,10 +201,7 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 			}
 		}
 
-		if err = t.finalizeAddBatch(); err != nil {
-			return nil, err
-		}
-		return invalids, nil
+		return t.finalizeAddBatch(len(keys), invalids)
 	}
 
 	keysAtL, err := t.getKeysAtLevel(l + 1)
@@ -225,10 +219,7 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 			return nil, err
 		}
 
-		if err = t.finalizeAddBatch(); err != nil {
-			return nil, err
-		}
-		return invalids, nil
+		return t.finalizeAddBatch(len(keys), invalids)
 	}
 
 	// CASE E
@@ -266,27 +257,28 @@ func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
 		}
 		invalids = append(invalids, invalidsCaseD...)
 
-		if err = t.finalizeAddBatch(); err != nil {
-			return nil, err
-		}
-		return invalids, nil
+		return t.finalizeAddBatch(len(keys), invalids)
 	}
-
-	// TODO update NLeafs from DB
 
 	return nil, fmt.Errorf("UNIMPLEMENTED")
 }
 
-func (t *Tree) finalizeAddBatch() error {
+func (t *Tree) finalizeAddBatch(nKeys int, invalids []int) ([]int, error) {
 	// store root to db
 	if err := t.tx.Put(dbKeyRoot, t.root); err != nil {
-		return err
+		return nil, err
 	}
+
+	// update nLeafs
+	if err := t.incNLeafs(nKeys - len(invalids)); err != nil {
+		return nil, err
+	}
+
 	// commit db tx
 	if err := t.tx.Commit(); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return invalids, nil
 }
 
 func (t *Tree) caseA(nCPU int, kvs []kv) ([]int, error) {
@@ -395,9 +387,8 @@ func (t *Tree) caseC(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 	// add the key-values that have not been used yet
 	var invalids []int
 	for i := 0; i < len(excedents); i++ {
-		// Add until the level L
 		if err = t.add(0, excedents[i].k, excedents[i].v); err != nil {
-			invalids = append(invalids, excedents[i].pos) // TODO WIP
+			invalids = append(invalids, excedents[i].pos)
 		}
 	}
 	return invalids, nil
