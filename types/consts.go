@@ -45,51 +45,51 @@ const (
 
 	// ENTITY RESOLVER
 	// EntityResolverDomain is the default entity resolver ENS domain
-	EntityResolverDomain = "entities.vocdoni.eth"
+	EntityResolverDomain = "entities.voc.eth"
 	// EntityResolverStageDomain is the default entity resolver ENS domain
-	EntityResolverStageDomain = "entities.stg.vocdoni.eth"
+	EntityResolverStageDomain = "entities.stg.voc.eth"
 	// EntityResolverDevelopmentDomain is the default entity resolver ENS domain
-	EntityResolverDevelopmentDomain = "entities.dev.vocdoni.eth"
+	EntityResolverDevelopmentDomain = "entities.dev.voc.eth"
 
 	// PROCESSES
 	// ProcessesDomain
-	ProcessesDomain = "processes.vocdoni.eth"
+	ProcessesDomain = "processes.voc.eth"
 	// ProcessesStageDomain
-	ProcessesStageDomain = "processes.stg.vocdoni.eth"
+	ProcessesStageDomain = "processes.stg.voc.eth"
 	// ProcessesDevelopmentDomain
-	ProcessesDevelopmentDomain = "processes.dev.vocdoni.eth"
+	ProcessesDevelopmentDomain = "processes.dev.voc.eth"
 
 	// NAMESPACES
 	// NamespacesDomain
-	NamespacesDomain = "namespaces.vocdoni.eth"
+	NamespacesDomain = "namespaces.voc.eth"
 	// NamespacesStageDomain
-	NamespacesStageDomain = "namespaces.stg.vocdoni.eth"
+	NamespacesStageDomain = "namespaces.stg.voc.eth"
 	// NamespacesDevelopmentDomain
-	NamespacesDevelopmentDomain = "namespaces.dev.vocdoni.eth"
+	NamespacesDevelopmentDomain = "namespaces.dev.voc.eth"
 
 	// ERC20 PROOFS
 	// ERC20ProofsDomain
-	ERC20ProofsDomain = "erc20.proofs.vocdoni.eth"
+	ERC20ProofsDomain = "erc20.proofs.voc.eth"
 	// ERC20ProofsStageDomain
-	ERC20ProofsStageDomain = "erc20.proofs.stg.vocdoni.eth"
+	ERC20ProofsStageDomain = "erc20.proofs.stg.voc.eth"
 	// ERC20ProofsDevelopmentDomain
-	ERC20ProofsDevelopmentDomain = "erc20.proofs.dev.vocdoni.eth"
+	ERC20ProofsDevelopmentDomain = "erc20.proofs.dev.voc.eth"
 
 	// GENESIS
 	// GenesisDomain
-	GenesisDomain = "genesis.vocdoni.eth"
+	GenesisDomain = "genesis.voc.eth"
 	// GenesisStageDomain
-	GenesisStageDomain = "genesis.stg.vocdoni.eth"
+	GenesisStageDomain = "genesis.stg.voc.eth"
 	// GenesisDevelopmentDomain
-	GenesisDevelopmentDomain = "genesis.dev.vocdoni.eth"
+	GenesisDevelopmentDomain = "genesis.dev.voc.eth"
 
 	// RESULTS
 	// ResultsDomain
-	ResultsDomain = "results.vocdoni.eth"
+	ResultsDomain = "results.voc.eth"
 	// ResultsStageDomain
-	ResultsStageDomain = "results.stg.vocdoni.eth"
+	ResultsStageDomain = "results.stg.voc.eth"
 	// ResultsDevelopmentDomain
-	ResultsDevelopmentDomain = "results.dev.vocdoni.eth"
+	ResultsDevelopmentDomain = "results.dev.voc.eth"
 
 	// EntityMetaKey is the key of an ENS text record for the entity metadata
 	EntityMetaKey = "vnd.vocdoni.meta"
