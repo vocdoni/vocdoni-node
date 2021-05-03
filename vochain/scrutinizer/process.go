@@ -256,7 +256,10 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	eid := p.GetEntityId()
 	entity := &types.Entity{}
 	// If entity is not registered in db, add to entity count cache and insert to db
-	if s.db.FindOne(entity, badgerhold.Where("ID").Eq(eid)); entity == nil {
+	if err := s.db.FindOne(entity, badgerhold.Where("ID").Eq(eid)); err != nil {
+		if err != badgerhold.ErrNotFound {
+			return err
+		}
 		atomic.AddInt64(s.countTotalEntities, 1)
 		if err := s.db.Insert(eid, &types.Entity{
 			ID:           eid,
