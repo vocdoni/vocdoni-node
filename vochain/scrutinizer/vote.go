@@ -61,11 +61,15 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*types.EnvelopePackage, []b
 	}
 	envelope.Nullifier = voteRef.Nullifier
 	return &types.EnvelopePackage{
-		Envelope: envelope,
-		Weight:   voteRef.Weight.Bytes(),
-		TxIndex:  voteRef.TxIndex,
-		Height:   voteRef.Height,
-		TxHash:   txHash,
+		Nonce:                envelope.Nonce,
+		ProcessId:            envelope.ProcessId,
+		VotePackage:          envelope.VotePackage,
+		Nullifier:            nullifier,
+		EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
+		Weight:               voteRef.Weight.Bytes(),
+		TxIndex:              voteRef.TxIndex,
+		Height:               voteRef.Height,
+		TxHash:               txHash,
 	}, stx.Signature, nil
 }
 
@@ -129,11 +133,15 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte) ([]*types.EnvelopePackage, 
 			}
 			envelope.Nullifier = txRef.Nullifier
 			envelopes = append(envelopes, &types.EnvelopePackage{
-				Envelope: envelope,
-				Weight:   txRef.Weight.Bytes(),
-				TxIndex:  txRef.TxIndex,
-				Height:   txRef.Height,
-				TxHash:   txHash,
+				Nonce:                envelope.Nonce,
+				ProcessId:            processId,
+				VotePackage:          envelope.VotePackage,
+				Nullifier:            txRef.Nullifier,
+				EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
+				Weight:               txRef.Weight.Bytes(),
+				TxIndex:              txRef.TxIndex,
+				Height:               txRef.Height,
+				TxHash:               txHash,
 			})
 			return nil
 		})

@@ -239,16 +239,20 @@ type VochainStats struct {
 	Syncing bool `json:"syncing"`
 }
 
-// EnvelopePackage contains a VoteEnvelope and auxilary information for the Envelope api
+// EnvelopePackage contains a VoteEnvelope and auxiliary information for the Envelope api
 type EnvelopePackage struct {
-	Envelope *models.VoteEnvelope
-	Weight   []byte
-	TxIndex  int32
-	Height   uint32
-	TxHash   HexBytes
+	Nonce                HexBytes
+	ProcessId            HexBytes
+	VotePackage          []byte
+	Nullifier            HexBytes
+	EncryptionKeyIndexes []uint32
+	Weight               []byte
+	TxIndex              int32
+	Height               uint32
+	TxHash               HexBytes
 }
 
-// TxPackage contains a SignedTx and auxilary information for the Transaction api
+// TxPackage contains a SignedTx and auxiliary information for the Transaction api
 type TxPackage struct {
 	Tx          []byte
 	BlockHeight uint32
