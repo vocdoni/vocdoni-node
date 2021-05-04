@@ -114,10 +114,12 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 }
 
 // GetEnvelopes retreives all Envelopes of a ProcessId from the Blockchain block store
-func (s *Scrutinizer) GetEnvelopes(processId []byte) ([]*types.EnvelopeMetadata, error) {
+func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int) ([]*types.EnvelopeMetadata, error) {
 	envelopes := []*types.EnvelopeMetadata{}
 	err := s.db.ForEach(
-		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
+		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID").
+			Skip(from).
+			Limit(max),
 		func(txRef *types.VoteReference) error {
 			stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
 			if err != nil {

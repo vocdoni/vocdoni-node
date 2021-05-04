@@ -285,7 +285,7 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	}
 	var response types.MetaResponse
 	var err error
-	if response.Envelopes, err = r.Scrutinizer.GetEnvelopes(request.ProcessID); err != nil {
+	if response.Envelopes, err = r.Scrutinizer.GetEnvelopes(request.ProcessID, request.ListSize, request.From); err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope list: (%s)", err))
 		return
 	}
