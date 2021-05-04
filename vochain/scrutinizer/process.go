@@ -138,7 +138,8 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
 	var c int
 	var err error
 	if len(entityID) == 0 {
-		c, err = s.db.Count(&types.Process{}, nil)
+		// If no entity ID, return the cached count of all processes
+		return atomic.LoadInt64(s.countTotalProcesses)
 	} else {
 		c, err = s.db.Count(&types.Process{}, badgerhold.Where("EntityID").Eq(entityID))
 	}
@@ -177,7 +178,6 @@ func (s *Scrutinizer) EntityList(searchTerm string, max, from int) []string {
 // EntityCount return the number of entities indexed by the scrutinizer
 func (s *Scrutinizer) EntityCount() int64 {
 	return atomic.LoadInt64(s.countTotalEntities)
-
 }
 
 // Return whether a process must have live results or not
@@ -248,6 +248,9 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		return err
 	}
 	s.addVoteLock.Unlock()
+
+	// Increment the total process count cache
+	atomic.AddInt64(s.countTotalProcesses, 1)
 
 	// Get the block time from the Header
 	currentBlockTime := time.Unix(s.App.State.Header(false).Timestamp, 0)
