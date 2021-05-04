@@ -267,6 +267,7 @@ type TxPackage struct {
 	BlockHeight uint32
 	Index       int32
 	Hash        HexBytes
+	Signature   HexBytes
 }
 
 // TxMetadata contains tx information for the TransactionList api

@@ -350,6 +350,7 @@ func (r *Router) getTx(request routerRequest) {
 		BlockHeight: request.BlockHeight,
 		Index:       request.TxIndex,
 		Hash:        hash,
+		Signature:   tx.Signature,
 	}
 	request.Send(r.buildReply(request, &response))
 }
