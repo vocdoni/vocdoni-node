@@ -310,7 +310,7 @@ func (r *Router) getBlock(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("block height %d not valid for vochain with height %d", request.BlockHeight, r.vocapp.Height()))
 		return
 	}
-	response.Block = r.Scrutinizer.App.GetBlockByHeight(int64(request.BlockHeight))
+	response.Block = types.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.BlockHeight)))
 	if response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.BlockHeight))
 		return
@@ -320,7 +320,7 @@ func (r *Router) getBlock(request routerRequest) {
 
 func (r *Router) getBlockByHash(request routerRequest) {
 	var response types.MetaResponse
-	response.Block = r.Scrutinizer.App.GetBlockByHash(request.Payload)
+	response.Block = types.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHash(request.Payload))
 	if response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Payload))
 		return
@@ -334,7 +334,7 @@ func (r *Router) getBlockList(request routerRequest) {
 		if int64(request.From)+int64(i) > r.vocinfo.Height() {
 			break
 		}
-		response.BlockList = append(response.BlockList, r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i)))
+		response.BlockList = append(response.BlockList, types.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i))))
 	}
 	request.Send(r.buildReply(request, &response))
 }

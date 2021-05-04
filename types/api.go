@@ -107,8 +107,8 @@ type ResponseMessage struct {
 // Those fields with valid zero-values (such as bool) must be pointers
 type MetaResponse struct {
 	APIList              []string            `json:"apiList,omitempty"`
-	Block                *tmtypes.Block      `json:"block,omitempty"`
-	BlockList            []*tmtypes.Block    `json:"blockList,omitempty"`
+	Block                *BlockMetadata      `json:"block,omitempty"`
+	BlockList            []*BlockMetadata    `json:"blockList,omitempty"`
 	BlockTime            *[5]int32           `json:"blockTime,omitempty"`
 	BlockTimestamp       int32               `json:"blockTimestamp,omitempty"`
 	CensusID             string              `json:"censusId,omitempty"`
@@ -258,4 +258,59 @@ type TxPackage struct {
 	BlockHeight uint32
 	Index       int32
 	Hash        HexBytes
+}
+
+// BlockMetadata contains the metadata for a single tendermint block
+type BlockMetadata struct {
+	ChainId         string
+	Height          uint32
+	Timestamp       time.Time
+	Hash            HexBytes
+	NumTxs          uint64
+	LastBlockHash   HexBytes
+	ProposerAddress HexBytes
+}
+
+func (b *BlockMetadata) String() string {
+	v := reflect.ValueOf(b)
+	t := v.Type()
+	var builder strings.Builder
+	builder.WriteString("{")
+	for i := 0; i < t.NumField(); i++ {
+		fv := v.Field(i)
+		if fv.IsZero() {
+			// omit zero values
+			continue
+		}
+		if builder.Len() > 1 {
+			builder.WriteString(" ")
+		}
+		ft := t.Field(i)
+		builder.WriteString(ft.Name)
+		builder.WriteString(":")
+		if ft.Type.Kind() == reflect.Slice && ft.Type.Elem().Kind() == reflect.Uint8 {
+			// print []byte as hexadecimal
+			fmt.Fprintf(&builder, "%x", fv.Bytes())
+		} else {
+			fv = reflect.Indirect(fv) // print *T as T
+			fmt.Fprintf(&builder, "%v", fv.Interface())
+		}
+	}
+	builder.WriteString("}")
+	return builder.String()
+}
+
+func BlockMetadataFromBlockModel(block *tmtypes.Block) *BlockMetadata {
+	if block == nil {
+		return nil
+	}
+	b := new(BlockMetadata)
+	b.ChainId = block.ChainID
+	b.Height = uint32(block.Height)
+	b.Timestamp = block.Time
+	b.Hash = block.Hash().Bytes()
+	b.NumTxs = uint64(len(block.Txs))
+	b.LastBlockHash = block.LastBlockID.Hash.Bytes()
+	b.ProposerAddress = block.ProposerAddress.Bytes()
+	return b
 }
