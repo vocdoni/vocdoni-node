@@ -22,7 +22,6 @@ type RequestMessage struct {
 // MetaRequest contains all of the possible request fields.
 // Fields must be in alphabetical order
 type MetaRequest struct {
-	BlockHeight  uint32   `json:"blockHeight,omitempty"`
 	CensusID     string   `json:"censusId,omitempty"`
 	CensusURI    string   `json:"censusUri,omitempty"`
 	CensusKey    []byte   `json:"censusKey,omitempty"`
@@ -33,6 +32,7 @@ type MetaRequest struct {
 	Content      []byte   `json:"content,omitempty"`
 	Digested     bool     `json:"digested,omitempty"`
 	EntityId     HexBytes `json:"entityId,omitempty"`
+	Height       uint32   `json:"height,omitempty"`
 	From         int      `json:"from,omitempty"`
 	ListSize     int      `json:"listSize,omitempty"`
 	Method       string   `json:"method"`

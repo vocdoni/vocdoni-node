@@ -305,13 +305,13 @@ func (r *Router) getValidatorList(request routerRequest) {
 
 func (r *Router) getBlock(request routerRequest) {
 	var response types.MetaResponse
-	if request.BlockHeight > r.vocapp.Height() {
-		r.sendError(request, fmt.Sprintf("block height %d not valid for vochain with height %d", request.BlockHeight, r.vocapp.Height()))
+	if request.Height > r.vocapp.Height() {
+		r.sendError(request, fmt.Sprintf("block height %d not valid for vochain with height %d", request.Height, r.vocapp.Height()))
 		return
 	}
-	response.Block = types.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.BlockHeight)))
+	response.Block = types.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.Height)))
 	if response.Block == nil {
-		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.BlockHeight))
+		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.Height))
 		return
 	}
 	request.Send(r.buildReply(request, &response))
@@ -340,14 +340,14 @@ func (r *Router) getBlockList(request routerRequest) {
 
 func (r *Router) getTx(request routerRequest) {
 	var response types.MetaResponse
-	tx, hash, err := r.Scrutinizer.App.GetTxHash(request.BlockHeight, request.TxIndex)
+	tx, hash, err := r.Scrutinizer.App.GetTxHash(request.Height, request.TxIndex)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
 		return
 	}
 	response.Tx = &types.TxPackage{
 		Tx:          tx.Tx,
-		BlockHeight: request.BlockHeight,
+		BlockHeight: request.Height,
 		Index:       request.TxIndex,
 		Hash:        hash,
 		Signature:   tx.Signature,
@@ -357,7 +357,7 @@ func (r *Router) getTx(request routerRequest) {
 
 func (r *Router) getTxListForBlock(request routerRequest) {
 	var response types.MetaResponse
-	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.BlockHeight))
+	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.Height))
 	if block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get tx list: block does not exist"))
 		return
@@ -386,7 +386,7 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 		}
 		response.TxList = append(response.TxList, &types.TxMetadata{
 			Type:        txType,
-			BlockHeight: request.BlockHeight,
+			BlockHeight: request.Height,
 			Index:       int32(i),
 			Hash:        tmtypes.Tx(block.Txs[i]).Hash(),
 		})
