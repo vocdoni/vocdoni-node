@@ -86,7 +86,7 @@ func (r *Router) getStats(request routerRequest) {
 	vals, _ := r.vocapp.State.Validators(true)
 	stats.ValidatorCount = len(vals)
 	stats.BlockTime = r.vocinfo.BlockTimes()
-	stats.ChainID = r.vocapp.Node.GenesisDoc().ChainID
+	stats.ChainID = r.vocapp.ChainID()
 	stats.GenesisTimeStamp = r.vocapp.Node.GenesisDoc().GenesisTime
 	stats.Syncing = r.vocapp.IsSynchronizing()
 

@@ -18,6 +18,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
 
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
@@ -43,12 +44,14 @@ type BaseApplication struct {
 	blockCache         *lru.Cache
 	height             *uint32
 	timestamp          *int64
+	chainId            string
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
 // NewBaseApplication creates a new BaseApplication given a name an a DB backend.
-// Node & callback functions still need to be initialized, if used.
+// Node still needs to be initialized with SetNode
+// Callback functions still need to be initialized
 func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	state, err := NewState(dbpath)
 	if err != nil {
@@ -64,6 +67,15 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 		height:     new(uint32),
 		timestamp:  new(int64),
 	}, nil
+}
+
+func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byte) error {
+	var err error
+	if app.Node, err = newTendermint(app, vochaincfg, genesis); err != nil {
+		return fmt.Errorf("could not set application Node: %s", err)
+	}
+	app.chainId = app.Node.GenesisDoc().ChainID
+	return nil
 }
 
 // SetDefaultMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use the
@@ -122,6 +134,11 @@ func (app *BaseApplication) Height() uint32 {
 // Timestamp returns the last block timestamp
 func (app *BaseApplication) Timestamp() int64 {
 	return atomic.LoadInt64(app.timestamp)
+}
+
+// ChainID returns the Node ChainID
+func (app *BaseApplication) ChainID() string {
+	return app.chainId
 }
 
 // MempoolRemoveTx removes a transaction (identifier by its vochain.TxKey() hash)
