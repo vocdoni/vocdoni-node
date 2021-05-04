@@ -124,7 +124,7 @@ type MetaResponse struct {
 	EntityID             string              `json:"entityId,omitempty"`
 	EntityIDs            []string            `json:"entityIds,omitempty"`
 	Envelope             *EnvelopePackage    `json:"envelope,omitempty"`
-	Envelopes            []*EnvelopePackage  `json:"envelopes,omitempty"`
+	Envelopes            []*EnvelopeMetadata `json:"envelopes,omitempty"`
 	Files                []byte              `json:"files,omitempty"`
 	Final                *bool               `json:"final,omitempty"`
 	Finished             *bool               `json:"finished,omitempty"`
@@ -252,6 +252,15 @@ type EnvelopePackage struct {
 	TxHash               HexBytes
 }
 
+// EnvelopeMetadata contains vote information for the EnvelopeList api
+type EnvelopeMetadata struct {
+	ProcessId HexBytes
+	Nullifier HexBytes
+	TxIndex   int32
+	Height    uint32
+	TxHash    HexBytes
+}
+
 // TxPackage contains a SignedTx and auxiliary information for the Transaction api
 type TxPackage struct {
 	Tx          []byte
@@ -260,7 +269,7 @@ type TxPackage struct {
 	Hash        HexBytes
 }
 
-// TxMetadata contains tx information for the Transaction api
+// TxMetadata contains tx information for the TransactionList api
 type TxMetadata struct {
 	Type        string
 	BlockHeight uint32
