@@ -157,7 +157,20 @@ func (app *BaseApplication) GetBlockByHash(hash []byte) *tmtypes.Block {
 }
 
 // GetTx retreives a vochain transaction from the blockstore
-func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
+func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedTx, error) {
+	block := app.GetBlockByHeight(int64(height))
+	if block == nil {
+		return nil, fmt.Errorf("unable to get block by height: %d", height)
+	}
+	if int32(len(block.Txs)) <= txIndex {
+		return nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
+	}
+	tx := &models.SignedTx{}
+	return tx, proto.Unmarshal(block.Txs[txIndex], tx)
+}
+
+// GetTxHash retreives a vochain transaction, with its hash, from the blockstore
+func (app *BaseApplication) GetTxHash(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
 	block := app.GetBlockByHeight(int64(height))
 	if block == nil {
 		return nil, nil, fmt.Errorf("unable to get block by height: %d", height)

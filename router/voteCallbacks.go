@@ -341,7 +341,7 @@ func (r *Router) getBlockList(request routerRequest) {
 
 func (r *Router) getTx(request routerRequest) {
 	var response types.MetaResponse
-	tx, hash, err := r.Scrutinizer.App.GetTx(request.BlockHeight, request.TxIndex)
+	tx, hash, err := r.Scrutinizer.App.GetTxHash(request.BlockHeight, request.TxIndex)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
 		return

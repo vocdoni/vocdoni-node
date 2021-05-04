@@ -47,7 +47,7 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*types.EnvelopePackage, []b
 	if err != nil {
 		return nil, nil, err
 	}
-	stx, txHash, err := s.App.GetTx(voteRef.Height, voteRef.TxIndex)
+	stx, txHash, err := s.App.GetTxHash(voteRef.Height, voteRef.TxIndex)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -85,7 +85,7 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 			wg.Add(1)
 			processVote := func() {
 				defer wg.Done()
-				stx, _, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
+				stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
 				if err != nil {
 					log.Errorf("could not get tx: %v", err)
 					return
@@ -119,7 +119,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte) ([]*types.EnvelopePackage, 
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
 		func(txRef *types.VoteReference) error {
-			stx, txHash, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
+			stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
 			if err != nil {
 				return err
 			}
