@@ -23,11 +23,11 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*types.Process, error) {
 }
 
 // ProcessList returns a list of process identifiers (PIDs) registered in the Vochain.
-// EntityID, namespace and status are optional filters, if declared as zero-values
-// will be ignored. SearchTerm is a partial or full PID, and is also optional.
+// EntityID, searchTerm, namespace, status, and withResults are optional filters, if
+// declared as zero-values will be ignored. SearchTerm is a partial or full PID.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
-func (s *Scrutinizer) ProcessList(entityID []byte, searchTerm string, namespace uint32,
-	status string, withResults bool, from, max int) ([][]byte, error) {
+func (s *Scrutinizer) ProcessList(entityID []byte, from, max int, searchTerm string, namespace uint32,
+	status string, withResults bool) ([][]byte, error) {
 	if from < 0 {
 		return nil, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
 	}
@@ -150,7 +150,9 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
 }
 
 // EntityList returns the list of entities indexed by the scrutinizer
-func (s *Scrutinizer) EntityList(searchTerm string, max, from int) []string {
+// searchTerm is optional, if declared as zero-value
+// will be ignored. Searches against the ID field.
+func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []string {
 	searchMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
 		if searchTerm == "" {
 			return true, nil
