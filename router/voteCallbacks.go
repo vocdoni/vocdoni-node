@@ -368,9 +368,24 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 	maxIndex := request.From + request.ListSize
 	for i := request.From; i < maxIndex && i < len(block.Txs); i++ {
 		signedTx := new(models.SignedTx)
+		tx := new(models.Tx)
 		proto.Unmarshal(block.Txs[i], signedTx)
-		response.TxList = append(response.TxList, &types.TxPackage{
-			Tx:          signedTx.Tx,
+		proto.Unmarshal(signedTx.Tx, tx)
+		var txType string
+		switch tx.Payload.(type) {
+		case *models.Tx_Vote:
+			txType = types.TxVote
+		case *models.Tx_NewProcess:
+			txType = types.TxNewProcess
+		case *models.Tx_Admin:
+			txType = tx.Payload.(*models.Tx_Admin).Admin.GetTxtype().String()
+		case *models.Tx_SetProcess:
+			txType = "setProcess"
+		default:
+			txType = "unknown"
+		}
+		response.TxList = append(response.TxList, &types.TxMetadata{
+			Type:        txType,
 			BlockHeight: request.BlockHeight,
 			Index:       int32(i),
 			Hash:        tmtypes.Tx(block.Txs[i]).Hash(),

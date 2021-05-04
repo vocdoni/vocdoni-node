@@ -153,7 +153,7 @@ type MetaResponse struct {
 	Timestamp            int32               `json:"timestamp"`
 	Type                 string              `json:"type,omitempty"`
 	Tx                   *TxPackage          `json:"tx,omitempty"`
-	TxList               []*TxPackage        `json:"txList,omitempty"`
+	TxList               []*TxMetadata       `json:"txList,omitempty"`
 	URI                  string              `json:"uri,omitempty"`
 	ValidatorList        []*models.Validator `json:"validatorlist,omitempty"`
 	ValidProof           *bool               `json:"validProof,omitempty"`
@@ -255,6 +255,14 @@ type EnvelopePackage struct {
 // TxPackage contains a SignedTx and auxiliary information for the Transaction api
 type TxPackage struct {
 	Tx          []byte
+	BlockHeight uint32
+	Index       int32
+	Hash        HexBytes
+}
+
+// TxMetadata contains tx information for the Transaction api
+type TxMetadata struct {
+	Type        string
 	BlockHeight uint32
 	Index       int32
 	Hash        HexBytes
