@@ -329,7 +329,7 @@ func (r *Router) getBlockByHash(request routerRequest) {
 func (r *Router) getBlockList(request routerRequest) {
 	var response types.MetaResponse
 	for i := 0; i < request.ListSize; i++ {
-		if int64(request.From)+int64(i) > r.vocinfo.Height() {
+		if uint32(request.From)+uint32(i) > r.vocapp.Height() {
 			break
 		}
 		response.BlockList = append(response.BlockList,
