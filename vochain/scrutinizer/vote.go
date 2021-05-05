@@ -73,7 +73,7 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*types.EnvelopePackage, err
 		Nonce:                envelope.Nonce,
 		VotePackage:          envelope.VotePackage,
 		EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
-		Weight:               new(big.Int).Set(voteRef.Weight),
+		Weight:               voteRef.Weight.String(),
 		Signature:            stx.Signature,
 		Meta: types.EnvelopeMetadata{
 			ProcessId: envelope.ProcessId,

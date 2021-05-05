@@ -3,7 +3,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"reflect"
 	"strings"
 	"time"
@@ -234,7 +233,7 @@ type EnvelopePackage struct {
 	Nonce                HexBytes         `json:"nonce"`
 	Signature            HexBytes         `json:"signature"`
 	VotePackage          []byte           `json:"vote_package"`
-	Weight               *big.Int         `json:"weight"`
+	Weight               string           `json:"weight"`
 }
 
 // EnvelopeMetadata contains vote information for the EnvelopeList api
