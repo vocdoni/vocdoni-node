@@ -14,13 +14,13 @@ import (
 	psnet "github.com/shirou/gopsutil/net"
 	"github.com/vocdoni/multirpc/transports"
 
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/crypto"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
@@ -32,7 +32,7 @@ const (
 	healthSocksMax = 10000
 )
 
-func (r *Router) buildReply(request routerRequest, resp *types.MetaResponse) transports.Message {
+func (r *Router) buildReply(request routerRequest, resp *api.MetaResponse) transports.Message {
 	// Add any last fields to the inner response, and marshal it with sorted
 	// fields for signing.
 	resp.Ok = true
@@ -59,7 +59,7 @@ func (r *Router) buildReply(request routerRequest, resp *types.MetaResponse) tra
 
 	// Build the outer response with the already-marshaled inner response
 	// and its signature.
-	respOuter := types.ResponseMessage{
+	respOuter := api.ResponseMessage{
 		ID:           request.id,
 		Signature:    signature,
 		MetaResponse: respInner,
@@ -135,7 +135,7 @@ func NewRouter(inbound <-chan transports.Message, storage data.Storage,
 }
 
 type routerRequest struct {
-	types.MetaRequest
+	api.MetaRequest
 	transports.MessageContext
 
 	method        string
@@ -150,13 +150,13 @@ func (r *Router) getRequest(payload []byte, context transports.MessageContext) (
 	request.MessageContext = context
 	// First unmarshal the outer layer, to obtain the request ID, the signed
 	// request, and the signature.
-	var reqOuter types.RequestMessage
+	var reqOuter api.RequestMessage
 	if err := json.Unmarshal(payload, &reqOuter); err != nil {
 		return request, err
 	}
 	request.id = reqOuter.ID
 
-	var reqInner types.MetaRequest
+	var reqInner api.MetaRequest
 	if err := json.Unmarshal(reqOuter.MetaRequest, &reqInner); err != nil {
 		return request, err
 	}
@@ -327,7 +327,7 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 
 	// Add any last fields to the inner response, and marshal it with sorted
 	// fields for signing.
-	response := types.MetaResponse{
+	response := api.MetaResponse{
 		Request:   request.id,
 		Timestamp: int32(time.Now().Unix()),
 	}
@@ -345,7 +345,7 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 		// continue without the signature
 	}
 
-	respOuter := types.ResponseMessage{
+	respOuter := api.ResponseMessage{
 		ID:           request.id,
 		Signature:    signature,
 		MetaResponse: respInner,
@@ -363,7 +363,7 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 }
 
 func (r *Router) info(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.APIList = r.APIs
 	response.Request = request.id
 	if health, err := getHealth(); err == nil {

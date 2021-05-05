@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 
 	"go.vocdoni.io/dvote/test/testcommon"
@@ -61,9 +61,9 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 
 	// check required components
 
-	req := &types.MetaRequest{}
-	zeroReq := &types.MetaRequest{}
-	reset := func(r *types.MetaRequest) {
+	req := &api.MetaRequest{}
+	zeroReq := &api.MetaRequest{}
+	reset := func(r *api.MetaRequest) {
 		*r = *zeroReq
 	}
 	doRequest := cl.ForTest(b, req)

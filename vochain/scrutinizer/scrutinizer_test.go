@@ -464,7 +464,7 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
-	vp, err := json.Marshal(types.VotePackage{
+	vp, err := json.Marshal(VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomBytes(32)),
 		Votes: []int{1, 1, 1, 1},
 	})
@@ -582,7 +582,7 @@ func TestLiveResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
-	vp, err := json.Marshal(types.VotePackage{
+	vp, err := json.Marshal(VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1, 1, 1},
 	})
@@ -709,7 +709,7 @@ func TestAddVote(t *testing.T) {
 }
 
 var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
-	vp, err := json.Marshal(types.VotePackage{
+	vp, err := json.Marshal(VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: v,
 	})
@@ -913,7 +913,7 @@ func TestCountVotes(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
-	vp, err := json.Marshal(types.VotePackage{
+	vp, err := json.Marshal(VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1, 1, 1},
 	})

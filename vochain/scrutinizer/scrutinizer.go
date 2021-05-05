@@ -102,7 +102,7 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 	if err != nil {
 		return nil, fmt.Errorf("could not count the total entities: %w", err)
 	}
-	processes, err := s.db.Count(&types.Process{}, &badgerhold.Query{})
+	processes, err := s.db.Count(&Process{}, &badgerhold.Query{})
 	if err != nil {
 		return nil, fmt.Errorf("could not count the total processes: %w", err)
 	}
@@ -157,7 +157,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 	prcs := [][]byte{}
 	err := s.db.ForEach(
 		badgerhold.Where("FinalResults").Eq(false),
-		func(p *types.Process) error {
+		func(p *Process) error {
 			prcs = append(prcs, p.ID)
 			return nil
 		})

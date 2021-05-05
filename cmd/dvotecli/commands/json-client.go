@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 )
 
 var jsonClientCmd = &cobra.Command{
@@ -50,7 +50,7 @@ func jsonInput(cmd *cobra.Command, args []string) error {
 		log.Fatal(err)
 	}
 	defer cl.CheckClose(&err)
-	var req types.MetaRequest
+	var req api.MetaRequest
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		line, _, err := reader.ReadLine()
@@ -74,8 +74,8 @@ func jsonInput(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func processLine(input []byte) types.MetaRequest {
-	var req types.MetaRequest
+func processLine(input []byte) api.MetaRequest {
+	var req api.MetaRequest
 	err := json.Unmarshal(input, &req)
 	if err != nil {
 		log.Fatal(err)
@@ -83,7 +83,7 @@ func processLine(input []byte) types.MetaRequest {
 	return req
 }
 
-func printNice(resp *types.MetaResponse) {
+func printNice(resp *api.MetaResponse) {
 	v := reflect.ValueOf(*resp)
 	typeOfS := v.Type()
 	output := "\n"

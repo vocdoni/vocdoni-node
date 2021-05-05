@@ -2,6 +2,7 @@ package scrutinizer
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -15,6 +16,36 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
+// Process represents an election process handled by the Vochain.
+// The scrutinizer Process data type is different from the vochain state data type
+// since it is optimized for querying purposes and not for keeping a shared consensus state.
+type Process struct {
+	ID            types.HexBytes             `badgerholdKey:"ID" json:"processId"`
+	EntityID      types.HexBytes             `badgerholdIndex:"EntityID" json:"entityId"`
+	StartBlock    uint32                     `json:"startBlock"`
+	EndBlock      uint32                     `badgerholdIndex:"EndBlock" json:"endBlock"`
+	Rheight       uint32                     `badgerholdIndex:"Rheight" json:"-"`
+	CensusRoot    types.HexBytes             `json:"censusRoot"`
+	CensusURI     string                     `json:"censusURI"`
+	CensusOrigin  int32                      `json:"censusOrigin"`
+	Status        int32                      `badgerholdIndex:"Status" json:"status"`
+	Namespace     uint32                     `badgerholdIndex:"Namespace" json:"namespace"`
+	Envelope      *models.EnvelopeType       `json:"envelopeType"`
+	Mode          *models.ProcessMode        `json:"processMode"`
+	VoteOpts      *models.ProcessVoteOptions `json:"voteOptions"`
+	PrivateKeys   []string                   `json:"-"`
+	PublicKeys    []string                   `json:"-"`
+	QuestionIndex uint32                     `json:"questionIndex"`
+	CreationTime  time.Time                  `json:"creationTime"`
+	HaveResults   bool                       `json:"haveResults"`
+	FinalResults  bool                       `json:"finalResults"`
+}
+
+func (p Process) String() string {
+	b, _ := json.Marshal(p)
+	return string(b)
+}
+
 // Entity holds the db reference for an entity
 type Entity struct {
 	ID           types.HexBytes `badgerholdKey:"ID"`
@@ -22,8 +53,8 @@ type Entity struct {
 }
 
 // ProcessInfo returns the available information regarding an election process id
-func (s *Scrutinizer) ProcessInfo(pid []byte) (*types.Process, error) {
-	proc := &types.Process{}
+func (s *Scrutinizer) ProcessInfo(pid []byte) (*Process, error) {
+	proc := &Process{}
 	err := s.db.FindOne(proc, badgerhold.Where(badgerhold.Key).Eq(pid))
 	return proc, err
 }
@@ -84,7 +115,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
-			func(p *types.Process) error {
+			func(p *Process) error {
 				procs = append(procs, p.ID)
 				return nil
 			})
@@ -98,7 +129,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
-			func(p *types.Process) error {
+			func(p *Process) error {
 				procs = append(procs, p.ID)
 				return nil
 			})
@@ -111,7 +142,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
-			func(p *types.Process) error {
+			func(p *Process) error {
 				procs = append(procs, p.ID)
 				return nil
 			})
@@ -126,7 +157,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
-			func(p *types.Process) error {
+			func(p *Process) error {
 				procs = append(procs, p.ID)
 				return nil
 			})
@@ -143,7 +174,7 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
 		// If no entity ID, return the cached count of all processes
 		return atomic.LoadInt64(s.countTotalProcesses)
 	}
-	if c, err = s.db.Count(&types.Process{}, badgerhold.Where("EntityID").Eq(entityID)); err != nil {
+	if c, err = s.db.Count(&Process{}, badgerhold.Where("EntityID").Eq(entityID)); err != nil {
 		log.Warnf("cannot count processes: %v", err)
 	}
 	return int64(c)
@@ -188,7 +219,7 @@ func (s *Scrutinizer) isOpenProcess(processID []byte) (bool, error) {
 // compute results if the current heigh has scheduled ending processes
 func (s *Scrutinizer) computePendingProcesses(height uint32) {
 	if err := s.db.ForEach(badgerhold.Where("Rheight").Eq(height).Index("Rheight"),
-		func(p *types.Process) error {
+		func(p *Process) error {
 			initT := time.Now()
 			if err := s.ComputeResult(p.ID); err != nil {
 				log.Warnf("cannot compute results for %x: (%v)", p.ID, err)
@@ -275,7 +306,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	}
 
 	// Create and store process in the indexer database
-	proc := &types.Process{
+	proc := &Process{
 		ID:           pid,
 		EntityID:     eid,
 		StartBlock:   p.GetStartBlock(),
@@ -305,9 +336,9 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
-	return s.db.UpdateMatching(&types.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
+	return s.db.UpdateMatching(&Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
 		func(record interface{}) error {
-			update, ok := record.(*types.Process)
+			update, ok := record.(*Process)
 			if !ok {
 				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 			}
@@ -335,9 +366,9 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 }
 
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
-	return s.db.UpdateMatching(&types.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
+	return s.db.UpdateMatching(&Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
 		func(record interface{}) error {
-			update, ok := record.(*types.Process)
+			update, ok := record.(*Process)
 			if !ok {
 				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 			}

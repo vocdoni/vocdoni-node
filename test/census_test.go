@@ -40,9 +40,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	qt "github.com/frankban/quicktest"
 
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/types"
 
 	"go.vocdoni.io/dvote/test/testcommon"
 )
@@ -72,7 +72,7 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Send the API requets
-	var req types.MetaRequest
+	var req api.MetaRequest
 	doRequest := cl.ForTest(t, &req)
 
 	// Create census

@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 )
 
 // CheckAuth check if a census request message is authorized
-func (m *Manager) CheckAuth(reqOuter *types.RequestMessage, reqInner *types.MetaRequest) error {
+func (m *Manager) CheckAuth(reqOuter *api.RequestMessage, reqInner *api.MetaRequest) error {
 	if len(reqOuter.Signature) < ethereum.SignatureLength || len(reqInner.CensusID) < 1 {
 		return errors.New("signature or censusId not provided or invalid")
 	}

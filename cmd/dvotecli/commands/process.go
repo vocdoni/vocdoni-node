@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/router"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 )
 
@@ -63,7 +63,7 @@ func processList(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getProcessList"}
+	req := api.MetaRequest{Method: "getProcessList"}
 	if len(args) >= 1 {
 		req.EntityId, err = hex.DecodeString(util.TrimHex(args[0]))
 		if err != nil {
@@ -109,7 +109,7 @@ func processInfo(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getProcessInfo"}
+	req := api.MetaRequest{Method: "getProcessInfo"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func processKeys(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getProcessKeys"}
+	req := api.MetaRequest{Method: "getProcessKeys"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err
@@ -187,7 +187,7 @@ func getResults(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getResults"}
+	req := api.MetaRequest{Method: "getResults"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err
@@ -218,7 +218,7 @@ func getResultsWeight(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getResultsWeight"}
+	req := api.MetaRequest{Method: "getResultsWeight"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err

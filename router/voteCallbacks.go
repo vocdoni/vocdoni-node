@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	tmtypes "github.com/tendermint/tendermint/types"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -28,7 +29,7 @@ func (r *Router) submitRawTx(request routerRequest) {
 		return
 	}
 	log.Debugf("broadcasting tx hash:%s", res.Hash)
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Payload = fmt.Sprintf("%x", res.Data) // return nullifier or other info
 	if err = request.Send(r.buildReply(request, &response)); err != nil {
 		log.Warnf("error sending raw tx: %v", err)
@@ -66,7 +67,7 @@ func (r *Router) submitEnvelope(request routerRequest) {
 		return
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Nullifier = fmt.Sprintf("%x", res.Data)
 	if err = request.Send(r.buildReply(request, &response)); err != nil {
 		log.Warnf("error on submitEnvelope: %v", err)
@@ -75,7 +76,7 @@ func (r *Router) submitEnvelope(request routerRequest) {
 
 func (r *Router) getStats(request routerRequest) {
 	var err error
-	stats := new(types.VochainStats)
+	stats := new(scrutinizer.VochainStats)
 	stats.BlockHeight = r.vocapp.Height()
 	stats.BlockTimeStamp = int32(r.vocapp.State.Header(true).Timestamp)
 	stats.EntityCount = r.Scrutinizer.EntityCount()
@@ -90,7 +91,7 @@ func (r *Router) getStats(request routerRequest) {
 	stats.GenesisTimeStamp = r.vocapp.Node.GenesisDoc().GenesisTime
 	stats.Syncing = r.vocapp.IsSynchronizing()
 
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Stats = stats
 	if err != nil {
 		log.Errorf("could not marshal vochainStats: %s", err)
@@ -111,7 +112,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	}
 
 	// Check envelope status and send reply
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Registered = types.False
 	vr, err := r.Scrutinizer.GetEnvelopeReference(request.Nullifier)
 	if err != nil {
@@ -140,7 +141,7 @@ func (r *Router) getEnvelope(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
 		return
 	}
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Envelope = env
 	response.Registered = types.True
 	request.Send(r.buildReply(request, &response))
@@ -158,14 +159,14 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 		return
 	}
 
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Height = new(uint32)
 	*response.Height = uint32(votes)
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getBlockHeight(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	h := r.vocapp.Height()
 	response.Height = &h
 	response.BlockTimestamp = int32(r.vocapp.Timestamp())
@@ -173,7 +174,7 @@ func (r *Router) getBlockHeight(request routerRequest) {
 }
 
 func (r *Router) getProcessList(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	max := request.ListSize
 	if max > MaxListSize || max <= 0 {
 		max = MaxListSize
@@ -205,7 +206,7 @@ func (r *Router) getProcessList(request routerRequest) {
 }
 
 func (r *Router) getProcessInfo(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	var err error
 	response.Process, err = r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
@@ -216,7 +217,7 @@ func (r *Router) getProcessInfo(request routerRequest) {
 }
 
 func (r *Router) getProcessCount(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Size = new(int64)
 	count := r.Scrutinizer.ProcessCount(request.EntityId)
 	*response.Size = count
@@ -224,7 +225,7 @@ func (r *Router) getProcessCount(request routerRequest) {
 }
 
 func (r *Router) getEntityCount(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Size = new(int64)
 	*response.Size = r.Scrutinizer.EntityCount()
 	request.Send(r.buildReply(request, &response))
@@ -241,7 +242,7 @@ func (r *Router) getProcessKeys(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get process encryption public keys: (%s)", err))
 		return
 	}
-	var response types.MetaResponse
+	var response api.MetaResponse
 	var pubs, privs, coms, revs []types.Key
 	for idx, pubk := range process.EncryptionPublicKeys {
 		if len(pubk) > 0 {
@@ -283,7 +284,7 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	if request.ListSize == 0 {
 		request.ListSize = MaxListSize
 	}
-	var response types.MetaResponse
+	var response api.MetaResponse
 	var err error
 	if response.Envelopes, err = r.Scrutinizer.GetEnvelopes(request.ProcessID, request.ListSize, request.From); err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope list: (%s)", err))
@@ -293,7 +294,7 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 }
 
 func (r *Router) getValidatorList(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	var err error
 	if response.ValidatorList, err = r.vocapp.State.Validators(true); err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get validator list: %v", err))
@@ -303,12 +304,12 @@ func (r *Router) getValidatorList(request routerRequest) {
 }
 
 func (r *Router) getBlock(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	if request.Height > r.vocapp.Height() {
 		r.sendError(request, fmt.Sprintf("block height %d not valid for vochain with height %d", request.Height, r.vocapp.Height()))
 		return
 	}
-	if response.Block = types.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.Height))); response.Block == nil {
+	if response.Block = scrutinizer.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.Height))); response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.Height))
 		return
 	}
@@ -316,8 +317,8 @@ func (r *Router) getBlock(request routerRequest) {
 }
 
 func (r *Router) getBlockByHash(request routerRequest) {
-	var response types.MetaResponse
-	response.Block = types.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHash(request.Payload))
+	var response api.MetaResponse
+	response.Block = scrutinizer.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHash(request.Payload))
 	if response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Payload))
 		return
@@ -327,26 +328,26 @@ func (r *Router) getBlockByHash(request routerRequest) {
 
 // TODO improve this function
 func (r *Router) getBlockList(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	for i := 0; i < request.ListSize; i++ {
 		if uint32(request.From)+uint32(i) > r.vocapp.Height() {
 			break
 		}
 		response.BlockList = append(response.BlockList,
-			types.BlockMetadataFromBlockModel(
+			scrutinizer.BlockMetadataFromBlockModel(
 				r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i))))
 	}
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getTx(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	tx, hash, err := r.Scrutinizer.App.GetTxHash(request.Height, request.TxIndex)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
 		return
 	}
-	response.Tx = &types.TxPackage{
+	response.Tx = &scrutinizer.TxPackage{
 		Tx:          tx.Tx,
 		BlockHeight: request.Height,
 		Index:       request.TxIndex,
@@ -357,10 +358,10 @@ func (r *Router) getTx(request routerRequest) {
 }
 
 func (r *Router) getTxListForBlock(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.Height))
 	if block == nil {
-		r.sendError(request, fmt.Sprintf("cannot get tx list: block does not exist"))
+		r.sendError(request, "cannot get tx list: block does not exist")
 		return
 	}
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
@@ -392,7 +393,7 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 		default:
 			txType = "unknown"
 		}
-		response.TxList = append(response.TxList, &types.TxMetadata{
+		response.TxList = append(response.TxList, &scrutinizer.TxMetadata{
 			Type:        txType,
 			BlockHeight: request.Height,
 			Index:       int32(i),
@@ -403,7 +404,7 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 }
 
 func (r *Router) getResultsWeight(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	w, err := r.Scrutinizer.GetResultsWeight(request.ProcessID)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get results weight: %v", err))
@@ -419,7 +420,7 @@ func (r *Router) getResults(request routerRequest) {
 		return
 	}
 
-	var response types.MetaResponse
+	var response api.MetaResponse
 
 	// Get process info
 	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
@@ -478,7 +479,7 @@ func (r *Router) getResults(request routerRequest) {
 
 // known entities
 func (r *Router) getEntityList(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize
 	}
@@ -487,7 +488,7 @@ func (r *Router) getEntityList(request routerRequest) {
 }
 
 func (r *Router) getBlockStatus(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	h := r.vocapp.Height()
 	response.Height = &h
 	response.BlockTime = r.vocinfo.BlockTimes()
