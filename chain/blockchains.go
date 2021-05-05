@@ -98,7 +98,7 @@ var mainnet = Specs{
 	NetworkId:       1,
 	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
 	BootNodes:       ethparams.MainnetBootnodes,
-	StartingBlock:   10230300, //2020 jun 09 10:00h
+	StartingBlock:   10230300, // 2020 jun 09 10:00h
 	Contracts: map[string]*EthereumContract{
 		EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
 		EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
@@ -114,7 +114,7 @@ var xdai = Specs{
 	NetworkId:       100,
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
-	StartingBlock:   14531875, //2021 Feb 13 21:58h
+	StartingBlock:   14531875, // 2021 Feb 13 21:58h
 	Contracts: map[string]*EthereumContract{
 		EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
 		EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
@@ -130,7 +130,7 @@ var xdaistage = Specs{
 	NetworkId:       100,
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
-	StartingBlock:   14531875, //2021 Feb 13 21:58h
+	StartingBlock:   14531875, // 2021 Feb 13 21:58h
 	Contracts: map[string]*EthereumContract{
 		EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
 		EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},

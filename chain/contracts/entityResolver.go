@@ -194,7 +194,6 @@ func (_EntityResolver *EntityResolverTransactorRaw) Transact(opts *bind.Transact
 func (_EntityResolver *EntityResolverCaller) ABI(opts *bind.CallOpts, node [32]byte, contentTypes *big.Int) (*big.Int, []byte, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "ABI", node, contentTypes)
-
 	if err != nil {
 		return *new(*big.Int), *new([]byte), err
 	}
@@ -203,7 +202,6 @@ func (_EntityResolver *EntityResolverCaller) ABI(opts *bind.CallOpts, node [32]b
 	out1 := *abi.ConvertType(out[1], new([]byte)).(*[]byte)
 
 	return out0, out1, err
-
 }
 
 // ABI is a free data retrieval call binding the contract method 0x2203ab56.
@@ -226,7 +224,6 @@ func (_EntityResolver *EntityResolverCallerSession) ABI(node [32]byte, contentTy
 func (_EntityResolver *EntityResolverCaller) Addr(opts *bind.CallOpts, node [32]byte) (common.Address, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "addr", node)
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -234,7 +231,6 @@ func (_EntityResolver *EntityResolverCaller) Addr(opts *bind.CallOpts, node [32]
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // Addr is a free data retrieval call binding the contract method 0x3b3b57de.
@@ -257,7 +253,6 @@ func (_EntityResolver *EntityResolverCallerSession) Addr(node [32]byte) (common.
 func (_EntityResolver *EntityResolverCaller) Addr0(opts *bind.CallOpts, node [32]byte, coinType *big.Int) ([]byte, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "addr0", node, coinType)
-
 	if err != nil {
 		return *new([]byte), err
 	}
@@ -265,7 +260,6 @@ func (_EntityResolver *EntityResolverCaller) Addr0(opts *bind.CallOpts, node [32
 	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
 
 	return out0, err
-
 }
 
 // Addr0 is a free data retrieval call binding the contract method 0xf1cb7e06.
@@ -288,7 +282,6 @@ func (_EntityResolver *EntityResolverCallerSession) Addr0(node [32]byte, coinTyp
 func (_EntityResolver *EntityResolverCaller) Authorisations(opts *bind.CallOpts, arg0 [32]byte, arg1 common.Address, arg2 common.Address) (bool, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "authorisations", arg0, arg1, arg2)
-
 	if err != nil {
 		return *new(bool), err
 	}
@@ -296,7 +289,6 @@ func (_EntityResolver *EntityResolverCaller) Authorisations(opts *bind.CallOpts,
 	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
-
 }
 
 // Authorisations is a free data retrieval call binding the contract method 0xf86bc879.
@@ -319,7 +311,6 @@ func (_EntityResolver *EntityResolverCallerSession) Authorisations(arg0 [32]byte
 func (_EntityResolver *EntityResolverCaller) Contenthash(opts *bind.CallOpts, node [32]byte) ([]byte, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "contenthash", node)
-
 	if err != nil {
 		return *new([]byte), err
 	}
@@ -327,7 +318,6 @@ func (_EntityResolver *EntityResolverCaller) Contenthash(opts *bind.CallOpts, no
 	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
 
 	return out0, err
-
 }
 
 // Contenthash is a free data retrieval call binding the contract method 0xbc1c58d1.
@@ -350,7 +340,6 @@ func (_EntityResolver *EntityResolverCallerSession) Contenthash(node [32]byte) (
 func (_EntityResolver *EntityResolverCaller) InterfaceImplementer(opts *bind.CallOpts, node [32]byte, interfaceID [4]byte) (common.Address, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "interfaceImplementer", node, interfaceID)
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -358,7 +347,6 @@ func (_EntityResolver *EntityResolverCaller) InterfaceImplementer(opts *bind.Cal
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // InterfaceImplementer is a free data retrieval call binding the contract method 0x124a319c.
@@ -381,7 +369,6 @@ func (_EntityResolver *EntityResolverCallerSession) InterfaceImplementer(node [3
 func (_EntityResolver *EntityResolverCaller) List(opts *bind.CallOpts, node [32]byte, key string) ([]string, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "list", node, key)
-
 	if err != nil {
 		return *new([]string), err
 	}
@@ -389,7 +376,6 @@ func (_EntityResolver *EntityResolverCaller) List(opts *bind.CallOpts, node [32]
 	out0 := *abi.ConvertType(out[0], new([]string)).(*[]string)
 
 	return out0, err
-
 }
 
 // List is a free data retrieval call binding the contract method 0x74c756ee.
@@ -412,7 +398,6 @@ func (_EntityResolver *EntityResolverCallerSession) List(node [32]byte, key stri
 func (_EntityResolver *EntityResolverCaller) ListText(opts *bind.CallOpts, node [32]byte, key string, index *big.Int) (string, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "listText", node, key, index)
-
 	if err != nil {
 		return *new(string), err
 	}
@@ -420,7 +405,6 @@ func (_EntityResolver *EntityResolverCaller) ListText(opts *bind.CallOpts, node 
 	out0 := *abi.ConvertType(out[0], new(string)).(*string)
 
 	return out0, err
-
 }
 
 // ListText is a free data retrieval call binding the contract method 0xfdf720c6.
@@ -443,7 +427,6 @@ func (_EntityResolver *EntityResolverCallerSession) ListText(node [32]byte, key 
 func (_EntityResolver *EntityResolverCaller) Name(opts *bind.CallOpts, node [32]byte) (string, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "name", node)
-
 	if err != nil {
 		return *new(string), err
 	}
@@ -451,7 +434,6 @@ func (_EntityResolver *EntityResolverCaller) Name(opts *bind.CallOpts, node [32]
 	out0 := *abi.ConvertType(out[0], new(string)).(*string)
 
 	return out0, err
-
 }
 
 // Name is a free data retrieval call binding the contract method 0x691f3431.
@@ -490,7 +472,6 @@ func (_EntityResolver *EntityResolverCaller) Pubkey(opts *bind.CallOpts, node [3
 	outstruct.Y = *abi.ConvertType(out[1], new([32]byte)).(*[32]byte)
 
 	return *outstruct, err
-
 }
 
 // Pubkey is a free data retrieval call binding the contract method 0xc8690233.
@@ -519,7 +500,6 @@ func (_EntityResolver *EntityResolverCallerSession) Pubkey(node [32]byte) (struc
 func (_EntityResolver *EntityResolverCaller) SupportsInterface(opts *bind.CallOpts, interfaceID [4]byte) (bool, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "supportsInterface", interfaceID)
-
 	if err != nil {
 		return *new(bool), err
 	}
@@ -527,7 +507,6 @@ func (_EntityResolver *EntityResolverCaller) SupportsInterface(opts *bind.CallOp
 	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
-
 }
 
 // SupportsInterface is a free data retrieval call binding the contract method 0x01ffc9a7.
@@ -550,7 +529,6 @@ func (_EntityResolver *EntityResolverCallerSession) SupportsInterface(interfaceI
 func (_EntityResolver *EntityResolverCaller) Text(opts *bind.CallOpts, node [32]byte, key string) (string, error) {
 	var out []interface{}
 	err := _EntityResolver.contract.Call(opts, &out, "text", node, key)
-
 	if err != nil {
 		return *new(string), err
 	}
@@ -558,7 +536,6 @@ func (_EntityResolver *EntityResolverCaller) Text(opts *bind.CallOpts, node [32]
 	out0 := *abi.ConvertType(out[0], new(string)).(*string)
 
 	return out0, err
-
 }
 
 // Text is a free data retrieval call binding the contract method 0x59d1d43c.
@@ -926,7 +903,6 @@ type EntityResolverABIChanged struct {
 //
 // Solidity: event ABIChanged(bytes32 indexed node, uint256 indexed contentType)
 func (_EntityResolver *EntityResolverFilterer) FilterABIChanged(opts *bind.FilterOpts, node [][32]byte, contentType []*big.Int) (*EntityResolverABIChangedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -947,7 +923,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterABIChanged(opts *bind.Filte
 //
 // Solidity: event ABIChanged(bytes32 indexed node, uint256 indexed contentType)
 func (_EntityResolver *EntityResolverFilterer) WatchABIChanged(opts *bind.WatchOpts, sink chan<- *EntityResolverABIChanged, node [][32]byte, contentType []*big.Int) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1079,7 +1054,6 @@ type EntityResolverAddrChanged struct {
 //
 // Solidity: event AddrChanged(bytes32 indexed node, address a)
 func (_EntityResolver *EntityResolverFilterer) FilterAddrChanged(opts *bind.FilterOpts, node [][32]byte) (*EntityResolverAddrChangedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1096,7 +1070,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterAddrChanged(opts *bind.Filt
 //
 // Solidity: event AddrChanged(bytes32 indexed node, address a)
 func (_EntityResolver *EntityResolverFilterer) WatchAddrChanged(opts *bind.WatchOpts, sink chan<- *EntityResolverAddrChanged, node [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1225,7 +1198,6 @@ type EntityResolverAddressChanged struct {
 //
 // Solidity: event AddressChanged(bytes32 indexed node, uint256 coinType, bytes newAddress)
 func (_EntityResolver *EntityResolverFilterer) FilterAddressChanged(opts *bind.FilterOpts, node [][32]byte) (*EntityResolverAddressChangedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1242,7 +1214,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterAddressChanged(opts *bind.F
 //
 // Solidity: event AddressChanged(bytes32 indexed node, uint256 coinType, bytes newAddress)
 func (_EntityResolver *EntityResolverFilterer) WatchAddressChanged(opts *bind.WatchOpts, sink chan<- *EntityResolverAddressChanged, node [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1372,7 +1343,6 @@ type EntityResolverAuthorisationChanged struct {
 //
 // Solidity: event AuthorisationChanged(bytes32 indexed node, address indexed owner, address indexed target, bool isAuthorised)
 func (_EntityResolver *EntityResolverFilterer) FilterAuthorisationChanged(opts *bind.FilterOpts, node [][32]byte, owner []common.Address, target []common.Address) (*EntityResolverAuthorisationChangedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1397,7 +1367,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterAuthorisationChanged(opts *
 //
 // Solidity: event AuthorisationChanged(bytes32 indexed node, address indexed owner, address indexed target, bool isAuthorised)
 func (_EntityResolver *EntityResolverFilterer) WatchAuthorisationChanged(opts *bind.WatchOpts, sink chan<- *EntityResolverAuthorisationChanged, node [][32]byte, owner []common.Address, target []common.Address) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1533,7 +1502,6 @@ type EntityResolverContenthashChanged struct {
 //
 // Solidity: event ContenthashChanged(bytes32 indexed node, bytes hash)
 func (_EntityResolver *EntityResolverFilterer) FilterContenthashChanged(opts *bind.FilterOpts, node [][32]byte) (*EntityResolverContenthashChangedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1550,7 +1518,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterContenthashChanged(opts *bi
 //
 // Solidity: event ContenthashChanged(bytes32 indexed node, bytes hash)
 func (_EntityResolver *EntityResolverFilterer) WatchContenthashChanged(opts *bind.WatchOpts, sink chan<- *EntityResolverContenthashChanged, node [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1679,7 +1646,6 @@ type EntityResolverInterfaceChanged struct {
 //
 // Solidity: event InterfaceChanged(bytes32 indexed node, bytes4 indexed interfaceID, address implementer)
 func (_EntityResolver *EntityResolverFilterer) FilterInterfaceChanged(opts *bind.FilterOpts, node [][32]byte, interfaceID [][4]byte) (*EntityResolverInterfaceChangedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1700,7 +1666,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterInterfaceChanged(opts *bind
 //
 // Solidity: event InterfaceChanged(bytes32 indexed node, bytes4 indexed interfaceID, address implementer)
 func (_EntityResolver *EntityResolverFilterer) WatchInterfaceChanged(opts *bind.WatchOpts, sink chan<- *EntityResolverInterfaceChanged, node [][32]byte, interfaceID [][4]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1833,7 +1798,6 @@ type EntityResolverListItemChanged struct {
 //
 // Solidity: event ListItemChanged(bytes32 indexed node, string key, uint256 index)
 func (_EntityResolver *EntityResolverFilterer) FilterListItemChanged(opts *bind.FilterOpts, node [][32]byte) (*EntityResolverListItemChangedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1850,7 +1814,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterListItemChanged(opts *bind.
 //
 // Solidity: event ListItemChanged(bytes32 indexed node, string key, uint256 index)
 func (_EntityResolver *EntityResolverFilterer) WatchListItemChanged(opts *bind.WatchOpts, sink chan<- *EntityResolverListItemChanged, node [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1979,7 +1942,6 @@ type EntityResolverListItemRemoved struct {
 //
 // Solidity: event ListItemRemoved(bytes32 indexed node, string key, uint256 index)
 func (_EntityResolver *EntityResolverFilterer) FilterListItemRemoved(opts *bind.FilterOpts, node [][32]byte) (*EntityResolverListItemRemovedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1996,7 +1958,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterListItemRemoved(opts *bind.
 //
 // Solidity: event ListItemRemoved(bytes32 indexed node, string key, uint256 index)
 func (_EntityResolver *EntityResolverFilterer) WatchListItemRemoved(opts *bind.WatchOpts, sink chan<- *EntityResolverListItemRemoved, node [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -2124,7 +2085,6 @@ type EntityResolverNameChanged struct {
 //
 // Solidity: event NameChanged(bytes32 indexed node, string name)
 func (_EntityResolver *EntityResolverFilterer) FilterNameChanged(opts *bind.FilterOpts, node [][32]byte) (*EntityResolverNameChangedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -2141,7 +2101,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterNameChanged(opts *bind.Filt
 //
 // Solidity: event NameChanged(bytes32 indexed node, string name)
 func (_EntityResolver *EntityResolverFilterer) WatchNameChanged(opts *bind.WatchOpts, sink chan<- *EntityResolverNameChanged, node [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -2270,7 +2229,6 @@ type EntityResolverPubkeyChanged struct {
 //
 // Solidity: event PubkeyChanged(bytes32 indexed node, bytes32 x, bytes32 y)
 func (_EntityResolver *EntityResolverFilterer) FilterPubkeyChanged(opts *bind.FilterOpts, node [][32]byte) (*EntityResolverPubkeyChangedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -2287,7 +2245,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterPubkeyChanged(opts *bind.Fi
 //
 // Solidity: event PubkeyChanged(bytes32 indexed node, bytes32 x, bytes32 y)
 func (_EntityResolver *EntityResolverFilterer) WatchPubkeyChanged(opts *bind.WatchOpts, sink chan<- *EntityResolverPubkeyChanged, node [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -2416,7 +2373,6 @@ type EntityResolverTextChanged struct {
 //
 // Solidity: event TextChanged(bytes32 indexed node, string indexed indexedKey, string key)
 func (_EntityResolver *EntityResolverFilterer) FilterTextChanged(opts *bind.FilterOpts, node [][32]byte, indexedKey []string) (*EntityResolverTextChangedIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -2437,7 +2393,6 @@ func (_EntityResolver *EntityResolverFilterer) FilterTextChanged(opts *bind.Filt
 //
 // Solidity: event TextChanged(bytes32 indexed node, string indexed indexedKey, string key)
 func (_EntityResolver *EntityResolverFilterer) WatchTextChanged(opts *bind.WatchOpts, sink chan<- *EntityResolverTextChanged, node [][32]byte, indexedKey []string) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)

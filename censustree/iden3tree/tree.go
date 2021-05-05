@@ -332,7 +332,6 @@ func (t *Tree) ImportDump(data []byte) error {
 	}
 	for _, ee := range census.Elements {
 		claims = append(claims, fmt.Sprintf("%x", ee.Key))
-
 	}
 	return t.Tree.ImportDumpedClaims(claims)
 }

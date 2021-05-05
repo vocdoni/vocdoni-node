@@ -194,7 +194,6 @@ func (_Processes *ProcessesTransactorRaw) Transact(opts *bind.TransactOpts, meth
 func (_Processes *ProcessesCaller) ActivationBlock(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "activationBlock")
-
 	if err != nil {
 		return *new(*big.Int), err
 	}
@@ -202,7 +201,6 @@ func (_Processes *ProcessesCaller) ActivationBlock(opts *bind.CallOpts) (*big.In
 	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
 
 	return out0, err
-
 }
 
 // ActivationBlock is a free data retrieval call binding the contract method 0x80faa3d2.
@@ -225,7 +223,6 @@ func (_Processes *ProcessesCallerSession) ActivationBlock() (*big.Int, error) {
 func (_Processes *ProcessesCaller) EthChainId(opts *bind.CallOpts) (uint32, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "ethChainId")
-
 	if err != nil {
 		return *new(uint32), err
 	}
@@ -233,7 +230,6 @@ func (_Processes *ProcessesCaller) EthChainId(opts *bind.CallOpts) (uint32, erro
 	out0 := *abi.ConvertType(out[0], new(uint32)).(*uint32)
 
 	return out0, err
-
 }
 
 // EthChainId is a free data retrieval call binding the contract method 0xf630cd63.
@@ -290,7 +286,6 @@ func (_Processes *ProcessesCaller) Get(opts *bind.CallOpts, processId [32]byte) 
 	outstruct.SourceBlockHeight = *abi.ConvertType(out[7], new(*big.Int)).(**big.Int)
 
 	return *outstruct, err
-
 }
 
 // Get is a free data retrieval call binding the contract method 0x8eaa6ac0.
@@ -331,7 +326,6 @@ func (_Processes *ProcessesCallerSession) Get(processId [32]byte) (struct {
 func (_Processes *ProcessesCaller) GetCreationInstance(opts *bind.CallOpts, processId [32]byte) (common.Address, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "getCreationInstance", processId)
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -339,7 +333,6 @@ func (_Processes *ProcessesCaller) GetCreationInstance(opts *bind.CallOpts, proc
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // GetCreationInstance is a free data retrieval call binding the contract method 0x43327872.
@@ -362,7 +355,6 @@ func (_Processes *ProcessesCallerSession) GetCreationInstance(processId [32]byte
 func (_Processes *ProcessesCaller) GetEntityProcessCount(opts *bind.CallOpts, entityAddress common.Address) (*big.Int, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "getEntityProcessCount", entityAddress)
-
 	if err != nil {
 		return *new(*big.Int), err
 	}
@@ -370,7 +362,6 @@ func (_Processes *ProcessesCaller) GetEntityProcessCount(opts *bind.CallOpts, en
 	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
 
 	return out0, err
-
 }
 
 // GetEntityProcessCount is a free data retrieval call binding the contract method 0xf2bcb15e.
@@ -393,7 +384,6 @@ func (_Processes *ProcessesCallerSession) GetEntityProcessCount(entityAddress co
 func (_Processes *ProcessesCaller) GetNextProcessId(opts *bind.CallOpts, entityAddress common.Address) ([32]byte, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "getNextProcessId", entityAddress)
-
 	if err != nil {
 		return *new([32]byte), err
 	}
@@ -401,7 +391,6 @@ func (_Processes *ProcessesCaller) GetNextProcessId(opts *bind.CallOpts, entityA
 	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
 
 	return out0, err
-
 }
 
 // GetNextProcessId is a free data retrieval call binding the contract method 0x68141f2c.
@@ -424,7 +413,6 @@ func (_Processes *ProcessesCallerSession) GetNextProcessId(entityAddress common.
 func (_Processes *ProcessesCaller) GetParamsSignature(opts *bind.CallOpts, processId [32]byte) ([32]byte, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "getParamsSignature", processId)
-
 	if err != nil {
 		return *new([32]byte), err
 	}
@@ -432,7 +420,6 @@ func (_Processes *ProcessesCaller) GetParamsSignature(opts *bind.CallOpts, proce
 	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
 
 	return out0, err
-
 }
 
 // GetParamsSignature is a free data retrieval call binding the contract method 0x317daac5.
@@ -455,7 +442,6 @@ func (_Processes *ProcessesCallerSession) GetParamsSignature(processId [32]byte)
 func (_Processes *ProcessesCaller) GetProcessId(opts *bind.CallOpts, entityAddress common.Address, processCountIndex *big.Int, namespaceIdNum uint32, ethereumChainId uint32) ([32]byte, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "getProcessId", entityAddress, processCountIndex, namespaceIdNum, ethereumChainId)
-
 	if err != nil {
 		return *new([32]byte), err
 	}
@@ -463,7 +449,6 @@ func (_Processes *ProcessesCaller) GetProcessId(opts *bind.CallOpts, entityAddre
 	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
 
 	return out0, err
-
 }
 
 // GetProcessId is a free data retrieval call binding the contract method 0xac17d1f4.
@@ -486,7 +471,6 @@ func (_Processes *ProcessesCallerSession) GetProcessId(entityAddress common.Addr
 func (_Processes *ProcessesCaller) NamespaceAddress(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "namespaceAddress")
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -494,7 +478,6 @@ func (_Processes *ProcessesCaller) NamespaceAddress(opts *bind.CallOpts) (common
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // NamespaceAddress is a free data retrieval call binding the contract method 0x34a2cdbc.
@@ -517,7 +500,6 @@ func (_Processes *ProcessesCallerSession) NamespaceAddress() (common.Address, er
 func (_Processes *ProcessesCaller) NamespaceId(opts *bind.CallOpts) (uint32, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "namespaceId")
-
 	if err != nil {
 		return *new(uint32), err
 	}
@@ -525,7 +507,6 @@ func (_Processes *ProcessesCaller) NamespaceId(opts *bind.CallOpts) (uint32, err
 	out0 := *abi.ConvertType(out[0], new(uint32)).(*uint32)
 
 	return out0, err
-
 }
 
 // NamespaceId is a free data retrieval call binding the contract method 0x34e088d6.
@@ -548,7 +529,6 @@ func (_Processes *ProcessesCallerSession) NamespaceId() (uint32, error) {
 func (_Processes *ProcessesCaller) PredecessorAddress(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "predecessorAddress")
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -556,7 +536,6 @@ func (_Processes *ProcessesCaller) PredecessorAddress(opts *bind.CallOpts) (comm
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // PredecessorAddress is a free data retrieval call binding the contract method 0x08ffce24.
@@ -579,7 +558,6 @@ func (_Processes *ProcessesCallerSession) PredecessorAddress() (common.Address, 
 func (_Processes *ProcessesCaller) ProcessPrice(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "processPrice")
-
 	if err != nil {
 		return *new(*big.Int), err
 	}
@@ -587,7 +565,6 @@ func (_Processes *ProcessesCaller) ProcessPrice(opts *bind.CallOpts) (*big.Int, 
 	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
 
 	return out0, err
-
 }
 
 // ProcessPrice is a free data retrieval call binding the contract method 0x270cd753.
@@ -610,7 +587,6 @@ func (_Processes *ProcessesCallerSession) ProcessPrice() (*big.Int, error) {
 func (_Processes *ProcessesCaller) ResultsAddress(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "resultsAddress")
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -618,7 +594,6 @@ func (_Processes *ProcessesCaller) ResultsAddress(opts *bind.CallOpts) (common.A
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // ResultsAddress is a free data retrieval call binding the contract method 0x6ca886f2.
@@ -641,7 +616,6 @@ func (_Processes *ProcessesCallerSession) ResultsAddress() (common.Address, erro
 func (_Processes *ProcessesCaller) SuccessorAddress(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "successorAddress")
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -649,7 +623,6 @@ func (_Processes *ProcessesCaller) SuccessorAddress(opts *bind.CallOpts) (common
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // SuccessorAddress is a free data retrieval call binding the contract method 0x1d88c05b.
@@ -672,7 +645,6 @@ func (_Processes *ProcessesCallerSession) SuccessorAddress() (common.Address, er
 func (_Processes *ProcessesCaller) TokenStorageProofAddress(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _Processes.contract.Call(opts, &out, "tokenStorageProofAddress")
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -680,7 +652,6 @@ func (_Processes *ProcessesCaller) TokenStorageProofAddress(opts *bind.CallOpts)
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // TokenStorageProofAddress is a free data retrieval call binding the contract method 0xc876091f.
@@ -963,7 +934,6 @@ type ProcessesActivated struct {
 //
 // Solidity: event Activated(uint256 blockNumber)
 func (_Processes *ProcessesFilterer) FilterActivated(opts *bind.FilterOpts) (*ProcessesActivatedIterator, error) {
-
 	logs, sub, err := _Processes.contract.FilterLogs(opts, "Activated")
 	if err != nil {
 		return nil, err
@@ -975,7 +945,6 @@ func (_Processes *ProcessesFilterer) FilterActivated(opts *bind.FilterOpts) (*Pr
 //
 // Solidity: event Activated(uint256 blockNumber)
 func (_Processes *ProcessesFilterer) WatchActivated(opts *bind.WatchOpts, sink chan<- *ProcessesActivated) (event.Subscription, error) {
-
 	logs, sub, err := _Processes.contract.WatchLogs(opts, "Activated")
 	if err != nil {
 		return nil, err
@@ -1098,7 +1067,6 @@ type ProcessesActivatedSuccessor struct {
 //
 // Solidity: event ActivatedSuccessor(uint256 blockNumber, address successor)
 func (_Processes *ProcessesFilterer) FilterActivatedSuccessor(opts *bind.FilterOpts) (*ProcessesActivatedSuccessorIterator, error) {
-
 	logs, sub, err := _Processes.contract.FilterLogs(opts, "ActivatedSuccessor")
 	if err != nil {
 		return nil, err
@@ -1110,7 +1078,6 @@ func (_Processes *ProcessesFilterer) FilterActivatedSuccessor(opts *bind.FilterO
 //
 // Solidity: event ActivatedSuccessor(uint256 blockNumber, address successor)
 func (_Processes *ProcessesFilterer) WatchActivatedSuccessor(opts *bind.WatchOpts, sink chan<- *ProcessesActivatedSuccessor) (event.Subscription, error) {
-
 	logs, sub, err := _Processes.contract.WatchLogs(opts, "ActivatedSuccessor")
 	if err != nil {
 		return nil, err
@@ -1233,7 +1200,6 @@ type ProcessesCensusUpdated struct {
 //
 // Solidity: event CensusUpdated(bytes32 processId, uint32 namespace)
 func (_Processes *ProcessesFilterer) FilterCensusUpdated(opts *bind.FilterOpts) (*ProcessesCensusUpdatedIterator, error) {
-
 	logs, sub, err := _Processes.contract.FilterLogs(opts, "CensusUpdated")
 	if err != nil {
 		return nil, err
@@ -1245,7 +1211,6 @@ func (_Processes *ProcessesFilterer) FilterCensusUpdated(opts *bind.FilterOpts) 
 //
 // Solidity: event CensusUpdated(bytes32 processId, uint32 namespace)
 func (_Processes *ProcessesFilterer) WatchCensusUpdated(opts *bind.WatchOpts, sink chan<- *ProcessesCensusUpdated) (event.Subscription, error) {
-
 	logs, sub, err := _Processes.contract.WatchLogs(opts, "CensusUpdated")
 	if err != nil {
 		return nil, err
@@ -1368,7 +1333,6 @@ type ProcessesNewProcess struct {
 //
 // Solidity: event NewProcess(bytes32 processId, uint32 namespace)
 func (_Processes *ProcessesFilterer) FilterNewProcess(opts *bind.FilterOpts) (*ProcessesNewProcessIterator, error) {
-
 	logs, sub, err := _Processes.contract.FilterLogs(opts, "NewProcess")
 	if err != nil {
 		return nil, err
@@ -1380,7 +1344,6 @@ func (_Processes *ProcessesFilterer) FilterNewProcess(opts *bind.FilterOpts) (*P
 //
 // Solidity: event NewProcess(bytes32 processId, uint32 namespace)
 func (_Processes *ProcessesFilterer) WatchNewProcess(opts *bind.WatchOpts, sink chan<- *ProcessesNewProcess) (event.Subscription, error) {
-
 	logs, sub, err := _Processes.contract.WatchLogs(opts, "NewProcess")
 	if err != nil {
 		return nil, err
@@ -1502,7 +1465,6 @@ type ProcessesProcessPriceUpdated struct {
 //
 // Solidity: event ProcessPriceUpdated(uint256 processPrice)
 func (_Processes *ProcessesFilterer) FilterProcessPriceUpdated(opts *bind.FilterOpts) (*ProcessesProcessPriceUpdatedIterator, error) {
-
 	logs, sub, err := _Processes.contract.FilterLogs(opts, "ProcessPriceUpdated")
 	if err != nil {
 		return nil, err
@@ -1514,7 +1476,6 @@ func (_Processes *ProcessesFilterer) FilterProcessPriceUpdated(opts *bind.Filter
 //
 // Solidity: event ProcessPriceUpdated(uint256 processPrice)
 func (_Processes *ProcessesFilterer) WatchProcessPriceUpdated(opts *bind.WatchOpts, sink chan<- *ProcessesProcessPriceUpdated) (event.Subscription, error) {
-
 	logs, sub, err := _Processes.contract.WatchLogs(opts, "ProcessPriceUpdated")
 	if err != nil {
 		return nil, err
@@ -1638,7 +1599,6 @@ type ProcessesQuestionIndexUpdated struct {
 //
 // Solidity: event QuestionIndexUpdated(bytes32 processId, uint32 namespace, uint8 newIndex)
 func (_Processes *ProcessesFilterer) FilterQuestionIndexUpdated(opts *bind.FilterOpts) (*ProcessesQuestionIndexUpdatedIterator, error) {
-
 	logs, sub, err := _Processes.contract.FilterLogs(opts, "QuestionIndexUpdated")
 	if err != nil {
 		return nil, err
@@ -1650,7 +1610,6 @@ func (_Processes *ProcessesFilterer) FilterQuestionIndexUpdated(opts *bind.Filte
 //
 // Solidity: event QuestionIndexUpdated(bytes32 processId, uint32 namespace, uint8 newIndex)
 func (_Processes *ProcessesFilterer) WatchQuestionIndexUpdated(opts *bind.WatchOpts, sink chan<- *ProcessesQuestionIndexUpdated) (event.Subscription, error) {
-
 	logs, sub, err := _Processes.contract.WatchLogs(opts, "QuestionIndexUpdated")
 	if err != nil {
 		return nil, err
@@ -1774,7 +1733,6 @@ type ProcessesStatusUpdated struct {
 //
 // Solidity: event StatusUpdated(bytes32 processId, uint32 namespace, uint8 status)
 func (_Processes *ProcessesFilterer) FilterStatusUpdated(opts *bind.FilterOpts) (*ProcessesStatusUpdatedIterator, error) {
-
 	logs, sub, err := _Processes.contract.FilterLogs(opts, "StatusUpdated")
 	if err != nil {
 		return nil, err
@@ -1786,7 +1744,6 @@ func (_Processes *ProcessesFilterer) FilterStatusUpdated(opts *bind.FilterOpts) 
 //
 // Solidity: event StatusUpdated(bytes32 processId, uint32 namespace, uint8 status)
 func (_Processes *ProcessesFilterer) WatchStatusUpdated(opts *bind.WatchOpts, sink chan<- *ProcessesStatusUpdated) (event.Subscription, error) {
-
 	logs, sub, err := _Processes.contract.WatchLogs(opts, "StatusUpdated")
 	if err != nil {
 		return nil, err
@@ -1909,7 +1866,6 @@ type ProcessesWithdraw struct {
 //
 // Solidity: event Withdraw(address to, uint256 amount)
 func (_Processes *ProcessesFilterer) FilterWithdraw(opts *bind.FilterOpts) (*ProcessesWithdrawIterator, error) {
-
 	logs, sub, err := _Processes.contract.FilterLogs(opts, "Withdraw")
 	if err != nil {
 		return nil, err
@@ -1921,7 +1877,6 @@ func (_Processes *ProcessesFilterer) FilterWithdraw(opts *bind.FilterOpts) (*Pro
 //
 // Solidity: event Withdraw(address to, uint256 amount)
 func (_Processes *ProcessesFilterer) WatchWithdraw(opts *bind.WatchOpts, sink chan<- *ProcessesWithdraw) (event.Subscription, error) {
-
 	logs, sub, err := _Processes.contract.WatchLogs(opts, "Withdraw")
 	if err != nil {
 		return nil, err

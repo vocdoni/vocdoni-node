@@ -83,6 +83,7 @@ func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string, txindex in
 func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string, txindex int32) {}
 func (c *CensusDownloader) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
 }
+
 func (c *CensusDownloader) OnProcessResults(pid []byte, results []*models.QuestionResult, txindex int32) error {
 	return nil
 }

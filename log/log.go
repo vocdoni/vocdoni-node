@@ -11,8 +11,10 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-var log *zap.SugaredLogger
-var errorLog *os.File
+var (
+	log      *zap.SugaredLogger
+	errorLog *os.File
+)
 
 func init() {
 	// Allow overriding the default log level via $LOG_LEVEL, so that the
@@ -46,7 +48,7 @@ func Init(logLevel string, output string) {
 func SetFileErrorLog(path string) error {
 	log.Infof("using file %s for logging warning and errors", path)
 	var err error
-	errorLog, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	errorLog, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	return err
 }
 

@@ -38,9 +38,7 @@ var (
 	validatorKey = []byte("validator")
 )
 
-var (
-	ErrProcessNotFound = fmt.Errorf("process not found")
-)
+var ErrProcessNotFound = fmt.Errorf("process not found")
 
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
 var PrefixDBCacheSize = 0

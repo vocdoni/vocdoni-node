@@ -194,7 +194,6 @@ func (_TokenStorageProof *TokenStorageProofTransactorRaw) Transact(opts *bind.Tr
 func (_TokenStorageProof *TokenStorageProofCaller) IsRegistered(opts *bind.CallOpts, tokenAddress common.Address) (bool, error) {
 	var out []interface{}
 	err := _TokenStorageProof.contract.Call(opts, &out, "isRegistered", tokenAddress)
-
 	if err != nil {
 		return *new(bool), err
 	}
@@ -202,7 +201,6 @@ func (_TokenStorageProof *TokenStorageProofCaller) IsRegistered(opts *bind.CallO
 	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
-
 }
 
 // IsRegistered is a free data retrieval call binding the contract method 0xc3c5a547.
@@ -225,7 +223,6 @@ func (_TokenStorageProof *TokenStorageProofCallerSession) IsRegistered(tokenAddr
 func (_TokenStorageProof *TokenStorageProofCaller) TokenAddresses(opts *bind.CallOpts, arg0 *big.Int) (common.Address, error) {
 	var out []interface{}
 	err := _TokenStorageProof.contract.Call(opts, &out, "tokenAddresses", arg0)
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -233,7 +230,6 @@ func (_TokenStorageProof *TokenStorageProofCaller) TokenAddresses(opts *bind.Cal
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // TokenAddresses is a free data retrieval call binding the contract method 0xe5df8b84.
@@ -256,7 +252,6 @@ func (_TokenStorageProof *TokenStorageProofCallerSession) TokenAddresses(arg0 *b
 func (_TokenStorageProof *TokenStorageProofCaller) TokenCount(opts *bind.CallOpts) (uint32, error) {
 	var out []interface{}
 	err := _TokenStorageProof.contract.Call(opts, &out, "tokenCount")
-
 	if err != nil {
 		return *new(uint32), err
 	}
@@ -264,7 +259,6 @@ func (_TokenStorageProof *TokenStorageProofCaller) TokenCount(opts *bind.CallOpt
 	out0 := *abi.ConvertType(out[0], new(uint32)).(*uint32)
 
 	return out0, err
-
 }
 
 // TokenCount is a free data retrieval call binding the contract method 0x9f181b5e.
@@ -306,7 +300,6 @@ func (_TokenStorageProof *TokenStorageProofCaller) Tokens(opts *bind.CallOpts, a
 	outstruct.BalanceMappingPosition = *abi.ConvertType(out[2], new(*big.Int)).(**big.Int)
 
 	return *outstruct, err
-
 }
 
 // Tokens is a free data retrieval call binding the contract method 0xe4860339.
@@ -472,7 +465,6 @@ type TokenStorageProofBalanceMappingPositionUpdated struct {
 //
 // Solidity: event BalanceMappingPositionUpdated(address tokenAddress, uint256 balanceMappingPosition)
 func (_TokenStorageProof *TokenStorageProofFilterer) FilterBalanceMappingPositionUpdated(opts *bind.FilterOpts) (*TokenStorageProofBalanceMappingPositionUpdatedIterator, error) {
-
 	logs, sub, err := _TokenStorageProof.contract.FilterLogs(opts, "BalanceMappingPositionUpdated")
 	if err != nil {
 		return nil, err
@@ -484,7 +476,6 @@ func (_TokenStorageProof *TokenStorageProofFilterer) FilterBalanceMappingPositio
 //
 // Solidity: event BalanceMappingPositionUpdated(address tokenAddress, uint256 balanceMappingPosition)
 func (_TokenStorageProof *TokenStorageProofFilterer) WatchBalanceMappingPositionUpdated(opts *bind.WatchOpts, sink chan<- *TokenStorageProofBalanceMappingPositionUpdated) (event.Subscription, error) {
-
 	logs, sub, err := _TokenStorageProof.contract.WatchLogs(opts, "BalanceMappingPositionUpdated")
 	if err != nil {
 		return nil, err
@@ -606,7 +597,6 @@ type TokenStorageProofTokenRegistered struct {
 //
 // Solidity: event TokenRegistered(address tokenAddress)
 func (_TokenStorageProof *TokenStorageProofFilterer) FilterTokenRegistered(opts *bind.FilterOpts) (*TokenStorageProofTokenRegisteredIterator, error) {
-
 	logs, sub, err := _TokenStorageProof.contract.FilterLogs(opts, "TokenRegistered")
 	if err != nil {
 		return nil, err
@@ -618,7 +608,6 @@ func (_TokenStorageProof *TokenStorageProofFilterer) FilterTokenRegistered(opts 
 //
 // Solidity: event TokenRegistered(address tokenAddress)
 func (_TokenStorageProof *TokenStorageProofFilterer) WatchTokenRegistered(opts *bind.WatchOpts, sink chan<- *TokenStorageProofTokenRegistered) (event.Subscription, error) {
-
 	logs, sub, err := _TokenStorageProof.contract.WatchLogs(opts, "TokenRegistered")
 	if err != nil {
 		return nil, err

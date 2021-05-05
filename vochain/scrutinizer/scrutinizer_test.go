@@ -318,7 +318,8 @@ func TestProcessSearch(t *testing.T) {
 	}
 
 	// Exact process search
-	list, err := sc.ProcessList(eidTest, 0, 10, "4011d50537fa164b6fef261141797bbe4014526e", 0, "", false)
+	list, err := sc.ProcessList(eidTest, 0, 10,
+		"4011d50537fa164b6fef261141797bbe4014526e", 0, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +327,8 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected 1 process, got %d", len(list))
 	}
 	// Search for nonexistent process
-	list, err = sc.ProcessList(eidTest, 0, 10, "4011d50537fa164b6fef261141797bbe4014526f", 0, "", false)
+	list, err = sc.ProcessList(eidTest, 0, 10,
+		"4011d50537fa164b6fef261141797bbe4014526f", 0, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +344,8 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected %d processes, got %d", len(processIds), len(list))
 	}
 
-	list, err = sc.ProcessList(eidTest, 0, 100, "0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, "ENDED", false)
+	list, err = sc.ProcessList(eidTest, 0, 100,
+		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, "ENDED", false)
 	if err != nil {
 		t.Fatal(err)
 	}

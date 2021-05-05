@@ -9,7 +9,10 @@ func TestMetaRequestString(t *testing.T) {
 	}{
 		{MetaRequest{}, ":{}"},
 		{MetaRequest{Method: "test1", Type: "foo"}, "test1:{Type:foo}"},
-		{MetaRequest{Method: "test2", Type: "foo", Payload: []byte("\x01\xFF")}, "test2:{Payload:01ff Type:foo}"},
+		{
+			MetaRequest{Method: "test2", Type: "foo", Payload: []byte("\x01\xFF")},
+			"test2:{Payload:01ff Type:foo}",
+		},
 	}
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {

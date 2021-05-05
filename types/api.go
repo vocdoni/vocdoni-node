@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"reflect"
 	"strings"
 	"time"
@@ -219,74 +220,62 @@ type VochainStats struct {
 	EnvelopeCount    uint64    `json:"envelope_count"`
 	ProcessCount     int64     `json:"process_count"`
 	ValidatorCount   int       `json:"validator_count"`
-	BlockTime        *[5]int32 `json:"block_time"`
+	BlockTime        [5]int32  `json:"block_time"`
 	BlockTimeStamp   int32     `json:"block_time_stamp"`
 	ChainID          string    `json:"chain_id"`
 	GenesisTimeStamp time.Time `json:"genesis_time_stamp"`
-
-	// TransactionHeight int64     `json:"transaction_height"`
-	// AvgTxsPerBlock    float64   `json:"avg_txs_per_block"`
-	// AvgTxsPerMinute   float64   `json:"avg_txs_per_minute"`
-	// The hash of the block with the most txs
-	// MaxBytes          int64  `json:"max_bytes"`
-	// MaxTxsBlockHash   string `json:"max_txs_block_hash"`
-	// MaxTxsBlockHeight int64  `json:"max_txs_block_height"`
-	// The start of the minute with the most txs
-	// MaxTxsMinute    time.Time `json:"max_txs_minute"`
-	// MaxTxsPerBlock  int64     `json:"max_txs_per_block"`
-	// MaxTxsPerMinute int64     `json:"max_txs_per_minute"`
-
-	Syncing bool `json:"syncing"`
+	Syncing          bool      `json:"syncing"`
 }
 
 // EnvelopePackage contains a VoteEnvelope and auxiliary information for the Envelope api
 type EnvelopePackage struct {
-	Nonce                HexBytes
-	ProcessId            HexBytes
-	VotePackage          []byte
-	Nullifier            HexBytes
-	EncryptionKeyIndexes []uint32
-	Weight               []byte
-	TxIndex              int32
-	Height               uint32
-	TxHash               HexBytes
+	EncryptionKeyIndexes []uint32 `json:"encryption_key_indexes"`
+	Height               uint32   `json:"height"`
+	Nonce                HexBytes `json:"nonce"`
+	Nullifier            HexBytes `json:"nullifier"`
+	ProcessId            HexBytes `json:"process_id"`
+	Signature            HexBytes `json:"signature"`
+	TxHash               HexBytes `json:"tx_hash"`
+	TxIndex              int32    `json:"tx_index"`
+	VotePackage          []byte   `json:"vote_package"`
+	Weight               *big.Int `json:"weight"`
 }
 
 // EnvelopeMetadata contains vote information for the EnvelopeList api
 type EnvelopeMetadata struct {
-	ProcessId HexBytes
-	Nullifier HexBytes
-	TxIndex   int32
-	Height    uint32
-	TxHash    HexBytes
+	ProcessId HexBytes `json:"process_id"`
+	Nullifier HexBytes `json:"nullifier"`
+	TxIndex   int32    `json:"tx_index"`
+	Height    uint32   `json:"height"`
+	TxHash    HexBytes `json:"tx_hash"`
 }
 
 // TxPackage contains a SignedTx and auxiliary information for the Transaction api
 type TxPackage struct {
-	Tx          []byte
-	BlockHeight uint32
-	Index       int32
-	Hash        HexBytes
-	Signature   HexBytes
+	Tx          []byte   `json:"tx"`
+	BlockHeight uint32   `json:"block_height"`
+	Index       int32    `json:"index"`
+	Hash        HexBytes `json:"hash"`
+	Signature   HexBytes `json:"signature"`
 }
 
 // TxMetadata contains tx information for the TransactionList api
 type TxMetadata struct {
-	Type        string
-	BlockHeight uint32
-	Index       int32
-	Hash        HexBytes
+	Type        string   `json:"type"`
+	BlockHeight uint32   `json:"block_height"`
+	Index       int32    `json:"index"`
+	Hash        HexBytes `json:"hash"`
 }
 
 // BlockMetadata contains the metadata for a single tendermint block
 type BlockMetadata struct {
-	ChainId         string
-	Height          uint32
-	Timestamp       time.Time
-	Hash            HexBytes
-	NumTxs          uint64
-	LastBlockHash   HexBytes
-	ProposerAddress HexBytes
+	ChainId         string    `json:"chain_id"`
+	Height          uint32    `json:"height"`
+	Timestamp       time.Time `json:"timestamp"`
+	Hash            HexBytes  `json:"hash"`
+	NumTxs          uint64    `json:"num_txs"`
+	LastBlockHash   HexBytes  `json:"last_block_hash"`
+	ProposerAddress HexBytes  `json:"proposer_address"`
 }
 
 func (b *BlockMetadata) String() string {

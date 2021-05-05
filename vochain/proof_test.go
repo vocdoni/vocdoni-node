@@ -179,6 +179,7 @@ func TestCAProof(t *testing.T) {
 	}
 	testCASendVotes(t, pid, vp, &k, proof, app, false)
 }
+
 func TestCABlindProof(t *testing.T) {
 	app, err := NewBaseApplication(t.TempDir())
 	if err != nil {
@@ -327,7 +328,6 @@ func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignK
 	} else {
 		if !expectedResult {
 			t.Fatalf("deliverTx success, but expected result is fail")
-
 		}
 	}
 	app.Commit()
@@ -376,7 +376,6 @@ func TestEthProof(t *testing.T) {
 
 	// Test double vote
 	testEthSendVotes(t, sp.StorageProofs[2], pid, vp, app, false)
-
 }
 
 func testEthSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, app *BaseApplication, expectedResult bool) {
@@ -458,11 +457,9 @@ func testEthSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, a
 	} else {
 		if !expectedResult {
 			t.Fatalf("deliverTx success, but expected result is fail")
-
 		}
 	}
 	app.Commit()
-
 }
 
 var testSmartContractHolders = []string{
@@ -473,10 +470,12 @@ var testSmartContractHolders = []string{
 	"aa16366cd207782dc4b2a9b8c9f82f3970c31540dd5c182acce12905ef9e272b",
 }
 
-//var testEthVotingSmartContract = "0x2b7222146a805bba0dbb61869c4b3a03209dffba"
-//var testEthHeight = uint32(3833670)
-var testEthIndexSlot = uint32(4)
-var testEthStorageRoot = testutil.Hex2byte(nil, "0xe338061cd5d5fa8a452dc950e336a838ff2ca79bef04fe48c5a3a071cc7e0c55")
+// var testEthVotingSmartContract = "0x2b7222146a805bba0dbb61869c4b3a03209dffba"
+// var testEthHeight = uint32(3833670)
+var (
+	testEthIndexSlot   = uint32(4)
+	testEthStorageRoot = testutil.Hex2byte(nil, "0xe338061cd5d5fa8a452dc950e336a838ff2ca79bef04fe48c5a3a071cc7e0c55")
+)
 
 type testStorageProofs struct {
 	StorageProofs []testStorageProof `json:"storageProofs"`

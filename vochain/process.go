@@ -87,7 +87,6 @@ func (v *State) CountProcesses(isQuery bool) int64 {
 		return int64(v.Store.ImmutableTree(ProcessTree).Count())
 	}
 	return int64(v.Store.Tree(ProcessTree).Count())
-
 }
 
 // set process stores in the database the process

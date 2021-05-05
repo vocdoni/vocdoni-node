@@ -174,7 +174,6 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		setProcessTx, err := processCensusUpdatedMeta(tctx, &e.ContractsInfo["processes"].ABI, event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain census uptade data for creating the transaction: %w", err)
-
 		}
 		log.Infof("found process %x census update on ethereum", setProcessTx.ProcessId)
 		p, err := e.VochainApp.State.Process(setProcessTx.ProcessId, true)

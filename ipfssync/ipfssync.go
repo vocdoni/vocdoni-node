@@ -34,7 +34,7 @@ type Message struct {
 	Type     string `json:"type"`
 	Address  string `json:"address,omitempty"`
 	Maddress string `json:"mAddress,omitempty"`
-	//NodeID    string   `json:"nodeId,omitempty"`
+	// NodeID    string   `json:"nodeId,omitempty"`
 	Hash      string   `json:"hash,omitempty"`
 	PinList   []string `json:"pinList,omitempty"`
 	Timestamp int32    `json:"timestamp"`

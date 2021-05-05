@@ -140,7 +140,7 @@ func GenerateNullifier(address ethcommon.Address, processID []byte) []byte {
 // if tmPrivKey not specified, uses the existing one or generates a new one
 func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV, error) {
 	stateFile := &privval.FilePVLastSignState{}
-	f, err := os.OpenFile(tconfig.PrivValidatorStateFile(), os.O_RDONLY|os.O_CREATE, 0666)
+	f, err := os.OpenFile(tconfig.PrivValidatorStateFile(), os.O_RDONLY|os.O_CREATE, 0o666)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 		if err != nil {
 			log.Fatalf("cannot create priv_validator_state.json: %s", err)
 		}
-		err = tempfile.WriteFileAtomic(tconfig.PrivValidatorStateFile(), jsonBytes, 0600)
+		err = tempfile.WriteFileAtomic(tconfig.PrivValidatorStateFile(), jsonBytes, 0o600)
 		if err != nil {
 			log.Fatalf("cannot create priv_validator_state.json: %s", err)
 		}

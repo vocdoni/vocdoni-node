@@ -90,8 +90,9 @@ type BlockParams struct {
 }
 
 type EvidenceParams struct {
-	MaxAgeNumBlocks int64         `json:"max_age_num_blocks"` // only accept new evidence more recent than this
-	MaxAgeDuration  time.Duration `json:"max_age_duration"`
+	MaxAgeNumBlocks int64 `json:"max_age_num_blocks"`
+	// only accept new evidence more recent than this
+	MaxAgeDuration time.Duration `json:"max_age_duration"`
 }
 
 type ValidatorParams struct {
@@ -131,8 +132,11 @@ type CensusProperties struct {
 }
 
 var CensusOrigins = map[models.CensusOrigin]CensusProperties{
-	models.CensusOrigin_OFF_CHAIN_TREE:          {Name: "offchain tree", NeedsDownload: true, NeedsURI: true, AllowCensusUpdate: true},
-	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: {Name: "offchain weighted tree", NeedsDownload: true, NeedsURI: true, WeightedSupport: true, AllowCensusUpdate: true},
-	models.CensusOrigin_ERC20:                   {Name: "erc20", NeedsDownload: true, WeightedSupport: true, NeedsIndexSlot: true},
-	models.CensusOrigin_OFF_CHAIN_CA:            {Name: "ca", WeightedSupport: true, NeedsURI: true, AllowCensusUpdate: true},
+	models.CensusOrigin_OFF_CHAIN_TREE: {Name: "offchain tree", NeedsDownload: true, NeedsURI: true, AllowCensusUpdate: true},
+	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: {
+		Name: "offchain weighted tree", NeedsDownload: true, NeedsURI: true,
+		WeightedSupport: true, AllowCensusUpdate: true,
+	},
+	models.CensusOrigin_ERC20:        {Name: "erc20", NeedsDownload: true, WeightedSupport: true, NeedsIndexSlot: true},
+	models.CensusOrigin_OFF_CHAIN_CA: {Name: "ca", WeightedSupport: true, NeedsURI: true, AllowCensusUpdate: true},
 }

@@ -534,7 +534,6 @@ func (c *Client) GetCurrentBlock() (uint32, error) {
 		return 0, fmt.Errorf("height is nil")
 	}
 	return *resp.Height, nil
-
 }
 
 // CreateCensus creates a new census on the remote gateway and publishes it.

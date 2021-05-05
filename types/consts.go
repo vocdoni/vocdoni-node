@@ -112,16 +112,19 @@ const (
 	ScrutinizerEntityPrefix = byte(0x22)
 	// ScrutinizerResultsPrefix is the prefix of the storage results summary keys
 	ScrutinizerResultsPrefix = byte(0x24)
-	// ScrutinizerProcessEndingPrefix is the prefix for keep track of the processes ending on a specific block
+	// ScrutinizerProcessEndingPrefix is the prefix for keep track of the processes ending
+	// on a specific block
 	ScrutinizerProcessEndingPrefix = byte(0x25)
 
 	// Vochain
 
-	// PetitionSign contains the string that needs to match with the received vote type for petition-sign
+	// PetitionSign contains the string that needs to match with the received vote type
+	// for petition-sign
 	PetitionSign = "petition-sign"
 	// PollVote contains the string that needs to match with the received vote type for poll-vote
 	PollVote = "poll-vote"
-	// EncryptedPoll contains the string that needs to match with the received vote type for encrypted-poll
+	// EncryptedPoll contains the string that needs to match with the received vote type
+	// for encrypted-poll
 	EncryptedPoll = "encrypted-poll"
 	// SnarkVote contains the string that needs to match with the received vote type for snark-vote
 	SnarkVote = "snark-vote"

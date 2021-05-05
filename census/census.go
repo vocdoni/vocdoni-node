@@ -103,7 +103,7 @@ func (m *Manager) Init(storageDir, rootKey string,
 			cns.RootKey = rootKey
 		}
 		m.Census = cns
-		if err := os.WriteFile(filepath.Clean(nsConfig), []byte(""), 0600); err != nil {
+		if err := os.WriteFile(filepath.Clean(nsConfig), []byte(""), 0o600); err != nil {
 			return err
 		}
 		return m.save()
@@ -219,7 +219,7 @@ func (m *Manager) save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(nsConfig, data, 0600)
+	return os.WriteFile(nsConfig, data, 0o600)
 }
 
 // Count returns the number of local created, external imported and loaded/active census

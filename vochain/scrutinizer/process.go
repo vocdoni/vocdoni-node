@@ -15,6 +15,12 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
+// Entity holds the db reference for an entity
+type Entity struct {
+	ID           types.HexBytes `badgerholdKey:"ID"`
+	CreationTime time.Time
+}
+
 // ProcessInfo returns the available information regarding an election process id
 func (s *Scrutinizer) ProcessInfo(pid []byte) (*types.Process, error) {
 	proc := &types.Process{}
@@ -26,8 +32,13 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*types.Process, error) {
 // EntityID, searchTerm, namespace, status, and withResults are optional filters, if
 // declared as zero-values will be ignored. SearchTerm is a partial or full PID.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
-func (s *Scrutinizer) ProcessList(entityID []byte, from, max int, searchTerm string, namespace uint32,
-	status string, withResults bool) ([][]byte, error) {
+func (s *Scrutinizer) ProcessList(entityID []byte,
+	from,
+	max int,
+	searchTerm string,
+	namespace uint32,
+	status string,
+	withResults bool) ([][]byte, error) {
 	if from < 0 {
 		return nil, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
 	}
@@ -39,15 +50,6 @@ func (s *Scrutinizer) ProcessList(entityID []byte, from, max int, searchTerm str
 		if statusnum, statusfound = models.ProcessStatus_value[status]; !statusfound {
 			return nil, fmt.Errorf("processList: status %s is unknown", status)
 		}
-	}
-	searchMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
-		if searchTerm == "" {
-			return true, nil
-		}
-		if strings.Contains(hex.EncodeToString(r.Field().(types.HexBytes)), searchTerm) {
-			return true, nil
-		}
-		return false, nil
 	}
 	statusMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
 		if statusnum == -1 {
@@ -78,7 +80,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte, from, max int, searchTerm str
 				Index("EntityID").
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
-				And("ID").MatchFunc(searchMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -92,7 +94,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte, from, max int, searchTerm str
 				Index("Namespace").
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
-				And("ID").MatchFunc(searchMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -105,7 +107,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte, from, max int, searchTerm str
 			badgerhold.Where("Status").MatchFunc(statusMatchFunc).
 				Index("Status").
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
-				And("ID").MatchFunc(searchMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -120,7 +122,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte, from, max int, searchTerm str
 				And("Namespace").Eq(namespace).
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
-				And("ID").MatchFunc(searchMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
@@ -140,10 +142,8 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
 	if len(entityID) == 0 {
 		// If no entity ID, return the cached count of all processes
 		return atomic.LoadInt64(s.countTotalProcesses)
-	} else {
-		c, err = s.db.Count(&types.Process{}, badgerhold.Where("EntityID").Eq(entityID))
 	}
-	if err != nil {
+	if c, err = s.db.Count(&types.Process{}, badgerhold.Where("EntityID").Eq(entityID)); err != nil {
 		log.Warnf("cannot count processes: %v", err)
 	}
 	return int64(c)
@@ -153,22 +153,13 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
 // searchTerm is optional, if declared as zero-value
 // will be ignored. Searches against the ID field.
 func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []string {
-	searchMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
-		if searchTerm == "" {
-			return true, nil
-		}
-		if strings.Contains(hex.EncodeToString(r.Field().(types.HexBytes)), searchTerm) {
-			return true, nil
-		}
-		return false, nil
-	}
 	entities := []string{}
 	if err := s.db.ForEach(
-		badgerhold.Where("ID").MatchFunc(searchMatchFunc).
+		badgerhold.Where("ID").MatchFunc(searchMatchFunc(searchTerm)).
 			SortBy("CreationTime").
 			Skip(from).
 			Limit(max),
-		func(e *types.Entity) error {
+		func(e *Entity) error {
 			entities = append(entities, fmt.Sprintf("%x", e.ID))
 			return nil
 		}); err != nil {
@@ -259,14 +250,14 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	// Add the entity to the indexer database
 	eid := p.GetEntityId()
-	entity := &types.Entity{}
+	entity := &Entity{}
 	// If entity is not registered in db, add to entity count cache and insert to db
 	if err := s.db.FindOne(entity, badgerhold.Where("ID").Eq(eid)); err != nil {
 		if err != badgerhold.ErrNotFound {
 			return err
 		}
 		atomic.AddInt64(s.countTotalEntities, 1)
-		if err := s.db.Insert(eid, &types.Entity{
+		if err := s.db.Insert(eid, &Entity{
 			ID:           eid,
 			CreationTime: currentBlockTime,
 		}); err != nil {
@@ -368,4 +359,17 @@ func newEmptyVotes(questions, options int) [][]*big.Int {
 		results = append(results, question)
 	}
 	return results
+}
+
+func searchMatchFunc(searchTerm string) func(r *badgerhold.RecordAccess) (bool, error) {
+	return func(r *badgerhold.RecordAccess) (bool, error) {
+		if searchTerm == "" {
+			return true, nil
+		}
+		// TODO search without having to convert each field to strings
+		if strings.Contains(hex.EncodeToString(r.Field().(types.HexBytes)), searchTerm) {
+			return true, nil
+		}
+		return false, nil
+	}
 }

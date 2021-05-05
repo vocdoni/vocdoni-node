@@ -37,7 +37,8 @@ func (r *Results) String() string {
 	return results.String()
 }
 
-// Add adds the total weight and votes from the given Results to the containing Results making the method call.
+// Add adds the total weight and votes from the given Results to the
+// containing Results making the method call.
 func (r *Results) Add(new *Results) error {
 	r.Weight.Add(r.Weight, new.Weight)
 	if new.Height > r.Height {

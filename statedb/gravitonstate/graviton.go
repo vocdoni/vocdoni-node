@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strconv"
 	"sync"
-
 	"sync/atomic"
 
 	"github.com/deroproject/graviton"
@@ -46,38 +45,48 @@ func (t *safeTree) Put(key, value []byte) error {
 	defer t.gtreeMu.Unlock()
 	return t.gtree.Put(key, value)
 }
+
 func (t *safeTree) Commit(tags ...string) error {
 	t.gtreeMu.Lock()
 	defer t.gtreeMu.Unlock()
 	return t.gtree.Commit(tags...)
 }
+
 func (t *safeTree) Cursor() (_ graviton.Cursor, deferFn func()) {
 	t.gtreeMu.RLock()
 	return t.gtree.Cursor(), t.gtreeMu.RUnlock
 }
+
 func (t *safeTree) Delete(key []byte) error {
 	t.gtreeMu.Lock()
 	defer t.gtreeMu.Unlock()
 	return t.gtree.Delete(key)
 }
+
 func (t *safeTree) Discard() error {
 	return t.gtree.Discard()
 }
+
 func (t *safeTree) GenerateProof(key []byte) (*graviton.Proof, error) {
 	return t.gtree.GenerateProof(key)
 }
+
 func (t *safeTree) Get(key []byte) ([]byte, error) {
 	return t.gtree.Get(key)
 }
+
 func (t *safeTree) GetParentVersion() uint64 {
 	return t.gtree.GetParentVersion()
 }
+
 func (t *safeTree) GetVersion() uint64 {
 	return t.gtree.GetVersion()
 }
+
 func (t *safeTree) Hash() (h [graviton.HASHSIZE]byte, err error) {
 	return t.gtree.Hash()
 }
+
 func (t *safeTree) IsDirty() bool {
 	return t.gtree.IsDirty()
 }

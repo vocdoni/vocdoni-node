@@ -487,7 +487,6 @@ func (e *ENSCallerHandler) Resolve(ctx context.Context, nameHash [32]byte, resol
 		resolvedAddr, err = e.Registry.Resolver(&ethbind.CallOpts{Context: tctx}, nameHash)
 	} else {
 		resolvedAddr, err = e.Resolver.Addr(&ethbind.CallOpts{Context: tctx}, nameHash)
-
 	}
 	if err != nil {
 		return "", fmt.Errorf("cannot resolve contract address: %w", err)

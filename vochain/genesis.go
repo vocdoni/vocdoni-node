@@ -135,7 +135,8 @@ var Genesis = map[string]VochainGenesis{
          ]
       }
    }
- `},
+ `,
+	},
 
 	// Development network
 	"dev": {
@@ -245,7 +246,8 @@ var Genesis = map[string]VochainGenesis{
       ]
    }
 }
-`},
+`,
+	},
 
 	"stage": {
 		AutoUpdateGenesis: true,
@@ -355,5 +357,6 @@ var Genesis = map[string]VochainGenesis{
       ]
    }
 }
-`},
+`,
+	},
 }

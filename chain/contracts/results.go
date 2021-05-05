@@ -194,7 +194,6 @@ func (_Results *ResultsTransactorRaw) Transact(opts *bind.TransactOpts, method s
 func (_Results *ResultsCaller) GenesisAddress(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _Results.contract.Call(opts, &out, "genesisAddress")
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -202,7 +201,6 @@ func (_Results *ResultsCaller) GenesisAddress(opts *bind.CallOpts) (common.Addre
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // GenesisAddress is a free data retrieval call binding the contract method 0x6065fb33.
@@ -241,7 +239,6 @@ func (_Results *ResultsCaller) GetResults(opts *bind.CallOpts, processId [32]byt
 	outstruct.Height = *abi.ConvertType(out[1], new(uint32)).(*uint32)
 
 	return *outstruct, err
-
 }
 
 // GetResults is a free data retrieval call binding the contract method 0x46475c4c.
@@ -270,7 +267,6 @@ func (_Results *ResultsCallerSession) GetResults(processId [32]byte) (struct {
 func (_Results *ResultsCaller) ProcessesAddress(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
 	err := _Results.contract.Call(opts, &out, "processesAddress")
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -278,7 +274,6 @@ func (_Results *ResultsCaller) ProcessesAddress(opts *bind.CallOpts) (common.Add
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // ProcessesAddress is a free data retrieval call binding the contract method 0x9d455ad6.
@@ -414,7 +409,6 @@ type ResultsResultsAvailable struct {
 //
 // Solidity: event ResultsAvailable(bytes32 processId)
 func (_Results *ResultsFilterer) FilterResultsAvailable(opts *bind.FilterOpts) (*ResultsResultsAvailableIterator, error) {
-
 	logs, sub, err := _Results.contract.FilterLogs(opts, "ResultsAvailable")
 	if err != nil {
 		return nil, err
@@ -426,7 +420,6 @@ func (_Results *ResultsFilterer) FilterResultsAvailable(opts *bind.FilterOpts) (
 //
 // Solidity: event ResultsAvailable(bytes32 processId)
 func (_Results *ResultsFilterer) WatchResultsAvailable(opts *bind.WatchOpts, sink chan<- *ResultsResultsAvailable) (event.Subscription, error) {
-
 	logs, sub, err := _Results.contract.WatchLogs(opts, "ResultsAvailable")
 	if err != nil {
 		return nil, err

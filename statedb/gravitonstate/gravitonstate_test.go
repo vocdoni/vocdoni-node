@@ -130,7 +130,6 @@ func TestState(t *testing.T) {
 		}
 		return false
 	})
-
 }
 
 func TestOrderAndProof(t *testing.T) {

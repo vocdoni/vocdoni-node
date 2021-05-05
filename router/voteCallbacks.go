@@ -85,7 +85,7 @@ func (r *Router) getStats(request routerRequest) {
 	stats.ProcessCount = r.Scrutinizer.ProcessCount([]byte{})
 	vals, _ := r.vocapp.State.Validators(true)
 	stats.ValidatorCount = len(vals)
-	stats.BlockTime = r.vocinfo.BlockTimes()
+	stats.BlockTime = *r.vocinfo.BlockTimes()
 	stats.ChainID = r.vocapp.ChainID()
 	stats.GenesisTimeStamp = r.vocapp.Node.GenesisDoc().GenesisTime
 	stats.Syncing = r.vocapp.IsSynchronizing()
@@ -135,7 +135,7 @@ func (r *Router) getEnvelope(request routerRequest) {
 		r.sendError(request, "cannot get envelope: (malformed nullifier)")
 		return
 	}
-	env, _, err := r.Scrutinizer.GetEnvelope(request.Nullifier)
+	env, err := r.Scrutinizer.GetEnvelope(request.Nullifier)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
 		return
@@ -295,8 +295,7 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 func (r *Router) getValidatorList(request routerRequest) {
 	var response types.MetaResponse
 	var err error
-	response.ValidatorList, err = r.vocapp.State.Validators(true)
-	if err != nil {
+	if response.ValidatorList, err = r.vocapp.State.Validators(true); err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get validator list: %v", err))
 		return
 	}
@@ -309,8 +308,7 @@ func (r *Router) getBlock(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("block height %d not valid for vochain with height %d", request.Height, r.vocapp.Height()))
 		return
 	}
-	response.Block = types.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.Height)))
-	if response.Block == nil {
+	if response.Block = types.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.Height))); response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.Height))
 		return
 	}
@@ -327,13 +325,16 @@ func (r *Router) getBlockByHash(request routerRequest) {
 	request.Send(r.buildReply(request, &response))
 }
 
+// TODO improve this function
 func (r *Router) getBlockList(request routerRequest) {
 	var response types.MetaResponse
 	for i := 0; i < request.ListSize; i++ {
 		if int64(request.From)+int64(i) > r.vocinfo.Height() {
 			break
 		}
-		response.BlockList = append(response.BlockList, types.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i))))
+		response.BlockList = append(response.BlockList,
+			types.BlockMetadataFromBlockModel(
+				r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i))))
 	}
 	request.Send(r.buildReply(request, &response))
 }
@@ -369,8 +370,15 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 	for i := request.From; i < maxIndex && i < len(block.Txs); i++ {
 		signedTx := new(models.SignedTx)
 		tx := new(models.Tx)
-		proto.Unmarshal(block.Txs[i], signedTx)
-		proto.Unmarshal(signedTx.Tx, tx)
+		var err error
+		if err = proto.Unmarshal(block.Txs[i], signedTx); err != nil {
+			r.sendError(request, fmt.Sprintf("cannot get signed tx: %v", err))
+			return
+		}
+		if err = proto.Unmarshal(signedTx.Tx, tx); err != nil {
+			r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
+			return
+		}
 		var txType string
 		switch tx.Payload.(type) {
 		case *models.Tx_Vote:

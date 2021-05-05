@@ -2,11 +2,12 @@ package types
 
 import (
 	"encoding/json"
-	"math/big"
 	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
 )
+
+// TODO move Process to scrutinizer package without circular import in types.MetaResponse
 
 // Process represents an election process handled by the Vochain.
 // The scrutinizer Process data type is different from the vochain state data type
@@ -36,18 +37,4 @@ type Process struct {
 func (p Process) String() string {
 	b, _ := json.Marshal(p)
 	return string(b)
-}
-
-type Entity struct {
-	ID           HexBytes `badgerholdKey:"ID"`
-	CreationTime time.Time
-}
-
-type VoteReference struct {
-	Nullifier    HexBytes `badgerholdKey:"Nullifier"`
-	ProcessID    HexBytes `badgerholdIndex:"ProcessID"`
-	Height       uint32
-	Weight       *big.Int
-	TxIndex      int32
-	CreationTime time.Time
 }

@@ -47,6 +47,7 @@ type keysBatch struct {
 	CensusID  types.HexBytes `json:"censusId"`
 	CensusURI string         `json:"censusUri"`
 }
+
 type signKey struct {
 	PrivKey string `json:"privKey"`
 	PubKey  string `json:"pubKey"`
@@ -64,7 +65,6 @@ func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*e
 			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub, Proof: proofs[i]})
 		} else {
 			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub})
-
 		}
 	}
 	kb.CensusID = censusID
@@ -74,7 +74,7 @@ func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*e
 		return err
 	}
 	log.Infof("saved census cache file has %d bytes, got %d keys", len(j), len(keys))
-	return os.WriteFile(filepath, j, 0644)
+	return os.WriteFile(filepath, j, 0o644)
 }
 
 func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, []byte, string, error) {

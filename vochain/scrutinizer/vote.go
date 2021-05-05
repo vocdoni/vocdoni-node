@@ -33,44 +33,53 @@ var ErrNotFoundInDatabase = badgerhold.ErrNotFound
 // implementation.
 const kvErrorStringForRetry = "Transaction Conflict"
 
+// VoteReference holds the db reference for a single vote
+type VoteReference struct {
+	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
+	ProcessID    types.HexBytes `badgerholdIndex:"ProcessID"`
+	Height       uint32
+	Weight       *big.Int
+	TxIndex      int32
+	CreationTime time.Time
+}
+
 // GetVoteReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
-func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*types.VoteReference, error) {
-	txRef := &types.VoteReference{}
+func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*VoteReference, error) {
+	txRef := &VoteReference{}
 	return txRef, s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
 }
 
 // GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
-func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*types.EnvelopePackage, []byte, error) {
+func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*types.EnvelopePackage, error) {
 	voteRef, err := s.GetEnvelopeReference(nullifier)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	stx, txHash, err := s.App.GetTxHash(voteRef.Height, voteRef.TxIndex)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	tx := &models.Tx{}
 	if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	envelope := tx.GetVote()
 	if envelope == nil {
-		return nil, nil, fmt.Errorf("transaction is not an Envelope")
+		return nil, fmt.Errorf("transaction is not an Envelope")
 	}
-	envelope.Nullifier = voteRef.Nullifier
 	return &types.EnvelopePackage{
 		Nonce:                envelope.Nonce,
 		ProcessId:            envelope.ProcessId,
 		VotePackage:          envelope.VotePackage,
-		Nullifier:            nullifier,
 		EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
-		Weight:               voteRef.Weight.Bytes(),
+		Weight:               new(big.Int).Set(voteRef.Weight),
 		TxIndex:              voteRef.TxIndex,
 		Height:               voteRef.Height,
 		TxHash:               txHash,
-	}, stx.Signature, nil
+		Signature:            stx.Signature,
+	}, nil
 }
 
 // WalkEnvelopes executes callback for each envelopes of the ProcessId.
@@ -81,7 +90,7 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 	wg := sync.WaitGroup{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId),
-		func(txRef *types.VoteReference) error {
+		func(txRef *VoteReference) error {
 			wg.Add(1)
 			processVote := func() {
 				defer wg.Done()
@@ -114,13 +123,16 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 }
 
 // GetEnvelopes retreives all Envelopes of a ProcessId from the Blockchain block store
-func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int) ([]*types.EnvelopeMetadata, error) {
+func (s *Scrutinizer) GetEnvelopes(processId []byte,
+	max,
+	from int) ([]*types.EnvelopeMetadata,
+	error) {
 	envelopes := []*types.EnvelopeMetadata{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID").
 			Skip(from).
 			Limit(max),
-		func(txRef *types.VoteReference) error {
+		func(txRef *VoteReference) error {
 			stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
 			if err != nil {
 				return err
@@ -155,7 +167,7 @@ func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (uint64, error) {
 			return cc.(uint64), nil
 		}
 		// TODO: Warning, int can overflow
-		c, err := s.db.Count(&types.VoteReference{},
+		c, err := s.db.Count(&VoteReference{},
 			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
 		if err != nil {
 			return 0, err
@@ -299,7 +311,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, votePackage []byte, weight *big.In
 func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 	weight []byte, txIndex int32, txn *badger.Txn) error {
 	if txn != nil {
-		return s.db.TxInsert(txn, nullifier, &types.VoteReference{
+		return s.db.TxInsert(txn, nullifier, &VoteReference{
 			Nullifier:    nullifier,
 			ProcessID:    pid,
 			Height:       blockHeight,
@@ -308,7 +320,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 			CreationTime: time.Now(),
 		})
 	}
-	return s.db.Insert(nullifier, &types.VoteReference{
+	return s.db.Insert(nullifier, &VoteReference{
 		Nullifier:    nullifier,
 		ProcessID:    pid,
 		Height:       blockHeight,
