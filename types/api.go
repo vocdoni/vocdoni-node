@@ -229,16 +229,12 @@ type VochainStats struct {
 
 // EnvelopePackage contains a VoteEnvelope and auxiliary information for the Envelope api
 type EnvelopePackage struct {
-	EncryptionKeyIndexes []uint32 `json:"encryption_key_indexes"`
-	Height               uint32   `json:"height"`
-	Nonce                HexBytes `json:"nonce"`
-	Nullifier            HexBytes `json:"nullifier"`
-	ProcessId            HexBytes `json:"process_id"`
-	Signature            HexBytes `json:"signature"`
-	TxHash               HexBytes `json:"tx_hash"`
-	TxIndex              int32    `json:"tx_index"`
-	VotePackage          []byte   `json:"vote_package"`
-	Weight               *big.Int `json:"weight"`
+	EncryptionKeyIndexes []uint32         `json:"encryption_key_indexes"`
+	Meta                 EnvelopeMetadata `json:"meta"`
+	Nonce                HexBytes         `json:"nonce"`
+	Signature            HexBytes         `json:"signature"`
+	VotePackage          []byte           `json:"vote_package"`
+	Weight               *big.Int         `json:"weight"`
 }
 
 // EnvelopeMetadata contains vote information for the EnvelopeList api

@@ -71,14 +71,17 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*types.EnvelopePackage, err
 	}
 	return &types.EnvelopePackage{
 		Nonce:                envelope.Nonce,
-		ProcessId:            envelope.ProcessId,
 		VotePackage:          envelope.VotePackage,
 		EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
 		Weight:               new(big.Int).Set(voteRef.Weight),
-		TxIndex:              voteRef.TxIndex,
-		Height:               voteRef.Height,
-		TxHash:               txHash,
 		Signature:            stx.Signature,
+		Meta: types.EnvelopeMetadata{
+			ProcessId: envelope.ProcessId,
+			Nullifier: nullifier,
+			TxIndex:   voteRef.TxIndex,
+			Height:    voteRef.Height,
+			TxHash:    txHash,
+		},
 	}, nil
 }
 
