@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
+	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -94,7 +95,7 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 		return nil, err
 	}
 	startTime := time.Now()
-	envelopes, err := s.db.Count(&VoteReference{}, &badgerhold.Query{})
+	envelopes, err := s.db.Count(&sctypes.VoteReference{}, &badgerhold.Query{})
 	if err != nil {
 		return nil, fmt.Errorf("could not count the total envelopes: %w", err)
 	}

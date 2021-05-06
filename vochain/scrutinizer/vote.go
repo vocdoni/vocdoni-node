@@ -17,6 +17,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
 )
 
 // ErrNoResultsYet is an error returned to indicate the process exist but
@@ -33,51 +34,16 @@ var ErrNotFoundInDatabase = badgerhold.ErrNotFound
 // implementation.
 const kvErrorStringForRetry = "Transaction Conflict"
 
-// VotePackage represents the payload of a vote (usually base64 encoded)
-type VotePackage struct {
-	Nonce string `json:"nonce,omitempty"`
-	Votes []int  `json:"votes"`
-}
-
-// VoteReference holds the db reference for a single vote
-type VoteReference struct {
-	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
-	ProcessID    types.HexBytes `badgerholdIndex:"ProcessID"`
-	Height       uint32
-	Weight       *big.Int
-	TxIndex      int32
-	CreationTime time.Time
-}
-
-// EnvelopeMetadata contains vote information for the EnvelopeList api
-type EnvelopeMetadata struct {
-	ProcessId types.HexBytes `json:"process_id"`
-	Nullifier types.HexBytes `json:"nullifier"`
-	TxIndex   int32          `json:"tx_index"`
-	Height    uint32         `json:"height"`
-	TxHash    types.HexBytes `json:"tx_hash"`
-}
-
-// EnvelopePackage contains a VoteEnvelope and auxiliary information for the Envelope api
-type EnvelopePackage struct {
-	EncryptionKeyIndexes []uint32         `json:"encryption_key_indexes"`
-	Meta                 EnvelopeMetadata `json:"meta"`
-	Nonce                types.HexBytes   `json:"nonce"`
-	Signature            types.HexBytes   `json:"signature"`
-	VotePackage          []byte           `json:"vote_package"`
-	Weight               string           `json:"weight"`
-}
-
-// GetVoteReference gets the reference for an AddVote transaction.
+// Getsctypes.VoteReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
-func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*VoteReference, error) {
-	txRef := &VoteReference{}
+func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*sctypes.VoteReference, error) {
+	txRef := &sctypes.VoteReference{}
 	return txRef, s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
 }
 
 // GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
-func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*EnvelopePackage, error) {
+func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*sctypes.EnvelopePackage, error) {
 	voteRef, err := s.GetEnvelopeReference(nullifier)
 	if err != nil {
 		return nil, err
@@ -94,13 +60,13 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*EnvelopePackage, error) {
 	if envelope == nil {
 		return nil, fmt.Errorf("transaction is not an Envelope")
 	}
-	return &EnvelopePackage{
+	return &sctypes.EnvelopePackage{
 		Nonce:                envelope.Nonce,
 		VotePackage:          envelope.VotePackage,
 		EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
 		Weight:               voteRef.Weight.String(),
 		Signature:            stx.Signature,
-		Meta: EnvelopeMetadata{
+		Meta: sctypes.EnvelopeMetadata{
 			ProcessId: envelope.ProcessId,
 			Nullifier: nullifier,
 			TxIndex:   voteRef.TxIndex,
@@ -118,7 +84,7 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 	wg := sync.WaitGroup{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId),
-		func(txRef *VoteReference) error {
+		func(txRef *sctypes.VoteReference) error {
 			wg.Add(1)
 			processVote := func() {
 				defer wg.Done()
@@ -153,14 +119,14 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 // GetEnvelopes retreives all Envelopes of a ProcessId from the Blockchain block store
 func (s *Scrutinizer) GetEnvelopes(processId []byte,
 	max,
-	from int) ([]*EnvelopeMetadata,
+	from int) ([]*sctypes.EnvelopeMetadata,
 	error) {
-	envelopes := []*EnvelopeMetadata{}
+	envelopes := []*sctypes.EnvelopeMetadata{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID").
 			Skip(from).
 			Limit(max),
-		func(txRef *VoteReference) error {
+		func(txRef *sctypes.VoteReference) error {
 			stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
 			if err != nil {
 				return err
@@ -174,7 +140,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte,
 				return fmt.Errorf("transaction is not an Envelope")
 			}
 			envelope.Nullifier = txRef.Nullifier
-			envelopes = append(envelopes, &EnvelopeMetadata{
+			envelopes = append(envelopes, &sctypes.EnvelopeMetadata{
 				ProcessId: processId,
 				Nullifier: txRef.Nullifier,
 				TxIndex:   txRef.TxIndex,
@@ -195,7 +161,7 @@ func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (uint64, error) {
 			return cc.(uint64), nil
 		}
 		// TODO: Warning, int can overflow
-		c, err := s.db.Count(&VoteReference{},
+		c, err := s.db.Count(&sctypes.VoteReference{},
 			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
 		if err != nil {
 			return 0, err
@@ -278,14 +244,14 @@ func (s *Scrutinizer) GetResultsWeight(processID []byte) (*big.Int, error) {
 }
 
 // unmarshalVote decodes the base64 payload to a VotePackage struct type.
-// If the votePackage is encrypted the list of keys to decrypt it should be provided.
+// If the sctypes.VotePackage is encrypted the list of keys to decrypt it should be provided.
 // The order of the Keys must be as it was encrypted.
 // The function will reverse the order and use the decryption keys starting from the
 // last one provided.
-func unmarshalVote(votePackage []byte, keys []string) (*VotePackage, error) {
-	var vote VotePackage
-	rawVote := make([]byte, len(votePackage))
-	copy(rawVote, votePackage)
+func unmarshalVote(VotePackage []byte, keys []string) (*sctypes.VotePackage, error) {
+	var vote sctypes.VotePackage
+	rawVote := make([]byte, len(VotePackage))
+	copy(rawVote, VotePackage)
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
 		for i := len(keys) - 1; i >= 0; i-- {
@@ -307,12 +273,12 @@ func unmarshalVote(votePackage []byte, keys []string) (*VotePackage, error) {
 // addLiveVote adds the envelope vote to the results. It does not commit to the database.
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
-func (s *Scrutinizer) addLiveVote(pid []byte, votePackage []byte, weight *big.Int,
+func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
 	results *Results) error {
 	// If live process, add vote to temporary results
-	var vote *VotePackage
+	var vote *sctypes.VotePackage
 	if open, err := s.isOpenProcess(pid); open && err == nil {
-		vote, err = unmarshalVote(votePackage, []string{})
+		vote, err = unmarshalVote(VotePackage, []string{})
 		if err != nil {
 			log.Warnf("cannot unmarshal vote: %v", err)
 			vote = nil
@@ -339,7 +305,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, votePackage []byte, weight *big.In
 func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 	weight []byte, txIndex int32, txn *badger.Txn) error {
 	if txn != nil {
-		return s.db.TxInsert(txn, nullifier, &VoteReference{
+		return s.db.TxInsert(txn, nullifier, &sctypes.VoteReference{
 			Nullifier:    nullifier,
 			ProcessID:    pid,
 			Height:       blockHeight,
@@ -348,7 +314,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 			CreationTime: time.Now(),
 		})
 	}
-	return s.db.Insert(nullifier, &VoteReference{
+	return s.db.Insert(nullifier, &sctypes.VoteReference{
 		Nullifier:    nullifier,
 		ProcessID:    pid,
 		Height:       blockHeight,
@@ -442,7 +408,7 @@ func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
 
 	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.VoteEnvelope,
 		weight *big.Int) {
-		var vp *VotePackage
+		var vp *sctypes.VotePackage
 		var err error
 		if p.Envelope.GetEncryptedVotes() {
 			if len(p.PrivateKeys) < len(vote.GetEncryptionKeyIndexes()) {

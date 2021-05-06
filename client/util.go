@@ -12,7 +12,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
 )
 
 func (c *Client) WaitUntilBlock(block uint32) {
@@ -119,7 +119,7 @@ func RandomHex(n int) string {
 }
 
 func genVote(encrypted bool, keys []string) ([]byte, error) {
-	vp := &scrutinizer.VotePackage{
+	vp := &sctypes.VotePackage{
 		Votes: []int{1, 2, 3, 4, 5, 6},
 	}
 	var vpBytes []byte

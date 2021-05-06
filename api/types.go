@@ -9,6 +9,7 @@ import (
 
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -141,58 +142,58 @@ type ResponseMessage struct {
 // Fields must be in alphabetical order
 // Those fields with valid zero-values (such as bool) must be pointers
 type MetaResponse struct {
-	APIList              []string                        `json:"apiList,omitempty"`
-	Block                *scrutinizer.BlockMetadata      `json:"block,omitempty"`
-	BlockList            []*scrutinizer.BlockMetadata    `json:"blockList,omitempty"`
-	BlockTime            *[5]int32                       `json:"blockTime,omitempty"`
-	BlockTimestamp       int32                           `json:"blockTimestamp,omitempty"`
-	CensusID             string                          `json:"censusId,omitempty"`
-	CensusList           []string                        `json:"censusList,omitempty"`
-	CensusKeys           [][]byte                        `json:"censusKeys,omitempty"`
-	CensusValues         []types.HexBytes                `json:"censusValues,omitempty"`
-	CensusDump           []byte                          `json:"censusDump,omitempty"`
-	CommitmentKeys       []types.Key                     `json:"commitmentKeys,omitempty"`
-	Content              []byte                          `json:"content,omitempty"`
-	CreationTime         int64                           `json:"creationTime,omitempty"`
-	EncryptionPrivKeys   []types.Key                     `json:"encryptionPrivKeys,omitempty"`
-	EncryptionPublicKeys []types.Key                     `json:"encryptionPubKeys,omitempty"`
-	EntityID             string                          `json:"entityId,omitempty"`
-	EntityIDs            []string                        `json:"entityIds,omitempty"`
-	Envelope             *scrutinizer.EnvelopePackage    `json:"envelope,omitempty"`
-	Envelopes            []*scrutinizer.EnvelopeMetadata `json:"envelopes,omitempty"`
-	Files                []byte                          `json:"files,omitempty"`
-	Final                *bool                           `json:"final,omitempty"`
-	Finished             *bool                           `json:"finished,omitempty"`
-	Health               int32                           `json:"health,omitempty"`
-	Height               *uint32                         `json:"height,omitempty"`
-	InvalidClaims        []int                           `json:"invalidClaims,omitempty"`
-	Message              string                          `json:"message,omitempty"`
-	Nullifier            string                          `json:"nullifier,omitempty"`
-	Nullifiers           *[]string                       `json:"nullifiers,omitempty"`
-	Ok                   bool                            `json:"ok"`
-	Paused               *bool                           `json:"paused,omitempty"`
-	Payload              string                          `json:"payload,omitempty"`
-	ProcessID            types.HexBytes                  `json:"processId,omitempty"`
-	ProcessIDs           []string                        `json:"processIds,omitempty"`
-	Process              *scrutinizer.Process            `json:"process,omitempty"`
-	ProcessList          []string                        `json:"processList,omitempty"`
-	Registered           *bool                           `json:"registered,omitempty"`
-	Request              string                          `json:"request"`
-	Results              [][]string                      `json:"results,omitempty"`
-	RevealKeys           []types.Key                     `json:"revealKeys,omitempty"`
-	Root                 types.HexBytes                  `json:"root,omitempty"`
-	Siblings             types.HexBytes                  `json:"siblings,omitempty"`
-	Size                 *int64                          `json:"size,omitempty"`
-	State                string                          `json:"state,omitempty"`
-	Stats                *scrutinizer.VochainStats       `json:"stats,omitempty"`
-	Timestamp            int32                           `json:"timestamp"`
-	Type                 string                          `json:"type,omitempty"`
-	Tx                   *scrutinizer.TxPackage          `json:"tx,omitempty"`
-	TxList               []*scrutinizer.TxMetadata       `json:"txList,omitempty"`
-	URI                  string                          `json:"uri,omitempty"`
-	ValidatorList        []*models.Validator             `json:"validatorlist,omitempty"`
-	ValidProof           *bool                           `json:"validProof,omitempty"`
-	Weight               string                          `json:"weight,omitempty"`
+	APIList              []string                    `json:"apiList,omitempty"`
+	Block                *sctypes.BlockMetadata      `json:"block,omitempty"`
+	BlockList            []*sctypes.BlockMetadata    `json:"blockList,omitempty"`
+	BlockTime            *[5]int32                   `json:"blockTime,omitempty"`
+	BlockTimestamp       int32                       `json:"blockTimestamp,omitempty"`
+	CensusID             string                      `json:"censusId,omitempty"`
+	CensusList           []string                    `json:"censusList,omitempty"`
+	CensusKeys           [][]byte                    `json:"censusKeys,omitempty"`
+	CensusValues         []types.HexBytes            `json:"censusValues,omitempty"`
+	CensusDump           []byte                      `json:"censusDump,omitempty"`
+	CommitmentKeys       []types.Key                 `json:"commitmentKeys,omitempty"`
+	Content              []byte                      `json:"content,omitempty"`
+	CreationTime         int64                       `json:"creationTime,omitempty"`
+	EncryptionPrivKeys   []types.Key                 `json:"encryptionPrivKeys,omitempty"`
+	EncryptionPublicKeys []types.Key                 `json:"encryptionPubKeys,omitempty"`
+	EntityID             string                      `json:"entityId,omitempty"`
+	EntityIDs            []string                    `json:"entityIds,omitempty"`
+	Envelope             *sctypes.EnvelopePackage    `json:"envelope,omitempty"`
+	Envelopes            []*sctypes.EnvelopeMetadata `json:"envelopes,omitempty"`
+	Files                []byte                      `json:"files,omitempty"`
+	Final                *bool                       `json:"final,omitempty"`
+	Finished             *bool                       `json:"finished,omitempty"`
+	Health               int32                       `json:"health,omitempty"`
+	Height               *uint32                     `json:"height,omitempty"`
+	InvalidClaims        []int                       `json:"invalidClaims,omitempty"`
+	Message              string                      `json:"message,omitempty"`
+	Nullifier            string                      `json:"nullifier,omitempty"`
+	Nullifiers           *[]string                   `json:"nullifiers,omitempty"`
+	Ok                   bool                        `json:"ok"`
+	Paused               *bool                       `json:"paused,omitempty"`
+	Payload              string                      `json:"payload,omitempty"`
+	ProcessID            types.HexBytes              `json:"processId,omitempty"`
+	ProcessIDs           []string                    `json:"processIds,omitempty"`
+	Process              *scrutinizer.Process        `json:"process,omitempty"`
+	ProcessList          []string                    `json:"processList,omitempty"`
+	Registered           *bool                       `json:"registered,omitempty"`
+	Request              string                      `json:"request"`
+	Results              [][]string                  `json:"results,omitempty"`
+	RevealKeys           []types.Key                 `json:"revealKeys,omitempty"`
+	Root                 types.HexBytes              `json:"root,omitempty"`
+	Siblings             types.HexBytes              `json:"siblings,omitempty"`
+	Size                 *int64                      `json:"size,omitempty"`
+	State                string                      `json:"state,omitempty"`
+	Stats                *sctypes.VochainStats       `json:"stats,omitempty"`
+	Timestamp            int32                       `json:"timestamp"`
+	Type                 string                      `json:"type,omitempty"`
+	Tx                   *sctypes.TxPackage          `json:"tx,omitempty"`
+	TxList               []*sctypes.TxMetadata       `json:"txList,omitempty"`
+	URI                  string                      `json:"uri,omitempty"`
+	ValidatorList        []*models.Validator         `json:"validatorlist,omitempty"`
+	ValidProof           *bool                       `json:"validProof,omitempty"`
+	Weight               string                      `json:"weight,omitempty"`
 }
 
 func (r MetaResponse) String() string {

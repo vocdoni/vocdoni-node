@@ -1,7 +1,8 @@
-package scrutinizer
+package types
 
 import (
 	"fmt"
+	"math/big"
 	"reflect"
 	"strings"
 	"time"
@@ -9,6 +10,41 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/types"
 )
+
+// VotePackage represents the payload of a vote (usually base64 encoded)
+type VotePackage struct {
+	Nonce string `json:"nonce,omitempty"`
+	Votes []int  `json:"votes"`
+}
+
+// VoteReference holds the db reference for a single vote
+type VoteReference struct {
+	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
+	ProcessID    types.HexBytes `badgerholdIndex:"ProcessID"`
+	Height       uint32
+	Weight       *big.Int
+	TxIndex      int32
+	CreationTime time.Time
+}
+
+// EnvelopeMetadata contains vote information for the EnvelopeList api
+type EnvelopeMetadata struct {
+	ProcessId types.HexBytes `json:"process_id"`
+	Nullifier types.HexBytes `json:"nullifier"`
+	TxIndex   int32          `json:"tx_index"`
+	Height    uint32         `json:"height"`
+	TxHash    types.HexBytes `json:"tx_hash"`
+}
+
+// EnvelopePackage contains a VoteEnvelope and auxiliary information for the Envelope api
+type EnvelopePackage struct {
+	EncryptionKeyIndexes []uint32         `json:"encryption_key_indexes"`
+	Meta                 EnvelopeMetadata `json:"meta"`
+	Nonce                types.HexBytes   `json:"nonce"`
+	Signature            types.HexBytes   `json:"signature"`
+	VotePackage          []byte           `json:"vote_package"`
+	Weight               string           `json:"weight"`
+}
 
 // VochainStats contains information about the current Vochain statistics and state
 type VochainStats struct {
