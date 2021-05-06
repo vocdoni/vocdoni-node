@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -175,7 +174,7 @@ type MetaResponse struct {
 	Payload              string                      `json:"payload,omitempty"`
 	ProcessID            types.HexBytes              `json:"processId,omitempty"`
 	ProcessIDs           []string                    `json:"processIds,omitempty"`
-	Process              *scrutinizer.Process        `json:"process,omitempty"`
+	Process              *sctypes.Process            `json:"process,omitempty"`
 	ProcessList          []string                    `json:"processList,omitempty"`
 	Registered           *bool                       `json:"registered,omitempty"`
 	Request              string                      `json:"request"`

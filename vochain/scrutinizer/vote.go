@@ -211,7 +211,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 
 // GetResults returns the current result for a processId aggregated in a two dimension int slice
 func (s *Scrutinizer) GetResults(processID []byte) (*Results, error) {
-	if n, err := s.db.Count(&Process{},
+	if n, err := s.db.Count(&sctypes.Process{},
 		badgerhold.Where("ID").Eq(processID).
 			And("HaveResults").Eq(true).
 			And("Status").Ne(int32(models.ProcessStatus_CANCELED))); err != nil {
@@ -382,7 +382,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, partialResults *Results, height ui
 	return err
 }
 
-func (s *Scrutinizer) computeFinalResults(p *Process) (*Results, error) {
+func (s *Scrutinizer) computeFinalResults(p *sctypes.Process) (*Results, error) {
 	if p == nil {
 		return nil, fmt.Errorf("process is nil")
 	}
