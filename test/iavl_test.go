@@ -9,9 +9,6 @@ import (
 	"github.com/tendermint/tendermint/privval"
 	models "go.vocdoni.io/proto/build/go/models"
 
-	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/client"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain"
@@ -93,27 +90,6 @@ func TestAddValidator(t *testing.T) {
 	if err := s.AddValidator(validator); err != nil {
 		t.Error(err)
 	}
-}
-
-func TestValidatorApi(t *testing.T) {
-	t.Parallel()
-
-	log.Info("test validator api")
-	var dvoteServer testcommon.DvoteAPIServer
-	dvoteServer.Start(t, "file", "census", "vote")
-	host := dvoteServer.PxyAddr
-	cl, err := client.New(host)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req := &api.MetaRequest{}
-	doRequest := cl.ForTest(t, req)
-	resp := doRequest("getValidatorList", nil)
-	if len(resp.ValidatorList) == 0 {
-		t.Error("Expected validators, none retrieved")
-	}
-	log.Infof("%d Validators found", len(resp.ValidatorList))
 }
 
 /*
