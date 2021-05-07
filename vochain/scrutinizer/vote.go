@@ -17,7 +17,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
+	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
 
 // ErrNoResultsYet is an error returned to indicate the process exist but
@@ -34,16 +34,16 @@ var ErrNotFoundInDatabase = badgerhold.ErrNotFound
 // implementation.
 const kvErrorStringForRetry = "Transaction Conflict"
 
-// Getsctypes.VoteReference gets the reference for an AddVote transaction.
+// Getindexertypes.VoteReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
-func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*sctypes.VoteReference, error) {
-	txRef := &sctypes.VoteReference{}
+func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
+	txRef := &indexertypes.VoteReference{}
 	return txRef, s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
 }
 
 // GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
-func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*sctypes.EnvelopePackage, error) {
+func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
 	voteRef, err := s.GetEnvelopeReference(nullifier)
 	if err != nil {
 		return nil, err
@@ -60,13 +60,13 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*sctypes.EnvelopePackage, e
 	if envelope == nil {
 		return nil, fmt.Errorf("transaction is not an Envelope")
 	}
-	return &sctypes.EnvelopePackage{
+	return &indexertypes.EnvelopePackage{
 		Nonce:                envelope.Nonce,
 		VotePackage:          envelope.VotePackage,
 		EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
 		Weight:               voteRef.Weight.String(),
 		Signature:            stx.Signature,
-		Meta: sctypes.EnvelopeMetadata{
+		Meta: indexertypes.EnvelopeMetadata{
 			ProcessId: envelope.ProcessId,
 			Nullifier: nullifier,
 			TxIndex:   voteRef.TxIndex,
@@ -84,7 +84,7 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 	wg := sync.WaitGroup{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId),
-		func(txRef *sctypes.VoteReference) error {
+		func(txRef *indexertypes.VoteReference) error {
 			wg.Add(1)
 			processVote := func() {
 				defer wg.Done()
@@ -119,12 +119,12 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 // GetEnvelopes retreives all Envelopes of a ProcessId from the Blockchain block store
 func (s *Scrutinizer) GetEnvelopes(processId []byte,
 	max,
-	from int, searchTerm string) ([]*sctypes.EnvelopeMetadata,
+	from int, searchTerm string) ([]*indexertypes.EnvelopeMetadata,
 	error) {
 	if from < 0 {
 		return nil, fmt.Errorf("envelopeList: invalid value: from is invalid value %d", from)
 	}
-	envelopes := []*sctypes.EnvelopeMetadata{}
+	envelopes := []*indexertypes.EnvelopeMetadata{}
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId).
 			Index("ProcessID").
@@ -132,7 +132,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte,
 			And("Nullifier").MatchFunc(searchMatchFunc(searchTerm)).
 			Skip(from).
 			Limit(max),
-		func(txRef *sctypes.VoteReference) error {
+		func(txRef *indexertypes.VoteReference) error {
 			stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
 			if err != nil {
 				return err
@@ -146,7 +146,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte,
 				return fmt.Errorf("transaction is not an Envelope")
 			}
 			envelope.Nullifier = txRef.Nullifier
-			envelopes = append(envelopes, &sctypes.EnvelopeMetadata{
+			envelopes = append(envelopes, &indexertypes.EnvelopeMetadata{
 				ProcessId: processId,
 				Nullifier: txRef.Nullifier,
 				TxIndex:   txRef.TxIndex,
@@ -167,7 +167,7 @@ func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (uint64, error) {
 			return cc.(uint64), nil
 		}
 		// TODO: Warning, int can overflow
-		c, err := s.db.Count(&sctypes.VoteReference{},
+		c, err := s.db.Count(&indexertypes.VoteReference{},
 			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
 		if err != nil {
 			return 0, err
@@ -193,7 +193,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	}
 
 	// Compute the results
-	var results *sctypes.Results
+	var results *indexertypes.Results
 	if results, err = s.computeFinalResults(p); err != nil {
 		return err
 	}
@@ -216,8 +216,8 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 }
 
 // GetResults returns the current result for a processId aggregated in a two dimension int slice
-func (s *Scrutinizer) GetResults(processID []byte) (*sctypes.Results, error) {
-	if n, err := s.db.Count(&sctypes.Process{},
+func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error) {
+	if n, err := s.db.Count(&indexertypes.Process{},
 		badgerhold.Where("ID").Eq(processID).
 			And("HaveResults").Eq(true).
 			And("Status").Ne(int32(models.ProcessStatus_CANCELED))); err != nil {
@@ -228,7 +228,7 @@ func (s *Scrutinizer) GetResults(processID []byte) (*sctypes.Results, error) {
 
 	s.addVoteLock.RLock()
 	defer s.addVoteLock.RUnlock()
-	results := &sctypes.Results{}
+	results := &indexertypes.Results{}
 	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").Eq(processID)); err != nil {
 		if err == badgerhold.ErrNotFound {
 			return nil, ErrNoResultsYet
@@ -242,7 +242,7 @@ func (s *Scrutinizer) GetResults(processID []byte) (*sctypes.Results, error) {
 func (s *Scrutinizer) GetResultsWeight(processID []byte) (*big.Int, error) {
 	s.addVoteLock.RLock()
 	defer s.addVoteLock.RUnlock()
-	results := &sctypes.Results{}
+	results := &indexertypes.Results{}
 	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").Eq(processID)); err != nil {
 		return nil, err
 	}
@@ -250,12 +250,12 @@ func (s *Scrutinizer) GetResultsWeight(processID []byte) (*big.Int, error) {
 }
 
 // unmarshalVote decodes the base64 payload to a VotePackage struct type.
-// If the sctypes.VotePackage is encrypted the list of keys to decrypt it should be provided.
+// If the indexertypes.VotePackage is encrypted the list of keys to decrypt it should be provided.
 // The order of the Keys must be as it was encrypted.
 // The function will reverse the order and use the decryption keys starting from the
 // last one provided.
-func unmarshalVote(VotePackage []byte, keys []string) (*sctypes.VotePackage, error) {
-	var vote sctypes.VotePackage
+func unmarshalVote(VotePackage []byte, keys []string) (*indexertypes.VotePackage, error) {
+	var vote indexertypes.VotePackage
 	rawVote := make([]byte, len(VotePackage))
 	copy(rawVote, VotePackage)
 	// if encryption keys, decrypt the vote
@@ -280,9 +280,9 @@ func unmarshalVote(VotePackage []byte, keys []string) (*sctypes.VotePackage, err
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
 func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
-	results *sctypes.Results) error {
+	results *indexertypes.Results) error {
 	// If live process, add vote to temporary results
-	var vote *sctypes.VotePackage
+	var vote *indexertypes.VotePackage
 	if open, err := s.isOpenProcess(pid); open && err == nil {
 		vote, err = unmarshalVote(VotePackage, []string{})
 		if err != nil {
@@ -311,7 +311,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.In
 func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 	weight []byte, txIndex int32, txn *badger.Txn) error {
 	if txn != nil {
-		return s.db.TxInsert(txn, nullifier, &sctypes.VoteReference{
+		return s.db.TxInsert(txn, nullifier, &indexertypes.VoteReference{
 			Nullifier:    nullifier,
 			ProcessID:    pid,
 			Height:       blockHeight,
@@ -320,7 +320,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 			CreationTime: time.Now(),
 		})
 	}
-	return s.db.Insert(nullifier, &sctypes.VoteReference{
+	return s.db.Insert(nullifier, &indexertypes.VoteReference{
 		Nullifier:    nullifier,
 		ProcessID:    pid,
 		Height:       blockHeight,
@@ -346,7 +346,7 @@ func (s *Scrutinizer) isProcessLiveResults(pid []byte) bool {
 // commitVotes adds the votes and weight from results to the local database.
 // Important: it does not overwrite the already stored results but update them
 // by adding the new content to the existing one.
-func (s *Scrutinizer) commitVotes(pid []byte, partialResults *sctypes.Results, height uint32) error {
+func (s *Scrutinizer) commitVotes(pid []byte, partialResults *indexertypes.Results, height uint32) error {
 	// If the recovery bootstrap is running, wait.
 	s.recoveryBootLock.RLock()
 	defer s.recoveryBootLock.RUnlock()
@@ -354,7 +354,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, partialResults *sctypes.Results, h
 	s.addVoteLock.Lock()
 	defer s.addVoteLock.Unlock()
 	update := func(record interface{}) error {
-		stored, ok := record.(*sctypes.Results)
+		stored, ok := record.(*indexertypes.Results)
 		if !ok {
 			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 		}
@@ -366,7 +366,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, partialResults *sctypes.Results, h
 	// until it works (while maxTries < 1000)
 	maxTries := 1000
 	for maxTries > 0 {
-		err = s.db.UpdateMatching(&sctypes.Results{},
+		err = s.db.UpdateMatching(&indexertypes.Results{},
 			badgerhold.Where("ProcessID").Eq(pid).And("Final").Eq(false), update)
 		if err == nil {
 			break
@@ -388,7 +388,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, partialResults *sctypes.Results, h
 	return err
 }
 
-func (s *Scrutinizer) computeFinalResults(p *sctypes.Process) (*sctypes.Results, error) {
+func (s *Scrutinizer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Results, error) {
 	if p == nil {
 		return nil, fmt.Errorf("process is nil")
 	}
@@ -398,8 +398,8 @@ func (s *Scrutinizer) computeFinalResults(p *sctypes.Process) (*sctypes.Results,
 	if p.VoteOpts.MaxCount > MaxQuestions || p.VoteOpts.MaxValue > MaxOptions {
 		return nil, fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
 	}
-	results := &sctypes.Results{
-		Votes:        sctypes.NewEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),
+	results := &indexertypes.Results{
+		Votes:        indexertypes.NewEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),
 		ProcessID:    p.ID,
 		Weight:       new(big.Int).SetUint64(0),
 		Final:        true,
@@ -414,7 +414,7 @@ func (s *Scrutinizer) computeFinalResults(p *sctypes.Process) (*sctypes.Results,
 
 	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.VoteEnvelope,
 		weight *big.Int) {
-		var vp *sctypes.VotePackage
+		var vp *indexertypes.VotePackage
 		var err error
 		if p.Envelope.GetEncryptedVotes() {
 			if len(p.PrivateKeys) < len(vote.GetEncryptionKeyIndexes()) {
@@ -458,7 +458,7 @@ func (s *Scrutinizer) computeFinalResults(p *sctypes.Process) (*sctypes.Results,
 
 // BuildProcessResult takes the indexer Results type and builds the protobuf type ProcessResult.
 // EntityId should be provided as addition field to include in ProcessResult.
-func BuildProcessResult(results *sctypes.Results, entityID []byte) *models.ProcessResult {
+func BuildProcessResult(results *indexertypes.Results, entityID []byte) *models.ProcessResult {
 	// build the protobuf type for Results
 	qr := []*models.QuestionResult{}
 	for i := range results.Votes {

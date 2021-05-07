@@ -13,7 +13,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
-	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
+	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -32,7 +32,7 @@ const (
 // EventListener is an interface used for executing custom functions during the
 // events of the tally of a process.
 type EventListener interface {
-	OnComputeResults(results *sctypes.Results)
+	OnComputeResults(results *indexertypes.Results)
 }
 
 // AddEventListener adds a new event listener, to receive method calls on block
@@ -50,11 +50,11 @@ type Scrutinizer struct {
 	// votePool is the list of votes that should be live counted, grouped by processId
 	votePool map[string][]*models.Vote
 	// newProcessPool is the list of new process IDs on the current block
-	newProcessPool []*sctypes.ScrutinizerOnProcessData
+	newProcessPool []*indexertypes.ScrutinizerOnProcessData
 	// updateProcessPool is the list of process IDs that require sync with the state database
 	updateProcessPool [][]byte
 	// resultsPool is the list of processes that finish on the current block
-	resultsPool []*sctypes.ScrutinizerOnProcessData
+	resultsPool []*indexertypes.ScrutinizerOnProcessData
 	// list of live processes (those on which the votes will be computed on arrival)
 	liveResultsProcs sync.Map
 	// eventListeners is the list of external callbacks that will be executed by the scrutinizer
@@ -95,15 +95,15 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 		return nil, err
 	}
 	startTime := time.Now()
-	envelopes, err := s.db.Count(&sctypes.VoteReference{}, &badgerhold.Query{})
+	envelopes, err := s.db.Count(&indexertypes.VoteReference{}, &badgerhold.Query{})
 	if err != nil {
 		return nil, fmt.Errorf("could not count the total envelopes: %w", err)
 	}
-	entities, err := s.db.Count(&sctypes.Entity{}, &badgerhold.Query{})
+	entities, err := s.db.Count(&indexertypes.Entity{}, &badgerhold.Query{})
 	if err != nil {
 		return nil, fmt.Errorf("could not count the total entities: %w", err)
 	}
-	processes, err := s.db.Count(&sctypes.Process{}, &badgerhold.Query{})
+	processes, err := s.db.Count(&indexertypes.Process{}, &badgerhold.Query{})
 	if err != nil {
 		return nil, fmt.Errorf("could not count the total processes: %w", err)
 	}
@@ -158,7 +158,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 	prcs := [][]byte{}
 	err := s.db.ForEach(
 		badgerhold.Where("FinalResults").Eq(false),
-		func(p *sctypes.Process) error {
+		func(p *indexertypes.Process) error {
 			prcs = append(prcs, p.ID)
 			return nil
 		})
@@ -179,10 +179,10 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 			continue
 		}
 		options := process.GetVoteOptions()
-		if err := s.db.Upsert(p, &sctypes.Results{
+		if err := s.db.Upsert(p, &indexertypes.Results{
 			ProcessID: p,
 			// MaxValue requires +1 since 0 is also an option
-			Votes:        sctypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+			Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
 			Weight:       new(big.Int).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.GetEnvelopeType(),
@@ -193,7 +193,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 		}
 
 		// Count the votes, add them to results (in memory, without any db transaction)
-		results := &sctypes.Results{
+		results := &indexertypes.Results{
 			Weight:       new(big.Int).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
@@ -296,7 +296,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		}
 		// This is a temporary "results" for computing votes
 		// of a single processId for the current block.
-		results := &sctypes.Results{
+		results := &indexertypes.Results{
 			Weight:       new(big.Int).SetUint64(0),
 			VoteOpts:     proc.VoteOpts,
 			EnvelopeType: proc.Envelope,
@@ -337,14 +337,14 @@ func (s *Scrutinizer) Commit(height uint32) error {
 func (s *Scrutinizer) Rollback() {
 	s.votePool = make(map[string][]*models.Vote)
 	s.voteIndexPool = []*VoteWithIndex{}
-	s.newProcessPool = []*sctypes.ScrutinizerOnProcessData{}
-	s.resultsPool = []*sctypes.ScrutinizerOnProcessData{}
+	s.newProcessPool = []*indexertypes.ScrutinizerOnProcessData{}
+	s.resultsPool = []*indexertypes.ScrutinizerOnProcessData{}
 	s.updateProcessPool = [][]byte{}
 }
 
 // OnProcess scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
-	data := &sctypes.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
+	data := &indexertypes.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
 	s.newProcessPool = append(s.newProcessPool, data)
 }
 
@@ -373,7 +373,7 @@ func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessSta
 		if live, err := s.isOpenProcess(pid); err != nil {
 			log.Warn(err)
 		} else if live {
-			s.resultsPool = append(s.resultsPool, &sctypes.ScrutinizerOnProcessData{ProcessID: pid})
+			s.resultsPool = append(s.resultsPool, &indexertypes.ScrutinizerOnProcessData{ProcessID: pid})
 		}
 	}
 	s.updateProcessPool = append(s.updateProcessPool, pid)
@@ -393,7 +393,7 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string, txIndex int3
 	}
 	// if all keys have been revealed, compute the results
 	if *p.KeyIndex < 1 {
-		data := sctypes.ScrutinizerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
+		data := indexertypes.ScrutinizerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
 		s.resultsPool = append(s.resultsPool, &data)
 	}
 	s.updateProcessPool = append(s.updateProcessPool, pid)
@@ -410,7 +410,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionRes
 	// This code must be run async in order to not delay the consensus. The results retreival
 	// could require some time.
 	go func() {
-		var myResults *sctypes.Results
+		var myResults *indexertypes.Results
 		var err error
 		retries := 20
 		for {

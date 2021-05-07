@@ -19,7 +19,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
-	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
+	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
@@ -153,7 +153,7 @@ func NewEthEvents(
 // OnComputeResults is called once a process result is computed by the scrutinizer.
 // The Oracle will build and send a RESULTS transaction to the Vochain.
 // The transaction includes the final results for the process.
-func (ev *EthereumEvents) OnComputeResults(results *sctypes.Results) {
+func (ev *EthereumEvents) OnComputeResults(results *indexertypes.Results) {
 	// check vochain process status
 	vocProcessData, err := ev.VochainApp.State.Process(results.ProcessID, true)
 	if err != nil {

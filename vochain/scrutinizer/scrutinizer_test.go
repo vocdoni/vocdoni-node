@@ -14,7 +14,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
+	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -465,7 +465,7 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
-	vp, err := json.Marshal(sctypes.VotePackage{
+	vp, err := json.Marshal(indexertypes.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomBytes(32)),
 		Votes: []int{1, 1, 1, 1},
 	})
@@ -583,13 +583,13 @@ func TestLiveResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
-	vp, err := json.Marshal(sctypes.VotePackage{
+	vp, err := json.Marshal(indexertypes.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1, 1, 1},
 	})
 	qt.Assert(t, err, qt.IsNil)
-	r := &sctypes.Results{
-		Votes:        sctypes.NewEmptyVotes(3, 100),
+	r := &indexertypes.Results{
+		Votes:        indexertypes.NewEmptyVotes(3, 100),
 		Weight:       new(big.Int).SetUint64(0),
 		VoteOpts:     &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
 		EnvelopeType: &models.EnvelopeType{},
@@ -710,7 +710,7 @@ func TestAddVote(t *testing.T) {
 }
 
 var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
-	vp, err := json.Marshal(sctypes.VotePackage{
+	vp, err := json.Marshal(indexertypes.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: v,
 	})
@@ -727,9 +727,9 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
 	if err != nil {
 		return err
 	}
-	r := &sctypes.Results{
+	r := &indexertypes.Results{
 		ProcessID:    pid,
-		Votes:        sctypes.NewEmptyVotes(int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
+		Votes:        indexertypes.NewEmptyVotes(int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
 		Weight:       new(big.Int).SetUint64(0),
 		Signatures:   []types.HexBytes{},
 		VoteOpts:     proc.VoteOpts,
@@ -914,7 +914,7 @@ func TestCountVotes(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
-	vp, err := json.Marshal(sctypes.VotePackage{
+	vp, err := json.Marshal(indexertypes.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1, 1, 1},
 	})

@@ -8,7 +8,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
-	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
+	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -77,7 +77,7 @@ func (r *Router) submitEnvelope(request routerRequest) {
 
 func (r *Router) getStats(request routerRequest) {
 	var err error
-	stats := new(sctypes.VochainStats)
+	stats := new(indexertypes.VochainStats)
 	stats.BlockHeight = r.vocapp.Height()
 	stats.BlockTimeStamp = int32(r.vocapp.State.Header(true).Timestamp)
 	stats.EntityCount = r.Scrutinizer.EntityCount()
@@ -311,7 +311,7 @@ func (r *Router) getBlock(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("block height %d not valid for vochain with height %d", request.Height, r.vocapp.Height()))
 		return
 	}
-	if response.Block = sctypes.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.Height))); response.Block == nil {
+	if response.Block = indexertypes.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.Height))); response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.Height))
 		return
 	}
@@ -320,7 +320,7 @@ func (r *Router) getBlock(request routerRequest) {
 
 func (r *Router) getBlockByHash(request routerRequest) {
 	var response api.MetaResponse
-	response.Block = sctypes.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHash(request.Payload))
+	response.Block = indexertypes.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHash(request.Payload))
 	if response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Payload))
 		return
@@ -336,7 +336,7 @@ func (r *Router) getBlockList(request routerRequest) {
 			break
 		}
 		response.BlockList = append(response.BlockList,
-			sctypes.BlockMetadataFromBlockModel(
+			indexertypes.BlockMetadataFromBlockModel(
 				r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i))))
 	}
 	request.Send(r.buildReply(request, &response))
@@ -349,7 +349,7 @@ func (r *Router) getTx(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
 		return
 	}
-	response.Tx = &sctypes.TxPackage{
+	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
 		BlockHeight: request.Height,
 		Index:       request.TxIndex,
@@ -395,7 +395,7 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 		default:
 			txType = "unknown"
 		}
-		response.TxList = append(response.TxList, &sctypes.TxMetadata{
+		response.TxList = append(response.TxList, &indexertypes.TxMetadata{
 			Type:        txType,
 			BlockHeight: request.Height,
 			Index:       int32(i),
