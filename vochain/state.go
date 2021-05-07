@@ -17,7 +17,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
-	"go.vocdoni.io/dvote/statedb/gravitonstate"
+	"go.vocdoni.io/dvote/statedb/iavlstate"
 	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -133,8 +133,8 @@ func NewState(dataDir string) (*State, error) {
 
 func initStore(dataDir string, state *State) error {
 	log.Infof("initializing state db store")
-	// state.Store = new(iavlstate.IavlState)
-	state.Store = new(gravitonstate.GravitonState)
+	state.Store = new(iavlstate.IavlState)
+	//state.Store = new(gravitonstate.GravitonState)
 	if err := state.Store.Init(dataDir, "disk"); err != nil {
 		return err
 	}
