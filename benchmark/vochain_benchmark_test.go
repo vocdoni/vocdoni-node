@@ -15,7 +15,7 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	sctypes "go.vocdoni.io/dvote/vochain/scrutinizer/types"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -235,7 +235,7 @@ func voteBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys,
 	}
 
 	// generate envelope votePackage
-	votePkg := &scrutinizer.VotePackage{
+	votePkg := &sctypes.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1},
 	}
