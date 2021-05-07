@@ -193,7 +193,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	}
 
 	// Compute the results
-	var results *Results
+	var results *sctypes.Results
 	if results, err = s.computeFinalResults(p); err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 }
 
 // GetResults returns the current result for a processId aggregated in a two dimension int slice
-func (s *Scrutinizer) GetResults(processID []byte) (*Results, error) {
+func (s *Scrutinizer) GetResults(processID []byte) (*sctypes.Results, error) {
 	if n, err := s.db.Count(&sctypes.Process{},
 		badgerhold.Where("ID").Eq(processID).
 			And("HaveResults").Eq(true).
@@ -228,7 +228,7 @@ func (s *Scrutinizer) GetResults(processID []byte) (*Results, error) {
 
 	s.addVoteLock.RLock()
 	defer s.addVoteLock.RUnlock()
-	results := &Results{}
+	results := &sctypes.Results{}
 	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").Eq(processID)); err != nil {
 		if err == badgerhold.ErrNotFound {
 			return nil, ErrNoResultsYet
@@ -242,7 +242,7 @@ func (s *Scrutinizer) GetResults(processID []byte) (*Results, error) {
 func (s *Scrutinizer) GetResultsWeight(processID []byte) (*big.Int, error) {
 	s.addVoteLock.RLock()
 	defer s.addVoteLock.RUnlock()
-	results := &Results{}
+	results := &sctypes.Results{}
 	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").Eq(processID)); err != nil {
 		return nil, err
 	}
@@ -280,7 +280,7 @@ func unmarshalVote(VotePackage []byte, keys []string) (*sctypes.VotePackage, err
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
 func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
-	results *Results) error {
+	results *sctypes.Results) error {
 	// If live process, add vote to temporary results
 	var vote *sctypes.VotePackage
 	if open, err := s.isOpenProcess(pid); open && err == nil {
@@ -346,7 +346,7 @@ func (s *Scrutinizer) isProcessLiveResults(pid []byte) bool {
 // commitVotes adds the votes and weight from results to the local database.
 // Important: it does not overwrite the already stored results but update them
 // by adding the new content to the existing one.
-func (s *Scrutinizer) commitVotes(pid []byte, partialResults *Results, height uint32) error {
+func (s *Scrutinizer) commitVotes(pid []byte, partialResults *sctypes.Results, height uint32) error {
 	// If the recovery bootstrap is running, wait.
 	s.recoveryBootLock.RLock()
 	defer s.recoveryBootLock.RUnlock()
@@ -354,7 +354,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, partialResults *Results, height ui
 	s.addVoteLock.Lock()
 	defer s.addVoteLock.Unlock()
 	update := func(record interface{}) error {
-		stored, ok := record.(*Results)
+		stored, ok := record.(*sctypes.Results)
 		if !ok {
 			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 		}
@@ -366,7 +366,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, partialResults *Results, height ui
 	// until it works (while maxTries < 1000)
 	maxTries := 1000
 	for maxTries > 0 {
-		err = s.db.UpdateMatching(&Results{},
+		err = s.db.UpdateMatching(&sctypes.Results{},
 			badgerhold.Where("ProcessID").Eq(pid).And("Final").Eq(false), update)
 		if err == nil {
 			break
@@ -388,7 +388,7 @@ func (s *Scrutinizer) commitVotes(pid []byte, partialResults *Results, height ui
 	return err
 }
 
-func (s *Scrutinizer) computeFinalResults(p *sctypes.Process) (*Results, error) {
+func (s *Scrutinizer) computeFinalResults(p *sctypes.Process) (*sctypes.Results, error) {
 	if p == nil {
 		return nil, fmt.Errorf("process is nil")
 	}
@@ -398,8 +398,8 @@ func (s *Scrutinizer) computeFinalResults(p *sctypes.Process) (*Results, error) 
 	if p.VoteOpts.MaxCount > MaxQuestions || p.VoteOpts.MaxValue > MaxOptions {
 		return nil, fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
 	}
-	results := &Results{
-		Votes:        newEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),
+	results := &sctypes.Results{
+		Votes:        sctypes.NewEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),
 		ProcessID:    p.ID,
 		Weight:       new(big.Int).SetUint64(0),
 		Final:        true,
@@ -458,7 +458,7 @@ func (s *Scrutinizer) computeFinalResults(p *sctypes.Process) (*Results, error) 
 
 // BuildProcessResult takes the indexer Results type and builds the protobuf type ProcessResult.
 // EntityId should be provided as addition field to include in ProcessResult.
-func BuildProcessResult(results *Results, entityID []byte) *models.ProcessResult {
+func BuildProcessResult(results *sctypes.Results, entityID []byte) *models.ProcessResult {
 	// build the protobuf type for Results
 	qr := []*models.QuestionResult{}
 	for i := range results.Votes {

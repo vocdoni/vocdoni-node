@@ -588,8 +588,8 @@ func TestLiveResults(t *testing.T) {
 		Votes: []int{1, 1, 1},
 	})
 	qt.Assert(t, err, qt.IsNil)
-	r := &Results{
-		Votes:        newEmptyVotes(3, 100),
+	r := &sctypes.Results{
+		Votes:        sctypes.NewEmptyVotes(3, 100),
 		Weight:       new(big.Int).SetUint64(0),
 		VoteOpts:     &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
 		EnvelopeType: &models.EnvelopeType{},
@@ -727,9 +727,9 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
 	if err != nil {
 		return err
 	}
-	r := &Results{
+	r := &sctypes.Results{
 		ProcessID:    pid,
-		Votes:        newEmptyVotes(int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
+		Votes:        sctypes.NewEmptyVotes(int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
 		Weight:       new(big.Int).SetUint64(0),
 		Signatures:   []types.HexBytes{},
 		VoteOpts:     proc.VoteOpts,

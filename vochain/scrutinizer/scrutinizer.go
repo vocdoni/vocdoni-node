@@ -32,7 +32,7 @@ const (
 // EventListener is an interface used for executing custom functions during the
 // events of the tally of a process.
 type EventListener interface {
-	OnComputeResults(results *Results)
+	OnComputeResults(results *sctypes.Results)
 }
 
 // AddEventListener adds a new event listener, to receive method calls on block
@@ -179,10 +179,10 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 			continue
 		}
 		options := process.GetVoteOptions()
-		if err := s.db.Upsert(p, &Results{
+		if err := s.db.Upsert(p, &sctypes.Results{
 			ProcessID: p,
 			// MaxValue requires +1 since 0 is also an option
-			Votes:        newEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+			Votes:        sctypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
 			Weight:       new(big.Int).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.GetEnvelopeType(),
@@ -193,7 +193,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 		}
 
 		// Count the votes, add them to results (in memory, without any db transaction)
-		results := &Results{
+		results := &sctypes.Results{
 			Weight:       new(big.Int).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
@@ -296,7 +296,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		}
 		// This is a temporary "results" for computing votes
 		// of a single processId for the current block.
-		results := &Results{
+		results := &sctypes.Results{
 			Weight:       new(big.Int).SetUint64(0),
 			VoteOpts:     proc.VoteOpts,
 			EnvelopeType: proc.Envelope,
@@ -410,7 +410,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionRes
 	// This code must be run async in order to not delay the consensus. The results retreival
 	// could require some time.
 	go func() {
-		var myResults *Results
+		var myResults *sctypes.Results
 		var err error
 		retries := 20
 		for {

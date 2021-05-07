@@ -223,10 +223,10 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	// Create results in the indexer database
 	s.addVoteLock.Lock()
-	if err := s.db.Insert(pid, &Results{
+	if err := s.db.Insert(pid, &sctypes.Results{
 		ProcessID: pid,
 		// MaxValue requires +1 since 0 is also an option
-		Votes:        newEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+		Votes:        sctypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
 		Weight:       new(big.Int).SetUint64(0),
 		Signatures:   []types.HexBytes{},
 		VoteOpts:     p.GetVoteOptions(),
@@ -318,7 +318,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 				update.HaveResults = false
 				update.FinalResults = true
 				update.Rheight = 0
-				if err := s.db.Delete(pid, &Results{}); err != nil {
+				if err := s.db.Delete(pid, &sctypes.Results{}); err != nil {
 					if err != badgerhold.ErrNotFound {
 						log.Warnf("cannot remove CANCELED results: %v", err)
 					}
@@ -339,21 +339,6 @@ func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
 			update.Rheight = height
 			return nil
 		})
-}
-
-func newEmptyVotes(questions, options int) [][]*big.Int {
-	if questions == 0 || options == 0 {
-		return nil
-	}
-	results := [][]*big.Int{}
-	for i := 0; i < questions; i++ {
-		question := []*big.Int{}
-		for j := 0; j < options; j++ {
-			question = append(question, big.NewInt(0))
-		}
-		results = append(results, question)
-	}
-	return results
 }
 
 func searchMatchFunc(searchTerm string) func(r *badgerhold.RecordAccess) (bool, error) {
