@@ -138,7 +138,8 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
 		// If no entity ID, return the cached count of all processes
 		return atomic.LoadInt64(s.countTotalProcesses)
 	}
-	if c, err = s.db.Count(&indexertypes.Process{}, badgerhold.Where("EntityID").Eq(entityID)); err != nil {
+	if c, err = s.db.Count(&indexertypes.Process{},
+		badgerhold.Where("EntityID").Eq(entityID)); err != nil {
 		log.Warnf("cannot count processes: %v", err)
 	}
 	return int64(c)

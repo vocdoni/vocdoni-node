@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
@@ -184,7 +185,7 @@ type MetaResponse struct {
 	Siblings             types.HexBytes                   `json:"siblings,omitempty"`
 	Size                 *int64                           `json:"size,omitempty"`
 	State                string                           `json:"state,omitempty"`
-	Stats                *indexertypes.VochainStats       `json:"stats,omitempty"`
+	Stats                *VochainStats                    `json:"stats,omitempty"`
 	Timestamp            int32                            `json:"timestamp"`
 	Type                 string                           `json:"type,omitempty"`
 	Tx                   *indexertypes.TxPackage          `json:"tx,omitempty"`
@@ -236,4 +237,18 @@ func (r *MetaResponse) SetError(v interface{}) {
 type Key struct {
 	Idx int    `json:"idx"`
 	Key string `json:"key"`
+}
+
+// VochainStats contains information about the current Vochain statistics and state
+type VochainStats struct {
+	BlockHeight      uint32    `json:"block_height"`
+	EntityCount      int64     `json:"entity_count"`
+	EnvelopeCount    uint64    `json:"envelope_count"`
+	ProcessCount     int64     `json:"process_count"`
+	ValidatorCount   int       `json:"validator_count"`
+	BlockTime        [5]int32  `json:"block_time"`
+	BlockTimeStamp   int32     `json:"block_time_stamp"`
+	ChainID          string    `json:"chain_id"`
+	GenesisTimeStamp time.Time `json:"genesis_time_stamp"`
+	Syncing          bool      `json:"syncing"`
 }

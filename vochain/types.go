@@ -9,6 +9,12 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+// VotePackage represents the payload of a vote (usually base64 encoded)
+type VotePackage struct {
+	Nonce string `json:"nonce,omitempty"`
+	Votes []int  `json:"votes"`
+}
+
 // ________________________ STATE ________________________
 // Defined in ../../db/iavl.go for convenience
 

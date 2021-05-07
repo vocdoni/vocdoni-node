@@ -84,20 +84,6 @@ type EnvelopePackage struct {
 	Weight               string           `json:"weight"`
 }
 
-// VochainStats contains information about the current Vochain statistics and state
-type VochainStats struct {
-	BlockHeight      uint32    `json:"block_height"`
-	EntityCount      int64     `json:"entity_count"`
-	EnvelopeCount    uint64    `json:"envelope_count"`
-	ProcessCount     int64     `json:"process_count"`
-	ValidatorCount   int       `json:"validator_count"`
-	BlockTime        [5]int32  `json:"block_time"`
-	BlockTimeStamp   int32     `json:"block_time_stamp"`
-	ChainID          string    `json:"chain_id"`
-	GenesisTimeStamp time.Time `json:"genesis_time_stamp"`
-	Syncing          bool      `json:"syncing"`
-}
-
 // TxPackage contains a SignedTx and auxiliary information for the Transaction api
 type TxPackage struct {
 	Tx          []byte         `json:"tx"`

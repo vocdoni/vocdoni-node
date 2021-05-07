@@ -77,7 +77,7 @@ func (r *Router) submitEnvelope(request routerRequest) {
 
 func (r *Router) getStats(request routerRequest) {
 	var err error
-	stats := new(indexertypes.VochainStats)
+	stats := new(api.VochainStats)
 	stats.BlockHeight = r.vocapp.Height()
 	stats.BlockTimeStamp = int32(r.vocapp.State.Header(true).Timestamp)
 	stats.EntityCount = r.Scrutinizer.EntityCount()
