@@ -169,3 +169,12 @@ func BlockMetadataFromBlockModel(block *tmtypes.Block) *BlockMetadata {
 	b.ProposerAddress = block.ProposerAddress.Bytes()
 	return b
 }
+
+// ________________________ CALLBACKS DATA STRUCTS ________________________
+
+// ScrutinizerOnProcessData holds the required data for callbacks when
+// a new process is added into the vochain.
+type ScrutinizerOnProcessData struct {
+	EntityID  []byte
+	ProcessID []byte
+}

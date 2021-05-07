@@ -4,11 +4,10 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 )
 
 // CacheAdd adds a new vote proof to the local cache
-func (v *State) CacheAdd(id [32]byte, vc *types.CacheTx) {
+func (v *State) CacheAdd(id [32]byte, vc *CacheTx) {
 	if len(id) == 0 {
 		return
 	}
@@ -25,7 +24,7 @@ func (v *State) CacheDel(id [32]byte) {
 }
 
 // CacheGet fetch an existing vote proof from the local cache
-func (v *State) CacheGet(id [32]byte) *types.CacheTx {
+func (v *State) CacheGet(id [32]byte) *CacheTx {
 	v.voteCacheLock.RLock()
 	defer v.voteCacheLock.RUnlock()
 	return v.voteCache[id]

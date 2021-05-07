@@ -50,11 +50,11 @@ type Scrutinizer struct {
 	// votePool is the list of votes that should be live counted, grouped by processId
 	votePool map[string][]*models.Vote
 	// newProcessPool is the list of new process IDs on the current block
-	newProcessPool []*types.ScrutinizerOnProcessData
+	newProcessPool []*sctypes.ScrutinizerOnProcessData
 	// updateProcessPool is the list of process IDs that require sync with the state database
 	updateProcessPool [][]byte
 	// resultsPool is the list of processes that finish on the current block
-	resultsPool []*types.ScrutinizerOnProcessData
+	resultsPool []*sctypes.ScrutinizerOnProcessData
 	// list of live processes (those on which the votes will be computed on arrival)
 	liveResultsProcs sync.Map
 	// eventListeners is the list of external callbacks that will be executed by the scrutinizer
@@ -337,14 +337,14 @@ func (s *Scrutinizer) Commit(height uint32) error {
 func (s *Scrutinizer) Rollback() {
 	s.votePool = make(map[string][]*models.Vote)
 	s.voteIndexPool = []*VoteWithIndex{}
-	s.newProcessPool = []*types.ScrutinizerOnProcessData{}
-	s.resultsPool = []*types.ScrutinizerOnProcessData{}
+	s.newProcessPool = []*sctypes.ScrutinizerOnProcessData{}
+	s.resultsPool = []*sctypes.ScrutinizerOnProcessData{}
 	s.updateProcessPool = [][]byte{}
 }
 
 // OnProcess scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
-	data := &types.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
+	data := &sctypes.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
 	s.newProcessPool = append(s.newProcessPool, data)
 }
 
@@ -373,7 +373,7 @@ func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessSta
 		if live, err := s.isOpenProcess(pid); err != nil {
 			log.Warn(err)
 		} else if live {
-			s.resultsPool = append(s.resultsPool, &types.ScrutinizerOnProcessData{ProcessID: pid})
+			s.resultsPool = append(s.resultsPool, &sctypes.ScrutinizerOnProcessData{ProcessID: pid})
 		}
 	}
 	s.updateProcessPool = append(s.updateProcessPool, pid)
@@ -393,7 +393,7 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string, txIndex int3
 	}
 	// if all keys have been revealed, compute the results
 	if *p.KeyIndex < 1 {
-		data := types.ScrutinizerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
+		data := sctypes.ScrutinizerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
 		s.resultsPool = append(s.resultsPool, &data)
 	}
 	s.updateProcessPool = append(s.updateProcessPool, pid)

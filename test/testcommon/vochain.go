@@ -15,7 +15,6 @@ import (
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -169,10 +168,10 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	d.VochainCfg.DataDir = tb.TempDir()
 	// create genesis file
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
-	consensusParams := &types.ConsensusParams{
-		Block:     types.BlockParams(tmConsensusParams.Block),
-		Evidence:  types.EvidenceParams{MaxAgeNumBlocks: 1, MaxAgeDuration: 1},
-		Validator: types.ValidatorParams(tmConsensusParams.Validator),
+	consensusParams := &vochain.ConsensusParams{
+		Block:     vochain.BlockParams(tmConsensusParams.Block),
+		Evidence:  vochain.EvidenceParams{MaxAgeNumBlocks: 1, MaxAgeDuration: 1},
+		Validator: vochain.ValidatorParams(tmConsensusParams.Validator),
 	}
 
 	validator := privval.GenFilePV(

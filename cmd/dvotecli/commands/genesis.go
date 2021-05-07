@@ -12,7 +12,6 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 )
 
@@ -80,9 +79,9 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 
 	// Generate genesis
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
-	consensusParams := &types.ConsensusParams{
-		Block:     types.BlockParams(tmConsensusParams.Block),
-		Validator: types.ValidatorParams(tmConsensusParams.Validator),
+	consensusParams := &vochain.ConsensusParams{
+		Block:     vochain.BlockParams(tmConsensusParams.Block),
+		Validator: vochain.ValidatorParams(tmConsensusParams.Validator),
 	}
 	chainID, _ := cmd.Flags().GetString("chainId")
 

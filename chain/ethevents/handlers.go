@@ -13,7 +13,6 @@ import (
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/chain/contracts"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -194,7 +193,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			return fmt.Errorf("process status %s does not accept census updates", p.Status.String())
 		}
 		// check census origin
-		if !types.CensusOrigins[p.CensusOrigin].AllowCensusUpdate {
+		if !vochain.CensusOrigins[p.CensusOrigin].AllowCensusUpdate {
 			return fmt.Errorf("process census origin %s does not accept census updates", p.CensusOrigin.String())
 		}
 

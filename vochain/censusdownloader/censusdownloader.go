@@ -6,7 +6,6 @@ import (
 
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
@@ -70,7 +69,7 @@ func (c *CensusDownloader) OnProcess(pid, eid []byte, censusRoot, censusURI stri
 			log.Errorf("censusDownloader cannot get process from state: (%v)", err)
 			return
 		}
-		if types.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
+		if vochain.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
 			c.queue[censusRoot] = censusURI
 		}
 	}

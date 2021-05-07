@@ -14,7 +14,6 @@ import (
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"google.golang.org/protobuf/proto"
 
@@ -201,18 +200,18 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
 }
 
 // NewGenesis creates a new genesis and return its bytes
-func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.ConsensusParams, validators []privval.FilePV, oracles []string) ([]byte, error) {
+func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *ConsensusParams, validators []privval.FilePV, oracles []string) ([]byte, error) {
 	// default consensus params
-	appState := new(types.GenesisAppState)
-	appState.Validators = make([]types.GenesisValidator, len(validators))
+	appState := new(GenesisAppState)
+	appState.Validators = make([]GenesisValidator, len(validators))
 	for idx, val := range validators {
 		pubk, err := val.GetPubKey()
 		if err != nil {
 			return []byte{}, err
 		}
-		appState.Validators[idx] = types.GenesisValidator{
+		appState.Validators[idx] = GenesisValidator{
 			Address: val.GetAddress().Bytes(),
-			PubKey:  types.TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
+			PubKey:  TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
 			Power:   "10",
 			Name:    strconv.Itoa(rand.Int()),
 		}
@@ -222,7 +221,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.C
 	if err != nil {
 		return []byte{}, err
 	}
-	genDoc := types.GenesisDoc{
+	genDoc := GenesisDoc{
 		ChainID:         chainID,
 		GenesisTime:     tmtime.Now(),
 		ConsensusParams: consensusParams,

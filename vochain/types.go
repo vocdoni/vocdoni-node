@@ -1,10 +1,11 @@
-package types
+package vochain
 
 import (
 	"encoding/json"
 	"math/big"
 	"time"
 
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -71,7 +72,7 @@ type GenesisDoc struct {
 	ChainID         string             `json:"chain_id"`
 	ConsensusParams *ConsensusParams   `json:"consensus_params,omitempty"`
 	Validators      []GenesisValidator `json:"validators,omitempty"`
-	AppHash         HexBytes           `json:"app_hash"`
+	AppHash         types.HexBytes     `json:"app_hash"`
 	AppState        json.RawMessage    `json:"app_state,omitempty"`
 }
 
@@ -100,7 +101,7 @@ type ValidatorParams struct {
 }
 
 type GenesisValidator struct {
-	Address HexBytes         `json:"address"`
+	Address types.HexBytes   `json:"address"`
 	PubKey  TendermintPubKey `json:"pub_key"`
 	Power   string           `json:"power"`
 	Name    string           `json:"name"`
@@ -109,15 +110,6 @@ type GenesisValidator struct {
 type TendermintPubKey struct {
 	Type  string `json:"type"`
 	Value []byte `json:"value"`
-}
-
-// ________________________ CALLBACKS DATA STRUCTS ________________________
-
-// ScrutinizerOnProcessData holds the required data for callbacks when
-// a new process is added into the vochain.
-type ScrutinizerOnProcessData struct {
-	EntityID  []byte
-	ProcessID []byte
 }
 
 // _________________________ CENSUS ORIGINS __________________________

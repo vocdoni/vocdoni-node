@@ -189,7 +189,7 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 					return nil, fmt.Errorf("proof not found on transaction")
 				}
 
-				vp = new(types.CacheTx)
+				vp = new(CacheTx)
 				tx := vtx.GetVote()
 				if tx == nil {
 					return nil, fmt.Errorf("vote envelope transaction not found")
