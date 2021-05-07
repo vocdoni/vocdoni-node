@@ -151,11 +151,11 @@ type MetaResponse struct {
 	CensusKeys           [][]byte                    `json:"censusKeys,omitempty"`
 	CensusValues         []types.HexBytes            `json:"censusValues,omitempty"`
 	CensusDump           []byte                      `json:"censusDump,omitempty"`
-	CommitmentKeys       []types.Key                 `json:"commitmentKeys,omitempty"`
+	CommitmentKeys       []Key                       `json:"commitmentKeys,omitempty"`
 	Content              []byte                      `json:"content,omitempty"`
 	CreationTime         int64                       `json:"creationTime,omitempty"`
-	EncryptionPrivKeys   []types.Key                 `json:"encryptionPrivKeys,omitempty"`
-	EncryptionPublicKeys []types.Key                 `json:"encryptionPubKeys,omitempty"`
+	EncryptionPrivKeys   []Key                       `json:"encryptionPrivKeys,omitempty"`
+	EncryptionPublicKeys []Key                       `json:"encryptionPubKeys,omitempty"`
 	EntityID             string                      `json:"entityId,omitempty"`
 	EntityIDs            []string                    `json:"entityIds,omitempty"`
 	Envelope             *sctypes.EnvelopePackage    `json:"envelope,omitempty"`
@@ -179,7 +179,7 @@ type MetaResponse struct {
 	Registered           *bool                       `json:"registered,omitempty"`
 	Request              string                      `json:"request"`
 	Results              [][]string                  `json:"results,omitempty"`
-	RevealKeys           []types.Key                 `json:"revealKeys,omitempty"`
+	RevealKeys           []Key                       `json:"revealKeys,omitempty"`
 	Root                 types.HexBytes              `json:"root,omitempty"`
 	Siblings             types.HexBytes              `json:"siblings,omitempty"`
 	Size                 *int64                      `json:"size,omitempty"`
@@ -229,4 +229,11 @@ func (r MetaResponse) String() string {
 func (r *MetaResponse) SetError(v interface{}) {
 	r.Ok = false
 	r.Message = fmt.Sprintf("%s", v)
+}
+
+// Key associates a key string with an index, so clients can check
+// the index of each process key.
+type Key struct {
+	Idx int    `json:"idx"`
+	Key string `json:"key"`
 }

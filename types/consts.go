@@ -139,6 +139,7 @@ const (
 	TxVote              = "vote"
 	TxNewProcess        = "newProcess"
 	TxCancelProcess     = "cancelProcess" // legacy
+	TxSetProcess        = "setProcess"
 	TxAddValidator      = "addValidator"
 	TxRemoveValidator   = "removeValidator"
 	TxAddOracle         = "addOracle"

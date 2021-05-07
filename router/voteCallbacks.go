@@ -244,25 +244,25 @@ func (r *Router) getProcessKeys(request routerRequest) {
 		return
 	}
 	var response api.MetaResponse
-	var pubs, privs, coms, revs []types.Key
+	var pubs, privs, coms, revs []api.Key
 	for idx, pubk := range process.EncryptionPublicKeys {
 		if len(pubk) > 0 {
-			pubs = append(pubs, types.Key{Idx: idx, Key: pubk})
+			pubs = append(pubs, api.Key{Idx: idx, Key: pubk})
 		}
 	}
 	for idx, privk := range process.EncryptionPrivateKeys {
 		if len(privk) > 0 {
-			privs = append(privs, types.Key{Idx: idx, Key: privk})
+			privs = append(privs, api.Key{Idx: idx, Key: privk})
 		}
 	}
 	for idx, comk := range process.CommitmentKeys {
 		if len(comk) > 0 {
-			coms = append(coms, types.Key{Idx: idx, Key: comk})
+			coms = append(coms, api.Key{Idx: idx, Key: comk})
 		}
 	}
 	for idx, revk := range process.RevealKeys {
 		if len(revk) > 0 {
-			revs = append(revs, types.Key{Idx: idx, Key: revk})
+			revs = append(revs, api.Key{Idx: idx, Key: revk})
 		}
 	}
 	response.EncryptionPublicKeys = pubs
@@ -391,7 +391,7 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 		case *models.Tx_Admin:
 			txType = tx.Payload.(*models.Tx_Admin).Admin.GetTxtype().String()
 		case *models.Tx_SetProcess:
-			txType = "setProcess"
+			txType = types.TxSetProcess
 		default:
 			txType = "unknown"
 		}

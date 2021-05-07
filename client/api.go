@@ -11,17 +11,16 @@ import (
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
 type pkeys struct {
-	pub  []types.Key
-	priv []types.Key
-	comm []types.Key
-	rev  []types.Key
+	pub  []api.Key
+	priv []api.Key
+	comm []api.Key
+	rev  []api.Key
 }
 
 func (c *Client) GetEnvelopeStatus(nullifier, pid []byte) (bool, error) {
