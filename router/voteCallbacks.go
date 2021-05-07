@@ -278,11 +278,6 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	if max > MaxListSize || max <= 0 {
 		max = MaxListSize
 	}
-	// check pid
-	if len(request.ProcessID) != types.ProcessIDsize {
-		r.sendError(request, "cannot get envelope status: (malformed processId)")
-		return
-	}
 	if request.ListSize > MaxListSize {
 		r.sendError(request, fmt.Sprintf("listSize overflow, maximum is %d", MaxListSize))
 		return

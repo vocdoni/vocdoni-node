@@ -84,7 +84,7 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 	callback func(*models.VoteEnvelope, *big.Int)) error {
 	wg := sync.WaitGroup{}
 	err := s.db.ForEach(
-		badgerhold.Where("ProcessID").Eq(processId),
+		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
 		func(txRef *indexertypes.VoteReference) error {
 			wg.Add(1)
 			processVote := func() {
@@ -126,36 +126,72 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte,
 		return nil, fmt.Errorf("envelopeList: invalid value: from is invalid value %d", from)
 	}
 	envelopes := []*indexertypes.EnvelopeMetadata{}
-	err := s.db.ForEach(
-		badgerhold.Where("ProcessID").Eq(processId).
-			Index("ProcessID").
-			SortBy("Height", "TxIndex").
-			And("Nullifier").MatchFunc(searchMatchFunc(searchTerm)).
-			Skip(from).
-			Limit(max),
-		func(txRef *indexertypes.VoteReference) error {
-			stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
-			if err != nil {
-				return err
-			}
-			tx := &models.Tx{}
-			if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-				return err
-			}
-			envelope := tx.GetVote()
-			if envelope == nil {
-				return fmt.Errorf("transaction is not an Envelope")
-			}
-			envelope.Nullifier = txRef.Nullifier
-			envelopes = append(envelopes, &indexertypes.EnvelopeMetadata{
-				ProcessId: processId,
-				Nullifier: txRef.Nullifier,
-				TxIndex:   txRef.TxIndex,
-				Height:    txRef.Height,
-				TxHash:    txHash,
+	var err error
+	// check pid
+	if len(processId) == types.ProcessIDsize {
+		err = s.db.ForEach(
+			badgerhold.Where("ProcessID").Eq(processId).
+				Index("ProcessID").
+				SortBy("Height", "TxIndex").
+				And("Nullifier").MatchFunc(searchMatchFunc(searchTerm)).
+				Skip(from).
+				Limit(max),
+			func(txRef *indexertypes.VoteReference) error {
+				stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
+				if err != nil {
+					return err
+				}
+				tx := &models.Tx{}
+				if err := proto.Unmarshal(stx.Tx, tx); err != nil {
+					return err
+				}
+				envelope := tx.GetVote()
+				if envelope == nil {
+					return fmt.Errorf("transaction is not an Envelope")
+				}
+				envelope.Nullifier = txRef.Nullifier
+				envelopes = append(envelopes, &indexertypes.EnvelopeMetadata{
+					ProcessId: processId,
+					Nullifier: txRef.Nullifier,
+					TxIndex:   txRef.TxIndex,
+					Height:    txRef.Height,
+					TxHash:    txHash,
+				})
+				return nil
 			})
-			return nil
-		})
+	} else if len(searchTerm) > 0 { // Search nullifiers without process id
+		err = s.db.ForEach(
+			badgerhold.
+				Where("Nullifier").MatchFunc(searchMatchFunc(searchTerm)).
+				SortBy("Height", "TxIndex").
+				Skip(from).
+				Limit(max),
+			func(txRef *indexertypes.VoteReference) error {
+				stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
+				if err != nil {
+					return err
+				}
+				tx := &models.Tx{}
+				if err := proto.Unmarshal(stx.Tx, tx); err != nil {
+					return err
+				}
+				envelope := tx.GetVote()
+				if envelope == nil {
+					return fmt.Errorf("transaction is not an Envelope")
+				}
+				envelope.Nullifier = txRef.Nullifier
+				envelopes = append(envelopes, &indexertypes.EnvelopeMetadata{
+					ProcessId: processId,
+					Nullifier: txRef.Nullifier,
+					TxIndex:   txRef.TxIndex,
+					Height:    txRef.Height,
+					TxHash:    txHash,
+				})
+				return nil
+			})
+	} else {
+		return nil, fmt.Errorf("cannot get envelope status: (malformed processId)")
+	}
 	return envelopes, err
 }
 
@@ -230,7 +266,8 @@ func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error
 	s.addVoteLock.RLock()
 	defer s.addVoteLock.RUnlock()
 	results := &indexertypes.Results{}
-	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").Eq(processID)); err != nil {
+	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").
+		Eq(processID)); err != nil {
 		if err == badgerhold.ErrNotFound {
 			return nil, ErrNoResultsYet
 		}
