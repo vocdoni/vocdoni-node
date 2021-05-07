@@ -11,7 +11,11 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
-const storageTimeout = time.Minute
+const (
+	storageTimeout = time.Second * 20
+	maxJSONsize    = 1024 * 10       // 10 KiB
+	maxFetchFile   = 1024 * 1024 * 2 // 2 MiB
+)
 
 func (r *Router) fetchFile(request routerRequest) {
 	log.Debugf("calling FetchFile %s", request.URI)
@@ -28,7 +32,7 @@ func (r *Router) fetchFile(request routerRequest) {
 			splt := strings.Split(parsedURIs[idx], "/")
 			hash := splt[len(splt)-1]
 			ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
-			content, err = r.storage.Retrieve(ctx, hash)
+			content, err = r.storage.Retrieve(ctx, hash, maxFetchFile)
 			if err == nil && len(content) == 0 {
 				err = fmt.Errorf("no content fetched")
 			}
@@ -78,6 +82,19 @@ func (r *Router) addFile(request routerRequest) {
 	}
 }
 
+func (r *Router) addJSONfile(request routerRequest) {
+	if len(request.Content) > maxJSONsize {
+		r.sendError(request,
+			fmt.Sprintf("JSON file too big: %d bytes", len(request.Content)))
+		return
+	}
+	if !isJSON(request.Content) {
+		r.sendError(request, "not a JSON file")
+		return
+	}
+	r.addFile(request)
+}
+
 func (r *Router) pinList(request routerRequest) {
 	log.Debug("calling PinList")
 	ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
@@ -121,4 +138,9 @@ func (r *Router) unpinFile(request routerRequest) {
 	}
 	var response types.MetaResponse
 	request.Send(r.buildReply(request, &response))
+}
+
+func isJSON(c []byte) bool {
+	var js interface{}
+	return json.Unmarshal(c, &js) == nil
 }
