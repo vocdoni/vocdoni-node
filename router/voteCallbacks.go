@@ -273,6 +273,11 @@ func (r *Router) getProcessKeys(request routerRequest) {
 }
 
 func (r *Router) getEnvelopeList(request routerRequest) {
+	var response api.MetaResponse
+	max := request.ListSize
+	if max > MaxListSize || max <= 0 {
+		max = MaxListSize
+	}
 	// check pid
 	if len(request.ProcessID) != types.ProcessIDsize {
 		r.sendError(request, "cannot get envelope status: (malformed processId)")
@@ -282,12 +287,8 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("listSize overflow, maximum is %d", MaxListSize))
 		return
 	}
-	if request.ListSize == 0 {
-		request.ListSize = MaxListSize
-	}
-	var response api.MetaResponse
 	var err error
-	if response.Envelopes, err = r.Scrutinizer.GetEnvelopes(request.ProcessID, request.ListSize, request.From); err != nil {
+	if response.Envelopes, err = r.Scrutinizer.GetEnvelopes(request.ProcessID, request.ListSize, request.From, request.SearchTerm); err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope list: (%s)", err))
 		return
 	}
