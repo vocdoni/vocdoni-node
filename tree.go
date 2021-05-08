@@ -52,7 +52,7 @@ type Tree struct {
 	sync.RWMutex
 	tx         db.Tx
 	db         db.Storage
-	lastAccess int64 // in unix time
+	lastAccess int64 // in unix time // TODO delete, is a feature of a upper abstraction level
 	maxLevels  int
 	root       []byte
 
@@ -107,45 +107,9 @@ func (t *Tree) Root() []byte {
 	return t.root
 }
 
-// AddBatch adds a batch of key-values to the Tree. This method will be
-// optimized to do some internal parallelization. Returns an array containing
-// the indexes of the keys failed to add.
-func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
-	t.updateAccessTime()
-	if len(keys) != len(values) {
-		return nil, fmt.Errorf("len(keys)!=len(values) (%d!=%d)",
-			len(keys), len(values))
-	}
-
-	t.Lock()
-	defer t.Unlock()
-
-	var err error
-	t.tx, err = t.db.NewTx()
-	if err != nil {
-		return nil, err
-	}
-
-	var indexes []int
-	for i := 0; i < len(keys); i++ {
-		err = t.add(0, keys[i], values[i])
-		if err != nil {
-			indexes = append(indexes, i)
-		}
-	}
-	// store root to db
-	if err := t.tx.Put(dbKeyRoot, t.root); err != nil {
-		return indexes, err
-	}
-	// update nLeafs
-	if err = t.incNLeafs(len(keys) - len(indexes)); err != nil {
-		return indexes, err
-	}
-
-	if err := t.tx.Commit(); err != nil {
-		return nil, err
-	}
-	return indexes, nil
+// HashFunction returns Tree.hashFunction
+func (t *Tree) HashFunction() HashFunction {
+	return t.hashFunction
 }
 
 // Add inserts the key-value into the Tree.  If the inputs come from a *big.Int,
@@ -248,7 +212,7 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 			if getLeaf {
 				return currKey, currValue, siblings, nil
 			}
-			oldLeafKey, _ := readLeafValue(currValue)
+			oldLeafKey, _ := ReadLeafValue(currValue)
 			oldLeafKeyFull := make([]byte, t.hashFunction.Len())
 			copy(oldLeafKeyFull[:], oldLeafKey)
 
@@ -269,12 +233,12 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 		// collect siblings while going down
 		if path[currLvl] {
 			// right
-			lChild, rChild := readIntermediateChilds(currValue)
+			lChild, rChild := ReadIntermediateChilds(currValue)
 			siblings = append(siblings, lChild)
 			return t.down(newKey, rChild, siblings, path, currLvl+1, getLeaf)
 		}
 		// left
-		lChild, rChild := readIntermediateChilds(currValue)
+		lChild, rChild := ReadIntermediateChilds(currValue)
 		siblings = append(siblings, rChild)
 		return t.down(newKey, lChild, siblings, path, currLvl+1, getLeaf)
 	default:
@@ -347,7 +311,8 @@ func newLeafValue(hashFunc HashFunction, k, v []byte) ([]byte, []byte, error) {
 	return leafKey, leafValue, nil
 }
 
-func readLeafValue(b []byte) ([]byte, []byte) {
+// ReadLeafValue reads from a byte array the leaf key & value
+func ReadLeafValue(b []byte) ([]byte, []byte) {
 	if len(b) < PrefixValueLen {
 		return []byte{}, []byte{}
 	}
@@ -376,7 +341,8 @@ func newIntermediate(hashFunc HashFunction, l, r []byte) ([]byte, []byte, error)
 	return key, b, nil
 }
 
-func readIntermediateChilds(b []byte) ([]byte, []byte) {
+// ReadIntermediateChilds reads from a byte array the two childs keys
+func ReadIntermediateChilds(b []byte) ([]byte, []byte) {
 	if len(b) < PrefixValueLen {
 		return []byte{}, []byte{}
 	}
@@ -421,7 +387,7 @@ func (t *Tree) Update(k, v []byte) error {
 	if err != nil {
 		return err
 	}
-	oldKey, _ := readLeafValue(valueAtBottom)
+	oldKey, _ := ReadLeafValue(valueAtBottom)
 	if !bytes.Equal(oldKey, k) {
 		return fmt.Errorf("key %s does not exist", hex.EncodeToString(k))
 	}
@@ -456,7 +422,7 @@ func (t *Tree) Update(k, v []byte) error {
 // GenProof generates a MerkleTree proof for the given key. If the key exists in
 // the Tree, the proof will be of existence, if the key does not exist in the
 // tree, the proof will be of non-existence.
-func (t *Tree) GenProof(k []byte) ([]byte, error) {
+func (t *Tree) GenProof(k []byte) ([]byte, []byte, error) {
 	t.updateAccessTime()
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)
@@ -466,10 +432,10 @@ func (t *Tree) GenProof(k []byte) ([]byte, error) {
 	var siblings [][]byte
 	_, value, siblings, err := t.down(k, t.root, siblings, path, 0, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	leafK, leafV := readLeafValue(value)
+	leafK, leafV := ReadLeafValue(value)
 	if !bytes.Equal(k, leafK) {
 		fmt.Println("key not in Tree")
 		fmt.Println(leafK)
@@ -479,7 +445,7 @@ func (t *Tree) GenProof(k []byte) ([]byte, error) {
 	}
 
 	s := PackSiblings(t.hashFunction, siblings)
-	return s, nil
+	return value, s, nil
 }
 
 // PackSiblings packs the siblings into a byte array.
@@ -567,7 +533,7 @@ func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	leafK, leafV := readLeafValue(value)
+	leafK, leafV := ReadLeafValue(value)
 	if !bytes.Equal(k, leafK) {
 		panic(fmt.Errorf("%s != %s", BytesToBigInt(k), BytesToBigInt(leafK)))
 	}
@@ -662,6 +628,7 @@ func (t *Tree) GetNLeafs() (int, error) {
 // Iterate iterates through the full Tree, executing the given function on each
 // node of the Tree.
 func (t *Tree) Iterate(f func([]byte, []byte)) error {
+	// TODO allow to define which root to use
 	t.updateAccessTime()
 	return t.iter(t.root, f)
 }
@@ -691,7 +658,7 @@ func (t *Tree) iterWithStop(k []byte, currLevel int, f func(int, []byte, []byte)
 		if stop {
 			return nil
 		}
-		l, r := readIntermediateChilds(v)
+		l, r := ReadIntermediateChilds(v)
 		if err = t.iterWithStop(l, currLevel, f); err != nil {
 			return err
 		}
@@ -719,6 +686,8 @@ func (t *Tree) iter(k []byte, f func([]byte, []byte)) error {
 // Where S is the size of the output of the hash function used for the Tree.
 func (t *Tree) Dump() ([]byte, error) {
 	t.updateAccessTime()
+	// TODO allow to define which root to use
+
 	// WARNING current encoding only supports key & values of 255 bytes each
 	// (due using only 1 byte for the length headers).
 	var b []byte
@@ -726,7 +695,7 @@ func (t *Tree) Dump() ([]byte, error) {
 		if v[0] != PrefixValueLeaf {
 			return
 		}
-		leafK, leafV := readLeafValue(v)
+		leafK, leafV := ReadLeafValue(v)
 		kv := make([]byte, 2+len(leafK)+len(leafV))
 		kv[0] = byte(len(leafK))
 		kv[1] = byte(len(leafV))
@@ -809,14 +778,14 @@ node [fontname=Monospace,fontsize=10,shape=box]
 		case PrefixValueLeaf:
 			fmt.Fprintf(w, "\"%v\" [style=filled];\n", hex.EncodeToString(k[:nChars]))
 			// key & value from the leaf
-			kB, vB := readLeafValue(v)
+			kB, vB := ReadLeafValue(v)
 			fmt.Fprintf(w, "\"%v\" -> {\"k:%v\\nv:%v\"}\n",
 				hex.EncodeToString(k[:nChars]), hex.EncodeToString(kB[:nChars]),
 				hex.EncodeToString(vB[:nChars]))
 			fmt.Fprintf(w, "\"k:%v\\nv:%v\" [style=dashed]\n",
 				hex.EncodeToString(kB[:nChars]), hex.EncodeToString(vB[:nChars]))
 		case PrefixValueIntermediate:
-			l, r := readIntermediateChilds(v)
+			l, r := ReadIntermediateChilds(v)
 			lStr := hex.EncodeToString(l[:nChars])
 			rStr := hex.EncodeToString(r[:nChars])
 			eStr := ""

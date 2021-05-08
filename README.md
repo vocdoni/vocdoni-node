@@ -1,5 +1,7 @@
 # arbo [![GoDoc](https://godoc.org/github.com/arnaucube/arbo?status.svg)](https://godoc.org/github.com/arnaucube/arbo) [![Go Report Card](https://goreportcard.com/badge/github.com/arnaucube/arbo)](https://goreportcard.com/report/github.com/arnaucube/arbo) [![Test](https://github.com/arnaucube/arbo/workflows/Test/badge.svg)](https://github.com/arnaucube/arbo/actions?query=workflow%3ATest)
 
+> *arbo*: tree in Esperanto.
+
 MerkleTree implementation in Go. Compatible with the circomlib implementation of
 the MerkleTree (when using the Poseidon hash function), following the
 specification from https://docs.iden3.io/publications/pdfs/Merkle-Tree.pdf and

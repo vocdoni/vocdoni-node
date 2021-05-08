@@ -75,7 +75,7 @@ func TestAddBatchCaseA(t *testing.T) {
 		values = append(values, v)
 	}
 	start = time.Now()
-	indexes, err := tree2.AddBatchOpt(keys, values)
+	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
 	debugTime("CASE A, AddBatch", time1, time2)
@@ -113,7 +113,7 @@ func TestAddBatchCaseANotPowerOf2(t *testing.T) {
 		keys = append(keys, k)
 		values = append(values, v)
 	}
-	indexes, err := tree2.AddBatchOpt(keys, values)
+	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, 0)
 
@@ -148,7 +148,7 @@ func TestAddBatchCaseB(t *testing.T) {
 		values = append(values, v)
 	}
 	start = time.Now()
-	indexes, err := tree2.AddBatchOpt(keys, values)
+	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
 	debugTime("CASE B, AddBatch", time1, time2)
@@ -182,7 +182,7 @@ func TestAddBatchCaseBRepeatedLeafs(t *testing.T) {
 		keys = append(keys, k)
 		values = append(values, v)
 	}
-	indexes, err := tree2.AddBatchOpt(keys, values)
+	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, initialNLeafs)
 
@@ -368,7 +368,7 @@ func TestAddBatchCaseC(t *testing.T) {
 		values = append(values, v)
 	}
 	start = time.Now()
-	indexes, err := tree2.AddBatchOpt(keys, values)
+	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
 	debugTime("CASE C, AddBatch", time1, time2)
@@ -405,7 +405,7 @@ func TestAddBatchCaseD(t *testing.T) {
 		values = append(values, v)
 	}
 	start = time.Now()
-	indexes, err := tree2.AddBatchOpt(keys, values)
+	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
 	debugTime("CASE D, AddBatch", time1, time2)
@@ -462,7 +462,7 @@ func TestAddBatchCaseE(t *testing.T) {
 		values = append(values, v)
 	}
 	start = time.Now()
-	indexes, err := tree2.AddBatchOpt(keys, values)
+	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
 	debugTime("CASE E, AddBatch", time1, time2)

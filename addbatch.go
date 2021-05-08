@@ -145,9 +145,10 @@ const (
 	minLeafsThreshold = 100 // nolint:gomnd // TMP WIP this will be autocalculated
 )
 
-// AddBatchOpt is the WIP implementation of the AddBatch method in a more
-// optimized approach.
-func (t *Tree) AddBatchOpt(keys, values [][]byte) ([]int, error) {
+// AddBatch adds a batch of key-values to the Tree. Returns an array containing
+// the indexes of the keys failed to add.
+func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
+	// TODO: support vaules=nil
 	t.updateAccessTime()
 	t.Lock()
 	defer t.Unlock()
@@ -678,7 +679,7 @@ func (t *Tree) getLeafs(root []byte) ([][]byte, [][]byte, error) {
 		if v[0] != PrefixValueLeaf {
 			return
 		}
-		leafK, leafV := readLeafValue(v)
+		leafK, leafV := ReadLeafValue(v)
 		ks = append(ks, leafK)
 		vs = append(vs, leafV)
 	})

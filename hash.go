@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/iden3/go-iden3-crypto/poseidon"
+	"golang.org/x/crypto/blake2b"
 )
 
 var (
@@ -13,6 +14,8 @@ var (
 	// TypeHashPoseidon represents the label for the HashFunction of
 	// Poseidon
 	TypeHashPoseidon = []byte("poseidon")
+	// TypeHashBlake2b represents the label for the HashFunction of Blake2b
+	TypeHashBlake2b = []byte("blake2b")
 
 	// HashFunctionSha256 contains the HashSha256 struct which implements
 	// the HashFunction interface
@@ -20,6 +23,9 @@ var (
 	// HashFunctionPoseidon contains the HashPoseidon struct which implements
 	// the HashFunction interface
 	HashFunctionPoseidon HashPoseidon
+	// HashFunctionBlake2b contains the HashBlake2b struct which implements
+	// the HashFunction interface
+	HashFunctionBlake2b HashBlake2b
 )
 
 // Once Generics are at Go, this will be updated (August 2021
@@ -84,4 +90,31 @@ func (f HashPoseidon) Hash(b ...[]byte) ([]byte, error) {
 	}
 	hB := BigIntToBytes(h)
 	return hB, nil
+}
+
+// HashBlake2b implements the HashFunction interface for the Blake2b hash
+type HashBlake2b struct{}
+
+// Type returns the type of HashFunction for the HashBlake2b
+func (f HashBlake2b) Type() []byte {
+	return TypeHashBlake2b
+}
+
+// Len returns the length of the Hash output
+func (f HashBlake2b) Len() int {
+	return 32 //nolint:gomnd
+}
+
+// Hash implements the hash method for the HashFunction HashBlake2b
+func (f HashBlake2b) Hash(b ...[]byte) ([]byte, error) {
+	hasher, err := blake2b.New256(nil)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(b); i++ {
+		if _, err = hasher.Write(b[i]); err != nil {
+			return nil, err
+		}
+	}
+	return hasher.Sum(nil), nil
 }

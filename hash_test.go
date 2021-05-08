@@ -38,3 +38,17 @@ func TestHashPoseidon(t *testing.T) {
 		qt.Equals,
 		"7853200120776062878684798364095072458815029376092732009249414926327459813530")
 }
+
+func TestHashBlake2b(t *testing.T) {
+	// Blake2b hash
+	hashFunc := &HashBlake2b{}
+	b := []byte("test")
+	h, err := hashFunc.Hash(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := qt.New(t)
+	c.Assert(hex.EncodeToString(h),
+		qt.Equals,
+		"928b20366943e2afd11ebc0eae2e53a93bf177a4fcf35bcc64d503704e65e202")
+}

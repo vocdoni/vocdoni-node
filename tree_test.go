@@ -267,7 +267,7 @@ func TestGenProofAndVerify(t *testing.T) {
 	}
 
 	k := BigIntToBytes(big.NewInt(int64(7)))
-	siblings, err := tree.GenProof(k)
+	_, siblings, err := tree.GenProof(k)
 	c.Assert(err, qt.IsNil)
 
 	k = BigIntToBytes(big.NewInt(int64(7)))
