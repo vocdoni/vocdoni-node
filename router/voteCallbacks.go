@@ -1,9 +1,9 @@
 package router
 
 import (
-	"encoding/base64"
 	"fmt"
 
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -28,7 +28,7 @@ func (r *Router) submitRawTx(request routerRequest) {
 		return
 	}
 	log.Debugf("broadcasting tx hash:%s", res.Hash)
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Payload = fmt.Sprintf("%x", res.Data) // return nullifier or other info
 	if err = request.Send(r.buildReply(request, &response)); err != nil {
 		log.Warnf("error sending raw tx: %v", err)
@@ -66,7 +66,7 @@ func (r *Router) submitEnvelope(request routerRequest) {
 		return
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Nullifier = fmt.Sprintf("%x", res.Data)
 	if err = request.Send(r.buildReply(request, &response)); err != nil {
 		log.Warnf("error on submitEnvelope: %v", err)
@@ -86,7 +86,7 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	}
 
 	// Check envelope status and send reply
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Registered = types.False
 	vr, err := r.Scrutinizer.GetEnvelopeReference(request.Nullifier)
 	if err != nil {
@@ -110,14 +110,14 @@ func (r *Router) getEnvelope(request routerRequest) {
 		r.sendError(request, "cannot get envelope: (malformed nullifier)")
 		return
 	}
-	env, _, err := r.Scrutinizer.GetEnvelope(request.Nullifier)
+	env, err := r.Scrutinizer.GetEnvelope(request.Nullifier)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
 		return
 	}
-	var response types.MetaResponse
+	var response api.MetaResponse
+	response.Envelope = env
 	response.Registered = types.True
-	response.Payload = base64.StdEncoding.EncodeToString(env.VotePackage)
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -133,14 +133,14 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 		return
 	}
 
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Height = new(uint32)
 	*response.Height = uint32(votes)
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getBlockHeight(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	h := r.vocapp.Height()
 	response.Height = &h
 	response.BlockTimestamp = int32(r.vocapp.Timestamp())
@@ -148,18 +148,19 @@ func (r *Router) getBlockHeight(request routerRequest) {
 }
 
 func (r *Router) getProcessList(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	max := request.ListSize
 	if max > MaxListSize || max <= 0 {
 		max = MaxListSize
 	}
 	processList, err := r.Scrutinizer.ProcessList(
 		request.EntityId,
+		request.From,
+		max,
+		request.SearchTerm,
 		request.Namespace,
 		request.Status,
-		request.WithResults,
-		request.From,
-		max)
+		request.WithResults)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get process list: (%s)", err))
 		return
@@ -179,9 +180,9 @@ func (r *Router) getProcessList(request routerRequest) {
 }
 
 func (r *Router) getProcessInfo(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	var err error
-	response.ProcessInfo, err = r.Scrutinizer.ProcessInfo(request.ProcessID)
+	response.Process, err = r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get process info: %v", err))
 		return
@@ -190,15 +191,15 @@ func (r *Router) getProcessInfo(request routerRequest) {
 }
 
 func (r *Router) getProcessCount(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Size = new(int64)
-	count := r.Scrutinizer.ProcessCount()
+	count := r.Scrutinizer.ProcessCount(request.EntityId)
 	*response.Size = count
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getEntityCount(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Size = new(int64)
 	*response.Size = r.Scrutinizer.EntityCount()
 	request.Send(r.buildReply(request, &response))
@@ -215,26 +216,26 @@ func (r *Router) getProcessKeys(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get process encryption public keys: (%s)", err))
 		return
 	}
-	var response types.MetaResponse
-	var pubs, privs, coms, revs []types.Key
+	var response api.MetaResponse
+	var pubs, privs, coms, revs []api.Key
 	for idx, pubk := range process.EncryptionPublicKeys {
 		if len(pubk) > 0 {
-			pubs = append(pubs, types.Key{Idx: idx, Key: pubk})
+			pubs = append(pubs, api.Key{Idx: idx, Key: pubk})
 		}
 	}
 	for idx, privk := range process.EncryptionPrivateKeys {
 		if len(privk) > 0 {
-			privs = append(privs, types.Key{Idx: idx, Key: privk})
+			privs = append(privs, api.Key{Idx: idx, Key: privk})
 		}
 	}
 	for idx, comk := range process.CommitmentKeys {
 		if len(comk) > 0 {
-			coms = append(coms, types.Key{Idx: idx, Key: comk})
+			coms = append(coms, api.Key{Idx: idx, Key: comk})
 		}
 	}
 	for idx, revk := range process.RevealKeys {
 		if len(revk) > 0 {
-			revs = append(revs, types.Key{Idx: idx, Key: revk})
+			revs = append(revs, api.Key{Idx: idx, Key: revk})
 		}
 	}
 	response.EncryptionPublicKeys = pubs
@@ -244,31 +245,8 @@ func (r *Router) getProcessKeys(request routerRequest) {
 	request.Send(r.buildReply(request, &response))
 }
 
-func (r *Router) getEnvelopeList(request routerRequest) {
-	// check pid
-	if len(request.ProcessID) != types.ProcessIDsize {
-		r.sendError(request, "cannot get envelope status: (malformed processId)")
-		return
-	}
-	if request.ListSize > MaxListSize {
-		r.sendError(request, fmt.Sprintf("listSize overflow, maximum is %d", MaxListSize))
-		return
-	}
-	if request.ListSize == 0 {
-		request.ListSize = MaxListSize
-	}
-	nullifiers := r.vocapp.State.EnvelopeList(request.ProcessID, request.From, request.ListSize, true)
-	var response types.MetaResponse
-	strnull := []string{}
-	for _, n := range nullifiers {
-		strnull = append(strnull, fmt.Sprintf("%x", n))
-	}
-	response.Nullifiers = &strnull
-	request.Send(r.buildReply(request, &response))
-}
-
 func (r *Router) getResultsWeight(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	w, err := r.Scrutinizer.GetResultsWeight(request.ProcessID)
 	if err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get results weight: %v", err))
@@ -284,7 +262,7 @@ func (r *Router) getResults(request routerRequest) {
 		return
 	}
 
-	var response types.MetaResponse
+	var response api.MetaResponse
 
 	// Get process info
 	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
@@ -337,22 +315,22 @@ func (r *Router) getResults(request routerRequest) {
 	}
 	votes := uint32(eh)
 	response.Height = &votes
-
+	response.Weight = vr.Weight.String()
 	request.Send(r.buildReply(request, &response))
 }
 
 // known entities
 func (r *Router) getEntityList(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize
 	}
-	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, request.From)
+	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
 	request.Send(r.buildReply(request, &response))
 }
 
 func (r *Router) getBlockStatus(request routerRequest) {
-	var response types.MetaResponse
+	var response api.MetaResponse
 	h := r.vocapp.Height()
 	response.Height = &h
 	response.BlockTime = r.vocinfo.BlockTimes()

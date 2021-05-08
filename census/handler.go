@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
@@ -21,7 +22,12 @@ const (
 	censusRemoteStorageTimeout = 1 * time.Minute
 )
 
-func httpReply(resp *types.ResponseMessage, w http.ResponseWriter) {
+type CensusDump struct {
+	RootHash []byte `json:"rootHash"`
+	Data     []byte `json:"data"`
+}
+
+func httpReply(resp *api.ResponseMessage, w http.ResponseWriter) {
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -47,13 +53,13 @@ func (m *Manager) HTTPhandler(ctx context.Context, w http.ResponseWriter,
 	}
 	// Decode JSON
 	log.Debug("decoding JSON")
-	var reqOuter types.RequestMessage
+	var reqOuter api.RequestMessage
 	if err := json.NewDecoder(req.Body).Decode(&reqOuter); err != nil {
 		log.Warnf("cannot decode JSON: %s", err)
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	var reqInner types.MetaRequest
+	var reqInner api.MetaRequest
 	if err := json.Unmarshal(reqOuter.MetaRequest, &reqInner); err != nil {
 		log.Warnf("cannot decode JSON: %s", err)
 		http.Error(w, err.Error(), 400)
@@ -90,7 +96,7 @@ func (m *Manager) HTTPhandler(ctx context.Context, w http.ResponseWriter,
 		log.Error(err)
 	}
 
-	respOuter := &types.ResponseMessage{
+	respOuter := &api.ResponseMessage{
 		ID:           reqOuter.ID,
 		Signature:    signature,
 		MetaResponse: respInner,
@@ -101,9 +107,9 @@ func (m *Manager) HTTPhandler(ctx context.Context, w http.ResponseWriter,
 // Handler handles an API census manager request.
 // isAuth gives access to the private methods only if censusPrefix match or censusPrefix not defined
 // censusPrefix should usually be the Ethereum Address or a Hash of the allowed PubKey
-func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool,
-	censusPrefix string) *types.MetaResponse {
-	resp := new(types.MetaResponse)
+func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
+	censusPrefix string) *api.MetaResponse {
+	resp := new(api.MetaResponse)
 
 	// Process data
 	log.Debugf("processing data %s", r.String())
@@ -261,7 +267,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			return resp
 		}
 		censusRaw = m.decompressBytes(censusRaw)
-		var dump types.CensusDump
+		var dump CensusDump
 		err = json.Unmarshal(censusRaw, &dump)
 		if err != nil {
 			log.Warnf("retrieved census do not have a correct format: %s", err)
@@ -379,7 +385,7 @@ func (m *Manager) Handler(ctx context.Context, r *types.MetaRequest, isAuth bool
 			resp.SetError("not supported")
 			return resp
 		}
-		var dump types.CensusDump
+		var dump CensusDump
 		dump.RootHash = tr.Root()
 		var err error
 		dump.Data, err = tr.Dump(tr.Root())

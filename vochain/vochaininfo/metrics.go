@@ -61,7 +61,6 @@ func (vi *VochainInfo) registerMetrics(ma *metrics.Agent) {
 	ma.Register(VochainVoteTree)
 	ma.Register(VochainVotesPerMinute)
 	ma.Register(VochainVoteCache)
-
 }
 
 func (vi *VochainInfo) getMetrics() {

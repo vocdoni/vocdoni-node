@@ -194,7 +194,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackTransactorRaw) Transact(o
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCaller) IsApprovedForAll(opts *bind.CallOpts, _owner common.Address, operator common.Address) (bool, error) {
 	var out []interface{}
 	err := _EnsRegistryWithFallback.contract.Call(opts, &out, "isApprovedForAll", _owner, operator)
-
 	if err != nil {
 		return *new(bool), err
 	}
@@ -202,7 +201,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCaller) IsApprovedForAll(
 	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
-
 }
 
 // IsApprovedForAll is a free data retrieval call binding the contract method 0xe985e9c5.
@@ -225,7 +223,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCallerSession) IsApproved
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCaller) Owner(opts *bind.CallOpts, node [32]byte) (common.Address, error) {
 	var out []interface{}
 	err := _EnsRegistryWithFallback.contract.Call(opts, &out, "owner", node)
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -233,7 +230,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCaller) Owner(opts *bind.
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // Owner is a free data retrieval call binding the contract method 0x02571be3.
@@ -256,7 +252,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCallerSession) Owner(node
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCaller) RecordExists(opts *bind.CallOpts, node [32]byte) (bool, error) {
 	var out []interface{}
 	err := _EnsRegistryWithFallback.contract.Call(opts, &out, "recordExists", node)
-
 	if err != nil {
 		return *new(bool), err
 	}
@@ -264,7 +259,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCaller) RecordExists(opts
 	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
-
 }
 
 // RecordExists is a free data retrieval call binding the contract method 0xf79fe538.
@@ -287,7 +281,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCallerSession) RecordExis
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCaller) Resolver(opts *bind.CallOpts, node [32]byte) (common.Address, error) {
 	var out []interface{}
 	err := _EnsRegistryWithFallback.contract.Call(opts, &out, "resolver", node)
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -295,7 +288,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCaller) Resolver(opts *bi
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // Resolver is a free data retrieval call binding the contract method 0x0178b8bf.
@@ -318,7 +310,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCallerSession) Resolver(n
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCaller) Ttl(opts *bind.CallOpts, node [32]byte) (uint64, error) {
 	var out []interface{}
 	err := _EnsRegistryWithFallback.contract.Call(opts, &out, "ttl", node)
-
 	if err != nil {
 		return *new(uint64), err
 	}
@@ -326,7 +317,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackCaller) Ttl(opts *bind.Ca
 	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
 
 	return out0, err
-
 }
 
 // Ttl is a free data retrieval call binding the contract method 0x16a25cbd.
@@ -569,7 +559,6 @@ type EnsRegistryWithFallbackApprovalForAll struct {
 //
 // Solidity: event ApprovalForAll(address indexed owner, address indexed operator, bool approved)
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) FilterApprovalForAll(opts *bind.FilterOpts, owner []common.Address, operator []common.Address) (*EnsRegistryWithFallbackApprovalForAllIterator, error) {
-
 	var ownerRule []interface{}
 	for _, ownerItem := range owner {
 		ownerRule = append(ownerRule, ownerItem)
@@ -590,7 +579,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) FilterApprovalF
 //
 // Solidity: event ApprovalForAll(address indexed owner, address indexed operator, bool approved)
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) WatchApprovalForAll(opts *bind.WatchOpts, sink chan<- *EnsRegistryWithFallbackApprovalForAll, owner []common.Address, operator []common.Address) (event.Subscription, error) {
-
 	var ownerRule []interface{}
 	for _, ownerItem := range owner {
 		ownerRule = append(ownerRule, ownerItem)
@@ -723,7 +711,6 @@ type EnsRegistryWithFallbackNewOwner struct {
 //
 // Solidity: event NewOwner(bytes32 indexed node, bytes32 indexed label, address owner)
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) FilterNewOwner(opts *bind.FilterOpts, node [][32]byte, label [][32]byte) (*EnsRegistryWithFallbackNewOwnerIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -744,7 +731,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) FilterNewOwner(
 //
 // Solidity: event NewOwner(bytes32 indexed node, bytes32 indexed label, address owner)
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) WatchNewOwner(opts *bind.WatchOpts, sink chan<- *EnsRegistryWithFallbackNewOwner, node [][32]byte, label [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -876,7 +862,6 @@ type EnsRegistryWithFallbackNewResolver struct {
 //
 // Solidity: event NewResolver(bytes32 indexed node, address resolver)
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) FilterNewResolver(opts *bind.FilterOpts, node [][32]byte) (*EnsRegistryWithFallbackNewResolverIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -893,7 +878,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) FilterNewResolv
 //
 // Solidity: event NewResolver(bytes32 indexed node, address resolver)
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) WatchNewResolver(opts *bind.WatchOpts, sink chan<- *EnsRegistryWithFallbackNewResolver, node [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1021,7 +1005,6 @@ type EnsRegistryWithFallbackNewTTL struct {
 //
 // Solidity: event NewTTL(bytes32 indexed node, uint64 ttl)
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) FilterNewTTL(opts *bind.FilterOpts, node [][32]byte) (*EnsRegistryWithFallbackNewTTLIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1038,7 +1021,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) FilterNewTTL(op
 //
 // Solidity: event NewTTL(bytes32 indexed node, uint64 ttl)
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) WatchNewTTL(opts *bind.WatchOpts, sink chan<- *EnsRegistryWithFallbackNewTTL, node [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1166,7 +1148,6 @@ type EnsRegistryWithFallbackTransfer struct {
 //
 // Solidity: event Transfer(bytes32 indexed node, address owner)
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) FilterTransfer(opts *bind.FilterOpts, node [][32]byte) (*EnsRegistryWithFallbackTransferIterator, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)
@@ -1183,7 +1164,6 @@ func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) FilterTransfer(
 //
 // Solidity: event Transfer(bytes32 indexed node, address owner)
 func (_EnsRegistryWithFallback *EnsRegistryWithFallbackFilterer) WatchTransfer(opts *bind.WatchOpts, sink chan<- *EnsRegistryWithFallbackTransfer, node [][32]byte) (event.Subscription, error) {
-
 	var nodeRule []interface{}
 	for _, nodeItem := range node {
 		nodeRule = append(nodeRule, nodeItem)

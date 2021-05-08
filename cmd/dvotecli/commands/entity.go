@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/router"
-	"go.vocdoni.io/dvote/types"
 )
 
 var (
@@ -34,7 +34,7 @@ func entityList(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getEntityList"}
+	req := api.MetaRequest{Method: "getEntityList"}
 	resp, err := cl.Request(req, nil)
 	if err != nil {
 		return err

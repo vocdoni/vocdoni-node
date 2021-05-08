@@ -31,7 +31,7 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 		log.Fatalf("cannot init vochain application: %s", err)
 	}
 	log.Info("creating tendermint node and application")
-	app.Node, err = newTendermint(app, vochaincfg, genesis)
+	err = app.SetNode(vochaincfg, genesis)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -120,8 +120,8 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	tconfig := tmcfg.DefaultConfig()
 	tconfig.FastSyncMode = true
 	tconfig.SetRoot(localConfig.DataDir)
-	os.MkdirAll(localConfig.DataDir+"/config", 0755)
-	os.MkdirAll(localConfig.DataDir+"/data", 0755)
+	os.MkdirAll(localConfig.DataDir+"/config", 0o755)
+	os.MkdirAll(localConfig.DataDir+"/data", 0o755)
 
 	// p2p config
 	tconfig.LogLevel = localConfig.LogLevel
@@ -255,7 +255,7 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		log.Infof("found genesis file %s", tconfig.Genesis)
 	} else {
 		log.Debugf("loaded genesis: %s", string(genesis))
-		if err := os.WriteFile(tconfig.Genesis, genesis, 0600); err != nil {
+		if err := os.WriteFile(tconfig.Genesis, genesis, 0o600); err != nil {
 			return nil, err
 		}
 		log.Infof("new genesis created, stored at %s", tconfig.Genesis)

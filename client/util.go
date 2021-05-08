@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 func (c *Client) WaitUntilBlock(block uint32) {
@@ -47,6 +48,7 @@ type keysBatch struct {
 	CensusID  types.HexBytes `json:"censusId"`
 	CensusURI string         `json:"censusUri"`
 }
+
 type signKey struct {
 	PrivKey string `json:"privKey"`
 	PubKey  string `json:"pubKey"`
@@ -64,7 +66,6 @@ func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*e
 			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub, Proof: proofs[i]})
 		} else {
 			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub})
-
 		}
 	}
 	kb.CensusID = censusID
@@ -74,7 +75,7 @@ func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*e
 		return err
 	}
 	log.Infof("saved census cache file has %d bytes, got %d keys", len(j), len(keys))
-	return os.WriteFile(filepath, j, 0644)
+	return os.WriteFile(filepath, j, 0o644)
 }
 
 func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, []byte, string, error) {
@@ -118,7 +119,7 @@ func RandomHex(n int) string {
 }
 
 func genVote(encrypted bool, keys []string) ([]byte, error) {
-	vp := &types.VotePackage{
+	vp := &vochain.VotePackage{
 		Votes: []int{1, 2, 3, 4, 5, 6},
 	}
 	var vpBytes []byte

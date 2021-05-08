@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"nhooyr.io/websocket"
 )
 
@@ -67,7 +67,7 @@ func (c *Client) CheckClose(err *error) {
 }
 
 // Request makes a request to the previously connected endpoint
-func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*types.MetaResponse, error) {
+func (c *Client) Request(req api.MetaRequest, signer *ethereum.SignKeys) (*api.MetaResponse, error) {
 	method := req.Method
 	req.Timestamp = int32(time.Now().Unix())
 	reqInner, err := crypto.SortedMarshalJSON(req)
@@ -82,7 +82,7 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 		}
 	}
 
-	reqOuter := types.RequestMessage{
+	reqOuter := api.RequestMessage{
 		ID:          fmt.Sprintf("%d", rand.Intn(1000)),
 		Signature:   signature,
 		MetaRequest: reqInner,
@@ -117,7 +117,7 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 		resp.Body.Close()
 	}
 	log.Debugf("response: %s", message)
-	var respOuter types.ResponseMessage
+	var respOuter api.ResponseMessage
 	if err := json.Unmarshal(message, &respOuter); err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
@@ -127,7 +127,7 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 	if len(respOuter.Signature) == 0 {
 		return nil, fmt.Errorf("%s: empty signature in response: %s", method, message)
 	}
-	var respInner types.MetaResponse
+	var respInner api.MetaResponse
 	if err := json.Unmarshal(respOuter.MetaResponse, &respInner); err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
@@ -135,9 +135,9 @@ func (c *Client) Request(req types.MetaRequest, signer *ethereum.SignKeys) (*typ
 }
 
 // Request makes a request to the previously connected endpoint
-func (c *Client) ForTest(tb testing.TB, req *types.MetaRequest) func(
-	method string, signer *ethereum.SignKeys) *types.MetaResponse {
-	return func(method string, signer *ethereum.SignKeys) *types.MetaResponse {
+func (c *Client) ForTest(tb testing.TB, req *api.MetaRequest) func(
+	method string, signer *ethereum.SignKeys) *api.MetaResponse {
+	return func(method string, signer *ethereum.SignKeys) *api.MetaResponse {
 		if req == nil {
 			tb.Fatalf("request is nil")
 		}
@@ -166,7 +166,7 @@ func NewForTest(tb testing.TB, addr string) *TestClient {
 	return &TestClient{tb: tb, client: *client}
 }
 
-func (c *TestClient) Request(req types.MetaRequest, signer *ethereum.SignKeys) *types.MetaResponse {
+func (c *TestClient) Request(req api.MetaRequest, signer *ethereum.SignKeys) *api.MetaResponse {
 	resp, err := c.client.Request(req, signer)
 	if err != nil {
 		c.tb.Fatal(err)

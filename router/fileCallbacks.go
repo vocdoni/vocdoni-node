@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 )
 
 const (
@@ -56,7 +56,7 @@ func (r *Router) fetchFile(request routerRequest) {
 	}
 
 	log.Debugf("file fetched, size %d", len(content))
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Content = content
 	request.Send(r.buildReply(request, &response))
 }
@@ -76,7 +76,7 @@ func (r *Router) addFile(request routerRequest) {
 			return
 		}
 		log.Debugf("added file %s, size %d", cid, len(request.Content))
-		var response types.MetaResponse
+		var response api.MetaResponse
 		response.URI = r.storage.URIprefix() + cid
 		request.Send(r.buildReply(request, &response))
 	}
@@ -109,7 +109,7 @@ func (r *Router) pinList(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("internal error parsing pins (%s)", err))
 		return
 	}
-	var response types.MetaResponse
+	var response api.MetaResponse
 	response.Files = pinsJSONArray
 	request.Send(r.buildReply(request, &response))
 }
@@ -123,7 +123,7 @@ func (r *Router) pinFile(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("error pinning file (%s)", err))
 		return
 	}
-	var response types.MetaResponse
+	var response api.MetaResponse
 	request.Send(r.buildReply(request, &response))
 }
 
@@ -136,7 +136,7 @@ func (r *Router) unpinFile(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("could not unpin file (%s)", err))
 		return
 	}
-	var response types.MetaResponse
+	var response api.MetaResponse
 	request.Send(r.buildReply(request, &response))
 }
 

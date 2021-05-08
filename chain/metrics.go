@@ -57,7 +57,6 @@ func (e *EthChainContext) getMetrics(ctx context.Context) {
 	EthereumHeight.Set(float64(info.Height))
 	EthereumMaxHeight.Set(float64(info.MaxHeight))
 	EthereumPeers.Set(float64(info.Peers))
-
 }
 
 // CollectMetrics constantly updates the metric values for prometheus

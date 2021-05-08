@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
-	"go.vocdoni.io/dvote/types"
 )
 
 var fileCmd = &cobra.Command{
@@ -56,7 +56,7 @@ func fileAdd(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{
+	req := api.MetaRequest{
 		Method: "addFile",
 		Type:   "ipfs",
 	}
@@ -92,7 +92,7 @@ func fileFetch(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{
+	req := api.MetaRequest{
 		Method: "fetchFile",
 		URI:    args[0],
 	}
@@ -122,7 +122,7 @@ func pinList(cmd *cobra.Command, args []string) error {
 	// Increase the default response size for large lists
 	cl.WS.SetReadLimit(32768 * 16)
 
-	req := types.MetaRequest{Method: "pinList"}
+	req := api.MetaRequest{Method: "pinList"}
 	resp, err := cl.Request(req, opt.signKey)
 	if err != nil {
 		return err

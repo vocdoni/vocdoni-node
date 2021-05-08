@@ -48,7 +48,7 @@ func main() {
 		_, privKey = sk.HexString()
 	} else {
 		pk := make([]byte, 64)
-		kfile, err := os.OpenFile(*dataDir+"/.ipfsSync.key", os.O_CREATE|os.O_RDWR, 0600)
+		kfile, err := os.OpenFile(*dataDir+"/.ipfsSync.key", os.O_CREATE|os.O_RDWR, 0o600)
 		if err != nil {
 			log.Fatal(err)
 		}

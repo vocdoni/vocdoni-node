@@ -18,9 +18,9 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
 
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -43,12 +43,14 @@ type BaseApplication struct {
 	blockCache         *lru.Cache
 	height             *uint32
 	timestamp          *int64
+	chainId            string
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
 // NewBaseApplication creates a new BaseApplication given a name an a DB backend.
-// Node & callback functions still need to be initialized, if used.
+// Node still needs to be initialized with SetNode
+// Callback functions still need to be initialized
 func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	state, err := NewState(dbpath)
 	if err != nil {
@@ -64,6 +66,15 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 		height:     new(uint32),
 		timestamp:  new(int64),
 	}, nil
+}
+
+func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byte) error {
+	var err error
+	if app.Node, err = newTendermint(app, vochaincfg, genesis); err != nil {
+		return fmt.Errorf("could not set application Node: %s", err)
+	}
+	app.chainId = app.Node.GenesisDoc().ChainID
+	return nil
 }
 
 // SetDefaultMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use the
@@ -124,6 +135,11 @@ func (app *BaseApplication) Timestamp() int64 {
 	return atomic.LoadInt64(app.timestamp)
 }
 
+// ChainID returns the Node ChainID
+func (app *BaseApplication) ChainID() string {
+	return app.chainId
+}
+
 // MempoolRemoveTx removes a transaction (identifier by its vochain.TxKey() hash)
 // from the Tendermint mempool.
 func (app *BaseApplication) MempoolRemoveTx(txKey [32]byte) {
@@ -169,6 +185,19 @@ func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedT
 	return tx, proto.Unmarshal(block.Txs[txIndex], tx)
 }
 
+// GetTxHash retreives a vochain transaction, with its hash, from the blockstore
+func (app *BaseApplication) GetTxHash(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
+	block := app.GetBlockByHeight(int64(height))
+	if block == nil {
+		return nil, nil, fmt.Errorf("unable to get block by height: %d", height)
+	}
+	if int32(len(block.Txs)) <= txIndex {
+		return nil, nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
+	}
+	tx := &models.SignedTx{}
+	return tx, tmtypes.Tx(block.Txs[txIndex]).Hash(), proto.Unmarshal(block.Txs[txIndex], tx)
+}
+
 // SendTX sends a transaction to the mempool (sync)
 func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error) {
 	if app.fnGetBlockByHeight == nil {
@@ -208,7 +237,7 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
 	// setting the app initial state with validators, oracles, height = 0 and empty apphash
 	// unmarshal app state from genesis
-	var genesisAppState types.GenesisAppState
+	var genesisAppState GenesisAppState
 	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
 		fmt.Printf("%s\n", req.AppStateBytes)

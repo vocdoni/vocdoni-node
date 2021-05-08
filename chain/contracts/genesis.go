@@ -213,7 +213,6 @@ func (_Genesis *GenesisCaller) Get(opts *bind.CallOpts, chainId uint32) (struct 
 	outstruct.Oracles = *abi.ConvertType(out[2], new([]common.Address)).(*[]common.Address)
 
 	return *outstruct, err
-
 }
 
 // Get is a free data retrieval call binding the contract method 0xd8a26e3a.
@@ -244,7 +243,6 @@ func (_Genesis *GenesisCallerSession) Get(chainId uint32) (struct {
 func (_Genesis *GenesisCaller) GetChainCount(opts *bind.CallOpts) (uint32, error) {
 	var out []interface{}
 	err := _Genesis.contract.Call(opts, &out, "getChainCount")
-
 	if err != nil {
 		return *new(uint32), err
 	}
@@ -252,7 +250,6 @@ func (_Genesis *GenesisCaller) GetChainCount(opts *bind.CallOpts) (uint32, error
 	out0 := *abi.ConvertType(out[0], new(uint32)).(*uint32)
 
 	return out0, err
-
 }
 
 // GetChainCount is a free data retrieval call binding the contract method 0xd25d23bd.
@@ -275,7 +272,6 @@ func (_Genesis *GenesisCallerSession) GetChainCount() (uint32, error) {
 func (_Genesis *GenesisCaller) IsOracle(opts *bind.CallOpts, chainId uint32, oracleAddress common.Address) (bool, error) {
 	var out []interface{}
 	err := _Genesis.contract.Call(opts, &out, "isOracle", chainId, oracleAddress)
-
 	if err != nil {
 		return *new(bool), err
 	}
@@ -283,7 +279,6 @@ func (_Genesis *GenesisCaller) IsOracle(opts *bind.CallOpts, chainId uint32, ora
 	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
-
 }
 
 // IsOracle is a free data retrieval call binding the contract method 0x0aa4bac2.
@@ -306,7 +301,6 @@ func (_Genesis *GenesisCallerSession) IsOracle(chainId uint32, oracleAddress com
 func (_Genesis *GenesisCaller) IsValidator(opts *bind.CallOpts, chainId uint32, validatorPublicKey []byte) (bool, error) {
 	var out []interface{}
 	err := _Genesis.contract.Call(opts, &out, "isValidator", chainId, validatorPublicKey)
-
 	if err != nil {
 		return *new(bool), err
 	}
@@ -314,7 +308,6 @@ func (_Genesis *GenesisCaller) IsValidator(opts *bind.CallOpts, chainId uint32, 
 	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
 
 	return out0, err
-
 }
 
 // IsValidator is a free data retrieval call binding the contract method 0x74af92a2.
@@ -534,7 +527,6 @@ type GenesisChainRegistered struct {
 //
 // Solidity: event ChainRegistered(uint32 chainId)
 func (_Genesis *GenesisFilterer) FilterChainRegistered(opts *bind.FilterOpts) (*GenesisChainRegisteredIterator, error) {
-
 	logs, sub, err := _Genesis.contract.FilterLogs(opts, "ChainRegistered")
 	if err != nil {
 		return nil, err
@@ -546,7 +538,6 @@ func (_Genesis *GenesisFilterer) FilterChainRegistered(opts *bind.FilterOpts) (*
 //
 // Solidity: event ChainRegistered(uint32 chainId)
 func (_Genesis *GenesisFilterer) WatchChainRegistered(opts *bind.WatchOpts, sink chan<- *GenesisChainRegistered) (event.Subscription, error) {
-
 	logs, sub, err := _Genesis.contract.WatchLogs(opts, "ChainRegistered")
 	if err != nil {
 		return nil, err
@@ -668,7 +659,6 @@ type GenesisGenesisUpdated struct {
 //
 // Solidity: event GenesisUpdated(uint32 chainId)
 func (_Genesis *GenesisFilterer) FilterGenesisUpdated(opts *bind.FilterOpts) (*GenesisGenesisUpdatedIterator, error) {
-
 	logs, sub, err := _Genesis.contract.FilterLogs(opts, "GenesisUpdated")
 	if err != nil {
 		return nil, err
@@ -680,7 +670,6 @@ func (_Genesis *GenesisFilterer) FilterGenesisUpdated(opts *bind.FilterOpts) (*G
 //
 // Solidity: event GenesisUpdated(uint32 chainId)
 func (_Genesis *GenesisFilterer) WatchGenesisUpdated(opts *bind.WatchOpts, sink chan<- *GenesisGenesisUpdated) (event.Subscription, error) {
-
 	logs, sub, err := _Genesis.contract.WatchLogs(opts, "GenesisUpdated")
 	if err != nil {
 		return nil, err
@@ -803,7 +792,6 @@ type GenesisOracleAdded struct {
 //
 // Solidity: event OracleAdded(uint32 chainId, address oracleAddress)
 func (_Genesis *GenesisFilterer) FilterOracleAdded(opts *bind.FilterOpts) (*GenesisOracleAddedIterator, error) {
-
 	logs, sub, err := _Genesis.contract.FilterLogs(opts, "OracleAdded")
 	if err != nil {
 		return nil, err
@@ -815,7 +803,6 @@ func (_Genesis *GenesisFilterer) FilterOracleAdded(opts *bind.FilterOpts) (*Gene
 //
 // Solidity: event OracleAdded(uint32 chainId, address oracleAddress)
 func (_Genesis *GenesisFilterer) WatchOracleAdded(opts *bind.WatchOpts, sink chan<- *GenesisOracleAdded) (event.Subscription, error) {
-
 	logs, sub, err := _Genesis.contract.WatchLogs(opts, "OracleAdded")
 	if err != nil {
 		return nil, err
@@ -938,7 +925,6 @@ type GenesisOracleRemoved struct {
 //
 // Solidity: event OracleRemoved(uint32 chainId, address oracleAddress)
 func (_Genesis *GenesisFilterer) FilterOracleRemoved(opts *bind.FilterOpts) (*GenesisOracleRemovedIterator, error) {
-
 	logs, sub, err := _Genesis.contract.FilterLogs(opts, "OracleRemoved")
 	if err != nil {
 		return nil, err
@@ -950,7 +936,6 @@ func (_Genesis *GenesisFilterer) FilterOracleRemoved(opts *bind.FilterOpts) (*Ge
 //
 // Solidity: event OracleRemoved(uint32 chainId, address oracleAddress)
 func (_Genesis *GenesisFilterer) WatchOracleRemoved(opts *bind.WatchOpts, sink chan<- *GenesisOracleRemoved) (event.Subscription, error) {
-
 	logs, sub, err := _Genesis.contract.WatchLogs(opts, "OracleRemoved")
 	if err != nil {
 		return nil, err
@@ -1073,7 +1058,6 @@ type GenesisValidatorAdded struct {
 //
 // Solidity: event ValidatorAdded(uint32 chainId, bytes validatorPublicKey)
 func (_Genesis *GenesisFilterer) FilterValidatorAdded(opts *bind.FilterOpts) (*GenesisValidatorAddedIterator, error) {
-
 	logs, sub, err := _Genesis.contract.FilterLogs(opts, "ValidatorAdded")
 	if err != nil {
 		return nil, err
@@ -1085,7 +1069,6 @@ func (_Genesis *GenesisFilterer) FilterValidatorAdded(opts *bind.FilterOpts) (*G
 //
 // Solidity: event ValidatorAdded(uint32 chainId, bytes validatorPublicKey)
 func (_Genesis *GenesisFilterer) WatchValidatorAdded(opts *bind.WatchOpts, sink chan<- *GenesisValidatorAdded) (event.Subscription, error) {
-
 	logs, sub, err := _Genesis.contract.WatchLogs(opts, "ValidatorAdded")
 	if err != nil {
 		return nil, err
@@ -1208,7 +1191,6 @@ type GenesisValidatorRemoved struct {
 //
 // Solidity: event ValidatorRemoved(uint32 chainId, bytes validatorPublicKey)
 func (_Genesis *GenesisFilterer) FilterValidatorRemoved(opts *bind.FilterOpts) (*GenesisValidatorRemovedIterator, error) {
-
 	logs, sub, err := _Genesis.contract.FilterLogs(opts, "ValidatorRemoved")
 	if err != nil {
 		return nil, err
@@ -1220,7 +1202,6 @@ func (_Genesis *GenesisFilterer) FilterValidatorRemoved(opts *bind.FilterOpts) (
 //
 // Solidity: event ValidatorRemoved(uint32 chainId, bytes validatorPublicKey)
 func (_Genesis *GenesisFilterer) WatchValidatorRemoved(opts *bind.WatchOpts, sink chan<- *GenesisValidatorRemoved) (event.Subscription, error) {
-
 	logs, sub, err := _Genesis.contract.WatchLogs(opts, "ValidatorRemoved")
 	if err != nil {
 		return nil, err

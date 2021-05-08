@@ -67,10 +67,11 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.Websockets = *flag.Bool("apiws", true, "enable websockets transport for the API")
 	globalCfg.API.HTTP = *flag.Bool("apihttp", true, "enable http transport for the API")
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable the file API")
-	globalCfg.API.Census = *flag.Bool("censusApi", true, "enable the census API")
+	globalCfg.API.Census = *flag.Bool("censusApi", false, "enable the census API")
 	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable the vote API")
 	globalCfg.API.Tendermint = *flag.Bool("tendermintApi", false, "make the Tendermint API public available")
 	globalCfg.API.Results = *flag.Bool("resultsApi", true, "enable the results API")
+	globalCfg.API.Indexer = *flag.Bool("indexerApi", false, "enable the indexer API (required for explorer)")
 	globalCfg.API.Route = *flag.String("apiRoute", "/", "dvote API base route for HTTP and Websockets")
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false, "allows private methods over the APIs")
 	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
@@ -105,8 +106,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
 	globalCfg.VochainConfig.RPCListen = *flag.String("vochainRPCListen", "127.0.0.1:26657", "rpc host and port to listen for the voting chain")
 	globalCfg.VochainConfig.CreateGenesis = *flag.Bool("vochainCreateGenesis", false, "create own/testing genesis file on vochain")
-	globalCfg.VochainConfig.Genesis = *flag.String("vochainGenesis", "", "use alternative genesis file for the voting chain")
-	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "error", "voting chain node log level")
+	globalCfg.VochainConfig.Genesis = *flag.String("vochainGenesis", "", "use alternative genesis file for the vochain")
+	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "none", "tendermint node log level (error, info, debug, nonde)")
 	globalCfg.VochainConfig.LogLevelMemPool = *flag.String("vochainLogLevelMemPool", "error", "tendermint mempool log level")
 	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
 	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
@@ -167,6 +168,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("api.Census", flag.Lookup("censusApi"))
 	viper.BindPFlag("api.Vote", flag.Lookup("voteApi"))
 	viper.BindPFlag("api.Results", flag.Lookup("resultsApi"))
+	viper.BindPFlag("api.Indexer", flag.Lookup("indexerApi"))
 	viper.BindPFlag("api.Tendermint", flag.Lookup("tendermintApi"))
 	viper.BindPFlag("api.Route", flag.Lookup("apiRoute"))
 	viper.BindPFlag("api.AllowPrivate", flag.Lookup("apiAllowPrivate"))
@@ -448,7 +450,8 @@ func main() {
 	}
 
 	// Ethereum service
-	if (globalCfg.Mode == types.ModeGateway && globalCfg.W3Config.Enabled) || globalCfg.Mode == types.ModeOracle || globalCfg.Mode == types.ModeWeb3 {
+	if (globalCfg.Mode == types.ModeGateway && globalCfg.W3Config.Enabled) ||
+		globalCfg.Mode == types.ModeOracle || globalCfg.Mode == types.ModeWeb3 {
 		node, err = service.Ethereum(globalCfg.EthConfig, globalCfg.W3Config, pxy, signer, ma)
 		if err != nil {
 			log.Fatal(err)
@@ -459,7 +462,8 @@ func main() {
 	if !globalCfg.API.Vote && globalCfg.API.Census {
 		log.Fatal("census API needs the vote API enabled")
 	}
-	if (globalCfg.Mode == types.ModeGateway && globalCfg.API.Vote) || globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle {
+	if (globalCfg.Mode == types.ModeGateway && globalCfg.API.Vote) ||
+		globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle {
 		scrutinizer := (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) || (globalCfg.Mode == types.ModeOracle)
 		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma, cm)
 		if err != nil {
@@ -496,7 +500,10 @@ func main() {
 
 	// Start keykeeper service
 	if globalCfg.Mode == types.ModeOracle && globalCfg.VochainConfig.KeyKeeperIndex > 0 {
-		kk, err = keykeeper.NewKeyKeeper(globalCfg.VochainConfig.DataDir+"/keykeeper", vnode, signer, globalCfg.VochainConfig.KeyKeeperIndex)
+		kk, err = keykeeper.NewKeyKeeper(globalCfg.VochainConfig.DataDir+"/keykeeper",
+			vnode,
+			signer,
+			globalCfg.VochainConfig.KeyKeeperIndex)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -504,7 +511,8 @@ func main() {
 		go kk.PrintInfo(time.Second * 20)
 	}
 
-	if (globalCfg.Mode == types.ModeGateway && globalCfg.W3Config.Enabled) || globalCfg.Mode == types.ModeOracle {
+	if (globalCfg.Mode == types.ModeGateway && globalCfg.W3Config.Enabled) ||
+		globalCfg.Mode == types.ModeOracle {
 		// Wait for Ethereum to be ready
 		if !globalCfg.EthConfig.NoWaitSync {
 			requiredPeers := 2
@@ -513,7 +521,8 @@ func main() {
 			}
 			for {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-				if info, err := node.SyncInfo(ctx); err == nil && info.Synced && info.Peers >= requiredPeers && info.Height > 0 {
+				if info, err := node.SyncInfo(ctx); err == nil &&
+					info.Synced && info.Peers >= requiredPeers && info.Height > 0 {
 					log.Infof("ethereum blockchain synchronized (%+v)", info)
 					cancel()
 					break
@@ -530,7 +539,8 @@ func main() {
 			switch {
 			case globalCfg.W3Config.W3External == "":
 				// If local ethereum node enabled, use the Go-Ethereum websockets endpoint
-				w3uri = "ws://" + net.JoinHostPort(globalCfg.W3Config.RPCHost, fmt.Sprintf("%d", globalCfg.W3Config.RPCPort))
+				w3uri = "ws://" + net.JoinHostPort(globalCfg.W3Config.RPCHost,
+					fmt.Sprintf("%d", globalCfg.W3Config.RPCPort))
 			case strings.HasPrefix(globalCfg.W3Config.W3External, "ws"):
 				w3uri = globalCfg.W3Config.W3External
 			case strings.HasSuffix(globalCfg.W3Config.W3External, "ipc"):
@@ -584,7 +594,15 @@ func main() {
 	if globalCfg.Mode == types.ModeGateway {
 		// dvote API service
 		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
-			if err := service.API(globalCfg.API, pxy, storage, cm, vnode, sc, vinfo, globalCfg.VochainConfig.RPCListen, signer, ma); err != nil {
+			if err := service.API(globalCfg.API,
+				pxy,
+				storage,
+				cm, vnode,
+				sc,
+				vinfo,
+				globalCfg.VochainConfig.RPCListen,
+				signer,
+				ma); err != nil {
 				log.Fatal(err)
 			}
 		}

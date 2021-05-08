@@ -87,7 +87,6 @@ func (v *State) CountProcesses(isQuery bool) int64 {
 		return int64(v.Store.ImmutableTree(ProcessTree).Count())
 	}
 	return int64(v.Store.Tree(ProcessTree).Count())
-
 }
 
 // set process stores in the database the process
@@ -251,7 +250,7 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 			"cannot update census, only processes with dynamic census can update its census")
 	}
 	// census origin
-	if !types.CensusOrigins[process.CensusOrigin].AllowCensusUpdate {
+	if !CensusOrigins[process.CensusOrigin].AllowCensusUpdate {
 		return fmt.Errorf(
 			"cannot update census, invalid census origin: %s", process.CensusOrigin.String())
 	}
@@ -267,7 +266,7 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 		return fmt.Errorf("cannot update census, same censusRoot")
 	}
 
-	if types.CensusOrigins[process.CensusOrigin].NeedsURI && censusURI == "" {
+	if CensusOrigins[process.CensusOrigin].NeedsURI && censusURI == "" {
 		return fmt.Errorf("process requires URI but an empty one was provided")
 	}
 

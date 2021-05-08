@@ -1,6 +1,7 @@
 package scrutinizer
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -13,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -55,7 +57,7 @@ func testEntityList(t *testing.T, entityCount int) {
 	var list []string
 	last := 0
 	for len(entities) <= entityCount {
-		list = sc.EntityList(10, last)
+		list = sc.EntityList(10, last, "")
 		if len(list) < 1 {
 			t.Log("list is empty")
 			break
@@ -70,6 +72,97 @@ func testEntityList(t *testing.T, entityCount int) {
 	}
 	if len(entities) < entityCount {
 		t.Fatalf("expected %d entityes, got %d", entityCount, len(entities))
+	}
+}
+
+func TestEntitySearch(t *testing.T) {
+	app, err := vochain.NewBaseApplication(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, err := NewScrutinizer(t.TempDir(), app)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entityIds := []string{
+		"1011d50537fa164b6fef261141797bbe4014526e",
+		"2011d50537fa164b6fef261141797bbe4014526e",
+		"3011d50537fa164b6fef261141797bbe4014526e",
+		"4011d50537fa164b6fef261141797bbe4014526e",
+		"5011d50537fa164b6fef261141797bbe4014526e",
+		"6011d50537fa164b6fef261141797bbe4014526e",
+		"7011d50537fa164b6fef261141797bbe4014526e",
+		"8011d50537fa164b6fef261141797bbe4014526e",
+		"9011d50537fa164b6fef261141797bbe4014526e",
+	}
+	// Add random entities before searchable ones
+	for i := 0; i < 5; i++ {
+		pid := util.RandomBytes(32)
+		if err := app.State.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     util.RandomBytes(20),
+			BlockCount:   10,
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := sc.newEmptyProcess(pid); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, entity := range entityIds {
+		pid := util.RandomBytes(32)
+		entityId, err := hex.DecodeString(entity)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := app.State.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     entityId,
+			BlockCount:   10,
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := sc.newEmptyProcess(pid); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Add random entities after searchable ones
+	for i := 0; i < 5; i++ {
+		pid := util.RandomBytes(32)
+		if err := app.State.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     util.RandomBytes(20),
+			BlockCount:   10,
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := sc.newEmptyProcess(pid); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var list []string
+	// Exact entity search
+	list = sc.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e")
+	if len(list) < 1 {
+		t.Fatalf("expected 1 entity, got %d", len(list))
+	}
+	// Search for nonexistent entity
+	list = sc.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f")
+	if len(list) > 0 {
+		t.Fatalf("expected 0 entities, got %d", len(list))
+	}
+	// Search containing part of all manually-defined entities
+	list = sc.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e")
+	log.Info(list)
+	if len(list) < len(entityIds) {
+		t.Fatalf("expected %d entities, got %d", len(entityIds), len(list))
 	}
 }
 
@@ -123,7 +216,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	last := 0
 	var list [][]byte
 	for len(procs) < procsCount {
-		list, err = sc.ProcessList(eidTest, 0, "", false, last, 10)
+		list, err = sc.ProcessList(eidTest, last, 10, "", 0, "", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -141,6 +234,124 @@ func testProcessList(t *testing.T, procsCount int) {
 	}
 	if len(procs) != procsCount {
 		t.Fatalf("expected %d processes, got %d", procsCount, len(procs))
+	}
+}
+
+func TestProcessSearch(t *testing.T) {
+	app, err := vochain.NewBaseApplication(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, err := NewScrutinizer(t.TempDir(), app)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add 10 entities and process for storing random content
+	for i := 0; i < 10; i++ {
+		pid := util.RandomBytes(32)
+		err := app.State.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     util.RandomBytes(20),
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+		})
+		qt.Assert(t, err, qt.IsNil)
+		err = sc.newEmptyProcess(pid)
+		qt.Assert(t, err, qt.IsNil)
+	}
+
+	processIds := []string{
+		"1011d50537fa164b6fef261141797bbe4014526e",
+		"2011d50537fa164b6fef261141797bbe4014526e",
+		"3011d50537fa164b6fef261141797bbe4014526e",
+		"4011d50537fa164b6fef261141797bbe4014526e",
+		"5011d50537fa164b6fef261141797bbe4014526e",
+		"6011d50537fa164b6fef261141797bbe4014526e",
+		"7011d50537fa164b6fef261141797bbe4014526e",
+		"8011d50537fa164b6fef261141797bbe4014526e",
+		"9011d50537fa164b6fef261141797bbe4014526e",
+	}
+	// For a entity, add 25 processes (this will be the queried entity)
+	eidTest := util.RandomBytes(20)
+	for _, process := range processIds {
+		pid, err := hex.DecodeString(process)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := app.State.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     eidTest,
+			BlockCount:   10,
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := sc.newEmptyProcess(pid); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	endedPIDs := []string{
+		"10c6ca22d2c175a1fbdd15d7595ae532bb1094b5",
+		"20c6ca22d2c175a1fbdd15d7595ae532bb1094b5",
+	}
+	// For a entity, add 25 processes (this will be the queried entity)
+	for _, process := range endedPIDs {
+		pid, err := hex.DecodeString(process)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := app.State.AddProcess(&models.Process{
+			ProcessId:    pid,
+			EntityId:     eidTest,
+			BlockCount:   10,
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType: &models.EnvelopeType{},
+			Status:       models.ProcessStatus_ENDED,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := sc.newEmptyProcess(pid); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Exact process search
+	list, err := sc.ProcessList(eidTest, 0, 10,
+		"4011d50537fa164b6fef261141797bbe4014526e", 0, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) < 1 {
+		t.Fatalf("expected 1 process, got %d", len(list))
+	}
+	// Search for nonexistent process
+	list, err = sc.ProcessList(eidTest, 0, 10,
+		"4011d50537fa164b6fef261141797bbe4014526f", 0, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) > 0 {
+		t.Fatalf("expected 0 processes, got %d", len(list))
+	}
+	// Search containing part of all manually-defined processes
+	list, err = sc.ProcessList(eidTest, 0, 10, "011d50537fa164b6fef261141797bbe4014526e", 0, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) < len(processIds) {
+		t.Fatalf("expected %d processes, got %d", len(processIds), len(list))
+	}
+
+	list, err = sc.ProcessList(eidTest, 0, 100,
+		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, "ENDED", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) < len(endedPIDs) {
+		t.Fatalf("expected %d processes, got %d", len(endedPIDs), len(list))
 	}
 }
 
@@ -189,25 +400,25 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	}
 
 	// Get the process list for namespace 123
-	list, err := sc.ProcessList(eid20, 123, "", false, 0, 100)
+	list, err := sc.ProcessList(eid20, 0, 100, "", 123, "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
 
 	// Get the process list for all namespaces
-	list, err = sc.ProcessList(nil, 0, "", false, 0, 100)
+	list, err = sc.ProcessList(nil, 0, 100, "", 0, "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10 + 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 20)
 
 	// Get the process list for namespace 10
-	list, err = sc.ProcessList(nil, 10, "", false, 0, 100)
+	list, err = sc.ProcessList(nil, 0, 100, "", 10, "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 1)
 
 	// Get the process list for namespace 10
-	list, err = sc.ProcessList(nil, 0, "READY", false, 0, 100)
+	list, err = sc.ProcessList(nil, 0, 100, "", 0, "READY", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
@@ -254,7 +465,7 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
-	vp, err := json.Marshal(types.VotePackage{
+	vp, err := json.Marshal(vochain.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomBytes(32)),
 		Votes: []int{1, 1, 1, 1},
 	})
@@ -372,13 +583,13 @@ func TestLiveResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
-	vp, err := json.Marshal(types.VotePackage{
+	vp, err := json.Marshal(vochain.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1, 1, 1},
 	})
 	qt.Assert(t, err, qt.IsNil)
-	r := &Results{
-		Votes:        newEmptyVotes(3, 100),
+	r := &indexertypes.Results{
+		Votes:        indexertypes.NewEmptyVotes(3, 100),
 		Weight:       new(big.Int).SetUint64(0),
 		VoteOpts:     &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
 		EnvelopeType: &models.EnvelopeType{},
@@ -499,7 +710,7 @@ func TestAddVote(t *testing.T) {
 }
 
 var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
-	vp, err := json.Marshal(types.VotePackage{
+	vp, err := json.Marshal(vochain.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: v,
 	})
@@ -516,9 +727,9 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
 	if err != nil {
 		return err
 	}
-	r := &Results{
+	r := &indexertypes.Results{
 		ProcessID:    pid,
-		Votes:        newEmptyVotes(int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
+		Votes:        indexertypes.NewEmptyVotes(int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
 		Weight:       new(big.Int).SetUint64(0),
 		Signatures:   []types.HexBytes{},
 		VoteOpts:     proc.VoteOpts,
@@ -703,7 +914,7 @@ func TestCountVotes(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Add 100 votes
-	vp, err := json.Marshal(types.VotePackage{
+	vp, err := json.Marshal(vochain.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1, 1, 1},
 	})

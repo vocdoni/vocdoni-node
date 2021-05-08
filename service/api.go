@@ -20,9 +20,9 @@ import (
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
-func API(apiconfig *config.API, pxy *mhttp.Proxy, storage data.Storage, cm *census.Manager, vapp *vochain.BaseApplication,
-	sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, vochainRPCaddr string, signer *ethereum.SignKeys, ma *metrics.Agent,
-) error {
+func API(apiconfig *config.API, pxy *mhttp.Proxy, storage data.Storage, cm *census.Manager,
+	vapp *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo,
+	vochainRPCaddr string, signer *ethereum.SignKeys, ma *metrics.Agent) error {
 	log.Infof("creating API service")
 	// API Endpoint initialization
 	listenerOutput := make(chan transports.Message)
@@ -48,7 +48,9 @@ func API(apiconfig *config.API, pxy *mhttp.Proxy, storage data.Storage, cm *cens
 		return err
 	}
 	htransport.Listen(listenerOutput)
-	htransport.AddNamespace(apiconfig.Route + "dvote")
+	if err := htransport.AddNamespace(apiconfig.Route + "dvote"); err != nil {
+		return err
+	}
 	log.Infof("%s API available at %s", htransport.ConnectionType(), apiconfig.Route+"dvote")
 
 	routerAPI := router.InitRouter(listenerOutput, storage, signer, ma, apiconfig.AllowPrivate)
@@ -60,18 +62,26 @@ func API(apiconfig *config.API, pxy *mhttp.Proxy, storage data.Storage, cm *cens
 		log.Info("enabling census API")
 		routerAPI.EnableCensusAPI(cm)
 	}
-	if apiconfig.Vote {
-		// todo: client params as cli flags
-		log.Info("enabling vote API")
+	if apiconfig.Vote || apiconfig.Results || apiconfig.Indexer {
 		routerAPI.Scrutinizer = sc
-		routerAPI.EnableVoteAPI(vapp, vi)
+		if apiconfig.Vote {
+			log.Info("enabling vote API")
+			routerAPI.EnableVoteAPI(vapp, vi)
+		}
+		if apiconfig.Results {
+			log.Info("enabling results API")
+			routerAPI.EnableResultsAPI(vapp, vi)
+		}
+		if apiconfig.Indexer {
+			log.Info("enabling indexer API")
+			routerAPI.EnableIndexerAPI(vapp, vi)
+		}
 	}
-
 	go routerAPI.Route()
 
 	go func() {
 		for {
-			time.Sleep(60 * time.Second)
+			time.Sleep(120 * time.Second)
 			log.Infof("[router info] privateReqs:%d publicReqs:%d", routerAPI.PrivateCalls, routerAPI.PublicCalls)
 		}
 	}()

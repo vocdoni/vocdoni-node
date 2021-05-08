@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"reflect"
 
 	"github.com/spf13/cobra"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/router"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 )
 
@@ -64,7 +63,7 @@ func processList(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getProcessList"}
+	req := api.MetaRequest{Method: "getProcessList"}
 	if len(args) >= 1 {
 		req.EntityId, err = hex.DecodeString(util.TrimHex(args[0]))
 		if err != nil {
@@ -110,7 +109,7 @@ func processInfo(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getProcessInfo"}
+	req := api.MetaRequest{Method: "getProcessInfo"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err
@@ -123,19 +122,7 @@ func processInfo(cmd *cobra.Command, args []string) error {
 	if !resp.Ok {
 		return fmt.Errorf(resp.Message)
 	}
-	buf := new(bytes.Buffer)
-	for k, v := range resp.ProcessInfo.(map[string]interface{}) {
-		value := new(bytes.Buffer)
-		if reflect.TypeOf(v).Kind() == reflect.Map {
-			for vk, vv := range v.(map[string]interface{}) {
-				value.WriteString(fmt.Sprintf("%s=%v ", vk, vv))
-			}
-		} else {
-			value.WriteString(fmt.Sprintf("%v", v))
-		}
-		buf.WriteString(fmt.Sprintf("%s: \t%s\n", k, value))
-	}
-	fmt.Println(buf.String())
+	fmt.Println(resp.Process.String())
 	return nil
 }
 
@@ -150,7 +137,7 @@ func processKeys(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getProcessKeys"}
+	req := api.MetaRequest{Method: "getProcessKeys"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err
@@ -200,7 +187,7 @@ func getResults(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getResults"}
+	req := api.MetaRequest{Method: "getResults"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err
@@ -231,7 +218,7 @@ func getResultsWeight(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getResultsWeight"}
+	req := api.MetaRequest{Method: "getResultsWeight"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err

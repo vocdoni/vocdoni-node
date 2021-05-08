@@ -38,9 +38,7 @@ var (
 	validatorKey = []byte("validator")
 )
 
-var (
-	ErrProcessNotFound = fmt.Errorf("process not found")
-)
+var ErrProcessNotFound = fmt.Errorf("process not found")
 
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
 var PrefixDBCacheSize = 0
@@ -79,7 +77,7 @@ func (e ErrHaltVochain) Unwrap() error { return e.reason }
 // State represents the state of the vochain application
 type State struct {
 	Store         statedb.StateDB
-	voteCache     map[[32]byte]*types.CacheTx
+	voteCache     map[[32]byte]*CacheTx
 	voteCacheLock sync.RWMutex
 	ImmutableState
 	MemPoolRemoveTxKey func([32]byte, bool)
@@ -116,14 +114,14 @@ func NewState(dataDir string) (*State, error) {
 			if err := initStore(dataDir, vs); err != nil {
 				return nil, fmt.Errorf("cannot init db: %s", err)
 			}
-			vs.voteCache = make(map[[32]byte]*types.CacheTx)
+			vs.voteCache = make(map[[32]byte]*CacheTx)
 			log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
 			return vs, nil
 		}
 		return nil, fmt.Errorf("unknown error loading state db: %v", err)
 	}
 
-	vs.voteCache = make(map[[32]byte]*types.CacheTx)
+	vs.voteCache = make(map[[32]byte]*CacheTx)
 	log.Infof("state database is ready at version %d with hash %x",
 		vs.Store.Version(), vs.Store.Hash())
 	vs.txCounter = new(int32)

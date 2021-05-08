@@ -22,6 +22,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -134,14 +135,14 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 
 	// census origin
 	censusOrigin := models.CensusOrigin(processMeta.ModeEnvelopeTypeCensusOrigin[2])
-	if _, ok := types.CensusOrigins[censusOrigin]; !ok {
+	if _, ok := vochain.CensusOrigins[censusOrigin]; !ok {
 		return nil, fmt.Errorf("census origin: %d not supported", censusOrigin)
 	}
 	processData.CensusOrigin = censusOrigin
 
 	// census URI
-	if types.CensusOrigins[censusOrigin].NeedsURI && len(processMeta.MetadataCensusRootCensusUri[2]) == 0 {
-		return nil, fmt.Errorf("census %s needs URI but non has been provided", types.CensusOrigins[censusOrigin].Name)
+	if vochain.CensusOrigins[censusOrigin].NeedsURI && len(processMeta.MetadataCensusRootCensusUri[2]) == 0 {
+		return nil, fmt.Errorf("census %s needs URI but non has been provided", vochain.CensusOrigins[censusOrigin].Name)
 	}
 	processData.CensusURI = &processMeta.MetadataCensusRootCensusUri[2]
 
@@ -192,7 +193,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	}
 
 	// if EVM census, check census root provided and get index slot from the token storage proof contract
-	if types.CensusOrigins[censusOrigin].NeedsIndexSlot {
+	if vochain.CensusOrigins[censusOrigin].NeedsIndexSlot {
 		// check valid storage root provided
 		// the holder address is choosen randomly
 		randSigner := ethereum.NewSignKeys()
@@ -321,10 +322,10 @@ func (ph *VotingHandle) SetCensusTxArgs(ctx context.Context, pid [types.ProcessI
 	}
 
 	censusOrigin := models.CensusOrigin(processData.ModeEnvelopeTypeCensusOrigin[2])
-	if !types.CensusOrigins[censusOrigin].AllowCensusUpdate {
+	if !vochain.CensusOrigins[censusOrigin].AllowCensusUpdate {
 		return nil, fmt.Errorf("cannot update census, invalid census origin")
 	}
-	if types.CensusOrigins[censusOrigin].NeedsURI && len(processData.MetadataCensusRootCensusUri[2]) == 0 {
+	if vochain.CensusOrigins[censusOrigin].NeedsURI && len(processData.MetadataCensusRootCensusUri[2]) == 0 {
 		return nil, fmt.Errorf("census %s needs URI but an empty census URI has been provided", censusOrigin.String())
 	}
 	setprocessTxArgs.CensusURI = &processData.MetadataCensusRootCensusUri[2]
@@ -487,7 +488,6 @@ func (e *ENSCallerHandler) Resolve(ctx context.Context, nameHash [32]byte, resol
 		resolvedAddr, err = e.Registry.Resolver(&ethbind.CallOpts{Context: tctx}, nameHash)
 	} else {
 		resolvedAddr, err = e.Resolver.Addr(&ethbind.CallOpts{Context: tctx}, nameHash)
-
 	}
 	if err != nil {
 		return "", fmt.Errorf("cannot resolve contract address: %w", err)

@@ -127,7 +127,7 @@ func (i *IPFSHandle) URIprefix() string {
 func PublishBytes(ctx context.Context, msg []byte, fileDir string, node *ipfscore.IpfsNode) (string, error) {
 	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(msg))
 	log.Infof("publishing file: %s", filePath)
-	err := os.WriteFile(filePath, msg, 0666)
+	err := os.WriteFile(filePath, msg, 0o666)
 	if err != nil {
 		return "", err
 	}

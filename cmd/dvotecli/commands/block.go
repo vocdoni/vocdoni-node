@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
-	"go.vocdoni.io/dvote/types"
 )
 
 var blockCmd = &cobra.Command{
@@ -53,7 +53,7 @@ func blockTime(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getBlockStatus"}
+	req := api.MetaRequest{Method: "getBlockStatus"}
 	resp, err := cl.Request(req, opt.signKey)
 	if err != nil {
 		return err

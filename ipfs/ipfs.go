@@ -32,12 +32,12 @@ func Init() error {
 		return fmt.Errorf("ipfs daemon is running. please stop it to run this command")
 	}
 
-	if err := os.MkdirAll(ConfigRoot, 0770); err != nil {
+	if err := os.MkdirAll(ConfigRoot, 0o770); err != nil {
 		return err
 	}
 
 	if err := os.WriteFile(filepath.Join(ConfigRoot, "version"),
-		[]byte(fmt.Sprintf("%d\n", RepoVersion)), 0666,
+		[]byte(fmt.Sprintf("%d\n", RepoVersion)), 0o666,
 	); err != nil {
 		return err
 	}

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 )
 
@@ -20,7 +19,7 @@ type censusImport struct {
 
 // importTree adds the raw (uncompressed) []byte tree to the cid namespace
 func (m *Manager) importTree(tree []byte, cid string) error {
-	var dump types.CensusDump
+	var dump CensusDump
 	if err := json.Unmarshal(tree, &dump); err != nil {
 		return fmt.Errorf("retrieved census does not have a valid format: (%s)", err)
 	}

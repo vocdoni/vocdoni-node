@@ -13,7 +13,8 @@ import (
 	"go.vocdoni.io/dvote/metrics"
 )
 
-func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys, ma *metrics.Agent) (storage data.Storage, err error) {
+func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys,
+	ma *metrics.Agent) (storage data.Storage, err error) {
 	log.Info("creating ipfs service")
 	var storageSync ipfssync.IPFSsync
 	if !ipfsconfig.NoInit {
@@ -26,7 +27,7 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys, ma *metrics.Age
 
 		go func() {
 			for {
-				time.Sleep(time.Second * 20)
+				time.Sleep(time.Second * 120)
 				tctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 				stats, err := storage.Stats(tctx)
 				cancel()

@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
-	"go.vocdoni.io/dvote/types"
 )
 
 var infoCmd = &cobra.Command{
@@ -26,7 +26,7 @@ func info(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := types.MetaRequest{Method: "getInfo"}
+	req := api.MetaRequest{Method: "getInfo"}
 	resp, err := cl.Request(req, nil)
 	if err != nil {
 		return err

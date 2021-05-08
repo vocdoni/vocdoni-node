@@ -3,7 +3,6 @@ package testutil
 import (
 	"bytes"
 	"sync"
-
 	"sync/atomic"
 
 	tmtypes "github.com/tendermint/tendermint/types"

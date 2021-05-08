@@ -194,7 +194,6 @@ func (_Namespaces *NamespacesTransactorRaw) Transact(opts *bind.TransactOpts, me
 func (_Namespaces *NamespacesCaller) NamespaceCount(opts *bind.CallOpts) (uint32, error) {
 	var out []interface{}
 	err := _Namespaces.contract.Call(opts, &out, "namespaceCount")
-
 	if err != nil {
 		return *new(uint32), err
 	}
@@ -202,7 +201,6 @@ func (_Namespaces *NamespacesCaller) NamespaceCount(opts *bind.CallOpts) (uint32
 	out0 := *abi.ConvertType(out[0], new(uint32)).(*uint32)
 
 	return out0, err
-
 }
 
 // NamespaceCount is a free data retrieval call binding the contract method 0xb40ec02b.
@@ -225,7 +223,6 @@ func (_Namespaces *NamespacesCallerSession) NamespaceCount() (uint32, error) {
 func (_Namespaces *NamespacesCaller) Namespaces(opts *bind.CallOpts, arg0 uint32) (common.Address, error) {
 	var out []interface{}
 	err := _Namespaces.contract.Call(opts, &out, "namespaces", arg0)
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -233,7 +230,6 @@ func (_Namespaces *NamespacesCaller) Namespaces(opts *bind.CallOpts, arg0 uint32
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // Namespaces is a free data retrieval call binding the contract method 0xf631514c.
@@ -256,7 +252,6 @@ func (_Namespaces *NamespacesCallerSession) Namespaces(arg0 uint32) (common.Addr
 func (_Namespaces *NamespacesCaller) ProcessContractAt(opts *bind.CallOpts, namespaceId uint32) (common.Address, error) {
 	var out []interface{}
 	err := _Namespaces.contract.Call(opts, &out, "processContractAt", namespaceId)
-
 	if err != nil {
 		return *new(common.Address), err
 	}
@@ -264,7 +259,6 @@ func (_Namespaces *NamespacesCaller) ProcessContractAt(opts *bind.CallOpts, name
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
 
 	return out0, err
-
 }
 
 // ProcessContractAt is a free data retrieval call binding the contract method 0x6d3005ae.
@@ -379,7 +373,6 @@ type NamespacesNamespaceRegistered struct {
 //
 // Solidity: event NamespaceRegistered(uint32 namespace)
 func (_Namespaces *NamespacesFilterer) FilterNamespaceRegistered(opts *bind.FilterOpts) (*NamespacesNamespaceRegisteredIterator, error) {
-
 	logs, sub, err := _Namespaces.contract.FilterLogs(opts, "NamespaceRegistered")
 	if err != nil {
 		return nil, err
@@ -391,7 +384,6 @@ func (_Namespaces *NamespacesFilterer) FilterNamespaceRegistered(opts *bind.Filt
 //
 // Solidity: event NamespaceRegistered(uint32 namespace)
 func (_Namespaces *NamespacesFilterer) WatchNamespaceRegistered(opts *bind.WatchOpts, sink chan<- *NamespacesNamespaceRegistered) (event.Subscription, error) {
-
 	logs, sub, err := _Namespaces.contract.WatchLogs(opts, "NamespaceRegistered")
 	if err != nil {
 		return nil, err

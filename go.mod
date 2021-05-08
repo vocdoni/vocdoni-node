@@ -45,7 +45,7 @@ require (
 	github.com/tendermint/tm-db v0.6.4
 	github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f
 	github.com/vocdoni/blind-ca v0.1.4
-	github.com/vocdoni/multirpc v0.1.22
+	github.com/vocdoni/multirpc v0.1.23
 	github.com/vocdoni/storage-proofs-eth-go v0.1.5
 	gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da
 	go.opencensus.io v0.23.0 // indirect

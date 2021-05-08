@@ -1,12 +1,19 @@
-package types
+package vochain
 
 import (
 	"encoding/json"
 	"math/big"
 	"time"
 
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
+
+// VotePackage represents the payload of a vote (usually base64 encoded)
+type VotePackage struct {
+	Nonce string `json:"nonce,omitempty"`
+	Votes []int  `json:"votes"`
+}
 
 // ________________________ STATE ________________________
 // Defined in ../../db/iavl.go for convenience
@@ -71,7 +78,7 @@ type GenesisDoc struct {
 	ChainID         string             `json:"chain_id"`
 	ConsensusParams *ConsensusParams   `json:"consensus_params,omitempty"`
 	Validators      []GenesisValidator `json:"validators,omitempty"`
-	AppHash         HexBytes           `json:"app_hash"`
+	AppHash         types.HexBytes     `json:"app_hash"`
 	AppState        json.RawMessage    `json:"app_state,omitempty"`
 }
 
@@ -90,8 +97,9 @@ type BlockParams struct {
 }
 
 type EvidenceParams struct {
-	MaxAgeNumBlocks int64         `json:"max_age_num_blocks"` // only accept new evidence more recent than this
-	MaxAgeDuration  time.Duration `json:"max_age_duration"`
+	MaxAgeNumBlocks int64 `json:"max_age_num_blocks"`
+	// only accept new evidence more recent than this
+	MaxAgeDuration time.Duration `json:"max_age_duration"`
 }
 
 type ValidatorParams struct {
@@ -99,7 +107,7 @@ type ValidatorParams struct {
 }
 
 type GenesisValidator struct {
-	Address HexBytes         `json:"address"`
+	Address types.HexBytes   `json:"address"`
 	PubKey  TendermintPubKey `json:"pub_key"`
 	Power   string           `json:"power"`
 	Name    string           `json:"name"`
@@ -108,15 +116,6 @@ type GenesisValidator struct {
 type TendermintPubKey struct {
 	Type  string `json:"type"`
 	Value []byte `json:"value"`
-}
-
-// ________________________ CALLBACKS DATA STRUCTS ________________________
-
-// ScrutinizerOnProcessData holds the required data for callbacks when
-// a new process is added into the vochain.
-type ScrutinizerOnProcessData struct {
-	EntityID  []byte
-	ProcessID []byte
 }
 
 // _________________________ CENSUS ORIGINS __________________________
@@ -131,8 +130,11 @@ type CensusProperties struct {
 }
 
 var CensusOrigins = map[models.CensusOrigin]CensusProperties{
-	models.CensusOrigin_OFF_CHAIN_TREE:          {Name: "offchain tree", NeedsDownload: true, NeedsURI: true, AllowCensusUpdate: true},
-	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: {Name: "offchain weighted tree", NeedsDownload: true, NeedsURI: true, WeightedSupport: true, AllowCensusUpdate: true},
-	models.CensusOrigin_ERC20:                   {Name: "erc20", NeedsDownload: true, WeightedSupport: true, NeedsIndexSlot: true},
-	models.CensusOrigin_OFF_CHAIN_CA:            {Name: "ca", WeightedSupport: true, NeedsURI: true, AllowCensusUpdate: true},
+	models.CensusOrigin_OFF_CHAIN_TREE: {Name: "offchain tree", NeedsDownload: true, NeedsURI: true, AllowCensusUpdate: true},
+	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: {
+		Name: "offchain weighted tree", NeedsDownload: true, NeedsURI: true,
+		WeightedSupport: true, AllowCensusUpdate: true,
+	},
+	models.CensusOrigin_ERC20:        {Name: "erc20", NeedsDownload: true, WeightedSupport: true, NeedsIndexSlot: true},
+	models.CensusOrigin_OFF_CHAIN_CA: {Name: "ca", WeightedSupport: true, NeedsURI: true, AllowCensusUpdate: true},
 }

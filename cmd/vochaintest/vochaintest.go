@@ -189,7 +189,6 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 		log.Fatal(err)
 	}
 	log.Infof("Census created and published\nRoot: %s\nURI: %s", root, uri)
-
 }
 
 func mkTreeVoteTest(host,
@@ -394,7 +393,6 @@ func cspVoteTest(
 	doubleVote, checkNullifiers bool,
 	gateways []string,
 ) {
-
 	var voters []*ethereum.SignKeys
 	var err error
 

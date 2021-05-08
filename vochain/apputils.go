@@ -14,7 +14,6 @@ import (
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"google.golang.org/protobuf/proto"
 
@@ -140,7 +139,7 @@ func GenerateNullifier(address ethcommon.Address, processID []byte) []byte {
 // if tmPrivKey not specified, uses the existing one or generates a new one
 func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV, error) {
 	stateFile := &privval.FilePVLastSignState{}
-	f, err := os.OpenFile(tconfig.PrivValidatorStateFile(), os.O_RDONLY|os.O_CREATE, 0666)
+	f, err := os.OpenFile(tconfig.PrivValidatorStateFile(), os.O_RDONLY|os.O_CREATE, 0o666)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -157,7 +156,7 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 		if err != nil {
 			log.Fatalf("cannot create priv_validator_state.json: %s", err)
 		}
-		err = tempfile.WriteFileAtomic(tconfig.PrivValidatorStateFile(), jsonBytes, 0600)
+		err = tempfile.WriteFileAtomic(tconfig.PrivValidatorStateFile(), jsonBytes, 0o600)
 		if err != nil {
 			log.Fatalf("cannot create priv_validator_state.json: %s", err)
 		}
@@ -201,18 +200,18 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
 }
 
 // NewGenesis creates a new genesis and return its bytes
-func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.ConsensusParams, validators []privval.FilePV, oracles []string) ([]byte, error) {
+func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *ConsensusParams, validators []privval.FilePV, oracles []string) ([]byte, error) {
 	// default consensus params
-	appState := new(types.GenesisAppState)
-	appState.Validators = make([]types.GenesisValidator, len(validators))
+	appState := new(GenesisAppState)
+	appState.Validators = make([]GenesisValidator, len(validators))
 	for idx, val := range validators {
 		pubk, err := val.GetPubKey()
 		if err != nil {
 			return []byte{}, err
 		}
-		appState.Validators[idx] = types.GenesisValidator{
+		appState.Validators[idx] = GenesisValidator{
 			Address: val.GetAddress().Bytes(),
-			PubKey:  types.TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
+			PubKey:  TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
 			Power:   "10",
 			Name:    strconv.Itoa(rand.Int()),
 		}
@@ -222,7 +221,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *types.C
 	if err != nil {
 		return []byte{}, err
 	}
-	genDoc := types.GenesisDoc{
+	genDoc := GenesisDoc{
 		ChainID:         chainID,
 		GenesisTime:     tmtime.Now(),
 		ConsensusParams: consensusParams,

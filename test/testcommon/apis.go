@@ -109,6 +109,8 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 			d.Scrutinizer = NewMockScrutinizer(tb, d, d.VochainAPP)
 			routerAPI.Scrutinizer = d.Scrutinizer
 			routerAPI.EnableVoteAPI(d.VochainAPP, nil)
+			routerAPI.EnableResultsAPI(d.VochainAPP, nil)
+			routerAPI.EnableIndexerAPI(d.VochainAPP, nil)
 		default:
 			tb.Fatalf("unknown api: %q", api)
 		}

@@ -1,8 +1,11 @@
 package scrutinizer
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/timshannon/badgerhold/v3"
@@ -10,20 +13,30 @@ import (
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
 
 // ProcessInfo returns the available information regarding an election process id
-func (s *Scrutinizer) ProcessInfo(pid []byte) (*Process, error) {
-	proc := &Process{}
+func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
+	proc := &indexertypes.Process{}
 	err := s.db.FindOne(proc, badgerhold.Where(badgerhold.Key).Eq(pid))
 	return proc, err
 }
 
 // ProcessList returns a list of process identifiers (PIDs) registered in the Vochain.
-// EntityID, namespace and status are optional filters, if declared as zero-values
-// will be ignored. Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
-func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
-	status string, withResults bool, from, max int) ([][]byte, error) {
+// EntityID, searchTerm, namespace, status, and withResults are optional filters, if
+// declared as zero-values will be ignored. SearchTerm is a partial or full PID.
+// Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
+func (s *Scrutinizer) ProcessList(entityID []byte,
+	from,
+	max int,
+	searchTerm string,
+	namespace uint32,
+	status string,
+	withResults bool) ([][]byte, error) {
+	if from < 0 {
+		return nil, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
+	}
 	// For filtering on Status we use a badgerhold match function.
 	// If status is not defined, then the match function will return always true.
 	statusnum := int32(-1)
@@ -62,10 +75,11 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 				Index("EntityID").
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
-			func(p *Process) error {
+			func(p *indexertypes.Process) error {
 				procs = append(procs, p.ID)
 				return nil
 			})
@@ -75,10 +89,11 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 				Index("Namespace").
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
-			func(p *Process) error {
+			func(p *indexertypes.Process) error {
 				procs = append(procs, p.ID)
 				return nil
 			})
@@ -87,10 +102,11 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 			badgerhold.Where("Status").MatchFunc(statusMatchFunc).
 				Index("Status").
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
-			func(p *Process) error {
+			func(p *indexertypes.Process) error {
 				procs = append(procs, p.ID)
 				return nil
 			})
@@ -101,10 +117,11 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 				And("Namespace").Eq(namespace).
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
+				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
 				Skip(from).
 				Limit(max),
-			func(p *Process) error {
+			func(p *indexertypes.Process) error {
 				procs = append(procs, p.ID)
 				return nil
 			})
@@ -114,24 +131,31 @@ func (s *Scrutinizer) ProcessList(entityID []byte, namespace uint32,
 }
 
 // ProcessCount return the number of processes indexed
-func (s *Scrutinizer) ProcessCount() int64 {
-	c, err := s.db.Count(&Process{}, nil)
-	if err != nil {
+func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
+	var c int
+	var err error
+	if len(entityID) == 0 {
+		// If no entity ID, return the cached count of all processes
+		return atomic.LoadInt64(s.countTotalProcesses)
+	}
+	if c, err = s.db.Count(&indexertypes.Process{},
+		badgerhold.Where("EntityID").Eq(entityID).Index("EntityID")); err != nil {
 		log.Warnf("cannot count processes: %v", err)
 	}
 	return int64(c)
 }
 
 // EntityList returns the list of entities indexed by the scrutinizer
-func (s *Scrutinizer) EntityList(max, from int) []string {
+// searchTerm is optional, if declared as zero-value
+// will be ignored. Searches against the ID field.
+func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []string {
 	entities := []string{}
 	if err := s.db.ForEach(
-		badgerhold.Where("ID").
-			Ne(&[]byte{}).
+		badgerhold.Where("ID").MatchFunc(searchMatchFunc(searchTerm)).
 			SortBy("CreationTime").
 			Skip(from).
 			Limit(max),
-		func(e *Entity) error {
+		func(e *indexertypes.Entity) error {
 			entities = append(entities, fmt.Sprintf("%x", e.ID))
 			return nil
 		}); err != nil {
@@ -142,11 +166,7 @@ func (s *Scrutinizer) EntityList(max, from int) []string {
 
 // EntityCount return the number of entities indexed by the scrutinizer
 func (s *Scrutinizer) EntityCount() int64 {
-	c, err := s.db.Count(&Entity{}, nil)
-	if err != nil {
-		log.Warnf("cannot count entities: %v", err)
-	}
-	return int64(c)
+	return atomic.LoadInt64(s.countTotalEntities)
 }
 
 // Return whether a process must have live results or not
@@ -164,7 +184,7 @@ func (s *Scrutinizer) isOpenProcess(processID []byte) (bool, error) {
 // compute results if the current heigh has scheduled ending processes
 func (s *Scrutinizer) computePendingProcesses(height uint32) {
 	if err := s.db.ForEach(badgerhold.Where("Rheight").Eq(height).Index("Rheight"),
-		func(p *Process) error {
+		func(p *indexertypes.Process) error {
 			initT := time.Now()
 			if err := s.ComputeResult(p.ID); err != nil {
 				log.Warnf("cannot compute results for %x: (%v)", p.ID, err)
@@ -204,10 +224,10 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	// Create results in the indexer database
 	s.addVoteLock.Lock()
-	if err := s.db.Insert(pid, &Results{
+	if err := s.db.Insert(pid, &indexertypes.Results{
 		ProcessID: pid,
 		// MaxValue requires +1 since 0 is also an option
-		Votes:        newEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+		Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
 		Weight:       new(big.Int).SetUint64(0),
 		Signatures:   []types.HexBytes{},
 		VoteOpts:     p.GetVoteOptions(),
@@ -218,16 +238,27 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	}
 	s.addVoteLock.Unlock()
 
+	// Increment the total process count cache
+	atomic.AddInt64(s.countTotalProcesses, 1)
+
 	// Get the block time from the Header
 	currentBlockTime := time.Unix(s.App.State.Header(false).Timestamp, 0)
 
 	// Add the entity to the indexer database
 	eid := p.GetEntityId()
-	if err := s.db.Upsert(eid, &Entity{
-		ID:           eid,
-		CreationTime: currentBlockTime,
-	}); err != nil {
-		return err
+	entity := &indexertypes.Entity{}
+	// If entity is not registered in db, add to entity count cache and insert to db
+	if err := s.db.FindOne(entity, badgerhold.Where("ID").Eq(eid)); err != nil {
+		if err != badgerhold.ErrNotFound {
+			return err
+		}
+		atomic.AddInt64(s.countTotalEntities, 1)
+		if err := s.db.Insert(eid, &indexertypes.Entity{
+			ID:           eid,
+			CreationTime: currentBlockTime,
+		}); err != nil {
+			return err
+		}
 	}
 
 	compResultsHeight := uint32(0)
@@ -240,7 +271,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	}
 
 	// Create and store process in the indexer database
-	proc := &Process{
+	proc := &indexertypes.Process{
 		ID:           pid,
 		EntityID:     eid,
 		StartBlock:   p.GetStartBlock(),
@@ -270,39 +301,51 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
-	return s.db.UpdateMatching(&Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
-		func(record interface{}) error {
-			update, ok := record.(*Process)
-			if !ok {
-				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
-			}
-			update.EndBlock = p.GetBlockCount() + p.GetStartBlock()
-			update.CensusRoot = p.GetCensusRoot()
-			update.CensusURI = p.GetCensusURI()
-			update.PrivateKeys = p.EncryptionPrivateKeys
-			update.PublicKeys = p.EncryptionPublicKeys
-			// If the process is transacting to CANCELED, ensure results are not computed and remove
-			// them from the KV database.
-			if update.Status != int32(models.ProcessStatus_CANCELED) &&
-				p.GetStatus() == models.ProcessStatus_CANCELED {
-				update.HaveResults = false
-				update.FinalResults = true
-				update.Rheight = 0
-				if err := s.db.Delete(pid, &Results{}); err != nil {
-					if err != badgerhold.ErrNotFound {
-						log.Warnf("cannot remove CANCELED results: %v", err)
-					}
+
+	updateFunc := func(record interface{}) error {
+		update, ok := record.(*indexertypes.Process)
+		if !ok {
+			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+		}
+		update.EndBlock = p.GetBlockCount() + p.GetStartBlock()
+		update.CensusRoot = p.GetCensusRoot()
+		update.CensusURI = p.GetCensusURI()
+		update.PrivateKeys = p.EncryptionPrivateKeys
+		update.PublicKeys = p.EncryptionPublicKeys
+		// If the process is transacting to CANCELED, ensure results are not computed and remove
+		// them from the KV database.
+		if update.Status != int32(models.ProcessStatus_CANCELED) &&
+			p.GetStatus() == models.ProcessStatus_CANCELED {
+			update.HaveResults = false
+			update.FinalResults = true
+			update.Rheight = 0
+			if err := s.db.Delete(pid, &indexertypes.Results{}); err != nil {
+				if err != badgerhold.ErrNotFound {
+					log.Warnf("cannot remove CANCELED results: %v", err)
 				}
 			}
-			update.Status = int32(p.GetStatus())
-			return nil
-		})
+		}
+		update.Status = int32(p.GetStatus())
+		return nil
+	}
+	// Retry if error is "Transaction Conflict"
+	for {
+		if err := s.db.UpdateMatching(&indexertypes.Process{},
+			badgerhold.Where(badgerhold.Key).Eq(pid), updateFunc); err != nil {
+			if strings.Contains(err.Error(), kvErrorStringForRetry) {
+				continue
+			}
+			return err
+		}
+		break
+	}
+	return nil
 }
 
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
-	return s.db.UpdateMatching(&Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
+	return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
 		func(record interface{}) error {
-			update, ok := record.(*Process)
+			update, ok := record.(*indexertypes.Process)
 			if !ok {
 				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 			}
@@ -311,17 +354,15 @@ func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
 		})
 }
 
-func newEmptyVotes(questions, options int) [][]*big.Int {
-	if questions == 0 || options == 0 {
-		return nil
-	}
-	results := [][]*big.Int{}
-	for i := 0; i < questions; i++ {
-		question := []*big.Int{}
-		for j := 0; j < options; j++ {
-			question = append(question, big.NewInt(0))
+func searchMatchFunc(searchTerm string) func(r *badgerhold.RecordAccess) (bool, error) {
+	return func(r *badgerhold.RecordAccess) (bool, error) {
+		if searchTerm == "" {
+			return true, nil
 		}
-		results = append(results, question)
+		// TODO search without having to convert each field to strings
+		if strings.Contains(hex.EncodeToString(r.Field().(types.HexBytes)), searchTerm) {
+			return true, nil
+		}
+		return false, nil
 	}
-	return results
 }
