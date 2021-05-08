@@ -309,25 +309,27 @@ func (t *Tree) caseB(nCPU, l int, kvs []kv) ([]int, []kv, error) {
 		return nil, nil, err
 	}
 	// add already existing key-values to the inputted key-values
-	kvs = append(kvs, aKvs...)
+	// kvs = append(kvs, aKvs...)
+	kvs, invalids := combineInKVSet(aKvs, kvs)
 
 	// proceed with CASE A
 	sortKvs(kvs)
 
 	// cutPowerOfTwo, the excedent add it as normal Tree.Add
 	kvsP2, kvsNonP2 := cutPowerOfTwo(kvs)
-	var invalids []int
+	var invalids2 []int
 	if nCPU > 1 {
-		invalids, err = t.buildTreeBottomUp(nCPU, kvsP2)
+		invalids2, err = t.buildTreeBottomUp(nCPU, kvsP2)
 		if err != nil {
 			return nil, nil, err
 		}
 	} else {
-		invalids, err = t.buildTreeBottomUpSingleThread(kvsP2)
+		invalids2, err = t.buildTreeBottomUpSingleThread(kvsP2)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
+	invalids = append(invalids, invalids2...)
 	// return the excedents which will be added at the full tree at the end
 	return invalids, kvsNonP2, nil
 }
@@ -357,7 +359,7 @@ func (t *Tree) caseC(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 			// 3. do CASE B (with 1 cpu) for each key at level L
 			_, bucketExcedents, err := bucketTree.caseB(1, l, buckets[cpu])
 			if err != nil {
-				panic(err)
+				panic(err) // TODO WIP
 				// return nil, err
 			}
 			excedentsInBucket[cpu] = bucketExcedents
@@ -718,6 +720,30 @@ func highestPowerOfTwo(n int) int {
 		}
 	}
 	return res
+}
+
+// combineInKVSet combines two kv array in one single array without repeated
+// keys.
+func combineInKVSet(base, toAdd []kv) ([]kv, []int) {
+	// TODO this is a naive version, this will be implemented in a more
+	// efficient way or through maps, or through sorted binary search
+	r := base
+	var invalids []int
+	for i := 0; i < len(toAdd); i++ {
+		e := false
+		// check if toAdd[i] exists in the base set
+		for j := 0; j < len(base); j++ {
+			if bytes.Equal(toAdd[i].k, base[j].k) {
+				e = true
+			}
+		}
+		if !e {
+			r = append(r, toAdd[i])
+		} else {
+			invalids = append(invalids, toAdd[i].pos)
+		}
+	}
+	return r, invalids
 }
 
 // func computeSimpleAddCost(nLeafs int) int {

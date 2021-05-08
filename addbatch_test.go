@@ -11,6 +11,15 @@ import (
 	"github.com/iden3/go-merkletree/db/memory"
 )
 
+var debug = true
+
+func debugTime(descr string, time1, time2 time.Duration) {
+	if debug {
+		fmt.Printf("%s was %f times faster than without AddBatch\n",
+			descr, float64(time1)/float64(time2))
+	}
+}
+
 func testInit(c *qt.C, n int) (*Tree, *Tree) {
 	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -33,12 +42,6 @@ func testInit(c *qt.C, n int) (*Tree, *Tree) {
 		}
 	}
 	return tree1, tree2
-}
-
-func ratio(t1, t2 time.Duration) float64 {
-	a := float64(t1)
-	b := float64(t2)
-	return (a / b)
 }
 
 func TestAddBatchCaseA(t *testing.T) {
@@ -75,8 +78,7 @@ func TestAddBatchCaseA(t *testing.T) {
 	indexes, err := tree2.AddBatchOpt(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
-	fmt.Printf("CASE A, AddBatch was %f times faster than without AddBatch\n",
-		ratio(time1, time2))
+	debugTime("CASE A, AddBatch", time1, time2)
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
@@ -149,12 +151,66 @@ func TestAddBatchCaseB(t *testing.T) {
 	indexes, err := tree2.AddBatchOpt(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
-	fmt.Printf("CASE B, AddBatch was %f times faster than without AddBatch\n",
-		ratio(time1, time2))
+	debugTime("CASE B, AddBatch", time1, time2)
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+}
+
+func TestAddBatchCaseBRepeatedLeafs(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 1024
+	initialNLeafs := 99 // TMP TODO use const minLeafsThreshold-1 once ready
+
+	tree1, tree2 := testInit(c, initialNLeafs)
+
+	for i := initialNLeafs; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		if err := tree1.Add(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// prepare the key-values to be added, including already existing keys
+	var keys, values [][]byte
+	for i := 0; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	indexes, err := tree2.AddBatchOpt(keys, values)
+	c.Assert(err, qt.IsNil)
+	c.Check(len(indexes), qt.Equals, initialNLeafs)
+
+	// check that both trees roots are equal
+	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+}
+
+func TestCombineInKVSet(t *testing.T) {
+	c := qt.New(t)
+
+	var a, b, expected []kv
+	for i := 0; i < 10; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		kv := kv{k: k}
+		if i < 7 {
+			a = append(a, kv)
+		}
+		if i >= 4 {
+			b = append(b, kv)
+		}
+		expected = append(expected, kv)
+	}
+
+	r, invalids := combineInKVSet(a, b)
+	for i := 0; i < len(r); i++ {
+		c.Assert(r[i].k, qt.DeepEquals, expected[i].k)
+	}
+	c.Assert(len(invalids), qt.Equals, 7-4)
 }
 
 func TestGetKeysAtLevel(t *testing.T) {
@@ -315,8 +371,7 @@ func TestAddBatchCaseC(t *testing.T) {
 	indexes, err := tree2.AddBatchOpt(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
-	fmt.Printf("CASE C, AddBatch was %f times faster than without AddBatch\n",
-		ratio(time1, time2))
+	debugTime("CASE C, AddBatch", time1, time2)
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
@@ -353,8 +408,7 @@ func TestAddBatchCaseD(t *testing.T) {
 	indexes, err := tree2.AddBatchOpt(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
-	fmt.Printf("CASE D, AddBatch was %f times faster than without AddBatch\n",
-		ratio(time1, time2))
+	debugTime("CASE D, AddBatch", time1, time2)
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
@@ -411,8 +465,7 @@ func TestAddBatchCaseE(t *testing.T) {
 	indexes, err := tree2.AddBatchOpt(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
-	fmt.Printf("CASE E, AddBatch was %f times faster than without AddBatch\n",
-		ratio(time1, time2))
+	debugTime("CASE E, AddBatch", time1, time2)
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
