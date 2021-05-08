@@ -240,7 +240,7 @@ func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
 	return pinMap, nil
 }
 
-func (i *IPFSHandle) Retrieve(ctx context.Context, path string) ([]byte, error) {
+func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) ([]byte, error) {
 	path = strings.TrimPrefix(path, "ipfs://")
 	pth := corepath.New(path)
 
@@ -249,7 +249,10 @@ func (i *IPFSHandle) Retrieve(ctx context.Context, path string) ([]byte, error) 
 		return nil, err
 	}
 	defer node.Close()
-	if s, err := node.Size(); s > int64(MaxFileSizeBytes) || err != nil {
+	if maxSize == 0 {
+		maxSize = MaxFileSizeBytes
+	}
+	if s, err := node.Size(); s > maxSize || err != nil {
 		return nil, fmt.Errorf("file too big or size cannot be obtained")
 	}
 	r, ok := node.(files.File)

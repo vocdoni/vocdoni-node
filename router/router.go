@@ -214,7 +214,11 @@ func (r *Router) registerPublic(name string, handler func(routerRequest)) {
 func (r *Router) EnableFileAPI() {
 	r.APIs = append(r.APIs, "file")
 	r.registerPublic("fetchFile", r.fetchFile)
-	r.registerPrivate("addFile", r.addFile)
+	if r.allowPrivate {
+		r.registerPrivate("addFile", r.addFile)
+	} else {
+		r.registerPublic("addFile", r.addJSONfile)
+	}
 	r.registerPrivate("pinList", r.pinList)
 	r.registerPrivate("pinFile", r.pinFile)
 	r.registerPrivate("unpinFile", r.unpinFile)

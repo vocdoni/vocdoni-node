@@ -12,7 +12,7 @@ import (
 type Storage interface {
 	Init(d *types.DataStore) error
 	Publish(ctx context.Context, o []byte) (string, error)
-	Retrieve(ctx context.Context, id string) ([]byte, error)
+	Retrieve(ctx context.Context, id string, maxSize int64) ([]byte, error)
 	Pin(ctx context.Context, path string) error
 	Unpin(ctx context.Context, path string) error
 	ListPins(ctx context.Context) (map[string]string, error)

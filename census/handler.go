@@ -260,7 +260,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			return resp
 		}
 		log.Infof("retrieving remote census %s", r.CensusURI)
-		censusRaw, err := m.RemoteStorage.Retrieve(ctx, r.URI[len(m.RemoteStorage.URIprefix()):])
+		censusRaw, err := m.RemoteStorage.Retrieve(ctx, r.URI[len(m.RemoteStorage.URIprefix()):], 0)
 		if err != nil {
 			log.Warnf("cannot retrieve census: %s", err)
 			resp.SetError("cannot retrieve census")
