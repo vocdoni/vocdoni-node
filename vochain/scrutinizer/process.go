@@ -301,33 +301,45 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
-	return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
-		func(record interface{}) error {
-			update, ok := record.(*indexertypes.Process)
-			if !ok {
-				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
-			}
-			update.EndBlock = p.GetBlockCount() + p.GetStartBlock()
-			update.CensusRoot = p.GetCensusRoot()
-			update.CensusURI = p.GetCensusURI()
-			update.PrivateKeys = p.EncryptionPrivateKeys
-			update.PublicKeys = p.EncryptionPublicKeys
-			// If the process is transacting to CANCELED, ensure results are not computed and remove
-			// them from the KV database.
-			if update.Status != int32(models.ProcessStatus_CANCELED) &&
-				p.GetStatus() == models.ProcessStatus_CANCELED {
-				update.HaveResults = false
-				update.FinalResults = true
-				update.Rheight = 0
-				if err := s.db.Delete(pid, &indexertypes.Results{}); err != nil {
-					if err != badgerhold.ErrNotFound {
-						log.Warnf("cannot remove CANCELED results: %v", err)
-					}
+
+	updateFunc := func(record interface{}) error {
+		update, ok := record.(*indexertypes.Process)
+		if !ok {
+			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+		}
+		update.EndBlock = p.GetBlockCount() + p.GetStartBlock()
+		update.CensusRoot = p.GetCensusRoot()
+		update.CensusURI = p.GetCensusURI()
+		update.PrivateKeys = p.EncryptionPrivateKeys
+		update.PublicKeys = p.EncryptionPublicKeys
+		// If the process is transacting to CANCELED, ensure results are not computed and remove
+		// them from the KV database.
+		if update.Status != int32(models.ProcessStatus_CANCELED) &&
+			p.GetStatus() == models.ProcessStatus_CANCELED {
+			update.HaveResults = false
+			update.FinalResults = true
+			update.Rheight = 0
+			if err := s.db.Delete(pid, &indexertypes.Results{}); err != nil {
+				if err != badgerhold.ErrNotFound {
+					log.Warnf("cannot remove CANCELED results: %v", err)
 				}
 			}
-			update.Status = int32(p.GetStatus())
-			return nil
-		})
+		}
+		update.Status = int32(p.GetStatus())
+		return nil
+	}
+	// Retry if error is "Transaction Conflict"
+	for {
+		if err := s.db.UpdateMatching(&indexertypes.Process{},
+			badgerhold.Where(badgerhold.Key).Eq(pid), updateFunc); err != nil {
+			if strings.Contains(err.Error(), kvErrorStringForRetry) {
+				continue
+			}
+			return err
+		}
+		break
+	}
+	return nil
 }
 
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {

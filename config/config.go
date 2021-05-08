@@ -74,6 +74,7 @@ type API struct {
 	Tendermint bool
 	Vote       bool
 	Results    bool
+	Indexer    bool
 	// AllowPrivate allow to use private methods
 	AllowPrivate bool
 	// AllowedAddrs allowed addresses to interact with
