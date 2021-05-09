@@ -11,8 +11,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
 
-	"github.com/vocdoni/multirpc/transports"
-	"github.com/vocdoni/multirpc/transports/mhttp"
+	"go.vocdoni.io/dvote/multirpc/transports"
+	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
 
 	"go.vocdoni.io/dvote/router"
 	"go.vocdoni.io/dvote/vochain"

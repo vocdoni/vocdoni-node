@@ -9,6 +9,12 @@ import (
 	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
 )
 
+// MetricsCfg initializes the metrics config
+type Metrics struct {
+	Enabled         bool
+	RefreshInterval int
+}
+
 // Agent struct with options
 type Agent struct {
 	Path            string

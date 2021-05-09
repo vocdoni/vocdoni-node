@@ -13,14 +13,14 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/vocdoni/multirpc/transports/subpubtransport"
+	"go.vocdoni.io/dvote/multirpc/transports/subpubtransport"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/vocdoni/multirpc/transports"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/multirpc/transports"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/statedb/gravitonstate"
 	"go.vocdoni.io/dvote/util"

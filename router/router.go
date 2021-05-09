@@ -12,7 +12,7 @@ import (
 	psload "github.com/shirou/gopsutil/load"
 	psmem "github.com/shirou/gopsutil/mem"
 	psnet "github.com/shirou/gopsutil/net"
-	"github.com/vocdoni/multirpc/transports"
+	"go.vocdoni.io/dvote/multirpc/transports"
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/census"
