@@ -1,3 +1,4 @@
+//go:build !badgerdb && !cleveldb
 // +build !badgerdb,!cleveldb
 
 // If neither -tags=badger nor -tags=cleveldb are used, we must fall back to

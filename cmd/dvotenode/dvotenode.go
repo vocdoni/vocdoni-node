@@ -16,7 +16,6 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/vocdoni/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/chain/ethevents"
@@ -26,6 +25,7 @@ import (
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
+	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"

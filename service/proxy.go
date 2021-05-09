@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/vocdoni/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
 )
 
 // Proxy creates a new service for routing HTTP connections using go-chi server

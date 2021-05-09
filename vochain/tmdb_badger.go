@@ -1,3 +1,4 @@
+//go:build badgerdb
 // +build badgerdb
 
 package vochain

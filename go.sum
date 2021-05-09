@@ -1725,8 +1725,6 @@ github.com/vocdoni/blind-ca v0.1.4/go.mod h1:4ouWDqlvXrrNS0Csf3hKA3cuDTmKh6nP7kS
 github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25/go.mod h1:NLA1A55raZ1VNMmKulPUm+Lu9CVetCDVuDCYk5bSYrE=
 github.com/vocdoni/multirpc v0.1.9/go.mod h1:SETFzlLbdZq2YFGy0udT1u2ouQUU2cIesopAIgyAjOU=
 github.com/vocdoni/multirpc v0.1.12/go.mod h1:OYWh2wBX0rztgatZC7VEcPW0Ew4Hm8f/msRAO24mpk0=
-github.com/vocdoni/multirpc v0.1.22 h1:CyblwgoD02ocR4FbVpPzPknnXb2tsSiAFyHm0kaVp2I=
-github.com/vocdoni/multirpc v0.1.22/go.mod h1:zCx0l/hu/Vdeav44geFJmK4PAawN+qoo1HYT2icU4GM=
 github.com/vocdoni/multirpc v0.1.23 h1:WETz8xRrV0u3dJgHYtRfuIHChgSEXRFZrGZSy4Rn2qE=
 github.com/vocdoni/multirpc v0.1.23/go.mod h1:zCx0l/hu/Vdeav44geFJmK4PAawN+qoo1HYT2icU4GM=
 github.com/vocdoni/storage-proofs-eth-go v0.1.4/go.mod h1:8XF/0CpAetwlQJRgQgwBFEbfaYcjrU9gWUBR4F2Aqso=

@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/vocdoni/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
+	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/types"
 )
 
