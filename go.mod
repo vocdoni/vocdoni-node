@@ -70,3 +70,12 @@ require (
 // https://github.com/ethereum/go-ethereum/issues/20590 is fixed, stub it out
 // with a replace directive. The stub was hacked together with vim.
 replace gopkg.in/olebedev/go-duktape.v3 => ./duktape-stub
+
+// Newer versions of the fuse module removed support for MacOS.
+// Unfortunately, its downstream users don't handle this properly,
+// so our builds simply break for GOOS=darwin.
+// Until either upstream or downstream solve this properly,
+// force a downgrade to the commit right before support was dropped.
+// It's also possible to use downstream's -tags=nofuse, but that's manual.
+// TODO(mvdan): remove once we've untangled module dep loops.
+replace bazil.org/fuse => bazil.org/fuse v0.0.0-20200407214033-5883e5a4b512
