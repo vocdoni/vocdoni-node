@@ -17,6 +17,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
@@ -168,6 +169,12 @@ func (ev *EthereumEvents) OnComputeResults(results *indexertypes.Results) {
 				results.ProcessID)
 			return
 		}
+	case models.ProcessStatus_READY:
+		if ev.VochainApp.Height() < vocProcessData.StartBlock+vocProcessData.BlockCount {
+			log.Warnf("process %x is in READY state and not yet finished by block, cannot publish results",
+				results.ProcessID)
+			return
+		}
 	case models.ProcessStatus_ENDED:
 		break
 	default:
@@ -182,6 +189,7 @@ func (ev *EthereumEvents) OnComputeResults(results *indexertypes.Results) {
 		Results:   scrutinizer.BuildProcessResult(results, vocProcessData.EntityId),
 		Status:    models.ProcessStatus_RESULTS.Enum(),
 		Txtype:    models.TxType_SET_PROCESS_RESULTS,
+		Nonce:     util.RandomBytes(32),
 	}
 
 	stx := &models.SignedTx{}
@@ -219,8 +227,8 @@ func (ev *EthereumEvents) AddEventHandler(h EventHandler) {
 }
 
 // SubscribeEthereumEventLogs enables the subscription of Ethereum events for new blocks.
-// Events are Queued for 60 seconds before processed in order to avoid possible blockchain reversions.
-// If fromBlock nil, subscription will start on current block
+// Events are Queued for 60 seconds before processed in order to avoid possible blockchain
+// reversions. If fromBlock nil, subscription will start on current block.
 // Blocking function (use go routine).
 func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBlock *int64) {
 	log.Debugf("dialing for %s", ev.DialAddr)
