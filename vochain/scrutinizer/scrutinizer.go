@@ -451,6 +451,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionRes
 				}
 			}
 		}
+		s.updateProcessPool = append(s.updateProcessPool, pid)
 		log.Infof("published results for process %x are correct!", pid)
 	}()
 	return nil
