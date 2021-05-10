@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
@@ -114,22 +113,6 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
 	// k.vochain.Codec.RegisterConcrete(processKeys{}, "processKeys", nil)
 	k.vochain.State.AddEventListener(k)
 	return k, nil
-}
-
-// PrintInfo print some log information every wait duration
-func (k *KeyKeeper) PrintInfo(wait time.Duration) {
-	for {
-		time.Sleep(wait)
-		iter := k.storage.NewIterator()
-		nprocs := 0
-		for iter.Next() {
-			if strings.HasPrefix(string(iter.Key()), dbPrefixBlock) {
-				nprocs++
-			}
-		}
-		iter.Release()
-		log.Infof("[keykeeper] scheduled keys %d", nprocs)
-	}
 }
 
 // RevealUnpublished is a rescue function for revealing keys that should be already revealed.

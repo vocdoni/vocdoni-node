@@ -155,6 +155,7 @@ func NewEthEvents(
 // The Oracle will build and send a RESULTS transaction to the Vochain.
 // The transaction includes the final results for the process.
 func (ev *EthereumEvents) OnComputeResults(results *indexertypes.Results) {
+	log.Infof("launching on compute results callback for process %x", results.ProcessID)
 	// check vochain process status
 	vocProcessData, err := ev.VochainApp.State.Process(results.ProcessID, true)
 	if err != nil {

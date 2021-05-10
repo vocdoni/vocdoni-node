@@ -508,7 +508,6 @@ func main() {
 			log.Fatal(err)
 		}
 		go kk.RevealUnpublished()
-		go kk.PrintInfo(time.Second * 20)
 	}
 
 	if (globalCfg.Mode == types.ModeGateway && globalCfg.W3Config.Enabled) ||
