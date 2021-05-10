@@ -130,6 +130,7 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 // and then execute a set of recovery actions. It mainly checks for those processes which are
 // still open (live) and updates all temporary data (current voting weight and live results
 // if unecrypted). This method might be called on a goroutine after initializing the Scrutinizer.
+// TO-DO: refactor and use blockHeight for reusing existing live results
 func (s *Scrutinizer) AfterSyncBootstrap() {
 	// During the first seconds/milliseconds of the Vochain startup, Tendermint might report that
 	// the chain is not synchronizing since it still does not have any peer and do not know the
@@ -173,6 +174,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 		// to reset the existing Results and count them again from scratch.
 		// Since we cannot be sure if there are votes missing, we need to
 		// perform the full computation.
+		log.Infof("recovering live process %x", p)
 		process, err := s.App.State.Process(p, false)
 		if err != nil {
 			log.Errorf("cannot fetch process: %v", err)
@@ -205,12 +207,13 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 			}
 		}); err != nil {
 			log.Error(err)
+			continue
 		}
 		// Store the results on the persisten database
-		if err := s.commitVotes(p, results, s.App.Height()); err != nil {
+		if err := s.commitVotesUnsafe(p, results, s.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes: (%v)", err)
+			continue
 		}
-
 		// Add process to live results so new votes will be added
 		s.addProcessToLiveResults(p)
 	}
