@@ -233,7 +233,9 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		BlockCount:   1024,
 	}
 	t.Logf("adding READY process %x", process.ProcessId)
-	app.State.AddProcess(process)
+	if err := app.State.AddProcess(process); err != nil {
+		t.Fatal(err)
+	}
 
 	// Set results  (should not work)
 	votes := make([]*models.QuestionResult, 1)
@@ -244,9 +246,6 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		ProcessId: process.ProcessId,
 		EntityId:  process.EntityId,
 		Votes:     votes,
-	}
-	if err := testSetProcessResults(t, pid, &oracle, app, results); err != nil {
-		t.Logf("adding results while process ready should not work")
 	}
 
 	// Set it to PAUSE

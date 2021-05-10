@@ -194,16 +194,19 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 		return err
 	}
 	// Check if the state transition is valid
-	// process must be ended for setting the results
-	if process.Status != models.ProcessStatus_ENDED {
+	// process must be ended or ready for setting the results
+	if process.Status != models.ProcessStatus_ENDED && process.Status != models.ProcessStatus_READY {
 		return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
+	}
+	if process.Status == models.ProcessStatus_READY &&
+		process.StartBlock+process.BlockCount <= v.Height() {
+		return fmt.Errorf("cannot set state results, process is still alive")
 	}
 	if !bytes.Equal(result.ProcessId, process.ProcessId) {
 		return fmt.Errorf(
 			"invalid process id on result provided, expected: %x got: %x",
 			process.ProcessId, result.ProcessId)
 	}
-
 	if !bytes.Equal(result.EntityId, process.EntityId) {
 		return fmt.Errorf(
 			"invalid entity id on result provided, expected: %x got: %x",
