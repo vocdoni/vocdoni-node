@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -214,16 +215,16 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 	}
 
 	if commit {
-		// If some of the event listeners return an error, do not include the transaction
-		for _, l := range v.eventListeners {
-			if err := l.OnProcessResults(process.ProcessId, result.Votes, v.TxCounter()); err != nil {
-				return err
-			}
-		}
 		process.Results = result
 		process.Status = models.ProcessStatus_RESULTS
 		if err := v.setProcess(process, process.ProcessId); err != nil {
 			return err
+		}
+		// Call event listeners
+		for _, l := range v.eventListeners {
+			if err := l.OnProcessResults(process.ProcessId, result.Votes, v.TxCounter()); err != nil {
+				log.Warnf("onProcessResults callback error: %v", err)
+			}
 		}
 	}
 	return nil
