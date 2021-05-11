@@ -80,9 +80,9 @@ func (r *Router) getBlock(request routerRequest) {
 
 func (r *Router) getBlockByHash(request routerRequest) {
 	var response api.MetaResponse
-	response.Block = indexertypes.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHash(request.Payload))
+	response.Block = indexertypes.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHash(request.Hash))
 	if response.Block == nil {
-		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Payload))
+		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Hash))
 		return
 	}
 	request.Send(r.buildReply(request, &response))

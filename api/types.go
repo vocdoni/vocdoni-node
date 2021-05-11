@@ -68,6 +68,7 @@ type MetaRequest struct {
 	Content      []byte         `json:"content,omitempty"`
 	Digested     bool           `json:"digested,omitempty"`
 	EntityId     types.HexBytes `json:"entityId,omitempty"`
+	Hash         []byte         `json:"hash,omitempty"`
 	Height       uint32         `json:"height,omitempty"`
 	From         int            `json:"from,omitempty"`
 	ListSize     int            `json:"listSize,omitempty"`
