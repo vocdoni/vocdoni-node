@@ -4,21 +4,27 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/censusdownloader"
+	"go.vocdoni.io/dvote/vochain/processarchive"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
-func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.Agent, cm *census.Manager) (vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo, err error) {
+func Vochain(vconfig *config.VochainCfg, results, waitForSync bool,
+	ma *metrics.Agent, cm *census.Manager, storage data.Storage) (
+	vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer,
+	vi *vochaininfo.VochainInfo, err error) {
 	log.Infof("creating vochain service for network %s", vconfig.Chain)
 	var host, port string
 	var ip net.IP
@@ -61,12 +67,12 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.
 		genesisBytes, err = os.ReadFile(vconfig.DataDir + "/config/genesis.json")
 
 		if err == nil { // If genesis file found
-			log.Info("found genesis file, comparing with the hardcoded one")
+			log.Info("found genesis file")
 			// compare genesis
 			if string(genesisBytes) != vochain.Genesis[vconfig.Chain].Genesis {
 				// if using a development chain, restore vochain
 				if vochain.Genesis[vconfig.Chain].AutoUpdateGenesis || vconfig.Dev {
-					log.Warn("local genesis is different from the hardcoded, cleaning and restarting Vochain")
+					log.Warn("new genesis found, cleaning and restarting Vochain")
 					if err = os.RemoveAll(vconfig.DataDir); err != nil {
 						return
 					}
@@ -76,7 +82,7 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.
 					}
 					genesisBytes = []byte(vochain.Genesis[vconfig.Chain].Genesis)
 				} else {
-					log.Warn("local genesis is different from the hardcoded! this will probably end in a consensus failure :(")
+					log.Warn("local and hardcoded genesis are different, potential consensus failure risk")
 				}
 			} else {
 				log.Info("local genesis match with the hardcoded genesis")
@@ -105,15 +111,34 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool, ma *metrics.
 	// Scrutinizer
 	if results {
 		log.Info("creating vochain scrutinizer service")
-		sc, err = scrutinizer.NewScrutinizer(vconfig.DataDir+"/scrutinizer", vnode)
+		sc, err = scrutinizer.NewScrutinizer(filepath.Join(vconfig.DataDir, "scrutinizer"), vnode)
 		if err != nil {
 			return
 		}
 		go sc.AfterSyncBootstrap()
 	}
+
+	// Census Downloader
 	if cm != nil {
 		log.Infof("starting census downloader service")
 		censusdownloader.NewCensusDownloader(vnode, cm, !vconfig.ImportPreviousCensus)
+	}
+
+	// Process Archiver
+	if vconfig.EnableProcessArchive {
+		ipfs, ok := storage.(*data.IPFSHandle)
+		if !ok {
+			log.Warnf("storage is not IPFS, archive publishing disabled")
+			ipfs = nil
+		}
+		dir := filepath.Join(vconfig.DataDir, "archive")
+		log.Infof("starting process archiver on %s", dir)
+		processarchive.NewProcessArchive(
+			vnode,
+			ipfs,
+			dir,
+			vconfig.ProcessArchiveKey,
+		)
 	}
 
 	// Vochain info

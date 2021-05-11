@@ -120,6 +120,9 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0, "if this node is a key keeper, use this index slot")
 	globalCfg.VochainConfig.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false, "if enabled the census downloader will import all existing census")
 	globalCfg.VochainConfig.EthereumWhiteListAddrs = *flag.StringArray("ethereumWhiteListAddrs", []string{}, "list of allowed ethereum address for creating processes on the vochain (oracle mode only)")
+	globalCfg.VochainConfig.EnableProcessArchive = *flag.Bool("processArchive", false, "enables the process archiver component")
+	globalCfg.VochainConfig.ProcessArchiveKey = *flag.String("processArchiveKey", "", "IPFS base64 encoded private key for process archive IPNS")
+
 	// metrics
 	globalCfg.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
 	globalCfg.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5, "metrics refresh interval in seconds")
@@ -224,6 +227,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.KeyKeeperIndex", flag.Lookup("keyKeeperIndex"))
 	viper.BindPFlag("vochainConfig.ImportPreviousCensus", flag.Lookup("importPreviousCensus"))
 	viper.BindPFlag("vochainConfig.EthereumWhiteListAddrs", flag.Lookup("ethereumWhiteListAddrs"))
+	viper.BindPFlag("vochainConfig.EnableProcessArchive", flag.Lookup("processArchive"))
+	viper.BindPFlag("vochainConfig.ProcessArchiveKey", flag.Lookup("processArchiveKey"))
 
 	// metrics
 	viper.BindPFlag("metrics.Enabled", flag.Lookup("metricsEnabled"))
@@ -375,7 +380,9 @@ func main() {
 		}()
 	}
 
-	log.Infof("starting vocdoni dvote node version %q in %s mode", internal.Version, globalCfg.Mode)
+	log.Infof("starting vocdoni dvote node version %q in %s mode",
+		internal.Version, globalCfg.Mode)
+
 	var err error
 	var signer *ethereum.SignKeys
 	var node *chain.EthChainContext
@@ -389,9 +396,11 @@ func main() {
 	var ma *metrics.Agent
 
 	if globalCfg.Dev {
-		log.Warn("developer mode is enabled, I hope you know what you are doing ;)")
+		log.Warn("¡developer mode is enabled!")
 	}
-	if globalCfg.Mode == types.ModeGateway || globalCfg.Mode == types.ModeOracle || globalCfg.Mode == types.ModeWeb3 {
+	if globalCfg.Mode == types.ModeGateway ||
+		globalCfg.Mode == types.ModeOracle ||
+		globalCfg.Mode == types.ModeWeb3 {
 		// Signing key
 		signer = ethereum.NewSignKeys()
 		// Add Authorized keys for private methods
@@ -417,7 +426,8 @@ func main() {
 	}
 
 	// Websockets and HTTPs proxy
-	if globalCfg.Mode == types.ModeGateway || globalCfg.Mode == types.ModeWeb3 || globalCfg.Metrics.Enabled ||
+	if globalCfg.Mode == types.ModeGateway ||
+		globalCfg.Mode == types.ModeWeb3 || globalCfg.Metrics.Enabled ||
 		(globalCfg.Mode == types.ModeOracle && len(globalCfg.W3Config.W3External) > 0) {
 		// Proxy service
 		pxy, err = service.Proxy(globalCfg.API.ListenHost, globalCfg.API.ListenPort,
@@ -428,7 +438,8 @@ func main() {
 
 		// Enable metrics via proxy
 		if globalCfg.Metrics.Enabled && pxy != nil {
-			ma = metrics.NewAgent("/metrics", time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, pxy)
+			ma = metrics.NewAgent("/metrics",
+				time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, pxy)
 		}
 	}
 
@@ -464,9 +475,16 @@ func main() {
 	}
 	if (globalCfg.Mode == types.ModeGateway && globalCfg.API.Vote) ||
 		globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle {
-		scrutinizer := (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) || (globalCfg.Mode == types.ModeOracle)
-		vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig, scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma, cm)
-		if err != nil {
+		scrutinizer := (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) ||
+			(globalCfg.Mode == types.ModeOracle)
+		if vnode, sc, vinfo, err = service.Vochain(
+			globalCfg.VochainConfig,
+			scrutinizer,
+			globalCfg.VochainConfig.NoWaitSync,
+			ma,
+			cm,
+			storage,
+		); err != nil {
 			log.Fatal(err)
 		}
 		defer func() {
@@ -478,9 +496,12 @@ func main() {
 			// Enable Tendermint RPC proxy endpoint on /tendermint
 			tp := strings.Split(globalCfg.VochainConfig.RPCListen, ":")
 			if len(tp) != 2 {
-				log.Warnf("cannot get port from vochain RPC listen: %s", globalCfg.VochainConfig.RPCListen)
+				log.Warnf("cannot get port from vochain RPC listen: %s",
+					globalCfg.VochainConfig.RPCListen)
 			} else {
-				pxy.AddWsHandler("/tendermint", pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket", types.VochainWsReadLimit), types.VochainWsReadLimit) // tendermint needs up to 20 MB
+				pxy.AddWsHandler("/tendermint",
+					pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket", types.VochainWsReadLimit),
+					types.VochainWsReadLimit) // tendermint needs up to 20 MB
 				log.Infof("tendermint API endpoint available at %s", "/tendermint")
 			}
 		}
