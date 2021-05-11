@@ -55,11 +55,11 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 		log.Warn("Error opening repo dir")
 		return nil, nil, err
 	}
-
 	cfg := &ipfscore.BuildCfg{
 		Repo:      r,
 		Online:    true,
 		Permanent: true,
+
 		// ExtraOpts: map[string]bool{
 		// 	"mplex":  true,
 		// 	"ipnsps": true,

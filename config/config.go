@@ -191,7 +191,8 @@ type VochainCfg struct {
 	MempoolSize int
 	// KeyKeeperIndex is the index used by the key keeper (usually and oracle)
 	KeyKeeperIndex int8
-	// ImportPreviousCensus if true the census downloader will try to download all census (not only the new ones)
+	// ImportPreviousCensus if true the census downloader will try to download
+	// all census (not only the new ones)
 	ImportPreviousCensus bool
 	// Enable Prometheus metrics from tendermint
 	TendermintMetrics bool
@@ -203,6 +204,10 @@ type VochainCfg struct {
 	EthereumWhiteListAddrs []string
 	// Target block time in seconds (only for miners)
 	MinerTargetBlockTimeSeconds int
+	// Enables the process archiver component
+	EnableProcessArchive bool
+	// Base64 IPFS private key for using with the process archive
+	ProcessArchiveKey string
 }
 
 // OracleCfg includes all possible config params needed by the Oracle

@@ -24,6 +24,7 @@ require (
 	github.com/iden3/go-iden3-crypto v0.0.4
 	github.com/ipfs/go-bitswap v0.3.4-0.20210226182239-d1d4afa29da4 // indirect
 	github.com/ipfs/go-block-format v0.0.3 // indirect
+	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-ipfs v0.7.1-0.20210129042248-884a5aebd748
 	github.com/ipfs/go-ipfs-config v0.12.0
 	github.com/ipfs/go-ipfs-files v0.0.8
