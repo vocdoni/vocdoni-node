@@ -104,7 +104,6 @@ type TxMetadata struct {
 
 // BlockMetadata contains the metadata for a single tendermint block
 type BlockMetadata struct {
-	ChainId         string         `json:"chain_id"`
 	Height          uint32         `json:"height"`
 	Timestamp       time.Time      `json:"timestamp"`
 	Hash            types.HexBytes `json:"hash"`
@@ -147,7 +146,6 @@ func BlockMetadataFromBlockModel(block *tmtypes.Block) *BlockMetadata {
 		return nil
 	}
 	b := new(BlockMetadata)
-	b.ChainId = block.ChainID
 	b.Height = uint32(block.Height)
 	b.Timestamp = block.Time
 	b.Hash = block.Hash().Bytes()
