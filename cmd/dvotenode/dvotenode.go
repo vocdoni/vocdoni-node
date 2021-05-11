@@ -227,6 +227,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.KeyKeeperIndex", flag.Lookup("keyKeeperIndex"))
 	viper.BindPFlag("vochainConfig.ImportPreviousCensus", flag.Lookup("importPreviousCensus"))
 	viper.BindPFlag("vochainConfig.EthereumWhiteListAddrs", flag.Lookup("ethereumWhiteListAddrs"))
+	viper.Set("vochainConfig.ProcessArchiveDataDir", globalCfg.DataDir+"/archive")
 	viper.BindPFlag("vochainConfig.EnableProcessArchive", flag.Lookup("processArchive"))
 	viper.BindPFlag("vochainConfig.ProcessArchiveKey", flag.Lookup("processArchiveKey"))
 
@@ -396,7 +397,7 @@ func main() {
 	var ma *metrics.Agent
 
 	if globalCfg.Dev {
-		log.Warn("¡developer mode is enabled!")
+		log.Warn("developer mode is enabled!")
 	}
 	if globalCfg.Mode == types.ModeGateway ||
 		globalCfg.Mode == types.ModeOracle ||
@@ -477,13 +478,8 @@ func main() {
 		globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle {
 		scrutinizer := (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) ||
 			(globalCfg.Mode == types.ModeOracle)
-		if vnode, sc, vinfo, err = service.Vochain(
-			globalCfg.VochainConfig,
-			scrutinizer,
-			globalCfg.VochainConfig.NoWaitSync,
-			ma,
-			cm,
-			storage,
+		if vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig,
+			scrutinizer, globalCfg.VochainConfig.NoWaitSync, ma, cm, storage,
 		); err != nil {
 			log.Fatal(err)
 		}

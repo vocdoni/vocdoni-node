@@ -19,7 +19,6 @@ const (
 // a new one.
 func (p *ProcessArchive) AddKey(b64key string) error {
 	var ipnsPk []byte
-	var err error
 	if b64key == "" {
 		// if key already exist, just return
 		if _, err := p.GetKey(); err == nil {
@@ -28,6 +27,7 @@ func (p *ProcessArchive) AddKey(b64key string) error {
 		// else generate a new key
 		ipnsPk = data.NewIPFSkey()
 	} else {
+		var err error
 		ipnsPk, err = base64.StdEncoding.DecodeString(b64key)
 		if err != nil {
 			return err
@@ -70,16 +70,16 @@ func (p *ProcessArchive) Publish() {
 			p.publishLock.Lock()
 			defer p.publishLock.Unlock()
 			log.Infof("publishing process archive")
-			st := time.Now()
+			start := time.Now()
 			ctx, cancel := context.WithTimeout(context.Background(), publishInterval)
 			ipnsentry, err := p.ipfs.PublishIPNSpath(ctx, p.storage.datadir, ipnsKeyAlias)
-			cancel()
+			defer cancel()
 			if err != nil {
 				log.Warnf("could not publish to IPFS: %v", err)
 				return
 			}
 			log.Infof("published to /ipns/%s with value %s, took %s",
-				ipnsentry.Name(), ipnsentry.Value(), time.Since(st))
+				ipnsentry.Name(), ipnsentry.Value(), time.Since(start))
 		}()
 	case <-p.close:
 		return
