@@ -208,6 +208,8 @@ type VochainCfg struct {
 	EnableProcessArchive bool
 	// Base64 IPFS private key for using with the process archive
 	ProcessArchiveKey string
+	// Data directory for storing the process archive
+	ProcessArchiveDataDir string
 }
 
 // OracleCfg includes all possible config params needed by the Oracle

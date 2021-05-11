@@ -297,7 +297,7 @@ func (i *IPFSHandle) PublishIPNSpath(ctx context.Context, path string,
 	return i.CoreAPI.Name().Publish(
 		ctx,
 		ipath.IpfsPath(c),
-		options.Name.TTL(time.Duration(time.Minute*10)),
+		options.Name.TTL(time.Minute*10),
 		options.Name.Key(keyalias),
 	)
 }
@@ -325,13 +325,13 @@ func (i *IPFSHandle) AddKeyToKeystore(keyalias string, privkey []byte) error {
 func NewIPFSkey() []byte {
 	// These functions must not return error since all input parameters
 	// are predefined, so we panic if an error returned.
-	pk, _, err := ipfscrypto.GenerateKeyPair(ipfscrypto.ECDSA, 256)
+	privKey, _, err := ipfscrypto.GenerateKeyPair(ipfscrypto.ECDSA, 256)
 	if err != nil {
 		panic(err)
 	}
-	pkb, err := ipfscrypto.MarshalPrivateKey(pk)
+	encPrivKey, err := ipfscrypto.MarshalPrivateKey(privKey)
 	if err != nil {
 		panic(err)
 	}
-	return pkb
+	return encPrivKey
 }

@@ -54,6 +54,7 @@ func (js *jsonStorage) AddProcess(p *Process) error {
 	}
 	js.lock.Lock()
 	defer js.lock.Unlock()
+	// TO-DO: use https://github.com/google/renameio
 	return os.WriteFile(filepath.Join(js.datadir, fmt.Sprintf("%x", p.Process.ProcessId)), data, 0o644)
 }
 
@@ -74,7 +75,7 @@ func NewProcessArchive(v *vochain.BaseApplication, ipfs *data.IPFSHandle,
 		ipfs:    ipfs,
 		storage: js,
 		publish: make(chan (bool), 10),
-		close:   make(chan (bool), 1),
+		close:   make(chan (bool), 1), // TO-DO: use a context
 	}
 	if ipfs != nil {
 		if err := ir.AddKey(key); err != nil {
