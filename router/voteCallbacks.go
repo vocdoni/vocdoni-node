@@ -91,7 +91,9 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	vr, err := r.Scrutinizer.GetEnvelopeReference(request.Nullifier)
 	if err != nil {
 		if err == scrutinizer.ErrNotFoundInDatabase {
-			request.Send(r.buildReply(request, &response))
+			if err := request.Send(r.buildReply(request, &response)); err != nil {
+				log.Warnf("error sending response: %s", err)
+			}
 			return
 		}
 		r.sendError(request, fmt.Sprintf("cannot get envelope status: (%v)", err))
@@ -101,7 +103,9 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	response.Height = &vr.Height
 	response.BlockTimestamp = int32(vr.CreationTime.Unix())
 	response.ProcessID = vr.ProcessID
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getEnvelope(request routerRequest) {
@@ -118,7 +122,9 @@ func (r *Router) getEnvelope(request routerRequest) {
 	var response api.MetaResponse
 	response.Envelope = env
 	response.Registered = types.True
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getEnvelopeHeight(request routerRequest) {
@@ -136,7 +142,9 @@ func (r *Router) getEnvelopeHeight(request routerRequest) {
 	var response api.MetaResponse
 	response.Height = new(uint32)
 	*response.Height = uint32(votes)
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getBlockHeight(request routerRequest) {
@@ -144,7 +152,9 @@ func (r *Router) getBlockHeight(request routerRequest) {
 	h := r.vocapp.Height()
 	response.Height = &h
 	response.BlockTimestamp = int32(r.vocapp.Timestamp())
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getProcessList(request routerRequest) {
@@ -170,13 +180,17 @@ func (r *Router) getProcessList(request routerRequest) {
 	}
 	if len(response.ProcessList) == 0 {
 		response.Message = "no processes found for the query"
-		request.Send(r.buildReply(request, &response))
+		if err := request.Send(r.buildReply(request, &response)); err != nil {
+			log.Warnf("error sending response: %s", err)
+		}
 		return
 	}
 
 	response.Size = new(int64)
 	*response.Size = int64(len(response.ProcessList))
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getProcessInfo(request routerRequest) {
@@ -187,7 +201,9 @@ func (r *Router) getProcessInfo(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get process info: %v", err))
 		return
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getProcessCount(request routerRequest) {
@@ -195,14 +211,18 @@ func (r *Router) getProcessCount(request routerRequest) {
 	response.Size = new(int64)
 	count := r.Scrutinizer.ProcessCount(request.EntityId)
 	*response.Size = count
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getEntityCount(request routerRequest) {
 	var response api.MetaResponse
 	response.Size = new(int64)
 	*response.Size = r.Scrutinizer.EntityCount()
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getProcessKeys(request routerRequest) {
@@ -242,7 +262,9 @@ func (r *Router) getProcessKeys(request routerRequest) {
 	response.EncryptionPrivKeys = privs
 	response.CommitmentKeys = coms
 	response.RevealKeys = revs
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getResultsWeight(request routerRequest) {
@@ -253,7 +275,9 @@ func (r *Router) getResultsWeight(request routerRequest) {
 		return
 	}
 	response.Weight = w.String()
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getResults(request routerRequest) {
@@ -297,7 +321,9 @@ func (r *Router) getResults(request routerRequest) {
 	}
 	if err == scrutinizer.ErrNoResultsYet {
 		response.Message = scrutinizer.ErrNoResultsYet.Error()
-		request.Send(r.buildReply(request, &response))
+		if err := request.Send(r.buildReply(request, &response)); err != nil {
+			log.Warnf("error sending response: %s", err)
+		}
 		return
 	}
 	if vr == nil {
@@ -310,13 +336,17 @@ func (r *Router) getResults(request routerRequest) {
 	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
 		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
-		request.Send(r.buildReply(request, &response))
+		if err := request.Send(r.buildReply(request, &response)); err != nil {
+			log.Warnf("error sending response: %s", err)
+		}
 		return
 	}
 	votes := uint32(eh)
 	response.Height = &votes
 	response.Weight = vr.Weight.String()
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 // known entities
@@ -326,7 +356,9 @@ func (r *Router) getEntityList(request routerRequest) {
 		request.ListSize = MaxListSize
 	}
 	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getBlockStatus(request routerRequest) {
@@ -335,5 +367,7 @@ func (r *Router) getBlockStatus(request routerRequest) {
 	response.Height = &h
 	response.BlockTime = r.vocinfo.BlockTimes()
 	response.BlockTimestamp = int32(r.vocapp.Timestamp())
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }

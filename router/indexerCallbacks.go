@@ -34,7 +34,9 @@ func (r *Router) getStats(request routerRequest) {
 	if err != nil {
 		log.Errorf("could not marshal vochainStats: %s", err)
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getEnvelopeList(request routerRequest) {
@@ -49,7 +51,9 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get envelope list: (%s)", err))
 		return
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getValidatorList(request routerRequest) {
@@ -59,7 +63,9 @@ func (r *Router) getValidatorList(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get validator list: %v", err))
 		return
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getBlock(request routerRequest) {
@@ -74,7 +80,9 @@ func (r *Router) getBlock(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.Height))
 		return
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getBlockByHash(request routerRequest) {
@@ -85,7 +93,9 @@ func (r *Router) getBlockByHash(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Hash))
 		return
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 // TODO improve this function
@@ -99,7 +109,9 @@ func (r *Router) getBlockList(request routerRequest) {
 			indexertypes.BlockMetadataFromBlockModel(
 				r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i)), true, true))
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getTx(request routerRequest) {
@@ -115,7 +127,9 @@ func (r *Router) getTx(request routerRequest) {
 		Hash:      hash,
 		Signature: tx.Signature,
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getTxListForBlock(request routerRequest) {
@@ -160,5 +174,7 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 			Hash:  tmtypes.Tx(block.Txs[i]).Hash(),
 		})
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }

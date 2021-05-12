@@ -25,5 +25,7 @@ func (r *Router) censusLocal(request routerRequest) {
 		r.sendError(request, resp.Message)
 		return
 	}
-	request.Send(r.buildReply(request, resp))
+	if err := request.Send(r.buildReply(request, resp)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }

@@ -118,7 +118,7 @@ func NewState(dataDir string) (*State, error) {
 func initStore(dataDir string, state *State) error {
 	log.Infof("initializing state db store")
 	state.Store = new(iavlstate.IavlState)
-	//state.Store = new(gravitonstate.GravitonState)
+	// state.Store = new(gravitonstate.GravitonState)
 	if err := state.Store.Init(dataDir, "disk"); err != nil {
 		return err
 	}
