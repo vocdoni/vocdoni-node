@@ -15,8 +15,8 @@ var Genesis = map[string]VochainGenesis{
 		SeedNodes:         []string{"121e65eb5994874d9c05cd8d584a54669d23f294@seed.vocdoni.net:26656"},
 		Genesis: `
    {
-      "genesis_time":"2021-05-07T17:38:33.672114557Z",
-      "chain_id":"vocdoni-release-1.0",
+      "genesis_time":"2021-05-12T12:38:33.672114557Z",
+      "chain_id":"vocdoni-release-1.0.1",
       "consensus_params":{
          "block":{
             "max_bytes":"10485760",
@@ -144,8 +144,8 @@ var Genesis = map[string]VochainGenesis{
 		SeedNodes:         []string{"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656"},
 		Genesis: `
 {
-   "genesis_time":"2021-05-07T17:43:28.668436552Z",
-   "chain_id":"vocdoni-development-42",
+   "genesis_time":"2021-05-12T12:43:28.668436552Z",
+   "chain_id":"vocdoni-development-43",
    "consensus_params":{
       "block":{
          "max_bytes":"10485760",
@@ -254,8 +254,8 @@ var Genesis = map[string]VochainGenesis{
 		SeedNodes:         []string{"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656"},
 		Genesis: `
 {
-   "genesis_time":"2021-02-09T17:41:19.055210151Z",
-   "chain_id":"vocdoni-stage-7",
+   "genesis_time":"2021-05-12T12:41:19.055210151Z",
+   "chain_id":"vocdoni-stage-8",
    "consensus_params":{
       "block":{
          "max_bytes":"22020096",
