@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -240,12 +239,12 @@ func (r *Router) SendError(request RouterRequest, errMsg string) {
 }
 
 // AddAuthKey adds a new pubkey address that will have access to private methods
-func (r *Router) AddAuthKey(addr common.Address) {
+func (r *Router) AddAuthKey(addr ethcommon.Address) {
 	r.signer.AddAuthKey(addr)
 }
 
 // DelAuthKey deletes a pubkey address from the authorized list
-func (r *Router) DelAuthKey(addr common.Address) {
+func (r *Router) DelAuthKey(addr ethcommon.Address) {
 	delete(r.signer.Authorized, addr)
 }
 

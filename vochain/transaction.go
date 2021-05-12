@@ -131,6 +131,8 @@ func UnmarshalTx(content []byte) (*models.Tx, []byte, []byte, error) {
 func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 	txID [32]byte, forCommit bool) (*models.Vote, error) {
 	tx := vtx.GetVote()
+
+	// Perform basic/general checks
 	if tx == nil {
 		return nil, fmt.Errorf("vote envelope transaction is nil")
 	}
@@ -189,9 +191,9 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 			return vote, nil
 		}
 
-		// if not forCommt but exist in cache, it is a mempool check, reject it
-		// since we already processed the transaction before.
-		if vote != nil {
+		// if not forCommit, it is a mempool check,
+		// reject it since we already processed the transaction before.
+		if !forCommit && vote != nil {
 			return nil, fmt.Errorf("vote already exist in cache")
 		}
 
@@ -226,6 +228,12 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 
 		// assign a nullifier
 		vote.Nullifier = GenerateNullifier(addr, vote.ProcessId)
+
+		// check that nullifier does not exist in cache already, this avoids
+		// processing multiple transactions with same nullifier.
+		if state.CacheHasNullifier(vote.Nullifier) {
+			return nil, fmt.Errorf("nullifier %x already exist in cache", vote.Nullifier)
+		}
 
 		// check if vote already exists
 		if exist, err := state.EnvelopeExists(vote.ProcessId,
@@ -262,7 +270,7 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 			return nil, fmt.Errorf("census origin not compatible")
 		}
 
-		// Check the digested payload has a minimum lenght
+		// check the digested payload has a minimum length
 		if len(pubKeyDigested) < 20 { // Minimum size is an Ethereum Address
 			return nil, fmt.Errorf("cannot digest public key: (%w)", err)
 		}
@@ -282,6 +290,8 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 			return nil, fmt.Errorf("proof not valid")
 		}
 		vote.Weight = weight.Bytes()
+
+		// add the vote to cache
 		state.CacheAdd(txID, vote)
 	}
 	return vote, nil

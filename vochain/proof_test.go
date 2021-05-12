@@ -32,15 +32,21 @@ func TestMerkleTreeProof(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	keys := util.CreateEthRandomKeysBatch(1000)
-	claims := []string{}
+	keys := util.CreateEthRandomKeysBatch(1001)
+	proofs := []string{}
 	for _, k := range keys {
 		c := k.PublicKey()
 		if err := tr.Add(c, nil); err != nil {
 			t.Fatal(err)
 		}
-		claims = append(claims, string(c))
+		proofs = append(proofs, string(c))
 	}
+	// We save the last key for the next test
+	lastKey := keys[len(keys)-1]
+	keys = keys[:len(keys)-2]
+	lastProof := proofs[len(proofs)-1]
+	proofs = proofs[:len(proofs)-2]
+
 	censusURI := "ipfs://123456789"
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
@@ -70,7 +76,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	var proof []byte
 	vp := []byte("[1,2,3,4]")
 	for i, s := range keys {
-		proof, err = tr.GenProof([]byte(claims[i]), nil)
+		proof, err = tr.GenProof([]byte(proofs[i]), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,6 +118,60 @@ func TestMerkleTreeProof(t *testing.T) {
 			t.Fatalf(fmt.Sprintf("deliverTX failed: %s", detxresp.Data))
 		}
 		app.Commit()
+	}
+
+	// Test send the same vote package multiple times with different nonce
+	proof, err = tr.GenProof([]byte(lastProof), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := &models.VoteEnvelope{
+		ProcessId: pid,
+		Proof: &models.Proof{
+			Payload: &models.Proof_Graviton{
+				Graviton: &models.ProofGraviton{
+					Siblings: proof,
+				},
+			},
+		},
+		VotePackage: vp,
+	}
+
+	for i := 0; i < 100; i++ {
+		tx.Nonce = util.RandomBytes(32)
+		if stx.Tx, err = proto.Marshal(&models.Tx{
+			Payload: &models.Tx_Vote{Vote: tx},
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		if stx.Signature, err = lastKey.Sign(stx.Tx); err != nil {
+			t.Fatal(err)
+		}
+
+		if cktx.Tx, err = proto.Marshal(&stx); err != nil {
+			t.Fatal(err)
+		}
+		cktxresp = app.CheckTx(cktx)
+		if i == 0 && cktxresp.Code != 0 {
+			t.Fatalf("checkTx returned err on first valid vote: %s", cktxresp.Data)
+
+		}
+		if i > 0 && cktxresp.Code == 0 {
+			t.Fatalf("checkTx returned 0, an error was expected")
+		}
+
+		if detx.Tx, err = proto.Marshal(&stx); err != nil {
+			t.Fatal(err)
+		}
+		detxresp = app.DeliverTx(detx)
+		if i == 0 && detxresp.Code != 0 {
+			t.Fatalf("devlierTx returned err on first valid vote: %s", detxresp.Data)
+		}
+		if i > 0 && detxresp.Code == 0 {
+			t.Fatalf("deliverTx returned 0, an error was expected")
+		}
+
 	}
 }
 
@@ -287,7 +347,8 @@ func TestCABlindProof(t *testing.T) {
 	testCASendVotes(t, pid, vp, &k, proof, app, false)
 }
 
-func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys, proof *models.ProofCA, app *BaseApplication, expectedResult bool) {
+func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys,
+	proof *models.ProofCA, app *BaseApplication, expectedResult bool) {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx
@@ -306,7 +367,11 @@ func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignK
 	pub, _ := signer.HexString()
 	t.Logf("addr: %s pubKey: %s", signer.Address(), pub)
 
-	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: tx}}); err != nil {
+	if stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_Vote{
+			Vote: tx,
+		},
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -388,7 +453,8 @@ func TestEthProof(t *testing.T) {
 	testEthSendVotes(t, sp.StorageProofs[2], pid, vp, app, false)
 }
 
-func testEthSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, app *BaseApplication, expectedResult bool) {
+func testEthSendVotes(t *testing.T, s testStorageProof,
+	pid []byte, vp []byte, app *BaseApplication, expectedResult bool) {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 
@@ -410,7 +476,11 @@ func testEthSendVotes(t *testing.T, s testStorageProof, pid []byte, vp []byte, a
 		}
 		siblings = append(siblings, sibb)
 	}
-	proof := models.ProofEthereumStorage{Key: k, Value: s.StorageProof.Value.ToInt().Bytes(), Siblings: siblings}
+	proof := models.ProofEthereumStorage{
+		Key:      k,
+		Value:    s.StorageProof.Value.ToInt().Bytes(),
+		Siblings: siblings,
+	}
 	tx := &models.VoteEnvelope{
 		Nonce:       util.RandomBytes(32),
 		ProcessId:   pid,
@@ -484,7 +554,8 @@ var testSmartContractHolders = []string{
 // var testEthHeight = uint32(3833670)
 var (
 	testEthIndexSlot   = uint32(4)
-	testEthStorageRoot = testutil.Hex2byte(nil, "0xe338061cd5d5fa8a452dc950e336a838ff2ca79bef04fe48c5a3a071cc7e0c55")
+	testEthStorageRoot = testutil.Hex2byte(nil,
+		"0xe338061cd5d5fa8a452dc950e336a838ff2ca79bef04fe48c5a3a071cc7e0c55")
 )
 
 type testStorageProofs struct {

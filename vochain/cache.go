@@ -7,16 +7,29 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+const (
+	cacheNullPrefix = "n_"
+)
+
+func cacheGetNullifierKey(nullifier []byte) string {
+	return cacheNullPrefix + string(nullifier)
+}
+
 // CacheAdd adds a new vote proof to the local cache
 func (v *State) CacheAdd(id [32]byte, vote *models.Vote) {
-	if len(id) == 0 {
+	if vote == nil || vote.Nullifier == nil {
 		return
 	}
 	v.voteCache.Add(id, vote)
+	v.voteCache.Add(cacheGetNullifierKey(vote.Nullifier), nil)
 }
 
 // CacheDel deletes an existing vote proof from the local cache
 func (v *State) CacheDel(id [32]byte) {
+	vote := v.CacheGet(id)
+	if vote != nil {
+		v.voteCache.Remove(cacheGetNullifierKey(vote.Nullifier))
+	}
 	v.voteCache.Remove(id)
 }
 
@@ -29,9 +42,15 @@ func (v *State) CacheGet(id [32]byte) *models.Vote {
 	return record.(*models.Vote)
 }
 
+// CacheHasNullifier fetch an existing vote from the local cache
+func (v *State) CacheHasNullifier(nullifier []byte) bool {
+	_, ok := v.voteCache.Get(cacheGetNullifierKey(nullifier))
+	return ok
+}
+
 // CachePurge removes the old cache saved votes
 func (v *State) CachePurge(height uint32) {
-	// Purge only every 6 blocks (3 minute)
+	// Purge only every 18 blocks (3 minute)
 	if height%18 != 0 {
 		return
 	}
@@ -55,7 +74,8 @@ func (v *State) CachePurge(height uint32) {
 			continue
 		}
 		if vote.Height+voteCachePurgeThreshold >= height {
-			v.voteCache.Remove(vid)
+			v.voteCache.Remove(cacheGetNullifierKey(vote.Nullifier))
+			v.voteCache.Remove(id)
 			if v.MemPoolRemoveTxKey != nil {
 				v.MemPoolRemoveTxKey(vid, true)
 				purged++
