@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -139,25 +138,6 @@ func (b *BlockMetadata) String() string {
 	}
 	builder.WriteString("}")
 	return builder.String()
-}
-
-func BlockMetadataFromBlockModel(
-	block *tmtypes.Block, includeHeight, includeHash bool) *BlockMetadata {
-	if block == nil {
-		return nil
-	}
-	b := new(BlockMetadata)
-	if includeHeight {
-		b.Height = uint32(block.Height)
-	}
-	b.Timestamp = block.Time
-	if includeHash {
-		b.Hash = block.Hash().Bytes()
-	}
-	b.NumTxs = uint64(len(block.Txs))
-	b.LastBlockHash = block.LastBlockID.Hash.Bytes()
-	b.ProposerAddress = block.ProposerAddress.Bytes()
-	return b
 }
 
 // ________________________ CALLBACKS DATA STRUCTS ________________________

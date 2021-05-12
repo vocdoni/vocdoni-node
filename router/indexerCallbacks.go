@@ -75,7 +75,7 @@ func (r *Router) getBlock(request routerRequest) {
 			"block height %d not valid for vochain with height %d", request.Height, r.vocapp.Height()))
 		return
 	}
-	if response.Block = indexertypes.BlockMetadataFromBlockModel(
+	if response.Block = blockMetadataFromBlockModel(
 		r.Scrutinizer.App.GetBlockByHeight(int64(request.Height)), false, true); response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.Height))
 		return
@@ -87,7 +87,7 @@ func (r *Router) getBlock(request routerRequest) {
 
 func (r *Router) getBlockByHash(request routerRequest) {
 	var response api.MetaResponse
-	response.Block = indexertypes.BlockMetadataFromBlockModel(
+	response.Block = blockMetadataFromBlockModel(
 		r.Scrutinizer.App.GetBlockByHash(request.Hash), true, false)
 	if response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Hash))
@@ -106,7 +106,7 @@ func (r *Router) getBlockList(request routerRequest) {
 			break
 		}
 		response.BlockList = append(response.BlockList,
-			indexertypes.BlockMetadataFromBlockModel(
+			blockMetadataFromBlockModel(
 				r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i)), true, true))
 	}
 	if err := request.Send(r.buildReply(request, &response)); err != nil {
@@ -177,4 +177,23 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 	if err := request.Send(r.buildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
+}
+
+func blockMetadataFromBlockModel(
+	block *tmtypes.Block, includeHeight, includeHash bool) *indexertypes.BlockMetadata {
+	if block == nil {
+		return nil
+	}
+	b := new(indexertypes.BlockMetadata)
+	if includeHeight {
+		b.Height = uint32(block.Height)
+	}
+	b.Timestamp = block.Time
+	if includeHash {
+		b.Hash = block.Hash().Bytes()
+	}
+	b.NumTxs = uint64(len(block.Txs))
+	b.LastBlockHash = block.LastBlockID.Hash.Bytes()
+	b.ProposerAddress = block.ProposerAddress.Bytes()
+	return b
 }
