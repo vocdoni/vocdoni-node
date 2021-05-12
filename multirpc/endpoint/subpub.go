@@ -46,15 +46,15 @@ func (sp *SubPubEndpoint) SetOption(name string, value interface{}) error {
 	switch name {
 	case OptionListenPort:
 		if sp.port, ok = value.(int32); !ok {
-			return fmt.Errorf("ListenPort must be int32")
+			return fmt.Errorf("listenPort must be int32")
 		}
 	case OptionBootnodes:
 		if sp.bootnodes, ok = value.([]string); !ok {
-			return fmt.Errorf("Botnodes must be []string")
+			return fmt.Errorf("botnodes must be []string")
 		}
 	case OptionPrivKey:
 		if sp.privKey, ok = value.(string); !ok {
-			return fmt.Errorf("PrivKey must be of type string")
+			return fmt.Errorf("privKey must be of type string")
 		}
 	case OptionTransportKey:
 		if sp.transportKey, ok = value.(string); !ok {
@@ -73,6 +73,7 @@ func (sp *SubPubEndpoint) SetOption(name string, value interface{}) error {
 func (sp *SubPubEndpoint) Transport() transports.Transport {
 	return &sp.transport
 }
+
 func (sp *SubPubEndpoint) ID() string {
 	return "subpub"
 }

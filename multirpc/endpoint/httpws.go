@@ -107,7 +107,8 @@ func (e *HTTPWSendPoint) Init(listener chan transports.Message) error {
 	log.Infof("creating API service")
 
 	// Create a HTTP Proxy service
-	pxy, err := proxy(e.config.ListenHost, e.config.ListenPort, e.config.TLSconfig, e.config.TLSdomain, e.config.TLSdirCert)
+	pxy, err := proxy(e.config.ListenHost, e.config.ListenPort,
+		e.config.TLSconfig, e.config.TLSdomain, e.config.TLSdirCert)
 	if err != nil {
 		return err
 	}
@@ -125,7 +126,9 @@ func (e *HTTPWSendPoint) Init(listener chan transports.Message) error {
 		return fmt.Errorf("mode %d not supported", e.config.Mode)
 	}
 
-	ts.Init(new(transports.Connection))
+	if err := ts.Init(new(transports.Connection)); err != nil {
+		return err
+	}
 
 	switch e.config.Mode {
 	case 0:
@@ -141,7 +144,10 @@ func (e *HTTPWSendPoint) Init(listener chan transports.Message) error {
 	// Attach the metrics agent (Prometheus)
 	var ma *metrics.Agent
 	if e.config.Metrics != nil && e.config.Metrics.Enabled {
-		ma = metrics.NewAgent("/metrics", time.Second*time.Duration(e.config.Metrics.RefreshInterval), pxy)
+		ma = metrics.NewAgent("/metrics",
+			time.Second*time.Duration(
+				e.config.Metrics.RefreshInterval),
+			pxy)
 	}
 	e.id = "httpws"
 	e.Proxy = pxy
@@ -152,7 +158,8 @@ func (e *HTTPWSendPoint) Init(listener chan transports.Message) error {
 
 // proxy creates a new service for routing HTTP connections using go-chi server
 // if tlsDomain is specified, it will use letsencrypt to fetch a valid TLS certificate
-func proxy(host string, port int32, tlsConfig *tls.Config, tlsDomain, tlsDir string) (*mhttp.Proxy, error) {
+func proxy(host string, port int32, tlsConfig *tls.Config,
+	tlsDomain, tlsDir string) (*mhttp.Proxy, error) {
 	pxy := mhttp.NewProxy()
 	pxy.Conn.TLSdomain = tlsDomain
 	pxy.Conn.TLScertDir = tlsDir
