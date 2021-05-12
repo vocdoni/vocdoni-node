@@ -90,11 +90,14 @@ func NewState(dataDir string) (*State, error) {
 			if err := os.RemoveAll(dataDir); err != nil {
 				log.Errorf("%s", err)
 			}
-			vs.Store.Close()
+			_ = vs.Store.Close()
 			if err := initStore(dataDir, vs); err != nil {
 				return nil, fmt.Errorf("cannot init db: %s", err)
 			}
 			vs.voteCache, err = lru.New(voteCacheSize)
+			if err != nil {
+				return nil, err
+			}
 			log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
 			return vs, nil
 		}
@@ -102,6 +105,9 @@ func NewState(dataDir string) (*State, error) {
 	}
 
 	vs.voteCache, err = lru.New(voteCacheSize)
+	if err != nil {
+		return nil, err
+	}
 	log.Infof("state database is ready at version %d with hash %x",
 		vs.Store.Version(), vs.Store.Hash())
 	vs.txCounter = new(int32)
