@@ -3,7 +3,7 @@ package vochain
 import (
 	"bytes"
 	"fmt"
-	"time"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethtoken "github.com/vocdoni/storage-proofs-eth-go/token"
@@ -25,7 +25,7 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 	switch vtx.Payload.(type) {
 	case *models.Tx_Vote:
 		v, err := VoteTxCheck(vtx, txBytes, signature, state, txID, commit)
-		if err != nil {
+		if err != nil || v == nil {
 			return []byte{}, fmt.Errorf("voteTxCheck %w", err)
 		}
 		if commit {
@@ -131,6 +131,9 @@ func UnmarshalTx(content []byte) (*models.Tx, []byte, []byte, error) {
 func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 	txID [32]byte, forCommit bool) (*models.Vote, error) {
 	tx := vtx.GetVote()
+	if tx == nil {
+		return nil, fmt.Errorf("vote envelope transaction is nil")
+	}
 	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
 		return nil, fmt.Errorf("cannot fetch processId: %w", err)
@@ -141,129 +144,147 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 	height := state.Height()
 	endBlock := process.StartBlock + process.BlockCount
 
-	if (height >= process.StartBlock && height <= endBlock) &&
-		process.Status == models.ProcessStatus_READY {
-
-		// Check in case of keys required, they have been sent by some keykeeper
-		if process.EnvelopeType.EncryptedVotes && process.KeyIndex != nil && *process.KeyIndex < 1 {
-			return nil, fmt.Errorf("no keys available, voting is not possible")
-		}
-
-		switch {
-		case process.EnvelopeType.Anonymous:
-			// TODO check snark
-			return nil, fmt.Errorf("snark vote not implemented")
-		default: // Signature based voting
-			var vote models.Vote
-			vote.ProcessId = tx.ProcessId
-			if signature == nil {
-				return nil, fmt.Errorf("signature missing on voteTx")
-			}
-			vote.VotePackage = tx.VotePackage
-			if process.EnvelopeType.EncryptedVotes {
-				if len(tx.EncryptionKeyIndexes) == 0 {
-					return nil, fmt.Errorf("no key indexes provided on vote package")
-				}
-				vote.EncryptionKeyIndexes = tx.EncryptionKeyIndexes
-			}
-
-			// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
-			// An element can only be added to the vote cache during checkTx.
-			// Every N seconds the old votes which are not yet in the blockchain will be removed from cache.
-			// If the same vote (but different transaction) is send to the mempool, the cache will detect it
-			// and vote will be discarted.
-			vp := state.CacheGet(txID)
-
-			if forCommit && vp != nil {
-				// if vote is in cache, lazy check and remove it from cache
-				defer state.CacheDel(txID)
-				if state.EnvelopeExists(vote.ProcessId, vp.Nullifier, false) {
-					return nil, fmt.Errorf("vote already exist")
-				}
-			} else {
-				if vp != nil {
-					return nil, fmt.Errorf("vote already exist in cache")
-				}
-				// if not in cache, extract pubKey, generate nullifier and check census proof
-				if tx.Proof == nil {
-					return nil, fmt.Errorf("proof not found on transaction")
-				}
-
-				vp = new(CacheTx)
-				tx := vtx.GetVote()
-				if tx == nil {
-					return nil, fmt.Errorf("vote envelope transaction not found")
-				}
-				vp.Proof = tx.Proof
-				vp.PubKey, err = ethereum.PubKeyFromSignature(txBytes, signature)
-				if err != nil {
-					return nil, fmt.Errorf("cannot extract public key from signature: (%w)", err)
-				}
-				addr, err := ethereum.AddrFromPublicKey(vp.PubKey)
-				if err != nil {
-					return nil, fmt.Errorf("cannot extract address from public key: (%w)", err)
-				}
-
-				// assign a nullifier
-				vp.Nullifier = GenerateNullifier(addr, vote.ProcessId)
-				log.Debugf("new vote %x for address %s and process %x", vp.Nullifier, addr.Hex(), tx.ProcessId)
-
-				// check if vote exists
-				if state.EnvelopeExists(vote.ProcessId, vp.Nullifier, false) {
-					return nil, fmt.Errorf("vote %x already exists", vp.Nullifier)
-				}
-
-				// check census origin and compute vote digest identifier
-				switch process.CensusOrigin {
-				case models.CensusOrigin_OFF_CHAIN_TREE:
-					if process.EnvelopeType.Anonymous {
-						vp.PubKeyDigest = snarks.Poseidon.Hash(vp.PubKey)
-					} else {
-						vp.PubKeyDigest = vp.PubKey
-					}
-				case models.CensusOrigin_OFF_CHAIN_CA:
-					vp.PubKeyDigest = addr.Bytes()
-				case models.CensusOrigin_ERC20:
-					if process.EthIndexSlot == nil {
-						return nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
-					}
-					slot, err := ethtoken.GetSlot(addr.Hex(), int(*process.EthIndexSlot))
-					if err != nil {
-						return nil, fmt.Errorf("cannot fetch slot: %w", err)
-					}
-					vp.PubKeyDigest = slot[:]
-					log.Debugf("ERC20 index slot %d, storage slot %x", *process.EthIndexSlot, vp.PubKeyDigest)
-				default:
-					return nil, fmt.Errorf("census origin not compatible")
-				}
-				if len(vp.PubKeyDigest) < 20 { // Minimum size is an Ethereum Address
-					return nil, fmt.Errorf("cannot digest public key: (%w)", err)
-				}
-
-				// check census proof
-				var valid bool
-				valid, vp.Weight, err = CheckProof(tx.Proof,
-					process.CensusOrigin,
-					process.CensusRoot,
-					process.ProcessId,
-					vp.PubKeyDigest)
-				if err != nil {
-					return nil, fmt.Errorf("proof not valid: (%w)", err)
-				}
-				if !valid {
-					return nil, fmt.Errorf("proof not valid")
-				}
-				vp.Created = time.Now()
-				state.CacheAdd(txID, vp)
-			}
-			vote.Nullifier = vp.Nullifier
-			if vp.Weight != nil {
-				vote.Weight = vp.Weight.Bytes()
-			}
-			return &vote, nil
-		}
+	if height < process.StartBlock || height > endBlock {
+		return nil, fmt.Errorf("process %x not started or finished", tx.ProcessId)
 	}
-	return nil, fmt.Errorf("cannot add vote, invalid block frame or process stop/paused/cancel")
+
+	if process.Status != models.ProcessStatus_READY {
+		return nil, fmt.Errorf("process %x not in READY state", tx.ProcessId)
+	}
+
+	// Check in case of keys required, they have been sent by some keykeeper
+	if process.EnvelopeType.EncryptedVotes &&
+		process.KeyIndex != nil &&
+		*process.KeyIndex < 1 {
+		return nil, fmt.Errorf("no keys available, voting is not possible")
+	}
+
+	var vote *models.Vote
+	switch {
+	case process.EnvelopeType.Anonymous:
+		// TODO check snark
+		return nil, fmt.Errorf("snark vote not implemented")
+	default: // Signature based voting
+		if signature == nil {
+			return nil, fmt.Errorf("signature missing on voteTx")
+		}
+		// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
+		// An element can only be added to the vote cache during checkTx.
+		// Every N seconds the old votes which are not yet in the blockchain will be removed from cache.
+		// If the same vote (but different transaction) is send to the mempool, the cache will detect it
+		// and vote will be discarted.
+		vote = state.CacheGet(txID)
+
+		// if vote is in cache, lazy check and remove it from cache
+		if forCommit && vote != nil {
+			vote.Height = height // update vote height
+			defer state.CacheDel(txID)
+			if exist, err := state.EnvelopeExists(vote.ProcessId,
+				vote.Nullifier, false); err != nil || exist {
+				if err != nil {
+					return nil, err
+				}
+				return nil, fmt.Errorf("vote already exist")
+			}
+			return vote, nil
+		}
+
+		// if not forCommt but exist in cache, it is a mempool check, reject it
+		// since we already processed the transaction before.
+		if vote != nil {
+			return nil, fmt.Errorf("vote already exist in cache")
+		}
+
+		// if not in cache, full check
+		// extract pubKey, generate nullifier and check census proof.
+		// add the transaction in the cache
+		if tx.Proof == nil {
+			return nil, fmt.Errorf("proof not found on transaction")
+		}
+
+		vote = &models.Vote{
+			Height:      height,
+			ProcessId:   tx.ProcessId,
+			VotePackage: tx.VotePackage,
+		}
+		// If process encrypted, check the vote is encrypted (includes at least one key index)
+		if process.EnvelopeType.EncryptedVotes {
+			if len(tx.EncryptionKeyIndexes) == 0 {
+				return nil, fmt.Errorf("no key indexes provided on vote package")
+			}
+			vote.EncryptionKeyIndexes = tx.EncryptionKeyIndexes
+		}
+		var pubKey []byte
+		pubKey, err = ethereum.PubKeyFromSignature(txBytes, signature)
+		if err != nil {
+			return nil, fmt.Errorf("cannot extract public key from signature: (%w)", err)
+		}
+		addr, err := ethereum.AddrFromPublicKey(pubKey)
+		if err != nil {
+			return nil, fmt.Errorf("cannot extract address from public key: (%w)", err)
+		}
+
+		// assign a nullifier
+		vote.Nullifier = GenerateNullifier(addr, vote.ProcessId)
+
+		// check if vote already exists
+		if exist, err := state.EnvelopeExists(vote.ProcessId,
+			vote.Nullifier, false); err != nil || exist {
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("vote %x already exists", vote.Nullifier)
+		}
+		log.Debugf("new vote %x for address %s and process %x", vote.Nullifier, addr.Hex(), tx.ProcessId)
+
+		// check census origin and compute vote digest identifier
+		var pubKeyDigested []byte
+		switch process.CensusOrigin {
+		case models.CensusOrigin_OFF_CHAIN_TREE:
+			if process.EnvelopeType.Anonymous {
+				pubKeyDigested = snarks.Poseidon.Hash(pubKey)
+			} else {
+				pubKeyDigested = pubKey
+			}
+		case models.CensusOrigin_OFF_CHAIN_CA:
+			pubKeyDigested = addr.Bytes()
+		case models.CensusOrigin_ERC20:
+			if process.EthIndexSlot == nil {
+				return nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
+			}
+			slot, err := ethtoken.GetSlot(addr.Hex(), int(*process.EthIndexSlot))
+			if err != nil {
+				return nil, fmt.Errorf("cannot fetch slot: %w", err)
+			}
+			pubKeyDigested = slot[:]
+			log.Debugf("ERC20 index slot %d, storage slot %x", *process.EthIndexSlot, pubKeyDigested)
+		default:
+			return nil, fmt.Errorf("census origin not compatible")
+		}
+
+		// Check the digested payload has a minimum lenght
+		if len(pubKeyDigested) < 20 { // Minimum size is an Ethereum Address
+			return nil, fmt.Errorf("cannot digest public key: (%w)", err)
+		}
+
+		// check census proof
+		var valid bool
+		var weight *big.Int
+		valid, weight, err = CheckProof(tx.Proof,
+			process.CensusOrigin,
+			process.CensusRoot,
+			process.ProcessId,
+			pubKeyDigested)
+		if err != nil {
+			return nil, fmt.Errorf("proof not valid: (%w)", err)
+		}
+		if !valid {
+			return nil, fmt.Errorf("proof not valid")
+		}
+		vote.Weight = weight.Bytes()
+		state.CacheAdd(txID, vote)
+	}
+	return vote, nil
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction

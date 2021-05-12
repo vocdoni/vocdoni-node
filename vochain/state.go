@@ -12,6 +12,7 @@ import (
 
 	"github.com/cosmos/iavl"
 	"github.com/ethereum/go-ethereum/common"
+	lru "github.com/hashicorp/golang-lru"
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -22,26 +23,6 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
-
-const (
-	// db names
-	AppTree                 = "app"
-	ProcessTree             = "process"
-	VoteTree                = "vote"
-	voteCachePurgeThreshold = time.Minute * 10
-)
-
-var (
-	// keys; not constants because of []byte
-	headerKey    = []byte("header")
-	oracleKey    = []byte("oracle")
-	validatorKey = []byte("validator")
-)
-
-var ErrProcessNotFound = fmt.Errorf("process not found")
-
-// PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
-var PrefixDBCacheSize = 0
 
 // EventListener is an interface used for executing custom functions during the
 // events of the block creation process.
@@ -76,9 +57,8 @@ func (e ErrHaltVochain) Unwrap() error { return e.reason }
 
 // State represents the state of the vochain application
 type State struct {
-	Store         statedb.StateDB
-	voteCache     map[[32]byte]*CacheTx
-	voteCacheLock sync.RWMutex
+	Store     statedb.StateDB
+	voteCache *lru.Cache
 	ImmutableState
 	MemPoolRemoveTxKey func([32]byte, bool)
 	txCounter          *int32
@@ -114,14 +94,14 @@ func NewState(dataDir string) (*State, error) {
 			if err := initStore(dataDir, vs); err != nil {
 				return nil, fmt.Errorf("cannot init db: %s", err)
 			}
-			vs.voteCache = make(map[[32]byte]*CacheTx)
+			vs.voteCache, err = lru.New(voteCacheSize)
 			log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
 			return vs, nil
 		}
 		return nil, fmt.Errorf("unknown error loading state db: %v", err)
 	}
 
-	vs.voteCache = make(map[[32]byte]*CacheTx)
+	vs.voteCache, err = lru.New(voteCacheSize)
 	log.Infof("state database is ready at version %d with hash %x",
 		vs.Store.Version(), vs.Store.Hash())
 	vs.txCounter = new(int32)
@@ -389,7 +369,8 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	return nil
 }
 
-// AddVote adds a new vote to a process if the process exists and the vote is not already submmited
+// AddVote adds a new vote to a process and call the even listeners to OnVote.
+// This method does not check if the vote already exist!
 func (v *State) AddVote(vote *models.Vote) error {
 	vid, err := v.voteID(vote.ProcessId, vote.Nullifier)
 	if err != nil {
@@ -421,10 +402,10 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 	if len(nullifier) != types.VoteNullifierSize {
 		return nil, fmt.Errorf("wrong nullifier size %d", len(nullifier))
 	}
-	vid := make([]byte, 0, len(pid)+len(nullifier))
-	vid = append(vid, pid...)
-	vid = append(vid, nullifier...)
-	return vid, nil
+	vid := bytes.Buffer{}
+	vid.Write(pid)
+	vid.Write(nullifier)
+	return vid.Bytes(), nil
 }
 
 // Envelope returns the hash of a stored vote if exists.
@@ -450,23 +431,21 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ []byte, e
 		voteHash = v.Store.Tree(VoteTree).Get(vid)
 	}
 	if voteHash == nil {
-		return nil, fmt.Errorf("vote with id (%x) does not exist", vid)
+		return nil, ErrVoteDoesNotExist
 	}
 	return voteHash, nil
 }
 
 // EnvelopeExists returns true if the envelope identified with voteID exists
-func (v *State) EnvelopeExists(processID, nullifier []byte, isQuery bool) bool {
-	voteID, err := v.voteID(processID, nullifier)
-	if err != nil {
-		return false
+func (v *State) EnvelopeExists(processID, nullifier []byte, isQuery bool) (bool, error) {
+	e, err := v.Envelope(processID, nullifier, isQuery)
+	if err != nil && err != ErrVoteDoesNotExist {
+		return false, err
 	}
-	v.RLock()
-	defer v.RUnlock()
-	if isQuery {
-		return len(v.Store.ImmutableTree(VoteTree).Get(voteID)) > 0
+	if err == ErrVoteDoesNotExist {
+		return false, nil
 	}
-	return len(v.Store.Tree(VoteTree).Get(voteID)) > 0
+	return e != nil, nil
 }
 
 func (v *State) iterateProcessID(processID []byte,

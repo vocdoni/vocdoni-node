@@ -2,38 +2,39 @@ package vochain
 
 import (
 	"encoding/json"
-	"math/big"
+	"fmt"
 	"time"
 
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+const (
+	// db names
+	AppTree                 = "app"
+	ProcessTree             = "process"
+	VoteTree                = "vote"
+	voteCachePurgeThreshold = uint32(60) // in blocks, 10 minutes
+	voteCacheSize           = 50000
+)
+
+var (
+	ErrVoteDoesNotExist = fmt.Errorf("vote does not exist")
+	ErrProcessNotFound  = fmt.Errorf("process not found")
+	// keys; not constants because of []byte
+	headerKey    = []byte("header")
+	oracleKey    = []byte("oracle")
+	validatorKey = []byte("validator")
+)
+
+// PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
+var PrefixDBCacheSize = 0
+
 // VotePackage represents the payload of a vote (usually base64 encoded)
 type VotePackage struct {
 	Nonce string `json:"nonce,omitempty"`
 	Votes []int  `json:"votes"`
 }
-
-// ________________________ STATE ________________________
-// Defined in ../../db/iavl.go for convenience
-
-// ________________________ VOTE ________________________
-
-// CacheTx contains the proof indicating that the user is in the census of the process
-type CacheTx struct {
-	Type         *models.TxType
-	Proof        *models.Proof `json:"proof,omitempty"`
-	PubKey       []byte        `json:"pubKey,omitempty"`
-	PubKeyDigest []byte        `json:"pubKeyDigest,omitempty"`
-	Nullifier    []byte        `json:"nullifier,omitempty"`
-	Weight       *big.Int      `json:"weight,omitempty"`
-	Created      time.Time     `json:"timestamp"`
-}
-
-// ________________________ PROCESS ________________________
-
-// ________________________ TX ________________________
 
 // UniqID returns a uniq identifier for the VoteTX. It depends on the Type.
 func UniqID(tx *models.SignedTx, isAnonymous bool) string {
@@ -44,8 +45,6 @@ func UniqID(tx *models.SignedTx, isAnonymous bool) string {
 	}
 	return ""
 }
-
-// ________________________ VALIDATORS ________________________
 
 // ________________________ QUERIES ________________________
 

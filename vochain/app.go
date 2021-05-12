@@ -312,7 +312,7 @@ func (app *BaseApplication) BeginBlock(
 		log.Fatal(err)
 	}
 	app.State.Unlock()
-	app.State.CachePurge(app.State.Header(true).Height)
+	go app.State.CachePurge(uint32(header.Height))
 
 	return abcitypes.ResponseBeginBlock{}
 }
