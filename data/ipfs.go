@@ -21,7 +21,6 @@ import (
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/ipfs/interface-go-ipfs-core/options"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
-	ipath "github.com/ipfs/interface-go-ipfs-core/path"
 	ipfscrypto "github.com/libp2p/go-libp2p-core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -296,7 +295,7 @@ func (i *IPFSHandle) PublishIPNSpath(ctx context.Context, path string,
 	}
 	return i.CoreAPI.Name().Publish(
 		ctx,
-		ipath.IpfsPath(c),
+		corepath.IpfsPath(c),
 		options.Name.TTL(time.Minute*10),
 		options.Name.Key(keyalias),
 	)
