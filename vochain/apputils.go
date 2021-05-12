@@ -122,7 +122,8 @@ func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 }
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
-func verifySignatureAgainstOracles(oracles []ethcommon.Address, message, signature []byte) (bool, ethcommon.Address, error) {
+func verifySignatureAgainstOracles(oracles []ethcommon.Address, message,
+	signature []byte) (bool, ethcommon.Address, error) {
 	signKeys := ethereum.NewSignKeys()
 	for _, oracle := range oracles {
 		signKeys.AddAuthKey(oracle)
@@ -131,8 +132,12 @@ func verifySignatureAgainstOracles(oracles []ethcommon.Address, message, signatu
 }
 
 // GenerateNullifier generates the nullifier of a vote (hash(address+processId))
+// This function assumes address and processID are correct.
 func GenerateNullifier(address ethcommon.Address, processID []byte) []byte {
-	return ethereum.HashRaw([]byte(fmt.Sprintf("%s%s", address.Bytes(), processID)))
+	nullifier := bytes.Buffer{}
+	nullifier.Write(address.Bytes())
+	nullifier.Write(processID)
+	return ethereum.HashRaw(nullifier.Bytes())
 }
 
 // NewPrivateValidator returns a tendermint file private validator (key and state)

@@ -11,6 +11,7 @@ import (
 
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 )
 
@@ -23,7 +24,10 @@ func TestVochainState(t *testing.T) {
 	}
 
 	// This used to panic due to nil *ImmutableTree fields.
-	exists := s.EnvelopeExists([]byte("foo"), []byte("bar"), false)
+	exists, err := s.EnvelopeExists(util.RandomBytes(32), util.RandomBytes(32), false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if exists {
 		t.Errorf("expected EnvelopeExists to return false")
 	}

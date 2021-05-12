@@ -56,7 +56,9 @@ func TestMerkleTreeProof(t *testing.T) {
 		BlockCount:   1024,
 	}
 	t.Logf("adding process %s", log.FormatProto(process))
-	app.State.AddProcess(process)
+	if err := app.State.AddProcess(process); err != nil {
+		t.Fatal(err)
+	}
 
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
@@ -73,13 +75,21 @@ func TestMerkleTreeProof(t *testing.T) {
 			t.Fatal(err)
 		}
 		tx := &models.VoteEnvelope{
-			Nonce:       util.RandomBytes(32),
-			ProcessId:   pid,
-			Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proof}}},
+			Nonce:     util.RandomBytes(32),
+			ProcessId: pid,
+			Proof: &models.Proof{
+				Payload: &models.Proof_Graviton{
+					Graviton: &models.ProofGraviton{
+						Siblings: proof,
+					},
+				},
+			},
 			VotePackage: vp,
 		}
 
-		if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: tx}}); err != nil {
+		if stx.Tx, err = proto.Marshal(&models.Tx{
+			Payload: &models.Tx_Vote{Vote: tx},
+		}); err != nil {
 			t.Fatal(err)
 		}
 
