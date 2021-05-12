@@ -97,16 +97,16 @@ type TxPackage struct {
 // TxMetadata contains tx information for the TransactionList api
 type TxMetadata struct {
 	Type        string         `json:"type"`
-	BlockHeight uint32         `json:"block_height"`
+	BlockHeight uint32         `json:"block_height,omitempty"`
 	Index       int32          `json:"index"`
 	Hash        types.HexBytes `json:"hash"`
 }
 
 // BlockMetadata contains the metadata for a single tendermint block
 type BlockMetadata struct {
-	Height          uint32         `json:"height"`
+	Height          uint32         `json:"height,omitempty"`
 	Timestamp       time.Time      `json:"timestamp"`
-	Hash            types.HexBytes `json:"hash"`
+	Hash            types.HexBytes `json:"hash,omitempty"`
 	NumTxs          uint64         `json:"num_txs"`
 	LastBlockHash   types.HexBytes `json:"last_block_hash"`
 	ProposerAddress types.HexBytes `json:"proposer_address"`
@@ -141,14 +141,19 @@ func (b *BlockMetadata) String() string {
 	return builder.String()
 }
 
-func BlockMetadataFromBlockModel(block *tmtypes.Block) *BlockMetadata {
+func BlockMetadataFromBlockModel(
+	block *tmtypes.Block, includeHeight, includeHash bool) *BlockMetadata {
 	if block == nil {
 		return nil
 	}
 	b := new(BlockMetadata)
-	b.Height = uint32(block.Height)
+	if includeHeight {
+		b.Height = uint32(block.Height)
+	}
 	b.Timestamp = block.Time
-	b.Hash = block.Hash().Bytes()
+	if includeHash {
+		b.Hash = block.Hash().Bytes()
+	}
 	b.NumTxs = uint64(len(block.Txs))
 	b.LastBlockHash = block.LastBlockID.Hash.Bytes()
 	b.ProposerAddress = block.ProposerAddress.Bytes()
