@@ -54,6 +54,7 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, vocInfo *vochain
 	r.registerPublic("getBlockHeight", r.getBlockHeight)
 	r.registerPublic("getProcessKeys", r.getProcessKeys)
 	r.registerPublic("getBlockStatus", r.getBlockStatus)
+	r.registerPublic("getOracleResults", r.getOracleResults)
 }
 
 // EnableVoteAPI enabled the Vote API in the Router

@@ -256,6 +256,21 @@ func (r *Router) getResultsWeight(request routerRequest) {
 	request.Send(r.buildReply(request, &response))
 }
 
+func (r *Router) getOracleResults(request routerRequest) {
+	var response api.MetaResponse
+	if len(request.ProcessID) != types.ProcessIDsize {
+		r.sendError(request, "cannot get oracle results: (malformed processId)")
+		return
+	}
+	var err error
+	response.Results, err = r.vocapp.State.GetProcessResults(request.ProcessID)
+	if err != nil {
+		r.sendError(request, fmt.Sprintf("cannot get oracle results: %v", err))
+		return
+	}
+	request.Send(r.buildReply(request, &response))
+}
+
 func (r *Router) getResults(request routerRequest) {
 	if len(request.ProcessID) != types.ProcessIDsize {
 		r.sendError(request, "cannot get envelope status: (malformed processId)")

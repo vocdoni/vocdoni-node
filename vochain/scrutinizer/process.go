@@ -266,7 +266,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		return fmt.Errorf("cannot check if process live: %w", err)
 	} else {
 		if live {
-			compResultsHeight = p.GetBlockCount() + p.GetStartBlock()
+			compResultsHeight = p.GetBlockCount() + p.GetStartBlock() + 1
 		}
 	}
 
