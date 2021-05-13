@@ -7,8 +7,12 @@ go 1.16
 
 replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 v3.0.0-20210416135442-1226c2c2c7d6
 
+// Don't upgrade bazil.org/fuse past v0.0.0-20200407214033-5883e5a4b512 for now,
+// as it dropped support for GOOS=darwin.
+// If you change its version, ensure that "GOOS=darwin go build ./..." still works.
+
 require (
-	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05 // indirect
+	bazil.org/fuse v0.0.0-20200407214033-5883e5a4b512 // indirect
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210227202403-5dae5c48f917
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
@@ -97,12 +101,3 @@ require (
 // https://github.com/ethereum/go-ethereum/issues/20590 is fixed, stub it out
 // with a replace directive. The stub was hacked together with vim.
 replace gopkg.in/olebedev/go-duktape.v3 => ./duktape-stub
-
-// Newer versions of the fuse module removed support for MacOS.
-// Unfortunately, its downstream users don't handle this properly,
-// so our builds simply break for GOOS=darwin.
-// Until either upstream or downstream solve this properly,
-// force a downgrade to the commit right before support was dropped.
-// It's also possible to use downstream's -tags=nofuse, but that's manual.
-// TODO(mvdan): remove once we've untangled module dep loops.
-replace bazil.org/fuse => bazil.org/fuse v0.0.0-20200407214033-5883e5a4b512
