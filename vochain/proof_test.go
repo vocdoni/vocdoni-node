@@ -216,7 +216,7 @@ func TestCAProof(t *testing.T) {
 
 		proof := &models.ProofCA{
 			Bundle:    bundle,
-			Type:      models.SignatureType_ECDSA,
+			Type:      models.ProofCA_ECDSA,
 			Signature: signature,
 		}
 		testCASendVotes(t, pid, vp, k, proof, app, true)
@@ -241,7 +241,7 @@ func TestCAProof(t *testing.T) {
 	}
 	proof := &models.ProofCA{
 		Bundle:    bundle,
-		Type:      models.SignatureType_ECDSA,
+		Type:      models.ProofCA_ECDSA,
 		Signature: signature,
 	}
 	testCASendVotes(t, pid, vp, &k, proof, app, false)
@@ -310,7 +310,7 @@ func TestCABlindProof(t *testing.T) {
 		// Pack the proof
 		proof := &models.ProofCA{
 			Bundle:    bundle,
-			Type:      models.SignatureType_ECDSA_BLIND,
+			Type:      models.ProofCA_ECDSA_BLIND,
 			Signature: signature,
 		}
 		testCASendVotes(t, pid, vp, k, proof, app, true)
@@ -339,7 +339,7 @@ func TestCABlindProof(t *testing.T) {
 	}
 	proof := &models.ProofCA{
 		Bundle:    bundle,
-		Type:      models.SignatureType_ECDSA,
+		Type:      models.ProofCA_ECDSA,
 		Signature: signature,
 	}
 	testCASendVotes(t, pid, vp, &k, proof, app, false)

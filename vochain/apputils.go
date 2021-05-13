@@ -66,7 +66,7 @@ func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 
 		// depending on signature type, use a mechanism for extracting the ca publickey from signature
 		switch p.GetType() {
-		case models.SignatureType_ECDSA:
+		case models.ProofCA_ECDSA:
 			caPubk, err = ethereum.PubKeyFromSignature(caBundle, p.GetSignature())
 			if err != nil {
 				return false, nil, fmt.Errorf("cannot fetch ca address from signature: %w", err)
@@ -74,7 +74,7 @@ func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 			if !bytes.Equal(caPubk, censusRoot) {
 				return false, nil, fmt.Errorf("ca bundle signature do not match")
 			}
-		case models.SignatureType_ECDSA_BLIND:
+		case models.ProofCA_ECDSA_BLIND:
 			// Blind CA check
 			pubdesc, err := ethereum.DecompressPubKey(censusRoot)
 			if err != nil {

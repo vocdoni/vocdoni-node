@@ -230,7 +230,7 @@ func (c *Client) GetCSPproofBatch(signers []*ethereum.SignKeys,
 
 		proof := &models.ProofCA{
 			Bundle:    bundle,
-			Type:      models.SignatureType_ECDSA,
+			Type:      models.ProofCA_ECDSA,
 			Signature: signature,
 		}
 		p, err := proto.Marshal(proof)
