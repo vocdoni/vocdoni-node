@@ -106,8 +106,8 @@ func (r *Router) getBlockList(request routerRequest) {
 			break
 		}
 		response.BlockList = append(response.BlockList,
-			blockMetadataFromBlockModel(
-				r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i)), true, true))
+			blockMetadataFromBlockModel(r.Scrutinizer.App.
+				GetBlockByHeight(int64(request.From)+int64(i)), true, true))
 	}
 	if err := request.Send(r.buildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)

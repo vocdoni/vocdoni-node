@@ -146,8 +146,8 @@ type routerRequest struct {
 }
 
 // semi-unmarshalls message, returns method name
-func (r *Router) getRequest(
-	payload []byte, context transports.MessageContext) (request routerRequest, err error) {
+func (r *Router) getRequest(payload []byte,
+	context transports.MessageContext) (request routerRequest, err error) {
 	request.MessageContext = context
 	// First unmarshal the outer layer, to obtain the request ID, the signed
 	// request, and the signature.
