@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -17,25 +16,26 @@ import (
 // The scrutinizer Process data type is different from the vochain state data type
 // since it is optimized for querying purposes and not for keeping a shared consensus state.
 type Process struct {
-	ID            types.HexBytes             `badgerholdKey:"ID" json:"processId"`
-	EntityID      types.HexBytes             `badgerholdIndex:"EntityID" json:"entityId"`
-	StartBlock    uint32                     `json:"startBlock"`
-	EndBlock      uint32                     `badgerholdIndex:"EndBlock" json:"endBlock"`
-	Rheight       uint32                     `badgerholdIndex:"Rheight" json:"-"`
-	CensusRoot    types.HexBytes             `json:"censusRoot"`
-	CensusURI     string                     `json:"censusURI"`
-	CensusOrigin  int32                      `json:"censusOrigin"`
-	Status        int32                      `badgerholdIndex:"Status" json:"status"`
-	Namespace     uint32                     `badgerholdIndex:"Namespace" json:"namespace"`
-	Envelope      *models.EnvelopeType       `json:"envelopeType"`
-	Mode          *models.ProcessMode        `json:"processMode"`
-	VoteOpts      *models.ProcessVoteOptions `json:"voteOptions"`
-	PrivateKeys   []string                   `json:"-"`
-	PublicKeys    []string                   `json:"-"`
-	QuestionIndex uint32                     `json:"questionIndex"`
-	CreationTime  time.Time                  `json:"creationTime"`
-	HaveResults   bool                       `json:"haveResults"`
-	FinalResults  bool                       `json:"finalResults"`
+	ID                types.HexBytes             `badgerholdKey:"ID" json:"processId"`
+	EntityID          types.HexBytes             `badgerholdIndex:"EntityID" json:"entityId"`
+	StartBlock        uint32                     `json:"startBlock"`
+	EndBlock          uint32                     `badgerholdIndex:"EndBlock" json:"endBlock"`
+	Rheight           uint32                     `badgerholdIndex:"Rheight" json:"-"`
+	CensusRoot        types.HexBytes             `json:"censusRoot"`
+	CensusURI         string                     `json:"censusURI"`
+	CensusOrigin      int32                      `json:"censusOrigin"`
+	Status            int32                      `badgerholdIndex:"Status" json:"status"`
+	Namespace         uint32                     `badgerholdIndex:"Namespace" json:"namespace"`
+	Envelope          *models.EnvelopeType       `json:"envelopeType"`
+	Mode              *models.ProcessMode        `json:"processMode"`
+	VoteOpts          *models.ProcessVoteOptions `json:"voteOptions"`
+	PrivateKeys       []string                   `json:"-"`
+	PublicKeys        []string                   `json:"-"`
+	QuestionIndex     uint32                     `json:"questionIndex"`
+	CreationTime      time.Time                  `json:"creationTime"`
+	HaveResults       bool                       `json:"haveResults"`
+	FinalResults      bool                       `json:"finalResults"`
+	SourceBlockHeight uint64                     `json:"sourceBlockHeight"`
 }
 
 func (p Process) String() string {
@@ -96,17 +96,16 @@ type TxPackage struct {
 // TxMetadata contains tx information for the TransactionList api
 type TxMetadata struct {
 	Type        string         `json:"type"`
-	BlockHeight uint32         `json:"block_height"`
+	BlockHeight uint32         `json:"block_height,omitempty"`
 	Index       int32          `json:"index"`
 	Hash        types.HexBytes `json:"hash"`
 }
 
 // BlockMetadata contains the metadata for a single tendermint block
 type BlockMetadata struct {
-	ChainId         string         `json:"chain_id"`
-	Height          uint32         `json:"height"`
+	Height          uint32         `json:"height,omitempty"`
 	Timestamp       time.Time      `json:"timestamp"`
-	Hash            types.HexBytes `json:"hash"`
+	Hash            types.HexBytes `json:"hash,omitempty"`
 	NumTxs          uint64         `json:"num_txs"`
 	LastBlockHash   types.HexBytes `json:"last_block_hash"`
 	ProposerAddress types.HexBytes `json:"proposer_address"`
@@ -139,21 +138,6 @@ func (b *BlockMetadata) String() string {
 	}
 	builder.WriteString("}")
 	return builder.String()
-}
-
-func BlockMetadataFromBlockModel(block *tmtypes.Block) *BlockMetadata {
-	if block == nil {
-		return nil
-	}
-	b := new(BlockMetadata)
-	b.ChainId = block.ChainID
-	b.Height = uint32(block.Height)
-	b.Timestamp = block.Time
-	b.Hash = block.Hash().Bytes()
-	b.NumTxs = uint64(len(block.Txs))
-	b.LastBlockHash = block.LastBlockID.Hash.Bytes()
-	b.ProposerAddress = block.ProposerAddress.Bytes()
-	return b
 }
 
 // ________________________ CALLBACKS DATA STRUCTS ________________________

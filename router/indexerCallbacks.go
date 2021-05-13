@@ -34,7 +34,9 @@ func (r *Router) getStats(request routerRequest) {
 	if err != nil {
 		log.Errorf("could not marshal vochainStats: %s", err)
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getEnvelopeList(request routerRequest) {
@@ -43,16 +45,15 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	if max > MaxListSize || max <= 0 {
 		max = MaxListSize
 	}
-	if request.ListSize > MaxListSize {
-		r.sendError(request, fmt.Sprintf("listSize overflow, maximum is %d", MaxListSize))
-		return
-	}
 	var err error
-	if response.Envelopes, err = r.Scrutinizer.GetEnvelopes(request.ProcessID, request.ListSize, request.From, request.SearchTerm); err != nil {
+	if response.Envelopes, err = r.Scrutinizer.GetEnvelopes(
+		request.ProcessID, max, request.From, request.SearchTerm); err != nil {
 		r.sendError(request, fmt.Sprintf("cannot get envelope list: (%s)", err))
 		return
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getValidatorList(request routerRequest) {
@@ -62,30 +63,39 @@ func (r *Router) getValidatorList(request routerRequest) {
 		r.sendError(request, fmt.Sprintf("cannot get validator list: %v", err))
 		return
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getBlock(request routerRequest) {
 	var response api.MetaResponse
 	if request.Height > r.vocapp.Height() {
-		r.sendError(request, fmt.Sprintf("block height %d not valid for vochain with height %d", request.Height, r.vocapp.Height()))
+		r.sendError(request, fmt.Sprintf(
+			"block height %d not valid for vochain with height %d", request.Height, r.vocapp.Height()))
 		return
 	}
-	if response.Block = indexertypes.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHeight(int64(request.Height))); response.Block == nil {
+	if response.Block = blockMetadataFromBlockModel(
+		r.Scrutinizer.App.GetBlockByHeight(int64(request.Height)), false, true); response.Block == nil {
 		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.Height))
 		return
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getBlockByHash(request routerRequest) {
 	var response api.MetaResponse
-	response.Block = indexertypes.BlockMetadataFromBlockModel(r.Scrutinizer.App.GetBlockByHash(request.Payload))
+	response.Block = blockMetadataFromBlockModel(
+		r.Scrutinizer.App.GetBlockByHash(request.Hash), true, false)
 	if response.Block == nil {
-		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Payload))
+		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Hash))
 		return
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 // TODO improve this function
@@ -96,10 +106,12 @@ func (r *Router) getBlockList(request routerRequest) {
 			break
 		}
 		response.BlockList = append(response.BlockList,
-			indexertypes.BlockMetadataFromBlockModel(
-				r.Scrutinizer.App.GetBlockByHeight(int64(request.From)+int64(i))))
+			blockMetadataFromBlockModel(r.Scrutinizer.App.
+				GetBlockByHeight(int64(request.From)+int64(i)), true, true))
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getTx(request routerRequest) {
@@ -110,13 +122,14 @@ func (r *Router) getTx(request routerRequest) {
 		return
 	}
 	response.Tx = &indexertypes.TxPackage{
-		Tx:          tx.Tx,
-		BlockHeight: request.Height,
-		Index:       request.TxIndex,
-		Hash:        hash,
-		Signature:   tx.Signature,
+		Tx:        tx.Tx,
+		Index:     request.TxIndex,
+		Hash:      hash,
+		Signature: tx.Signature,
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) getTxListForBlock(request routerRequest) {
@@ -156,11 +169,31 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 			txType = "unknown"
 		}
 		response.TxList = append(response.TxList, &indexertypes.TxMetadata{
-			Type:        txType,
-			BlockHeight: request.Height,
-			Index:       int32(i),
-			Hash:        tmtypes.Tx(block.Txs[i]).Hash(),
+			Type:  txType,
+			Index: int32(i),
+			Hash:  tmtypes.Tx(block.Txs[i]).Hash(),
 		})
 	}
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
+}
+
+func blockMetadataFromBlockModel(
+	block *tmtypes.Block, includeHeight, includeHash bool) *indexertypes.BlockMetadata {
+	if block == nil {
+		return nil
+	}
+	b := new(indexertypes.BlockMetadata)
+	if includeHeight {
+		b.Height = uint32(block.Height)
+	}
+	b.Timestamp = block.Time
+	if includeHash {
+		b.Hash = block.Hash().Bytes()
+	}
+	b.NumTxs = uint64(len(block.Txs))
+	b.LastBlockHash = block.LastBlockID.Hash.Bytes()
+	b.ProposerAddress = block.ProposerAddress.Bytes()
+	return b
 }

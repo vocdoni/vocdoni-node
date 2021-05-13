@@ -58,7 +58,9 @@ func (r *Router) fetchFile(request routerRequest) {
 	log.Debugf("file fetched, size %d", len(content))
 	var response api.MetaResponse
 	response.Content = content
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) addFile(request routerRequest) {
@@ -78,7 +80,9 @@ func (r *Router) addFile(request routerRequest) {
 		log.Debugf("added file %s, size %d", cid, len(request.Content))
 		var response api.MetaResponse
 		response.URI = r.storage.URIprefix() + cid
-		request.Send(r.buildReply(request, &response))
+		if err := request.Send(r.buildReply(request, &response)); err != nil {
+			log.Warnf("error sending response: %s", err)
+		}
 	}
 }
 
@@ -111,7 +115,9 @@ func (r *Router) pinList(request routerRequest) {
 	}
 	var response api.MetaResponse
 	response.Files = pinsJSONArray
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) pinFile(request routerRequest) {
@@ -124,7 +130,9 @@ func (r *Router) pinFile(request routerRequest) {
 		return
 	}
 	var response api.MetaResponse
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func (r *Router) unpinFile(request routerRequest) {
@@ -137,7 +145,9 @@ func (r *Router) unpinFile(request routerRequest) {
 		return
 	}
 	var response api.MetaResponse
-	request.Send(r.buildReply(request, &response))
+	if err := request.Send(r.buildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
 }
 
 func isJSON(c []byte) bool {
