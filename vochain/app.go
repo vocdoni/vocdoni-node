@@ -10,7 +10,6 @@ import (
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	lru "github.com/hashicorp/golang-lru"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	mempl "github.com/tendermint/tendermint/mempool"
 	nm "github.com/tendermint/tendermint/node"
@@ -19,14 +18,13 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
-const (
-	blockCacheSize = 128
-)
+const blockCacheSize = 128
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
@@ -40,7 +38,7 @@ type BaseApplication struct {
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
 	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
-	blockCache         *lru.Cache
+	blockLRU           *lru.Cache
 	height             uint32
 	timestamp          int64
 	chainId            string
@@ -56,13 +54,9 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}
-	lruc, err := lru.New(blockCacheSize)
-	if err != nil {
-		return nil, err
-	}
 	return &BaseApplication{
-		State:      state,
-		blockCache: lruc,
+		State:    state,
+		blockLRU: lru.New(128),
 	}, nil
 }
 
@@ -152,13 +146,10 @@ func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 		log.Error("application getBlockByHeight method not assigned")
 		return nil
 	}
-	cacheBlk, ok := app.blockCache.Get(height)
-	if ok {
-		return cacheBlk.(*tmtypes.Block)
-	}
-	blk := app.fnGetBlockByHeight(height)
-	app.blockCache.Add(height, blk)
-	return blk
+	cachedBlock := app.blockLRU.GetOrAdd(height, func() interface{} {
+		return app.fnGetBlockByHeight(height)
+	})
+	return cachedBlock.(*tmtypes.Block)
 }
 
 // GetBlockByHash retreies a full Tendermint block indexed by its Hash
