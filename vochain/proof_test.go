@@ -4,12 +4,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"testing"
 
-	blind "github.com/arnaucube/go-blindsecp256k1"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	blindca "github.com/vocdoni/blind-ca/blindca"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	tree "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -250,6 +247,7 @@ func TestCAProof(t *testing.T) {
 	testCASendVotes(t, pid, vp, &k, proof, app, false)
 }
 
+/*
 func TestCABlindProof(t *testing.T) {
 	app, err := NewBaseApplication(t.TempDir())
 	if err != nil {
@@ -346,6 +344,7 @@ func TestCABlindProof(t *testing.T) {
 	}
 	testCASendVotes(t, pid, vp, &k, proof, app, false)
 }
+*/
 
 func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys,
 	proof *models.ProofCA, app *BaseApplication, expectedResult bool) {
