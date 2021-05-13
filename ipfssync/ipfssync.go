@@ -189,7 +189,7 @@ func (is *IPFSsync) syncPins() error {
 
 func (is *IPFSsync) askPins(address string, hash []byte) error {
 	var msg models.IpfsSync
-	msg.Msgtype = models.IpfsSyncType_FETCH
+	msg.Msgtype = models.IpfsSync_FETCH
 	msg.Address = is.Transport.Address()
 	msg.Hash = hash
 	return is.unicastMsg(address, &msg)
@@ -198,7 +198,7 @@ func (is *IPFSsync) askPins(address string, hash []byte) error {
 func (is *IPFSsync) sendPins(address string, theirHash []byte) error {
 	var msg models.IpfsSync
 	var err error
-	msg.Msgtype = models.IpfsSyncType_FETCHREPLY
+	msg.Msgtype = models.IpfsSync_FETCHREPLY
 	msg.Address = is.Transport.Address()
 	msg.Hash = is.hashTree.Hash()
 	msg.PinList, err = is.listPins(theirHash)
@@ -236,7 +236,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 		return nil
 	}
 	switch msg.Msgtype {
-	case models.IpfsSyncType_HELLO:
+	case models.IpfsSync_HELLO:
 		peers, err := is.Storage.CoreAPI.Swarm().Peers(is.Storage.Node.Context())
 		if err != nil {
 			return err
@@ -262,7 +262,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 			return is.Storage.Node.PeerHost.Connect(context.Background(), *peerInfo)
 		}
 
-	case models.IpfsSyncType_UPDATE:
+	case models.IpfsSync_UPDATE:
 		if len(msg.Hash) == gravitonstate.GravitonHashSizeBytes && len(msg.Address) > 31 {
 			is.updateLock.RLock()
 			defer is.updateLock.RUnlock()
@@ -274,7 +274,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 		}
 
 	// received a fetchReply, adding new pins
-	case models.IpfsSyncType_FETCHREPLY:
+	case models.IpfsSync_FETCHREPLY:
 		if len(msg.Hash) == gravitonstate.GravitonHashSizeBytes && len(msg.Address) > 31 {
 			is.updateLock.Lock()
 			defer is.updateLock.Unlock()
@@ -284,7 +284,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 			}
 		}
 
-	case models.IpfsSyncType_FETCH:
+	case models.IpfsSync_FETCH:
 		if len(msg.Address) > 31 {
 			is.updateLock.RLock()
 			defer is.updateLock.RUnlock()
@@ -297,7 +297,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 
 func (is *IPFSsync) sendUpdate() {
 	var msg models.IpfsSync
-	msg.Msgtype = models.IpfsSyncType_UPDATE
+	msg.Msgtype = models.IpfsSync_UPDATE
 	msg.Address = is.Transport.Address()
 	msg.Hash = is.hashTree.Hash()
 	if s := is.hashTree.Count(); s > 0 {
@@ -311,7 +311,7 @@ func (is *IPFSsync) sendUpdate() {
 
 func (is *IPFSsync) sendHello() {
 	var msg models.IpfsSync
-	msg.Msgtype = models.IpfsSyncType_HELLO
+	msg.Msgtype = models.IpfsSync_HELLO
 	msg.Address = is.Transport.Address()
 	msg.Multiaddress = is.myMultiAddr.String()
 	err := is.broadcastMsg(&msg)
