@@ -200,7 +200,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 		return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
 	}
 	if process.Status == models.ProcessStatus_READY &&
-		process.StartBlock+process.BlockCount <= v.Height() {
+		process.StartBlock+process.BlockCount > v.Height() {
 		return fmt.Errorf("cannot set state results, process is still alive")
 	}
 	if !bytes.Equal(result.ProcessId, process.ProcessId) {

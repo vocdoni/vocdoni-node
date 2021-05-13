@@ -232,10 +232,11 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
-	t.Logf("adding READY process %x", process.ProcessId)
 	if err := app.State.AddProcess(process); err != nil {
 		t.Fatal(err)
 	}
+
+	t.Log(app.State.Process(process.ProcessId, false))
 
 	// Set results  (should not work)
 	votes := make([]*models.QuestionResult, 1)
@@ -248,14 +249,20 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		Votes:     votes,
 	}
 
+	// Set results (should not work)
+	if err := testSetProcessResults(t, pid, &oracle, app, results); err == nil {
+		t.Fatal("adding results while process ready but end block not reached should not work")
+	}
+
 	// Set it to PAUSE
 	status := models.ProcessStatus_PAUSED
 	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
 		t.Fatal(err)
 	}
+
 	// Set results  (should not work)
-	if err := testSetProcessResults(t, pid, &oracle, app, results); err != nil {
-		t.Logf("adding results while process paused should not work")
+	if err := testSetProcessResults(t, pid, &oracle, app, results); err == nil {
+		t.Fatal("adding results while process paused should not work")
 	}
 
 	// Set it to READY
@@ -264,11 +271,13 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Set it to ENDED (should work)
+	// Set it to ENDED
 	status = models.ProcessStatus_ENDED
 	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
 		t.Fatal(err)
 	}
+
+	// set results should work if process ended
 	if err := testSetProcessResults(t, pid, &oracle, app, results); err != nil {
 		t.Fatal("adding results while process ended should work")
 	}
@@ -276,7 +285,7 @@ func TestProcessSetResultsTransition(t *testing.T) {
 	// status results already added by the previous tx
 
 	// Set results  (should not work)
-	if err := testSetProcessResults(t, pid, &oracle, app, results); err != nil {
+	if err := testSetProcessResults(t, pid, &oracle, app, results); err == nil {
 		t.Logf("adding results cannot be added twice")
 	}
 }
