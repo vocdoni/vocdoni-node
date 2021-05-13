@@ -83,6 +83,15 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePacka
 func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 	callback func(*models.VoteEnvelope, *big.Int)) error {
 	wg := sync.WaitGroup{}
+
+	// There might be tens of thousands of votes.
+	// When async==true, we don't want to process all of them at once,
+	// as that could easily result in running out of memory.
+	// Limit it to a relatively small amount of goroutines,
+	// but also large enough to be faster than sequential processing.
+	const limitConcurrentProcessing = 20
+	semaphore := make(chan bool, limitConcurrentProcessing)
+
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
 		func(txRef *indexertypes.VoteReference) error {
@@ -107,7 +116,11 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 				callback(envelope, txRef.Weight)
 			}
 			if async {
-				go processVote()
+				go func() {
+					semaphore <- true
+					processVote()
+					<-semaphore
+				}()
 			} else {
 				processVote()
 			}
