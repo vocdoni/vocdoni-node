@@ -16,14 +16,13 @@ import (
 )
 
 type ProcessArchive struct {
-	vochain     *vochain.BaseApplication
-	ipfs        *data.IPFSHandle
-	storage     *jsonStorage
-	pprocs      []*Process
-	publish     chan (bool)
-	lastUpdate  time.Time
-	close       chan (bool)
-	publishLock sync.Mutex
+	vochain    *vochain.BaseApplication
+	ipfs       *data.IPFSHandle
+	storage    *jsonStorage
+	pprocs     []*Process
+	publish    chan (bool)
+	lastUpdate time.Time
+	close      chan (bool)
 }
 
 type Process struct {
@@ -48,7 +47,7 @@ func (js *jsonStorage) AddProcess(p *Process) error {
 	if p == nil || p.Process == nil || len(p.Process.ProcessId) != types.ProcessIDsize {
 		return fmt.Errorf("process not valid")
 	}
-	data, err := json.Marshal(p)
+	data, err := json.MarshalIndent(p, "", "\t")
 	if err != nil {
 		return err
 	}
@@ -74,7 +73,7 @@ func NewProcessArchive(v *vochain.BaseApplication, ipfs *data.IPFSHandle,
 		vochain: v,
 		ipfs:    ipfs,
 		storage: js,
-		publish: make(chan (bool), 10),
+		publish: make(chan (bool), 1),
 		close:   make(chan (bool), 1), // TO-DO: use a context
 	}
 	if ipfs != nil {
@@ -86,7 +85,9 @@ func NewProcessArchive(v *vochain.BaseApplication, ipfs *data.IPFSHandle,
 		} else {
 			log.Infof("using IPNS privkey: %s", pk)
 		}
-		go ir.Publish()
+		ir.lastUpdate = time.Unix(1, 0)
+		ir.publish <- true
+		go ir.publishLoop()
 	}
 	v.State.AddEventListener(ir)
 	return ir, nil
@@ -107,7 +108,10 @@ func (i *ProcessArchive) Commit(height uint32) error {
 	// publish to IPFS if there is a new process with results
 	if len(i.pprocs) > 0 && i.ipfs != nil {
 		log.Debugf("sending archive publish signal for height %d", height)
-		i.publish <- true
+		select {
+		case i.publish <- true:
+		default: // do nothing
+		}
 	}
 	return nil
 }

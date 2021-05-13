@@ -53,22 +53,16 @@ func (p *ProcessArchive) GetKey() (string, error) {
 // Publish is a blocking routine that reads ProcessArchive.publish channel
 // in order to trigger a new IPNS record announcement publishing the
 // process archive directory.
-func (p *ProcessArchive) Publish() {
+func (p *ProcessArchive) publishLoop() {
 	log.Infof("starting process archive IPNS publish daemon with interval %s",
 		publishInterval)
-	// Wait for publishInterval and ensure a first execution
-	p.lastUpdate = time.Now().Add(-publishInterval)
-	p.publish <- true
-	select {
-	case <-p.publish:
-		if time.Since(p.lastUpdate) < publishInterval {
-			break
-		}
-		p.lastUpdate = time.Now()
-		// make it async so the channel does not get full and blocking
-		go func() {
-			p.publishLock.Lock()
-			defer p.publishLock.Unlock()
+	for {
+		select {
+		case <-p.publish:
+			if time.Since(p.lastUpdate) < publishInterval {
+				break
+			}
+			p.lastUpdate = time.Now()
 			log.Infof("publishing process archive")
 			start := time.Now()
 			ctx, cancel := context.WithTimeout(context.Background(), publishInterval)
@@ -80,8 +74,8 @@ func (p *ProcessArchive) Publish() {
 			}
 			log.Infof("published to /ipns/%s with value %s, took %s",
 				ipnsentry.Name(), ipnsentry.Value(), time.Since(start))
-		}()
-	case <-p.close:
-		return
+		case <-p.close:
+			return
+		}
 	}
 }
