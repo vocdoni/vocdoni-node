@@ -5,7 +5,7 @@ go 1.16
 // For testing purposes while dvote-protobuf becomes stable
 // replace go.vocdoni.io/proto  => ../dvote-protobuf
 
-replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 v3.0.0-20210416135442-1226c2c2c7d6
+replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f
 
 // Don't upgrade bazil.org/fuse past v0.0.0-20200407214033-5883e5a4b512 for now,
 // as it dropped support for GOOS=darwin.
@@ -25,10 +25,10 @@ require (
 	github.com/dgraph-io/badger/v3 v3.2011.1
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/ethereum/go-ethereum v1.9.26-0.20201212163632-00d10e610f9f
-	github.com/frankban/quicktest v1.11.3
+	github.com/frankban/quicktest v1.13.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/cors v1.1.1
-	github.com/google/go-cmp v0.5.4
+	github.com/google/go-cmp v0.5.5
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
