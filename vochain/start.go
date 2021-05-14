@@ -55,7 +55,7 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 		log.Errorf("failed to parse log level: %v", err)
 	}
 	app.Node.Mempool().(*mempl.CListMempool).SetLogger(logger)
-
+	app.Node.Mempool().Flush()
 	return app
 }
 
