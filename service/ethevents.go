@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/chain"
+	"go.vocdoni.io/dvote/chain/ethereumhandler"
 	"go.vocdoni.io/dvote/chain/ethevents"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
@@ -42,7 +43,7 @@ func EthEvents(
 		}
 		var addr string
 		for i := 0; i < types.EthereumDialMaxRetry; i++ {
-			addr, err = chain.EnsResolve(ctx, specs.ENSregistryAddr, contract.Domain, w3uri)
+			addr, err = ethereumhandler.EnsResolve(ctx, specs.ENSregistryAddr, contract.Domain, w3uri)
 			if err != nil {
 				log.Errorf("cannot resolve domain: %s, error: %s, trying again ...", contract.Domain, err)
 				continue
@@ -50,7 +51,7 @@ func EthEvents(
 			break
 		}
 		if addr == "" {
-			return fmt.Errorf("cannot resolve domain address, cannot proceed without resolving contract addresses")
+			return fmt.Errorf("cannot resolve domain contract addresses")
 		}
 		contract.Address = common.HexToAddress(addr)
 		if err := contract.SetABI(k); err != nil {

@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"go.vocdoni.io/dvote/chain"
 	"go.vocdoni.io/dvote/chain/contracts"
+	"go.vocdoni.io/dvote/chain/ethereumhandler"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -307,7 +307,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 }
 
 func newProcessMeta(ctx context.Context, contractABI *abi.ABI, eventData []byte,
-	ph *chain.VotingHandle) (*models.NewProcessTx, error) {
+	ph *ethereumhandler.EthereumHandler) (*models.NewProcessTx, error) {
 	structuredData := &contracts.ProcessesNewProcess{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "NewProcess", eventData); err != nil {
 		return nil, fmt.Errorf("cannot unpack NewProcess event: %w", err)
@@ -320,7 +320,7 @@ func processStatusUpdatedMeta(
 	ctx context.Context,
 	contractABI *abi.ABI,
 	eventData []byte,
-	ph *chain.VotingHandle,
+	ph *ethereumhandler.EthereumHandler,
 ) (*models.SetProcessTx, error) {
 	structuredData := &contracts.ProcessesStatusUpdated{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "StatusUpdated", eventData); err != nil {
@@ -339,7 +339,7 @@ func processCensusUpdatedMeta(
 	ctx context.Context,
 	contractABI *abi.ABI,
 	eventData []byte,
-	ph *chain.VotingHandle,
+	ph *ethereumhandler.EthereumHandler,
 ) (*models.SetProcessTx, error) {
 	structuredData := &contracts.ProcessesCensusUpdated{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "CensusUpdated", eventData); err != nil {
@@ -353,7 +353,7 @@ func genesisOracleAddedMeta(
 	ctx context.Context,
 	contractABI *abi.ABI,
 	eventData []byte,
-	ph *chain.VotingHandle,
+	ph *ethereumhandler.EthereumHandler,
 ) (*models.AdminTx, error) {
 	structuredData := &contracts.GenesisOracleAdded{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "OracleAdded", eventData); err != nil {
@@ -367,7 +367,7 @@ func genesisOracleRemovedMeta(
 	ctx context.Context,
 	contractABI *abi.ABI,
 	eventData []byte,
-	ph *chain.VotingHandle,
+	ph *ethereumhandler.EthereumHandler,
 ) (*models.AdminTx, error) {
 	structuredData := &contracts.GenesisOracleRemoved{}
 	if err := contractABI.UnpackIntoInterface(structuredData, "OracleRemoved", eventData); err != nil {

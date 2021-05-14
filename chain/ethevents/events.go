@@ -26,13 +26,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"go.vocdoni.io/dvote/chain"
+	"go.vocdoni.io/dvote/chain/ethereumhandler"
 	"go.vocdoni.io/dvote/log"
 )
 
-// EthereumEvents type is used to monitorize Ethereum smart contracts and call custom EventHandler functions
+// EthereumEvents type is used to monitorize Ethereum smart
+// contracts and call custom EventHandler functions
 type EthereumEvents struct {
 	// contracts handle
-	VotingHandle *chain.VotingHandle
+	VotingHandle *ethereumhandler.EthereumHandler
 	// dial web3 address
 	DialAddr string
 	// list of handler functions that will be called on events
@@ -54,7 +56,7 @@ type EthereumEvents struct {
 	// ContractsAddress
 	ContractsAddress []common.Address
 	// ContractsInfo holds useful info for working with the desired contracts
-	ContractsInfo map[string]*chain.EthereumContract
+	ContractsInfo map[string]*ethereumhandler.EthereumContract
 }
 
 type logEvent struct {
@@ -91,7 +93,7 @@ type EventProcessor struct {
 
 // NewEthEvents creates a new Ethereum events handler
 func NewEthEvents(
-	contracts map[string]*chain.EthereumContract,
+	contracts map[string]*ethereumhandler.EthereumContract,
 	signer *ethereum.SignKeys,
 	w3Endpoint string,
 	cens *census.Manager,
@@ -103,7 +105,7 @@ func NewEthEvents(
 	if len(w3Endpoint) == 0 {
 		return nil, fmt.Errorf("no w3Endpoint specified on Ethereum Events")
 	}
-	ph, err := chain.NewVotingHandle(contracts, w3Endpoint)
+	ph, err := ethereumhandler.NewEthereumHandler(contracts, w3Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create voting handle: %w", err)
 	}
@@ -270,7 +272,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 		// sure that the events are already processed so do not
 		// block and do not fatal here
 		if err := ev.processEventLogsFromTo(ctx, *fromBlock, lastBlock, client); err != nil {
-			log.Errorf("cannot process event logs from block %d to block %d with error: %s", *fromBlock, lastBlock, err)
+			log.Errorf("cannot process event logs: %v", err)
 		}
 		// Update block number
 		// Expect the client to be connected here
@@ -282,7 +284,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 			}
 			blk, err = client.BlockByNumber(blockTctx, nil)
 			if err != nil {
-				log.Errorf("cannot update block number: %s", err)
+				log.Errorf("cannot update block number: %v", err)
 				// If any error try close the client and reconnect
 				// normally errors are related to connection.
 				// If the error is not related to connections
@@ -299,13 +301,14 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 		// For security, read also the new passed blocks before subscribing
 		// Same as the last processEventLogsFromTo function call
 		if err := ev.processEventLogsFromTo(ctx, lastBlock, blk.Number().Int64(), client); err != nil {
-			log.Errorf("cannot process event logs from block %d to block %d with error: %s", lastBlock, blk.Number().Int64(), err)
+			log.Errorf("cannot process event logs: %s", err)
 		}
 	} else {
 		// For security, even if subscribe only, force to process at least the past 1024
 		// Same as the last processEventLogsFromTo function call
-		if err := ev.processEventLogsFromTo(ctx, blk.Number().Int64()-1024, blk.Number().Int64(), client); err != nil {
-			log.Errorf("cannot process event logs from block %d to block %d with error: %s", *fromBlock, blk.Number().Int64(), err)
+		if err := ev.processEventLogsFromTo(ctx, blk.Number().Int64()-1024,
+			blk.Number().Int64(), client); err != nil {
+			log.Errorf("cannot process event logs: %v", err)
 		}
 	}
 
@@ -361,7 +364,8 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 
 // ReadEthereumEventLogs reads the oracle
 // defined smart contract and looks for events.
-func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context, from, to int64, client *ethclient.Client) error {
+func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context,
+	from, to int64, client *ethclient.Client) error {
 	log.Infof("reading ethereum events from block %d to %d", from, to)
 	query := eth.FilterQuery{
 		FromBlock: big.NewInt(from),

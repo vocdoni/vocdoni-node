@@ -1,4 +1,4 @@
-package chain
+package ethereumhandler
 
 import (
 	"bytes"
@@ -29,8 +29,8 @@ import (
 // The following methods and structures represent an exportable abstraction over raw contract bindings
 // Use these methods, rather than those present in the contracts folder
 
-// VotingHandle wraps the Processes, Namespace and TokenStorageProof contracts and holds a reference to an ethereum client
-type VotingHandle struct {
+// EthereumHandler wraps the Processes, Namespace and TokenStorageProof contracts and holds a reference to an ethereum client
+type EthereumHandler struct {
 	VotingProcess     *contracts.Processes
 	Namespace         *contracts.Namespaces
 	TokenStorageProof *contracts.TokenStorageProof
@@ -47,14 +47,15 @@ type Genesis struct {
 	Oracles    []common.Address
 }
 
-// NewVotingHandle initializes contracts creating a transactor using the ethereum client
-func NewVotingHandle(contracts map[string]*EthereumContract, dialEndpoint string) (*VotingHandle, error) {
+// NewEthereumHandler initializes contracts creating a transactor using the ethereum client
+func NewEthereumHandler(contracts map[string]*EthereumContract,
+	dialEndpoint string) (*EthereumHandler, error) {
 	var err error
-	ph := new(VotingHandle)
+	eh := new(EthereumHandler)
 	// try connect to the w3endpoint using an RPC connection
 	for {
-		ph.EthereumRPC, err = ethrpc.Dial(dialEndpoint)
-		if err != nil || ph.EthereumRPC == nil {
+		eh.EthereumRPC, err = ethrpc.Dial(dialEndpoint)
+		if err != nil || eh.EthereumRPC == nil {
 			log.Warnf("cannot create a ethereum rpc connection: (%s), trying again ...", err)
 			time.Sleep(time.Second * 10)
 			continue
@@ -62,39 +63,39 @@ func NewVotingHandle(contracts map[string]*EthereumContract, dialEndpoint string
 		break
 	}
 	// if RPC connection established, create an ethereum client using the RPC client
-	ph.EthereumClient = ethclient.NewClient(ph.EthereumRPC)
+	eh.EthereumClient = ethclient.NewClient(eh.EthereumRPC)
 	for _, contract := range contracts {
-		if err := ph.SetContractInstance(contract); err != nil {
+		if err := eh.SetContractInstance(contract); err != nil {
 			log.Errorf("cannot set contract instance: %s", err)
 		}
 	}
 
-	return ph, nil
+	return eh, nil
 }
 
 // SetContractInstance creates the given contract transactor and returns
 // an object ready to interact with a web3 fashion
-func (ph *VotingHandle) SetContractInstance(ec *EthereumContract) error {
+func (eh *EthereumHandler) SetContractInstance(ec *EthereumContract) error {
 	var err error
 	switch {
 	case strings.HasPrefix(ec.Domain, "processes"):
-		if ph.VotingProcess, err = contracts.NewProcesses(ec.Address, ph.EthereumClient); err != nil {
+		if eh.VotingProcess, err = contracts.NewProcesses(ec.Address, eh.EthereumClient); err != nil {
 			return fmt.Errorf("error constructing processes contract transactor: %w", err)
 		}
 	case strings.HasPrefix(ec.Domain, "namespaces"):
-		if ph.Namespace, err = contracts.NewNamespaces(ec.Address, ph.EthereumClient); err != nil {
+		if eh.Namespace, err = contracts.NewNamespaces(ec.Address, eh.EthereumClient); err != nil {
 			return fmt.Errorf("error constructing namespace contract transactor: %w", err)
 		}
 	case strings.HasPrefix(ec.Domain, "erc20"):
-		if ph.TokenStorageProof, err = contracts.NewTokenStorageProof(ec.Address, ph.EthereumClient); err != nil {
+		if eh.TokenStorageProof, err = contracts.NewTokenStorageProof(ec.Address, eh.EthereumClient); err != nil {
 			return fmt.Errorf("error constructing token storage proof contract transactor: %w", err)
 		}
 	case strings.HasPrefix(ec.Domain, "genesis"):
-		if ph.Genesis, err = contracts.NewGenesis(ec.Address, ph.EthereumClient); err != nil {
+		if eh.Genesis, err = contracts.NewGenesis(ec.Address, eh.EthereumClient); err != nil {
 			return fmt.Errorf("error constructing genesis contract transactor: %w", err)
 		}
 	case strings.HasPrefix(ec.Domain, "results"):
-		if ph.Results, err = contracts.NewResults(ec.Address, ph.EthereumClient); err != nil {
+		if eh.Results, err = contracts.NewResults(ec.Address, eh.EthereumClient); err != nil {
 			return fmt.Errorf("error constructing results contract transactor: %w", err)
 		}
 	}
@@ -104,10 +105,10 @@ func (ph *VotingHandle) SetContractInstance(ec *EthereumContract) error {
 // PROCESSES WRAPPER
 
 // NewProcessTxArgs gets the info of a created process on the processes contract and creates a NewProcessTx instance
-func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint32) (*models.NewProcessTx, error) {
+func (eh *EthereumHandler) NewProcessTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint32) (*models.NewProcessTx, error) {
 	// TODO: @jordipainan What to do with namespace?
 	// get process info from the processes contract
-	processMeta, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
+	processMeta, err := eh.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
 	}
@@ -187,7 +188,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 
 	// TDB: @jordipainan namespaceAddr && ethChainID
 	// namespace
-	processData.Namespace, err = ph.VotingProcess.NamespaceId(&ethbind.CallOpts{Context: ctx})
+	processData.Namespace, err = eh.VotingProcess.NamespaceId(&ethbind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
 	}
@@ -200,7 +201,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 		if err := randSigner.Generate(); err != nil {
 			return nil, fmt.Errorf("cannot check storage root, cannot generate random Ethereum address: %w", err)
 		}
-		fetchedRoot, err := ph.getStorageRoot(ctx, randSigner.Address(), processMeta.EntityAddressOwner[0], processMeta.SourceBlockHeight)
+		fetchedRoot, err := eh.getStorageRoot(ctx, randSigner.Address(), processMeta.EntityAddressOwner[0], processMeta.SourceBlockHeight)
 		if err != nil {
 			return nil, fmt.Errorf("cannot check EVM storage root: %w", err)
 		}
@@ -211,7 +212,7 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 			return nil, fmt.Errorf("invalid storage root, root fetched and provided must be the same. Got: %x expected: %x", fetchedRoot, processData.CensusRoot)
 		}
 		// get index slot from the token storage proof contract
-		islot, err := ph.GetTokenBalanceMappingPosition(ctx, processMeta.EntityAddressOwner[0])
+		islot, err := eh.GetTokenBalanceMappingPosition(ctx, processMeta.EntityAddressOwner[0])
 		if err != nil {
 			return nil, fmt.Errorf("cannot get balance mapping position from the contract: %w", err)
 		}
@@ -236,11 +237,11 @@ func (ph *VotingHandle) NewProcessTxArgs(ctx context.Context, pid [types.Process
 	return processTxArgs, nil
 }
 
-func (ph *VotingHandle) getStorageRoot(ctx context.Context, holder common.Address, contractAddr common.Address, blockNum *big.Int) (hash common.Hash, err error) {
+func (eh *EthereumHandler) getStorageRoot(ctx context.Context, holder common.Address, contractAddr common.Address, blockNum *big.Int) (hash common.Hash, err error) {
 	// create token storage proof artifact
 	ts := token.ERC20Token{
-		RPCcli: ph.EthereumRPC,
-		Ethcli: ph.EthereumClient,
+		RPCcli: eh.EthereumRPC,
+		Ethcli: eh.EthereumClient,
 	}
 	ts.Init(ctx, "", contractAddr.String())
 	// get block
@@ -284,9 +285,9 @@ func extractProcessMode(processMode uint8) (*models.ProcessMode, error) {
 }
 
 // SetStatusTxArgs returns a SetProcessTx instance with the processStatus set
-func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint32, status uint8) (*models.SetProcessTx, error) {
+func (eh *EthereumHandler) SetStatusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint32, status uint8) (*models.SetProcessTx, error) {
 	status++ // +1 for matching with ethevent uint8
-	processData, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
+	processData, err := eh.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
 	}
@@ -307,8 +308,8 @@ func (ph *VotingHandle) SetStatusTxArgs(ctx context.Context, pid [types.ProcessI
 }
 
 // SetCensusTxArgs returns a SetProcess tx instance with census censusRoot and census censusURI set
-func (ph *VotingHandle) SetCensusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint32) (*models.SetProcessTx, error) {
-	processData, err := ph.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
+func (eh *EthereumHandler) SetCensusTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte, namespace uint32) (*models.SetProcessTx, error) {
+	processData, err := eh.VotingProcess.Get(&ethbind.CallOpts{Context: ctx}, pid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
 	}
@@ -337,37 +338,37 @@ func (ph *VotingHandle) SetCensusTxArgs(ctx context.Context, pid [types.ProcessI
 }
 
 // IncrementQuestionIndexTxArgs
-func (ph *VotingHandle) IncrementQuestionIndexTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte) (*models.SetProcessTx, error) {
+func (eh *EthereumHandler) IncrementQuestionIndexTxArgs(ctx context.Context, pid [types.ProcessIDsize]byte) (*models.SetProcessTx, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
 // EntityProcessCount returns the entity process count given an entity address
-func (ph *VotingHandle) EntityProcessCount(ctx context.Context, eid common.Address) (entityProcessCount *big.Int, err error) {
-	if entityProcessCount, err = ph.VotingProcess.GetEntityProcessCount(&ethbind.CallOpts{Context: ctx}, eid); err != nil {
+func (eh *EthereumHandler) EntityProcessCount(ctx context.Context, eid common.Address) (entityProcessCount *big.Int, err error) {
+	if entityProcessCount, err = eh.VotingProcess.GetEntityProcessCount(&ethbind.CallOpts{Context: ctx}, eid); err != nil {
 		err = fmt.Errorf("cannot get entity process count: %w", err)
 	}
 	return
 }
 
 // EntityNextProcessID returns the next process id of a given entity address
-func (ph *VotingHandle) EntityNextProcessID(ctx context.Context, eid common.Address) (entityNextProcessID [32]byte, err error) {
-	if entityNextProcessID, err = ph.VotingProcess.GetNextProcessId(&ethbind.CallOpts{Context: ctx}, eid); err != nil {
+func (eh *EthereumHandler) EntityNextProcessID(ctx context.Context, eid common.Address) (entityNextProcessID [32]byte, err error) {
+	if entityNextProcessID, err = eh.VotingProcess.GetNextProcessId(&ethbind.CallOpts{Context: ctx}, eid); err != nil {
 		err = fmt.Errorf("cannot get entity next process id: %w", err)
 	}
 	return
 }
 
 // ProcessParamsSignature returns the signature of the process parameters
-func (ph *VotingHandle) ProcessParamsSignature(ctx context.Context, pid [types.ProcessIDsize]byte) (processParamsSignature [types.ProcessesParamsSignatureSize]byte, err error) {
-	if processParamsSignature, err = ph.VotingProcess.GetParamsSignature(&ethbind.CallOpts{Context: ctx}, pid); err != nil {
+func (eh *EthereumHandler) ProcessParamsSignature(ctx context.Context, pid [types.ProcessIDsize]byte) (processParamsSignature [types.ProcessesParamsSignatureSize]byte, err error) {
+	if processParamsSignature, err = eh.VotingProcess.GetParamsSignature(&ethbind.CallOpts{Context: ctx}, pid); err != nil {
 		err = fmt.Errorf("cannot get process params signature: %w", err)
 	}
 	return
 }
 
 // ProcessCreationInstance returns the address of the processes contract instance where the process was created
-func (ph *VotingHandle) ProcessCreationInstance(ctx context.Context, pid [types.ProcessIDsize]byte) (processCreationInstance common.Address, err error) {
-	if processCreationInstance, err = ph.VotingProcess.GetCreationInstance(&ethbind.CallOpts{Context: ctx}, pid); err != nil {
+func (eh *EthereumHandler) ProcessCreationInstance(ctx context.Context, pid [types.ProcessIDsize]byte) (processCreationInstance common.Address, err error) {
+	if processCreationInstance, err = eh.VotingProcess.GetCreationInstance(&ethbind.CallOpts{Context: ctx}, pid); err != nil {
 		err = fmt.Errorf("cannot get process creation instance: %w", err)
 	}
 	return
@@ -378,13 +379,13 @@ func (ph *VotingHandle) ProcessCreationInstance(ctx context.Context, pid [types.
 // TOKEN STORAGE PROOF WRAPPER
 
 // IsTokenRegistered returns true if a token represented by the given address is registered on the token storage proof contract
-func (ph *VotingHandle) IsTokenRegistered(ctx context.Context, address common.Address) (bool, error) {
-	return ph.TokenStorageProof.IsRegistered(&ethbind.CallOpts{Context: ctx}, address)
+func (eh *EthereumHandler) IsTokenRegistered(ctx context.Context, address common.Address) (bool, error) {
+	return eh.TokenStorageProof.IsRegistered(&ethbind.CallOpts{Context: ctx}, address)
 }
 
 // GetTokenBalanceMappingPosition returns the balance mapping position given a token address
-func (ph *VotingHandle) GetTokenBalanceMappingPosition(ctx context.Context, address common.Address) (*big.Int, error) {
-	tokenInfo, err := ph.TokenStorageProof.Tokens(&ethbind.CallOpts{Context: ctx}, address)
+func (eh *EthereumHandler) GetTokenBalanceMappingPosition(ctx context.Context, address common.Address) (*big.Int, error) {
+	tokenInfo, err := eh.TokenStorageProof.Tokens(&ethbind.CallOpts{Context: ctx}, address)
 	if err != nil {
 		return nil, err
 	}
@@ -394,8 +395,8 @@ func (ph *VotingHandle) GetTokenBalanceMappingPosition(ctx context.Context, addr
 // GENESIS WRAPPER
 
 // AddOracleTxArgs returns an Admin tx instance with the oracle address to add
-func (ph *VotingHandle) AddOracleTxArgs(ctx context.Context, oracleAddress common.Address, chainId uint32) (tx *models.AdminTx, err error) {
-	genesis, err := ph.Genesis.Get(&ethbind.CallOpts{Context: ctx}, chainId)
+func (eh *EthereumHandler) AddOracleTxArgs(ctx context.Context, oracleAddress common.Address, chainId uint32) (tx *models.AdminTx, err error) {
+	genesis, err := eh.Genesis.Get(&ethbind.CallOpts{Context: ctx}, chainId)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get genesis %d: %w", chainId, err)
 	}
@@ -417,8 +418,8 @@ func (ph *VotingHandle) AddOracleTxArgs(ctx context.Context, oracleAddress commo
 }
 
 // RemoveOracleTxArgs returns an Admin tx instance with the oracle address to remove
-func (ph *VotingHandle) RemoveOracleTxArgs(ctx context.Context, oracleAddress common.Address, chainId uint32) (tx *models.AdminTx, err error) {
-	genesis, err := ph.Genesis.Get(&ethbind.CallOpts{Context: ctx}, chainId)
+func (eh *EthereumHandler) RemoveOracleTxArgs(ctx context.Context, oracleAddress common.Address, chainId uint32) (tx *models.AdminTx, err error) {
+	genesis, err := eh.Genesis.Get(&ethbind.CallOpts{Context: ctx}, chainId)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get genesis %d: %w", chainId, err)
 	}

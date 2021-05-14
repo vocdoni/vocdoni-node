@@ -2,59 +2,11 @@ package chain
 
 import (
 	"errors"
-	"fmt"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
 	ethparams "github.com/ethereum/go-ethereum/params"
-	"go.vocdoni.io/dvote/chain/contracts"
+	"go.vocdoni.io/dvote/chain/ethereumhandler"
 	"go.vocdoni.io/dvote/types"
 )
-
-// EthereumContractNames is the list of supported smart contracts names
-var EthereumContractNames []string = []string{"processes", "namespaces", "erc20", "genesis", "results", "entities"}
-
-// EthereumContract wraps basic smartcontract information
-type EthereumContract struct {
-	ABI             abi.ABI
-	Bytecode        []byte
-	Domain          string
-	Address         common.Address
-	ListenForEvents bool
-}
-
-// SetABI sets the ethereum contract ABI given a ethereum contract name defined at EthereumContractNames
-func (ec *EthereumContract) SetABI(contractName string) error {
-	var err error
-	switch contractName {
-	case EthereumContractNames[0]:
-		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.ProcessesABI)); err != nil {
-			return fmt.Errorf("cannot read processes contract abi: %w", err)
-		}
-	case EthereumContractNames[1]:
-		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.NamespacesABI)); err != nil {
-			return fmt.Errorf("cannot read namespace contract abi: %w", err)
-		}
-	case EthereumContractNames[2]:
-		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.TokenStorageProofABI)); err != nil {
-			return fmt.Errorf("cannot read token storage proof contract abi: %w", err)
-		}
-	case EthereumContractNames[3]:
-		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.GenesisABI)); err != nil {
-			return fmt.Errorf("cannot read genesis contract abi: %w", err)
-		}
-	case EthereumContractNames[4]:
-		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.ResultsABI)); err != nil {
-			return fmt.Errorf("cannot read results contract abi: %w", err)
-		}
-	case EthereumContractNames[5]:
-		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.EntityResolverABI)); err != nil {
-			return fmt.Errorf("cannot read entity resolver contract abi: %w", err)
-		}
-	}
-	return nil
-}
 
 // Specs defines a set of blockchain network specifications
 type Specs struct {
@@ -66,7 +18,7 @@ type Specs struct {
 	StartingBlock   int64    // Where to start looking for events
 	ENSregistryAddr string
 	// Contracts are ordered as [processes, namespaces, erc20tokenproofs, genesis, results, entityResolver]
-	Contracts map[string]*EthereumContract
+	Contracts map[string]*ethereumhandler.EthereumContract
 }
 
 // AvailableChains is the list of supported ethereum networks / environments
@@ -98,14 +50,14 @@ var mainnet = Specs{
 	NetworkId:       1,
 	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
 	BootNodes:       ethparams.MainnetBootnodes,
-	StartingBlock:   10230300, // 2020 jun 09 10:00h
-	Contracts: map[string]*EthereumContract{
-		EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
-		EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
-		EthereumContractNames[2]: {Domain: types.ERC20ProofsDomain, ListenForEvents: true},
-		EthereumContractNames[3]: {Domain: types.GenesisDomain, ListenForEvents: true},
-		EthereumContractNames[4]: {Domain: types.ResultsDomain, ListenForEvents: true},
-		EthereumContractNames[5]: {Domain: types.EntityResolverDomain},
+	StartingBlock:   10230300, //2020 jun 09 10:00h
+	Contracts: map[string]*ethereumhandler.EthereumContract{
+		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDomain},
 	},
 }
 
@@ -114,14 +66,14 @@ var xdai = Specs{
 	NetworkId:       100,
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
-	StartingBlock:   14531875, // 2021 Feb 13 21:58h
-	Contracts: map[string]*EthereumContract{
-		EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
-		EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
-		EthereumContractNames[2]: {Domain: types.ERC20ProofsDomain, ListenForEvents: true},
-		EthereumContractNames[3]: {Domain: types.GenesisDomain, ListenForEvents: true},
-		EthereumContractNames[4]: {Domain: types.ResultsDomain, ListenForEvents: true},
-		EthereumContractNames[5]: {Domain: types.EntityResolverDomain},
+	StartingBlock:   14531875, //2021 Feb 13 21:58h
+	Contracts: map[string]*ethereumhandler.EthereumContract{
+		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDomain},
 	},
 }
 
@@ -130,14 +82,14 @@ var xdaistage = Specs{
 	NetworkId:       100,
 	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
 	BootNodes:       nil,
-	StartingBlock:   14531875, // 2021 Feb 13 21:58h
-	Contracts: map[string]*EthereumContract{
-		EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
-		EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},
-		EthereumContractNames[2]: {Domain: types.ERC20ProofsStageDomain, ListenForEvents: true},
-		EthereumContractNames[3]: {Domain: types.GenesisStageDomain, ListenForEvents: true},
-		EthereumContractNames[4]: {Domain: types.ResultsStageDomain, ListenForEvents: true},
-		EthereumContractNames[5]: {Domain: types.EntityResolverStageDomain},
+	StartingBlock:   14531875, //2021 Feb 13 21:58h
+	Contracts: map[string]*ethereumhandler.EthereumContract{
+		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsStageDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisStageDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsStageDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverStageDomain},
 	},
 }
 
@@ -147,13 +99,13 @@ var rinkeby = Specs{
 	StartingBlock:   8399062, // 2021 Apr 12 09:28h
 	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
 	BootNodes:       nil,
-	Contracts: map[string]*EthereumContract{
-		EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
-		EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},
-		EthereumContractNames[2]: {Domain: types.ERC20ProofsDevelopmentDomain, ListenForEvents: true},
-		EthereumContractNames[3]: {Domain: types.GenesisDevelopmentDomain, ListenForEvents: true},
-		EthereumContractNames[4]: {Domain: types.ResultsDevelopmentDomain, ListenForEvents: true},
-		EthereumContractNames[5]: {Domain: types.EntityResolverDevelopmentDomain},
+	Contracts: map[string]*ethereumhandler.EthereumContract{
+		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsDevelopmentDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDevelopmentDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDevelopmentDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDevelopmentDomain},
 	},
 }
 
@@ -164,13 +116,13 @@ var goerlistage = Specs{
 	StartingBlock:   goerli.StartingBlock,
 	ENSregistryAddr: goerli.ENSregistryAddr,
 	BootNodes:       ethparams.GoerliBootnodes,
-	Contracts: map[string]*EthereumContract{
-		EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
-		EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},
-		EthereumContractNames[2]: {Domain: types.ERC20ProofsStageDomain, ListenForEvents: true},
-		EthereumContractNames[3]: {Domain: types.GenesisStageDomain, ListenForEvents: true},
-		EthereumContractNames[4]: {Domain: types.ResultsStageDomain, ListenForEvents: true},
-		EthereumContractNames[5]: {Domain: types.EntityResolverStageDomain},
+	Contracts: map[string]*ethereumhandler.EthereumContract{
+		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsStageDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisStageDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsStageDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverStageDomain},
 	},
 	GenesisHash: goerli.GenesisHash,
 	GenesisB64:  goerli.GenesisB64,
@@ -183,13 +135,13 @@ var goerli = Specs{
 	StartingBlock:   3000000,
 	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
 	BootNodes:       ethparams.GoerliBootnodes,
-	Contracts: map[string]*EthereumContract{
-		EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
-		EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},
-		EthereumContractNames[2]: {Domain: types.ERC20ProofsDevelopmentDomain, ListenForEvents: true},
-		EthereumContractNames[3]: {Domain: types.GenesisDevelopmentDomain, ListenForEvents: true},
-		EthereumContractNames[4]: {Domain: types.ResultsDevelopmentDomain, ListenForEvents: true},
-		EthereumContractNames[5]: {Domain: types.EntityResolverDevelopmentDomain},
+	Contracts: map[string]*ethereumhandler.EthereumContract{
+		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsDevelopmentDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDevelopmentDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDevelopmentDomain, ListenForEvents: true},
+		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDevelopmentDomain},
 	},
 	GenesisHash: "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog
