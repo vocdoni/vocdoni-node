@@ -19,7 +19,7 @@ import (
 // ProcessInfo returns the available information regarding an election process id
 func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	proc := &indexertypes.Process{}
-	err := s.db.FindOne(proc, badgerhold.Where(badgerhold.Key).Eq(pid))
+	err := s.db.FindOne(proc, badgerhold.Where("ID").Eq(pid))
 	return proc, err
 }
 
@@ -332,7 +332,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 	// Retry if error is "Transaction Conflict"
 	for {
 		if err := s.db.UpdateMatching(&indexertypes.Process{},
-			badgerhold.Where(badgerhold.Key).Eq(pid), updateFunc); err != nil {
+			badgerhold.Where("ID").Eq(pid), updateFunc); err != nil {
 			if strings.Contains(err.Error(), kvErrorStringForRetry) {
 				continue
 			}
@@ -344,7 +344,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 }
 
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
-	return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
+	return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where("ID").Eq(pid),
 		func(record interface{}) error {
 			update, ok := record.(*indexertypes.Process)
 			if !ok {

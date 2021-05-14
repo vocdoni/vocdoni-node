@@ -39,12 +39,13 @@ const kvErrorStringForRetry = "Transaction Conflict"
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
 func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
 	txRef := &indexertypes.VoteReference{}
-	return txRef, s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
+	return txRef, s.db.FindOne(txRef, badgerhold.Where("Nullifier").Eq(nullifier))
 }
 
 // GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
 func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
+	t := time.Now()
 	voteRef, err := s.GetEnvelopeReference(nullifier)
 	if err != nil {
 		return nil, err
@@ -61,6 +62,7 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePacka
 	if envelope == nil {
 		return nil, fmt.Errorf("transaction is not an Envelope")
 	}
+	log.Debugf("getEnvelope took %s", time.Since(t))
 	return &indexertypes.EnvelopePackage{
 		Nonce:                envelope.Nonce,
 		VotePackage:          envelope.VotePackage,
