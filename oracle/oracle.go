@@ -1,7 +1,6 @@
 package oracle
 
 import (
-	"bytes"
 	"fmt"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -9,6 +8,8 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -19,20 +20,12 @@ type Oracle struct {
 }
 
 func NewOracle(app *vochain.BaseApplication, signer *ethereum.SignKeys) (*Oracle, error) {
-	oracles, err := app.State.Oracles(true)
-	if err != nil {
-		return nil, err
-	}
-	found := false
-	for _, oc := range oracles {
-		if !bytes.Equal(signer.Address().Bytes(), oc.Bytes()) {
-			found = true
-		}
-	}
-	if !found {
-		return nil, fmt.Errorf("this node is not an oracle")
-	}
 	return &Oracle{VochainApp: app, signer: signer}, nil
+}
+
+func (o *Oracle) EnableResults(scr *scrutinizer.Scrutinizer) {
+	log.Infof("oracle results enabled")
+	scr.AddEventListener(o)
 }
 
 func (o *Oracle) NewProcess(process *models.Process) error {
@@ -105,4 +98,75 @@ func (o *Oracle) NewProcess(process *models.Process) error {
 	}
 	log.Infof("newProcess transaction sent, hash: %x", res.Hash)
 	return nil
+}
+
+// OnComputeResults is called once a process result is computed by the scrutinizer.
+// The Oracle will build and send a RESULTS transaction to the Vochain.
+// The transaction includes the final results for the process.
+func (o *Oracle) OnComputeResults(results *indexertypes.Results) {
+	log.Infof("launching on compute results callback for process %x", results.ProcessID)
+	// check vochain process status
+	vocProcessData, err := o.VochainApp.State.Process(results.ProcessID, true)
+	if err != nil {
+		log.Errorf("error fetching process %x from the Vochain: %v", results.ProcessID, err)
+		return
+	}
+	switch vocProcessData.Status {
+	case models.ProcessStatus_RESULTS:
+		// check vochain process results
+		if len(vocProcessData.Results.Votes) > 0 {
+			log.Infof("process %x results already added on the Vochain, skipping",
+				results.ProcessID)
+			return
+		}
+	case models.ProcessStatus_READY:
+		if o.VochainApp.Height() < vocProcessData.StartBlock+vocProcessData.BlockCount {
+			log.Warnf("process %x is in READY state and not yet finished by block, cannot publish results",
+				results.ProcessID)
+			return
+		}
+	case models.ProcessStatus_ENDED:
+		break
+	default:
+		log.Infof("invalid process %x status %s for setting the results, skipping",
+			results.ProcessID, vocProcessData.Status)
+		return
+	}
+
+	// create setProcessTx
+	setprocessTxArgs := &models.SetProcessTx{
+		ProcessId: results.ProcessID,
+		Results:   scrutinizer.BuildProcessResult(results, vocProcessData.EntityId),
+		Status:    models.ProcessStatus_RESULTS.Enum(),
+		Txtype:    models.TxType_SET_PROCESS_RESULTS,
+		Nonce:     util.RandomBytes(32),
+	}
+
+	stx := &models.SignedTx{}
+	if stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetProcess{
+			SetProcess: setprocessTxArgs,
+		},
+	}); err != nil {
+		log.Errorf("cannot marshal set process results tx: %v", err)
+		return
+	}
+	if stx.Signature, err = o.signer.Sign(stx.Tx); err != nil {
+		log.Errorf("cannot sign oracle tx: %v", err)
+		return
+	}
+
+	txb, err := proto.Marshal(stx)
+	if err != nil {
+		log.Errorf("error marshaling set process results tx: %v", err)
+		return
+	}
+	log.Debugf("broadcasting Vochain Tx: %s", log.FormatProto(setprocessTxArgs))
+
+	res, err := o.VochainApp.SendTx(txb)
+	if err != nil || res == nil {
+		log.Errorf("cannot broadcast tx: %v, res: %+v", err, res)
+		return
+	}
+	log.Infof("oracle transaction sent, hash:%x", res.Hash)
 }

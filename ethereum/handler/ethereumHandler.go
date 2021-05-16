@@ -17,8 +17,8 @@ import (
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/net/idna"
 
-	"go.vocdoni.io/dvote/chain/contracts"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/ethereum/contracts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -26,10 +26,12 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
-// The following methods and structures represent an exportable abstraction over raw contract bindings
+// The following methods and structures represent an exportable abstraction
+// over raw contract bindings.
 // Use these methods, rather than those present in the contracts folder
 
-// EthereumHandler wraps the Processes, Namespace and TokenStorageProof contracts and holds a reference to an ethereum client
+// EthereumHandler wraps the Processes, Namespace and TokenStorageProof
+// contracts and holds a reference to an ethereum client
 type EthereumHandler struct {
 	VotingProcess     *contracts.Processes
 	Namespace         *contracts.Namespaces
@@ -38,6 +40,7 @@ type EthereumHandler struct {
 	Results           *contracts.Results
 	EthereumClient    *ethclient.Client
 	EthereumRPC       *ethrpc.Client
+	Endpoint          string
 }
 
 // Genesis wraps the info retrieved for a call to genesis.Get(chainId)
@@ -58,25 +61,10 @@ type EthSyncInfo struct {
 // NewEthereumHandler initializes contracts creating a transactor using the ethereum client
 func NewEthereumHandler(contracts map[string]*EthereumContract,
 	dialEndpoint string) (*EthereumHandler, error) {
-	var err error
 	eh := new(EthereumHandler)
-	// try connect to the w3endpoint using an RPC connection
-	maxtries := 6
-	for {
-		if maxtries == 0 {
-			return nil, fmt.Errorf("could not connect to web3 endpoint")
-		}
-		eh.EthereumRPC, err = ethrpc.Dial(dialEndpoint)
-		if err != nil || eh.EthereumRPC == nil {
-			log.Warnf("cannot create a ethereum rpc connection: (%s), trying again ...", err)
-			time.Sleep(time.Second * 5)
-			maxtries--
-			continue
-		}
-		break
+	if err := eh.Connect(dialEndpoint); err != nil {
+		return nil, err
 	}
-	// if RPC connection established, create an ethereum client using the RPC client
-	eh.EthereumClient = ethclient.NewClient(eh.EthereumRPC)
 	for _, contract := range contracts {
 		if err := eh.SetContractInstance(contract); err != nil {
 			log.Errorf("cannot set contract instance: %s", err)
@@ -84,6 +72,35 @@ func NewEthereumHandler(contracts map[string]*EthereumContract,
 	}
 	go eh.PrintInfo(context.Background(), time.Second*20)
 	return eh, nil
+}
+
+// Connect creates a new connection to the Ethereum client
+func (eh *EthereumHandler) Connect(dialEndpoint string) error {
+	if eh.EthereumClient != nil {
+		eh.EthereumClient.Close()
+	}
+	if eh.EthereumRPC != nil {
+		eh.EthereumRPC.Close()
+	}
+	maxtries := 10
+	var err error
+	for {
+		if maxtries == 0 {
+			return fmt.Errorf("could not connect to web3 endpoint")
+		}
+		eh.EthereumRPC, err = ethrpc.Dial(dialEndpoint)
+		if err != nil || eh.EthereumRPC == nil {
+			log.Warnf("cannot create a ethereum rpc connection: (%s), trying again ...", err)
+			time.Sleep(time.Second * 2)
+			maxtries--
+			continue
+		}
+		break
+	}
+	// if RPC connection established, create an ethereum client using the RPC client
+	eh.EthereumClient = ethclient.NewClient(eh.EthereumRPC)
+	eh.Endpoint = dialEndpoint
+	return nil
 }
 
 func (eh *EthereumHandler) WaitSync() {

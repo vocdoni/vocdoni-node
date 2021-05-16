@@ -6,10 +6,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/census"
-	"go.vocdoni.io/dvote/chain"
-	"go.vocdoni.io/dvote/chain/ethevents"
-	ethereumhandler "go.vocdoni.io/dvote/chain/handler"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	chain "go.vocdoni.io/dvote/ethereum"
+	"go.vocdoni.io/dvote/ethereum/ethevents"
+	ethereumhandler "go.vocdoni.io/dvote/ethereum/handler"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -67,7 +67,6 @@ func EthEvents(
 		w3uri,
 		cm,
 		vocapp,
-		sc,
 		ethereumWhiteList,
 	)
 	if err != nil {

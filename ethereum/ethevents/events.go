@@ -17,16 +17,11 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
-	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
-	models "go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ethereum/go-ethereum/ethclient"
-	"go.vocdoni.io/dvote/chain"
-	ethereumhandler "go.vocdoni.io/dvote/chain/handler"
+	ethereumhandler "go.vocdoni.io/dvote/ethereum/handler"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -98,7 +93,6 @@ func NewEthEvents(
 	w3Endpoint string,
 	cens *census.Manager,
 	vocapp *vochain.BaseApplication,
-	scrutinizer *scrutinizer.Scrutinizer,
 	ethereumWhiteList []string,
 ) (*EthereumEvents, error) {
 	// try to connect to default addr if w3Endpoint is empty
@@ -145,84 +139,7 @@ func NewEthEvents(
 		ContractsInfo:          contracts,
 	}
 
-	if scrutinizer != nil {
-		log.Infof("starting ethevents with scrutinizer enabled")
-		ethev.Scrutinizer = scrutinizer
-		ethev.Scrutinizer.AddEventListener(ethev)
-	}
-
 	return ethev, nil
-}
-
-// OnComputeResults is called once a process result is computed by the scrutinizer.
-// The Oracle will build and send a RESULTS transaction to the Vochain.
-// The transaction includes the final results for the process.
-func (ev *EthereumEvents) OnComputeResults(results *indexertypes.Results) {
-	log.Infof("launching on compute results callback for process %x", results.ProcessID)
-	// check vochain process status
-	vocProcessData, err := ev.VochainApp.State.Process(results.ProcessID, true)
-	if err != nil {
-		log.Errorf("error fetching process %x from the Vochain: %v", results.ProcessID, err)
-		return
-	}
-	switch vocProcessData.Status {
-	case models.ProcessStatus_RESULTS:
-		// check vochain process results
-		if len(vocProcessData.Results.Votes) > 0 {
-			log.Infof("process %x results already added on the Vochain, skipping",
-				results.ProcessID)
-			return
-		}
-	case models.ProcessStatus_READY:
-		if ev.VochainApp.Height() < vocProcessData.StartBlock+vocProcessData.BlockCount {
-			log.Warnf("process %x is in READY state and not yet finished by block, cannot publish results",
-				results.ProcessID)
-			return
-		}
-	case models.ProcessStatus_ENDED:
-		break
-	default:
-		log.Infof("invalid process %x status %s for setting the results, skipping",
-			results.ProcessID, vocProcessData.Status)
-		return
-	}
-
-	// create setProcessTx
-	setprocessTxArgs := &models.SetProcessTx{
-		ProcessId: results.ProcessID,
-		Results:   scrutinizer.BuildProcessResult(results, vocProcessData.EntityId),
-		Status:    models.ProcessStatus_RESULTS.Enum(),
-		Txtype:    models.TxType_SET_PROCESS_RESULTS,
-		Nonce:     util.RandomBytes(32),
-	}
-
-	stx := &models.SignedTx{}
-	if stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_SetProcess{
-			SetProcess: setprocessTxArgs,
-		},
-	}); err != nil {
-		log.Errorf("cannot marshal set process results tx: %v", err)
-		return
-	}
-	if stx.Signature, err = ev.Signer.Sign(stx.Tx); err != nil {
-		log.Errorf("cannot sign oracle tx: %v", err)
-		return
-	}
-
-	txb, err := proto.Marshal(stx)
-	if err != nil {
-		log.Errorf("error marshaling set process results tx: %v", err)
-		return
-	}
-	log.Debugf("broadcasting Vochain Tx: %s", log.FormatProto(setprocessTxArgs))
-
-	res, err := ev.VochainApp.SendTx(txb)
-	if err != nil || res == nil {
-		log.Errorf("cannot broadcast tx: %v, res: %+v", err, res)
-		return
-	}
-	log.Infof("oracle transaction sent, hash:%x", res.Hash)
 }
 
 // AddEventHandler adds a new handler even log function
@@ -235,33 +152,30 @@ func (ev *EthereumEvents) AddEventHandler(h EventHandler) {
 // reversions. If fromBlock nil, subscription will start on current block.
 // Blocking function (use go routine).
 func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBlock *int64) {
-	log.Debugf("dialing for %s", ev.DialAddr)
 	var sub eth.Subscription
 	var err error
 
-	client, _ := chain.EthClientConnect(ev.DialAddr, 0)
 	// Get current block
 	blockTctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout*2)
 	defer cancel()
 	var lastBlock int64
 	var blk *ethtypes.Block
+	errors := 0
 	for {
-		if client == nil {
-			client, _ = chain.EthClientConnect(ev.DialAddr, 0)
+		if errors > 5 {
+			log.Fatal("the web3 client connection is not working")
 		}
-		blk, err = client.BlockByNumber(blockTctx, nil)
+		blk, err = ev.VotingHandle.EthereumClient.BlockByNumber(blockTctx, nil)
 		if err != nil {
 			log.Errorf("cannot get ethereum block: %s", err)
-			// If any error try close the client and reconnect
-			// normally errors are related to connection.
-			// If the error is not related to connections
-			// something very wrong is happening at this point
-			// so the go routine will get stucked here and the
-			// user will be alerted
-			client.Close()
-			client = nil
+			errors++
+			time.Sleep(time.Second * 2)
+			if err := ev.VotingHandle.Connect(ev.DialAddr); err != nil {
+				log.Warn(err)
+			}
 			continue
 		}
+		errors = 0
 		lastBlock = blk.Number().Int64()
 		break
 	}
@@ -272,28 +186,28 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 		// Unless this is the first set of oracles, it is almost
 		// sure that the events are already processed so do not
 		// block and do not fatal here
-		if err := ev.processEventLogsFromTo(ctx, *fromBlock, lastBlock, client); err != nil {
+		if err := ev.processEventLogsFromTo(ctx, *fromBlock, lastBlock,
+			ev.VotingHandle.EthereumClient); err != nil {
 			log.Errorf("cannot process event logs: %v", err)
 		}
 		// Update block number
 		// Expect the client to be connected here
 		// and the call is successful, if not
 		// block the execution and alert
+		errors = 0
 		for {
-			if client == nil {
-				client, _ = chain.EthClientConnect(ev.DialAddr, 0)
+			if errors > 5 {
+				log.Fatal("the web3 connection is not working")
 			}
-			blk, err = client.BlockByNumber(blockTctx, nil)
+			blk, err = ev.VotingHandle.EthereumClient.BlockByNumber(blockTctx, nil)
 			if err != nil {
 				log.Errorf("cannot update block number: %v", err)
+				errors++
+				time.Sleep(time.Second * 2)
 				// If any error try close the client and reconnect
-				// normally errors are related to connection.
-				// If the error is not related to connections
-				// something very wrong is happening at this point
-				// so the go routine will get stucked here and the
-				// user will be alerted
-				client.Close()
-				client = nil
+				if err := ev.VotingHandle.Connect(ev.DialAddr); err != nil {
+					log.Warn(err)
+				}
 				continue
 			}
 			lastBlock = blk.Number().Int64()
@@ -301,14 +215,15 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 		}
 		// For security, read also the new passed blocks before subscribing
 		// Same as the last processEventLogsFromTo function call
-		if err := ev.processEventLogsFromTo(ctx, lastBlock, blk.Number().Int64(), client); err != nil {
+		if err := ev.processEventLogsFromTo(ctx, lastBlock, blk.Number().Int64(),
+			ev.VotingHandle.EthereumClient); err != nil {
 			log.Errorf("cannot process event logs: %s", err)
 		}
 	} else {
 		// For security, even if subscribe only, force to process at least the past 1024
 		// Same as the last processEventLogsFromTo function call
 		if err := ev.processEventLogsFromTo(ctx, blk.Number().Int64()-1024,
-			blk.Number().Int64(), client); err != nil {
+			blk.Number().Int64(), ev.VotingHandle.EthereumClient); err != nil {
 			log.Errorf("cannot process event logs: %v", err)
 		}
 	}
@@ -317,7 +232,7 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 	defer cancel()
 	// And then subscribe to new events
 	// Update block number
-	blk, err = client.BlockByNumber(blockTctx, nil)
+	blk, err = ev.VotingHandle.EthereumClient.BlockByNumber(blockTctx, nil)
 	if err != nil {
 		// accept to not update the block number here
 		// if any error, the old blk fetched will be used instead.
@@ -334,15 +249,19 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 	// start the event processor if the client
 	// cannot be subscribed to the logs.
 	// Use the same policy as processEventsLogsFromTo
+	errors = 0
 	for {
-		if client == nil {
-			client, _ = chain.EthClientConnect(ev.DialAddr, 0)
+		if errors > 5 {
+			log.Fatal("the web3 connection is not working")
 		}
-		sub, err = client.SubscribeFilterLogs(ctx, query, logs)
+		sub, err = ev.VotingHandle.EthereumClient.SubscribeFilterLogs(ctx, query, logs)
 		if err != nil {
 			log.Errorf("cannot subscribe to ethereum client log: %s", err)
-			client.Close()
-			client = nil
+			errors++
+			time.Sleep(time.Second * 2)
+			if err := ev.VotingHandle.Connect(ev.DialAddr); err != nil {
+				log.Warn(err)
+			}
 			continue
 		}
 		break

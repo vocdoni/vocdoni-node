@@ -18,11 +18,11 @@ import (
 	"github.com/spf13/viper"
 
 	"go.vocdoni.io/dvote/census"
-	"go.vocdoni.io/dvote/chain"
-	"go.vocdoni.io/dvote/chain/ethevents"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
+	ethchain "go.vocdoni.io/dvote/ethereum"
+	"go.vocdoni.io/dvote/ethereum/ethevents"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
@@ -80,63 +80,92 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable the file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", false, "enable the census API")
 	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable the vote API")
-	globalCfg.API.Tendermint = *flag.Bool("tendermintApi", false, "make the Tendermint API public available")
-	globalCfg.API.Results = *flag.Bool("resultsApi", true, "enable the results API")
-	globalCfg.API.Indexer = *flag.Bool("indexerApi", false, "enable the indexer API (required for explorer)")
-	globalCfg.API.Route = *flag.String("apiRoute", "/", "dvote API base route for HTTP and Websockets")
-	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false, "allows private methods over the APIs")
-	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "", "comma delimited list of allowed client ETH addresses for private methods")
-	globalCfg.API.ListenHost = *flag.String("listenHost", "0.0.0.0", "API endpoint listen address")
-	globalCfg.API.ListenPort = *flag.Int("listenPort", 9090, "API endpoint http port")
-	globalCfg.API.WebsocketsReadLimit = *flag.Int64("apiWsReadLimit", types.Web3WsReadLimit, "dvote websocket API read size limit in bytes")
+	globalCfg.API.Tendermint = *flag.Bool("tendermintApi", false,
+		"make the Tendermint API public available")
+	globalCfg.API.Results = *flag.Bool("resultsApi", true,
+		"enable the results API")
+	globalCfg.API.Indexer = *flag.Bool("indexerApi", false,
+		"enable the indexer API (required for explorer)")
+	globalCfg.API.Route = *flag.String("apiRoute", "/",
+		"dvote API base route for HTTP and Websockets")
+	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false,
+		"allows private methods over the APIs")
+	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "",
+		"comma delimited list of allowed client ETH addresses for private methods")
+	globalCfg.API.ListenHost = *flag.String("listenHost", "0.0.0.0",
+		"API endpoint listen address")
+	globalCfg.API.ListenPort = *flag.Int("listenPort", 9090,
+		"API endpoint http port")
+	globalCfg.API.WebsocketsReadLimit = *flag.Int64("apiWsReadLimit", types.Web3WsReadLimit,
+		"dvote websocket API read size limit in bytes")
 	// ssl
-	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "", "enable TLS secure domain with LetsEncrypt auto-generated certificate (listenPort=443 is required)")
+	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "",
+		"enable TLS secure domain with LetsEncrypt (listenPort=443 is required)")
 	// ethereum node
-	globalCfg.EthConfig.SigningKey = *flag.String("ethSigningKey", "", "signing private Key (if not specified the Ethereum keystore will be used)")
-	globalCfg.EthConfig.ChainType = *flag.String("ethChain", "goerli", fmt.Sprintf("Ethereum blockchain to use: %s", chain.AvailableChains))
-	globalCfg.EthConfig.LightMode = *flag.Bool("ethChainLightMode", false, "synchronize Ethereum blockchain in light mode")
-	globalCfg.EthConfig.NodePort = *flag.Int("ethNodePort", 30303, "Ethereum p2p node port to use")
-	globalCfg.EthConfig.BootNodes = *flag.StringArray("ethBootNodes", []string{}, "Ethereum p2p custom bootstrap nodes (enode://<pubKey>@<ip>[:port])")
-	globalCfg.EthConfig.TrustedPeers = *flag.StringArray("ethTrustedPeers", []string{}, "Ethereum p2p trusted peer nodes (enode://<pubKey>@<ip>[:port])")
-	globalCfg.EthConfig.NoWaitSync = *flag.Bool("ethNoWaitSync", false, "do not wait for Ethereum to synchronize (for testing only)")
+	globalCfg.EthConfig.SigningKey = *flag.String("ethSigningKey", "",
+		"signing private Key (if not specified the Ethereum keystore will be used)")
 	// ethereum events
-	globalCfg.EthEventConfig.CensusSync = *flag.Bool("ethCensusSync", true, "automatically import new census published on the smart contract")
-	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", true, "only subscribe to new ethereum events (do not read past log)")
+	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", true,
+		"only subscribe to new ethereum events (do not read past log)")
 	// ethereum web3
-	globalCfg.W3Config.W3External = *flag.String("w3External", "", "use an external web3 endpoint instead of the local one. Supported protocols: http(s)://, ws(s):// and IPC filepath")
-	globalCfg.W3Config.Enabled = *flag.Bool("w3Enabled", false, "if true, Ethereum will be synced and a web3 public endpoint will be available")
-	globalCfg.W3Config.Route = *flag.String("w3Route", "/web3", "web3 endpoint API route")
-	globalCfg.W3Config.RPCPort = *flag.Int("w3RPCPort", 9091, "web3 RPC port")
-	globalCfg.W3Config.RPCHost = *flag.String("w3RPCHost", "127.0.0.1", "web3 RPC host")
+	globalCfg.W3Config.ChainType = *flag.String("ethChain", "goerli",
+		fmt.Sprintf("Ethereum blockchain to use: %s", ethchain.AvailableChains))
+	globalCfg.W3Config.W3External = *flag.String("w3External", "",
+		"ethereum web3 endpoint. Supported protocols: http(s)://, ws(s):// and IPC filepath")
 	// ipfs
-	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false, "disables inter planetary file system support")
-	globalCfg.Ipfs.SyncKey = *flag.String("ipfsSyncKey", "", "enable IPFS cluster synchronization using the given secret key")
-	globalCfg.Ipfs.SyncPeers = *flag.StringArray("ipfsSyncPeers", []string{}, "use custom ipfsSync peers/bootnodes for accessing the DHT")
+	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false,
+		"disables inter planetary file system support")
+	globalCfg.Ipfs.SyncKey = *flag.String("ipfsSyncKey", "",
+		"enable IPFS cluster synchronization using the given secret key")
+	globalCfg.Ipfs.SyncPeers = *flag.StringArray("ipfsSyncPeers", []string{},
+		"use custom ipfsSync peers/bootnodes for accessing the DHT")
 	// vochain
-	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656", "p2p host and port to listent for the voting chain")
-	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "", "external addrress:port to announce to other peers (automatically guessed if empty)")
-	globalCfg.VochainConfig.RPCListen = *flag.String("vochainRPCListen", "127.0.0.1:26657", "rpc host and port to listen for the voting chain")
-	globalCfg.VochainConfig.CreateGenesis = *flag.Bool("vochainCreateGenesis", false, "create own/testing genesis file on vochain")
-	globalCfg.VochainConfig.Genesis = *flag.String("vochainGenesis", "", "use alternative genesis file for the vochain")
-	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "none", "tendermint node log level (error, info, debug, nonde)")
-	globalCfg.VochainConfig.LogLevelMemPool = *flag.String("vochainLogLevelMemPool", "error", "tendermint mempool log level")
-	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{}, "coma separated list of p2p peers")
-	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{}, "coma separated list of p2p seed nodes")
-	globalCfg.VochainConfig.MinerKey = *flag.String("vochainMinerKey", "", "user alternative vochain miner private key (hexstring[64])")
-	globalCfg.VochainConfig.NodeKey = *flag.String("vochainNodeKey", "", "user alternative vochain private key (hexstring[64])")
-	globalCfg.VochainConfig.NoWaitSync = *flag.Bool("vochainNoWaitSync", false, "do not wait for Vochain to synchronize (for testing only)")
-	globalCfg.VochainConfig.SeedMode = *flag.Bool("vochainSeedMode", false, "act as a vochain seed node")
-	globalCfg.VochainConfig.MempoolSize = *flag.Int("vochainMempoolSize", 20000, "vochain mempool size")
-	globalCfg.VochainConfig.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10, "vohain consensus block time target (in seconds)")
-	globalCfg.VochainConfig.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0, "if this node is a key keeper, use this index slot")
-	globalCfg.VochainConfig.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false, "if enabled the census downloader will import all existing census")
-	globalCfg.VochainConfig.EthereumWhiteListAddrs = *flag.StringArray("ethereumWhiteListAddrs", []string{}, "list of allowed ethereum address for creating processes on the vochain (oracle mode only)")
-	globalCfg.VochainConfig.EnableProcessArchive = *flag.Bool("processArchive", false, "enables the process archiver component")
-	globalCfg.VochainConfig.ProcessArchiveKey = *flag.String("processArchiveKey", "", "IPFS base64 encoded private key for process archive IPNS")
+	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656",
+		"p2p host and port to listent for the voting chain")
+	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "",
+		"external addrress:port to announce to other peers (automatically guessed if empty)")
+	globalCfg.VochainConfig.RPCListen = *flag.String("vochainRPCListen", "127.0.0.1:26657",
+		"rpc host and port to listen for the voting chain")
+	globalCfg.VochainConfig.CreateGenesis = *flag.Bool("vochainCreateGenesis", false,
+		"create own/testing genesis file on vochain")
+	globalCfg.VochainConfig.Genesis = *flag.String("vochainGenesis", "",
+		"use alternative genesis file for the vochain")
+	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "none",
+		"tendermint node log level (error, info, debug, nonde)")
+	globalCfg.VochainConfig.LogLevelMemPool = *flag.String("vochainLogLevelMemPool", "error",
+		"tendermint mempool log level")
+	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{},
+		"coma separated list of p2p peers")
+	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{},
+		"coma separated list of p2p seed nodes")
+	globalCfg.VochainConfig.MinerKey = *flag.String("vochainMinerKey", "",
+		"user alternative vochain miner private key (hexstring[64])")
+	globalCfg.VochainConfig.NodeKey = *flag.String("vochainNodeKey", "",
+		"user alternative vochain private key (hexstring[64])")
+	globalCfg.VochainConfig.NoWaitSync = *flag.Bool("vochainNoWaitSync", false,
+		"do not wait for Vochain to synchronize (for testing only)")
+	globalCfg.VochainConfig.SeedMode = *flag.Bool("vochainSeedMode", false,
+		"act as a vochain seed node")
+	globalCfg.VochainConfig.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
+		"vochain mempool size")
+	globalCfg.VochainConfig.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
+		"vohain consensus block time target (in seconds)")
+	globalCfg.VochainConfig.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0,
+		"if this node is a key keeper, use this index slot")
+	globalCfg.VochainConfig.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false,
+		"if enabled the census downloader will import all existing census")
+	globalCfg.VochainConfig.EthereumWhiteListAddrs = *flag.StringArray("ethereumWhiteListAddrs",
+		[]string{},
+		"list of allowed ethereum address for creating processes on the vochain (oracle mode only)")
+	globalCfg.VochainConfig.EnableProcessArchive = *flag.Bool("processArchive", false,
+		"enables the process archiver component")
+	globalCfg.VochainConfig.ProcessArchiveKey = *flag.String("processArchiveKey", "",
+		"IPFS base64 encoded private key for process archive IPNS")
 
 	// metrics
 	globalCfg.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
-	globalCfg.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5, "metrics refresh interval in seconds")
+	globalCfg.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5,
+		"metrics refresh interval in seconds")
 
 	flag.CommandLine.SortFlags = false
 	// parse flags
@@ -193,23 +222,12 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("api.Ssl.Domain", flag.Lookup("sslDomain"))
 
 	// ethereum node
-	viper.Set("ethConfig.Datadir", globalCfg.DataDir+"/ethereum")
 	viper.BindPFlag("ethConfig.SigningKey", flag.Lookup("ethSigningKey"))
-	viper.BindPFlag("ethConfig.ChainType", flag.Lookup("ethChain"))
-	viper.BindPFlag("ethConfig.LightMode", flag.Lookup("ethChainLightMode"))
-	viper.BindPFlag("ethConfig.NodePort", flag.Lookup("ethNodePort"))
-	viper.BindPFlag("ethConfig.BootNodes", flag.Lookup("ethBootNodes"))
-	viper.BindPFlag("ethConfig.TrustedPeers", flag.Lookup("ethTrustedPeers"))
-	viper.BindPFlag("ethConfig.NoWaitSync", flag.Lookup("ethNoWaitSync"))
-	viper.BindPFlag("ethEventConfig.CensusSync", flag.Lookup("ethCensusSync"))
 	viper.BindPFlag("ethEventConfig.SubscribeOnly", flag.Lookup("ethSubscribeOnly"))
 
 	// ethereum web3
+	viper.BindPFlag("w3Config.ChainType", flag.Lookup("ethChain"))
 	viper.BindPFlag("w3Config.W3External", flag.Lookup("w3External"))
-	viper.BindPFlag("w3Config.Route", flag.Lookup("w3Route"))
-	viper.BindPFlag("w3Config.enabled", flag.Lookup("w3Enabled"))
-	viper.BindPFlag("w3Config.RPCPort", flag.Lookup("w3RPCPort"))
-	viper.BindPFlag("w3Config.RPCHost", flag.Lookup("w3RPCHost"))
 
 	// ipfs
 	viper.Set("ipfs.ConfigPath", globalCfg.DataDir+"/ipfs")
@@ -397,7 +415,6 @@ func main() {
 
 	var err error
 	var signer *ethereum.SignKeys
-	var node *chain.EthChainContext
 	var pxy *mhttp.Proxy
 	var storage data.Storage
 	var cm *census.Manager
@@ -405,7 +422,7 @@ func main() {
 	var vinfo *vochaininfo.VochainInfo
 	var sc *scrutinizer.Scrutinizer
 	var kk *keykeeper.KeyKeeper
-	var or *oracle.Oracle
+	var orc *oracle.Oracle
 	var ma *metrics.Agent
 
 	if globalCfg.Dev {
@@ -472,15 +489,9 @@ func main() {
 		}
 	}
 
-	// Ethereum service
-	if globalCfg.Mode == types.ModeOracle {
-		node, err = service.Ethereum(globalCfg.EthConfig, globalCfg.W3Config, pxy, signer, ma)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	// Vochain, Scrutinizer and Oracle services
+	//
+	// Vochain and Scrutinizer
+	//
 	if (globalCfg.Mode == types.ModeGateway && globalCfg.API.Vote) ||
 		globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle ||
 		globalCfg.Mode == types.ModeEthAPIoracle {
@@ -499,8 +510,7 @@ func main() {
 		}()
 
 		// Tendermint API
-		if globalCfg.Mode == types.ModeGateway && globalCfg.API.Tendermint ||
-			globalCfg.Mode == types.ModeEthAPIoracle {
+		if globalCfg.Mode == types.ModeGateway && globalCfg.API.Tendermint {
 			// Enable Tendermint RPC proxy endpoint on /tendermint
 			tp := strings.Split(globalCfg.VochainConfig.RPCListen, ":")
 			if len(tp) != 2 {
@@ -527,129 +537,113 @@ func main() {
 		}
 	}
 
-	// Start keykeeper service
-	if globalCfg.Mode == types.ModeOracle &&
-		globalCfg.VochainConfig.KeyKeeperIndex > 0 {
-		kk, err = keykeeper.NewKeyKeeper(path.Join(globalCfg.VochainConfig.DataDir, "/keykeeper"),
-			vnode,
-			signer,
-			globalCfg.VochainConfig.KeyKeeperIndex)
-		if err != nil {
+	//
+	// Oracle and ethApiOracle modes
+	//
+	if globalCfg.Mode == types.ModeOracle || globalCfg.Mode == types.ModeEthAPIoracle {
+		if orc, err = oracle.NewOracle(vnode, signer); err != nil {
 			log.Fatal(err)
 		}
-		go kk.RevealUnpublished()
-	}
 
-	if globalCfg.Mode == types.ModeEthAPIoracle {
-		// TO-DO: use this oracle instance for the standard oracle too
-		if or, err = oracle.NewOracle(vnode, signer); err != nil {
-			log.Fatal(err)
-		}
-		router, err := service.API(globalCfg.API,
-			pxy,
-			nil,
-			nil, // census manager
-			nil, // vochain core
-			nil, // scrutinizere
-			nil,
-			globalCfg.VochainConfig.RPCListen,
-			signer,
-			ma)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Info("starting oracle API")
-		apior, err := apioracle.NewAPIoracle(or, router)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err := apior.EnableERC20(globalCfg.EthConfig.ChainType,
-			globalCfg.W3Config.W3External); err != nil {
-			log.Fatal(err)
-		}
-	}
+		if globalCfg.Mode == types.ModeOracle {
+			// Start oracle results scrutinizer
+			orc.EnableResults(sc)
 
-	// TO-DO: Remove
-	if (globalCfg.Mode == types.ModeGateway && globalCfg.W3Config.Enabled) ||
-		globalCfg.Mode == types.ModeOracle {
-		// Wait for Ethereum to be ready
-		if !globalCfg.EthConfig.NoWaitSync {
-			requiredPeers := 2
-			if len(globalCfg.W3Config.W3External) > 0 {
-				requiredPeers = 1
-			}
-			for {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-				if info, err := node.SyncInfo(ctx); err == nil &&
-					info.Synced && info.Peers >= requiredPeers && info.Height > 0 {
-					log.Infof("ethereum blockchain synchronized (%+v)", info)
-					cancel()
-					break
-				}
-				cancel()
-				time.Sleep(time.Second * 5)
-			}
-		}
-
-		// Ethereum events service (needs Ethereum synchronized). Only for Oracle.
-		if !globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == types.ModeOracle {
-			var evh []ethevents.EventHandler
-			var w3uri string
-			switch {
-			case globalCfg.W3Config.W3External == "":
-				// If local ethereum node enabled, use the Go-Ethereum websockets endpoint
-				w3uri = "ws://" + net.JoinHostPort(globalCfg.W3Config.RPCHost,
-					fmt.Sprintf("%d", globalCfg.W3Config.RPCPort))
-			case strings.HasPrefix(globalCfg.W3Config.W3External, "ws"):
-				w3uri = globalCfg.W3Config.W3External
-			case strings.HasSuffix(globalCfg.W3Config.W3External, "ipc"):
-				w3uri = globalCfg.W3Config.W3External
-
-			default:
-				log.Fatal("web3 external must be websocket or IPC for event subscription")
-			}
-
-			if globalCfg.Mode == types.ModeOracle {
-				evh = append(evh, ethevents.HandleVochainOracle)
-			}
-
-			var initBlock *int64
-			if !globalCfg.EthEventConfig.SubscribeOnly {
-				initBlock = new(int64)
-				chainSpecs, err := chain.SpecsFor(globalCfg.EthConfig.ChainType)
+			// Start keykeeper service (if key index specified)
+			if globalCfg.VochainConfig.KeyKeeperIndex > 0 {
+				kk, err = keykeeper.NewKeyKeeper(path.Join(globalCfg.VochainConfig.DataDir, "/keykeeper"),
+					vnode,
+					signer,
+					globalCfg.VochainConfig.KeyKeeperIndex)
 				if err != nil {
-					log.Warn("cannot get chain block to start looking for events, using 0")
-					*initBlock = 0
-				} else {
-					*initBlock = chainSpecs.StartingBlock
+					log.Fatal(err)
 				}
+				go kk.RevealUnpublished()
 			}
 
-			whiteListedAddr := []string{}
-			for _, addr := range globalCfg.VochainConfig.EthereumWhiteListAddrs {
-				if ethcommon.IsHexAddress(addr) {
-					whiteListedAddr = append(whiteListedAddr, addr)
+			// Start ethereum events (if web3 endpoint configured)
+			if globalCfg.W3Config.W3External != "" {
+				var evh []ethevents.EventHandler
+				var w3uri string
+				switch {
+				case strings.HasPrefix(globalCfg.W3Config.W3External, "ws"):
+					w3uri = globalCfg.W3Config.W3External
+				case strings.HasSuffix(globalCfg.W3Config.W3External, "ipc"):
+					w3uri = globalCfg.W3Config.W3External
+				default:
+					log.Fatal("web3 external must be websocket or IPC for event subscription")
+				}
+
+				evh = append(evh, ethevents.HandleVochainOracle)
+
+				var initBlock *int64
+				if !globalCfg.EthEventConfig.SubscribeOnly {
+					initBlock = new(int64)
+					chainSpecs, err := ethchain.SpecsFor(globalCfg.W3Config.ChainType)
+					if err != nil {
+						log.Warn("cannot get chain block to start looking for events, using 0")
+						*initBlock = 0
+					} else {
+						*initBlock = chainSpecs.StartingBlock
+					}
+				}
+
+				whiteListedAddr := []string{}
+				for _, addr := range globalCfg.VochainConfig.EthereumWhiteListAddrs {
+					if ethcommon.IsHexAddress(addr) {
+						whiteListedAddr = append(whiteListedAddr, addr)
+					}
+				}
+				if len(whiteListedAddr) > 0 {
+					log.Infof("ethereum whitelisted addresses %+v", whiteListedAddr)
+				}
+				if err := service.EthEvents(
+					context.Background(),
+					w3uri,
+					globalCfg.W3Config.ChainType,
+					initBlock,
+					cm,
+					signer,
+					vnode,
+					evh,
+					sc,
+					whiteListedAddr); err != nil {
+					log.Fatal(err)
 				}
 			}
-			if len(whiteListedAddr) > 0 {
-				log.Infof("ethereum whitelisted addresses %+v", whiteListedAddr)
-			}
-			if err := service.EthEvents(
-				context.Background(),
-				w3uri,
-				globalCfg.EthConfig.ChainType,
-				initBlock,
-				cm,
+		}
+
+		// Ethereum API oracle
+		if globalCfg.Mode == types.ModeEthAPIoracle {
+			router, err := service.API(globalCfg.API,
+				pxy,
+				nil,
+				nil, // census manager
+				nil, // vochain core
+				nil, // scrutinizere
+				nil,
+				globalCfg.VochainConfig.RPCListen,
 				signer,
-				vnode,
-				evh,
-				sc,
-				whiteListedAddr); err != nil {
+				ma)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Info("starting oracle API")
+			apior, err := apioracle.NewAPIoracle(orc, router)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := apior.EnableERC20(globalCfg.W3Config.ChainType,
+				globalCfg.W3Config.W3External); err != nil {
 				log.Fatal(err)
 			}
 		}
+
 	}
 
+	//
+	// Gateway API
+	//
 	if globalCfg.Mode == types.ModeGateway {
 		// dvote API service
 		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {

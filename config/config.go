@@ -108,36 +108,14 @@ type IPFSCfg struct {
 
 // EthCfg stores global configs for ethereum bockchain
 type EthCfg struct {
-	// ChainType chain to connect with
-	ChainType string
-	// LightMode use ethereum node in light mode
-	LightMode bool
-	// NodePort port announced for p2p connections
-	NodePort int
-	// LogLevel logging level
-	LogLevel string
-	// DataDir path indicating where the ethereum related data will be stored
-	DataDir string
 	// SigningKey key used to sign transactions
 	SigningKey string
-	// BootNodes list for bootstraping the Ethereum network
-	BootNodes []string
-	// TrustedPeers list of p2p Ethereum peers to trust and connect (if possible)
-	TrustedPeers []string
-	// NoWaitSync do not wait for Ethereum to synchronize
-	NoWaitSync bool
 }
 
 // W3Cfg stores global configs for web3
 type W3Cfg struct {
-	// Enabled if true w3 will be initialized
-	Enabled bool
-	// RPCHost node websocket host endpoint
-	RPCHost string
-	// RPCPort node websocket port endpoint
-	RPCPort int
-	// Route web3 route endpoint
-	Route string
+	// ChainType chain to connect with
+	ChainType string
 	// W3External URL of an external ethereum node to connect with
 	W3External string
 }
