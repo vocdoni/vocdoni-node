@@ -243,7 +243,6 @@ func (e *EthChainContext) Start() {
 			e.Node.Server().AddPeer(p)
 			e.Node.Server().AddTrustedPeer(p)
 		}
-		go e.SyncGuard(context.Background())
 
 	} else {
 
@@ -382,28 +381,6 @@ func (e *EthChainContext) SyncInfo(ctx context.Context) (info EthSyncInfo, err e
 	}
 	err = fmt.Errorf("cannot get sync info, unknown error")
 	return
-}
-
-func (e *EthChainContext) SyncGuard(ctx context.Context) {
-	log.Infof("starting ethereum sync guard")
-	for {
-		time.Sleep(time.Second * 120)
-		si, err := e.SyncInfo(ctx)
-		if err != nil {
-			continue
-		}
-		if si.Synced && si.Height+200 < si.MaxHeight {
-			log.Warn("ethereum is experiencing sync problems, restarting node...")
-			e.RestartLock.Lock()
-			if err = e.Node.Close(); err != nil {
-				log.Fatal(err)
-			}
-			if err = e.Node.Start(); err != nil {
-				log.Fatal(err)
-			}
-			e.RestartLock.Unlock()
-		}
-	}
 }
 
 // EthClientConnect is a utility blocking function for connecting to an endpoint

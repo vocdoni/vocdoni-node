@@ -47,6 +47,35 @@ func (b *HexBytes) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func printStruct(s interface{}) string {
+	v := reflect.ValueOf(s)
+	t := v.Type()
+	var b strings.Builder
+	b.WriteString("{")
+	for i := 0; i < t.NumField(); i++ {
+		fv := v.Field(i)
+		if fv.IsZero() {
+			// omit zero values
+			continue
+		}
+		if b.Len() > 1 {
+			b.WriteString(" ")
+		}
+		ft := t.Field(i)
+		b.WriteString(ft.Name)
+		b.WriteString(":")
+		if ft.Type.Kind() == reflect.Slice && ft.Type.Elem().Kind() == reflect.Uint8 {
+			// print []byte as hexadecimal
+			fmt.Fprintf(&b, "%x", fv.Bytes())
+		} else {
+			fv = reflect.Indirect(fv) // print *T as T
+			fmt.Fprintf(&b, "%v", fv.Interface())
+		}
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
 // MessageRequest holds a decoded request but does not decode the body
 type RequestMessage struct {
 	MetaRequest json.RawMessage `json:"request"`
@@ -75,6 +104,7 @@ type MetaRequest struct {
 	Method       string         `json:"method"`
 	Name         string         `json:"name,omitempty"`
 	Namespace    uint32         `json:"namespace,omitempty"`
+	NewProcess   *NewProcess    `json:"newProcess,omitempty"`
 	Nullifier    types.HexBytes `json:"nullifier,omitempty"`
 	Payload      []byte         `json:"payload,omitempty"`
 	ProcessID    types.HexBytes `json:"processId,omitempty"`
@@ -198,32 +228,7 @@ type MetaResponse struct {
 }
 
 func (r MetaResponse) String() string {
-	v := reflect.ValueOf(r)
-	t := v.Type()
-	var b strings.Builder
-	b.WriteString("{")
-	for i := 0; i < t.NumField(); i++ {
-		fv := v.Field(i)
-		if fv.IsZero() {
-			// omit zero values
-			continue
-		}
-		if b.Len() > 1 {
-			b.WriteString(" ")
-		}
-		ft := t.Field(i)
-		b.WriteString(ft.Name)
-		b.WriteString(":")
-		if ft.Type.Kind() == reflect.Slice && ft.Type.Elem().Kind() == reflect.Uint8 {
-			// print []byte as hexadecimal
-			fmt.Fprintf(&b, "%x", fv.Bytes())
-		} else {
-			fv = reflect.Indirect(fv) // print *T as T
-			fmt.Fprintf(&b, "%v", fv.Interface())
-		}
-	}
-	b.WriteString("}")
-	return b.String()
+	return printStruct(r)
 }
 
 // SetError sets the MetaResponse's Ok field to false, and Message to a string
@@ -252,4 +257,21 @@ type VochainStats struct {
 	ChainID          string    `json:"chain_id"`
 	GenesisTimeStamp time.Time `json:"genesis_time_stamp"`
 	Syncing          bool      `json:"syncing"`
+}
+
+// NewProcess contains the fields required for creating a Vochain process
+type NewProcess struct {
+	EntityID     types.HexBytes               `json:"entityId"`
+	StartBlock   uint32                       `json:"startBlock"`
+	BlockCount   uint32                       `json:"blockCount"`
+	CensusRoot   types.HexBytes               `json:"censusRoot"`
+	SourceHeight *uint64                      `json:"sourceHeight,omitempty"`
+	EnvelopeType *models.EnvelopeType         `json:"envelopeType,omitempty"`
+	VoteOptions  *models.ProcessVoteOptions   `json:"voteOptions,omitempty"`
+	EthIndexSlot *uint32                      `json:"ethIndexSlot,omitempty"`
+	EthProof     *models.ProofEthereumStorage `json:"ethProof,omitempty"`
+}
+
+func (p NewProcess) String() string {
+	return printStruct(p)
 }

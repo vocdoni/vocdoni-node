@@ -22,7 +22,7 @@ var (
 	}, []string{"method"})
 )
 
-func (r *Router) registerMetrics(ma *metrics.Agent) {
+func (r *Router) RegisterMetrics(ma *metrics.Agent) {
 	ma.Register(RouterPrivateReqs)
 	ma.Register(RouterPublicReqs)
 }

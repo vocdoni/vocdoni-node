@@ -26,7 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"go.vocdoni.io/dvote/chain"
-	"go.vocdoni.io/dvote/chain/ethereumhandler"
+	ethereumhandler "go.vocdoni.io/dvote/chain/handler"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -109,7 +109,8 @@ func NewEthEvents(
 	if err != nil {
 		return nil, fmt.Errorf("cannot create voting handle: %w", err)
 	}
-
+	ph.WaitSync()
+	go ph.PrintInfo(context.Background(), time.Second*60)
 	secureAddrList := make(map[common.Address]bool, len(ethereumWhiteList))
 	if len(ethereumWhiteList) != 0 {
 		for _, sAddr := range ethereumWhiteList {

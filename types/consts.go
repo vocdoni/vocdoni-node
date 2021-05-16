@@ -22,8 +22,8 @@ const (
 	ModeMiner = "miner"
 	// ModeGateway start the dvotenode as a gateway
 	ModeGateway = "gateway"
-	// ModeWeb3 start the dvotenode as a web3 gateway
-	ModeWeb3 = "web3"
+	// ModeEthAPIoracle start an Ethereum signaling API oracle
+	ModeEthAPIoracle = "ethApiOracle"
 
 	// ProcessIDsize is the size of a process id
 	ProcessIDsize = 32

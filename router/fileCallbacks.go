@@ -17,7 +17,7 @@ const (
 	maxFetchFile   = 1024 * 1024 * 2 // 2 MiB
 )
 
-func (r *Router) fetchFile(request routerRequest) {
+func (r *Router) fetchFile(request RouterRequest) {
 	log.Debugf("calling FetchFile %s", request.URI)
 	parsedURIs := strings.Split(request.URI, ",")
 	transportTypes := parseTransportFromURI(parsedURIs)
@@ -47,23 +47,23 @@ func (r *Router) fetchFile(request routerRequest) {
 	}
 
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("error fetching file: (%s)", err))
+		r.SendError(request, fmt.Sprintf("error fetching file: (%s)", err))
 		return
 	}
 	if !found {
-		r.sendError(request, "error fetching file: (not supported)")
+		r.SendError(request, "error fetching file: (not supported)")
 		return
 	}
 
 	log.Debugf("file fetched, size %d", len(content))
 	var response api.MetaResponse
 	response.Content = content
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) addFile(request routerRequest) {
+func (r *Router) addFile(request RouterRequest) {
 	log.Debugf("calling addFile")
 	ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
 	defer cancel()
@@ -73,79 +73,79 @@ func (r *Router) addFile(request routerRequest) {
 	case "ipfs":
 		cid, err := r.storage.Publish(ctx, request.Content)
 		if err != nil {
-			r.sendError(request,
+			r.SendError(request,
 				fmt.Sprintf("cannot add file (%s)", err))
 			return
 		}
 		log.Debugf("added file %s, size %d", cid, len(request.Content))
 		var response api.MetaResponse
 		response.URI = r.storage.URIprefix() + cid
-		if err := request.Send(r.buildReply(request, &response)); err != nil {
+		if err := request.Send(r.BuildReply(request, &response)); err != nil {
 			log.Warnf("error sending response: %s", err)
 		}
 	}
 }
 
-func (r *Router) addJSONfile(request routerRequest) {
+func (r *Router) addJSONfile(request RouterRequest) {
 	if len(request.Content) > maxJSONsize {
-		r.sendError(request,
+		r.SendError(request,
 			fmt.Sprintf("JSON file too big: %d bytes", len(request.Content)))
 		return
 	}
 	if !isJSON(request.Content) {
-		r.sendError(request, "not a JSON file")
+		r.SendError(request, "not a JSON file")
 		return
 	}
 	r.addFile(request)
 }
 
-func (r *Router) pinList(request routerRequest) {
+func (r *Router) pinList(request RouterRequest) {
 	log.Debug("calling PinList")
 	ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
 	defer cancel()
 	pins, err := r.storage.ListPins(ctx)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("internal error fetching pins (%s)", err))
+		r.SendError(request, fmt.Sprintf("internal error fetching pins (%s)", err))
 		return
 	}
 	pinsJSONArray, err := json.Marshal(pins)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("internal error parsing pins (%s)", err))
+		r.SendError(request, fmt.Sprintf("internal error parsing pins (%s)", err))
 		return
 	}
 	var response api.MetaResponse
 	response.Files = pinsJSONArray
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) pinFile(request routerRequest) {
+func (r *Router) pinFile(request RouterRequest) {
 	log.Debugf("calling PinFile %s", request.URI)
 	ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
 	defer cancel()
 	err := r.storage.Pin(ctx, request.URI)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("error pinning file (%s)", err))
+		r.SendError(request, fmt.Sprintf("error pinning file (%s)", err))
 		return
 	}
 	var response api.MetaResponse
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) unpinFile(request routerRequest) {
+func (r *Router) unpinFile(request RouterRequest) {
 	log.Debugf("calling UnPinFile %s", request.URI)
 	ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
 	defer cancel()
 	err := r.storage.Unpin(ctx, request.URI)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("could not unpin file (%s)", err))
+		r.SendError(request, fmt.Sprintf("could not unpin file (%s)", err))
 		return
 	}
 	var response api.MetaResponse
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }

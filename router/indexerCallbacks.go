@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (r *Router) getStats(request routerRequest) {
+func (r *Router) getStats(request RouterRequest) {
 	var err error
 	stats := new(api.VochainStats)
 	stats.BlockHeight = r.vocapp.Height()
@@ -34,12 +34,12 @@ func (r *Router) getStats(request routerRequest) {
 	if err != nil {
 		log.Errorf("could not marshal vochainStats: %s", err)
 	}
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getEnvelopeList(request routerRequest) {
+func (r *Router) getEnvelopeList(request RouterRequest) {
 	var response api.MetaResponse
 	max := request.ListSize
 	if max > MaxListSize || max <= 0 {
@@ -48,58 +48,58 @@ func (r *Router) getEnvelopeList(request routerRequest) {
 	var err error
 	if response.Envelopes, err = r.Scrutinizer.GetEnvelopes(
 		request.ProcessID, max, request.From, request.SearchTerm); err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get envelope list: (%s)", err))
+		r.SendError(request, fmt.Sprintf("cannot get envelope list: (%s)", err))
 		return
 	}
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getValidatorList(request routerRequest) {
+func (r *Router) getValidatorList(request RouterRequest) {
 	var response api.MetaResponse
 	var err error
 	if response.ValidatorList, err = r.vocapp.State.Validators(true); err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get validator list: %v", err))
+		r.SendError(request, fmt.Sprintf("cannot get validator list: %v", err))
 		return
 	}
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getBlock(request routerRequest) {
+func (r *Router) getBlock(request RouterRequest) {
 	var response api.MetaResponse
 	if request.Height > r.vocapp.Height() {
-		r.sendError(request, fmt.Sprintf(
+		r.SendError(request, fmt.Sprintf(
 			"block height %d not valid for vochain with height %d", request.Height, r.vocapp.Height()))
 		return
 	}
 	if response.Block = blockMetadataFromBlockModel(
 		r.Scrutinizer.App.GetBlockByHeight(int64(request.Height)), false, true); response.Block == nil {
-		r.sendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.Height))
+		r.SendError(request, fmt.Sprintf("cannot get block: no block with height %d", request.Height))
 		return
 	}
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getBlockByHash(request routerRequest) {
+func (r *Router) getBlockByHash(request RouterRequest) {
 	var response api.MetaResponse
 	response.Block = blockMetadataFromBlockModel(
 		r.Scrutinizer.App.GetBlockByHash(request.Hash), true, false)
 	if response.Block == nil {
-		r.sendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Hash))
+		r.SendError(request, fmt.Sprintf("cannot get block: no block with hash %x", request.Hash))
 		return
 	}
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
 // TODO improve this function
-func (r *Router) getBlockList(request routerRequest) {
+func (r *Router) getBlockList(request RouterRequest) {
 	var response api.MetaResponse
 	for i := 0; i < request.ListSize; i++ {
 		if uint32(request.From)+uint32(i) > r.vocapp.Height() {
@@ -109,16 +109,16 @@ func (r *Router) getBlockList(request routerRequest) {
 			blockMetadataFromBlockModel(r.Scrutinizer.App.
 				GetBlockByHeight(int64(request.From)+int64(i)), true, true))
 	}
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getTx(request routerRequest) {
+func (r *Router) getTx(request RouterRequest) {
 	var response api.MetaResponse
 	tx, hash, err := r.Scrutinizer.App.GetTxHash(request.Height, request.TxIndex)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
+		r.SendError(request, fmt.Sprintf("cannot get tx: %v", err))
 		return
 	}
 	response.Tx = &indexertypes.TxPackage{
@@ -127,16 +127,16 @@ func (r *Router) getTx(request routerRequest) {
 		Hash:      hash,
 		Signature: tx.Signature,
 	}
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getTxListForBlock(request routerRequest) {
+func (r *Router) getTxListForBlock(request RouterRequest) {
 	var response api.MetaResponse
 	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.Height))
 	if block == nil {
-		r.sendError(request, "cannot get tx list: block does not exist")
+		r.SendError(request, "cannot get tx list: block does not exist")
 		return
 	}
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
@@ -148,11 +148,11 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 		tx := new(models.Tx)
 		var err error
 		if err = proto.Unmarshal(block.Txs[i], signedTx); err != nil {
-			r.sendError(request, fmt.Sprintf("cannot get signed tx: %v", err))
+			r.SendError(request, fmt.Sprintf("cannot get signed tx: %v", err))
 			return
 		}
 		if err = proto.Unmarshal(signedTx.Tx, tx); err != nil {
-			r.sendError(request, fmt.Sprintf("cannot get tx: %v", err))
+			r.SendError(request, fmt.Sprintf("cannot get tx: %v", err))
 			return
 		}
 		var txType string
@@ -174,7 +174,7 @@ func (r *Router) getTxListForBlock(request routerRequest) {
 			Hash:  tmtypes.Tx(block.Txs[i]).Hash(),
 		})
 	}
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }

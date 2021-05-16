@@ -47,17 +47,30 @@ type Genesis struct {
 	Oracles    []common.Address
 }
 
+type EthSyncInfo struct {
+	Height    uint64
+	MaxHeight uint64
+	Synced    bool
+	Peers     int
+	Mode      string
+}
+
 // NewEthereumHandler initializes contracts creating a transactor using the ethereum client
 func NewEthereumHandler(contracts map[string]*EthereumContract,
 	dialEndpoint string) (*EthereumHandler, error) {
 	var err error
 	eh := new(EthereumHandler)
 	// try connect to the w3endpoint using an RPC connection
+	maxtries := 6
 	for {
+		if maxtries == 0 {
+			return nil, fmt.Errorf("could not connect to web3 endpoint")
+		}
 		eh.EthereumRPC, err = ethrpc.Dial(dialEndpoint)
 		if err != nil || eh.EthereumRPC == nil {
 			log.Warnf("cannot create a ethereum rpc connection: (%s), trying again ...", err)
-			time.Sleep(time.Second * 10)
+			time.Sleep(time.Second * 5)
+			maxtries--
 			continue
 		}
 		break
@@ -69,8 +82,73 @@ func NewEthereumHandler(contracts map[string]*EthereumContract,
 			log.Errorf("cannot set contract instance: %s", err)
 		}
 	}
-
+	go eh.PrintInfo(context.Background(), time.Second*20)
 	return eh, nil
+}
+
+func (eh *EthereumHandler) WaitSync() {
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		if info, err := eh.SyncInfo(ctx); err == nil &&
+			info.Synced && info.Peers >= 1 && info.Height > 0 {
+			log.Infof("ethereum blockchain synchronized (%+v)", *info)
+			cancel()
+			break
+		}
+		cancel()
+		time.Sleep(time.Second * 5)
+	}
+}
+
+// SyncInfo returns the height and syncing Ethereum blockchain information
+func (eh *EthereumHandler) SyncInfo(ctx context.Context) (*EthSyncInfo, error) {
+	info := new(EthSyncInfo)
+	info.Mode = "web3"
+	info.Synced = false
+	info.Peers = 1 // force peers=1 if using external web3
+	sp, err := eh.EthereumClient.SyncProgress(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if sp != nil {
+		info.MaxHeight = sp.HighestBlock
+		info.Height = sp.CurrentBlock
+	} else {
+		header, err := eh.EthereumClient.HeaderByNumber(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+		info.Height = uint64(header.Number.Int64())
+		info.MaxHeight = info.Height
+		info.Synced = info.Height > 0
+	}
+	return info, nil
+}
+
+// PrintInfo prints every N seconds some ethereum information (sync and height). It's blocking!
+func (eh *EthereumHandler) PrintInfo(ctx context.Context, seconds time.Duration) {
+	var info *EthSyncInfo
+	var lastHeight uint64
+	var err error
+	var syncingInfo string
+	for {
+		time.Sleep(seconds)
+		tctx, cancel := context.WithTimeout(ctx, time.Minute)
+		info, err = eh.SyncInfo(tctx)
+		cancel()
+		if err != nil {
+			log.Warn(err)
+			continue
+		}
+		if !info.Synced {
+			syncingInfo = fmt.Sprintf("syncSpeed:%d b/s", (info.Height-lastHeight)/uint64(seconds.Seconds()))
+		} else {
+			syncingInfo = ""
+		}
+		log.Infof("[ethereum info] synced:%t height:%d/%d mode:%s %s",
+			info.Synced, info.Height, info.MaxHeight, info.Mode, syncingInfo)
+		lastHeight = info.Height
+	}
 }
 
 // SetContractInstance creates the given contract transactor and returns

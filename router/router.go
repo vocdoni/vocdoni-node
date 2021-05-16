@@ -32,7 +32,7 @@ const (
 	healthSocksMax = 10000
 )
 
-func (r *Router) buildReply(request routerRequest, resp *api.MetaResponse) transports.Message {
+func (r *Router) BuildReply(request RouterRequest, resp *api.MetaResponse) transports.Message {
 	// Add any last fields to the inner response, and marshal it with sorted
 	// fields for signing.
 	resp.Ok = true
@@ -94,14 +94,14 @@ func parseTransportFromURI(uris []string) []string {
 	return out
 }
 
-type registeredMethod struct {
+type RegisteredMethod struct {
 	public  bool
-	handler func(routerRequest)
+	handler func(RouterRequest)
 }
 
 // Router holds a router object
 type Router struct {
-	methods      map[string]registeredMethod
+	methods      map[string]RegisteredMethod
 	inbound      <-chan transports.Message
 	storage      data.Storage
 	signer       *ethereum.SignKeys
@@ -120,21 +120,21 @@ func NewRouter(inbound <-chan transports.Message, storage data.Storage,
 	signer *ethereum.SignKeys, metricsagent *metrics.Agent, allowPrivate bool) *Router {
 	cm := new(census.Manager)
 	r := new(Router)
-	r.methods = make(map[string]registeredMethod)
+	r.methods = make(map[string]RegisteredMethod)
 	r.census = cm
 	r.inbound = inbound
 	r.storage = storage
 	r.signer = signer
 	r.metricsagent = metricsagent
 	r.allowPrivate = allowPrivate
-	r.registerPublic("getInfo", r.info)
+	r.RegisterPublic("getInfo", r.info)
 	if metricsagent != nil {
-		r.registerMetrics(metricsagent)
+		r.RegisterMetrics(metricsagent)
 	}
 	return r
 }
 
-type routerRequest struct {
+type RouterRequest struct {
 	api.MetaRequest
 	transports.MessageContext
 
@@ -147,7 +147,7 @@ type routerRequest struct {
 
 // semi-unmarshalls message, returns method name
 func (r *Router) getRequest(payload []byte,
-	context transports.MessageContext) (request routerRequest, err error) {
+	context transports.MessageContext) (request RouterRequest, err error) {
 	request.MessageContext = context
 	// First unmarshal the outer layer, to obtain the request ID, the signed
 	// request, and the signature.
@@ -198,18 +198,18 @@ func InitRouter(inbound <-chan transports.Message, storage data.Storage,
 	return NewRouter(inbound, storage, signer, metricsagent, allowPrivate)
 }
 
-func (r *Router) registerPrivate(name string, handler func(routerRequest)) {
+func (r *Router) RegisterPrivate(name string, handler func(RouterRequest)) {
 	if _, ok := r.methods[name]; ok {
 		log.Fatalf("duplicate method: %q", name)
 	}
-	r.methods[name] = registeredMethod{handler: handler}
+	r.methods[name] = RegisteredMethod{handler: handler}
 }
 
-func (r *Router) registerPublic(name string, handler func(routerRequest)) {
+func (r *Router) RegisterPublic(name string, handler func(RouterRequest)) {
 	if _, ok := r.methods[name]; ok {
 		log.Fatalf("duplicate method: %q", name)
 	}
-	r.methods[name] = registeredMethod{public: true, handler: handler}
+	r.methods[name] = RegisteredMethod{public: true, handler: handler}
 }
 
 // Route routes requests through the Router object
@@ -223,18 +223,18 @@ func (r *Router) Route() {
 		msg := <-r.inbound
 		request, err := r.getRequest(msg.Data, msg.Context)
 		if !request.authenticated && err != nil {
-			go r.sendError(request, err.Error())
+			go r.SendError(request, err.Error())
 			continue
 		}
 		method, ok := r.methods[request.method]
 		if !ok {
 			errMsg := fmt.Sprintf("router has no method %q", request.method)
-			go r.sendError(request, errMsg)
+			go r.SendError(request, errMsg)
 			continue
 		}
 		if !method.public && !request.authenticated {
 			errMsg := fmt.Sprintf("authentication is required for %q", request.method)
-			go r.sendError(request, errMsg)
+			go r.SendError(request, errMsg)
 			continue
 		}
 		log.Debugf("api query %s", request.MetaRequest.String())
@@ -256,7 +256,7 @@ func (r *Router) Route() {
 	}
 }
 
-func (r *Router) sendError(request routerRequest, errMsg string) {
+func (r *Router) SendError(request RouterRequest, errMsg string) {
 	if request.MessageContext == nil {
 		log.Errorf("failed to send error as MessageContext==nil: %s", errMsg)
 		return
@@ -302,7 +302,7 @@ func (r *Router) sendError(request routerRequest, errMsg string) {
 	}
 }
 
-func (r *Router) info(request routerRequest) {
+func (r *Router) info(request RouterRequest) {
 	var response api.MetaResponse
 	response.APIList = r.APIs
 	response.Request = request.id
@@ -312,7 +312,7 @@ func (r *Router) info(request routerRequest) {
 		response.Health = -1
 		log.Errorf("cannot get health status: (%s)", err)
 	}
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }

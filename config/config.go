@@ -45,7 +45,7 @@ func (c *DvoteCfg) ValidMode() bool {
 		break
 	case types.ModeMiner:
 		break
-	case types.ModeWeb3:
+	case types.ModeEthAPIoracle:
 		break
 	default:
 		return false

@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	ethparams "github.com/ethereum/go-ethereum/params"
-	"go.vocdoni.io/dvote/chain/ethereumhandler"
+	ethereumhandler "go.vocdoni.io/dvote/chain/handler"
 	"go.vocdoni.io/dvote/types"
 )
 

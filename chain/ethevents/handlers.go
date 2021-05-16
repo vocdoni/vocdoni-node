@@ -11,7 +11,7 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"go.vocdoni.io/dvote/chain/contracts"
-	"go.vocdoni.io/dvote/chain/ethereumhandler"
+	ethereumhandler "go.vocdoni.io/dvote/chain/handler"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
 	models "go.vocdoni.io/proto/build/go/models"

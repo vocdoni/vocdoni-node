@@ -8,6 +8,7 @@ import (
 	_ "net/http/pprof" // for the pprof endpoints
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -26,6 +27,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
+	"go.vocdoni.io/dvote/oracle"
+	"go.vocdoni.io/dvote/oracle/apioracle"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -54,15 +57,23 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// Booleans should be passed to the CLI as: var=True/false
 
 	// global
-	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote", "directory where data is stored")
-	flag.StringVar(&globalCfg.VochainConfig.Chain, "vochain", "dev", "vocdoni blokchain network to connect with")
-	flag.BoolVar(&globalCfg.Dev, "dev", false, "use developer mode (less security)")
-	globalCfg.LogLevel = *flag.String("logLevel", "info", "Log level (debug, info, warn, error, fatal)")
-	globalCfg.LogOutput = *flag.String("logOutput", "stdout", "Log output (stdout, stderr or filepath)")
-	globalCfg.LogErrorFile = *flag.String("logErrorFile", "", "Log errors and warnings to a file")
-	globalCfg.SaveConfig = *flag.Bool("saveConfig", false, "overwrites an existing config file with the CLI provided flags")
+	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote",
+		"directory where data is stored")
+	flag.StringVar(&globalCfg.VochainConfig.Chain, "vochain", "dev",
+		"vocdoni blokchain network to connect with")
+	flag.BoolVar(&globalCfg.Dev, "dev", false,
+		"use developer mode (less security)")
+	globalCfg.LogLevel = *flag.String("logLevel", "info",
+		"Log level (debug, info, warn, error, fatal)")
+	globalCfg.LogOutput = *flag.String("logOutput", "stdout",
+		"Log output (stdout, stderr or filepath)")
+	globalCfg.LogErrorFile = *flag.String("logErrorFile", "",
+		"Log errors and warnings to a file")
+	globalCfg.SaveConfig = *flag.Bool("saveConfig", false,
+		"overwrites an existing config file with the CLI provided flags")
 	// TODO(mvdan): turn this into an enum to avoid human error
-	globalCfg.Mode = *flag.String("mode", types.ModeGateway, "global operation mode. Available options: [gateway,web3,oracle,miner]")
+	globalCfg.Mode = *flag.String("mode", types.ModeGateway,
+		"global operation mode. Available options: [gateway,oracle,ethApiOracle,miner]")
 	// api
 	globalCfg.API.Websockets = *flag.Bool("apiws", true, "enable websockets transport for the API")
 	globalCfg.API.HTTP = *flag.Bool("apihttp", true, "enable http transport for the API")
@@ -394,6 +405,7 @@ func main() {
 	var vinfo *vochaininfo.VochainInfo
 	var sc *scrutinizer.Scrutinizer
 	var kk *keykeeper.KeyKeeper
+	var or *oracle.Oracle
 	var ma *metrics.Agent
 
 	if globalCfg.Dev {
@@ -401,7 +413,7 @@ func main() {
 	}
 	if globalCfg.Mode == types.ModeGateway ||
 		globalCfg.Mode == types.ModeOracle ||
-		globalCfg.Mode == types.ModeWeb3 {
+		globalCfg.Mode == types.ModeEthAPIoracle {
 		// Signing key
 		signer = ethereum.NewSignKeys()
 		// Add Authorized keys for private methods
@@ -426,10 +438,9 @@ func main() {
 		}
 	}
 
-	// Websockets and HTTPs proxy
-	if globalCfg.Mode == types.ModeGateway ||
-		globalCfg.Mode == types.ModeWeb3 || globalCfg.Metrics.Enabled ||
-		(globalCfg.Mode == types.ModeOracle && len(globalCfg.W3Config.W3External) > 0) {
+	// Websockets and HTTPs proxy for Gateway and EthApiOracle
+	if globalCfg.Mode == types.ModeGateway || globalCfg.Metrics.Enabled ||
+		(globalCfg.Mode == types.ModeEthAPIoracle) {
 		// Proxy service
 		pxy, err = service.Proxy(globalCfg.API.ListenHost, globalCfg.API.ListenPort,
 			globalCfg.API.Ssl.Domain, globalCfg.API.Ssl.DirCert)
@@ -462,22 +473,21 @@ func main() {
 	}
 
 	// Ethereum service
-	if (globalCfg.Mode == types.ModeGateway && globalCfg.W3Config.Enabled) ||
-		globalCfg.Mode == types.ModeOracle || globalCfg.Mode == types.ModeWeb3 {
+	if globalCfg.Mode == types.ModeOracle {
 		node, err = service.Ethereum(globalCfg.EthConfig, globalCfg.W3Config, pxy, signer, ma)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	// Vochain and Scrutinizer service
-	if !globalCfg.API.Vote && globalCfg.API.Census {
-		log.Fatal("census API needs the vote API enabled")
-	}
+	// Vochain, Scrutinizer and Oracle services
 	if (globalCfg.Mode == types.ModeGateway && globalCfg.API.Vote) ||
-		globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle {
+		globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle ||
+		globalCfg.Mode == types.ModeEthAPIoracle {
+		// do we need scrutinizer?
 		scrutinizer := (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) ||
 			(globalCfg.Mode == types.ModeOracle)
+		// create the vochain node
 		if vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig,
 			scrutinizer, globalCfg.VochainConfig.NoWaitSync, ma, cm, storage,
 		); err != nil {
@@ -488,7 +498,9 @@ func main() {
 			vnode.Node.Wait()
 		}()
 
-		if globalCfg.Mode == types.ModeGateway && globalCfg.API.Tendermint {
+		// Tendermint API
+		if globalCfg.Mode == types.ModeGateway && globalCfg.API.Tendermint ||
+			globalCfg.Mode == types.ModeEthAPIoracle {
 			// Enable Tendermint RPC proxy endpoint on /tendermint
 			tp := strings.Split(globalCfg.VochainConfig.RPCListen, ":")
 			if len(tp) != 2 {
@@ -516,8 +528,9 @@ func main() {
 	}
 
 	// Start keykeeper service
-	if globalCfg.Mode == types.ModeOracle && globalCfg.VochainConfig.KeyKeeperIndex > 0 {
-		kk, err = keykeeper.NewKeyKeeper(globalCfg.VochainConfig.DataDir+"/keykeeper",
+	if globalCfg.Mode == types.ModeOracle &&
+		globalCfg.VochainConfig.KeyKeeperIndex > 0 {
+		kk, err = keykeeper.NewKeyKeeper(path.Join(globalCfg.VochainConfig.DataDir, "/keykeeper"),
 			vnode,
 			signer,
 			globalCfg.VochainConfig.KeyKeeperIndex)
@@ -527,6 +540,36 @@ func main() {
 		go kk.RevealUnpublished()
 	}
 
+	if globalCfg.Mode == types.ModeEthAPIoracle {
+		// TO-DO: use this oracle instance for the standard oracle too
+		if or, err = oracle.NewOracle(vnode, signer); err != nil {
+			log.Fatal(err)
+		}
+		router, err := service.API(globalCfg.API,
+			pxy,
+			nil,
+			nil, // census manager
+			nil, // vochain core
+			nil, // scrutinizere
+			nil,
+			globalCfg.VochainConfig.RPCListen,
+			signer,
+			ma)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Info("starting oracle API")
+		apior, err := apioracle.NewAPIoracle(or, router)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := apior.EnableERC20(globalCfg.EthConfig.ChainType,
+			globalCfg.W3Config.W3External); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	// TO-DO: Remove
 	if (globalCfg.Mode == types.ModeGateway && globalCfg.W3Config.Enabled) ||
 		globalCfg.Mode == types.ModeOracle {
 		// Wait for Ethereum to be ready
@@ -548,7 +591,7 @@ func main() {
 			}
 		}
 
-		// Ethereum events service (needs Ethereum synchronized)
+		// Ethereum events service (needs Ethereum synchronized). Only for Oracle.
 		if !globalCfg.EthConfig.NoWaitSync && globalCfg.Mode == types.ModeOracle {
 			var evh []ethevents.EventHandler
 			var w3uri string
@@ -610,11 +653,12 @@ func main() {
 	if globalCfg.Mode == types.ModeGateway {
 		// dvote API service
 		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
-			if err := service.API(globalCfg.API,
+			if _, err = service.API(globalCfg.API,
 				pxy,
 				storage,
-				cm, vnode,
-				sc,
+				cm,    // census manager
+				vnode, // vochain core
+				sc,    // scrutinizere
 				vinfo,
 				globalCfg.VochainConfig.RPCListen,
 				signer,

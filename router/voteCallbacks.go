@@ -13,32 +13,32 @@ import (
 
 const MaxListSize = 64
 
-func (r *Router) submitRawTx(request routerRequest) {
+func (r *Router) submitRawTx(request RouterRequest) {
 	res, err := r.vocapp.SendTx(request.Payload)
 	if err != nil {
-		r.sendError(request, err.Error())
+		r.SendError(request, err.Error())
 		return
 	}
 	if res == nil {
-		r.sendError(request, "no reply from Vochain")
+		r.SendError(request, "no reply from Vochain")
 		return
 	}
 	if res.Code != 0 {
-		r.sendError(request, string(res.Data))
+		r.SendError(request, string(res.Data))
 		return
 	}
 	log.Debugf("broadcasting tx hash:%s", res.Hash)
 	var response api.MetaResponse
 	response.Payload = fmt.Sprintf("%x", res.Data) // return nullifier or other info
-	if err = request.Send(r.buildReply(request, &response)); err != nil {
+	if err = request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending raw tx: %v", err)
 	}
 }
 
-func (r *Router) submitEnvelope(request routerRequest) {
+func (r *Router) submitEnvelope(request RouterRequest) {
 	var err error
 	if request.Payload == nil {
-		r.sendError(request, "payload is empty")
+		r.SendError(request, "payload is empty")
 		return
 	}
 	// Prepare Vote transaction
@@ -50,38 +50,38 @@ func (r *Router) submitEnvelope(request routerRequest) {
 	// Encode and forward the transaction to the Vochain mempool
 	txBytes, err := proto.Marshal(stx)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot marshal vote transaction: (%s)", err))
+		r.SendError(request, fmt.Sprintf("cannot marshal vote transaction: (%s)", err))
 		return
 	}
 
 	res, err := r.vocapp.SendTx(txBytes)
 	if err != nil || res == nil {
-		r.sendError(request, fmt.Sprintf("cannot broadcast transaction: (%s)", err))
+		r.SendError(request, fmt.Sprintf("cannot broadcast transaction: (%s)", err))
 		return
 	}
 
 	// Get mempool checkTx reply
 	if res.Code != 0 {
-		r.sendError(request, string(res.Data))
+		r.SendError(request, string(res.Data))
 		return
 	}
 	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
 	var response api.MetaResponse
 	response.Nullifier = fmt.Sprintf("%x", res.Data)
-	if err = request.Send(r.buildReply(request, &response)); err != nil {
+	if err = request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error on submitEnvelope: %v", err)
 	}
 }
 
-func (r *Router) getEnvelopeStatus(request routerRequest) {
+func (r *Router) getEnvelopeStatus(request RouterRequest) {
 	// check pid
 	if len(request.ProcessID) != types.ProcessIDsize {
-		r.sendError(request, "cannot get envelope status: (malformed processId)")
+		r.SendError(request, "cannot get envelope status: (malformed processId)")
 		return
 	}
 	// check nullifier
 	if len(request.Nullifier) != types.VoteNullifierSize {
-		r.sendError(request, "cannot get envelope status: (malformed nullifier)")
+		r.SendError(request, "cannot get envelope status: (malformed nullifier)")
 		return
 	}
 
@@ -91,73 +91,73 @@ func (r *Router) getEnvelopeStatus(request routerRequest) {
 	vr, err := r.Scrutinizer.GetEnvelopeReference(request.Nullifier)
 	if err != nil {
 		if err == scrutinizer.ErrNotFoundInDatabase {
-			if err := request.Send(r.buildReply(request, &response)); err != nil {
+			if err := request.Send(r.BuildReply(request, &response)); err != nil {
 				log.Warnf("error sending response: %s", err)
 			}
 			return
 		}
-		r.sendError(request, fmt.Sprintf("cannot get envelope status: (%v)", err))
+		r.SendError(request, fmt.Sprintf("cannot get envelope status: (%v)", err))
 		return
 	}
 	response.Registered = types.True
 	response.Height = &vr.Height
 	response.BlockTimestamp = int32(vr.CreationTime.Unix())
 	response.ProcessID = vr.ProcessID
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getEnvelope(request routerRequest) {
+func (r *Router) getEnvelope(request RouterRequest) {
 	// check nullifier
 	if len(request.Nullifier) != types.VoteNullifierSize {
-		r.sendError(request, "cannot get envelope: (malformed nullifier)")
+		r.SendError(request, "cannot get envelope: (malformed nullifier)")
 		return
 	}
 	env, err := r.Scrutinizer.GetEnvelope(request.Nullifier)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
+		r.SendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
 		return
 	}
 	var response api.MetaResponse
 	response.Envelope = env
 	response.Registered = types.True
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getEnvelopeHeight(request routerRequest) {
+func (r *Router) getEnvelopeHeight(request RouterRequest) {
 	// check pid
 	if len(request.ProcessID) != types.ProcessIDsize && len(request.ProcessID) != 0 {
-		r.sendError(request, "cannot get envelope height: (malformed processId)")
+		r.SendError(request, "cannot get envelope height: (malformed processId)")
 		return
 	}
 	votes, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get envelope height: (%v)", err))
+		r.SendError(request, fmt.Sprintf("cannot get envelope height: (%v)", err))
 		return
 	}
 
 	var response api.MetaResponse
 	response.Height = new(uint32)
 	*response.Height = uint32(votes)
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getBlockHeight(request routerRequest) {
+func (r *Router) getBlockHeight(request RouterRequest) {
 	var response api.MetaResponse
 	h := r.vocapp.Height()
 	response.Height = &h
 	response.BlockTimestamp = int32(r.vocapp.Timestamp())
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getProcessList(request routerRequest) {
+func (r *Router) getProcessList(request RouterRequest) {
 	var response api.MetaResponse
 	max := request.ListSize
 	if max > MaxListSize || max <= 0 {
@@ -172,7 +172,7 @@ func (r *Router) getProcessList(request routerRequest) {
 		request.Status,
 		request.WithResults)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get process list: (%s)", err))
+		r.SendError(request, fmt.Sprintf("cannot get process list: (%s)", err))
 		return
 	}
 	for _, p := range processList {
@@ -180,7 +180,7 @@ func (r *Router) getProcessList(request routerRequest) {
 	}
 	if len(response.ProcessList) == 0 {
 		response.Message = "no processes found for the query"
-		if err := request.Send(r.buildReply(request, &response)); err != nil {
+		if err := request.Send(r.BuildReply(request, &response)); err != nil {
 			log.Warnf("error sending response: %s", err)
 		}
 		return
@@ -188,52 +188,52 @@ func (r *Router) getProcessList(request routerRequest) {
 
 	response.Size = new(int64)
 	*response.Size = int64(len(response.ProcessList))
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getProcessInfo(request routerRequest) {
+func (r *Router) getProcessInfo(request RouterRequest) {
 	var response api.MetaResponse
 	var err error
 	response.Process, err = r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get process info: %v", err))
+		r.SendError(request, fmt.Sprintf("cannot get process info: %v", err))
 		return
 	}
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getProcessCount(request routerRequest) {
+func (r *Router) getProcessCount(request RouterRequest) {
 	var response api.MetaResponse
 	response.Size = new(int64)
 	count := r.Scrutinizer.ProcessCount(request.EntityId)
 	*response.Size = count
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getEntityCount(request routerRequest) {
+func (r *Router) getEntityCount(request RouterRequest) {
 	var response api.MetaResponse
 	response.Size = new(int64)
 	*response.Size = r.Scrutinizer.EntityCount()
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getProcessKeys(request routerRequest) {
+func (r *Router) getProcessKeys(request RouterRequest) {
 	// check pid
 	if len(request.ProcessID) != types.ProcessIDsize {
-		r.sendError(request, "cannot get envelope status: (malformed processId)")
+		r.SendError(request, "cannot get envelope status: (malformed processId)")
 		return
 	}
 	process, err := r.vocapp.State.Process(request.ProcessID, true)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get process encryption public keys: (%s)", err))
+		r.SendError(request, fmt.Sprintf("cannot get process encryption public keys: (%s)", err))
 		return
 	}
 	var response api.MetaResponse
@@ -262,42 +262,42 @@ func (r *Router) getProcessKeys(request routerRequest) {
 	response.EncryptionPrivKeys = privs
 	response.CommitmentKeys = coms
 	response.RevealKeys = revs
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getResultsWeight(request routerRequest) {
+func (r *Router) getResultsWeight(request RouterRequest) {
 	var response api.MetaResponse
 	w, err := r.Scrutinizer.GetResultsWeight(request.ProcessID)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get results weight: %v", err))
+		r.SendError(request, fmt.Sprintf("cannot get results weight: %v", err))
 		return
 	}
 	response.Weight = w.String()
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getOracleResults(request routerRequest) {
+func (r *Router) getOracleResults(request RouterRequest) {
 	var response api.MetaResponse
 	if len(request.ProcessID) != types.ProcessIDsize {
-		r.sendError(request, "cannot get oracle results: (malformed processId)")
+		r.SendError(request, "cannot get oracle results: (malformed processId)")
 		return
 	}
 	var err error
 	response.Results, err = r.vocapp.State.GetProcessResults(request.ProcessID)
 	if err != nil {
-		r.sendError(request, fmt.Sprintf("cannot get oracle results: %v", err))
+		r.SendError(request, fmt.Sprintf("cannot get oracle results: %v", err))
 		return
 	}
-	request.Send(r.buildReply(request, &response))
+	request.Send(r.BuildReply(request, &response))
 }
 
-func (r *Router) getResults(request routerRequest) {
+func (r *Router) getResults(request RouterRequest) {
 	if len(request.ProcessID) != types.ProcessIDsize {
-		r.sendError(request, "cannot get envelope status: (malformed processId)")
+		r.SendError(request, "cannot get envelope status: (malformed processId)")
 		return
 	}
 
@@ -307,7 +307,7 @@ func (r *Router) getResults(request routerRequest) {
 	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
-		r.sendError(request, err.Error())
+		r.SendError(request, err.Error())
 		return
 	}
 
@@ -331,18 +331,18 @@ func (r *Router) getResults(request routerRequest) {
 	// Get results info
 	vr, err := r.Scrutinizer.GetResults(request.ProcessID)
 	if err != nil && err != scrutinizer.ErrNoResultsYet {
-		r.sendError(request, err.Error())
+		r.SendError(request, err.Error())
 		return
 	}
 	if err == scrutinizer.ErrNoResultsYet {
 		response.Message = scrutinizer.ErrNoResultsYet.Error()
-		if err := request.Send(r.buildReply(request, &response)); err != nil {
+		if err := request.Send(r.BuildReply(request, &response)); err != nil {
 			log.Warnf("error sending response: %s", err)
 		}
 		return
 	}
 	if vr == nil {
-		r.sendError(request, "unknown problem fetching results")
+		r.SendError(request, "unknown problem fetching results")
 		return
 	}
 	response.Results = scrutinizer.GetFriendlyResults(vr.Votes)
@@ -351,7 +351,7 @@ func (r *Router) getResults(request routerRequest) {
 	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
 		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
-		if err := request.Send(r.buildReply(request, &response)); err != nil {
+		if err := request.Send(r.BuildReply(request, &response)); err != nil {
 			log.Warnf("error sending response: %s", err)
 		}
 		return
@@ -359,30 +359,30 @@ func (r *Router) getResults(request routerRequest) {
 	votes := uint32(eh)
 	response.Height = &votes
 	response.Weight = vr.Weight.String()
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
 // known entities
-func (r *Router) getEntityList(request routerRequest) {
+func (r *Router) getEntityList(request RouterRequest) {
 	var response api.MetaResponse
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize
 	}
 	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }
 
-func (r *Router) getBlockStatus(request routerRequest) {
+func (r *Router) getBlockStatus(request RouterRequest) {
 	var response api.MetaResponse
 	h := r.vocapp.Height()
 	response.Height = &h
 	response.BlockTime = r.vocinfo.BlockTimes()
 	response.BlockTimestamp = int32(r.vocapp.Timestamp())
-	if err := request.Send(r.buildReply(request, &response)); err != nil {
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
 }

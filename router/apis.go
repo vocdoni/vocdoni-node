@@ -10,15 +10,15 @@ import (
 // EnableFileAPI enables the FILE API in the Router
 func (r *Router) EnableFileAPI() {
 	r.APIs = append(r.APIs, "file")
-	r.registerPublic("fetchFile", r.fetchFile)
+	r.RegisterPublic("fetchFile", r.fetchFile)
 	if r.allowPrivate {
-		r.registerPrivate("addFile", r.addFile)
+		r.RegisterPrivate("addFile", r.addFile)
 	} else {
-		r.registerPublic("addFile", r.addJSONfile)
+		r.RegisterPublic("addFile", r.addJSONfile)
 	}
-	r.registerPrivate("pinList", r.pinList)
-	r.registerPrivate("pinFile", r.pinFile)
-	r.registerPrivate("unpinFile", r.unpinFile)
+	r.RegisterPrivate("pinList", r.pinList)
+	r.RegisterPrivate("pinFile", r.pinFile)
+	r.RegisterPrivate("unpinFile", r.unpinFile)
 }
 
 // EnableCensusAPI enables the Census API in the Router
@@ -28,18 +28,18 @@ func (r *Router) EnableCensusAPI(cm *census.Manager) {
 	if cm.RemoteStorage == nil {
 		cm.RemoteStorage = r.storage
 	}
-	r.registerPublic("getRoot", r.censusLocal)
-	r.registerPrivate("dump", r.censusLocal)
-	r.registerPrivate("dumpPlain", r.censusLocal)
-	r.registerPublic("getSize", r.censusLocal)
-	r.registerPublic("genProof", r.censusLocal)
-	r.registerPublic("checkProof", r.censusLocal)
-	r.registerPrivate("addCensus", r.censusLocal)
-	r.registerPrivate("addClaim", r.censusLocal)
-	r.registerPrivate("addClaimBulk", r.censusLocal)
-	r.registerPrivate("publish", r.censusLocal)
-	r.registerPrivate("importRemote", r.censusLocal)
-	r.registerPrivate("getCensusList", r.censusLocal)
+	r.RegisterPublic("getRoot", r.censusLocal)
+	r.RegisterPrivate("dump", r.censusLocal)
+	r.RegisterPrivate("dumpPlain", r.censusLocal)
+	r.RegisterPublic("getSize", r.censusLocal)
+	r.RegisterPublic("genProof", r.censusLocal)
+	r.RegisterPublic("checkProof", r.censusLocal)
+	r.RegisterPrivate("addCensus", r.censusLocal)
+	r.RegisterPrivate("addClaim", r.censusLocal)
+	r.RegisterPrivate("addClaimBulk", r.censusLocal)
+	r.RegisterPrivate("publish", r.censusLocal)
+	r.RegisterPrivate("importRemote", r.censusLocal)
+	r.RegisterPrivate("getCensusList", r.censusLocal)
 }
 
 // EnableVoteAPI enabled the Vote API in the Router
@@ -47,14 +47,14 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, vocInfo *vochain
 	r.APIs = append(r.APIs, "vote")
 	r.vocapp = vocapp
 	r.vocinfo = vocInfo
-	r.registerPublic("submitRawTx", r.submitRawTx)
-	r.registerPublic("submitEnvelope", r.submitEnvelope)
-	r.registerPublic("getEnvelopeStatus", r.getEnvelopeStatus)
-	r.registerPublic("getEnvelopeHeight", r.getEnvelopeHeight)
-	r.registerPublic("getBlockHeight", r.getBlockHeight)
-	r.registerPublic("getProcessKeys", r.getProcessKeys)
-	r.registerPublic("getBlockStatus", r.getBlockStatus)
-	r.registerPublic("getOracleResults", r.getOracleResults)
+	r.RegisterPublic("submitRawTx", r.submitRawTx)
+	r.RegisterPublic("submitEnvelope", r.submitEnvelope)
+	r.RegisterPublic("getEnvelopeStatus", r.getEnvelopeStatus)
+	r.RegisterPublic("getEnvelopeHeight", r.getEnvelopeHeight)
+	r.RegisterPublic("getBlockHeight", r.getBlockHeight)
+	r.RegisterPublic("getProcessKeys", r.getProcessKeys)
+	r.RegisterPublic("getBlockStatus", r.getBlockStatus)
+	r.RegisterPublic("getOracleResults", r.getOracleResults)
 }
 
 // EnableVoteAPI enabled the Vote API in the Router
@@ -64,14 +64,14 @@ func (r *Router) EnableResultsAPI(vocapp *vochain.BaseApplication,
 		log.Fatal("cannot enable results API without scrutinizer")
 	}
 	r.APIs = append(r.APIs, "results")
-	r.registerPublic("getProcessList", r.getProcessList)
-	r.registerPublic("getProcessInfo", r.getProcessInfo)
-	r.registerPublic("getProcessCount", r.getProcessCount)
-	r.registerPublic("getResults", r.getResults)
-	r.registerPublic("getResultsWeight", r.getResultsWeight)
-	r.registerPublic("getEntityList", r.getEntityList)
-	r.registerPublic("getEntityCount", r.getEntityCount)
-	r.registerPublic("getEnvelope", r.getEnvelope)
+	r.RegisterPublic("getProcessList", r.getProcessList)
+	r.RegisterPublic("getProcessInfo", r.getProcessInfo)
+	r.RegisterPublic("getProcessCount", r.getProcessCount)
+	r.RegisterPublic("getResults", r.getResults)
+	r.RegisterPublic("getResultsWeight", r.getResultsWeight)
+	r.RegisterPublic("getEntityList", r.getEntityList)
+	r.RegisterPublic("getEntityCount", r.getEntityCount)
+	r.RegisterPublic("getEnvelope", r.getEnvelope)
 }
 
 // EnableVoteAPI enabled the Vote API in the Router
@@ -81,12 +81,12 @@ func (r *Router) EnableIndexerAPI(vocapp *vochain.BaseApplication,
 		log.Fatal("cannot enable indexer API without scrutinizer")
 	}
 	r.APIs = append(r.APIs, "indexer")
-	r.registerPublic("getStats", r.getStats)
-	r.registerPublic("getEnvelopeList", r.getEnvelopeList)
-	r.registerPublic("getBlock", r.getBlock)
-	r.registerPublic("getBlockByHash", r.getBlockByHash)
-	r.registerPublic("getBlockList", r.getBlockList)
-	r.registerPublic("getTx", r.getTx)
-	r.registerPublic("getValidatorList", r.getValidatorList)
-	r.registerPublic("getTxListForBlock", r.getTxListForBlock)
+	r.RegisterPublic("getStats", r.getStats)
+	r.RegisterPublic("getEnvelopeList", r.getEnvelopeList)
+	r.RegisterPublic("getBlock", r.getBlock)
+	r.RegisterPublic("getBlockByHash", r.getBlockByHash)
+	r.RegisterPublic("getBlockList", r.getBlockList)
+	r.RegisterPublic("getTx", r.getTx)
+	r.RegisterPublic("getValidatorList", r.getValidatorList)
+	r.RegisterPublic("getTxListForBlock", r.getTxListForBlock)
 }

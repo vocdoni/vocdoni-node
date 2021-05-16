@@ -77,7 +77,7 @@ type ImmutableState struct {
 // NewState creates a new State
 func NewState(dataDir string) (*State, error) {
 	var err error
-	vs := &State{}
+	vs := &State{txCounter: new(int32), height: new(uint32)}
 	if err := initStore(dataDir, vs); err != nil {
 		return nil, fmt.Errorf("cannot init state db: %s", err)
 	}
@@ -110,8 +110,6 @@ func NewState(dataDir string) (*State, error) {
 	}
 	log.Infof("state database is ready at version %d with hash %x",
 		vs.Store.Version(), vs.Store.Hash())
-	vs.txCounter = new(int32)
-	vs.height = new(uint32)
 	return vs, nil
 }
 

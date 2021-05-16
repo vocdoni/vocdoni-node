@@ -22,7 +22,7 @@ import (
 
 func API(apiconfig *config.API, pxy *mhttp.Proxy, storage data.Storage, cm *census.Manager,
 	vapp *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo,
-	vochainRPCaddr string, signer *ethereum.SignKeys, ma *metrics.Agent) error {
+	vochainRPCaddr string, signer *ethereum.SignKeys, ma *metrics.Agent) (*router.Router, error) {
 	log.Infof("creating API service")
 	// API Endpoint initialization
 	listenerOutput := make(chan transports.Message)
@@ -40,39 +40,39 @@ func API(apiconfig *config.API, pxy *mhttp.Proxy, storage data.Storage, cm *cens
 			htransport = new(mhttp.HttpHandler)
 			htransport.(*mhttp.HttpHandler).SetProxy(pxy)
 		} else {
-			return fmt.Errorf("no transports available. At least one of HTTP and WS should be enabled")
+			return nil, fmt.Errorf("no transports available. At least one of HTTP and WS should be enabled")
 		}
 	}
 
 	if err := htransport.Init(new(transports.Connection)); err != nil {
-		return err
+		return nil, err
 	}
 	htransport.Listen(listenerOutput)
 	if err := htransport.AddNamespace(apiconfig.Route + "dvote"); err != nil {
-		return err
+		return nil, err
 	}
 	log.Infof("%s API available at %s", htransport.ConnectionType(), apiconfig.Route+"dvote")
 
 	routerAPI := router.InitRouter(listenerOutput, storage, signer, ma, apiconfig.AllowPrivate)
-	if apiconfig.File {
+	if apiconfig.File && storage != nil {
 		log.Info("enabling file API")
 		routerAPI.EnableFileAPI()
 	}
-	if apiconfig.Census {
+	if apiconfig.Census && cm != nil {
 		log.Info("enabling census API")
 		routerAPI.EnableCensusAPI(cm)
 	}
 	if apiconfig.Vote || apiconfig.Results || apiconfig.Indexer {
 		routerAPI.Scrutinizer = sc
-		if apiconfig.Vote {
+		if apiconfig.Vote && vapp != nil {
 			log.Info("enabling vote API")
 			routerAPI.EnableVoteAPI(vapp, vi)
 		}
-		if apiconfig.Results {
+		if apiconfig.Results && sc != nil {
 			log.Info("enabling results API")
 			routerAPI.EnableResultsAPI(vapp, vi)
 		}
-		if apiconfig.Indexer {
+		if apiconfig.Indexer && sc != nil {
 			log.Info("enabling indexer API")
 			routerAPI.EnableIndexerAPI(vapp, vi)
 		}
@@ -82,8 +82,9 @@ func API(apiconfig *config.API, pxy *mhttp.Proxy, storage data.Storage, cm *cens
 	go func() {
 		for {
 			time.Sleep(120 * time.Second)
-			log.Infof("[router info] privateReqs:%d publicReqs:%d", routerAPI.PrivateCalls, routerAPI.PublicCalls)
+			log.Infof("[router info] privateReqs:%d publicReqs:%d",
+				routerAPI.PrivateCalls, routerAPI.PublicCalls)
 		}
 	}()
-	return nil
+	return routerAPI, nil
 }
