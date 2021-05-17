@@ -10,7 +10,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
-	"github.com/vocdoni/storage-proofs-eth-go/token"
 	ethtoken "github.com/vocdoni/storage-proofs-eth-go/token"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -88,6 +87,7 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		VoteOptions:       req.NewProcess.VoteOptions,
 		EthIndexSlot:      req.NewProcess.EthIndexSlot,
 		SourceBlockHeight: req.NewProcess.SourceHeight,
+		Metadata:          req.NewProcess.Metadata,
 		ProcessId:         ethereum.HashRaw([]byte(pidseed)),
 		Status:            models.ProcessStatus_READY,
 		Namespace:         a.Namespace,
@@ -209,7 +209,7 @@ func (a *APIoracle) getIndexSlot(ctx context.Context, contractAddr []byte,
 func (a *APIoracle) getStorageRoot(ctx context.Context, contractAddr common.Address,
 	blockNum uint64) (hash common.Hash, err error) {
 	// create token storage proof artifact
-	ts := token.ERC20Token{
+	ts := ethtoken.ERC20Token{
 		RPCcli: a.eh.EthereumRPC,
 		Ethcli: a.eh.EthereumClient,
 	}

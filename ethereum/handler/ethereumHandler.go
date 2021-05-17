@@ -223,6 +223,9 @@ func (eh *EthereumHandler) NewProcessTxArgs(ctx context.Context, pid [types.Proc
 		return nil, fmt.Errorf("error decoding entity address: %w", err)
 	}
 
+	// process metadata
+	processData.Metadata = &processMeta.MetadataCensusRootCensusUri[0]
+
 	// census root
 	processData.CensusRoot, err = hex.DecodeString(util.TrimHex(processMeta.MetadataCensusRootCensusUri[1]))
 	if err != nil {
