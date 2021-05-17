@@ -267,6 +267,7 @@ type NewProcess struct {
 	StartBlock   uint32                     `json:"startBlock"`
 	BlockCount   uint32                     `json:"blockCount"`
 	CensusRoot   types.HexBytes             `json:"censusRoot"`
+	Metadata     *string                    `json:"metadata"`
 	SourceHeight *uint64                    `json:"sourceHeight,omitempty"`
 	EnvelopeType *models.EnvelopeType       `json:"envelopeType,omitempty"`
 	VoteOptions  *models.ProcessVoteOptions `json:"voteOptions,omitempty"`
