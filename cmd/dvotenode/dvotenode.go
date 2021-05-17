@@ -57,13 +57,13 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// Booleans should be passed to the CLI as: var=True/false
 
 	// global
-	flag.StringVar(&globalCfg.DataDir, "dataDir", home+"/.dvote",
+	flag.StringVarP(&globalCfg.DataDir, "dataDir", "d", home+"/.dvote",
 		"directory where data is stored")
-	flag.StringVar(&globalCfg.VochainConfig.Chain, "vochain", "dev",
+	flag.StringVarP(&globalCfg.VochainConfig.Chain, "vochain", "v", "dev",
 		"vocdoni blokchain network to connect with")
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
 		"use developer mode (less security)")
-	globalCfg.LogLevel = *flag.String("logLevel", "info",
+	globalCfg.LogLevel = *flag.StringP("logLevel", "l", "info",
 		"Log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout",
 		"Log output (stdout, stderr or filepath)")
@@ -72,7 +72,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false,
 		"overwrites an existing config file with the CLI provided flags")
 	// TODO(mvdan): turn this into an enum to avoid human error
-	globalCfg.Mode = *flag.String("mode", types.ModeGateway,
+	globalCfg.Mode = *flag.StringP("mode", "m", types.ModeGateway,
 		"global operation mode. Available options: [gateway,oracle,ethApiOracle,miner]")
 	// api
 	globalCfg.API.Websockets = *flag.Bool("apiws", true, "enable websockets transport for the API")
@@ -94,7 +94,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"comma delimited list of allowed client ETH addresses for private methods")
 	globalCfg.API.ListenHost = *flag.String("listenHost", "0.0.0.0",
 		"API endpoint listen address")
-	globalCfg.API.ListenPort = *flag.Int("listenPort", 9090,
+	globalCfg.API.ListenPort = *flag.IntP("listenPort", "p", 9090,
 		"API endpoint http port")
 	globalCfg.API.WebsocketsReadLimit = *flag.Int64("apiWsReadLimit", types.Web3WsReadLimit,
 		"dvote websocket API read size limit in bytes")
@@ -102,20 +102,20 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "",
 		"enable TLS secure domain with LetsEncrypt (listenPort=443 is required)")
 	// ethereum node
-	globalCfg.EthConfig.SigningKey = *flag.String("ethSigningKey", "",
+	globalCfg.EthConfig.SigningKey = *flag.StringP("ethSigningKey", "k", "",
 		"signing private Key (if not specified the Ethereum keystore will be used)")
 	// ethereum events
 	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", true,
 		"only subscribe to new ethereum events (do not read past log)")
 	// ethereum web3
-	globalCfg.W3Config.ChainType = *flag.String("ethChain", "goerli",
+	globalCfg.W3Config.ChainType = *flag.StringP("ethChain", "c", "goerli",
 		fmt.Sprintf("Ethereum blockchain to use: %s", ethchain.AvailableChains))
-	globalCfg.W3Config.W3External = *flag.String("w3External", "",
+	globalCfg.W3Config.W3External = *flag.StringP("w3External", "w", "",
 		"ethereum web3 endpoint. Supported protocols: http(s)://, ws(s):// and IPC filepath")
 	// ipfs
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false,
 		"disables inter planetary file system support")
-	globalCfg.Ipfs.SyncKey = *flag.String("ipfsSyncKey", "",
+	globalCfg.Ipfs.SyncKey = *flag.StringP("ipfsSyncKey", "i", "",
 		"enable IPFS cluster synchronization using the given secret key")
 	globalCfg.Ipfs.SyncPeers = *flag.StringArray("ipfsSyncPeers", []string{},
 		"use custom ipfsSync peers/bootnodes for accessing the DHT")
