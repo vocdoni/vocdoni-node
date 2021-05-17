@@ -145,6 +145,10 @@ type RouterRequest struct {
 	private       bool
 }
 
+func (r *RouterRequest) GetAddress() *ethcommon.Address {
+	return &r.address
+}
+
 // semi-unmarshalls message, returns method name
 func (r *Router) getRequest(payload []byte,
 	context transports.MessageContext) (request RouterRequest, err error) {
@@ -174,7 +178,10 @@ func (r *Router) getRequest(payload []byte,
 	if method.public {
 		request.private = false
 		request.authenticated = true
-		request.address = ethcommon.Address{}
+		if len(reqOuter.Signature) > 0 {
+			_, request.address, _ = r.signer.VerifySender(
+				reqOuter.MetaRequest, reqOuter.Signature)
+		}
 	} else {
 		request.private = true
 		request.authenticated, request.address, err = r.signer.VerifySender(

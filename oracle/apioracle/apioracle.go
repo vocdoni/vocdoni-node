@@ -3,12 +3,15 @@ package apioracle
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"github.com/vocdoni/storage-proofs-eth-go/token"
+	ethtoken "github.com/vocdoni/storage-proofs-eth-go/token"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	chain "go.vocdoni.io/dvote/ethereum"
@@ -17,6 +20,7 @@ import (
 	"go.vocdoni.io/dvote/oracle"
 	"go.vocdoni.io/dvote/router"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -90,7 +94,11 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		CensusOrigin:      models.CensusOrigin_ERC20,
 		Mode:              &models.ProcessMode{AutoStart: true},
 	}
-
+	sproof, err := buildETHproof(req.EthProof)
+	if err != nil {
+		a.router.SendError(req, err.Error())
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), ethQueryTimeOut)
 	defer cancel()
 	index, err := a.getIndexSlot(ctx, p.EntityId, p.GetSourceBlockHeight(), p.CensusRoot)
@@ -104,6 +112,29 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		return
 	}
 
+	slot, err := ethtoken.GetSlot(req.GetAddress().Hex(), int(index))
+	if err != nil {
+		a.router.SendError(req, fmt.Sprintf("cannot fetch slot: %s", err))
+		return
+	}
+
+	log.Debugf("ERC20 index slot %d, storage slot %x", index, slot)
+
+	valid, _, err := vochain.CheckProof(sproof,
+		models.CensusOrigin_ERC20,
+		p.CensusRoot,
+		p.ProcessId,
+		slot[:],
+	)
+	if err != nil {
+		a.router.SendError(req, err.Error())
+		return
+	}
+	if !valid {
+		a.router.SendError(req, "proof is not valid")
+		return
+	}
+
 	if err := a.oracle.NewProcess(p); err != nil {
 		a.router.SendError(req, err.Error())
 		return
@@ -113,6 +144,37 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 	if err := req.Send(a.router.BuildReply(req, &response)); err != nil {
 		log.Warn(err)
 	}
+}
+
+func buildETHproof(proof *ethstorageproof.StorageResult) (*models.Proof, error) {
+	if proof == nil {
+		return nil, fmt.Errorf("storage proof is nil")
+	}
+	if len(proof.Proof) < 1 {
+		return nil, fmt.Errorf("storage proof siblings missing")
+	}
+	if proof.Value == nil {
+		return nil, fmt.Errorf("storage proof value missing")
+	}
+	siblings := [][]byte{}
+	for _, sib := range proof.Proof {
+		sibb, err := hex.DecodeString(util.TrimHex(sib))
+		if err != nil {
+			return nil, err
+		}
+		siblings = append(siblings, sibb)
+	}
+	key, err := hex.DecodeString(proof.Key)
+	if err != nil {
+		return nil, fmt.Errorf("cannot decode key: %w", err)
+	}
+	return &models.Proof{Payload: &models.Proof_EthereumStorage{
+		EthereumStorage: &models.ProofEthereumStorage{
+			Key:      key,
+			Value:    proof.Value.ToInt().Bytes(),
+			Siblings: siblings,
+		},
+	}}, nil
 }
 
 func (a *APIoracle) getIndexSlot(ctx context.Context, contractAddr []byte,
