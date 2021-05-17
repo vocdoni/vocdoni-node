@@ -83,7 +83,7 @@ func (v *State) CachePurge(height uint32) {
 		}
 	}
 	if purged > 0 {
-		log.Infof("[txcache] purged %d transactions, took %s", purged, time.Since(start))
+		log.Debugf("[txcache] purged %d transactions, took %s", purged, time.Since(start))
 	}
 }
 

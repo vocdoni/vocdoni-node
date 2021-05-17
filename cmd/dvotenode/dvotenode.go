@@ -500,7 +500,7 @@ func main() {
 			(globalCfg.Mode == types.ModeOracle)
 		// create the vochain node
 		if vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig,
-			scrutinizer, globalCfg.VochainConfig.NoWaitSync, ma, cm, storage,
+			scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma, cm, storage,
 		); err != nil {
 			log.Fatal(err)
 		}
@@ -525,14 +525,12 @@ func main() {
 		}
 
 		// Wait for Vochain to be ready
-		var h, hPrev int64
+		var h, hPrev uint32
 		for vnode.Node == nil {
 			hPrev = h
-			time.Sleep(time.Second * 5)
-			if header := vnode.State.Header(true); header != nil {
-				h = header.Height
-			}
-			log.Infof("[vochain info] replaying block %d at %d b/s",
+			time.Sleep(time.Second * 10)
+			h = vnode.Height()
+			log.Infof("[vochain info] replaying height %d at %d blocks/s",
 				h, (h-hPrev)/5)
 		}
 	}

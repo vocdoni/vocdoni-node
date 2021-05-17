@@ -153,7 +153,7 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool,
 		for !vi.Sync() {
 			time.Sleep(time.Second * 1)
 			if i%20 == 0 {
-				log.Infof("[vochain info] fastsync running at block %d (%d blocks/s), peers %d",
+				log.Infof("[vochain info] fastsync running at height %d (%d blocks/s), peers %d",
 					vi.Height(), (vi.Height()-lastHeight)/20, len(vi.Peers()))
 				lastHeight = vi.Height()
 			}
