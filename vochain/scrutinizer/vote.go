@@ -227,7 +227,7 @@ func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (uint64, error) {
 	}
 
 	// If no processId is provided, count all envelopes
-	return atomic.LoadUint64(s.countTotalEnvelopes), nil
+	return atomic.LoadUint64(&s.countTotalEnvelopes), nil
 }
 
 // ComputeResult process a finished voting, compute the results and saves it in the Storage.

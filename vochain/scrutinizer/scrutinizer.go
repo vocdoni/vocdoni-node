@@ -63,9 +63,9 @@ type Scrutinizer struct {
 	// envelopeHeightCache and countTotalEnvelopes are in memory counters that helps reducing the
 	// access time when GenEnvelopeHeight() is called.
 	envelopeHeightCache *lru.Cache
-	countTotalEnvelopes *uint64
-	countTotalEntities  *int64
-	countTotalProcesses *int64
+	countTotalEnvelopes uint64
+	countTotalEntities  int64
+	countTotalProcesses int64
 
 	// addVoteLock is used to avoid Transaction Conflicts on the KV database.
 	// It is not critical and the code should be able to recover from a Conflict, but we
@@ -112,12 +112,9 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 		time.Since(startTime),
 		envelopes,
 		entities)
-	s.countTotalEnvelopes = new(uint64)
-	*s.countTotalEnvelopes = uint64(envelopes)
-	s.countTotalEntities = new(int64)
-	*s.countTotalEntities = int64(entities)
-	s.countTotalProcesses = new(int64)
-	*s.countTotalProcesses = int64(processes)
+	s.countTotalEnvelopes = uint64(envelopes)
+	s.countTotalEntities = int64(entities)
+	s.countTotalProcesses = int64(processes)
 	// Subscrive to events
 	s.App.State.AddEventListener(s)
 	if s.envelopeHeightCache, err = lru.New(countEnvelopeCacheSize); err != nil {
@@ -277,7 +274,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		log.Infof("indexed %d new envelopes, took %s",
 			len(s.voteIndexPool), time.Since(startTime))
 		// Add the envelopes to the countTotalEnvelopes var
-		atomic.AddUint64(s.countTotalEnvelopes, uint64(len(s.voteIndexPool)))
+		atomic.AddUint64(&s.countTotalEnvelopes, uint64(len(s.voteIndexPool)))
 	}
 	txn.Discard()
 
