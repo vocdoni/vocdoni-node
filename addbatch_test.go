@@ -1,6 +1,7 @@
 package arbo
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -119,6 +120,201 @@ func TestAddBatchCaseANotPowerOf2(t *testing.T) {
 
 	// check that both trees roots are equal
 	c.Check(tree2.Root(), qt.DeepEquals, tree.Root())
+}
+
+func randomBytes(n int) []byte {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func TestBuildTreeBottomUpSingleThread(t *testing.T) {
+	c := qt.New(t)
+	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree1.db.Close()
+
+	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close()
+
+	testvectorKeys := []string{
+		"1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642",
+		"2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf",
+		"1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5",
+		"d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7",
+	}
+	var keys, values [][]byte
+	for i := 0; i < len(testvectorKeys); i++ {
+		key, err := hex.DecodeString(testvectorKeys[i])
+		c.Assert(err, qt.IsNil)
+		keys = append(keys, key)
+		values = append(values, []byte{0})
+	}
+
+	for i := 0; i < len(keys); i++ {
+		if err := tree1.Add(keys[i], values[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	kvs, err := tree2.keysValuesToKvs(keys, values)
+	c.Assert(err, qt.IsNil)
+	sortKvs(kvs)
+
+	tree2.tx, err = tree2.db.NewTx()
+	c.Assert(err, qt.IsNil)
+	// indexes, err := tree2.buildTreeBottomUpSingleThread(kvs)
+	indexes, err := tree2.buildTreeBottomUp(4, kvs)
+	c.Assert(err, qt.IsNil)
+	// tree1.PrintGraphviz(nil)
+	// tree2.PrintGraphviz(nil)
+
+	c.Check(len(indexes), qt.Equals, 0)
+
+	// check that both trees roots are equal
+	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	// 15b6a23945ae6c81342b7eb14e70fff50812dc8791cb15ec791eb08f91784139
+}
+
+func TestAddBatchCaseATestVector(t *testing.T) {
+	c := qt.New(t)
+	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree1.db.Close()
+
+	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close()
+
+	// leafs in 2nd level subtrees: [ 6, 0, 1, 1]
+	testvectorKeys := []string{
+		"1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642",
+		"2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf",
+		"1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5",
+		"d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7",
+	}
+	var keys, values [][]byte
+	for i := 0; i < len(testvectorKeys); i++ {
+		key, err := hex.DecodeString(testvectorKeys[i])
+		c.Assert(err, qt.IsNil)
+		keys = append(keys, key)
+		values = append(values, []byte{0})
+	}
+
+	for i := 0; i < len(keys); i++ {
+		if err := tree1.Add(keys[i], values[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	indexes, err := tree2.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	// tree1.PrintGraphviz(nil)
+	// tree2.PrintGraphviz(nil)
+
+	c.Check(len(indexes), qt.Equals, 0)
+
+	// check that both trees roots are equal
+	// fmt.Println(hex.EncodeToString(tree1.Root()))
+	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+
+	//////
+
+	// tree1, err = NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	// c.Assert(err, qt.IsNil)
+	// defer tree1.db.Close()
+	//
+	// tree2, err = NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	// c.Assert(err, qt.IsNil)
+	// defer tree2.db.Close()
+	//
+	// // leafs in 2nd level subtrees: [ 6, 0, 1, 1]
+	// testvectorKeys = []string{
+	//         "1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642",
+	//         "2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf",
+	//         "9cb87ec67e875c61390edcd1ab517f443591047709a4d4e45b0f9ed980857b8e",
+	//         "9b4e9e92e974a589f426ceeb4cb291dc24893513fecf8e8460992dcf52621d4d",
+	//         "1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5",
+	//         "d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7",
+	//         "3cd55dbfb8f975f20a0925dfbdabe79fa2d51dd0268afbb8ba6b01de9dfcdd3c",
+	//         "5d0a9d6d9f197c091bf054fac9cb60e11ec723d6610ed8578e617b4d46cb43d5",
+	// }
+	// keys = [][]byte{}
+	// values = [][]byte{}
+	// for i := 0; i < len(testvectorKeys); i++ {
+	//         key, err := hex.DecodeString(testvectorKeys[i])
+	//         c.Assert(err, qt.IsNil)
+	//         keys = append(keys, key)
+	//         values = append(values, []byte{0})
+	// }
+	//
+	// for i := 0; i < len(keys); i++ {
+	//         if err := tree1.Add(keys[i], values[i]); err != nil {
+	//                 t.Fatal(err)
+	//         }
+	// }
+	//
+	// indexes, err = tree2.AddBatch(keys, values)
+	// c.Assert(err, qt.IsNil)
+	// tree1.PrintGraphviz(nil)
+	// tree2.PrintGraphviz(nil)
+	//
+	// c.Check(len(indexes), qt.Equals, 0)
+	//
+	// // check that both trees roots are equal
+	// // c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+}
+
+func TestAddBatchCaseARandomKeys(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 8
+
+	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree1.db.Close()
+
+	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close()
+
+	var keys, values [][]byte
+	for i := 0; i < nLeafs; i++ {
+		keys = append(keys, randomBytes(32))
+		// values = append(values, randomBytes(32))
+		values = append(values, []byte{0})
+		// fmt.Println("K", hex.EncodeToString(keys[i]))
+	}
+
+	// TMP:
+	keys[0], _ = hex.DecodeString("1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642")
+	keys[1], _ = hex.DecodeString("2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf")
+	keys[2], _ = hex.DecodeString("9cb87ec67e875c61390edcd1ab517f443591047709a4d4e45b0f9ed980857b8e")
+	keys[3], _ = hex.DecodeString("9b4e9e92e974a589f426ceeb4cb291dc24893513fecf8e8460992dcf52621d4d")
+	keys[4], _ = hex.DecodeString("1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5")
+	keys[5], _ = hex.DecodeString("d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7")
+	keys[6], _ = hex.DecodeString("3cd55dbfb8f975f20a0925dfbdabe79fa2d51dd0268afbb8ba6b01de9dfcdd3c")
+	keys[7], _ = hex.DecodeString("5d0a9d6d9f197c091bf054fac9cb60e11ec723d6610ed8578e617b4d46cb43d5")
+
+	for i := 0; i < len(keys); i++ {
+		if err := tree1.Add(keys[i], values[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	indexes, err := tree2.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	// tree1.PrintGraphviz(nil)
+	// tree2.PrintGraphviz(nil)
+
+	c.Check(len(indexes), qt.Equals, 0)
+
+	// check that both trees roots are equal
+	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 }
 
 func TestAddBatchCaseB(t *testing.T) {

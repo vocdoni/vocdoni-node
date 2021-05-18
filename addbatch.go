@@ -325,7 +325,7 @@ func (t *Tree) caseB(nCPU, l int, kvs []kv) ([]int, []kv, error) {
 			return nil, nil, err
 		}
 	} else {
-		invalids2, err = t.buildTreeBottomUpSingleThread(kvsP2)
+		invalids2, err = t.buildTreeBottomUpSingleThread(l, kvsP2)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -353,6 +353,9 @@ func (t *Tree) caseC(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 			txs[cpu], err = t.db.NewTx()
 			if err != nil {
 				panic(err) // TODO WIP
+			}
+			if err := txs[cpu].Add(t.tx); err != nil {
+				panic(err) // TODO
 			}
 			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels,
 				hashFunction: t.hashFunction, root: keysAtL[cpu]}
@@ -567,6 +570,7 @@ func (t *Tree) kvsToKeysValues(kvs []kv) ([][]byte, [][]byte) {
 // will have the complete Tree build from bottom to up, where until the
 // log2(nCPU) level it has been computed in parallel.
 func (t *Tree) buildTreeBottomUp(nCPU int, kvs []kv) ([]int, error) {
+	l := int(math.Log2(float64(nCPU)))
 	buckets := splitInBuckets(kvs, nCPU)
 
 	subRoots := make([][]byte, nCPU)
@@ -584,10 +588,13 @@ func (t *Tree) buildTreeBottomUp(nCPU int, kvs []kv) ([]int, error) {
 			if err != nil {
 				panic(err) // TODO
 			}
+			if err := txs[cpu].Add(t.tx); err != nil {
+				panic(err) // TODO
+			}
 			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels,
 				hashFunction: t.hashFunction, root: t.emptyHash}
 
-			currInvalids, err := bucketTree.buildTreeBottomUpSingleThread(buckets[cpu])
+			currInvalids, err := bucketTree.buildTreeBottomUpSingleThread(l, buckets[cpu])
 			if err != nil {
 				panic(err) // TODO
 			}
@@ -615,39 +622,42 @@ func (t *Tree) buildTreeBottomUp(nCPU int, kvs []kv) ([]int, error) {
 	for i := 0; i < len(invalidsInBucket); i++ {
 		invalids = append(invalids, invalidsInBucket[i]...)
 	}
+
 	return invalids, err
 }
 
 // buildTreeBottomUpSingleThread builds the tree with the given []kv from bottom
-// to the root. keys & values must be sorted by path, and the array ks must be
-// length multiple of 2
-func (t *Tree) buildTreeBottomUpSingleThread(kvs []kv) ([]int, error) {
+// to the root
+func (t *Tree) buildTreeBottomUpSingleThread(l int, kvsRaw []kv) ([]int, error) {
 	// TODO check that log2(len(leafs)) < t.maxLevels, if not, maxLevels
 	// would be reached and should return error
+	if len(kvsRaw) == 0 {
+		return nil, nil
+	}
 
-	var invalids []int
-	// build the leafs
-	leafKeys := make([][]byte, len(kvs))
-	for i := 0; i < len(kvs); i++ {
-		// TODO handle the case where Key&Value == 0
-		leafKey, leafValue, err := newLeafValue(t.hashFunction, kvs[i].k, kvs[i].v)
-		if err != nil {
-			// return nil, err
-			invalids = append(invalids, kvs[i].pos)
+	vt := newVT(t.maxLevels, t.hashFunction)
+
+	for i := 0; i < len(kvsRaw); i++ {
+		if err := vt.add(l, kvsRaw[i].k, kvsRaw[i].v); err != nil {
+			return nil, err
 		}
-		// store leafKey & leafValue to db
-		if err := t.tx.Put(leafKey, leafValue); err != nil {
-			// return nil, err
-			invalids = append(invalids, kvs[i].pos)
-		}
-		leafKeys[i] = leafKey
 	}
-	r, err := t.upFromKeys(leafKeys)
+
+	pairs, err := vt.computeHashes()
 	if err != nil {
-		return invalids, err
+		return nil, err
 	}
-	t.root = r
-	return invalids, nil
+	// store pairs in db
+	for i := 0; i < len(pairs); i++ {
+		if err := t.tx.Put(pairs[i][0], pairs[i][1]); err != nil {
+			return nil, err
+		}
+	}
+
+	// set tree.root from the virtual tree root
+	t.root = vt.root.h
+
+	return nil, nil // TODO invalids
 }
 
 // keys & values must be sorted by path, and the array ks must be length
@@ -659,7 +669,11 @@ func (t *Tree) upFromKeys(ks [][]byte) ([]byte, error) {
 
 	var rKs [][]byte
 	for i := 0; i < len(ks); i += 2 {
-		// TODO handle the case where Key&Value == 0
+		if bytes.Equal(ks[i], t.emptyHash) && bytes.Equal(ks[i+1], t.emptyHash) {
+			// when both sub keys are empty, the key is also empty
+			rKs = append(rKs, t.emptyHash)
+			continue
+		}
 		k, v, err := newIntermediate(t.hashFunction, ks[i], ks[i+1])
 		if err != nil {
 			return nil, err

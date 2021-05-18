@@ -45,14 +45,14 @@ func newVT(maxLevels int, hash HashFunction) vt {
 	}
 }
 
-func (t *vt) add(k, v []byte) error {
+func (t *vt) add(fromLvl int, k, v []byte) error {
 	leaf := newLeafNode(t.params, k, v)
 	if t.root == nil {
 		t.root = leaf
 		return nil
 	}
 
-	if err := t.root.add(t.params, 0, leaf); err != nil {
+	if err := t.root.add(t.params, fromLvl, leaf); err != nil {
 		return err
 	}
 
@@ -119,6 +119,7 @@ func (n *node) add(p *params, currLvl int, leaf *node) error {
 			if n.r == nil {
 				// empty sub-node, add the leaf here
 				n.r = leaf
+				return nil
 			}
 			if err := n.r.add(p, currLvl+1, leaf); err != nil {
 				return err
@@ -127,6 +128,7 @@ func (n *node) add(p *params, currLvl int, leaf *node) error {
 			if n.l == nil {
 				// empty sub-node, add the leaf here
 				n.l = leaf
+				return nil
 			}
 			if err := n.l.add(p, currLvl+1, leaf); err != nil {
 				return err
@@ -134,7 +136,8 @@ func (n *node) add(p *params, currLvl int, leaf *node) error {
 		}
 	case vtLeaf:
 		if bytes.Equal(n.k, leaf.k) {
-			return fmt.Errorf("key already exists")
+			return fmt.Errorf("key already exists. Existing node: %s, trying to add node: %s",
+				hex.EncodeToString(n.k), hex.EncodeToString(leaf.k))
 		}
 
 		oldLeaf := &node{
@@ -145,10 +148,13 @@ func (n *node) add(p *params, currLvl int, leaf *node) error {
 		// remove values from current node (converting it to mid node)
 		n.k = nil
 		n.v = nil
+		n.h = nil
 		n.path = nil
 		if err := n.downUntilDivergence(p, currLvl, oldLeaf, leaf); err != nil {
 			return err
 		}
+	case vtEmpty:
+		panic(fmt.Errorf("EMPTY %v", n)) // TODO TMP
 	default:
 		return fmt.Errorf("ERR")
 	}

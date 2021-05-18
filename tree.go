@@ -445,7 +445,7 @@ func (t *Tree) GenProof(k []byte) ([]byte, []byte, error) {
 	}
 
 	s := PackSiblings(t.hashFunction, siblings)
-	return value, s, nil
+	return leafV, s, nil
 }
 
 // PackSiblings packs the siblings into a byte array.
@@ -711,10 +711,8 @@ func (t *Tree) Dump() ([]byte, error) {
 func (t *Tree) ImportDump(b []byte) error {
 	t.updateAccessTime()
 	r := bytes.NewReader(b)
-	count := 0
-	// TODO instead of adding one by one, use AddBatch (once AddBatch is
-	// optimized)
 	var err error
+	var keys, values [][]byte
 	for {
 		l := make([]byte, 2)
 		_, err = io.ReadFull(r, l)
@@ -733,22 +731,10 @@ func (t *Tree) ImportDump(b []byte) error {
 		if err != nil {
 			return err
 		}
-		err = t.Add(k, v)
-		if err != nil {
-			return err
-		}
-		count++
+		keys = append(keys, k)
+		values = append(values, v)
 	}
-	// update nLeafs (once ImportDump uses AddBatch method, this will not be
-	// needed)
-	t.tx, err = t.db.NewTx()
-	if err != nil {
-		return err
-	}
-	if err := t.incNLeafs(count); err != nil {
-		return err
-	}
-	if err = t.tx.Commit(); err != nil {
+	if _, err = t.AddBatch(keys, values); err != nil {
 		return err
 	}
 	return nil
@@ -767,7 +753,7 @@ func (t *Tree) GraphvizFirstNLevels(w io.Writer, rootKey []byte, untilLvl int) e
 	fmt.Fprintf(w, `digraph hierarchy {
 node [fontname=Monospace,fontsize=10,shape=box]
 `)
-	nChars := 4
+	nChars := 4 // TODO move to global constant
 	nEmpties := 0
 	err := t.iterWithStop(t.root, 0, func(currLvl int, k, v []byte) bool {
 		if currLvl == untilLvl {
