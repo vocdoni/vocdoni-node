@@ -175,7 +175,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 		err = s.db.ForEach(
 			badgerhold.
 				Where("Nullifier").MatchFunc(searchMatchFunc(searchTerm)).
-				SortBy("Height", "TxIndex").
+				SortBy("Height").
 				Skip(from).
 				Limit(max),
 			func(txRef *indexertypes.VoteReference) error {
