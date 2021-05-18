@@ -61,9 +61,9 @@ type State struct {
 	voteCache *lru.Cache
 	ImmutableState
 	MemPoolRemoveTxKey func([32]byte, bool)
-	txCounter          *int32
+	txCounter          int32
 	eventListeners     []EventListener
-	height             *uint32
+	height             uint32
 }
 
 // ImmutableState holds the latest trees version saved on disk
@@ -77,7 +77,7 @@ type ImmutableState struct {
 // NewState creates a new State
 func NewState(dataDir string) (*State, error) {
 	var err error
-	vs := &State{txCounter: new(int32), height: new(uint32)}
+	vs := &State{}
 	if err := initStore(dataDir, vs); err != nil {
 		return nil, fmt.Errorf("cannot init state db: %s", err)
 	}
@@ -556,7 +556,7 @@ func (v *State) Save() []byte {
 				log.Warnf("event callback error on commit: %v", err)
 			}
 		}
-		atomic.StoreUint32(v.height, height)
+		atomic.StoreUint32(&v.height, height)
 	}
 	return hash
 }
@@ -571,12 +571,12 @@ func (v *State) Rollback() {
 	if err := v.Store.Rollback(); err != nil {
 		panic(fmt.Sprintf("cannot rollback state tree: (%s)", err))
 	}
-	atomic.StoreInt32(v.txCounter, 0)
+	atomic.StoreInt32(&v.txCounter, 0)
 }
 
 // Height returns the current state height (block count)
 func (v *State) Height() uint32 {
-	return atomic.LoadUint32(v.height)
+	return atomic.LoadUint32(&v.height)
 }
 
 // WorkingHash returns the hash of the vochain trees censusRoots
@@ -588,9 +588,9 @@ func (v *State) WorkingHash() []byte {
 }
 
 func (v *State) TxCounterAdd() {
-	atomic.AddInt32(v.txCounter, 1)
+	atomic.AddInt32(&v.txCounter, 1)
 }
 
 func (v *State) TxCounter() int32 {
-	return atomic.LoadInt32(v.txCounter)
+	return atomic.LoadInt32(&v.txCounter)
 }

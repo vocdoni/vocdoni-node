@@ -41,8 +41,8 @@ type BaseApplication struct {
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
 	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
 	blockCache         *lru.Cache
-	height             *uint32
-	timestamp          *int64
+	height             uint32
+	timestamp          int64
 	chainId            string
 }
 
@@ -63,8 +63,6 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	return &BaseApplication{
 		State:      state,
 		blockCache: lruc,
-		height:     new(uint32),
-		timestamp:  new(int64),
 	}, nil
 }
 
@@ -127,12 +125,12 @@ func (app *BaseApplication) IsSynchronizing() bool {
 
 // Height returns the current blockchain height
 func (app *BaseApplication) Height() uint32 {
-	return atomic.LoadUint32(app.height)
+	return atomic.LoadUint32(&app.height)
 }
 
 // Timestamp returns the last block timestamp
 func (app *BaseApplication) Timestamp() int64 {
-	return atomic.LoadInt64(app.timestamp)
+	return atomic.LoadInt64(&app.timestamp)
 }
 
 // ChainID returns the Node ChainID
@@ -372,8 +370,8 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 }
 
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	atomic.StoreUint32(app.height, uint32(req.Height))
-	atomic.StoreInt64(app.timestamp, time.Now().Unix())
+	atomic.StoreUint32(&app.height, uint32(req.Height))
+	atomic.StoreInt64(&app.timestamp, time.Now().Unix())
 	return abcitypes.ResponseEndBlock{}
 }
 
