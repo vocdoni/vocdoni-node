@@ -286,10 +286,12 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	startTime = time.Now()
 
 	for pid, votes := range s.votePool {
-		// Update the cache of envelopes height by process ID (if exist)
+		// Update or set the cache of envelopes height by process ID
 		if vcount, ok := s.envelopeHeightCache.Get(pid); ok {
 			c := vcount.(uint64) + uint64(len(votes))
 			s.envelopeHeightCache.Add(pid, c)
+		} else {
+			s.envelopeHeightCache.Add(pid, uint64(len(votes)))
 		}
 		// Get the process information
 		proc, err := s.ProcessInfo([]byte(pid))
