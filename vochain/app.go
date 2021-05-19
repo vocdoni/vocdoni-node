@@ -24,8 +24,6 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
-const blockCacheSize = 128
-
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
 	State *State
@@ -38,7 +36,7 @@ type BaseApplication struct {
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
 	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
-	blockLRU           *lru.Cache
+	blockCache         *lru.Cache
 	height             uint32
 	timestamp          int64
 	chainId            string
@@ -55,8 +53,8 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}
 	return &BaseApplication{
-		State:    state,
-		blockLRU: lru.New(128),
+		State:      state,
+		blockCache: lru.New(128),
 	}, nil
 }
 
@@ -146,7 +144,11 @@ func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 		log.Error("application getBlockByHeight method not assigned")
 		return nil
 	}
-	cachedBlock := app.blockLRU.GetOrAdd(height, func() interface{} {
+	cachedBlock := app.blockCache.GetOrUpdate(height, func(prev interface{}) interface{} {
+		if prev != nil {
+			// If it's already in the cache, use it as-is.
+			return prev
+		}
 		return app.fnGetBlockByHeight(height)
 	})
 	return cachedBlock.(*tmtypes.Block)
