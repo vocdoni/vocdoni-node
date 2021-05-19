@@ -20,7 +20,7 @@ import (
 func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 	txID [32]byte, commit bool) ([]byte, error) {
 	if vtx == nil || state == nil || vtx.Payload == nil {
-		return nil, fmt.Errorf("transaction, state or transaction payload are nil")
+		return nil, fmt.Errorf("transaction, state, and/or transaction payload is nil")
 	}
 	switch vtx.Payload.(type) {
 	case *models.Tx_Vote:
@@ -47,7 +47,7 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 				pk, err := hexPubKeyToTendermintEd25519(fmt.Sprintf("%x", tx.PublicKey))
 				if err == nil {
 					if tx.Power == nil {
-						return []byte{}, fmt.Errorf("power not specified on add validator transaction")
+						return []byte{}, fmt.Errorf("power not specified on addValidator transaction")
 					}
 					validator := &models.Validator{
 						Address: pk.Address().Bytes(),
@@ -73,7 +73,7 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 			if commit {
 				tx := vtx.GetNewProcess()
 				if tx.Process == nil {
-					return []byte{}, fmt.Errorf("newprocess process is empty")
+					return []byte{}, fmt.Errorf("newProcess process is empty")
 				}
 				return []byte{}, state.AddProcess(p)
 			}
@@ -186,7 +186,7 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 				if err != nil {
 					return nil, err
 				}
-				return nil, fmt.Errorf("vote already exist")
+				return nil, fmt.Errorf("vote %x already exists", vote.Nullifier)
 			}
 			return vote, nil
 		}
@@ -194,7 +194,7 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 		// if not forCommit, it is a mempool check,
 		// reject it since we already processed the transaction before.
 		if !forCommit && vote != nil {
-			return nil, fmt.Errorf("vote already exist in cache")
+			return nil, fmt.Errorf("vote %x already exists in cache", vote.Nullifier)
 		}
 
 		// if not in cache, full check
@@ -232,7 +232,7 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 		// check that nullifier does not exist in cache already, this avoids
 		// processing multiple transactions with same nullifier.
 		if state.CacheHasNullifier(vote.Nullifier) {
-			return nil, fmt.Errorf("nullifier %x already exist in cache", vote.Nullifier)
+			return nil, fmt.Errorf("nullifier %x already exists in cache", vote.Nullifier)
 		}
 
 		// check if vote already exists
@@ -302,7 +302,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 	tx := vtx.GetAdmin()
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {
-		return fmt.Errorf("missing signature or admin transaction")
+		return fmt.Errorf("missing signature and/or admin transaction")
 	}
 	// get oracles
 	oracles, err := state.Oracles(false)
@@ -343,7 +343,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 			}
 			// endblock is always greater than start block so that case is also included here
 			if height > process.StartBlock {
-				return fmt.Errorf("cannot add process keys in a started or finished process")
+				return fmt.Errorf("cannot add process keys to a process that has started or finished")
 			}
 			// process is not canceled
 			if process.Status == models.ProcessStatus_CANCELED || process.Status == models.ProcessStatus_ENDED ||
@@ -359,7 +359,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 			}
 		case models.TxType_REVEAL_PROCESS_KEYS:
 			if tx.KeyIndex == nil {
-				return fmt.Errorf("missing keyIndexon AdminTxCheck")
+				return fmt.Errorf("missing keyIndex on AdminTxCheck")
 			}
 			// check process is finished
 			if height < process.StartBlock+process.BlockCount &&
@@ -381,7 +381,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 		}
 		for idx, oracle := range oracles {
 			if oracle == common.BytesToAddress(tx.Address) {
-				return fmt.Errorf("oracle already added at oracle list position %d", idx)
+				return fmt.Errorf("oracle already added to oracle list at position %d", idx)
 			}
 		}
 	case models.TxType_REMOVE_ORACLE:
@@ -413,7 +413,7 @@ func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
 	}
 	// check if provided keyIndex is not already used
 	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) > 0 || len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
-		return fmt.Errorf("key index %d alrady exist", tx.KeyIndex)
+		return fmt.Errorf("key index %d already exists", tx.KeyIndex)
 	}
 	// TBD check that provided keys are correct (ed25519 for encryption and size for Commitment)
 	return nil
@@ -437,7 +437,8 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 			pub := priv.Public().Bytes()
 			if fmt.Sprintf("%x", pub) != process.EncryptionPublicKeys[*tx.KeyIndex] {
 				log.Debugf("%x != %s", pub, process.EncryptionPublicKeys[*tx.KeyIndex])
-				return fmt.Errorf("the provided private key does not match with the stored public key on index %d", *tx.KeyIndex)
+				return fmt.Errorf("the provided private key does not match "+
+					"with the stored public key for index %d", *tx.KeyIndex)
 			}
 		} else {
 			return err
@@ -447,7 +448,8 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		commitment := ethereum.HashRaw(tx.RevealKey)
 		if fmt.Sprintf("%x", commitment) != process.CommitmentKeys[*tx.KeyIndex] {
 			log.Debugf("%x != %s", commitment, process.CommitmentKeys[*tx.KeyIndex])
-			return fmt.Errorf("the provided commitment reveal key does not match with the stored on index %d", *tx.KeyIndex)
+			return fmt.Errorf("the provided commitment reveal key does not match "+
+				"with the stored for index %d", *tx.KeyIndex)
 		}
 
 	}

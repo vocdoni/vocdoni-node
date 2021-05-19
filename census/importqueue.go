@@ -44,7 +44,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 		if err := m.DelNamespace(cid); err != nil {
 			log.Error(err)
 		}
-		return fmt.Errorf("root hash does not match on imported census, aborting import")
+		return fmt.Errorf("root hash does not match imported census, aborting import")
 	}
 	tr.Publish()
 	log.Infof("census imported successfully, %d claims. Status is public:%t",

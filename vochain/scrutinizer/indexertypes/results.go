@@ -54,7 +54,7 @@ func (r *Results) Add(new *Results) error {
 		return nil
 	}
 	if len(new.Votes) != len(r.Votes) {
-		return fmt.Errorf("results.Add: different number of fields")
+		return fmt.Errorf("results.Add: incorrect number of fields")
 	}
 	for i := range new.Votes {
 		if len(r.Votes[i]) < len(new.Votes[i]) {

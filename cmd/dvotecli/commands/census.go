@@ -184,7 +184,7 @@ func getSize(cmd *cobra.Command, args []string) error {
 
 func genProof(cmd *cobra.Command, args []string) error {
 	if len(args) < 3 {
-		return fmt.Errorf("you must provide a census id, a key, and a value to proof")
+		return fmt.Errorf("you must provide a census id, a key, and a value to prove")
 	}
 
 	cl, err := client.New(opt.host)

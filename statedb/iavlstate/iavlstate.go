@@ -70,7 +70,7 @@ func (i *IavlState) LoadVersion(v int64) error { // zero means last version, -1 
 	var err error
 
 	if v != 0 {
-		// get las versiontree saved version and decrease by 1 if higher than zero
+		// get last versiontree saved version and decrease by 1 if higher than zero
 		if v == -1 {
 			v, err = i.versionTree.Load()
 			if err != nil {
@@ -107,7 +107,7 @@ func (i *IavlState) LoadVersion(v int64) error { // zero means last version, -1 
 			}
 		}
 		if _, err = i.versionTree.Load(); err != nil {
-			return fmt.Errorf("cannot load versions tree: (%s)", err)
+			return fmt.Errorf("cannot load version tree: (%s)", err)
 		}
 	}
 
@@ -243,7 +243,7 @@ func (t *IavlTree) Get(key []byte) (r []byte) {
 
 func (t *IavlTree) Add(key, value []byte) error {
 	if t.isImmutable {
-		return fmt.Errorf("cannot add values to a immutable tree")
+		return fmt.Errorf("cannot add values to an immutable tree")
 	}
 	if value == nil {
 		return fmt.Errorf("value cannot be nil")

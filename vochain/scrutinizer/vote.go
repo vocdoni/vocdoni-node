@@ -249,7 +249,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	p.HaveResults = true
 	p.FinalResults = true
 	if err := s.db.Update(processID, p); err != nil {
-		return fmt.Errorf("computeResults: cannot update processID %x: %w, ", processID, err)
+		return fmt.Errorf("computeResult: cannot update processID %x: %w, ", processID, err)
 	}
 	s.addVoteLock.Lock()
 	defer s.addVoteLock.Unlock()
@@ -436,7 +436,7 @@ func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 		return err
 	}
 	if maxTries == 0 {
-		err = fmt.Errorf("got too much transaction conflicts")
+		err = fmt.Errorf("got too many transaction conflicts")
 	}
 	if err != nil {
 		log.Debugf("saved %d votes with total weight of %s on process %x", len(partialResults.Votes),
@@ -450,10 +450,10 @@ func (s *Scrutinizer) computeFinalResults(p *indexertypes.Process) (*indexertype
 		return nil, fmt.Errorf("process is nil")
 	}
 	if p.VoteOpts.MaxCount == 0 || p.VoteOpts.MaxValue == 0 {
-		return nil, fmt.Errorf("computeNonLiveResults: maxCount or maxValue are zero")
+		return nil, fmt.Errorf("computeNonLiveResults: maxCount and/or maxValue is zero")
 	}
 	if p.VoteOpts.MaxCount > MaxQuestions || p.VoteOpts.MaxValue > MaxOptions {
-		return nil, fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
+		return nil, fmt.Errorf("maxCount and/or maxValue overflows hardcoded maximum")
 	}
 	results := &indexertypes.Results{
 		Votes:        indexertypes.NewEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),

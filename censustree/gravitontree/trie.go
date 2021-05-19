@@ -174,11 +174,11 @@ func (t *Tree) GenProof(index, value []byte) ([]byte, error) {
 // CheckProof standalone function for checking a merkle proof
 func CheckProof(index, value, root []byte, mproof []byte) (bool, error) {
 	if len(index) > gravitonstate.GravitonMaxKeySize {
-		return false, fmt.Errorf("index is too big, maximum allow is %d",
+		return false, fmt.Errorf("index is too big, maximum allowed is %d",
 			gravitonstate.GravitonMaxKeySize)
 	}
 	if len(value) > gravitonstate.GravitonMaxValueSize {
-		return false, fmt.Errorf("value is too big, maximum allow is %d",
+		return false, fmt.Errorf("value is too big, maximum allowed is %d",
 			gravitonstate.GravitonMaxValueSize)
 	}
 	if len(root) != gravitonstate.GravitonHashSizeBytes {
@@ -191,11 +191,11 @@ func CheckProof(index, value, root []byte, mproof []byte) (bool, error) {
 // CheckProof validates a merkle proof and its data
 func (t *Tree) CheckProof(index, value, root, mproof []byte) (bool, error) {
 	if len(index) > gravitonstate.GravitonMaxKeySize {
-		return false, fmt.Errorf("index is too big, maximum allow is %d",
+		return false, fmt.Errorf("index is too big, maximum allowed is %d",
 			gravitonstate.GravitonMaxKeySize)
 	}
 	if len(value) > gravitonstate.GravitonMaxValueSize {
-		return false, fmt.Errorf("value is too big, maximum allow is %d",
+		return false, fmt.Errorf("value is too big, maximum allowed is %d",
 			gravitonstate.GravitonMaxValueSize)
 	}
 	if t.Tree == nil {

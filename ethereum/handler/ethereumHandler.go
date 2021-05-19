@@ -241,7 +241,7 @@ func (eh *EthereumHandler) NewProcessTxArgs(ctx context.Context, pid [types.Proc
 
 	// census URI
 	if vochain.CensusOrigins[censusOrigin].NeedsURI && len(processMeta.MetadataCensusRootCensusUri[2]) == 0 {
-		return nil, fmt.Errorf("census %s needs URI but non has been provided", vochain.CensusOrigins[censusOrigin].Name)
+		return nil, fmt.Errorf("census %s needs URI, none has been provided", vochain.CensusOrigins[censusOrigin].Name)
 	}
 	processData.CensusURI = &processMeta.MetadataCensusRootCensusUri[2]
 
@@ -307,7 +307,8 @@ func (eh *EthereumHandler) NewProcessTxArgs(ctx context.Context, pid [types.Proc
 			return nil, fmt.Errorf("invalid storage root obtained from Ethereum: %x", fetchedRoot)
 		}
 		if !bytes.Equal(fetchedRoot.Bytes(), processData.CensusRoot) {
-			return nil, fmt.Errorf("invalid storage root, root fetched and provided must be the same. Got: %x expected: %x", fetchedRoot, processData.CensusRoot)
+			return nil, fmt.Errorf("invalid storage root: root fetched must be the same as root provided. "+
+				"Got: %x expected: %x", fetchedRoot, processData.CensusRoot)
 		}
 		// get index slot from the token storage proof contract
 		islot, err := eh.GetTokenBalanceMappingPosition(ctx, processMeta.EntityAddressOwner[0])
@@ -390,7 +391,7 @@ func (eh *EthereumHandler) SetStatusTxArgs(ctx context.Context, pid [types.Proce
 		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
 	}
 	if processData.Status == status {
-		return nil, fmt.Errorf("status should differ: %w", err)
+		return nil, fmt.Errorf("status should be changed: %w", err)
 	}
 	// create setProcessTx
 	setprocessTxArgs := new(models.SetProcessTx)
@@ -425,7 +426,8 @@ func (eh *EthereumHandler) SetCensusTxArgs(ctx context.Context, pid [types.Proce
 		return nil, fmt.Errorf("cannot update census, invalid census origin")
 	}
 	if vochain.CensusOrigins[censusOrigin].NeedsURI && len(processData.MetadataCensusRootCensusUri[2]) == 0 {
-		return nil, fmt.Errorf("census %s needs URI but an empty census URI has been provided", censusOrigin.String())
+		return nil, fmt.Errorf("census %s needs URI but an empty census URI has been provided",
+			censusOrigin.String())
 	}
 	setprocessTxArgs.CensusURI = &processData.MetadataCensusRootCensusUri[2]
 
@@ -451,7 +453,7 @@ func (eh *EthereumHandler) EntityProcessCount(ctx context.Context, eid common.Ad
 // EntityNextProcessID returns the next process id of a given entity address
 func (eh *EthereumHandler) EntityNextProcessID(ctx context.Context, eid common.Address) (entityNextProcessID [32]byte, err error) {
 	if entityNextProcessID, err = eh.VotingProcess.GetNextProcessId(&ethbind.CallOpts{Context: ctx}, eid); err != nil {
-		err = fmt.Errorf("cannot get entity next process id: %w", err)
+		err = fmt.Errorf("cannot get entity's next process id: %w", err)
 	}
 	return
 }
@@ -523,7 +525,7 @@ func (eh *EthereumHandler) RemoveOracleTxArgs(ctx context.Context, oracleAddress
 	}
 	for _, oracle := range genesis.Oracles {
 		if oracle == oracleAddress {
-			return nil, fmt.Errorf("cannot remove oracle, at this point the oracle should not be on ethereum")
+			return nil, fmt.Errorf("cannot remove oracle: the oracle should not be on ethereum")
 		}
 	}
 	removeOracleTxArgs := &models.AdminTx{
@@ -605,14 +607,16 @@ func ENSAddress(ctx context.Context, publicRegistryAddr, domain, ethEndpoint str
 	for i := 0; i < types.EthereumDialMaxRetry; i++ {
 		client, err = ethclient.Dial(ethEndpoint)
 		if err != nil || client == nil {
-			log.Warnf("cannot create a client connection: %s, trying again... %d of %d", err, i+1, types.EthereumDialMaxRetry)
+			log.Warnf("cannot create a client connection: %s, trying again... %d of %d",
+				err, i+1, types.EthereumDialMaxRetry)
 			time.Sleep(time.Second * 2)
 			continue
 		}
 		break
 	}
 	if err != nil || client == nil {
-		log.Warnf("cannot create a client connection: %s, tried %d times.", err, types.EthereumDialMaxRetry)
+		log.Warnf("cannot create a client connection: %s, tried %d times.",
+			err, types.EthereumDialMaxRetry)
 		return "", fmt.Errorf("cannot create client connection: %w", err)
 	}
 

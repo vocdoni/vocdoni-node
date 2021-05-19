@@ -112,7 +112,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		stx := &models.SignedTx{}
 		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: processTx}})
 		if err != nil {
-			return fmt.Errorf("cannot marshal new process tx: %w", err)
+			return fmt.Errorf("cannot marshal newProcess tx: %w", err)
 		}
 		stx.Signature, err = e.Signer.Sign(stx.Tx)
 		if err != nil {
@@ -175,7 +175,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		setProcessTx, err := processCensusUpdatedMeta(tctx,
 			&e.ContractsInfo["processes"].ABI, event.Data, e.VotingHandle)
 		if err != nil {
-			return fmt.Errorf("cannot obtain census uptade data for creating the transaction: %w", err)
+			return fmt.Errorf("cannot obtain census update data for creating the transaction: %w", err)
 		}
 		log.Infof("found process %x census update on ethereum", setProcessTx.ProcessId)
 		p, err := e.VochainApp.State.Process(setProcessTx.ProcessId, true)
@@ -228,7 +228,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		addOracleTx, err := genesisOracleAddedMeta(tctx,
 			&e.ContractsInfo["genesis"].ABI, event.Data, e.VotingHandle)
 		if err != nil {
-			return fmt.Errorf("cannot obtain add oracle data for creating the transaction: %w", err)
+			return fmt.Errorf("cannot obtain addOracle data for creating the transaction: %w", err)
 		}
 		log.Infof("found add oracle %x genesis event on ethereum", addOracleTx.Address)
 		oracles, err := e.VochainApp.State.Oracles(true)
@@ -268,7 +268,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		removeOracleTx, err := genesisOracleRemovedMeta(tctx,
 			&e.ContractsInfo["genesis"].ABI, event.Data, e.VotingHandle)
 		if err != nil {
-			return fmt.Errorf("cannot obtain remove oracle data for creating the transaction: %w", err)
+			return fmt.Errorf("cannot obtain removeOracle data for creating the transaction: %w", err)
 		}
 		log.Infof("found remove oracle %x genesis event on ethereum", removeOracleTx.Address)
 		oracles, err := e.VochainApp.State.Oracles(true)
@@ -285,7 +285,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			}
 		}
 		if !found {
-			return fmt.Errorf("oracle not found, cannot remove")
+			return fmt.Errorf("oracle not found, cannot be removed")
 		}
 		// create admin tx
 		stx := &models.SignedTx{}
