@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
 	"github.com/timshannon/badgerhold/v3"
+	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -117,9 +117,7 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 	s.countTotalProcesses = int64(processes)
 	// Subscrive to events
 	s.App.State.AddEventListener(s)
-	if s.envelopeHeightCache, err = lru.New(countEnvelopeCacheSize); err != nil {
-		return nil, err
-	}
+	s.envelopeHeightCache = lru.New(countEnvelopeCacheSize)
 	return s, nil
 }
 
@@ -284,12 +282,12 @@ func (s *Scrutinizer) Commit(height uint32) error {
 
 	for pid, votes := range s.votePool {
 		// Update or set the cache of envelopes height by process ID
-		if vcount, ok := s.envelopeHeightCache.Get(pid); ok {
-			c := vcount.(uint64) + uint64(len(votes))
-			s.envelopeHeightCache.Add(pid, c)
-		} else {
-			s.envelopeHeightCache.Add(pid, uint64(len(votes)))
-		}
+		s.envelopeHeightCache.GetOrUpdate(pid, func(prev interface{}) interface{} {
+			if prev, ok := prev.(uint64); ok {
+				return prev + uint64(len(votes))
+			}
+			return uint64(len(votes))
+		})
 		// Get the process information
 		proc, err := s.ProcessInfo([]byte(pid))
 		if err != nil {

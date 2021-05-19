@@ -209,25 +209,39 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 
 // GetEnvelopeHeight returns the number of envelopes for a processId.
 // If processId is empty, returns the total number of envelopes.
-func (s *Scrutinizer) GetEnvelopeHeight(processId []byte) (uint64, error) {
-	if len(processId) > 0 {
-		cc, ok := s.envelopeHeightCache.Get(string(processId))
-		if ok {
-			return cc.(uint64), nil
-		}
-		// TODO: Warning, int can overflow
-		c, err := s.db.Count(&indexertypes.VoteReference{},
-			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"))
-		if err != nil {
-			return 0, err
-		}
-		c64 := uint64(c)
-		s.envelopeHeightCache.Add(string(processId), c64)
-		return c64, nil
+func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
+	if len(processID) == 0 {
+		// If no processID is provided, count all envelopes
+		return atomic.LoadUint64(&s.countTotalEnvelopes), nil
 	}
 
-	// If no processId is provided, count all envelopes
-	return atomic.LoadUint64(&s.countTotalEnvelopes), nil
+	// The DB's count operation can error, so the cache entry stores either
+	// a result uint64 or an error.
+	// If an error occurs, right now it's "sticky", in the sense that it
+	// remains there until the entry is evicted as per the LRU rules.
+
+	val := s.envelopeHeightCache.GetOrUpdate(string(processID), func(prev interface{}) interface{} {
+		if prev != nil {
+			// If it's already in the cache, use it as-is.
+			return prev
+		}
+		// TODO: Warning, int can overflow
+		count, err := s.db.Count(&indexertypes.VoteReference{},
+			badgerhold.Where("ProcessID").Eq(processID).Index("ProcessID"))
+		if err != nil {
+			return err
+		}
+		return uint64(count)
+
+	})
+	switch val := val.(type) {
+	case error:
+		return 0, val
+	case uint64:
+		return val, nil
+	default:
+		panic(fmt.Sprintf("unexpected type: %T", val))
+	}
 }
 
 // ComputeResult process a finished voting, compute the results and saves it in the Storage.
