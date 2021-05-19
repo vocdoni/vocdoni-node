@@ -60,17 +60,17 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	flag.StringVarP(&globalCfg.DataDir, "dataDir", "d", home+"/.dvote",
 		"directory where data is stored")
 	flag.StringVarP(&globalCfg.VochainConfig.Chain, "vochain", "v", "dev",
-		"vocdoni blokchain network to connect with")
+		"vocdoni blockchain network to connect with")
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
 		"use developer mode (less security)")
 	globalCfg.LogLevel = *flag.StringP("logLevel", "l", "info",
-		"Log level (debug, info, warn, error, fatal)")
+		"log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout",
-		"Log output (stdout, stderr or filepath)")
+		"log output (stdout, stderr or filepath)")
 	globalCfg.LogErrorFile = *flag.String("logErrorFile", "",
-		"Log errors and warnings to a file")
+		"log errors and warnings to a file")
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false,
-		"overwrites an existing config file with the CLI provided flags")
+		"overwrite an existing config file with the provided CLI flags")
 	// TODO(mvdan): turn this into an enum to avoid human error
 	globalCfg.Mode = *flag.StringP("mode", "m", types.ModeGateway,
 		"global operation mode. Available options: [gateway,oracle,ethApiOracle,miner]")
@@ -81,7 +81,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.Census = *flag.Bool("censusApi", false, "enable the census API")
 	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable the vote API")
 	globalCfg.API.Tendermint = *flag.Bool("tendermintApi", false,
-		"make the Tendermint API public available")
+		"make the Tendermint API publicly available")
 	globalCfg.API.Results = *flag.Bool("resultsApi", true,
 		"enable the results API")
 	globalCfg.API.Indexer = *flag.Bool("indexerApi", false,
@@ -91,7 +91,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false,
 		"allows private methods over the APIs")
 	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "",
-		"comma delimited list of allowed client ETH addresses for private methods")
+		"comma-delimited list of allowed client ETH addresses for private methods")
 	globalCfg.API.ListenHost = *flag.String("listenHost", "0.0.0.0",
 		"API endpoint listen address")
 	globalCfg.API.ListenPort = *flag.IntP("listenPort", "p", 9090,
@@ -100,7 +100,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"dvote websocket API read size limit in bytes")
 	// ssl
 	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "",
-		"enable TLS secure domain with LetsEncrypt (listenPort=443 is required)")
+		"enable TLS-secure domain with LetsEncrypt (listenPort=443 is required)")
 	// ethereum node
 	globalCfg.EthConfig.SigningKey = *flag.StringP("ethSigningKey", "k", "",
 		"signing private Key (if not specified the Ethereum keystore will be used)")
@@ -114,7 +114,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"ethereum web3 endpoint. Supported protocols: http(s)://, ws(s):// and IPC filepath")
 	// ipfs
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false,
-		"disables inter planetary file system support")
+		"disable inter planetary file system support")
 	globalCfg.Ipfs.SyncKey = *flag.StringP("ipfsSyncKey", "i", "",
 		"enable IPFS cluster synchronization using the given secret key")
 	globalCfg.Ipfs.SyncPeers = *flag.StringArray("ipfsSyncPeers", []string{},
@@ -123,21 +123,21 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656",
 		"p2p host and port to listent for the voting chain")
 	globalCfg.VochainConfig.PublicAddr = *flag.String("vochainPublicAddr", "",
-		"external addrress:port to announce to other peers (automatically guessed if empty)")
+		"external address:port to announce to other peers (automatically guessed if empty)")
 	globalCfg.VochainConfig.RPCListen = *flag.String("vochainRPCListen", "127.0.0.1:26657",
-		"rpc host and port to listen for the voting chain")
+		"rpc host and port to listen to for the voting chain")
 	globalCfg.VochainConfig.CreateGenesis = *flag.Bool("vochainCreateGenesis", false,
-		"create own/testing genesis file on vochain")
+		"create local/testing genesis file for the vochain")
 	globalCfg.VochainConfig.Genesis = *flag.String("vochainGenesis", "",
 		"use alternative genesis file for the vochain")
 	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "none",
-		"tendermint node log level (error, info, debug, nonde)")
+		"tendermint node log level (error, info, debug, none)")
 	globalCfg.VochainConfig.LogLevelMemPool = *flag.String("vochainLogLevelMemPool", "error",
 		"tendermint mempool log level")
 	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{},
-		"coma separated list of p2p peers")
+		"comma-separated list of p2p peers")
 	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{},
-		"coma separated list of p2p seed nodes")
+		"comma-separated list of p2p seed nodes")
 	globalCfg.VochainConfig.MinerKey = *flag.String("vochainMinerKey", "",
 		"user alternative vochain miner private key (hexstring[64])")
 	globalCfg.VochainConfig.NodeKey = *flag.String("vochainNodeKey", "",
@@ -151,12 +151,12 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
 		"vohain consensus block time target (in seconds)")
 	globalCfg.VochainConfig.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0,
-		"if this node is a key keeper, use this index slot")
+		"index slot used by this node if it is a key keeper")
 	globalCfg.VochainConfig.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false,
 		"if enabled the census downloader will import all existing census")
 	globalCfg.VochainConfig.EthereumWhiteListAddrs = *flag.StringArray("ethereumWhiteListAddrs",
 		[]string{},
-		"list of allowed ethereum address for creating processes on the vochain (oracle mode only)")
+		"list of ethereum addresses allowed to create processes on the vochain (oracle mode only)")
 	globalCfg.VochainConfig.EnableProcessArchive = *flag.Bool("processArchive", false,
 		"enables the process archiver component")
 	globalCfg.VochainConfig.ProcessArchiveKey = *flag.String("processArchiveKey", "",

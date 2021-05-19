@@ -104,7 +104,7 @@ func processLine(input []byte) *message.MyAPI {
 func main() {
 	host := flag.String("host", "ws://127.0.0.1:7788/main", "URL to connect to")
 	logLevel := flag.String("logLevel", "error", "log level <debug, info, warn, error>")
-	privKey := flag.String("key", "", "private key for signature (leave blank for auto-generate)")
+	privKey := flag.String("key", "", "private key for signature (leave blank for auto-generated key)")
 	flag.Parse()
 	log.Init(*logLevel, "stdout")
 	rand.Seed(time.Now().UnixNano())
