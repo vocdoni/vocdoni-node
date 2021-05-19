@@ -49,7 +49,7 @@ func (m *Manager) CheckAuth(reqOuter *api.RequestMessage, reqInner *api.MetaRequ
 	log.Debugf("namespace keys %s", ns.Keys)
 	if len(ns.Keys) > 0 {
 		if len(ns.Keys) == 1 && len(ns.Keys[0]) < ethereum.PubKeyLengthBytes*2 {
-			log.Warnf("namespace %s does have management public key configured, allowing all", ns.Name)
+			log.Warnf("namespace %s does not have management public key configured, allowing all", ns.Name)
 			return nil
 		}
 		valid := false
@@ -71,7 +71,7 @@ func (m *Manager) CheckAuth(reqOuter *api.RequestMessage, reqInner *api.MetaRequ
 			return fmt.Errorf("unauthorized")
 		}
 	} else {
-		log.Warnf("namespace %s does have management public key configured, allowing all", ns.Name)
+		log.Warnf("namespace %s does now have management public key configured, allowing all", ns.Name)
 	}
 	return nil
 }

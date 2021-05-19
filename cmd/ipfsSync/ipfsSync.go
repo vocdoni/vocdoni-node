@@ -21,14 +21,18 @@ func main() {
 	logLevel := flag.String("logLevel", "info", "log level")
 	dataDir := flag.String("dataDir", userDir, "directory for storing data")
 	key := flag.String("key", "vocdoni", "secret shared group key for the sync cluster")
-	nodeKey := flag.String("nodeKey", "", "custom private hexadeciaml 256 bit key for p2p identity")
+	nodeKey := flag.String("nodeKey", "", "custom private hexadecimal 256 bit key for p2p identity")
 	port := flag.Int16("port", 4171, "port for the sync network")
 	helloTime := flag.Int("helloTime", 40, "period in seconds for sending hello messages")
 	updateTime := flag.Int("updateTime", 20, "period in seconds for sending update messages")
-	peers := flag.StringArray("peers", []string{}, "custom list of peers to connect (multiaddress separated by commas)")
-	private := flag.Bool("private", false, "if enabled a private libp2p network will be created (using the secret key at transport layer)")
-	bootnodes := flag.StringArray("bootnodes", []string{}, "list of bootnodes (multiaddress separated by commas)")
-	bootnode := flag.Bool("bootnode", false, "act as a bootstrap node (will not try to connect with other bootnodes)")
+	peers := flag.StringArray("peers", []string{},
+		"custom list of peers to connect to (multiaddresses separated by commas)")
+	private := flag.Bool("private", false,
+		"if enabled a private libp2p network will be created (using the secret key at transport layer)")
+	bootnodes := flag.StringArray("bootnodes", []string{},
+		"list of bootnodes (multiaddress separated by commas)")
+	bootnode := flag.Bool("bootnode", false,
+		"act as a bootstrap node (will not try to connect with other bootnodes)")
 
 	flag.Parse()
 	log.Init(*logLevel, "stdout")

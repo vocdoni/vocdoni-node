@@ -176,7 +176,7 @@ func (p *Proxy) AddWsHandler(path string, handler ProxyWsHandler, readLimit int6
 		if r.Header.Get("Upgrade") == "websocket" {
 			wshandler(w, r, handler, readLimit)
 		} else {
-			log.Warn("receied a non upgrade websockets connection to a only WS endpoint")
+			log.Warn("receied a non-upgrade websockets connection to a WS-only endpoint")
 		}
 	})
 }

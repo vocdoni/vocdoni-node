@@ -190,7 +190,7 @@ func (s *Scrutinizer) computePendingProcesses(height uint32) {
 				log.Warnf("cannot compute results for %x: (%v)", p.ID, err)
 				return nil
 			}
-			log.Infof("results compute on %x took %s", p.ID, time.Since(initT).String())
+			log.Infof("results computation on %x took %s", p.ID, time.Since(initT).String())
 			p.FinalResults = true
 			p.HaveResults = true
 			if err := s.db.Update(p.ID, p); err != nil {

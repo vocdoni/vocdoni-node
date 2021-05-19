@@ -52,7 +52,7 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 	log.Infof("config root: %s", ConfigRoot)
 	r, err := fsrepo.Open(ConfigRoot)
 	if err != nil {
-		log.Warn("Error opening repo dir")
+		log.Warn("error opening repo dir")
 		return nil, nil, err
 	}
 	cfg := &ipfscore.BuildCfg{

@@ -82,10 +82,10 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool,
 					}
 					genesisBytes = []byte(vochain.Genesis[vconfig.Chain].Genesis)
 				} else {
-					log.Warn("local and hardcoded genesis are different, potential consensus failure risk")
+					log.Warn("local and hardcoded genesis are different, risk of potential consensus failure")
 				}
 			} else {
-				log.Info("local genesis match with the hardcoded genesis")
+				log.Info("local genesis matches with the hardcoded genesis")
 			}
 		} else { // If genesis file not found
 			if !os.IsNotExist(err) {
@@ -195,7 +195,8 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 		m = vi.MempoolSize()
 		p, v, vxm = vi.TreeSizes()
 		vc = vi.VoteCacheSize()
-		log.Infof("[vochain info] height:%d mempool:%d peers:%d processes:%d votes:%d vxm:%d voteCache:%d blockTime:{%s}",
+		log.Infof("[vochain info] height:%d mempool:%d peers:%d "+
+			"processes:%d votes:%d vxm:%d voteCache:%d blockTime:{%s}",
 			h, m, len(vi.Peers()), p, v, vxm, vc, b.String(),
 		)
 		time.Sleep(time.Duration(sleepSecs) * time.Second)

@@ -232,7 +232,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 		return nil
 	}
 	if since := int32(time.Now().Unix()) - int32(msg.Timestamp); since > is.TimestampWindow {
-		log.Debugf("discarting old message from %d seconds ago", since)
+		log.Debugf("discarding old message from %d seconds ago", since)
 		return nil
 	}
 	switch msg.Msgtype {
@@ -404,7 +404,8 @@ func (is *IPFSsync) Start() {
 				log.Warnf("cannot unmarshal message %s", err)
 			} else {
 				log.Debugf("received message %s {Address:%s Hash:%x MA:%s PL:%v Ts:%d}",
-					imsg.Msgtype.String(), imsg.Address, imsg.Hash, imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
+					imsg.Msgtype.String(), imsg.Address, imsg.Hash,
+					imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
 				go is.Handle(&imsg)
 			}
 		}

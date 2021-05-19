@@ -123,7 +123,7 @@ func BenchmarkVochain(b *testing.B) {
 		b.Fatalf("request returned an error: %s", resp.Message)
 	}
 
-	log.Infof("check block height is not less than process start block")
+	log.Infof("ensure block height is not less than process start block")
 	reset(req)
 	resp = doRequest("getBlockHeight", nil)
 	if !resp.Ok {
@@ -174,7 +174,7 @@ func BenchmarkVochain(b *testing.B) {
 	}
 
 	// check if process is created
-	log.Infof("check if process created")
+	log.Infof("check if process was created")
 	reset(req)
 	req.ProcessID = processID
 	failures := 20

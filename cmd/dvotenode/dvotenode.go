@@ -376,9 +376,9 @@ func main() {
 	if cfgErr.Critical && cfgErr.Message != "" {
 		log.Fatalf("critical error loading config: %s", cfgErr.Message)
 	} else if !cfgErr.Critical && cfgErr.Message != "" {
-		log.Warnf("non Critical error loading config: %s", cfgErr.Message)
+		log.Warnf("non-critical error loading config: %s", cfgErr.Message)
 	} else if !cfgErr.Critical && cfgErr.Message == "" {
-		log.Infof("config file loaded successfully, remember CLI flags have preference")
+		log.Infof("config file loaded successfully. Reminder: CLI flags have preference")
 	}
 
 	// Ensure we can have at least 8k open files. This is necessary, since
@@ -386,7 +386,7 @@ func main() {
 	// connections. Some systems have low defaults like 1024, which can make
 	// the program crash after it's been running for a bit.
 	if err := ensureNumberFiles(8000); err != nil {
-		log.Errorf("could not ensure we can have enough open files: %v", err)
+		log.Errorf("could not ensure support for enough open files: %v", err)
 	}
 
 	// Check the mode is valid
@@ -410,7 +410,7 @@ func main() {
 		}()
 	}
 
-	log.Infof("starting vocdoni dvote node version %q in %s mode",
+	log.Infof("starting vocdoni node version %q in %s mode",
 		internal.Version, globalCfg.Mode)
 
 	var err error

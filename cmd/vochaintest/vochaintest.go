@@ -45,7 +45,8 @@ func main() {
 	parallelCons := flag.Int("parallelCons", 1, "parallel API connections")
 	procDuration := flag.Int("processDuration", 500, "voting process duration in blocks")
 	doubleVote := flag.Bool("doubleVote", true, "send every vote twice")
-	checkNullifiers := flag.Bool("checkNullifiers", false, "check all votes are correct one by one (slow)")
+	checkNullifiers := flag.Bool("checkNullifiers", false,
+		"check all votes are correct one by one (slow)")
 	gateways := flag.StringSlice("gwExtra", []string{},
 		"list of extra gateways to be used in addition to gwHost for sending votes")
 	keysfile := flag.String("keysFile", "cache-keys.json", "file to store and reuse keys and census")
@@ -54,17 +55,22 @@ func main() {
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nAvailable operation modes:\n")
 		fmt.Fprintf(os.Stderr,
-			"=> vtest\n\tPerforms a complete test, from creating a census to voting and validate votes\n")
+			"=> vtest\n\tPerforms a complete test, from creating a census to voting and validating votes\n")
 		fmt.Fprintf(os.Stderr,
-			"\t./test --operation=vtest --electionSize=1000 --oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223\n")
+			"\t./test --operation=vtest --electionSize=1000 "+
+				"--oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223\n")
 		fmt.Fprintf(os.Stderr,
-			"=> censusImport\n\tReads from stdin line by line to read a list of hex public keys, creates and publishes the census\n")
+			"=> censusImport\n\tReads from stdin line by line"+
+				" to read a list of hex public keys, creates and publishes the census\n")
 		fmt.Fprintf(os.Stderr,
-			"\tcat keys.txt | ./test --operation=censusImport --gwHost wss://gw1test.vocdoni.net/dvote\n")
+			"\tcat keys.txt | ./test --operation=censusImport "+
+				"--gwHost wss://gw1test.vocdoni.net/dvote\n")
 		fmt.Fprintf(os.Stderr,
-			"=> censusGenerate\n\tGenerate a list of private/public keys and its merkle Proofs\n")
+			"=> censusGenerate\n\tGenerate a list of "+
+				"private/public keys and their merkle Proofs\n")
 		fmt.Fprintf(os.Stderr,
-			"\t./test --operation=censusGenerate --gwHost wss://gw1test.vocdoni.net/dvote --electionSize=10000 --keysFile=keys.json\n")
+			"\t./test --operation=censusGenerate --gwHost "+
+				"wss://gw1test.vocdoni.net/dvote --electionSize=10000 --keysFile=keys.json\n")
 	}
 	flag.Parse()
 
@@ -294,7 +300,7 @@ func mkTreeVoteTest(host,
 				if _, ok := gatewaysWithCensus[cl.Addr]; !ok {
 					if size, err := cl.CensusSize(censusRoot); err == nil {
 						if size < int64(electionSize) {
-							log.Fatalf("gateway %s has an incorrect census size (got:%d expected%d)",
+							log.Fatalf("gateway %s has an incorrect census size (got: %d expected %d)",
 								cl.Addr, size, electionSize)
 						}
 						log.Infof("gateway %s got the census!", cl.Addr)
@@ -307,7 +313,7 @@ func mkTreeVoteTest(host,
 			}
 		}
 
-		log.Infof("all gateways got the census! let's start voting")
+		log.Infof("all gateways retrieved the census! let's start voting")
 	}
 
 	// Send votes
@@ -371,7 +377,7 @@ func mkTreeVoteTest(host,
 			maxVotingTime = t
 		}
 	}
-	log.Infof("the TOTAL voting process took %s", maxVotingTime)
+	log.Infof("the ENTIRE voting process took %s", maxVotingTime)
 	log.Infof("checking results....")
 	if r, err := mainClient.TestResults(pid, len(censusKeys)); err != nil {
 		log.Fatal(err)
@@ -524,7 +530,7 @@ func cspVoteTest(
 			maxVotingTime = t
 		}
 	}
-	log.Infof("the TOTAL voting process took %s", maxVotingTime)
+	log.Infof("the ENTIRE voting process took %s", maxVotingTime)
 	log.Infof("checking results....")
 	if r, err := mainClient.TestResults(pid, len(voters)); err != nil {
 		log.Fatal(err)

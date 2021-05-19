@@ -13,7 +13,7 @@ type Transport interface {
   ConnectionType() string
   
 	// Listen starts and keeps listening for new messages, takes a channel where new messages will be written.
-  Listen(reciever chan<- Message)
+  Listen(receiver chan<- Message)
   
 	// Send outputs a new message to the connection of MessageContext.
 	// The package implementing this interface must also implement its own transports.MessageContext.

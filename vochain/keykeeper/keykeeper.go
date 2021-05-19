@@ -121,7 +121,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 	// wait for vochain sync?
 	header := k.vochain.State.Header(true)
 	if header == nil {
-		log.Errorf("cannot get blockchain header, skipping reveal unpublished operation")
+		log.Errorf("cannot get blockchain header, skipping RevealUnpublished operation")
 		return
 	}
 	k.lock.Lock()
@@ -363,7 +363,7 @@ func (k *KeyKeeper) checkRevealProcess(height uint32) {
 	}
 	data, err := k.storage.Get(pKey)
 	if err != nil {
-		log.Errorf("cannot get revel process for block %d", height)
+		log.Errorf("cannot get reveal process for block %d", height)
 		return
 	}
 

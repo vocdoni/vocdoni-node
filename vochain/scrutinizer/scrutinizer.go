@@ -108,7 +108,7 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 		return nil, fmt.Errorf("could not count the total processes: %w", err)
 	}
 
-	log.Infof("indexer initialization took %s, have %d envelopes and %d entities stored",
+	log.Infof("indexer initialization took %s, stored %d envelopes and %d entities",
 		time.Since(startTime),
 		envelopes,
 		entities)

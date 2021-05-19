@@ -65,7 +65,7 @@ func (r *Router) submitEnvelope(request RouterRequest) {
 		r.SendError(request, string(res.Data))
 		return
 	}
-	log.Infof("broadcasting vochain tx hash:%s code:%d", res.Hash, res.Code)
+	log.Infof("broadcasting vochain tx hash: %s code: %d", res.Hash, res.Code)
 	var response api.MetaResponse
 	response.Nullifier = fmt.Sprintf("%x", res.Data)
 	if err = request.Send(r.BuildReply(request, &response)); err != nil {

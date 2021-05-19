@@ -106,7 +106,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 				return fmt.Errorf("process not found on the Vochain")
 			}
 		} else {
-			log.Infof("process already exist, skipping")
+			log.Infof("process already exists, skipping")
 			return nil
 		}
 		stx := &models.SignedTx{}
@@ -133,11 +133,13 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 	case ethereumEventList["processesStatusUpdated"]:
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		setProcessTx, err := processStatusUpdatedMeta(tctx, &e.ContractsInfo["processes"].ABI, event.Data, e.VotingHandle)
+		setProcessTx, err := processStatusUpdatedMeta(tctx,
+			&e.ContractsInfo["processes"].ABI, event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain update status data for creating the transaction: %w", err)
 		}
-		log.Infof("found process %x status update on ethereum, new status is %s", setProcessTx.ProcessId, setProcessTx.Status)
+		log.Infof("found process %x status update on ethereum, new status is %s",
+			setProcessTx.ProcessId, setProcessTx.Status)
 		p, err := e.VochainApp.State.Process(setProcessTx.ProcessId, true)
 		if err != nil {
 			return fmt.Errorf("cannot fetch the process from the Vochain: %w", err)
@@ -170,7 +172,8 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 	case ethereumEventList["processesCensusUpdated"]:
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		setProcessTx, err := processCensusUpdatedMeta(tctx, &e.ContractsInfo["processes"].ABI, event.Data, e.VotingHandle)
+		setProcessTx, err := processCensusUpdatedMeta(tctx,
+			&e.ContractsInfo["processes"].ABI, event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain census uptade data for creating the transaction: %w", err)
 		}
@@ -194,7 +197,8 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 		// check census origin
 		if !vochain.CensusOrigins[p.CensusOrigin].AllowCensusUpdate {
-			return fmt.Errorf("process census origin %s does not accept census updates", p.CensusOrigin.String())
+			return fmt.Errorf("process census origin %s does not accept census updates",
+				p.CensusOrigin.String())
 		}
 
 		stx := &models.SignedTx{}
@@ -221,7 +225,8 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 	case ethereumEventList["genesisOracleAdded"]:
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		addOracleTx, err := genesisOracleAddedMeta(tctx, &e.ContractsInfo["genesis"].ABI, event.Data, e.VotingHandle)
+		addOracleTx, err := genesisOracleAddedMeta(tctx,
+			&e.ContractsInfo["genesis"].ABI, event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain add oracle data for creating the transaction: %w", err)
 		}
@@ -260,7 +265,8 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 	case ethereumEventList["genesisOracleRemoved"]:
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		removeOracleTx, err := genesisOracleRemovedMeta(tctx, &e.ContractsInfo["genesis"].ABI, event.Data, e.VotingHandle)
+		removeOracleTx, err := genesisOracleRemovedMeta(tctx,
+			&e.ContractsInfo["genesis"].ABI, event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain remove oracle data for creating the transaction: %w", err)
 		}

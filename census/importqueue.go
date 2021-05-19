@@ -118,7 +118,7 @@ func (m *Manager) importQueueDaemon() {
 		exists := m.Exists(cid)
 		m.TreesMu.RUnlock()
 		if exists {
-			log.Debugf("census %s already exist, skipping", cid)
+			log.Debugf("census %s already exists, skipping", cid)
 			continue
 		}
 		log.Infof("retrieving remote census %s", uri)

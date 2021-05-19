@@ -55,7 +55,7 @@ func (r *Router) fetchFile(request RouterRequest) {
 		return
 	}
 
-	log.Debugf("file fetched, size %d", len(content))
+	log.Debugf("fetched file of size %d", len(content))
 	var response api.MetaResponse
 	response.Content = content
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
@@ -77,7 +77,7 @@ func (r *Router) addFile(request RouterRequest) {
 				fmt.Sprintf("cannot add file (%s)", err))
 			return
 		}
-		log.Debugf("added file %s, size %d", cid, len(request.Content))
+		log.Debugf("added file %s of size %d", cid, len(request.Content))
 		var response api.MetaResponse
 		response.URI = r.storage.URIprefix() + cid
 		if err := request.Send(r.BuildReply(request, &response)); err != nil {
