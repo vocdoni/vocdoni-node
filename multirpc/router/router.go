@@ -132,7 +132,7 @@ func (r *Router) getRequest(namespace string, payload []byte, context transports
 
 	if !method.skipSignature {
 		if len(reqOuter.Signature) != ethereum.SignatureLength {
-			return request, fmt.Errorf("no signature provided or invalid lenght")
+			return request, fmt.Errorf("no signature provided or invalid length")
 		}
 		var sigBytes []byte
 		if err = reqOuter.Signature.UnmarshalJSON(sigBytes); err != nil {

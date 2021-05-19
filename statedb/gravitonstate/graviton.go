@@ -496,7 +496,7 @@ func Verify(key, value, proof, root []byte) (bool, error) {
 	var p graviton.Proof
 	var r [GravitonHashSizeBytes]byte
 	if proof == nil || key == nil {
-		return false, fmt.Errorf("proof or key are nil")
+		return false, fmt.Errorf("proof and/or key is nil")
 	}
 	// Unmarshal() will generate a panic if the proof size is incorrect.
 	// See https://go.vocdoni.io/dvote/-/issues/333

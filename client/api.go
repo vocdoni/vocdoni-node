@@ -399,7 +399,7 @@ func (c *Client) TestSendVotes(
 			}
 		}
 		if time.Since(checkStart) > timeDeadLine {
-			return 0, fmt.Errorf("wait for envelope height took longer than deadline, skipping")
+			return 0, fmt.Errorf("waiting for envelope height took longer than deadline, skipping")
 		}
 	}
 	votingElapsedTime := time.Since(start)
@@ -427,7 +427,7 @@ func (c *Client) TestSendVotes(
 		}
 		registered = 0
 		if time.Since(checkStart) > timeDeadLine {
-			return 0, fmt.Errorf("check nullifier time took more than deadline, skipping")
+			return 0, fmt.Errorf("checking nullifier time took more than deadline, skipping")
 		}
 	}
 

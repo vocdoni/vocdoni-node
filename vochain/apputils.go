@@ -56,7 +56,7 @@ func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 			return false, nil, fmt.Errorf("CA bundle address and key do not match: %x != %x", key, p.Bundle.Address)
 		}
 		if !bytes.Equal(p.Bundle.ProcessId, processID) {
-			return false, nil, fmt.Errorf("CA bundle processID do not match")
+			return false, nil, fmt.Errorf("CA bundle processID does not match")
 		}
 		caBundle, err := proto.Marshal(p.Bundle)
 		if err != nil {
@@ -72,7 +72,7 @@ func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 				return false, nil, fmt.Errorf("cannot fetch ca address from signature: %w", err)
 			}
 			if !bytes.Equal(caPubk, censusRoot) {
-				return false, nil, fmt.Errorf("ca bundle signature do not match")
+				return false, nil, fmt.Errorf("ca bundle signature does not match")
 			}
 		case models.ProofCA_ECDSA_BLIND:
 			// Blind CA check

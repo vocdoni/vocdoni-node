@@ -46,7 +46,7 @@ func (o *Oracle) NewProcess(process *models.Process) error {
 		return fmt.Errorf("census origin: %d not supported", process.CensusOrigin)
 	}
 	if vochain.CensusOrigins[process.CensusOrigin].NeedsURI && process.CensusURI == nil {
-		return fmt.Errorf("census %s needs URI but non has been provided",
+		return fmt.Errorf("census %s needs URI but none has been provided",
 			vochain.CensusOrigins[process.CensusOrigin].Name)
 	}
 	if process.BlockCount < types.ProcessesContractMinBlockCount {
@@ -80,7 +80,7 @@ func (o *Oracle) NewProcess(process *models.Process) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("cannot marshal new process tx: %w", err)
+		return fmt.Errorf("cannot marshal newProcess tx: %w", err)
 	}
 	stx.Signature, err = o.signer.Sign(stx.Tx)
 	if err != nil {

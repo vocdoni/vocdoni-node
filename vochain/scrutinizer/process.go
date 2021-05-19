@@ -263,7 +263,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	compResultsHeight := uint32(0)
 	if live, err := s.isOpenProcess(pid); err != nil {
-		return fmt.Errorf("cannot check if process live: %w", err)
+		return fmt.Errorf("cannot check if process is live: %w", err)
 	} else {
 		if live {
 			compResultsHeight = p.GetBlockCount() + p.GetStartBlock() + 1

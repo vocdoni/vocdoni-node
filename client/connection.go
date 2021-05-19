@@ -122,7 +122,7 @@ func (c *Client) Request(req api.MetaRequest, signer *ethereum.SignKeys) (*api.M
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
 	if respOuter.ID != reqOuter.ID {
-		return nil, fmt.Errorf("%s: %v", method, "request ID doesn'tb match")
+		return nil, fmt.Errorf("%s: %v", method, "request ID doesn't match")
 	}
 	if len(respOuter.Signature) == 0 {
 		return nil, fmt.Errorf("%s: empty signature in response: %s", method, message)

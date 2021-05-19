@@ -142,7 +142,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return fmt.Errorf("process %x already in canceled state", pid)
 		}
 		if currentStatus == models.ProcessStatus_ENDED || currentStatus == models.ProcessStatus_RESULTS {
-			return fmt.Errorf("cannot set state canceled from ended or results")
+			return fmt.Errorf("cannot set state to canceled from ended or results")
 		}
 		if currentStatus != models.ProcessStatus_PAUSED && !process.Mode.Interruptible {
 			return fmt.Errorf("process %x is not interruptible, cannot change state to %s",
@@ -163,11 +163,11 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return fmt.Errorf("process %x already in results state", pid)
 		}
 		if currentStatus != models.ProcessStatus_ENDED && currentStatus != models.ProcessStatus_READY {
-			return fmt.Errorf("cannot set state results from %s", currentStatus.String())
+			return fmt.Errorf("cannot set state to results from %s", currentStatus.String())
 		}
 		if currentStatus == models.ProcessStatus_READY &&
 			process.StartBlock+process.BlockCount <= v.Height() {
-			return fmt.Errorf("cannot set state results from %s, process is still alive",
+			return fmt.Errorf("cannot set state to results from %s, process is still alive",
 				currentStatus.String())
 		}
 	default:
@@ -201,7 +201,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 	}
 	if process.Status == models.ProcessStatus_READY &&
 		process.StartBlock+process.BlockCount > v.Height() {
-		return fmt.Errorf("cannot set state results, process is still alive")
+		return fmt.Errorf("cannot set state to results, process is still alive")
 	}
 	if !bytes.Equal(result.ProcessId, process.ProcessId) {
 		return fmt.Errorf(
@@ -252,7 +252,7 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 	// dynamic census
 	if !process.Mode.DynamicCensus {
 		return fmt.Errorf(
-			"cannot update census, only processes with dynamic census can update its census")
+			"cannot update census, only processes with dynamic census can update their census")
 	}
 	// census origin
 	if !CensusOrigins[process.CensusOrigin].AllowCensusUpdate {
@@ -316,11 +316,11 @@ func NewProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	// start and endblock sanity check
 	if int64(tx.Process.StartBlock) < header.Height {
 		return nil, fmt.Errorf(
-			"cannot add process with start block lower or equal than the current height")
+			"cannot add process with start block lower than or equal to the current height")
 	}
 	if tx.Process.BlockCount <= 0 {
 		return nil, fmt.Errorf(
-			"cannot add process with duration lower or equal than the current height")
+			"cannot add process with duration lower than or equal to the current height")
 	}
 	authorized, addr, err := verifySignatureAgainstOracles(oracles, txBytes, signature)
 	if err != nil {
@@ -358,7 +358,7 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	tx := vtx.GetSetProcess()
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {
-		return fmt.Errorf("missing signature on set process transaction")
+		return fmt.Errorf("missing signature on setProcess transaction")
 	}
 	// get oracles
 	oracles, err := state.Oracles(false)
@@ -387,6 +387,6 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	case models.TxType_SET_PROCESS_CENSUS:
 		return state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), false)
 	default:
-		return fmt.Errorf("unknown set process tx type: %s", tx.Txtype)
+		return fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
 	}
 }
