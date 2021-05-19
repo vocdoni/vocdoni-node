@@ -90,7 +90,7 @@ func (eh *EthereumHandler) Connect(dialEndpoint string) error {
 		}
 		eh.EthereumRPC, err = ethrpc.Dial(dialEndpoint)
 		if err != nil || eh.EthereumRPC == nil {
-			log.Warnf("cannot create a ethereum rpc connection: (%s), trying again ...", err)
+			log.Warnf("cannot create an ethereum rpc connection: (%s), trying again ...", err)
 			time.Sleep(time.Second * 2)
 			maxtries--
 			continue
@@ -729,15 +729,18 @@ func ResolveEntityMetadataURL(ctx context.Context, ensRegistryAddr, entityResolv
 	for i := 0; i < types.EthereumDialMaxRetry; i++ {
 		client, err = ethclient.Dial(ethEndpoint)
 		if err != nil || client == nil {
-			log.Warnf("cannot create a client connection: %s, trying again... %d of %d", err, i+1, types.EthereumDialMaxRetry)
+			log.Warnf("cannot create a client connection: %s, trying again... %d of %d",
+				err, i+1, types.EthereumDialMaxRetry)
 			time.Sleep(time.Second * 10)
 			continue
 		}
 		break
 	}
 	if err != nil || client == nil {
-		log.Errorf("cannot create a client connection: %s, tried %d times.", err, types.EthereumDialMaxRetry)
-		return "", fmt.Errorf("cannot resolve entity metadata URL, cannot create a client connection: %w", err)
+		log.Errorf("cannot create a client connection: %s, tried %d times.",
+			err, types.EthereumDialMaxRetry)
+		return "", fmt.Errorf("cannot resolve entity metadata URL, cannot create a client connection: %w",
+			err)
 	}
 	ensCallerHandler := &ENSCallerHandler{
 		PublicRegistryAddr: ensRegistryAddr,

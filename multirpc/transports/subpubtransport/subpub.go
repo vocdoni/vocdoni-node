@@ -48,7 +48,7 @@ func (p *SubPubHandle) Init(c *transports.Connection) error {
 	return nil
 }
 
-func (s *SubPubHandle) Listen(reciever chan<- transports.Message) {
+func (s *SubPubHandle) Listen(receiver chan<- transports.Message) {
 	s.SubPub.Start(context.Background())
 	go s.SubPub.Subscribe(context.Background())
 	go func() {
@@ -59,7 +59,7 @@ func (s *SubPubHandle) Listen(reciever chan<- transports.Message) {
 			msg.TimeStamp = int32(time.Now().Unix())
 			msg.Context = &SubPubContext{PeerID: spmsg.Peer, Sp: s}
 			log.Debugf("received %d bytes from %s", len(msg.Data), spmsg.Peer)
-			reciever <- msg
+			receiver <- msg
 		}
 	}()
 }

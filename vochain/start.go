@@ -28,7 +28,7 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	// creating new vochain app
 	app, err := NewBaseApplication(vochaincfg.DataDir + "/data")
 	if err != nil {
-		log.Fatalf("cannot init vochain application: %s", err)
+		log.Fatalf("cannot initialize vochain application: %s", err)
 	}
 	log.Info("creating tendermint node and application")
 	err = app.SetNode(vochaincfg, genesis)

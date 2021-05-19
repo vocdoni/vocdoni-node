@@ -65,7 +65,7 @@ func (v *State) CachePurge(height uint32) {
 		}
 		vote, ok := record.(*models.Vote)
 		if !ok {
-			log.Warn("vote cache is not models.Vote")
+			log.Warn("vote cache is not type models.Vote")
 			continue
 		}
 		vid, ok := id.([32]byte)

@@ -41,7 +41,7 @@ func Init(logLevel string, output string) {
 	defer logger.Sync()
 	withOptions := logger.WithOptions(zap.AddCallerSkip(1))
 	log = withOptions.Sugar()
-	log.Infof("logger construction succeeded at level %s and output %s", logLevel, output)
+	log.Infof("logger construction succeeded at level %s with output %s", logLevel, output)
 }
 
 // SetFileErrorLog if set writes the Warning and Error messages to a file.

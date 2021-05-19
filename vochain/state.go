@@ -82,7 +82,7 @@ func NewState(dataDir string) (*State, error) {
 		return nil, fmt.Errorf("cannot init state db: %s", err)
 	}
 	// Must be -1 in order to get the last committed block state, if not block replay will fail
-	log.Infof("loading state db last safe version, this could take a while...")
+	log.Infof("loading last safe state db version, this could take a while...")
 	if err = vs.Store.LoadVersion(-1); err != nil {
 		if err == iavl.ErrVersionDoesNotExist {
 			// restart data db

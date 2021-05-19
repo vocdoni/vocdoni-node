@@ -83,7 +83,7 @@ func (r *APIConnection) Request(req *message.MyAPI, signer *ethereum.SignKeys) *
 		log.Fatalf("%v", err)
 	}
 	if respOuter.ID != reqOuter.ID {
-		log.Fatalf("%s: %v", req.Method, "request ID doesn'tb match")
+		log.Fatalf("%s: %v", req.Method, "request ID doesn't match")
 	}
 	if len(respOuter.Signature) == 0 {
 		log.Fatalf("%s: empty signature in response: %s", req.Method, message)

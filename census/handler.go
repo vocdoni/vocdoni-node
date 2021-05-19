@@ -130,7 +130,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 				resp.SetError(err)
 			} else {
 				t.Publish()
-				log.Infof("census %s%s created successfully managed by %s", censusPrefix, r.CensusID, r.PubKeys)
+				log.Infof("census %s%s created, successfully managed by %s", censusPrefix, r.CensusID, r.PubKeys)
 				resp.CensusID = censusPrefix + r.CensusID
 			}
 		} else {
@@ -163,7 +163,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 	validAuthPrefix := false
 	if len(censusPrefix) == 0 {
 		validAuthPrefix = true
-		log.Debugf("prefix not specified, allowing access to all census IDs if pubkey validation correct")
+		log.Debugf("prefix not specified, allowing access to all census IDs if pubkey validation is correct")
 	} else {
 		validAuthPrefix = strings.HasPrefix(r.CensusID, censusPrefix)
 		log.Debugf("prefix allowed for %s", r.CensusID)

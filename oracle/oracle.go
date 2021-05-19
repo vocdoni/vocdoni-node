@@ -62,7 +62,7 @@ func (o *Oracle) NewProcess(process *models.Process) error {
 			return err
 		}
 	} else {
-		log.Infof("process %x already exist, skipping", process.ProcessId)
+		log.Infof("process %x already exists, skipping", process.ProcessId)
 		return nil
 	}
 
@@ -104,7 +104,7 @@ func (o *Oracle) NewProcess(process *models.Process) error {
 // The Oracle will build and send a RESULTS transaction to the Vochain.
 // The transaction includes the final results for the process.
 func (o *Oracle) OnComputeResults(results *indexertypes.Results) {
-	log.Infof("launching on compute results callback for process %x", results.ProcessID)
+	log.Infof("launching on computeResults callback for process %x", results.ProcessID)
 	// check vochain process status
 	vocProcessData, err := o.VochainApp.State.Process(results.ProcessID, true)
 	if err != nil {
@@ -115,20 +115,20 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results) {
 	case models.ProcessStatus_RESULTS:
 		// check vochain process results
 		if len(vocProcessData.Results.Votes) > 0 {
-			log.Infof("process %x results already added on the Vochain, skipping",
+			log.Infof("process %x results already added to the Vochain, skipping",
 				results.ProcessID)
 			return
 		}
 	case models.ProcessStatus_READY:
 		if o.VochainApp.Height() < vocProcessData.StartBlock+vocProcessData.BlockCount {
-			log.Warnf("process %x is in READY state and not yet finished by block, cannot publish results",
+			log.Warnf("process %x is in READY state and not yet finished, cannot publish results",
 				results.ProcessID)
 			return
 		}
 	case models.ProcessStatus_ENDED:
 		break
 	default:
-		log.Infof("invalid process %x status %s for setting the results, skipping",
+		log.Infof("process %x: invalid status %s for setting the results, skipping",
 			results.ProcessID, vocProcessData.Status)
 		return
 	}
@@ -148,7 +148,7 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results) {
 			SetProcess: setprocessTxArgs,
 		},
 	}); err != nil {
-		log.Errorf("cannot marshal set process results tx: %v", err)
+		log.Errorf("cannot marshal setProcessResults tx: %v", err)
 		return
 	}
 	if stx.Signature, err = o.signer.Sign(stx.Tx); err != nil {
@@ -158,7 +158,7 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results) {
 
 	txb, err := proto.Marshal(stx)
 	if err != nil {
-		log.Errorf("error marshaling set process results tx: %v", err)
+		log.Errorf("error marshaling setProcessResults tx: %v", err)
 		return
 	}
 	log.Debugf("broadcasting Vochain Tx: %s", log.FormatProto(setprocessTxArgs))

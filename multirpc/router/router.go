@@ -186,7 +186,7 @@ func (r *Router) registerPublic(namespace, method string, handler func(RouterReq
 // SendError formats and sends an error message
 func (r *Router) SendError(request RouterRequest, errMsg string) {
 	if request.MessageContext == nil {
-		log.Errorf("cannot reply with error as MessageContext==nil: %s", errMsg)
+		log.Errorf("cannot reply with error: MessageContext==nil: %s", errMsg)
 		return
 	}
 	var err error

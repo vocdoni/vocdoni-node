@@ -265,7 +265,7 @@ func (r *Router) Route() {
 
 func (r *Router) SendError(request RouterRequest, errMsg string) {
 	if request.MessageContext == nil {
-		log.Errorf("failed to send error as MessageContext==nil: %s", errMsg)
+		log.Errorf("failed to send error: MessageContext==nil: %s", errMsg)
 		return
 	}
 	log.Debugf("api error: %s", errMsg)

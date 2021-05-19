@@ -275,7 +275,7 @@ func (c *Client) TestSendVotes(
 	}
 	// Wait until all gateway connections are ready
 	wg.Done()
-	log.Infof("%s is waiting other gateways to be ready before start voting", c.Addr)
+	log.Infof("%s is waiting other gateways to be ready before it can start voting", c.Addr)
 	c.WaitUntilBlock(startBlock)
 	wg.Wait()
 
@@ -361,7 +361,7 @@ func (c *Client) TestSendVotes(
 		}
 		if !resp.Ok {
 			if strings.Contains(resp.Message, "mempool is full") {
-				log.Warnf("mempool is full, wait and retry")
+				log.Warnf("mempool is full, waiting and retrying")
 				time.Sleep(1 * time.Second)
 				i--
 			} else {
@@ -399,7 +399,7 @@ func (c *Client) TestSendVotes(
 			}
 		}
 		if time.Since(checkStart) > timeDeadLine {
-			return 0, fmt.Errorf("wait for envelope height took more than deadline, skipping")
+			return 0, fmt.Errorf("wait for envelope height took longer than deadline, skipping")
 		}
 	}
 	votingElapsedTime := time.Since(start)
