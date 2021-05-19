@@ -267,11 +267,11 @@ func TestGenProofAndVerify(t *testing.T) {
 	}
 
 	k := BigIntToBytes(big.NewInt(int64(7)))
-	_, siblings, err := tree.GenProof(k)
-	c.Assert(err, qt.IsNil)
-
-	k = BigIntToBytes(big.NewInt(int64(7)))
 	v := BigIntToBytes(big.NewInt(int64(14)))
+	proofV, siblings, err := tree.GenProof(k)
+	c.Assert(err, qt.IsNil)
+	c.Assert(proofV, qt.DeepEquals, v)
+
 	verif, err := CheckProof(tree.hashFunction, k, v, tree.Root(), siblings)
 	c.Assert(err, qt.IsNil)
 	c.Check(verif, qt.IsTrue)

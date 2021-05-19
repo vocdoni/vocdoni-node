@@ -61,8 +61,6 @@ func TestVirtualTreeRandomKeys(t *testing.T) {
 		values[i] = []byte{0}
 	}
 
-	// check the root for different batches of leafs
-	testVirtualTree(c, 100, keys[:1], values[:1])
 	testVirtualTree(c, 100, keys, values)
 }
 

@@ -668,13 +668,14 @@ func TestAddBatchCaseE(t *testing.T) {
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 }
 
-func TestHighestPowerOfTwo(t *testing.T) {
+func TestFlp2(t *testing.T) {
 	c := qt.New(t)
-	c.Assert(highestPowerOfTwo(31), qt.Equals, 16)
-	c.Assert(highestPowerOfTwo(32), qt.Equals, 32)
-	c.Assert(highestPowerOfTwo(33), qt.Equals, 32)
-	c.Assert(highestPowerOfTwo(63), qt.Equals, 32)
-	c.Assert(highestPowerOfTwo(64), qt.Equals, 64)
+	c.Assert(flp2(31), qt.Equals, 16)
+	c.Assert(flp2(32), qt.Equals, 32)
+	c.Assert(flp2(33), qt.Equals, 32)
+	c.Assert(flp2(63), qt.Equals, 32)
+	c.Assert(flp2(64), qt.Equals, 64)
+	c.Assert(flp2(9000), qt.Equals, 8192)
 }
 
 // func printLeafs(name string, t *Tree) {
