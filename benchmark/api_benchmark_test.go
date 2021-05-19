@@ -23,7 +23,7 @@ func init() { rand.Seed(time.Now().UnixNano()) }
 var (
 	hostFlag      = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
 	censusSize    = flag.Int("censusSize", 100, "number of census entries to add (minimum 100)")
-	onlyCensus    = flag.Bool("onlyCreateCensus", false, "perform only create census operations")
+	onlyCensus    = flag.Bool("onlyCreateCensus", false, "only perform create census operations")
 	censusBackend = flag.String("censusBackend", "graviton", "supported backends are: graviton")
 )
 

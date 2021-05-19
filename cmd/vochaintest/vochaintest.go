@@ -46,7 +46,7 @@ func main() {
 	procDuration := flag.Int("processDuration", 500, "voting process duration in blocks")
 	doubleVote := flag.Bool("doubleVote", true, "send every vote twice")
 	checkNullifiers := flag.Bool("checkNullifiers", false,
-		"check all votes are correct one by one (slow)")
+		"check that all votes are correct one-by-one (slow)")
 	gateways := flag.StringSlice("gwExtra", []string{},
 		"list of extra gateways to be used in addition to gwHost for sending votes")
 	keysfile := flag.String("keysFile", "cache-keys.json", "file to store and reuse keys and census")
