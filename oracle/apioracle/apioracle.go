@@ -55,6 +55,7 @@ func (a *APIoracle) EnableERC20(chainName, web3Endpoint string) error {
 	a.eh.WaitSync()
 	a.chainName = chainName
 	a.router.RegisterPublic("newERC20process", a.handleNewEthProcess)
+	a.router.APIs = append(a.router.APIs, "oracle")
 	return nil
 }
 
