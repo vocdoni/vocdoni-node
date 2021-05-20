@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -174,6 +175,55 @@ func (r *Router) getTxListForBlock(request RouterRequest) {
 			Hash:  tmtypes.Tx(block.Txs[i]).Hash(),
 		})
 	}
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
+}
+
+func (r *Router) getProcessMeta(request RouterRequest) {
+	var response api.MetaResponse
+	if len(request.ProcessID) != types.ProcessIDsize {
+		r.SendError(request, "cannot get envelope status: (malformed processId)")
+		return
+	}
+
+	// Get process info
+	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
+	if err != nil {
+		log.Warn(err)
+		r.SendError(request, err.Error())
+		return
+	}
+
+	if procInfo.Envelope.Anonymous {
+		response.Type = "anonymous"
+	} else {
+		response.Type = "poll"
+	}
+	if procInfo.Envelope.EncryptedVotes {
+		response.Type += " encrypted"
+	} else {
+		response.Type += " open"
+	}
+	if procInfo.Envelope.Serial {
+		response.Type += " serial"
+	} else {
+		response.Type += " single"
+	}
+	response.State = models.ProcessStatus(procInfo.Status).String()
+	response.EntityID = hex.EncodeToString(procInfo.EntityID)
+
+	// Get total number of votes (including invalid/null)
+	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
+	if err != nil {
+		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
+		if err := request.Send(r.BuildReply(request, &response)); err != nil {
+			log.Warnf("error sending response: %s", err)
+		}
+		return
+	}
+	votes := uint32(eh)
+	response.Height = &votes
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
