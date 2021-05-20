@@ -329,6 +329,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 			}
 		}
 		update.Status = int32(p.GetStatus())
+		log.Debugf("updateProcess: set process %x status to %d", pid, update.Status)
 		return nil
 	}
 	// Retry if error is "Transaction Conflict"
