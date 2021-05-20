@@ -171,7 +171,7 @@ func buildETHproof(proof *ethstorageproof.StorageResult) (*models.Proof, error) 
 		}
 		siblings = append(siblings, sibb)
 	}
-	key, err := hex.DecodeString(proof.Key)
+	key, err := hex.DecodeString(util.TrimHex(proof.Key))
 	if err != nil {
 		return nil, fmt.Errorf("cannot decode key: %w", err)
 	}
