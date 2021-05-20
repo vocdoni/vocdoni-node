@@ -727,6 +727,11 @@ func combineInKVSet(base, toAdd []kv) ([]kv, []int) {
 	return r, invalids
 }
 
+// TODO WIP
+// func loadDBTreeToVirtualTree() error {
+//         return nil
+// }
+
 // func computeSimpleAddCost(nLeafs int) int {
 //         // nLvls 2^nLvls
 //         nLvls := int(math.Log2(float64(nLeafs)))

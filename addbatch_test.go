@@ -5,10 +5,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"runtime"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/iden3/go-merkletree/db/leveldb"
 	"github.com/iden3/go-merkletree/db/memory"
 )
 
@@ -221,52 +223,6 @@ func TestAddBatchCaseATestVector(t *testing.T) {
 	// check that both trees roots are equal
 	// fmt.Println(hex.EncodeToString(tree1.Root()))
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
-
-	//////
-
-	// tree1, err = NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
-	// c.Assert(err, qt.IsNil)
-	// defer tree1.db.Close()
-	//
-	// tree2, err = NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
-	// c.Assert(err, qt.IsNil)
-	// defer tree2.db.Close()
-	//
-	// // leafs in 2nd level subtrees: [ 6, 0, 1, 1]
-	// testvectorKeys = []string{
-	//         "1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642",
-	//         "2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf",
-	//         "9cb87ec67e875c61390edcd1ab517f443591047709a4d4e45b0f9ed980857b8e",
-	//         "9b4e9e92e974a589f426ceeb4cb291dc24893513fecf8e8460992dcf52621d4d",
-	//         "1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5",
-	//         "d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7",
-	//         "3cd55dbfb8f975f20a0925dfbdabe79fa2d51dd0268afbb8ba6b01de9dfcdd3c",
-	//         "5d0a9d6d9f197c091bf054fac9cb60e11ec723d6610ed8578e617b4d46cb43d5",
-	// }
-	// keys = [][]byte{}
-	// values = [][]byte{}
-	// for i := 0; i < len(testvectorKeys); i++ {
-	//         key, err := hex.DecodeString(testvectorKeys[i])
-	//         c.Assert(err, qt.IsNil)
-	//         keys = append(keys, key)
-	//         values = append(values, []byte{0})
-	// }
-	//
-	// for i := 0; i < len(keys); i++ {
-	//         if err := tree1.Add(keys[i], values[i]); err != nil {
-	//                 t.Fatal(err)
-	//         }
-	// }
-	//
-	// indexes, err = tree2.AddBatch(keys, values)
-	// c.Assert(err, qt.IsNil)
-	// tree1.PrintGraphviz(nil)
-	// tree2.PrintGraphviz(nil)
-	//
-	// c.Check(len(indexes), qt.Equals, 0)
-	//
-	// // check that both trees roots are equal
-	// // c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 }
 
 func TestAddBatchCaseARandomKeys(t *testing.T) {
@@ -676,6 +632,64 @@ func TestFlp2(t *testing.T) {
 	c.Assert(flp2(63), qt.Equals, 32)
 	c.Assert(flp2(64), qt.Equals, 64)
 	c.Assert(flp2(9000), qt.Equals, 8192)
+}
+
+func TestAddBatchBench(t *testing.T) {
+	nLeafs := 50_000
+	fmt.Printf("TestAddBatchBench\n	nCPU: %d, nLeafs: %d, hash: Blake2b, db: leveldb\n",
+		runtime.NumCPU(), nLeafs)
+
+	// prepare inputs
+	var ks, vs [][]byte
+	for i := 0; i < nLeafs; i++ {
+		k := randomBytes(32)
+		v := randomBytes(32)
+		ks = append(ks, k)
+		vs = append(vs, v)
+	}
+
+	benchAdd(t, ks, vs)
+
+	benchAddBatch(t, ks, vs)
+}
+
+func benchAdd(t *testing.T, ks, vs [][]byte) {
+	c := qt.New(t)
+
+	dbDir := t.TempDir()
+	storage, err := leveldb.NewLevelDbStorage(dbDir, false)
+	c.Assert(err, qt.IsNil)
+	tree, err := NewTree(storage, 140, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+
+	start := time.Now()
+	for i := 0; i < len(ks); i++ {
+		err = tree.Add(ks[i], vs[i])
+		c.Assert(err, qt.IsNil)
+	}
+	printRes("	Add loop", time.Since(start))
+}
+
+func benchAddBatch(t *testing.T, ks, vs [][]byte) {
+	c := qt.New(t)
+
+	dbDir := t.TempDir()
+	storage, err := leveldb.NewLevelDbStorage(dbDir, false)
+	c.Assert(err, qt.IsNil)
+	tree, err := NewTree(storage, 140, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+
+	start := time.Now()
+	invalids, err := tree.AddBatch(ks, vs)
+	printRes("	AddBatch", time.Since(start))
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(invalids), qt.Equals, 0)
+}
+
+func printRes(name string, duration time.Duration) {
+	if debug {
+		fmt.Printf("	%s:	%s \n", name, duration)
+	}
 }
 
 // func printLeafs(name string, t *Tree) {
