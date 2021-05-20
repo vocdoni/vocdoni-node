@@ -32,6 +32,7 @@ type APIoracle struct {
 	oracle    *oracle.Oracle
 	router    *router.Router
 	eh        *ethereumhandler.EthereumHandler
+	chainName string
 }
 
 func NewAPIoracle(o *oracle.Oracle, r *router.Router) (*APIoracle, error) {
@@ -52,6 +53,7 @@ func (a *APIoracle) EnableERC20(chainName, web3Endpoint string) error {
 		return err
 	}
 	a.eh.WaitSync()
+	a.chainName = chainName
 	a.router.RegisterPublic("newERC20process", a.handleNewEthProcess)
 	return nil
 }
@@ -60,6 +62,10 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 	var response api.MetaResponse
 	if req.NewProcess == nil {
 		a.router.SendError(req, "newProcess is empty")
+		return
+	}
+	if req.NewProcess.NetworkId != a.chainName {
+		a.router.SendError(req, fmt.Sprintf("provided chainId does not match ours (%s)", a.chainName))
 		return
 	}
 	if req.NewProcess.EthIndexSlot == nil {
@@ -87,7 +93,7 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		VoteOptions:       req.NewProcess.VoteOptions,
 		EthIndexSlot:      req.NewProcess.EthIndexSlot,
 		SourceBlockHeight: req.NewProcess.SourceHeight,
-		Metadata:          req.NewProcess.Metadata,
+		Metadata:          &req.NewProcess.Metadata,
 		ProcessId:         ethereum.HashRaw([]byte(pidseed)),
 		Status:            models.ProcessStatus_READY,
 		Namespace:         a.Namespace,
