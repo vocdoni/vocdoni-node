@@ -290,6 +290,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		VoteOpts:          p.GetVoteOptions(),
 		CreationTime:      currentBlockTime,
 		SourceBlockHeight: p.GetSourceBlockHeight(),
+		Metadata:          p.GetMetadata(),
 	}
 	log.Debugf("new indexer process %s", proc.String())
 	return s.db.Insert(pid, proc)
@@ -313,6 +314,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 		update.CensusURI = p.GetCensusURI()
 		update.PrivateKeys = p.EncryptionPrivateKeys
 		update.PublicKeys = p.EncryptionPublicKeys
+		update.Metadata = p.GetMetadata()
 		// If the process is transacting to CANCELED, ensure results are not computed and remove
 		// them from the KV database.
 		if update.Status != int32(models.ProcessStatus_CANCELED) &&

@@ -23,6 +23,7 @@ type Process struct {
 	Rheight           uint32                     `badgerholdIndex:"Rheight" json:"-"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
 	CensusURI         string                     `json:"censusURI"`
+	Metadata          string                     `json:"metadata"`
 	CensusOrigin      int32                      `json:"censusOrigin"`
 	Status            int32                      `badgerholdIndex:"Status" json:"status"`
 	Namespace         uint32                     `badgerholdIndex:"Namespace" json:"namespace"`
