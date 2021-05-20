@@ -82,6 +82,7 @@ func (r *Router) EnableIndexerAPI(vocapp *vochain.BaseApplication,
 	}
 	r.APIs = append(r.APIs, "indexer")
 	r.RegisterPublic("getStats", r.getStats)
+	r.RegisterPublic("getProcessMeta", r.getProcessMeta)
 	r.RegisterPublic("getEnvelopeList", r.getEnvelopeList)
 	r.RegisterPublic("getBlock", r.getBlock)
 	r.RegisterPublic("getBlockByHash", r.getBlockByHash)
