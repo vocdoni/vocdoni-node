@@ -69,6 +69,10 @@ var ethereumEventList = map[string]string{
 	"resultsAvailable": "0x5aff397e0d9bfad4e73dfd9c2da1d146ce7fe8cfd1a795dbf6b95b417236fa4c",
 }
 
+// Number of blocks to add to the process start block to start as soon as possible the process.
+// This start block addition takes into account that can be some delay on the Vochain commit operation.
+const ProcessStartBlockDelay = 10
+
 // HandleVochainOracle handles the events on ethereum for the Oracle.
 func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEvents) error {
 	tctx, cancel := context.WithTimeout(ctx, time.Minute)
@@ -109,6 +113,25 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			log.Infof("process already exists, skipping")
 			return nil
 		}
+
+		// Due to uncertainty of when an EVM based blockchain Tx
+		// will be mined/sealed, let the user choose to put
+		// startBlock = 1 with the autostart mode in order
+		// to start the process as soon as the tx is mined
+		// on the EVM based blockchain plus some delay
+		// required by the Vochain.
+		// startBlock = 1 is used because the processes
+		// smart contract checks that startBlock > 0 which is required
+		// for other type of processes. Given that the Vochain will be
+		// already initialized when a process is created, using 1 and not 0
+		// will have the same effect for the purpose of this check and
+		// also maintains compatibility with the smartcontract code.
+		if processTx.Process.Status == models.ProcessStatus_READY &&
+			processTx.Process.StartBlock == 1 &&
+			processTx.Process.Mode.AutoStart {
+			processTx.Process.StartBlock = e.VochainApp.Height() + ProcessStartBlockDelay
+		}
+
 		stx := &models.SignedTx{}
 		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: processTx}})
 		if err != nil {
