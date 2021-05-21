@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	chain "go.vocdoni.io/dvote/ethereum"
 	"go.vocdoni.io/dvote/ethereum/ethevents"
-	ethereumhandler "go.vocdoni.io/dvote/ethereum/handler"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 )
@@ -38,29 +36,20 @@ func EthEvents(
 	if err != nil {
 		return fmt.Errorf("cannot get specs for the selected network: %w", err)
 	}
-	for k, contract := range specs.Contracts {
+
+	web3Client, err := ethclient.Dial(w3uri)
+	if err != nil {
+		return fmt.Errorf("cannot connect to the web3 endpoint: %w", err)
+	}
+
+	for name, contract := range specs.Contracts {
 		if !contract.ListenForEvents {
 			continue
 		}
-		var addr string
-		for i := 0; i < types.EthereumDialMaxRetry; i++ {
-			addr, err = ethereumhandler.EnsResolve(ctx, specs.ENSregistryAddr, contract.Domain, w3uri)
-			if err != nil {
-				log.Errorf("cannot resolve domain: %s, error: %s, trying again ...", contract.Domain, err)
-				continue
-			}
-			break
+		if err := contract.InitContract(ctx, name, specs.Contracts["ensRegistry"].Address, web3Client); err != nil {
+			return fmt.Errorf("cannot initialize contracts: %w", err)
 		}
-		if addr == "" {
-			return fmt.Errorf("cannot resolve domain contract addresses")
-		}
-		contract.Address = common.HexToAddress(addr)
-		if err := contract.SetABI(k); err != nil {
-			return fmt.Errorf("couldn't set contract ABI: %w", err)
-		}
-		log.Infof("loaded contract %s at address: %s", contract.Domain, contract.Address)
 	}
-
 	ev, err := ethevents.NewEthEvents(
 		specs.Contracts,
 		signer,

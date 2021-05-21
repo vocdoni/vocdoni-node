@@ -3,6 +3,7 @@ package chain
 import (
 	"errors"
 
+	"github.com/ethereum/go-ethereum/common"
 	ethparams "github.com/ethereum/go-ethereum/params"
 	ethereumhandler "go.vocdoni.io/dvote/ethereum/handler"
 	"go.vocdoni.io/dvote/types"
@@ -10,13 +11,12 @@ import (
 
 // Specs defines a set of blockchain network specifications
 type Specs struct {
-	Name            string   // Identity name
-	GenesisB64      string   // Base64 JSON encoded genesis file
-	GenesisHash     string   // Genesis Hash
-	NetworkId       int      // Ethereum Like network identification number
-	BootNodes       []string // List of Bootnodes for this network
-	StartingBlock   int64    // Where to start looking for events
-	ENSregistryAddr string
+	Name          string   // Identity name
+	GenesisB64    string   // Base64 JSON encoded genesis file
+	GenesisHash   string   // Genesis Hash
+	NetworkId     int      // Ethereum Like network identification number
+	BootNodes     []string // List of Bootnodes for this network
+	StartingBlock int64    // Where to start looking for events
 	// Contracts are ordered as [processes, namespaces, erc20tokenproofs, genesis, results, entityResolver]
 	Contracts map[string]*ethereumhandler.EthereumContract
 }
@@ -46,11 +46,10 @@ func SpecsFor(name string) (*Specs, error) {
 
 // Ethereum MainNet
 var mainnet = Specs{
-	Name:            "mainnet",
-	NetworkId:       1,
-	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
-	BootNodes:       ethparams.MainnetBootnodes,
-	StartingBlock:   10230300, //2020 jun 09 10:00h
+	Name:          "mainnet",
+	NetworkId:     1,
+	BootNodes:     ethparams.MainnetBootnodes,
+	StartingBlock: 10230300, //2020 jun 09 10:00h
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
@@ -58,15 +57,15 @@ var mainnet = Specs{
 		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDomain},
+		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e")},
 	},
 }
 
 var xdai = Specs{
-	Name:            "xdai",
-	NetworkId:       100,
-	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
-	BootNodes:       nil,
-	StartingBlock:   14531875, //2021 Feb 13 21:58h
+	Name:          "xdai",
+	NetworkId:     100,
+	BootNodes:     nil,
+	StartingBlock: 14531875, //2021 Feb 13 21:58h
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
@@ -74,15 +73,15 @@ var xdai = Specs{
 		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDomain},
+		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD")},
 	},
 }
 
 var xdaistage = Specs{
-	Name:            "xdaistage",
-	NetworkId:       100,
-	ENSregistryAddr: "0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD",
-	BootNodes:       nil,
-	StartingBlock:   14531875, //2021 Feb 13 21:58h
+	Name:          "xdaistage",
+	NetworkId:     100,
+	BootNodes:     nil,
+	StartingBlock: 14531875, //2021 Feb 13 21:58h
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},
@@ -90,15 +89,15 @@ var xdaistage = Specs{
 		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisStageDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsStageDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverStageDomain},
+		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD")},
 	},
 }
 
 var rinkeby = Specs{
-	Name:            "rinkeby",
-	NetworkId:       4,
-	StartingBlock:   8399062, // 2021 Apr 12 09:28h
-	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
-	BootNodes:       nil,
+	Name:          "rinkeby",
+	NetworkId:     4,
+	StartingBlock: 8399062, // 2021 Apr 12 09:28h
+	BootNodes:     nil,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},
@@ -106,16 +105,16 @@ var rinkeby = Specs{
 		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDevelopmentDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDevelopmentDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDevelopmentDomain},
+		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e")},
 	},
 }
 
 // Goerli Ethereum PoA testnet - Staging
 var goerlistage = Specs{
-	Name:            "goerlistage",
-	NetworkId:       goerli.NetworkId,
-	StartingBlock:   goerli.StartingBlock,
-	ENSregistryAddr: goerli.ENSregistryAddr,
-	BootNodes:       ethparams.GoerliBootnodes,
+	Name:          "goerlistage",
+	NetworkId:     goerli.NetworkId,
+	StartingBlock: goerli.StartingBlock,
+	BootNodes:     ethparams.GoerliBootnodes,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},
@@ -123,6 +122,7 @@ var goerlistage = Specs{
 		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisStageDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsStageDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverStageDomain},
+		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e")},
 	},
 	GenesisHash: goerli.GenesisHash,
 	GenesisB64:  goerli.GenesisB64,
@@ -130,11 +130,10 @@ var goerlistage = Specs{
 
 // Goerli Ethereum PoA Testnet
 var goerli = Specs{
-	Name:            "goerli",
-	NetworkId:       5,
-	StartingBlock:   3000000,
-	ENSregistryAddr: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
-	BootNodes:       ethparams.GoerliBootnodes,
+	Name:          "goerli",
+	NetworkId:     5,
+	StartingBlock: 3000000,
+	BootNodes:     ethparams.GoerliBootnodes,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},
@@ -142,6 +141,7 @@ var goerli = Specs{
 		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDevelopmentDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDevelopmentDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDevelopmentDomain},
+		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e")},
 	},
 	GenesisHash: "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog
