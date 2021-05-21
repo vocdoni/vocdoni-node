@@ -26,6 +26,8 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
+const ensRegistryName = "ensRegistry"
+
 // The following methods and structures represent an exportable abstraction
 // over raw contract bindings.
 // Use these methods, rather than those present in the contracts folder
@@ -65,7 +67,17 @@ func NewEthereumHandler(contracts map[string]*EthereumContract,
 	if err := eh.Connect(dialEndpoint); err != nil {
 		return nil, err
 	}
-	for _, contract := range contracts {
+	ctx, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
+	defer cancel()
+	for name, contract := range contracts {
+		// avoid resolve registry contract, this is the entry point for the ENS
+		// and does not have a domain name
+		if name == ensRegistryName {
+			continue
+		}
+		if err := contract.InitContract(ctx, name, contracts["ensRegistry"].Address, eh.EthereumClient); err != nil {
+			return eh, fmt.Errorf("cannot initialize contracts: %w", err)
+		}
 		if err := eh.SetContractInstance(contract); err != nil {
 			log.Errorf("cannot set contract instance: %s", err)
 		}
@@ -597,34 +609,16 @@ func (e *ENSCallerHandler) Resolve(ctx context.Context, nameHash [32]byte, resol
 }
 
 // ENSAddress gets a smart contract address trough the ENS given a public regitry address and its domain
-func ENSAddress(ctx context.Context, publicRegistryAddr, domain, ethEndpoint string) (string, error) {
+func ENSAddress(ctx context.Context, publicRegistryAddr, domain string, web3Client *ethclient.Client) (string, error) {
 	// normalize voting process domain name
 	nh, err := NameHash(domain)
 	if err != nil {
 		return "", fmt.Errorf("cannot get ENS address of the given domain: %w", err)
 	}
-	var client *ethclient.Client
-	for i := 0; i < types.EthereumDialMaxRetry; i++ {
-		client, err = ethclient.Dial(ethEndpoint)
-		if err != nil || client == nil {
-			log.Warnf("cannot create a client connection: %s, trying again... %d of %d",
-				err, i+1, types.EthereumDialMaxRetry)
-			time.Sleep(time.Second * 2)
-			continue
-		}
-		break
-	}
-	if err != nil || client == nil {
-		log.Warnf("cannot create a client connection: %s, tried %d times.",
-			err, types.EthereumDialMaxRetry)
-		return "", fmt.Errorf("cannot create client connection: %w", err)
-	}
-
 	ensCallerHandler := &ENSCallerHandler{
 		PublicRegistryAddr: publicRegistryAddr,
-		EthereumClient:     client,
+		EthereumClient:     web3Client,
 	}
-	defer ensCallerHandler.close()
 	// create registry contract instance
 	if err := ensCallerHandler.NewENSRegistryWithFallbackHandle(); err != nil {
 		return "", fmt.Errorf("cannot get ENS address of the given domain: %w", err)
@@ -705,9 +699,9 @@ func NameHash(name string) (hash [32]byte, err error) {
 const maxRetries = 30
 
 // EnsResolve resolves smart contract addresses through the stardard ENS
-func EnsResolve(ctx context.Context, ensRegistryAddr, ethDomain, w3uri string) (contractAddr string, err error) {
+func EnsResolve(ctx context.Context, ensRegistryAddr, ethDomain string, web3Client *ethclient.Client) (contractAddr string, err error) {
 	for i := 0; i < maxRetries; i++ {
-		contractAddr, err = ENSAddress(ctx, ensRegistryAddr, ethDomain, w3uri)
+		contractAddr, err = ENSAddress(ctx, ensRegistryAddr, ethDomain, web3Client)
 		if err != nil {
 			if strings.Contains(err.Error(), "no suitable peers available") {
 				time.Sleep(time.Second * 2)
