@@ -55,9 +55,11 @@ func (v *State) CachePurge(height uint32) {
 		return
 	}
 	start := time.Now()
-	purged := 0
-	v.voteCache.Keys()
-	for _, id := range v.voteCache.Keys() {
+
+	keys := v.voteCache.Keys()
+	removeFromMempool := make([][32]byte, 0, len(keys))
+
+	for _, id := range keys {
 		record, ok := v.voteCache.Get(id)
 		if !ok {
 			// vote have been already deleted?
@@ -76,14 +78,13 @@ func (v *State) CachePurge(height uint32) {
 		if vote.Height+voteCachePurgeThreshold >= height {
 			v.voteCache.Remove(cacheGetNullifierKey(vote.Nullifier))
 			v.voteCache.Remove(id)
-			if v.MemPoolRemoveTxKey != nil {
-				v.MemPoolRemoveTxKey(vid, true)
-				purged++
-			}
+			removeFromMempool = append(removeFromMempool, vid)
 		}
 	}
-	if purged > 0 {
-		log.Debugf("[txcache] purged %d transactions, took %s", purged, time.Since(start))
+	if len(removeFromMempool) > 0 && v.mempoolRemoveTxKeys != nil {
+		v.mempoolRemoveTxKeys(removeFromMempool, true)
+		log.Debugf("[txcache] purged %d transactions, took %s",
+			len(removeFromMempool), time.Since(start))
 	}
 }
 
