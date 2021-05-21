@@ -60,10 +60,10 @@ type State struct {
 	Store     statedb.StateDB
 	voteCache *lru.Cache
 	ImmutableState
-	MemPoolRemoveTxKey func([32]byte, bool)
-	txCounter          int32
-	eventListeners     []EventListener
-	height             uint32
+	mempoolRemoveTxKeys func([][32]byte, bool)
+	txCounter           int32
+	eventListeners      []EventListener
+	height              uint32
 }
 
 // ImmutableState holds the latest trees version saved on disk

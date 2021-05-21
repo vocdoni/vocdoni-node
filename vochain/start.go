@@ -40,7 +40,27 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 		log.Fatal(err)
 	}
 	// Set mempool function for removing transactions.
-	app.State.MemPoolRemoveTxKey = app.Node.Mempool().(*mempl.CListMempool).RemoveTxByKey
+	app.State.mempoolRemoveTxKeys = func(keys [][32]byte, removeFromCache bool) {
+		mp := app.Node.Mempool().(*mempl.CListMempool)
+
+		// We'd sometimes see panics if we used RemoveTxByKey without
+		// the mempool's lock being held, like:
+		//
+		//     panic: Remove(e) with false head
+		//
+		// The panic is hard to reproduce, so for now, we're locking the
+		// entire mempool to see if the panics go away for a while.
+		// See https://github.com/vocdoni/vocdoni-node/issues/176.
+		//
+		// TODO(mvdan): file tendermint bug if we haven't seen any
+		// panics by September 2021.
+		mp.Lock()
+		defer mp.Unlock()
+
+		for _, key := range keys {
+			mp.RemoveTxByKey(key, removeFromCache)
+		}
+	}
 	// Create custom logger for mempool
 	logDisable := false
 	if vochaincfg.LogLevelMemPool == "none" {
