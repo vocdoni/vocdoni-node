@@ -76,6 +76,10 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	}
 	app.Node.Mempool().(*mempl.CListMempool).SetLogger(logger)
 	app.Node.Mempool().Flush()
+	// Set the vote cache at least as big as the mempool size
+	if app.State.CacheSize() < vochaincfg.MempoolSize {
+		app.State.SetCacheSize(vochaincfg.MempoolSize)
+	}
 	return app
 }
 

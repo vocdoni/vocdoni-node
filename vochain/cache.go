@@ -88,6 +88,11 @@ func (v *State) CachePurge(height uint32) {
 	}
 }
 
+// SetVoteCacheSize sets the size for the vote LRU cache.
+func (v *State) SetCacheSize(size int) {
+	v.voteCache.Resize(size)
+}
+
 // CacheSize returns the current size of the vote cache
 func (v *State) CacheSize() int {
 	return v.voteCache.Len()
