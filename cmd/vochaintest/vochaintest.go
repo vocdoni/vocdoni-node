@@ -367,6 +367,33 @@ func mkTreeVoteTest(host,
 	// Wait until all votes sent and check the results
 	wg.Wait()
 
+	log.Infof("waiting for all votes to be validated...")
+	timeDeadLine := time.Second * 200
+	if electionSize > 1000 {
+		timeDeadLine = time.Duration(electionSize/5) * time.Second
+	}
+	checkStart := time.Now()
+	i = 0
+	for {
+		time.Sleep(time.Millisecond * 1000)
+		if h, err := clients[i].GetEnvelopeHeight(pid); err != nil {
+			log.Warnf("error getting envelope height: %v", err)
+			i++
+			if i > len(clients) {
+				i = 0
+			}
+			continue
+		} else {
+			if h >= uint32(electionSize) {
+				break
+			}
+			log.Infof("validated votes: %d", h)
+		}
+		if time.Since(checkStart) > timeDeadLine {
+			log.Fatal("time deadline reached while waiting for results")
+		}
+	}
+
 	log.Infof("ending process in order to fetch the results")
 	if err := mainClient.EndProcess(oracleKey, pid); err != nil {
 		log.Fatal(err)
