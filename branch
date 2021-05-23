@@ -1,0 +1,3 @@
+git clone https://github.com/vocdoni/vocdoni-node
+cd vocdoni-node
+git checkout stage
