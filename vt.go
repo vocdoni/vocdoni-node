@@ -24,11 +24,13 @@ type params struct {
 	maxLevels    int
 	hashFunction HashFunction
 	emptyHash    []byte
+	dbg          *dbgStats
 }
 
 // vt stands for virtual tree. It's a tree that does not have any computed hash
 // while placing the leafs. Once all the leafs are placed, it computes all the
-// hashes. In this way, each node hash is only computed one time.
+// hashes. In this way, each node hash is only computed one time (at the end)
+// and the tree is computed in memory.
 type vt struct {
 	root   *node
 	params *params
@@ -44,6 +46,15 @@ func newVT(maxLevels int, hash HashFunction) vt {
 		},
 	}
 }
+
+// WIP
+// func (t *vt) addBatch(fromLvl int, k, v []byte) error {
+//         // parallelize adding leafs in the virtual tree
+//         nCPU := flp2(runtime.NumCPU())
+//         l := int(math.Log2(float64(nCPU)))
+//
+//         return nil
+// }
 
 func (t *vt) add(fromLvl int, k, v []byte) error {
 	leaf := newLeafNode(t.params, k, v)
@@ -205,6 +216,7 @@ func (n *node) computeHashes(p *params, pairs [][2][]byte) ([][2][]byte, error) 
 	t := n.typ()
 	switch t {
 	case vtLeaf:
+		p.dbg.incHash()
 		leafKey, leafValue, err := newLeafValue(p.hashFunction, n.k, n.v)
 		if err != nil {
 			return pairs, err
@@ -235,6 +247,7 @@ func (n *node) computeHashes(p *params, pairs [][2][]byte) ([][2][]byte, error) 
 		}
 		// once the sub nodes are computed, can compute the current node
 		// hash
+		p.dbg.incHash()
 		k, v, err := newIntermediate(p.hashFunction, n.l.h, n.r.h)
 		if err != nil {
 			return nil, err

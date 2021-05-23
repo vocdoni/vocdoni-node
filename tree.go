@@ -57,7 +57,11 @@ type Tree struct {
 	root       []byte
 
 	hashFunction HashFunction
-	emptyHash    []byte
+	// TODO in the methods that use it, check if emptyHash param is len>0
+	// (check if it has been initialized)
+	emptyHash []byte
+
+	dbg *dbgStats
 }
 
 // NewTree returns a new Tree, if there is a Tree still in the given storage, it
@@ -76,7 +80,7 @@ func NewTree(storage db.Storage, maxLevels int, hash HashFunction) (*Tree, error
 			return nil, err
 		}
 		t.root = t.emptyHash
-		if err = t.tx.Put(dbKeyRoot, t.root); err != nil {
+		if err = t.dbPut(dbKeyRoot, t.root); err != nil {
 			return nil, err
 		}
 		if err = t.setNLeafs(0); err != nil {
@@ -132,7 +136,7 @@ func (t *Tree) Add(k, v []byte) error {
 		return err
 	}
 	// store root to db
-	if err := t.tx.Put(dbKeyRoot, t.root); err != nil {
+	if err := t.dbPut(dbKeyRoot, t.root); err != nil {
 		return err
 	}
 	// update nLeafs
@@ -156,12 +160,12 @@ func (t *Tree) add(fromLvl int, k, v []byte) error {
 		return err
 	}
 
-	leafKey, leafValue, err := newLeafValue(t.hashFunction, k, v)
+	leafKey, leafValue, err := t.newLeafValue(k, v)
 	if err != nil {
 		return err
 	}
 
-	if err := t.tx.Put(leafKey, leafValue); err != nil {
+	if err := t.dbPut(leafKey, leafValue); err != nil {
 		return err
 	}
 
@@ -186,6 +190,7 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 	if currLvl > t.maxLevels-1 {
 		return nil, nil, nil, fmt.Errorf("max level")
 	}
+
 	var err error
 	var currValue []byte
 	if bytes.Equal(currKey, t.emptyHash) {
@@ -205,6 +210,9 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 		panic("should not be reached, as the 'if' above should avoid reaching this point") // TMP
 	case PrefixValueLeaf: // leaf
 		if bytes.Equal(newKey, currKey) {
+			// TODO move this error msg to const & add test that
+			// checks that adding a repeated key this error is
+			// returned
 			return nil, nil, nil, fmt.Errorf("key already exists")
 		}
 
@@ -275,18 +283,18 @@ func (t *Tree) up(key []byte, siblings [][]byte, path []bool, currLvl, toLvl int
 	var k, v []byte
 	var err error
 	if path[currLvl+toLvl] {
-		k, v, err = newIntermediate(t.hashFunction, siblings[currLvl], key)
+		k, v, err = t.newIntermediate(siblings[currLvl], key)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		k, v, err = newIntermediate(t.hashFunction, key, siblings[currLvl])
+		k, v, err = t.newIntermediate(key, siblings[currLvl])
 		if err != nil {
 			return nil, err
 		}
 	}
 	// store k-v to db
-	if err = t.tx.Put(k, v); err != nil {
+	if err = t.dbPut(k, v); err != nil {
 		return nil, err
 	}
 
@@ -296,6 +304,11 @@ func (t *Tree) up(key []byte, siblings [][]byte, path []bool, currLvl, toLvl int
 	}
 
 	return t.up(k, siblings, path, currLvl-1, toLvl)
+}
+
+func (t *Tree) newLeafValue(k, v []byte) ([]byte, []byte, error) {
+	t.dbg.incHash()
+	return newLeafValue(t.hashFunction, k, v)
 }
 
 func newLeafValue(hashFunc HashFunction, k, v []byte) ([]byte, []byte, error) {
@@ -324,6 +337,11 @@ func ReadLeafValue(b []byte) ([]byte, []byte) {
 	k := b[PrefixValueLen : PrefixValueLen+kLen]
 	v := b[PrefixValueLen+kLen:]
 	return k, v
+}
+
+func (t *Tree) newIntermediate(l, r []byte) ([]byte, []byte, error) {
+	t.dbg.incHash()
+	return newIntermediate(t.hashFunction, l, r)
 }
 
 func newIntermediate(hashFunc HashFunction, l, r []byte) ([]byte, []byte, error) {
@@ -392,12 +410,12 @@ func (t *Tree) Update(k, v []byte) error {
 		return fmt.Errorf("key %s does not exist", hex.EncodeToString(k))
 	}
 
-	leafKey, leafValue, err := newLeafValue(t.hashFunction, k, v)
+	leafKey, leafValue, err := t.newLeafValue(k, v)
 	if err != nil {
 		return err
 	}
 
-	if err := t.tx.Put(leafKey, leafValue); err != nil {
+	if err := t.dbPut(leafKey, leafValue); err != nil {
 		return err
 	}
 
@@ -413,7 +431,7 @@ func (t *Tree) Update(k, v []byte) error {
 
 	t.root = root
 	// store root to db
-	if err := t.tx.Put(dbKeyRoot, t.root); err != nil {
+	if err := t.dbPut(dbKeyRoot, t.root); err != nil {
 		return err
 	}
 	return t.tx.Commit()
@@ -535,7 +553,8 @@ func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
 	}
 	leafK, leafV := ReadLeafValue(value)
 	if !bytes.Equal(k, leafK) {
-		panic(fmt.Errorf("%s != %s", BytesToBigInt(k), BytesToBigInt(leafK)))
+		panic(fmt.Errorf("Tree.Get error: keys doesn't match, %s != %s",
+			BytesToBigInt(k), BytesToBigInt(leafK)))
 	}
 
 	return leafK, leafV, nil
@@ -577,11 +596,20 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 	return false, nil
 }
 
+func (t *Tree) dbPut(k, v []byte) error {
+	if t.tx == nil {
+		return fmt.Errorf("dbPut error: no db Tx")
+	}
+	t.dbg.incDbPut()
+	return t.tx.Put(k, v)
+}
+
 func (t *Tree) dbGet(k []byte) ([]byte, error) {
 	// if key is empty, return empty as value
 	if bytes.Equal(k, t.emptyHash) {
 		return t.emptyHash, nil
 	}
+	t.dbg.incDbGet()
 
 	v, err := t.db.Get(k)
 	if err == nil {
@@ -609,7 +637,7 @@ func (t *Tree) incNLeafs(nLeafs int) error {
 func (t *Tree) setNLeafs(nLeafs int) error {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, uint64(nLeafs))
-	if err := t.tx.Put(dbKeyNLeafs, b); err != nil {
+	if err := t.dbPut(dbKeyNLeafs, b); err != nil {
 		return err
 	}
 	return nil

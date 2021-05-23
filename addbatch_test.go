@@ -14,7 +14,20 @@ import (
 	"github.com/iden3/go-merkletree/db/memory"
 )
 
-var debug = true
+var debug = false
+
+func printTestContext(prefix string, nLeafs int, hashName, dbName string) {
+	if debug {
+		fmt.Printf("%snCPU: %d, nLeafs: %d, hash: %s, db: %s\n",
+			prefix, runtime.NumCPU(), nLeafs, hashName, dbName)
+	}
+}
+
+func printRes(name string, duration time.Duration) {
+	if debug {
+		fmt.Printf("%s:	%s \n", name, duration)
+	}
+}
 
 func debugTime(descr string, time1, time2 time.Duration) {
 	if debug {
@@ -69,6 +82,7 @@ func TestAddBatchCaseA(t *testing.T) {
 	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close()
+	tree2.dbgInit()
 
 	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
@@ -81,7 +95,11 @@ func TestAddBatchCaseA(t *testing.T) {
 	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
-	debugTime("CASE A, AddBatch", time1, time2)
+	if debug {
+		debugTime("CASE A, AddBatch", time1, time2)
+		printTestContext("	", nLeafs, "Poseidon", "memory")
+		tree2.dbg.print("	")
+	}
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
@@ -133,7 +151,7 @@ func randomBytes(n int) []byte {
 	return b
 }
 
-func TestBuildTreeBottomUpSingleThread(t *testing.T) {
+func TestBuildTreeFromLeafsSingleThread(t *testing.T) {
 	c := qt.New(t)
 	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
@@ -169,8 +187,8 @@ func TestBuildTreeBottomUpSingleThread(t *testing.T) {
 
 	tree2.tx, err = tree2.db.NewTx()
 	c.Assert(err, qt.IsNil)
-	// indexes, err := tree2.buildTreeBottomUpSingleThread(kvs)
-	indexes, err := tree2.buildTreeBottomUp(4, kvs)
+	// indexes, err := tree2.buildTreeFromLeafsSingleThread(kvs)
+	indexes, err := tree2.buildTreeFromLeafs(4, kvs)
 	c.Assert(err, qt.IsNil)
 	// tree1.PrintGraphviz(nil)
 	// tree2.PrintGraphviz(nil)
@@ -280,6 +298,7 @@ func TestAddBatchCaseB(t *testing.T) {
 	initialNLeafs := 99 // TMP TODO use const minLeafsThreshold-1 once ready
 
 	tree1, tree2 := testInit(c, initialNLeafs)
+	tree2.dbgInit()
 
 	start := time.Now()
 	for i := initialNLeafs; i < nLeafs; i++ {
@@ -303,7 +322,11 @@ func TestAddBatchCaseB(t *testing.T) {
 	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
-	debugTime("CASE B, AddBatch", time1, time2)
+	if debug {
+		debugTime("CASE B, AddBatch", time1, time2)
+		printTestContext("	", nLeafs, "Poseidon", "memory")
+		tree2.dbg.print("	")
+	}
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
@@ -500,6 +523,7 @@ func TestAddBatchCaseC(t *testing.T) {
 	initialNLeafs := 101 // TMP TODO use const minLeafsThreshold+1 once ready
 
 	tree1, tree2 := testInit(c, initialNLeafs)
+	tree2.dbgInit()
 
 	start := time.Now()
 	for i := initialNLeafs; i < nLeafs; i++ {
@@ -523,7 +547,11 @@ func TestAddBatchCaseC(t *testing.T) {
 	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
-	debugTime("CASE C, AddBatch", time1, time2)
+	if debug {
+		debugTime("CASE C, AddBatch", time1, time2)
+		printTestContext("	", nLeafs, "Poseidon", "memory")
+		tree2.dbg.print("	")
+	}
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
@@ -537,6 +565,7 @@ func TestAddBatchCaseD(t *testing.T) {
 	initialNLeafs := 900
 
 	tree1, tree2 := testInit(c, initialNLeafs)
+	tree2.dbgInit()
 
 	start := time.Now()
 	for i := initialNLeafs; i < nLeafs; i++ {
@@ -560,7 +589,11 @@ func TestAddBatchCaseD(t *testing.T) {
 	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
-	debugTime("CASE D, AddBatch", time1, time2)
+	if debug {
+		debugTime("CASE D, AddBatch", time1, time2)
+		printTestContext("	", nLeafs, "Poseidon", "memory")
+		tree2.dbg.print("	")
+	}
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
@@ -588,6 +621,7 @@ func TestAddBatchCaseE(t *testing.T) {
 	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close()
+	tree2.dbgInit()
 
 	var keys, values [][]byte
 	// add the initial leafs to fill a bit the tree before calling the
@@ -617,7 +651,11 @@ func TestAddBatchCaseE(t *testing.T) {
 	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
-	debugTime("CASE E, AddBatch", time1, time2)
+	if debug {
+		debugTime("CASE E, AddBatch", time1, time2)
+		printTestContext("	", nLeafs, "Poseidon", "memory")
+		tree2.dbg.print("	")
+	}
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
@@ -636,8 +674,7 @@ func TestFlp2(t *testing.T) {
 
 func TestAddBatchBench(t *testing.T) {
 	nLeafs := 50_000
-	fmt.Printf("TestAddBatchBench\n	nCPU: %d, nLeafs: %d, hash: Blake2b, db: leveldb\n",
-		runtime.NumCPU(), nLeafs)
+	printTestContext("TestAddBatchBench: ", nLeafs, "Blake2b", "leveldb")
 
 	// prepare inputs
 	var ks, vs [][]byte
@@ -662,12 +699,16 @@ func benchAdd(t *testing.T, ks, vs [][]byte) {
 	tree, err := NewTree(storage, 140, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
 
+	if debug {
+		tree.dbgInit()
+	}
 	start := time.Now()
 	for i := 0; i < len(ks); i++ {
 		err = tree.Add(ks[i], vs[i])
 		c.Assert(err, qt.IsNil)
 	}
 	printRes("	Add loop", time.Since(start))
+	tree.dbg.print("		")
 }
 
 func benchAddBatch(t *testing.T, ks, vs [][]byte) {
@@ -679,16 +720,80 @@ func benchAddBatch(t *testing.T, ks, vs [][]byte) {
 	tree, err := NewTree(storage, 140, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
 
+	if debug {
+		tree.dbgInit()
+	}
 	start := time.Now()
 	invalids, err := tree.AddBatch(ks, vs)
 	printRes("	AddBatch", time.Since(start))
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(invalids), qt.Equals, 0)
+	tree.dbg.print("		")
 }
 
-func printRes(name string, duration time.Duration) {
+func TestDbgStats(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 10_000
+
+	// prepare inputs
+	var ks, vs [][]byte
+	for i := 0; i < nLeafs; i++ {
+		k := randomBytes(32)
+		v := randomBytes(32)
+		ks = append(ks, k)
+		vs = append(vs, v)
+	}
+
+	// 1
+	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree1.db.Close()
+
+	tree1.dbgInit()
+
+	for i := 0; i < len(ks); i++ {
+		err = tree1.Add(ks[i], vs[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	// 2
+	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close()
+
+	tree2.dbgInit()
+
+	invalids, err := tree2.AddBatch(ks, vs)
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(invalids), qt.Equals, 0)
+
+	// 3
+	tree3, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree3.db.Close()
+
+	tree3.dbgInit()
+
+	// add few key-values
+	// invalids, err = tree3.AddBatch(ks[:], vs[:])
+	invalids, err = tree3.AddBatch(ks[:1000], vs[:1000])
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(invalids), qt.Equals, 0)
+
+	// add the rest of key-values
+	invalids, err = tree3.AddBatch(ks[1000:], vs[1000:])
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(invalids), qt.Equals, 0)
+
+	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	c.Check(tree3.Root(), qt.DeepEquals, tree1.Root())
+
 	if debug {
-		fmt.Printf("	%s:	%s \n", name, duration)
+		fmt.Println("TestDbgStats")
+		tree1.dbg.print("	add in loop    ")
+		tree2.dbg.print("	addbatch caseA ")
+		tree3.dbg.print("	addbatch caseD ")
 	}
 }
 
@@ -714,10 +819,10 @@ func printRes(name string, duration time.Duration) {
 
 // func TestComputeCosts(t *testing.T) {
 //         fmt.Println(computeSimpleAddCost(10))
-//         fmt.Println(computeBottomUpAddCost(10))
+//         fmt.Println(computeFromLeafsAddCost(10))
 //
 //         fmt.Println(computeSimpleAddCost(1024))
-//         fmt.Println(computeBottomUpAddCost(1024))
+//         fmt.Println(computeFromLeafsAddCost(1024))
 // }
 
 // TODO test tree with nLeafs > minLeafsThreshold, but that at level L, there is

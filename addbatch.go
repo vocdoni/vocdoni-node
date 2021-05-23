@@ -153,10 +153,6 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 	t.Lock()
 	defer t.Unlock()
 
-	// when len(keyvalues) is not a power of 2, cut at the biggest power of
-	// 2 under the len(keys), add those 2**n key-values using the AddBatch
-	// approach, and then add the remaining key-values using tree.Add.
-
 	kvs, err := t.keysValuesToKvs(keys, values)
 	if err != nil {
 		return nil, err
@@ -258,7 +254,7 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 
 func (t *Tree) finalizeAddBatch(nKeys int, invalids []int) ([]int, error) {
 	// store root to db
-	if err := t.tx.Put(dbKeyRoot, t.root); err != nil {
+	if err := t.dbPut(dbKeyRoot, t.root); err != nil {
 		return nil, err
 	}
 
@@ -275,7 +271,7 @@ func (t *Tree) finalizeAddBatch(nKeys int, invalids []int) ([]int, error) {
 }
 
 func (t *Tree) caseA(nCPU int, kvs []kv) ([]int, error) {
-	invalids, err := t.buildTreeBottomUp(nCPU, kvs)
+	invalids, err := t.buildTreeFromLeafs(nCPU, kvs)
 	if err != nil {
 		return nil, err
 	}
@@ -301,17 +297,18 @@ func (t *Tree) caseB(nCPU, l int, kvs []kv) ([]int, error) {
 
 	var invalids2 []int
 	if nCPU > 1 {
-		invalids2, err = t.buildTreeBottomUp(nCPU, kvs)
+		invalids2, err = t.buildTreeFromLeafs(nCPU, kvs)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		invalids2, err = t.buildTreeBottomUpSingleThread(l, kvs)
+		invalids2, err = t.buildTreeFromLeafsSingleThread(l, kvs)
 		if err != nil {
 			return nil, err
 		}
 	}
 	invalids = append(invalids, invalids2...)
+
 	return invalids, nil
 }
 
@@ -323,6 +320,7 @@ func (t *Tree) caseC(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 
 	// 2. use keys at level L as roots of the subtrees under each one
 	subRoots := make([][]byte, nCPU)
+	dbgStatsPerBucket := make([]*dbgStats, nCPU)
 	txs := make([]db.Tx, nCPU)
 	var wg sync.WaitGroup
 	wg.Add(nCPU)
@@ -337,7 +335,8 @@ func (t *Tree) caseC(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 				panic(err) // TODO
 			}
 			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels,
-				hashFunction: t.hashFunction, root: keysAtL[cpu]}
+				hashFunction: t.hashFunction, root: keysAtL[cpu],
+				emptyHash: t.emptyHash, dbg: newDbgStats()}
 
 			// 3. do CASE B (with 1 cpu) for each key at level L
 			_, err = bucketTree.caseB(1, l, buckets[cpu]) // TODO handle invalids
@@ -346,6 +345,7 @@ func (t *Tree) caseC(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 				// return nil, err
 			}
 			subRoots[cpu] = bucketTree.root
+			dbgStatsPerBucket[cpu] = bucketTree.dbg
 			wg.Done()
 		}(i)
 	}
@@ -372,6 +372,11 @@ func (t *Tree) caseC(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 			invalids = append(invalids, excedents[i].pos)
 		}
 	}
+
+	for i := 0; i < len(dbgStatsPerBucket); i++ {
+		t.dbg.add(dbgStatsPerBucket[i])
+	}
+
 	return invalids, nil
 }
 
@@ -390,6 +395,7 @@ func (t *Tree) caseD(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 
 	subRoots := make([][]byte, nCPU)
 	invalidsInBucket := make([][]int, nCPU)
+	dbgStatsPerBucket := make([]*dbgStats, nCPU)
 	txs := make([]db.Tx, nCPU)
 
 	var wg sync.WaitGroup
@@ -409,7 +415,8 @@ func (t *Tree) caseD(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 			}
 
 			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels - l,
-				hashFunction: t.hashFunction, root: keysAtL[cpu]}
+				hashFunction: t.hashFunction, root: keysAtL[cpu],
+				emptyHash: t.emptyHash, dbg: newDbgStats()}
 
 			for j := 0; j < len(buckets[cpu]); j++ {
 				if err = bucketTree.add(l, buckets[cpu][j].k, buckets[cpu][j].v); err != nil {
@@ -417,6 +424,7 @@ func (t *Tree) caseD(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 				}
 			}
 			subRoots[cpu] = bucketTree.root
+			dbgStatsPerBucket[cpu] = bucketTree.dbg
 			wg.Done()
 		}(i)
 	}
@@ -438,6 +446,10 @@ func (t *Tree) caseD(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 	var invalids []int
 	for i := 0; i < len(invalidsInBucket); i++ {
 		invalids = append(invalids, invalidsInBucket[i]...)
+	}
+
+	for i := 0; i < len(dbgStatsPerBucket); i++ {
+		t.dbg.add(dbgStatsPerBucket[i])
 	}
 
 	return invalids, nil
@@ -539,17 +551,18 @@ func (t *Tree) kvsToKeysValues(kvs []kv) ([][]byte, [][]byte) {
 }
 */
 
-// buildTreeBottomUp splits the key-values into n Buckets (where n is the number
+// buildTreeFromLeafs splits the key-values into n Buckets (where n is the number
 // of CPUs), in parallel builds a subtree for each bucket, once all the subtrees
 // are built, uses the subtrees roots as keys for a new tree, which as result
 // will have the complete Tree build from bottom to up, where until the
 // log2(nCPU) level it has been computed in parallel.
-func (t *Tree) buildTreeBottomUp(nCPU int, kvs []kv) ([]int, error) {
+func (t *Tree) buildTreeFromLeafs(nCPU int, kvs []kv) ([]int, error) {
 	l := int(math.Log2(float64(nCPU)))
 	buckets := splitInBuckets(kvs, nCPU)
 
 	subRoots := make([][]byte, nCPU)
 	invalidsInBucket := make([][]int, nCPU)
+	dbgStatsPerBucket := make([]*dbgStats, nCPU)
 	txs := make([]db.Tx, nCPU)
 
 	var wg sync.WaitGroup
@@ -567,14 +580,16 @@ func (t *Tree) buildTreeBottomUp(nCPU int, kvs []kv) ([]int, error) {
 				panic(err) // TODO
 			}
 			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels,
-				hashFunction: t.hashFunction, root: t.emptyHash}
+				hashFunction: t.hashFunction, root: t.emptyHash,
+				emptyHash: t.emptyHash, dbg: newDbgStats()}
 
-			currInvalids, err := bucketTree.buildTreeBottomUpSingleThread(l, buckets[cpu])
+			currInvalids, err := bucketTree.buildTreeFromLeafsSingleThread(l, buckets[cpu])
 			if err != nil {
 				panic(err) // TODO
 			}
 			invalidsInBucket[cpu] = currInvalids
 			subRoots[cpu] = bucketTree.root
+			dbgStatsPerBucket[cpu] = bucketTree.dbg
 			wg.Done()
 		}(i)
 	}
@@ -598,12 +613,16 @@ func (t *Tree) buildTreeBottomUp(nCPU int, kvs []kv) ([]int, error) {
 		invalids = append(invalids, invalidsInBucket[i]...)
 	}
 
+	for i := 0; i < len(dbgStatsPerBucket); i++ {
+		t.dbg.add(dbgStatsPerBucket[i])
+	}
+
 	return invalids, err
 }
 
-// buildTreeBottomUpSingleThread builds the tree with the given []kv from bottom
+// buildTreeFromLeafsSingleThread builds the tree with the given []kv from bottom
 // to the root
-func (t *Tree) buildTreeBottomUpSingleThread(l int, kvsRaw []kv) ([]int, error) {
+func (t *Tree) buildTreeFromLeafsSingleThread(l int, kvsRaw []kv) ([]int, error) {
 	// TODO check that log2(len(leafs)) < t.maxLevels, if not, maxLevels
 	// would be reached and should return error
 	if len(kvsRaw) == 0 {
@@ -611,23 +630,27 @@ func (t *Tree) buildTreeBottomUpSingleThread(l int, kvsRaw []kv) ([]int, error) 
 	}
 
 	vt := newVT(t.maxLevels, t.hashFunction)
+	if t.dbg != nil {
+		vt.params.dbg = newDbgStats()
+	}
 
 	for i := 0; i < len(kvsRaw); i++ {
 		if err := vt.add(l, kvsRaw[i].k, kvsRaw[i].v); err != nil {
 			return nil, err
 		}
 	}
-
 	pairs, err := vt.computeHashes()
 	if err != nil {
 		return nil, err
 	}
+
 	// store pairs in db
 	for i := 0; i < len(pairs); i++ {
-		if err := t.tx.Put(pairs[i][0], pairs[i][1]); err != nil {
+		if err := t.dbPut(pairs[i][0], pairs[i][1]); err != nil {
 			return nil, err
 		}
 	}
+	t.dbg.add(vt.params.dbg)
 
 	// set tree.root from the virtual tree root
 	t.root = vt.root.h
@@ -654,7 +677,7 @@ func (t *Tree) upFromKeys(ks [][]byte) ([]byte, error) {
 			return nil, err
 		}
 		// store k-v to db
-		if err = t.tx.Put(k, v); err != nil {
+		if err = t.dbPut(k, v); err != nil {
 			return nil, err
 		}
 		rKs = append(rKs, k)
@@ -727,9 +750,25 @@ func combineInKVSet(base, toAdd []kv) ([]kv, []int) {
 	return r, invalids
 }
 
-// TODO WIP
-// func loadDBTreeToVirtualTree() error {
-//         return nil
+// loadVT loads a new virtual tree (vt) from the current Tree, which contains
+// the same leafs.
+// func (t *Tree) loadVT() (vt, error) {
+//         vt := newVT(t.maxLevels, t.hashFunction)
+//         vt.params.dbg = t.dbg
+//         err := t.Iterate(func(k, v []byte) {
+//                 switch v[0] {
+//                 case PrefixValueEmpty:
+//                 case PrefixValueLeaf:
+//                         leafK, leafV := ReadLeafValue(v)
+//                         if err := vt.add(0, leafK, leafV); err != nil {
+//                                 panic(err)
+//                         }
+//                 case PrefixValueIntermediate:
+//                 default:
+//                 }
+//         })
+//
+//         return vt, err
 // }
 
 // func computeSimpleAddCost(nLeafs int) int {
@@ -738,7 +777,7 @@ func combineInKVSet(base, toAdd []kv) ([]kv, []int) {
 //         return nLvls * int(math.Pow(2, float64(nLvls)))
 // }
 //
-// func computeBottomUpAddCost(nLeafs int) int {
+// func computeFromLeafsAddCost(nLeafs int) int {
 //         // 2^nLvls * 2 - 1
 //         nLvls := int(math.Log2(float64(nLeafs)))
 //         return (int(math.Pow(2, float64(nLvls))) * 2) - 1
