@@ -90,3 +90,38 @@ func testVirtualTree(c *qt.C, maxLevels int, keys, values [][]byte) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(vTree.root.h, qt.DeepEquals, tree.root)
 }
+
+func TestVirtualTreeAddBatch(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 2000
+	maxLevels := 100
+
+	keys := make([][]byte, nLeafs)
+	values := make([][]byte, nLeafs)
+	for i := 0; i < nLeafs; i++ {
+		keys[i] = randomBytes(32)
+		values[i] = randomBytes(32)
+	}
+
+	// normal tree, to have an expected root value
+	tree, err := NewTree(memory.NewMemoryStorage(), maxLevels, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	for i := 0; i < len(keys); i++ {
+		err := tree.Add(keys[i], values[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	// virtual tree
+	vTree := newVT(maxLevels, HashFunctionBlake2b)
+
+	c.Assert(vTree.root, qt.IsNil)
+
+	err = vTree.addBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+
+	// compute hashes, and check Root
+	_, err = vTree.computeHashes()
+	c.Assert(err, qt.IsNil)
+	c.Assert(vTree.root.h, qt.DeepEquals, tree.root)
+}
