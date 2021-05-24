@@ -94,7 +94,7 @@ var xdaistage = Specs{
 		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisStageDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsStageDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverStageDomain},
-		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD")},
+		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x693E79F3FD7DC5B3c32D1914E02a932b88397cC7")},
 	},
 }
 
