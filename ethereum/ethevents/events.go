@@ -19,6 +19,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/proto/build/go/models"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	ethereumhandler "go.vocdoni.io/dvote/ethereum/handler"
@@ -89,6 +90,7 @@ type EventProcessor struct {
 // NewEthEvents creates a new Ethereum events handler
 func NewEthEvents(
 	contracts map[string]*ethereumhandler.EthereumContract,
+	srcNetworkId models.SourceNetworkId,
 	signer *ethereum.SignKeys,
 	w3Endpoint string,
 	cens *census.Manager,
@@ -99,7 +101,7 @@ func NewEthEvents(
 	if len(w3Endpoint) == 0 {
 		return nil, fmt.Errorf("no w3Endpoint specified on Ethereum Events")
 	}
-	ph, err := ethereumhandler.NewEthereumHandler(contracts, w3Endpoint)
+	ph, err := ethereumhandler.NewEthereumHandler(contracts, srcNetworkId, w3Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create voting handle: %w", err)
 	}

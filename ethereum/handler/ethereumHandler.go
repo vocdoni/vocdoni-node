@@ -43,6 +43,7 @@ type EthereumHandler struct {
 	EthereumClient    *ethclient.Client
 	EthereumRPC       *ethrpc.Client
 	Endpoint          string
+	SrcNetworkId      models.SourceNetworkId
 }
 
 // Genesis wraps the info retrieved for a call to genesis.Get(chainId)
@@ -61,9 +62,9 @@ type EthSyncInfo struct {
 }
 
 // NewEthereumHandler initializes contracts creating a transactor using the ethereum client
-func NewEthereumHandler(contracts map[string]*EthereumContract,
+func NewEthereumHandler(contracts map[string]*EthereumContract, srcNetworkId models.SourceNetworkId,
 	dialEndpoint string) (*EthereumHandler, error) {
-	eh := new(EthereumHandler)
+	eh := &EthereumHandler{SrcNetworkId: srcNetworkId}
 	if err := eh.Connect(dialEndpoint); err != nil {
 		return nil, err
 	}
@@ -174,8 +175,8 @@ func (eh *EthereumHandler) PrintInfo(ctx context.Context, seconds time.Duration)
 		} else {
 			syncingInfo = ""
 		}
-		log.Infof("[ethereum info] synced:%t height:%d/%d mode:%s %s",
-			info.Synced, info.Height, info.MaxHeight, info.Mode, syncingInfo)
+		log.Infof("[ethereum info] synced:%t height:%d/%d mode:%s src:%s %s",
+			info.Synced, info.Height, info.MaxHeight, info.Mode, eh.SrcNetworkId, syncingInfo)
 		lastHeight = info.Height
 	}
 }
@@ -296,12 +297,12 @@ func (eh *EthereumHandler) NewProcessTxArgs(ctx context.Context, pid [types.Proc
 		CostExponent: uint32(processMeta.MaxTotalCostCostExponent[1]),
 	}
 
-	// TDB: @jordipainan namespaceAddr && ethChainID
-	// namespace
+	// namespace and sourceNetworkId
 	processData.Namespace, err = eh.VotingProcess.NamespaceId(&ethbind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("error fetching process from Ethereum: %w", err)
 	}
+	processData.SourceNetworkId = eh.SrcNetworkId
 
 	// if EVM census, check census root provided and get index slot from the token storage proof contract
 	if vochain.CensusOrigins[censusOrigin].NeedsIndexSlot {

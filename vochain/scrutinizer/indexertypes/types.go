@@ -37,6 +37,7 @@ type Process struct {
 	HaveResults       bool                       `json:"haveResults"`
 	FinalResults      bool                       `json:"finalResults"`
 	SourceBlockHeight uint64                     `json:"sourceBlockHeight"`
+	SourceNetworkId   string                     `badgerholdIndex:"SourceNetworkId" json:"sourceNetworkId"`
 }
 
 func (p Process) String() string {

@@ -27,6 +27,11 @@ const (
 	ethQueryTimeOut = 20 * time.Second
 )
 
+var srcNetworkIds = map[string]models.SourceNetworkId{
+	"default": models.SourceNetworkId_UNKNOWN,
+	"mainnet": models.SourceNetworkId_ETH_MAINNET_SIGNALING,
+}
+
 type APIoracle struct {
 	Namespace uint32
 	oracle    *oracle.Oracle
@@ -48,7 +53,11 @@ func (a *APIoracle) EnableERC20(chainName, web3Endpoint string) error {
 	if err != nil {
 		return err
 	}
-	a.eh, err = ethereumhandler.NewEthereumHandler(specs.Contracts, web3Endpoint)
+	srcNetId, ok := srcNetworkIds[chainName]
+	if !ok {
+		srcNetId = srcNetworkIds["default"]
+	}
+	a.eh, err = ethereumhandler.NewEthereumHandler(specs.Contracts, srcNetId, web3Endpoint)
 	if err != nil {
 		return err
 	}
@@ -100,6 +109,7 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		Namespace:         a.Namespace,
 		CensusOrigin:      models.CensusOrigin_ERC20,
 		Mode:              &models.ProcessMode{AutoStart: true},
+		SourceNetworkId:   a.eh.SrcNetworkId,
 	}
 	sproof, err := buildETHproof(req.EthProof)
 	if err != nil {
