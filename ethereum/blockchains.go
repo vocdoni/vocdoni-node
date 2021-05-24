@@ -7,6 +7,7 @@ import (
 	ethparams "github.com/ethereum/go-ethereum/params"
 	ethereumhandler "go.vocdoni.io/dvote/ethereum/handler"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // Specs defines a set of blockchain network specifications
@@ -18,7 +19,8 @@ type Specs struct {
 	BootNodes     []string // List of Bootnodes for this network
 	StartingBlock int64    // Where to start looking for events
 	// Contracts are ordered as [processes, namespaces, erc20tokenproofs, genesis, results, entityResolver]
-	Contracts map[string]*ethereumhandler.EthereumContract
+	Contracts     map[string]*ethereumhandler.EthereumContract
+	NetworkSource models.SourceNetworkId
 }
 
 // AvailableChains is the list of supported ethereum networks / environments
@@ -50,6 +52,7 @@ var mainnet = Specs{
 	NetworkId:     1,
 	BootNodes:     ethparams.MainnetBootnodes,
 	StartingBlock: 10230300, //2020 jun 09 10:00h
+	NetworkSource: models.SourceNetworkId_ETH_MAINNET,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
@@ -66,6 +69,7 @@ var xdai = Specs{
 	NetworkId:     100,
 	BootNodes:     nil,
 	StartingBlock: 14531875, //2021 Feb 13 21:58h
+	NetworkSource: models.SourceNetworkId_POA_XDAI,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
@@ -82,6 +86,7 @@ var xdaistage = Specs{
 	NetworkId:     100,
 	BootNodes:     nil,
 	StartingBlock: 14531875, //2021 Feb 13 21:58h
+	NetworkSource: models.SourceNetworkId_POA_XDAI,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},
@@ -98,6 +103,7 @@ var rinkeby = Specs{
 	NetworkId:     4,
 	StartingBlock: 8399062, // 2021 Apr 12 09:28h
 	BootNodes:     nil,
+	NetworkSource: models.SourceNetworkId_ETH_RINKEBY,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},
@@ -115,6 +121,7 @@ var goerlistage = Specs{
 	NetworkId:     goerli.NetworkId,
 	StartingBlock: goerli.StartingBlock,
 	BootNodes:     ethparams.GoerliBootnodes,
+	NetworkSource: models.SourceNetworkId_ETH_GOERLI,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},
@@ -134,6 +141,7 @@ var goerli = Specs{
 	NetworkId:     5,
 	StartingBlock: 3000000,
 	BootNodes:     ethparams.GoerliBootnodes,
+	NetworkSource: models.SourceNetworkId_ETH_GOERLI,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
 		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},

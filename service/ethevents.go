@@ -52,6 +52,7 @@ func EthEvents(
 	}
 	ev, err := ethevents.NewEthEvents(
 		specs.Contracts,
+		specs.NetworkSource,
 		signer,
 		w3uri,
 		cm,

@@ -290,6 +290,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		VoteOpts:          p.GetVoteOptions(),
 		CreationTime:      currentBlockTime,
 		SourceBlockHeight: p.GetSourceBlockHeight(),
+		SourceNetworkId:   p.SourceNetworkId.String(),
 		Metadata:          p.GetMetadata(),
 	}
 	log.Debugf("new indexer process %s", proc.String())
