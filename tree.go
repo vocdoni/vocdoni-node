@@ -116,6 +116,77 @@ func (t *Tree) HashFunction() HashFunction {
 	return t.hashFunction
 }
 
+// AddBatch adds a batch of key-values to the Tree. Returns an array containing
+// the indexes of the keys failed to add.
+func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
+	t.updateAccessTime()
+	t.Lock()
+	defer t.Unlock()
+
+	vt, err := t.loadVT()
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO check that keys & values is valid for Tree.hashFunction
+	invalids, err := vt.addBatch(keys, values)
+	if err != nil {
+		return nil, err
+	}
+
+	// once the VirtualTree is build, compute the hashes
+	pairs, err := vt.computeHashes()
+	if err != nil {
+		return nil, err
+	}
+	t.root = vt.root.h
+
+	// store pairs in db
+	t.tx, err = t.db.NewTx()
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(pairs); i++ {
+		if err := t.dbPut(pairs[i][0], pairs[i][1]); err != nil {
+			return nil, err
+		}
+	}
+
+	// store root to db
+	if err := t.dbPut(dbKeyRoot, t.root); err != nil {
+		return nil, err
+	}
+
+	// update nLeafs
+	if err := t.incNLeafs(len(keys) - len(invalids)); err != nil {
+		return nil, err
+	}
+
+	// commit db tx
+	if err := t.tx.Commit(); err != nil {
+		return nil, err
+	}
+	return invalids, nil
+}
+
+// loadVT loads a new virtual tree (vt) from the current Tree, which contains
+// the same leafs.
+func (t *Tree) loadVT() (vt, error) {
+	vt := newVT(t.maxLevels, t.hashFunction)
+	vt.params.dbg = t.dbg
+	err := t.Iterate(func(k, v []byte) {
+		if v[0] != PrefixValueLeaf {
+			return
+		}
+		leafK, leafV := ReadLeafValue(v)
+		if err := vt.add(0, leafK, leafV); err != nil {
+			panic(err)
+		}
+	})
+
+	return vt, err
+}
+
 // Add inserts the key-value into the Tree.  If the inputs come from a *big.Int,
 // is expected that are represented by a Little-Endian byte array (for circom
 // compatibility).

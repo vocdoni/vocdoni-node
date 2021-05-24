@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"runtime"
+	"sort"
 	"testing"
 	"time"
 
@@ -31,7 +32,7 @@ func printRes(name string, duration time.Duration) {
 
 func debugTime(descr string, time1, time2 time.Duration) {
 	if debug {
-		fmt.Printf("%s was %f times faster than without AddBatch\n",
+		fmt.Printf("%s was %.02fx times faster than without AddBatch\n",
 			descr, float64(time1)/float64(time2))
 	}
 }
@@ -151,55 +152,6 @@ func randomBytes(n int) []byte {
 	return b
 }
 
-func TestBuildTreeFromLeafsSingleThread(t *testing.T) {
-	c := qt.New(t)
-	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
-	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close()
-
-	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
-	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close()
-
-	testvectorKeys := []string{
-		"1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642",
-		"2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf",
-		"1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5",
-		"d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7",
-	}
-	var keys, values [][]byte
-	for i := 0; i < len(testvectorKeys); i++ {
-		key, err := hex.DecodeString(testvectorKeys[i])
-		c.Assert(err, qt.IsNil)
-		keys = append(keys, key)
-		values = append(values, []byte{0})
-	}
-
-	for i := 0; i < len(keys); i++ {
-		if err := tree1.Add(keys[i], values[i]); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	kvs, err := tree2.keysValuesToKvs(keys, values)
-	c.Assert(err, qt.IsNil)
-	sortKvs(kvs)
-
-	tree2.tx, err = tree2.db.NewTx()
-	c.Assert(err, qt.IsNil)
-	// indexes, err := tree2.buildTreeFromLeafsSingleThread(kvs)
-	indexes, err := tree2.buildTreeFromLeafs(4, kvs)
-	c.Assert(err, qt.IsNil)
-	// tree1.PrintGraphviz(nil)
-	// tree2.PrintGraphviz(nil)
-
-	c.Check(len(indexes), qt.Equals, 0)
-
-	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
-	// 15b6a23945ae6c81342b7eb14e70fff50812dc8791cb15ec791eb08f91784139
-}
-
 func TestAddBatchCaseATestVector(t *testing.T) {
 	c := qt.New(t)
 	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
@@ -230,69 +182,52 @@ func TestAddBatchCaseATestVector(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// tree1.PrintGraphviz(nil)
 
 	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
-	// tree1.PrintGraphviz(nil)
-	// tree2.PrintGraphviz(nil)
-
 	c.Check(len(indexes), qt.Equals, 0)
-
-	// tree1.PrintGraphviz(nil)
-	// tree2.PrintGraphviz(nil)
-
 	// check that both trees roots are equal
-	// fmt.Println(hex.EncodeToString(tree1.Root()))
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
-	// c.Assert(tree2.Root(), qt.DeepEquals, tree1.Root())
 
-	// fmt.Println("\n---2nd test vector---")
-	//
-	// // 2nd test vectors
-	// tree1, err = NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
-	// c.Assert(err, qt.IsNil)
-	// defer tree1.db.Close()
-	//
-	// tree2, err = NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
-	// c.Assert(err, qt.IsNil)
-	// defer tree2.db.Close()
-	//
-	// testvectorKeys = []string{
-	//         "1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642",
-	//         "2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf",
-	//         "9cb87ec67e875c61390edcd1ab517f443591047709a4d4e45b0f9ed980857b8e",
-	//         "9b4e9e92e974a589f426ceeb4cb291dc24893513fecf8e8460992dcf52621d4d",
-	//         "1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5",
-	//         "d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7",
-	//         "3cd55dbfb8f975f20a0925dfbdabe79fa2d51dd0268afbb8ba6b01de9dfcdd3c",
-	//         "5d0a9d6d9f197c091bf054fac9cb60e11ec723d6610ed8578e617b4d46cb43d5",
-	// }
-	// keys = [][]byte{}
-	// values = [][]byte{}
-	// for i := 0; i < len(testvectorKeys); i++ {
-	//         key, err := hex.DecodeString(testvectorKeys[i])
-	//         c.Assert(err, qt.IsNil)
-	//         keys = append(keys, key)
-	//         values = append(values, []byte{0})
-	// }
-	//
-	// for i := 0; i < len(keys); i++ {
-	//         if err := tree1.Add(keys[i], values[i]); err != nil {
-	//                 t.Fatal(err)
-	//         }
-	// }
-	//
-	// indexes, err = tree2.AddBatch(keys, values)
-	// c.Assert(err, qt.IsNil)
-	// // tree1.PrintGraphviz(nil)
-	// // tree2.PrintGraphviz(nil)
-	//
-	// c.Check(len(indexes), qt.Equals, 0)
-	//
-	// // check that both trees roots are equal
-	// // fmt.Println(hex.EncodeToString(tree1.Root()))
-	// c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	// 2nd test vectors
+	tree1, err = NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree1.db.Close()
+
+	tree2, err = NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close()
+
+	testvectorKeys = []string{
+		"1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642",
+		"2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf",
+		"9cb87ec67e875c61390edcd1ab517f443591047709a4d4e45b0f9ed980857b8e",
+		"9b4e9e92e974a589f426ceeb4cb291dc24893513fecf8e8460992dcf52621d4d",
+		"1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5",
+		"d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7",
+		"3cd55dbfb8f975f20a0925dfbdabe79fa2d51dd0268afbb8ba6b01de9dfcdd3c",
+		"5d0a9d6d9f197c091bf054fac9cb60e11ec723d6610ed8578e617b4d46cb43d5",
+	}
+	keys = [][]byte{}
+	values = [][]byte{}
+	for i := 0; i < len(testvectorKeys); i++ {
+		key, err := hex.DecodeString(testvectorKeys[i])
+		c.Assert(err, qt.IsNil)
+		keys = append(keys, key)
+		values = append(values, []byte{0})
+	}
+
+	for i := 0; i < len(keys); i++ {
+		if err := tree1.Add(keys[i], values[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	indexes, err = tree2.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	c.Check(len(indexes), qt.Equals, 0)
+	// check that both trees roots are equal
+	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 }
 
 func TestAddBatchCaseARandomKeys(t *testing.T) {
@@ -417,83 +352,6 @@ func TestAddBatchCaseBRepeatedLeafs(t *testing.T) {
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 }
 
-func TestCombineInKVSet(t *testing.T) {
-	c := qt.New(t)
-
-	var a, b, expected []kv
-	for i := 0; i < 10; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		kv := kv{k: k}
-		if i < 7 {
-			a = append(a, kv)
-		}
-		if i >= 4 {
-			b = append(b, kv)
-		}
-		expected = append(expected, kv)
-	}
-
-	r, invalids := combineInKVSet(a, b)
-	for i := 0; i < len(r); i++ {
-		c.Assert(r[i].k, qt.DeepEquals, expected[i].k)
-	}
-	c.Assert(len(invalids), qt.Equals, 7-4)
-}
-
-func TestGetKeysAtLevel(t *testing.T) {
-	c := qt.New(t)
-
-	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
-	c.Assert(err, qt.IsNil)
-	defer tree.db.Close()
-
-	for i := 0; i < 32; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
-		if err := tree.Add(k, v); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	keys, err := tree.getKeysAtLevel(2)
-	c.Assert(err, qt.IsNil)
-	expected := []string{
-		"a5d5f14fce7348e40751496cf25d107d91b0bd043435b9577d778a01f8aa6111",
-		"e9e8dd9b28a7f81d1ff34cb5cefc0146dd848b31031a427b79bdadb62e7f6910",
-	}
-	for i := 0; i < len(keys); i++ {
-		c.Assert(hex.EncodeToString(keys[i]), qt.Equals, expected[i])
-	}
-
-	keys, err = tree.getKeysAtLevel(3)
-	c.Assert(err, qt.IsNil)
-	expected = []string{
-		"9f12c13e52bca96ad4882a26558e48ab67ddd63e062b839207e893d961390f01",
-		"16d246dd6826ec7346c7328f11c4261facf82d4689f33263ff6e207956a77f21",
-		"4a22cc901c6337daa17a431fa20170684b710e5f551509511492ec24e81a8f2f",
-		"470d61abcbd154977bffc9a9ec5a8daff0caabcf2a25e8441f604c79daa0f82d",
-	}
-	for i := 0; i < len(keys); i++ {
-		c.Assert(hex.EncodeToString(keys[i]), qt.Equals, expected[i])
-	}
-
-	keys, err = tree.getKeysAtLevel(4)
-	c.Assert(err, qt.IsNil)
-	expected = []string{
-		"7a5d1c81f7b96318012de3417e53d4f13df5b1337718651cd29d0cb0a66edd20",
-		"3408213e4e844bdf3355eb8781c74e31626812898c2dbe141ed6d2c92256fc1c",
-		"dfd8a4d0b6954a3e9f3892e655b58d456eeedf9367f27dfdd9bc2dd6a5577312",
-		"9e99fbec06fb2a6725997c12c4995f62725eb4cce4808523a5a5e80cca64b007",
-		"0befa1e070231dbf4e8ff841c05878cdec823e0c09594c24910a248b3ff5a628",
-		"b7131b0a15c772a57005a4dc5d0d6dd4b3414f5d9ee7408ce5e86c5ab3520e04",
-		"6d1abe0364077846a56bab1deb1a04883eb796b74fe531a7676a9a370f83ab21",
-		"4270116394bede69cf9cd72069eca018238080380bef5de75be8dcbbe968e105",
-	}
-	for i := 0; i < len(keys); i++ {
-		c.Assert(hex.EncodeToString(keys[i]), qt.Equals, expected[i])
-	}
-}
-
 func TestSplitInBuckets(t *testing.T) {
 	c := qt.New(t)
 
@@ -563,9 +421,35 @@ func TestSplitInBuckets(t *testing.T) {
 		sortKvs(buckets[i])
 		c.Assert(len(buckets[i]), qt.Equals, len(expected[i]))
 		for j := 0; j < len(buckets[i]); j++ {
-			c.Check(hex.EncodeToString(buckets[i][j].k[:4]), qt.Equals, expected[i][j])
+			c.Check(hex.EncodeToString(buckets[i][j].k[:4]),
+				qt.Equals, expected[i][j])
 		}
 	}
+}
+
+// compareBytes compares byte slices where the bytes are compared from left to
+// right and each byte is compared by bit from right to left
+func compareBytes(a, b []byte) bool {
+	// WIP
+	for i := 0; i < len(a); i++ {
+		for j := 0; j < 8; j++ {
+			aBit := a[i] & (1 << j)
+			bBit := b[i] & (1 << j)
+			if aBit > bBit {
+				return false
+			} else if aBit < bBit {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// sortKvs sorts the kv by path
+func sortKvs(kvs []kv) {
+	sort.Slice(kvs, func(i, j int) bool {
+		return compareBytes(kvs[i].keyPath, kvs[j].keyPath)
+	})
 }
 
 func TestAddBatchCaseC(t *testing.T) {
@@ -877,38 +761,6 @@ func TestLoadVT(t *testing.T) {
 	// check that tree & vt roots are equal
 	c.Check(tree.Root(), qt.DeepEquals, vt.root.h)
 }
-
-// func printLeafs(name string, t *Tree) {
-//         w := bytes.NewBufferString("")
-//
-//         err := t.Iterate(func(k, v []byte) {
-//                 if v[0] != PrefixValueLeaf {
-//                         return
-//                 }
-//                 leafK, _ := readLeafValue(v)
-//                 fmt.Fprintf(w, hex.EncodeToString(leafK[:4])+"\n")
-//         })
-//         if err != nil {
-//                 panic(err)
-//         }
-//         err = ioutil.WriteFile(name, w.Bytes(), 0644)
-//         if err != nil {
-//                 panic(err)
-//         }
-//
-// }
-
-// func TestComputeCosts(t *testing.T) {
-//         fmt.Println(computeSimpleAddCost(10))
-//         fmt.Println(computeFromLeafsAddCost(10))
-//
-//         fmt.Println(computeSimpleAddCost(1024))
-//         fmt.Println(computeFromLeafsAddCost(1024))
-// }
-
-// TODO test tree with nLeafs > minLeafsThreshold, but that at level L, there is
-// less keys than nBuckets (so CASE C could be applied if first few leafs are
-// added to balance the tree)
 
 // TODO test adding batch with repeated keys in the batch
 // TODO test adding batch with multiple invalid keys

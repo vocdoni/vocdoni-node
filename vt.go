@@ -30,6 +30,13 @@ type params struct {
 	dbg          *dbgStats
 }
 
+type kv struct {
+	pos     int // original position in the inputted array
+	keyPath []byte
+	k       []byte
+	v       []byte
+}
+
 func (p *params) keysValuesToKvs(ks, vs [][]byte) ([]kv, error) {
 	if len(ks) != len(vs) {
 		return nil, fmt.Errorf("len(keys)!=len(values) (%d!=%d)",
@@ -68,8 +75,12 @@ func newVT(maxLevels int, hash HashFunction) vt {
 	}
 }
 
+// addBatch adds a batch of key-values to the VirtualTree. Returns an array
+// containing the indexes of the keys failed to add. Does not include the
+// computation of hashes of the nodes neither the storage of the key-values of
+// the tree into the db. After addBatch, vt.computeHashes should be called to
+// compute the hashes of all the nodes of the tree.
 func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
-	// parallelize adding leafs in the virtual tree
 	nCPU := flp2(runtime.NumCPU())
 	if nCPU == 1 || len(ks) < nCPU {
 		var invalids []int
@@ -95,7 +106,37 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 		return nil, err
 	}
 	if len(nodesAtL) != nCPU && t.root != nil {
-		// CASE E: add one key at each bucket, and then do CASE D
+		/*
+			Already populated Tree but Unbalanced
+			- Need to fill M1 and M2, and then will be able to continue with the flow
+				- Search for M1 & M2 in the inputed Keys
+				- Add M1 & M2 to the Tree
+				- From here can continue with the flow
+
+			              R
+			             /  \
+			            /    \
+			           /      \
+			          *        *
+			           |        \
+			           |         \
+			           |          \
+			L:    M1   *   M2      *        (where M1 and M2 are empty)
+			          / |         /
+			         /  |        /
+			        /   |       /
+			       A    *      *
+			           / \     | \
+			          /   \    |  \
+			         /     \   |   \
+			        B      *   *   C
+			              / \  |\
+			           ... ... | \
+			                   |  \
+			                   D  E
+		*/
+
+		// add one key at each bucket, and then continue with the flow
 		for i := 0; i < len(buckets); i++ {
 			// add one leaf of the bucket, if there is an error when
 			// adding the k-v, try to add the next one of the bucket
@@ -120,8 +161,7 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 		}
 	}
 	if len(nodesAtL) != nCPU {
-		fmt.Println("ASDF")
-		panic("should not happen")
+		panic("should not happen") // TODO TMP
 	}
 
 	subRoots := make([]*node, nCPU)
@@ -131,8 +171,6 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 	wg.Add(nCPU)
 	for i := 0; i < nCPU; i++ {
 		go func(cpu int) {
-			sortKvs(buckets[cpu])
-
 			bucketVT := newVT(t.params.maxLevels-l, t.params.hashFunction)
 			bucketVT.root = nodesAtL[cpu]
 			for j := 0; j < len(buckets[cpu]); j++ {
@@ -214,8 +252,8 @@ func upFromNodes(ns []*node) (*node, error) {
 
 	var res []*node
 	for i := 0; i < len(ns); i += 2 {
-		// if ns[i].typ() == vtEmpty && ns[i+1].typ() == vtEmpty {
-		if ns[i] == nil && ns[i+1] == nil {
+		if ns[i].typ() == vtEmpty && ns[i+1].typ() == vtEmpty {
+			// if ns[i] == nil && ns[i+1] == nil {
 			// when both sub nodes are empty, the node is also empty
 			res = append(res, ns[i]) // empty node
 			continue
@@ -228,56 +266,6 @@ func upFromNodes(ns []*node) (*node, error) {
 	}
 	return upFromNodes(res)
 }
-
-// func upFromNodesComputingHashes(p *params, ns []*node, pairs [][2][]byte) (
-//         [][2][]byte, *node, error) {
-//         if len(ns) == 1 {
-//                 return pairs, ns[0], nil
-//         }
-//
-//         var res []*node
-//         for i := 0; i < len(ns); i += 2 {
-//                 if ns[i] == nil && ns[i+1] == nil {
-//                         // when both sub nodes are empty, the node is also empty
-//                         res = append(res, ns[i]) // empty node
-//                         continue
-//                 }
-//                 n := &node{
-//                         l: ns[i],
-//                         r: ns[i+1],
-//                 }
-//
-//                 if n.l == nil {
-//                         n.l = &node{
-//                                 h: p.emptyHash,
-//                         }
-//                 }
-//                 if n.r == nil {
-//                         n.r = &node{
-//                                 h: p.emptyHash,
-//                         }
-//                 }
-//                 if n.l.typ() == vtEmpty && n.r.typ() == vtLeaf {
-//                         n = n.r
-//                 }
-//                 if n.r.typ() == vtEmpty && n.l.typ() == vtLeaf {
-//                         n = n.l
-//                 }
-//
-//                 // once the sub nodes are computed, can compute the current node
-//                 // hash
-//                 p.dbg.incHash()
-//                 k, v, err := newIntermediate(p.hashFunction, n.l.h, n.r.h)
-//                 if err != nil {
-//                         return nil, nil, err
-//                 }
-//                 n.h = k
-//                 kv := [2][]byte{k, v}
-//                 pairs = append(pairs, kv)
-//                 res = append(res, n)
-//         }
-//         return upFromNodesComputingHashes(p, res, pairs)
-// }
 
 func (t *vt) add(fromLvl int, k, v []byte) error {
 	leaf := newLeafNode(t.params, k, v)
@@ -320,8 +308,7 @@ func (t *vt) computeHashes() ([][2][]byte, error) {
 				t.params.maxLevels, bucketVT.params, bucketPairs[cpu])
 			if err != nil {
 				// TODO WIP
-				fmt.Println("TODO ERR, err:", err)
-				panic(err)
+				panic("TODO" + err.Error())
 			}
 
 			subRoots[cpu] = bucketVT.root
@@ -444,7 +431,7 @@ func (n *node) add(p *params, currLvl int, leaf *node) error {
 	case vtEmpty:
 		panic(fmt.Errorf("EMPTY %v", n)) // TODO TMP
 	default:
-		return fmt.Errorf("ERR")
+		return fmt.Errorf("ERR") // TODO TMP
 	}
 
 	return nil
@@ -482,6 +469,53 @@ func (n *node) downUntilDivergence(p *params, currLvl int, oldLeaf, newLeaf *nod
 	}
 
 	return nil
+}
+
+func splitInBuckets(kvs []kv, nBuckets int) [][]kv {
+	buckets := make([][]kv, nBuckets)
+	// 1. classify the keyvalues into buckets
+	for i := 0; i < len(kvs); i++ {
+		pair := kvs[i]
+
+		// bucketnum := keyToBucket(pair.k, nBuckets)
+		bucketnum := keyToBucket(pair.keyPath, nBuckets)
+		buckets[bucketnum] = append(buckets[bucketnum], pair)
+	}
+	return buckets
+}
+
+// TODO rename in a more 'real' name (calculate bucket from/for key)
+func keyToBucket(k []byte, nBuckets int) int {
+	nLevels := int(math.Log2(float64(nBuckets)))
+	b := make([]int, nBuckets)
+	for i := 0; i < nBuckets; i++ {
+		b[i] = i
+	}
+	r := b
+	mid := len(r) / 2 //nolint:gomnd
+	for i := 0; i < nLevels; i++ {
+		if int(k[i/8]&(1<<(i%8))) != 0 {
+			r = r[mid:]
+			mid = len(r) / 2 //nolint:gomnd
+		} else {
+			r = r[:mid]
+			mid = len(r) / 2 //nolint:gomnd
+		}
+	}
+	return r[0]
+}
+
+// flp2 computes the floor power of 2, the highest power of 2 under the given
+// value.
+func flp2(n int) int {
+	res := 0
+	for i := n; i >= 1; i-- {
+		if (i & (i - 1)) == 0 {
+			res = i
+			break
+		}
+	}
+	return res
 }
 
 // returns an array of key-values to store in the db
@@ -539,8 +573,7 @@ func (n *node) computeHashes(currLvl, maxLvl int, p *params, pairs [][2][]byte) 
 		pairs = append(pairs, kv)
 	case vtEmpty:
 	default:
-		fmt.Println("n.computeHashes type no match", t)
-		return nil, fmt.Errorf("ERR TMP") // TODO
+		return nil, fmt.Errorf("ERR:n.computeHashes type (%d) no match", t) // TODO TMP
 	}
 
 	return pairs, nil
