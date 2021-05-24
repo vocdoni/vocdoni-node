@@ -148,6 +148,43 @@ const (
 // AddBatch adds a batch of key-values to the Tree. Returns an array containing
 // the indexes of the keys failed to add.
 func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
+	t.updateAccessTime()
+	t.Lock()
+	defer t.Unlock()
+
+	vt, err := t.loadVT()
+	if err != nil {
+		return nil, err
+	}
+
+	invalids, err := vt.addBatch(keys, values)
+	if err != nil {
+		return nil, err
+	}
+
+	pairs, err := vt.computeHashes()
+	if err != nil {
+		return nil, err
+	}
+	t.root = vt.root.h
+
+	// store pairs in db
+	t.tx, err = t.db.NewTx()
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(pairs); i++ {
+		if err := t.dbPut(pairs[i][0], pairs[i][1]); err != nil {
+			return nil, err
+		}
+	}
+
+	return t.finalizeAddBatch(len(keys), invalids)
+}
+
+// AddBatchOLD adds a batch of key-values to the Tree. Returns an array containing
+// the indexes of the keys failed to add.
+func (t *Tree) AddBatchOLD(keys, values [][]byte) ([]int, error) {
 	// TODO: support vaules=nil
 	t.updateAccessTime()
 	t.Lock()
@@ -416,7 +453,7 @@ func (t *Tree) caseD(nCPU, l int, keysAtL [][]byte, kvs []kv) ([]int, error) {
 
 			bucketTree := Tree{tx: txs[cpu], db: t.db, maxLevels: t.maxLevels - l,
 				hashFunction: t.hashFunction, root: keysAtL[cpu],
-				emptyHash: t.emptyHash, dbg: newDbgStats()}
+				emptyHash: t.emptyHash, dbg: newDbgStats()} // TODO bucketTree.dbg should be optional
 
 			for j := 0; j < len(buckets[cpu]); j++ {
 				if err = bucketTree.add(l, buckets[cpu][j].k, buckets[cpu][j].v); err != nil {
@@ -752,24 +789,24 @@ func combineInKVSet(base, toAdd []kv) ([]kv, []int) {
 
 // loadVT loads a new virtual tree (vt) from the current Tree, which contains
 // the same leafs.
-// func (t *Tree) loadVT() (vt, error) {
-//         vt := newVT(t.maxLevels, t.hashFunction)
-//         vt.params.dbg = t.dbg
-//         err := t.Iterate(func(k, v []byte) {
-//                 switch v[0] {
-//                 case PrefixValueEmpty:
-//                 case PrefixValueLeaf:
-//                         leafK, leafV := ReadLeafValue(v)
-//                         if err := vt.add(0, leafK, leafV); err != nil {
-//                                 panic(err)
-//                         }
-//                 case PrefixValueIntermediate:
-//                 default:
-//                 }
-//         })
-//
-//         return vt, err
-// }
+func (t *Tree) loadVT() (vt, error) {
+	vt := newVT(t.maxLevels, t.hashFunction)
+	vt.params.dbg = t.dbg
+	err := t.Iterate(func(k, v []byte) {
+		switch v[0] {
+		case PrefixValueEmpty:
+		case PrefixValueLeaf:
+			leafK, leafV := ReadLeafValue(v)
+			if err := vt.add(0, leafK, leafV); err != nil {
+				panic(err)
+			}
+		case PrefixValueIntermediate:
+		default:
+		}
+	})
+
+	return vt, err
+}
 
 // func computeSimpleAddCost(nLeafs int) int {
 //         // nLvls 2^nLvls

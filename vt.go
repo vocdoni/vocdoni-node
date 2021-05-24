@@ -68,41 +68,39 @@ func newVT(maxLevels int, hash HashFunction) vt {
 	}
 }
 
-func (t *vt) addBatch(ks, vs [][]byte) error {
+func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 	// parallelize adding leafs in the virtual tree
 	nCPU := flp2(runtime.NumCPU())
 	if nCPU == 1 || len(ks) < nCPU {
-		// var invalids []int
+		var invalids []int
 		for i := 0; i < len(ks); i++ {
 			if err := t.add(0, ks[i], vs[i]); err != nil {
-				// invalids = append(invalids, i)
-				fmt.Println(err) // TODO WIP
+				invalids = append(invalids, i)
 			}
 		}
-		return nil // TODO invalids
+		return invalids, nil
 	}
 
 	l := int(math.Log2(float64(nCPU)))
 
 	kvs, err := t.params.keysValuesToKvs(ks, vs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	buckets := splitInBuckets(kvs, nCPU)
 
 	nodesAtL, err := t.getNodesAtLevel(l)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	// fmt.Println("nodesatL pre-E", len(nodesAtL))
-	if len(nodesAtL) != nCPU {
+	if len(nodesAtL) != nCPU && t.root != nil {
 		// CASE E: add one key at each bucket, and then do CASE D
 		for i := 0; i < len(buckets); i++ {
 			// add one leaf of the bucket, if there is an error when
 			// adding the k-v, try to add the next one of the bucket
 			// (until one is added)
-			var inserted int
+			inserted := -1
 			for j := 0; j < len(buckets[i]); j++ {
 				if err := t.add(0, buckets[i][j].k, buckets[i][j].v); err == nil {
 					inserted = j
@@ -111,12 +109,19 @@ func (t *vt) addBatch(ks, vs [][]byte) error {
 			}
 
 			// remove the inserted element from buckets[i]
-			buckets[i] = append(buckets[i][:inserted], buckets[i][inserted+1:]...)
+			// fmt.Println("rm-ins", inserted)
+			if inserted != -1 {
+				buckets[i] = append(buckets[i][:inserted], buckets[i][inserted+1:]...)
+			}
 		}
 		nodesAtL, err = t.getNodesAtLevel(l)
 		if err != nil {
-			return err
+			return nil, err
 		}
+	}
+	if len(nodesAtL) != nCPU {
+		fmt.Println("ASDF")
+		panic("should not happen")
 	}
 
 	subRoots := make([]*node, nCPU)
@@ -141,49 +146,64 @@ func (t *vt) addBatch(ks, vs [][]byte) error {
 	}
 	wg.Wait()
 
+	var invalids []int
+	for i := 0; i < len(invalidsInBucket); i++ {
+		invalids = append(invalids, invalidsInBucket[i]...)
+	}
+
 	newRootNode, err := upFromNodes(subRoots)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	t.root = newRootNode
 
-	return nil
+	return invalids, nil
 }
 
 func (t *vt) getNodesAtLevel(l int) ([]*node, error) {
 	if t.root == nil {
-		return nil, nil
+		var r []*node
+		nChilds := int(math.Pow(2, float64(l))) //nolint:gomnd
+		for i := 0; i < nChilds; i++ {
+			r = append(r, nil)
+		}
+		return r, nil
 	}
 	return t.root.getNodesAtLevel(0, l)
 }
 
 func (n *node) getNodesAtLevel(currLvl, l int) ([]*node, error) {
-	var nodes []*node
+	if n == nil {
+		var r []*node
+		nChilds := int(math.Pow(2, float64(l-currLvl))) //nolint:gomnd
+		for i := 0; i < nChilds; i++ {
+			r = append(r, nil)
+		}
+		return r, nil
+	}
 
 	typ := n.typ()
 	if currLvl == l && typ != vtEmpty {
-		nodes = append(nodes, n)
-		return nodes, nil
+		return []*node{n}, nil
 	}
 	if currLvl >= l {
 		panic("should not reach this point") // TODO TMP
-		// return nil, nil
 	}
 
-	if n.l != nil {
-		nodesL, err := n.l.getNodesAtLevel(currLvl+1, l)
-		if err != nil {
-			return nil, err
-		}
-		nodes = append(nodes, nodesL...)
+	var nodes []*node
+
+	nodesL, err := n.l.getNodesAtLevel(currLvl+1, l)
+	if err != nil {
+		return nil, err
 	}
-	if n.r != nil {
-		nodesR, err := n.r.getNodesAtLevel(currLvl+1, l)
-		if err != nil {
-			return nil, err
-		}
-		nodes = append(nodes, nodesR...)
+	nodes = append(nodes, nodesL...)
+
+	nodesR, err := n.r.getNodesAtLevel(currLvl+1, l)
+	if err != nil {
+		return nil, err
 	}
+	nodes = append(nodes, nodesR...)
+
 	return nodes, nil
 }
 
@@ -194,9 +214,11 @@ func upFromNodes(ns []*node) (*node, error) {
 
 	var res []*node
 	for i := 0; i < len(ns); i += 2 {
-		if ns[i].typ() == vtEmpty && ns[i+1].typ() == vtEmpty {
+		// if ns[i].typ() == vtEmpty && ns[i+1].typ() == vtEmpty {
+		if ns[i] == nil && ns[i+1] == nil {
 			// when both sub nodes are empty, the node is also empty
 			res = append(res, ns[i]) // empty node
+			continue
 		}
 		n := &node{
 			l: ns[i],
@@ -206,6 +228,56 @@ func upFromNodes(ns []*node) (*node, error) {
 	}
 	return upFromNodes(res)
 }
+
+// func upFromNodesComputingHashes(p *params, ns []*node, pairs [][2][]byte) (
+//         [][2][]byte, *node, error) {
+//         if len(ns) == 1 {
+//                 return pairs, ns[0], nil
+//         }
+//
+//         var res []*node
+//         for i := 0; i < len(ns); i += 2 {
+//                 if ns[i] == nil && ns[i+1] == nil {
+//                         // when both sub nodes are empty, the node is also empty
+//                         res = append(res, ns[i]) // empty node
+//                         continue
+//                 }
+//                 n := &node{
+//                         l: ns[i],
+//                         r: ns[i+1],
+//                 }
+//
+//                 if n.l == nil {
+//                         n.l = &node{
+//                                 h: p.emptyHash,
+//                         }
+//                 }
+//                 if n.r == nil {
+//                         n.r = &node{
+//                                 h: p.emptyHash,
+//                         }
+//                 }
+//                 if n.l.typ() == vtEmpty && n.r.typ() == vtLeaf {
+//                         n = n.r
+//                 }
+//                 if n.r.typ() == vtEmpty && n.l.typ() == vtLeaf {
+//                         n = n.l
+//                 }
+//
+//                 // once the sub nodes are computed, can compute the current node
+//                 // hash
+//                 p.dbg.incHash()
+//                 k, v, err := newIntermediate(p.hashFunction, n.l.h, n.r.h)
+//                 if err != nil {
+//                         return nil, nil, err
+//                 }
+//                 n.h = k
+//                 kv := [2][]byte{k, v}
+//                 pairs = append(pairs, kv)
+//                 res = append(res, n)
+//         }
+//         return upFromNodesComputingHashes(p, res, pairs)
+// }
 
 func (t *vt) add(fromLvl int, k, v []byte) error {
 	leaf := newLeafNode(t.params, k, v)
@@ -224,13 +296,63 @@ func (t *vt) add(fromLvl int, k, v []byte) error {
 // computeHashes should be called after all the vt.add is used, once all the
 // leafs are in the tree
 func (t *vt) computeHashes() ([][2][]byte, error) {
-	var pairs [][2][]byte
 	var err error
-	// TODO parallelize computeHashes
-	pairs, err = t.root.computeHashes(t.params, pairs)
+
+	nCPU := flp2(runtime.NumCPU())
+	l := int(math.Log2(float64(nCPU)))
+	nodesAtL, err := t.getNodesAtLevel(l)
 	if err != nil {
-		return pairs, err
+		return nil, err
 	}
+	subRoots := make([]*node, nCPU)
+	bucketPairs := make([][][2][]byte, nCPU)
+	dbgStatsPerBucket := make([]*dbgStats, nCPU)
+
+	var wg sync.WaitGroup
+	wg.Add(nCPU)
+	for i := 0; i < nCPU; i++ {
+		go func(cpu int) {
+			bucketVT := newVT(t.params.maxLevels-l, t.params.hashFunction)
+			bucketVT.params.dbg = newDbgStats()
+			bucketVT.root = nodesAtL[cpu]
+
+			bucketPairs[cpu], err = bucketVT.root.computeHashes(l,
+				t.params.maxLevels, bucketVT.params, bucketPairs[cpu])
+			if err != nil {
+				// TODO WIP
+				fmt.Println("TODO ERR, err:", err)
+				panic(err)
+			}
+
+			subRoots[cpu] = bucketVT.root
+			dbgStatsPerBucket[cpu] = bucketVT.params.dbg
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < len(dbgStatsPerBucket); i++ {
+		t.params.dbg.add(dbgStatsPerBucket[i])
+	}
+
+	var pairs [][2][]byte
+	for i := 0; i < len(bucketPairs); i++ {
+		pairs = append(pairs, bucketPairs[i]...)
+	}
+
+	nodesAtL, err = t.getNodesAtLevel(l)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(nodesAtL); i++ {
+		nodesAtL = subRoots
+	}
+
+	pairs, err = t.root.computeHashes(0, l, t.params, pairs)
+	if err != nil {
+		return nil, err
+	}
+
 	return pairs, nil
 }
 
@@ -363,7 +485,12 @@ func (n *node) downUntilDivergence(p *params, currLvl int, oldLeaf, newLeaf *nod
 }
 
 // returns an array of key-values to store in the db
-func (n *node) computeHashes(p *params, pairs [][2][]byte) ([][2][]byte, error) {
+func (n *node) computeHashes(currLvl, maxLvl int, p *params, pairs [][2][]byte) (
+	[][2][]byte, error) {
+	if n == nil || currLvl >= maxLvl {
+		// no need to compute any hash
+		return pairs, nil
+	}
 	if pairs == nil {
 		pairs = [][2][]byte{}
 	}
@@ -381,7 +508,7 @@ func (n *node) computeHashes(p *params, pairs [][2][]byte) ([][2][]byte, error) 
 		pairs = append(pairs, kv)
 	case vtMid:
 		if n.l != nil {
-			pairs, err = n.l.computeHashes(p, pairs)
+			pairs, err = n.l.computeHashes(currLvl+1, maxLvl, p, pairs)
 			if err != nil {
 				return pairs, err
 			}
@@ -391,7 +518,7 @@ func (n *node) computeHashes(p *params, pairs [][2][]byte) ([][2][]byte, error) 
 			}
 		}
 		if n.r != nil {
-			pairs, err = n.r.computeHashes(p, pairs)
+			pairs, err = n.r.computeHashes(currLvl+1, maxLvl, p, pairs)
 			if err != nil {
 				return pairs, err
 			}
@@ -410,7 +537,9 @@ func (n *node) computeHashes(p *params, pairs [][2][]byte) ([][2][]byte, error) 
 		n.h = k
 		kv := [2][]byte{k, v}
 		pairs = append(pairs, kv)
+	case vtEmpty:
 	default:
+		fmt.Println("n.computeHashes type no match", t)
 		return nil, fmt.Errorf("ERR TMP") // TODO
 	}
 
