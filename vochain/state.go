@@ -86,13 +86,13 @@ func NewState(dataDir string) (*State, error) {
 	if err = vs.Store.LoadVersion(-1); err != nil {
 		if err == iavl.ErrVersionDoesNotExist {
 			// restart data db
-			log.Errorf("no db version available: %s, restarting vochain database", err)
+			log.Warnf("no db version available: %s, restarting vochain database", err)
 			if err := os.RemoveAll(dataDir); err != nil {
-				log.Errorf("%s", err)
+				return nil, fmt.Errorf("cannot remove dataDir %w", err)
 			}
 			_ = vs.Store.Close()
 			if err := initStore(dataDir, vs); err != nil {
-				return nil, fmt.Errorf("cannot init db: %s", err)
+				return nil, fmt.Errorf("cannot init db: %w", err)
 			}
 			vs.voteCache, err = lru.New(voteCacheSize)
 			if err != nil {
@@ -101,7 +101,7 @@ func NewState(dataDir string) (*State, error) {
 			log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
 			return vs, nil
 		}
-		return nil, fmt.Errorf("unknown error loading state db: %v", err)
+		return nil, fmt.Errorf("unknown error loading state db: %w", err)
 	}
 
 	vs.voteCache, err = lru.New(voteCacheSize)
