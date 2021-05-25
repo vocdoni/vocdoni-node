@@ -32,6 +32,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 	max int,
 	searchTerm string,
 	namespace uint32,
+	srcNetworkIdstr,
 	status string,
 	withResults bool) ([][]byte, error) {
 	if from < 0 {
@@ -55,7 +56,21 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 		}
 		return false, nil
 	}
-
+	// Filter match function for source network Id
+	if srcNetworkIdstr != "" {
+		if _, ok := models.SourceNetworkId_value[srcNetworkIdstr]; !ok {
+			return nil, fmt.Errorf("sourceNetworkId is unknown %s", srcNetworkIdstr)
+		}
+	}
+	netIdMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
+		if srcNetworkIdstr == "" {
+			return true, nil
+		}
+		if r.Field().(string) == srcNetworkIdstr {
+			return true, nil
+		}
+		return false, nil
+	}
 	// For filtering on withResults we use also a match function
 	wResultsMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
 		if !withResults {
@@ -74,6 +89,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 			badgerhold.Where("EntityID").Eq(entityID).
 				Index("EntityID").
 				And("Status").MatchFunc(statusMatchFunc).
+				And("SourceNetworkId").MatchFunc(netIdMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
@@ -88,6 +104,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 			badgerhold.Where("Namespace").Eq(namespace).
 				Index("Namespace").
 				And("Status").MatchFunc(statusMatchFunc).
+				And("SourceNetworkId").MatchFunc(netIdMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
@@ -101,6 +118,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 		err = s.db.ForEach(
 			badgerhold.Where("Status").MatchFunc(statusMatchFunc).
 				Index("Status").
+				And("SourceNetworkId").MatchFunc(netIdMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
 				SortBy("CreationTime").
@@ -115,6 +133,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 			badgerhold.Where("EntityID").Eq(entityID).
 				Index("EntityID").
 				And("Namespace").Eq(namespace).
+				And("SourceNetworkId").MatchFunc(netIdMatchFunc).
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				And("ID").MatchFunc(searchMatchFunc(searchTerm)).

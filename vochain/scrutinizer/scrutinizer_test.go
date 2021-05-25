@@ -216,7 +216,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	last := 0
 	var list [][]byte
 	for len(procs) < procsCount {
-		list, err = sc.ProcessList(eidTest, last, 10, "", 0, "", false)
+		list, err = sc.ProcessList(eidTest, last, 10, "", 0, "", "", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -320,7 +320,7 @@ func TestProcessSearch(t *testing.T) {
 
 	// Exact process search
 	list, err := sc.ProcessList(eidTest, 0, 10,
-		"4011d50537fa164b6fef261141797bbe4014526e", 0, "", false)
+		"4011d50537fa164b6fef261141797bbe4014526e", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +329,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 	// Search for nonexistent process
 	list, err = sc.ProcessList(eidTest, 0, 10,
-		"4011d50537fa164b6fef261141797bbe4014526f", 0, "", false)
+		"4011d50537fa164b6fef261141797bbe4014526f", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +337,7 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected 0 processes, got %d", len(list))
 	}
 	// Search containing part of all manually-defined processes
-	list, err = sc.ProcessList(eidTest, 0, 10, "011d50537fa164b6fef261141797bbe4014526e", 0, "", false)
+	list, err = sc.ProcessList(eidTest, 0, 10, "011d50537fa164b6fef261141797bbe4014526e", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +346,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 
 	list, err = sc.ProcessList(eidTest, 0, 100,
-		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, "ENDED", false)
+		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, "", "ENDED", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,25 +400,25 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	}
 
 	// Get the process list for namespace 123
-	list, err := sc.ProcessList(eid20, 0, 100, "", 123, "", false)
+	list, err := sc.ProcessList(eid20, 0, 100, "", 123, "", "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
 
 	// Get the process list for all namespaces
-	list, err = sc.ProcessList(nil, 0, 100, "", 0, "", false)
+	list, err = sc.ProcessList(nil, 0, 100, "", 0, "", "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10 + 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 20)
 
 	// Get the process list for namespace 10
-	list, err = sc.ProcessList(nil, 0, 100, "", 10, "", false)
+	list, err = sc.ProcessList(nil, 0, 100, "", 10, "", "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 1)
 
 	// Get the process list for namespace 10
-	list, err = sc.ProcessList(nil, 0, 100, "", 0, "READY", false)
+	list, err = sc.ProcessList(nil, 0, 100, "", 0, "", "READY", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
