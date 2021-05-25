@@ -169,6 +169,7 @@ func (r *Router) getProcessList(request RouterRequest) {
 		max,
 		request.SearchTerm,
 		request.Namespace,
+		request.SrcNetId,
 		request.Status,
 		request.WithResults)
 	if err != nil {
