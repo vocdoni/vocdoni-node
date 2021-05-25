@@ -312,22 +312,14 @@ func (r *Router) getResults(request RouterRequest) {
 		return
 	}
 
-	if procInfo.Envelope.Anonymous {
-		response.Type = "anonymous"
-	} else {
-		response.Type = "poll"
+	response.Type = api.ProcessType{
+		Anonymous:      procInfo.Envelope.Anonymous,
+		Encrypted:      procInfo.Envelope.EncryptedVotes,
+		CostFromWeight: procInfo.Envelope.CostFromWeight,
+		Serial:         procInfo.Envelope.Serial,
+		UniqueValues:   procInfo.Envelope.UniqueValues,
 	}
-	if procInfo.Envelope.EncryptedVotes {
-		response.Type += " encrypted"
-	} else {
-		response.Type += " open"
-	}
-	if procInfo.Envelope.Serial {
-		response.Type += " serial"
-	} else {
-		response.Type += " single"
-	}
-	response.State = models.ProcessStatus(procInfo.Status).String()
+	response.Status = models.ProcessStatus(procInfo.Status).String()
 
 	// Get results info
 	vr, err := r.Scrutinizer.GetResults(request.ProcessID)
