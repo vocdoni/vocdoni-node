@@ -254,31 +254,35 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	if err != nil {
 		return fmt.Errorf("computeResult: cannot load processID %x from database: %w", processID, err)
 	}
+	// Compute the results
+	var results *indexertypes.Results
+	if results, err = s.computeFinalResults(p); err != nil {
+		return err
+	}
 
 	if err := s.db.UpdateMatching(&indexertypes.Process{},
 		badgerhold.Where("ID").Eq(processID),
 		func(record interface{}) error {
-			// Compute the results
-			var results *indexertypes.Results
-			if results, err = s.computeFinalResults(p); err != nil {
-				return err
+			update, ok := record.(*indexertypes.Process)
+			if !ok {
+				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 			}
-			p.HaveResults = true
-			p.FinalResults = true
-			s.addVoteLock.Lock()
-			defer s.addVoteLock.Unlock()
-			if err := s.db.Upsert(processID, results); err != nil {
-				return err
-			}
-
-			// Execute callbacks
-			for _, l := range s.eventListeners {
-				go l.OnComputeResults(results)
-			}
+			update.HaveResults = true
+			update.FinalResults = true
 			return nil
 		},
 	); err != nil {
 		return fmt.Errorf("computeResult: cannot update processID %x: %w, ", processID, err)
+	}
+	s.addVoteLock.Lock()
+	defer s.addVoteLock.Unlock()
+	if err := s.db.Upsert(processID, results); err != nil {
+		return err
+	}
+
+	// Execute callbacks
+	for _, l := range s.eventListeners {
+		go l.OnComputeResults(results)
 	}
 	return nil
 }
