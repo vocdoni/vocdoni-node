@@ -151,15 +151,14 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 
 // ProcessCount return the number of processes indexed
 func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
-	var c int
+	var c uint32
 	var err error
 	if len(entityID) == 0 {
 		// If no entity ID, return the cached count of all processes
 		return atomic.LoadInt64(&s.countTotalProcesses)
 	}
-	if c, err = s.db.Count(&indexertypes.Process{},
-		badgerhold.Where("EntityID").Eq(entityID).Index("EntityID")); err != nil {
-		log.Warnf("cannot count processes: %v", err)
+	if c, err = s.EntityProcessCount(entityID); err != nil {
+		log.Warnf("processCount: cannot fetch entity process count: %v", err)
 	}
 	return int64(c)
 }
@@ -181,6 +180,15 @@ func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []string {
 		log.Warnf("error listing entities: %v", err)
 	}
 	return entities
+}
+
+// EntityProcessCount returns the number of processes that an entity holds
+func (s *Scrutinizer) EntityProcessCount(entityId []byte) (uint32, error) {
+	entity := &indexertypes.Entity{}
+	if err := s.db.FindOne(entity, badgerhold.Where(badgerhold.Key).Eq(entityId)); err != nil {
+		return 0, err
+	}
+	return entity.ProcessCount, nil
 }
 
 // EntityCount return the number of entities indexed by the scrutinizer
@@ -266,13 +274,15 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		if err != badgerhold.ErrNotFound {
 			return err
 		}
+		entity.ID = eid
+		entity.CreationTime = currentBlockTime
+		entity.ProcessCount = 0
 		atomic.AddInt64(&s.countTotalEntities, 1)
-		if err := s.db.Insert(eid, &indexertypes.Entity{
-			ID:           eid,
-			CreationTime: currentBlockTime,
-		}); err != nil {
-			return err
-		}
+	}
+	// Increase the entity process count (and create new entity if does not exist)
+	entity.ProcessCount++
+	if err := s.db.Upsert(eid, entity); err != nil {
+		return err
 	}
 
 	compResultsHeight := uint32(0)
@@ -306,6 +316,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		SourceBlockHeight: p.GetSourceBlockHeight(),
 		SourceNetworkId:   p.SourceNetworkId.String(),
 		Metadata:          p.GetMetadata(),
+		EntityIndex:       entity.ProcessCount,
 	}
 	log.Debugf("new indexer process %s", proc.String())
 	return s.db.Insert(pid, proc)

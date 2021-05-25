@@ -18,6 +18,7 @@ import (
 type Process struct {
 	ID                types.HexBytes             `badgerholdKey:"ID" json:"processId"`
 	EntityID          types.HexBytes             `badgerholdIndex:"EntityID" json:"entityId"`
+	EntityIndex       uint32                     `json:"entityIndex"`
 	StartBlock        uint32                     `json:"startBlock"`
 	EndBlock          uint32                     `badgerholdIndex:"EndBlock" json:"endBlock"`
 	Rheight           uint32                     `badgerholdIndex:"Rheight" json:"-"`
@@ -48,6 +49,7 @@ func (p Process) String() string {
 // Entity holds the db reference for an entity
 type Entity struct {
 	ID           types.HexBytes `badgerholdKey:"ID"`
+	ProcessCount uint32
 	CreationTime time.Time
 }
 
