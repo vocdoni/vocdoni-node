@@ -30,6 +30,7 @@ const (
 var srcNetworkIds = map[string]models.SourceNetworkId{
 	"default": models.SourceNetworkId_UNKNOWN,
 	"mainnet": models.SourceNetworkId_ETH_MAINNET_SIGNALING,
+	"rinkeby": models.SourceNetworkId_ETH_RINKEBY_SIGNALING,
 }
 
 type APIoracle struct {
