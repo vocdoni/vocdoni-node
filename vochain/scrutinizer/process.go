@@ -210,11 +210,6 @@ func (s *Scrutinizer) computePendingProcesses(height uint32) {
 				return nil
 			}
 			log.Infof("results computation on %x took %s", p.ID, time.Since(initT).String())
-			p.FinalResults = true
-			p.HaveResults = true
-			if err := s.db.Update(p.ID, p); err != nil {
-				log.Warnf("cannot update results for process %x: %v", p.ID, err)
-			}
 			return nil
 		}); err != nil {
 		log.Warn(err)

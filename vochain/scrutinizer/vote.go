@@ -260,6 +260,10 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 		return err
 	}
 
+	// We need to use UpdateMatching here because of a race condition between ComputeResult and
+	// updateProcess. If we fetch the process, compute the results, then update the process,
+	// ComputeResult can override the process status set by updateProcess. UpdateMatching
+	// gets rid of the time between fetching and updating the process, eliminating this race.
 	if err := s.db.UpdateMatching(&indexertypes.Process{},
 		badgerhold.Where("ID").Eq(processID),
 		func(record interface{}) error {
