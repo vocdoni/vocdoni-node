@@ -180,7 +180,7 @@ func (r *Router) getTxListForBlock(request RouterRequest) {
 	}
 }
 
-func (r *Router) getProcessMeta(request RouterRequest) {
+func (r *Router) getProcessSummary(request RouterRequest) {
 	var response api.MetaResponse
 	if len(request.ProcessID) != types.ProcessIDsize {
 		r.SendError(request, "cannot get envelope status: (malformed processId)")
@@ -195,22 +195,18 @@ func (r *Router) getProcessMeta(request RouterRequest) {
 		return
 	}
 
-	if procInfo.Envelope.Anonymous {
-		response.Type = "anonymous"
-	} else {
-		response.Type = "poll"
+	response.Type = api.ProcessType{
+		Anonymous:      procInfo.Envelope.Anonymous,
+		Encrypted:      procInfo.Envelope.EncryptedVotes,
+		CostFromWeight: procInfo.Envelope.CostFromWeight,
+		Serial:         procInfo.Envelope.Serial,
+		UniqueValues:   procInfo.Envelope.UniqueValues,
 	}
-	if procInfo.Envelope.EncryptedVotes {
-		response.Type += " encrypted"
-	} else {
-		response.Type += " open"
-	}
-	if procInfo.Envelope.Serial {
-		response.Type += " serial"
-	} else {
-		response.Type += " single"
-	}
-	response.State = models.ProcessStatus(procInfo.Status).String()
+	response.EntityIndex = procInfo.EntityIndex
+	response.SourceNetworkID = procInfo.SourceNetworkId
+	response.BlockCount = procInfo.EndBlock - procInfo.StartBlock
+	response.StartBlock = procInfo.StartBlock
+	response.Status = models.ProcessStatus(procInfo.Status).String()
 	response.EntityID = hex.EncodeToString(procInfo.EntityID)
 
 	// Get total number of votes (including invalid/null)
