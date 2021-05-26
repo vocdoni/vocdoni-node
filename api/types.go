@@ -207,7 +207,7 @@ type MetaResponse struct {
 	Ok                   bool                             `json:"ok"`
 	Paused               *bool                            `json:"paused,omitempty"`
 	Payload              string                           `json:"payload,omitempty"`
-	ProcessSummary       ProcessSummary                   `json:"processSummary,omitempty"`
+	ProcessSummary       *ProcessSummary                  `json:"processSummary,omitempty"`
 	ProcessID            types.HexBytes                   `json:"processId,omitempty"`
 	ProcessIDs           []string                         `json:"processIds,omitempty"`
 	Process              *indexertypes.Process            `json:"process,omitempty"`

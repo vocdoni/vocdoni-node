@@ -195,15 +195,6 @@ func (r *Router) getProcessSummary(request RouterRequest) {
 		return
 	}
 
-	response.ProcessSummary.Type = procInfo.Envelope
-	response.ProcessSummary.EntityIndex = procInfo.EntityIndex
-	response.ProcessSummary.SourceNetworkID = procInfo.SourceNetworkId
-	response.ProcessSummary.BlockCount = procInfo.EndBlock - procInfo.StartBlock
-	response.ProcessSummary.StartBlock = procInfo.StartBlock
-	response.ProcessSummary.State = models.ProcessStatus(procInfo.Status).String()
-	response.ProcessSummary.EntityID = hex.EncodeToString(procInfo.EntityID)
-	response.ProcessSummary.Metadata = procInfo.Metadata + "Metadata"
-
 	// Get total number of votes (including invalid/null)
 	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
@@ -214,7 +205,18 @@ func (r *Router) getProcessSummary(request RouterRequest) {
 		return
 	}
 	votes := uint32(eh)
-	response.ProcessSummary.EnvelopeHeight = &votes
+
+	response.ProcessSummary = &api.ProcessSummary{
+		BlockCount:      procInfo.EndBlock - procInfo.StartBlock,
+		EntityID:        hex.EncodeToString(procInfo.EntityID),
+		EntityIndex:     procInfo.EntityIndex,
+		EnvelopeHeight:  &votes,
+		Metadata:        procInfo.Metadata,
+		SourceNetworkID: procInfo.SourceNetworkId,
+		StartBlock:      procInfo.StartBlock,
+		State:           models.ProcessStatus(procInfo.Status).String(),
+		Type:            procInfo.Envelope,
+	}
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
