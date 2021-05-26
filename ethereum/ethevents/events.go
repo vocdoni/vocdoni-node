@@ -181,7 +181,6 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 			}
 			continue
 		}
-		errors = 0
 		lastBlock = blk.Number().Int64()
 		break
 	}
@@ -369,7 +368,8 @@ func (ev *EthereumEvents) runEventProcessor(ctx context.Context) {
 		time.Sleep(1 * time.Second)
 		if e := ev.EventProcessor.next(); e != nil {
 			log.Infof("processing event log: (txhash:%x txid:%d)", e.TxHash, e.TxIndex)
-			for _, h := range ev.EventHandlers {
+			for i, h := range ev.EventHandlers {
+				log.Infof("executing event %d", i)
 				if err := h(ctx, e, ev); err != nil {
 					log.Error(err)
 				}

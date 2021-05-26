@@ -75,9 +75,11 @@ const ProcessStartBlockDelay = 10
 
 // HandleVochainOracle handles the events on ethereum for the Oracle.
 func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEvents) error {
+	log.Debugf("executing oracle event %+v", event)
 	tctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	if len(e.EthereumWhiteListAddrs) != 0 {
+		log.Debugf("executing EtehreumCreator whitelist: %v", e.EthereumWhiteListAddrs)
 		if err := checkEthereumTxCreator(tctx,
 			event.TxHash,
 			event.BlockHash,
@@ -92,10 +94,12 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 	switch event.Topics[0].Hex() {
 
 	case ethereumEventList["processesNewProcess"]:
+		log.Infof("executing NewProcess event")
 		// Get process metadata
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		processTx, err := newProcessMeta(tctx, &e.ContractsInfo["processes"].ABI, event.Data, e.VotingHandle)
+		processTx, err := newProcessMeta(tctx, &e.ContractsInfo["processes"].ABI,
+			event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain process data for creating the transaction: %w", err)
 		}
@@ -154,6 +158,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		log.Infof("oracle transaction sent, hash: %x", res.Hash)
 
 	case ethereumEventList["processesStatusUpdated"]:
+		log.Infof("executing StatusUpdate event")
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		setProcessTx, err := processStatusUpdatedMeta(tctx,
@@ -193,6 +198,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		log.Infof("oracle transaction sent, hash: %x", res.Hash)
 
 	case ethereumEventList["processesCensusUpdated"]:
+		log.Infof("executing CensusUpdate event")
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		setProcessTx, err := processCensusUpdatedMeta(tctx,
@@ -246,6 +252,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		log.Infof("oracle transaction sent, hash: %x", res.Hash)
 
 	case ethereumEventList["genesisOracleAdded"]:
+		log.Infof("executing GenesisOracleAdd event")
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		addOracleTx, err := genesisOracleAddedMeta(tctx,
@@ -286,6 +293,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 		log.Infof("oracle transaction sent, hash: %x", res.Hash)
 	case ethereumEventList["genesisOracleRemoved"]:
+		log.Infof("executing GenesisOracleRemove event")
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		removeOracleTx, err := genesisOracleRemovedMeta(tctx,
@@ -331,6 +339,8 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
 		log.Infof("oracle transaction sent, hash: %x", res.Hash)
+	default:
+		log.Warnf("no event configured for %s", event.Topics[0].Hex())
 	}
 	return nil
 }
