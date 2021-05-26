@@ -66,6 +66,7 @@ func (r *Router) EnableResultsAPI(vocapp *vochain.BaseApplication,
 	r.APIs = append(r.APIs, "results")
 	r.RegisterPublic("getProcessList", r.getProcessList)
 	r.RegisterPublic("getProcessInfo", r.getProcessInfo)
+	r.RegisterPublic("getProcessSummary", r.getProcessSummary)
 	r.RegisterPublic("getProcessCount", r.getProcessCount)
 	r.RegisterPublic("getResults", r.getResults)
 	r.RegisterPublic("getResultsWeight", r.getResultsWeight)
@@ -82,7 +83,6 @@ func (r *Router) EnableIndexerAPI(vocapp *vochain.BaseApplication,
 	}
 	r.APIs = append(r.APIs, "indexer")
 	r.RegisterPublic("getStats", r.getStats)
-	r.RegisterPublic("getProcessSummary", r.getProcessSummary)
 	r.RegisterPublic("getEnvelopeList", r.getEnvelopeList)
 	r.RegisterPublic("getBlock", r.getBlock)
 	r.RegisterPublic("getBlockByHash", r.getBlockByHash)
