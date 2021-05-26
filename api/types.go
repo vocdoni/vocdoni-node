@@ -251,7 +251,7 @@ type ProcessSummary struct {
 	SourceNetworkID string               `json:"sourceNetworkID,omitempty"`
 	StartBlock      uint32               `json:"startBlock,omitempty"`
 	State           string               `json:"state,omitempty"`
-	Type            *models.EnvelopeType `json:"type,omitempty"`
+	EnvelopeType    *models.EnvelopeType `json:"envelopeType,omitempty"`
 }
 
 // Key associates a key string with an index, so clients can check
