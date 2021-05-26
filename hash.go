@@ -37,8 +37,8 @@ type HashFunction interface {
 	Type() []byte
 	Len() int
 	Hash(...[]byte) ([]byte, error)
-	// CheckInputs checks if the inputs are valid without computing the hash
-	// CheckInputs(...[]byte) error
+	// CheckInput checks if the input is valid without computing the hash
+	// CheckInput(...[]byte) error
 }
 
 // HashSha256 implements the HashFunction interface for the Sha256 hash
@@ -88,7 +88,7 @@ func (f HashPoseidon) Hash(b ...[]byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	hB := BigIntToBytes(h)
+	hB := BigIntToBytes(f.Len(), h)
 	return hB, nil
 }
 

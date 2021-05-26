@@ -378,7 +378,7 @@ func (n *node) typ() virtualNodeType {
 
 func (n *node) add(p *params, currLvl int, leaf *node) error {
 	if currLvl > p.maxLevels-1 {
-		return fmt.Errorf("max virtual level %d", currLvl)
+		return ErrMaxVirtualLevel
 	}
 
 	if n == nil {
@@ -411,8 +411,9 @@ func (n *node) add(p *params, currLvl int, leaf *node) error {
 		}
 	case vtLeaf:
 		if bytes.Equal(n.k, leaf.k) {
-			return fmt.Errorf("key already exists. Existing node: %s, trying to add node: %s",
-				hex.EncodeToString(n.k), hex.EncodeToString(leaf.k))
+			return fmt.Errorf("%s. Existing node: %s, trying to add node: %s",
+				ErrKeyAlreadyExists, hex.EncodeToString(n.k),
+				hex.EncodeToString(leaf.k))
 		}
 
 		oldLeaf := &node{
@@ -439,7 +440,7 @@ func (n *node) add(p *params, currLvl int, leaf *node) error {
 
 func (n *node) downUntilDivergence(p *params, currLvl int, oldLeaf, newLeaf *node) error {
 	if currLvl > p.maxLevels-1 {
-		return fmt.Errorf("max virtual level %d", currLvl)
+		return ErrMaxVirtualLevel
 	}
 
 	if oldLeaf.path[currLvl] != newLeaf.path[currLvl] {

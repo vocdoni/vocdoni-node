@@ -46,11 +46,12 @@ func testInit(c *qt.C, n int) (*Tree, *Tree) {
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close()
 
+	bLen := HashFunctionPoseidon.Len()
 	// add the initial leafs to fill a bit the trees before calling the
 	// AddBatch method
 	for i := 0; i < n; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree1.Add(k, v); err != nil {
 			c.Fatal(err)
 		}
@@ -70,10 +71,11 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close()
 
+	bLen := tree.HashFunction().Len()
 	start := time.Now()
 	for i := 0; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -87,8 +89,8 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 
 	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -116,9 +118,10 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close()
 
+	bLen := tree.HashFunction().Len()
 	for i := 0; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -130,8 +133,8 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 
 	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -271,10 +274,11 @@ func TestAddBatchTreeNotEmptyFewLeafs(t *testing.T) {
 	tree1, tree2 := testInit(c, initialNLeafs)
 	tree2.dbgInit()
 
+	bLen := tree1.HashFunction().Len()
 	start := time.Now()
 	for i := initialNLeafs; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree1.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -284,8 +288,8 @@ func TestAddBatchTreeNotEmptyFewLeafs(t *testing.T) {
 	// prepare the key-values to be added
 	var keys, values [][]byte
 	for i := initialNLeafs; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -313,10 +317,11 @@ func TestAddBatchTreeNotEmptyEnoughLeafs(t *testing.T) {
 	tree1, tree2 := testInit(c, initialNLeafs)
 	tree2.dbgInit()
 
+	bLen := tree1.HashFunction().Len()
 	start := time.Now()
 	for i := initialNLeafs; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree1.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -326,8 +331,8 @@ func TestAddBatchTreeNotEmptyEnoughLeafs(t *testing.T) {
 	// prepare the key-values to be added
 	var keys, values [][]byte
 	for i := initialNLeafs; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -353,18 +358,19 @@ func TestAddBatchTreeEmptyRepeatedLeafs(t *testing.T) {
 
 	tree1, tree2 := testInit(c, 0)
 
+	bLen := tree1.HashFunction().Len()
 	// prepare the key-values to be added
 	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
 	// add repeated key-values
 	for i := 0; i < nRepeatedKeys; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -391,11 +397,12 @@ func TestAddBatchTreeNotEmptyFewLeafsRepeatedLeafs(t *testing.T) {
 
 	tree1, tree2 := testInit(c, initialNLeafs)
 
+	bLen := tree1.HashFunction().Len()
 	// prepare the key-values to be added
 	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -417,11 +424,12 @@ func TestAddBatchTreeNotEmptyFewLeafsRepeatedLeafs(t *testing.T) {
 func TestSplitInBuckets(t *testing.T) {
 	c := qt.New(t)
 
+	bLen := HashFunctionPoseidon.Len()
 	nLeafs := 16
 	kvs := make([]kv, nLeafs)
 	for i := 0; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keyPath := make([]byte, 32)
 		copy(keyPath[:], k)
 		kvs[i].pos = i
@@ -523,10 +531,11 @@ func TestAddBatchTreeNotEmpty(t *testing.T) {
 	tree1, tree2 := testInit(c, initialNLeafs)
 	tree2.dbgInit()
 
+	bLen := tree1.HashFunction().Len()
 	start := time.Now()
 	for i := initialNLeafs; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree1.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -536,8 +545,8 @@ func TestAddBatchTreeNotEmpty(t *testing.T) {
 	// prepare the key-values to be added
 	var keys, values [][]byte
 	for i := initialNLeafs; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -563,11 +572,12 @@ func TestAddBatchNotEmptyUnbalanced(t *testing.T) {
 	initialNLeafs := 900
 
 	tree1, _ := testInit(c, initialNLeafs)
+	bLen := tree1.HashFunction().Len()
 
 	start := time.Now()
 	for i := initialNLeafs; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree1.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -583,8 +593,8 @@ func TestAddBatchNotEmptyUnbalanced(t *testing.T) {
 	// add the initial leafs to fill a bit the tree before calling the
 	// AddBatch method
 	for i := 0; i < initialNLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		// use only the keys of one bucket, store the not used ones for
 		// later
 		if i%4 != 0 {
@@ -598,8 +608,8 @@ func TestAddBatchNotEmptyUnbalanced(t *testing.T) {
 	}
 
 	for i := initialNLeafs; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}

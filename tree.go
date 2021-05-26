@@ -19,8 +19,6 @@ import (
 	"io"
 	"math"
 	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/iden3/go-merkletree/db"
 )
@@ -48,16 +46,30 @@ var (
 	dbKeyRoot   = []byte("root")
 	dbKeyNLeafs = []byte("nleafs")
 	emptyValue  = []byte{0}
+
+	// ErrKeyAlreadyExists is used when trying to add a key as leaf to the
+	// tree that already exists.
+	ErrKeyAlreadyExists = fmt.Errorf("key already exists")
+	// ErrInvalidValuePrefix is used when going down into the tree, a value
+	// is read from the db and has an unrecognized prefix.
+	ErrInvalidValuePrefix = fmt.Errorf("invalid value prefix")
+	// ErrDBNoTx is used when trying to use Tree.dbPut but Tree.tx==nil
+	ErrDBNoTx = fmt.Errorf("dbPut error: no db Tx")
+	// ErrMaxLevel indicates when going down into the tree, the max level is
+	// reached
+	ErrMaxLevel = fmt.Errorf("max level reached")
+	// ErrMaxVirtualLevel indicates when going down into the tree, the max
+	// virtual level is reached
+	ErrMaxVirtualLevel = fmt.Errorf("max virtual level reached")
 )
 
 // Tree defines the struct that implements the MerkleTree functionalities
 type Tree struct {
 	sync.RWMutex
-	tx         db.Tx
-	db         db.Storage
-	lastAccess int64 // in unix time // TODO delete, is a feature of a upper abstraction level
-	maxLevels  int
-	root       []byte
+	tx        db.Tx
+	db        db.Storage
+	maxLevels int
+	root      []byte
 
 	hashFunction HashFunction
 	// TODO in the methods that use it, check if emptyHash param is len>0
@@ -71,8 +83,6 @@ type Tree struct {
 // will load it.
 func NewTree(storage db.Storage, maxLevels int, hash HashFunction) (*Tree, error) {
 	t := Tree{db: storage, maxLevels: maxLevels, hashFunction: hash}
-	t.updateAccessTime()
-
 	t.emptyHash = make([]byte, t.hashFunction.Len()) // empty
 
 	root, err := t.dbGet(dbKeyRoot)
@@ -100,15 +110,6 @@ func NewTree(storage db.Storage, maxLevels int, hash HashFunction) (*Tree, error
 	return &t, nil
 }
 
-func (t *Tree) updateAccessTime() {
-	atomic.StoreInt64(&t.lastAccess, time.Now().Unix())
-}
-
-// LastAccess returns the last access timestamp in Unixtime
-func (t *Tree) LastAccess() int64 {
-	return atomic.LoadInt64(&t.lastAccess)
-}
-
 // Root returns the root of the Tree
 func (t *Tree) Root() []byte {
 	return t.root
@@ -122,7 +123,6 @@ func (t *Tree) HashFunction() HashFunction {
 // AddBatch adds a batch of key-values to the Tree. Returns an array containing
 // the indexes of the keys failed to add.
 func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
-	t.updateAccessTime()
 	t.Lock()
 	defer t.Unlock()
 
@@ -131,7 +131,8 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 		return nil, err
 	}
 
-	// TODO check that keys & values is valid for Tree.hashFunction
+	// TODO check validity of keys & values for Tree.hashFunction
+
 	invalids, err := vt.addBatch(keys, values)
 	if err != nil {
 		return nil, err
@@ -140,6 +141,7 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 	// once the VirtualTree is build, compute the hashes
 	pairs, err := vt.computeHashes()
 	if err != nil {
+		// TODO currently invalids in computeHashes are not counted
 		return nil, err
 	}
 	t.root = vt.root.h
@@ -177,7 +179,7 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 func (t *Tree) loadVT() (vt, error) {
 	vt := newVT(t.maxLevels, t.hashFunction)
 	vt.params.dbg = t.dbg
-	err := t.Iterate(func(k, v []byte) {
+	err := t.Iterate(nil, func(k, v []byte) {
 		if v[0] != PrefixValueLeaf {
 			return
 		}
@@ -194,8 +196,6 @@ func (t *Tree) loadVT() (vt, error) {
 // is expected that are represented by a Little-Endian byte array (for circom
 // compatibility).
 func (t *Tree) Add(k, v []byte) error {
-	t.updateAccessTime()
-
 	t.Lock()
 	defer t.Unlock()
 
@@ -204,6 +204,8 @@ func (t *Tree) Add(k, v []byte) error {
 	if err != nil {
 		return err
 	}
+
+	// TODO check validity of key & value for Tree.hashFunction
 
 	err = t.add(0, k, v) // add from level 0
 	if err != nil {
@@ -221,8 +223,6 @@ func (t *Tree) Add(k, v []byte) error {
 }
 
 func (t *Tree) add(fromLvl int, k, v []byte) error {
-	// TODO check validity of key & value (for the Tree.HashFunction type)
-
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)
 
@@ -262,7 +262,7 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 	path []bool, currLvl int, getLeaf bool) (
 	[]byte, []byte, [][]byte, error) {
 	if currLvl > t.maxLevels-1 {
-		return nil, nil, nil, fmt.Errorf("max level")
+		return nil, nil, nil, ErrMaxLevel
 	}
 
 	var err error
@@ -287,7 +287,7 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 			// TODO move this error msg to const & add test that
 			// checks that adding a repeated key this error is
 			// returned
-			return nil, nil, nil, fmt.Errorf("key already exists")
+			return nil, nil, nil, ErrKeyAlreadyExists
 		}
 
 		if !bytes.Equal(currValue, emptyValue) {
@@ -324,7 +324,7 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 		siblings = append(siblings, rChild)
 		return t.down(newKey, lChild, siblings, path, currLvl+1, getLeaf)
 	default:
-		return nil, nil, nil, fmt.Errorf("invalid value")
+		return nil, nil, nil, ErrInvalidValuePrefix
 	}
 }
 
@@ -334,7 +334,7 @@ func (t *Tree) downVirtually(siblings [][]byte, oldKey, newKey []byte, oldPath,
 	newPath []bool, currLvl int) ([][]byte, error) {
 	var err error
 	if currLvl > t.maxLevels-1 {
-		return nil, fmt.Errorf("max virtual level %d", currLvl)
+		return nil, ErrMaxVirtualLevel
 	}
 
 	if oldPath[currLvl] == newPath[currLvl] {
@@ -459,8 +459,6 @@ func getPath(numLevels int, k []byte) []bool {
 // Update updates the value for a given existing key. If the given key does not
 // exist, returns an error.
 func (t *Tree) Update(k, v []byte) error {
-	t.updateAccessTime()
-
 	t.Lock()
 	defer t.Unlock()
 
@@ -515,7 +513,6 @@ func (t *Tree) Update(k, v []byte) error {
 // the Tree, the proof will be of existence, if the key does not exist in the
 // tree, the proof will be of non-existence.
 func (t *Tree) GenProof(k []byte) ([]byte, []byte, error) {
-	t.updateAccessTime()
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)
 
@@ -533,7 +530,7 @@ func (t *Tree) GenProof(k []byte) ([]byte, []byte, error) {
 		fmt.Println(leafK)
 		fmt.Println(leafV)
 		// TODO proof of non-existence
-		panic(fmt.Errorf("unimplemented"))
+		panic("unimplemented")
 	}
 
 	s := PackSiblings(t.hashFunction, siblings)
@@ -627,8 +624,8 @@ func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
 	}
 	leafK, leafV := ReadLeafValue(value)
 	if !bytes.Equal(k, leafK) {
-		panic(fmt.Errorf("Tree.Get error: keys doesn't match, %s != %s",
-			BytesToBigInt(k), BytesToBigInt(leafK)))
+		return leafK, leafV, fmt.Errorf("Tree.Get error: keys doesn't match, %s != %s",
+			BytesToBigInt(k), BytesToBigInt(leafK))
 	}
 
 	return leafK, leafV, nil
@@ -672,7 +669,7 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 
 func (t *Tree) dbPut(k, v []byte) error {
 	if t.tx == nil {
-		return fmt.Errorf("dbPut error: no db Tx")
+		return ErrDBNoTx
 	}
 	t.dbg.incDbPut()
 	return t.tx.Put(k, v)
@@ -729,18 +726,23 @@ func (t *Tree) GetNLeafs() (int, error) {
 
 // Iterate iterates through the full Tree, executing the given function on each
 // node of the Tree.
-func (t *Tree) Iterate(f func([]byte, []byte)) error {
-	// TODO allow to define which root to use
-	t.updateAccessTime()
-	return t.iter(t.root, f)
+func (t *Tree) Iterate(rootKey []byte, f func([]byte, []byte)) error {
+	// allow to define which root to use
+	if rootKey == nil {
+		rootKey = t.Root()
+	}
+	return t.iter(rootKey, f)
 }
 
 // IterateWithStop does the same than Iterate, but with int for the current
 // level, and a boolean parameter used by the passed function, is to indicate to
 // stop iterating on the branch when the method returns 'true'.
-func (t *Tree) IterateWithStop(f func(int, []byte, []byte) bool) error {
-	t.updateAccessTime()
-	return t.iterWithStop(t.root, 0, f)
+func (t *Tree) IterateWithStop(rootKey []byte, f func(int, []byte, []byte) bool) error {
+	// allow to define which root to use
+	if rootKey == nil {
+		rootKey = t.Root()
+	}
+	return t.iterWithStop(rootKey, 0, f)
 }
 
 func (t *Tree) iterWithStop(k []byte, currLevel int, f func(int, []byte, []byte) bool) error {
@@ -768,7 +770,7 @@ func (t *Tree) iterWithStop(k []byte, currLevel int, f func(int, []byte, []byte)
 			return err
 		}
 	default:
-		return fmt.Errorf("invalid value")
+		return ErrInvalidValuePrefix
 	}
 	return nil
 }
@@ -786,14 +788,16 @@ func (t *Tree) iter(k []byte, f func([]byte, []byte)) error {
 // [ 1 byte | 1 byte | S bytes | len(v) bytes ]
 // [ len(k) | len(v) |   key   |     value    ]
 // Where S is the size of the output of the hash function used for the Tree.
-func (t *Tree) Dump() ([]byte, error) {
-	t.updateAccessTime()
-	// TODO allow to define which root to use
+func (t *Tree) Dump(rootKey []byte) ([]byte, error) {
+	// allow to define which root to use
+	if rootKey == nil {
+		rootKey = t.Root()
+	}
 
 	// WARNING current encoding only supports key & values of 255 bytes each
 	// (due using only 1 byte for the length headers).
 	var b []byte
-	err := t.Iterate(func(k, v []byte) {
+	err := t.Iterate(rootKey, func(k, v []byte) {
 		if v[0] != PrefixValueLeaf {
 			return
 		}
@@ -811,7 +815,6 @@ func (t *Tree) Dump() ([]byte, error) {
 // ImportDump imports the leafs (that have been exported with the ExportLeafs
 // method) in the Tree.
 func (t *Tree) ImportDump(b []byte) error {
-	t.updateAccessTime()
 	r := bytes.NewReader(b)
 	var err error
 	var keys, values [][]byte
@@ -855,8 +858,11 @@ func (t *Tree) GraphvizFirstNLevels(w io.Writer, rootKey []byte, untilLvl int) e
 	fmt.Fprintf(w, `digraph hierarchy {
 node [fontname=Monospace,fontsize=10,shape=box]
 `)
+	if rootKey == nil {
+		rootKey = t.Root()
+	}
 	nEmpties := 0
-	err := t.iterWithStop(t.root, 0, func(currLvl int, k, v []byte) bool {
+	err := t.iterWithStop(rootKey, 0, func(currLvl int, k, v []byte) bool {
 		if currLvl == untilLvl {
 			return true // to stop the iter from going down
 		}
@@ -901,6 +907,9 @@ node [fontname=Monospace,fontsize=10,shape=box]
 
 // PrintGraphviz prints the output of Tree.Graphviz
 func (t *Tree) PrintGraphviz(rootKey []byte) error {
+	if rootKey == nil {
+		rootKey = t.Root()
+	}
 	return t.PrintGraphvizFirstNLevels(rootKey, t.maxLevels)
 }
 
@@ -912,7 +921,7 @@ func (t *Tree) PrintGraphvizFirstNLevels(rootKey []byte, untilLvl int) error {
 	w := bytes.NewBufferString("")
 	fmt.Fprintf(w,
 		"--------\nGraphviz of the Tree with Root "+hex.EncodeToString(rootKey)+":\n")
-	err := t.GraphvizFirstNLevels(w, nil, untilLvl)
+	err := t.GraphvizFirstNLevels(w, rootKey, untilLvl)
 	if err != nil {
 		fmt.Println(w)
 		return err
@@ -924,7 +933,9 @@ func (t *Tree) PrintGraphvizFirstNLevels(rootKey []byte, untilLvl int) error {
 	return nil
 }
 
-// Purge WIP: unimplemented
+// Purge WIP: unimplemented TODO
 func (t *Tree) Purge(keys [][]byte) error {
 	return nil
 }
+
+// TODO circom proofs

@@ -38,23 +38,24 @@ func testAdd(c *qt.C, hashFunc HashFunction, testVectors []string) {
 
 	c.Check(hex.EncodeToString(tree.Root()), qt.Equals, testVectors[0])
 
+	bLen := hashFunc.Len()
 	err = tree.Add(
-		BigIntToBytes(big.NewInt(1)),
-		BigIntToBytes(big.NewInt(2)))
+		BigIntToBytes(bLen, big.NewInt(1)),
+		BigIntToBytes(bLen, big.NewInt(2)))
 	c.Assert(err, qt.IsNil)
 	rootBI := BytesToBigInt(tree.Root())
 	c.Check(rootBI.String(), qt.Equals, testVectors[1])
 
 	err = tree.Add(
-		BigIntToBytes(big.NewInt(33)),
-		BigIntToBytes(big.NewInt(44)))
+		BigIntToBytes(bLen, big.NewInt(33)),
+		BigIntToBytes(bLen, big.NewInt(44)))
 	c.Assert(err, qt.IsNil)
 	rootBI = BytesToBigInt(tree.Root())
 	c.Check(rootBI.String(), qt.Equals, testVectors[2])
 
 	err = tree.Add(
-		BigIntToBytes(big.NewInt(1234)),
-		BigIntToBytes(big.NewInt(9876)))
+		BigIntToBytes(bLen, big.NewInt(1234)),
+		BigIntToBytes(bLen, big.NewInt(9876)))
 	c.Assert(err, qt.IsNil)
 	rootBI = BytesToBigInt(tree.Root())
 	c.Check(rootBI.String(), qt.Equals, testVectors[3])
@@ -66,9 +67,10 @@ func TestAddBatch(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close()
 
+	bLen := tree.HashFunction().Len()
 	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(0))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(0))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -84,8 +86,8 @@ func TestAddBatch(t *testing.T) {
 
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(0))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(0))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -104,9 +106,10 @@ func TestAddDifferentOrder(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close()
 
+	bLen := tree1.HashFunction().Len()
 	for i := 0; i < 16; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(0))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(0))
 		if err := tree1.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -117,8 +120,8 @@ func TestAddDifferentOrder(t *testing.T) {
 	defer tree2.db.Close()
 
 	for i := 16 - 1; i >= 0; i-- {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(0))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(0))
 		if err := tree2.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -135,14 +138,15 @@ func TestAddRepeatedIndex(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close()
 
-	k := BigIntToBytes(big.NewInt(int64(3)))
-	v := BigIntToBytes(big.NewInt(int64(12)))
+	bLen := tree.HashFunction().Len()
+	k := BigIntToBytes(bLen, big.NewInt(int64(3)))
+	v := BigIntToBytes(bLen, big.NewInt(int64(12)))
 	if err := tree.Add(k, v); err != nil {
 		t.Fatal(err)
 	}
 	err = tree.Add(k, v)
 	c.Assert(err, qt.Not(qt.IsNil))
-	c.Check(err, qt.ErrorMatches, "max virtual level 100")
+	c.Check(err, qt.Equals, ErrMaxVirtualLevel)
 }
 
 func TestUpdate(t *testing.T) {
@@ -151,13 +155,14 @@ func TestUpdate(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close()
 
-	k := BigIntToBytes(big.NewInt(int64(20)))
-	v := BigIntToBytes(big.NewInt(int64(12)))
+	bLen := tree.HashFunction().Len()
+	k := BigIntToBytes(bLen, big.NewInt(int64(20)))
+	v := BigIntToBytes(bLen, big.NewInt(int64(12)))
 	if err := tree.Add(k, v); err != nil {
 		t.Fatal(err)
 	}
 
-	v = BigIntToBytes(big.NewInt(int64(11)))
+	v = BigIntToBytes(bLen, big.NewInt(int64(11)))
 	err = tree.Update(k, v)
 	c.Assert(err, qt.IsNil)
 
@@ -168,21 +173,21 @@ func TestUpdate(t *testing.T) {
 
 	// add more leafs to the tree to do another test
 	for i := 0; i < 16; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	k = BigIntToBytes(big.NewInt(int64(3)))
-	v = BigIntToBytes(big.NewInt(int64(11)))
+	k = BigIntToBytes(bLen, big.NewInt(int64(3)))
+	v = BigIntToBytes(bLen, big.NewInt(int64(11)))
 	// check that before the Update, value for 3 is !=11
 	gettedKey, gettedValue, err = tree.Get(k)
 	c.Assert(err, qt.IsNil)
 	c.Check(gettedKey, qt.DeepEquals, k)
 	c.Check(gettedValue, qt.Not(qt.DeepEquals), v)
-	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(big.NewInt(6)))
+	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(bLen, big.NewInt(6)))
 
 	err = tree.Update(k, v)
 	c.Assert(err, qt.IsNil)
@@ -192,7 +197,7 @@ func TestUpdate(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(gettedKey, qt.DeepEquals, k)
 	c.Check(gettedValue, qt.DeepEquals, v)
-	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(big.NewInt(11)))
+	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(bLen, big.NewInt(11)))
 }
 
 func TestAux(t *testing.T) { // TODO split in proper tests
@@ -201,29 +206,30 @@ func TestAux(t *testing.T) { // TODO split in proper tests
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close()
 
-	k := BigIntToBytes(big.NewInt(int64(1)))
-	v := BigIntToBytes(big.NewInt(int64(0)))
+	bLen := tree.HashFunction().Len()
+	k := BigIntToBytes(bLen, big.NewInt(int64(1)))
+	v := BigIntToBytes(bLen, big.NewInt(int64(0)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
-	k = BigIntToBytes(big.NewInt(int64(256)))
-	err = tree.Add(k, v)
-	c.Assert(err, qt.IsNil)
-
-	k = BigIntToBytes(big.NewInt(int64(257)))
+	k = BigIntToBytes(bLen, big.NewInt(int64(256)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
 
-	k = BigIntToBytes(big.NewInt(int64(515)))
-	err = tree.Add(k, v)
-	c.Assert(err, qt.IsNil)
-	k = BigIntToBytes(big.NewInt(int64(770)))
+	k = BigIntToBytes(bLen, big.NewInt(int64(257)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
 
-	k = BigIntToBytes(big.NewInt(int64(388)))
+	k = BigIntToBytes(bLen, big.NewInt(int64(515)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
-	k = BigIntToBytes(big.NewInt(int64(900)))
+	k = BigIntToBytes(bLen, big.NewInt(int64(770)))
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
+
+	k = BigIntToBytes(bLen, big.NewInt(int64(388)))
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
+	k = BigIntToBytes(bLen, big.NewInt(int64(900)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
 	//
@@ -237,19 +243,20 @@ func TestGet(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close()
 
+	bLen := tree.HashFunction().Len()
 	for i := 0; i < 10; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	k := BigIntToBytes(big.NewInt(int64(7)))
+	k := BigIntToBytes(bLen, big.NewInt(int64(7)))
 	gettedKey, gettedValue, err := tree.Get(k)
 	c.Assert(err, qt.IsNil)
 	c.Check(gettedKey, qt.DeepEquals, k)
-	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(big.NewInt(int64(7*2))))
+	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(bLen, big.NewInt(int64(7*2))))
 }
 
 func TestGenProofAndVerify(t *testing.T) {
@@ -258,16 +265,17 @@ func TestGenProofAndVerify(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close()
 
+	bLen := tree.HashFunction().Len()
 	for i := 0; i < 10; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	k := BigIntToBytes(big.NewInt(int64(7)))
-	v := BigIntToBytes(big.NewInt(int64(14)))
+	k := BigIntToBytes(bLen, big.NewInt(int64(7)))
+	v := BigIntToBytes(bLen, big.NewInt(int64(14)))
 	proofV, siblings, err := tree.GenProof(k)
 	c.Assert(err, qt.IsNil)
 	c.Assert(proofV, qt.DeepEquals, v)
@@ -283,15 +291,16 @@ func TestDumpAndImportDump(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close()
 
+	bLen := tree1.HashFunction().Len()
 	for i := 0; i < 16; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		if err := tree1.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	e, err := tree1.Dump()
+	e, err := tree1.Dump(nil)
 	c.Assert(err, qt.IsNil)
 
 	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
@@ -310,10 +319,11 @@ func TestRWMutex(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close()
 
+	bLen := tree.HashFunction().Len()
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(0))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(0))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -325,8 +335,8 @@ func TestRWMutex(t *testing.T) {
 	}()
 
 	time.Sleep(500 * time.Millisecond)
-	k := BigIntToBytes(big.NewInt(int64(99999)))
-	v := BigIntToBytes(big.NewInt(int64(99999)))
+	k := BigIntToBytes(bLen, big.NewInt(int64(99999)))
+	v := BigIntToBytes(bLen, big.NewInt(int64(99999)))
 	if err := tree.Add(k, v); err != nil {
 		t.Fatal(err)
 	}
@@ -384,11 +394,12 @@ func TestSetGetNLeafs(t *testing.T) {
 }
 
 func BenchmarkAdd(b *testing.B) {
+	bLen := 32 // for both Poseidon & Sha256
 	// prepare inputs
 	var ks, vs [][]byte
 	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i)))
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i)))
 		ks = append(ks, k)
 		vs = append(vs, v)
 	}

@@ -25,9 +25,10 @@ func TestHashSha256(t *testing.T) {
 func TestHashPoseidon(t *testing.T) {
 	// Poseidon hash
 	hashFunc := &HashPoseidon{}
+	bLen := hashFunc.Len()
 	h, err := hashFunc.Hash(
-		BigIntToBytes(big.NewInt(1)),
-		BigIntToBytes(big.NewInt(2)))
+		BigIntToBytes(bLen, big.NewInt(1)),
+		BigIntToBytes(bLen, big.NewInt(2)))
 	if err != nil {
 		t.Fatal(err)
 	}

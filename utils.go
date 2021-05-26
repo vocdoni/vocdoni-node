@@ -12,8 +12,9 @@ func SwapEndianness(b []byte) []byte {
 }
 
 // BigIntToBytes converts a *big.Int into a byte array in Little-Endian
-func BigIntToBytes(bi *big.Int) []byte {
-	var b [32]byte // TODO make the length depending on the tree.hashFunction.Len()
+func BigIntToBytes(blen int, bi *big.Int) []byte {
+	// var b [blen]byte // TODO make the length depending on the tree.hashFunction.Len()
+	b := make([]byte, blen)
 	copy(b[:], SwapEndianness(bi.Bytes()))
 	return b[:]
 }
