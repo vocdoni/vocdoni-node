@@ -195,19 +195,14 @@ func (r *Router) getProcessSummary(request RouterRequest) {
 		return
 	}
 
-	response.Type = api.ProcessType{
-		Anonymous:      procInfo.Envelope.Anonymous,
-		Encrypted:      procInfo.Envelope.EncryptedVotes,
-		CostFromWeight: procInfo.Envelope.CostFromWeight,
-		Serial:         procInfo.Envelope.Serial,
-		UniqueValues:   procInfo.Envelope.UniqueValues,
-	}
-	response.EntityIndex = procInfo.EntityIndex
-	response.SourceNetworkID = procInfo.SourceNetworkId
-	response.BlockCount = procInfo.EndBlock - procInfo.StartBlock
-	response.StartBlock = procInfo.StartBlock
-	response.Status = models.ProcessStatus(procInfo.Status).String()
-	response.EntityID = hex.EncodeToString(procInfo.EntityID)
+	response.ProcessSummary.Type = procInfo.Envelope
+	response.ProcessSummary.EntityIndex = procInfo.EntityIndex
+	response.ProcessSummary.SourceNetworkID = procInfo.SourceNetworkId
+	response.ProcessSummary.BlockCount = procInfo.EndBlock - procInfo.StartBlock
+	response.ProcessSummary.StartBlock = procInfo.StartBlock
+	response.ProcessSummary.State = models.ProcessStatus(procInfo.Status).String()
+	response.ProcessSummary.EntityID = hex.EncodeToString(procInfo.EntityID)
+	response.ProcessSummary.Metadata = procInfo.Metadata + "Metadata"
 
 	// Get total number of votes (including invalid/null)
 	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
@@ -219,7 +214,7 @@ func (r *Router) getProcessSummary(request RouterRequest) {
 		return
 	}
 	votes := uint32(eh)
-	response.Height = &votes
+	response.ProcessSummary.EnvelopeHeight = &votes
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
