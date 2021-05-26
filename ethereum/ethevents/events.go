@@ -26,6 +26,10 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
+const (
+	readBlocksPast = 100
+)
+
 // EthereumEvents type is used to monitorize Ethereum smart
 // contracts and call custom EventHandler functions
 type EthereumEvents struct {
@@ -222,9 +226,9 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 			log.Errorf("cannot process event logs: %s", err)
 		}
 	} else {
-		// For security, even if subscribe only, force to process at least the past 1024
+		// For security, even if subscribe only, force to process at least the past `readBlockPast`
 		// Same as the last processEventLogsFromTo function call
-		if err := ev.processEventLogsFromTo(ctx, blk.Number().Int64()-1024,
+		if err := ev.processEventLogsFromTo(ctx, blk.Number().Int64()-readBlocksPast,
 			blk.Number().Int64(), ev.VotingHandle.EthereumClient); err != nil {
 			log.Errorf("cannot process event logs: %v", err)
 		}
