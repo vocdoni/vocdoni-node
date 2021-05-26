@@ -61,7 +61,7 @@ func testInit(c *qt.C, n int) (*Tree, *Tree) {
 	return tree1, tree2
 }
 
-func TestAddBatchCaseA(t *testing.T) {
+func TestAddBatchTreeEmpty(t *testing.T) {
 	c := qt.New(t)
 
 	nLeafs := 1024
@@ -97,7 +97,7 @@ func TestAddBatchCaseA(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
 	if debug {
-		debugTime("CASE A, AddBatch", time1, time2)
+		debugTime("Case tree empty, AddBatch", time1, time2)
 		printTestContext("	", nLeafs, "Poseidon", "memory")
 		tree2.dbg.print("	")
 	}
@@ -107,7 +107,7 @@ func TestAddBatchCaseA(t *testing.T) {
 	c.Check(tree2.Root(), qt.DeepEquals, tree.Root())
 }
 
-func TestAddBatchCaseANotPowerOf2(t *testing.T) {
+func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 	c := qt.New(t)
 
 	nLeafs := 1027
@@ -152,7 +152,7 @@ func randomBytes(n int) []byte {
 	return b
 }
 
-func TestAddBatchCaseATestVector(t *testing.T) {
+func TestAddBatchTreeEmptyTestVector(t *testing.T) {
 	c := qt.New(t)
 	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
@@ -230,7 +230,7 @@ func TestAddBatchCaseATestVector(t *testing.T) {
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 }
 
-func TestAddBatchCaseARandomKeys(t *testing.T) {
+func TestAddBatchTreeEmptyRandomKeys(t *testing.T) {
 	c := qt.New(t)
 
 	nLeafs := 8
@@ -246,20 +246,8 @@ func TestAddBatchCaseARandomKeys(t *testing.T) {
 	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
 		keys = append(keys, randomBytes(32))
-		// values = append(values, randomBytes(32))
-		values = append(values, []byte{0})
-		// fmt.Println("K", hex.EncodeToString(keys[i]))
+		values = append(values, randomBytes(32))
 	}
-
-	// TODO delete
-	keys[0], _ = hex.DecodeString("1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642")
-	keys[1], _ = hex.DecodeString("2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf")
-	keys[2], _ = hex.DecodeString("9cb87ec67e875c61390edcd1ab517f443591047709a4d4e45b0f9ed980857b8e")
-	keys[3], _ = hex.DecodeString("9b4e9e92e974a589f426ceeb4cb291dc24893513fecf8e8460992dcf52621d4d")
-	keys[4], _ = hex.DecodeString("1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5")
-	keys[5], _ = hex.DecodeString("d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7")
-	keys[6], _ = hex.DecodeString("3cd55dbfb8f975f20a0925dfbdabe79fa2d51dd0268afbb8ba6b01de9dfcdd3c")
-	keys[7], _ = hex.DecodeString("5d0a9d6d9f197c091bf054fac9cb60e11ec723d6610ed8578e617b4d46cb43d5")
 
 	for i := 0; i < len(keys); i++ {
 		if err := tree1.Add(keys[i], values[i]); err != nil {
@@ -269,20 +257,16 @@ func TestAddBatchCaseARandomKeys(t *testing.T) {
 
 	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
-	// tree1.PrintGraphviz(nil)
-	// tree2.PrintGraphviz(nil)
-
 	c.Check(len(indexes), qt.Equals, 0)
-
 	// check that both trees roots are equal
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 }
 
-func TestAddBatchCaseB(t *testing.T) {
+func TestAddBatchTreeNotEmptyFewLeafs(t *testing.T) {
 	c := qt.New(t)
 
 	nLeafs := 1024
-	initialNLeafs := 99 // TMP TODO use const minLeafsThreshold-1 once ready
+	initialNLeafs := 99
 
 	tree1, tree2 := testInit(c, initialNLeafs)
 	tree2.dbgInit()
@@ -310,7 +294,7 @@ func TestAddBatchCaseB(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
 	if debug {
-		debugTime("CASE B, AddBatch", time1, time2)
+		debugTime("Case tree not empty w/ few leafs, AddBatch", time1, time2)
 		printTestContext("	", nLeafs, "Poseidon", "memory")
 		tree2.dbg.print("	")
 	}
@@ -320,14 +304,16 @@ func TestAddBatchCaseB(t *testing.T) {
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 }
 
-func TestAddBatchCaseBRepeatedLeafs(t *testing.T) {
+func TestAddBatchTreeNotEmptyEnoughLeafs(t *testing.T) {
 	c := qt.New(t)
 
 	nLeafs := 1024
-	initialNLeafs := 99 // TMP TODO use const minLeafsThreshold-1 once ready
+	initialNLeafs := 500
 
 	tree1, tree2 := testInit(c, initialNLeafs)
+	tree2.dbgInit()
 
+	start := time.Now()
 	for i := initialNLeafs; i < nLeafs; i++ {
 		k := BigIntToBytes(big.NewInt(int64(i)))
 		v := BigIntToBytes(big.NewInt(int64(i * 2)))
@@ -335,8 +321,39 @@ func TestAddBatchCaseBRepeatedLeafs(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	time1 := time.Since(start)
 
-	// prepare the key-values to be added, including already existing keys
+	// prepare the key-values to be added
+	var keys, values [][]byte
+	for i := initialNLeafs; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	start = time.Now()
+	indexes, err := tree2.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	time2 := time.Since(start)
+	if debug {
+		debugTime("Case tree not empty w/ enough leafs, AddBatch", time1, time2)
+		printTestContext("	", nLeafs, "Poseidon", "memory")
+		tree2.dbg.print("	")
+	}
+	c.Check(len(indexes), qt.Equals, 0)
+	// check that both trees roots are equal
+	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+}
+
+func TestAddBatchTreeEmptyRepeatedLeafs(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 1024
+	nRepeatedKeys := 99
+
+	tree1, tree2 := testInit(c, 0)
+
+	// prepare the key-values to be added
 	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
 		k := BigIntToBytes(big.NewInt(int64(i)))
@@ -344,10 +361,55 @@ func TestAddBatchCaseBRepeatedLeafs(t *testing.T) {
 		keys = append(keys, k)
 		values = append(values, v)
 	}
+	// add repeated key-values
+	for i := 0; i < nRepeatedKeys; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+
+	// add the non-repeated key-values in tree1 with .Add loop
+	for i := 0; i < nLeafs; i++ {
+		if err := tree1.Add(keys[i], values[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	indexes, err := tree2.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	c.Check(len(indexes), qt.Equals, nRepeatedKeys)
+	// check that both trees roots are equal
+	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+}
+
+func TestAddBatchTreeNotEmptyFewLeafsRepeatedLeafs(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 1024
+	initialNLeafs := 99
+
+	tree1, tree2 := testInit(c, initialNLeafs)
+
+	// prepare the key-values to be added
+	var keys, values [][]byte
+	for i := 0; i < nLeafs; i++ {
+		k := BigIntToBytes(big.NewInt(int64(i)))
+		v := BigIntToBytes(big.NewInt(int64(i * 2)))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+
+	// add the keys that will be existing when AddBatch is called
+	for i := initialNLeafs; i < nLeafs; i++ {
+		if err := tree1.Add(keys[i], values[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, initialNLeafs)
-
 	// check that both trees roots are equal
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 }
@@ -452,49 +514,7 @@ func sortKvs(kvs []kv) {
 	})
 }
 
-func TestAddBatchCaseC(t *testing.T) {
-	c := qt.New(t)
-
-	nLeafs := 1024
-	initialNLeafs := 101 // TMP TODO use const minLeafsThreshold+1 once ready
-
-	tree1, tree2 := testInit(c, initialNLeafs)
-	tree2.dbgInit()
-
-	start := time.Now()
-	for i := initialNLeafs; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
-		if err := tree1.Add(k, v); err != nil {
-			t.Fatal(err)
-		}
-	}
-	time1 := time.Since(start)
-
-	// prepare the key-values to be added
-	var keys, values [][]byte
-	for i := initialNLeafs; i < nLeafs; i++ {
-		k := BigIntToBytes(big.NewInt(int64(i)))
-		v := BigIntToBytes(big.NewInt(int64(i * 2)))
-		keys = append(keys, k)
-		values = append(values, v)
-	}
-	start = time.Now()
-	indexes, err := tree2.AddBatch(keys, values)
-	c.Assert(err, qt.IsNil)
-	time2 := time.Since(start)
-	if debug {
-		debugTime("CASE C, AddBatch", time1, time2)
-		printTestContext("	", nLeafs, "Poseidon", "memory")
-		tree2.dbg.print("	")
-	}
-	c.Check(len(indexes), qt.Equals, 0)
-
-	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
-}
-
-func TestAddBatchCaseD(t *testing.T) {
+func TestAddBatchTreeNotEmpty(t *testing.T) {
 	c := qt.New(t)
 
 	nLeafs := 4096
@@ -526,7 +546,7 @@ func TestAddBatchCaseD(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
 	if debug {
-		debugTime("CASE D, AddBatch", time1, time2)
+		debugTime("Case tree not empty, AddBatch", time1, time2)
 		printTestContext("	", nLeafs, "Poseidon", "memory")
 		tree2.dbg.print("	")
 	}
@@ -536,7 +556,7 @@ func TestAddBatchCaseD(t *testing.T) {
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
 }
 
-func TestAddBatchCaseE(t *testing.T) {
+func TestAddBatchNotEmptyUnbalanced(t *testing.T) {
 	c := qt.New(t)
 
 	nLeafs := 4096
@@ -588,7 +608,7 @@ func TestAddBatchCaseE(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	time2 := time.Since(start)
 	if debug {
-		debugTime("CASE E, AddBatch", time1, time2)
+		debugTime("Case tree not empty & unbalanced, AddBatch", time1, time2)
 		printTestContext("	", nLeafs, "Poseidon", "memory")
 		tree2.dbg.print("	")
 	}
@@ -630,21 +650,21 @@ func benchAdd(t *testing.T, ks, vs [][]byte) {
 	c := qt.New(t)
 
 	dbDir := t.TempDir()
+	// storage, err := pebble.NewPebbleStorage(dbDir, false)
 	storage, err := leveldb.NewLevelDbStorage(dbDir, false)
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(storage, 140, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
 
-	if debug {
-		tree.dbgInit()
-	}
 	start := time.Now()
 	for i := 0; i < len(ks); i++ {
 		err = tree.Add(ks[i], vs[i])
 		c.Assert(err, qt.IsNil)
 	}
-	printRes("	Add loop", time.Since(start))
-	tree.dbg.print("		")
+	if debug {
+		printRes("	Add loop", time.Since(start))
+		tree.dbg.print("		")
+	}
 }
 
 func benchAddBatch(t *testing.T, ks, vs [][]byte) {
@@ -656,15 +676,16 @@ func benchAddBatch(t *testing.T, ks, vs [][]byte) {
 	tree, err := NewTree(storage, 140, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
 
-	if debug {
-		tree.dbgInit()
-	}
+	tree.dbgInit()
+
 	start := time.Now()
 	invalids, err := tree.AddBatch(ks, vs)
-	printRes("	AddBatch", time.Since(start))
+	if debug {
+		printRes("	AddBatch", time.Since(start))
+		tree.dbg.print("		")
+	}
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(invalids), qt.Equals, 0)
-	tree.dbg.print("		")
 }
 
 func TestDbgStats(t *testing.T) {
@@ -727,9 +748,9 @@ func TestDbgStats(t *testing.T) {
 
 	if debug {
 		fmt.Println("TestDbgStats")
-		tree1.dbg.print("	add in loop    ")
-		tree2.dbg.print("	addbatch caseA ")
-		tree3.dbg.print("	addbatch caseD ")
+		tree1.dbg.print("	add in loop in emptyTree ")
+		tree2.dbg.print("	addbatch caseEmptyTree ")
+		tree3.dbg.print("	addbatch caseNotEmptyTree ")
 	}
 }
 
@@ -762,5 +783,4 @@ func TestLoadVT(t *testing.T) {
 	c.Check(tree.Root(), qt.DeepEquals, vt.root.h)
 }
 
-// TODO test adding batch with repeated keys in the batch
 // TODO test adding batch with multiple invalid keys

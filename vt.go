@@ -593,7 +593,6 @@ node [fontname=Monospace,fontsize=10,shape=box]
 
 //nolint:unused
 func (n *node) graphviz(w io.Writer, p *params, nEmpties int) (int, error) {
-	nChars := 4 // TODO move to global constant
 	if n == nil {
 		return nEmpties, nil
 	}

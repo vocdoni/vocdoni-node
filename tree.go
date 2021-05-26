@@ -39,6 +39,9 @@ const (
 	// PrefixValueIntermediate is used for the first byte of a Value to
 	// indicate that is a Intermediate value
 	PrefixValueIntermediate = 2
+
+	// nChars is used to crop the Graphviz nodes labels
+	nChars = 4
 )
 
 var (
@@ -852,7 +855,6 @@ func (t *Tree) GraphvizFirstNLevels(w io.Writer, rootKey []byte, untilLvl int) e
 	fmt.Fprintf(w, `digraph hierarchy {
 node [fontname=Monospace,fontsize=10,shape=box]
 `)
-	nChars := 4 // TODO move to global constant
 	nEmpties := 0
 	err := t.iterWithStop(t.root, 0, func(currLvl int, k, v []byte) bool {
 		if currLvl == untilLvl {
