@@ -215,7 +215,7 @@ func (r *Router) getProcessSummary(request RouterRequest) {
 		SourceNetworkID: procInfo.SourceNetworkId,
 		StartBlock:      procInfo.StartBlock,
 		State:           models.ProcessStatus(procInfo.Status).String(),
-		Type:            procInfo.Envelope,
+		EnvelopeType:    procInfo.Envelope,
 	}
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
