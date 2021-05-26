@@ -340,7 +340,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		}
 		log.Infof("oracle transaction sent, hash: %x", res.Hash)
 	default:
-		log.Warnf("no event configured for %s", event.Topics[0].Hex())
+		log.Debugf("no event configured for %s", event.Topics[0].Hex())
 	}
 	return nil
 }
