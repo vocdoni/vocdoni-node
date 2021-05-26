@@ -178,7 +178,6 @@ type ResponseMessage struct {
 type MetaResponse struct {
 	APIList              []string                         `json:"apiList,omitempty"`
 	Block                *indexertypes.BlockMetadata      `json:"block,omitempty"`
-	BlockCount           uint32                           `json:"blockCount,omitempty"`
 	BlockList            []*indexertypes.BlockMetadata    `json:"blockList,omitempty"`
 	BlockTime            *[5]int32                        `json:"blockTime,omitempty"`
 	BlockTimestamp       int32                            `json:"blockTimestamp,omitempty"`
@@ -194,7 +193,6 @@ type MetaResponse struct {
 	EncryptionPublicKeys []Key                            `json:"encryptionPubKeys,omitempty"`
 	EntityID             string                           `json:"entityId,omitempty"`
 	EntityIDs            []string                         `json:"entityIds,omitempty"`
-	EntityIndex          uint32                           `json:"entityIndex,omitempty"`
 	Envelope             *indexertypes.EnvelopePackage    `json:"envelope,omitempty"`
 	Envelopes            []*indexertypes.EnvelopeMetadata `json:"envelopes,omitempty"`
 	Files                []byte                           `json:"files,omitempty"`
@@ -203,13 +201,13 @@ type MetaResponse struct {
 	Health               int32                            `json:"health,omitempty"`
 	Height               *uint32                          `json:"height,omitempty"`
 	InvalidClaims        []int                            `json:"invalidClaims,omitempty"`
-	Metadata             string                           `json:"metadata,omitempty"`
 	Message              string                           `json:"message,omitempty"`
 	Nullifier            string                           `json:"nullifier,omitempty"`
 	Nullifiers           *[]string                        `json:"nullifiers,omitempty"`
 	Ok                   bool                             `json:"ok"`
 	Paused               *bool                            `json:"paused,omitempty"`
 	Payload              string                           `json:"payload,omitempty"`
+	ProcessSummary       ProcessSummary                   `json:"processSummary,omitempty"`
 	ProcessID            types.HexBytes                   `json:"processId,omitempty"`
 	ProcessIDs           []string                         `json:"processIds,omitempty"`
 	Process              *indexertypes.Process            `json:"process,omitempty"`
@@ -221,12 +219,10 @@ type MetaResponse struct {
 	Root                 types.HexBytes                   `json:"root,omitempty"`
 	Siblings             types.HexBytes                   `json:"siblings,omitempty"`
 	Size                 *int64                           `json:"size,omitempty"`
-	SourceNetworkID      string                           `json:"sourceNetworkID,omitempty"`
-	StartBlock           uint32                           `json:"startBlock,omitempty"`
-	Status               string                           `json:"status,omitempty"`
+	State                string                           `json:"state,omitempty"`
 	Stats                *VochainStats                    `json:"stats,omitempty"`
 	Timestamp            int32                            `json:"timestamp"`
-	Type                 ProcessType                      `json:"type,omitempty"`
+	Type                 string                           `json:"type,omitempty"`
 	Tx                   *indexertypes.TxPackage          `json:"tx,omitempty"`
 	TxList               []*indexertypes.TxMetadata       `json:"txList,omitempty"`
 	URI                  string                           `json:"uri,omitempty"`
@@ -246,12 +242,16 @@ func (r *MetaResponse) SetError(v interface{}) {
 	r.Message = fmt.Sprintf("%s", v)
 }
 
-type ProcessType struct {
-	Anonymous      bool `json:"anonymous,omitempty"`
-	Encrypted      bool `json:"encrypted,omitempty"`
-	CostFromWeight bool `json:"costFromWeight,omitempty"`
-	Serial         bool `json:"serial,omitempty"`
-	UniqueValues   bool `json:"uniqueValues,omitempty"`
+type ProcessSummary struct {
+	BlockCount      uint32               `json:"blockCount,omitempty"`
+	EntityID        string               `json:"entityId,omitempty"`
+	EntityIndex     uint32               `json:"entityIndex,omitempty"`
+	EnvelopeHeight  *uint32              `json:"envelopeHeight,omitempty"`
+	Metadata        string               `json:"metadata,omitempty"`
+	SourceNetworkID string               `json:"sourceNetworkID,omitempty"`
+	StartBlock      uint32               `json:"startBlock,omitempty"`
+	State           string               `json:"state,omitempty"`
+	Type            *models.EnvelopeType `json:"type,omitempty"`
 }
 
 // Key associates a key string with an index, so clients can check
