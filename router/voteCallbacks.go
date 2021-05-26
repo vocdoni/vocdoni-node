@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"go.vocdoni.io/dvote/api"
@@ -201,6 +202,48 @@ func (r *Router) getProcessInfo(request RouterRequest) {
 	if err != nil {
 		r.SendError(request, fmt.Sprintf("cannot get process info: %v", err))
 		return
+	}
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
+}
+
+func (r *Router) getProcessSummary(request RouterRequest) {
+	var response api.MetaResponse
+	if len(request.ProcessID) != types.ProcessIDsize {
+		r.SendError(request, "cannot get envelope status: (malformed processId)")
+		return
+	}
+
+	// Get process info
+	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
+	if err != nil {
+		log.Warn(err)
+		r.SendError(request, err.Error())
+		return
+	}
+
+	// Get total number of votes (including invalid/null)
+	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
+	if err != nil {
+		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
+		if err := request.Send(r.BuildReply(request, &response)); err != nil {
+			log.Warnf("error sending response: %s", err)
+		}
+		return
+	}
+	votes := uint32(eh)
+
+	response.ProcessSummary = &api.ProcessSummary{
+		BlockCount:      procInfo.EndBlock - procInfo.StartBlock,
+		EntityID:        hex.EncodeToString(procInfo.EntityID),
+		EntityIndex:     procInfo.EntityIndex,
+		EnvelopeHeight:  &votes,
+		Metadata:        procInfo.Metadata,
+		SourceNetworkID: procInfo.SourceNetworkId,
+		StartBlock:      procInfo.StartBlock,
+		State:           models.ProcessStatus(procInfo.Status).String(),
+		EnvelopeType:    procInfo.Envelope,
 	}
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
