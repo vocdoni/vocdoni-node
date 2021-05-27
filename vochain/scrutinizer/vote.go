@@ -264,19 +264,32 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	// updateProcess. If we fetch the process, compute the results, then update the process,
 	// ComputeResult can override the process status set by updateProcess. UpdateMatching
 	// gets rid of the time between fetching and updating the process, eliminating this race.
-	if err := s.db.UpdateMatching(&indexertypes.Process{},
-		badgerhold.Where("ID").Eq(processID),
-		func(record interface{}) error {
-			update, ok := record.(*indexertypes.Process)
-			if !ok {
-				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+	maxTries := 1000
+	for {
+		if err := s.db.UpdateMatching(&indexertypes.Process{},
+			badgerhold.Where("ID").Eq(processID),
+			func(record interface{}) error {
+				update, ok := record.(*indexertypes.Process)
+				if !ok {
+					return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+				}
+				update.HaveResults = true
+				update.FinalResults = true
+				return nil
+			},
+		); err != nil {
+			if strings.Contains(err.Error(), kvErrorStringForRetry) {
+				maxTries--
+				if maxTries == 0 {
+					return fmt.Errorf("computeResult: cannot update processID %x: max retires reached",
+						processID)
+				}
+				time.Sleep(time.Millisecond * 5)
+				continue
 			}
-			update.HaveResults = true
-			update.FinalResults = true
-			return nil
-		},
-	); err != nil {
-		return fmt.Errorf("computeResult: cannot update processID %x: %w, ", processID, err)
+			return fmt.Errorf("computeResult: cannot update processID %x: %w, ", processID, err)
+		}
+		break
 	}
 	s.addVoteLock.Lock()
 	defer s.addVoteLock.Unlock()
