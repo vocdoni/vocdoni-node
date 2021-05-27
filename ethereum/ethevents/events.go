@@ -65,7 +65,7 @@ type EthereumEvents struct {
 	ContractsInfo map[string]*ethereumhandler.EthereumContract
 }
 
-type logEvent struct {
+type timedEvent struct {
 	event *ethtypes.Log
 	added time.Time
 }
@@ -93,7 +93,8 @@ type EventProcessor struct {
 	Events                chan ethtypes.Log
 	EventProcessThreshold time.Duration
 	eventProcessorRunning bool
-	eventQueue            sync.Map
+	eventQueue            map[string]timedEvent
+	eventQueueLock        sync.RWMutex
 }
 
 // NewEthEvents creates a new Ethereum events handler
@@ -149,6 +150,7 @@ func NewEthEvents(
 		EventProcessor: &EventProcessor{
 			Events:                make(chan ethtypes.Log),
 			EventProcessThreshold: confirmThreshold,
+			eventQueue:            make(map[string]timedEvent),
 		},
 		EthereumWhiteListAddrs: secureAddrList,
 		ContractsAddress:       contractsAddress,
@@ -159,8 +161,8 @@ func NewEthEvents(
 }
 
 // AddEventHandler adds a new handler even log function
-func (ev *EthereumEvents) AddEventHandler(h EventHandler) {
-	ev.EventHandlers = append(ev.EventHandlers, h)
+func (ev *EthereumEvents) AddEventHandler(handler EventHandler) {
+	ev.EventHandlers = append(ev.EventHandlers, handler)
 }
 
 // SubscribeEthereumEventLogs enables the subscription of Ethereum events for new blocks.
@@ -315,9 +317,14 @@ func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context,
 
 	for _, event := range logs {
 		log.Infof("processing event log from block %d", event.BlockNumber)
-		for _, h := range ev.EventHandlers {
-			e := event
-			if err := h(ctx, &e, ev); err != nil {
+		for _, handler := range ev.EventHandlers {
+
+			// Use a pointer to a copy of the event for each handler.
+			// Just in case the handler runs asynchronously,
+			// or for some reason ends up modifying the event.
+			event := event
+
+			if err := handler(ctx, &event, ev); err != nil {
 				// TODO: handle when event cannot be processed
 				log.Warnf("cannot handle event (%+v) with error (%s)", event, err)
 			}
@@ -326,76 +333,66 @@ func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context,
 	return nil
 }
 
-func (ep *EventProcessor) id(e *ethtypes.Log) string {
-	return fmt.Sprintf("%x%d", e.TxHash, e.TxIndex)
+func (ep *EventProcessor) id(event *ethtypes.Log) string {
+	return fmt.Sprintf("%x%d", event.TxHash, event.TxIndex)
 }
 
-func (ep *EventProcessor) add(e *ethtypes.Log) {
-	eventID := ep.id(e)
-	ep.eventQueue.Store(eventID, logEvent{event: e, added: time.Now()})
+func (ep *EventProcessor) add(event *ethtypes.Log) {
+	eventID := ep.id(event)
+	ep.eventQueueLock.Lock()
+	defer ep.eventQueueLock.Unlock()
+	ep.eventQueue[eventID] = timedEvent{event: event, added: time.Now()}
 }
 
-func (ep *EventProcessor) del(e *ethtypes.Log) {
-	eventID := ep.id(e)
-	ep.eventQueue.Delete(eventID)
+func (ep *EventProcessor) del(event *ethtypes.Log) {
+	eventID := ep.id(event)
+	ep.eventQueueLock.Lock()
+	defer ep.eventQueueLock.Unlock()
+	delete(ep.eventQueue, eventID)
 }
 
 // next returns the first log event rady to be processed
 func (ep *EventProcessor) next() *ethtypes.Log {
-	nextId := ""
-	ep.eventQueue.Range(func(k, v interface{}) bool {
-		elog, ok := v.(logEvent)
-		if !ok {
-			log.Errorf("stored type is not %T", logEvent{})
+	ep.eventQueueLock.Lock()
+	defer ep.eventQueueLock.Unlock()
+	for id, event := range ep.eventQueue {
+		if time.Since(event.added) >= ep.EventProcessThreshold {
+			delete(ep.eventQueue, id)
+			return event.event
 		}
-		if time.Since(elog.added) < ep.EventProcessThreshold {
-			return true
-		}
-		nextId = k.(string)
-		return false
-	},
-	)
-	if nextId == "" {
-		return nil
 	}
-	next, ok := ep.eventQueue.LoadAndDelete(nextId)
-	if !ok {
-		log.Errorf("could not load and delete %s", nextId)
-		return nil
-	}
-	return next.(logEvent).event
+	return nil
 }
 
 func (ev *EthereumEvents) runEventProcessor(ctx context.Context) {
 	ev.EventProcessor.eventProcessorRunning = true
 	go func() {
-		var evt ethtypes.Log
-		var evtJSON []byte
-		var err error
 		for {
-			evt = <-ev.EventProcessor.Events
-			if evtJSON, err = evt.MarshalJSON(); err != nil {
+			event := <-ev.EventProcessor.Events
+			evtJSON, err := event.MarshalJSON()
+			if err != nil {
 				log.Error(err)
 				continue
 			}
-			if evt.Removed {
+			if event.Removed {
 				log.Warnf("removing reversed log event: %s", evtJSON)
-				evtc := evt
-				ev.EventProcessor.del(&evtc)
+				ev.EventProcessor.del(&event)
 			} else {
 				log.Debugf("queued event log: %s", evtJSON)
-				evtc := evt
-				ev.EventProcessor.add(&evtc)
+				ev.EventProcessor.add(&event)
 			}
 		}
 	}()
 
 	for {
+		// TODO(mvdan): Perhaps refactor this so we don't need a sleep.
+		// Maybe use a queue-like structure sorted by added time,
+		// and separately mark the removed events to ignore them.
 		time.Sleep(2 * time.Second)
-		if e := ev.EventProcessor.next(); e != nil {
-			for i, h := range ev.EventHandlers {
-				log.Infof("executing event handler %d for %s", i, ev.EventProcessor.id(e))
-				if err := h(ctx, e, ev); err != nil {
+		if tev := ev.EventProcessor.next(); tev != nil {
+			for i, handler := range ev.EventHandlers {
+				log.Infof("executing event handler %d for %s", i, ev.EventProcessor.id(tev))
+				if err := handler(ctx, tev, ev); err != nil {
 					log.Error(err)
 				}
 			}
