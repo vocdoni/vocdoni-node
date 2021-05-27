@@ -2,6 +2,7 @@ package vochain
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"math/big"
 
@@ -122,8 +123,12 @@ func UnmarshalTx(content []byte) (*models.Tx, []byte, []byte, error) {
 	if err := proto.Unmarshal(content, stx); err != nil {
 		return nil, nil, nil, err
 	}
+	txBytes := stx.GetTx()
+	if stx.GetB64Encoded() {
+		txBytes = []byte(base64.StdEncoding.EncodeToString(txBytes))
+	}
 	vtx := new(models.Tx)
-	return vtx, stx.GetTx(), stx.GetSignature(), proto.Unmarshal(stx.GetTx(), vtx)
+	return vtx, txBytes, stx.GetSignature(), proto.Unmarshal(stx.GetTx(), vtx)
 }
 
 // VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote

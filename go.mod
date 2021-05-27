@@ -86,7 +86,7 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0
-	go.vocdoni.io/proto v1.0.4-0.20210525130734-c9e1ff675866
+	go.vocdoni.io/proto v1.0.4-0.20210527145653-f1d7b726fcf2
 	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2 // indirect
