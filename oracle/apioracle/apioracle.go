@@ -24,7 +24,10 @@ import (
 )
 
 const (
-	ethQueryTimeOut = 20 * time.Second
+	ethQueryTimeOut      = 20 * time.Second
+	aclPurgePeriod       = 10 * time.Minute
+	aclTimeWindow        = 5 * 24 * time.Hour // 5 days
+	maxProposalPerWindow = 3
 )
 
 var srcNetworkIds = map[string]models.SourceNetworkId{
@@ -34,11 +37,12 @@ var srcNetworkIds = map[string]models.SourceNetworkId{
 }
 
 type APIoracle struct {
-	Namespace uint32
-	oracle    *oracle.Oracle
-	router    *router.Router
-	eh        *ethereumhandler.EthereumHandler
-	chainName string
+	Namespace        uint32
+	oracle           *oracle.Oracle
+	router           *router.Router
+	eh               *ethereumhandler.EthereumHandler
+	chainName        string
+	erc20proposalACL *proposalACL
 }
 
 func NewAPIoracle(o *oracle.Oracle, r *router.Router) (*APIoracle, error) {
@@ -54,6 +58,7 @@ func (a *APIoracle) EnableERC20(chainName, web3Endpoint string) error {
 	if err != nil {
 		return err
 	}
+	a.erc20proposalACL = NewProposalACL(aclTimeWindow, maxProposalPerWindow)
 	srcNetId, ok := srcNetworkIds[chainName]
 	if !ok {
 		srcNetId = srcNetworkIds["default"]
@@ -111,7 +116,15 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		CensusOrigin:      models.CensusOrigin_ERC20,
 		Mode:              &models.ProcessMode{AutoStart: true},
 		SourceNetworkId:   a.eh.SrcNetworkId,
+		Owner:             req.GetAddress().Bytes(),
 	}
+
+	// Check the ACL
+	if err := a.erc20proposalACL.add(p.Owner, p.EntityId); err != nil {
+		a.router.SendError(req, err.Error())
+		return
+	}
+
 	sproof, err := buildETHproof(req.EthProof)
 	if err != nil {
 		a.router.SendError(req, err.Error())
@@ -152,7 +165,6 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		a.router.SendError(req, "proof is not valid")
 		return
 	}
-
 	if err := a.oracle.NewProcess(p); err != nil {
 		a.router.SendError(req, err.Error())
 		return
