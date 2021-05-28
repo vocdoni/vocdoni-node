@@ -39,7 +39,7 @@ const kvErrorStringForRetry = "Transaction Conflict"
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
 func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
 	txRef := &indexertypes.VoteReference{}
-	return txRef, s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
+	return txRef, s.db.FindOne(txRef, badgerhold.Where("Nullifier").Eq(nullifier))
 }
 
 // GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
@@ -318,7 +318,7 @@ func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error
 	s.addVoteLock.RLock()
 	defer s.addVoteLock.RUnlock()
 	results := &indexertypes.Results{}
-	if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).
+	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").
 		Eq(processID)); err != nil {
 		if err == badgerhold.ErrNotFound {
 			return nil, ErrNoResultsYet
@@ -333,7 +333,7 @@ func (s *Scrutinizer) GetResultsWeight(processID []byte) (*big.Int, error) {
 	s.addVoteLock.RLock()
 	defer s.addVoteLock.RUnlock()
 	results := &indexertypes.Results{}
-	if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).Eq(processID)); err != nil {
+	if err := s.db.FindOne(results, badgerhold.Where("ProcessID").Eq(processID)); err != nil {
 		return nil, err
 	}
 	return results.Weight, nil

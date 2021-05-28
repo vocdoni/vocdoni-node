@@ -19,7 +19,7 @@ import (
 // ProcessInfo returns the available information regarding an election process id
 func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	proc := &indexertypes.Process{}
-	err := s.db.FindOne(proc, badgerhold.Where(badgerhold.Key).Eq(pid))
+	err := s.db.FindOne(proc, badgerhold.Where("ID").Eq(pid))
 	return proc, err
 }
 
@@ -185,7 +185,7 @@ func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []string {
 // EntityProcessCount returns the number of processes that an entity holds
 func (s *Scrutinizer) EntityProcessCount(entityId []byte) (uint32, error) {
 	entity := &indexertypes.Entity{}
-	if err := s.db.FindOne(entity, badgerhold.Where(badgerhold.Key).Eq(entityId)); err != nil {
+	if err := s.db.FindOne(entity, badgerhold.Where("ID").Eq(entityId)); err != nil {
 		return 0, err
 	}
 	return entity.ProcessCount, nil
@@ -270,7 +270,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	eid := p.GetEntityId()
 	entity := &indexertypes.Entity{}
 	// If entity is not registered in db, add to entity count cache and insert to db
-	if err := s.db.FindOne(entity, badgerhold.Where(badgerhold.Key).Eq(eid)); err != nil {
+	if err := s.db.FindOne(entity, badgerhold.Where("ID").Eq(eid)); err != nil {
 		if err != badgerhold.ErrNotFound {
 			return err
 		}
@@ -360,7 +360,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 	// Retry if error is "Transaction Conflict"
 	for {
 		if err := s.db.UpdateMatching(&indexertypes.Process{},
-			badgerhold.Where(badgerhold.Key).Eq(pid), updateFunc); err != nil {
+			badgerhold.Where("ID").Eq(pid), updateFunc); err != nil {
 			if strings.Contains(err.Error(), kvErrorStringForRetry) {
 				continue
 			}
@@ -372,7 +372,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 }
 
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
-	return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
+	return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where("ID").Eq(pid),
 		func(record interface{}) error {
 			update, ok := record.(*indexertypes.Process)
 			if !ok {
