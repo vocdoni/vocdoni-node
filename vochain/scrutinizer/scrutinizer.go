@@ -27,6 +27,7 @@ const (
 	MaxEnvelopeListSize = 32 << 18
 
 	countEnvelopeCacheSize = 1024
+	resultsCacheSize       = 512
 )
 
 // EventListener is an interface used for executing custom functions during the
@@ -62,11 +63,12 @@ type Scrutinizer struct {
 	db             *badgerhold.Store
 	// envelopeHeightCache and countTotalEnvelopes are in memory counters that helps reducing the
 	// access time when GenEnvelopeHeight() is called.
-	envelopeHeightCache *lru.Cache
+	envelopeHeightCache *lru.AtomicCache
 	countTotalEnvelopes uint64
 	countTotalEntities  int64
 	countTotalProcesses int64
-
+	// resultsCache is a memory cache for final results results, stores processId:<results>
+	resultsCache *lru.Cache
 	// addVoteLock is used to avoid Transaction Conflicts on the KV database.
 	// It is not critical and the code should be able to recover from a Conflict, but we
 	// try to minimize this situations in order to improve performance on the KV.
@@ -117,7 +119,8 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 	s.countTotalProcesses = int64(processes)
 	// Subscrive to events
 	s.App.State.AddEventListener(s)
-	s.envelopeHeightCache = lru.New(countEnvelopeCacheSize)
+	s.envelopeHeightCache = lru.NewAtomic(countEnvelopeCacheSize)
+	s.resultsCache = lru.New(resultsCacheSize)
 	return s, nil
 }
 
@@ -282,7 +285,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 
 	for pid, votes := range s.votePool {
 		// Update or set the cache of envelopes height by process ID
-		s.envelopeHeightCache.GetOrUpdate(pid, func(prev interface{}) interface{} {
+		s.envelopeHeightCache.GetAndUpdate(pid, func(prev interface{}) interface{} {
 			if prev, ok := prev.(uint64); ok {
 				return prev + uint64(len(votes))
 			}

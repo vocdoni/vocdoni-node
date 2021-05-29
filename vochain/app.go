@@ -36,7 +36,7 @@ type BaseApplication struct {
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
 	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
-	blockCache         *lru.Cache
+	blockCache         *lru.AtomicCache
 	height             uint32
 	timestamp          int64
 	chainId            string
@@ -54,7 +54,7 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	}
 	return &BaseApplication{
 		State:      state,
-		blockCache: lru.New(128),
+		blockCache: lru.NewAtomic(128),
 	}, nil
 }
 
@@ -144,7 +144,7 @@ func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 		log.Error("application getBlockByHeight method not assigned")
 		return nil
 	}
-	cachedBlock := app.blockCache.GetOrUpdate(height, func(prev interface{}) interface{} {
+	cachedBlock := app.blockCache.GetAndUpdate(height, func(prev interface{}) interface{} {
 		if prev != nil {
 			// If it's already in the cache, use it as-is.
 			return prev
