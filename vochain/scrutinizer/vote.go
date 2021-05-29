@@ -220,7 +220,7 @@ func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 	// If an error occurs, right now it's "sticky", in the sense that it
 	// remains there until the entry is evicted as per the LRU rules.
 
-	val := s.envelopeHeightCache.GetOrUpdate(string(processID), func(prev interface{}) interface{} {
+	val := s.envelopeHeightCache.GetAndUpdate(string(processID), func(prev interface{}) interface{} {
 		if prev != nil {
 			// If it's already in the cache, use it as-is.
 			return prev
@@ -232,8 +232,8 @@ func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 			return err
 		}
 		return uint64(count)
-
 	})
+
 	switch val := val.(type) {
 	case error:
 		return 0, val
@@ -304,17 +304,14 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	return nil
 }
 
-// GetResults returns the current result for a processId aggregated in a two dimension int slice
+// GetResults returns the current result for a processId
 func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error) {
-	if n, err := s.db.Count(&indexertypes.Process{},
-		badgerhold.Where("ID").Eq(processID).
-			And("HaveResults").Eq(true).
-			And("Status").Ne(int32(models.ProcessStatus_CANCELED))); err != nil {
-		return nil, err
-	} else if n == 0 {
-		return nil, ErrNoResultsYet
+	// Check if results are in cache and return them
+	val := s.resultsCache.Get(string(processID))
+	if val != nil {
+		return val.(*indexertypes.Results), nil
 	}
-
+	// If not in cache, execute the expensive query
 	s.addVoteLock.RLock()
 	defer s.addVoteLock.RUnlock()
 	results := &indexertypes.Results{}
@@ -324,6 +321,10 @@ func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error
 			return nil, ErrNoResultsYet
 		}
 		return nil, err
+	}
+	// If results are final, store in cache for next queries
+	if results.Final {
+		s.resultsCache.Add(string(processID), results)
 	}
 	return results, nil
 }

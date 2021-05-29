@@ -113,7 +113,11 @@ func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 		hexamount := hexutil.Big(amount)
 		log.Debugf("validating erc20 storage proof for key %x and amount %s", p.Key, amount.String())
 		valid, err := ethstorageproof.VerifyEthStorageProof(
-			&ethstorageproof.StorageResult{Key: fmt.Sprintf("%x", p.Key), Proof: hexproof, Value: &hexamount},
+			&ethstorageproof.StorageResult{
+				Key:   fmt.Sprintf("%x", p.Key),
+				Proof: hexproof,
+				Value: &hexamount,
+			},
 			ethcommon.BytesToHash(censusRoot),
 		)
 		return valid, &amount, err
