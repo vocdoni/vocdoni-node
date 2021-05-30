@@ -38,6 +38,8 @@ const kvErrorStringForRetry = "Transaction Conflict"
 // Getindexertypes.VoteReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
 func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
+	startTime := time.Now()
+	defer func() { log.Debugf("GetEnvelopeReference took %s", time.Since(startTime)) }()
 	txRef := &indexertypes.VoteReference{}
 	return txRef, s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
 }
@@ -45,6 +47,8 @@ func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*indexertypes.Vote
 // GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
 func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
+	startTime := time.Now()
+	defer func() { log.Debugf("GetEnvelope took %s", time.Since(startTime)) }()
 	t := time.Now()
 	voteRef, err := s.GetEnvelopeReference(nullifier)
 	if err != nil {
@@ -210,6 +214,8 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 // GetEnvelopeHeight returns the number of envelopes for a processId.
 // If processId is empty, returns the total number of envelopes.
 func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
+	startTime := time.Now()
+	defer func() { log.Debugf("GetEnvelopeHeight took %s", time.Since(startTime)) }()
 	if len(processID) == 0 {
 		// If no processID is provided, count all envelopes
 		return atomic.LoadUint64(&s.countTotalEnvelopes), nil
@@ -306,6 +312,8 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 
 // GetResults returns the current result for a processId
 func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error) {
+	startTime := time.Now()
+	defer func() { log.Debugf("GetResults took %s", time.Since(startTime)) }()
 	// Check if results are in cache and return them
 	val := s.resultsCache.Get(string(processID))
 	if val != nil {
@@ -331,6 +339,8 @@ func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error
 
 // GetResultsWeight returns the current weight of cast votes for a processId.
 func (s *Scrutinizer) GetResultsWeight(processID []byte) (*big.Int, error) {
+	startTime := time.Now()
+	defer func() { log.Debugf("GetResultsWeight took %s", time.Since(startTime)) }()
 	s.addVoteLock.RLock()
 	defer s.addVoteLock.RUnlock()
 	results := &indexertypes.Results{}

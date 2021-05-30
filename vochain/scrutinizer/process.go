@@ -18,6 +18,8 @@ import (
 
 // ProcessInfo returns the available information regarding an election process id
 func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
+	startTime := time.Now()
+	defer func() { log.Debugf("ProcessInfo took %s", time.Since(startTime)) }()
 	proc := &indexertypes.Process{}
 	err := s.db.FindOne(proc, badgerhold.Where(badgerhold.Key).Eq(pid))
 	return proc, err
@@ -35,6 +37,8 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 	srcNetworkIdstr,
 	status string,
 	withResults bool) ([][]byte, error) {
+	startTime := time.Now()
+	defer func() { log.Debugf("ProcessList took %s", time.Since(startTime)) }()
 	if from < 0 {
 		return nil, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
 	}
@@ -151,6 +155,8 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 
 // ProcessCount return the number of processes indexed
 func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
+	startTime := time.Now()
+	defer func() { log.Debugf("ProcessCount took %s", time.Since(startTime)) }()
 	var c uint32
 	var err error
 	if len(entityID) == 0 {
