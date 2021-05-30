@@ -220,34 +220,21 @@ func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 		// If no processID is provided, count all envelopes
 		return atomic.LoadUint64(&s.countTotalEnvelopes), nil
 	}
-
-	// The DB's count operation can error, so the cache entry stores either
-	// a result uint64 or an error.
-	// If an error occurs, right now it's "sticky", in the sense that it
-	// remains there until the entry is evicted as per the LRU rules.
-
-	val := s.envelopeHeightCache.GetAndUpdate(string(processID), func(prev interface{}) interface{} {
-		if prev != nil {
-			// If it's already in the cache, use it as-is.
-			return prev
-		}
-		// TODO: Warning, int can overflow
-		count, err := s.db.Count(&indexertypes.VoteReference{},
-			badgerhold.Where("ProcessID").Eq(processID).Index("ProcessID"))
-		if err != nil {
-			return err
-		}
-		return uint64(count)
-	})
-
-	switch val := val.(type) {
-	case error:
-		return 0, val
-	case uint64:
-		return val, nil
-	default:
-		panic(fmt.Sprintf("unexpected type: %T", val))
+	// Check if the envelope height is cached
+	val := s.envelopeHeightCache.Get(string(processID))
+	if val != nil {
+		return val.(uint64), nil
 	}
+	// If not cached, make the expensive query
+	results := &indexertypes.Results{}
+	if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).Eq(processID)); err != nil {
+		return 0, err
+	}
+	// If final, store them in cache (won't change anymore)
+	if results.Final {
+		s.envelopeHeightCache.Add(string(processID), results.EnvelopeHeight)
+	}
+	return results.EnvelopeHeight, nil
 }
 
 // ComputeResult process a finished voting, compute the results and saves it in the Storage.
@@ -273,7 +260,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	maxTries := 1000
 	for {
 		if err := s.db.UpdateMatching(&indexertypes.Process{},
-			badgerhold.Where("ID").Eq(processID),
+			badgerhold.Where(badgerhold.Key).Eq(processID),
 			func(record interface{}) error {
 				update, ok := record.(*indexertypes.Process)
 				if !ok {
@@ -402,6 +389,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.In
 	} else {
 		// If encrypted, just add the weight
 		results.Weight.Add(results.Weight, weight)
+		results.EnvelopeHeight++
 	}
 	return nil
 }
@@ -458,13 +446,17 @@ func (s *Scrutinizer) commitVotes(pid []byte,
 	return s.commitVotesUnsafe(pid, partialResults, height)
 }
 
-// commitVotesUnsafe does the same as commitVotes but its unsafe, use commitVotes instead.
+// commitVotesUnsafe does the same as commitVotes but it does not use locks.
 func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 	partialResults *indexertypes.Results, height uint32) error {
 	update := func(record interface{}) error {
 		stored, ok := record.(*indexertypes.Results)
 		if !ok {
 			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+		}
+		// If already final, don't update.
+		if stored.Final {
+			return nil
 		}
 		return stored.Add(partialResults)
 	}
@@ -475,7 +467,7 @@ func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 	maxTries := 1000
 	for maxTries > 0 {
 		err = s.db.UpdateMatching(&indexertypes.Results{},
-			badgerhold.Where("ProcessID").Eq(pid).And("Final").Eq(false), update)
+			badgerhold.Where(badgerhold.Key).Eq(pid), update)
 		if err == nil {
 			break
 		}
@@ -513,7 +505,7 @@ func (s *Scrutinizer) computeFinalResults(p *indexertypes.Process) (*indexertype
 		Final:        true,
 		VoteOpts:     p.VoteOpts,
 		EnvelopeType: p.Envelope,
-		Height:       s.App.Height(),
+		BlockHeight:  s.App.Height(),
 	}
 
 	var nvotes uint64
@@ -561,6 +553,7 @@ func (s *Scrutinizer) computeFinalResults(p *indexertypes.Process) (*indexertype
 		log.Infof("computed results for process %x with %d votes", p.ID, nvotes)
 		log.Debugf("results: %s", results)
 	}
+	results.EnvelopeHeight = nvotes
 	return results, err
 }
 

@@ -18,14 +18,15 @@ const (
 )
 
 type Results struct {
-	ProcessID    types.HexBytes `badgerholdKey:"ProcessID"`
-	Votes        [][]*big.Int
-	Weight       *big.Int
-	EnvelopeType *models.EnvelopeType       `json:"envelopeType"`
-	VoteOpts     *models.ProcessVoteOptions `json:"voteOptions"`
-	Signatures   []types.HexBytes
-	Final        bool
-	Height       uint32
+	ProcessID      types.HexBytes `badgerholdKey:"ProcessID"`
+	Votes          [][]*big.Int
+	Weight         *big.Int
+	EnvelopeHeight uint64
+	EnvelopeType   *models.EnvelopeType       `json:"envelopeType"`
+	VoteOpts       *models.ProcessVoteOptions `json:"voteOptions"`
+	Signatures     []types.HexBytes
+	Final          bool
+	BlockHeight    uint32
 }
 
 func (r *Results) String() string {
@@ -47,9 +48,11 @@ func (r *Results) String() string {
 // containing Results making the method call.
 func (r *Results) Add(new *Results) error {
 	r.Weight.Add(r.Weight, new.Weight)
-	if new.Height > r.Height {
-		r.Height = new.Height
+	if new.BlockHeight > r.BlockHeight {
+		r.BlockHeight = new.BlockHeight
 	}
+	r.EnvelopeHeight += new.EnvelopeHeight
+	// Update votes only if present
 	if len(new.Votes) == 0 {
 		return nil
 	}
@@ -146,6 +149,8 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 	if len(r.Votes) == 0 {
 		r.Votes = NewEmptyVotes(int(r.VoteOpts.MaxCount), int(r.VoteOpts.MaxValue)+1)
 	}
+	// Increase EnvelopeHeight by the number of votes added
+	r.EnvelopeHeight++
 
 	// If MaxValue is zero, consider discrete value couting. So for each questoin, the value
 	// is aggregated. The weight is multiplied for the value if costFromWeight=False.

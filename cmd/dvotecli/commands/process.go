@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -199,12 +200,12 @@ func getResults(cmd *cobra.Command, args []string) error {
 	if !resp.Ok {
 		return fmt.Errorf(resp.Message)
 	}
-	buffer := new(bytes.Buffer)
-	for _, res := range resp.Results {
-		fmt.Fprintf(buffer, "%v\n", res)
+	jresp, err := json.MarshalIndent(resp, "", " ")
+	if err != nil {
+		return err
 	}
-	fmt.Print(buffer.String())
-	return err
+	fmt.Printf("%s\n", jresp)
+	return nil
 }
 
 func getResultsWeight(cmd *cobra.Command, args []string) error {

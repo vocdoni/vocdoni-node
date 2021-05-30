@@ -63,7 +63,7 @@ type Scrutinizer struct {
 	db             *badgerhold.Store
 	// envelopeHeightCache and countTotalEnvelopes are in memory counters that helps reducing the
 	// access time when GenEnvelopeHeight() is called.
-	envelopeHeightCache *lru.AtomicCache
+	envelopeHeightCache *lru.Cache
 	countTotalEnvelopes uint64
 	countTotalEntities  int64
 	countTotalProcesses int64
@@ -119,7 +119,7 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 	s.countTotalProcesses = int64(processes)
 	// Subscrive to events
 	s.App.State.AddEventListener(s)
-	s.envelopeHeightCache = lru.NewAtomic(countEnvelopeCacheSize)
+	s.envelopeHeightCache = lru.New(countEnvelopeCacheSize)
 	s.resultsCache = lru.New(resultsCacheSize)
 	return s, nil
 }
@@ -284,13 +284,6 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	startTime = time.Now()
 
 	for pid, votes := range s.votePool {
-		// Update or set the cache of envelopes height by process ID
-		s.envelopeHeightCache.GetAndUpdate(pid, func(prev interface{}) interface{} {
-			if prev, ok := prev.(uint64); ok {
-				return prev + uint64(len(votes))
-			}
-			return uint64(len(votes))
-		})
 		// Get the process information
 		proc, err := s.ProcessInfo([]byte(pid))
 		if err != nil {
@@ -315,14 +308,10 @@ func (s *Scrutinizer) Commit(height uint32) error {
 				nvotes++
 			}
 		}
-		p := []byte(pid) // make a copy
-		go func() {
-			// The commit is run async because it might be blocking (due the Mutex locks)
-			// and since this is the more costly operation, avoid affecting the consensus time.
-			if err := s.commitVotes(p, results, s.App.Height()); err != nil {
-				log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
-			}
-		}()
+		// Commit votes (store to disk)
+		if err := s.commitVotes([]byte(pid), results, s.App.Height()); err != nil {
+			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
+		}
 	}
 	if nvotes > 0 {
 		log.Infof("added %d live votes on block %d, took %s",

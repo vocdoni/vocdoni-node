@@ -391,6 +391,8 @@ func (r *Router) getResults(request RouterRequest) {
 	}
 	response.Results = scrutinizer.GetFriendlyResults(vr.Votes)
 	response.Final = &vr.Final
+	h := uint32(vr.EnvelopeHeight)
+	response.Height = &h
 	// Get total number of votes (including invalid/null)
 	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
