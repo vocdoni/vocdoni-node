@@ -306,7 +306,10 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 
 // GetResults returns the current result for a processId
 func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error) {
-	// Check if results are in cache and return them
+	// Check if results are in cache and return them.
+	// Note that we don't use an atomic cache,
+	// since that would mean always inserting into the cache.
+	// TODO: remove this cache once we replace badgerhold
 	val := s.resultsCache.Get(string(processID))
 	if val != nil {
 		return val.(*indexertypes.Results), nil
