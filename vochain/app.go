@@ -350,6 +350,9 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			log.Debugf("rejected tx: %v", err)
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
+		for _, e := range app.State.eventListeners {
+			e.OnNewTx(uint32(app.State.TxCounter()), app.State.height)
+		}
 	} else {
 		return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 	}

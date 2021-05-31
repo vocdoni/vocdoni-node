@@ -256,6 +256,11 @@ func (k *KeyKeeper) OnVote(v *models.Vote, txindex int32) {
 	// do nothing
 }
 
+// OnNewTx is not used by the KeyKeeper
+func (k *KeyKeeper) OnNewTx(blockHeight, txIndex uint32) {
+	// do nothing
+}
+
 // OnProcessStatusChange will publish the private
 // and reveal keys of the ended process, if required
 func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {

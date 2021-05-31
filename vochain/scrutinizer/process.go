@@ -154,19 +154,19 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 }
 
 // ProcessCount return the number of processes indexed
-func (s *Scrutinizer) ProcessCount(entityID []byte) int64 {
+func (s *Scrutinizer) ProcessCount(entityID []byte) uint64 {
 	startTime := time.Now()
 	defer func() { log.Debugf("ProcessCount took %s", time.Since(startTime)) }()
 	var c uint32
 	var err error
 	if len(entityID) == 0 {
 		// If no entity ID, return the cached count of all processes
-		return atomic.LoadInt64(&s.countTotalProcesses)
+		return atomic.LoadUint64(&s.countTotalProcesses)
 	}
 	if c, err = s.EntityProcessCount(entityID); err != nil {
 		log.Warnf("processCount: cannot fetch entity process count: %v", err)
 	}
-	return int64(c)
+	return uint64(c)
 }
 
 // EntityList returns the list of entities indexed by the scrutinizer
@@ -198,8 +198,8 @@ func (s *Scrutinizer) EntityProcessCount(entityId []byte) (uint32, error) {
 }
 
 // EntityCount return the number of entities indexed by the scrutinizer
-func (s *Scrutinizer) EntityCount() int64 {
-	return atomic.LoadInt64(&s.countTotalEntities)
+func (s *Scrutinizer) EntityCount() uint64 {
+	return atomic.LoadUint64(&s.countTotalEntities)
 }
 
 // Return whether a process must have live results or not
@@ -267,7 +267,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	s.addVoteLock.Unlock()
 
 	// Increment the total process count cache
-	atomic.AddInt64(&s.countTotalProcesses, 1)
+	atomic.AddUint64(&s.countTotalProcesses, 1)
 
 	// Get the block time from the Header
 	currentBlockTime := time.Unix(s.App.State.Header(false).Timestamp, 0)
@@ -283,7 +283,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		entity.ID = eid
 		entity.CreationTime = currentBlockTime
 		entity.ProcessCount = 0
-		atomic.AddInt64(&s.countTotalEntities, 1)
+		atomic.AddUint64(&s.countTotalEntities, 1)
 	}
 	// Increase the entity process count (and create new entity if does not exist)
 	entity.ProcessCount++
