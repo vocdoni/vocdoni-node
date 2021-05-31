@@ -267,6 +267,7 @@ type VochainStats struct {
 	EntityCount      int64     `json:"entity_count"`
 	EnvelopeCount    uint64    `json:"envelope_count"`
 	ProcessCount     int64     `json:"process_count"`
+	TransactionCount uint64    `json:"transaction_count"`
 	ValidatorCount   int       `json:"validator_count"`
 	BlockTime        [5]int32  `json:"block_time"`
 	BlockTimeStamp   int32     `json:"block_time_stamp"`

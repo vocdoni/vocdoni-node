@@ -153,7 +153,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 	return procs, err
 }
 
-// ProcessCount return the number of processes indexed
+// ProcessCount returns the number of processes indexed
 func (s *Scrutinizer) ProcessCount(entityID []byte) uint64 {
 	startTime := time.Now()
 	defer func() { log.Debugf("ProcessCount took %s", time.Since(startTime)) }()

@@ -351,7 +351,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
 		for _, e := range app.State.eventListeners {
-			e.OnNewTx(uint32(app.State.TxCounter()), app.State.height)
+			e.OnNewTx(app.State.height+1, uint32(app.State.TxCounter()))
 		}
 	} else {
 		return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}

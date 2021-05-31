@@ -22,6 +22,7 @@ func (r *Router) getStats(request RouterRequest) {
 		log.Warnf("could not count vote envelopes: %s", err)
 	}
 	stats.ProcessCount = int64(r.Scrutinizer.ProcessCount([]byte{}))
+	stats.TransactionCount = r.Scrutinizer.TransactionCount()
 	vals, _ := r.vocapp.State.Validators(true)
 	stats.ValidatorCount = len(vals)
 	stats.BlockTime = *r.vocinfo.BlockTimes()
@@ -126,6 +127,31 @@ func (r *Router) getTx(request RouterRequest) {
 		Index:     request.TxIndex,
 		Hash:      hash,
 		Signature: tx.Signature,
+	}
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
+}
+
+func (r *Router) getTxByHeight(request RouterRequest) {
+	var response api.MetaResponse
+	txRef, err := r.Scrutinizer.GetTxReference(uint64(request.Height))
+	if err != nil {
+		r.SendError(request, fmt.Sprintf("cannot get tx reference for height %d: %v",
+			request.Height, err))
+		return
+	}
+	tx, hash, err := r.Scrutinizer.App.GetTxHash(txRef.BlockHeight, int32(txRef.Index))
+	if err != nil {
+		r.SendError(request, fmt.Sprintf("cannot get tx: %v", err))
+		return
+	}
+	response.Tx = &indexertypes.TxPackage{
+		Tx:          tx.Tx,
+		Index:       int32(txRef.Index),
+		BlockHeight: txRef.BlockHeight,
+		Hash:        hash,
+		Signature:   tx.Signature,
 	}
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)

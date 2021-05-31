@@ -88,6 +88,7 @@ func (r *Router) EnableIndexerAPI(vocapp *vochain.BaseApplication,
 	r.RegisterPublic("getBlockByHash", r.getBlockByHash)
 	r.RegisterPublic("getBlockList", r.getBlockList)
 	r.RegisterPublic("getTx", r.getTx)
+	r.RegisterPublic("getTxByHeight", r.getTxByHeight)
 	r.RegisterPublic("getValidatorList", r.getValidatorList)
 	r.RegisterPublic("getTxListForBlock", r.getTxListForBlock)
 }

@@ -367,19 +367,6 @@ func (s *Scrutinizer) OnVote(v *models.Vote, txIndex int32) {
 	s.voteIndexPool = append(s.voteIndexPool, &VoteWithIndex{vote: v, txIndex: txIndex})
 }
 
-// OnNewTx does nothing
-func (s *Scrutinizer) OnNewTx(blockHeight, txIndex uint32) {
-	txCount := atomic.AddUint64(&s.countTotalTransactions, 1)
-	err := s.db.Insert(txCount, indexertypes.TxReference{
-		Index:        txCount,
-		BlockHeight:  blockHeight,
-		TxBlockIndex: txIndex,
-	})
-	if err != nil {
-		log.Errorf("cannot store tx at height %d: %v", txCount, err)
-	}
-}
-
 // OnCancel scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnCancel(pid []byte, txIndex int32) {
 	s.updateProcessPool = append(s.updateProcessPool, pid)
