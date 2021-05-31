@@ -230,7 +230,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 	return nil
 }
 
-// GetProcessResults return a friendly representation of the results stored in the State (if any).
+// GetProcessResults returns a friendly representation of the results stored in the State (if any).
 func (v *State) GetProcessResults(pid []byte) ([][]string, error) {
 	// TO-DO (pau): use a LRU cache for results
 	process, err := v.Process(pid, true)
@@ -243,6 +243,7 @@ func (v *State) GetProcessResults(pid []byte) ([][]string, error) {
 	return GetFriendlyResults(process.Results.GetVotes()), nil
 }
 
+// SetProcessCensus sets the census for a given process, only if that process enables dynamic census
 func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commit bool) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
@@ -287,7 +288,8 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
-func NewProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (*models.Process, error) {
+func NewProcessTxCheck(vtx *models.Tx, txBytes,
+	signature []byte, state *State) (*models.Process, error) {
 	tx := vtx.GetNewProcess()
 	if tx.Process == nil {
 		return nil, fmt.Errorf("process data is empty")

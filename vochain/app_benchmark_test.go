@@ -38,7 +38,8 @@ func BenchmarkCheckTx(b *testing.B) {
 	})
 }
 
-func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int, tmpDir string) (voters []*models.SignedTx) {
+func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
+	nvoters int, tmpDir string) (voters []*models.SignedTx) {
 	tr, err := tree.NewTree(util.RandomHex(12), tmpDir)
 	if err != nil {
 		b.Fatal(err)
@@ -56,7 +57,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int, tmpDir
 		}
 		claims = append(claims, string(c))
 	}
-	censusURI := "ipfs://123456789"
+	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
 	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
@@ -80,9 +81,10 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication, nvoters int, tmpDir
 			b.Fatal(err)
 		}
 		tx := &models.VoteEnvelope{
-			Nonce:       util.RandomBytes(16),
-			ProcessId:   pid,
-			Proof:       &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{Siblings: proof}}},
+			Nonce:     util.RandomBytes(16),
+			ProcessId: pid,
+			Proof: &models.Proof{Payload: &models.Proof_Graviton{
+				Graviton: &models.ProofGraviton{Siblings: proof}}},
 			VotePackage: []byte("{[\"1\",\"2\",\"3\"]}"),
 		}
 

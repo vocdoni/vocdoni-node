@@ -137,7 +137,8 @@ func NewTenderLogger(artifact string, disabled bool) *TenderLogger {
 }
 
 // we need to set init (first time validators and oracles)
-func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis []byte) (*nm.Node, error) {
+func newTendermint(app *BaseApplication,
+	localConfig *config.VochainCfg, genesis []byte) (*nm.Node, error) {
 	// create node config
 	var err error
 
@@ -162,7 +163,8 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 	if !localConfig.CreateGenesis {
 		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
-		if _, ok := Genesis[localConfig.Chain]; len(tconfig.P2P.Seeds) < 8 && !localConfig.SeedMode && ok {
+		if _, ok := Genesis[localConfig.Chain]; len(tconfig.P2P.Seeds) < 8 &&
+			!localConfig.SeedMode && ok {
 			tconfig.P2P.Seeds = strings.Join(Genesis[localConfig.Chain].SeedNodes, ",")
 		}
 		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
@@ -238,7 +240,8 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg, genesis
 		logDisable = true
 		tconfig.LogLevel = "error"
 	}
-	logger, err := tmflags.ParseLogLevel(tconfig.LogLevel, NewTenderLogger("tendermint", logDisable), tmcfg.DefaultLogLevel)
+	logger, err := tmflags.ParseLogLevel(tconfig.LogLevel,
+		NewTenderLogger("tendermint", logDisable), tmcfg.DefaultLogLevel)
 	if err != nil {
 		log.Errorf("failed to parse log level: %v", err)
 	}

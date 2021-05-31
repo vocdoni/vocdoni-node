@@ -310,7 +310,8 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}
 
-	if authorized, addr, err := verifySignatureAgainstOracles(oracles, txBytes, signature); err != nil {
+	if authorized, addr, err := verifySignatureAgainstOracles(
+		oracles, txBytes, signature); err != nil {
 		return err
 	} else if !authorized {
 		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())
@@ -346,11 +347,13 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 				return fmt.Errorf("cannot add process keys to a process that has started or finished")
 			}
 			// process is not canceled
-			if process.Status == models.ProcessStatus_CANCELED || process.Status == models.ProcessStatus_ENDED ||
+			if process.Status == models.ProcessStatus_CANCELED ||
+				process.Status == models.ProcessStatus_ENDED ||
 				process.Status == models.ProcessStatus_RESULTS {
 				return fmt.Errorf("cannot add process keys to a %s process", process.Status)
 			}
-			if len(process.EncryptionPublicKeys[*tx.KeyIndex])+len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
+			if len(process.EncryptionPublicKeys[*tx.KeyIndex])+
+				len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
 				return fmt.Errorf("keys for process %x already revealed", tx.ProcessId)
 			}
 			// check included keys and keyindex are valid
@@ -363,7 +366,8 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 			}
 			// check process is finished
 			if height < process.StartBlock+process.BlockCount &&
-				!(process.Status == models.ProcessStatus_ENDED || process.Status == models.ProcessStatus_CANCELED) {
+				!(process.Status == models.ProcessStatus_ENDED ||
+					process.Status == models.ProcessStatus_CANCELED) {
 				return fmt.Errorf("cannot reveal keys before the process is finished")
 			}
 			if len(process.EncryptionPrivateKeys[*tx.KeyIndex])+len(process.RevealKeys[*tx.KeyIndex]) > 0 {
@@ -376,7 +380,9 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 		}
 	case models.TxType_ADD_ORACLE:
 		// check not empty, correct length and not 0x0 addr
-		if (bytes.Equal(tx.Address, []byte{})) || (len(tx.Address) != types.EthereumAddressSize) || (bytes.Equal(tx.Address, common.Address{}.Bytes())) {
+		if (bytes.Equal(tx.Address, []byte{})) ||
+			(len(tx.Address) != types.EthereumAddressSize) ||
+			(bytes.Equal(tx.Address, common.Address{}.Bytes())) {
 			return fmt.Errorf("invalid oracle address: %x", tx.Address)
 		}
 		for idx, oracle := range oracles {
@@ -386,7 +392,9 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 		}
 	case models.TxType_REMOVE_ORACLE:
 		// check not empty, correct length and not 0x0 addr
-		if (bytes.Equal(tx.Address, []byte{})) || (len(tx.Address) != types.EthereumAddressSize) || (bytes.Equal(tx.Address, common.Address{}.Bytes())) {
+		if (bytes.Equal(tx.Address, []byte{})) ||
+			(len(tx.Address) != types.EthereumAddressSize) ||
+			(bytes.Equal(tx.Address, common.Address{}.Bytes())) {
 			return fmt.Errorf("invalid oracle address: %x", tx.Address)
 		}
 		var found bool
@@ -408,11 +416,13 @@ func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		return fmt.Errorf("key index is nil")
 	}
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if (tx.CommitmentKey == nil && tx.EncryptionPublicKey == nil) || *tx.KeyIndex < 1 || *tx.KeyIndex > types.KeyKeeperMaxKeyIndex {
+	if (tx.CommitmentKey == nil && tx.EncryptionPublicKey == nil) ||
+		*tx.KeyIndex < 1 || *tx.KeyIndex > types.KeyKeeperMaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex is not already used
-	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) > 0 || len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
+	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) > 0 ||
+		len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
 		return fmt.Errorf("key index %d already exists", tx.KeyIndex)
 	}
 	// TBD check that provided keys are correct (ed25519 for encryption and size for Commitment)
@@ -424,11 +434,13 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		return fmt.Errorf("key index is nil")
 	}
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if (tx.RevealKey == nil && tx.EncryptionPrivateKey == nil) || *tx.KeyIndex < 1 || *tx.KeyIndex > types.KeyKeeperMaxKeyIndex {
+	if (tx.RevealKey == nil && tx.EncryptionPrivateKey == nil) ||
+		*tx.KeyIndex < 1 || *tx.KeyIndex > types.KeyKeeperMaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex exists
-	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) < 1 || len(process.CommitmentKeys[*tx.KeyIndex]) < 1 {
+	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) < 1 ||
+		len(process.CommitmentKeys[*tx.KeyIndex]) < 1 {
 		return fmt.Errorf("key index %d does not exist", *tx.KeyIndex)
 	}
 	// check keys actually work

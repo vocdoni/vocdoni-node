@@ -35,7 +35,8 @@ import (
 // CheckProof checks the validity of a census proof (depending on the origin).
 // key is the data to be proof in behalf the censusRoot.
 // In case of weighted proof, this function will return the weight as second parameter.
-func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoot, processID, key []byte) (bool, *big.Int, error) {
+func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin,
+	censusRoot, processID, key []byte) (bool, *big.Int, error) {
 	switch censusOrigin {
 	case models.CensusOrigin_OFF_CHAIN_TREE:
 		switch proof.Payload.(type) {
@@ -53,7 +54,8 @@ func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin, censusRoo
 	case models.CensusOrigin_OFF_CHAIN_CA:
 		p := proof.GetCa()
 		if !bytes.Equal(p.Bundle.Address, key) {
-			return false, nil, fmt.Errorf("CA bundle address and key do not match: %x != %x", key, p.Bundle.Address)
+			return false, nil, fmt.Errorf(
+				"CA bundle address and key do not match: %x != %x", key, p.Bundle.Address)
 		}
 		if !bytes.Equal(p.Bundle.ProcessId, processID) {
 			return false, nil, fmt.Errorf("CA bundle processID does not match")
@@ -209,7 +211,8 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
 }
 
 // NewGenesis creates a new genesis and return its bytes
-func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *ConsensusParams, validators []privval.FilePV, oracles []string) ([]byte, error) {
+func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *ConsensusParams,
+	validators []privval.FilePV, oracles []string) ([]byte, error) {
 	// default consensus params
 	appState := new(GenesisAppState)
 	appState.Validators = make([]GenesisValidator, len(validators))

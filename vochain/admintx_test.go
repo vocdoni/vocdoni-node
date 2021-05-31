@@ -124,7 +124,8 @@ func TestRemoveOracle(t *testing.T) {
 	}
 }
 
-func testRemoveOracle(t *testing.T, oracle *ethereum.SignKeys, app *BaseApplication, newOracle common.Address) error {
+func testRemoveOracle(t *testing.T, oracle *ethereum.SignKeys,
+	app *BaseApplication, newOracle common.Address) error {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx

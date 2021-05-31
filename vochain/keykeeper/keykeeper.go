@@ -50,6 +50,7 @@ type processKeys struct {
 	index         int8
 }
 
+// Encode encodes processKeys to bytes
 func (pk *processKeys) Encode() []byte {
 	data := make([]byte, commitmentKeySize*2+encryptionKeySize*2+1)
 	i := 0
@@ -69,6 +70,7 @@ func (pk *processKeys) Encode() []byte {
 	return data
 }
 
+// Decode decodes processKeys from data
 func (pk *processKeys) Decode(data []byte) error {
 	if len(data) < commitmentKeySize*2+encryptionKeySize*2+1 {
 		return fmt.Errorf("cannot decode, data too small")
@@ -91,6 +93,7 @@ func (pk *processKeys) Decode(data []byte) error {
 	return nil
 }
 
+// NewKeyKeeper registers a new keyKeeper to the vochain
 func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
 	signer *ethereum.SignKeys, index int8) (*KeyKeeper, error) {
 	if v == nil || signer == nil || len(dbPath) < 1 {
@@ -272,15 +275,19 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 	}
 }
 
+// OnProcessKeys does nothing
 func (k *KeyKeeper) OnProcessKeys(pid []byte, pub, com string, txindex int32) {
 	// do nothing
 }
 
+// OnRevealKeys does nothing
 func (k *KeyKeeper) OnRevealKeys(pid []byte, priv, rev string, txindex int32) {
 	// do nothing
 }
 
-func (k *KeyKeeper) OnProcessResults(pid []byte, results []*models.QuestionResult, txindex int32) error {
+// OnProcessResults does nothing
+func (k *KeyKeeper) OnProcessResults(pid []byte,
+	results []*models.QuestionResult, txindex int32) error {
 	// do nothing
 	return nil
 }
@@ -393,6 +400,7 @@ func (k *KeyKeeper) checkRevealProcess(height uint32) {
 	}
 }
 
+// publishPendingKeys publishes each key in the keyPool
 func (k *KeyKeeper) publishPendingKeys() {
 	for pid, pk := range k.keyPool {
 		if err := k.publishKeys(pk, pid); err != nil {
@@ -429,6 +437,7 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 }
 
 // Insecure
+// revealKeys reveals the keys for a given process
 func (k *KeyKeeper) revealKeys(pid string) error {
 	/*	dbKey := []byte(dbPrefixProcess + pid)
 		data, err := k.storage.Get(dbKey)

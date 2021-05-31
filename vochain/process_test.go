@@ -13,6 +13,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const ipfsUrl = "ipfs://123456789"
+
 func TestProcessSetStatusTransition(t *testing.T) {
 	app, err := NewBaseApplication(t.TempDir())
 	if err != nil {
@@ -27,7 +29,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 	}
 
 	// Add a process with status=READY and interruptible=true
-	censusURI := "ipfs://123456789"
+	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
@@ -78,7 +80,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 	}
 
 	// Add a process with status=PAUSED and interruptible=true
-	censusURI = "ipfs://123456789"
+	censusURI = ipfsUrl
 	pid = util.RandomBytes(types.ProcessIDsize)
 	process = &models.Process{
 		ProcessId:    pid,
@@ -126,7 +128,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 	}
 
 	// Add a process with status=PAUSE and interruptible=false
-	censusURI = "ipfs://123456789"
+	censusURI = ipfsUrl
 	pid = util.RandomBytes(types.ProcessIDsize)
 	process = &models.Process{
 		ProcessId:    pid,
@@ -163,7 +165,8 @@ func TestProcessSetStatusTransition(t *testing.T) {
 	}
 }
 
-func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys, app *BaseApplication, status *models.ProcessStatus) error {
+func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
+	app *BaseApplication, status *models.ProcessStatus) error {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx
@@ -218,7 +221,7 @@ func TestProcessSetResultsTransition(t *testing.T) {
 	}
 
 	// Add a process with status=READY and interruptible=true
-	censusURI := "ipfs://123456789"
+	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
@@ -290,7 +293,8 @@ func TestProcessSetResultsTransition(t *testing.T) {
 	}
 }
 
-func testSetProcessResults(t *testing.T, pid []byte, oracle *ethereum.SignKeys, app *BaseApplication, results *models.ProcessResult) error {
+func testSetProcessResults(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
+	app *BaseApplication, results *models.ProcessResult) error {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx
@@ -344,7 +348,7 @@ func TestProcessSetCensusTransition(t *testing.T) {
 	}
 
 	// Add a process with status=READY and interruptible=true
-	censusURI := "ipfs://123456789"
+	censusURI := ipfsUrl
 	censusURI2 := "ipfs://987654321"
 	pid := util.RandomBytes(types.ProcessIDsize)
 	pid2 := util.RandomBytes(types.ProcessIDsize)
@@ -420,7 +424,8 @@ func TestProcessSetCensusTransition(t *testing.T) {
 	}
 }
 
-func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys, app *BaseApplication, censusRoot []byte, censusURI *string) error {
+func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
+	app *BaseApplication, censusRoot []byte, censusURI *string) error {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx

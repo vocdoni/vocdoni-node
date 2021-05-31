@@ -44,7 +44,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	lastProof := proofs[len(proofs)-1]
 	proofs = proofs[:len(proofs)-2]
 
-	censusURI := "ipfs://123456789"
+	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
@@ -152,7 +152,6 @@ func TestMerkleTreeProof(t *testing.T) {
 		cktxresp = app.CheckTx(cktx)
 		if i == 0 && cktxresp.Code != 0 {
 			t.Fatalf("checkTx returned err on first valid vote: %s", cktxresp.Data)
-
 		}
 		if i > 0 && cktxresp.Code == 0 {
 			t.Fatalf("checkTx returned 0, an error was expected")

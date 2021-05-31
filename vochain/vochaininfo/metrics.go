@@ -53,6 +53,7 @@ var (
 	})
 )
 
+// registerMetrics registers each of the vochain prometheus metrics
 func (vi *VochainInfo) registerMetrics(ma *metrics.Agent) {
 	ma.Register(VochainHeight)
 	ma.Register(VochainMempool)
@@ -63,6 +64,7 @@ func (vi *VochainInfo) registerMetrics(ma *metrics.Agent) {
 	ma.Register(VochainVoteCache)
 }
 
+// getMetrics updates the metrics values to the current state
 func (vi *VochainInfo) getMetrics() {
 	VochainHeight.Set(float64(vi.Height()))
 	VochainMempool.Set(float64(vi.MempoolSize()))

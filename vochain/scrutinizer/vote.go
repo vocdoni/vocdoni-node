@@ -494,7 +494,7 @@ func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 	return err
 }
 
-// computeFinalResults walks through the envelopes of a process and computes the results from scratch.
+// computeFinalResults walks through the envelopes of a process and computes the results.
 func (s *Scrutinizer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Results, error) {
 	if p == nil {
 		return nil, fmt.Errorf("process is nil")

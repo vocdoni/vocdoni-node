@@ -141,7 +141,8 @@ var Genesis = map[string]VochainGenesis{
 	// Development network
 	"dev": {
 		AutoUpdateGenesis: true,
-		SeedNodes:         []string{"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656"},
+		SeedNodes: []string{
+			"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656"},
 		Genesis: `
 {
    "genesis_time":"2021-05-12T12:43:28.668436552Z",
@@ -251,7 +252,8 @@ var Genesis = map[string]VochainGenesis{
 
 	"stage": {
 		AutoUpdateGenesis: true,
-		SeedNodes:         []string{"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656"},
+		SeedNodes: []string{
+			"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656"},
 		Genesis: `
 {
    "genesis_time":"2021-05-24T14:41:19.055210151Z",

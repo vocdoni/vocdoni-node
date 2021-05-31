@@ -35,6 +35,7 @@ type jsonStorage struct {
 	lock    sync.RWMutex
 }
 
+// NewJsonStorage opens a new jsonStorage file at the location provided by datadir
 func NewJsonStorage(datadir string) (*jsonStorage, error) {
 	err := os.MkdirAll(datadir, 0o750)
 	if err != nil {
@@ -43,6 +44,7 @@ func NewJsonStorage(datadir string) (*jsonStorage, error) {
 	return &jsonStorage{datadir: datadir}, nil
 }
 
+// AddProcess adds an entire process to js
 func (js *jsonStorage) AddProcess(p *Process) error {
 	if p == nil || p.Process == nil || len(p.Process.ProcessId) != types.ProcessIDsize {
 		return fmt.Errorf("process not valid")
@@ -93,10 +95,12 @@ func NewProcessArchive(v *vochain.BaseApplication, ipfs *data.IPFSHandle,
 	return ir, nil
 }
 
+// Rollback resets the pending process list
 func (i *ProcessArchive) Rollback() {
 	i.pprocs = []*Process{}
 }
 
+// Commit adds pending processes to the process archive
 func (i *ProcessArchive) Commit(height uint32) error {
 	for _, p := range i.pprocs {
 		if err := i.storage.AddProcess(p); err != nil {
@@ -116,6 +120,7 @@ func (i *ProcessArchive) Commit(height uint32) error {
 	return nil
 }
 
+// OnProcessResults adds the process & results to the pending process list
 func (i *ProcessArchive) OnProcessResults(pid []byte,
 	results []*models.QuestionResult, txindex int32) error {
 	process, err := i.vochain.State.Process(pid, false)
@@ -130,16 +135,29 @@ func (i *ProcessArchive) OnProcessResults(pid []byte,
 	return nil
 }
 
+// Close closes the process archive
 func (i *ProcessArchive) Close() {
 	i.close <- true
 }
 
 // NOT USED but required for implementing the interface
-func (i *ProcessArchive) OnCancel(pid []byte, txindex int32)                       {}
-func (i *ProcessArchive) OnVote(v *models.Vote, txindex int32)                     {}
+
+// OnCancel does nothing
+func (i *ProcessArchive) OnCancel(pid []byte, txindex int32) {}
+
+// OnCancOnVoteel does nothing
+func (i *ProcessArchive) OnVote(v *models.Vote, txindex int32) {}
+
+// OnProcessKeys does nothing
 func (i *ProcessArchive) OnProcessKeys(pid []byte, pub, com string, txindex int32) {}
+
+// OnRevealKeys does nothing
 func (i *ProcessArchive) OnRevealKeys(pid []byte, priv, rev string, txindex int32) {}
+
+// OnProcessStatusChange does nothing
 func (i *ProcessArchive) OnProcessStatusChange(pid []byte,
 	status models.ProcessStatus, txindex int32) {
 }
+
+// OnProcess does nothing
 func (i *ProcessArchive) OnProcess(pid, eid []byte, censusRoot, censusURI string, txindex int32) {}

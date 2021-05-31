@@ -11,10 +11,11 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// TBD: A startup process for importing on-going processe census
-// TBD: a mechanism for removing alyready finished census?
+// TBD: A startup process for importing on-going process census
+// TBD: a mechanism for removing already finished census?
 
-// CensusDownloader is a Vochain event handler aimed to fetch and import census when a new process is created
+// CensusDownloader is a Vochain event handler aimed to fetch and import census
+// when a new process is created
 type CensusDownloader struct {
 	vochain       *vochain.BaseApplication
 	census        *census.Manager
@@ -26,7 +27,8 @@ type CensusDownloader struct {
 
 // NewCensusDownloader creates a new instance of the census downloader daemon.
 // It will subscribe to Vochain events and perform the census import.
-func NewCensusDownloader(v *vochain.BaseApplication, c *census.Manager, importOnlyNew bool) *CensusDownloader {
+func NewCensusDownloader(v *vochain.BaseApplication,
+	c *census.Manager, importOnlyNew bool) *CensusDownloader {
 	cd := CensusDownloader{vochain: v, census: c, importOnlyNew: importOnlyNew}
 	cd.queue = make(map[string]string)
 	v.State.AddEventListener(&cd)
@@ -35,7 +37,8 @@ func NewCensusDownloader(v *vochain.BaseApplication, c *census.Manager, importOn
 
 // importcensus imports remote census
 func (c *CensusDownloader) importCensus(root, uri string) {
-	if !strings.HasPrefix(uri, c.census.RemoteStorage.URIprefix()) || len(root) == 0 || len(uri) <= len(c.census.RemoteStorage.URIprefix()) {
+	if !strings.HasPrefix(uri, c.census.RemoteStorage.URIprefix()) ||
+		len(root) == 0 || len(uri) <= len(c.census.RemoteStorage.URIprefix()) {
 		log.Warnf("census URI or root not valid: (%s,%s)", uri, root)
 		return
 	}
@@ -80,9 +83,11 @@ func (c *CensusDownloader) OnCancel(pid []byte, txindex int32)                  
 func (c *CensusDownloader) OnVote(v *models.Vote, txindex int32)                     {}
 func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string, txindex int32) {}
 func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string, txindex int32) {}
-func (c *CensusDownloader) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
+func (c *CensusDownloader) OnProcessStatusChange(pid []byte,
+	status models.ProcessStatus, txindex int32) {
 }
 
-func (c *CensusDownloader) OnProcessResults(pid []byte, results []*models.QuestionResult, txindex int32) error {
+func (c *CensusDownloader) OnProcessResults(pid []byte,
+	results []*models.QuestionResult, txindex int32) error {
 	return nil
 }
