@@ -12,6 +12,19 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+const (
+	Entities     = 0
+	Processes    = 1
+	Envelopes    = 2
+	Transactions = 3
+)
+
+// CountStore holds the count of envelopes, processes, entities, or transactions
+type CountStore struct {
+	Type  int `badgerholdKey:"Type"`
+	Count uint64
+}
+
 // Process represents an election process handled by the Vochain.
 // The scrutinizer Process data type is different from the vochain state data type
 // since it is optimized for querying purposes and not for keeping a shared consensus state.
@@ -103,6 +116,13 @@ type TxMetadata struct {
 	BlockHeight uint32         `json:"block_height,omitempty"`
 	Index       int32          `json:"index"`
 	Hash        types.HexBytes `json:"hash"`
+}
+
+// TxReference holds the db reference for a single transaction
+type TxReference struct {
+	Index        uint64 `badgerholdKey:"Index"`
+	BlockHeight  uint32
+	TxBlockIndex uint32
 }
 
 // BlockMetadata contains the metadata for a single tendermint block

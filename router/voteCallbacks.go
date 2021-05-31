@@ -254,7 +254,7 @@ func (r *Router) getProcessCount(request RouterRequest) {
 	var response api.MetaResponse
 	response.Size = new(int64)
 	count := r.Scrutinizer.ProcessCount(request.EntityId)
-	*response.Size = count
+	*response.Size = int64(count)
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
@@ -263,7 +263,7 @@ func (r *Router) getProcessCount(request RouterRequest) {
 func (r *Router) getEntityCount(request RouterRequest) {
 	var response api.MetaResponse
 	response.Size = new(int64)
-	*response.Size = r.Scrutinizer.EntityCount()
+	*response.Size = int64(r.Scrutinizer.EntityCount())
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}

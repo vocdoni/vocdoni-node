@@ -51,7 +51,7 @@ func testEntityList(t *testing.T, entityCount int) {
 		}
 	}
 	entities := make(map[string]bool)
-	if ec := sc.EntityCount(); ec != int64(entityCount) {
+	if ec := sc.EntityCount(); ec != uint64(entityCount) {
 		t.Fatalf("entity count is wrong, got %d expected %d", ec, entityCount)
 	}
 	var list []string

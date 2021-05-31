@@ -2,7 +2,6 @@ package scrutinizer
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -63,10 +62,11 @@ type Scrutinizer struct {
 	db             *badgerhold.Store
 	// envelopeHeightCache and countTotalEnvelopes are in memory counters that helps reducing the
 	// access time when GenEnvelopeHeight() is called.
-	envelopeHeightCache *lru.Cache
-	countTotalEnvelopes uint64
-	countTotalEntities  int64
-	countTotalProcesses int64
+	envelopeHeightCache    *lru.Cache
+	countTotalEnvelopes    uint64
+	countTotalEntities     uint64
+	countTotalProcesses    uint64
+	countTotalTransactions uint64
 	// resultsCache is a memory cache for final results results, stores processId:<results>
 	resultsCache *lru.Cache
 	// addVoteLock is used to avoid Transaction Conflicts on the KV database.
@@ -97,26 +97,44 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 		return nil, err
 	}
 	startTime := time.Now()
-	envelopes, err := s.db.Count(&indexertypes.VoteReference{}, &badgerhold.Query{})
+
+	txCountStore := new(indexertypes.CountStore)
+	err = s.db.FindOne(txCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Transactions))
 	if err != nil {
-		return nil, fmt.Errorf("could not count the total envelopes: %w", err)
+		log.Warnf("could not get the transaction count: %v", err)
 	}
-	entities, err := s.db.Count(&indexertypes.Entity{}, &badgerhold.Query{})
+	envelopeCountStore := new(indexertypes.CountStore)
+	err = s.db.FindOne(envelopeCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Envelopes))
 	if err != nil {
-		return nil, fmt.Errorf("could not count the total entities: %w", err)
+		log.Warnf("could not get the envelope count: %v", err)
 	}
-	processes, err := s.db.Count(&indexertypes.Process{}, &badgerhold.Query{})
+	processCountStore := new(indexertypes.CountStore)
+	err = s.db.FindOne(processCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Processes))
 	if err != nil {
-		return nil, fmt.Errorf("could not count the total processes: %w", err)
+		log.Warnf("could not get the process count: %v", err)
+	}
+	entityCountStore := new(indexertypes.CountStore)
+	err = s.db.FindOne(entityCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Entities))
+	if err != nil {
+		log.Warnf("could not get the entity count: %v", err)
 	}
 
-	log.Infof("indexer initialization took %s, stored %d envelopes and %d entities",
+	s.countTotalTransactions = txCountStore.Count
+	s.countTotalEnvelopes = envelopeCountStore.Count
+	s.countTotalProcesses = processCountStore.Count
+	s.countTotalEntities = entityCountStore.Count
+
+	log.Infof("indexer initialization took %s, stored %d "+
+		"transactions, %d envelopes, %d processes and %d entities",
 		time.Since(startTime),
-		envelopes,
-		entities)
-	s.countTotalEnvelopes = uint64(envelopes)
-	s.countTotalEntities = int64(entities)
-	s.countTotalProcesses = int64(processes)
+		s.countTotalTransactions,
+		s.countTotalEnvelopes,
+		s.countTotalProcesses,
+		s.countTotalEntities)
 	// Subscrive to events
 	s.App.State.AddEventListener(s)
 	s.envelopeHeightCache = lru.New(countEnvelopeCacheSize)
@@ -317,11 +335,11 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		log.Infof("added %d live votes on block %d, took %s",
 			nvotes, height, time.Since(startTime))
 	}
+	s.storeCountCaches()
 
 	// Check if there are processes that need results computing
 	// this can be run async
 	go s.computePendingProcesses(height)
-
 	return nil
 }
 
@@ -347,6 +365,19 @@ func (s *Scrutinizer) OnVote(v *models.Vote, txIndex int32) {
 		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
 	}
 	s.voteIndexPool = append(s.voteIndexPool, &VoteWithIndex{vote: v, txIndex: txIndex})
+}
+
+// OnNewTx does nothing
+func (s *Scrutinizer) OnNewTx(blockHeight, txIndex uint32) {
+	txCount := atomic.AddUint64(&s.countTotalTransactions, 1)
+	err := s.db.Insert(txCount, indexertypes.TxReference{
+		Index:        txCount,
+		BlockHeight:  blockHeight,
+		TxBlockIndex: txIndex,
+	})
+	if err != nil {
+		log.Errorf("cannot store tx at height %d: %v", txCount, err)
+	}
 }
 
 // OnCancel scrutinizer stores the processID and entityID
@@ -446,6 +477,35 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionRes
 	}()
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 	return nil
+}
+
+// storeCountCaches stores the transaction, envelope, process, and entity count
+// caches to the database
+func (s *Scrutinizer) storeCountCaches() {
+	if err := s.db.Upsert(indexertypes.Transactions, &indexertypes.CountStore{
+		Type:  indexertypes.Transactions,
+		Count: s.countTotalTransactions,
+	}); err != nil {
+		log.Errorf("cannot store transaction count: %v", err)
+	}
+	if err := s.db.Upsert(indexertypes.Envelopes, &indexertypes.CountStore{
+		Type:  indexertypes.Envelopes,
+		Count: s.countTotalEnvelopes,
+	}); err != nil {
+		log.Errorf("cannot store envelope count: %v", err)
+	}
+	if err := s.db.Upsert(indexertypes.Processes, &indexertypes.CountStore{
+		Type:  indexertypes.Processes,
+		Count: s.countTotalProcesses,
+	}); err != nil {
+		log.Errorf("cannot store process count: %v", err)
+	}
+	if err := s.db.Upsert(indexertypes.Entities, &indexertypes.CountStore{
+		Type:  indexertypes.Entities,
+		Count: s.countTotalEntities,
+	}); err != nil {
+		log.Errorf("cannot store entity count: %v", err)
+	}
 }
 
 // GetFriendlyResults translates votes into a matrix of strings

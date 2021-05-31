@@ -17,11 +17,11 @@ func (r *Router) getStats(request RouterRequest) {
 	stats := new(api.VochainStats)
 	stats.BlockHeight = r.vocapp.Height()
 	stats.BlockTimeStamp = int32(r.vocapp.State.Header(true).Timestamp)
-	stats.EntityCount = r.Scrutinizer.EntityCount()
+	stats.EntityCount = int64(r.Scrutinizer.EntityCount())
 	if stats.EnvelopeCount, err = r.Scrutinizer.GetEnvelopeHeight([]byte{}); err != nil {
 		log.Warnf("could not count vote envelopes: %s", err)
 	}
-	stats.ProcessCount = r.Scrutinizer.ProcessCount([]byte{})
+	stats.ProcessCount = int64(r.Scrutinizer.ProcessCount([]byte{}))
 	vals, _ := r.vocapp.State.Validators(true)
 	stats.ValidatorCount = len(vals)
 	stats.BlockTime = *r.vocinfo.BlockTimes()

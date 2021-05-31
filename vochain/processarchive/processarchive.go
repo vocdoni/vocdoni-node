@@ -148,6 +148,9 @@ func (i *ProcessArchive) OnCancel(pid []byte, txindex int32) {}
 // OnCancOnVoteel does nothing
 func (i *ProcessArchive) OnVote(v *models.Vote, txindex int32) {}
 
+// OnNewTx does nothing
+func (i *ProcessArchive) OnNewTx(blockHeight, txIndex uint32) {}
+
 // OnProcessKeys does nothing
 func (i *ProcessArchive) OnProcessKeys(pid []byte, pub, com string, txindex int32) {}
 
