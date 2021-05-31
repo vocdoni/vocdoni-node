@@ -115,6 +115,7 @@ type BlockMetadata struct {
 	ProposerAddress types.HexBytes `json:"proposer_address"`
 }
 
+// String prints the BlockMetadata in a human-readable format
 func (b *BlockMetadata) String() string {
 	v := reflect.ValueOf(b)
 	t := v.Type()

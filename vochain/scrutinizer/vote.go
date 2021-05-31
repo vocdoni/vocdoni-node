@@ -422,14 +422,17 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 	})
 }
 
+// addProcessToLiveResults adds the process id to the liveResultsProcs map
 func (s *Scrutinizer) addProcessToLiveResults(pid []byte) {
 	s.liveResultsProcs.Store(string(pid), true)
 }
 
+// delProcessFromLiveResults removes the process id from the liveResultsProcs map
 func (s *Scrutinizer) delProcessFromLiveResults(pid []byte) {
 	s.liveResultsProcs.Delete(string(pid))
 }
 
+// isProcessLiveResults returns true if the process id is in the liveResultsProcs map
 func (s *Scrutinizer) isProcessLiveResults(pid []byte) bool {
 	_, ok := s.liveResultsProcs.Load(string(pid))
 	return ok
@@ -491,6 +494,7 @@ func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 	return err
 }
 
+// computeFinalResults walks through the envelopes of a process and computes the results from scratch.
 func (s *Scrutinizer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Results, error) {
 	if p == nil {
 		return nil, fmt.Errorf("process is nil")
