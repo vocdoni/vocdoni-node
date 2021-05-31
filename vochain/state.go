@@ -113,6 +113,7 @@ func NewState(dataDir string) (*State, error) {
 	return vs, nil
 }
 
+// initStore initializes the state iavl tree
 func initStore(dataDir string, state *State) error {
 	log.Infof("initializing state db store")
 	state.Store = new(iavlstate.IavlState)
@@ -218,6 +219,7 @@ func (v *State) Oracles(isQuery bool) ([]common.Address, error) {
 	return oracles, err
 }
 
+// hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
 func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
 	var tmkey ed25519.PubKey
 	pubKeyBytes, err := hex.DecodeString(pubKey)
@@ -452,6 +454,8 @@ func (v *State) EnvelopeExists(processID, nullifier []byte, isQuery bool) (bool,
 	return e != nil, nil
 }
 
+// iterateProcessID iterates fn over state tree entries with the processID prefix.
+// if isQuery, the IAVL tree is used, otherwise the AVL tree is used.
 func (v *State) iterateProcessID(processID []byte,
 	fn func(key []byte, value []byte) bool, isQuery bool) bool {
 	v.RLock()
@@ -587,10 +591,12 @@ func (v *State) WorkingHash() []byte {
 	return v.Store.Hash()
 }
 
+// TxCounterAdd adds to the atomic transaction counter
 func (v *State) TxCounterAdd() {
 	atomic.AddInt32(&v.txCounter, 1)
 }
 
+// TxCounter returns the current tx count
 func (v *State) TxCounter() int32 {
 	return atomic.LoadInt32(&v.txCounter)
 }

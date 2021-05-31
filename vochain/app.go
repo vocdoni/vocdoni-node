@@ -177,7 +177,8 @@ func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedT
 }
 
 // GetTxHash retreives a vochain transaction, with its hash, from the blockstore
-func (app *BaseApplication) GetTxHash(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
+func (app *BaseApplication) GetTxHash(height uint32,
+	txIndex int32) (*models.SignedTx, []byte, error) {
 	block := app.GetBlockByHeight(int64(height))
 	if block == nil {
 		return nil, nil, fmt.Errorf("unable to get block by height: %d", height)
@@ -308,10 +309,12 @@ func (app *BaseApplication) BeginBlock(
 	return abcitypes.ResponseBeginBlock{}
 }
 
+// SetOption does nothing
 func (*BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
 	return abcitypes.ResponseSetOption{}
 }
 
+// CheckTx unmarshals req.Tx and checks its validity
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	var data []byte
 	var err error
@@ -332,6 +335,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 	return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 }
 
+// DeliverTx unmarshals req.Tx and adds it to the State if it is valid
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	var data []byte
 	var err error
@@ -352,16 +356,19 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	return abcitypes.ResponseDeliverTx{Code: 0, Data: data}
 }
 
+// Commit saves the current vochain state and returns a commit hash
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	return abcitypes.ResponseCommit{
 		Data: app.State.Save(),
 	}
 }
 
+// Query does nothing
 func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
 	return abcitypes.ResponseQuery{}
 }
 
+// EndBlock updates the app height and timestamp at the end of the current block
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	atomic.StoreUint32(&app.height, uint32(req.Height))
 	atomic.StoreInt64(&app.timestamp, time.Now().Unix())
@@ -388,6 +395,7 @@ func (app *BaseApplication) OfferSnapshot(
 	return abcitypes.ResponseOfferSnapshot{}
 }
 
+// TxKey computes the checksum of the tx
 func TxKey(tx tmtypes.Tx) [32]byte {
 	return sha256.Sum256(tx)
 }

@@ -11,6 +11,7 @@ const (
 	cacheNullPrefix = "n_"
 )
 
+// cacheGetNullifierKey appends the cacheNullPrefix to nullifier
 func cacheGetNullifierKey(nullifier []byte) string {
 	return cacheNullPrefix + string(nullifier)
 }

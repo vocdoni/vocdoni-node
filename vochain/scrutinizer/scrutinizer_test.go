@@ -337,7 +337,8 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected 0 processes, got %d", len(list))
 	}
 	// Search containing part of all manually-defined processes
-	list, err = sc.ProcessList(eidTest, 0, 10, "011d50537fa164b6fef261141797bbe4014526e", 0, "", "", false)
+	list, err = sc.ProcessList(eidTest, 0, 10,
+		"011d50537fa164b6fef261141797bbe4014526e", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -728,8 +729,9 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
 		return err
 	}
 	r := &indexertypes.Results{
-		ProcessID:    pid,
-		Votes:        indexertypes.NewEmptyVotes(int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
+		ProcessID: pid,
+		Votes: indexertypes.NewEmptyVotes(
+			int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
 		Weight:       new(big.Int).SetUint64(0),
 		Signatures:   []types.HexBytes{},
 		VoteOpts:     proc.VoteOpts,

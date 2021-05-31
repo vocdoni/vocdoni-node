@@ -74,7 +74,8 @@ func (vi *VochainInfo) MempoolSize() int {
 	return vi.mempoolSize
 }
 
-// VoteCacheSize returns the current number of validated votes waiting to be included in the blockchain
+// VoteCacheSize returns the current number of validated votes waiting to be
+// included in the blockchain
 func (vi *VochainInfo) VoteCacheSize() int {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
