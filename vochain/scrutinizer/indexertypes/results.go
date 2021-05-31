@@ -17,6 +17,7 @@ const (
 	MaxOptions = 128
 )
 
+// Results holds the final results and relevant process info for a vochain process
 type Results struct {
 	ProcessID      types.HexBytes `badgerholdKey:"ProcessID"`
 	Votes          [][]*big.Int
@@ -29,6 +30,7 @@ type Results struct {
 	BlockHeight    uint32
 }
 
+// String formats the results in a human-readable string
 func (r *Results) String() string {
 	results := bytes.Buffer{}
 	for _, q := range r.Votes {
@@ -187,6 +189,7 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 	return nil
 }
 
+// NewEmptyVotes creates a new results struct with the given number of questions and options
 func NewEmptyVotes(questions, options int) [][]*big.Int {
 	if questions == 0 || options == 0 {
 		return nil

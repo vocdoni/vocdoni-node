@@ -4,6 +4,7 @@ import (
 	"github.com/timshannon/badgerhold/v3"
 )
 
+// InitDB initializes a badgerhold db at the location given by dataDir
 func InitDB(dataDir string) (*badgerhold.Store, error) {
 	opts := badgerhold.DefaultOptions
 	opts.WithCompression(0)

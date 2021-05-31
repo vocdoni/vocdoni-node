@@ -377,6 +377,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 	return nil
 }
 
+// setResultsHeight updates the Rheight of any process whose ID is pid.
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
 	return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
 		func(record interface{}) error {
@@ -389,6 +390,8 @@ func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
 		})
 }
 
+// searchMatchFunc generates a function which compares a badgerhold record against searchTerm.
+// The record should be types.HexBytes, and is encoded as a string to compare to searchTerm.
 func searchMatchFunc(searchTerm string) func(r *badgerhold.RecordAccess) (bool, error) {
 	return func(r *badgerhold.RecordAccess) (bool, error) {
 		if searchTerm == "" {

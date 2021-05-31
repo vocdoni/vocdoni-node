@@ -359,6 +359,7 @@ func (s *Scrutinizer) OnProcessKeys(pid []byte, pub, commit string, txIndex int3
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
+// OnProcessStatusChange adds the process to the updateProcessPool and, if ended, the resultsPool
 func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
 	txIndex int32) {
 	if status == models.ProcessStatus_ENDED {
@@ -391,6 +392,7 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string, txIndex int3
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
+// OnProcessResults verifies the results for  a process and appends it to the updateProcessPool
 func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionResult,
 	txIndex int32) error {
 	// TODO: check results are valid and return an error if not.
@@ -446,6 +448,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionRes
 	return nil
 }
 
+// GetFriendlyResults translates votes into a matrix of strings
 func GetFriendlyResults(votes [][]*big.Int) [][]string {
 	r := [][]string{}
 	for i := range votes {
