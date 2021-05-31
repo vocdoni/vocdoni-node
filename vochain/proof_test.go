@@ -223,7 +223,9 @@ func TestCAProof(t *testing.T) {
 
 	// Test invalid vote
 	k := ethereum.SignKeys{}
-	k.Generate()
+	if err := k.Generate(); err != nil {
+		t.Fatal(err)
+	}
 	bundle := &models.CAbundle{
 		ProcessId: pid,
 		Address:   k.Address().Bytes(),
@@ -233,7 +235,9 @@ func TestCAProof(t *testing.T) {
 		t.Fatal(err)
 	}
 	ca2 := ethereum.SignKeys{}
-	ca2.Generate()
+	if err := ca2.Generate(); err != nil {
+		t.Fatal(err)
+	}
 	signature, err := ca2.Sign(bundleBytes)
 	if err != nil {
 		t.Fatal(err)
@@ -490,7 +494,9 @@ func testEthSendVotes(t *testing.T, s testStorageProof,
 	found := false
 	for _, key := range testSmartContractHolders {
 		sk := ethereum.NewSignKeys()
-		sk.AddHexKey(key)
+		if err := sk.AddHexKey(key); err != nil {
+			t.Fatal(err)
+		}
 		if util.TrimHex(sk.Address().Hex()) == util.TrimHex(s.Address) {
 			signer = sk
 			found = true

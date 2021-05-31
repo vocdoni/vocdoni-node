@@ -21,7 +21,9 @@ func TestState(t *testing.T) {
 		pids = append(pids, util.RandomBytes(32))
 		censusURI := "ipfs://foobar"
 		p := &models.Process{EntityId: util.RandomBytes(32), CensusURI: &censusURI, ProcessId: pids[i]}
-		s.AddProcess(p)
+		if err := s.AddProcess(p); err != nil {
+			t.Fatal(err)
+		}
 
 		for j := 0; j < 10; j++ {
 			v := &models.Vote{
