@@ -154,7 +154,11 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Error(err)
+		}
+	}()
 
 	stateJSONBytes, err := os.ReadFile(tconfig.PrivValidatorStateFile())
 	if err != nil {

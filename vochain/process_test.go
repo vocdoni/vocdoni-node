@@ -95,7 +95,9 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		BlockCount:   1024,
 	}
 	t.Logf("adding PAUSED process %x", process.ProcessId)
-	app.State.AddProcess(process)
+	if err := app.State.AddProcess(process); err != nil {
+		t.Fatal(err)
+	}
 
 	// Set it to READY (should work)
 	status = models.ProcessStatus_READY
@@ -143,7 +145,9 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		BlockCount:   1024,
 	}
 	t.Logf("adding PAUSED process %x", process.ProcessId)
-	app.State.AddProcess(process)
+	if err := app.State.AddProcess(process); err != nil {
+		t.Fatal(err)
+	}
 
 	// Set it to READY (should work)
 	status = models.ProcessStatus_READY
@@ -441,7 +445,8 @@ func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 		CensusURI:  censusURI,
 	}
 
-	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}}); err != nil {
+	if stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetProcess{SetProcess: tx}}); err != nil {
 		t.Fatal(err)
 	}
 

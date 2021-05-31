@@ -145,8 +145,12 @@ func newTendermint(app *BaseApplication,
 	tconfig := tmcfg.DefaultConfig()
 	tconfig.FastSyncMode = true
 	tconfig.SetRoot(localConfig.DataDir)
-	os.MkdirAll(localConfig.DataDir+"/config", 0o755)
-	os.MkdirAll(localConfig.DataDir+"/data", 0o755)
+	if err := os.MkdirAll(localConfig.DataDir+"/config", 0o755); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.MkdirAll(localConfig.DataDir+"/data", 0o755); err != nil {
+		log.Fatal(err)
+	}
 
 	// p2p config
 	tconfig.LogLevel = localConfig.LogLevel
