@@ -1,10 +1,10 @@
 package scrutinizer
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/timshannon/badgerhold/v3"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
 
@@ -18,21 +18,21 @@ func (s *Scrutinizer) GetTxReference(height uint64) (*indexertypes.TxReference, 
 	txReference := &indexertypes.TxReference{}
 	err := s.db.FindOne(txReference, badgerhold.Where(badgerhold.Key).Eq(height))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Tx height %d not found: %v", height, err)
 	}
 	return txReference, nil
 }
 
 // OnNewTx stores the transaction reference in the indexer database
-func (s *Scrutinizer) OnNewTx(blockHeight, txIndex uint32) {
+func (s *Scrutinizer) OnNewTx(blockHeight, txIndex uint32) error {
 	txCount := atomic.AddUint64(&s.countTotalTransactions, 1)
-	log.Debugf("Storing tx %d: block %d tx %d", txCount, blockHeight, txIndex)
 	err := s.db.Insert(txCount, &indexertypes.TxReference{
 		Index:        txCount,
 		BlockHeight:  blockHeight,
 		TxBlockIndex: txIndex,
 	})
 	if err != nil {
-		log.Errorf("cannot store tx at height %d: %v", txCount, err)
+		return fmt.Errorf("cannot store tx at height %d: %v", txCount, err)
 	}
+	return nil
 }
