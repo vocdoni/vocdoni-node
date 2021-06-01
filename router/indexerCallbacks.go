@@ -141,14 +141,14 @@ func (r *Router) getTxByHeight(request RouterRequest) {
 			request.Height, err))
 		return
 	}
-	tx, hash, err := r.Scrutinizer.App.GetTxHash(txRef.BlockHeight, int32(txRef.Index))
+	tx, hash, err := r.Scrutinizer.App.GetTxHash(txRef.BlockHeight, int32(txRef.TxBlockIndex))
 	if err != nil {
 		r.SendError(request, fmt.Sprintf("cannot get tx: %v", err))
 		return
 	}
 	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
-		Index:       int32(txRef.Index),
+		Index:       int32(txRef.TxBlockIndex),
 		BlockHeight: txRef.BlockHeight,
 		Hash:        hash,
 		Signature:   tx.Signature,
