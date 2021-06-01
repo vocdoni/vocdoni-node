@@ -18,7 +18,7 @@ func (s *Scrutinizer) GetTxReference(height uint64) (*indexertypes.TxReference, 
 	txReference := &indexertypes.TxReference{}
 	err := s.db.FindOne(txReference, badgerhold.Where(badgerhold.Key).Eq(height))
 	if err != nil {
-		return nil, fmt.Errorf("Tx height %d not found: %v", height, err)
+		return nil, fmt.Errorf("tx height %d not found: %v", height, err)
 	}
 	return txReference, nil
 }
