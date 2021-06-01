@@ -31,9 +31,10 @@ const (
 )
 
 var srcNetworkIds = map[string]models.SourceNetworkId{
-	"default": models.SourceNetworkId_UNKNOWN,
-	"mainnet": models.SourceNetworkId_ETH_MAINNET_SIGNALING,
-	"rinkeby": models.SourceNetworkId_ETH_RINKEBY_SIGNALING,
+	"default":   models.SourceNetworkId_UNKNOWN,
+	"mainnet":   models.SourceNetworkId_ETH_MAINNET_SIGNALING,
+	"homestead": models.SourceNetworkId_ETH_MAINNET_SIGNALING,
+	"rinkeby":   models.SourceNetworkId_ETH_RINKEBY_SIGNALING,
 }
 
 type APIoracle struct {
@@ -41,12 +42,12 @@ type APIoracle struct {
 	oracle           *oracle.Oracle
 	router           *router.Router
 	eh               *ethereumhandler.EthereumHandler
-	chainName        string
+	chainNames       map[string]bool
 	erc20proposalACL *proposalACL
 }
 
 func NewAPIoracle(o *oracle.Oracle, r *router.Router) (*APIoracle, error) {
-	a := &APIoracle{router: r, oracle: o}
+	a := &APIoracle{router: r, oracle: o, chainNames: make(map[string]bool)}
 	return a, nil
 }
 
@@ -68,7 +69,11 @@ func (a *APIoracle) EnableERC20(chainName, web3Endpoint string) error {
 		return err
 	}
 	a.eh.WaitSync()
-	a.chainName = chainName
+	for k, v := range srcNetworkIds {
+		if v.String() == srcNetId.String() {
+			a.chainNames[k] = true
+		}
+	}
 	a.router.RegisterPublic("newERC20process", a.handleNewEthProcess)
 	a.router.APIs = append(a.router.APIs, "oracle")
 	return nil
@@ -80,8 +85,9 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		a.router.SendError(req, "newProcess is empty")
 		return
 	}
-	if req.NewProcess.NetworkId != a.chainName {
-		a.router.SendError(req, fmt.Sprintf("provided chainId does not match ours (%s)", a.chainName))
+	if _, ok := a.chainNames[req.NewProcess.NetworkId]; !ok {
+		a.router.SendError(req, fmt.Sprintf("provided chainId does not match ours (%s)",
+			req.NewProcess.NetworkId))
 		return
 	}
 	if req.NewProcess.EthIndexSlot == nil {
