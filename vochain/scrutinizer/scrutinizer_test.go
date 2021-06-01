@@ -15,7 +15,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
-	"go.vocdoni.io/proto/build/go/models"
+	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -952,4 +952,29 @@ func TestCountVotes(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, ref.Height, qt.CmpEquals(), blockHeight)
 	qt.Assert(t, ref.TxIndex, qt.CmpEquals(), txIndex)
+}
+
+func TestTxIndexer(t *testing.T) {
+	app, err := vochain.NewBaseApplication(t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+
+	sc, err := NewScrutinizer(t.TempDir(), app)
+	qt.Assert(t, err, qt.IsNil)
+	app.SetTestingMethods()
+
+	for i := 0; i < 10; i++ {
+		for j := 0; j < 10; j++ {
+			err := sc.OnNewTx(uint32(i), uint32(j))
+			qt.Assert(t, err, qt.IsNil)
+		}
+	}
+
+	for i := 0; i < 10; i++ {
+		for j := 0; j < 10; j++ {
+			ref, err := sc.GetTxReference(uint64(i*10 + j + 1))
+			qt.Assert(t, err, qt.IsNil)
+			qt.Assert(t, ref.BlockHeight, qt.CmpEquals(), uint32(i))
+			qt.Assert(t, ref.TxBlockIndex, qt.CmpEquals(), uint32(j))
+		}
+	}
 }
