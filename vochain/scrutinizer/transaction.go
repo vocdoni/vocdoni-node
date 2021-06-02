@@ -24,14 +24,11 @@ func (s *Scrutinizer) GetTxReference(height uint64) (*indexertypes.TxReference, 
 }
 
 // OnNewTx stores the transaction reference in the indexer database
-func (s *Scrutinizer) OnNewTx(blockHeight uint32, txIndex int32) error {
+func (s *Scrutinizer) OnNewTx(blockHeight uint32, txIndex int32) {
 	txCount := atomic.AddUint64(&s.countTotalTransactions, 1)
-	if err := s.db.Insert(txCount, &indexertypes.TxReference{
+	s.newTxPool = append(s.newTxPool, &indexertypes.TxReference{
 		Index:        txCount,
 		BlockHeight:  blockHeight,
 		TxBlockIndex: txIndex,
-	}); err != nil {
-		return fmt.Errorf("cannot store tx at height %d: %v", txCount, err)
-	}
-	return nil
+	})
 }

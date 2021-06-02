@@ -964,10 +964,10 @@ func TestTxIndexer(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 10; j++ {
-			err := sc.OnNewTx(uint32(i), int32(j))
-			qt.Assert(t, err, qt.IsNil)
+			sc.OnNewTx(uint32(i), int32(j))
 		}
 	}
+	sc.Commit(0)
 
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 10; j++ {
