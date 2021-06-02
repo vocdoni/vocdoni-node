@@ -148,6 +148,7 @@ func (r *Router) getTxByHeight(request RouterRequest) {
 	}
 	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
+		Height:      uint32(txRef.Index),
 		Index:       int32(txRef.TxBlockIndex),
 		BlockHeight: txRef.BlockHeight,
 		Hash:        hash,
