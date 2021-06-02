@@ -278,23 +278,24 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 
 	switch currValue[0] {
 	case PrefixValueEmpty: // empty
-		// TODO WIP WARNING should not be reached, as the 'if' above should avoid
-		// reaching this point
-		// return currKey, empty, siblings, nil
-		panic("should not be reached, as the 'if' above should avoid reaching this point") // TMP
+		fmt.Printf("newKey: %s, currKey: %s, currLvl: %d, currValue: %s\n",
+			hex.EncodeToString(newKey), hex.EncodeToString(currKey),
+			currLvl, hex.EncodeToString(currValue))
+		panic("This point should not be reached, as the 'if' above" +
+			" should avoid reaching this point. This panic is temporary" +
+			" for reporting purposes, will be deleted in future versions." +
+			" Please paste this log (including the previous lines) in a" +
+			" new issue: https://github.com/arnaucube/arbo/issues/new") // TMP
 	case PrefixValueLeaf: // leaf
-		if bytes.Equal(newKey, currKey) {
-			// TODO move this error msg to const & add test that
-			// checks that adding a repeated key this error is
-			// returned
-			return nil, nil, nil, ErrKeyAlreadyExists
-		}
-
 		if !bytes.Equal(currValue, emptyValue) {
 			if getLeaf {
 				return currKey, currValue, siblings, nil
 			}
 			oldLeafKey, _ := ReadLeafValue(currValue)
+			if bytes.Equal(newKey, oldLeafKey) {
+				return nil, nil, nil, ErrKeyAlreadyExists
+			}
+
 			oldLeafKeyFull := make([]byte, t.hashFunction.Len())
 			copy(oldLeafKeyFull[:], oldLeafKey)
 
@@ -385,6 +386,12 @@ func (t *Tree) newLeafValue(k, v []byte) ([]byte, []byte, error) {
 	return newLeafValue(t.hashFunction, k, v)
 }
 
+// newLeafValue takes a key & value from a leaf, and computes the leaf hash,
+// which is used as the leaf key. And the value is the concatenation of the
+// inputed key & value. The output of this function is used as key-value to
+// store the leaf in the DB.
+// [     1 byte   |     1 byte    | N bytes | M bytes ]
+// [ type of node | length of key |   key   |  value  ]
 func newLeafValue(hashFunc HashFunction, k, v []byte) ([]byte, []byte, error) {
 	leafKey, err := hashFunc.Hash(k, v, []byte{1})
 	if err != nil {
@@ -418,6 +425,12 @@ func (t *Tree) newIntermediate(l, r []byte) ([]byte, []byte, error) {
 	return newIntermediate(t.hashFunction, l, r)
 }
 
+// newIntermediate takes the left & right keys of a intermediate node, and
+// computes its hash. Returns the hash of the node, which is the node key, and a
+// byte array that contains the value (which contains the left & right child
+// keys) to store in the DB.
+// [     1 byte   |     1 byte    | N bytes  |  N bytes  ]
+// [ type of node | length of key | left key | right key ]
 func newIntermediate(hashFunc HashFunction, l, r []byte) ([]byte, []byte, error) {
 	b := make([]byte, PrefixValueLen+hashFunc.Len()*2)
 	b[0] = 2

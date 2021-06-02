@@ -245,6 +245,7 @@ func (n *node) getNodesAtLevel(currLvl, l int) ([]*node, error) {
 	return nodes, nil
 }
 
+// upFromNodes builds the tree from the bottom to up
 func upFromNodes(ns []*node) (*node, error) {
 	if len(ns) == 1 {
 		return ns[0], nil
@@ -267,6 +268,7 @@ func upFromNodes(ns []*node) (*node, error) {
 	return upFromNodes(res)
 }
 
+// add adds a key&value as a leaf in the VirtualTree
 func (t *vt) add(fromLvl int, k, v []byte) error {
 	leaf := newLeafNode(t.params, k, v)
 	if t.root == nil {
@@ -282,7 +284,8 @@ func (t *vt) add(fromLvl int, k, v []byte) error {
 }
 
 // computeHashes should be called after all the vt.add is used, once all the
-// leafs are in the tree
+// leafs are in the tree. Computes the hashes of the tree, parallelizing in the
+// available CPUs.
 func (t *vt) computeHashes() ([][2][]byte, error) {
 	var err error
 
@@ -519,7 +522,8 @@ func flp2(n int) int {
 	return res
 }
 
-// returns an array of key-values to store in the db
+// computeHashes computes the hashes under the node from which is called the
+// method. Returns an array of key-values to store in the db
 func (n *node) computeHashes(currLvl, maxLvl int, p *params, pairs [][2][]byte) (
 	[][2][]byte, error) {
 	if n == nil || currLvl >= maxLvl {

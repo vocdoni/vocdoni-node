@@ -141,12 +141,11 @@ func TestAddRepeatedIndex(t *testing.T) {
 	bLen := tree.HashFunction().Len()
 	k := BigIntToBytes(bLen, big.NewInt(int64(3)))
 	v := BigIntToBytes(bLen, big.NewInt(int64(12)))
-	if err := tree.Add(k, v); err != nil {
-		t.Fatal(err)
-	}
+
 	err = tree.Add(k, v)
-	c.Assert(err, qt.Not(qt.IsNil))
-	c.Check(err, qt.Equals, ErrMaxVirtualLevel)
+	c.Assert(err, qt.IsNil)
+	err = tree.Add(k, v) // repeating same key-value
+	c.Check(err, qt.Equals, ErrKeyAlreadyExists)
 }
 
 func TestUpdate(t *testing.T) {

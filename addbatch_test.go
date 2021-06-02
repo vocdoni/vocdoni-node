@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"os"
 	"runtime"
 	"sort"
 	"testing"
@@ -660,6 +661,7 @@ func benchAdd(t *testing.T, ks, vs [][]byte) {
 	c := qt.New(t)
 
 	dbDir := t.TempDir()
+	defer os.RemoveAll(dbDir) //nolint:errcheck
 	// storage, err := pebble.NewPebbleStorage(dbDir, false)
 	storage, err := leveldb.NewLevelDbStorage(dbDir, false)
 	c.Assert(err, qt.IsNil)
@@ -681,6 +683,8 @@ func benchAddBatch(t *testing.T, ks, vs [][]byte) {
 	c := qt.New(t)
 
 	dbDir := t.TempDir()
+	defer os.RemoveAll(dbDir) //nolint:errcheck
+	// storage, err := pebble.NewPebbleStorage(dbDir, false)
 	storage, err := leveldb.NewLevelDbStorage(dbDir, false)
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(storage, 140, HashFunctionBlake2b)
