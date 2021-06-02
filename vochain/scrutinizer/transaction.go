@@ -25,9 +25,7 @@ func (s *Scrutinizer) GetTxReference(height uint64) (*indexertypes.TxReference, 
 
 // OnNewTx stores the transaction reference in the indexer database
 func (s *Scrutinizer) OnNewTx(blockHeight uint32, txIndex int32) {
-	txCount := atomic.AddUint64(&s.countTotalTransactions, 1)
 	s.newTxPool = append(s.newTxPool, &indexertypes.TxReference{
-		Index:        txCount,
 		BlockHeight:  blockHeight,
 		TxBlockIndex: txIndex,
 	})

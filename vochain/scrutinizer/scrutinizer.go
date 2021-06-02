@@ -256,6 +256,9 @@ func (s *Scrutinizer) Commit(height uint32) error {
 
 	// Index new transactions
 	for _, tx := range s.newTxPool {
+		// Add confirmed txs to transaction count
+		txCount := atomic.AddUint64(&s.countTotalTransactions, 1)
+		tx.Index = txCount
 		if err := s.db.Insert(tx.Index, tx); err != nil {
 			log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
 		}
