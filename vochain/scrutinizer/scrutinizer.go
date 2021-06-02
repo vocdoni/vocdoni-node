@@ -99,27 +99,23 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 	startTime := time.Now()
 
 	txCountStore := new(indexertypes.CountStore)
-	err = s.db.FindOne(txCountStore,
-		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Transactions))
-	if err != nil {
+	if err = s.db.FindOne(txCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Transactions)); err != nil {
 		log.Warnf("could not get the transaction count: %v", err)
 	}
 	envelopeCountStore := new(indexertypes.CountStore)
-	err = s.db.FindOne(envelopeCountStore,
-		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Envelopes))
-	if err != nil {
+	if err = s.db.FindOne(envelopeCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Envelopes)); err != nil {
 		log.Warnf("could not get the envelope count: %v", err)
 	}
 	processCountStore := new(indexertypes.CountStore)
-	err = s.db.FindOne(processCountStore,
-		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Processes))
-	if err != nil {
+	if err = s.db.FindOne(processCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Processes)); err != nil {
 		log.Warnf("could not get the process count: %v", err)
 	}
 	entityCountStore := new(indexertypes.CountStore)
-	err = s.db.FindOne(entityCountStore,
-		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Entities))
-	if err != nil {
+	if err = s.db.FindOne(entityCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Entities)); err != nil {
 		log.Warnf("could not get the entity count: %v", err)
 	}
 
