@@ -55,6 +55,8 @@ type Scrutinizer struct {
 	updateProcessPool [][]byte
 	// resultsPool is the list of processes that finish on the current block
 	resultsPool []*indexertypes.ScrutinizerOnProcessData
+	// newTxPool is the list of new tx references to be indexed
+	newTxPool []*indexertypes.TxReference
 	// list of live processes (those on which the votes will be computed on arrival)
 	liveResultsProcs sync.Map
 	// eventListeners is the list of external callbacks that will be executed by the scrutinizer
@@ -252,6 +254,13 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		}
 	}
 
+	// Index new transactions
+	for _, tx := range s.newTxPool {
+		if err := s.db.Insert(tx.Index, tx); err != nil {
+			log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
+		}
+	}
+
 	// Schedule results computation
 	for _, p := range s.resultsPool {
 		if err := s.setResultsHeight(p.ProcessID, uint32(height+1)); err != nil {
@@ -346,6 +355,7 @@ func (s *Scrutinizer) Rollback() {
 	s.newProcessPool = []*indexertypes.ScrutinizerOnProcessData{}
 	s.resultsPool = []*indexertypes.ScrutinizerOnProcessData{}
 	s.updateProcessPool = [][]byte{}
+	s.newTxPool = []*indexertypes.TxReference{}
 }
 
 // OnProcess scrutinizer stores the processID and entityID

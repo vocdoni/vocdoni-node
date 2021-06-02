@@ -257,9 +257,8 @@ func (k *KeyKeeper) OnVote(v *models.Vote, txindex int32) {
 }
 
 // OnNewTx is not used by the KeyKeeper
-func (k *KeyKeeper) OnNewTx(blockHeight uint32, txIndex int32) error {
+func (k *KeyKeeper) OnNewTx(blockHeight uint32, txIndex int32) {
 	// do nothing
-	return nil
 }
 
 // OnProcessStatusChange will publish the private
