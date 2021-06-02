@@ -21,7 +21,7 @@ const (
 
 // CountStore holds the count of envelopes, processes, entities, or transactions
 type CountStore struct {
-	Type  int `badgerholdKey:"Type"`
+	Type  uint8 `badgerholdKey:"Type"`
 	Count uint64
 }
 
@@ -123,7 +123,7 @@ type TxMetadata struct {
 type TxReference struct {
 	Index        uint64 `badgerholdKey:"Index"`
 	BlockHeight  uint32
-	TxBlockIndex uint32
+	TxBlockIndex int32
 }
 
 // BlockMetadata contains the metadata for a single tendermint block

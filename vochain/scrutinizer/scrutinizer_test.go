@@ -964,7 +964,7 @@ func TestTxIndexer(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 10; j++ {
-			err := sc.OnNewTx(uint32(i), uint32(j))
+			err := sc.OnNewTx(uint32(i), int32(j))
 			qt.Assert(t, err, qt.IsNil)
 		}
 	}
@@ -973,8 +973,8 @@ func TestTxIndexer(t *testing.T) {
 		for j := 0; j < 10; j++ {
 			ref, err := sc.GetTxReference(uint64(i*10 + j + 1))
 			qt.Assert(t, err, qt.IsNil)
-			qt.Assert(t, ref.BlockHeight, qt.CmpEquals(), uint32(i))
-			qt.Assert(t, ref.TxBlockIndex, qt.CmpEquals(), uint32(j))
+			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
+			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
 		}
 	}
 }
