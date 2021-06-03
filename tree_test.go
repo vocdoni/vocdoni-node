@@ -7,8 +7,18 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/iden3/go-merkletree/db/memory"
+	"go.vocdoni.io/dvote/db"
 )
+
+func TestDBBatch(t *testing.T) {
+	c := qt.New(t)
+
+	database, err := db.NewBadgerDB(c.TempDir())
+	c.Assert(err, qt.IsNil)
+	b := database.NewBatch()
+	err = b.Put([]byte("a"), []byte("b"))
+	c.Assert(err, qt.IsNil)
+}
 
 func TestAddTestVectors(t *testing.T) {
 	c := qt.New(t)
@@ -32,9 +42,11 @@ func TestAddTestVectors(t *testing.T) {
 }
 
 func testAdd(c *qt.C, hashFunc HashFunction, testVectors []string) {
-	tree, err := NewTree(memory.NewMemoryStorage(), 10, hashFunc)
+	database, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close()
+	tree, err := NewTree(database, 10, hashFunc)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
 
 	c.Check(hex.EncodeToString(tree.Root()), qt.Equals, testVectors[0])
 
@@ -63,9 +75,11 @@ func testAdd(c *qt.C, hashFunc HashFunction, testVectors []string) {
 
 func TestAddBatch(t *testing.T) {
 	c := qt.New(t)
-	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close()
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
 
 	bLen := tree.HashFunction().Len()
 	for i := 0; i < 1000; i++ {
@@ -80,9 +94,11 @@ func TestAddBatch(t *testing.T) {
 	c.Check(rootBI.String(), qt.Equals,
 		"296519252211642170490407814696803112091039265640052570497930797516015811235")
 
-	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database, err = db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close()
+	tree2, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close() //nolint:errcheck
 
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
@@ -102,9 +118,11 @@ func TestAddBatch(t *testing.T) {
 
 func TestAddDifferentOrder(t *testing.T) {
 	c := qt.New(t)
-	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database1, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close()
+	tree1, err := NewTree(database1, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree1.db.Close() //nolint:errcheck
 
 	bLen := tree1.HashFunction().Len()
 	for i := 0; i < 16; i++ {
@@ -115,9 +133,11 @@ func TestAddDifferentOrder(t *testing.T) {
 		}
 	}
 
-	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database2, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close()
+	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close() //nolint:errcheck
 
 	for i := 16 - 1; i >= 0; i-- {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
@@ -134,9 +154,11 @@ func TestAddDifferentOrder(t *testing.T) {
 
 func TestAddRepeatedIndex(t *testing.T) {
 	c := qt.New(t)
-	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close()
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
 
 	bLen := tree.HashFunction().Len()
 	k := BigIntToBytes(bLen, big.NewInt(int64(3)))
@@ -150,9 +172,11 @@ func TestAddRepeatedIndex(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	c := qt.New(t)
-	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close()
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
 
 	bLen := tree.HashFunction().Len()
 	k := BigIntToBytes(bLen, big.NewInt(int64(20)))
@@ -201,9 +225,11 @@ func TestUpdate(t *testing.T) {
 
 func TestAux(t *testing.T) { // TODO split in proper tests
 	c := qt.New(t)
-	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close()
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
 
 	bLen := tree.HashFunction().Len()
 	k := BigIntToBytes(bLen, big.NewInt(int64(1)))
@@ -238,9 +264,11 @@ func TestAux(t *testing.T) { // TODO split in proper tests
 
 func TestGet(t *testing.T) {
 	c := qt.New(t)
-	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close()
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
 
 	bLen := tree.HashFunction().Len()
 	for i := 0; i < 10; i++ {
@@ -260,9 +288,11 @@ func TestGet(t *testing.T) {
 
 func TestGenProofAndVerify(t *testing.T) {
 	c := qt.New(t)
-	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close()
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
 
 	bLen := tree.HashFunction().Len()
 	for i := 0; i < 10; i++ {
@@ -286,9 +316,11 @@ func TestGenProofAndVerify(t *testing.T) {
 
 func TestDumpAndImportDump(t *testing.T) {
 	c := qt.New(t)
-	tree1, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database1, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close()
+	tree1, err := NewTree(database1, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree1.db.Close() //nolint:errcheck
 
 	bLen := tree1.HashFunction().Len()
 	for i := 0; i < 16; i++ {
@@ -302,9 +334,11 @@ func TestDumpAndImportDump(t *testing.T) {
 	e, err := tree1.Dump(nil)
 	c.Assert(err, qt.IsNil)
 
-	tree2, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database2, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close()
+	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close() //nolint:errcheck
 	err = tree2.ImportDump(e)
 	c.Assert(err, qt.IsNil)
 	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
@@ -314,9 +348,11 @@ func TestDumpAndImportDump(t *testing.T) {
 
 func TestRWMutex(t *testing.T) {
 	c := qt.New(t)
-	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close()
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
 
 	bLen := tree.HashFunction().Len()
 	var keys, values [][]byte
@@ -343,17 +379,18 @@ func TestRWMutex(t *testing.T) {
 
 func TestSetGetNLeafs(t *testing.T) {
 	c := qt.New(t)
-	tree, err := NewTree(memory.NewMemoryStorage(), 100, HashFunctionPoseidon)
+	database, err := db.NewBadgerDB(c.TempDir())
+	c.Assert(err, qt.IsNil)
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 
 	// 0
-	tree.tx, err = tree.db.NewTx()
-	c.Assert(err, qt.IsNil)
+	tree.dbBatch = tree.db.NewBatch()
 
 	err = tree.setNLeafs(0)
 	c.Assert(err, qt.IsNil)
 
-	err = tree.tx.Commit()
+	err = tree.dbBatch.Write()
 	c.Assert(err, qt.IsNil)
 
 	n, err := tree.GetNLeafs()
@@ -361,13 +398,12 @@ func TestSetGetNLeafs(t *testing.T) {
 	c.Assert(n, qt.Equals, 0)
 
 	// 1024
-	tree.tx, err = tree.db.NewTx()
-	c.Assert(err, qt.IsNil)
+	tree.dbBatch = tree.db.NewBatch()
 
 	err = tree.setNLeafs(1024)
 	c.Assert(err, qt.IsNil)
 
-	err = tree.tx.Commit()
+	err = tree.dbBatch.Write()
 	c.Assert(err, qt.IsNil)
 
 	n, err = tree.GetNLeafs()
@@ -375,8 +411,7 @@ func TestSetGetNLeafs(t *testing.T) {
 	c.Assert(n, qt.Equals, 1024)
 
 	// 2**64 -1
-	tree.tx, err = tree.db.NewTx()
-	c.Assert(err, qt.IsNil)
+	tree.dbBatch = tree.db.NewBatch()
 
 	maxUint := ^uint(0)
 	maxInt := int(maxUint >> 1)
@@ -384,7 +419,7 @@ func TestSetGetNLeafs(t *testing.T) {
 	err = tree.setNLeafs(maxInt)
 	c.Assert(err, qt.IsNil)
 
-	err = tree.tx.Commit()
+	err = tree.dbBatch.Write()
 	c.Assert(err, qt.IsNil)
 
 	n, err = tree.GetNLeafs()
@@ -413,9 +448,11 @@ func BenchmarkAdd(b *testing.B) {
 
 func benchmarkAdd(b *testing.B, hashFunc HashFunction, ks, vs [][]byte) {
 	c := qt.New(b)
-	tree, err := NewTree(memory.NewMemoryStorage(), 140, hashFunc)
+	database, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close()
+	tree, err := NewTree(database, 140, hashFunc)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
 
 	for i := 0; i < len(ks); i++ {
 		if err := tree.Add(ks[i], vs[i]); err != nil {

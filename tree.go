@@ -13,6 +13,7 @@ package arbo
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -20,7 +21,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/iden3/go-merkletree/db"
+	"go.vocdoni.io/dvote/db"
 )
 
 const (
@@ -47,14 +48,17 @@ var (
 	dbKeyNLeafs = []byte("nleafs")
 	emptyValue  = []byte{0}
 
+	// ErrKeyNotFound is used when a key is not found in the db neither in
+	// the current db Batch.
+	ErrKeyNotFound = fmt.Errorf("key not found")
 	// ErrKeyAlreadyExists is used when trying to add a key as leaf to the
 	// tree that already exists.
 	ErrKeyAlreadyExists = fmt.Errorf("key already exists")
 	// ErrInvalidValuePrefix is used when going down into the tree, a value
 	// is read from the db and has an unrecognized prefix.
 	ErrInvalidValuePrefix = fmt.Errorf("invalid value prefix")
-	// ErrDBNoTx is used when trying to use Tree.dbPut but Tree.tx==nil
-	ErrDBNoTx = fmt.Errorf("dbPut error: no db Tx")
+	// ErrDBNoTx is used when trying to use Tree.dbPut but Tree.dbBatch==nil
+	ErrDBNoTx = fmt.Errorf("dbPut error: no db Batch")
 	// ErrMaxLevel indicates when going down into the tree, the max level is
 	// reached
 	ErrMaxLevel = fmt.Errorf("max level reached")
@@ -66,10 +70,11 @@ var (
 // Tree defines the struct that implements the MerkleTree functionalities
 type Tree struct {
 	sync.RWMutex
-	tx        db.Tx
-	db        db.Storage
-	maxLevels int
-	root      []byte
+	dbBatch     db.Batch
+	batchMemory kvMap // TODO TMP
+	db          db.Database
+	maxLevels   int
+	root        []byte
 
 	hashFunction HashFunction
 	// TODO in the methods that use it, check if emptyHash param is len>0
@@ -79,19 +84,33 @@ type Tree struct {
 	dbg *dbgStats
 }
 
-// NewTree returns a new Tree, if there is a Tree still in the given storage, it
+const bmSize = sha256.Size
+
+// TMP
+type kvMap map[[bmSize]byte]kv
+
+// Get retreives the value respective to a key from the KvMap
+func (m kvMap) Get(k []byte) ([]byte, bool) {
+	v, ok := m[sha256.Sum256(k)]
+	return v.v, ok
+}
+
+// Put stores a key and a value in the KvMap
+func (m kvMap) Put(k, v []byte) {
+	m[sha256.Sum256(k)] = kv{k: k, v: v}
+}
+
+// NewTree returns a new Tree, if there is a Tree still in the given database, it
 // will load it.
-func NewTree(storage db.Storage, maxLevels int, hash HashFunction) (*Tree, error) {
-	t := Tree{db: storage, maxLevels: maxLevels, hashFunction: hash}
+func NewTree(database db.Database, maxLevels int, hash HashFunction) (*Tree, error) {
+	t := Tree{db: database, maxLevels: maxLevels, hashFunction: hash}
 	t.emptyHash = make([]byte, t.hashFunction.Len()) // empty
 
 	root, err := t.dbGet(dbKeyRoot)
-	if err == db.ErrNotFound {
+	if err == ErrKeyNotFound {
 		// store new root 0
-		t.tx, err = t.db.NewTx()
-		if err != nil {
-			return nil, err
-		}
+		t.dbBatch = t.db.NewBatch()
+		t.batchMemory = make(map[[bmSize]byte]kv) // TODO TMP
 		t.root = t.emptyHash
 		if err = t.dbPut(dbKeyRoot, t.root); err != nil {
 			return nil, err
@@ -99,7 +118,7 @@ func NewTree(storage db.Storage, maxLevels int, hash HashFunction) (*Tree, error
 		if err = t.setNLeafs(0); err != nil {
 			return nil, err
 		}
-		if err = t.tx.Commit(); err != nil {
+		if err = t.dbBatch.Write(); err != nil {
 			return nil, err
 		}
 		return &t, err
@@ -147,10 +166,8 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 	t.root = vt.root.h
 
 	// store pairs in db
-	t.tx, err = t.db.NewTx()
-	if err != nil {
-		return nil, err
-	}
+	t.dbBatch = t.db.NewBatch()
+	t.batchMemory = make(map[[bmSize]byte]kv) // TODO TMP
 	for i := 0; i < len(pairs); i++ {
 		if err := t.dbPut(pairs[i][0], pairs[i][1]); err != nil {
 			return nil, err
@@ -167,8 +184,8 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 		return nil, err
 	}
 
-	// commit db tx
-	if err := t.tx.Commit(); err != nil {
+	// commit db dbBatch
+	if err := t.dbBatch.Write(); err != nil {
 		return nil, err
 	}
 	return invalids, nil
@@ -200,10 +217,8 @@ func (t *Tree) Add(k, v []byte) error {
 	defer t.Unlock()
 
 	var err error
-	t.tx, err = t.db.NewTx()
-	if err != nil {
-		return err
-	}
+	t.dbBatch = t.db.NewBatch()
+	t.batchMemory = make(map[[bmSize]byte]kv) // TODO TMP
 
 	// TODO check validity of key & value for Tree.hashFunction
 
@@ -219,7 +234,7 @@ func (t *Tree) Add(k, v []byte) error {
 	if err = t.incNLeafs(1); err != nil {
 		return err
 	}
-	return t.tx.Commit()
+	return t.dbBatch.Write()
 }
 
 func (t *Tree) add(fromLvl int, k, v []byte) error {
@@ -476,10 +491,8 @@ func (t *Tree) Update(k, v []byte) error {
 	defer t.Unlock()
 
 	var err error
-	t.tx, err = t.db.NewTx()
-	if err != nil {
-		return err
-	}
+	t.dbBatch = t.db.NewBatch()
+	t.batchMemory = make(map[[bmSize]byte]kv) // TODO TMP
 
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)
@@ -507,7 +520,7 @@ func (t *Tree) Update(k, v []byte) error {
 	// go up to the root
 	if len(siblings) == 0 {
 		t.root = leafKey
-		return t.tx.Commit()
+		return t.dbBatch.Write()
 	}
 	root, err := t.up(leafKey, siblings, path, len(siblings)-1, 0)
 	if err != nil {
@@ -519,7 +532,7 @@ func (t *Tree) Update(k, v []byte) error {
 	if err := t.dbPut(dbKeyRoot, t.root); err != nil {
 		return err
 	}
-	return t.tx.Commit()
+	return t.dbBatch.Write()
 }
 
 // GenProof generates a MerkleTree proof for the given key. If the key exists in
@@ -681,11 +694,12 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 }
 
 func (t *Tree) dbPut(k, v []byte) error {
-	if t.tx == nil {
+	if t.dbBatch == nil {
 		return ErrDBNoTx
 	}
 	t.dbg.incDbPut()
-	return t.tx.Put(k, v)
+	t.batchMemory.Put(k, v) // TODO TMP
+	return t.dbBatch.Put(k, v)
 }
 
 func (t *Tree) dbGet(k []byte) ([]byte, error) {
@@ -699,14 +713,20 @@ func (t *Tree) dbGet(k []byte) ([]byte, error) {
 	if err == nil {
 		return v, nil
 	}
-	if t.tx != nil {
-		return t.tx.Get(k)
+	if t.dbBatch != nil {
+		// TODO TMP
+		v, ok := t.batchMemory.Get(k)
+		if !ok {
+			return nil, ErrKeyNotFound
+		}
+		// /TMP
+		return v, nil
 	}
-	return nil, db.ErrNotFound
+	return nil, ErrKeyNotFound
 }
 
-// Warning: should be called with a Tree.tx created, and with a Tree.tx.Commit
-// after the setNLeafs call.
+// Warning: should be called with a Tree.dbBatch created, and with a
+// Tree.dbBatch.Write after the incNLeafs call.
 func (t *Tree) incNLeafs(nLeafs int) error {
 	oldNLeafs, err := t.GetNLeafs()
 	if err != nil {
@@ -716,8 +736,8 @@ func (t *Tree) incNLeafs(nLeafs int) error {
 	return t.setNLeafs(newNLeafs)
 }
 
-// Warning: should be called with a Tree.tx created, and with a Tree.tx.Commit
-// after the setNLeafs call.
+// Warning: should be called with a Tree.dbBatch created, and with a
+// Tree.dbBatch.Write after the setNLeafs call.
 func (t *Tree) setNLeafs(nLeafs int) error {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, uint64(nLeafs))
