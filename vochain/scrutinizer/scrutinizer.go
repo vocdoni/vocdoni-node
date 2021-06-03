@@ -100,26 +100,7 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 	}
 	startTime := time.Now()
 
-	txCountStore := new(indexertypes.CountStore)
-	if err = s.db.FindOne(txCountStore,
-		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Transactions)); err != nil {
-		log.Warnf("could not get the transaction count: %v", err)
-	}
-	envelopeCountStore := new(indexertypes.CountStore)
-	if err = s.db.FindOne(envelopeCountStore,
-		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Envelopes)); err != nil {
-		log.Warnf("could not get the envelope count: %v", err)
-	}
-	processCountStore := new(indexertypes.CountStore)
-	if err = s.db.FindOne(processCountStore,
-		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Processes)); err != nil {
-		log.Warnf("could not get the process count: %v", err)
-	}
-	entityCountStore := new(indexertypes.CountStore)
-	if err = s.db.FindOne(entityCountStore,
-		badgerhold.Where(badgerhold.Key).Eq(indexertypes.Entities)); err != nil {
-		log.Warnf("could not get the entity count: %v", err)
-	}
+	txCountStore, envelopeCountStore, processCountStore, entityCountStore := s.retrieveCounts()
 
 	s.countTotalTransactions = txCountStore.Count
 	s.countTotalEnvelopes = envelopeCountStore.Count
@@ -138,6 +119,78 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, 
 	s.envelopeHeightCache = lru.New(countEnvelopeCacheSize)
 	s.resultsCache = lru.New(resultsCacheSize)
 	return s, nil
+}
+
+// retrieveCounts returns a count for txs, envelopes, processes, and entities, in that order.
+// If no CountStore model is stored for the type, it counts all db entries of that type.
+func (s *Scrutinizer) retrieveCounts() (*indexertypes.CountStore,
+	*indexertypes.CountStore, *indexertypes.CountStore, *indexertypes.CountStore) {
+	var err error
+	txCountStore := new(indexertypes.CountStore)
+	if err = s.db.FindOne(txCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStore_Transactions)); err != nil {
+		log.Warnf("could not get the transaction count: %v", err)
+		count, err := s.db.Count(&indexertypes.TxReference{}, &badgerhold.Query{})
+		if err != nil {
+			log.Warnf("could not count total transactions: %v", err)
+		} else {
+			// Store new countStore value
+			txCountStore.Count = uint64(count)
+			txCountStore.Type = indexertypes.CountStore_Transactions
+			if err := s.db.Insert(txCountStore.Type, txCountStore); err != nil {
+				log.Warnf("could not store transaction count: %v", err)
+			}
+		}
+	}
+	envelopeCountStore := new(indexertypes.CountStore)
+	if err = s.db.FindOne(envelopeCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStore_Envelopes)); err != nil {
+		log.Warnf("could not get the envelope count: %v", err)
+		count, err := s.db.Count(&indexertypes.VoteReference{}, &badgerhold.Query{})
+		if err != nil {
+			log.Warnf("could not count total envelopes: %v", err)
+		} else {
+			// Store new countStore value
+			envelopeCountStore.Count = uint64(count)
+			envelopeCountStore.Type = indexertypes.CountStore_Envelopes
+			if err := s.db.Insert(envelopeCountStore.Type, envelopeCountStore); err != nil {
+				log.Warnf("could not store envelope count: %v", err)
+			}
+		}
+	}
+	processCountStore := new(indexertypes.CountStore)
+	if err = s.db.FindOne(processCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStore_Processes)); err != nil {
+		log.Warnf("could not get the process count: %v", err)
+		count, err := s.db.Count(&indexertypes.Process{}, &badgerhold.Query{})
+		if err != nil {
+			log.Warnf("could not count total processes: %v", err)
+		} else {
+			// Store new countStore value
+			processCountStore.Count = uint64(count)
+			processCountStore.Type = indexertypes.CountStore_Processes
+			if err := s.db.Insert(processCountStore.Type, processCountStore); err != nil {
+				log.Warnf("could not store process count: %v", err)
+			}
+		}
+	}
+	entityCountStore := new(indexertypes.CountStore)
+	if err = s.db.FindOne(entityCountStore,
+		badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStore_Entities)); err != nil {
+		log.Warnf("could not get the entity count: %v", err)
+		count, err := s.db.Count(&indexertypes.Entity{}, &badgerhold.Query{})
+		if err != nil {
+			log.Warnf("could not count total entities: %v", err)
+		} else {
+			// Store new countStore value
+			entityCountStore.Count = uint64(count)
+			entityCountStore.Type = indexertypes.CountStore_Entities
+			if err := s.db.Insert(entityCountStore.Type, entityCountStore); err != nil {
+				log.Warnf("could not store entity count: %v", err)
+			}
+		}
+	}
+	return txCountStore, envelopeCountStore, processCountStore, entityCountStore
 }
 
 // AfterSyncBootstrap is a blocking function that waits until the Vochain is synchronized
@@ -478,26 +531,26 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionRes
 // storeCountCaches stores the transaction, envelope, process, and entity count
 // caches to the database
 func (s *Scrutinizer) storeCountCaches() {
-	if err := s.db.Upsert(indexertypes.Transactions, &indexertypes.CountStore{
-		Type:  indexertypes.Transactions,
+	if err := s.db.Upsert(indexertypes.CountStore_Transactions, &indexertypes.CountStore{
+		Type:  indexertypes.CountStore_Transactions,
 		Count: s.countTotalTransactions,
 	}); err != nil {
 		log.Errorf("cannot store transaction count: %v", err)
 	}
-	if err := s.db.Upsert(indexertypes.Envelopes, &indexertypes.CountStore{
-		Type:  indexertypes.Envelopes,
+	if err := s.db.Upsert(indexertypes.CountStore_Envelopes, &indexertypes.CountStore{
+		Type:  indexertypes.CountStore_Envelopes,
 		Count: s.countTotalEnvelopes,
 	}); err != nil {
 		log.Errorf("cannot store envelope count: %v", err)
 	}
-	if err := s.db.Upsert(indexertypes.Processes, &indexertypes.CountStore{
-		Type:  indexertypes.Processes,
+	if err := s.db.Upsert(indexertypes.CountStore_Processes, &indexertypes.CountStore{
+		Type:  indexertypes.CountStore_Processes,
 		Count: s.countTotalProcesses,
 	}); err != nil {
 		log.Errorf("cannot store process count: %v", err)
 	}
-	if err := s.db.Upsert(indexertypes.Entities, &indexertypes.CountStore{
-		Type:  indexertypes.Entities,
+	if err := s.db.Upsert(indexertypes.CountStore_Entities, &indexertypes.CountStore{
+		Type:  indexertypes.CountStore_Entities,
 		Count: s.countTotalEntities,
 	}); err != nil {
 		log.Errorf("cannot store entity count: %v", err)
