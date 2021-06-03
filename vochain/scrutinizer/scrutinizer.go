@@ -294,22 +294,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	}
 
 	// Index new transactions
-	txCount := &indexertypes.CountStore{}
-	if err := s.db.Get(indexertypes.CountStore_Transactions, txCount); err != nil {
-		log.Errorf("could not get tx count: %v", err)
-	}
-	for i, tx := range s.newTxPool {
-		// Add confirmed txs to transaction count
-		tx.Index = txCount.Count + uint64(i) + 1 // Start indexing at 1
-		if err := s.db.Insert(tx.Index, tx); err != nil {
-			log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
-		}
-	}
-	// Store new transaction count
-	txCount.Count += uint64(len(s.newTxPool))
-	if err := s.db.Upsert(indexertypes.CountStore_Transactions, txCount); err != nil {
-		log.Errorf("could not update tx count: %v", err)
-	}
+	go s.indexNewTxs(s.newTxPool)
 
 	// Schedule results computation
 	for _, p := range s.resultsPool {

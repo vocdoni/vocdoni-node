@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/timshannon/badgerhold/v3"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
 
@@ -32,4 +33,25 @@ func (s *Scrutinizer) OnNewTx(blockHeight uint32, txIndex int32) {
 		BlockHeight:  blockHeight,
 		TxBlockIndex: txIndex,
 	})
+}
+
+// indexNewTxs indexes the txs pending in the newTxPool and updates the transaction count
+// this function should only be called within Commit(), on a new block.
+func (s *Scrutinizer) indexNewTxs(txList []*indexertypes.TxReference) {
+	txCount := &indexertypes.CountStore{}
+	if err := s.db.Get(indexertypes.CountStore_Transactions, txCount); err != nil {
+		log.Errorf("could not get tx count: %v", err)
+	}
+	for i, tx := range txList {
+		// Add confirmed txs to transaction count
+		tx.Index = txCount.Count + uint64(i) + 1 // Start indexing at 1
+		if err := s.db.Insert(tx.Index, tx); err != nil {
+			log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
+		}
+	}
+	// Store new transaction count
+	txCount.Count += uint64(len(txList))
+	if err := s.db.Upsert(indexertypes.CountStore_Transactions, txCount); err != nil {
+		log.Errorf("could not update tx count: %v", err)
+	}
 }
