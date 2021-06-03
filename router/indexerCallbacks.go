@@ -22,7 +22,9 @@ func (r *Router) getStats(request RouterRequest) {
 		log.Warnf("could not count vote envelopes: %s", err)
 	}
 	stats.ProcessCount = int64(r.Scrutinizer.ProcessCount([]byte{}))
-	stats.TransactionCount = r.Scrutinizer.TransactionCount()
+	if stats.TransactionCount, err = r.Scrutinizer.TransactionCount(); err != nil {
+		log.Warnf("could not count transactions: %s", err)
+	}
 	vals, _ := r.vocapp.State.Validators(true)
 	stats.ValidatorCount = len(vals)
 	stats.BlockTime = *r.vocinfo.BlockTimes()

@@ -218,7 +218,11 @@ func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 	defer func() { log.Debugf("GetEnvelopeHeight took %s", time.Since(startTime)) }()
 	if len(processID) == 0 {
 		// If no processID is provided, count all envelopes
-		return atomic.LoadUint64(&s.countTotalEnvelopes), nil
+		envelopeCountStore := &indexertypes.CountStore{}
+		if err := s.db.Get(indexertypes.CountStore_Envelopes, envelopeCountStore); err != nil {
+			return envelopeCountStore.Count, err
+		}
+		return envelopeCountStore.Count, nil
 	}
 	// Check if the envelope height is cached
 	val := s.envelopeHeightCache.Get(string(processID))
