@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,13 +26,6 @@ var ErrNoResultsYet = fmt.Errorf("no results yet")
 
 // ErrNotFoundIndatabase is raised if a database query returns no results
 var ErrNotFoundInDatabase = badgerhold.ErrNotFound
-
-// The string to search on the KV database error to identify a transaction conflict.
-// If the KV (currently badger) returns this error, it is considered non fatal and the
-// transaction will be retried until it works.
-// This check is made comparing string in order to avoid importing a specific KV
-// implementation.
-const kvErrorStringForRetry = "Transaction Conflict"
 
 // Getindexertypes.VoteReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
@@ -257,32 +249,20 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	// updateProcess. If we fetch the process, compute the results, then update the process,
 	// ComputeResult can override the process status set by updateProcess. UpdateMatching
 	// gets rid of the time between fetching and updating the process, eliminating this race.
-	maxTries := 1000
-	for {
-		if err := s.db.UpdateMatching(&indexertypes.Process{},
-			badgerhold.Where(badgerhold.Key).Eq(processID),
-			func(record interface{}) error {
-				update, ok := record.(*indexertypes.Process)
-				if !ok {
-					return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
-				}
-				update.HaveResults = true
-				update.FinalResults = true
-				return nil
-			},
-		); err != nil {
-			if strings.Contains(err.Error(), kvErrorStringForRetry) {
-				maxTries--
-				if maxTries == 0 {
-					return fmt.Errorf("computeResult: cannot update processID %x: max retires reached",
-						processID)
-				}
-				time.Sleep(time.Millisecond * 5)
-				continue
+	if err := s.updateMatchingWithoutTxConflicts(&indexertypes.Process{},
+		badgerhold.Where(badgerhold.Key).Eq(processID),
+		func(record interface{}) error {
+			update, ok := record.(*indexertypes.Process)
+			if !ok {
+				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 			}
-			return fmt.Errorf("computeResult: cannot update processID %x: %w, ", processID, err)
-		}
-		break
+			update.HaveResults = true
+			update.FinalResults = true
+			return nil
+		},
+		1000,
+	); err != nil {
+		return fmt.Errorf("computeResult: cannot update processID %x: %v", processID, err)
 	}
 	s.addVoteLock.Lock()
 	defer s.addVoteLock.Unlock()
@@ -467,31 +447,13 @@ func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 		return stored.Add(partialResults)
 	}
 
-	var err error
-	// If badgerhold returns a transaction conflict error message, we try again
-	// until it works (while maxTries < 1000)
-	maxTries := 1000
-	for maxTries > 0 {
-		err = s.db.UpdateMatching(&indexertypes.Results{},
-			badgerhold.Where(badgerhold.Key).Eq(pid), update)
-		if err == nil {
-			break
-		}
-		if strings.Contains(err.Error(), kvErrorStringForRetry) {
-			maxTries--
-			time.Sleep(5 * time.Millisecond)
-			continue
-		}
-		return err
-	}
-	if maxTries == 0 {
-		err = fmt.Errorf("got too many transaction conflicts")
-	}
-	if err != nil {
+	if err := s.updateMatchingWithoutTxConflicts(&indexertypes.Results{},
+		badgerhold.Where(badgerhold.Key).Eq(pid), update, 1000); err != nil {
 		log.Debugf("saved %d votes with total weight of %s on process %x", len(partialResults.Votes),
 			partialResults.Weight, pid)
+		return err
 	}
-	return err
+	return nil
 }
 
 // computeFinalResults walks through the envelopes of a process and computes the results.

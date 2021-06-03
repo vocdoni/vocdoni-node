@@ -363,23 +363,13 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 		update.Status = int32(p.GetStatus())
 		return nil
 	}
-	// Retry if error is "Transaction Conflict"
-	for {
-		if err := s.db.UpdateMatching(&indexertypes.Process{},
-			badgerhold.Where(badgerhold.Key).Eq(pid), updateFunc); err != nil {
-			if strings.Contains(err.Error(), kvErrorStringForRetry) {
-				continue
-			}
-			return err
-		}
-		break
-	}
-	return nil
+	return s.updateMatchingWithoutTxConflicts(&indexertypes.Process{},
+		badgerhold.Where(badgerhold.Key).Eq(pid), updateFunc, 1000)
 }
 
 // setResultsHeight updates the Rheight of any process whose ID is pid.
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
-	return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
+	return s.updateMatchingWithoutTxConflicts(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
 		func(record interface{}) error {
 			update, ok := record.(*indexertypes.Process)
 			if !ok {
@@ -387,7 +377,8 @@ func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
 			}
 			update.Rheight = height
 			return nil
-		})
+		},
+		1000)
 }
 
 // searchMatchFunc generates a function which compares a badgerhold record against searchTerm.
