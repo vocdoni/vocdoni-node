@@ -72,7 +72,7 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(database, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck //nolint:errcheck
+	defer tree.db.Close() //nolint:errcheck
 
 	bLen := tree.HashFunction().Len()
 	start := time.Now()
@@ -89,7 +89,7 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck //nolint:errcheck
+	defer tree2.db.Close() //nolint:errcheck
 	tree2.dbgInit()
 
 	var keys, values [][]byte
@@ -111,7 +111,7 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree.Root())
+	checkRoots(c, tree, tree2)
 }
 
 func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
@@ -152,7 +152,7 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree.Root())
+	checkRoots(c, tree, tree2)
 }
 
 func randomBytes(n int) []byte {
@@ -164,7 +164,7 @@ func randomBytes(n int) []byte {
 	return b
 }
 
-func TestAddBatchTreeEmptyTestVector(t *testing.T) {
+func TestAddBatchTestVector1(t *testing.T) {
 	c := qt.New(t)
 	database1, err := db.NewBadgerDB(c.TempDir())
 	c.Assert(err, qt.IsNil)
@@ -203,7 +203,7 @@ func TestAddBatchTreeEmptyTestVector(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, 0)
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	checkRoots(c, tree1, tree2)
 
 	// 2nd test vectors
 	database1, err = db.NewBadgerDB(c.TempDir())
@@ -247,7 +247,100 @@ func TestAddBatchTreeEmptyTestVector(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, 0)
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	checkRoots(c, tree1, tree2)
+}
+
+func TestAddBatchTestVector2(t *testing.T) {
+	// test vector with unbalanced tree
+	c := qt.New(t)
+
+	database, err := db.NewBadgerDB(c.TempDir())
+	c.Assert(err, qt.IsNil)
+	tree1, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree1.db.Close() //nolint:errcheck
+
+	database2, err := db.NewBadgerDB(c.TempDir())
+	c.Assert(err, qt.IsNil)
+	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close() //nolint:errcheck
+
+	bLen := tree1.HashFunction().Len()
+	var keys, values [][]byte
+	// 1
+	keys = append(keys, BigIntToBytes(bLen, big.NewInt(int64(1))))
+	values = append(values, BigIntToBytes(bLen, big.NewInt(int64(1))))
+	// 2
+	keys = append(keys, BigIntToBytes(bLen, big.NewInt(int64(2))))
+	values = append(values, BigIntToBytes(bLen, big.NewInt(int64(2))))
+	// 3
+	keys = append(keys, BigIntToBytes(bLen, big.NewInt(int64(3))))
+	values = append(values, BigIntToBytes(bLen, big.NewInt(int64(3))))
+	// 5
+	keys = append(keys, BigIntToBytes(bLen, big.NewInt(int64(5))))
+	values = append(values, BigIntToBytes(bLen, big.NewInt(int64(5))))
+
+	for i := 0; i < len(keys); i++ {
+		if err := tree1.Add(keys[i], values[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	indexes, err := tree2.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	c.Check(len(indexes), qt.Equals, 0)
+
+	// check that both trees roots are equal
+	checkRoots(c, tree1, tree2)
+}
+
+func TestAddBatchTestVector3(t *testing.T) {
+	// test vector with unbalanced tree
+	c := qt.New(t)
+
+	database, err := db.NewBadgerDB(c.TempDir())
+	c.Assert(err, qt.IsNil)
+	tree1, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree1.db.Close() //nolint:errcheck
+
+	database2, err := db.NewBadgerDB(c.TempDir())
+	c.Assert(err, qt.IsNil)
+	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close() //nolint:errcheck
+
+	bLen := tree1.HashFunction().Len()
+	var keys, values [][]byte
+	// 0
+	keys = append(keys, BigIntToBytes(bLen, big.NewInt(int64(0))))
+	values = append(values, BigIntToBytes(bLen, big.NewInt(int64(0))))
+	// 3
+	keys = append(keys, BigIntToBytes(bLen, big.NewInt(int64(3))))
+	values = append(values, BigIntToBytes(bLen, big.NewInt(int64(3))))
+	// 7
+	keys = append(keys, BigIntToBytes(bLen, big.NewInt(int64(7))))
+	values = append(values, BigIntToBytes(bLen, big.NewInt(int64(7))))
+	// 135
+	keys = append(keys, BigIntToBytes(bLen, big.NewInt(int64(135))))
+	values = append(values, BigIntToBytes(bLen, big.NewInt(int64(135))))
+
+	for i := 0; i < len(keys); i++ {
+		if err := tree1.Add(keys[i], values[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	indexes, err := tree2.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	c.Check(len(indexes), qt.Equals, 0)
+
+	// check that both trees roots are equal
+	checkRoots(c, tree1, tree2)
+	//
+	// tree1.PrintGraphvizFirstNLevels(nil, 100)
+	// tree2.PrintGraphvizFirstNLevels(nil, 100)
 }
 
 func TestAddBatchTreeEmptyRandomKeys(t *testing.T) {
@@ -283,7 +376,7 @@ func TestAddBatchTreeEmptyRandomKeys(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, 0)
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	checkRoots(c, tree1, tree2)
 }
 
 func TestAddBatchTreeNotEmptyFewLeafs(t *testing.T) {
@@ -326,7 +419,7 @@ func TestAddBatchTreeNotEmptyFewLeafs(t *testing.T) {
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	checkRoots(c, tree1, tree2)
 }
 
 func TestAddBatchTreeNotEmptyEnoughLeafs(t *testing.T) {
@@ -368,7 +461,7 @@ func TestAddBatchTreeNotEmptyEnoughLeafs(t *testing.T) {
 	}
 	c.Check(len(indexes), qt.Equals, 0)
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	checkRoots(c, tree1, tree2)
 }
 
 func TestAddBatchTreeEmptyRepeatedLeafs(t *testing.T) {
@@ -407,7 +500,7 @@ func TestAddBatchTreeEmptyRepeatedLeafs(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, nRepeatedKeys)
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	checkRoots(c, tree1, tree2)
 }
 
 func TestAddBatchTreeNotEmptyFewLeafsRepeatedLeafs(t *testing.T) {
@@ -439,7 +532,7 @@ func TestAddBatchTreeNotEmptyFewLeafsRepeatedLeafs(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, initialNLeafs)
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	checkRoots(c, tree1, tree2)
 }
 
 func TestSplitInBuckets(t *testing.T) {
@@ -583,7 +676,7 @@ func TestAddBatchTreeNotEmpty(t *testing.T) {
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	checkRoots(c, tree1, tree2)
 }
 
 func TestAddBatchNotEmptyUnbalanced(t *testing.T) {
@@ -648,7 +741,7 @@ func TestAddBatchNotEmptyUnbalanced(t *testing.T) {
 	c.Check(len(indexes), qt.Equals, 0)
 
 	// check that both trees roots are equal
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	checkRoots(c, tree1, tree2)
 }
 
 func TestFlp2(t *testing.T) {
@@ -781,8 +874,8 @@ func TestDbgStats(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(invalids), qt.Equals, 0)
 
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
-	c.Check(tree3.Root(), qt.DeepEquals, tree1.Root())
+	checkRoots(c, tree1, tree2)
+	checkRoots(c, tree1, tree3)
 
 	if debug {
 		fmt.Println("TestDbgStats")

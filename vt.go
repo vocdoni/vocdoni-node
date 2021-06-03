@@ -150,7 +150,6 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 			}
 
 			// remove the inserted element from buckets[i]
-			// fmt.Println("rm-ins", inserted)
 			if inserted != -1 {
 				buckets[i] = append(buckets[i][:inserted], buckets[i][inserted+1:]...)
 			}
@@ -253,10 +252,19 @@ func upFromNodes(ns []*node) (*node, error) {
 
 	var res []*node
 	for i := 0; i < len(ns); i += 2 {
-		if ns[i].typ() == vtEmpty && ns[i+1].typ() == vtEmpty {
-			// if ns[i] == nil && ns[i+1] == nil {
-			// when both sub nodes are empty, the node is also empty
-			res = append(res, ns[i]) // empty node
+		if (ns[i].typ() == vtEmpty && ns[i+1].typ() == vtEmpty) ||
+			(ns[i].typ() == vtLeaf && ns[i+1].typ() == vtEmpty) {
+			// when both sub nodes are empty, the parent is also empty
+			// or
+			// when 1st sub node is a leaf but the 2nd is empty, the
+			// leaf is used as parent
+			res = append(res, ns[i])
+			continue
+		}
+		if ns[i].typ() == vtEmpty && ns[i+1].typ() == vtLeaf {
+			// when 2nd sub node is a leaf but the 1st is empty, the
+			// leaf is used as 'parent'
+			res = append(res, ns[i+1])
 			continue
 		}
 		n := &node{
@@ -611,12 +619,21 @@ func (n *node) graphviz(w io.Writer, p *params, nEmpties int) (int, error) {
 		}
 		fmt.Fprintf(w, "\"%p\" [style=filled,label=\"%v\"];\n", n, hex.EncodeToString(leafKey[:nChars]))
 
+		k := n.k
+		v := n.v
+		if len(n.k) >= nChars {
+			k = n.k[:nChars]
+		}
+		if len(n.v) >= nChars {
+			v = n.v[:nChars]
+		}
+
 		fmt.Fprintf(w, "\"%p\" -> {\"k:%v\\nv:%v\"}\n", n,
-			hex.EncodeToString(n.k[:nChars]),
-			hex.EncodeToString(n.v[:nChars]))
+			hex.EncodeToString(k),
+			hex.EncodeToString(v))
 		fmt.Fprintf(w, "\"k:%v\\nv:%v\" [style=dashed]\n",
-			hex.EncodeToString(n.k[:nChars]),
-			hex.EncodeToString(n.v[:nChars]))
+			hex.EncodeToString(k),
+			hex.EncodeToString(v))
 	case vtMid:
 		fmt.Fprintf(w, "\"%p\" [label=\"\"];\n", n)
 
