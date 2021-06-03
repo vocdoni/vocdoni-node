@@ -2,15 +2,18 @@ package scrutinizer
 
 import (
 	"fmt"
-	"sync/atomic"
 
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
 
 // TransactionCount returns the number of transactions indexed
-func (s *Scrutinizer) TransactionCount() uint64 {
-	return atomic.LoadUint64(&s.countTotalTransactions)
+func (s *Scrutinizer) TransactionCount() (uint64, error) {
+	txCountStore := &indexertypes.CountStore{}
+	if err := s.db.Get(indexertypes.CountStore_Transactions, txCountStore); err != nil {
+		return txCountStore.Count, err
+	}
+	return txCountStore.Count, nil
 }
 
 // GetTxReference fetches the txReference for the given tx height

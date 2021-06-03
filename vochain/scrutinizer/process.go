@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/timshannon/badgerhold/v3"
@@ -160,8 +159,12 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) uint64 {
 	var c uint32
 	var err error
 	if len(entityID) == 0 {
-		// If no entity ID, return the cached count of all processes
-		return atomic.LoadUint64(&s.countTotalProcesses)
+		// If no entity ID, return the stored count of all processes
+		processCountStore := &indexertypes.CountStore{}
+		if err = s.db.Get(indexertypes.CountStore_Processes, processCountStore); err != nil {
+			log.Warnf("could not get the process count: %v", err)
+		}
+		return processCountStore.Count
 	}
 	if c, err = s.EntityProcessCount(entityID); err != nil {
 		log.Warnf("processCount: cannot fetch entity process count: %v", err)
@@ -199,7 +202,11 @@ func (s *Scrutinizer) EntityProcessCount(entityId []byte) (uint32, error) {
 
 // EntityCount return the number of entities indexed by the scrutinizer
 func (s *Scrutinizer) EntityCount() uint64 {
-	return atomic.LoadUint64(&s.countTotalEntities)
+	entityCountStore := &indexertypes.CountStore{}
+	if err := s.db.Get(indexertypes.CountStore_Entities, entityCountStore); err != nil {
+		log.Warnf("could not get the process count: %v", err)
+	}
+	return entityCountStore.Count
 }
 
 // Return whether a process must have live results or not
@@ -266,8 +273,15 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	}
 	s.addVoteLock.Unlock()
 
-	// Increment the total process count cache
-	atomic.AddUint64(&s.countTotalProcesses, 1)
+	// Increment the total process count storage
+	s.db.UpdateMatching(&indexertypes.CountStore{}, badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStore_Processes), func(record interface{}) error {
+		update, ok := record.(*indexertypes.CountStore)
+		if !ok {
+			return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
+		}
+		update.Count++
+		return nil
+	})
 
 	// Get the block time from the Header
 	currentBlockTime := time.Unix(s.App.State.Header(false).Timestamp, 0)
@@ -283,7 +297,15 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		entity.ID = eid
 		entity.CreationTime = currentBlockTime
 		entity.ProcessCount = 0
-		atomic.AddUint64(&s.countTotalEntities, 1)
+		// Increment the total entity count storage
+		s.db.UpdateMatching(&indexertypes.CountStore{}, badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStore_Entities), func(record interface{}) error {
+			update, ok := record.(*indexertypes.CountStore)
+			if !ok {
+				return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
+			}
+			update.Count++
+			return nil
+		})
 	}
 	// Increase the entity process count (and create new entity if does not exist)
 	entity.ProcessCount++
