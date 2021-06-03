@@ -179,7 +179,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 			continue
 		}
 		options := process.GetVoteOptions()
-		if err := s.db.Upsert(p, &indexertypes.Results{
+		if err := s.upsertWithoutTxConflicts(p, &indexertypes.Results{
 			ProcessID: p,
 			// MaxValue requires +1 since 0 is also an option
 			Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),

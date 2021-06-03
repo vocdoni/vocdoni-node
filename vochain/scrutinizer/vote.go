@@ -260,13 +260,12 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 			update.FinalResults = true
 			return nil
 		},
-		1000,
 	); err != nil {
 		return fmt.Errorf("computeResult: cannot update processID %x: %v", processID, err)
 	}
 	s.addVoteLock.Lock()
 	defer s.addVoteLock.Unlock()
-	if err := s.db.Upsert(processID, results); err != nil {
+	if err := s.upsertWithoutTxConflicts(processID, results); err != nil {
 		return err
 	}
 
@@ -392,7 +391,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 			CreationTime: time.Now(),
 		})
 	}
-	return s.db.Insert(nullifier, &indexertypes.VoteReference{
+	return s.insertWithoutTxConflicts(nullifier, &indexertypes.VoteReference{
 		Nullifier:    nullifier,
 		ProcessID:    pid,
 		Height:       blockHeight,
@@ -448,7 +447,7 @@ func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 	}
 
 	if err := s.updateMatchingWithoutTxConflicts(&indexertypes.Results{},
-		badgerhold.Where(badgerhold.Key).Eq(pid), update, 1000); err != nil {
+		badgerhold.Where(badgerhold.Key).Eq(pid), update); err != nil {
 		log.Debugf("saved %d votes with total weight of %s on process %x", len(partialResults.Votes),
 			partialResults.Weight, pid)
 		return err
