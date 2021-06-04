@@ -252,14 +252,16 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	// Create results in the indexer database
 	s.addVoteLock.Lock()
-	if err := s.insertWithoutTxConflicts(pid, &indexertypes.Results{
-		ProcessID: pid,
-		// MaxValue requires +1 since 0 is also an option
-		Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
-		Weight:       new(big.Int).SetUint64(0),
-		Signatures:   []types.HexBytes{},
-		VoteOpts:     p.GetVoteOptions(),
-		EnvelopeType: p.GetEnvelopeType(),
+	if err := s.queryWithRetries(func() error {
+		return s.db.Insert(pid, &indexertypes.Results{
+			ProcessID: pid,
+			// MaxValue requires +1 since 0 is also an option
+			Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+			Weight:       new(big.Int).SetUint64(0),
+			Signatures:   []types.HexBytes{},
+			VoteOpts:     p.GetVoteOptions(),
+			EnvelopeType: p.GetEnvelopeType(),
+		})
 	}); err != nil {
 		s.addVoteLock.Unlock()
 		return err
@@ -287,7 +289,9 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	}
 	// Increase the entity process count (and create new entity if does not exist)
 	entity.ProcessCount++
-	if err := s.upsertWithoutTxConflicts(eid, entity); err != nil {
+	if err := s.queryWithRetries(func() error {
+		return s.db.Upsert(eid, entity)
+	}); err != nil {
 		return err
 	}
 
@@ -325,7 +329,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		EntityIndex:       entity.ProcessCount,
 	}
 	log.Debugf("new indexer process %s", proc.String())
-	return s.insertWithoutTxConflicts(pid, proc)
+	return s.queryWithRetries(func() error { return s.db.Insert(pid, proc) })
 }
 
 // updateProcess synchronize those fields that can be updated on a existing process
@@ -363,21 +367,25 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 		update.Status = int32(p.GetStatus())
 		return nil
 	}
-	return s.updateMatchingWithoutTxConflicts(&indexertypes.Process{},
-		badgerhold.Where(badgerhold.Key).Eq(pid), updateFunc)
+	return s.queryWithRetries(func() error {
+		return s.db.UpdateMatching(&indexertypes.Process{},
+			badgerhold.Where(badgerhold.Key).Eq(pid), updateFunc)
+	})
 }
 
 // setResultsHeight updates the Rheight of any process whose ID is pid.
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
-	return s.updateMatchingWithoutTxConflicts(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
-		func(record interface{}) error {
-			update, ok := record.(*indexertypes.Process)
-			if !ok {
-				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
-			}
-			update.Rheight = height
-			return nil
-		})
+	return s.queryWithRetries(func() error {
+		return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
+			func(record interface{}) error {
+				update, ok := record.(*indexertypes.Process)
+				if !ok {
+					return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+				}
+				update.Rheight = height
+				return nil
+			})
+	})
 }
 
 // searchMatchFunc generates a function which compares a badgerhold record against searchTerm.

@@ -29,14 +29,10 @@ func InitDB(dataDir string) (*badgerhold.Store, error) {
 	return badgerhold.Open(opts)
 }
 
-func (s *Scrutinizer) updateMatchingWithoutTxConflicts(datatype interface{},
-	query *badgerhold.Query, update func(record interface{}) error) error {
+func (s *Scrutinizer) queryWithRetries(query func() error) error {
 	maxTries := 1000
 	for {
-		if err := s.db.UpdateMatching(datatype,
-			query,
-			update,
-		); err != nil {
+		if err := query(); err != nil {
 			if strings.Contains(err.Error(), kvErrorStringForRetry) {
 				maxTries--
 				if maxTries == 0 {
@@ -46,42 +42,6 @@ func (s *Scrutinizer) updateMatchingWithoutTxConflicts(datatype interface{},
 				continue
 			}
 			return fmt.Errorf("cannot update record: %w, ", err)
-		}
-		return nil
-	}
-}
-
-func (s *Scrutinizer) upsertWithoutTxConflicts(key interface{}, data interface{}) error {
-	maxTries := 1000
-	for {
-		if err := s.db.Upsert(key, data); err != nil {
-			if strings.Contains(err.Error(), kvErrorStringForRetry) {
-				maxTries--
-				if maxTries == 0 {
-					return fmt.Errorf("cannot update record: max retires reached")
-				}
-				time.Sleep(time.Millisecond * 5)
-				continue
-			}
-			return fmt.Errorf("cannot update record %v: %w, ", key, err)
-		}
-		return nil
-	}
-}
-
-func (s *Scrutinizer) insertWithoutTxConflicts(key interface{}, data interface{}) error {
-	maxTries := 1000
-	for {
-		if err := s.db.Insert(key, data); err != nil {
-			if strings.Contains(err.Error(), kvErrorStringForRetry) {
-				maxTries--
-				if maxTries == 0 {
-					return fmt.Errorf("cannot update record: max retires reached")
-				}
-				time.Sleep(time.Millisecond * 5)
-				continue
-			}
-			return fmt.Errorf("cannot update record %v: %w, ", key, err)
 		}
 		return nil
 	}

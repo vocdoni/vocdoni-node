@@ -249,23 +249,25 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	// updateProcess. If we fetch the process, compute the results, then update the process,
 	// ComputeResult can override the process status set by updateProcess. UpdateMatching
 	// gets rid of the time between fetching and updating the process, eliminating this race.
-	if err := s.updateMatchingWithoutTxConflicts(&indexertypes.Process{},
-		badgerhold.Where(badgerhold.Key).Eq(processID),
-		func(record interface{}) error {
-			update, ok := record.(*indexertypes.Process)
-			if !ok {
-				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
-			}
-			update.HaveResults = true
-			update.FinalResults = true
-			return nil
-		},
-	); err != nil {
+	if err := s.queryWithRetries(func() error {
+		return s.db.UpdateMatching(&indexertypes.Process{},
+			badgerhold.Where(badgerhold.Key).Eq(processID),
+			func(record interface{}) error {
+				update, ok := record.(*indexertypes.Process)
+				if !ok {
+					return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+				}
+				update.HaveResults = true
+				update.FinalResults = true
+				return nil
+			},
+		)
+	}); err != nil {
 		return fmt.Errorf("computeResult: cannot update processID %x: %v", processID, err)
 	}
 	s.addVoteLock.Lock()
 	defer s.addVoteLock.Unlock()
-	if err := s.upsertWithoutTxConflicts(processID, results); err != nil {
+	if err := s.queryWithRetries(func() error { return s.db.Upsert(processID, results) }); err != nil {
 		return err
 	}
 
@@ -391,13 +393,15 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 			CreationTime: time.Now(),
 		})
 	}
-	return s.insertWithoutTxConflicts(nullifier, &indexertypes.VoteReference{
-		Nullifier:    nullifier,
-		ProcessID:    pid,
-		Height:       blockHeight,
-		Weight:       new(big.Int).SetBytes(weight),
-		TxIndex:      txIndex,
-		CreationTime: time.Now(),
+	return s.queryWithRetries(func() error {
+		return s.db.Insert(nullifier, &indexertypes.VoteReference{
+			Nullifier:    nullifier,
+			ProcessID:    pid,
+			Height:       blockHeight,
+			Weight:       new(big.Int).SetBytes(weight),
+			TxIndex:      txIndex,
+			CreationTime: time.Now(),
+		})
 	})
 }
 
@@ -446,8 +450,10 @@ func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 		return stored.Add(partialResults)
 	}
 
-	if err := s.updateMatchingWithoutTxConflicts(&indexertypes.Results{},
-		badgerhold.Where(badgerhold.Key).Eq(pid), update); err != nil {
+	if err := s.queryWithRetries(func() error {
+		return s.db.UpdateMatching(&indexertypes.Results{},
+			badgerhold.Where(badgerhold.Key).Eq(pid), update)
+	}); err != nil {
 		log.Debugf("saved %d votes with total weight of %s on process %x", len(partialResults.Votes),
 			partialResults.Weight, pid)
 		return err
