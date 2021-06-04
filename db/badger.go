@@ -13,6 +13,8 @@ type BadgerDB struct {
 	db   *badger.DB
 }
 
+var _ Database = (*BadgerDB)(nil)
+
 func NewBadgerDB(path string) (*BadgerDB, error) {
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
 		return nil, err

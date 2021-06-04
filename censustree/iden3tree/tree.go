@@ -25,6 +25,8 @@ type Tree struct {
 	lastAccessUnix int64 // a unix timestamp, used via sync/atomic
 }
 
+var _ censustree.Tree = (*Tree)(nil)
+
 type exportElement struct {
 	Key   []byte `bare:"key"`
 	Value []byte `bare:"value"`
