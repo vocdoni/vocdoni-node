@@ -245,14 +245,16 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 			continue
 		}
 		options := process.GetVoteOptions()
-		if err := s.upsertWithoutTxConflicts(p, &indexertypes.Results{
-			ProcessID: p,
-			// MaxValue requires +1 since 0 is also an option
-			Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
-			Weight:       new(big.Int).SetUint64(0),
-			VoteOpts:     options,
-			EnvelopeType: process.GetEnvelopeType(),
-			Signatures:   []types.HexBytes{},
+		if err := s.queryWithRetries(func() error {
+			return s.db.Upsert(p, &indexertypes.Results{
+				ProcessID: p,
+				// MaxValue requires +1 since 0 is also an option
+				Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+				Weight:       new(big.Int).SetUint64(0),
+				VoteOpts:     options,
+				EnvelopeType: process.GetEnvelopeType(),
+				Signatures:   []types.HexBytes{},
+			})
 		}); err != nil {
 			log.Errorf("cannot upsert results to db: %v", err)
 			continue
