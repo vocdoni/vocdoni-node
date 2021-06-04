@@ -30,6 +30,7 @@ type Tree struct {
 	lastAccessUnix int64 // a unix timestamp, used via sync/atomic
 }
 
+// check that censustree.Tree interface is matched by Tree
 var _ censustree.Tree = (*Tree)(nil)
 
 type exportElement struct {
@@ -70,6 +71,7 @@ func NewTree(name, storageDir string) (censustree.Tree, error) {
 	return tr, nil
 }
 
+// Init initializes the Tree using the given storage directory.
 func (t *Tree) Init(name, storageDir string) error {
 	ct, err := NewTree(name, storageDir)
 	if err != nil {
@@ -83,6 +85,7 @@ func (t *Tree) Init(name, storageDir string) error {
 	return nil
 }
 
+// MaxKeySize returns the maximum key size supported by the Tree
 func (t *Tree) MaxKeySize() int {
 	return MaxKeySize
 }
@@ -113,7 +116,7 @@ func (t *Tree) IsPublic() bool {
 	return atomic.LoadUint32(&t.public) == 1
 }
 
-// Add adds a new claim to the merkle tree
+// Add adds a new leaf to the merkle tree
 // A claim is composed of two parts: index and value
 //  1.index is mandatory, the data will be used for indexing the claim into to merkle tree
 //  2.value is optional, the data will not affect the indexing
