@@ -1,13 +1,12 @@
 /*
 Package arbo implements a Merkle Tree compatible with the circomlib
-implementation of the MerkleTree (when using the Poseidon hash function),
-following the specification from
+implementation of the MerkleTree, following the specification from
 https://docs.iden3.io/publications/pdfs/Merkle-Tree.pdf and
 https://eprint.iacr.org/2018/955.
 
-Also allows to define which hash function to use. So for example, when working
-with zkSnarks the Poseidon hash function can be used, but when not, it can be
-used the Blake3 hash function, which improves the computation time.
+Allows to define which hash function to use. So for example, when working with
+zkSnarks the Poseidon hash function can be used, but when not, it can be used
+the Blake2b hash function, which has much faster computation time.
 */
 package arbo
 
@@ -966,9 +965,6 @@ func (t *Tree) PrintGraphvizFirstNLevels(rootKey []byte, untilLvl int) error {
 	return nil
 }
 
-// Purge WIP: unimplemented TODO
-func (t *Tree) Purge(keys [][]byte) error {
-	return nil
-}
-
 // TODO circom proofs
+// TODO data structure for proofs (including root, key, value, siblings,
+// hashFunction) + method to verify that data structure
