@@ -274,14 +274,16 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	s.addVoteLock.Unlock()
 
 	// Increment the total process count storage
-	s.db.UpdateMatching(&indexertypes.CountStore{}, badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStore_Processes), func(record interface{}) error {
+	s.db.UpdateMatching(&indexertypes.CountStore{}, badgerhold.Where(badgerhold.Key).
+		Eq(indexertypes.CountStore_Processes), func(record interface{}) error {
 		update, ok := record.(*indexertypes.CountStore)
 		if !ok {
 			return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
 		}
 		update.Count++
 		return nil
-	})
+	},
+	)
 
 	// Get the block time from the Header
 	currentBlockTime := time.Unix(s.App.State.Header(false).Timestamp, 0)
