@@ -153,14 +153,13 @@ func (s *Scrutinizer) retrieveCounts() (*indexertypes.CountStore,
 		log.Warnf("could not get the process count: %v", err)
 		count, err := s.db.Count(&indexertypes.Process{}, &badgerhold.Query{})
 		if err != nil {
-			log.Warnf("could not count total processes: %v", err)
-		} else {
-			// Store new countStore value
-			processCountStore.Count = uint64(count)
-			processCountStore.Type = indexertypes.CountStore_Processes
-			if err := s.db.Upsert(processCountStore.Type, processCountStore); err != nil {
-				log.Warnf("could not store process count: %v", err)
-			}
+			log.Fatalf("could not count total processes: %v", err)
+		}
+		// Store new countStore value
+		processCountStore.Count = uint64(count)
+		processCountStore.Type = indexertypes.CountStore_Processes
+		if err := s.db.Upsert(processCountStore.Type, processCountStore); err != nil {
+			log.Warnf("could not store process count: %v", err)
 		}
 	}
 	entityCountStore := new(indexertypes.CountStore)
