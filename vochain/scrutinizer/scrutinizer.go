@@ -71,8 +71,10 @@ type Scrutinizer struct {
 	// try to minimize this situations in order to improve performance on the KV.
 	// TODO (pau): remove this mutex and relay on the KV layer
 	addVoteLock sync.RWMutex
-	// indexTxLock is used to avoid Transaction Conflicts on the vote index KV database.
-	indexTxLock sync.RWMutex
+	// voteTxLock is used to avoid Transaction Conflicts on the vote index KV database.
+	voteTxLock sync.RWMutex
+	// txIndexLock is used to avoid Transaction Conflicts on the transaction index KV database.
+	txIndexLock sync.Mutex
 	// recoveryBootLock prevents Commit() to add new votes while the recovery bootstratp is
 	// being executed.
 	recoveryBootLock sync.RWMutex
@@ -319,7 +321,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		}
 	}
 	if len(s.voteIndexPool) > 0 {
-		s.indexTxLock.Lock()
+		s.voteTxLock.Lock()
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		txn.CommitWith(func(err error) {
@@ -329,7 +331,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 			wg.Done()
 		})
 		wg.Wait()
-		s.indexTxLock.Unlock()
+		s.voteTxLock.Unlock()
 		log.Infof("indexed %d new envelopes, took %s",
 			len(s.voteIndexPool), time.Since(startTime))
 		envelopeCount := &indexertypes.CountStore{}

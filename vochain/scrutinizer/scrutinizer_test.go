@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -968,6 +969,7 @@ func TestTxIndexer(t *testing.T) {
 		}
 	}
 	qt.Assert(t, sc.Commit(0), qt.IsNil)
+	time.Sleep(3 * time.Second)
 
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 10; j++ {
