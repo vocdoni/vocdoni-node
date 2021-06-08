@@ -1,4 +1,4 @@
-# arbo [![GoDoc](https://godoc.org/github.com/arnaucube/arbo?status.svg)](https://godoc.org/github.com/arnaucube/arbo) [![Go Report Card](https://goreportcard.com/badge/github.com/arnaucube/arbo)](https://goreportcard.com/report/github.com/arnaucube/arbo) [![Test](https://github.com/arnaucube/arbo/workflows/Test/badge.svg)](https://github.com/arnaucube/arbo/actions?query=workflow%3ATest)
+# arbo [![GoDoc](https://godoc.org/github.com/vocdoni/arbo?status.svg)](https://godoc.org/github.com/vocdoni/arbo) [![Go Report Card](https://goreportcard.com/badge/github.com/vocdoni/arbo)](https://goreportcard.com/report/github.com/vocdoni/arbo) [![Test](https://github.com/vocdoni/arbo/workflows/Test/badge.svg)](https://github.com/vocdoni/arbo/actions?query=workflow%3ATest)
 
 > *arbo*: tree in Esperanto.
 
@@ -20,14 +20,13 @@ database, err := db.NewBadgerDB(c.TempDir())
 // create new Tree with maxLevels=100 and Blake2b hash function
 tree, err := arbo.NewTree(database, 100, arbo.HashFunctionBlake2b)
 
-
 key := []byte("hello")
 value := []byte("world")
+// Add a key & value into the merkle tree
 err = tree.Add(key, value)
 
-
 // There are cases where multiple key-values (leafs) are going to be added to a
-// Tree, for these cases is more effitient to use:
+// Tree, for these cases is more efficient to use:
 invalids, err := tree.AddBatch(keys, values)
 
 // generate the merkle proof of a leaf by it's key

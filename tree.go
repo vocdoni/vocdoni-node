@@ -299,7 +299,7 @@ func (t *Tree) down(newKey, currKey []byte, siblings [][]byte,
 			" should avoid reaching this point. This panic is temporary" +
 			" for reporting purposes, will be deleted in future versions." +
 			" Please paste this log (including the previous lines) in a" +
-			" new issue: https://github.com/arnaucube/arbo/issues/new") // TMP
+			" new issue: https://github.com/vocdoni/arbo/issues/new") // TMP
 	case PrefixValueLeaf: // leaf
 		if !bytes.Equal(currValue, emptyValue) {
 			if getLeaf {

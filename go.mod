@@ -1,4 +1,4 @@
-module github.com/arnaucube/arbo
+module github.com/vocdoni/arbo
 
 go 1.16
 
