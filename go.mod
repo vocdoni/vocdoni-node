@@ -34,8 +34,6 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.1-0.20180906183839-65a6292f0157 // indirect
-	github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78
-	github.com/iden3/go-iden3-crypto v0.0.4
 	github.com/ipfs/go-bitswap v0.3.4-0.20210226182239-d1d4afa29da4 // indirect
 	github.com/ipfs/go-block-format v0.0.3 // indirect
 	github.com/ipfs/go-cid v0.0.7

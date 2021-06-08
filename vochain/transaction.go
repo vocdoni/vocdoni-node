@@ -9,7 +9,6 @@ import (
 	ethtoken "github.com/vocdoni/storage-proofs-eth-go/token"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
-	"go.vocdoni.io/dvote/crypto/snarks"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -250,7 +249,8 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 		switch process.CensusOrigin {
 		case models.CensusOrigin_OFF_CHAIN_TREE:
 			if process.EnvelopeType.Anonymous {
-				pubKeyDigested = snarks.Poseidon.Hash(pubKey)
+				// TODO Poseidon hash of pubKey
+				// pubKeyDigested = snarks.Poseidon.Hash(pubKey)
 			} else {
 				pubKeyDigested = pubKey
 			}
