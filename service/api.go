@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"go.vocdoni.io/dvote/census"
@@ -83,7 +84,7 @@ func API(apiconfig *config.API, pxy *mhttp.Proxy, storage data.Storage, cm *cens
 		for {
 			time.Sleep(120 * time.Second)
 			log.Infof("[router info] privateReqs:%d publicReqs:%d",
-				routerAPI.PrivateCalls, routerAPI.PublicCalls)
+				atomic.LoadUint64(&routerAPI.PrivateCalls), atomic.LoadUint64(&routerAPI.PublicCalls))
 		}
 	}()
 	return routerAPI, nil
