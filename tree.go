@@ -756,6 +756,30 @@ func (t *Tree) GetNLeafs() (int, error) {
 	return int(nLeafs), nil
 }
 
+// Snapshot returns a copy of the Tree from the given root
+func (t *Tree) Snapshot(rootKey []byte) (*Tree, error) {
+	// TODO currently this method only changes the 'root pointer', but the
+	// db continues being the same. In a future iteration, once the
+	// db.Database interface allows to do database checkpoints, this method
+	// could be updated to do a full checkpoint of the database for the
+	// snapshot, to return a completly new independent tree containing the
+	// snapshot.
+	t.RLock()
+	defer t.RUnlock()
+
+	// allow to define which root to use
+	if rootKey == nil {
+		rootKey = t.Root()
+	}
+	return &Tree{
+		db:           t.db,
+		maxLevels:    t.maxLevels,
+		root:         rootKey,
+		hashFunction: t.hashFunction,
+		dbg:          t.dbg,
+	}, nil
+}
+
 // Iterate iterates through the full Tree, executing the given function on each
 // node of the Tree.
 func (t *Tree) Iterate(rootKey []byte, f func([]byte, []byte)) error {
@@ -844,8 +868,8 @@ func (t *Tree) Dump(rootKey []byte) ([]byte, error) {
 	return b, err
 }
 
-// ImportDump imports the leafs (that have been exported with the ExportLeafs
-// method) in the Tree.
+// ImportDump imports the leafs (that have been exported with the Dump method)
+// in the Tree.
 func (t *Tree) ImportDump(b []byte) error {
 	r := bytes.NewReader(b)
 	var err error

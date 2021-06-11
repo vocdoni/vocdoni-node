@@ -427,6 +427,61 @@ func TestSetGetNLeafs(t *testing.T) {
 	c.Assert(n, qt.Equals, maxInt)
 }
 
+func TestSnapshot(t *testing.T) {
+	c := qt.New(t)
+	database, err := db.NewBadgerDB(c.TempDir())
+	c.Assert(err, qt.IsNil)
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+
+	// fill the tree
+	bLen := tree.HashFunction().Len()
+	var keys, values [][]byte
+	for i := 0; i < 1000; i++ {
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	indexes, err := tree.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	c.Check(len(indexes), qt.Equals, 0)
+
+	rootBI := BytesToBigInt(tree.Root())
+	c.Check(rootBI.String(), qt.Equals,
+		"13742386369878513332697380582061714160370929283209286127733983161245560237407")
+
+	tree2, err := tree.Snapshot(nil)
+	c.Assert(err, qt.IsNil)
+	rootBI = BytesToBigInt(tree2.Root())
+	c.Check(rootBI.String(), qt.Equals,
+		"13742386369878513332697380582061714160370929283209286127733983161245560237407")
+
+	// add k-v to original tree
+	k := BigIntToBytes(bLen, big.NewInt(int64(1000)))
+	v := BigIntToBytes(bLen, big.NewInt(int64(1000)))
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
+
+	// expect original tree to have new root
+	rootBI = BytesToBigInt(tree.Root())
+	c.Check(rootBI.String(), qt.Equals,
+		"10747149055773881257049574592162159501044114324358186833013814735296193179713")
+
+	// expect snapshot tree to have the old root
+	rootBI = BytesToBigInt(tree2.Root())
+	c.Check(rootBI.String(), qt.Equals,
+		"13742386369878513332697380582061714160370929283209286127733983161245560237407")
+
+	err = tree2.Add(k, v)
+	c.Assert(err, qt.IsNil)
+	// after adding also the k-v into the snapshot tree, expect original
+	// tree to have new root
+	rootBI = BytesToBigInt(tree.Root())
+	c.Check(rootBI.String(), qt.Equals,
+		"10747149055773881257049574592162159501044114324358186833013814735296193179713")
+}
+
 func BenchmarkAdd(b *testing.B) {
 	bLen := 32 // for both Poseidon & Sha256
 	// prepare inputs
