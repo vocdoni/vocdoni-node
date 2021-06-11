@@ -11,7 +11,7 @@ import (
 // TransactionCount returns the number of transactions indexed
 func (s *Scrutinizer) TransactionCount() (uint64, error) {
 	txCountStore := &indexertypes.CountStore{}
-	if err := s.db.Get(indexertypes.CountStore_Transactions, txCountStore); err != nil {
+	if err := s.db.Get(indexertypes.CountStoreTransactions, txCountStore); err != nil {
 		return txCountStore.Count, err
 	}
 	return txCountStore.Count, nil
@@ -41,7 +41,7 @@ func (s *Scrutinizer) indexNewTxs(txList []*indexertypes.TxReference) {
 	if len(txList) > 0 {
 		s.txIndexLock.Lock()
 		txCount := &indexertypes.CountStore{}
-		if err := s.db.Get(indexertypes.CountStore_Transactions, txCount); err != nil {
+		if err := s.db.Get(indexertypes.CountStoreTransactions, txCount); err != nil {
 			log.Errorf("could not get tx count: %v", err)
 		}
 		for i, tx := range txList {
@@ -53,7 +53,7 @@ func (s *Scrutinizer) indexNewTxs(txList []*indexertypes.TxReference) {
 		}
 		// Store new transaction count
 		txCount.Count += uint64(len(txList))
-		if err := s.db.Upsert(indexertypes.CountStore_Transactions, txCount); err != nil {
+		if err := s.db.Upsert(indexertypes.CountStoreTransactions, txCount); err != nil {
 			log.Errorf("could not update tx count: %v", err)
 		}
 		s.txIndexLock.Unlock()
