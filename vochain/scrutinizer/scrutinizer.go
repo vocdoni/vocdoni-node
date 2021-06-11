@@ -354,14 +354,19 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		s.voteTxLock.Unlock()
 		log.Infof("indexed %d new envelopes, took %s",
 			len(s.voteIndexPool), time.Since(startTime))
-		envelopeCount := &indexertypes.CountStore{}
-		if err := s.db.Get(indexertypes.CountStoreEnvelopes, envelopeCount); err != nil {
+
+		if err := s.db.UpdateMatching(&indexertypes.CountStore{},
+			badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStoreEnvelopes),
+			func(record interface{}) error {
+				update, ok := record.(*indexertypes.CountStore)
+				if !ok {
+					return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
+				}
+				update.Count += uint64(len(s.voteIndexPool))
+				return nil
+			},
+		); err != nil {
 			log.Errorf("could not get envelope count: %v", err)
-		}
-		// Store new envelope count
-		envelopeCount.Count += uint64(len(s.voteIndexPool))
-		if err := s.db.Upsert(indexertypes.CountStoreEnvelopes, envelopeCount); err != nil {
-			log.Errorf("could not update envelope count: %v", err)
 		}
 	}
 	txn.Discard()
