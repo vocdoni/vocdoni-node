@@ -13,14 +13,14 @@ import (
 )
 
 const (
-	// CountStore_Entities is the key for the entity count db reference
-	CountStore_Entities uint8 = 0
-	// CountStore_Processes is the key for the process count db reference
-	CountStore_Processes uint8 = 1
-	// CountStore_Envelopes is the key for the envelope count db reference
-	CountStore_Envelopes uint8 = 2
-	// CountStore_Transactions is the key for the transaction count db reference
-	CountStore_Transactions uint8 = 3
+	// CountStoreEntities is the key for the entity count db reference
+	CountStoreEntities uint8 = 0
+	// CountStoreProcesses is the key for the process count db reference
+	CountStoreProcesses uint8 = 1
+	// CountStoreEnvelopes is the key for the envelope count db reference
+	CountStoreEnvelopes uint8 = 2
+	// CountStoreTransactions is the key for the transaction count db reference
+	CountStoreTransactions uint8 = 3
 )
 
 // CountStore holds the count of envelopes, processes, entities, or transactions

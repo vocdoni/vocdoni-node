@@ -219,8 +219,8 @@ func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 	if len(processID) == 0 {
 		// If no processID is provided, count all envelopes
 		envelopeCountStore := &indexertypes.CountStore{}
-		if err := s.db.Get(indexertypes.CountStore_Envelopes, envelopeCountStore); err != nil {
-			return envelopeCountStore.Count, err
+		if err := s.db.Get(indexertypes.CountStoreEnvelopes, envelopeCountStore); err != nil {
+			return 0, err
 		}
 		return envelopeCountStore.Count, nil
 	}

@@ -161,7 +161,7 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) uint64 {
 	if len(entityID) == 0 {
 		// If no entity ID, return the stored count of all processes
 		processCountStore := &indexertypes.CountStore{}
-		if err = s.db.Get(indexertypes.CountStore_Processes, processCountStore); err != nil {
+		if err = s.db.Get(indexertypes.CountStoreProcesses, processCountStore); err != nil {
 			log.Warnf("could not get the process count: %v", err)
 		}
 		return processCountStore.Count
@@ -203,8 +203,9 @@ func (s *Scrutinizer) EntityProcessCount(entityId []byte) (uint32, error) {
 // EntityCount return the number of entities indexed by the scrutinizer
 func (s *Scrutinizer) EntityCount() uint64 {
 	entityCountStore := &indexertypes.CountStore{}
-	if err := s.db.Get(indexertypes.CountStore_Entities, entityCountStore); err != nil {
+	if err := s.db.Get(indexertypes.CountStoreEntities, entityCountStore); err != nil {
 		log.Warnf("could not get the process count: %v", err)
+		return 0
 	}
 	return entityCountStore.Count
 }
@@ -275,7 +276,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	// Increment the total process count storage
 	s.db.UpdateMatching(&indexertypes.CountStore{}, badgerhold.Where(badgerhold.Key).
-		Eq(indexertypes.CountStore_Processes), func(record interface{}) error {
+		Eq(indexertypes.CountStoreProcesses), func(record interface{}) error {
 		update, ok := record.(*indexertypes.CountStore)
 		if !ok {
 			return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
@@ -300,7 +301,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		entity.CreationTime = currentBlockTime
 		entity.ProcessCount = 0
 		// Increment the total entity count storage
-		s.db.UpdateMatching(&indexertypes.CountStore{}, badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStore_Entities), func(record interface{}) error {
+		s.db.UpdateMatching(&indexertypes.CountStore{}, badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStoreEntities), func(record interface{}) error {
 			update, ok := record.(*indexertypes.CountStore)
 			if !ok {
 				return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
