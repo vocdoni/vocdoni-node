@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -246,9 +247,9 @@ func (r *Router) Route() {
 		}
 		log.Debugf("api query %s", request.MetaRequest.String())
 		if request.private {
-			r.PrivateCalls++
+			atomic.AddUint64(&r.PrivateCalls, 1)
 		} else {
-			r.PublicCalls++
+			atomic.AddUint64(&r.PublicCalls, 1)
 		}
 
 		if r.metricsagent != nil {
