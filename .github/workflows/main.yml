@@ -1,5 +1,4 @@
 ---
-
 name: Main
 
 on: [push, pull_request]
@@ -15,20 +14,20 @@ jobs:
       run:
         shell: bash
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-    - name: Go test
-      run: |
-        # we run vet in another step
-        go test -vet=off -timeout=1m ./...
-        # -race can easily make the crypto stuff 10x slower
-        go test -vet=off -timeout=15m -race -covermode atomic -coverprofile=covprofile ./...
-    - name: Go analyze
-      run: |
-        diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
-        go vet ./...
-        curl -L https://github.com/dominikh/go-tools/releases/download/2020.2.1/staticcheck_linux_amd64.tar.gz | tar -xzf -
-        ./staticcheck/staticcheck ./...
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Go test
+        run: |
+          # we run vet in another step
+          go test -vet=off -timeout=1m ./...
+          # -race can easily make the crypto stuff 10x slower
+          go test -vet=off -timeout=15m -race -covermode atomic -coverprofile=covprofile ./...
+      - name: Go analyze
+        run: |
+          diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
+          go vet ./...
+          curl -L https://github.com/dominikh/go-tools/releases/download/2020.2.1/staticcheck_linux_amd64.tar.gz | tar -xzf -
+          ./staticcheck/staticcheck ./...
 
   compose-test:
     runs-on: self-hosted
@@ -51,8 +50,7 @@ jobs:
   docker-release:
     runs-on: self-hosted
     needs: [go-tests, compose-test]
-    if:
-      github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -85,7 +83,7 @@ jobs:
         shell: bash
         # Grab the short branch name, convert slashes to dashes
         run: |
-         echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' )"
+          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' )"
       - name: Push to Docker Hub, Packages and ghcr.io
         uses: docker/build-push-action@v2
         with:
@@ -95,3 +93,15 @@ jobs:
           tags: |
             vocdoni/go-dvote:latest, vocdoni/go-dvote:${{ steps.var.outputs.branch }},
             ghcr.io/vocdoni/go-dvote:latest,ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch }}
+
+      - name: Push to Docker Hub, Packages and ghcr.io (race enabled)
+        uses: docker/build-push-action@v2
+        if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master'
+        with:
+          context: .
+          push: true
+          build-args: |
+            BUILDARGS=-race
+          tags: |
+            vocdoni/go-dvote:latest-race, vocdoni/go-dvote:${{ steps.var.outputs.branch }}-race,
+            ghcr.io/vocdoni/go-dvote:latest-race,ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch }}-race
