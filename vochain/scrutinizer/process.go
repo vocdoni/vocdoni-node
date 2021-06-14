@@ -162,12 +162,14 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) uint64 {
 		// If no entity ID, return the stored count of all processes
 		processCountStore := &indexertypes.CountStore{}
 		if err = s.db.Get(indexertypes.CountStoreProcesses, processCountStore); err != nil {
-			log.Warnf("could not get the process count: %v", err)
+			log.Errorf("could not get the process count: %v", err)
+			return 0
 		}
 		return processCountStore.Count
 	}
 	if c, err = s.EntityProcessCount(entityID); err != nil {
-		log.Warnf("processCount: cannot fetch entity process count: %v", err)
+		log.Errorf("processCount: cannot fetch entity process count: %v", err)
+		return 0
 	}
 	return uint64(c)
 }
@@ -204,7 +206,7 @@ func (s *Scrutinizer) EntityProcessCount(entityId []byte) (uint32, error) {
 func (s *Scrutinizer) EntityCount() uint64 {
 	entityCountStore := &indexertypes.CountStore{}
 	if err := s.db.Get(indexertypes.CountStoreEntities, entityCountStore); err != nil {
-		log.Warnf("could not get the process count: %v", err)
+		log.Errorf("could not get the entity count: %v", err)
 		return 0
 	}
 	return entityCountStore.Count

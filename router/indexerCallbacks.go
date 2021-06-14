@@ -19,11 +19,11 @@ func (r *Router) getStats(request RouterRequest) {
 	stats.BlockTimeStamp = int32(r.vocapp.State.Header(true).Timestamp)
 	stats.EntityCount = int64(r.Scrutinizer.EntityCount())
 	if stats.EnvelopeCount, err = r.Scrutinizer.GetEnvelopeHeight([]byte{}); err != nil {
-		log.Warnf("could not count vote envelopes: %s", err)
+		r.SendError(request, fmt.Sprintf("could not count vote envelopes: (%s)", err))
 	}
 	stats.ProcessCount = int64(r.Scrutinizer.ProcessCount([]byte{}))
 	if stats.TransactionCount, err = r.Scrutinizer.TransactionCount(); err != nil {
-		log.Warnf("could not count transactions: %s", err)
+		r.SendError(request, fmt.Sprintf("could not count transactions: (%s)", err))
 	}
 	vals, _ := r.vocapp.State.Validators(true)
 	stats.ValidatorCount = len(vals)
@@ -35,7 +35,8 @@ func (r *Router) getStats(request RouterRequest) {
 	var response api.MetaResponse
 	response.Stats = stats
 	if err != nil {
-		log.Errorf("could not marshal vochainStats: %s", err)
+		r.SendError(request, fmt.Sprintf("could not marshal vochainStats: (%s)", err))
+		return
 	}
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
