@@ -98,7 +98,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		// Get process metadata
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
-		processTx, err := newProcessMeta(tctx, &e.ContractsInfo["processes"].ABI,
+		processTx, err := newProcessMeta(tctx, &e.ContractsInfo[ethereumhandler.ContractNameProcesses].ABI,
 			event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain process data for creating the transaction: %w", err)
@@ -256,7 +256,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		addOracleTx, err := genesisOracleAddedMeta(tctx,
-			&e.ContractsInfo["genesis"].ABI, event.Data, e.VotingHandle)
+			&e.ContractsInfo[ethereumhandler.ContractNameGenesis].ABI, event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain addOracle data for creating the transaction: %w", err)
 		}
@@ -297,7 +297,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		removeOracleTx, err := genesisOracleRemovedMeta(tctx,
-			&e.ContractsInfo["genesis"].ABI, event.Data, e.VotingHandle)
+			&e.ContractsInfo[ethereumhandler.ContractNameGenesis].ABI, event.Data, e.VotingHandle)
 		if err != nil {
 			return fmt.Errorf("cannot obtain removeOracle data for creating the transaction: %w", err)
 		}
