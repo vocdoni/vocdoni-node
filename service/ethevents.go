@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	chain "go.vocdoni.io/dvote/ethereum"
@@ -37,19 +36,6 @@ func EthEvents(
 		return fmt.Errorf("cannot get specs for the selected network: %w", err)
 	}
 
-	web3Client, err := ethclient.Dial(w3uri)
-	if err != nil {
-		return fmt.Errorf("cannot connect to the web3 endpoint: %w", err)
-	}
-
-	for name, contract := range specs.Contracts {
-		if !contract.ListenForEvents {
-			continue
-		}
-		if err := contract.InitContract(ctx, name, specs.Contracts["ensRegistry"].Address, web3Client); err != nil {
-			return fmt.Errorf("cannot initialize contracts: %w", err)
-		}
-	}
 	ev, err := ethevents.NewEthEvents(
 		specs.Contracts,
 		specs.NetworkSource,
