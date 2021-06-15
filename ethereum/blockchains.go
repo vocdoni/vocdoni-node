@@ -54,13 +54,32 @@ var mainnet = Specs{
 	StartingBlock: 10230300, //2020 jun 09 10:00h
 	NetworkSource: models.SourceNetworkId_ETH_MAINNET,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
-		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDomain},
-		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e")},
+		ethereumhandler.ContractNameProcesses: {
+			Domain:          types.ProcessesDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameNamespaces: {
+			Domain:          types.NamespacesDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameTokenStorageProof: {
+			Domain:          types.ERC20ProofsDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameGenesis: {
+			Domain:          types.GenesisDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameResults: {
+			Domain:          types.ResultsDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameEntities: {
+			Domain: types.EntityResolverDomain,
+		},
+		ethereumhandler.ContractNameENSregistry: {
+			Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"),
+		},
 	},
 }
 
@@ -71,13 +90,32 @@ var xdai = Specs{
 	StartingBlock: 14531875, //2021 Feb 13 21:58h
 	NetworkSource: models.SourceNetworkId_POA_XDAI,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
-		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDomain},
-		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD")},
+		ethereumhandler.ContractNameProcesses: {
+			Domain:          types.ProcessesDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameNamespaces: {
+			Domain:          types.NamespacesDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameTokenStorageProof: {
+			Domain:          types.ERC20ProofsDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameGenesis: {
+			Domain:          types.GenesisDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameResults: {
+			Domain:          types.ResultsDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameEntities: {
+			Domain: types.EntityResolverDomain,
+		},
+		ethereumhandler.ContractNameENSregistry: {
+			Address: common.HexToAddress("0x00cEBf9E1E81D3CC17fbA0a49306EBA77a8F26cD"),
+		},
 	},
 }
 
@@ -88,13 +126,31 @@ var xdaistage = Specs{
 	StartingBlock: 14531875, //2021 Feb 13 21:58h
 	NetworkSource: models.SourceNetworkId_POA_XDAI,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
-		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsStageDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisStageDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsStageDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverStageDomain},
-		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x693E79F3FD7DC5B3c32D1914E02a932b88397cC7")},
+		ethereumhandler.ContractNameProcesses: {
+			Domain:          types.ProcessesStageDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameNamespaces: {
+			Domain:          types.NamespacesStageDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameTokenStorageProof: {
+			Domain:          types.ERC20ProofsStageDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameGenesis: {
+			Domain:          types.GenesisStageDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameResults: {
+			Domain:          types.ResultsStageDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameEntities: {
+			Domain: types.EntityResolverStageDomain},
+		ethereumhandler.ContractNameENSregistry: {
+			Address: common.HexToAddress("0x693E79F3FD7DC5B3c32D1914E02a932b88397cC7"),
+		},
 	},
 }
 
@@ -105,13 +161,31 @@ var rinkeby = Specs{
 	BootNodes:     nil,
 	NetworkSource: models.SourceNetworkId_ETH_RINKEBY,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
-		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsDevelopmentDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDevelopmentDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDevelopmentDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDevelopmentDomain},
-		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e")},
+		ethereumhandler.ContractNameProcesses: {
+			Domain:          types.ProcessesDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameNamespaces: {
+			Domain:          types.NamespacesDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameTokenStorageProof: {
+			Domain:          types.ERC20ProofsDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameGenesis: {
+			Domain:          types.GenesisDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameResults: {
+			Domain:          types.ResultsDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameEntities: {
+			Domain: types.EntityResolverDevelopmentDomain},
+		ethereumhandler.ContractNameENSregistry: {
+			Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"),
+		},
 	},
 }
 
@@ -123,13 +197,31 @@ var goerlistage = Specs{
 	BootNodes:     ethparams.GoerliBootnodes,
 	NetworkSource: models.SourceNetworkId_ETH_GOERLI,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
-		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesStageDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesStageDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsStageDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisStageDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsStageDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverStageDomain},
-		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e")},
+		ethereumhandler.ContractNameProcesses: {
+			Domain:          types.ProcessesStageDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameNamespaces: {
+			Domain:          types.NamespacesStageDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameTokenStorageProof: {
+			Domain:          types.ERC20ProofsStageDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameGenesis: {
+			Domain:          types.GenesisStageDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameResults: {
+			Domain:          types.ResultsStageDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameEntities: {
+			Domain: types.EntityResolverStageDomain},
+		ethereumhandler.ContractNameENSregistry: {
+			Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"),
+		},
 	},
 	GenesisHash: goerli.GenesisHash,
 	GenesisB64:  goerli.GenesisB64,
@@ -143,13 +235,31 @@ var goerli = Specs{
 	BootNodes:     ethparams.GoerliBootnodes,
 	NetworkSource: models.SourceNetworkId_ETH_GOERLI,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
-		ethereumhandler.EthereumContractNames[0]: {Domain: types.ProcessesDevelopmentDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[1]: {Domain: types.NamespacesDevelopmentDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[2]: {Domain: types.ERC20ProofsDevelopmentDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[3]: {Domain: types.GenesisDevelopmentDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[4]: {Domain: types.ResultsDevelopmentDomain, ListenForEvents: true},
-		ethereumhandler.EthereumContractNames[5]: {Domain: types.EntityResolverDevelopmentDomain},
-		ethereumhandler.EthereumContractNames[6]: {Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e")},
+		ethereumhandler.ContractNameProcesses: {
+			Domain:          types.ProcessesDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameNamespaces: {
+			Domain:          types.NamespacesDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameTokenStorageProof: {
+			Domain:          types.ERC20ProofsDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameGenesis: {
+			Domain:          types.GenesisDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameResults: {
+			Domain:          types.ResultsDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameEntities: {
+			Domain: types.EntityResolverDevelopmentDomain},
+		ethereumhandler.ContractNameENSregistry: {
+			Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"),
+		},
 	},
 	GenesisHash: "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a",
 	GenesisB64: `ewogICJjb25maWciOnsKICAgICJjaGFpbklkIjo1LAogICAgImhvbWVzdGVhZEJsb2NrIjowLAog

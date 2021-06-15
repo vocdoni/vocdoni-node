@@ -26,20 +26,20 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
-const ensRegistryName = "ensRegistry"
-
 // The following methods and structures represent an exportable abstraction
 // over raw contract bindings.
 // Use these methods, rather than those present in the contracts folder
 
-// EthereumHandler wraps the Processes, Namespace and TokenStorageProof
-// contracts and holds a reference to an ethereum client
+// EthereumHandler wraps the vocdoni smart contracts
 type EthereumHandler struct {
 	VotingProcess     *contracts.Processes
 	Namespace         *contracts.Namespaces
 	TokenStorageProof *contracts.TokenStorageProof
 	Genesis           *contracts.Genesis
 	Results           *contracts.Results
+	EntityResolver    *contracts.EntityResolver
+	ENSPublicRegistry *contracts.EnsRegistryWithFallback
+	ENSPublicResolver *contracts.EntityResolver
 	EthereumClient    *ethclient.Client
 	EthereumRPC       *ethrpc.Client
 	Endpoint          string
@@ -68,15 +68,11 @@ func NewEthereumHandler(contracts map[string]*EthereumContract, srcNetworkId mod
 	if err := eh.Connect(dialEndpoint); err != nil {
 		return nil, err
 	}
+	log.Infof("Using ENS Registry at address: %s", contracts[ContractNameENSregistry].Address.Hex())
 	ctx, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
 	defer cancel()
 	for name, contract := range contracts {
-		// avoid resolve registry contract, this is the entry point for the ENS
-		// and does not have a domain name
-		if name == ensRegistryName {
-			continue
-		}
-		if err := contract.InitContract(ctx, name, contracts["ensRegistry"].Address, eh.EthereumClient); err != nil {
+		if err := contract.InitContract(ctx, name, contracts[ContractNameENSregistry].Address, eh.EthereumClient); err != nil {
 			return eh, fmt.Errorf("cannot initialize contracts: %w", err)
 		}
 		if err := eh.SetContractInstance(contract); err != nil {
@@ -186,24 +182,36 @@ func (eh *EthereumHandler) PrintInfo(ctx context.Context, seconds time.Duration)
 func (eh *EthereumHandler) SetContractInstance(ec *EthereumContract) error {
 	var err error
 	switch {
-	case strings.HasPrefix(ec.Domain, "processes"):
+	case strings.HasPrefix(ec.Domain, ContractNameProcesses):
 		if eh.VotingProcess, err = contracts.NewProcesses(ec.Address, eh.EthereumClient); err != nil {
 			return fmt.Errorf("error constructing processes contract transactor: %w", err)
 		}
-	case strings.HasPrefix(ec.Domain, "namespaces"):
+	case strings.HasPrefix(ec.Domain, ContractNameNamespaces):
 		if eh.Namespace, err = contracts.NewNamespaces(ec.Address, eh.EthereumClient); err != nil {
 			return fmt.Errorf("error constructing namespace contract transactor: %w", err)
 		}
-	case strings.HasPrefix(ec.Domain, "erc20"):
+	case strings.HasPrefix(ec.Domain, ContractNameTokenStorageProof):
 		if eh.TokenStorageProof, err = contracts.NewTokenStorageProof(ec.Address, eh.EthereumClient); err != nil {
 			return fmt.Errorf("error constructing token storage proof contract transactor: %w", err)
 		}
-	case strings.HasPrefix(ec.Domain, "genesis"):
+	case strings.HasPrefix(ec.Domain, ContractNameGenesis):
 		if eh.Genesis, err = contracts.NewGenesis(ec.Address, eh.EthereumClient); err != nil {
 			return fmt.Errorf("error constructing genesis contract transactor: %w", err)
 		}
-	case strings.HasPrefix(ec.Domain, "results"):
+	case strings.HasPrefix(ec.Domain, ContractNameResults):
 		if eh.Results, err = contracts.NewResults(ec.Address, eh.EthereumClient); err != nil {
+			return fmt.Errorf("error constructing results contract transactor: %w", err)
+		}
+	case strings.HasPrefix(ec.Domain, ContractNameEntities):
+		if eh.EntityResolver, err = contracts.NewEntityResolver(ec.Address, eh.EthereumClient); err != nil {
+			return fmt.Errorf("error constructing results contract transactor: %w", err)
+		}
+	case strings.HasPrefix(ec.Domain, ContractNameENSresolver):
+		if eh.ENSPublicResolver, err = contracts.NewEntityResolver(ec.Address, eh.EthereumClient); err != nil {
+			return fmt.Errorf("error constructing results contract transactor: %w", err)
+		}
+	case strings.HasPrefix(ec.Domain, ContractNameENSregistry):
+		if eh.ENSPublicRegistry, err = contracts.NewEnsRegistryWithFallback(ec.Address, eh.EthereumClient); err != nil {
 			return fmt.Errorf("error constructing results contract transactor: %w", err)
 		}
 	}

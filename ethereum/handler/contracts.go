@@ -12,16 +12,16 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
-// EthereumContractNames is the list of supported smart contracts names
-var EthereumContractNames []string = []string{
-	"processes",
-	"namespaces",
-	"erc20",
-	"genesis",
-	"results",
-	"entities",
-	"ensRegistry",
-}
+const (
+	ContractNameENSregistry       = "ensRegistry"
+	ContractNameENSresolver       = "ensResolver"
+	ContractNameProcesses         = "processes"
+	ContractNameNamespaces        = "namespaces"
+	ContractNameTokenStorageProof = "erc20"
+	ContractNameGenesis           = "genesis"
+	ContractNameResults           = "results"
+	ContractNameEntities          = "entities"
+)
 
 // EthereumContract wraps basic smartcontract information
 type EthereumContract struct {
@@ -37,33 +37,38 @@ type EthereumContract struct {
 func (ec *EthereumContract) SetABI(contractName string) error {
 	var err error
 	switch contractName {
-	case EthereumContractNames[0]:
+	case ContractNameProcesses:
 		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.ProcessesABI)); err != nil {
 			return fmt.Errorf("cannot read processes contract abi: %w", err)
 		}
-	case EthereumContractNames[1]:
+	case ContractNameNamespaces:
 		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.NamespacesABI)); err != nil {
 			return fmt.Errorf("cannot read namespace contract abi: %w", err)
 		}
-	case EthereumContractNames[2]:
+	case ContractNameTokenStorageProof:
 		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.TokenStorageProofABI)); err != nil {
 			return fmt.Errorf("cannot read token storage proof contract abi: %w", err)
 		}
-	case EthereumContractNames[3]:
+	case ContractNameGenesis:
 		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.GenesisABI)); err != nil {
 			return fmt.Errorf("cannot read genesis contract abi: %w", err)
 		}
-	case EthereumContractNames[4]:
+	case ContractNameResults:
 		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.ResultsABI)); err != nil {
 			return fmt.Errorf("cannot read results contract abi: %w", err)
 		}
-	case EthereumContractNames[5]:
+	case ContractNameEntities:
 		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.EntityResolverABI)); err != nil {
 			return fmt.Errorf("cannot read entity resolver contract abi: %w", err)
 		}
-	case EthereumContractNames[6]:
+	case ContractNameENSregistry:
 		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.EnsRegistryWithFallbackABI)); err != nil {
 			return fmt.Errorf("cannot read ENS registry contract abi: %w", err)
+		}
+	// entity resolver and public resolver have the same ABI
+	case ContractNameENSresolver:
+		if ec.ABI, err = abi.JSON(strings.NewReader(contracts.EntityResolverABI)); err != nil {
+			return fmt.Errorf("cannot read public resolver contract abi: %w", err)
 		}
 	}
 	return nil
@@ -73,6 +78,14 @@ func (ec *EthereumContract) SetABI(contractName string) error {
 // the contract ABI creating an artifact that allows to start interacting with
 // the contract
 func (ec *EthereumContract) InitContract(ctx context.Context, contractName string, ensRegistry common.Address, web3Client *ethclient.Client) error {
+	// avoid resolve registry contract, this is the entry point for the ENS
+	// and does not have a domain name
+	if contractName == ContractNameENSregistry || contractName == ContractNameENSresolver {
+		if err := ec.SetABI(contractName); err != nil {
+			return fmt.Errorf("couldn't set contract %s ABI: %w", contractName, err)
+		}
+		return nil
+	}
 	var addr string
 	var err error
 	addr, err = EnsResolve(ctx, ensRegistry.Hex(), ec.Domain, web3Client)
@@ -84,7 +97,7 @@ func (ec *EthereumContract) InitContract(ctx context.Context, contractName strin
 	}
 	ec.Address = common.HexToAddress(addr)
 	if err := ec.SetABI(contractName); err != nil {
-		return fmt.Errorf("couldn't set contract ABI: %w", err)
+		return fmt.Errorf("couldn't set contract %s ABI: %w", contractName, err)
 	}
 	log.Infof("loaded contract %s at address: %s", ec.Domain, ec.Address)
 	return nil
