@@ -51,8 +51,8 @@ func NewAPIoracle(o *oracle.Oracle, r *router.Router) (*APIoracle, error) {
 	return a, nil
 }
 
-func (a *APIoracle) EnableERC20(chainName, web3Endpoint string) error {
-	if chainName == "" || web3Endpoint == "" {
+func (a *APIoracle) EnableERC20(chainName string, web3Endpoints []string) error {
+	if chainName == "" || len(web3Endpoints) == 0 {
 		return fmt.Errorf("no web3 endpoint or chain name provided")
 	}
 	specs, err := chain.SpecsFor(chainName)
@@ -64,7 +64,7 @@ func (a *APIoracle) EnableERC20(chainName, web3Endpoint string) error {
 	if !ok {
 		srcNetId = srcNetworkIds["default"]
 	}
-	a.eh, err = ethereumhandler.NewEthereumHandler(specs.Contracts, srcNetId, web3Endpoint)
+	a.eh, err = ethereumhandler.NewEthereumHandler(specs.Contracts, srcNetId, web3Endpoints)
 	if err != nil {
 		return err
 	}
