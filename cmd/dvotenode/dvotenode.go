@@ -110,7 +110,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// ethereum web3
 	globalCfg.W3Config.ChainType = *flag.StringP("ethChain", "c", "goerli",
 		fmt.Sprintf("Ethereum blockchain to use: %s", ethchain.AvailableChains))
-	globalCfg.W3Config.W3External = *flag.StringP("w3External", "w", "",
+	globalCfg.W3Config.W3External = *flag.StringArrayP("w3External", "w", []string{},
 		"ethereum web3 endpoint. Supported protocols: http(s)://, ws(s):// and IPC filepath")
 	// ipfs
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false,
@@ -561,37 +561,48 @@ func main() {
 				go kk.RevealUnpublished()
 			}
 
-			// Start ethereum events (if web3 endpoint configured)
-			if globalCfg.W3Config.W3External != "" {
-				var evh []ethevents.EventHandler
-				var w3uri string
-				switch {
-				case strings.HasPrefix(globalCfg.W3Config.W3External, "ws"):
-					w3uri = globalCfg.W3Config.W3External
-				case strings.HasSuffix(globalCfg.W3Config.W3External, "ipc"):
-					w3uri = globalCfg.W3Config.W3External
-				default:
-					log.Fatal("web3 external must be websocket or IPC for event subscription")
+			var w3uris []string
+			if globalCfg.W3Config.W3External != nil {
+				for idx, web3Endpoint := range globalCfg.W3Config.W3External {
+					web3EndpointTrimmed := strings.Trim(web3Endpoint, `"[]`)
+					log.Debugf("web3endpoint %d: %s", idx, web3EndpointTrimmed)
+					switch {
+					case strings.HasPrefix(web3EndpointTrimmed, "ws"):
+						w3uris = append(w3uris, web3EndpointTrimmed)
+					case strings.HasSuffix(web3EndpointTrimmed, "ipc"):
+						w3uris = append(w3uris, web3EndpointTrimmed)
+					default:
+						log.Warnf(`invalid web3 endpoint %s must be websocket or IPC
+						for event subscription`, web3EndpointTrimmed)
+					}
 				}
+			}
+			// Start ethereum events (if at least one web3 endpoint configured)
+			if len(w3uris) > 0 {
+				log.Infof("using %+v web3 endpoints", w3uris)
 
+				var evh []ethevents.EventHandler
 				evh = append(evh, ethevents.HandleVochainOracle)
 
-				var initBlock *int64
+				var initBlock int64
 				if !globalCfg.EthEventConfig.SubscribeOnly {
-					initBlock = new(int64)
 					chainSpecs, err := ethchain.SpecsFor(globalCfg.W3Config.ChainType)
 					if err != nil {
-						log.Warn("cannot get chain block to start looking for events, using 0")
-						*initBlock = 0
-					} else {
-						*initBlock = chainSpecs.StartingBlock
+						log.Fatal("cannot get chain block to start looking for events")
 					}
+					initBlock = chainSpecs.StartingBlock
 				}
 
 				whiteListedAddr := []string{}
 				for _, addr := range globalCfg.VochainConfig.EthereumWhiteListAddrs {
+					if addr == "[]" {
+						// avoid empty address and pflag autofill in case of empty array
+						continue
+					}
 					if ethcommon.IsHexAddress(addr) {
 						whiteListedAddr = append(whiteListedAddr, addr)
+					} else {
+						log.Warnf("whitelist address %s is not a valid hex address", addr)
 					}
 				}
 				if len(whiteListedAddr) > 0 {
@@ -599,7 +610,7 @@ func main() {
 				}
 				if err := service.EthEvents(
 					context.Background(),
-					w3uri,
+					w3uris,
 					globalCfg.W3Config.ChainType,
 					initBlock,
 					cm,
@@ -633,8 +644,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := apior.EnableERC20(globalCfg.W3Config.ChainType,
-				globalCfg.W3Config.W3External); err != nil {
+			if err := apior.EnableERC20(globalCfg.W3Config.ChainType, globalCfg.W3Config.W3External); err != nil {
 				log.Fatal(err)
 			}
 		}

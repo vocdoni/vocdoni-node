@@ -42,7 +42,7 @@ type EthereumHandler struct {
 	ENSPublicResolver *contracts.EntityResolver
 	EthereumClient    *ethclient.Client
 	EthereumRPC       *ethrpc.Client
-	Endpoint          string
+	Endpoints         []string
 	SrcNetworkId      models.SourceNetworkId
 }
 
@@ -63,9 +63,12 @@ type EthSyncInfo struct {
 
 // NewEthereumHandler initializes contracts creating a transactor using the ethereum client
 func NewEthereumHandler(contracts map[string]*EthereumContract, srcNetworkId models.SourceNetworkId,
-	dialEndpoint string) (*EthereumHandler, error) {
-	eh := &EthereumHandler{SrcNetworkId: srcNetworkId}
-	if err := eh.Connect(dialEndpoint); err != nil {
+	dialEndpoints []string) (*EthereumHandler, error) {
+	eh := &EthereumHandler{
+		SrcNetworkId: srcNetworkId,
+		Endpoints:    dialEndpoints,
+	}
+	if err := eh.Connect(dialEndpoints); err != nil {
 		return nil, err
 	}
 	log.Infof("Using ENS Registry at address: %s", contracts[ContractNameENSregistry].Address.Hex())
@@ -84,32 +87,29 @@ func NewEthereumHandler(contracts map[string]*EthereumContract, srcNetworkId mod
 }
 
 // Connect creates a new connection to the Ethereum client
-func (eh *EthereumHandler) Connect(dialEndpoint string) error {
-	if eh.EthereumClient != nil {
-		eh.EthereumClient.Close()
-	}
-	if eh.EthereumRPC != nil {
-		eh.EthereumRPC.Close()
-	}
-	maxtries := 10
+func (eh *EthereumHandler) Connect(dialEndpoints []string) error {
 	var err error
-	for {
-		if maxtries == 0 {
-			return fmt.Errorf("could not connect to web3 endpoint")
+	for _, endpoint := range dialEndpoints {
+		maxtries := 5
+		for {
+			if maxtries == 0 {
+				log.Warnf("could not connect to %s endpoint, trying the next one", endpoint)
+				break
+			}
+			if eh.EthereumRPC, err = ethrpc.Dial(endpoint); err != nil || eh.EthereumRPC == nil {
+				log.Warnf("cannot create an ethereum rpc connection with %s: (%v), trying again", endpoint, err)
+				time.Sleep(time.Second * 3)
+				maxtries--
+				continue
+			}
+			// if RPC connection established, create an ethereum client using the RPC client
+			// TODO: @jordipainan this is racy
+			eh.EthereumClient = ethclient.NewClient(eh.EthereumRPC)
+			log.Infof("connected to %s web3 client", endpoint)
+			return nil
 		}
-		eh.EthereumRPC, err = ethrpc.Dial(dialEndpoint)
-		if err != nil || eh.EthereumRPC == nil {
-			log.Warnf("cannot create an ethereum rpc connection: (%s), trying again ...", err)
-			time.Sleep(time.Second * 2)
-			maxtries--
-			continue
-		}
-		break
 	}
-	// if RPC connection established, create an ethereum client using the RPC client
-	eh.EthereumClient = ethclient.NewClient(eh.EthereumRPC)
-	eh.Endpoint = dialEndpoint
-	return nil
+	return fmt.Errorf("could not connect to any web3 endpoint")
 }
 
 func (eh *EthereumHandler) WaitSync() {
@@ -120,6 +120,9 @@ func (eh *EthereumHandler) WaitSync() {
 			log.Infof("ethereum blockchain synchronized (%+v)", *info)
 			cancel()
 			break
+		}
+		if err := eh.Connect(eh.Endpoints); err != nil {
+			log.Warnf("cannot connect to any web3 endpoint: %v", err)
 		}
 		cancel()
 		time.Sleep(time.Second * 5)
@@ -163,7 +166,10 @@ func (eh *EthereumHandler) PrintInfo(ctx context.Context, seconds time.Duration)
 		info, err = eh.SyncInfo(tctx)
 		cancel()
 		if err != nil {
-			log.Warn(err)
+			log.Warnf("error getting ethereum info: %s", err)
+			if err := eh.Connect(eh.Endpoints); err != nil {
+				log.Fatalf("cannot connect to any web3 endpoint: %v", err)
+			}
 			continue
 		}
 		if !info.Synced {
@@ -315,7 +321,7 @@ func (eh *EthereumHandler) NewProcessTxArgs(ctx context.Context, pid [types.Proc
 	// if EVM census, check census root provided and get index slot from the token storage proof contract
 	if vochain.CensusOrigins[censusOrigin].NeedsIndexSlot {
 		// check valid storage root provided
-		// the holder address is choosen randomly
+		// the holder address is chosen randomly
 		randSigner := ethereum.NewSignKeys()
 		if err := randSigner.Generate(); err != nil {
 			return nil, fmt.Errorf("cannot check storage root, cannot generate random Ethereum address: %w", err)

@@ -116,8 +116,8 @@ type EthCfg struct {
 type W3Cfg struct {
 	// ChainType chain to connect with
 	ChainType string
-	// W3External URL of an external ethereum node to connect with
-	W3External string
+	// W3External URLs of an external ethereum nodes to connect with
+	W3External []string
 }
 
 type EthEventCfg struct {
