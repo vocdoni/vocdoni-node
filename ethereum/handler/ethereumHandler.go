@@ -711,7 +711,6 @@ func EnsResolve(ctx context.Context, ensRegistryAddr, ethDomain string, web3Clie
 			err = fmt.Errorf("cannot get contract address: %w", err)
 			return
 		}
-		log.Debugf("loaded contract at address: %s", contractAddr)
 		break
 	}
 	return
