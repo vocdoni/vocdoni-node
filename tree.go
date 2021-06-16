@@ -534,10 +534,10 @@ func (t *Tree) Update(k, v []byte) error {
 	return t.dbBatch.Write()
 }
 
-// GenProof generates a MerkleTree proof for the given key. If the key exists in
-// the Tree, the proof will be of existence, if the key does not exist in the
-// tree, the proof will be of non-existence.
-func (t *Tree) GenProof(k []byte) ([]byte, []byte, error) {
+// GenProof generates a MerkleTree proof for the given key. The leaf value is
+// returned, together with the packed siblings of the proof, and a boolean
+// parameter that indicates if the proof is of existence (true) or not (false).
+func (t *Tree) GenProof(k []byte) ([]byte, []byte, []byte, bool, error) {
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)
 
@@ -546,20 +546,18 @@ func (t *Tree) GenProof(k []byte) ([]byte, []byte, error) {
 	var siblings [][]byte
 	_, value, siblings, err := t.down(k, t.root, siblings, path, 0, true)
 	if err != nil {
-		return nil, nil, err
-	}
-
-	leafK, leafV := ReadLeafValue(value)
-	if !bytes.Equal(k, leafK) {
-		fmt.Println("key not in Tree")
-		fmt.Println(leafK)
-		fmt.Println(leafV)
-		// TODO proof of non-existence
-		panic("unimplemented")
+		return nil, nil, nil, false, err
 	}
 
 	s := PackSiblings(t.hashFunction, siblings)
-	return leafV, s, nil
+
+	leafK, leafV := ReadLeafValue(value)
+	if !bytes.Equal(k, leafK) {
+		// key not in tree, proof of non-existence
+		return leafK, leafV, s, false, err
+	}
+
+	return leafK, leafV, s, true, nil
 }
 
 // PackSiblings packs the siblings into a byte array.
