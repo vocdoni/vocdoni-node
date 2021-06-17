@@ -131,7 +131,9 @@ func NewEthEvents(
 	contractsAddress := []common.Address{}
 	for _, contract := range contracts {
 		if !bytes.Equal(contract.Address.Bytes(), common.Address{}.Bytes()) {
-			contractsAddress = append(contractsAddress, contract.Address)
+			if contract.ListenForEvents {
+				contractsAddress = append(contractsAddress, contract.Address)
+			}
 		}
 	}
 
