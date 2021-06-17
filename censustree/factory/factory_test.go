@@ -1,4 +1,4 @@
-package censustreefactory
+package factory
 
 import (
 	"encoding/hex"

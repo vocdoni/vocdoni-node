@@ -1,4 +1,4 @@
-package censustreefactory
+package factory
 
 import (
 	"fmt"
@@ -25,6 +25,9 @@ const (
 	TreeTypeGraviton
 )
 
+// TMP to be defined the production circuit nLevels
+const nLevels = 32
+
 // NewCensusTree creates a merkle tree using the given storage and hash
 // function. Note that each tree should use an entirely separate namespace for
 // its database keys.
@@ -34,12 +37,12 @@ func NewCensusTree(treeType int, name, storageDir string) (censustree.Tree, erro
 	switch treeType {
 	case TreeTypeArboBlake2b:
 		if tree, err =
-			arbotree.NewTree(name, storageDir, arbo.HashFunctionBlake2b); err != nil {
+			arbotree.NewTree(name, storageDir, nLevels, arbo.HashFunctionBlake2b); err != nil {
 			return nil, err
 		}
 	case TreeTypeArboPoseidon:
 		if tree, err =
-			arbotree.NewTree(name, storageDir, arbo.HashFunctionPoseidon); err != nil {
+			arbotree.NewTree(name, storageDir, nLevels, arbo.HashFunctionPoseidon); err != nil {
 			return nil, err
 		}
 	case TreeTypeGraviton:

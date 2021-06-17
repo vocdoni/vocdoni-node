@@ -30,14 +30,15 @@ var _ censustree.Tree = (*Tree)(nil)
 // NewTree opens or creates a merkle tree using the given storage, and the given
 // hash function.
 // Note that each tree should use an entirely separate namespace for its database keys.
-func NewTree(name, storageDir string, hashFunc arbo.HashFunction) (censustree.Tree, error) {
+func NewTree(name, storageDir string, nLevels int, hashFunc arbo.HashFunction) (
+	censustree.Tree, error) {
 	dbDir := filepath.Join(storageDir, "arbotree.db."+strings.TrimSpace(name))
 	database, err := db.NewBadgerDB(dbDir)
 	if err != nil {
 		return nil, err
 	}
 
-	mt, err := arbo.NewTree(database, 140, hashFunc)
+	mt, err := arbo.NewTree(database, nLevels, hashFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -134,9 +135,12 @@ func (t *Tree) AddBatch(indexes, values [][]byte) ([]int, error) {
 // to validate it
 func (t *Tree) GenProof(index, value []byte) ([]byte, error) {
 	t.updateAccessTime()
-	v, siblings, err := t.Tree.GenProof(index)
+	_, v, siblings, existence, err := t.Tree.GenProof(index)
 	if err != nil {
 		return nil, err
+	}
+	if !existence {
+		return nil, fmt.Errorf("index does not exist in the tree")
 	}
 	if !bytes.Equal(v, value) {
 		return nil, fmt.Errorf("value does not match %s!=%s",

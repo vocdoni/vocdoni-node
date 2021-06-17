@@ -1725,6 +1725,8 @@ github.com/viant/assertly v0.4.8/go.mod h1:aGifi++jvCrUaklKEKT0BU95igDNaqkvz+49u
 github.com/viant/toolbox v0.24.0/go.mod h1:OxMCG57V0PXuIP2HNQrtJf2CjqdmbrOx5EkMILuUhzM=
 github.com/vocdoni/arbo v0.0.0-20210614155137-465f0ed17235 h1:MW/S7oCUGMKYnffP3ZlkD9GsDC4vEpeo7NrI2WTVp2g=
 github.com/vocdoni/arbo v0.0.0-20210614155137-465f0ed17235/go.mod h1:Pikn2YIz/Rt05HWs35QHdpx7IWk4E2G0KdnCX+KRsNs=
+github.com/vocdoni/arbo v0.0.0-20210616072504-a8c7ea980892 h1:03JgKD4XOvQ5w3p8uxZCt7Ix3F9DrnKLn+8+iI1iYkI=
+github.com/vocdoni/arbo v0.0.0-20210616072504-a8c7ea980892/go.mod h1:Pikn2YIz/Rt05HWs35QHdpx7IWk4E2G0KdnCX+KRsNs=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f h1:z7CK3k1yIutKycPY8s2ZbtwUBKMy3xPcLMh12QukLRY=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f/go.mod h1:BoN7UMTA/JcgmNPaoUQq6RwuixhgSrk5PmCMVMKLxpc=
 github.com/vocdoni/blind-ca v0.1.4/go.mod h1:4ouWDqlvXrrNS0Csf3hKA3cuDTmKh6nP7kSXF39nT4s=
