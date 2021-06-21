@@ -478,6 +478,11 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string, txIndex int3
 // OnProcessResults verifies the results for  a process and appends it to the updateProcessPool
 func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionResult,
 	txIndex int32) error {
+	// We don't execute any action if the blockchain is being syncronized
+	if s.App.IsSynchronizing() {
+		return nil
+	}
+
 	// TODO: check results are valid and return an error if not.
 	// This is very dangerous since an Oracle would be able to create a consensus failure,
 	// the validaros (that do not check the results) and the full-nodes (with the scrutinizer enabled)
@@ -489,7 +494,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionRes
 	go func() {
 		var myResults *indexertypes.Results
 		var err error
-		retries := 20
+		retries := 50
 		for {
 			if retries == 0 {
 				log.Errorf("could not fetch results after max retries")
