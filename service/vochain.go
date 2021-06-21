@@ -125,7 +125,7 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool,
 	}
 
 	// Process Archiver
-	if vconfig.EnableProcessArchive {
+	if vconfig.ProcessArchive {
 		ipfs, ok := storage.(*data.IPFSHandle)
 		if !ok {
 			log.Warnf("storage is not IPFS, archive publishing disabled")

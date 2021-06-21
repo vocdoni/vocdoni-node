@@ -183,7 +183,7 @@ type VochainCfg struct {
 	// Target block time in seconds (only for miners)
 	MinerTargetBlockTimeSeconds int
 	// Enables the process archiver component
-	EnableProcessArchive bool
+	ProcessArchive bool
 	// Base64 IPFS private key for using with the process archive
 	ProcessArchiveKey string
 	// Data directory for storing the process archive

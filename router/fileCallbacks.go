@@ -13,48 +13,30 @@ import (
 
 const (
 	storageTimeout = time.Second * 20
-	maxJSONsize    = 1024 * 10       // 10 KiB
+	maxJSONsize    = 1024 * 20       // 20 KiB
 	maxFetchFile   = 1024 * 1024 * 2 // 2 MiB
 )
 
 func (r *Router) fetchFile(request RouterRequest) {
 	log.Debugf("calling FetchFile %s", request.URI)
-	parsedURIs := strings.Split(request.URI, ",")
-	transportTypes := parseTransportFromURI(parsedURIs)
 	var content []byte
 	var err error
 
-	found := false
-	for idx, t := range transportTypes {
-		switch t {
-		case "ipfs:":
-			found = true
-			splt := strings.Split(parsedURIs[idx], "/")
-			hash := splt[len(splt)-1]
-			ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
-			content, err = r.storage.Retrieve(ctx, hash, maxFetchFile)
-			if err == nil && len(content) == 0 {
-				err = fmt.Errorf("no content fetched")
-			}
-			cancel()
-		case "bzz:", "bzz-feed":
-			found = true
-			err = fmt.Errorf("bzz and bzz-feed not implemented yet")
-		}
-		if found {
-			break
-		}
+	switch strings.Split(request.URI, "://")[0] {
+	case "ipfs":
+		ctx, cancel := context.WithTimeout(context.Background(), storageTimeout)
+		content, err = r.storage.Retrieve(ctx, request.URI, maxFetchFile)
+		cancel()
+	case "bzz", "bzz-feed":
+		err = fmt.Errorf("bzz and bzz-feed not implemented yet")
+	default:
+		err = fmt.Errorf("transport type not supported")
 	}
 
 	if err != nil {
 		r.SendError(request, fmt.Sprintf("error fetching file: (%s)", err))
 		return
 	}
-	if !found {
-		r.SendError(request, "error fetching file: (not supported)")
-		return
-	}
-
 	log.Debugf("fetched file of size %d", len(content))
 	var response api.MetaResponse
 	response.Content = content

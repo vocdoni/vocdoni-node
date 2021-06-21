@@ -25,18 +25,23 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	crypto "go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 )
 
-const MaxFileSizeBytes = 1024 * 1024 * 50 // 50 MB
+const (
+	MaxFileSizeBytes      = 1024 * 1024 * 50 // 50 MB
+	RetrivedFileCacheSize = 128
+)
 
 type IPFSHandle struct {
-	Node     *ipfscore.IpfsNode
-	CoreAPI  coreiface.CoreAPI
-	DataDir  string
-	LogLevel string
+	Node         *ipfscore.IpfsNode
+	CoreAPI      coreiface.CoreAPI
+	DataDir      string
+	LogLevel     string
+	retriveCache *lru.Cache
 
 	// cancel helps us stop extra goroutines and listeners which complement
 	// the IpfsNode above.
@@ -107,7 +112,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	i.Node = node
 	i.CoreAPI = coreAPI
 	i.DataDir = d.Datadir
-
+	i.retriveCache = lru.New(RetrivedFileCacheSize)
 	return nil
 }
 
@@ -244,11 +249,22 @@ func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
 	return pinMap, nil
 }
 
+// Retrieve gets an IPFS file (either from the p2p network or from the local cache)
 func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) ([]byte, error) {
 	path = strings.TrimPrefix(path, "ipfs://")
-	pth := corepath.New(path)
-
-	node, err := i.CoreAPI.Unixfs().Get(ctx, pth)
+	ccontent := i.retriveCache.Get(path)
+	if ccontent != nil {
+		log.Debugf("retreived file %s from cache", path)
+		return ccontent.([]byte), nil
+	}
+	rpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
+	if err != nil {
+		return nil, fmt.Errorf("resolvepath: %w", err)
+	}
+	if err := rpath.IsValid(); err != nil {
+		return nil, fmt.Errorf("ipfs path is invalid")
+	}
+	node, err := i.CoreAPI.Unixfs().Get(ctx, rpath)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +279,19 @@ func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) (
 	if !ok {
 		return nil, fmt.Errorf("received incorrect type from Unixfs().Get()")
 	}
-	return io.ReadAll(r)
+
+	// Fetch the file content
+	content, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	if len(content) == 0 {
+		return nil, fmt.Errorf("retreived file is empty")
+	}
+	// Save file to cache for future attempts
+	i.retriveCache.Add(path, content)
+
+	return content, nil
 }
 
 // PublishIPNSpath creates or updates an IPNS record with the content of a

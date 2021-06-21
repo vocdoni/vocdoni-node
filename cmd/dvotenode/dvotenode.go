@@ -157,7 +157,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.EthereumWhiteListAddrs = *flag.StringArray("ethereumWhiteListAddrs",
 		[]string{},
 		"list of ethereum addresses allowed to create processes on the vochain (oracle mode only)")
-	globalCfg.VochainConfig.EnableProcessArchive = *flag.Bool("processArchive", false,
+	globalCfg.VochainConfig.ProcessArchive = *flag.Bool("processArchive", false,
 		"enables the process archiver component")
 	globalCfg.VochainConfig.ProcessArchiveKey = *flag.String("processArchiveKey", "",
 		"IPFS base64 encoded private key for process archive IPNS")
@@ -257,7 +257,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.ImportPreviousCensus", flag.Lookup("importPreviousCensus"))
 	viper.BindPFlag("vochainConfig.EthereumWhiteListAddrs", flag.Lookup("ethereumWhiteListAddrs"))
 	viper.Set("vochainConfig.ProcessArchiveDataDir", globalCfg.DataDir+"/archive")
-	viper.BindPFlag("vochainConfig.EnableProcessArchive", flag.Lookup("processArchive"))
+	viper.BindPFlag("vochainConfig.ProcessArchive", flag.Lookup("processArchive"))
 	viper.BindPFlag("vochainConfig.ProcessArchiveKey", flag.Lookup("processArchiveKey"))
 
 	// metrics
