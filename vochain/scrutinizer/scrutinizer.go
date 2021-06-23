@@ -80,6 +80,8 @@ type Scrutinizer struct {
 	// recoveryBootLock prevents Commit() to add new votes while the recovery bootstratp is
 	// being executed.
 	recoveryBootLock sync.RWMutex
+	// ignoreLiveResults if true, partial/live results won't be calculated (only final results)
+	ignoreLiveResults bool
 }
 
 // VoteWithIndex holds a Vote and a txIndex. Model for the VotePool.
@@ -90,8 +92,8 @@ type VoteWithIndex struct {
 
 // NewScrutinizer returns an instance of the Scrutinizer
 // using the local storage database of dbPath and integrated into the state vochain instance
-func NewScrutinizer(dbPath string, app *vochain.BaseApplication) (*Scrutinizer, error) {
-	s := &Scrutinizer{App: app}
+func NewScrutinizer(dbPath string, app *vochain.BaseApplication, countLiveResults bool) (*Scrutinizer, error) {
+	s := &Scrutinizer{App: app, ignoreLiveResults: !countLiveResults}
 	var err error
 	s.db, err = InitDB(dbPath)
 	if err != nil {
@@ -196,6 +198,10 @@ func (s *Scrutinizer) retrieveCounts() (map[uint8]uint64, error) {
 // if unecrypted). This method might be called on a goroutine after initializing the Scrutinizer.
 // TO-DO: refactor and use blockHeight for reusing existing live results
 func (s *Scrutinizer) AfterSyncBootstrap() {
+	// if no live results, we don't need the bootstraping
+	if s.ignoreLiveResults {
+		return
+	}
 	// During the first seconds/milliseconds of the Vochain startup, Tendermint might report that
 	// the chain is not synchronizing since it still does not have any peer and do not know the
 	// actual size of the blockchain. If afterSyncBootStrap is executed on this specific moment,
@@ -362,7 +368,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	}
 	txn.Discard()
 
-	// Add votes collected by onVote (live results), can be run async
+	// Add votes collected by onVote (live results)
 	nvotes := 0
 	startTime = time.Now()
 
@@ -426,7 +432,7 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, t
 // OnVote scrutinizer stores the votes if the processId is live results (on going)
 // and the blockchain is not synchronizing.
 func (s *Scrutinizer) OnVote(v *models.Vote, txIndex int32) {
-	if s.isProcessLiveResults(v.ProcessId) {
+	if !s.ignoreLiveResults && s.isProcessLiveResults(v.ProcessId) {
 		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
 	}
 	s.voteIndexPool = append(s.voteIndexPool, &VoteWithIndex{vote: v, txIndex: txIndex})

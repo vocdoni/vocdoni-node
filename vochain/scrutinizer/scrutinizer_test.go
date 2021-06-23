@@ -32,7 +32,7 @@ func testEntityList(t *testing.T, entityCount int) {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestEntitySearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func testProcessList(t *testing.T, procsCount int) {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func TestProcessSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +363,7 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,7 +431,7 @@ func TestResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -564,7 +564,7 @@ func TestLiveResults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -638,7 +638,7 @@ func TestAddVote(t *testing.T) {
 	app, err := vochain.NewBaseApplication(t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
 	app.SetTestingMethods()
 
@@ -750,7 +750,7 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	app, err := vochain.NewBaseApplication(t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
 	app.SetTestingMethods()
 
@@ -789,7 +789,7 @@ func TestBallotProtocolQuadratic(t *testing.T) {
 	app, err := vochain.NewBaseApplication(t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
 	app.SetTestingMethods()
 
@@ -842,7 +842,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	app, err := vochain.NewBaseApplication(t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
 	app.SetTestingMethods()
 
@@ -892,7 +892,7 @@ func TestCountVotes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -959,7 +959,7 @@ func TestTxIndexer(t *testing.T) {
 	app, err := vochain.NewBaseApplication(t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
-	sc, err := NewScrutinizer(t.TempDir(), app)
+	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
 	app.SetTestingMethods()
 

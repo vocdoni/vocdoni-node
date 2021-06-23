@@ -496,11 +496,13 @@ func main() {
 		globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle ||
 		globalCfg.Mode == types.ModeEthAPIoracle {
 		// do we need scrutinizer?
-		scrutinizer := (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) ||
+		globalCfg.VochainConfig.Scrutinizer.Enabled = (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) ||
 			(globalCfg.Mode == types.ModeOracle)
+		// if oracle mode, we don't need live results
+		globalCfg.VochainConfig.Scrutinizer.IgnoreLiveResults = (globalCfg.Mode == types.ModeOracle)
 		// create the vochain node
 		if vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig,
-			scrutinizer, !globalCfg.VochainConfig.NoWaitSync, ma, cm, storage,
+			!globalCfg.VochainConfig.NoWaitSync, ma, cm, storage,
 		); err != nil {
 			log.Fatal(err)
 		}

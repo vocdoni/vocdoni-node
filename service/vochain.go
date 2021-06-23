@@ -21,7 +21,7 @@ import (
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
-func Vochain(vconfig *config.VochainCfg, results, waitForSync bool,
+func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 	ma *metrics.Agent, cm *census.Manager, storage data.Storage) (
 	vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer,
 	vi *vochaininfo.VochainInfo, err error) {
@@ -109,10 +109,13 @@ func Vochain(vconfig *config.VochainCfg, results, waitForSync bool,
 
 	vnode = vochain.NewVochain(vconfig, genesisBytes)
 	// Scrutinizer
-	if results {
+	if vconfig.Scrutinizer.Enabled {
 		log.Info("creating vochain scrutinizer service")
-		sc, err = scrutinizer.NewScrutinizer(filepath.Join(vconfig.DataDir, "scrutinizer"), vnode)
-		if err != nil {
+		if sc, err = scrutinizer.NewScrutinizer(
+			filepath.Join(vconfig.DataDir, "scrutinizer"),
+			vnode,
+			!vconfig.Scrutinizer.IgnoreLiveResults,
+		); err != nil {
 			return
 		}
 		go sc.AfterSyncBootstrap()

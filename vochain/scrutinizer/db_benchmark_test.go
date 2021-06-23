@@ -33,7 +33,7 @@ func benchmarkIndexTx(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(b.TempDir(), app)
+	sc, err := NewScrutinizer(b.TempDir(), app, true)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func benchmarkNewProcess(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	sc, err := NewScrutinizer(b.TempDir(), app)
+	sc, err := NewScrutinizer(b.TempDir(), app, true)
 	if err != nil {
 		b.Fatal(err)
 	}

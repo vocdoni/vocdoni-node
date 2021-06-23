@@ -188,6 +188,16 @@ type VochainCfg struct {
 	ProcessArchiveKey string
 	// Data directory for storing the process archive
 	ProcessArchiveDataDir string
+	// Scrutinizer holds the configuration regarding the scrutinizer component
+	Scrutinizer ScrutinizerCfg
+}
+
+// ScrutinizerCfg handles the configuration options of the scrutinizer
+type ScrutinizerCfg struct {
+	// Enables Scrutinizer
+	Enabled bool
+	// Disables live results computation on scrutinizer
+	IgnoreLiveResults bool
 }
 
 // OracleCfg includes all possible config params needed by the Oracle
