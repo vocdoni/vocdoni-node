@@ -305,14 +305,12 @@ func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBl
 // defined smart contract and looks for events.
 func (ev *EthereumEvents) processEventLogsFromTo(ctx context.Context,
 	from, to int64, client *ethclient.Client) error {
-	idx := 0
 	for name, contract := range ev.ContractsInfo {
 		if !contract.ListenForEvents {
 			continue
 		}
-		ev.ContractsAddress = append(ev.ContractsAddress[idx:], ev.ContractsAddress[idx+1:]...)
+		ev.ContractsAddress = append(ev.ContractsAddress, contract.Address)
 		log.Infof("subscribing to contract: %s at address %s", name, contract.Address)
-		idx++
 	}
 	log.Infof("reading ethereum events from block %d to %d", from, to)
 	query := eth.FilterQuery{
