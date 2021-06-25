@@ -48,6 +48,22 @@ func NewTree(name, storageDir string, hashFunc arbo.HashFunction) (censustree.Tr
 	return tree, nil
 }
 
+// Type returns the name identifying the censustree implementation
+func (t *Tree) Type() string {
+	return fmt.Sprintf("arbo-%s", t.Tree.HashFunction().Type())
+}
+
+// FactoryID returns the numeric identifier of the censustree implementation
+func (t *Tree) FactoryID() int {
+	switch string(t.Tree.HashFunction().Type()) {
+	case "blake2b":
+		return 1
+	case "poseidon":
+		return 2
+	}
+	return 0
+}
+
 // Init initializes the Tree using the given storage directory, by default is
 // used the Blake2b hash function. If another hash function is desired, should
 // use NewTree method or even censustree/util.NewCensusTree method, which allows

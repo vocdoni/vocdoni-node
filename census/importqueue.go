@@ -30,7 +30,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 	if len(dump.Data) == 0 {
 		return fmt.Errorf("no claims found on the retreived census")
 	}
-	tr, err := m.AddNamespace(cid, []string{})
+	tr, err := m.AddNamespace(cid, dump.Type, []string{})
 	if err == ErrNamespaceExist {
 		return nil
 	} else if err != nil {

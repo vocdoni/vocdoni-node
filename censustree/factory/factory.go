@@ -10,10 +10,13 @@ import (
 )
 
 const (
+	// TreeUnknown is the default value used for censusTree implementations
+	// which are not part of the this factory.
+	TreeUnknown = iota
 	// TreeTypeArboBlake2b defines a tree type that uses arbo with Blake2b
 	// hash function. Is thought for being used when computation speed is
 	// important.
-	TreeTypeArboBlake2b = iota
+	TreeTypeArboBlake2b
 	// TreeTypeArboPoseidon defines a tree type that uses arbo with Poseidon
 	// hash function. Is thought for being used when zkSNARK compatibility
 	// is needed (with circomlib).
@@ -23,7 +26,7 @@ const (
 )
 
 // NewCensusTree creates a merkle tree using the given storage and hash
-// function.  Note that each tree should use an entirely separate namespace for
+// function. Note that each tree should use an entirely separate namespace for
 // its database keys.
 func NewCensusTree(treeType int, name, storageDir string) (censustree.Tree, error) {
 	var err error
