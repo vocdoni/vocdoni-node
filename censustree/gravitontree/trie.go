@@ -45,6 +45,7 @@ type exportData struct {
 const (
 	MaxKeySize   = 65
 	MaxValueSize = 65
+	FactoryID    = 3
 )
 
 // NewTree opens or creates a merkle tree under the given storage.
@@ -83,6 +84,16 @@ func (t *Tree) Init(name, storageDir string) error {
 	t.dataDir = ct.(*Tree).dataDir
 	t.updateAccessTime()
 	return nil
+}
+
+// Type returns the name identifying the censustree implementation
+func (t *Tree) Type() string {
+	return "graviton"
+}
+
+// FactoryID returns the numeric identifier of the censustree implementation
+func (t *Tree) FactoryID() int {
+	return FactoryID
 }
 
 // MaxKeySize returns the maximum key size supported by the Tree

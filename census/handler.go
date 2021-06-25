@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/crypto"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -20,9 +18,11 @@ import (
 const (
 	censusHTTPhandlerTimeout   = 30 * time.Second
 	censusRemoteStorageTimeout = 1 * time.Minute
+	censusDefaultType          = 3
 )
 
 type CensusDump struct {
+	Type     int    `json:"type"`
 	RootHash []byte `json:"rootHash"`
 	Data     []byte `json:"data"`
 }
@@ -42,66 +42,6 @@ func checkRequest(w http.ResponseWriter, req *http.Request) bool {
 		return false
 	}
 	return true
-}
-
-// HTTPhandler handles an API census manager request via HTTP
-func (m *Manager) HTTPhandler(ctx context.Context, w http.ResponseWriter,
-	req *http.Request, signer *ethereum.SignKeys) {
-	log.Debug("new request received")
-	if ok := checkRequest(w, req); !ok {
-		return
-	}
-	// Decode JSON
-	log.Debug("decoding JSON")
-	var reqOuter api.RequestMessage
-	if err := json.NewDecoder(req.Body).Decode(&reqOuter); err != nil {
-		log.Warnf("cannot decode JSON: %s", err)
-		http.Error(w, err.Error(), 400)
-		return
-	}
-	var reqInner api.MetaRequest
-	if err := json.Unmarshal(reqOuter.MetaRequest, &reqInner); err != nil {
-		log.Warnf("cannot decode JSON: %s", err)
-		http.Error(w, err.Error(), 400)
-		return
-	}
-	if len(reqInner.Method) < 1 {
-		http.Error(w, "method must be specified", 400)
-		return
-	}
-	log.Debugf("found method %s", reqInner.Method)
-	auth := true
-	if err := m.CheckAuth(&reqOuter, &reqInner); err != nil {
-		log.Warnf("authorization error: %s", err)
-		auth = false
-	}
-	toWait := censusHTTPhandlerTimeout
-	// use a bigger timeout for remote storage operations
-	if req.Method == "importRemote" || req.Method == "publish" {
-		toWait = censusRemoteStorageTimeout
-	}
-	tctx, cancel := context.WithTimeout(ctx, toWait)
-	defer cancel()
-	resp := m.Handler(tctx, &reqInner, auth, "")
-	resp.Request = reqOuter.ID
-
-	respInner, err := crypto.SortedMarshalJSON(resp)
-	if err != nil {
-		log.Errorf("cannot encode JSON: %s", err)
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	signature, err := signer.Sign(respInner)
-	if err != nil {
-		log.Error(err)
-	}
-
-	respOuter := &api.ResponseMessage{
-		ID:           reqOuter.ID,
-		Signature:    signature,
-		MetaResponse: respInner,
-	}
-	httpReply(respOuter, w)
 }
 
 // Handler handles an API census manager request.
@@ -124,7 +64,10 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 	// Special methods not depending on census existence
 	if r.Method == "addCensus" {
 		if isAuth {
-			t, err := m.AddNamespace(censusPrefix+r.CensusID, r.PubKeys)
+			if r.CensusType == 0 {
+				r.CensusType = censusDefaultType
+			}
+			t, err := m.AddNamespace(censusPrefix+r.CensusID, r.CensusType, r.PubKeys)
 			if err != nil {
 				log.Warnf("error creating census: %s", err)
 				resp.SetError(err)
@@ -414,7 +357,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %x", resp.Root)
 		namespace := hex.EncodeToString(resp.Root)
-		tr2, err := m.AddNamespace(namespace, r.PubKeys)
+		tr2, err := m.AddNamespace(namespace, tr.FactoryID(), r.PubKeys)
 		if err != nil && err != ErrNamespaceExist {
 			log.Warnf("error creating local published census: %s", err)
 		} else if err == nil {

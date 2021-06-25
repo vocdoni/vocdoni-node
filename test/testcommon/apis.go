@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"go.vocdoni.io/dvote/census"
-	graviton "go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
@@ -90,12 +89,8 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
 	d.CensusDir = tb.TempDir()
-	if d.CensusBackend == "" || d.CensusBackend == "graviton" {
-		if err := cm.Init(d.CensusDir, "", graviton.NewTree); err != nil {
-			tb.Fatal(err)
-		}
-	} else {
-		tb.Fatalf("census backend %s is unknown", d.CensusBackend)
+	if err := cm.Init(d.CensusDir, ""); err != nil {
+		tb.Fatal(err)
 	}
 
 	for _, api := range apis {
