@@ -4,7 +4,6 @@ package router
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -84,15 +83,6 @@ func (r *Router) BuildReply(request RouterRequest, resp *api.MetaResponse) trans
 		Context:   request.MessageContext,
 		Data:      respData,
 	}
-}
-
-func parseTransportFromURI(uris []string) []string {
-	out := make([]string, 0)
-	for _, u := range uris {
-		splt := strings.Split(u, "/")
-		out = append(out, splt[0])
-	}
-	return out
 }
 
 type RegisteredMethod struct {
