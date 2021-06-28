@@ -370,7 +370,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 	updateFunc := func(record interface{}) error {
 		update, ok := record.(*indexertypes.Process)
 		if !ok {
-			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+			return fmt.Errorf("record isn't the correct type! Wanted Process, got %T", record)
 		}
 		update.EndBlock = p.GetBlockCount() + p.GetStartBlock()
 		update.CensusRoot = p.GetCensusRoot()
@@ -385,7 +385,21 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 			update.HaveResults = false
 			update.FinalResults = true
 			update.Rheight = 0
-			if err := s.db.Delete(pid, &indexertypes.Results{}); err != nil {
+			if err := s.db.UpdateMatching(&indexertypes.Results{},
+				badgerhold.Where(badgerhold.Key).Eq(pid), func(record interface{}) error {
+					results, ok := record.(*indexertypes.Results)
+					if !ok {
+						return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+					}
+					// On cancelled process, remove all results except for envelope height, weight, pid
+					results.Votes = [][]*big.Int{}
+					results.EnvelopeType = &models.EnvelopeType{}
+					results.VoteOpts = &models.ProcessVoteOptions{}
+					results.Signatures = []types.HexBytes{}
+					results.Final = false
+					results.BlockHeight = 0
+					return nil
+				}); err != nil {
 				if err != badgerhold.ErrNotFound {
 					log.Warnf("cannot remove CANCELED results: %v", err)
 				}

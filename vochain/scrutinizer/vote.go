@@ -224,11 +224,6 @@ func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 	// If not cached, make the expensive query
 	results := &indexertypes.Results{}
 	if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).Eq(processID)); err != nil {
-		// If results are not found, return envelope height of 0.
-		//  This is the case for cancelled processes
-		if err == ErrNotFoundInDatabase {
-			return 0, nil
-		}
 		return 0, err
 	}
 	// If final, store them in cache (won't change anymore)
