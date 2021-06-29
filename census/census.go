@@ -16,6 +16,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // ErrNamespaceExist is the error returned when trying to add a namespace
@@ -43,9 +44,9 @@ type Namespaces struct {
 // Namespace is composed by a list of keys which are capable to execute private operations
 // on the namespace.
 type Namespace struct {
-	Type int      `json:"type"`
-	Name string   `json:"name"`
-	Keys []string `json:"keys"`
+	Type models.Census_Type `json:"type"`
+	Name string             `json:"name"`
+	Keys []string           `json:"keys"`
 }
 
 // Manager is the type representing the census manager component
@@ -129,7 +130,7 @@ func (m *Manager) Init(storageDir, rootAuthPubKey string) error {
 
 // LoadTree opens the database containing the merkle tree or returns nil if already loaded
 // Not thread safe
-func (m *Manager) LoadTree(name string, treeType int) (censustree.Tree, error) {
+func (m *Manager) LoadTree(name string, treeType models.Census_Type) (censustree.Tree, error) {
 	if _, exist := m.Trees[name]; exist {
 		return m.Trees[name], nil
 	}
@@ -165,7 +166,7 @@ func (m *Manager) Exists(name string) bool {
 
 // AddNamespace adds a new merkletree identified by a censusId (name), and
 // returns the new tree.
-func (m *Manager) AddNamespace(name string, treeType int, authPubKeys []string) (censustree.Tree, error) {
+func (m *Manager) AddNamespace(name string, treeType models.Census_Type, authPubKeys []string) (censustree.Tree, error) {
 	m.TreesMu.Lock()
 	defer m.TreesMu.Unlock()
 	if m.Exists(name) {

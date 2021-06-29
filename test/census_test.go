@@ -77,7 +77,6 @@ func TestCensus(t *testing.T) {
 
 	// Create census
 	req.CensusID = "test"
-	req.CensusType = 3
 	resp := doRequest("addCensus", signer2)
 	qt.Assert(t, err, qt.IsNil)
 	censusID := resp.CensusID
@@ -116,7 +115,6 @@ func TestCensus(t *testing.T) {
 
 	// Create census2
 	req.CensusID = "test2"
-	req.CensusType = 3
 	resp = doRequest("addCensus", signer2)
 	qt.Assert(t, resp.Ok, qt.IsTrue)
 	censusID = resp.CensusID
@@ -191,7 +189,6 @@ func TestCensus(t *testing.T) {
 
 	// add second census
 	req.CensusID = "importTest"
-	req.CensusType = 3
 	resp = doRequest("addCensus", signer2)
 	qt.Assert(t, resp.Ok, qt.IsTrue)
 

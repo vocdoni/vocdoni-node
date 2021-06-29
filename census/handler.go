@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -13,35 +12,19 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 const (
 	censusHTTPhandlerTimeout   = 30 * time.Second
 	censusRemoteStorageTimeout = 1 * time.Minute
-	censusDefaultType          = 3
+	censusDefaultType          = models.Census_GRAVITON
 )
 
 type CensusDump struct {
-	Type     int    `json:"type"`
-	RootHash []byte `json:"rootHash"`
-	Data     []byte `json:"data"`
-}
-
-func httpReply(resp *api.ResponseMessage, w http.ResponseWriter) {
-	err := json.NewEncoder(w).Encode(resp)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-	} else {
-		w.Header().Set("content-type", "application/json")
-	}
-}
-
-func checkRequest(w http.ResponseWriter, req *http.Request) bool {
-	if req.Body == nil {
-		http.Error(w, "Please send a request body", 400)
-		return false
-	}
-	return true
+	Type     models.Census_Type `json:"type"`
+	RootHash []byte             `json:"rootHash"`
+	Data     []byte             `json:"data"`
 }
 
 // Handler handles an API census manager request.
@@ -64,7 +47,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 	// Special methods not depending on census existence
 	if r.Method == "addCensus" {
 		if isAuth {
-			if r.CensusType == 0 {
+			if r.CensusType == models.Census_UNKNOWN {
 				r.CensusType = censusDefaultType
 			}
 			t, err := m.AddNamespace(censusPrefix+r.CensusID, r.CensusType, r.PubKeys)
@@ -357,7 +340,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %x", resp.Root)
 		namespace := hex.EncodeToString(resp.Root)
-		tr2, err := m.AddNamespace(namespace, tr.FactoryID(), r.PubKeys)
+		tr2, err := m.AddNamespace(namespace, tr.Type(), r.PubKeys)
 		if err != nil && err != ErrNamespaceExist {
 			log.Warnf("error creating local published census: %s", err)
 		} else if err == nil {

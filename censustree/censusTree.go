@@ -1,10 +1,13 @@
 package censustree
 
+import "go.vocdoni.io/proto/build/go/models"
+
 type Tree interface {
-	// Type returns a human readable name for the censusTree implementation
-	Type() string
-	// ID returns the numeric identifier for the censusTree implementation
-	FactoryID() int
+	// Type returns the numeric identifier for the censusTree implementation
+	Type() models.Census_Type
+	// TypeString returns a human readable name for the censusTree
+	// implementation
+	TypeString() string
 	// Init initializes the Tree using the given storage directory.
 	Init(name, storage string) error
 	// MaxKeySize returns the maximum key size supported by the Tree
