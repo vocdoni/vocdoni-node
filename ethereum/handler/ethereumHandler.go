@@ -71,6 +71,7 @@ func NewEthereumHandler(contracts map[string]*EthereumContract, srcNetworkId mod
 	if err := eh.Connect(dialEndpoints); err != nil {
 		return nil, err
 	}
+	eh.WaitSync()
 	log.Infof("Using ENS Registry at address: %s", contracts[ContractNameENSregistry].Address.Hex())
 	ctx, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
 	defer cancel()
@@ -82,7 +83,6 @@ func NewEthereumHandler(contracts map[string]*EthereumContract, srcNetworkId mod
 			log.Errorf("cannot set contract instance: %s", err)
 		}
 	}
-	go eh.PrintInfo(context.Background(), time.Second*20)
 	return eh, nil
 }
 
@@ -122,7 +122,7 @@ func (eh *EthereumHandler) WaitSync() {
 			break
 		}
 		if err := eh.Connect(eh.Endpoints); err != nil {
-			log.Warnf("cannot connect to any web3 endpoint: %v", err)
+			log.Fatalf("cannot connect to any web3 endpoint: %v", err)
 		}
 		cancel()
 		time.Sleep(time.Second * 5)
@@ -161,15 +161,15 @@ func (eh *EthereumHandler) PrintInfo(ctx context.Context, seconds time.Duration)
 	var err error
 	var syncingInfo string
 	for {
+		if ctx.Err() != nil {
+			return
+		}
 		time.Sleep(seconds)
 		tctx, cancel := context.WithTimeout(ctx, time.Minute)
 		info, err = eh.SyncInfo(tctx)
 		cancel()
 		if err != nil {
 			log.Warnf("error getting ethereum info: %s", err)
-			if err := eh.Connect(eh.Endpoints); err != nil {
-				log.Fatalf("cannot connect to any web3 endpoint: %v", err)
-			}
 			continue
 		}
 		if !info.Synced {

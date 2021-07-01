@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -46,7 +47,8 @@ func EthEvents(
 		vocapp,
 		ethereumWhiteList,
 	)
-	ev.EthereumLastKnownBlock = startBlock
+
+	ev.EthereumLastKnownBlock.Store(startBlock)
 
 	if err != nil {
 		return fmt.Errorf("couldn't create ethereum events listener: %w", err)
@@ -61,24 +63,16 @@ func EthEvents(
 	// Once all the resources are freed the Ethereum handler is initialized
 	// again as well as the subscription mechanism
 	go func() {
-		// TODO: @jordipainan
-		// Since the NewEthEvents service calls NewEthereumHandler
-		// the initialized boolean avoids to create the new ethereum hanler
-		// twice on the first run. NewEthEvents and the handler creation
-		// should be decoupled.
-		var initialized bool
 		for {
 			if ctx.Err() != nil {
 				return
 			}
-			ctx, cancel := context.WithCancel(ctx)
-			if initialized {
-				if ev.VotingHandle, err = ethereumhandler.NewEthereumHandler(ev.ContractsInfo, specs.NetworkSource, w3uris); err != nil {
-					log.Fatalf("cannot restart ethereum events, cannot create ethereum handler: %v", err)
-				}
+			if ev.VotingHandle, err = ethereumhandler.NewEthereumHandler(ev.ContractsInfo, specs.NetworkSource, w3uris); err != nil {
+				log.Fatalf("cannot restart ethereum events, cannot create ethereum handler: %v", err)
 			}
-			ev.SubscribeEthereumEventLogs(ctx, ev.EthereumLastKnownBlock)
-			initialized = true
+			ctx, cancel := context.WithCancel(ctx)
+			go ev.VotingHandle.PrintInfo(ctx, time.Second*20)
+			ev.SubscribeEthereumEventLogs(ctx)
 			// stop all child goroutines if error on subscription
 			cancel()
 		}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	eth "github.com/ethereum/go-ethereum"
@@ -64,7 +65,7 @@ type EthereumEvents struct {
 	// ContractsInfo holds useful info for working with the desired contracts
 	ContractsInfo map[string]*ethereumhandler.EthereumContract
 	// EthereumLastKnownBlock keeps track of the latest Ethereum known block
-	EthereumLastKnownBlock int64
+	EthereumLastKnownBlock atomic.Value
 }
 
 type timedEvent struct {
@@ -109,15 +110,6 @@ func NewEthEvents(
 	vocapp *vochain.BaseApplication,
 	ethereumWhiteList []string,
 ) (*EthereumEvents, error) {
-	// try to connect to default addr if w3Endpoint is empty
-	if len(w3Endpoints) == 0 {
-		return nil, fmt.Errorf("no w3Endpoint specified on Ethereum Events")
-	}
-	ph, err := ethereumhandler.NewEthereumHandler(contracts, srcNetworkId, w3Endpoints)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create voting handle: %w", err)
-	}
-	ph.WaitSync()
 	secureAddrList := make(map[common.Address]bool, len(ethereumWhiteList))
 	if len(ethereumWhiteList) != 0 {
 		for _, sAddr := range ethereumWhiteList {
@@ -128,7 +120,6 @@ func NewEthEvents(
 			secureAddrList[addr] = true
 		}
 	}
-
 	contractsAddress := []common.Address{}
 	for _, contract := range contracts {
 		if !bytes.Equal(contract.Address.Bytes(), common.Address{}.Bytes()) {
@@ -137,7 +128,6 @@ func NewEthEvents(
 			}
 		}
 	}
-
 	confirmThreshold := blockConfirmThreshold[0]
 	if _, ok := blockConfirmThreshold[srcNetworkId]; ok {
 		confirmThreshold = blockConfirmThreshold[srcNetworkId]
@@ -145,11 +135,10 @@ func NewEthEvents(
 	log.Infof("chain %s found, block confirmation threshold set to %s",
 		srcNetworkId, confirmThreshold)
 	ethev := &EthereumEvents{
-		VotingHandle: ph,
-		Signer:       signer,
-		DialAddrs:    w3Endpoints,
-		Census:       cens,
-		VochainApp:   vocapp,
+		Signer:     signer,
+		DialAddrs:  w3Endpoints,
+		Census:     cens,
+		VochainApp: vocapp,
 		EventProcessor: &EventProcessor{
 			Events:                make(chan ethtypes.Log),
 			EventProcessThreshold: confirmThreshold,
@@ -172,155 +161,81 @@ func (ev *EthereumEvents) AddEventHandler(handler EventHandler) {
 // Events are Queued for 60 seconds before processed in order to avoid possible blockchain
 // reversions.
 // Blocking function (use go routine).
-func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context, fromBlock int64) {
-	var sub eth.Subscription
-	var err error
+func (ev *EthereumEvents) SubscribeEthereumEventLogs(ctx context.Context) {
+
 	// Get current block
 	tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 	defer cancel()
-	var lastBlock int64
-	var blk *ethtypes.Block
-	errors := 0
-	for {
-		if errors > 5 {
-			log.Fatal("the web3 client connection is not working")
-		}
-		blk, err = ev.VotingHandle.EthereumClient.BlockByNumber(tctx, nil)
-		if err != nil {
-			log.Errorf("cannot get ethereum block: %s", err)
-			errors++
-			time.Sleep(time.Second * 2)
-			if err := ev.VotingHandle.Connect(ev.DialAddrs); err != nil {
-				log.Warn(err)
-			}
-			continue
-		}
-		lastBlock = blk.Number().Int64()
-		break
-	}
-
-	if fromBlock != 0 {
-		// do not retry if error processing old logs
-		// Unless this is the first set of oracles, it is almost
-		// sure that the events are already processed so do not
-		// block and do not fatal here
-		if err := ev.processEventLogsFromTo(ctx, fromBlock, lastBlock,
-			ev.VotingHandle.EthereumClient); err != nil {
-			log.Errorf("cannot process event logs: %v", err)
-		}
-		// Update block number
-		// Expect the client to be connected here
-		// and the call is successful, if not
-		// block the execution and alert
-		errors = 0
-		for {
-			if errors > 5 {
-				log.Fatal("the web3 connection is not working")
-			}
-			tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
-			defer cancel()
-			blk, err = ev.VotingHandle.EthereumClient.BlockByNumber(tctx, nil)
-			if err != nil {
-				log.Errorf("cannot update block number: %v", err)
-				errors++
-				time.Sleep(time.Second * 2)
-				// If any error try close the client and reconnect
-				if err := ev.VotingHandle.Connect(ev.DialAddrs); err != nil {
-					log.Warn(err)
-				}
-				continue
-			}
-			lastBlock = blk.Number().Int64()
-			break
-		}
-		// For security, read also the new passed blocks before subscribing
-		// Same as the last processEventLogsFromTo function call
-		if err := ev.processEventLogsFromTo(ctx, lastBlock, blk.Number().Int64(),
-			ev.VotingHandle.EthereumClient); err != nil {
-			log.Errorf("cannot process event logs: %s", err)
-		}
-	} else {
-		// For security, even if subscribe only, force to process at least the past `readBlockPast`
-		// Same as the last processEventLogsFromTo function call
-		if err := ev.processEventLogsFromTo(ctx, blk.Number().Int64()-readBlocksPast,
-			blk.Number().Int64(), ev.VotingHandle.EthereumClient); err != nil {
-			log.Errorf("cannot process event logs: %v", err)
-		}
-	}
-
-	tctx, cancel = context.WithTimeout(ctx, types.EthereumReadTimeout*2)
-	defer cancel()
-	// And then subscribe to new events
-	// Update block number
-	blk, err = ev.VotingHandle.EthereumClient.BlockByNumber(tctx, nil)
+	var err error
+	uLastBlockNumber, err := ev.VotingHandle.EthereumClient.BlockNumber(tctx)
 	if err != nil {
-		// accept to not update the block number here
-		// if any error, the old blk fetched will be used instead.
-		log.Errorf("cannot upate block number: %s", err)
+		log.Fatalf("cannot get last block number: (%v)", err)
 	}
-	log.Infof("subscribing to Ethereum Events from block %d", blk.Number().Int64())
+	lastBlockNumber := int64(uLastBlockNumber)
+	fromBlock := ev.EthereumLastKnownBlock.Load().(int64)
+	if fromBlock == 0 {
+		ev.EthereumLastKnownBlock.Store(lastBlockNumber)
+		fromBlock = lastBlockNumber
+	}
+
+	// For security, even if subscribe only, force to process
+	// from some past blocks defined by `readBlocksPast`
+	if err := ev.processEventLogsFromTo(ctx, fromBlock-readBlocksPast,
+		lastBlockNumber, ev.VotingHandle.EthereumClient); err != nil {
+		log.Errorf("cannot process event logs: %v", err)
+	}
+
+	// Subscribing from latest known block
+	log.Infof("subscribing to Ethereum Events from block %d", fromBlock)
 	query := eth.FilterQuery{
 		Addresses: ev.ContractsAddress,
-		FromBlock: blk.Number(),
+		FromBlock: big.NewInt(fromBlock),
 	}
-
 	logs := make(chan ethtypes.Log, 30) // give it some buffer as recommended by the package library
-	// block here, since it is not acceptable to
-	// start the event processor if the client
-	// cannot be subscribed to the logs.
-	// Use the same policy as processEventsLogsFromTo
-	errors = 0
-	for {
-		if errors > 5 {
-			log.Fatal("the web3 connection is not working")
-		}
-		sub, err = ev.VotingHandle.EthereumClient.SubscribeFilterLogs(ctx, query, logs)
-		if err != nil {
-			log.Errorf("cannot subscribe to ethereum client log: %s", err)
-			errors++
-			time.Sleep(time.Second * 2)
-			if err := ev.VotingHandle.Connect(ev.DialAddrs); err != nil {
-				log.Warn(err)
-			}
-			continue
-		}
-		break
+	var sub eth.Subscription
+	sub, err = ev.VotingHandle.EthereumClient.SubscribeFilterLogs(ctx, query, logs)
+	if err != nil {
+		log.Fatalf("cannot subscribe to ethereum events: (%v)", err)
 	}
 
+	// Run event processor
 	if !ev.EventProcessor.eventProcessorRunning {
 		go ev.runEventProcessor(ctx)
 	}
 
-	// check eth connection
+	// Monitorize ethereum client connection
 	connFailure := make(chan bool, 1)
 	go func(chan bool) {
 		for {
 			time.Sleep(time.Second * 5)
 			tctx, cancel := context.WithTimeout(ctx, types.EthereumReadTimeout)
 			defer cancel()
-			block, err := ev.VotingHandle.EthereumClient.BlockByNumber(tctx, nil)
+			block, err := ev.VotingHandle.EthereumClient.BlockNumber(tctx)
 			if err != nil {
 				log.Warnf("cannot check ethereum connection while running the event processor, %s", err)
 				connFailure <- false
 				return
 			}
-			ev.EthereumLastKnownBlock = block.Number().Int64()
+			ev.EthereumLastKnownBlock.Store(int64(block))
 		}
 	}(connFailure)
 
+	// Block forever and start processing events
 	for {
 		select {
 		case <-sub.Err():
+			ev.EventProcessor.eventProcessorRunning = false
+			ev.VotingHandle = nil
 			log.Warn("ethereum events subscription error on channel")
 			log.Infof("restarting ethereum events subscription with web3: %+v", ev.DialAddrs)
-			ev.EventProcessor.eventProcessorRunning = false
 			return
 		case event := <-logs:
 			ev.EventProcessor.Events <- event
 		case <-connFailure:
+			ev.EventProcessor.eventProcessorRunning = false
+			ev.VotingHandle = nil
 			log.Warn("ethereum events subscription error on channel")
 			log.Infof("restarting ethereum events subscription with web3: %+v", ev.DialAddrs)
-			ev.EventProcessor.eventProcessorRunning = false
 			return
 		}
 	}
