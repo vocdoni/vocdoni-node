@@ -319,7 +319,7 @@ func (t *vt) computeHashes() ([][2][]byte, error) {
 				t.params.maxLevels, bucketVT.params, bucketPairs[cpu])
 			if err != nil {
 				// TODO WIP
-				panic("TODO" + err.Error())
+				panic("TODO: " + err.Error())
 			}
 
 			subRoots[cpu] = bucketVT.root

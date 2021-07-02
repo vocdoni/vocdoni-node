@@ -83,10 +83,11 @@ type Tree struct {
 	dbg *dbgStats
 }
 
-const bmSize = sha256.Size
+// bmKeySize stands for batchMemoryKeySize
+const bmKeySize = sha256.Size
 
 // TMP
-type kvMap map[[bmSize]byte]kv
+type kvMap map[[bmKeySize]byte]kv
 
 // Get retreives the value respective to a key from the KvMap
 func (m kvMap) Get(k []byte) ([]byte, bool) {
@@ -109,7 +110,7 @@ func NewTree(database db.Database, maxLevels int, hash HashFunction) (*Tree, err
 	if err == ErrKeyNotFound {
 		// store new root 0
 		t.dbBatch = t.db.NewBatch()
-		t.batchMemory = make(map[[bmSize]byte]kv) // TODO TMP
+		t.batchMemory = make(map[[bmKeySize]byte]kv) // TODO TMP
 		t.root = t.emptyHash
 		if err = t.dbPut(dbKeyRoot, t.root); err != nil {
 			return nil, err
@@ -139,7 +140,8 @@ func (t *Tree) HashFunction() HashFunction {
 }
 
 // AddBatch adds a batch of key-values to the Tree. Returns an array containing
-// the indexes of the keys failed to add.
+// the indexes of the keys failed to add. Supports empty values as input
+// parameters, which is equivalent to 0 valued byte array.
 func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 	t.Lock()
 	defer t.Unlock()
@@ -150,6 +152,17 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 	}
 
 	// TODO check validity of keys & values for Tree.hashFunction
+
+	// equal the number of keys & values
+	if len(keys) > len(values) {
+		// add missing values
+		for i := len(values); i < len(keys); i++ {
+			values = append(values, emptyValue)
+		}
+	} else if len(keys) < len(values) {
+		// crop extra values
+		values = values[:len(keys)]
+	}
 
 	invalids, err := vt.addBatch(keys, values)
 	if err != nil {
@@ -166,7 +179,7 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 
 	// store pairs in db
 	t.dbBatch = t.db.NewBatch()
-	t.batchMemory = make(map[[bmSize]byte]kv) // TODO TMP
+	t.batchMemory = make(map[[bmKeySize]byte]kv) // TODO TMP
 	for i := 0; i < len(pairs); i++ {
 		if err := t.dbPut(pairs[i][0], pairs[i][1]); err != nil {
 			return nil, err
@@ -217,7 +230,7 @@ func (t *Tree) Add(k, v []byte) error {
 
 	var err error
 	t.dbBatch = t.db.NewBatch()
-	t.batchMemory = make(map[[bmSize]byte]kv) // TODO TMP
+	t.batchMemory = make(map[[bmKeySize]byte]kv) // TODO TMP
 
 	// TODO check validity of key & value for Tree.hashFunction
 
@@ -491,7 +504,7 @@ func (t *Tree) Update(k, v []byte) error {
 
 	var err error
 	t.dbBatch = t.db.NewBatch()
-	t.batchMemory = make(map[[bmSize]byte]kv) // TODO TMP
+	t.batchMemory = make(map[[bmKeySize]byte]kv) // TODO TMP
 
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)

@@ -75,11 +75,17 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	defer tree.db.Close() //nolint:errcheck
 
 	bLen := tree.HashFunction().Len()
-	start := time.Now()
+	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
 		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
-		if err := tree.Add(k, v); err != nil {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+
+	start := time.Now()
+	for i := 0; i < nLeafs; i++ {
+		if err := tree.Add(keys[i], values[i]); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -92,13 +98,6 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	defer tree2.db.Close() //nolint:errcheck
 	tree2.dbgInit()
 
-	var keys, values [][]byte
-	for i := 0; i < nLeafs; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
-		keys = append(keys, k)
-		values = append(values, v)
-	}
 	start = time.Now()
 	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
@@ -914,6 +913,77 @@ func TestLoadVT(t *testing.T) {
 
 	// check that tree & vt roots are equal
 	c.Check(tree.Root(), qt.DeepEquals, vt.root.h)
+}
+
+// TestAddKeysWithEmptyValues calls AddBatch giving an array of empty values
+func TestAddKeysWithEmptyValues(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 1024
+
+	database, err := db.NewBadgerDB(c.TempDir())
+	c.Assert(err, qt.IsNil)
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
+
+	bLen := tree.HashFunction().Len()
+	var keys, values [][]byte
+	for i := 0; i < nLeafs; i++ {
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := []byte{}
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+
+	for i := 0; i < nLeafs; i++ {
+		if err := tree.Add(keys[i], values[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	database2, err := db.NewBadgerDB(c.TempDir())
+	c.Assert(err, qt.IsNil)
+	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree2.db.Close() //nolint:errcheck
+	tree2.dbgInit()
+
+	indexes, err := tree2.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	c.Check(len(indexes), qt.Equals, 0)
+
+	// check that both trees roots are equal
+	checkRoots(c, tree, tree2)
+
+	kAux, proofV, siblings, existence, err := tree2.GenProof(keys[9])
+	c.Assert(err, qt.IsNil)
+	c.Assert(proofV, qt.DeepEquals, values[9])
+	c.Assert(keys[9], qt.DeepEquals, kAux)
+	c.Assert(existence, qt.IsTrue)
+
+	// check with empty array
+	verif, err := CheckProof(tree.hashFunction, keys[9], []byte{}, tree.Root(), siblings)
+	c.Assert(err, qt.IsNil)
+	c.Check(verif, qt.IsTrue)
+
+	// check with array with only 1 zero
+	verif, err = CheckProof(tree.hashFunction, keys[9], []byte{0}, tree.Root(), siblings)
+	c.Assert(err, qt.IsNil)
+	c.Check(verif, qt.IsTrue)
+
+	// check with array with 32 zeroes
+	e32 := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	c.Assert(len(e32), qt.Equals, 32)
+	verif, err = CheckProof(tree.hashFunction, keys[9], e32, tree.Root(), siblings)
+	c.Assert(err, qt.IsNil)
+	c.Check(verif, qt.IsTrue)
+
+	// check with array with value!=0 returns false at verification
+	verif, err = CheckProof(tree.hashFunction, keys[9], []byte{0, 1}, tree.Root(), siblings)
+	c.Assert(err, qt.IsNil)
+	c.Check(verif, qt.IsFalse)
 }
 
 // TODO test adding batch with multiple invalid keys
