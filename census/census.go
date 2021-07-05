@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/censustree"
+	censustreefactory "go.vocdoni.io/dvote/censustree/factory"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // ErrNamespaceExist is the error returned when trying to add a namespace
@@ -42,8 +44,9 @@ type Namespaces struct {
 // Namespace is composed by a list of keys which are capable to execute private operations
 // on the namespace.
 type Namespace struct {
-	Name string   `json:"name"`
-	Keys []string `json:"keys"`
+	Type models.Census_Type `json:"type"`
+	Name string             `json:"name"`
+	Keys []string           `json:"keys"`
 }
 
 // Manager is the type representing the census manager component
@@ -63,7 +66,6 @@ type Manager struct {
 	failedQueueLock sync.RWMutex
 	failedQueue     map[string]string
 	compressor
-	newTreeFunc func(name, storage string) (censustree.Tree, error)
 }
 
 // Data helps satisfy an ethevents interface.
@@ -71,16 +73,11 @@ func (m *Manager) Data() data.Storage { return m.RemoteStorage }
 
 // Init creates a new census manager.
 // A constructor function for the interface censustree.Tree must be provided.
-func (m *Manager) Init(storageDir, rootKey string,
-	newTreeImpl func(name, storageDir string) (censustree.Tree, error)) error {
+func (m *Manager) Init(storageDir, rootAuthPubKey string) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storageDir)
 	m.StorageDir = storageDir
 	m.Trees = make(map[string]censustree.Tree)
 	m.failedQueue = make(map[string]string)
-	if newTreeImpl == nil {
-		return fmt.Errorf("missing census tree implementation")
-	}
-	m.newTreeFunc = newTreeImpl
 	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
 	m.importQueue = make(chan censusImport, importQueueBuffer)
 	m.AuthWindow = 10
@@ -97,10 +94,10 @@ func (m *Manager) Init(storageDir, rootKey string,
 	if _, err := os.Stat(nsConfig); os.IsNotExist(err) {
 		log.Info("creating new config file")
 		var cns Namespaces
-		if len(rootKey) < ethereum.PubKeyLengthBytes*2 {
+		if len(rootAuthPubKey) < ethereum.PubKeyLengthBytes*2 {
 			// log.Warn("no root key provided or invalid, anyone will be able to create new census")
 		} else {
-			cns.RootKey = rootKey
+			cns.RootKey = rootAuthPubKey
 		}
 		m.Census = cns
 		if err := os.WriteFile(filepath.Clean(nsConfig), []byte(""), 0o600); err != nil {
@@ -117,14 +114,14 @@ func (m *Manager) Init(storageDir, rootKey string,
 		log.Warn("could not unmarshal json config file, probably empty. Skipping")
 		return nil
 	}
-	if len(rootKey) >= ethereum.PubKeyLengthBytes*2 {
-		log.Infof("updating root key to %s", rootKey)
-		m.Census.RootKey = rootKey
-	} else if rootKey != "" {
-		log.Infof("current root key %s", rootKey)
+	if len(rootAuthPubKey) >= ethereum.PubKeyLengthBytes*2 {
+		log.Infof("updating root key to %s", rootAuthPubKey)
+		m.Census.RootKey = rootAuthPubKey
+	} else if rootAuthPubKey != "" {
+		log.Infof("current root key %s", rootAuthPubKey)
 	}
 	for _, v := range m.Census.Namespaces {
-		if _, err := m.LoadTree(v.Name); err != nil {
+		if _, err := m.LoadTree(v.Name, v.Type); err != nil {
 			log.Warnf("census %s cannot be loaded: (%v)", v.Name, err)
 		}
 	}
@@ -133,11 +130,11 @@ func (m *Manager) Init(storageDir, rootKey string,
 
 // LoadTree opens the database containing the merkle tree or returns nil if already loaded
 // Not thread safe
-func (m *Manager) LoadTree(name string) (censustree.Tree, error) {
+func (m *Manager) LoadTree(name string, treeType models.Census_Type) (censustree.Tree, error) {
 	if _, exist := m.Trees[name]; exist {
 		return m.Trees[name], nil
 	}
-	tr, err := m.newTreeFunc(name, m.StorageDir)
+	tr, err := censustreefactory.NewCensusTree(treeType, name, m.StorageDir)
 	if err != nil {
 		return nil, err
 	}
@@ -169,20 +166,21 @@ func (m *Manager) Exists(name string) bool {
 
 // AddNamespace adds a new merkletree identified by a censusId (name), and
 // returns the new tree.
-func (m *Manager) AddNamespace(name string, pubKeys []string) (censustree.Tree, error) {
+func (m *Manager) AddNamespace(name string, treeType models.Census_Type, authPubKeys []string) (censustree.Tree, error) {
 	m.TreesMu.Lock()
 	defer m.TreesMu.Unlock()
 	if m.Exists(name) {
 		return nil, ErrNamespaceExist
 	}
-	tr, err := m.newTreeFunc(name, m.StorageDir)
+	tr, err := censustreefactory.NewCensusTree(treeType, name, m.StorageDir)
 	if err != nil {
 		return nil, err
 	}
 	m.Trees[name] = tr
 	m.Census.Namespaces = append(m.Census.Namespaces, Namespace{
+		Type: treeType,
 		Name: name,
-		Keys: pubKeys,
+		Keys: authPubKeys,
 	})
 	return tr, m.save()
 }

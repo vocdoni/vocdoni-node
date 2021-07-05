@@ -1,6 +1,13 @@
 package censustree
 
+import "go.vocdoni.io/proto/build/go/models"
+
 type Tree interface {
+	// Type returns the numeric identifier for the censusTree implementation
+	Type() models.Census_Type
+	// TypeString returns a human readable name for the censusTree
+	// implementation
+	TypeString() string
 	// Init initializes the Tree using the given storage directory.
 	Init(name, storage string) error
 	// MaxKeySize returns the maximum key size supported by the Tree
@@ -27,6 +34,7 @@ type Tree interface {
 	GenProof(key, value []byte) (mproof []byte, err error)
 	// CheckProof validates a merkle proof and its data for the Tree hash function
 	CheckProof(key, value, root, mproof []byte) (included bool, err error)
+	// Root returns the current merkle tree root
 	Root() []byte
 	// Dump exports all the Tree leafs in a byte array, which can later be
 	// imported using the ImportDump method

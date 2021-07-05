@@ -95,6 +95,7 @@ type MetaRequest struct {
 	CensusValue  []byte                         `json:"censusValue,omitempty"`
 	CensusValues [][]byte                       `json:"censusValues,omitempty"`
 	CensusDump   []byte                         `json:"censusDump,omitempty"`
+	CensusType   models.Census_Type             `json:"censusType,omitempty"`
 	Content      []byte                         `json:"content,omitempty"`
 	Digested     bool                           `json:"digested,omitempty"`
 	EntityId     types.HexBytes                 `json:"entityId,omitempty"`
