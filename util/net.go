@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	externalip "gitlab.com/vocdoni/go-external-ip"
+	externalip "github.com/vocdoni/go-external-ip"
 )
 
 // PublicIP returns the external/public IP of the host

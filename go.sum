@@ -1729,6 +1729,8 @@ github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f h1:z7CK3k1yI
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f/go.mod h1:BoN7UMTA/JcgmNPaoUQq6RwuixhgSrk5PmCMVMKLxpc=
 github.com/vocdoni/blind-ca v0.1.4/go.mod h1:4ouWDqlvXrrNS0Csf3hKA3cuDTmKh6nP7kSXF39nT4s=
 github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25/go.mod h1:NLA1A55raZ1VNMmKulPUm+Lu9CVetCDVuDCYk5bSYrE=
+github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44 h1:OK5B1GPq2zPu2Z1sYaUcAmt3CpILABwYsvkK2raI1AQ=
+github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44/go.mod h1:o/kqzlz81Aq5/++p7zIRaaOiEUmCOiap7ulEAUeSQWI=
 github.com/vocdoni/multirpc v0.1.9/go.mod h1:SETFzlLbdZq2YFGy0udT1u2ouQUU2cIesopAIgyAjOU=
 github.com/vocdoni/multirpc v0.1.12/go.mod h1:OYWh2wBX0rztgatZC7VEcPW0Ew4Hm8f/msRAO24mpk0=
 github.com/vocdoni/multirpc v0.1.21/go.mod h1:zCx0l/hu/Vdeav44geFJmK4PAawN+qoo1HYT2icU4GM=
@@ -1787,7 +1789,6 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 gitlab.com/vocdoni/go-dvote v0.6.1-0.20201009163905-60d45cde762f/go.mod h1:wIeoXaIHjIf9f2+bHxUhvzqYdIyefxTHqJ68sfsxm4U=
-gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da h1:qEKse/C/gOACneRkXQQZLgXjXEe8aaxzcuS60KwUX78=
 gitlab.com/vocdoni/go-external-ip v0.0.0-20190919225616-59cf485d00da/go.mod h1:IRX9TEuQAK5j8yDceSak55G0gu8S52aeK++NJuAyYSY=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
