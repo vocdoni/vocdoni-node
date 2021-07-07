@@ -104,9 +104,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// ethereum node
 	globalCfg.EthConfig.SigningKey = *flag.StringP("ethSigningKey", "k", "",
 		"signing private Key (if not specified the Ethereum keystore will be used)")
-	// ethereum events
-	globalCfg.EthEventConfig.SubscribeOnly = *flag.Bool("ethSubscribeOnly", true,
-		"only subscribe to new ethereum events (do not read past log)")
 	// ethereum web3
 	globalCfg.W3Config.ChainType = *flag.StringP("ethChain", "c", "goerli",
 		fmt.Sprintf("Ethereum blockchain to use: %s", ethchain.AvailableChains))
@@ -223,7 +220,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 
 	// ethereum node
 	viper.BindPFlag("ethConfig.SigningKey", flag.Lookup("ethSigningKey"))
-	viper.BindPFlag("ethEventConfig.SubscribeOnly", flag.Lookup("ethSubscribeOnly"))
 
 	// ethereum web3
 	viper.BindPFlag("w3Config.ChainType", flag.Lookup("ethChain"))
@@ -579,19 +575,8 @@ func main() {
 			}
 			// Start ethereum events (if at least one web3 endpoint configured)
 			if len(w3uris) > 0 {
-				log.Infof("using %+v web3 endpoints", w3uris)
-
 				var evh []ethevents.EventHandler
 				evh = append(evh, ethevents.HandleVochainOracle)
-
-				var initBlock int64
-				if !globalCfg.EthEventConfig.SubscribeOnly {
-					chainSpecs, err := ethchain.SpecsFor(globalCfg.W3Config.ChainType)
-					if err != nil {
-						log.Fatal("cannot get chain block to start looking for events")
-					}
-					initBlock = chainSpecs.StartingBlock
-				}
 
 				whiteListedAddr := []string{}
 				for _, addr := range globalCfg.VochainConfig.EthereumWhiteListAddrs {
@@ -612,12 +597,9 @@ func main() {
 					context.Background(),
 					w3uris,
 					globalCfg.W3Config.ChainType,
-					initBlock,
-					cm,
 					signer,
 					vnode,
 					evh,
-					sc,
 					whiteListedAddr); err != nil {
 					log.Fatal(err)
 				}

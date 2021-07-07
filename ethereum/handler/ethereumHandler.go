@@ -42,7 +42,7 @@ type EthereumHandler struct {
 	ENSPublicResolver *contracts.EntityResolver
 	EthereumClient    *ethclient.Client
 	EthereumRPC       *ethrpc.Client
-	Endpoints         []string
+	Endpoint          string
 	SrcNetworkId      models.SourceNetworkId
 }
 
@@ -63,16 +63,16 @@ type EthSyncInfo struct {
 
 // NewEthereumHandler initializes contracts creating a transactor using the ethereum client
 func NewEthereumHandler(contracts map[string]*EthereumContract, srcNetworkId models.SourceNetworkId,
-	dialEndpoints []string) (*EthereumHandler, error) {
+	dialEndpoint string) (*EthereumHandler, error) {
 	eh := &EthereumHandler{
 		SrcNetworkId: srcNetworkId,
-		Endpoints:    dialEndpoints,
+		Endpoint:     dialEndpoint,
 	}
-	if err := eh.Connect(dialEndpoints); err != nil {
+	if err := eh.Connect(dialEndpoint); err != nil {
 		return nil, err
 	}
 	eh.WaitSync()
-	log.Infof("Using ENS Registry at address: %s", contracts[ContractNameENSregistry].Address.Hex())
+	log.Infof("using ENS Registry at address: %s", contracts[ContractNameENSregistry].Address.Hex())
 	ctx, cancel := context.WithTimeout(context.Background(), types.EthereumReadTimeout)
 	defer cancel()
 	for name, contract := range contracts {
@@ -87,29 +87,26 @@ func NewEthereumHandler(contracts map[string]*EthereumContract, srcNetworkId mod
 }
 
 // Connect creates a new connection to the Ethereum client
-func (eh *EthereumHandler) Connect(dialEndpoints []string) error {
+func (eh *EthereumHandler) Connect(dialEndpoint string) error {
 	var err error
-	for _, endpoint := range dialEndpoints {
-		maxtries := 5
-		for {
-			if maxtries == 0 {
-				log.Warnf("could not connect to %s endpoint, trying the next one", endpoint)
-				break
-			}
-			if eh.EthereumRPC, err = ethrpc.Dial(endpoint); err != nil || eh.EthereumRPC == nil {
-				log.Warnf("cannot create an ethereum rpc connection with %s: (%v), trying again", endpoint, err)
-				time.Sleep(time.Second * 3)
-				maxtries--
-				continue
-			}
-			// if RPC connection established, create an ethereum client using the RPC client
-			// TODO: @jordipainan this is racy
-			eh.EthereumClient = ethclient.NewClient(eh.EthereumRPC)
-			log.Infof("connected to %s web3 client", endpoint)
-			return nil
+	maxtries := 5
+	for {
+		if maxtries == 0 {
+			break
 		}
+		if eh.EthereumRPC, err = ethrpc.Dial(dialEndpoint); err != nil || eh.EthereumRPC == nil {
+			log.Warnf("cannot create an ethereum rpc connection with %s: (%v), trying again", dialEndpoint, err)
+			time.Sleep(time.Second * 3)
+			maxtries--
+			continue
+		}
+		// if RPC connection established, create an ethereum client using the RPC client
+		// TODO: @jordipainan this is racy
+		eh.EthereumClient = ethclient.NewClient(eh.EthereumRPC)
+		log.Infof("connected to %s web3 endpoint", dialEndpoint)
+		return nil
 	}
-	return fmt.Errorf("could not connect to any web3 endpoint")
+	return fmt.Errorf("could not connect to the web3 endpoint %s", dialEndpoint)
 }
 
 func (eh *EthereumHandler) WaitSync() {
@@ -121,11 +118,8 @@ func (eh *EthereumHandler) WaitSync() {
 			cancel()
 			break
 		}
-		if err := eh.Connect(eh.Endpoints); err != nil {
-			log.Fatalf("cannot connect to any web3 endpoint: %v", err)
-		}
 		cancel()
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 2)
 	}
 }
 

@@ -14,8 +14,6 @@ type DvoteCfg struct {
 	Ipfs *IPFSCfg
 	// EthConfig ethereum client config options
 	EthConfig *EthCfg
-	// EthEventConfig ethereum even subscription config options
-	EthEventConfig *EthEventCfg
 	// API api config options
 	API *API
 	// Metrics config options
@@ -56,13 +54,12 @@ func (c *DvoteCfg) ValidMode() bool {
 // NewGatewayConfig initializes the fields in the gateway config stuct
 func NewConfig() *DvoteCfg {
 	return &DvoteCfg{
-		W3Config:       new(W3Cfg),
-		VochainConfig:  new(VochainCfg),
-		Ipfs:           new(IPFSCfg),
-		EthConfig:      new(EthCfg),
-		EthEventConfig: new(EthEventCfg),
-		API:            new(API),
-		Metrics:        new(MetricsCfg),
+		W3Config:      new(W3Cfg),
+		VochainConfig: new(VochainCfg),
+		Ipfs:          new(IPFSCfg),
+		EthConfig:     new(EthCfg),
+		API:           new(API),
+		Metrics:       new(MetricsCfg),
 	}
 }
 
@@ -118,13 +115,6 @@ type W3Cfg struct {
 	ChainType string
 	// W3External URLs of an external ethereum nodes to connect with
 	W3External []string
-}
-
-type EthEventCfg struct {
-	// CensusSync if true census sync will be enabled
-	CensusSync bool
-	// SubscribeOnly if true only new received events will be processed, otherwise all events of the current chain will be processed
-	SubscribeOnly bool
 }
 
 // VochainCfg includes all possible config params needed by the Vochain

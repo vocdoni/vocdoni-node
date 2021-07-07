@@ -71,7 +71,7 @@ var ethereumEventList = map[string]string{
 
 // Number of blocks to add to the process start block to start as soon as possible the process.
 // This start block addition takes into account that can be some delay on the Vochain commit operation.
-const ProcessStartBlockDelay = 10
+const processStartBlockDelay = 10
 
 // HandleVochainOracle handles the events on ethereum for the Oracle.
 func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEvents) error {
@@ -133,7 +133,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if processTx.Process.Status == models.ProcessStatus_READY &&
 			processTx.Process.StartBlock == 1 &&
 			processTx.Process.Mode.AutoStart {
-			processTx.Process.StartBlock = e.VochainApp.Height() + ProcessStartBlockDelay
+			processTx.Process.StartBlock = e.VochainApp.Height() + processStartBlockDelay
 		}
 
 		stx := &models.SignedTx{}
