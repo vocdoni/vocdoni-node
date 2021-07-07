@@ -64,7 +64,8 @@ func (a *APIoracle) EnableERC20(chainName string, web3Endpoints []string) error 
 	if !ok {
 		srcNetId = srcNetworkIds["default"]
 	}
-	a.eh, err = ethereumhandler.NewEthereumHandler(specs.Contracts, srcNetId, web3Endpoints)
+	// TODO: use multiple web3
+	a.eh, err = ethereumhandler.NewEthereumHandler(specs.Contracts, srcNetId, web3Endpoints[0])
 	if err != nil {
 		return err
 	}
