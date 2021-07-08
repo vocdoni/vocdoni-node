@@ -20,7 +20,6 @@ import (
 	blind "github.com/arnaucube/go-blindsecp256k1"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -106,19 +105,15 @@ func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin,
 		if !bytes.Equal(p.Key, key) {
 			return false, nil, fmt.Errorf("proof key and leafData do not match (%x != %x)", p.Key, key)
 		}
-		hexproof := []string{}
-		for _, s := range p.Siblings {
-			hexproof = append(hexproof, fmt.Sprintf("%x", s))
-		}
 		amount := big.Int{}
 		amount.SetBytes(p.Value)
-		hexamount := hexutil.Big(amount)
 		log.Debugf("validating erc20 storage proof for key %x and amount %s", p.Key, amount.String())
+		// TODO mapbased.VerifyProof()
 		valid, err := ethstorageproof.VerifyEthStorageProof(
 			&ethstorageproof.StorageResult{
-				Key:   fmt.Sprintf("%x", p.Key),
-				Proof: hexproof,
-				Value: &hexamount,
+				Key:   p.Key,
+				Proof: p.Siblings,
+				Value: p.Value,
 			},
 			ethcommon.BytesToHash(censusRoot),
 		)

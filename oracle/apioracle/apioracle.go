@@ -3,14 +3,13 @@ package apioracle
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
-	ethtoken "github.com/vocdoni/storage-proofs-eth-go/token"
+	ethstoragehelpers "github.com/vocdoni/storage-proofs-eth-go/helpers"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	chain "go.vocdoni.io/dvote/ethereum"
@@ -150,12 +149,7 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		return
 	}
 
-	slot, err := ethtoken.GetSlot(req.GetAddress().Hex(), int(index))
-	if err != nil {
-		a.router.SendError(req, fmt.Sprintf("cannot fetch slot: %s", err))
-		return
-	}
-
+	slot := ethstoragehelpers.GetMapSlot(*req.GetAddress(), int(index))
 	log.Debugf("ERC20 index slot %d, storage slot %x", index, slot)
 
 	valid, _, err := vochain.CheckProof(sproof,
@@ -193,23 +187,11 @@ func buildETHproof(proof *ethstorageproof.StorageResult) (*models.Proof, error) 
 	if proof.Value == nil {
 		return nil, fmt.Errorf("storage proof value missing")
 	}
-	siblings := [][]byte{}
-	for _, sib := range proof.Proof {
-		sibb, err := hex.DecodeString(util.TrimHex(sib))
-		if err != nil {
-			return nil, err
-		}
-		siblings = append(siblings, sibb)
-	}
-	key, err := hex.DecodeString(util.TrimHex(proof.Key))
-	if err != nil {
-		return nil, fmt.Errorf("cannot decode key: %w", err)
-	}
 	return &models.Proof{Payload: &models.Proof_EthereumStorage{
 		EthereumStorage: &models.ProofEthereumStorage{
-			Key:      key,
-			Value:    proof.Value.ToInt().Bytes(),
-			Siblings: siblings,
+			Key:      proof.Key,
+			Value:    proof.Value,
+			Siblings: proof.Proof,
 		},
 	}}, nil
 }
@@ -245,34 +227,5 @@ func (a *APIoracle) getIndexSlot(ctx context.Context, contractAddr []byte,
 // a contract address and a block height
 func (a *APIoracle) getStorageRoot(ctx context.Context, contractAddr common.Address,
 	blockNum uint64) (hash common.Hash, err error) {
-	// create token storage proof artifact
-	ts := ethtoken.ERC20Token{
-		RPCcli: a.eh.EthereumRPC,
-		Ethcli: a.eh.EthereumClient,
-	}
-	if err := ts.Init(ctx, "", contractAddr.String()); err != nil {
-		return common.Hash{}, err
-	}
-
-	// get block
-	blk, err := ts.GetBlock(ctx, new(big.Int).SetUint64(blockNum))
-	if err != nil {
-		return common.Hash{}, fmt.Errorf("cannot get block: %w", err)
-	}
-
-	// get proof, we use a random token holder and a dummy index slot
-	holder := ethereum.NewSignKeys()
-	if err := holder.Generate(); err != nil {
-		return common.Hash{},
-			fmt.Errorf("cannot check storage root, cannot generate random Ethereum address: %w", err)
-	}
-
-	log.Debugf("get EVM storage root for address %s and block %d", holder.Address(), blockNum)
-	sproof, err := ts.GetProofWithIndexSlot(ctx, holder.Address(), blk, 1)
-	if err != nil {
-		return common.Hash{}, fmt.Errorf("cannot get storage root: %w", err)
-	}
-
-	// return the storage root hash
-	return sproof.StorageHash, nil
+	return a.eh.GetStorageRoot(ctx, contractAddr, big.NewInt(int64(blockNum)))
 }

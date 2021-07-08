@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/vocdoni/storage-proofs-eth-go/token"
+	"github.com/vocdoni/storage-proofs-eth-go/token/erc20"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/net/idna"
 
@@ -315,12 +315,7 @@ func (eh *EthereumHandler) NewProcessTxArgs(ctx context.Context, pid [types.Proc
 	// if EVM census, check census root provided and get index slot from the token storage proof contract
 	if vochain.CensusOrigins[censusOrigin].NeedsIndexSlot {
 		// check valid storage root provided
-		// the holder address is chosen randomly
-		randSigner := ethereum.NewSignKeys()
-		if err := randSigner.Generate(); err != nil {
-			return nil, fmt.Errorf("cannot check storage root, cannot generate random Ethereum address: %w", err)
-		}
-		fetchedRoot, err := eh.getStorageRoot(ctx, randSigner.Address(), processMeta.EntityAddressOwner[0], processMeta.SourceBlockHeight)
+		fetchedRoot, err := eh.GetStorageRoot(ctx, processMeta.EntityAddressOwner[0], processMeta.SourceBlockHeight)
 		if err != nil {
 			return nil, fmt.Errorf("cannot check EVM storage root: %w", err)
 		}
@@ -357,21 +352,15 @@ func (eh *EthereumHandler) NewProcessTxArgs(ctx context.Context, pid [types.Proc
 	return processTxArgs, nil
 }
 
-func (eh *EthereumHandler) getStorageRoot(ctx context.Context, holder common.Address, contractAddr common.Address, blockNum *big.Int) (hash common.Hash, err error) {
+func (eh *EthereumHandler) GetStorageRoot(ctx context.Context, contractAddr common.Address, blockNum *big.Int) (common.Hash, error) {
 	// create token storage proof artifact
-	ts := token.ERC20Token{
-		RPCcli: eh.EthereumRPC,
-		Ethcli: eh.EthereumClient,
-	}
-	ts.Init(ctx, "", contractAddr.String())
-	// get block
-	blk, err := ts.GetBlock(ctx, blockNum)
+	ts, err := erc20.New(ctx, eh.EthereumRPC, contractAddr)
 	if err != nil {
-		return common.Hash{}, fmt.Errorf("cannot get block: %w", err)
+		return common.Hash{}, err
 	}
 	// get proof
-	log.Debugf("get EVM storage root for address %s and block %d", holder.String(), blk.NumberU64())
-	sproof, err := ts.GetProofWithIndexSlot(ctx, holder, blk, 1)
+	log.Debugf("get EVM storage root for contract %s and block %v", contractAddr.String(), blockNum)
+	sproof, err := ts.GetProof(ctx, [][]byte{}, blockNum)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("cannot get storage root: %w", err)
 	}

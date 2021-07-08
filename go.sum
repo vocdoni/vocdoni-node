@@ -1737,6 +1737,14 @@ github.com/vocdoni/multirpc v0.1.21/go.mod h1:zCx0l/hu/Vdeav44geFJmK4PAawN+qoo1H
 github.com/vocdoni/storage-proofs-eth-go v0.1.4/go.mod h1:8XF/0CpAetwlQJRgQgwBFEbfaYcjrU9gWUBR4F2Aqso=
 github.com/vocdoni/storage-proofs-eth-go v0.1.5 h1:/QTLeM1tkRIruA0LIB9yIMhBTk5++Pm7t2Zp0gCT1Xs=
 github.com/vocdoni/storage-proofs-eth-go v0.1.5/go.mod h1:8XF/0CpAetwlQJRgQgwBFEbfaYcjrU9gWUBR4F2Aqso=
+github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210707140958-25d9ba8e545e h1:vp11RDkYnViVDMj6oVGN9rXAi+IbxhtU+qhlGpCcL4o=
+github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210707140958-25d9ba8e545e/go.mod h1:xSAcW2zYbTehWJvFyXOLNBBnETqj90+B5vytqRpvlFg=
+github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210709100659-da492b36b7d0 h1:/gRjgHfgWk4e11YULAz0X/yHir5U8BghyPghaELN0pA=
+github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210709100659-da492b36b7d0/go.mod h1:/xP265mk9OwnrnfPwPFpdf+GEZ5Kc4w1hWZvic4YiT0=
+github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210712180028-635e3f56567d h1:WrsWm8DpXXxvLjFMvzcyp0e8P1hfFaw9wjSUE48rdy8=
+github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210712180028-635e3f56567d/go.mod h1:/xP265mk9OwnrnfPwPFpdf+GEZ5Kc4w1hWZvic4YiT0=
+github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210713135939-56f40edd0def h1:WYeNuiiVMqd4BZqUwyYuxcrF+vivP4v+r1YCwNLlBo0=
+github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210713135939-56f40edd0def/go.mod h1:/xP265mk9OwnrnfPwPFpdf+GEZ5Kc4w1hWZvic4YiT0=
 github.com/wangjia184/sortedset v0.0.0-20160527075905-f5d03557ba30/go.mod h1:YkocrP2K2tcw938x9gCOmT5G5eCD6jsTz0SZuyAqwIE=
 github.com/warpfork/go-wish v0.0.0-20180510122957-5ad1f5abf436/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
 github.com/warpfork/go-wish v0.0.0-20190328234359-8b3e70f8e830/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=
