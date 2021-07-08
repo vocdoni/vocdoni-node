@@ -1,7 +1,6 @@
 package vochain
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -465,23 +464,11 @@ func testEthSendVotes(t *testing.T, s testStorageProof,
 
 	var stx models.SignedTx
 
-	t.Logf("voting %s", s.StorageProof.Key)
-	k, err := hex.DecodeString(s.StorageProof.Key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	siblings := [][]byte{}
-	for _, sib := range s.StorageProof.Proof {
-		sibb, err := hex.DecodeString(util.TrimHex(sib))
-		if err != nil {
-			t.Fatal(err)
-		}
-		siblings = append(siblings, sibb)
-	}
+	t.Logf("voting %x", s.StorageProof.Key)
 	proof := models.ProofEthereumStorage{
-		Key:      k,
-		Value:    s.StorageProof.Value.ToInt().Bytes(),
-		Siblings: siblings,
+		Key:      s.StorageProof.Key,
+		Value:    s.StorageProof.Value,
+		Siblings: s.StorageProof.Proof,
 	}
 	tx := &models.VoteEnvelope{
 		Nonce:       util.RandomBytes(32),
@@ -509,6 +496,7 @@ func testEthSendVotes(t *testing.T, s testStorageProof,
 	pub, _ := signer.HexString()
 	t.Logf("addr: %s pubKey: %s", signer.Address(), pub)
 
+	var err error
 	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: tx}}); err != nil {
 		t.Fatal(err)
 	}

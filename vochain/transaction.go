@@ -6,7 +6,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethtoken "github.com/vocdoni/storage-proofs-eth-go/token"
+	sphelpers "github.com/vocdoni/storage-proofs-eth-go/helpers"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -245,34 +245,32 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 		log.Debugf("new vote %x for address %s and process %x", vote.Nullifier, addr.Hex(), tx.ProcessId)
 
 		// check census origin and compute vote digest identifier
-		var pubKeyDigested []byte
+		var proofKey []byte
 		switch process.CensusOrigin {
 		case models.CensusOrigin_OFF_CHAIN_TREE:
 			if process.EnvelopeType.Anonymous {
 				// TODO Poseidon hash of pubKey
 				// pubKeyDigested = snarks.Poseidon.Hash(pubKey)
 			} else {
-				pubKeyDigested = pubKey
+				proofKey = pubKey
 			}
 		case models.CensusOrigin_OFF_CHAIN_CA:
-			pubKeyDigested = addr.Bytes()
+			proofKey = addr.Bytes()
 		case models.CensusOrigin_ERC20:
 			if process.EthIndexSlot == nil {
 				return nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
 			}
-			slot, err := ethtoken.GetSlot(addr.Hex(), int(*process.EthIndexSlot))
-			if err != nil {
-				return nil, fmt.Errorf("cannot fetch slot: %w", err)
-			}
-			pubKeyDigested = slot[:]
-			log.Debugf("ERC20 index slot %d, storage slot %x", *process.EthIndexSlot, pubKeyDigested)
+			slot := sphelpers.GetMapSlot(addr, int(*process.EthIndexSlot))
+			proofKey = slot[:]
+			log.Debugf("ERC20 index slot %d, storage slot %x", *process.EthIndexSlot, proofKey)
 		default:
 			return nil, fmt.Errorf("census origin not compatible")
 		}
 
-		// check the digested payload has a minimum length
-		if len(pubKeyDigested) < 20 { // Minimum size is an Ethereum Address
-			return nil, fmt.Errorf("cannot digest public key: (%w)", err)
+		// check the proofKey  has a minimum length
+		if len(proofKey) < 20 { // Minimum size is an Ethereum Address
+			return nil, fmt.Errorf("proof key too short: expected len >= 20, got %v",
+				len(proofKey))
 		}
 
 		// check census proof
@@ -282,7 +280,7 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 			process.CensusOrigin,
 			process.CensusRoot,
 			process.ProcessId,
-			pubKeyDigested)
+			proofKey)
 		if err != nil {
 			return nil, fmt.Errorf("proof not valid: (%w)", err)
 		}
