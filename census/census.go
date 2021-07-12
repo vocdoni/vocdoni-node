@@ -134,6 +134,14 @@ func (m *Manager) LoadTree(name string, treeType models.Census_Type) (censustree
 	if _, exist := m.Trees[name]; exist {
 		return m.Trees[name], nil
 	}
+
+	// ensure backwards compatibility to CensusTrees created before the
+	// Protobuf CensusTypes implementation. When TreeType is set to 0, uses
+	// the 'default' tree type
+	if treeType == models.Census_UNKNOWN {
+		treeType = censusDefaultType
+	}
+
 	tr, err := censustreefactory.NewCensusTree(treeType, name, m.StorageDir)
 	if err != nil {
 		return nil, err
