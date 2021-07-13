@@ -251,6 +251,8 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 			if process.EnvelopeType.Anonymous {
 				// TODO Poseidon hash of pubKey
 				// pubKeyDigested = snarks.Poseidon.Hash(pubKey)
+				return nil, fmt.Errorf("census origin OFF_CHAIN_TREE with " +
+					"EnvelopeType.Anonymousnot implemented")
 			} else {
 				proofKey = pubKey
 			}
@@ -265,12 +267,6 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 			log.Debugf("ERC20 index slot %d, storage slot %x", *process.EthIndexSlot, proofKey)
 		default:
 			return nil, fmt.Errorf("census origin not compatible")
-		}
-
-		// check the proofKey  has a minimum length
-		if len(proofKey) < 20 { // Minimum size is an Ethereum Address
-			return nil, fmt.Errorf("proof key too short: expected len >= 20, got %v",
-				len(proofKey))
 		}
 
 		// check census proof
