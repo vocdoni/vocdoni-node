@@ -3,10 +3,8 @@ package vochain
 import (
 	"bytes"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	sphelpers "github.com/vocdoni/storage-proofs-eth-go/helpers"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -25,7 +23,7 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 	case *models.Tx_Vote:
 		v, err := VoteTxCheck(vtx, txBytes, signature, state, txID, commit)
 		if err != nil || v == nil {
-			return []byte{}, fmt.Errorf("voteTxCheck %w", err)
+			return []byte{}, fmt.Errorf("voteTxCheck: %w", err)
 		}
 		if commit {
 			return v.Nullifier, state.AddVote(v)
@@ -33,7 +31,7 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 		return v.Nullifier, nil
 	case *models.Tx_Admin:
 		if err := AdminTxCheck(vtx, txBytes, signature, state); err != nil {
-			return []byte{}, fmt.Errorf("adminTxChek %w", err)
+			return []byte{}, fmt.Errorf("adminTxChek: %w", err)
 		}
 		tx := vtx.GetAdmin()
 		if commit {
@@ -56,7 +54,7 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 					return []byte{}, state.AddValidator(validator)
 
 				}
-				return []byte{}, fmt.Errorf("addValidator %w", err)
+				return []byte{}, fmt.Errorf("addValidator: %w", err)
 
 			case models.TxType_REMOVE_VALIDATOR:
 				return []byte{}, state.RemoveValidator(tx.Address)
@@ -77,12 +75,12 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 				return []byte{}, state.AddProcess(p)
 			}
 		} else {
-			return []byte{}, fmt.Errorf("newProcess %w", err)
+			return []byte{}, fmt.Errorf("newProcess: %w", err)
 		}
 
 	case *models.Tx_SetProcess:
 		if err := SetProcessTxCheck(vtx, txBytes, signature, state); err != nil {
-			return []byte{}, fmt.Errorf("setProcess %w", err)
+			return []byte{}, fmt.Errorf("setProcess: %w", err)
 		}
 		if commit {
 			tx := vtx.GetSetProcess()
@@ -215,14 +213,13 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 			}
 			vote.EncryptionKeyIndexes = tx.EncryptionKeyIndexes
 		}
-		var pubKey []byte
-		pubKey, err = ethereum.PubKeyFromSignature(txBytes, signature)
+		pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 		if err != nil {
-			return nil, fmt.Errorf("cannot extract public key from signature: (%w)", err)
+			return nil, fmt.Errorf("cannot extract public key from signature: %w", err)
 		}
 		addr, err := ethereum.AddrFromPublicKey(pubKey)
 		if err != nil {
-			return nil, fmt.Errorf("cannot extract address from public key: (%w)", err)
+			return nil, fmt.Errorf("cannot extract address from public key: %w", err)
 		}
 
 		// assign a nullifier
@@ -245,40 +242,23 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 		log.Debugf("new vote %x for address %s and process %x", vote.Nullifier, addr.Hex(), tx.ProcessId)
 
 		// check census origin and compute vote digest identifier
-		var proofKey []byte
+		var verifyProof VerifyProofFunc
 		switch process.CensusOrigin {
 		case models.CensusOrigin_OFF_CHAIN_TREE:
-			if process.EnvelopeType.Anonymous {
-				// TODO Poseidon hash of pubKey
-				// pubKeyDigested = snarks.Poseidon.Hash(pubKey)
-				return nil, fmt.Errorf("census origin OFF_CHAIN_TREE with " +
-					"EnvelopeType.Anonymousnot implemented")
-			} else {
-				proofKey = pubKey
-			}
+			verifyProof = VerifyProofOffChainTree
 		case models.CensusOrigin_OFF_CHAIN_CA:
-			proofKey = addr.Bytes()
+			verifyProof = VerifyProofOffChainCA
 		case models.CensusOrigin_ERC20:
-			if process.EthIndexSlot == nil {
-				return nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
-			}
-			slot := sphelpers.GetMapSlot(addr, int(*process.EthIndexSlot))
-			proofKey = slot[:]
-			log.Debugf("ERC20 index slot %d, storage slot %x", *process.EthIndexSlot, proofKey)
+			verifyProof = VerifyProofERC20
 		default:
 			return nil, fmt.Errorf("census origin not compatible")
 		}
 
-		// check census proof
-		var valid bool
-		var weight *big.Int
-		valid, weight, err = CheckProof(tx.Proof,
-			process.CensusOrigin,
-			process.CensusRoot,
-			process.ProcessId,
-			proofKey)
+		valid, weight, err := verifyProof(process, tx.Proof,
+			process.CensusOrigin, process.CensusRoot, process.ProcessId,
+			pubKey, addr)
 		if err != nil {
-			return nil, fmt.Errorf("proof not valid: (%w)", err)
+			return nil, fmt.Errorf("proof not valid: %w", err)
 		}
 		if !valid {
 			return nil, fmt.Errorf("proof not valid")

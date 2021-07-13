@@ -10,14 +10,11 @@ import (
 	"os"
 	"strconv"
 
-	"go.vocdoni.io/dvote/censustree/gravitontree"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
-	"google.golang.org/protobuf/proto"
 
-	blind "github.com/arnaucube/go-blindsecp256k1"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	cfg "github.com/tendermint/tendermint/config"
@@ -27,100 +24,8 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	tmtime "github.com/tendermint/tendermint/types/time"
-	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"go.vocdoni.io/proto/build/go/models"
 )
-
-// CheckProof checks the validity of a census proof (depending on the origin).
-// key is the data to be proof in behalf the censusRoot.
-// In case of weighted proof, this function will return the weight as second parameter.
-func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin,
-	censusRoot, processID, key []byte) (bool, *big.Int, error) {
-	switch censusOrigin {
-	case models.CensusOrigin_OFF_CHAIN_TREE:
-		switch proof.Payload.(type) {
-		case *models.Proof_Graviton:
-			p := proof.GetGraviton()
-			if p == nil {
-				return false, nil, fmt.Errorf("graviton proof is empty")
-			}
-			valid, err := gravitontree.CheckProof(key, []byte{}, censusRoot, p.Siblings)
-			return valid, big.NewInt(1), err
-		case *models.Proof_Iden3:
-			// NOT IMPLEMENTED
-			return false, nil, fmt.Errorf("iden3 proof not implemented")
-		}
-	case models.CensusOrigin_OFF_CHAIN_CA:
-		p := proof.GetCa()
-		if !bytes.Equal(p.Bundle.Address, key) {
-			return false, nil, fmt.Errorf(
-				"CA bundle address and key do not match: %x != %x", key, p.Bundle.Address)
-		}
-		if !bytes.Equal(p.Bundle.ProcessId, processID) {
-			return false, nil, fmt.Errorf("CA bundle processID does not match")
-		}
-		caBundle, err := proto.Marshal(p.Bundle)
-		if err != nil {
-			return false, nil, fmt.Errorf("cannot marshal ca bundle to protobuf: %w", err)
-		}
-		var caPubk []byte
-
-		// depending on signature type, use a mechanism for extracting the ca publickey from signature
-		switch p.GetType() {
-		case models.ProofCA_ECDSA:
-			caPubk, err = ethereum.PubKeyFromSignature(caBundle, p.GetSignature())
-			if err != nil {
-				return false, nil, fmt.Errorf("cannot fetch ca address from signature: %w", err)
-			}
-			if !bytes.Equal(caPubk, censusRoot) {
-				return false, nil, fmt.Errorf("ca bundle signature does not match")
-			}
-		case models.ProofCA_ECDSA_BLIND:
-			// Blind CA check
-			pubdesc, err := ethereum.DecompressPubKey(censusRoot)
-			if err != nil {
-				return false, nil, fmt.Errorf("cannot decompress CA public key: %w", err)
-			}
-			pub, err := blind.NewPublicKeyFromECDSA(pubdesc)
-			if err != nil {
-				return false, nil, fmt.Errorf("cannot compute blind CA public key: %w", err)
-			}
-			signature, err := blind.NewSignatureFromBytes(p.GetSignature())
-			if err != nil {
-				return false, nil, fmt.Errorf("cannot compute blind CA signature: %w", err)
-			}
-			if !blind.Verify(new(big.Int).SetBytes(ethereum.HashRaw(caBundle)), signature, pub) {
-				return false, nil, fmt.Errorf("blind CA verification failed %s", log.FormatProto(p.Bundle))
-			}
-		default:
-			return false, nil, fmt.Errorf("ca proof %s type not supported", p.Type.String())
-		}
-		return true, big.NewInt(1), nil
-
-	case models.CensusOrigin_ERC20:
-		p := proof.GetEthereumStorage()
-		if p == nil {
-			return false, nil, fmt.Errorf("ethereum proof is empty")
-		}
-		if !bytes.Equal(p.Key, key) {
-			return false, nil, fmt.Errorf("proof key and leafData do not match (%x != %x)", p.Key, key)
-		}
-		amount := big.Int{}
-		amount.SetBytes(p.Value)
-		log.Debugf("validating erc20 storage proof for key %x and amount %s", p.Key, amount.String())
-		// TODO mapbased.VerifyProof()
-		valid, err := ethstorageproof.VerifyEthStorageProof(
-			&ethstorageproof.StorageResult{
-				Key:   p.Key,
-				Proof: p.Siblings,
-				Value: p.Value,
-			},
-			ethcommon.BytesToHash(censusRoot),
-		)
-		return valid, &amount, err
-	}
-	return false, nil, fmt.Errorf("proof type not supported for census origin %d", censusOrigin)
-}
 
 // VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
 func verifySignatureAgainstOracles(oracles []ethcommon.Address, message,
