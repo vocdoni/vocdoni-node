@@ -29,6 +29,9 @@ type GravitonState struct {
 	vTree             *VersionTree
 }
 
+// check that statedb.StateDB interface is matched by GravitonState
+var _ statedb.StateDB = (*GravitonState)(nil)
+
 // safeTree is a wrapper around graviton.Tree which uses a RWMutex to ensure its
 // methods are safe for concurrent use. The methods chosen to use the lock were
 // found via the race detector.
@@ -98,6 +101,9 @@ type GravitonTree struct {
 
 	tmpSizeCounter uint64
 }
+
+// check that statedb.StateTree interface is matched by GravitonTree
+var _ statedb.StateTree = (*GravitonTree)(nil)
 
 type VersionTree struct {
 	Name  string

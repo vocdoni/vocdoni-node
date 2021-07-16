@@ -24,12 +24,18 @@ type IavlState struct {
 	db          tmdb.DB
 }
 
+// check that statedb.StateDB interface is matched by IavlState
+var _ statedb.StateDB = (*IavlState)(nil)
+
 type IavlTree struct {
 	tree                *iavl.MutableTree
 	itree               *iavl.ImmutableTree
 	isImmutable         bool
 	lastCommitedVersion uint64
 }
+
+// check that statedb.StateTree interface is matched by IavlTree
+var _ statedb.StateTree = (*IavlTree)(nil)
 
 // Init initializes a iavlstate storage.
 // storageType can be disk or mem, default is disk.

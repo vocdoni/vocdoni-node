@@ -1,7 +1,7 @@
 package statedb
 
 type StateDB interface {
-	Init(storagePath, sorageType string) error
+	Init(storagePath, storageType string) error
 	Version() uint64
 	LoadVersion(int64) error // zero means last version, -1 is the previous to the last version
 	AddTree(name string) error
