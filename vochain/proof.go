@@ -11,11 +11,11 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	blind "github.com/arnaucube/go-blindsecp256k1"
-	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"github.com/vocdoni/storage-proofs-eth-go/token/mapbased"
+	"github.com/vocdoni/storage-proofs-eth-go/token/minime"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -23,13 +23,13 @@ import (
 // into a census within a process.
 type VerifyProofFunc func(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
-	censusRoot, processID, pubKey []byte, addr common.Address) (bool, *big.Int, error)
+	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error)
 
 // VerifyProofOffChainTree verifies a proof with census origin OFF_CHAIN_TREE.
 // Returns verification result and weight.
 func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
-	censusRoot, processID, pubKey []byte, addr common.Address) (bool, *big.Int, error) {
+	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
 	var key []byte
 	if process.EnvelopeType.Anonymous {
 		// TODO Poseidon hash of pubKey
@@ -61,7 +61,7 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 // Returns verification result and weight.
 func VerifyProofOffChainCA(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
-	censusRoot, processID, pubKey []byte, addr common.Address) (bool, *big.Int, error) {
+	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
 	key := addr.Bytes()
 
 	p := proof.GetCa()
@@ -115,7 +115,7 @@ func VerifyProofOffChainCA(process *models.Process, proof *models.Proof,
 // Returns verification result and weight.
 func VerifyProofERC20(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
-	censusRoot, processID, pubKey []byte, addr common.Address) (bool, *big.Int, error) {
+	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
 	if process.EthIndexSlot == nil {
 		return false, nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
 	}
@@ -125,6 +125,9 @@ func VerifyProofERC20(process *models.Process, proof *models.Proof,
 	}
 
 	balance := new(big.Int).SetBytes(p.Value)
+	if balance.Cmp(big.NewInt(0)) == 0 {
+		return false, nil, fmt.Errorf("balance at proof is 0")
+	}
 	log.Debugf("validating erc20 storage proof for key %x and balance %v", p.Key, balance)
 	err := mapbased.VerifyProof(addr, ethcommon.BytesToHash(censusRoot),
 		ethstorageproof.StorageResult{
@@ -136,4 +139,46 @@ func VerifyProofERC20(process *models.Process, proof *models.Proof,
 		balance,
 		nil)
 	return err == nil, balance, err
+}
+
+// VerifyProofMiniMe verifies a proof with census origin MiniMe.
+// Returns verification result and weight.
+func VerifyProofMiniMe(process *models.Process, proof *models.Proof,
+	censusOrigin models.CensusOrigin,
+	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
+	if process.EthIndexSlot == nil {
+		return false, nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
+	}
+	if process.SourceBlockHeight == nil {
+		return false, nil, fmt.Errorf("source block height not found for process %x",
+			process.ProcessId)
+	}
+	p := proof.GetMinimeStorage()
+	if p == nil {
+		return false, nil, fmt.Errorf("minime proof is empty")
+	}
+
+	_, proof0Balance, _ := minime.ParseMinimeValue(p.ProofPrevBlock.Value, 0)
+	if proof0Balance.Cmp(big.NewInt(0)) == 0 {
+		return false, nil, fmt.Errorf("balance at proofPrevBlock is 0")
+	}
+	log.Debugf("validating minime storage proof for key %x and balance %v",
+		p.ProofPrevBlock.Key, proof0Balance)
+	err := minime.VerifyProof(addr, ethcommon.BytesToHash(censusRoot),
+		[]ethstorageproof.StorageResult{
+			{
+				Key:   p.ProofPrevBlock.Key,
+				Proof: p.ProofPrevBlock.Siblings,
+				Value: p.ProofPrevBlock.Value,
+			},
+			{
+				Key:   p.ProofNextBlock.Key,
+				Proof: p.ProofNextBlock.Siblings,
+				Value: p.ProofNextBlock.Value,
+			},
+		},
+		int(*process.EthIndexSlot),
+		proof0Balance,
+		new(big.Int).SetUint64(*process.SourceBlockHeight))
+	return err == nil, proof0Balance, err
 }

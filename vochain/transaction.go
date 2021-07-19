@@ -250,6 +250,8 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 			verifyProof = VerifyProofOffChainCA
 		case models.CensusOrigin_ERC20:
 			verifyProof = VerifyProofERC20
+		case models.CensusOrigin_MINI_ME:
+			verifyProof = VerifyProofMiniMe
 		default:
 			return nil, fmt.Errorf("census origin not compatible")
 		}
