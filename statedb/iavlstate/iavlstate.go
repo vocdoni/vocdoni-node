@@ -16,11 +16,11 @@ const PrefixDBCacheSize = 1024
 
 type IavlState struct {
 	dataDir     string
-	dataType    string
+	dataType    statedb.StorageType
 	trees       map[string]*IavlTree
 	lock        sync.RWMutex
-	versionTree *iavl.MutableTree // For each tree, saves its last committed version
-	storageType string            // mem or disk
+	versionTree *iavl.MutableTree   // For each tree, saves its last committed version
+	storageType statedb.StorageType // mem or disk
 	db          tmdb.DB
 }
 
@@ -39,22 +39,23 @@ var _ statedb.StateTree = (*IavlTree)(nil)
 
 // Init initializes a iavlstate storage.
 // storageType can be disk or mem, default is disk.
-func (i *IavlState) Init(storagePath, storageType string) error {
+func (i *IavlState) Init(storagePath string, storageType statedb.StorageType) error {
 	i.dataDir = storagePath
 	i.dataType = storageType
 	i.trees = make(map[string]*IavlTree, 32)
 	var err error
 
-	if storageType == "disk" || storageType == "" {
+	switch storageType {
+	case statedb.StorageTypeDisk, "":
 		i.db, err = tmdb.NewGoLevelDB("versions", storagePath)
 		if err != nil {
 			return err
 		}
-		i.storageType = "disk"
-	} else if storageType == "mem" {
+		i.storageType = statedb.StorageTypeDisk
+	case statedb.StorageTypeMemory:
 		i.db = tmdb.NewMemDB()
-		i.storageType = "mem"
-	} else {
+		i.storageType = statedb.StorageTypeMemory
+	default:
 		return fmt.Errorf("storageType %s not supported", storageType)
 	}
 
@@ -141,13 +142,16 @@ func (i *IavlState) AddTree(name string) error {
 	var st tmdb.DB
 	var err error
 
-	if i.storageType == "disk" {
+	switch i.storageType {
+	case statedb.StorageTypeDisk, "":
 		st, err = tmdb.NewGoLevelDB(name, i.dataDir)
 		if err != nil {
 			return err
 		}
-	} else {
+	case statedb.StorageTypeMemory:
 		st = tmdb.NewMemDB()
+	default:
+		return fmt.Errorf("storageType %s not supported", i.storageType)
 	}
 
 	var t *iavl.MutableTree
