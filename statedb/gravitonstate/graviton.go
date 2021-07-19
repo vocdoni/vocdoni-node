@@ -29,6 +29,9 @@ type GravitonState struct {
 	vTree             *VersionTree
 }
 
+// check that statedb.StateDB interface is matched by GravitonState
+var _ statedb.StateDB = (*GravitonState)(nil)
+
 // safeTree is a wrapper around graviton.Tree which uses a RWMutex to ensure its
 // methods are safe for concurrent use. The methods chosen to use the lock were
 // found via the race detector.
@@ -99,6 +102,9 @@ type GravitonTree struct {
 	tmpSizeCounter uint64
 }
 
+// check that statedb.StateTree interface is matched by GravitonTree
+var _ statedb.StateTree = (*GravitonTree)(nil)
+
 type VersionTree struct {
 	Name  string
 	tree  safeTree
@@ -163,18 +169,20 @@ func (v *VersionTree) String() (s string) {
 	return s
 }
 
-func (g *GravitonState) Init(storagePath, storageType string) (err error) {
-	if storageType == "disk" || storageType == "" {
+func (g *GravitonState) Init(storagePath string, storageType statedb.StorageType) (err error) {
+	switch storageType {
+	case statedb.StorageTypeDisk, "":
 		if g.store, err = graviton.NewDiskStore(storagePath); err != nil {
 			return err
 		}
-	} else if storageType == "mem" {
+	case statedb.StorageTypeMemory:
 		if g.store, err = graviton.NewMemStore(); err != nil {
 			return err
 		}
-	} else {
+	default:
 		return fmt.Errorf("storageType %s not supported", storageType)
 	}
+
 	g.trees = make(map[string]*GravitonTree, 32)
 	g.imTrees = make(map[string]*GravitonTree, 32)
 	g.vTree = &VersionTree{}
