@@ -160,7 +160,10 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 		}
 	}
 	if len(nodesAtL) != nCPU {
-		panic("should not happen") // TODO TMP
+		return nil, fmt.Errorf("This error should not be reached."+
+			" len(nodesAtL) != nCPU, len(nodesAtL)=%d, nCPU=%d."+
+			" Please report it in a new issue:"+
+			" https://github.com/vocdoni/arbo/issues/new", len(nodesAtL), nCPU)
 	}
 
 	subRoots := make([]*node, nCPU)
@@ -224,7 +227,10 @@ func (n *node) getNodesAtLevel(currLvl, l int) ([]*node, error) {
 		return []*node{n}, nil
 	}
 	if currLvl >= l {
-		panic("should not reach this point") // TODO TMP
+		return nil, fmt.Errorf("This error should not be reached."+
+			" currLvl >= l, currLvl=%d, l=%d."+
+			" Please report it in a new issue:"+
+			" https://github.com/vocdoni/arbo/issues/new", currLvl, l)
 	}
 
 	var nodes []*node
@@ -306,6 +312,7 @@ func (t *vt) computeHashes() ([][2][]byte, error) {
 	subRoots := make([]*node, nCPU)
 	bucketPairs := make([][][2][]byte, nCPU)
 	dbgStatsPerBucket := make([]*dbgStats, nCPU)
+	errs := make([]error, nCPU)
 
 	var wg sync.WaitGroup
 	wg.Add(nCPU)
@@ -318,8 +325,7 @@ func (t *vt) computeHashes() ([][2][]byte, error) {
 			bucketPairs[cpu], err = bucketVT.root.computeHashes(l,
 				t.params.maxLevels, bucketVT.params, bucketPairs[cpu])
 			if err != nil {
-				// TODO WIP
-				panic("TODO: " + err.Error())
+				errs[cpu] = err
 			}
 
 			subRoots[cpu] = bucketVT.root
@@ -328,6 +334,12 @@ func (t *vt) computeHashes() ([][2][]byte, error) {
 		}(i)
 	}
 	wg.Wait()
+
+	for i := 0; i < len(errs); i++ {
+		if errs[i] != nil {
+			return nil, errs[i]
+		}
+	}
 
 	for i := 0; i < len(dbgStatsPerBucket); i++ {
 		t.params.dbg.add(dbgStatsPerBucket[i])
@@ -441,9 +453,9 @@ func (n *node) add(p *params, currLvl int, leaf *node) error {
 			return err
 		}
 	case vtEmpty:
-		panic(fmt.Errorf("EMPTY %v", n)) // TODO TMP
+		return fmt.Errorf("virtual tree node.add() with empty node %v", n)
 	default:
-		return fmt.Errorf("ERR") // TODO TMP
+		return fmt.Errorf("virtual tree node.add() with unknown node type %v", n)
 	}
 
 	return nil
@@ -586,7 +598,7 @@ func (n *node) computeHashes(currLvl, maxLvl int, p *params, pairs [][2][]byte) 
 		pairs = append(pairs, kv)
 	case vtEmpty:
 	default:
-		return nil, fmt.Errorf("ERR:n.computeHashes type (%d) no match", t) // TODO TMP
+		return nil, fmt.Errorf("error: n.computeHashes type (%d) no match", t)
 	}
 
 	return pairs, nil

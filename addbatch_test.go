@@ -952,9 +952,20 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	indexes, err := tree2.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, 0)
-
 	// check that both trees roots are equal
 	checkRoots(c, tree, tree2)
+
+	// use tree3 to add nil value array
+	database3, err := db.NewBadgerDB(c.TempDir())
+	c.Assert(err, qt.IsNil)
+	tree3, err := NewTree(database3, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree3.db.Close() //nolint:errcheck
+
+	indexes, err = tree3.AddBatch(keys, nil)
+	c.Assert(err, qt.IsNil)
+	c.Check(len(indexes), qt.Equals, 0)
+	checkRoots(c, tree, tree3)
 
 	kAux, proofV, siblings, existence, err := tree2.GenProof(keys[9])
 	c.Assert(err, qt.IsNil)

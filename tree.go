@@ -151,13 +151,16 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 		return nil, err
 	}
 
-	// TODO check validity of keys & values for Tree.hashFunction
+	// TODO check validity of keys & values for Tree.hashFunction (maybe do
+	// not add the checks, as would need more time, and this could be
+	// checked/ensured before calling this method)
 
+	e := []byte{}
 	// equal the number of keys & values
 	if len(keys) > len(values) {
 		// add missing values
 		for i := len(values); i < len(keys); i++ {
-			values = append(values, emptyValue)
+			values = append(values, e)
 		}
 	} else if len(keys) < len(values) {
 		// crop extra values
@@ -172,7 +175,9 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 	// once the VirtualTree is build, compute the hashes
 	pairs, err := vt.computeHashes()
 	if err != nil {
-		// TODO currently invalids in computeHashes are not counted
+		// currently invalids in computeHashes are not counted,
+		// but should not be needed, as if there is an error there is
+		// nothing stored in the db and the error is returned
 		return nil, err
 	}
 	t.root = vt.root.h
@@ -214,6 +219,7 @@ func (t *Tree) loadVT() (vt, error) {
 		}
 		leafK, leafV := ReadLeafValue(v)
 		if err := vt.add(0, leafK, leafV); err != nil {
+			// TODO instead of panic, return this error
 			panic(err)
 		}
 	})
@@ -232,7 +238,9 @@ func (t *Tree) Add(k, v []byte) error {
 	t.dbBatch = t.db.NewBatch()
 	t.batchMemory = make(map[[bmKeySize]byte]kv) // TODO TMP
 
-	// TODO check validity of key & value for Tree.hashFunction
+	// TODO check validity of key & value for Tree.hashFunction (maybe do
+	// not add the checks, as would need more time, and this could be
+	// checked/ensured before calling this method)
 
 	err = t.add(0, k, v) // add from level 0
 	if err != nil {
