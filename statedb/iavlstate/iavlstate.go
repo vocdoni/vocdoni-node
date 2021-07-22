@@ -242,13 +242,13 @@ func (t *IavlState) Close() error {
 	return t.db.Close()
 }
 
-func (t *IavlTree) Get(key []byte) (r []byte) {
+func (t *IavlTree) Get(key []byte) (r []byte, err error) {
 	if t.isImmutable {
 		_, r = t.itree.Get(key)
 	} else {
 		_, r = t.tree.Get(key)
 	}
-	return r
+	return r, nil
 }
 
 func (t *IavlTree) Add(key, value []byte) error {

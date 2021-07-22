@@ -396,9 +396,9 @@ func (t *GravitonTree) Init() error {
 	return nil
 }
 
-func (t *GravitonTree) Get(key []byte) []byte {
-	b, _ := t.tree.Get(key)
-	return b
+func (t *GravitonTree) Get(key []byte) ([]byte, error) {
+	b, err := t.tree.Get(key)
+	return b, err
 }
 
 func (t *GravitonTree) Add(key, value []byte) error {
