@@ -3,6 +3,7 @@ package processarchive
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
@@ -26,8 +27,9 @@ type ProcessArchive struct {
 }
 
 type Process struct {
-	Process *models.Process
-	Votes   uint32
+	Process *models.Process `json:"process"`
+	Votes   uint32          `json:"votes"`
+	Weight  *big.Int        `json:"weight,omitempty"`
 }
 
 type jsonStorage struct {
@@ -128,9 +130,11 @@ func (i *ProcessArchive) OnProcessResults(pid []byte,
 		return fmt.Errorf("cannot get process %x info: %w", pid, err)
 	}
 	process.Results = &models.ProcessResult{Votes: results, ProcessId: pid}
+	votes := i.vochain.State.CountVotes(pid, false)
 	i.pprocs = append(i.pprocs, &Process{
-		Votes:   i.vochain.State.CountVotes(pid, false),
+		Votes:   votes,
 		Process: process,
+		Weight:  new(big.Int).SetUint64(uint64(votes)), // TODO: return the correct weight
 	})
 	return nil
 }
@@ -145,7 +149,7 @@ func (i *ProcessArchive) Close() {
 // OnCancel does nothing
 func (i *ProcessArchive) OnCancel(pid []byte, txindex int32) {}
 
-// OnCancOnVoteel does nothing
+// OnVote does nothing
 func (i *ProcessArchive) OnVote(v *models.Vote, txindex int32) {}
 
 // OnNewTx does nothing
