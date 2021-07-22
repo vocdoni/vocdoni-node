@@ -57,7 +57,11 @@ func TestState(t *testing.T) {
 	}
 
 	// Check value persists and its OK
-	if string(s.Tree("t1").Get([]byte("1"))) != "number 1" {
+	v, err := s.Tree("t1").Get([]byte("1"))
+	if err != nil {
+		t.Error(err)
+	}
+	if string(v) != "number 1" {
 		t.Errorf("stored data for key 1 is wrong")
 	}
 
@@ -73,14 +77,20 @@ func TestState(t *testing.T) {
 	s.Rollback()
 
 	// Check value persists and its OK
-	if string(s.Tree("t1").Get([]byte("1"))) != "number 1" {
+	if v, err = s.Tree("t1").Get([]byte("1")); err != nil {
+		t.Error(err)
+	}
+	if string(v) != "number 1" {
 		t.Errorf("rollback do not reset the values")
 	}
 
 	// Change a value and test immutable (should be the previous version)
 	s.Tree("t1").Add([]byte("1"), []byte(("number changed")))
 
-	if string(s.ImmutableTree("t1").Get([]byte("1"))) != "number 1" {
+	if v, err = s.ImmutableTree("t1").Get([]byte("1")); err != nil {
+		t.Error(err)
+	}
+	if string(v) != "number 1" {
 		t.Errorf("immutable tree has muted without commit")
 	}
 
@@ -92,8 +102,11 @@ func TestState(t *testing.T) {
 	}
 
 	// Test immutable tree is updated
-	if v := string(s.ImmutableTree("t1").Get([]byte("1"))); v != "number changed" {
-		t.Errorf("immutable tree has not been updated after commit, value is %s", v)
+	if v, err = s.ImmutableTree("t1").Get([]byte("1")); err != nil {
+		t.Error(err)
+	}
+	if vStr := string(v); vStr != "number changed" {
+		t.Errorf("immutable tree has not been updated after commit, value is %s", vStr)
 	}
 
 	// Load previous version
@@ -107,7 +120,10 @@ func TestState(t *testing.T) {
 	}
 
 	// Check value persists and its OK
-	if string(s.Tree("t1").Get([]byte("1"))) != "number 1" {
+	if v, err = s.Tree("t1").Get([]byte("1")); err != nil {
+		t.Error(err)
+	}
+	if string(v) != "number 1" {
 		t.Errorf("load version -1 does not work")
 	}
 

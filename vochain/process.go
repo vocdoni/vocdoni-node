@@ -64,9 +64,13 @@ func (v *State) Process(pid []byte, isQuery bool) (*models.Process, error) {
 	var err error
 	v.RLock()
 	if isQuery {
-		processBytes = v.Store.ImmutableTree(ProcessTree).Get(pid)
+		if processBytes, err = v.Store.ImmutableTree(ProcessTree).Get(pid); err != nil {
+			return nil, err
+		}
 	} else {
-		processBytes = v.Store.Tree(ProcessTree).Get(pid)
+		if processBytes, err = v.Store.Tree(ProcessTree).Get(pid); err != nil {
+			return nil, err
+		}
 	}
 	v.RUnlock()
 	if processBytes == nil {
