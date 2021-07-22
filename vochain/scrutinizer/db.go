@@ -18,14 +18,21 @@ const kvErrorStringForRetry = "Transaction Conflict"
 // InitDB initializes a badgerhold db at the location given by dataDir
 func InitDB(dataDir string) (*badgerhold.Store, error) {
 	opts := badgerhold.DefaultOptions
-	opts.WithCompression(0)
-	opts.WithBlockCacheSize(0)
+
+	// Note that these "With" options return a modified copy.
+	opts.Options = opts.WithCompression(0)
+	opts.Options = opts.WithBlockCacheSize(0)
+	opts.Options = opts.WithVerifyValueChecksum(false)
+	opts.Options = opts.WithDetectConflicts(true)
+
 	opts.SequenceBandwith = 10000
-	opts.WithVerifyValueChecksum(false)
-	opts.WithDetectConflicts(true)
 	opts.Dir = dataDir
 	opts.ValueDir = dataDir
-	// TO-DO set custom logger
+
+	// TODO: support configurable logging
+	opts.Options = opts.WithLogger(nil)
+	opts.Logger = nil
+
 	return badgerhold.Open(opts)
 }
 
