@@ -12,12 +12,12 @@ replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 
 // If you change its version, ensure that "GOOS=darwin go build ./..." still works.
 
 require (
-	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210227202403-5dae5c48f917
+	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210406120253-ab86bc2846d9
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210203222605-876755a714c3
 	github.com/cosmos/iavl v0.15.3
-	github.com/deroproject/graviton v0.0.0-20200906044921-89e9e09f9601
+	github.com/deroproject/graviton v0.0.0-20201218180342-ab474f4c94d2
 	github.com/dgraph-io/badger/v2 v2.2007.3 // indirect
-	github.com/dgraph-io/badger/v3 v3.2011.1
+	github.com/dgraph-io/badger/v3 v3.2103.1
 	github.com/ethereum/go-ethereum v1.9.26-0.20201212163632-00d10e610f9f
 	github.com/frankban/quicktest v1.13.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -32,8 +32,8 @@ require (
 	github.com/ipfs/go-ipfs-keystore v0.0.2
 	github.com/ipfs/go-log v1.0.5
 	github.com/ipfs/interface-go-ipfs-core v0.4.0
-	github.com/klauspost/compress v1.11.7
-	github.com/libp2p/go-libp2p v0.14.3
+	github.com/klauspost/compress v1.13.1
+	github.com/libp2p/go-libp2p v0.14.4
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
 	github.com/libp2p/go-libp2p-core v0.8.5
 	github.com/libp2p/go-libp2p-discovery v0.5.1
@@ -44,19 +44,19 @@ require (
 	github.com/p4u/recws v1.2.2-0.20201005083112-7be7f9397e75
 	github.com/prometheus/client_golang v1.10.0
 	github.com/shirou/gopsutil v3.20.12+incompatible
-	github.com/spf13/cobra v1.1.3
+	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.7.1
+	github.com/spf13/viper v1.8.1
 	github.com/tendermint/tendermint v0.34.10
 	github.com/tendermint/tm-db v0.6.4
 	github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f
 	github.com/vocdoni/arbo v0.0.0-20210616072504-a8c7ea980892
 	github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210719161106-675817be681e
-	go.uber.org/zap v1.16.0
+	go.uber.org/zap v1.18.1
 	go.vocdoni.io/proto v1.0.4-0.20210719161241-4f28acf85d46
-	golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf
-	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
+	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+	golang.org/x/net v0.0.0-20210716203947-853a461950ff
 	google.golang.org/protobuf v1.27.1
 	nhooyr.io/websocket v1.8.6
 )
