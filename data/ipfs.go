@@ -10,12 +10,12 @@ import (
 
 	"github.com/ipfs/go-cid"
 	files "github.com/ipfs/go-ipfs-files"
+	keystore "github.com/ipfs/go-ipfs-keystore"
 	ipfscmds "github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
 	"github.com/ipfs/go-ipfs/core/corehttp"
 	"github.com/ipfs/go-ipfs/core/corerepo"
 	"github.com/ipfs/go-ipfs/core/coreunix"
-	"github.com/ipfs/go-ipfs/keystore"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
