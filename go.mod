@@ -26,22 +26,23 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.1-0.20180906183839-65a6292f0157 // indirect
 	github.com/ipfs/go-cid v0.0.7
-	github.com/ipfs/go-ipfs v0.7.1-0.20210129042248-884a5aebd748
-	github.com/ipfs/go-ipfs-config v0.12.0
+	github.com/ipfs/go-ipfs v0.9.1
+	github.com/ipfs/go-ipfs-config v0.14.0
 	github.com/ipfs/go-ipfs-files v0.0.8
-	github.com/ipfs/go-log v1.0.4
+	github.com/ipfs/go-ipfs-keystore v0.0.2
+	github.com/ipfs/go-log v1.0.5
 	github.com/ipfs/interface-go-ipfs-core v0.4.0
-	github.com/klauspost/compress v1.11.4
-	github.com/libp2p/go-libp2p v0.13.1-0.20210302020805-6a14d8c23942
+	github.com/klauspost/compress v1.11.7
+	github.com/libp2p/go-libp2p v0.14.3
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
 	github.com/libp2p/go-libp2p-core v0.8.5
-	github.com/libp2p/go-libp2p-discovery v0.5.0
-	github.com/libp2p/go-libp2p-kad-dht v0.11.1
+	github.com/libp2p/go-libp2p-discovery v0.5.1
+	github.com/libp2p/go-libp2p-kad-dht v0.12.2
 	github.com/libp2p/go-reuseport v0.0.2
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/multiformats/go-multiaddr v0.3.1
+	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/p4u/recws v1.2.2-0.20201005083112-7be7f9397e75
-	github.com/prometheus/client_golang v1.9.0
+	github.com/prometheus/client_golang v1.10.0
 	github.com/shirou/gopsutil v3.20.12+incompatible
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
@@ -50,13 +51,13 @@ require (
 	github.com/tendermint/tm-db v0.6.4
 	github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f
 	github.com/vocdoni/arbo v0.0.0-20210616072504-a8c7ea980892
-	github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44 // indirect
+	github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44
 	github.com/vocdoni/storage-proofs-eth-go v0.1.5
 	go.uber.org/zap v1.16.0
-	go.vocdoni.io/proto v1.0.4-0.20210705131333-7925ca319268 // indirect
-	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
-	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
-	google.golang.org/protobuf v1.25.0
+	go.vocdoni.io/proto v1.0.4-0.20210719161241-4f28acf85d46
+	golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf
+	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
+	google.golang.org/protobuf v1.27.1
 	nhooyr.io/websocket v1.8.6
 )
 
