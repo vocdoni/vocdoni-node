@@ -3,7 +3,6 @@ package processarchive
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
@@ -12,24 +11,22 @@ import (
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
 
 type ProcessArchive struct {
-	vochain    *vochain.BaseApplication
+	indexer    *scrutinizer.Scrutinizer
 	ipfs       *data.IPFSHandle
 	storage    *jsonStorage
-	pprocs     []*Process
 	publish    chan (bool)
 	lastUpdate time.Time
 	close      chan (bool)
 }
 
 type Process struct {
-	Process *models.Process `json:"process"`
-	Votes   uint32          `json:"votes"`
-	Weight  *big.Int        `json:"weight,omitempty"`
+	ProcessInfo *indexertypes.Process `json:"process"`
+	Results     *indexertypes.Results `json:"results"`
 }
 
 type jsonStorage struct {
@@ -48,7 +45,7 @@ func NewJsonStorage(datadir string) (*jsonStorage, error) {
 
 // AddProcess adds an entire process to js
 func (js *jsonStorage) AddProcess(p *Process) error {
-	if p == nil || p.Process == nil || len(p.Process.ProcessId) != types.ProcessIDsize {
+	if p == nil || p.ProcessInfo == nil || len(p.ProcessInfo.ID) != types.ProcessIDsize {
 		return fmt.Errorf("process not valid")
 	}
 	data, err := json.MarshalIndent(p, "", "\t")
@@ -58,7 +55,20 @@ func (js *jsonStorage) AddProcess(p *Process) error {
 	js.lock.Lock()
 	defer js.lock.Unlock()
 	// TO-DO: use https://github.com/google/renameio
-	return os.WriteFile(filepath.Join(js.datadir, fmt.Sprintf("%x", p.Process.ProcessId)), data, 0o644)
+	return os.WriteFile(filepath.Join(js.datadir, fmt.Sprintf("%x", p.ProcessInfo.ID)), data, 0o644)
+}
+
+// ProcessExist returns true if a process already existin in the storage
+func (js *jsonStorage) ProcessExist(pid []byte) (bool, error) {
+	js.lock.Lock()
+	defer js.lock.Unlock()
+	if _, err := os.Stat(filepath.Join(js.datadir, fmt.Sprintf("%x", pid))); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // NewProcessArchive creates a new instance of the process archiver.
@@ -67,19 +77,29 @@ func (js *jsonStorage) AddProcess(p *Process) error {
 // The key parameter must be either a valid IPFS base64 encoded private key
 // or empty (a new key will be generated).
 // If ipfs is nil, only JSON archive storage will be performed.
-func NewProcessArchive(v *vochain.BaseApplication, ipfs *data.IPFSHandle,
+func NewProcessArchive(s *scrutinizer.Scrutinizer, ipfs *data.IPFSHandle,
 	datadir, key string) (*ProcessArchive, error) {
 	js, err := NewJsonStorage(datadir)
 	if err != nil {
 		return nil, fmt.Errorf("could not create process archive: %w", err)
 	}
 	ir := &ProcessArchive{
-		vochain: v,
+		indexer: s,
 		ipfs:    ipfs,
 		storage: js,
 		publish: make(chan (bool), 1),
 		close:   make(chan (bool), 1), // TO-DO: use a context
 	}
+
+	// Perform an initial scan to add previous processes
+	// This might not be required since fast-sync should be able to find all processes,
+	// but for security reasons we perform this redundant scan over the previous processes.
+	// For instance, if the process archive format is changed, without this initial scan
+	// the node should synchronize the blockchain from scratch.
+	if err := ir.ProcessScan(0); err != nil {
+		return nil, err
+	}
+
 	if ipfs != nil {
 		if err := ir.AddKey(key); err != nil {
 			return nil, err
@@ -93,78 +113,68 @@ func NewProcessArchive(v *vochain.BaseApplication, ipfs *data.IPFSHandle,
 		ir.publish <- true
 		go ir.publishLoop()
 	}
-	v.State.AddEventListener(ir)
+	// Subscribe to events for new processes
+	s.AddEventListener(ir)
+
 	return ir, nil
 }
 
-// Rollback resets the pending process list
-func (i *ProcessArchive) Rollback() {
-	i.pprocs = []*Process{}
-}
-
-// Commit adds pending processes to the process archive
-func (i *ProcessArchive) Commit(height uint32) error {
-	for _, p := range i.pprocs {
-		if err := i.storage.AddProcess(p); err != nil {
-			log.Errorf("cannot add json process: %v", err)
+// ProcessScan search for previous (not added) processes to the archive and adds them.
+// This method is build for being executed only once (when bootstraping) since new
+// processes will automatically be added to the archive by event callbacks.
+func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
+	pids, err := pa.indexer.ProcessList(nil, fromBlock,
+		int(pa.indexer.ProcessCount(nil)), "", 0, "", "RESULTS", true)
+	if err != nil {
+		return err
+	}
+	log.Infof("scanning blockchain processes from block %d", fromBlock)
+	added := 0
+	startTime := time.Now()
+	for _, p := range pids {
+		exists, err := pa.storage.ProcessExist(p)
+		if err != nil {
+			log.Warnf("processScan: %v", err)
 			continue
 		}
-		log.Infof("stored json process %x", p.Process.ProcessId)
-	}
-	// publish to IPFS if there is a new process with results
-	if len(i.pprocs) > 0 && i.ipfs != nil {
-		log.Debugf("sending archive publish signal for height %d", height)
-		select {
-		case i.publish <- true:
-		default: // do nothing
+		if exists {
+			continue
 		}
+		procInfo, err := pa.indexer.ProcessInfo(p)
+		if err != nil {
+			return err
+		}
+		results, err := pa.indexer.GetResults(p)
+		if err != nil {
+			return err
+		}
+		if err := pa.storage.AddProcess(&Process{ProcessInfo: procInfo, Results: results}); err != nil {
+			log.Warnf("processScan: %v", err)
+		}
+		added++
 	}
+	log.Infof("archive scan added %d archive processes, took %s", added, time.Since(startTime))
 	return nil
 }
 
-// OnProcessResults adds the process & results to the pending process list
-func (i *ProcessArchive) OnProcessResults(pid []byte,
-	results []*models.QuestionResult, txindex int32) error {
-	process, err := i.vochain.State.Process(pid, false)
-	if err != nil {
-		return fmt.Errorf("cannot get process %x info: %w", pid, err)
+// OnComputeResults implements the indexer event callback
+func (pa *ProcessArchive) OnComputeResults(results *indexertypes.Results,
+	proc *indexertypes.Process, height uint32) {
+	if err := pa.storage.AddProcess(&Process{ProcessInfo: proc, Results: results}); err != nil {
+		log.Errorf("cannot add json process: %v", err)
+		return
 	}
-	process.Results = &models.ProcessResult{Votes: results, ProcessId: pid}
-	votes := i.vochain.State.CountVotes(pid, false)
-	i.pprocs = append(i.pprocs, &Process{
-		Votes:   votes,
-		Process: process,
-		Weight:  new(big.Int).SetUint64(uint64(votes)), // TODO: return the correct weight
-	})
-	return nil
+	log.Infof("stored json process %x", proc.ID)
+
+	// send publish signal
+	log.Debugf("sending archive publish signal for height %d", height)
+	select {
+	case pa.publish <- true:
+	default: // do nothing
+	}
 }
 
 // Close closes the process archive
-func (i *ProcessArchive) Close() {
-	i.close <- true
+func (pa *ProcessArchive) Close() {
+	pa.close <- true
 }
-
-// NOT USED but required for implementing the interface
-
-// OnCancel does nothing
-func (i *ProcessArchive) OnCancel(pid []byte, txindex int32) {}
-
-// OnVote does nothing
-func (i *ProcessArchive) OnVote(v *models.Vote, txindex int32) {}
-
-// OnNewTx does nothing
-func (i *ProcessArchive) OnNewTx(blockHeight uint32, txIndex int32) {}
-
-// OnProcessKeys does nothing
-func (i *ProcessArchive) OnProcessKeys(pid []byte, pub, com string, txindex int32) {}
-
-// OnRevealKeys does nothing
-func (i *ProcessArchive) OnRevealKeys(pid []byte, priv, rev string, txindex int32) {}
-
-// OnProcessStatusChange does nothing
-func (i *ProcessArchive) OnProcessStatusChange(pid []byte,
-	status models.ProcessStatus, txindex int32) {
-}
-
-// OnProcess does nothing
-func (i *ProcessArchive) OnProcess(pid, eid []byte, censusRoot, censusURI string, txindex int32) {}

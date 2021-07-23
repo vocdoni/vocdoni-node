@@ -33,7 +33,7 @@ const (
 // EventListener is an interface used for executing custom functions during the
 // events of the tally of a process.
 type EventListener interface {
-	OnComputeResults(results *indexertypes.Results)
+	OnComputeResults(results *indexertypes.Results, process *indexertypes.Process, height uint32)
 }
 
 // AddEventListener adds a new event listener, to receive method calls on block

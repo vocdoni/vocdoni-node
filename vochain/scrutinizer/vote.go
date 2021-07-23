@@ -236,7 +236,8 @@ func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 // ComputeResult process a finished voting, compute the results and saves it in the Storage.
 // Once this function is called, any future live vote event for the processId will be discarted.
 func (s *Scrutinizer) ComputeResult(processID []byte) error {
-	log.Debugf("computing results for %x", processID)
+	height := s.App.Height()
+	log.Debugf("computing results on height %d for %x", height, processID)
 
 	// Get process from database
 	p, err := s.ProcessInfo(processID)
@@ -277,7 +278,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 
 	// Execute callbacks
 	for _, l := range s.eventListeners {
-		go l.OnComputeResults(results)
+		go l.OnComputeResults(results, p, height)
 	}
 	return nil
 }

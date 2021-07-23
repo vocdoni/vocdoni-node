@@ -103,7 +103,7 @@ func (o *Oracle) NewProcess(process *models.Process) error {
 // OnComputeResults is called once a process result is computed by the scrutinizer.
 // The Oracle will build and send a RESULTS transaction to the Vochain.
 // The transaction includes the final results for the process.
-func (o *Oracle) OnComputeResults(results *indexertypes.Results) {
+func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexertypes.Process, h uint32) {
 	log.Infof("launching on computeResults callback for process %x", results.ProcessID)
 	// check vochain process status
 	vocProcessData, err := o.VochainApp.State.Process(results.ProcessID, true)

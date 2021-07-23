@@ -19,15 +19,15 @@ const (
 
 // Results holds the final results and relevant process info for a vochain process
 type Results struct {
-	ProcessID      types.HexBytes `badgerholdKey:"ProcessID"`
-	Votes          [][]*big.Int
-	Weight         *big.Int
-	EnvelopeHeight uint64
+	ProcessID      types.HexBytes             `badgerholdKey:"ProcessID" json:"processId"`
+	Votes          [][]*big.Int               `json:"votes"`
+	Weight         *big.Int                   `json:"weight"`
+	EnvelopeHeight uint64                     `json:"envelopeHeight"`
 	EnvelopeType   *models.EnvelopeType       `json:"envelopeType"`
 	VoteOpts       *models.ProcessVoteOptions `json:"voteOptions"`
-	Signatures     []types.HexBytes
-	Final          bool
-	BlockHeight    uint32
+	Signatures     []types.HexBytes           `json:"signatures"`
+	Final          bool                       `json:"final"`
+	BlockHeight    uint32                     `json:"blockHeight"`
 }
 
 // String formats the results in a human-readable string

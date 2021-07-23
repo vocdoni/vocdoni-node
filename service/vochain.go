@@ -129,13 +129,17 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 
 	// Process Archiver
 	if vconfig.ProcessArchive {
+		if sc == nil {
+			err = fmt.Errorf("process archive needs indexer enabled")
+			return
+		}
 		ipfs, ok := storage.(*data.IPFSHandle)
 		if !ok {
 			log.Warnf("storage is not IPFS, archive publishing disabled")
 		}
 		log.Infof("starting process archiver on %s", vconfig.ProcessArchiveDataDir)
 		processarchive.NewProcessArchive(
-			vnode,
+			sc,
 			ipfs,
 			vconfig.ProcessArchiveDataDir,
 			vconfig.ProcessArchiveKey,
