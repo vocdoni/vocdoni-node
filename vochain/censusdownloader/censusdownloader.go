@@ -89,6 +89,6 @@ func (c *CensusDownloader) OnProcessStatusChange(pid []byte,
 }
 
 func (c *CensusDownloader) OnProcessResults(pid []byte,
-	results []*models.QuestionResult, txindex int32) error {
+	results *models.ProcessResult, txindex int32) error {
 	return nil
 }

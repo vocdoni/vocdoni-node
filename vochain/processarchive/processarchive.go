@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 type ProcessArchive struct {
@@ -56,6 +57,21 @@ func (js *jsonStorage) AddProcess(p *Process) error {
 	defer js.lock.Unlock()
 	// TO-DO: use https://github.com/google/renameio
 	return os.WriteFile(filepath.Join(js.datadir, fmt.Sprintf("%x", p.ProcessInfo.ID)), data, 0o644)
+}
+
+// GetProcess retreives a process from the js storage
+func (js *jsonStorage) GetProcess(pid []byte) (*Process, error) {
+	if len(pid) != types.ProcessIDsize {
+		return nil, fmt.Errorf("process not valid")
+	}
+	js.lock.Lock()
+	defer js.lock.Unlock()
+	data, err := os.ReadFile(filepath.Join(js.datadir, fmt.Sprintf("%x", pid)))
+	if err != nil {
+		return nil, err
+	}
+	p := &Process{}
+	return p, json.Unmarshal(data, p)
 }
 
 // ProcessExist returns true if a process already existin in the storage
@@ -157,16 +173,67 @@ func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
 	return nil
 }
 
-// OnComputeResults implements the indexer event callback
+// OnComputeResults implements the indexer event callback.
+// On this event the results are set always and the process info only if it
+// does not exist yet in the json storage.
 func (pa *ProcessArchive) OnComputeResults(results *indexertypes.Results,
 	proc *indexertypes.Process, height uint32) {
-	if err := pa.storage.AddProcess(&Process{ProcessInfo: proc, Results: results}); err != nil {
+	// Get the process (if exist)
+	jsProc, err := pa.storage.GetProcess(results.ProcessID)
+	if err != nil {
+		if os.IsNotExist(err) { // if it does not exist yet, we create it
+			jsProc = &Process{ProcessInfo: proc, Results: results}
+		} else {
+			log.Errorf("cannot get json store process: %v", err)
+			return
+		}
+	}
+	jsProc.Results = results
+	if err := pa.storage.AddProcess(jsProc); err != nil {
 		log.Errorf("cannot add json process: %v", err)
 		return
 	}
-	log.Infof("stored json process %x", proc.ID)
+	log.Infof("stored json process %x for compute results event", proc.ID)
 
 	// send publish signal
+	log.Debugf("sending archive publish signal for height %d", height)
+	select {
+	case pa.publish <- true:
+	default: // do nothing
+	}
+}
+
+// OnOracleResults implements the indexer event callback.
+// On this event the process status is set to Results.
+func (pa *ProcessArchive) OnOracleResults(oracleResults *models.ProcessResult, pid []byte, height uint32) {
+	jsProc, err := pa.storage.GetProcess(pid)
+	if err != nil {
+		if os.IsNotExist(err) { // if it does not exist yet, we create it
+			proc, err := pa.indexer.ProcessInfo(pid)
+			if err != nil {
+				log.Errorf("cannot get process info %x from indexer: %v", pid, err)
+				return
+			}
+			jsProc = &Process{ProcessInfo: proc, Results: nil}
+		} else {
+			log.Errorf("cannot get json store process: %v", err)
+			return
+		}
+	}
+	// Ensure the status is set to RESULTS since OnOracleResults event is called on setProcessResultsTx
+	jsProc.ProcessInfo.Status = int32(models.ProcessStatus_RESULTS)
+	jsProc.ProcessInfo.FinalResults = true
+	// TODO: add signatures from oracles
+	//jsProc.Results.Signatures = append(jsProc.results.Signatures, oracleResults.Signature)
+
+	// Store the process
+	if err := pa.storage.AddProcess(jsProc); err != nil {
+		log.Errorf("cannot add json process: %v", err)
+		return
+	}
+	log.Infof("stored json process %x for oracle results transaction event", pid)
+
+	// Send publish signal
 	log.Debugf("sending archive publish signal for height %d", height)
 	select {
 	case pa.publish <- true:

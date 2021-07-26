@@ -292,7 +292,7 @@ func (k *KeyKeeper) OnRevealKeys(pid []byte, priv, rev string, txindex int32) {
 
 // OnProcessResults does nothing
 func (k *KeyKeeper) OnProcessResults(pid []byte,
-	results []*models.QuestionResult, txindex int32) error {
+	results *models.ProcessResult, txindex int32) error {
 	// do nothing
 	return nil
 }

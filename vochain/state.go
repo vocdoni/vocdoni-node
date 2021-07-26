@@ -44,7 +44,7 @@ type EventListener interface {
 	OnCancel(pid []byte, txIndex int32)
 	OnProcessKeys(pid []byte, encryptionPub, commitment string, txIndex int32)
 	OnRevealKeys(pid []byte, encryptionPriv, reveal string, txIndex int32)
-	OnProcessResults(pid []byte, results []*models.QuestionResult, txIndex int32) error
+	OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) error
 	Commit(height uint32) (err error)
 	Rollback()
 }
