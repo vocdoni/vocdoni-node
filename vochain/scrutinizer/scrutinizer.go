@@ -34,12 +34,13 @@ const (
 // events of the tally of a process.
 type EventListener interface {
 	OnComputeResults(results *indexertypes.Results, process *indexertypes.Process, height uint32)
+	OnOracleResults(oracleResults *models.ProcessResult, pid []byte, height uint32)
 }
 
 // AddEventListener adds a new event listener, to receive method calls on block
 // events as documented in EventListener.
 func (s *Scrutinizer) AddEventListener(l EventListener) {
-	s.eventListeners = append(s.eventListeners, l)
+	s.eventOnResults = append(s.eventOnResults, l)
 }
 
 // Scrutinizer is the component which makes the accounting of the voting processes
@@ -60,8 +61,8 @@ type Scrutinizer struct {
 	newTxPool []*indexertypes.TxReference
 	// list of live processes (those on which the votes will be computed on arrival)
 	liveResultsProcs sync.Map
-	// eventListeners is the list of external callbacks that will be executed by the scrutinizer
-	eventListeners []EventListener
+	// eventOnResults is the list of external callbacks that will be executed by the scrutinizer
+	eventOnResults []EventListener
 	db             *badgerhold.Store
 	// envelopeHeightCache and countTotalEnvelopes are in memory counters that helps reducing the
 	// access time when GenEnvelopeHeight() is called.
@@ -481,9 +482,14 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string, txIndex int3
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
-// OnProcessResults verifies the results for  a process and appends it to the updateProcessPool
-func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionResult,
+// OnProcessResults verifies the results for a process and appends it to the updateProcessPool
+func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult,
 	txIndex int32) error {
+	// Execute callbacks
+	for _, l := range s.eventOnResults {
+		go l.OnOracleResults(results, pid, s.App.Height())
+	}
+
 	// We don't execute any action if the blockchain is being syncronized
 	if s.App.IsSynchronizing() {
 		return nil
@@ -498,6 +504,10 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionRes
 	// This code must be run async in order to not delay the consensus. The results retreival
 	// could require some time.
 	go func() {
+		if results == nil || results.Votes == nil {
+			log.Errorf("results are nil")
+			return
+		}
 		var myResults *indexertypes.Results
 		var err error
 		retries := 50
@@ -519,24 +529,30 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results []*models.QuestionRes
 			return
 		}
 
-		myVotes := BuildProcessResult(myResults, nil).GetVotes()
-		if len(myVotes) != len(results) {
-			log.Errorf("results validation failed: wrong result questions size")
-			return
-		}
-		for i, q := range results {
+		myVotes := BuildProcessResult(myResults, results.EntityId).GetVotes()
+		correct := len(myVotes) != len(results.Votes)
+		for i, q := range results.GetVotes() {
+			if !correct {
+				break
+			}
 			if len(q.Question) != len(myVotes[i].Question) {
 				log.Errorf("results validation failed: wrong question size")
-				return
+				correct = false
+				break
 			}
 			for j, v := range q.Question {
 				if !bytes.Equal(v, myVotes[i].Question[j]) {
 					log.Errorf("results validation failed: wrong question result")
-					return
+					correct = false
+					break
 				}
 			}
 		}
-		log.Infof("published results for process %x are correct!", pid)
+		if correct {
+			log.Infof("published results for process %x are correct", pid)
+		} else {
+			log.Warnf("published results for process %x are not correct", pid)
+		}
 	}()
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 	return nil

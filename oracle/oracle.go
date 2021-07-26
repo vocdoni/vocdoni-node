@@ -170,3 +170,7 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 	}
 	log.Infof("oracle transaction sent, hash:%x", res.Hash)
 }
+
+// OnOracleResults does nothing. Required for implementing the scrutinizer EventListener interface
+func (o *Oracle) OnOracleResults(procResults *models.ProcessResult, pid []byte, height uint32) {
+}

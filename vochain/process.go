@@ -222,7 +222,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 		}
 		// Call event listeners
 		for _, l := range v.eventListeners {
-			if err := l.OnProcessResults(process.ProcessId, result.Votes, v.TxCounter()); err != nil {
+			if err := l.OnProcessResults(process.ProcessId, result, v.TxCounter()); err != nil {
 				log.Warnf("onProcessResults callback error: %v", err)
 			}
 		}

@@ -277,7 +277,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	}
 
 	// Execute callbacks
-	for _, l := range s.eventListeners {
+	for _, l := range s.eventOnResults {
 		go l.OnComputeResults(results, p, height)
 	}
 	return nil
