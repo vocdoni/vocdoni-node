@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	corediscovery "github.com/libp2p/go-libp2p-core/discovery"
 	libpeer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	multiaddr "github.com/multiformats/go-multiaddr"
@@ -37,9 +38,10 @@ func (ps *SubPub) PeerStreamWrite(peerID string, msg []byte) error {
 
 // FindTopic opens one or multiple new streams with the peers announcing the namespace.
 // The callback function is executed once a new stream connection is created
-func (ps *SubPub) FindTopic(namespace string, callback func(*bufio.ReadWriter)) error {
+func (ps *SubPub) FindTopic(ctx context.Context, namespace string, callback func(*bufio.ReadWriter)) error {
 	log.Infof("searching for topic %s", namespace)
-	peerChan, err := ps.routing.FindPeers(context.Background(), namespace)
+	peerChan, err := ps.routing.FindPeers(ctx, namespace,
+		corediscovery.Limit(4*ps.MaxDHTpeers))
 	if err != nil {
 		return err
 	}
@@ -109,7 +111,7 @@ func (ps *SubPub) peersManager() {
 			}
 		}
 		ps.PeersMu.Unlock()
-		tctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		tctx, cancel := context.WithTimeout(context.Background(), ps.CollectionPeriod)
 		ps.Host.ConnManager().TrimOpenConns(tctx) // Not sure if it works
 		cancel()
 		time.Sleep(ps.CollectionPeriod)
