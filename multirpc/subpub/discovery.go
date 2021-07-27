@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	corediscovery "github.com/libp2p/go-libp2p-core/discovery"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"go.vocdoni.io/dvote/log"
 )
@@ -13,7 +14,8 @@ func (ps *SubPub) discover(ctx context.Context) {
 	// Now, look for others who have announced.
 	// This is like your friend telling you the location to meet you.
 	log.Debugf("searching for SubPub group identity %s", ps.Topic)
-	peerChan, err := ps.routing.FindPeers(ctx, ps.Topic)
+	peerChan, err := ps.routing.FindPeers(ctx, ps.Topic,
+		corediscovery.Limit(4*ps.MaxDHTpeers))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,7 +81,9 @@ func (ps *SubPub) Subscribe(ctx context.Context) {
 		case <-ps.close:
 			return
 		default:
-			ps.discover(ctx)
+			pctx, cancel := context.WithTimeout(ctx, ps.DiscoveryPeriod)
+			ps.discover(pctx)
+			cancel()
 			time.Sleep(ps.DiscoveryPeriod)
 		}
 	}
@@ -97,7 +101,8 @@ func (ps *SubPub) advertise(ctx context.Context, topic string) {
 			// The duration should be updated, and be in the order
 			// of multiple hours.
 			var err error
-			duration, err = ps.routing.Advertise(ctx, topic)
+			duration, err = ps.routing.Advertise(ctx, topic,
+				corediscovery.Limit(4*ps.MaxDHTpeers))
 			if err == nil && duration < time.Second {
 				err = fmt.Errorf("refusing to advertise too often: %v", duration)
 			}
