@@ -59,7 +59,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// global
 	flag.StringVarP(&globalCfg.DataDir, "dataDir", "d", home+"/.dvote",
 		"directory where data is stored")
-	flag.StringVarP(&globalCfg.VochainConfig.Chain, "vochain", "v", "dev",
+	flag.StringVarP(&globalCfg.VochainConfig.Chain, "vochain", "v", "main",
 		"vocdoni blockchain network to connect with")
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
 		"use developer mode (less security)")
