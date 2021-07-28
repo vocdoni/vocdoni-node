@@ -11,6 +11,18 @@ Allows to define which hash function to use. So for example, when working with
 zkSnarks the Poseidon hash function can be used, but when not, it can be used
 the Blake2b hash function, which has much faster computation time.
 
+## AddBatch
+The method `tree.AddBatch` is designed for the cases where there is a big amount of key-values to be added in the tree. It has the following characteristics:
+
+- Makes a copy of the tree in memory (*VirtualTree*)
+- The *VirtualTree* does not compute any hash, only the relations between the nodes of the tree
+	- This step (computing the *VirtualTree*) is done in parallel in each available CPU until level *log2(nCPU)*
+- Once the *VirtualTree* is updated with all the new leafs (key-values) in each corresponent position, it *computes all the hashes* of each node until the root
+	- In this way, each node hash is computed only once, while when adding many key-values using `tree.Add` method, most of the intermediate nodes will be recalculated each time that a new leaf is added
+	- This step (*computing all the hashes*) is done in parallel in each available CPU
+
+As result, the method `tree.AddBatch` goes way faster thant looping over `tree.Add`, and can compute the tree with parallelization, so as more available CPUs, faster will do the computation.
+
 ## Usage
 
 ```go
@@ -61,7 +73,7 @@ snark-friendly merkletree.
 The only change needed is the hash function used for the Tree, for example using
 the Poseidon hash function:
 ```go
-tree, err := arbo.NewTree(database, 100, arbo.HashFunctionPoseidon)
+tree, err := arbo.NewTree(database, 32, arbo.HashFunctionPoseidon)
 ```
 Be aware of the characteristics of this kind of hashes, such as using values
 inside the finite field used by the hash, and also the computation time.
