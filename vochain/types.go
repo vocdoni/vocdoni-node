@@ -14,6 +14,7 @@ const (
 	AppTree                 = "app"
 	ProcessTree             = "process"
 	VoteTree                = "vote"
+	CensusTree              = "census"
 	voteCachePurgeThreshold = uint32(60) // in blocks, 10 minutes
 	voteCacheSize           = 50000
 )

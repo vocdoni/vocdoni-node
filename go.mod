@@ -54,7 +54,7 @@ require (
 	github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210719161106-675817be681e
 	go.uber.org/zap v1.18.1
-	go.vocdoni.io/proto v1.0.4-0.20210719161241-4f28acf85d46
+	go.vocdoni.io/proto v1.0.4-0.20210726091234-bceaf416353b
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 	golang.org/x/net v0.0.0-20210716203947-853a461950ff
 	google.golang.org/protobuf v1.27.1

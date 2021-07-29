@@ -3,6 +3,7 @@ package vochain
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -13,7 +14,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// AddTx check the validity of a transaction and adds it to the state if commit=true
+// AddTx check the validity of a transaction and adds it to the state if commit=true.
+// It returns a bytes value which depends on the transaction type:
+//  Tx_Vote: vote nullifier
+//  default: []byte{}
 func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 	txID [32]byte, commit bool) ([]byte, error) {
 	if vtx == nil || state == nil || vtx.Payload == nil {
@@ -103,6 +107,15 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 			default:
 				return []byte{}, fmt.Errorf("unknown set process tx type")
 			}
+		}
+
+	case *models.Tx_RegisterKey:
+		if err := RegisterKeyTxCheck(vtx, txBytes, signature, state); err != nil {
+			return []byte{}, fmt.Errorf("registerKeyTx %w", err)
+		}
+		if commit {
+			tx := vtx.GetRegisterKey()
+			return []byte{}, state.AddToRollingCensus(tx.ProcessId, tx.NewKey, new(big.Int).SetBytes(tx.Weight))
 		}
 
 	default:
@@ -241,26 +254,11 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 		}
 		log.Debugf("new vote %x for address %s and process %x", vote.Nullifier, addr.Hex(), tx.ProcessId)
 
-		// check census origin and compute vote digest identifier
-		var verifyProof VerifyProofFunc
-		switch process.CensusOrigin {
-		case models.CensusOrigin_OFF_CHAIN_TREE:
-			verifyProof = VerifyProofOffChainTree
-		case models.CensusOrigin_OFF_CHAIN_CA:
-			verifyProof = VerifyProofOffChainCA
-		case models.CensusOrigin_ERC20:
-			verifyProof = VerifyProofERC20
-		case models.CensusOrigin_MINI_ME:
-			verifyProof = VerifyProofMiniMe
-		default:
-			return nil, fmt.Errorf("census origin not compatible")
-		}
-
-		valid, weight, err := verifyProof(process, tx.Proof,
+		valid, weight, err := VerifyProof(process, tx.Proof,
 			process.CensusOrigin, process.CensusRoot, process.ProcessId,
 			pubKey, addr)
 		if err != nil {
-			return nil, fmt.Errorf("proof not valid: %w", err)
+			return nil, err
 		}
 		if !valid {
 			return nil, fmt.Errorf("proof not valid")
