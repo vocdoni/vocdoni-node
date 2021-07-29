@@ -86,7 +86,18 @@ func (s *SubPubHandle) ConnectionType() string {
 
 func (s *SubPubHandle) Send(msg transports.Message) error {
 	log.Debugf("sending %d bytes to broadcast channel", len(msg.Data))
-	s.SubPub.BroadcastWriter <- msg.Data
+
+	// Use a fallback timeout of five minutes, to prevent blocking forever
+	// or leaking goroutines.
+	// TODO(mvdan): turn this fallback timeout into a ctx parameter
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Minute)
+	defer cancel()
+
+	select {
+	case s.SubPub.BroadcastWriter <- msg.Data:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	return nil
 }
 
