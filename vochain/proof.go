@@ -25,6 +25,34 @@ type VerifyProofFunc func(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
 	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error)
 
+// VerifyProof is a wrapper over all VerifyProofFunc(s) available which uses the process.CensusOrigin
+// to execute the correct verification function.
+func VerifyProof(process *models.Process, proof *models.Proof,
+	censusOrigin models.CensusOrigin,
+	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
+	// check census origin and compute vote digest identifier
+	var verifyProof VerifyProofFunc
+	switch process.CensusOrigin {
+	case models.CensusOrigin_OFF_CHAIN_TREE:
+		verifyProof = VerifyProofOffChainTree
+	case models.CensusOrigin_OFF_CHAIN_CA:
+		verifyProof = VerifyProofOffChainCA
+	case models.CensusOrigin_ERC20:
+		verifyProof = VerifyProofERC20
+	case models.CensusOrigin_MINI_ME:
+		verifyProof = VerifyProofMiniMe
+	default:
+		return false, nil, fmt.Errorf("census origin not compatible")
+	}
+	valid, weight, err := verifyProof(process, proof,
+		process.CensusOrigin, process.CensusRoot, process.ProcessId,
+		pubKey, addr)
+	if err != nil {
+		return false, nil, fmt.Errorf("proof not valid: %w", err)
+	}
+	return valid, weight, nil
+}
+
 // VerifyProofOffChainTree verifies a proof with census origin OFF_CHAIN_TREE.
 // Returns verification result and weight.
 func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,

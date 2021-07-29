@@ -132,6 +132,9 @@ func initStore(dataDir string, state *State) error {
 	if err := state.Store.AddTree(VoteTree); err != nil {
 		return err
 	}
+	//	if err := state.Store.AddTree(CensusTree); err != nil {
+	//		return err
+	//	}
 	log.Infof("state tree load took %s", time.Since(startTime))
 	return nil
 }
