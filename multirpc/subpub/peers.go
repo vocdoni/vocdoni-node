@@ -14,8 +14,14 @@ import (
 )
 
 type peerSub struct {
-	id    libpeer.ID
+	id libpeer.ID
+
 	write chan []byte
+
+	// peerClosed signals that we've lost the connection with the peer, or
+	// it has been removed by peersManager.
+	// When closed, its goroutines stop.
+	peerClosed chan bool
 }
 
 // PeerStreamWrite looks for an existing connection with peerID and calls the callback function with the writer channel as parameter
@@ -32,8 +38,14 @@ func (ps *SubPub) PeerStreamWrite(peerID string, msg []byte) error {
 	if peerIdx < 0 {
 		return fmt.Errorf("no connection with peer %s, cannot open stream", peerID)
 	}
-	ps.Peers[peerIdx].write <- msg
-	return nil
+
+	peer := ps.Peers[peerIdx]
+	select {
+	case peer.write <- msg:
+		return nil
+	case <-peer.peerClosed:
+		return nil
+	}
 }
 
 // FindTopic opens one or multiple new streams with the peers announcing the namespace.
@@ -103,6 +115,8 @@ func (ps *SubPub) peersManager() {
 			if len(ps.Host.Network().ConnsToPeer(peer.id)) > 0 {
 				continue
 			}
+			close(peer.peerClosed)
+
 			// Remove peer if no active connection
 			ps.Peers[i] = ps.Peers[len(ps.Peers)-1]
 			ps.Peers = ps.Peers[:len(ps.Peers)-1]

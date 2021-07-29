@@ -60,6 +60,7 @@ func (ps *SubPub) Subscribe(ctx context.Context) {
 			case <-ps.close:
 				return
 			case msg := <-ps.BroadcastWriter:
+
 				ps.PeersMu.Lock()
 				for _, peer := range ps.Peers {
 					if peer.write == nil {
@@ -67,6 +68,7 @@ func (ps *SubPub) Subscribe(ctx context.Context) {
 					}
 					select {
 					case peer.write <- msg:
+					case <-peer.peerClosed:
 					default:
 						log.Infof("dropping broadcast message for peer %s", peer.id)
 					}
