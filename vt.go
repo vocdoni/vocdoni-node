@@ -388,7 +388,7 @@ const (
 
 func (n *node) typ() virtualNodeType {
 	if n == nil {
-		return vtEmpty // TODO decide if return 'vtEmpty' or an error
+		return vtEmpty
 	}
 	if n.l == nil && n.r == nil && n.k != nil {
 		return vtLeaf

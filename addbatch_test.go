@@ -11,7 +11,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/badgerdb"
 )
 
 var debug = true
@@ -37,12 +37,12 @@ func debugTime(descr string, time1, time2 time.Duration) {
 }
 
 func testInit(c *qt.C, n int) (*Tree, *Tree) {
-	database1, err := db.NewBadgerDB(c.TempDir())
+	database1, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree1, err := NewTree(database1, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 
-	database2, err := db.NewBadgerDB(c.TempDir())
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -68,7 +68,7 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 
 	nLeafs := 1024
 
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(database, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -91,7 +91,7 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	}
 	time1 := time.Since(start)
 
-	database2, err := db.NewBadgerDB(c.TempDir())
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -118,7 +118,7 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 
 	nLeafs := 1027
 
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(database, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -133,7 +133,7 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 		}
 	}
 
-	database2, err := db.NewBadgerDB(c.TempDir())
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -165,13 +165,13 @@ func randomBytes(n int) []byte {
 
 func TestAddBatchTestVector1(t *testing.T) {
 	c := qt.New(t)
-	database1, err := db.NewBadgerDB(c.TempDir())
+	database1, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree1, err := NewTree(database1, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
-	database2, err := db.NewBadgerDB(c.TempDir())
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
@@ -205,13 +205,13 @@ func TestAddBatchTestVector1(t *testing.T) {
 	checkRoots(c, tree1, tree2)
 
 	// 2nd test vectors
-	database1, err = db.NewBadgerDB(c.TempDir())
+	database1, err = badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree1, err = NewTree(database1, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
-	database2, err = db.NewBadgerDB(c.TempDir())
+	database2, err = badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err = NewTree(database2, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
@@ -253,13 +253,13 @@ func TestAddBatchTestVector2(t *testing.T) {
 	// test vector with unbalanced tree
 	c := qt.New(t)
 
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree1, err := NewTree(database, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
-	database2, err := db.NewBadgerDB(c.TempDir())
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -298,13 +298,13 @@ func TestAddBatchTestVector3(t *testing.T) {
 	// test vector with unbalanced tree
 	c := qt.New(t)
 
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree1, err := NewTree(database, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
-	database2, err := db.NewBadgerDB(c.TempDir())
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -347,13 +347,13 @@ func TestAddBatchTreeEmptyRandomKeys(t *testing.T) {
 
 	nLeafs := 8
 
-	database1, err := db.NewBadgerDB(c.TempDir())
+	database1, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree1, err := NewTree(database1, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
-	database2, err := db.NewBadgerDB(c.TempDir())
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
@@ -697,7 +697,7 @@ func TestAddBatchNotEmptyUnbalanced(t *testing.T) {
 	}
 	time1 := time.Since(start)
 
-	database2, err := db.NewBadgerDB(c.TempDir())
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -774,7 +774,7 @@ func TestAddBatchBench(t *testing.T) {
 func benchAdd(t *testing.T, ks, vs [][]byte) {
 	c := qt.New(t)
 
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(database, 140, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
@@ -794,7 +794,7 @@ func benchAdd(t *testing.T, ks, vs [][]byte) {
 func benchAddBatch(t *testing.T, ks, vs [][]byte) {
 	c := qt.New(t)
 
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(database, 140, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
@@ -827,7 +827,7 @@ func TestDbgStats(t *testing.T) {
 	}
 
 	// 1
-	database1, err := db.NewBadgerDB(c.TempDir())
+	database1, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree1, err := NewTree(database1, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
@@ -841,7 +841,7 @@ func TestDbgStats(t *testing.T) {
 	}
 
 	// 2
-	database2, err := db.NewBadgerDB(c.TempDir())
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
@@ -854,7 +854,7 @@ func TestDbgStats(t *testing.T) {
 	c.Assert(len(invalids), qt.Equals, 0)
 
 	// 3
-	database3, err := db.NewBadgerDB(c.TempDir())
+	database3, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree3, err := NewTree(database3, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
@@ -889,7 +889,7 @@ func TestLoadVT(t *testing.T) {
 
 	nLeafs := 1024
 
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(database, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -906,7 +906,9 @@ func TestLoadVT(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, 0)
 
-	vt, err := tree.loadVT()
+	rTx := tree.db.ReadTx()
+	defer rTx.Discard()
+	vt, err := tree.loadVT(rTx)
 	c.Assert(err, qt.IsNil)
 	_, err = vt.computeHashes()
 	c.Assert(err, qt.IsNil)
@@ -921,7 +923,7 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 
 	nLeafs := 1024
 
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(database, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -942,7 +944,7 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 		}
 	}
 
-	database2, err := db.NewBadgerDB(c.TempDir())
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
@@ -956,7 +958,7 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	checkRoots(c, tree, tree2)
 
 	// use tree3 to add nil value array
-	database3, err := db.NewBadgerDB(c.TempDir())
+	database3, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree3, err := NewTree(database3, 100, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)

@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/badgerdb"
 )
 
 func TestCircomVerifierProof(t *testing.T) {
 	c := qt.New(t)
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(database, 4, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)

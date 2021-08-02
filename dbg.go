@@ -4,7 +4,7 @@ import "fmt"
 
 // dbgStats is for debug purposes
 type dbgStats struct {
-	hash  int
+	hash  int // TODO use atomics for all ints in dbgStats
 	dbGet int
 	dbPut int
 }
@@ -28,6 +28,7 @@ func (d *dbgStats) incHash() {
 	d.hash++
 }
 
+//nolint:unused
 func (d *dbgStats) incDbGet() {
 	if d == nil {
 		return
@@ -35,6 +36,7 @@ func (d *dbgStats) incDbGet() {
 	d.dbGet++
 }
 
+//nolint:unused
 func (d *dbgStats) incDbPut() {
 	if d == nil {
 		return

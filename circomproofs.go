@@ -46,7 +46,9 @@ func siblingsToStringArray(s [][]byte) []string {
 	return r
 }
 
-func (t *Tree) fillMissingEmptySiblings(s [][]byte) [][]byte {
+// FillMissingEmptySiblings adds the empty values to the array of siblings for
+// the Tree number of max levels
+func (t *Tree) FillMissingEmptySiblings(s [][]byte) [][]byte {
 	for i := len(s); i < t.maxLevels; i++ {
 		s = append(s, emptyValue)
 	}
@@ -66,7 +68,7 @@ func (t *Tree) GenerateCircomVerifierProof(k []byte) (*CircomVerifierProof, erro
 	if err != nil {
 		return nil, err
 	}
-	cp.Siblings = t.fillMissingEmptySiblings(s)
+	cp.Siblings = t.FillMissingEmptySiblings(s)
 	if !existence {
 		cp.OldKey = kAux
 		cp.OldValue = v

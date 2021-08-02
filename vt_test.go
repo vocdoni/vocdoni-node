@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/badgerdb"
 )
 
 func TestVirtualTreeTestVectors(t *testing.T) {
@@ -76,7 +76,7 @@ func testVirtualTree(c *qt.C, maxLevels int, keys, values [][]byte) {
 	c.Assert(len(keys), qt.Equals, len(values))
 
 	// normal tree, to have an expected root value
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(database, maxLevels, HashFunctionSha256)
 	c.Assert(err, qt.IsNil)
@@ -115,7 +115,7 @@ func TestVirtualTreeAddBatch(t *testing.T) {
 	}
 
 	// normal tree, to have an expected root value
-	database, err := db.NewBadgerDB(c.TempDir())
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree, err := NewTree(database, maxLevels, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
