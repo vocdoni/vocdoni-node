@@ -111,7 +111,7 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 					log.Errorf("transaction is not an Envelope")
 					return
 				}
-				callback(envelope, txRef.Weight)
+				callback(envelope, txRef.Weight.ToInt())
 			}
 			if async {
 				go func() {
@@ -323,7 +323,7 @@ func (s *Scrutinizer) GetResultsWeight(processID []byte) (*big.Int, error) {
 	if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).Eq(processID)); err != nil {
 		return nil, err
 	}
-	return results.Weight, nil
+	return results.Weight.ToInt(), nil
 }
 
 // unmarshalVote decodes the base64 payload to a VotePackage struct type.
@@ -377,7 +377,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.In
 		}
 	} else {
 		// If encrypted, just add the weight
-		results.Weight.Add(results.Weight, weight)
+		results.Weight.Add(results.Weight, (*types.BigInt)(weight))
 		results.EnvelopeHeight++
 	}
 	return nil
@@ -393,7 +393,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 			Nullifier:    nullifier,
 			ProcessID:    pid,
 			Height:       blockHeight,
-			Weight:       new(big.Int).SetBytes(weight),
+			Weight:       new(types.BigInt).SetBytes(weight),
 			TxIndex:      txIndex,
 			CreationTime: time.Now(),
 		})
@@ -403,7 +403,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 			Nullifier:    nullifier,
 			ProcessID:    pid,
 			Height:       blockHeight,
-			Weight:       new(big.Int).SetBytes(weight),
+			Weight:       new(types.BigInt).SetBytes(weight),
 			TxIndex:      txIndex,
 			CreationTime: time.Now(),
 		})
@@ -480,7 +480,7 @@ func (s *Scrutinizer) computeFinalResults(p *indexertypes.Process) (*indexertype
 	results := &indexertypes.Results{
 		Votes:        indexertypes.NewEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),
 		ProcessID:    p.ID,
-		Weight:       new(big.Int).SetUint64(0),
+		Weight:       new(types.BigInt).SetUint64(0),
 		Final:        true,
 		VoteOpts:     p.VoteOpts,
 		EnvelopeType: p.Envelope,

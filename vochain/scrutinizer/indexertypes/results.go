@@ -20,8 +20,8 @@ const (
 // Results holds the final results and relevant process info for a vochain process
 type Results struct {
 	ProcessID      types.HexBytes             `badgerholdKey:"ProcessID" json:"processId"`
-	Votes          [][]*big.Int               `json:"votes"`
-	Weight         *big.Int                   `json:"weight"`
+	Votes          [][]*types.BigInt          `json:"votes"`
+	Weight         *types.BigInt              `json:"weight"`
 	EnvelopeHeight uint64                     `json:"envelopeHeight"`
 	EnvelopeType   *models.EnvelopeType       `json:"envelopeType"`
 	VoteOpts       *models.ProcessVoteOptions `json:"voteOptions"`
@@ -147,7 +147,7 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 	}
 
 	// Add the Election weight (tells how much voting power have already been processed)
-	r.Weight.Add(r.Weight, weight)
+	r.Weight.Add(r.Weight, (*types.BigInt)(weight))
 	if len(r.Votes) == 0 {
 		r.Votes = NewEmptyVotes(int(r.VoteOpts.MaxCount), int(r.VoteOpts.MaxValue)+1)
 	}
@@ -174,31 +174,31 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 		for q, value := range voteValues {
 			r.Votes[q][0].Add(
 				r.Votes[q][0],
-				new(big.Int).Mul(
-					new(big.Int).SetUint64(uint64(value)),
-					weight),
+				new(types.BigInt).Mul(
+					new(types.BigInt).SetUint64(uint64(value)),
+					(*types.BigInt)(weight)),
 			)
 		}
 	} else {
 		// For the other cases, we use the results matrix index weighted
 		// as described in the Ballot Protocol.
 		for q, opt := range voteValues {
-			r.Votes[q][opt].Add(r.Votes[q][opt], weight)
+			r.Votes[q][opt].Add(r.Votes[q][opt], (*types.BigInt)(weight))
 		}
 	}
 	return nil
 }
 
 // NewEmptyVotes creates a new results struct with the given number of questions and options
-func NewEmptyVotes(questions, options int) [][]*big.Int {
+func NewEmptyVotes(questions, options int) [][]*types.BigInt {
 	if questions == 0 || options == 0 {
 		return nil
 	}
-	results := [][]*big.Int{}
+	results := [][]*types.BigInt{}
 	for i := 0; i < questions; i++ {
-		question := []*big.Int{}
+		question := []*types.BigInt{}
 		for j := 0; j < options; j++ {
-			question = append(question, big.NewInt(0))
+			question = append(question, new(types.BigInt).SetUint64(0))
 		}
 		results = append(results, question)
 	}
