@@ -3,7 +3,6 @@ package indexertypes
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"reflect"
 	"strings"
 	"time"
@@ -81,7 +80,7 @@ type VoteReference struct {
 	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
 	ProcessID    types.HexBytes `badgerholdIndex:"ProcessID"`
 	Height       uint32
-	Weight       *big.Int
+	Weight       *types.BigInt
 	TxIndex      int32
 	CreationTime time.Time
 }

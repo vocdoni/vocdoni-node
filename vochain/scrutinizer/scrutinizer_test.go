@@ -534,7 +534,7 @@ func TestResults(t *testing.T) {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
 			}
-			value = result.Votes[q][qi]
+			value = result.Votes[q][qi].ToInt()
 			if qi != 1 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
@@ -592,7 +592,7 @@ func TestLiveResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	r := &indexertypes.Results{
 		Votes:        indexertypes.NewEmptyVotes(3, 100),
-		Weight:       new(big.Int).SetUint64(0),
+		Weight:       new(types.BigInt).SetUint64(0),
 		VoteOpts:     &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
 		EnvelopeType: &models.EnvelopeType{},
 	}
@@ -623,7 +623,7 @@ func TestLiveResults(t *testing.T) {
 			if qi > 100 {
 				t.Fatalf("found more questions that expected")
 			}
-			value = result.Votes[q][qi]
+			value = result.Votes[q][qi].ToInt()
 			if qi == 0 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
@@ -733,7 +733,7 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
 		ProcessID: pid,
 		Votes: indexertypes.NewEmptyVotes(
 			int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
-		Weight:       new(big.Int).SetUint64(0),
+		Weight:       new(types.BigInt).SetUint64(0),
 		Signatures:   []types.HexBytes{},
 		VoteOpts:     proc.VoteOpts,
 		EnvelopeType: proc.Envelope,
