@@ -3,7 +3,6 @@ package scrutinizer
 import (
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"strings"
 	"time"
 
@@ -267,7 +266,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 			ProcessID: pid,
 			// MaxValue requires +1 since 0 is also an option
 			Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
-			Weight:       new(big.Int).SetUint64(0),
+			Weight:       new(types.BigInt).SetUint64(0),
 			Signatures:   []types.HexBytes{},
 			VoteOpts:     p.GetVoteOptions(),
 			EnvelopeType: p.GetEnvelopeType(),
@@ -392,7 +391,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 						return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
 					}
 					// On cancelled process, remove all results except for envelope height, weight, pid
-					results.Votes = [][]*big.Int{}
+					results.Votes = [][]*types.BigInt{}
 					results.EnvelopeType = &models.EnvelopeType{}
 					results.VoteOpts = &models.ProcessVoteOptions{}
 					results.Signatures = []types.HexBytes{}

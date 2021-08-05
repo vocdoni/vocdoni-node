@@ -257,7 +257,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 				ProcessID: p,
 				// MaxValue requires +1 since 0 is also an option
 				Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
-				Weight:       new(big.Int).SetUint64(0),
+				Weight:       new(types.BigInt).SetUint64(0),
 				VoteOpts:     options,
 				EnvelopeType: process.GetEnvelopeType(),
 				Signatures:   []types.HexBytes{},
@@ -269,7 +269,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 
 		// Count the votes, add them to results (in memory, without any db transaction)
 		results := &indexertypes.Results{
-			Weight:       new(big.Int).SetUint64(0),
+			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
 		}
@@ -383,7 +383,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		// This is a temporary "results" for computing votes
 		// of a single processId for the current block.
 		results := &indexertypes.Results{
-			Weight:       new(big.Int).SetUint64(0),
+			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     proc.VoteOpts,
 			EnvelopeType: proc.Envelope,
 		}
@@ -559,7 +559,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 }
 
 // GetFriendlyResults translates votes into a matrix of strings
-func GetFriendlyResults(votes [][]*big.Int) [][]string {
+func GetFriendlyResults(votes [][]*types.BigInt) [][]string {
 	r := [][]string{}
 	for i := range votes {
 		r = append(r, []string{})
