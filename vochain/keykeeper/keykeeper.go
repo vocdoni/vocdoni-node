@@ -3,12 +3,12 @@ package keykeeper
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"sync"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/badgerdb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -107,7 +107,7 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
 		signer:  signer,
 	}
 	var err error
-	k.storage, err = db.NewBadgerDB(dbPath)
+	k.storage, err = badgerdb.New(badgerdb.Options{Path: dbPath})
 	if err != nil {
 		return nil, err
 	}
@@ -129,27 +129,26 @@ func (k *KeyKeeper) RevealUnpublished() {
 	}
 	k.lock.Lock()
 	defer k.lock.Unlock()
-	iter := k.storage.NewIterator()
-	defer iter.Release()
+
 	var pids models.StoredKeys
 	log.Infof("starting keykeeper reveal recovery")
-	// First get the scheduled reveal key process from the storage
-	for iter.Next() {
-		// TODO(mvdan): use a prefixed iterator
-		if !strings.HasPrefix(string(iter.Key()), dbPrefixBlock) {
-			continue
-		}
-		h, err := strconv.ParseInt(string(iter.Key()[len(dbPrefixBlock):]), 10, 64)
+	wTx := k.storage.WriteTx()
+	defer wTx.Discard()
+
+	// First get the scheduled reveal key process from the storage, iterate
+	// over the prefix dbPrefixBlock
+	if err := k.storage.Iterate([]byte(dbPrefixBlock), func(key, value []byte) bool {
+		h, err := strconv.ParseInt(string(key[len(dbPrefixBlock):]), 10, 64)
 		if err != nil {
 			log.Errorf("cannot fetch block number from keykeeper database: (%s)", err)
-			continue
+			return true
 		}
 		if header.Height <= h+1 {
-			continue
+			return true
 		}
-		if err := proto.Unmarshal(iter.Value(), &pids); err != nil {
+		if err := proto.Unmarshal(value, &pids); err != nil {
 			log.Errorf("could not unmarshal value: %s", err)
-			continue
+			return true
 		}
 		log.Warnf("found pending keys for reveal")
 		for _, p := range pids.GetPids() {
@@ -157,25 +156,28 @@ func (k *KeyKeeper) RevealUnpublished() {
 				log.Error(err)
 			}
 		}
-		if err := k.storage.Del(iter.Key()); err != nil {
+		if err := wTx.Delete(key); err != nil {
 			log.Error(err)
 		}
+		return true
+	}); err != nil {
+		log.Error(err)
 	}
-	iter.Release()
-	iter = k.storage.NewIterator()
+	if err := wTx.Commit(); err != nil {
+		log.Error(err)
+	}
+
 	var pid []byte
 	var err error
 	var process *models.Process
-	// Second take all existing processes and check if keys should be revealed (if canceled)
-	for iter.Next() {
-		if !strings.HasPrefix(string(iter.Key()), dbPrefixProcess) {
-			continue
-		}
-		pid = iter.Key()[len(dbPrefixProcess):]
+	// Second take all existing processes and check if keys should be
+	// revealed (if canceled), iterate over the prefix dbPrefixProcess
+	if err := k.storage.Iterate([]byte(dbPrefixProcess), func(key, value []byte) bool {
+		pid = key[len(dbPrefixProcess):]
 		process, err = k.vochain.State.Process(pid, true)
 		if err != nil {
 			log.Error(err)
-			continue
+			return true
 		}
 		if process.Status == models.ProcessStatus_CANCELED ||
 			process.Status == models.ProcessStatus_ENDED {
@@ -184,6 +186,9 @@ func (k *KeyKeeper) RevealUnpublished() {
 				log.Error(err)
 			}
 		}
+		return true
+	}); err != nil {
+		log.Error(err)
 	}
 	log.Infof("keykeeper reveal recovery finished")
 }
@@ -330,33 +335,42 @@ func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {
 func (k *KeyKeeper) scheduleRevealKeys() {
 	k.lock.Lock()
 	defer k.lock.Unlock()
+
+	wTx := k.storage.WriteTx()
+	defer wTx.Discard()
+
 	for pid, height := range k.blockPool {
 		pids := models.StoredKeys{}
 		pkey := []byte(dbPrefixBlock + fmt.Sprintf("%d", height))
 		var data []byte
 		var err error
-		// TODO(mvdan): replace Has+Get with just Get
-		if has, _ := k.storage.Has(pkey); has {
-			data, err = k.storage.Get(pkey)
-			if err != nil {
-				log.Errorf("cannot get existing list of scheduled reveal processes for block %d", height)
-				continue
-			}
+
+		data, err = wTx.Get(pkey)
+		if err == nil {
+			// case where key does exist
 			if err := proto.Unmarshal(data, &pids); err != nil {
 				log.Errorf("cannot unmarshal process pids for block %d: (%s)", height, err)
 			}
+		} else if err != db.ErrKeyNotFound {
+			// case where Get returns an error, and is not that ErrKeyNotFound
+			log.Errorf("cannot get existing list of scheduled reveal processes for block %d", height)
+			continue
 		}
+
 		pids.Pids = append(pids.Pids, []byte(pid))
 		data, err = proto.Marshal(&pids)
 		if err != nil {
 			log.Errorf("cannot marshal new pid list for scheduling on block %d: (%s)", height, err)
 			continue
 		}
-		if err := k.storage.Put(pkey, data); err != nil {
+		if err := wTx.Set(pkey, data); err != nil {
 			log.Errorf("cannot save scheduled list of pids for block %d: (%s)", height, err)
 			continue
 		}
 		log.Infof("scheduled reveal keys of process %x for block %d", pid, height)
+	}
+	if err := wTx.Commit(); err != nil {
+		log.Error(err)
 	}
 }
 
@@ -366,14 +380,14 @@ func (k *KeyKeeper) checkRevealProcess(height uint32) {
 	k.lock.Lock()
 	defer k.lock.Unlock()
 	pKey := []byte(dbPrefixBlock + fmt.Sprintf("%d", height))
-	// TODO(mvdan): replace Has+Get with just Get
-	if has, err := k.storage.Has(pKey); !has {
-		return
-	} else if err != nil {
-		log.Errorf("cannot check existence of reveal processes for block %d", height)
+
+	wTx := k.storage.WriteTx()
+	defer wTx.Discard()
+
+	data, err := wTx.Get(pKey)
+	if err == db.ErrKeyNotFound {
 		return
 	}
-	data, err := k.storage.Get(pKey)
 	if err != nil {
 		log.Errorf("cannot get reveal process for block %d", height)
 		return
@@ -400,8 +414,12 @@ func (k *KeyKeeper) checkRevealProcess(height uint32) {
 			}
 		}
 	}
-	if err := k.storage.Del(pKey); err != nil {
+	if err := wTx.Delete(pKey); err != nil {
 		log.Errorf("cannot delete revealed keys for block %d: (%s)", height, err)
+	}
+	if err := wTx.Commit(); err != nil {
+		log.Error(err)
+		return
 	}
 }
 
@@ -433,12 +451,21 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	k.lock.Lock()
 	defer k.lock.Unlock()
 	dbKey := []byte(dbPrefixProcess + pid)
-	// TODO(mvdan): replace Has with just Get
-	if exists, err := k.storage.Has(dbKey); exists || err != nil {
-		return fmt.Errorf("keys for process %x already exist or error fetching storage: (%s)", pid, err)
+
+	wTx := k.storage.WriteTx()
+	defer wTx.Discard()
+
+	var err error
+	if _, err = wTx.Get(dbKey); err == db.ErrKeyNotFound {
+		// key does not exist yet, store it
+		data := pk.Encode()
+		if err = wTx.Set(dbKey, data); err != nil {
+			return err
+		}
+		return wTx.Commit()
 	}
-	data := pk.Encode()
-	return k.storage.Put(dbKey, data)
+	// key exists or there is an error fetching storage
+	return fmt.Errorf("keys for process %x already exist or error fetching storage: (%s)", pid, err)
 }
 
 // Insecure
@@ -483,10 +510,13 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 	if len(pk.revealKey) > 0 {
 		log.Infof("revealing commitment key for process %x", pid)
 	}
-	if err = k.storage.Del([]byte(dbPrefixProcess + pid)); err != nil {
+
+	wTx := k.storage.WriteTx()
+	defer wTx.Discard()
+	if err = wTx.Delete([]byte(dbPrefixProcess + pid)); err != nil {
 		log.Warnf("cannot delete pid %x, for some reason it does not exist", pid)
 	}
-	return nil
+	return wTx.Commit()
 }
 
 func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
