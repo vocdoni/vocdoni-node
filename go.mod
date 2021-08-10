@@ -16,7 +16,6 @@ require (
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210203222605-876755a714c3
 	github.com/cosmos/iavl v0.15.3
 	github.com/deroproject/graviton v0.0.0-20201218180342-ab474f4c94d2
-	github.com/dgraph-io/badger/v2 v2.2007.3 // indirect
 	github.com/dgraph-io/badger/v3 v3.2103.1
 	github.com/ethereum/go-ethereum v1.9.26-0.20201212163632-00d10e610f9f
 	github.com/frankban/quicktest v1.13.0
@@ -24,7 +23,6 @@ require (
 	github.com/go-chi/cors v1.1.1
 	github.com/google/go-cmp v0.5.5
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hashicorp/hcl v1.0.1-0.20180906183839-65a6292f0157 // indirect
 	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-ipfs v0.9.1
 	github.com/ipfs/go-ipfs-config v0.14.0
@@ -50,7 +48,7 @@ require (
 	github.com/tendermint/tendermint v0.34.10
 	github.com/tendermint/tm-db v0.6.4
 	github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f
-	github.com/vocdoni/arbo v0.0.0-20210806164113-2514b3188ff8
+	github.com/vocdoni/arbo v0.0.0-20210825074242-6ae28bc0099d
 	github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210719161106-675817be681e
 	go.uber.org/zap v1.18.1

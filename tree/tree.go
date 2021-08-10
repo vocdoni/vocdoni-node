@@ -1,0 +1,225 @@
+package tree
+
+import (
+	"encoding/hex"
+	"fmt"
+
+	"github.com/vocdoni/arbo"
+	"go.vocdoni.io/dvote/db"
+)
+
+// Tree defines the struct that implements the MerkleTree functionalities
+type Tree struct {
+	tree *arbo.Tree
+	db   db.Database
+}
+
+// Options is used to pass the parameters to load a new Tree
+type Options struct {
+	// DB defines the database that will be used for the tree
+	DB db.Database
+	// MaxLevels that the Tree will have
+	MaxLevels int
+	// HashFunc defines the hash function that the tree will use
+	HashFunc arbo.HashFunction
+}
+
+// New returns a new Tree, if there already is a Tree in the database, it will
+// load it
+func New(wTx db.WriteTx, opts Options) (*Tree, error) {
+	givenTx := true
+	if wTx == nil {
+		givenTx = false
+		wTx = opts.DB.WriteTx()
+		defer wTx.Discard()
+	}
+	tree, err := arbo.NewTreeWithTx(wTx, opts.DB, opts.MaxLevels, opts.HashFunc)
+	if err != nil {
+		return nil, err
+	}
+
+	if !givenTx {
+		if err := wTx.Commit(); err != nil {
+			return nil, err
+		}
+	}
+
+	return &Tree{
+		tree: tree,
+		db:   opts.DB,
+	}, nil
+}
+
+// DB returns the db.Database from the Tree
+func (t *Tree) DB() db.Database {
+	return t.db
+}
+
+// Get returns the value for a given key.
+func (t *Tree) Get(rTx db.ReadTx, key []byte) ([]byte, error) {
+	if rTx == nil {
+		rTx = t.DB().ReadTx()
+		defer rTx.Discard()
+	}
+	_, v, err := t.tree.GetWithTx(rTx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return v, nil
+}
+
+// Set adds or updates a key. First performs a Get, and if the key does not
+// exist yet it will call Add, while if the key already exists, it will perform
+// an Update. If the non-existence or existence of the key is already known, is
+// more efficient to directly call Add or Update.
+func (t *Tree) Set(wTx db.WriteTx, key, value []byte) error {
+	givenTx := true
+	if wTx == nil {
+		givenTx = false
+		wTx = t.DB().WriteTx()
+		defer wTx.Discard()
+	}
+	err := t.tree.UpdateWithTx(wTx, key, value)
+	if err == arbo.ErrKeyNotFound {
+		// key does not exist, use Add
+		return t.Add(wTx, key, value)
+	}
+	if err != nil {
+		return err
+	}
+
+	if !givenTx {
+		if err := wTx.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Add adds a new leaf, if the key already exists will return error
+func (t *Tree) Add(wTx db.WriteTx, key, value []byte) error {
+	givenTx := true
+	if wTx == nil {
+		givenTx = false
+		wTx = t.DB().WriteTx()
+		defer wTx.Discard()
+	}
+	if err := t.tree.AddWithTx(wTx, key, value); err != nil {
+		return err
+	}
+	if !givenTx {
+		if err := wTx.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// AddBatch adds a batch of key-values to the Tree. Returns an array containing
+// the indexes of the keys failed to add. Supports empty values as input
+// parameters, which is equivalent to 0 valued byte array.
+func (t *Tree) AddBatch(wTx db.WriteTx, keys, values [][]byte) ([]int, error) {
+	givenTx := true
+	if wTx == nil {
+		givenTx = false
+		wTx = t.DB().WriteTx()
+		defer wTx.Discard()
+	}
+	i, err := t.tree.AddBatchWithTx(wTx, keys, values)
+	if err != nil {
+		return i, err
+	}
+
+	if !givenTx {
+		if err := wTx.Commit(); err != nil {
+			return i, err
+		}
+	}
+	return i, nil
+}
+
+func (t *Tree) Iterate(rTx db.ReadTx, callback func(key, value []byte) bool) error {
+	if rTx == nil {
+		rTx = t.DB().ReadTx()
+		defer rTx.Discard()
+	}
+	callbackWrapper := func(currLvl int, k, v []byte) bool {
+		return callback(k, v)
+	}
+	root, err := t.Root(rTx)
+	if err != nil {
+		return err
+	}
+	return t.tree.IterateWithStopWithTx(rTx, root, callbackWrapper)
+}
+
+// Root returns the current root.
+func (t *Tree) Root(rTx db.ReadTx) ([]byte, error) {
+	if rTx == nil {
+		rTx = t.DB().ReadTx()
+		defer rTx.Discard()
+	}
+	return t.tree.RootWithTx(rTx)
+}
+
+// Size returns the number of leafs under the current root
+func (t *Tree) Size(rTx db.ReadTx) uint64 {
+	// TODO we need to review where this would be used and in which
+	// context, and define the way how this is computed
+	panic("unimplemented")
+}
+
+// GenProof returns a byte array with the necessary data to verify that the
+// key&value are in a leaf under the current root
+func (t *Tree) GenProof(rTx db.ReadTx, key []byte) ([]byte, []byte, error) {
+	if rTx == nil {
+		rTx = t.DB().ReadTx()
+		defer rTx.Discard()
+	}
+	_, leafV, s, existence, err := t.tree.GenProofWithTx(rTx, key)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !existence {
+		// proof of non-existence currently not needed in vocdoni-node
+		return nil, nil, fmt.Errorf("key does not exist %s", hex.EncodeToString(key))
+	}
+	return leafV, s, nil
+}
+
+// VerifyProof checks the proof for the given key, value and root, using the
+// passed hash function
+func VerifyProof(hashFunc arbo.HashFunction, key, value, proof, root []byte) (bool, error) {
+	return arbo.CheckProof(hashFunc, key, value, proof, root)
+}
+
+// VerifyProof checks the proof for the given key, value and root, using the
+// hash function of the Tree
+func (t *Tree) VerifyProof(key, value, proof, root []byte) (bool, error) {
+	return VerifyProof(t.tree.HashFunction(), key, value, root, proof)
+}
+
+// FromRoot returns a new read-only Tree for the given root, that uses the same
+// underlying db.
+func (t *Tree) FromRoot(root []byte) (*Tree, error) {
+	tree, err := t.tree.Snapshot(root)
+	if err != nil {
+		return nil, err
+	}
+	return &Tree{
+		tree: tree,
+		db:   t.db,
+	}, nil
+}
+
+// Dump exports all the Tree leafs in a byte array.
+func (t *Tree) Dump() ([]byte, error) {
+	return t.tree.Dump(nil)
+}
+
+// ImportDump imports the leafs (that have been exported with the Dump method)
+// in the Tree.
+func (t *Tree) ImportDump(b []byte) error {
+	return t.tree.ImportDump(b)
+}
