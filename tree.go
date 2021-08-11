@@ -63,15 +63,18 @@ var (
 	// ErrMaxVirtualLevel indicates when going down into the tree, the max
 	// virtual level is reached
 	ErrMaxVirtualLevel = fmt.Errorf("max virtual level reached")
+	// ErrSnapshotNotEditable indicates when the tree is a snapshot, thus
+	// can not be modified
+	ErrSnapshotNotEditable = fmt.Errorf("snapshot tree can not be edited")
 )
 
 // Tree defines the struct that implements the MerkleTree functionalities
 type Tree struct {
 	sync.RWMutex
 
-	db        db.Database
-	maxLevels int
-	root      []byte
+	db           db.Database
+	maxLevels    int
+	snapshotRoot []byte
 
 	hashFunction HashFunction
 	// TODO in the methods that use it, check if emptyHash param is len>0
@@ -90,11 +93,10 @@ func NewTree(database db.Database, maxLevels int, hash HashFunction) (*Tree, err
 	wTx := t.db.WriteTx()
 	defer wTx.Discard()
 
-	root, err := wTx.Get(dbKeyRoot)
+	_, err := wTx.Get(dbKeyRoot)
 	if err == db.ErrKeyNotFound {
-		// store new root 0
-		t.root = t.emptyHash
-		if err = wTx.Set(dbKeyRoot, t.root); err != nil {
+		// store new root 0 (empty)
+		if err = wTx.Set(dbKeyRoot, t.emptyHash); err != nil {
 			return nil, err
 		}
 		if err = t.setNLeafs(wTx, 0); err != nil {
@@ -111,19 +113,41 @@ func NewTree(database db.Database, maxLevels int, hash HashFunction) (*Tree, err
 	if err = wTx.Commit(); err != nil {
 		return nil, err
 	}
-	t.root = root
 	return &t, nil
 }
 
 // Root returns the root of the Tree
-func (t *Tree) Root() []byte {
-	// TODO get Root from db
-	return t.root
+func (t *Tree) Root() ([]byte, error) {
+	rTx := t.db.ReadTx()
+	defer rTx.Discard()
+	return t.RootWithTx(rTx)
+}
+
+// RootWithTx returns the root of the Tree using the given db.ReadTx
+func (t *Tree) RootWithTx(rTx db.ReadTx) ([]byte, error) {
+	// if snapshotRoot is defined, means that the tree is a snapshot, and
+	// the root is not obtained from the db, but from the snapshotRoot
+	// parameter
+	if t.snapshotRoot != nil {
+		return t.snapshotRoot, nil
+	}
+	// get db root
+	return rTx.Get(dbKeyRoot)
+}
+
+func (t *Tree) setRoot(wTx db.WriteTx, root []byte) error {
+	return wTx.Set(dbKeyRoot, root)
 }
 
 // HashFunction returns Tree.hashFunction
 func (t *Tree) HashFunction() HashFunction {
 	return t.hashFunction
+}
+
+// editable returns true if the tree is editable, and false when is not
+// editable (because is a snapshot tree)
+func (t *Tree) editable() bool {
+	return t.snapshotRoot == nil
 }
 
 // AddBatch adds a batch of key-values to the Tree. Returns an array containing
@@ -146,6 +170,10 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 func (t *Tree) AddBatchWithTx(wTx db.WriteTx, keys, values [][]byte) ([]int, error) {
 	t.Lock()
 	defer t.Unlock()
+
+	if !t.editable() {
+		return nil, ErrSnapshotNotEditable
+	}
 
 	vt, err := t.loadVT(wTx)
 	if err != nil {
@@ -177,7 +205,6 @@ func (t *Tree) AddBatchWithTx(wTx db.WriteTx, keys, values [][]byte) ([]int, err
 		// nothing stored in the db and the error is returned
 		return nil, err
 	}
-	t.root = vt.root.h
 
 	// store pairs in db
 	for i := 0; i < len(pairs); i++ {
@@ -186,8 +213,8 @@ func (t *Tree) AddBatchWithTx(wTx db.WriteTx, keys, values [][]byte) ([]int, err
 		}
 	}
 
-	// store root to db
-	if err := wTx.Set(dbKeyRoot, t.root); err != nil {
+	// store root (from the vt) to db
+	if err := wTx.Set(dbKeyRoot, vt.root.h); err != nil {
 		return nil, err
 	}
 
@@ -239,12 +266,21 @@ func (t *Tree) AddWithTx(wTx db.WriteTx, k, v []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
-	err := t.add(wTx, 0, k, v) // add from level 0
+	if !t.editable() {
+		return ErrSnapshotNotEditable
+	}
+
+	root, err := t.RootWithTx(wTx)
+	if err != nil {
+		return err
+	}
+
+	root, err = t.add(wTx, root, 0, k, v) // add from level 0
 	if err != nil {
 		return err
 	}
 	// store root to db
-	if err := wTx.Set(dbKeyRoot, t.root); err != nil {
+	if err := t.setRoot(wTx, root); err != nil {
 		return err
 	}
 	// update nLeafs
@@ -254,39 +290,38 @@ func (t *Tree) AddWithTx(wTx db.WriteTx, k, v []byte) error {
 	return nil
 }
 
-func (t *Tree) add(wTx db.WriteTx, fromLvl int, k, v []byte) error {
+func (t *Tree) add(wTx db.WriteTx, root []byte, fromLvl int, k, v []byte) ([]byte, error) {
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)
 
 	path := getPath(t.maxLevels, keyPath)
 	// go down to the leaf
 	var siblings [][]byte
-	_, _, siblings, err := t.down(wTx, k, t.root, siblings, path, fromLvl, false)
+	_, _, siblings, err := t.down(wTx, k, root, siblings, path, fromLvl, false)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	leafKey, leafValue, err := t.newLeafValue(k, v)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := wTx.Set(leafKey, leafValue); err != nil {
-		return err
+		return nil, err
 	}
 
 	// go up to the root
 	if len(siblings) == 0 {
-		t.root = leafKey
-		return nil
+		// return the leafKey as root
+		return leafKey, nil
 	}
-	root, err := t.up(wTx, leafKey, siblings, path, len(siblings)-1, fromLvl)
+	root, err = t.up(wTx, leafKey, siblings, path, len(siblings)-1, fromLvl)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	t.root = root
-	return nil
+	return root, nil
 }
 
 // down goes down to the leaf recursively
@@ -521,14 +556,23 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
+	if !t.editable() {
+		return ErrSnapshotNotEditable
+	}
+
 	var err error
 
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)
 	path := getPath(t.maxLevels, keyPath)
 
+	root, err := t.RootWithTx(wTx)
+	if err != nil {
+		return err
+	}
+
 	var siblings [][]byte
-	_, valueAtBottom, siblings, err := t.down(wTx, k, t.root, siblings, path, 0, true)
+	_, valueAtBottom, siblings, err := t.down(wTx, k, root, siblings, path, 0, true)
 	if err != nil {
 		return err
 	}
@@ -548,17 +592,15 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 
 	// go up to the root
 	if len(siblings) == 0 {
-		t.root = leafKey
-		return nil
+		return t.setRoot(wTx, leafKey)
 	}
-	root, err := t.up(wTx, leafKey, siblings, path, len(siblings)-1, 0)
+	root, err = t.up(wTx, leafKey, siblings, path, len(siblings)-1, 0)
 	if err != nil {
 		return err
 	}
 
-	t.root = root
 	// store root to db
-	if err := wTx.Set(dbKeyRoot, t.root); err != nil {
+	if err := t.setRoot(wTx, root); err != nil {
 		return err
 	}
 	return nil
@@ -580,10 +622,15 @@ func (t *Tree) GenProofWithTx(rTx db.ReadTx, k []byte) ([]byte, []byte, []byte, 
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)
 
+	root, err := t.RootWithTx(rTx)
+	if err != nil {
+		return nil, nil, nil, false, err
+	}
+
 	path := getPath(t.maxLevels, keyPath)
 	// go down to the leaf
 	var siblings [][]byte
-	_, value, siblings, err := t.down(rTx, k, t.root, siblings, path, 0, true)
+	_, value, siblings, err := t.down(rTx, k, root, siblings, path, 0, true)
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
@@ -672,7 +719,10 @@ func bytesToBitmap(b []byte) []bool {
 	return bitmap
 }
 
-// Get returns the value for a given key
+// Get returns the value for a given key. If the key is not found, will return
+// the error ErrKeyNotFound, and in the leafK & leafV parameters will be placed
+// the data found in the tree in the leaf that was on the path going to the
+// input key.
 func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
 	rTx := t.db.ReadTx()
 	defer rTx.Discard()
@@ -681,22 +731,28 @@ func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
 }
 
 // GetWithTx does the same than the Get method, but allowing to pass the
-// db.ReadTx that is used.
+// db.ReadTx that is used. If the key is not found, will return the error
+// ErrKeyNotFound, and in the leafK & leafV parameters will be placed the data
+// found in the tree in the leaf that was on the path going to the input key.
 func (t *Tree) GetWithTx(rTx db.ReadTx, k []byte) ([]byte, []byte, error) {
 	keyPath := make([]byte, t.hashFunction.Len())
 	copy(keyPath[:], k)
 
+	root, err := t.RootWithTx(rTx)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	path := getPath(t.maxLevels, keyPath)
 	// go down to the leaf
 	var siblings [][]byte
-	_, value, _, err := t.down(rTx, k, t.root, siblings, path, 0, true)
+	_, value, _, err := t.down(rTx, k, root, siblings, path, 0, true)
 	if err != nil {
 		return nil, nil, err
 	}
 	leafK, leafV := ReadLeafValue(value)
 	if !bytes.Equal(k, leafK) {
-		return leafK, leafV, fmt.Errorf("Tree.Get error: keys doesn't match, %s != %s",
-			BytesToBigInt(k), BytesToBigInt(leafK))
+		return leafK, leafV, ErrKeyNotFound
 	}
 
 	return leafK, leafV, nil
@@ -775,25 +831,23 @@ func (t *Tree) GetNLeafsWithTx(rTx db.ReadTx) (int, error) {
 	return int(nLeafs), nil
 }
 
-// Snapshot returns a copy of the Tree from the given root
-func (t *Tree) Snapshot(rootKey []byte) (*Tree, error) {
-	// TODO currently this method only changes the 'root pointer', but the
-	// db continues being the same. In a future iteration, once the
-	// db.Database interface allows to do database checkpoints, this method
-	// could be updated to do a full checkpoint of the database for the
-	// snapshot, to return a completly new independent tree containing the
-	// snapshot.
+// Snapshot returns a read-only copy of the Tree from the given root
+func (t *Tree) Snapshot(fromRoot []byte) (*Tree, error) {
 	t.RLock()
 	defer t.RUnlock()
 
 	// allow to define which root to use
-	if rootKey == nil {
-		rootKey = t.Root()
+	if fromRoot == nil {
+		var err error
+		fromRoot, err = t.Root()
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &Tree{
 		db:           t.db,
 		maxLevels:    t.maxLevels,
-		root:         rootKey,
+		snapshotRoot: fromRoot,
 		hashFunction: t.hashFunction,
 		dbg:          t.dbg,
 	}, nil
@@ -801,45 +855,58 @@ func (t *Tree) Snapshot(rootKey []byte) (*Tree, error) {
 
 // Iterate iterates through the full Tree, executing the given function on each
 // node of the Tree.
-func (t *Tree) Iterate(rootKey []byte, f func([]byte, []byte)) error {
+func (t *Tree) Iterate(fromRoot []byte, f func([]byte, []byte)) error {
 	rTx := t.db.ReadTx()
 	defer rTx.Discard()
 
-	return t.IterateWithTx(rTx, rootKey, f)
+	return t.IterateWithTx(rTx, fromRoot, f)
 }
 
 // IterateWithTx does the same than the Iterate method, but allowing to pass
 // the db.ReadTx that is used.
-func (t *Tree) IterateWithTx(rTx db.ReadTx, rootKey []byte, f func([]byte, []byte)) error {
+func (t *Tree) IterateWithTx(rTx db.ReadTx, fromRoot []byte, f func([]byte, []byte)) error {
 	// allow to define which root to use
-	if rootKey == nil {
-		rootKey = t.Root()
+	if fromRoot == nil {
+		var err error
+		fromRoot, err = t.RootWithTx(rTx)
+		if err != nil {
+			return err
+		}
 	}
-	return t.iter(rTx, rootKey, f)
+	return t.iter(rTx, fromRoot, f)
 }
 
 // IterateWithStop does the same than Iterate, but with int for the current
 // level, and a boolean parameter used by the passed function, is to indicate to
 // stop iterating on the branch when the method returns 'true'.
-func (t *Tree) IterateWithStop(rootKey []byte, f func(int, []byte, []byte) bool) error {
-	// allow to define which root to use
-	if rootKey == nil {
-		rootKey = t.Root()
-	}
+func (t *Tree) IterateWithStop(fromRoot []byte, f func(int, []byte, []byte) bool) error {
 	rTx := t.db.ReadTx()
 	defer rTx.Discard()
-	return t.iterWithStop(rTx, rootKey, 0, f)
+
+	// allow to define which root to use
+	if fromRoot == nil {
+		var err error
+		fromRoot, err = t.RootWithTx(rTx)
+		if err != nil {
+			return err
+		}
+	}
+	return t.iterWithStop(rTx, fromRoot, 0, f)
 }
 
 // IterateWithStopWithTx does the same than the IterateWithStop method, but
 // allowing to pass the db.ReadTx that is used.
-func (t *Tree) IterateWithStopWithTx(rTx db.ReadTx, rootKey []byte,
+func (t *Tree) IterateWithStopWithTx(rTx db.ReadTx, fromRoot []byte,
 	f func(int, []byte, []byte) bool) error {
 	// allow to define which root to use
-	if rootKey == nil {
-		rootKey = t.Root()
+	if fromRoot == nil {
+		var err error
+		fromRoot, err = t.RootWithTx(rTx)
+		if err != nil {
+			return err
+		}
 	}
-	return t.iterWithStop(rTx, rootKey, 0, f)
+	return t.iterWithStop(rTx, fromRoot, 0, f)
 }
 
 func (t *Tree) iterWithStop(rTx db.ReadTx, k []byte, currLevel int,
@@ -892,16 +959,20 @@ func (t *Tree) iter(rTx db.ReadTx, k []byte, f func([]byte, []byte)) error {
 // [ 1 byte | 1 byte | S bytes | len(v) bytes ]
 // [ len(k) | len(v) |   key   |     value    ]
 // Where S is the size of the output of the hash function used for the Tree.
-func (t *Tree) Dump(rootKey []byte) ([]byte, error) {
+func (t *Tree) Dump(fromRoot []byte) ([]byte, error) {
 	// allow to define which root to use
-	if rootKey == nil {
-		rootKey = t.Root()
+	if fromRoot == nil {
+		var err error
+		fromRoot, err = t.Root()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// WARNING current encoding only supports key & values of 255 bytes each
 	// (due using only 1 byte for the length headers).
 	var b []byte
-	err := t.Iterate(rootKey, func(k, v []byte) {
+	err := t.Iterate(fromRoot, func(k, v []byte) {
 		if v[0] != PrefixValueLeaf {
 			return
 		}
@@ -919,6 +990,10 @@ func (t *Tree) Dump(rootKey []byte) ([]byte, error) {
 // ImportDump imports the leafs (that have been exported with the Dump method)
 // in the Tree.
 func (t *Tree) ImportDump(b []byte) error {
+	if !t.editable() {
+		return ErrSnapshotNotEditable
+	}
+
 	r := bytes.NewReader(b)
 	var err error
 	var keys, values [][]byte
@@ -951,25 +1026,31 @@ func (t *Tree) ImportDump(b []byte) error {
 
 // Graphviz iterates across the full tree to generate a string Graphviz
 // representation of the tree and writes it to w
-func (t *Tree) Graphviz(w io.Writer, rootKey []byte) error {
-	return t.GraphvizFirstNLevels(w, rootKey, t.maxLevels)
+func (t *Tree) Graphviz(w io.Writer, fromRoot []byte) error {
+	return t.GraphvizFirstNLevels(w, fromRoot, t.maxLevels)
 }
 
 // GraphvizFirstNLevels iterates across the first NLevels of the tree to
 // generate a string Graphviz representation of the first NLevels of the tree
 // and writes it to w
-func (t *Tree) GraphvizFirstNLevels(w io.Writer, rootKey []byte, untilLvl int) error {
+func (t *Tree) GraphvizFirstNLevels(w io.Writer, fromRoot []byte, untilLvl int) error {
 	fmt.Fprintf(w, `digraph hierarchy {
 node [fontname=Monospace,fontsize=10,shape=box]
 `)
-	if rootKey == nil {
-		rootKey = t.Root()
-	}
+
 	rTx := t.db.ReadTx()
 	defer rTx.Discard()
 
+	if fromRoot == nil {
+		var err error
+		fromRoot, err = t.RootWithTx(rTx)
+		if err != nil {
+			return err
+		}
+	}
+
 	nEmpties := 0
-	err := t.iterWithStop(rTx, rootKey, 0, func(currLvl int, k, v []byte) bool {
+	err := t.iterWithStop(rTx, fromRoot, 0, func(currLvl int, k, v []byte) bool {
 		if currLvl == untilLvl {
 			return true // to stop the iter from going down
 		}
@@ -1013,28 +1094,36 @@ node [fontname=Monospace,fontsize=10,shape=box]
 }
 
 // PrintGraphviz prints the output of Tree.Graphviz
-func (t *Tree) PrintGraphviz(rootKey []byte) error {
-	if rootKey == nil {
-		rootKey = t.Root()
+func (t *Tree) PrintGraphviz(fromRoot []byte) error {
+	if fromRoot == nil {
+		var err error
+		fromRoot, err = t.Root()
+		if err != nil {
+			return err
+		}
 	}
-	return t.PrintGraphvizFirstNLevels(rootKey, t.maxLevels)
+	return t.PrintGraphvizFirstNLevels(fromRoot, t.maxLevels)
 }
 
 // PrintGraphvizFirstNLevels prints the output of Tree.GraphvizFirstNLevels
-func (t *Tree) PrintGraphvizFirstNLevels(rootKey []byte, untilLvl int) error {
-	if rootKey == nil {
-		rootKey = t.Root()
+func (t *Tree) PrintGraphvizFirstNLevels(fromRoot []byte, untilLvl int) error {
+	if fromRoot == nil {
+		var err error
+		fromRoot, err = t.Root()
+		if err != nil {
+			return err
+		}
 	}
 	w := bytes.NewBufferString("")
 	fmt.Fprintf(w,
-		"--------\nGraphviz of the Tree with Root "+hex.EncodeToString(rootKey)+":\n")
-	err := t.GraphvizFirstNLevels(w, rootKey, untilLvl)
+		"--------\nGraphviz of the Tree with Root "+hex.EncodeToString(fromRoot)+":\n")
+	err := t.GraphvizFirstNLevels(w, fromRoot, untilLvl)
 	if err != nil {
 		fmt.Println(w)
 		return err
 	}
 	fmt.Fprintf(w,
-		"End of Graphviz of the Tree with Root "+hex.EncodeToString(rootKey)+"\n--------\n")
+		"End of Graphviz of the Tree with Root "+hex.EncodeToString(fromRoot)+"\n--------\n")
 
 	fmt.Println(w)
 	return nil

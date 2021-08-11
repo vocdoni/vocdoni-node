@@ -98,7 +98,9 @@ func testVirtualTree(c *qt.C, maxLevels int, keys, values [][]byte) {
 	// compute hashes, and check Root
 	_, err = vTree.computeHashes()
 	c.Assert(err, qt.IsNil)
-	c.Assert(vTree.root.h, qt.DeepEquals, tree.root)
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(vTree.root.h, qt.DeepEquals, root)
 }
 
 func TestVirtualTreeAddBatch(t *testing.T) {
@@ -136,7 +138,9 @@ func TestVirtualTreeAddBatch(t *testing.T) {
 	// compute hashes, and check Root
 	_, err = vTree.computeHashes()
 	c.Assert(err, qt.IsNil)
-	c.Assert(vTree.root.h, qt.DeepEquals, tree.root)
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(vTree.root.h, qt.DeepEquals, root)
 }
 
 func TestGetNodesAtLevel(t *testing.T) {

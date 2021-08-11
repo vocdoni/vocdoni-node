@@ -63,7 +63,10 @@ func (t *Tree) GenerateCircomVerifierProof(k []byte) (*CircomVerifierProof, erro
 		return nil, err
 	}
 	var cp CircomVerifierProof
-	cp.Root = t.Root()
+	cp.Root, err = t.Root()
+	if err != nil {
+		return nil, err
+	}
 	s, err := UnpackSiblings(t.hashFunction, siblings)
 	if err != nil {
 		return nil, err

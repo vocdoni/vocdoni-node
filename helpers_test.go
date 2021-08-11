@@ -13,7 +13,11 @@ import (
 )
 
 func checkRoots(c *qt.C, tree1, tree2 *Tree) {
-	if !bytes.Equal(tree2.Root(), tree1.Root()) {
+	root1, err := tree1.Root()
+	c.Assert(err, qt.IsNil)
+	root2, err := tree2.Root()
+	c.Assert(err, qt.IsNil)
+	if !bytes.Equal(root2, root1) {
 		dir := "err-dump"
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			err := os.Mkdir(dir, os.ModePerm)
@@ -25,7 +29,11 @@ func checkRoots(c *qt.C, tree1, tree2 *Tree) {
 		// store tree2
 		storeTree(c, tree2, dir+"/tree2")
 
-		c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+		root1, err := tree1.Root()
+		c.Assert(err, qt.IsNil)
+		root2, err := tree2.Root()
+		c.Assert(err, qt.IsNil)
+		c.Check(root2, qt.DeepEquals, root1)
 	}
 }
 
@@ -103,5 +111,9 @@ func TestReadTreeDBG(t *testing.T) {
 	// tree1.PrintGraphvizFirstNLevels(nil, 6)
 	// tree2.PrintGraphvizFirstNLevels(nil, 6)
 
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
+	root1, err := tree1.Root()
+	c.Assert(err, qt.IsNil)
+	root2, err := tree2.Root()
+	c.Assert(err, qt.IsNil)
+	c.Check(root2, qt.DeepEquals, root1)
 }

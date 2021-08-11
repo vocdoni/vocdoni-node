@@ -11,6 +11,13 @@ import (
 	"go.vocdoni.io/dvote/db/badgerdb"
 )
 
+func checkRootBIString(c *qt.C, tree *Tree, expected string) {
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	rootBI := BytesToBigInt(root)
+	c.Check(rootBI.String(), qt.Equals, expected)
+}
+
 func TestDBTx(t *testing.T) {
 	c := qt.New(t)
 
@@ -57,29 +64,28 @@ func testAdd(c *qt.C, hashFunc HashFunction, testVectors []string) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	c.Check(hex.EncodeToString(tree.Root()), qt.Equals, testVectors[0])
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Check(hex.EncodeToString(root), qt.Equals, testVectors[0])
 
 	bLen := hashFunc.Len()
 	err = tree.Add(
 		BigIntToBytes(bLen, big.NewInt(1)),
 		BigIntToBytes(bLen, big.NewInt(2)))
 	c.Assert(err, qt.IsNil)
-	rootBI := BytesToBigInt(tree.Root())
-	c.Check(rootBI.String(), qt.Equals, testVectors[1])
+	checkRootBIString(c, tree, testVectors[1])
 
 	err = tree.Add(
 		BigIntToBytes(bLen, big.NewInt(33)),
 		BigIntToBytes(bLen, big.NewInt(44)))
 	c.Assert(err, qt.IsNil)
-	rootBI = BytesToBigInt(tree.Root())
-	c.Check(rootBI.String(), qt.Equals, testVectors[2])
+	checkRootBIString(c, tree, testVectors[2])
 
 	err = tree.Add(
 		BigIntToBytes(bLen, big.NewInt(1234)),
 		BigIntToBytes(bLen, big.NewInt(9876)))
 	c.Assert(err, qt.IsNil)
-	rootBI = BytesToBigInt(tree.Root())
-	c.Check(rootBI.String(), qt.Equals, testVectors[3])
+	checkRootBIString(c, tree, testVectors[3])
 }
 
 func TestAddBatch(t *testing.T) {
@@ -99,8 +105,7 @@ func TestAddBatch(t *testing.T) {
 		}
 	}
 
-	rootBI := BytesToBigInt(tree.Root())
-	c.Check(rootBI.String(), qt.Equals,
+	checkRootBIString(c, tree,
 		"296519252211642170490407814696803112091039265640052570497930797516015811235")
 
 	database, err = badgerdb.New(badgerdb.Options{Path: c.TempDir()})
@@ -120,8 +125,7 @@ func TestAddBatch(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, 0)
 
-	rootBI = BytesToBigInt(tree2.Root())
-	c.Check(rootBI.String(), qt.Equals,
+	checkRootBIString(c, tree2,
 		"296519252211642170490407814696803112091039265640052570497930797516015811235")
 }
 
@@ -156,8 +160,12 @@ func TestAddDifferentOrder(t *testing.T) {
 		}
 	}
 
-	c.Check(hex.EncodeToString(tree2.Root()), qt.Equals, hex.EncodeToString(tree1.Root()))
-	c.Check(hex.EncodeToString(tree1.Root()), qt.Equals,
+	root1, err := tree1.Root()
+	c.Assert(err, qt.IsNil)
+	root2, err := tree2.Root()
+	c.Assert(err, qt.IsNil)
+	c.Check(hex.EncodeToString(root2), qt.Equals, hex.EncodeToString(root1))
+	c.Check(hex.EncodeToString(root1), qt.Equals,
 		"3b89100bec24da9275c87bc188740389e1d5accfc7d88ba5688d7fa96a00d82f")
 }
 
@@ -320,7 +328,9 @@ func TestGenProofAndVerify(t *testing.T) {
 	c.Assert(k, qt.DeepEquals, kAux)
 	c.Assert(existence, qt.IsTrue)
 
-	verif, err := CheckProof(tree.hashFunction, k, v, tree.Root(), siblings)
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	verif, err := CheckProof(tree.hashFunction, k, v, root, siblings)
 	c.Assert(err, qt.IsNil)
 	c.Check(verif, qt.IsTrue)
 }
@@ -352,8 +362,13 @@ func TestDumpAndImportDump(t *testing.T) {
 	defer tree2.db.Close() //nolint:errcheck
 	err = tree2.ImportDump(e)
 	c.Assert(err, qt.IsNil)
-	c.Check(tree2.Root(), qt.DeepEquals, tree1.Root())
-	c.Check(hex.EncodeToString(tree2.Root()), qt.Equals,
+
+	root1, err := tree1.Root()
+	c.Assert(err, qt.IsNil)
+	root2, err := tree2.Root()
+	c.Assert(err, qt.IsNil)
+	c.Check(root2, qt.DeepEquals, root1)
+	c.Check(hex.EncodeToString(root2), qt.Equals,
 		"0d93aaa3362b2f999f15e15728f123087c2eee716f01c01f56e23aae07f09f08")
 }
 
@@ -458,40 +473,34 @@ func TestSnapshot(t *testing.T) {
 	indexes, err := tree.AddBatch(keys, values)
 	c.Assert(err, qt.IsNil)
 	c.Check(len(indexes), qt.Equals, 0)
-
-	rootBI := BytesToBigInt(tree.Root())
-	c.Check(rootBI.String(), qt.Equals,
+	checkRootBIString(c, tree,
 		"13742386369878513332697380582061714160370929283209286127733983161245560237407")
 
-	tree2, err := tree.Snapshot(nil)
+	// do a snapshot, and expect the same root than the original tree
+	snapshotTree, err := tree.Snapshot(nil)
 	c.Assert(err, qt.IsNil)
-	rootBI = BytesToBigInt(tree2.Root())
-	c.Check(rootBI.String(), qt.Equals,
+	checkRootBIString(c, snapshotTree,
 		"13742386369878513332697380582061714160370929283209286127733983161245560237407")
 
-	// add k-v to original tree
-	k := BigIntToBytes(bLen, big.NewInt(int64(1000)))
-	v := BigIntToBytes(bLen, big.NewInt(int64(1000)))
-	err = tree.Add(k, v)
+	// check that the snapshotTree can not be updated
+	_, err = snapshotTree.AddBatch(keys, values)
+	c.Assert(err, qt.Equals, ErrSnapshotNotEditable)
+	err = snapshotTree.Add([]byte("test"), []byte("test"))
+	c.Assert(err, qt.Equals, ErrSnapshotNotEditable)
+	err = snapshotTree.Update([]byte("test"), []byte("test"))
+	c.Assert(err, qt.Equals, ErrSnapshotNotEditable)
+	err = snapshotTree.ImportDump(nil)
+	c.Assert(err, qt.Equals, ErrSnapshotNotEditable)
+
+	// update the original tree by adding a new key-value, and check that
+	// snapshotTree still has the old root, but the original tree has a new
+	// root
+	err = tree.Add([]byte("test"), []byte("test"))
 	c.Assert(err, qt.IsNil)
-
-	// expect original tree to have new root
-	rootBI = BytesToBigInt(tree.Root())
-	c.Check(rootBI.String(), qt.Equals,
-		"10747149055773881257049574592162159501044114324358186833013814735296193179713")
-
-	// expect snapshot tree to have the old root
-	rootBI = BytesToBigInt(tree2.Root())
-	c.Check(rootBI.String(), qt.Equals,
+	checkRootBIString(c, snapshotTree,
 		"13742386369878513332697380582061714160370929283209286127733983161245560237407")
-
-	err = tree2.Add(k, v)
-	c.Assert(err, qt.IsNil)
-	// after adding also the k-v into the snapshot tree, expect original
-	// tree to have new root
-	rootBI = BytesToBigInt(tree.Root())
-	c.Check(rootBI.String(), qt.Equals,
-		"10747149055773881257049574592162159501044114324358186833013814735296193179713")
+	checkRootBIString(c, tree,
+		"1025190963769001718196479367844646783678188389989148142691917685159698888868")
 }
 
 func BenchmarkAdd(b *testing.B) {

@@ -914,7 +914,9 @@ func TestLoadVT(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// check that tree & vt roots are equal
-	c.Check(tree.Root(), qt.DeepEquals, vt.root.h)
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Check(root, qt.DeepEquals, vt.root.h)
 }
 
 // TestAddKeysWithEmptyValues calls AddBatch giving an array of empty values
@@ -976,12 +978,14 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	c.Assert(existence, qt.IsTrue)
 
 	// check with empty array
-	verif, err := CheckProof(tree.hashFunction, keys[9], []byte{}, tree.Root(), siblings)
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	verif, err := CheckProof(tree.hashFunction, keys[9], []byte{}, root, siblings)
 	c.Assert(err, qt.IsNil)
 	c.Check(verif, qt.IsTrue)
 
 	// check with array with only 1 zero
-	verif, err = CheckProof(tree.hashFunction, keys[9], []byte{0}, tree.Root(), siblings)
+	verif, err = CheckProof(tree.hashFunction, keys[9], []byte{0}, root, siblings)
 	c.Assert(err, qt.IsNil)
 	c.Check(verif, qt.IsTrue)
 
@@ -989,12 +993,12 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	e32 := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	c.Assert(len(e32), qt.Equals, 32)
-	verif, err = CheckProof(tree.hashFunction, keys[9], e32, tree.Root(), siblings)
+	verif, err = CheckProof(tree.hashFunction, keys[9], e32, root, siblings)
 	c.Assert(err, qt.IsNil)
 	c.Check(verif, qt.IsTrue)
 
 	// check with array with value!=0 returns false at verification
-	verif, err = CheckProof(tree.hashFunction, keys[9], []byte{0, 1}, tree.Root(), siblings)
+	verif, err = CheckProof(tree.hashFunction, keys[9], []byte{0, 1}, root, siblings)
 	c.Assert(err, qt.IsNil)
 	c.Check(verif, qt.IsFalse)
 }
