@@ -155,13 +155,17 @@ func (t *Tree) GenProof(index, value []byte) ([]byte, error) {
 func (t *Tree) CheckProof(index, value, root, mproof []byte) (bool, error) {
 	t.updateAccessTime()
 	if root == nil {
-		root = t.Root()
+		var err error
+		root, err = t.Root()
+		if err != nil {
+			return false, err
+		}
 	}
 	return arbo.CheckProof(t.Tree.HashFunction(), index, value, root, mproof)
 }
 
 // Root returns the current root hash of the merkle tree
-func (t *Tree) Root() []byte {
+func (t *Tree) Root() ([]byte, error) {
 	t.updateAccessTime()
 	return t.Tree.Root()
 }

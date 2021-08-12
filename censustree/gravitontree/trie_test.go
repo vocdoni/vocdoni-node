@@ -43,7 +43,10 @@ func TestTree(t *testing.T) {
 		}
 	}
 
-	root1 := tr1.Root()
+	root1, err := tr1.Root()
+	if err != nil {
+		t.Fatal(err)
+	}
 	data, err := tr1.Dump(root1)
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +60,10 @@ func TestTree(t *testing.T) {
 	if err = tr2.ImportDump(data); err != nil {
 		t.Fatal(err)
 	}
-	root2 := tr2.Root()
+	root2, err := tr2.Root()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !bytes.Equal(root1, root2) {
 		t.Errorf("roots are different but they should be equal (%x != %x)", root1, root2)
 	}
@@ -80,7 +86,11 @@ func TestTree(t *testing.T) {
 	}
 
 	// Check Root is still the same
-	if !bytes.Equal(tr2.Root(), root2) {
+	tr2Root, err := tr2.Root()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(tr2Root, root2) {
 		t.Fatalf("after closing and opening the tree, the root is different")
 	}
 
@@ -158,7 +168,10 @@ func benchProofs(b *testing.B, censusSize int) {
 	b.Logf("addBatch took %d ms", time.Since(timer).Milliseconds())
 
 	timer = time.Now()
-	root1 := tr1.Root()
+	root1, err := tr1.Root()
+	if err != nil {
+		b.Fatal(err)
+	}
 	data, err := tr1.Dump(root1)
 	if err != nil {
 		b.Fatal(err)

@@ -25,7 +25,11 @@ func TestGenProof(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		v, err := tr1.CheckProof(keys[i], values[i], tr1.Root(), p)
+		root, err := tr1.Root()
+		if err != nil {
+			t.Fatal(err)
+		}
+		v, err := tr1.CheckProof(keys[i], values[i], root, p)
 		if err != nil {
 			t.Fatal(err)
 		}

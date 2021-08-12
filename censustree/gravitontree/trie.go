@@ -225,9 +225,9 @@ func (t *Tree) CheckProof(index, value, root, mproof []byte) (bool, error) {
 }
 
 // Root returns the current root hash of the merkle tree
-func (t *Tree) Root() []byte {
+func (t *Tree) Root() ([]byte, error) {
 	t.updateAccessTime()
-	return t.Tree.Hash()
+	return t.Tree.Hash(), nil
 }
 
 func (t *Tree) treeWithRoot(root []byte) statedb.StateTree {
