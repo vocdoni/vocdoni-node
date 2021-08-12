@@ -35,7 +35,7 @@ type Tree interface {
 	// CheckProof validates a merkle proof and its data for the Tree hash function
 	CheckProof(key, value, root, mproof []byte) (included bool, err error)
 	// Root returns the current merkle tree root
-	Root() []byte
+	Root() ([]byte, error)
 	// Dump exports all the Tree leafs in a byte array, which can later be
 	// imported using the ImportDump method
 	Dump(root []byte) (data []byte, err error)

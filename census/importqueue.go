@@ -40,7 +40,11 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 	if err != nil {
 		return fmt.Errorf("error importing dump: %s", err)
 	}
-	if !bytes.Equal(tr.Root(), dump.RootHash) {
+	root, err := tr.Root()
+	if err != nil {
+		return fmt.Errorf("error importing dump: %s", err)
+	}
+	if !bytes.Equal(root, dump.RootHash) {
 		if err := m.DelNamespace(cid); err != nil {
 			log.Error(err)
 		}

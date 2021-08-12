@@ -108,10 +108,15 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		return resp
 	}
 
+	var err error
 	// Methods without rootHash
 	switch r.Method {
 	case "getRoot":
-		resp.Root = tr.Root()
+		resp.Root, err = tr.Root()
+		if err != nil {
+			resp.SetError(err.Error())
+			return resp
+		}
 		return resp
 
 	case "addClaimBulk":
@@ -124,7 +129,11 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			if len(invalidClaims) > 0 {
 				resp.InvalidClaims = invalidClaims
 			}
-			resp.Root = tr.Root()
+			resp.Root, err = tr.Root()
+			if err != nil {
+				resp.SetError(err.Error())
+				return resp
+			}
 			log.Infof("%d claims addedd successfully", len(r.CensusKeys)-len(invalidClaims))
 		} else {
 			resp.SetError("invalid authentication")
@@ -146,7 +155,11 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			if err != nil {
 				resp.SetError(err)
 			} else {
-				resp.Root = tr.Root()
+				resp.Root, err = tr.Root()
+				if err != nil {
+					resp.SetError(err.Error())
+					return resp
+				}
 				log.Debugf("claim added %x/%x", data, r.CensusValue)
 			}
 		} else {
@@ -223,7 +236,11 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		var err error
 		var root []byte
 		if len(r.RootHash) < 1 {
-			root = tr.Root()
+			root, err = tr.Root()
+			if err != nil {
+				resp.SetError(err.Error())
+				return resp
+			}
 		} else {
 			root = r.RootHash
 		}
@@ -268,7 +285,12 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		return resp
 
 	case "getSize":
-		size, err := tr.Size(tr.Root())
+		root, err := tr.Root()
+		if err != nil {
+			resp.SetError(err.Error())
+			return resp
+		}
+		size, err := tr.Size(root)
 		if err != nil {
 			resp.SetError(err)
 		}
@@ -283,7 +305,11 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		// dump the claim data and return it
 		var root []byte
 		if len(r.RootHash) < 1 {
-			root = tr.Root()
+			root, err = tr.Root()
+			if err != nil {
+				resp.SetError(err.Error())
+				return resp
+			}
 		} else {
 			root = r.RootHash
 		}
@@ -312,12 +338,20 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			return resp
 		}
 		var dump CensusDump
-		dump.RootHash = tr.Root()
-		var err error
-		dump.Data, err = tr.Dump(tr.Root())
+		dump.RootHash, err = tr.Root()
+		if err != nil {
+			resp.SetError(err.Error())
+			return resp
+		}
+		root, err := tr.Root()
+		if err != nil {
+			resp.SetError(err.Error())
+			return resp
+		}
+		dump.Data, err = tr.Dump(root)
 		if err != nil {
 			resp.SetError(err)
-			log.Warnf("cannot dump census with root %x: %s", tr.Root(), err)
+			log.Warnf("cannot dump census with root %x: %s", root, err)
 			return resp
 		}
 		dumpBytes, err := json.Marshal(dump)
@@ -335,7 +369,11 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		}
 		resp.URI = m.RemoteStorage.URIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
-		resp.Root = tr.Root()
+		resp.Root, err = tr.Root()
+		if err != nil {
+			resp.SetError(err.Error())
+			return resp
+		}
 
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %x", resp.Root)

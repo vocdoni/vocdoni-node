@@ -42,6 +42,10 @@ func TestMerkleTreeProof(t *testing.T) {
 
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
+	root, err := tr.Root()
+	if err != nil {
+		t.Fatal(err)
+	}
 	process := &models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
@@ -49,7 +53,7 @@ func TestMerkleTreeProof(t *testing.T) {
 		Mode:         &models.ProcessMode{},
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EthereumAddressSize),
-		CensusRoot:   tr.Root(),
+		CensusRoot:   root,
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,

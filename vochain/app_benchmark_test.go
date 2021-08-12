@@ -59,6 +59,11 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 	}
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
+	root, err := tr.Root()
+	if err != nil {
+		b.Fatal(err)
+	}
+
 	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
@@ -66,7 +71,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 		Mode:         &models.ProcessMode{Interruptible: true, AutoStart: true},
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EthereumAddressSize),
-		CensusRoot:   tr.Root(),
+		CensusRoot:   root,
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
