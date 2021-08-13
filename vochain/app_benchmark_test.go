@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tree "go.vocdoni.io/dvote/censustree/gravitontree"
+	tree "go.vocdoni.io/dvote/censustreelegacy/gravitontree"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"

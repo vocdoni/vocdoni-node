@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"go.vocdoni.io/dvote/censustree/gravitontree"
+	"go.vocdoni.io/dvote/censustreelegacy/gravitontree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"google.golang.org/protobuf/proto"

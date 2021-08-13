@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"go.vocdoni.io/dvote/censustree"
-	censustreefactory "go.vocdoni.io/dvote/censustree/factory"
+	censustree "go.vocdoni.io/dvote/censustreelegacy"
+	censustreefactory "go.vocdoni.io/dvote/censustreelegacy/factory"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"

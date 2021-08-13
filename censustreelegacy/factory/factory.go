@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/vocdoni/arbo"
-	"go.vocdoni.io/dvote/censustree"
-	"go.vocdoni.io/dvote/censustree/arbotree"
-	"go.vocdoni.io/dvote/censustree/gravitontree"
+	censustree "go.vocdoni.io/dvote/censustreelegacy"
+	"go.vocdoni.io/dvote/censustreelegacy/arbotree"
+	"go.vocdoni.io/dvote/censustreelegacy/gravitontree"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
