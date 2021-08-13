@@ -1,4 +1,4 @@
-package censustree
+package censustreelegacy
 
 import "go.vocdoni.io/proto/build/go/models"
 

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tree "go.vocdoni.io/dvote/censustree/gravitontree"
+	tree "go.vocdoni.io/dvote/censustreelegacy/gravitontree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"

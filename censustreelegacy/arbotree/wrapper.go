@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/vocdoni/arbo"
-	"go.vocdoni.io/dvote/censustree"
+	censustree "go.vocdoni.io/dvote/censustreelegacy"
 	"go.vocdoni.io/dvote/db/badgerdb"
 	"go.vocdoni.io/proto/build/go/models"
 )

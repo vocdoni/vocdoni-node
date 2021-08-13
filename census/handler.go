@@ -338,16 +338,13 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			return resp
 		}
 		var dump CensusDump
-		dump.RootHash, err = tr.Root()
-		if err != nil {
-			resp.SetError(err.Error())
-			return resp
-		}
+
 		root, err := tr.Root()
 		if err != nil {
 			resp.SetError(err.Error())
 			return resp
 		}
+		dump.RootHash = root
 		dump.Data, err = tr.Dump(root)
 		if err != nil {
 			resp.SetError(err)
@@ -369,11 +366,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		}
 		resp.URI = m.RemoteStorage.URIprefix() + cid
 		log.Infof("published census at %s", resp.URI)
-		resp.Root, err = tr.Root()
-		if err != nil {
-			resp.SetError(err.Error())
-			return resp
-		}
+		resp.Root = root
 
 		// adding published census with censusID = rootHash
 		log.Infof("adding new namespace for published census %x", resp.Root)

@@ -48,7 +48,7 @@ func (tx ReadTx) Discard() {
 
 // Get implements the db.WriteTx.Get interface method
 func (tx WriteTx) Get(k []byte) ([]byte, error) {
-	return ReadTx{tx: tx.tx}.Get(k)
+	return ReadTx(tx).Get(k)
 }
 
 // Set implements the db.WriteTx.Set interface method
@@ -68,7 +68,7 @@ func (tx WriteTx) Commit() error {
 
 // Discard implements the db.WriteTx.Discard interface method
 func (tx WriteTx) Discard() {
-	ReadTx{tx: tx.tx}.Discard()
+	ReadTx(tx).Discard()
 }
 
 // BadgerDB implements db.Database interface

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"git.sr.ht/~sircmpwn/go-bare"
-	"go.vocdoni.io/dvote/censustree"
+	censustree "go.vocdoni.io/dvote/censustreelegacy"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
