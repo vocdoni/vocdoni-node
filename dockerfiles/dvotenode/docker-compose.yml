@@ -24,11 +24,7 @@ services:
     sysctls:
       net.core.somaxconn: 8128
     restart: ${RESTART:-no}
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "10"
+
 volumes:
   run: {}
   eth: {}
