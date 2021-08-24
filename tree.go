@@ -66,6 +66,9 @@ var (
 	// ErrSnapshotNotEditable indicates when the tree is a snapshot, thus
 	// can not be modified
 	ErrSnapshotNotEditable = fmt.Errorf("snapshot tree can not be edited")
+	// ErrTreeNotEmpty indicates when the tree was expected to be empty and
+	// it is not
+	ErrTreeNotEmpty = fmt.Errorf("tree is not empty")
 )
 
 // Tree defines the struct that implements the MerkleTree functionalities
@@ -578,7 +581,7 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 	}
 	oldKey, _ := ReadLeafValue(valueAtBottom)
 	if !bytes.Equal(oldKey, k) {
-		return fmt.Errorf("key %s does not exist", hex.EncodeToString(k))
+		return ErrKeyNotFound
 	}
 
 	leafKey, leafValue, err := t.newLeafValue(k, v)
@@ -640,7 +643,7 @@ func (t *Tree) GenProofWithTx(rTx db.ReadTx, k []byte) ([]byte, []byte, []byte, 
 	leafK, leafV := ReadLeafValue(value)
 	if !bytes.Equal(k, leafK) {
 		// key not in tree, proof of non-existence
-		return leafK, leafV, s, false, err
+		return leafK, leafV, s, false, nil
 	}
 
 	return leafK, leafV, s, true, nil
@@ -993,9 +996,15 @@ func (t *Tree) ImportDump(b []byte) error {
 	if !t.editable() {
 		return ErrSnapshotNotEditable
 	}
+	root, err := t.Root()
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(root, t.emptyHash) {
+		return ErrTreeNotEmpty
+	}
 
 	r := bytes.NewReader(b)
-	var err error
 	var keys, values [][]byte
 	for {
 		l := make([]byte, 2)
