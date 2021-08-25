@@ -90,11 +90,27 @@ type Tree struct {
 // NewTree returns a new Tree, if there is a Tree still in the given database, it
 // will load it.
 func NewTree(database db.Database, maxLevels int, hash HashFunction) (*Tree, error) {
+	wTx := database.WriteTx()
+	defer wTx.Discard()
+
+	t, err := NewTreeWithTx(wTx, database, maxLevels, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = wTx.Commit(); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+// NewTreeWithTx returns a new Tree using the given db.WriteTx, which will not
+// be ccommited inside this method, if there is a Tree still in the given
+// database, it will load it.
+func NewTreeWithTx(wTx db.WriteTx, database db.Database,
+	maxLevels int, hash HashFunction) (*Tree, error) {
 	t := Tree{db: database, maxLevels: maxLevels, hashFunction: hash}
 	t.emptyHash = make([]byte, t.hashFunction.Len()) // empty
-
-	wTx := t.db.WriteTx()
-	defer wTx.Discard()
 
 	_, err := wTx.Get(dbKeyRoot)
 	if err == db.ErrKeyNotFound {
@@ -105,15 +121,8 @@ func NewTree(database db.Database, maxLevels int, hash HashFunction) (*Tree, err
 		if err = t.setNLeafs(wTx, 0); err != nil {
 			return nil, err
 		}
-		if err = wTx.Commit(); err != nil {
-			return nil, err
-		}
 		return &t, nil
 	} else if err != nil {
-		return nil, err
-	}
-
-	if err = wTx.Commit(); err != nil {
 		return nil, err
 	}
 	return &t, nil
