@@ -143,6 +143,30 @@ func TestVirtualTreeAddBatch(t *testing.T) {
 	c.Assert(vTree.root.h, qt.DeepEquals, root)
 }
 
+func TestVirtualTreeAddBatchFullyUsed(t *testing.T) {
+	c := qt.New(t)
+
+	vTree1 := newVT(7, HashFunctionPoseidon) // used for add one by one
+	vTree2 := newVT(7, HashFunctionPoseidon) // used for addBatch
+
+	var keys, values [][]byte
+	for i := 0; i < 128; i++ {
+		k := BigIntToBytes(32, big.NewInt(int64(i)))
+		v := k
+
+		keys = append(keys, k)
+		values = append(values, v)
+
+		// add one by one expecting no error
+		err := vTree1.add(0, k, v)
+		c.Assert(err, qt.IsNil)
+	}
+
+	invalids, err := vTree2.addBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	c.Assert(0, qt.Equals, len(invalids))
+}
+
 func TestGetNodesAtLevel(t *testing.T) {
 	c := qt.New(t)
 

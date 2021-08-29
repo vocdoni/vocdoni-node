@@ -173,7 +173,7 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 	wg.Add(nCPU)
 	for i := 0; i < nCPU; i++ {
 		go func(cpu int) {
-			bucketVT := newVT(t.params.maxLevels-l, t.params.hashFunction)
+			bucketVT := newVT(t.params.maxLevels, t.params.hashFunction)
 			bucketVT.root = nodesAtL[cpu]
 			for j := 0; j < len(buckets[cpu]); j++ {
 				if err = bucketVT.add(l, buckets[cpu][j].k, buckets[cpu][j].v); err != nil {
