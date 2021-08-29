@@ -478,7 +478,7 @@ func newLeafValue(hashFunc HashFunction, k, v []byte) ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 	var leafValue []byte
-	leafValue = append(leafValue, byte(1))
+	leafValue = append(leafValue, byte(PrefixValueLeaf))
 	leafValue = append(leafValue, byte(len(k)))
 	leafValue = append(leafValue, k...)
 	leafValue = append(leafValue, v...)
@@ -509,11 +509,11 @@ func (t *Tree) newIntermediate(l, r []byte) ([]byte, []byte, error) {
 // computes its hash. Returns the hash of the node, which is the node key, and a
 // byte array that contains the value (which contains the left & right child
 // keys) to store in the DB.
-// [     1 byte   |     1 byte    | N bytes  |  N bytes  ]
-// [ type of node | length of key | left key | right key ]
+// [     1 byte   |     1 byte         | N bytes  |  N bytes  ]
+// [ type of node | length of left key | left key | right key ]
 func newIntermediate(hashFunc HashFunction, l, r []byte) ([]byte, []byte, error) {
 	b := make([]byte, PrefixValueLen+hashFunc.Len()*2)
-	b[0] = 2
+	b[0] = PrefixValueIntermediate
 	b[1] = byte(len(l))
 	copy(b[PrefixValueLen:PrefixValueLen+hashFunc.Len()], l)
 	copy(b[PrefixValueLen+hashFunc.Len():], r)
