@@ -1,0 +1,359 @@
+/*
+Package statedb contains the implementation of StateDB, a database backed
+structure that holds the state of the blockchain indexed by version (each
+version corresponding to the state at each block).  The StateDB holds a dynamic
+hierarcy of linked merkle trees starting with the mainTree on top, with the
+property that the keys and values of all merkle trees can be cryptographically
+represented by a single hash, the StateDB.Hash (which corresponds to the
+mainTree.Root).
+
+Internally all subTrees of the StateDB use the same database (for views) and
+the same transaction (for a block update).  Database prefixes are used to split
+the storage of each subTree while avoiding collisions.  The structure of
+prefixes is detailed here:
+- subTree: `{KindID}{id}/`
+	- arbo.Tree: `t/`
+	- subTrees: `s/`
+		- contains any number of subTree
+	- nostate: `n/`
+	- metadata: `m/`
+		- versions: `v/` (only in mainTree)
+			- currentVersion: `current` -> {currentVersion}
+			- version to root: `{version}` -> `{root}`
+
+Since the mainTree is unique and doesn't have a parent, the prefixes used in
+the mainTree skip the first element of the path (`{KindID}{id}/`).
+- Example:
+	- mainTree arbo.Tree: `t/`
+	- processTree arbo.Tree (a singleton under mainTree): `s/process/t/`
+	- censusTree arbo.Tree (a non-singleton under processTree):
+	`s/process/s/census{pID}/t/` (we are using pID, the processID as the id
+	of the subTree)
+	- voteTree arbo.Tree (a non-singleton under processTree):
+	`s/process/s/vote{pID}/t/` (we are using pID, the processID as the id
+	of the subTree)
+
+Each tree has an associated database that can be accessed via the NoState
+method.  These databases are auxiliary key-values that don't belong to the
+blockchain state, and thus any value in the NoState databases won't be
+reflected in the StateDB.Hash.  One of the usecases for the NoState database is
+to store auxiliary mappings used to optimize the capacity usage of merkletrees
+used for zkSNARKS, where the number of levels is of critical matter.  For
+example, we may want to build a census tree of babyjubjub public keys that will
+be used to prove ownership of the public key via a SNARK in order to vote.  If
+we build the merkle tree using the public key as path, we will have an
+unbalanced tree which requires more levels than strictly necessary.  On the
+other hand, if we use a sequential index as path and set the value to the
+public key, we achieve maximum balancing reducing the number of tree levels.
+But then we can't easily query for the existence of a public key in the tree to
+generate a proof, as it requires to know its index.  In such a case, we can
+store the mapping of public key to index in the NoState database.
+*/
+package statedb
+
+import (
+	"encoding/binary"
+	"errors"
+	"path"
+
+	"github.com/vocdoni/arbo"
+	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/prefixeddb"
+	"go.vocdoni.io/dvote/tree"
+)
+
+const (
+	subKeyTree    = "t"
+	subKeyMeta    = "m"
+	subKeyNoState = "n"
+	subKeySubTree = "s"
+)
+
+const pathVersion = "v"
+
+var keyCurVersion = []byte("current")
+
+// uint32ToBytes encodes an uint32 as a little endian in []byte
+func uint32ToBytes(v uint32) []byte {
+	b := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, v)
+	return b
+}
+
+// subDB returns a db.Database prefixed with `path | '/'`
+func subDB(db db.Database, path string) db.Database {
+	return prefixeddb.NewPrefixedDatabase(db, []byte(path+"/"))
+}
+
+// subWriteTx returns a db.WriteTx prefixed with `path | '/'`
+func subWriteTx(tx db.WriteTx, path string) db.WriteTx {
+	return prefixeddb.NewPrefixedWriteTx(tx, []byte(path+"/"))
+}
+
+// subReadTx returns a db.ReadTx prefixed with `path | '/'`
+func subReadTx(tx db.ReadTx, path string) db.ReadTx {
+	return prefixeddb.NewPrefixedReadTx(tx, []byte(path+"/"))
+}
+
+// treeConfig is a unified configuration for a subTree.
+type treeConfig struct {
+	parentLeafKey []byte
+	prefix        string
+	*SubTreeConfig
+}
+
+// GetRootFn is a function type that takes a leaf value and returns the contained root.
+type GetRootFn func(value []byte) ([]byte, error)
+
+// SetRootFn is a function type that takes a leaf value and a root, updates the
+// leaf value with the new root and returns it.
+type SetRootFn func(value []byte, root []byte) ([]byte, error)
+
+// SubTreeConfig
+type SubTreeConfig struct {
+	hashFunc          arbo.HashFunction
+	kindID            string
+	parentLeafGetRoot GetRootFn
+	parentLeafSetRoot SetRootFn
+	maxLevels         int
+}
+
+// SubTreeSingleConfig contains the configuration used for a non-singleton subTree.
+func NewSubTreeConfig(hashFunc arbo.HashFunction, kindID string, maxLevels int,
+	parentLeafGetRoot GetRootFn, parentLeafSetRoot SetRootFn) *SubTreeConfig {
+	return &SubTreeConfig{
+		hashFunc:          hashFunc,
+		kindID:            kindID,
+		parentLeafGetRoot: parentLeafGetRoot,
+		parentLeafSetRoot: parentLeafSetRoot,
+		maxLevels:         maxLevels,
+	}
+}
+
+// treeConfig returns a unified configuration type for opening a singleton
+// subTree that is identified by `id`.  `id` is the path in the parent tree to
+// the leaf that contains the subTree root.
+func (c *SubTreeConfig) treeConfig(id []byte) *treeConfig {
+	return &treeConfig{
+		parentLeafKey: id,
+		prefix:        c.kindID + string(id),
+		SubTreeConfig: c,
+	}
+}
+
+// SubTreeSingleConfig contains the configuration used for a singleton subTree.
+type SubTreeSingleConfig struct {
+	*SubTreeConfig
+}
+
+// NewSubTreeSingleConfig creates a new SubTreeSingleConfig.
+func NewSubTreeSingleConfig(hashFunc arbo.HashFunction, kindID string, maxLevels int,
+	parentLeafGetRoot GetRootFn, parentLeafSetRoot SetRootFn) *SubTreeSingleConfig {
+	return &SubTreeSingleConfig{
+		NewSubTreeConfig(hashFunc, kindID, maxLevels, parentLeafGetRoot, parentLeafSetRoot),
+	}
+}
+
+// Key returns the key used in the parent tree in which the value that contains
+// the subTree root is stored.  The key is the path of the parent leaf with the root.
+func (c *SubTreeSingleConfig) Key() []byte {
+	return []byte(c.kindID)
+}
+
+// treeConfig returns a unified configuration type for opening a subTree.
+func (c *SubTreeSingleConfig) treeConfig() *treeConfig {
+	return &treeConfig{
+		parentLeafKey: []byte(c.kindID),
+		prefix:        c.kindID,
+		SubTreeConfig: c.SubTreeConfig,
+	}
+}
+
+// mainTreeCfg is the subTree configuration of the mainTree.  It doesn't have a
+// kindID because it's the top level tree.  For the same reason, it doesn't
+// contain functions to work with the parent leaf: it doesn't have a parent.
+var mainTreeCfg = NewSubTreeSingleConfig(arbo.HashFunctionSha256, "", 256, nil, nil).treeConfig()
+
+// StateDB is a database backed structure that holds a dynamic hierarchy of
+// linked merkle trees with the property that the keys and values of all merkle
+// trees can be cryptographically represented by a single hash, the
+// StateDB.Root (which corresponds to the mainTree.Root).
+type StateDB struct {
+	hashLen int
+	db      db.Database
+}
+
+// NewStateDB returns an instance of the StateDB.
+func NewStateDB(db db.Database) *StateDB {
+	return &StateDB{
+		hashLen: mainTreeCfg.hashFunc.Len(),
+		db:      db,
+	}
+}
+
+// setVersionRoot is a helper function used to set the last version and its
+// corresponding root from the top level tx.
+func setVersionRoot(tx db.WriteTx, version uint32, root []byte) error {
+	txMetaVer := subWriteTx(tx, path.Join(subKeyMeta, pathVersion))
+	if err := txMetaVer.Set(keyCurVersion, uint32ToBytes(version)); err != nil {
+		return err
+	}
+	return txMetaVer.Set(uint32ToBytes(version), root)
+}
+
+// getVersionRoot is a helper function used get the last version from the top
+// level tx.
+func getVersion(tx db.ReadTx) (uint32, error) {
+	versionLE, err := subReadTx(tx, path.Join(subKeyMeta, pathVersion)).Get(keyCurVersion)
+	if err == db.ErrKeyNotFound {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint32(versionLE), nil
+}
+
+// getVersionRoot is a helper function used get the root of version from the
+// top level tx.
+func (s *StateDB) getVersionRoot(tx db.ReadTx, version uint32) ([]byte, error) {
+	if version == 0 {
+		return make([]byte, s.hashLen), nil
+	}
+	root, err := subReadTx(tx, path.Join(subKeyMeta, pathVersion)).Get(uint32ToBytes(version))
+	if err != nil {
+		return nil, err
+	}
+	return root, nil
+}
+
+// getRoot is a helper function used to get the last version's root from the
+// top level tx.
+func (s *StateDB) getRoot(tx db.ReadTx) ([]byte, error) {
+	version, err := getVersion(tx)
+	if err != nil {
+		return nil, err
+	}
+	return s.getVersionRoot(tx, version)
+}
+
+// The first commited version is 1.  Calling Version on a fresh StateDB will
+// return 0.
+func (s *StateDB) Version() (uint32, error) {
+	tx := s.db.ReadTx()
+	defer tx.Discard()
+	return getVersion(tx)
+}
+
+// VersionRoot returns the StateDB root corresponding to the version v.  A new
+// StateDB always has the version 0 with root == emptyHash.
+func (s *StateDB) VersionRoot(v uint32) ([]byte, error) {
+	tx := s.db.ReadTx()
+	defer tx.Discard()
+	return s.getVersionRoot(tx, v)
+}
+
+// Hash returns the cryptographic summary of the StateDB, which corresponds to
+// the root of the mainTree.  This hash cryptographically represents the entire
+// StateDB (except for the NoState databases).
+func (s *StateDB) Hash() ([]byte, error) {
+	tx := s.db.ReadTx()
+	defer tx.Discard()
+	return s.getRoot(tx)
+}
+
+// BeginTx creates a new transaction for the StateDB to begin an update, with
+// the mainTree opened for update wrapped in the returned TreeTx.  You must
+// either call treeTx.Commit or treeTx.Discard if BeginTx doesn't return an
+// error.  Calling treeTx.Discard after treeTx.Commit is ok.
+func (s *StateDB) BeginTx() (treeTx *TreeTx, err error) {
+	cfg := mainTreeCfg
+	tx := s.db.WriteTx()
+	defer func() {
+		if err != nil {
+			tx.Discard()
+		}
+	}()
+	txTree := subWriteTx(tx, subKeyTree)
+	tree, err := tree.New(txTree,
+		tree.Options{DB: nil, MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
+	if err != nil {
+		return nil, err
+	}
+	return &TreeTx{
+		sdb: s,
+		TreeUpdate: TreeUpdate{
+			tx: tx,
+			tree: treeWithTx{
+				Tree: tree,
+				tx:   txTree,
+			},
+			cfg:      cfg,
+			openSubs: make(map[string]*TreeUpdate),
+		},
+	}, nil
+}
+
+// readOnlyWriteTx is a wrapper over a db.ReadTx that implements the db.WriteTx
+// methods but forbids them by returning errors.  This is used for functions
+// that take a db.WriteTx but only write conditionally, and we want to detect a
+// write attempt.
+type readOnlyWriteTx struct {
+	db.ReadTx
+}
+
+// ErrReadOnly is returned when a write operation is attempted on a db.WriteTx
+// that we set up for read only.
+var ErrReadOnly = errors.New("read only")
+
+// ErrEmptyTree is returned when a tree is opened for read-only but hasn't been
+// created yet.
+var ErrEmptyTree = errors.New("empty tree")
+
+// Set implements db.WriteTx.Set but returns error always.
+func (t *readOnlyWriteTx) Set(key []byte, value []byte) error {
+	return ErrReadOnly
+}
+
+// Set implements db.WriteTx.Delete but returns error always.
+func (t *readOnlyWriteTx) Delete(key []byte) error {
+	return ErrReadOnly
+}
+
+// Commit implements db.WriteTx.COmmit but returns nil always.
+func (t *readOnlyWriteTx) Commit() error {
+	return nil
+}
+
+// TreeView returns the mainTree opened at root as a TreeView for read-only.
+// If root is nil, the last version's root is used.
+func (s *StateDB) TreeView(root []byte) (*TreeView, error) {
+	cfg := mainTreeCfg
+
+	tx := s.db.ReadTx()
+	defer tx.Discard()
+	if root == nil {
+		var err error
+		if root, err = s.getRoot(tx); err != nil {
+			return nil, err
+		}
+	}
+
+	txTree := subReadTx(tx, subKeyTree)
+	defer txTree.Discard()
+	tree, err := tree.New(&readOnlyWriteTx{txTree},
+		tree.Options{DB: subDB(s.db, subKeyTree), MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
+	if err == ErrReadOnly {
+		return nil, ErrEmptyTree
+	} else if err != nil {
+		return nil, err
+	}
+	tree, err = tree.FromRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	return &TreeView{
+		db:   s.db,
+		tree: tree,
+		cfg:  mainTreeCfg,
+	}, nil
+}
