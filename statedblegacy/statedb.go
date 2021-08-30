@@ -1,4 +1,4 @@
-package statedb
+package statedblegacy
 
 type StorageType string
 

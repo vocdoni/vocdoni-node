@@ -11,7 +11,7 @@ import (
 	"github.com/deroproject/graviton"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/statedb"
+	statedb "go.vocdoni.io/dvote/statedblegacy"
 )
 
 const (
