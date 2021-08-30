@@ -9,7 +9,7 @@ import (
 	"github.com/cosmos/iavl"
 	tmdb "github.com/tendermint/tm-db"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/statedb"
+	statedb "go.vocdoni.io/dvote/statedblegacy"
 )
 
 const PrefixDBCacheSize = 1024

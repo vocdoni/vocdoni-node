@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.vocdoni.io/dvote/multirpc/transports/subpubtransport"
+	statedb "go.vocdoni.io/dvote/statedblegacy"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
@@ -21,8 +22,7 @@ import (
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/multirpc/transports"
-	"go.vocdoni.io/dvote/statedb"
-	"go.vocdoni.io/dvote/statedb/gravitonstate"
+	"go.vocdoni.io/dvote/statedblegacy/gravitonstate"
 	"go.vocdoni.io/dvote/util"
 )
 

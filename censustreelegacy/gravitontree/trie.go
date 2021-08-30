@@ -11,8 +11,8 @@ import (
 	censustree "go.vocdoni.io/dvote/censustreelegacy"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/statedb"
-	"go.vocdoni.io/dvote/statedb/gravitonstate"
+	statedb "go.vocdoni.io/dvote/statedblegacy"
+	"go.vocdoni.io/dvote/statedblegacy/gravitonstate"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
