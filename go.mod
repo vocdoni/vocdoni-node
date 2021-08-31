@@ -17,12 +17,12 @@ require (
 	github.com/cosmos/iavl v0.15.3
 	github.com/deroproject/graviton v0.0.0-20201218180342-ab474f4c94d2
 	github.com/dgraph-io/badger/v3 v3.2103.1
-	github.com/ethereum/go-ethereum v1.9.26-0.20201212163632-00d10e610f9f
+	github.com/ethereum/go-ethereum v1.10.8
 	github.com/frankban/quicktest v1.13.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/cors v1.1.1
 	github.com/google/go-cmp v0.5.5
-	github.com/hashicorp/golang-lru v0.5.4
+	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-ipfs v0.9.1
 	github.com/ipfs/go-ipfs-config v0.14.0
@@ -41,7 +41,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/p4u/recws v1.2.2-0.20201005083112-7be7f9397e75
 	github.com/prometheus/client_golang v1.10.0
-	github.com/shirou/gopsutil v3.20.12+incompatible
+	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.8.1
@@ -50,11 +50,11 @@ require (
 	github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f
 	github.com/vocdoni/arbo v0.0.0-20210825074242-6ae28bc0099d
 	github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44
-	github.com/vocdoni/storage-proofs-eth-go v0.1.6-0.20210719161106-675817be681e
+	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.uber.org/zap v1.18.1
 	go.vocdoni.io/proto v1.0.4-0.20210726091234-bceaf416353b
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
-	golang.org/x/net v0.0.0-20210716203947-853a461950ff
+	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
 	google.golang.org/protobuf v1.27.1
 	nhooyr.io/websocket v1.8.6
 )
