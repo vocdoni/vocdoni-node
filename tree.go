@@ -340,7 +340,7 @@ func (t *Tree) add(wTx db.WriteTx, root []byte, fromLvl int, k, v []byte) ([]byt
 func (t *Tree) down(rTx db.ReadTx, newKey, currKey []byte, siblings [][]byte,
 	path []bool, currLvl int, getLeaf bool) (
 	[]byte, []byte, [][]byte, error) {
-	if currLvl > t.maxLevels-1 {
+	if currLvl > t.maxLevels {
 		return nil, nil, nil, ErrMaxLevel
 	}
 
