@@ -318,11 +318,11 @@ func (t *vt) computeHashes() ([][2][]byte, error) {
 	wg.Add(nCPU)
 	for i := 0; i < nCPU; i++ {
 		go func(cpu int) {
-			bucketVT := newVT(t.params.maxLevels-l, t.params.hashFunction)
+			bucketVT := newVT(t.params.maxLevels, t.params.hashFunction)
 			bucketVT.params.dbg = newDbgStats()
 			bucketVT.root = nodesAtL[cpu]
 
-			bucketPairs[cpu], err = bucketVT.root.computeHashes(l,
+			bucketPairs[cpu], err = bucketVT.root.computeHashes(l-1,
 				t.params.maxLevels, bucketVT.params, bucketPairs[cpu])
 			if err != nil {
 				errs[cpu] = err

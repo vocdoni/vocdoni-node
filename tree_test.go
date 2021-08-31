@@ -454,6 +454,66 @@ func TestRWMutex(t *testing.T) {
 //         c.Assert(n, qt.Equals, maxInt)
 // }
 
+func TestAddBatchFullyUsed(t *testing.T) {
+	c := qt.New(t)
+
+	database1, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	tree1, err := NewTree(database1, 4, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+
+	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	tree2, err := NewTree(database2, 4, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+
+	var keys, values [][]byte
+	for i := 0; i < 16; i++ {
+		k := BigIntToBytes(32, big.NewInt(int64(i)))
+		v := k
+
+		keys = append(keys, k)
+		values = append(values, v)
+
+		// add one by one expecting no error
+		err := tree1.Add(k, v)
+		c.Assert(err, qt.IsNil)
+	}
+
+	invalids, err := tree2.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	c.Assert(0, qt.Equals, len(invalids))
+
+	root1, err := tree1.Root()
+	c.Assert(err, qt.IsNil)
+	root2, err := tree2.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(root1, qt.DeepEquals, root2)
+
+	// get all key-values and check that are equal between both trees
+	for i := 0; i < 16; i++ {
+		auxK1, auxV1, err := tree1.Get(BigIntToBytes(32, big.NewInt(int64(i))))
+		c.Assert(err, qt.IsNil)
+
+		auxK2, auxV2, err := tree2.Get(BigIntToBytes(32, big.NewInt(int64(i))))
+		c.Assert(err, qt.IsNil)
+
+		c.Assert(auxK1, qt.DeepEquals, auxK2)
+		c.Assert(auxV1, qt.DeepEquals, auxV2)
+	}
+
+	// try adding one more key to both trees (through Add & AddBatch) and
+	// expect not being added due the tree is already full
+	k := BigIntToBytes(32, big.NewInt(int64(16)))
+	v := k
+	err = tree1.Add(k, v)
+	c.Assert(err, qt.Equals, ErrMaxVirtualLevel)
+
+	invalids, err = tree2.AddBatch([][]byte{k}, [][]byte{v})
+	c.Assert(err, qt.IsNil)
+	c.Assert(1, qt.Equals, len(invalids))
+}
+
 func TestSnapshot(t *testing.T) {
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
