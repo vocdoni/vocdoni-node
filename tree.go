@@ -807,7 +807,7 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 }
 
 func (t *Tree) incNLeafs(wTx db.WriteTx, nLeafs int) error {
-	oldNLeafs, err := t.GetNLeafs()
+	oldNLeafs, err := t.GetNLeafsWithTx(wTx)
 	if err != nil {
 		return err
 	}
