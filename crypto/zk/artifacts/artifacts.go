@@ -1,0 +1,199 @@
+package artifacts
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+)
+
+/*
+# Directories structure
+=======================
+Path: circuitname/network/parameters/file.extension
+- Circuit Name: the circuit name. Example: `zkcensusproof`
+- Network: The network name. Example: `main, dev, stage`
+- Circuit Parameters: numbers in decimal separated by underscore. Example: `1024`, `1024_3_500`
+- Files:
+	- circuit.zkey: contains the provingKey & verificationKey (big size, linear with circuit
+	size) [needed by the user]
+	- verificationKey.json: extracted from circuit.zkey (small size, constant size) [needed
+	by the vochain]
+	- witness.wasm: (medium size, linear with circuit size) [needed by the user]
+- Examples:
+	- zkcensusproof/stage/1024/circuit.zkey
+	- zkcensusproof/dev/128/witness.wasm
+
+# Files hash
+=============
+Each file is hashed with sha256, which output is publicly known. The hash
+values of each file are hardcoded in the VochainGenesis.
+
+*/
+
+const (
+	// FilenameWitness defines the name of the file of the WitnessCalculator
+	FilenameWitness = "witness.wasm"
+	// FilenameZKey defines the name of the file of the circom ZKey
+	FilenameZKey = "circuit.zkey"
+	// FilenameVK defines the name of the VerificationKey.json
+	FilenameVK = "verificationKey.json"
+)
+
+// CircuitsConfig defines the configuration of the files to be downloaded
+type CircuitsConfig struct {
+	// URL defines the URL from where to download the files
+	URL string
+	// CircuitsPath defines the path from where the files are downloaded
+	CircuitsPath string
+	// LocalDir defines in which directory will be the files
+	// downloaded, under that directory it will follow the CircuitsPath
+	// directories structure
+	LocalDir string
+
+	// WitnessHash contains the expected hash for the file filenameWitness
+	WitnessHash []byte // witness.wasm
+	// ZKeyHash contains the expected hash for the file filenameZKey
+	ZKeyHash []byte // circuit.zkey
+	// VKHash contains the expected hash for the file filenameVK
+	VKHash []byte // verificationKey.json
+}
+
+// DownloadCircuitFiles will download the circuits in the specified path,
+// checking the expected sha256 hash of each file. If the files already exist
+// in the path, it will not download them again but it will check the hash of
+// the existing files.
+func DownloadCircuitFiles(ctx context.Context, c CircuitsConfig) error {
+	// check if files already exist, if files already exist, check hashes
+	err := checkHashes(c)
+	if err == nil {
+		// files already exist, and match the expected hashes
+		return nil
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	// at this point, or files do not exist, or exist with a not expected
+	// hash
+	return downloadFiles(ctx, c)
+}
+
+func checkHashes(c CircuitsConfig) error {
+	err := checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameWitness), c.WitnessHash)
+	if err != nil {
+		return err
+	}
+
+	err = checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameZKey), c.ZKeyHash)
+	if err != nil {
+		return err
+	}
+
+	err = checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameVK), c.VKHash)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func checkHash(path string, expected []byte) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+	hash := h.Sum(nil)
+
+	if !bytes.Equal(hash[:], expected) {
+		return fmt.Errorf("path: %s, expected hash: %x, computed hash: %x",
+			path, expected, hash)
+	}
+	return nil
+}
+
+// downloadFiles downloads the files, and once downloaded calls checkHashes
+func downloadFiles(ctx context.Context, c CircuitsConfig) error {
+	if err := os.MkdirAll(filepath.Join(c.LocalDir, c.CircuitsPath), os.ModePerm); err != nil {
+		return err
+	}
+
+	u, err := url.Parse(c.URL)
+	if err != nil {
+		return err
+	}
+	u.Path = path.Join(u.Path, c.CircuitsPath, FilenameWitness)
+	if err := downloadFile(ctx,
+		u.String(),
+		filepath.Join(c.LocalDir, c.CircuitsPath, FilenameWitness),
+	); err != nil {
+		return err
+	}
+
+	u, err = url.Parse(c.URL)
+	if err != nil {
+		return err
+	}
+	u.Path = path.Join(u.Path, c.CircuitsPath, FilenameZKey)
+	if err := downloadFile(ctx,
+		u.String(),
+		filepath.Join(c.LocalDir, c.CircuitsPath, FilenameZKey),
+	); err != nil {
+		return err
+	}
+
+	u, err = url.Parse(c.URL)
+	if err != nil {
+		return err
+	}
+	u.Path = path.Join(u.Path, c.CircuitsPath, FilenameVK)
+	if err := downloadFile(ctx,
+		u.String(),
+		filepath.Join(c.LocalDir, c.CircuitsPath, FilenameVK),
+	); err != nil {
+		return err
+	}
+
+	if err := checkHashes(c); err != nil {
+		return fmt.Errorf("error on download files from %s, %s", c.URL, err)
+	}
+
+	return nil
+}
+
+func downloadFile(ctx context.Context, fromUrl, toPath string) error {
+	out, err := os.Create(toPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", fromUrl, nil)
+	if err != nil {
+		return err
+	}
+	client := http.DefaultClient
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+	return nil
+}
