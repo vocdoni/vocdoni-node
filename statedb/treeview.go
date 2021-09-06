@@ -27,6 +27,38 @@ func (v *databaseViewer) Get(key []byte) ([]byte, error) {
 	return tx.Get(key)
 }
 
+// TreeViewer groups the read-only methods that can be made on a subTree.
+type TreeViewer interface {
+	// NoState returns a read-only key-value database associated with this tree
+	// that doesn't affect the cryptographic integrity of the StateDB.
+	NoState() Viewer
+	// Get returns the value at key in this tree.  `key` is the path of the leaf,
+	// and the returned value is the leaf's value.
+	Get(key []byte) ([]byte, error)
+	// DeepGet allows performing a Get on a nested subTree by passing the list
+	// of tree configurations and the key to get at the last subTree.
+	DeepGet(key []byte, cfgs ...TreeConfig) ([]byte, error)
+	// Iterate iterates over all leafs of this tree.  When callback returns true,
+	// the iteration is stopped and this function returns.
+	Iterate(callback func(key, value []byte) bool) error
+	// Root returns the root of the tree, which cryptographically summarises the
+	// state of the tree.
+	Root() ([]byte, error)
+	// Size returns the number of leafs (key-values) that this tree contains.
+	Size() (uint64, error)
+	// GenProof generates a proof of existence of the given key for this tree.  The
+	// returned values are the leaf value and the proof itself.
+	GenProof(key []byte) ([]byte, []byte, error)
+	// SubTree is used to open the subTree (singleton and non-singleton) as a
+	// TreeView.
+	SubTree(c TreeConfig) (TreeViewer, error)
+	// DeepSubTree allows opening a nested subTree by passing the list of tree
+	// configurations.
+	DeepSubTree(cfgs ...TreeConfig) (TreeViewer, error)
+}
+
+var _ TreeViewer = (*TreeView)(nil)
+
 // TreeView is an opened tree that can only be read.
 type TreeView struct {
 	// db is db.Database where the contents of this TreeView are stored.
@@ -41,7 +73,7 @@ type TreeView struct {
 	// tree is the Arbo merkle tree in this TreeView.
 	tree *tree.Tree
 	// cfg points to this TreeView configuration.
-	cfg *treeConfig
+	cfg TreeConfig
 }
 
 // NoState returns a read-only key-value database associated with this tree
@@ -58,9 +90,18 @@ func (v *TreeView) Get(key []byte) ([]byte, error) {
 	return v.tree.Get(nil, key)
 }
 
-// Iterate iterates over all nodes of this tree.
-func (v *TreeView) Iterate(callback func(key, value []byte) bool) error {
+// IterateNodes iterates over all nodes of this tree.  The key and value are
+// the Arbo database representation of a node, and don't match the key value
+// used in Get, Add and Set.  When callback returns true, the iteration is
+// stopped and this function returns.
+func (v *TreeView) IterateNodes(callback func(key, value []byte) bool) error {
 	return v.tree.Iterate(nil, callback)
+}
+
+// Iterate iterates over all leafs of this tree.  When callback returns true,
+// the iteration is stopped and this function returns.
+func (v *TreeView) Iterate(callback func(key, value []byte) bool) error {
+	return v.tree.IterateLeaves(nil, callback)
 }
 
 // Root returns the root of the tree, which cryptographically summarises the
@@ -86,13 +127,12 @@ func (v *TreeView) Dump() ([]byte, error) {
 	return v.tree.Dump()
 }
 
-// subTree is an internal function used to open the subTree (singleton and
-// non-singleton) as a TreeView.  The treeView.db is created from
-// v.db appending the prefix `subKeySubTree | cfg.prefix`.  In turn
-// the treeView.db uses the db.Database from treeView.db appending the
-// prefix `'/' | subKeyTree`.  The treeView.tree is opened as a snapshot from
-// the root found in its parent leaf
-func (v *TreeView) subTree(cfg *treeConfig) (treeView *TreeView, err error) {
+// SubTree is used to open the subTree (singleton and non-singleton) as a
+// TreeView.  The treeView.db is created from v.db appending the prefix
+// `subKeySubTree | cfg.prefix`.  In turn the treeView.db uses the db.Database
+// from treeView.db appending the prefix `'/' | subKeyTree`.  The treeView.tree
+// is opened as a snapshot from the root found in its parent leaf
+func (v *TreeView) SubTree(cfg TreeConfig) (treeView TreeViewer, err error) {
 	parentLeaf, err := v.tree.Get(nil, cfg.parentLeafKey)
 	if err != nil {
 		return nil, err
@@ -125,14 +165,24 @@ func (v *TreeView) subTree(cfg *treeConfig) (treeView *TreeView, err error) {
 	}, nil
 }
 
-// SubTreeSingle returns a TreeView of a singleton SubTree whose root is stored
-// in the leaf with `cfg.Key()`, and is parametrized by `cfg`.
-func (v *TreeView) SubTreeSingle(c *SubTreeSingleConfig) (*TreeView, error) {
-	return v.subTree(c.treeConfig())
+// DeepSubTree allows opening a nested subTree by passing the list of tree
+// configurations.
+func (v *TreeView) DeepSubTree(cfgs ...TreeConfig) (treeUpdate TreeViewer, err error) {
+	var tree TreeViewer = v
+	for _, cfg := range cfgs {
+		if tree, err = tree.SubTree(cfg); err != nil {
+			return nil, err
+		}
+	}
+	return tree, nil
 }
 
-// SubTree returns a TreeView of a non-singleton SubTree whose root is stored
-// in the leaf with `key`, and is parametrized by `cfg`.
-func (v *TreeView) SubTree(key []byte, c *SubTreeConfig) (*TreeView, error) {
-	return v.subTree(c.treeConfig(key))
+// DeepGet allows performing a Get on a nested subTree by passing the list
+// of tree configurations and the key to get at the last subTree.
+func (v *TreeView) DeepGet(key []byte, cfgs ...TreeConfig) ([]byte, error) {
+	tree, err := v.DeepSubTree(cfgs...)
+	if err != nil {
+		return nil, err
+	}
+	return tree.Get(key)
 }

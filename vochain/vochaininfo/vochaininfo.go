@@ -99,7 +99,7 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 	var n1, n10, n60, n360, n1440, vm int64
 	var a1, a10, a60, a360, a1440 int32
 	var sync bool
-	var oldVoteTreeSize uint64
+	// var oldVoteTreeSize uint64
 	duration = time.Second * time.Duration(sleepSecs)
 	for {
 		select {
@@ -164,13 +164,22 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			vi.avg360 = a360
 			vi.avg1440 = a1440
 			vi.vnode.State.RLock()
-			vi.processTreeSize = vi.vnode.State.Store.Tree(vochain.ProcessTree).Count()
-			vi.voteTreeSize = vi.vnode.State.Store.Tree(vochain.VoteTree).Count()
-			if sleepSecs*vm >= 60 {
-				vi.votesPerMinute = int(vi.voteTreeSize) - int(oldVoteTreeSize)
-				oldVoteTreeSize = vi.voteTreeSize
-				vm = 0
+			var err error
+			vi.processTreeSize, err = vi.vnode.State.CountProcesses(true)
+			if err != nil {
+				log.Errorf("cannot count processes: %s", err)
 			}
+			// NOTE: votes are now stored separately for each
+			// process, so there's no automatic way to get the
+			// total number of votes.  If having this value is
+			// desirable, we can add a counter in the State (stored
+			// in Storage)
+			// vi.voteTreeSize = vi.vnode.State.Store.Tree(vochain.VoteTree).Count()
+			// if sleepSecs*vm >= 60 {
+			// 	vi.votesPerMinute = int(vi.voteTreeSize) - int(oldVoteTreeSize)
+			// 	oldVoteTreeSize = vi.voteTreeSize
+			// 	vm = 0
+			// }
 			vi.voteCacheSize = vi.vnode.State.CacheSize()
 			vi.vnode.State.RUnlock()
 			vi.mempoolSize = vi.vnode.Node.Mempool().Size()

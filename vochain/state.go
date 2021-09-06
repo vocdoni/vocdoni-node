@@ -2,26 +2,153 @@ package vochain
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/cosmos/iavl"
 	"github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru"
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/db/badgerdb"
 	"go.vocdoni.io/dvote/log"
-	statedb "go.vocdoni.io/dvote/statedblegacy"
-	"go.vocdoni.io/dvote/statedblegacy/iavlstate"
+	"go.vocdoni.io/dvote/statedb"
+
 	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
+)
+
+// rootLeafGetRoot is the GetRootFn function for a leaf that is the root
+// itself.
+func rootLeafGetRoot(value []byte) ([]byte, error) {
+	if len(value) != 32 {
+		return nil, fmt.Errorf("len(value) = %v != 32", len(value))
+	}
+	return value, nil
+}
+
+// rootLeafSetRoot is the SetRootFn function for a leaf that is the root
+// itself.
+func rootLeafSetRoot(value []byte, root []byte) ([]byte, error) {
+	if len(value) != 32 {
+		return nil, fmt.Errorf("len(value) = %v != 32", len(value))
+	}
+	return root, nil
+}
+
+// processGetCensusRoot is the GetRootFn function to get the census root of a
+// process leaf.
+func processGetCensusRoot(value []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	return sdbProc.Process.CensusRoot, nil
+}
+
+// processSetCensusRoot is the SetRootFn function to set the census root of a
+// process leaf.
+func processSetCensusRoot(value []byte, root []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	sdbProc.Process.CensusRoot = root
+	newValue, err := proto.Marshal(&sdbProc)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal StateDBProcess: %w", err)
+	}
+	return newValue, nil
+}
+
+// processGetVotesRoot is the GetRootFn function to get the votes root of a
+// process leaf.
+func processGetVotesRoot(value []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	return sdbProc.VotesRoot, nil
+}
+
+// processSetVotesRoot is the SetRootFn function to set the votes root of a
+// process leaf.
+func processSetVotesRoot(value []byte, root []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	sdbProc.VotesRoot = root
+	newValue, err := proto.Marshal(&sdbProc)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal StateDBProcess: %w", err)
+	}
+	return newValue, nil
+}
+
+var (
+	// OraclesCfg is the Oracles subTree configuration.
+	OraclesCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionSha256,
+		KindID:            "oracs",
+		MaxLevels:         256,
+		ParentLeafGetRoot: rootLeafGetRoot,
+		ParentLeafSetRoot: rootLeafSetRoot,
+	})
+
+	// ValidatorsCfg is the Validators subTree configuration.
+	ValidatorsCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionSha256,
+		KindID:            "valids",
+		MaxLevels:         256,
+		ParentLeafGetRoot: rootLeafGetRoot,
+		ParentLeafSetRoot: rootLeafSetRoot,
+	})
+
+	// ProcessesCfg is the Processes subTree configuration.
+	ProcessesCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionSha256,
+		KindID:            "procs",
+		MaxLevels:         256,
+		ParentLeafGetRoot: rootLeafGetRoot,
+		ParentLeafSetRoot: rootLeafSetRoot,
+	})
+
+	// CensusCfg is the Census subTree (found under a Process leaf) configuration
+	// for a process that supports non-anonymous voting with rolling census.
+	CensusCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionSha256,
+		KindID:            "cen",
+		MaxLevels:         256,
+		ParentLeafGetRoot: processGetCensusRoot,
+		ParentLeafSetRoot: processSetCensusRoot,
+	})
+
+	// CensusPoseidonCfg is the Census subTree (found under a Process leaf)
+	// configuration when the process supports anonymous voting with rolling
+	// census.  This Census subTree uses the SNARK friendly hash function Poseidon.
+	CensusPoseidonCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionPoseidon,
+		KindID:            "cenPos",
+		MaxLevels:         64,
+		ParentLeafGetRoot: processGetCensusRoot,
+		ParentLeafSetRoot: processSetCensusRoot,
+	})
+
+	// VotesCfg is the Votes subTree (found under a Process leaf) configuration.
+	VotesCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionSha256,
+		KindID:            "votes",
+		MaxLevels:         256,
+		ParentLeafGetRoot: processGetVotesRoot,
+		ParentLeafSetRoot: processSetVotesRoot,
+	})
 )
 
 // EventListener is an interface used for executing custom functions during the
@@ -58,8 +185,10 @@ func (e ErrHaltVochain) Unwrap() error { return e.reason }
 
 // State represents the state of the vochain application
 type State struct {
-	Store     statedb.StateDB
-	voteCache *lru.Cache
+	Store             *statedb.StateDB
+	Tx                *statedb.TreeTx
+	mainTreeViewValue atomic.Value
+	voteCache         *lru.Cache
 	ImmutableState
 	mempoolRemoveTxKeys func([][32]byte, bool)
 	txCounter           int32
@@ -67,6 +196,13 @@ type State struct {
 	height              uint32
 }
 
+// NOTE(Edu): It is my understanding that all write operations to the State
+// come from processing transaction, which are always processed serially, and
+// thus no thread-safety is required.  The arbo-based StateDB supports
+// concurrent reads to the TreeView while a new transaction is opened and
+// written serially, so there should not be need for this mutex anymore.
+// TODO: Remove the mutex and the locking once we're ready to do integration
+// tests.
 // ImmutableState holds the latest trees version saved on disk
 type ImmutableState struct {
 	// Note that the mutex locks the entirety of the three IAVL trees, both
@@ -78,65 +214,108 @@ type ImmutableState struct {
 // NewState creates a new State
 func NewState(dataDir string) (*State, error) {
 	var err error
-	vs := &State{}
-	if err := initStore(dataDir, vs); err != nil {
-		return nil, fmt.Errorf("cannot init state db: %s", err)
+	sdb, err := initStateDB(dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("cannot init StateDB: %s", err)
 	}
-	// Must be -1 in order to get the last committed block state, if not block replay will fail
-	log.Infof("loading last safe state db version, this could take a while...")
-	if err = vs.Store.LoadVersion(-1); err != nil {
-		if err == iavl.ErrVersionDoesNotExist {
-			// restart data db
-			log.Warnf("no db version available: %s, restarting vochain database", err)
-			if err := os.RemoveAll(dataDir); err != nil {
-				return nil, fmt.Errorf("cannot remove dataDir %w", err)
-			}
-			_ = vs.Store.Close()
-			if err := initStore(dataDir, vs); err != nil {
-				return nil, fmt.Errorf("cannot init db: %w", err)
-			}
-			vs.voteCache, err = lru.New(voteCacheSize)
-			if err != nil {
-				return nil, err
-			}
-			log.Infof("application trees successfully loaded at version %d", vs.Store.Version())
-			return vs, nil
-		}
-		return nil, fmt.Errorf("unknown error loading state db: %w", err)
+	voteCache, err := lru.New(voteCacheSize)
+	if err != nil {
+		return nil, err
 	}
-
-	vs.voteCache, err = lru.New(voteCacheSize)
+	version, err := sdb.Version()
+	if err != nil {
+		return nil, err
+	}
+	root, err := sdb.Hash()
 	if err != nil {
 		return nil, err
 	}
 	log.Infof("state database is ready at version %d with hash %x",
-		vs.Store.Version(), vs.Store.Hash())
-	return vs, nil
+		version, root)
+	tx, err := sdb.BeginTx()
+	if err != nil {
+		return nil, err
+	}
+	mainTreeView, err := sdb.TreeView(nil)
+	if err != nil {
+		return nil, err
+	}
+	s := &State{
+		Store:     sdb,
+		Tx:        tx,
+		voteCache: voteCache,
+	}
+	s.setMainTreeView(mainTreeView)
+	return s, nil
 }
 
-// initStore initializes the state iavl tree
-func initStore(dataDir string, state *State) error {
-	log.Infof("initializing state db store")
-	state.Store = new(iavlstate.IavlState)
-	// state.Store = new(gravitonstate.GravitonState)
-	if err := state.Store.Init(dataDir, "disk"); err != nil {
-		return err
+// initStateDB initializes the StateDB with the default subTrees
+func initStateDB(dataDir string) (*statedb.StateDB, error) {
+	log.Infof("initializing StateDB")
+	db, err := badgerdb.New(badgerdb.Options{Path: dataDir})
+	if err != nil {
+		return nil, err
 	}
+	sdb := statedb.NewStateDB(db)
 	startTime := time.Now()
-	if err := state.Store.AddTree(AppTree); err != nil {
-		return err
+	defer log.Infof("StateDB load took %s", time.Since(startTime))
+	root, err := sdb.Hash()
+	if err != nil {
+		return nil, err
 	}
-	if err := state.Store.AddTree(ProcessTree); err != nil {
-		return err
+	if !bytes.Equal(root, make([]byte, len(root))) {
+		// StateDB already initialized if StateDB.Root != emptyHash
+		return sdb, nil
 	}
-	if err := state.Store.AddTree(VoteTree); err != nil {
-		return err
+	update, err := sdb.BeginTx()
+	defer update.Discard()
+	if err != nil {
+		return nil, err
 	}
-	//	if err := state.Store.AddTree(CensusTree); err != nil {
-	//		return err
-	//	}
-	log.Infof("state tree load took %s", time.Since(startTime))
-	return nil
+	if err := update.Add(OraclesCfg.Key(),
+		make([]byte, OraclesCfg.HashFunc().Len())); err != nil {
+		return nil, err
+	}
+	if err := update.Add(ValidatorsCfg.Key(),
+		make([]byte, ValidatorsCfg.HashFunc().Len())); err != nil {
+		return nil, err
+	}
+	if err := update.Add(ProcessesCfg.Key(),
+		make([]byte, ProcessesCfg.HashFunc().Len())); err != nil {
+		return nil, err
+	}
+	header := models.TendermintHeader{}
+	headerBytes, err := proto.Marshal(&header)
+	if err != nil {
+		return nil, err
+	}
+	if err := update.Add(headerKey, headerBytes); err != nil {
+		return nil, err
+	}
+	return sdb, update.Commit()
+}
+
+// mainTreeView is a thread-safe function to obtain a pointer to the last
+// opened mainTree as a TreeView.
+func (v *State) mainTreeView() *statedb.TreeView {
+	return v.mainTreeViewValue.Load().(*statedb.TreeView)
+}
+
+// setMainTreeView is a thread-safe function to store a pointer to the last
+// opened mainTree as TreeView.
+func (v *State) setMainTreeView(treeView *statedb.TreeView) {
+	v.mainTreeViewValue.Store(treeView)
+}
+
+// mainTreeViewer returns the mainTree as a treeViewer.  When isQuery is false,
+// the mainTree returned is the not yet commited one from the currently open
+// StateDB transaction.  When isQuery is false, the mainTree returned is the
+// last commited version.
+func (v *State) mainTreeViewer(isQuery bool) statedb.TreeViewer {
+	if isQuery {
+		return v.mainTreeView()
+	}
+	return v.Tx.AsTreeView()
 }
 
 // AddEventListener adds a new event listener, to receive method calls on block
@@ -145,92 +324,53 @@ func (v *State) AddEventListener(l EventListener) {
 	v.eventListeners = append(v.eventListeners, l)
 }
 
+var exist = []byte{1}
+
 // AddOracle adds a trusted oracle given its address if not exists
 func (v *State) AddOracle(address common.Address) error {
-	var err error
 	v.Lock()
 	defer v.Unlock()
-	oraclesBytes, err := v.Store.Tree(AppTree).Get(oracleKey)
-	if err != nil {
-		return err
-	}
-	var oracleList models.OracleList
-	if len(oraclesBytes) > 0 {
-		if err = proto.Unmarshal(oraclesBytes, &oracleList); err != nil {
-			return err
-		}
-	}
-	oracles := oracleList.GetOracles()
-	for _, v := range oracles {
-		if bytes.Equal(v, address.Bytes()) {
-			return errors.New("oracle already added")
-		}
-	}
-	oracles = append(oracles, address.Bytes())
-	oracleList.Oracles = oracles
-	newOraclesBytes, err := proto.Marshal(&oracleList)
-	if err != nil {
-		return fmt.Errorf("cannot marshal oracles: (%s)", err)
-	}
-	return v.Store.Tree(AppTree).Add(oracleKey, newOraclesBytes)
+	return v.Tx.DeepSet(address.Bytes(), exist, OraclesCfg)
 }
 
 // RemoveOracle removes a trusted oracle given its address if exists
 func (v *State) RemoveOracle(address common.Address) error {
 	v.Lock()
 	defer v.Unlock()
-	oraclesBytes, err := v.Store.Tree(AppTree).Get(oracleKey)
+	oracles, err := v.Tx.SubTree(OraclesCfg)
 	if err != nil {
 		return err
 	}
-	var oracleList models.OracleList
-
-	if err := proto.Unmarshal(oraclesBytes, &oracleList); err != nil {
+	if _, err := oracles.Get(address.Bytes()); err == arbo.ErrKeyNotFound {
+		return fmt.Errorf("oracle not found: %w", err)
+	} else if err != nil {
 		return err
 	}
-	oracles := oracleList.GetOracles()
-
-	for i, o := range oracles {
-		if bytes.Equal(o, address.Bytes()) {
-			// remove oracle
-			copy(oracles[i:], oracles[i+1:])
-			oracles[len(oracles)-1] = []byte{}
-			oracles = oracles[:len(oracles)-1]
-			oracleList.Oracles = oracles
-			newOraclesBytes, err := proto.Marshal(&oracleList)
-			if err != nil {
-				return fmt.Errorf("cannot marshal oracles: (%s)", err)
-			}
-			return v.Store.Tree(AppTree).Add(oracleKey, newOraclesBytes)
-		}
-	}
-	return fmt.Errorf("oracle not found")
+	return oracles.Set(address.Bytes(), nil)
 }
 
 // Oracles returns the current oracle list
 func (v *State) Oracles(isQuery bool) ([]common.Address, error) {
-	var oraclesBytes []byte
-	var err error
 	v.RLock()
 	defer v.RUnlock()
-	if isQuery {
-		if oraclesBytes, err = v.Store.ImmutableTree(AppTree).Get(oracleKey); err != nil {
-			return nil, err
-		}
-	} else {
-		if oraclesBytes, err = v.Store.Tree(AppTree).Get(oracleKey); err != nil {
-			return nil, err
-		}
-	}
-	var oracleList models.OracleList
-	if err = proto.Unmarshal(oraclesBytes, &oracleList); err != nil {
+
+	oraclesTree, err := v.mainTreeViewer(isQuery).SubTree(OraclesCfg)
+	if err != nil {
 		return nil, err
 	}
+
 	var oracles []common.Address
-	for _, o := range oracleList.GetOracles() {
-		oracles = append(oracles, common.BytesToAddress(o))
+	if err := oraclesTree.Iterate(func(key, value []byte) bool {
+		// removed oracles are still in the tree but with value set to nil
+		if len(value) == 0 {
+			return true
+		}
+		oracles = append(oracles, common.BytesToAddress(key))
+		return true
+	}); err != nil {
+		return nil, err
 	}
-	return oracles, err
+	return oracles, nil
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
@@ -249,85 +389,63 @@ func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
 
 // AddValidator adds a tendemint validator if it is not already added
 func (v *State) AddValidator(validator *models.Validator) error {
-	var err error
 	v.Lock()
 	defer v.Unlock()
-	validatorsBytes, err := v.Store.Tree(AppTree).Get(validatorKey)
+	validatorBytes, err := proto.Marshal(validator)
 	if err != nil {
 		return err
 	}
-	var validatorsList models.ValidatorList
-	if len(validatorsBytes) > 0 {
-		if err = proto.Unmarshal(validatorsBytes, &validatorsList); err != nil {
-			return err
-		}
-	}
-	for _, v := range validatorsList.Validators {
-		if bytes.Equal(v.Address, validator.Address) {
-			return nil
-		}
-	}
-	newVal := &models.Validator{
-		Address: validator.GetAddress(),
-		PubKey:  validator.GetPubKey(),
-		Power:   validator.GetPower(),
-	}
-	validatorsList.Validators = append(validatorsList.Validators, newVal)
-	validatorsBytes, err = proto.Marshal(&validatorsList)
-	if err != nil {
-		return fmt.Errorf("cannot marshal validators: %v", err)
-	}
-	return v.Store.Tree(AppTree).Add(validatorKey, validatorsBytes)
+	return v.Tx.DeepSet(validator.Address, validatorBytes, ValidatorsCfg)
 }
 
 // RemoveValidator removes a tendermint validator identified by its address
 func (v *State) RemoveValidator(address []byte) error {
-	v.RLock()
-	validatorsBytes, err := v.Store.Tree(AppTree).Get(validatorKey)
+	v.Lock()
+	defer v.Unlock()
+	validators, err := v.Tx.SubTree(ValidatorsCfg)
 	if err != nil {
 		return err
 	}
-	v.RUnlock()
-	var validators models.ValidatorList
-	if err := proto.Unmarshal(validatorsBytes, &validators); err != nil {
+	if _, err := validators.Get(address); err == arbo.ErrKeyNotFound {
+		return fmt.Errorf("validator not found: %w", err)
+	} else if err != nil {
 		return err
 	}
-	for i, val := range validators.Validators {
-		if bytes.Equal(val.Address, address) {
-			// remove validator
-			copy(validators.Validators[i:], validators.Validators[i+1:])
-			validators.Validators[len(validators.Validators)-1] = &models.Validator{}
-			validators.Validators = validators.Validators[:len(validators.Validators)-1]
-			validatorsBytes, err := proto.Marshal(&validators)
-			if err != nil {
-				return errors.New("cannot marshal validators")
-			}
-			v.Lock()
-			defer v.Unlock()
-			return v.Store.Tree(AppTree).Add(validatorKey, validatorsBytes)
-		}
-	}
-	return errors.New("validator not found")
+	return validators.Set(address, nil)
 }
 
 // Validators returns a list of the validators saved on persistent storage
 func (v *State) Validators(isQuery bool) ([]*models.Validator, error) {
-	var validatorBytes []byte
-	var err error
 	v.RLock()
-	if isQuery {
-		if validatorBytes, err = v.Store.ImmutableTree(AppTree).Get(validatorKey); err != nil {
-			return nil, err
-		}
-	} else {
-		if validatorBytes, err = v.Store.Tree(AppTree).Get(validatorKey); err != nil {
-			return nil, err
-		}
+	defer v.RUnlock()
+
+	validatorsTree, err := v.mainTreeViewer(isQuery).SubTree(ValidatorsCfg)
+	if err != nil {
+		return nil, err
 	}
-	v.RUnlock()
-	var validators models.ValidatorList
-	err = proto.Unmarshal(validatorBytes, &validators)
-	return validators.Validators, err
+
+	var validators []*models.Validator
+	var callbackErr error
+	if err := validatorsTree.Iterate(func(key, value []byte) bool {
+		// removed validators are still in the tree but with value set
+		// to nil
+		if len(value) == 0 {
+			return true
+		}
+		validator := &models.Validator{}
+		if err := proto.Unmarshal(value, validator); err != nil {
+			callbackErr = err
+			return false
+		}
+		validators = append(validators, validator)
+		return true
+	}); err != nil {
+		return nil, err
+	}
+	if callbackErr != nil {
+		return nil, callbackErr
+	}
+	return validators, nil
 }
 
 // AddProcessKeys adds the keys to the process
@@ -353,7 +471,7 @@ func (v *State) AddProcessKeys(tx *models.AdminTx) error {
 		process.KeyIndex = new(uint32)
 	}
 	*process.KeyIndex++
-	if err := v.setProcess(process, tx.ProcessId); err != nil {
+	if err := v.updateProcess(process, tx.ProcessId); err != nil {
 		return err
 	}
 	for _, l := range v.eventListeners {
@@ -390,7 +508,7 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 			*tx.KeyIndex, tx.ProcessId, tx.EncryptionPrivateKey)
 	}
 	*process.KeyIndex--
-	if err := v.setProcess(process, tx.ProcessId); err != nil {
+	if err := v.updateProcess(process, tx.ProcessId); err != nil {
 		return err
 	}
 	for _, l := range v.eventListeners {
@@ -408,12 +526,21 @@ func (v *State) AddVote(vote *models.Vote) error {
 	}
 	// save block number
 	vote.Height = v.Height()
-	newVoteBytes, err := proto.Marshal(vote)
+	voteBytes, err := proto.Marshal(vote)
 	if err != nil {
-		return fmt.Errorf("cannot marshal vote")
+		return fmt.Errorf("cannot marshal vote: %w", err)
+	}
+	sdbVote := models.StateDBVote{
+		VoteHash:  ethereum.HashRaw(voteBytes),
+		ProcessId: vote.ProcessId,
+		Nullifier: vote.Nullifier,
+	}
+	sdbVoteBytes, err := proto.Marshal(&sdbVote)
+	if err != nil {
+		return fmt.Errorf("cannot marshal sdbVote: %w", err)
 	}
 	v.Lock()
-	err = v.Store.Tree(VoteTree).Add(vid, ethereum.HashRaw(newVoteBytes))
+	err = v.Tx.DeepAdd(vid, sdbVoteBytes, ProcessesCfg, VotesCfg.WithKey(vote.ProcessId))
 	v.Unlock()
 	if err != nil {
 		return err
@@ -424,7 +551,9 @@ func (v *State) AddVote(vote *models.Vote) error {
 	return nil
 }
 
-// voteID = byte( processID+nullifier )
+// NOTE(Edu): Changed this from byte(processID+nullifier) to
+// hash(processID+nullifier) to allow using it as a key in Arbo tree.
+// voteID = hash(processID+nullifier)
 func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 	if len(pid) != types.ProcessIDsize {
 		return nil, fmt.Errorf("wrong processID size %d", len(pid))
@@ -432,42 +561,38 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 	if len(nullifier) != types.VoteNullifierSize {
 		return nil, fmt.Errorf("wrong nullifier size %d", len(nullifier))
 	}
-	vid := bytes.Buffer{}
+	vid := sha256.New()
 	vid.Write(pid)
 	vid.Write(nullifier)
-	return vid.Bytes(), nil
+	return vid.Sum(nil), nil
 }
 
 // Envelope returns the hash of a stored vote if exists.
 func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ []byte, err error) {
-	// TODO(mvdan): remove the recover once
-	// https://github.com/tendermint/iavl/issues/212 is fixed
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("recovered panic: %v", r)
-		}
-	}()
-
-	var voteHash []byte
 	vid, err := v.voteID(processID, nullifier)
 	if err != nil {
 		return nil, err
 	}
 	v.RLock()
 	defer v.RUnlock() // needs to be deferred due to the recover above
-	if isQuery {
-		if voteHash, err = v.Store.ImmutableTree(VoteTree).Get(vid); err != nil {
-			return nil, err
-		}
-	} else {
-		if voteHash, err = v.Store.Tree(VoteTree).Get(vid); err != nil {
-			return nil, err
-		}
+	votesTree, err := v.mainTreeViewer(isQuery).DeepSubTree(
+		ProcessesCfg, VotesCfg.WithKey(processID))
+	if err == arbo.ErrKeyNotFound {
+		return nil, ErrProcessNotFound
+	} else if err != nil {
+		return nil, err
 	}
-	if voteHash == nil {
+	sdbVoteBytes, err := votesTree.Get(vid)
+	if err == arbo.ErrKeyNotFound {
 		return nil, ErrVoteDoesNotExist
+	} else if err != nil {
+		return nil, err
 	}
-	return voteHash, nil
+	var sdbVote models.StateDBVote
+	if err := proto.Unmarshal(sdbVoteBytes, &sdbVote); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal sdbVote: %w", err)
+	}
+	return sdbVote.VoteHash, nil
 }
 
 // EnvelopeExists returns true if the envelope identified with voteID exists
@@ -482,24 +607,39 @@ func (v *State) EnvelopeExists(processID, nullifier []byte, isQuery bool) (bool,
 	return e != nil, nil
 }
 
-// iterateProcessID iterates fn over state tree entries with the processID prefix.
+// iterateVotes iterates fn over state tree entries with the processID prefix.
 // if isQuery, the IAVL tree is used, otherwise the AVL tree is used.
-func (v *State) iterateProcessID(processID []byte,
-	fn func(key []byte, value []byte) bool, isQuery bool) bool {
+func (v *State) iterateVotes(processID []byte,
+	fn func(vid []byte, sdbVote *models.StateDBVote) bool, isQuery bool) error {
 	v.RLock()
 	defer v.RUnlock()
-	if isQuery {
-		v.Store.ImmutableTree(VoteTree).Iterate(processID, fn)
-	} else {
-		v.Store.Tree(VoteTree).Iterate(processID, fn)
+	votesTree, err := v.mainTreeViewer(isQuery).DeepSubTree(
+		ProcessesCfg, VotesCfg.WithKey(processID))
+	if err != nil {
+		return err
 	}
-	return true
+	var callbackErr error
+	if err := votesTree.Iterate(func(key, value []byte) bool {
+		var sdbVote models.StateDBVote
+		if err := proto.Unmarshal(value, &sdbVote); err != nil {
+			callbackErr = err
+			return true
+		}
+		return fn(key, &sdbVote)
+	}); err != nil {
+		return err
+	}
+	if callbackErr != nil {
+		return callbackErr
+	}
+	return nil
 }
 
 // CountVotes returns the number of votes registered for a given process id
 func (v *State) CountVotes(processID []byte, isQuery bool) uint32 {
 	var count uint32
-	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
+	// TODO: Once statedb.TreeView.Size() works, replace this by that.
+	v.iterateVotes(processID, func(vid []byte, sdbVote *models.StateDBVote) bool {
 		count++
 		return false
 	}, isQuery)
@@ -509,22 +649,13 @@ func (v *State) CountVotes(processID []byte, isQuery bool) uint32 {
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
 func (v *State) EnvelopeList(processID []byte, from, listSize int,
 	isQuery bool) (nullifiers [][]byte) {
-	// TODO(mvdan): remove the recover once
-	// https://github.com/tendermint/iavl/issues/212 is fixed
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorf("recovered panic: %v", r)
-			// TODO(mvdan): this func should return an error instead
-			// err = fmt.Errorf("recovered panic: %v", r)
-		}
-	}()
 	idx := 0
-	v.iterateProcessID(processID, func(key []byte, value []byte) bool {
+	v.iterateVotes(processID, func(vid []byte, sdbVote *models.StateDBVote) bool {
 		if idx >= from+listSize {
 			return true
 		}
 		if idx >= from {
-			nullifiers = append(nullifiers, key[32:])
+			nullifiers = append(nullifiers, sdbVote.Nullifier)
 		}
 		idx++
 		return false
@@ -534,77 +665,52 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int,
 
 // Header returns the blockchain last block committed height
 func (v *State) Header(isQuery bool) *models.TendermintHeader {
-	var headerBytes []byte
 	v.RLock()
-	if isQuery {
-		var err error
-		if headerBytes, err = v.Store.ImmutableTree(AppTree).Get(headerKey); err != nil {
-			log.Errorf("cannot get vochain height: %s", err)
-			return nil
-		}
-	} else {
-		var err error
-		if headerBytes, err = v.Store.Tree(AppTree).Get(headerKey); err != nil {
-			log.Errorf("cannot get vochain height: %s", err)
-			return nil
-		}
-	}
+	headerBytes, err := v.mainTreeViewer(isQuery).Get(headerKey)
 	v.RUnlock()
-	var header models.TendermintHeader
-	err := proto.Unmarshal(headerBytes, &header)
 	if err != nil {
-		log.Errorf("cannot get vochain height: %s", err)
-		return nil
+		log.Fatalf("cannot get headerKey from mainTree: %s", err)
+	}
+	var header models.TendermintHeader
+	if err := proto.Unmarshal(headerBytes, &header); err != nil {
+		log.Fatalf("cannot get proto.Unmarshal header: %s", err)
 	}
 	return &header
 }
 
-// AppHash returns last hash of the application
-func (v *State) AppHash(isQuery bool) []byte {
-	var headerBytes []byte
-	v.RLock()
-	if isQuery {
-		var err error
-		if headerBytes, err = v.Store.ImmutableTree(AppTree).Get(headerKey); err != nil {
-			return []byte{}
-		}
-	} else {
-		var err error
-		if headerBytes, err = v.Store.Tree(AppTree).Get(headerKey); err != nil {
-			return []byte{}
-		}
-	}
-	v.RUnlock()
-	var header models.TendermintHeader
-	err := proto.Unmarshal(headerBytes, &header)
-	if err != nil {
-		return []byte{}
-	}
-	return header.AppHash
-}
-
 // Save persistent save of vochain mem trees
-func (v *State) Save() []byte {
+func (v *State) Save() ([]byte, error) {
 	v.Lock()
-	hash, err := v.Store.Commit()
-	if err != nil {
-		panic(fmt.Sprintf("cannot commit state trees: (%v)", err))
-	}
-	v.Unlock()
-	if h := v.Header(false); h != nil {
-		height := uint32(h.Height)
-		for _, l := range v.eventListeners {
-			err := l.Commit(height)
-			if err != nil {
-				if _, fatal := err.(ErrHaltVochain); fatal {
-					panic(err)
-				}
-				log.Warnf("event callback error on commit: %v", err)
-			}
+	err := func() error {
+		if err := v.Tx.Commit(); err != nil {
+			return fmt.Errorf("cannot commit statedb tx: %w", err)
 		}
-		atomic.StoreUint32(&v.height, height)
+		var err error
+		if v.Tx, err = v.Store.BeginTx(); err != nil {
+			return fmt.Errorf("cannot begin statedb tx: %w", err)
+		}
+		return nil
+	}()
+	v.Unlock()
+	if err != nil {
+		return nil, err
 	}
-	return hash
+	mainTreeView, err := v.Store.TreeView(nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get statdeb mainTreeView: %w", err)
+	}
+	v.setMainTreeView(mainTreeView)
+	height := uint32(v.Header(false).Height)
+	for _, l := range v.eventListeners {
+		if err := l.Commit(height); err != nil {
+			if _, fatal := err.(ErrHaltVochain); fatal {
+				return nil, err
+			}
+			log.Warnf("event callback error on commit: %v", err)
+		}
+	}
+	atomic.StoreUint32(&v.height, height)
+	return v.Store.Hash()
 }
 
 // Rollback rollbacks to the last persistent db data version
@@ -614,8 +720,10 @@ func (v *State) Rollback() {
 	}
 	v.Lock()
 	defer v.Unlock()
-	if err := v.Store.Rollback(); err != nil {
-		panic(fmt.Sprintf("cannot rollback state tree: (%s)", err))
+	v.Tx.Discard()
+	var err error
+	if v.Tx, err = v.Store.BeginTx(); err != nil {
+		log.Fatalf("cannot begin statedb tx: %s", err)
 	}
 	atomic.StoreInt32(&v.txCounter, 0)
 }
@@ -625,12 +733,15 @@ func (v *State) Height() uint32 {
 	return atomic.LoadUint32(&v.height)
 }
 
-// WorkingHash returns the hash of the vochain trees censusRoots
-// hash(appTree+processTree+voteTree)
+// WorkingHash returns the hash of the vochain StateDB (mainTree.Root)
 func (v *State) WorkingHash() []byte {
 	v.RLock()
 	defer v.RUnlock()
-	return v.Store.Hash()
+	hash, err := v.Tx.Root()
+	if err != nil {
+		panic(fmt.Sprintf("cannot get statedb mainTree root: %s", err))
+	}
+	return hash
 }
 
 // TxCounterAdd adds to the atomic transaction counter

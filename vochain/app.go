@@ -209,17 +209,12 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	log.Infof("tendermint Core version: %s", req.Version)
 	log.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
 	log.Infof("tendermint Block protocol version: %d", req.BlockVersion)
-	var height int64
 	header := app.State.Header(false)
-	if header != nil {
-		height = header.Height
-	}
-	app.State.Rollback()
-	hash := app.State.AppHash(false)
-	log.Infof("replaying blocks. Current height %d, current APP hash %x", height, hash)
+	log.Infof("replaying blocks. Current height %d, current APP hash %x",
+		header.Height, header.AppHash)
 	return abcitypes.ResponseInfo{
-		LastBlockHeight:  height,
-		LastBlockAppHash: hash,
+		LastBlockHeight:  header.Height,
+		LastBlockAppHash: header.AppHash,
 	}
 }
 
@@ -268,11 +263,14 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		log.Fatalf("cannot marshal header: %s", err)
 	}
 	app.State.Lock()
-	if err = app.State.Store.Tree(AppTree).Add(headerKey, headerBytes); err != nil {
+	if err := app.State.Tx.Set(headerKey, headerBytes); err != nil {
 		log.Fatal(err)
 	}
 	app.State.Unlock()
-	app.State.Save() // Is this save needed?
+	// Is this save needed?
+	if _, err := app.State.Save(); err != nil {
+		log.Fatalf("cannot save state: %s", err)
+	}
 	// TBD: using empty list here, should return validatorsUpdate to use the validators obtained here
 	return abcitypes.ResponseInitChain{}
 }
@@ -300,7 +298,7 @@ func (app *BaseApplication) BeginBlock(
 	// reset app state to latest persistent data
 	app.State.Rollback()
 	app.State.Lock()
-	if err = app.State.Store.Tree(AppTree).Add(headerKey, headerBytes); err != nil {
+	if err = app.State.Tx.Set(headerKey, headerBytes); err != nil {
 		log.Fatal(err)
 	}
 	app.State.Unlock()
@@ -361,8 +359,12 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 
 // Commit saves the current vochain state and returns a commit hash
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
+	data, err := app.State.Save()
+	if err != nil {
+		log.Fatalf("cannot save state: %s", err)
+	}
 	return abcitypes.ResponseCommit{
-		Data: app.State.Save(),
+		Data: data,
 	}
 }
 
