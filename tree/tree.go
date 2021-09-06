@@ -139,6 +139,8 @@ func (t *Tree) AddBatch(wTx db.WriteTx, keys, values [][]byte) ([]int, error) {
 	return i, nil
 }
 
+// Iterate over all the database-encoded nodes of the tree.  When callback
+// returns true, the iteration is stopped and this function returns.
 func (t *Tree) Iterate(rTx db.ReadTx, callback func(key, value []byte) bool) error {
 	if rTx == nil {
 		rTx = t.DB().ReadTx()
@@ -152,6 +154,18 @@ func (t *Tree) Iterate(rTx db.ReadTx, callback func(key, value []byte) bool) err
 		return err
 	}
 	return t.tree.IterateWithStopWithTx(rTx, root, callbackWrapper)
+}
+
+// ItrateLeaves iterates over all leafs of the tree.  When callback returns true,
+// the iteration is stopped and this function returns.
+func (t *Tree) IterateLeaves(rTx db.ReadTx, callback func(key, value []byte) bool) error {
+	return t.Iterate(rTx, func(key, value []byte) bool {
+		if value[0] != arbo.PrefixValueLeaf {
+			return false
+		}
+		leafK, leafV := arbo.ReadLeafValue(value)
+		return callback(leafK, leafV)
+	})
 }
 
 // Root returns the current root.

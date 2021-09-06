@@ -32,9 +32,9 @@ var (
 		common.HexToAddress("06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0"),
 	}
 
-	// VoteHardcoded needs to be a constructor, since multiple tests will
+	// NewVoteHardcoded needs to be a constructor, since multiple tests will
 	// modify its value. We need a different pointer for each test.
-	VoteHardcoded = func() *models.Vote {
+	NewVoteHardcoded = func() *models.Vote {
 		vp, _ := base64.StdEncoding.DecodeString("eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19")
 		return &models.Vote{
 			ProcessId:   testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
@@ -53,6 +53,11 @@ var (
 		Mode:         &models.ProcessMode{},
 		Status:       models.ProcessStatus_READY,
 		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+	}
+
+	StateDBProcessHardcoded = &models.StateDBProcess{
+		Process:   ProcessHardcoded,
+		VotesRoot: make([]byte, 32),
 	}
 
 	// privKey e0aa6db5a833531da4d259fb5df210bae481b276dc4c2ab6ab9771569375aed5 for address 06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0
@@ -151,11 +156,14 @@ func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 		tb.Fatal(err)
 	}
 	// add process
-	processBytes, err := proto.Marshal(ProcessHardcoded)
+	processBytes, err := proto.Marshal(StateDBProcessHardcoded)
 	if err != nil {
 		tb.Fatal(err)
 	}
-	if err = s.Store.Tree(vochain.ProcessTree).Add(testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), processBytes); err != nil {
+	if err = s.Tx.DeepSet(
+		testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+		processBytes,
+		vochain.ProcessesCfg); err != nil {
 		tb.Fatal(err)
 	}
 	return s

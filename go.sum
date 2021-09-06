@@ -1969,6 +1969,8 @@ github.com/viant/toolbox v0.24.0/go.mod h1:OxMCG57V0PXuIP2HNQrtJf2CjqdmbrOx5EkMI
 github.com/vocdoni/arbo v0.0.0-20210616072504-a8c7ea980892/go.mod h1:Pikn2YIz/Rt05HWs35QHdpx7IWk4E2G0KdnCX+KRsNs=
 github.com/vocdoni/arbo v0.0.0-20210831141531-de5914f453cf h1:8hZXnUdi3v6hsarvQ6Qv7b0+j8UaqBrfLlKvn6JpNSI=
 github.com/vocdoni/arbo v0.0.0-20210831141531-de5914f453cf/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
+github.com/vocdoni/arbo v0.0.0-20210909102959-f09b0b039255 h1:Gabst/0jIl3CgiywQWS5VpWsqaPuBwz0XAuMws5Pcyw=
+github.com/vocdoni/arbo v0.0.0-20210909102959-f09b0b039255/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f h1:z7CK3k1yIutKycPY8s2ZbtwUBKMy3xPcLMh12QukLRY=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f/go.mod h1:BoN7UMTA/JcgmNPaoUQq6RwuixhgSrk5PmCMVMKLxpc=
 github.com/vocdoni/blind-ca v0.1.4/go.mod h1:4ouWDqlvXrrNS0Csf3hKA3cuDTmKh6nP7kSXF39nT4s=
@@ -2102,8 +2104,11 @@ go.vocdoni.io/dvote v1.0.4-0.20210806163627-9494efbc5382/go.mod h1:kl66EQmAjR252
 go.vocdoni.io/proto v0.1.7/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v0.1.8/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v0.1.9-0.20210304214308-6f7363b52750/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
-go.vocdoni.io/proto v1.0.4-0.20210726091234-bceaf416353b h1:Xcc4GRtegTWKCwn2VKQTATrkmhy9f+Ju5teULJCRYg0=
 go.vocdoni.io/proto v1.0.4-0.20210726091234-bceaf416353b/go.mod h1:QV3gKc9Zf0xHW3o8wEaqSn8iZ94UTl8gOzekxoz3kWs=
+go.vocdoni.io/proto v1.0.4-0.20210909161946-f3158498ba88 h1:EJnuknmHjwPQL44d5TVOZJhzVA4oFzZT41etyaRervk=
+go.vocdoni.io/proto v1.0.4-0.20210909161946-f3158498ba88/go.mod h1:QV3gKc9Zf0xHW3o8wEaqSn8iZ94UTl8gOzekxoz3kWs=
+go.vocdoni.io/proto v1.0.4-0.20210910085433-e7c056b7c23a h1:7QimTKlkCY0O5KRFi0ejafFkLQze7zN0qOE/BuZosbE=
+go.vocdoni.io/proto v1.0.4-0.20210910085433-e7c056b7c23a/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
 go4.org v0.0.0-20180809161055-417644f6feb5/go.mod h1:MkTOUMDaeVYJUOUsaDXIhWPZYa1yOyC1qaOBpL57BhE=
 go4.org v0.0.0-20200411211856-f5505b9728dd h1:BNJlw5kRTzdmyfh5U8F93HA2OwkP7ZGwA51eJ/0wKOU=
 go4.org v0.0.0-20200411211856-f5505b9728dd/go.mod h1:CIiUVy99QCPfoE13bO4EZaz5GZMZXMSBGhxRdsvzbkg=

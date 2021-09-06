@@ -48,7 +48,7 @@ type TreeUpdate struct {
 	// corresponding parent leafs up to the mainTree.
 	openSubs map[string]*TreeUpdate
 	// cfg points to this TreeUpdate configuration.
-	cfg *treeConfig
+	cfg TreeConfig
 }
 
 // Get returns the value at key in this tree.  `key` is the path of the leaf,
@@ -57,9 +57,17 @@ func (u *TreeUpdate) Get(key []byte) ([]byte, error) {
 	return u.tree.Get(u.tree.tx, key)
 }
 
-// Iterate iterates over all nodes of this tree.
-func (u *TreeUpdate) Iterate(callback func(key, value []byte) bool) error {
+// IterateNodes iterates over all nodes of this tree.  The key and value are
+// the Arbo database representation of a node, and don't match the key value
+// used in Get, Add and Set.
+func (u *TreeUpdate) IterateNodes(callback func(key, value []byte) bool) error {
 	return u.tree.Iterate(u.tree.tx, callback)
+}
+
+// Iterate iterates over all leafs of this tree.  When callback returns true,
+// the iteration is stopped and this function returns.
+func (u *TreeUpdate) Iterate(callback func(key, value []byte) bool) error {
+	return u.tree.IterateLeaves(u.tree.tx, callback)
 }
 
 // Root returns the root of the tree, which cryptographically summarises the
@@ -106,12 +114,11 @@ func (u *TreeUpdate) Set(key, value []byte) error {
 	return u.tree.Set(u.tree.tx, key, value)
 }
 
-// subTree is an internal function used to open the subTree (singleton and
-// non-singleton) as a TreeUpdate.  The treeUpdate.tx is created from
-// u.tx appending the prefix `subKeySubTree | cfg.prefix`.  In turn
-// the treeUpdate.tree uses the db.WriteTx from treeUpdate.tx appending the
-// prefix `'/' | subKeyTree`.
-func (u *TreeUpdate) subTree(cfg *treeConfig) (treeUpdate *TreeUpdate, err error) {
+// SubTree is used to open the subTree (singleton and non-singleton) as a
+// TreeUpdate.  The treeUpdate.tx is created from u.tx appending the prefix
+// `subKeySubTree | cfg.prefix`.  In turn the treeUpdate.tree uses the
+// db.WriteTx from treeUpdate.tx appending the prefix `'/' | subKeyTree`.
+func (u *TreeUpdate) SubTree(cfg TreeConfig) (treeUpdate *TreeUpdate, err error) {
 	if treeUpdate, ok := u.openSubs[string(cfg.prefix)]; ok {
 		return treeUpdate, nil
 	}
@@ -140,16 +147,46 @@ func (u *TreeUpdate) subTree(cfg *treeConfig) (treeUpdate *TreeUpdate, err error
 	return treeUpdate, nil
 }
 
-// SubTreeSingle returns a TreeUpdate of a singleton SubTree whose root is stored
-// in the leaf with `cfg.Key()`, and is parametrized by `cfg`.
-func (u *TreeUpdate) SubTreeSingle(cfg *SubTreeSingleConfig) (*TreeUpdate, error) {
-	return u.subTree(cfg.treeConfig())
+// DeepSubTree allows opening a nested subTree by passing the list of tree
+// configurations.
+func (u *TreeUpdate) DeepSubTree(cfgs ...TreeConfig) (treeUpdate *TreeUpdate, err error) {
+	tree := u
+	for _, cfg := range cfgs {
+		if tree, err = tree.SubTree(cfg); err != nil {
+			return nil, err
+		}
+	}
+	return tree, nil
 }
 
-// SubTree returns a TreeUpdate of a non-singleton SubTree whose root is stored
-// in the leaf with `key`, and is parametrized by `cfg`.
-func (u *TreeUpdate) SubTree(key []byte, cfg *SubTreeConfig) (*TreeUpdate, error) {
-	return u.subTree(cfg.treeConfig(key))
+// DeepGet allows performing a Get on a nested subTree by passing the list
+// of tree configurations and the key to get at the last subTree.
+func (u *TreeUpdate) DeepGet(key []byte, cfgs ...TreeConfig) ([]byte, error) {
+	tree, err := u.DeepSubTree(cfgs...)
+	if err != nil {
+		return nil, err
+	}
+	return tree.Get(key)
+}
+
+// DeepAdd allows performing an Add on a nested subTree by passing the list
+// of tree configurations and the key, value to add on the last subTree.
+func (u *TreeUpdate) DeepAdd(key, value []byte, cfgs ...TreeConfig) error {
+	tree, err := u.DeepSubTree(cfgs...)
+	if err != nil {
+		return err
+	}
+	return tree.Add(key, value)
+}
+
+// DeepSet allows performing a Set on a nested subTree by passing the list
+// of tree configurations and the key, value to set on the last subTree.
+func (u *TreeUpdate) DeepSet(key, value []byte, cfgs ...TreeConfig) error {
+	tree, err := u.DeepSubTree(cfgs...)
+	if err != nil {
+		return err
+	}
+	return tree.Set(key, value)
 }
 
 // TreeTx is a wrapper over TreeUpdate that includes the Commit and Discard
@@ -261,4 +298,58 @@ func (t *TreeTx) Commit() error {
 // Discard, the TreeTx shouldn't no longer be used.
 func (t *TreeTx) Discard() {
 	t.tx.Discard()
+}
+
+// treeUpdateView is a wrapper over TreeUpdate that fulfills the TreeViewer
+// interface.
+type treeUpdateView TreeUpdate
+
+// NoState implements the TreeViewer.NoState method.
+func (v *treeUpdateView) NoState() Viewer {
+	return (*TreeUpdate)(v).NoState()
+}
+
+// SubTree implements the TreeViewer.SubTree method.
+func (v *treeUpdateView) SubTree(c TreeConfig) (TreeViewer, error) {
+	tu, err := (*TreeUpdate)(v).SubTree(c)
+	return (*treeUpdateView)(tu), err
+}
+
+// DeepSubTree implements the TreeViewer.DeepSubTree method.
+func (v *treeUpdateView) DeepSubTree(cfgs ...TreeConfig) (TreeViewer, error) {
+	tu, err := (*TreeUpdate)(v).DeepSubTree(cfgs...)
+	return (*treeUpdateView)(tu), err
+}
+
+// Get implements the TreeViewer.Get method.
+func (v *treeUpdateView) Get(key []byte) ([]byte, error) { return (*TreeUpdate)(v).Get(key) }
+
+// DeepGet implements the TreeViewer.DeepGet method.
+func (v *treeUpdateView) DeepGet(key []byte, cfgs ...TreeConfig) ([]byte, error) {
+	return (*TreeUpdate)(v).DeepGet(key, cfgs...)
+}
+
+// Iterate implements the TreeViewer.Iterate method.
+func (v *treeUpdateView) Iterate(callback func(key, value []byte) bool) error {
+	return (*TreeUpdate)(v).Iterate(callback)
+}
+
+// Root implements the TreeViewer.Root method.
+func (v *treeUpdateView) Root() ([]byte, error) { return (*TreeUpdate)(v).Root() }
+
+// Size implements the TreeViewer.Size method.
+func (v *treeUpdateView) Size() (uint64, error) { return (*TreeUpdate)(v).Size() }
+
+// GenProof implements the TreeViewer.GenProof method.
+func (v *treeUpdateView) GenProof(key []byte) ([]byte, []byte, error) {
+	return (*TreeUpdate)(v).GenProof(key)
+}
+
+// verify that treeUpdateView fulfills the TreeViewer interface.
+var _ TreeViewer = (*treeUpdateView)(nil)
+
+// AsTreeView returns a read-only view of this subTree that fulfills the
+// TreeViewer interface.
+func (u *TreeUpdate) AsTreeView() TreeViewer {
+	return (*treeUpdateView)(u)
 }

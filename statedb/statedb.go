@@ -95,13 +95,6 @@ func subReadTx(tx db.ReadTx, path string) db.ReadTx {
 	return prefixeddb.NewPrefixedReadTx(tx, []byte(path+"/"))
 }
 
-// treeConfig is a unified configuration for a subTree.
-type treeConfig struct {
-	parentLeafKey []byte
-	prefix        string
-	*SubTreeConfig
-}
-
 // GetRootFn is a function type that takes a leaf value and returns the contained root.
 type GetRootFn func(value []byte) ([]byte, error)
 
@@ -109,8 +102,28 @@ type GetRootFn func(value []byte) ([]byte, error)
 // leaf value with the new root and returns it.
 type SetRootFn func(value []byte, root []byte) ([]byte, error)
 
-// SubTreeConfig
-type SubTreeConfig struct {
+// TreeParams are the parameters used in the constructor for a tree configuration.
+type TreeParams struct {
+	// HashFunc is the hash function used in the merkle tree
+	HashFunc arbo.HashFunction
+	// KindID is a unique identifier that specifies what kind of tree this
+	// is.  Diferent kind of trees under the same parent tree must have
+	// different KindIDs, as this parameter is used to build a disjoint
+	// database prefix for each subTree under the same parent tree.
+	KindID string
+	// MaxLevels is the maximum number of merkle tree levels allowed.
+	MaxLevels int
+	// ParentLeafGetRoot is the function that takes a leaf value of the
+	// parent at which this tree hangs, and returns the root of this tree.
+	ParentLeafGetRoot GetRootFn
+	// ParentLeafSetRoot is the function that takes a leaf value of the
+	// parent at which this tree hangs, and updates it (returning it) with
+	// the new root of this tree.
+	ParentLeafSetRoot SetRootFn
+}
+
+// TreeNonSingletonConfig contains the configuration used for a non-singleton subTree.
+type TreeNonSingletonConfig struct {
 	hashFunc          arbo.HashFunction
 	kindID            string
 	parentLeafGetRoot GetRootFn
@@ -118,61 +131,70 @@ type SubTreeConfig struct {
 	maxLevels         int
 }
 
-// SubTreeSingleConfig contains the configuration used for a non-singleton subTree.
-func NewSubTreeConfig(hashFunc arbo.HashFunction, kindID string, maxLevels int,
-	parentLeafGetRoot GetRootFn, parentLeafSetRoot SetRootFn) *SubTreeConfig {
-	return &SubTreeConfig{
-		hashFunc:          hashFunc,
-		kindID:            kindID,
-		parentLeafGetRoot: parentLeafGetRoot,
-		parentLeafSetRoot: parentLeafSetRoot,
-		maxLevels:         maxLevels,
+// NewTreeNonSingletonConfig creates a new configuration for a non-singleton subTree.
+func NewTreeNonSingletonConfig(params TreeParams) *TreeNonSingletonConfig {
+	return &TreeNonSingletonConfig{
+		hashFunc:          params.HashFunc,
+		kindID:            params.KindID,
+		parentLeafGetRoot: params.ParentLeafGetRoot,
+		parentLeafSetRoot: params.ParentLeafSetRoot,
+		maxLevels:         params.MaxLevels,
 	}
 }
 
-// treeConfig returns a unified configuration type for opening a singleton
-// subTree that is identified by `id`.  `id` is the path in the parent tree to
-// the leaf that contains the subTree root.
-func (c *SubTreeConfig) treeConfig(id []byte) *treeConfig {
-	return &treeConfig{
-		parentLeafKey: id,
-		prefix:        c.kindID + string(id),
-		SubTreeConfig: c,
+// HashFunc returns the hashFunc set for this SubTreeConfig
+func (c *TreeNonSingletonConfig) HashFunc() arbo.HashFunction {
+	return c.hashFunc
+}
+
+// WithKey returns a unified subTree configuration type for opening a singleton
+// subTree that is identified by `key`.  `key` is the path in the parent tree
+// to the leaf that contains the subTree root.
+func (c *TreeNonSingletonConfig) WithKey(key []byte) TreeConfig {
+	return TreeConfig{
+		parentLeafKey:          key,
+		prefix:                 c.kindID + string(key),
+		TreeNonSingletonConfig: c,
 	}
 }
 
-// SubTreeSingleConfig contains the configuration used for a singleton subTree.
-type SubTreeSingleConfig struct {
-	*SubTreeConfig
+// TreeConfig contains the configuration used for a subTree.
+type TreeConfig struct {
+	parentLeafKey []byte
+	prefix        string
+	*TreeNonSingletonConfig
 }
 
-// NewSubTreeSingleConfig creates a new SubTreeSingleConfig.
-func NewSubTreeSingleConfig(hashFunc arbo.HashFunction, kindID string, maxLevels int,
-	parentLeafGetRoot GetRootFn, parentLeafSetRoot SetRootFn) *SubTreeSingleConfig {
-	return &SubTreeSingleConfig{
-		NewSubTreeConfig(hashFunc, kindID, maxLevels, parentLeafGetRoot, parentLeafSetRoot),
+// NewTreeSingletonConfig creates a new configuration for a singleton subTree.
+func NewTreeSingletonConfig(params TreeParams) TreeConfig {
+	return TreeConfig{
+		parentLeafKey:          []byte(params.KindID),
+		prefix:                 params.KindID,
+		TreeNonSingletonConfig: NewTreeNonSingletonConfig(params),
 	}
 }
 
 // Key returns the key used in the parent tree in which the value that contains
 // the subTree root is stored.  The key is the path of the parent leaf with the root.
-func (c *SubTreeSingleConfig) Key() []byte {
+func (c *TreeConfig) Key() []byte {
 	return []byte(c.kindID)
 }
 
-// treeConfig returns a unified configuration type for opening a subTree.
-func (c *SubTreeSingleConfig) treeConfig() *treeConfig {
-	return &treeConfig{
-		parentLeafKey: []byte(c.kindID),
-		prefix:        c.kindID,
-		SubTreeConfig: c.SubTreeConfig,
-	}
+// HashFunc returns the hashFunc set for this SubTreeSingleConfig
+func (c *TreeConfig) HashFunc() arbo.HashFunction {
+	return c.hashFunc
 }
 
 // mainTreeCfg is the subTree configuration of the mainTree.  It doesn't have a
 // kindID because it's the top level tree.  For the same reason, it doesn't
 // contain functions to work with the parent leaf: it doesn't have a parent.
-var mainTreeCfg = NewSubTreeSingleConfig(arbo.HashFunctionSha256, "", 256, nil, nil).treeConfig()
+var mainTreeCfg = NewTreeSingletonConfig(TreeParams{
+	HashFunc:          arbo.HashFunctionSha256,
+	KindID:            "",
+	MaxLevels:         256,
+	ParentLeafGetRoot: nil,
+	ParentLeafSetRoot: nil,
+})
 
 // StateDB is a database backed structure that holds a dynamic hierarchy of
 // linked merkle trees with the property that the keys and values of all merkle

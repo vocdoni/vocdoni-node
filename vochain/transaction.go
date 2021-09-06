@@ -35,7 +35,7 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 		return v.Nullifier, nil
 	case *models.Tx_Admin:
 		if err := AdminTxCheck(vtx, txBytes, signature, state); err != nil {
-			return []byte{}, fmt.Errorf("adminTxChek: %w", err)
+			return []byte{}, fmt.Errorf("adminTxCheck: %w", err)
 		}
 		tx := vtx.GetAdmin()
 		if commit {

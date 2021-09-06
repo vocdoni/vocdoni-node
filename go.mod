@@ -48,11 +48,11 @@ require (
 	github.com/tendermint/tendermint v0.34.10
 	github.com/tendermint/tm-db v0.6.4
 	github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f
-	github.com/vocdoni/arbo v0.0.0-20210831141531-de5914f453cf
+	github.com/vocdoni/arbo v0.0.0-20210909102959-f09b0b039255
 	github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.uber.org/zap v1.18.1
-	go.vocdoni.io/proto v1.0.4-0.20210726091234-bceaf416353b
+	go.vocdoni.io/proto v1.0.4-0.20210910085433-e7c056b7c23a
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
 	google.golang.org/protobuf v1.27.1
