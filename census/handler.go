@@ -351,6 +351,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			log.Warnf("cannot dump census with root %x: %s", root, err)
 			return resp
 		}
+		dump.Type = tr.Type()
 		dumpBytes, err := json.Marshal(dump)
 		if err != nil {
 			resp.SetError(err)
