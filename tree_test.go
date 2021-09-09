@@ -563,6 +563,27 @@ func TestSnapshot(t *testing.T) {
 		"1025190963769001718196479367844646783678188389989148142691917685159698888868")
 }
 
+func TestGetFromSnapshotExpectArboErrKeyNotFound(t *testing.T) {
+	c := qt.New(t)
+
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+	defer tree.db.Close() //nolint:errcheck
+
+	bLen := tree.HashFunction().Len()
+	k := BigIntToBytes(bLen, big.NewInt(int64(3)))
+
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	tree, err = tree.Snapshot(root)
+	c.Assert(err, qt.IsNil)
+
+	_, _, err = tree.Get(k)
+	c.Assert(err, qt.Equals, ErrKeyNotFound) // and not equal to db.ErrKeyNotFound
+}
+
 func BenchmarkAdd(b *testing.B) {
 	bLen := 32 // for both Poseidon & Sha256
 	// prepare inputs
