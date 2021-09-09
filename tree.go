@@ -860,6 +860,7 @@ func (t *Tree) Snapshot(fromRoot []byte) (*Tree, error) {
 		db:           t.db,
 		maxLevels:    t.maxLevels,
 		snapshotRoot: fromRoot,
+		emptyHash:    t.emptyHash,
 		hashFunction: t.hashFunction,
 		dbg:          t.dbg,
 	}, nil
