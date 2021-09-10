@@ -180,6 +180,25 @@ func (m *Manager) AddNamespace(name string, treeType models.Census_Type, authPub
 	if m.Exists(name) {
 		return nil, ErrNamespaceExist
 	}
+
+	/*
+		Hotfix to census publish/import bug
+			The census publish method had a bug that didn't add the census treeType to the censusDump published to ipfs.
+			This caused the type to be `0`, which is invalid. Gateways importing the census, then, would error.
+			The bug was fixed here: https://github.com/vocdoni/vocdoni-node/pull/259
+			Unfortunately this only fixes census published in the future. For existing census that already don't
+			 have the treeType set properly, gateways still cannot import them.
+			This clause fixes the bug for already published census by assuming that an invalid treeType of `0`
+			 should really be a Graviton tree (all current census). Gateways running this hotfix should be
+			 re-started and re-synced, and they should then be able to correctly import the census.
+			This hotfix is temporary and should not be included in future versions of the code once the
+			 Vochain is reset and the broken census are no longer used. Until then, this fix is needed
+			 whenever a gateway is syncing.
+	*/
+	if treeType == 0 {
+		treeType = censusDefaultType
+	}
+
 	tr, err := censustreefactory.NewCensusTree(treeType, name, m.StorageDir)
 	if err != nil {
 		return nil, err
