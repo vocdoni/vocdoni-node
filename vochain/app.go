@@ -15,6 +15,7 @@ import (
 	nm "github.com/tendermint/tendermint/node"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
+	snarkTypes "github.com/vocdoni/go-snark/types"
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/config"
@@ -40,6 +41,8 @@ type BaseApplication struct {
 	height             uint32
 	timestamp          int64
 	chainId            string
+	// ZkVks contains the VerificationKey for each circuit parameters index
+	ZkVks []*snarkTypes.Vk
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
@@ -323,7 +326,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 		return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 	}
 	if tx, txBytes, signature, err = UnmarshalTx(req.Tx); err == nil {
-		if data, err = AddTx(tx, txBytes, signature, app.State, TxKey(req.Tx), false); err != nil {
+		if data, err = app.AddTx(tx, txBytes, signature, TxKey(req.Tx), false); err != nil {
 			log.Debugf("checkTx error: %s", err)
 			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("addTx " + err.Error())}
 		}
@@ -344,7 +347,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	defer app.State.TxCounterAdd()
 	if tx, txBytes, signature, err = UnmarshalTx(req.Tx); err == nil {
 		log.Debugf("deliver tx: %s", log.FormatProto(tx))
-		if data, err = AddTx(tx, txBytes, signature, app.State, TxKey(req.Tx), true); err != nil {
+		if data, err = app.AddTx(tx, txBytes, signature, TxKey(req.Tx), true); err != nil {
 			log.Debugf("rejected tx: %v", err)
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
