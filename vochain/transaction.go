@@ -6,8 +6,11 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/vocdoni/arbo"
+	"github.com/vocdoni/go-snark/verifier"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -18,32 +21,37 @@ import (
 // It returns a bytes value which depends on the transaction type:
 //  Tx_Vote: vote nullifier
 //  default: []byte{}
-func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
+func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 	txID [32]byte, commit bool) ([]byte, error) {
-	if vtx == nil || state == nil || vtx.Payload == nil {
+	if vtx == nil || app.State == nil || vtx.Payload == nil {
 		return nil, fmt.Errorf("transaction, state, and/or transaction payload is nil")
 	}
 	switch vtx.Payload.(type) {
 	case *models.Tx_Vote:
-		v, err := VoteTxCheck(vtx, txBytes, signature, state, txID, commit)
+		if vtx == nil {
+			return nil, fmt.Errorf("vote envelope transaction is nil")
+		}
+		// get VoteEnvelope from tx
+		txVote := vtx.GetVote()
+		v, err := app.VoteEnvelopeCheck(txVote, txBytes, signature, txID, commit)
 		if err != nil || v == nil {
 			return []byte{}, fmt.Errorf("voteTxCheck: %w", err)
 		}
 		if commit {
-			return v.Nullifier, state.AddVote(v)
+			return v.Nullifier, app.State.AddVote(v)
 		}
 		return v.Nullifier, nil
 	case *models.Tx_Admin:
-		if err := AdminTxCheck(vtx, txBytes, signature, state); err != nil {
-			return []byte{}, fmt.Errorf("adminTxCheck: %w", err)
+		if err := AdminTxCheck(vtx, txBytes, signature, app.State); err != nil {
+			return []byte{}, fmt.Errorf("adminTxChek: %w", err)
 		}
 		tx := vtx.GetAdmin()
 		if commit {
 			switch tx.Txtype {
 			case models.TxType_ADD_ORACLE:
-				return []byte{}, state.AddOracle(common.BytesToAddress(tx.Address))
+				return []byte{}, app.State.AddOracle(common.BytesToAddress(tx.Address))
 			case models.TxType_REMOVE_ORACLE:
-				return []byte{}, state.RemoveOracle(common.BytesToAddress(tx.Address))
+				return []byte{}, app.State.RemoveOracle(common.BytesToAddress(tx.Address))
 			case models.TxType_ADD_VALIDATOR:
 				pk, err := hexPubKeyToTendermintEd25519(fmt.Sprintf("%x", tx.PublicKey))
 				if err == nil {
@@ -55,35 +63,35 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 						PubKey:  pk.Bytes(),
 						Power:   *tx.Power,
 					}
-					return []byte{}, state.AddValidator(validator)
+					return []byte{}, app.State.AddValidator(validator)
 
 				}
 				return []byte{}, fmt.Errorf("addValidator: %w", err)
 
 			case models.TxType_REMOVE_VALIDATOR:
-				return []byte{}, state.RemoveValidator(tx.Address)
+				return []byte{}, app.State.RemoveValidator(tx.Address)
 			case models.TxType_ADD_PROCESS_KEYS:
-				return []byte{}, state.AddProcessKeys(tx)
+				return []byte{}, app.State.AddProcessKeys(tx)
 			case models.TxType_REVEAL_PROCESS_KEYS:
-				return []byte{}, state.RevealProcessKeys(tx)
+				return []byte{}, app.State.RevealProcessKeys(tx)
 			}
 		}
 
 	case *models.Tx_NewProcess:
-		if p, err := NewProcessTxCheck(vtx, txBytes, signature, state); err == nil {
+		if p, err := NewProcessTxCheck(vtx, txBytes, signature, app.State); err == nil {
 			if commit {
 				tx := vtx.GetNewProcess()
 				if tx.Process == nil {
 					return []byte{}, fmt.Errorf("newProcess process is empty")
 				}
-				return []byte{}, state.AddProcess(p)
+				return []byte{}, app.State.AddProcess(p)
 			}
 		} else {
 			return []byte{}, fmt.Errorf("newProcess: %w", err)
 		}
 
 	case *models.Tx_SetProcess:
-		if err := SetProcessTxCheck(vtx, txBytes, signature, state); err != nil {
+		if err := SetProcessTxCheck(vtx, txBytes, signature, app.State); err != nil {
 			return []byte{}, fmt.Errorf("setProcess: %w", err)
 		}
 		if commit {
@@ -93,29 +101,29 @@ func AddTx(vtx *models.Tx, txBytes, signature []byte, state *State,
 				if tx.GetStatus() == models.ProcessStatus_PROCESS_UNKNOWN {
 					return []byte{}, fmt.Errorf("set process status, status unknown")
 				}
-				return []byte{}, state.SetProcessStatus(tx.ProcessId, *tx.Status, true)
+				return []byte{}, app.State.SetProcessStatus(tx.ProcessId, *tx.Status, true)
 			case models.TxType_SET_PROCESS_RESULTS:
 				if tx.GetResults() == nil {
 					return []byte{}, fmt.Errorf("set process results, results is nil")
 				}
-				return []byte{}, state.SetProcessResults(tx.ProcessId, tx.Results, true)
+				return []byte{}, app.State.SetProcessResults(tx.ProcessId, tx.Results, true)
 			case models.TxType_SET_PROCESS_CENSUS:
 				if tx.GetCensusRoot() == nil {
 					return []byte{}, fmt.Errorf("set process census, census root is nil")
 				}
-				return []byte{}, state.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true)
+				return []byte{}, app.State.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true)
 			default:
 				return []byte{}, fmt.Errorf("unknown set process tx type")
 			}
 		}
 
 	case *models.Tx_RegisterKey:
-		if err := RegisterKeyTxCheck(vtx, txBytes, signature, state); err != nil {
+		if err := RegisterKeyTxCheck(vtx, txBytes, signature, app.State); err != nil {
 			return []byte{}, fmt.Errorf("registerKeyTx %w", err)
 		}
 		if commit {
 			tx := vtx.GetRegisterKey()
-			return []byte{}, state.AddToRollingCensus(tx.ProcessId, tx.NewKey, new(big.Int).SetBytes(tx.Weight))
+			return []byte{}, app.State.AddToRollingCensus(tx.ProcessId, tx.NewKey, new(big.Int).SetBytes(tx.Weight))
 		}
 
 	default:
@@ -136,32 +144,31 @@ func UnmarshalTx(content []byte) (*models.Tx, []byte, []byte, error) {
 	return vtx, stx.GetTx(), stx.GetSignature(), proto.Unmarshal(stx.GetTx(), vtx)
 }
 
-// VoteTxCheck is an abstraction of ABCI checkTx for submitting a vote
+// VoteEnvelopeCheck is an abstraction of ABCI checkTx for submitting a vote
 // All hexadecimal strings should be already sanitized (without 0x)
-func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
+func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, signature []byte,
 	txID [32]byte, forCommit bool) (*models.Vote, error) {
-	tx := vtx.GetVote()
 
 	// Perform basic/general checks
-	if tx == nil {
-		return nil, fmt.Errorf("vote envelope transaction is nil")
+	if ve == nil {
+		return nil, fmt.Errorf("vote envelope is nil")
 	}
-	process, err := state.Process(tx.ProcessId, false)
+	process, err := app.State.Process(ve.ProcessId, false)
 	if err != nil {
 		return nil, fmt.Errorf("cannot fetch processId: %w", err)
 	}
 	if process == nil || process.EnvelopeType == nil || process.Mode == nil {
-		return nil, fmt.Errorf("process %x malformed", tx.ProcessId)
+		return nil, fmt.Errorf("process %x malformed", ve.ProcessId)
 	}
-	height := state.Height()
+	height := app.State.Height()
 	endBlock := process.StartBlock + process.BlockCount
 
 	if height < process.StartBlock || height > endBlock {
-		return nil, fmt.Errorf("process %x not started or finished", tx.ProcessId)
+		return nil, fmt.Errorf("process %x not started or finished", ve.ProcessId)
 	}
 
 	if process.Status != models.ProcessStatus_READY {
-		return nil, fmt.Errorf("process %x not in READY state", tx.ProcessId)
+		return nil, fmt.Errorf("process %x not in READY state", ve.ProcessId)
 	}
 
 	// Check in case of keys required, they have been sent by some keykeeper
@@ -174,8 +181,55 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 	var vote *models.Vote
 	switch {
 	case process.EnvelopeType.Anonymous:
-		// TODO check snark
-		return nil, fmt.Errorf("snark vote not implemented")
+		// Supports Groth16 proof generated from circom snark compatible
+		// prover
+		proofZkSNARK := ve.Proof.GetZkSnark()
+		if proofZkSNARK == nil {
+			return nil, fmt.Errorf("zkSNARK proof is empty")
+		}
+		proof, publicInputsFromUser, err := zk.ProtobufZKProofToCircomProof(proofZkSNARK)
+		if err != nil {
+			return nil, err
+		}
+
+		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVks) {
+			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d", proofZkSNARK.CircuitParametersIndex)
+		}
+		verificationKey := app.ZkVks[proofZkSNARK.CircuitParametersIndex]
+
+		// prepare the publicInputs that are defined by the process
+		censusRootBI := arbo.BytesToBigInt(process.CensusRoot)
+		electionIdBI := arbo.BytesToBigInt(process.ProcessId)
+		publicInputs := []*big.Int{
+			electionIdBI,
+			censusRootBI,
+		}
+		// append the user defined public inputs values
+		publicInputs = append(publicInputs, publicInputsFromUser...)
+
+		// check zkSnark proof
+		if !verifier.Verify(verificationKey, proof, publicInputs) {
+			return nil, fmt.Errorf("zkSNARK proof verification failed")
+		}
+
+		// TODO the next 12 lines of code are the same than a little
+		// further down. TODO: maybe move them before the 'switch', as
+		// is a logic that must be done even if
+		// process.EnvelopeType.Anonymous==true or not
+		vote = &models.Vote{
+			Height:      height,
+			ProcessId:   ve.ProcessId,
+			VotePackage: ve.VotePackage,
+		}
+		// If process encrypted, check the vote is encrypted (includes at least one key index)
+		if process.EnvelopeType.EncryptedVotes {
+			if len(ve.EncryptionKeyIndexes) == 0 {
+				return nil, fmt.Errorf("no key indexes provided on vote package")
+			}
+			vote.EncryptionKeyIndexes = ve.EncryptionKeyIndexes
+		}
+
+		return vote, nil
 	default: // Signature based voting
 		if signature == nil {
 			return nil, fmt.Errorf("signature missing on voteTx")
@@ -185,13 +239,13 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 		// Every N seconds the old votes which are not yet in the blockchain will be removed from cache.
 		// If the same vote (but different transaction) is send to the mempool, the cache will detect it
 		// and vote will be discarted.
-		vote = state.CacheGet(txID)
+		vote = app.State.CacheGet(txID)
 
 		// if vote is in cache, lazy check and remove it from cache
 		if forCommit && vote != nil {
 			vote.Height = height // update vote height
-			defer state.CacheDel(txID)
-			if exist, err := state.EnvelopeExists(vote.ProcessId,
+			defer app.State.CacheDel(txID)
+			if exist, err := app.State.EnvelopeExists(vote.ProcessId,
 				vote.Nullifier, false); err != nil || exist {
 				if err != nil {
 					return nil, err
@@ -210,21 +264,21 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 		// if not in cache, full check
 		// extract pubKey, generate nullifier and check census proof.
 		// add the transaction in the cache
-		if tx.Proof == nil {
+		if ve.Proof == nil {
 			return nil, fmt.Errorf("proof not found on transaction")
 		}
 
 		vote = &models.Vote{
 			Height:      height,
-			ProcessId:   tx.ProcessId,
-			VotePackage: tx.VotePackage,
+			ProcessId:   ve.ProcessId,
+			VotePackage: ve.VotePackage,
 		}
 		// If process encrypted, check the vote is encrypted (includes at least one key index)
 		if process.EnvelopeType.EncryptedVotes {
-			if len(tx.EncryptionKeyIndexes) == 0 {
+			if len(ve.EncryptionKeyIndexes) == 0 {
 				return nil, fmt.Errorf("no key indexes provided on vote package")
 			}
-			vote.EncryptionKeyIndexes = tx.EncryptionKeyIndexes
+			vote.EncryptionKeyIndexes = ve.EncryptionKeyIndexes
 		}
 		pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 		if err != nil {
@@ -240,21 +294,21 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 
 		// check that nullifier does not exist in cache already, this avoids
 		// processing multiple transactions with same nullifier.
-		if state.CacheHasNullifier(vote.Nullifier) {
+		if app.State.CacheHasNullifier(vote.Nullifier) {
 			return nil, fmt.Errorf("nullifier %x already exists in cache", vote.Nullifier)
 		}
 
 		// check if vote already exists
-		if exist, err := state.EnvelopeExists(vote.ProcessId,
+		if exist, err := app.State.EnvelopeExists(vote.ProcessId,
 			vote.Nullifier, false); err != nil || exist {
 			if err != nil {
 				return nil, err
 			}
 			return nil, fmt.Errorf("vote %x already exists", vote.Nullifier)
 		}
-		log.Debugf("new vote %x for address %s and process %x", vote.Nullifier, addr.Hex(), tx.ProcessId)
+		log.Debugf("new vote %x for address %s and process %x", vote.Nullifier, addr.Hex(), ve.ProcessId)
 
-		valid, weight, err := VerifyProof(process, tx.Proof,
+		valid, weight, err := VerifyProof(process, ve.Proof,
 			process.CensusOrigin, process.CensusRoot, process.ProcessId,
 			pubKey, addr)
 		if err != nil {
@@ -266,7 +320,7 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 		vote.Weight = weight.Bytes()
 
 		// add the vote to cache
-		state.CacheAdd(txID, vote)
+		app.State.CacheAdd(txID, vote)
 	}
 	return vote, nil
 }

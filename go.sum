@@ -354,6 +354,7 @@ github.com/etcd-io/bbolt v1.3.3/go.mod h1:ZF2nL25h33cCyBtcyWeZ2/I3HQOfTP+0PIEvHj
 github.com/ethereum/go-ethereum v1.8.27/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
 github.com/ethereum/go-ethereum v1.9.3/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
 github.com/ethereum/go-ethereum v1.9.12/go.mod h1:PvsVkQmhZFx92Y+h2ylythYlheEDt/uBgFbl61Js/jo=
+github.com/ethereum/go-ethereum v1.9.13/go.mod h1:qwN9d1GLyDh0N7Ab8bMGd0H9knaji2jOBm2RrMGjXls=
 github.com/ethereum/go-ethereum v1.9.20/go.mod h1:JSSTypSMTkGZtAdAChH2wP5dZEvPGh3nUTuDpH+hNrg=
 github.com/ethereum/go-ethereum v1.9.23/go.mod h1:JIfVb6esrqALTExdz9hRYvrP0xBDf6wCncIu1hNwHpM=
 github.com/ethereum/go-ethereum v1.9.25/go.mod h1:vMkFiYLHI4tgPw4k2j4MHKoovchFE8plZ0M9VMk4/oM=
@@ -676,6 +677,7 @@ github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/iden3/go-iden3-core v0.0.8-0.20200325104031-1ed04a261b78/go.mod h1:N9xiQvwx5EZhrVuO0hW8GBF9Uy0ZbONdhguPHSC+wQg=
 github.com/iden3/go-iden3-crypto v0.0.4/go.mod h1:LLcgB7DLWAUs+8eBSKne+ZHy5z7xtAmlYlEz0M9M8gE=
+github.com/iden3/go-iden3-crypto v0.0.5/go.mod h1:XKw1oDwYn2CIxKOtr7m/mL5jMn4mLOxAxtZBRxQBev8=
 github.com/iden3/go-iden3-crypto v0.0.6-0.20210308142348-8f85683b2cef h1:72PG9b2eDlLqKszJVLrsoJbpt4CtgJLhKOjH1MJqCVY=
 github.com/iden3/go-iden3-crypto v0.0.6-0.20210308142348-8f85683b2cef/go.mod h1:oBgthFLboAWi9feaBUFy7OxEcyn9vA1khHSL/WwWFyg=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
@@ -1977,6 +1979,8 @@ github.com/vocdoni/blind-ca v0.1.4/go.mod h1:4ouWDqlvXrrNS0Csf3hKA3cuDTmKh6nP7kS
 github.com/vocdoni/eth-storage-proof v0.1.4-0.20201128112323-de7513ce5e25/go.mod h1:NLA1A55raZ1VNMmKulPUm+Lu9CVetCDVuDCYk5bSYrE=
 github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44 h1:OK5B1GPq2zPu2Z1sYaUcAmt3CpILABwYsvkK2raI1AQ=
 github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44/go.mod h1:o/kqzlz81Aq5/++p7zIRaaOiEUmCOiap7ulEAUeSQWI=
+github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319 h1:W8N7yfnWsVD3l2Sh0pTtXCDd4+LNh58lE427D1U9SVY=
+github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319/go.mod h1:A4ZJ8jq+ZbNvxrNUmScv2ghL34A6c6vw5Y1Oza2h7lo=
 github.com/vocdoni/multirpc v0.1.9/go.mod h1:SETFzlLbdZq2YFGy0udT1u2ouQUU2cIesopAIgyAjOU=
 github.com/vocdoni/multirpc v0.1.12/go.mod h1:OYWh2wBX0rztgatZC7VEcPW0Ew4Hm8f/msRAO24mpk0=
 github.com/vocdoni/multirpc v0.1.21/go.mod h1:zCx0l/hu/Vdeav44geFJmK4PAawN+qoo1HYT2icU4GM=
@@ -2105,10 +2109,8 @@ go.vocdoni.io/proto v0.1.7/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M
 go.vocdoni.io/proto v0.1.8/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v0.1.9-0.20210304214308-6f7363b52750/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v1.0.4-0.20210726091234-bceaf416353b/go.mod h1:QV3gKc9Zf0xHW3o8wEaqSn8iZ94UTl8gOzekxoz3kWs=
-go.vocdoni.io/proto v1.0.4-0.20210909161946-f3158498ba88 h1:EJnuknmHjwPQL44d5TVOZJhzVA4oFzZT41etyaRervk=
-go.vocdoni.io/proto v1.0.4-0.20210909161946-f3158498ba88/go.mod h1:QV3gKc9Zf0xHW3o8wEaqSn8iZ94UTl8gOzekxoz3kWs=
-go.vocdoni.io/proto v1.0.4-0.20210910085433-e7c056b7c23a h1:7QimTKlkCY0O5KRFi0ejafFkLQze7zN0qOE/BuZosbE=
-go.vocdoni.io/proto v1.0.4-0.20210910085433-e7c056b7c23a/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
+go.vocdoni.io/proto v1.0.4-0.20210910152144-4f30a5b8664c h1:kM/ZBLJ7UQZqqu8INlFbaHDxAt4o7L1omJMgL4AJcJw=
+go.vocdoni.io/proto v1.0.4-0.20210910152144-4f30a5b8664c/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
 go4.org v0.0.0-20180809161055-417644f6feb5/go.mod h1:MkTOUMDaeVYJUOUsaDXIhWPZYa1yOyC1qaOBpL57BhE=
 go4.org v0.0.0-20200411211856-f5505b9728dd h1:BNJlw5kRTzdmyfh5U8F93HA2OwkP7ZGwA51eJ/0wKOU=
 go4.org v0.0.0-20200411211856-f5505b9728dd/go.mod h1:CIiUVy99QCPfoE13bO4EZaz5GZMZXMSBGhxRdsvzbkg=
