@@ -11,8 +11,7 @@ import (
 	"sync"
 	"time"
 
-	censustree "go.vocdoni.io/dvote/censustreelegacy"
-	censustreefactory "go.vocdoni.io/dvote/censustreelegacy/factory"
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
@@ -57,7 +56,7 @@ type Manager struct {
 
 	// TODO(mvdan): should we protect Census with the mutex too?
 	TreesMu sync.RWMutex
-	Trees   map[string]censustree.Tree // MkTrees map of merkle trees indexed by censusId
+	Trees   map[string]*censustree.Tree // MkTrees map of merkle trees indexed by censusId
 
 	RemoteStorage data.Storage // e.g. IPFS
 
@@ -76,7 +75,7 @@ func (m *Manager) Data() data.Storage { return m.RemoteStorage }
 func (m *Manager) Init(storageDir, rootAuthPubKey string) error {
 	nsConfig := fmt.Sprintf("%s/namespaces.json", storageDir)
 	m.StorageDir = storageDir
-	m.Trees = make(map[string]censustree.Tree)
+	m.Trees = make(map[string]*censustree.Tree)
 	m.failedQueue = make(map[string]string)
 	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
 	m.importQueue = make(chan censusImport, importQueueBuffer)
@@ -130,26 +129,21 @@ func (m *Manager) Init(storageDir, rootAuthPubKey string) error {
 
 // LoadTree opens the database containing the merkle tree or returns nil if already loaded
 // Not thread safe
-func (m *Manager) LoadTree(name string, treeType models.Census_Type) (censustree.Tree, error) {
+func (m *Manager) LoadTree(name string, censusType models.Census_Type) (*censustree.Tree, error) {
 	if _, exist := m.Trees[name]; exist {
 		return m.Trees[name], nil
 	}
 
-	// ensure backwards compatibility to CensusTrees created before the
-	// Protobuf CensusTypes implementation. When TreeType is set to 0, uses
-	// the 'default' tree type
-	if treeType == models.Census_UNKNOWN {
-		treeType = censusDefaultType
-	}
-
-	tr, err := censustreefactory.NewCensusTree(treeType, name, m.StorageDir)
+	censusTree, err := censustree.New(nil,
+		censustree.Options{Name: name, StorageDir: m.StorageDir, MaxLevels: 256, CensusType: censusType})
 	if err != nil {
 		return nil, err
 	}
+
 	log.Infof("load merkle tree %s", name)
-	m.Trees[name] = tr
+	m.Trees[name] = censusTree
 	m.Trees[name].Publish()
-	return tr, nil
+	return censusTree, nil
 }
 
 // UnloadTree closes the database containing the merkle tree
@@ -174,23 +168,24 @@ func (m *Manager) Exists(name string) bool {
 
 // AddNamespace adds a new merkletree identified by a censusId (name), and
 // returns the new tree.
-func (m *Manager) AddNamespace(name string, treeType models.Census_Type, authPubKeys []string) (censustree.Tree, error) {
+func (m *Manager) AddNamespace(name string, censusType models.Census_Type, authPubKeys []string) (*censustree.Tree, error) {
 	m.TreesMu.Lock()
 	defer m.TreesMu.Unlock()
 	if m.Exists(name) {
 		return nil, ErrNamespaceExist
 	}
-	tr, err := censustreefactory.NewCensusTree(treeType, name, m.StorageDir)
+	censusTree, err := censustree.New(nil,
+		censustree.Options{Name: name, StorageDir: m.StorageDir, MaxLevels: 256, CensusType: censusType})
 	if err != nil {
 		return nil, err
 	}
-	m.Trees[name] = tr
+	m.Trees[name] = censusTree
 	m.Census.Namespaces = append(m.Census.Namespaces, Namespace{
-		Type: treeType,
+		Type: censusType,
 		Name: name,
 		Keys: authPubKeys,
 	})
-	return tr, m.save()
+	return censusTree, m.save()
 }
 
 // DelNamespace removes a merkletree namespace

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tree "go.vocdoni.io/dvote/censustreelegacy/gravitontree"
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
@@ -20,7 +20,9 @@ func TestMerkleTreeProof(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tr, err := tree.NewTree("testchecktx", t.TempDir())
+	tr, err := censustree.New(nil,
+		censustree.Options{Name: "testchecktx", StorageDir: t.TempDir(),
+			MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +31,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	proofs := []string{}
 	for _, k := range keys {
 		c := k.PublicKey()
-		if err := tr.Add(c, nil); err != nil {
+		if err := tr.Add(nil, c, nil); err != nil {
 			t.Fatal(err)
 		}
 		proofs = append(proofs, string(c))
@@ -42,7 +44,7 @@ func TestMerkleTreeProof(t *testing.T) {
 
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
-	root, err := tr.Root()
+	root, err := tr.Root(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +75,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	var proof []byte
 	vp := []byte("[1,2,3,4]")
 	for i, s := range keys {
-		proof, err = tr.GenProof([]byte(proofs[i]), nil)
+		_, proof, err = tr.GenProof(nil, []byte(proofs[i]))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,8 +83,9 @@ func TestMerkleTreeProof(t *testing.T) {
 			Nonce:     util.RandomBytes(32),
 			ProcessId: pid,
 			Proof: &models.Proof{
-				Payload: &models.Proof_Graviton{
-					Graviton: &models.ProofGraviton{
+				Payload: &models.Proof_Arbo{
+					Arbo: &models.ProofArbo{
+						Type:     models.ProofArbo_BLAKE2B,
 						Siblings: proof,
 					},
 				},
@@ -118,15 +121,16 @@ func TestMerkleTreeProof(t *testing.T) {
 	}
 
 	// Test send the same vote package multiple times with different nonce
-	proof, err = tr.GenProof([]byte(lastProof), nil)
+	_, proof, err = tr.GenProof(nil, []byte(lastProof))
 	if err != nil {
 		t.Fatal(err)
 	}
 	tx := &models.VoteEnvelope{
 		ProcessId: pid,
 		Proof: &models.Proof{
-			Payload: &models.Proof_Graviton{
-				Graviton: &models.ProofGraviton{
+			Payload: &models.Proof_Arbo{
+				Arbo: &models.ProofArbo{
+					Type:     models.ProofArbo_BLAKE2B,
 					Siblings: proof,
 				},
 			},

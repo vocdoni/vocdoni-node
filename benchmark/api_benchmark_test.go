@@ -21,9 +21,10 @@ import (
 func init() { rand.Seed(time.Now().UnixNano()) }
 
 var (
-	hostFlag      = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
-	censusSize    = flag.Int("censusSize", 100, "number of census entries to add (minimum 100)")
-	onlyCensus    = flag.Bool("onlyCreateCensus", false, "only perform create census operations")
+	hostFlag   = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")
+	censusSize = flag.Int("censusSize", 100, "number of census entries to add (minimum 100)")
+	onlyCensus = flag.Bool("onlyCreateCensus", false, "only perform create census operations")
+	// NOTE: censusBackend is not used
 	censusBackend = flag.String("censusBackend", "graviton", "supported backends are: graviton")
 )
 
@@ -34,7 +35,7 @@ func BenchmarkCensus(b *testing.B) {
 	host := *hostFlag
 	if host == "" {
 		var server testcommon.DvoteAPIServer
-		server.CensusBackend = *censusBackend
+		server.CensusBackend = *censusBackend // NOTE: CensusBackend is not used
 		server.Start(b, "file", "census")
 		host = server.PxyAddr
 	}

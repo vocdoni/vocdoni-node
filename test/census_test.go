@@ -29,7 +29,6 @@ Run it executing `go test -v test/census_test.go`
 */
 
 import (
-	"bytes"
 	"encoding/hex"
 	"flag"
 	"math/rand"
@@ -43,6 +42,7 @@ import (
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	models "go.vocdoni.io/proto/build/go/models"
 
 	"go.vocdoni.io/dvote/test/testcommon"
 )
@@ -77,6 +77,7 @@ func TestCensus(t *testing.T) {
 
 	// Create census
 	req.CensusID = "test"
+	req.CensusType = models.Census_ARBO_BLAKE2B
 	resp := doRequest("addCensus", signer2)
 	qt.Assert(t, err, qt.IsNil)
 	censusID := resp.CensusID
@@ -134,21 +135,23 @@ func TestCensus(t *testing.T) {
 	resp = doRequest("addClaimBulk", signer2)
 	qt.Assert(t, resp.Ok, qt.IsTrue)
 
+	// TODO WIP: the method DumpPlain no longer exists, clarify the
+	// difference of usage between 'dump' & 'dumpPlain'.
 	// dumpPlain
-	req.CensusKey = []byte{}
-	req.CensusKeys = [][]byte{}
-	resp = doRequest("dumpPlain", signer2)
-	qt.Assert(t, resp.Ok, qt.IsTrue)
-	for _, c := range claims {
-		found := false
-		for _, c2 := range resp.CensusKeys {
-			if bytes.Equal(c, c2) {
-				found = true
-				break
-			}
-		}
-		qt.Assert(t, found, qt.IsTrue)
-	}
+	// req.CensusKey = []byte{}
+	// req.CensusKeys = [][]byte{}
+	// resp = doRequest("dumpPlain", signer2)
+	// qt.Assert(t, resp.Ok, qt.IsTrue)
+	// for _, c := range claims {
+	//         found := false
+	//         for _, c2 := range resp.CensusKeys {
+	//                 if bytes.Equal(c, c2) {
+	//                         found = true
+	//                         break
+	//                 }
+	//         }
+	//         qt.Assert(t, found, qt.IsTrue)
+	// }
 
 	// GenProof valid
 	req.RootHash = nil
@@ -202,10 +205,11 @@ func TestCensus(t *testing.T) {
 	resp = doRequest("getRoot", nil)
 	qt.Assert(t, resp.Root, qt.DeepEquals, root)
 
+	// TODO WIP getSize method is not currently supported
 	// getSize
-	req.RootHash = nil
-	resp = doRequest("getSize", nil)
-	qt.Assert(t, *resp.Size, qt.Equals, int64(*censusSize))
+	// req.RootHash = nil
+	// resp = doRequest("getSize", nil)
+	// qt.Assert(t, *resp.Size, qt.Equals, int64(*censusSize))
 
 	// get census list
 	resp = doRequest("getCensusList", signer2)

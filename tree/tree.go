@@ -178,10 +178,10 @@ func (t *Tree) Root(rTx db.ReadTx) ([]byte, error) {
 }
 
 // Size returns the number of leafs under the current root
-func (t *Tree) Size(rTx db.ReadTx) uint64 {
+func (t *Tree) Size(rTx db.ReadTx) (uint64, error) {
 	// TODO we need to review where this would be used and in which
 	// context, and define the way how this is computed
-	panic("unimplemented")
+	return 0, fmt.Errorf("unimplemented")
 }
 
 // GenProof returns a byte array with the necessary data to verify that the
@@ -205,13 +205,13 @@ func (t *Tree) GenProof(rTx db.ReadTx, key []byte) ([]byte, []byte, error) {
 // VerifyProof checks the proof for the given key, value and root, using the
 // passed hash function
 func VerifyProof(hashFunc arbo.HashFunction, key, value, proof, root []byte) (bool, error) {
-	return arbo.CheckProof(hashFunc, key, value, proof, root)
+	return arbo.CheckProof(hashFunc, key, value, root, proof)
 }
 
 // VerifyProof checks the proof for the given key, value and root, using the
 // hash function of the Tree
 func (t *Tree) VerifyProof(key, value, proof, root []byte) (bool, error) {
-	return VerifyProof(t.tree.HashFunction(), key, value, root, proof)
+	return VerifyProof(t.tree.HashFunction(), key, value, proof, root)
 }
 
 // FromRoot returns a new read-only Tree for the given root, that uses the same

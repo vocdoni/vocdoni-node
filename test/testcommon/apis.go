@@ -21,7 +21,7 @@ type DvoteAPIServer struct {
 	Signer         *ethereum.SignKeys
 	VochainCfg     *config.VochainCfg
 	CensusDir      string
-	CensusBackend  string // graviton or asmt
+	CensusBackend  string // graviton or asmt // NOTE: CensusBackend is not used
 	IpfsDir        string
 	ScrutinizerDir string
 	PxyAddr        string

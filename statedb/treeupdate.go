@@ -79,7 +79,7 @@ func (u *TreeUpdate) Root() ([]byte, error) {
 // Size returns the number of leafs (key-values) that this tree contains.
 func (u *TreeUpdate) Size() (uint64, error) {
 	// NOTE: Tree.Size is currently unimplemented
-	return u.tree.Size(u.tree.tx), nil
+	return u.tree.Size(u.tree.tx)
 }
 
 // GenProof generates a proof of existence of the given key for this tree.  The
