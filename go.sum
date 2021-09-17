@@ -2025,8 +2025,10 @@ github.com/viant/toolbox v0.24.0/go.mod h1:OxMCG57V0PXuIP2HNQrtJf2CjqdmbrOx5EkMI
 github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYppBueQtXaqoE=
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17pCcGlemwknint6hfoeCVQrEMVwxRLRjXpq+BU=
 github.com/vocdoni/arbo v0.0.0-20210616072504-a8c7ea980892/go.mod h1:Pikn2YIz/Rt05HWs35QHdpx7IWk4E2G0KdnCX+KRsNs=
-github.com/vocdoni/arbo v0.0.0-20210909102959-f09b0b039255 h1:Gabst/0jIl3CgiywQWS5VpWsqaPuBwz0XAuMws5Pcyw=
-github.com/vocdoni/arbo v0.0.0-20210909102959-f09b0b039255/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
+github.com/vocdoni/arbo v0.0.0-20210920213715-1f885e3ac1cf h1:0go2OtM6HJPZt7TINaGcO1JxU107NO8jAr/uQOyVOTQ=
+github.com/vocdoni/arbo v0.0.0-20210920213715-1f885e3ac1cf/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
+github.com/vocdoni/arbo v0.0.0-20210921154009-4227039df19f h1:78yhWWKm+wxQTSfk+C4xGD5Rxv/+qQ0yM+vdQkH3E/0=
+github.com/vocdoni/arbo v0.0.0-20210921154009-4227039df19f/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f h1:z7CK3k1yIutKycPY8s2ZbtwUBKMy3xPcLMh12QukLRY=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f/go.mod h1:BoN7UMTA/JcgmNPaoUQq6RwuixhgSrk5PmCMVMKLxpc=
 github.com/vocdoni/blind-ca v0.1.4/go.mod h1:4ouWDqlvXrrNS0Csf3hKA3cuDTmKh6nP7kSXF39nT4s=

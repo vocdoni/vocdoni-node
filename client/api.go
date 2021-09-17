@@ -323,8 +323,9 @@ func (c *Client) TestSendVotes(
 		switch censusOrigin {
 		case models.CensusOrigin_OFF_CHAIN_TREE:
 			v.Proof = &models.Proof{
-				Payload: &models.Proof_Graviton{
-					Graviton: &models.ProofGraviton{
+				Payload: &models.Proof_Arbo{
+					Arbo: &models.ProofArbo{
+						Type:     models.ProofArbo_BLAKE2B,
 						Siblings: proofs[i],
 					},
 				},
@@ -546,6 +547,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	// Create census
 	log.Infof("Create census")
 	req.Method = "addCensus"
+	req.CensusType = models.Census_ARBO_BLAKE2B
 	req.CensusID = fmt.Sprintf("test%d", rand.Int())
 	resp, err := c.Request(req, signer)
 	if err != nil {
@@ -601,17 +603,18 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 		log.Infof("census creation progress: %d%%", (i*100*100)/(censusSize))
 	}
 
+	// TODO WIP getSize method is not currently supported
 	// getSize
-	log.Infof("get size")
-	req.Method = "getSize"
-	req.RootHash = nil
-	resp, err = c.Request(req, nil)
-	if err != nil {
-		return nil, "", err
-	}
-	if got := *resp.Size; int64(censusSize) != got {
-		return nil, "", fmt.Errorf("expected size %v, got %v", censusSize, got)
-	}
+	// log.Infof("get size")
+	// req.Method = "getSize"
+	// req.RootHash = nil
+	// resp, err = c.Request(req, nil)
+	// if err != nil {
+	//         return nil, "", err
+	// }
+	// if got := *resp.Size; int64(censusSize) != got {
+	//         return nil, "", fmt.Errorf("expected size %v, got %v", censusSize, got)
+	// }
 
 	// publish
 	log.Infof("publish census")

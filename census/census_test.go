@@ -25,14 +25,3 @@ func TestCompressor(t *testing.T) {
 	// Decompressing should give us the original input back.
 	qt.Assert(t, comp.decompressBytes(compressed), qt.DeepEquals, input)
 }
-
-func TestLoadTreeDefaultCensusType(t *testing.T) {
-	m := &Manager{}
-	err := m.Init(t.TempDir(), "")
-	qt.Assert(t, err, qt.IsNil)
-
-	// ensure that when TreeType is set to 0, uses the 'default' tree type
-	tree, err := m.LoadTree("testtree", 0)
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, censusDefaultType, qt.Equals, tree.Type())
-}

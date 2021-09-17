@@ -5,18 +5,24 @@ import (
 	"fmt"
 	"math/big"
 
-	"go.vocdoni.io/dvote/censustreelegacy/gravitontree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/tree"
 	"google.golang.org/protobuf/proto"
 
 	blind "github.com/arnaucube/go-blindsecp256k1"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
+	"github.com/vocdoni/arbo"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"github.com/vocdoni/storage-proofs-eth-go/token/mapbased"
 	"github.com/vocdoni/storage-proofs-eth-go/token/minime"
 	"go.vocdoni.io/proto/build/go/models"
+)
+
+var (
+	bigZero = big.NewInt(0)
+	bigOne  = big.NewInt(1)
 )
 
 // VerifyProofFunc is the generic function type to verify a proof of belonging
@@ -70,15 +76,26 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 	}
 	switch proof.Payload.(type) {
 	case *models.Proof_Graviton:
-		p := proof.GetGraviton()
-		if p == nil {
-			return false, nil, fmt.Errorf("graviton proof is empty")
-		}
-		valid, err := gravitontree.CheckProof(key, []byte{}, censusRoot, p.Siblings)
-		return valid, big.NewInt(1), err
+		return false, nil, fmt.Errorf("graviton proof no longer supported")
 	case *models.Proof_Iden3:
 		// NOT IMPLEMENTED
 		return false, nil, fmt.Errorf("iden3 proof not implemented")
+	case *models.Proof_Arbo:
+		p := proof.GetArbo()
+		if p == nil {
+			return false, nil, fmt.Errorf("arbo proof is empty")
+		}
+		var hashFunc arbo.HashFunction = arbo.HashFunctionBlake2b
+		switch p.Type {
+		case models.ProofArbo_BLAKE2B:
+			hashFunc = arbo.HashFunctionBlake2b
+		case models.ProofArbo_POSEIDON:
+			hashFunc = arbo.HashFunctionPoseidon
+		default:
+			return false, nil, fmt.Errorf("not recognized ProofArbo type: %s", p.Type)
+		}
+		valid, err := tree.VerifyProof(hashFunc, key, []byte{}, p.Siblings, censusRoot)
+		return valid, bigOne, err
 	default:
 		return false, nil, fmt.Errorf("unexpected proof.Payload type: %T",
 			proof.Payload)
@@ -136,7 +153,7 @@ func VerifyProofOffChainCA(process *models.Process, proof *models.Proof,
 	default:
 		return false, nil, fmt.Errorf("ca proof %s type not supported", p.Type.String())
 	}
-	return true, big.NewInt(1), nil
+	return true, bigOne, nil
 }
 
 // VerifyProofERC20 verifies a proof with census origin ERC20 (mapbased).
@@ -153,7 +170,7 @@ func VerifyProofERC20(process *models.Process, proof *models.Proof,
 	}
 
 	balance := new(big.Int).SetBytes(p.Value)
-	if balance.Cmp(big.NewInt(0)) == 0 {
+	if balance.Cmp(bigZero) == 0 {
 		return false, nil, fmt.Errorf("balance at proof is 0")
 	}
 	log.Debugf("validating erc20 storage proof for key %x and balance %v", p.Key, balance)
@@ -187,7 +204,7 @@ func VerifyProofMiniMe(process *models.Process, proof *models.Proof,
 	}
 
 	_, proof0Balance, _ := minime.ParseMinimeValue(p.ProofPrevBlock.Value, 0)
-	if proof0Balance.Cmp(big.NewInt(0)) == 0 {
+	if proof0Balance.Cmp(bigZero) == 0 {
 		return false, nil, fmt.Errorf("balance at proofPrevBlock is 0")
 	}
 	log.Debugf("validating minime storage proof for key %x and balance %v",
