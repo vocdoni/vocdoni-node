@@ -311,7 +311,7 @@ func TestGenProofAndVerify(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	bLen := tree.HashFunction().Len()
+	bLen := tree.HashFunction().Len() - 1
 	for i := 0; i < 10; i++ {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
 		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))

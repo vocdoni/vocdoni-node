@@ -73,7 +73,7 @@ var (
 
 // Tree defines the struct that implements the MerkleTree functionalities
 type Tree struct {
-	sync.RWMutex
+	sync.Mutex
 
 	db           db.Database
 	maxLevels    int
@@ -659,11 +659,12 @@ func (t *Tree) GenProofWithTx(rTx db.ReadTx, k []byte) ([]byte, []byte, []byte, 
 }
 
 // PackSiblings packs the siblings into a byte array.
-// [      1 byte        | L bytes |       S * N bytes     ]
-// [  bitmap length (L) |  bitmap |  N non-zero siblings  ]
+// [    2 byte   |     2 byte        | L bytes |      S * N bytes    ]
+// [ full length | bitmap length (L) |  bitmap | N non-zero siblings ]
 // Where the bitmap indicates if the sibling is 0 or a value from the siblings
 // array. And S is the size of the output of the hash function used for the
-// Tree.
+// Tree. The 2 2-byte that define the full length and bitmap length, are
+// encoded in little-endian.
 func PackSiblings(hashFunc HashFunction, siblings [][]byte) []byte {
 	var b []byte
 	var bitmap []bool
@@ -680,19 +681,28 @@ func PackSiblings(hashFunc HashFunction, siblings [][]byte) []byte {
 	bitmapBytes := bitmapToBytes(bitmap)
 	l := len(bitmapBytes)
 
-	res := make([]byte, l+1+len(b))
-	res[0] = byte(l) // set the bitmapBytes length
-	copy(res[1:1+l], bitmapBytes)
-	copy(res[1+l:], b)
+	fullLen := 4 + l + len(b) //nolint:gomnd
+	res := make([]byte, fullLen)
+	binary.LittleEndian.PutUint16(res[0:2], uint16(fullLen)) // set full length
+	binary.LittleEndian.PutUint16(res[2:4], uint16(l))       // set the bitmapBytes length
+	copy(res[4:4+l], bitmapBytes)
+	copy(res[4+l:], b)
 	return res
 }
 
 // UnpackSiblings unpacks the siblings from a byte array.
 func UnpackSiblings(hashFunc HashFunction, b []byte) ([][]byte, error) {
-	l := b[0]
-	bitmapBytes := b[1 : 1+l]
+	fullLen := binary.LittleEndian.Uint16(b[0:2])
+	l := binary.LittleEndian.Uint16(b[2:4]) // bitmap bytes length
+	if len(b) != int(fullLen) {
+		return nil,
+			fmt.Errorf("error unpacking siblings. Expected len: %d, current len: %d",
+				fullLen, len(b))
+	}
+
+	bitmapBytes := b[4 : 4+l]
 	bitmap := bytesToBitmap(bitmapBytes)
-	siblingsBytes := b[1+l:]
+	siblingsBytes := b[4+l:]
 	iSibl := 0
 	emptySibl := make([]byte, hashFunc.Len())
 	var siblings [][]byte
@@ -845,9 +855,6 @@ func (t *Tree) GetNLeafsWithTx(rTx db.ReadTx) (int, error) {
 
 // Snapshot returns a read-only copy of the Tree from the given root
 func (t *Tree) Snapshot(fromRoot []byte) (*Tree, error) {
-	t.RLock()
-	defer t.RUnlock()
-
 	// allow to define which root to use
 	if fromRoot == nil {
 		var err error
