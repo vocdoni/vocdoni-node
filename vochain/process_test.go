@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
@@ -163,7 +164,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 
 	// Set it to ENDED (should fail)
 	status = models.ProcessStatus_ENDED
-	t.Logf("height: %d", app.State.Header(false).Height)
+	t.Logf("height: %d", app.State.CurrentHeight())
 	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err == nil {
 		t.Fatal("ready to ended should not be valid if interruptible=false")
 	}
@@ -470,4 +471,18 @@ func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 	}
 	app.Commit()
 	return nil
+}
+
+func TestCount(t *testing.T) {
+	app, err := NewBaseApplication(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	count, err := app.State.CountProcesses(false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, count, qt.Equals, uint64(0))
+
+	count, err = app.State.CountProcesses(true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, count, qt.Equals, uint64(0))
 }

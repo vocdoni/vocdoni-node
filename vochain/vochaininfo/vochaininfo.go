@@ -163,7 +163,6 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			vi.avg60 = a60
 			vi.avg360 = a360
 			vi.avg1440 = a1440
-			vi.vnode.State.RLock()
 			var err error
 			vi.processTreeSize, err = vi.vnode.State.CountProcesses(true)
 			if err != nil {
@@ -181,7 +180,6 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			// 	vm = 0
 			// }
 			vi.voteCacheSize = vi.vnode.State.CacheSize()
-			vi.vnode.State.RUnlock()
 			vi.mempoolSize = vi.vnode.Node.Mempool().Size()
 			vi.lock.Unlock()
 

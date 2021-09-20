@@ -20,9 +20,9 @@ func (v *State) AddProcess(p *models.Process) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal process bytes: %w", err)
 	}
-	v.Lock()
+	v.Tx.Lock()
 	err = v.Tx.DeepSet(p.ProcessId, newProcessBytes, ProcessesCfg)
-	v.Unlock()
+	v.Tx.Unlock()
 	if err != nil {
 		return err
 	}
@@ -50,9 +50,9 @@ func (v *State) CancelProcess(pid []byte) error { // LEGACY
 	if err != nil {
 		return fmt.Errorf("cannot marshal updated process bytes: %w", err)
 	}
-	v.Lock()
+	v.Tx.Lock()
 	err = v.Tx.DeepSet(pid, updatedProcessBytes, ProcessesCfg)
-	v.Unlock()
+	v.Tx.Unlock()
 	if err != nil {
 		return err
 	}
@@ -64,11 +64,11 @@ func (v *State) CancelProcess(pid []byte) error { // LEGACY
 
 // Process returns a process info given a processId if exists
 func (v *State) Process(pid []byte, isQuery bool) (*models.Process, error) {
-	var processBytes []byte
-	var err error
-	v.RLock()
-	processBytes, err = v.mainTreeViewer(isQuery).DeepGet(pid, ProcessesCfg)
-	v.RUnlock()
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	processBytes, err := v.mainTreeViewer(isQuery).DeepGet(pid, ProcessesCfg)
 	if err == arbo.ErrKeyNotFound {
 		return nil, ErrProcessNotFound
 	} else if err != nil {
@@ -85,6 +85,10 @@ func (v *State) Process(pid []byte, isQuery bool) (*models.Process, error) {
 // CountProcesses returns the overall number of processes the vochain has
 func (v *State) CountProcesses(isQuery bool) (uint64, error) {
 	// TODO: Once statedb.TreeView.Size() works, replace this by that.
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
 	processesTree, err := v.mainTreeViewer(isQuery).SubTree(ProcessesCfg)
 	if err != nil {
 		return 0, err
@@ -104,8 +108,8 @@ func (v *State) updateProcess(p *models.Process, pid []byte) error {
 	if p == nil || len(p.ProcessId) != types.ProcessIDsize {
 		return ErrProcessNotFound
 	}
-	v.Lock()
-	defer v.Unlock()
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
 	processesTree, err := v.Tx.SubTree(ProcessesCfg)
 	if err != nil {
 		return err
@@ -156,7 +160,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return fmt.Errorf("process %x can only be ended from ready status", pid)
 		}
 		if !process.Mode.Interruptible {
-			if v.Header(false).Height <= int64(process.BlockCount+process.StartBlock) {
+			if v.CurrentHeight() <= process.BlockCount+process.StartBlock {
 				return fmt.Errorf("process %x is not interruptible, cannot change state to %s",
 					pid, newstatus.String())
 			}
@@ -190,7 +194,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return fmt.Errorf("cannot set state to results from %s", currentStatus.String())
 		}
 		if currentStatus == models.ProcessStatus_READY &&
-			process.StartBlock+process.BlockCount <= v.Height() {
+			process.StartBlock+process.BlockCount <= v.CurrentHeight() {
 			return fmt.Errorf("cannot set state to results from %s, process is still alive",
 				currentStatus.String())
 		}
@@ -224,7 +228,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 		return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
 	}
 	if process.Status == models.ProcessStatus_READY &&
-		process.StartBlock+process.BlockCount > v.Height() {
+		process.StartBlock+process.BlockCount > v.CurrentHeight() {
 		return fmt.Errorf("cannot set state to results, process is still alive")
 	}
 	if !bytes.Equal(result.ProcessId, process.ProcessId) {
@@ -336,7 +340,7 @@ func NewProcessTxCheck(vtx *models.Tx, txBytes,
 	}
 
 	// start and endblock sanity check
-	if int64(tx.Process.StartBlock) < state.Header(false).Height {
+	if tx.Process.StartBlock < state.CurrentHeight() {
 		return nil, fmt.Errorf(
 			"cannot add process with start block lower than or equal to the current height")
 	}

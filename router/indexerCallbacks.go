@@ -15,15 +15,23 @@ import (
 func (r *Router) getStats(request RouterRequest) {
 	var err error
 	stats := new(api.VochainStats)
-	stats.BlockHeight = r.vocapp.Height()
-	stats.BlockTimeStamp = int32(r.vocapp.State.Header(true).Timestamp)
+	height := r.vocapp.Node.BlockStore().Height()
+	stats.BlockHeight = uint32(height)
+	block := r.vocapp.Node.BlockStore().LoadBlockMeta(height)
+	if block == nil {
+		r.SendError(request, fmt.Sprintf("could not get block at height %v", height))
+		return
+	}
+	stats.BlockTimeStamp = int32(block.Header.Time.Unix())
 	stats.EntityCount = int64(r.Scrutinizer.EntityCount())
 	if stats.EnvelopeCount, err = r.Scrutinizer.GetEnvelopeHeight([]byte{}); err != nil {
 		r.SendError(request, fmt.Sprintf("could not count vote envelopes: (%s)", err))
+		return
 	}
 	stats.ProcessCount = int64(r.Scrutinizer.ProcessCount([]byte{}))
 	if stats.TransactionCount, err = r.Scrutinizer.TransactionCount(); err != nil {
 		r.SendError(request, fmt.Sprintf("could not count transactions: (%s)", err))
+		return
 	}
 	vals, _ := r.vocapp.State.Validators(true)
 	stats.ValidatorCount = len(vals)

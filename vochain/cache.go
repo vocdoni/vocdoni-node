@@ -5,6 +5,7 @@ import (
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -34,13 +35,22 @@ func (v *State) CacheDel(id [32]byte) {
 	v.voteCache.Remove(id)
 }
 
-// CacheGet fetch an existing vote from the local cache
+// CacheGet fetch an existing vote from the local cache and returns a copy
 func (v *State) CacheGet(id [32]byte) *models.Vote {
 	record, ok := v.voteCache.Get(id)
 	if !ok || record == nil {
 		return nil
 	}
 	return record.(*models.Vote)
+}
+
+// CacheGetCopy fetch an existing vote from the local cache and returns a copy
+// which is thread-safe for writing.
+func (v *State) CacheGetCopy(id [32]byte) *models.Vote {
+	if vote := v.CacheGet(id); vote != nil {
+		return proto.Clone(vote).(*models.Vote)
+	}
+	return nil
 }
 
 // CacheHasNullifier fetch an existing vote from the local cache

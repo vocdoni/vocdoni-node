@@ -122,9 +122,9 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
 // It should be callend once the Vochain is syncronized in order to have the correct height.
 func (k *KeyKeeper) RevealUnpublished() {
 	// wait for vochain sync?
-	header := k.vochain.State.Header(true)
-	if header == nil {
-		log.Errorf("cannot get blockchain header, skipping RevealUnpublished operation")
+	height, err := k.vochain.State.LastHeight()
+	if err != nil {
+		log.Errorf("cannot get blockchain last height, skipping RevealUnpublished operation")
 		return
 	}
 	k.lock.Lock()
@@ -143,7 +143,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 			log.Errorf("cannot fetch block number from keykeeper database: (%s)", err)
 			return true
 		}
-		if header.Height <= h+1 {
+		if int64(height) <= h+1 {
 			return true
 		}
 		if err := proto.Unmarshal(value, &pids); err != nil {
@@ -168,7 +168,6 @@ func (k *KeyKeeper) RevealUnpublished() {
 	}
 
 	var pid []byte
-	var err error
 	var process *models.Process
 	// Second take all existing processes and check if keys should be
 	// revealed (if canceled), iterate over the prefix dbPrefixProcess
@@ -244,7 +243,7 @@ func (k *KeyKeeper) OnCancel(pid []byte, txindex int32) { // LEGACY
 
 	if p.EncryptionPublicKeys[k.myIndex] != "" {
 		log.Infof("process canceled, scheduling reveal keys for next block")
-		k.blockPool[string(pid)] = k.vochain.State.Header(false).Height + 1
+		k.blockPool[string(pid)] = int64(k.vochain.State.CurrentHeight()) + 1
 	}
 }
 
@@ -280,7 +279,7 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 	if p.EncryptionPublicKeys[k.myIndex] != "" {
 		if status == models.ProcessStatus_ENDED {
 			log.Infof("process ended, scheduling reveal keys for next block")
-			k.blockPool[string(pid)] = k.vochain.State.Header(false).Height + 1
+			k.blockPool[string(pid)] = int64(k.vochain.State.CurrentHeight()) + 1
 		}
 	}
 }

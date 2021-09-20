@@ -290,7 +290,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	)
 
 	// Get the block time from the Header
-	currentBlockTime := time.Unix(s.App.State.Header(false).Timestamp, 0)
+	currentBlockTime := time.Unix(s.App.TimestampStartBlock(), 0)
 
 	// Add the entity to the indexer database
 	eid := p.GetEntityId()

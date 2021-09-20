@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/log"
 	models "go.vocdoni.io/proto/build/go/models"
 )
@@ -28,7 +29,23 @@ func (r *Random) RandomBytes(n int) []byte {
 	return b
 }
 
-func TestState(t *testing.T) {
+func TestStateReopen(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewState(dir)
+	qt.Assert(t, err, qt.IsNil)
+	hash1Before, err := s.Save()
+	qt.Assert(t, err, qt.IsNil)
+
+	s.db.Close()
+
+	s, err = NewState(dir)
+	qt.Assert(t, err, qt.IsNil)
+	hash1After, err := s.Store.Hash()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, hash1After, qt.DeepEquals, hash1Before)
+}
+
+func TestStateBasic(t *testing.T) {
 	rng := newRandom(0)
 	log.Init("info", "stdout")
 	s, err := NewState(t.TempDir())
