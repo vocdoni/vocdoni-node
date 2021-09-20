@@ -3,6 +3,7 @@ package vochain
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/badgerdb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
@@ -183,38 +185,41 @@ type ErrHaltVochain struct {
 func (e ErrHaltVochain) Error() string { return fmt.Sprintf("halting vochain: %v", e.reason) }
 func (e ErrHaltVochain) Unwrap() error { return e.reason }
 
+// treeTxWithMutex is a wrapper over TreeTx with a mutex for convenient
+// RWLocking.
+type treeTxWithMutex struct {
+	*statedb.TreeTx
+	sync.RWMutex
+}
+
 // State represents the state of the vochain application
 type State struct {
-	Store             *statedb.StateDB
-	Tx                *statedb.TreeTx
-	mainTreeViewValue atomic.Value
-	voteCache         *lru.Cache
-	ImmutableState
+	// db is the underlying key-value database used by the StateDB
+	db    db.Database
+	Store *statedb.StateDB
+	// Tx must always be accessed via mutex because there will be
+	// concurrent operations on it.  In particular, while the Tx is being
+	// written serially via Tendermint DeliverTx (which updates the StateDB
+	// by processing Vochain transactions), parallel calls of Tendermint
+	// CheckTx happen (which read the temporary state kept in the Tx to
+	// validate Vochain transactions).
+	Tx                  treeTxWithMutex
+	mainTreeViewValue   atomic.Value
+	voteCache           *lru.Cache
 	mempoolRemoveTxKeys func([][32]byte, bool)
 	txCounter           int32
 	eventListeners      []EventListener
-	height              uint32
-}
-
-// NOTE(Edu): It is my understanding that all write operations to the State
-// come from processing transaction, which are always processed serially, and
-// thus no thread-safety is required.  The arbo-based StateDB supports
-// concurrent reads to the TreeView while a new transaction is opened and
-// written serially, so there should not be need for this mutex anymore.
-// TODO: Remove the mutex and the locking once we're ready to do integration
-// tests.
-// ImmutableState holds the latest trees version saved on disk
-type ImmutableState struct {
-	// Note that the mutex locks the entirety of the three IAVL trees, both
-	// their mutable and immutable components. An immutable tree is not safe
-	// for concurrent use with its parent mutable tree.
-	sync.RWMutex
+	currentHeight       uint32 // current height
 }
 
 // NewState creates a new State
 func NewState(dataDir string) (*State, error) {
 	var err error
-	sdb, err := initStateDB(dataDir)
+	db, err := badgerdb.New(badgerdb.Options{Path: dataDir})
+	if err != nil {
+		return nil, err
+	}
+	sdb, err := initStateDB(db)
 	if err != nil {
 		return nil, fmt.Errorf("cannot init StateDB: %s", err)
 	}
@@ -241,8 +246,9 @@ func NewState(dataDir string) (*State, error) {
 		return nil, err
 	}
 	s := &State{
+		db:        db,
 		Store:     sdb,
-		Tx:        tx,
+		Tx:        treeTxWithMutex{TreeTx: tx},
 		voteCache: voteCache,
 	}
 	s.setMainTreeView(mainTreeView)
@@ -250,12 +256,8 @@ func NewState(dataDir string) (*State, error) {
 }
 
 // initStateDB initializes the StateDB with the default subTrees
-func initStateDB(dataDir string) (*statedb.StateDB, error) {
+func initStateDB(db db.Database) (*statedb.StateDB, error) {
 	log.Infof("initializing StateDB")
-	db, err := badgerdb.New(badgerdb.Options{Path: dataDir})
-	if err != nil {
-		return nil, err
-	}
 	sdb := statedb.NewStateDB(db)
 	startTime := time.Now()
 	defer log.Infof("StateDB load took %s", time.Since(startTime))
@@ -272,24 +274,29 @@ func initStateDB(dataDir string) (*statedb.StateDB, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Create the Oracles, Validators and Processes subtrees (from
+	// mainTree) by adding leaves in the mainTree that contain the
+	// corresponding tree roots, and opening the subTrees for the first
+	// time.
 	if err := update.Add(OraclesCfg.Key(),
 		make([]byte, OraclesCfg.HashFunc().Len())); err != nil {
+		return nil, err
+	}
+	if _, err := update.SubTree(OraclesCfg); err != nil {
 		return nil, err
 	}
 	if err := update.Add(ValidatorsCfg.Key(),
 		make([]byte, ValidatorsCfg.HashFunc().Len())); err != nil {
 		return nil, err
 	}
+	if _, err := update.SubTree(ValidatorsCfg); err != nil {
+		return nil, err
+	}
 	if err := update.Add(ProcessesCfg.Key(),
 		make([]byte, ProcessesCfg.HashFunc().Len())); err != nil {
 		return nil, err
 	}
-	header := models.TendermintHeader{}
-	headerBytes, err := proto.Marshal(&header)
-	if err != nil {
-		return nil, err
-	}
-	if err := update.Add(headerKey, headerBytes); err != nil {
+	if _, err := update.SubTree(ProcessesCfg); err != nil {
 		return nil, err
 	}
 	return sdb, update.Commit()
@@ -328,15 +335,15 @@ var exist = []byte{1}
 
 // AddOracle adds a trusted oracle given its address if not exists
 func (v *State) AddOracle(address common.Address) error {
-	v.Lock()
-	defer v.Unlock()
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
 	return v.Tx.DeepSet(address.Bytes(), exist, OraclesCfg)
 }
 
 // RemoveOracle removes a trusted oracle given its address if exists
 func (v *State) RemoveOracle(address common.Address) error {
-	v.Lock()
-	defer v.Unlock()
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
 	oracles, err := v.Tx.SubTree(OraclesCfg)
 	if err != nil {
 		return err
@@ -351,8 +358,10 @@ func (v *State) RemoveOracle(address common.Address) error {
 
 // Oracles returns the current oracle list
 func (v *State) Oracles(isQuery bool) ([]common.Address, error) {
-	v.RLock()
-	defer v.RUnlock()
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
 
 	oraclesTree, err := v.mainTreeViewer(isQuery).SubTree(OraclesCfg)
 	if err != nil {
@@ -389,8 +398,8 @@ func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
 
 // AddValidator adds a tendemint validator if it is not already added
 func (v *State) AddValidator(validator *models.Validator) error {
-	v.Lock()
-	defer v.Unlock()
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
 	validatorBytes, err := proto.Marshal(validator)
 	if err != nil {
 		return err
@@ -400,8 +409,8 @@ func (v *State) AddValidator(validator *models.Validator) error {
 
 // RemoveValidator removes a tendermint validator identified by its address
 func (v *State) RemoveValidator(address []byte) error {
-	v.Lock()
-	defer v.Unlock()
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
 	validators, err := v.Tx.SubTree(ValidatorsCfg)
 	if err != nil {
 		return err
@@ -416,8 +425,10 @@ func (v *State) RemoveValidator(address []byte) error {
 
 // Validators returns a list of the validators saved on persistent storage
 func (v *State) Validators(isQuery bool) ([]*models.Validator, error) {
-	v.RLock()
-	defer v.RUnlock()
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
 
 	validatorsTree, err := v.mainTreeViewer(isQuery).SubTree(ValidatorsCfg)
 	if err != nil {
@@ -525,7 +536,7 @@ func (v *State) AddVote(vote *models.Vote) error {
 		return err
 	}
 	// save block number
-	vote.Height = v.Height()
+	vote.Height = v.CurrentHeight()
 	voteBytes, err := proto.Marshal(vote)
 	if err != nil {
 		return fmt.Errorf("cannot marshal vote: %w", err)
@@ -539,9 +550,9 @@ func (v *State) AddVote(vote *models.Vote) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal sdbVote: %w", err)
 	}
-	v.Lock()
+	v.Tx.Lock()
 	err = v.Tx.DeepAdd(vid, sdbVoteBytes, ProcessesCfg, VotesCfg.WithKey(vote.ProcessId))
-	v.Unlock()
+	v.Tx.Unlock()
 	if err != nil {
 		return err
 	}
@@ -573,8 +584,10 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ []byte, e
 	if err != nil {
 		return nil, err
 	}
-	v.RLock()
-	defer v.RUnlock() // needs to be deferred due to the recover above
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock() // needs to be deferred due to the recover above
+	}
 	votesTree, err := v.mainTreeViewer(isQuery).DeepSubTree(
 		ProcessesCfg, VotesCfg.WithKey(processID))
 	if err == arbo.ErrKeyNotFound {
@@ -611,8 +624,10 @@ func (v *State) EnvelopeExists(processID, nullifier []byte, isQuery bool) (bool,
 // if isQuery, the IAVL tree is used, otherwise the AVL tree is used.
 func (v *State) iterateVotes(processID []byte,
 	fn func(vid []byte, sdbVote *models.StateDBVote) bool, isQuery bool) error {
-	v.RLock()
-	defer v.RUnlock()
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
 	votesTree, err := v.mainTreeViewer(isQuery).DeepSubTree(
 		ProcessesCfg, VotesCfg.WithKey(processID))
 	if err != nil {
@@ -663,35 +678,20 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int,
 	return nullifiers
 }
 
-// Header returns the blockchain last block committed height
-func (v *State) Header(isQuery bool) *models.TendermintHeader {
-	v.RLock()
-	headerBytes, err := v.mainTreeViewer(isQuery).Get(headerKey)
-	v.RUnlock()
-	if err != nil {
-		log.Fatalf("cannot get headerKey from mainTree: %s", err)
-	}
-	var header models.TendermintHeader
-	if err := proto.Unmarshal(headerBytes, &header); err != nil {
-		log.Fatalf("cannot get proto.Unmarshal header: %s", err)
-	}
-	return &header
-}
-
 // Save persistent save of vochain mem trees
 func (v *State) Save() ([]byte, error) {
-	v.Lock()
+	v.Tx.Lock()
 	err := func() error {
 		if err := v.Tx.Commit(); err != nil {
 			return fmt.Errorf("cannot commit statedb tx: %w", err)
 		}
 		var err error
-		if v.Tx, err = v.Store.BeginTx(); err != nil {
+		if v.Tx.TreeTx, err = v.Store.BeginTx(); err != nil {
 			return fmt.Errorf("cannot begin statedb tx: %w", err)
 		}
 		return nil
 	}()
-	v.Unlock()
+	v.Tx.Unlock()
 	if err != nil {
 		return nil, err
 	}
@@ -700,7 +700,7 @@ func (v *State) Save() ([]byte, error) {
 		return nil, fmt.Errorf("cannot get statdeb mainTreeView: %w", err)
 	}
 	v.setMainTreeView(mainTreeView)
-	height := uint32(v.Header(false).Height)
+	height := v.CurrentHeight()
 	for _, l := range v.eventListeners {
 		if err := l.Commit(height); err != nil {
 			if _, fatal := err.(ErrHaltVochain); fatal {
@@ -709,7 +709,6 @@ func (v *State) Save() ([]byte, error) {
 			log.Warnf("event callback error on commit: %v", err)
 		}
 	}
-	atomic.StoreUint32(&v.height, height)
 	return v.Store.Hash()
 }
 
@@ -718,25 +717,49 @@ func (v *State) Rollback() {
 	for _, l := range v.eventListeners {
 		l.Rollback()
 	}
-	v.Lock()
-	defer v.Unlock()
-	v.Tx.Discard()
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
 	var err error
-	if v.Tx, err = v.Store.BeginTx(); err != nil {
+	if v.Tx.TreeTx, err = v.Store.BeginTx(); err != nil {
 		log.Fatalf("cannot begin statedb tx: %s", err)
 	}
 	atomic.StoreInt32(&v.txCounter, 0)
 }
 
-// Height returns the current state height (block count)
-func (v *State) Height() uint32 {
-	return atomic.LoadUint32(&v.height)
+// LastHeight returns the last commited height (block count)
+func (v *State) LastHeight() (uint32, error) {
+	v.Tx.RLock()
+	noState := v.mainTreeViewer(true).NoState()
+	heightLE, err := noState.Get(heightKey)
+	v.Tx.RUnlock()
+	if err == db.ErrKeyNotFound {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint32(heightLE), nil
+}
+
+// CurrentHeight returns the current state height (block count)
+func (v *State) CurrentHeight() uint32 {
+	return atomic.LoadUint32(&v.currentHeight)
+}
+
+// SetHeight sets the height for the current block
+func (v *State) SetHeight(height uint32) error {
+	atomic.StoreUint32(&v.currentHeight, height)
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	noState := v.Tx.NoState()
+	heightLE := make([]byte, 4)
+	binary.LittleEndian.PutUint32(heightLE, height)
+	return noState.Set(heightKey, heightLE)
 }
 
 // WorkingHash returns the hash of the vochain StateDB (mainTree.Root)
 func (v *State) WorkingHash() []byte {
-	v.RLock()
-	defer v.RUnlock()
+	v.Tx.RLock()
+	defer v.Tx.RUnlock()
 	hash, err := v.Tx.Root()
 	if err != nil {
 		panic(fmt.Sprintf("cannot get statedb mainTree root: %s", err))

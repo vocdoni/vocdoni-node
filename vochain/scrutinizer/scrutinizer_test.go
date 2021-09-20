@@ -517,7 +517,7 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	err = sc.updateProcess(pid)
 	qt.Assert(t, err, qt.IsNil)
-	err = sc.setResultsHeight(pid, uint32(app.State.Header(false).GetHeight()))
+	err = sc.setResultsHeight(pid, app.State.CurrentHeight())
 	qt.Assert(t, err, qt.IsNil)
 	err = sc.ComputeResult(pid)
 	qt.Assert(t, err, qt.IsNil)

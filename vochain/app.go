@@ -39,8 +39,12 @@ type BaseApplication struct {
 	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
 	blockCache         *lru.AtomicCache
 	height             uint32
-	timestamp          int64
-	chainId            string
+	// endBlockTimestamp is the last block end timestamp calculated from local time.
+	endBlockTimestamp int64
+	// startBlockTimestamp is the current block timestamp from tendermint's
+	// abcitypes.RequestBeginBlock.Header.Time
+	startBlockTimestamp int64
+	chainId             string
 	// ZkVks contains the VerificationKey for each circuit parameters index
 	ZkVks []*snarkTypes.Vk
 }
@@ -123,9 +127,14 @@ func (app *BaseApplication) Height() uint32 {
 	return atomic.LoadUint32(&app.height)
 }
 
-// Timestamp returns the last block timestamp
+// Timestamp returns the last block end timestamp
 func (app *BaseApplication) Timestamp() int64 {
-	return atomic.LoadInt64(&app.timestamp)
+	return atomic.LoadInt64(&app.endBlockTimestamp)
+}
+
+// TimestampStartBlock returns the current block start timestamp
+func (app *BaseApplication) TimestampStartBlock() int64 {
+	return atomic.LoadInt64(&app.startBlockTimestamp)
 }
 
 // ChainID returns the Node ChainID
@@ -139,7 +148,7 @@ func (app *BaseApplication) MempoolRemoveTx(txKey [32]byte) {
 	app.Node.Mempool().(*mempl.CListMempool).RemoveTxByKey(txKey, false)
 }
 
-// GetBlockByHeight retreies a full Tendermint block indexed by its height.
+// GetBlockByHeight retrieves a full Tendermint block indexed by its height.
 // This method uses an LRU cache for the blocks so in general it is more
 // convinient for high load operations than GetBlockByHash(), which does not use cache.
 func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
@@ -166,7 +175,7 @@ func (app *BaseApplication) GetBlockByHash(hash []byte) *tmtypes.Block {
 	return app.fnGetBlockByHash(hash)
 }
 
-// GetTx retreives a vochain transaction from the blockstore
+// GetTx retrieves a vochain transaction from the blockstore
 func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedTx, error) {
 	block := app.GetBlockByHeight(int64(height))
 	if block == nil {
@@ -179,7 +188,7 @@ func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedT
 	return tx, proto.Unmarshal(block.Txs[txIndex], tx)
 }
 
-// GetTxHash retreives a vochain transaction, with its hash, from the blockstore
+// GetTxHash retrieves a vochain transaction, with its hash, from the blockstore
 func (app *BaseApplication) GetTxHash(height uint32,
 	txIndex int32) (*models.SignedTx, []byte, error) {
 	block := app.GetBlockByHeight(int64(height))
@@ -212,12 +221,19 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	log.Infof("tendermint Core version: %s", req.Version)
 	log.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
 	log.Infof("tendermint Block protocol version: %d", req.BlockVersion)
-	header := app.State.Header(false)
+	lastHeight, err := app.State.LastHeight()
+	if err != nil {
+		log.Fatalf("cannot get Store.LastHeight: %v", err)
+	}
+	appHash, err := app.State.Store.Hash()
+	if err != nil {
+		log.Fatalf("cannot get Store.Hash: %v", err)
+	}
 	log.Infof("replaying blocks. Current height %d, current APP hash %x",
-		header.Height, header.AppHash)
+		lastHeight, appHash)
 	return abcitypes.ResponseInfo{
-		LastBlockHeight:  header.Height,
-		LastBlockAppHash: header.AppHash,
+		LastBlockHeight:  int64(lastHeight),
+		LastBlockAppHash: appHash,
 	}
 }
 
@@ -265,11 +281,11 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	if err != nil {
 		log.Fatalf("cannot marshal header: %s", err)
 	}
-	app.State.Lock()
+	app.State.Tx.Lock()
 	if err := app.State.Tx.Set(headerKey, headerBytes); err != nil {
 		log.Fatal(err)
 	}
-	app.State.Unlock()
+	app.State.Tx.Unlock()
 	// Is this save needed?
 	if _, err := app.State.Save(); err != nil {
 		log.Fatalf("cannot save state: %s", err)
@@ -285,27 +301,11 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 // punishments for the validators.
 func (app *BaseApplication) BeginBlock(
 	req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	header := &models.TendermintHeader{
-		Height:         req.Header.GetHeight(),
-		ConsensusHash:  req.Header.GetConsensusHash(),
-		AppHash:        req.Header.GetAppHash(),
-		BlockID:        req.Header.LastBlockId.GetHash(),
-		DataHash:       req.Header.GetDataHash(),
-		LastCommitHash: req.Header.GetLastCommitHash(),
-		Timestamp:      req.Header.GetTime().Unix(),
-	}
-	headerBytes, err := proto.Marshal(header)
-	if err != nil {
-		log.Warnf("cannot marshal header in BeginBlock")
-	}
-	// reset app state to latest persistent data
 	app.State.Rollback()
-	app.State.Lock()
-	if err = app.State.Tx.Set(headerKey, headerBytes); err != nil {
-		log.Fatal(err)
-	}
-	app.State.Unlock()
-	go app.State.CachePurge(uint32(header.Height))
+	atomic.StoreInt64(&app.startBlockTimestamp, req.Header.GetTime().Unix())
+	height := uint32(req.Header.GetHeight())
+	app.State.SetHeight(height)
+	go app.State.CachePurge(height)
 
 	return abcitypes.ResponseBeginBlock{}
 }
@@ -379,7 +379,7 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 // EndBlock updates the app height and timestamp at the end of the current block
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	atomic.StoreUint32(&app.height, uint32(req.Height))
-	atomic.StoreInt64(&app.timestamp, time.Now().Unix())
+	atomic.StoreInt64(&app.endBlockTimestamp, time.Now().Unix())
 	return abcitypes.ResponseEndBlock{}
 }
 

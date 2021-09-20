@@ -160,7 +160,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 	if process == nil || process.EnvelopeType == nil || process.Mode == nil {
 		return nil, fmt.Errorf("process %x malformed", ve.ProcessId)
 	}
-	height := app.State.Height()
+	height := app.State.CurrentHeight()
 	endBlock := process.StartBlock + process.BlockCount
 
 	if height < process.StartBlock || height > endBlock {
@@ -239,7 +239,12 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		// Every N seconds the old votes which are not yet in the blockchain will be removed from cache.
 		// If the same vote (but different transaction) is send to the mempool, the cache will detect it
 		// and vote will be discarted.
-		vote = app.State.CacheGet(txID)
+		// We use CacheGetCopy because we will modify the vote to set
+		// the Height.  If we don't work with a copy we are racing with
+		// concurrent reads to the votes in the cache which happen in
+		// in State.CachePurge run via a goroutine in
+		// started in BaseApplication.BeginBlock.
+		vote = app.State.CacheGetCopy(txID)
 
 		// if vote is in cache, lazy check and remove it from cache
 		if forCommit && vote != nil {
@@ -363,7 +368,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 			return fmt.Errorf("process does not require keys")
 		}
 
-		height := state.Height()
+		height := state.CurrentHeight()
 		// Specific checks
 		switch tx.Txtype {
 		case models.TxType_ADD_PROCESS_KEYS:

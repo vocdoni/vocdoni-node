@@ -24,6 +24,7 @@ var (
 	ErrProcessNotFound  = fmt.Errorf("process not found")
 	// keys; not constants because of []byte
 	headerKey = []byte("header")
+	heightKey = []byte("height")
 )
 
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases

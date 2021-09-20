@@ -57,7 +57,7 @@ func RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State)
 	if process == nil || process.EnvelopeType == nil || process.Mode == nil {
 		return fmt.Errorf("process %x malformed", tx.ProcessId)
 	}
-	if state.Height() >= process.StartBlock {
+	if state.CurrentHeight() >= process.StartBlock {
 		return fmt.Errorf("process %x already started", tx.ProcessId)
 	}
 	if process.Status != models.ProcessStatus_READY {
