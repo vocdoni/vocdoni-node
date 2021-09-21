@@ -11,8 +11,11 @@ import (
 // VochainInfo stores some metrics and information regarding the Vochain Blockchain
 // Avg1/10/60/360 are the block time average for 1 minute, 10 minutes, 1 hour and 6 hours
 type VochainInfo struct {
-	sync            bool
-	height          int64
+	sync   bool
+	height int64
+	// NOTE(Edu): After the integration of the arbo-based StateDB, there's
+	// no single voteTree, but we can still count total number of votes.  A
+	// more appropiate name for this variable would be voteCount
 	voteTreeSize    uint64
 	processTreeSize uint64
 	mempoolSize     int
@@ -99,7 +102,7 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 	var n1, n10, n60, n360, n1440, vm int64
 	var a1, a10, a60, a360, a1440 int32
 	var sync bool
-	// var oldVoteTreeSize uint64
+	var oldVoteTreeSize uint64
 	duration = time.Second * time.Duration(sleepSecs)
 	for {
 		select {
@@ -168,17 +171,15 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			if err != nil {
 				log.Errorf("cannot count processes: %s", err)
 			}
-			// NOTE: votes are now stored separately for each
-			// process, so there's no automatic way to get the
-			// total number of votes.  If having this value is
-			// desirable, we can add a counter in the State (stored
-			// in Storage)
-			// vi.voteTreeSize = vi.vnode.State.Store.Tree(vochain.VoteTree).Count()
-			// if sleepSecs*vm >= 60 {
-			// 	vi.votesPerMinute = int(vi.voteTreeSize) - int(oldVoteTreeSize)
-			// 	oldVoteTreeSize = vi.voteTreeSize
-			// 	vm = 0
-			// }
+			vi.voteTreeSize, err = vi.vnode.State.VoteCount(true)
+			if err != nil {
+				log.Errorf("cannot access vote count: %s", err)
+			}
+			if sleepSecs*vm >= 60 {
+				vi.votesPerMinute = int(vi.voteTreeSize) - int(oldVoteTreeSize)
+				oldVoteTreeSize = vi.voteTreeSize
+				vm = 0
+			}
 			vi.voteCacheSize = vi.vnode.State.CacheSize()
 			vi.mempoolSize = vi.vnode.Node.Mempool().Size()
 			vi.lock.Unlock()
