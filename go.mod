@@ -13,7 +13,7 @@ replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 
 
 require (
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210406120253-ab86bc2846d9
-	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210203222605-876755a714c3
+	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210323162413-ccaa6313370d
 	github.com/cosmos/iavl v0.15.3
 	github.com/deroproject/graviton v0.0.0-20201218180342-ab474f4c94d2
 	github.com/dgraph-io/badger/v3 v3.2103.1
@@ -30,7 +30,7 @@ require (
 	github.com/ipfs/go-ipfs-keystore v0.0.2
 	github.com/ipfs/go-log v1.0.5
 	github.com/ipfs/interface-go-ipfs-core v0.4.0
-	github.com/klauspost/compress v1.13.1
+	github.com/klauspost/compress v1.13.6
 	github.com/libp2p/go-libp2p v0.14.4
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
 	github.com/libp2p/go-libp2p-core v0.8.6
@@ -41,11 +41,11 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/p4u/recws v1.2.2-0.20201005083112-7be7f9397e75
 	github.com/prometheus/client_golang v1.10.0
-	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible
+	github.com/shirou/gopsutil v3.21.8+incompatible
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.8.1
-	github.com/tendermint/tendermint v0.34.10
+	github.com/tendermint/tendermint v0.34.13
 	github.com/tendermint/tm-db v0.6.4
 	github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f
 	github.com/vocdoni/arbo v0.0.0-20210909102959-f09b0b039255
@@ -54,10 +54,10 @@ require (
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.uber.org/zap v1.18.1
 	go.vocdoni.io/proto v1.0.4-0.20210910152144-4f30a5b8664c
-	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
-	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
+	golang.org/x/crypto v0.0.0-20210920023735-84f357641f63
+	golang.org/x/net v0.0.0-20210917221730-978cfadd31cf
 	google.golang.org/protobuf v1.27.1
-	nhooyr.io/websocket v1.8.6
+	nhooyr.io/websocket v1.8.7
 )
 
 // Duktape is very slow to build, and can't be built with multiple cores since
