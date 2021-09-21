@@ -176,7 +176,7 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 			bucketVT := newVT(t.params.maxLevels, t.params.hashFunction)
 			bucketVT.root = nodesAtL[cpu]
 			for j := 0; j < len(buckets[cpu]); j++ {
-				if err = bucketVT.add(l, buckets[cpu][j].k, buckets[cpu][j].v); err != nil {
+				if err := bucketVT.add(l, buckets[cpu][j].k, buckets[cpu][j].v); err != nil {
 					invalidsInBucket[cpu] = append(invalidsInBucket[cpu], buckets[cpu][j].pos)
 				}
 			}
@@ -321,7 +321,7 @@ func (t *vt) computeHashes() ([][2][]byte, error) {
 			bucketVT := newVT(t.params.maxLevels, t.params.hashFunction)
 			bucketVT.params.dbg = newDbgStats()
 			bucketVT.root = nodesAtL[cpu]
-
+			var err error
 			bucketPairs[cpu], err = bucketVT.root.computeHashes(l-1,
 				t.params.maxLevels, bucketVT.params, bucketPairs[cpu])
 			if err != nil {
