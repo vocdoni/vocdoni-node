@@ -373,8 +373,6 @@ func NewProcessTxCheck(vtx *models.Tx, txBytes,
 		// We consider the zero value as nil for security
 		tx.Process.EncryptionPublicKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 		tx.Process.EncryptionPrivateKeys = make([]string, types.KeyKeeperMaxKeyIndex)
-		tx.Process.CommitmentKeys = make([]string, types.KeyKeeperMaxKeyIndex)
-		tx.Process.RevealKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 	}
 	return tx.Process, nil
 }

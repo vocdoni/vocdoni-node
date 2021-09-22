@@ -19,8 +19,6 @@ import (
 type pkeys struct {
 	pub  []api.Key
 	priv []api.Key
-	comm []api.Key
-	rev  []api.Key
 }
 
 func (c *Client) GetEnvelopeStatus(nullifier, pid []byte) (bool, error) {
@@ -148,8 +146,6 @@ func (c *Client) GetKeys(pid, eid []byte) (*pkeys, error) {
 	return &pkeys{
 		pub:  resp.EncryptionPublicKeys,
 		priv: resp.EncryptionPrivKeys,
-		comm: resp.CommitmentKeys,
-		rev:  resp.RevealKeys,
 	}, nil
 }
 
