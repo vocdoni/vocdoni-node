@@ -7,7 +7,7 @@ jobs:
   go-tests:
     runs-on: self-hosted
     container:
-      image: golang:1.16.5
+      image: golang:1.17.1
       options: --user 1000
     if: github.repository == 'vocdoni/vocdoni-node'
     defaults:
@@ -26,7 +26,7 @@ jobs:
         run: |
           diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
           go vet ./...
-          curl -L https://github.com/dominikh/go-tools/releases/download/2021.1/staticcheck_linux_amd64.tar.gz | tar -xzf -
+          curl -L https://github.com/dominikh/go-tools/releases/download/2021.1.1/staticcheck_linux_amd64.tar.gz | tar -xzf -
           ./staticcheck/staticcheck ./...
 
   compose-test:
