@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:experimental
 
-FROM golang:1.16.5 AS builder
+FROM golang:1.17.1 AS builder
 
 ARG BUILDARGS
 
@@ -10,17 +10,17 @@ WORKDIR /src
 COPY . .
 RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
-	go build -trimpath -tags=badgerdb -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" -mod=readonly $BUILDARGS \
+	go build -trimpath -tags=badgerdb -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
 	./cmd/dvotenode ./cmd/vochaintest
 
-FROM debian:10.10-slim AS test
+FROM debian:11.0-slim AS test
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 RUN apt update && apt install -y curl
 COPY --from=builder /src/vochaintest ./
 
-FROM debian:10.10-slim
+FROM debian:11.0-slim
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
