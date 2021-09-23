@@ -53,7 +53,7 @@ require (
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.uber.org/zap v1.18.1
-	go.vocdoni.io/proto v1.0.4-0.20210910152144-4f30a5b8664c
+	go.vocdoni.io/proto v1.0.4-0.20210922091620-af1d75fc6de2
 	golang.org/x/crypto v0.0.0-20210920023735-84f357641f63
 	golang.org/x/net v0.0.0-20210917221730-978cfadd31cf
 	google.golang.org/protobuf v1.27.1

@@ -171,8 +171,8 @@ type EventListener interface {
 	OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)
 	OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32)
 	OnCancel(pid []byte, txIndex int32)
-	OnProcessKeys(pid []byte, encryptionPub, commitment string, txIndex int32)
-	OnRevealKeys(pid []byte, encryptionPriv, reveal string, txIndex int32)
+	OnProcessKeys(pid []byte, encryptionPub string, txIndex int32)
+	OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32)
 	OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) error
 	Commit(height uint32) (err error)
 	Rollback()
@@ -468,11 +468,6 @@ func (v *State) AddProcessKeys(tx *models.AdminTx) error {
 	if err != nil {
 		return err
 	}
-	if tx.CommitmentKey != nil {
-		process.CommitmentKeys[*tx.KeyIndex] = fmt.Sprintf("%x", tx.CommitmentKey)
-		log.Debugf("added commitment key %d for process %x: %x",
-			*tx.KeyIndex, tx.ProcessId, tx.CommitmentKey)
-	}
 	if tx.EncryptionPublicKey != nil {
 		process.EncryptionPublicKeys[*tx.KeyIndex] = fmt.Sprintf("%x", tx.EncryptionPublicKey)
 		log.Debugf("added encryption key %d for process %x: %x",
@@ -486,8 +481,7 @@ func (v *State) AddProcessKeys(tx *models.AdminTx) error {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnProcessKeys(tx.ProcessId, fmt.Sprintf("%x", tx.EncryptionPublicKey),
-			fmt.Sprintf("%x", tx.CommitmentKey), v.TxCounter())
+		l.OnProcessKeys(tx.ProcessId, fmt.Sprintf("%x", tx.EncryptionPublicKey), v.TxCounter())
 	}
 	return nil
 }
@@ -504,13 +498,6 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	if process.KeyIndex == nil || *process.KeyIndex < 1 {
 		return fmt.Errorf("no keys to reveal, keyIndex is < 1")
 	}
-	rkey := ""
-	if tx.RevealKey != nil {
-		rkey = fmt.Sprintf("%x", tx.RevealKey)
-		process.RevealKeys[*tx.KeyIndex] = rkey // TBD: Change hex strings for []byte
-		log.Debugf("revealed commitment key %d for process %x: %x",
-			*tx.KeyIndex, tx.ProcessId, tx.RevealKey)
-	}
 	ekey := ""
 	if tx.EncryptionPrivateKey != nil {
 		ekey = fmt.Sprintf("%x", tx.EncryptionPrivateKey)
@@ -523,7 +510,7 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnRevealKeys(tx.ProcessId, ekey, rkey, v.TxCounter())
+		l.OnRevealKeys(tx.ProcessId, ekey, v.TxCounter())
 	}
 	return nil
 }

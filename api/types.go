@@ -187,7 +187,6 @@ type MetaResponse struct {
 	CensusKeys           [][]byte                         `json:"censusKeys,omitempty"`
 	CensusValues         []types.HexBytes                 `json:"censusValues,omitempty"`
 	CensusDump           []byte                           `json:"censusDump,omitempty"`
-	CommitmentKeys       []Key                            `json:"commitmentKeys,omitempty"`
 	Content              []byte                           `json:"content,omitempty"`
 	CreationTime         int64                            `json:"creationTime,omitempty"`
 	EncryptionPrivKeys   []Key                            `json:"encryptionPrivKeys,omitempty"`
@@ -216,7 +215,6 @@ type MetaResponse struct {
 	Registered           *bool                            `json:"registered,omitempty"`
 	Request              string                           `json:"request"`
 	Results              [][]string                       `json:"results,omitempty"`
-	RevealKeys           []Key                            `json:"revealKeys,omitempty"`
 	Root                 types.HexBytes                   `json:"root,omitempty"`
 	Siblings             types.HexBytes                   `json:"siblings,omitempty"`
 	Size                 *int64                           `json:"size,omitempty"`

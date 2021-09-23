@@ -281,7 +281,7 @@ func (r *Router) getProcessKeys(request RouterRequest) {
 		return
 	}
 	var response api.MetaResponse
-	var pubs, privs, coms, revs []api.Key
+	var pubs, privs []api.Key
 	for idx, pubk := range process.EncryptionPublicKeys {
 		if len(pubk) > 0 {
 			pubs = append(pubs, api.Key{Idx: idx, Key: pubk})
@@ -292,20 +292,8 @@ func (r *Router) getProcessKeys(request RouterRequest) {
 			privs = append(privs, api.Key{Idx: idx, Key: privk})
 		}
 	}
-	for idx, comk := range process.CommitmentKeys {
-		if len(comk) > 0 {
-			coms = append(coms, api.Key{Idx: idx, Key: comk})
-		}
-	}
-	for idx, revk := range process.RevealKeys {
-		if len(revk) > 0 {
-			revs = append(revs, api.Key{Idx: idx, Key: revk})
-		}
-	}
 	response.EncryptionPublicKeys = pubs
 	response.EncryptionPrivKeys = privs
-	response.CommitmentKeys = coms
-	response.RevealKeys = revs
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}

@@ -445,7 +445,7 @@ func (s *Scrutinizer) OnCancel(pid []byte, txIndex int32) {
 }
 
 // OnProcessKeys does nothing
-func (s *Scrutinizer) OnProcessKeys(pid []byte, pub, commit string, txIndex int32) {
+func (s *Scrutinizer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
@@ -464,7 +464,7 @@ func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessSta
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
-func (s *Scrutinizer) OnRevealKeys(pid []byte, priv, reveal string, txIndex int32) {
+func (s *Scrutinizer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)

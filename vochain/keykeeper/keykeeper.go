@@ -26,7 +26,6 @@ import (
 // keys are deterministic and can be re-created at any time.
 
 const (
-	commitmentKeySize = nacl.KeyLength
 	encryptionKeySize = nacl.KeyLength
 	dbPrefixProcess   = "p_"
 	dbPrefixBlock     = "b_"
@@ -43,16 +42,14 @@ type KeyKeeper struct {
 }
 
 type processKeys struct {
-	pubKey        []byte
-	privKey       []byte
-	revealKey     []byte
-	commitmentKey []byte
-	index         int8
+	pubKey  []byte
+	privKey []byte
+	index   int8
 }
 
 // Encode encodes processKeys to bytes
 func (pk *processKeys) Encode() []byte {
-	data := make([]byte, commitmentKeySize*2+encryptionKeySize*2+1)
+	data := make([]byte, encryptionKeySize*2+1)
 	i := 0
 
 	copy(data, pk.pubKey)
@@ -61,18 +58,13 @@ func (pk *processKeys) Encode() []byte {
 	copy(data[i:], pk.privKey)
 	i += encryptionKeySize
 
-	copy(data[i:], pk.revealKey)
-	i += commitmentKeySize
-
-	copy(data[i:], pk.commitmentKey)
-
-	data[128] = byte(pk.index)
+	data[i] = byte(pk.index)
 	return data
 }
 
 // Decode decodes processKeys from data
 func (pk *processKeys) Decode(data []byte) error {
-	if len(data) < commitmentKeySize*2+encryptionKeySize*2+1 {
+	if len(data) < encryptionKeySize*2+1 {
 		return fmt.Errorf("cannot decode, data too small")
 	}
 	i := 0
@@ -82,12 +74,6 @@ func (pk *processKeys) Decode(data []byte) error {
 
 	pk.privKey = append([]byte(nil), data[i:i+encryptionKeySize]...)
 	i += encryptionKeySize
-
-	pk.revealKey = append([]byte(nil), data[i:i+commitmentKeySize]...)
-	i += commitmentKeySize
-
-	pk.commitmentKey = append([]byte(nil), data[i:i+commitmentKeySize]...)
-	i += commitmentKeySize
 
 	pk.index = int8(data[i])
 	return nil
@@ -112,8 +98,6 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
 		return nil, err
 	}
 	k.myIndex = index
-	// k.vochain.Codec.RegisterConcrete(&processKeys{}, "vocdoni/keykeeper.processKeys", nil)
-	// k.vochain.Codec.RegisterConcrete(processKeys{}, "processKeys", nil)
 	k.vochain.State.AddEventListener(k)
 	return k, nil
 }
@@ -210,7 +194,7 @@ func (k *KeyKeeper) OnProcess(pid, eid []byte, censusRoot, censusURI string, txi
 		return
 	}
 	// If keys already exist, do nothing (this happens on the start-up block replay)
-	if len(p.EncryptionPublicKeys[k.myIndex])+len(p.CommitmentKeys[k.myIndex]) > 0 {
+	if len(p.EncryptionPublicKeys[k.myIndex]) > 0 {
 		return
 	}
 	log.Debugf("generating key for process %x", pid)
@@ -266,7 +250,7 @@ func (k *KeyKeeper) OnNewTx(blockHeight uint32, txIndex int32) {
 }
 
 // OnProcessStatusChange will publish the private
-// and reveal keys of the ended process, if required
+// keys of the ended process, if required
 func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
@@ -285,12 +269,12 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 }
 
 // OnProcessKeys does nothing
-func (k *KeyKeeper) OnProcessKeys(pid []byte, pub, com string, txindex int32) {
+func (k *KeyKeeper) OnProcessKeys(pid []byte, pub string, txindex int32) {
 	// do nothing
 }
 
 // OnRevealKeys does nothing
-func (k *KeyKeeper) OnRevealKeys(pid []byte, priv, rev string, txindex int32) {
+func (k *KeyKeeper) OnRevealKeys(pid []byte, priv string, txindex int32) {
 	// do nothing
 }
 
@@ -303,8 +287,6 @@ func (k *KeyKeeper) OnProcessResults(pid []byte,
 
 // Generate Keys generates a set of encryption/commitment keys for a process.
 // Encryption private key = hash(signer.privKey + processId + keyIndex).
-// Reveal key is hashPoseidon(key).
-// Commitment key is hashPoseidon(revealKey)
 func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {
 	// Generate keys
 	// Add the index in order to win some extra entropy
@@ -315,17 +297,10 @@ func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot generate encryption key: (%s)", err)
 	}
-	// Reveal and commitment keys
-	ckb := ethereum.HashRaw(priv.Bytes())
-	ck := ckb[:commitmentKeySize]
-	ckhash := ethereum.HashRaw(ckb)[:commitmentKeySize]
-
 	pk := &processKeys{
-		privKey:       priv.Bytes(),
-		pubKey:        priv.Public().Bytes(),
-		revealKey:     ck,
-		commitmentKey: ckhash,
-		index:         k.myIndex,
+		privKey: priv.Bytes(),
+		pubKey:  priv.Public().Bytes(),
+		index:   k.myIndex,
 	}
 	return pk, nil
 }
@@ -442,7 +417,6 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 		Nonce:               util.RandomBytes(32),
 		ProcessId:           []byte(pid),
 		EncryptionPublicKey: pk.pubKey,
-		CommitmentKey:       pk.commitmentKey,
 	}
 	if err := k.signAndSendTx(tx); err != nil {
 		return err
@@ -470,22 +444,6 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 // Insecure
 // revealKeys reveals the keys for a given process
 func (k *KeyKeeper) revealKeys(pid string) error {
-	/*	dbKey := []byte(dbPrefixProcess + pid)
-		data, err := k.storage.Get(dbKey)
-		if err != nil {
-			return fmt.Errorf("cannot fetch reveal keys from storage: (%s)", err)
-		}
-		if len(data) == 0 {
-			return fmt.Errorf("no keys data found on storage")
-		}
-		var pk processKeys
-		if err := pk.Decode(data); err != nil {
-			return fmt.Errorf("cannot unmarshal process keys: (%s)", err)
-		}
-		if len(pk.privKey) < 32 && len(pk.revealKey) < commitmentKeySize {
-			return fmt.Errorf("empty process keys")
-		}
-	*/
 	pk, err := k.generateKeys([]byte(pid))
 	if err != nil {
 		return err
@@ -498,16 +456,12 @@ func (k *KeyKeeper) revealKeys(pid string) error {
 		Nonce:                util.RandomBytes(32),
 		ProcessId:            []byte(pid),
 		EncryptionPrivateKey: pk.privKey,
-		RevealKey:            pk.revealKey,
 	}
 	if err := k.signAndSendTx(tx); err != nil {
 		return err
 	}
 	if len(pk.privKey) > 0 {
 		log.Infof("revealing encryption key for process %x", pid)
-	}
-	if len(pk.revealKey) > 0 {
-		log.Infof("revealing commitment key for process %x", pid)
 	}
 
 	wTx := k.storage.WriteTx()

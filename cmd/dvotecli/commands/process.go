@@ -161,17 +161,9 @@ func processKeys(cmd *cobra.Command, args []string) error {
 	for _, pubk := range resp.EncryptionPublicKeys {
 		fmt.Fprintf(buffer, "%v ", pubk.Key)
 	}
-	buffer.WriteString("\nCommitment Keys: ")
-	for _, cmk := range resp.CommitmentKeys {
-		fmt.Fprintf(buffer, "%v ", cmk.Key)
-	}
 	buffer.WriteString("\nEncryption Private Keys: ")
 	for _, pvk := range resp.EncryptionPrivKeys {
 		fmt.Fprintf(buffer, "%v ", pvk.Key)
-	}
-	buffer.WriteString("\nReveal Keys: ")
-	for _, rvk := range resp.RevealKeys {
-		fmt.Fprintf(buffer, "%v ", rvk.Key)
 	}
 	fmt.Print(buffer.String())
 	return err

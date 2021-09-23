@@ -13,15 +13,11 @@ import (
 func TestEncodeDecode(t *testing.T) {
 	priv1, err := nacl.Generate(rand.Reader)
 	qt.Assert(t, err, qt.IsNil)
-	priv2, err := nacl.Generate(rand.Reader)
-	qt.Assert(t, err, qt.IsNil)
 
 	pk := processKeys{
-		pubKey:        priv1.Public().Bytes(),
-		privKey:       priv1.Bytes(),
-		revealKey:     priv2.Public().Bytes(),
-		commitmentKey: priv2.Bytes(),
-		index:         5,
+		pubKey:  priv1.Public().Bytes(),
+		privKey: priv1.Bytes(),
+		index:   5,
 	}
 	data := pk.Encode()
 	t.Logf("encoded data: %x", data)

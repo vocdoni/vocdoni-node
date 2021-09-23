@@ -385,8 +385,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 				process.Status == models.ProcessStatus_RESULTS {
 				return fmt.Errorf("cannot add process keys to a %s process", process.Status)
 			}
-			if len(process.EncryptionPublicKeys[*tx.KeyIndex])+
-				len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
+			if len(process.EncryptionPublicKeys[*tx.KeyIndex]) > 0 {
 				return fmt.Errorf("keys for process %x already revealed", tx.ProcessId)
 			}
 			// check included keys and keyindex are valid
@@ -403,7 +402,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 					process.Status == models.ProcessStatus_CANCELED) {
 				return fmt.Errorf("cannot reveal keys before the process is finished")
 			}
-			if len(process.EncryptionPrivateKeys[*tx.KeyIndex])+len(process.RevealKeys[*tx.KeyIndex]) > 0 {
+			if len(process.EncryptionPrivateKeys[*tx.KeyIndex]) > 0 {
 				return fmt.Errorf("keys for process %x already revealed", tx.ProcessId)
 			}
 			// check the keys are valid
@@ -449,13 +448,12 @@ func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		return fmt.Errorf("key index is nil")
 	}
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if (tx.CommitmentKey == nil && tx.EncryptionPublicKey == nil) ||
+	if (tx.EncryptionPublicKey == nil) ||
 		*tx.KeyIndex < 1 || *tx.KeyIndex > types.KeyKeeperMaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex is not already used
-	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) > 0 ||
-		len(process.CommitmentKeys[*tx.KeyIndex]) > 0 {
+	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) > 0 {
 		return fmt.Errorf("key index %d already exists", tx.KeyIndex)
 	}
 	// TBD check that provided keys are correct (ed25519 for encryption and size for Commitment)
@@ -467,13 +465,12 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		return fmt.Errorf("key index is nil")
 	}
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
-	if (tx.RevealKey == nil && tx.EncryptionPrivateKey == nil) ||
+	if (tx.EncryptionPrivateKey == nil) ||
 		*tx.KeyIndex < 1 || *tx.KeyIndex > types.KeyKeeperMaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex exists
-	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) < 1 ||
-		len(process.CommitmentKeys[*tx.KeyIndex]) < 1 {
+	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) < 1 {
 		return fmt.Errorf("key index %d does not exist", *tx.KeyIndex)
 	}
 	// check keys actually work
@@ -488,15 +485,6 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		} else {
 			return err
 		}
-	}
-	if tx.RevealKey != nil {
-		commitment := ethereum.HashRaw(tx.RevealKey)
-		if fmt.Sprintf("%x", commitment) != process.CommitmentKeys[*tx.KeyIndex] {
-			log.Debugf("%x != %s", commitment, process.CommitmentKeys[*tx.KeyIndex])
-			return fmt.Errorf("the provided commitment reveal key does not match "+
-				"with the stored for index %d", *tx.KeyIndex)
-		}
-
 	}
 	return nil
 }

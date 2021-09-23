@@ -79,11 +79,11 @@ func (c *CensusDownloader) OnProcess(pid, eid []byte, censusRoot, censusURI stri
 }
 
 // NOT USED but required for implementing the interface
-func (c *CensusDownloader) OnCancel(pid []byte, txindex int32)                       {}
-func (c *CensusDownloader) OnVote(v *models.Vote, txindex int32)                     {}
-func (c *CensusDownloader) OnNewTx(blockHeight uint32, txIndex int32)                {}
-func (c *CensusDownloader) OnProcessKeys(pid []byte, pub, com string, txindex int32) {}
-func (c *CensusDownloader) OnRevealKeys(pid []byte, priv, rev string, txindex int32) {}
+func (c *CensusDownloader) OnCancel(pid []byte, txindex int32)                  {}
+func (c *CensusDownloader) OnVote(v *models.Vote, txindex int32)                {}
+func (c *CensusDownloader) OnNewTx(blockHeight uint32, txIndex int32)           {}
+func (c *CensusDownloader) OnProcessKeys(pid []byte, pub string, txindex int32) {}
+func (c *CensusDownloader) OnRevealKeys(pid []byte, priv string, txindex int32) {}
 func (c *CensusDownloader) OnProcessStatusChange(pid []byte,
 	status models.ProcessStatus, txindex int32) {
 }
