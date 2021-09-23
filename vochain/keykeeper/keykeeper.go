@@ -49,7 +49,7 @@ type processKeys struct {
 
 // Encode encodes processKeys to bytes
 func (pk *processKeys) Encode() []byte {
-	data := make([]byte, +encryptionKeySize*2+1)
+	data := make([]byte, encryptionKeySize*2+1)
 	i := 0
 
 	copy(data, pk.pubKey)
@@ -98,8 +98,6 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
 		return nil, err
 	}
 	k.myIndex = index
-	// k.vochain.Codec.RegisterConcrete(&processKeys{}, "vocdoni/keykeeper.processKeys", nil)
-	// k.vochain.Codec.RegisterConcrete(processKeys{}, "processKeys", nil)
 	k.vochain.State.AddEventListener(k)
 	return k, nil
 }
@@ -252,7 +250,7 @@ func (k *KeyKeeper) OnNewTx(blockHeight uint32, txIndex int32) {
 }
 
 // OnProcessStatusChange will publish the private
-// and reveal keys of the ended process, if required
+// keys of the ended process, if required
 func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
@@ -289,8 +287,6 @@ func (k *KeyKeeper) OnProcessResults(pid []byte,
 
 // Generate Keys generates a set of encryption/commitment keys for a process.
 // Encryption private key = hash(signer.privKey + processId + keyIndex).
-// Reveal key is hashPoseidon(key).
-// Commitment key is hashPoseidon(revealKey)
 func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {
 	// Generate keys
 	// Add the index in order to win some extra entropy
@@ -448,22 +444,6 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 // Insecure
 // revealKeys reveals the keys for a given process
 func (k *KeyKeeper) revealKeys(pid string) error {
-	/*	dbKey := []byte(dbPrefixProcess + pid)
-		data, err := k.storage.Get(dbKey)
-		if err != nil {
-			return fmt.Errorf("cannot fetch reveal keys from storage: (%s)", err)
-		}
-		if len(data) == 0 {
-			return fmt.Errorf("no keys data found on storage")
-		}
-		var pk processKeys
-		if err := pk.Decode(data); err != nil {
-			return fmt.Errorf("cannot unmarshal process keys: (%s)", err)
-		}
-		if len(pk.privKey) < 32 && len(pk.revealKey) < commitmentKeySize {
-			return fmt.Errorf("empty process keys")
-		}
-	*/
 	pk, err := k.generateKeys([]byte(pid))
 	if err != nil {
 		return err

@@ -131,7 +131,7 @@ const (
 
 	// KeyKeeper
 
-	// KeyKeeperMaxKeyIndex is the maxim number of allowed Encryption or Commitment keys
+	// KeyKeeperMaxKeyIndex is the maxim number of allowed encryption keys
 	KeyKeeperMaxKeyIndex = 16
 
 	// List of transition names
