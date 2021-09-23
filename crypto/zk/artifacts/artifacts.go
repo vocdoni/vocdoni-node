@@ -85,6 +85,42 @@ func DownloadCircuitFiles(ctx context.Context, c CircuitsConfig) error {
 	return downloadFiles(ctx, c)
 }
 
+// DownloadVKFile will download the circuit VerificationKey in the specified
+// path, checking the expected sha256 hash of the file. If the file already
+// exist in the path, it will not download it again but it will check the hash
+// of the existing file.
+func DownloadVKFile(ctx context.Context, c CircuitsConfig) error {
+	err := checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameVK), c.VKHash)
+	if err == nil {
+		// VK file already exist, and match the expected hash
+		return err
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	// proceed to download the VK file
+	if err := os.MkdirAll(filepath.Join(c.LocalDir, c.CircuitsPath), os.ModePerm); err != nil {
+		return err
+	}
+	u, err := url.Parse(c.URL)
+	if err != nil {
+		return err
+	}
+	u.Path = path.Join(u.Path, c.CircuitsPath, FilenameVK)
+	if err := downloadFile(ctx,
+		u.String(),
+		filepath.Join(c.LocalDir, c.CircuitsPath, FilenameVK),
+	); err != nil {
+		return err
+	}
+	if err := checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameVK),
+		c.VKHash); err != nil {
+		return fmt.Errorf("error on download VerificationKey (VK) file from %s, %s", c.URL, err)
+	}
+	return nil
+}
+
 func checkHashes(c CircuitsConfig) error {
 	err := checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameWitness), c.WitnessHash)
 	if err != nil {
