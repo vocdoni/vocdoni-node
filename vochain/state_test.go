@@ -72,6 +72,9 @@ func TestStateBasic(t *testing.T) {
 				t.Error(err)
 			}
 		}
+		totalVotes, err := s.VoteCount(false)
+		qt.Assert(t, err, qt.IsNil)
+		qt.Assert(t, totalVotes, qt.Equals, uint64(10*(i+1)))
 	}
 	s.Save()
 
@@ -87,6 +90,13 @@ func TestStateBasic(t *testing.T) {
 	if err == nil {
 		t.Errorf("process must not exist")
 	}
+
+	totalVotes, err := s.VoteCount(false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, totalVotes, qt.Equals, uint64(100*10))
+	totalVotes, err = s.VoteCount(true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, totalVotes, qt.Equals, uint64(100*10))
 
 	votes := s.CountVotes(pids[40], false)
 	if votes != 10 {

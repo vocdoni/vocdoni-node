@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	tree "go.vocdoni.io/dvote/censustreelegacy/gravitontree"
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -40,7 +40,9 @@ func BenchmarkCheckTx(b *testing.B) {
 
 func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 	nvoters int, tmpDir string) (voters []*models.SignedTx) {
-	tr, err := tree.NewTree(util.RandomHex(12), tmpDir)
+	tr, err := censustree.New(nil,
+		censustree.Options{Name: util.RandomHex(12), StorageDir: tmpDir,
+			MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -52,14 +54,14 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 	claims := []string{}
 	for _, k := range keys {
 		c := k.PublicKey()
-		if err := tr.Add(c, nil); err != nil {
+		if err := tr.Add(nil, c, nil); err != nil {
 			b.Error(err)
 		}
 		claims = append(claims, string(c))
 	}
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
-	root, err := tr.Root()
+	root, err := tr.Root(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -81,7 +83,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 
 	var proof []byte
 	for i, s := range keys {
-		proof, err = tr.GenProof([]byte(claims[i]), nil)
+		_, proof, err = tr.GenProof(nil, []byte(claims[i]))
 		if err != nil {
 			b.Fatal(err)
 		}

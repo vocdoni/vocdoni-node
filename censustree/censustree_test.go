@@ -4,9 +4,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/vocdoni/arbo"
-	"go.vocdoni.io/dvote/db/badgerdb"
-	"go.vocdoni.io/dvote/tree"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // NOTE: most of the methods of CensusTree are just wrappers over tree.Tree.
@@ -14,10 +12,7 @@ import (
 // added code in the CensusTree wrapper.
 
 func TestPublish(t *testing.T) {
-	database, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
-	qt.Assert(t, err, qt.IsNil)
-
-	censusTree, err := New(nil, tree.Options{DB: database, MaxLevels: 100, HashFunc: arbo.HashFunctionBlake2b})
+	censusTree, err := New(nil, Options{Name: "test", StorageDir: t.TempDir(), MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
 	qt.Assert(t, err, qt.IsNil)
 
 	qt.Assert(t, censusTree.IsPublic(), qt.IsFalse)

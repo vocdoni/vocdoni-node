@@ -1,6 +1,7 @@
 package census
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -10,15 +11,8 @@ import (
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
-)
-
-const (
-	censusHTTPhandlerTimeout   = 30 * time.Second
-	censusRemoteStorageTimeout = 1 * time.Minute
-	censusDefaultType          = models.Census_GRAVITON
 )
 
 type CensusDump struct {
@@ -47,13 +41,17 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 	// Special methods not depending on census existence
 	if r.Method == "addCensus" {
 		if isAuth {
-			if r.CensusType == models.Census_UNKNOWN {
-				r.CensusType = censusDefaultType
+			if r.CensusType != models.Census_ARBO_BLAKE2B {
+				err := fmt.Errorf("only supported CensusType: %s, current: %s", models.Census_ARBO_BLAKE2B, r.CensusType)
+				log.Warnf("error creating census: %s", err)
+				resp.SetError(err)
+				return resp
 			}
 			t, err := m.AddNamespace(censusPrefix+r.CensusID, r.CensusType, r.PubKeys)
 			if err != nil {
 				log.Warnf("error creating census: %s", err)
 				resp.SetError(err)
+				return resp
 			} else {
 				t.Publish()
 				log.Infof("census %s%s created, successfully managed by %s", censusPrefix, r.CensusID, r.PubKeys)
@@ -61,6 +59,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			}
 		} else {
 			resp.SetError("invalid authentication")
+			return resp
 		}
 		return resp
 	}
@@ -72,6 +71,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			}
 		} else {
 			resp.SetError("invalid authentication")
+			return resp
 		}
 		return resp
 	}
@@ -112,7 +112,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 	// Methods without rootHash
 	switch r.Method {
 	case "getRoot":
-		resp.Root, err = tr.Root()
+		resp.Root, err = tr.Root(nil)
 		if err != nil {
 			resp.SetError(err.Error())
 			return resp
@@ -121,7 +121,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 
 	case "addClaimBulk":
 		if isAuth && validAuthPrefix {
-			invalidClaims, err := tr.AddBatch(r.CensusKeys, r.CensusValues)
+			invalidClaims, err := tr.AddBatch(nil, r.CensusKeys, r.CensusValues)
 			if err != nil {
 				resp.SetError(err.Error())
 				return resp
@@ -129,7 +129,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			if len(invalidClaims) > 0 {
 				resp.InvalidClaims = invalidClaims
 			}
-			resp.Root, err = tr.Root()
+			resp.Root, err = tr.Root(nil)
 			if err != nil {
 				resp.SetError(err.Error())
 				return resp
@@ -137,6 +137,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			log.Infof("%d claims addedd successfully", len(r.CensusKeys)-len(invalidClaims))
 		} else {
 			resp.SetError("invalid authentication")
+			return resp
 		}
 		return resp
 
@@ -151,11 +152,12 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			//if !r.Digested {
 			// data = snarks.Poseidon.Hash(data)
 			//}
-			err := tr.Add(data, r.CensusValue)
+			err := tr.Add(nil, data, r.CensusValue)
 			if err != nil {
 				resp.SetError(err)
+				return resp
 			} else {
-				resp.Root, err = tr.Root()
+				resp.Root, err = tr.Root(nil)
 				if err != nil {
 					resp.SetError(err.Error())
 					return resp
@@ -164,6 +166,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			}
 		} else {
 			resp.SetError("invalid authentication")
+			return resp
 		}
 		return resp
 
@@ -174,12 +177,14 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 				if err != nil {
 					log.Warnf("error importing dump: %s", err)
 					resp.SetError(err)
+					return resp
 				} else {
 					log.Infof("dump imported successfully, %d claims", len(r.CensusKeys))
 				}
 			}
 		} else {
 			resp.SetError("invalid authentication")
+			return resp
 		}
 		return resp
 
@@ -219,12 +224,14 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			if err != nil {
 				log.Warnf("error importing dump: %s", err)
 				resp.SetError("error importing census")
+				return resp
 			} else {
 				log.Infof("dump imported successfully, %d bytes", len(dump.Data))
 			}
 		} else {
 			log.Warnf("no data found on the retreived census")
 			resp.SetError("no claims found")
+			return resp
 		}
 		return resp
 
@@ -236,7 +243,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		var err error
 		var root []byte
 		if len(r.RootHash) < 1 {
-			root, err = tr.Root()
+			root, err = tr.Root(nil)
 			if err != nil {
 				resp.SetError(err.Error())
 				return resp
@@ -250,7 +257,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		//if !r.Digested {
 		//	data = snarks.Poseidon.Hash(data)
 		//}
-		validProof, err := tr.CheckProof(data, r.CensusValue, root, r.ProofData)
+		validProof, err := tr.VerifyProof(data, r.CensusValue, r.ProofData, root)
 		if err != nil {
 			resp.SetError(err)
 			return resp
@@ -263,7 +270,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 	// Otherwise, we use the same tree.
 	if len(r.RootHash) > 1 {
 		var err error
-		tr, err = tr.Snapshot(r.RootHash)
+		tr, err = tr.FromRoot(r.RootHash)
 		if err != nil {
 			resp.SetError("cannot fetch snapshot for root")
 			return resp
@@ -277,24 +284,26 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		//if !r.Digested {
 		//	data = snarks.Poseidon.Hash(data)
 		//}
-		siblings, err := tr.GenProof(data, r.CensusValue)
+		leafV, siblings, err := tr.GenProof(nil, data)
 		if err != nil {
 			resp.SetError(err)
+			return resp
+		}
+		if !bytes.Equal(leafV, r.CensusValue) {
+			resp.SetError(fmt.Errorf("leaf value (%x) != r.CensusValue (%x)", leafV, r.CensusValue))
+			return resp
 		}
 		resp.Siblings = siblings
 		return resp
 
 	case "getSize":
-		root, err := tr.Root()
-		if err != nil {
-			resp.SetError(err.Error())
-			return resp
-		}
-		size, err := tr.Size(root)
+		size, err := tr.Size(nil)
 		if err != nil {
 			resp.SetError(err)
+			return resp
 		}
-		resp.Size = &size
+		sizeInt64 := int64(size)
+		resp.Size = &sizeInt64
 		return resp
 
 	case "dump", "dumpPlain":
@@ -305,7 +314,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		// dump the claim data and return it
 		var root []byte
 		if len(r.RootHash) < 1 {
-			root, err = tr.Root()
+			root, err = tr.Root(nil)
 			if err != nil {
 				resp.SetError(err.Error())
 				return resp
@@ -315,16 +324,30 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		}
 		var err error
 		if r.Method == "dump" {
-			resp.CensusDump, err = tr.Dump(root)
-		} else {
-			var vals [][]byte
-			resp.CensusKeys, vals, err = tr.DumpPlain(root)
-			for _, v := range vals {
-				resp.CensusValues = append(resp.CensusValues, types.HexBytes(v))
+			snapshot, err := tr.FromRoot(root)
+			if err != nil {
+				resp.SetError(err)
+				return resp
+			}
+			resp.CensusDump, err = snapshot.Dump()
+			if err != nil {
+				resp.SetError(err)
+				return resp
 			}
 		}
+		// else {
+		// 	TODO the method DumpPlain no longer exists, clarify
+		// 	the difference of usage between 'dump' & 'dumpPlain'.
+
+		// 	var vals [][]byte
+		// 	resp.CensusKeys, vals, err = tr.DumpPlain(root)
+		// 	for _, v := range vals {
+		// 	        resp.CensusValues = append(resp.CensusValues, types.HexBytes(v))
+		// 	}
+		// }
 		if err != nil {
 			resp.SetError(err)
+			return resp
 		}
 		return resp
 
@@ -339,13 +362,19 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		}
 		var dump CensusDump
 
-		root, err := tr.Root()
+		root, err := tr.Root(nil)
 		if err != nil {
 			resp.SetError(err.Error())
 			return resp
 		}
 		dump.RootHash = root
-		dump.Data, err = tr.Dump(root)
+		snapshot, err := tr.FromRoot(root)
+		if err != nil {
+			resp.SetError(err)
+			log.Warnf("cannot do a tree from root (in order to do a census dump) with root %x: %s", root, err)
+			return resp
+		}
+		dump.Data, err = snapshot.Dump()
 		if err != nil {
 			resp.SetError(err)
 			log.Warnf("cannot dump census with root %x: %s", root, err)

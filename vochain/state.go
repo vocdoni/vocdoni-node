@@ -515,6 +515,37 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	return nil
 }
 
+// VoteCount return the global vote count.
+func (v *State) VoteCount(isQuery bool) (uint64, error) {
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	noState := v.mainTreeViewer(isQuery).NoState()
+	voteCountLE, err := noState.Get(voteCountKey)
+	if err == db.ErrKeyNotFound {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint64(voteCountLE), nil
+}
+
+// voteCountInc increases by 1 the global vote count.
+func (v *State) voteCountInc() error {
+	noState := v.Tx.NoState()
+	voteCountLE, err := noState.Get(voteCountKey)
+	if err == db.ErrKeyNotFound {
+		voteCountLE = make([]byte, 8)
+	} else if err != nil {
+		return err
+	}
+	voteCount := binary.LittleEndian.Uint64(voteCountLE)
+	voteCount += 1
+	binary.LittleEndian.PutUint64(voteCountLE, voteCount)
+	return noState.Set(voteCountKey, voteCountLE)
+}
+
 // AddVote adds a new vote to a process and call the even listeners to OnVote.
 // This method does not check if the vote already exist!
 func (v *State) AddVote(vote *models.Vote) error {
@@ -538,7 +569,13 @@ func (v *State) AddVote(vote *models.Vote) error {
 		return fmt.Errorf("cannot marshal sdbVote: %w", err)
 	}
 	v.Tx.Lock()
-	err = v.Tx.DeepAdd(vid, sdbVoteBytes, ProcessesCfg, VotesCfg.WithKey(vote.ProcessId))
+	err = func() error {
+		if err := v.Tx.DeepAdd(vid, sdbVoteBytes,
+			ProcessesCfg, VotesCfg.WithKey(vote.ProcessId)); err != nil {
+			return err
+		}
+		return v.voteCountInc()
+	}()
 	v.Tx.Unlock()
 	if err != nil {
 		return err
@@ -715,10 +752,8 @@ func (v *State) Rollback() {
 
 // LastHeight returns the last commited height (block count)
 func (v *State) LastHeight() (uint32, error) {
-	v.Tx.RLock()
-	noState := v.mainTreeViewer(true).NoState()
+	noState := v.mainTreeView().NoState()
 	heightLE, err := noState.Get(heightKey)
-	v.Tx.RUnlock()
 	if err == db.ErrKeyNotFound {
 		return 0, nil
 	} else if err != nil {
