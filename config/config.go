@@ -32,6 +32,8 @@ type DvoteCfg struct {
 	Mode string
 	// Dev enables the development mode (less security)
 	Dev bool
+	// PprofPort is the port where pprof http endpoint listen if dev enabled
+	PprofPort int
 }
 
 // ValidMode checks if the configured mode is valid

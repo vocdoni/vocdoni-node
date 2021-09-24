@@ -63,6 +63,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"vocdoni blockchain network to connect with")
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
 		"use developer mode (less security)")
+	globalCfg.PprofPort = *flag.Int("pprof", 0,
+		"pprof port for runtime profiling data (zero is disabled)")
 	globalCfg.LogLevel = *flag.StringP("logLevel", "l", "info",
 		"log level (debug, info, warn, error, fatal)")
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout",
@@ -183,6 +185,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.VochainConfig.Chain = viper.GetString("vochain")
 	viper.BindPFlag("dev", flag.Lookup("dev"))
 	globalCfg.Dev = viper.GetBool("dev")
+	viper.BindPFlag("pprofPort", flag.Lookup("pprof"))
 
 	// Use different datadirs for non main chains
 	if globalCfg.VochainConfig.Chain != "main" {
@@ -390,14 +393,17 @@ func main() {
 		log.Fatalf("mode %s is invalid", globalCfg.Mode)
 	}
 
-	// If dev enabled, expose debugging profiles under a port between 61000 and 61100.
+	// If dev enabled, expose debugging profiles under an http server
+	// If PprofPort is not set, a random port between 61000 and 61100 is choosed.
 	// We log what port is being used near the start of the logs, so it can
 	// be easily grabbed. Start this before the rest of the node, since it
 	// is helpful to debug if some other component hangs.
-	if globalCfg.Dev {
+	if globalCfg.Dev || globalCfg.PprofPort > 0 {
 		go func() {
-			port := (time.Now().Unix() % 100) + 61000
-			ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
+			if globalCfg.PprofPort == 0 {
+				globalCfg.PprofPort = int((time.Now().Unix() % 100)) + 61000
+			}
+			ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", globalCfg.PprofPort))
 			if err != nil {
 				log.Fatal(err)
 			}
