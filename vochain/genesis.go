@@ -1,9 +1,18 @@
 package vochain
 
+import (
+	"encoding/hex"
+	"strings"
+
+	"go.vocdoni.io/dvote/crypto/zk/artifacts"
+	"go.vocdoni.io/dvote/log"
+)
+
 type VochainGenesis struct {
-	SeedNodes         []string
-	Genesis           string
 	AutoUpdateGenesis bool
+	SeedNodes         []string
+	CircuitsConfig    []artifacts.CircuitConfig
+	Genesis           string
 }
 
 // Genesis is a map containing the defaut Genesis details
@@ -143,6 +152,14 @@ var Genesis = map[string]VochainGenesis{
 		AutoUpdateGenesis: true,
 		SeedNodes: []string{
 			"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656"},
+		CircuitsConfig: []artifacts.CircuitConfig{
+			{ // index: 0, size: 1024
+				URL:         "https://raw.githubusercontent.com/vocdoni/zk-circuits-artifacts/master/",
+				CircuitPath: "/zkcensusproof/dev/1024",
+				LocalDir:    "./circuits",
+				VKHash:      hexToBytes("0x3669e12ea939564b59b995b9067eab83c8ebb09f5a83ad4aa3d6d6f90c1b0fc4"),
+			},
+		},
 		Genesis: `
 {
    "genesis_time":"2021-09-23T20:43:28.668436552Z",
@@ -361,4 +378,15 @@ var Genesis = map[string]VochainGenesis{
 }
 `,
 	},
+}
+
+// hexToBytes parses a hex string and returns the byte array from it. Warning,
+// in case of error it will panic.
+func hexToBytes(s string) []byte {
+	s = strings.TrimPrefix(s, "0x")
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		log.Fatalf("Error decoding hex string %s: %s", s, err)
+	}
+	return b
 }

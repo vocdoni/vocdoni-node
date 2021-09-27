@@ -11,6 +11,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+
+	"go.vocdoni.io/dvote/log"
 )
 
 /*
@@ -42,18 +44,18 @@ const (
 	FilenameWitness = "witness.wasm"
 	// FilenameZKey defines the name of the file of the circom ZKey
 	FilenameZKey = "circuit.zkey"
-	// FilenameVK defines the name of the VerificationKey.json
-	FilenameVK = "verificationKey.json"
+	// FilenameVK defines the name of the verification_key.json
+	FilenameVK = "verification_key.json"
 )
 
-// CircuitsConfig defines the configuration of the files to be downloaded
-type CircuitsConfig struct {
+// CircuitConfig defines the configuration of the files to be downloaded
+type CircuitConfig struct {
 	// URL defines the URL from where to download the files
 	URL string
-	// CircuitsPath defines the path from where the files are downloaded
-	CircuitsPath string
+	// CircuitPath defines the path from where the files are downloaded
+	CircuitPath string
 	// LocalDir defines in which directory will be the files
-	// downloaded, under that directory it will follow the CircuitsPath
+	// downloaded, under that directory it will follow the CircuitPath
 	// directories structure
 	LocalDir string
 
@@ -69,11 +71,12 @@ type CircuitsConfig struct {
 // checking the expected sha256 hash of each file. If the files already exist
 // in the path, it will not download them again but it will check the hash of
 // the existing files.
-func DownloadCircuitFiles(ctx context.Context, c CircuitsConfig) error {
+func DownloadCircuitFiles(ctx context.Context, c CircuitConfig) error {
 	// check if files already exist, if files already exist, check hashes
 	err := checkHashes(c)
 	if err == nil {
 		// files already exist, and match the expected hashes
+		log.Info("files already exist and match the expected hashes")
 		return nil
 	}
 	if err != nil && !os.IsNotExist(err) {
@@ -82,6 +85,7 @@ func DownloadCircuitFiles(ctx context.Context, c CircuitsConfig) error {
 
 	// at this point, or files do not exist, or exist with a not expected
 	// hash
+	log.Info("files or don't exist locally or exist with a not expected hash. Proceed with fresh download")
 	return downloadFiles(ctx, c)
 }
 
@@ -89,50 +93,53 @@ func DownloadCircuitFiles(ctx context.Context, c CircuitsConfig) error {
 // path, checking the expected sha256 hash of the file. If the file already
 // exist in the path, it will not download it again but it will check the hash
 // of the existing file.
-func DownloadVKFile(ctx context.Context, c CircuitsConfig) error {
-	err := checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameVK), c.VKHash)
+func DownloadVKFile(ctx context.Context, c CircuitConfig) error {
+	err := checkHash(filepath.Join(c.LocalDir, c.CircuitPath, FilenameVK), c.VKHash)
 	if err == nil {
 		// VK file already exist, and match the expected hash
+		log.Info("VK file already exist and match the expected hash")
 		return err
 	}
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
+	log.Info("VK file or does not exist locally or exist with a not expected hash. Proceed with fresh download")
 	// proceed to download the VK file
-	if err := os.MkdirAll(filepath.Join(c.LocalDir, c.CircuitsPath), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Join(c.LocalDir, c.CircuitPath), os.ModePerm); err != nil {
 		return err
 	}
 	u, err := url.Parse(c.URL)
 	if err != nil {
 		return err
 	}
-	u.Path = path.Join(u.Path, c.CircuitsPath, FilenameVK)
+	u.Path = path.Join(u.Path, c.CircuitPath, FilenameVK)
 	if err := downloadFile(ctx,
 		u.String(),
-		filepath.Join(c.LocalDir, c.CircuitsPath, FilenameVK),
+		filepath.Join(c.LocalDir, c.CircuitPath, FilenameVK),
 	); err != nil {
 		return err
 	}
-	if err := checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameVK),
+	if err := checkHash(filepath.Join(c.LocalDir, c.CircuitPath, FilenameVK),
 		c.VKHash); err != nil {
 		return fmt.Errorf("error on download VerificationKey (VK) file from %s, %s", c.URL, err)
 	}
+	log.Info("VK file downloaded correctly & match the expected hash")
 	return nil
 }
 
-func checkHashes(c CircuitsConfig) error {
-	err := checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameWitness), c.WitnessHash)
+func checkHashes(c CircuitConfig) error {
+	err := checkHash(filepath.Join(c.LocalDir, c.CircuitPath, FilenameWitness), c.WitnessHash)
 	if err != nil {
 		return err
 	}
 
-	err = checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameZKey), c.ZKeyHash)
+	err = checkHash(filepath.Join(c.LocalDir, c.CircuitPath, FilenameZKey), c.ZKeyHash)
 	if err != nil {
 		return err
 	}
 
-	err = checkHash(filepath.Join(c.LocalDir, c.CircuitsPath, FilenameVK), c.VKHash)
+	err = checkHash(filepath.Join(c.LocalDir, c.CircuitPath, FilenameVK), c.VKHash)
 	if err != nil {
 		return err
 	}
@@ -161,8 +168,8 @@ func checkHash(path string, expected []byte) error {
 }
 
 // downloadFiles downloads the files, and once downloaded calls checkHashes
-func downloadFiles(ctx context.Context, c CircuitsConfig) error {
-	if err := os.MkdirAll(filepath.Join(c.LocalDir, c.CircuitsPath), os.ModePerm); err != nil {
+func downloadFiles(ctx context.Context, c CircuitConfig) error {
+	if err := os.MkdirAll(filepath.Join(c.LocalDir, c.CircuitPath), os.ModePerm); err != nil {
 		return err
 	}
 
@@ -170,10 +177,10 @@ func downloadFiles(ctx context.Context, c CircuitsConfig) error {
 	if err != nil {
 		return err
 	}
-	u.Path = path.Join(u.Path, c.CircuitsPath, FilenameWitness)
+	u.Path = path.Join(u.Path, c.CircuitPath, FilenameWitness)
 	if err := downloadFile(ctx,
 		u.String(),
-		filepath.Join(c.LocalDir, c.CircuitsPath, FilenameWitness),
+		filepath.Join(c.LocalDir, c.CircuitPath, FilenameWitness),
 	); err != nil {
 		return err
 	}
@@ -182,10 +189,10 @@ func downloadFiles(ctx context.Context, c CircuitsConfig) error {
 	if err != nil {
 		return err
 	}
-	u.Path = path.Join(u.Path, c.CircuitsPath, FilenameZKey)
+	u.Path = path.Join(u.Path, c.CircuitPath, FilenameZKey)
 	if err := downloadFile(ctx,
 		u.String(),
-		filepath.Join(c.LocalDir, c.CircuitsPath, FilenameZKey),
+		filepath.Join(c.LocalDir, c.CircuitPath, FilenameZKey),
 	); err != nil {
 		return err
 	}
@@ -194,10 +201,10 @@ func downloadFiles(ctx context.Context, c CircuitsConfig) error {
 	if err != nil {
 		return err
 	}
-	u.Path = path.Join(u.Path, c.CircuitsPath, FilenameVK)
+	u.Path = path.Join(u.Path, c.CircuitPath, FilenameVK)
 	if err := downloadFile(ctx,
 		u.String(),
-		filepath.Join(c.LocalDir, c.CircuitsPath, FilenameVK),
+		filepath.Join(c.LocalDir, c.CircuitPath, FilenameVK),
 	); err != nil {
 		return err
 	}
@@ -206,16 +213,11 @@ func downloadFiles(ctx context.Context, c CircuitsConfig) error {
 		return fmt.Errorf("error on download files from %s, %s", c.URL, err)
 	}
 
+	log.Info("files downloaded correctly & match the expected hashes")
 	return nil
 }
 
 func downloadFile(ctx context.Context, fromUrl, toPath string) error {
-	out, err := os.Create(toPath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
 	req, err := http.NewRequestWithContext(ctx, "GET", fromUrl, nil)
 	if err != nil {
 		return err
@@ -227,9 +229,19 @@ func downloadFile(ctx context.Context, fromUrl, toPath string) error {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("error on download file %s: http status: %d", fromUrl, resp.StatusCode)
+	}
+
+	out, err := os.Create(toPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		return err
 	}
-	return nil
+	return out.Close()
 }

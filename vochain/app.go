@@ -45,8 +45,8 @@ type BaseApplication struct {
 	// abcitypes.RequestBeginBlock.Header.Time
 	startBlockTimestamp int64
 	chainId             string
-	// ZkVks contains the VerificationKey for each circuit parameters index
-	ZkVks []*snarkTypes.Vk
+	// ZkVKs contains the VerificationKey for each circuit parameters index
+	ZkVKs []*snarkTypes.Vk
 }
 
 var _ abcitypes.Application = (*BaseApplication)(nil)
