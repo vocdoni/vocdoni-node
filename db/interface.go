@@ -8,6 +8,10 @@ import (
 // ErrKeysNotFound is used to indicate that a key does not exist in the db.
 var ErrKeyNotFound = fmt.Errorf("key not found")
 
+// ErrTxnTooBig is used to indicate that a WriteTx is too big and can't include
+// more writes.
+var ErrTxnTooBig = fmt.Errorf("Txn too big")
+
 // Database wraps all database operations. All methods are safe for concurrent
 // use.
 type Database interface {

@@ -1,6 +1,7 @@
 package statedb
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strings"
 	"testing"
@@ -459,4 +460,82 @@ func TestTree(t *testing.T) {
 	qt.Assert(t, tree.Add(txTree, []byte("key0"), []byte("value0")), qt.IsNil)
 	tx.Commit()
 	// dumpPrint(db)
+}
+
+func TestBigUpdate(t *testing.T) {
+	sdb := newTestStateDB(t)
+
+	mainTree, err := sdb.BeginTx()
+	qt.Assert(t, err, qt.IsNil)
+
+	const n = 20_000
+	var key [4]byte
+	var value [4]byte
+	for i := 0; i < n; i++ {
+		binary.LittleEndian.PutUint32(key[:], uint32(i))
+		binary.LittleEndian.PutUint32(value[:], uint32(i))
+		qt.Assert(t, mainTree.Add(key[:], value[:]), qt.IsNil)
+	}
+	qt.Assert(t, mainTree.Commit(), qt.IsNil)
+}
+
+func TestBigUpdateDiscard(t *testing.T) {
+	sdb := newTestStateDB(t)
+
+	mainTree, err := sdb.BeginTx()
+	qt.Assert(t, err, qt.IsNil)
+
+	root, err := mainTree.Root()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, root, qt.DeepEquals, emptyHash)
+
+	// Do a big update in the mainTree.  Although internally there will be
+	// Database transactions, we shouldn't observe a change in the tree
+	// because we discard.
+	const n = 20_000
+	var key [4]byte
+	var value [4]byte
+	for i := 0; i < n; i++ {
+		binary.LittleEndian.PutUint32(key[:], uint32(i))
+		binary.LittleEndian.PutUint32(value[:], uint32(i))
+		qt.Assert(t, mainTree.Add(key[:], value[:]), qt.IsNil)
+	}
+	mainTree.Discard()
+
+	mainTree, err = sdb.BeginTx()
+	qt.Assert(t, err, qt.IsNil)
+	root, err = mainTree.Root()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, root, qt.DeepEquals, emptyHash)
+	mainTree.Discard()
+
+	// Now we do the same for a subTree.
+	mainTree, err = sdb.BeginTx()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, mainTree.Add(singleCfg.Key(), emptyHash), qt.IsNil)
+	qt.Assert(t, mainTree.Commit(), qt.IsNil)
+
+	mainTree, err = sdb.BeginTx()
+	qt.Assert(t, err, qt.IsNil)
+	single, err := mainTree.SubTree(singleCfg)
+	qt.Assert(t, err, qt.IsNil)
+	singleRoot, err := single.Root()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, singleRoot, qt.DeepEquals, emptyHash)
+
+	for i := 0; i < n; i++ {
+		binary.LittleEndian.PutUint32(key[:], uint32(i))
+		binary.LittleEndian.PutUint32(value[:], uint32(i))
+		qt.Assert(t, single.Add(key[:], value[:]), qt.IsNil)
+	}
+	mainTree.Discard()
+
+	mainTree, err = sdb.BeginTx()
+	qt.Assert(t, err, qt.IsNil)
+	single, err = mainTree.SubTree(singleCfg)
+	qt.Assert(t, err, qt.IsNil)
+	singleRoot, err = single.Root()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, singleRoot, qt.DeepEquals, emptyHash)
+	mainTree.Discard()
 }
