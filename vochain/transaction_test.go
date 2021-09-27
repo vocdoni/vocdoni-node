@@ -132,7 +132,7 @@ func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
 	`
 	vk0, err := snarkParsers.ParseVk([]byte(vkJSON))
 	qt.Assert(t, err, qt.IsNil)
-	app.ZkVks = append(app.ZkVks, vk0)
+	app.ZkVKs = append(app.ZkVKs, vk0)
 
 	processId := arbo.BigIntToBytes(32, big.NewInt(10))
 	entityId := []byte("entityid-test")

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -8,8 +9,11 @@ import (
 	"strings"
 	"time"
 
+	snarkTypes "github.com/vocdoni/go-snark/types"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/crypto/zk"
+	zkartifacts "go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
@@ -23,27 +27,25 @@ import (
 
 func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 	ma *metrics.Agent, cm *census.Manager, storage data.Storage) (
-	vnode *vochain.BaseApplication, sc *scrutinizer.Scrutinizer,
-	vi *vochaininfo.VochainInfo, err error) {
+	*vochain.BaseApplication, *scrutinizer.Scrutinizer,
+	*vochaininfo.VochainInfo, error) {
 	log.Infof("creating vochain service for network %s", vconfig.Chain)
-	var host, port string
-	var ip net.IP
 	// node + app layer
 	if len(vconfig.PublicAddr) == 0 {
-		ip, err = util.PublicIP()
+		ip, err := util.PublicIP()
 		if err != nil {
 			log.Warn(err)
 		} else {
-			_, port, err = net.SplitHostPort(vconfig.P2PListen)
+			_, port, err := net.SplitHostPort(vconfig.P2PListen)
 			if err != nil {
-				return
+				return nil, nil, nil, err
 			}
 			vconfig.PublicAddr = net.JoinHostPort(ip.String(), port)
 		}
 	} else {
-		host, port, err = net.SplitHostPort(vconfig.PublicAddr)
+		host, port, err := net.SplitHostPort(vconfig.PublicAddr)
 		if err != nil {
-			return
+			return nil, nil, nil, err
 		}
 		vconfig.PublicAddr = net.JoinHostPort(host, port)
 	}
@@ -53,15 +55,16 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 
 	// Genesis file
 	var genesisBytes []byte
+	var err error
 
 	// If genesis file from flag, prioritize it
 	if len(vconfig.Genesis) > 0 {
 		log.Infof("using custom genesis from %s", vconfig.Genesis)
-		if _, err = os.Stat(vconfig.Genesis); os.IsNotExist(err) {
-			return
+		if _, err := os.Stat(vconfig.Genesis); os.IsNotExist(err) {
+			return nil, nil, nil, err
 		}
 		if genesisBytes, err = os.ReadFile(vconfig.Genesis); err != nil {
-			return
+			return nil, nil, nil, err
 		}
 	} else { // If genesis flag not defined, use a hardcoded or local genesis
 		genesisBytes, err = os.ReadFile(vconfig.DataDir + "/config/genesis.json")
@@ -74,11 +77,11 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 				if vochain.Genesis[vconfig.Chain].AutoUpdateGenesis || vconfig.Dev {
 					log.Warn("new genesis found, cleaning and restarting Vochain")
 					if err = os.RemoveAll(vconfig.DataDir); err != nil {
-						return
+						return nil, nil, nil, err
 					}
 					if _, ok := vochain.Genesis[vconfig.Chain]; !ok {
 						err = fmt.Errorf("cannot find a valid genesis for the %s network", vconfig.Chain)
-						return
+						return nil, nil, nil, err
 					}
 					genesisBytes = []byte(vochain.Genesis[vconfig.Chain].Genesis)
 				} else {
@@ -89,14 +92,14 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 			}
 		} else { // If genesis file not found
 			if !os.IsNotExist(err) {
-				return
+				return nil, nil, nil, err
 			}
 			// If dev mode enabled, auto-update genesis file
 			log.Debug("genesis does not exist, using hardcoded genesis")
 			err = nil
 			if _, ok := vochain.Genesis[vconfig.Chain]; !ok {
 				err = fmt.Errorf("cannot find a valid genesis for the %s network", vconfig.Chain)
-				return
+				return nil, nil, nil, err
 			}
 			genesisBytes = []byte(vochain.Genesis[vconfig.Chain].Genesis)
 		}
@@ -107,7 +110,8 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 		vconfig.TendermintMetrics = true
 	}
 
-	vnode = vochain.NewVochain(vconfig, genesisBytes)
+	vnode := vochain.NewVochain(vconfig, genesisBytes)
+	var sc *scrutinizer.Scrutinizer
 	// Scrutinizer
 	if vconfig.Scrutinizer.Enabled {
 		log.Info("creating vochain scrutinizer service")
@@ -116,7 +120,7 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 			vnode,
 			!vconfig.Scrutinizer.IgnoreLiveResults,
 		); err != nil {
-			return
+			return nil, nil, nil, err
 		}
 		go sc.AfterSyncBootstrap()
 	}
@@ -131,7 +135,7 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 	if vconfig.ProcessArchive {
 		if sc == nil {
 			err = fmt.Errorf("process archive needs indexer enabled")
-			return
+			return nil, nil, nil, err
 		}
 		ipfs, ok := storage.(*data.IPFSHandle)
 		if !ok {
@@ -146,8 +150,32 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 		)
 	}
 
+	// get the zk Circuits VerificationKey files
+	vnode.ZkVKs = []*snarkTypes.Vk{}
+	for i, cc := range vochain.Genesis[vconfig.Chain].CircuitsConfig {
+		log.Infof("downloading zk-circuits-artifacts index: %d", i)
+
+		// download VKs from CircuitsConfig
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Minute*1))
+		defer cancel()
+		err = zkartifacts.DownloadVKFile(ctx, cc)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		// parse VK and store it into vnode.ZkVKs
+		log.Infof("parse VK from file into memory. CircuitArtifact index: %d", i)
+		var vk *snarkTypes.Vk
+		vk, err = zk.LoadVkFromFile(filepath.Join(cc.LocalDir, cc.CircuitPath, zkartifacts.FilenameVK))
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		vnode.ZkVKs = append(vnode.ZkVKs, vk)
+
+	}
+
 	// Vochain info
-	vi = vochaininfo.NewVochainInfo(vnode)
+	vi := vochaininfo.NewVochainInfo(vnode)
 	go vi.Start(10)
 
 	// Grab metrics
@@ -170,7 +198,7 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 	}
 	go VochainPrintInfo(20, vi)
 
-	return
+	return vnode, sc, vi, nil
 }
 
 // VochainPrintInfo initializes the Vochain statistics recollection

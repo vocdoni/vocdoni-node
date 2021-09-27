@@ -192,10 +192,10 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			return nil, err
 		}
 
-		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVks) {
-			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d", proofZkSNARK.CircuitParametersIndex)
+		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVKs) {
+			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d of %d", proofZkSNARK.CircuitParametersIndex, len(app.ZkVKs))
 		}
-		verificationKey := app.ZkVks[proofZkSNARK.CircuitParametersIndex]
+		verificationKey := app.ZkVKs[proofZkSNARK.CircuitParametersIndex]
 
 		// prepare the publicInputs that are defined by the process
 		censusRootBI := arbo.BytesToBigInt(process.CensusRoot)
