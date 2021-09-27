@@ -2,6 +2,7 @@ package scrutinizer
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -520,7 +521,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 			if err == nil {
 				break
 			}
-			if err == ErrNoResultsYet {
+			if errors.Is(err, ErrNoResultsYet) {
 				time.Sleep(2 * time.Second)
 				retries--
 				continue

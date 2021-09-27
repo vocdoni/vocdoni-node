@@ -2,6 +2,7 @@ package vochain
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/vocdoni/arbo"
@@ -69,7 +70,7 @@ func (v *State) Process(pid []byte, isQuery bool) (*models.Process, error) {
 		defer v.Tx.RUnlock()
 	}
 	processBytes, err := v.mainTreeViewer(isQuery).DeepGet(pid, ProcessesCfg)
-	if err == arbo.ErrKeyNotFound {
+	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, ErrProcessNotFound
 	} else if err != nil {
 		return nil, err
@@ -115,7 +116,7 @@ func (v *State) updateProcess(p *models.Process, pid []byte) error {
 		return err
 	}
 	processBytes, err := processesTree.Get(pid)
-	if err == arbo.ErrKeyNotFound {
+	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return ErrProcessNotFound
 	} else if err != nil {
 		return err

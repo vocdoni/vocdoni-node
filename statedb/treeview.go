@@ -1,6 +1,7 @@
 package statedb
 
 import (
+	"errors"
 	"path"
 
 	"go.vocdoni.io/dvote/db"
@@ -149,7 +150,7 @@ func (v *TreeView) SubTree(cfg TreeConfig) (treeView TreeViewer, err error) {
 	defer txTree.Discard()
 	tree, err := tree.New(&readOnlyWriteTx{txTree},
 		tree.Options{DB: subDB(db, subKeyTree), MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
-	if err == ErrReadOnly {
+	if errors.Is(err, ErrReadOnly) {
 		return nil, ErrEmptyTree
 	} else if err != nil {
 		return nil, err

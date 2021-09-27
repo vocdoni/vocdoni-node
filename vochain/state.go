@@ -349,7 +349,7 @@ func (v *State) RemoveOracle(address common.Address) error {
 	if err != nil {
 		return err
 	}
-	if _, err := oracles.Get(address.Bytes()); err == arbo.ErrKeyNotFound {
+	if _, err := oracles.Get(address.Bytes()); errors.Is(err, arbo.ErrKeyNotFound) {
 		return fmt.Errorf("oracle not found: %w", err)
 	} else if err != nil {
 		return err
@@ -416,7 +416,7 @@ func (v *State) RemoveValidator(address []byte) error {
 	if err != nil {
 		return err
 	}
-	if _, err := validators.Get(address); err == arbo.ErrKeyNotFound {
+	if _, err := validators.Get(address); errors.Is(err, arbo.ErrKeyNotFound) {
 		return fmt.Errorf("validator not found: %w", err)
 	} else if err != nil {
 		return err
@@ -524,7 +524,7 @@ func (v *State) VoteCount(isQuery bool) (uint64, error) {
 	}
 	noState := v.mainTreeViewer(isQuery).NoState()
 	voteCountLE, err := noState.Get(voteCountKey)
-	if err == db.ErrKeyNotFound {
+	if errors.Is(err, db.ErrKeyNotFound) {
 		return 0, nil
 	} else if err != nil {
 		return 0, err
@@ -536,7 +536,7 @@ func (v *State) VoteCount(isQuery bool) (uint64, error) {
 func (v *State) voteCountInc() error {
 	noState := v.Tx.NoState()
 	voteCountLE, err := noState.Get(voteCountKey)
-	if err == db.ErrKeyNotFound {
+	if errors.Is(err, db.ErrKeyNotFound) {
 		voteCountLE = make([]byte, 8)
 	} else if err != nil {
 		return err
@@ -615,13 +615,13 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ []byte, e
 	}
 	votesTree, err := v.mainTreeViewer(isQuery).DeepSubTree(
 		ProcessesCfg, VotesCfg.WithKey(processID))
-	if err == arbo.ErrKeyNotFound {
+	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, ErrProcessNotFound
 	} else if err != nil {
 		return nil, err
 	}
 	sdbVoteBytes, err := votesTree.Get(vid)
-	if err == arbo.ErrKeyNotFound {
+	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, ErrVoteDoesNotExist
 	} else if err != nil {
 		return nil, err
@@ -756,7 +756,7 @@ func (v *State) Rollback() {
 func (v *State) LastHeight() (uint32, error) {
 	noState := v.mainTreeView().NoState()
 	heightLE, err := noState.Get(heightKey)
-	if err == db.ErrKeyNotFound {
+	if errors.Is(err, db.ErrKeyNotFound) {
 		return 0, nil
 	} else if err != nil {
 		return 0, err

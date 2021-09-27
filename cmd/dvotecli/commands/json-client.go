@@ -3,6 +3,7 @@ package commands
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -54,7 +55,7 @@ func jsonInput(cmd *cobra.Command, args []string) error {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		line, _, err := reader.ReadLine()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

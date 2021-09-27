@@ -33,7 +33,7 @@ var _ db.WriteTx = (*WriteTx)(nil)
 // Get implements the db.ReadTx.Get interface method
 func (tx ReadTx) Get(k []byte) ([]byte, error) {
 	item, err := tx.tx.Get(k)
-	if err == badger.ErrKeyNotFound {
+	if errors.Is(err, badger.ErrKeyNotFound) {
 		return nil, db.ErrKeyNotFound
 	}
 	if err != nil {

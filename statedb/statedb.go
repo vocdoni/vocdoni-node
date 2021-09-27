@@ -228,7 +228,7 @@ func setVersionRoot(tx db.WriteTx, version uint32, root []byte) error {
 // level tx.
 func getVersion(tx db.ReadTx) (uint32, error) {
 	versionLE, err := subReadTx(tx, path.Join(subKeyMeta, pathVersion)).Get(keyCurVersion)
-	if err == db.ErrKeyNotFound {
+	if errors.Is(err, db.ErrKeyNotFound) {
 		return 0, nil
 	} else if err != nil {
 		return 0, err
@@ -378,7 +378,7 @@ func (s *StateDB) TreeView(root []byte) (*TreeView, error) {
 	defer txTree.Discard()
 	tree, err := tree.New(&readOnlyWriteTx{txTree},
 		tree.Options{DB: subDB(s.db, subKeyTree), MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
-	if err == ErrReadOnly {
+	if errors.Is(err, ErrReadOnly) {
 		return nil, ErrEmptyTree
 	} else if err != nil {
 		return nil, err

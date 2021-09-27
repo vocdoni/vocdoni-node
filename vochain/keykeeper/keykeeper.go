@@ -1,6 +1,7 @@
 package keykeeper
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -359,7 +360,7 @@ func (k *KeyKeeper) checkRevealProcess(height uint32) {
 	defer wTx.Discard()
 
 	data, err := wTx.Get(pKey)
-	if err == db.ErrKeyNotFound {
+	if errors.Is(err, db.ErrKeyNotFound) {
 		return
 	}
 	if err != nil {
@@ -429,7 +430,7 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	defer wTx.Discard()
 
 	var err error
-	if _, err = wTx.Get(dbKey); err == db.ErrKeyNotFound {
+	if _, err = wTx.Get(dbKey); errors.Is(err, db.ErrKeyNotFound) {
 		// key does not exist yet, store it
 		data := pk.Encode()
 		if err = wTx.Set(dbKey, data); err != nil {
