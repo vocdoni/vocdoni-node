@@ -42,6 +42,7 @@ func NewTree(name, storageDir string, nLevels int, hashFunc arbo.HashFunction) (
 
 	mt, err := arbo.NewTree(database, nLevels, hashFunc)
 	if err != nil {
+		database.Close()
 		return nil, err
 	}
 	tree := &Tree{
@@ -80,6 +81,7 @@ func (t *Tree) Init(name, storageDir string) error {
 
 	mt, err := arbo.NewTree(database, 140, arbo.HashFunctionBlake2b)
 	if err != nil {
+		database.Close()
 		return err
 	}
 	t.Tree = mt
