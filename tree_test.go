@@ -514,6 +514,62 @@ func TestAddBatchFullyUsed(t *testing.T) {
 	c.Assert(1, qt.Equals, len(invalids))
 }
 
+func TestSetRoot(t *testing.T) {
+	c := qt.New(t)
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+
+	expectedRoot := "13742386369878513332697380582061714160370929283209286127733983161245560237407"
+
+	// fill the tree
+	bLen := tree.HashFunction().Len()
+	var keys, values [][]byte
+	for i := 0; i < 1000; i++ {
+		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	indexes, err := tree.AddBatch(keys, values)
+	c.Assert(err, qt.IsNil)
+	c.Check(len(indexes), qt.Equals, 0)
+	checkRootBIString(c, tree,
+		expectedRoot)
+
+	// add one more k-v
+	k := BigIntToBytes(bLen, big.NewInt(1000))
+	v := BigIntToBytes(bLen, big.NewInt(1000))
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
+	checkRootBIString(c, tree,
+		"10747149055773881257049574592162159501044114324358186833013814735296193179713")
+
+	// do a SetRoot, and expect the same root than the original tree
+	pastRootBI, ok := new(big.Int).SetString(expectedRoot, 10)
+	c.Assert(ok, qt.IsTrue)
+	pastRoot := BigIntToBytes(32, pastRootBI)
+
+	err = tree.SetRoot(pastRoot)
+	c.Assert(err, qt.IsNil)
+	checkRootBIString(c, tree, expectedRoot)
+
+	// check that the tree can be updated
+	err = tree.Add([]byte("test"), []byte("test"))
+	c.Assert(err, qt.IsNil)
+	err = tree.Update([]byte("test"), []byte("test"))
+	c.Assert(err, qt.IsNil)
+
+	// check that the k-v '1000' does not exist in the new tree
+	_, _, err = tree.Get(k)
+	c.Assert(err, qt.Equals, ErrKeyNotFound)
+
+	// check that can be set an empty root
+	err = tree.SetRoot(tree.emptyHash)
+	c.Assert(err, qt.IsNil)
+}
+
 func TestSnapshot(t *testing.T) {
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
