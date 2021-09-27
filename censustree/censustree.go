@@ -33,8 +33,7 @@ const nLevels = 256
 
 // New returns a new Tree, if there already is a Tree in the
 // database, it will load it.
-func New(wTx db.WriteTx, opts Options) (
-	*Tree, error) {
+func New(wTx db.WriteTx, opts Options) (*Tree, error) {
 	var hashFunc arbo.HashFunction
 
 	switch opts.CensusType {
@@ -54,6 +53,7 @@ func New(wTx db.WriteTx, opts Options) (
 
 	t, err := tree.New(wTx, tree.Options{DB: database, MaxLevels: nLevels, HashFunc: hashFunc})
 	if err != nil {
+		database.Close()
 		return nil, err
 	}
 	return &Tree{Tree: t, censusType: opts.CensusType}, nil
