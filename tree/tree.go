@@ -2,6 +2,7 @@ package tree
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/vocdoni/arbo"
@@ -79,7 +80,7 @@ func (t *Tree) Set(wTx db.WriteTx, key, value []byte) error {
 		defer wTx.Discard()
 	}
 	err := t.tree.UpdateWithTx(wTx, key, value)
-	if err == arbo.ErrKeyNotFound {
+	if errors.Is(err, arbo.ErrKeyNotFound) {
 		// key does not exist, use Add
 		return t.Add(wTx, key, value)
 	}

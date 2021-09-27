@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sync/atomic"
@@ -31,7 +32,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 		return fmt.Errorf("no claims found on the retreived census")
 	}
 	tr, err := m.AddNamespace(cid, dump.Type, []string{})
-	if err == ErrNamespaceExist {
+	if errors.Is(err, ErrNamespaceExist) {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("cannot create new census namespace: (%s)", err)

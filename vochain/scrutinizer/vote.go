@@ -2,6 +2,7 @@ package scrutinizer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -301,7 +302,7 @@ func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error
 	results := &indexertypes.Results{}
 	if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).
 		Eq(processID)); err != nil {
-		if err == badgerhold.ErrNotFound {
+		if errors.Is(err, badgerhold.ErrNotFound) {
 			return nil, ErrNoResultsYet
 		}
 		return nil, err

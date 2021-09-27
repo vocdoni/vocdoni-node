@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -129,7 +130,7 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		line, _, err := reader.ReadLine()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

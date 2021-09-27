@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"go.vocdoni.io/dvote/api"
@@ -91,7 +92,7 @@ func (r *Router) getEnvelopeStatus(request RouterRequest) {
 	response.Registered = types.False
 	vr, err := r.Scrutinizer.GetEnvelopeReference(request.Nullifier)
 	if err != nil {
-		if err == scrutinizer.ErrNotFoundInDatabase {
+		if errors.Is(err, scrutinizer.ErrNotFoundInDatabase) {
 			if err := request.Send(r.BuildReply(request, &response)); err != nil {
 				log.Warnf("error sending response: %s", err)
 			}
@@ -366,7 +367,7 @@ func (r *Router) getResults(request RouterRequest) {
 		r.SendError(request, err.Error())
 		return
 	}
-	if err == scrutinizer.ErrNoResultsYet {
+	if errors.Is(err, scrutinizer.ErrNoResultsYet) {
 		response.Message = scrutinizer.ErrNoResultsYet.Error()
 		if err := request.Send(r.BuildReply(request, &response)); err != nil {
 			log.Warnf("error sending response: %s", err)
