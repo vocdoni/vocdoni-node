@@ -52,6 +52,7 @@ store the mapping of public key to index in the NoState database.
 package statedb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"path"
@@ -217,10 +218,10 @@ func NewStateDB(db db.Database) *StateDB {
 // corresponding root from the top level tx.
 func setVersionRoot(tx db.WriteTx, version uint32, root []byte) error {
 	txMetaVer := subWriteTx(tx, path.Join(subKeyMeta, pathVersion))
-	if err := txMetaVer.Set(keyCurVersion, uint32ToBytes(version)); err != nil {
+	if err := txMetaVer.Set(uint32ToBytes(version), root); err != nil {
 		return err
 	}
-	return txMetaVer.Set(uint32ToBytes(version), root)
+	return txMetaVer.Set(keyCurVersion, uint32ToBytes(version))
 }
 
 // getVersionRoot is a helper function used get the last version from the top
@@ -289,17 +290,30 @@ func (s *StateDB) Hash() ([]byte, error) {
 // error.  Calling treeTx.Discard after treeTx.Commit is ok.
 func (s *StateDB) BeginTx() (treeTx *TreeTx, err error) {
 	cfg := mainTreeCfg
-	tx := s.db.WriteTx()
+	tx := db.NewBatch(s.db)
 	defer func() {
 		if err != nil {
 			tx.Discard()
 		}
 	}()
+	root, err := s.getRoot(tx)
+	if err != nil {
+		return nil, err
+	}
 	txTree := subWriteTx(tx, subKeyTree)
 	tree, err := tree.New(txTree,
 		tree.Options{DB: nil, MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
 	if err != nil {
 		return nil, err
+	}
+	lastRoot, err := tree.Root(txTree)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(root, lastRoot) {
+		if err := tree.SetRoot(txTree, root); err != nil {
+			return nil, err
+		}
 	}
 	return &TreeTx{
 		sdb: s,

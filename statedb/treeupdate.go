@@ -1,6 +1,7 @@
 package statedb
 
 import (
+	"bytes"
 	"path"
 
 	"go.vocdoni.io/dvote/db"
@@ -122,6 +123,14 @@ func (u *TreeUpdate) SubTree(cfg TreeConfig) (treeUpdate *TreeUpdate, err error)
 	if treeUpdate, ok := u.openSubs[string(cfg.prefix)]; ok {
 		return treeUpdate, nil
 	}
+	parentLeaf, err := u.tree.Get(u.tree.tx, cfg.parentLeafKey)
+	if err != nil {
+		return nil, err
+	}
+	root, err := cfg.parentLeafGetRoot(parentLeaf)
+	if err != nil {
+		return nil, err
+	}
 	tx := subWriteTx(u.tx, path.Join(subKeySubTree, cfg.prefix))
 	defer func() {
 		if err != nil {
@@ -133,6 +142,15 @@ func (u *TreeUpdate) SubTree(cfg TreeConfig) (treeUpdate *TreeUpdate, err error)
 		tree.Options{DB: nil, MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
 	if err != nil {
 		return nil, err
+	}
+	lastRoot, err := tree.Root(txTree)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(root, lastRoot) {
+		if err := tree.SetRoot(txTree, root); err != nil {
+			return nil, err
+		}
 	}
 	treeUpdate = &TreeUpdate{
 		tx: tx,

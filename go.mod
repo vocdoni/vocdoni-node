@@ -48,7 +48,7 @@ require (
 	github.com/tendermint/tendermint v0.34.13
 	github.com/tendermint/tm-db v0.6.4
 	github.com/timshannon/badgerhold/v3 v3.0.0-20210415132401-e7c90fb5919f
-	github.com/vocdoni/arbo v0.0.0-20210921154009-4227039df19f
+	github.com/vocdoni/arbo v0.0.0-20210927131431-d7c756341372
 	github.com/vocdoni/go-external-ip v0.0.0-20210705122950-fae6195a1d44
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6

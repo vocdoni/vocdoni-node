@@ -27,9 +27,8 @@ type Options struct {
 // New returns a new Tree, if there already is a Tree in the database, it will
 // load it
 func New(wTx db.WriteTx, opts Options) (*Tree, error) {
-	givenTx := true
-	if wTx == nil {
-		givenTx = false
+	givenTx := wTx != nil
+	if !givenTx {
 		wTx = opts.DB.WriteTx()
 		defer wTx.Discard()
 	}
@@ -74,9 +73,8 @@ func (t *Tree) Get(rTx db.ReadTx, key []byte) ([]byte, error) {
 // an Update. If the non-existence or existence of the key is already known, is
 // more efficient to directly call Add or Update.
 func (t *Tree) Set(wTx db.WriteTx, key, value []byte) error {
-	givenTx := true
-	if wTx == nil {
-		givenTx = false
+	givenTx := wTx != nil
+	if !givenTx {
 		wTx = t.DB().WriteTx()
 		defer wTx.Discard()
 	}
@@ -99,9 +97,8 @@ func (t *Tree) Set(wTx db.WriteTx, key, value []byte) error {
 
 // Add adds a new leaf, if the key already exists will return error
 func (t *Tree) Add(wTx db.WriteTx, key, value []byte) error {
-	givenTx := true
-	if wTx == nil {
-		givenTx = false
+	givenTx := wTx != nil
+	if !givenTx {
 		wTx = t.DB().WriteTx()
 		defer wTx.Discard()
 	}
@@ -120,9 +117,8 @@ func (t *Tree) Add(wTx db.WriteTx, key, value []byte) error {
 // the indexes of the keys failed to add. Supports empty values as input
 // parameters, which is equivalent to 0 valued byte array.
 func (t *Tree) AddBatch(wTx db.WriteTx, keys, values [][]byte) ([]int, error) {
-	givenTx := true
-	if wTx == nil {
-		givenTx = false
+	givenTx := wTx != nil
+	if !givenTx {
 		wTx = t.DB().WriteTx()
 		defer wTx.Discard()
 	}
@@ -225,6 +221,23 @@ func (t *Tree) FromRoot(root []byte) (*Tree, error) {
 		tree: tree,
 		db:   t.db,
 	}, nil
+}
+
+func (t *Tree) SetRoot(wTx db.WriteTx, root []byte) error {
+	givenTx := wTx != nil
+	if !givenTx {
+		wTx = t.DB().WriteTx()
+		defer wTx.Discard()
+	}
+	if err := t.tree.SetRootWithTx(wTx, root); err != nil {
+		return err
+	}
+	if !givenTx {
+		if err := wTx.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Dump exports all the Tree leafs in a byte array.

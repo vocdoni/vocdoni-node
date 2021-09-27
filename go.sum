@@ -2029,6 +2029,8 @@ github.com/vocdoni/arbo v0.0.0-20210920213715-1f885e3ac1cf h1:0go2OtM6HJPZt7TINa
 github.com/vocdoni/arbo v0.0.0-20210920213715-1f885e3ac1cf/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
 github.com/vocdoni/arbo v0.0.0-20210921154009-4227039df19f h1:78yhWWKm+wxQTSfk+C4xGD5Rxv/+qQ0yM+vdQkH3E/0=
 github.com/vocdoni/arbo v0.0.0-20210921154009-4227039df19f/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
+github.com/vocdoni/arbo v0.0.0-20210927131431-d7c756341372 h1:kgd6g8uJmZe6ftaKC9WORlPqSddZYLUQ1uwhYMJu6Xo=
+github.com/vocdoni/arbo v0.0.0-20210927131431-d7c756341372/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f h1:z7CK3k1yIutKycPY8s2ZbtwUBKMy3xPcLMh12QukLRY=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f/go.mod h1:BoN7UMTA/JcgmNPaoUQq6RwuixhgSrk5PmCMVMKLxpc=
 github.com/vocdoni/blind-ca v0.1.4/go.mod h1:4ouWDqlvXrrNS0Csf3hKA3cuDTmKh6nP7kSXF39nT4s=

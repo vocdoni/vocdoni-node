@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -634,14 +635,15 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ []byte, e
 
 // EnvelopeExists returns true if the envelope identified with voteID exists
 func (v *State) EnvelopeExists(processID, nullifier []byte, isQuery bool) (bool, error) {
-	e, err := v.Envelope(processID, nullifier, isQuery)
-	if err != nil && err != ErrVoteDoesNotExist {
+	_, err := v.Envelope(processID, nullifier, isQuery)
+	if errors.Is(err, ErrProcessNotFound) {
+		return false, nil
+	} else if errors.Is(err, ErrVoteDoesNotExist) {
+		return false, nil
+	} else if err != nil {
 		return false, err
 	}
-	if err == ErrVoteDoesNotExist {
-		return false, nil
-	}
-	return e != nil, nil
+	return true, nil
 }
 
 // iterateVotes iterates fn over state tree entries with the processID prefix.

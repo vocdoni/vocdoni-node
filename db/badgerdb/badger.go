@@ -1,6 +1,7 @@
 package badgerdb
 
 import (
+	"errors"
 	"os"
 
 	"github.com/dgraph-io/badger/v3"
@@ -53,12 +54,20 @@ func (tx WriteTx) Get(k []byte) ([]byte, error) {
 
 // Set implements the db.WriteTx.Set interface method
 func (tx WriteTx) Set(k, v []byte) error {
-	return tx.tx.Set(k, v)
+	if err := tx.tx.Set(k, v); errors.Is(err, badger.ErrTxnTooBig) {
+		return db.ErrTxnTooBig
+	} else {
+		return err
+	}
 }
 
 // Delete implements the db.WriteTx.Delete interface method
 func (tx WriteTx) Delete(k []byte) error {
-	return tx.tx.Delete(k)
+	if err := tx.tx.Delete(k); errors.Is(err, badger.ErrTxnTooBig) {
+		return db.ErrTxnTooBig
+	} else {
+		return err
+	}
 }
 
 // Commit implements the db.WriteTx.Commit interface method
