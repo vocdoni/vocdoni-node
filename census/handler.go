@@ -112,7 +112,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 	// Methods without rootHash
 	switch r.Method {
 	case "getRoot":
-		resp.Root, err = tr.Root(nil)
+		resp.Root, err = tr.Root()
 		if err != nil {
 			resp.SetError(err.Error())
 			return resp
@@ -121,7 +121,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 
 	case "addClaimBulk":
 		if isAuth && validAuthPrefix {
-			invalidClaims, err := tr.AddBatch(nil, r.CensusKeys, r.CensusValues)
+			invalidClaims, err := tr.AddBatch(r.CensusKeys, r.CensusValues)
 			if err != nil {
 				resp.SetError(err.Error())
 				return resp
@@ -129,7 +129,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			if len(invalidClaims) > 0 {
 				resp.InvalidClaims = invalidClaims
 			}
-			resp.Root, err = tr.Root(nil)
+			resp.Root, err = tr.Root()
 			if err != nil {
 				resp.SetError(err.Error())
 				return resp
@@ -152,12 +152,12 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			//if !r.Digested {
 			// data = snarks.Poseidon.Hash(data)
 			//}
-			err := tr.Add(nil, data, r.CensusValue)
+			err := tr.Add(data, r.CensusValue)
 			if err != nil {
 				resp.SetError(err)
 				return resp
 			} else {
-				resp.Root, err = tr.Root(nil)
+				resp.Root, err = tr.Root()
 				if err != nil {
 					resp.SetError(err.Error())
 					return resp
@@ -173,6 +173,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 	case "importDump":
 		if isAuth && validAuthPrefix {
 			if len(r.CensusKeys) > 0 {
+				// FIXME: Can cause Txn too big
 				err := tr.ImportDump(r.CensusDump)
 				if err != nil {
 					log.Warnf("error importing dump: %s", err)
@@ -243,7 +244,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		var err error
 		var root []byte
 		if len(r.RootHash) < 1 {
-			root, err = tr.Root(nil)
+			root, err = tr.Root()
 			if err != nil {
 				resp.SetError(err.Error())
 				return resp
@@ -284,7 +285,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		//if !r.Digested {
 		//	data = snarks.Poseidon.Hash(data)
 		//}
-		leafV, siblings, err := tr.GenProof(nil, data)
+		leafV, siblings, err := tr.GenProof(data)
 		if err != nil {
 			resp.SetError(err)
 			return resp
@@ -297,7 +298,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		return resp
 
 	case "getSize":
-		size, err := tr.Size(nil)
+		size, err := tr.Size()
 		if err != nil {
 			resp.SetError(err)
 			return resp
@@ -314,7 +315,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		// dump the claim data and return it
 		var root []byte
 		if len(r.RootHash) < 1 {
-			root, err = tr.Root(nil)
+			root, err = tr.Root()
 			if err != nil {
 				resp.SetError(err.Error())
 				return resp
@@ -362,7 +363,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		}
 		var dump CensusDump
 
-		root, err := tr.Root(nil)
+		root, err := tr.Root()
 		if err != nil {
 			resp.SetError(err.Error())
 			return resp

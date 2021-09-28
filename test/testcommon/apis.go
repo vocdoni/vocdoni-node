@@ -89,7 +89,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
 	d.CensusDir = tb.TempDir()
-	if err := cm.Init(d.CensusDir, ""); err != nil {
+	if err := cm.Start(d.CensusDir, ""); err != nil {
 		tb.Fatal(err)
 	}
 

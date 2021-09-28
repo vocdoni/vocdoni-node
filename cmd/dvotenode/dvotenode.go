@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -193,6 +194,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	}
 
 	// Add viper config path (now we know it)
+	globalCfg.DataDir = filepath.Clean(globalCfg.DataDir)
 	viper.AddConfigPath(globalCfg.DataDir)
 
 	// binding flags to viper
@@ -553,7 +555,8 @@ func main() {
 
 			// Start keykeeper service (if key index specified)
 			if globalCfg.VochainConfig.KeyKeeperIndex > 0 {
-				kk, err = keykeeper.NewKeyKeeper(path.Join(globalCfg.VochainConfig.DataDir, "/keykeeper"),
+				kk, err = keykeeper.NewKeyKeeper(
+					path.Join(globalCfg.VochainConfig.DataDir, "keykeeper"),
 					vnode,
 					signer,
 					globalCfg.VochainConfig.KeyKeeperIndex)

@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/db/badgerdb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -20,9 +22,10 @@ func TestMerkleTreeProof(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tr, err := censustree.New(nil,
-		censustree.Options{Name: "testchecktx", StorageDir: t.TempDir(),
-			MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
+	db, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
+	qt.Assert(t, err, qt.IsNil)
+	tr, err := censustree.New(censustree.Options{Name: "testchecktx", ParentDB: db,
+		MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +34,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	proofs := []string{}
 	for _, k := range keys {
 		c := k.PublicKey()
-		if err := tr.Add(nil, c, nil); err != nil {
+		if err := tr.Add(c, nil); err != nil {
 			t.Fatal(err)
 		}
 		proofs = append(proofs, string(c))
@@ -44,7 +47,7 @@ func TestMerkleTreeProof(t *testing.T) {
 
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
-	root, err := tr.Root(nil)
+	root, err := tr.Root()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +78,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	var proof []byte
 	vp := []byte("[1,2,3,4]")
 	for i, s := range keys {
-		_, proof, err = tr.GenProof(nil, []byte(proofs[i]))
+		_, proof, err = tr.GenProof([]byte(proofs[i]))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,7 +124,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	}
 
 	// Test send the same vote package multiple times with different nonce
-	_, proof, err = tr.GenProof(nil, []byte(lastProof))
+	_, proof, err = tr.GenProof([]byte(lastProof))
 	if err != nil {
 		t.Fatal(err)
 	}
