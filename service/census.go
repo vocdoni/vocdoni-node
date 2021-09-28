@@ -19,7 +19,7 @@ func Census(datadir string, ma *metrics.Agent) (*census.Manager, error) {
 			return nil, err
 		}
 	}
-	if err := censusManager.Init(stdir, ""); err != nil {
+	if err := censusManager.Start(stdir, ""); err != nil {
 		return nil, err
 	}
 

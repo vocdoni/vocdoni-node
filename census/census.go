@@ -2,9 +2,11 @@
 package census
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +16,8 @@ import (
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/badgerdb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -40,19 +44,30 @@ type Namespaces struct {
 	Namespaces []Namespace `json:"namespaces"`
 }
 
+// CurrentCensusVersion history:
+// - 0: First Version, Graviton based with a separate database for each census.
+// - 1: Arbo + BadgerDB based, single database with all censuses separated by
+//      Database prefixes (using Namespace.Name).
+const CurrentCensusVersion = 1
+
 // Namespace is composed by a list of keys which are capable to execute private operations
 // on the namespace.
 type Namespace struct {
 	Type models.Census_Type `json:"type"`
 	Name string             `json:"name"`
 	Keys []string           `json:"keys"`
+	// Version of the census in this Namespace.  If the version doesn't
+	// correspond to the CurrentCensusVersion, this census is outdated and
+	// will not be used.
+	Version int `json:"version"`
 }
 
 // Manager is the type representing the census manager component
 type Manager struct {
-	StorageDir string     // Root storage data dir for LocalStorage
-	AuthWindow int32      // Time window (seconds) in which TimeStamp will be accepted if auth enabled
-	Census     Namespaces // Available namespaces
+	StorageDir string      // Root storage data dir for LocalStorage
+	db         db.Database // Database where all census trees are stored under different prefixes
+	AuthWindow int32       // Time window (seconds) in which TimeStamp will be accepted if auth enabled
+	Census     Namespaces  // Available namespaces
 
 	// TODO(mvdan): should we protect Census with the mutex too?
 	TreesMu sync.RWMutex
@@ -65,15 +80,30 @@ type Manager struct {
 	failedQueueLock sync.RWMutex
 	failedQueue     map[string]string
 	compressor
+	cancel         context.CancelFunc
+	wgQueueDaemons sync.WaitGroup
 }
 
 // Data helps satisfy an ethevents interface.
 func (m *Manager) Data() data.Storage { return m.RemoteStorage }
 
-// Init creates a new census manager.
+// BadgerDBBatched wraps badgerdb.BadgerDB turning all requested db.WriteTx
+// into db.Batch so that commits happen automatically when the Tx becomes too
+// big.
+type BadgerDBBatched struct {
+	*badgerdb.BadgerDB
+}
+
+// WriteTx returns a db.Batch that will commit automatically with the Tx
+// becomes too big.
+func (d *BadgerDBBatched) WriteTx() db.WriteTx {
+	return db.NewBatch(d.BadgerDB)
+}
+
+// Start creates a new census manager.
 // A constructor function for the interface censustree.Tree must be provided.
-func (m *Manager) Init(storageDir, rootAuthPubKey string) error {
-	nsConfig := fmt.Sprintf("%s/namespaces.json", storageDir)
+func (m *Manager) Start(storageDir, rootAuthPubKey string) (err error) {
+	nsConfig := filepath.Join(storageDir, "namespaces.json")
 	m.StorageDir = storageDir
 	m.Trees = make(map[string]*censustree.Tree)
 	m.failedQueue = make(map[string]string)
@@ -82,12 +112,28 @@ func (m *Manager) Init(storageDir, rootAuthPubKey string) error {
 	m.AuthWindow = 10
 	m.compressor = newCompressor()
 
+	dbDir := filepath.Join(m.StorageDir, fmt.Sprintf("v%v", CurrentCensusVersion))
+	db, err := badgerdb.New(badgerdb.Options{Path: dbDir})
+	if err != nil {
+		return err
+	}
+	m.db = &BadgerDBBatched{db}
+	defer func() {
+		if err != nil {
+			db.Close()
+		}
+	}()
+
 	// Start daemon for importing remote census
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancel = cancel
 	log.Infof("starting %d import queue routines", ImportQueueRoutines)
 	for i := 0; i < ImportQueueRoutines; i++ {
-		go m.importQueueDaemon()
+		m.wgQueueDaemons.Add(1)
+		go m.importQueueDaemon(ctx)
 	}
-	go m.importFailedQueueDaemon()
+	m.wgQueueDaemons.Add(1)
+	go m.importFailedQueueDaemon(ctx)
 
 	log.Infof("loading namespaces and keys from %s", nsConfig)
 	if _, err := os.Stat(nsConfig); os.IsNotExist(err) {
@@ -99,20 +145,65 @@ func (m *Manager) Init(storageDir, rootAuthPubKey string) error {
 			cns.RootKey = rootAuthPubKey
 		}
 		m.Census = cns
-		if err := os.WriteFile(filepath.Clean(nsConfig), []byte(""), 0o600); err != nil {
+		if err := os.WriteFile(nsConfig, []byte(""), 0o600); err != nil {
 			return err
 		}
 		return m.save()
 	}
 
-	jsonBytes, err := os.ReadFile(filepath.Clean(nsConfig))
+	jsonBytes, err := os.ReadFile(nsConfig)
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(jsonBytes, &m.Census); err != nil {
+	var namespaces Namespaces
+	if err := json.Unmarshal(jsonBytes, &namespaces); err != nil {
 		log.Warn("could not unmarshal json config file, probably empty. Skipping")
 		return nil
 	}
+
+	// Copy censuses of the expected version into m.Census and remove old ones
+	m.Census.RootKey = namespaces.RootKey
+	cleanOldCensues := false
+	timestamp := time.Now()
+	for _, v := range namespaces.Namespaces {
+		switch v.Version {
+		case 0:
+			// Version 0 are graviton censuses.  These censuses are
+			// no longer supported and belong to legacy processes.
+			cleanOldCensues = true
+			outdatedDir := filepath.Join(storageDir,
+				fmt.Sprintf("outdated.%v",
+					timestamp.Format(time.RFC3339)), "v0")
+			if err := os.MkdirAll(outdatedDir, 0o700); err != nil {
+				return err
+			}
+			log.Infof("Moving outdated census %v to %v", v.Name, outdatedDir)
+			dir := strings.Split(v.Name, string(os.PathSeparator))[0]
+			src := filepath.Join(storageDir, dir)
+			dst := filepath.Join(outdatedDir, dir)
+			if err := os.Rename(src, dst); err != nil {
+				log.Warnf("Unable to move outdated census from %v to %v: %v",
+					src, dst, err)
+			}
+		case CurrentCensusVersion:
+			m.Census.Namespaces = append(m.Census.Namespaces, v)
+		default:
+			return fmt.Errorf("unexpected census version in %v: %v",
+				nsConfig, v.Version)
+		}
+	}
+	if cleanOldCensues {
+		// Make a backup of the old namespaces.json
+		nsConfigBackup := filepath.Join(storageDir,
+			fmt.Sprintf("namespaces.%v.json", timestamp.Format(time.RFC3339)))
+		if err := ioutil.WriteFile(nsConfigBackup, jsonBytes, 0o600); err != nil {
+			return err
+		}
+		if err := m.save(); err != nil {
+			return err
+		}
+	}
+
 	if len(rootAuthPubKey) >= ethereum.PubKeyLengthBytes*2 {
 		log.Infof("updating root key to %s", rootAuthPubKey)
 		m.Census.RootKey = rootAuthPubKey
@@ -127,6 +218,15 @@ func (m *Manager) Init(storageDir, rootAuthPubKey string) error {
 	return nil
 }
 
+// Stop terminates the Manager goroutines and closes the database.  The
+// Manager can't be used after Stop is called.
+func (m *Manager) Stop() error {
+	log.Infof("stopping import queue routines")
+	m.cancel()
+	m.wgQueueDaemons.Wait()
+	return m.db.Close()
+}
+
 // LoadTree opens the database containing the merkle tree or returns nil if already loaded
 // Not thread safe
 func (m *Manager) LoadTree(name string, censusType models.Census_Type) (*censustree.Tree, error) {
@@ -134,8 +234,8 @@ func (m *Manager) LoadTree(name string, censusType models.Census_Type) (*censust
 		return m.Trees[name], nil
 	}
 
-	censusTree, err := censustree.New(nil,
-		censustree.Options{Name: name, StorageDir: m.StorageDir, MaxLevels: 256, CensusType: censusType})
+	censusTree, err := censustree.New(censustree.Options{Name: name, ParentDB: m.db,
+		MaxLevels: 256, CensusType: censusType})
 	if err != nil {
 		return nil, err
 	}
@@ -174,16 +274,17 @@ func (m *Manager) AddNamespace(name string, censusType models.Census_Type, authP
 	if m.Exists(name) {
 		return nil, ErrNamespaceExist
 	}
-	censusTree, err := censustree.New(nil,
-		censustree.Options{Name: name, StorageDir: m.StorageDir, MaxLevels: 256, CensusType: censusType})
+	censusTree, err := censustree.New(censustree.Options{Name: name, ParentDB: m.db,
+		MaxLevels: 256, CensusType: censusType})
 	if err != nil {
 		return nil, err
 	}
 	m.Trees[name] = censusTree
 	m.Census.Namespaces = append(m.Census.Namespaces, Namespace{
-		Type: censusType,
-		Name: name,
-		Keys: authPubKeys,
+		Type:    censusType,
+		Name:    name,
+		Keys:    authPubKeys,
+		Version: CurrentCensusVersion,
 	})
 	return censusTree, m.save()
 }
@@ -215,7 +316,7 @@ func (m *Manager) DelNamespace(name string) error {
 
 func (m *Manager) save() error {
 	log.Debug("saving namespaces")
-	nsConfig := fmt.Sprintf("%s/namespaces.json", m.StorageDir)
+	nsConfig := filepath.Join(m.StorageDir, "namespaces.json")
 	data, err := json.Marshal(m.Census)
 	if err != nil {
 		return err

@@ -41,7 +41,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 	if err != nil {
 		return fmt.Errorf("error importing dump: %s", err)
 	}
-	root, err := tr.Root(nil)
+	root, err := tr.Root()
 	if err != nil {
 		return fmt.Errorf("error importing dump: %s", err)
 	}
@@ -89,64 +89,84 @@ func (m *Manager) AddToImportQueue(censusID, censusURI string) {
 	m.importQueue <- censusImport{censusID: censusID, censusURI: censusURI}
 }
 
-func (m *Manager) importFailedQueueDaemon() {
-	log.Infof("starting import failed queue daemon")
-	for {
-		for cid, uri := range m.ImportFailedQueue() {
-			log.Debugf("retrying census import %s %s", cid, uri)
-			ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout*2)
-			censusRaw, err := m.RemoteStorage.Retrieve(ctx, uri[len(m.RemoteStorage.URIprefix()):], 0)
-			cancel()
-			if err != nil {
-				continue
-			}
-			censusRaw = m.decompressBytes(censusRaw)
-			if err := m.importTree(censusRaw, cid); err != nil {
-				log.Warnf("cannot import census %s: (%v)", cid, err)
-			}
-			m.failedQueueLock.Lock()
-			delete(m.failedQueue, cid)
-			m.failedQueueLock.Unlock()
-		}
-		time.Sleep(1 * time.Second)
-	}
-}
-
-// ImportQueueDaemon fetches and imports remote census added via importQueue.
-func (m *Manager) importQueueDaemon() {
-	for imp := range m.importQueue {
-		cid, uri := imp.censusID, imp.censusURI
-		// TODO(mvdan): this lock is separate from the one
-		// from AddNamespace below. The namespace might appear
-		// in between the two pieces of code.
-		m.TreesMu.RLock()
-		exists := m.Exists(cid)
-		m.TreesMu.RUnlock()
-		if exists {
-			log.Debugf("census %s already exists, skipping", cid)
-			continue
-		}
-		log.Infof("retrieving remote census %s", uri)
-		m.queueAdd(1)
-		ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
+func (m *Manager) handleImportFailedQueue() {
+	for cid, uri := range m.ImportFailedQueue() {
+		log.Debugf("retrying census import %s %s", cid, uri)
+		ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout*2)
 		censusRaw, err := m.RemoteStorage.Retrieve(ctx, uri[len(m.RemoteStorage.URIprefix()):], 0)
 		cancel()
 		if err != nil {
-			if os.IsTimeout(err) {
-				log.Warnf("timeout importing census %s, adding it to failed queue for retry", uri)
-				m.failedQueueLock.Lock()
-				m.failedQueue[cid] = uri
-				m.failedQueueLock.Unlock()
-			} else {
-				log.Warnf("cannot retrieve census %s: (%s)", cid, err)
-			}
-			m.queueAdd(-1)
 			continue
 		}
 		censusRaw = m.decompressBytes(censusRaw)
-		if err = m.importTree(censusRaw, cid); err != nil {
-			log.Warnf("cannot import census %s: (%s)", cid, err)
+		if err := m.importTree(censusRaw, cid); err != nil {
+			log.Warnf("cannot import census %s: (%v)", cid, err)
+		}
+		m.failedQueueLock.Lock()
+		delete(m.failedQueue, cid)
+		m.failedQueueLock.Unlock()
+	}
+}
+
+func (m *Manager) importFailedQueueDaemon(ctx context.Context) {
+	log.Infof("starting import failed queue daemon")
+	m.handleImportFailedQueue()
+	for {
+		select {
+		case <-time.NewTimer(1 * time.Second).C:
+			m.handleImportFailedQueue()
+		case <-ctx.Done():
+			m.wgQueueDaemons.Done()
+			return
+		}
+	}
+}
+
+func (m *Manager) handleImport(imp censusImport) {
+	cid, uri := imp.censusID, imp.censusURI
+	// TODO(mvdan): this lock is separate from the one
+	// from AddNamespace below. The namespace might appear
+	// in between the two pieces of code.
+	m.TreesMu.RLock()
+	exists := m.Exists(cid)
+	m.TreesMu.RUnlock()
+	if exists {
+		log.Debugf("census %s already exists, skipping", cid)
+		return
+	}
+	log.Infof("retrieving remote census %s", uri)
+	m.queueAdd(1)
+	ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
+	censusRaw, err := m.RemoteStorage.Retrieve(ctx, uri[len(m.RemoteStorage.URIprefix()):], 0)
+	cancel()
+	if err != nil {
+		if os.IsTimeout(err) {
+			log.Warnf("timeout importing census %s, adding it to failed queue for retry", uri)
+			m.failedQueueLock.Lock()
+			m.failedQueue[cid] = uri
+			m.failedQueueLock.Unlock()
+		} else {
+			log.Warnf("cannot retrieve census %s: (%s)", cid, err)
 		}
 		m.queueAdd(-1)
+		return
+	}
+	censusRaw = m.decompressBytes(censusRaw)
+	if err = m.importTree(censusRaw, cid); err != nil {
+		log.Warnf("cannot import census %s: (%s)", cid, err)
+	}
+	m.queueAdd(-1)
+}
+
+// ImportQueueDaemon fetches and imports remote census added via importQueue.
+func (m *Manager) importQueueDaemon(ctx context.Context) {
+	for {
+		select {
+		case imp := <-m.importQueue:
+			m.handleImport(imp)
+		case <-ctx.Done():
+			m.wgQueueDaemons.Done()
+			return
+		}
 	}
 }

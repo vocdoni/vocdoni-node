@@ -7,8 +7,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/db/badgerdb"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -40,9 +42,10 @@ func BenchmarkCheckTx(b *testing.B) {
 
 func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 	nvoters int, tmpDir string) (voters []*models.SignedTx) {
-	tr, err := censustree.New(nil,
-		censustree.Options{Name: util.RandomHex(12), StorageDir: tmpDir,
-			MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
+	db, err := badgerdb.New(badgerdb.Options{Path: tmpDir})
+	qt.Assert(b, err, qt.IsNil)
+	tr, err := censustree.New(censustree.Options{Name: util.RandomHex(12), ParentDB: db,
+		MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -54,14 +57,14 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 	claims := []string{}
 	for _, k := range keys {
 		c := k.PublicKey()
-		if err := tr.Add(nil, c, nil); err != nil {
+		if err := tr.Add(c, nil); err != nil {
 			b.Error(err)
 		}
 		claims = append(claims, string(c))
 	}
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
-	root, err := tr.Root(nil)
+	root, err := tr.Root()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -83,7 +86,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 
 	var proof []byte
 	for i, s := range keys {
-		_, proof, err = tr.GenProof(nil, []byte(claims[i]))
+		_, proof, err = tr.GenProof([]byte(claims[i]))
 		if err != nil {
 			b.Fatal(err)
 		}
