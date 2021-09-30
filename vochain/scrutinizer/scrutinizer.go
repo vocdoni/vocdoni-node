@@ -531,7 +531,10 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 		}
 
 		myVotes := BuildProcessResult(myResults, results.EntityId).GetVotes()
-		correct := len(myVotes) != len(results.Votes)
+		correct := len(myVotes) == len(results.Votes)
+		if !correct {
+			log.Errorf("results validation failed: wrong number of votes")
+		}
 		for i, q := range results.GetVotes() {
 			if !correct {
 				break
@@ -552,7 +555,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 		if correct {
 			log.Infof("published results for process %x are correct", pid)
 		} else {
-			log.Warnf("published results for process %x are not correct", pid)
+			log.Errorf("published results for process %x are not correct", pid)
 		}
 	}()
 	s.updateProcessPool = append(s.updateProcessPool, pid)
