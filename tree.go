@@ -40,8 +40,8 @@ const (
 	// nChars is used to crop the Graphviz nodes labels
 	nChars = 4
 
-	maxKeyLen           = 255
-	maxSiblingsFieldLen = 65535
+	maxUint8  = int(^uint8(0))  // 2**8 -1
+	maxUint16 = int(^uint16(0)) // 2**16 -1
 )
 
 var (
@@ -312,9 +312,9 @@ func (t *Tree) AddWithTx(wTx db.WriteTx, k, v []byte) error {
 
 func (t *Tree) add(wTx db.WriteTx, root []byte, fromLvl int, k, v []byte) ([]byte, error) {
 	keyPath := make([]byte, t.hashFunction.Len())
-	if len(k) > len(keyPath) {
-		return nil, fmt.Errorf("len(k) > len(keyPath)")
-	}
+	// if len(k) > t.hashFunction.Len() { // WIP
+	//         return nil, fmt.Errorf("len(k) > hashFunction.Len()")
+	// }
 	copy(keyPath[:], k)
 
 	path := getPath(t.maxLevels, keyPath)
@@ -371,10 +371,10 @@ func (t *Tree) down(rTx db.ReadTx, newKey, currKey []byte, siblings [][]byte,
 		fmt.Printf("newKey: %s, currKey: %s, currLvl: %d, currValue: %s\n",
 			hex.EncodeToString(newKey), hex.EncodeToString(currKey),
 			currLvl, hex.EncodeToString(currValue))
-		panic("This point should not be reached, as the 'if' above" +
-			" should avoid reaching this point. This panic is temporary" +
+		panic("This point should not be reached, as the 'if currKey==t.emptyHash'" +
+			" above should avoid reaching this point. This panic is temporary" +
 			" for reporting purposes, will be deleted in future versions." +
-			" Please paste this log (including the previous lines) in a" +
+			" Please paste this log (including the previous log lines) in a" +
 			" new issue: https://github.com/vocdoni/arbo/issues/new") // TMP
 	case PrefixValueLeaf: // leaf
 		if !bytes.Equal(currValue, emptyValue) {
@@ -387,10 +387,10 @@ func (t *Tree) down(rTx db.ReadTx, newKey, currKey []byte, siblings [][]byte,
 			}
 
 			oldLeafKeyFull := make([]byte, t.hashFunction.Len())
-			if len(oldLeafKey) > len(oldLeafKeyFull) {
-				return nil, nil, nil,
-					fmt.Errorf("len(oldLeafKey) > len(oldLeafKeyFull)")
-			}
+			// if len(oldLeafKey) > t.hashFunction.Len() { // WIP
+			//         return nil, nil, nil,
+			//                 fmt.Errorf("len(oldLeafKey) > hashFunction.Len()")
+			// }
 			copy(oldLeafKeyFull[:], oldLeafKey)
 
 			// if currKey is already used, go down until paths diverge
@@ -494,8 +494,8 @@ func newLeafValue(hashFunc HashFunction, k, v []byte) ([]byte, []byte, error) {
 	}
 	var leafValue []byte
 	leafValue = append(leafValue, byte(PrefixValueLeaf))
-	if len(k) > maxKeyLen {
-		return nil, nil, fmt.Errorf("len(k) > %v", maxKeyLen)
+	if len(k) > maxUint8 {
+		return nil, nil, fmt.Errorf("newLeafValue: len(k) > %v", maxUint8)
 	}
 	leafValue = append(leafValue, byte(len(k)))
 	leafValue = append(leafValue, k...)
@@ -532,8 +532,8 @@ func (t *Tree) newIntermediate(l, r []byte) ([]byte, []byte, error) {
 func newIntermediate(hashFunc HashFunction, l, r []byte) ([]byte, []byte, error) {
 	b := make([]byte, PrefixValueLen+hashFunc.Len()*2)
 	b[0] = PrefixValueIntermediate
-	if len(l) > maxKeyLen {
-		return nil, nil, fmt.Errorf("len(k) > %v", maxKeyLen)
+	if len(l) > maxUint8 {
+		return nil, nil, fmt.Errorf("newIntermediate: len(l) > %v", maxUint8)
 	}
 	b[1] = byte(len(l))
 	copy(b[PrefixValueLen:PrefixValueLen+hashFunc.Len()], l)
@@ -596,9 +596,9 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 	var err error
 
 	keyPath := make([]byte, t.hashFunction.Len())
-	if len(k) > len(keyPath) {
-		return fmt.Errorf("len(k) > len(keyPath)")
-	}
+	// if len(k) > t.hashFunction.Len() { // WIP
+	//         return fmt.Errorf("len(k) > hashFunction.Len()")
+	// }
 	copy(keyPath[:], k)
 	path := getPath(t.maxLevels, keyPath)
 
@@ -656,9 +656,9 @@ func (t *Tree) GenProof(k []byte) ([]byte, []byte, []byte, bool, error) {
 // the db.ReadTx that is used.
 func (t *Tree) GenProofWithTx(rTx db.ReadTx, k []byte) ([]byte, []byte, []byte, bool, error) {
 	keyPath := make([]byte, t.hashFunction.Len())
-	if len(k) > len(keyPath) {
-		return nil, nil, nil, false, fmt.Errorf("len(k) > len(keyPath)")
-	}
+	// if len(k) > t.hashFunction.Len() { // WIP
+	//         return nil, nil, nil, false, fmt.Errorf("len(k) > hashFunction.Len()")
+	// }
 	copy(keyPath[:], k)
 
 	root, err := t.RootWithTx(rTx)
@@ -710,17 +710,17 @@ func PackSiblings(hashFunc HashFunction, siblings [][]byte) ([]byte, error) {
 
 	bitmapBytes := bitmapToBytes(bitmap)
 	l := len(bitmapBytes)
+	if l > maxUint16 {
+		return nil, fmt.Errorf("PackSiblings: bitmapBytes length > %v", maxUint16)
+	}
 
 	fullLen := 4 + l + len(b) //nolint:gomnd
+	if fullLen > maxUint16 {
+		return nil, fmt.Errorf("PackSiblings: fullLen > %v", maxUint16)
+	}
 	res := make([]byte, fullLen)
-	if fullLen > maxSiblingsFieldLen {
-		return nil, fmt.Errorf("fullLen > %v", maxSiblingsFieldLen)
-	}
 	binary.LittleEndian.PutUint16(res[0:2], uint16(fullLen)) // set full length
-	if l > maxSiblingsFieldLen {
-		return nil, fmt.Errorf("l > %v", maxSiblingsFieldLen)
-	}
-	binary.LittleEndian.PutUint16(res[2:4], uint16(l)) // set the bitmapBytes length
+	binary.LittleEndian.PutUint16(res[2:4], uint16(l))       // set the bitmapBytes length
 	copy(res[4:4+l], bitmapBytes)
 	copy(res[4+l:], b)
 	return res, nil
@@ -732,7 +732,7 @@ func UnpackSiblings(hashFunc HashFunction, b []byte) ([][]byte, error) {
 	l := binary.LittleEndian.Uint16(b[2:4]) // bitmap bytes length
 	if len(b) != int(fullLen) {
 		return nil,
-			fmt.Errorf("error unpacking siblings. Expected len: %d, current len: %d",
+			fmt.Errorf("expected len: %d, current len: %d",
 				fullLen, len(b))
 	}
 
@@ -794,6 +794,9 @@ func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
 // found in the tree in the leaf that was on the path going to the input key.
 func (t *Tree) GetWithTx(rTx db.ReadTx, k []byte) ([]byte, []byte, error) {
 	keyPath := make([]byte, t.hashFunction.Len())
+	// if len(k) > t.hashFunction.Len() { // WIP
+	//         return nil, nil, fmt.Errorf("len(k) > hashFunction.Len()")
+	// }
 	copy(keyPath[:], k)
 
 	root, err := t.RootWithTx(rTx)
@@ -1081,13 +1084,13 @@ func (t *Tree) Dump(fromRoot []byte) ([]byte, error) {
 		}
 		leafK, leafV := ReadLeafValue(v)
 		kv := make([]byte, 2+len(leafK)+len(leafV))
-		if len(leafK) > maxKeyLen {
-			callbackErr = fmt.Errorf("len(leafK) > %v", maxKeyLen)
+		if len(leafK) > maxUint8 {
+			callbackErr = fmt.Errorf("len(leafK) > %v", maxUint8)
 			return true
 		}
 		kv[0] = byte(len(leafK))
-		if len(leafV) > maxKeyLen {
-			callbackErr = fmt.Errorf("len(leafV) > %v", maxKeyLen)
+		if len(leafV) > maxUint8 {
+			callbackErr = fmt.Errorf("len(leafV) > %v", maxUint8)
 			return true
 		}
 		kv[1] = byte(len(leafV))
