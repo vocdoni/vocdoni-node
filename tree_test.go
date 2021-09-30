@@ -640,6 +640,40 @@ func TestGetFromSnapshotExpectArboErrKeyNotFound(t *testing.T) {
 	c.Assert(err, qt.Equals, ErrKeyNotFound) // and not equal to db.ErrKeyNotFound
 }
 
+func TestKeyLen(t *testing.T) {
+	c := qt.New(t)
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	// maxLevels is 100, keyPath length = ceil(maxLevels/8) = 13
+	maxLevels := 100
+	tree, err := NewTree(database, maxLevels, HashFunctionPoseidon)
+	c.Assert(err, qt.IsNil)
+
+	// expect no errors when adding a key of only 4 bytes (when the
+	// required length of keyPath for 100 levels would be 13 bytes)
+	bLen := 4
+	k := BigIntToBytes(bLen, big.NewInt(1))
+	v := BigIntToBytes(bLen, big.NewInt(1))
+
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
+
+	err = tree.Update(k, v)
+	c.Assert(err, qt.IsNil)
+
+	_, _, _, _, err = tree.GenProof(k)
+	c.Assert(err, qt.IsNil)
+
+	_, _, err = tree.Get(k)
+	c.Assert(err, qt.IsNil)
+
+	k = BigIntToBytes(bLen, big.NewInt(2))
+	v = BigIntToBytes(bLen, big.NewInt(2))
+	invalids, err := tree.AddBatch([][]byte{k}, [][]byte{v})
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(invalids), qt.Equals, 0)
+}
+
 func BenchmarkAdd(b *testing.B) {
 	bLen := 32 // for both Poseidon & Sha256
 	// prepare inputs

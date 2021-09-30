@@ -44,7 +44,7 @@ func (p *params) keysValuesToKvs(ks, vs [][]byte) ([]kv, error) {
 	}
 	kvs := make([]kv, len(ks))
 	for i := 0; i < len(ks); i++ {
-		keyPath := make([]byte, p.hashFunction.Len())
+		keyPath := make([]byte, int(math.Ceil(float64(p.maxLevels)/float64(8)))) //nolint:gomnd
 		copy(keyPath[:], ks[i])
 		kvs[i].pos = i
 		kvs[i].keyPath = keyPath

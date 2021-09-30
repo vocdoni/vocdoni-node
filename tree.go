@@ -311,13 +311,10 @@ func (t *Tree) AddWithTx(wTx db.WriteTx, k, v []byte) error {
 }
 
 func (t *Tree) add(wTx db.WriteTx, root []byte, fromLvl int, k, v []byte) ([]byte, error) {
-	keyPath := make([]byte, t.hashFunction.Len())
-	// if len(k) > t.hashFunction.Len() { // WIP
-	//         return nil, fmt.Errorf("len(k) > hashFunction.Len()")
-	// }
+	keyPath := make([]byte, int(math.Ceil(float64(t.maxLevels)/float64(8)))) //nolint:gomnd
 	copy(keyPath[:], k)
-
 	path := getPath(t.maxLevels, keyPath)
+
 	// go down to the leaf
 	var siblings [][]byte
 	_, _, siblings, err := t.down(wTx, k, root, siblings, path, fromLvl, false)
@@ -593,12 +590,7 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 		return ErrSnapshotNotEditable
 	}
 
-	var err error
-
-	keyPath := make([]byte, t.hashFunction.Len())
-	// if len(k) > t.hashFunction.Len() { // WIP
-	//         return fmt.Errorf("len(k) > hashFunction.Len()")
-	// }
+	keyPath := make([]byte, int(math.Ceil(float64(t.maxLevels)/float64(8)))) //nolint:gomnd
 	copy(keyPath[:], k)
 	path := getPath(t.maxLevels, keyPath)
 
@@ -655,18 +647,15 @@ func (t *Tree) GenProof(k []byte) ([]byte, []byte, []byte, bool, error) {
 // GenProofWithTx does the same than the GenProof method, but allowing to pass
 // the db.ReadTx that is used.
 func (t *Tree) GenProofWithTx(rTx db.ReadTx, k []byte) ([]byte, []byte, []byte, bool, error) {
-	keyPath := make([]byte, t.hashFunction.Len())
-	// if len(k) > t.hashFunction.Len() { // WIP
-	//         return nil, nil, nil, false, fmt.Errorf("len(k) > hashFunction.Len()")
-	// }
+	keyPath := make([]byte, int(math.Ceil(float64(t.maxLevels)/float64(8)))) //nolint:gomnd
 	copy(keyPath[:], k)
+	path := getPath(t.maxLevels, keyPath)
 
 	root, err := t.RootWithTx(rTx)
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
 
-	path := getPath(t.maxLevels, keyPath)
 	// go down to the leaf
 	var siblings [][]byte
 	_, value, siblings, err := t.down(rTx, k, root, siblings, path, 0, true)
@@ -793,18 +782,15 @@ func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
 // ErrKeyNotFound, and in the leafK & leafV parameters will be placed the data
 // found in the tree in the leaf that was on the path going to the input key.
 func (t *Tree) GetWithTx(rTx db.ReadTx, k []byte) ([]byte, []byte, error) {
-	keyPath := make([]byte, t.hashFunction.Len())
-	// if len(k) > t.hashFunction.Len() { // WIP
-	//         return nil, nil, fmt.Errorf("len(k) > hashFunction.Len()")
-	// }
+	keyPath := make([]byte, int(math.Ceil(float64(t.maxLevels)/float64(8)))) //nolint:gomnd
 	copy(keyPath[:], k)
+	path := getPath(t.maxLevels, keyPath)
 
 	root, err := t.RootWithTx(rTx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	path := getPath(t.maxLevels, keyPath)
 	// go down to the leaf
 	var siblings [][]byte
 	_, value, _, err := t.down(rTx, k, root, siblings, path, 0, true)
@@ -827,7 +813,7 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 		return false, err
 	}
 
-	keyPath := make([]byte, hashFunc.Len())
+	keyPath := make([]byte, len(siblings))
 	copy(keyPath[:], k)
 
 	key, _, err := newLeafValue(hashFunc, k, v)
