@@ -12,8 +12,6 @@ import (
 	eth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	cttypes "github.com/tendermint/tendermint/rpc/core/types"
-	ttypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/types"
@@ -65,12 +63,6 @@ type EthereumEvents struct {
 type timedEvent struct {
 	event *ethtypes.Log
 	added time.Time
-}
-
-// VochainClient is the interface that any vochain client should fullfy
-type VochainClient interface {
-	// TODO(mvdan): do we want a more generic API?
-	BroadcastTxSync(tx ttypes.Tx) (*cttypes.ResultBroadcastTx, error)
 }
 
 // CensusManager is the interface that any census manager should fullfy
