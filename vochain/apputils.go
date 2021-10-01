@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
@@ -20,7 +21,6 @@ import (
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"
-	"github.com/tendermint/tendermint/libs/tempfile"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -71,7 +71,7 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 		if err != nil {
 			log.Fatalf("cannot create priv_validator_state.json: %s", err)
 		}
-		err = tempfile.WriteFileAtomic(tconfig.PrivValidatorStateFile(), jsonBytes, 0o600)
+		err = ioutil.WriteFile(tconfig.PrivValidatorStateFile(), jsonBytes, 0o600)
 		if err != nil {
 			log.Fatalf("cannot create priv_validator_state.json: %s", err)
 		}
