@@ -374,7 +374,6 @@ func (s *StateDB) TreeView(root []byte) (*TreeView, error) {
 	}
 
 	txTree := subReadTx(tx, subKeyTree)
-	defer txTree.Discard()
 	tree, err := tree.New(&readOnlyWriteTx{txTree},
 		tree.Options{DB: subDB(s.db, subKeyTree), MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
 	if errors.Is(err, ErrReadOnly) {
