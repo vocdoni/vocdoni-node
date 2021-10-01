@@ -132,11 +132,6 @@ func (u *TreeUpdate) SubTree(cfg TreeConfig) (treeUpdate *TreeUpdate, err error)
 		return nil, err
 	}
 	tx := subWriteTx(u.tx, path.Join(subKeySubTree, cfg.prefix))
-	defer func() {
-		if err != nil {
-			tx.Discard()
-		}
-	}()
 	txTree := subWriteTx(tx, subKeyTree)
 	tree, err := tree.New(txTree,
 		tree.Options{DB: nil, MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})

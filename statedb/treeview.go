@@ -147,7 +147,6 @@ func (v *TreeView) SubTree(cfg TreeConfig) (treeView TreeViewer, err error) {
 	tx := db.ReadTx()
 	defer tx.Discard()
 	txTree := subReadTx(tx, subKeyTree)
-	defer txTree.Discard()
 	tree, err := tree.New(&readOnlyWriteTx{txTree},
 		tree.Options{DB: subDB(db, subKeyTree), MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
 	if errors.Is(err, ErrReadOnly) {
