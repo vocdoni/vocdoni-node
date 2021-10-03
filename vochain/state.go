@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -216,7 +217,7 @@ type State struct {
 // NewState creates a new State
 func NewState(dataDir string) (*State, error) {
 	var err error
-	db, err := badgerdb.New(badgerdb.Options{Path: dataDir})
+	db, err := badgerdb.New(badgerdb.Options{Path: filepath.Join(dataDir, "vcstate")})
 	if err != nil {
 		return nil, err
 	}

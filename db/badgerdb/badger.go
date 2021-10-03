@@ -103,10 +103,14 @@ func New(opts Options) (*BadgerDB, error) {
 		WithLogger(nil).
 		// Do we want compression in the future?
 		// WithCompression(options.Snappy).
-		WithSyncWrites(false)
+		WithSyncWrites(false).
+		WithCompression(0).
+		WithBlockCacheSize(0).
+		WithNumCompactors(20).
+		WithNumMemtables(1).
+		WithBlockSize(16)
 
 	badgerOpts.MemTableSize = MemTableSize
-
 	db, err := badger.Open(badgerOpts)
 	if err != nil {
 		return nil, err
