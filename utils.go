@@ -1,6 +1,8 @@
 package arbo
 
-import "math/big"
+import (
+	"math/big"
+)
 
 // SwapEndianness swaps the order of the bytes in the byte slice.
 func SwapEndianness(b []byte) []byte {

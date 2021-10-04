@@ -2,6 +2,7 @@ package arbo
 
 import (
 	"encoding/hex"
+	"math"
 	"math/big"
 	"testing"
 
@@ -9,69 +10,8 @@ import (
 	"go.vocdoni.io/dvote/db/badgerdb"
 )
 
-func TestVirtualTreeTestVectors(t *testing.T) {
-	c := qt.New(t)
-
-	bLen := 32
-	keys := [][]byte{
-		BigIntToBytes(bLen, big.NewInt(1)),
-		BigIntToBytes(bLen, big.NewInt(33)),
-		BigIntToBytes(bLen, big.NewInt(1234)),
-		BigIntToBytes(bLen, big.NewInt(123456789)),
-	}
-	values := [][]byte{
-		BigIntToBytes(bLen, big.NewInt(2)),
-		BigIntToBytes(bLen, big.NewInt(44)),
-		BigIntToBytes(bLen, big.NewInt(9876)),
-		BigIntToBytes(bLen, big.NewInt(987654321)),
-	}
-
-	// check the root for different batches of leafs
-	testVirtualTree(c, 10, keys[:1], values[:1])
-	testVirtualTree(c, 10, keys[:2], values[:2])
-	testVirtualTree(c, 10, keys[:3], values[:3])
-	testVirtualTree(c, 10, keys[:4], values[:4])
-
-	// test with hardcoded values
-	testvectorKeys := []string{
-		"1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642",
-		"2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf",
-		"9cb87ec67e875c61390edcd1ab517f443591047709a4d4e45b0f9ed980857b8e",
-		"9b4e9e92e974a589f426ceeb4cb291dc24893513fecf8e8460992dcf52621d4d",
-		"1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5",
-		"d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7",
-		"3cd55dbfb8f975f20a0925dfbdabe79fa2d51dd0268afbb8ba6b01de9dfcdd3c",
-		"5d0a9d6d9f197c091bf054fac9cb60e11ec723d6610ed8578e617b4d46cb43d5",
-	}
-	keys = [][]byte{}
-	values = [][]byte{}
-	for i := 0; i < len(testvectorKeys); i++ {
-		key, err := hex.DecodeString(testvectorKeys[i])
-		c.Assert(err, qt.IsNil)
-		keys = append(keys, key)
-		values = append(values, []byte{0})
-	}
-
-	// check the root for different batches of leafs
-	testVirtualTree(c, 10, keys[:1], values[:1])
-	testVirtualTree(c, 10, keys, values)
-}
-
-func TestVirtualTreeRandomKeys(t *testing.T) {
-	c := qt.New(t)
-
-	// test with random values
-	nLeafs := 1024
-	keys := make([][]byte, nLeafs)
-	values := make([][]byte, nLeafs)
-	for i := 0; i < nLeafs; i++ {
-		keys[i] = randomBytes(32)
-		values[i] = randomBytes(32)
-	}
-
-	testVirtualTree(c, 100, keys, values)
-}
-
+// testVirtualTree adds the given key-values and tests the vt root against the
+// Tree
 func testVirtualTree(c *qt.C, maxLevels int, keys, values [][]byte) {
 	c.Assert(len(keys), qt.Equals, len(values))
 
@@ -103,11 +43,75 @@ func testVirtualTree(c *qt.C, maxLevels int, keys, values [][]byte) {
 	c.Assert(vTree.root.h, qt.DeepEquals, root)
 }
 
+func TestVirtualTreeTestVectors(t *testing.T) {
+	c := qt.New(t)
+
+	maxLevels := 32
+	keyLen := int(math.Ceil(float64(maxLevels) / float64(8))) //nolint:gomnd
+	keys := [][]byte{
+		BigIntToBytes(keyLen, big.NewInt(1)),
+		BigIntToBytes(keyLen, big.NewInt(33)),
+		BigIntToBytes(keyLen, big.NewInt(1234)),
+		BigIntToBytes(keyLen, big.NewInt(123456789)),
+	}
+	values := [][]byte{
+		BigIntToBytes(keyLen, big.NewInt(2)),
+		BigIntToBytes(keyLen, big.NewInt(44)),
+		BigIntToBytes(keyLen, big.NewInt(9876)),
+		BigIntToBytes(keyLen, big.NewInt(987654321)),
+	}
+
+	// check the root for different batches of leafs
+	testVirtualTree(c, maxLevels, keys[:1], values[:1])
+	testVirtualTree(c, maxLevels, keys[:2], values[:2])
+	testVirtualTree(c, maxLevels, keys[:3], values[:3])
+	testVirtualTree(c, maxLevels, keys[:4], values[:4])
+
+	// test with hardcoded values
+	testvectorKeys := []string{
+		"1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642",
+		"2c9f0a578afff5bfa4e0992a43066460faaab9e8e500db0b16647c701cdb16bf",
+		"9cb87ec67e875c61390edcd1ab517f443591047709a4d4e45b0f9ed980857b8e",
+		"9b4e9e92e974a589f426ceeb4cb291dc24893513fecf8e8460992dcf52621d4d",
+		"1c45cb31f2fa39ec7b9ebf0fad40e0b8296016b5ce8844ae06ff77226379d9a5",
+		"d8af98bbbb585129798ae54d5eabbc9d0561d583faf1663b3a3724d15bda4ec7",
+		"3cd55dbfb8f975f20a0925dfbdabe79fa2d51dd0268afbb8ba6b01de9dfcdd3c",
+		"5d0a9d6d9f197c091bf054fac9cb60e11ec723d6610ed8578e617b4d46cb43d5",
+	}
+	keys = [][]byte{}
+	values = [][]byte{}
+	for i := 0; i < len(testvectorKeys); i++ {
+		key, err := hex.DecodeString(testvectorKeys[i])
+		c.Assert(err, qt.IsNil)
+		keys = append(keys, key)
+		values = append(values, []byte{0})
+	}
+
+	// check the root for different batches of leafs
+	testVirtualTree(c, 256, keys[:1], values[:1])
+	testVirtualTree(c, 256, keys, values)
+}
+
+func TestVirtualTreeRandomKeys(t *testing.T) {
+	c := qt.New(t)
+
+	// test with random values
+	nLeafs := 1024
+	keys := make([][]byte, nLeafs)
+	values := make([][]byte, nLeafs)
+	for i := 0; i < nLeafs; i++ {
+		keys[i] = randomBytes(32)
+		values[i] = randomBytes(32)
+	}
+
+	testVirtualTree(c, 256, keys, values)
+}
+
 func TestVirtualTreeAddBatch(t *testing.T) {
 	c := qt.New(t)
 
 	nLeafs := 2000
-	maxLevels := 100
+	maxLevels := 256
 
 	keys := make([][]byte, nLeafs)
 	values := make([][]byte, nLeafs)
@@ -151,7 +155,7 @@ func TestVirtualTreeAddBatchFullyUsed(t *testing.T) {
 
 	var keys, values [][]byte
 	for i := 0; i < 128; i++ {
-		k := BigIntToBytes(32, big.NewInt(int64(i)))
+		k := BigIntToBytes(1, big.NewInt(int64(i)))
 		v := k
 
 		keys = append(keys, k)
