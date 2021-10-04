@@ -73,7 +73,7 @@ func TestStateDB(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, root1, qt.Not(qt.DeepEquals), emptyHash)
 
-	qt.Assert(t, mainTree.Commit(), qt.IsNil)
+	qt.Assert(t, mainTree.Commit(1), qt.IsNil)
 
 	// statedb.Root == mainTree.Root
 	rootStateDB, err := sdb.Hash()
@@ -132,7 +132,7 @@ func TestStateDB(t *testing.T) {
 	// Expect Commit with no changes to work, StateDB.Root is not changed
 	mainTree, err = sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)
-	mainTree.Commit()
+	qt.Assert(t, mainTree.Commit(2), qt.IsNil)
 	version, err = sdb.Version()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, version, qt.Equals, uint32(2))
@@ -242,7 +242,7 @@ func TestSubTree(t *testing.T) {
 	qt.Assert(t, multiB.Add([]byte("key3"), []byte("value3")), qt.IsNil)
 	// treePrint(multiA.tree, multiA.txTree, "multiA")
 
-	qt.Assert(t, mainTree.Commit(), qt.IsNil)
+	qt.Assert(t, mainTree.Commit(1), qt.IsNil)
 
 	// dumpPrint(sdb.db)
 
@@ -340,7 +340,7 @@ func TestNoState(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, v1, qt.DeepEquals, []byte("value1"))
 
-	qt.Assert(t, mainTree.Commit(), qt.IsNil)
+	qt.Assert(t, mainTree.Commit(1), qt.IsNil)
 
 	// Expect the NoState values in each treeView.  Expect that roots
 	// haven't changed after Commit.
@@ -476,7 +476,7 @@ func TestBigUpdate(t *testing.T) {
 		binary.LittleEndian.PutUint32(value[:], uint32(i))
 		qt.Assert(t, mainTree.Add(key[:], value[:]), qt.IsNil)
 	}
-	qt.Assert(t, mainTree.Commit(), qt.IsNil)
+	qt.Assert(t, mainTree.Commit(1), qt.IsNil)
 }
 
 func TestBigUpdateDiscard(t *testing.T) {
@@ -513,7 +513,7 @@ func TestBigUpdateDiscard(t *testing.T) {
 	mainTree, err = sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, mainTree.Add(singleCfg.Key(), emptyHash), qt.IsNil)
-	qt.Assert(t, mainTree.Commit(), qt.IsNil)
+	qt.Assert(t, mainTree.Commit(1), qt.IsNil)
 
 	mainTree, err = sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)

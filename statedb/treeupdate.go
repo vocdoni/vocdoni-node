@@ -288,25 +288,29 @@ func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 // Commit will write all the changes made from the TreeTx into the database,
 // propagating the roots of dirtiy subTrees up to the mainTree so that a new
 // Hash/Root (mainTree.Root == StateDB.Root) is calculated representing the
-// state.
-func (t *TreeTx) Commit() error {
+// state.  Parameter version sets the version used to index this update
+// (identified by the mainTree root).  The specified version will be stored as
+// the last version of the StateDB.  In general, Commits should use sequential
+// version numbers, but overwritting an existing version can be useful in some
+// cases (for example, overwritting version 0 to setup a genesis state).
+func (t *TreeTx) Commit(version uint32) error {
 	root, err := propagateRoot(&t.TreeUpdate)
 	if err != nil {
 		return err
 	}
 	t.openSubs = make(map[string]*TreeUpdate)
-	version, err := getVersion(t.tx)
+	curVersion, err := getVersion(t.tx)
 	if err != nil {
 		return err
 	}
 	// If root is nil, it means that there were no updates to the StateDB,
 	// so the next version root is the current version root.
 	if root == nil {
-		if root, err = t.sdb.getVersionRoot(t.tx, version); err != nil {
+		if root, err = t.sdb.getVersionRoot(t.tx, curVersion); err != nil {
 			return err
 		}
 	}
-	if err := setVersionRoot(t.tx, version+1, root); err != nil {
+	if err := setVersionRoot(t.tx, version, root); err != nil {
 		return err
 	}
 	return t.tx.Commit()

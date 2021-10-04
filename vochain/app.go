@@ -223,7 +223,7 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	log.Infof("tendermint Block protocol version: %d", req.BlockVersion)
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
-		log.Fatalf("cannot get Store.LastHeight: %v", err)
+		log.Fatalf("cannot get State.LastHeight: %v", err)
 	}
 	appHash, err := app.State.Store.Hash()
 	if err != nil {

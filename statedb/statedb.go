@@ -239,11 +239,10 @@ func getVersion(tx db.ReadTx) (uint32, error) {
 // getVersionRoot is a helper function used get the root of version from the
 // top level tx.
 func (s *StateDB) getVersionRoot(tx db.ReadTx, version uint32) ([]byte, error) {
-	if version == 0 {
-		return make([]byte, s.hashLen), nil
-	}
 	root, err := subReadTx(tx, path.Join(subKeyMeta, pathVersion)).Get(uint32ToBytes(version))
-	if err != nil {
+	if errors.Is(err, db.ErrKeyNotFound) && version == 0 {
+		return make([]byte, s.hashLen), nil
+	} else if err != nil {
 		return nil, err
 	}
 	return root, nil
@@ -259,8 +258,8 @@ func (s *StateDB) getRoot(tx db.ReadTx) ([]byte, error) {
 	return s.getVersionRoot(tx, version)
 }
 
-// The first commited version is 1.  Calling Version on a fresh StateDB will
-// return 0.
+// Version returns the last commited version.  Calling Version on a fresh
+// StateDB will return 0.
 func (s *StateDB) Version() (uint32, error) {
 	tx := s.db.ReadTx()
 	defer tx.Discard()
