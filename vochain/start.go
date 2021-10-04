@@ -158,6 +158,11 @@ func newTendermint(app *BaseApplication,
 	tconfig.P2P.ListenAddress = "tcp://" + localConfig.P2PListen
 	tconfig.P2P.AllowDuplicateIP = false
 	tconfig.P2P.AddrBookStrict = true
+	tconfig.P2P.FlushThrottleTimeout = 500 * time.Millisecond
+	tconfig.P2P.MaxPacketMsgPayloadSize = 10240
+	tconfig.P2P.RecvRate = 5120000
+	tconfig.P2P.DialTimeout = time.Second * 5
+
 	if localConfig.Dev {
 		tconfig.P2P.AllowDuplicateIP = true
 		tconfig.P2P.AddrBookStrict = false
@@ -185,7 +190,7 @@ func newTendermint(app *BaseApplication,
 	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
 
 	// consensus config
-	blockTime := 10
+	blockTime := 8
 	if localConfig.MinerTargetBlockTimeSeconds > 0 {
 		blockTime = localConfig.MinerTargetBlockTimeSeconds
 	}

@@ -61,7 +61,7 @@ func NewBaseApplication(dbpath string) (*BaseApplication, error) {
 	}
 	return &BaseApplication{
 		State:      state,
-		blockCache: lru.NewAtomic(128),
+		blockCache: lru.NewAtomic(32),
 	}, nil
 }
 
