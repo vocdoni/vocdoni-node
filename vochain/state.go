@@ -196,7 +196,9 @@ type treeTxWithMutex struct {
 // State represents the state of the vochain application
 type State struct {
 	// db is the underlying key-value database used by the StateDB
-	db    db.Database
+	db db.Database
+	// Store contains the StateDB.  We match every StateDB commit version
+	// with the block height.
 	Store *statedb.StateDB
 	// Tx must always be accessed via mutex because there will be
 	// concurrent operations on it.  In particular, while the Tx is being
@@ -271,10 +273,10 @@ func initStateDB(db db.Database) (*statedb.StateDB, error) {
 		return sdb, nil
 	}
 	update, err := sdb.BeginTx()
-	defer update.Discard()
 	if err != nil {
 		return nil, err
 	}
+	defer update.Discard()
 	// Create the Oracles, Validators and Processes subtrees (from
 	// mainTree) by adding leaves in the mainTree that contain the
 	// corresponding tree roots, and opening the subTrees for the first
@@ -300,7 +302,7 @@ func initStateDB(db db.Database) (*statedb.StateDB, error) {
 	if _, err := update.SubTree(ProcessesCfg); err != nil {
 		return nil, err
 	}
-	return sdb, update.Commit()
+	return sdb, update.Commit(0)
 }
 
 // mainTreeView is a thread-safe function to obtain a pointer to the last
@@ -706,9 +708,10 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int,
 
 // Save persistent save of vochain mem trees
 func (v *State) Save() ([]byte, error) {
+	height := v.CurrentHeight()
 	v.Tx.Lock()
 	err := func() error {
-		if err := v.Tx.Commit(); err != nil {
+		if err := v.Tx.Commit(height); err != nil {
 			return fmt.Errorf("cannot commit statedb tx: %w", err)
 		}
 		var err error
@@ -726,7 +729,6 @@ func (v *State) Save() ([]byte, error) {
 		return nil, fmt.Errorf("cannot get statdeb mainTreeView: %w", err)
 	}
 	v.setMainTreeView(mainTreeView)
-	height := v.CurrentHeight()
 	for _, l := range v.eventListeners {
 		if err := l.Commit(height); err != nil {
 			if _, fatal := err.(ErrHaltVochain); fatal {
@@ -752,32 +754,20 @@ func (v *State) Rollback() {
 	atomic.StoreInt32(&v.txCounter, 0)
 }
 
-// LastHeight returns the last commited height (block count)
+// LastHeight returns the last commited height (block count).  We match the
+// StateDB Version with the height via the Commits done in Save.
 func (v *State) LastHeight() (uint32, error) {
-	noState := v.mainTreeView().NoState()
-	heightLE, err := noState.Get(heightKey)
-	if errors.Is(err, db.ErrKeyNotFound) {
-		return 0, nil
-	} else if err != nil {
-		return 0, err
-	}
-	return binary.LittleEndian.Uint32(heightLE), nil
+	return v.Store.Version()
 }
 
-// CurrentHeight returns the current state height (block count)
+// CurrentHeight returns the current state height (block count).
 func (v *State) CurrentHeight() uint32 {
 	return atomic.LoadUint32(&v.currentHeight)
 }
 
-// SetHeight sets the height for the current block
-func (v *State) SetHeight(height uint32) error {
+// SetHeight sets the height for the current block.
+func (v *State) SetHeight(height uint32) {
 	atomic.StoreUint32(&v.currentHeight, height)
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	noState := v.Tx.NoState()
-	heightLE := make([]byte, 4)
-	binary.LittleEndian.PutUint32(heightLE, height)
-	return noState.Set(heightKey, heightLE)
 }
 
 // WorkingHash returns the hash of the vochain StateDB (mainTree.Root)
