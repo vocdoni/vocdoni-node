@@ -1,9 +1,11 @@
 package tree
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
@@ -123,17 +125,35 @@ func (t *Tree) AddBatch(wTx db.WriteTx, keys, values [][]byte) ([]int, error) {
 		wTx = t.DB().WriteTx()
 		defer wTx.Discard()
 	}
-	i, err := t.tree.AddBatchWithTx(wTx, keys, values)
-	if err != nil {
-		return i, err
+
+	//////////////////////////////////////////////
+	// TMP AddBatch uses a loop for test purposes:
+
+	// equal the number of keys & values
+	e := []byte{}
+	if len(keys) > len(values) {
+		// add missing values
+		for i := len(values); i < len(keys); i++ {
+			values = append(values, e)
+		}
+	} else if len(keys) < len(values) {
+		// crop extra values
+		values = values[:len(keys)]
+	}
+	// use Add loop
+	var invalids []int
+	for i := 0; i < len(keys); i++ {
+		if err := t.tree.AddWithTx(wTx, keys[i], values[i]); err != nil {
+			invalids = append(invalids, i)
+		}
 	}
 
 	if !givenTx {
 		if err := wTx.Commit(); err != nil {
-			return i, err
+			return invalids, err
 		}
 	}
-	return i, nil
+	return invalids, nil
 }
 
 // Iterate over all the database-encoded nodes of the tree.  When callback
@@ -249,5 +269,44 @@ func (t *Tree) Dump() ([]byte, error) {
 // ImportDump imports the leafs (that have been exported with the Dump method)
 // in the Tree.
 func (t *Tree) ImportDump(b []byte) error {
-	return t.tree.ImportDump(b)
+	// return t.tree.ImportDump(b)
+
+	//////////////////////////////////////////////
+	// TMP AddBatch uses a loop for test purposes:
+	root, err := t.tree.Root()
+	if err != nil {
+		return err
+	}
+	emptyHash := make([]byte, t.tree.HashFunction().Len()) // empty
+	if !bytes.Equal(root, emptyHash) {
+		return arbo.ErrTreeNotEmpty
+	}
+
+	r := bytes.NewReader(b)
+	var keys, values [][]byte
+	for {
+		l := make([]byte, 2)
+		_, err = io.ReadFull(r, l)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+		k := make([]byte, l[0])
+		_, err = io.ReadFull(r, k)
+		if err != nil {
+			return err
+		}
+		v := make([]byte, l[1])
+		_, err = io.ReadFull(r, v)
+		if err != nil {
+			return err
+		}
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	if _, err = t.AddBatch(nil, keys, values); err != nil {
+		return err
+	}
+	return nil
 }
