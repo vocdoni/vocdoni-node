@@ -37,22 +37,32 @@ type kv struct {
 	v       []byte
 }
 
-func (p *params) keysValuesToKvs(ks, vs [][]byte) ([]kv, error) {
+func (p *params) keysValuesToKvs(ks, vs [][]byte) ([]kv, []int, error) {
 	if len(ks) != len(vs) {
-		return nil, fmt.Errorf("len(keys)!=len(values) (%d!=%d)",
+		return nil, nil, fmt.Errorf("len(keys)!=len(values) (%d!=%d)",
 			len(ks), len(vs))
 	}
-	kvs := make([]kv, len(ks))
+	var invalids []int
+	var kvs []kv
 	for i := 0; i < len(ks); i++ {
-		keyPath := make([]byte, p.hashFunction.Len())
-		copy(keyPath[:], ks[i])
-		kvs[i].pos = i
-		kvs[i].keyPath = keyPath
-		kvs[i].k = ks[i]
-		kvs[i].v = vs[i]
+		keyPath, err := keyPathFromKey(p.maxLevels, ks[i])
+		if err != nil {
+			// TODO in a future iteration, invalids will contain
+			// the reason of the error of why each index is
+			// invalid.
+			invalids = append(invalids, i)
+			continue
+		}
+
+		var kvsI kv
+		kvsI.pos = i
+		kvsI.keyPath = keyPath
+		kvsI.k = ks[i]
+		kvsI.v = vs[i]
+		kvs = append(kvs, kvsI)
 	}
 
-	return kvs, nil
+	return kvs, invalids, nil
 }
 
 // vt stands for virtual tree. It's a tree that does not have any computed hash
@@ -94,9 +104,9 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 
 	l := int(math.Log2(float64(nCPU)))
 
-	kvs, err := t.params.keysValuesToKvs(ks, vs)
+	kvs, invalids, err := t.params.keysValuesToKvs(ks, vs)
 	if err != nil {
-		return nil, err
+		return invalids, err
 	}
 
 	buckets := splitInBuckets(kvs, nCPU)
@@ -186,7 +196,6 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 	}
 	wg.Wait()
 
-	var invalids []int
 	for i := 0; i < len(invalidsInBucket); i++ {
 		invalids = append(invalids, invalidsInBucket[i]...)
 	}
@@ -284,7 +293,10 @@ func upFromNodes(ns []*node) (*node, error) {
 
 // add adds a key&value as a leaf in the VirtualTree
 func (t *vt) add(fromLvl int, k, v []byte) error {
-	leaf := newLeafNode(t.params, k, v)
+	leaf, err := newLeafNode(t.params, k, v)
+	if err != nil {
+		return err
+	}
 	if t.root == nil {
 		t.root = leaf
 		return nil
@@ -366,16 +378,18 @@ func (t *vt) computeHashes() ([][2][]byte, error) {
 	return pairs, nil
 }
 
-func newLeafNode(p *params, k, v []byte) *node {
-	keyPath := make([]byte, p.hashFunction.Len())
-	copy(keyPath[:], k)
+func newLeafNode(p *params, k, v []byte) (*node, error) {
+	keyPath, err := keyPathFromKey(p.maxLevels, k)
+	if err != nil {
+		return nil, err
+	}
 	path := getPath(p.maxLevels, keyPath)
 	n := &node{
 		k:    k,
 		v:    v,
 		path: path,
 	}
-	return n
+	return n, nil
 }
 
 type virtualNodeType int

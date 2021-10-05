@@ -17,14 +17,13 @@ func TestCircomVerifierProof(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	bLen := tree.HashFunction().Len()
-
 	testVector := [][]int64{
 		{1, 11},
 		{2, 22},
 		{3, 33},
 		{4, 44},
 	}
+	bLen := 1
 	for i := 0; i < len(testVector); i++ {
 		k := BigIntToBytes(bLen, big.NewInt(testVector[i][0]))
 		v := BigIntToBytes(bLen, big.NewInt(testVector[i][1]))

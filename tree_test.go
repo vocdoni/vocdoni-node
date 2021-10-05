@@ -2,7 +2,9 @@ package arbo
 
 import (
 	"encoding/hex"
+	"math"
 	"math/big"
+	"runtime"
 	"testing"
 	"time"
 
@@ -60,7 +62,7 @@ func TestAddTestVectors(t *testing.T) {
 func testAdd(c *qt.C, hashFunc HashFunction, testVectors []string) {
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 10, hashFunc)
+	tree, err := NewTree(database, 256, hashFunc)
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
@@ -68,7 +70,7 @@ func testAdd(c *qt.C, hashFunc HashFunction, testVectors []string) {
 	c.Assert(err, qt.IsNil)
 	c.Check(hex.EncodeToString(root), qt.Equals, testVectors[0])
 
-	bLen := hashFunc.Len()
+	bLen := 32
 	err = tree.Add(
 		BigIntToBytes(bLen, big.NewInt(1)),
 		BigIntToBytes(bLen, big.NewInt(2)))
@@ -92,11 +94,11 @@ func TestAddBatch(t *testing.T) {
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	bLen := tree.HashFunction().Len()
+	bLen := 32
 	for i := 0; i < 1000; i++ {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
 		v := BigIntToBytes(bLen, big.NewInt(0))
@@ -110,7 +112,7 @@ func TestAddBatch(t *testing.T) {
 
 	database, err = badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree2, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 
@@ -133,11 +135,11 @@ func TestAddDifferentOrder(t *testing.T) {
 	c := qt.New(t)
 	database1, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree1, err := NewTree(database1, 100, HashFunctionPoseidon)
+	tree1, err := NewTree(database1, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
-	bLen := tree1.HashFunction().Len()
+	bLen := 32
 	for i := 0; i < 16; i++ {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
 		v := BigIntToBytes(bLen, big.NewInt(0))
@@ -148,7 +150,7 @@ func TestAddDifferentOrder(t *testing.T) {
 
 	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
+	tree2, err := NewTree(database2, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 
@@ -173,11 +175,11 @@ func TestAddRepeatedIndex(t *testing.T) {
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	bLen := tree.HashFunction().Len()
+	bLen := 32
 	k := BigIntToBytes(bLen, big.NewInt(int64(3)))
 	v := BigIntToBytes(bLen, big.NewInt(int64(12)))
 
@@ -191,11 +193,11 @@ func TestUpdate(t *testing.T) {
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	bLen := tree.HashFunction().Len()
+	bLen := 32
 	k := BigIntToBytes(bLen, big.NewInt(int64(20)))
 	v := BigIntToBytes(bLen, big.NewInt(int64(12)))
 	if err := tree.Add(k, v); err != nil {
@@ -244,11 +246,11 @@ func TestAux(t *testing.T) { // TODO split in proper tests
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	bLen := tree.HashFunction().Len()
+	bLen := 32
 	k := BigIntToBytes(bLen, big.NewInt(int64(1)))
 	v := BigIntToBytes(bLen, big.NewInt(int64(0)))
 	err = tree.Add(k, v)
@@ -283,11 +285,11 @@ func TestGet(t *testing.T) {
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	bLen := tree.HashFunction().Len()
+	bLen := 32
 	for i := 0; i < 10; i++ {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
 		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
@@ -307,11 +309,11 @@ func TestGenProofAndVerify(t *testing.T) {
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	bLen := tree.HashFunction().Len() - 1
+	bLen := 32
 	for i := 0; i < 10; i++ {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
 		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
@@ -339,11 +341,11 @@ func TestDumpAndImportDump(t *testing.T) {
 	c := qt.New(t)
 	database1, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree1, err := NewTree(database1, 100, HashFunctionPoseidon)
+	tree1, err := NewTree(database1, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
-	bLen := tree1.HashFunction().Len()
+	bLen := 32
 	for i := 0; i < 16; i++ {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
 		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
@@ -357,7 +359,7 @@ func TestDumpAndImportDump(t *testing.T) {
 
 	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 100, HashFunctionPoseidon)
+	tree2, err := NewTree(database2, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 	err = tree2.ImportDump(e)
@@ -376,11 +378,11 @@ func TestRWMutex(t *testing.T) {
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	bLen := tree.HashFunction().Len()
+	bLen := 32
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
@@ -469,7 +471,7 @@ func TestAddBatchFullyUsed(t *testing.T) {
 
 	var keys, values [][]byte
 	for i := 0; i < 16; i++ {
-		k := BigIntToBytes(32, big.NewInt(int64(i)))
+		k := BigIntToBytes(1, big.NewInt(int64(i)))
 		v := k
 
 		keys = append(keys, k)
@@ -492,10 +494,10 @@ func TestAddBatchFullyUsed(t *testing.T) {
 
 	// get all key-values and check that are equal between both trees
 	for i := 0; i < 16; i++ {
-		auxK1, auxV1, err := tree1.Get(BigIntToBytes(32, big.NewInt(int64(i))))
+		auxK1, auxV1, err := tree1.Get(BigIntToBytes(1, big.NewInt(int64(i))))
 		c.Assert(err, qt.IsNil)
 
-		auxK2, auxV2, err := tree2.Get(BigIntToBytes(32, big.NewInt(int64(i))))
+		auxK2, auxV2, err := tree2.Get(BigIntToBytes(1, big.NewInt(int64(i))))
 		c.Assert(err, qt.IsNil)
 
 		c.Assert(auxK1, qt.DeepEquals, auxK2)
@@ -504,7 +506,7 @@ func TestAddBatchFullyUsed(t *testing.T) {
 
 	// try adding one more key to both trees (through Add & AddBatch) and
 	// expect not being added due the tree is already full
-	k := BigIntToBytes(32, big.NewInt(int64(16)))
+	k := BigIntToBytes(1, big.NewInt(int64(16)))
 	v := k
 	err = tree1.Add(k, v)
 	c.Assert(err, qt.Equals, ErrMaxVirtualLevel)
@@ -518,13 +520,13 @@ func TestSetRoot(t *testing.T) {
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 
 	expectedRoot := "13742386369878513332697380582061714160370929283209286127733983161245560237407"
 
 	// fill the tree
-	bLen := tree.HashFunction().Len()
+	bLen := 32
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
@@ -574,11 +576,11 @@ func TestSnapshot(t *testing.T) {
 	c := qt.New(t)
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 
 	// fill the tree
-	bLen := tree.HashFunction().Len()
+	bLen := 32
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
@@ -624,11 +626,11 @@ func TestGetFromSnapshotExpectArboErrKeyNotFound(t *testing.T) {
 
 	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 100, HashFunctionPoseidon)
+	tree, err := NewTree(database, 256, HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
-	bLen := tree.HashFunction().Len()
+	bLen := 32
 	k := BigIntToBytes(bLen, big.NewInt(int64(3)))
 
 	root, err := tree.Root()
@@ -638,6 +640,133 @@ func TestGetFromSnapshotExpectArboErrKeyNotFound(t *testing.T) {
 
 	_, _, err = tree.Get(k)
 	c.Assert(err, qt.Equals, ErrKeyNotFound) // and not equal to db.ErrKeyNotFound
+}
+
+func TestKeyLen(t *testing.T) {
+	c := qt.New(t)
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	// maxLevels is 100, keyPath length = ceil(maxLevels/8) = 13
+	maxLevels := 100
+	tree, err := NewTree(database, maxLevels, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+
+	// expect no errors when adding a key of only 4 bytes (when the
+	// required length of keyPath for 100 levels would be 13 bytes)
+	bLen := 4
+	k := BigIntToBytes(bLen, big.NewInt(1))
+	v := BigIntToBytes(bLen, big.NewInt(1))
+
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
+
+	err = tree.Update(k, v)
+	c.Assert(err, qt.IsNil)
+
+	_, _, _, _, err = tree.GenProof(k)
+	c.Assert(err, qt.IsNil)
+
+	_, _, err = tree.Get(k)
+	c.Assert(err, qt.IsNil)
+
+	k = BigIntToBytes(bLen, big.NewInt(2))
+	v = BigIntToBytes(bLen, big.NewInt(2))
+	invalids, err := tree.AddBatch([][]byte{k}, [][]byte{v})
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(invalids), qt.Equals, 0)
+
+	// expect errors when adding a key bigger than maximum capacity of the
+	// tree: ceil(maxLevels/8)
+	maxLevels = 32
+	database, err = badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	tree, err = NewTree(database, maxLevels, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+
+	maxKeyLen := int(math.Ceil(float64(maxLevels) / float64(8))) //nolint:gomnd
+	k = BigIntToBytes(maxKeyLen+1, big.NewInt(1))
+	v = BigIntToBytes(maxKeyLen+1, big.NewInt(1))
+
+	expectedErrMsg := "len(k) can not be bigger than ceil(maxLevels/8)," +
+		" where len(k): 5, maxLevels: 32, max key len=ceil(maxLevels/8): 4." +
+		" Might need a bigger tree depth (maxLevels>=40) in order to input" +
+		" keys of length 5"
+
+	err = tree.Add(k, v)
+	c.Assert(err.Error(), qt.Equals, expectedErrMsg)
+
+	err = tree.Update(k, v)
+	c.Assert(err.Error(), qt.Equals, expectedErrMsg)
+
+	_, _, _, _, err = tree.GenProof(k)
+	c.Assert(err.Error(), qt.Equals, expectedErrMsg)
+
+	_, _, err = tree.Get(k)
+	c.Assert(err.Error(), qt.Equals, expectedErrMsg)
+
+	// check AddBatch with few key-values
+	invalids, err = tree.AddBatch([][]byte{k}, [][]byte{v})
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(invalids), qt.Equals, 1)
+
+	// check AddBatch with many key-values
+	nCPU := flp2(runtime.NumCPU())
+	nKVs := nCPU + 1
+	var ks, vs [][]byte
+	for i := 0; i < nKVs; i++ {
+		ks = append(ks, BigIntToBytes(maxKeyLen+1, big.NewInt(1)))
+		vs = append(vs, BigIntToBytes(maxKeyLen+1, big.NewInt(1)))
+	}
+	invalids, err = tree.AddBatch(ks, vs)
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(invalids), qt.Equals, nKVs)
+
+	// check that with maxKeyLen it can be added
+	k = BigIntToBytes(maxKeyLen, big.NewInt(1))
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
+
+	// check CheckProof check with key longer
+	kAux, vAux, packedSiblings, existence, err := tree.GenProof(k)
+	c.Assert(err, qt.IsNil)
+	c.Assert(existence, qt.IsTrue)
+
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	verif, err := CheckProof(tree.HashFunction(), kAux, vAux, root, packedSiblings)
+	c.Assert(err, qt.IsNil)
+	c.Assert(verif, qt.IsTrue)
+
+	// use a similar key but with one zero, expect that CheckProof fails on
+	// the verification
+	kAux = append(kAux, 0)
+	verif, err = CheckProof(tree.HashFunction(), kAux, vAux, root, packedSiblings)
+	c.Assert(err, qt.IsNil)
+	c.Assert(verif, qt.IsFalse)
+}
+
+func TestKeyLenBiggerThan32(t *testing.T) {
+	c := qt.New(t)
+	maxLevels := 264
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	tree, err := NewTree(database, maxLevels, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+
+	bLen := 33
+	err = tree.Add(
+		randomBytes(bLen),
+		randomBytes(bLen))
+	c.Assert(err, qt.IsNil)
+
+	// 2nd key that we add, will find a node with len(key)==32 (due the
+	// hash output size, expect that next Add does not give any error, as
+	// internally it will use a keyPath of size corresponent to the
+	// maxLevels size of the tree
+	err = tree.Add(
+		randomBytes(bLen),
+		randomBytes(bLen))
+	c.Assert(err, qt.IsNil)
 }
 
 func BenchmarkAdd(b *testing.B) {

@@ -18,14 +18,13 @@ func TestGenerator(t *testing.T) {
 	tree, err := arbo.NewTree(database, 4, arbo.HashFunctionPoseidon)
 	c.Assert(err, qt.IsNil)
 
-	bLen := tree.HashFunction().Len()
-
 	testVector := [][]int64{
 		{1, 11},
 		{2, 22},
 		{3, 33},
 		{4, 44},
 	}
+	bLen := 1
 	for i := 0; i < len(testVector); i++ {
 		k := arbo.BigIntToBytes(bLen, big.NewInt(testVector[i][0]))
 		v := arbo.BigIntToBytes(bLen, big.NewInt(testVector[i][1]))
