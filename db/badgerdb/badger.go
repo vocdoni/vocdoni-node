@@ -27,7 +27,6 @@ type WriteTx struct {
 }
 
 // check that WriteTx implements the db.ReadTx & db.WriteTx interfaces
-var _ db.ReadTx = (*WriteTx)(nil)
 var _ db.WriteTx = (*WriteTx)(nil)
 
 // Get implements the db.ReadTx.Get interface method

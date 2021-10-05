@@ -14,6 +14,7 @@ replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 
 require (
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210406120253-ab86bc2846d9
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210323162413-ccaa6313370d
+	github.com/cockroachdb/pebble v0.0.0-20211004132338-b2eb88a71826
 	github.com/cosmos/iavl v0.15.3
 	github.com/deroproject/graviton v0.0.0-20201218180342-ab474f4c94d2
 	github.com/dgraph-io/badger/v3 v3.2103.1
@@ -81,6 +82,10 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/cheekybits/genny v1.0.0 // indirect
 	github.com/cheggaaa/pb v1.0.29 // indirect
+	github.com/cockroachdb/errors v1.8.1 // indirect
+	github.com/cockroachdb/logtags v0.0.0-20190617123548-eb05cc24525f // indirect
+	github.com/cockroachdb/redact v1.0.8 // indirect
+	github.com/cockroachdb/sentry-go v0.6.1-cockroachdb.2 // indirect
 	github.com/confio/ics23/go v0.6.3 // indirect
 	github.com/crackcomm/go-gitignore v0.0.0-20170627025303-887ab5e44cc3 // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
@@ -294,11 +299,12 @@ require (
 	go.uber.org/fx v1.13.1 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
+	golang.org/x/exp v0.0.0-20200513190911-00229845015e // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20210903071746-97244b99971b // indirect
+	golang.org/x/sys v0.0.0-20210909193231-528a39cd75f3 // indirect
 	golang.org/x/text v0.3.6 // indirect
 	golang.org/x/tools v0.1.2 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
