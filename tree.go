@@ -405,12 +405,10 @@ func (t *Tree) down(rTx db.ReadTx, newKey, currKey []byte, siblings [][]byte,
 				return nil, nil, nil, ErrKeyAlreadyExists
 			}
 
-			oldLeafKeyFull := make([]byte, t.hashFunction.Len())
-			// if len(oldLeafKey) > t.hashFunction.Len() { // WIP
-			//         return nil, nil, nil,
-			//                 fmt.Errorf("len(oldLeafKey) > hashFunction.Len()")
-			// }
-			copy(oldLeafKeyFull[:], oldLeafKey)
+			oldLeafKeyFull, err := keyPathFromKey(t.maxLevels, oldLeafKey)
+			if err != nil {
+				return nil, nil, nil, err
+			}
 
 			// if currKey is already used, go down until paths diverge
 			oldPath := getPath(t.maxLevels, oldLeafKeyFull)
@@ -841,7 +839,7 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 		return false, err
 	}
 
-	keyPath := make([]byte, len(siblings))
+	keyPath := make([]byte, int(math.Ceil(float64(len(siblings))/float64(8)))) //nolint:gomnd
 	copy(keyPath[:], k)
 
 	key, _, err := newLeafValue(hashFunc, k, v)

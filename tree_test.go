@@ -745,6 +745,30 @@ func TestKeyLen(t *testing.T) {
 	c.Assert(verif, qt.IsFalse)
 }
 
+func TestKeyLenBiggerThan32(t *testing.T) {
+	c := qt.New(t)
+	maxLevels := 264
+	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	tree, err := NewTree(database, maxLevels, HashFunctionBlake2b)
+	c.Assert(err, qt.IsNil)
+
+	bLen := 33
+	err = tree.Add(
+		randomBytes(bLen),
+		randomBytes(bLen))
+	c.Assert(err, qt.IsNil)
+
+	// 2nd key that we add, will find a node with len(key)==32 (due the
+	// hash output size, expect that next Add does not give any error, as
+	// internally it will use a keyPath of size corresponent to the
+	// maxLevels size of the tree
+	err = tree.Add(
+		randomBytes(bLen),
+		randomBytes(bLen))
+	c.Assert(err, qt.IsNil)
+}
+
 func BenchmarkAdd(b *testing.B) {
 	bLen := 32 // for both Poseidon & Sha256
 	// prepare inputs
