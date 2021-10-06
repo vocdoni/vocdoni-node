@@ -19,7 +19,9 @@ import (
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/badgerdbv2"
+	"go.vocdoni.io/dvote/db/badgerdbv3"
+	"go.vocdoni.io/dvote/db/pebbledb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 
@@ -217,13 +219,23 @@ type State struct {
 }
 
 // NewState creates a new State
-func NewState(dataDir string) (*State, error) {
+func NewState(dataDir string, storageType db.StorageType) (*State, error) {
 	var err error
-	db, err := badgerdb.New(badgerdb.Options{Path: filepath.Join(dataDir, "vcstate")})
+	var kv db.Database
+	switch storageType {
+	case db.StoragePebble:
+		kv, err = pebbledb.New(pebbledb.Options{Path: filepath.Join(dataDir, "vcstate")})
+	case db.StorageBadgerv2:
+		kv, err = badgerdbv2.New(badgerdbv2.Options{Path: filepath.Join(dataDir, "vcstate")})
+	case db.StorageBadgerv3:
+		kv, err = badgerdbv3.New(badgerdbv3.Options{Path: filepath.Join(dataDir, "vcstate")})
+	default:
+		return nil, fmt.Errorf("storage type %d not recognized", storageType)
+	}
 	if err != nil {
 		return nil, err
 	}
-	sdb, err := initStateDB(db)
+	sdb, err := initStateDB(kv)
 	if err != nil {
 		return nil, fmt.Errorf("cannot init StateDB: %s", err)
 	}
@@ -250,7 +262,7 @@ func NewState(dataDir string) (*State, error) {
 		return nil, err
 	}
 	s := &State{
-		db:        db,
+		db:        kv,
 		Store:     sdb,
 		Tx:        treeTxWithMutex{TreeTx: tx},
 		voteCache: voteCache,

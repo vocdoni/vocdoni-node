@@ -10,6 +10,7 @@ import (
 	"github.com/tendermint/tendermint/privval"
 	models "go.vocdoni.io/proto/build/go/models"
 
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/util"
@@ -19,7 +20,7 @@ import (
 func TestVochainState(t *testing.T) {
 	t.Parallel()
 
-	s, err := vochain.NewState(t.TempDir())
+	s, err := vochain.NewState(t.TempDir(), db.StoragePebble)
 	qt.Assert(t, err, qt.IsNil)
 
 	// This used to panic due to nil *ImmutableTree fields.

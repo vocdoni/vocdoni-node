@@ -7,6 +7,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -28,7 +29,7 @@ func BenchmarkNewProcess(b *testing.B) {
 }
 
 func benchmarkIndexTx(b *testing.B) {
-	app, err := vochain.NewBaseApplication(b.TempDir())
+	app, err := vochain.NewBaseApplication(b.TempDir(), db.StoragePebble)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -74,7 +75,7 @@ func benchmarkIndexTx(b *testing.B) {
 }
 
 func benchmarkNewProcess(b *testing.B) {
-	app, err := vochain.NewBaseApplication(b.TempDir())
+	app, err := vochain.NewBaseApplication(b.TempDir(), db.StoragePebble)
 	if err != nil {
 		b.Fatal(err)
 	}

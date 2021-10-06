@@ -5,6 +5,18 @@ import (
 	"io"
 )
 
+// StorageType defines the key value storage used as a backend database for the state
+type StorageType int
+
+const (
+	// StoragePebble defines pebbledb key value
+	StoragePebble StorageType = iota
+	// StorageBadgerv2 defines badgerdb v2 key value
+	StorageBadgerv2
+	// StorageBadgerv3 defines badgerdb v3 key value
+	StorageBadgerv3
+)
+
 // ErrKeysNotFound is used to indicate that a key does not exist in the db.
 var ErrKeyNotFound = fmt.Errorf("key not found")
 

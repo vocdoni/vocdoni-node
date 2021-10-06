@@ -13,7 +13,7 @@ import (
 
 	"github.com/vocdoni/arbo"
 	censustree "go.vocdoni.io/dvote/censustreelegacy"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	kv "go.vocdoni.io/dvote/db/pebbledb"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -35,7 +35,7 @@ var _ censustree.Tree = (*Tree)(nil)
 func NewTree(name, storageDir string, nLevels int, hashFunc arbo.HashFunction) (
 	censustree.Tree, error) {
 	dbDir := filepath.Join(storageDir, "arbotree.db."+strings.TrimSpace(name))
-	database, err := badgerdb.New(badgerdb.Options{Path: dbDir})
+	database, err := kv.New(kv.Options{Path: dbDir})
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (t *Tree) TypeString() string {
 // to choose the hash function to be used in the Tree.
 func (t *Tree) Init(name, storageDir string) error {
 	dbDir := filepath.Join(storageDir, "arbotree.db."+strings.TrimSpace(name))
-	database, err := badgerdb.New(badgerdb.Options{Path: dbDir})
+	database, err := kv.New(kv.Options{Path: dbDir})
 	if err != nil {
 		return err
 	}

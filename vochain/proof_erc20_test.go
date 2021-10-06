@@ -8,6 +8,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -16,7 +17,7 @@ import (
 )
 
 func TestEthProof(t *testing.T) {
-	app, err := NewBaseApplication(t.TempDir())
+	app, err := NewBaseApplication(t.TempDir(), db.StoragePebble)
 	if err != nil {
 		t.Fatal(err)
 	}

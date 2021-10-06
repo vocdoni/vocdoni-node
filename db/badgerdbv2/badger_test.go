@@ -1,4 +1,4 @@
-package badgerdb
+package badgerdbv2
 
 import (
 	"encoding/binary"

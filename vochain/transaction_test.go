@@ -7,11 +7,12 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/vocdoni/arbo"
 	snarkParsers "github.com/vocdoni/go-snark/parsers"
+	"go.vocdoni.io/dvote/db"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
 func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
-	app, err := NewBaseApplication(t.TempDir())
+	app, err := NewBaseApplication(t.TempDir(), db.StoragePebble)
 	qt.Assert(t, err, qt.IsNil)
 
 	vkJSON := `

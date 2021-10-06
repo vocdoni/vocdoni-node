@@ -17,7 +17,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/pebbledb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -87,17 +87,17 @@ type Manager struct {
 // Data helps satisfy an ethevents interface.
 func (m *Manager) Data() data.Storage { return m.RemoteStorage }
 
-// BadgerDBBatched wraps badgerdb.BadgerDB turning all requested db.WriteTx
+// DBbatched wraps pebbleDB turning all requested db.WriteTx
 // into db.Batch so that commits happen automatically when the Tx becomes too
 // big.
-type BadgerDBBatched struct {
-	*badgerdb.BadgerDB
+type DBbatched struct {
+	*pebbledb.PebbleDB
 }
 
 // WriteTx returns a db.Batch that will commit automatically with the Tx
 // becomes too big.
-func (d *BadgerDBBatched) WriteTx() db.WriteTx {
-	return db.NewBatch(d.BadgerDB)
+func (d *DBbatched) WriteTx() db.WriteTx {
+	return db.NewBatch(d.PebbleDB)
 }
 
 // Start creates a new census manager.
@@ -113,11 +113,11 @@ func (m *Manager) Start(storageDir, rootAuthPubKey string) (err error) {
 	m.compressor = newCompressor()
 
 	dbDir := filepath.Join(m.StorageDir, fmt.Sprintf("v%v", CurrentCensusVersion))
-	db, err := badgerdb.New(badgerdb.Options{Path: dbDir})
+	db, err := pebbledb.New(pebbledb.Options{Path: dbDir})
 	if err != nil {
 		return err
 	}
-	m.db = &BadgerDBBatched{db}
+	m.db = &DBbatched{db}
 	defer func() {
 		if err != nil {
 			db.Close()

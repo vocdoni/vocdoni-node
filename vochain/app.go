@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
@@ -54,8 +55,8 @@ var _ abcitypes.Application = (*BaseApplication)(nil)
 // NewBaseApplication creates a new BaseApplication given a name an a DB backend.
 // Node still needs to be initialized with SetNode
 // Callback functions still need to be initialized
-func NewBaseApplication(dbpath string) (*BaseApplication, error) {
-	state, err := NewState(dbpath)
+func NewBaseApplication(dbpath string, dbtype db.StorageType) (*BaseApplication, error) {
+	state, err := NewState(dbpath, dbtype)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}

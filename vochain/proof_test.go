@@ -8,7 +8,8 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db"
+	kv "go.vocdoni.io/dvote/db/pebbledb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -17,12 +18,12 @@ import (
 )
 
 func TestMerkleTreeProof(t *testing.T) {
-	app, err := NewBaseApplication(t.TempDir())
+	app, err := NewBaseApplication(t.TempDir(), db.StoragePebble)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	db, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
+	db, err := kv.New(kv.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 	tr, err := censustree.New(censustree.Options{Name: "testchecktx", ParentDB: db,
 		MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
@@ -179,7 +180,7 @@ func TestMerkleTreeProof(t *testing.T) {
 }
 
 func TestCAProof(t *testing.T) {
-	app, err := NewBaseApplication(t.TempDir())
+	app, err := NewBaseApplication(t.TempDir(), db.StoragePebble)
 	if err != nil {
 		t.Fatal(err)
 	}

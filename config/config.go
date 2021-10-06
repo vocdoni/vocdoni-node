@@ -1,6 +1,7 @@
 package config
 
 import (
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/types"
 )
 
@@ -182,6 +183,8 @@ type VochainCfg struct {
 	ProcessArchiveDataDir string
 	// Scrutinizer holds the configuration regarding the scrutinizer component
 	Scrutinizer ScrutinizerCfg
+	// DBbackend defines the type of key value backend
+	DBbackend db.StorageType
 }
 
 // ScrutinizerCfg handles the configuration options of the scrutinizer

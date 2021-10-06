@@ -6,7 +6,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/vocdoni/arbo"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	kv "go.vocdoni.io/dvote/db/pebbledb"
 )
 
 // NOTE: most of the methods of Tree are just wrappers over
@@ -14,7 +14,7 @@ import (
 // there are tests that check the added code in the Tree wrapper
 
 func TestSet(t *testing.T) {
-	database, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
+	database, err := kv.New(kv.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 
 	tree, err := New(nil, Options{DB: database, MaxLevels: 100, HashFunc: arbo.HashFunctionBlake2b})
@@ -62,7 +62,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestGenProof(t *testing.T) {
-	database, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
+	database, err := kv.New(kv.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 
 	tree, err := New(nil, Options{DB: database, MaxLevels: 100, HashFunc: arbo.HashFunctionBlake2b})
@@ -89,7 +89,7 @@ func TestGenProof(t *testing.T) {
 }
 
 func TestFromRoot(t *testing.T) {
-	database, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
+	database, err := kv.New(kv.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 
 	tree, err := New(nil, Options{DB: database, MaxLevels: 100, HashFunc: arbo.HashFunctionBlake2b})

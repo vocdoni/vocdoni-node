@@ -22,6 +22,7 @@ import (
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/db"
 	ethchain "go.vocdoni.io/dvote/ethereum"
 	"go.vocdoni.io/dvote/ethereum/ethevents"
 	"go.vocdoni.io/dvote/internal"
@@ -126,6 +127,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"external address:port to announce to other peers (automatically guessed if empty)")
 	globalCfg.VochainConfig.RPCListen = *flag.String("vochainRPCListen", "127.0.0.1:26657",
 		"rpc host and port to listen to for the voting chain")
+	globalCfg.VochainConfig.DBbackend = db.StorageType(*flag.Int("dbBackend", 0,
+		"database backend for storing the vochain state (0:pebble 1:badger2 2:badger3"))
 	globalCfg.VochainConfig.CreateGenesis = *flag.Bool("vochainCreateGenesis", false,
 		"create local/testing genesis file for the vochain")
 	globalCfg.VochainConfig.Genesis = *flag.String("vochainGenesis", "",
@@ -244,6 +247,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.RPCListen", flag.Lookup("vochainRPCListen"))
 	viper.BindPFlag("vochainConfig.LogLevel", flag.Lookup("vochainLogLevel"))
 	viper.BindPFlag("vochainConfig.LogLevelMemPool", flag.Lookup("vochainLogLevelMemPool"))
+	viper.BindPFlag("vochainConfig.DBbackend", flag.Lookup("dbBackend"))
 	viper.BindPFlag("vochainConfig.Peers", flag.Lookup("vochainPeers"))
 	viper.BindPFlag("vochainConfig.Seeds", flag.Lookup("vochainSeeds"))
 	viper.BindPFlag("vochainConfig.CreateGenesis", flag.Lookup("vochainCreateGenesis"))

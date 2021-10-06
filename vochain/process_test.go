@@ -8,6 +8,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -17,7 +18,7 @@ import (
 const ipfsUrl = "ipfs://123456789"
 
 func TestProcessSetStatusTransition(t *testing.T) {
-	app, err := NewBaseApplication(t.TempDir())
+	app, err := NewBaseApplication(t.TempDir(), db.StoragePebble)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +214,7 @@ func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 }
 
 func TestProcessSetResultsTransition(t *testing.T) {
-	app, err := NewBaseApplication(t.TempDir())
+	app, err := NewBaseApplication(t.TempDir(), db.StoragePebble)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +341,7 @@ func testSetProcessResults(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 }
 
 func TestProcessSetCensusTransition(t *testing.T) {
-	app, err := NewBaseApplication(t.TempDir())
+	app, err := NewBaseApplication(t.TempDir(), db.StoragePebble)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +475,7 @@ func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 }
 
 func TestCount(t *testing.T) {
-	app, err := NewBaseApplication(t.TempDir())
+	app, err := NewBaseApplication(t.TempDir(), db.StoragePebble)
 	if err != nil {
 		t.Fatal(err)
 	}

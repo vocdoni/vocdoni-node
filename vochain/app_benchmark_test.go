@@ -10,7 +10,8 @@ import (
 	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/censustree"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db"
+	kv "go.vocdoni.io/dvote/db/pebbledb"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -22,7 +23,7 @@ const benchmarkVoters = 2000
 func BenchmarkCheckTx(b *testing.B) {
 	b.ReportAllocs()
 	tdir := b.TempDir()
-	app, err := NewBaseApplication(tdir)
+	app, err := NewBaseApplication(tdir, db.StoragePebble)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -42,7 +43,7 @@ func BenchmarkCheckTx(b *testing.B) {
 
 func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 	nvoters int, tmpDir string) (voters []*models.SignedTx) {
-	db, err := badgerdb.New(badgerdb.Options{Path: tmpDir})
+	db, err := kv.New(kv.Options{Path: tmpDir})
 	qt.Assert(b, err, qt.IsNil)
 	tr, err := censustree.New(censustree.Options{Name: util.RandomHex(12), ParentDB: db,
 		MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})

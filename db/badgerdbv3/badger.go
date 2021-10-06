@@ -1,4 +1,4 @@
-package badgerdb
+package badgerdbv3
 
 import (
 	"errors"

@@ -9,7 +9,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	kv "go.vocdoni.io/dvote/db/pebbledb"
 	"go.vocdoni.io/dvote/tree"
 )
 
@@ -376,7 +376,7 @@ func TestNoState(t *testing.T) {
 }
 
 func newTestStateDB(t *testing.T) *StateDB {
-	db, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
+	db, err := kv.New(kv.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 	sdb := NewStateDB(db)
 	return sdb
@@ -449,7 +449,7 @@ func treePrint(t *tree.Tree, tx db.ReadTx, name string) {
 }
 
 func TestTree(t *testing.T) {
-	db, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
+	db, err := kv.New(kv.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 
 	tx := db.WriteTx()
