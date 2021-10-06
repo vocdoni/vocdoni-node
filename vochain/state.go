@@ -19,7 +19,7 @@ import (
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 
@@ -217,13 +217,12 @@ type State struct {
 }
 
 // NewState creates a new State
-func NewState(dataDir string) (*State, error) {
-	var err error
-	db, err := badgerdb.New(badgerdb.Options{Path: filepath.Join(dataDir, "vcstate")})
+func NewState(dbType, dataDir string) (*State, error) {
+	database, err := metadb.New(dbType, filepath.Join(dataDir, "vcstate"))
 	if err != nil {
 		return nil, err
 	}
-	sdb, err := initStateDB(db)
+	sdb, err := initStateDB(database)
 	if err != nil {
 		return nil, fmt.Errorf("cannot init StateDB: %s", err)
 	}
@@ -250,7 +249,7 @@ func NewState(dataDir string) (*State, error) {
 		return nil, err
 	}
 	s := &State{
-		db:        db,
+		db:        database,
 		Store:     sdb,
 		Tx:        treeTxWithMutex{TreeTx: tx},
 		voteCache: voteCache,
@@ -260,9 +259,9 @@ func NewState(dataDir string) (*State, error) {
 }
 
 // initStateDB initializes the StateDB with the default subTrees
-func initStateDB(db db.Database) (*statedb.StateDB, error) {
+func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	log.Infof("initializing StateDB")
-	sdb := statedb.NewStateDB(db)
+	sdb := statedb.NewStateDB(database)
 	startTime := time.Now()
 	defer log.Infof("StateDB load took %s", time.Since(startTime))
 	root, err := sdb.Hash()

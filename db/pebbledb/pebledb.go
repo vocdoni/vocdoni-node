@@ -77,14 +77,9 @@ type PebbleDB struct {
 // check that PebbleDB implements the db.Database interface
 var _ db.Database = (*PebbleDB)(nil)
 
-// Options defines params for creating a new PebbleDB
-type Options struct {
-	Path string
-}
-
 // New returns a PebbleDB using the given Options, which implements the
 // db.Database interface
-func New(opts Options) (*PebbleDB, error) {
+func New(opts db.Options) (*PebbleDB, error) {
 	if err := os.MkdirAll(opts.Path, os.ModePerm); err != nil {
 		return nil, err
 	}

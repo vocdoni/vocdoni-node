@@ -14,6 +14,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -38,7 +39,7 @@ func TestCompressor(t *testing.T) {
 
 func TestMemoryUsage(t *testing.T) {
 	var cm Manager
-	qt.Assert(t, cm.Start(t.TempDir(), ""), qt.IsNil)
+	qt.Assert(t, cm.Start(db.TypePebble, t.TempDir(), ""), qt.IsNil)
 	defer func() { qt.Assert(t, cm.Stop(), qt.IsNil) }()
 
 	const n = 16
@@ -95,7 +96,7 @@ func TestOutdatedCensuses(t *testing.T) {
 	// Init Manager, and expect the outdated censuses to be moved,
 	// namespaces.json to be backed up and cleaned
 	var cm Manager
-	qt.Assert(t, cm.Start(storageDir, ""), qt.IsNil)
+	qt.Assert(t, cm.Start(db.TypePebble, storageDir, ""), qt.IsNil)
 	defer func() { qt.Assert(t, cm.Stop(), qt.IsNil) }()
 
 	// Assert correct namespaces.json backup
@@ -129,7 +130,7 @@ func TestOutdatedCensuses(t *testing.T) {
 func TestManager(t *testing.T) {
 	storageDir := t.TempDir()
 	var cm Manager
-	qt.Assert(t, cm.Start(storageDir, ""), qt.IsNil)
+	qt.Assert(t, cm.Start(db.TypePebble, storageDir, ""), qt.IsNil)
 
 	// Add some censues with some keys
 	const numCensuses = 3
@@ -149,7 +150,7 @@ func TestManager(t *testing.T) {
 	// Close and open again the Manager, and read back the censuses and keys
 	qt.Assert(t, cm.Stop(), qt.IsNil)
 	cm = Manager{}
-	qt.Assert(t, cm.Start(storageDir, ""), qt.IsNil)
+	qt.Assert(t, cm.Start(db.TypePebble, storageDir, ""), qt.IsNil)
 
 	for i := 0; i < numCensuses; i++ {
 		tree, err := cm.LoadTree(fmt.Sprintf("%v", i), models.Census_ARBO_BLAKE2B)

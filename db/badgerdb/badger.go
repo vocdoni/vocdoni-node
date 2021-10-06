@@ -87,14 +87,9 @@ type BadgerDB struct {
 // check that BadgerDB implements the db.Database interface
 var _ db.Database = (*BadgerDB)(nil)
 
-// Options defines params for creating a new BadgerDB
-type Options struct {
-	Path string
-}
-
 // New returns a BadgerDB using the given Options, which implements the
 // db.Database interface
-func New(opts Options) (*BadgerDB, error) {
+func New(opts db.Options) (*BadgerDB, error) {
 	if err := os.MkdirAll(opts.Path, os.ModePerm); err != nil {
 		return nil, err
 	}

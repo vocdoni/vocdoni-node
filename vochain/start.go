@@ -26,7 +26,7 @@ import (
 // NewVochain starts a node with an ABCI application
 func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
 	// creating new vochain app
-	app, err := NewBaseApplication(vochaincfg.DataDir + "/data")
+	app, err := NewBaseApplication(vochaincfg.DBType, vochaincfg.DataDir+"/data")
 	if err != nil {
 		log.Fatalf("cannot initialize vochain application: %s", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
 	models "go.vocdoni.io/proto/build/go/models"
 )
@@ -31,14 +32,14 @@ func (r *Random) RandomBytes(n int) []byte {
 
 func TestStateReopen(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewState(dir)
+	s, err := NewState(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	hash1Before, err := s.Save()
 	qt.Assert(t, err, qt.IsNil)
 
 	s.db.Close()
 
-	s, err = NewState(dir)
+	s, err = NewState(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	hash1After, err := s.Store.Hash()
 	qt.Assert(t, err, qt.IsNil)
@@ -48,7 +49,7 @@ func TestStateReopen(t *testing.T) {
 func TestStateBasic(t *testing.T) {
 	rng := newRandom(0)
 	log.Init("info", "stdout")
-	s, err := NewState(t.TempDir())
+	s, err := NewState(db.TypePebble, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

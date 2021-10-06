@@ -26,7 +26,7 @@ import (
 )
 
 func Vochain(vconfig *config.VochainCfg, waitForSync bool,
-	ma *metrics.Agent, cm *census.Manager, storage data.Storage) (
+	ma *metrics.Agent, cm *census.Manager, ipfsStorage data.Storage) (
 	*vochain.BaseApplication, *scrutinizer.Scrutinizer,
 	*vochaininfo.VochainInfo, error) {
 	log.Infof("creating vochain service for network %s", vconfig.Chain)
@@ -137,9 +137,9 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 			err = fmt.Errorf("process archive needs indexer enabled")
 			return nil, nil, nil, err
 		}
-		ipfs, ok := storage.(*data.IPFSHandle)
+		ipfs, ok := ipfsStorage.(*data.IPFSHandle)
 		if !ok {
-			log.Warnf("storage is not IPFS, archive publishing disabled")
+			log.Warnf("ipfsStorage is not IPFS, archive publishing disabled")
 		}
 		log.Infof("starting process archiver on %s", vconfig.ProcessArchiveDataDir)
 		processarchive.NewProcessArchive(

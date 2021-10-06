@@ -17,7 +17,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -46,8 +46,8 @@ type Namespaces struct {
 
 // CurrentCensusVersion history:
 // - 0: First Version, Graviton based with a separate database for each census.
-// - 1: Arbo + BadgerDB based, single database with all censuses separated by
-//      Database prefixes (using Namespace.Name).
+// - 1: Arbo + PebbleDB/BadgerDB based, single database with all censuses
+// separated by Database prefixes (using Namespace.Name).
 const CurrentCensusVersion = 1
 
 // Namespace is composed by a list of keys which are capable to execute private operations
@@ -87,22 +87,22 @@ type Manager struct {
 // Data helps satisfy an ethevents interface.
 func (m *Manager) Data() data.Storage { return m.RemoteStorage }
 
-// BadgerDBBatched wraps badgerdb.BadgerDB turning all requested db.WriteTx
+// DBBatched wraps db.Database turning all requested db.WriteTx
 // into db.Batch so that commits happen automatically when the Tx becomes too
 // big.
-type BadgerDBBatched struct {
-	*badgerdb.BadgerDB
+type DBBatched struct {
+	db.Database
 }
 
 // WriteTx returns a db.Batch that will commit automatically with the Tx
 // becomes too big.
-func (d *BadgerDBBatched) WriteTx() db.WriteTx {
-	return db.NewBatch(d.BadgerDB)
+func (d *DBBatched) WriteTx() db.WriteTx {
+	return db.NewBatch(d.Database)
 }
 
 // Start creates a new census manager.
 // A constructor function for the interface censustree.Tree must be provided.
-func (m *Manager) Start(storageDir, rootAuthPubKey string) (err error) {
+func (m *Manager) Start(dbType, storageDir, rootAuthPubKey string) (err error) {
 	nsConfig := filepath.Join(storageDir, "namespaces.json")
 	m.StorageDir = storageDir
 	m.Trees = make(map[string]*censustree.Tree)
@@ -113,14 +113,15 @@ func (m *Manager) Start(storageDir, rootAuthPubKey string) (err error) {
 	m.compressor = newCompressor()
 
 	dbDir := filepath.Join(m.StorageDir, fmt.Sprintf("v%v", CurrentCensusVersion))
-	db, err := badgerdb.New(badgerdb.Options{Path: dbDir})
+	database, err := metadb.New(dbType, dbDir)
 	if err != nil {
 		return err
 	}
-	m.db = &BadgerDBBatched{db}
+
+	m.db = &DBBatched{database}
 	defer func() {
 		if err != nil {
-			db.Close()
+			database.Close()
 		}
 	}()
 
