@@ -10,6 +10,7 @@ import (
 // ReadTx implements the interface db.ReadTx
 type ReadTx struct {
 	batch *pebble.Batch
+	db    *pebble.DB
 }
 
 // check that ReadTx implements the db.ReadTx interface
@@ -18,6 +19,7 @@ var _ db.ReadTx = (*ReadTx)(nil)
 // WriteTx implements the interface db.WriteTx
 type WriteTx struct {
 	batch *pebble.Batch
+	db    *pebble.DB
 }
 
 // check that WriteTx implements the db.ReadTx & db.WriteTx interfaces
@@ -61,7 +63,10 @@ func (tx WriteTx) Delete(k []byte) error {
 
 // Commit implements the db.WriteTx.Commit interface method
 func (tx WriteTx) Commit() error {
-	return tx.batch.Commit(nil)
+	if err := tx.batch.Commit(nil); err != nil {
+		return err
+	}
+	return tx.db.Flush()
 }
 
 // Discard implements the db.WriteTx.Discard interface method
@@ -105,6 +110,7 @@ func (db *PebbleDB) ReadTx() db.ReadTx {
 func (db *PebbleDB) WriteTx() db.WriteTx {
 	return WriteTx{
 		batch: db.db.NewIndexedBatch(),
+		db:    db.db,
 	}
 }
 
