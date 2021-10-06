@@ -16,12 +16,12 @@ func New(typ, dir string) (db.Database, error) {
 	opts := db.Options{Path: dir}
 	switch typ {
 	case db.TypePebble:
-		database, err = badgerdb.New(opts)
+		database, err = pebbledb.New(opts)
 		if err != nil {
 			return nil, err
 		}
 	case db.TypeBadger:
-		database, err = pebbledb.New(opts)
+		database, err = badgerdb.New(opts)
 		if err != nil {
 			return nil, err
 		}
