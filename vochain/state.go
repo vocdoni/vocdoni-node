@@ -755,6 +755,14 @@ func (v *State) Rollback() {
 	atomic.StoreInt32(&v.txCounter, 0)
 }
 
+func (v *State) Close() error {
+	v.Tx.Lock()
+	v.Tx.Discard()
+	v.Tx.Unlock()
+
+	return v.db.Close()
+}
+
 // LastHeight returns the last commited height (block count).  We match the
 // StateDB Version with the height via the Commits done in Save.
 func (v *State) LastHeight() (uint32, error) {

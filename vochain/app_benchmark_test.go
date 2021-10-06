@@ -7,11 +7,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/censustree"
-	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -22,14 +20,10 @@ const benchmarkVoters = 2000
 
 func BenchmarkCheckTx(b *testing.B) {
 	b.ReportAllocs()
-	tdir := b.TempDir()
-	app, err := NewBaseApplication(db.TypePebble, tdir)
-	if err != nil {
-		b.Fatal(err)
-	}
+	app := TestBaseApplication(b)
 	var voters [][]*models.SignedTx
 	for i := 0; i < b.N+1; i++ {
-		voters = append(voters, prepareBenchCheckTx(b, app, benchmarkVoters, tdir))
+		voters = append(voters, prepareBenchCheckTx(b, app, benchmarkVoters, b.TempDir()))
 	}
 	var i int32
 	b.ResetTimer()
@@ -43,8 +37,7 @@ func BenchmarkCheckTx(b *testing.B) {
 
 func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 	nvoters int, tmpDir string) (voters []*models.SignedTx) {
-	db, err := badgerdb.New(db.Options{Path: tmpDir})
-	qt.Assert(b, err, qt.IsNil)
+	db := metadb.NewTest(b)
 	tr, err := censustree.New(censustree.Options{Name: util.RandomHex(12), ParentDB: db,
 		MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
 	if err != nil {

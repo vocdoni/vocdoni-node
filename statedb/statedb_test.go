@@ -9,14 +9,14 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/tree"
 )
 
 var emptyHash = make([]byte, 32)
 
 func TestVersion(t *testing.T) {
-	sdb := newTestStateDB(t)
+	sdb := NewStateDB(metadb.NewTest(t))
 	version, err := sdb.Version()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, version, qt.Equals, uint32(0))
@@ -43,7 +43,7 @@ func TestVersion(t *testing.T) {
 }
 
 func TestStateDB(t *testing.T) {
-	sdb := newTestStateDB(t)
+	sdb := NewStateDB(metadb.NewTest(t))
 	version, err := sdb.Version()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, version, qt.Equals, uint32(0))
@@ -210,7 +210,7 @@ func TestSubTree(t *testing.T) {
 	// - an instance of two non-singleton subTrees (multiACfg, multiBCfg)
 	//   in a single leaf at path `id`.  The leaf of the mainTree at path
 	//   `id` == multiA_id.Root | multiB_id.Root
-	sdb := newTestStateDB(t)
+	sdb := NewStateDB(metadb.NewTest(t))
 
 	mainTree, err := sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)
@@ -311,7 +311,7 @@ func TestSubTree(t *testing.T) {
 }
 
 func TestNoState(t *testing.T) {
-	sdb := newTestStateDB(t)
+	sdb := NewStateDB(metadb.NewTest(t))
 
 	mainTree, err := sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)
@@ -373,13 +373,6 @@ func TestNoState(t *testing.T) {
 	}
 
 	// dumpPrint(sdb.db)
-}
-
-func newTestStateDB(t *testing.T) *StateDB {
-	db, err := badgerdb.New(db.Options{Path: t.TempDir()})
-	qt.Assert(t, err, qt.IsNil)
-	sdb := NewStateDB(db)
-	return sdb
 }
 
 //lint:ignore U1000 debug function
@@ -449,8 +442,7 @@ func treePrint(t *tree.Tree, tx db.ReadTx, name string) {
 }
 
 func TestTree(t *testing.T) {
-	db, err := badgerdb.New(db.Options{Path: t.TempDir()})
-	qt.Assert(t, err, qt.IsNil)
+	db := metadb.NewTest(t)
 
 	tx := db.WriteTx()
 	txTree := subWriteTx(tx, subKeyTree)
@@ -463,7 +455,7 @@ func TestTree(t *testing.T) {
 }
 
 func TestBigUpdate(t *testing.T) {
-	sdb := newTestStateDB(t)
+	sdb := NewStateDB(metadb.NewTest(t))
 
 	mainTree, err := sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)
@@ -480,7 +472,7 @@ func TestBigUpdate(t *testing.T) {
 }
 
 func TestBigUpdateDiscard(t *testing.T) {
-	sdb := newTestStateDB(t)
+	sdb := NewStateDB(metadb.NewTest(t))
 
 	mainTree, err := sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)

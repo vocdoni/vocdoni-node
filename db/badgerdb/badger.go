@@ -2,11 +2,17 @@ package badgerdb
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"runtime"
+	"runtime/debug"
+	"strings"
 
 	"github.com/dgraph-io/badger/v3"
 	"go.vocdoni.io/dvote/db"
 )
+
+var inTest = len(os.Args) > 0 && strings.HasSuffix(strings.TrimSuffix(os.Args[0], ".exe"), ".test")
 
 // MemTableSize defines the BadgerDB maximum size in bytes for memtable table.
 // The default is 64<<20 (64MB), this does not pre-allocate enough memory for
@@ -71,6 +77,11 @@ func (tx WriteTx) Delete(k []byte) error {
 
 // Commit implements the db.WriteTx.Commit interface method
 func (tx WriteTx) Commit() error {
+	// Note that badger's Txn.Commit will not call discard if the transaction
+	// has zero pending writes.
+	// Seems like a potential bug or leak? In any case, always discard.
+	defer tx.tx.Discard()
+
 	return tx.tx.Commit()
 }
 
@@ -109,24 +120,65 @@ func New(opts db.Options) (*BadgerDB, error) {
 	if err != nil {
 		return nil, err
 	}
+	runtime.SetFinalizer(db, func(db *badger.DB) {
+		if !db.IsClosed() {
+			if inTest {
+				panic("badgerdb: database was not closed")
+			} else {
+				println("warning: badgerdb: database was not closed")
+				db.Close()
+			}
+		}
+	})
 
 	return &BadgerDB{
 		db: db,
 	}, nil
 }
 
+func isDiscarded(tx *badger.Txn) bool {
+	// If the tx isn't discarded, this key should throw an "invalid key" error.
+	// This helps the Get be a cheap no-op either way.
+	// Unfortunately, badger has no IsDiscarded method.
+	err := tx.Set([]byte("!badger!banned"), nil)
+	switch err {
+	case badger.ErrDiscardedTxn:
+		return true
+	case badger.ErrInvalidKey:
+		return false
+	default:
+		panic(fmt.Sprintf("unexpected isDiscarded Set error: %v", err))
+	}
+}
+
 // ReadTx returns a db.ReadTx
 func (db *BadgerDB) ReadTx() db.ReadTx {
-	return ReadTx{
-		tx: db.db.NewTransaction(false),
-	}
+	tx := db.db.NewTransaction(false)
+	// Unfortunately, we can't easily use isDiscarded on read-only transactions,
+	// as tx.Set quickly errors there as an invalid operation.
+	// Using tx.Get would get us the same information, but might not be a no-op.
+	return WriteTx{tx: tx}
 }
 
 // WriteTx returns a db.WriteTx
 func (db *BadgerDB) WriteTx() db.WriteTx {
-	return WriteTx{
-		tx: db.db.NewTransaction(true),
+	tx := db.db.NewTransaction(true)
+	var stack []byte
+	if inTest {
+		stack = debug.Stack()
 	}
+	runtime.SetFinalizer(tx, func(tx *badger.Txn) {
+		if !isDiscarded(tx) {
+			if inTest {
+				panic("badgerdb: write tx was not committed or discarded; creator stack:\n\n" +
+					string(stack) + "\nfinalize stack (to ignore):\n")
+			} else {
+				println("warning: badgerdb: write tx was not committed or discarded")
+				tx.Discard()
+			}
+		}
+	})
+	return WriteTx{tx: tx}
 }
 
 // Close closes the BadgerDB

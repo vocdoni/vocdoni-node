@@ -37,13 +37,15 @@ func TestStateReopen(t *testing.T) {
 	hash1Before, err := s.Save()
 	qt.Assert(t, err, qt.IsNil)
 
-	s.db.Close()
+	s.Close()
 
 	s, err = NewState(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	hash1After, err := s.Store.Hash()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, hash1After, qt.DeepEquals, hash1Before)
+
+	s.Close()
 }
 
 func TestStateBasic(t *testing.T) {
@@ -53,6 +55,7 @@ func TestStateBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer s.Close()
 
 	var pids [][]byte
 	for i := 0; i < 100; i++ {

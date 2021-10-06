@@ -25,7 +25,7 @@ func TestWriteTx(t *testing.T, database db.Database) {
 	if !bytes.Equal(v, []byte("b")) {
 		t.Errorf("expected v (%v) to be equal to %v", v, []byte("b"))
 	}
-	wTx.Commit()
+	err = wTx.Commit()
 	qt.Assert(t, err, qt.IsNil)
 
 	// Discard should not give any problem
@@ -40,6 +40,9 @@ func TestWriteTx(t *testing.T, database db.Database) {
 	// ensure that WriteTx can be passed into a function that accepts
 	// ReadTx, and that can be used
 	useReadTxFromWriteTx(t, wTx)
+
+	err = wTx.Commit()
+	qt.Assert(t, err, qt.IsNil)
 }
 
 func useReadTxFromWriteTx(t *testing.T, rTx db.ReadTx) {

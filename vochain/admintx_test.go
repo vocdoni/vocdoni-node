@@ -7,16 +7,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
 func TestAddOracle(t *testing.T) {
-	app, err := NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := TestBaseApplication(t)
 	oracle := ethereum.SignKeys{}
 	if err := oracle.Generate(); err != nil {
 		t.Fatal(err)
@@ -88,10 +84,7 @@ func testAddOracle(t *testing.T,
 }
 
 func TestRemoveOracle(t *testing.T) {
-	app, err := NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := TestBaseApplication(t)
 	oracle := ethereum.SignKeys{}
 	if err := oracle.Generate(); err != nil {
 		t.Fatal(err)

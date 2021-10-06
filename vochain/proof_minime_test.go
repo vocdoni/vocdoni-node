@@ -9,7 +9,6 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -18,10 +17,7 @@ import (
 )
 
 func TestMinimeProof(t *testing.T) {
-	app, err := NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := TestBaseApplication(t)
 
 	proofs := make([]ethstorageproof.StorageProof, len(minimeStorageProofs))
 	for i, proofJSON := range minimeStorageProofs {

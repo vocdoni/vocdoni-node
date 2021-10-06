@@ -4,13 +4,11 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/metadb"
 )
 
 func TestPrefixed(t *testing.T) {
-	database, err := badgerdb.New(db.Options{Path: t.TempDir()})
-	qt.Assert(t, err, qt.IsNil)
+	database := metadb.NewTest(t)
 
 	prefix1 := []byte("one")
 	prefix2 := []byte("two")
@@ -34,7 +32,7 @@ func TestPrefixed(t *testing.T) {
 
 	// Check key-values in PrefixedDatabase "one"
 	i := 0
-	err = db1.Iterate(nil, func(key, value []byte) bool {
+	err := db1.Iterate(nil, func(key, value []byte) bool {
 		qt.Assert(t, key, qt.DeepEquals, keys1[i])
 		qt.Assert(t, value, qt.DeepEquals, values1[i])
 		i++
