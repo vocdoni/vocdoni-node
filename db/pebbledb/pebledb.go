@@ -32,10 +32,17 @@ func (tx ReadTx) Get(k []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = closer.Close(); err != nil {
+
+	// Note that the returned value slice is only valid until Close is called.
+	// Make a copy so we can return it.
+	// TODO(mvdan): write a dbtest test to ensure this property on all DBs.
+	v2 := make([]byte, len(v))
+	copy(v2, v)
+
+	if err := closer.Close(); err != nil {
 		return nil, err
 	}
-	return v, nil
+	return v2, nil
 }
 
 // Discard implements the db.ReadTx.Discard interface method
