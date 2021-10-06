@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -18,13 +16,9 @@ import (
 )
 
 func TestMerkleTreeProof(t *testing.T) {
-	app, err := NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := TestBaseApplication(t)
 
-	db, err := badgerdb.New(db.Options{Path: t.TempDir()})
-	qt.Assert(t, err, qt.IsNil)
+	db := metadb.NewTest(t)
 	tr, err := censustree.New(censustree.Options{Name: "testchecktx", ParentDB: db,
 		MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
 	if err != nil {
@@ -180,10 +174,7 @@ func TestMerkleTreeProof(t *testing.T) {
 }
 
 func TestCAProof(t *testing.T) {
-	app, err := NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := TestBaseApplication(t)
 	ca := ethereum.SignKeys{}
 	if err := ca.Generate(); err != nil {
 		t.Fatal(err)
@@ -260,7 +251,7 @@ func TestCAProof(t *testing.T) {
 
 /*
 func TestCABlindProof(t *testing.T) {
-	app, err := NewBaseApplication(t.TempDir())
+	app := TestBaseApplication(t)
 	if err != nil {
 		t.Fatal(err)
 	}

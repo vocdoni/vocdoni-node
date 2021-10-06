@@ -4,8 +4,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -14,8 +13,7 @@ import (
 // added code in the CensusTree wrapper.
 
 func TestPublish(t *testing.T) {
-	db, err := badgerdb.New(db.Options{Path: t.TempDir()})
-	qt.Assert(t, err, qt.IsNil)
+	db := metadb.NewTest(t)
 
 	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
 		CensusType: models.Census_ARBO_BLAKE2B})

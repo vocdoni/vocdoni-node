@@ -6,8 +6,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/vocdoni/arbo"
-	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/metadb"
 )
 
 // NOTE: most of the methods of Tree are just wrappers over
@@ -15,8 +14,7 @@ import (
 // there are tests that check the added code in the Tree wrapper
 
 func TestSet(t *testing.T) {
-	database, err := badgerdb.New(db.Options{Path: t.TempDir()})
-	qt.Assert(t, err, qt.IsNil)
+	database := metadb.NewTest(t)
 
 	tree, err := New(nil, Options{DB: database, MaxLevels: 100, HashFunc: arbo.HashFunctionBlake2b})
 	qt.Assert(t, err, qt.IsNil)
@@ -60,11 +58,13 @@ func TestSet(t *testing.T) {
 
 	_, err = tree.Get(wTx, []byte("key2"))
 	qt.Assert(t, err, qt.Equals, arbo.ErrKeyNotFound)
+
+	err = wTx.Commit()
+	qt.Assert(t, err, qt.IsNil)
 }
 
 func TestGenProof(t *testing.T) {
-	database, err := badgerdb.New(db.Options{Path: t.TempDir()})
-	qt.Assert(t, err, qt.IsNil)
+	database := metadb.NewTest(t)
 
 	tree, err := New(nil, Options{DB: database, MaxLevels: 100, HashFunc: arbo.HashFunctionBlake2b})
 	qt.Assert(t, err, qt.IsNil)
@@ -87,11 +87,13 @@ func TestGenProof(t *testing.T) {
 	verif, err := tree.VerifyProof(k, v, proof, root)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, verif, qt.IsTrue)
+
+	err = wTx.Commit()
+	qt.Assert(t, err, qt.IsNil)
 }
 
 func TestFromRoot(t *testing.T) {
-	database, err := badgerdb.New(db.Options{Path: t.TempDir()})
-	qt.Assert(t, err, qt.IsNil)
+	database := metadb.NewTest(t)
 
 	tree, err := New(nil, Options{DB: database, MaxLevels: 100, HashFunc: arbo.HashFunctionBlake2b})
 	qt.Assert(t, err, qt.IsNil)
@@ -103,7 +105,9 @@ func TestFromRoot(t *testing.T) {
 		err := tree.Add(wTx, k, v)
 		qt.Assert(t, err, qt.IsNil)
 	}
-	wTx.Commit()
+	err = wTx.Commit()
+	qt.Assert(t, err, qt.IsNil)
+
 	wTx = tree.DB().WriteTx()
 
 	// do a snapshot
@@ -130,4 +134,7 @@ func TestFromRoot(t *testing.T) {
 	newRoot, err := tree.Root(wTx)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, newRoot, qt.Not(qt.DeepEquals), oldRoot)
+
+	err = wTx.Commit()
+	qt.Assert(t, err, qt.IsNil)
 }

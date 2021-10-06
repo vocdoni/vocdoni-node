@@ -109,6 +109,7 @@ func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 	if err != nil {
 		tb.Fatal(err)
 	}
+	tb.Cleanup(func() { s.Close() })
 	for _, o := range OracleListHardcoded {
 		if err := s.AddOracle(o); err != nil {
 			tb.Fatal(err)
@@ -122,6 +123,7 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 	if err != nil {
 		tb.Fatal(err)
 	}
+	tb.Cleanup(func() { s.Close() })
 	vals := make([]*privval.FilePV, 2)
 	rint := rand.Int()
 	vals[0] = privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
@@ -156,6 +158,7 @@ func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 	if err != nil {
 		tb.Fatal(err)
 	}
+	tb.Cleanup(func() { s.Close() })
 	// add process
 	processBytes, err := proto.Marshal(StateDBProcessHardcoded)
 	if err != nil {

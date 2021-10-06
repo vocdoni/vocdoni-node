@@ -22,6 +22,7 @@ func TestVochainState(t *testing.T) {
 
 	s, err := vochain.NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
+	defer s.Close()
 
 	// This used to panic due to nil *ImmutableTree fields.
 	exists, err := s.EnvelopeExists(util.RandomBytes(32), util.RandomBytes(32), false)

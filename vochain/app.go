@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -20,6 +21,7 @@ import (
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/db/lru"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -63,6 +65,16 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		State:      state,
 		blockCache: lru.NewAtomic(32),
 	}, nil
+}
+
+func TestBaseApplication(tb testing.TB) *BaseApplication {
+	app, err := NewBaseApplication(metadb.ForTest(), tb.TempDir())
+	if err != nil {
+		tb.Fatal(err)
+	}
+	// TODO: should this be a Close on the entire BaseApplication?
+	tb.Cleanup(func() { app.State.Close() })
+	return app
 }
 
 func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byte) error {

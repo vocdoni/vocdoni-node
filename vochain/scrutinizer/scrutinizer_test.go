@@ -11,7 +11,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
-	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -28,11 +27,7 @@ func TestEntityList(t *testing.T) {
 }
 
 func testEntityList(t *testing.T, entityCount int) {
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	app := vochain.TestBaseApplication(t)
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
@@ -78,10 +73,7 @@ func testEntityList(t *testing.T, entityCount int) {
 }
 
 func TestEntitySearch(t *testing.T) {
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := vochain.TestBaseApplication(t)
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
@@ -175,11 +167,7 @@ func TestProcessList(t *testing.T) {
 }
 
 func testProcessList(t *testing.T, procsCount int) {
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	app := vochain.TestBaseApplication(t)
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
@@ -240,10 +228,7 @@ func testProcessList(t *testing.T, procsCount int) {
 }
 
 func TestProcessSearch(t *testing.T) {
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := vochain.TestBaseApplication(t)
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
@@ -359,10 +344,7 @@ func TestProcessSearch(t *testing.T) {
 }
 
 func TestProcessListWithNamespaceAndStatus(t *testing.T) {
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := vochain.TestBaseApplication(t)
 
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
@@ -428,10 +410,7 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 }
 
 func TestResults(t *testing.T) {
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := vochain.TestBaseApplication(t)
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
@@ -560,10 +539,7 @@ func TestResults(t *testing.T) {
 }
 
 func TestLiveResults(t *testing.T) {
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := vochain.TestBaseApplication(t)
 
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
@@ -636,8 +612,7 @@ func TestLiveResults(t *testing.T) {
 }
 
 func TestAddVote(t *testing.T) {
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	qt.Assert(t, err, qt.IsNil)
+	app := vochain.TestBaseApplication(t)
 
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
@@ -748,8 +723,7 @@ var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
 
 func TestBallotProtocolRateProduct(t *testing.T) {
 	// Rate a product from 0 to 4
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	qt.Assert(t, err, qt.IsNil)
+	app := vochain.TestBaseApplication(t)
 
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
@@ -787,8 +761,7 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 
 func TestBallotProtocolQuadratic(t *testing.T) {
 	// Rate a product from 0 to 4
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	qt.Assert(t, err, qt.IsNil)
+	app := vochain.TestBaseApplication(t)
 
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
@@ -840,8 +813,7 @@ func TestBallotProtocolQuadratic(t *testing.T) {
 func TestBallotProtocolMultiChoice(t *testing.T) {
 	// Choose your 3 favorite colours out of 5
 
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	qt.Assert(t, err, qt.IsNil)
+	app := vochain.TestBaseApplication(t)
 
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
@@ -888,11 +860,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 }
 
 func TestCountVotes(t *testing.T) {
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	app := vochain.TestBaseApplication(t)
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)
@@ -957,8 +925,7 @@ func TestCountVotes(t *testing.T) {
 }
 
 func TestTxIndexer(t *testing.T) {
-	app, err := vochain.NewBaseApplication(db.TypePebble, t.TempDir())
-	qt.Assert(t, err, qt.IsNil)
+	app := vochain.TestBaseApplication(t)
 
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
