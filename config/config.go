@@ -1,6 +1,7 @@
 package config
 
 import (
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/types"
 )
 
@@ -46,6 +47,19 @@ func (c *DvoteCfg) ValidMode() bool {
 	case types.ModeMiner:
 		break
 	case types.ModeEthAPIoracle:
+		break
+	default:
+		return false
+	}
+	return true
+}
+
+// ValidDBType checks if the configured dbType is valid
+func (c *VochainCfg) ValidDBType() bool {
+	switch c.DBType {
+	case db.TypePebble:
+		break
+	case db.TypeBadger:
 		break
 	default:
 		return false
@@ -139,6 +153,8 @@ type VochainCfg struct {
 	PublicAddr string
 	// DataDir directory where the Vochain related data (DB's and priv_validator_state.json) is stored
 	DataDir string
+	// DBType is the type of key-value db to be used
+	DBType string
 	// Genesis path where the genesis file is stored
 	Genesis string
 	// CreateGenesis if True a new genesis file is created

@@ -9,6 +9,7 @@ import (
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/multirpc/transports"
 	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/router"
@@ -89,7 +90,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
 	d.CensusDir = tb.TempDir()
-	if err := cm.Start(d.CensusDir, ""); err != nil {
+	if err := cm.Start(db.TypePebble, d.CensusDir, ""); err != nil {
 		tb.Fatal(err)
 	}
 

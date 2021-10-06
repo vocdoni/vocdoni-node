@@ -14,6 +14,7 @@ import (
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -104,7 +105,7 @@ var (
 )
 
 func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
-	s, err := vochain.NewState(tb.TempDir())
+	s, err := vochain.NewState(db.TypePebble, tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -117,7 +118,7 @@ func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 }
 
 func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
-	s, err := vochain.NewState(tb.TempDir())
+	s, err := vochain.NewState(db.TypePebble, tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -151,7 +152,7 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 }
 
 func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
-	s, err := vochain.NewState(tb.TempDir())
+	s, err := vochain.NewState(db.TypePebble, tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}

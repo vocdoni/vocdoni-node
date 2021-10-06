@@ -5,12 +5,24 @@ import (
 	"io"
 )
 
+const (
+	// TypePebble defines the type of db that uses PebbleDB
+	TypePebble = "pebble"
+	// TypeBadger defines the type of db that uses BadgerDB
+	TypeBadger = "badger"
+)
+
 // ErrKeysNotFound is used to indicate that a key does not exist in the db.
 var ErrKeyNotFound = fmt.Errorf("key not found")
 
 // ErrTxnTooBig is used to indicate that a WriteTx is too big and can't include
 // more writes.
 var ErrTxnTooBig = fmt.Errorf("txn too big")
+
+// Options defines params for creating a new Database
+type Options struct {
+	Path string
+}
 
 // Database wraps all database operations. All methods are safe for concurrent
 // use.

@@ -376,7 +376,7 @@ func TestNoState(t *testing.T) {
 }
 
 func newTestStateDB(t *testing.T) *StateDB {
-	db, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
+	db, err := badgerdb.New(db.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 	sdb := NewStateDB(db)
 	return sdb
@@ -449,7 +449,7 @@ func treePrint(t *tree.Tree, tx db.ReadTx, name string) {
 }
 
 func TestTree(t *testing.T) {
-	db, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
+	db, err := badgerdb.New(db.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 
 	tx := db.WriteTx()

@@ -10,7 +10,7 @@ import (
 	"go.vocdoni.io/dvote/metrics"
 )
 
-func Census(datadir string, ma *metrics.Agent) (*census.Manager, error) {
+func Census(dbType, datadir string, ma *metrics.Agent) (*census.Manager, error) {
 	log.Info("creating census service")
 	var censusManager census.Manager
 	stdir := path.Join(datadir, "census")
@@ -19,7 +19,7 @@ func Census(datadir string, ma *metrics.Agent) (*census.Manager, error) {
 			return nil, err
 		}
 	}
-	if err := censusManager.Start(stdir, ""); err != nil {
+	if err := censusManager.Start(dbType, stdir, ""); err != nil {
 		return nil, err
 	}
 

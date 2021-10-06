@@ -54,8 +54,8 @@ var _ abcitypes.Application = (*BaseApplication)(nil)
 // NewBaseApplication creates a new BaseApplication given a name an a DB backend.
 // Node still needs to be initialized with SetNode
 // Callback functions still need to be initialized
-func NewBaseApplication(dbpath string) (*BaseApplication, error) {
-	state, err := NewState(dbpath)
+func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
+	state, err := NewState(dbType, dbpath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}

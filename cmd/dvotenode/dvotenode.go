@@ -22,6 +22,7 @@ import (
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/db"
 	ethchain "go.vocdoni.io/dvote/ethereum"
 	"go.vocdoni.io/dvote/ethereum/ethevents"
 	"go.vocdoni.io/dvote/internal"
@@ -60,6 +61,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// global
 	flag.StringVarP(&globalCfg.DataDir, "dataDir", "d", home+"/.dvote",
 		"directory where data is stored")
+	flag.StringVarP(&globalCfg.VochainConfig.DBType, "dbType", "t", db.TypePebble,
+		fmt.Sprintf("key-value db type (%s, %s)", db.TypePebble, db.TypeBadger))
 	flag.StringVarP(&globalCfg.VochainConfig.Chain, "vochain", "v", "dev",
 		"vocdoni blockchain network to connect with")
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
@@ -394,6 +397,10 @@ func main() {
 	if !globalCfg.ValidMode() {
 		log.Fatalf("mode %s is invalid", globalCfg.Mode)
 	}
+	// Check the dbType is valid
+	if !globalCfg.VochainConfig.ValidDBType() {
+		log.Fatalf("dbType %s is invalid. Valid ones: %s, %s", globalCfg.VochainConfig.DBType, db.TypePebble, db.TypeBadger)
+	}
 
 	// If dev enabled, expose debugging profiles under an http server
 	// If PprofPort is not set, a random port between 61000 and 61100 is choosed.
@@ -485,7 +492,7 @@ func main() {
 
 		// Census service
 		if globalCfg.API.Census {
-			cm, err = service.Census(globalCfg.DataDir, ma)
+			cm, err = service.Census(globalCfg.VochainConfig.DBType, globalCfg.DataDir, ma)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -504,6 +511,7 @@ func main() {
 			(globalCfg.Mode == types.ModeOracle)
 		// if oracle mode, we don't need live results
 		globalCfg.VochainConfig.Scrutinizer.IgnoreLiveResults = (globalCfg.Mode == types.ModeOracle)
+
 		// create the vochain node
 		if vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig,
 			!globalCfg.VochainConfig.NoWaitSync, ma, cm, storage,

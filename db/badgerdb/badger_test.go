@@ -10,21 +10,21 @@ import (
 )
 
 func TestWriteTx(t *testing.T) {
-	database, err := New(Options{Path: t.TempDir()})
+	database, err := New(db.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 
 	dbtest.TestWriteTx(t, database)
 }
 
 func TestIterate(t *testing.T) {
-	database, err := New(Options{Path: t.TempDir()})
+	database, err := New(db.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 
 	dbtest.TestIterate(t, database)
 }
 
 func TestBatch(t *testing.T) {
-	database, err := New(Options{Path: t.TempDir()})
+	database, err := New(db.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 
 	const n = 1_000_000

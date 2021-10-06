@@ -94,7 +94,7 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
 		signer:  signer,
 	}
 	var err error
-	k.storage, err = badgerdb.New(badgerdb.Options{Path: dbPath})
+	k.storage, err = badgerdb.New(db.Options{Path: dbPath})
 	if err != nil {
 		return nil, err
 	}

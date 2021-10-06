@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/badgerdb"
 )
 
 func TestPrefixed(t *testing.T) {
-	database, err := badgerdb.New(badgerdb.Options{Path: t.TempDir()})
+	database, err := badgerdb.New(db.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)
 
 	prefix1 := []byte("one")

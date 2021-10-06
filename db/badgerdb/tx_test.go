@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgraph-io/badger/v3"
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/db"
 )
 
 var key = []byte{1}
@@ -27,7 +28,7 @@ func inc(t *testing.T, m *sync.Mutex, db *BadgerDB) error {
 // TestConcurrentWriteTx validates the behaviour of badgerdb when multiple
 // write transactions modify the same key.
 func TestConcurrentWriteTx(t *testing.T) {
-	db, err := New(Options{Path: t.TempDir()})
+	db, err := New(db.Options{Path: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
 	}
