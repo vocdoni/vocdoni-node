@@ -165,10 +165,17 @@ func (t *Tree) editable() bool {
 	return t.snapshotRoot == nil
 }
 
+// Invalid is used when a key-value can not be added trough AddBatch, and
+// contains the index of the key-value and the error.
+type Invalid struct {
+	Index int
+	Error error
+}
+
 // AddBatch adds a batch of key-values to the Tree. Returns an array containing
 // the indexes of the keys failed to add. Supports empty values as input
 // parameters, which is equivalent to 0 valued byte array.
-func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
+func (t *Tree) AddBatch(keys, values [][]byte) ([]Invalid, error) {
 	wTx := t.db.WriteTx()
 	defer wTx.Discard()
 
@@ -182,7 +189,7 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 // AddBatchWithTx does the same than the AddBatch method, but allowing to pass
 // the db.WriteTx that is used. The db.WriteTx will not be committed inside
 // this method.
-func (t *Tree) AddBatchWithTx(wTx db.WriteTx, keys, values [][]byte) ([]int, error) {
+func (t *Tree) AddBatchWithTx(wTx db.WriteTx, keys, values [][]byte) ([]Invalid, error) {
 	t.Lock()
 	defer t.Unlock()
 
