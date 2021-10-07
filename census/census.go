@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -197,7 +196,7 @@ func (m *Manager) Start(dbType, storageDir, rootAuthPubKey string) (err error) {
 		// Make a backup of the old namespaces.json
 		nsConfigBackup := filepath.Join(storageDir,
 			fmt.Sprintf("namespaces.%v.json", timestamp.Format(time.RFC3339)))
-		if err := ioutil.WriteFile(nsConfigBackup, jsonBytes, 0o600); err != nil {
+		if err := os.WriteFile(nsConfigBackup, jsonBytes, 0o600); err != nil {
 			return err
 		}
 		if err := m.save(); err != nil {

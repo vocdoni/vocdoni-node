@@ -211,7 +211,7 @@ func (app *BaseApplication) GetTxHash(height uint32,
 		return nil, nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
 	}
 	tx := &models.SignedTx{}
-	return tx, tmtypes.Tx(block.Txs[txIndex]).Hash(), proto.Unmarshal(block.Txs[txIndex], tx)
+	return tx, block.Txs[txIndex].Hash(), proto.Unmarshal(block.Txs[txIndex], tx)
 }
 
 // SendTX sends a transaction to the mempool (sync)

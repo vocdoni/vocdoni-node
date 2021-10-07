@@ -6,9 +6,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	reuse "github.com/libp2p/go-reuseport"
@@ -72,7 +73,7 @@ func (l stdLogger) Print(v ...interface{}) { l.log.Debug(v...) }
 // When it returns, the server is ready. The returned address is useful if the
 // port was left as 0, to retrieve the randomly allocated port.
 func (p *Proxy) Init() error {
-	ln, err := reuse.Listen("tcp", fmt.Sprintf("%s:%d", p.Conn.Address, p.Conn.Port))
+	ln, err := reuse.Listen("tcp", net.JoinHostPort(p.Conn.Address, strconv.Itoa(int(p.Conn.Port))))
 	if err != nil {
 		return err
 	}
@@ -162,7 +163,7 @@ func (p *Proxy) GenerateSSLCertificate(tlsConfig *tls.Config) (*http.Server, *au
 	}
 	tlsConfig.GetCertificate = m.GetCertificate
 	serverConfig := &http.Server{
-		Addr:      fmt.Sprintf("%s:%d", p.Conn.Address, p.Conn.Port), // 443 tls
+		Addr:      net.JoinHostPort(p.Conn.Address, strconv.Itoa(int(p.Conn.Port))), // 443 tls
 		TLSConfig: tlsConfig,
 	}
 	serverConfig.TLSConfig.NextProtos = append(serverConfig.TLSConfig.NextProtos, acme.ALPNProto)
@@ -203,7 +204,7 @@ func (p *Proxy) AddHandler(path string, handler http.HandlerFunc) {
 func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader *http.Request) {
 	// TODO(mvdan): this should just be a reverse proxy
 	fn := func(writer http.ResponseWriter, reader *http.Request) {
-		body, err := ioutil.ReadAll(reader.Body)
+		body, err := io.ReadAll(reader.Body)
 		if err != nil {
 			http.Error(writer, "", http.StatusInternalServerError)
 			log.Errorf("failed to read request body: %v", err)
@@ -225,7 +226,7 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 			log.Warnf("request failed: %s", err)
 		}
 
-		respBody, err := ioutil.ReadAll(resp.Body)
+		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			log.Infof("cannot read response: %s", err)
 		}
@@ -240,7 +241,7 @@ func (p *Proxy) AddEndpoint(url string) func(writer http.ResponseWriter, reader 
 
 func (p *Proxy) ProxyIPC(path string) http.HandlerFunc {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(rw, "", http.StatusInternalServerError)
 			log.Errorf("failed to read request body: %v", err)
@@ -259,7 +260,7 @@ func (p *Proxy) ProxyIPC(path string) http.HandlerFunc {
 			return
 		}
 
-		// We can't use ioutil.ReadAll, because the server keeps the
+		// We can't use io.ReadAll, because the server keeps the
 		// connection open for more requests. Read a single json object.
 		var respBody json.RawMessage
 		if err := json.NewDecoder(conn).Decode(&respBody); err != nil {
@@ -298,7 +299,7 @@ func (p *Proxy) AddWsHTTPBridge(url string) ProxyWsHandler {
 				log.Warnf("request failed: %s", err)
 				continue
 			}
-			respBody, err := ioutil.ReadAll(resp.Body)
+			respBody, err := io.ReadAll(resp.Body)
 			if err != nil {
 				log.Warnf("cannot read response: %s", err)
 				continue
@@ -352,7 +353,7 @@ func (p *Proxy) AddWsWsBridge(url string, readLimit int64) ProxyWsHandler {
 				log.Debugf("websocket closed by the client: %s", err)
 				break
 			}
-			respBody, err := ioutil.ReadAll(msg)
+			respBody, err := io.ReadAll(msg)
 			if err != nil {
 				log.Warnf("cannot read response: %s", err)
 				continue

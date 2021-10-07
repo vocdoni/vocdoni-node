@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"time"
@@ -72,7 +72,7 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET")
 		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token")
 
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "", http.StatusInternalServerError)
 			log.Errorf("failed to read request body: %v", err)
@@ -95,7 +95,7 @@ func main() {
 				w.Write([]byte("\n"))
 				return
 			default:
-				if time.Since(st) > time.Duration(time.Second*15) {
+				if time.Since(st) > time.Second*15 {
 					log.Warnf("request timeout")
 					w.Write([]byte("{\"error\": \"timeout\"}"))
 					w.Write([]byte("\n"))

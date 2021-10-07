@@ -3,7 +3,6 @@ package census
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -85,7 +84,7 @@ func TestOutdatedCensuses(t *testing.T) {
 	storageDir := t.TempDir()
 	time.Sleep(1 * time.Second)
 	nsConfig := filepath.Join(storageDir, "namespaces.json")
-	qt.Assert(t, ioutil.WriteFile(nsConfig, []byte(nsConfigJSON1), 0o600), qt.IsNil)
+	qt.Assert(t, os.WriteFile(nsConfig, []byte(nsConfigJSON1), 0o600), qt.IsNil)
 
 	var namespaces Namespaces
 	qt.Assert(t, json.Unmarshal([]byte(nsConfigJSON1), &namespaces), qt.IsNil)
@@ -107,14 +106,14 @@ func TestOutdatedCensuses(t *testing.T) {
 	nsConfigBackupJSON, err := os.ReadFile(matches[0])
 	qt.Assert(t, err, qt.IsNil)
 	var namespacesBackup Namespaces
-	qt.Assert(t, json.Unmarshal([]byte(nsConfigBackupJSON), &namespacesBackup), qt.IsNil)
+	qt.Assert(t, json.Unmarshal(nsConfigBackupJSON, &namespacesBackup), qt.IsNil)
 	qt.Assert(t, namespacesBackup, qt.DeepEquals, namespaces)
 
 	// Assert correnct namespaces.json cleaned
 	nsConfigJSON, err := os.ReadFile(nsConfig)
 	qt.Assert(t, err, qt.IsNil)
 	var namespacesClean Namespaces
-	qt.Assert(t, json.Unmarshal([]byte(nsConfigJSON), &namespacesClean), qt.IsNil)
+	qt.Assert(t, json.Unmarshal(nsConfigJSON, &namespacesClean), qt.IsNil)
 	qt.Assert(t, namespacesClean, qt.DeepEquals, Namespaces{})
 
 	// Assert outdated censuses moved to outdated folder

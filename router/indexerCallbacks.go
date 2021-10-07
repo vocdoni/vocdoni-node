@@ -152,7 +152,7 @@ func (r *Router) getTxByHeight(request RouterRequest) {
 			request.Height, err))
 		return
 	}
-	tx, hash, err := r.Scrutinizer.App.GetTxHash(txRef.BlockHeight, int32(txRef.TxBlockIndex))
+	tx, hash, err := r.Scrutinizer.App.GetTxHash(txRef.BlockHeight, txRef.TxBlockIndex)
 	if err != nil {
 		r.SendError(request, fmt.Sprintf("cannot get tx: %v", err))
 		return
@@ -160,7 +160,7 @@ func (r *Router) getTxByHeight(request RouterRequest) {
 	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
 		Height:      uint32(txRef.Index),
-		Index:       int32(txRef.TxBlockIndex),
+		Index:       txRef.TxBlockIndex,
 		BlockHeight: txRef.BlockHeight,
 		Hash:        hash,
 		Signature:   tx.Signature,
@@ -209,7 +209,7 @@ func (r *Router) getTxListForBlock(request RouterRequest) {
 		response.TxList = append(response.TxList, &indexertypes.TxMetadata{
 			Type:  txType,
 			Index: int32(i),
-			Hash:  tmtypes.Tx(block.Txs[i]).Hash(),
+			Hash:  block.Txs[i].Hash(),
 		})
 	}
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {

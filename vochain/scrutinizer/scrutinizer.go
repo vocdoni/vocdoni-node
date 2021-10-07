@@ -319,7 +319,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 
 	// Schedule results computation
 	for _, p := range s.resultsPool {
-		if err := s.setResultsHeight(p.ProcessID, uint32(height+1)); err != nil {
+		if err := s.setResultsHeight(p.ProcessID, height+1); err != nil {
 			log.Errorf("commit: cannot update process %x: %v", p.ProcessID, err)
 			continue
 		}

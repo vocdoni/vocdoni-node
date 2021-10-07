@@ -3,8 +3,8 @@ package mhttp
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"syscall"
@@ -149,7 +149,7 @@ func wshandler(w http.ResponseWriter, r *http.Request, ph ProxyWsHandler, readLi
 }
 
 func somaxconn() int {
-	content, err := ioutil.ReadFile("/proc/sys/net/core/somaxconn")
+	content, err := os.ReadFile("/proc/sys/net/core/somaxconn")
 	if err != nil {
 		return syscall.SOMAXCONN
 	}

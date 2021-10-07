@@ -9,7 +9,7 @@ import (
 // SendMessage encrypts and writes a message on the readwriter buffer
 func (ps *SubPub) SendMessage(w *bufio.Writer, msg []byte) error {
 	if !ps.Private {
-		msg = []byte(ps.encrypt(msg))
+		msg = ps.encrypt(msg)
 	}
 	message := &Message{Data: msg}
 	data, err := bare.Marshal(message)

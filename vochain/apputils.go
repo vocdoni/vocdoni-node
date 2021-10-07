@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
@@ -71,7 +70,7 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 		if err != nil {
 			log.Fatalf("cannot create priv_validator_state.json: %s", err)
 		}
-		err = ioutil.WriteFile(tconfig.PrivValidatorStateFile(), jsonBytes, 0o600)
+		err = os.WriteFile(tconfig.PrivValidatorStateFile(), jsonBytes, 0o600)
 		if err != nil {
 			log.Fatalf("cannot create priv_validator_state.json: %s", err)
 		}

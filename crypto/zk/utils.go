@@ -3,8 +3,8 @@ package zk
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/big"
+	"os"
 
 	"github.com/vocdoni/go-snark/parsers"
 	"github.com/vocdoni/go-snark/types"
@@ -12,7 +12,7 @@ import (
 )
 
 func LoadVkFromFile(path string) (*types.Vk, error) {
-	vkJSON, err := ioutil.ReadFile(path)
+	vkJSON, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

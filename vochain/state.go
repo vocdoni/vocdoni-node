@@ -544,7 +544,7 @@ func (v *State) voteCountInc() error {
 		return err
 	}
 	voteCount := binary.LittleEndian.Uint64(voteCountLE)
-	voteCount += 1
+	voteCount++
 	binary.LittleEndian.PutUint64(voteCountLE, voteCount)
 	return noState.Set(voteCountKey, voteCountLE)
 }
