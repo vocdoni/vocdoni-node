@@ -28,9 +28,6 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 	}
 	switch vtx.Payload.(type) {
 	case *models.Tx_Vote:
-		if vtx == nil {
-			return nil, fmt.Errorf("vote envelope transaction is nil")
-		}
 		// get VoteEnvelope from tx
 		txVote := vtx.GetVote()
 		v, err := app.VoteEnvelopeCheck(txVote, txBytes, signature, txID, commit)

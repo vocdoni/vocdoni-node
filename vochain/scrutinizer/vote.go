@@ -509,7 +509,7 @@ func (s *Scrutinizer) computeFinalResults(p *indexertypes.Process) (*indexertype
 				}
 				keys = append(keys, p.PrivateKeys[k])
 			}
-			if len(keys) == 0 || err != nil {
+			if len(keys) == 0 {
 				log.Warn("no keys provided or wrong index")
 				return
 			}
