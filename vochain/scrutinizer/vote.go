@@ -500,22 +500,20 @@ func (s *Scrutinizer) computeFinalResults(p *indexertypes.Process) (*indexertype
 			if len(p.PrivateKeys) < len(vote.GetEncryptionKeyIndexes()) {
 				log.Errorf("encryptionKeyIndexes has too many fields")
 				return
-			} else {
-				keys := []string{}
-				for _, k := range vote.GetEncryptionKeyIndexes() {
-					if k >= types.KeyKeeperMaxKeyIndex {
-						log.Warn("key index overflow")
-						return
-					}
-					keys = append(keys, p.PrivateKeys[k])
-				}
-				if len(keys) == 0 || err != nil {
-					log.Warn("no keys provided or wrong index")
-					return
-				} else {
-					vp, err = unmarshalVote(vote.GetVotePackage(), keys)
-				}
 			}
+			keys := []string{}
+			for _, k := range vote.GetEncryptionKeyIndexes() {
+				if k >= types.KeyKeeperMaxKeyIndex {
+					log.Warn("key index overflow")
+					return
+				}
+				keys = append(keys, p.PrivateKeys[k])
+			}
+			if len(keys) == 0 || err != nil {
+				log.Warn("no keys provided or wrong index")
+				return
+			}
+			vp, err = unmarshalVote(vote.GetVotePackage(), keys)
 		} else {
 			vp, err = unmarshalVote(vote.GetVotePackage(), []string{})
 		}

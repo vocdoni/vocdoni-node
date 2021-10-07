@@ -338,7 +338,7 @@ func (eh *EthereumHandler) NewProcessTxArgs(ctx context.Context, pid [types.Proc
 			return nil, fmt.Errorf("error decoding owner address: %w", err)
 		}
 		// save sourceBlockHeight
-		sourceBlockHeight64 := uint64(processMeta.SourceBlockHeight.Uint64())
+		sourceBlockHeight64 := processMeta.SourceBlockHeight.Uint64()
 		if sourceBlockHeight64 == 0 {
 			return nil, fmt.Errorf("source block height must be > 0: %w", err)
 		}

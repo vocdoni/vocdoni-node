@@ -18,7 +18,6 @@ func (o options) checkSignKey() error {
 	o.signKey = ethereum.NewSignKeys()
 	if o.privKey == "" {
 		return fmt.Errorf("a private key is needed to sign this command")
-	} else {
-		return o.signKey.AddHexKey(o.privKey)
 	}
+	return o.signKey.AddHexKey(o.privKey)
 }

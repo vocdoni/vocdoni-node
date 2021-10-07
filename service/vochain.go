@@ -156,7 +156,7 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 		log.Infof("downloading zk-circuits-artifacts index: %d", i)
 
 		// download VKs from CircuitsConfig
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Minute*1))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
 		defer cancel()
 		err = zkartifacts.DownloadVKFile(ctx, cc)
 		if err != nil {

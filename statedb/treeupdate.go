@@ -120,7 +120,7 @@ func (u *TreeUpdate) Set(key, value []byte) error {
 // `subKeySubTree | cfg.prefix`.  In turn the treeUpdate.tree uses the
 // db.WriteTx from treeUpdate.tx appending the prefix `'/' | subKeyTree`.
 func (u *TreeUpdate) SubTree(cfg TreeConfig) (treeUpdate *TreeUpdate, err error) {
-	if treeUpdate, ok := u.openSubs[string(cfg.prefix)]; ok {
+	if treeUpdate, ok := u.openSubs[cfg.prefix]; ok {
 		return treeUpdate, nil
 	}
 	parentLeaf, err := u.tree.Get(u.tree.tx, cfg.parentLeafKey)
@@ -156,7 +156,7 @@ func (u *TreeUpdate) SubTree(cfg TreeConfig) (treeUpdate *TreeUpdate, err error)
 		openSubs: make(map[string]*TreeUpdate),
 		cfg:      cfg,
 	}
-	u.openSubs[string(cfg.prefix)] = treeUpdate
+	u.openSubs[cfg.prefix] = treeUpdate
 	return treeUpdate, nil
 }
 
@@ -230,9 +230,8 @@ func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 		// If tree is not dirty, there's nothing to propagate
 		if !treeUpdate.dirtyTree {
 			return nil, nil
-		} else {
-			return treeUpdate.tree.Root(treeUpdate.tree.tx)
 		}
+		return treeUpdate.tree.Root(treeUpdate.tree.tx)
 	}
 	// Gather all the updates that need to be applied to the
 	// treeUpdate.tree leaves, by leaf key

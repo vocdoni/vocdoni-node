@@ -2,7 +2,7 @@ package mhttp
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -34,7 +34,7 @@ func (h *HttpHandler) SetProxy(p *Proxy) {
 func getHTTPhandler(path string, receiver chan transports.Message) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		respBody, err := ioutil.ReadAll(r.Body)
+		respBody, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Warnf("HTTP connection closed: (%s)", err)
 			return

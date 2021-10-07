@@ -389,7 +389,7 @@ func toString(v []byte) string {
 		}
 		var elemClean string
 		if asciiPrint {
-			elemClean = string(elem)
+			elemClean = elem
 		} else {
 			elemClean = fmt.Sprintf("\\x%x", elem)
 		}

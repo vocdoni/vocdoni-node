@@ -52,11 +52,10 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 				log.Warnf("error creating census: %s", err)
 				resp.SetError(err)
 				return resp
-			} else {
-				t.Publish()
-				log.Infof("census %s%s created, successfully managed by %s", censusPrefix, r.CensusID, r.PubKeys)
-				resp.CensusID = censusPrefix + r.CensusID
 			}
+			t.Publish()
+			log.Infof("census %s%s created, successfully managed by %s", censusPrefix, r.CensusID, r.PubKeys)
+			resp.CensusID = censusPrefix + r.CensusID
 		} else {
 			resp.SetError("invalid authentication")
 			return resp
@@ -156,14 +155,13 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			if err != nil {
 				resp.SetError(err)
 				return resp
-			} else {
-				resp.Root, err = tr.Root()
-				if err != nil {
-					resp.SetError(err.Error())
-					return resp
-				}
-				log.Debugf("claim added %x/%x", data, r.CensusValue)
 			}
+			resp.Root, err = tr.Root()
+			if err != nil {
+				resp.SetError(err.Error())
+				return resp
+			}
+			log.Debugf("claim added %x/%x", data, r.CensusValue)
 		} else {
 			resp.SetError("invalid authentication")
 			return resp
@@ -179,9 +177,8 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 					log.Warnf("error importing dump: %s", err)
 					resp.SetError(err)
 					return resp
-				} else {
-					log.Infof("dump imported successfully, %d claims", len(r.CensusKeys))
 				}
+				log.Infof("dump imported successfully, %d claims", len(r.CensusKeys))
 			}
 		} else {
 			resp.SetError("invalid authentication")
@@ -226,9 +223,8 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 				log.Warnf("error importing dump: %s", err)
 				resp.SetError("error importing census")
 				return resp
-			} else {
-				log.Infof("dump imported successfully, %d bytes", len(dump.Data))
 			}
+			log.Infof("dump imported successfully, %d bytes", len(dump.Data))
 		} else {
 			log.Warnf("no data found on the retreived census")
 			resp.SetError("no claims found")
