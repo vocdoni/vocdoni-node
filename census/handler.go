@@ -319,7 +319,6 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		} else {
 			root = r.RootHash
 		}
-		var err error
 		if r.Method == "dump" {
 			snapshot, err := tr.FromRoot(root)
 			if err != nil {
@@ -342,10 +341,10 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		// 	        resp.CensusValues = append(resp.CensusValues, types.HexBytes(v))
 		// 	}
 		// }
-		if err != nil {
-			resp.SetError(err)
-			return resp
-		}
+		// if err != nil {
+		// 	resp.SetError(err)
+		// 	return resp
+		// }
 		return resp
 
 	case "publish":

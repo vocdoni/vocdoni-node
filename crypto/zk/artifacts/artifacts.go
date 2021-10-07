@@ -79,7 +79,7 @@ func DownloadCircuitFiles(ctx context.Context, c CircuitConfig) error {
 		log.Info("files already exist and match the expected hashes")
 		return nil
 	}
-	if err != nil && !os.IsNotExist(err) {
+	if !os.IsNotExist(err) {
 		return err
 	}
 
@@ -100,7 +100,7 @@ func DownloadVKFile(ctx context.Context, c CircuitConfig) error {
 		log.Info("VK file already exist and match the expected hash")
 		return err
 	}
-	if err != nil && !os.IsNotExist(err) {
+	if !os.IsNotExist(err) {
 		return err
 	}
 

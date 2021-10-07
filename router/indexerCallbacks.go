@@ -42,10 +42,6 @@ func (r *Router) getStats(request RouterRequest) {
 
 	var response api.MetaResponse
 	response.Stats = stats
-	if err != nil {
-		r.SendError(request, fmt.Sprintf("could not marshal vochainStats: (%s)", err))
-		return
-	}
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
