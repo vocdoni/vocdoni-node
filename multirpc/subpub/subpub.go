@@ -33,6 +33,11 @@ const bareMaxArrayLength uint64 = 1024 * 1014 * 8 // 8 Million entires
 
 const bareMaxUnmarshalBytes uint64 = bareMaxArrayLength * 32 // Assuming 32 bytes per entry
 
+const (
+	IPv4 = 4
+	IPv6 = 6
+)
+
 // SubPub is a simplified PubSub protocol using libp2p
 type SubPub struct {
 	Key             ecdsa.PrivateKey
@@ -44,7 +49,8 @@ type SubPub struct {
 	BootNodes       []string
 	PubKey          string
 	Private         bool
-	MultiAddr       string
+	MultiAddrIPv4   string
+	MultiAddrIPv6   string
 	NodeID          string
 	Port            int32
 	Host            host.Host
@@ -107,8 +113,8 @@ func (ps *SubPub) Start(ctx context.Context) {
 	}
 	ipfslog.SetLogLevel("*", "ERROR")
 
-	// 0.0.0.0 will listen on any interface device.
-	sourceMultiAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", ps.Port))
+	// :: will listen on any interface device (both on IPv4 and IPv6)
+	sourceMultiAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip6/::/tcp/%d", ps.Port))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -135,13 +141,23 @@ func (ps *SubPub) Start(ctx context.Context) {
 		log.Fatal(err)
 	}
 
-	ip, err := util.PublicIP()
-	if err != nil {
-		log.Fatal(err)
+	ipv4, err4 := util.PublicIP(IPv4)
+	ipv6, err6 := util.PublicIP(IPv6)
+
+	// Fail only if BOTH ipv4 and ipv6 failed.
+	if err4 != nil && err6 != nil {
+		log.Fatal("ipv4: %s; ipv6: %s", err4, err6)
 	}
-	ps.MultiAddr = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", ip, ps.Port, ps.Host.ID())
+	if ipv4 != nil {
+		ps.MultiAddrIPv4 = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", ipv4, ps.Port, ps.Host.ID())
+		log.Infof("my subpub multiaddress ipv4: %s", ps.MultiAddrIPv4)
+	}
+	if ipv6 != nil {
+		ps.MultiAddrIPv6 = fmt.Sprintf("/ip6/%s/tcp/%d/p2p/%s", ipv6, ps.Port, ps.Host.ID())
+		log.Infof("my subpub multiaddress ipv6: %s", ps.MultiAddrIPv6)
+	}
+
 	ps.NodeID = ps.Host.ID().String()
-	log.Infof("my subpub multiaddress %s", ps.MultiAddr)
 
 	// Set a function as stream handler. This function is called when a peer
 	// initiates a connection and starts a stream with this peer.

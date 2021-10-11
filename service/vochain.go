@@ -28,7 +28,7 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 	log.Infof("creating vochain service for network %s", vconfig.Chain)
 	// node + app layer
 	if len(vconfig.PublicAddr) == 0 {
-		ip, err := util.PublicIP()
+		ip, err := util.PublicIP(4)
 		if err != nil {
 			log.Warn(err)
 		} else {
