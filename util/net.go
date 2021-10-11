@@ -7,19 +7,20 @@ import (
 	"net"
 	"time"
 
-	externalip "github.com/vocdoni/go-external-ip"
+	externalip "github.com/glendc/go-external-ip"
 )
 
-// PublicIP returns the external/public IP of the host
-// For now, let's only support IPv4. Hope we can change this in the future...
+// PublicIP returns the external/public IP (v4 or v6) of the host
 //
 // If a nil error is returned, the returned IP must be valid.
-func PublicIP() (net.IP, error) {
+
+func PublicIP(ipversion uint) (net.IP, error) {
 	consensus := externalip.DefaultConsensus(nil, nil)
-	ip, err := consensus.ExternalIP(4)
-	// if the IP isn't a valid ipv4, To4 will return nil
-	if ip = ip.To4(); ip == nil {
-		return nil, fmt.Errorf("public IP discovery failed: %v", err)
+	consensus.UseIPProtocol(ipversion)
+	ip, err := consensus.ExternalIP()
+	// if the IP isn't a valid ip (v4 or v6), To16 will return nil
+	if ip = ip.To16(); ip == nil {
+		return nil, fmt.Errorf("public IPv%d discovery failed: %v", ipversion, err)
 	}
 	return ip, nil
 }
