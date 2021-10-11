@@ -4,22 +4,42 @@ import (
 	"errors"
 )
 
-// Batch wraps a WriteTx to automatically commit when it becomes too big,
+// Batch wraps a WriteTx to automatically commit when it becomes too big
+// (either the Tx write operation returns ErrTxnTooBig or the write count
+// reaches the specified maxSize),
 // causing a new internal WriteTx to be created.
 type Batch struct {
-	tx WriteTx
-	db Database
+	tx      WriteTx
+	db      Database
+	maxSize uint
+	count   uint
 }
 
 // check that Batch implements the ReadTx & WriteTx interfaces
 var _ ReadTx = (*Batch)(nil)
 var _ WriteTx = (*Batch)(nil)
 
-// NewBatch creates a new Batch from a Database
+// DefaultBatchMaxSize is the default value for maxSize used in NewBatch.
+// Assuming keys and values of 64 bytes, which should be common in our use
+// case, this value allows for 128 MiB of key-values which should be a nice
+// tradeoff between performance and memory consumption.
+const DefaultBatchMaxSize uint = 1024 * 1024
+
+// NewBatch creates a new Batch from a Database with a default maxSize.
 func NewBatch(db Database) *Batch {
 	return &Batch{
-		tx: db.WriteTx(),
-		db: db,
+		tx:      db.WriteTx(),
+		db:      db,
+		maxSize: DefaultBatchMaxSize,
+	}
+}
+
+// NewBatchMaxSize creates a new Batch from a Database with the specified maxSize.
+func NewBatchMaxSize(db Database, maxSize uint) *Batch {
+	return &Batch{
+		tx:      db.WriteTx(),
+		db:      db,
+		maxSize: maxSize,
 	}
 }
 
@@ -40,11 +60,17 @@ func (t *Batch) Discard() {
 // operation, the internal tx becomes too big, all the pending writes will be
 // committed and a new WriteTx will be created to continue with this and
 // future writes.
-func (t *Batch) Set(key []byte, value []byte) error {
-	if err := t.tx.Set(key, value); errors.Is(err, ErrTxnTooBig) {
+func (t *Batch) Set(key []byte, value []byte) (err error) {
+	defer func() {
+		if err == nil {
+			t.count++
+		}
+	}()
+	if err := t.tx.Set(key, value); errors.Is(err, ErrTxnTooBig) || t.count+1 == t.maxSize {
 		if err := t.tx.Commit(); err != nil {
 			return err
 		}
+		t.count = 0
 		t.tx = t.db.WriteTx()
 		return t.tx.Set(key, value)
 	} else {
@@ -56,11 +82,17 @@ func (t *Batch) Set(key []byte, value []byte) error {
 // operation, the internal tx becomes too big, all the pending writes will be
 // committed and a new WriteTx will be created to continue with this and
 // future writes.
-func (t *Batch) Delete(key []byte) error {
-	if err := t.tx.Delete(key); errors.Is(err, ErrTxnTooBig) {
+func (t *Batch) Delete(key []byte) (err error) {
+	defer func() {
+		if err == nil {
+			t.count++
+		}
+	}()
+	if err := t.tx.Delete(key); errors.Is(err, ErrTxnTooBig) || t.count+1 == t.maxSize {
 		if err := t.tx.Commit(); err != nil {
 			return err
 		}
+		t.count = 0
 		t.tx = t.db.WriteTx()
 		return t.tx.Delete(key)
 	} else {
