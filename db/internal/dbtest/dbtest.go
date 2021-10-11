@@ -3,6 +3,7 @@ package dbtest
 import (
 	"bytes"
 	"strconv"
+	"sync"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -90,4 +91,65 @@ func TestIterate(t *testing.T, d db.Database) {
 	})
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, prefix1KeysFound, qt.Equals, prefix1NumKeys)
+}
+
+// TestConcurrentWriteTx validates the behaviour of badgerdb when multiple
+// write transactions modify the same key.
+func TestConcurrentWriteTx(t *testing.T, database db.Database) {
+	var key = []byte{1}
+	wTx := database.WriteTx()
+	qt.Assert(t, wTx.Set(key, []byte{0}), qt.IsNil)
+	qt.Assert(t, wTx.Commit(), qt.IsNil)
+
+	var wgSync sync.WaitGroup
+	wgSync.Add(2)
+	inc := func(t *testing.T, m *sync.Mutex, database db.Database) error {
+		var key = []byte{1}
+		wTx := database.WriteTx()
+		// Sync here so that both goroutines have created a WriteTx
+		// before operating with it.
+		wgSync.Done()
+		wgSync.Wait()
+
+		m.Lock()
+		val, err := wTx.Get(key)
+		qt.Assert(t, err, qt.IsNil)
+		qt.Assert(t, wTx.Set(key, []byte{val[0] + 1}), qt.IsNil)
+		m.Unlock()
+
+		return wTx.Commit()
+	}
+
+	var wgInc sync.WaitGroup
+	var m sync.Mutex
+	// A
+	var errA error
+	wgInc.Add(1)
+	go func() {
+		errA = inc(t, &m, database)
+		wgInc.Done()
+	}()
+
+	// B
+	var errB error
+	wgInc.Add(1)
+	go func() {
+		errB = inc(t, &m, database)
+		wgInc.Done()
+	}()
+
+	wgInc.Wait()
+	rTx := database.ReadTx()
+	defer rTx.Discard()
+	val, err := rTx.Get(key)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, val, qt.DeepEquals, []byte{1})
+
+	if errA == nil {
+		qt.Assert(t, errA, qt.IsNil)
+		qt.Assert(t, errB, qt.Equals, db.ErrConflict)
+	} else {
+		qt.Assert(t, errA, qt.Equals, db.ErrConflict)
+		qt.Assert(t, errB, qt.IsNil)
+	}
 }

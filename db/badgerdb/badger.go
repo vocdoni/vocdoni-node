@@ -82,7 +82,11 @@ func (tx WriteTx) Commit() error {
 	// Seems like a potential bug or leak? In any case, always discard.
 	defer tx.tx.Discard()
 
-	return tx.tx.Commit()
+	err := tx.tx.Commit()
+	if errors.Is(err, badger.ErrConflict) {
+		return db.ErrConflict
+	}
+	return err
 }
 
 // Discard implements the db.WriteTx.Discard interface method
