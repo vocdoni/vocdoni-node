@@ -37,20 +37,17 @@ type kv struct {
 	v       []byte
 }
 
-func (p *params) keysValuesToKvs(ks, vs [][]byte) ([]kv, []int, error) {
+func (p *params) keysValuesToKvs(ks, vs [][]byte) ([]kv, []Invalid, error) {
 	if len(ks) != len(vs) {
 		return nil, nil, fmt.Errorf("len(keys)!=len(values) (%d!=%d)",
 			len(ks), len(vs))
 	}
-	var invalids []int
+	var invalids []Invalid
 	var kvs []kv
 	for i := 0; i < len(ks); i++ {
 		keyPath, err := keyPathFromKey(p.maxLevels, ks[i])
 		if err != nil {
-			// TODO in a future iteration, invalids will contain
-			// the reason of the error of why each index is
-			// invalid.
-			invalids = append(invalids, i)
+			invalids = append(invalids, Invalid{i, err})
 			continue
 		}
 
@@ -90,13 +87,13 @@ func newVT(maxLevels int, hash HashFunction) vt {
 // computation of hashes of the nodes neither the storage of the key-values of
 // the tree into the db. After addBatch, vt.computeHashes should be called to
 // compute the hashes of all the nodes of the tree.
-func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
+func (t *vt) addBatch(ks, vs [][]byte) ([]Invalid, error) {
 	nCPU := flp2(runtime.NumCPU())
 	if nCPU == 1 || len(ks) < nCPU {
-		var invalids []int
+		var invalids []Invalid
 		for i := 0; i < len(ks); i++ {
 			if err := t.add(0, ks[i], vs[i]); err != nil {
-				invalids = append(invalids, i)
+				invalids = append(invalids, Invalid{i, err})
 			}
 		}
 		return invalids, nil
@@ -177,7 +174,7 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 	}
 
 	subRoots := make([]*node, nCPU)
-	invalidsInBucket := make([][]int, nCPU)
+	invalidsInBucket := make([][]Invalid, nCPU)
 
 	var wg sync.WaitGroup
 	wg.Add(nCPU)
@@ -186,8 +183,10 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]int, error) {
 			bucketVT := newVT(t.params.maxLevels, t.params.hashFunction)
 			bucketVT.root = nodesAtL[cpu]
 			for j := 0; j < len(buckets[cpu]); j++ {
-				if err := bucketVT.add(l, buckets[cpu][j].k, buckets[cpu][j].v); err != nil {
-					invalidsInBucket[cpu] = append(invalidsInBucket[cpu], buckets[cpu][j].pos)
+				if err := bucketVT.add(l, buckets[cpu][j].k,
+					buckets[cpu][j].v); err != nil {
+					invalidsInBucket[cpu] = append(invalidsInBucket[cpu],
+						Invalid{buckets[cpu][j].pos, err})
 				}
 			}
 			subRoots[cpu] = bucketVT.root
