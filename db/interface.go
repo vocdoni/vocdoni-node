@@ -19,6 +19,10 @@ var ErrKeyNotFound = fmt.Errorf("key not found")
 // more writes.
 var ErrTxnTooBig = fmt.Errorf("txn too big")
 
+// ErrConflict is returned when a transaction conflicts with another transaction. This can
+// happen if the read rows had been updated concurrently by another transaction.
+var ErrConflict = fmt.Errorf("txn conflict")
+
 // Options defines generic parameters for creating a new Database.
 type Options struct {
 	Path string
