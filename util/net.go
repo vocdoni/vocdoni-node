@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	externalip "github.com/vocdoni/go-external-ip"
+	externalip "github.com/glendc/go-external-ip"
 )
 
 // PublicIP returns the external/public IP of the host
@@ -16,7 +16,8 @@ import (
 // If a nil error is returned, the returned IP must be valid.
 func PublicIP() (net.IP, error) {
 	consensus := externalip.DefaultConsensus(nil, nil)
-	ip, err := consensus.ExternalIP(4)
+	consensus.UseIPProtocol(4)
+	ip, err := consensus.ExternalIP()
 	// if the IP isn't a valid ipv4, To4 will return nil
 	if ip = ip.To4(); ip == nil {
 		return nil, fmt.Errorf("public IP discovery failed: %v", err)
