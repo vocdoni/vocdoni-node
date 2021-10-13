@@ -19,7 +19,7 @@ var ErrKeyNotFound = fmt.Errorf("key not found")
 // more writes.
 var ErrTxnTooBig = fmt.Errorf("txn too big")
 
-// Options defines params for creating a new Database
+// Options defines generic parameters for creating a new Database.
 type Options struct {
 	Path string
 }
@@ -29,17 +29,18 @@ type Options struct {
 type Database interface {
 	io.Closer
 
-	// ReadTx returns a ReadTx
+	// ReadTx creates a new read transaction.
 	ReadTx() ReadTx
-	// WriteTx returns a WriteTx
+	// WriteTx creates a new write transaction.
 	WriteTx() WriteTx
-	// Iterate iterates over the key-value pairs executing the given
-	// callback function for each pair. If a prefix is given, it will only
-	// iterate over the key-values with the prefix. The callback returns a
-	// boolean which is used to indicate to the iteration if to stop or to
-	// continue iterating. While the callback returns `true`, the iteration
-	// will keep continuing, and if the callback returned boolean is
-	// `false`, the iteration will stop.
+
+	// Iterate calls callback with all key-value pairs in the database whose key
+	// starts with prefix. The calls are ordered lexicographically by key.
+	//
+	// The iteration is stopped early when the callback function returns false.
+	//
+	// It is not safe to use the key or value slices after the callback returns.
+	// To use the values for longer, make a copy.
 	Iterate(prefix []byte, callback func(key, value []byte) bool) error
 }
 
