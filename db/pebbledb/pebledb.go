@@ -1,6 +1,7 @@
 package pebbledb
 
 import (
+	"errors"
 	"os"
 
 	"github.com/cockroachdb/pebble"
@@ -26,7 +27,7 @@ var _ db.WriteTx = (*WriteTx)(nil)
 // Get implements the db.ReadTx.Get interface method
 func (tx ReadTx) Get(k []byte) ([]byte, error) {
 	v, closer, err := tx.batch.Get(k)
-	if err == pebble.ErrNotFound {
+	if errors.Is(err, pebble.ErrNotFound) {
 		return nil, db.ErrKeyNotFound
 	}
 	if err != nil {
