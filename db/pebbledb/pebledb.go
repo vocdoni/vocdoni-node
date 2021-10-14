@@ -67,6 +67,12 @@ func (tx WriteTx) Delete(k []byte) error {
 	return tx.batch.Delete(k, nil)
 }
 
+// Apply implements the db.WriteTx.Apply interface method
+func (tx WriteTx) Apply(other db.WriteTx) (err error) {
+	otherPebble := other.(WriteTx)
+	return tx.batch.Apply(otherPebble.batch, nil)
+}
+
 // Commit implements the db.WriteTx.Commit interface method
 func (tx WriteTx) Commit() error {
 	return tx.batch.Commit(nil)

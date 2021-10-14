@@ -30,6 +30,13 @@ func TestConcurrentWriteTx(t *testing.T) {
 	dbtest.TestConcurrentWriteTx(t, database)
 }
 
+func TestWriteTxApply(t *testing.T) {
+	database, err := New(db.Options{Path: t.TempDir()})
+	qt.Assert(t, err, qt.IsNil)
+
+	dbtest.TestWriteTxApply(t, database)
+}
+
 func TestBatch(t *testing.T) {
 	database, err := New(db.Options{Path: t.TempDir()})
 	qt.Assert(t, err, qt.IsNil)

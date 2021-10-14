@@ -367,7 +367,12 @@ func (t *readOnlyWriteTx) Delete(key []byte) error {
 	return ErrReadOnly
 }
 
-// Commit implements db.WriteTx.COmmit but returns nil always.
+// Apply implements db.WriteTx.Apply but returns error always.
+func (t *readOnlyWriteTx) Apply(w db.WriteTx) error {
+	return ErrReadOnly
+}
+
+// Commit implements db.WriteTx.Commit but returns nil always.
 func (t *readOnlyWriteTx) Commit() error {
 	return nil
 }
