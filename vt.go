@@ -37,7 +37,7 @@ type kv struct {
 	v       []byte
 }
 
-func (p *params) keysValuesToKvs(ks, vs [][]byte) ([]kv, []Invalid, error) {
+func keysValuesToKvs(maxLevels int, ks, vs [][]byte) ([]kv, []Invalid, error) {
 	if len(ks) != len(vs) {
 		return nil, nil, fmt.Errorf("len(keys)!=len(values) (%d!=%d)",
 			len(ks), len(vs))
@@ -45,7 +45,7 @@ func (p *params) keysValuesToKvs(ks, vs [][]byte) ([]kv, []Invalid, error) {
 	var invalids []Invalid
 	var kvs []kv
 	for i := 0; i < len(ks); i++ {
-		keyPath, err := keyPathFromKey(p.maxLevels, ks[i])
+		keyPath, err := keyPathFromKey(maxLevels, ks[i])
 		if err != nil {
 			invalids = append(invalids, Invalid{i, err})
 			continue
@@ -101,7 +101,7 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]Invalid, error) {
 
 	l := int(math.Log2(float64(nCPU)))
 
-	kvs, invalids, err := t.params.keysValuesToKvs(ks, vs)
+	kvs, invalids, err := keysValuesToKvs(t.params.maxLevels, ks, vs)
 	if err != nil {
 		return invalids, err
 	}

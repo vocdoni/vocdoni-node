@@ -9,6 +9,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/badgerdb"
 )
 
@@ -87,12 +88,12 @@ func TestReadTreeDBG(t *testing.T) {
 
 	c := qt.New(t)
 
-	database1, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	database1, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree1, err := NewTree(database1, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
 
-	database2, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(database2, 100, HashFunctionBlake2b)
 	c.Assert(err, qt.IsNil)
