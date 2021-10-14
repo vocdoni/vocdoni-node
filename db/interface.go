@@ -67,6 +67,13 @@ type WriteTx interface {
 	Set(key []byte, value []byte) error
 	// Delete deletes a key and its value.
 	Delete(key []byte) error
+	// Apply applies the value-passed WriteTx into the given WriteTx,
+	// copying the key-values from the original WriteTx into the one from
+	// which the method is called.
+	// TODO Review once generics are ready: WriteTx is an interface, so
+	// Apply internally needs type assertions, revisit this once generics
+	// are ready.
+	Apply(WriteTx) error
 	// Commit commits the transaction into the db
 	Commit() error
 }

@@ -128,6 +128,11 @@ func (t *PrefixedWriteTx) Delete(key []byte) error {
 	return t.tx.Delete(prefixSlice(t.prefix, key))
 }
 
+// Apply implements the db.WriteTx.Apply interface method
+func (t *PrefixedWriteTx) Apply(other db.WriteTx) error {
+	return t.tx.Apply(other)
+}
+
 // Commit implements the db.WriteTx.Commit interface method.  Notice that this
 // method also commits the wrapped db.WriteTx.
 func (t *PrefixedWriteTx) Commit() error {

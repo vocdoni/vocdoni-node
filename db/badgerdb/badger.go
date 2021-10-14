@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"runtime"
 	"runtime/debug"
+
 	"strings"
 
 	"github.com/dgraph-io/badger/v3"
@@ -73,6 +75,25 @@ func (tx WriteTx) Delete(k []byte) error {
 	} else {
 		return err
 	}
+}
+
+// Apply implements the db.WriteTx.Apply interface method
+func (tx WriteTx) Apply(other db.WriteTx) (err error) {
+	otherBadger := other.(WriteTx)
+
+	valueOfTx := reflect.ValueOf(otherBadger.tx)
+	pendingWrites := valueOfTx.Elem().FieldByName("pendingWrites")
+
+	for _, mKey := range pendingWrites.MapKeys() {
+		e := pendingWrites.MapIndex(mKey).Elem()
+		k := e.FieldByName("Key").Bytes()
+		v := e.FieldByName("Value").Bytes()
+
+		if err := tx.Set(k, v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Commit implements the db.WriteTx.Commit interface method

@@ -59,6 +59,7 @@ func TestIterate(t *testing.T, d db.Database) {
 	prefix1NumKeys := 30
 
 	wTx := d.WriteTx()
+	defer wTx.Discard()
 	for i := 0; i < prefix0NumKeys; i++ {
 		wTx.Set(append(prefix0, []byte(strconv.Itoa(i))...), []byte(strconv.Itoa(i)))
 	}
@@ -152,4 +153,23 @@ func TestConcurrentWriteTx(t *testing.T, database db.Database) {
 		qt.Assert(t, errA, qt.Equals, db.ErrConflict)
 		qt.Assert(t, errB, qt.IsNil)
 	}
+}
+
+func TestWriteTxApply(t *testing.T, d db.Database) {
+	wTx0 := d.WriteTx()
+	defer wTx0.Discard()
+
+	for i := 0; i < 10; i++ {
+		wTx0.Set([]byte(strconv.Itoa(i)), []byte(strconv.Itoa(i)))
+	}
+
+	wTx1 := d.WriteTx()
+	defer wTx1.Discard()
+
+	err := wTx1.Apply(wTx0)
+	qt.Assert(t, err, qt.IsNil)
+
+	gV, err := wTx1.Get([]byte(strconv.Itoa(3)))
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, gV, qt.DeepEquals, []byte(strconv.Itoa(3)))
 }
