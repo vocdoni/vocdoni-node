@@ -56,6 +56,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"path"
+	"sync"
 
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
@@ -323,7 +324,7 @@ func (s *StateDB) BeginTx() (treeTx *TreeTx, err error) {
 				tx:   txTree,
 			},
 			cfg:      cfg,
-			openSubs: make(map[string]*TreeUpdate),
+			openSubs: sync.Map{},
 		},
 	}, nil
 }
