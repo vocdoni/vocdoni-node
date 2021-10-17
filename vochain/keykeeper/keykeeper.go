@@ -180,6 +180,8 @@ func (k *KeyKeeper) RevealUnpublished() {
 // Rollback removes the non committed pending operations.
 // Rollback must be called before any other operation in order to allocate the pool queue memory.
 func (k *KeyKeeper) Rollback() {
+	k.lock.Lock()
+	defer k.lock.Unlock()
 	k.keyPool = make(map[string]*processKeys)
 	k.blockPool = make(map[string]int64)
 }
@@ -400,6 +402,8 @@ func (k *KeyKeeper) checkRevealProcess(height uint32) {
 
 // publishPendingKeys publishes each key in the keyPool
 func (k *KeyKeeper) publishPendingKeys() {
+	k.lock.Lock()
+	defer k.lock.Unlock()
 	for pid, pk := range k.keyPool {
 		if err := k.publishKeys(pk, pid); err != nil {
 			log.Errorf("cannot execute commit on publish keys for process %x: (%s)", pid, err)
@@ -407,7 +411,6 @@ func (k *KeyKeeper) publishPendingKeys() {
 	}
 }
 
-// This functions must be async in order to avoid a deadlock on the block creation
 func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	log.Infof("publishing keys for process %x", []byte(pid))
 	kindex := new(uint32)
@@ -422,8 +425,6 @@ func (k *KeyKeeper) publishKeys(pk *processKeys, pid string) error {
 	if err := k.signAndSendTx(tx); err != nil {
 		return err
 	}
-	k.lock.Lock()
-	defer k.lock.Unlock()
 	dbKey := []byte(dbPrefixProcess + pid)
 
 	wTx := k.storage.WriteTx()

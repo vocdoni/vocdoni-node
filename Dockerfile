@@ -8,10 +8,11 @@ ARG BUILDARGS
 # Go installed to build each of them.
 WORKDIR /src
 COPY . .
+ENV CGO_ENABLED=0
 RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
 	go build -trimpath -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
-	./cmd/dvotenode ./cmd/vochaintest
+	./cmd/dvotenode ./cmd/vochaintest ./cmd/voconed
 
 FROM debian:11.0-slim AS test
 
@@ -25,4 +26,5 @@ FROM debian:11.0-slim
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY --from=builder /src/dvotenode ./
+COPY --from=builder /src/voconed ./
 ENTRYPOINT ["/app/dvotenode"]

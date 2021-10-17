@@ -248,6 +248,7 @@ func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 		sub := v.(*TreeUpdate)
 		root, err := propagateRoot(sub)
 		if err != nil {
+			gerr = err
 			return false
 		}
 		if root == nil {

@@ -57,7 +57,7 @@ func (vi *VochainInfo) BlockTimes() *[5]int32 {
 // Sync returns true if the Vochain is considered up-to-date
 // Disclaimer: this method is not 100% accurated. Use it just for non-critical operations
 func (vi *VochainInfo) Sync() bool {
-	return !vi.vnode.Node.ConsensusReactor().WaitSync()
+	return vi.vnode.IsSynchronizing()
 }
 
 // TreeSizes returns the current size of the ProcessTree, VoteTree and the votes per minute
@@ -87,8 +87,10 @@ func (vi *VochainInfo) VoteCacheSize() int {
 
 // Peers returns the current list of connected peers
 func (vi *VochainInfo) Peers() (peers []string) {
-	for _, p := range vi.vnode.Node.Switch().Peers().List() {
-		peers = append(peers, string(p.ID()))
+	if vi.vnode.Node != nil {
+		for _, p := range vi.vnode.Node.Switch().Peers().List() {
+			peers = append(peers, string(p.ID()))
+		}
 	}
 	return
 }
@@ -107,14 +109,10 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 	for {
 		select {
 		case <-time.After(duration):
-			// TODO(mvdan): this seems racy too
-			if vi.vnode.Node == nil {
-				continue
-			}
-			height = vi.vnode.Node.BlockStore().Height()
+			height = int64(vi.vnode.Height())
 
 			// less than 2s per block it's not real. Consider blockchain is synchcing
-			if pheight > 0 && sleepSecs/2 > (height-pheight) {
+			if pheight > 0 {
 				sync = true
 				vm++
 				n1++
@@ -181,7 +179,7 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 				vm = 0
 			}
 			vi.voteCacheSize = vi.vnode.State.CacheSize()
-			vi.mempoolSize = vi.vnode.Node.Mempool().Size()
+			vi.mempoolSize = vi.vnode.MempoolSize()
 			vi.lock.Unlock()
 
 		case <-vi.close:

@@ -15,9 +15,10 @@ import (
 func (r *Router) getStats(request RouterRequest) {
 	var err error
 	stats := new(api.VochainStats)
-	height := r.vocapp.Node.BlockStore().Height()
+	height := r.vocapp.Height()
 	stats.BlockHeight = uint32(height)
-	block := r.vocapp.Node.BlockStore().LoadBlockMeta(height)
+	block := r.vocapp.GetBlockByHeight(int64(height))
+
 	if block == nil {
 		r.SendError(request, fmt.Sprintf("could not get block at height %v", height))
 		return
@@ -37,7 +38,9 @@ func (r *Router) getStats(request RouterRequest) {
 	stats.ValidatorCount = len(vals)
 	stats.BlockTime = *r.vocinfo.BlockTimes()
 	stats.ChainID = r.vocapp.ChainID()
-	stats.GenesisTimeStamp = r.vocapp.Node.GenesisDoc().GenesisTime
+	if r.vocapp.Node != nil {
+		stats.GenesisTimeStamp = r.vocapp.Node.GenesisDoc().GenesisTime
+	}
 	stats.Syncing = r.vocapp.IsSynchronizing()
 
 	var response api.MetaResponse
@@ -168,7 +171,7 @@ func (r *Router) getTxByHeight(request RouterRequest) {
 
 func (r *Router) getTxListForBlock(request RouterRequest) {
 	var response api.MetaResponse
-	block := r.vocapp.Node.BlockStore().LoadBlock(int64(request.Height))
+	block := r.vocapp.GetBlockByHeight(int64(request.Height))
 	if block == nil {
 		r.SendError(request, "cannot get tx list: block does not exist")
 		return

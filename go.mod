@@ -18,6 +18,7 @@ require (
 	github.com/cosmos/iavl v0.15.3
 	github.com/deroproject/graviton v0.0.0-20201218180342-ab474f4c94d2
 	github.com/dgraph-io/badger/v3 v3.2103.1
+	github.com/enriquebris/goconcurrentqueue v0.6.0
 	github.com/ethereum/go-ethereum v1.10.8
 	github.com/frankban/quicktest v1.13.0
 	github.com/go-chi/chi v4.1.2+incompatible
