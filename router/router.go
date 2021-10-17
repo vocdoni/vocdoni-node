@@ -197,16 +197,10 @@ func InitRouter(inbound <-chan transports.Message, storage data.Storage,
 }
 
 func (r *Router) RegisterPrivate(name string, handler func(RouterRequest)) {
-	if _, ok := r.methods[name]; ok {
-		log.Fatalf("duplicate method: %q", name)
-	}
 	r.methods[name] = RegisteredMethod{handler: handler}
 }
 
 func (r *Router) RegisterPublic(name string, handler func(RouterRequest)) {
-	if _, ok := r.methods[name]; ok {
-		log.Fatalf("duplicate method: %q", name)
-	}
 	r.methods[name] = RegisteredMethod{public: true, handler: handler}
 }
 

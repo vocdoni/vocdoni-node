@@ -62,7 +62,7 @@ func (v *State) CacheHasNullifier(nullifier []byte) bool {
 // CachePurge removes the old cache saved votes
 func (v *State) CachePurge(height uint32) {
 	// Purge only every 18 blocks (3 minute)
-	if height%18 != 0 {
+	if height%18 != 0 { // TODO(pau): do not use height but time
 		return
 	}
 	start := time.Now()
@@ -78,7 +78,6 @@ func (v *State) CachePurge(height uint32) {
 		}
 		vote, ok := record.(*models.Vote)
 		if !ok {
-			log.Warn("vote cache is not type models.Vote")
 			continue
 		}
 		vid, ok := id.([32]byte)
@@ -99,7 +98,7 @@ func (v *State) CachePurge(height uint32) {
 	}
 }
 
-// SetVoteCacheSize sets the size for the vote LRU cache.
+// SetCacheSize sets the size for the vote LRU cache.
 func (v *State) SetCacheSize(size int) {
 	v.voteCache.Resize(size)
 }
