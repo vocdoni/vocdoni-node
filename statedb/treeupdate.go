@@ -3,6 +3,7 @@ package statedb
 import (
 	"bytes"
 	"path"
+	"sync"
 
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/tree"
@@ -47,7 +48,8 @@ type TreeUpdate struct {
 	// is used in the TreeTx.Commit to traverse all opened subTrees in a
 	// TreeTx in order to propagate the roots upwards to update the
 	// corresponding parent leafs up to the mainTree.
-	openSubs map[string]*TreeUpdate
+	//openSubs map[string]*TreeUpdate
+	openSubs sync.Map
 	// cfg points to this TreeUpdate configuration.
 	cfg TreeConfig
 }
@@ -120,8 +122,8 @@ func (u *TreeUpdate) Set(key, value []byte) error {
 // `subKeySubTree | cfg.prefix`.  In turn the treeUpdate.tree uses the
 // db.WriteTx from treeUpdate.tx appending the prefix `'/' | subKeyTree`.
 func (u *TreeUpdate) SubTree(cfg TreeConfig) (treeUpdate *TreeUpdate, err error) {
-	if treeUpdate, ok := u.openSubs[cfg.prefix]; ok {
-		return treeUpdate, nil
+	if treeUpdate, ok := u.openSubs.Load(cfg.prefix); ok {
+		return treeUpdate.(*TreeUpdate), nil
 	}
 	parentLeaf, err := u.tree.Get(u.tree.tx, cfg.parentLeafKey)
 	if err != nil {
@@ -153,10 +155,10 @@ func (u *TreeUpdate) SubTree(cfg TreeConfig) (treeUpdate *TreeUpdate, err error)
 			Tree: tree,
 			tx:   txTree,
 		},
-		openSubs: make(map[string]*TreeUpdate),
+		openSubs: sync.Map{},
 		cfg:      cfg,
 	}
-	u.openSubs[cfg.prefix] = treeUpdate
+	u.openSubs.Store(cfg.prefix, treeUpdate)
 	return treeUpdate, nil
 }
 
@@ -226,7 +228,12 @@ type update struct {
 // treeUpdate.tree, avoiding recalculating hashes unnecessarily).
 func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 	// End of recursion
-	if len(treeUpdate.openSubs) == 0 {
+	emptySubs := true
+	treeUpdate.openSubs.Range(func(k, value interface{}) bool {
+		emptySubs = false
+		return false
+	})
+	if emptySubs {
 		// If tree is not dirty, there's nothing to propagate
 		if !treeUpdate.dirtyTree {
 			return nil, nil
@@ -236,13 +243,16 @@ func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 	// Gather all the updates that need to be applied to the
 	// treeUpdate.tree leaves, by leaf key
 	updatesByKey := make(map[string][]update)
-	for _, sub := range treeUpdate.openSubs {
+	var gerr error
+	treeUpdate.openSubs.Range(func(k, v interface{}) bool {
+		sub := v.(*TreeUpdate)
 		root, err := propagateRoot(sub)
 		if err != nil {
-			return nil, err
+			return false
 		}
 		if root == nil {
-			continue
+			gerr = err
+			return true
 		}
 		key := sub.cfg.parentLeafKey
 		updatesByKey[string(key)] = append(updatesByKey[string(key)], update{
@@ -250,6 +260,10 @@ func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 			setRoot: sub.cfg.parentLeafSetRoot,
 			root:    root,
 		})
+		return true
+	})
+	if gerr != nil {
+		return nil, gerr
 	}
 	// If there are no updates for treeUpdate.tree leaves, and treeUpdate
 	// is not dirty, there's nothing to propagate
@@ -292,7 +306,7 @@ func (t *TreeTx) Commit(version uint32) error {
 	if err != nil {
 		return err
 	}
-	t.openSubs = make(map[string]*TreeUpdate)
+	t.openSubs = sync.Map{}
 	curVersion, err := getVersion(t.tx)
 	if err != nil {
 		return err
