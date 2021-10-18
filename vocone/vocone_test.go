@@ -29,7 +29,7 @@ func TestVocone(t *testing.T) {
 	go vc.Start()
 	port := 13000 + util.RandomInt(0, 2000)
 	vc.EnableAPI("127.0.0.1", port, "/dvote")
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 2) // TODO: find a more smart way to wait until everything is ready
 	if err := testCSPvote(&oracle, fmt.Sprintf("http://127.0.0.1:%d/dvote", port)); err != nil {
 		t.Fatal(err)
 	}
