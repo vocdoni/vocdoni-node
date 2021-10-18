@@ -1,9 +1,7 @@
 package vocone
 
 import (
-	"bytes"
 	"fmt"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -16,7 +14,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/pebbledb"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/multirpc/transports"
 	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
@@ -32,7 +30,7 @@ import (
 const (
 	DefaultTxsPerBlock     = 500
 	DefaultBlockTimeTarget = time.Second * 5
-	mempoolSize            = 100000
+	mempoolSize            = 100 << 10
 )
 
 // Vocone is an implementation of the Vocdoni protocol run by a single (atomic) node.
@@ -66,7 +64,8 @@ func NewVocone(dataDir string, oracleKey *ethereum.SignKeys) (*Vocone, error) {
 		return nil, err
 	}
 	vc.height = int64(version)
-	if vc.blockStore, err = pebbledb.New(db.Options{Path: filepath.Join(dataDir, "blockstore")}); err != nil {
+	if vc.blockStore, err = metadb.New(db.TypePebble,
+		filepath.Join(dataDir, "blockstore")); err != nil {
 		return nil, err
 	}
 
@@ -89,7 +88,7 @@ func NewVocone(dataDir string, oracleKey *ethereum.SignKeys) (*Vocone, error) {
 
 	// Create key keeper
 	vc.kk, err = keykeeper.NewKeyKeeper(
-		path.Join(dataDir, "keykeeper"),
+		filepath.Join(dataDir, "keykeeper"),
 		vc.app,
 		oracleKey,
 		1)
@@ -121,7 +120,7 @@ func (vc *Vocone) EnableAPI(host string, port int, path string) (err error) {
 // Start initializes the block production. This method should be run async.
 func (vc *Vocone) Start() {
 	vc.lastBlockTime = time.Now()
-	go VochainPrintInfo(10, vc.appInfo)
+	go vochainPrintInfo(10, vc.appInfo)
 
 	for {
 		// Begin block
@@ -139,8 +138,9 @@ func (vc *Vocone) Start() {
 		vc.app.EndBlock(abcitypes.RequestEndBlock{Height: bblock.Header.Height})
 
 		// Waiting time
-		for time.Since(vc.lastBlockTime) < vc.blockTimeTarget {
-			time.Sleep(time.Millisecond * 200)
+		sinceLast := time.Since(vc.lastBlockTime)
+		if sinceLast < vc.blockTimeTarget {
+			time.Sleep(vc.blockTimeTarget - sinceLast)
 		}
 		vc.lastBlockTime = time.Now()
 		atomic.AddInt64(&vc.height, 1)
@@ -165,7 +165,7 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 	}
 	oracleExist := false
 	for _, o := range oracleList {
-		if bytes.Equal(oracleKey.Address().Bytes(), o.Bytes()) {
+		if oracleKey.Address() == o {
 			oracleExist = true
 			break
 		}
@@ -190,10 +190,9 @@ func (vc *Vocone) setDefaultMethods() {
 }
 
 func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
-	var err error
 	resp := vc.app.CheckTx(abcitypes.RequestCheckTx{Tx: tx})
 	if resp.Code == 0 {
-		if err = vc.mempool.Enqueue(tx); err != nil {
+		if err := vc.mempool.Enqueue(tx); err != nil {
 			return &tmcoretypes.ResultBroadcastTx{
 				Code: 1,
 				Data: []byte("mempool is full"),
@@ -206,11 +205,12 @@ func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
 		Code: resp.Code,
 		Data: resp.Data,
 		Hash: ethereum.HashRaw(tx),
-	}, err
+	}, nil
 }
 
 func (vc *Vocone) commitBlock() {
 	blockStoreTx := vc.blockStore.WriteTx()
+	defer blockStoreTx.Discard()
 	var txCount int
 	for txCount = 0; txCount < vc.txsPerBlock; {
 		tx, err := vc.mempool.Dequeue()
@@ -230,9 +230,9 @@ func (vc *Vocone) commitBlock() {
 	}
 	if txCount > 0 {
 		log.Infof("stored %d transactions on block %d", txCount, vc.height)
-		blockStoreTx.Commit()
-	} else {
-		blockStoreTx.Discard()
+		if err := blockStoreTx.Commit(); err != nil {
+			log.Errorf("cannot commit to blockstore: %v", err)
+		}
 	}
 }
 
@@ -314,7 +314,7 @@ func startAPI(host string, port int, path string) (*router.Router, error) {
 }
 
 // VochainPrintInfo initializes the Vochain statistics recollection
-func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
+func vochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 	var a *[5]int32
 	var h int64
 	var p, v uint64

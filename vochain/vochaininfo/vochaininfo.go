@@ -57,7 +57,7 @@ func (vi *VochainInfo) BlockTimes() *[5]int32 {
 // Sync returns true if the Vochain is considered up-to-date
 // Disclaimer: this method is not 100% accurated. Use it just for non-critical operations
 func (vi *VochainInfo) Sync() bool {
-	return vi.vnode.IsSynchronizing()
+	return !vi.vnode.IsSynchronizing()
 }
 
 // TreeSizes returns the current size of the ProcessTree, VoteTree and the votes per minute
@@ -95,7 +95,8 @@ func (vi *VochainInfo) Peers() (peers []string) {
 	return
 }
 
-// Start initializes the Vochain statistics recollection
+// Start initializes the Vochain statistics recollection.
+// TODO: use time.Duration instead of int64
 func (vi *VochainInfo) Start(sleepSecs int64) {
 	log.Infof("starting vochain info service every %d seconds", sleepSecs)
 	var duration time.Duration
