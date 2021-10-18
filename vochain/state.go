@@ -153,6 +153,15 @@ var (
 		ParentLeafGetRoot: processGetVotesRoot,
 		ParentLeafSetRoot: processSetVotesRoot,
 	})
+
+	// BalancesCfg is the Balances subTree configuration.
+	BalancesCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionSha256,
+		KindID:            "balan",
+		MaxLevels:         256,
+		ParentLeafGetRoot: rootLeafGetRoot,
+		ParentLeafSetRoot: rootLeafSetRoot,
+	})
 )
 
 // EventListener is an interface used for executing custom functions during the
@@ -302,6 +311,10 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	if _, err := update.SubTree(ProcessesCfg); err != nil {
 		return nil, err
 	}
+	if err := update.Add(BalancesCfg.Key(),
+		make([]byte, BalancesCfg.HashFunc().Len())); err != nil {
+		return nil, err
+	}
 	return sdb, update.Commit(0)
 }
 
@@ -319,7 +332,7 @@ func (v *State) setMainTreeView(treeView *statedb.TreeView) {
 
 // mainTreeViewer returns the mainTree as a treeViewer.  When isQuery is false,
 // the mainTree returned is the not yet commited one from the currently open
-// StateDB transaction.  When isQuery is false, the mainTree returned is the
+// StateDB transaction.  When isQuery is true, the mainTree returned is the
 // last commited version.
 func (v *State) mainTreeViewer(isQuery bool) statedb.TreeViewer {
 	if isQuery {

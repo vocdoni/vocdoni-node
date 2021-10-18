@@ -20,8 +20,10 @@ const (
 )
 
 var (
-	ErrVoteDoesNotExist = fmt.Errorf("vote does not exist")
-	ErrProcessNotFound  = fmt.Errorf("process not found")
+	ErrVoteDoesNotExist    = fmt.Errorf("vote does not exist")
+	ErrNotEnoughBalance    = fmt.Errorf("not enough balance to transfer")
+	ErrBalanceNonceInvalid = fmt.Errorf("invalid balance nonce")
+	ErrProcessNotFound     = fmt.Errorf("process not found")
 	// keys; not constants because of []byte
 	headerKey    = []byte("header")
 	voteCountKey = []byte("voteCount")
