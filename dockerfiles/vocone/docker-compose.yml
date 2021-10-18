@@ -1,0 +1,69 @@
+version: "3.4"
+
+services:
+  explorer:
+    image: "ghcr.io/vocdoni/vocexplorer:master"
+    env_file: .env
+    environment:
+      - "VOCEXPLORER_GLOBAL_GATEWAYURL=http://localhost:8080/dvote"
+    volumes:
+      - "vocexplorer:/data/vocexplorer"
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.explorer.entrypoints=web"
+      - "traefik.http.routers.explorer.service=explorer"
+      - "traefik.http.routers.explorer.rule=Host(`localhost`)"
+      - "traefik.http.services.explorer.loadbalancer.server.port=8081"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+  gateway:
+    build:
+      context: ../../
+    image: "ghcr.io/vocdoni/voconed:master"
+    entrypoint: "/app/voconed" 
+    env_file: .env
+    volumes:
+    - "run:/app/run"
+    ports:
+      - "9095:9095"
+    sysctls:
+      net.core.somaxconn: 8128
+    restart: ${RESTART:-no}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gateway.entrypoints=web"
+      - "traefik.http.routers.gateway.service=gateway"
+      - "traefik.http.routers.gateway.rule=(Host(`localhost`) && PathPrefix(`/dvote`))"
+      - "traefik.http.services.gateway.loadbalancer.server.port=9095"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+  traefik:
+    image: traefik:2.3
+    ports:
+      - 8080:80
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
+
+volumes:
+  vocexplorer: {}
+  run: {}
+
