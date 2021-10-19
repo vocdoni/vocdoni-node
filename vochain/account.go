@@ -1,42 +1,32 @@
 package vochain
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 // Account represents an amount of tokens, usually attached to an address.
 // Account includes a Nonce which needs to be incremented by 1 on each transfer,
-// an external URI link for metadata and a list of allowed addresses to manage the
-// account on its behalf (in addition to himself).
+// an external URI link for metadata and a list of delegated addresses allowed
+// to use the account on its behalf (in addition to himself).
 type Account struct {
-	Balance      uint64
-	Nonce        uint32
-	InfoURI      string
-	AllowedAddrs []common.Address
+	models.Account
 }
 
 // Marshal encodes the Account and returns the serialized bytes.
-func (a *Account) Marshal() []byte {
-	data := make([]byte, 12)
-	binary.LittleEndian.PutUint64(data[:8], a.Balance)
-	binary.LittleEndian.PutUint32(data[8:], a.Nonce)
-	return data
+func (a *Account) Marshal() ([]byte, error) {
+	return proto.Marshal(a)
 }
 
 // Unmarshal decode a set of bytes.
 func (a *Account) Unmarshal(data []byte) error {
-	if len(data) != 12 {
-		return fmt.Errorf("wrong acc data lenght: %d", len(data))
-	}
-	a.Balance = binary.LittleEndian.Uint64(data[:8])
-	a.Nonce = binary.LittleEndian.Uint32(data[8:])
-	return nil
+	return proto.Unmarshal(data, a)
 }
 
 // Transfer moves amount from the origin Account to the dest Account.
@@ -92,10 +82,18 @@ func (v *State) TransferBalance(from, to common.Address, amount uint64, nonce ui
 		return err
 	}
 	if !isQuery {
-		if err := v.Tx.DeepSet(from.Bytes(), accFrom.Marshal(), AccountsCfg); err != nil {
+		af, err := accFrom.Marshal()
+		if err != nil {
 			return err
 		}
-		if err := v.Tx.DeepSet(to.Bytes(), accTo.Marshal(), AccountsCfg); err != nil {
+		if err := v.Tx.DeepSet(from.Bytes(), af, AccountsCfg); err != nil {
+			return err
+		}
+		at, err := accTo.Marshal()
+		if err != nil {
+			return err
+		}
+		if err := v.Tx.DeepSet(to.Bytes(), at, AccountsCfg); err != nil {
 			return err
 		}
 	}
@@ -122,7 +120,11 @@ func (v *State) MintBalance(address common.Address, amount uint64) error {
 		return ErrBalanceOverflow
 	}
 	acc.Balance += amount
-	return v.Tx.DeepSet(address.Bytes(), acc.Marshal(), AccountsCfg)
+	accBytes, err := acc.Marshal()
+	if err != nil {
+		return err
+	}
+	return v.Tx.DeepSet(address.Bytes(), accBytes, AccountsCfg)
 }
 
 // GetAccount retrives the Account for an address.
