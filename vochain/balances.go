@@ -96,6 +96,9 @@ func (v *State) TransferBalance(from, to common.Address, amount uint64, nonce ui
 
 // MintBalance increments the existing balance of address by amount
 func (v *State) MintBalance(address common.Address, amount uint64) error {
+    if amount == 0 {
+        return ErrBalanceAmountZero
+    }
 	var balance Balance
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
