@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -50,6 +51,35 @@ func (a *Account) Transfer(dest *Account, amount uint64, nonce uint32) error {
 	a.Balance -= amount
 	a.Nonce++
 	return nil
+}
+
+// IsDelegate checks if an address is a delegate for an account
+func (a *Account) IsDelegate(addr common.Address) bool {
+	for _, d := range a.DelegateAddrs {
+		if bytes.Equal(addr.Bytes(), d) {
+			return true
+		}
+	}
+	return false
+}
+
+// AddDelegate adds an address to the list of delegates for an account
+func (a *Account) AddDelegate(addr common.Address) error {
+	if a.IsDelegate(addr) {
+		return fmt.Errorf("address %s is already a delegate", addr.Hex())
+	}
+	a.DelegateAddrs = append(a.DelegateAddrs, addr.Bytes())
+	return nil
+}
+
+// DelDelegate removes an address from the list of delegates for an account
+func (a *Account) DelDelegate(addr common.Address) {
+	for i, d := range a.DelegateAddrs {
+		if bytes.Equal(addr.Bytes(), d) {
+			a.DelegateAddrs[i] = a.DelegateAddrs[len(a.DelegateAddrs)-1]
+			a.DelegateAddrs = a.DelegateAddrs[:len(a.DelegateAddrs)-1]
+		}
+	}
 }
 
 // TransferBalance transfers balance from origin address to destination address,
