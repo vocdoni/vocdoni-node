@@ -154,8 +154,8 @@ var (
 		ParentLeafSetRoot: processSetVotesRoot,
 	})
 
-	// BalancesCfg is the Balances subTree configuration.
-	BalancesCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
+	// AccountsCfg is the Accounts subTree configuration.
+	AccountsCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
 		HashFunc:          arbo.HashFunctionSha256,
 		KindID:            "balan",
 		MaxLevels:         256,
@@ -311,8 +311,8 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	if _, err := update.SubTree(ProcessesCfg); err != nil {
 		return nil, err
 	}
-	if err := update.Add(BalancesCfg.Key(),
-		make([]byte, BalancesCfg.HashFunc().Len())); err != nil {
+	if err := update.Add(AccountsCfg.Key(),
+		make([]byte, AccountsCfg.HashFunc().Len())); err != nil {
 		return nil, err
 	}
 	return sdb, update.Commit(0)
