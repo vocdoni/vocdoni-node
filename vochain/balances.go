@@ -36,6 +36,9 @@ func (b *Balance) Unmarshal(data []byte) error {
 
 // Transfer moves amount from the origin Balance to the dest Balance.
 func (b *Balance) Transfer(dest *Balance, amount uint64, nonce uint32) error {
+      if amount == 0 {
+              return ErrBalanceAmountZero
+      }
 	if dest == nil {
 		return fmt.Errorf("destination balance wallet nil")
 	}
