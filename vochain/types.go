@@ -22,10 +22,10 @@ const (
 var (
 	ErrVoteDoesNotExist    = fmt.Errorf("vote does not exist")
 	ErrNotEnoughBalance    = fmt.Errorf("not enough balance to transfer")
-	ErrBalanceNonceInvalid = fmt.Errorf("invalid balance nonce")
+	ErrAccountNonceInvalid = fmt.Errorf("invalid account nonce")
 	ErrProcessNotFound     = fmt.Errorf("process not found")
-	ErrBalanceOverflow = fmt.Errorf("balance overflow")
-	ErrBalanceAmountZero = fmt.Errorf("zero amount not valid")
+	ErrBalanceOverflow     = fmt.Errorf("balance overflow")
+	ErrAccountBalanceZero  = fmt.Errorf("zero balance account not valid")
 	// keys; not constants because of []byte
 	headerKey    = []byte("header")
 	voteCountKey = []byte("voteCount")
