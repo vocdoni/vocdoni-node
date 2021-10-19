@@ -24,6 +24,8 @@ var (
 	ErrNotEnoughBalance    = fmt.Errorf("not enough balance to transfer")
 	ErrBalanceNonceInvalid = fmt.Errorf("invalid balance nonce")
 	ErrProcessNotFound     = fmt.Errorf("process not found")
+	ErrBalanceOverflow = fmt.Errorf("balance overflow")
+	ErrBalanceAmountZero = fmt.Errorf("zero amount not valid")
 	// keys; not constants because of []byte
 	headerKey    = []byte("header")
 	voteCountKey = []byte("voteCount")
