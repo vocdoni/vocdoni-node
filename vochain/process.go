@@ -104,7 +104,7 @@ func (v *State) CountProcesses(isQuery bool) (uint64, error) {
 	return count, nil
 }
 
-// set process stores in the database the process
+// updateProcess updates an existing process
 func (v *State) updateProcess(p *models.Process, pid []byte) error {
 	if p == nil || len(p.ProcessId) != types.ProcessIDsize {
 		return ErrProcessNotFound
@@ -130,10 +130,7 @@ func (v *State) updateProcess(p *models.Process, pid []byte) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal updated process bytes: %w", err)
 	}
-	if err := processesTree.Set(pid, updatedProcessBytes); err != nil {
-		return err
-	}
-	return nil
+	return processesTree.Set(pid, updatedProcessBytes)
 }
 
 // SetProcessStatus changes the process status to the one provided.
@@ -334,12 +331,6 @@ func NewProcessTxCheck(vtx *models.Tx, txBytes,
 	if signature == nil || tx == nil || txBytes == nil {
 		return nil, fmt.Errorf("missing signature or new process transaction")
 	}
-	// get oracles
-	oracles, err := state.Oracles(false)
-	if err != nil || len(oracles) == 0 {
-		return nil, fmt.Errorf("cannot check authorization against a nil or empty oracle list")
-	}
-
 	// start and endblock sanity check
 	if tx.Process.StartBlock < state.CurrentHeight() {
 		return nil, fmt.Errorf(
@@ -349,10 +340,24 @@ func NewProcessTxCheck(vtx *models.Tx, txBytes,
 		return nil, fmt.Errorf(
 			"cannot add process with duration lower than or equal to the current height")
 	}
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, txBytes, signature)
+	// Check if transaction owner has enough funds to create a process
+	authorized, addr, err := state.VerifyAccountBalance(txBytes, signature, NewProcessCost)
 	if err != nil {
 		return nil, err
 	}
+	if authorized {
+		// If owner authorized, check entityId matches with owner address
+		if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) {
+			return nil, fmt.Errorf("process entityID and transaction owner do not match")
+		}
+	} else {
+		// Check if the transaction comes from an oracle
+		// Oracles can create processes with any entityID
+		if authorized, err = state.IsOracle(addr); err != nil {
+			return nil, err
+		}
+	}
+	// If owner without balance and not an oracle, fail
 	if !authorized {
 		return nil, fmt.Errorf("unauthorized to create a process, recovered addr is %s", addr.Hex())
 	}
@@ -385,27 +390,40 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	if signature == nil || tx == nil || txBytes == nil {
 		return fmt.Errorf("missing signature on setProcess transaction")
 	}
-	// get oracles
-	oracles, err := state.Oracles(false)
-	if err != nil || len(oracles) == 0 {
-		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
-	}
-	// check signature
-	authorized, addr, err := verifySignatureAgainstOracles(oracles, txBytes, signature)
+
+	// Check if transaction owner has enough funds to create a process
+	authorized, addr, err := state.VerifyAccountBalance(txBytes, signature, SetProcessCost)
 	if err != nil {
 		return err
-	}
-	if !authorized {
-		return fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
 	}
 	// get process
 	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
 		return fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
 	}
+	isOracle := false
+	if authorized {
+		// If owner authorized, check entityId matches with owner address
+		if !bytes.Equal(process.EntityId, addr.Bytes()) {
+			return fmt.Errorf("process entityID and transaction owner do not match")
+		}
+	} else {
+		// Check if the transaction comes from an oracle
+		// Oracles can create processes with any entityID
+		if isOracle, err = state.IsOracle(addr); err != nil {
+			return err
+		}
+	}
 
+	// If owner without balance and not an oracle, fail
+	if !authorized && !isOracle {
+		return fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
+	}
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_RESULTS:
+		if !isOracle {
+			return fmt.Errorf("only oracles can execute set process results transaction")
+		}
 		return state.SetProcessResults(process.ProcessId, tx.GetResults(), false)
 	case models.TxType_SET_PROCESS_STATUS:
 		return state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)

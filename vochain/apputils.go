@@ -26,7 +26,7 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// VerifySignatureAgainstOracles verifies that a signature match with one of the oracles
+// verifySignatureAgainstOracles verifies that a signature match with one of the oracles
 func verifySignatureAgainstOracles(oracles []ethcommon.Address, message,
 	signature []byte) (bool, ethcommon.Address, error) {
 	signKeys := ethereum.NewSignKeys()

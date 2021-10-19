@@ -298,9 +298,8 @@ func startAPI(host string, port int, path string) (*router.Router, error) {
 	// API Endpoint initialization
 	listenerOutput := make(chan transports.Message)
 
-	var htransport transports.Transport
-	htransport = new(mhttp.HttpHandler)
-	htransport.(*mhttp.HttpHandler).SetProxy(pxy)
+	htransport := new(mhttp.HttpHandler)
+	htransport.SetProxy(pxy)
 	if err := htransport.Init(new(transports.Connection)); err != nil {
 		return nil, err
 	}
