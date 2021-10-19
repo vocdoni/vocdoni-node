@@ -107,6 +107,9 @@ func (v *State) MintBalance(address common.Address, amount uint64) error {
 			return err
 		}
 	}
+	if balance.Amount+amount <= balance.Amount {
+		return ErrBalanceOverflow
+	}
 	balance.Amount += amount
 	return v.Tx.DeepSet(address.Bytes(), balance.Marshal(), BalancesCfg)
 }
