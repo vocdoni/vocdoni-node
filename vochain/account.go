@@ -7,13 +7,18 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/arbo"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 )
 
 // Account represents an amount of tokens, usually attached to an address.
-// Account includes a Nonce which needs to be incremented by 1 on each transfer.
+// Account includes a Nonce which needs to be incremented by 1 on each transfer,
+// an external URI link for metadata and a list of allowed addresses to manage the
+// account on its behalf (in addition to himself).
 type Account struct {
-	Balance uint64
-	Nonce   uint32
+	Balance      uint64
+	Nonce        uint32
+	InfoURI      string
+	AllowedAddrs []common.Address
 }
 
 // Marshal encodes the Account and returns the serialized bytes.
@@ -120,7 +125,8 @@ func (v *State) MintBalance(address common.Address, amount uint64) error {
 	return v.Tx.DeepSet(address.Bytes(), acc.Marshal(), AccountsCfg)
 }
 
-// GetAccount retrives the Account for an address
+// GetAccount retrives the Account for an address.
+// Returns a nil account and no error if the account does not exist.
 func (v *State) GetAccount(address common.Address, isQuery bool) (*Account, error) {
 	var acc Account
 	if !isQuery {
@@ -128,8 +134,29 @@ func (v *State) GetAccount(address common.Address, isQuery bool) (*Account, erro
 		defer v.Tx.RUnlock()
 	}
 	raw, err := v.mainTreeViewer(isQuery).DeepGet(address.Bytes(), AccountsCfg)
-	if err != nil {
+	if errors.Is(err, arbo.ErrKeyNotFound) {
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
 	return &acc, acc.Unmarshal(raw)
+}
+
+// VerifyAccountBalance extracts an account address from a signed message, and verifies if
+// there is enough balance to cover an amount expense
+func (v *State) VerifyAccountBalance(message, signature []byte, amount uint64) (bool, common.Address, error) {
+	var err error
+	address := common.Address{}
+	address, err = ethereum.AddrFromSignature(message, signature)
+	if err != nil {
+		return false, address, err
+	}
+	acc, err := v.GetAccount(address, false)
+	if err != nil {
+		return false, address, fmt.Errorf("VerifyAccountWithAmmount: %v", err)
+	}
+	if acc == nil {
+		return false, address, nil
+	}
+	return acc.Balance >= amount, address, nil
 }

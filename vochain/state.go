@@ -398,6 +398,22 @@ func (v *State) Oracles(isQuery bool) ([]common.Address, error) {
 	return oracles, nil
 }
 
+// IsOracle returns true if the address is a valid oracle
+func (v *State) IsOracle(addr common.Address) (bool, error) {
+	oracles, err := v.Oracles(false)
+	if err != nil || len(oracles) == 0 {
+		return false, fmt.Errorf("cannot check authorization against a nil or empty oracle list")
+	}
+	return func() bool {
+		for _, oracle := range oracles {
+			if oracle == addr {
+				return true
+			}
+		}
+		return false
+	}(), nil
+}
+
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
 func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
 	var tmkey ed25519.PubKey
