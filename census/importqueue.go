@@ -10,12 +10,44 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 type censusImport struct {
 	censusID, censusURI string
+}
+
+func (m *Manager) ImportDump(censusID string, typ models.Census_Type, dumpRoot, data []byte) (*censustree.Tree, error) {
+	tr, err := m.AddNamespace(censusID, typ, []string{})
+	if err != nil {
+		return nil, fmt.Errorf("cannot create new census namespace: %w", err)
+	}
+	if err := tr.ImportDump(data); err != nil {
+		return nil, fmt.Errorf("error importing dump: %w", err)
+	}
+	root, err := tr.Root()
+	if err != nil {
+		return nil, fmt.Errorf("error importing dump: %w", err)
+	}
+	if !bytes.Equal(root, dumpRoot) {
+		if err := m.DelNamespace(censusID); err != nil {
+			log.Error(err)
+		}
+		return nil, fmt.Errorf("root hash does not match imported census, aborting import.  "+
+			"%x (expected) != %x (got)", dumpRoot, root)
+	}
+	if typ == models.Census_ARBO_POSEIDON {
+		if err := m.fillKeyToIndex(censusID, tr); err != nil {
+			return nil, fmt.Errorf("error filling keyToIndex: %w", err)
+		}
+	}
+	tr.Publish()
+	log.Infof("census imported successfully, %d bytes. Status is public:%t",
+		len(data), tr.IsPublic())
+	return tr, nil
 }
 
 // importTree adds the raw (uncompressed) []byte tree to the cid namespace
@@ -31,29 +63,12 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 	if len(dump.Data) == 0 {
 		return fmt.Errorf("no claims found on the retreived census")
 	}
-	tr, err := m.AddNamespace(cid, dump.Type, []string{})
+	_, err := m.ImportDump(cid, dump.Type, dump.RootHash, dump.Data)
 	if errors.Is(err, ErrNamespaceExist) {
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("cannot create new census namespace: (%s)", err)
+		return err
 	}
-	err = tr.ImportDump(dump.Data)
-	if err != nil {
-		return fmt.Errorf("error importing dump: %s", err)
-	}
-	root, err := tr.Root()
-	if err != nil {
-		return fmt.Errorf("error importing dump: %s", err)
-	}
-	if !bytes.Equal(root, dump.RootHash) {
-		if err := m.DelNamespace(cid); err != nil {
-			log.Error(err)
-		}
-		return fmt.Errorf("root hash does not match imported census, aborting import")
-	}
-	tr.Publish()
-	log.Infof("census imported successfully, %d claims. Status is public:%t",
-		len(dump.Data), tr.IsPublic())
 	return nil
 }
 

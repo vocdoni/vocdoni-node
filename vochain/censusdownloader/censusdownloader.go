@@ -48,7 +48,7 @@ func (c *CensusDownloader) importCensus(root, uri string) {
 func (c *CensusDownloader) Rollback() {
 	c.queueLock.Lock()
 	c.queue = make(map[string]string)
-	c.isFastSync = c.vochain.Node.ConsensusReactor().WaitSync()
+	c.isFastSync = c.vochain.IsSynchronizing()
 	c.queueLock.Unlock()
 }
 
@@ -78,7 +78,7 @@ func (c *CensusDownloader) OnProcess(pid, eid []byte, censusRoot, censusURI stri
 	}
 }
 
-// NOT USED but required for implementing the interface
+// NOT USED but required for implementing the vochain.EventListener interface
 func (c *CensusDownloader) OnCancel(pid []byte, txindex int32)                  {}
 func (c *CensusDownloader) OnVote(v *models.Vote, txindex int32)                {}
 func (c *CensusDownloader) OnNewTx(blockHeight uint32, txIndex int32)           {}
@@ -91,4 +91,23 @@ func (c *CensusDownloader) OnProcessStatusChange(pid []byte,
 func (c *CensusDownloader) OnProcessResults(pid []byte,
 	results *models.ProcessResult, txindex int32) error {
 	return nil
+}
+
+func (s *CensusDownloader) OnProcessesStart(pids [][]byte) {
+	for _, pid := range pids {
+		process, err := s.vochain.State.Process(pid, true)
+		if err != nil {
+			log.Fatalf("cannot find process with pid %x: %v", pid, err)
+		}
+		if process.Mode.PreRegister && process.EnvelopeType.Anonymous {
+			census, err := s.vochain.State.DumpRollingCensus(pid)
+			if err != nil {
+				log.Fatalf("cannot dump census with pid %x: %v", pid, err)
+			}
+			if _, err := s.census.ImportDump(census.CensusID,
+				census.Type, census.DumpRoot, census.DumpData); err != nil {
+				log.Fatalf("cannot import census with pid %x: %v", pid, err)
+			}
+		}
+	}
 }

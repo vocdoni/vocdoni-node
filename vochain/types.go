@@ -24,7 +24,6 @@ var (
 	ErrBalanceOverflow     = fmt.Errorf("balance overflow")
 	ErrAccountBalanceZero  = fmt.Errorf("zero balance account not valid")
 	// keys; not constants because of []byte
-	headerKey    = []byte("header")
 	voteCountKey = []byte("voteCount")
 )
 

@@ -290,7 +290,19 @@ func (s *StateDB) Hash() ([]byte, error) {
 // error.  Calling treeTx.Discard after treeTx.Commit is ok.
 func (s *StateDB) BeginTx() (treeTx *TreeTx, err error) {
 	cfg := mainTreeCfg
-	tx := db.NewBatch(s.db)
+	// NOTE(Edu): The introduction of Batched Txs here came from the fact
+	// that Badger takes a lot of memory and as a preconfigured maximum
+	// memory allocated for a Tx, which we were easily reaching.  But by
+	// using Batched Txs we didn't have atomic updates for the StateDB.
+	// Unfortunately I have been using the NoState assuming atomic updates,
+	// and using NoState without assuming atomic updates is cumbersome, so
+	// I'm switching back to a regular WriteTx now that we are using Pebble
+	// which can grow the memory allocated to a Tx dynamically and uses
+	// much less memory.  Based on the MemoryUsage results from the
+	// `TestBlockMemoryUsage` in `vochain/state_test.go` this should be
+	// reasonable.
+	// tx := db.NewBatch(s.db)
+	tx := s.db.WriteTx()
 	defer func() {
 		if err != nil {
 			tx.Discard()

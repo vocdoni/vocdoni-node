@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"path"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -28,11 +29,16 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// defaultHashLen is the most common default hash length for Arbo hashes.  This
+// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
+// arbo.HashFunctionBlake2b.Len()
+const defaultHashLen = 32
+
 // rootLeafGetRoot is the GetRootFn function for a leaf that is the root
 // itself.
 func rootLeafGetRoot(value []byte) ([]byte, error) {
-	if len(value) != 32 {
-		return nil, fmt.Errorf("len(value) = %v != 32", len(value))
+	if len(value) != defaultHashLen {
+		return nil, fmt.Errorf("len(value) = %v != %v", len(value), defaultHashLen)
 	}
 	return value, nil
 }
@@ -40,8 +46,8 @@ func rootLeafGetRoot(value []byte) ([]byte, error) {
 // rootLeafSetRoot is the SetRootFn function for a leaf that is the root
 // itself.
 func rootLeafSetRoot(value []byte, root []byte) ([]byte, error) {
-	if len(value) != 32 {
-		return nil, fmt.Errorf("len(value) = %v != 32", len(value))
+	if len(value) != defaultHashLen {
+		return nil, fmt.Errorf("len(value) = %v != %v", len(value), defaultHashLen)
 	}
 	return root, nil
 }
@@ -52,6 +58,9 @@ func processGetCensusRoot(value []byte) ([]byte, error) {
 	var sdbProc models.StateDBProcess
 	if err := proto.Unmarshal(value, &sdbProc); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	if len(sdbProc.Process.CensusRoot) != defaultHashLen {
+		return nil, fmt.Errorf("len(sdbProc.Process.CensusRoot) != %v", defaultHashLen)
 	}
 	return sdbProc.Process.CensusRoot, nil
 }
@@ -77,6 +86,9 @@ func processGetVotesRoot(value []byte) ([]byte, error) {
 	var sdbProc models.StateDBProcess
 	if err := proto.Unmarshal(value, &sdbProc); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	if len(sdbProc.VotesRoot) != defaultHashLen {
+		return nil, fmt.Errorf("len(sdbProc.VotesRoot) != %v", defaultHashLen)
 	}
 	return sdbProc.VotesRoot, nil
 }
@@ -185,6 +197,7 @@ type EventListener interface {
 	OnProcessKeys(pid []byte, encryptionPub string, txIndex int32)
 	OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32)
 	OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) error
+	OnProcessesStart(pids [][]byte)
 	Commit(height uint32) (err error)
 	Rollback()
 }
@@ -222,7 +235,8 @@ type State struct {
 	mempoolRemoveTxKeys func([][32]byte, bool)
 	txCounter           int32
 	eventListeners      []EventListener
-	currentHeight       uint32 // current height
+	// currentHeight is the height of the current started block
+	currentHeight uint32
 }
 
 // NewState creates a new State
@@ -318,9 +332,9 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	return sdb, update.Commit(0)
 }
 
-// mainTreeView is a thread-safe function to obtain a pointer to the last
+// MainTreeView is a thread-safe function to obtain a pointer to the last
 // opened mainTree as a TreeView.
-func (v *State) mainTreeView() *statedb.TreeView {
+func (v *State) MainTreeView() *statedb.TreeView {
 	return v.mainTreeViewValue.Load().(*statedb.TreeView)
 }
 
@@ -336,7 +350,7 @@ func (v *State) setMainTreeView(treeView *statedb.TreeView) {
 // last commited version.
 func (v *State) mainTreeViewer(isQuery bool) statedb.TreeViewer {
 	if isQuery {
-		return v.mainTreeView()
+		return v.MainTreeView()
 	}
 	return v.Tx.AsTreeView()
 }
@@ -735,6 +749,56 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int,
 	return nullifiers
 }
 
+// pathProcessIDsByStartBlock is the db path used to store ProcessIDs indexed
+// by their StartBlock.
+const pathProcessIDsByStartBlock = "pidByStartBlock"
+
+// keyProcessIDsByStartBlock returns the db key where ProcessesIDs with
+// startBlock are stored.
+func keyProcessIDsByStartBlock(startBlock uint32) []byte {
+	key := make([]byte, 4)
+	binary.LittleEndian.PutUint32(key, startBlock)
+	return []byte(path.Join(pathProcessIDsByStartBlock, string(key)))
+}
+
+// processIDsByStartBlock returns the ProcessIDs of processes with startBlock.
+func (v *State) processIDsByStartBlock(startBlock uint32) ([][]byte, error) {
+	noState := v.Tx.NoState()
+	pidsBytes, err := noState.Get(keyProcessIDsByStartBlock(startBlock))
+	if err == db.ErrKeyNotFound {
+		return [][]byte{}, nil
+	} else if err != nil {
+		return nil, err
+	}
+	var pids models.ProcessIdList
+	if err := proto.Unmarshal(pidsBytes, &pids); err != nil {
+		return nil, fmt.Errorf("cannot proto.Unmarshal pids: %w", err)
+	}
+	return pids.ProcessIds, nil
+}
+
+// setProcessIDByStartBlock indexes the processIDs to by its processes
+// startBlock.
+func (v *State) setProcessIDByStartBlock(processID []byte, startBlock uint32) error {
+	noState := v.Tx.NoState()
+	var pids models.ProcessIdList
+	if pidsBytes, err := noState.Get(keyProcessIDsByStartBlock(startBlock)); err == db.ErrKeyNotFound {
+		// no pids indexed by startBlock, so we build upon an empty pids
+	} else if err != nil {
+		return err
+	} else {
+		if err := proto.Unmarshal(pidsBytes, &pids); err != nil {
+			return fmt.Errorf("cannot proto.Unmarshal pids: %w", err)
+		}
+	}
+	pids.ProcessIds = append(pids.ProcessIds, processID)
+	pidsBytes, err := proto.Marshal(&pids)
+	if err != nil {
+		return err
+	}
+	return noState.Set(keyProcessIDsByStartBlock(startBlock), pidsBytes)
+}
+
 // Save persistent save of vochain mem trees
 func (v *State) Save() ([]byte, error) {
 	height := v.CurrentHeight()
@@ -803,9 +867,26 @@ func (v *State) CurrentHeight() uint32 {
 	return atomic.LoadUint32(&v.currentHeight)
 }
 
-// SetHeight sets the height for the current block.
+// SetHeight sets the height for the current block and does work related to
+// starting a new block.
 func (v *State) SetHeight(height uint32) {
 	atomic.StoreUint32(&v.currentHeight, height)
+
+	// Notify listeners about processes that start in this block.
+	pids, err := v.processIDsByStartBlock(height)
+	if err != nil {
+		log.Fatalf("cannot get processIDs by StartBlock: %v", err)
+	}
+	if len(pids) > 0 {
+		for _, l := range v.eventListeners {
+			l.OnProcessesStart(pids)
+		}
+	}
+
+	// TODO: Purge rolling censuses from all processes that start now
+	// for _, pid := range pids {
+	//   v.PurgeRollingCensus(pid)
+	// }
 }
 
 // WorkingHash returns the hash of the vochain StateDB (mainTree.Root)

@@ -110,7 +110,7 @@ func TestGetValidators(t *testing.T) {
 func TestAddProcess(t *testing.T) {
 	t.Parallel()
 
-	s := testcommon.NewVochainStateWithProcess(t)
+	s := testcommon.NewVochainState(t)
 	err := s.AddProcess(testcommon.ProcessHardcoded)
 	qt.Assert(t, err, qt.IsNil)
 }

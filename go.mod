@@ -25,6 +25,7 @@ require (
 	github.com/go-chi/cors v1.1.1
 	github.com/google/go-cmp v0.5.5
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
+	github.com/iden3/go-iden3-crypto v0.0.6-0.20210308142348-8f85683b2cef
 	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-ipfs v0.9.1
 	github.com/ipfs/go-ipfs-config v0.14.0
@@ -128,7 +129,6 @@ require (
 	github.com/hashicorp/hcl v1.0.1-0.20180906183839-65a6292f0157 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/huin/goupnp v1.0.2 // indirect
-	github.com/iden3/go-iden3-crypto v0.0.6-0.20210308142348-8f85683b2cef // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitswap v0.3.4 // indirect

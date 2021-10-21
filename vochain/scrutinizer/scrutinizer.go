@@ -562,6 +562,9 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 	return nil
 }
 
+// NOT USED but required for implementing the vochain.EventListener interface
+func (s *Scrutinizer) OnProcessesStart(pids [][]byte) {}
+
 // GetFriendlyResults translates votes into a matrix of strings
 func GetFriendlyResults(votes [][]*types.BigInt) [][]string {
 	r := [][]string{}

@@ -54,6 +54,8 @@ type CircuitConfig struct {
 	URL string
 	// CircuitPath defines the path from where the files are downloaded
 	CircuitPath string
+	// Parameters used for the circuit build
+	Parameters []int64
 	// LocalDir defines in which directory will be the files
 	// downloaded, under that directory it will follow the CircuitPath
 	// directories structure

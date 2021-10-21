@@ -7,22 +7,48 @@ import (
 
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
 var emptyVotesRoot = make([]byte, VotesCfg.HashFunc().Len())
+var emptyCensusRoot = make([]byte, CensusCfg.HashFunc().Len())
 
-// AddProcess adds or overides a new process to vochain
+// AddProcess adds a new process to the vochain.  Adding a process with a
+// ProcessId that already exists will return an error.
 func (v *State) AddProcess(p *models.Process) error {
+	preRegister := p.Mode != nil && p.Mode.PreRegister
+	anonymous := p.EnvelopeType != nil && p.EnvelopeType.Anonymous
+	if preRegister {
+		p.CensusRoot = emptyCensusRoot
+	}
+
 	newProcessBytes, err := proto.Marshal(
 		&models.StateDBProcess{Process: p, VotesRoot: emptyVotesRoot})
 	if err != nil {
 		return fmt.Errorf("cannot marshal process bytes: %w", err)
 	}
 	v.Tx.Lock()
-	err = v.Tx.DeepSet(p.ProcessId, newProcessBytes, ProcessesCfg)
+	err = func() error {
+		if err := v.Tx.DeepAdd(p.ProcessId, newProcessBytes, ProcessesCfg); err != nil {
+			return err
+		}
+		// If Mode.PreRegister && EnvelopeType.Anonymous we create (by
+		// opening) a new empty poseidon census tree at p.ProcessId.
+		if preRegister && anonymous {
+			census, err := v.Tx.DeepSubTree(ProcessesCfg, CensusPoseidonCfg.WithKey(p.ProcessId))
+			if err != nil {
+				return err
+			}
+			// We store census size as little endian 64 bits.  Set it to 0.
+			if err := statedb.SetUint64(census.NoState(), keyCensusLen, 0); err != nil {
+				return err
+			}
+		}
+		return v.setProcessIDByStartBlock(p.ProcessId, p.StartBlock)
+	}()
 	v.Tx.Unlock()
 	if err != nil {
 		return err
@@ -368,10 +394,16 @@ func NewProcessTxCheck(vtx *models.Tx, txBytes,
 	}
 
 	// check valid/implemented process types
-	switch {
-	case tx.Process.EnvelopeType.Anonymous:
-		return nil, fmt.Errorf("anonymous process not yet implemented")
-	case tx.Process.EnvelopeType.Serial:
+	// pre-regiser and anonymous must be either both enabled or disabled, as
+	// we only support a single scenario of pre-register + anonymous.
+	if tx.Process.Mode.PreRegister != tx.Process.EnvelopeType.Anonymous {
+		return nil, fmt.Errorf("pre-register mode only supported " +
+			"with anonymous envelope type and viceversa")
+	}
+	// TODO: Enable support for PreRegiser without Anonymous.  Figure out
+	// all the required changes to support a process with a rolling census
+	// that is not Anonymous.
+	if tx.Process.EnvelopeType.Serial {
 		return nil, fmt.Errorf("serial process not yet implemented")
 	}
 

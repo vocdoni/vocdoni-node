@@ -3,10 +3,12 @@ package census
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -335,4 +337,65 @@ func (m *Manager) Count() (local, imported, loaded int) {
 	}
 	loaded = len(m.Trees)
 	return
+}
+
+// keyCensusKeyIndex returns the Manager.db key where key index is stored.
+func keyCensusKeyIndex(censusID string, key []byte) []byte {
+	return []byte(path.Join("key", censusID, string(key)))
+}
+
+func keyCensusLen(censusID string) []byte {
+	return []byte(path.Join(censusID, "len"))
+}
+
+// fillKeyToIndex fills a mapping in m.db under the path "`key`/censusID" of
+// value -> key.  This function should be called when importing a Poseidon
+// Census tree as we expect it to use a sequential index for the key, and a
+// public key for the value.  Having this mapping will allow us to resolve the
+// index given a public key.
+func (m *Manager) fillKeyToIndex(censusID string, t *censustree.Tree) error {
+	type IndexKey struct {
+		IndexLE []byte
+		Key     []byte
+	}
+	indexKeys := make([]IndexKey, 0)
+	t.IterateLeaves(func(indexLE, key []byte) bool {
+		indexKeys = append(indexKeys, IndexKey{IndexLE: indexLE, Key: key})
+		return false
+	})
+	tx := m.db.WriteTx()
+	defer tx.Discard()
+	for _, indexKey := range indexKeys {
+		if err := tx.Set(keyCensusKeyIndex(censusID, indexKey.Key),
+			indexKey.IndexLE); err != nil {
+			return fmt.Errorf("error storing census key index by key: %w", err)
+		}
+	}
+	censusLenLE := [8]byte{}
+	binary.LittleEndian.PutUint64(censusLenLE[:], uint64(len(indexKeys)))
+	if err := tx.Set(keyCensusLen(censusID), censusLenLE[:]); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// KeyToIndex resolves the index of the key for the Poseidon census identified
+// by `censusID`.  The returned index is 64 bit little endian encoded and can
+// be used to query the tree.
+func (m *Manager) KeyToIndex(censusID string, key []byte) ([]byte, error) {
+	// Sanity check
+	m.TreesMu.Lock()
+	tr, ok := m.Trees[censusID]
+	m.TreesMu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("census tree not loaded")
+	}
+	if tr.Type() != models.Census_ARBO_POSEIDON {
+		return nil, fmt.Errorf("expected Tree type to be Census_ARBO_POSEIDON, found %v",
+			tr.Type())
+	}
+
+	tx := m.db.ReadTx()
+	defer tx.Discard()
+	return tx.Get(keyCensusKeyIndex(censusID, key))
 }

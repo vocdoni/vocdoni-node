@@ -2,6 +2,7 @@ package statedb
 
 import (
 	"bytes"
+	"fmt"
 	"path"
 	"sync"
 
@@ -91,10 +92,12 @@ func (u *TreeUpdate) GenProof(key []byte) ([]byte, []byte, error) {
 	return u.tree.GenProof(u.tree.tx, key)
 }
 
+// Dump exports all the tree leafs in a byte array.
 // Unimplemented because arbo.Tree.Dump doesn't take db.ReadTx as input.
-// func (u *TreeUpdate) Dump() ([]byte, error) {
-// 	panic("TODO")
-// }
+func (u *TreeUpdate) Dump() ([]byte, error) {
+	// return u.tree.Dump(u.tree.tx)
+	return nil, fmt.Errorf("unimplemented because arbo.Tree.Dump doesn't take db.ReadTx as input")
+}
 
 // NoState returns a key-value database associated with this tree that doesn't
 // affect the cryptographic integrity of the StateDB.  Writing to this database
@@ -374,6 +377,11 @@ func (v *treeUpdateView) Size() (uint64, error) { return (*TreeUpdate)(v).Size()
 // GenProof implements the TreeViewer.GenProof method.
 func (v *treeUpdateView) GenProof(key []byte) ([]byte, []byte, error) {
 	return (*TreeUpdate)(v).GenProof(key)
+}
+
+// Dump exports all the tree leafs in a byte array.
+func (v *treeUpdateView) Dump() ([]byte, error) {
+	return (*TreeUpdate)(v).Dump()
 }
 
 // verify that treeUpdateView fulfills the TreeViewer interface.
