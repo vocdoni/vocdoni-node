@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"os"
@@ -9,11 +8,8 @@ import (
 	"strings"
 	"time"
 
-	snarkTypes "github.com/vocdoni/go-snark/types"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/config"
-	"go.vocdoni.io/dvote/crypto/zk"
-	zkartifacts "go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
@@ -148,30 +144,6 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 			vconfig.ProcessArchiveDataDir,
 			vconfig.ProcessArchiveKey,
 		)
-	}
-
-	// get the zk Circuits VerificationKey files
-	vnode.ZkVKs = []*snarkTypes.Vk{}
-	for i, cc := range vochain.Genesis[vconfig.Chain].CircuitsConfig {
-		log.Infof("downloading zk-circuits-artifacts index: %d", i)
-
-		// download VKs from CircuitsConfig
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
-		defer cancel()
-		err = zkartifacts.DownloadVKFile(ctx, cc)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		// parse VK and store it into vnode.ZkVKs
-		log.Infof("parse VK from file into memory. CircuitArtifact index: %d", i)
-		var vk *snarkTypes.Vk
-		vk, err = zk.LoadVkFromFile(filepath.Join(cc.LocalDir, cc.CircuitPath, zkartifacts.FilenameVK))
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		vnode.ZkVKs = append(vnode.ZkVKs, vk)
-
 	}
 
 	// Vochain info

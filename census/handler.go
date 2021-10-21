@@ -276,12 +276,20 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 
 	switch r.Method {
 	case "genProof":
-		data := r.CensusKey
+		key := r.CensusKey
 		// TO-DO: if census=snarks do Poseidon hashing
 		//if !r.Digested {
-		//	data = snarks.Poseidon.Hash(data)
+		//	key = snarks.Poseidon.Hash(key)
 		//}
-		leafV, siblings, err := tr.GenProof(data)
+		// If tr.Type() == ARBO_POSEIDON, resolve mapping key -> index before genProof
+		if tr.Type() == models.Census_ARBO_POSEIDON {
+			key, err = m.KeyToIndex(r.CensusID, key)
+			if err != nil {
+				resp.SetError(err)
+				return resp
+			}
+		}
+		leafV, siblings, err := tr.GenProof(key)
 		if err != nil {
 			resp.SetError(err)
 			return resp

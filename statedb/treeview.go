@@ -42,6 +42,8 @@ type TreeViewer interface {
 	// Iterate iterates over all leafs of this tree.  When callback returns true,
 	// the iteration is stopped and this function returns.
 	Iterate(callback func(key, value []byte) bool) error
+	// Dump exports all the tree leafs in a byte array.
+	Dump() ([]byte, error)
 	// Root returns the root of the tree, which cryptographically summarises the
 	// state of the tree.
 	Root() ([]byte, error)

@@ -95,6 +95,11 @@ func (t *Tree) Root() ([]byte, error) {
 	return t.tree.Root(nil)
 }
 
+// Get wraps tree.Tree.Get.
+func (t *Tree) Get(key []byte) ([]byte, error) {
+	return t.tree.Get(nil, key)
+}
+
 // Root wraps t.tree.VerifyProof.
 func (t *Tree) VerifyProof(key, value, proof, root []byte) (bool, error) {
 	return t.tree.VerifyProof(key, value, proof, root)

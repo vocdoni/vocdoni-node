@@ -2,6 +2,7 @@
 package vochain
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -23,6 +24,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
+const downloadZkVKsTimeout = 1 * time.Minute
+
 // NewVochain starts a node with an ABCI application
 func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
 	// creating new vochain app
@@ -37,6 +40,12 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	}
 	app.SetDefaultMethods()
 	if err := app.Node.Start(); err != nil {
+		log.Fatal(err)
+	}
+	// get the zk Circuits VerificationKey files
+	ctx, cancel := context.WithTimeout(context.Background(), downloadZkVKsTimeout)
+	defer cancel()
+	if err := app.LoadZkVKs(ctx); err != nil {
 		log.Fatal(err)
 	}
 	// Set mempool function for removing transactions.

@@ -176,8 +176,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 	}
 
 	var vote *models.Vote
-	switch {
-	case process.EnvelopeType.Anonymous:
+	if process.EnvelopeType.Anonymous {
 		// Supports Groth16 proof generated from circom snark compatible
 		// prover
 		proofZkSNARK := ve.Proof.GetZkSnark()
@@ -227,7 +226,8 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		}
 
 		return vote, nil
-	default: // Signature based voting
+	} else {
+		// Signature based voting
 		if signature == nil {
 			return nil, fmt.Errorf("signature missing on voteTx")
 		}
