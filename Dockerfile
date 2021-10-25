@@ -8,7 +8,7 @@ ARG BUILDARGS
 # Go installed to build each of them.
 WORKDIR /src
 COPY . .
-ENV CGO_ENABLED=0
+ENV CGO_ENABLED=1
 RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
 	go build -trimpath -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
