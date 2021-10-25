@@ -33,7 +33,7 @@ func TestRollingCensus(t *testing.T) {
 	app.State.SetHeight(1)
 
 	censusURI := "ipfs://foobar"
-	maxRollingCensusSize := uint64(numKeys)
+	maxCensusSize := uint64(numKeys)
 	p := &models.Process{
 		EntityId:   rng.RandomBytes(32),
 		CensusURI:  &censusURI,
@@ -45,7 +45,7 @@ func TestRollingCensus(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{
 			Anonymous: true,
 		},
-		MaxRollingCensusSize: &maxRollingCensusSize,
+		MaxCensusSize: &maxCensusSize,
 	}
 	qt.Assert(t, app.State.AddProcess(p), qt.IsNil)
 

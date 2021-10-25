@@ -409,14 +409,14 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 			"with anonymous envelope type and viceversa")
 	}
 	if tx.Process.Mode.PreRegister &&
-		(tx.Process.MaxRollingCensusSize == nil || *tx.Process.MaxRollingCensusSize <= 0) {
+		(tx.Process.MaxCensusSize == nil || *tx.Process.MaxCensusSize <= 0) {
 		return nil, fmt.Errorf("pre-register mode requires setting " +
-			"maxRollingCensusSize to be > 0")
+			"maxCensusSize to be > 0")
 	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
 		circuits := Genesis[app.chainId].CircuitsConfig
-		if *tx.Process.MaxRollingCensusSize > uint64(circuits[len(circuits)-1].Parameters[0]) {
-			return nil, fmt.Errorf("maxRollingCensusSize for anonymous envelope "+
+		if *tx.Process.MaxCensusSize > uint64(circuits[len(circuits)-1].Parameters[0]) {
+			return nil, fmt.Errorf("maxCensusSize for anonymous envelope "+
 				"cannot be bigger than the parameter for the biggest circuit (%v)",
 				circuits[len(circuits)-1].Parameters[0])
 		}

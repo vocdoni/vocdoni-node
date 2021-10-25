@@ -44,8 +44,8 @@ func (v *State) AddToRollingCensus(pid []byte, key []byte, weight *big.Int) erro
 	if err != nil {
 		return fmt.Errorf("cannot get ceneusLen: %w", err)
 	}
-	if censusLen >= *process.MaxRollingCensusSize {
-		return fmt.Errorf("maxRollingCensusSize already reached")
+	if censusLen >= *process.MaxCensusSize {
+		return fmt.Errorf("maxCensusSize already reached")
 	}
 	// Add key to census
 	index := [8]byte{}
@@ -181,13 +181,13 @@ func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, st
 	if len(tx.NewKey) != 32 {
 		return fmt.Errorf("newKey wrong size")
 	}
-	// Verify that we are not over maxRollingCensusSize
+	// Verify that we are not over maxCensusSize
 	censusSize, err := v.GetRollingCensusSize(tx.ProcessId, false)
 	if err != nil {
 		return err
 	}
-	if censusSize >= *process.MaxRollingCensusSize {
-		return fmt.Errorf("maxRollingCensusSize already reached")
+	if censusSize >= *process.MaxCensusSize {
+		return fmt.Errorf("maxCensusSize already reached")
 	}
 
 	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
