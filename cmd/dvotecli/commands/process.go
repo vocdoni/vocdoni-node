@@ -36,6 +36,12 @@ var processKeysCmd = &cobra.Command{
 	RunE:  processKeys,
 }
 
+var processCircuitConfigCmd = &cobra.Command{
+	Use:   "circuitConfig [processId]",
+	Short: "CircuitConfig of processes with rolling census and anonymous envelope",
+	RunE:  processCircuitConfig,
+}
+
 var processResultsCmd = &cobra.Command{
 	Use:   "results [processId]",
 	Short: "get the results of a process",
@@ -53,6 +59,7 @@ func init() {
 	processCmd.AddCommand(processListCmd)
 	processCmd.AddCommand(processInfoCmd)
 	processCmd.AddCommand(processKeysCmd)
+	processCmd.AddCommand(processCircuitConfigCmd)
 	processCmd.AddCommand(processResultsCmd)
 	processCmd.AddCommand(processResultsWeightCmd)
 }
@@ -166,6 +173,43 @@ func processKeys(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(buffer, "%v ", pvk.Key)
 	}
 	fmt.Print(buffer.String())
+	return err
+}
+
+func processCircuitConfig(cmd *cobra.Command, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("you must provide a process id")
+	}
+
+	cl, err := client.New(opt.host)
+	if err != nil {
+		return err
+	}
+	defer cl.CheckClose(&err)
+
+	req := api.MetaRequest{Method: "getCircuitConfig"}
+	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
+	if err != nil {
+		return err
+	}
+	resp, err := cl.Request(req, nil)
+	if err != nil {
+		return err
+	}
+
+	if !resp.Ok {
+		return fmt.Errorf(resp.Message)
+	}
+	if resp.CircuitConfig == nil {
+		return fmt.Errorf("circuitConfig is nil")
+	}
+
+	circuitConfigJSON, err := json.MarshalIndent(resp.CircuitConfig, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("CircuitConfig: \n")
+	fmt.Printf("%v", string(circuitConfigJSON))
 	return err
 }
 

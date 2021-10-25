@@ -10,6 +10,7 @@ import (
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -147,6 +148,20 @@ func (c *Client) GetKeys(pid, eid []byte) (*pkeys, error) {
 		pub:  resp.EncryptionPublicKeys,
 		priv: resp.EncryptionPrivKeys,
 	}, nil
+}
+
+func (c *Client) GetCircuitConfig(pid, eid []byte) (*artifacts.CircuitConfig, error) {
+	var req api.MetaRequest
+	req.Method = "getCircuitConfig"
+	req.ProcessID = pid
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Ok {
+		return nil, fmt.Errorf("cannot get circuitConfig for process %s: (%s)", pid, resp.Message)
+	}
+	return resp.CircuitConfig, nil
 }
 
 func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {

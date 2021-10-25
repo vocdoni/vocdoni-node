@@ -29,6 +29,10 @@ var keyCensusLen = []byte("len")
 func (v *State) AddToRollingCensus(pid []byte, key []byte, weight *big.Int) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
+	process, err := getProcess(v.mainTreeViewer(false), pid)
+	if err != nil {
+		return fmt.Errorf("cannot open process with pid %x: %w", pid, err)
+	}
 	census, err := v.Tx.DeepSubTree(ProcessesCfg, CensusPoseidonCfg.WithKey(pid))
 	if err != nil {
 		return fmt.Errorf("cannot open rolling census with pid %x: %w", pid, err)
@@ -39,6 +43,9 @@ func (v *State) AddToRollingCensus(pid []byte, key []byte, weight *big.Int) erro
 	censusLen, err := statedb.GetUint64(noState, keyCensusLen)
 	if err != nil {
 		return fmt.Errorf("cannot get ceneusLen: %w", err)
+	}
+	if censusLen >= *process.MaxRollingCensusSize {
+		return fmt.Errorf("maxRollingCensusSize already reached")
 	}
 	// Add key to census
 	index := [8]byte{}
@@ -55,6 +62,27 @@ func (v *State) AddToRollingCensus(pid []byte, key []byte, weight *big.Int) erro
 		return err
 	}
 	return nil
+}
+
+func getRollingCensusSize(mainTreeView statedb.TreeViewer, pid []byte) (uint64, error) {
+	census, err := mainTreeView.DeepSubTree(ProcessesCfg, CensusPoseidonCfg.WithKey(pid))
+	if err != nil {
+		return 0, fmt.Errorf("cannot open rolling census with pid %x: %w", pid, err)
+	}
+	noState := census.NoState()
+	censusLen, err := statedb.GetUint64(noState, keyCensusLen)
+	if err != nil {
+		return 0, fmt.Errorf("cannot get ceneusLen: %w", err)
+	}
+	return censusLen, nil
+}
+
+func (v *State) GetRollingCensusSize(pid []byte, isQuery bool) (uint64, error) {
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	return getRollingCensusSize(v.mainTreeViewer(isQuery), pid)
 }
 
 // PurgeRollingCensus removes a rolling census from the permanent store
@@ -120,7 +148,7 @@ func (v *State) DumpRollingCensus(pid []byte) (*RollingCensus, error) {
 }
 
 // RegisterKeyTxCheck validates a registerKeyTx transaction against the state
-func RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
+func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
 	tx := vtx.GetRegisterKey()
 
 	// Sanity checks
@@ -152,6 +180,14 @@ func RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State)
 	}
 	if len(tx.NewKey) != 32 {
 		return fmt.Errorf("newKey wrong size")
+	}
+	// Verify that we are not over maxRollingCensusSize
+	censusSize, err := v.GetRollingCensusSize(tx.ProcessId, false)
+	if err != nil {
+		return err
+	}
+	if censusSize >= *process.MaxRollingCensusSize {
+		return fmt.Errorf("maxRollingCensusSize already reached")
 	}
 
 	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)

@@ -6,8 +6,10 @@ import (
 	"fmt"
 
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -295,6 +297,39 @@ func (r *Router) getProcessKeys(request RouterRequest) {
 	}
 	response.EncryptionPublicKeys = pubs
 	response.EncryptionPrivKeys = privs
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
+}
+
+func (r *Router) getProcessCircuitConfig(request RouterRequest) {
+	// check pid
+	if len(request.ProcessID) != types.ProcessIDsize {
+		r.SendError(request, "cannot get envelope status: (malformed processId)")
+		return
+	}
+	process, err := r.vocapp.State.Process(request.ProcessID, true)
+	if err != nil {
+		r.SendError(request, fmt.Sprintf("cannot get process encryption public keys: (%s)", err))
+		return
+	}
+	if !process.EnvelopeType.Anonymous {
+		r.SendError(request, "no CircuitConfig for non-anonymous process")
+		return
+	}
+	if process.RollingCensusSize == nil {
+		r.SendError(request, "rolling census is not closed yet")
+		return
+	}
+	var response api.MetaResponse
+	var config artifacts.CircuitConfig
+	for _, cfg := range vochain.Genesis[r.vocapp.ChainID()].CircuitsConfig {
+		if *process.RollingCensusSize <= uint64(cfg.Parameters[0]) {
+			config = cfg
+			break
+		}
+	}
+	response.CircuitConfig = &config
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}

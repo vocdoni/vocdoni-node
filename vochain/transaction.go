@@ -75,7 +75,7 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 		}
 
 	case *models.Tx_NewProcess:
-		if p, err := NewProcessTxCheck(vtx, txBytes, signature, app.State); err == nil {
+		if p, err := app.NewProcessTxCheck(vtx, txBytes, signature, app.State); err == nil {
 			if commit {
 				tx := vtx.GetNewProcess()
 				if tx.Process == nil {
@@ -115,7 +115,7 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 		}
 
 	case *models.Tx_RegisterKey:
-		if err := RegisterKeyTxCheck(vtx, txBytes, signature, app.State); err != nil {
+		if err := app.State.RegisterKeyTxCheck(vtx, txBytes, signature, app.State); err != nil {
 			return []byte{}, fmt.Errorf("registerKeyTx %w", err)
 		}
 		if commit {
