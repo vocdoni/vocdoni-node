@@ -89,13 +89,8 @@ func (v *State) CancelProcess(pid []byte) error { // LEGACY
 	return nil
 }
 
-// Process returns a process info given a processId if exists
-func (v *State) Process(pid []byte, isQuery bool) (*models.Process, error) {
-	if !isQuery {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
-	}
-	processBytes, err := v.mainTreeViewer(isQuery).DeepGet(pid, ProcessesCfg)
+func getProcess(mainTreeView statedb.TreeViewer, pid []byte) (*models.Process, error) {
+	processBytes, err := mainTreeView.DeepGet(pid, ProcessesCfg)
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, ErrProcessNotFound
 	} else if err != nil {
@@ -107,6 +102,15 @@ func (v *State) Process(pid []byte, isQuery bool) (*models.Process, error) {
 		return nil, fmt.Errorf("cannot unmarshal process (%s): %w", pid, err)
 	}
 	return process.Process, nil
+}
+
+// Process returns a process info given a processId if exists
+func (v *State) Process(pid []byte, isQuery bool) (*models.Process, error) {
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	return getProcess(v.mainTreeViewer(isQuery), pid)
 }
 
 // CountProcesses returns the overall number of processes the vochain has
@@ -130,14 +134,8 @@ func (v *State) CountProcesses(isQuery bool) (uint64, error) {
 	return count, nil
 }
 
-// updateProcess updates an existing process
-func (v *State) updateProcess(p *models.Process, pid []byte) error {
-	if p == nil || len(p.ProcessId) != types.ProcessIDsize {
-		return ErrProcessNotFound
-	}
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	processesTree, err := v.Tx.SubTree(ProcessesCfg)
+func updateProcess(tx *treeTxWithMutex, p *models.Process, pid []byte) error {
+	processesTree, err := tx.SubTree(ProcessesCfg)
 	if err != nil {
 		return err
 	}
@@ -157,6 +155,16 @@ func (v *State) updateProcess(p *models.Process, pid []byte) error {
 		return fmt.Errorf("cannot marshal updated process bytes: %w", err)
 	}
 	return processesTree.Set(pid, updatedProcessBytes)
+}
+
+// updateProcess updates an existing process
+func (v *State) updateProcess(p *models.Process, pid []byte) error {
+	if p == nil || len(p.ProcessId) != types.ProcessIDsize {
+		return ErrProcessNotFound
+	}
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return updateProcess(&v.Tx, p, pid)
 }
 
 // SetProcessStatus changes the process status to the one provided.
@@ -340,7 +348,7 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
-func NewProcessTxCheck(vtx *models.Tx, txBytes,
+func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	signature []byte, state *State) (*models.Process, error) {
 	tx := vtx.GetNewProcess()
 	if tx.Process == nil {
@@ -400,6 +408,20 @@ func NewProcessTxCheck(vtx *models.Tx, txBytes,
 		return nil, fmt.Errorf("pre-register mode only supported " +
 			"with anonymous envelope type and viceversa")
 	}
+	if tx.Process.Mode.PreRegister &&
+		(tx.Process.MaxRollingCensusSize == nil || *tx.Process.MaxRollingCensusSize <= 0) {
+		return nil, fmt.Errorf("pre-register mode requires setting " +
+			"maxRollingCensusSize to be > 0")
+	}
+	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
+		circuits := Genesis[app.chainId].CircuitsConfig
+		if *tx.Process.MaxRollingCensusSize > uint64(circuits[len(circuits)-1].Parameters[0]) {
+			return nil, fmt.Errorf("maxRollingCensusSize for anonymous envelope "+
+				"cannot be bigger than the parameter for the biggest circuit (%v)",
+				circuits[len(circuits)-1].Parameters[0])
+		}
+	}
+
 	// TODO: Enable support for PreRegiser without Anonymous.  Figure out
 	// all the required changes to support a process with a rolling census
 	// that is not Anonymous.

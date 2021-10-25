@@ -25,6 +25,7 @@ func TestRollingCensus(t *testing.T) {
 
 	_ = censusdownloader.NewCensusDownloader(app, &cm, false)
 
+	const numKeys = 128
 	pid := rng.RandomBytes(32)
 
 	// Block 1
@@ -32,6 +33,7 @@ func TestRollingCensus(t *testing.T) {
 	app.State.SetHeight(1)
 
 	censusURI := "ipfs://foobar"
+	maxRollingCensusSize := uint64(numKeys)
 	p := &models.Process{
 		EntityId:   rng.RandomBytes(32),
 		CensusURI:  &censusURI,
@@ -43,6 +45,7 @@ func TestRollingCensus(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{
 			Anonymous: true,
 		},
+		MaxRollingCensusSize: &maxRollingCensusSize,
 	}
 	qt.Assert(t, app.State.AddProcess(p), qt.IsNil)
 
@@ -53,7 +56,6 @@ func TestRollingCensus(t *testing.T) {
 	app.State.Rollback()
 	app.State.SetHeight(2)
 
-	const numKeys = 128
 	keys := make([][]byte, numKeys)
 	for i := 0; i < numKeys; i++ {
 		keys[i] = rng.RandomInZKField()

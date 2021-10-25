@@ -799,15 +799,49 @@ func (v *State) setProcessIDByStartBlock(processID []byte, startBlock uint32) er
 	return noState.Set(keyProcessIDsByStartBlock(startBlock), pidsBytes)
 }
 
+// setRollingCensusSize loads all processes from pids, and for those that are
+// rolling, it sets the RollingCensusSize parameter.
+func (v *State) setRollingCensusSize(pids [][]byte) error {
+	mainTreeView := v.mainTreeViewer(false)
+	for _, pid := range pids {
+		process, err := getProcess(mainTreeView, pid)
+		if err != nil {
+			return err
+		}
+		if !process.Mode.PreRegister {
+			continue
+		}
+		censusSize, err := getRollingCensusSize(mainTreeView, pid)
+		if err != nil {
+			return err
+		}
+		process.RollingCensusSize = &censusSize
+		if err := updateProcess(&v.Tx, process, pid); err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
 // Save persistent save of vochain mem trees
 func (v *State) Save() ([]byte, error) {
 	height := v.CurrentHeight()
+	var pidsStartNextBlock [][]byte
 	v.Tx.Lock()
 	err := func() error {
+		var err error
+		pidsStartNextBlock, err = v.processIDsByStartBlock(height + 1)
+		if err != nil {
+			return fmt.Errorf("cannot get processIDs by StartBlock: %w", err)
+		}
+		if err = v.setRollingCensusSize(pidsStartNextBlock); err != nil {
+			return fmt.Errorf("cannot set rollingCensusSize for processes")
+		}
+
 		if err := v.Tx.Commit(height); err != nil {
 			return fmt.Errorf("cannot commit statedb tx: %w", err)
 		}
-		var err error
 		if v.Tx.TreeTx, err = v.Store.BeginTx(); err != nil {
 			return fmt.Errorf("cannot begin statedb tx: %w", err)
 		}
@@ -832,13 +866,9 @@ func (v *State) Save() ([]byte, error) {
 	}
 
 	// Notify listeners about processes that start in the next block.
-	pids, err := v.processIDsByStartBlock(height + 1)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get processIDs by StartBlock: %w", err)
-	}
-	if len(pids) > 0 {
+	if len(pidsStartNextBlock) > 0 {
 		for _, l := range v.eventListeners {
-			l.OnProcessesStart(pids)
+			l.OnProcessesStart(pidsStartNextBlock)
 		}
 	}
 	// TODO: Purge rolling censuses from all processes that start now

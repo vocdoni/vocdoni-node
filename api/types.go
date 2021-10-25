@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
+	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
@@ -187,6 +188,7 @@ type MetaResponse struct {
 	CensusKeys           [][]byte                         `json:"censusKeys,omitempty"`
 	CensusValues         []types.HexBytes                 `json:"censusValues,omitempty"`
 	CensusDump           []byte                           `json:"censusDump,omitempty"`
+	CircuitConfig        *artifacts.CircuitConfig         `json:"circuitConfig,omitempty"`
 	Content              []byte                           `json:"content,omitempty"`
 	CreationTime         int64                            `json:"creationTime,omitempty"`
 	EncryptionPrivKeys   []Key                            `json:"encryptionPrivKeys,omitempty"`
