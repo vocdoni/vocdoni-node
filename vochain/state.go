@@ -830,6 +830,22 @@ func (v *State) Save() ([]byte, error) {
 			log.Warnf("event callback error on commit: %v", err)
 		}
 	}
+
+	// Notify listeners about processes that start in the next block.
+	pids, err := v.processIDsByStartBlock(height + 1)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get processIDs by StartBlock: %w", err)
+	}
+	if len(pids) > 0 {
+		for _, l := range v.eventListeners {
+			l.OnProcessesStart(pids)
+		}
+	}
+	// TODO: Purge rolling censuses from all processes that start now
+	// for _, pid := range pids {
+	//   v.PurgeRollingCensus(pid)
+	// }
+
 	return v.Store.Hash()
 }
 
@@ -867,26 +883,9 @@ func (v *State) CurrentHeight() uint32 {
 	return atomic.LoadUint32(&v.currentHeight)
 }
 
-// SetHeight sets the height for the current block and does work related to
-// starting a new block.
+// SetHeight sets the height for the current block.
 func (v *State) SetHeight(height uint32) {
 	atomic.StoreUint32(&v.currentHeight, height)
-
-	// Notify listeners about processes that start in this block.
-	pids, err := v.processIDsByStartBlock(height)
-	if err != nil {
-		log.Fatalf("cannot get processIDs by StartBlock: %v", err)
-	}
-	if len(pids) > 0 {
-		for _, l := range v.eventListeners {
-			l.OnProcessesStart(pids)
-		}
-	}
-
-	// TODO: Purge rolling censuses from all processes that start now
-	// for _, pid := range pids {
-	//   v.PurgeRollingCensus(pid)
-	// }
 }
 
 // WorkingHash returns the hash of the vochain StateDB (mainTree.Root)
