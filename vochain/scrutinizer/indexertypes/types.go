@@ -55,6 +55,8 @@ type Process struct {
 	FinalResults      bool                       `json:"finalResults"`
 	SourceBlockHeight uint64                     `json:"sourceBlockHeight"`
 	SourceNetworkId   string                     `badgerholdIndex:"SourceNetworkId" json:"sourceNetworkId"`
+	MaxCensusSize     uint64                     `json:"maxCensusSize"`
+	RollingCensusSize uint64                     `json:"rollingCensusSize"`
 }
 
 func (p Process) String() string {

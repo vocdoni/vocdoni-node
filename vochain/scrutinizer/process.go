@@ -353,6 +353,8 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		SourceNetworkId:   p.SourceNetworkId.String(),
 		Metadata:          p.GetMetadata(),
 		EntityIndex:       entity.ProcessCount,
+		MaxCensusSize:     p.GetMaxCensusSize(),
+		RollingCensusSize: p.GetRollingCensusSize(),
 	}
 	log.Debugf("new indexer process %s", proc.String())
 	return s.queryWithRetries(func() error { return s.db.Insert(pid, proc) })
@@ -377,6 +379,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 		update.PrivateKeys = p.EncryptionPrivateKeys
 		update.PublicKeys = p.EncryptionPublicKeys
 		update.Metadata = p.GetMetadata()
+		update.RollingCensusSize = p.GetRollingCensusSize()
 		// If the process is transacting to CANCELED, ensure results are not computed and remove
 		// them from the KV database.
 		if update.Status != int32(models.ProcessStatus_CANCELED) &&

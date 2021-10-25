@@ -193,7 +193,7 @@ func TestOnProcessStart(t *testing.T) {
 	startBlock := uint32(4)
 	doBlock(1, func() {
 		censusURI := "ipfs://foobar"
-		maxRollingCensusSize := uint64(16)
+		maxCensusSize := uint64(16)
 		p := &models.Process{
 			EntityId:   rng.RandomBytes(32),
 			CensusURI:  &censusURI,
@@ -205,7 +205,7 @@ func TestOnProcessStart(t *testing.T) {
 			EnvelopeType: &models.EnvelopeType{
 				Anonymous: true,
 			},
-			MaxRollingCensusSize: &maxRollingCensusSize,
+			MaxCensusSize: &maxCensusSize,
 		}
 		qt.Assert(t, s.AddProcess(p), qt.IsNil)
 	})

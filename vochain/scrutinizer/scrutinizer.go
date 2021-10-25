@@ -563,7 +563,14 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
-func (s *Scrutinizer) OnProcessesStart(pids [][]byte) {}
+func (s *Scrutinizer) OnProcessesStart(pids [][]byte) {
+	// Update existing processes
+	for _, p := range pids {
+		if err := s.updateProcess(p); err != nil {
+			log.Errorf("OnProcessesStart: cannot update process %x: %v", p, err)
+		}
+	}
+}
 
 // GetFriendlyResults translates votes into a matrix of strings
 func GetFriendlyResults(votes [][]*types.BigInt) [][]string {
