@@ -71,7 +71,7 @@ func TestRollingCensus(t *testing.T) {
 
 	process, err := app.State.Process(pid, true)
 	qt.Assert(t, err, qt.IsNil)
-	censusID := fmt.Sprintf("%x", process.CensusRoot)
+	censusID := fmt.Sprintf("%x", process.RollingCensusRoot)
 	census, ok := cm.Trees[censusID]
 	qt.Assert(t, ok, qt.Equals, true)
 

@@ -52,27 +52,28 @@ func rootLeafSetRoot(value []byte, root []byte) ([]byte, error) {
 	return root, nil
 }
 
-// processGetCensusRoot is the GetRootFn function to get the census root of a
-// process leaf.
+// processGetCensusRoot is the GetRootFn function to get the rolling census
+// root of a process leaf.
 func processGetCensusRoot(value []byte) ([]byte, error) {
 	var sdbProc models.StateDBProcess
 	if err := proto.Unmarshal(value, &sdbProc); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
 	}
-	if len(sdbProc.Process.CensusRoot) != defaultHashLen {
-		return nil, fmt.Errorf("len(sdbProc.Process.CensusRoot) != %v", defaultHashLen)
+	if len(sdbProc.Process.RollingCensusRoot) != defaultHashLen {
+		return nil, fmt.Errorf("len(sdbProc.Process.RollingCensusRoot) != %v",
+			defaultHashLen)
 	}
-	return sdbProc.Process.CensusRoot, nil
+	return sdbProc.Process.RollingCensusRoot, nil
 }
 
-// processSetCensusRoot is the SetRootFn function to set the census root of a
-// process leaf.
+// processSetCensusRoot is the SetRootFn function to set the rolling census
+// root of a process leaf.
 func processSetCensusRoot(value []byte, root []byte) ([]byte, error) {
 	var sdbProc models.StateDBProcess
 	if err := proto.Unmarshal(value, &sdbProc); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
 	}
-	sdbProc.Process.CensusRoot = root
+	sdbProc.Process.RollingCensusRoot = root
 	newValue, err := proto.Marshal(&sdbProc)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal StateDBProcess: %w", err)
@@ -136,8 +137,9 @@ var (
 		ParentLeafSetRoot: rootLeafSetRoot,
 	})
 
-	// CensusCfg is the Census subTree (found under a Process leaf) configuration
-	// for a process that supports non-anonymous voting with rolling census.
+	// CensusCfg is the Rolling census subTree (found under a Process leaf)
+	// configuration for a process that supports non-anonymous voting with
+	// rolling census.
 	CensusCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
 		HashFunc:          arbo.HashFunctionSha256,
 		KindID:            "cen",
@@ -146,9 +148,10 @@ var (
 		ParentLeafSetRoot: processSetCensusRoot,
 	})
 
-	// CensusPoseidonCfg is the Census subTree (found under a Process leaf)
-	// configuration when the process supports anonymous voting with rolling
-	// census.  This Census subTree uses the SNARK friendly hash function Poseidon.
+	// CensusPoseidonCfg is the Rolling census subTree (found under a
+	// Process leaf) configuration when the process supports anonymous
+	// voting with rolling census.  This Census subTree uses the SNARK
+	// friendly hash function Poseidon.
 	CensusPoseidonCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
 		HashFunc:          arbo.HashFunctionPoseidon,
 		KindID:            "cenPos",
