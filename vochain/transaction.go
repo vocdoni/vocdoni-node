@@ -194,7 +194,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		verificationKey := app.ZkVKs[proofZkSNARK.CircuitParametersIndex]
 
 		// prepare the publicInputs that are defined by the process
-		censusRootBI := arbo.BytesToBigInt(process.CensusRoot)
+		censusRootBI := arbo.BytesToBigInt(process.RollingCensusRoot)
 		electionIdBI := arbo.BytesToBigInt(process.ProcessId)
 		publicInputs := []*big.Int{
 			electionIdBI,

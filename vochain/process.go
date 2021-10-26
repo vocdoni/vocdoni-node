@@ -22,7 +22,7 @@ func (v *State) AddProcess(p *models.Process) error {
 	preRegister := p.Mode != nil && p.Mode.PreRegister
 	anonymous := p.EnvelopeType != nil && p.EnvelopeType.Anonymous
 	if preRegister {
-		p.CensusRoot = emptyCensusRoot
+		p.RollingCensusRoot = emptyCensusRoot
 	}
 
 	newProcessBytes, err := proto.Marshal(

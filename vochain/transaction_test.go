@@ -145,9 +145,13 @@ func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
 		},
 		Mode:       &models.ProcessMode{},
 		Status:     models.ProcessStatus_READY,
-		CensusRoot: arbo.BigIntToBytes(32, censusRootBI),
+		CensusRoot: make([]byte, 32), // emtpy hash
 	}
 	err = app.State.AddProcess(process)
+	qt.Assert(t, err, qt.IsNil)
+	process, err = app.State.Process(processId, false)
+	process.RollingCensusRoot = arbo.BigIntToBytes(32, censusRootBI)
+	err = app.State.updateProcess(process, processId)
 	qt.Assert(t, err, qt.IsNil)
 
 	protoProof := models.ProofZkSNARK{
