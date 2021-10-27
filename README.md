@@ -6,9 +6,9 @@
 [![Join Discord](https://img.shields.io/badge/discord-join%20chat-blue.svg)](https://discord.gg/4hKeArDaU2)
 [![Twitter Follow](https://img.shields.io/twitter/follow/vocdoni.svg?style=social&label=Follow)](https://twitter.com/vocdoni)
 
-This repository contains a set of libraries and tools for the **Vocdoni** decentralized backend infrastrucutre, as described [in the documentation](http://vocdoni.io/docs/#/).
+This repository contains a set of libraries and tools for the **Vocdoni** decentralized backend infrastructure, as described [in the documentation](https://docs.vocdoni.io/).
 
-A good summary of the whole Vocdoni architecture can be found in the [blog post technical overview v1](https://blog.vocdoni.io/vocdoni-technical-overview-v1/).
+A good summary of the whole Vocdoni architecture can be found in the [blog post technical overview v1](https://blog.aragon.org/vocdoni-technical-overview-v1/).
 
 ## Vocdoni
 
@@ -26,10 +26,10 @@ The dvotenode is the main tool of go-dvote, it contains all the required feature
 
 Currently dvotenode can operate in three modes:
 
-- **gateway** mode provides an entry point to the P2P networks for the clients (APP or Web), it uses most of the components from go-dvote. Detailed information can be found [here](https://vocdoni.io/docs/#/architecture/components/gateway)
+- **gateway** mode provides an entry point to the P2P networks for the clients (APP or Web), it uses most of the components from go-dvote. Detailed information can be found [here](https://docs.vocdoni.io/architecture/services/gateway.html)
 
-- **miner** mode provides a block validation node (full node) of the Vochain (Tendermint based blockchain for voting). Defailed information can be found [here](https://vocdoni.io/docs/#/architecture/components/vochain)
-- **oracle** mode provdes a bridge between Ethereum and the Vochain
+- **miner** mode provides a block validation node (full node) of the Vochain (Tendermint based blockchain for voting). Detailed information can be found [here](https://docs.vocdoni.io/architecture/services/vochain.html)
+- **oracle** mode provides a bridge between Ethereum and the Vochain
 
 One of the design primitives of go-dvote is to run everything as a single daemon in order to have complete control over the components and avoid local RPC or IPC connections. So unlike other projects, go-dvote uses go-ethereum, go-ipfs and tendermint as GoLang libraries.
 

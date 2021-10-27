@@ -2,7 +2,7 @@
 name: Add feature
 about: Enhance this repository to help us on reinvent digital voting
 title: "feature: <add-text-here>"
-labels: enchancement
+labels: enhancement
 assignees: ""
 ---
 
@@ -22,7 +22,7 @@ Call out any constraint and/or assumption relevant for the development and use o
 
 **Additional information (if required)**
 
-- Infractucture needed (e.g. web3 endpoint)
+- Infrastucture needed (e.g. web3 endpoint)
 - Drawbacks
 - Alternatives
 - Benchmarks
