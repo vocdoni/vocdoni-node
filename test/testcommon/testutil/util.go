@@ -53,6 +53,10 @@ func (r *Random) RandomBytes(n int) []byte {
 	return b
 }
 
+func (r *Random) RandomIntn(n int) int {
+	return r.rand.Intn(n)
+}
+
 // RandomInSnarkField returns a random litte-endian encoded element in the
 // ZK SNARK field.
 func (r *Random) RandomInZKField() []byte {
