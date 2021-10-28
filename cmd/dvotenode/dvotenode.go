@@ -141,6 +141,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"user alternative vochain miner private key (hexstring[64])")
 	globalCfg.VochainConfig.NodeKey = *flag.String("vochainNodeKey", "",
 		"user alternative vochain private key (hexstring[64])")
+	globalCfg.VochainConfig.PrivValidatorListenAddr = *flag.String("vochainPrivValidator", "",
+		"if defined, Tendermint node will open a port and wait for a remote private validator connection (example: tcp://0.0.0.0:26658)")
 	globalCfg.VochainConfig.NoWaitSync = *flag.Bool("vochainNoWaitSync", false,
 		"do not wait for Vochain to synchronize (for testing only)")
 	globalCfg.VochainConfig.SeedMode = *flag.Bool("vochainSeedMode", false,
@@ -246,6 +248,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.Genesis", flag.Lookup("vochainGenesis"))
 	viper.BindPFlag("vochainConfig.MinerKey", flag.Lookup("vochainMinerKey"))
 	viper.BindPFlag("vochainConfig.NodeKey", flag.Lookup("vochainNodeKey"))
+	viper.BindPFlag("vochainConfig.PrivValidatorListenAddr", flag.Lookup("vochainPrivValidator"))
 	viper.BindPFlag("vochainConfig.NoWaitSync", flag.Lookup("vochainNoWaitSync"))
 	viper.BindPFlag("vochainConfig.SeedMode", flag.Lookup("vochainSeedMode"))
 	viper.BindPFlag("vochainConfig.MempoolSize", flag.Lookup("vochainMempoolSize"))
