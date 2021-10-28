@@ -11,7 +11,6 @@ import (
 
 // MessageAPI inteface defines the methods that the SignedJRPC custom message type must contain.
 type MessageAPI interface {
-	GetID() string
 	SetID(string)
 	SetTimestamp(int32)
 	SetError(string)

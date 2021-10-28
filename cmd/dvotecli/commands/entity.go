@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
-	"go.vocdoni.io/dvote/router"
+	"go.vocdoni.io/dvote/rpcapi"
 )
 
 var (
@@ -44,9 +44,9 @@ func entityList(cmd *cobra.Command, args []string) error {
 	}
 
 	entities := append([]string{}, resp.EntityIDs...)
-	if len(entities) == router.MaxListSize {
+	if len(entities) == rpcapi.MaxListSize {
 		for i, count := 1, len(entities); count > 0 && i < MaxListIterations; i++ {
-			req.From = i * router.MaxListSize
+			req.From = i * rpcapi.MaxListSize
 			resp, err := cl.Request(req, nil)
 			if err != nil {
 				return err
