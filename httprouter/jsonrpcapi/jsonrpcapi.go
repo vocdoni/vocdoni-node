@@ -34,12 +34,14 @@ import (
 type SignedJRPC struct {
 	signer    *ethereum.SignKeys
 	reqType   func() MessageAPI
+	resType   func() MessageAPI
 	methods   map[string]*registeredMethod
 	adminAddr *ethcommon.Address
 }
 
 // SignedJRPCdata is the data type used by SignedJRPC
 type SignedJRPCdata struct {
+	ID                 string
 	Method             string
 	Address            ethcommon.Address
 	SignaturePublicKey []byte
@@ -54,12 +56,14 @@ type registeredMethod struct {
 
 // NewSignedJRPC returns an initialized instance of the SignedJRPC type.
 // A signer is required in order to create signatures and authenticate clients.
-// A function returning an empty type implementing the custom MessageAPI should also be provided.
-func NewSignedJRPC(signer *ethereum.SignKeys, reqType func() MessageAPI) *SignedJRPC {
+// A function returning an empty type implementing the custom MessageAPI should be provided
+// for request message and for response messages (might be the same).
+func NewSignedJRPC(signer *ethereum.SignKeys, reqType func() MessageAPI, resType func() MessageAPI) *SignedJRPC {
 	return &SignedJRPC{
 		methods: make(map[string]*registeredMethod, 128),
 		signer:  signer,
 		reqType: reqType,
+		resType: resType,
 	}
 }
 
@@ -100,7 +104,7 @@ func (s *SignedJRPC) SendError(requestID string, errorMsg string, ctxt *httprout
 	if ctxt == nil {
 		return fmt.Errorf("http context is nil")
 	}
-	msg := s.reqType()
+	msg := s.resType()
 	msg.SetError(errorMsg)
 	data, err := BuildReply(s.signer, msg, requestID)
 	if err != nil {
@@ -141,8 +145,12 @@ func (s *SignedJRPC) getRequest(payload []byte) (*SignedJRPCdata, error) {
 	if err := json.Unmarshal(payload, &reqOuter); err != nil {
 		return nil, err
 	}
-
+	if reqOuter.ID == "" {
+		return nil, fmt.Errorf("missing request ID")
+	}
 	request := new(SignedJRPCdata)
+	request.ID = reqOuter.ID
+
 	// Second unmarshal the request message to obtain the method
 	request.Message = s.reqType()
 	if err := json.Unmarshal(reqOuter.MessageAPI, request.Message); err != nil {

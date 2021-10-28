@@ -25,12 +25,11 @@ import (
 	"go.vocdoni.io/dvote/db"
 	ethchain "go.vocdoni.io/dvote/ethereum"
 	"go.vocdoni.io/dvote/ethereum/ethevents"
+	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
-	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
 	"go.vocdoni.io/dvote/oracle"
-	"go.vocdoni.io/dvote/oracle/apioracle"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -426,7 +425,8 @@ func main() {
 
 	var err error
 	var signer *ethereum.SignKeys
-	var pxy *mhttp.Proxy
+	//var pxy *mhttp.Proxy
+	var apiRouter httprouter.HTTProuter
 	var storage data.Storage
 	var cm *census.Manager
 	var vnode *vochain.BaseApplication
@@ -469,18 +469,20 @@ func main() {
 	// Websockets and HTTPs proxy for Gateway and EthApiOracle
 	if globalCfg.Mode == types.ModeGateway || globalCfg.Metrics.Enabled ||
 		(globalCfg.Mode == types.ModeEthAPIoracle) {
-		// Proxy service
-		pxy, err = service.Proxy(globalCfg.API.ListenHost, globalCfg.API.ListenPort,
-			globalCfg.API.Ssl.Domain, globalCfg.API.Ssl.DirCert)
+		// Initialize the HTTP API router
+		apiRouter.TLSdomain = globalCfg.API.Ssl.Domain
+		apiRouter.TLSdirCert = globalCfg.API.Ssl.DirCert
+		apiRouter.Init(globalCfg.API.ListenHost, globalCfg.API.ListenPort)
 		if err != nil {
 			log.Fatal(err)
 		}
 
+		// TODO NEW ROUTER
 		// Enable metrics via proxy
-		if globalCfg.Metrics.Enabled && pxy != nil {
-			ma = metrics.NewAgent("/metrics",
-				time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, pxy)
-		}
+		//if globalCfg.Metrics.Enabled {
+		//	ma = metrics.NewAgent("/metrics",
+		//		time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, apiRouter)
+		//}
 	}
 
 	if globalCfg.Mode == types.ModeGateway {
@@ -523,20 +525,7 @@ func main() {
 			vnode.Node.Wait()
 		}()
 
-		// Tendermint API
-		if globalCfg.Mode == types.ModeGateway && globalCfg.API.Tendermint {
-			// Enable Tendermint RPC proxy endpoint on /tendermint
-			tp := strings.Split(globalCfg.VochainConfig.RPCListen, ":")
-			if len(tp) != 2 {
-				log.Warnf("cannot get port from vochain RPC listen: %s",
-					globalCfg.VochainConfig.RPCListen)
-			} else {
-				pxy.AddWsHandler("/tendermint",
-					pxy.AddWsWsBridge("ws://127.0.0.1:"+tp[1]+"/websocket", types.VochainWsReadLimit),
-					types.VochainWsReadLimit) // tendermint needs up to 20 MB
-				log.Infof("tendermint API endpoint available at %s", "/tendermint")
-			}
-		}
+		// TODO NEW ROUTER: Remove tendermint endpoint flags
 
 		// Wait for Vochain to be ready
 		var h, hPrev uint32
@@ -623,31 +612,33 @@ func main() {
 			}
 		}
 
-		// Ethereum API oracle
-		if globalCfg.Mode == types.ModeEthAPIoracle {
-			router, err := service.API(globalCfg.API,
-				pxy,
-				nil,
-				nil, // census manager
-				nil, // vochain core
-				nil, // scrutinizere
-				nil,
-				globalCfg.VochainConfig.RPCListen,
-				signer,
-				ma)
-			if err != nil {
-				log.Fatal(err)
+		// TODO NEW ROUTER
+		/*
+			// Ethereum API oracle
+			if globalCfg.Mode == types.ModeEthAPIoracle {
+				router, err := service.API(globalCfg.API,
+					pxy,
+					nil,
+					nil, // census manager
+					nil, // vochain core
+					nil, // scrutinizere
+					nil,
+					globalCfg.VochainConfig.RPCListen,
+					signer,
+					ma)
+				if err != nil {
+					log.Fatal(err)
+				}
+				log.Info("starting oracle API")
+				apior, err := apioracle.NewAPIoracle(orc, router)
+				if err != nil {
+					log.Fatal(err)
+				}
+				if err := apior.EnableERC20(globalCfg.W3Config.ChainType, globalCfg.W3Config.W3External); err != nil {
+					log.Fatal(err)
+				}
 			}
-			log.Info("starting oracle API")
-			apior, err := apioracle.NewAPIoracle(orc, router)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if err := apior.EnableERC20(globalCfg.W3Config.ChainType, globalCfg.W3Config.W3External); err != nil {
-				log.Fatal(err)
-			}
-		}
-
+		*/
 	}
 
 	//
@@ -655,15 +646,14 @@ func main() {
 	//
 	if globalCfg.Mode == types.ModeGateway {
 		// dvote API service
-		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote {
+		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote || globalCfg.API.Indexer {
 			if _, err = service.API(globalCfg.API,
-				pxy,
+				&apiRouter,
 				storage,
 				cm,    // census manager
 				vnode, // vochain core
 				sc,    // scrutinizere
 				vinfo,
-				globalCfg.VochainConfig.RPCListen,
 				signer,
 				ma); err != nil {
 				log.Fatal(err)

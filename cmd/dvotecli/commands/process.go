@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
-	"go.vocdoni.io/dvote/router"
+	"go.vocdoni.io/dvote/rpcapi"
 	"go.vocdoni.io/dvote/util"
 )
 
@@ -86,9 +86,9 @@ func processList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf(resp.Message)
 	}
 	procs := append([]string{}, resp.ProcessList...)
-	if len(procs) == router.MaxListSize {
+	if len(procs) == rpcapi.MaxListSize {
 		for i, count := 1, len(procs); count > 0 && i < MaxListIterations; i++ {
-			req.From = i * router.MaxListSize
+			req.From = i * rpcapi.MaxListSize
 			resp, err := cl.Request(req, nil)
 			if err != nil {
 				return err

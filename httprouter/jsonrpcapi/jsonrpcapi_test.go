@@ -25,7 +25,7 @@ func TestJSONRPCAPI(t *testing.T) {
 	// Create a standard API handler
 	signer := ethereum.NewSignKeys()
 	signer.Generate()
-	rpcAPI := NewSignedJRPC(signer, NewAPI)
+	rpcAPI := NewSignedJRPC(signer, NewAPI, NewAPI)
 
 	// Add it under namespace "rpc"
 	r.AddNamespace("rpc", rpcAPI)
@@ -43,21 +43,21 @@ func TestJSONRPCAPI(t *testing.T) {
 		switch req.Method {
 		case "add":
 			if apiMsg.Name == "" || apiMsg.Age == 0 {
-				rpcAPI.SendError(req.Message.GetID(), "name or age missing", msg.Context)
+				rpcAPI.SendError(req.ID, "name or age missing", msg.Context)
 				break
 			}
 			resp.Ok = true
-			data, err := BuildReply(signer, &resp, req.Message.GetID())
+			data, err := BuildReply(signer, &resp, req.ID)
 			qt.Check(t, err, qt.IsNil)
 			err = msg.Context.Send(data)
 			qt.Check(t, err, qt.IsNil)
 		case "del":
 			if apiMsg.Name == "" {
-				rpcAPI.SendError(req.Message.GetID(), "name missing", msg.Context)
+				rpcAPI.SendError(req.ID, "name missing", msg.Context)
 				break
 			}
 			resp.Ok = true
-			data, err := BuildReply(signer, &resp, req.Message.GetID())
+			data, err := BuildReply(signer, &resp, req.ID)
 			qt.Check(t, err, qt.IsNil)
 			msg.Context.Send(data)
 			qt.Check(t, err, qt.IsNil)
@@ -114,10 +114,6 @@ func (a *API) SetError(errorMsg string) {
 	a.Error = errorMsg
 }
 
-func (a *API) GetID() string {
-	return a.ID
-}
-
 func (a *API) SetTimestamp(ts int32) {
 	a.Timestamp = ts
 }
@@ -131,7 +127,7 @@ func doRequest(t *testing.T, url, method string, signer *ethereum.SignKeys, msg 
 		qt.Check(t, err, qt.IsNil)
 	}
 	msgReq := RequestMessage{
-		ID:         "123",
+		ID:         msg.ID,
 		Signature:  signature,
 		MessageAPI: data,
 	}
