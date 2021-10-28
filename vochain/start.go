@@ -13,6 +13,7 @@ import (
 	tmcfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	mempl "github.com/tendermint/tendermint/mempool"
+	"github.com/tendermint/tendermint/privval"
 
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	tmjson "github.com/tendermint/tendermint/libs/json"
@@ -264,22 +265,33 @@ func newTendermint(app *BaseApplication,
 		log.Errorf("failed to parse log level: %v", err)
 	}
 
-	// read or create private validator
-	pv, err := NewPrivateValidator(localConfig.MinerKey, tconfig)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
-	}
-	pv.Save()
+	// pv will contain a local private validator,
+	// if PrivValidatorListenAddr is defined, there's no need to initialize it since nm.NewNode() will ignore it
+	var pv *privval.FilePV
 
-	log.Infof("tendermint private key %x", pv.Key.PrivKey)
-	log.Infof("tendermint address: %s", pv.Key.Address)
-	aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
-	if err != nil {
-		return nil, err
+	// if PrivValidatorListenAddr is defined, use a remote private validator, like TMKMS which allows signing with Ledger
+	// else, use a local private validator
+	if len(localConfig.PrivValidatorListenAddr) > 0 {
+		log.Info("PrivValidatorListenAddr defined, Tendermint will wait for a remote private validator connection")
+		tconfig.PrivValidatorListenAddr = localConfig.PrivValidatorListenAddr
+	} else {
+		// read or create local private validator
+		pv, err = NewPrivateValidator(localConfig.MinerKey, tconfig)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
+		}
+		pv.Save()
+
+		log.Infof("tendermint private key %x", pv.Key.PrivKey)
+		log.Infof("tendermint address: %s", pv.Key.Address)
+		aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
+		if err != nil {
+			return nil, err
+		}
+		log.Infof("amino private key: %s", aminoPrivKey)
+		log.Infof("amino public key: %s", aminoPubKey)
+		log.Infof("using keyfile %s", tconfig.PrivValidatorKeyFile())
 	}
-	log.Infof("amino private key: %s", aminoPrivKey)
-	log.Infof("amino public key: %s", aminoPubKey)
-	log.Infof("using keyfile %s", tconfig.PrivValidatorKeyFile())
 
 	// nodekey is used for the p2p transport layer
 	var nodeKey *p2p.NodeKey
@@ -330,6 +342,24 @@ func newTendermint(app *BaseApplication,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}
+
+	// If using a remote private validator, the pubkeys are only available after nm.NewNode()
+	// In that case, print them now, for debugging purposes
+	if len(localConfig.PrivValidatorListenAddr) > 0 {
+		pv := node.PrivValidator()
+		pubKey, err := pv.GetPubKey()
+		if err != nil {
+			log.Warnf("failed to get pubkey from private validator: %v", err)
+		}
+		log.Infof("tendermint address: %v", pubKey.Address())
+
+		aminoPubKey, err := AminoPubKey(pubKey.Bytes())
+		if err != nil {
+			log.Warnf("failed to get amino public key: %v", err)
+		}
+		log.Infof("amino public key: %s", aminoPubKey)
+	}
+
 	log.Debugf("consensus config %+v", *node.Config().Consensus)
 	return node, nil
 }
@@ -348,4 +378,10 @@ func AminoKeys(key crypto25519.PrivKey) (private, public []byte, err error) {
 	}
 
 	return aminoKey, aminoPubKey, nil
+}
+
+// AminoPubKey is a helper function that transforms a standard EDDSA pubkey into
+// Tendermint like amino format useful for creating genesis files.
+func AminoPubKey(pubkey []byte) ([]byte, error) {
+	return tmjson.Marshal(pubkey)
 }
