@@ -1,6 +1,7 @@
 package rpcapi
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -33,6 +34,7 @@ func (a *RPCAPI) submitEnvelope(request *api.APIrequest) (*api.APIresponse, erro
 	if request.Payload == nil {
 		return nil, fmt.Errorf("payload is empty")
 	}
+
 	// Prepare Vote transaction
 	stx := &models.SignedTx{
 		Tx:        request.Payload,
@@ -86,58 +88,46 @@ func (r *RPCAPI) getEnvelopeStatus(request *api.APIrequest) (*api.APIresponse, e
 	return &response, nil
 }
 
-/*
-func (r *Router) getEnvelope(request RouterRequest) {
+func (r *RPCAPI) getEnvelope(request *api.APIrequest) (*api.APIresponse, error) {
 	// check nullifier
 	if len(request.Nullifier) != types.VoteNullifierSize {
-		r.SendError(request, "cannot get envelope: (malformed nullifier)")
-		return
+		return nil, fmt.Errorf("cannot get envelope: (malformed nullifier)")
 	}
 	env, err := r.Scrutinizer.GetEnvelope(request.Nullifier)
 	if err != nil {
-		r.SendError(request, fmt.Sprintf("cannot get envelope: (%v)", err))
-		return
+		return nil, fmt.Errorf("cannot get envelope: (%v)", err)
 	}
-	var response api.MetaResponse
+	var response api.APIresponse
 	response.Envelope = env
 	response.Registered = types.True
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getEnvelopeHeight(request RouterRequest) {
+func (r *RPCAPI) getEnvelopeHeight(request *api.APIrequest) (*api.APIresponse, error) {
 	// check pid
 	if len(request.ProcessID) != types.ProcessIDsize && len(request.ProcessID) != 0 {
-		r.SendError(request, "cannot get envelope height: (malformed processId)")
-		return
+		return nil, fmt.Errorf("cannot get envelope height: (malformed processId)")
 	}
 	votes, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
-		r.SendError(request, fmt.Sprintf("cannot get envelope height: (%v)", err))
-		return
+		return nil, fmt.Errorf("cannot get envelope height: (%v)", err)
 	}
-
-	var response api.MetaResponse
+	var response api.APIresponse
 	response.Height = new(uint32)
 	*response.Height = uint32(votes)
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getBlockHeight(request RouterRequest) {
-	var response api.MetaResponse
+func (r *RPCAPI) getBlockHeight(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
 	h := r.vocapp.Height()
 	response.Height = &h
 	response.BlockTimestamp = int32(r.vocapp.Timestamp())
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getProcessList(request RouterRequest) {
-	var response api.MetaResponse
+func (r *RPCAPI) getProcessList(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
 	max := request.ListSize
 	if max > MaxListSize || max <= 0 {
 		max = MaxListSize
@@ -152,63 +142,49 @@ func (r *Router) getProcessList(request RouterRequest) {
 		request.Status,
 		request.WithResults)
 	if err != nil {
-		r.SendError(request, fmt.Sprintf("cannot get process list: (%s)", err))
-		return
+		return nil, fmt.Errorf("cannot get process list: (%s)", err)
 	}
 	for _, p := range processList {
 		response.ProcessList = append(response.ProcessList, fmt.Sprintf("%x", p))
 	}
 	if len(response.ProcessList) == 0 {
 		response.Message = "no processes found for the query"
-		if err := request.Send(r.BuildReply(request, &response)); err != nil {
-			log.Warnf("error sending response: %s", err)
-		}
-		return
+		return &response, nil
 	}
 
 	response.Size = new(int64)
 	*response.Size = int64(len(response.ProcessList))
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getProcessInfo(request RouterRequest) {
-	var response api.MetaResponse
+func (r *RPCAPI) getProcessInfo(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
 	var err error
 	response.Process, err = r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
-		r.SendError(request, fmt.Sprintf("cannot get process info: %v", err))
-		return
+		return nil, fmt.Errorf("cannot get process info: (%v)", err)
 	}
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getProcessSummary(request RouterRequest) {
-	var response api.MetaResponse
+func (r *RPCAPI) getProcessSummary(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
 	if len(request.ProcessID) != types.ProcessIDsize {
-		r.SendError(request, "cannot get envelope status: (malformed processId)")
-		return
+		return nil, fmt.Errorf("cannot get envelope status: (malformed processId)")
 	}
 
 	// Get process info
 	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
-		r.SendError(request, err.Error())
-		return
+		return nil, fmt.Errorf("cannot get envelope status: (cannot get process info (%v))", err)
 	}
 
 	// Get total number of votes (including invalid/null)
 	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
 		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
-		if err := request.Send(r.BuildReply(request, &response)); err != nil {
-			log.Warnf("error sending response: %s", err)
-		}
-		return
+		return &response, nil
 	}
 	votes := uint32(eh)
 
@@ -223,42 +199,34 @@ func (r *Router) getProcessSummary(request RouterRequest) {
 		State:           models.ProcessStatus(procInfo.Status).String(),
 		EnvelopeType:    procInfo.Envelope,
 	}
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getProcessCount(request RouterRequest) {
-	var response api.MetaResponse
+func (r *RPCAPI) getProcessCount(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
 	response.Size = new(int64)
 	count := r.Scrutinizer.ProcessCount(request.EntityId)
 	*response.Size = int64(count)
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getEntityCount(request RouterRequest) {
-	var response api.MetaResponse
+func (r *RPCAPI) getEntityCount(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
 	response.Size = new(int64)
 	*response.Size = int64(r.Scrutinizer.EntityCount())
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getProcessKeys(request RouterRequest) {
+func (r *RPCAPI) getProcessKeys(request *api.APIrequest) (*api.APIresponse, error) {
 	// check pid
 	if len(request.ProcessID) != types.ProcessIDsize {
-		r.SendError(request, "cannot get envelope status: (malformed processId)")
-		return
+		return nil, fmt.Errorf("cannot get envelope status: (malformed processId)")
 	}
 	process, err := r.vocapp.State.Process(request.ProcessID, true)
 	if err != nil {
-		r.SendError(request, fmt.Sprintf("cannot get process encryption public keys: (%s)", err))
-		return
+		return nil, fmt.Errorf("cannot get process encryption public keys: (%s)", err)
 	}
-	var response api.MetaResponse
+	var response api.APIresponse
 	var pubs, privs []api.Key
 	for idx, pubk := range process.EncryptionPublicKeys {
 		if len(pubk) > 0 {
@@ -272,53 +240,42 @@ func (r *Router) getProcessKeys(request RouterRequest) {
 	}
 	response.EncryptionPublicKeys = pubs
 	response.EncryptionPrivKeys = privs
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getResultsWeight(request RouterRequest) {
-	var response api.MetaResponse
+func (r *RPCAPI) getResultsWeight(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
 	w, err := r.Scrutinizer.GetResultsWeight(request.ProcessID)
 	if err != nil {
-		r.SendError(request, fmt.Sprintf("cannot get results weight: %v", err))
-		return
+		return nil, fmt.Errorf("cannot get results weight: %v", err)
 	}
 	response.Weight = w.String()
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getOracleResults(request RouterRequest) {
-	var response api.MetaResponse
+func (r *RPCAPI) getOracleResults(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
 	if len(request.ProcessID) != types.ProcessIDsize {
-		r.SendError(request, "cannot get oracle results: (malformed processId)")
-		return
+		return nil, fmt.Errorf("cannot get oracle results: (malformed processId)")
 	}
 	var err error
 	response.Results, err = r.vocapp.State.GetProcessResults(request.ProcessID)
 	if err != nil {
-		r.SendError(request, fmt.Sprintf("cannot get oracle results: %v", err))
-		return
+		return nil, fmt.Errorf("cannot get oracle results: %v", err)
 	}
-	request.Send(r.BuildReply(request, &response))
+	return &response, nil
 }
 
-func (r *Router) getResults(request RouterRequest) {
+func (r *RPCAPI) getResults(request *api.APIrequest) (*api.APIresponse, error) {
 	if len(request.ProcessID) != types.ProcessIDsize {
-		r.SendError(request, "cannot get envelope status: (malformed processId)")
-		return
+		return nil, fmt.Errorf("cannot get results: (malformed processId)")
 	}
-
-	var response api.MetaResponse
-
+	var response api.APIresponse
 	// Get process info
 	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
-		r.SendError(request, err.Error())
-		return
+		return nil, fmt.Errorf("cannot get results: (%v)", err)
 	}
 
 	if procInfo.Envelope.Anonymous {
@@ -341,19 +298,14 @@ func (r *Router) getResults(request RouterRequest) {
 	// Get results info
 	vr, err := r.Scrutinizer.GetResults(request.ProcessID)
 	if err != nil && err != scrutinizer.ErrNoResultsYet {
-		r.SendError(request, err.Error())
-		return
+		return nil, fmt.Errorf("cannot get results: (%v)", err)
 	}
 	if errors.Is(err, scrutinizer.ErrNoResultsYet) {
 		response.Message = scrutinizer.ErrNoResultsYet.Error()
-		if err := request.Send(r.BuildReply(request, &response)); err != nil {
-			log.Warnf("error sending response: %s", err)
-		}
-		return
+		return &response, nil
 	}
 	if vr == nil {
-		r.SendError(request, "unknown problem fetching results")
-		return
+		return nil, fmt.Errorf("cannot get results: (unknown error fetching results)")
 	}
 	response.Results = scrutinizer.GetFriendlyResults(vr.Votes)
 	response.Final = &vr.Final
@@ -363,39 +315,29 @@ func (r *Router) getResults(request RouterRequest) {
 	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
 		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
-		if err := request.Send(r.BuildReply(request, &response)); err != nil {
-			log.Warnf("error sending response: %s", err)
-		}
-		return
+		return &response, nil
 	}
 	votes := uint32(eh)
 	response.Height = &votes
 	response.Weight = vr.Weight.String()
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
 // known entities
-func (r *Router) getEntityList(request RouterRequest) {
-	var response api.MetaResponse
+func (r *RPCAPI) getEntityList(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize
 	}
 	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
 
-func (r *Router) getBlockStatus(request RouterRequest) {
-	var response api.MetaResponse
+func (r *RPCAPI) getBlockStatus(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
 	h := r.vocapp.Height()
 	response.Height = &h
 	response.BlockTime = r.vocinfo.BlockTimes()
 	response.BlockTimestamp = int32(r.vocapp.Timestamp())
-	if err := request.Send(r.BuildReply(request, &response)); err != nil {
-		log.Warnf("error sending response: %s", err)
-	}
+	return &response, nil
 }
-*/
