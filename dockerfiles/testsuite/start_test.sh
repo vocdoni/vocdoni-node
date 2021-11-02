@@ -1,18 +1,26 @@
 #!/bin/bash
-# bash start_test.sh <0|1|2>
+set -x
+# bash start_test.sh <0|1|2|3>
 #  0: run all tests <default>
 #  1: run poll vote test
 #  2: run encrypted vote test
+#  3: run anonymous vote test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
 ORACLE_KEY=${TESTSUITE_ORACLE_KEY:-6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223}
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
+ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-16}
 TEST=${1:-0}
 CLEAN=${CLEAN:-1}
 
 test() {
-	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway:9090/dvote --logLevel=INFO --electionType=$1
+	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway:9090/dvote --logLevel=INFO --operation=vtest --electionType=$1
 	echo $? >$2
+}
+
+test_anon() {
+	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE_ANON --gwHost http://gateway:9090/dvote --logLevel=INFO --operation=anonvoting
+	echo $? >$1
 }
 
 echo "### Starting test suite ###"
@@ -39,6 +47,13 @@ testid="/tmp/.vochaintest$RANDOM"
 	test encrypted-poll ${testid}2 &
 } || echo 0 >${testid}2
 
+# TODO: Uncomment this line and remove the next one once anonymous voting integration test works
+# [ $TEST -eq 3 -o $TEST -eq 0 ] && {
+[ $TEST -eq 3 ] && {
+	echo "### Running test 3 ###"
+	test_anon ${testid}3 &
+} || echo 0 >${testid}3
+
 echo "### Waiting for tests ###"
 wait
 
@@ -47,7 +62,7 @@ wait
 	docker-compose down -v --remove-orphans
 }
 
-[ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" ] && {
+[ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" -a "$(cat ${testid}3)" == "0" ] && {
 	echo "Vochain test finished correctly!"
 	RET=0
 } || {
@@ -56,5 +71,5 @@ wait
 	echo "### Post run logs ###"
 	docker-compose logs --tail 1000
 }
-rm -f ${testid}1 ${testid}2
+rm -f ${testid}1 ${testid}2 ${testid}3
 exit $RET
