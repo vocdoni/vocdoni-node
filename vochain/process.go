@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/vocdoni/arbo"
+	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/types"
@@ -414,7 +415,16 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 			"maxCensusSize to be > 0")
 	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
-		circuits := Genesis[app.chainId].CircuitsConfig
+		var circuits []artifacts.CircuitConfig
+		if genesis, ok := Genesis[app.chainId]; ok {
+			circuits = genesis.CircuitsConfig
+		} else {
+			log.Warn("Using dev network genesis CircuitsConfig")
+			circuits = Genesis["dev"].CircuitsConfig
+		}
+		if len(circuits) == 0 {
+			return nil, fmt.Errorf("no circuit configs in the %v genesis", app.chainId)
+		}
 		if *tx.Process.MaxCensusSize > uint64(circuits[len(circuits)-1].Parameters[0]) {
 			return nil, fmt.Errorf("maxCensusSize for anonymous envelope "+
 				"cannot be bigger than the parameter for the biggest circuit (%v)",

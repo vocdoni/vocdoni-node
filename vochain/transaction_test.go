@@ -150,6 +150,7 @@ func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
 	err = app.State.AddProcess(process)
 	qt.Assert(t, err, qt.IsNil)
 	process, err = app.State.Process(processId, false)
+	qt.Assert(t, err, qt.IsNil)
 	process.RollingCensusRoot = arbo.BigIntToBytes(32, censusRootBI)
 	err = app.State.updateProcess(process, processId)
 	qt.Assert(t, err, qt.IsNil)

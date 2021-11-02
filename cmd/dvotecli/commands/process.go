@@ -187,7 +187,7 @@ func processCircuitConfig(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{Method: "getCircuitConfig"}
+	req := api.MetaRequest{Method: "getProcessCircuitConfig"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err

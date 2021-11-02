@@ -39,6 +39,7 @@ type Process struct {
 	EndBlock          uint32                     `badgerholdIndex:"EndBlock" json:"endBlock"`
 	Rheight           uint32                     `badgerholdIndex:"Rheight" json:"-"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
+	RollingCensusRoot types.HexBytes             `json:"rollingCensusRoot"`
 	CensusURI         string                     `json:"censusURI"`
 	Metadata          string                     `json:"metadata"`
 	CensusOrigin      int32                      `json:"censusOrigin"`

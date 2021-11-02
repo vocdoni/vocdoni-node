@@ -54,6 +54,7 @@ func (r *Router) EnableVoteAPI(vocapp *vochain.BaseApplication, vocInfo *vochain
 	r.RegisterPublic("getBlockHeight", r.getBlockHeight)
 	r.RegisterPublic("getProcessKeys", r.getProcessKeys)
 	r.RegisterPublic("getProcessCircuitConfig", r.getProcessCircuitConfig)
+	r.RegisterPublic("getProcessRollingCensusSize", r.getProcessRollingCensusSize)
 	r.RegisterPublic("getBlockStatus", r.getBlockStatus)
 	r.RegisterPublic("getOracleResults", r.getOracleResults)
 }
