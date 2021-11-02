@@ -74,7 +74,7 @@ func (r *RPCAPI) getEnvelopeStatus(request *api.APIrequest) (*api.APIresponse, e
 	// Check envelope status and send reply
 	var response api.APIresponse
 	response.Registered = types.False
-	vr, err := r.Scrutinizer.GetEnvelopeReference(request.Nullifier)
+	vr, err := r.scrutinizer.GetEnvelopeReference(request.Nullifier)
 	if err != nil {
 		if errors.Is(err, scrutinizer.ErrNotFoundInDatabase) {
 			return &response, nil
@@ -93,7 +93,7 @@ func (r *RPCAPI) getEnvelope(request *api.APIrequest) (*api.APIresponse, error) 
 	if len(request.Nullifier) != types.VoteNullifierSize {
 		return nil, fmt.Errorf("cannot get envelope: (malformed nullifier)")
 	}
-	env, err := r.Scrutinizer.GetEnvelope(request.Nullifier)
+	env, err := r.scrutinizer.GetEnvelope(request.Nullifier)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get envelope: (%v)", err)
 	}
@@ -108,7 +108,7 @@ func (r *RPCAPI) getEnvelopeHeight(request *api.APIrequest) (*api.APIresponse, e
 	if len(request.ProcessID) != types.ProcessIDsize && len(request.ProcessID) != 0 {
 		return nil, fmt.Errorf("cannot get envelope height: (malformed processId)")
 	}
-	votes, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
+	votes, err := r.scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get envelope height: (%v)", err)
 	}
@@ -132,7 +132,7 @@ func (r *RPCAPI) getProcessList(request *api.APIrequest) (*api.APIresponse, erro
 	if max > MaxListSize || max <= 0 {
 		max = MaxListSize
 	}
-	processList, err := r.Scrutinizer.ProcessList(
+	processList, err := r.scrutinizer.ProcessList(
 		request.EntityId,
 		request.From,
 		max,
@@ -160,7 +160,7 @@ func (r *RPCAPI) getProcessList(request *api.APIrequest) (*api.APIresponse, erro
 func (r *RPCAPI) getProcessInfo(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	var err error
-	response.Process, err = r.Scrutinizer.ProcessInfo(request.ProcessID)
+	response.Process, err = r.scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get process info: (%v)", err)
 	}
@@ -174,14 +174,14 @@ func (r *RPCAPI) getProcessSummary(request *api.APIrequest) (*api.APIresponse, e
 	}
 
 	// Get process info
-	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
+	procInfo, err := r.scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
 		return nil, fmt.Errorf("cannot get envelope status: (cannot get process info (%v))", err)
 	}
 
 	// Get total number of votes (including invalid/null)
-	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
+	eh, err := r.scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
 		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
 		return &response, nil
@@ -205,7 +205,7 @@ func (r *RPCAPI) getProcessSummary(request *api.APIrequest) (*api.APIresponse, e
 func (r *RPCAPI) getProcessCount(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	response.Size = new(int64)
-	count := r.Scrutinizer.ProcessCount(request.EntityId)
+	count := r.scrutinizer.ProcessCount(request.EntityId)
 	*response.Size = int64(count)
 	return &response, nil
 }
@@ -213,7 +213,7 @@ func (r *RPCAPI) getProcessCount(request *api.APIrequest) (*api.APIresponse, err
 func (r *RPCAPI) getEntityCount(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	response.Size = new(int64)
-	*response.Size = int64(r.Scrutinizer.EntityCount())
+	*response.Size = int64(r.scrutinizer.EntityCount())
 	return &response, nil
 }
 
@@ -245,7 +245,7 @@ func (r *RPCAPI) getProcessKeys(request *api.APIrequest) (*api.APIresponse, erro
 
 func (r *RPCAPI) getResultsWeight(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
-	w, err := r.Scrutinizer.GetResultsWeight(request.ProcessID)
+	w, err := r.scrutinizer.GetResultsWeight(request.ProcessID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get results weight: %v", err)
 	}
@@ -272,7 +272,7 @@ func (r *RPCAPI) getResults(request *api.APIrequest) (*api.APIresponse, error) {
 	}
 	var response api.APIresponse
 	// Get process info
-	procInfo, err := r.Scrutinizer.ProcessInfo(request.ProcessID)
+	procInfo, err := r.scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
 		return nil, fmt.Errorf("cannot get results: (%v)", err)
@@ -296,7 +296,7 @@ func (r *RPCAPI) getResults(request *api.APIrequest) (*api.APIresponse, error) {
 	response.State = models.ProcessStatus(procInfo.Status).String()
 
 	// Get results info
-	vr, err := r.Scrutinizer.GetResults(request.ProcessID)
+	vr, err := r.scrutinizer.GetResults(request.ProcessID)
 	if err != nil && err != scrutinizer.ErrNoResultsYet {
 		return nil, fmt.Errorf("cannot get results: (%v)", err)
 	}
@@ -312,7 +312,7 @@ func (r *RPCAPI) getResults(request *api.APIrequest) (*api.APIresponse, error) {
 	h := uint32(vr.EnvelopeHeight)
 	response.Height = &h
 	// Get total number of votes (including invalid/null)
-	eh, err := r.Scrutinizer.GetEnvelopeHeight(request.ProcessID)
+	eh, err := r.scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
 		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
 		return &response, nil
@@ -329,7 +329,7 @@ func (r *RPCAPI) getEntityList(request *api.APIrequest) (*api.APIresponse, error
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize
 	}
-	response.EntityIDs = r.Scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
+	response.EntityIDs = r.scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
 	return &response, nil
 }
 
