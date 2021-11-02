@@ -2,19 +2,19 @@
 
 ## Summary
 
-Package statedb contains the implementation of StateDB, a database backed
+Package statedb contains the implementation of StateDB, a database-backed
 structure that holds the state of the blockchain indexed by version (each
-version corresponding to the state at each block).  The StateDB holds a dynamic
-hierarcy of linked merkle trees starting with the mainTree on top, with the
-property that the keys and values of all merkle trees can be cryptographically
+version corresponding to the state at each block). The StateDB holds a dynamic
+hierarchy of linked merkle trees starting with the mainTree on top. 
+The keys and values of all merkle trees can be cryptographically
 represented by a single hash, the StateDB.Hash (which corresponds to the
 mainTree.Root).
 
 ## Internals
 
 Internally all subTrees of the StateDB use the same database (for views) and
-the same transaction (for a block update).  Database prefixes are used to split
-the storage of each subTree while avoiding collisions.  The structure of
+the same transaction (for a block update). Database prefixes are used to split
+the storage of each subTree while avoiding collisions. The structure of
 prefixes is detailed here:
 - subTree: `{KindID}{id}/`
 	- arbo.Tree: `t/`
@@ -39,29 +39,32 @@ the mainTree skip the first element of the path (`{KindID}{id}/`).
 	of the subTree)
 
 Each tree has an associated database that can be accessed via the NoState
-method.  These databases are auxiliary key-values that don't belong to the
-blockchain state, and thus any value in the NoState databases won't be
-reflected in the StateDB.Hash.  One of the usecases for the NoState database is
-to store auxiliary mappings used to optimize the capacity usage of merkletrees
-used for zkSNARKS, where the number of levels is of critical matter.  For
+method. These databases are auxiliary key-values that don't belong to the
+blockchain state, and thus values in the NoState databases won't be
+reflected in the StateDB.Hash. One of the use cases for the NoState database is
+to store auxiliary mappings used to optimize the capacity usage of the merkle trees
+used for zk-SNARKS, where the tree height is a critical matter. For
 example, we may want to build a census tree of babyjubjub public keys that will
-be used to prove ownership of the public key via a SNARK in order to vote.  If
-we build the merkle tree using the public key as path, we will have an
-unbalanced tree which requires more levels than strictly necessary.  On the
-other hand, if we use a sequential index as path and set the value to the
-public key, we achieve maximum balancing reducing the number of tree levels.
-But then we can't easily query for the existence of a public key in the tree to
-generate a proof, as it requires to know its index.  In such a case, we can
-store the mapping of public key to index in the NoState database.
+be used by voters to prove, via a SNARK, that they are in the census and eligible 
+to vote with their public key. If we build the merkle tree using the public key 
+as the path, we will have an unbalanced tree which requires more levels than 
+strictly necessary. On the other hand, if we use a sequential index as the path 
+and set the value to the public key, we achieve a balanced tree, thus reducing 
+the height of the tree.
+The downside of this strategy is that it take away our ability to easily query 
+for the existence of an arbitrary public key in the tree when 
+generating a proof, as the index must be known. Thankfully we can
+store the mapping of public keys to indexes in the NoState database, 
+avoiding this dilemma. 
 
 ## Usage
 
 By default the StateDB has a single tree that will be the parent of all
 subTrees: the mainTree.
 
-The StateDB is updated via transactions.  When starting a new transaction
+The StateDB is updated via transactions. When starting a new transaction
 (`TreeTx`), you will also get a pointer to the mainTree (via a `TreeUpdate`
-type).  When commiting a transaction you must specify the version for the
+type). When commiting a transaction you must specify the version for the
 update.
 
 ```go
@@ -76,9 +79,9 @@ mainTree.Commit(1)
 
 The `TreeTx` and all `TreeUpdate`s derived from it are not thread-safe.
 
-You can get a read-only view of a commited version of the StateDB via the
-`TreeView` types.  Passing `nil` to `StateDB.TreeView` will return the last
-commited version.
+You can get a read-only view of a committed version of the StateDB via the
+`TreeView` types. Passing `nil` to `StateDB.TreeView` will return the last
+committed version.
 
 ```go
 mainTree, err := sdb.TreeView(nil)
@@ -87,11 +90,11 @@ qt.Assert(t, err, qt.IsNotNil)
 qt.Assert(t, value, qt.DeepEquals, []byte("value"))
 ```
 
-Each subTree can contain other subTrees.  Singleton subTrees are those that are
+Each subTree can contain other subTrees. Singleton subTrees are those that are
 unique, whereas NonSingleton subTrees can have many instances of the same type,
-identified by a different key.  To use a subTree you must first define its configuration:
+identified by a different key. To use a subTree you must first define its configuration:
 
-The following example is a Signleton subTree which stores its root as the
+The following example is a Singleton subTree that stores its root as the
 entire value of the parent leaf:
 ```go
 func rootLeafGetRoot(value []byte) ([]byte, error) {
@@ -109,16 +112,16 @@ func rootLeafSetRoot(value []byte, root []byte) ([]byte, error) {
 }
 
 ProcessesCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
-    HashFunc:          arbo.HashFunctionSha256,
-    KindID:            "procs",
-    MaxLevels:         256,
-    ParentLeafGetRoot: rootLeafGetRoot,
-    ParentLeafSetRoot: rootLeafSetRoot,
+  HashFunc:     arbo.HashFunctionSha256,
+  KindID:      "procs",
+  MaxLevels:     256,
+  ParentLeafGetRoot: rootLeafGetRoot,
+  ParentLeafSetRoot: rootLeafSetRoot,
 })
 ```
 
-Before accessing a subTree it must be created.  We do this by creating the
-parent leaf that will contain its root, and by opening the SubTree once.
+Before we can access a subTree, it must be created. We do this by creating the
+parent leaf that will contain its root and then opening the SubTree once.
 ```go
 mainTree, err := sdb.BeginTx()
 qt.Assert(t, err, qt.IsNotNil)
@@ -148,7 +151,7 @@ qt.Assert(t, err, qt.IsNotNil)
 mainTree.Commit(3)
 ```
 
-Using a NonSingleton subTree is very simmilar, but requires specifying a
+Using a NonSingleton subTree is very similar, but requires specifying a
 subTree key in the tree configuration:
 ```go
 census, err := processes.SubTree(CensusCfg.WithKey([]byte("processID")))
@@ -158,9 +161,9 @@ err := census.Add([]byte("nullifier"), []byte("censusKey"))
 qt.Assert(t, err, qt.IsNotNil)
 ```
 
-Apart from leafs identified by a path (key) and a value, each subTree has a
+Apart from leaves identified by a path (key) and a value, each subTree has a
 key-value storage that doesn't change the StateDB cryptographic integrity, the
-`NoState`.  This storage should only be used for auxiliary data, like mappings
+`NoState`. This storage should only be used for auxiliary data like mappings
 and indexes.
 
 ```go
@@ -174,19 +177,19 @@ qt.Assert(t, value, qt.DeepEquals, []byte("value"))
 ```
 
 Both `TreeUpdate` and `TreeView` implement the `TreeViewer` interface, which
-contains all the read-only methods.  This allows reusing code for reading from
-the StateDB either from a commited state or from the current update.
+contains all the read-only methods. This allows reusing code for reading from
+the StateDB either from a committed state or from the current update.
 
 Usually we will have several levels of subTrees that we need to traverse until
-we reach the desired subTree.  For better ergonomics when we don't care about
-the parent subTrees, we have the set of `Deep*` functions, which act the same
+we reach the desired subTree. For better ergonomics when we don't care about
+the parent subTrees, we can use the set of `Deep*` functions, which act the same
 way as the regular `Get`, `Set`, `SubTree` functions, but allow passing a list
-of tree configurations so that the operation is applied on the last one.  For
+of tree configurations so that the operation is applied to the last one. For
 example, the example above where we added a key in the census tree could have
 been done like this:
 
 ```go
 err := mainTree.DeepAdd([]byte("nullifier"), []byte("censusKey"), 
-  ProcessesCfg, CensusCfg.WithKey([]byte("processID")))
+ ProcessesCfg, CensusCfg.WithKey([]byte("processID")))
 qt.Assert(t, err, qt.IsNotNil)
 ```
