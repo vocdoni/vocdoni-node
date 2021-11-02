@@ -22,6 +22,7 @@ import (
 var ops = map[string]bool{
 	"vtest":          true,
 	"cspvoting":      true,
+	"anonvoting":     true,
 	"censusImport":   true,
 	"censusGenerate": true,
 }
@@ -46,6 +47,8 @@ func main() {
 	parallelCons := flag.Int("parallelCons", 1, "parallel API connections")
 	procDuration := flag.Int("processDuration", 500, "voting process duration in blocks")
 	doubleVote := flag.Bool("doubleVote", true, "send every vote twice")
+	// TODO: Set to default = true once #333 is resolved
+	doublePreRegister := flag.Bool("doublePreRegister", false, "send every pre-register twice")
 	checkNullifiers := flag.Bool("checkNullifiers", false,
 		"check that all votes are correct one-by-one (slow)")
 	gateways := flag.StringSlice("gwExtra", []string{},
@@ -91,6 +94,20 @@ func main() {
 	}
 
 	switch *opmode {
+	case "anonvoting":
+		mkTreeAnonVoteTest(*host,
+			*oraclePrivKey,
+			entityKey,
+			*electionSize,
+			*procDuration,
+			*parallelCons,
+			*doubleVote,
+			*doublePreRegister,
+			*checkNullifiers,
+			*gateways,
+			*keysfile,
+			true,
+			false)
 	case "vtest":
 		mkTreeVoteTest(*host,
 			*oraclePrivKey,
@@ -264,9 +281,12 @@ func mkTreeVoteTest(host,
 		entityKey.Address().Bytes(),
 		censusRoot,
 		censusURI,
-		pid, &models.EnvelopeType{EncryptedVotes: encryptedVotes},
+		pid,
+		&models.EnvelopeType{EncryptedVotes: encryptedVotes},
+		nil,
 		models.CensusOrigin_OFF_CHAIN_TREE,
-		procDuration)
+		procDuration,
+		uint64(electionSize))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -415,6 +435,304 @@ func mkTreeVoteTest(host,
 	log.Infof("all done!")
 }
 
+func mkTreeAnonVoteTest(host,
+	oraclePrivKey string,
+	entityKey *ethereum.SignKeys,
+	electionSize,
+	procDuration,
+	parallelCons int,
+	doubleVote, doublePreRegister, checkNullifiers bool,
+	gateways []string,
+	keysfile string,
+	useLastCensus bool,
+	forceGatewaysGotCensus bool) {
+	// log.Init("debug", "stdout")
+
+	var censusKeys []*ethereum.SignKeys
+	var proofs [][]byte
+	var err error
+	var censusRoot []byte
+	censusURI := ""
+
+	oracleKey := ethereum.NewSignKeys()
+	if err := oracleKey.AddHexKey(oraclePrivKey); err != nil {
+		log.Fatal(err)
+	}
+
+	// Try to reuse previous census and keys
+	censusKeys, proofs, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
+	if err != nil || len(censusKeys) < electionSize || len(proofs) < electionSize {
+		censusGenerate(host, entityKey, electionSize, keysfile)
+		censusKeys, proofs, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Infof("loaded cache census %x with size %d", censusRoot, len(censusKeys))
+		if len(censusKeys) > electionSize {
+			log.Infof("truncating census from %d to %d", len(censusKeys), electionSize)
+			censusKeys = censusKeys[:electionSize]
+			proofs = proofs[:electionSize]
+		}
+	}
+
+	log.Infof("connecting to main gateway %s", host)
+	// Add the first connection, this will be the main connection
+	var mainClient *client.Client
+	var clients []*client.Client
+
+	for tries := 10; tries > 0; tries-- {
+		mainClient, err = client.New(host)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer mainClient.Close()
+
+	// Create process
+	pid := client.Random(32)
+	log.Infof("creating process with entityID: %s", entityKey.AddressString())
+	start, err := mainClient.CreateProcess(
+		oracleKey,
+		entityKey.Address().Bytes(),
+		censusRoot,
+		censusURI,
+		pid,
+		&models.EnvelopeType{Anonymous: true},
+		&models.ProcessMode{AutoStart: true, Interruptible: true, PreRegister: true},
+		models.CensusOrigin_OFF_CHAIN_TREE,
+		procDuration,
+		uint64(electionSize))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Infof("created process with ID: %x", pid)
+	// Create the websockets connections for sending the votes
+	gwList := append(gateways, host)
+
+	for i := 0; i < parallelCons; i++ {
+		log.Infof("opening gateway connection to %s", gwList[i%len(gwList)])
+		cl, err := client.New(gwList[i%len(gwList)])
+		if err != nil {
+			log.Warn(err)
+			continue
+		}
+		defer cl.Close()
+		clients = append(clients, cl)
+	}
+
+	if forceGatewaysGotCensus {
+		// Make sure all gateways have the census
+		log.Infof("waiting for gateways to import the census")
+
+		workingGateways := make(map[string]bool)
+		for _, cl := range clients {
+			workingGateways[cl.Addr] = true
+		}
+
+		gatewaysWithCensus := make(map[string]bool)
+		for len(gatewaysWithCensus) < len(workingGateways) {
+			for _, cl := range clients {
+				if _, ok := gatewaysWithCensus[cl.Addr]; !ok {
+					if size, err := cl.CensusSize(censusRoot); err == nil {
+						if size < int64(electionSize) {
+							log.Fatalf("gateway %s has an incorrect census size (got: %d expected %d)",
+								cl.Addr, size, electionSize)
+						}
+						log.Infof("gateway %s got the census!", cl.Addr)
+						gatewaysWithCensus[cl.Addr] = true
+					} else {
+						log.Debug(err)
+					}
+				}
+				time.Sleep(time.Second * 2)
+			}
+		}
+
+		log.Infof("all gateways retrieved the census! let's start voting")
+	}
+
+	// Pre-register keys zkCensusKey
+	i := 0
+	p := len(censusKeys) / len(clients)
+	var wg sync.WaitGroup
+	var proofsReadyWG sync.WaitGroup
+	regKeyTimes := make([]time.Duration, len(clients))
+	wg.Add(len(clients))
+	proofsReadyWG.Add(len(clients))
+
+	for gw, cl := range clients {
+		var gwSigners []*ethereum.SignKeys
+		var gwProofs [][]byte
+		// Split the voters
+		if len(clients) == gw+1 {
+			// if last client, add all remaining keys
+			gwSigners = make([]*ethereum.SignKeys, len(censusKeys)-i)
+			copy(gwSigners, censusKeys[i:])
+			gwProofs = make([][]byte, len(censusKeys)-i)
+			copy(gwProofs, proofs[i:])
+		} else {
+			gwSigners = make([]*ethereum.SignKeys, p)
+			copy(gwSigners, censusKeys[i:i+p])
+			gwProofs = make([][]byte, p)
+			copy(gwProofs, proofs[i:i+p])
+		}
+		log.Infof("%s will receive %d register keys", cl.Addr, len(gwSigners))
+		gw, cl := gw, cl
+		go func() {
+			defer wg.Done()
+			if regKeyTimes[gw], err = cl.TestPreRegisterKeys(pid,
+				entityKey.Address().Bytes(),
+				censusRoot,
+				start,
+				gwSigners,
+				models.CensusOrigin_OFF_CHAIN_TREE,
+				nil,
+				gwProofs,
+				doubleVote,
+				doublePreRegister,
+				checkNullifiers,
+				&proofsReadyWG); err != nil {
+				log.Fatalf("[%s] %s", cl.Addr, err)
+			}
+			log.Infof("gateway %d %s has ended its job", gw, cl.Addr)
+		}()
+		i += p
+	}
+
+	// Wait until all pre-register keys sent and check the results
+	wg.Wait()
+
+	// Wait until al pre-register have been registered
+	log.Infof("waiting for all pre-registers to be registered...")
+	for {
+		rollingCensusSize, err := mainClient.GetRollingCensusSize(pid)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if int(rollingCensusSize) == electionSize {
+			break
+		}
+		log.Infof("RollingCensusSize = %v / %v", rollingCensusSize, electionSize)
+		time.Sleep(5 * time.Second)
+	}
+
+	maxRegKeyTime := time.Duration(0)
+	for _, t := range regKeyTimes {
+		if t > maxRegKeyTime {
+			maxRegKeyTime = t
+		}
+	}
+	log.Infof("the pre-register process took %s", maxRegKeyTime)
+
+	log.Infof("Waiting for start block...")
+	mainClient.WaitUntilBlock(start)
+
+	//
+	// End of pre-registration.  Now we do the voting step with a SNARK
+	//
+
+	proc, err := mainClient.GetProcessInfo(pid)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Infof("Process: %+v\n", proc)
+	rollingCensusRoot := proc.RollingCensusRoot
+
+	// Send votes
+	i = 0
+	p = len(censusKeys) / len(clients)
+	wg = sync.WaitGroup{}
+	proofsReadyWG = sync.WaitGroup{}
+	votingTimes := make([]time.Duration, len(clients))
+	wg.Add(len(clients))
+	proofsReadyWG.Add(len(clients))
+
+	for gw, cl := range clients {
+		var gwSigners []*ethereum.SignKeys
+		// Split the voters
+		if len(clients) == gw+1 {
+			// if last client, add all remaining keys
+			gwSigners = make([]*ethereum.SignKeys, len(censusKeys)-i)
+			copy(gwSigners, censusKeys[i:])
+		} else {
+			gwSigners = make([]*ethereum.SignKeys, p)
+			copy(gwSigners, censusKeys[i:i+p])
+		}
+		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
+		gw, cl := gw, cl
+		go func() {
+			defer wg.Done()
+			if votingTimes[gw], err = cl.TestSendAnonVotes(pid,
+				entityKey.Address().Bytes(),
+				rollingCensusRoot,
+				start,
+				gwSigners,
+				doubleVote,
+				checkNullifiers,
+				&proofsReadyWG); err != nil {
+				log.Fatalf("[%s] %s", cl.Addr, err)
+			}
+			log.Infof("gateway %d %s has ended its job", gw, cl.Addr)
+		}()
+		i += p
+	}
+
+	// Wait until all votes sent and check the results
+	wg.Wait()
+
+	log.Infof("waiting for all votes to be validated...")
+	timeDeadLine := time.Second * 200
+	if electionSize > 1000 {
+		timeDeadLine = time.Duration(electionSize/5) * time.Second
+	}
+	checkStart := time.Now()
+	i = 0
+	for {
+		time.Sleep(time.Millisecond * 1000)
+		if h, err := clients[i].GetEnvelopeHeight(pid); err != nil {
+			log.Warnf("error getting envelope height: %v", err)
+			i++
+			if i > len(clients) {
+				i = 0
+			}
+			continue
+		} else {
+			if h >= uint32(electionSize) {
+				break
+			}
+			log.Infof("validated votes: %d", h)
+		}
+		if time.Since(checkStart) > timeDeadLine {
+			log.Fatal("time deadline reached while waiting for results")
+		}
+	}
+
+	log.Infof("ending process in order to fetch the results")
+	if err := mainClient.EndProcess(oracleKey, pid); err != nil {
+		log.Fatal(err)
+	}
+	maxVotingTime := time.Duration(0)
+	for _, t := range votingTimes {
+		if t > maxVotingTime {
+			maxVotingTime = t
+		}
+	}
+	log.Infof("the ENTIRE voting process took %s", maxVotingTime)
+	log.Infof("checking results....")
+	if r, err := mainClient.TestResults(pid, len(censusKeys)); err != nil {
+		log.Fatal(err)
+	} else {
+		log.Infof("results: %+v", r)
+	}
+	log.Infof("all done!")
+}
+
 func cspVoteTest(
 	host,
 	oraclePrivKey string,
@@ -468,9 +786,12 @@ func cspVoteTest(
 		entityKey.Address().Bytes(),
 		cspKey.PublicKey(),
 		"https://dumycsp.foo",
-		pid, &models.EnvelopeType{EncryptedVotes: encryptedVotes},
+		pid,
+		&models.EnvelopeType{EncryptedVotes: encryptedVotes},
+		nil,
 		models.CensusOrigin_OFF_CHAIN_CA,
-		procDuration)
+		procDuration,
+		uint64(electionSize))
 	if err != nil {
 		log.Fatal(err)
 	}
