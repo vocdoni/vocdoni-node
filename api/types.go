@@ -188,6 +188,7 @@ type MetaResponse struct {
 	CensusKeys           [][]byte                         `json:"censusKeys,omitempty"`
 	CensusValues         []types.HexBytes                 `json:"censusValues,omitempty"`
 	CensusDump           []byte                           `json:"censusDump,omitempty"`
+	CircuitIndex         *int                             `json:"circuitIndex,omitempty"`
 	CircuitConfig        *artifacts.CircuitConfig         `json:"circuitConfig,omitempty"`
 	Content              []byte                           `json:"content,omitempty"`
 	CreationTime         int64                            `json:"creationTime,omitempty"`

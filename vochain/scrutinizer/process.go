@@ -339,6 +339,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		Rheight:           compResultsHeight,
 		HaveResults:       compResultsHeight > 0,
 		CensusRoot:        p.GetCensusRoot(),
+		RollingCensusRoot: p.GetRollingCensusRoot(),
 		CensusURI:         p.GetCensusURI(),
 		CensusOrigin:      int32(p.GetCensusOrigin()),
 		Status:            int32(p.GetStatus()),
@@ -375,6 +376,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 		}
 		update.EndBlock = p.GetBlockCount() + p.GetStartBlock()
 		update.CensusRoot = p.GetCensusRoot()
+		update.RollingCensusRoot = p.GetRollingCensusRoot()
 		update.CensusURI = p.GetCensusURI()
 		update.PrivateKeys = p.EncryptionPrivateKeys
 		update.PublicKeys = p.EncryptionPublicKeys

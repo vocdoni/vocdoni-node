@@ -277,6 +277,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 	switch r.Method {
 	case "genProof":
 		key := r.CensusKey
+		value := r.CensusValue
 		// TO-DO: if census=snarks do Poseidon hashing
 		//if !r.Digested {
 		//	key = snarks.Poseidon.Hash(key)
@@ -288,14 +289,15 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 				resp.SetError(err)
 				return resp
 			}
+			value = r.CensusKey
 		}
 		leafV, siblings, err := tr.GenProof(key)
 		if err != nil {
 			resp.SetError(err)
 			return resp
 		}
-		if !bytes.Equal(leafV, r.CensusValue) {
-			resp.SetError(fmt.Errorf("leaf value (%x) != r.CensusValue (%x)", leafV, r.CensusValue))
+		if !bytes.Equal(leafV, value) {
+			resp.SetError(fmt.Errorf("leaf value (%x) != request value (%x)", leafV, value))
 			return resp
 		}
 		resp.Siblings = siblings

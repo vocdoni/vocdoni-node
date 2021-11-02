@@ -64,13 +64,6 @@ func VerifyProof(process *models.Process, proof *models.Proof,
 func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
 	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
-	if process.EnvelopeType.Anonymous {
-		// TODO Poseidon hash of pubKey
-		// pubKeyDigested = snarks.Poseidon.Hash(pubKey)
-		// NOT IMPLEMENTED
-		return false, nil, fmt.Errorf("census origin OFF_CHAIN_TREE with " +
-			"EnvelopeType.Anonymous not implemented")
-	}
 	key := pubKey
 	switch proof.Payload.(type) {
 	case *models.Proof_Graviton:

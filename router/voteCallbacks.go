@@ -310,7 +310,7 @@ func (r *Router) getProcessCircuitConfig(request RouterRequest) {
 	}
 	process, err := r.vocapp.State.Process(request.ProcessID, true)
 	if err != nil {
-		r.SendError(request, fmt.Sprintf("cannot get process encryption public keys: (%s)", err))
+		r.SendError(request, fmt.Sprintf("cannot get process %x: %v", request.ProcessID, err))
 		return
 	}
 	if !process.EnvelopeType.Anonymous {
@@ -323,13 +323,45 @@ func (r *Router) getProcessCircuitConfig(request RouterRequest) {
 	}
 	var response api.MetaResponse
 	var config artifacts.CircuitConfig
-	for _, cfg := range vochain.Genesis[r.vocapp.ChainID()].CircuitsConfig {
+	index := -1
+	var circuits []artifacts.CircuitConfig
+	if genesis, ok := vochain.Genesis[r.vocapp.ChainID()]; ok {
+		circuits = genesis.CircuitsConfig
+	} else {
+		log.Warn("Using dev network genesis CircuitsConfig")
+		circuits = vochain.Genesis["dev"].CircuitsConfig
+	}
+	for i, cfg := range circuits {
 		if *process.RollingCensusSize <= uint64(cfg.Parameters[0]) {
+			index = i
 			config = cfg
 			break
 		}
 	}
-	response.CircuitConfig = &config
+	response.CircuitIndex = &index
+	if index != -1 {
+		response.CircuitConfig = &config
+	}
+	if err := request.Send(r.BuildReply(request, &response)); err != nil {
+		log.Warnf("error sending response: %s", err)
+	}
+}
+
+func (r *Router) getProcessRollingCensusSize(request RouterRequest) {
+	// check pid
+	if len(request.ProcessID) != types.ProcessIDsize {
+		r.SendError(request, "cannot get envelope status: (malformed processId)")
+		return
+	}
+	censusSize, err := r.vocapp.State.GetRollingCensusSize(request.ProcessID, true)
+	if err != nil {
+		r.SendError(request, fmt.Sprintf("cannot get process %x rolling census size: %v",
+			censusSize, err))
+		return
+	}
+	var response api.MetaResponse
+	size := int64(censusSize)
+	response.Size = &size
 	if err := request.Send(r.BuildReply(request, &response)); err != nil {
 		log.Warnf("error sending response: %s", err)
 	}
