@@ -23,7 +23,7 @@ func API(apiconfig *config.API, router *httprouter.HTTProuter, storage data.Stor
 	signer *ethereum.SignKeys, ma *metrics.Agent) (*rpcapi.RPCAPI, error) {
 	log.Infof("creating API service")
 
-	rpc, err := rpcapi.NewAPI(signer, router, apiconfig.Route+"dvote", storage, ma, apiconfig.AllowPrivate)
+	rpc, err := rpcapi.NewAPI(signer, router, apiconfig.Route+"dvote", ma, apiconfig.AllowPrivate)
 	if err != nil {
 		return nil, err
 	}
@@ -31,25 +31,34 @@ func API(apiconfig *config.API, router *httprouter.HTTProuter, storage data.Stor
 
 	if apiconfig.File && storage != nil {
 		log.Info("enabling file API")
-		rpc.EnableFileAPI()
+		if err := rpc.EnableFileAPI(storage); err != nil {
+			return nil, err
+		}
 	}
 	if apiconfig.Census && cm != nil {
 		log.Info("enabling census API")
-		rpc.EnableCensusAPI(cm)
+		if err := rpc.EnableCensusAPI(cm); err != nil {
+			return nil, err
+		}
 	}
 	if apiconfig.Vote || apiconfig.Results || apiconfig.Indexer {
-		rpc.Scrutinizer = sc
 		if apiconfig.Vote && vapp != nil {
 			log.Info("enabling vote API")
-			rpc.EnableVoteAPI(vapp, vi)
+			if err := rpc.EnableVoteAPI(vapp, vi); err != nil {
+				return nil, err
+			}
 		}
 		if apiconfig.Results && sc != nil {
 			log.Info("enabling results API")
-			rpc.EnableResultsAPI(vapp, vi)
+			if err := rpc.EnableResultsAPI(vapp, sc); err != nil {
+				return nil, err
+			}
 		}
 		if apiconfig.Indexer && sc != nil {
 			log.Info("enabling indexer API")
-			rpc.EnableIndexerAPI(vapp, vi)
+			if err := rpc.EnableIndexerAPI(vapp, vi, sc); err != nil {
+				return nil, err
+			}
 		}
 	}
 

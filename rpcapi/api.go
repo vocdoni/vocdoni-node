@@ -19,13 +19,13 @@ const MaxListSize = 64
 type Handler = func(*api.APIrequest) (*api.APIresponse, error)
 
 type RPCAPI struct {
-	Scrutinizer  *scrutinizer.Scrutinizer
 	PrivateCalls uint64
 	PublicCalls  uint64
 	APIs         []string
 
 	router       *httprouter.HTTProuter
 	rpcAPI       *jsonrpcapi.SignedJRPC
+	scrutinizer  *scrutinizer.Scrutinizer
 	methods      map[string]Handler
 	storage      data.Storage
 	signer       *ethereum.SignKeys
@@ -37,11 +37,10 @@ type RPCAPI struct {
 }
 
 func NewAPI(signer *ethereum.SignKeys, router *httprouter.HTTProuter, endpoint string,
-	storage data.Storage, metricsagent *metrics.Agent, allowPrivate bool) (*RPCAPI, error) {
+	metricsagent *metrics.Agent, allowPrivate bool) (*RPCAPI, error) {
 	cm := new(census.Manager)
 	api := new(RPCAPI)
 	api.census = cm
-	api.storage = storage
 	api.signer = signer
 	api.metricsagent = metricsagent
 	api.allowPrivate = allowPrivate
@@ -68,6 +67,22 @@ func (a *RPCAPI) RegisterPrivate(method string, h Handler) {
 func (a *RPCAPI) RegisterPublic(method string, requireSignature bool, h Handler) {
 	a.rpcAPI.RegisterMethod(method, false, !requireSignature)
 	a.methods[method] = h
+}
+
+func (a *RPCAPI) SetScrutinizer(sc *scrutinizer.Scrutinizer) {
+	a.scrutinizer = sc
+}
+
+func (a *RPCAPI) SetVocdoniApp(app *vochain.BaseApplication) {
+	a.vocapp = app
+}
+
+func (a *RPCAPI) SetVocdoniInfo(info *vochaininfo.VochainInfo) {
+	a.vocinfo = info
+}
+
+func (a *RPCAPI) SetStorage(stg data.Storage) {
+	a.storage = stg
 }
 
 func (a *RPCAPI) route(msg httprouter.Message) {
