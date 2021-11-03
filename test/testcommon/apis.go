@@ -10,11 +10,12 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/multirpc/transports"
-	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
-	"go.vocdoni.io/dvote/router"
+	"go.vocdoni.io/dvote/httprouter"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/rpcapi"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
 // DvoteAPIServer contains all the required pieces for running a go-dvote api server
@@ -25,7 +26,7 @@ type DvoteAPIServer struct {
 	CensusBackend  string // graviton or asmt // NOTE: CensusBackend is not used
 	IpfsDir        string
 	ScrutinizerDir string
-	PxyAddr        string
+	ListenAddr     string
 	Storage        data.Storage
 	IpfsPort       int
 
@@ -50,32 +51,15 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 		tb.Fatal(err)
 	}
 
-	// create the proxy to handle HTTP queries
-	pxy := NewMockProxy(tb)
-	d.PxyAddr = fmt.Sprintf("http://%s/dvote", pxy.Addr)
-
-	// Create WebSocket endpoint
-	httpws := new(mhttp.HttpWsHandler)
-	if err := httpws.Init(new(transports.Connection)); err != nil {
-		tb.Fatal(err)
-	}
-	httpws.SetProxy(pxy)
-
-	// Create the listener for routing messages
-	listenerOutput := make(chan transports.Message)
-	httpws.Listen(listenerOutput)
-
 	// Create the API router
-	var err error
-
 	d.IpfsDir = tb.TempDir()
 	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
 	ipfs := data.IPFSHandle{}
 	d.IpfsPort = 14000 + rand.Intn(2048)
-	if err = ipfs.SetMultiAddress(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", d.IpfsPort)); err != nil {
+	if err := ipfs.SetMultiAddress(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", d.IpfsPort)); err != nil {
 		tb.Fatal(err)
 	}
-	if err = ipfs.Init(ipfsStore); err != nil {
+	if err := ipfs.Init(ipfsStore); err != nil {
 		tb.Fatal(err)
 	}
 	d.Storage = &ipfs
@@ -85,7 +69,17 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 		}
 	})
 
-	routerAPI := router.InitRouter(listenerOutput, d.Storage, d.Signer, nil, true)
+	httpRouter := httprouter.HTTProuter{}
+	if err := httpRouter.Init("127.0.0.1", 0); err != nil {
+		log.Fatal(err)
+	}
+	d.ListenAddr = fmt.Sprintf("http://%s/dvote", httpRouter.Address().String())
+
+	// Initialize the RPC API
+	rpc, err := rpcapi.NewAPI(d.Signer, &httpRouter, "/dvote", nil, true)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Create the Census Manager and enable it trough the router
 	var cm census.Manager
@@ -97,33 +91,19 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	for _, api := range apis {
 		switch api {
 		case "file":
-			routerAPI.EnableFileAPI()
+			rpc.EnableFileAPI(d.Storage)
 		case "census":
-			routerAPI.EnableCensusAPI(&cm)
+			rpc.EnableCensusAPI(&cm)
 		case "vote":
 			d.VochainAPP = NewMockVochainNode(tb, d)
+			vi := vochaininfo.NewVochainInfo(d.VochainAPP)
+			go vi.Start(10)
 			d.Scrutinizer = NewMockScrutinizer(tb, d, d.VochainAPP)
-			routerAPI.Scrutinizer = d.Scrutinizer
-			routerAPI.EnableVoteAPI(d.VochainAPP, nil)
-			routerAPI.EnableResultsAPI(d.VochainAPP, nil)
-			routerAPI.EnableIndexerAPI(d.VochainAPP, nil)
+			rpc.EnableVoteAPI(d.VochainAPP, vi)
+			rpc.EnableResultsAPI(d.VochainAPP, d.Scrutinizer)
+			rpc.EnableIndexerAPI(d.VochainAPP, vi, d.Scrutinizer)
 		default:
 			tb.Fatalf("unknown api: %q", api)
 		}
 	}
-
-	go routerAPI.Route()
-	httpws.AddProxyHandler("/dvote")
-}
-
-// NewMockProxy creates a new testing proxy with predefined valudes
-func NewMockProxy(tb testing.TB) *mhttp.Proxy {
-	pxy := mhttp.NewProxy()
-	pxy.Conn.Address = "127.0.0.1"
-	pxy.Conn.Port = 0
-	err := pxy.Init()
-	if err != nil {
-		tb.Fatal(err)
-	}
-	return pxy
 }

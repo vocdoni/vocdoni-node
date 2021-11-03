@@ -25,7 +25,7 @@ type pkeys struct {
 }
 
 func (c *Client) GetProcessInfo(pid []byte) (*indexertypes.Process, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "getProcessInfo"
 	req.ProcessID = pid
 	resp, err := c.Request(req, nil)
@@ -39,7 +39,7 @@ func (c *Client) GetProcessInfo(pid []byte) (*indexertypes.Process, error) {
 }
 
 func (c *Client) GetEnvelopeStatus(nullifier, pid []byte) (bool, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "getEnvelopeStatus"
 	req.ProcessID = pid
 	req.Nullifier = nullifier
@@ -54,7 +54,7 @@ func (c *Client) GetEnvelopeStatus(nullifier, pid []byte) (bool, error) {
 }
 
 func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "genProof"
 	req.CensusID = hex.EncodeToString(root)
 	req.Digested = false
@@ -72,7 +72,7 @@ func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
 }
 
 func (c *Client) GetResults(pid []byte) ([][]string, string, bool, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "getResults"
 	req.ProcessID = pid
 	resp, err := c.Request(req, nil)
@@ -89,7 +89,7 @@ func (c *Client) GetResults(pid []byte) ([][]string, string, bool, error) {
 }
 
 func (c *Client) GetEnvelopeHeight(pid []byte) (uint32, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "getEnvelopeHeight"
 	req.ProcessID = pid
 	resp, err := c.Request(req, nil)
@@ -103,7 +103,7 @@ func (c *Client) GetEnvelopeHeight(pid []byte) (uint32, error) {
 }
 
 func (c *Client) CensusSize(cid []byte) (int64, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "getSize"
 	req.CensusID = hex.EncodeToString(cid)
 	resp, err := c.Request(req, nil)
@@ -117,7 +117,7 @@ func (c *Client) CensusSize(cid []byte) (int64, error) {
 }
 
 func (c *Client) ImportCensus(signer *ethereum.SignKeys, uri string) ([]byte, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "addCensus"
 	req.CensusID = RandomHex(16)
 	resp, err := c.Request(req, signer)
@@ -149,7 +149,7 @@ func (c *Client) ImportCensus(signer *ethereum.SignKeys, uri string) ([]byte, er
 }
 
 func (c *Client) GetKeys(pid, eid []byte) (*pkeys, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "getProcessKeys"
 	req.ProcessID = pid
 	req.EntityId = eid
@@ -167,7 +167,7 @@ func (c *Client) GetKeys(pid, eid []byte) (*pkeys, error) {
 }
 
 func (c *Client) GetCircuitConfig(pid []byte) (*int, *artifacts.CircuitConfig, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "getProcessCircuitConfig"
 	req.ProcessID = pid
 	resp, err := c.Request(req, nil)
@@ -181,7 +181,7 @@ func (c *Client) GetCircuitConfig(pid []byte) (*int, *artifacts.CircuitConfig, e
 }
 
 func (c *Client) GetRollingCensusSize(pid []byte) (int64, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "getProcessRollingCensusSize"
 	req.ProcessID = pid
 	resp, err := c.Request(req, nil)
@@ -387,7 +387,7 @@ func (c *Client) TestPreRegisterKeys(
 		timeDeadLine = time.Duration(len(signers)/5) * time.Second
 	}
 	log.Infof("time deadline set to %d seconds", timeDeadLine/time.Second)
-	req := api.MetaRequest{Method: "submitRawTx"}
+	req := api.APIrequest{Method: "submitRawTx"}
 	start := time.Now()
 
 	for i := 0; i < len(signers); i++ {
@@ -527,7 +527,7 @@ func (c *Client) TestSendVotes(
 		timeDeadLine = time.Duration(len(signers)/5) * time.Second
 	}
 	log.Infof("time deadline set to %d seconds", timeDeadLine/time.Second)
-	req := api.MetaRequest{Method: "submitRawTx"}
+	req := api.APIrequest{Method: "submitRawTx"}
 	nullifiers := []string{}
 	var vpb []byte
 	start := time.Now()
@@ -690,7 +690,7 @@ func (c *Client) TestSendAnonVotes(
 		timeDeadLine = time.Duration(len(signers)/5) * time.Second
 	}
 	log.Infof("time deadline set to %d seconds", timeDeadLine/time.Second)
-	req := api.MetaRequest{Method: "submitRawTx"}
+	req := api.APIrequest{Method: "submitRawTx"}
 	nullifiers := []string{}
 	var vpb []byte
 	start := time.Now()
@@ -829,7 +829,8 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 	censusOrigin models.CensusOrigin,
 	duration int,
 	maxCensusSize uint64) (uint32, error) {
-	var req api.MetaRequest
+
+	var req api.APIrequest
 	req.Method = "submitRawTx"
 	block, err := c.GetCurrentBlock()
 	if err != nil {
@@ -880,7 +881,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 }
 
 func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
-	var req api.MetaRequest
+	var req api.APIrequest
 	var err error
 	req.Method = "submitRawTx"
 	status := models.ProcessStatus_ENDED
@@ -913,7 +914,7 @@ func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
 }
 
 func (c *Client) GetCurrentBlock() (uint32, error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 	req.Method = "getBlockHeight"
 	resp, err := c.Request(req, nil)
 	if err != nil {
@@ -933,7 +934,7 @@ func (c *Client) GetCurrentBlock() (uint32, error) {
 // censusPubKeys (raw hex public keys).
 func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys,
 	censusPubKeys []string) (root []byte, uri string, _ error) {
-	var req api.MetaRequest
+	var req api.APIrequest
 
 	// Create census
 	log.Infof("Create census")

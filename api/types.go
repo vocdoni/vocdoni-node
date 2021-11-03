@@ -1,53 +1,18 @@
 package api
 
 import (
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 )
-
-// HexBytes is a []byte which encodes as hexadecimal in json, as opposed to the
-// base64 default.
-// This type mirrors types/encoding.go HexBytes for this package, to avoid cyclical imports
-type HexBytes []byte
-
-func (b HexBytes) MarshalJSON() ([]byte, error) {
-	enc := make([]byte, hex.EncodedLen(len(b))+2)
-	enc[0] = '"'
-	hex.Encode(enc[1:], b)
-	enc[len(enc)-1] = '"'
-	return enc, nil
-}
-
-func (b *HexBytes) UnmarshalJSON(data []byte) error {
-	if len(data) < 2 || data[0] != '"' || data[len(data)-1] != '"' {
-		return fmt.Errorf("invalid JSON string: %q", data)
-	}
-	data = data[1 : len(data)-1]
-
-	// Strip a leading "0x" prefix, for backwards compatibility.
-	if len(data) >= 2 && data[0] == '0' && (data[1] == 'x' || data[1] == 'X') {
-		data = data[2:]
-	}
-
-	decLen := hex.DecodedLen(len(data))
-	if cap(*b) < decLen {
-		*b = make([]byte, decLen)
-	}
-	if _, err := hex.Decode(*b, data); err != nil {
-		return err
-	}
-	return nil
-}
 
 func printStruct(s interface{}) string {
 	v := reflect.ValueOf(s)
@@ -76,14 +41,6 @@ func printStruct(s interface{}) string {
 	}
 	b.WriteString("}")
 	return b.String()
-}
-
-// MessageRequest holds a decoded request but does not decode the body
-type RequestMessage struct {
-	MetaRequest json.RawMessage `json:"request"`
-
-	ID        string         `json:"id"`
-	Signature types.HexBytes `json:"signature"`
 }
 
 // APIrequest contains all of the possible request fields.
@@ -124,6 +81,16 @@ type APIrequest struct {
 	Type         string                         `json:"type,omitempty"`
 	URI          string                         `json:"uri,omitempty"`
 	WithResults  bool                           `json:"withResults,omitempty"`
+
+	address *common.Address `json:"-"`
+}
+
+func (a *APIrequest) Address() *common.Address {
+	return a.address
+}
+
+func (a *APIrequest) SetAddress(addr *common.Address) {
+	a.address = addr
 }
 
 func (a *APIrequest) SetID(id string) {
@@ -140,51 +107,11 @@ func (a *APIrequest) GetMethod() string {
 	return a.Method
 }
 
-// MetaRequest contains all of the possible request fields.
-// Fields must be in alphabetical order
-type MetaRequest struct {
-	CensusID     string                         `json:"censusId,omitempty"`
-	CensusURI    string                         `json:"censusUri,omitempty"`
-	CensusKey    []byte                         `json:"censusKey,omitempty"`
-	CensusKeys   [][]byte                       `json:"censusKeys,omitempty"`
-	CensusValue  []byte                         `json:"censusValue,omitempty"`
-	CensusValues [][]byte                       `json:"censusValues,omitempty"`
-	CensusDump   []byte                         `json:"censusDump,omitempty"`
-	CensusType   models.Census_Type             `json:"censusType,omitempty"`
-	Content      []byte                         `json:"content,omitempty"`
-	Digested     bool                           `json:"digested,omitempty"`
-	EntityId     types.HexBytes                 `json:"entityId,omitempty"`
-	EthProof     *ethstorageproof.StorageResult `json:"storageProof,omitempty"`
-	Hash         []byte                         `json:"hash,omitempty"`
-	Height       uint32                         `json:"height,omitempty"`
-	From         int                            `json:"from,omitempty"`
-	ListSize     int                            `json:"listSize,omitempty"`
-	Method       string                         `json:"method"`
-	Name         string                         `json:"name,omitempty"`
-	Namespace    uint32                         `json:"namespace,omitempty"`
-	NewProcess   *NewProcess                    `json:"newProcess,omitempty"`
-	Nullifier    types.HexBytes                 `json:"nullifier,omitempty"`
-	Payload      []byte                         `json:"payload,omitempty"`
-	ProcessID    types.HexBytes                 `json:"processId,omitempty"`
-	ProofData    types.HexBytes                 `json:"proofData,omitempty"`
-	PubKeys      []string                       `json:"pubKeys,omitempty"`
-	RootHash     types.HexBytes                 `json:"rootHash,omitempty"`
-	SearchTerm   string                         `json:"searchTerm,omitempty"`
-	Signature    types.HexBytes                 `json:"signature,omitempty"`
-	SrcNetId     string                         `json:"sourceNetworkId,omitempty"`
-	Status       string                         `json:"status,omitempty"`
-	Timestamp    int32                          `json:"timestamp"`
-	TxIndex      int32                          `json:"txIndex,omitempty"`
-	Type         string                         `json:"type,omitempty"`
-	URI          string                         `json:"uri,omitempty"`
-	WithResults  bool                           `json:"withResults,omitempty"`
-}
-
-func (r MetaRequest) String() string {
-	v := reflect.ValueOf(r)
+func (a APIrequest) String() string {
+	v := reflect.ValueOf(a)
 	t := v.Type()
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("%s:{", r.Method))
+	b.WriteString(fmt.Sprintf("%s:{", a.Method))
 	first := true
 	for i := 0; i < t.NumField(); i++ {
 		fv := v.Field(i)
@@ -193,7 +120,7 @@ func (r MetaRequest) String() string {
 			continue
 		}
 		ft := t.Field(i)
-		if ft.Name == "Method" {
+		if ft.Name == "Method" || ft.Name == "address" {
 			continue
 		}
 		if first {
@@ -220,14 +147,6 @@ func (r MetaRequest) String() string {
 	return b.String()
 }
 
-// ResponseMessage wraps an api response
-type ResponseMessage struct {
-	MetaResponse json.RawMessage `json:"response"`
-
-	ID        string         `json:"id"`
-	Signature types.HexBytes `json:"signature"`
-}
-
 // APIresponse contains all of the possible request fields.
 // Fields must be in alphabetical order
 // Those fields with valid zero-values (such as bool) must be pointers
@@ -242,6 +161,8 @@ type APIresponse struct {
 	CensusKeys           [][]byte                         `json:"censusKeys,omitempty"`
 	CensusValues         []types.HexBytes                 `json:"censusValues,omitempty"`
 	CensusDump           []byte                           `json:"censusDump,omitempty"`
+	CircuitIndex         *int                             `json:"circuitIndex,omitempty"`
+	CircuitConfig        *artifacts.CircuitConfig         `json:"circuitConfig,omitempty"`
 	Content              []byte                           `json:"content,omitempty"`
 	CreationTime         int64                            `json:"creationTime,omitempty"`
 	EncryptionPrivKeys   []Key                            `json:"encryptionPrivKeys,omitempty"`
@@ -304,76 +225,6 @@ func (a *APIresponse) SetID(id string) {
 
 func (r APIresponse) String() string {
 	return printStruct(r)
-}
-
-// MetaResponse contains all of the possible request fields.
-// Fields must be in alphabetical order
-// Those fields with valid zero-values (such as bool) must be pointers
-type MetaResponse struct {
-	APIList              []string                         `json:"apiList,omitempty"`
-	Block                *indexertypes.BlockMetadata      `json:"block,omitempty"`
-	BlockList            []*indexertypes.BlockMetadata    `json:"blockList,omitempty"`
-	BlockTime            *[5]int32                        `json:"blockTime,omitempty"`
-	BlockTimestamp       int32                            `json:"blockTimestamp,omitempty"`
-	CensusID             string                           `json:"censusId,omitempty"`
-	CensusList           []string                         `json:"censusList,omitempty"`
-	CensusKeys           [][]byte                         `json:"censusKeys,omitempty"`
-	CensusValues         []types.HexBytes                 `json:"censusValues,omitempty"`
-	CensusDump           []byte                           `json:"censusDump,omitempty"`
-	CircuitIndex         *int                             `json:"circuitIndex,omitempty"`
-	CircuitConfig        *artifacts.CircuitConfig         `json:"circuitConfig,omitempty"`
-	Content              []byte                           `json:"content,omitempty"`
-	CreationTime         int64                            `json:"creationTime,omitempty"`
-	EncryptionPrivKeys   []Key                            `json:"encryptionPrivKeys,omitempty"`
-	EncryptionPublicKeys []Key                            `json:"encryptionPubKeys,omitempty"`
-	EntityID             string                           `json:"entityId,omitempty"`
-	EntityIDs            []string                         `json:"entityIds,omitempty"`
-	Envelope             *indexertypes.EnvelopePackage    `json:"envelope,omitempty"`
-	Envelopes            []*indexertypes.EnvelopeMetadata `json:"envelopes,omitempty"`
-	Files                []byte                           `json:"files,omitempty"`
-	Final                *bool                            `json:"final,omitempty"`
-	Finished             *bool                            `json:"finished,omitempty"`
-	Health               int32                            `json:"health,omitempty"`
-	Height               *uint32                          `json:"height,omitempty"`
-	InvalidClaims        []int                            `json:"invalidClaims,omitempty"`
-	Message              string                           `json:"message,omitempty"`
-	Nullifier            string                           `json:"nullifier,omitempty"`
-	Nullifiers           *[]string                        `json:"nullifiers,omitempty"`
-	Ok                   bool                             `json:"ok"`
-	Paused               *bool                            `json:"paused,omitempty"`
-	Payload              string                           `json:"payload,omitempty"`
-	ProcessSummary       *ProcessSummary                  `json:"processSummary,omitempty"`
-	ProcessID            types.HexBytes                   `json:"processId,omitempty"`
-	ProcessIDs           []string                         `json:"processIds,omitempty"`
-	Process              *indexertypes.Process            `json:"process,omitempty"`
-	ProcessList          []string                         `json:"processList,omitempty"`
-	Registered           *bool                            `json:"registered,omitempty"`
-	Request              string                           `json:"request"`
-	Results              [][]string                       `json:"results,omitempty"`
-	Root                 types.HexBytes                   `json:"root,omitempty"`
-	Siblings             types.HexBytes                   `json:"siblings,omitempty"`
-	Size                 *int64                           `json:"size,omitempty"`
-	State                string                           `json:"state,omitempty"`
-	Stats                *VochainStats                    `json:"stats,omitempty"`
-	Timestamp            int32                            `json:"timestamp"`
-	Type                 string                           `json:"type,omitempty"`
-	Tx                   *indexertypes.TxPackage          `json:"tx,omitempty"`
-	TxList               []*indexertypes.TxMetadata       `json:"txList,omitempty"`
-	URI                  string                           `json:"uri,omitempty"`
-	ValidatorList        []*models.Validator              `json:"validatorlist,omitempty"`
-	ValidProof           *bool                            `json:"validProof,omitempty"`
-	Weight               string                           `json:"weight,omitempty"`
-}
-
-func (r MetaResponse) String() string {
-	return printStruct(r)
-}
-
-// SetError sets the MetaResponse's Ok field to false, and Message to a string
-// representation of v. Usually, v's type will be error or string.
-func (r *MetaResponse) SetError(v interface{}) {
-	r.Ok = false
-	r.Message = fmt.Sprintf("%s", v)
 }
 
 type ProcessSummary struct {

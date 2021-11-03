@@ -7,6 +7,7 @@ import (
 	"go.vocdoni.io/dvote/crypto"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 )
 
 // MessageAPI inteface defines the methods that the SignedJRPC custom message type must contain.
@@ -21,16 +22,16 @@ type MessageAPI interface {
 type RequestMessage struct {
 	MessageAPI json.RawMessage `json:"request"`
 
-	ID        string   `json:"id"`
-	Signature HexBytes `json:"signature"`
+	ID        string         `json:"id"`
+	Signature types.HexBytes `json:"signature"`
 }
 
 // ResponseMessage is the envelope for the SignedJRPC message response
 type ResponseMessage struct {
 	MessageAPI json.RawMessage `json:"response"`
 
-	ID        string   `json:"id"`
-	Signature HexBytes `json:"signature"`
+	ID        string         `json:"id"`
+	Signature types.HexBytes `json:"signature"`
 }
 
 // BuildReply builds a response message (ID, Timestamp and Signature) and marshals it using JSON.

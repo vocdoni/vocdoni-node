@@ -25,7 +25,8 @@ func TestJSONRPCAPI(t *testing.T) {
 	// Create a standard API handler
 	signer := ethereum.NewSignKeys()
 	signer.Generate()
-	rpcAPI := NewSignedJRPC(signer, NewAPI, NewAPI)
+	rpcAPI := NewSignedJRPC(signer, NewAPI, NewAPI, true)
+	rpcAPI.AddAuthorizedAddress(signer.Address())
 
 	// Add it under namespace "rpc"
 	r.AddNamespace("rpc", rpcAPI)
@@ -80,7 +81,7 @@ func TestJSONRPCAPI(t *testing.T) {
 
 	// Test a delete (authorized), should fail
 	resp = doRequest(t, url+"/names", "POST", &clientSigner, &API{Method: "del", ID: "bcd", Name: "John"})
-	qt.Check(t, resp, qt.DeepEquals, []byte("Not Authorized\n"))
+	qt.Check(t, string(resp), qt.Contains, "not authorized")
 
 	// Add the client address key and test again (should work)
 	rpcAPI.AddAuthorizedAddress(clientSigner.Address())

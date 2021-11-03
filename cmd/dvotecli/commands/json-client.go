@@ -51,7 +51,7 @@ func jsonInput(cmd *cobra.Command, args []string) error {
 		log.Fatal(err)
 	}
 	defer cl.CheckClose(&err)
-	var req api.MetaRequest
+	var req api.APIrequest
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		line, _, err := reader.ReadLine()
@@ -75,8 +75,8 @@ func jsonInput(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func processLine(input []byte) api.MetaRequest {
-	var req api.MetaRequest
+func processLine(input []byte) api.APIrequest {
+	var req api.APIrequest
 	err := json.Unmarshal(input, &req)
 	if err != nil {
 		log.Fatal(err)
@@ -84,7 +84,7 @@ func processLine(input []byte) api.MetaRequest {
 	return req
 }
 
-func printNice(resp *api.MetaResponse) {
+func printNice(resp *api.APIresponse) {
 	v := reflect.ValueOf(*resp)
 	typeOfS := v.Type()
 	output := "\n"

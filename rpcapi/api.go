@@ -1,6 +1,7 @@
 package rpcapi
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -45,7 +46,7 @@ func NewAPI(signer *ethereum.SignKeys, router *httprouter.HTTProuter, endpoint s
 	api.metricsagent = metricsagent
 	api.allowPrivate = allowPrivate
 	api.methods = make(map[string]Handler, 128)
-	api.rpcAPI = jsonrpcapi.NewSignedJRPC(signer, NewApiRequest, NewApiResponse)
+	api.rpcAPI = jsonrpcapi.NewSignedJRPC(signer, NewApiRequest, NewApiResponse, allowPrivate)
 	api.router = router
 	router.AddNamespace("rpcAPI", api.rpcAPI)
 
@@ -85,9 +86,25 @@ func (a *RPCAPI) SetStorage(stg data.Storage) {
 	a.storage = stg
 }
 
+func (a *RPCAPI) AuthorizedAddress(addr *common.Address) bool {
+	if addr == nil {
+		return false
+	}
+	if !a.allowPrivate {
+		return false
+	}
+	// Warning: if allowPrivate is true but no authorized addresses,
+	// we allow any address
+	if len(a.signer.Authorized) == 0 {
+		return true
+	}
+	return a.signer.Authorized[*addr]
+}
+
 func (a *RPCAPI) route(msg httprouter.Message) {
 	request := msg.Data.(*jsonrpcapi.SignedJRPCdata)
 	apiMsg := request.Message.(*api.APIrequest)
+	apiMsg.SetAddress(&request.Address)
 	method := a.methods[apiMsg.GetMethod()]
 	apiMsgResponse, err := method(apiMsg)
 	if err != nil {
@@ -98,6 +115,7 @@ func (a *RPCAPI) route(msg httprouter.Message) {
 		)
 		return
 	}
+	apiMsgResponse.Ok = true
 	data, err := jsonrpcapi.BuildReply(a.signer, apiMsgResponse, request.ID)
 	if err != nil {
 		log.Errorf("cannot build reply for method %s: %v", apiMsg.GetMethod(), err)

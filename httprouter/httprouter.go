@@ -47,7 +47,7 @@ type HTTProuter struct {
 // RouterNamespace is the interface that a HTTProuter handler should follow in order
 // to become a valid namespace.
 type RouterNamespace interface {
-	AuthorizeRequest(data interface{}, isAdmin bool) (valid bool)
+	AuthorizeRequest(data interface{}, isAdmin bool) (valid bool, err error)
 	ProcessData(req *http.Request) (data interface{}, err error)
 }
 
@@ -136,6 +136,11 @@ func (r *HTTProuter) Init(host string, port int) error {
 
 }
 
+// Address return the current network address used by the HTTP router
+func (r *HTTProuter) Address() net.Addr {
+	return r.address
+}
+
 // AddNamespace creates a new namespace handled by the RouterNamespace implementation.
 func (r *HTTProuter) AddNamespace(id string, rns RouterNamespace) {
 	log.Infof("added namespace %s", id)
@@ -173,6 +178,13 @@ func (r *HTTProuter) AddPublicHandler(namespaceID, pattern, HTTPmethod string, h
 	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, false, false, handler))
 }
 
+// AddRawHTTPHandler adds a standard net/http handled function to the router.
+// The public requests are not protected so all requests are allowed.
+func (r *HTTProuter) AddRawHTTPHandler(pattern, HTTPmethod string, handler http.HandlerFunc) {
+	log.Infof("added http raw handler for pattern %s", pattern)
+	r.Mux.MethodFunc(HTTPmethod, pattern, handler)
+}
+
 func (r *HTTProuter) routerHandler(namespaceID string, private, admin bool,
 	handlerFunc RouterHandlerFn) func(w http.ResponseWriter, req *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -188,9 +200,11 @@ func (r *HTTProuter) routerHandler(namespaceID string, private, admin bool,
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if (private || admin) && !nsProcessor.AuthorizeRequest(data, admin) {
-			http.Error(w, "Not Authorized", http.StatusUnauthorized)
-			return
+		if private || admin {
+			if ok, err := nsProcessor.AuthorizeRequest(data, admin); !ok {
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+				return
+			}
 		}
 		hc := &HTTPContext{Request: req, Writer: w, sent: make(chan struct{})}
 		msg := Message{

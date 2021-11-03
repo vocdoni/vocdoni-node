@@ -15,6 +15,7 @@ import (
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/httprouter/jsonrpcapi"
 	"go.vocdoni.io/dvote/log"
 	"nhooyr.io/websocket"
 )
@@ -67,7 +68,7 @@ func (c *Client) CheckClose(err *error) {
 }
 
 // Request makes a request to the previously connected endpoint
-func (c *Client) Request(req api.MetaRequest, signer *ethereum.SignKeys) (*api.MetaResponse, error) {
+func (c *Client) Request(req api.APIrequest, signer *ethereum.SignKeys) (*api.APIresponse, error) {
 	method := req.Method
 	req.Timestamp = int32(time.Now().Unix())
 	reqInner, err := crypto.SortedMarshalJSON(req)
@@ -82,10 +83,10 @@ func (c *Client) Request(req api.MetaRequest, signer *ethereum.SignKeys) (*api.M
 		}
 	}
 
-	reqOuter := api.RequestMessage{
-		ID:          fmt.Sprintf("%d", rand.Intn(1000)),
-		Signature:   signature,
-		MetaRequest: reqInner,
+	reqOuter := jsonrpcapi.RequestMessage{
+		ID:         fmt.Sprintf("%d", rand.Intn(1000)),
+		Signature:  signature,
+		MessageAPI: reqInner,
 	}
 	reqBody, err := json.Marshal(reqOuter)
 	if err != nil {
@@ -117,7 +118,7 @@ func (c *Client) Request(req api.MetaRequest, signer *ethereum.SignKeys) (*api.M
 		resp.Body.Close()
 	}
 	log.Debugf("response: %s", message)
-	var respOuter api.ResponseMessage
+	var respOuter jsonrpcapi.ResponseMessage
 	if err := json.Unmarshal(message, &respOuter); err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
@@ -127,17 +128,17 @@ func (c *Client) Request(req api.MetaRequest, signer *ethereum.SignKeys) (*api.M
 	if len(respOuter.Signature) == 0 {
 		return nil, fmt.Errorf("%s: empty signature in response: %s", method, message)
 	}
-	var respInner api.MetaResponse
-	if err := json.Unmarshal(respOuter.MetaResponse, &respInner); err != nil {
+	var respInner api.APIresponse
+	if err := json.Unmarshal(respOuter.MessageAPI, &respInner); err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
 	}
 	return &respInner, nil
 }
 
 // Request makes a request to the previously connected endpoint
-func (c *Client) ForTest(tb testing.TB, req *api.MetaRequest) func(
-	method string, signer *ethereum.SignKeys) *api.MetaResponse {
-	return func(method string, signer *ethereum.SignKeys) *api.MetaResponse {
+func (c *Client) ForTest(tb testing.TB, req *api.APIrequest) func(
+	method string, signer *ethereum.SignKeys) *api.APIresponse {
+	return func(method string, signer *ethereum.SignKeys) *api.APIresponse {
 		if req == nil {
 			tb.Fatalf("request is nil")
 		}
@@ -166,7 +167,7 @@ func NewForTest(tb testing.TB, addr string) *TestClient {
 	return &TestClient{tb: tb, client: *client}
 }
 
-func (c *TestClient) Request(req api.MetaRequest, signer *ethereum.SignKeys) *api.MetaResponse {
+func (c *TestClient) Request(req api.APIrequest, signer *ethereum.SignKeys) *api.APIresponse {
 	resp, err := c.client.Request(req, signer)
 	if err != nil {
 		c.tb.Fatal(err)

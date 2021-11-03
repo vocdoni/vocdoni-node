@@ -4,15 +4,15 @@ import (
 	"testing"
 )
 
-func TestMetaRequestString(t *testing.T) {
+func TestAPIrequestString(t *testing.T) {
 	tests := []struct {
-		in   MetaRequest
+		in   APIrequest
 		want string
 	}{
-		{MetaRequest{}, ":{}"},
-		{MetaRequest{Method: "test1", Type: "foo"}, "test1:{Type:foo}"},
+		{APIrequest{}, ":{}"},
+		{APIrequest{Method: "test1", Type: "foo"}, "test1:{Type:foo}"},
 		{
-			MetaRequest{Method: "test2", Type: "foo", Payload: []byte("\x01\xFF")},
+			APIrequest{Method: "test2", Type: "foo", Payload: []byte("\x01\xFF")},
 			"test2:{Payload:01ff Type:foo}",
 		},
 	}

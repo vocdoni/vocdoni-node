@@ -62,13 +62,13 @@ func TestRouterWithBearerStdAPI(t *testing.T) {
 
 	// Token should be unauthorized now
 	resp = doRequest(t, url+"/private/ping", "1234", "POST", []byte("hello"))
-	qt.Check(t, resp, qt.DeepEquals, []byte("Not Authorized\n"))
+	qt.Check(t, string(resp), qt.Contains, "no more requests available")
 
 	// Test admin
 	resp = doRequest(t, url+"/admin/do", "abcd", "POST", []byte("hello"))
 	qt.Check(t, resp, qt.DeepEquals, []byte("hello admin!\n"))
 	resp = doRequest(t, url+"/admin/do", "abcde", "POST", []byte("hello"))
-	qt.Check(t, resp, qt.DeepEquals, []byte("Not Authorized\n"))
+	qt.Check(t, string(resp), qt.Contains, "admin token not valid\n")
 
 }
 

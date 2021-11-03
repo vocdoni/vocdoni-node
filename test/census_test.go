@@ -67,12 +67,12 @@ func TestCensus(t *testing.T) {
 	t.Logf("added authorized address %s", signer2.AddressString())
 
 	// Create websocket client
-	t.Logf("connecting to %s", server.PxyAddr)
-	cl, err := client.New(server.PxyAddr)
+	t.Logf("connecting to %s", server.ListenAddr)
+	cl, err := client.New(server.ListenAddr)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Send the API requets
-	var req api.MetaRequest
+	var req api.APIrequest
 	doRequest := cl.ForTest(t, &req)
 
 	// Create census
@@ -87,6 +87,9 @@ func TestCensus(t *testing.T) {
 	req.CensusKey = []byte("hello")
 	req.Digested = true
 	resp = doRequest("addClaim", signer2)
+	if !resp.Ok {
+		t.Logf("%s", resp.Message)
+	}
 	qt.Assert(t, resp.Ok, qt.IsTrue)
 
 	// addClaim not authorized; use Request directly
@@ -101,6 +104,9 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.CensusKey = []byte("hello")
 	resp = doRequest("genProof", nil)
+	if !resp.Ok {
+		t.Logf("%s", resp.Message)
+	}
 	qt.Assert(t, resp.Ok, qt.IsTrue)
 
 	// GenProof not valid

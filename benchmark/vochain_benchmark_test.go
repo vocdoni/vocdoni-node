@@ -34,7 +34,7 @@ func BenchmarkVochain(b *testing.B) {
 	host := *hostFlag
 	if host == "" {
 		dvoteServer.Start(b, "file", "census", "vote")
-		host = dvoteServer.PxyAddr
+		host = dvoteServer.ListenAddr
 	}
 
 	// create random key batch
@@ -51,9 +51,9 @@ func BenchmarkVochain(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	req := &api.MetaRequest{}
-	zeroReq := &api.MetaRequest{}
-	reset := func(r *api.MetaRequest) {
+	req := &api.APIrequest{}
+	zeroReq := &api.APIrequest{}
+	reset := func(r *api.APIrequest) {
 		*r = *zeroReq
 	}
 	doRequest := cl.ForTest(b, req)
@@ -213,9 +213,9 @@ func BenchmarkVochain(b *testing.B) {
 func voteBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys,
 	censusRoot, processID []byte) {
 	// API requests
-	req := &api.MetaRequest{}
-	zeroReq := &api.MetaRequest{}
-	reset := func(r *api.MetaRequest) {
+	req := &api.APIrequest{}
+	zeroReq := &api.APIrequest{}
+	reset := func(r *api.APIrequest) {
 		*r = *zeroReq
 	}
 	doRequest := cl.ForTest(b, req)

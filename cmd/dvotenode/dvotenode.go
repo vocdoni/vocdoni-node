@@ -30,6 +30,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/oracle"
+	"go.vocdoni.io/dvote/oracle/apioracle"
+	"go.vocdoni.io/dvote/rpcapi"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -80,19 +82,16 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.Mode = *flag.StringP("mode", "m", types.ModeGateway,
 		"global operation mode. Available options: [gateway,oracle,ethApiOracle,miner]")
 	// api
-	globalCfg.API.Websockets = *flag.Bool("apiws", true, "enable websockets transport for the API")
 	globalCfg.API.HTTP = *flag.Bool("apihttp", true, "enable http transport for the API")
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable the file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", false, "enable the census API")
 	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable the vote API")
-	globalCfg.API.Tendermint = *flag.Bool("tendermintApi", false,
-		"make the Tendermint API publicly available")
 	globalCfg.API.Results = *flag.Bool("resultsApi", true,
 		"enable the results API")
 	globalCfg.API.Indexer = *flag.Bool("indexerApi", false,
 		"enable the indexer API (required for explorer)")
 	globalCfg.API.Route = *flag.String("apiRoute", "/",
-		"dvote API base route for HTTP and Websockets")
+		"dvote HTTP API base route")
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false,
 		"allows private methods over the APIs")
 	globalCfg.API.AllowedAddrs = *flag.String("apiAllowedAddrs", "",
@@ -101,8 +100,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"API endpoint listen address")
 	globalCfg.API.ListenPort = *flag.IntP("listenPort", "p", 9090,
 		"API endpoint http port")
-	globalCfg.API.WebsocketsReadLimit = *flag.Int64("apiWsReadLimit", types.Web3WsReadLimit,
-		"dvote websocket API read size limit in bytes")
 	// ssl
 	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "",
 		"enable TLS-secure domain with LetsEncrypt (listenPort=443 is required)")
@@ -208,15 +205,12 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
 
 	// api
-	viper.BindPFlag("api.Websockets", flag.Lookup("apiws"))
-	viper.BindPFlag("api.WebsocketsReadLimit", flag.Lookup("apiWsReadLimit"))
 	viper.BindPFlag("api.Http", flag.Lookup("apihttp"))
 	viper.BindPFlag("api.File", flag.Lookup("fileApi"))
 	viper.BindPFlag("api.Census", flag.Lookup("censusApi"))
 	viper.BindPFlag("api.Vote", flag.Lookup("voteApi"))
 	viper.BindPFlag("api.Results", flag.Lookup("resultsApi"))
 	viper.BindPFlag("api.Indexer", flag.Lookup("indexerApi"))
-	viper.BindPFlag("api.Tendermint", flag.Lookup("tendermintApi"))
 	viper.BindPFlag("api.Route", flag.Lookup("apiRoute"))
 	viper.BindPFlag("api.AllowPrivate", flag.Lookup("apiAllowPrivate"))
 	viper.BindPFlag("api.AllowedAddrs", flag.Lookup("apiAllowedAddrs"))
@@ -425,16 +419,16 @@ func main() {
 
 	var err error
 	var signer *ethereum.SignKeys
-	//var pxy *mhttp.Proxy
-	var apiRouter httprouter.HTTProuter
+	var httpRouter httprouter.HTTProuter
+	var rpc *rpcapi.RPCAPI
 	var storage data.Storage
-	var cm *census.Manager
-	var vnode *vochain.BaseApplication
-	var vinfo *vochaininfo.VochainInfo
-	var sc *scrutinizer.Scrutinizer
-	var kk *keykeeper.KeyKeeper
-	var orc *oracle.Oracle
-	var ma *metrics.Agent
+	var censusManager *census.Manager
+	var vochainApp *vochain.BaseApplication
+	var vochainInfo *vochaininfo.VochainInfo
+	var scrutinizer *scrutinizer.Scrutinizer
+	var vochainKeykeeper *keykeeper.KeyKeeper
+	var vochainOracle *oracle.Oracle
+	var metricsAgent *metrics.Agent
 
 	if globalCfg.Dev {
 		log.Warn("developer mode is enabled!")
@@ -466,39 +460,43 @@ func main() {
 		}
 	}
 
-	// Websockets and HTTPs proxy for Gateway and EthApiOracle
+	// HTTP(s) router and RPC for Gateway and EthApiOracle
 	if globalCfg.Mode == types.ModeGateway || globalCfg.Metrics.Enabled ||
-		(globalCfg.Mode == types.ModeEthAPIoracle) {
-		// Initialize the HTTP API router
-		apiRouter.TLSdomain = globalCfg.API.Ssl.Domain
-		apiRouter.TLSdirCert = globalCfg.API.Ssl.DirCert
-		apiRouter.Init(globalCfg.API.ListenHost, globalCfg.API.ListenPort)
+		globalCfg.Mode == types.ModeEthAPIoracle {
+		// Initialize the HTTP router
+		httpRouter.TLSdomain = globalCfg.API.Ssl.Domain
+		httpRouter.TLSdirCert = globalCfg.API.Ssl.DirCert
+		httpRouter.Init(globalCfg.API.ListenHost, globalCfg.API.ListenPort)
 		if err != nil {
 			log.Fatal(err)
 		}
+		// Initialize the RPC API
+		if rpc, err = rpcapi.NewAPI(signer, &httpRouter, globalCfg.API.Route+"dvote", metricsAgent, globalCfg.API.AllowPrivate); err != nil {
+			log.Fatal(err)
+		}
+		log.Infof("rpc API available at %s", globalCfg.API.Route+"dvote")
 
-		// TODO NEW ROUTER
 		// Enable metrics via proxy
-		//if globalCfg.Metrics.Enabled {
-		//	ma = metrics.NewAgent("/metrics",
-		//		time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, apiRouter)
-		//}
+		if globalCfg.Metrics.Enabled {
+			metricsAgent = metrics.NewAgent("/metrics",
+				time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, &httpRouter)
+		}
 	}
 
 	if globalCfg.Mode == types.ModeGateway {
 		// Storage service
-		storage, err = service.IPFS(globalCfg.Ipfs, signer, ma)
+		storage, err = service.IPFS(globalCfg.Ipfs, signer, metricsAgent)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		// Census service
 		if globalCfg.API.Census {
-			cm, err = service.Census(globalCfg.VochainConfig.DBType, globalCfg.DataDir, ma)
+			censusManager, err = service.Census(globalCfg.VochainConfig.DBType, globalCfg.DataDir, metricsAgent)
 			if err != nil {
 				log.Fatal(err)
 			}
-			cm.RemoteStorage = storage
+			censusManager.RemoteStorage = storage
 		}
 	}
 
@@ -515,24 +513,22 @@ func main() {
 		globalCfg.VochainConfig.Scrutinizer.IgnoreLiveResults = (globalCfg.Mode == types.ModeOracle)
 
 		// create the vochain node
-		if vnode, sc, vinfo, err = service.Vochain(globalCfg.VochainConfig,
-			!globalCfg.VochainConfig.NoWaitSync, ma, cm, storage,
+		if vochainApp, scrutinizer, vochainInfo, err = service.Vochain(globalCfg.VochainConfig,
+			!globalCfg.VochainConfig.NoWaitSync, metricsAgent, censusManager, storage,
 		); err != nil {
 			log.Fatal(err)
 		}
 		defer func() {
-			vnode.Node.Stop()
-			vnode.Node.Wait()
+			vochainApp.Node.Stop()
+			vochainApp.Node.Wait()
 		}()
-
-		// TODO NEW ROUTER: Remove tendermint endpoint flags
 
 		// Wait for Vochain to be ready
 		var h, hPrev uint32
-		for vnode.Node == nil {
+		for vochainApp.Node == nil {
 			hPrev = h
 			time.Sleep(time.Second * 10)
-			h = vnode.Height()
+			h = vochainApp.Height()
 			log.Infof("[vochain info] replaying height %d at %d blocks/s",
 				h, (h-hPrev)/5)
 		}
@@ -542,25 +538,25 @@ func main() {
 	// Oracle and ethApiOracle modes
 	//
 	if globalCfg.Mode == types.ModeOracle || globalCfg.Mode == types.ModeEthAPIoracle {
-		if orc, err = oracle.NewOracle(vnode, signer); err != nil {
+		if vochainOracle, err = oracle.NewOracle(vochainApp, signer); err != nil {
 			log.Fatal(err)
 		}
 
 		if globalCfg.Mode == types.ModeOracle {
 			// Start oracle results scrutinizer
-			orc.EnableResults(sc)
+			vochainOracle.EnableResults(scrutinizer)
 
 			// Start keykeeper service (if key index specified)
 			if globalCfg.VochainConfig.KeyKeeperIndex > 0 {
-				kk, err = keykeeper.NewKeyKeeper(
+				vochainKeykeeper, err = keykeeper.NewKeyKeeper(
 					path.Join(globalCfg.VochainConfig.DataDir, "keykeeper"),
-					vnode,
+					vochainApp,
 					signer,
 					globalCfg.VochainConfig.KeyKeeperIndex)
 				if err != nil {
 					log.Fatal(err)
 				}
-				go kk.RevealUnpublished()
+				go vochainKeykeeper.RevealUnpublished()
 			}
 
 			var w3uris []string
@@ -604,7 +600,7 @@ func main() {
 					w3uris,
 					globalCfg.W3Config.ChainType,
 					signer,
-					vnode,
+					vochainApp,
 					evh,
 					whiteListedAddr); err != nil {
 					log.Fatal(err)
@@ -612,33 +608,17 @@ func main() {
 			}
 		}
 
-		// TODO NEW ROUTER
-		/*
-			// Ethereum API oracle
-			if globalCfg.Mode == types.ModeEthAPIoracle {
-				router, err := service.API(globalCfg.API,
-					pxy,
-					nil,
-					nil, // census manager
-					nil, // vochain core
-					nil, // scrutinizere
-					nil,
-					globalCfg.VochainConfig.RPCListen,
-					signer,
-					ma)
-				if err != nil {
-					log.Fatal(err)
-				}
-				log.Info("starting oracle API")
-				apior, err := apioracle.NewAPIoracle(orc, router)
-				if err != nil {
-					log.Fatal(err)
-				}
-				if err := apior.EnableERC20(globalCfg.W3Config.ChainType, globalCfg.W3Config.W3External); err != nil {
-					log.Fatal(err)
-				}
+		// Ethereum API oracle
+		if globalCfg.Mode == types.ModeEthAPIoracle {
+			log.Info("starting oracle API")
+			apior, err := apioracle.NewAPIoracle(vochainOracle, rpc)
+			if err != nil {
+				log.Fatal(err)
 			}
-		*/
+			if err := apior.EnableERC20(globalCfg.W3Config.ChainType, globalCfg.W3Config.W3External); err != nil {
+				log.Fatal(err)
+			}
+		}
 	}
 
 	//
@@ -648,14 +628,14 @@ func main() {
 		// dvote API service
 		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote || globalCfg.API.Indexer {
 			if _, err = service.API(globalCfg.API,
-				&apiRouter,
-				storage,
-				cm,    // census manager
-				vnode, // vochain core
-				sc,    // scrutinizere
-				vinfo,
+				rpc,           // rpcAPI
+				storage,       // data storage
+				censusManager, // census manager
+				vochainApp,    // vochain core
+				scrutinizer,   // scrutinizere
+				vochainInfo,   // vochain info
 				signer,
-				ma); err != nil {
+				metricsAgent); err != nil {
 				log.Fatal(err)
 			}
 		}
