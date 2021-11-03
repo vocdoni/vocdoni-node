@@ -159,6 +159,7 @@ var Genesis = map[string]VochainGenesis{
 				Parameters:  []int64{1024},
 				LocalDir:    "./circuits",
 				VKHash:      hexToBytes("0x3669e12ea939564b59b995b9067eab83c8ebb09f5a83ad4aa3d6d6f90c1b0fc4"),
+				// TODO: Add the other hashes
 			},
 		},
 		Genesis: `

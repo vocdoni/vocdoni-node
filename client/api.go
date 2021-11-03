@@ -2,7 +2,9 @@ package client
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"strings"
 	"sync"
@@ -328,6 +330,55 @@ func testGetZKCensusKey(s *ethereum.SignKeys) ([]byte, []byte) {
 		log.Fatalf("Cannnot calculate pre-register key with Poseidon: %v", err)
 	}
 	return pubKey, secretKey
+}
+
+type SNARKProof struct {
+	A            []string
+	B            []string
+	C            []string
+	PublicInputs []string
+}
+
+type SNARKProofInputs struct {
+	CensusRoot     string   `json:"censusRoot"`
+	CensusSiblings []string `json:"censusSiblings"`
+	Index          string   `json:"index"`
+	SecretKey      string   `json:"secretKey"`
+	VoteHash       []string `json:"voteHash"`
+	ProcessID      []string `json:"processId"`
+	Nullifier      string   `json:"nullifier"`
+}
+
+func testGenSNARKProof(censusRoot, merkleProof []byte, index uint64,
+	secretKey, votePackage, processId []byte) (*SNARKProof, error) {
+	poseidon := arbo.HashPoseidon{}
+	nullifier, err := poseidon.Hash(
+		secretKey,
+		processId,
+	)
+	if err != nil {
+		return nil, err
+	}
+	inputs := SNARKProofInputs{
+		CensusRoot:     arbo.BytesToBigInt(censusRoot).String(),
+		CensusSiblings: nil,
+		Index:          big.NewInt(int64(index)).String(),
+		SecretKey:      arbo.BytesToBigInt(secretKey).String(),
+		VoteHash:       nil,
+		ProcessID: []string{
+			arbo.BytesToBigInt(processId[:16]).String(),
+			arbo.BytesToBigInt(processId[16:]).String(),
+		},
+		Nullifier: arbo.BytesToBigInt(nullifier).String(),
+	}
+	inputsJSON, err := json.Marshal(&inputs)
+	if err != nil {
+		return nil, err
+	}
+	// TODO:
+	// `node run gen_proof.js inputsJSON`
+
+	return nil, nil
 }
 
 func (c *Client) TestPreRegisterKeys(
@@ -706,6 +757,11 @@ func (c *Client) TestSendAnonVotes(
 			VotePackage: vpb,
 		}
 		// TODO: Generate SNARK proof here.  Inputs:
+		_, secretKey := testGetZKCensusKey(s)
+		proof, err := testGenSNARKProof(root, proofs[i], 0, secretKey, vpb, pid)
+		if err != nil {
+			return 0, err
+		}
 		// merkleTreeProof := proofs[i] // []byte // TODO: JS: Uncompress the merkle proof
 		// zkCensusKey, secretKey := testGetZKCensusKey(s) // []byte, []byte
 		// rollingCensusRoot := root
@@ -713,16 +769,14 @@ func (c *Client) TestSendAnonVotes(
 		// MISSING: VoteHash see https://github.com/vocdoni/zk-franchise-proof-circuit/blob/fd55e571949b8db429d798062c670bf23b463486/test/go-inputs-generator/census_test.go#L90
 		// electionId := eid
 		// MISSING nullifier: https://github.com/vocdoni/zk-franchise-proof-circuit/blob/fd55e571949b8db429d798062c670bf23b463486/test/go-inputs-generator/census_test.go#L94
-		// `node run gen_proof.js '{"censusRoot": "1234", "censusSiblings": ...}'`
 		v.Proof = &models.Proof{
 			Payload: &models.Proof_ZkSnark{
 				ZkSnark: &models.ProofZkSNARK{
 					CircuitParametersIndex: int32(*circuitIndex),
-					// TODO: Insert SNARK proof here
-					A:            nil,
-					B:            nil,
-					C:            nil,
-					PublicInputs: nil,
+					A:                      proof.A,
+					B:                      proof.B,
+					C:                      proof.C,
+					PublicInputs:           proof.PublicInputs,
 				},
 			},
 		}
