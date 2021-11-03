@@ -9,7 +9,7 @@ set -x
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
 ORACLE_KEY=${TESTSUITE_ORACLE_KEY:-6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223}
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
-ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-16}
+ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 TEST=${1:-0}
 CLEAN=${CLEAN:-1}
 
@@ -47,9 +47,7 @@ testid="/tmp/.vochaintest$RANDOM"
 	test encrypted-poll ${testid}2 &
 } || echo 0 >${testid}2
 
-# TODO: Uncomment this line and remove the next one once anonymous voting integration test works
-# [ $TEST -eq 3 -o $TEST -eq 0 ] && {
-[ $TEST -eq 3 ] && {
+[ $TEST -eq 3 -o $TEST -eq 0 ] && {
 	echo "### Running test 3 ###"
 	test_anon ${testid}3 &
 } || echo 0 >${testid}3

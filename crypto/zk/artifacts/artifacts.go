@@ -50,23 +50,24 @@ const (
 
 // CircuitConfig defines the configuration of the files to be downloaded
 type CircuitConfig struct {
+	// TODO: Replace by URI
 	// URL defines the URL from where to download the files
-	URL string
+	URL string `json:"url"`
 	// CircuitPath defines the path from where the files are downloaded
-	CircuitPath string
+	CircuitPath string `json:"circuitPath"`
 	// Parameters used for the circuit build
-	Parameters []int64
+	Parameters []int64 `json:"parameters"`
 	// LocalDir defines in which directory will be the files
 	// downloaded, under that directory it will follow the CircuitPath
 	// directories structure
-	LocalDir string
+	LocalDir string `json:"localDir"`
 
 	// WitnessHash contains the expected hash for the file filenameWitness
-	WitnessHash []byte // witness.wasm
+	WitnessHash []byte `json:"witnessHash"` // witness.wasm
 	// ZKeyHash contains the expected hash for the file filenameZKey
-	ZKeyHash []byte // circuit.zkey
+	ZKeyHash []byte `json:"zKeyHash"` // circuit.zkey
 	// VKHash contains the expected hash for the file filenameVK
-	VKHash []byte // verificationKey.json
+	VKHash []byte `json:"vKHash"` // verificationKey.json
 }
 
 // DownloadCircuitFiles will download the circuits in the specified path,

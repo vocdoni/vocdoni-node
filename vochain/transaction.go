@@ -178,6 +178,38 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 
 	var vote *models.Vote
 	if process.EnvelopeType.Anonymous {
+		// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
+		// An element can only be added to the vote cache during checkTx.
+		// Every N seconds the old votes which are not yet in the blockchain will be removed from cache.
+		// If the same vote (but different transaction) is send to the mempool, the cache will detect it
+		// and vote will be discarted.
+		// We use CacheGetCopy because we will modify the vote to set
+		// the Height.  If we don't work with a copy we are racing with
+		// concurrent reads to the votes in the cache which happen in
+		// in State.CachePurge run via a goroutine in
+		// started in BaseApplication.BeginBlock.
+		vote = app.State.CacheGetCopy(txID)
+
+		// if vote is in cache, lazy check and remove it from cache
+		if forCommit && vote != nil {
+			vote.Height = height // update vote height
+			defer app.State.CacheDel(txID)
+			if exist, err := app.State.EnvelopeExists(vote.ProcessId,
+				vote.Nullifier, false); err != nil || exist {
+				if err != nil {
+					return nil, err
+				}
+				return nil, fmt.Errorf("vote %x already exists", vote.Nullifier)
+			}
+			return vote, nil
+		}
+
+		// if not forCommit, it is a mempool check,
+		// reject it since we already processed the transaction before.
+		if !forCommit && vote != nil {
+			return nil, fmt.Errorf("vote %x already exists in cache", vote.Nullifier)
+		}
+
 		// Supports Groth16 proof generated from circom snark compatible
 		// prover
 		proofZkSNARK := ve.Proof.GetZkSnark()
@@ -186,7 +218,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		}
 		proof, publicInputsFromUser, err := zk.ProtobufZKProofToCircomProof(proofZkSNARK)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
 		}
 		if len(publicInputsFromUser) < 1 {
 			return nil, fmt.Errorf("len(publicInputs)<1, at least need one element (nullifier)")
@@ -251,6 +283,9 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			ProcessId:   ve.ProcessId,
 			VotePackage: ve.VotePackage,
 			Nullifier:   nullifierBytes,
+			// Anonymous Voting doesn't support weighted voting, so
+			// we assing always 1 to each vote.
+			Weight: big.NewInt(1).Bytes(),
 		}
 		// If process encrypted, check the vote is encrypted (includes at least one key index)
 		if process.EnvelopeType.EncryptedVotes {
