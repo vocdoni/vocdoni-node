@@ -26,7 +26,7 @@ func info(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{Method: "getInfo"}
+	req := api.APIrequest{Method: "getInfo"}
 	resp, err := cl.Request(req, nil)
 	if err != nil {
 		return err

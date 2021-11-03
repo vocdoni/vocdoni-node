@@ -53,7 +53,7 @@ func blockTime(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{Method: "getBlockStatus"}
+	req := api.APIrequest{Method: "getBlockStatus"}
 	resp, err := cl.Request(req, opt.signKey)
 	if err != nil {
 		return err

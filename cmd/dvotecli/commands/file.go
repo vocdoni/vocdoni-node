@@ -56,7 +56,7 @@ func fileAdd(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{
+	req := api.APIrequest{
 		Method: "addFile",
 		Type:   "ipfs",
 	}
@@ -92,7 +92,7 @@ func fileFetch(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{
+	req := api.APIrequest{
 		Method: "fetchFile",
 		URI:    args[0],
 	}
@@ -122,7 +122,7 @@ func pinList(cmd *cobra.Command, args []string) error {
 	// Increase the default response size for large lists
 	cl.WS.SetReadLimit(32768 * 16)
 
-	req := api.MetaRequest{Method: "pinList"}
+	req := api.APIrequest{Method: "pinList"}
 	resp, err := cl.Request(req, opt.signKey)
 	if err != nil {
 		return err

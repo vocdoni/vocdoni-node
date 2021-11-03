@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-
-	"go.vocdoni.io/dvote/log"
 )
 
 const bearerPrefix = "Bearer "
@@ -33,24 +31,26 @@ func NewBearerStandardAPI() *BearerStandardAPI {
 
 // AuthorizeRequest is a function for the RouterNamespace interface.
 // On private handlers checks if the supplied bearer token have still request credits
-func (b *BearerStandardAPI) AuthorizeRequest(data interface{}, isAdmin bool) bool {
+func (b *BearerStandardAPI) AuthorizeRequest(data interface{}, isAdmin bool) (bool, error) {
 
 	msg, ok := data.(*BearerStandardAPIdata)
 	if !ok {
-		log.Warnf("type is not bearerStandardApi")
-		return false
+		panic("type is not bearerStandardApi")
 	}
 	if isAdmin {
 		b.adminTokenLock.RLock()
 		defer b.adminTokenLock.RUnlock()
-		return msg.AuthToken == b.adminToken
+		if msg.AuthToken != b.adminToken {
+			return false, fmt.Errorf("admin token not valid")
+		}
+		return true, nil
 	}
 	remainingReqs, ok := b.authTokens.Load(msg.AuthToken)
 	if !ok || remainingReqs.(int64) < 1 {
-		return false
+		return false, fmt.Errorf("no more requests available")
 	}
 	b.authTokens.Store(msg.AuthToken, remainingReqs.(int64)-1)
-	return true
+	return true, nil
 }
 
 // ProcessData is a function for the RouterNamespace interface.

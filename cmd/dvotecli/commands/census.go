@@ -71,7 +71,7 @@ func censusAdd(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{
+	req := api.APIrequest{
 		Method:   "addCensus",
 		CensusID: args[0],
 	}
@@ -108,7 +108,7 @@ func addClaim(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{
+	req := api.APIrequest{
 		Method:    "addClaim",
 		CensusID:  args[0],
 		Digested:  opt.digested,
@@ -139,7 +139,7 @@ func getRoot(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{
+	req := api.APIrequest{
 		Method:   "getRoot",
 		CensusID: args[0],
 	}
@@ -166,7 +166,7 @@ func getSize(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{
+	req := api.APIrequest{
 		Method:   "getSize",
 		CensusID: args[0],
 	}
@@ -193,7 +193,7 @@ func genProof(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{
+	req := api.APIrequest{
 		Method:    "genProof",
 		CensusID:  args[0],
 		Digested:  opt.digested,

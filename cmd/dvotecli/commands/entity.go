@@ -34,7 +34,7 @@ func entityList(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{Method: "getEntityList"}
+	req := api.APIrequest{Method: "getEntityList"}
 	resp, err := cl.Request(req, nil)
 	if err != nil {
 		return err

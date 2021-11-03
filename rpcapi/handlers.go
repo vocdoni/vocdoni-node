@@ -41,26 +41,26 @@ func (r *RPCAPI) EnableCensusAPI(cm *census.Manager) error {
 	if cm.RemoteStorage == nil {
 		cm.RemoteStorage = r.storage
 	}
-	/*
-		r.RegisterPublic("getRoot", r.censusLocal)
-		r.RegisterPrivate("dump", r.censusLocal)
-		r.RegisterPrivate("dumpPlain", r.censusLocal)
-		r.RegisterPublic("getSize", r.censusLocal)
-		r.RegisterPublic("genProof", r.censusLocal)
-		r.RegisterPublic("checkProof", r.censusLocal)
-		r.RegisterPrivate("addCensus", r.censusLocal)
-		r.RegisterPrivate("addClaim", r.censusLocal)
-		r.RegisterPrivate("addClaimBulk", r.censusLocal)
-		r.RegisterPrivate("publish", r.censusLocal)
-		r.RegisterPrivate("importRemote", r.censusLocal)
-		r.RegisterPrivate("getCensusList", r.censusLocal)
-	*/
+
+	r.RegisterPublic("getRoot", false, r.censusLocal)
+	r.RegisterPrivate("dump", r.censusLocal)
+	r.RegisterPrivate("dumpPlain", r.censusLocal)
+	r.RegisterPublic("getSize", false, r.censusLocal)
+	r.RegisterPublic("genProof", false, r.censusLocal)
+	r.RegisterPublic("checkProof", false, r.censusLocal)
+	r.RegisterPrivate("addCensus", r.censusLocal)
+	r.RegisterPrivate("addClaim", r.censusLocal)
+	r.RegisterPrivate("addClaimBulk", r.censusLocal)
+	r.RegisterPrivate("publish", r.censusLocal)
+	r.RegisterPrivate("importRemote", r.censusLocal)
+	r.RegisterPrivate("getCensusList", r.censusLocal)
+
 	return nil
 }
 
 // EnableVoteAPI enabled the Vote API in the Router
 func (r *RPCAPI) EnableVoteAPI(vocapp *vochain.BaseApplication, vocinfo *vochaininfo.VochainInfo) error {
-	if (r.vocapp == nil && vocapp == nil) || (r.vocinfo == nil || vocinfo == nil) {
+	if (r.vocapp == nil && vocapp == nil) || (r.vocinfo == nil && vocinfo == nil) {
 		return fmt.Errorf("vocdoni APP or vocdoni Info are nil")
 	}
 	if r.vocapp == nil {
@@ -78,12 +78,14 @@ func (r *RPCAPI) EnableVoteAPI(vocapp *vochain.BaseApplication, vocinfo *vochain
 	r.RegisterPublic("getProcessKeys", false, r.getProcessKeys)
 	r.RegisterPublic("getBlockStatus", false, r.getBlockStatus)
 	r.RegisterPublic("getOracleResults", false, r.getOracleResults)
+	r.RegisterPublic("getProcessCircuitConfig", false, r.getProcessCircuitConfig)
+
 	return nil
 }
 
 // EnableResultsAPI enabled the vote results API in the Router
 func (r *RPCAPI) EnableResultsAPI(vocapp *vochain.BaseApplication, scrutinizer *scrutinizer.Scrutinizer) error {
-	if (r.vocapp == nil && vocapp == nil) || (r.scrutinizer == nil || scrutinizer == nil) {
+	if (r.vocapp == nil && vocapp == nil) || (r.scrutinizer == nil && scrutinizer == nil) {
 		return fmt.Errorf("vocdoni APP or scrutinizer are nil")
 	}
 	if r.vocapp == nil {
@@ -109,7 +111,7 @@ func (r *RPCAPI) EnableResultsAPI(vocapp *vochain.BaseApplication, scrutinizer *
 // EnableIndexerAPI enables the vote indexer API in the Router
 func (r *RPCAPI) EnableIndexerAPI(vocapp *vochain.BaseApplication,
 	vocinfo *vochaininfo.VochainInfo, scrutinizer *scrutinizer.Scrutinizer) error {
-	if (r.vocapp == nil && vocapp == nil) || (r.scrutinizer == nil || scrutinizer == nil) ||
+	if (r.vocapp == nil && vocapp == nil) || (r.scrutinizer == nil && scrutinizer == nil) ||
 		(r.vocinfo == nil && vocinfo == nil) {
 		return fmt.Errorf("vocdoni APP or scrutinizer are nil")
 	}

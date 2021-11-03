@@ -15,10 +15,9 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
+	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/multirpc/transports"
-	"go.vocdoni.io/dvote/multirpc/transports/mhttp"
-	"go.vocdoni.io/dvote/router"
+	"go.vocdoni.io/dvote/rpcapi"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -42,7 +41,7 @@ type Vocone struct {
 	height          int64
 	appInfo         *vochaininfo.VochainInfo
 	app             *vochain.BaseApplication
-	routerAPI       *router.Router
+	routerAPI       *rpcapi.RPCAPI
 	lastBlockTime   time.Time
 	blockTimeTarget time.Duration
 	txsPerBlock     int
@@ -109,12 +108,13 @@ func (vc *Vocone) EnableAPI(host string, port int, path string) (err error) {
 	if vc.routerAPI, err = startAPI(host, port, path); err != nil {
 		return err
 	}
-	vc.routerAPI.Scrutinizer = vc.sc
-	vc.routerAPI.EnableResultsAPI(vc.app, vc.appInfo)
-	vc.routerAPI.EnableVoteAPI(vc.app, vc.appInfo)
-	vc.routerAPI.EnableIndexerAPI(vc.app, vc.appInfo)
-	go vc.routerAPI.Route()
-	return nil
+	if err := vc.routerAPI.EnableResultsAPI(vc.app, vc.sc); err != nil {
+		return err
+	}
+	if err := vc.routerAPI.EnableVoteAPI(vc.app, vc.appInfo); err != nil {
+		return err
+	}
+	return vc.routerAPI.EnableIndexerAPI(vc.app, vc.appInfo, vc.sc)
 }
 
 // Start initializes the block production. This method should be run async.
@@ -278,38 +278,17 @@ func (vc *Vocone) getTxWithHash(height uint32, txIndex int32) (*models.SignedTx,
 	return stx, ethereum.HashRaw(tx), proto.Unmarshal(tx, stx)
 }
 
-func startAPI(host string, port int, path string) (*router.Router, error) {
+// Initialize the RPC API
+func startAPI(host string, port int, path string) (*rpcapi.RPCAPI, error) {
 	signer := ethereum.NewSignKeys()
 	if err := signer.Generate(); err != nil {
 		return nil, err
 	}
-
-	pxy := mhttp.NewProxy()
-	pxy.Conn.Address = host
-	if pxy.Conn.Address == "" {
-		pxy.Conn.Address = "0.0.0.0"
-	}
-	pxy.Conn.Port = int32(port)
-	if err := pxy.Init(); err != nil {
+	httpRouter := httprouter.HTTProuter{}
+	if err := httpRouter.Init(host, port); err != nil {
 		return nil, err
 	}
-
-	log.Infof("creating API service")
-	// API Endpoint initialization
-	listenerOutput := make(chan transports.Message)
-
-	htransport := new(mhttp.HttpHandler)
-	htransport.SetProxy(pxy)
-	if err := htransport.Init(new(transports.Connection)); err != nil {
-		return nil, err
-	}
-	go htransport.Listen(listenerOutput)
-	if err := htransport.AddNamespace(path); err != nil {
-		return nil, err
-	}
-	log.Infof("%s API available at %s", htransport.ConnectionType(), path)
-
-	return router.InitRouter(listenerOutput, nil, signer, nil, true), nil
+	return rpcapi.NewAPI(signer, &httpRouter, path, nil, true)
 }
 
 // VochainPrintInfo initializes the Vochain statistics recollection

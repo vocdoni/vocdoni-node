@@ -37,7 +37,7 @@ func BenchmarkCensus(b *testing.B) {
 		var server testcommon.DvoteAPIServer
 		server.CensusBackend = *censusBackend // NOTE: CensusBackend is not used
 		server.Start(b, "file", "census")
-		host = server.PxyAddr
+		host = server.ListenAddr
 	}
 
 	b.ResetTimer()
@@ -62,9 +62,9 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 
 	// check required components
 
-	req := &api.MetaRequest{}
-	zeroReq := &api.MetaRequest{}
-	reset := func(r *api.MetaRequest) {
+	req := &api.APIrequest{}
+	zeroReq := &api.APIrequest{}
+	reset := func(r *api.APIrequest) {
 		*r = *zeroReq
 	}
 	doRequest := cl.ForTest(b, req)

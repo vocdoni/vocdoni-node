@@ -81,13 +81,12 @@ func NewConfig() *DvoteCfg {
 
 // API includes information required by the api, which modules are enabled and the route
 type API struct {
-	Route      string
-	File       bool
-	Census     bool
-	Tendermint bool
-	Vote       bool
-	Results    bool
-	Indexer    bool
+	Route   string
+	File    bool
+	Census  bool
+	Vote    bool
+	Results bool
+	Indexer bool
 	// AllowPrivate allow to use private methods
 	AllowPrivate bool
 	// AllowedAddrs allowed addresses to interact with
@@ -101,9 +100,6 @@ type API struct {
 		Domain  string
 		DirCert string
 	}
-	// Enable WebSockets API
-	Websockets          bool
-	WebsocketsReadLimit int64
 	// Enable HTTP API
 	HTTP bool
 }

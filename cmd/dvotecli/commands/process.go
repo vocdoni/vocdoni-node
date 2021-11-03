@@ -71,7 +71,7 @@ func processList(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{Method: "getProcessList"}
+	req := api.APIrequest{Method: "getProcessList"}
 	if len(args) >= 1 {
 		req.EntityId, err = hex.DecodeString(util.TrimHex(args[0]))
 		if err != nil {
@@ -117,7 +117,7 @@ func processInfo(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{Method: "getProcessInfo"}
+	req := api.APIrequest{Method: "getProcessInfo"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err
@@ -145,7 +145,7 @@ func processKeys(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{Method: "getProcessKeys"}
+	req := api.APIrequest{Method: "getProcessKeys"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err
@@ -187,7 +187,7 @@ func processCircuitConfig(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{Method: "getProcessCircuitConfig"}
+	req := api.APIrequest{Method: "getProcessCircuitConfig"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err
@@ -224,7 +224,7 @@ func getResults(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{Method: "getResults"}
+	req := api.APIrequest{Method: "getResults"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err
@@ -255,7 +255,7 @@ func getResultsWeight(cmd *cobra.Command, args []string) error {
 	}
 	defer cl.CheckClose(&err)
 
-	req := api.MetaRequest{Method: "getResultsWeight"}
+	req := api.APIrequest{Method: "getResultsWeight"}
 	req.ProcessID, err = hex.DecodeString(util.TrimHex(args[0]))
 	if err != nil {
 		return err

@@ -6,8 +6,10 @@ import (
 	"fmt"
 
 	api "go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -240,6 +242,60 @@ func (r *RPCAPI) getProcessKeys(request *api.APIrequest) (*api.APIresponse, erro
 	}
 	response.EncryptionPublicKeys = pubs
 	response.EncryptionPrivKeys = privs
+	return &response, nil
+}
+
+func (r *RPCAPI) getProcessCircuitConfig(request *api.APIrequest) (*api.APIresponse, error) {
+	// check pid
+	if len(request.ProcessID) != types.ProcessIDsize {
+		return nil, fmt.Errorf("cannot get envelope status: (malformed processId)")
+	}
+	process, err := r.vocapp.State.Process(request.ProcessID, true)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get process %x: %v", request.ProcessID, err)
+	}
+	if !process.EnvelopeType.Anonymous {
+		return nil, fmt.Errorf("no CircuitConfig for non-anonymous process")
+	}
+	if process.RollingCensusSize == nil {
+		return nil, fmt.Errorf("rolling census is not closed yet")
+	}
+	var response api.APIresponse
+	var config artifacts.CircuitConfig
+	index := -1
+	var circuits []artifacts.CircuitConfig
+	if genesis, ok := vochain.Genesis[r.vocapp.ChainID()]; ok {
+		circuits = genesis.CircuitsConfig
+	} else {
+		log.Warn("Using dev network genesis CircuitsConfig")
+		circuits = vochain.Genesis["dev"].CircuitsConfig
+	}
+	for i, cfg := range circuits {
+		if *process.RollingCensusSize <= uint64(cfg.Parameters[0]) {
+			index = i
+			config = cfg
+			break
+		}
+	}
+	response.CircuitIndex = &index
+	if index != -1 {
+		response.CircuitConfig = &config
+	}
+	return &response, nil
+}
+
+func (r *RPCAPI) getProcessRollingCensusSize(request *api.APIrequest) (*api.APIresponse, error) {
+	if len(request.ProcessID) != types.ProcessIDsize {
+		return nil, fmt.Errorf("cannot get envelope status: (malformed processId)")
+	}
+	censusSize, err := r.vocapp.State.GetRollingCensusSize(request.ProcessID, true)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get process %x rolling census size: %v",
+			censusSize, err)
+	}
+	var response api.APIresponse
+	size := int64(censusSize)
+	response.Size = &size
 	return &response, nil
 }
 
