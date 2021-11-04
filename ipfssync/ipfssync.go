@@ -13,15 +13,13 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
-	"go.vocdoni.io/dvote/multirpc/transports/subpubtransport"
+	"go.vocdoni.io/dvote/ipfssync/subpub"
 	statedb "go.vocdoni.io/dvote/statedblegacy"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/multirpc/transports"
 	"go.vocdoni.io/dvote/statedblegacy/gravitonstate"
 	"go.vocdoni.io/dvote/util"
 )
@@ -47,14 +45,15 @@ type IPFSsync struct {
 	Key             string
 	PrivKey         string
 	Port            int16
-	HelloTime       int
-	UpdateTime      int
+	HelloInterval   time.Duration
+	UpdateInterval  time.Duration
 	Bootnodes       []string
 	Storage         *data.IPFSHandle
-	Transport       transports.Transport
-	Topic           string
+	Transport       *subpub.SubPub
+	GroupKey        string
 	Timeout         time.Duration
 	TimestampWindow int32
+	Messages        chan *subpub.Message
 
 	hashTree        statedb.StateTree
 	state           statedb.StateDB
@@ -69,26 +68,20 @@ type IPFSsync struct {
 func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.Storage) *IPFSsync {
 	is := &IPFSsync{
 		DataDir:         dataDir,
-		Topic:           groupKey,
+		GroupKey:        groupKey,
 		PrivKey:         privKeyHex,
 		Port:            4171,
-		HelloTime:       40,
-		UpdateTime:      20,
+		HelloInterval:   time.Second * 40,
+		UpdateInterval:  time.Second * 20,
 		Timeout:         time.Second * 600,
 		Storage:         storage.(*data.IPFSHandle),
-		TimestampWindow: 180,
+		TimestampWindow: 180, // seconds
+		Messages:        make(chan *subpub.Message),
 	}
 	if transport == "privlibp2p" {
 		transport = "libp2p"
 		is.private = true
 	}
-	switch transport {
-	case "libp2p":
-		is.Transport = &subpubtransport.SubPubHandle{}
-	default:
-		is.Transport = &subpubtransport.SubPubHandle{}
-	}
-
 	return is
 }
 
@@ -222,14 +215,14 @@ func (is *IPFSsync) broadcastMsg(imsg *models.IpfsSync) error {
 	}
 	log.Debugf("broadcasting message %s {Address:%s Hash:%x MA:%s PL:%v Ts:%d}",
 		imsg.Msgtype.String(), imsg.Address, imsg.Hash, imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
-	is.Transport.Send(transports.Message{
-		Data:      d,
-		TimeStamp: int32(time.Now().Unix()),
-	})
+	is.Transport.SendBroadcast(subpub.Message{Data: d})
 	return nil
 }
 
-// Handle handles an Message
+// Handle handles a Message in a thread-safe way:
+// is.updateLock RWMutex syncs the calls to:
+// * addPins which modifies IPFS pin list
+// * askPins and sendPins, which produce outgoing unicasts messages with thread-safe is.unicastMsg()
 func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 	if msg.Address == is.Transport.Address() {
 		return nil
@@ -252,7 +245,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 			}
 		}
 		if !found {
-			log.Infof("connecting to peer %s", msg.Multiaddress)
+			log.Infof("connecting IPFS to peer %s", msg.Multiaddress)
 			multiAddr, err := ma.NewMultiaddr(msg.Multiaddress)
 			if err != nil {
 				return err
@@ -350,23 +343,23 @@ func (is *IPFSsync) listPins(fromHash []byte) ([]*models.IpfsPin, error) {
 }
 
 func (is *IPFSsync) unicastMsg(address string, imsg *models.IpfsSync) error {
-	var msg transports.Message
+	var msg subpub.Message
 	imsg.Timestamp = uint32(time.Now().Unix())
 	d, err := proto.Marshal(imsg)
 	if err != nil {
 		return fmt.Errorf("unicastMsg: %w", err)
 	}
 	msg.Data = d
-	msg.TimeStamp = int32(time.Now().Unix())
 	log.Debugf("sending message %s {Addr:%s Hash:%x MA:%s PL:%v Ts:%d}",
 		imsg.Msgtype.String(), imsg.Address, imsg.Hash, imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
-	go is.Transport.SendUnicast(address, msg)
-	return nil
+	return is.Transport.SendUnicast(address, msg)
 }
 
 // Start initializes and start an IPFSsync instance
 func (is *IPFSsync) Start() {
 	var err error
+
+	// Init pin storage
 	log.Infof("initializing new pin storage")
 	dbDir := path.Join(is.DataDir, "db")
 	if err := os.RemoveAll(dbDir); err != nil {
@@ -382,26 +375,15 @@ func (is *IPFSsync) Start() {
 	is.hashTree = is.state.Tree("ipfsSync")
 	is.updateLocalPins()
 	log.Infof("current hash %x", is.hashTree.Hash())
+	// end Init pin storage
 
-	conn := transports.Connection{
-		Port:         int32(is.Port),
-		Key:          is.PrivKey,
-		Topic:        fmt.Sprintf("%x", ethereum.HashRaw([]byte(is.Topic))),
-		TransportKey: is.Topic,
-	}
-	// conn.Address, _ = ethereum.PubKeyFromPrivateKey(is.PrivKey)
-	if is.private {
-		conn.Encryption = "private"
-	}
+	// Init SubPub
+	is.Transport = subpub.NewSubPub(is.PrivKey, []byte(is.GroupKey), int32(is.Port), is.private)
+	is.Transport.BootNodes = is.Bootnodes
+	is.Transport.Start(context.Background(), is.Messages)
+	// end Init SubPub
 
-	if err := is.Transport.Init(&conn); err != nil {
-		log.Fatal(err)
-	}
-	is.Transport.SetBootnodes(is.Bootnodes)
-
-	msg := make(chan transports.Message)
-	is.Transport.Listen(msg)
-
+	// guessMyAddress and print it
 	var err4, err6 error
 	is.myMultiAddrIPv4, err4 = ma.NewMultiaddr(guessMyAddress(IPv4, 4001, is.Storage.Node.PeerHost.ID().String()))
 	is.myMultiAddrIPv6, err6 = ma.NewMultiaddr(guessMyAddress(IPv6, 4001, is.Storage.Node.PeerHost.ID().String()))
@@ -409,16 +391,33 @@ func (is *IPFSsync) Start() {
 		log.Fatal("ipv4: %s; ipv6: %s", err4, err6)
 	}
 	if is.myMultiAddrIPv4 != nil {
-		log.Infof("my multiaddress ipv4: %s", is.myMultiAddrIPv4)
+		log.Infof("my IPFS multiaddress ipv4: %s", is.myMultiAddrIPv4)
 	}
 	if is.myMultiAddrIPv6 != nil {
-		log.Infof("my multiaddress ipv6: %s", is.myMultiAddrIPv6)
+		log.Infof("my IPFS multiaddress ipv6: %s", is.myMultiAddrIPv6)
 	}
+	// end guessMyAddress and print it
 
-	// receive messages and handle them
-	go func() {
-		for {
-			d := <-msg
+	go is.handleEvents() // this spawns a single background task per IPFSsync instance
+}
+
+// handleEvents runs an event loop that
+// * checks for incoming messages, passing them to is.Handle(),
+// * at regular interval sends HELLOs, UPDATEs and calls syncPins()
+func (is *IPFSsync) handleEvents() {
+	helloTicker := time.NewTicker(is.HelloInterval)
+	defer helloTicker.Stop()
+
+	updateTicker := time.NewTicker(is.UpdateInterval)
+	defer updateTicker.Stop()
+
+	syncPinsTicker := time.NewTicker(time.Second * 10)
+	defer syncPinsTicker.Stop()
+
+	for {
+		select {
+		case d := <-is.Messages:
+			// receive unicast & broadcast messages and handle them
 			var imsg models.IpfsSync
 			err := proto.Unmarshal(d.Data, &imsg)
 			if err != nil {
@@ -427,36 +426,25 @@ func (is *IPFSsync) Start() {
 				log.Debugf("received message %s {Address:%s Hash:%x MA:%s PL:%v Ts:%d}",
 					imsg.Msgtype.String(), imsg.Address, imsg.Hash,
 					imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
-				go is.Handle(&imsg)
+				go is.Handle(&imsg) // handle each incoming message in parallel, since is.Handle() is thread-safe
 			}
-		}
-	}()
 
-	// send hello messages
-	go func() {
-		for {
+		case <-helloTicker.C:
+			// send hello messages
 			is.sendHello()
-			time.Sleep(time.Second * time.Duration(is.HelloTime))
-		}
-	}()
 
-	// send update messages
-	go func() {
-		for {
-			time.Sleep(time.Duration(is.UpdateTime) * time.Second)
+		case <-updateTicker.C:
+			// send update messages
 			is.updateLock.Lock()
 			is.updateLocalPins()
 			is.sendUpdate()
 			is.updateLock.Unlock()
-		}
-	}()
 
-	go func() {
-		for {
+		case <-syncPinsTicker.C:
+			// pin everything found in the merkle tree
 			if err := is.syncPins(); err != nil {
 				log.Warnf("syncPins: %v", err)
 			}
-			time.Sleep(time.Second * 10)
 		}
-	}()
+	}
 }
