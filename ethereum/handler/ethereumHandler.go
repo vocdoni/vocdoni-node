@@ -390,6 +390,7 @@ func extractProcessMode(processMode uint8) (*models.ProcessMode, error) {
 		Interruptible:     processMode&byte(0b00000010) > 0,
 		DynamicCensus:     processMode&byte(0b00000100) > 0,
 		EncryptedMetaData: processMode&byte(0b00001000) > 0,
+		PreRegister:       processMode&byte(0b00010000) > 0,
 	}, nil
 }
 
