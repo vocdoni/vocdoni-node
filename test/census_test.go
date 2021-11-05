@@ -211,11 +211,10 @@ func TestCensus(t *testing.T) {
 	resp = doRequest("getRoot", nil)
 	qt.Assert(t, resp.Root, qt.DeepEquals, root)
 
-	// TODO WIP getSize method is not currently supported
 	// getSize
-	// req.RootHash = nil
-	// resp = doRequest("getSize", nil)
-	// qt.Assert(t, *resp.Size, qt.Equals, int64(*censusSize))
+	req.RootHash = nil
+	resp = doRequest("getSize", nil)
+	qt.Assert(t, *resp.Size, qt.Equals, int64(*censusSize))
 
 	// get census list
 	resp = doRequest("getCensusList", signer2)
