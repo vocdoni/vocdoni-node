@@ -349,6 +349,11 @@ func (eh *EthereumHandler) NewProcessTxArgs(ctx context.Context, pid [types.Proc
 	processTxArgs := new(models.NewProcessTx)
 	processTxArgs.Txtype = models.TxType_NEW_PROCESS
 	processTxArgs.Process = processData
+
+	// Workaround until maxCensusSize is added to the Ethereum smart contract
+	maxCensusSize := uint64(10000)
+	processTxArgs.Process.MaxCensusSize = &maxCensusSize
+
 	return processTxArgs, nil
 }
 
