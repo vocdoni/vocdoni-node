@@ -995,18 +995,17 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 		log.Infof("census creation progress: %d%%", (i*100*100)/(censusSize))
 	}
 
-	// TODO WIP getSize method is not currently supported
 	// getSize
-	// log.Infof("get size")
-	// req.Method = "getSize"
-	// req.RootHash = nil
-	// resp, err = c.Request(req, nil)
-	// if err != nil {
-	//         return nil, "", err
-	// }
-	// if got := *resp.Size; int64(censusSize) != got {
-	//         return nil, "", fmt.Errorf("expected size %v, got %v", censusSize, got)
-	// }
+	log.Infof("get size")
+	req.Method = "getSize"
+	req.RootHash = nil
+	resp, err = c.Request(req, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	if got := *resp.Size; int64(censusSize) != got {
+		return nil, "", fmt.Errorf("expected size %v, got %v", censusSize, got)
+	}
 
 	// publish
 	log.Infof("publish census")

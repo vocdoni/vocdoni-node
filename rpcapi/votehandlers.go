@@ -284,6 +284,7 @@ func (r *RPCAPI) getProcessCircuitConfig(request *api.APIrequest) (*api.APIrespo
 	return &response, nil
 }
 
+//lint:ignore U1000
 func (r *RPCAPI) getProcessRollingCensusSize(request *api.APIrequest) (*api.APIresponse, error) {
 	if len(request.ProcessID) != types.ProcessIDsize {
 		return nil, fmt.Errorf("cannot get envelope status: (malformed processId)")

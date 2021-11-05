@@ -176,9 +176,8 @@ func (t *Tree) Root(rTx db.ReadTx) ([]byte, error) {
 
 // Size returns the number of leafs under the current root
 func (t *Tree) Size(rTx db.ReadTx) (uint64, error) {
-	// TODO we need to review where this would be used and in which
-	// context, and define the way how this is computed
-	return 0, fmt.Errorf("unimplemented")
+	n, err := t.tree.GetNLeafs()
+	return uint64(n), err
 }
 
 // GenProof returns a byte array with the necessary data to verify that the
