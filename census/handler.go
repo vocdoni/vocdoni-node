@@ -269,7 +269,10 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		resp.Size = &sizeInt64
 		return resp, nil
 
-	case "dump", "dumpPlain":
+	case "dumpPlain":
+		return nil, fmt.Errorf("dumpPlain is deprecated, dump should be used instead")
+
+	case "dump":
 		if !validAuthPrefix {
 			return resp, fmt.Errorf("invalid authentication")
 		}
@@ -283,30 +286,14 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		} else {
 			root = r.RootHash
 		}
-		if r.Method == "dump" {
-			snapshot, err := tr.FromRoot(root)
-			if err != nil {
-				return nil, err
-			}
-			resp.CensusDump, err = snapshot.Dump()
-			if err != nil {
-				return nil, err
-			}
+		snapshot, err := tr.FromRoot(root)
+		if err != nil {
+			return nil, err
 		}
-		// else {
-		// 	TODO the method DumpPlain no longer exists, clarify
-		// 	the difference of usage between 'dump' & 'dumpPlain'.
-
-		// 	var vals [][]byte
-		// 	resp.CensusKeys, vals, err = tr.DumpPlain(root)
-		// 	for _, v := range vals {
-		// 	        resp.CensusValues = append(resp.CensusValues, types.HexBytes(v))
-		// 	}
-		// }
-		// if err != nil {
-		// 	resp.SetError(err)
-		// 	return resp
-		// }
+		resp.CensusDump, err = snapshot.Dump()
+		if err != nil {
+			return nil, err
+		}
 		return resp, nil
 
 	case "publish":

@@ -141,24 +141,6 @@ func TestCensus(t *testing.T) {
 	resp = doRequest("addClaimBulk", signer2)
 	qt.Assert(t, resp.Ok, qt.IsTrue)
 
-	// TODO WIP: the method DumpPlain no longer exists, clarify the
-	// difference of usage between 'dump' & 'dumpPlain'.
-	// dumpPlain
-	// req.CensusKey = []byte{}
-	// req.CensusKeys = [][]byte{}
-	// resp = doRequest("dumpPlain", signer2)
-	// qt.Assert(t, resp.Ok, qt.IsTrue)
-	// for _, c := range claims {
-	//         found := false
-	//         for _, c2 := range resp.CensusKeys {
-	//                 if bytes.Equal(c, c2) {
-	//                         found = true
-	//                         break
-	//                 }
-	//         }
-	//         qt.Assert(t, found, qt.IsTrue)
-	// }
-
 	// GenProof valid
 	req.RootHash = nil
 	req.CensusKey = claims[1]
