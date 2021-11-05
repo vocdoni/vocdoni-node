@@ -139,16 +139,6 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 		return
 	}
 
-	// dumpPlain
-	/*	log.Infof("[%d] dump claims", rint)
-		req.CensusKey = []byte{}
-		req.CensusKeys = [][]byte{}
-		resp = doRequest("dumpPlain", signer)
-		if len(resp.CensusKeys) != len(claims) {
-			b.Fatalf("missing claims on dumpPlain, %d != %d", len(req.CensusKeys), len(claims))
-		}
-	*/
-
 	// GenProof valid
 	log.Infof("Generating proofs")
 	var siblings [][]byte

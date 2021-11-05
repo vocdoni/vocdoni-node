@@ -46,7 +46,7 @@ This command will open an interactive input where you can request raw JSON comma
 ./dvotecli json-client --host https://gw2.vocdoni.net/dvote
 2020-12-23T10:46:55Z    INFO    commands/client.go:36   logger construction succeeded at level  and output stdout
 2020-12-23T10:46:55Z    INFO    commands/client.go:47   connecting to https://gw2.vocdoni.net/dvote
-{"method":"dumpPlain","censusId":"0x16c0feec71ab17f603bb8053802c745f77e75e65cd65e3b1bc92e8c6443be820"}
+{"method":"dump","censusId":"0x16c0feec71ab17f603bb8053802c745f77e75e65cd65e3b1bc92e8c6443be820"}
 ...
 {"method":"genProof","censusId":"0x16c0feec71ab17f603bb8053802c745f77e75e65cd65e3b1bc92e8c6443be820", "digested":true,"claimData":"IutkMaMqFvU+VSNd6DRQs/SHoBxPqPjHZc90/rE/HDw="}
 ...
