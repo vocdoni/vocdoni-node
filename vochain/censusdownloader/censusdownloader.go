@@ -97,16 +97,16 @@ func (s *CensusDownloader) OnProcessesStart(pids [][]byte) {
 	for _, pid := range pids {
 		process, err := s.vochain.State.Process(pid, true)
 		if err != nil {
-			log.Fatalf("cannot find process with pid %x: %v", pid, err)
+			log.Errorf("cannot find process with pid %x: %v", pid, err)
 		}
 		if process.Mode.PreRegister && process.EnvelopeType.Anonymous {
 			census, err := s.vochain.State.DumpRollingCensus(pid)
 			if err != nil {
-				log.Fatalf("cannot dump census with pid %x: %v", pid, err)
+				log.Errorf("cannot dump census with pid %x: %v", pid, err)
 			}
 			if _, err := s.census.ImportDump(census.CensusID,
 				census.Type, census.DumpRoot, census.DumpData); err != nil {
-				log.Fatalf("cannot import census with pid %x: %v", pid, err)
+				log.Errorf("cannot import census with pid %x: %v", pid, err)
 			}
 		}
 	}
