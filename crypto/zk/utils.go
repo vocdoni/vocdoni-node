@@ -25,7 +25,7 @@ func LoadVkFromFile(path string) (*types.Vk, error) {
 }
 
 func ProtobufZKProofToCircomProof(p *models.ProofZkSNARK) (*types.Proof, []*big.Int, error) {
-	if len(p.A) != 3 && len(p.B) != 6 && len(p.C) != 3 {
+	if len(p.A) != 3 || len(p.B) != 6 || len(p.C) != 3 {
 		return nil, nil, fmt.Errorf("error on zkProof format")
 	}
 	proofString := parsers.ProofString{
