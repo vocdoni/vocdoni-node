@@ -101,7 +101,19 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 
 	case "addClaimBulk":
 		if validAuthPrefix {
-			invalidClaims, err := tr.AddBatch(r.CensusKeys, r.CensusValues)
+			batchKeys := r.CensusKeys
+			if !r.Digested {
+				batchKeys = [][]byte{}
+				for _, k := range r.CensusKeys {
+					hk, err := tr.Hash(k)
+					if err != nil {
+						log.Warnf("error hashing claim: %v", err)
+						return nil, err
+					}
+					batchKeys = append(batchKeys, hk)
+				}
+			}
+			invalidClaims, err := tr.AddBatch(batchKeys, r.CensusValues)
 			if err != nil {
 				return nil, err
 			}
@@ -124,10 +136,11 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 				return resp, fmt.Errorf("error decoding claim data")
 			}
 			data := r.CensusKey
-			// TO-DO: do a poseidon hash if census=snarks
-			//if !r.Digested {
-			// data = snarks.Poseidon.Hash(data)
-			//}
+			if !r.Digested {
+				if data, err = tr.Hash(data); err != nil {
+					return resp, fmt.Errorf("error digesting data: %w", err)
+				}
+			}
 			err := tr.Add(data, r.CensusValue)
 			if err != nil {
 				return nil, err
@@ -212,10 +225,11 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		}
 		// Generate proof and return it
 		data := r.CensusKey
-		// TO-DO: if census=snarks do Poseidon hashing
-		//if !r.Digested {
-		//	data = snarks.Poseidon.Hash(data)
-		//}
+		if !r.Digested {
+			if data, err = tr.Hash(data); err != nil {
+				return resp, fmt.Errorf("error digesting data: %w", err)
+			}
+		}
 		validProof, err := tr.VerifyProof(data, r.CensusValue, r.ProofData, root)
 		if err != nil {
 			return nil, err
@@ -238,10 +252,11 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 	case "genProof":
 		key := r.CensusKey
 		value := r.CensusValue
-		// TO-DO: if census=snarks do Poseidon hashing
-		//if !r.Digested {
-		//	key = snarks.Poseidon.Hash(key)
-		//}
+		if !r.Digested {
+			if key, err = tr.Hash(key); err != nil {
+				return resp, fmt.Errorf("error digesting data: %w", err)
+			}
+		}
 		// If tr.Type() == ARBO_POSEIDON, resolve mapping key -> index before genProof
 		if tr.Type() == models.Census_ARBO_POSEIDON {
 			key, err = m.KeyToIndex(r.CensusID, key)

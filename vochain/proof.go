@@ -85,7 +85,11 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 		default:
 			return false, nil, fmt.Errorf("not recognized ProofArbo type: %s", p.Type)
 		}
-		valid, err := tree.VerifyProof(hashFunc, key, []byte{}, p.Siblings, censusRoot)
+		hashedKey, err := hashFunc.Hash(key)
+		if err != nil {
+			return false, nil, err
+		}
+		valid, err := tree.VerifyProof(hashFunc, hashedKey, []byte{}, p.Siblings, censusRoot)
 		return valid, bigOne, err
 	default:
 		return false, nil, fmt.Errorf("unexpected proof.Payload type: %T",

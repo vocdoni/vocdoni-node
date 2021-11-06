@@ -38,6 +38,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	qt "github.com/frankban/quicktest"
+	"github.com/vocdoni/arbo"
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
@@ -133,7 +134,8 @@ func TestCensus(t *testing.T) {
 	req.Digested = false
 	keys := testcommon.CreateEthRandomKeysBatch(t, *censusSize)
 	for _, key := range keys {
-		claim := crypto.FromECDSAPub(&key.Public)
+		claim, err := arbo.HashFunctionBlake2b.Hash(crypto.FromECDSAPub(&key.Public))
+		qt.Assert(t, err, qt.IsNil)
 		qt.Assert(t, claim, qt.Not(qt.HasLen), 0)
 		claims = append(claims, claim)
 	}

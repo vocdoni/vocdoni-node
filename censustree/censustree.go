@@ -22,6 +22,7 @@ type Tree struct {
 	sync.Mutex
 	public     uint32
 	censusType models.Census_Type
+	hashFunc   func(...[]byte) ([]byte, error)
 }
 
 type Options struct {
@@ -55,12 +56,17 @@ func New(opts Options) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Tree{tree: t, censusType: opts.CensusType}, nil
+	return &Tree{tree: t, censusType: opts.CensusType, hashFunc: hashFunc.Hash}, nil
 }
 
 // Type returns the numeric identifier of the censustree implementation
 func (t *Tree) Type() models.Census_Type {
 	return t.censusType
+}
+
+// Hash executes the tree hash function for input data and returns its output
+func (t *Tree) Hash(data []byte) ([]byte, error) {
+	return t.hashFunc(data)
 }
 
 // FromRoot returns a new read-only Tree for the given root, that uses the same

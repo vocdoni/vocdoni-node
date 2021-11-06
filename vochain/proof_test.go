@@ -28,7 +28,10 @@ func TestMerkleTreeProof(t *testing.T) {
 	keys := util.CreateEthRandomKeysBatch(1001)
 	proofs := []string{}
 	for _, k := range keys {
-		c := k.PublicKey()
+		c, err := tr.Hash(k.PublicKey())
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := tr.Add(c, nil); err != nil {
 			t.Fatal(err)
 		}

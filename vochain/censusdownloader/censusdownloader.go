@@ -1,6 +1,7 @@
 package censusdownloader
 
 import (
+	"errors"
 	"strings"
 	"sync"
 
@@ -100,13 +101,19 @@ func (s *CensusDownloader) OnProcessesStart(pids [][]byte) {
 			log.Errorf("cannot find process with pid %x: %v", pid, err)
 		}
 		if process.Mode.PreRegister && process.EnvelopeType.Anonymous {
-			census, err := s.vochain.State.DumpRollingCensus(pid)
+			rcensus, err := s.vochain.State.DumpRollingCensus(pid)
 			if err != nil {
 				log.Errorf("cannot dump census with pid %x: %v", pid, err)
 			}
-			if _, err := s.census.ImportDump(census.CensusID,
-				census.Type, census.DumpRoot, census.DumpData); err != nil {
-				log.Errorf("cannot import census with pid %x: %v", pid, err)
+			log.Infof("snapshoting rolling census %s for process %x", rcensus.CensusID, pid)
+			if _, err := s.census.ImportDump(rcensus.CensusID,
+				rcensus.Type, rcensus.DumpRoot, rcensus.DumpData); err != nil {
+				if errors.Is(err, census.ErrNamespaceExist) {
+					// If namespace exists it means the census is already loaded, so
+					// no need to show an error message.
+					return
+				}
+				log.Warnf("cannot import census with pid %x: %v", pid, err)
 			}
 		}
 	}
