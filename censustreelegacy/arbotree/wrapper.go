@@ -133,7 +133,15 @@ func (t *Tree) Add(index, value []byte) error {
 // optimized method from arbo
 func (t *Tree) AddBatch(indexes, values [][]byte) ([]int, error) {
 	t.updateAccessTime()
-	return t.Tree.AddBatch(indexes, values)
+	invalid, err := t.Tree.AddBatch(indexes, values)
+	invalidIndexes := func() []int {
+		ii := []int{}
+		for _, i := range invalid {
+			ii = append(ii, i.Index)
+		}
+		return ii
+	}()
+	return invalidIndexes, err
 }
 
 // GenProof generates a merkle tree proof that can be later used on CheckProof()

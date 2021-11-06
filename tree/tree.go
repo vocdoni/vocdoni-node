@@ -123,17 +123,24 @@ func (t *Tree) AddBatch(wTx db.WriteTx, keys, values [][]byte) ([]int, error) {
 		wTx = t.DB().WriteTx()
 		defer wTx.Discard()
 	}
-	i, err := t.tree.AddBatchWithTx(wTx, keys, values)
+	invalid, err := t.tree.AddBatchWithTx(wTx, keys, values)
+	invalidIndexes := func() []int {
+		ii := []int{}
+		for _, i := range invalid {
+			ii = append(ii, i.Index)
+		}
+		return ii
+	}()
 	if err != nil {
-		return i, err
+		return invalidIndexes, err
 	}
 
 	if !givenTx {
 		if err := wTx.Commit(); err != nil {
-			return i, err
+			return invalidIndexes, err
 		}
 	}
-	return i, nil
+	return invalidIndexes, nil
 }
 
 // Iterate over all the database-encoded nodes of the tree.  When callback
