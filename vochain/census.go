@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	models "go.vocdoni.io/proto/build/go/models"
 )
@@ -51,8 +52,9 @@ func (v *State) AddToRollingCensus(pid []byte, key []byte, weight *big.Int) erro
 	index := [8]byte{}
 	binary.LittleEndian.PutUint64(index[:], censusLen)
 	if err := census.Add(index[:], key); err != nil {
-		return err
+		return fmt.Errorf("cannot add (%x) to rolling census: %w", key, err)
 	}
+	log.Debugf("added key %x with index %d to rolling census", key, censusLen)
 	// // Store mapping between key -> key index
 	// if err := noState.Set(keyCensusKeyIndex(key), censusLenLE); err != nil {
 	// 	return err
