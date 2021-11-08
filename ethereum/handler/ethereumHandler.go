@@ -103,7 +103,15 @@ func (eh *EthereumHandler) Connect(dialEndpoint string) error {
 		// if RPC connection established, create an ethereum client using the RPC client
 		// TODO: @jordipainan this is racy
 		eh.EthereumClient = ethclient.NewClient(eh.EthereumRPC)
-		log.Infof("connected to %s web3 endpoint", dialEndpoint)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
+		blkNum, err := eh.EthereumClient.BlockNumber(ctx)
+		if err != nil {
+			log.Debugf("cannot connect: %s", err)
+			maxtries--
+			continue
+		}
+		log.Infof("connected to %s web3 endpoint, latest known block number is: %d", dialEndpoint, blkNum)
 		return nil
 	}
 	return fmt.Errorf("could not connect to the web3 endpoint %s", dialEndpoint)
@@ -133,10 +141,7 @@ func (eh *EthereumHandler) SyncInfo(ctx context.Context) (*EthSyncInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	if sp != nil {
-		info.MaxHeight = sp.HighestBlock
-		info.Height = sp.CurrentBlock
-	} else {
+	if sp == nil {
 		header, err := eh.EthereumClient.HeaderByNumber(ctx, nil)
 		if err != nil {
 			return nil, err
@@ -144,7 +149,21 @@ func (eh *EthereumHandler) SyncInfo(ctx context.Context) (*EthSyncInfo, error) {
 		info.Height = uint64(header.Number.Int64())
 		info.MaxHeight = info.Height
 		info.Synced = info.Height > 0
+		return info, nil
 	}
+	// some clients return 0x0 on block number if are synced
+	// do an extra check getting the latest block number via eth_blockNumber
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	if info.Height, err = eh.EthereumClient.BlockNumber(ctx); err != nil {
+		return nil, fmt.Errorf("cannot get latest block number from client: %s", err)
+	}
+	if sp.HighestBlock == 0 {
+		info.MaxHeight = info.Height
+	} else {
+		info.MaxHeight = sp.HighestBlock
+	}
+	info.Synced = info.Height > 0
 	return info, nil
 }
 
