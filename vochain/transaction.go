@@ -192,6 +192,27 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			return nil, fmt.Errorf("len(publicInputs)<1, at least need one element (nullifier)")
 		}
 
+		// currently nullifier is obtained from the Protobuf
+		// models.ProofZkSNARK. Alternatively, nullifier could be sent
+		// & taken from veote.Nullifier.
+		nullifier := publicInputsFromUser[0]
+		nullifierBytes := arbo.BigIntToBytes(32, nullifier)
+
+		// check that nullifier does not exist in cache already, this avoids
+		// processing multiple transactions with same nullifier.
+		if app.State.CacheHasNullifier(nullifierBytes) {
+			return nil, fmt.Errorf("nullifier %x already exists in cache", nullifierBytes)
+		}
+		// check if vote already exists
+		if exist, err := app.State.EnvelopeExists(ve.ProcessId,
+			nullifierBytes, false); err != nil || exist {
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("vote %x already exists", nullifierBytes)
+		}
+		log.Debugf("new vote %x for process %x", nullifierBytes, ve.ProcessId)
+
 		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVKs) {
 			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d of %d", proofZkSNARK.CircuitParametersIndex, len(app.ZkVKs))
 		}
@@ -211,7 +232,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			processId0BI,
 			processId1BI,
 			censusRootBI,
-			publicInputsFromUser[0], // nullifier
+			nullifier,
 			voteHash0,
 			voteHash1,
 		}
@@ -229,6 +250,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			Height:      height,
 			ProcessId:   ve.ProcessId,
 			VotePackage: ve.VotePackage,
+			Nullifier:   nullifierBytes,
 		}
 		// If process encrypted, check the vote is encrypted (includes at least one key index)
 		if process.EnvelopeType.EncryptedVotes {
@@ -238,7 +260,8 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			vote.EncryptionKeyIndexes = ve.EncryptionKeyIndexes
 		}
 
-		return vote, nil
+		// add the vote to cache
+		app.State.CacheAdd(txID, vote)
 	} else {
 		// Signature based voting
 		if signature == nil {
