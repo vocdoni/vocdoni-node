@@ -258,11 +258,14 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			}
 		}
 		// If tr.Type() == ARBO_POSEIDON, resolve mapping key -> index before genProof
+		var proofPrefix []byte
 		if tr.Type() == models.Census_ARBO_POSEIDON {
+			// key is 64 bits index, little endian encoded
 			key, err = m.KeyToIndex(r.CensusID, key)
 			if err != nil {
 				return nil, err
 			}
+			proofPrefix = key
 			value = r.CensusKey
 		}
 		leafV, siblings, err := tr.GenProof(key)
@@ -271,6 +274,12 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		}
 		if !bytes.Equal(leafV, value) {
 			return nil, fmt.Errorf("leaf value (%x) != request value (%x)", leafV, value)
+		}
+		// When the key is not the user's public key from the request,
+		// we prefix it to the proof so that the user receives the real
+		// proof key as well.
+		if len(proofPrefix) != 0 {
+			siblings = append(proofPrefix, siblings...)
 		}
 		resp.Siblings = siblings
 		return resp, nil

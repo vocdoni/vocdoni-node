@@ -185,7 +185,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		}
 		proof, publicInputsFromUser, err := zk.ProtobufZKProofToCircomProof(proofZkSNARK)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
 		}
 
 		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVKs) {

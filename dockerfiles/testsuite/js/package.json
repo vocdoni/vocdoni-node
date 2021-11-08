@@ -1,0 +1,31 @@
+{
+  "name": "voccircuits",
+  "version": "0.0.1",
+  "description": "Vocdoni circuits",
+  "main": "",
+  "scripts": {
+    "clean": "rm -fR dist",
+    "build": "npm run clean && ./node_modules/.bin/tsc --strictNullChecks",
+    "pretest": "cd test/go-inputs-generator && go test",
+    "test": "./node_modules/.bin/mocha -r ts-node/register test/**/*.ts",
+    "testspecific": "mocha --max-old-space-size=4000"
+  },
+  "license": "GPL-3.0",
+  "dependencies": {
+    "@types/node": "^14.14.41",
+    "circomlib": "^2.0.1",
+    "circomlibjs": "0.1.0",
+    "snarkjs": "0.4.10"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.16",
+    "@types/mocha": "^5.2.6",
+    "circom_tester": "0.0.7",
+    "chai": "^4.3.4",
+    "mocha": "^9.1.2",
+    "mocha-steps": "^1.3.0",
+    "ts-node": "^7.0.1",
+    "tslint": "^5.18.0",
+    "typescript": "^3.9.9"
+  }
+}

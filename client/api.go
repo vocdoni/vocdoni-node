@@ -1,11 +1,15 @@
 package client
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"math/rand"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -55,11 +59,11 @@ func (c *Client) GetEnvelopeStatus(nullifier, pid []byte) (bool, error) {
 	return *resp.Registered, nil
 }
 
-func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
+func (c *Client) GetProof(pubkey, root []byte, digested bool) ([]byte, error) {
 	var req api.APIrequest
 	req.Method = "genProof"
 	req.CensusID = hex.EncodeToString(root)
-	req.Digested = false
+	req.Digested = digested
 	req.CensusKey = pubkey
 
 	resp, err := c.Request(req, nil)
@@ -235,7 +239,7 @@ func (c *Client) GetMerkleProofBatch(signers []*ethereum.SignKeys,
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, s := range signers {
-		proof, err := c.GetProof(s.PublicKey(), root)
+		proof, err := c.GetProof(s.PublicKey(), root, false)
 		if err != nil {
 			if tolerateError {
 				continue
@@ -259,7 +263,7 @@ func (c *Client) GetMerkleProofPoseidonBatch(signers []*ethereum.SignKeys,
 	log.Infof("generating poseidon proofs...")
 	for i, s := range signers {
 		zkCensusKey, _ := testGetZKCensusKey(s)
-		proof, err := c.GetProof(zkCensusKey, root)
+		proof, err := c.GetProof(zkCensusKey, root, true)
 		if err != nil {
 			if tolerateError {
 				continue
@@ -349,25 +353,55 @@ type SNARKProofInputs struct {
 	Nullifier      string   `json:"nullifier"`
 }
 
-func testGenSNARKProof(censusRoot, merkleProof []byte, index uint64,
+func testGenSNARKProof(censusRoot, merkleProof []byte, treeSize int64,
 	secretKey, votePackage, processId []byte) (*SNARKProof, error) {
+	if len(merkleProof) < 8 {
+		return nil, fmt.Errorf("merkleProof too short")
+	}
+	indexLE := merkleProof[:8]
+	index := binary.LittleEndian.Uint64(indexLE)
+	siblingsBytes := merkleProof[8:]
+
+	levels := int(math.Log2(float64(treeSize)))
+	siblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, siblingsBytes)
+	if err != nil {
+		return nil, fmt.Errorf("cannot arbo.UnpackSiblings: %w", err)
+	}
+	for i := len(siblings); i < levels; i++ {
+		siblings = append(siblings, []byte{0})
+	}
+	siblings = append(siblings, []byte{0})
+	var siblingsStr []string
+	for i := 0; i < len(siblings); i++ {
+		siblingsStr = append(siblingsStr, arbo.BytesToBigInt(siblings[i]).String())
+	}
+
+	voteHash := sha256.Sum256(votePackage)
+	voteHash0, voteHash1 := voteHash[:16], voteHash[16:]
+
+	processId0, processId1 := processId[:16], processId[16:]
 	poseidon := arbo.HashPoseidon{}
 	nullifier, err := poseidon.Hash(
 		secretKey,
-		processId,
+		processId0,
+		processId1,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("poseidon: %w", err)
 	}
+
 	inputs := SNARKProofInputs{
 		CensusRoot:     arbo.BytesToBigInt(censusRoot).String(),
-		CensusSiblings: nil,
-		Index:          big.NewInt(int64(index)).String(),
+		CensusSiblings: siblingsStr,
+		Index:          new(big.Int).SetUint64(index).String(),
 		SecretKey:      arbo.BytesToBigInt(secretKey).String(),
-		VoteHash:       nil,
+		VoteHash: []string{
+			arbo.BytesToBigInt(voteHash0).String(),
+			arbo.BytesToBigInt(voteHash1).String(),
+		},
 		ProcessID: []string{
-			arbo.BytesToBigInt(processId[:16]).String(),
-			arbo.BytesToBigInt(processId[16:]).String(),
+			arbo.BytesToBigInt(processId0).String(),
+			arbo.BytesToBigInt(processId1).String(),
 		},
 		Nullifier: arbo.BytesToBigInt(nullifier).String(),
 	}
@@ -375,10 +409,20 @@ func testGenSNARKProof(censusRoot, merkleProof []byte, index uint64,
 	if err != nil {
 		return nil, err
 	}
-	// TODO:
-	// `node run gen_proof.js inputsJSON`
-
-	return nil, nil
+	log.Debugf("gen-vote-snark.js input: %v", string(inputsJSON))
+	cmd := exec.Command("node", "/app/js/gen-vote-snark.js", string(inputsJSON))
+	proofJSON, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("node /app/js/gen-vote-snark.js: %w\n%s",
+			err, string(proofJSON))
+	}
+	log.Debugf("gen-vote-snark.js output: %v", string(proofJSON))
+	var proof SNARKProof
+	if err := json.Unmarshal(proofJSON, &proof); err != nil {
+		return nil, fmt.Errorf("/app/js/gen-vote-snark.js output unmarshal: %w\n%s",
+			err, string(proofJSON))
+	}
+	return &proof, nil
 }
 
 func (c *Client) TestPreRegisterKeys(
@@ -756,19 +800,11 @@ func (c *Client) TestSendAnonVotes(
 			ProcessId:   pid,
 			VotePackage: vpb,
 		}
-		// TODO: Generate SNARK proof here.  Inputs:
 		_, secretKey := testGetZKCensusKey(s)
-		proof, err := testGenSNARKProof(root, proofs[i], 0, secretKey, vpb, pid)
+		proof, err := testGenSNARKProof(root, proofs[i], circuitConfig.Parameters[0], secretKey, vpb, pid)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("cannot generate test SNARK proof: %w", err)
 		}
-		// merkleTreeProof := proofs[i] // []byte // TODO: JS: Uncompress the merkle proof
-		// zkCensusKey, secretKey := testGetZKCensusKey(s) // []byte, []byte
-		// rollingCensusRoot := root
-		// MISSING: Index (Merkle Tree key)
-		// MISSING: VoteHash see https://github.com/vocdoni/zk-franchise-proof-circuit/blob/fd55e571949b8db429d798062c670bf23b463486/test/go-inputs-generator/census_test.go#L90
-		// electionId := eid
-		// MISSING nullifier: https://github.com/vocdoni/zk-franchise-proof-circuit/blob/fd55e571949b8db429d798062c670bf23b463486/test/go-inputs-generator/census_test.go#L94
 		v.Proof = &models.Proof{
 			Payload: &models.Proof_ZkSnark{
 				ZkSnark: &models.ProofZkSNARK{
@@ -805,7 +841,13 @@ func (c *Client) TestSendAnonVotes(
 				time.Sleep(1 * time.Second)
 				i--
 			} else {
-				return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+				log.Infof("DBG resp: %+v", resp)
+				// FIXME: once the req.Message are no longer in hex, remove this
+				msg, err := hex.DecodeString(resp.Message)
+				if err != nil {
+					return 0, fmt.Errorf("resp.Message hex decode: %w", err)
+				}
+				return 0, fmt.Errorf("%s failed: %s", req.Method, msg)
 			}
 		}
 		nullifiers = append(nullifiers, resp.Payload)

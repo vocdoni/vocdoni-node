@@ -14,12 +14,15 @@ RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	go build -trimpath -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
 	./cmd/dvotenode ./cmd/vochaintest ./cmd/voconed
 
-FROM debian:11.0-slim AS test
+FROM node:lts-bullseye-slim AS test
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 RUN apt update && apt install -y curl
 COPY --from=builder /src/vochaintest ./
+COPY ./dockerfiles/testsuite/js ./js
+RUN --mount=type=cache,sharing=locked,id=gomod,target=/app/js/node_modules \
+	cd js && npm install
 
 FROM debian:11.0-slim
 
