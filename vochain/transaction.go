@@ -2,6 +2,7 @@ package vochain
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 
@@ -187,21 +188,33 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		if err != nil {
 			return nil, err
 		}
+		if len(publicInputsFromUser) < 1 {
+			return nil, fmt.Errorf("len(publicInputs)<1, at least need one element (nullifier)")
+		}
 
 		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVKs) {
 			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d of %d", proofZkSNARK.CircuitParametersIndex, len(app.ZkVKs))
 		}
 		verificationKey := app.ZkVKs[proofZkSNARK.CircuitParametersIndex]
 
-		// prepare the publicInputs that are defined by the process
+		// prepare the publicInputs that are defined by the process.
+		// publicInputs contains: processId0, processId1, censusRoot,
+		// nullifier, voteHash0, voteHash1.
+		processId0BI := arbo.BytesToBigInt(process.ProcessId[:16])
+		processId1BI := arbo.BytesToBigInt(process.ProcessId[16:])
 		censusRootBI := arbo.BytesToBigInt(process.RollingCensusRoot)
-		electionIdBI := arbo.BytesToBigInt(process.ProcessId)
+		// voteHash from the user voteValue to the publicInputs
+		voteValueHash := sha256.Sum256(ve.VotePackage)
+		voteHash0 := arbo.BytesToBigInt(voteValueHash[:16])
+		voteHash1 := arbo.BytesToBigInt(voteValueHash[16:])
 		publicInputs := []*big.Int{
-			electionIdBI,
+			processId0BI,
+			processId1BI,
 			censusRootBI,
+			publicInputsFromUser[0], // nullifier
+			voteHash0,
+			voteHash1,
 		}
-		// append the user defined public inputs values
-		publicInputs = append(publicInputs, publicInputsFromUser...)
 
 		// check zkSnark proof
 		if !verifier.Verify(verificationKey, proof, publicInputs) {
