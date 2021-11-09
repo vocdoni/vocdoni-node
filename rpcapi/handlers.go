@@ -2,10 +2,10 @@ package rpcapi
 
 import (
 	"fmt"
-	"log"
 
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
@@ -16,6 +16,7 @@ func (r *RPCAPI) EnableFileAPI(storage data.Storage) error {
 	if storage == nil {
 		return fmt.Errorf("storage cannot be nil for file API")
 	}
+	log.Infof("enabling file API")
 	r.storage = storage
 	r.APIs = append(r.APIs, "file")
 
@@ -36,6 +37,7 @@ func (r *RPCAPI) EnableCensusAPI(cm *census.Manager) error {
 	if cm == nil {
 		return fmt.Errorf("census manager cannot be nil for census API")
 	}
+	log.Infof("enabling census API")
 	r.APIs = append(r.APIs, "census")
 	r.census = cm
 	if cm.RemoteStorage == nil {
@@ -47,12 +49,14 @@ func (r *RPCAPI) EnableCensusAPI(cm *census.Manager) error {
 	r.RegisterPublic("getSize", false, r.censusLocal)
 	r.RegisterPublic("genProof", false, r.censusLocal)
 	r.RegisterPublic("checkProof", false, r.censusLocal)
-	r.RegisterPrivate("addCensus", r.censusLocal)
-	r.RegisterPrivate("addClaim", r.censusLocal)
-	r.RegisterPrivate("addClaimBulk", r.censusLocal)
-	r.RegisterPrivate("publish", r.censusLocal)
-	r.RegisterPrivate("importRemote", r.censusLocal)
-	r.RegisterPrivate("getCensusList", r.censusLocal)
+	if r.allowPrivate {
+		r.RegisterPrivate("addCensus", r.censusLocal)
+		r.RegisterPrivate("addClaim", r.censusLocal)
+		r.RegisterPrivate("addClaimBulk", r.censusLocal)
+		r.RegisterPrivate("publish", r.censusLocal)
+		r.RegisterPrivate("importRemote", r.censusLocal)
+		r.RegisterPrivate("getCensusList", r.censusLocal)
+	}
 
 	return nil
 }
@@ -62,6 +66,7 @@ func (r *RPCAPI) EnableVoteAPI(vocapp *vochain.BaseApplication, vocinfo *vochain
 	if (r.vocapp == nil && vocapp == nil) || (r.vocinfo == nil && vocinfo == nil) {
 		return fmt.Errorf("vocdoni APP or vocdoni Info are nil")
 	}
+	log.Infof("enabling vote API")
 	if r.vocapp == nil {
 		r.vocapp = vocapp
 	}
@@ -88,6 +93,7 @@ func (r *RPCAPI) EnableResultsAPI(vocapp *vochain.BaseApplication, scrutinizer *
 	if (r.vocapp == nil && vocapp == nil) || (r.scrutinizer == nil && scrutinizer == nil) {
 		return fmt.Errorf("vocdoni APP or scrutinizer are nil")
 	}
+	log.Infof("enabling results API")
 	if r.vocapp == nil {
 		r.vocapp = vocapp
 	}
@@ -115,6 +121,7 @@ func (r *RPCAPI) EnableIndexerAPI(vocapp *vochain.BaseApplication,
 		(r.vocinfo == nil && vocinfo == nil) {
 		return fmt.Errorf("vocdoni APP or scrutinizer are nil")
 	}
+	log.Infof("enabling indexer API")
 	if r.vocapp == nil {
 		r.vocapp = vocapp
 	}
