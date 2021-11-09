@@ -7,40 +7,36 @@ const wc  = require("./witness_calculator.js");
 const snarkjs = require("snarkjs");
 const ffutils = require("ffjavascript").utils;
 
-async function generateProof(inputs, path) {
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function generateProof(inputs, artifactsPath, outPath) {
   // witness
-  let wasmBuff = fs.readFileSync(`${path}/circuit.wasm`);
+  let wasmBuff = fs.readFileSync(`${artifactsPath}/circuit.wasm`);
   let witnessCalculator = await wc(wasmBuff)
-  let wtnsBuff = await witnessCalculator.calculateWTNSBin(inputs, 0);
-  await fs.writeFile(`${path}/out.wtns`, wtnsBuff, function(err) {
+  let wtnsBuff = await witnessCalculator.calculateWTNSBin(inputs, 1);
+  await fs.writeFile(`${outPath}/out.wtns`, wtnsBuff, function(err) {
     if (err) console.error(err);
   });
+  await sleep(100);
 
   // proof
-  let { proof, publicSignals } = await snarkjs.groth16.prove(`${path}/circuit_final.zkey`, `${path}/out.wtns`)
+  let { proof, publicSignals } = await snarkjs.groth16.prove(`${artifactsPath}/circuit_final.zkey`,
+    `${outPath}/out.wtns`);
 
   // print proof
   console.log(JSON.stringify(proof));
 
   // check verification of the proof
-  let vk = fs.readFileSync(`${path}/verification_key.json`);
+  let vk = fs.readFileSync(`${artifactsPath}/verification_key.json`);
   let verified = await snarkjs.groth16.verify(JSON.parse(vk), publicSignals, proof);
   if (!verified) {
     console.error("zk proof failed on verify");
   }
   globalThis.curve_bn128.terminate();
-}
-
-async function downloadFile(id, url, path, filename) {
-  // console.log("download file:", filename);
-  const file = fs.createWriteStream(`${path}/${id}/${filename}`);
-
-  const res = await axios.get(`${url}/${path}/${filename}`, {responseType: "stream"});
-  await new Promise(resolve => {
-    res.data.pipe(file);
-    // console.log("download done:", filename);
-    file.on("close", resolve);
-  });
 }
 
 function randomID(size = 32) {
@@ -58,16 +54,12 @@ if (process.argv.length<3) {
 }
 
 const data = JSON.parse(process.argv[2]);
-const url = data.circuitConfig.url;
-const path = data.circuitConfig.circuitPath;
+const outPath = data.circuitConfig.circuitPath;
+const artifactsPath = `/tmp/${data.circuitConfig.circuitPath}`;
 const inputs = data.inputs;
 const id = randomID();
 
-fs.mkdir(`${path}/${id}`, {recursive:true}, async function() {
-  await downloadFile(id, url, path, "circuit.wasm");
-  await downloadFile(id, url, path, "circuit_final.zkey");
-  await downloadFile(id, url, path, "verification_key.json");
-
-  await generateProof(inputs, `${path}/${id}`);
+fs.mkdir(`${outPath}/${id}`, {recursive:true}, async function() {
+  await generateProof(inputs, artifactsPath, `${outPath}/${id}`);
 });
 

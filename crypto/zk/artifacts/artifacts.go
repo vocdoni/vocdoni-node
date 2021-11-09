@@ -41,9 +41,9 @@ values of each file are hardcoded in the VochainGenesis.
 
 const (
 	// FilenameWitness defines the name of the file of the WitnessCalculator
-	FilenameWitness = "witness.wasm"
+	FilenameWitness = "circuit.wasm"
 	// FilenameZKey defines the name of the file of the circom ZKey
-	FilenameZKey = "circuit.zkey"
+	FilenameZKey = "circuit_final.zkey"
 	// FilenameVK defines the name of the verification_key.json
 	FilenameVK = "verification_key.json"
 )
