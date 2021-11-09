@@ -31,9 +31,9 @@ func TestDownloadCircuitFiles(t *testing.T) {
 	ts := newTestServer(t)
 	defer ts.Close()
 
-	witnessHash, err := hex.DecodeString("2ba5070e6fb17b920c1f938903c39867a2561900aaa2de52ec2265d46d41eb12")
+	witnessHash, err := hex.DecodeString("a812fddbb71ca2b5cc5a2326dad391c1f98c11fe2641927ec490fad7c5ef30ac")
 	qt.Assert(t, err, qt.IsNil)
-	zkeyHash, err := hex.DecodeString("279433966c3d258fa747121207b02baad715e12877473f9c2326da7f3a17597b")
+	zkeyHash, err := hex.DecodeString("e6827f50f2a44d5fa6c95b15893124af82ca154c0338295be8fa09fd9e8eb8ac")
 	qt.Assert(t, err, qt.IsNil)
 	vkHash, err := hex.DecodeString("3ec7355a7be53019b66563d02a1e2ce689e6dfac207a5f9ce503fb8ac915acf0")
 	qt.Assert(t, err, qt.IsNil)
@@ -92,7 +92,7 @@ func TestDownloadCircuitFiles(t *testing.T) {
 	qt.Assert(t, err, qt.IsNotNil)
 	errExpected := strings.Split(err.Error(), "wasm, ")[1]
 	qt.Assert(t, errExpected, qt.Equals,
-		"expected hash: 2ca5070e6fb17b920c1f938903c39867a2561900aaa2de52ec2265d46d41eb12, computed hash: 2ba5070e6fb17b920c1f938903c39867a2561900aaa2de52ec2265d46d41eb12")
+		"expected hash: a912fddbb71ca2b5cc5a2326dad391c1f98c11fe2641927ec490fad7c5ef30ac, computed hash: a812fddbb71ca2b5cc5a2326dad391c1f98c11fe2641927ec490fad7c5ef30ac")
 }
 
 func TestErrorDownloading(t *testing.T) {
