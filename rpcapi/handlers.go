@@ -78,6 +78,7 @@ func (r *RPCAPI) EnableVoteAPI(vocapp *vochain.BaseApplication, vocinfo *vochain
 	r.RegisterPublic("getBlockStatus", false, r.getBlockStatus)
 	r.RegisterPublic("getOracleResults", false, r.getOracleResults)
 	r.RegisterPublic("getProcessCircuitConfig", false, r.getProcessCircuitConfig)
+	r.RegisterPublic("getProcessRollingCensusSize", false, r.getProcessRollingCensusSize)
 
 	return nil
 }
