@@ -186,8 +186,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2021-11-06T22:43:28.668436552Z",
-   "chain_id":"vocdoni-development-52",
+   "genesis_time":"2021-11-10T09:43:28.668436552Z",
+   "chain_id":"vocdoni-development-56",
    "consensus_params":{
       "block":{
          "max_bytes":"5120000",
