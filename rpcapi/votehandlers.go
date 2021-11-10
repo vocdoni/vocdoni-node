@@ -46,12 +46,12 @@ func (a *RPCAPI) submitEnvelope(request *api.APIrequest) (*api.APIresponse, erro
 	// Encode and forward the transaction to the Vochain mempool
 	txBytes, err := proto.Marshal(stx)
 	if err != nil {
-		return nil, fmt.Errorf("cannot marshal vote transaction: (%s)", err)
+		return nil, fmt.Errorf("cannot marshal vote transaction: %w", err)
 	}
 
 	res, err := a.vocapp.SendTx(txBytes)
 	if err != nil || res == nil {
-		return nil, fmt.Errorf("cannot broadcast transaction: (%s)", err)
+		return nil, fmt.Errorf("cannot broadcast transaction: %w", err)
 	}
 
 	// Get mempool checkTx reply
@@ -81,7 +81,7 @@ func (r *RPCAPI) getEnvelopeStatus(request *api.APIrequest) (*api.APIresponse, e
 		if errors.Is(err, scrutinizer.ErrNotFoundInDatabase) {
 			return &response, nil
 		}
-		return nil, fmt.Errorf("cannot get envelope status: (%v)", err)
+		return nil, fmt.Errorf("cannot get envelope status: %w", err)
 	}
 	response.Registered = types.True
 	response.Height = &vr.Height
@@ -97,7 +97,7 @@ func (r *RPCAPI) getEnvelope(request *api.APIrequest) (*api.APIresponse, error) 
 	}
 	env, err := r.scrutinizer.GetEnvelope(request.Nullifier)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get envelope: (%v)", err)
+		return nil, fmt.Errorf("cannot get envelope: %w", err)
 	}
 	var response api.APIresponse
 	response.Envelope = env
@@ -112,7 +112,7 @@ func (r *RPCAPI) getEnvelopeHeight(request *api.APIrequest) (*api.APIresponse, e
 	}
 	votes, err := r.scrutinizer.GetEnvelopeHeight(request.ProcessID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get envelope height: (%v)", err)
+		return nil, fmt.Errorf("cannot get envelope height: %w", err)
 	}
 	var response api.APIresponse
 	response.Height = new(uint32)
@@ -144,7 +144,7 @@ func (r *RPCAPI) getProcessList(request *api.APIrequest) (*api.APIresponse, erro
 		request.Status,
 		request.WithResults)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get process list: (%s)", err)
+		return nil, fmt.Errorf("cannot get process list: %w", err)
 	}
 	for _, p := range processList {
 		response.ProcessList = append(response.ProcessList, fmt.Sprintf("%x", p))
@@ -164,7 +164,7 @@ func (r *RPCAPI) getProcessInfo(request *api.APIrequest) (*api.APIresponse, erro
 	var err error
 	response.Process, err = r.scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get process info: (%v)", err)
+		return nil, fmt.Errorf("cannot get process info: %w", err)
 	}
 	return &response, nil
 }
@@ -179,7 +179,7 @@ func (r *RPCAPI) getProcessSummary(request *api.APIrequest) (*api.APIresponse, e
 	procInfo, err := r.scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
-		return nil, fmt.Errorf("cannot get envelope status: (cannot get process info (%v))", err)
+		return nil, fmt.Errorf("cannot get process info: %w", err)
 	}
 
 	// Get total number of votes (including invalid/null)
@@ -226,7 +226,7 @@ func (r *RPCAPI) getProcessKeys(request *api.APIrequest) (*api.APIresponse, erro
 	}
 	process, err := r.vocapp.State.Process(request.ProcessID, true)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get process encryption public keys: (%s)", err)
+		return nil, fmt.Errorf("cannot get process encryption public keys: %w", err)
 	}
 	var response api.APIresponse
 	var pubs, privs []api.Key
@@ -252,7 +252,7 @@ func (r *RPCAPI) getProcessCircuitConfig(request *api.APIrequest) (*api.APIrespo
 	}
 	process, err := r.vocapp.State.Process(request.ProcessID, true)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get process %x: %v", request.ProcessID, err)
+		return nil, fmt.Errorf("cannot get process %x: %w", request.ProcessID, err)
 	}
 	if !process.EnvelopeType.Anonymous {
 		return nil, fmt.Errorf("no CircuitConfig for non-anonymous process")
@@ -290,7 +290,7 @@ func (r *RPCAPI) getProcessRollingCensusSize(request *api.APIrequest) (*api.APIr
 	}
 	censusSize, err := r.vocapp.State.GetRollingCensusSize(request.ProcessID, true)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get process %x rolling census size: %v",
+		return nil, fmt.Errorf("cannot get process %x rolling census size: %w",
 			censusSize, err)
 	}
 	var response api.APIresponse
@@ -303,7 +303,7 @@ func (r *RPCAPI) getResultsWeight(request *api.APIrequest) (*api.APIresponse, er
 	var response api.APIresponse
 	w, err := r.scrutinizer.GetResultsWeight(request.ProcessID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get results weight: %v", err)
+		return nil, fmt.Errorf("cannot get results weight: %w", err)
 	}
 	response.Weight = w.String()
 	return &response, nil
@@ -317,7 +317,7 @@ func (r *RPCAPI) getOracleResults(request *api.APIrequest) (*api.APIresponse, er
 	var err error
 	response.Results, err = r.vocapp.State.GetProcessResults(request.ProcessID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get oracle results: %v", err)
+		return nil, fmt.Errorf("cannot get oracle results: %w", err)
 	}
 	return &response, nil
 }
@@ -331,7 +331,7 @@ func (r *RPCAPI) getResults(request *api.APIrequest) (*api.APIresponse, error) {
 	procInfo, err := r.scrutinizer.ProcessInfo(request.ProcessID)
 	if err != nil {
 		log.Warn(err)
-		return nil, fmt.Errorf("cannot get results: (%v)", err)
+		return nil, fmt.Errorf("cannot get results: %w", err)
 	}
 
 	if procInfo.Envelope.Anonymous {
@@ -354,7 +354,7 @@ func (r *RPCAPI) getResults(request *api.APIrequest) (*api.APIresponse, error) {
 	// Get results info
 	vr, err := r.scrutinizer.GetResults(request.ProcessID)
 	if err != nil && err != scrutinizer.ErrNoResultsYet {
-		return nil, fmt.Errorf("cannot get results: (%v)", err)
+		return nil, fmt.Errorf("cannot get results: %w", err)
 	}
 	if errors.Is(err, scrutinizer.ErrNoResultsYet) {
 		response.Message = scrutinizer.ErrNoResultsYet.Error()

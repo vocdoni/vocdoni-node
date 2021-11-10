@@ -46,12 +46,52 @@ func (vi *VochainInfo) Height() int64 {
 	return vi.height
 }
 
-// BlockTimes returns the average block time for 1, 10, 60, 360 and 1440 minutes
+// BlockTimes returns the average block time in milliseconds for 1, 10, 60, 360 and 1440 minutes.
 // Value 0 means there is not yet an average
 func (vi *VochainInfo) BlockTimes() *[5]int32 {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
 	return &[5]int32{vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}
+}
+
+// HeightTime estimates the UTC time for a future height or returns the
+// block timestamp if height is in the past.
+func (vi *VochainInfo) HeightTime(height int64) time.Time {
+	times := vi.BlockTimes()
+	currentHeight := vi.Height()
+	diffHeight := height - currentHeight
+
+	if diffHeight < 0 {
+		blk := vi.vnode.GetBlockByHeight(height)
+		if blk == nil {
+			log.Errorf("cannot get block height %d", height)
+			return time.Time{}
+		}
+		return blk.Header.Time
+	}
+
+	getMaxTimeFrom := func(i int) int64 {
+		for ; i <= 0; i-- {
+			if times[i] != 0 {
+				return int64(times[i])
+			}
+		}
+		return 10 // fallback
+	}
+
+	t := int64(0)
+	switch {
+	// if less than around 15 minutes missing
+	case diffHeight < 100:
+		t = getMaxTimeFrom(1)
+	// if less than around 6 hours missing
+	case diffHeight < 1000:
+		t = getMaxTimeFrom(3)
+	// if less than around 6 hours missing
+	case diffHeight >= 1000:
+		t = getMaxTimeFrom(4)
+	}
+	return time.Now().Add(time.Duration(diffHeight*t) * time.Millisecond)
 }
 
 // Sync returns true if the Vochain is considered up-to-date

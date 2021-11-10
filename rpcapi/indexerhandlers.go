@@ -24,11 +24,11 @@ func (r *RPCAPI) getStats(request *api.APIrequest) (*api.APIresponse, error) {
 	stats.BlockTimeStamp = int32(block.Header.Time.Unix())
 	stats.EntityCount = int64(r.scrutinizer.EntityCount())
 	if stats.EnvelopeCount, err = r.scrutinizer.GetEnvelopeHeight([]byte{}); err != nil {
-		return nil, fmt.Errorf("could not count vote envelopes: (%s)", err)
+		return nil, fmt.Errorf("could not count vote envelopes: %w", err)
 	}
 	stats.ProcessCount = int64(r.scrutinizer.ProcessCount([]byte{}))
 	if stats.TransactionCount, err = r.scrutinizer.TransactionCount(); err != nil {
-		return nil, fmt.Errorf("could not count transactions: (%s)", err)
+		return nil, fmt.Errorf("could not count transactions: %w", err)
 	}
 	vals, _ := r.vocapp.State.Validators(true)
 	stats.ValidatorCount = len(vals)
@@ -53,7 +53,7 @@ func (r *RPCAPI) getEnvelopeList(request *api.APIrequest) (*api.APIresponse, err
 	var err error
 	if response.Envelopes, err = r.scrutinizer.GetEnvelopes(
 		request.ProcessID, max, request.From, request.SearchTerm); err != nil {
-		return nil, fmt.Errorf("cannot get envelope list: (%s)", err)
+		return nil, fmt.Errorf("cannot get envelope list: %w", err)
 	}
 	return &response, nil
 }
@@ -62,7 +62,7 @@ func (r *RPCAPI) getValidatorList(request *api.APIrequest) (*api.APIresponse, er
 	var response api.APIresponse
 	var err error
 	if response.ValidatorList, err = r.vocapp.State.Validators(true); err != nil {
-		return nil, fmt.Errorf("cannot get validator list: (%v)", err)
+		return nil, fmt.Errorf("cannot get validator list: %w", err)
 	}
 	return &response, err
 }
@@ -107,7 +107,7 @@ func (r *RPCAPI) getTx(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	tx, hash, err := r.scrutinizer.App.GetTxHash(request.Height, request.TxIndex)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get tx: %v", err)
+		return nil, fmt.Errorf("cannot get tx: %w", err)
 	}
 	response.Tx = &indexertypes.TxPackage{
 		Tx:        tx.Tx,
@@ -122,11 +122,11 @@ func (r *RPCAPI) getTxByHeight(request *api.APIrequest) (*api.APIresponse, error
 	var response api.APIresponse
 	txRef, err := r.scrutinizer.GetTxReference(uint64(request.Height))
 	if err != nil {
-		return nil, fmt.Errorf("cannot get tx reference for height %d: %v", request.Height, err)
+		return nil, fmt.Errorf("cannot get tx reference for height %d: %w", request.Height, err)
 	}
 	tx, hash, err := r.scrutinizer.App.GetTxHash(txRef.BlockHeight, txRef.TxBlockIndex)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get tx: %v", err)
+		return nil, fmt.Errorf("cannot get tx: %w", err)
 	}
 	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
@@ -154,10 +154,10 @@ func (r *RPCAPI) getTxListForBlock(request *api.APIrequest) (*api.APIresponse, e
 		tx := new(models.Tx)
 		var err error
 		if err = proto.Unmarshal(block.Txs[i], signedTx); err != nil {
-			return nil, fmt.Errorf("cannot get signed tx: %v", err)
+			return nil, fmt.Errorf("cannot get signed tx: %w", err)
 		}
 		if err = proto.Unmarshal(signedTx.Tx, tx); err != nil {
-			return nil, fmt.Errorf("cannot get tx: %v", err)
+			return nil, fmt.Errorf("cannot get tx: %w", err)
 		}
 		var txType string
 		switch tx.Payload.(type) {

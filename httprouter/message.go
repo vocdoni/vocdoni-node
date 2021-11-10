@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -24,6 +25,11 @@ type HTTPContext struct {
 	Request *http.Request
 
 	sent chan struct{}
+}
+
+// URLParam is a wrapper around go-chi to get a URL parameter (specified in the path pattern as {key})
+func (h *HTTPContext) URLParam(key string) string {
+	return chi.URLParam(h.Request, key)
 }
 
 // Send replies the request with the provided message.

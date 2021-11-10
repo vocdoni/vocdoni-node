@@ -34,6 +34,7 @@ import (
 	"go.vocdoni.io/dvote/rpcapi"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/urlapi"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -90,6 +91,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"enable the results API")
 	globalCfg.API.Indexer = *flag.Bool("indexerApi", false,
 		"enable the indexer API (required for explorer)")
+	globalCfg.API.URL = *flag.Bool("urlApi", false, "enable the url API")
 	globalCfg.API.Route = *flag.String("apiRoute", "/",
 		"dvote HTTP API base route")
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false,
@@ -213,6 +215,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("api.Vote", flag.Lookup("voteApi"))
 	viper.BindPFlag("api.Results", flag.Lookup("resultsApi"))
 	viper.BindPFlag("api.Indexer", flag.Lookup("indexerApi"))
+	viper.BindPFlag("api.Url", flag.Lookup("urlApi"))
 	viper.BindPFlag("api.Route", flag.Lookup("apiRoute"))
 	viper.BindPFlag("api.AllowPrivate", flag.Lookup("apiAllowPrivate"))
 	viper.BindPFlag("api.AllowedAddrs", flag.Lookup("apiAllowedAddrs"))
@@ -629,7 +632,7 @@ func main() {
 	//
 	if globalCfg.Mode == types.ModeGateway {
 		// dvote API service
-		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote || globalCfg.API.Indexer {
+		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote || globalCfg.API.Indexer || globalCfg.API.URL {
 			if _, err = service.API(globalCfg.API,
 				rpc,           // rpcAPI
 				storage,       // data storage
@@ -639,6 +642,16 @@ func main() {
 				vochainInfo,   // vochain info
 				signer,
 				metricsAgent); err != nil {
+				log.Fatal(err)
+			}
+		}
+		if globalCfg.API.URL {
+			log.Info("enabling URL API")
+			uAPI, err := urlapi.NewURLAPI(&httpRouter, "/v1/pub")
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := uAPI.EnableVotingHandlers(vochainApp, vochainInfo, scrutinizer); err != nil {
 				log.Fatal(err)
 			}
 		}

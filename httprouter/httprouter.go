@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	chiprometheus "github.com/766b/chi-prometheus"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
@@ -89,6 +90,7 @@ func (r *HTTProuter) Init(host string, port int) error {
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	})
 	r.Mux.Use(cors.Handler)
+	r.Mux.Use(chiprometheus.NewMiddleware("gochi_http"))
 
 	if len(r.TLSdomain) > 0 {
 		log.Infof("fetching letsencrypt TLS certificate for %s", r.TLSdomain)
@@ -206,6 +208,7 @@ func (r *HTTProuter) routerHandler(namespaceID string, private, admin bool,
 				return
 			}
 		}
+
 		hc := &HTTPContext{Request: req, Writer: w, sent: make(chan struct{})}
 		msg := Message{
 			Data:      data,

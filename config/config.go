@@ -87,6 +87,7 @@ type API struct {
 	Vote    bool
 	Results bool
 	Indexer bool
+	URL     bool
 	// AllowPrivate allow to use private methods
 	AllowPrivate bool
 	// AllowedAddrs allowed addresses to interact with
