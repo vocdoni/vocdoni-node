@@ -16,33 +16,31 @@ func TestRouterWithBearerStdAPI(t *testing.T) {
 	r := httprouter.HTTProuter{}
 	rng := testutil.NewRandom(124)
 	port := 23000 + rng.RandomIntn(1024)
-	url := fmt.Sprintf("http://127.0.0.1:%d", port)
+	url := fmt.Sprintf("http://127.0.0.1:%d/api", port)
 	err := r.Init("127.0.0.1", port)
 	qt.Check(t, err, qt.IsNil)
 
 	// Create a standard API handler
-	stdAPI := NewBearerStandardAPI()
-
-	// Add it under namespace "std"
-	r.AddNamespace("std", stdAPI)
+	stdAPI, err := NewBearerStandardAPI(&r, "/api")
+	qt.Check(t, err, qt.IsNil)
 
 	// Add a public handler to serve requests on std namespace
-	r.AddPublicHandler("std", "/hello/*", "POST", func(msg httprouter.Message) {
-		t.Logf("Path: %v Received: %s\n", msg.Path, msg.Data.(*BearerStandardAPIdata).Data)
-		msg.Context.Send([]byte("hello public!"))
-	})
+	stdAPI.RegisterMethod("/hello/*", "POST", MethodAccessTypePublic,
+		func(msg *BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+			return ctx.Send([]byte("hello public!"))
+		})
 
 	// Add an admin handler to serve requests on std namespace
-	r.AddAdminHandler("std", "/admin/*", "POST", func(msg httprouter.Message) {
-		t.Logf("Path: %v Received: %s\n", msg.Path, msg.Data.(*BearerStandardAPIdata).Data)
-		msg.Context.Send([]byte("hello admin!"))
-	})
+	stdAPI.RegisterMethod("/admin/*", "POST", MethodAccessTypeAdmin,
+		func(msg *BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+			return ctx.Send([]byte("hello admin!"))
+		})
 
 	// Add a private handler
-	r.AddPrivateHandler("std", "/private/*", "POST", func(msg httprouter.Message) {
-		t.Logf("Received: %s", msg.Data.(*BearerStandardAPIdata).Data)
-		msg.Context.Send([]byte("hello private!"))
-	})
+	stdAPI.RegisterMethod("/private/{name}", "POST", MethodAccessTypePrivate,
+		func(msg *BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+			return ctx.Send([]byte(fmt.Sprintf("hello %s!", ctx.URLParam("name"))))
+		})
 
 	// Set the bearer admin token
 	stdAPI.SetAdminToken("abcd")
@@ -51,14 +49,14 @@ func TestRouterWithBearerStdAPI(t *testing.T) {
 	stdAPI.AddAuthToken("1234", 2)
 
 	// Test public
-	resp := doRequest(t, url+"/hello/1234", "", "POST", []byte("hello"))
+	resp := doRequest(t, url+"/hello/1234", "", "POST", []byte{})
 	qt.Check(t, resp, qt.DeepEquals, []byte("hello public!\n"))
 
-	// Test private
-	resp = doRequest(t, url+"/private/ping", "1234", "POST", []byte("hello"))
-	qt.Check(t, resp, qt.DeepEquals, []byte("hello private!\n"))
-	resp = doRequest(t, url+"/private/ping", "1234", "POST", []byte("hello"))
-	qt.Check(t, resp, qt.DeepEquals, []byte("hello private!\n"))
+	// Test private and Path vars
+	resp = doRequest(t, url+"/private/john", "1234", "POST", []byte{})
+	qt.Check(t, resp, qt.DeepEquals, []byte("hello john!\n"))
+	resp = doRequest(t, url+"/private/martin", "1234", "POST", []byte{})
+	qt.Check(t, resp, qt.DeepEquals, []byte("hello martin!\n"))
 
 	// Token should be unauthorized now
 	resp = doRequest(t, url+"/private/ping", "1234", "POST", []byte("hello"))

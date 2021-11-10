@@ -1,9 +1,6 @@
 package service
 
 import (
-	"sync/atomic"
-	"time"
-
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -55,12 +52,5 @@ func API(apiconfig *config.API, rpc *rpcapi.RPCAPI, storage data.Storage, cm *ce
 		}
 	}
 
-	go func() {
-		for {
-			time.Sleep(120 * time.Second)
-			log.Infof("[router info] privateReqs:%d publicReqs:%d",
-				atomic.LoadUint64(&rpc.PrivateCalls), atomic.LoadUint64(&rpc.PublicCalls))
-		}
-	}()
 	return rpc, nil
 }

@@ -34,7 +34,7 @@ func (r *RPCAPI) fetchFile(request *api.APIrequest) (*api.APIresponse, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("error fetching file: (%s)", err)
+		return nil, fmt.Errorf("error fetching file: %w", err)
 	}
 	log.Debugf("fetched file of size %d", len(content))
 	var response api.APIresponse
@@ -78,11 +78,11 @@ func (r *RPCAPI) pinList(request *api.APIrequest) (*api.APIresponse, error) {
 	defer cancel()
 	pins, err := r.storage.ListPins(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("internal error fetching pins (%s)", err)
+		return nil, fmt.Errorf("internal error fetching pins: %w", err)
 	}
 	pinsJSONArray, err := json.Marshal(pins)
 	if err != nil {
-		return nil, fmt.Errorf("internal error parsing pins (%s)", err)
+		return nil, fmt.Errorf("internal error parsing pins: %w", err)
 	}
 	var response api.APIresponse
 	response.Files = pinsJSONArray
@@ -95,7 +95,7 @@ func (r *RPCAPI) pinFile(request *api.APIrequest) (*api.APIresponse, error) {
 	defer cancel()
 	err := r.storage.Pin(ctx, request.URI)
 	if err != nil {
-		return nil, fmt.Errorf("error pinning file (%s)", err)
+		return nil, fmt.Errorf("error pinning file: %w", err)
 	}
 	var response api.APIresponse
 	response.URI = request.URI
@@ -108,7 +108,7 @@ func (r *RPCAPI) unpinFile(request *api.APIrequest) (*api.APIresponse, error) {
 	defer cancel()
 	err := r.storage.Unpin(ctx, request.URI)
 	if err != nil {
-		return nil, fmt.Errorf("could not unpin file (%s)", err)
+		return nil, fmt.Errorf("could not unpin file: %w", err)
 	}
 	var response api.APIresponse
 	response.URI = request.URI

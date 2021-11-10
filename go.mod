@@ -66,6 +66,7 @@ require (
 require (
 	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05 // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.3.0 // indirect
+	github.com/766b/chi-prometheus v0.0.0-20180509160047-46ac2b31aa30 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
