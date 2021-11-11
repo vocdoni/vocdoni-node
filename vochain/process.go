@@ -16,6 +16,7 @@ import (
 
 var emptyVotesRoot = make([]byte, VotesCfg.HashFunc().Len())
 var emptyCensusRoot = make([]byte, CensusCfg.HashFunc().Len())
+var emptyNullifiersRoot = make([]byte, NullifiersCfg.HashFunc().Len())
 
 // AddProcess adds a new process to the vochain.  Adding a process with a
 // ProcessId that already exists will return an error.
@@ -24,6 +25,7 @@ func (v *State) AddProcess(p *models.Process) error {
 	anonymous := p.EnvelopeType != nil && p.EnvelopeType.Anonymous
 	if preRegister {
 		p.RollingCensusRoot = emptyCensusRoot
+		p.NullifiersRoot = emptyNullifiersRoot
 	}
 
 	newProcessBytes, err := proto.Marshal(
@@ -37,7 +39,8 @@ func (v *State) AddProcess(p *models.Process) error {
 			return err
 		}
 		// If Mode.PreRegister && EnvelopeType.Anonymous we create (by
-		// opening) a new empty poseidon census tree at p.ProcessId.
+		// opening) a new empty poseidon census tree and nullifier tree
+		// at p.ProcessId.
 		if preRegister && anonymous {
 			census, err := v.Tx.DeepSubTree(ProcessesCfg, CensusPoseidonCfg.WithKey(p.ProcessId))
 			if err != nil {
@@ -45,6 +48,10 @@ func (v *State) AddProcess(p *models.Process) error {
 			}
 			// We store census size as little endian 64 bits.  Set it to 0.
 			if err := statedb.SetUint64(census.NoState(), keyCensusLen, 0); err != nil {
+				return err
+			}
+			if _, err = v.Tx.DeepSubTree(ProcessesCfg,
+				NullifiersCfg.WithKey(p.ProcessId)); err != nil {
 				return err
 			}
 		}

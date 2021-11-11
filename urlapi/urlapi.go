@@ -17,10 +17,11 @@ type URLAPI struct {
 	PublicCalls  uint64
 	BaseRoute    string
 
-	router       *httprouter.HTTProuter
-	api          *bearerstdapi.BearerStandardAPI
-	scrutinizer  *scrutinizer.Scrutinizer
-	vocapp       *vochain.BaseApplication
+	router      *httprouter.HTTProuter
+	api         *bearerstdapi.BearerStandardAPI
+	scrutinizer *scrutinizer.Scrutinizer
+	vocapp      *vochain.BaseApplication
+	//lint:ignore U1000 unused
 	metricsagent *metrics.Agent
 	vocinfo      *vochaininfo.VochainInfo
 }

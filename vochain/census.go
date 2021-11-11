@@ -3,10 +3,12 @@ package vochain
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
@@ -150,7 +152,8 @@ func (v *State) DumpRollingCensus(pid []byte) (*RollingCensus, error) {
 }
 
 // RegisterKeyTxCheck validates a registerKeyTx transaction against the state
-func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
+func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
+	forCommit bool) error {
 	tx := vtx.GetRegisterKey()
 
 	// Sanity checks
@@ -194,12 +197,12 @@ func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, st
 
 	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 	if err != nil {
-		return fmt.Errorf("cannot extract public key from signature: (%w)", err)
+		return fmt.Errorf("cannot extract public key from signature: %w", err)
 	}
 	var addr common.Address
 	addr, err = ethereum.AddrFromPublicKey(pubKey)
 	if err != nil {
-		return fmt.Errorf("cannot extract address from public key: (%w)", err)
+		return fmt.Errorf("cannot extract address from public key: %w", err)
 	}
 
 	var valid bool
@@ -212,12 +215,56 @@ func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, st
 		addr,
 	)
 	if err != nil {
-		return fmt.Errorf("proof not valid: (%w)", err)
+		return fmt.Errorf("proof not valid: %w", err)
 	}
 	if !valid {
 		return fmt.Errorf("proof not valid")
 	}
+
+	// Validate that this user is not registering more keys than possible
+	// with the users weight.
+	nullifier := GenerateNullifier(addr, process.ProcessId)
+	usedWeight, err := v.getNullifierUsedWeight(process.ProcessId, nullifier)
+	if err != nil {
+		return fmt.Errorf("cannot get nullifeir used weight: %w", err)
+	}
+	txWeight := new(big.Int).SetBytes(tx.Weight)
+	// TODO: In order to support tx.Weight != 1 for anonymous voting, we
+	// need to add the weight to the leaf in the CensusPoseidon Tree, and
+	// also add the weight as a public input in the circuit to verify it anonymously.
+	if txWeight.Cmp(bigOne) != 0 {
+		return fmt.Errorf("RegisterKey weight != 1 not supported, got: %v", txWeight)
+	}
+	usedWeight.Add(usedWeight, txWeight)
+	if usedWeight.Cmp(weight) > 0 {
+		return fmt.Errorf("cannot register more keys: "+
+			"usedWeight + RegisterKey.Weight (%v) > proof weight (%v)",
+			usedWeight, weight)
+	}
+	if forCommit {
+		v.setNullifierUsedWeight(process.ProcessId, nullifier, usedWeight)
+	}
+
+	// TODO: Add cache like in VoteEnvelopeCheck for the registered key so that:
+	// A. We can skip the proof verification when commiting
+	// B. We can detect invalid key registration (due to no more weight
+	//    available) at mempool tx insertion
+
 	tx.Weight = weight.Bytes() // TODO: support weight
 
 	return nil
+}
+
+func (v *State) setNullifierUsedWeight(pid, nullifier []byte, weight *big.Int) error {
+	return v.Tx.DeepSet(nullifier, weight.Bytes(), ProcessesCfg, NullifiersCfg.WithKey(pid))
+}
+
+func (v *State) getNullifierUsedWeight(pid, nullifier []byte) (*big.Int, error) {
+	weightBytes, err := v.Tx.DeepGet(nullifier, ProcessesCfg, NullifiersCfg.WithKey(pid))
+	if errors.Is(err, arbo.ErrKeyNotFound) {
+		return big.NewInt(0), nil
+	} else if err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetBytes(weightBytes), nil
 }
