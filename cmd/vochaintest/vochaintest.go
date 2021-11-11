@@ -48,7 +48,7 @@ func main() {
 	procDuration := flag.Int("processDuration", 500, "voting process duration in blocks")
 	doubleVote := flag.Bool("doubleVote", true, "send every vote twice")
 	// TODO: Set to default = true once #333 is resolved
-	doublePreRegister := flag.Bool("doublePreRegister", false, "send every pre-register twice")
+	doublePreRegister := flag.Bool("doublePreRegister", true, "send every pre-register twice")
 	checkNullifiers := flag.Bool("checkNullifiers", false,
 		"check that all votes are correct one-by-one (slow)")
 	gateways := flag.StringSlice("gwExtra", []string{},
@@ -594,7 +594,6 @@ func mkTreeAnonVoteTest(host,
 				models.CensusOrigin_OFF_CHAIN_TREE,
 				nil,
 				gwProofs,
-				doubleVote,
 				doublePreRegister,
 				checkNullifiers,
 				&proofsReadyWG); err != nil {

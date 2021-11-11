@@ -81,6 +81,35 @@ func processSetCensusRoot(value []byte, root []byte) ([]byte, error) {
 	return newValue, nil
 }
 
+// processGetNullifiersRoot is the GetRootFn function to get the nullifiers
+// root of a process leaf.
+func processGetNullifiersRoot(value []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	if len(sdbProc.Process.NullifiersRoot) != defaultHashLen {
+		return nil, fmt.Errorf("len(sdbProc.Process.NullifiersRoot) != %v",
+			defaultHashLen)
+	}
+	return sdbProc.Process.NullifiersRoot, nil
+}
+
+// processSetNullifiersRoot is the SetRootFn function to set the nullifiers
+// root of a process leaf.
+func processSetNullifiersRoot(value []byte, root []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	sdbProc.Process.NullifiersRoot = root
+	newValue, err := proto.Marshal(&sdbProc)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal StateDBProcess: %w", err)
+	}
+	return newValue, nil
+}
+
 // processGetVotesRoot is the GetRootFn function to get the votes root of a
 // process leaf.
 func processGetVotesRoot(value []byte) ([]byte, error) {
@@ -108,6 +137,16 @@ func processSetVotesRoot(value []byte, root []byte) ([]byte, error) {
 	}
 	return newValue, nil
 }
+
+// StateDB Tree hierarchy
+// - Main
+//   - Oracles (key: address, value: []byte{1} if exists)
+//   - Validators (key: address, value: models.Validator)
+//   - Accounts (key: address, value: models.Account)
+//   - Processes (key: ProcessId, value: models.StateDBProcess)
+//     - CensusPoseidon (key: sequential index 64 bits little endian, value: zkCensusKey)
+//     - Nullifiers (key: pre-census user nullifier, value: weight used)
+//     - Votes (key: VoteId, value: models.StateDBVote)
 
 var (
 	// OraclesCfg is the Oracles subTree configuration.
@@ -158,6 +197,17 @@ var (
 		MaxLevels:         64,
 		ParentLeafGetRoot: processGetCensusRoot,
 		ParentLeafSetRoot: processSetCensusRoot,
+	})
+	// NullifiersCfg is the Nullifiers subTree (found under a
+	// Process leaf) configuration when the process supports anonymous
+	// voting with rolling census.  This tree contains the pre-census
+	// nullifiers that have pre-registered.
+	NullifiersCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionSha256,
+		KindID:            "nulli",
+		MaxLevels:         256,
+		ParentLeafGetRoot: processGetNullifiersRoot,
+		ParentLeafSetRoot: processSetNullifiersRoot,
 	})
 
 	// VotesCfg is the Votes subTree (found under a Process leaf) configuration.

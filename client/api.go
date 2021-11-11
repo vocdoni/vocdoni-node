@@ -463,7 +463,7 @@ func (c *Client) TestPreRegisterKeys(
 	censusOrigin models.CensusOrigin,
 	caSigner *ethereum.SignKeys,
 	proofs [][]byte,
-	doubleVote, doublePreRegister, checkNullifiers bool,
+	doublePreRegister, checkNullifiers bool,
 	wg *sync.WaitGroup) (time.Duration, error) {
 
 	var err error
@@ -521,6 +521,7 @@ func (c *Client) TestPreRegisterKeys(
 			Nonce:     util.RandomBytes(32),
 			ProcessId: pid,
 			NewKey:    zkCensusKey,
+			Weight:    big.NewInt(1).Bytes(),
 		}
 		switch censusOrigin {
 		case models.CensusOrigin_OFF_CHAIN_TREE:
@@ -567,21 +568,57 @@ func (c *Client) TestPreRegisterKeys(
 				time.Sleep(1 * time.Second)
 				i--
 			} else {
-				return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+				// FIXME: once the req.Message are no longer in hex, remove this
+				msg, err := hex.DecodeString(resp.Message)
+				if err != nil {
+					return 0, fmt.Errorf("resp.Message hex decode: %w", err)
+				}
+				return 0, fmt.Errorf("%s failed: %s", req.Method, msg)
 			}
 		}
 		if (i+1)%100 == 0 {
 			log.Infof("pre-register progress for %s: %d%%", c.Addr, ((i+1)*100)/(len(signers)))
 		}
 
-		// Try double preRegister (should fail)
+		// Try double preRegister.  The request will not fail but
+		// that's OK.  For each user we will have 2 pre-register Txs in
+		// the pool, only one of them will succeed (the first one
+		// assuming that the node includes the transactions in the
+		// mempool received order).  Later on we check that the Rolling
+		// Census Size has the expected size, so we verify that there
+		// were no more pre-registers than expected.  And finally we
+		// vote with the first zkCensusKey for each user, making sure
+		// those pre-register succeded (and thus the second ones
+		// failed).
 		if doublePreRegister {
+			// We change the key in order to submit a different Tx
+			// with the same pre-census proof.
+			v.NewKey[1] = ^v.NewKey[1]
+			stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_RegisterKey{RegisterKey: v}})
+			if err != nil {
+				return 0, err
+			}
+			if stx.Signature, err = s.Sign(stx.Tx); err != nil {
+				return 0, err
+			}
+			if req.Payload, err = proto.Marshal(stx); err != nil {
+				return 0, err
+			}
 			resp, err := c.Request(req, nil)
 			if err != nil {
 				return 0, err
 			}
+			// log.Warnf("DBG Double: %#v", resp)
 			if resp.Ok {
-				return 0, fmt.Errorf("double pre-register not detected")
+				continue
+				// We can't detect double pre-register here yet
+				// because we're not caching the RegisterKeyTx
+				// verification.  Nevertheless when the block
+				// is mined, only one pre-register will
+				// succeed.
+				// Uncomment once we have a pre-regsiter
+				// verification cache.
+				// return 0, fmt.Errorf("double pre-register not detected")
 			}
 		}
 	}

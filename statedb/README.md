@@ -127,10 +127,10 @@ mainTree, err := sdb.BeginTx()
 qt.Assert(t, err, qt.IsNotNil)
 defer mainTree.Discard()
 
-err := update.Add(ProcessesCfg.Key(), make([]byte, ProcessesCfg.HashFunc().Len()))
+err := mainTree.Add(ProcessesCfg.Key(), make([]byte, ProcessesCfg.HashFunc().Len()))
 qt.Assert(t, err, qt.IsNotNil)
 
-_, err := update.SubTree(ProcessesCfg)
+_, err := mainTree.SubTree(ProcessesCfg)
 qt.Assert(t, err, qt.IsNotNil)
 
 mainTree.Commit(0)

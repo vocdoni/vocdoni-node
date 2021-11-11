@@ -116,7 +116,8 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 		}
 
 	case *models.Tx_RegisterKey:
-		if err := app.State.RegisterKeyTxCheck(vtx, txBytes, signature, app.State); err != nil {
+		if err := app.State.RegisterKeyTxCheck(vtx, txBytes, signature, app.State,
+			commit); err != nil {
 			return []byte{}, fmt.Errorf("registerKeyTx %w", err)
 		}
 		if commit {
