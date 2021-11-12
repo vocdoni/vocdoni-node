@@ -305,6 +305,36 @@ func TestGet(t *testing.T) {
 	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(bLen, big.NewInt(int64(7*2))))
 }
 
+func TestBitmapBytes(t *testing.T) {
+	c := qt.New(t)
+
+	b := []byte{15}
+	bits := bytesToBitmap(b)
+	c.Assert(bits, qt.DeepEquals, []bool{true, true, true, true,
+		false, false, false, false})
+	b2 := bitmapToBytes(bits)
+	c.Assert(b2, qt.DeepEquals, b)
+
+	b = []byte{0, 15, 50}
+	bits = bytesToBitmap(b)
+	c.Assert(bits, qt.DeepEquals, []bool{false, false, false,
+		false, false, false, false, false, true, true, true, true,
+		false, false, false, false, false, true, false, false, true,
+		true, false, false})
+	b2 = bitmapToBytes(bits)
+	c.Assert(b2, qt.DeepEquals, b)
+
+	b = []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
+	bits = bytesToBitmap(b)
+	b2 = bitmapToBytes(bits)
+	c.Assert(b2, qt.DeepEquals, b)
+
+	b = []byte("testbytes")
+	bits = bytesToBitmap(b)
+	b2 = bitmapToBytes(bits)
+	c.Assert(b2, qt.DeepEquals, b)
+}
+
 func TestPackAndUnpackSiblings(t *testing.T) {
 	c := qt.New(t)
 
