@@ -203,6 +203,7 @@ type APIresponse struct {
 	URI                  string                           `json:"uri,omitempty"`
 	ValidatorList        []*models.Validator              `json:"validatorlist,omitempty"`
 	ValidProof           *bool                            `json:"validProof,omitempty"`
+	CensusValue          []byte                           `json:"censusValue,omitempty"`
 	Weight               string                           `json:"weight,omitempty"`
 }
 

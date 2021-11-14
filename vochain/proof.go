@@ -89,8 +89,12 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 		if err != nil {
 			return false, nil, fmt.Errorf("cannot hash proof key: %w", err)
 		}
-		valid, err := tree.VerifyProof(hashFunc, hashedKey, []byte{}, p.Siblings, censusRoot)
-		return valid, bigOne, err
+		valid, err := tree.VerifyProof(hashFunc, hashedKey, p.Value, p.Siblings, censusRoot)
+		// Legacy: support p.Value == nil, assume then value=1
+		if p.Value == nil {
+			return valid, bigOne, err
+		}
+		return valid, new(big.Int).SetBytes(p.Value), err
 	default:
 		return false, nil, fmt.Errorf("unexpected proof.Payload type: %T",
 			proof.Payload)

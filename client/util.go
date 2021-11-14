@@ -53,17 +53,18 @@ type signKey struct {
 	PrivKey string `json:"privKey"`
 	PubKey  string `json:"pubKey"`
 	Proof   []byte `json:"proof"`
+	Value   []byte `json:"value"`
 }
 
-func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*ethereum.SignKeys, proofs [][]byte) error {
+func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*ethereum.SignKeys, proofs []*Proof) error {
 	if proofs != nil && (len(proofs) != len(keys)) {
-		return fmt.Errorf("length of Proof is different from length of Signers")
+		return fmt.Errorf("length of Proof are Signers are different length")
 	}
 	var kb keysBatch
 	for i, k := range keys {
 		pub, priv := k.HexString()
 		if proofs != nil {
-			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub, Proof: proofs[i]})
+			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub, Proof: proofs[i].Siblings, Value: proofs[i].Value})
 		} else {
 			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub})
 		}
@@ -78,7 +79,7 @@ func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*e
 	return os.WriteFile(filepath, j, 0o644)
 }
 
-func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, []byte, string, error) {
+func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, []*Proof, []byte, string, error) {
 	jb, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, nil, nil, "", err
@@ -94,13 +95,13 @@ func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, []byte, str
 	}
 
 	keys := make([]*ethereum.SignKeys, len(kb.Keys))
-	proofs := [][]byte{}
+	proofs := []*Proof{}
 	for i, k := range kb.Keys {
 		s := ethereum.NewSignKeys()
 		if err = s.AddHexKey(k.PrivKey); err != nil {
 			return nil, nil, nil, "", err
 		}
-		proofs = append(proofs, k.Proof)
+		proofs = append(proofs, &Proof{Siblings: k.Proof, Value: k.Value})
 		keys[i] = s
 	}
 	return keys, proofs, kb.CensusID, kb.CensusURI, nil

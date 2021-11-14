@@ -12,14 +12,14 @@ ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
 ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 TEST=${1:-0}
 CLEAN=${CLEAN:-1}
-
+LOGLEVEL=${LOGLEVEL:info}
 test() {
-	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway:9090/dvote --logLevel=INFO --operation=vtest --electionType=$1
+	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway:9090/dvote --logLevel=$LOGLEVEL --operation=vtest --electionType=$1 --withWeight=2
 	echo $? >$2
 }
 
 test_anon() {
-	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE_ANON --gwHost http://gateway:9090/dvote --logLevel=INFO --operation=anonvoting
+	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE_ANON --gwHost http://gateway:9090/dvote --logLevel=$LOGLEVEL --operation=anonvoting
 	echo $? >$1
 }
 

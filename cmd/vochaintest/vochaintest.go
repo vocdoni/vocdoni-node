@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"math/rand"
 	"os"
 	"strings"
@@ -47,6 +48,7 @@ func main() {
 	parallelCons := flag.Int("parallelCons", 1, "parallel API connections")
 	procDuration := flag.Int("processDuration", 500, "voting process duration in blocks")
 	doubleVote := flag.Bool("doubleVote", true, "send every vote twice")
+	withWeight := flag.Uint64("withWeight", 1, "vote with weight (same for all voters)")
 	// TODO: Set to default = true once #333 is resolved
 	doublePreRegister := flag.Bool("doublePreRegister", true, "send every pre-register twice")
 	checkNullifiers := flag.Bool("checkNullifiers", false,
@@ -116,6 +118,7 @@ func main() {
 			*electionSize,
 			*procDuration,
 			*parallelCons,
+			*withWeight,
 			*doubleVote,
 			*checkNullifiers,
 			*gateways,
@@ -142,13 +145,13 @@ func main() {
 	case "censusImport":
 		censusImport(*host, entityKey)
 	case "censusGenerate":
-		censusGenerate(*host, entityKey, *electionSize, *keysfile)
+		censusGenerate(*host, entityKey, *electionSize, *keysfile, 1)
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
 }
 
-func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath string) {
+func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath string, withWeight uint64) {
 	cl, err := client.New(host)
 	if err != nil {
 		log.Fatal(err)
@@ -156,7 +159,13 @@ func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath s
 	defer cl.Close()
 	log.Infof("generating new keys census batch")
 	keys := client.CreateEthRandomKeysBatch(size)
-	root, uri, err := cl.CreateCensus(signer, keys, nil)
+	weights := [][]byte{}
+	log.Infof("creating census with weight == %d", withWeight)
+	for i := uint64(1); i <= uint64(size); i++ {
+		weights = append(weights, new(big.Int).SetUint64(withWeight).Bytes())
+	}
+
+	root, uri, err := cl.CreateCensus(signer, keys, nil, weights)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -208,7 +217,7 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 		keys = append(keys, pubk)
 		i++
 	}
-	root, uri, err := cl.CreateCensus(signer, nil, keys)
+	root, uri, err := cl.CreateCensus(signer, nil, keys, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -221,7 +230,7 @@ func mkTreeVoteTest(host,
 	entityKey *ethereum.SignKeys,
 	electionSize,
 	procDuration,
-	parallelCons int,
+	parallelCons int, withWeight uint64,
 	doubleVote, checkNullifiers bool,
 	gateways []string,
 	keysfile string,
@@ -229,7 +238,7 @@ func mkTreeVoteTest(host,
 	forceGatewaysGotCensus bool) {
 
 	var censusKeys []*ethereum.SignKeys
-	var proofs [][]byte
+	var proofs []*client.Proof
 	var err error
 	var censusRoot []byte
 	censusURI := ""
@@ -242,7 +251,7 @@ func mkTreeVoteTest(host,
 	// Try to reuse previous census and keys
 	censusKeys, proofs, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
 	if err != nil || len(censusKeys) < electionSize || len(proofs) < electionSize {
-		censusGenerate(host, entityKey, electionSize, keysfile)
+		censusGenerate(host, entityKey, electionSize, keysfile, withWeight)
 		censusKeys, proofs, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
 		if err != nil {
 			log.Fatal(err)
@@ -348,18 +357,18 @@ func mkTreeVoteTest(host,
 
 	for gw, cl := range clients {
 		var gwSigners []*ethereum.SignKeys
-		var gwProofs [][]byte
+		var gwProofs []*client.Proof
 		// Split the voters
 		if len(clients) == gw+1 {
 			// if last client, add all remaining keys
 			gwSigners = make([]*ethereum.SignKeys, len(censusKeys)-i)
 			copy(gwSigners, censusKeys[i:])
-			gwProofs = make([][]byte, len(censusKeys)-i)
+			gwProofs = make([]*client.Proof, len(censusKeys)-i)
 			copy(gwProofs, proofs[i:])
 		} else {
 			gwSigners = make([]*ethereum.SignKeys, p)
 			copy(gwSigners, censusKeys[i:i+p])
-			gwProofs = make([][]byte, p)
+			gwProofs = make([]*client.Proof, p)
 			copy(gwProofs, proofs[i:i+p])
 		}
 		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
@@ -427,7 +436,7 @@ func mkTreeVoteTest(host,
 	}
 	log.Infof("the ENTIRE voting process took %s", maxVotingTime)
 	log.Infof("checking results....")
-	if r, err := mainClient.TestResults(pid, len(censusKeys)); err != nil {
+	if r, err := mainClient.TestResults(pid, len(censusKeys), withWeight); err != nil {
 		log.Fatal(err)
 	} else {
 		log.Infof("results: %+v", r)
@@ -449,7 +458,7 @@ func mkTreeAnonVoteTest(host,
 	// log.Init("debug", "stdout")
 
 	var censusKeys []*ethereum.SignKeys
-	var proofs [][]byte
+	var proofs []*client.Proof
 	var err error
 	var censusRoot []byte
 	censusURI := ""
@@ -462,7 +471,7 @@ func mkTreeAnonVoteTest(host,
 	// Try to reuse previous census and keys
 	censusKeys, proofs, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
 	if err != nil || len(censusKeys) < electionSize || len(proofs) < electionSize {
-		censusGenerate(host, entityKey, electionSize, keysfile)
+		censusGenerate(host, entityKey, electionSize, keysfile, 1)
 		censusKeys, proofs, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
 		if err != nil {
 			log.Fatal(err)
@@ -568,18 +577,18 @@ func mkTreeAnonVoteTest(host,
 
 	for gw, cl := range clients {
 		var gwSigners []*ethereum.SignKeys
-		var gwProofs [][]byte
+		var gwProofs []*client.Proof
 		// Split the voters
 		if len(clients) == gw+1 {
 			// if last client, add all remaining keys
 			gwSigners = make([]*ethereum.SignKeys, len(censusKeys)-i)
 			copy(gwSigners, censusKeys[i:])
-			gwProofs = make([][]byte, len(censusKeys)-i)
+			gwProofs = make([]*client.Proof, len(censusKeys)-i)
 			copy(gwProofs, proofs[i:])
 		} else {
 			gwSigners = make([]*ethereum.SignKeys, p)
 			copy(gwSigners, censusKeys[i:i+p])
-			gwProofs = make([][]byte, p)
+			gwProofs = make([]*client.Proof, p)
 			copy(gwProofs, proofs[i:i+p])
 		}
 		log.Infof("%s will receive %d register keys", cl.Addr, len(gwSigners))
@@ -724,7 +733,7 @@ func mkTreeAnonVoteTest(host,
 	}
 	log.Infof("the ENTIRE voting process took %s", maxVotingTime)
 	log.Infof("checking results....")
-	if r, err := mainClient.TestResults(pid, len(censusKeys)); err != nil {
+	if r, err := mainClient.TestResults(pid, len(censusKeys), 1); err != nil {
 		log.Fatal(err)
 	} else {
 		log.Infof("results: %+v", r)
@@ -880,7 +889,7 @@ func cspVoteTest(
 	}
 	log.Infof("the ENTIRE voting process took %s", maxVotingTime)
 	log.Infof("checking results....")
-	if r, err := mainClient.TestResults(pid, len(voters)); err != nil {
+	if r, err := mainClient.TestResults(pid, len(voters), 1); err != nil {
 		log.Fatal(err)
 	} else {
 		log.Infof("results: %+v", r)
