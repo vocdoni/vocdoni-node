@@ -95,7 +95,7 @@ func testCSPvote(oracle *ethereum.SignKeys, url string) error {
 	if err := cli.EndProcess(oracle, processID); err != nil {
 		return err
 	}
-	if _, err := cli.TestResults(processID, len(voterKeys)); err != nil {
+	if _, err := cli.TestResults(processID, len(voterKeys), 1); err != nil {
 		return err
 	}
 	return nil

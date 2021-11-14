@@ -1,7 +1,6 @@
 package census
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -251,7 +250,6 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 	switch r.Method {
 	case "genProof":
 		key := r.CensusKey
-		value := r.CensusValue
 		if !r.Digested {
 			if key, err = tr.Hash(key); err != nil {
 				return resp, fmt.Errorf("error digesting data: %w", err)
@@ -266,14 +264,10 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 				return nil, err
 			}
 			proofPrefix = key
-			value = r.CensusKey
 		}
 		leafV, siblings, err := tr.GenProof(key)
 		if err != nil {
 			return nil, err
-		}
-		if !bytes.Equal(leafV, value) {
-			return nil, fmt.Errorf("leaf value (%x) != request value (%x)", leafV, value)
 		}
 		// When the key is not the user's public key from the request,
 		// we prefix it to the proof so that the user receives the real
@@ -282,6 +276,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			siblings = append(proofPrefix, siblings...)
 		}
 		resp.Siblings = siblings
+		resp.CensusValue = leafV
 		return resp, nil
 
 	case "getSize":

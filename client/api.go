@@ -60,7 +60,7 @@ func (c *Client) GetEnvelopeStatus(nullifier, pid []byte) (bool, error) {
 	return *resp.Registered, nil
 }
 
-func (c *Client) GetProof(pubkey, root []byte, digested bool) ([]byte, error) {
+func (c *Client) GetProof(pubkey, root []byte, digested bool) ([]byte, []byte, error) {
 	var req api.APIrequest
 	req.Method = "genProof"
 	req.CensusID = hex.EncodeToString(root)
@@ -69,13 +69,13 @@ func (c *Client) GetProof(pubkey, root []byte, digested bool) ([]byte, error) {
 
 	resp, err := c.Request(req, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(resp.Siblings) == 0 || !resp.Ok {
-		return nil, fmt.Errorf("cannot get merkle proof: (%s)", resp.Message)
+		return nil, nil, fmt.Errorf("cannot get merkle proof: (%s)", resp.Message)
 	}
 
-	return resp.Siblings, nil
+	return resp.Siblings, resp.CensusValue, nil
 }
 
 func (c *Client) GetResults(pid []byte) ([][]string, string, bool, error) {
@@ -201,7 +201,7 @@ func (c *Client) GetRollingCensusSize(pid []byte) (int64, error) {
 	return *resp.Size, nil
 }
 
-func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
+func (c *Client) TestResults(pid []byte, totalVotes int, withWeight uint64) ([][]string, error) {
 	log.Infof("waiting for results...")
 	var err error
 	var results [][]string
@@ -222,7 +222,7 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
 		}
 		log.Infof("no results yet at block %d", block+2)
 	}
-	total := fmt.Sprintf("%d", totalVotes)
+	total := fmt.Sprintf("%d", uint64(totalVotes)*withWeight)
 	if results[0][1] != total ||
 		results[1][2] != total ||
 		results[2][3] != total ||
@@ -232,22 +232,27 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
 	return results, nil
 }
 
+type Proof struct {
+	Siblings []byte
+	Value    []byte
+}
+
 func (c *Client) GetMerkleProofBatch(signers []*ethereum.SignKeys,
 	root []byte,
-	tolerateError bool) ([][]byte, error) {
+	tolerateError bool) ([]*Proof, error) {
 
-	var proofs [][]byte
+	var proofs []*Proof
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, s := range signers {
-		proof, err := c.GetProof(s.PublicKey(), root, false)
+		siblings, value, err := c.GetProof(s.PublicKey(), root, false)
 		if err != nil {
 			if tolerateError {
 				continue
 			}
 			return proofs, err
 		}
-		proofs = append(proofs, proof)
+		proofs = append(proofs, &Proof{Siblings: siblings, Value: value})
 		if (i+1)%100 == 0 {
 			log.Infof("proof generation progress for %s: %d%%", c.Addr, ((i+1)*100)/(len(signers)))
 		}
@@ -257,21 +262,21 @@ func (c *Client) GetMerkleProofBatch(signers []*ethereum.SignKeys,
 
 func (c *Client) GetMerkleProofPoseidonBatch(signers []*ethereum.SignKeys,
 	root []byte,
-	tolerateError bool) ([][]byte, error) {
+	tolerateError bool) ([]*Proof, error) {
 
-	var proofs [][]byte
+	var proofs []*Proof
 	// Generate merkle proofs
 	log.Infof("generating poseidon proofs...")
 	for i, s := range signers {
 		zkCensusKey, _ := testGetZKCensusKey(s)
-		proof, err := c.GetProof(zkCensusKey, root, true)
+		siblings, value, err := c.GetProof(zkCensusKey, root, true)
 		if err != nil {
 			if tolerateError {
 				continue
 			}
 			return proofs, err
 		}
-		proofs = append(proofs, proof)
+		proofs = append(proofs, &Proof{Siblings: siblings, Value: value})
 		if (i+1)%100 == 0 {
 			log.Infof("proof generation progress for %s: %d%%", c.Addr, ((i+1)*100)/(len(signers)))
 		}
@@ -281,9 +286,9 @@ func (c *Client) GetMerkleProofPoseidonBatch(signers []*ethereum.SignKeys,
 
 func (c *Client) GetCSPproofBatch(signers []*ethereum.SignKeys,
 	ca *ethereum.SignKeys,
-	pid []byte) ([][]byte, error) {
+	pid []byte) ([]*Proof, error) {
 
-	var proofs [][]byte
+	var proofs []*Proof
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, k := range signers {
@@ -300,16 +305,16 @@ func (c *Client) GetCSPproofBatch(signers []*ethereum.SignKeys,
 			log.Fatal(err)
 		}
 
-		proof := &models.ProofCA{
+		caProof := &models.ProofCA{
 			Bundle:    bundle,
 			Type:      models.ProofCA_ECDSA,
 			Signature: signature,
 		}
-		p, err := proto.Marshal(proof)
+		caProofBytes, err := proto.Marshal(caProof)
 		if err != nil {
 			return nil, err
 		}
-		proofs = append(proofs, p)
+		proofs = append(proofs, &Proof{Siblings: caProofBytes})
 		if (i+1)%100 == 0 {
 			log.Infof("proof generation progress for %s: %d%%", c.Addr, ((i+1)*100)/(len(signers)))
 		}
@@ -462,7 +467,7 @@ func (c *Client) TestPreRegisterKeys(
 	signers []*ethereum.SignKeys,
 	censusOrigin models.CensusOrigin,
 	caSigner *ethereum.SignKeys,
-	proofs [][]byte,
+	proofs []*Proof,
 	doublePreRegister, checkNullifiers bool,
 	wg *sync.WaitGroup) (time.Duration, error) {
 
@@ -529,14 +534,15 @@ func (c *Client) TestPreRegisterKeys(
 				Payload: &models.Proof_Arbo{
 					Arbo: &models.ProofArbo{
 						Type:     models.ProofArbo_BLAKE2B,
-						Siblings: proofs[i],
+						Siblings: proofs[i].Siblings,
+						Value:    proofs[i].Value,
 					},
 				},
 			}
 
 		case models.CensusOrigin_OFF_CHAIN_CA:
 			p := &models.ProofCA{}
-			if err := proto.Unmarshal(proofs[i], p); err != nil {
+			if err := proto.Unmarshal(proofs[i].Siblings, p); err != nil {
 				log.Fatal(err)
 			}
 			v.Proof = &models.Proof{Payload: &models.Proof_Ca{Ca: p}}
@@ -637,7 +643,7 @@ func (c *Client) TestSendVotes(
 	signers []*ethereum.SignKeys,
 	censusOrigin models.CensusOrigin,
 	caSigner *ethereum.SignKeys,
-	proofs [][]byte,
+	proofs []*Proof,
 	encrypted, doubleVoting, checkNullifiers bool,
 	wg *sync.WaitGroup) (time.Duration, error) {
 
@@ -710,14 +716,15 @@ func (c *Client) TestSendVotes(
 				Payload: &models.Proof_Arbo{
 					Arbo: &models.ProofArbo{
 						Type:     models.ProofArbo_BLAKE2B,
-						Siblings: proofs[i],
+						Siblings: proofs[i].Siblings,
+						Value:    proofs[i].Value,
 					},
 				},
 			}
 
 		case models.CensusOrigin_OFF_CHAIN_CA:
 			p := &models.ProofCA{}
-			if err := proto.Unmarshal(proofs[i], p); err != nil {
+			if err := proto.Unmarshal(proofs[i].Siblings, p); err != nil {
 				log.Fatal(err)
 			}
 			v.Proof = &models.Proof{Payload: &models.Proof_Ca{Ca: p}}
@@ -739,7 +746,7 @@ func (c *Client) TestSendVotes(
 			return 0, err
 		}
 		pub, _ := s.HexString()
-		log.Debugf("voting with pubKey:%s", pub)
+		log.Debugf("voting with pubKey:%s {%s}", pub, log.FormatProto(v))
 		resp, err := c.Request(req, nil)
 		if err != nil {
 			return 0, err
@@ -837,7 +844,7 @@ func (c *Client) TestSendAnonVotes(
 	if err != nil {
 		return 0, err
 	}
-	log.Infof("CircuitIndex: %v, CircuitConfit: %+v", *circuitIndex, *circuitConfig)
+	log.Infof("CircuitIndex: %v, CircuitPath: %+v", *circuitIndex, *&circuitConfig.CircuitPath)
 	// Wait until all gateway connections are ready
 	wg.Done()
 	log.Infof("%s is waiting other gateways to be ready before it can start voting", c.Addr)
@@ -876,7 +883,7 @@ func (c *Client) TestSendAnonVotes(
 		}
 		_, secretKey := testGetZKCensusKey(s)
 		proof, err := testGenSNARKProof(*circuitIndex, circuitConfig,
-			root, proofs[i], circuitConfig.Parameters[0], secretKey, vpb, pid)
+			root, proofs[i].Siblings, circuitConfig.Parameters[0], secretKey, vpb, pid)
 		if err != nil {
 			return 0, fmt.Errorf("cannot generate test SNARK proof: %w", err)
 		}
@@ -1102,8 +1109,9 @@ func (c *Client) GetCurrentBlock() (uint32, error) {
 // CreateCensus creates a new census on the remote gateway and publishes it.
 // Users public keys can be added using censusSigner (ethereum.SignKeys) or
 // censusPubKeys (raw hex public keys).
+// censusValues can be empty for a non-weighted census
 func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys,
-	censusPubKeys []string) (root []byte, uri string, _ error) {
+	censusPubKeys []string, censusValues [][]byte) (root []byte, uri string, _ error) {
 	var req api.APIrequest
 
 	// Create census
@@ -1128,6 +1136,10 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	} else {
 		censusSize = len(censusPubKeys)
 	}
+	if len(censusValues) > 0 && len(censusValues) != censusSize {
+		return nil, "", fmt.Errorf("census keys and values are not the same lenght (%d != %d)",
+			censusSize, len(censusValues))
+	}
 	log.Infof("add bulk claims (size %d)", censusSize)
 	req.Method = "addClaimBulk"
 	req.CensusKey = []byte{}
@@ -1137,6 +1149,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	var hexpub string
 	for currentSize > 0 {
 		claims := [][]byte{}
+		values := [][]byte{}
 		for j := 0; j < 100; j++ {
 			if currentSize < 1 {
 				break
@@ -1151,9 +1164,13 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 				return nil, "", err
 			}
 			claims = append(claims, pub)
+			if len(censusValues) > 0 {
+				values = append(values, censusValues[currentSize-1])
+			}
 			currentSize--
 		}
 		req.CensusKeys = claims
+		req.CensusValues = values
 		resp, err := c.Request(req, signer)
 		if err != nil {
 			return nil, "", err
@@ -1164,6 +1181,8 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 		i++
 		log.Infof("census creation progress: %d%%", (i*100*100)/(censusSize))
 	}
+	req.CensusKeys = [][]byte{}
+	req.CensusValues = [][]byte{}
 
 	// getSize
 	log.Infof("get size")
@@ -1180,7 +1199,6 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	// publish
 	log.Infof("publish census")
 	req.Method = "publish"
-	req.CensusKeys = [][]byte{}
 	resp, err = c.Request(req, signer)
 	if err != nil {
 		return nil, "", err
