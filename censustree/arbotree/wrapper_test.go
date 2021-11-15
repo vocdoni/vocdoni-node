@@ -21,7 +21,7 @@ func TestGenProof(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		p, err := tr1.GenProof(keys[i], values[i])
+		p, err := tr1.GenProof(keys[i])
 		if err != nil {
 			t.Fatal(err)
 		}

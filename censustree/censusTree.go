@@ -31,8 +31,10 @@ type Tree interface {
 	AddBatch(keys, values [][]byte) (failedIndexes []int, err error)
 	// GenProof generates a merkle tree proof that can be later used on
 	// CheckProof() to validate it
-	GenProof(key, value []byte) (mproof []byte, err error)
+	GenProof(key []byte) (mproof []byte, err error)
 	// CheckProof validates a merkle proof and its data for the Tree hash function
+	// GetValue returns the value for a key
+	GetValue(key []byte) []byte
 	CheckProof(key, value, root, mproof []byte) (included bool, err error)
 	// Root returns the current merkle tree root
 	Root() []byte

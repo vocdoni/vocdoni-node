@@ -181,13 +181,19 @@ func (t *Tree) AddBatch(indexes, values [][]byte) ([]int, error) {
 }
 
 // GenProof generates a merkle tree proof that can be later used on CheckProof() to validate it
-func (t *Tree) GenProof(index, value []byte) ([]byte, error) {
+func (t *Tree) GenProof(index []byte) ([]byte, error) {
 	t.updateAccessTime()
 	proof, err := t.Tree.Proof(index)
 	if err != nil {
 		return nil, err
 	}
 	return proof, nil
+}
+
+// GetValue returns the value of a key
+func (t *Tree) GetValue(index []byte) []byte {
+	t.updateAccessTime()
+	return t.Tree.Get(index)
 }
 
 // CheckProof standalone function for checking a merkle proof

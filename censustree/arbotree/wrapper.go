@@ -3,8 +3,6 @@
 package arbotree
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -133,20 +131,23 @@ func (t *Tree) AddBatch(indexes, values [][]byte) ([]int, error) {
 	return t.Tree.AddBatch(indexes, values)
 }
 
+// GetValue returns the value stored for a index key
+func (t *Tree) GetValue(index []byte) []byte {
+	t.updateAccessTime()
+	_, v, _ := t.Tree.Get(index)
+	return v
+}
+
 // GenProof generates a merkle tree proof that can be later used on CheckProof()
 // to validate it
-func (t *Tree) GenProof(index, value []byte) ([]byte, error) {
+func (t *Tree) GenProof(index []byte) ([]byte, error) {
 	t.updateAccessTime()
-	_, v, siblings, existence, err := t.Tree.GenProof(index)
+	_, _, siblings, existence, err := t.Tree.GenProof(index)
 	if err != nil {
 		return nil, err
 	}
 	if !existence {
 		return nil, fmt.Errorf("index does not exist in the tree")
-	}
-	if !bytes.Equal(v, value) {
-		return nil, fmt.Errorf("value does not match %s!=%s",
-			hex.EncodeToString(v), hex.EncodeToString(value))
 	}
 	return siblings, nil
 }

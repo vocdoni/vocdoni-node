@@ -73,7 +73,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	var proof []byte
 	vp := []byte("[1,2,3,4]")
 	for i, s := range keys {
-		proof, err = tr.GenProof([]byte(proofs[i]), nil)
+		proof, err = tr.GenProof([]byte(proofs[i]))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -118,7 +118,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	}
 
 	// Test send the same vote package multiple times with different nonce
-	proof, err = tr.GenProof([]byte(lastProof), nil)
+	proof, err = tr.GenProof([]byte(lastProof))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -76,7 +76,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 
 	var proof []byte
 	for i, s := range keys {
-		proof, err = tr.GenProof([]byte(claims[i]), nil)
+		proof, err = tr.GenProof([]byte(claims[i]))
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -45,8 +45,11 @@ func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin,
 			if p == nil {
 				return false, nil, fmt.Errorf("graviton proof is empty")
 			}
-			valid, err := gravitontree.CheckProof(key, []byte{}, censusRoot, p.Siblings)
-			return valid, big.NewInt(1), err
+			valid, err := gravitontree.CheckProof(key, p.Value, censusRoot, p.Siblings)
+			if len(p.Value) == 0 {
+				return valid, big.NewInt(1), err
+			}
+			return valid, new(big.Int).SetBytes(p.Value), err
 		case *models.Proof_Iden3:
 			// NOT IMPLEMENTED
 			return false, nil, fmt.Errorf("iden3 proof not implemented")

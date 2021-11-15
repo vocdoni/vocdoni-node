@@ -85,7 +85,7 @@ func TestTree(t *testing.T) {
 	}
 
 	// Generate a proof on tr1 and check validity on snapshot and tr2
-	proof1, err := tr1.GenProof([]byte("number 5"), []byte("number 5 value"))
+	proof1, err := tr1.GenProof([]byte("number 5"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -180,7 +180,7 @@ func benchProofs(b *testing.B, censusSize int) {
 	time.Sleep(5 * time.Second)
 	proofs := [][]byte{}
 	for i := 0; i < censusSize; i++ {
-		p, err := tr1.GenProof(keys[i], values[i])
+		p, err := tr1.GenProof(keys[i])
 		if err != nil {
 			b.Fatal(err)
 		}

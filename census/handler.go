@@ -228,12 +228,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			root = r.RootHash
 		}
 		// Generate proof and return it
-		data := r.CensusKey
-		// TO-DO: if census=snarks do Poseidon hashing
-		//if !r.Digested {
-		//	data = snarks.Poseidon.Hash(data)
-		//}
-		validProof, err := tr.CheckProof(data, r.CensusValue, root, r.ProofData)
+		validProof, err := tr.CheckProof(r.CensusKey, r.CensusValue, root, r.ProofData)
 		if err != nil {
 			resp.SetError(err)
 			return resp
@@ -255,16 +250,12 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 
 	switch r.Method {
 	case "genProof":
-		data := r.CensusKey
-		// TO-DO: if census=snarks do Poseidon hashing
-		//if !r.Digested {
-		//	data = snarks.Poseidon.Hash(data)
-		//}
-		siblings, err := tr.GenProof(data, r.CensusValue)
+		siblings, err := tr.GenProof(r.CensusKey)
 		if err != nil {
 			resp.SetError(err)
 		}
 		resp.Siblings = siblings
+		resp.CensusValue = tr.GetValue(r.CensusKey)
 		return resp
 
 	case "getSize":
