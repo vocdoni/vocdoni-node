@@ -844,7 +844,7 @@ func (c *Client) TestSendAnonVotes(
 	if err != nil {
 		return 0, err
 	}
-	log.Infof("CircuitIndex: %v, CircuitPath: %+v", *circuitIndex, *&circuitConfig.CircuitPath)
+	log.Infof("CircuitIndex: %v, CircuitPath: %+v", *circuitIndex, circuitConfig.CircuitPath)
 	// Wait until all gateway connections are ready
 	wg.Done()
 	log.Infof("%s is waiting other gateways to be ready before it can start voting", c.Addr)
