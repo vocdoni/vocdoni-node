@@ -933,7 +933,7 @@ func TestTxIndexer(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 10; j++ {
-			sc.OnNewTx(uint32(i), int32(j))
+			sc.OnNewTx([]byte(fmt.Sprintf("hash%d%d", i, j)), uint32(i), int32(j))
 		}
 	}
 	qt.Assert(t, sc.Commit(0), qt.IsNil)
@@ -945,6 +945,11 @@ func TestTxIndexer(t *testing.T) {
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
+
+			hashRef, err := sc.GetTxHashReference([]byte(fmt.Sprintf("hash%d%d", i, j)))
+			qt.Assert(t, err, qt.IsNil)
+			qt.Assert(t, hashRef.BlockHeight, qt.Equals, uint32(i))
+			qt.Assert(t, hashRef.TxBlockIndex, qt.Equals, int32(j))
 		}
 	}
 }

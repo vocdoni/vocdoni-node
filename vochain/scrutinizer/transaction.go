@@ -5,6 +5,7 @@ import (
 
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
 
@@ -27,9 +28,20 @@ func (s *Scrutinizer) GetTxReference(height uint64) (*indexertypes.TxReference, 
 	return txReference, nil
 }
 
+// GetTxReference fetches the txReference for the given tx hash
+func (s *Scrutinizer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxReference, error) {
+	txReference := &indexertypes.TxReference{}
+	err := s.db.FindOne(txReference, badgerhold.Where("Hash").Eq(hash))
+	if err != nil {
+		return nil, fmt.Errorf("tx hash %x not found: %v", hash, err)
+	}
+	return txReference, nil
+}
+
 // OnNewTx stores the transaction reference in the indexer database
-func (s *Scrutinizer) OnNewTx(blockHeight uint32, txIndex int32) {
+func (s *Scrutinizer) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {
 	s.newTxPool = append(s.newTxPool, &indexertypes.TxReference{
+		Hash:         types.HexBytes(hash),
 		BlockHeight:  blockHeight,
 		TxBlockIndex: txIndex,
 	})

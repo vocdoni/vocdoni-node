@@ -147,6 +147,7 @@ func (r *RPCAPI) EnableIndexerAPI(vocapp *vochain.BaseApplication,
 	r.RegisterPublic("getBlockList", false, r.getBlockList)
 	r.RegisterPublic("getTx", false, r.getTx)
 	r.RegisterPublic("getTxByHeight", false, r.getTxByHeight)
+	r.RegisterPublic("getTxByHash", false, r.getTxByHash)
 	r.RegisterPublic("getValidatorList", false, r.getValidatorList)
 	r.RegisterPublic("getTxListForBlock", false, r.getTxListForBlock)
 	return nil
