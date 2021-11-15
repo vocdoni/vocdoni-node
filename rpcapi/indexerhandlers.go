@@ -139,6 +139,27 @@ func (r *RPCAPI) getTxByHeight(request *api.APIrequest) (*api.APIresponse, error
 	return &response, nil
 }
 
+func (r *RPCAPI) getTxByHash(request *api.APIrequest) (*api.APIresponse, error) {
+	var response api.APIresponse
+	txRef, err := r.scrutinizer.GetTxHashReference(request.Hash)
+	if err != nil {
+		return nil, fmt.Errorf("tx %x not found: %w", request.Hash, err)
+	}
+	tx, err := r.scrutinizer.App.GetTx(txRef.BlockHeight, txRef.TxBlockIndex)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get tx: %w", err)
+	}
+	response.Tx = &indexertypes.TxPackage{
+		Tx:          tx.Tx,
+		Height:      uint32(txRef.Index),
+		Index:       txRef.TxBlockIndex,
+		BlockHeight: txRef.BlockHeight,
+		Hash:        request.Hash,
+		Signature:   tx.Signature,
+	}
+	return &response, nil
+}
+
 func (r *RPCAPI) getTxListForBlock(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	block := r.vocapp.GetBlockByHeight(int64(request.Height))

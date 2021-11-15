@@ -127,7 +127,8 @@ type TxMetadata struct {
 
 // TxReference holds the db reference for a single transaction
 type TxReference struct {
-	Index        uint64 `badgerholdKey:"Index"`
+	Index        uint64         `badgerholdKey:"Index"`
+	Hash         types.HexBytes `badgerholdIndex:"Hash"`
 	BlockHeight  uint32
 	TxBlockIndex int32
 }

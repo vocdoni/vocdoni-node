@@ -248,7 +248,7 @@ func (k *KeyKeeper) OnVote(v *models.Vote, txindex int32) {
 }
 
 // OnNewTx is not used by the KeyKeeper
-func (k *KeyKeeper) OnNewTx(blockHeight uint32, txIndex int32) {
+func (k *KeyKeeper) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {
 	// do nothing
 }
 

@@ -58,7 +58,7 @@ type APIrequest struct {
 	Digested     bool                           `json:"digested,omitempty"`
 	EntityId     types.HexBytes                 `json:"entityId,omitempty"`
 	EthProof     *ethstorageproof.StorageResult `json:"storageProof,omitempty"`
-	Hash         []byte                         `json:"hash,omitempty"`
+	Hash         types.HexBytes                 `json:"hash,omitempty"`
 	Height       uint32                         `json:"height,omitempty"`
 	From         int                            `json:"from,omitempty"`
 	ListSize     int                            `json:"listSize,omitempty"`
