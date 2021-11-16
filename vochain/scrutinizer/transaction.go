@@ -31,7 +31,7 @@ func (s *Scrutinizer) GetTxReference(height uint64) (*indexertypes.TxReference, 
 // GetTxReference fetches the txReference for the given tx hash
 func (s *Scrutinizer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxReference, error) {
 	txReference := &indexertypes.TxReference{}
-	err := s.db.FindOne(txReference, badgerhold.Where("Hash").Eq(hash))
+	err := s.db.FindOne(txReference, badgerhold.Where("Hash").Eq(hash).Index("Hash"))
 	if err != nil {
 		return nil, fmt.Errorf("tx hash %x not found: %v", hash, err)
 	}
