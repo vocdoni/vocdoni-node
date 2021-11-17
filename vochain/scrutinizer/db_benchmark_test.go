@@ -1,6 +1,7 @@
 package scrutinizer
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -18,6 +19,13 @@ func BenchmarkCheckTx(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	b.Run("indexTx", benchmarkIndexTx)
+}
+
+// LOG_LEVEL=info go test -v -benchmem -run=- -bench=FetchTx -benchtime=20s
+func BenchmarkFetchTx(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.Run("fetchTx", benchmarkFetchTx)
 }
 
 // LOG_LEVEL=info go test -v -benchmem -run=- -bench=NewProcess -benchtime=20s
@@ -67,6 +75,42 @@ func benchmarkIndexTx(b *testing.B) {
 		}
 		err := sc.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)
+	}
+}
+
+func benchmarkFetchTx(b *testing.B) {
+	numTxs := 1000
+	app := vochain.TestBaseApplication(b)
+
+	sc, err := NewScrutinizer(b.TempDir(), app, true)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for i := 0; i < b.N; i++ {
+		sc.Rollback()
+		for j := 0; j < numTxs; j++ {
+			sc.OnNewTx([]byte(fmt.Sprintf("hash%d%d", i, j)), uint32(i), int32(j))
+		}
+		err = sc.Commit(uint32(i))
+		qt.Assert(b, err, qt.IsNil)
+
+		time.Sleep(time.Second * 2)
+
+		startTime := time.Now()
+		for j := 0; j < numTxs; j++ {
+			_, err = sc.GetTxReference(uint64((i * numTxs) + j + 1))
+			qt.Assert(b, err, qt.IsNil)
+		}
+		log.Infof("fetched %d transactions (out of %d total) by index, took %s",
+			numTxs, (i+1)*numTxs, time.Since(startTime))
+		startTime = time.Now()
+		for j := 0; j < numTxs; j++ {
+			_, err = sc.GetTxHashReference([]byte(fmt.Sprintf("hash%d%d", i, j)))
+			qt.Assert(b, err, qt.IsNil)
+		}
+		log.Infof("fetched %d transactions (out of %d total) by hash, took %s",
+			numTxs, (i+1)*numTxs, time.Since(startTime))
 	}
 }
 
