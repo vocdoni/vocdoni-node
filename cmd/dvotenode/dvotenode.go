@@ -472,8 +472,7 @@ func main() {
 		// Initialize the HTTP router
 		httpRouter.TLSdomain = globalCfg.API.Ssl.Domain
 		httpRouter.TLSdirCert = globalCfg.API.Ssl.DirCert
-		httpRouter.Init(globalCfg.API.ListenHost, globalCfg.API.ListenPort)
-		if err != nil {
+		if err = httpRouter.Init(globalCfg.API.ListenHost, globalCfg.API.ListenPort); err != nil {
 			log.Fatal(err)
 		}
 		// Initialize the RPC API
