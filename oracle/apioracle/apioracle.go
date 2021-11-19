@@ -23,7 +23,7 @@ import (
 const (
 	ethQueryTimeOut      = 20 * time.Second
 	aclPurgePeriod       = 10 * time.Minute
-	aclTimeWindow        = 5 * 24 * time.Hour // 5 days
+	aclTimeWindow        = 24 * time.Hour
 	maxProposalPerWindow = 3
 )
 
@@ -121,11 +121,6 @@ func (a *APIoracle) handleNewEthProcess(req *api.APIrequest) (*api.APIresponse, 
 		Owner:             req.Address().Bytes(),
 	}
 
-	// Check the ACL
-	if err := a.erc20proposalACL.add(p.Owner, p.EntityId); err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), ethQueryTimeOut)
 	defer cancel()
 	index, err := a.getIndexSlot(ctx, p.EntityId, p.GetSourceBlockHeight(), p.CensusRoot)
@@ -149,6 +144,12 @@ func (a *APIoracle) handleNewEthProcess(req *api.APIrequest) (*api.APIresponse, 
 	if err := a.oracle.NewProcess(p); err != nil {
 		return nil, err
 	}
+
+	// Check the ACL
+	if err := a.erc20proposalACL.add(p.Owner, p.EntityId); err != nil {
+		return nil, err
+	}
+
 	return &api.APIresponse{ProcessID: p.ProcessId}, nil
 }
 
