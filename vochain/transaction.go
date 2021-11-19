@@ -247,7 +247,7 @@ func VoteTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State,
 		// check census origin and compute vote digest identifier
 		var pubKeyDigested []byte
 		switch process.CensusOrigin {
-		case models.CensusOrigin_OFF_CHAIN_TREE:
+		case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
 			if process.EnvelopeType.Anonymous {
 				// TODO Poseidon hash of pubKey
 				// pubKeyDigested = snarks.Poseidon.Hash(pubKey)

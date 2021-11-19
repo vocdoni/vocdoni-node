@@ -262,7 +262,7 @@ func (c *Client) TestSendVotes(
 	// Generate merkle proofs
 	if proofs == nil {
 		switch censusOrigin {
-		case models.CensusOrigin_OFF_CHAIN_TREE:
+		case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
 			proofs, err = c.GetMerkleProofBatch(signers, root, false)
 		case models.CensusOrigin_OFF_CHAIN_CA:
 			proofs, err = c.GetCSPproofBatch(signers, caSigner, pid)
@@ -321,7 +321,7 @@ func (c *Client) TestSendVotes(
 			EncryptionKeyIndexes: keyIndexes,
 		}
 		switch censusOrigin {
-		case models.CensusOrigin_OFF_CHAIN_TREE:
+		case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
 			v.Proof = &models.Proof{
 				Payload: &models.Proof_Graviton{
 					Graviton: &models.ProofGraviton{

@@ -38,7 +38,7 @@ import (
 func CheckProof(proof *models.Proof, censusOrigin models.CensusOrigin,
 	censusRoot, processID, key []byte) (bool, *big.Int, error) {
 	switch censusOrigin {
-	case models.CensusOrigin_OFF_CHAIN_TREE:
+	case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
 		switch proof.Payload.(type) {
 		case *models.Proof_Graviton:
 			p := proof.GetGraviton()
