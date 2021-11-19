@@ -26,7 +26,7 @@ import (
 const (
 	ethQueryTimeOut      = 20 * time.Second
 	aclPurgePeriod       = 10 * time.Minute
-	aclTimeWindow        = 5 * 24 * time.Hour // 5 days
+	aclTimeWindow        = 24 * time.Hour
 	maxProposalPerWindow = 3
 )
 
@@ -126,12 +126,6 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		Owner:             req.GetAddress().Bytes(),
 	}
 
-	// Check the ACL
-	if err := a.erc20proposalACL.add(p.Owner, p.EntityId); err != nil {
-		a.router.SendError(req, err.Error())
-		return
-	}
-
 	sproof, err := buildETHproof(req.EthProof)
 	if err != nil {
 		a.router.SendError(req, err.Error())
@@ -173,6 +167,12 @@ func (a *APIoracle) handleNewEthProcess(req router.RouterRequest) {
 		return
 	}
 	if err := a.oracle.NewProcess(p); err != nil {
+		a.router.SendError(req, err.Error())
+		return
+	}
+
+	// Check the ACL
+	if err := a.erc20proposalACL.add(p.Owner, p.EntityId); err != nil {
 		a.router.SendError(req, err.Error())
 		return
 	}
