@@ -94,7 +94,7 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 		if p.Value == nil {
 			return valid, bigOne, err
 		}
-		return valid, new(big.Int).SetBytes(p.Value), err
+		return valid, arbo.BytesToBigInt(p.Value), err
 	default:
 		return false, nil, fmt.Errorf("unexpected proof.Payload type: %T",
 			proof.Payload)

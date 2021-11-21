@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 
 	"go.vocdoni.io/dvote/test/testcommon"
@@ -73,24 +74,27 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 	log.Infof("Create census")
 	req.CensusID = fmt.Sprintf("test%x", util.RandomBytes(16))
 	resp := doRequest("addCensus", signer)
-
+	if len(resp.CensusID) == 0 {
+		b.Fatalf("cannot create census")
+	}
 	// Set correct censusID for commint requests
 	censusId := resp.CensusID
 
 	// addClaimBulk
 	log.Infof("Add bulk claims (size %d)", size)
-	var keys, values [][]byte
+	var keys [][]byte
+	var weights []*types.BigInt
 	for i := 0; i < size; i++ {
 		keys = append(keys, util.RandomBytes(32))
-		values = append(values, util.RandomBytes(32))
+		weights = append(weights, new(types.BigInt).SetUint64(uint64(util.RandomInt(1, 100))))
 	}
 	i := 0
 	for i < size-200 {
 		reset(req)
 		req.CensusID = censusId
-		req.Digested = true
+		req.Digested = false
 		req.CensusKeys = keys[i : i+200]
-		req.CensusValues = values[i : i+200]
+		req.Weights = weights[i : i+200]
 		doRequest("addClaimBulk", signer)
 		i += 200
 	}
@@ -98,9 +102,9 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 	if i < size {
 		reset(req)
 		req.CensusID = censusId
-		req.Digested = true
+		req.Digested = false
 		req.CensusKeys = keys[i:]
-		req.CensusValues = values[i:]
+		req.Weights = weights[i:]
 		doRequest("addClaimBulk", signer)
 	}
 
@@ -142,24 +146,25 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 	// GenProof valid
 	log.Infof("Generating proofs")
 	var siblings [][]byte
-	for i, cl := range keys {
+	var values [][]byte
+	for _, cl := range keys {
 		reset(req)
 		req.CensusID = root
-		req.Digested = true
+		req.Digested = false
 		req.CensusKey = cl
-		req.CensusValue = values[i]
 		resp = doRequest("genProof", nil)
 		if len(resp.Siblings) == 0 {
 			b.Fatalf("proof not generated while it should be generated correctly")
 		}
 		siblings = append(siblings, resp.Siblings)
+		values = append(values, resp.CensusValue)
 	}
 
 	// CheckProof valid
 	log.Infof("Checking proofs")
 	for i, sibl := range siblings {
 		req.CensusID = root
-		req.Digested = true
+		req.Digested = false
 		req.ProofData = sibl
 		req.CensusKey = keys[i]
 		req.CensusValue = values[i]

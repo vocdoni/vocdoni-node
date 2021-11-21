@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"math/rand"
 	"os"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -159,10 +159,10 @@ func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath s
 	defer cl.Close()
 	log.Infof("generating new keys census batch")
 	keys := client.CreateEthRandomKeysBatch(size)
-	weights := [][]byte{}
+	weights := []*types.BigInt{}
 	log.Infof("creating census with weight == %d", withWeight)
 	for i := uint64(1); i <= uint64(size); i++ {
-		weights = append(weights, new(big.Int).SetUint64(withWeight).Bytes())
+		weights = append(weights, new(types.BigInt).SetUint64(withWeight))
 	}
 
 	root, uri, err := cl.CreateCensus(signer, keys, nil, weights)
