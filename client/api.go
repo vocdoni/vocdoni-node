@@ -20,6 +20,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -1111,7 +1112,7 @@ func (c *Client) GetCurrentBlock() (uint32, error) {
 // censusPubKeys (raw hex public keys).
 // censusValues can be empty for a non-weighted census
 func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethereum.SignKeys,
-	censusPubKeys []string, censusValues [][]byte) (root []byte, uri string, _ error) {
+	censusPubKeys []string, censusValues []*types.BigInt) (root []byte, uri string, _ error) {
 	var req api.APIrequest
 
 	// Create census
@@ -1149,7 +1150,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 	var hexpub string
 	for currentSize > 0 {
 		claims := [][]byte{}
-		values := [][]byte{}
+		values := []*types.BigInt{}
 		for j := 0; j < 100; j++ {
 			if currentSize < 1 {
 				break
@@ -1170,7 +1171,7 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 			currentSize--
 		}
 		req.CensusKeys = claims
-		req.CensusValues = values
+		req.Weights = values
 		resp, err := c.Request(req, signer)
 		if err != nil {
 			return nil, "", err
@@ -1181,8 +1182,8 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 		i++
 		log.Infof("census creation progress: %d%%", (i*100*100)/(censusSize))
 	}
-	req.CensusKeys = [][]byte{}
-	req.CensusValues = [][]byte{}
+	req.CensusKeys = nil
+	req.Weights = nil
 
 	// getSize
 	log.Infof("get size")

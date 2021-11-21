@@ -5,11 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -39,8 +41,11 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 
 	// Special methods not depending on census existence
 	if r.Method == "addCensus" {
-		if r.CensusType != models.Census_ARBO_BLAKE2B {
-			return nil, fmt.Errorf("only supported CensusType: %s, current: %s", models.Census_ARBO_BLAKE2B, r.CensusType)
+		if r.CensusType == models.Census_UNKNOWN {
+			r.CensusType = models.Census_ARBO_BLAKE2B
+		}
+		if r.CensusType != models.Census_ARBO_BLAKE2B && r.CensusType != models.Census_ARBO_POSEIDON {
+			return nil, fmt.Errorf("census type not supported: %s", r.CensusType)
 		}
 		t, err := m.AddNamespace(censusPrefix+r.CensusID, r.CensusType, r.PubKeys)
 		if err != nil {
@@ -100,19 +105,34 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 
 	case "addClaimBulk":
 		if validAuthPrefix {
-			batchKeys := r.CensusKeys
+			if len(r.Weights) > 0 && len(r.Weights) != len(r.CensusKeys) {
+				return nil, fmt.Errorf("weights and censusKeys have different size")
+			}
+			var batchKeys [][]byte
 			if !r.Digested {
 				batchKeys = [][]byte{}
 				for _, k := range r.CensusKeys {
 					hk, err := tr.Hash(k)
 					if err != nil {
-						log.Warnf("error hashing claim: %v", err)
-						return nil, err
+						return nil, fmt.Errorf("error hashig key: %w", err)
 					}
 					batchKeys = append(batchKeys, hk)
 				}
+			} else {
+				batchKeys = r.CensusKeys
 			}
-			invalidClaims, err := tr.AddBatch(batchKeys, r.CensusValues)
+			var batchValues [][]byte
+			if len(r.Weights) > 0 {
+				for _, v := range r.Weights {
+					batchValues = append(batchValues, tr.BigIntToBytes(v.ToInt()))
+				}
+			} else {
+				// If no weights specified, assume al weight values are equal to 1
+				for i := 0; i < len(r.CensusKeys); i++ {
+					batchValues = append(batchValues, tr.BigIntToBytes(big.NewInt(1)))
+				}
+			}
+			invalidClaims, err := tr.AddBatch(batchKeys, batchValues)
 			if err != nil {
 				return nil, err
 			}
@@ -134,13 +154,17 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			if r.CensusKey == nil {
 				return resp, fmt.Errorf("error decoding claim data")
 			}
-			data := r.CensusKey
+			key := r.CensusKey
 			if !r.Digested {
-				if data, err = tr.Hash(data); err != nil {
+				if key, err = tr.Hash(key); err != nil {
 					return resp, fmt.Errorf("error digesting data: %w", err)
 				}
 			}
-			err := tr.Add(data, r.CensusValue)
+			value := tr.BigIntToBytes(big.NewInt(1))
+			if r.Weight != nil {
+				value = tr.BigIntToBytes(r.Weight.ToInt())
+			}
+			err := tr.Add(key, value)
 			if err != nil {
 				return nil, err
 			}
@@ -148,7 +172,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			if err != nil {
 				return nil, err
 			}
-			log.Debugf("claim added (key:%x value:%x)", data, r.CensusValue)
+			log.Debugf("claim added (key:%x value:%x)", key, value)
 		} else {
 			return nil, fmt.Errorf("invalid authentication")
 		}
@@ -223,13 +247,17 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			root = r.RootHash
 		}
 		// Generate proof and return it
-		data := r.CensusKey
+		key := r.CensusKey
 		if !r.Digested {
-			if data, err = tr.Hash(data); err != nil {
+			if key, err = tr.Hash(key); err != nil {
 				return resp, fmt.Errorf("error digesting data: %w", err)
 			}
 		}
-		validProof, err := tr.VerifyProof(data, r.CensusValue, r.ProofData, root)
+		// For legacy compatibility, assume weight=1 if value is nil
+		if r.CensusValue == nil {
+			r.CensusValue = tr.BigIntToBytes(big.NewInt(1))
+		}
+		validProof, err := tr.VerifyProof(key, r.CensusValue, r.ProofData, root)
 		if err != nil {
 			return nil, err
 		}
@@ -252,7 +280,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		key := r.CensusKey
 		if !r.Digested {
 			if key, err = tr.Hash(key); err != nil {
-				return resp, fmt.Errorf("error digesting data: %w", err)
+				return nil, fmt.Errorf("error digesting data: %w", err)
 			}
 		}
 		// If tr.Type() == ARBO_POSEIDON, resolve mapping key -> index before genProof
@@ -276,7 +304,14 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			siblings = append(proofPrefix, siblings...)
 		}
 		resp.Siblings = siblings
-		resp.CensusValue = leafV
+
+		if len(leafV) > 0 {
+			resp.CensusValue = leafV
+			// return also the string representation of the census value (weight)
+			// to make the client know his voting power for the census
+			weight := tr.BytesToBigInt(leafV)
+			resp.Weight = (*types.BigInt)(weight)
+		}
 		return resp, nil
 
 	case "getSize":

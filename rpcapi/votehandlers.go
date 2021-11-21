@@ -302,10 +302,11 @@ func (r *RPCAPI) getProcessRollingCensusSize(request *api.APIrequest) (*api.APIr
 func (r *RPCAPI) getResultsWeight(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	w, err := r.scrutinizer.GetResultsWeight(request.ProcessID)
-	if err != nil {
+	if err != nil || w == nil {
 		return nil, fmt.Errorf("cannot get results weight: %w", err)
 	}
-	response.Weight = w.String()
+	response.Weight = new(types.BigInt)
+	*response.Weight = types.BigInt(*w)
 	return &response, nil
 }
 
@@ -375,7 +376,7 @@ func (r *RPCAPI) getResults(request *api.APIrequest) (*api.APIresponse, error) {
 	}
 	votes := uint32(eh)
 	response.Height = &votes
-	response.Weight = vr.Weight.String()
+	response.Weight = vr.Weight
 	return &response, nil
 }
 

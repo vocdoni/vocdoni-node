@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
-	"go.vocdoni.io/dvote/util"
 )
 
 var censusCmd = &cobra.Command{
@@ -199,10 +198,7 @@ func genProof(cmd *cobra.Command, args []string) error {
 		Digested:  opt.digested,
 		CensusKey: []byte(args[1]),
 	}
-	req.CensusValue, err = hex.DecodeString(util.TrimHex(args[2]))
-	if err != nil {
-		return err
-	}
+
 	resp, err := cl.Request(req, nil)
 	if err != nil {
 		return err

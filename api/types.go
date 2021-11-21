@@ -46,41 +46,42 @@ func printStruct(s interface{}) string {
 // APIrequest contains all of the possible request fields.
 // Fields must be in alphabetical order
 type APIrequest struct {
-	CensusID     string                         `json:"censusId,omitempty"`
-	CensusURI    string                         `json:"censusUri,omitempty"`
-	CensusKey    []byte                         `json:"censusKey,omitempty"`
-	CensusKeys   [][]byte                       `json:"censusKeys,omitempty"`
-	CensusValue  []byte                         `json:"censusValue,omitempty"`
-	CensusValues [][]byte                       `json:"censusValues,omitempty"`
-	CensusDump   []byte                         `json:"censusDump,omitempty"`
-	CensusType   models.Census_Type             `json:"censusType,omitempty"`
-	Content      []byte                         `json:"content,omitempty"`
-	Digested     bool                           `json:"digested,omitempty"`
-	EntityId     types.HexBytes                 `json:"entityId,omitempty"`
-	EthProof     *ethstorageproof.StorageResult `json:"storageProof,omitempty"`
-	Hash         []byte                         `json:"hash,omitempty"`
-	Height       uint32                         `json:"height,omitempty"`
-	From         int                            `json:"from,omitempty"`
-	ListSize     int                            `json:"listSize,omitempty"`
-	Method       string                         `json:"method"`
-	Name         string                         `json:"name,omitempty"`
-	Namespace    uint32                         `json:"namespace,omitempty"`
-	NewProcess   *NewProcess                    `json:"newProcess,omitempty"`
-	Nullifier    types.HexBytes                 `json:"nullifier,omitempty"`
-	Payload      []byte                         `json:"payload,omitempty"`
-	ProcessID    types.HexBytes                 `json:"processId,omitempty"`
-	ProofData    types.HexBytes                 `json:"proofData,omitempty"`
-	PubKeys      []string                       `json:"pubKeys,omitempty"`
-	RootHash     types.HexBytes                 `json:"rootHash,omitempty"`
-	SearchTerm   string                         `json:"searchTerm,omitempty"`
-	Signature    types.HexBytes                 `json:"signature,omitempty"`
-	SrcNetId     string                         `json:"sourceNetworkId,omitempty"`
-	Status       string                         `json:"status,omitempty"`
-	Timestamp    int32                          `json:"timestamp"`
-	TxIndex      int32                          `json:"txIndex,omitempty"`
-	Type         string                         `json:"type,omitempty"`
-	URI          string                         `json:"uri,omitempty"`
-	WithResults  bool                           `json:"withResults,omitempty"`
+	CensusID    string                         `json:"censusId,omitempty"`
+	CensusURI   string                         `json:"censusUri,omitempty"`
+	CensusKey   []byte                         `json:"censusKey,omitempty"`
+	CensusKeys  [][]byte                       `json:"censusKeys,omitempty"`
+	CensusValue []byte                         `json:"censusValue,omitempty"`
+	CensusDump  []byte                         `json:"censusDump,omitempty"`
+	CensusType  models.Census_Type             `json:"censusType,omitempty"`
+	Content     []byte                         `json:"content,omitempty"`
+	Digested    bool                           `json:"digested,omitempty"`
+	EntityId    types.HexBytes                 `json:"entityId,omitempty"`
+	EthProof    *ethstorageproof.StorageResult `json:"storageProof,omitempty"`
+	Hash        []byte                         `json:"hash,omitempty"`
+	Height      uint32                         `json:"height,omitempty"`
+	From        int                            `json:"from,omitempty"`
+	ListSize    int                            `json:"listSize,omitempty"`
+	Method      string                         `json:"method"`
+	Name        string                         `json:"name,omitempty"`
+	Namespace   uint32                         `json:"namespace,omitempty"`
+	NewProcess  *NewProcess                    `json:"newProcess,omitempty"`
+	Nullifier   types.HexBytes                 `json:"nullifier,omitempty"`
+	Payload     []byte                         `json:"payload,omitempty"`
+	ProcessID   types.HexBytes                 `json:"processId,omitempty"`
+	ProofData   types.HexBytes                 `json:"proofData,omitempty"`
+	PubKeys     []string                       `json:"pubKeys,omitempty"`
+	RootHash    types.HexBytes                 `json:"rootHash,omitempty"`
+	SearchTerm  string                         `json:"searchTerm,omitempty"`
+	Signature   types.HexBytes                 `json:"signature,omitempty"`
+	SrcNetId    string                         `json:"sourceNetworkId,omitempty"`
+	Status      string                         `json:"status,omitempty"`
+	Timestamp   int32                          `json:"timestamp"`
+	TxIndex     int32                          `json:"txIndex,omitempty"`
+	Type        string                         `json:"type,omitempty"`
+	URI         string                         `json:"uri,omitempty"`
+	Weight      *types.BigInt                  `json:"weight,omitempty"`
+	Weights     []*types.BigInt                `json:"weights,omitempty"`
+	WithResults bool                           `json:"withResults,omitempty"`
 
 	address *common.Address `json:"-"`
 }
@@ -159,8 +160,8 @@ type APIresponse struct {
 	CensusID             string                           `json:"censusId,omitempty"`
 	CensusList           []string                         `json:"censusList,omitempty"`
 	CensusKeys           [][]byte                         `json:"censusKeys,omitempty"`
-	CensusValues         []types.HexBytes                 `json:"censusValues,omitempty"`
 	CensusDump           []byte                           `json:"censusDump,omitempty"`
+	CensusValue          []byte                           `json:"censusValue,omitempty"`
 	CircuitIndex         *int                             `json:"circuitIndex,omitempty"`
 	CircuitConfig        *artifacts.CircuitConfig         `json:"circuitConfig,omitempty"`
 	Content              []byte                           `json:"content,omitempty"`
@@ -203,8 +204,7 @@ type APIresponse struct {
 	URI                  string                           `json:"uri,omitempty"`
 	ValidatorList        []*models.Validator              `json:"validatorlist,omitempty"`
 	ValidProof           *bool                            `json:"validProof,omitempty"`
-	CensusValue          []byte                           `json:"censusValue,omitempty"`
-	Weight               string                           `json:"weight,omitempty"`
+	Weight               *types.BigInt                    `json:"weight,omitempty"`
 }
 
 func (a *APIresponse) SetTimestamp(ts int32) {

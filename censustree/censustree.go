@@ -2,6 +2,7 @@ package censustree
 
 import (
 	"fmt"
+	"math/big"
 	"sync"
 	"sync/atomic"
 
@@ -23,6 +24,7 @@ type Tree struct {
 	public     uint32
 	censusType models.Census_Type
 	hashFunc   func(...[]byte) ([]byte, error)
+	hashLen    int
 }
 
 type Options struct {
@@ -41,7 +43,6 @@ const nLevels = 256
 // database, it will load it.
 func New(opts Options) (*Tree, error) {
 	var hashFunc arbo.HashFunction
-
 	switch opts.CensusType {
 	case models.Census_ARBO_BLAKE2B:
 		hashFunc = arbo.HashFunctionBlake2b
@@ -56,7 +57,7 @@ func New(opts Options) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Tree{tree: t, censusType: opts.CensusType, hashFunc: hashFunc.Hash}, nil
+	return &Tree{tree: t, censusType: opts.CensusType, hashFunc: hashFunc.Hash, hashLen: hashFunc.Len()}, nil
 }
 
 // Type returns the numeric identifier of the censustree implementation
@@ -67,6 +68,16 @@ func (t *Tree) Type() models.Census_Type {
 // Hash executes the tree hash function for input data and returns its output
 func (t *Tree) Hash(data []byte) ([]byte, error) {
 	return t.hashFunc(data)
+}
+
+// BytesToBigInt unmarshals a slice of bytes into a bigInt following the censusTree encoding rules
+func (t *Tree) BytesToBigInt(data []byte) *big.Int {
+	return arbo.BytesToBigInt(data)
+}
+
+// BigIntToBytes marshals a bigInt following the censusTree encoding rules
+func (t *Tree) BigIntToBytes(b *big.Int) []byte {
+	return arbo.BigIntToBytes(t.hashLen, b)
 }
 
 // FromRoot returns a new read-only Tree for the given root, that uses the same
