@@ -19,7 +19,8 @@ func testVirtualTree(c *qt.C, maxLevels int, keys, values [][]byte) {
 	// normal tree, to have an expected root value
 	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, maxLevels, HashFunctionSha256)
+	tree, err := NewTree(Config{Database: database, MaxLevels: maxLevels,
+		HashFunction: HashFunctionSha256})
 	c.Assert(err, qt.IsNil)
 	for i := 0; i < len(keys); i++ {
 		err := tree.Add(keys[i], values[i])
@@ -124,7 +125,8 @@ func TestVirtualTreeAddBatch(t *testing.T) {
 	// normal tree, to have an expected root value
 	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, maxLevels, HashFunctionBlake2b)
+	tree, err := NewTree(Config{Database: database, MaxLevels: maxLevels,
+		HashFunction: HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	for i := 0; i < len(keys); i++ {
 		err := tree.Add(keys[i], values[i])

@@ -46,11 +46,11 @@ const (
 )
 
 var (
-	// thresholdNLeafs defines the threshold number of leafs in the tree
-	// that determines if AddBatch will work in memory or in disk. Is
-	// defined as a var in order to have the ability to modify it for
-	// testing purposes.
-	thresholdNLeafs = 1024 // TODO define a reasonable value
+	// DefaultThresholdNLeafs defines the threshold number of leafs in the
+	// tree that determines if AddBatch will work in memory or in disk.  It
+	// is defined when calling NewTree, and if set to 0 it will work always
+	// in disk.
+	DefaultThresholdNLeafs = 65536
 
 	dbKeyRoot   = []byte("root")
 	dbKeyNLeafs = []byte("nleafs")
@@ -85,9 +85,14 @@ var (
 type Tree struct {
 	sync.Mutex
 
-	db           db.Database
-	maxLevels    int
-	snapshotRoot []byte
+	db        db.Database
+	maxLevels int
+	// thresholdNLeafs defines the threshold number of leafs in the tree
+	// that determines if AddBatch will work in memory or in disk.  It is
+	// defined when calling NewTree, and if set to 0 it will work always in
+	// disk.
+	thresholdNLeafs int
+	snapshotRoot    []byte
 
 	hashFunction HashFunction
 	// TODO in the methods that use it, check if emptyHash param is len>0
@@ -97,13 +102,21 @@ type Tree struct {
 	dbg *dbgStats
 }
 
+// Config defines the configuration for calling NewTree & NewTreeWithTx methods
+type Config struct {
+	Database        db.Database
+	MaxLevels       int
+	ThresholdNLeafs int
+	HashFunction    HashFunction
+}
+
 // NewTree returns a new Tree, if there is a Tree still in the given database, it
 // will load it.
-func NewTree(database db.Database, maxLevels int, hash HashFunction) (*Tree, error) {
-	wTx := database.WriteTx()
+func NewTree(cfg Config) (*Tree, error) {
+	wTx := cfg.Database.WriteTx()
 	defer wTx.Discard()
 
-	t, err := NewTreeWithTx(wTx, database, maxLevels, hash)
+	t, err := NewTreeWithTx(wTx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -117,9 +130,10 @@ func NewTree(database db.Database, maxLevels int, hash HashFunction) (*Tree, err
 // NewTreeWithTx returns a new Tree using the given db.WriteTx, which will not
 // be ccommited inside this method, if there is a Tree still in the given
 // database, it will load it.
-func NewTreeWithTx(wTx db.WriteTx, database db.Database,
-	maxLevels int, hash HashFunction) (*Tree, error) {
-	t := Tree{db: database, maxLevels: maxLevels, hashFunction: hash}
+func NewTreeWithTx(wTx db.WriteTx, cfg Config) (*Tree, error) {
+	// if thresholdNLeafs is set to 0, use the DefaultThresholdNLeafs
+	t := Tree{db: cfg.Database, maxLevels: cfg.MaxLevels,
+		thresholdNLeafs: cfg.ThresholdNLeafs, hashFunction: cfg.HashFunction}
 	t.emptyHash = make([]byte, t.hashFunction.Len()) // empty
 
 	_, err := wTx.Get(dbKeyRoot)
@@ -220,7 +234,7 @@ func (t *Tree) AddBatchWithTx(wTx db.WriteTx, keys, values [][]byte) ([]Invalid,
 	if err != nil {
 		return nil, err
 	}
-	if nLeafs > thresholdNLeafs {
+	if nLeafs > t.thresholdNLeafs {
 		return t.addBatchInDisk(wTx, keys, values)
 	}
 	return t.addBatchInMemory(wTx, keys, values)
@@ -231,7 +245,7 @@ func (t *Tree) addBatchInDisk(wTx db.WriteTx, keys, values [][]byte) ([]Invalid,
 	if nCPU == 1 || len(keys) < nCPU {
 		var invalids []Invalid
 		for i := 0; i < len(keys); i++ {
-			if err := t.AddWithTx(wTx, keys[i], values[i]); err != nil {
+			if err := t.addWithTx(wTx, keys[i], values[i]); err != nil {
 				invalids = append(invalids, Invalid{i, err})
 			}
 		}
@@ -265,7 +279,8 @@ func (t *Tree) addBatchInDisk(wTx db.WriteTx, keys, values [][]byte) ([]Invalid,
 			// (until one is added)
 			inserted := -1
 			for j := 0; j < len(buckets[i]); j++ {
-				if newRoot, err := t.add(wTx, root, 0, buckets[i][j].k, buckets[i][j].v); err == nil {
+				if newRoot, err := t.add(wTx, root, 0,
+					buckets[i][j].k, buckets[i][j].v); err == nil {
 					inserted = j
 					root = newRoot
 					break
@@ -308,10 +323,15 @@ func (t *Tree) addBatchInDisk(wTx db.WriteTx, keys, values [][]byte) ([]Invalid,
 			// are done, iter over the cpuWTxs and copy their
 			// content into the main wTx
 			for j := 0; j < len(buckets[cpu]); j++ {
-				subRoots[cpu], err = t.add(txs[cpu], subRoots[cpu], l, buckets[cpu][j].k, buckets[cpu][j].v)
+				newSubRoot, err := t.add(txs[cpu], subRoots[cpu],
+					l, buckets[cpu][j].k, buckets[cpu][j].v)
 				if err != nil {
-					invalidsInBucket[cpu] = append(invalidsInBucket[cpu], Invalid{buckets[cpu][j].pos, err})
+					invalidsInBucket[cpu] = append(invalidsInBucket[cpu],
+						Invalid{buckets[cpu][j].pos, err})
+					continue
 				}
+				// if there has not been errors, set the new subRoots[cpu]
+				subRoots[cpu] = newSubRoot
 			}
 			wg.Done()
 		}(i)
@@ -346,6 +366,7 @@ func (t *Tree) addBatchInDisk(wTx db.WriteTx, keys, values [][]byte) ([]Invalid,
 
 	return invalids, nil
 }
+
 func (t *Tree) upFromSubRoots(wTx db.WriteTx, subRoots [][]byte) ([]byte, error) {
 	// is a method of Tree just to get access to t.hashFunction and
 	// t.emptyHash.
@@ -495,7 +516,12 @@ func (t *Tree) AddWithTx(wTx db.WriteTx, k, v []byte) error {
 	if !t.editable() {
 		return ErrSnapshotNotEditable
 	}
+	return t.addWithTx(wTx, k, v)
+}
 
+// warning: addWithTx does not use the Tree mutex, the mutex is responsibility
+// of the methods calling this method, and same with t.editable().
+func (t *Tree) addWithTx(wTx db.WriteTx, k, v []byte) error {
 	root, err := t.RootWithTx(wTx)
 	if err != nil {
 		return err
@@ -1132,7 +1158,8 @@ func (t *Tree) SetRootWithTx(wTx db.WriteTx, root []byte) error {
 	// check that the root exists in the db
 	if !bytes.Equal(root, t.emptyHash) {
 		if _, err := wTx.Get(root); err == ErrKeyNotFound {
-			return fmt.Errorf("can not SetRoot with root %x, as it does not exist in the db", root)
+			return fmt.Errorf("can not SetRoot with root %x, as it"+
+				" does not exist in the db", root)
 		} else if err != nil {
 			return err
 		}
@@ -1157,8 +1184,8 @@ func (t *Tree) Snapshot(fromRoot []byte) (*Tree, error) {
 	if !bytes.Equal(fromRoot, t.emptyHash) {
 		if _, err := rTx.Get(fromRoot); err == ErrKeyNotFound {
 			return nil,
-				fmt.Errorf("can not do a Snapshot with root %x, as it does not exist in the db",
-					fromRoot)
+				fmt.Errorf("can not do a Snapshot with root %x,"+
+					" as it does not exist in the db", fromRoot)
 		} else if err != nil {
 			return nil, err
 		}

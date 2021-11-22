@@ -77,7 +77,9 @@ func (f HashPoseidon) Len() int {
 	return 32 //nolint:gomnd
 }
 
-// Hash implements the hash method for the HashFunction HashPoseidon
+// Hash implements the hash method for the HashFunction HashPoseidon. It
+// expects the byte arrays to be little-endian representations of big.Int
+// values.
 func (f HashPoseidon) Hash(b ...[]byte) ([]byte, error) {
 	var toHash []*big.Int
 	for i := 0; i < len(b); i++ {

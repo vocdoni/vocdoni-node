@@ -41,12 +41,14 @@ func debugTime(descr string, time1, time2 time.Duration) {
 func testInit(c *qt.C, n int) (*Tree, *Tree) {
 	database1, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree1, err := NewTree(database1, 256, HashFunctionPoseidon)
+	tree1, err := NewTree(Config{Database: database1, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionPoseidon)
+	tree2, err := NewTree(Config{Database: database2, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 
 	bLen := HashFunctionPoseidon.Len()
@@ -72,7 +74,8 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 
 	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 256, HashFunctionPoseidon)
+	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
@@ -95,7 +98,8 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionPoseidon)
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 	tree2.dbgInit()
@@ -122,7 +126,8 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 
 	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 256, HashFunctionPoseidon)
+	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
@@ -137,7 +142,8 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionPoseidon)
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 
@@ -169,13 +175,15 @@ func TestAddBatchTestVector1(t *testing.T) {
 	c := qt.New(t)
 	database1, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree1, err := NewTree(database1, 256, HashFunctionBlake2b)
+	tree1, err := NewTree(Config{database1, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionBlake2b)
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 
@@ -209,13 +217,15 @@ func TestAddBatchTestVector1(t *testing.T) {
 	// 2nd test vectors
 	database1, err = badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree1, err = NewTree(database1, 256, HashFunctionBlake2b)
+	tree1, err = NewTree(Config{database1, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
 	database2, err = badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err = NewTree(database2, 256, HashFunctionBlake2b)
+	tree2, err = NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 
@@ -257,13 +267,15 @@ func TestAddBatchTestVector2(t *testing.T) {
 
 	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree1, err := NewTree(database, 256, HashFunctionPoseidon)
+	tree1, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionPoseidon)
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 
@@ -302,13 +314,15 @@ func TestAddBatchTestVector3(t *testing.T) {
 
 	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree1, err := NewTree(database, 256, HashFunctionPoseidon)
+	tree1, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionPoseidon)
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 
@@ -351,13 +365,15 @@ func TestAddBatchTreeEmptyRandomKeys(t *testing.T) {
 
 	database1, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree1, err := NewTree(database1, 256, HashFunctionBlake2b)
+	tree1, err := NewTree(Config{database1, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionBlake2b)
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 
@@ -701,7 +717,8 @@ func TestAddBatchNotEmptyUnbalanced(t *testing.T) {
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionPoseidon)
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 	tree2.dbgInit()
@@ -778,7 +795,8 @@ func benchAdd(t *testing.T, ks, vs [][]byte) {
 
 	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 256, HashFunctionBlake2b)
+	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
@@ -798,7 +816,8 @@ func benchAddBatch(t *testing.T, ks, vs [][]byte) {
 
 	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 256, HashFunctionBlake2b)
+	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
@@ -831,7 +850,8 @@ func TestDbgStats(t *testing.T) {
 	// 1
 	database1, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree1, err := NewTree(database1, 256, HashFunctionBlake2b)
+	tree1, err := NewTree(Config{database1, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
@@ -845,7 +865,8 @@ func TestDbgStats(t *testing.T) {
 	// 2
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionBlake2b)
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 
@@ -858,7 +879,8 @@ func TestDbgStats(t *testing.T) {
 	// 3
 	database3, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree3, err := NewTree(database3, 256, HashFunctionBlake2b)
+	tree3, err := NewTree(Config{database3, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree3.db.Close() //nolint:errcheck
 
@@ -893,7 +915,8 @@ func TestLoadVT(t *testing.T) {
 
 	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 256, HashFunctionPoseidon)
+	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
@@ -929,7 +952,8 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 
 	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := NewTree(database, 256, HashFunctionPoseidon)
+	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree.db.Close() //nolint:errcheck
 
@@ -950,7 +974,8 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionPoseidon)
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 	tree2.dbgInit()
@@ -964,7 +989,8 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	// use tree3 to add nil value array
 	database3, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree3, err := NewTree(database3, 256, HashFunctionPoseidon)
+	tree3, err := NewTree(Config{database3, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree3.db.Close() //nolint:errcheck
 
@@ -1008,35 +1034,38 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 func TestAddBatchThresholdInDisk(t *testing.T) {
 	c := qt.New(t)
 
+	// customize thresholdNLeafs for the test
+	testThresholdNLeafs := 1024
+
 	database1, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree1, err := NewTree(database1, 256, HashFunctionBlake2b)
+	tree1, err := NewTree(Config{database1, 256, testThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree1.db.Close() //nolint:errcheck
 
 	database2, err := pebbledb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree2, err := NewTree(database2, 256, HashFunctionBlake2b)
+	tree2, err := NewTree(Config{database2, 256, testThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
 
 	database3, err := pebbledb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree3, err := NewTree(database3, 256, HashFunctionBlake2b)
+	tree3, err := NewTree(Config{database3, 256, testThresholdNLeafs,
+		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 	defer tree3.db.Close() //nolint:errcheck
 
-	// customize thresholdNLeafs for the test
-	thresholdNLeafs = 1024
-
 	var keys, values [][]byte
-	for i := 0; i < 3*thresholdNLeafs; i++ {
+	for i := 0; i < 3*testThresholdNLeafs; i++ {
 		k := randomBytes(32)
 		v := randomBytes(32)
 		if err := tree1.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
-		if i < thresholdNLeafs+1 {
+		if i < testThresholdNLeafs+1 {
 			if err := tree2.Add(k, v); err != nil {
 				t.Fatal(err)
 			}
@@ -1046,7 +1075,7 @@ func TestAddBatchThresholdInDisk(t *testing.T) {
 		values = append(values, v)
 	}
 
-	invalids, err := tree2.AddBatch(keys[thresholdNLeafs+1:], values[thresholdNLeafs+1:])
+	invalids, err := tree2.AddBatch(keys[testThresholdNLeafs+1:], values[testThresholdNLeafs+1:])
 	c.Assert(err, qt.IsNil)
 	c.Check(len(invalids), qt.Equals, 0)
 	// check that both trees roots are equal
