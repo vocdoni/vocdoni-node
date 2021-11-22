@@ -158,6 +158,14 @@ var (
 		ParentLeafSetRoot: rootLeafSetRoot,
 	})
 
+	// TreasurerCfg is the Validators subTree configuration.
+	TreasurerCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionSha256,
+		KindID:            "treasurer",
+		MaxLevels:         1,
+		ParentLeafGetRoot: rootLeafGetRoot,
+		ParentLeafSetRoot: rootLeafSetRoot,
+	})
 	// ValidatorsCfg is the Validators subTree configuration.
 	ValidatorsCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
 		HashFunc:          arbo.HashFunctionSha256,
@@ -479,6 +487,13 @@ func (v *State) IsOracle(addr common.Address) (bool, error) {
 		}
 		return false
 	}(), nil
+}
+
+// SetTreasurer saves the Treasurer address to the state
+func (v *State) SetTreasurer(address []byte) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet(address, exist, TreasurerCfg)
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
