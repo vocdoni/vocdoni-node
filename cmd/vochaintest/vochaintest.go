@@ -143,11 +143,11 @@ func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath s
 		log.Fatal(err)
 	}
 	log.Infof("census created and published\nRoot: %x\nURI: %s", root, uri)
-	proofs, err := cl.GetMerkleProofBatch(keys, root, false)
+	proofs, values, err := cl.GetMerkleProofBatch(keys, root, false)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := client.SaveKeysBatch(filepath, root, uri, keys, proofs); err != nil {
+	if err := client.SaveKeysBatch(filepath, root, uri, keys, proofs, values); err != nil {
 		log.Fatalf("cannot save keys file %s: (%s)", filepath, err)
 	}
 	log.Infof("keys batch created and saved into %s", filepath)
@@ -211,7 +211,7 @@ func mkTreeVoteTest(host,
 	forceGatewaysGotCensus bool) {
 
 	var censusKeys []*ethereum.SignKeys
-	var proofs [][]byte
+	var proofs, values [][]byte
 	var err error
 	var censusRoot []byte
 	censusURI := ""
@@ -222,10 +222,10 @@ func mkTreeVoteTest(host,
 	}
 
 	// Try to reuse previous census and keys
-	censusKeys, proofs, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
+	censusKeys, proofs, values, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
 	if err != nil || len(censusKeys) < electionSize || len(proofs) < electionSize {
 		censusGenerate(host, entityKey, electionSize, keysfile)
-		censusKeys, proofs, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
+		censusKeys, proofs, values, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -235,9 +235,9 @@ func mkTreeVoteTest(host,
 			log.Infof("truncating census from %d to %d", len(censusKeys), electionSize)
 			censusKeys = censusKeys[:electionSize]
 			proofs = proofs[:electionSize]
+			values = values[:electionSize]
 		}
 	}
-
 	log.Infof("connecting to main gateway %s", host)
 	// Add the first connection, this will be the main connection
 	var mainClient *client.Client
@@ -324,22 +324,25 @@ func mkTreeVoteTest(host,
 	votingTimes := make([]time.Duration, len(clients))
 	wg.Add(len(clients))
 	proofsReadyWG.Add(len(clients))
-
 	for gw, cl := range clients {
 		var gwSigners []*ethereum.SignKeys
-		var gwProofs [][]byte
+		var gwProofs, gwValues [][]byte
 		// Split the voters
 		if len(clients) == gw+1 {
 			// if last client, add all remaining keys
 			gwSigners = make([]*ethereum.SignKeys, len(censusKeys)-i)
 			copy(gwSigners, censusKeys[i:])
 			gwProofs = make([][]byte, len(censusKeys)-i)
+			gwValues = make([][]byte, len(censusKeys)-i)
 			copy(gwProofs, proofs[i:])
+			copy(gwValues, values[i:])
 		} else {
 			gwSigners = make([]*ethereum.SignKeys, p)
 			copy(gwSigners, censusKeys[i:i+p])
 			gwProofs = make([][]byte, p)
+			gwValues = make([][]byte, p)
 			copy(gwProofs, proofs[i:i+p])
+			copy(gwValues, values[i:i+p])
 		}
 		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl
@@ -353,6 +356,7 @@ func mkTreeVoteTest(host,
 				models.CensusOrigin_OFF_CHAIN_TREE,
 				nil,
 				gwProofs,
+				gwValues,
 				encryptedVotes,
 				doubleVote,
 				checkNullifiers,
@@ -532,7 +536,7 @@ func cspVoteTest(
 				gwSigners,
 				models.CensusOrigin_OFF_CHAIN_CA,
 				cspKey,
-				nil,
+				nil, nil,
 				encryptedVotes,
 				doubleVote,
 				checkNullifiers,

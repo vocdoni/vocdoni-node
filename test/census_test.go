@@ -159,6 +159,7 @@ func TestCensus(t *testing.T) {
 
 	// CheckProof valid
 	req.ProofData = siblings
+	req.CensusValue = resp.CensusValue
 	resp = doRequest("checkProof", nil)
 	qt.Assert(t, *resp.ValidProof, qt.IsTrue)
 

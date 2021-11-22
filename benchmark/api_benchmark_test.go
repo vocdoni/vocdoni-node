@@ -3,6 +3,7 @@ package test
 import (
 	"flag"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 
 	"go.vocdoni.io/dvote/test/testcommon"
@@ -78,10 +80,11 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 
 	// addClaimBulk
 	log.Infof("Add bulk claims (size %d)", size)
-	var keys, values [][]byte
+	var keys [][]byte
+	var values []*types.BigInt
 	for i := 0; i < size; i++ {
 		keys = append(keys, util.RandomBytes(32))
-		values = append(values, util.RandomBytes(32))
+		values = append(values, (*types.BigInt)(big.NewInt(1)))
 	}
 	i := 0
 	for i < size-200 {
@@ -89,7 +92,7 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 		req.CensusID = censusId
 		req.Digested = true
 		req.CensusKeys = keys[i : i+200]
-		req.CensusValues = values[i : i+200]
+		req.Weights = values[i : i+200]
 		doRequest("addClaimBulk", signer)
 		i += 200
 	}
@@ -99,7 +102,7 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 		req.CensusID = censusId
 		req.Digested = true
 		req.CensusKeys = keys[i:]
-		req.CensusValues = values[i:]
+		req.Weights = values[i:]
 		doRequest("addClaimBulk", signer)
 	}
 
@@ -156,7 +159,7 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 		req.CensusID = root
 		req.Digested = true
 		req.CensusKey = cl
-		req.CensusValue = values[i]
+		req.Weight = values[i]
 		resp = doRequest("genProof", nil)
 		if len(resp.Siblings) == 0 {
 			b.Fatalf("proof not generated while it should be generated correctly")
@@ -171,7 +174,7 @@ func censusBench(b *testing.B, cl *client.Client, size int) {
 		req.Digested = true
 		req.ProofData = sibl
 		req.CensusKey = keys[i]
-		req.CensusValue = values[i]
+		req.Weight = values[i]
 		resp = doRequest("checkProof", nil)
 		if resp.ValidProof != nil && !*resp.ValidProof {
 			b.Fatalf("proof is invalid but it should be valid")

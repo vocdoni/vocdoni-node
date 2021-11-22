@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -116,7 +117,19 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 
 	case "addClaimBulk":
 		if isAuth && validAuthPrefix {
-			invalidClaims, err := tr.AddBatch(r.CensusKeys, r.CensusValues)
+
+			var batchValues [][]byte
+			if len(r.Weights) > 0 {
+				for _, v := range r.Weights {
+					batchValues = append(batchValues, v.Bytes())
+				}
+			} else {
+				// If no weights specified, assume al weight values are equal to 1
+				for i := 0; i < len(r.CensusKeys); i++ {
+					batchValues = append(batchValues, big.NewInt(1).Bytes())
+				}
+			}
+			invalidClaims, err := tr.AddBatch(r.CensusKeys, batchValues)
 			if err != nil {
 				resp.SetError(err.Error())
 				return resp
@@ -137,17 +150,20 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 				resp.SetError("error decoding claim data")
 				return resp
 			}
-			data := r.CensusKey
 			// TO-DO: do a poseidon hash if census=snarks
 			//if !r.Digested {
 			// data = snarks.Poseidon.Hash(data)
 			//}
-			err := tr.Add(data, r.CensusValue)
+			value := big.NewInt(1).Bytes()
+			if r.Weight != nil {
+				value = r.Weight.Bytes()
+			}
+			err := tr.Add(r.CensusKey, value)
 			if err != nil {
 				resp.SetError(err)
 			} else {
 				resp.Root = tr.Root()
-				log.Debugf("claim added %x/%x", data, r.CensusValue)
+				log.Debugf("claim added %x/%x", r.CensusKey, value)
 			}
 		} else {
 			resp.SetError("invalid authentication")
@@ -256,6 +272,9 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 		}
 		resp.Siblings = siblings
 		resp.CensusValue = tr.GetValue(r.CensusKey)
+		if len(resp.CensusValue) > 0 {
+			resp.Weight = new(big.Int).SetBytes(resp.CensusValue).String()
+		}
 		return resp
 
 	case "getSize":

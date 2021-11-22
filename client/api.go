@@ -38,7 +38,7 @@ func (c *Client) GetEnvelopeStatus(nullifier, pid []byte) (bool, error) {
 	return *resp.Registered, nil
 }
 
-func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
+func (c *Client) GetProof(pubkey, root []byte) ([]byte, []byte, error) {
 	var req api.MetaRequest
 	req.Method = "genProof"
 	req.CensusID = hex.EncodeToString(root)
@@ -47,13 +47,13 @@ func (c *Client) GetProof(pubkey, root []byte) ([]byte, error) {
 
 	resp, err := c.Request(req, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(resp.Siblings) == 0 || !resp.Ok {
-		return nil, fmt.Errorf("cannot get merkle proof: (%s)", resp.Message)
+		return nil, nil, fmt.Errorf("cannot get merkle proof: (%s)", resp.Message)
 	}
 
-	return resp.Siblings, nil
+	return resp.Siblings, resp.CensusValue, nil
 }
 
 func (c *Client) GetResults(pid []byte) ([][]string, string, bool, error) {
@@ -186,25 +186,28 @@ func (c *Client) TestResults(pid []byte, totalVotes int) ([][]string, error) {
 
 func (c *Client) GetMerkleProofBatch(signers []*ethereum.SignKeys,
 	root []byte,
-	tolerateError bool) ([][]byte, error) {
+	tolerateError bool) ([][]byte, [][]byte, error) {
 
 	var proofs [][]byte
+	var values [][]byte
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, s := range signers {
-		proof, err := c.GetProof(s.PublicKey(), root)
+		proof, value, err := c.GetProof(s.PublicKey(), root)
 		if err != nil {
 			if tolerateError {
 				continue
 			}
-			return proofs, err
+			return proofs, values, err
 		}
 		proofs = append(proofs, proof)
+		values = append(values, value)
+
 		if (i+1)%100 == 0 {
 			log.Infof("proof generation progress for %s: %d%%", c.Addr, ((i+1)*100)/(len(signers)))
 		}
 	}
-	return proofs, nil
+	return proofs, values, nil
 }
 
 func (c *Client) GetCSPproofBatch(signers []*ethereum.SignKeys,
@@ -254,6 +257,7 @@ func (c *Client) TestSendVotes(
 	censusOrigin models.CensusOrigin,
 	caSigner *ethereum.SignKeys,
 	proofs [][]byte,
+	values [][]byte,
 	encrypted, doubleVoting, checkNullifiers bool,
 	wg *sync.WaitGroup) (time.Duration, error) {
 
@@ -263,7 +267,7 @@ func (c *Client) TestSendVotes(
 	if proofs == nil {
 		switch censusOrigin {
 		case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
-			proofs, err = c.GetMerkleProofBatch(signers, root, false)
+			proofs, values, err = c.GetMerkleProofBatch(signers, root, false)
 		case models.CensusOrigin_OFF_CHAIN_CA:
 			proofs, err = c.GetCSPproofBatch(signers, caSigner, pid)
 		default:
@@ -326,10 +330,10 @@ func (c *Client) TestSendVotes(
 				Payload: &models.Proof_Graviton{
 					Graviton: &models.ProofGraviton{
 						Siblings: proofs[i],
+						Value:    values[i],
 					},
 				},
 			}
-
 		case models.CensusOrigin_OFF_CHAIN_CA:
 			p := &models.ProofCA{}
 			if err := proto.Unmarshal(proofs[i], p); err != nil {

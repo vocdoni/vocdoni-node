@@ -53,9 +53,10 @@ type signKey struct {
 	PrivKey string `json:"privKey"`
 	PubKey  string `json:"pubKey"`
 	Proof   []byte `json:"proof"`
+	Value   []byte `json:"value"`
 }
 
-func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*ethereum.SignKeys, proofs [][]byte) error {
+func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*ethereum.SignKeys, proofs [][]byte, values [][]byte) error {
 	if proofs != nil && (len(proofs) != len(keys)) {
 		return fmt.Errorf("length of Proof is different from length of Signers")
 	}
@@ -63,7 +64,7 @@ func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*e
 	for i, k := range keys {
 		pub, priv := k.HexString()
 		if proofs != nil {
-			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub, Proof: proofs[i]})
+			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub, Proof: proofs[i], Value: values[i]})
 		} else {
 			kb.Keys = append(kb.Keys, signKey{PrivKey: priv, PubKey: pub})
 		}
@@ -78,32 +79,34 @@ func SaveKeysBatch(filepath string, censusID []byte, censusURI string, keys []*e
 	return os.WriteFile(filepath, j, 0o644)
 }
 
-func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, []byte, string, error) {
+func LoadKeysBatch(filepath string) ([]*ethereum.SignKeys, [][]byte, [][]byte, []byte, string, error) {
 	jb, err := os.ReadFile(filepath)
 	if err != nil {
-		return nil, nil, nil, "", err
+		return nil, nil, nil, nil, "", err
 	}
 
 	var kb keysBatch
 	if err = json.Unmarshal(jb, &kb); err != nil {
-		return nil, nil, nil, "", err
+		return nil, nil, nil, nil, "", err
 	}
 
 	if len(kb.Keys) == 0 || len(kb.CensusID) == 0 || kb.CensusURI == "" {
-		return nil, nil, nil, "", fmt.Errorf("keybatch file is empty or missing data")
+		return nil, nil, nil, nil, "", fmt.Errorf("keybatch file is empty or missing data")
 	}
 
 	keys := make([]*ethereum.SignKeys, len(kb.Keys))
 	proofs := [][]byte{}
+	values := [][]byte{}
 	for i, k := range kb.Keys {
 		s := ethereum.NewSignKeys()
 		if err = s.AddHexKey(k.PrivKey); err != nil {
-			return nil, nil, nil, "", err
+			return nil, nil, nil, nil, "", err
 		}
 		proofs = append(proofs, k.Proof)
+		values = append(values, k.Value)
 		keys[i] = s
 	}
-	return keys, proofs, kb.CensusID, kb.CensusURI, nil
+	return keys, proofs, values, kb.CensusID, kb.CensusURI, nil
 }
 
 func Random(n int) []byte {
