@@ -1,6 +1,7 @@
 package arbo
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -1091,6 +1092,118 @@ func TestAddBatchThresholdInDisk(t *testing.T) {
 	c.Check(len(invalids), qt.Equals, 0)
 	// check that both trees roots are equal
 	checkRoots(c, tree1, tree3)
+
+	// now add one leaf more to the trees to ensure that the previous
+	// actions did not left the tree in an invalid state
+	k := randomBytes(32)
+	v := randomBytes(32)
+	err = tree1.Add(k, v)
+	c.Assert(err, qt.IsNil)
+	err = tree2.Add(k, v)
+	c.Assert(err, qt.IsNil)
+	err = tree3.Add(k, v)
+	c.Assert(err, qt.IsNil)
+}
+
+func initTestUpFromSubRoots(c *qt.C) (*Tree, *Tree) {
+	database1, err := badgerdb.New(db.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	tree1, err := NewTree(Config{database1, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
+	c.Assert(err, qt.IsNil)
+
+	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
+	c.Assert(err, qt.IsNil)
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b})
+	c.Assert(err, qt.IsNil)
+	return tree1, tree2
+}
+
+func testUpFromSubRoots(c *qt.C, tree1, tree2 *Tree, preSubRoots [][]byte) {
+	// add the preSubRoots to the tree1
+	for i := 0; i < len(preSubRoots); i++ {
+		if bytes.Equal(preSubRoots[i], tree1.emptyHash) {
+			continue
+		}
+		err := tree1.Add(preSubRoots[i], nil)
+		c.Assert(err, qt.IsNil)
+	}
+	root1, err := tree1.Root()
+	c.Assert(err, qt.IsNil)
+
+	wTx := tree2.db.WriteTx()
+	subRoots := make([][]byte, len(preSubRoots))
+	for i := 0; i < len(preSubRoots); i++ {
+		if preSubRoots[i] == nil || bytes.Equal(preSubRoots[i], tree1.emptyHash) {
+			subRoots[i] = tree1.emptyHash
+			continue
+		}
+		leafKey, leafValue, err := tree2.newLeafValue(preSubRoots[i], nil)
+		c.Assert(err, qt.IsNil)
+		subRoots[i] = leafKey
+
+		err = wTx.Set(leafKey, leafValue)
+		c.Assert(err, qt.IsNil)
+	}
+	// first fill the leaf nodes
+	// then call upFromSubRoots
+	root2FromUp, err := tree2.upFromSubRoots(wTx, subRoots)
+	c.Assert(err, qt.IsNil)
+
+	err = tree2.SetRootWithTx(wTx, root2FromUp)
+	c.Assert(err, qt.IsNil)
+	err = wTx.Commit()
+	c.Assert(err, qt.IsNil)
+
+	root2, err := tree2.Root()
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(root1, qt.DeepEquals, root2)
+}
+
+func testUpFromSubRootsWithEmpties(c *qt.C, preSubRoots [][]byte, indexEmpties []int) {
+	tree1, tree2 := initTestUpFromSubRoots(c)
+	defer tree1.db.Close() //nolint:errcheck
+	defer tree2.db.Close() //nolint:errcheck
+
+	testPreSubRoots := make([][]byte, len(preSubRoots))
+	copy(testPreSubRoots[:], preSubRoots[:])
+	for i := 0; i < len(indexEmpties); i++ {
+		testPreSubRoots[indexEmpties[i]] = tree1.emptyHash
+	}
+	testUpFromSubRoots(c, tree1, tree2, testPreSubRoots)
+}
+
+func TestUpFromSubRoots(t *testing.T) {
+	c := qt.New(t)
+
+	// prepare preSubRoots
+	preSubRoots := [][]byte{
+		BigIntToBytes(32, big.NewInt(4)),
+		BigIntToBytes(32, big.NewInt(2)),
+		BigIntToBytes(32, big.NewInt(1)),
+		BigIntToBytes(32, big.NewInt(3)),
+	}
+
+	// test using the full 4 leafs as subRoots
+	testUpFromSubRootsWithEmpties(c, preSubRoots, nil)
+	// 1st subRoot empty
+	testUpFromSubRootsWithEmpties(c, preSubRoots, []int{0})
+	// 2nd subRoot empty
+	testUpFromSubRootsWithEmpties(c, preSubRoots, []int{1})
+	// 3rd subRoot empty
+	testUpFromSubRootsWithEmpties(c, preSubRoots, []int{2})
+	// 4th subRoot empty
+	testUpFromSubRootsWithEmpties(c, preSubRoots, []int{3})
+
+	// other combinations of empty SubRoots
+	testUpFromSubRootsWithEmpties(c, preSubRoots, []int{0, 1, 2, 3})
+	testUpFromSubRootsWithEmpties(c, preSubRoots, []int{0, 1})
+	testUpFromSubRootsWithEmpties(c, preSubRoots, []int{1, 2})
+	testUpFromSubRootsWithEmpties(c, preSubRoots, []int{1, 3})
+	testUpFromSubRootsWithEmpties(c, preSubRoots, []int{2, 3})
+	testUpFromSubRootsWithEmpties(c, preSubRoots, []int{0, 2, 3})
 }
 
 // TODO test adding batch with multiple invalid keys

@@ -271,7 +271,7 @@ func upFromNodes(ns []*node) (*node, error) {
 			// when both sub nodes are empty, the parent is also empty
 			// or
 			// when 1st sub node is a leaf but the 2nd is empty, the
-			// leaf is used as parent
+			// leaf is used as 'parent'
 			res = append(res, ns[i])
 			continue
 		}

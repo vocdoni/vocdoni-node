@@ -376,24 +376,38 @@ func (t *Tree) upFromSubRoots(wTx db.WriteTx, subRoots [][]byte) ([]byte, error)
 	if len(subRoots) == 1 {
 		return subRoots[0], nil
 	}
+	// get the subRoots values to know the node types of each subRoot
+	nodeTypes := make([]byte, len(subRoots))
+	for i := 0; i < len(subRoots); i++ {
+		if bytes.Equal(subRoots[i], t.emptyHash) {
+			nodeTypes[i] = PrefixValueEmpty
+			continue
+		}
+		v, err := wTx.Get(subRoots[i])
+		if err != nil {
+			return nil, err
+		}
+		nodeTypes[i] = v[0]
+	}
 
 	var newSubRoots [][]byte
-	// TODO store the nodes key-values into the wTx
 	for i := 0; i < len(subRoots); i += 2 {
-		if bytes.Equal(subRoots[i], t.emptyHash) && bytes.Equal(subRoots[i+1], t.emptyHash) {
-			// TODO: || (ns[i].typ() == vtLeaf && ns[i+1].typ() == vtEmpty) {
-
+		if (bytes.Equal(subRoots[i], t.emptyHash) && bytes.Equal(subRoots[i+1], t.emptyHash)) ||
+			(nodeTypes[i] == PrefixValueLeaf && bytes.Equal(subRoots[i+1], t.emptyHash)) {
 			// when both sub nodes are empty, the parent is also empty
 			// or
-			// (TODO WIP) when 1st sub node is a leaf but the 2nd is empty, the
-			// leaf is used as parent
+			// when 1st sub node is a leaf but the 2nd is empty, the
+			// leaf is used as 'parent'
 
 			newSubRoots = append(newSubRoots, subRoots[i])
 			continue
 		}
-		// TODO if ns[i].typ() == vtEmpty && ns[i+1].typ() == vtLeaf {
-		// when 2nd sub node is a leaf but the 1st is empty, the
-		// leaf is used as 'parent'
+		if bytes.Equal(subRoots[i], t.emptyHash) && nodeTypes[i+1] == PrefixValueLeaf {
+			// when 2nd sub node is a leaf but the 1st is empty,
+			// the leaf is used as 'parent'
+			newSubRoots = append(newSubRoots, subRoots[i+1])
+			continue
+		}
 
 		k, v, err := t.newIntermediate(subRoots[i], subRoots[i+1])
 		if err != nil {
@@ -408,6 +422,7 @@ func (t *Tree) upFromSubRoots(wTx db.WriteTx, subRoots [][]byte) ([]byte, error)
 
 	return t.upFromSubRoots(wTx, newSubRoots)
 }
+
 func (t *Tree) getSubRootsAtLevel(rTx db.ReadTx, root []byte, l int) ([][]byte, error) {
 	// go at level l and return each node key, where each node key is the
 	// subRoot of the subTree that starts there
