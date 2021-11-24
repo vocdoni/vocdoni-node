@@ -51,7 +51,8 @@ func (m *Manager) Handler(ctx context.Context, r *api.MetaRequest, isAuth bool,
 			if r.CensusType == models.Census_UNKNOWN {
 				r.CensusType = censusDefaultType
 			}
-			t, err := m.AddNamespace(censusPrefix+r.CensusID, r.CensusType, r.PubKeys)
+			// r.CensusType is actually ignored, we use censusDefaultType always
+			t, err := m.AddNamespace(censusPrefix+r.CensusID, censusDefaultType, r.PubKeys)
 			if err != nil {
 				log.Warnf("error creating census: %s", err)
 				resp.SetError(err)
