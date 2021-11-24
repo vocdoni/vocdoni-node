@@ -24,7 +24,7 @@ async function generateProof(inputs, artifactsPath, outPath) {
   await sleep(100);
 
   // proof
-  let { proof, publicSignals } = await snarkjs.groth16.prove(`${artifactsPath}/circuit_final.zkey`,
+  let { proof, publicSignals } = await snarkjs.groth16.prove(`${artifactsPath}/circuit.zkey`,
     `${outPath}/out.wtns`);
 
   // print proof
