@@ -43,7 +43,7 @@ const (
 	// FilenameWitness defines the name of the file of the WitnessCalculator
 	FilenameWitness = "circuit.wasm"
 	// FilenameZKey defines the name of the file of the circom ZKey
-	FilenameZKey = "circuit_final.zkey"
+	FilenameZKey = "circuit.zkey"
 	// FilenameVK defines the name of the verification_key.json
 	FilenameVK = "verification_key.json"
 )
@@ -51,8 +51,8 @@ const (
 // CircuitConfig defines the configuration of the files to be downloaded
 type CircuitConfig struct {
 	// TODO: Replace by URI
-	// URL defines the URL from where to download the files
-	URL string `json:"url"`
+	// URI defines the URI from where to download the files
+	URI string `json:"uri"`
 	// CircuitPath defines the path from where the files are downloaded
 	CircuitPath string `json:"circuitPath"`
 	// Parameters used for the circuit build
@@ -112,7 +112,7 @@ func DownloadVKFile(ctx context.Context, c CircuitConfig) error {
 	if err := os.MkdirAll(filepath.Join(c.LocalDir, c.CircuitPath), os.ModePerm); err != nil {
 		return err
 	}
-	u, err := url.Parse(c.URL)
+	u, err := url.Parse(c.URI)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func DownloadVKFile(ctx context.Context, c CircuitConfig) error {
 	}
 	if err := checkHash(filepath.Join(c.LocalDir, c.CircuitPath, FilenameVK),
 		c.VKHash); err != nil {
-		return fmt.Errorf("error on download VerificationKey (VK) file from %s, %s", c.URL, err)
+		return fmt.Errorf("error on download VerificationKey (VK) file from %s, %s", c.URI, err)
 	}
 	log.Info("VK file downloaded correctly & match the expected hash")
 	return nil
@@ -176,7 +176,7 @@ func downloadFiles(ctx context.Context, c CircuitConfig) error {
 		return err
 	}
 
-	u, err := url.Parse(c.URL)
+	u, err := url.Parse(c.URI)
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func downloadFiles(ctx context.Context, c CircuitConfig) error {
 		return err
 	}
 
-	u, err = url.Parse(c.URL)
+	u, err = url.Parse(c.URI)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func downloadFiles(ctx context.Context, c CircuitConfig) error {
 		return err
 	}
 
-	u, err = url.Parse(c.URL)
+	u, err = url.Parse(c.URI)
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func downloadFiles(ctx context.Context, c CircuitConfig) error {
 	}
 
 	if err := checkHashes(c); err != nil {
-		return fmt.Errorf("error on download files from %s, %s", c.URL, err)
+		return fmt.Errorf("error on download files from %s, %s", c.URI, err)
 	}
 
 	log.Info("files downloaded correctly & match the expected hashes")

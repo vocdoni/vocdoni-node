@@ -154,8 +154,8 @@ var Genesis = map[string]VochainGenesis{
 			"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656"},
 		CircuitsConfig: []artifacts.CircuitConfig{
 			{ // index: 0, size: 8
-				URL: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-circuits-artifacts/32a16e1c58dddebef6165a4fcf3a3c1f665a343f",
+				URI: "https://raw.githubusercontent.com/vocdoni/" +
+					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
 				CircuitPath: "zkcensusproof/dev/8",
 				Parameters:  []int64{8},
 				LocalDir:    "./circuits",
@@ -164,8 +164,8 @@ var Genesis = map[string]VochainGenesis{
 				VKHash:      hexToBytes("0xf4876aa550e33de1d1f552dc38fa89f6e87e553fd05179e693f82f661cd0c6a0"),
 			},
 			{ // index: 1, size: 16
-				URL: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-circuits-artifacts/32a16e1c58dddebef6165a4fcf3a3c1f665a343f",
+				URI: "https://raw.githubusercontent.com/vocdoni/" +
+					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
 				CircuitPath: "zkcensusproof/dev/16",
 				Parameters:  []int64{16},
 				LocalDir:    "./circuits",
@@ -174,8 +174,8 @@ var Genesis = map[string]VochainGenesis{
 				VKHash:      hexToBytes("0x0d8af5c3cc443cfbaed59b6144b1edb959daacbae085a97f74cbafbe109de2fa"),
 			},
 			{ // index: 2, size: 1024
-				URL: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-circuits-artifacts/32a16e1c58dddebef6165a4fcf3a3c1f665a343f",
+				URI: "https://raw.githubusercontent.com/vocdoni/" +
+					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
 				CircuitPath: "zkcensusproof/dev/1024",
 				Parameters:  []int64{1024},
 				LocalDir:    "./circuits",

@@ -33,14 +33,14 @@ func TestDownloadCircuitFiles(t *testing.T) {
 
 	witnessHash, err := hex.DecodeString("a812fddbb71ca2b5cc5a2326dad391c1f98c11fe2641927ec490fad7c5ef30ac")
 	qt.Assert(t, err, qt.IsNil)
-	zkeyHash, err := hex.DecodeString("e6827f50f2a44d5fa6c95b15893124af82ca154c0338295be8fa09fd9e8eb8ac")
+	zkeyHash, err := hex.DecodeString("279433966c3d258fa747121207b02baad715e12877473f9c2326da7f3a17597b")
 	qt.Assert(t, err, qt.IsNil)
 	vkHash, err := hex.DecodeString("3ec7355a7be53019b66563d02a1e2ce689e6dfac207a5f9ce503fb8ac915acf0")
 	qt.Assert(t, err, qt.IsNil)
 
 	path := t.TempDir()
 	c := CircuitConfig{
-		URL:         ts.URL,
+		URI:         ts.URL,
 		CircuitPath: "/zkcensusproof/test/1024/",
 		LocalDir:    path,
 		WitnessHash: witnessHash,
@@ -103,7 +103,7 @@ func TestErrorDownloading(t *testing.T) {
 
 	path := t.TempDir()
 	c := CircuitConfig{
-		URL:         ts.URL,
+		URI:         ts.URL,
 		CircuitPath: "/zkcensusproof/test/1024/",
 		LocalDir:    path,
 	}
@@ -124,7 +124,7 @@ func TestDownloadVKFile(t *testing.T) {
 
 	path := t.TempDir()
 	c := CircuitConfig{
-		URL:         ts.URL,
+		URI:         ts.URL,
 		CircuitPath: "/zkcensusproof/test/1024/",
 		LocalDir:    path,
 		VKHash:      vkHash,
