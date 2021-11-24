@@ -228,13 +228,14 @@ func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, st
 	if err != nil {
 		return fmt.Errorf("cannot get nullifeir used weight: %w", err)
 	}
-	txWeight := new(big.Int).SetBytes(tx.Weight)
+	txWeight := weight
+	//	txWeight := new(big.Int).SetBytes(tx.Weight)
 	// TODO: In order to support tx.Weight != 1 for anonymous voting, we
 	// need to add the weight to the leaf in the CensusPoseidon Tree, and
 	// also add the weight as a public input in the circuit to verify it anonymously.
-	if txWeight.Cmp(bigOne) != 0 {
-		return fmt.Errorf("RegisterKey weight != 1 not supported, got: %v", txWeight)
-	}
+	//	if txWeight.Cmp(bigOne) != 0 {
+	//		return fmt.Errorf("RegisterKey weight != 1 not supported, got: %v", txWeight)
+	//	}
 	usedWeight.Add(usedWeight, txWeight)
 	if usedWeight.Cmp(weight) > 0 {
 		return fmt.Errorf("cannot register more keys: "+
@@ -249,8 +250,6 @@ func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, st
 	// A. We can skip the proof verification when commiting
 	// B. We can detect invalid key registration (due to no more weight
 	//    available) at mempool tx insertion
-
-	tx.Weight = weight.Bytes() // TODO: support weight
 
 	return nil
 }
