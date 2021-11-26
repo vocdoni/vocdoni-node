@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -200,6 +201,21 @@ func (c *Client) GetRollingCensusSize(pid []byte) (int64, error) {
 		return 0, fmt.Errorf("cannot get RollingCensusSize for process %x: %s", pid, resp.Message)
 	}
 	return *resp.Size, nil
+}
+
+func (c *Client) GetRollingCensusVoterWeight(pid []byte, address common.Address) (*big.Int, error) {
+	var req api.APIrequest
+	req.Method = "getPreregisterVoterWeight"
+	req.ProcessID = pid
+	req.VoterAddress = address.Bytes()
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Ok {
+		return nil, fmt.Errorf("cannot get pre register voter weight for process %x: %s", pid, resp.Message)
+	}
+	return resp.Weight.ToInt(), nil
 }
 
 func (c *Client) TestResults(pid []byte, totalVotes int, withWeight uint64) ([][]string, error) {
@@ -473,6 +489,7 @@ func (c *Client) TestPreRegisterKeys(
 	wg *sync.WaitGroup) (time.Duration, error) {
 
 	var err error
+	registerKeyWeight := "1"
 	// Generate merkle proofs
 	if proofs == nil {
 		switch censusOrigin {
@@ -527,7 +544,7 @@ func (c *Client) TestPreRegisterKeys(
 			Nonce:     util.RandomBytes(32),
 			ProcessId: pid,
 			NewKey:    zkCensusKey,
-			Weight:    "1",
+			Weight:    registerKeyWeight,
 		}
 		switch censusOrigin {
 		case models.CensusOrigin_OFF_CHAIN_TREE:
@@ -628,6 +645,22 @@ func (c *Client) TestPreRegisterKeys(
 				// return 0, fmt.Errorf("double pre-register not detected")
 			}
 		}
+	}
+
+	tries := 10
+	log.Infof("checking first pre-registered key")
+	for ; tries >= 0; tries-- {
+		weight, err := c.GetRollingCensusVoterWeight(pid, signers[0].Address())
+		if err != nil {
+			return 0, fmt.Errorf("the pre-register key cannot be verified: %w", err)
+		}
+		if weight.String() == registerKeyWeight {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if tries == 0 {
+		return 0, fmt.Errorf("could not get pre-register key")
 	}
 
 	log.Infof("pre-registers submited! took %s", time.Since(start))

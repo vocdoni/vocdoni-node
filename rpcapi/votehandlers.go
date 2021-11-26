@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	api "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
@@ -396,5 +397,21 @@ func (r *RPCAPI) getBlockStatus(request *api.APIrequest) (*api.APIresponse, erro
 	response.Height = &h
 	response.BlockTime = r.vocinfo.BlockTimes()
 	response.BlockTimestamp = int32(r.vocapp.Timestamp())
+	return &response, nil
+}
+
+func (r *RPCAPI) getPreRegisterWeight(request *api.APIrequest) (*api.APIresponse, error) {
+	if len(request.ProcessID) != types.ProcessIDsize {
+		return nil, fmt.Errorf("malformed processId")
+	}
+	if len(request.VoterAddress) != common.AddressLength {
+		return nil, fmt.Errorf("voterAddress invalid length (%d)", len(request.VoterAddress))
+	}
+	var response api.APIresponse
+	weight, err := r.vocapp.State.GetPreRegisterAddrUsedWeight(request.ProcessID, common.BytesToAddress(request.VoterAddress))
+	if err != nil {
+		return nil, fmt.Errorf("cannot get preregister address weight: %w", err)
+	}
+	response.Weight = (*types.BigInt)(weight)
 	return &response, nil
 }
