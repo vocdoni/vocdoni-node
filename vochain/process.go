@@ -16,7 +16,7 @@ import (
 
 var emptyVotesRoot = make([]byte, VotesCfg.HashFunc().Len())
 var emptyCensusRoot = make([]byte, CensusCfg.HashFunc().Len())
-var emptyNullifiersRoot = make([]byte, NullifiersCfg.HashFunc().Len())
+var emptyPreRegisterNullifiersRoot = make([]byte, PreRegisterNullifiersCfg.HashFunc().Len())
 
 // AddProcess adds a new process to the vochain.  Adding a process with a
 // ProcessId that already exists will return an error.
@@ -25,7 +25,7 @@ func (v *State) AddProcess(p *models.Process) error {
 	anonymous := p.EnvelopeType != nil && p.EnvelopeType.Anonymous
 	if preRegister {
 		p.RollingCensusRoot = emptyCensusRoot
-		p.NullifiersRoot = emptyNullifiersRoot
+		p.NullifiersRoot = emptyPreRegisterNullifiersRoot
 	}
 
 	newProcessBytes, err := proto.Marshal(
@@ -51,7 +51,7 @@ func (v *State) AddProcess(p *models.Process) error {
 				return err
 			}
 			if _, err = v.Tx.DeepSubTree(ProcessesCfg,
-				NullifiersCfg.WithKey(p.ProcessId)); err != nil {
+				PreRegisterNullifiersCfg.WithKey(p.ProcessId)); err != nil {
 				return err
 			}
 		}

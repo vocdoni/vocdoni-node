@@ -2096,8 +2096,6 @@ github.com/viant/toolbox v0.24.0/go.mod h1:OxMCG57V0PXuIP2HNQrtJf2CjqdmbrOx5EkMI
 github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYppBueQtXaqoE=
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17pCcGlemwknint6hfoeCVQrEMVwxRLRjXpq+BU=
 github.com/vocdoni/arbo v0.0.0-20210616072504-a8c7ea980892/go.mod h1:Pikn2YIz/Rt05HWs35QHdpx7IWk4E2G0KdnCX+KRsNs=
-github.com/vocdoni/arbo v0.0.0-20210927131431-d7c756341372 h1:kgd6g8uJmZe6ftaKC9WORlPqSddZYLUQ1uwhYMJu6Xo=
-github.com/vocdoni/arbo v0.0.0-20210927131431-d7c756341372/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
 github.com/vocdoni/arbo v0.0.0-20211011134549-3f7e76997421 h1:arYQr9xPfQyf+w2lwG9EGT2sRiKw0m8ih08z2WmevCI=
 github.com/vocdoni/arbo v0.0.0-20211011134549-3f7e76997421/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f h1:z7CK3k1yIutKycPY8s2ZbtwUBKMy3xPcLMh12QukLRY=
@@ -2242,16 +2240,8 @@ go.vocdoni.io/proto v0.1.7/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M
 go.vocdoni.io/proto v0.1.8/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v0.1.9-0.20210304214308-6f7363b52750/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v1.0.4-0.20210726091234-bceaf416353b/go.mod h1:QV3gKc9Zf0xHW3o8wEaqSn8iZ94UTl8gOzekxoz3kWs=
-go.vocdoni.io/proto v1.13.3-0.20211019215004-0ca7d4436553 h1:0aQHf6mdFEhP8x5ArPtwPwW9AiEXEZSK45GoHzlNrro=
-go.vocdoni.io/proto v1.13.3-0.20211019215004-0ca7d4436553/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
-go.vocdoni.io/proto v1.13.3-0.20211026121805-ac3d037a6139 h1:gUSpa7+K71nR1c0DF25HWYtn+3fcMEB0M0zzqpRBpyo=
-go.vocdoni.io/proto v1.13.3-0.20211026121805-ac3d037a6139/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
-go.vocdoni.io/proto v1.13.3-0.20211027093430-8170bfc7dc03 h1:SDnIqN/MDlePqwCfQEGkpgHIKASekDEU8u+rt+ho87Y=
-go.vocdoni.io/proto v1.13.3-0.20211027093430-8170bfc7dc03/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
-go.vocdoni.io/proto v1.13.3-0.20211111204422-dac54577ad68 h1:JE1nTnu4s3rnSVDImbDTT9H/nYhmLV5pyuLAGNLOwN8=
-go.vocdoni.io/proto v1.13.3-0.20211111204422-dac54577ad68/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
-go.vocdoni.io/proto v1.13.3-0.20211114162531-c85a04c58730 h1:CgTuDulomypbXvAC4Gj/AgDGQDtltt0+nAC34ruO8yI=
-go.vocdoni.io/proto v1.13.3-0.20211114162531-c85a04c58730/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
+go.vocdoni.io/proto v1.13.3-0.20211126083500-46ba146eff3f h1:YtqKk93BnLla8sBqYNMQAZAkv5Yqniwlr/ilzUVCP9Q=
+go.vocdoni.io/proto v1.13.3-0.20211126083500-46ba146eff3f/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
 go4.org v0.0.0-20180809161055-417644f6feb5/go.mod h1:MkTOUMDaeVYJUOUsaDXIhWPZYa1yOyC1qaOBpL57BhE=
 go4.org v0.0.0-20200411211856-f5505b9728dd h1:BNJlw5kRTzdmyfh5U8F93HA2OwkP7ZGwA51eJ/0wKOU=
 go4.org v0.0.0-20200411211856-f5505b9728dd/go.mod h1:CIiUVy99QCPfoE13bO4EZaz5GZMZXMSBGhxRdsvzbkg=

@@ -527,7 +527,7 @@ func (c *Client) TestPreRegisterKeys(
 			Nonce:     util.RandomBytes(32),
 			ProcessId: pid,
 			NewKey:    zkCensusKey,
-			Weight:    big.NewInt(1).Bytes(),
+			Weight:    "1",
 		}
 		switch censusOrigin {
 		case models.CensusOrigin_OFF_CHAIN_TREE:

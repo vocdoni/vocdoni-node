@@ -122,7 +122,11 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 		}
 		if commit {
 			tx := vtx.GetRegisterKey()
-			return []byte{}, app.State.AddToRollingCensus(tx.ProcessId, tx.NewKey, new(big.Int).SetBytes(tx.Weight))
+			weight, ok := new(big.Int).SetString(tx.Weight, 10)
+			if !ok {
+				return []byte{}, fmt.Errorf("cannot parse weight %s", weight)
+			}
+			return []byte{}, app.State.AddToRollingCensus(tx.ProcessId, tx.NewKey, weight)
 		}
 
 	default:
