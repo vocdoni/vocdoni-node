@@ -13,7 +13,7 @@ ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
 ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 TEST=${1:-0}
 CLEAN=${CLEAN:-1}
-LOGLEVEL=${LOGLEVEL:info}
+LOGLEVEL=${LOGLEVEL:-info}
 test() {
 	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway:9090/dvote --logLevel=$LOGLEVEL --operation=vtest --electionType=$1 --withWeight=2
 	echo $? >$2
@@ -65,11 +65,6 @@ testid="/tmp/.vochaintest$RANDOM"
 echo "### Waiting for tests ###"
 wait
 
-[ $CLEAN -eq 1 ] && {
-	echo "### Cleaning environment ###"
-	docker-compose down -v --remove-orphans
-}
-
 [ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" -a "$(cat ${testid}3)" == "0" -a "$(cat ${testid}4)" == "0" ] && {
 	echo "Vochain test finished correctly!"
 	RET=0
@@ -79,5 +74,11 @@ wait
 	echo "### Post run logs ###"
 	docker-compose logs --tail 1000
 }
+
+[ $CLEAN -eq 1 ] && {
+	echo "### Cleaning environment ###"
+	docker-compose down -v --remove-orphans
+}
+
 rm -f ${testid}1 ${testid}2 ${testid}3 ${testid}4
 exit $RET

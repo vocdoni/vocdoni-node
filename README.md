@@ -99,13 +99,11 @@ docker-compose build
 docker-compose -f docker-compose.miner.yml up -d
 ```
 
-The test suite is an all-in-one compose file to bootstrap a minimal testing testing environment. To do a voting process test, follow the example:
+The test suite is an all-in-one compose file to bootstrap a minimal testing testing environment. To do a voting process test, follow the examples mentioned in the included README:
 
 ```
 cd dockerfiles/testsuite
-docker-compose build
-docker-compose up -d
-go run ../../cmd/vochaintest/vochaintest.go --oracleKey 6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223 --electionSize=1000
+cat README.md
 ```
 
 ---
