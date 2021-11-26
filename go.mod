@@ -13,6 +13,7 @@ replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 
 
 require (
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210406120253-ab86bc2846d9
+	github.com/766b/chi-prometheus v0.0.0-20180509160047-46ac2b31aa30
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210323162413-ccaa6313370d
 	github.com/cockroachdb/pebble v0.0.0-20211004132338-b2eb88a71826
 	github.com/cosmos/iavl v0.15.3
@@ -56,7 +57,7 @@ require (
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.uber.org/zap v1.18.1
-	go.vocdoni.io/proto v1.13.3-0.20211114162531-c85a04c58730
+	go.vocdoni.io/proto v1.13.3-0.20211126083500-46ba146eff3f
 	golang.org/x/crypto v0.0.0-20210920023735-84f357641f63
 	golang.org/x/net v0.0.0-20210917221730-978cfadd31cf
 	google.golang.org/protobuf v1.27.1
@@ -66,7 +67,6 @@ require (
 require (
 	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05 // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.3.0 // indirect
-	github.com/766b/chi-prometheus v0.0.0-20180509160047-46ac2b31aa30 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect

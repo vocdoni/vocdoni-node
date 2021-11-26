@@ -223,27 +223,32 @@ func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, st
 
 	// Validate that this user is not registering more keys than possible
 	// with the users weight.
-	nullifier := GenerateNullifier(addr, process.ProcessId)
-	usedWeight, err := v.getNullifierUsedWeight(process.ProcessId, nullifier)
+	usedWeight, err := v.GetPreRegisterAddrUsedWeight(process.ProcessId, addr)
 	if err != nil {
 		return fmt.Errorf("cannot get nullifeir used weight: %w", err)
 	}
-	txWeight := weight
-	//	txWeight := new(big.Int).SetBytes(tx.Weight)
+	txWeight, ok := new(big.Int).SetString(tx.Weight, 10)
+	if !ok {
+		return fmt.Errorf("cannot parse tx weight %s", txWeight)
+	}
+	usedWeight.Add(usedWeight, txWeight)
+
 	// TODO: In order to support tx.Weight != 1 for anonymous voting, we
 	// need to add the weight to the leaf in the CensusPoseidon Tree, and
 	// also add the weight as a public input in the circuit to verify it anonymously.
-	//	if txWeight.Cmp(bigOne) != 0 {
-	//		return fmt.Errorf("RegisterKey weight != 1 not supported, got: %v", txWeight)
-	//	}
-	usedWeight.Add(usedWeight, txWeight)
+	// The following check ensures that weight != 1 is not used, once the above is
+	// implemented we can remove it
+	if usedWeight.Cmp(bigOne) != 0 {
+		return fmt.Errorf("weight != 1 is not yet supported, received %s", tx.Weight)
+	}
+
 	if usedWeight.Cmp(weight) > 0 {
 		return fmt.Errorf("cannot register more keys: "+
 			"usedWeight + RegisterKey.Weight (%v) > proof weight (%v)",
 			usedWeight, weight)
 	}
 	if forCommit {
-		v.setNullifierUsedWeight(process.ProcessId, nullifier, usedWeight)
+		v.setPreRegisterAddrUsedWeight(process.ProcessId, addr, usedWeight)
 	}
 
 	// TODO: Add cache like in VoteEnvelopeCheck for the registered key so that:
@@ -254,12 +259,13 @@ func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, st
 	return nil
 }
 
-func (v *State) setNullifierUsedWeight(pid, nullifier []byte, weight *big.Int) error {
-	return v.Tx.DeepSet(nullifier, weight.Bytes(), ProcessesCfg, NullifiersCfg.WithKey(pid))
+func (v *State) setPreRegisterAddrUsedWeight(pid []byte, addr common.Address, weight *big.Int) error {
+	return v.Tx.DeepSet(GenerateNullifier(addr, pid), weight.Bytes(), ProcessesCfg, PreRegisterNullifiersCfg.WithKey(pid))
 }
 
-func (v *State) getNullifierUsedWeight(pid, nullifier []byte) (*big.Int, error) {
-	weightBytes, err := v.Tx.DeepGet(nullifier, ProcessesCfg, NullifiersCfg.WithKey(pid))
+// GetPreRegisterAddrUsedWeight returns the weight used by the address for a process ID on pre-register census
+func (v *State) GetPreRegisterAddrUsedWeight(pid []byte, addr common.Address) (*big.Int, error) {
+	weightBytes, err := v.Tx.DeepGet(GenerateNullifier(addr, pid), ProcessesCfg, PreRegisterNullifiersCfg.WithKey(pid))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return big.NewInt(0), nil
 	} else if err != nil {

@@ -81,9 +81,9 @@ func processSetCensusRoot(value []byte, root []byte) ([]byte, error) {
 	return newValue, nil
 }
 
-// processGetNullifiersRoot is the GetRootFn function to get the nullifiers
+// processGetPreRegisterNullifiersRoot is the GetRootFn function to get the nullifiers
 // root of a process leaf.
-func processGetNullifiersRoot(value []byte) ([]byte, error) {
+func processGetPreRegisterNullifiersRoot(value []byte) ([]byte, error) {
 	var sdbProc models.StateDBProcess
 	if err := proto.Unmarshal(value, &sdbProc); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
@@ -95,9 +95,9 @@ func processGetNullifiersRoot(value []byte) ([]byte, error) {
 	return sdbProc.Process.NullifiersRoot, nil
 }
 
-// processSetNullifiersRoot is the SetRootFn function to set the nullifiers
+// processSetPreRegisterNullifiersRoot is the SetRootFn function to set the nullifiers
 // root of a process leaf.
-func processSetNullifiersRoot(value []byte, root []byte) ([]byte, error) {
+func processSetPreRegisterNullifiersRoot(value []byte, root []byte) ([]byte, error) {
 	var sdbProc models.StateDBProcess
 	if err := proto.Unmarshal(value, &sdbProc); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
@@ -198,16 +198,16 @@ var (
 		ParentLeafGetRoot: processGetCensusRoot,
 		ParentLeafSetRoot: processSetCensusRoot,
 	})
-	// NullifiersCfg is the Nullifiers subTree (found under a
+	// PreRegisterNullifiersCfg is the Nullifiers subTree (found under a
 	// Process leaf) configuration when the process supports anonymous
 	// voting with rolling census.  This tree contains the pre-census
 	// nullifiers that have pre-registered.
-	NullifiersCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
+	PreRegisterNullifiersCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
 		HashFunc:          arbo.HashFunctionSha256,
-		KindID:            "nulli",
+		KindID:            "prNul",
 		MaxLevels:         256,
-		ParentLeafGetRoot: processGetNullifiersRoot,
-		ParentLeafSetRoot: processSetNullifiersRoot,
+		ParentLeafGetRoot: processGetPreRegisterNullifiersRoot,
+		ParentLeafSetRoot: processSetPreRegisterNullifiersRoot,
 	})
 
 	// VotesCfg is the Votes subTree (found under a Process leaf) configuration.
