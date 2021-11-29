@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"testing"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
@@ -285,4 +286,34 @@ func TestBlockMemoryUsage(t *testing.T) {
 
 	_, err = s.Save()
 	qt.Assert(t, err, qt.IsNil)
+}
+
+func TestStateTreasurer(t *testing.T) {
+	log.Init("info", "stdout")
+	s, err := NewState(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	defer s.Close()
+
+	// block 1
+	var height uint32 = 1
+	s.Rollback()
+	s.SetHeight(height)
+
+	treasurer := "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"
+	qt.Assert(t, s.SetTreasurer(ethcommon.HexToAddress(treasurer)), qt.IsNil)
+
+	fetchedTreasurer, err := s.Treasurer(false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, fetchedTreasurer.String(), qt.CmpEquals(), treasurer)
+
+	fetchedTreasurer, err = s.Treasurer(true)
+	// key does not exist yet
+	qt.Assert(t, err, qt.IsNotNil)
+
+	_, err = s.Save()
+	qt.Assert(t, err, qt.IsNil)
+
+	fetchedTreasurer, err = s.Treasurer(true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, fetchedTreasurer.String(), qt.CmpEquals(), treasurer)
 }

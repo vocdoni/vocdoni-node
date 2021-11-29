@@ -354,7 +354,8 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	if !ethcommon.IsHexAddress(genesisAppState.Treasurer) {
 		log.Fatalf("Treasurer should be a valid Ethereum address: %s", err)
 	}
-	if err := app.State.SetTreasurer(ethcommon.FromHex(genesisAppState.Treasurer)); err != nil {
+	log.Infof("adding genesis treasurer %s", genesisAppState.Treasurer)
+	if err := app.State.SetTreasurer(ethcommon.HexToAddress(genesisAppState.Treasurer)); err != nil {
 		log.Fatalf("Could not set State.Treasurer from genesis file: %s", err)
 	}
 
