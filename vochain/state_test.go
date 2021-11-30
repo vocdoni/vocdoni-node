@@ -300,7 +300,7 @@ func TestStateTreasurer(t *testing.T) {
 	s.SetHeight(height)
 
 	treasurer := "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"
-	qt.Assert(t, s.SetTreasurer(ethcommon.HexToAddress(treasurer)), qt.IsNil)
+	qt.Assert(t, s.setTreasurer(ethcommon.HexToAddress(treasurer)), qt.IsNil)
 
 	fetchedTreasurer, err := s.Treasurer(false)
 	qt.Assert(t, err, qt.IsNil)
@@ -329,7 +329,7 @@ func TestStateIsTreasurer(t *testing.T) {
 	s.SetHeight(height)
 
 	treasurer := "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"
-	qt.Assert(t, s.SetTreasurer(ethcommon.HexToAddress(treasurer)), qt.IsNil)
+	qt.Assert(t, s.setTreasurer(ethcommon.HexToAddress(treasurer)), qt.IsNil)
 	r, err := s.IsTreasurer(ethcommon.HexToAddress(treasurer))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, r, qt.IsTrue)
