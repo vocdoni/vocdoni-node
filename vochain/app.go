@@ -352,11 +352,11 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 
 	// set treasurer address
 	if !ethcommon.IsHexAddress(genesisAppState.Treasurer) {
-		log.Fatalf("Treasurer should be a valid Ethereum address: %s", err)
+		log.Fatalf("treasurer should be a valid Ethereum address: %s", err)
 	}
 	log.Infof("adding genesis treasurer %s", genesisAppState.Treasurer)
 	if err := app.State.SetTreasurer(ethcommon.HexToAddress(genesisAppState.Treasurer)); err != nil {
-		log.Fatalf("Could not set State.Treasurer from genesis file: %s", err)
+		log.Fatalf("could not set State.Treasurer from genesis file: %s", err)
 	}
 
 	// Is this save needed?

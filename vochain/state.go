@@ -526,6 +526,15 @@ func (v *State) Treasurer(isQuery bool) (common.Address, error) {
 	return common.BytesToAddress(rawTreasurer), nil
 }
 
+func (v *State) IsTreasurer(addr common.Address) (bool, error) {
+	tAddr, err := v.Treasurer(false)
+	if err != nil {
+		return false, err
+	}
+
+	return addr == tAddr, nil
+}
+
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
 func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
 	var tmkey ed25519.PubKey
