@@ -42,10 +42,16 @@ func TestRouterWithBearerStdAPI(t *testing.T) {
 			return ctx.Send([]byte(fmt.Sprintf("hello %s!", ctx.URLParam("name"))))
 		})
 
+	// Add a quota handler
+	stdAPI.RegisterMethod("/quota/{name}", "POST", MethodAccessTypeQuota,
+		func(msg *BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+			return ctx.Send([]byte(fmt.Sprintf("hello %s!", ctx.URLParam("name"))))
+		})
+
 	// Set the bearer admin token
 	stdAPI.SetAdminToken("abcd")
 
-	// Create a token with access to 4 requests
+	// Create a token with access to 2 requests
 	stdAPI.AddAuthToken("1234", 2)
 
 	// Test public
@@ -58,9 +64,24 @@ func TestRouterWithBearerStdAPI(t *testing.T) {
 	resp = doRequest(t, url+"/private/martin", "1234", "POST", []byte{})
 	qt.Check(t, resp, qt.DeepEquals, []byte("hello martin!\n"))
 
-	// Token should be unauthorized now
-	resp = doRequest(t, url+"/private/ping", "1234", "POST", []byte("hello"))
+	// Test quota
+	resp = doRequest(t, url+"/quota/john", "1234", "POST", []byte{})
+	qt.Check(t, resp, qt.DeepEquals, []byte("hello john!\n"))
+	resp = doRequest(t, url+"/quota/martin", "1234", "POST", []byte{})
+	qt.Check(t, resp, qt.DeepEquals, []byte("hello martin!\n"))
+
+	// Token should be out of authorized requests now
+	resp = doRequest(t, url+"/quota/ping", "1234", "POST", []byte("hello"))
 	qt.Check(t, string(resp), qt.Contains, "no more requests available")
+
+	// Private requests should still be valid, though
+	resp = doRequest(t, url+"/private/john", "1234", "POST", []byte{})
+	qt.Check(t, resp, qt.DeepEquals, []byte("hello john!\n"))
+
+	// After revoking token, private method should not be valid
+	stdAPI.DelAuthToken("1234")
+	resp = doRequest(t, url+"/private/ping", "1234", "POST", []byte("hello"))
+	qt.Check(t, string(resp), qt.Contains, "auth token not valid")
 
 	// Test admin
 	resp = doRequest(t, url+"/admin/do", "abcd", "POST", []byte("hello"))
