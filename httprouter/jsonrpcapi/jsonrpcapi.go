@@ -76,7 +76,7 @@ func (s *SignedJRPC) AllowPrivate(allow bool) {
 }
 
 // AuthorizeRequest implements the httprouter interface
-func (s *SignedJRPC) AuthorizeRequest(data interface{}, isAdmin bool) (bool, error) {
+func (s *SignedJRPC) AuthorizeRequest(data interface{}, isQuota, isAdmin bool) (bool, error) {
 	request, ok := data.(*SignedJRPCdata)
 	if !ok {
 		panic("type is not SignedJRPCdata")
@@ -90,6 +90,9 @@ func (s *SignedJRPC) AuthorizeRequest(data interface{}, isAdmin bool) (bool, err
 			return false, s.returnError("admin address do not match", request.ID)
 		}
 		return true, nil
+	}
+	if isQuota {
+		log.Warn("rate-limiting quota requests unimplemented for jsonRPC")
 	}
 	// If private method, check authentication.
 	// If no authorized addresses configured, allows any address.

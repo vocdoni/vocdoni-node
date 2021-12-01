@@ -16,6 +16,8 @@ import (
 const (
 	// MethodAccessTypePrivate for private requests
 	MethodAccessTypePrivate = "private"
+	// MethodAccessTypeQuota for rate-limited quota requests
+	MethodAccessTypeQuota = "quota"
 	// MethodAccessTypePublic for public requests
 	MethodAccessTypePublic = "public"
 	// MethodAccessTypeAdmin for admin requests
@@ -64,12 +66,12 @@ func NewBearerStandardAPI(router *httprouter.HTTProuter, baseRoute string) (*Bea
 	bsa := BearerStandardAPI{router: router, basePath: baseRoute}
 	router.AddNamespace(namespace, &bsa)
 	return &bsa, nil
-
 }
 
 // AuthorizeRequest is a function for the RouterNamespace interface.
 // On private handlers checks if the supplied bearer token have still request credits
-func (b *BearerStandardAPI) AuthorizeRequest(data interface{}, isAdmin bool) (bool, error) {
+func (b *BearerStandardAPI) AuthorizeRequest(
+	data interface{}, isQuota, isAdmin bool) (bool, error) {
 	msg, ok := data.(*BearerStandardAPIdata)
 	if !ok {
 		panic("type is not bearerStandardApi")
@@ -82,11 +84,19 @@ func (b *BearerStandardAPI) AuthorizeRequest(data interface{}, isAdmin bool) (bo
 		}
 		return true, nil
 	}
-	remainingReqs, ok := b.authTokens.Load(msg.AuthToken)
-	if !ok || remainingReqs.(int64) < 1 {
-		return false, fmt.Errorf("no more requests available")
+	if isQuota {
+		remainingReqs, ok := b.authTokens.Load(msg.AuthToken)
+		if !ok || remainingReqs.(int64) < 1 {
+			return false, fmt.Errorf("no more requests available")
+		}
+		b.authTokens.Store(msg.AuthToken, remainingReqs.(int64)-1)
+		return true, nil
 	}
-	b.authTokens.Store(msg.AuthToken, remainingReqs.(int64)-1)
+	// If not admin or quota, it is non-limited private request
+	_, ok = b.authTokens.Load(msg.AuthToken)
+	if !ok {
+		return false, fmt.Errorf("auth token not valid")
+	}
 	return true, nil
 }
 
@@ -130,6 +140,8 @@ func (b *BearerStandardAPI) RegisterMethod(pattern, HTTPmethod string, accessTyp
 	switch accessType {
 	case "public":
 		b.router.AddPublicHandler(namespace, path, HTTPmethod, routerHandler)
+	case "quota":
+		b.router.AddQuotaHandler(namespace, path, HTTPmethod, routerHandler)
 	case "private":
 		b.router.AddPrivateHandler(namespace, path, HTTPmethod, routerHandler)
 	case "admin":
