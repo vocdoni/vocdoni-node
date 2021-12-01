@@ -140,6 +140,7 @@ func processSetVotesRoot(value []byte, root []byte) ([]byte, error) {
 
 // StateDB Tree hierarchy
 // - Main
+//   - Extra (key: string, value: []byte)
 //   - Oracles (key: address, value: []byte{1} if exists)
 //   - Validators (key: address, value: models.Validator)
 //   - Accounts (key: address, value: models.Account)
@@ -149,6 +150,17 @@ func processSetVotesRoot(value []byte, root []byte) ([]byte, error) {
 //     - Votes (key: VoteId, value: models.StateDBVote)
 
 var (
+	// TreasurerKey is the key representing the Treasurer entry on the Extra subtree
+	TreasurerKey = "treasurer"
+	// ExtraCfg is the Extra subTree configuration.
+	ExtraCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionSha256,
+		KindID:            "xtra",
+		MaxLevels:         256,
+		ParentLeafGetRoot: rootLeafGetRoot,
+		ParentLeafSetRoot: rootLeafSetRoot,
+	})
+
 	// OraclesCfg is the Oracles subTree configuration.
 	OraclesCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
 		HashFunc:          arbo.HashFunctionSha256,
@@ -353,10 +365,17 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 		return nil, err
 	}
 	defer update.Discard()
-	// Create the Oracles, Validators and Processes subtrees (from
+	// Create the Extra, Oracles, Validators and Processes subtrees (from
 	// mainTree) by adding leaves in the mainTree that contain the
 	// corresponding tree roots, and opening the subTrees for the first
 	// time.
+	if err := update.Add(ExtraCfg.Key(),
+		make([]byte, ExtraCfg.HashFunc().Len())); err != nil {
+		return nil, err
+	}
+	if _, err := update.SubTree(ExtraCfg); err != nil {
+		return nil, err
+	}
 	if err := update.Add(OraclesCfg.Key(),
 		make([]byte, OraclesCfg.HashFunc().Len())); err != nil {
 		return nil, err
@@ -382,6 +401,7 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 		make([]byte, AccountsCfg.HashFunc().Len())); err != nil {
 		return nil, err
 	}
+
 	return sdb, update.Commit(0)
 }
 
@@ -479,6 +499,40 @@ func (v *State) IsOracle(addr common.Address) (bool, error) {
 		}
 		return false
 	}(), nil
+}
+
+// setTreasurer saves the Treasurer address to the state
+func (v *State) setTreasurer(address common.Address) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet([]byte(TreasurerKey), address.Bytes(), ExtraCfg)
+}
+
+func (v *State) Treasurer(isQuery bool) (common.Address, error) {
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+
+	extraTree, err := v.mainTreeViewer(isQuery).SubTree(ExtraCfg)
+	if err != nil {
+		return common.Address{}, err
+	}
+
+	var rawTreasurer []byte
+	if rawTreasurer, err = extraTree.Get([]byte(TreasurerKey)); err != nil {
+		return common.Address{}, err
+	}
+	return common.BytesToAddress(rawTreasurer), nil
+}
+
+func (v *State) IsTreasurer(addr common.Address) (bool, error) {
+	tAddr, err := v.Treasurer(false)
+	if err != nil {
+		return false, err
+	}
+
+	return addr == tAddr, nil
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey

@@ -285,7 +285,8 @@ var Genesis = map[string]VochainGenesis{
       "oracles":[
          "0xb926be24A9ca606B515a835E91298C7cF0f2846f",
          "0x2f4ed2773dcf7ad0ec15eb84ec896f4eebe0e08a"
-      ]
+      ],
+      "treasurer": "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"
    }
 }
 `,
