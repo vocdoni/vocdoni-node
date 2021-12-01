@@ -70,34 +70,36 @@ func NewBearerStandardAPI(router *httprouter.HTTProuter, baseRoute string) (*Bea
 
 // AuthorizeRequest is a function for the RouterNamespace interface.
 // On private handlers checks if the supplied bearer token have still request credits
-func (b *BearerStandardAPI) AuthorizeRequest(
-	data interface{}, isQuota, isAdmin bool) (bool, error) {
+func (b *BearerStandardAPI) AuthorizeRequest(data interface{},
+	accessType httprouter.AuthAccessType) (bool, error) {
 	msg, ok := data.(*BearerStandardAPIdata)
 	if !ok {
 		panic("type is not bearerStandardApi")
 	}
-	if isAdmin {
+	switch accessType {
+	case httprouter.AccessTypeAdmin:
 		b.adminTokenLock.RLock()
 		defer b.adminTokenLock.RUnlock()
 		if msg.AuthToken != b.adminToken {
 			return false, fmt.Errorf("admin token not valid")
 		}
 		return true, nil
-	}
-	if isQuota {
+	case httprouter.AccessTypePrivate:
+		_, ok = b.authTokens.Load(msg.AuthToken)
+		if !ok {
+			return false, fmt.Errorf("auth token not valid")
+		}
+		return true, nil
+	case httprouter.AccessTypeQuota:
 		remainingReqs, ok := b.authTokens.Load(msg.AuthToken)
 		if !ok || remainingReqs.(int64) < 1 {
 			return false, fmt.Errorf("no more requests available")
 		}
 		b.authTokens.Store(msg.AuthToken, remainingReqs.(int64)-1)
 		return true, nil
+	default:
+		return true, nil
 	}
-	// If not admin or quota, it is non-limited private request
-	_, ok = b.authTokens.Load(msg.AuthToken)
-	if !ok {
-		return false, fmt.Errorf("auth token not valid")
-	}
-	return true, nil
 }
 
 // ProcessData is a function for the RouterNamespace interface.
@@ -118,7 +120,8 @@ func (b *BearerStandardAPI) ProcessData(req *http.Request) (interface{}, error) 
 // The pattern URL can contain variable names by using braces, such as /send/{name}/hello
 // The pattern can also contain wildcard at the end of the path, such as /send/{name}/hello/*
 // The accessType can be of type private, public or admin.
-func (b *BearerStandardAPI) RegisterMethod(pattern, HTTPmethod string, accessType string, handler BearerStdAPIhandler) error {
+func (b *BearerStandardAPI) RegisterMethod(pattern, HTTPmethod string,
+	accessType string, handler BearerStdAPIhandler) error {
 	if pattern[0] != '/' {
 		panic("pattern must start with /")
 	}
