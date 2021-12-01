@@ -17,9 +17,16 @@ Usage:
   dvotecli [command]
 
 Available Commands:
-  genesis-gen Generate keys and genesis for vochain
+  block       block subcommands
+  census      census subcommands
+  completion  generate the autocompletion script for the specified shell
+  entity      entity subcommands
+  file        file subcommands
+  genesis     Generate keys and genesis for vochain
   help        Help about any command
+  info        get information about the gateway
   json-client JSON command line client
+  process     process subcommands
 
 Flags:
   -c, --color         colorize output (default true)
@@ -30,15 +37,15 @@ Flags:
 Use "dvotecli [command] --help" for more information about a command.
 ```
 
-- genesis-gen
+- genesis
 
 This is a helper command to generate custom genesis data, along with the generation of the required private keys for seed nodes, miners and oracles.
 
 ```
- ./dvotecli genesis-gen --chainId examplechain --seeds 2 --miners 8 --oracles 2
+ ./dvotecli genesis --chainId examplechain --seeds 2 --miners 8 --oracles 2
 ```
 
-- client
+- json-client
 
 This command will open an interactive input where you can request raw JSON commands to the dvote API. Here are some examples:
 
