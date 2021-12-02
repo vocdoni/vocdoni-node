@@ -45,10 +45,19 @@ type HTTProuter struct {
 	namespacesLock sync.RWMutex
 }
 
+type AuthAccessType int
+
+const (
+	AccessTypePublic AuthAccessType = iota
+	AccessTypeQuota
+	AccessTypePrivate
+	AccessTypeAdmin
+)
+
 // RouterNamespace is the interface that a HTTProuter handler should follow in order
 // to become a valid namespace.
 type RouterNamespace interface {
-	AuthorizeRequest(data interface{}, isAdmin bool) (valid bool, err error)
+	AuthorizeRequest(data interface{}, accessType AuthAccessType) (valid bool, err error)
 	ProcessData(req *http.Request) (data interface{}, err error)
 }
 
@@ -160,24 +169,35 @@ func (r *HTTProuter) getNamespace(id string) (RouterNamespace, bool) {
 
 // AddAdminHandler adds a handler function for the namespace, pattern and HTTPmethod.
 // The Admin requests are usually protected by some authorization mechanism.
-func (r *HTTProuter) AddAdminHandler(namespaceID, pattern, HTTPmethod string, handler RouterHandlerFn) {
+func (r *HTTProuter) AddAdminHandler(namespaceID,
+	pattern, HTTPmethod string, handler RouterHandlerFn) {
 	log.Infof("added admin handler for namespace %s with pattern %s", namespaceID, pattern)
-	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, false, true, handler))
+	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypeAdmin, handler))
+}
+
+// AddQuotaHandler adds a handler function for the namespace, pattern and HTTPmethod.
+// The Quota requests are rate-limited per bearer token
+func (r *HTTProuter) AddQuotaHandler(namespaceID,
+	pattern, HTTPmethod string, handler RouterHandlerFn) {
+	log.Infof("added quota handler for namespace %s with pattern %s", namespaceID, pattern)
+	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypeQuota, handler))
 }
 
 // AddPrivateHandler adds a handler function for the namespace, pattern and HTTPmethod.
 // The Private requests are usually protected by some authorization mechanism, such as signature verification,
 // which must be handled by the namespace implementation.
-func (r *HTTProuter) AddPrivateHandler(namespaceID, pattern, HTTPmethod string, handler RouterHandlerFn) {
+func (r *HTTProuter) AddPrivateHandler(namespaceID,
+	pattern, HTTPmethod string, handler RouterHandlerFn) {
 	log.Infof("added private handler for namespace %s with pattern %s", namespaceID, pattern)
-	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, true, false, handler))
+	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypePrivate, handler))
 }
 
 // AddPublicHandler adds a handled function for the namespace, patter and HTTPmethod.
 // The public requests are not protected so all requests are allowed.
-func (r *HTTProuter) AddPublicHandler(namespaceID, pattern, HTTPmethod string, handler RouterHandlerFn) {
+func (r *HTTProuter) AddPublicHandler(namespaceID,
+	pattern, HTTPmethod string, handler RouterHandlerFn) {
 	log.Infof("added public handler for namespace %s with pattern %s", namespaceID, pattern)
-	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, false, false, handler))
+	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypePublic, handler))
 }
 
 // AddRawHTTPHandler adds a standard net/http handled function to the router.
@@ -187,7 +207,7 @@ func (r *HTTProuter) AddRawHTTPHandler(pattern, HTTPmethod string, handler http.
 	r.Mux.MethodFunc(HTTPmethod, pattern, handler)
 }
 
-func (r *HTTProuter) routerHandler(namespaceID string, private, admin bool,
+func (r *HTTProuter) routerHandler(namespaceID string, accessType AuthAccessType,
 	handlerFunc RouterHandlerFn) func(w http.ResponseWriter, req *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
@@ -202,11 +222,9 @@ func (r *HTTProuter) routerHandler(namespaceID string, private, admin bool,
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if private || admin {
-			if ok, err := nsProcessor.AuthorizeRequest(data, admin); !ok {
-				http.Error(w, err.Error(), http.StatusUnauthorized)
-				return
-			}
+		if ok, err := nsProcessor.AuthorizeRequest(data, accessType); !ok {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
 		}
 
 		hc := &HTTPContext{Request: req, Writer: w, sent: make(chan struct{})}

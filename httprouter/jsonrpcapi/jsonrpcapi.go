@@ -76,13 +76,15 @@ func (s *SignedJRPC) AllowPrivate(allow bool) {
 }
 
 // AuthorizeRequest implements the httprouter interface
-func (s *SignedJRPC) AuthorizeRequest(data interface{}, isAdmin bool) (bool, error) {
+func (s *SignedJRPC) AuthorizeRequest(data interface{},
+	accessType httprouter.AuthAccessType) (bool, error) {
 	request, ok := data.(*SignedJRPCdata)
 	if !ok {
 		panic("type is not SignedJRPCdata")
 	}
 	// If admin method, compare with the admin address
-	if isAdmin {
+	switch accessType {
+	case httprouter.AccessTypeAdmin:
 		if s.adminAddr == nil {
 			return false, s.returnError("admin address not defined", request.ID)
 		}
@@ -90,19 +92,23 @@ func (s *SignedJRPC) AuthorizeRequest(data interface{}, isAdmin bool) (bool, err
 			return false, s.returnError("admin address do not match", request.ID)
 		}
 		return true, nil
-	}
-	// If private method, check authentication.
-	// If no authorized addresses configured, allows any address.
-	if s.allowPrivate && request.Private {
-		if len(s.signer.Authorized) == 0 {
-			return true, nil
+	case httprouter.AccessTypeQuota:
+		panic("quota auth access not implemented for jsonRPC")
+	case httprouter.AccessTypePrivate:
+		// If private method, check authentication.
+		// If no authorized addresses configured, allows any address.
+		if s.allowPrivate && request.Private {
+			if len(s.signer.Authorized) == 0 {
+				return true, nil
+			}
+			if !s.signer.Authorized[request.Address] {
+				return false, s.returnError("not authorized", request.ID)
+			}
 		}
-		if !s.signer.Authorized[request.Address] {
-			return false, s.returnError("not authorized", request.ID)
-		}
+		return true, nil
+	default:
+		return true, nil
 	}
-	// If the method is registered as public, return true
-	return true, nil
 }
 
 // ProcessData implements the httprouter interface
