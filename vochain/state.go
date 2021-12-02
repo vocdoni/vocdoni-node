@@ -467,7 +467,7 @@ func (v *State) Oracles(isQuery bool) ([]common.Address, error) {
 
 // IsOracle returns true if the address is a valid oracle
 func (v *State) IsOracle(addr common.Address) (bool, error) {
-	oracles, err := v.Oracles(false)
+	oracles, err := v.Oracles(true)
 	if err != nil || len(oracles) == 0 {
 		return false, fmt.Errorf("cannot check authorization against a nil or empty oracle list")
 	}

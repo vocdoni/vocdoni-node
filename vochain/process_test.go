@@ -26,6 +26,9 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	app.State.SetHeight(1)
+	app.State.Save()
+
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
@@ -219,6 +222,9 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	app.State.SetHeight(1)
+	app.State.Save()
+
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
@@ -342,6 +348,9 @@ func TestProcessSetCensusTransition(t *testing.T) {
 	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
 		t.Fatal(err)
 	}
+
+	app.State.SetHeight(1)
+	app.State.Save()
 
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
