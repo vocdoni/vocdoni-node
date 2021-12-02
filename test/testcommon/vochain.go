@@ -188,12 +188,14 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 		d.VochainCfg.DataDir+"/data/priv_validator_state.json",
 	)
 	oracles := []string{d.Signer.AddressString()}
+	treasurer := d.Signer.AddressString()
 	genBytes, err := vochain.NewGenesis(
 		d.VochainCfg,
 		strconv.Itoa(rand.Int()),
 		consensusParams,
 		[]privval.FilePV{*validator},
 		oracles,
+		treasurer,
 	)
 	if err != nil {
 		tb.Fatal(err)

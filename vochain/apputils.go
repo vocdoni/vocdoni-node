@@ -115,7 +115,7 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
 
 // NewGenesis creates a new genesis and return its bytes
 func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *ConsensusParams,
-	validators []privval.FilePV, oracles []string) ([]byte, error) {
+	validators []privval.FilePV, oracles []string, treasurer string) ([]byte, error) {
 	// default consensus params
 	appState := new(GenesisAppState)
 	appState.Validators = make([]GenesisValidator, len(validators))
@@ -132,6 +132,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 		}
 	}
 	appState.Oracles = oracles
+	appState.Treasurer = treasurer
 	appStateBytes, err := tmjson.Marshal(appState)
 	if err != nil {
 		return []byte{}, err
