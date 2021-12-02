@@ -93,17 +93,7 @@ func (s *SignedJRPC) AuthorizeRequest(data interface{},
 		}
 		return true, nil
 	case httprouter.AccessTypeQuota:
-		log.Warn("rate-limiting quota requests unimplemented for jsonRPC")
-		// Fallback to private method
-		if s.allowPrivate && request.Private {
-			if len(s.signer.Authorized) == 0 {
-				return true, nil
-			}
-			if !s.signer.Authorized[request.Address] {
-				return false, s.returnError("not authorized", request.ID)
-			}
-		}
-		return true, nil
+		panic("quota auth access not implemented for jsonRPC")
 	case httprouter.AccessTypePrivate:
 		// If private method, check authentication.
 		// If no authorized addresses configured, allows any address.
