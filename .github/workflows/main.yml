@@ -50,7 +50,7 @@ jobs:
   docker-release:
     runs-on: self-hosted
     needs: [go-tests, compose-test]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/ethless'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
