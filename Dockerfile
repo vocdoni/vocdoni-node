@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:experimental
 
-FROM golang:1.17.1 AS builder
+FROM golang:1.17.4 AS builder
 
 ARG BUILDARGS
 
@@ -23,7 +23,7 @@ COPY --from=builder /src/vochaintest ./
 COPY ./dockerfiles/testsuite/js ./js
 RUN cd js && npm install
 
-FROM debian:11.0-slim
+FROM debian:11.1-slim
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
