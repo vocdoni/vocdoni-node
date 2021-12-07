@@ -4,11 +4,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	stdlog "log"
 	"math/big"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/pressly/goose/v3"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -19,6 +22,11 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
+
+func init() {
+	// keep the tests silent
+	goose.SetLogger(stdlog.New(io.Discard, "", 0))
+}
 
 func TestEntityList(t *testing.T) {
 	testEntityList(t, 2)
@@ -411,6 +419,7 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 
 func TestResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
+	app.State.SetHeight(3)
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	if err != nil {
 		t.Fatal(err)

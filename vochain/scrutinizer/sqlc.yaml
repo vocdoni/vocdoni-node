@@ -1,0 +1,31 @@
+version: 1
+packages:
+  - path: "db"
+    name: "scrutinizerdb"
+    engine: "mysql" # TODO: sqlite
+    schema: "migrations"
+    queries: "queries"
+overrides:
+  # Defaults to int32 for integers, which is a bit small.
+  - db_type: "int"
+    go_type: "int64"
+
+  # Force these blobs to be our "bytes" types.
+  - column: "processes.id"
+    go_type: "go.vocdoni.io/dvote/types.ProcessID"
+  - column: "processes.id"
+    go_type: "go.vocdoni.io/dvote/types.ProcessID"
+  # TODO: breaks sqlc generate; still just non-encoded bytes in string form.
+  # - column: "processes.entity_id"
+  #   go_type: "go.vocdoni.io/dvote/types.EntityID"
+  - column: "processes.census_root"
+    go_type: "go.vocdoni.io/dvote/types.CensusRoot"
+  - column: "processes.rolling_census_root"
+    go_type: "go.vocdoni.io/dvote/types.CensusRoot"
+
+  - column: "processes.envelope_pb"
+    go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
+  - column: "processes.mode_pb"
+    go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
+  - column: "processes.vote_opts_pb"
+    go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"

@@ -6,21 +6,65 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
 
+var zeroBytes = []byte("")
+
+func nonNullBytes(p []byte) []byte {
+	if p == nil {
+		return zeroBytes
+	}
+	return p
+}
+
+// TODO(mvdan): funcs to safely convert integers
+
+func encodedPb(msg proto.Message) types.EncodedProtoBuf {
+	enc, err := proto.Marshal(msg)
+	if err != nil {
+		panic(err) // TODO(mvdan): propagate errors via a database/sql interface?
+	}
+	return nonNullBytes(enc)
+}
+
 // ProcessInfo returns the available information regarding an election process id
 func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
-	startTime := time.Now()
-	defer func() { log.Debugf("ProcessInfo took %s", time.Since(startTime)) }()
+	bhStartTime := time.Now()
 	proc := &indexertypes.Process{}
-	err := s.db.FindOne(proc, badgerhold.Where(badgerhold.Key).Eq(pid))
-	return proc, err
+	if err := s.db.FindOne(proc, badgerhold.Where(badgerhold.Key).Eq(pid)); err != nil {
+		return nil, err
+	}
+	log.Debugf("ProcessInfo badgerhold took %s", time.Since(bhStartTime))
+
+	sqlStartTime := time.Now()
+
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	sqlProcInner, err := queries.GetProcess(ctx, pid)
+	if err != nil {
+		return nil, err
+	}
+	log.Debugf("ProcessInfo sqlite took %s", time.Since(sqlStartTime))
+	sqlProc := indexertypes.ProcessFromDB(&sqlProcInner)
+	if diff := cmp.Diff(proc, sqlProc, cmpopts.IgnoreUnexported(
+		models.EnvelopeType{},
+		models.ProcessMode{},
+		models.ProcessVoteOptions{},
+	)); diff != "" {
+		panic(diff)
+	}
+
+	return proc, nil
 }
 
 // ProcessList returns a list of process identifiers (PIDs) registered in the Vochain.
@@ -35,14 +79,12 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 	srcNetworkIdstr,
 	status string,
 	withResults bool) ([][]byte, error) {
-	startTime := time.Now()
-	defer func() { log.Debugf("ProcessList took %s", time.Since(startTime)) }()
 	if from < 0 {
 		return nil, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
 	}
 	// For filtering on Status we use a badgerhold match function.
 	// If status is not defined, then the match function will return always true.
-	statusnum := int32(-1)
+	statusnum := int32(0)
 	statusfound := false
 	if status != "" {
 		if statusnum, statusfound = models.ProcessStatus_value[status]; !statusfound {
@@ -50,7 +92,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 		}
 	}
 	statusMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
-		if statusnum == -1 {
+		if statusnum == 0 {
 			return true, nil
 		}
 		if r.Field().(int32) == statusnum {
@@ -80,11 +122,16 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 		}
 		return r.Field().(bool), nil
 	}
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+
+	bhStartTime := time.Now()
 
 	// For EntityID and Namespace we use different queries, since they are indexes and the
 	// performance improvement is quite relevant.
 	var err error
 	var procs [][]byte
+	var sqlProcs [][]byte
 	switch {
 	case namespace == 0 && len(entityID) > 0:
 		err = s.db.ForEach(
@@ -147,8 +194,29 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 				return nil
 			})
 	}
+	log.Debugf("ProcessList badgerhold took %s", time.Since(bhStartTime))
+	if err != nil {
+		return nil, err
+	}
+	sqlStartTime := time.Now()
+	sqlProcs, err = queries.SearchProcesses(ctx, scrutinizerdb.SearchProcessesParams{
+		EntityID:        string(entityID),
+		Namespace:       int64(namespace),
+		Status:          int64(statusnum),
+		SourceNetworkID: srcNetworkIdstr,
+		IDSubstr:        searchTerm,
+		Offset:          int32(from),
+		Limit:           int32(max),
+	})
+	log.Debugf("ProcessList sqlite took %s", time.Since(sqlStartTime))
+	if err != nil {
+		return nil, err
+	}
+	if diff := cmp.Diff(procs, sqlProcs); diff != "" {
+		panic(diff)
+	}
 
-	return procs, err
+	return procs, nil
 }
 
 // ProcessCount returns the number of processes indexed
@@ -358,6 +426,38 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 		RollingCensusSize: p.GetRollingCensusSize(),
 	}
 	log.Debugf("new indexer process %s", proc.String())
+
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	if _, err := queries.CreateProcess(ctx, scrutinizerdb.CreateProcessParams{
+		ID:                pid,
+		EntityID:          string(eid), // NOTE: we use string instead of []byte; see sqlc.yaml
+		EntityIndex:       int64(entity.ProcessCount),
+		StartBlock:        int64(p.GetStartBlock()),
+		EndBlock:          int64(p.GetBlockCount() + p.GetStartBlock()),
+		ResultsHeight:     int64(compResultsHeight),
+		HaveResults:       compResultsHeight > 0,
+		CensusRoot:        nonNullBytes(p.GetCensusRoot()),
+		RollingCensusRoot: nonNullBytes(p.GetRollingCensusRoot()),
+		RollingCensusSize: int64(p.GetRollingCensusSize()),
+		MaxCensusSize:     int64(p.GetMaxCensusSize()),
+		CensusUri:         p.GetCensusURI(),
+		CensusOrigin:      int64(p.GetCensusOrigin()),
+		Status:            int64(p.GetStatus()),
+		Namespace:         int64(p.GetNamespace()),
+		EnvelopePb:        encodedPb(p.GetEnvelopeType()),
+		ModePb:            encodedPb(p.GetMode()),
+		VoteOptsPb:        encodedPb(p.GetVoteOptions()),
+		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
+		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
+		CreationTime:      currentBlockTime,
+		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
+		SourceNetworkID:   p.SourceNetworkId.String(), // TODO: store the integer?
+		Metadata:          p.GetMetadata(),
+	}); err != nil {
+		return fmt.Errorf("sql create process: %w", err)
+	}
+
 	return s.queryWithRetries(func() error { return s.db.Insert(pid, proc) })
 }
 
@@ -412,15 +512,56 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 		update.Status = int32(p.GetStatus())
 		return nil
 	}
-	return s.queryWithRetries(func() error {
+	if err := s.queryWithRetries(func() error {
 		return s.db.UpdateMatching(&indexertypes.Process{},
 			badgerhold.Where(badgerhold.Key).Eq(pid), updateFunc)
-	})
+	}); err != nil {
+		return err
+	}
+	// TODO: remove from results table
+	// TODO: hold a sql db transaction for multiple queries
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	previousStatus, err := queries.GetProcessStatus(ctx, pid)
+	if err != nil {
+		return err
+	}
+	if _, err := queries.UpdateProcessFromState(ctx, scrutinizerdb.UpdateProcessFromStateParams{
+		ID:                pid,
+		EndBlock:          int64(p.GetBlockCount() + p.GetStartBlock()),
+		CensusRoot:        nonNullBytes(p.GetCensusRoot()),
+		RollingCensusRoot: nonNullBytes(p.GetRollingCensusRoot()),
+		RollingCensusSize: int64(p.GetRollingCensusSize()),
+		CensusUri:         p.GetCensusURI(),
+		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
+		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
+		Metadata:          p.GetMetadata(),
+		Status:            int64(p.GetStatus()),
+	}); err != nil {
+		return err
+	}
+	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
+		p.GetStatus() == models.ProcessStatus_CANCELED {
+
+		if _, err := queries.SetProcessResultsHeight(ctx, scrutinizerdb.SetProcessResultsHeightParams{
+			ID:            pid,
+			ResultsHeight: 0,
+		}); err != nil {
+			return err
+		}
+		if _, err := queries.SetProcessResultsCancelled(ctx, pid); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // setResultsHeight updates the Rheight of any process whose ID is pid.
 func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
-	return s.queryWithRetries(func() error {
+	if height == 0 {
+		panic("setting results height to 0?")
+	}
+	if err := s.queryWithRetries(func() error {
 		return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
 			func(record interface{}) error {
 				update, ok := record.(*indexertypes.Process)
@@ -430,7 +571,18 @@ func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
 				update.Rheight = height
 				return nil
 			})
-	})
+	}); err != nil {
+		return err
+	}
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	if _, err := queries.SetProcessResultsHeight(ctx, scrutinizerdb.SetProcessResultsHeightParams{
+		ID:            pid,
+		ResultsHeight: int64(height),
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // searchMatchFunc generates a function which compares a badgerhold record against searchTerm.

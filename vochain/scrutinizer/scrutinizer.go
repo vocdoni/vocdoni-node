@@ -2,6 +2,9 @@ package scrutinizer
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
+	"embed"
 	"errors"
 	"fmt"
 	"math/big"
@@ -14,9 +17,19 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
+	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
+
+	"github.com/pressly/goose/v3"
+	// modernc is a pure-Go version, but its errors have less useful info.
+	// We use mattn while developing and testing, and we can swap them later.
+	// _ "modernc.org/sqlite"
+	_ "github.com/mattn/go-sqlite3"
 )
+
+//go:embed migrations/*.sql
+var embedMigrations embed.FS
 
 const (
 	// MaxQuestions is the maximum number of questions allowed in a VotePackage
@@ -65,6 +78,7 @@ type Scrutinizer struct {
 	// eventOnResults is the list of external callbacks that will be executed by the scrutinizer
 	eventOnResults []EventListener
 	db             *badgerhold.Store
+	sqlDB          *sql.DB
 	// envelopeHeightCache and countTotalEnvelopes are in memory counters that helps reducing the
 	// access time when GenEnvelopeHeight() is called.
 	envelopeHeightCache *lru.Cache
@@ -101,6 +115,7 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication, countLiveResult
 	if err != nil {
 		return nil, err
 	}
+
 	startTime := time.Now()
 
 	countMap, err := s.retrieveCounts()
@@ -115,11 +130,35 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication, countLiveResult
 		countMap[indexertypes.CountStoreEnvelopes],
 		countMap[indexertypes.CountStoreProcesses],
 		countMap[indexertypes.CountStoreEntities])
+
+	sqlPath := dbPath + "-sqlite"
+	// s.sqlDB, err = sql.Open("sqlite", sqlPath) // modernc
+	s.sqlDB, err = sql.Open("sqlite3", sqlPath) // mattn
+	if err != nil {
+		return nil, err
+	}
+
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return nil, err
+	}
+	// goose.SetLogger(log.Logger()) // TODO: interfaces aren't compatible
+	goose.SetBaseFS(embedMigrations)
+	if err := goose.Up(s.sqlDB, "migrations"); err != nil {
+		return nil, fmt.Errorf("goose up: %w", err)
+	}
+
 	// Subscrive to events
 	s.App.State.AddEventListener(s)
 	s.envelopeHeightCache = lru.New(countEnvelopeCacheSize)
 	s.resultsCache = lru.New(resultsCacheSize)
 	return s, nil
+}
+
+func (s *Scrutinizer) timeoutQueries() (*scrutinizerdb.Queries, context.Context, context.CancelFunc) {
+	ctx := context.TODO()
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	queries := scrutinizerdb.New(s.sqlDB)
+	return queries, ctx, cancel
 }
 
 // retrieveCounts returns a count for txs, envelopes, processes, and entities, in that order.

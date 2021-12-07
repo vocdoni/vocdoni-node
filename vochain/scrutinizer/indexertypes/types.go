@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/types"
+	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -58,6 +60,61 @@ type Process struct {
 	SourceNetworkId   string                     `badgerholdIndex:"SourceNetworkId" json:"sourceNetworkId"`
 	MaxCensusSize     uint64                     `json:"maxCensusSize"`
 	RollingCensusSize uint64                     `json:"rollingCensusSize"`
+}
+
+func ProcessFromDB(dbproc *scrutinizerdb.Process) *Process {
+	proc := &Process{
+		ID:                dbproc.ID,
+		EntityID:          nonEmptyBytes([]byte(dbproc.EntityID)),
+		EntityIndex:       uint32(dbproc.EntityIndex),
+		StartBlock:        uint32(dbproc.StartBlock),
+		EndBlock:          uint32(dbproc.EndBlock),
+		Rheight:           uint32(dbproc.ResultsHeight),
+		HaveResults:       dbproc.HaveResults,
+		FinalResults:      dbproc.FinalResults,
+		CensusRoot:        nonEmptyBytes(dbproc.CensusRoot),
+		RollingCensusRoot: nonEmptyBytes(dbproc.RollingCensusRoot),
+		RollingCensusSize: uint64(dbproc.RollingCensusSize),
+		MaxCensusSize:     uint64(dbproc.MaxCensusSize),
+		CensusURI:         dbproc.CensusUri,
+		CensusOrigin:      int32(dbproc.CensusOrigin),
+		Status:            int32(dbproc.Status),
+		Namespace:         uint32(dbproc.Namespace),
+		PrivateKeys:       nonEmptySplit(dbproc.PrivateKeys, ","),
+		PublicKeys:        nonEmptySplit(dbproc.PublicKeys, ","),
+		CreationTime:      dbproc.CreationTime,
+		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
+		SourceNetworkId:   dbproc.SourceNetworkID,
+		Metadata:          dbproc.Metadata,
+	}
+	proc.Envelope = new(models.EnvelopeType)
+	if err := proto.Unmarshal(dbproc.EnvelopePb, proc.Envelope); err != nil {
+		panic(err)
+	}
+	proc.Mode = new(models.ProcessMode)
+	if err := proto.Unmarshal(dbproc.ModePb, proc.Mode); err != nil {
+		panic(err)
+	}
+	proc.VoteOpts = new(models.ProcessVoteOptions)
+	if err := proto.Unmarshal(dbproc.VoteOptsPb, proc.VoteOpts); err != nil {
+		panic(err)
+	}
+	return proc
+}
+
+func nonEmptyBytes(p []byte) []byte {
+	if len(p) == 0 {
+		return nil
+	}
+	return p
+}
+
+func nonEmptySplit(s, sep string) []string {
+	list := strings.Split(s, sep)
+	if len(list) == 1 && list[0] == "" {
+		return nil // avoid []string{""} for s==""
+	}
+	return list
 }
 
 func (p Process) String() string {
