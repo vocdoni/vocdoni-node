@@ -43,8 +43,10 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.12.3-0.20210722180723-7706c7bcfdc7
 	github.com/libp2p/go-reuseport v0.0.2
 	github.com/logrusorgru/aurora v2.0.3+incompatible
+	github.com/mattn/go-sqlite3 v1.14.9
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/p4u/recws v1.2.2-0.20201005083112-7be7f9397e75
+	github.com/pressly/goose/v3 v3.3.0
 	github.com/prometheus/client_golang v1.10.0
 	github.com/shirou/gopsutil v3.21.8+incompatible
 	github.com/spf13/cobra v1.2.1
@@ -59,7 +61,7 @@ require (
 	go.uber.org/zap v1.18.1
 	go.vocdoni.io/proto v1.13.3-0.20211126083500-46ba146eff3f
 	golang.org/x/crypto v0.0.0-20210920023735-84f357641f63
-	golang.org/x/net v0.0.0-20210917221730-978cfadd31cf
+	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f
 	google.golang.org/protobuf v1.27.1
 	nhooyr.io/websocket v1.8.7
 )

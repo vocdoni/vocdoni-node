@@ -271,6 +271,11 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	}); err != nil {
 		return fmt.Errorf("computeResult: cannot update processID %x: %v", processID, err)
 	}
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	if _, err := queries.SetProcessResultsReady(ctx, processID); err != nil {
+		return err
+	}
 	s.addVoteLock.Lock()
 	defer s.addVoteLock.Unlock()
 	if err := s.queryWithRetries(func() error { return s.db.Upsert(processID, results) }); err != nil {
