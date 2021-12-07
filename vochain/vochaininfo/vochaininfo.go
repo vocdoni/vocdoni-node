@@ -71,7 +71,7 @@ func (vi *VochainInfo) HeightTime(height int64) time.Time {
 	}
 
 	getMaxTimeFrom := func(i int) int64 {
-		for ; i <= 0; i-- {
+		for ; i >= 0; i-- {
 			if times[i] != 0 {
 				return int64(times[i])
 			}
