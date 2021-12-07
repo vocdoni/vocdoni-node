@@ -76,7 +76,7 @@ func (vi *VochainInfo) HeightTime(height int64) time.Time {
 				return int64(times[i])
 			}
 		}
-		return 10 // fallback
+		return 10000 // fallback
 	}
 
 	t := int64(0)
