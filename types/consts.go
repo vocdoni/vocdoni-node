@@ -29,6 +29,8 @@ const (
 	ProcessIDsize = 32
 	// EthereumAddressSize is the size of an ethereum address
 	EthereumAddressSize = 20
+	// EthereumZeroAddress is the 0x0000000000000000000000000000000000000000 address
+	EthereumZeroAddress = "0x0000000000000000000000000000000000000000"
 
 	// EntityIDsizeV2 legacy: in the past we used hash(addr)
 	// this is a temporal work around to support both
