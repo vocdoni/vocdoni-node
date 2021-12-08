@@ -154,6 +154,7 @@ func (a APIrequest) String() string {
 // Those fields with valid zero-values (such as bool) must be pointers
 type APIresponse struct {
 	APIList              []string                         `json:"apiList,omitempty"`
+	Balance              *uint64                          `json:"balance,omitempty"`
 	Block                *indexertypes.BlockMetadata      `json:"block,omitempty"`
 	BlockList            []*indexertypes.BlockMetadata    `json:"blockList,omitempty"`
 	BlockTime            *[5]int32                        `json:"blockTime,omitempty"`
@@ -167,6 +168,7 @@ type APIresponse struct {
 	CircuitConfig        *artifacts.CircuitConfig         `json:"circuitConfig,omitempty"`
 	Content              []byte                           `json:"content,omitempty"`
 	CreationTime         int64                            `json:"creationTime,omitempty"`
+	Delegates            []string                         `json:"delegates,omitempty"`
 	EncryptionPrivKeys   []Key                            `json:"encryptionPrivKeys,omitempty"`
 	EncryptionPublicKeys []Key                            `json:"encryptionPubKeys,omitempty"`
 	EntityID             string                           `json:"entityId,omitempty"`
@@ -179,7 +181,9 @@ type APIresponse struct {
 	Health               int32                            `json:"health,omitempty"`
 	Height               *uint32                          `json:"height,omitempty"`
 	InvalidClaims        []int                            `json:"invalidClaims,omitempty"`
+	InfoURI              string                           `json:"infoURI,omitempty"`
 	Message              string                           `json:"message,omitempty"`
+	Nonce                *uint32                          `json:"nonce,omitempty"`
 	Nullifier            string                           `json:"nullifier,omitempty"`
 	Nullifiers           *[]string                        `json:"nullifiers,omitempty"`
 	Ok                   bool                             `json:"ok"`
