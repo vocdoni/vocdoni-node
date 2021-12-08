@@ -114,6 +114,7 @@ func (r *RPCAPI) EnableResultsAPI(vocapp *vochain.BaseApplication, scrutinizer *
 	r.RegisterPublic("getEntityList", false, r.getEntityList)
 	r.RegisterPublic("getEntityCount", false, r.getEntityCount)
 	r.RegisterPublic("getEnvelope", false, r.getEnvelope)
+	r.RegisterPublic("getAccount", false, r.getAccount)
 	return nil
 }
 
