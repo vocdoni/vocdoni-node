@@ -141,6 +141,7 @@ func testMintTokensTx(t *testing.T,
 		Txtype: models.TxType_MINT_TOKENS,
 		To:     toAddr.Bytes(),
 		Value:  value,
+		Nonce:  0,
 	}
 
 	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_MintTokens{MintTokens: tx}}); err != nil {
