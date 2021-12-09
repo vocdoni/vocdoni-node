@@ -6,12 +6,14 @@ import (
 	"math/big"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/saltedkey"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/tree"
 	"google.golang.org/protobuf/proto"
 
 	blind "github.com/arnaucube/go-blindsecp256k1"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/vocdoni/arbo"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
@@ -42,7 +44,7 @@ func VerifyProof(process *models.Process, proof *models.Proof,
 	case models.CensusOrigin_OFF_CHAIN_TREE:
 		verifyProof = VerifyProofOffChainTree
 	case models.CensusOrigin_OFF_CHAIN_CA:
-		verifyProof = VerifyProofOffChainCA
+		verifyProof = VerifyProofOffChainCSP
 	case models.CensusOrigin_ERC20:
 		verifyProof = VerifyProofERC20
 	case models.CensusOrigin_MINI_ME:
@@ -103,7 +105,7 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 
 // VerifyProofOffChainCA verifies a proof with census origin OFF_CHAIN_CA.
 // Returns verification result and weight.
-func VerifyProofOffChainCA(process *models.Process, proof *models.Proof,
+func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
 	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
 	key := addr.Bytes()
@@ -111,43 +113,64 @@ func VerifyProofOffChainCA(process *models.Process, proof *models.Proof,
 	p := proof.GetCa()
 	if !bytes.Equal(p.Bundle.Address, key) {
 		return false, nil, fmt.Errorf(
-			"CA bundle address and key do not match: %x != %x", key, p.Bundle.Address)
+			"CSP bundle address and key do not match: %x != %x", key, p.Bundle.Address)
 	}
 	if !bytes.Equal(p.Bundle.ProcessId, processID) {
-		return false, nil, fmt.Errorf("CA bundle processID does not match")
+		return false, nil, fmt.Errorf("CSP bundle processID does not match")
 	}
-	caBundle, err := proto.Marshal(p.Bundle)
+	cspBundle, err := proto.Marshal(p.Bundle)
 	if err != nil {
-		return false, nil, fmt.Errorf("cannot marshal ca bundle to protobuf: %w", err)
+		return false, nil, fmt.Errorf("cannot marshal CSP bundle to protobuf: %w", err)
 	}
-	var caPubk []byte
 
 	// depending on signature type, use a mechanism for extracting the ca publickey from signature
 	switch p.GetType() {
-	case models.ProofCA_ECDSA:
-		caPubk, err = ethereum.PubKeyFromSignature(caBundle, p.GetSignature())
+	case models.ProofCA_ECDSA, models.ProofCA_ECDSA_PIDSALTED:
+		bundlePub, err := ethereum.PubKeyFromSignature(cspBundle, p.GetSignature())
 		if err != nil {
-			return false, nil, fmt.Errorf("cannot fetch ca address from signature: %w", err)
+			return false, nil, fmt.Errorf("cannot fetch CSP public key from signature: %w", err)
 		}
-		if !bytes.Equal(caPubk, censusRoot) {
+		if p.GetType() == models.ProofCA_ECDSA_BLIND_PIDSALTED {
+			rootPub, err := ethereum.DecompressPubKey(censusRoot)
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot decompress CSP public key: %w", err)
+			}
+			rootPubSalted, err := ethcrypto.UnmarshalPubkey(rootPub)
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot unmarshal ECDSA CSP public key: %w", err)
+			}
+			rootPubSalted, err = saltedkey.SaltECDSAPubKey(rootPubSalted, processID)
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot salt ECDSA public key: %w", err)
+			}
+			censusRoot = ethcrypto.FromECDSAPub(rootPubSalted)
+		}
+		if !bytes.Equal(bundlePub, censusRoot) {
 			return false, nil, fmt.Errorf("ca bundle signature does not match")
 		}
-	case models.ProofCA_ECDSA_BLIND:
-		// Blind CA check
-		pubdesc, err := ethereum.DecompressPubKey(censusRoot)
+	case models.ProofCA_ECDSA_BLIND, models.ProofCA_ECDSA_BLIND_PIDSALTED:
+		// Blind CSP check
+		rootPubdesc, err := ethereum.DecompressPubKey(censusRoot)
 		if err != nil {
-			return false, nil, fmt.Errorf("cannot decompress CA public key: %w", err)
+			return false, nil, fmt.Errorf("cannot decompress CSP public key: %w", err)
 		}
-		pub, err := blind.NewPublicKeyFromECDSA(pubdesc)
+		rootPub, err := blind.NewPublicKeyFromECDSA(rootPubdesc)
 		if err != nil {
-			return false, nil, fmt.Errorf("cannot compute blind CA public key: %w", err)
+			return false, nil, fmt.Errorf("cannot compute blind CSP public key: %w", err)
 		}
 		signature, err := blind.NewSignatureFromBytes(p.GetSignature())
 		if err != nil {
-			return false, nil, fmt.Errorf("cannot compute blind CA signature: %w", err)
+			return false, nil, fmt.Errorf("cannot compute blind CSP signature: %w", err)
 		}
-		if !blind.Verify(new(big.Int).SetBytes(ethereum.HashRaw(caBundle)), signature, pub) {
-			return false, nil, fmt.Errorf("blind CA verification failed %s", log.FormatProto(p.Bundle))
+		// If pid salted, apply the salt (processId) to the censusRoot public key
+		if p.GetType() == models.ProofCA_ECDSA_BLIND_PIDSALTED {
+			rootPub, err = saltedkey.SaltBlindPubKey(rootPub, processID)
+			if err != nil {
+				return false, nil, fmt.Errorf("cannot salt blind pubkey: %w", err)
+			}
+		}
+		if !blind.Verify(new(big.Int).SetBytes(ethereum.HashRaw(cspBundle)), signature, rootPub) {
+			return false, nil, fmt.Errorf("blind CSP verification failed %s", log.FormatProto(p.Bundle))
 		}
 	default:
 		return false, nil, fmt.Errorf("ca proof %s type not supported", p.Type.String())
