@@ -27,25 +27,25 @@ func TestRouterWithBearerStdAPI(t *testing.T) {
 	// Add a public handler to serve requests on std namespace
 	stdAPI.RegisterMethod("/hello/*", "POST", MethodAccessTypePublic,
 		func(msg *BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-			return ctx.Send([]byte("hello public!"))
+			return ctx.Send([]byte("hello public!"), 200)
 		})
 
 	// Add an admin handler to serve requests on std namespace
 	stdAPI.RegisterMethod("/admin/*", "POST", MethodAccessTypeAdmin,
 		func(msg *BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-			return ctx.Send([]byte("hello admin!"))
+			return ctx.Send([]byte("hello admin!"), 200)
 		})
 
 	// Add a private handler
 	stdAPI.RegisterMethod("/private/{name}", "POST", MethodAccessTypePrivate,
 		func(msg *BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-			return ctx.Send([]byte(fmt.Sprintf("hello %s!", ctx.URLParam("name"))))
+			return ctx.Send([]byte(fmt.Sprintf("hello %s!", ctx.URLParam("name"))), 200)
 		})
 
 	// Add a quota handler
 	stdAPI.RegisterMethod("/quota/{name}", "POST", MethodAccessTypeQuota,
 		func(msg *BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-			return ctx.Send([]byte(fmt.Sprintf("hello %s!", ctx.URLParam("name"))))
+			return ctx.Send([]byte(fmt.Sprintf("hello %s!", ctx.URLParam("name"))), 200)
 		})
 
 	// Set the bearer admin token

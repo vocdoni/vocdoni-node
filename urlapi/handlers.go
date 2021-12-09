@@ -81,7 +81,7 @@ func (u *URLAPI) entityProcessHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
-	if err = ctx.Send(data); err != nil {
+	if err = ctx.Send(data, bearerstdapi.HTTPstatusCodeOK); err != nil {
 		log.Warn(err)
 	}
 	return nil
@@ -119,7 +119,7 @@ func (u *URLAPI) processHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
-	if err = ctx.Send(data); err != nil {
+	if err = ctx.Send(data, bearerstdapi.HTTPstatusCodeOK); err != nil {
 		log.Warn(err)
 	}
 	return nil

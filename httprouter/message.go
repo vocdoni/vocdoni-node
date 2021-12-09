@@ -33,7 +33,7 @@ func (h *HTTPContext) URLParam(key string) string {
 }
 
 // Send replies the request with the provided message.
-func (h *HTTPContext) Send(msg []byte) error {
+func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Warnf("recovered http send panic: %v", r)
@@ -42,12 +42,17 @@ func (h *HTTPContext) Send(msg []byte) error {
 	defer close(h.sent)
 	defer h.Request.Body.Close()
 
+	if httpStatusCode < 100 || httpStatusCode >= 600 {
+		return fmt.Errorf("http status code %d not supported", httpStatusCode)
+	}
 	if h.Request.Context().Err() != nil {
 		// The connection was closed, so don't try to write to it.
 		return fmt.Errorf("connection is closed")
 	}
 	h.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg)+1))
 	h.Writer.Header().Set("Content-Type", "application/json")
+	h.Writer.WriteHeader(httpStatusCode)
+
 	if _, err := h.Writer.Write(msg); err != nil {
 		return err
 	}
