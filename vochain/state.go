@@ -503,36 +503,61 @@ func (v *State) IsOracle(addr common.Address) (bool, error) {
 
 // setTreasurer saves the Treasurer address to the state
 func (v *State) setTreasurer(address common.Address) error {
+	t := &models.Treasurer{
+		Address: address.Bytes(),
+		Nonce:   0,
+	}
+	tBytes, err := proto.Marshal(t)
+	if err != nil {
+		return err
+	}
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	return v.Tx.DeepSet([]byte(TreasurerKey), address.Bytes(), ExtraCfg)
+	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
 }
 
-func (v *State) Treasurer(isQuery bool) (common.Address, error) {
+func (v *State) Treasurer(isQuery bool) (*models.Treasurer, error) {
 	if !isQuery {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-
 	extraTree, err := v.mainTreeViewer(isQuery).SubTree(ExtraCfg)
 	if err != nil {
-		return common.Address{}, err
+		return nil, err
 	}
-
 	var rawTreasurer []byte
 	if rawTreasurer, err = extraTree.Get([]byte(TreasurerKey)); err != nil {
-		return common.Address{}, err
+		return nil, err
 	}
-	return common.BytesToAddress(rawTreasurer), nil
+	var t models.Treasurer
+	if err := proto.Unmarshal(rawTreasurer, &t); err != nil {
+		return nil, err
+	}
+	return &t, nil
 }
 
 func (v *State) IsTreasurer(addr common.Address) (bool, error) {
-	tAddr, err := v.Treasurer(false)
+	t, err := v.Treasurer(false)
 	if err != nil {
 		return false, err
 	}
-
+	tAddr := common.BytesToAddress(t.Address)
 	return addr == tAddr, nil
+}
+
+func (v *State) incrementTreasurerNonce() error {
+	t, err := v.Treasurer(false)
+	if err != nil {
+		return err
+	}
+	t.Nonce++
+	tBytes, err := proto.Marshal(t)
+	if err != nil {
+		return err
+	}
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
