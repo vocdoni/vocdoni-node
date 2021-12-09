@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	flag "github.com/spf13/pflag"
@@ -37,7 +38,9 @@ func main() {
 	viper := viper.New()
 	viper.SetConfigName("voconed")
 	viper.SetConfigType("env")
+	viper.SetEnvPrefix("VOCONED")
 	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Set FlagVars first
 	viper.BindPFlag("dir", flag.Lookup("dir"))
