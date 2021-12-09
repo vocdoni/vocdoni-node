@@ -282,3 +282,40 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	}
 	return accountAddress, false, nil
 }
+
+func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, uint64, error) {
+	tx := vtx.GetMintTokens()
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return common.Address{}, 0, fmt.Errorf("missing signature and/or transaction")
+	}
+	// get address from signature
+	sigAddress, err := ethereum.AddrFromSignature(txBytes, signature)
+	if err != nil {
+		return common.Address{}, 0, err
+	}
+	// get treasurer
+	treasurer, err := state.Treasurer(true)
+	if err != nil {
+		return common.Address{}, 0, err
+	}
+	// check signature recovered address
+	tAddr := common.BytesToAddress(treasurer.Address)
+	if tAddr != sigAddress {
+		return common.Address{}, 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", treasurer.String(), sigAddress.String())
+	}
+	// check nonce
+	if tx.Nonce != treasurer.Nonce {
+		return common.Address{}, 0, fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce+1)
+	}
+	// check to
+	to := common.BytesToAddress(tx.To)
+	if to.String() == types.EthereumZeroAddress || to.String() == tAddr.String() {
+		return common.Address{}, 0, fmt.Errorf("invalid address to mint")
+	}
+	// check value
+	if tx.Value <= 0 {
+		return common.Address{}, 0, fmt.Errorf("invalid value")
+	}
+	return to, tx.Value, nil
+}
