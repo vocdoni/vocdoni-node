@@ -59,6 +59,19 @@ type QueryData struct {
 	ProcessType string `json:"type,omitempty"`
 }
 
+// ________________________ TRANSACTION COSTS __________________________
+// TransactionCosts describes how much each operation should cost
+type TransactionCosts struct {
+	SetProcess            uint64 `json:"Tx_SetProcess"`
+	RegisterKey           uint64 `json:"Tx_RegisterKey"`
+	NewProcess            uint64 `json:"Tx_NewProcess"`
+	SendTokens            uint64 `json:"Tx_SendTokens"`
+	SetAccountInfo        uint64 `json:"Tx_SetAccountInfo"`
+	AddDelegateForAccount uint64 `json:"Tx_AddDelegateForAccount"`
+	DelDelegateForAccount uint64 `json:"Tx_DelDelegateForAccount"`
+	CollectFaucet         uint64 `json:"Tx_CollectFaucet"`
+}
+
 // ________________________ GENESIS APP STATE ________________________
 
 // GenesisAppState application state in genesis
@@ -66,6 +79,7 @@ type GenesisAppState struct {
 	Validators []GenesisValidator `json:"validators"`
 	Oracles    []string           `json:"oracles"`
 	Treasurer  string             `json:"treasurer"`
+	TxCost     TransactionCosts   `json:"tx_cost"`
 }
 
 // The rest of these genesis app state types are copied from
