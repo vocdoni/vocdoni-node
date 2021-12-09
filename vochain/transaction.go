@@ -154,6 +154,23 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 			return []byte{}, app.State.incrementTreasurerNonce()
 		}
 
+	case *models.Tx_SetAccountDelegateTx:
+		accountAddr, delegate, err := SetAccountDelegateTxCheck(vtx, txBytes, signature, app.State)
+		if err != nil {
+			return []byte{}, fmt.Errorf("setAccountDelegateTx: %w", err)
+		}
+		if commit {
+			tx := vtx.GetSetAccountDelegateTx()
+			switch tx.Txtype {
+			case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
+				return []byte{}, app.State.setDelegate(accountAddr, delegate, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
+			case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+				return []byte{}, app.State.setDelegate(accountAddr, delegate, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
+			default:
+				return []byte{}, fmt.Errorf("unknown set account delegate tx type")
+			}
+		}
+
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
 	}
