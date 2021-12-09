@@ -74,13 +74,15 @@ func (a *Account) AddDelegate(addr common.Address) error {
 }
 
 // DelDelegate removes an address from the list of delegates for an account
-func (a *Account) DelDelegate(addr common.Address) {
+func (a *Account) DelDelegate(addr common.Address) error {
 	for i, d := range a.DelegateAddrs {
 		if bytes.Equal(addr.Bytes(), d) {
 			a.DelegateAddrs[i] = a.DelegateAddrs[len(a.DelegateAddrs)-1]
 			a.DelegateAddrs = a.DelegateAddrs[:len(a.DelegateAddrs)-1]
+			return nil
 		}
 	}
+	return fmt.Errorf("cannot delete delegate, not found")
 }
 
 // TransferBalance transfers balance from origin address to destination address,
@@ -316,4 +318,88 @@ func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 		return common.Address{}, 0, fmt.Errorf("invalid value")
 	}
 	return to, tx.Value, nil
+}
+
+func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, common.Address, error) {
+	tx := vtx.GetSetAccountDelegateTx()
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return common.Address{}, common.Address{}, fmt.Errorf("missing signature and/or transaction")
+	}
+	// get address from signature
+	sigAddress, err := ethereum.AddrFromSignature(txBytes, signature)
+	if err != nil {
+		return common.Address{}, common.Address{}, err
+	}
+	// check nonce
+	acc, err := state.GetAccount(sigAddress, false)
+	if err != nil {
+		return common.Address{}, common.Address{}, fmt.Errorf("cannot get account info: %v", err)
+	}
+	if tx.Nonce != acc.Nonce {
+		return common.Address{}, common.Address{}, fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
+	}
+	// check delegate
+	delAcc := common.BytesToAddress(tx.Delegate)
+	if delAcc.String() == types.EthereumZeroAddress {
+		return common.Address{}, common.Address{}, fmt.Errorf("invalid delegate address")
+	}
+	switch tx.Txtype {
+	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
+		for i := 0; i < len(acc.DelegateAddrs); i++ {
+			delegateToCmp := common.BytesToAddress(acc.DelegateAddrs[i])
+			if delegateToCmp == delAcc {
+				return common.Address{}, common.Address{}, fmt.Errorf("delegate already added")
+			}
+		}
+		return sigAddress, delAcc, nil
+	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+		f := false
+		for i := 0; i < len(acc.DelegateAddrs); i++ {
+			delegateToCmp := common.BytesToAddress(acc.DelegateAddrs[i])
+			if delegateToCmp == delAcc {
+				f = true
+			}
+		}
+		if !f {
+			return common.Address{}, common.Address{}, fmt.Errorf("cannot remove a non existent delegate")
+		}
+		return sigAddress, delAcc, nil
+	default:
+		return common.Address{}, common.Address{}, fmt.Errorf("unsupported SetAccountDelegate operation")
+	}
+}
+
+func (v *State) setDelegate(accountAddr, delegateAddr common.Address, txType models.TxType) error {
+	// get account
+	acc, err := v.GetAccount(accountAddr, false)
+	if err != nil {
+		return err
+	}
+	switch txType {
+	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
+		if err := acc.AddDelegate(delegateAddr); err != nil {
+			return err
+		}
+		acc.Nonce++
+		return v.setAccount(accountAddr, acc)
+	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+		if err := acc.DelDelegate(delegateAddr); err != nil {
+			return err
+		}
+		acc.Nonce++
+		return v.setAccount(accountAddr, acc)
+	default:
+		return fmt.Errorf("invalid setDelegate tx type")
+	}
+}
+
+func (v *State) setAccount(accountAddress common.Address, account *Account) error {
+	accBytes, err := proto.Marshal(account)
+	if err != nil {
+		return err
+	}
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
 }
