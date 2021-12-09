@@ -23,8 +23,10 @@ const (
 	// MethodAccessTypeAdmin for admin requests
 	MethodAccessTypeAdmin = "admin"
 
-	namespace    = "bearerStd"
-	bearerPrefix = "Bearer "
+	namespace         = "bearerStd"
+	bearerPrefix      = "Bearer "
+	HTTPstatusCodeOK  = 200
+	HTTPstatusCodeErr = 400
 )
 
 // BearerStandardAPI is a namespace handler for the httpRouter with Bearer authorization
@@ -128,12 +130,12 @@ func (b *BearerStandardAPI) RegisterMethod(pattern, HTTPmethod string,
 	routerHandler := func(msg httprouter.Message) {
 		bsaMsg := msg.Data.(*BearerStandardAPIdata)
 		if err := handler(bsaMsg, msg.Context); err != nil {
-			data, err := json.Marshal(&ErrorMsg{Error: err.Error()})
-			if err != nil {
-				log.Warn(err)
+			data, err2 := json.Marshal(&ErrorMsg{Error: err.Error()})
+			if err2 != nil {
+				log.Warn(err2)
 				return
 			}
-			if err := msg.Context.Send(data); err != nil {
+			if err := msg.Context.Send(data, HTTPstatusCodeErr); err != nil {
 				log.Warn(err)
 			}
 		}

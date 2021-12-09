@@ -50,7 +50,7 @@ func TestJSONRPCAPI(t *testing.T) {
 			resp.Ok = true
 			data, err := BuildReply(signer, &resp, req.ID)
 			qt.Check(t, err, qt.IsNil)
-			err = msg.Context.Send(data)
+			err = msg.Context.Send(data, 200)
 			qt.Check(t, err, qt.IsNil)
 		case "del":
 			if apiMsg.Name == "" {
@@ -60,7 +60,7 @@ func TestJSONRPCAPI(t *testing.T) {
 			resp.Ok = true
 			data, err := BuildReply(signer, &resp, req.ID)
 			qt.Check(t, err, qt.IsNil)
-			msg.Context.Send(data)
+			msg.Context.Send(data, 200)
 			qt.Check(t, err, qt.IsNil)
 		default:
 			t.Fatal("method invalid")

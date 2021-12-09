@@ -135,7 +135,7 @@ func (s *SignedJRPC) SendError(requestID string, errorMsg string, ctxt *httprout
 	if err != nil {
 		return err
 	}
-	return ctxt.Send(data)
+	return ctxt.Send(data, 200)
 }
 
 func (s *SignedJRPC) returnError(errorMsg, requestID string) error {

@@ -121,7 +121,7 @@ func (a *RPCAPI) route(msg httprouter.Message) {
 		log.Errorf("cannot build reply for method %s: %v", apiMsg.GetMethod(), err)
 		return
 	}
-	if err := msg.Context.Send(data); err != nil {
+	if err := msg.Context.Send(data, 200); err != nil {
 		log.Warnf("cannot send api response: %v", err)
 	}
 }
