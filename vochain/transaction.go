@@ -177,6 +177,18 @@ func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
 			return vtx.txID[:], app.State.SetAccountInfoURI(accountAddr, vtx.tx.GetSetAccountInfo().GetInfoURI())
 		}
 
+	case *models.Tx_MintTokens:
+		address, amount, err := MintTokensTxCheck(vtx, txBytes, signature, app.State)
+		if err != nil {
+			return []byte{}, fmt.Errorf("mintTokensTx: %w", err)
+		}
+		if commit {
+			if err := app.State.MintBalance(address, amount); err != nil {
+				return []byte{}, fmt.Errorf("mintTokensTx: %w", err)
+			}
+			return []byte{}, app.State.incrementTreasurerNonce()
+		}
+
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
 	}

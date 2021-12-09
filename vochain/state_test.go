@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -299,14 +300,18 @@ func TestStateTreasurer(t *testing.T) {
 	s.Rollback()
 	s.SetHeight(height)
 
-	treasurer := "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"
-	qt.Assert(t, s.setTreasurer(ethcommon.HexToAddress(treasurer)), qt.IsNil)
+	tAddr := common.HexToAddress("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d")
+	treasurer := &models.Treasurer{
+		Address: tAddr.Bytes(),
+		Nonce:   0,
+	}
+	qt.Assert(t, s.setTreasurer(tAddr), qt.IsNil)
 
 	fetchedTreasurer, err := s.Treasurer(false)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, fetchedTreasurer.String(), qt.CmpEquals(), treasurer)
+	qt.Assert(t, fetchedTreasurer.Address, qt.CmpEquals(), treasurer.Address)
 
-	fetchedTreasurer, err = s.Treasurer(true)
+	_, err = s.Treasurer(true)
 	// key does not exist yet
 	qt.Assert(t, err, qt.IsNotNil)
 
@@ -315,7 +320,7 @@ func TestStateTreasurer(t *testing.T) {
 
 	fetchedTreasurer, err = s.Treasurer(true)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, fetchedTreasurer.String(), qt.CmpEquals(), treasurer)
+	qt.Assert(t, fetchedTreasurer.Address, qt.CmpEquals(), treasurer.Address)
 }
 
 func TestStateIsTreasurer(t *testing.T) {
@@ -328,9 +333,9 @@ func TestStateIsTreasurer(t *testing.T) {
 	s.Rollback()
 	s.SetHeight(height)
 
-	treasurer := "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"
-	qt.Assert(t, s.setTreasurer(ethcommon.HexToAddress(treasurer)), qt.IsNil)
-	r, err := s.IsTreasurer(ethcommon.HexToAddress(treasurer))
+	tAddr := common.HexToAddress("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d")
+	qt.Assert(t, s.setTreasurer(tAddr), qt.IsNil)
+	r, err := s.IsTreasurer(tAddr)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, r, qt.IsTrue)
 
