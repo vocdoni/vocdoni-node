@@ -3,9 +3,11 @@ package vochain
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -62,14 +64,36 @@ type QueryData struct {
 // ________________________ TRANSACTION COSTS __________________________
 // TransactionCosts describes how much each operation should cost
 type TransactionCosts struct {
-	SetProcess            uint64 `json:"Tx_SetProcess"`
-	RegisterKey           uint64 `json:"Tx_RegisterKey"`
-	NewProcess            uint64 `json:"Tx_NewProcess"`
-	SendTokens            uint64 `json:"Tx_SendTokens"`
-	SetAccountInfo        uint64 `json:"Tx_SetAccountInfo"`
-	AddDelegateForAccount uint64 `json:"Tx_AddDelegateForAccount"`
-	DelDelegateForAccount uint64 `json:"Tx_DelDelegateForAccount"`
-	CollectFaucet         uint64 `json:"Tx_CollectFaucet"`
+	SetProcess            uint64 `json:"Tx_SetProcess" state:"c_setProcess"`
+	RegisterKey           uint64 `json:"Tx_RegisterKey" state:"c_registerKey"`
+	NewProcess            uint64 `json:"Tx_NewProcess" state:"c_newProcess"`
+	SendTokens            uint64 `json:"Tx_SendTokens" state:"c_sendTokens"`
+	SetAccountInfo        uint64 `json:"Tx_SetAccountInfo" state:"c_setAccountInfo"`
+	AddDelegateForAccount uint64 `json:"Tx_AddDelegateForAccount" state:"c_addDelegateForAccount"`
+	DelDelegateForAccount uint64 `json:"Tx_DelDelegateForAccount" state:"c_delDelegateForAccount"`
+	CollectFaucet         uint64 `json:"Tx_CollectFaucet" state:"c_collectFaucet"`
+}
+
+// StructAsBytes returns the contents of TransactionCosts as a map. Its purpose
+// is to keep knowledge of TransactionCosts' fields within itself, so the
+// function using it only needs to iterate over the key-values.
+func (t *TransactionCosts) StructAsBytes() (b map[string][]byte, err error) {
+	b = make(map[string][]byte)
+
+	tType := reflect.TypeOf(*t)
+	tValue := reflect.ValueOf(*t)
+	for i := 0; i < tType.NumField(); i++ {
+		key := tType.Field(i).Tag.Get("state")
+		value := tValue.Field(i).Uint()
+
+		valueBytes, err := util.Uint64ToBytes(value)
+		if err != nil {
+			return nil, err
+		}
+
+		b[key] = valueBytes
+	}
+	return
 }
 
 // ________________________ GENESIS APP STATE ________________________
