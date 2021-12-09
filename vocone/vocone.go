@@ -12,12 +12,15 @@ import (
 	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmcoretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/rpcapi"
+	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -42,6 +45,7 @@ type Vocone struct {
 	appInfo         *vochaininfo.VochainInfo
 	app             *vochain.BaseApplication
 	routerAPI       *rpcapi.RPCAPI
+	storage         data.Storage
 	lastBlockTime   time.Time
 	blockTimeTarget time.Duration
 	txsPerBlock     int
@@ -99,7 +103,12 @@ func NewVocone(dataDir string, oracleKey *ethereum.SignKeys) (*Vocone, error) {
 	vc.appInfo = vochaininfo.NewVochainInfo(vc.app)
 	go vc.appInfo.Start(10)
 
-	return vc, nil
+	// Create the IPFS storage layer
+	vc.storage, err = service.IPFS(&config.IPFSCfg{
+		ConfigPath: filepath.Join(dataDir, "ipfs"),
+	}, nil, nil)
+
+	return vc, err
 }
 
 // EnableAPI starts the HTTP API
@@ -112,6 +121,9 @@ func (vc *Vocone) EnableAPI(host string, port int, path string) (err error) {
 		return err
 	}
 	if err := vc.routerAPI.EnableVoteAPI(vc.app, vc.appInfo); err != nil {
+		return err
+	}
+	if err := vc.routerAPI.EnableFileAPI(vc.storage); err != nil {
 		return err
 	}
 	return vc.routerAPI.EnableIndexerAPI(vc.app, vc.appInfo, vc.sc)
