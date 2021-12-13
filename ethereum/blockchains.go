@@ -24,7 +24,7 @@ type Specs struct {
 }
 
 // AvailableChains is the list of supported ethereum networks / environments
-var AvailableChains = []string{"mainnet", "goerli", "goerlistage", "xdai", "xdaistage", "rinkeby"}
+var AvailableChains = []string{"mainnet", "goerli", "goerlistage", "xdai", "xdaistage", "rinkeby", "fuji", "avalanche"}
 
 // SpecsFor returns the specs for the given blockchain network name
 func SpecsFor(name string) (*Specs, error) {
@@ -41,6 +41,10 @@ func SpecsFor(name string) (*Specs, error) {
 		return &goerlistage, nil
 	case "rinkeby":
 		return &rinkeby, nil
+	case "fuji":
+		return &fuji, nil
+	case "avalanche":
+		return &avalanche, nil
 	default:
 		return nil, errors.New("chain name not found")
 	}
@@ -185,6 +189,76 @@ var rinkeby = Specs{
 			Domain: types.EntityResolverDevelopmentDomain},
 		ethereumhandler.ContractNameENSregistry: {
 			Address: common.HexToAddress("0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"),
+		},
+	},
+}
+
+var fuji = Specs{
+	Name:          "fuji",
+	NetworkId:     43113,
+	StartingBlock: 3090089, // Dec-03-2021 01:50:31 PM +UTC
+	BootNodes:     nil,
+	NetworkSource: models.SourceNetworkId_AVAX_FUJI,
+	Contracts: map[string]*ethereumhandler.EthereumContract{
+		ethereumhandler.ContractNameProcesses: {
+			Domain:          types.ProcessesDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameNamespaces: {
+			Domain:          types.NamespacesDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameTokenStorageProof: {
+			Domain:          types.ERC20ProofsDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameGenesis: {
+			Domain:          types.GenesisDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameResults: {
+			Domain:          types.ResultsDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameEntities: {
+			Domain: types.EntityResolverDevelopmentDomain},
+		ethereumhandler.ContractNameENSregistry: {
+			Address: common.HexToAddress("0x21a60F4a895769bE78436CC0D83956db83A4297c"),
+		},
+	},
+}
+
+var avalanche = Specs{
+	Name:          "avalanche",
+	NetworkId:     43114,
+	StartingBlock: 8188761, // Dec-13-2021 03:01:13 PM +UTC
+	BootNodes:     nil,
+	NetworkSource: models.SourceNetworkId_AVAX,
+	Contracts: map[string]*ethereumhandler.EthereumContract{
+		ethereumhandler.ContractNameProcesses: {
+			Domain:          types.ProcessesDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameNamespaces: {
+			Domain:          types.NamespacesDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameTokenStorageProof: {
+			Domain:          types.ERC20ProofsDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameGenesis: {
+			Domain:          types.GenesisDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameResults: {
+			Domain:          types.ResultsDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameEntities: {
+			Domain: types.EntityResolverDevelopmentDomain},
+		ethereumhandler.ContractNameENSregistry: {
+			Address: common.HexToAddress("0x0x0"), // this we add once we have the testing done from Fuji
 		},
 	},
 }
