@@ -372,18 +372,36 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	}
 }
 
-func (v *State) setDelegate(account, delegate common.Address, txType models.TxType) error {
+func (v *State) setDelegate(accountAddr, delegateAddr common.Address, txType models.TxType) error {
 	// get account
-	acc, err := v.GetAccount(account, false)
+	acc, err := v.GetAccount(accountAddr, false)
 	if err != nil {
 		return err
 	}
 	switch txType {
 	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-		return acc.AddDelegate(delegate)
+		if err := acc.AddDelegate(delegateAddr); err != nil {
+			return err
+		}
+		acc.Nonce++
+		return v.setAccount(accountAddr, acc)
 	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-		return acc.DelDelegate(delegate)
+		if err := acc.DelDelegate(delegateAddr); err != nil {
+			return err
+		}
+		acc.Nonce++
+		return v.setAccount(accountAddr, acc)
 	default:
 		return fmt.Errorf("invalid setDelegate tx type")
 	}
+}
+
+func (v *State) setAccount(accountAddress common.Address, account *Account) error {
+	accBytes, err := proto.Marshal(account)
+	if err != nil {
+		return err
+	}
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
 }
