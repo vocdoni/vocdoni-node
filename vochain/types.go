@@ -18,6 +18,7 @@ const (
 	voteCacheSize           = 50000
 	NewProcessCost          = 0
 	SetProcessCost          = 0
+	costPrefix              = "c_"
 )
 
 var (
@@ -101,10 +102,10 @@ func (t *TransactionCosts) StructAsBytes() (b map[string][]byte, err error) {
 // TransactionCostsFieldFromStateKey transforms "c_setProcess" to "SetProcess" for all of
 // TransactionCosts' fields
 func TransactionCostsFieldFromStateKey(key string) (string, error) {
-	if key[0:2] != "c_" {
-		return "", fmt.Errorf("state keys must start with 'c_', got %s", key)
+	if key[0:2] != costPrefix {
+		return "", fmt.Errorf("state keys must start with '%s', got %s", costPrefix, key)
 	}
-	name := strings.TrimLeft(key, "c_")
+	name := strings.TrimLeft(key, costPrefix)
 
 	// strings.Title will misbehave when there are punctuation marks in the
 	// string. To clean the input up, we ensure there are only alphabetical
