@@ -50,7 +50,6 @@ func (c *Client) GetProcessInfo(pid []byte) (*indexertypes.Process, error) {
 func (c *Client) GetEnvelopeStatus(nullifier, pid []byte) (bool, error) {
 	var req api.APIrequest
 	req.Method = "getEnvelopeStatus"
-	req.ProcessID = pid
 	req.Nullifier = nullifier
 	resp, err := c.Request(req, nil)
 	if err != nil {
