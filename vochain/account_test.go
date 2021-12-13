@@ -169,3 +169,104 @@ func testMintTokensTx(t *testing.T,
 	app.Commit()
 	return nil
 }
+
+func TestSetDelegateTx(t *testing.T) {
+	app := TestBaseApplication(t)
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+
+	// create account
+	testSetAccountInfoTx(t, &signer, app, infoURI)
+	// get nonce
+	acc, err := app.State.GetAccount(signer.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// should add new delegate
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, acc.Nonce, true); err != nil {
+		t.Fatal(err)
+	}
+
+	// should fail adding same delegate
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, acc.Nonce+1, true); err == nil {
+		t.Fatal(err)
+	}
+
+	// should remove an existing delegate
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, acc.Nonce+1, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// should fail removing a non existent delegate
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, acc.Nonce+2, false); err == nil {
+		t.Fatal(err)
+	}
+
+	// should fail using a wrong nonce
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, acc.Nonce+4, true); err == nil {
+		t.Fatal(err)
+	}
+
+	// get account
+	acc, err = app.State.GetAccount(signer.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(acc.DelegateAddrs) != 0 {
+		t.Fatalf("expected delegates length to be 0, got %d", len(acc.DelegateAddrs))
+	}
+	if acc.Nonce != 2 {
+		t.Fatalf("expected next nonce is 2, got %d", acc.Nonce)
+	}
+}
+
+func testSetDelegateTx(t *testing.T,
+	signer *ethereum.SignKeys,
+	app *BaseApplication,
+	delegate string,
+	nonce uint32,
+	op bool) error { // op == true -> add, op == false -> del
+	var cktx abcitypes.RequestCheckTx
+	var detx abcitypes.RequestDeliverTx
+	var cktxresp abcitypes.ResponseCheckTx
+	var detxresp abcitypes.ResponseDeliverTx
+	var stx models.SignedTx
+	var err error
+
+	delegateAddr := common.HexToAddress(delegate)
+	tx := &models.SetAccountDelegateTx{}
+	if op {
+		tx.Txtype = models.TxType_ADD_DELEGATE_FOR_ACCOUNT
+	} else {
+		tx.Txtype = models.TxType_DEL_DELEGATE_FOR_ACCOUNT
+	}
+	tx.Delegate = delegateAddr.Bytes()
+	tx.Nonce = nonce
+
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountDelegateTx{SetAccountDelegateTx: tx}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+		t.Fatal(err)
+	}
+
+	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
+		t.Fatal(err)
+	}
+	cktxresp = app.CheckTx(cktx)
+	if cktxresp.Code != 0 {
+		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
+	}
+	if detx.Tx, err = proto.Marshal(&stx); err != nil {
+		t.Fatal(err)
+	}
+	detxresp = app.DeliverTx(detx)
+	if detxresp.Code != 0 {
+		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
+	}
+	app.Commit()
+	return nil
+}
