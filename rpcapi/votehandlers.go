@@ -64,11 +64,6 @@ func (a *RPCAPI) submitEnvelope(request *api.APIrequest) (*api.APIresponse, erro
 }
 
 func (r *RPCAPI) getEnvelopeStatus(request *api.APIrequest) (*api.APIresponse, error) {
-	// check pid
-	if len(request.ProcessID) != types.ProcessIDsize {
-		return nil, fmt.Errorf("cannot get envelope status: (malformed processId)")
-
-	}
 	// check nullifier
 	if len(request.Nullifier) != types.VoteNullifierSize {
 		return nil, fmt.Errorf("cannot get envelope status: (malformed nullifier)")
