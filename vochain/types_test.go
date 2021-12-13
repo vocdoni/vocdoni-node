@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"fmt"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -31,4 +32,14 @@ func TestTransactionCostsStructAsBytes(t *testing.T) {
 		"c_setProcess":            {10, 0, 0, 0, 0, 0, 0, 0},
 	}
 	qt.Assert(t, txCostsBytes, qt.DeepEquals, expected)
+}
+
+func TestTransactionCostsFieldFromStateKey(t *testing.T) {
+	fieldName, err := TransactionCostsFieldFromStateKey("c_setProcess")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, fieldName, qt.Equals, "SetProcess")
+	fmt.Println("Fieldname", fieldName)
+
+	_, err = TransactionCostsFieldFromStateKey("c_fictionalField")
+	qt.Assert(t, err, qt.IsNotNil)
 }

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
+	"strings"
 	"time"
 
 	"go.vocdoni.io/dvote/types"
@@ -94,6 +96,31 @@ func (t *TransactionCosts) StructAsBytes() (b map[string][]byte, err error) {
 		b[key] = valueBytes
 	}
 	return
+}
+
+// TransactionCostsFieldFromStateKey transforms "c_setProcess" to "SetProcess" for all of
+// TransactionCosts' fields
+func TransactionCostsFieldFromStateKey(key string) (string, error) {
+	if key[0:2] != "c_" {
+		return "", fmt.Errorf("state keys must start with 'c_', got %s", key)
+	}
+	name := strings.TrimLeft(key, "c_")
+
+	// strings.Title will misbehave when there are punctuation marks in the
+	// string. To clean the input up, we ensure there are only alphabetical
+	// characters left in the string
+	isAlpha := regexp.MustCompile(`^[A-Za-z]+$`).MatchString
+	if !isAlpha(name) {
+		return "", fmt.Errorf("%s needs to be alphabetical only", name)
+	}
+	Name := strings.Title(name)
+
+	// check if TransactionCosts actually has such a field
+	_, found := reflect.TypeOf(TransactionCosts{}).FieldByName(Name)
+	if !found {
+		return "", fmt.Errorf("no such field %s exists on TransactionCosts", Name)
+	}
+	return Name, nil
 }
 
 // ________________________ GENESIS APP STATE ________________________
