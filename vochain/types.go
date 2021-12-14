@@ -67,26 +67,27 @@ type QueryData struct {
 // ________________________ TRANSACTION COSTS __________________________
 // TransactionCosts describes how much each operation should cost
 type TransactionCosts struct {
-	SetProcess            uint64 `json:"Tx_SetProcess" state:"c_setProcess"`
-	RegisterKey           uint64 `json:"Tx_RegisterKey" state:"c_registerKey"`
-	NewProcess            uint64 `json:"Tx_NewProcess" state:"c_newProcess"`
-	SendTokens            uint64 `json:"Tx_SendTokens" state:"c_sendTokens"`
-	SetAccountInfo        uint64 `json:"Tx_SetAccountInfo" state:"c_setAccountInfo"`
-	AddDelegateForAccount uint64 `json:"Tx_AddDelegateForAccount" state:"c_addDelegateForAccount"`
-	DelDelegateForAccount uint64 `json:"Tx_DelDelegateForAccount" state:"c_delDelegateForAccount"`
-	CollectFaucet         uint64 `json:"Tx_CollectFaucet" state:"c_collectFaucet"`
+	SetProcess            uint64 `json:"Tx_SetProcess"`
+	RegisterKey           uint64 `json:"Tx_RegisterKey"`
+	NewProcess            uint64 `json:"Tx_NewProcess"`
+	SendTokens            uint64 `json:"Tx_SendTokens"`
+	SetAccountInfo        uint64 `json:"Tx_SetAccountInfo"`
+	AddDelegateForAccount uint64 `json:"Tx_AddDelegateForAccount"`
+	DelDelegateForAccount uint64 `json:"Tx_DelDelegateForAccount"`
+	CollectFaucet         uint64 `json:"Tx_CollectFaucet"`
 }
 
 // StructAsBytes returns the contents of TransactionCosts as a map. Its purpose
 // is to keep knowledge of TransactionCosts' fields within itself, so the
 // function using it only needs to iterate over the key-values.
-func (t *TransactionCosts) StructAsBytes() (b map[string][]byte, err error) {
-	b = make(map[string][]byte)
+func (t *TransactionCosts) StructAsBytes() (map[string][]byte, error) {
+	b := make(map[string][]byte)
 
 	tType := reflect.TypeOf(*t)
 	tValue := reflect.ValueOf(*t)
 	for i := 0; i < tType.NumField(); i++ {
-		key := tType.Field(i).Tag.Get("state")
+		key := TransactionCostsFieldToStateKey(tType.Field(i).Name)
+
 		value := tValue.Field(i).Uint()
 		valueBytes, err := util.Uint64ToBytes(value)
 		if err != nil {
@@ -94,7 +95,15 @@ func (t *TransactionCosts) StructAsBytes() (b map[string][]byte, err error) {
 		}
 		b[key] = valueBytes
 	}
-	return
+	return b, nil
+}
+
+// TransactionCostsFieldToStateKey transforms "SetProcess" to "c_setProcess" for all of
+// TransactionCosts' fields
+func TransactionCostsFieldToStateKey(key string) string {
+	a := []rune(key)
+	a[0] = unicode.ToLower(a[0])
+	return strings.Join([]string{costPrefix, string(a)}, "")
 }
 
 // TransactionCostsFieldFromStateKey transforms "c_setProcess" to "SetProcess" for all of
