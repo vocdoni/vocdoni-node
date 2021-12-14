@@ -42,4 +42,7 @@ func TestTransactionCostsFieldFromStateKey(t *testing.T) {
 
 	_, err = TransactionCostsFieldFromStateKey("c_fictionalField")
 	qt.Assert(t, err, qt.IsNotNil)
+
+	_, err = TransactionCostsFieldFromStateKey("c_")
+	qt.Assert(t, err, qt.ErrorMatches, "state key must have a length greater than .*")
 }

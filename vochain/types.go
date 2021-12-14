@@ -88,12 +88,10 @@ func (t *TransactionCosts) StructAsBytes() (b map[string][]byte, err error) {
 	for i := 0; i < tType.NumField(); i++ {
 		key := tType.Field(i).Tag.Get("state")
 		value := tValue.Field(i).Uint()
-
 		valueBytes, err := util.Uint64ToBytes(value)
 		if err != nil {
 			return nil, err
 		}
-
 		b[key] = valueBytes
 	}
 	return
@@ -102,6 +100,9 @@ func (t *TransactionCosts) StructAsBytes() (b map[string][]byte, err error) {
 // TransactionCostsFieldFromStateKey transforms "c_setProcess" to "SetProcess" for all of
 // TransactionCosts' fields
 func TransactionCostsFieldFromStateKey(key string) (string, error) {
+	if len(key) < 3 {
+		return "", fmt.Errorf("state key must have a length greater than 3, because it should include the costPrefix: got %s", key)
+	}
 	if key[0:2] != costPrefix {
 		return "", fmt.Errorf("state keys must start with '%s', got %s", costPrefix, key)
 	}
@@ -110,18 +111,16 @@ func TransactionCostsFieldFromStateKey(key string) (string, error) {
 	// strings.Title will misbehave when there are punctuation marks in the
 	// string. To clean the input up, we ensure there are only alphabetical
 	// characters left in the string
-	isAlpha := regexp.MustCompile(`^[A-Za-z]+$`).MatchString
-	if !isAlpha(name) {
+	if !regexp.MustCompile(`^[A-Za-z]+$`).MatchString(name) {
 		return "", fmt.Errorf("%s needs to be alphabetical only", name)
 	}
-	Name := strings.Title(name)
+	capName := strings.Title(name)
 
 	// check if TransactionCosts actually has such a field
-	_, found := reflect.TypeOf(TransactionCosts{}).FieldByName(Name)
-	if !found {
-		return "", fmt.Errorf("no such field %s exists on TransactionCosts", Name)
+	if _, found := reflect.TypeOf(TransactionCosts{}).FieldByName(capName); !found {
+		return "", fmt.Errorf("no such field %s exists on TransactionCosts", capName)
 	}
-	return Name, nil
+	return capName, nil
 }
 
 // ________________________ GENESIS APP STATE ________________________
