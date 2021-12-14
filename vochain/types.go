@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -30,6 +31,8 @@ var (
 	ErrAccountBalanceZero  = fmt.Errorf("zero balance account not valid")
 	// keys; not constants because of []byte
 	voteCountKey = []byte("voteCount")
+
+	rxAlphabetical = regexp.MustCompile(`^[A-Za-z]+$`)
 )
 
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
@@ -110,24 +113,24 @@ func TransactionCostsFieldToStateKey(key string) string {
 // TransactionCosts' fields
 func TransactionCostsFieldFromStateKey(key string) (string, error) {
 	if len(key) < 3 {
-		return "", fmt.Errorf("state key must have a length greater than 3, because it should include the costPrefix: got %s", key)
+		return "", fmt.Errorf("state key must have a length greater than 3, because it should include the costPrefix: got %q", key)
 	}
-	if key[0:2] != costPrefix {
-		return "", fmt.Errorf("state keys must start with '%s', got %s", costPrefix, key)
+	if !strings.HasPrefix(key, costPrefix) {
+		return "", fmt.Errorf("state keys must start with %q, got %q", costPrefix, key)
 	}
-	name := strings.TrimLeft(key, costPrefix)
+	name := strings.TrimPrefix(key, costPrefix)
 
 	// strings.Title will misbehave when there are punctuation marks in the
 	// string. To clean the input up, we ensure there are only alphabetical
 	// characters left in the string
-	if !regexp.MustCompile(`^[A-Za-z]+$`).MatchString(name) {
-		return "", fmt.Errorf("%s needs to be alphabetical only", name)
+	if !rxAlphabetical.MatchString(name) {
+		return "", fmt.Errorf("%q needs to be alphabetical only", name)
 	}
 	capName := strings.Title(name)
 
 	// check if TransactionCosts actually has such a field
 	if _, found := reflect.TypeOf(TransactionCosts{}).FieldByName(capName); !found {
-		return "", fmt.Errorf("no such field %s exists on TransactionCosts", capName)
+		return "", fmt.Errorf("no such field %q exists on TransactionCosts", capName)
 	}
 	return capName, nil
 }
