@@ -354,17 +354,13 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 		}
 		return sigAddress, delAcc, nil
 	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-		f := false
 		for i := 0; i < len(acc.DelegateAddrs); i++ {
 			delegateToCmp := common.BytesToAddress(acc.DelegateAddrs[i])
 			if delegateToCmp == delAcc {
-				f = true
+				return sigAddress, delAcc, nil
 			}
 		}
-		if !f {
-			return common.Address{}, common.Address{}, fmt.Errorf("cannot remove a non existent delegate")
-		}
-		return sigAddress, delAcc, nil
+		return common.Address{}, common.Address{}, fmt.Errorf("cannot remove a non existent delegate")
 	default:
 		return common.Address{}, common.Address{}, fmt.Errorf("unsupported SetAccountDelegate operation")
 	}

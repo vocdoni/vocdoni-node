@@ -25,14 +25,32 @@ import (
 	"go.vocdoni.io/dvote/statedb"
 
 	"go.vocdoni.io/dvote/types"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
-// defaultHashLen is the most common default hash length for Arbo hashes.  This
-// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
-// arbo.HashFunctionBlake2b.Len()
-const defaultHashLen = 32
+const (
+	// defaultHashLen is the most common default hash length for Arbo hashes.  This
+	// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
+	// arbo.HashFunctionBlake2b.Len()
+	defaultHashLen = 32
+)
+
+// TxTypeCostToStateKey translates models.TxType to a string which the State uses
+// as a key internally under the Extra tree
+var TxTypeCostToStateKey = map[models.TxType]string{
+	models.TxType_SET_PROCESS_STATUS:         "c_setProcessStatus",
+	models.TxType_SET_PROCESS_CENSUS:         "c_setProcessCensus",
+	models.TxType_SET_PROCESS_QUESTION_INDEX: "c_setProcessResults",
+	models.TxType_SET_PROCESS_RESULTS:        "c_setProcessQuestionIndex",
+	models.TxType_REGISTER_VOTER_KEY:         "c_registerKey",
+	models.TxType_NEW_PROCESS:                "c_newProcess",
+	models.TxType_SEND_TOKENS:                "c_sendTokens",
+	models.TxType_SET_ACCOUNT_INFO:           "c_setAccountInfo",
+	models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "c_addDelegateForAccount",
+	models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   "c_delDelegateForAccount",
+	models.TxType_COLLECT_FAUCET:             "c_collectFaucet",
+}
 
 // rootLeafGetRoot is the GetRootFn function for a leaf that is the root
 // itself.
@@ -504,11 +522,12 @@ func (v *State) IsOracle(addr common.Address) (bool, error) {
 
 // setTreasurer saves the Treasurer address to the state
 func (v *State) setTreasurer(address common.Address) error {
-	t := &models.Treasurer{
-		Address: address.Bytes(),
-		Nonce:   0,
-	}
-	tBytes, err := proto.Marshal(t)
+	tBytes, err := proto.Marshal(
+		&models.Treasurer{
+			Address: address.Bytes(),
+			Nonce:   0,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -559,6 +578,39 @@ func (v *State) incrementTreasurerNonce() error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
+}
+
+func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
+	key, ok := TxTypeCostToStateKey[txType]
+	if !ok {
+		return fmt.Errorf("txType %v shouldn't cost anything", txType)
+	}
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+
+	costBytes := [8]byte{}
+	binary.LittleEndian.PutUint64(costBytes[:], cost)
+	return v.Tx.DeepSet([]byte(key), costBytes[:], ExtraCfg)
+}
+
+func (v *State) TxCost(txType models.TxType, isQuery bool) (uint64, error) {
+	key, ok := TxTypeCostToStateKey[txType]
+	if !ok {
+		return 0, fmt.Errorf("txType %v shouldn't cost anything", txType)
+	}
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	extraTree, err := v.mainTreeViewer(isQuery).SubTree(ExtraCfg)
+	if err != nil {
+		return 0, err
+	}
+	var cost []byte
+	if cost, err = extraTree.Get([]byte(key)); err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint64(cost), nil
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey

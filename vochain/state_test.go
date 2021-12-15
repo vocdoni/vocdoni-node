@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
@@ -340,7 +339,23 @@ func TestStateIsTreasurer(t *testing.T) {
 	qt.Assert(t, r, qt.IsTrue)
 
 	notTreasurer := "0x000000000000000000000000000000000000dead"
-	r, err = s.IsTreasurer(ethcommon.HexToAddress(notTreasurer))
+	r, err = s.IsTreasurer(common.HexToAddress(notTreasurer))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, r, qt.IsFalse)
+}
+
+func TestStateSetGetTxCostByTxType(t *testing.T) {
+	log.Init("info", "stdout")
+	s, err := NewState(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	defer s.Close()
+
+	var height uint32 = 1
+	s.Rollback()
+	s.SetHeight(height)
+
+	qt.Assert(t, s.SetTxCost(models.TxType_SET_PROCESS_CENSUS, 100), qt.IsNil)
+	cost, err := s.TxCost(models.TxType_SET_PROCESS_CENSUS, false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, cost, qt.Equals, uint64(100))
 }

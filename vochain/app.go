@@ -392,6 +392,14 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		log.Fatalf("could not set State.Treasurer from genesis file: %s", err)
 	}
 
+	// add tx costs
+	for k, v := range genesisAppState.TxCost.AsMap() {
+		err = app.State.SetTxCost(k, v)
+		if err != nil {
+			log.Fatalf("could not set tx cost %q to value %q from genesis file to the State", k, v)
+		}
+	}
+
 	// Is this save needed?
 	if _, err := app.State.Save(); err != nil {
 		log.Fatalf("cannot save state: %s", err)
