@@ -503,11 +503,12 @@ func (v *State) IsOracle(addr common.Address) (bool, error) {
 
 // setTreasurer saves the Treasurer address to the state
 func (v *State) setTreasurer(address common.Address) error {
-	t := &models.Treasurer{
-		Address: address.Bytes(),
-		Nonce:   0,
-	}
-	tBytes, err := proto.Marshal(t)
+	tBytes, err := proto.Marshal(
+		&models.Treasurer{
+			Address: address.Bytes(),
+			Nonce:   0,
+		},
+	)
 	if err != nil {
 		return err
 	}
