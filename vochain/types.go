@@ -3,9 +3,14 @@ package vochain
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"regexp"
+	"strings"
 	"time"
+	"unicode"
 
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -14,6 +19,7 @@ const (
 	voteCacheSize           = 50000
 	NewProcessCost          = 0
 	SetProcessCost          = 0
+	costPrefix              = "c_"
 )
 
 var (
@@ -25,6 +31,8 @@ var (
 	ErrAccountBalanceZero  = fmt.Errorf("zero balance account not valid")
 	// keys; not constants because of []byte
 	voteCountKey = []byte("voteCount")
+
+	rxAlphabetical = regexp.MustCompile(`^[A-Za-z]+$`)
 )
 
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
@@ -59,6 +67,74 @@ type QueryData struct {
 	ProcessType string `json:"type,omitempty"`
 }
 
+// ________________________ TRANSACTION COSTS __________________________
+// TransactionCosts describes how much each operation should cost
+type TransactionCosts struct {
+	SetProcess            uint64 `json:"Tx_SetProcess"`
+	RegisterKey           uint64 `json:"Tx_RegisterKey"`
+	NewProcess            uint64 `json:"Tx_NewProcess"`
+	SendTokens            uint64 `json:"Tx_SendTokens"`
+	SetAccountInfo        uint64 `json:"Tx_SetAccountInfo"`
+	AddDelegateForAccount uint64 `json:"Tx_AddDelegateForAccount"`
+	DelDelegateForAccount uint64 `json:"Tx_DelDelegateForAccount"`
+	CollectFaucet         uint64 `json:"Tx_CollectFaucet"`
+}
+
+// StructAsBytes returns the contents of TransactionCosts as a map. Its purpose
+// is to keep knowledge of TransactionCosts' fields within itself, so the
+// function using it only needs to iterate over the key-values.
+func (t *TransactionCosts) StructAsBytes() (map[string][]byte, error) {
+	b := make(map[string][]byte)
+
+	tType := reflect.TypeOf(*t)
+	tValue := reflect.ValueOf(*t)
+	for i := 0; i < tType.NumField(); i++ {
+		key := TransactionCostsFieldToStateKey(tType.Field(i).Name)
+
+		value := tValue.Field(i).Uint()
+		valueBytes, err := util.Uint64ToBytes(value)
+		if err != nil {
+			return nil, err
+		}
+		b[key] = valueBytes
+	}
+	return b, nil
+}
+
+// TransactionCostsFieldToStateKey transforms "SetProcess" to "c_setProcess" for all of
+// TransactionCosts' fields
+func TransactionCostsFieldToStateKey(key string) string {
+	a := []rune(key)
+	a[0] = unicode.ToLower(a[0])
+	return strings.Join([]string{costPrefix, string(a)}, "")
+}
+
+// TransactionCostsFieldFromStateKey transforms "c_setProcess" to "SetProcess" for all of
+// TransactionCosts' fields
+func TransactionCostsFieldFromStateKey(key string) (string, error) {
+	if len(key) < 3 {
+		return "", fmt.Errorf("state key must have a length greater than 3, because it should include the costPrefix: got %q", key)
+	}
+	if !strings.HasPrefix(key, costPrefix) {
+		return "", fmt.Errorf("state keys must start with %q, got %q", costPrefix, key)
+	}
+	name := strings.TrimPrefix(key, costPrefix)
+
+	// strings.Title will misbehave when there are punctuation marks in the
+	// string. To clean the input up, we ensure there are only alphabetical
+	// characters left in the string
+	if !rxAlphabetical.MatchString(name) {
+		return "", fmt.Errorf("%q needs to be alphabetical only", name)
+	}
+	capName := strings.Title(name)
+
+	// check if TransactionCosts actually has such a field
+	if _, found := reflect.TypeOf(TransactionCosts{}).FieldByName(capName); !found {
+		return "", fmt.Errorf("no such field %q exists on TransactionCosts", capName)
+	}
+	return capName, nil
+}
+
 // ________________________ GENESIS APP STATE ________________________
 
 // GenesisAppState application state in genesis
@@ -66,6 +142,7 @@ type GenesisAppState struct {
 	Validators []GenesisValidator `json:"validators"`
 	Oracles    []string           `json:"oracles"`
 	Treasurer  string             `json:"treasurer"`
+	TxCost     TransactionCosts   `json:"tx_cost"`
 }
 
 // The rest of these genesis app state types are copied from
