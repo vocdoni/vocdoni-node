@@ -61,7 +61,8 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 		models.ProcessMode{},
 		models.ProcessVoteOptions{},
 	)); diff != "" {
-		panic(diff)
+		println(diff)
+		panic("ping mvdan to fix this bug")
 	}
 
 	return proc, nil
@@ -213,7 +214,9 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 		return nil, err
 	}
 	if diff := cmp.Diff(procs, sqlProcs); diff != "" {
-		panic(diff)
+		println(diff)
+		// TODO(mvdan): fix the bug reported on 2021-12-16
+		// panic("ping mvdan to fix this bug")
 	}
 
 	return procs, nil
