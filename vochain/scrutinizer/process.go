@@ -3,6 +3,7 @@ package scrutinizer
 import (
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -62,6 +63,7 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 		models.ProcessVoteOptions{},
 	)); diff != "" {
 		println(diff)
+		fmt.Fprintf(os.Stderr, "params: %x", pid)
 		panic("ping mvdan to fix this bug")
 	}
 
@@ -132,7 +134,6 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 	// performance improvement is quite relevant.
 	var err error
 	var procs [][]byte
-	var sqlProcs [][]byte
 	switch {
 	case namespace == 0 && len(entityID) > 0:
 		err = s.db.ForEach(
@@ -200,7 +201,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 		return nil, err
 	}
 	sqlStartTime := time.Now()
-	sqlProcs, err = queries.SearchProcesses(ctx, scrutinizerdb.SearchProcessesParams{
+	sqlProcs, err := queries.SearchProcesses(ctx, scrutinizerdb.SearchProcessesParams{
 		EntityID:        string(entityID),
 		Namespace:       int64(namespace),
 		Status:          int64(statusnum),
@@ -213,13 +214,26 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 	if err != nil {
 		return nil, err
 	}
-	if diff := cmp.Diff(procs, sqlProcs); diff != "" {
+	// []string in hex form is easier to debug when we get mismatches
+	if diff := cmp.Diff(toHexList(procs), toHexList(sqlProcs)); diff != "" {
 		println(diff)
-		// TODO(mvdan): fix the bug reported on 2021-12-16
-		// panic("ping mvdan to fix this bug")
+		fmt.Fprintf(os.Stderr, "params: %#v\n", []interface{}{
+			entityID, from, max,
+			searchTerm, namespace,
+			srcNetworkIdstr, status, withResults,
+		})
+		panic("ping mvdan to fix this bug")
 	}
 
 	return procs, nil
+}
+
+func toHexList(decList [][]byte) []string {
+	encList := make([]string, len(decList))
+	for i, dec := range decList {
+		encList[i] = hex.EncodeToString(dec)
+	}
+	return encList
 }
 
 // ProcessCount returns the number of processes indexed

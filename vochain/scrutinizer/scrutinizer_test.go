@@ -245,6 +245,7 @@ func TestProcessSearch(t *testing.T) {
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
+		t.Logf("random process ID: %x", pid)
 		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     util.RandomBytes(20),
@@ -349,6 +350,16 @@ func TestProcessSearch(t *testing.T) {
 	if len(list) < len(endedPIDs) {
 		t.Fatalf("expected %d processes, got %d", len(endedPIDs), len(list))
 	}
+
+	// list all processes, with a max of 10
+	list, err = sc.ProcessList(nil, 0, 10, "", 0, "", "", false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, list, qt.HasLen, 10)
+
+	// list all processes, with a max of 1000
+	list, err = sc.ProcessList(nil, 0, 1000, "", 0, "", "", false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, list, qt.HasLen, 21)
 }
 
 func TestProcessListWithNamespaceAndStatus(t *testing.T) {
