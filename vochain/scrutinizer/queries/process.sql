@@ -34,8 +34,9 @@ WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
 	AND (sqlc.arg(source_network_id) = "" OR source_network_id = sqlc.arg(source_network_id))
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
 	AND (sqlc.arg(id_substr) = "" OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
-	AND (sqlc.arg(with_results) = FALSE OR results_height > 0)
-ORDER BY creation_time ASC, ID ASC
+	AND (sqlc.arg(with_results) = FALSE OR have_results)
+	-- Note that badgerhold sorted by length before the bytes. For backwards compatibility.
+ORDER BY creation_time ASC, LENGTH(ID) ASC, ID ASC
 	-- TODO(mvdan): use sqlc.arg once limit/offset support it:
 	-- https://github.com/kyleconroy/sqlc/issues/1025
 LIMIT ?
