@@ -41,7 +41,7 @@ func VerifyProof(process *models.Process, proof *models.Proof,
 	// check census origin and compute vote digest identifier
 	var verifyProof VerifyProofFunc
 	switch process.CensusOrigin {
-	case models.CensusOrigin_OFF_CHAIN_TREE:
+	case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
 		verifyProof = VerifyProofOffChainTree
 	case models.CensusOrigin_OFF_CHAIN_CA:
 		verifyProof = VerifyProofOffChainCSP
