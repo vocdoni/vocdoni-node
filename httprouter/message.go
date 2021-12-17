@@ -53,6 +53,7 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 	h.Writer.Header().Set("Content-Type", "application/json")
 	h.Writer.WriteHeader(httpStatusCode)
 
+	log.Debugf("response: %s", msg)
 	if _, err := h.Writer.Write(msg); err != nil {
 		return err
 	}

@@ -112,6 +112,9 @@ func (b *BearerStandardAPI) ProcessData(req *http.Request) (interface{}, error) 
 	if err != nil {
 		return nil, fmt.Errorf("HTTP connection closed: (%v)", err)
 	}
+	if len(respBody) > 0 {
+		log.Debugf("request: %s", respBody)
+	}
 	return &BearerStandardAPIdata{
 		Data:      respBody,
 		AuthToken: strings.TrimPrefix(req.Header.Get("Authorization"), bearerPrefix),

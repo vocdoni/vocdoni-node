@@ -93,7 +93,7 @@ func (r *HTTProuter) Init(host string, port int) error {
 		AllowOriginFunc: func(r *http.Request, origin string) bool {
 			return true
 		}, // Kind of equivalent to AllowedOrigin: []string{"*"} but it returns the origin as allowed origin.
-		AllowedMethods:   []string{"GET", "POST", "PUT", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "OPTIONS", "DELETE"},
 		AllowedHeaders:   []string{"Content-Type"},
 		AllowCredentials: true,
 		MaxAge:           300, // Maximum value not ignored by any of major browsers

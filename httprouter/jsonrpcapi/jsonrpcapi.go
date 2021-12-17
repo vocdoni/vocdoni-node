@@ -117,6 +117,9 @@ func (s *SignedJRPC) ProcessData(req *http.Request) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("HTTP connection closed: (%v)", err)
 	}
+	if len(reqBody) > 0 {
+		log.Debugf("request: %s", reqBody)
+	}
 	procReq, err := s.getRequest(reqBody)
 	if err != nil {
 		return nil, s.returnError(err.Error(), procReq.ID)
