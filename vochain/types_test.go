@@ -2,6 +2,7 @@ package vochain
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -9,29 +10,49 @@ import (
 
 func TestTransactionCostsStructAsBytes(t *testing.T) {
 	txCosts := TransactionCosts{
-		SetProcess:            10,
-		RegisterKey:           10,
-		NewProcess:            10,
-		SendTokens:            10,
-		SetAccountInfo:        10,
-		AddDelegateForAccount: 10,
-		DelDelegateForAccount: 10,
-		CollectFaucet:         10,
+		SetProcess:            0,
+		RegisterKey:           1,
+		NewProcess:            2,
+		SendTokens:            3,
+		SetAccountInfo:        4,
+		AddDelegateForAccount: 5,
+		DelDelegateForAccount: 6,
+		CollectFaucet:         7,
 	}
 	txCostsBytes, err := txCosts.StructAsBytes()
 	qt.Assert(t, err, qt.IsNil)
 
 	expected := map[string][]byte{
-		"c_addDelegateForAccount": {10, 0, 0, 0, 0, 0, 0, 0},
-		"c_collectFaucet":         {10, 0, 0, 0, 0, 0, 0, 0},
-		"c_delDelegateForAccount": {10, 0, 0, 0, 0, 0, 0, 0},
-		"c_newProcess":            {10, 0, 0, 0, 0, 0, 0, 0},
-		"c_registerKey":           {10, 0, 0, 0, 0, 0, 0, 0},
-		"c_sendTokens":            {10, 0, 0, 0, 0, 0, 0, 0},
-		"c_setAccountInfo":        {10, 0, 0, 0, 0, 0, 0, 0},
-		"c_setProcess":            {10, 0, 0, 0, 0, 0, 0, 0},
+		kAddDelegateForAccount: {5, 0, 0, 0, 0, 0, 0, 0},
+		kCollectFaucet:         {7, 0, 0, 0, 0, 0, 0, 0},
+		kDelDelegateForAccount: {6, 0, 0, 0, 0, 0, 0, 0},
+		kNewProcess:            {2, 0, 0, 0, 0, 0, 0, 0},
+		kRegisterKey:           {1, 0, 0, 0, 0, 0, 0, 0},
+		kSendTokens:            {3, 0, 0, 0, 0, 0, 0, 0},
+		kSetAccountInfo:        {4, 0, 0, 0, 0, 0, 0, 0},
+		kSetProcess:            {0, 0, 0, 0, 0, 0, 0, 0},
 	}
 	qt.Assert(t, txCostsBytes, qt.DeepEquals, expected)
+}
+func TestTransactionCostsFieldUsesSameKeysAsState(t *testing.T) {
+	fields := map[string]string{
+		"SetProcess":            kSetProcess,
+		"RegisterKey":           kRegisterKey,
+		"NewProcess":            kNewProcess,
+		"SendTokens":            kSendTokens,
+		"SetAccountInfo":        kSetAccountInfo,
+		"AddDelegateForAccount": kAddDelegateForAccount,
+		"DelDelegateForAccount": kDelDelegateForAccount,
+		"CollectFaucet":         kCollectFaucet,
+	}
+	for k, v := range fields {
+		qt.Assert(t, TransactionCostsFieldToStateKey(k), qt.Equals, v)
+
+		// check that TransactionCosts struct does have the fields that we
+		// specify in this test
+		_, found := reflect.TypeOf(TransactionCosts{}).FieldByName(k)
+		qt.Assert(t, found, qt.IsTrue)
+	}
 }
 
 func TestTransactionCostsFieldFromStateKey(t *testing.T) {

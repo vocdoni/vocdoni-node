@@ -23,16 +23,30 @@ import (
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
+	"go.vocdoni.io/dvote/util"
 
 	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
-// defaultHashLen is the most common default hash length for Arbo hashes.  This
-// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
-// arbo.HashFunctionBlake2b.Len()
-const defaultHashLen = 32
+const (
+	// defaultHashLen is the most common default hash length for Arbo hashes.  This
+	// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
+	// arbo.HashFunctionBlake2b.Len()
+	defaultHashLen = 32
+
+	// k* are the keys under which the State stores how much each
+	// transaction should cost
+	kSetProcess            = "c_setProcess"
+	kRegisterKey           = "c_registerKey"
+	kNewProcess            = "c_newProcess"
+	kSendTokens            = "c_sendTokens"
+	kSetAccountInfo        = "c_setAccountInfo"
+	kAddDelegateForAccount = "c_addDelegateForAccount"
+	kDelDelegateForAccount = "c_delDelegateForAccount"
+	kCollectFaucet         = "c_collectFaucet"
+)
 
 // rootLeafGetRoot is the GetRootFn function for a leaf that is the root
 // itself.
@@ -559,6 +573,60 @@ func (v *State) incrementTreasurerNonce() error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
+}
+
+func (v *State) getTxCostKey(txType models.TxType) (string, error) {
+	var s string
+	switch txType {
+	case models.TxType_SET_PROCESS_STATUS, models.TxType_SET_PROCESS_CENSUS, models.TxType_SET_PROCESS_QUESTION_INDEX, models.TxType_SET_PROCESS_RESULTS:
+		s = kSetProcess
+	case models.TxType_REGISTER_VOTER_KEY:
+		s = kRegisterKey
+	case models.TxType_NEW_PROCESS:
+		s = kNewProcess
+	case models.TxType_SEND_TOKENS:
+		s = kSendTokens
+	case models.TxType_SET_ACCOUNT_INFO:
+		s = kSetAccountInfo
+	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
+		s = kAddDelegateForAccount
+	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+		s = kDelDelegateForAccount
+	case models.TxType_COLLECT_FAUCET:
+		s = kCollectFaucet
+	default:
+		return "", fmt.Errorf("txType %v shouldn't cost anything", txType)
+	}
+	return s, nil
+}
+
+func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
+	key, err := v.getTxCostKey(txType)
+	if err != nil {
+		return err
+	}
+
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	costBytes, err := util.Uint64ToBytes(cost)
+	if err != nil {
+		return err
+	}
+	return v.Tx.DeepSet([]byte(key), costBytes, ExtraCfg)
+}
+
+func (v *State) TxCost(txType models.TxType) (uint64, error) {
+	key, err := v.getTxCostKey(txType)
+	if err != nil {
+		return 0, err
+	}
+
+	extraTree, err := v.mainTreeViewer(true).SubTree(ExtraCfg)
+	if err != nil {
+		return 0, err
+	}
+	cost, err := statedb.GetUint64(extraTree, []byte(key))
+	return cost, err
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
