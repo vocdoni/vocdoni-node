@@ -1,7 +1,6 @@
 package vochain
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -53,17 +52,4 @@ func TestTransactionCostsFieldUsesSameKeysAsState(t *testing.T) {
 		_, found := reflect.TypeOf(TransactionCosts{}).FieldByName(k)
 		qt.Assert(t, found, qt.IsTrue)
 	}
-}
-
-func TestTransactionCostsFieldFromStateKey(t *testing.T) {
-	fieldName, err := TransactionCostsFieldFromStateKey("c_setProcess")
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, fieldName, qt.Equals, "SetProcess")
-	fmt.Println("Fieldname", fieldName)
-
-	_, err = TransactionCostsFieldFromStateKey("c_fictionalField")
-	qt.Assert(t, err, qt.IsNotNil)
-
-	_, err = TransactionCostsFieldFromStateKey("c_")
-	qt.Assert(t, err, qt.ErrorMatches, "state key must have a length greater than .*")
 }
