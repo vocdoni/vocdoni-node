@@ -170,6 +170,15 @@
     "oracles": [
       "0xf7FB77ee1F309D9468fB6DCB71aDD0f934a33c6B"
     ],
-    "processes": {}
+    "treasurer": "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d",
+    "tx_cost": {
+       "Tx_SetProcess": 100,
+       "Tx_RegisterKey": 100,
+       "Tx_NewProcess": 100,
+       "Tx_SendTokens": 100,
+       "Tx_SetAccountInfo": 100,
+       "Tx_SetAccountDelegate": 100,
+       "Tx_CollectFaucet": 100
+     }
   }
 }

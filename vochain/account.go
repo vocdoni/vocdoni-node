@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -191,4 +192,93 @@ func (v *State) VerifyAccountBalance(message, signature []byte, amount uint64) (
 		return false, address, nil
 	}
 	return acc.Balance >= amount, address, nil
+}
+
+func (v *State) SetAccountInfoURI(address common.Address, infoURI string) error {
+	if infoURI == "" {
+		return fmt.Errorf("cannot set an empty URI")
+	}
+	var acc Account
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	raw, err := v.Tx.DeepGet(address.Bytes(), AccountsCfg)
+	if err != nil && !errors.Is(err, arbo.ErrKeyNotFound) {
+		return err
+	} else if err == nil {
+		if err := acc.Unmarshal(raw); err != nil {
+			return err
+		}
+	}
+	acc.InfoURI = infoURI
+	accBytes, err := acc.Marshal()
+	if err != nil {
+		return err
+	}
+	return v.Tx.DeepSet(address.Bytes(), accBytes, AccountsCfg)
+}
+
+func (v *State) CreateAccount(address common.Address, infoURI string, delegates []common.Address, initBalance uint64) error {
+	// check valid address
+	if address.String() == types.EthereumZeroAddress {
+		return fmt.Errorf("invalid address")
+	}
+	// check not created
+	acc, err := v.GetAccount(address, false)
+	if err != nil {
+		return fmt.Errorf("cannot create account %s: %v", address.String(), err)
+	}
+	if acc != nil {
+		return fmt.Errorf("account %s already exists", address.String())
+	}
+	// account not found, creating it
+	// check valid infoURI, must be set on creation
+	if infoURI == "" {
+		return fmt.Errorf("cannot set an empty URI")
+	}
+	newAccount := &Account{}
+	newAccount.InfoURI = infoURI
+	if len(delegates) > 0 {
+		newAccount.DelegateAddrs = make([][]byte, len(delegates))
+		for i := 0; i < len(delegates); i++ {
+			if delegates[i].String() != types.EthereumZeroAddress {
+				newAccount.DelegateAddrs = append(newAccount.DelegateAddrs, delegates[i].Bytes())
+			}
+		}
+	}
+	newAccount.Balance = initBalance
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	accBytes, err := newAccount.Marshal()
+	if err != nil {
+		return err
+	}
+	return v.Tx.DeepSet(address.Bytes(), accBytes, AccountsCfg)
+}
+
+// SetAccountInfoTxCheck is an abstraction of ABCI checkTx for an setAccountInfoTx transaction
+// If the bool returned is true means that the account does not exist and is going to be created
+func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, bool, error) {
+	tx := vtx.GetSetAccountInfo()
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return common.Address{}, false, fmt.Errorf("missing signature and/or transaction")
+	}
+	infoURI := tx.GetInfoURI()
+	if infoURI == "" {
+		return common.Address{}, false, fmt.Errorf("invalid URI, cannot be empty")
+	}
+	// get address from signature
+	accountAddress, err := ethereum.AddrFromSignature(txBytes, signature)
+	if err != nil {
+		return common.Address{}, false, err
+	}
+	// check account, if not exists a new one will be created
+	acc, err := state.GetAccount(accountAddress, false)
+	if err != nil {
+		return common.Address{}, false, fmt.Errorf("cannot check if account %s exists: %v", accountAddress.String(), err)
+	}
+	if acc == nil {
+		return accountAddress, true, nil
+	}
+	return accountAddress, false, nil
 }

@@ -29,28 +29,28 @@ jobs:
           curl -L https://github.com/dominikh/go-tools/releases/download/2021.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
           ./staticcheck/staticcheck ./...
 
-  compose-test:
-    runs-on: self-hosted
-    if: github.repository == 'vocdoni/vocdoni-node'
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2
-      - name: Run compose script
-        run: |
-          export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
-          export DOCKER_CLI_EXPERIMENTAL=enabled
-          export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
-          export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
-          export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
-          export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
-          cd dockerfiles/testsuite
-          docker-compose build
-          ./start_test.sh
+  # compose-test:
+  #   runs-on: self-hosted
+  #   if: github.repository == 'vocdoni/vocdoni-node'
+  #   steps:
+  #     - name: Check out the repo
+  #       uses: actions/checkout@v2
+  #     - name: Run compose script
+  #       run: |
+  #         export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
+  #         export DOCKER_CLI_EXPERIMENTAL=enabled
+  #         export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
+  #         export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
+  #         export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
+  #         export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
+  #         cd dockerfiles/testsuite
+  #         docker-compose build
+  #         ./start_test.sh
 
   docker-release:
     runs-on: self-hosted
-    needs: [go-tests, compose-test]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev'
+    needs: [go-tests]
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/ethless'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2

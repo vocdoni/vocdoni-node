@@ -2268,10 +2268,8 @@ go.vocdoni.io/proto v0.1.7/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M
 go.vocdoni.io/proto v0.1.8/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v0.1.9-0.20210304214308-6f7363b52750/go.mod h1:cyITrt7+sHmUJH06WLu69xB7LBY9c9FakFaBOe8gs/M=
 go.vocdoni.io/proto v1.0.4-0.20210726091234-bceaf416353b/go.mod h1:QV3gKc9Zf0xHW3o8wEaqSn8iZ94UTl8gOzekxoz3kWs=
-go.vocdoni.io/proto v1.13.3-0.20211126083500-46ba146eff3f h1:YtqKk93BnLla8sBqYNMQAZAkv5Yqniwlr/ilzUVCP9Q=
-go.vocdoni.io/proto v1.13.3-0.20211126083500-46ba146eff3f/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
-go.vocdoni.io/proto v1.13.3-0.20211213103251-819c44a1427e h1:FfRIilv/5AFgCK/jFTXQYjtqw2FDFvFkz0hioeg8+RM=
-go.vocdoni.io/proto v1.13.3-0.20211213103251-819c44a1427e/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
+go.vocdoni.io/proto v1.13.3-0.20211202161242-17ea8a435be6 h1:ObMJQOAGPOkQouub0EdkRXrkPOjtW6RW41rbdvurdcw=
+go.vocdoni.io/proto v1.13.3-0.20211202161242-17ea8a435be6/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
 go.vocdoni.io/proto v1.13.3-0.20211213155005-46b4177904ba h1:K9e6PRLXk+lAy9vv8oz0qeXx7IUAF/7ISOylj1jVcug=
 go.vocdoni.io/proto v1.13.3-0.20211213155005-46b4177904ba/go.mod h1:oi/WtiBFJ6QwNDv2aUQYwOnUKzYuS/fBqXF8xDNwcGo=
 go4.org v0.0.0-20180809161055-417644f6feb5/go.mod h1:MkTOUMDaeVYJUOUsaDXIhWPZYa1yOyC1qaOBpL57BhE=

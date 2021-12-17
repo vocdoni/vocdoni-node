@@ -12,8 +12,8 @@ import (
 const (
 	voteCachePurgeThreshold = uint32(60) // in blocks, 10 minutes
 	voteCacheSize           = 50000
-	NewProcessCost          = 10
-	SetProcessCost          = 1
+	NewProcessCost          = 0
+	SetProcessCost          = 0
 )
 
 var (
@@ -65,6 +65,7 @@ type QueryData struct {
 type GenesisAppState struct {
 	Validators []GenesisValidator `json:"validators"`
 	Oracles    []string           `json:"oracles"`
+	Treasurer  string             `json:"treasurer"`
 }
 
 // The rest of these genesis app state types are copied from

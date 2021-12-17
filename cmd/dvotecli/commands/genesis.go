@@ -26,6 +26,7 @@ func init() {
 	genesisGenCmd.Flags().Int("seeds", 1, "number of seed keys")
 	genesisGenCmd.Flags().Int("miners", 4, "number of miner keys")
 	genesisGenCmd.Flags().Int("oracles", 2, "number of oracle keys")
+	genesisGenCmd.Flags().String("treasurer", "", "address of the treasurer")
 	genesisGenCmd.Flags().String("chainId", "",
 		"an ID name for the genesis chain to generate (required)")
 	cobra.CheckErr(genesisGenCmd.MarkFlagRequired("chainId"))
@@ -83,9 +84,10 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 		Block:     vochain.BlockParams(tmConsensusParams.Block),
 		Validator: vochain.ValidatorParams(tmConsensusParams.Validator),
 	}
+	treasurer, _ := cmd.Flags().GetString("treasurer")
 	chainID, _ := cmd.Flags().GetString("chainId")
 
-	genesisBytes, err := vochain.NewGenesis(nil, chainID, consensusParams, minerPVs, oracles)
+	genesisBytes, err := vochain.NewGenesis(nil, chainID, consensusParams, minerPVs, oracles, treasurer)
 	if err != nil {
 		return err
 	}
