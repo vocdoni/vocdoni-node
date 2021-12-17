@@ -41,7 +41,13 @@ func NewTree(name, storageDir string, nLevels int, hashFunc arbo.HashFunction) (
 		return nil, err
 	}
 
-	mt, err := arbo.NewTree(database, nLevels, hashFunc)
+	arboConfig := arbo.Config{
+		Database:     database,
+		MaxLevels:    nLevels,
+		HashFunction: hashFunc,
+		// ThresholdNLeafs: not specified, use the default
+	}
+	mt, err := arbo.NewTree(arboConfig)
 	if err != nil {
 		database.Close()
 		return nil, err
@@ -80,7 +86,13 @@ func (t *Tree) Init(name, storageDir string) error {
 		return err
 	}
 
-	mt, err := arbo.NewTree(database, 140, arbo.HashFunctionBlake2b)
+	arboConfig := arbo.Config{
+		Database:     database,
+		MaxLevels:    140,
+		HashFunction: arbo.HashFunctionBlake2b,
+		// ThresholdNLeafs: not specified, use the default
+	}
+	mt, err := arbo.NewTree(arboConfig)
 	if err != nil {
 		database.Close()
 		return err
