@@ -1,9 +1,7 @@
 package util
 
 import (
-	"bytes"
 	"crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"math/big"
 
@@ -67,13 +65,4 @@ func CreateEthRandomKeysBatch(n int) []*ethereum.SignKeys {
 		}
 	}
 	return s
-}
-
-// Uint64ToBytes converts a uint to a little-endian byte array
-func Uint64ToBytes(x uint64) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := binary.Write(buf, binary.LittleEndian, x); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
