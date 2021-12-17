@@ -158,7 +158,7 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 		if err != nil {
 			return false, nil, fmt.Errorf("cannot compute blind CSP public key: %w", err)
 		}
-		signature, err := blind.NewSignatureFromBytes(p.GetSignature())
+		signature, err := blind.NewSignatureFromBytesUncompressed(p.GetSignature())
 		if err != nil {
 			return false, nil, fmt.Errorf("cannot compute blind CSP signature: %w", err)
 		}
