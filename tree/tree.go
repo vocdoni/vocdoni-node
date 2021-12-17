@@ -33,7 +33,13 @@ func New(wTx db.WriteTx, opts Options) (*Tree, error) {
 		wTx = opts.DB.WriteTx()
 		defer wTx.Discard()
 	}
-	tree, err := arbo.NewTreeWithTx(wTx, opts.DB, opts.MaxLevels, opts.HashFunc)
+	arboConfig := arbo.Config{
+		Database:     opts.DB,
+		MaxLevels:    opts.MaxLevels,
+		HashFunction: opts.HashFunc,
+		// ThresholdNLeafs: not specified, use the default
+	}
+	tree, err := arbo.NewTreeWithTx(wTx, arboConfig)
 	if err != nil {
 		return nil, err
 	}
