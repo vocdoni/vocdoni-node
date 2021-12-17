@@ -89,13 +89,10 @@ func (a *Account) DelDelegate(addr common.Address) error {
 // and updates the state with the new values (including nonce).
 // If origin address acc is not enough, ErrNotEnoughBalance is returned.
 // If provided nonce does not match origin address nonce+1, ErrAccountNonceInvalid is returned.
-// If isQuery is set to true, this method will only check against the current state (no changes will be stored)
-func (v *State) TransferBalance(from, to common.Address, amount uint64, nonce uint32, isQuery bool) error {
+func (v *State) TransferBalance(from, to common.Address, amount uint64, nonce uint32) error {
 	var accFrom, accTo Account
-	if !isQuery {
-		v.Tx.Lock()
-		defer v.Tx.Unlock()
-	}
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
 	accFromRaw, err := v.Tx.DeepGet(from.Bytes(), AccountsCfg)
 	if err != nil {
 		return err
@@ -104,31 +101,28 @@ func (v *State) TransferBalance(from, to common.Address, amount uint64, nonce ui
 		return err
 	}
 	accToRaw, err := v.Tx.DeepGet(to.Bytes(), AccountsCfg)
-	if err != nil && !errors.Is(err, arbo.ErrKeyNotFound) {
+	if err != nil {
 		return err
-	} else if err == nil {
-		if err := accTo.Unmarshal(accToRaw); err != nil {
-			return err
-		}
+	}
+	if err := accTo.Unmarshal(accToRaw); err != nil {
+		return err
 	}
 	if err := accFrom.Transfer(&accTo, amount, nonce); err != nil {
 		return err
 	}
-	if !isQuery {
-		af, err := accFrom.Marshal()
-		if err != nil {
-			return err
-		}
-		if err := v.Tx.DeepSet(from.Bytes(), af, AccountsCfg); err != nil {
-			return err
-		}
-		at, err := accTo.Marshal()
-		if err != nil {
-			return err
-		}
-		if err := v.Tx.DeepSet(to.Bytes(), at, AccountsCfg); err != nil {
-			return err
-		}
+	af, err := accFrom.Marshal()
+	if err != nil {
+		return err
+	}
+	if err := v.Tx.DeepSet(from.Bytes(), af, AccountsCfg); err != nil {
+		return err
+	}
+	at, err := accTo.Marshal()
+	if err != nil {
+		return err
+	}
+	if err := v.Tx.DeepSet(to.Bytes(), at, AccountsCfg); err != nil {
+		return err
 	}
 	return nil
 }
@@ -388,6 +382,49 @@ func (v *State) setDelegate(accountAddr, delegateAddr common.Address, txType mod
 	default:
 		return fmt.Errorf("invalid setDelegate tx type")
 	}
+}
+
+func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, common.Address, uint64, uint32, error) {
+	tx := vtx.GetSendTokens()
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("missing signature and/or transaction")
+	}
+	// get address from signature
+	sigAddress, err := ethereum.AddrFromSignature(txBytes, signature)
+	if err != nil {
+		return common.Address{}, common.Address{}, 0, 0, err
+	}
+	// check from
+	txFromAddress := common.BytesToAddress(tx.From)
+	if txFromAddress != sigAddress {
+		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("from (%s) field and extracted signature (%s) mismatch",
+			txFromAddress.String(),
+			sigAddress.String(),
+		)
+	}
+	// check to
+	txToAddress := common.BytesToAddress(tx.To)
+	if txToAddress.String() == types.EthereumZeroAddress {
+		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("invalid address")
+	}
+	_, err = state.GetAccount(txToAddress, false)
+	if err != nil {
+		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("cannot get to account info: %v", err)
+	}
+	// check nonce
+	acc, err := state.GetAccount(sigAddress, false)
+	if err != nil {
+		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("cannot get account info: %v", err)
+	}
+	if tx.Nonce != acc.Nonce {
+		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
+	}
+	// check value
+	if tx.Value > acc.Balance {
+		return common.Address{}, common.Address{}, 0, 0, ErrNotEnoughBalance
+	}
+	return sigAddress, txToAddress, tx.Value, tx.Nonce, nil
 }
 
 func (v *State) setAccount(accountAddress common.Address, account *Account) error {

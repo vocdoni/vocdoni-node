@@ -206,6 +206,15 @@ func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
 			}
 		}
 
+	case *models.Tx_SendTokens:
+		from, to, amount, nonce, err := SendTokensTxCheck(vtx, txBytes, signature, app.State)
+		if err != nil {
+			return []byte{}, fmt.Errorf("sendTokensTx: %w", err)
+		}
+		if commit {
+			return []byte{}, app.State.TransferBalance(from, to, amount, nonce)
+		}
+
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
 	}
