@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
@@ -340,7 +339,7 @@ func TestStateIsTreasurer(t *testing.T) {
 	qt.Assert(t, r, qt.IsTrue)
 
 	notTreasurer := "0x000000000000000000000000000000000000dead"
-	r, err = s.IsTreasurer(ethcommon.HexToAddress(notTreasurer))
+	r, err = s.IsTreasurer(common.HexToAddress(notTreasurer))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, r, qt.IsFalse)
 }
