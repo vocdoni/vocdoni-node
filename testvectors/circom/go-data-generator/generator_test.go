@@ -8,14 +8,16 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/vocdoni/arbo"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/badgerdb"
 )
 
 func TestGenerator(t *testing.T) {
 	c := qt.New(t)
-	database, err := badgerdb.New(badgerdb.Options{Path: c.TempDir()})
+	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
-	tree, err := arbo.NewTree(database, 4, arbo.HashFunctionPoseidon)
+	tree, err := arbo.NewTree(arbo.Config{Database: database, MaxLevels: 4,
+		HashFunction: arbo.HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 
 	testVector := [][]int64{
