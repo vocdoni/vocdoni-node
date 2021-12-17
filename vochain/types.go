@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -10,7 +11,6 @@ import (
 	"unicode"
 
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -90,11 +90,10 @@ func (t *TransactionCosts) StructAsBytes() (map[string][]byte, error) {
 		key := TransactionCostsFieldToStateKey(tType.Field(i).Name)
 
 		value := tValue.Field(i).Uint()
-		valueBytes, err := util.Uint64ToBytes(value)
-		if err != nil {
-			return nil, err
-		}
-		b[key] = valueBytes
+
+		valueBytes := [8]byte{}
+		binary.LittleEndian.PutUint64(valueBytes[:], value)
+		b[key] = valueBytes[:]
 	}
 	return b, nil
 }
