@@ -166,6 +166,8 @@ github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkY
 github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210203222605-876755a714c3/go.mod h1:10oM1DQMpukFfSzNsjSQG2rE6UjoGsXT4iIxWIiVbu0=
 github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210323162413-ccaa6313370d h1:QRip5Otx+8mDr77Z3AtTi3aq5cksZHyvDarzOo/vj7g=
 github.com/arnaucube/go-blindsecp256k1 v0.0.0-20210323162413-ccaa6313370d/go.mod h1:10oM1DQMpukFfSzNsjSQG2rE6UjoGsXT4iIxWIiVbu0=
+github.com/arnaucube/go-blindsecp256k1 v0.0.0-20211204171003-644e7408753f h1:+9bA9YJEr8gb+F4rsJ2EYIyaB/3+nKcuOiUStTAf1Pg=
+github.com/arnaucube/go-blindsecp256k1 v0.0.0-20211204171003-644e7408753f/go.mod h1:n598ze+TUwDUQ2mbbiKgitcH6UNJlVYX6sLc08iI1nM=
 github.com/aryann/difflib v0.0.0-20170710044230-e206f873d14a/go.mod h1:DAHtR1m6lCRdSC2Tm3DSWRPvIPr6xNKyeHdqDQSQT+A=
 github.com/aws/aws-lambda-go v1.13.3/go.mod h1:4UKl9IzQMoD+QF79YdCuzCwp8VbmG4VAQwij/eHl5CU=
 github.com/aws/aws-sdk-go v1.25.48/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
