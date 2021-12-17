@@ -270,3 +270,115 @@ func testSetDelegateTx(t *testing.T,
 	app.Commit()
 	return nil
 }
+
+func TestSendTokensTx(t *testing.T) {
+	app := TestBaseApplication(t)
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	randomAccountSigner := ethereum.SignKeys{}
+	if err := randomAccountSigner.Generate(); err != nil {
+		t.Fatal(err)
+	}
+
+	// create accounts
+	// from
+	testSetAccountInfoTx(t, &signer, app, infoURI)
+	// to
+	testSetAccountInfoTx(t, &randomAccountSigner, app, infoURI)
+	// top up signer account
+	if err := app.State.MintBalance(signer.Address(), 100); err != nil {
+		t.Fatal(err)
+	}
+	// get nonce
+	acc, err := app.State.GetAccount(signer.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// should transfer tokens
+	if err := testSendTokensTx(t, &signer, app, randomAccountSigner.Address().String(), 50, acc.Nonce); err != nil {
+		t.Fatal(err)
+	}
+
+	// should fail if sender does not have enough balance
+	if err := testSendTokensTx(t, &signer, app, randomAccountSigner.Address().String(), 51, acc.Nonce+1); err == nil {
+		t.Fatal(err)
+	}
+
+	// should fail if nonce is not correct
+	if err := testSendTokensTx(t, &signer, app, randomAccountSigner.Address().String(), 50, acc.Nonce+5); err == nil {
+		t.Fatal(err)
+	}
+
+	// should fail if account does not exist
+	if err := testSendTokensTx(t, &signer, app, randomEthAccount, 50, acc.Nonce+1); err == nil {
+		t.Fatal(err)
+	}
+
+	// get accounts
+	signerAcc, err := app.State.GetAccount(signer.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	toAcc, err := app.State.GetAccount(randomAccountSigner.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signerAcc.Balance != 50 {
+		t.Fatalf("signer balance expected to be 50, got %d", signerAcc.Balance)
+	}
+	if toAcc.Balance != 50 {
+		t.Fatalf("to account balance expected to be 50, got %d", toAcc.Balance)
+	}
+	if signerAcc.Nonce != 1 {
+		t.Fatalf("expected nonce is 1, got %d", signerAcc.Nonce)
+	}
+}
+
+func testSendTokensTx(t *testing.T,
+	signer *ethereum.SignKeys,
+	app *BaseApplication,
+	to string,
+	amount uint64,
+	nonce uint32) error { // op == true -> add, op == false -> del
+	var cktx abcitypes.RequestCheckTx
+	var detx abcitypes.RequestDeliverTx
+	var cktxresp abcitypes.ResponseCheckTx
+	var detxresp abcitypes.ResponseDeliverTx
+	var stx models.SignedTx
+	var err error
+
+	toAddr := common.HexToAddress(to)
+	tx := &models.SendTokensTx{
+		From:  signer.Address().Bytes(),
+		To:    toAddr.Bytes(),
+		Value: amount,
+		Nonce: nonce,
+	}
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SendTokens{SendTokens: tx}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+		t.Fatal(err)
+	}
+
+	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
+		t.Fatal(err)
+	}
+	cktxresp = app.CheckTx(cktx)
+	if cktxresp.Code != 0 {
+		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
+	}
+	if detx.Tx, err = proto.Marshal(&stx); err != nil {
+		t.Fatal(err)
+	}
+	detxresp = app.DeliverTx(detx)
+	if detxresp.Code != 0 {
+		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
+	}
+	app.Commit()
+	return nil
+}

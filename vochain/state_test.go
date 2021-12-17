@@ -110,6 +110,9 @@ func TestBalanceTransfer(t *testing.T) {
 	addr2 := ethereum.SignKeys{}
 	addr2.Generate()
 
+	s.SetAccountInfoURI(addr1.Address(), "test://")
+	s.SetAccountInfoURI(addr2.Address(), "test://")
+
 	err = s.MintBalance(addr1.Address(), 50)
 	qt.Assert(t, err, qt.IsNil)
 
@@ -119,23 +122,23 @@ func TestBalanceTransfer(t *testing.T) {
 	qt.Assert(t, b1.Balance, qt.Equals, uint64(50))
 	qt.Assert(t, b1.Nonce, qt.Equals, uint32(0))
 
-	err = s.TransferBalance(addr1.Address(), addr2.Address(), 20, 0, false)
+	err = s.TransferBalance(addr1.Address(), addr2.Address(), 20, 0)
 	qt.Assert(t, err, qt.IsNil)
 
 	b2, err := s.GetAccount(addr2.Address(), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b2.Balance, qt.Equals, uint64(20))
 
-	err = s.TransferBalance(addr1.Address(), addr2.Address(), 20, 2, false)
+	err = s.TransferBalance(addr1.Address(), addr2.Address(), 20, 2)
 	qt.Assert(t, err, qt.IsNotNil)
 
-	err = s.TransferBalance(addr1.Address(), addr2.Address(), 40, 1, false)
+	err = s.TransferBalance(addr1.Address(), addr2.Address(), 40, 1)
 	qt.Assert(t, err, qt.IsNotNil)
 
-	err = s.TransferBalance(addr2.Address(), addr1.Address(), 10, 0, false)
+	err = s.TransferBalance(addr2.Address(), addr1.Address(), 10, 0)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = s.TransferBalance(addr2.Address(), addr1.Address(), 5, 1, false)
+	err = s.TransferBalance(addr2.Address(), addr1.Address(), 5, 1)
 	qt.Assert(t, err, qt.IsNil)
 
 	b1, err = s.GetAccount(addr1.Address(), false)
