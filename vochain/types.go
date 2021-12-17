@@ -1,11 +1,9 @@
 package vochain
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -78,24 +76,19 @@ type TransactionCosts struct {
 	CollectFaucet         uint64 `json:"Tx_CollectFaucet"`
 }
 
-// StructAsBytes returns the contents of TransactionCosts as a map. Its purpose
+// AsMap returns the contents of TransactionCosts as a map. Its purpose
 // is to keep knowledge of TransactionCosts' fields within itself, so the
 // function using it only needs to iterate over the key-values.
-func (t *TransactionCosts) StructAsBytes() (map[string][]byte, error) {
-	b := make(map[string][]byte)
+func (t *TransactionCosts) AsMap() map[string]uint64 {
+	b := make(map[string]uint64)
 
 	tType := reflect.TypeOf(*t)
 	tValue := reflect.ValueOf(*t)
 	for i := 0; i < tType.NumField(); i++ {
 		key := TransactionCostsFieldToStateKey(tType.Field(i).Name)
-
-		value := tValue.Field(i).Uint()
-
-		valueBytes := [8]byte{}
-		binary.LittleEndian.PutUint64(valueBytes[:], value)
-		b[key] = valueBytes[:]
+		b[key] = tValue.Field(i).Uint()
 	}
-	return b, nil
+	return b
 }
 
 // TransactionCostsFieldToStateKey transforms "SetProcess" to "c_setProcess" for all of
