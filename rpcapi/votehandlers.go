@@ -25,7 +25,7 @@ func (r *RPCAPI) submitRawTx(request *api.APIrequest) (*api.APIresponse, error) 
 		return nil, fmt.Errorf("no reply from vochain")
 	}
 	if res.Code != 0 {
-		return nil, fmt.Errorf("%s", res.Data)
+		return nil, fmt.Errorf("%s", string(res.Data))
 	}
 	log.Debugf("broadcasting tx hash:%s", res.Hash)
 	// return nullifier or other info
