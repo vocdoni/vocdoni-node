@@ -23,10 +23,9 @@ import (
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
-	"go.vocdoni.io/dvote/util"
 
 	"go.vocdoni.io/dvote/types"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -47,6 +46,23 @@ const (
 	kDelDelegateForAccount = "c_delDelegateForAccount"
 	kCollectFaucet         = "c_collectFaucet"
 )
+
+// TxTypeToKey translates models.TxType to a string which the State uses
+// as a key internally under the Extra tree
+var TxTypeToKey = map[models.TxType]string{
+	models.TxType_SET_PROCESS_STATUS:         kSetProcess,
+	models.TxType_SET_PROCESS_CENSUS:         kSetProcess,
+	models.TxType_SET_PROCESS_QUESTION_INDEX: kSetProcess,
+	models.TxType_SET_PROCESS_RESULTS:        kSetProcess,
+
+	models.TxType_REGISTER_VOTER_KEY:       kRegisterKey,
+	models.TxType_NEW_PROCESS:              kNewProcess,
+	models.TxType_SEND_TOKENS:              kSendTokens,
+	models.TxType_SET_ACCOUNT_INFO:         kSetAccountInfo,
+	models.TxType_ADD_DELEGATE_FOR_ACCOUNT: kAddDelegateForAccount,
+	models.TxType_DEL_DELEGATE_FOR_ACCOUNT: kDelDelegateForAccount,
+	models.TxType_COLLECT_FAUCET:           kCollectFaucet,
+}
 
 // rootLeafGetRoot is the GetRootFn function for a leaf that is the root
 // itself.
@@ -575,58 +591,28 @@ func (v *State) incrementTreasurerNonce() error {
 	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
 }
 
-func (v *State) getTxCostKey(txType models.TxType) (string, error) {
-	var s string
-	switch txType {
-	case models.TxType_SET_PROCESS_STATUS, models.TxType_SET_PROCESS_CENSUS, models.TxType_SET_PROCESS_QUESTION_INDEX, models.TxType_SET_PROCESS_RESULTS:
-		s = kSetProcess
-	case models.TxType_REGISTER_VOTER_KEY:
-		s = kRegisterKey
-	case models.TxType_NEW_PROCESS:
-		s = kNewProcess
-	case models.TxType_SEND_TOKENS:
-		s = kSendTokens
-	case models.TxType_SET_ACCOUNT_INFO:
-		s = kSetAccountInfo
-	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-		s = kAddDelegateForAccount
-	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-		s = kDelDelegateForAccount
-	case models.TxType_COLLECT_FAUCET:
-		s = kCollectFaucet
-	default:
-		return "", fmt.Errorf("txType %v shouldn't cost anything", txType)
-	}
-	return s, nil
-}
-
 func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
-	key, err := v.getTxCostKey(txType)
-	if err != nil {
-		return err
+	key, ok := TxTypeToKey[txType]
+	if !ok {
+		return fmt.Errorf("txType %v shouldn't cost anything", txType)
 	}
 
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	costBytes, err := util.Uint64ToBytes(cost)
-	if err != nil {
-		return err
-	}
-	return v.Tx.DeepSet([]byte(key), costBytes, ExtraCfg)
+
+	costBytes := [8]byte{}
+	binary.LittleEndian.PutUint64(costBytes[:], cost)
+	return v.Tx.DeepSet([]byte(key), costBytes[:], ExtraCfg)
 }
 
 func (v *State) TxCost(txType models.TxType) (uint64, error) {
-	key, err := v.getTxCostKey(txType)
-	if err != nil {
-		return 0, err
+	key, ok := TxTypeToKey[txType]
+	if !ok {
+		return 0, fmt.Errorf("txType %v shouldn't cost anything", txType)
 	}
 
-	extraTree, err := v.mainTreeViewer(true).SubTree(ExtraCfg)
-	if err != nil {
-		return 0, err
-	}
-	cost, err := statedb.GetUint64(extraTree, []byte(key))
-	return cost, err
+	cost, err := v.Tx.DeepGet([]byte(key), ExtraCfg)
+	return binary.LittleEndian.Uint64(cost), err
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
