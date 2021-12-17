@@ -132,6 +132,9 @@ func NewTree(cfg Config) (*Tree, error) {
 // database, it will load it.
 func NewTreeWithTx(wTx db.WriteTx, cfg Config) (*Tree, error) {
 	// if thresholdNLeafs is set to 0, use the DefaultThresholdNLeafs
+	if cfg.ThresholdNLeafs == 0 {
+		cfg.ThresholdNLeafs = DefaultThresholdNLeafs
+	}
 	t := Tree{db: cfg.Database, maxLevels: cfg.MaxLevels,
 		thresholdNLeafs: cfg.ThresholdNLeafs, hashFunction: cfg.HashFunction}
 	t.emptyHash = make([]byte, t.hashFunction.Len()) // empty
