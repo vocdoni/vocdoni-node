@@ -591,12 +591,15 @@ func (v *State) incrementTreasurerNonce() error {
 	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
 }
 
-func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
+func (v *State) SetTxCostByTxType(txType models.TxType, cost uint64) error {
 	key, ok := TxTypeToKey[txType]
 	if !ok {
 		return fmt.Errorf("txType %v shouldn't cost anything", txType)
 	}
+	return v.SetTxCost(key, cost)
+}
 
+func (v *State) SetTxCost(key string, cost uint64) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 
@@ -605,12 +608,15 @@ func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
 	return v.Tx.DeepSet([]byte(key), costBytes[:], ExtraCfg)
 }
 
-func (v *State) TxCost(txType models.TxType) (uint64, error) {
+func (v *State) TxCostByTxType(txType models.TxType) (uint64, error) {
 	key, ok := TxTypeToKey[txType]
 	if !ok {
 		return 0, fmt.Errorf("txType %v shouldn't cost anything", txType)
 	}
+	return v.TxCost(key)
+}
 
+func (v *State) TxCost(key string) (uint64, error) {
 	cost, err := v.Tx.DeepGet([]byte(key), ExtraCfg)
 	return binary.LittleEndian.Uint64(cost), err
 }

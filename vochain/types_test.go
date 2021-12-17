@@ -7,7 +7,7 @@ import (
 	qt "github.com/frankban/quicktest"
 )
 
-func TestTransactionCostsStructAsBytes(t *testing.T) {
+func TestTransactionCostsAsMap(t *testing.T) {
 	txCosts := TransactionCosts{
 		SetProcess:            0,
 		RegisterKey:           1,
@@ -18,18 +18,17 @@ func TestTransactionCostsStructAsBytes(t *testing.T) {
 		DelDelegateForAccount: 6,
 		CollectFaucet:         7,
 	}
-	txCostsBytes, err := txCosts.StructAsBytes()
-	qt.Assert(t, err, qt.IsNil)
+	txCostsBytes := txCosts.AsMap()
 
-	expected := map[string][]byte{
-		kAddDelegateForAccount: {5, 0, 0, 0, 0, 0, 0, 0},
-		kCollectFaucet:         {7, 0, 0, 0, 0, 0, 0, 0},
-		kDelDelegateForAccount: {6, 0, 0, 0, 0, 0, 0, 0},
-		kNewProcess:            {2, 0, 0, 0, 0, 0, 0, 0},
-		kRegisterKey:           {1, 0, 0, 0, 0, 0, 0, 0},
-		kSendTokens:            {3, 0, 0, 0, 0, 0, 0, 0},
-		kSetAccountInfo:        {4, 0, 0, 0, 0, 0, 0, 0},
-		kSetProcess:            {0, 0, 0, 0, 0, 0, 0, 0},
+	expected := map[string]uint64{
+		kSetProcess:            0,
+		kRegisterKey:           1,
+		kNewProcess:            2,
+		kSendTokens:            3,
+		kSetAccountInfo:        4,
+		kAddDelegateForAccount: 5,
+		kDelDelegateForAccount: 6,
+		kCollectFaucet:         7,
 	}
 	qt.Assert(t, txCostsBytes, qt.DeepEquals, expected)
 }
