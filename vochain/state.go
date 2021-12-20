@@ -34,34 +34,22 @@ const (
 	// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
 	// arbo.HashFunctionBlake2b.Len()
 	defaultHashLen = 32
-
-	// k* are the keys under which the State stores how much each
-	// transaction should cost
-	kSetProcess            = "c_setProcess"
-	kRegisterKey           = "c_registerKey"
-	kNewProcess            = "c_newProcess"
-	kSendTokens            = "c_sendTokens"
-	kSetAccountInfo        = "c_setAccountInfo"
-	kAddDelegateForAccount = "c_addDelegateForAccount"
-	kDelDelegateForAccount = "c_delDelegateForAccount"
-	kCollectFaucet         = "c_collectFaucet"
 )
 
-// TxTypeToKey translates models.TxType to a string which the State uses
+// TxTypeCostToStateKey translates models.TxType to a string which the State uses
 // as a key internally under the Extra tree
-var TxTypeToKey = map[models.TxType]string{
-	models.TxType_SET_PROCESS_STATUS:         kSetProcess,
-	models.TxType_SET_PROCESS_CENSUS:         kSetProcess,
-	models.TxType_SET_PROCESS_QUESTION_INDEX: kSetProcess,
-	models.TxType_SET_PROCESS_RESULTS:        kSetProcess,
-
-	models.TxType_REGISTER_VOTER_KEY:       kRegisterKey,
-	models.TxType_NEW_PROCESS:              kNewProcess,
-	models.TxType_SEND_TOKENS:              kSendTokens,
-	models.TxType_SET_ACCOUNT_INFO:         kSetAccountInfo,
-	models.TxType_ADD_DELEGATE_FOR_ACCOUNT: kAddDelegateForAccount,
-	models.TxType_DEL_DELEGATE_FOR_ACCOUNT: kDelDelegateForAccount,
-	models.TxType_COLLECT_FAUCET:           kCollectFaucet,
+var TxTypeCostToStateKey = map[models.TxType]string{
+	models.TxType_SET_PROCESS_STATUS:         "c_setProcessStatus",
+	models.TxType_SET_PROCESS_CENSUS:         "c_setProcessCensus",
+	models.TxType_SET_PROCESS_QUESTION_INDEX: "c_setProcessResults",
+	models.TxType_SET_PROCESS_RESULTS:        "c_setProcessQuestionIndex",
+	models.TxType_REGISTER_VOTER_KEY:         "c_registerKey",
+	models.TxType_NEW_PROCESS:                "c_newProcess",
+	models.TxType_SEND_TOKENS:                "c_sendTokens",
+	models.TxType_SET_ACCOUNT_INFO:           "c_setAccountInfo",
+	models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "c_addDelegateForAccount",
+	models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   "c_delDelegateForAccount",
+	models.TxType_COLLECT_FAUCET:             "c_collectFaucet",
 }
 
 // rootLeafGetRoot is the GetRootFn function for a leaf that is the root
@@ -591,15 +579,19 @@ func (v *State) incrementTreasurerNonce() error {
 	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
 }
 
-func (v *State) SetTxCostByTxType(txType models.TxType, cost uint64) error {
-	key, ok := TxTypeToKey[txType]
+func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
+	// check current cost != new cost
+	currentCost, err := v.TxCost(txType, true)
+	if err != nil {
+		return err
+	}
+	if currentCost == cost {
+		return fmt.Errorf("cannot set the same cost")
+	}
+	key, ok := TxTypeCostToStateKey[txType]
 	if !ok {
 		return fmt.Errorf("txType %v shouldn't cost anything", txType)
 	}
-	return v.SetTxCost(key, cost)
-}
-
-func (v *State) SetTxCost(key string, cost uint64) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 
@@ -608,17 +600,24 @@ func (v *State) SetTxCost(key string, cost uint64) error {
 	return v.Tx.DeepSet([]byte(key), costBytes[:], ExtraCfg)
 }
 
-func (v *State) TxCostByTxType(txType models.TxType) (uint64, error) {
-	key, ok := TxTypeToKey[txType]
+func (v *State) TxCost(txType models.TxType, isQuery bool) (uint64, error) {
+	key, ok := TxTypeCostToStateKey[txType]
 	if !ok {
 		return 0, fmt.Errorf("txType %v shouldn't cost anything", txType)
 	}
-	return v.TxCost(key)
-}
-
-func (v *State) TxCost(key string) (uint64, error) {
-	cost, err := v.Tx.DeepGet([]byte(key), ExtraCfg)
-	return binary.LittleEndian.Uint64(cost), err
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	extraTree, err := v.mainTreeViewer(isQuery).SubTree(ExtraCfg)
+	if err != nil {
+		return 0, err
+	}
+	var cost []byte
+	if cost, err = extraTree.Get([]byte(key)); err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint64(cost), nil
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey

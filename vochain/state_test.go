@@ -354,8 +354,8 @@ func TestStateSetGetTxCostByTxType(t *testing.T) {
 	s.Rollback()
 	s.SetHeight(height)
 
-	qt.Assert(t, s.SetTxCostByTxType(models.TxType_SET_PROCESS_CENSUS, 100), qt.IsNil)
-	cost, err := s.TxCostByTxType(models.TxType_SET_PROCESS_RESULTS)
+	qt.Assert(t, s.SetTxCost(models.TxType_SET_PROCESS_CENSUS, 100), qt.IsNil)
+	cost, err := s.TxCost(models.TxType_SET_PROCESS_CENSUS, false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, cost, qt.Equals, uint64(100))
 }
