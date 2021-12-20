@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
-	"unicode"
 
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
@@ -66,37 +64,53 @@ type QueryData struct {
 // ________________________ TRANSACTION COSTS __________________________
 // TransactionCosts describes how much each operation should cost
 type TransactionCosts struct {
-	SetProcess            uint64 `json:"Tx_SetProcess"`
-	RegisterKey           uint64 `json:"Tx_RegisterKey"`
-	NewProcess            uint64 `json:"Tx_NewProcess"`
-	SendTokens            uint64 `json:"Tx_SendTokens"`
-	SetAccountInfo        uint64 `json:"Tx_SetAccountInfo"`
-	AddDelegateForAccount uint64 `json:"Tx_AddDelegateForAccount"`
-	DelDelegateForAccount uint64 `json:"Tx_DelDelegateForAccount"`
-	CollectFaucet         uint64 `json:"Tx_CollectFaucet"`
+	SetProcessStatus        uint64 `json:"Tx_SetProcessStatus"`
+	SetProcessCensus        uint64 `json:"Tx_SetProcessCensus"`
+	SetProcessResults       uint64 `json:"Tx_SetProcessResults"`
+	SetProcessQuestionIndex uint64 `json:"Tx_SetProcessQuestionIndex"`
+	RegisterKey             uint64 `json:"Tx_RegisterKey"`
+	NewProcess              uint64 `json:"Tx_NewProcess"`
+	SendTokens              uint64 `json:"Tx_SendTokens"`
+	SetAccountInfo          uint64 `json:"Tx_SetAccountInfo"`
+	AddDelegateForAccount   uint64 `json:"Tx_AddDelegateForAccount"`
+	DelDelegateForAccount   uint64 `json:"Tx_DelDelegateForAccount"`
+	CollectFaucet           uint64 `json:"Tx_CollectFaucet"`
 }
 
 // AsMap returns the contents of TransactionCosts as a map. Its purpose
 // is to keep knowledge of TransactionCosts' fields within itself, so the
 // function using it only needs to iterate over the key-values.
-func (t *TransactionCosts) AsMap() map[string]uint64 {
-	b := make(map[string]uint64)
+func (t *TransactionCosts) AsMap() map[models.TxType]uint64 {
+	b := make(map[models.TxType]uint64)
 
 	tType := reflect.TypeOf(*t)
 	tValue := reflect.ValueOf(*t)
 	for i := 0; i < tType.NumField(); i++ {
-		key := TransactionCostsFieldToStateKey(tType.Field(i).Name)
+		key := TxCostNameToTxType(tType.Field(i).Name)
 		b[key] = tValue.Field(i).Uint()
 	}
 	return b
 }
 
-// TransactionCostsFieldToStateKey transforms "SetProcess" to "c_setProcess" for all of
-// TransactionCosts' fields
-func TransactionCostsFieldToStateKey(key string) string {
-	a := []rune(key)
-	a[0] = unicode.ToLower(a[0])
-	return strings.Join([]string{costPrefix, string(a)}, "")
+var TxCostNameToTxTypeMap = map[string]models.TxType{
+	"SetProcessStatus":        models.TxType_SET_PROCESS_STATUS,
+	"SetProcessCensus":        models.TxType_SET_PROCESS_CENSUS,
+	"SetProcessResults":       models.TxType_SET_PROCESS_RESULTS,
+	"SetProcessQuestionIndex": models.TxType_SET_PROCESS_QUESTION_INDEX,
+	"SendTokens":              models.TxType_SEND_TOKENS,
+	"SetAccountInfo":          models.TxType_SET_ACCOUNT_INFO,
+	"RegisterKey":             models.TxType_REGISTER_VOTER_KEY,
+	"NewProcess":              models.TxType_NEW_PROCESS,
+	"AddDelegateForAccount":   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
+	"DelDelegateForAccount":   models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
+	"CollectFaucet":           models.TxType_COLLECT_FAUCET,
+}
+
+func TxCostNameToTxType(key string) models.TxType {
+	if _, ok := TxCostNameToTxTypeMap[key]; ok {
+		return TxCostNameToTxTypeMap[key]
+	}
+	return models.TxType_TX_UNKNOWN
 }
 
 // ________________________ GENESIS APP STATE ________________________

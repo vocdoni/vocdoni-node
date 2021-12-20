@@ -288,7 +288,10 @@ var Genesis = map[string]VochainGenesis{
       ],
       "treasurer": "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d",
       "tx_cost": {
-         "Tx_SetProcess": 100,
+         "Tx_SetProcessStatus": 100,
+         "Tx_SetProcessCensus": 100,
+         "Tx_SetProcessResults": 100,
+         "Tx_SetProcessQuestionIndex": 100,
          "Tx_RegisterKey": 100,
          "Tx_NewProcess": 100,
          "Tx_SendTokens": 100,

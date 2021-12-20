@@ -5,46 +5,56 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 func TestTransactionCostsAsMap(t *testing.T) {
 	txCosts := TransactionCosts{
-		SetProcess:            0,
-		RegisterKey:           1,
-		NewProcess:            2,
-		SendTokens:            3,
-		SetAccountInfo:        4,
-		AddDelegateForAccount: 5,
-		DelDelegateForAccount: 6,
-		CollectFaucet:         7,
+		SetProcessStatus:        100,
+		SetProcessCensus:        100,
+		SetProcessResults:       100,
+		SetProcessQuestionIndex: 100,
+		RegisterKey:             100,
+		NewProcess:              100,
+		SendTokens:              100,
+		SetAccountInfo:          100,
+		AddDelegateForAccount:   100,
+		DelDelegateForAccount:   100,
+		CollectFaucet:           100,
 	}
 	txCostsBytes := txCosts.AsMap()
 
-	expected := map[string]uint64{
-		kSetProcess:            0,
-		kRegisterKey:           1,
-		kNewProcess:            2,
-		kSendTokens:            3,
-		kSetAccountInfo:        4,
-		kAddDelegateForAccount: 5,
-		kDelDelegateForAccount: 6,
-		kCollectFaucet:         7,
+	expected := map[models.TxType]uint64{
+		models.TxType_SET_PROCESS_STATUS:         100,
+		models.TxType_SET_PROCESS_CENSUS:         100,
+		models.TxType_SET_PROCESS_RESULTS:        100,
+		models.TxType_SET_PROCESS_QUESTION_INDEX: 100,
+		models.TxType_REGISTER_VOTER_KEY:         100,
+		models.TxType_NEW_PROCESS:                100,
+		models.TxType_SEND_TOKENS:                100,
+		models.TxType_SET_ACCOUNT_INFO:           100,
+		models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   100,
+		models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   100,
+		models.TxType_COLLECT_FAUCET:             100,
 	}
 	qt.Assert(t, txCostsBytes, qt.DeepEquals, expected)
 }
-func TestTransactionCostsFieldUsesSameKeysAsState(t *testing.T) {
-	fields := map[string]string{
-		"SetProcess":            kSetProcess,
-		"RegisterKey":           kRegisterKey,
-		"NewProcess":            kNewProcess,
-		"SendTokens":            kSendTokens,
-		"SetAccountInfo":        kSetAccountInfo,
-		"AddDelegateForAccount": kAddDelegateForAccount,
-		"DelDelegateForAccount": kDelDelegateForAccount,
-		"CollectFaucet":         kCollectFaucet,
+func TestTxCostNameToTxType(t *testing.T) {
+	fields := map[string]models.TxType{
+		"SetProcessStatus":        models.TxType_SET_PROCESS_STATUS,
+		"SetProcessCensus":        models.TxType_SET_PROCESS_CENSUS,
+		"SetProcessResults":       models.TxType_SET_PROCESS_RESULTS,
+		"SetProcessQuestionIndex": models.TxType_SET_PROCESS_QUESTION_INDEX,
+		"RegisterKey":             models.TxType_REGISTER_VOTER_KEY,
+		"NewProcess":              models.TxType_NEW_PROCESS,
+		"SendTokens":              models.TxType_SEND_TOKENS,
+		"SetAccountInfo":          models.TxType_SET_ACCOUNT_INFO,
+		"AddDelegateForAccount":   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
+		"DelDelegateForAccount":   models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
+		"CollectFaucet":           models.TxType_COLLECT_FAUCET,
 	}
 	for k, v := range fields {
-		qt.Assert(t, TransactionCostsFieldToStateKey(k), qt.Equals, v)
+		qt.Assert(t, TxCostNameToTxType(k), qt.Equals, v)
 
 		// check that TransactionCosts struct does have the fields that we
 		// specify in this test
