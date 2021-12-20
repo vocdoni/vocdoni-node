@@ -20,7 +20,6 @@ import (
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
-	multiaddr "github.com/multiformats/go-multiaddr"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
@@ -113,17 +112,24 @@ func (ps *SubPub) Start(ctx context.Context) {
 	}
 	ipfslog.SetLogLevel("*", "ERROR")
 
-	// :: will listen on any interface device (both on IPv4 and IPv6)
-	sourceMultiAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip6/::/tcp/%d", ps.Port))
-	if err != nil {
-		log.Fatal(err)
-	}
 	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.ECDSA, 2048, strings.NewReader(ps.privKey))
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	var c libp2p.Config
 	libp2p.Defaults(&c)
+
+	// libp2p will listen on any interface device (both on IPv4 and IPv6)
+	c.ListenAddrs = nil
+	err = c.Apply(libp2p.ListenAddrStrings(
+		fmt.Sprintf("/ip6/::/tcp/%d", ps.Port),
+		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", ps.Port),
+	))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	c.RelayCustom = true
 	c.Relay = false
 	c.EnableAutoRelay = false
@@ -131,7 +137,6 @@ func (ps *SubPub) Start(ctx context.Context) {
 	if ps.Private {
 		c.PSK = ps.GroupKey[:32]
 	}
-	c.ListenAddrs = []multiaddr.Multiaddr{sourceMultiAddr}
 	c.ConnManager = connmanager.NewConnManager(ps.MaxDHTpeers/2, ps.MaxDHTpeers, time.Second*10)
 
 	log.Debugf("libp2p config: %+v", c)
