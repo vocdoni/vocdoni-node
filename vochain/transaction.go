@@ -234,34 +234,28 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		if proofZkSNARK == nil {
 			return nil, fmt.Errorf("zkSNARK proof is empty")
 		}
-		proof, publicInputsFromUser, err := zk.ProtobufZKProofToCircomProof(proofZkSNARK)
+		proof, _, err := zk.ProtobufZKProofToCircomProof(proofZkSNARK)
 		if err != nil {
 			return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
 		}
-		if len(publicInputsFromUser) < 1 {
-			return nil, fmt.Errorf("len(publicInputs)<1, at least need one element (nullifier)")
-		}
 
-		// currently nullifier is obtained from the Protobuf
-		// models.ProofZkSNARK. Alternatively, nullifier could be sent
-		// & taken from veote.Nullifier.
-		nullifier := publicInputsFromUser[0]
-		nullifierBytes := arbo.BigIntToBytes(32, nullifier)
+		// ve.Nullifier is encoded in little-endian
+		nullifierBI := arbo.BytesToBigInt(ve.Nullifier)
 
 		// check that nullifier does not exist in cache already, this avoids
 		// processing multiple transactions with same nullifier.
-		if app.State.CacheHasNullifier(nullifierBytes) {
-			return nil, fmt.Errorf("nullifier %x already exists in cache", nullifierBytes)
+		if app.State.CacheHasNullifier(ve.Nullifier) {
+			return nil, fmt.Errorf("nullifier %x already exists in cache", ve.Nullifier)
 		}
 		// check if vote already exists
 		if exist, err := app.State.EnvelopeExists(ve.ProcessId,
-			nullifierBytes, false); err != nil || exist {
+			ve.Nullifier, false); err != nil || exist {
 			if err != nil {
 				return nil, err
 			}
-			return nil, fmt.Errorf("vote %x already exists", nullifierBytes)
+			return nil, fmt.Errorf("vote %x already exists", ve.Nullifier)
 		}
-		log.Debugf("new vote %x for process %x", nullifierBytes, ve.ProcessId)
+		log.Debugf("new vote %x for process %x", ve.Nullifier, ve.ProcessId)
 
 		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVKs) {
 			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d of %d", proofZkSNARK.CircuitParametersIndex, len(app.ZkVKs))
@@ -282,7 +276,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			processId0BI,
 			processId1BI,
 			censusRootBI,
-			nullifier,
+			nullifierBI,
 			voteHash0,
 			voteHash1,
 		}
@@ -300,7 +294,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			Height:      height,
 			ProcessId:   ve.ProcessId,
 			VotePackage: ve.VotePackage,
-			Nullifier:   nullifierBytes,
+			Nullifier:   ve.Nullifier,
 			// Anonymous Voting doesn't support weighted voting, so
 			// we assing always 1 to each vote.
 			Weight: big.NewInt(1).Bytes(),

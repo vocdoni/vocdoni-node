@@ -182,13 +182,17 @@ func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
 			"10971670069192505909163110232130604279972038238575277963470838562849902719515",
 			"1",
 		},
-		PublicInputs: []string{"9464482416872469446849476841635888299250846240473623349595304484954843565595"}, // nullifier
 	}
+
+	nullifierBI, ok := new(big.Int).SetString("9464482416872469446849476841635888299250846240473623349595304484954843565595", 10)
+	qt.Assert(t, ok, qt.IsTrue)
+	nullifier := arbo.BigIntToBytes(32, nullifierBI)
 
 	voteValue := big.NewInt(1).Bytes()
 	vtx := &models.VoteEnvelope{
 		ProcessId:   processId[:],
 		VotePackage: voteValue,
+		Nullifier:   nullifier,
 		Proof: &models.Proof{
 			Payload: &models.Proof_ZkSnark{
 				ZkSnark: &protoProof,
