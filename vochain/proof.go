@@ -146,7 +146,7 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 			censusRoot = ethcrypto.FromECDSAPub(rootPubSalted)
 		}
 		if !bytes.Equal(bundlePub, censusRoot) {
-			return false, nil, fmt.Errorf("ca bundle signature does not match")
+			return false, nil, fmt.Errorf("csp bundle signature does not match")
 		}
 	case models.ProofCA_ECDSA_BLIND, models.ProofCA_ECDSA_BLIND_PIDSALTED:
 		// Blind CSP check
@@ -170,10 +170,16 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 			}
 		}
 		if !blind.Verify(new(big.Int).SetBytes(ethereum.HashRaw(cspBundle)), signature, rootPub) {
-			return false, nil, fmt.Errorf("blind CSP verification failed %s", log.FormatProto(p.Bundle))
+			cspbundleDec := &models.CAbundle{}
+			if err := proto.Unmarshal(cspBundle, cspbundleDec); err != nil {
+				log.Warnf("cannot unmarshal CSP bundle: %v", err)
+			}
+			return false, nil, fmt.Errorf("blind CSP verification failed for "+
+				"pid %x with CSP key %x. CSP bundle {pid:%x, addr:%x}. CSP signature %x",
+				processID, rootPub.Bytes(), cspbundleDec.ProcessId, cspbundleDec.Address, signature.Bytes())
 		}
 	default:
-		return false, nil, fmt.Errorf("ca proof %s type not supported", p.Type.String())
+		return false, nil, fmt.Errorf("csp proof %s type not supported", p.Type.String())
 	}
 	return true, bigOne, nil
 }
