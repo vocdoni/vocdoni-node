@@ -64,7 +64,7 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	)); diff != "" {
 		println(diff)
 		fmt.Fprintf(os.Stderr, "params: %x", pid)
-		panic("ping mvdan to fix this bug")
+		log.Warn("ping mvdan to fix this bug")
 	}
 
 	return proc, nil
@@ -222,7 +222,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 			searchTerm, namespace,
 			srcNetworkIdstr, status, withResults,
 		})
-		panic("ping mvdan to fix this bug")
+		log.Warn("ping mvdan to fix this bug")
 	}
 
 	return procs, nil
