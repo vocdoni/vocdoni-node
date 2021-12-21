@@ -390,9 +390,9 @@ type GenSNARKData struct {
 
 func testGenSNARKProof(circuitIndex int, circuitConfig *artifacts.CircuitConfig,
 	censusRoot, merkleProof []byte, treeSize int64,
-	secretKey, votePackage, processId []byte) (*SNARKProof, error) {
+	secretKey, votePackage, processId []byte) (*SNARKProof, []byte, error) {
 	if len(merkleProof) < 8 {
-		return nil, fmt.Errorf("merkleProof too short")
+		return nil, nil, fmt.Errorf("merkleProof too short")
 	}
 	indexLE := merkleProof[:8]
 	index := binary.LittleEndian.Uint64(indexLE)
@@ -401,7 +401,7 @@ func testGenSNARKProof(circuitIndex int, circuitConfig *artifacts.CircuitConfig,
 	levels := int(math.Log2(float64(treeSize)))
 	siblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, siblingsBytes)
 	if err != nil {
-		return nil, fmt.Errorf("cannot arbo.UnpackSiblings: %w", err)
+		return nil, nil, fmt.Errorf("cannot arbo.UnpackSiblings: %w", err)
 	}
 	for i := len(siblings); i < levels; i++ {
 		siblings = append(siblings, []byte{0})
@@ -423,7 +423,7 @@ func testGenSNARKProof(circuitIndex int, circuitConfig *artifacts.CircuitConfig,
 		processId1,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("poseidon: %w", err)
+		return nil, nil, fmt.Errorf("poseidon: %w", err)
 	}
 
 	inputs := SNARKProofInputs{
@@ -448,19 +448,19 @@ func testGenSNARKProof(circuitIndex int, circuitConfig *artifacts.CircuitConfig,
 	}
 	dataJSON, err := json.Marshal(&data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	log.Debugf("gen-vote-snark.js input: %v", string(dataJSON))
 	cmd := exec.Command("node", "/app/js/gen-vote-snark.js", string(dataJSON))
 	proofJSON, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("node /app/js/gen-vote-snark.js: %w\n%s",
+		return nil, nil, fmt.Errorf("node /app/js/gen-vote-snark.js: %w\n%s",
 			err, string(proofJSON))
 	}
 	log.Debugf("gen-vote-snark.js output: %v", string(proofJSON))
 	var proofCircom SNARKProofCircom
 	if err := json.Unmarshal(proofJSON, &proofCircom); err != nil {
-		return nil, fmt.Errorf("/app/js/gen-vote-snark.js output unmarshal: %w\n%s",
+		return nil, nil, fmt.Errorf("/app/js/gen-vote-snark.js output unmarshal: %w\n%s",
 			err, string(proofJSON))
 	}
 	return &SNARKProof{
@@ -470,9 +470,11 @@ func testGenSNARKProof(circuitIndex int, circuitConfig *artifacts.CircuitConfig,
 			proofCircom.B[1][0], proofCircom.B[1][1],
 			proofCircom.B[2][0], proofCircom.B[2][1],
 		},
-		C:            proofCircom.C,
-		PublicInputs: []string{arbo.BytesToBigInt(nullifier).String()},
-	}, nil
+		C: proofCircom.C,
+		// PublicInputs is not used in the anonymous-voting flow, as
+		// the only needed public input from user's side is the
+		// nullifier, which is already in the VoteEnvelope struct
+	}, nullifier, nil
 }
 
 func (c *Client) TestPreRegisterKeys(
@@ -909,16 +911,17 @@ func (c *Client) TestSendAnonVotes(
 		if vpb, err = genVote(false, nil); err != nil {
 			return 0, err
 		}
+		_, secretKey := testGetZKCensusKey(s)
+		proof, nullifier, err := testGenSNARKProof(*circuitIndex, circuitConfig,
+			root, proofs[i].Siblings, circuitConfig.Parameters[0], secretKey, vpb, pid)
+		if err != nil {
+			return 0, fmt.Errorf("cannot generate test SNARK proof: %w", err)
+		}
 		v := &models.VoteEnvelope{
 			Nonce:       util.RandomBytes(32),
 			ProcessId:   pid,
 			VotePackage: vpb,
-		}
-		_, secretKey := testGetZKCensusKey(s)
-		proof, err := testGenSNARKProof(*circuitIndex, circuitConfig,
-			root, proofs[i].Siblings, circuitConfig.Parameters[0], secretKey, vpb, pid)
-		if err != nil {
-			return 0, fmt.Errorf("cannot generate test SNARK proof: %w", err)
+			Nullifier:   nullifier,
 		}
 		v.Proof = &models.Proof{
 			Payload: &models.Proof_ZkSnark{
@@ -927,7 +930,11 @@ func (c *Client) TestSendAnonVotes(
 					A:                      proof.A,
 					B:                      proof.B,
 					C:                      proof.C,
-					PublicInputs:           proof.PublicInputs,
+					// PublicInputs is not used in the
+					// anonymous-voting flow, as the only
+					// needed public input from user's side
+					// is the nullifier, which is already
+					// in the VoteEnvelope struct
 				},
 			},
 		}
