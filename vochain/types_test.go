@@ -11,31 +11,31 @@ import (
 func TestTransactionCostsAsMap(t *testing.T) {
 	txCosts := TransactionCosts{
 		SetProcessStatus:        100,
-		SetProcessCensus:        100,
-		SetProcessResults:       100,
-		SetProcessQuestionIndex: 100,
-		RegisterKey:             100,
-		NewProcess:              100,
-		SendTokens:              100,
-		SetAccountInfo:          100,
-		AddDelegateForAccount:   100,
-		DelDelegateForAccount:   100,
-		CollectFaucet:           100,
+		SetProcessCensus:        200,
+		SetProcessResults:       300,
+		SetProcessQuestionIndex: 400,
+		RegisterKey:             500,
+		NewProcess:              600,
+		SendTokens:              700,
+		SetAccountInfo:          800,
+		AddDelegateForAccount:   900,
+		DelDelegateForAccount:   1000,
+		CollectFaucet:           1100,
 	}
 	txCostsBytes := txCosts.AsMap()
 
 	expected := map[models.TxType]uint64{
 		models.TxType_SET_PROCESS_STATUS:         100,
-		models.TxType_SET_PROCESS_CENSUS:         100,
-		models.TxType_SET_PROCESS_RESULTS:        100,
-		models.TxType_SET_PROCESS_QUESTION_INDEX: 100,
-		models.TxType_REGISTER_VOTER_KEY:         100,
-		models.TxType_NEW_PROCESS:                100,
-		models.TxType_SEND_TOKENS:                100,
-		models.TxType_SET_ACCOUNT_INFO:           100,
-		models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   100,
-		models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   100,
-		models.TxType_COLLECT_FAUCET:             100,
+		models.TxType_SET_PROCESS_CENSUS:         200,
+		models.TxType_SET_PROCESS_RESULTS:        300,
+		models.TxType_SET_PROCESS_QUESTION_INDEX: 400,
+		models.TxType_REGISTER_VOTER_KEY:         500,
+		models.TxType_NEW_PROCESS:                600,
+		models.TxType_SEND_TOKENS:                700,
+		models.TxType_SET_ACCOUNT_INFO:           800,
+		models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   900,
+		models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   1000,
+		models.TxType_COLLECT_FAUCET:             1100,
 	}
 	qt.Assert(t, txCostsBytes, qt.DeepEquals, expected)
 }
