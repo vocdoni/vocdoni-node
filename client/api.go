@@ -1037,15 +1037,21 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 	envelopeType *models.EnvelopeType,
 	mode *models.ProcessMode,
 	censusOrigin models.CensusOrigin,
+	startBlockIncrement int,
 	duration int,
 	maxCensusSize uint64) (uint32, error) {
 
+	startBlock := uint32(0)
+	if startBlockIncrement > 0 {
+		current, err := c.GetCurrentBlock()
+		if err != nil {
+			return 0, err
+		}
+		startBlock = current + uint32(startBlockIncrement)
+	}
+
 	var req api.APIrequest
 	req.Method = "submitRawTx"
-	block, err := c.GetCurrentBlock()
-	if err != nil {
-		return 0, err
-	}
 	if mode == nil {
 		mode = &models.ProcessMode{AutoStart: true, Interruptible: true}
 	}
@@ -1056,7 +1062,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 		CensusOrigin:  censusOrigin,
 		BlockCount:    uint32(duration),
 		ProcessId:     pid,
-		StartBlock:    block + 4,
+		StartBlock:    startBlock,
 		EnvelopeType:  envelopeType,
 		Mode:          mode,
 		Status:        models.ProcessStatus_READY,
@@ -1068,6 +1074,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 		Nonce:   util.RandomBytes(32),
 		Process: processData,
 	}
+	var err error
 	stx := &models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: p}})
 	if err != nil {
@@ -1087,7 +1094,17 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 	if !resp.Ok {
 		return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
-	return p.Process.StartBlock, nil
+	if startBlockIncrement == 0 {
+		for i := 0; i < 10; i++ {
+			time.Sleep(2 * time.Second)
+			p, err := c.GetProcessInfo(pid)
+			if err == nil && p != nil {
+				return p.StartBlock, nil
+			}
+		}
+		return 0, fmt.Errorf("process was not created")
+	}
+	return startBlock, nil
 }
 
 func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
