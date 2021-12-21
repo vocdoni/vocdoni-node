@@ -580,14 +580,6 @@ func (v *State) incrementTreasurerNonce() error {
 }
 
 func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
-	// check current cost != new cost
-	currentCost, err := v.TxCost(txType, true)
-	if err != nil {
-		return err
-	}
-	if currentCost == cost {
-		return fmt.Errorf("cannot set the same cost")
-	}
 	key, ok := TxTypeCostToStateKey[txType]
 	if !ok {
 		return fmt.Errorf("txType %v shouldn't cost anything", txType)
