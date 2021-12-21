@@ -373,8 +373,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 
 	// add tx costs
-	txCosts := genesisAppState.TxCost.AsMap()
-	for k, v := range txCosts {
+	for k, v := range genesisAppState.TxCost.AsMap() {
 		err = app.State.SetTxCost(k, v)
 		if err != nil {
 			log.Fatalf("could not set tx cost %q to value %q from genesis file to the State", k, v)
