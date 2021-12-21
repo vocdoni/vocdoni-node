@@ -162,6 +162,7 @@ func processSetVotesRoot(value []byte, root []byte) ([]byte, error) {
 //   - Oracles (key: address, value: []byte{1} if exists)
 //   - Validators (key: address, value: models.Validator)
 //   - Accounts (key: address, value: models.Account)
+//   - FaucetNonce (key: hash(address, nonce), value: nil)
 //   - Processes (key: ProcessId, value: models.StateDBProcess)
 //     - CensusPoseidon (key: sequential index 64 bits little endian, value: zkCensusKey)
 //     - Nullifiers (key: pre-census user nullifier, value: weight used)
@@ -253,6 +254,15 @@ var (
 	AccountsCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
 		HashFunc:          arbo.HashFunctionSha256,
 		KindID:            "balan",
+		MaxLevels:         256,
+		ParentLeafGetRoot: rootLeafGetRoot,
+		ParentLeafSetRoot: rootLeafSetRoot,
+	})
+
+	// FaucetNonceCfg is the Accounts used Faucet Nonce subTree configuration
+	FaucetNonceCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		HashFunc:          arbo.HashFunctionSha256,
+		KindID:            "faucet",
 		MaxLevels:         256,
 		ParentLeafGetRoot: rootLeafGetRoot,
 		ParentLeafSetRoot: rootLeafSetRoot,
@@ -418,6 +428,16 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	}
 	if err := update.Add(AccountsCfg.Key(),
 		make([]byte, AccountsCfg.HashFunc().Len())); err != nil {
+		return nil, err
+	}
+	if _, err := update.SubTree(AccountsCfg); err != nil {
+		return nil, err
+	}
+	if err := update.Add(FaucetNonceCfg.Key(),
+		make([]byte, FaucetNonceCfg.HashFunc().Len())); err != nil {
+		return nil, err
+	}
+	if _, err := update.SubTree(FaucetNonceCfg); err != nil {
 		return nil, err
 	}
 
@@ -611,6 +631,40 @@ func (v *State) TxCost(txType models.TxType, isQuery bool) (uint64, error) {
 		return 0, err
 	}
 	return binary.LittleEndian.Uint64(cost), nil
+}
+
+// FaucetNonce returns true if the key is found in the subtree
+// key == hash(address, nonce)
+func (v *State) FaucetNonce(key []byte, isQuery bool) (bool, error) {
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	faucetNonceTree, err := v.mainTreeViewer(isQuery).SubTree(FaucetNonceCfg)
+	if err != nil {
+		return false, err
+	}
+	var found bool
+	if err := faucetNonceTree.Iterate(
+		func(k, _ []byte) bool {
+			if bytes.Equal(key, k) {
+				found = true
+				return true
+			}
+			return true
+		},
+	); err != nil {
+		return false, err
+	}
+	return found, nil
+}
+
+// SetFaucetNonce stores an already used faucet nonce in the
+// FaucetNonce subtree
+func (v *State) SetFaucetNonce(key []byte) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet(key, nil, FaucetNonceCfg)
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey

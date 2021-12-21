@@ -382,3 +382,96 @@ func testSendTokensTx(t *testing.T,
 	app.Commit()
 	return nil
 }
+
+func TestCollectFaucetTx(t *testing.T) {
+	app := TestBaseApplication(t)
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	randomAccountSigner := ethereum.SignKeys{}
+	if err := randomAccountSigner.Generate(); err != nil {
+		t.Fatal(err)
+	}
+
+	// create accounts
+	// from
+	testSetAccountInfoTx(t, &signer, app, infoURI)
+	// to
+	testSetAccountInfoTx(t, &randomAccountSigner, app, infoURI)
+	// top up signer account
+	if err := app.State.MintBalance(signer.Address(), 100); err != nil {
+		t.Fatal(err)
+	}
+
+	// should transfer tokens
+	if err := testCollectFaucetTx(t, app, &signer, &randomAccountSigner, 10, 246728262361); err != nil {
+		t.Fatal(err)
+	}
+
+	// should not transfer tokens if same payload identifier
+	if err := testCollectFaucetTx(t, app, &signer, &randomAccountSigner, 10, 246728262361); err == nil {
+		t.Fatal(err)
+	}
+}
+
+func testCollectFaucetTx(t *testing.T,
+	app *BaseApplication,
+	from,
+	to *ethereum.SignKeys,
+	amount,
+	nonce uint64) error { // op == true -> add, op == false -> del
+	var cktx abcitypes.RequestCheckTx
+	var detx abcitypes.RequestDeliverTx
+	var cktxresp abcitypes.ResponseCheckTx
+	var detxresp abcitypes.ResponseDeliverTx
+	var stx models.SignedTx
+	var err error
+
+	// create faucet pkg
+	faucetPayload := &models.FaucetPayload{
+		Identifier: nonce,
+		To:         to.Address().Bytes(),
+		Amount:     amount,
+	}
+	faucetPayloadBytes, err := proto.Marshal(faucetPayload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	faucetPayloadSignature, err := from.Sign(faucetPayloadBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	faucetPackage := &models.FaucetPackage{
+		Payload:   faucetPayload,
+		Signature: faucetPayloadSignature,
+	}
+
+	tx := &models.CollectFaucetTx{
+		FaucetPackage: faucetPackage,
+	}
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_CollectFaucet{CollectFaucet: tx}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if stx.Signature, err = to.Sign(stx.Tx); err != nil {
+		t.Fatal(err)
+	}
+
+	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
+		t.Fatal(err)
+	}
+	cktxresp = app.CheckTx(cktx)
+	if cktxresp.Code != 0 {
+		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
+	}
+	if detx.Tx, err = proto.Marshal(&stx); err != nil {
+		t.Fatal(err)
+	}
+	detxresp = app.DeliverTx(detx)
+	if detxresp.Code != 0 {
+		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
+	}
+	app.Commit()
+	return nil
+}

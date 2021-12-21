@@ -207,12 +207,30 @@ func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
 		}
 
 	case *models.Tx_SendTokens:
-		from, to, amount, nonce, err := SendTokensTxCheck(vtx, txBytes, signature, app.State)
+		txValues, err := SendTokensTxCheck(vtx, txBytes, signature, app.State)
 		if err != nil {
 			return []byte{}, fmt.Errorf("sendTokensTx: %w", err)
 		}
 		if commit {
-			return []byte{}, app.State.TransferBalance(from, to, amount, nonce)
+			if txValues != nil {
+				return []byte{}, app.State.TransferBalance(txValues.From, txValues.To, txValues.Value, uint64(txValues.Nonce))
+			}
+			return []byte{}, fmt.Errorf("sendTokensTx: tx data is invalid")
+		}
+
+	case *models.Tx_CollectFaucet:
+		from, err := CollectFaucetTxCheck(vtx, txBytes, signature, app.State)
+		if err != nil {
+			return []byte{}, fmt.Errorf("collectFaucetTx: %w", err)
+		}
+		if commit {
+			tx := vtx.GetCollectFaucet()
+			return []byte{}, app.State.CollectFaucet(
+				from,
+				common.BytesToAddress(tx.FaucetPackage.Payload.To),
+				tx.FaucetPackage.Payload.Amount,
+				tx.FaucetPackage.Payload.Identifier,
+			)
 		}
 
 	default:
