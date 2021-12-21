@@ -2,10 +2,12 @@ package vochain
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/tendermint/tendermint/crypto"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
@@ -42,6 +44,7 @@ func (a *Account) Transfer(dest *Account, amount uint64, nonce uint32) error {
 	if a.Nonce != nonce {
 		return ErrAccountNonceInvalid
 	}
+	a.Nonce++
 	if a.Balance < amount {
 		return ErrNotEnoughBalance
 	}
@@ -50,7 +53,6 @@ func (a *Account) Transfer(dest *Account, amount uint64, nonce uint32) error {
 	}
 	dest.Balance += amount
 	a.Balance -= amount
-	a.Nonce++
 	return nil
 }
 
@@ -89,7 +91,7 @@ func (a *Account) DelDelegate(addr common.Address) error {
 // and updates the state with the new values (including nonce).
 // If origin address acc is not enough, ErrNotEnoughBalance is returned.
 // If provided nonce does not match origin address nonce+1, ErrAccountNonceInvalid is returned.
-func (v *State) TransferBalance(from, to common.Address, amount uint64, nonce uint32) error {
+func (v *State) TransferBalance(from, to common.Address, amount uint64, nonce uint64) error {
 	var accFrom, accTo Account
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
@@ -107,7 +109,62 @@ func (v *State) TransferBalance(from, to common.Address, amount uint64, nonce ui
 	if err := accTo.Unmarshal(accToRaw); err != nil {
 		return err
 	}
-	if err := accFrom.Transfer(&accTo, amount, nonce); err != nil {
+	if err := accFrom.Transfer(&accTo, amount, uint32(nonce)); err != nil {
+		return err
+	}
+	af, err := accFrom.Marshal()
+	if err != nil {
+		return err
+	}
+	if err := v.Tx.DeepSet(from.Bytes(), af, AccountsCfg); err != nil {
+		return err
+	}
+	at, err := accTo.Marshal()
+	if err != nil {
+		return err
+	}
+	if err := v.Tx.DeepSet(to.Bytes(), at, AccountsCfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+// CollectFaucet transfers balance from faucet generated package address to collector address,
+// and updates the state with the new values (including nonce).
+func (v *State) CollectFaucet(from, to common.Address, amount uint64, nonce uint64) error {
+	var accFrom, accTo Account
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	accFromRaw, err := v.Tx.DeepGet(from.Bytes(), AccountsCfg)
+	if err != nil {
+		return err
+	}
+	if err := accFrom.Unmarshal(accFromRaw); err != nil {
+		return err
+	}
+	accToRaw, err := v.Tx.DeepGet(to.Bytes(), AccountsCfg)
+	if err != nil {
+		return err
+	}
+	if err := accTo.Unmarshal(accToRaw); err != nil {
+		return err
+	}
+	if amount == 0 {
+		return fmt.Errorf("cannot transfer zero amount")
+	}
+	if accFrom.Balance < amount {
+		return ErrNotEnoughBalance
+	}
+	if accTo.Balance+amount <= accTo.Balance {
+		return ErrBalanceOverflow
+	}
+	accTo.Balance += amount
+	accFrom.Balance -= amount
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, nonce)
+	key := from.Bytes()
+	key = append(key, b...)
+	if err := v.Tx.DeepSet(crypto.Sha256(key), nil, FaucetNonceCfg); err != nil {
 		return err
 	}
 	af, err := accFrom.Marshal()
@@ -386,21 +443,28 @@ func (v *State) setDelegate(accountAddr, delegateAddr common.Address, txType mod
 	}
 }
 
-func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, common.Address, uint64, uint32, error) {
+type SendTokensTxCheckValues struct {
+	From  common.Address
+	To    common.Address
+	Value uint64
+	Nonce uint32
+}
+
+func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (*SendTokensTxCheckValues, error) {
 	tx := vtx.GetSendTokens()
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {
-		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("missing signature and/or transaction")
+		return nil, fmt.Errorf("missing signature and/or transaction")
 	}
 	// get address from signature
 	sigAddress, err := ethereum.AddrFromSignature(txBytes, signature)
 	if err != nil {
-		return common.Address{}, common.Address{}, 0, 0, err
+		return nil, err
 	}
 	// check from
 	txFromAddress := common.BytesToAddress(tx.From)
 	if txFromAddress != sigAddress {
-		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("from (%s) field and extracted signature (%s) mismatch",
+		return nil, fmt.Errorf("from (%s) field and extracted signature (%s) mismatch",
 			txFromAddress.String(),
 			sigAddress.String(),
 		)
@@ -408,25 +472,74 @@ func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	// check to
 	txToAddress := common.BytesToAddress(tx.To)
 	if txToAddress.String() == types.EthereumZeroAddress {
-		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("invalid address")
+		return nil, fmt.Errorf("invalid address")
 	}
 	_, err = state.GetAccount(txToAddress, false)
 	if err != nil {
-		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("cannot get to account info: %v", err)
+		return nil, fmt.Errorf("cannot get to account info: %v", err)
 	}
 	// check nonce
 	acc, err := state.GetAccount(sigAddress, false)
 	if err != nil {
-		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("cannot get account info: %v", err)
+		return nil, fmt.Errorf("cannot get account info: %v", err)
 	}
 	if tx.Nonce != acc.Nonce {
-		return common.Address{}, common.Address{}, 0, 0, fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
+		return nil, fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
 	}
 	// check value
 	if tx.Value > acc.Balance {
-		return common.Address{}, common.Address{}, 0, 0, ErrNotEnoughBalance
+		return nil, ErrNotEnoughBalance
 	}
-	return sigAddress, txToAddress, tx.Value, tx.Nonce, nil
+	return &SendTokensTxCheckValues{sigAddress, txToAddress, tx.Value, tx.Nonce}, nil
+}
+
+func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, error) {
+	tx := vtx.GetCollectFaucet()
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return common.Address{}, fmt.Errorf("missing signature and/or transaction")
+	}
+	// get recipient address from signature
+	recipientAddress, err := ethereum.AddrFromSignature(txBytes, signature)
+	if err != nil {
+		return common.Address{}, err
+	}
+	// get issuer address from faucetPayload
+	faucetPkgPayload := tx.FaucetPackage.GetPayload()
+	faucetPackageBytes, err := proto.Marshal(faucetPkgPayload)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("cannot extract faucet package payload: %v", err)
+	}
+	issuerAddress, err := ethereum.AddrFromSignature(faucetPackageBytes, tx.FaucetPackage.Signature)
+	if err != nil {
+		return common.Address{}, err
+	}
+	// check recipient address extracted from signature matches with payload.To
+	payloadToAddr := common.BytesToAddress(faucetPkgPayload.GetTo())
+	if recipientAddress != payloadToAddr {
+		return common.Address{}, fmt.Errorf("address extracted from tx (%s) does not match recipient address (%s)", recipientAddress.String(), payloadToAddr.String())
+	}
+	// check issuer nonce not used
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, faucetPkgPayload.Identifier)
+	key := issuerAddress.Bytes()
+	key = append(key, b...)
+	used, err := state.FaucetNonce(crypto.Sha256(key), false)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("cannot check faucet nonce: %v", err)
+	}
+	if used {
+		return common.Address{}, fmt.Errorf("nonce %d already used", faucetPkgPayload.Identifier)
+	}
+	// check issuer have enough funds
+	issuerAcc, err := state.GetAccount(issuerAddress, false)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("cannot get faucet account: %v", err)
+	}
+	if issuerAcc.Balance < faucetPkgPayload.Amount {
+		return common.Address{}, fmt.Errorf("faucet does not have enough balance %d < %d", issuerAcc.Balance, faucetPkgPayload.Amount)
+	}
+	return issuerAddress, nil
 }
 
 func (v *State) setAccount(accountAddress common.Address, account *Account) error {
