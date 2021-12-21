@@ -58,6 +58,7 @@ func testCSPvote(oracle *ethereum.SignKeys, url string) error {
 		envelope,
 		nil,
 		censusOrigin,
+		0,
 		duration,
 		uint64(censusSize),
 	)

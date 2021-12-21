@@ -373,8 +373,11 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	if signature == nil || tx == nil || txBytes == nil {
 		return nil, fmt.Errorf("missing signature or new process transaction")
 	}
-	// start and endblock sanity check
-	if tx.Process.StartBlock < state.CurrentHeight() {
+	// start and block count sanity check
+	// if startBlock is zero or one, the process will be enabled on the next block
+	if tx.Process.StartBlock == 0 || tx.Process.StartBlock == 1 {
+		tx.Process.StartBlock = state.CurrentHeight() + 1
+	} else if tx.Process.StartBlock < state.CurrentHeight() {
 		return nil, fmt.Errorf(
 			"cannot add process with start block lower than or equal to the current height")
 	}
@@ -431,6 +434,9 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 		}
 		if len(circuits) == 0 {
 			return nil, fmt.Errorf("no circuit configs in the %v genesis", app.chainId)
+		}
+		if tx.Process.MaxCensusSize == nil {
+			return nil, fmt.Errorf("maxCensusSize is not provided")
 		}
 		if *tx.Process.MaxCensusSize > uint64(circuits[len(circuits)-1].Parameters[0]) {
 			return nil, fmt.Errorf("maxCensusSize for anonymous envelope "+

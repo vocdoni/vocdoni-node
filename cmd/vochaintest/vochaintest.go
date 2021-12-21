@@ -294,6 +294,7 @@ func mkTreeVoteTest(host,
 		&models.EnvelopeType{EncryptedVotes: encryptedVotes},
 		nil,
 		models.CensusOrigin_OFF_CHAIN_TREE,
+		0,
 		procDuration,
 		uint64(electionSize))
 	if err != nil {
@@ -514,6 +515,7 @@ func mkTreeAnonVoteTest(host,
 		&models.EnvelopeType{Anonymous: true},
 		&models.ProcessMode{AutoStart: true, Interruptible: true, PreRegister: true},
 		models.CensusOrigin_OFF_CHAIN_TREE,
+		5,
 		procDuration,
 		uint64(electionSize))
 	if err != nil {
@@ -798,6 +800,7 @@ func cspVoteTest(
 		&models.EnvelopeType{EncryptedVotes: encryptedVotes},
 		nil,
 		models.CensusOrigin_OFF_CHAIN_CA,
+		0,
 		procDuration,
 		uint64(electionSize))
 	if err != nil {
