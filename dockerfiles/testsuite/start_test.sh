@@ -8,19 +8,18 @@ set -x
 #  4: run csp vote test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
-ORACLE_KEY=${TESTSUITE_ORACLE_KEY:-6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223}
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
 ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 TEST=${1:-0}
 CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-info}
 test() {
-	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway:9090/dvote --logLevel=$LOGLEVEL --operation=vtest --electionType=$1 --withWeight=2
+	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway0:9090/dvote --logLevel=$LOGLEVEL --operation=vtest --electionType=$1 --withWeight=2
 	echo $? >$2
 }
 
 test_anon() {
-	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE_ANON --gwHost http://gateway:9090/dvote --logLevel=$LOGLEVEL --operation=anonvoting
+	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE_ANON --gwHost http://gateway0:9090/dvote --logLevel=$LOGLEVEL --operation=anonvoting
 	echo $? >$1
 }
 
@@ -35,10 +34,16 @@ docker-compose up -d
 
 echo "### Waiting for test suite to be ready ###"
 for i in {1..20}; do
-	docker-compose run test curl -s --fail http://gateway:9090/dvote \
+	docker-compose run test curl -s --fail http://gateway0:9090/dvote \
 		-X POST \
 		-d '{"id": "req00'$RANDOM'", "request": {"method": "genProof", "timestamp":'$(date +%s)'}}' 2>/dev/null && break || sleep 2
 done
+
+. env.oracle0key
+ORACLE_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
+if [ -n "$TESTSUITE_ORACLE_KEY" ] ; then
+	ORACLE_KEY="$TESTSUITE_ORACLE_KEY"
+fi
 
 testid="/tmp/.vochaintest$RANDOM"
 

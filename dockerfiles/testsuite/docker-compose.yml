@@ -75,14 +75,16 @@ services:
 
   oracle:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.oracle"
+    env_file:
+      - "${COMPOSE_HOST_PATH:-.}/env.oracle"
+      - "${COMPOSE_HOST_PATH:-.}/env.oracle0key"
     volumes:
       - data-oracle:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
     links:
       - seed
 
-  gateway:
+  gateway0:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.gateway"
     ports:
@@ -99,7 +101,7 @@ services:
       context: ../../
       target: test
     links:
-      - gateway
+      - gateway0
     command: "true"
 
 volumes:

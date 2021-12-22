@@ -1,0 +1,92 @@
+version: "3.7"
+
+services:
+{% for key in seed_keys %}
+  seed{{loop.index0}}:
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+{%  if loop.first %}
+    build: # reused by the other services
+      context: {{git_root}}
+{%  endif %}
+    environment:
+      - DVOTE_VOCHAINCONFIG_PUBLICADDR=seed{{loop.index0}}:26656
+      - DVOTE_VOCHAINCONFIG_NODEKEY=0x{{key.priv_key}}
+    env_file:
+      - "${COMPOSE_HOST_PATH:-.}/env.seed"
+    volumes:
+      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+    networks:
+      - seed{{loop.index0}}
+
+{% endfor %}
+{% for key in miner_keys %}
+  miner{{loop.index0}}:
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    environment:
+      - DVOTE_VOCHAINCONFIG_PUBLICADDR=miner{{loop.index0}}:26656
+      - DVOTE_VOCHAINCONFIG_MINERKEY=0x{{key.priv_key}}
+    env_file:
+      - "${COMPOSE_HOST_PATH:-.}/env.miner"
+      - "${COMPOSE_HOST_PATH:-.}/env.seeds"
+    volumes:
+      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+    networks:
+{%    for id in range(seeds|int) %}
+      - seed{{id}}
+{%    endfor %}
+
+{% endfor %}
+{% for key in oracle_keys %}
+  oracle{{loop.index0}}:
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    environment:
+      - DVOTE_VOCHAINCONFIG_PUBLICADDR=oracle{{loop.index0}}:26656
+      - DVOTE_ETHCONFIG_SIGNINGKEY={{key.priv_key}}
+    env_file:
+      - "${COMPOSE_HOST_PATH:-.}/env.oracle"
+      - "${COMPOSE_HOST_PATH:-.}/env.seeds"
+    volumes:
+      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+    networks:
+{%    for id in range(seeds|int) %}
+      - seed{{id}}
+{%    endfor %}
+
+{% endfor %}
+{% for id in range(gateways|int) %}
+  gateway{{id}}:
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    environment:
+      - DVOTE_VOCHAINCONFIG_PUBLICADDR=gateway{{id}}:26656
+    env_file:
+      - "${COMPOSE_HOST_PATH:-.}/env.gateway"
+      - "${COMPOSE_HOST_PATH:-.}/env.seeds"
+    ports:
+      - "${COMPOSE_DVOTE_PORT_MAPPING:-{{9090+id}}:9090}"
+    volumes:
+      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+    networks:
+      - gateway{{id}}
+{%    for id in range(seeds|int) %}
+      - seed{{id}}
+{%    endfor %}
+
+{% endfor %}
+  test:
+    image: "dvotenode-test:${TESTSUITE_BUILD_TAG:-latest}"
+    build:
+      context: {{git_root}}
+      target: test
+    networks:
+{%    for id in range(gateways|int) %}
+      - gateway{{id}}
+{%    endfor %}
+    command: "true"
+
+networks:
+{%    for id in range(seeds|int) %}
+  seed{{id}}:
+{%    endfor %}
+{%    for id in range(gateways|int) %}
+  gateway{{id}}:
+{%    endfor %}
