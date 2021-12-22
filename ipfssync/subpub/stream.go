@@ -71,15 +71,15 @@ func (ps *SubPub) readHandler(stream network.Stream) {
 			// continues below
 		}
 		message, err := ps.ReadMessage(r)
-		if strings.Contains(err.Error(), "stream reset") {
-			log.Errorf("peer %s disconnected (stream reset)", peer)
+		if err != nil {
+			if strings.Contains(err.Error(), "stream reset") {
+				log.Infof("peer %s disconnected (stream reset)", peer)
+			} else {
+				log.Errorf("error reading stream from %s: %v", peer, err)
+			}
 			if fn := ps.OnPeerRemove; fn != nil {
 				fn(peer)
 			}
-			return
-		}
-		if err != nil {
-			log.Errorf("error reading stream from %s: %v", peer, err)
 			return
 		}
 
