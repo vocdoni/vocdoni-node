@@ -46,7 +46,7 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys,
 			storageSync = *ipfssync.NewIPFSsync(ipfsconfig.ConfigPath+"/.ipfsSync", ipfsconfig.SyncKey, priv, "libp2p", storage)
 			if len(ipfsconfig.SyncPeers) > 0 && len(ipfsconfig.SyncPeers[0]) > 8 {
 				log.Debugf("using custom ipfs sync bootnodes %s", ipfsconfig.SyncPeers)
-				storageSync.Transport.BootNodes = ipfsconfig.SyncPeers
+				storageSync.Transport.SetBootnodes(ipfsconfig.SyncPeers)
 			}
 			storageSync.Start()
 		}

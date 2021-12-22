@@ -207,7 +207,7 @@ require (
 	github.com/libp2p/go-libp2p-noise v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-peerstore v0.2.8 // indirect
 	github.com/libp2p/go-libp2p-pnet v0.2.0 // indirect
-	github.com/libp2p/go-libp2p-pubsub v0.4.2 // direct
+	github.com/libp2p/go-libp2p-pubsub v0.4.2 // indirect
 	github.com/libp2p/go-libp2p-pubsub-router v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-quic-transport v0.11.2 // indirect
 	github.com/libp2p/go-libp2p-record v0.1.3 // indirect

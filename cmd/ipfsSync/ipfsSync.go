@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -12,21 +11,6 @@ import (
 	"go.vocdoni.io/dvote/ipfssync"
 	"go.vocdoni.io/dvote/log"
 )
-
-// makes deprecated flags work the same as the new flags, but prints a warning
-func deprecatedFlagsFunc(f *flag.FlagSet, name string) flag.NormalizedName {
-	oldName := name
-	switch name {
-	case "helloTime":
-		name = "helloInterval"
-	case "updateTime":
-		name = "updateInterval"
-	}
-	if oldName != name {
-		fmt.Printf("Flag --%s has been deprecated, please use --%s instead\n", oldName, name)
-	}
-	return flag.NormalizedName(name)
-}
 
 func main() {
 	home, err := os.UserHomeDir()
@@ -39,8 +23,8 @@ func main() {
 	key := flag.String("key", "vocdoni", "secret shared group key for the sync cluster")
 	nodeKey := flag.String("nodeKey", "", "custom private hexadecimal 256 bit key for p2p identity")
 	port := flag.Int16("port", 4171, "port for the sync network")
-	helloInterval := flag.Int("helloInterval", 40, "period in seconds for sending hello messages")
-	updateInterval := flag.Int("updateInterval", 20, "period in seconds for sending update messages")
+	helloTime := flag.Int("helloTime", 40, "period in seconds for sending hello messages")
+	updateTime := flag.Int("updateTime", 20, "period in seconds for sending update messages")
 	peers := flag.StringArray("peers", []string{},
 		"custom list of peers to connect to (multiaddresses separated by commas)")
 	private := flag.Bool("private", false,
@@ -50,10 +34,7 @@ func main() {
 	bootnode := flag.Bool("bootnode", false,
 		"act as a bootstrap node (will not try to connect with other bootnodes)")
 
-	flag.CommandLine.SortFlags = false
-	flag.CommandLine.SetNormalizeFunc(deprecatedFlagsFunc)
 	flag.Parse()
-
 	log.Init(*logLevel, "stdout")
 	ipfsStore := data.IPFSNewConfig(*dataDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
@@ -103,8 +84,8 @@ func main() {
 	}
 
 	is := ipfssync.NewIPFSsync(*dataDir, *key, privKey, p2pType, storage)
-	is.HelloInterval = time.Second * time.Duration(*helloInterval)
-	is.UpdateInterval = time.Second * time.Duration(*updateInterval)
+	is.HelloTime = *helloTime
+	is.UpdateTime = *updateTime
 	is.Port = *port
 	if *bootnode {
 		is.Bootnodes = []string{""}

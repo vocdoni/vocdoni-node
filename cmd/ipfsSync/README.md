@@ -16,17 +16,17 @@ Pins can only be added but not deleted. So once a new pin enters into the networ
 Available options:
 
 ```shell
-      --logLevel string         log level (default "info")
-      --dataDir string          directory for storing data (default "/home/user/.ipfs")
-      --key string              secret shared group key for the sync cluster (default "vocdoni")
-      --nodeKey string          custom private hexadecimal 256 bit key for p2p identity
-      --port int16              port for the sync network (default 4171)
-      --helloInterval int       period in seconds for sending hello messages (default 40)
-      --updateInterval int      period in seconds for sending update messages (default 20)
-      --peers stringArray       custom list of peers to connect to (multiaddresses separated by commas)
-      --private                 if enabled a private libp2p network will be created (using the secret key at transport layer)
-      --bootnodes stringArray   list of bootnodes (multiaddress separated by commas)
       --bootnode                act as a bootstrap node (will not try to connect with other bootnodes)
+      --bootnodes stringArray   list of bootnodes (multiaddress separated by commas)
+      --dataDir string          directory for storing data (default "/home/p4u/.ipfs")
+      --helloTime int           period in seconds for sending hello messages (default 40)
+      --key string              secret shared group key for the sync cluster (default "vocdoni")
+      --logLevel string         log level (default "info")
+      --nodeKey string          custom private hexadeciaml 256 bit key for p2p identity
+      --peers stringArray       custom list of peers to connect (multiaddress separated by commas)
+      --port int16              port for the sync network (default 4171)
+      --private                 if enabled a private libp2p network will be created (using the secret key at transport layer)
+      --updateTime int          period in seconds for sending update messages (default 20)
 ```
 
 ### Example
