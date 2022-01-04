@@ -3,6 +3,7 @@ package httprouter
 import (
 	"crypto/tls"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -99,7 +100,8 @@ func (r *HTTProuter) Init(host string, port int) error {
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	})
 	r.Mux.Use(cors.Handler)
-	r.Mux.Use(chiprometheus.NewMiddleware("gochi_http"))
+	// add entropy to middleware so multiple router instances do not conflict
+	r.Mux.Use(chiprometheus.NewMiddleware(fmt.Sprintf("gochi_http_%d", rand.Intn(1000))))
 
 	if len(r.TLSdomain) > 0 {
 		log.Infof("fetching letsencrypt TLS certificate for %s", r.TLSdomain)
