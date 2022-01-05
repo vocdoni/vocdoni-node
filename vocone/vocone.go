@@ -296,7 +296,7 @@ func startAPI(host string, port int, path string) (*rpcapi.RPCAPI, error) {
 	if err := signer.Generate(); err != nil {
 		return nil, err
 	}
-	httpRouter := httprouter.HTTProuter{}
+	httpRouter := httprouter.HTTProuter{PrometheusID: "vocone-chi"}
 	if err := httpRouter.Init(host, port); err != nil {
 		return nil, err
 	}
