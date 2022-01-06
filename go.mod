@@ -205,6 +205,7 @@ require (
 	github.com/libp2p/go-libp2p-noise v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-peerstore v0.2.8 // indirect
 	github.com/libp2p/go-libp2p-pnet v0.2.0 // indirect
+	github.com/libp2p/go-libp2p-pubsub v0.4.2 // direct
 	github.com/libp2p/go-libp2p-pubsub-router v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-quic-transport v0.11.2 // indirect
 	github.com/libp2p/go-libp2p-record v0.1.3 // indirect
@@ -318,8 +319,6 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
-
-require github.com/libp2p/go-libp2p-pubsub v0.4.2 // direct
 
 // Duktape is very slow to build, and can't be built with multiple cores since
 // it includes a lot of C in a single file. Until
