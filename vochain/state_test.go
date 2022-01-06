@@ -110,8 +110,8 @@ func TestBalanceTransfer(t *testing.T) {
 	addr2 := ethereum.SignKeys{}
 	addr2.Generate()
 
-	s.SetAccountInfoURI(addr1.Address(), "test://")
-	s.SetAccountInfoURI(addr2.Address(), "test://")
+	s.SetAccountInfoURI(addr1.Address(), addr1.Address(), "test://")
+	s.SetAccountInfoURI(addr2.Address(), addr1.Address(), "test://")
 
 	err = s.MintBalance(addr1.Address(), 50)
 	qt.Assert(t, err, qt.IsNil)

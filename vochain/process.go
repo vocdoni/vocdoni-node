@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
@@ -67,6 +68,14 @@ func (v *State) AddProcess(p *models.Process) error {
 	}
 	for _, l := range v.eventListeners {
 		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI, v.TxCounter())
+	}
+	creatorAddress := common.BytesToAddress(p.EntityId)
+	processCreationCost, err := v.TxCost(models.TxType_NEW_PROCESS, false)
+	if err != nil {
+		return err
+	}
+	if err := v.burnAccountBalance(creatorAddress, processCreationCost); err != nil {
+		return err
 	}
 	return nil
 }
@@ -250,6 +259,14 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 		for _, l := range v.eventListeners {
 			l.OnProcessStatusChange(process.ProcessId, process.Status, v.TxCounter())
 		}
+		creatorAddress := common.BytesToAddress(process.EntityId)
+		processCreationCost, err := v.TxCost(models.TxType_SET_PROCESS_STATUS, false)
+		if err != nil {
+			return err
+		}
+		if err := v.burnAccountBalance(creatorAddress, processCreationCost); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -316,6 +333,14 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 				log.Warnf("onProcessResults callback error: %v", err)
 			}
 		}
+		creatorAddress := common.BytesToAddress(process.EntityId)
+		processCreationCost, err := v.TxCost(models.TxType_SET_PROCESS_RESULTS, false)
+		if err != nil {
+			return err
+		}
+		if err := v.burnAccountBalance(creatorAddress, processCreationCost); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -373,6 +398,14 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 		if err := v.updateProcess(process, process.ProcessId); err != nil {
 			return err
 		}
+		creatorAddress := common.BytesToAddress(process.EntityId)
+		processCreationCost, err := v.TxCost(models.TxType_SET_PROCESS_CENSUS, false)
+		if err != nil {
+			return err
+		}
+		if err := v.burnAccountBalance(creatorAddress, processCreationCost); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -409,7 +442,11 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 			"cannot add process with duration lower than or equal to the current height")
 	}
 	// Check if transaction owner has enough funds to create a process
-	authorized, addr, err := state.VerifyAccountBalance(txBytes, signature, NewProcessCost)
+	cost, err := state.TxCost(tx.Txtype, false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get tx cost from state %w", err)
+	}
+	authorized, addr, err := state.VerifyAccountBalance(txBytes, signature, cost)
 	if err != nil {
 		return nil, err
 	}
@@ -490,9 +527,12 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	if signature == nil || tx == nil || txBytes == nil {
 		return fmt.Errorf("missing signature on setProcess transaction")
 	}
-
-	// Check if transaction owner has enough funds to create a process
-	authorized, addr, err := state.VerifyAccountBalance(txBytes, signature, SetProcessCost)
+	// Check if transaction owner has enough funds to set a process
+	cost, err := state.TxCost(tx.Txtype, false)
+	if err != nil {
+		return fmt.Errorf("cannot get tx cost from state %w", err)
+	}
+	authorized, addr, err := state.VerifyAccountBalance(txBytes, signature, cost)
 	if err != nil {
 		return err
 	}

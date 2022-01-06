@@ -165,16 +165,15 @@ func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
 		}
 
 	case *models.Tx_SetAccountInfo:
-		accountAddr, create, err := SetAccountInfoTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State)
+		accountAddr, txSender, create, err := SetAccountInfoTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State)
 		if err != nil {
 			return []byte{}, fmt.Errorf("cannot set account: %w", err)
 		}
 		if commit {
 			if create {
-				return vtx.txID[:], app.State.CreateAccount(accountAddr,
-					vtx.tx.GetSetAccountInfo().GetInfoURI(), make([]common.Address, 0), 0)
+				return vtx.txID[:], app.State.CreateAccount(accountAddr, vtx.tx.GetSetAccountInfo().GetInfoURI(), make([]common.Address, 0), 0)
 			}
-			return vtx.txID[:], app.State.SetAccountInfoURI(accountAddr, vtx.tx.GetSetAccountInfo().GetInfoURI())
+			return vtx.txID[:], app.State.SetAccountInfoURI(accountAddr, txSender, vtx.tx.GetSetAccountInfo().GetInfoURI())
 		}
 
 	case *models.Tx_MintTokens:

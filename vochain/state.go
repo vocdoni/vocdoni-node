@@ -667,6 +667,15 @@ func (v *State) SetFaucetNonce(key []byte) error {
 	return v.Tx.DeepSet(key, nil, FaucetNonceCfg)
 }
 
+func (v *State) burnAccountBalance(accoutAddress common.Address, value uint64) error {
+	acc, err := v.GetAccount(accoutAddress, false)
+	if err != nil {
+		return err
+	}
+	acc.Balance -= value
+	return v.setAccount(accoutAddress, acc)
+}
+
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
 func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
 	var tmkey ed25519.PubKey
