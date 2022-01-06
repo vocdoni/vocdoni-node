@@ -130,7 +130,7 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 		}
 
 	case *models.Tx_SetAccountInfo:
-		accountAddr, create, err := SetAccountInfoTxCheck(vtx, txBytes, signature, app.State)
+		accountAddr, txSender, create, err := SetAccountInfoTxCheck(vtx, txBytes, signature, app.State)
 		if err != nil {
 			return []byte{}, fmt.Errorf("cannot set account: %w", err)
 		}
@@ -138,7 +138,7 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 			if create {
 				return []byte{}, app.State.CreateAccount(accountAddr, vtx.GetSetAccountInfo().GetInfoURI(), make([]common.Address, 0), 0)
 			} else {
-				return []byte{}, app.State.SetAccountInfoURI(accountAddr, vtx.GetSetAccountInfo().GetInfoURI())
+				return []byte{}, app.State.SetAccountInfoURI(accountAddr, txSender, vtx.GetSetAccountInfo().GetInfoURI())
 			}
 		}
 
