@@ -111,15 +111,15 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// ethereum web3
 	globalCfg.W3Config.ChainType = *flag.StringP("ethChain", "c", "goerli",
 		fmt.Sprintf("Ethereum blockchain to use: %s", ethchain.AvailableChains))
-	globalCfg.W3Config.W3External = *flag.StringArrayP("w3External", "w", []string{},
-		"ethereum web3 endpoint. Supported protocols: http(s)://, ws(s):// and IPC filepath")
+	globalCfg.W3Config.W3External = *flag.StringSliceP("w3External", "w", []string{},
+		"comma-separated list of ethereum web3 endpoints. Supported protocols: http(s)://, ws(s):// and IPC filepath")
 	// ipfs
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false,
 		"disable inter planetary file system support")
 	globalCfg.Ipfs.SyncKey = *flag.StringP("ipfsSyncKey", "i", "",
 		"enable IPFS cluster synchronization using the given secret key")
-	globalCfg.Ipfs.SyncPeers = *flag.StringArray("ipfsSyncPeers", []string{},
-		"use custom ipfsSync peers/bootnodes for accessing the DHT")
+	globalCfg.Ipfs.SyncPeers = *flag.StringSlice("ipfsSyncPeers", []string{},
+		"use custom ipfsSync peers/bootnodes for accessing the DHT (comma-separated)")
 	// vochain
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656",
 		"p2p host and port to listent for the voting chain")
@@ -135,9 +135,9 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"tendermint node log level (error, info, debug, none)")
 	globalCfg.VochainConfig.LogLevelMemPool = *flag.String("vochainLogLevelMemPool", "error",
 		"tendermint mempool log level")
-	globalCfg.VochainConfig.Peers = *flag.StringArray("vochainPeers", []string{},
+	globalCfg.VochainConfig.Peers = *flag.StringSlice("vochainPeers", []string{},
 		"comma-separated list of p2p peers")
-	globalCfg.VochainConfig.Seeds = *flag.StringArray("vochainSeeds", []string{},
+	globalCfg.VochainConfig.Seeds = *flag.StringSlice("vochainSeeds", []string{},
 		"comma-separated list of p2p seed nodes")
 	globalCfg.VochainConfig.MinerKey = *flag.String("vochainMinerKey", "",
 		"user alternative vochain miner private key (hexstring[64])")
@@ -157,9 +157,9 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"index slot used by this node if it is a key keeper")
 	globalCfg.VochainConfig.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false,
 		"if enabled the census downloader will import all existing census")
-	globalCfg.VochainConfig.EthereumWhiteListAddrs = *flag.StringArray("ethereumWhiteListAddrs",
+	globalCfg.VochainConfig.EthereumWhiteListAddrs = *flag.StringSlice("ethereumWhiteListAddrs",
 		[]string{},
-		"list of ethereum addresses allowed to create processes on the vochain (oracle mode only)")
+		"comma-separated list of ethereum addresses allowed to create processes on the vochain (oracle mode only)")
 	globalCfg.VochainConfig.ProcessArchive = *flag.Bool("processArchive", false,
 		"enables the process archiver component")
 	globalCfg.VochainConfig.ProcessArchiveKey = *flag.String("processArchiveKey", "",
