@@ -5,6 +5,7 @@ services:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     build: # reused by the other services
       context: ../../
+      network: host
     env_file: "${COMPOSE_HOST_PATH:-.}/env.seed"
     volumes:
       - data-seed:/app/run/
@@ -98,6 +99,7 @@ services:
     build:
       context: ../../
       target: test
+      network: host
     links:
       - gateway
     command: "true"
