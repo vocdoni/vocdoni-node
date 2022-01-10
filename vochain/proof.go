@@ -144,9 +144,10 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 				return false, nil, fmt.Errorf("cannot salt ECDSA public key: %w", err)
 			}
 			censusRoot = ethcrypto.FromECDSAPub(rootPubSalted)
-		}
-		if bundlePub, err = ethereum.DecompressPubKey(bundlePub); err != nil {
-			return false, nil, fmt.Errorf("unable to decompress proof pub key: %w", err)
+			// if salted, pubKey should be decompressed
+			if bundlePub, err = ethereum.DecompressPubKey(bundlePub); err != nil {
+				return false, nil, fmt.Errorf("unable to decompress proof pub key: %w", err)
+			}
 		}
 		if !bytes.Equal(bundlePub, censusRoot) {
 			return false, nil, fmt.Errorf("csp bundle signature does not match")
