@@ -45,7 +45,6 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mattn/go-sqlite3 v1.14.9
 	github.com/multiformats/go-multiaddr v0.3.3
-	github.com/p4u/recws v1.2.2-0.20201005083112-7be7f9397e75
 	github.com/pressly/goose/v3 v3.3.0
 	github.com/prometheus/client_golang v1.10.0
 	github.com/shirou/gopsutil v3.21.8+incompatible
@@ -181,7 +180,6 @@ require (
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
-	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/kisielk/errcheck v1.5.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.4 // indirect
 	github.com/koron/go-ssdp v0.0.2 // indirect

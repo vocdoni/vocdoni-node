@@ -40,6 +40,7 @@ type HTTProuter struct {
 	TLSconfig      *tls.Config
 	TLSdomain      string
 	TLSdirCert     string
+	PrometheusID   string
 	address        net.Addr
 	namespaces     map[string]RouterNamespace
 	namespacesLock sync.RWMutex
@@ -99,7 +100,10 @@ func (r *HTTProuter) Init(host string, port int) error {
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	})
 	r.Mux.Use(cors.Handler)
-	r.Mux.Use(chiprometheus.NewMiddleware("gochi_http"))
+	if r.PrometheusID == "" {
+		r.PrometheusID = "gochi_http"
+	}
+	r.Mux.Use(chiprometheus.NewMiddleware(r.PrometheusID))
 
 	if len(r.TLSdomain) > 0 {
 		log.Infof("fetching letsencrypt TLS certificate for %s", r.TLSdomain)
