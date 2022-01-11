@@ -130,7 +130,7 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 		if err != nil {
 			return false, nil, fmt.Errorf("cannot fetch CSP public key from signature: %w", err)
 		}
-		if p.GetType() == models.ProofCA_ECDSA_BLIND_PIDSALTED {
+		if p.GetType() == models.ProofCA_ECDSA_PIDSALTED {
 			rootPub, err := ethereum.DecompressPubKey(censusRoot)
 			if err != nil {
 				return false, nil, fmt.Errorf("cannot decompress CSP public key: %w", err)
@@ -144,6 +144,10 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 				return false, nil, fmt.Errorf("cannot salt ECDSA public key: %w", err)
 			}
 			censusRoot = ethcrypto.FromECDSAPub(rootPubSalted)
+			// if salted, pubKey should be decompressed
+			if bundlePub, err = ethereum.DecompressPubKey(bundlePub); err != nil {
+				return false, nil, fmt.Errorf("unable to decompress proof pub key: %w", err)
+			}
 		}
 		if !bytes.Equal(bundlePub, censusRoot) {
 			return false, nil, fmt.Errorf("csp bundle signature does not match")
