@@ -41,12 +41,12 @@ func main() {
 	port := flag.Int16("port", 4171, "port for the sync network")
 	helloInterval := flag.Int("helloInterval", 40, "period in seconds for sending hello messages")
 	updateInterval := flag.Int("updateInterval", 20, "period in seconds for sending update messages")
-	peers := flag.StringArray("peers", []string{},
+	peers := flag.StringSlice("peers", []string{},
 		"custom list of peers to connect to (multiaddresses separated by commas)")
 	private := flag.Bool("private", false,
 		"if enabled a private libp2p network will be created (using the secret key at transport layer)")
-	bootnodes := flag.StringArray("bootnodes", []string{},
-		"list of bootnodes (multiaddress separated by commas)")
+	bootnodes := flag.StringSlice("bootnodes", []string{},
+		"list of bootnodes (multiaddresses separated by commas)")
 	bootnode := flag.Bool("bootnode", false,
 		"act as a bootstrap node (will not try to connect with other bootnodes)")
 
