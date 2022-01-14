@@ -16,6 +16,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	mempl "github.com/tendermint/tendermint/mempool"
 	nm "github.com/tendermint/tendermint/node"
+	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	snarkTypes "github.com/vocdoni/go-snark/types"
@@ -82,6 +83,8 @@ func TestBaseApplication(tb testing.TB) *BaseApplication {
 	if err != nil {
 		tb.Fatal(err)
 	}
+	app.SetTestingMethods()
+
 	// TODO: should this be a Close on the entire BaseApplication?
 	tb.Cleanup(func() { app.State.Close() })
 	return app
@@ -176,6 +179,16 @@ func (app *BaseApplication) SetTestingMethods() {
 	})
 	app.SetFnMempoolSize(func() int { return 0 })
 	app.IsSynchronizing = func() bool { return false }
+
+	// For tests, we begin at block 2.
+	// The last block we finished was 1, and we did so 10s ago.
+	app.height = 1
+	now := time.Now()
+	app.endBlockTimestamp = now.Add(-10 * time.Second).Unix()
+	app.BeginBlock(abcitypes.RequestBeginBlock{Header: tmprototypes.Header{
+		Time:   now,
+		Height: 2,
+	}})
 }
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.
@@ -383,6 +396,23 @@ func (app *BaseApplication) BeginBlock(
 	return abcitypes.ResponseBeginBlock{}
 }
 
+func (app *BaseApplication) AdvanceTestBlock() {
+	// Each block spans tens seconds.
+	endingHeight := int64(app.Height()) + 1
+	endingTime := time.Unix(app.TimestampStartBlock(), 0).Add(10 * time.Second)
+	app.endBlock(endingHeight, endingTime)
+
+	app.Commit()
+
+	// The next block begins a second later.
+	nextHeight := endingHeight + 1
+	nextStartTime := endingTime.Add(2 * time.Second)
+	app.BeginBlock(abcitypes.RequestBeginBlock{Header: tmprototypes.Header{
+		Time:   nextStartTime,
+		Height: nextHeight,
+	}})
+}
+
 // SetOption does nothing
 func (*BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
 	return abcitypes.ResponseSetOption{}
@@ -451,8 +481,13 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 
 // EndBlock updates the app height and timestamp at the end of the current block
 func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	atomic.StoreUint32(&app.height, uint32(req.Height))
-	atomic.StoreInt64(&app.endBlockTimestamp, time.Now().Unix())
+	app.endBlock(req.Height, time.Now())
+	return abcitypes.ResponseEndBlock{}
+}
+
+func (app *BaseApplication) endBlock(height int64, timestamp time.Time) abcitypes.ResponseEndBlock {
+	atomic.StoreUint32(&app.height, uint32(height))
+	atomic.StoreInt64(&app.endBlockTimestamp, timestamp.Unix())
 	return abcitypes.ResponseEndBlock{}
 }
 

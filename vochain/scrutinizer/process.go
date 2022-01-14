@@ -143,7 +143,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 				And("SourceNetworkId").MatchFunc(netIdMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
-				SortBy("CreationTime").
+				SortBy("CreationTime", "ID").
 				Skip(from).
 				Limit(max),
 			func(p *indexertypes.Process) error {
@@ -158,7 +158,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 				And("SourceNetworkId").MatchFunc(netIdMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
-				SortBy("CreationTime").
+				SortBy("CreationTime", "ID").
 				Skip(from).
 				Limit(max),
 			func(p *indexertypes.Process) error {
@@ -172,7 +172,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 				And("SourceNetworkId").MatchFunc(netIdMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
-				SortBy("CreationTime").
+				SortBy("CreationTime", "ID").
 				Skip(from).
 				Limit(max),
 			func(p *indexertypes.Process) error {
@@ -188,7 +188,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 				And("Status").MatchFunc(statusMatchFunc).
 				And("HaveResults").MatchFunc(wResultsMatchFunc).
 				And("ID").MatchFunc(searchMatchFunc(searchTerm)).
-				SortBy("CreationTime").
+				SortBy("CreationTime", "ID").
 				Skip(from).
 				Limit(max),
 			func(p *indexertypes.Process) error {
@@ -265,7 +265,7 @@ func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []string {
 	entities := []string{}
 	if err := s.db.ForEach(
 		badgerhold.Where("ID").MatchFunc(searchMatchFunc(searchTerm)).
-			SortBy("CreationTime").
+			SortBy("CreationTime", "ID").
 			Skip(from).
 			Limit(max),
 		func(e *indexertypes.Entity) error {
@@ -346,7 +346,9 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	// Create results in the indexer database
 	s.addVoteLock.Lock()
+	try := 0
 	if err := s.queryWithRetries(func() error {
+		try++
 		return s.db.Insert(pid, &indexertypes.Results{
 			ProcessID: pid,
 			// MaxValue requires +1 since 0 is also an option
