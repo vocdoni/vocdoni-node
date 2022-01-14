@@ -152,6 +152,8 @@ func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
 		Mode:       &models.ProcessMode{},
 		Status:     models.ProcessStatus_READY,
 		CensusRoot: make([]byte, 32), // emtpy hash
+		StartBlock: 1,
+		BlockCount: 3,
 	}
 	err = app.State.AddProcess(process)
 	qt.Assert(t, err, qt.IsNil)
