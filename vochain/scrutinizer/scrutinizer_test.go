@@ -172,8 +172,8 @@ func TestEntitySearch(t *testing.T) {
 
 func TestProcessList(t *testing.T) {
 	testProcessList(t, 10)
-	// testProcessList(t, 20)
-	// testProcessList(t, 155)
+	testProcessList(t, 20)
+	testProcessList(t, 155)
 }
 
 func testProcessList(t *testing.T, procsCount int) {

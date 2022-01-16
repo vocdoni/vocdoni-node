@@ -346,9 +346,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	// Create results in the indexer database
 	s.addVoteLock.Lock()
-	try := 0
 	if err := s.queryWithRetries(func() error {
-		try++
 		return s.db.Insert(pid, &indexertypes.Results{
 			ProcessID: pid,
 			// MaxValue requires +1 since 0 is also an option
