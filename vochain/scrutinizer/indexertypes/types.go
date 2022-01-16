@@ -87,12 +87,12 @@ func ProcessFromDB(dbproc *scrutinizerdb.Process) *Process {
 		SourceNetworkId:   dbproc.SourceNetworkID,
 		Metadata:          dbproc.Metadata,
 	}
-	// if len(dbproc.EnvelopePb) > 0 {
-	proc.Envelope = new(models.EnvelopeType)
-	if err := proto.Unmarshal(dbproc.EnvelopePb, proc.Envelope); err != nil {
-		panic(err)
+	if len(dbproc.EnvelopePb) > 0 {
+		proc.Envelope = new(models.EnvelopeType)
+		if err := proto.Unmarshal(dbproc.EnvelopePb, proc.Envelope); err != nil {
+			panic(err)
+		}
 	}
-	// }
 	if len(dbproc.ModePb) > 0 {
 		proc.Mode = new(models.ProcessMode)
 		if err := proto.Unmarshal(dbproc.ModePb, proc.Mode); err != nil {
