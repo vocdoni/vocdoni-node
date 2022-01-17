@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,13 +16,11 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/httprouter/jsonrpcapi"
 	"go.vocdoni.io/dvote/log"
-	"nhooyr.io/websocket"
 )
 
 // Client holds an API client.
 type Client struct {
 	Addr string
-	WS   *websocket.Conn
 	HTTP *http.Client
 }
 
@@ -31,12 +28,8 @@ type Client struct {
 // Supported protocols are ws(s):// and http(s)://
 func New(addr string) (*Client, error) {
 	cli := &Client{Addr: addr}
-	var err error
 	if strings.HasPrefix(addr, "ws") {
-		cli.WS, _, err = websocket.Dial(context.Background(), addr, nil)
-		if err != nil {
-			return nil, err
-		}
+		return nil, fmt.Errorf("websockets not supported")
 	} else if strings.HasPrefix(addr, "http") {
 		tr := &http.Transport{
 			MaxIdleConns:       10,
@@ -52,9 +45,6 @@ func New(addr string) (*Client, error) {
 
 func (c *Client) Close() error {
 	var err error
-	if c.WS != nil {
-		err = c.WS.Close(websocket.StatusNormalClosure, "")
-	}
 	if c.HTTP != nil {
 		c.HTTP.CloseIdleConnections()
 	}
@@ -95,17 +85,6 @@ func (c *Client) Request(req api.APIrequest, signer *ethereum.SignKeys) (*api.AP
 
 	log.Debugf("request: %s", reqBody)
 	message := []byte{}
-	if c.WS != nil {
-		tctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-		defer cancel()
-		if err := c.WS.Write(tctx, websocket.MessageText, reqBody); err != nil {
-			return nil, fmt.Errorf("%s: %v", method, err)
-		}
-		_, message, err = c.WS.Read(tctx)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %v", method, err)
-		}
-	}
 	if c.HTTP != nil {
 		resp, err := c.HTTP.Post(c.Addr, "application/json", bytes.NewBuffer(reqBody))
 		if err != nil {

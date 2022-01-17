@@ -62,7 +62,6 @@ require (
 	golang.org/x/crypto v0.0.0-20210920023735-84f357641f63
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f
 	google.golang.org/protobuf v1.27.1
-	nhooyr.io/websocket v1.8.7
 )
 
 require (
