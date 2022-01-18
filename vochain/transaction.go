@@ -197,9 +197,9 @@ func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
 			tx := vtx.GetSetAccountDelegateTx()
 			switch tx.Txtype {
 			case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-				return []byte{}, app.State.setDelegate(accountAddr, delegate, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
+				return []byte{}, app.State.SetDelegate(accountAddr, delegate, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
 			case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-				return []byte{}, app.State.setDelegate(accountAddr, delegate, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
+				return []byte{}, app.State.SetDelegate(accountAddr, delegate, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
 			default:
 				return []byte{}, fmt.Errorf("unknown set account delegate tx type")
 			}

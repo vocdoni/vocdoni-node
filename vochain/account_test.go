@@ -2,9 +2,11 @@ package vochain
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/proto/build/go/models"
@@ -17,35 +19,52 @@ const randomEthAccount = "0x52bc44d5378309ee2abf1539bf71de1b7d7be3b5"
 
 func TestSetAccountInfoTx(t *testing.T) {
 	app := TestBaseApplication(t)
+	// set tx cost for Tx: SetAccountInfo
+	if err := app.State.SetTxCost(models.TxType_SET_ACCOUNT_INFO, 10); err != nil {
+		t.Fatal(err)
+	}
 	signer := ethereum.SignKeys{}
 	if err := signer.Generate(); err != nil {
 		t.Fatal(err)
 	}
-
-	// should create an account
-	if err := testSetAccountInfoTx(t, &signer, app, infoURI); err != nil {
+	// set treasurer account (same as signer for testing purposes)
+	if err := app.State.setTreasurer(signer.Address()); err != nil {
 		t.Fatal(err)
 	}
-
+	// should create an account if address does not exist
+	if err := testSetAccountInfoTx(t, &signer, app, infoURI, 0); err != nil {
+		t.Fatal(err)
+	}
+	// should fail if account does not have enough balance
+	if err := testSetAccountInfoTx(t, &signer, app, ipfsUrl, 0); err == nil {
+		t.Fatal(err)
+	}
+	// should pass if infoURI is not empty and acccount have enough balance
+	// mint tokens for the newly created account
+	if err := app.State.MintBalance(signer.Address(), 100); err != nil {
+		t.Fatal(err)
+	}
+	if err := testSetAccountInfoTx(t, &signer, app, ipfsUrl, 0); err != nil {
+		t.Fatal(err)
+	}
 	// should fail if infoURI is empty
-	if err := testSetAccountInfoTx(t, &signer, app, ""); err == nil {
+	if err := testSetAccountInfoTx(t, &signer, app, "", 1); err == nil {
 		t.Fatal(err)
 	}
-
 	// get account
 	acc, err := app.State.GetAccount(signer.Address(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if acc.InfoURI != infoURI {
-		t.Fatalf("infoURI missmatch, got %s expected %s", acc.InfoURI, infoURI)
-	}
+	qt.Assert(t, acc.InfoURI, qt.Equals, ipfsUrl)
+	qt.Assert(t, acc.Balance, qt.Equals, uint64(90))
 }
 
 func testSetAccountInfoTx(t *testing.T,
 	signer *ethereum.SignKeys,
 	app *BaseApplication,
-	infoURI string) error {
+	infouri string,
+	nonce uint32) error {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx
@@ -55,7 +74,9 @@ func testSetAccountInfoTx(t *testing.T,
 
 	tx := &models.SetAccountInfoTx{
 		Txtype:  models.TxType_SET_ACCOUNT_INFO,
-		InfoURI: infoURI,
+		InfoURI: infouri,
+		Account: signer.Address().Bytes(),
+		Nonce:   nonce,
 	}
 
 	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{SetAccountInfo: tx}}); err != nil {
@@ -119,9 +140,7 @@ func TestMintTokensTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	// check nonce incremented
-	if treasurer.Nonce != 1 {
-		t.Fatal(err)
-	}
+	qt.Assert(t, treasurer.Nonce, qt.Equals, uint32(1))
 }
 
 func testMintTokensTx(t *testing.T,
@@ -176,50 +195,88 @@ func TestSetDelegateTx(t *testing.T) {
 	if err := signer.Generate(); err != nil {
 		t.Fatal(err)
 	}
-
+	// set tx cost for Tx: AddDelegateForAccount
+	if err := app.State.SetTxCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 10); err != nil {
+		t.Fatal(err)
+	}
+	// set tx cost for Tx: DelDelegateForAccount
+	if err := app.State.SetTxCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, 10); err != nil {
+		t.Fatal(err)
+	}
+	// set treasurer account (same as signer for testing purposes)
+	if err := app.State.setTreasurer(signer.Address()); err != nil {
+		t.Fatal(err)
+	}
 	// create account
-	testSetAccountInfoTx(t, &signer, app, infoURI)
-	// get nonce
-	acc, err := app.State.GetAccount(signer.Address(), false)
-	if err != nil {
+	if err := app.State.SetAccount(
+		signer.Address(),
+		&Account{
+			models.Account{
+				Balance: 30,
+				InfoURI: infoURI,
+			},
+		},
+	); err != nil {
 		t.Fatal(err)
 	}
 	// should add new delegate
-	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, acc.Nonce, true); err != nil {
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, 0, true); err != nil {
 		t.Fatal(err)
 	}
-
-	// should fail adding same delegate
-	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, acc.Nonce+1, true); err == nil {
-		t.Fatal(err)
-	}
-
-	// should remove an existing delegate
-	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, acc.Nonce+1, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// should fail removing a non existent delegate
-	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, acc.Nonce+2, false); err == nil {
-		t.Fatal(err)
-	}
-
-	// should fail using a wrong nonce
-	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, acc.Nonce+4, true); err == nil {
-		t.Fatal(err)
-	}
-
 	// get account
-	acc, err = app.State.GetAccount(signer.Address(), false)
+	signerAcc, err := app.State.GetAccount(signer.Address(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(acc.DelegateAddrs) != 0 {
-		t.Fatalf("expected delegates length to be 0, got %d", len(acc.DelegateAddrs))
+	qt.Assert(t, strings.ToLower(common.BytesToAddress(signerAcc.DelegateAddrs[0]).String()), qt.Equals, randomEthAccount)
+	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(20))
+
+	// should fail adding same delegate
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, 1, true); err == nil {
+		t.Fatal(err)
 	}
-	if acc.Nonce != 2 {
-		t.Fatalf("expected next nonce is 2, got %d", acc.Nonce)
+	// get account
+	signerAcc, err = app.State.GetAccount(signer.Address(), false)
+	if err != nil {
+		t.Fatal(err)
 	}
+	qt.Assert(t, strings.ToLower(common.BytesToAddress(signerAcc.DelegateAddrs[0]).String()), qt.Equals, randomEthAccount)
+	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(20))
+
+	// should remove an existing delegate
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, 1, false); err != nil {
+		t.Fatal(err)
+	}
+	// get account
+	signerAcc, err = app.State.GetAccount(signer.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(10))
+	// should fail removing a non existent delegate
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, 2, false); err == nil {
+		t.Fatal(err)
+	}
+	// should fail using a wrong nonce
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, 4, true); err == nil {
+		t.Fatal(err)
+	}
+	// add same delegate
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, 2, true); err != nil {
+		t.Fatal(err)
+	}
+	// should fail if no balance
+	if err := testSetDelegateTx(t, &signer, app, randomEthAccount, 3, false); err == nil {
+		t.Fatal(err)
+	}
+	// get account
+	signerAcc, err = app.State.GetAccount(signer.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qt.Assert(t, strings.ToLower(common.BytesToAddress(signerAcc.DelegateAddrs[0]).String()), qt.Equals, randomEthAccount)
+	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(0))
+	qt.Assert(t, signerAcc.Nonce, qt.Equals, uint32(3))
 }
 
 func testSetDelegateTx(t *testing.T,
@@ -277,64 +334,77 @@ func TestSendTokensTx(t *testing.T) {
 	if err := signer.Generate(); err != nil {
 		t.Fatal(err)
 	}
-	randomAccountSigner := ethereum.SignKeys{}
-	if err := randomAccountSigner.Generate(); err != nil {
+	signer2 := ethereum.SignKeys{}
+	if err := signer2.Generate(); err != nil {
 		t.Fatal(err)
 	}
-
-	// create accounts
-	// from
-	testSetAccountInfoTx(t, &signer, app, infoURI)
-	// to
-	testSetAccountInfoTx(t, &randomAccountSigner, app, infoURI)
-	// top up signer account
-	if err := app.State.MintBalance(signer.Address(), 100); err != nil {
+	// set tx cost for Tx: SendTokens
+	if err := app.State.SetTxCost(models.TxType_SEND_TOKENS, 10); err != nil {
 		t.Fatal(err)
 	}
-	// get nonce
-	acc, err := app.State.GetAccount(signer.Address(), false)
-	if err != nil {
+	// set treasurer account (same as signer for testing purposes)
+	if err := app.State.setTreasurer(signer.Address()); err != nil {
 		t.Fatal(err)
 	}
-
-	// should transfer tokens
-	if err := testSendTokensTx(t, &signer, app, randomAccountSigner.Address().String(), 50, acc.Nonce); err != nil {
+	// create account
+	if err := app.State.SetAccount(
+		signer.Address(),
+		&Account{
+			models.Account{
+				Balance: 30,
+				InfoURI: infoURI,
+			},
+		},
+	); err != nil {
 		t.Fatal(err)
 	}
-
-	// should fail if sender does not have enough balance
-	if err := testSendTokensTx(t, &signer, app, randomAccountSigner.Address().String(), 51, acc.Nonce+1); err == nil {
+	if err := app.State.SetAccount(
+		signer2.Address(),
+		&Account{
+			models.Account{
+				Balance: 10,
+				InfoURI: infoURI,
+			},
+		},
+	); err != nil {
 		t.Fatal(err)
 	}
-
-	// should fail if nonce is not correct
-	if err := testSendTokensTx(t, &signer, app, randomAccountSigner.Address().String(), 50, acc.Nonce+5); err == nil {
-		t.Fatal(err)
-	}
-
-	// should fail if account does not exist
-	if err := testSendTokensTx(t, &signer, app, randomEthAccount, 50, acc.Nonce+1); err == nil {
-		t.Fatal(err)
-	}
-
-	// get accounts
 	signerAcc, err := app.State.GetAccount(signer.Address(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	toAcc, err := app.State.GetAccount(randomAccountSigner.Address(), false)
+	// should transfer tokens
+	if err := testSendTokensTx(t, &signer, app, signer2.Address().String(), 10, signerAcc.Nonce); err != nil {
+		t.Fatal(err)
+	}
+
+	// should fail if sender does not have enough balance
+	if err := testSendTokensTx(t, &signer, app, signer2.Address().String(), 100, signerAcc.Nonce+1); err == nil {
+		t.Fatal(err)
+	}
+
+	// should fail if nonce is not correct
+	if err := testSendTokensTx(t, &signer, app, signer2.Address().String(), 2, signerAcc.Nonce+5); err == nil {
+		t.Fatal(err)
+	}
+
+	// should fail if account does not exist
+	if err := testSendTokensTx(t, &signer, app, randomEthAccount, 50, signerAcc.Nonce+1); err == nil {
+		t.Fatal(err)
+	}
+
+	// get accounts
+	signerAcc, err = app.State.GetAccount(signer.Address(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if signerAcc.Balance != 50 {
-		t.Fatalf("signer balance expected to be 50, got %d", signerAcc.Balance)
+	toAcc, err := app.State.GetAccount(signer2.Address(), false)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if toAcc.Balance != 50 {
-		t.Fatalf("to account balance expected to be 50, got %d", toAcc.Balance)
-	}
-	if signerAcc.Nonce != 1 {
-		t.Fatalf("expected nonce is 1, got %d", signerAcc.Nonce)
-	}
+	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(10))
+	qt.Assert(t, signerAcc.Nonce, qt.Equals, uint32(1))
+	qt.Assert(t, toAcc.Balance, qt.Equals, uint64(20))
 }
 
 func testSendTokensTx(t *testing.T,
@@ -389,30 +459,59 @@ func TestCollectFaucetTx(t *testing.T) {
 	if err := signer.Generate(); err != nil {
 		t.Fatal(err)
 	}
-	randomAccountSigner := ethereum.SignKeys{}
-	if err := randomAccountSigner.Generate(); err != nil {
+	signer2 := ethereum.SignKeys{}
+	if err := signer2.Generate(); err != nil {
 		t.Fatal(err)
 	}
-
-	// create accounts
-	// from
-	testSetAccountInfoTx(t, &signer, app, infoURI)
-	// to
-	testSetAccountInfoTx(t, &randomAccountSigner, app, infoURI)
-	// top up signer account
-	if err := app.State.MintBalance(signer.Address(), 100); err != nil {
+	// set tx cost for Tx: SendTokens
+	if err := app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 10); err != nil {
 		t.Fatal(err)
 	}
-
+	// set treasurer account (same as signer for testing purposes)
+	if err := app.State.setTreasurer(signer.Address()); err != nil {
+		t.Fatal(err)
+	}
+	// create account
+	if err := app.State.SetAccount(
+		signer.Address(),
+		&Account{
+			models.Account{
+				Balance: 30,
+				InfoURI: infoURI,
+			},
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.SetAccount(
+		signer2.Address(),
+		&Account{
+			models.Account{
+				Balance: 10,
+				InfoURI: infoURI,
+			},
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
 	// should transfer tokens
-	if err := testCollectFaucetTx(t, app, &signer, &randomAccountSigner, 10, 246728262361); err != nil {
+	if err := testCollectFaucetTx(t, app, &signer, &signer2, 10, 246728262361); err != nil {
 		t.Fatal(err)
 	}
-
 	// should not transfer tokens if same payload identifier
-	if err := testCollectFaucetTx(t, app, &signer, &randomAccountSigner, 10, 246728262361); err == nil {
+	if err := testCollectFaucetTx(t, app, &signer, &signer2, 10, 246728262361); err == nil {
 		t.Fatal(err)
 	}
+	signerAcc, err := app.State.GetAccount(signer.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signerAcc2, err := app.State.GetAccount(signer2.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(10))
+	qt.Assert(t, signerAcc2.Balance, qt.Equals, uint64(20))
 }
 
 func testCollectFaucetTx(t *testing.T,

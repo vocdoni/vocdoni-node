@@ -92,42 +92,25 @@ func (a *Account) DelDelegate(addr common.Address) error {
 // If origin address acc is not enough, ErrNotEnoughBalance is returned.
 // If provided nonce does not match origin address nonce+1, ErrAccountNonceInvalid is returned.
 func (v *State) TransferBalance(from, to common.Address, amount uint64, nonce uint64) error {
-	var accFrom, accTo Account
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	accFromRaw, err := v.Tx.DeepGet(from.Bytes(), AccountsCfg)
-	if err != nil {
+	var accFrom, accTo *Account
+	var err error
+	if accFrom, err = v.GetAccount(from, false); err != nil {
 		return err
 	}
-	if err := accFrom.Unmarshal(accFromRaw); err != nil {
-		return err
-	}
-	accToRaw, err := v.Tx.DeepGet(to.Bytes(), AccountsCfg)
-	if err != nil {
-		return err
-	}
-	if err := accTo.Unmarshal(accToRaw); err != nil {
+	if accTo, err = v.GetAccount(to, false); err != nil {
 		return err
 	}
 	transferCost, err := v.TxCost(models.TxType_SEND_TOKENS, false)
 	if err != nil {
 		return err
 	}
-	if err := accFrom.Transfer(&accTo, amount, transferCost, uint32(nonce)); err != nil {
+	if err := accFrom.Transfer(accTo, amount, transferCost, uint32(nonce)); err != nil {
 		return err
 	}
-	af, err := accFrom.Marshal()
-	if err != nil {
+	if err := v.SetAccount(from, accFrom); err != nil {
 		return err
 	}
-	if err := v.Tx.DeepSet(from.Bytes(), af, AccountsCfg); err != nil {
-		return err
-	}
-	at, err := accTo.Marshal()
-	if err != nil {
-		return err
-	}
-	if err := v.Tx.DeepSet(to.Bytes(), at, AccountsCfg); err != nil {
+	if err := v.SetAccount(to, accTo); err != nil {
 		return err
 	}
 	return nil
@@ -136,21 +119,12 @@ func (v *State) TransferBalance(from, to common.Address, amount uint64, nonce ui
 // CollectFaucet transfers balance from faucet generated package address to collector address,
 // and updates the state with the new values (including nonce).
 func (v *State) CollectFaucet(from, to common.Address, amount uint64, nonce uint64) error {
-	var accFrom, accTo Account
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	accFromRaw, err := v.Tx.DeepGet(from.Bytes(), AccountsCfg)
-	if err != nil {
+	var accFrom, accTo *Account
+	var err error
+	if accFrom, err = v.GetAccount(from, false); err != nil {
 		return err
 	}
-	if err := accFrom.Unmarshal(accFromRaw); err != nil {
-		return err
-	}
-	accToRaw, err := v.Tx.DeepGet(to.Bytes(), AccountsCfg)
-	if err != nil {
-		return err
-	}
-	if err := accTo.Unmarshal(accToRaw); err != nil {
+	if accTo, err = v.GetAccount(to, false); err != nil {
 		return err
 	}
 	if amount == 0 {
@@ -160,14 +134,13 @@ func (v *State) CollectFaucet(from, to common.Address, amount uint64, nonce uint
 	if err != nil {
 		return err
 	}
-	if (accFrom.Balance + transferCost) < amount {
+	if accFrom.Balance < amount+transferCost {
 		return ErrNotEnoughBalance
 	}
 	if accTo.Balance+amount <= accTo.Balance {
 		return ErrBalanceOverflow
 	}
 	accTo.Balance += amount
-
 	accFrom.Balance -= amount + transferCost
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, nonce)
@@ -176,24 +149,16 @@ func (v *State) CollectFaucet(from, to common.Address, amount uint64, nonce uint
 	if err := v.Tx.DeepSet(crypto.Sha256(key), nil, FaucetNonceCfg); err != nil {
 		return err
 	}
-	af, err := accFrom.Marshal()
-	if err != nil {
+	if err := v.SetAccount(from, accFrom); err != nil {
 		return err
 	}
-	if err := v.Tx.DeepSet(from.Bytes(), af, AccountsCfg); err != nil {
-		return err
-	}
-	at, err := accTo.Marshal()
-	if err != nil {
-		return err
-	}
-	if err := v.Tx.DeepSet(to.Bytes(), at, AccountsCfg); err != nil {
+	if err := v.SetAccount(to, accTo); err != nil {
 		return err
 	}
 	return nil
 }
 
-// MintBalance increments the existing acc of address by amount
+// mintBalance increments the existing acc of address by amount
 func (v *State) MintBalance(address common.Address, amount uint64) error {
 	if amount == 0 {
 		return fmt.Errorf("cannot mint a zero amount balance")
@@ -237,10 +202,12 @@ func (v *State) GetAccount(address common.Address, isQuery bool) (*Account, erro
 	return &acc, acc.Unmarshal(raw)
 }
 
-// VerifyAccountBalance extracts an account address from a signed message, and verifies if
+// VerifyAccountBalanceFromSignature extracts an account address from a signed message, and verifies if
 // there is enough balance to cover an amount expense
-func (v *State) VerifyAccountBalance(message, signature []byte, amount uint64) (bool, common.Address, error) {
-	address, err := ethereum.AddrFromSignature(message, signature)
+func (v *State) VerifyAccountBalanceFromSignature(message, signature []byte, amount uint64) (bool, common.Address, error) {
+	var err error
+	address := common.Address{}
+	address, err = ethereum.AddrFromSignature(message, signature)
 	if err != nil {
 		return false, address, err
 	}
@@ -254,75 +221,89 @@ func (v *State) VerifyAccountBalance(message, signature []byte, amount uint64) (
 	return acc.Balance >= amount, address, nil
 }
 
-func (v *State) SetAccountInfoURI(address common.Address, txSender common.Address, infoURI string) error {
-	if infoURI == "" {
-		return fmt.Errorf("cannot set an empty URI")
-	}
-	var acc Account
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	raw, err := v.Tx.DeepGet(address.Bytes(), AccountsCfg)
-	if err != nil && !errors.Is(err, arbo.ErrKeyNotFound) {
+func (v *State) SetAccountInfoURI(accountAddress, txSender common.Address, infoURI string) error {
+	acc, err := v.GetAccount(accountAddress, false)
+	if err != nil {
 		return err
-	} else if err == nil {
-		if err := acc.Unmarshal(raw); err != nil {
+	}
+	if acc == nil {
+		return fmt.Errorf("account does not exist")
+	}
+	SetAccountInfoCost, err := v.TxCost(models.TxType_SET_ACCOUNT_INFO, false)
+	if err != nil {
+		return err
+	}
+	if accountAddress == txSender {
+		acc.InfoURI = infoURI
+		acc.Balance -= SetAccountInfoCost
+		acc.Nonce++
+		accBytes, err := acc.Marshal()
+		if err != nil {
 			return err
 		}
+		v.Tx.Lock()
+		defer v.Tx.Unlock()
+		return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
+	}
+	sender, err := v.GetAccount(txSender, false)
+	if err != nil {
+		return err
+	}
+	sender.Balance -= SetAccountInfoCost
+	sender.Nonce++
+	senderBytes, err := sender.Marshal()
+	if err != nil {
+		return err
 	}
 	acc.InfoURI = infoURI
 	accBytes, err := acc.Marshal()
 	if err != nil {
 		return err
 	}
-	processCreationCost, err := v.TxCost(models.TxType_SET_PROCESS_STATUS, false)
-	if err != nil {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	if err := v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg); err != nil {
 		return err
 	}
-	if err := v.burnAccountBalance(txSender, processCreationCost); err != nil {
-		return err
-	}
-	return v.Tx.DeepSet(address.Bytes(), accBytes, AccountsCfg)
+	return v.Tx.DeepSet(txSender.Bytes(), senderBytes, AccountsCfg)
 }
 
-func (v *State) CreateAccount(address common.Address, infoURI string, delegates []common.Address, initBalance uint64) error {
+func (v *State) CreateAccount(accountAddress common.Address, infoURI string, delegates []common.Address, initBalance uint64) error {
 	// check valid address
-	if address.String() == types.EthereumZeroAddress {
+	if accountAddress.String() == types.EthereumZeroAddressString {
 		return fmt.Errorf("invalid address")
 	}
 	// check not created
-	acc, err := v.GetAccount(address, false)
+	acc, err := v.GetAccount(accountAddress, false)
 	if err != nil {
-		return fmt.Errorf("cannot create account %s: %v", address.String(), err)
+		return fmt.Errorf("cannot create account %s: %v", accountAddress.String(), err)
 	}
 	if acc != nil {
-		return fmt.Errorf("account %s already exists", address.String())
+		return fmt.Errorf("account %s already exists", accountAddress.String())
 	}
 	// account not found, creating it
 	// check valid infoURI, must be set on creation
-	if infoURI == "" {
-		return fmt.Errorf("cannot set an empty URI")
-	}
 	newAccount := &Account{}
 	newAccount.InfoURI = infoURI
 	if len(delegates) > 0 {
 		newAccount.DelegateAddrs = make([][]byte, len(delegates))
 		for i := 0; i < len(delegates); i++ {
-			if delegates[i].String() != types.EthereumZeroAddress {
+			if delegates[i].String() != types.EthereumZeroAddressString {
 				newAccount.DelegateAddrs = append(newAccount.DelegateAddrs, delegates[i].Bytes())
 			}
 		}
 	}
 	newAccount.Balance = initBalance
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
 	accBytes, err := newAccount.Marshal()
 	if err != nil {
 		return err
 	}
-	return v.Tx.DeepSet(address.Bytes(), accBytes, AccountsCfg)
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
 }
 
-// SetAccountInfoTxCheck is an abstraction of ABCI checkTx for an setAccountInfoTx transaction
+// SetAccountInfoTxCheck is an abstraction of ABCI checkTx for an SetAccountInfoTx transaction
 // If the bool returned is true means that the account does not exist and is going to be created
 func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, common.Address, bool, error) {
 	tx := vtx.GetSetAccountInfo()
@@ -330,21 +311,26 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	if signature == nil || tx == nil || txBytes == nil {
 		return common.Address{}, common.Address{}, false, fmt.Errorf("missing signature and/or transaction")
 	}
+	accountAddressBytes := tx.GetAccount()
+	if accountAddressBytes == nil || len(accountAddressBytes) != types.EntityIDsize {
+		return common.Address{}, common.Address{}, false, fmt.Errorf("invalid account")
+	}
+	if bytes.Equal(accountAddressBytes, types.EthereumZeroAddressBytes[:]) {
+		return common.Address{}, common.Address{}, false, fmt.Errorf("invalid account")
+	}
 	cost, err := state.TxCost(models.TxType_SET_ACCOUNT_INFO, false)
 	if err != nil {
 		return common.Address{}, common.Address{}, false, err
 	}
-	authorized, accountAddress, err := state.VerifyAccountBalance(txBytes, signature, cost)
+	txSender, err := ethereum.AddrFromSignature(txBytes, signature)
 	if err != nil {
-		return common.Address{}, common.Address{}, false, err
-	}
-	if !authorized {
-		return common.Address{}, common.Address{}, false, fmt.Errorf("unauthorized: %s", ErrNotEnoughBalance)
+		return common.Address{}, common.Address{}, false, fmt.Errorf("cannot extract address from signature %s", err)
 	}
 	infoURI := tx.GetInfoURI()
 	if infoURI == "" {
 		return common.Address{}, common.Address{}, false, fmt.Errorf("invalid URI, cannot be empty")
 	}
+	accountAddress := common.BytesToAddress(accountAddressBytes)
 	// check account, if not exists a new one will be created
 	acc, err := state.GetAccount(accountAddress, false)
 	if err != nil {
@@ -353,7 +339,20 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	if acc == nil {
 		return accountAddress, accountAddress, true, nil
 	}
-	return common.BytesToAddress(tx.Account), accountAddress, false, nil
+	txSenderAccount, err := state.GetAccount(txSender, false)
+	if err != nil {
+		return common.Address{}, common.Address{}, false, fmt.Errorf("cannot get nonce of tx sender: %v", err)
+	}
+	if tx.Nonce != txSenderAccount.Nonce {
+		return common.Address{}, common.Address{}, false, fmt.Errorf("invalid nonce, expected %d got %d", txSenderAccount.Nonce, tx.Nonce)
+	}
+	if txSenderAccount.Balance < cost {
+		return common.Address{}, common.Address{}, false, fmt.Errorf("unauthorized: %s", ErrNotEnoughBalance)
+	}
+	if acc.InfoURI == infoURI {
+		return common.Address{}, common.Address{}, false, fmt.Errorf("same infoURI: %s", infoURI)
+	}
+	return accountAddress, txSender, false, nil
 }
 
 func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, uint64, error) {
@@ -361,6 +360,10 @@ func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {
 		return common.Address{}, 0, fmt.Errorf("missing signature and/or transaction")
+	}
+	// check value
+	if tx.Value <= 0 {
+		return common.Address{}, 0, fmt.Errorf("invalid value")
 	}
 	// get address from signature
 	sigAddress, err := ethereum.AddrFromSignature(txBytes, signature)
@@ -382,15 +385,10 @@ func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 		return common.Address{}, 0, fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce+1)
 	}
 	// check to
-	to := common.BytesToAddress(tx.To)
-	if to.String() == types.EthereumZeroAddress || to.String() == tAddr.String() {
-		return common.Address{}, 0, fmt.Errorf("invalid address to mint")
+	if len(tx.To) != types.EntityIDsize || bytes.Equal(tx.To, types.EthereumZeroAddressBytes[:]) {
+		return common.Address{}, 0, fmt.Errorf("invalid To address")
 	}
-	// check value
-	if tx.Value <= 0 {
-		return common.Address{}, 0, fmt.Errorf("invalid value")
-	}
-	return to, tx.Value, nil
+	return common.BytesToAddress(tx.To), tx.Value, nil
 }
 
 func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, common.Address, error) {
@@ -399,11 +397,11 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	if signature == nil || tx == nil || txBytes == nil {
 		return common.Address{}, common.Address{}, fmt.Errorf("missing signature and/or transaction")
 	}
-	cost, err := state.TxCost(models.TxType_SET_ACCOUNT_INFO, false)
+	cost, err := state.TxCost(tx.GetTxtype(), false)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
-	authorized, sigAddress, err := state.VerifyAccountBalance(txBytes, signature, cost)
+	authorized, sigAddress, err := state.VerifyAccountBalanceFromSignature(txBytes, signature, cost)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
@@ -420,7 +418,7 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	}
 	// check delegate
 	delAcc := common.BytesToAddress(tx.Delegate)
-	if delAcc.String() == types.EthereumZeroAddress {
+	if delAcc.String() == types.EthereumZeroAddressString {
 		return common.Address{}, common.Address{}, fmt.Errorf("invalid delegate address")
 	}
 	switch tx.Txtype {
@@ -445,31 +443,29 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	}
 }
 
-func (v *State) setDelegate(accountAddr, delegateAddr common.Address, txType models.TxType) error {
+func (v *State) SetDelegate(accountAddr, delegateAddr common.Address, txType models.TxType) error {
 	// get account
 	acc, err := v.GetAccount(accountAddr, false)
 	if err != nil {
 		return err
 	}
-	setDelegateCost, err := v.TxCost(models.TxType_SET_ACCOUNT_INFO, false)
+	setDelegateCost, err := v.TxCost(txType, false)
 	if err != nil {
 		return err
 	}
 	switch txType {
 	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-		if err := acc.AddDelegate(delegateAddr); err != nil {
-			return err
-		}
+		acc.DelegateAddrs = append(acc.DelegateAddrs, delegateAddr.Bytes())
 		acc.Nonce++
 		acc.Balance -= setDelegateCost
-		return v.setAccount(accountAddr, acc)
+		return v.SetAccount(accountAddr, acc)
 	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
 		if err := acc.DelDelegate(delegateAddr); err != nil {
 			return err
 		}
 		acc.Nonce++
 		acc.Balance -= setDelegateCost
-		return v.setAccount(accountAddr, acc)
+		return v.SetAccount(accountAddr, acc)
 	default:
 		return fmt.Errorf("invalid setDelegate tx type")
 	}
@@ -503,7 +499,7 @@ func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	}
 	// check to
 	txToAddress := common.BytesToAddress(tx.To)
-	if txToAddress.String() == types.EthereumZeroAddress {
+	if txToAddress.String() == types.EthereumZeroAddressString {
 		return nil, fmt.Errorf("invalid address")
 	}
 	_, err = state.GetAccount(txToAddress, false)
@@ -518,7 +514,7 @@ func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	if tx.Nonce != acc.Nonce {
 		return nil, fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
 	}
-	cost, err := state.TxCost(models.TxType_SET_ACCOUNT_INFO, false)
+	cost, err := state.TxCost(models.TxType_SEND_TOKENS, false)
 	if err != nil {
 		return nil, err
 	}
@@ -576,13 +572,13 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	if err != nil {
 		return common.Address{}, err
 	}
-	if (issuerAcc.Balance + cost) < faucetPkgPayload.Amount {
-		return common.Address{}, fmt.Errorf("faucet does not have enough balance %d < %d", issuerAcc.Balance, faucetPkgPayload.Amount)
+	if (issuerAcc.Balance) < faucetPkgPayload.Amount+cost {
+		return common.Address{}, fmt.Errorf("faucet does not have enough balance %d < %d", issuerAcc.Balance, faucetPkgPayload.Amount+cost)
 	}
 	return issuerAddress, nil
 }
 
-func (v *State) setAccount(accountAddress common.Address, account *Account) error {
+func (v *State) SetAccount(accountAddress common.Address, account *Account) error {
 	accBytes, err := proto.Marshal(account)
 	if err != nil {
 		return err

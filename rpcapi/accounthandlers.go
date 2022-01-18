@@ -9,12 +9,12 @@ import (
 )
 
 func (r *RPCAPI) getAccount(request *api.APIrequest) (*api.APIresponse, error) {
-	// check pid
+	// check entity id
 	if len(request.EntityId) != types.EntityIDsize {
 		return nil, fmt.Errorf("cannot get account info: (malformed entityId)")
 
 	}
-	// Check account and send reply
+	// check account and send reply
 	var response api.APIresponse
 	entityIdAddr := common.BytesToAddress(request.EntityId)
 	acc, err := r.vocapp.State.GetAccount(entityIdAddr, true)
@@ -36,5 +36,24 @@ func (r *RPCAPI) getAccount(request *api.APIrequest) (*api.APIresponse, error) {
 		delegates = append(delegates, common.BytesToAddress(acc.DelegateAddrs[i]).String())
 	}
 	response.Delegates = delegates
+	return &response, nil
+}
+
+func (r *RPCAPI) getTreasurer(request *api.APIrequest) (*api.APIresponse, error) {
+
+	// try get treasyrer and send reply
+	var response api.APIresponse
+	t, err := r.vocapp.State.Treasurer(true)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get treasurer: %w", err)
+	}
+	// treasurer does not exist
+	if t == nil {
+		// response ok meaning the treasurer does not exist
+		return &response, nil
+	}
+	response.EntityID = common.BytesToAddress(t.Address).String()
+	response.Nonce = new(uint32)
+	*response.Nonce = t.Nonce
 	return &response, nil
 }

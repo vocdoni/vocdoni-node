@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -41,11 +42,29 @@ func TestStateBasic(t *testing.T) {
 	}
 	defer s.Close()
 
+	// set tx cost for Tx: NewProcess
+	if err := s.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
 	var pids [][]byte
 	for i := 0; i < 100; i++ {
 		pids = append(pids, rng.RandomBytes(32))
 		censusURI := "ipfs://foobar"
-		p := &models.Process{EntityId: rng.RandomBytes(32), CensusURI: &censusURI, ProcessId: pids[i]}
+		signer := ethereum.SignKeys{}
+		if err := signer.Generate(); err != nil {
+			t.Fatal(err)
+		}
+		acc := &Account{}
+		acc.Balance = 100000
+		acc.InfoURI = "ipfs://"
+		if err := s.SetAccount(
+			signer.Address(),
+			acc,
+		); err != nil {
+			t.Fatal(err)
+		}
+		p := &models.Process{EntityId: signer.Address().Bytes(), CensusURI: &censusURI, ProcessId: pids[i]}
 		if err := s.AddProcess(p); err != nil {
 			t.Fatal(err)
 		}
@@ -70,8 +89,8 @@ func TestStateBasic(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(p.EntityId) != 32 {
-		t.Errorf("entityID is not correct")
+	if len(p.EntityId) != types.EntityIDsize {
+		t.Errorf("entityID is not correct, got %d length", len(p.EntityId))
 	}
 
 	_, err = s.Process(rng.RandomBytes(32), false)
@@ -105,16 +124,39 @@ func TestBalanceTransfer(t *testing.T) {
 	s, err := NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
+
 	addr1 := ethereum.SignKeys{}
-	addr1.Generate()
+	if err := addr1.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &Account{}
+	acc.Balance = 50
+	acc.InfoURI = "ipfs://"
+	if err := s.SetAccount(
+		addr1.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	addr2 := ethereum.SignKeys{}
-	addr2.Generate()
+	if err := addr2.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc2 := &Account{}
+	acc2.Balance = 50
+	acc2.InfoURI = "ipfs://"
+	if err := s.SetAccount(
+		addr2.Address(),
+		acc2,
+	); err != nil {
+		t.Fatal(err)
+	}
 
-	s.SetAccountInfoURI(addr1.Address(), addr1.Address(), "test://")
-	s.SetAccountInfoURI(addr2.Address(), addr1.Address(), "test://")
-
-	err = s.MintBalance(addr1.Address(), 50)
-	qt.Assert(t, err, qt.IsNil)
+	// set tx cost for Tx: NewProcess
+	if err := s.SetTxCost(models.TxType_SEND_TOKENS, 10); err != nil {
+		t.Fatal(err)
+	}
 
 	s.Save() // Save to test isQuery value on next call
 	b1, err := s.GetAccount(addr1.Address(), true)
@@ -127,7 +169,7 @@ func TestBalanceTransfer(t *testing.T) {
 
 	b2, err := s.GetAccount(addr2.Address(), false)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, b2.Balance, qt.Equals, uint64(20))
+	qt.Assert(t, b2.Balance, qt.Equals, uint64(70))
 
 	err = s.TransferBalance(addr1.Address(), addr2.Address(), 20, 2)
 	qt.Assert(t, err, qt.IsNotNil)
@@ -143,13 +185,13 @@ func TestBalanceTransfer(t *testing.T) {
 
 	b1, err = s.GetAccount(addr1.Address(), false)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, b1.Balance, qt.Equals, uint64(45))
+	qt.Assert(t, b1.Balance, qt.Equals, uint64(35))
 	qt.Assert(t, b1.Nonce, qt.Equals, uint32(1))
 
 	s.Save()
 	b2, err = s.GetAccount(addr2.Address(), true)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, b2.Balance, qt.Equals, uint64(5))
+	qt.Assert(t, b2.Balance, qt.Equals, uint64(35))
 	qt.Assert(t, b2.Nonce, qt.Equals, uint32(2))
 
 }
@@ -193,13 +235,34 @@ func TestOnProcessStart(t *testing.T) {
 		qt.Assert(t, err, qt.IsNil)
 	}
 
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &Account{}
+	acc.Balance = 100000
+	acc.InfoURI = "ipfs://"
+	if err := s.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	// set tx cost for Tx: NewProcess
+	if err := s.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	s.Save()
+
 	pid := rng.RandomBytes(32)
 	startBlock := uint32(4)
 	doBlock(1, func() {
 		censusURI := "ipfs://foobar"
 		maxCensusSize := uint64(16)
 		p := &models.Process{
-			EntityId:   rng.RandomBytes(32),
+			EntityId:   signer.Address().Bytes(),
 			CensusURI:  &censusURI,
 			ProcessId:  pid,
 			StartBlock: startBlock,
@@ -245,10 +308,29 @@ func TestBlockMemoryUsage(t *testing.T) {
 	s.Rollback()
 	s.SetHeight(height)
 
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &Account{}
+	acc.Balance = 100000
+	acc.InfoURI = "ipfs://"
+	if err := s.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	// set tx cost for Tx: NewProcess
+	if err := s.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
 	pid := rng.RandomBytes(32)
 	censusURI := "ipfs://foobar"
 	p := &models.Process{
-		EntityId:   rng.RandomBytes(32),
+		EntityId:   signer.Address().Bytes(),
 		CensusURI:  &censusURI,
 		ProcessId:  pid,
 		StartBlock: 2,

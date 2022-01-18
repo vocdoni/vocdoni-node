@@ -296,7 +296,8 @@ var Genesis = map[string]VochainGenesis{
          "Tx_NewProcess": 100,
          "Tx_SendTokens": 100,
          "Tx_SetAccountInfo": 100,
-         "Tx_SetAccountDelegate": 100,
+         "Tx_AddDelegateForAccount": 100,
+         "Tx_DelDelegateForAccount": 100,
          "Tx_CollectFaucet": 100
        }
    }

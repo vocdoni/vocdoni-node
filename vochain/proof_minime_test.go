@@ -26,6 +26,25 @@ func TestMinimeProof(t *testing.T) {
 		}
 	}
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:         pid,
@@ -33,7 +52,7 @@ func TestMinimeProof(t *testing.T) {
 		EnvelopeType:      &models.EnvelopeType{EncryptedVotes: false},
 		Mode:              new(models.ProcessMode),
 		Status:            models.ProcessStatus_READY,
-		EntityId:          util.RandomBytes(types.EthereumAddressSize),
+		EntityId:          signer.Address().Bytes(),
 		CensusRoot:        testMinimeStorageRoot,
 		CensusOrigin:      models.CensusOrigin_MINI_ME,
 		BlockCount:        1024,

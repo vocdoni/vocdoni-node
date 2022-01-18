@@ -23,6 +23,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -1048,6 +1049,276 @@ func (c *Client) TestSendAnonVotes(
 	}
 
 	return votingElapsedTime, nil
+}
+
+func (c *Client) CreateAccount(signer *ethereum.SignKeys, infoURI string, nonce uint32) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.SetAccountInfoTx{
+		Txtype:  models.TxType_SET_ACCOUNT_INFO,
+		Nonce:   nonce,
+		InfoURI: infoURI,
+		Account: signer.Address().Bytes(),
+	}
+
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{SetAccountInfo: tx}})
+	if err != nil {
+		return err
+	}
+	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+		return err
+	}
+	if req.Payload, err = proto.Marshal(stx); err != nil {
+		return err
+	}
+
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+	}
+	return nil
+}
+
+func (c *Client) SetAccountInfoURI(signer *ethereum.SignKeys, to common.Address, infoURI string, nonce uint32) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.SetAccountInfoTx{
+		Txtype:  models.TxType_SET_ACCOUNT_INFO,
+		Nonce:   nonce,
+		InfoURI: infoURI,
+		Account: to.Bytes(),
+	}
+
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{SetAccountInfo: tx}})
+	if err != nil {
+		return err
+	}
+	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+		return err
+	}
+	if req.Payload, err = proto.Marshal(stx); err != nil {
+		return err
+	}
+
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+	}
+	return nil
+}
+
+func (c *Client) GetAccount(signer *ethereum.SignKeys, accountAddr common.Address) (*vochain.Account, error) {
+	req := api.APIrequest{Method: "getAccount", EntityId: accountAddr.Bytes()}
+	resp, err := c.Request(req, signer)
+	acc := &vochain.Account{}
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Ok {
+		return nil, fmt.Errorf("could not get account: %s", resp.Message)
+	}
+	if resp.Balance != nil {
+		acc.Balance = *resp.Balance
+	}
+	if resp.Nonce != nil {
+		acc.Nonce = *resp.Nonce
+	}
+	if resp.InfoURI != "" {
+		acc.InfoURI = resp.InfoURI
+	}
+	return acc, nil
+}
+
+func (c *Client) GetTreasurer(signer *ethereum.SignKeys) (*models.Treasurer, error) {
+	req := api.APIrequest{Method: "getTreasurer"}
+	resp, err := c.Request(req, signer)
+	treasurer := &models.Treasurer{}
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Ok {
+		return nil, fmt.Errorf("could not get treasurer: %s", resp.Message)
+	}
+	if resp.EntityID != "" {
+		treasurer.Address = common.HexToAddress(resp.EntityID).Bytes()
+	}
+	if resp.Nonce != nil {
+		treasurer.Nonce = *resp.Nonce
+	}
+	return treasurer, nil
+}
+
+// del = true -> delete operation
+func (c *Client) SetAccountDelegate(signer *ethereum.SignKeys, delegate common.Address, nonce uint32, del bool) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.SetAccountDelegateTx{
+		Txtype:   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
+		Nonce:    nonce,
+		Delegate: delegate.Bytes(),
+	}
+
+	if del {
+		tx.Txtype = models.TxType_DEL_DELEGATE_FOR_ACCOUNT
+	}
+
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountDelegateTx{SetAccountDelegateTx: tx}})
+	if err != nil {
+		return err
+	}
+	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+		return err
+	}
+	if req.Payload, err = proto.Marshal(stx); err != nil {
+		return err
+	}
+
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+	}
+	return nil
+}
+
+func (c *Client) SendTokens(from *ethereum.SignKeys, to common.Address, value uint64, nonce uint32) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.SendTokensTx{
+		Txtype: models.TxType_SEND_TOKENS,
+		Nonce:  nonce,
+		From:   from.Address().Bytes(),
+		To:     to.Bytes(),
+		Value:  value,
+	}
+
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SendTokens{SendTokens: tx}})
+	if err != nil {
+		return err
+	}
+	if stx.Signature, err = from.Sign(stx.Tx); err != nil {
+		return err
+	}
+	if req.Payload, err = proto.Marshal(stx); err != nil {
+		return err
+	}
+
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+	}
+	return nil
+}
+
+func (c *Client) GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value uint64) (*models.FaucetPackage, error) {
+	rand.Seed(time.Now().UnixNano())
+	payload := &models.FaucetPayload{
+		Identifier: rand.Uint64(),
+		To:         to.Bytes(),
+		Amount:     value,
+	}
+	payloadBytes, err := proto.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	payloadSignature, err := from.Sign(payloadBytes)
+	if err != nil {
+		return nil, err
+	}
+	return &models.FaucetPackage{
+		Payload:   payload,
+		Signature: payloadSignature,
+	}, nil
+}
+
+func (c *Client) CollectFaucet(signer *ethereum.SignKeys, fpkg *models.FaucetPackage, nonce uint32) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.CollectFaucetTx{
+		TxType:        models.TxType_COLLECT_FAUCET,
+		FaucetPackage: fpkg,
+		// Nonce: nonce
+	}
+
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_CollectFaucet{CollectFaucet: tx}})
+	if err != nil {
+		return err
+	}
+	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+		return err
+	}
+	if req.Payload, err = proto.Marshal(stx); err != nil {
+		return err
+	}
+
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+	}
+	return nil
+}
+
+func (c *Client) MintTokens(treasurer *ethereum.SignKeys, to common.Address, amount uint64, nonce uint32) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.MintTokensTx{
+		Txtype: models.TxType_MINT_TOKENS,
+		Nonce:  nonce,
+		To:     to.Bytes(),
+		Value:  amount,
+	}
+
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_MintTokens{MintTokens: tx}})
+	if err != nil {
+		return err
+	}
+	if stx.Signature, err = treasurer.Sign(stx.Tx); err != nil {
+		return err
+	}
+	if req.Payload, err = proto.Marshal(stx); err != nil {
+		return err
+	}
+
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+	}
+	return nil
 }
 
 func (c *Client) CreateProcess(oracle *ethereum.SignKeys,

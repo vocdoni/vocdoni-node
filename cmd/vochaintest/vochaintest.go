@@ -146,6 +146,11 @@ func main() {
 		censusImport(*host, entityKey)
 	case "censusGenerate":
 		censusGenerate(*host, entityKey, *electionSize, *keysfile, 1)
+	case "testtxs":
+		// end-user voting is not tested here
+		testAllTransactions(*host,
+			*oraclePrivKey,
+		)
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
@@ -282,11 +287,13 @@ func mkTreeVoteTest(host,
 	}
 	defer mainClient.Close()
 
-	// Get the chain ID for signing the transactions
-	oracleKey.VocdoniChainID, err = mainClient.GetChainID()
+	// create and top-up entity account
+	mainClient.CreateAccount(entityKey, "ipfs://", 0)
+	treasurer, err := mainClient.GetTreasurer(oracleKey)
 	if err != nil {
 		log.Fatal(err)
 	}
+	mainClient.MintTokens(oracleKey, entityKey.Address(), 10000, treasurer.Nonce)
 
 	// Create process
 	pid := client.Random(32)
@@ -518,11 +525,13 @@ func mkTreeAnonVoteTest(host,
 	}
 	defer mainClient.Close()
 
-	// Get the chain ID for signing the transactions
-	oracleKey.VocdoniChainID, err = mainClient.GetChainID()
+	// create and top-up entity account
+	mainClient.CreateAccount(entityKey, "ipfs://", 0)
+	treasurer, err := mainClient.GetTreasurer(oracleKey)
 	if err != nil {
 		log.Fatal(err)
 	}
+	mainClient.MintTokens(oracleKey, entityKey.Address(), 10000, treasurer.Nonce)
 
 	// Create process
 	pid := client.Random(32)
@@ -821,11 +830,13 @@ func cspVoteTest(
 	}
 	defer mainClient.Close()
 
-	// Get the chain ID for signing the transactions
-	oracleKey.VocdoniChainID, err = mainClient.GetChainID()
+	// create and top-up entity account
+	mainClient.CreateAccount(entityKey, "ipfs://", 0)
+	treasurer, err := mainClient.GetTreasurer(oracleKey)
 	if err != nil {
 		log.Fatal(err)
 	}
+	mainClient.MintTokens(oracleKey, entityKey.Address(), 10000, treasurer.Nonce)
 
 	// Create process
 	pid := client.Random(32)
@@ -946,4 +957,226 @@ func cspVoteTest(
 		log.Infof("results: %+v", r)
 	}
 	log.Infof("all done!")
+}
+
+// enduser voting is not tested here
+func testAllTransactions(
+	host,
+	oraclePrivKey string,
+) {
+
+	var err error
+	oracleKey := ethereum.NewSignKeys()
+	if err := oracleKey.AddHexKey(oraclePrivKey); err != nil {
+		log.Fatal(err)
+	}
+
+	log.Infof("connecting to main gateway %s", host)
+	// Add the first connection, this will be the main connection
+	var mainClient *client.Client
+
+	for tries := 10; tries > 0; tries-- {
+		mainClient, err = client.New(host)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer mainClient.Close()
+
+	// create and top-up main entity account
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	randomSigner := &ethereum.SignKeys{}
+	if err := randomSigner.Generate(); err != nil {
+		log.Fatal(err)
+	}
+	mainClient.CreateAccount(randomSigner, "ipfs://", 0)
+	treasurer, err := mainClient.GetTreasurer(oracleKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mainClient.MintTokens(oracleKey, randomSigner.Address(), 10000, treasurer.Nonce)
+
+	// create new account
+	newSigner := &ethereum.SignKeys{}
+	if err := newSigner.Generate(); err != nil {
+		log.Fatal(err)
+	}
+	err = mainClient.CreateAccount(newSigner, "ipfs://xyz", 0)
+	if err != nil {
+		log.Fatalf("cannot create account: %v", err)
+	}
+	log.Infof("account %s created successfully", newSigner.Address().String())
+
+	log.Infof("waiting for new block ...")
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+
+	// treasurer can mint tokens
+	treasurer, err = mainClient.GetTreasurer(oracleKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mainClient.MintTokens(oracleKey, newSigner.Address(), 100, treasurer.Nonce); err != nil {
+		log.Fatalf("cannot mint tokens: %v", err)
+	}
+	log.Infof("minted 15000 tokens to account %s", newSigner.Address().String())
+
+	// change account info
+	randomSignerAccount, err := mainClient.GetAccount(randomSigner, randomSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mainClient.CreateAccount(randomSigner, "ipfs://xyz", randomSignerAccount.Nonce); err != nil {
+		log.Fatalf("cannot change account info: %v", err)
+	}
+	log.Infof("account infoURI changed to %s", "ipfs://xyz")
+
+	log.Infof("waiting for new block ...")
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+
+	// add delegate
+	randomSignerAccount, err = mainClient.GetAccount(randomSigner, randomSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mainClient.SetAccountDelegate(randomSigner, newSigner.Address(), randomSignerAccount.Nonce, false); err != nil {
+		log.Fatalf("cannot add account delegate: %v", err)
+	}
+	log.Infof("added delegate %s for account %s", newSigner.Address().String(), randomSigner.Address().String())
+
+	// added delegate can change account info
+	newSignerAccount, err := mainClient.GetAccount(newSigner, newSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mainClient.SetAccountInfoURI(newSigner, randomSigner.Address(), "ipfs://zyx", newSignerAccount.Nonce); err != nil {
+		log.Fatalf("cannot change account info: %v", err)
+	}
+	log.Infof("account infoURI changed to %s", "ipfs://zyx")
+
+	// delete delegate
+	log.Infof("waiting for new block ...")
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	randomSignerAccount, err = mainClient.GetAccount(randomSigner, randomSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mainClient.SetAccountDelegate(randomSigner, newSigner.Address(), randomSignerAccount.Nonce, true); err != nil {
+		log.Fatalf("cannot delete account delegate: %v", err)
+	}
+	log.Infof("deleted delegate %s for account %s", newSigner.Address().String(), randomSigner.Address().String())
+
+	// send tokens to the newly created account
+	log.Infof("waiting for new block ...")
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	randomSignerAccount, err = mainClient.GetAccount(randomSigner, randomSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mainClient.SendTokens(randomSigner, newSigner.Address(), 1714, randomSignerAccount.Nonce); err != nil {
+		log.Fatalf("cannot send tokens from %s to %s", randomSigner.Address().String(), newSigner.Address().String())
+	}
+	log.Infof("sent %d tokens from %s to %s", 1500, randomSigner.Address().String(), newSigner.Address().String())
+
+	// receive tokens using a faucet payload
+	faucetPkg, err := mainClient.GenerateFaucetPackage(randomSigner, newSigner.Address(), 286)
+	if err != nil {
+		log.Fatal(err)
+	}
+	newSignerAccount, err = mainClient.GetAccount(newSigner, newSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mainClient.CollectFaucet(newSigner, faucetPkg, newSignerAccount.Nonce); err != nil {
+		log.Fatal(err)
+	}
+	log.Infof("%s claimed %d tokens from %s", newSigner.Address().String(), 500, randomSigner.Address().String())
+
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+
+	// check expected data
+	newSignerAccount, err = mainClient.GetAccount(newSigner, newSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if newSignerAccount.Nonce != 1 {
+		log.Fatalf("expected nonce %d for account %s, got %d", 1, newSigner.Address().String(), newSignerAccount.Nonce)
+	}
+	if newSignerAccount.Balance != 2090 {
+		log.Fatalf("expected balance %d for account %s, got %d", 2090, newSigner.Address().String(), newSignerAccount.Balance)
+	}
+
+	log.Info("all done!")
 }
