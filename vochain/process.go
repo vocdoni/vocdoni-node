@@ -62,20 +62,20 @@ func (v *State) AddProcess(p *models.Process) error {
 	if err != nil {
 		return err
 	}
+	creatorAddress := common.BytesToAddress(p.EntityId)
+	processCreationCost, err := v.TxCost(models.TxType_NEW_PROCESS, false)
+	if err != nil {
+		return err
+	}
+	if err := v.substractTxCost(creatorAddress, processCreationCost); err != nil {
+		return err
+	}
 	censusURI := ""
 	if p.CensusURI != nil {
 		censusURI = *p.CensusURI
 	}
 	for _, l := range v.eventListeners {
 		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI, v.TxCounter())
-	}
-	creatorAddress := common.BytesToAddress(p.EntityId)
-	processCreationCost, err := v.TxCost(models.TxType_NEW_PROCESS, false)
-	if err != nil {
-		return err
-	}
-	if err := v.burnAccountBalance(creatorAddress, processCreationCost); err != nil {
-		return err
 	}
 	return nil
 }
@@ -264,7 +264,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 		if err != nil {
 			return err
 		}
-		if err := v.burnAccountBalance(creatorAddress, processCreationCost); err != nil {
+		if err := v.substractTxCost(creatorAddress, processCreationCost); err != nil {
 			return err
 		}
 	}
@@ -316,7 +316,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 		if err != nil {
 			return err
 		}
-		if err := v.burnAccountBalance(creatorAddress, processCreationCost); err != nil {
+		if err := v.substractTxCost(creatorAddress, processCreationCost); err != nil {
 			return err
 		}
 	}
@@ -380,7 +380,7 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 		if err != nil {
 			return err
 		}
-		if err := v.burnAccountBalance(creatorAddress, processCreationCost); err != nil {
+		if err := v.substractTxCost(creatorAddress, processCreationCost); err != nil {
 			return err
 		}
 	}
@@ -423,7 +423,7 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx cost from state %w", err)
 	}
-	authorized, addr, err := state.VerifyAccountBalance(txBytes, signature, cost)
+	authorized, addr, err := state.VerifyAccountBalanceFromSignature(txBytes, signature, cost)
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +509,7 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	if err != nil {
 		return fmt.Errorf("cannot get tx cost from state %w", err)
 	}
-	authorized, addr, err := state.VerifyAccountBalance(txBytes, signature, cost)
+	authorized, addr, err := state.VerifyAccountBalanceFromSignature(txBytes, signature, cost)
 	if err != nil {
 		return err
 	}

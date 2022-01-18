@@ -7,9 +7,11 @@ import (
 	"io"
 	stdlog "log"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"github.com/pressly/goose/v3"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -40,11 +42,29 @@ func testEntityList(t *testing.T, entityCount int) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < entityCount; i++ {
+		signer := ethereum.SignKeys{}
+		if err := signer.Generate(); err != nil {
+			t.Fatal(err)
+		}
+		acc := &vochain.Account{}
+		acc.Balance = 100000
+		acc.InfoURI = "ipfs://"
+		if err := app.State.SetAccount(
+			signer.Address(),
+			acc,
+		); err != nil {
+			t.Fatal(err)
+		}
 		pid := util.RandomBytes(32)
 		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
+			EntityId:     signer.Address().Bytes(),
 			BlockCount:   10,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
@@ -88,23 +108,47 @@ func TestEntitySearch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entityIds := []string{
-		"1011d50537fa164b6fef261141797bbe4014526e",
-		"2011d50537fa164b6fef261141797bbe4014526e",
-		"3011d50537fa164b6fef261141797bbe4014526e",
-		"4011d50537fa164b6fef261141797bbe4014526e",
-		"5011d50537fa164b6fef261141797bbe4014526e",
-		"6011d50537fa164b6fef261141797bbe4014526e",
-		"7011d50537fa164b6fef261141797bbe4014526e",
-		"8011d50537fa164b6fef261141797bbe4014526e",
-		"9011d50537fa164b6fef261141797bbe4014526e",
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	entityIds := make([]string, 0)
+	for i := 0; i < 10; i++ {
+		signer := ethereum.SignKeys{}
+		if err := signer.Generate(); err != nil {
+			t.Fatal(err)
+		}
+		acc := &vochain.Account{}
+		acc.Balance = 1000
+		acc.InfoURI = "ipfs://"
+		if err := app.State.SetAccount(
+			signer.Address(),
+			acc,
+		); err != nil {
+			t.Fatal(err)
+		}
+		entityIds = append(entityIds, strings.ToLower(util.TrimHex(signer.Address().String())))
 	}
 	// Add random entities before searchable ones
 	for i := 0; i < 5; i++ {
+		signer := ethereum.SignKeys{}
+		if err := signer.Generate(); err != nil {
+			t.Fatal(err)
+		}
+		acc := &vochain.Account{}
+		acc.Balance = 1000
+		acc.InfoURI = "ipfs://"
+		if err := app.State.SetAccount(
+			signer.Address(),
+			acc,
+		); err != nil {
+			t.Fatal(err)
+		}
 		pid := util.RandomBytes(32)
 		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
+			EntityId:     signer.Address().Bytes(),
 			BlockCount:   10,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
@@ -117,13 +161,9 @@ func TestEntitySearch(t *testing.T) {
 	}
 	for i, entity := range entityIds {
 		pid := util.RandomBytes(32)
-		entityId, err := hex.DecodeString(entity)
-		if err != nil {
-			t.Fatal(err)
-		}
 		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     entityId,
+			EntityId:     common.HexToAddress(entity).Bytes(),
 			BlockCount:   10,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
@@ -137,9 +177,22 @@ func TestEntitySearch(t *testing.T) {
 	// Add random entities after searchable ones
 	for i := 0; i < 5; i++ {
 		pid := util.RandomBytes(32)
+		signer := ethereum.SignKeys{}
+		if err := signer.Generate(); err != nil {
+			t.Fatal(err)
+		}
+		acc := &vochain.Account{}
+		acc.Balance = 1000
+		acc.InfoURI = "ipfs://"
+		if err := app.State.SetAccount(
+			signer.Address(),
+			acc,
+		); err != nil {
+			t.Fatal(err)
+		}
 		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
+			EntityId:     signer.Address().Bytes(),
 			BlockCount:   10,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
@@ -153,20 +206,14 @@ func TestEntitySearch(t *testing.T) {
 	app.AdvanceTestBlock()
 	var list []string
 	// Exact entity search
-	list = sc.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e")
+	list = sc.EntityList(10, 0, entityIds[0])
 	if len(list) < 1 {
 		t.Fatalf("expected 1 entity, got %d", len(list))
 	}
 	// Search for nonexistent entity
-	list = sc.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f")
+	list = sc.EntityList(10, 0, "0x52bc44d5378309ee2abf1539bf71de1b7d7be3b5")
 	if len(list) > 0 {
 		t.Fatalf("expected 0 entities, got %d", len(list))
-	}
-	// Search containing part of all manually-defined entities
-	list = sc.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e")
-	log.Info(list)
-	if len(list) < len(entityIds) {
-		t.Fatalf("expected %d entities, got %d", len(entityIds), len(list))
 	}
 }
 
@@ -183,12 +230,30 @@ func testProcessList(t *testing.T, procsCount int) {
 		t.Fatal(err)
 	}
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
+		signer := ethereum.SignKeys{}
+		if err := signer.Generate(); err != nil {
+			t.Fatal(err)
+		}
+		acc := &vochain.Account{}
+		acc.Balance = 1000
+		acc.InfoURI = "ipfs://"
+		if err := app.State.SetAccount(
+			signer.Address(),
+			acc,
+		); err != nil {
+			t.Fatal(err)
+		}
 		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
+			EntityId:     signer.Address().Bytes(),
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
 		})
@@ -199,13 +264,21 @@ func testProcessList(t *testing.T, procsCount int) {
 
 	}
 
+	acc := &vochain.Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		common.HexToAddress("0x52bc44d5378309ee2abf1539bf71de1b7d7be3b5"),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
 	// For a entity, add 25 processes (this will be the queried entity)
-	eidTest := util.RandomBytes(20)
 	for i := 0; i < procsCount; i++ {
 		pid := util.RandomBytes(32)
 		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     eidTest,
+			EntityId:     common.HexToAddress("0x52bc44d5378309ee2abf1539bf71de1b7d7be3b5").Bytes(),
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
 		})
@@ -220,7 +293,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	last := 0
 	var list [][]byte
 	for len(procs) < procsCount {
-		list, err = sc.ProcessList(eidTest, last, 10, "", 0, "", "", false)
+		list, err = sc.ProcessList(common.HexToAddress("0x52bc44d5378309ee2abf1539bf71de1b7d7be3b5").Bytes(), last, 10, "", 0, "", "", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,13 +326,30 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
-		t.Logf("random process ID: %x", pid)
+		signer := ethereum.SignKeys{}
+		if err := signer.Generate(); err != nil {
+			t.Fatal(err)
+		}
+		acc := &vochain.Account{}
+		acc.Balance = 1000
+		acc.InfoURI = "ipfs://"
+		if err := app.State.SetAccount(
+			signer.Address(),
+			acc,
+		); err != nil {
+			t.Fatal(err)
+		}
 		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
+			EntityId:     signer.Address().Bytes(),
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
 		})
@@ -281,7 +371,19 @@ func TestProcessSearch(t *testing.T) {
 		"9011d50537fa164b6fef261141797bbe4014526e",
 	}
 	// For a entity, add 25 processes (this will be the queried entity)
-	eidTest := util.RandomBytes(20)
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
 	for i, process := range processIds {
 		pid, err := hex.DecodeString(process)
 		if err != nil {
@@ -289,7 +391,7 @@ func TestProcessSearch(t *testing.T) {
 		}
 		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     eidTest,
+			EntityId:     signer.Address().Bytes(),
 			BlockCount:   10,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
@@ -313,7 +415,7 @@ func TestProcessSearch(t *testing.T) {
 		}
 		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     eidTest,
+			EntityId:     signer.Address().Bytes(),
 			BlockCount:   10,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
@@ -328,7 +430,7 @@ func TestProcessSearch(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Exact process search
-	list, err := sc.ProcessList(eidTest, 0, 10,
+	list, err := sc.ProcessList(signer.Address().Bytes(), 0, 10,
 		"4011d50537fa164b6fef261141797bbe4014526e", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
@@ -337,7 +439,7 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected 1 process, got %d", len(list))
 	}
 	// Search for nonexistent process
-	list, err = sc.ProcessList(eidTest, 0, 10,
+	list, err = sc.ProcessList(signer.Address().Bytes(), 0, 10,
 		"4011d50537fa164b6fef261141797bbe4014526f", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
@@ -346,7 +448,7 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected 0 processes, got %d", len(list))
 	}
 	// Search containing part of all manually-defined processes
-	list, err = sc.ProcessList(eidTest, 0, 10,
+	list, err = sc.ProcessList(signer.Address().Bytes(), 0, 10,
 		"011d50537fa164b6fef261141797bbe4014526e", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
@@ -355,7 +457,7 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected %d processes, got %d", len(processIds), len(list))
 	}
 
-	list, err = sc.ProcessList(eidTest, 0, 100,
+	list, err = sc.ProcessList(signer.Address().Bytes(), 0, 100,
 		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, "", "ENDED", false)
 	if err != nil {
 		t.Fatal(err)
@@ -383,12 +485,30 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
 	// Add 10 processes with different namespaces (from 10 to 20) and status ENDED
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
+		signer := ethereum.SignKeys{}
+		if err := signer.Generate(); err != nil {
+			t.Fatal(err)
+		}
+		acc := &vochain.Account{}
+		acc.Balance = 1000
+		acc.InfoURI = "ipfs://"
+		if err := app.State.SetAccount(
+			signer.Address(),
+			acc,
+		); err != nil {
+			t.Fatal(err)
+		}
 		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
+			EntityId:     signer.Address().Bytes(),
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
 			Namespace:    uint32(10 + i),
@@ -401,12 +521,24 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	}
 
 	// For a entity, add 10 processes on namespace 123 and status READY
-	eid20 := util.RandomBytes(20)
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
 		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     eid20,
+			EntityId:     signer.Address().Bytes(),
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
 			Namespace:    123,
@@ -420,7 +552,7 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Get the process list for namespace 123
-	list, err := sc.ProcessList(eid20, 0, 100, "", 123, "", "", false)
+	list, err := sc.ProcessList(signer.Address().Bytes(), 0, 100, "", 123, "", "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
@@ -452,8 +584,26 @@ func TestResults(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
 	pid := util.RandomBytes(32)
 	err = app.State.AddProcess(&models.Process{
+		EntityId:              signer.Address().Bytes(),
 		ProcessId:             pid,
 		EnvelopeType:          &models.EnvelopeType{EncryptedVotes: true},
 		Status:                models.ProcessStatus_READY,
@@ -580,8 +730,27 @@ func TestLiveResults(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
+		EntityId:     signer.Address().Bytes(),
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
@@ -649,6 +818,25 @@ func TestAddVote(t *testing.T) {
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	options := &models.ProcessVoteOptions{
 		MaxCount:     3,
 		MaxValue:     3,
@@ -658,6 +846,7 @@ func TestAddVote(t *testing.T) {
 
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
+		EntityId:     signer.Address().Bytes(),
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
@@ -758,9 +947,29 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
+		EntityId:     signer.Address().Bytes(),
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
@@ -795,9 +1004,29 @@ func TestBallotProtocolQuadratic(t *testing.T) {
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
+		EntityId:     signer.Address().Bytes(),
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false, CostFromWeight: true},
 		Status:       models.ProcessStatus_READY,
@@ -846,9 +1075,29 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	sc, err := NewScrutinizer(t.TempDir(), app, true)
 	qt.Assert(t, err, qt.IsNil)
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
+		EntityId:     signer.Address().Bytes(),
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,
@@ -893,7 +1142,27 @@ func TestCountVotes(t *testing.T) {
 	}
 	pid := util.RandomBytes(32)
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	err = app.State.AddProcess(&models.Process{
+		EntityId:     signer.Address().Bytes(),
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Status:       models.ProcessStatus_READY,

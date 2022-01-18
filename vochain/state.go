@@ -666,13 +666,16 @@ func (v *State) SetFaucetNonce(key []byte) error {
 	return v.Tx.DeepSet(key, nil, FaucetNonceCfg)
 }
 
-func (v *State) burnAccountBalance(accoutAddress common.Address, value uint64) error {
+func (v *State) substractTxCost(accoutAddress common.Address, value uint64) error {
 	acc, err := v.GetAccount(accoutAddress, false)
 	if err != nil {
 		return err
 	}
+	if acc == nil {
+		return fmt.Errorf("account not found")
+	}
 	acc.Balance -= value
-	return v.setAccount(accoutAddress, acc)
+	return v.SetAccount(accoutAddress, acc)
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey

@@ -7,6 +7,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain"
@@ -32,10 +33,29 @@ func TestRollingCensus(t *testing.T) {
 	app.State.Rollback()
 	app.State.SetHeight(1)
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+	// create account
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 100
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	censusURI := "ipfs://foobar"
 	maxCensusSize := uint64(numKeys)
 	p := &models.Process{
-		EntityId:   rng.RandomBytes(32),
+		EntityId:   signer.Address().Bytes(),
 		CensusURI:  &censusURI,
 		ProcessId:  pid,
 		StartBlock: 3,

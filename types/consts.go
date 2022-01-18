@@ -7,8 +7,9 @@ func Bool(b bool) *bool { return &b }
 // These exported variables should be treated as constants, to be used in API
 // responses which require *bool fields.
 var (
-	False = Bool(false)
-	True  = Bool(true)
+	False                    = Bool(false)
+	True                     = Bool(true)
+	EthereumZeroAddressBytes = [20]byte{}
 )
 
 const (
@@ -30,7 +31,7 @@ const (
 	// EthereumAddressSize is the size of an ethereum address
 	EthereumAddressSize = 20
 	// EthereumZeroAddress is the 0x0000000000000000000000000000000000000000 address
-	EthereumZeroAddress = "0x0000000000000000000000000000000000000000"
+	EthereumZeroAddressString = "0x0000000000000000000000000000000000000000"
 
 	// EntityIDsizeV2 legacy: in the past we used hash(addr)
 	// this is a temporal work around to support both

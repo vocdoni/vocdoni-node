@@ -10,6 +10,7 @@ import (
 	"github.com/tendermint/tendermint/privval"
 	models "go.vocdoni.io/proto/build/go/models"
 
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
@@ -111,7 +112,26 @@ func TestAddProcess(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainState(t)
-	err := s.AddProcess(testcommon.ProcessHardcoded)
+	// set tx cost for Tx: NewProcess
+	if err := s.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+	// create account
+	signer := ethereum.SignKeys{}
+	err := signer.AddHexKey(testcommon.SignerPrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc := &vochain.Account{}
+	acc.Balance = 100
+	acc.InfoURI = "ipfs://"
+	if err := s.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+	err = s.AddProcess(testcommon.ProcessHardcoded)
 	qt.Assert(t, err, qt.IsNil)
 }
 

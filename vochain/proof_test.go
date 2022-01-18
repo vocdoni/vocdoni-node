@@ -49,13 +49,33 @@ func TestMerkleTreeProof(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	process := &models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     signer.Address().Bytes(),
 		CensusRoot:   root,
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -182,6 +202,22 @@ func TestCAProof(t *testing.T) {
 	if err := ca.Generate(); err != nil {
 		t.Fatal(err)
 	}
+
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	acc := &Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		ca.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
@@ -189,7 +225,7 @@ func TestCAProof(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         new(models.ProcessMode),
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     ca.Address().Bytes(),
 		CensusRoot:   ca.PublicKey(),
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA,
 		BlockCount:   1024,

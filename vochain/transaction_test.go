@@ -8,6 +8,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/vocdoni/arbo"
 	snarkParsers "github.com/vocdoni/go-snark/parsers"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -140,12 +141,28 @@ func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
 	app.ZkVKs = append(app.ZkVKs, vk0)
 
 	processId := sha256.Sum256(big.NewInt(10).Bytes()) // processId is a byte-array of 32 bytes
-	entityId := []byte("entityid-test")
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &Account{}
+	acc.Balance = 100000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
 	censusRootBI, ok := new(big.Int).SetString("13256983273841966279055596043431919350426357891097196583481278449962353221936", 10)
 	qt.Assert(t, ok, qt.IsTrue)
 	process := &models.Process{
 		ProcessId: processId[:],
-		EntityId:  entityId,
+		EntityId:  signer.Address().Bytes(),
 		EnvelopeType: &models.EnvelopeType{
 			Anonymous: true,
 		},

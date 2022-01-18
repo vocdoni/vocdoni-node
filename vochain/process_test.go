@@ -25,6 +25,27 @@ func TestProcessSetStatusTransition(t *testing.T) {
 	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
 		t.Fatal(err)
 	}
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_STATUS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
@@ -36,7 +57,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		Mode:         &models.ProcessMode{Interruptible: true},
 		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     signer.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -86,7 +107,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_PAUSED,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     signer.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -136,7 +157,7 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: false, AutoStart: false},
 		Status:       models.ProcessStatus_PAUSED,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     signer.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -165,6 +186,14 @@ func TestProcessSetStatusTransition(t *testing.T) {
 	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err == nil {
 		t.Fatal("ready to ended should not be valid if interruptible=false")
 	}
+
+	if acc, err := app.State.GetAccount(signer.Address(), false); err != nil {
+		t.Fatal(err)
+	} else {
+		fmt.Printf("%d", acc.Balance)
+		fmt.Printf("/n%d", acc.Nonce)
+	}
+
 }
 
 func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
@@ -219,6 +248,31 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_RESULTS, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_STATUS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
@@ -228,7 +282,7 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     signer.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -343,6 +397,28 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// set tx cost for Tx: NewProcess
+	if err := app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_CENSUS, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+	acc := &Account{}
+	acc.Balance = 1000
+	acc.InfoURI = "ipfs://"
+	if err := app.State.SetAccount(
+		signer.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
 	censusURI2 := "ipfs://987654321"
@@ -355,7 +431,7 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true, DynamicCensus: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     signer.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -368,7 +444,7 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     signer.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI2,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -381,7 +457,7 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true, DynamicCensus: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     signer.Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI2,
 		CensusOrigin: models.CensusOrigin_ERC20,
