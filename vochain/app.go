@@ -2,7 +2,6 @@ package vochain
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -422,14 +421,12 @@ func (*BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Resp
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	var data []byte
 	var err error
-	var tx *models.Tx
-	var signature []byte
-	var txBytes []byte
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 	}
-	if tx, txBytes, signature, err = UnmarshalTx(req.Tx); err == nil {
-		if data, err = app.AddTx(tx, txBytes, signature, TxKey(req.Tx), false); err != nil {
+	tx := new(vochainTx)
+	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
+		if data, err = app.AddTx(tx, false); err != nil {
 			log.Debugf("checkTx error: %s", err)
 			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("addTx " + err.Error())}
 		}
@@ -443,14 +440,12 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
 	var data []byte
 	var err error
-	var tx *models.Tx
-	var signature []byte
-	var txBytes []byte
 	// Increase Tx counter on return since the index 0 is valid
 	defer app.State.TxCounterAdd()
-	if tx, txBytes, signature, err = UnmarshalTx(req.Tx); err == nil {
-		log.Debugf("deliver tx: %s", log.FormatProto(tx))
-		if data, err = app.AddTx(tx, txBytes, signature, TxKey(req.Tx), true); err != nil {
+	tx := new(vochainTx)
+	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
+		log.Debugf("deliver tx: %s", log.FormatProto(tx.tx))
+		if data, err = app.AddTx(tx, true); err != nil {
 			log.Debugf("rejected tx: %v", err)
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
@@ -509,11 +504,6 @@ func (app *BaseApplication) LoadSnapshotChunk(
 func (app *BaseApplication) OfferSnapshot(
 	req abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
 	return abcitypes.ResponseOfferSnapshot{}
-}
-
-// TxKey computes the checksum of the tx
-func TxKey(tx tmtypes.Tx) [32]byte {
-	return sha256.Sum256(tx)
 }
 
 // SetFnGetBlockByHash sets the getter for blocks by hash

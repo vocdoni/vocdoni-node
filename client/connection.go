@@ -67,7 +67,7 @@ func (c *Client) Request(req api.APIrequest, signer *ethereum.SignKeys) (*api.AP
 	}
 	var signature []byte
 	if signer != nil {
-		signature, err = signer.Sign(reqInner)
+		signature, err = signer.SignEthereum(reqInner)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %v", method, err)
 		}

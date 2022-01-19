@@ -18,6 +18,9 @@ const (
 func (a *RPCAPI) info(request *api.APIrequest) (*api.APIresponse, error) {
 	response := api.APIresponse{}
 	response.APIList = a.APIs
+	if a.vocapp != nil {
+		response.ChainID = a.vocapp.ChainID()
+	}
 	if health, err := getHealth(); err == nil {
 		response.Health = health
 	} else {

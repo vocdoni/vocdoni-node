@@ -178,9 +178,7 @@ func (v *State) GetAccount(address common.Address, isQuery bool) (*Account, erro
 // VerifyAccountBalance extracts an account address from a signed message, and verifies if
 // there is enough balance to cover an amount expense
 func (v *State) VerifyAccountBalance(message, signature []byte, amount uint64) (bool, common.Address, error) {
-	var err error
-	address := common.Address{}
-	address, err = ethereum.AddrFromSignature(message, signature)
+	address, err := ethereum.AddrFromSignature(message, signature)
 	if err != nil {
 		return false, address, err
 	}

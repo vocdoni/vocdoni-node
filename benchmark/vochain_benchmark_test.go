@@ -156,7 +156,7 @@ func BenchmarkVochain(b *testing.B) {
 	if err != nil {
 		b.Fatal("cannot marshal process")
 	}
-	stx.Signature, err = dvoteServer.Signer.Sign(stx.Tx)
+	stx.Signature, err = dvoteServer.Signer.SignVocdoni(stx.Tx)
 	if err != nil {
 		b.Fatalf("cannot sign oracle tx: %s", err)
 	}
@@ -262,7 +262,7 @@ func voteBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys,
 	if err != nil {
 		b.Fatal(err)
 	}
-	stx.Signature, err = s.Sign(stx.Tx)
+	stx.Signature, err = s.SignVocdoni(stx.Tx)
 	if err != nil {
 		b.Fatal(err)
 	}

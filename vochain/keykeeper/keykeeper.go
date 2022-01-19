@@ -484,7 +484,7 @@ func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
 	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Admin{Admin: tx}}); err != nil {
 		return err
 	}
-	if stx.Signature, err = k.signer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = k.signer.SignVocdoni(stx.Tx); err != nil {
 		return err
 	}
 	vtxBytes, err := proto.Marshal(stx)

@@ -31,10 +31,11 @@ const SigningPrefix = "\u0019Ethereum Signed Message:\n"
 // SignKeys represents an ECDSA pair of keys for signing.
 // Authorized addresses is a list of Ethereum like addresses which are checked on Verify
 type SignKeys struct {
-	Public     ecdsa.PublicKey
-	Private    ecdsa.PrivateKey
-	Authorized map[ethcommon.Address]bool
-	Lock       sync.RWMutex
+	Public         ecdsa.PublicKey
+	Private        ecdsa.PrivateKey
+	Authorized     map[ethcommon.Address]bool
+	Lock           sync.RWMutex
+	VocdoniChainID string
 }
 
 // NewSignKeys creates an ECDSA pair of keys for signing
@@ -121,8 +122,8 @@ func (k *SignKeys) Address() ethcommon.Address {
 // AddressString returns the ethereum Address as string
 func (k *SignKeys) AddressString() string { return ethcrypto.PubkeyToAddress(k.Public).String() }
 
-// Sign signs a message. Message is a normal string (no HexString nor a Hash)
-func (k *SignKeys) Sign(message []byte) ([]byte, error) {
+// SignEthereum signs a message. Message is a normal string (no HexString nor a Hash)
+func (k *SignKeys) SignEthereum(message []byte) ([]byte, error) {
 	if k.Private.D == nil {
 		return nil, errors.New("no private key available")
 	}
@@ -133,13 +134,16 @@ func (k *SignKeys) Sign(message []byte) ([]byte, error) {
 	return signature, nil
 }
 
-// SignJSON signs a JSON message. Message is a struct interface
-func (k *SignKeys) SignJSON(message interface{}) ([]byte, error) {
-	encMsg, err := crypto.SortedMarshalJSON(message)
-	if err != nil {
-		return nil, errors.New("unable to marshal message to sign: %s")
+// SignVocdoni signs a vocdoni message. Message is a normal string (no HexString nor a Hash)
+func (k *SignKeys) SignVocdoni(message []byte) ([]byte, error) {
+	if k.Private.D == nil {
+		return nil, errors.New("no private key available")
 	}
-	return k.Sign(encMsg)
+	signature, err := ethcrypto.Sign(Hash(BuildVocdoniPayload(message, k.VocdoniChainID)), &k.Private)
+	if err != nil {
+		return nil, err
+	}
+	return signature, nil
 }
 
 // Verify verifies a message. Signature is HexString
@@ -174,13 +178,6 @@ func (k *SignKeys) VerifyJSONsender(message interface{}, signature []byte) (bool
 		return false, ethcommon.Address{}, errors.New("unable to marshal message to sign: %s")
 	}
 	return k.VerifySender(encMsg, signature)
-}
-
-// Verify standalone function for verify a message
-func Verify(message, signature, pub []byte) (bool, error) {
-	// TODO(mvdan): pub is unused?
-	sk := NewSignKeys()
-	return sk.Verify(message, signature)
 }
 
 // AddrFromPublicKey standaolone function to obtain the Ethereum address from a ECDSA public key
@@ -248,14 +245,22 @@ func AddrFromJSONsignature(message interface{}, signature []byte) (ethcommon.Add
 	return AddrFromSignature(encMsg, signature)
 }
 
-// Hash string data adding Ethereum prefix
+// Hash data adding Ethereum prefix
 func Hash(data []byte) []byte {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%s%d%s", SigningPrefix, len(data), data)
 	return HashRaw(buf.Bytes())
 }
 
-// HashRaw hashes a string with no prefix
+// BuildVocdoniPayload builds the payload of a vochain transaction (txData)
+// ready to be signed
+func BuildVocdoniPayload(txData []byte, chainID string) []byte {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "Vocdoni signed message:\n%s\n%x", chainID, HashRaw(txData))
+	return buf.Bytes()
+}
+
+// HashRaw hashes data with no prefix
 func HashRaw(data []byte) []byte {
 	return ethcrypto.Keccak256(data)
 }
