@@ -33,6 +33,19 @@ type pkeys struct {
 	priv []api.Key
 }
 
+func (c *Client) GetChainID() (string, error) {
+	var req api.APIrequest
+	req.Method = "getInfo"
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return "", err
+	}
+	if !resp.Ok {
+		return "", fmt.Errorf("cannot get chain ID: %v", resp.Message)
+	}
+	return resp.ChainID, nil
+}
+
 func (c *Client) GetProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	var req api.APIrequest
 	req.Method = "getProcessInfo"
@@ -316,7 +329,7 @@ func (c *Client) GetCSPproofBatch(signers []*ethereum.SignKeys,
 		if err != nil {
 			log.Fatal(err)
 		}
-		signature, err := ca.Sign(bundleBytes)
+		signature, err := ca.SignEthereum(bundleBytes)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -342,7 +355,7 @@ func (c *Client) GetCSPproofBatch(signers []*ethereum.SignKeys,
 // generate a secretKey from a signature by the ethereum key.
 func testGetZKCensusKey(s *ethereum.SignKeys) ([]byte, []byte) {
 	// secret is 65 bytes
-	secret, err := s.Sign([]byte("secretKey"))
+	secret, err := s.SignEthereum([]byte("secretKey"))
 	if err != nil {
 		log.Fatalf("Cannot sign: %v", err)
 	}
@@ -576,7 +589,7 @@ func (c *Client) TestPreRegisterKeys(
 			return 0, err
 		}
 
-		if stx.Signature, err = s.Sign(stx.Tx); err != nil {
+		if stx.Signature, err = s.SignVocdoni(stx.Tx); err != nil {
 			return 0, err
 		}
 		if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -623,7 +636,7 @@ func (c *Client) TestPreRegisterKeys(
 			if err != nil {
 				return 0, err
 			}
-			if stx.Signature, err = s.Sign(stx.Tx); err != nil {
+			if stx.Signature, err = s.SignVocdoni(stx.Tx); err != nil {
 				return 0, err
 			}
 			if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -774,7 +787,7 @@ func (c *Client) TestSendVotes(
 			return 0, err
 		}
 
-		if stx.Signature, err = s.Sign(stx.Tx); err != nil {
+		if stx.Signature, err = s.SignVocdoni(stx.Tx); err != nil {
 			return 0, err
 		}
 		if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -945,7 +958,7 @@ func (c *Client) TestSendAnonVotes(
 			return 0, err
 		}
 
-		if stx.Signature, err = s.Sign(stx.Tx); err != nil {
+		if stx.Signature, err = s.SignVocdoni(stx.Tx); err != nil {
 			return 0, err
 		}
 		if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1087,7 +1100,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 	if err != nil {
 		return 0, err
 	}
-	if stx.Signature, err = oracle.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = oracle.SignVocdoni(stx.Tx); err != nil {
 		return 0, err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1130,7 +1143,7 @@ func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
 	if err != nil {
 		return err
 	}
-	if stx.Signature, err = oracle.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = oracle.SignVocdoni(stx.Tx); err != nil {
 		return err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {

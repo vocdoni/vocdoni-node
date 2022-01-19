@@ -164,6 +164,7 @@ type APIresponse struct {
 	CensusKeys           [][]byte                         `json:"censusKeys,omitempty"`
 	CensusDump           []byte                           `json:"censusDump,omitempty"`
 	CensusValue          []byte                           `json:"censusValue,omitempty"`
+	ChainID              string                           `json:"chainId,omitempty"`
 	CircuitIndex         *int                             `json:"circuitIndex,omitempty"`
 	CircuitConfig        *artifacts.CircuitConfig         `json:"circuitConfig,omitempty"`
 	Content              []byte                           `json:"content,omitempty"`

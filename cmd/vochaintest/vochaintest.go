@@ -282,6 +282,12 @@ func mkTreeVoteTest(host,
 	}
 	defer mainClient.Close()
 
+	// Get the chain ID for signing the transactions
+	oracleKey.VocdoniChainID, err = mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
@@ -347,6 +353,12 @@ func mkTreeVoteTest(host,
 		log.Infof("all gateways retrieved the census! let's start voting")
 	}
 
+	// Get chainID
+	chID, err := mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Send votes
 	i := 0
 	p := len(censusKeys) / len(clients)
@@ -371,6 +383,9 @@ func mkTreeVoteTest(host,
 			copy(gwSigners, censusKeys[i:i+p])
 			gwProofs = make([]*client.Proof, p)
 			copy(gwProofs, proofs[i:i+p])
+		}
+		for _, gws := range gwSigners {
+			gws.VocdoniChainID = chID
 		}
 		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl
@@ -503,6 +518,12 @@ func mkTreeAnonVoteTest(host,
 	}
 	defer mainClient.Close()
 
+	// Get the chain ID for signing the transactions
+	oracleKey.VocdoniChainID, err = mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
@@ -568,6 +589,12 @@ func mkTreeAnonVoteTest(host,
 		log.Infof("all gateways retrieved the census! let's start voting")
 	}
 
+	// Get chainID
+	chID, err := mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Pre-register keys zkCensusKey
 	i := 0
 	p := len(censusKeys) / len(clients)
@@ -592,6 +619,9 @@ func mkTreeAnonVoteTest(host,
 			copy(gwSigners, censusKeys[i:i+p])
 			gwProofs = make([]*client.Proof, p)
 			copy(gwProofs, proofs[i:i+p])
+		}
+		for _, gws := range gwSigners {
+			gws.VocdoniChainID = chID
 		}
 		log.Infof("%s will receive %d register keys", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl
@@ -673,6 +703,9 @@ func mkTreeAnonVoteTest(host,
 		} else {
 			gwSigners = make([]*ethereum.SignKeys, p)
 			copy(gwSigners, censusKeys[i:i+p])
+		}
+		for _, gws := range gwSigners {
+			gws.VocdoniChainID = chID
 		}
 		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl
@@ -788,6 +821,12 @@ func cspVoteTest(
 	}
 	defer mainClient.Close()
 
+	// Get the chain ID for signing the transactions
+	oracleKey.VocdoniChainID, err = mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
@@ -833,6 +872,12 @@ func cspVoteTest(
 		clients = append(clients, cl)
 	}
 
+	// Get chainID
+	chID, err := mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Send votes
 	i := 0
 	p := len(voters) / len(clients)
@@ -852,6 +897,9 @@ func cspVoteTest(
 		} else {
 			gwSigners = make([]*ethereum.SignKeys, p)
 			copy(gwSigners, voters[i:i+p])
+		}
+		for _, gws := range gwSigners {
+			gws.VocdoniChainID = chID
 		}
 		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl

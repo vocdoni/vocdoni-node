@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"github.com/vocdoni/arbo"
 	"github.com/vocdoni/go-snark/verifier"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -18,20 +19,50 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// VochainTx is a wrapper around a protobuf transaction with some helpers
+type vochainTx struct {
+	tx         *models.Tx
+	signedBody []byte
+	signature  []byte
+	txID       [32]byte
+}
+
+// Unmarshal unarshal the content of a bytes serialized transaction.
+// Returns the transaction struct, the original bytes and the signature
+// of those bytes.
+func (tx *vochainTx) Unmarshal(content []byte, chainID string) error {
+	stx := new(models.SignedTx)
+	if err := proto.Unmarshal(content, stx); err != nil {
+		return err
+	}
+	tx.tx = new(models.Tx)
+	if err := proto.Unmarshal(stx.GetTx(), tx.tx); err != nil {
+		return err
+	}
+	tx.signature = stx.GetSignature()
+	tx.txID = TxKey(content)
+	tx.signedBody = ethereum.BuildVocdoniPayload(stx.GetTx(), chainID)
+	return nil
+}
+
+// TxKey computes the checksum of the tx
+func TxKey(tx tmtypes.Tx) [32]byte {
+	return sha256.Sum256(tx)
+}
+
 // AddTx check the validity of a transaction and adds it to the state if commit=true.
 // It returns a bytes value which depends on the transaction type:
 //  Tx_Vote: vote nullifier
 //  default: []byte{}
-func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
-	txID [32]byte, commit bool) ([]byte, error) {
-	if vtx == nil || app.State == nil || vtx.Payload == nil {
+func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
+	if vtx.tx == nil || app.State == nil || vtx.tx.Payload == nil {
 		return nil, fmt.Errorf("transaction, state, and/or transaction payload is nil")
 	}
-	switch vtx.Payload.(type) {
+	switch vtx.tx.Payload.(type) {
 	case *models.Tx_Vote:
 		// get VoteEnvelope from tx
-		txVote := vtx.GetVote()
-		v, err := app.VoteEnvelopeCheck(txVote, txBytes, signature, txID, commit)
+		txVote := vtx.tx.GetVote()
+		v, err := app.VoteEnvelopeCheck(txVote, vtx.signedBody, vtx.signature, vtx.txID, commit)
 		if err != nil || v == nil {
 			return []byte{}, fmt.Errorf("voteTxCheck: %w", err)
 		}
@@ -40,16 +71,16 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 		}
 		return v.Nullifier, nil
 	case *models.Tx_Admin:
-		if err := AdminTxCheck(vtx, txBytes, signature, app.State); err != nil {
+		if err := AdminTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State); err != nil {
 			return []byte{}, fmt.Errorf("adminTxChek: %w", err)
 		}
-		tx := vtx.GetAdmin()
+		tx := vtx.tx.GetAdmin()
 		if commit {
 			switch tx.Txtype {
 			case models.TxType_ADD_ORACLE:
-				return []byte{}, app.State.AddOracle(common.BytesToAddress(tx.Address))
+				return vtx.txID[:], app.State.AddOracle(common.BytesToAddress(tx.Address))
 			case models.TxType_REMOVE_ORACLE:
-				return []byte{}, app.State.RemoveOracle(common.BytesToAddress(tx.Address))
+				return vtx.txID[:], app.State.RemoveOracle(common.BytesToAddress(tx.Address))
 			case models.TxType_ADD_VALIDATOR:
 				pk, err := hexPubKeyToTendermintEd25519(fmt.Sprintf("%x", tx.PublicKey))
 				if err == nil {
@@ -61,103 +92,91 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 						PubKey:  pk.Bytes(),
 						Power:   *tx.Power,
 					}
-					return []byte{}, app.State.AddValidator(validator)
+					return vtx.txID[:], app.State.AddValidator(validator)
 
 				}
 				return []byte{}, fmt.Errorf("addValidator: %w", err)
 
 			case models.TxType_REMOVE_VALIDATOR:
-				return []byte{}, app.State.RemoveValidator(tx.Address)
+				return vtx.txID[:], app.State.RemoveValidator(tx.Address)
 			case models.TxType_ADD_PROCESS_KEYS:
-				return []byte{}, app.State.AddProcessKeys(tx)
+				return vtx.txID[:], app.State.AddProcessKeys(tx)
 			case models.TxType_REVEAL_PROCESS_KEYS:
-				return []byte{}, app.State.RevealProcessKeys(tx)
+				return vtx.txID[:], app.State.RevealProcessKeys(tx)
 			}
 		}
 
 	case *models.Tx_NewProcess:
-		if p, err := app.NewProcessTxCheck(vtx, txBytes, signature, app.State); err == nil {
+		if p, err := app.NewProcessTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State); err == nil {
 			if commit {
-				tx := vtx.GetNewProcess()
+				tx := vtx.tx.GetNewProcess()
 				if tx.Process == nil {
 					return []byte{}, fmt.Errorf("newProcess process is empty")
 				}
-				return []byte{}, app.State.AddProcess(p)
+				return vtx.txID[:], app.State.AddProcess(p)
 			}
 		} else {
 			return []byte{}, fmt.Errorf("newProcess: %w", err)
 		}
 
 	case *models.Tx_SetProcess:
-		if err := SetProcessTxCheck(vtx, txBytes, signature, app.State); err != nil {
+		if err := SetProcessTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State); err != nil {
 			return []byte{}, fmt.Errorf("setProcess: %w", err)
 		}
 		if commit {
-			tx := vtx.GetSetProcess()
+			tx := vtx.tx.GetSetProcess()
 			switch tx.Txtype {
 			case models.TxType_SET_PROCESS_STATUS:
 				if tx.GetStatus() == models.ProcessStatus_PROCESS_UNKNOWN {
 					return []byte{}, fmt.Errorf("set process status, status unknown")
 				}
-				return []byte{}, app.State.SetProcessStatus(tx.ProcessId, *tx.Status, true)
+				return vtx.txID[:], app.State.SetProcessStatus(tx.ProcessId, *tx.Status, true)
 			case models.TxType_SET_PROCESS_RESULTS:
 				if tx.GetResults() == nil {
 					return []byte{}, fmt.Errorf("set process results, results is nil")
 				}
-				return []byte{}, app.State.SetProcessResults(tx.ProcessId, tx.Results, true)
+				return vtx.txID[:], app.State.SetProcessResults(tx.ProcessId, tx.Results, true)
 			case models.TxType_SET_PROCESS_CENSUS:
 				if tx.GetCensusRoot() == nil {
 					return []byte{}, fmt.Errorf("set process census, census root is nil")
 				}
-				return []byte{}, app.State.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true)
+				return vtx.txID[:], app.State.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true)
 			default:
 				return []byte{}, fmt.Errorf("unknown set process tx type")
 			}
 		}
 
 	case *models.Tx_RegisterKey:
-		if err := app.State.RegisterKeyTxCheck(vtx, txBytes, signature, app.State,
+		if err := app.State.RegisterKeyTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State,
 			commit); err != nil {
 			return []byte{}, fmt.Errorf("registerKeyTx %w", err)
 		}
 		if commit {
-			tx := vtx.GetRegisterKey()
+			tx := vtx.tx.GetRegisterKey()
 			weight, ok := new(big.Int).SetString(tx.Weight, 10)
 			if !ok {
 				return []byte{}, fmt.Errorf("cannot parse weight %s", weight)
 			}
-			return []byte{}, app.State.AddToRollingCensus(tx.ProcessId, tx.NewKey, weight)
+			return vtx.txID[:], app.State.AddToRollingCensus(tx.ProcessId, tx.NewKey, weight)
 		}
 
 	case *models.Tx_SetAccountInfo:
-		accountAddr, create, err := SetAccountInfoTxCheck(vtx, txBytes, signature, app.State)
+		accountAddr, create, err := SetAccountInfoTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State)
 		if err != nil {
 			return []byte{}, fmt.Errorf("cannot set account: %w", err)
 		}
 		if commit {
 			if create {
-				return []byte{}, app.State.CreateAccount(accountAddr, vtx.GetSetAccountInfo().GetInfoURI(), make([]common.Address, 0), 0)
-			} else {
-				return []byte{}, app.State.SetAccountInfoURI(accountAddr, vtx.GetSetAccountInfo().GetInfoURI())
+				return vtx.txID[:], app.State.CreateAccount(accountAddr,
+					vtx.tx.GetSetAccountInfo().GetInfoURI(), make([]common.Address, 0), 0)
 			}
+			return vtx.txID[:], app.State.SetAccountInfoURI(accountAddr, vtx.tx.GetSetAccountInfo().GetInfoURI())
 		}
 
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
 	}
-	return []byte{}, nil
-}
-
-// UnmarshalTx unarshal the content of a bytes serialized transaction.
-// Returns the transaction struct, the original bytes and the signature
-// of those bytes.
-func UnmarshalTx(content []byte) (*models.Tx, []byte, []byte, error) {
-	stx := new(models.SignedTx)
-	if err := proto.Unmarshal(content, stx); err != nil {
-		return nil, nil, nil, err
-	}
-	vtx := new(models.Tx)
-	return vtx, stx.GetTx(), stx.GetSignature(), proto.Unmarshal(stx.GetTx(), vtx)
+	return vtx.txID[:], nil
 }
 
 // VoteEnvelopeCheck is an abstraction of ABCI checkTx for submitting a vote

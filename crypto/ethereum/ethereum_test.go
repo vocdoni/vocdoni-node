@@ -17,7 +17,7 @@ func TestSignature(t *testing.T) {
 	t.Logf("Generated pub:%s priv:%s", pub, priv)
 	message := []byte("hello")
 	t.Logf("Message to sign: %s", message)
-	msgSign, err := s.Sign(message)
+	msgSign, err := s.SignEthereum(message)
 	if err != nil {
 		t.Fatalf("Error while signing %s", err)
 	}
@@ -52,7 +52,7 @@ func TestSignature(t *testing.T) {
 	if priv != hardcodedPriv {
 		t.Fatalf("PrivKey from %s not match the hardcoded one\nGot %s\nMust have %s", hardcodedPriv, priv, hardcodedPriv[2:])
 	}
-	signature, err := s3.Sign(message)
+	signature, err := s3.SignEthereum(message)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestAddr(t *testing.T) {
 		t.Fatalf("Calculated address from pubKey do not match: %s != %s", addr1, addr2)
 	}
 	msg := []byte("hello vocdoni")
-	signature, err := s.Sign(msg)
+	signature, err := s.SignEthereum(msg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestAddr(t *testing.T) {
 	}
 
 	msg = []byte("bye-bye vocdoni")
-	signature2, err := s.Sign(msg)
+	signature2, err := s.SignEthereum(msg)
 	if err != nil {
 		t.Fatal(err)
 	}

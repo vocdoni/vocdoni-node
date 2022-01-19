@@ -141,7 +141,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot marshal newProcess tx: %w", err)
 		}
-		stx.Signature, err = e.Signer.Sign(stx.Tx)
+		stx.Signature, err = e.Signer.SignVocdoni(stx.Tx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
@@ -181,7 +181,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot marshal setProcess tx: %w", err)
 		}
-		stx.Signature, err = e.Signer.Sign(stx.Tx)
+		stx.Signature, err = e.Signer.SignVocdoni(stx.Tx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
@@ -235,7 +235,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot marshal setProcess tx: %w", err)
 		}
-		stx.Signature, err = e.Signer.Sign(stx.Tx)
+		stx.Signature, err = e.Signer.SignVocdoni(stx.Tx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
@@ -277,7 +277,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot marshal admin tx (addOracle): %w", err)
 		}
-		stx.Signature, err = e.Signer.Sign(stx.Tx)
+		stx.Signature, err = e.Signer.SignVocdoni(stx.Tx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}
@@ -324,7 +324,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot marshal admin tx (removeOracle): %w", err)
 		}
-		stx.Signature, err = e.Signer.Sign(stx.Tx)
+		stx.Signature, err = e.Signer.SignVocdoni(stx.Tx)
 		if err != nil {
 			return fmt.Errorf("cannot sign oracle tx: %w", err)
 		}

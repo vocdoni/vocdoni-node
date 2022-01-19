@@ -60,7 +60,7 @@ func testSetAccountInfoTx(t *testing.T,
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoni(stx.Tx); err != nil {
 		t.Fatal(err)
 	}
 

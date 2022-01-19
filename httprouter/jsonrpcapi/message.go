@@ -46,7 +46,7 @@ func BuildReply(signer *ethereum.SignKeys, msg MessageAPI, requestID string) ([]
 		return nil, err
 	}
 
-	respRequest.Signature, err = signer.Sign(respRequest.MessageAPI)
+	respRequest.Signature, err = signer.SignEthereum(respRequest.MessageAPI)
 	if err != nil {
 		log.Error(err)
 		// continue without the signature
