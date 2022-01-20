@@ -32,11 +32,11 @@ func TestSetAccountInfoTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	// should create an account if address does not exist
-	if err := testSetAccountInfoTx(t, &signer, app, infoURI); err != nil {
+	if err := testSetAccountInfoTx(t, &signer, app, infoURI, 0); err != nil {
 		t.Fatal(err)
 	}
 	// should fail if account does not have enough balance
-	if err := testSetAccountInfoTx(t, &signer, app, ipfsUrl); err == nil {
+	if err := testSetAccountInfoTx(t, &signer, app, ipfsUrl, 0); err == nil {
 		t.Fatal(err)
 	}
 	// should pass if infoURI is not empty and acccount have enough balance
@@ -44,11 +44,11 @@ func TestSetAccountInfoTx(t *testing.T) {
 	if err := app.State.MintBalance(signer.Address(), 100); err != nil {
 		t.Fatal(err)
 	}
-	if err := testSetAccountInfoTx(t, &signer, app, ipfsUrl); err != nil {
+	if err := testSetAccountInfoTx(t, &signer, app, ipfsUrl, 0); err != nil {
 		t.Fatal(err)
 	}
 	// should fail if infoURI is empty
-	if err := testSetAccountInfoTx(t, &signer, app, ""); err == nil {
+	if err := testSetAccountInfoTx(t, &signer, app, "", 1); err == nil {
 		t.Fatal(err)
 	}
 	// get account
@@ -63,7 +63,8 @@ func TestSetAccountInfoTx(t *testing.T) {
 func testSetAccountInfoTx(t *testing.T,
 	signer *ethereum.SignKeys,
 	app *BaseApplication,
-	infoURI string) error {
+	infouri string,
+	nonce uint32) error {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx
@@ -73,8 +74,9 @@ func testSetAccountInfoTx(t *testing.T,
 
 	tx := &models.SetAccountInfoTx{
 		Txtype:  models.TxType_SET_ACCOUNT_INFO,
-		InfoURI: infoURI,
+		InfoURI: infouri,
 		Account: signer.Address().Bytes(),
+		Nonce:   nonce,
 	}
 
 	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{SetAccountInfo: tx}}); err != nil {

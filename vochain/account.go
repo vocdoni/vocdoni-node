@@ -229,19 +229,43 @@ func (v *State) SetAccountInfoURI(accountAddress, txSender common.Address, infoU
 	if acc == nil {
 		return fmt.Errorf("account does not exist")
 	}
-	acc.InfoURI = infoURI
 	SetAccountInfoCost, err := v.TxCost(models.TxType_SET_ACCOUNT_INFO, false)
 	if err != nil {
 		return err
 	}
-	acc.Balance -= SetAccountInfoCost
+	if accountAddress == txSender {
+		acc.InfoURI = infoURI
+		acc.Balance -= SetAccountInfoCost
+		acc.Nonce++
+		accBytes, err := acc.Marshal()
+		if err != nil {
+			return err
+		}
+		v.Tx.Lock()
+		defer v.Tx.Unlock()
+		return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
+	}
+	sender, err := v.GetAccount(txSender, false)
+	if err != nil {
+		return err
+	}
+	sender.Balance -= SetAccountInfoCost
+	sender.Nonce++
+	senderBytes, err := sender.Marshal()
+	if err != nil {
+		return err
+	}
+	acc.InfoURI = infoURI
 	accBytes, err := acc.Marshal()
 	if err != nil {
 		return err
 	}
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
+	if err := v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg); err != nil {
+		return err
+	}
+	return v.Tx.DeepSet(txSender.Bytes(), senderBytes, AccountsCfg)
 }
 
 func (v *State) CreateAccount(accountAddress common.Address, infoURI string, delegates []common.Address, initBalance uint64) error {
@@ -324,6 +348,9 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	}
 	if txSenderAccount.Balance < cost {
 		return common.Address{}, common.Address{}, false, fmt.Errorf("unauthorized: %s", ErrNotEnoughBalance)
+	}
+	if acc.InfoURI == infoURI {
+		return common.Address{}, common.Address{}, false, fmt.Errorf("same infoURI: %s", infoURI)
 	}
 	return accountAddress, txSender, false, nil
 }
@@ -428,7 +455,7 @@ func (v *State) SetDelegate(accountAddr, delegateAddr common.Address, txType mod
 	}
 	switch txType {
 	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-		acc.DelegateAddrs = append(acc.DelegateAddrs, delegateAddr[:])
+		acc.DelegateAddrs = append(acc.DelegateAddrs, delegateAddr.Bytes())
 		acc.Nonce++
 		acc.Balance -= setDelegateCost
 		return v.SetAccount(accountAddr, acc)

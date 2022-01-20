@@ -138,7 +138,7 @@ func (app *BaseApplication) AddTx(vtx *models.Tx, txBytes, signature []byte,
 			if create {
 				return []byte{}, app.State.CreateAccount(accountAddr, vtx.GetSetAccountInfo().GetInfoURI(), make([]common.Address, 0), 0)
 			} else {
-				return []byte{}, app.State.SetAccountInfoURI(accountAddr, txSender, vtx.GetSetAccountInfo().GetInfoURI())
+				return []byte{}, app.State.SetAccountInfoURI(accountAddr, txSender, vtx.GetSetAccountInfo().InfoURI)
 			}
 		}
 
