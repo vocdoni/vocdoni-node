@@ -124,7 +124,7 @@ func doRequest(t *testing.T, url, method string, signer *ethereum.SignKeys, msg 
 	qt.Check(t, err, qt.IsNil)
 	signature := []byte{}
 	if signer != nil {
-		signature, err = signer.SignEthereum(data)
+		signature, err = signer.SignVocdoniMsg(data)
 		qt.Check(t, err, qt.IsNil)
 	}
 	msgReq := RequestMessage{

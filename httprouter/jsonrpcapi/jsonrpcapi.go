@@ -217,7 +217,9 @@ func (s *SignedJRPC) getRequest(payload []byte) (*SignedJRPCdata, error) {
 	}
 
 	var err error
-	if request.SignaturePublicKey, err = ethereum.PubKeyFromSignature(reqOuter.MessageAPI, reqOuter.Signature); err != nil {
+	if request.SignaturePublicKey, err = ethereum.PubKeyFromSignature(
+		ethereum.BuildVocdoniMessage(reqOuter.MessageAPI),
+		reqOuter.Signature); err != nil {
 		return request, err
 	}
 
