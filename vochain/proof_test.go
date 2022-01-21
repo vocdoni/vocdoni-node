@@ -100,7 +100,7 @@ func TestMerkleTreeProof(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if stx.Signature, err = s.SignVocdoni(stx.Tx); err != nil {
+		if stx.Signature, err = s.SignVocdoniTx(stx.Tx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -147,7 +147,7 @@ func TestMerkleTreeProof(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if stx.Signature, err = lastKey.SignVocdoni(stx.Tx); err != nil {
+		if stx.Signature, err = lastKey.SignVocdoniTx(stx.Tx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -210,7 +210,7 @@ func TestCAProof(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		signature, err := ca.SignEthereum(bundleBytes)
+		signature, err := ca.SignVocdoniMsg(bundleBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -240,7 +240,7 @@ func TestCAProof(t *testing.T) {
 	if err := ca2.Generate(); err != nil {
 		t.Fatal(err)
 	}
-	signature, err := ca2.SignEthereum(bundleBytes)
+	signature, err := ca2.SignVocdoniMsg(bundleBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +379,7 @@ func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignK
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = signer.SignVocdoni(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
 		t.Fatal(err)
 	}
 

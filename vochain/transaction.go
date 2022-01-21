@@ -41,7 +41,7 @@ func (tx *vochainTx) Unmarshal(content []byte, chainID string) error {
 	}
 	tx.signature = stx.GetSignature()
 	tx.txID = TxKey(content)
-	tx.signedBody = ethereum.BuildVocdoniPayload(stx.GetTx(), chainID)
+	tx.signedBody = ethereum.BuildVocdoniTransaction(stx.GetTx(), chainID)
 	return nil
 }
 

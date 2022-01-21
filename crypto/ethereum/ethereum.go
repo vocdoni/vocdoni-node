@@ -12,8 +12,6 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-
-	"go.vocdoni.io/dvote/crypto"
 )
 
 // SignatureLength is the size of an ECDSA signature in hexString format
@@ -134,27 +132,28 @@ func (k *SignKeys) SignEthereum(message []byte) ([]byte, error) {
 	return signature, nil
 }
 
-// SignVocdoni signs a vocdoni message. Message is a normal string (no HexString nor a Hash)
-func (k *SignKeys) SignVocdoni(message []byte) ([]byte, error) {
+// SignVocdoniTx signs a vocdoni transaction. TxData is the full transaction payload (no HexString nor a Hash)
+func (k *SignKeys) SignVocdoniTx(txData []byte) ([]byte, error) {
 	if k.Private.D == nil {
 		return nil, errors.New("no private key available")
 	}
-	signature, err := ethcrypto.Sign(Hash(BuildVocdoniPayload(message, k.VocdoniChainID)), &k.Private)
+	signature, err := ethcrypto.Sign(Hash(BuildVocdoniTransaction(txData, k.VocdoniChainID)), &k.Private)
 	if err != nil {
 		return nil, err
 	}
 	return signature, nil
 }
 
-// Verify verifies a message. Signature is HexString
-func (k *SignKeys) Verify(message, signature []byte) (bool, error) {
-	pub, err := PubKeyFromSignature(message, signature)
-	if err != nil {
-		return false, err
+// SignVocdoniMsg signs a vocdoni message. Message is the full payload (no HexString nor a Hash)
+func (k *SignKeys) SignVocdoniMsg(message []byte) ([]byte, error) {
+	if k.Private.D == nil {
+		return nil, errors.New("no private key available")
 	}
-	hash := Hash(message)
-	result := ethcrypto.VerifySignature(pub, hash, signature[:64])
-	return result, nil
+	signature, err := ethcrypto.Sign(Hash(BuildVocdoniMessage(message)), &k.Private)
+	if err != nil {
+		return nil, err
+	}
+	return signature, nil
 }
 
 // VerifySender verifies if a message is sent by some Authorized address key
@@ -169,15 +168,6 @@ func (k *SignKeys) VerifySender(message, signature []byte) (bool, ethcommon.Addr
 		return true, recoveredAddr, nil
 	}
 	return false, recoveredAddr, nil
-}
-
-// VerifyJSONsender verifies if a JSON message is sent by some Authorized address key
-func (k *SignKeys) VerifyJSONsender(message interface{}, signature []byte) (bool, ethcommon.Address, error) {
-	encMsg, err := crypto.SortedMarshalJSON(message)
-	if err != nil {
-		return false, ethcommon.Address{}, errors.New("unable to marshal message to sign: %s")
-	}
-	return k.VerifySender(encMsg, signature)
 }
 
 // AddrFromPublicKey standaolone function to obtain the Ethereum address from a ECDSA public key
@@ -236,15 +226,6 @@ func AddrFromSignature(message, signature []byte) (ethcommon.Address, error) {
 	return AddrFromPublicKey(pub)
 }
 
-// AddrFromJSONsignature recovers the Ethereum address that created the signature of a JSON message
-func AddrFromJSONsignature(message interface{}, signature []byte) (ethcommon.Address, error) {
-	encMsg, err := crypto.SortedMarshalJSON(message)
-	if err != nil {
-		return ethcommon.Address{}, errors.New("unable to marshal message to sign: %s")
-	}
-	return AddrFromSignature(encMsg, signature)
-}
-
 // Hash data adding Ethereum prefix
 func Hash(data []byte) []byte {
 	var buf bytes.Buffer
@@ -252,11 +233,19 @@ func Hash(data []byte) []byte {
 	return HashRaw(buf.Bytes())
 }
 
-// BuildVocdoniPayload builds the payload of a vochain transaction (txData)
+// BuildVocdoniTransaction builds the payload of a vochain transaction (txData)
 // ready to be signed
-func BuildVocdoniPayload(txData []byte, chainID string) []byte {
+func BuildVocdoniTransaction(txData []byte, chainID string) []byte {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Vocdoni signed message:\n%s\n%x", chainID, HashRaw(txData))
+	fmt.Fprintf(&buf, "Vocdoni signed transaction:\n%s\n%x", chainID, HashRaw(txData))
+	return buf.Bytes()
+}
+
+// BuildVocdoniMessage builds the payload of a vocdoni message
+// ready to be signed
+func BuildVocdoniMessage(message []byte) []byte {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "Vocdoni signed message:\n%x", HashRaw(message))
 	return buf.Bytes()
 }
 

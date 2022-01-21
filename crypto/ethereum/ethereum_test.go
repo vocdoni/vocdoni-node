@@ -29,7 +29,8 @@ func TestSignature(t *testing.T) {
 	}
 	pub, priv = s2.HexString()
 	t.Logf("Imported pub:%s priv:%s", pub, priv)
-	v, err := s.Verify(message, msgSign)
+	s2.AddAuthKey(s.Address())
+	v, _, err := s2.VerifySender(message, msgSign)
 	if err != nil {
 		t.Fatalf("Verification error: %s", err)
 	}
@@ -104,7 +105,7 @@ func TestAddr(t *testing.T) {
 		t.Fatal("Cannot verify sender")
 	}
 
-	v, err = s.Verify(msg, signature)
+	v, _, err = s.VerifySender(msg, signature)
 	if err != nil {
 		t.Fatal(err)
 	}
