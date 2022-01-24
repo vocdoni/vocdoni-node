@@ -2,8 +2,8 @@ package scrutinizer
 
 import (
 	"encoding/hex"
+	"flag"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -38,6 +38,13 @@ func encodedPb(msg proto.Message) types.EncodedProtoBuf {
 	return nonNullBytes(enc)
 }
 
+func sqliteWarnf(format string, args ...interface{}) {
+	if flag.Lookup("test.run") != nil {
+		log.Fatalf(format, args...)
+	}
+	log.Warnf(format, args...)
+}
+
 // ProcessInfo returns the available information regarding an election process id
 func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	bhStartTime := time.Now()
@@ -62,9 +69,7 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 		models.ProcessMode{},
 		models.ProcessVoteOptions{},
 	)); diff != "" {
-		println(diff)
-		fmt.Fprintf(os.Stderr, "params: %x", pid)
-		log.Warn("ping mvdan to fix this bug")
+		sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", pid, diff)
 	}
 
 	return proc, nil
@@ -216,13 +221,12 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 	}
 	// []string in hex form is easier to debug when we get mismatches
 	if diff := cmp.Diff(toHexList(procs), toHexList(sqlProcs)); diff != "" {
-		println(diff)
-		fmt.Fprintf(os.Stderr, "params: %#v\n", []interface{}{
+		params := []interface{}{
 			entityID, from, max,
 			searchTerm, namespace,
 			srcNetworkIdstr, status, withResults,
-		})
-		log.Warn("ping mvdan to fix this bug")
+		}
+		sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %#v\ndiff (-badger +sql):\n%s", params, diff)
 	}
 
 	return procs, nil

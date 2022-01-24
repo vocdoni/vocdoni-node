@@ -87,11 +87,11 @@ func ProcessFromDB(dbproc *scrutinizerdb.Process) *Process {
 		SourceNetworkId:   dbproc.SourceNetworkID,
 		Metadata:          dbproc.Metadata,
 	}
-	if len(dbproc.EnvelopePb) > 0 {
-		proc.Envelope = new(models.EnvelopeType)
-		if err := proto.Unmarshal(dbproc.EnvelopePb, proc.Envelope); err != nil {
-			panic(err)
-		}
+	// Note that the old DB does not seem to keep a nil Envelope.
+	// TODO(mvdan): when we drop badgerhold, consider removing this alloc.
+	proc.Envelope = new(models.EnvelopeType)
+	if err := proto.Unmarshal(dbproc.EnvelopePb, proc.Envelope); err != nil {
+		panic(err)
 	}
 	if len(dbproc.ModePb) > 0 {
 		proc.Mode = new(models.ProcessMode)
