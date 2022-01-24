@@ -28,6 +28,10 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 	log.Infof("creating vochain service for network %s", vconfig.Chain)
 	// node + app layer
 	if len(vconfig.PublicAddr) == 0 {
+		// tendermint doesn't have support for finding out it's own external address (as of v0.35.0)
+		// there's some background discussion https://github.com/tendermint/tendermint/issues/758
+		// so we need to find it ourselves out somehow
+		// (PublicAddr ends up being passed to tendermint as ExternalAddress)
 		ip, err := util.PublicIP(4)
 		if err != nil {
 			log.Warn(err)

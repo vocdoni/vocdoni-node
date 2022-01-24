@@ -21,7 +21,6 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/util"
 )
 
 // UnicastBufSize is the number of unicast incoming messages to buffer.
@@ -39,19 +38,17 @@ const (
 
 // SubPub is a simplified PubSub protocol using libp2p
 type SubPub struct {
-	Key           ecdsa.PrivateKey
-	GroupKey      [32]byte
-	Topic         string
-	NoBootStrap   bool
-	BootNodes     []string
-	PubKey        string
-	Private       bool
-	MultiAddrIPv4 string
-	MultiAddrIPv6 string
-	NodeID        string
-	Port          int32
-	Host          host.Host
-	MaxDHTpeers   int
+	Key         ecdsa.PrivateKey
+	GroupKey    [32]byte
+	Topic       string
+	NoBootStrap bool
+	BootNodes   []string
+	PubKey      string
+	Private     bool
+	NodeID      string
+	Port        int32
+	Host        host.Host
+	MaxDHTpeers int
 
 	Gossip      *Gossip       // Gossip deals with broadcasts
 	Streams     sync.Map      // this is a thread-safe map[libpeer.ID]bufioWithMutex
@@ -155,22 +152,6 @@ func (ps *SubPub) Start(ctx context.Context, receiver chan *Message) {
 	}
 	log.Debug("libp2p host created: ", ps.Host.ID())
 	log.Debug("libp2p host addrs: ", ps.Host.Addrs())
-
-	ipv4, err4 := util.PublicIP(IPv4)
-	ipv6, err6 := util.PublicIP(IPv6)
-
-	// Fail only if BOTH ipv4 and ipv6 failed.
-	if err4 != nil && err6 != nil {
-		log.Fatalf("ipv4: %s; ipv6: %s", err4, err6)
-	}
-	if ipv4 != nil {
-		ps.MultiAddrIPv4 = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", ipv4, ps.Port, ps.Host.ID())
-		log.Infof("my libp2p multiaddress ipv4: %s", ps.MultiAddrIPv4)
-	}
-	if ipv6 != nil {
-		ps.MultiAddrIPv6 = fmt.Sprintf("/ip6/%s/tcp/%d/p2p/%s", ipv6, ps.Port, ps.Host.ID())
-		log.Infof("my libp2p multiaddress ipv6: %s", ps.MultiAddrIPv6)
-	}
 
 	ps.NodeID = ps.Host.ID().String()
 	ps.Messages = receiver
