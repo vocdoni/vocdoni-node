@@ -189,6 +189,8 @@ func TestProcessSetStatusTransition(t *testing.T) {
 
 	if acc, err := app.State.GetAccount(signer.Address(), false); err != nil {
 		t.Fatal(err)
+	} else if acc == nil {
+		t.Fatal(ErrAccountNotFound)
 	} else {
 		fmt.Printf("%d", acc.Balance)
 		fmt.Printf("/n%d", acc.Nonce)
