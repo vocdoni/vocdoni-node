@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.vocdoni.io/dvote/ipfssync/subpub"
 	statedb "go.vocdoni.io/dvote/statedblegacy"
@@ -21,7 +23,6 @@ import (
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedblegacy/gravitonstate"
-	"go.vocdoni.io/dvote/util"
 )
 
 const (
@@ -55,13 +56,11 @@ type IPFSsync struct {
 	TimestampWindow int32
 	Messages        chan *subpub.Message
 
-	hashTree        statedb.StateTree
-	state           statedb.StateDB
-	updateLock      sync.RWMutex
-	myMultiAddrIPv4 ma.Multiaddr // The IPFS multiaddress (IPv4)
-	myMultiAddrIPv6 ma.Multiaddr // The IPFS multiaddress (IPv6)
-	lastHash        []byte
-	private         bool
+	hashTree   statedb.StateTree
+	state      statedb.StateDB
+	updateLock sync.RWMutex
+	lastHash   []byte
+	private    bool
 }
 
 // NewIPFSsync creates a new IPFSsync instance. Transports supported are "libp2p" or "privlibp2p"
@@ -83,22 +82,6 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 		is.private = true
 	}
 	return is
-}
-
-// shity function to workaround NAT problems (hope it's temporary)
-func guessMyAddress(ipversion uint, port int, id string) string {
-	ip, err := util.PublicIP(ipversion)
-	if err != nil {
-		log.Warnf("guessMyAddress: %v", err)
-		return ""
-	}
-	if ip4 := ip.To4(); ip4 != nil {
-		return fmt.Sprintf("/ip4/%s/tcp/%d/ipfs/%s", ip4, port, id)
-	}
-	if ip6 := ip.To16(); ip6 != nil {
-		return fmt.Sprintf("/ip6/%s/tcp/%d/ipfs/%s", ip6, port, id)
-	}
-	return ""
 }
 
 // myPins return the list of local stored pins
@@ -317,14 +300,28 @@ func (is *IPFSsync) sendHelloWithAddr(multiaddress string) {
 }
 
 func (is *IPFSsync) sendHello() {
-	// send HELLO with IPv4 address, if defined
-	if is.myMultiAddrIPv4 != nil {
-		is.sendHelloWithAddr(is.myMultiAddrIPv4.String())
+	for _, addr := range is.ipfsAddrs() {
+		is.sendHelloWithAddr(addr.String())
 	}
-	// send HELLO with IPv6 address, if defined
-	if is.myMultiAddrIPv6 != nil {
-		is.sendHelloWithAddr(is.myMultiAddrIPv6.String())
+}
+
+func (is *IPFSsync) ipfsAddrs() (maddrs []multiaddr.Multiaddr) {
+	ipfs, err := multiaddr.NewMultiaddr("/ipfs/" + is.Storage.Node.PeerHost.ID().String())
+	if err != nil {
+		return nil
 	}
+	for _, maddr := range is.Storage.Node.PeerHost.Addrs() {
+		for _, p := range []int{multiaddr.P_IP4, multiaddr.P_IP6} {
+			if v, _ := maddr.ValueForProtocol(p); v != "" {
+				if ip := net.ParseIP(v); ip != nil {
+					if !ip.IsLoopback() && !ip.IsPrivate() {
+						maddrs = append(maddrs, maddr.Encapsulate(ipfs))
+					}
+				}
+			}
+		}
+	}
+	return maddrs
 }
 
 // listPins return the current pins of the Merkle Tree
@@ -382,21 +379,6 @@ func (is *IPFSsync) Start() {
 	is.Transport.BootNodes = is.Bootnodes
 	is.Transport.Start(context.Background(), is.Messages)
 	// end Init SubPub
-
-	// guessMyAddress and print it
-	var err4, err6 error
-	is.myMultiAddrIPv4, err4 = ma.NewMultiaddr(guessMyAddress(IPv4, 4001, is.Storage.Node.PeerHost.ID().String()))
-	is.myMultiAddrIPv6, err6 = ma.NewMultiaddr(guessMyAddress(IPv6, 4001, is.Storage.Node.PeerHost.ID().String()))
-	if err4 != nil && err6 != nil {
-		log.Fatal("ipv4: %s; ipv6: %s", err4, err6)
-	}
-	if is.myMultiAddrIPv4 != nil {
-		log.Infof("my IPFS multiaddress ipv4: %s", is.myMultiAddrIPv4)
-	}
-	if is.myMultiAddrIPv6 != nil {
-		log.Infof("my IPFS multiaddress ipv6: %s", is.myMultiAddrIPv6)
-	}
-	// end guessMyAddress and print it
 
 	go is.handleEvents() // this spawns a single background task per IPFSsync instance
 }
