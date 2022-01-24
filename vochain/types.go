@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -23,6 +24,7 @@ var (
 	ErrProcessNotFound     = fmt.Errorf("process not found")
 	ErrBalanceOverflow     = fmt.Errorf("balance overflow")
 	ErrAccountBalanceZero  = fmt.Errorf("zero balance account not valid")
+	ErrAccountNotFound     = fmt.Errorf("account does not exist")
 	// keys; not constants because of []byte
 	voteCountKey = []byte("voteCount")
 )
@@ -34,6 +36,17 @@ var PrefixDBCacheSize = 0
 type VotePackage struct {
 	Nonce string `json:"nonce,omitempty"`
 	Votes []int  `json:"votes"`
+}
+
+type sendTokensTxCheckValues struct {
+	From, To common.Address
+	Value    uint64
+	Nonce    uint32
+}
+
+type setAccountInfoTxCheckValues struct {
+	Account, TxSender common.Address
+	Create            bool
 }
 
 // UniqID returns a uniq identifier for the VoteTX. It depends on the Type.

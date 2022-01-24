@@ -160,6 +160,7 @@ func TestBalanceTransfer(t *testing.T) {
 
 	s.Save() // Save to test isQuery value on next call
 	b1, err := s.GetAccount(addr1.Address(), true)
+	qt.Assert(t, b1, qt.IsNotNil)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b1.Balance, qt.Equals, uint64(50))
 	qt.Assert(t, b1.Nonce, qt.Equals, uint32(0))
@@ -168,6 +169,7 @@ func TestBalanceTransfer(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	b2, err := s.GetAccount(addr2.Address(), false)
+	qt.Assert(t, b2, qt.IsNotNil)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b2.Balance, qt.Equals, uint64(70))
 
@@ -184,12 +186,14 @@ func TestBalanceTransfer(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	b1, err = s.GetAccount(addr1.Address(), false)
+	qt.Assert(t, b1, qt.IsNotNil)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b1.Balance, qt.Equals, uint64(35))
 	qt.Assert(t, b1.Nonce, qt.Equals, uint32(1))
 
 	s.Save()
 	b2, err = s.GetAccount(addr2.Address(), true)
+	qt.Assert(t, b2, qt.IsNotNil)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b2.Balance, qt.Equals, uint64(35))
 	qt.Assert(t, b2.Nonce, qt.Equals, uint32(2))

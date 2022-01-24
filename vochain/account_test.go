@@ -56,6 +56,9 @@ func TestSetAccountInfoTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if acc == nil {
+		t.Fatal(ErrAccountNotFound)
+	}
 	qt.Assert(t, acc.InfoURI, qt.Equals, ipfsUrl)
 	qt.Assert(t, acc.Balance, qt.Equals, uint64(90))
 }
@@ -130,6 +133,9 @@ func TestMintTokensTx(t *testing.T) {
 	acc, err := app.State.GetAccount(toAcc, false)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if acc == nil {
+		t.Fatal(ErrAccountNotFound)
 	}
 	if acc.Balance != 100 {
 		t.Fatal(fmt.Sprintf("infoURI missmatch, got %d expected %d", acc.Balance, 100))
@@ -228,6 +234,9 @@ func TestSetDelegateTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if signerAcc == nil {
+		t.Fatal(ErrAccountNotFound)
+	}
 	qt.Assert(t, strings.ToLower(common.BytesToAddress(signerAcc.DelegateAddrs[0]).String()), qt.Equals, randomEthAccount)
 	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(20))
 
@@ -240,6 +249,9 @@ func TestSetDelegateTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if signerAcc == nil {
+		t.Fatal(ErrAccountNotFound)
+	}
 	qt.Assert(t, strings.ToLower(common.BytesToAddress(signerAcc.DelegateAddrs[0]).String()), qt.Equals, randomEthAccount)
 	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(20))
 
@@ -251,6 +263,9 @@ func TestSetDelegateTx(t *testing.T) {
 	signerAcc, err = app.State.GetAccount(signer.Address(), false)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if signerAcc == nil {
+		t.Fatal(ErrAccountNotFound)
 	}
 	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(10))
 	// should fail removing a non existent delegate
@@ -273,6 +288,9 @@ func TestSetDelegateTx(t *testing.T) {
 	signerAcc, err = app.State.GetAccount(signer.Address(), false)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if signerAcc == nil {
+		t.Fatal(ErrAccountNotFound)
 	}
 	qt.Assert(t, strings.ToLower(common.BytesToAddress(signerAcc.DelegateAddrs[0]).String()), qt.Equals, randomEthAccount)
 	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(0))
@@ -373,6 +391,9 @@ func TestSendTokensTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if signerAcc == nil {
+		t.Fatal(ErrAccountNotFound)
+	}
 	// should transfer tokens
 	if err := testSendTokensTx(t, &signer, app, signer2.Address().String(), 10, signerAcc.Nonce); err != nil {
 		t.Fatal(err)
@@ -398,9 +419,15 @@ func TestSendTokensTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if signerAcc == nil {
+		t.Fatal(ErrAccountNotFound)
+	}
 	toAcc, err := app.State.GetAccount(signer2.Address(), false)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if toAcc == nil {
+		t.Fatal(ErrAccountNotFound)
 	}
 	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(10))
 	qt.Assert(t, signerAcc.Nonce, qt.Equals, uint32(1))
@@ -506,9 +533,15 @@ func TestCollectFaucetTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if signerAcc == nil {
+		t.Fatal(ErrAccountNotFound)
+	}
 	signerAcc2, err := app.State.GetAccount(signer2.Address(), false)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if signerAcc2 == nil {
+		t.Fatal(ErrAccountNotFound)
 	}
 	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(10))
 	qt.Assert(t, signerAcc2.Balance, qt.Equals, uint64(20))

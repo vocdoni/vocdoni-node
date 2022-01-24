@@ -313,7 +313,7 @@ func testProcessList(t *testing.T, procsCount int) {
 		t.Fatalf("expected %d processes, got %d", procsCount, len(procs))
 	}
 
-	list, err = sc.ProcessList(nil, 0, 64, "", 0, "", "", false)
+	_, err = sc.ProcessList(nil, 0, 64, "", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
