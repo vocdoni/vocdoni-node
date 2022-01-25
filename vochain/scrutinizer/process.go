@@ -220,7 +220,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 		return nil, err
 	}
 	// []string in hex form is easier to debug when we get mismatches
-	if diff := cmp.Diff(toHexList(procs), toHexList(sqlProcs)); diff != "" {
+	if diff := cmp.Diff(procs, sqlProcs); diff != "" {
 		params := []interface{}{
 			entityID, from, max,
 			searchTerm, namespace,
@@ -230,14 +230,6 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 	}
 
 	return procs, nil
-}
-
-func toHexList(decList [][]byte) []string {
-	encList := make([]string, len(decList))
-	for i, dec := range decList {
-		encList[i] = hex.EncodeToString(dec)
-	}
-	return encList
 }
 
 // ProcessCount returns the number of processes indexed
