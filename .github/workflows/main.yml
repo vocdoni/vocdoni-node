@@ -42,14 +42,18 @@ jobs:
           GOOS=darwin go build ./...
 
           CLONE_DIR="$PWD"
+          echo $CLONE_DIR
+          # hard-coded below
+          stat /__w/vocdoni-node/vocdoni-node
+          stat /__w/vocdoni-node
+          stat /__w
+          stat /
 
-          cd vochain
-          ../staticcheck/staticcheck ./...
-          (cd /; stat "$CLONE_DIR") # is it a symlink?
+          mount
 
   compose-test:
     runs-on: self-hosted
-    if: github.repository == 'vocdoni/vocdoni-node'
+    if: github.repository == 'xxx'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
