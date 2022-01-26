@@ -231,7 +231,17 @@ func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
 				tx.FaucetPackage.Payload.Identifier,
 			)
 		}
-
+	case *models.Tx_SetTransactionCosts:
+		cost, err := SetTransactionCostsTxCheck(vtx, txBytes, signature, app.State)
+		if err != nil {
+			return []byte{}, fmt.Errorf("setTransactionCostsTx: %w", err)
+		}
+		if commit {
+			if err := app.State.SetTxCost(vtx.GetSetTransactionCosts().Txtype, cost); err != nil {
+				return []byte{}, fmt.Errorf("setTransactionCosts: %w", err)
+			}
+			return []byte{}, app.State.incrementTreasurerNonce()
+		}
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
 	}
@@ -601,6 +611,42 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 		}
 	}
 	return nil
+}
+
+func SetTransactionCostsTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (uint64, error) {
+	tx := vtx.GetSetTransactionCosts()
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return 0, fmt.Errorf("missing signature and/or transaction")
+	}
+	// check value
+	if tx.Value <= 0 {
+		return 0, fmt.Errorf("invalid value")
+	}
+	// get address from signature
+	sigAddress, err := ethereum.AddrFromSignature(txBytes, signature)
+	if err != nil {
+		return 0, err
+	}
+	// get treasurer
+	treasurer, err := state.Treasurer(false)
+	if err != nil {
+		return 0, err
+	}
+	// check signature recovered address
+	tAddr := common.BytesToAddress(treasurer.Address)
+	if tAddr != sigAddress {
+		return 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", treasurer.String(), sigAddress.String())
+	}
+	// check nonce
+	if tx.Nonce != treasurer.Nonce {
+		return 0, fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce+1)
+	}
+	// check valid tx type
+	if _, ok := TxTypeCostToStateKey[tx.Txtype]; !ok {
+		return 0, fmt.Errorf("tx type not supported")
+	}
+	return tx.Value, nil
 }
 
 func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
