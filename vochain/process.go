@@ -62,12 +62,11 @@ func (v *State) AddProcess(p *models.Process) error {
 	if err != nil {
 		return err
 	}
-	creatorAddress := common.BytesToAddress(p.EntityId)
 	processCreationCost, err := v.TxCost(models.TxType_NEW_PROCESS, false)
 	if err != nil {
 		return err
 	}
-	if err := v.substractTxCost(creatorAddress, processCreationCost); err != nil {
+	if err := v.substractTxCostIncrementNonce(common.BytesToAddress(p.Owner), processCreationCost); err != nil {
 		return err
 	}
 	censusURI := ""
@@ -188,7 +187,7 @@ func (v *State) updateProcess(p *models.Process, pid []byte) error {
 // One of ready, ended, canceled, paused, results.
 // Transition checks are handled inside this function, so the caller
 // does not need to worry about it.
-func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, commit bool) error {
+func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, txSender common.Address, commit bool) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
@@ -259,12 +258,11 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 		for _, l := range v.eventListeners {
 			l.OnProcessStatusChange(process.ProcessId, process.Status, v.TxCounter())
 		}
-		creatorAddress := common.BytesToAddress(process.EntityId)
 		processCreationCost, err := v.TxCost(models.TxType_SET_PROCESS_STATUS, false)
 		if err != nil {
 			return err
 		}
-		if err := v.substractTxCost(creatorAddress, processCreationCost); err != nil {
+		if err := v.substractTxCostIncrementNonce(txSender, processCreationCost); err != nil {
 			return err
 		}
 	}
@@ -272,7 +270,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 }
 
 // SetProcessResults sets the results for a given process
-func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, commit bool) error {
+func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, txSender common.Address, commit bool) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
@@ -333,12 +331,11 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 				log.Warnf("onProcessResults callback error: %v", err)
 			}
 		}
-		creatorAddress := common.BytesToAddress(process.EntityId)
 		processCreationCost, err := v.TxCost(models.TxType_SET_PROCESS_RESULTS, false)
 		if err != nil {
 			return err
 		}
-		if err := v.substractTxCost(creatorAddress, processCreationCost); err != nil {
+		if err := v.substractTxCostIncrementNonce(txSender, processCreationCost); err != nil {
 			return err
 		}
 	}
@@ -360,7 +357,7 @@ func (v *State) GetProcessResults(pid []byte) ([][]string, error) {
 }
 
 // SetProcessCensus sets the census for a given process, only if that process enables dynamic census
-func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commit bool) error {
+func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, txSender common.Address, commit bool) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
@@ -398,12 +395,11 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 		if err := v.updateProcess(process, process.ProcessId); err != nil {
 			return err
 		}
-		creatorAddress := common.BytesToAddress(process.EntityId)
 		processCreationCost, err := v.TxCost(models.TxType_SET_PROCESS_CENSUS, false)
 		if err != nil {
 			return err
 		}
-		if err := v.substractTxCost(creatorAddress, processCreationCost); err != nil {
+		if err := v.substractTxCostIncrementNonce(txSender, processCreationCost); err != nil {
 			return err
 		}
 	}
@@ -450,6 +446,7 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	if err != nil {
 		return nil, fmt.Errorf("cannot get account from signature %w", err)
 	}
+	tx.Process.Owner = sigAddress.Bytes()
 	authorized := acc.Balance >= cost
 	if authorized {
 		// check tx signer can create process
@@ -527,25 +524,25 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 }
 
 // SetProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
-func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
+func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, error) {
 	tx := vtx.GetSetProcess()
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {
-		return fmt.Errorf("missing signature on setProcess transaction")
+		return common.Address{}, fmt.Errorf("missing signature on setProcess transaction")
 	}
 	// Check if transaction owner has enough funds to set a process
 	cost, err := state.TxCost(tx.Txtype, false)
 	if err != nil {
-		return fmt.Errorf("cannot get tx cost from state %w", err)
+		return common.Address{}, fmt.Errorf("cannot get tx cost from state %w", err)
 	}
 	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature, cost)
 	if err != nil {
-		return fmt.Errorf("cannot get account from signature %w", err)
+		return common.Address{}, fmt.Errorf("cannot get account from signature %w", err)
 	}
 	// get process
 	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
-		return fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
+		return common.Address{}, fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
 	}
 
 	isOracle := false
@@ -563,33 +560,33 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 			// Check if the transaction comes from an oracle
 			// Oracles can create processes with any entityID
 			if isOracle, err = state.IsOracle(sigAddress); err != nil {
-				return err
+				return common.Address{}, err
 			}
 			if !isDelegate && !isOracle {
-				return fmt.Errorf("unauthorized")
+				return common.Address{}, fmt.Errorf("unauthorized")
 			}
 		}
 	}
 
 	// If owner without balance and not an oracle, fail
 	if !authorized && !isOracle {
-		return fmt.Errorf("unauthorized to set process status, recovered addr is %s", sigAddress.Hex())
+		return common.Address{}, fmt.Errorf("unauthorized to set process status, recovered addr is %s", sigAddress.Hex())
 	}
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_RESULTS:
 		if !isOracle {
-			return fmt.Errorf("only oracles can execute set process results transaction")
+			return common.Address{}, fmt.Errorf("only oracles can execute set process results transaction")
 		}
 		results := tx.GetResults()
-		if !bytes.Equal(results.OracleAddress, addr.Bytes()) {
-			return fmt.Errorf("cannot set results, oracle address provided in results does not match")
+		if !bytes.Equal(results.OracleAddress, sigAddress.Bytes()) {
+			return common.Address{}, fmt.Errorf("cannot set results, oracle address provided in results does not match")
 		}
-		return state.SetProcessResults(process.ProcessId, results, false)
+		return sigAddress, state.SetProcessResults(process.ProcessId, results, sigAddress, false)
 	case models.TxType_SET_PROCESS_STATUS:
-		return state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
+		return sigAddress, state.SetProcessStatus(process.ProcessId, tx.GetStatus(), sigAddress, false)
 	case models.TxType_SET_PROCESS_CENSUS:
-		return state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), false)
+		return sigAddress, state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), sigAddress, false)
 	default:
-		return fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
+		return common.Address{}, fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
 	}
 }

@@ -667,7 +667,7 @@ func (v *State) SetFaucetNonce(key []byte) error {
 	return v.Tx.DeepSet(key, nil, FaucetNonceCfg)
 }
 
-func (v *State) substractTxCost(accoutAddress common.Address, value uint64) error {
+func (v *State) substractTxCostIncrementNonce(accoutAddress common.Address, value uint64) error {
 	acc, err := v.GetAccount(accoutAddress, false)
 	if err != nil {
 		return err
@@ -675,6 +675,7 @@ func (v *State) substractTxCost(accoutAddress common.Address, value uint64) erro
 	if acc == nil {
 		return fmt.Errorf("account not found")
 	}
+	acc.Nonce++
 	acc.Balance -= value
 	return v.SetAccount(accoutAddress, acc)
 }
