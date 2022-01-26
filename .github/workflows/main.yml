@@ -28,6 +28,11 @@ jobs:
           go vet ./...
           curl -L https://github.com/dominikh/go-tools/releases/download/2021.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
           ./staticcheck/staticcheck ./...
+      - name: Go build for Mac
+        run: |
+          # Some of our devs are on Mac. Ensure it builds.
+          # It's surprisingly hard with some deps like bazil.org/fuse.
+          GOOS=darwin go build ./...
 
   compose-test:
     runs-on: self-hosted
