@@ -36,7 +36,7 @@ func TestSetAccountInfoTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	if acc.InfoURI != infoURI {
-		t.Fatal(fmt.Sprintf("infoURI missmatch, got %s expected %s", acc.InfoURI, infoURI))
+		t.Fatalf("infoURI missmatch, got %s expected %s", acc.InfoURI, infoURI)
 	}
 }
 
