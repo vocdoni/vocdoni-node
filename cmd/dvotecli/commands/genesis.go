@@ -84,10 +84,33 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 		Block:     vochain.BlockParams(tmConsensusParams.Block),
 		Validator: vochain.ValidatorParams(tmConsensusParams.Validator),
 	}
-	treasurer, _ := cmd.Flags().GetString("treasurer")
+
+	// Get treasurer
+	treasurer, err := cmd.Flags().GetString("treasurer")
+	if err != nil {
+		return err
+	}
+	t := &ethereum.SignKeys{}
+	if treasurer == "" {
+		// generate new treasurer
+		t = ethereum.NewSignKeys()
+		if err := t.Generate(); err != nil {
+			return err
+		}
+	} else {
+		if err := t.AddHexKey(treasurer); err != nil {
+			return err
+		}
+	}
+	prettyHeader("Treasurer")
+	fmt.Printf("Address: %s\n", au.Yellow(t.Address().String()))
+	_, priv := t.HexString()
+	fmt.Printf("Private Key: %x\n", au.Yellow(priv))
+
+	// Get chainID
 	chainID, _ := cmd.Flags().GetString("chainId")
 
-	genesisBytes, err := vochain.NewGenesis(nil, chainID, consensusParams, minerPVs, oracles, treasurer)
+	genesisBytes, err := vochain.NewGenesis(nil, chainID, consensusParams, minerPVs, oracles, t.Address().String())
 	if err != nil {
 		return err
 	}
