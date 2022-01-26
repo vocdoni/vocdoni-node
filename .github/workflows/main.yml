@@ -19,12 +19,6 @@ jobs:
         uses: actions/checkout@v2
       - name: gofmt
         run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
-      - name: Go test
-        run: |
-          # we run vet in another step
-          go test -vet=off -timeout=1m -coverprofile=covprofile ./...
-          # -race can easily make the crypto stuff 10x slower
-          go test -vet=off -timeout=15m -race ./...
       - name: go vet
         run: go vet ./...
       - name: staticcheck
