@@ -47,11 +47,11 @@ jobs:
           # It's surprisingly hard with some deps like bazil.org/fuse.
           GOOS=darwin go build ./...
 
-          # And again, just in case any files were deleted while we ran it.
-          git status -sb --ignored
-          go list ./...
-          ls -la
-          find tree/
+          CLONE_DIR="$PWD"
+
+          cd vochain
+          ../staticcheck/staticcheck ./...
+          (cd /; stat "$CLONE_DIR") # is it a symlink?
 
   compose-test:
     runs-on: self-hosted
