@@ -446,25 +446,31 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx cost from state %w", err)
 	}
-	authorized, addr, err := state.VerifyAccountBalanceFromSignature(txBytes, signature, cost)
+	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature, cost)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot get account from signature %w", err)
 	}
+	authorized := acc.Balance >= cost
 	if authorized {
-		// If owner authorized, check entityId matches with owner address
-		if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) {
-			return nil, fmt.Errorf("process entityID and transaction owner do not match")
+		// check tx signer can create process
+		if !bytes.Equal(tx.Process.EntityId, sigAddress.Bytes()) {
+			var isDelegate bool
+			for _, delegate := range acc.DelegateAddrs {
+				if common.BytesToAddress(delegate) == sigAddress {
+					isDelegate = true
+					break
+				}
+			}
+			// Check if the transaction comes from an oracle
+			// Oracles can create processes with any entityID
+			authorized, err = state.IsOracle(sigAddress)
+			if err != nil {
+				return nil, fmt.Errorf("cannot check if authorized: %w", err)
+			}
+			if !isDelegate && !authorized {
+				return nil, fmt.Errorf("unauthorized to create a process, recovered addr is %s", sigAddress.Hex())
+			}
 		}
-	} else {
-		// Check if the transaction comes from an oracle
-		// Oracles can create processes with any entityID
-		if authorized, err = state.IsOracle(addr); err != nil {
-			return nil, err
-		}
-	}
-	// If owner without balance and not an oracle, fail
-	if !authorized {
-		return nil, fmt.Errorf("unauthorized to create a process, recovered addr is %s", addr.Hex())
 	}
 	// get process
 	_, err = state.Process(tx.Process.ProcessId, false)
@@ -532,32 +538,42 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	if err != nil {
 		return fmt.Errorf("cannot get tx cost from state %w", err)
 	}
-	authorized, addr, err := state.VerifyAccountBalanceFromSignature(txBytes, signature, cost)
+	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature, cost)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot get account from signature %w", err)
 	}
 	// get process
 	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
 		return fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
 	}
+
 	isOracle := false
+	authorized := acc.Balance >= cost
 	if authorized {
-		// If owner authorized, check entityId matches with owner address
-		if !bytes.Equal(process.EntityId, addr.Bytes()) {
-			return fmt.Errorf("process entityID and transaction owner do not match")
-		}
-	} else {
-		// Check if the transaction comes from an oracle
-		// Oracles can create processes with any entityID
-		if isOracle, err = state.IsOracle(addr); err != nil {
-			return err
+		// If address authorized, check entityId matches with address address or a delegate
+		if !bytes.Equal(process.EntityId, sigAddress.Bytes()) {
+			var isDelegate bool
+			for _, delegate := range acc.DelegateAddrs {
+				if common.BytesToAddress(delegate) == sigAddress {
+					isDelegate = true
+					break
+				}
+			}
+			// Check if the transaction comes from an oracle
+			// Oracles can create processes with any entityID
+			if isOracle, err = state.IsOracle(sigAddress); err != nil {
+				return err
+			}
+			if !isDelegate && !isOracle {
+				return fmt.Errorf("unauthorized")
+			}
 		}
 	}
 
 	// If owner without balance and not an oracle, fail
 	if !authorized && !isOracle {
-		return fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
+		return fmt.Errorf("unauthorized to set process status, recovered addr is %s", sigAddress.Hex())
 	}
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_RESULTS:

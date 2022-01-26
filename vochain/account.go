@@ -214,23 +214,20 @@ func (v *State) GetAccount(address common.Address, isQuery bool) (*Account, erro
 	return &acc, acc.Unmarshal(raw)
 }
 
-// VerifyAccountBalanceFromSignature extracts an account address from a signed message, and verifies if
-// there is enough balance to cover an amount expense
-func (v *State) VerifyAccountBalanceFromSignature(message, signature []byte, amount uint64) (bool, common.Address, error) {
-	var err error
-	address := common.Address{}
-	address, err = ethereum.AddrFromSignature(message, signature)
+// AccountFromSignature extracts an address from a signed message and returns an account if exists
+func (v *State) AccountFromSignature(message, signature []byte, amount uint64) (common.Address, *Account, error) {
+	address, err := ethereum.AddrFromSignature(message, signature)
 	if err != nil {
-		return false, address, err
+		return address, nil, err
 	}
 	acc, err := v.GetAccount(address, false)
 	if err != nil {
-		return false, address, fmt.Errorf("VerifyAccountBalanceFromSignature: %v", err)
+		return address, nil, fmt.Errorf("AccountFromSignature: %v", err)
 	}
 	if acc == nil {
-		return false, address, nil
+		return address, nil, ErrAccountNotFound
 	}
-	return acc.Balance >= amount, address, nil
+	return address, acc, nil
 }
 
 func (v *State) SetAccountInfoURI(accountAddress, txSender common.Address, infoURI string) error {
@@ -389,7 +386,7 @@ func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 		return common.Address{}, 0, err
 	}
 	// get treasurer
-	treasurer, err := state.Treasurer(true)
+	treasurer, err := state.Treasurer(false)
 	if err != nil {
 		return common.Address{}, 0, err
 	}
@@ -419,21 +416,14 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
-	authorized, sigAddress, err := state.VerifyAccountBalanceFromSignature(txBytes, signature, cost)
+	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature, cost)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
-	if !authorized {
+	if acc.Balance < cost {
 		return common.Address{}, common.Address{}, ErrNotEnoughBalance
 	}
 	// check nonce
-	acc, err := state.GetAccount(sigAddress, false)
-	if err != nil {
-		return common.Address{}, common.Address{}, fmt.Errorf("cannot get account info: %v", err)
-	}
-	if acc == nil {
-		return common.Address{}, common.Address{}, ErrAccountNotFound
-	}
 	if tx.Nonce != acc.Nonce {
 		return common.Address{}, common.Address{}, fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
 	}
