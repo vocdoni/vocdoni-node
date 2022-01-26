@@ -48,6 +48,8 @@ func (c *DvoteCfg) ValidMode() bool {
 		break
 	case types.ModeEthAPIoracle:
 		break
+	case types.ModeSeed:
+		break
 	default:
 		return false
 	}
@@ -138,8 +140,6 @@ type VochainCfg struct {
 	Dev bool
 	// LogLevel logging level for tendermint
 	LogLevel string
-	// LogLevelMempool logging level for tendermint mempool
-	LogLevelMemPool string
 	// LogOutput logging output
 	LogOutput string
 	// RPCListen address for the RPC server tp listen on
@@ -160,8 +160,6 @@ type VochainCfg struct {
 	Peers []string
 	// Seeds seeds with which the node tries to connect
 	Seeds []string
-	// SeedMode if True the node will act as a seed node
-	SeedMode bool
 	// MinerKey contains the EDDSA private key for signing tendermint blocks
 	MinerKey string
 	// NodeKey contains the EDDSA public key that identifies the node in the P2P network
@@ -198,6 +196,8 @@ type VochainCfg struct {
 	ProcessArchiveDataDir string
 	// Scrutinizer holds the configuration regarding the scrutinizer component
 	Scrutinizer ScrutinizerCfg
+	// IsSeedNode specifies if the node is configured to act as a seed node
+	IsSeedNode bool
 }
 
 // ScrutinizerCfg handles the configuration options of the scrutinizer

@@ -16,13 +16,15 @@ const (
 
 	// The mode defines the behaviour of the dvotenode
 
-	// ModeOracle start dvotenode as an oracle
+	// ModeOracle starts dvotenode as an oracle
 	ModeOracle = "oracle"
-	// ModeMiner start dvotenode as a miner
+	// ModeMiner starts dvotenode as a miner
 	ModeMiner = "miner"
-	// ModeGateway start the dvotenode as a gateway
+	// ModeSeed starts dvotenode as a seed node
+	ModeSeed = "seed"
+	// ModeGateway starts the dvotenode as a gateway
 	ModeGateway = "gateway"
-	// ModeEthAPIoracle start an Ethereum signaling API oracle
+	// ModeEthAPIoracle starts an Ethereum signaling API oracle
 	ModeEthAPIoracle = "ethApiOracle"
 
 	// ProcessIDsize is the size of a process id

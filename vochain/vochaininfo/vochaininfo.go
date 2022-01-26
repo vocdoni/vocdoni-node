@@ -1,9 +1,12 @@
 package vochaininfo
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/tendermint/tendermint/rpc/coretypes"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
 )
@@ -125,14 +128,21 @@ func (vi *VochainInfo) VoteCacheSize() int {
 	return vi.voteCacheSize
 }
 
-// Peers returns the current list of connected peers
-func (vi *VochainInfo) Peers() (peers []string) {
+// netInfo returns network info (mainly, peers)
+func (vi *VochainInfo) netInfo() (*coretypes.ResultNetInfo, error) {
 	if vi.vnode.Node != nil {
-		for _, p := range vi.vnode.Node.Switch().Peers().List() {
-			peers = append(peers, string(p.ID()))
-		}
+		return vi.vnode.Node.NetInfo(context.Background())
 	}
-	return
+	return nil, fmt.Errorf("vochain node not ready")
+}
+
+// Peers returns the whole list of peers, including ID and URL
+func (vi *VochainInfo) Peers() []coretypes.Peer {
+	ni, err := vi.netInfo()
+	if err != nil || ni == nil {
+		return nil
+	}
+	return ni.Peers
 }
 
 // Start initializes the Vochain statistics recollection.

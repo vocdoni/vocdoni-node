@@ -81,7 +81,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"overwrite an existing config file with the provided CLI flags")
 	// TODO(mvdan): turn this into an enum to avoid human error
 	globalCfg.Mode = *flag.StringP("mode", "m", types.ModeGateway,
-		"global operation mode. Available options: [gateway,oracle,ethApiOracle,miner]")
+		"global operation mode. Available options: [gateway,oracle,ethApiOracle,miner,seed]")
 	// api
 	globalCfg.API.HTTP = *flag.Bool("apihttp", true, "enable http transport for the API")
 	globalCfg.API.File = *flag.Bool("fileApi", true, "enable the file API")
@@ -133,8 +133,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"use alternative genesis file for the vochain")
 	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "none",
 		"tendermint node log level (error, info, debug, none)")
-	globalCfg.VochainConfig.LogLevelMemPool = *flag.String("vochainLogLevelMemPool", "error",
-		"tendermint mempool log level")
 	globalCfg.VochainConfig.Peers = *flag.StringSlice("vochainPeers", []string{},
 		"comma-separated list of p2p peers")
 	globalCfg.VochainConfig.Seeds = *flag.StringSlice("vochainSeeds", []string{},
@@ -147,8 +145,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"if defined, Tendermint node will open a port and wait for a remote private validator connection (example: tcp://0.0.0.0:26658)")
 	globalCfg.VochainConfig.NoWaitSync = *flag.Bool("vochainNoWaitSync", false,
 		"do not wait for Vochain to synchronize (for testing only)")
-	globalCfg.VochainConfig.SeedMode = *flag.Bool("vochainSeedMode", false,
-		"act as a vochain seed node")
 	globalCfg.VochainConfig.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
 	globalCfg.VochainConfig.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
@@ -244,7 +240,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.PublicAddr", flag.Lookup("vochainPublicAddr"))
 	viper.BindPFlag("vochainConfig.RPCListen", flag.Lookup("vochainRPCListen"))
 	viper.BindPFlag("vochainConfig.LogLevel", flag.Lookup("vochainLogLevel"))
-	viper.BindPFlag("vochainConfig.LogLevelMemPool", flag.Lookup("vochainLogLevelMemPool"))
 	viper.BindPFlag("vochainConfig.Peers", flag.Lookup("vochainPeers"))
 	viper.BindPFlag("vochainConfig.Seeds", flag.Lookup("vochainSeeds"))
 	viper.BindPFlag("vochainConfig.CreateGenesis", flag.Lookup("vochainCreateGenesis"))
@@ -253,7 +248,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.NodeKey", flag.Lookup("vochainNodeKey"))
 	viper.BindPFlag("vochainConfig.PrivValidatorListenAddr", flag.Lookup("vochainPrivValidator"))
 	viper.BindPFlag("vochainConfig.NoWaitSync", flag.Lookup("vochainNoWaitSync"))
-	viper.BindPFlag("vochainConfig.SeedMode", flag.Lookup("vochainSeedMode"))
 	viper.BindPFlag("vochainConfig.MempoolSize", flag.Lookup("vochainMempoolSize"))
 	viper.BindPFlag("vochainConfig.MinerTargetBlockTimeSeconds", flag.Lookup("vochainBlockTime"))
 	viper.BindPFlag("vochainConfig.KeyKeeperIndex", flag.Lookup("keyKeeperIndex"))
@@ -510,7 +504,9 @@ func main() {
 	//
 	if (globalCfg.Mode == types.ModeGateway && globalCfg.API.Vote) ||
 		globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle ||
-		globalCfg.Mode == types.ModeEthAPIoracle {
+		globalCfg.Mode == types.ModeEthAPIoracle || globalCfg.Mode == types.ModeSeed {
+		// set IsSeedNode to true if seed mode configured
+		globalCfg.VochainConfig.IsSeedNode = types.ModeSeed == globalCfg.Mode
 		// do we need scrutinizer?
 		globalCfg.VochainConfig.Scrutinizer.Enabled = (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) ||
 			(globalCfg.Mode == types.ModeOracle)
@@ -518,14 +514,18 @@ func main() {
 		globalCfg.VochainConfig.Scrutinizer.IgnoreLiveResults = (globalCfg.Mode == types.ModeOracle)
 
 		// create the vochain node
-		if vochainApp, scrutinizer, vochainInfo, err = service.Vochain(globalCfg.VochainConfig,
-			!globalCfg.VochainConfig.NoWaitSync, metricsAgent, censusManager, storage,
-		); err != nil {
+		if vochainApp, scrutinizer, vochainInfo, err = service.Vochain(
+			&service.VochainService{
+				Config:        globalCfg.VochainConfig,
+				MetricsAgent:  metricsAgent,
+				CensusManager: censusManager,
+				Storage:       storage,
+			}); err != nil {
 			log.Fatal(err)
 		}
 		defer func() {
-			vochainApp.Node.Stop()
-			vochainApp.Node.Wait()
+			vochainApp.Service.Stop()
+			vochainApp.Service.Wait()
 		}()
 
 		// Wait for Vochain to be ready
