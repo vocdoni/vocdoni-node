@@ -47,11 +47,17 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	// Generate miners
-	mCount, _ := cmd.Flags().GetInt("miners")
+	mCount, err := cmd.Flags().GetInt("miners")
+	if err != nil {
+		return err
+	}
 
 	minerPVs := make([]privval.FilePV, mCount)
 	for i := range minerPVs {
-		pv := privval.GenFilePV("", "")
+		pv, err := privval.GenFilePV("", "", tmtypes.ABCIPubKeyTypeEd25519)
+		if err != nil {
+			return err
+		}
 		minerPVs[i] = *pv
 		prettyHeader(fmt.Sprintf("Miner #%d", i+1))
 		fmt.Printf("Address: %s\n", au.Yellow(minerPVs[i].Key.Address))

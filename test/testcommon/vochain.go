@@ -127,9 +127,22 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 	s := NewVochainState(tb)
 	vals := make([]*privval.FilePV, 2)
 	rint := rand.Int()
-	vals[0] = privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
+	var err error
+	vals[0], err = privval.GenFilePV("/tmp/"+strconv.Itoa(rint),
+		"/tmp/"+strconv.Itoa(rint),
+		tmtypes.ABCIPubKeyTypeEd25519,
+	)
+	if err != nil {
+		tb.Fatal(err)
+	}
 	rint = rand.Int()
-	vals[1] = privval.GenFilePV("/tmp/"+strconv.Itoa(rint), "/tmp/"+strconv.Itoa(rint))
+	vals[1], err = privval.GenFilePV("/tmp/"+strconv.Itoa(rint),
+		"/tmp/"+strconv.Itoa(rint),
+		tmtypes.ABCIPubKeyTypeEd25519,
+	)
+	if err != nil {
+		tb.Fatal(err)
+	}
 	validator0 := &models.Validator{
 		Address: vals[0].Key.Address.Bytes(),
 		PubKey:  vals[0].Key.PubKey.Bytes(),
@@ -177,16 +190,22 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	d.VochainCfg.DataDir = tb.TempDir()
 	// create genesis file
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
+	// TO-DO: use tendermint/tendermint/types instead of custom (copied) types
 	consensusParams := &vochain.ConsensusParams{
 		Block:     vochain.BlockParams(tmConsensusParams.Block),
 		Evidence:  vochain.EvidenceParams{MaxAgeNumBlocks: 1, MaxAgeDuration: 1},
 		Validator: vochain.ValidatorParams(tmConsensusParams.Validator),
 	}
 
-	validator := privval.GenFilePV(
+	validator, err := privval.GenFilePV(
 		d.VochainCfg.DataDir+"/config/priv_validator_key.json",
 		d.VochainCfg.DataDir+"/data/priv_validator_state.json",
+		tmtypes.ABCIPubKeyTypeEd25519,
 	)
+	if err != nil {
+		tb.Fatal(err)
+	}
+
 	oracles := []string{d.Signer.AddressString()}
 	treasurer := d.Signer.AddressString()
 	genBytes, err := vochain.NewGenesis(
@@ -202,7 +221,6 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	}
 	// creating node
 	d.VochainCfg.LogLevel = "error"
-	d.VochainCfg.LogLevelMemPool = "error"
 	d.VochainCfg.P2PListen = fmt.Sprintf("0.0.0.0:%d", 29000+rand.Intn(1000))
 	d.VochainCfg.PublicAddr = fmt.Sprintf("0.0.0.0:%d", 28000+rand.Intn(1000))
 	d.VochainCfg.RPCListen = fmt.Sprintf("0.0.0.0:%d", 27000+rand.Intn(1000))
@@ -214,10 +232,11 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	d.VochainCfg.MinerKey = fmt.Sprintf("%x", validator.Key.PrivKey)
 	vnode := vochain.NewVochain(d.VochainCfg, genBytes)
 	tb.Cleanup(func() {
-		if err := vnode.Node.Stop(); err != nil {
+		vnode.Service.Stop()
+		if err := vnode.Service.Stop(); err != nil {
 			tb.Error(err)
 		}
-		vnode.Node.Wait()
+		vnode.Service.Wait()
 	})
 	return vnode
 }

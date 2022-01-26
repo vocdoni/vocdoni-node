@@ -21,13 +21,20 @@ import (
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
-func Vochain(vconfig *config.VochainCfg, waitForSync bool,
-	ma *metrics.Agent, cm *census.Manager, ipfsStorage data.Storage) (
+type VochainService struct {
+	Config        *config.VochainCfg
+	MetricsAgent  *metrics.Agent
+	CensusManager *census.Manager
+	Storage       data.Storage
+}
+
+// Vochain creates a new vochain service
+func Vochain(vs *VochainService) (
 	*vochain.BaseApplication, *scrutinizer.Scrutinizer,
 	*vochaininfo.VochainInfo, error) {
-	log.Infof("creating vochain service for network %s", vconfig.Chain)
+	log.Infof("creating vochain service for network %s", vs.Config.Chain)
 	// node + app layer
-	if len(vconfig.PublicAddr) == 0 {
+	if len(vs.Config.PublicAddr) == 0 {
 		// tendermint doesn't have support for finding out it's own external address (as of v0.35.0)
 		// there's some background discussion https://github.com/tendermint/tendermint/issues/758
 		// so we need to find it ourselves out somehow
@@ -36,54 +43,54 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 		if err != nil {
 			log.Warn(err)
 		} else {
-			_, port, err := net.SplitHostPort(vconfig.P2PListen)
+			_, port, err := net.SplitHostPort(vs.Config.P2PListen)
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			vconfig.PublicAddr = net.JoinHostPort(ip.String(), port)
+			vs.Config.PublicAddr = net.JoinHostPort(ip.String(), port)
 		}
 	} else {
-		host, port, err := net.SplitHostPort(vconfig.PublicAddr)
+		host, port, err := net.SplitHostPort(vs.Config.PublicAddr)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		vconfig.PublicAddr = net.JoinHostPort(host, port)
+		vs.Config.PublicAddr = net.JoinHostPort(host, port)
 	}
-	log.Infof("vochain listening on: %s", vconfig.P2PListen)
-	log.Infof("vochain exposed IP address: %s", vconfig.PublicAddr)
-	log.Infof("vochain RPC listening on: %s", vconfig.RPCListen)
+	log.Infof("vochain listening on: %s", vs.Config.P2PListen)
+	log.Infof("vochain exposed IP address: %s", vs.Config.PublicAddr)
+	log.Infof("vochain RPC listening on: %s", vs.Config.RPCListen)
 
 	// Genesis file
 	var genesisBytes []byte
 	var err error
 
 	// If genesis file from flag, prioritize it
-	if len(vconfig.Genesis) > 0 {
-		log.Infof("using custom genesis from %s", vconfig.Genesis)
-		if _, err := os.Stat(vconfig.Genesis); os.IsNotExist(err) {
+	if len(vs.Config.Genesis) > 0 {
+		log.Infof("using custom genesis from %s", vs.Config.Genesis)
+		if _, err := os.Stat(vs.Config.Genesis); os.IsNotExist(err) {
 			return nil, nil, nil, err
 		}
-		if genesisBytes, err = os.ReadFile(vconfig.Genesis); err != nil {
+		if genesisBytes, err = os.ReadFile(vs.Config.Genesis); err != nil {
 			return nil, nil, nil, err
 		}
 	} else { // If genesis flag not defined, use a hardcoded or local genesis
-		genesisBytes, err = os.ReadFile(vconfig.DataDir + "/config/genesis.json")
+		genesisBytes, err = os.ReadFile(vs.Config.DataDir + "/config/genesis.json")
 
 		if err == nil { // If genesis file found
 			log.Info("found genesis file")
 			// compare genesis
-			if string(genesisBytes) != vochain.Genesis[vconfig.Chain].Genesis {
+			if string(genesisBytes) != vochain.Genesis[vs.Config.Chain].Genesis {
 				// if using a development chain, restore vochain
-				if vochain.Genesis[vconfig.Chain].AutoUpdateGenesis || vconfig.Dev {
+				if vochain.Genesis[vs.Config.Chain].AutoUpdateGenesis || vs.Config.Dev {
 					log.Warn("new genesis found, cleaning and restarting Vochain")
-					if err = os.RemoveAll(vconfig.DataDir); err != nil {
+					if err = os.RemoveAll(vs.Config.DataDir); err != nil {
 						return nil, nil, nil, err
 					}
-					if _, ok := vochain.Genesis[vconfig.Chain]; !ok {
-						err = fmt.Errorf("cannot find a valid genesis for the %s network", vconfig.Chain)
+					if _, ok := vochain.Genesis[vs.Config.Chain]; !ok {
+						err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Chain)
 						return nil, nil, nil, err
 					}
-					genesisBytes = []byte(vochain.Genesis[vconfig.Chain].Genesis)
+					genesisBytes = []byte(vochain.Genesis[vs.Config.Chain].Genesis)
 				} else {
 					log.Warn("local and hardcoded genesis are different, risk of potential consensus failure")
 				}
@@ -97,28 +104,35 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 			// If dev mode enabled, auto-update genesis file
 			log.Debug("genesis does not exist, using hardcoded genesis")
 			err = nil
-			if _, ok := vochain.Genesis[vconfig.Chain]; !ok {
-				err = fmt.Errorf("cannot find a valid genesis for the %s network", vconfig.Chain)
+			if _, ok := vochain.Genesis[vs.Config.Chain]; !ok {
+				err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Chain)
 				return nil, nil, nil, err
 			}
-			genesisBytes = []byte(vochain.Genesis[vconfig.Chain].Genesis)
+			genesisBytes = []byte(vochain.Genesis[vs.Config.Chain].Genesis)
 		}
 	}
 
 	// Metrics agent (Prometheus)
-	if ma != nil {
-		vconfig.TendermintMetrics = true
+	if vs.MetricsAgent != nil {
+		vs.Config.TendermintMetrics = true
 	}
 
-	vnode := vochain.NewVochain(vconfig, genesisBytes)
-	var sc *scrutinizer.Scrutinizer
+	// Create the vochain node
+	vnode := vochain.NewVochain(vs.Config, genesisBytes)
+
+	// If seed mode, we are finished
+	if vs.Config.IsSeedNode {
+		return vnode, nil, nil, vnode.Service.Start()
+	}
+
 	// Scrutinizer
-	if vconfig.Scrutinizer.Enabled {
+	var sc *scrutinizer.Scrutinizer
+	if vs.Config.Scrutinizer.Enabled {
 		log.Info("creating vochain scrutinizer service")
 		if sc, err = scrutinizer.NewScrutinizer(
-			filepath.Join(vconfig.DataDir, "scrutinizer"),
+			filepath.Join(vs.Config.DataDir, "scrutinizer"),
 			vnode,
-			!vconfig.Scrutinizer.IgnoreLiveResults,
+			!vs.Config.Scrutinizer.IgnoreLiveResults,
 		); err != nil {
 			return nil, nil, nil, err
 		}
@@ -126,27 +140,27 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 	}
 
 	// Census Downloader
-	if cm != nil {
+	if vs.CensusManager != nil {
 		log.Infof("starting census downloader service")
-		censusdownloader.NewCensusDownloader(vnode, cm, !vconfig.ImportPreviousCensus)
+		censusdownloader.NewCensusDownloader(vnode, vs.CensusManager, !vs.Config.ImportPreviousCensus)
 	}
 
 	// Process Archiver
-	if vconfig.ProcessArchive {
+	if vs.Config.ProcessArchive {
 		if sc == nil {
 			err = fmt.Errorf("process archive needs indexer enabled")
 			return nil, nil, nil, err
 		}
-		ipfs, ok := ipfsStorage.(*data.IPFSHandle)
+		ipfs, ok := vs.Storage.(*data.IPFSHandle)
 		if !ok {
 			log.Warnf("ipfsStorage is not IPFS, archive publishing disabled")
 		}
-		log.Infof("starting process archiver on %s", vconfig.ProcessArchiveDataDir)
+		log.Infof("starting process archiver on %s", vs.Config.ProcessArchiveDataDir)
 		processarchive.NewProcessArchive(
 			sc,
 			ipfs,
-			vconfig.ProcessArchiveDataDir,
-			vconfig.ProcessArchiveKey,
+			vs.Config.ProcessArchiveDataDir,
+			vs.Config.ProcessArchiveKey,
 		)
 	}
 
@@ -155,9 +169,14 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 	go vi.Start(10)
 
 	// Grab metrics
-	go vi.CollectMetrics(ma)
+	go vi.CollectMetrics(vs.MetricsAgent)
 
-	if waitForSync && !vconfig.SeedMode {
+	// Start the vochain node
+	if err := vnode.Service.Start(); err != nil {
+		return nil, nil, nil, err
+	}
+
+	if !vs.Config.NoWaitSync {
 		log.Infof("waiting for vochain to synchronize")
 		var lastHeight int64
 		i := 0
@@ -173,6 +192,10 @@ func Vochain(vconfig *config.VochainCfg, waitForSync bool,
 		log.Infof("vochain fastsync completed!")
 	}
 	go VochainPrintInfo(20, vi)
+
+	if vs.Config.LogLevel == "debug" {
+		go vochainPrintPeers(20*time.Second, vi)
+	}
 
 	return vnode, sc, vi, nil
 }
@@ -211,5 +234,17 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 			h, m, len(vi.Peers()), p, v, vxm, vc, b.String(),
 		)
 		time.Sleep(time.Duration(sleepSecs) * time.Second)
+	}
+}
+
+// vochainPrintPeers prints the peers to log, for debugging tendermint PEX
+func vochainPrintPeers(interval time.Duration, vi *vochaininfo.VochainInfo) {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		<-t.C
+		for _, peer := range vi.Peers() {
+			log.Debugf("vochain peers: %s", peer.URL)
+		}
 	}
 }

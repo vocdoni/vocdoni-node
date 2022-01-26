@@ -5,23 +5,23 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"go.vocdoni.io/dvote/config"
 
+	abciclient "github.com/tendermint/tendermint/abci/client"
 	tmcfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	mempl "github.com/tendermint/tendermint/mempool"
 	"github.com/tendermint/tendermint/privval"
 
-	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
-	nm "github.com/tendermint/tendermint/node"
-	"github.com/tendermint/tendermint/p2p"
-	"github.com/tendermint/tendermint/proxy"
+	"github.com/tendermint/tendermint/libs/service"
+	tmnode "github.com/tendermint/tendermint/node"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -30,7 +30,7 @@ const downloadZkVKsTimeout = 1 * time.Minute
 // NewVochain starts a node with an ABCI application
 func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
 	// creating new vochain app
-	app, err := NewBaseApplication(vochaincfg.DBType, vochaincfg.DataDir+"/data")
+	app, err := NewBaseApplication(vochaincfg.DBType, filepath.Join(vochaincfg.DataDir, "data"))
 	if err != nil {
 		log.Fatalf("cannot initialize vochain application: %s", err)
 	}
@@ -40,9 +40,6 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 		log.Fatal(err)
 	}
 	app.SetDefaultMethods()
-	if err := app.Node.Start(); err != nil {
-		log.Fatal(err)
-	}
 	// get the zk Circuits VerificationKey files
 	ctx, cancel := context.WithTimeout(context.Background(), downloadZkVKsTimeout)
 	defer cancel()
@@ -51,41 +48,12 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	}
 	// Set mempool function for removing transactions.
 	app.State.mempoolRemoveTxKeys = func(keys [][32]byte, removeFromCache bool) {
-		mp := app.Node.Mempool().(*mempl.CListMempool)
-
-		// We'd sometimes see panics if we used RemoveTxByKey without
-		// the mempool's lock being held, like:
-		//
-		//     panic: Remove(e) with false head
-		//
-		// The panic is hard to reproduce, so for now, we're locking the
-		// entire mempool to see if the panics go away for a while.
-		// See https://github.com/vocdoni/vocdoni-node/issues/176.
-		//
-		// TODO(mvdan): file tendermint bug if we haven't seen any
-		// panics by September 2021.
-		mp.Lock()
-		defer mp.Unlock()
-
 		for _, key := range keys {
-			mp.RemoveTxByKey(key, removeFromCache)
+			if err := app.Node.RemoveTx(context.Background(), key); err != nil {
+				log.Warnf("cannot remove transaction %x: %v", key, err)
+			}
 		}
 	}
-	// Create custom logger for mempool
-	logDisable := false
-	if vochaincfg.LogLevelMemPool == "none" {
-		logDisable = true
-		vochaincfg.LogLevelMemPool = "error"
-	}
-	logger, err := tmflags.ParseLogLevel(
-		vochaincfg.LogLevelMemPool,
-		NewTenderLogger("mempool", logDisable),
-		tmcfg.DefaultLogLevel)
-	if err != nil {
-		log.Errorf("failed to parse log level: %v", err)
-	}
-	app.Node.Mempool().(*mempl.CListMempool).SetLogger(logger)
-	app.Node.Mempool().Flush()
 	// Set the vote cache at least as big as the mempool size
 	if app.State.CacheSize() < vochaincfg.MempoolSize {
 		app.State.SetCacheSize(vochaincfg.MempoolSize)
@@ -148,17 +116,16 @@ func NewTenderLogger(artifact string, disabled bool) *TenderLogger {
 
 // we need to set init (first time validators and oracles)
 func newTendermint(app *BaseApplication,
-	localConfig *config.VochainCfg, genesis []byte) (*nm.Node, error) {
+	localConfig *config.VochainCfg, genesis []byte) (service.Service, error) {
 	// create node config
 	var err error
 
 	tconfig := tmcfg.DefaultConfig()
-	tconfig.FastSyncMode = true
 	tconfig.SetRoot(localConfig.DataDir)
-	if err := os.MkdirAll(localConfig.DataDir+"/config", 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "config"), 0o755); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.MkdirAll(localConfig.DataDir+"/data", 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "data"), 0o755); err != nil {
 		log.Fatal(err)
 	}
 
@@ -172,7 +139,6 @@ func newTendermint(app *BaseApplication,
 	tconfig.P2P.MaxPacketMsgPayloadSize = 10240
 	tconfig.P2P.RecvRate = 5120000
 	tconfig.P2P.DialTimeout = time.Second * 5
-
 	if localConfig.Dev {
 		tconfig.P2P.AllowDuplicateIP = true
 		tconfig.P2P.AddrBookStrict = false
@@ -181,12 +147,14 @@ func newTendermint(app *BaseApplication,
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 	if !localConfig.CreateGenesis {
-		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
-		if _, ok := Genesis[localConfig.Chain]; len(tconfig.P2P.Seeds) < 8 &&
-			!localConfig.SeedMode && ok {
-			tconfig.P2P.Seeds = strings.Join(Genesis[localConfig.Chain].SeedNodes, ",")
+		tconfig.P2P.BootstrapPeers = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
+		if _, ok := Genesis[localConfig.Chain]; len(tconfig.P2P.BootstrapPeers) < 8 &&
+			!localConfig.IsSeedNode && ok {
+			tconfig.P2P.BootstrapPeers = strings.Join(Genesis[localConfig.Chain].SeedNodes, ",")
 		}
-		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
+		if len(tconfig.P2P.BootstrapPeers) > 0 {
+			log.Infof("seed nodes: %s", tconfig.P2P.BootstrapPeers)
+		}
 	}
 
 	if len(localConfig.Peers) > 0 {
@@ -195,8 +163,6 @@ func newTendermint(app *BaseApplication,
 	if len(tconfig.P2P.PersistentPeers) > 0 {
 		log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
 	}
-
-	tconfig.P2P.SeedMode = localConfig.SeedMode
 	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
 
 	// consensus config
@@ -212,12 +178,29 @@ func newTendermint(app *BaseApplication,
 	tconfig.Consensus.TimeoutPrecommit = time.Second * 1
 	tconfig.Consensus.TimeoutCommit = time.Second * time.Duration(blockTime)
 
+	// Enable only FastSync (until StateSync is implemented)
+	tconfig.BlockSync.Enable = true
+	tconfig.StateSync.Enable = false
+
+	// Set mempool TTL to 5 minutes
+	tconfig.Mempool.TTLDuration = time.Minute * 5
+
+	// if gateway or oracle
+	tconfig.Mode = tmcfg.ModeFull
+	// if seed node
+	if localConfig.IsSeedNode {
+		tconfig.Mode = tmcfg.ModeSeed
+	} else if len(localConfig.MinerKey) > 0 {
+		// if validator
+		tconfig.Mode = tmcfg.ModeValidator
+	}
+
+	log.Infof("tendermint configured as %s node", tconfig.Mode)
 	log.Infof("consensus block time target: commit=%.2fs propose=%.2fs",
 		tconfig.Consensus.TimeoutCommit.Seconds(), tconfig.Consensus.TimeoutPropose.Seconds())
 
 	// disable transaction indexer (we don't use it)
-	tconfig.TxIndex.Indexer = "null"
-
+	tconfig.TxIndex = &tmcfg.TxIndexConfig{Indexer: []string{"null"}}
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = false
@@ -240,7 +223,7 @@ func newTendermint(app *BaseApplication,
 			if err != nil {
 				log.Fatal(err)
 			}
-			tconfig.Genesis = dir + "/" + localConfig.Genesis
+			tconfig.Genesis = filepath.Join(dir, localConfig.Genesis)
 
 		} else {
 			tconfig.Genesis = localConfig.Genesis
@@ -254,13 +237,10 @@ func newTendermint(app *BaseApplication,
 	}
 
 	// create tendermint logger
-	logDisable := false
 	if tconfig.LogLevel == "none" {
-		logDisable = true
 		tconfig.LogLevel = "error"
 	}
-	logger, err := tmflags.ParseLogLevel(tconfig.LogLevel,
-		NewTenderLogger("tendermint", logDisable), tmcfg.DefaultLogLevel)
+	logger, err := tmlog.NewDefaultLogger("plain", tconfig.LogLevel, false)
 	if err != nil {
 		log.Errorf("failed to parse log level: %v", err)
 	}
@@ -269,43 +249,45 @@ func newTendermint(app *BaseApplication,
 	// if PrivValidatorListenAddr is defined, there's no need to initialize it since nm.NewNode() will ignore it
 	var pv *privval.FilePV
 
+	// TO-DO: check if current tendermint version supports hardware wallets
 	// if PrivValidatorListenAddr is defined, use a remote private validator, like TMKMS which allows signing with Ledger
 	// else, use a local private validator
-	if len(localConfig.PrivValidatorListenAddr) > 0 {
-		log.Info("PrivValidatorListenAddr defined, Tendermint will wait for a remote private validator connection")
-		tconfig.PrivValidatorListenAddr = localConfig.PrivValidatorListenAddr
-	} else {
-		// read or create local private validator
-		pv, err = NewPrivateValidator(localConfig.MinerKey, tconfig)
-		if err != nil {
-			return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
-		}
-		pv.Save()
+	//	if len(localConfig.PrivValidatorListenAddr) > 0 {
+	//		log.Info("PrivValidatorListenAddr defined, Tendermint will wait for a remote private validator connection")
+	//		tconfig.PrivValidatorListenAddr = localConfig.PrivValidatorListenAddr
+	//	} else {
 
-		log.Infof("tendermint private key %x", pv.Key.PrivKey)
-		log.Infof("tendermint address: %s", pv.Key.Address)
-		aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
-		if err != nil {
-			return nil, err
-		}
-		log.Infof("amino private key: %s", aminoPrivKey)
-		log.Infof("amino public key: %s", aminoPubKey)
-		log.Infof("using keyfile %s", tconfig.PrivValidatorKeyFile())
+	// read or create local private validator
+	pv, err = NewPrivateValidator(localConfig.MinerKey, tconfig)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
 	}
+	pv.Save()
+
+	log.Infof("tendermint validator private key %x", pv.Key.PrivKey)
+	log.Infof("tendermint validator address: %s", pv.Key.Address)
+	aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("amino private key: %s", aminoPrivKey)
+	log.Infof("amino public key: %s", aminoPubKey)
+	log.Infof("using keyfile %s", tconfig.PrivValidator.KeyFile())
 
 	// nodekey is used for the p2p transport layer
-	var nodeKey *p2p.NodeKey
+	nodeKey := new(tmtypes.NodeKey)
 	if len(localConfig.NodeKey) > 0 {
 		nodeKey, err = NewNodeKey(localConfig.NodeKey, tconfig)
 		if err != nil {
 			return nil, fmt.Errorf("cannot create node key: %w", err)
 		}
 	} else {
-		if nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile()); err != nil {
+		if *nodeKey, err = tmtypes.LoadOrGenNodeKey(tconfig.NodeKeyFile()); err != nil {
 			return nil, fmt.Errorf("cannot create or load node key: %w", err)
 		}
 	}
-	log.Infof("tendermint p2p node ID: %s", nodeKey.ID())
+	log.Infof("tendermint p2p node ID: %s", nodeKey.ID)
+	log.Debugf("tendermint p2p config: %+v", tconfig.P2P)
 
 	// read or create genesis file
 	if tmos.FileExists(tconfig.Genesis) {
@@ -328,40 +310,31 @@ func newTendermint(app *BaseApplication,
 	}
 
 	// create node
-	node, err := nm.NewNode(
-		tconfig,
-		pv,      // the node val
-		nodeKey, // node key
-		proxy.NewLocalClientCreator(app),
-		// Note we use proxy.NewLocalClientCreator here to create a local client
-		// instead of one communicating through a socket or gRPC.
-		nm.DefaultGenesisDocProviderFunc(tconfig),
-		nm.DefaultDBProvider,
-		nm.DefaultMetricsProvider(tconfig.Instrumentation),
-		logger)
+	// TO-DO: the last parameter can be used for adding a custom (user provided) genesis file
+	service, err := tmnode.New(tconfig, logger, abciclient.NewLocalCreator(app), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}
 
+	// Disabled until hardware wallet support is back
 	// If using a remote private validator, the pubkeys are only available after nm.NewNode()
 	// In that case, print them now, for debugging purposes
-	if len(localConfig.PrivValidatorListenAddr) > 0 {
-		pv := node.PrivValidator()
-		pubKey, err := pv.GetPubKey()
-		if err != nil {
-			log.Warnf("failed to get pubkey from private validator: %v", err)
-		}
-		log.Infof("tendermint address: %v", pubKey.Address())
+	/*	if len(localConfig.PrivValidatorListenAddr) > 0 {
+			pv := node.PrivValidator()
+			pubKey, err := pv.GetPubKey()
+			if err != nil {
+				log.Warnf("failed to get pubkey from private validator: %v", err)
+			}
+			log.Infof("tendermint address: %v", pubKey.Address())
 
-		aminoPubKey, err := AminoPubKey(pubKey.Bytes())
-		if err != nil {
-			log.Warnf("failed to get amino public key: %v", err)
+			aminoPubKey, err := AminoPubKey(pubKey.Bytes())
+			if err != nil {
+				log.Warnf("failed to get amino public key: %v", err)
+			}
+			log.Infof("amino public key: %s", aminoPubKey)
 		}
-		log.Infof("amino public key: %s", aminoPubKey)
-	}
-
-	log.Debugf("consensus config %+v", *node.Config().Consensus)
-	return node, nil
+	*/
+	return service, nil
 }
 
 // AminoKeys is a helper function that transforms a standard EDDSA key into

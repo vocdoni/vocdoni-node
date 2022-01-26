@@ -86,14 +86,14 @@ type ConsensusParams struct {
 	Block     BlockParams     `json:"block"`
 	Evidence  EvidenceParams  `json:"evidence"`
 	Validator ValidatorParams `json:"validator"`
+	Version   VersionParams   `json:"version"`
 }
 
+// BlockParams define limits on the block size and gas plus minimum time
+// between blocks.
 type BlockParams struct {
 	MaxBytes int64 `json:"max_bytes"`
 	MaxGas   int64 `json:"max_gas"`
-	// Minimum time increment between consecutive blocks (in milliseconds)
-	// Not exposed to the application.
-	TimeIotaMs int64 `json:"time_iota_ms"`
 }
 
 type EvidenceParams struct {
@@ -104,6 +104,10 @@ type EvidenceParams struct {
 
 type ValidatorParams struct {
 	PubKeyTypes []string `json:"pub_key_types"`
+}
+
+type VersionParams struct {
+	AppVersion uint64 `json:"app_version"`
 }
 
 type GenesisValidator struct {
