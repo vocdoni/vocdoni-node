@@ -7,7 +7,7 @@ jobs:
   go-tests:
     runs-on: self-hosted
     container:
-      image: golang:1.17.4
+      image: golang:1.17.6
       options: --user 1000
     if: github.repository == 'vocdoni/vocdoni-node'
     defaults:
@@ -16,16 +16,28 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: gofmt
+        run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
       - name: Go test
         run: |
           # we run vet in another step
           go test -vet=off -timeout=1m -coverprofile=covprofile ./...
           # -race can easily make the crypto stuff 10x slower
           go test -vet=off -timeout=15m -race ./...
-      - name: Go analyze
+      - name: go vet
+        run: go vet ./...
+      - name: staticcheck
         run: |
-          diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
-          go vet ./...
+          # Sometimes, the staticcheck like below silently does nothing due to:
+          #
+          #     "./..." matched no packages
+          #
+          # We have no idea what causes that yet, hence the debug commands.
+          git status -sb --ignored
+          go list ./...
+          ls -la
+          find tree/
+
           curl -L https://github.com/dominikh/go-tools/releases/download/2021.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
           ./staticcheck/staticcheck ./...
       - name: Go build for Mac
@@ -33,6 +45,12 @@ jobs:
           # Some of our devs are on Mac. Ensure it builds.
           # It's surprisingly hard with some deps like bazil.org/fuse.
           GOOS=darwin go build ./...
+
+          # And again, just in case any files were deleted while we ran it.
+          git status -sb --ignored
+          go list ./...
+          ls -la
+          find tree/
 
   compose-test:
     runs-on: self-hosted
