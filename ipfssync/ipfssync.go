@@ -14,7 +14,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
-	ma "github.com/multiformats/go-multiaddr"
 	"go.vocdoni.io/dvote/ipfssync/subpub"
 	statedb "go.vocdoni.io/dvote/statedblegacy"
 	"go.vocdoni.io/proto/build/go/models"
@@ -229,7 +228,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 		}
 		if !found {
 			log.Infof("connecting IPFS to peer %s", msg.Multiaddress)
-			multiAddr, err := ma.NewMultiaddr(msg.Multiaddress)
+			multiAddr, err := multiaddr.NewMultiaddr(msg.Multiaddress)
 			if err != nil {
 				return err
 			}
