@@ -294,6 +294,39 @@ func mkTreeVoteTest(host,
 		log.Fatal(err)
 	}
 	mainClient.MintTokens(oracleKey, entityKey.Address(), 10000, treasurer.Nonce)
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	// create and top-up oracle
+	mainClient.CreateAccount(oracleKey, "ipfs://", 0)
+	mainClient.MintTokens(oracleKey, oracleKey.Address(), 10000, treasurer.Nonce+1)
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
 
 	// Create process
 	pid := client.Random(32)
@@ -532,6 +565,39 @@ func mkTreeAnonVoteTest(host,
 		log.Fatal(err)
 	}
 	mainClient.MintTokens(oracleKey, entityKey.Address(), 10000, treasurer.Nonce)
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	// create and top-up oracle
+	mainClient.CreateAccount(oracleKey, "ipfs://", 0)
+	mainClient.MintTokens(oracleKey, oracleKey.Address(), 10000, treasurer.Nonce+1)
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
 
 	// Create process
 	pid := client.Random(32)
