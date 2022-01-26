@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.vocdoni.io/dvote/ipfssync/subpub"
 	statedb "go.vocdoni.io/dvote/statedblegacy"
@@ -305,13 +304,13 @@ func (is *IPFSsync) sendHello() {
 	}
 }
 
-func (is *IPFSsync) ipfsAddrs() (maddrs []multiaddr.Multiaddr) {
-	ipfs, err := multiaddr.NewMultiaddr("/ipfs/" + is.Storage.Node.PeerHost.ID().String())
+func (is *IPFSsync) ipfsAddrs() (maddrs []ma.Multiaddr) {
+	ipfs, err := ma.NewMultiaddr("/ipfs/" + is.Storage.Node.PeerHost.ID().String())
 	if err != nil {
 		return nil
 	}
 	for _, maddr := range is.Storage.Node.PeerHost.Addrs() {
-		for _, p := range []int{multiaddr.P_IP4, multiaddr.P_IP6} {
+		for _, p := range []int{ma.P_IP4, ma.P_IP6} {
 			if v, _ := maddr.ValueForProtocol(p); v != "" {
 				if ip := net.ParseIP(v); ip != nil {
 					if !ip.IsLoopback() && !ip.IsPrivate() {
