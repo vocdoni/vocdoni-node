@@ -66,6 +66,9 @@ func (v *State) AddProcess(p *models.Process) error {
 	if err != nil {
 		return err
 	}
+	if bytes.Equal(p.Owner, []byte{}) {
+		p.Owner = p.EntityId
+	}
 	if err := v.substractTxCostIncrementNonce(common.BytesToAddress(p.Owner), processCreationCost); err != nil {
 		return err
 	}
