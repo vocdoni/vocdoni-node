@@ -50,16 +50,15 @@ jobs:
           
           time find /github/home/.cache/go-build -not -user 1000 >/dev/null || true
           time find /github/home/.cache-broken-by-root/go-build -not -user 1000 >/dev/null || true
+          du -sh /github/home/.cache/go-build
+          du -sh /github/home/.cache-broken-by-root/go-build
 
-          echo "rm -rf /github/home/.cache/"
-          mv /github/home/.cache/ /github/home/.cache-broken-by-root/ || true
-
-          echo "raw cmds: go list -e -f {{context.ReleaseTags}}"
-          GOROOT= GOPATH=/go GO111MODULE=off GOPROXY= go list -e -f {{context.ReleaseTags}}
-          echo "raw cmds: go list -f "{{context.GOARCH}} {{context.Compiler}}" -- unsafe"
-          GOROOT= GOPATH=/go GO111MODULE= GOPROXY= go list -f "{{context.GOARCH}} {{context.Compiler}}" -- unsafe
-          echo "raw cmds: go list -e -json -compiled=true -test=true -export=true -deps=true -find=false -- ./..."
-          GOROOT= GOPATH=/go GO111MODULE= GOPROXY= go list -e -json -compiled=true -test=true -export=true -deps=true -find=false -- ./...
+          # echo "raw cmds: go list -e -f {{context.ReleaseTags}}"
+          # GOROOT= GOPATH=/go GO111MODULE=off GOPROXY= go list -e -f {{context.ReleaseTags}}
+          # echo "raw cmds: go list -f "{{context.GOARCH}} {{context.Compiler}}" -- unsafe"
+          # GOROOT= GOPATH=/go GO111MODULE= GOPROXY= go list -f "{{context.GOARCH}} {{context.Compiler}}" -- unsafe
+          # echo "raw cmds: go list -e -json -compiled=true -test=true -export=true -deps=true -find=false -- ./..."
+          # GOROOT= GOPATH=/go GO111MODULE= GOPROXY= go list -e -json -compiled=true -test=true -export=true -deps=true -find=false -- ./...
 
           pwd -L
           pwd -P
