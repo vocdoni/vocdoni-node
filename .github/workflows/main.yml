@@ -38,7 +38,7 @@ jobs:
 
           pwd -L
           pwd -P
-          whoami
+          whoami || true
 
           ls -ld /github/ || true
           ls -ld /github/home/ || true
@@ -47,7 +47,10 @@ jobs:
           ls -ld /github/home/.cache/go-build/fc/ || true
           ls -ld /github/home/.cache/go-build/fc/fc0c834f7738ff86f05ec60adbd5736130df7c72423ddd801e9349680096154d-d || true
           ls -l /github/home/.cache/go-build/fc/ || true
-
+          
+          echo "rm -rf /github/home/.cache/"
+          rm -rf /github/home/.cache/ || true
+          
           echo "raw cmds: go list -e -f {{context.ReleaseTags}}"
           GOROOT= GOPATH=/go GO111MODULE=off GOPROXY= go list -e -f {{context.ReleaseTags}}
           echo "raw cmds: go list -f "{{context.GOARCH}} {{context.Compiler}}" -- unsafe"
