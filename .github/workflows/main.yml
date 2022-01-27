@@ -38,6 +38,7 @@ jobs:
 
           pwd -L
           pwd -P
+          whoami
 
           ls -ld /github/ || true
           ls -ld /github/home/ || true
