@@ -35,20 +35,17 @@ jobs:
 
           curl -L https://github.com/dominikh/go-tools/releases/download/2021.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
           GOPACKAGESDEBUG=1 ./staticcheck/staticcheck ./...
-          sleep 1
-          echo "a race?"
-          GOPACKAGESDEBUG=1 ./staticcheck/staticcheck ./...
-
 
           pwd -L
           pwd -P
 
-          ls -ld /github/
-          ls -ld /github/home/
-          ls -ld /github/home/.cache/
-          ls -ld /github/home/.cache/go-build/
-          ls -ld /github/home/.cache/go-build/fc/
-          ls -ld /github/home/.cache/go-build/fc/fc0c834f7738ff86f05ec60adbd5736130df7c72423ddd801e9349680096154d-d
+          ls -ld /github/ || true
+          ls -ld /github/home/ || true
+          ls -ld /github/home/.cache/ || true
+          ls -ld /github/home/.cache/go-build/ || true
+          ls -ld /github/home/.cache/go-build/fc/ || true
+          ls -ld /github/home/.cache/go-build/fc/fc0c834f7738ff86f05ec60adbd5736130df7c72423ddd801e9349680096154d-d || true
+          ls -l /github/home/.cache/go-build/fc/ || true
 
           echo "raw cmds: go list -e -f {{context.ReleaseTags}}"
           GOROOT= GOPATH=/go GO111MODULE=off GOPROXY= go list -e -f {{context.ReleaseTags}}
