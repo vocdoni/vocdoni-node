@@ -39,6 +39,17 @@ jobs:
           echo "a race?"
           GOPACKAGESDEBUG=1 ./staticcheck/staticcheck ./...
 
+
+          echo "raw cmds: go list -e -f {{context.ReleaseTags}}"
+          GOROOT= GOPATH=/go GO111MODULE=off GOPROXY= go list -e -f {{context.ReleaseTags}}
+          echo "raw cmds: go list -f "{{context.GOARCH}} {{context.Compiler}}" -- unsafe"
+          GOROOT= GOPATH=/go GO111MODULE= GOPROXY= go list -f "{{context.GOARCH}} {{context.Compiler}}" -- unsafe
+          echo "raw cmds: go list -e -json -compiled=true -test=true -export=true -deps=true -find=false -- ./..."
+          GOROOT= GOPATH=/go GO111MODULE= GOPROXY= go list -e -json -compiled=true -test=true -export=true -deps=true -find=false -- ./...
+
+          pwd -L
+          pwd -P
+
           CLONE_DIR="$PWD"
           echo $CLONE_DIR
           # hard-coded below
