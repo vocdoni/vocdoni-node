@@ -19,8 +19,8 @@ jobs:
         uses: actions/checkout@v2
       - name: gofmt
         run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
-      - name: go vet
-        run: go vet ./...
+      # - name: go vet
+      #   run: go vet ./...
       - name: staticcheck
         run: |
           # Sometimes, the staticcheck like below silently does nothing due to:
