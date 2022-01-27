@@ -49,8 +49,8 @@ jobs:
           ls -l /github/home/.cache/go-build/fc/ || true
           
           echo "rm -rf /github/home/.cache/"
-          rm -rf /github/home/.cache/ || true
-          
+          mv /github/home/.cache/ /github/home/.cache-broken-by-root/ || true
+
           echo "raw cmds: go list -e -f {{context.ReleaseTags}}"
           GOROOT= GOPATH=/go GO111MODULE=off GOPROXY= go list -e -f {{context.ReleaseTags}}
           echo "raw cmds: go list -f "{{context.GOARCH}} {{context.Compiler}}" -- unsafe"
