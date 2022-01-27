@@ -48,6 +48,9 @@ jobs:
           ls -ld /github/home/.cache/go-build/fc/fc0c834f7738ff86f05ec60adbd5736130df7c72423ddd801e9349680096154d-d || true
           ls -l /github/home/.cache/go-build/fc/ || true
           
+          time find /github/home/.cache/go-build -not -user 1000 >/dev/null || true
+          time find /github/home/.cache-broken-by-root/go-build -not -user 1000 >/dev/null || true
+
           echo "rm -rf /github/home/.cache/"
           mv /github/home/.cache/ /github/home/.cache-broken-by-root/ || true
 
