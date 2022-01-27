@@ -182,8 +182,8 @@ func newTendermint(app *BaseApplication,
 	tconfig.BlockSync.Enable = true
 	tconfig.StateSync.Enable = false
 
-	// Set mempool TTL to 5 minutes
-	tconfig.Mempool.TTLDuration = time.Minute * 5
+	// Set mempool TTL to 20 minutes
+	tconfig.Mempool.TTLDuration = time.Minute * 15
 
 	// if gateway or oracle
 	tconfig.Mode = tmcfg.ModeFull
