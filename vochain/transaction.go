@@ -329,9 +329,6 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			}
 			vote.EncryptionKeyIndexes = ve.EncryptionKeyIndexes
 		}
-
-		// add the vote to cache
-		app.State.CacheAdd(txID, vote)
 	} else {
 		// Signature based voting
 		if signature == nil {
@@ -426,7 +423,8 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			return nil, fmt.Errorf("proof not valid")
 		}
 		vote.Weight = weight.Bytes()
-
+	}
+	if !forCommit {
 		// add the vote to cache
 		app.State.CacheAdd(txID, vote)
 	}
