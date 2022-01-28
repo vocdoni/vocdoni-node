@@ -174,9 +174,6 @@ func newTendermint(app *BaseApplication,
 	tconfig.BlockSync.Enable = true
 	tconfig.StateSync.Enable = false
 
-	// Set mempool TTL to 20 minutes
-	tconfig.Mempool.TTLDuration = time.Minute * 15
-
 	// if gateway or oracle
 	tconfig.Mode = tmcfg.ModeFull
 	// if seed node
@@ -196,11 +193,16 @@ func newTendermint(app *BaseApplication,
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = false
-	tconfig.Mempool.KeepInvalidTxsInCache = true
+	tconfig.Mempool.KeepInvalidTxsInCache = false
+	tconfig.Mempool.MaxTxBytes = 1024 * 100 // 100 KiB
 	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
 	tconfig.Mempool.CacheSize = 100000
-
-	//	tconfig.Mempool.MaxBatchBytes = 500 * tconfig.Mempool.MaxTxBytes // maximum 500 full-size txs
+	tconfig.Mempool.Broadcast = true
+	tconfig.Mempool.MaxBatchBytes = 500 * tconfig.Mempool.MaxTxBytes // maximum 500 full-size txs
+	// Set mempool TTL to 15 minutes
+	tconfig.Mempool.TTLDuration = time.Minute * 15
+	tconfig.Mempool.TTLNumBlocks = 100
+	log.Infof("mempool config: %+v", tconfig.Mempool)
 
 	// tmdbBackend defaults to goleveldb, but switches to cleveldb if
 	// -tags=cleveldb is used, and switches to badgerdb if -tags=badger is
