@@ -3,6 +3,7 @@ package vochain
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -439,7 +440,10 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 	tx := new(vochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
 		if data, err = app.AddTx(tx, false); err != nil {
-			log.Debugf("checkTx error: %s", err)
+			if errors.Is(err, ErrorAlreadyExistInCache) {
+				return abcitypes.ResponseCheckTx{Code: 0}
+			}
+			log.Debugf("checkTx error: %v", err)
 			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("addTx " + err.Error())}
 		}
 	} else {
