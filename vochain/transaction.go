@@ -19,6 +19,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// ErrorAlreadyExistInCache is returned if the transaction has been already processed
+// and stored in the vote cache
+var ErrorAlreadyExistInCache = fmt.Errorf("vote already exist in cache")
+
 // VochainTx is a wrapper around a protobuf transaction with some helpers
 type vochainTx struct {
 	tx         *models.Tx
@@ -244,7 +248,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		// if not forCommit, it is a mempool check,
 		// reject it since we already processed the transaction before.
 		if !forCommit && vote != nil {
-			return nil, fmt.Errorf("vote %x already exists in cache", vote.Nullifier)
+			return nil, ErrorAlreadyExistInCache
 		}
 
 		// Supports Groth16 proof generated from circom snark compatible
