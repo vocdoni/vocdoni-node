@@ -249,14 +249,6 @@ func (app *BaseApplication) ChainID() string {
 	return app.chainId
 }
 
-// MempoolRemoveTx removes a transaction (identifier by its vochain.TxKey() hash)
-// from the Tendermint mempool.
-func (app *BaseApplication) MempoolRemoveTx(txKey [32]byte) {
-	if err := app.Node.RemoveTx(context.Background(), txKey); err != nil {
-		log.Warnf("cannot remove transactio from mempool: %v", err)
-	}
-}
-
 // MempoolSize returns the size of the transaction mempool
 func (app *BaseApplication) MempoolSize() int {
 	return app.fnMempoolSize()
