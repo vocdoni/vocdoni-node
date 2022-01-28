@@ -46,14 +46,6 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	if err := app.LoadZkVKs(ctx); err != nil {
 		log.Fatal(err)
 	}
-	// Set mempool function for removing transactions.
-	app.State.mempoolRemoveTxKeys = func(keys [][32]byte, removeFromCache bool) {
-		for _, key := range keys {
-			if err := app.Node.RemoveTx(context.Background(), key); err != nil {
-				log.Warnf("cannot remove transaction %x: %v", key, err)
-			}
-		}
-	}
 	// Set the vote cache at least as big as the mempool size
 	if app.State.CacheSize() < vochaincfg.MempoolSize {
 		app.State.SetCacheSize(vochaincfg.MempoolSize)
