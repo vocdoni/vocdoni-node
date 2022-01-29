@@ -136,12 +136,6 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 	if app.Node, err = tmcli.New(app.Service.(tmcli.NodeService)); err != nil {
 		return fmt.Errorf("could not start tendermint node client: %w", err)
 	}
-
-	nodeGenesis, err := app.Node.Genesis(context.Background())
-	if err != nil {
-		return fmt.Errorf("could not retrive genesis information: %w", err)
-	}
-	app.chainId = nodeGenesis.Genesis.ChainID
 	return nil
 }
 

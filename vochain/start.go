@@ -3,6 +3,7 @@ package vochain
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -302,6 +303,23 @@ func newTendermint(app *BaseApplication,
 			Namespace:            "tendermint",
 		}
 	}
+
+	// We need to fetch chain_id in order to make Replay work,
+	// since signatures depend on it.
+	log.Warnf("genesis file at %s", tconfig.GenesisFile())
+	type genesisChainID struct {
+		ChainID string `json:"chain_id"`
+	}
+	genesisData, err := os.ReadFile(tconfig.Genesis)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read genesis file: %w", err)
+	}
+	genesisCID := &genesisChainID{}
+	if err := json.Unmarshal(genesisData, genesisCID); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal genesis file for fetching chainID")
+	}
+	log.Infof("found chainID %s", genesisCID.ChainID)
+	app.chainId = genesisCID.ChainID
 
 	// create node
 	// TO-DO: the last parameter can be used for adding a custom (user provided) genesis file
