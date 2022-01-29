@@ -128,8 +128,8 @@ func (vi *VochainInfo) VoteCacheSize() int {
 	return vi.voteCacheSize
 }
 
-// netInfo returns network info (mainly, peers)
-func (vi *VochainInfo) netInfo() (*coretypes.ResultNetInfo, error) {
+// NetInfo returns network info (mainly, peers)
+func (vi *VochainInfo) NetInfo() (*coretypes.ResultNetInfo, error) {
 	if vi.vnode.Node != nil {
 		return vi.vnode.Node.NetInfo(context.Background())
 	}
@@ -137,12 +137,12 @@ func (vi *VochainInfo) netInfo() (*coretypes.ResultNetInfo, error) {
 }
 
 // Peers returns the whole list of peers, including ID and URL
-func (vi *VochainInfo) Peers() []coretypes.Peer {
-	ni, err := vi.netInfo()
+func (vi *VochainInfo) Peers() int {
+	ni, err := vi.NetInfo()
 	if err != nil || ni == nil {
-		return nil
+		return 0
 	}
-	return ni.Peers
+	return ni.NPeers
 }
 
 // Start initializes the Vochain statistics recollection.
