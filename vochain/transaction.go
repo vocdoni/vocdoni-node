@@ -357,6 +357,10 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 				}
 				return nil, fmt.Errorf("vote %x already exists", vote.Nullifier)
 			}
+			if height > process.GetStartBlock()+process.GetBlockCount() ||
+				process.GetStatus() != models.ProcessStatus_READY {
+				return nil, fmt.Errorf("vote %x is not longer valid", vote.Nullifier)
+			}
 			return vote, nil
 		}
 

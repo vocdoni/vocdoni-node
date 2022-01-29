@@ -15,8 +15,15 @@ func cacheGetNullifierKey(nullifier []byte) string {
 	return cacheNullPrefix + string(nullifier)
 }
 
+func (v *State) cacheDisabled() bool {
+	return v.DisableVoteCache.Load().(bool)
+}
+
 // CacheAdd adds a new vote proof to the local cache
 func (v *State) CacheAdd(id [32]byte, vote *models.Vote) {
+	if v.cacheDisabled() {
+		return
+	}
 	if vote == nil || vote.Nullifier == nil {
 		return
 	}
@@ -26,6 +33,9 @@ func (v *State) CacheAdd(id [32]byte, vote *models.Vote) {
 
 // CacheDel deletes an existing vote proof from the local cache
 func (v *State) CacheDel(id [32]byte) {
+	if v.cacheDisabled() {
+		return
+	}
 	vote := v.CacheGet(id)
 	if vote != nil {
 		v.voteCache.Remove(cacheGetNullifierKey(vote.Nullifier))
@@ -35,6 +45,9 @@ func (v *State) CacheDel(id [32]byte) {
 
 // CacheGet fetch an existing vote from the local cache and returns a copy
 func (v *State) CacheGet(id [32]byte) *models.Vote {
+	if v.cacheDisabled() {
+		return nil
+	}
 	record, ok := v.voteCache.Get(id)
 	if !ok || record == nil {
 		return nil
@@ -45,6 +58,9 @@ func (v *State) CacheGet(id [32]byte) *models.Vote {
 // CacheGetCopy fetch an existing vote from the local cache and returns a copy
 // which is thread-safe for writing.
 func (v *State) CacheGetCopy(id [32]byte) *models.Vote {
+	if v.cacheDisabled() {
+		return nil
+	}
 	if vote := v.CacheGet(id); vote != nil {
 		return proto.Clone(vote).(*models.Vote)
 	}
@@ -53,12 +69,18 @@ func (v *State) CacheGetCopy(id [32]byte) *models.Vote {
 
 // CacheHasNullifier fetch an existing vote from the local cache
 func (v *State) CacheHasNullifier(nullifier []byte) bool {
+	if v.cacheDisabled() {
+		return false
+	}
 	_, ok := v.voteCache.Get(cacheGetNullifierKey(nullifier))
 	return ok
 }
 
 // CachePurge removes the old cache saved votes
 func (v *State) CachePurge(height uint32) {
+	if v.cacheDisabled() {
+		return
+	}
 	// Purge only every 18 blocks (3 minute)
 	if height%18 != 0 { // TODO(pau): do not use height but time
 		return
@@ -95,5 +117,8 @@ func (v *State) SetCacheSize(size int) {
 
 // CacheSize returns the current size of the vote cache
 func (v *State) CacheSize() int {
+	if v.cacheDisabled() {
+		return 0
+	}
 	return v.voteCache.Len()
 }

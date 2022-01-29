@@ -296,6 +296,7 @@ type State struct {
 	// validate Vochain transactions).
 	Tx                treeTxWithMutex
 	mainTreeViewValue atomic.Value
+	DisableVoteCache  atomic.Value
 	voteCache         *lru.Cache
 	txCounter         int32
 	eventListeners    []EventListener
@@ -341,6 +342,7 @@ func NewState(dbType, dataDir string) (*State, error) {
 		Tx:        treeTxWithMutex{TreeTx: tx},
 		voteCache: voteCache,
 	}
+	s.DisableVoteCache.Store(false)
 	s.setMainTreeView(mainTreeView)
 	return s, nil
 }
