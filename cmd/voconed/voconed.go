@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -15,8 +16,9 @@ import (
 
 // VoconeConfig contains the basic configuration for the voconed
 type VoconeConfig struct {
-	logLevel, dir, oracle, path   string
-	port, blockSeconds, blockSize int
+	logLevel, dir, oracle, path, lottery string
+	port, blockSeconds, blockSize        int
+	txCosts                              uint64
 }
 
 func main() {
@@ -32,6 +34,8 @@ func main() {
 	flag.StringVar(&config.path, "urlPath", "/dvote", "HTTP path for the API rest")
 	flag.IntVar(&config.blockSeconds, "blockPeriod", int(vocone.DefaultBlockTimeTarget.Seconds()), "block time target in seconds")
 	flag.IntVar(&config.blockSize, "blockSize", int(vocone.DefaultTxsPerBlock), "max number of transactions per block")
+	flag.Uint64Var(&config.txCosts, "txCosts", vocone.DefaultTxCosts, "transaction cost for every transaction type")
+	flag.StringVar(&config.lottery, "lottery", "", "address that will be given a lot of tokens in the genesis")
 	flag.CommandLine.SortFlags = false
 	flag.Parse()
 
@@ -57,6 +61,10 @@ func main() {
 	config.blockSeconds = viper.GetInt("blockPeriod")
 	viper.BindPFlag("blockSize", flag.Lookup("blockSize"))
 	config.blockSize = viper.GetInt("blockSize")
+	viper.BindPFlag("txCosts", flag.Lookup("txCosts"))
+	config.txCosts = viper.GetUint64("txCosts")
+	viper.BindPFlag("lottery", flag.Lookup("lottery"))
+	config.lottery = viper.GetString("lottery")
 
 	viper.AddConfigPath(config.dir)
 
@@ -93,6 +101,20 @@ func main() {
 	}
 
 	vc, err := vocone.NewVocone(config.dir, &oracle)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if len(config.lottery) > 0 {
+		log.Info("setting lottery winner ", config.lottery)
+		err = vc.SetLottery(common.HexToAddress(config.lottery))
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	log.Info("setting tx costs to ", config.txCosts)
+	err = vc.SetBulkTxCosts(config.txCosts)
 	if err != nil {
 		log.Fatal(err)
 	}

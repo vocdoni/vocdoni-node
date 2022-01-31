@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/enriquebris/goconcurrentqueue"
+	"github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 
@@ -35,6 +36,7 @@ import (
 const (
 	DefaultTxsPerBlock     = 500
 	DefaultBlockTimeTarget = time.Second * 5
+	DefaultTxCosts         = 10
 	mempoolSize            = 100 << 10
 )
 
@@ -193,6 +195,27 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 		}
 	}
 	return nil
+}
+
+func (vc *Vocone) SetLottery(winner common.Address) error {
+	err := vc.app.State.CreateAccount(winner, "ipfs://", []common.Address{}, 9999999999)
+	if err != nil {
+		return err
+	}
+	_, err = vc.app.State.Save()
+	return err
+}
+
+func (vc *Vocone) SetBulkTxCosts(txCosts uint64) error {
+	for k, _ := range vochain.TxTypeCostToStateKey {
+		log.Debugf("setting tx cost for txtype %s", models.TxType_name[int32(k)])
+		err := vc.app.State.SetTxCost(k, txCosts)
+		if err != nil {
+			return err
+		}
+	}
+	_, err := vc.app.State.Save()
+	return err
 }
 
 func (vc *Vocone) setDefaultMethods() {
