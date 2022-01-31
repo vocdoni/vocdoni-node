@@ -80,6 +80,7 @@ func (r *HTTProuter) Init(host string, port int) error {
 
 	r.Mux = chi.NewRouter()
 	r.Mux.Use(middleware.RealIP)
+
 	// If we want rich logging (e.g. with fields), we could implement our
 	// own version of DefaultLogFormatter.
 	r.Mux.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
@@ -90,20 +91,36 @@ func (r *HTTProuter) Init(host string, port int) error {
 	r.Mux.Use(middleware.Heartbeat("/ping"))
 	r.Mux.Use(middleware.ThrottleBacklog(5000, 40000, 30*time.Second))
 	r.Mux.Use(middleware.Timeout(30 * time.Second))
+
+	// Cors handler
 	cors := cors.New(cors.Options{
 		AllowOriginFunc: func(r *http.Request, origin string) bool {
 			return true
 		}, // Kind of equivalent to AllowedOrigin: []string{"*"} but it returns the origin as allowed origin.
-		AllowedMethods:   []string{"GET", "POST", "PUT", "OPTIONS", "DELETE"},
-		AllowedHeaders:   []string{"Content-Type"},
-		AllowCredentials: true,
-		MaxAge:           300, // Maximum value not ignored by any of major browsers
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
+		AllowedHeaders:     []string{"*"},
+		AllowCredentials:   true,
+		MaxAge:             300, // Maximum value not ignored by any of major browsers
+		OptionsPassthrough: false,
+		Debug:              false,
 	})
 	r.Mux.Use(cors.Handler)
+
+	// Prometheus handler
 	if r.PrometheusID == "" {
 		r.PrometheusID = "gochi_http"
 	}
 	r.Mux.Use(chiprometheus.NewMiddleware(r.PrometheusID))
+
+	// For some reason the Cors handler is not returning 200 on OPTIONS.
+	// So as a workaround we declare explicitly the Options handler
+	r.Mux.Options("/*", func(w http.ResponseWriter, r *http.Request) {})
 
 	if len(r.TLSdomain) > 0 {
 		log.Infof("fetching letsencrypt TLS certificate for %s", r.TLSdomain)

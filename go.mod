@@ -30,7 +30,7 @@ require (
 	github.com/frankban/quicktest v1.14.0
 	github.com/glendc/go-external-ip v0.1.0
 	github.com/go-chi/chi v4.1.2+incompatible
-	github.com/go-chi/cors v1.1.1
+	github.com/go-chi/cors v1.2.0
 	github.com/google/go-cmp v0.5.6
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/iden3/go-iden3-crypto v0.0.6-0.20210308142348-8f85683b2cef
