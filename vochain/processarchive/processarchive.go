@@ -142,15 +142,30 @@ func NewProcessArchive(s *scrutinizer.Scrutinizer, ipfs *data.IPFSHandle,
 // This method is build for being executed only once (when bootstraping) since new
 // processes will automatically be added to the archive by event callbacks.
 func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
+	startTime := time.Now()
+	// Processes with on-chain results
 	pids, err := pa.indexer.ProcessList(nil, fromBlock,
 		int(pa.indexer.ProcessCount(nil)), "", 0, "", "RESULTS", true)
 	if err != nil {
 		return err
 	}
-	log.Infof("scanning blockchain processes from block %d", fromBlock)
+	// Processes finished by transaction without (yet?) on-chain results
+	pids2, err := pa.indexer.ProcessList(nil, fromBlock,
+		int(pa.indexer.ProcessCount(nil)), "", 0, "", "ENDED", true)
+	if err != nil {
+		return err
+	}
+	// Processes finished by endBlock without (yet?) on-chain results
+	pids3, err := pa.indexer.ProcessList(nil, fromBlock,
+		int(pa.indexer.ProcessCount(nil)), "", 0, "", "READY", true)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("scanning blockchain processes from block %d (ended:%d results:%d ready:%d)",
+		fromBlock, len(pids2), len(pids), len(pids3))
 	added := 0
-	startTime := time.Now()
-	for _, p := range pids {
+	for _, p := range append(append(pids, pids2...), pids3...) {
 		exists, err := pa.storage.ProcessExist(p)
 		if err != nil {
 			log.Warnf("processScan: %v", err)
@@ -163,6 +178,12 @@ func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
 		if err != nil {
 			return err
 		}
+		// If status is READY but the process is not yet finished, ignore
+		if procInfo.Status == int32(models.ProcessStatus_READY) {
+			if pa.indexer.App.Height() < procInfo.EndBlock {
+				continue
+			}
+		}
 		results, err := pa.indexer.GetResults(p)
 		if err != nil {
 			return err
@@ -172,7 +193,7 @@ func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
 			ProcessInfo: procInfo,
 			Results:     results,
 			StartDate:   pa.indexer.App.TimestampFromBlock(int64(procInfo.StartBlock)),
-			EndDate:     pa.indexer.App.TimestampFromBlock(int64(procInfo.EndBlock)),
+			EndDate:     pa.indexer.App.TimestampFromBlock(int64(results.BlockHeight)),
 			ChainID:     pa.indexer.App.ChainID(),
 		}); err != nil {
 			log.Warnf("processScan: %v", err)
@@ -195,8 +216,6 @@ func (pa *ProcessArchive) OnComputeResults(results *indexertypes.Results,
 			jsProc = &Process{
 				ProcessInfo: proc,
 				Results:     results,
-				StartDate:   pa.indexer.App.TimestampFromBlock(int64(proc.StartBlock)),
-				EndDate:     pa.indexer.App.TimestampFromBlock(int64(height - 1)),
 				ChainID:     pa.indexer.App.ChainID(),
 			}
 		} else {
@@ -205,6 +224,8 @@ func (pa *ProcessArchive) OnComputeResults(results *indexertypes.Results,
 		}
 	}
 	jsProc.Results = results
+	jsProc.StartDate = pa.indexer.App.TimestampFromBlock(int64(proc.StartBlock))
+	jsProc.EndDate = pa.indexer.App.TimestampFromBlock(int64(results.BlockHeight))
 	if err := pa.storage.AddProcess(jsProc); err != nil {
 		log.Errorf("cannot add json process: %v", err)
 		return
