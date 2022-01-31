@@ -178,7 +178,7 @@ func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
 		}
 
 	case *models.Tx_MintTokens:
-		address, amount, err := MintTokensTxCheck(vtx, txBytes, signature, app.State)
+		address, amount, err := MintTokensTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State)
 		if err != nil {
 			return []byte{}, fmt.Errorf("mintTokensTx: %w", err)
 		}
@@ -186,46 +186,46 @@ func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
 			if err := app.State.MintBalance(address, amount); err != nil {
 				return []byte{}, fmt.Errorf("mintTokensTx: %w", err)
 			}
-			return []byte{}, app.State.incrementTreasurerNonce()
+			return vtx.txID[:], app.State.incrementTreasurerNonce()
 		}
 
 	case *models.Tx_SetAccountDelegateTx:
-		accountAddr, delegate, err := SetAccountDelegateTxCheck(vtx, txBytes, signature, app.State)
+		accountAddr, delegate, err := SetAccountDelegateTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State)
 		if err != nil {
 			return []byte{}, fmt.Errorf("setAccountDelegateTx: %w", err)
 		}
 		if commit {
-			tx := vtx.GetSetAccountDelegateTx()
+			tx := vtx.tx.GetSetAccountDelegateTx()
 			switch tx.Txtype {
 			case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-				return []byte{}, app.State.SetDelegate(accountAddr, delegate, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
+				return vtx.txID[:], app.State.SetDelegate(accountAddr, delegate, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
 			case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-				return []byte{}, app.State.SetDelegate(accountAddr, delegate, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
+				return vtx.txID[:], app.State.SetDelegate(accountAddr, delegate, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
 			default:
 				return []byte{}, fmt.Errorf("unknown set account delegate tx type")
 			}
 		}
 
 	case *models.Tx_SendTokens:
-		txValues, err := SendTokensTxCheck(vtx, txBytes, signature, app.State)
+		txValues, err := SendTokensTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State)
 		if err != nil {
 			return []byte{}, fmt.Errorf("sendTokensTx: %w", err)
 		}
 		if commit {
 			if txValues != nil {
-				return []byte{}, app.State.TransferBalance(txValues.From, txValues.To, txValues.Value, uint64(txValues.Nonce))
+				return vtx.txID[:], app.State.TransferBalance(txValues.From, txValues.To, txValues.Value, uint64(txValues.Nonce))
 			}
 			return []byte{}, fmt.Errorf("sendTokensTx: tx data is invalid")
 		}
 
 	case *models.Tx_CollectFaucet:
-		from, err := CollectFaucetTxCheck(vtx, txBytes, signature, app.State)
+		from, err := CollectFaucetTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State)
 		if err != nil {
 			return []byte{}, fmt.Errorf("collectFaucetTx: %w", err)
 		}
 		if commit {
-			tx := vtx.GetCollectFaucet()
-			return []byte{}, app.State.CollectFaucet(
+			tx := vtx.tx.GetCollectFaucet()
+			return vtx.txID[:], app.State.CollectFaucet(
 				from,
 				common.BytesToAddress(tx.FaucetPackage.Payload.To),
 				tx.FaucetPackage.Payload.Amount,
@@ -233,15 +233,15 @@ func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
 			)
 		}
 	case *models.Tx_SetTransactionCosts:
-		cost, err := SetTransactionCostsTxCheck(vtx, txBytes, signature, app.State)
+		cost, err := SetTransactionCostsTxCheck(vtx.tx, vtx.signedBody, vtx.signature, app.State)
 		if err != nil {
 			return []byte{}, fmt.Errorf("setTransactionCostsTx: %w", err)
 		}
 		if commit {
-			if err := app.State.SetTxCost(vtx.GetSetTransactionCosts().Txtype, cost); err != nil {
+			if err := app.State.SetTxCost(vtx.tx.GetSetTransactionCosts().Txtype, cost); err != nil {
 				return []byte{}, fmt.Errorf("setTransactionCosts: %w", err)
 			}
-			return []byte{}, app.State.incrementTreasurerNonce()
+			return vtx.txID[:], app.State.incrementTreasurerNonce()
 		}
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
@@ -625,9 +625,13 @@ func SetTransactionCostsTxCheck(vtx *models.Tx, txBytes, signature []byte, state
 		return 0, fmt.Errorf("invalid value")
 	}
 	// get address from signature
-	sigAddress, err := ethereum.AddrFromSignature(txBytes, signature)
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	sigAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return 0, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
 	// get treasurer
 	treasurer, err := state.Treasurer(false)

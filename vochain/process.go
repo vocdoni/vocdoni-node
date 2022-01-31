@@ -445,7 +445,7 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx cost from state %w", err)
 	}
-	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature, cost)
+	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get account from signature %w", err)
 	}
@@ -538,7 +538,7 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	if err != nil {
 		return common.Address{}, fmt.Errorf("cannot get tx cost from state %w", err)
 	}
-	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature, cost)
+	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("cannot get account from signature %w", err)
 	}

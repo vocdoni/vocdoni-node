@@ -1068,7 +1068,7 @@ func (c *Client) CreateAccount(signer *ethereum.SignKeys, infoURI string, nonce 
 	if err != nil {
 		return err
 	}
-	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
 		return err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1102,7 +1102,7 @@ func (c *Client) SetAccountInfoURI(signer *ethereum.SignKeys, to common.Address,
 	if err != nil {
 		return err
 	}
-	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
 		return err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1181,7 +1181,7 @@ func (c *Client) SetAccountDelegate(signer *ethereum.SignKeys, delegate common.A
 	if err != nil {
 		return err
 	}
-	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
 		return err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1216,7 +1216,7 @@ func (c *Client) SendTokens(from *ethereum.SignKeys, to common.Address, value ui
 	if err != nil {
 		return err
 	}
-	if stx.Signature, err = from.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = from.SignVocdoniTx(stx.Tx); err != nil {
 		return err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1244,7 +1244,7 @@ func (c *Client) GenerateFaucetPackage(from *ethereum.SignKeys, to common.Addres
 	if err != nil {
 		return nil, err
 	}
-	payloadSignature, err := from.Sign(payloadBytes)
+	payloadSignature, err := from.SignEthereum(payloadBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -1270,7 +1270,7 @@ func (c *Client) CollectFaucet(signer *ethereum.SignKeys, fpkg *models.FaucetPac
 	if err != nil {
 		return err
 	}
-	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
 		return err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1304,7 +1304,7 @@ func (c *Client) MintTokens(treasurer *ethereum.SignKeys, to common.Address, amo
 	if err != nil {
 		return err
 	}
-	if stx.Signature, err = treasurer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = treasurer.SignVocdoniTx(stx.Tx); err != nil {
 		return err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1321,7 +1321,7 @@ func (c *Client) MintTokens(treasurer *ethereum.SignKeys, to common.Address, amo
 	return nil
 }
 
-func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
+func (c *Client) CreateProcess(signer *ethereum.SignKeys,
 	entityID, censusRoot []byte,
 	censusURI string,
 	pid []byte,
@@ -1371,7 +1371,7 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 	if err != nil {
 		return 0, err
 	}
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
 		return 0, err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {

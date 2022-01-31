@@ -287,13 +287,23 @@ func mkTreeVoteTest(host,
 	}
 	defer mainClient.Close()
 
+	chainId, err := mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+	oracleKey.VocdoniChainID = chainId
+	entityKey.VocdoniChainID = chainId
 	// create and top-up entity account
-	mainClient.CreateAccount(entityKey, "ipfs://", 0)
+	if err := mainClient.CreateAccount(entityKey, "ipfs://", 0); err != nil {
+		log.Fatal(err)
+	}
 	treasurer, err := mainClient.GetTreasurer(oracleKey)
 	if err != nil {
 		log.Fatal(err)
 	}
-	mainClient.MintTokens(oracleKey, entityKey.Address(), 10000, treasurer.Nonce)
+	if err := mainClient.MintTokens(oracleKey, entityKey.Address(), 10000, treasurer.Nonce); err != nil {
+		log.Fatal(err)
+	}
 	h, err := mainClient.GetCurrentBlock()
 	if err != nil {
 		log.Fatal("cannot get current height")
@@ -332,7 +342,7 @@ func mkTreeVoteTest(host,
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
 	start, err := mainClient.CreateProcess(
-		oracleKey,
+		entityKey,
 		entityKey.Address().Bytes(),
 		censusRoot,
 		censusURI,
@@ -393,12 +403,6 @@ func mkTreeVoteTest(host,
 		log.Infof("all gateways retrieved the census! let's start voting")
 	}
 
-	// Get chainID
-	chID, err := mainClient.GetChainID()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// Send votes
 	i := 0
 	p := len(censusKeys) / len(clients)
@@ -425,7 +429,7 @@ func mkTreeVoteTest(host,
 			copy(gwProofs, proofs[i:i+p])
 		}
 		for _, gws := range gwSigners {
-			gws.VocdoniChainID = chID
+			gws.VocdoniChainID = chainId
 		}
 		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl
@@ -558,6 +562,13 @@ func mkTreeAnonVoteTest(host,
 	}
 	defer mainClient.Close()
 
+	chainId, err := mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+	oracleKey.VocdoniChainID = chainId
+	entityKey.VocdoniChainID = chainId
+
 	// create and top-up entity account
 	mainClient.CreateAccount(entityKey, "ipfs://", 0)
 	treasurer, err := mainClient.GetTreasurer(oracleKey)
@@ -603,7 +614,7 @@ func mkTreeAnonVoteTest(host,
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
 	start, err := mainClient.CreateProcess(
-		oracleKey,
+		entityKey,
 		entityKey.Address().Bytes(),
 		censusRoot,
 		censusURI,
@@ -664,12 +675,6 @@ func mkTreeAnonVoteTest(host,
 		log.Infof("all gateways retrieved the census! let's start voting")
 	}
 
-	// Get chainID
-	chID, err := mainClient.GetChainID()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// Pre-register keys zkCensusKey
 	i := 0
 	p := len(censusKeys) / len(clients)
@@ -696,7 +701,7 @@ func mkTreeAnonVoteTest(host,
 			copy(gwProofs, proofs[i:i+p])
 		}
 		for _, gws := range gwSigners {
-			gws.VocdoniChainID = chID
+			gws.VocdoniChainID = chainId
 		}
 		log.Infof("%s will receive %d register keys", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl
@@ -780,7 +785,7 @@ func mkTreeAnonVoteTest(host,
 			copy(gwSigners, censusKeys[i:i+p])
 		}
 		for _, gws := range gwSigners {
-			gws.VocdoniChainID = chID
+			gws.VocdoniChainID = chainId
 		}
 		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl
@@ -896,6 +901,13 @@ func cspVoteTest(
 	}
 	defer mainClient.Close()
 
+	chainId, err := mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+	oracleKey.VocdoniChainID = chainId
+	entityKey.VocdoniChainID = chainId
+
 	// create and top-up entity account
 	mainClient.CreateAccount(entityKey, "ipfs://", 0)
 	treasurer, err := mainClient.GetTreasurer(oracleKey)
@@ -908,7 +920,7 @@ func cspVoteTest(
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
 	start, err := mainClient.CreateProcess(
-		oracleKey,
+		entityKey,
 		entityKey.Address().Bytes(),
 		cspKey.PublicKey(),
 		"https://dumycsp.foo",
@@ -949,12 +961,6 @@ func cspVoteTest(
 		clients = append(clients, cl)
 	}
 
-	// Get chainID
-	chID, err := mainClient.GetChainID()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// Send votes
 	i := 0
 	p := len(voters) / len(clients)
@@ -976,7 +982,7 @@ func cspVoteTest(
 			copy(gwSigners, voters[i:i+p])
 		}
 		for _, gws := range gwSigners {
-			gws.VocdoniChainID = chID
+			gws.VocdoniChainID = chainId
 		}
 		log.Infof("%s will receive %d votes", cl.Addr, len(gwSigners))
 		gw, cl := gw, cl
@@ -1053,6 +1059,11 @@ func testAllTransactions(
 	}
 	defer mainClient.Close()
 
+	chainId, err := mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// create and top-up main entity account
 	h, err := mainClient.GetCurrentBlock()
 	if err != nil {
@@ -1062,6 +1073,10 @@ func testAllTransactions(
 	if err := randomSigner.Generate(); err != nil {
 		log.Fatal(err)
 	}
+
+	oracleKey.VocdoniChainID = chainId
+	randomSigner.VocdoniChainID = chainId
+
 	mainClient.CreateAccount(randomSigner, "ipfs://", 0)
 	treasurer, err := mainClient.GetTreasurer(oracleKey)
 	if err != nil {
@@ -1074,6 +1089,7 @@ func testAllTransactions(
 	if err := newSigner.Generate(); err != nil {
 		log.Fatal(err)
 	}
+	newSigner.VocdoniChainID = chainId
 	err = mainClient.CreateAccount(newSigner, "ipfs://xyz", 0)
 	if err != nil {
 		log.Fatalf("cannot create account: %v", err)
@@ -1098,7 +1114,7 @@ func testAllTransactions(
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := mainClient.MintTokens(oracleKey, newSigner.Address(), 100, treasurer.Nonce); err != nil {
+	if err := mainClient.MintTokens(oracleKey, newSigner.Address(), 15000, treasurer.Nonce); err != nil {
 		log.Fatalf("cannot mint tokens: %v", err)
 	}
 	log.Infof("minted 15000 tokens to account %s", newSigner.Address().String())
@@ -1240,8 +1256,8 @@ func testAllTransactions(
 	if newSignerAccount.Nonce != 1 {
 		log.Fatalf("expected nonce %d for account %s, got %d", 1, newSigner.Address().String(), newSignerAccount.Nonce)
 	}
-	if newSignerAccount.Balance != 2090 {
-		log.Fatalf("expected balance %d for account %s, got %d", 2090, newSigner.Address().String(), newSignerAccount.Balance)
+	if newSignerAccount.Balance != 16990 {
+		log.Fatalf("expected balance %d for account %s, got %d", 16990, newSigner.Address().String(), newSignerAccount.Balance)
 	}
 
 	log.Info("all done!")

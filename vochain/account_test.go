@@ -173,7 +173,7 @@ func testMintTokensTx(t *testing.T,
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -324,7 +324,7 @@ func testSetDelegateTx(t *testing.T,
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -458,7 +458,7 @@ func testSendTokensTx(t *testing.T,
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -570,7 +570,7 @@ func testCollectFaucetTx(t *testing.T,
 	if err != nil {
 		t.Fatal(err)
 	}
-	faucetPayloadSignature, err := from.Sign(faucetPayloadBytes)
+	faucetPayloadSignature, err := from.SignEthereum(faucetPayloadBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -586,7 +586,7 @@ func testCollectFaucetTx(t *testing.T,
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = to.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = to.SignVocdoniTx(stx.Tx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -675,7 +675,7 @@ func testSetTransactionCostsTx(t *testing.T,
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = signer.Sign(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
 		t.Fatal(err)
 	}
 

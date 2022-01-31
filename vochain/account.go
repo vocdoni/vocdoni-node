@@ -215,17 +215,24 @@ func (v *State) GetAccount(address common.Address, isQuery bool) (*Account, erro
 }
 
 // AccountFromSignature extracts an address from a signed message and returns an account if exists
-func (v *State) AccountFromSignature(message, signature []byte, amount uint64) (common.Address, *Account, error) {
-	address, err := ethereum.AddrFromSignature(message, signature)
+func (v *State) AccountFromSignature(message, signature []byte) (common.Address, *Account, error) {
+	pubKey, err := ethereum.PubKeyFromSignature(message, signature)
 	if err != nil {
-		return address, nil, err
+		return common.Address{}, nil, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	address, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	if address == types.EthereumZeroAddressBytes {
+		return types.EthereumZeroAddressBytes, nil, fmt.Errorf("invalid address")
 	}
 	acc, err := v.GetAccount(address, false)
 	if err != nil {
-		return address, nil, fmt.Errorf("AccountFromSignature: %v", err)
+		return common.Address{}, nil, fmt.Errorf("cannot get account: %v", err)
 	}
 	if acc == nil {
-		return address, nil, ErrAccountNotFound
+		return common.Address{}, nil, ErrAccountNotFound
 	}
 	return address, acc, nil
 }
@@ -334,9 +341,13 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	if err != nil {
 		return nil, err
 	}
-	txSender, err := ethereum.AddrFromSignature(txBytes, signature)
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 	if err != nil {
-		return nil, fmt.Errorf("cannot extract address from signature %s", err)
+		return nil, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	txSender, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
 	infoURI := tx.GetInfoURI()
 	if infoURI == "" {
@@ -381,9 +392,13 @@ func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 		return common.Address{}, 0, fmt.Errorf("invalid value")
 	}
 	// get address from signature
-	sigAddress, err := ethereum.AddrFromSignature(txBytes, signature)
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 	if err != nil {
-		return common.Address{}, 0, err
+		return common.Address{}, 0, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	sigAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return common.Address{}, 0, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
 	// get treasurer
 	treasurer, err := state.Treasurer(false)
@@ -393,7 +408,7 @@ func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	// check signature recovered address
 	tAddr := common.BytesToAddress(treasurer.Address)
 	if tAddr != sigAddress {
-		return common.Address{}, 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", treasurer.String(), sigAddress.String())
+		return common.Address{}, 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", tAddr.String(), sigAddress.String())
 	}
 	// check nonce
 	if tx.Nonce != treasurer.Nonce {
@@ -416,7 +431,7 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
-	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature, cost)
+	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
@@ -492,9 +507,13 @@ func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 		return nil, fmt.Errorf("missing signature and/or transaction")
 	}
 	// get address from signature
-	sigAddress, err := ethereum.AddrFromSignature(txBytes, signature)
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	sigAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
 	// check from
 	txFromAddress := common.BytesToAddress(tx.From)
@@ -545,9 +564,13 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 		return common.Address{}, fmt.Errorf("missing signature and/or transaction")
 	}
 	// get recipient address from signature
-	recipientAddress, err := ethereum.AddrFromSignature(txBytes, signature)
+	recipientPubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 	if err != nil {
-		return common.Address{}, err
+		return common.Address{}, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	recipientAddress, err := ethereum.AddrFromPublicKey(recipientPubKey)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
 	// get issuer address from faucetPayload
 	faucetPkgPayload := tx.FaucetPackage.GetPayload()
