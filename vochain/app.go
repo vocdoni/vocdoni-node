@@ -235,6 +235,15 @@ func (app *BaseApplication) TimestampStartBlock() int64 {
 	return atomic.LoadInt64(&app.startBlockTimestamp)
 }
 
+// TimestampFromBlock returns the timestamp for a specific block height
+func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
+	blk := app.fnGetBlockByHeight(height)
+	if blk == nil {
+		return nil
+	}
+	return &blk.Time
+}
+
 // ChainID returns the Node ChainID
 func (app *BaseApplication) ChainID() string {
 	return app.chainId
