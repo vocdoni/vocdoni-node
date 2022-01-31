@@ -26,8 +26,11 @@ type ProcessArchive struct {
 }
 
 type Process struct {
+	ChainID     string                `json:"chainId,omitempty"`
 	ProcessInfo *indexertypes.Process `json:"process"`
 	Results     *indexertypes.Results `json:"results"`
+	StartDate   *time.Time            `json:"startDate,omitempty"`
+	EndDate     *time.Time            `json:"endDate,omitempty"`
 }
 
 type jsonStorage struct {
@@ -49,7 +52,7 @@ func (js *jsonStorage) AddProcess(p *Process) error {
 	if p == nil || p.ProcessInfo == nil || len(p.ProcessInfo.ID) != types.ProcessIDsize {
 		return fmt.Errorf("process not valid")
 	}
-	data, err := json.MarshalIndent(p, "", "\t")
+	data, err := json.MarshalIndent(p, " ", " ")
 	if err != nil {
 		return err
 	}
@@ -164,7 +167,14 @@ func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
 		if err != nil {
 			return err
 		}
-		if err := pa.storage.AddProcess(&Process{ProcessInfo: procInfo, Results: results}); err != nil {
+
+		if err := pa.storage.AddProcess(&Process{
+			ProcessInfo: procInfo,
+			Results:     results,
+			StartDate:   pa.indexer.App.TimestampFromBlock(int64(procInfo.StartBlock)),
+			EndDate:     pa.indexer.App.TimestampFromBlock(int64(procInfo.EndBlock)),
+			ChainID:     pa.indexer.App.ChainID(),
+		}); err != nil {
 			log.Warnf("processScan: %v", err)
 		}
 		added++
@@ -182,7 +192,13 @@ func (pa *ProcessArchive) OnComputeResults(results *indexertypes.Results,
 	jsProc, err := pa.storage.GetProcess(results.ProcessID)
 	if err != nil {
 		if os.IsNotExist(err) { // if it does not exist yet, we create it
-			jsProc = &Process{ProcessInfo: proc, Results: results}
+			jsProc = &Process{
+				ProcessInfo: proc,
+				Results:     results,
+				StartDate:   pa.indexer.App.TimestampFromBlock(int64(proc.StartBlock)),
+				EndDate:     pa.indexer.App.TimestampFromBlock(int64(height - 1)),
+				ChainID:     pa.indexer.App.ChainID(),
+			}
 		} else {
 			log.Errorf("cannot get json store process: %v", err)
 			return
