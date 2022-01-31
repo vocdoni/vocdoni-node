@@ -184,7 +184,7 @@ func Vochain(vs *VochainService) (
 			time.Sleep(time.Second * 1)
 			if i%20 == 0 {
 				log.Infof("[vochain info] fastsync running at height %d (%d blocks/s), peers %d",
-					vi.Height(), (vi.Height()-lastHeight)/20, vi.Peers())
+					vi.Height(), (vi.Height()-lastHeight)/20, vi.NPeers())
 				lastHeight = vi.Height()
 			}
 			i++
@@ -231,7 +231,7 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 		vc = vi.VoteCacheSize()
 		log.Infof("[vochain info] height:%d mempool:%d peers:%d "+
 			"processes:%d votes:%d vxm:%d voteCache:%d blockTime:{%s}",
-			h, m, vi.Peers(), p, v, vxm, vc, b.String(),
+			h, m, vi.NPeers(), p, v, vxm, vc, b.String(),
 		)
 		time.Sleep(time.Duration(sleepSecs) * time.Second)
 	}

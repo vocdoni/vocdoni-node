@@ -3,7 +3,7 @@ module go.vocdoni.io/dvote
 go 1.17
 
 // For testing purposes while dvote-protobuf becomes stable
-// replace go.vocdoni.io/proto => ../dvote-protobuf
+//replace go.vocdoni.io/proto => ../dvote-protobuf
 
 replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f
 
@@ -64,7 +64,7 @@ require (
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.uber.org/zap v1.19.1
-	go.vocdoni.io/proto v1.13.3-0.20211213155005-46b4177904ba
+	go.vocdoni.io/proto v1.13.3-0.20220130225849-48b5dc91da49
 	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
 	golang.org/x/net v0.0.0-20211208012354-db4efeb81f4b
 	google.golang.org/protobuf v1.27.1

@@ -210,12 +210,18 @@ func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 }
 
 func TestProcessSetResultsTransition(t *testing.T) {
+	var oracle, oracle2 ethereum.SignKeys
 	app := TestBaseApplication(t)
-	oracle := ethereum.SignKeys{}
 	if err := oracle.Generate(); err != nil {
 		t.Fatal(err)
 	}
+	if err := oracle2.Generate(); err != nil {
+		t.Fatal(err)
+	}
 	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.AddOracle(common.HexToAddress(oracle2.AddressString())); err != nil {
 		t.Fatal(err)
 	}
 
@@ -250,6 +256,7 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		EntityId:  process.EntityId,
 		Votes:     votes,
 	}
+	results.OracleAddress = oracle.Address().Bytes()
 
 	// Set results (should not work)
 	if err := testSetProcessResults(t, pid, &oracle, app, results); err == nil {
@@ -288,7 +295,23 @@ func TestProcessSetResultsTransition(t *testing.T) {
 
 	// Set results  (should not work)
 	if err := testSetProcessResults(t, pid, &oracle, app, results); err == nil {
-		t.Logf("adding results cannot be added twice")
+		t.Error("adding results cannot be added twice")
+	}
+
+	// the second Oracle should be able to set the results
+	results.OracleAddress = oracle2.Address().Bytes()
+	if err := testSetProcessResults(t, pid, &oracle2, app, results); err != nil {
+		t.Error("second oracle should be able to set results")
+	}
+
+	// a non oracle address should not be able to add results
+	nonOracle := ethereum.SignKeys{}
+	if err := nonOracle.Generate(); err != nil {
+		t.Fatal("cannot generate key")
+	}
+	results.OracleAddress = nonOracle.Address().Bytes()
+	if err := testSetProcessResults(t, pid, &oracle2, app, results); err == nil {
+		t.Error("a non oracle address should not be able to set results")
 	}
 }
 

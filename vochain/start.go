@@ -306,7 +306,7 @@ func newTendermint(app *BaseApplication,
 
 	// We need to fetch chain_id in order to make Replay work,
 	// since signatures depend on it.
-	log.Warnf("genesis file at %s", tconfig.GenesisFile())
+	log.Infof("genesis file at %s", tconfig.GenesisFile())
 	type genesisChainID struct {
 		ChainID string `json:"chain_id"`
 	}
