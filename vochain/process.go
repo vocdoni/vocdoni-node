@@ -254,17 +254,17 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 	return nil
 }
 
-// SetProcessResults sets the results for a given process. Only if the process status
-// allows and the format of the results allows to do so
-// TODO: allow result confirm with another Tx (in order to have N/M oracle signatures)
+// SetProcessResults sets the results for a given process
 func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, commit bool) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
 	}
 	// Check if the state transition is valid
-	// process must be ended or ready for setting the results
-	if process.Status != models.ProcessStatus_ENDED && process.Status != models.ProcessStatus_READY {
+	// process must be ended, ready or results for setting the results
+	if process.Status != models.ProcessStatus_ENDED &&
+		process.Status != models.ProcessStatus_READY &&
+		process.Status != models.ProcessStatus_RESULTS {
 		return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
 	}
 	if process.Status == models.ProcessStatus_READY &&
@@ -281,12 +281,34 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 			"invalid entity id on result provided, expected: %x got: %x",
 			process.EntityId, result.EntityId)
 	}
+	if result.OracleAddress == nil {
+		return fmt.Errorf("cannot set results, oracle address is nil")
+	}
 
 	if commit {
-		process.Results = result
+		// Warning: if we don't set a maximum block number on which results can be
+		// set by oracles, once oracles become third party contributed (by staking an
+		// amount of tokens), there will be a potential risk of overflow on the
+		// process.Results slice
+		if process.Results == nil {
+			n, err := v.Oracles(false)
+			if err != nil {
+				return fmt.Errorf("cannot set results: %w", err)
+			}
+			// use len*2 for security, a new oracle could be registered during
+			// the time window from the first results tx to the last one
+			process.Results = make([]*models.ProcessResult, len(n)*2)
+		}
+		// check the oracle has not already sent a results
+		for _, pr := range process.Results {
+			if bytes.Equal(pr.GetOracleAddress(), result.OracleAddress) {
+				return fmt.Errorf("results already set for this oracle address")
+			}
+		}
+		process.Results = append(process.Results, result)
 		process.Status = models.ProcessStatus_RESULTS
 		if err := v.updateProcess(process, process.ProcessId); err != nil {
-			return err
+			return fmt.Errorf("cannot set results: %w", err)
 		}
 		// Call event listeners
 		for _, l := range v.eventListeners {
@@ -305,10 +327,11 @@ func (v *State) GetProcessResults(pid []byte) ([][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if process.Results == nil {
-		return nil, fmt.Errorf("no results for process %x", pid)
+	if len(process.Results) > 0 {
+		// TO-DO (pau): return the whole list of oracle results
+		return GetFriendlyResults(process.Results[0].GetVotes()), nil
 	}
-	return GetFriendlyResults(process.Results.GetVotes()), nil
+	return nil, fmt.Errorf("no results for process %x", pid)
 }
 
 // SetProcessCensus sets the census for a given process, only if that process enables dynamic census
@@ -501,7 +524,11 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 		if !isOracle {
 			return fmt.Errorf("only oracles can execute set process results transaction")
 		}
-		return state.SetProcessResults(process.ProcessId, tx.GetResults(), false)
+		results := tx.GetResults()
+		if !bytes.Equal(results.OracleAddress, addr.Bytes()) {
+			return fmt.Errorf("cannot set results, oracle address provided in results does not match")
+		}
+		return state.SetProcessResults(process.ProcessId, results, false)
 	case models.TxType_SET_PROCESS_STATUS:
 		return state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
 	case models.TxType_SET_PROCESS_CENSUS:

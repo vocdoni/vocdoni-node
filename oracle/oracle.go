@@ -1,8 +1,10 @@
 package oracle
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
@@ -17,6 +19,14 @@ import (
 type Oracle struct {
 	VochainApp *vochain.BaseApplication
 	signer     *ethereum.SignKeys
+}
+
+type OracleResults struct {
+	ChainID       string         `json:"chainId"`
+	EntityID      types.HexBytes `json:"entityId"`
+	OracleAddress common.Address `json:"oracleAddress"`
+	ProcessID     types.HexBytes `json:"processId"`
+	Results       [][]string     `json:"results"`
 }
 
 func NewOracle(app *vochain.BaseApplication, signer *ethereum.SignKeys) (*Oracle, error) {
@@ -111,21 +121,16 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 		log.Errorf("error fetching process %x from the Vochain: %v", results.ProcessID, err)
 		return
 	}
+
+	// check process status
 	switch vocProcessData.Status {
-	case models.ProcessStatus_RESULTS:
-		// check vochain process results
-		if len(vocProcessData.Results.Votes) > 0 {
-			log.Infof("process %x results already added to the Vochain, skipping",
-				results.ProcessID)
-			return
-		}
 	case models.ProcessStatus_READY:
 		if o.VochainApp.Height() < vocProcessData.StartBlock+vocProcessData.BlockCount {
 			log.Warnf("process %x is in READY state and not yet finished, cannot publish results",
 				results.ProcessID)
 			return
 		}
-	case models.ProcessStatus_ENDED:
+	case models.ProcessStatus_ENDED, models.ProcessStatus_RESULTS:
 		break
 	default:
 		log.Infof("process %x: invalid status %s for setting the results, skipping",
@@ -142,6 +147,25 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 		Nonce:     util.RandomBytes(32),
 	}
 
+	// add the signature to the results and own address
+	setprocessTxArgs.Results.OracleAddress = o.signer.Address().Bytes()
+	signedResultsPayload := OracleResults{
+		ChainID:   o.VochainApp.ChainID(),
+		EntityID:  vocProcessData.EntityId,
+		ProcessID: results.ProcessID,
+		Results:   vochain.GetFriendlyResults(setprocessTxArgs.Results.GetVotes()),
+	}
+	resultsPayload, err := json.Marshal(signedResultsPayload)
+	if err != nil {
+		log.Warnf("cannot marshal signed results: %v", err)
+		return
+	}
+	setprocessTxArgs.Results.Signature, err = o.signer.SignEthereum(resultsPayload)
+	if err != nil {
+		log.Warnf("cannot sign results: %v", err)
+	}
+
+	// sign and send the transaction
 	stx := &models.SignedTx{}
 	if stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetProcess{

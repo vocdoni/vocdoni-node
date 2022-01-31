@@ -136,8 +136,8 @@ func (vi *VochainInfo) NetInfo() (*coretypes.ResultNetInfo, error) {
 	return nil, fmt.Errorf("vochain node not ready")
 }
 
-// Peers returns the whole list of peers, including ID and URL
-func (vi *VochainInfo) Peers() int {
+// NPeers returns the whole list of peers, including ID and URL
+func (vi *VochainInfo) NPeers() int {
 	ni, err := vi.NetInfo()
 	if err != nil || ni == nil {
 		return 0
