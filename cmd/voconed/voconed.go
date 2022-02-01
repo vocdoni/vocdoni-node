@@ -16,9 +16,9 @@ import (
 
 // VoconeConfig contains the basic configuration for the voconed
 type VoconeConfig struct {
-	logLevel, dir, oracle, path, lottery string
-	port, blockSeconds, blockSize        int
-	txCosts                              uint64
+	logLevel, dir, oracle, path, lottery, treasurer string
+	port, blockSeconds, blockSize                   int
+	txCosts                                         uint64
 }
 
 func main() {
@@ -29,6 +29,7 @@ func main() {
 	}
 	flag.StringVar(&config.dir, "dir", filepath.Join(home, ".voconed"), "storage data directory")
 	flag.StringVar(&config.oracle, "oracle", "", "oracle private hexadecimal key")
+	flag.StringVar(&config.treasurer, "treasurer", "", "treasurer public address")
 	flag.StringVar(&config.logLevel, "logLevel", "info", "log level (info, debug, warn, error)")
 	flag.IntVar(&config.port, "port", 9095, "network port for the HTTP API")
 	flag.StringVar(&config.path, "urlPath", "/dvote", "HTTP path for the API rest")
@@ -103,6 +104,14 @@ func main() {
 	vc, err := vocone.NewVocone(config.dir, &oracle)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if len(config.treasurer) > 0 {
+		log.Info("setting treasurer ", config.treasurer)
+		err = vc.SetTreasurer(common.HexToAddress(config.treasurer))
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if len(config.lottery) > 0 {

@@ -206,6 +206,15 @@ func (vc *Vocone) SetLottery(winner common.Address) error {
 	return err
 }
 
+func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
+	err := vc.app.State.SetTreasurer(treasurer)
+	if err != nil {
+		return err
+	}
+	_, err = vc.app.State.Save()
+	return err
+}
+
 func (vc *Vocone) SetBulkTxCosts(txCosts uint64) error {
 	for k, _ := range vochain.TxTypeCostToStateKey {
 		log.Debugf("setting tx cost for txtype %s", models.TxType_name[int32(k)])
