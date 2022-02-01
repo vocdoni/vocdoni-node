@@ -325,60 +325,92 @@ func (v *State) CreateAccount(accountAddress common.Address, infoURI string, del
 // SetAccountInfoTxCheck is an abstraction of ABCI checkTx for an SetAccountInfoTx transaction
 // If the bool returned is true means that the account does not exist and is going to be created
 func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (*setAccountInfoTxCheckValues, error) {
+	returnValues := &setAccountInfoTxCheckValues{}
 	tx := vtx.GetSetAccountInfo()
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {
 		return nil, fmt.Errorf("missing signature and/or transaction")
 	}
-	accountAddressBytes := tx.GetAccount()
-	if accountAddressBytes == nil || len(accountAddressBytes) != types.EntityIDsize {
-		return nil, fmt.Errorf("invalid account")
-	}
-	if bytes.Equal(accountAddressBytes, types.EthereumZeroAddressBytes[:]) {
-		return nil, fmt.Errorf("invalid account")
-	}
-	cost, err := state.TxCost(models.TxType_SET_ACCOUNT_INFO, false)
-	if err != nil {
-		return nil, err
-	}
-	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
-	if err != nil {
-		return nil, fmt.Errorf("cannot extract public key from signature: %w", err)
-	}
-	txSender, err := ethereum.AddrFromPublicKey(pubKey)
-	if err != nil {
-		return nil, fmt.Errorf("cannot extract address from public key: %w", err)
-	}
+	// check infoURI
 	infoURI := tx.GetInfoURI()
 	if infoURI == "" {
 		return nil, fmt.Errorf("invalid URI, cannot be empty")
 	}
-	accountAddress := common.BytesToAddress(accountAddressBytes)
-	// check account, if not exists a new one will be created
-	acc, err := state.GetAccount(accountAddress, false)
+	// get tx cost
+	cost, err := state.TxCost(models.TxType_SET_ACCOUNT_INFO, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot check if account %s exists: %v", accountAddress.String(), err)
+		return nil, err
+	}
+	// recover txSender address from signature
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
+	if err != nil {
+		return nil, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	returnValues.TxSender, err = ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	// get txSender account
+	txSender, err := state.GetAccount(returnValues.TxSender, false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot check if account %s exists: %v", returnValues.TxSender.String(), err)
+	}
+	// get tx.Account, if not valid set to txSender address
+	accountAddressBytes := tx.GetAccount()
+	returnValues.Account = common.BytesToAddress(accountAddressBytes)
+	if accountAddressBytes == nil ||
+		len(accountAddressBytes) != types.EntityIDsize ||
+		bytes.Equal(accountAddressBytes, types.EthereumZeroAddressBytes[:]) ||
+		returnValues.TxSender == returnValues.Account {
+		// txSender == tx.Account
+		// if not exist create new one
+		if txSender == nil {
+			returnValues.Create = true
+			return returnValues, nil
+		}
+		// if exists change txSender infoURI
+		// check txSender nonce
+		if tx.Nonce != txSender.Nonce {
+			return nil, fmt.Errorf("invalid nonce, expected %d got %d", txSender.Nonce, tx.Nonce)
+		}
+		// check txSender balance
+		if txSender.Balance < cost {
+			return nil, fmt.Errorf("unauthorized: %s", ErrNotEnoughBalance)
+		}
+		// check not the same infoURI
+		if txSender.InfoURI == infoURI {
+			return nil, fmt.Errorf("same infoURI: %s", infoURI)
+		}
+		return returnValues, nil
+	}
+	// txSender != tx.Account
+
+	// if tx sender does not exist and the account to change is not the same return error
+	// tx sender must have an account created in order to change accounts for whom is a delegate
+	if txSender == nil {
+		return nil, fmt.Errorf("tx sender account does not exist")
+	}
+	// check tx.Account exists
+	acc, err := state.GetAccount(returnValues.Account, false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot check if account %s exists: %v", returnValues.Account.String(), err)
 	}
 	if acc == nil {
-		return &setAccountInfoTxCheckValues{Account: accountAddress, TxSender: accountAddress, Create: true}, nil
+		return nil, fmt.Errorf("tx.Account account does not exist")
 	}
-	txSenderAccount, err := state.GetAccount(txSender, false)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get nonce of tx sender: %v", err)
+	// check txSender nonce
+	if tx.Nonce != txSender.Nonce {
+		return nil, fmt.Errorf("invalid nonce, expected %d got %d", txSender.Nonce, tx.Nonce)
 	}
-	if txSenderAccount == nil {
-		return nil, ErrAccountNotFound
-	}
-	if tx.Nonce != txSenderAccount.Nonce {
-		return nil, fmt.Errorf("invalid nonce, expected %d got %d", txSenderAccount.Nonce, tx.Nonce)
-	}
-	if txSenderAccount.Balance < cost {
+	// check txSender balance
+	if txSender.Balance < cost {
 		return nil, fmt.Errorf("unauthorized: %s", ErrNotEnoughBalance)
 	}
+	// check not the same infoURI
 	if acc.InfoURI == infoURI {
 		return nil, fmt.Errorf("same infoURI: %s", infoURI)
 	}
-	return &setAccountInfoTxCheckValues{Account: accountAddress, TxSender: txSender}, nil
+	return returnValues, nil
 }
 
 func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, uint64, error) {
