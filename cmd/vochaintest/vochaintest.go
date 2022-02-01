@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	flag "github.com/spf13/pflag"
 
 	"go.vocdoni.io/dvote/client"
@@ -1065,26 +1066,68 @@ func testAllTransactions(
 	}
 
 	// create and top-up main entity account
-	h, err := mainClient.GetCurrentBlock()
-	if err != nil {
-		log.Fatal("cannot get current height")
-	}
-	randomSigner := &ethereum.SignKeys{}
-	if err := randomSigner.Generate(); err != nil {
+	mainSigner := &ethereum.SignKeys{}
+	if err := mainSigner.Generate(); err != nil {
 		log.Fatal(err)
 	}
 
 	oracleKey.VocdoniChainID = chainId
-	randomSigner.VocdoniChainID = chainId
+	mainSigner.VocdoniChainID = chainId
 
-	mainClient.CreateAccount(randomSigner, "ipfs://", 0)
+	if err := mainClient.CreateAccount(mainSigner, "ipfs://", 0); err != nil {
+		log.Fatal(err)
+	}
 	treasurer, err := mainClient.GetTreasurer(oracleKey)
 	if err != nil {
 		log.Fatal(err)
 	}
-	mainClient.MintTokens(oracleKey, randomSigner.Address(), 10000, treasurer.Nonce)
+	if err := mainClient.MintTokens(oracleKey, mainSigner.Address(), 10000, treasurer.Nonce); err != nil {
+		log.Fatal(err)
+	}
+	log.Info("waiting for new block ...")
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
 
-	// create new account
+	mainSignerAccount, err := mainClient.GetAccount(mainSigner, mainSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if mainSignerAccount.Balance != 10000 {
+		log.Fatalf("account %s expected balance %d got %d", mainSigner.Address(), 10000, mainSignerAccount.Balance)
+	}
+	log.Infof("minted 10000 tokens to account %s", mainSigner.Address().String())
+
+	log.Info("waiting for new block ...")
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+
+	// create and top-up new account
 	newSigner := &ethereum.SignKeys{}
 	if err := newSigner.Generate(); err != nil {
 		log.Fatal(err)
@@ -1095,21 +1138,6 @@ func testAllTransactions(
 		log.Fatalf("cannot create account: %v", err)
 	}
 	log.Infof("account %s created successfully", newSigner.Address().String())
-
-	log.Infof("waiting for new block ...")
-	for {
-		time.Sleep(time.Millisecond * 500)
-		if h2, err := mainClient.GetCurrentBlock(); err != nil {
-			log.Warnf("error getting current height: %v", err)
-			continue
-		} else {
-			if h2 > h {
-				break
-			}
-		}
-	}
-
-	// treasurer can mint tokens
 	treasurer, err = mainClient.GetTreasurer(oracleKey)
 	if err != nil {
 		log.Fatal(err)
@@ -1117,19 +1145,8 @@ func testAllTransactions(
 	if err := mainClient.MintTokens(oracleKey, newSigner.Address(), 15000, treasurer.Nonce); err != nil {
 		log.Fatalf("cannot mint tokens: %v", err)
 	}
-	log.Infof("minted 15000 tokens to account %s", newSigner.Address().String())
 
-	// change account info
-	randomSignerAccount, err := mainClient.GetAccount(randomSigner, randomSigner.Address())
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := mainClient.CreateAccount(randomSigner, "ipfs://xyz", randomSignerAccount.Nonce); err != nil {
-		log.Fatalf("cannot change account info: %v", err)
-	}
-	log.Infof("account infoURI changed to %s", "ipfs://xyz")
-
-	log.Infof("waiting for new block ...")
+	log.Info("waiting for new block ...")
 	h, err = mainClient.GetCurrentBlock()
 	if err != nil {
 		log.Fatal("cannot get current height")
@@ -1145,54 +1162,129 @@ func testAllTransactions(
 			}
 		}
 	}
-
-	// add delegate
-	randomSignerAccount, err = mainClient.GetAccount(randomSigner, randomSigner.Address())
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := mainClient.SetAccountDelegate(randomSigner, newSigner.Address(), randomSignerAccount.Nonce, false); err != nil {
-		log.Fatalf("cannot add account delegate: %v", err)
-	}
-	log.Infof("added delegate %s for account %s", newSigner.Address().String(), randomSigner.Address().String())
-
-	// added delegate can change account info
 	newSignerAccount, err := mainClient.GetAccount(newSigner, newSigner.Address())
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := mainClient.SetAccountInfoURI(newSigner, randomSigner.Address(), "ipfs://zyx", newSignerAccount.Nonce); err != nil {
+	if newSignerAccount.Balance != 15000 {
+		log.Fatal("account %s expected balance %d got %d", newSigner.Address(), 15000, newSignerAccount.Balance)
+	}
+	log.Infof("minted 15000 tokens to account %s", newSigner.Address().String())
+
+	log.Infof("waiting for new block ...")
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+
+	// change account info
+	mainSignerAccount, err = mainClient.GetAccount(mainSigner, mainSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mainClient.CreateAccount(mainSigner, "ipfs://xyz", mainSignerAccount.Nonce); err != nil {
 		log.Fatalf("cannot change account info: %v", err)
+	}
+
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	mainSignerAccount, err = mainClient.GetAccount(mainSigner, mainSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if mainSignerAccount.InfoURI != "ipfs://xyz" {
+		log.Fatalf("account %s expected infoURI %s got %s", mainSigner.Address(), "ipfs://xyz", mainSignerAccount.InfoURI)
+	}
+	log.Infof("account infoURI changed to %s", "ipfs://xyz")
+
+	// add delegate
+	if err := mainClient.SetAccountDelegate(mainSigner, newSigner.Address(), mainSignerAccount.Nonce, false); err != nil {
+		log.Fatalf("cannot add account delegate: %v", err)
+	}
+	log.Infof("waiting for new block ...")
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	mainSignerAccount, err = mainClient.GetAccount(mainSigner, mainSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if common.BytesToAddress(mainSignerAccount.DelegateAddrs[0]) != newSigner.Address() {
+		log.Fatalf("account %s expected delegates %s got %s", mainSigner.Address(), newSigner.Address(), common.BytesToAddress(mainSignerAccount.DelegateAddrs[0]))
+	}
+	log.Infof("added delegate %s for account %s", newSigner.Address().String(), mainSigner.Address().String())
+	// added delegate can change account info
+	newSignerAccount, err = mainClient.GetAccount(newSigner, newSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mainClient.SetAccountInfoURI(newSigner, mainSigner.Address(), "ipfs://zyx", newSignerAccount.Nonce); err != nil {
+		log.Fatalf("cannot change account info: %v", err)
+	}
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	mainSignerAccount, err = mainClient.GetAccount(mainSigner, mainSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if mainSignerAccount.InfoURI != "ipfs://zyx" {
+		log.Fatalf("account %s expected infoURI %s got %s", mainSigner.Address(), "ipfs://zyx", mainSignerAccount.InfoURI)
 	}
 	log.Infof("account infoURI changed to %s", "ipfs://zyx")
 
 	// delete delegate
-	log.Infof("waiting for new block ...")
-	h, err = mainClient.GetCurrentBlock()
-	if err != nil {
-		log.Fatal("cannot get current height")
-	}
-	for {
-		time.Sleep(time.Millisecond * 500)
-		if h2, err := mainClient.GetCurrentBlock(); err != nil {
-			log.Warnf("error getting current height: %v", err)
-			continue
-		} else {
-			if h2 > h {
-				break
-			}
-		}
-	}
-	randomSignerAccount, err = mainClient.GetAccount(randomSigner, randomSigner.Address())
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := mainClient.SetAccountDelegate(randomSigner, newSigner.Address(), randomSignerAccount.Nonce, true); err != nil {
+	if err := mainClient.SetAccountDelegate(mainSigner, newSigner.Address(), mainSignerAccount.Nonce, true); err != nil {
 		log.Fatalf("cannot delete account delegate: %v", err)
 	}
-	log.Infof("deleted delegate %s for account %s", newSigner.Address().String(), randomSigner.Address().String())
-
-	// send tokens to the newly created account
 	log.Infof("waiting for new block ...")
 	h, err = mainClient.GetCurrentBlock()
 	if err != nil {
@@ -1209,17 +1301,43 @@ func testAllTransactions(
 			}
 		}
 	}
-	randomSignerAccount, err = mainClient.GetAccount(randomSigner, randomSigner.Address())
+	mainSignerAccount, err = mainClient.GetAccount(mainSigner, mainSigner.Address())
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := mainClient.SendTokens(randomSigner, newSigner.Address(), 1714, randomSignerAccount.Nonce); err != nil {
-		log.Fatalf("cannot send tokens from %s to %s", randomSigner.Address().String(), newSigner.Address().String())
+	if len(mainSignerAccount.DelegateAddrs) != 0 {
+		log.Fatalf("account %s expected to not have delegates got %s", mainSigner.Address(), common.BytesToAddress(mainSignerAccount.DelegateAddrs[0]))
 	}
-	log.Infof("sent %d tokens from %s to %s", 1500, randomSigner.Address().String(), newSigner.Address().String())
+	log.Infof("deleted delegate %s for account %s", newSigner.Address().String(), mainSigner.Address().String())
+
+	// send tokens to the newly created account
+	mainSignerAccount, err = mainClient.GetAccount(mainSigner, mainSigner.Address())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := mainClient.SendTokens(mainSigner, newSigner.Address(), 1714, mainSignerAccount.Nonce); err != nil {
+		log.Fatalf("cannot send tokens from %s to %s", mainSigner.Address().String(), newSigner.Address().String())
+	}
+	log.Infof("waiting for new block ...")
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		log.Fatal("cannot get current height")
+	}
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	log.Infof("sent %d tokens from %s to %s", 1500, mainSigner.Address().String(), newSigner.Address().String())
 
 	// receive tokens using a faucet payload
-	faucetPkg, err := mainClient.GenerateFaucetPackage(randomSigner, newSigner.Address(), 286)
+	faucetPkg, err := mainClient.GenerateFaucetPackage(mainSigner, newSigner.Address(), 286)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1230,7 +1348,6 @@ func testAllTransactions(
 	if err := mainClient.CollectFaucet(newSigner, faucetPkg, newSignerAccount.Nonce); err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("%s claimed %d tokens from %s", newSigner.Address().String(), 500, randomSigner.Address().String())
 
 	h, err = mainClient.GetCurrentBlock()
 	if err != nil {
@@ -1247,7 +1364,6 @@ func testAllTransactions(
 			}
 		}
 	}
-
 	// check expected data
 	newSignerAccount, err = mainClient.GetAccount(newSigner, newSigner.Address())
 	if err != nil {
@@ -1259,6 +1375,7 @@ func testAllTransactions(
 	if newSignerAccount.Balance != 16990 {
 		log.Fatalf("expected balance %d for account %s, got %d", 16990, newSigner.Address().String(), newSignerAccount.Balance)
 	}
+	log.Infof("%s claimed %d tokens from %s", newSigner.Address().String(), 500, mainSigner.Address().String())
 
 	log.Info("all done!")
 }

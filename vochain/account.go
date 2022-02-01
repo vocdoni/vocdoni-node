@@ -306,9 +306,9 @@ func (v *State) CreateAccount(accountAddress common.Address, infoURI string, del
 	newAccount.InfoURI = infoURI
 	if len(delegates) > 0 {
 		newAccount.DelegateAddrs = make([][]byte, len(delegates))
-		for i := 0; i < len(delegates); i++ {
-			if delegates[i].String() != types.EthereumZeroAddressString {
-				newAccount.DelegateAddrs = append(newAccount.DelegateAddrs, delegates[i].Bytes())
+		for _, v := range delegates {
+			if v.String() != types.EthereumZeroAddressString {
+				newAccount.DelegateAddrs = append(newAccount.DelegateAddrs, v.Bytes())
 			}
 		}
 	}

@@ -1138,6 +1138,11 @@ func (c *Client) GetAccount(signer *ethereum.SignKeys, accountAddr common.Addres
 	if resp.InfoURI != "" {
 		acc.InfoURI = resp.InfoURI
 	}
+	if len(resp.Delegates) > 0 {
+		for _, v := range resp.Delegates {
+			acc.DelegateAddrs = append(acc.DelegateAddrs, common.HexToAddress(v).Bytes())
+		}
+	}
 	return acc, nil
 }
 

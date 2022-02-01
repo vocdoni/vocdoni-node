@@ -19,7 +19,7 @@ const (
 
 var (
 	ErrVoteDoesNotExist    = fmt.Errorf("vote does not exist")
-	ErrNotEnoughBalance    = fmt.Errorf("not enough balance to transfer")
+	ErrNotEnoughBalance    = fmt.Errorf("not enough balance")
 	ErrAccountNonceInvalid = fmt.Errorf("invalid account nonce")
 	ErrProcessNotFound     = fmt.Errorf("process not found")
 	ErrBalanceOverflow     = fmt.Errorf("balance overflow")

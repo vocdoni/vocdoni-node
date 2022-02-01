@@ -31,11 +31,11 @@ func (r *RPCAPI) getAccount(request *api.APIrequest) (*api.APIresponse, error) {
 	response.Nonce = new(uint32)
 	*response.Nonce = acc.Nonce
 	response.InfoURI = acc.InfoURI
-	delegates := make([]string, len(acc.DelegateAddrs))
-	for i := 0; i < len(acc.DelegateAddrs); i++ {
-		delegates = append(delegates, common.BytesToAddress(acc.DelegateAddrs[i]).String())
+	if len(acc.DelegateAddrs) > 0 {
+		for _, v := range acc.DelegateAddrs {
+			response.Delegates = append(response.Delegates, common.BytesToAddress(v).String())
+		}
 	}
-	response.Delegates = delegates
 	return &response, nil
 }
 
