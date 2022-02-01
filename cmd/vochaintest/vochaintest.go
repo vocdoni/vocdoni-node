@@ -171,7 +171,7 @@ func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath s
 		weights = append(weights, new(types.BigInt).SetUint64(withWeight))
 	}
 
-	root, uri, err := cl.CreateCensus(signer, keys, nil, weights)
+	root, uri, err := cl.TestCreateCensus(signer, keys, nil, weights)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 		keys = append(keys, pubk)
 		i++
 	}
-	root, uri, err := cl.CreateCensus(signer, nil, keys, nil)
+	root, uri, err := cl.TestCreateCensus(signer, nil, keys, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -295,7 +295,7 @@ func mkTreeVoteTest(host,
 	oracleKey.VocdoniChainID = chainId
 	entityKey.VocdoniChainID = chainId
 	// create and top-up entity account
-	if err := mainClient.CreateAccount(entityKey, "ipfs://", 0); err != nil {
+	if err := mainClient.CreateOrSetAccount(entityKey, common.Address{}, "ipfs://", 0); err != nil {
 		log.Fatal(err)
 	}
 	treasurer, err := mainClient.GetTreasurer(oracleKey)
@@ -321,7 +321,7 @@ func mkTreeVoteTest(host,
 		}
 	}
 	// create and top-up oracle
-	mainClient.CreateAccount(oracleKey, "ipfs://", 0)
+	mainClient.CreateOrSetAccount(oracleKey, common.Address{}, "ipfs://", 0)
 	mainClient.MintTokens(oracleKey, oracleKey.Address(), 10000, treasurer.Nonce+1)
 	h, err = mainClient.GetCurrentBlock()
 	if err != nil {
@@ -342,7 +342,7 @@ func mkTreeVoteTest(host,
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := mainClient.CreateProcess(
+	start, err := mainClient.TestCreateProcess(
 		entityKey,
 		entityKey.Address().Bytes(),
 		censusRoot,
@@ -571,7 +571,7 @@ func mkTreeAnonVoteTest(host,
 	entityKey.VocdoniChainID = chainId
 
 	// create and top-up entity account
-	mainClient.CreateAccount(entityKey, "ipfs://", 0)
+	mainClient.CreateOrSetAccount(entityKey, common.Address{}, "ipfs://", 0)
 	treasurer, err := mainClient.GetTreasurer(oracleKey)
 	if err != nil {
 		log.Fatal(err)
@@ -593,7 +593,7 @@ func mkTreeAnonVoteTest(host,
 		}
 	}
 	// create and top-up oracle
-	mainClient.CreateAccount(oracleKey, "ipfs://", 0)
+	mainClient.CreateOrSetAccount(oracleKey, common.Address{}, "ipfs://", 0)
 	mainClient.MintTokens(oracleKey, oracleKey.Address(), 10000, treasurer.Nonce+1)
 	h, err = mainClient.GetCurrentBlock()
 	if err != nil {
@@ -614,7 +614,7 @@ func mkTreeAnonVoteTest(host,
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := mainClient.CreateProcess(
+	start, err := mainClient.TestCreateProcess(
 		entityKey,
 		entityKey.Address().Bytes(),
 		censusRoot,
@@ -910,7 +910,7 @@ func cspVoteTest(
 	entityKey.VocdoniChainID = chainId
 
 	// create and top-up entity account
-	mainClient.CreateAccount(entityKey, "ipfs://", 0)
+	mainClient.CreateOrSetAccount(entityKey, common.Address{}, "ipfs://", 0)
 	treasurer, err := mainClient.GetTreasurer(oracleKey)
 	if err != nil {
 		log.Fatal(err)
@@ -920,7 +920,7 @@ func cspVoteTest(
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := mainClient.CreateProcess(
+	start, err := mainClient.TestCreateProcess(
 		entityKey,
 		entityKey.Address().Bytes(),
 		cspKey.PublicKey(),
@@ -1074,7 +1074,7 @@ func testAllTransactions(
 	oracleKey.VocdoniChainID = chainId
 	mainSigner.VocdoniChainID = chainId
 
-	if err := mainClient.CreateAccount(mainSigner, "ipfs://", 0); err != nil {
+	if err := mainClient.CreateOrSetAccount(mainSigner, common.Address{}, "ipfs://", 0); err != nil {
 		log.Fatal(err)
 	}
 	treasurer, err := mainClient.GetTreasurer(oracleKey)
@@ -1133,7 +1133,7 @@ func testAllTransactions(
 		log.Fatal(err)
 	}
 	newSigner.VocdoniChainID = chainId
-	err = mainClient.CreateAccount(newSigner, "ipfs://xyz", 0)
+	err = mainClient.CreateOrSetAccount(newSigner, common.Address{}, "ipfs://xyz", 0)
 	if err != nil {
 		log.Fatalf("cannot create account: %v", err)
 	}
@@ -1193,7 +1193,7 @@ func testAllTransactions(
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := mainClient.CreateAccount(mainSigner, "ipfs://xyz", mainSignerAccount.Nonce); err != nil {
+	if err := mainClient.CreateOrSetAccount(mainSigner, common.Address{}, "ipfs://xyz", mainSignerAccount.Nonce); err != nil {
 		log.Fatalf("cannot change account info: %v", err)
 	}
 
@@ -1254,7 +1254,7 @@ func testAllTransactions(
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := mainClient.SetAccountInfoURI(newSigner, mainSigner.Address(), "ipfs://zyx", newSignerAccount.Nonce); err != nil {
+	if err := mainClient.CreateOrSetAccount(newSigner, mainSigner.Address(), "ipfs://zyx", newSignerAccount.Nonce); err != nil {
 		log.Fatalf("cannot change account info: %v", err)
 	}
 	h, err = mainClient.GetCurrentBlock()

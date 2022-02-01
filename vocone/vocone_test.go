@@ -73,7 +73,7 @@ func testCSPvote(oracle *ethereum.SignKeys, url string) error {
 	censusOrigin := models.CensusOrigin_OFF_CHAIN_CA
 	duration := 100
 	censusSize := 10
-	startBlock, err := cli.CreateProcess(
+	startBlock, err := cli.TestCreateProcess(
 		oracle,
 		entityID,
 		censusRoot,
