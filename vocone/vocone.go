@@ -36,6 +36,7 @@ import (
 const (
 	DefaultTxsPerBlock     = 500
 	DefaultBlockTimeTarget = time.Second * 5
+	DefaultTxCosts         = 10
 	mempoolSize            = 100 << 10
 )
 

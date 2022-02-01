@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -15,8 +16,9 @@ import (
 
 // VoconeConfig contains the basic configuration for the voconed
 type VoconeConfig struct {
-	logLevel, dir, oracle, path   string
-	port, blockSeconds, blockSize int
+	logLevel, dir, oracle, path, treasurer string
+	port, blockSeconds, blockSize          int
+	txCosts                                uint64
 }
 
 func main() {
@@ -27,11 +29,13 @@ func main() {
 	}
 	flag.StringVar(&config.dir, "dir", filepath.Join(home, ".voconed"), "storage data directory")
 	flag.StringVar(&config.oracle, "oracle", "", "oracle private hexadecimal key")
+	flag.StringVar(&config.treasurer, "treasurer", "", "treasurer public address")
 	flag.StringVar(&config.logLevel, "logLevel", "info", "log level (info, debug, warn, error)")
 	flag.IntVar(&config.port, "port", 9095, "network port for the HTTP API")
 	flag.StringVar(&config.path, "urlPath", "/dvote", "HTTP path for the API rest")
 	flag.IntVar(&config.blockSeconds, "blockPeriod", int(vocone.DefaultBlockTimeTarget.Seconds()), "block time target in seconds")
 	flag.IntVar(&config.blockSize, "blockSize", int(vocone.DefaultTxsPerBlock), "max number of transactions per block")
+	flag.Uint64Var(&config.txCosts, "txCosts", vocone.DefaultTxCosts, "transaction cost for every transaction type")
 	flag.CommandLine.SortFlags = false
 	flag.Parse()
 
@@ -57,6 +61,8 @@ func main() {
 	config.blockSeconds = viper.GetInt("blockPeriod")
 	viper.BindPFlag("blockSize", flag.Lookup("blockSize"))
 	config.blockSize = viper.GetInt("blockSize")
+	viper.BindPFlag("txCosts", flag.Lookup("txCosts"))
+	config.txCosts = viper.GetUint64("txCosts")
 
 	viper.AddConfigPath(config.dir)
 
@@ -94,6 +100,18 @@ func main() {
 
 	vc, err := vocone.NewVocone(config.dir, &oracle)
 	if err != nil {
+		log.Fatal(err)
+	}
+
+	if len(config.treasurer) > 0 {
+		log.Infof("setting treasurer %s", config.treasurer)
+		if err := vc.SetTreasurer(common.HexToAddress(config.treasurer)); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	log.Infof("setting tx costs to %d", config.txCosts)
+	if err := vc.SetBulkTxCosts(config.txCosts); err != nil {
 		log.Fatal(err)
 	}
 
