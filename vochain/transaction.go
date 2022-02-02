@@ -172,7 +172,22 @@ func (app *BaseApplication) AddTx(vtx *vochainTx, commit bool) ([]byte, error) {
 		}
 		if commit {
 			if txValues.Create {
-				return vtx.txID[:], app.State.CreateAccount(txValues.TxSender, vtx.tx.GetSetAccountInfo().GetInfoURI(), make([]common.Address, 0), 0)
+				if txValues.FaucetPayloadSigner == types.EthereumZeroAddressBytes {
+					return vtx.txID[:], app.State.CreateAccount(txValues.TxSender,
+						vtx.tx.GetSetAccountInfo().GetInfoURI(),
+						make([]common.Address, 0),
+						0,
+						common.Address{},
+						0,
+					)
+				}
+				return vtx.txID[:], app.State.CreateAccount(txValues.TxSender,
+					vtx.tx.GetSetAccountInfo().GetInfoURI(),
+					make([]common.Address, 0),
+					txValues.FaucetPayload.Amount,
+					txValues.FaucetPayloadSigner,
+					txValues.FaucetPayload.Identifier,
+				)
 			}
 			return vtx.txID[:], app.State.SetAccountInfoURI(txValues.Account, txValues.TxSender, vtx.tx.GetSetAccountInfo().GetInfoURI())
 		}

@@ -45,8 +45,9 @@ type sendTokensTxCheckValues struct {
 }
 
 type setAccountInfoTxCheckValues struct {
-	Account, TxSender common.Address
-	Create            bool
+	Account, TxSender, FaucetPayloadSigner common.Address
+	FaucetPayload                          *models.FaucetPayload
+	Create                                 bool
 }
 
 // UniqID returns a uniq identifier for the VoteTX. It depends on the Type.

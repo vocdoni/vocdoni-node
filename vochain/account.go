@@ -287,7 +287,7 @@ func (v *State) SetAccountInfoURI(accountAddress, txSender common.Address, infoU
 	return v.Tx.DeepSet(txSender.Bytes(), senderBytes, AccountsCfg)
 }
 
-func (v *State) CreateAccount(accountAddress common.Address, infoURI string, delegates []common.Address, initBalance uint64) error {
+func (v *State) CreateAccount(accountAddress common.Address, infoURI string, delegates []common.Address, initBalance uint64, faucetSender common.Address, faucetNonce uint64) error {
 	// check valid address
 	if accountAddress.String() == types.EthereumZeroAddressString {
 		return fmt.Errorf("invalid address")
@@ -300,26 +300,52 @@ func (v *State) CreateAccount(accountAddress common.Address, infoURI string, del
 	if acc != nil {
 		return fmt.Errorf("account %s already exists", accountAddress.String())
 	}
+	acc = &Account{}
 	// account not found, creating it
 	// check valid infoURI, must be set on creation
-	newAccount := &Account{}
-	newAccount.InfoURI = infoURI
+	acc.InfoURI = infoURI
 	if len(delegates) > 0 {
-		newAccount.DelegateAddrs = make([][]byte, len(delegates))
+		acc.DelegateAddrs = make([][]byte, len(delegates))
 		for _, v := range delegates {
 			if v.String() != types.EthereumZeroAddressString {
-				newAccount.DelegateAddrs = append(newAccount.DelegateAddrs, v.Bytes())
+				acc.DelegateAddrs = append(acc.DelegateAddrs, v.Bytes())
 			}
 		}
 	}
-	newAccount.Balance = initBalance
-	accBytes, err := newAccount.Marshal()
-	if err != nil {
-		return err
+	acc.Balance = initBalance
+
+	// handle faucet claim
+	if !bytes.Equal(faucetSender.Bytes(), types.EthereumZeroAddressBytes[:]) {
+		var accFrom *Account
+		if accFrom, err = v.GetAccount(faucetSender, false); err != nil {
+			return err
+		}
+		if accFrom == nil {
+			return ErrAccountNotFound
+		}
+		transferCost, err := v.TxCost(models.TxType_COLLECT_FAUCET, false)
+		if err != nil {
+			return err
+		}
+		if accFrom.Balance < initBalance+transferCost {
+			return ErrNotEnoughBalance
+		}
+		if acc.Balance+initBalance <= acc.Balance {
+			return ErrBalanceOverflow
+		}
+		accFrom.Balance -= initBalance + transferCost
+		b := make([]byte, 8)
+		binary.LittleEndian.PutUint64(b, faucetNonce)
+		key := faucetSender.Bytes()
+		key = append(key, b...)
+		if err := v.Tx.DeepSet(crypto.Sha256(key), nil, FaucetNonceCfg); err != nil {
+			return err
+		}
+		if err := v.SetAccount(faucetSender, accFrom); err != nil {
+			return err
+		}
 	}
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
+	return v.SetAccount(accountAddress, acc)
 }
 
 // SetAccountInfoTxCheck is an abstraction of ABCI checkTx for an SetAccountInfoTx transaction
@@ -360,30 +386,59 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	returnValues.Account = common.BytesToAddress(accountAddressBytes)
 	if accountAddressBytes == nil ||
 		len(accountAddressBytes) != types.EntityIDsize ||
-		bytes.Equal(accountAddressBytes, types.EthereumZeroAddressBytes[:]) ||
-		returnValues.TxSender == returnValues.Account {
-		// txSender == tx.Account
-		// if not exist create new one
-		if txSender == nil {
-			returnValues.Create = true
-			return returnValues, nil
+		bytes.Equal(accountAddressBytes, types.EthereumZeroAddressBytes[:]) {
+		returnValues.Account = returnValues.TxSender
+	}
+	// if not exist create new one
+	if txSender == nil {
+		if tx.FaucetPackage != nil {
+			if bytes.Equal(tx.FaucetPackage.Payload.To, returnValues.TxSender.Bytes()) {
+				// get issuer address from faucetPayload
+				faucetPkgPayload := tx.FaucetPackage.GetPayload()
+				faucetPackageBytes, err := proto.Marshal(faucetPkgPayload)
+				if err != nil {
+					return nil, fmt.Errorf("cannot extract faucet package payload: %v", err)
+				}
+				issuerAddress, err := ethereum.AddrFromSignature(faucetPackageBytes, tx.FaucetPackage.Signature)
+				if err != nil {
+					return nil, err
+				}
+				// check issuer nonce not used
+				b := make([]byte, 8)
+				binary.LittleEndian.PutUint64(b, faucetPkgPayload.Identifier)
+				key := issuerAddress.Bytes()
+				key = append(key, b...)
+				used, err := state.FaucetNonce(crypto.Sha256(key), false)
+				if err != nil {
+					return nil, fmt.Errorf("cannot check faucet nonce: %v", err)
+				}
+				if used {
+					return nil, fmt.Errorf("nonce %d already used", faucetPkgPayload.Identifier)
+				}
+				// check issuer have enough funds
+				issuerAcc, err := state.GetAccount(issuerAddress, false)
+				if err != nil {
+					return nil, fmt.Errorf("cannot get faucet account: %v", err)
+				}
+				if issuerAcc == nil {
+					return nil, ErrAccountNotFound
+				}
+				cost, err := state.TxCost(models.TxType_COLLECT_FAUCET, false)
+				if err != nil {
+					return nil, err
+				}
+				if (issuerAcc.Balance) < faucetPkgPayload.Amount+cost {
+					return nil, fmt.Errorf("faucet does not have enough balance %d < %d", issuerAcc.Balance, faucetPkgPayload.Amount+cost)
+				}
+				returnValues.FaucetPayloadSigner = issuerAddress
+				returnValues.FaucetPayload = tx.GetFaucetPackage().Payload
+			} else {
+				return nil, fmt.Errorf("payload to and tx sender missmatch")
+			}
 		}
-		// if exists change txSender infoURI
-		// check txSender nonce
-		if tx.Nonce != txSender.Nonce {
-			return nil, fmt.Errorf("invalid nonce, expected %d got %d", txSender.Nonce, tx.Nonce)
-		}
-		// check txSender balance
-		if txSender.Balance < cost {
-			return nil, fmt.Errorf("unauthorized: %s", ErrNotEnoughBalance)
-		}
-		// check not the same infoURI
-		if txSender.InfoURI == infoURI {
-			return nil, fmt.Errorf("same infoURI: %s", infoURI)
-		}
+		returnValues.Create = true
 		return returnValues, nil
 	}
-	// txSender != tx.Account
 
 	// if tx sender does not exist and the account to change is not the same return error
 	// tx sender must have an account created in order to change accounts for whom is a delegate

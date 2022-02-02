@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
@@ -23,6 +24,9 @@ func TestSetAccountInfoTx(t *testing.T) {
 	if err := app.State.SetTxCost(models.TxType_SET_ACCOUNT_INFO, 10); err != nil {
 		t.Fatal(err)
 	}
+	if err := app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 10); err != nil {
+		t.Fatal(err)
+	}
 	signer := ethereum.SignKeys{}
 	if err := signer.Generate(); err != nil {
 		t.Fatal(err)
@@ -32,11 +36,11 @@ func TestSetAccountInfoTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	// should create an account if address does not exist
-	if err := testSetAccountInfoTx(t, &signer, app, infoURI, 0); err != nil {
+	if err := testSetAccountInfoTx(t, &signer, app, infoURI, 0, nil); err != nil {
 		t.Fatal(err)
 	}
 	// should fail if account does not have enough balance
-	if err := testSetAccountInfoTx(t, &signer, app, ipfsUrl, 0); err == nil {
+	if err := testSetAccountInfoTx(t, &signer, app, ipfsUrl, 0, nil); err == nil {
 		t.Fatal(err)
 	}
 	// should pass if infoURI is not empty and acccount have enough balance
@@ -44,11 +48,11 @@ func TestSetAccountInfoTx(t *testing.T) {
 	if err := app.State.MintBalance(signer.Address(), 100); err != nil {
 		t.Fatal(err)
 	}
-	if err := testSetAccountInfoTx(t, &signer, app, ipfsUrl, 0); err != nil {
+	if err := testSetAccountInfoTx(t, &signer, app, ipfsUrl, 0, nil); err != nil {
 		t.Fatal(err)
 	}
 	// should fail if infoURI is empty
-	if err := testSetAccountInfoTx(t, &signer, app, "", 1); err == nil {
+	if err := testSetAccountInfoTx(t, &signer, app, "", 1, nil); err == nil {
 		t.Fatal(err)
 	}
 	// get account
@@ -61,13 +65,53 @@ func TestSetAccountInfoTx(t *testing.T) {
 	}
 	qt.Assert(t, acc.InfoURI, qt.Equals, ipfsUrl)
 	qt.Assert(t, acc.Balance, qt.Equals, uint64(90))
+
+	// create account with faucet pkg
+	signer2 := ethereum.SignKeys{}
+	if err := signer2.Generate(); err != nil {
+		t.Fatal(err)
+	}
+
+	payload := &models.FaucetPayload{
+		Identifier: uint64(time.Now().Unix()),
+		To:         signer2.Address().Bytes(),
+		Amount:     20,
+	}
+	payloadBytes, err := proto.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payloadSignature, err := signer.SignEthereum(payloadBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := testSetAccountInfoTx(t, &signer2, app, infoURI, 0, &models.FaucetPackage{
+		Payload:   payload,
+		Signature: payloadSignature,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	acc, err = app.State.GetAccount(signer.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc2, err := app.State.GetAccount(signer2.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if acc2 == nil {
+		t.Fatal(ErrAccountNotFound)
+	}
+	qt.Assert(t, acc.Balance, qt.Equals, uint64(60))
+	qt.Assert(t, acc2.Balance, qt.Equals, uint64(20))
 }
 
 func testSetAccountInfoTx(t *testing.T,
 	signer *ethereum.SignKeys,
 	app *BaseApplication,
 	infouri string,
-	nonce uint32) error {
+	nonce uint32,
+	faucetPkg *models.FaucetPackage) error {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
 	var cktxresp abcitypes.ResponseCheckTx
@@ -76,10 +120,11 @@ func testSetAccountInfoTx(t *testing.T,
 	var err error
 
 	tx := &models.SetAccountInfoTx{
-		Txtype:  models.TxType_SET_ACCOUNT_INFO,
-		InfoURI: infouri,
-		Account: signer.Address().Bytes(),
-		Nonce:   nonce,
+		Txtype:        models.TxType_SET_ACCOUNT_INFO,
+		InfoURI:       infouri,
+		Account:       signer.Address().Bytes(),
+		Nonce:         nonce,
+		FaucetPackage: faucetPkg,
 	}
 
 	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{SetAccountInfo: tx}}); err != nil {
