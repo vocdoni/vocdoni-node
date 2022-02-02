@@ -24,7 +24,7 @@ type Specs struct {
 }
 
 // AvailableChains is the list of supported ethereum networks / environments
-var AvailableChains = []string{"mainnet", "goerli", "goerlistage", "xdai", "xdaistage", "rinkeby", "fuji", "avalanche"}
+var AvailableChains = []string{"mainnet", "goerli", "goerlistage", "xdai", "xdaistage", "rinkeby", "fuji", "avalanche", "matic", "mumbai"}
 
 // SpecsFor returns the specs for the given blockchain network name
 func SpecsFor(name string) (*Specs, error) {
@@ -45,6 +45,10 @@ func SpecsFor(name string) (*Specs, error) {
 		return &fuji, nil
 	case "avalanche":
 		return &avalanche, nil
+	case "matic":
+		return &matic, nil
+	case "mumbai":
+		return &mumbai, nil
 	default:
 		return nil, errors.New("chain name not found")
 	}
@@ -299,6 +303,76 @@ var goerlistage = Specs{
 	},
 	GenesisHash: goerli.GenesisHash,
 	GenesisB64:  goerli.GenesisB64,
+}
+
+var matic = Specs{
+	Name:          "matic",
+	NetworkId:     137,
+	StartingBlock: 24472500,
+	BootNodes:     nil,
+	NetworkSource: models.SourceNetworkId_POLYGON,
+	Contracts: map[string]*ethereumhandler.EthereumContract{
+		ethereumhandler.ContractNameProcesses: {
+			Domain:          types.ProcessesDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameNamespaces: {
+			Domain:          types.NamespacesDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameTokenStorageProof: {
+			Domain:          types.ERC20ProofsDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameGenesis: {
+			Domain:          types.GenesisDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameResults: {
+			Domain:          types.ResultsDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameEntities: {
+			Domain: types.EntityResolverDomain},
+		ethereumhandler.ContractNameENSregistry: {
+			Address: common.HexToAddress("0xffe6ef08Eb7770837b3bBBE04e67eE25cC19a12a"),
+		},
+	},
+}
+
+var mumbai = Specs{
+	Name:          "mumbai",
+	NetworkId:     80001,
+	StartingBlock: 24526634,
+	BootNodes:     nil,
+	NetworkSource: models.SourceNetworkId_POLYGON,
+	Contracts: map[string]*ethereumhandler.EthereumContract{
+		ethereumhandler.ContractNameProcesses: {
+			Domain:          types.ProcessesDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameNamespaces: {
+			Domain:          types.NamespacesDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameTokenStorageProof: {
+			Domain:          types.ERC20ProofsDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameGenesis: {
+			Domain:          types.GenesisDevelopmentDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameResults: {
+			Domain:          types.ResultsDomain,
+			ListenForEvents: true,
+		},
+		ethereumhandler.ContractNameEntities: {
+			Domain: types.EntityResolverDevelopmentDomain},
+		ethereumhandler.ContractNameENSregistry: {
+			Address: common.HexToAddress("0x841d2f05e00813623edac5f514a21c70e8667b04"),
+		},
+	},
 }
 
 // Goerli Ethereum PoA Testnet
