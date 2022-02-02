@@ -288,6 +288,12 @@ func TestProcessSetResultsTransition(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	if err := app.State.SetAccount(
+		oracle2.Address(),
+		acc,
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
