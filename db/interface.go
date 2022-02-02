@@ -77,3 +77,14 @@ type WriteTx interface {
 	// Commit commits the transaction into the db
 	Commit() error
 }
+
+// UnwrapWriteTx unwraps (if possible) the WriteTx using Unwrap method
+func UnwrapWriteTx(tx WriteTx) WriteTx {
+	for {
+		wtx, ok := tx.(interface{ Unwrap() WriteTx })
+		if !ok {
+			return tx
+		}
+		tx = wtx.Unwrap()
+	}
+}

@@ -69,7 +69,7 @@ func (tx WriteTx) Delete(k []byte) error {
 
 // Apply implements the db.WriteTx.Apply interface method
 func (tx WriteTx) Apply(other db.WriteTx) (err error) {
-	otherPebble := other.(WriteTx)
+	otherPebble := db.UnwrapWriteTx(other).(WriteTx)
 	return tx.batch.Apply(otherPebble.batch, nil)
 }
 

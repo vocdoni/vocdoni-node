@@ -133,6 +133,11 @@ func (t *PrefixedWriteTx) Apply(other db.WriteTx) error {
 	return t.tx.Apply(other)
 }
 
+// Unwrap returns the wrapped WriteTx
+func (t *PrefixedWriteTx) Unwrap() db.WriteTx {
+	return t.tx
+}
+
 // Commit implements the db.WriteTx.Commit interface method.  Notice that this
 // method also commits the wrapped db.WriteTx.
 func (t *PrefixedWriteTx) Commit() error {
