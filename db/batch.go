@@ -61,6 +61,11 @@ func (t *Batch) Apply(other WriteTx) (err error) {
 	return t.tx.Apply(other)
 }
 
+// Unwrap returns the wrapped WriteTx
+func (t *Batch) Unwrap() WriteTx {
+	return t.tx
+}
+
 // Set implements the WriteTx.Set interface method.  If during this
 // operation, the internal tx becomes too big, all the pending writes will be
 // committed and a new WriteTx will be created to continue with this and

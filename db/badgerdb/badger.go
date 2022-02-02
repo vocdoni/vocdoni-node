@@ -79,7 +79,7 @@ func (tx WriteTx) Delete(k []byte) error {
 
 // Apply implements the db.WriteTx.Apply interface method
 func (tx WriteTx) Apply(other db.WriteTx) (err error) {
-	otherBadger := other.(WriteTx)
+	otherBadger := db.UnwrapWriteTx(other).(WriteTx)
 
 	valueOfTx := reflect.ValueOf(otherBadger.tx)
 	pendingWrites := valueOfTx.Elem().FieldByName("pendingWrites")
