@@ -126,7 +126,7 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 	// depending on signature type, use a mechanism for extracting the ca publickey from signature
 	switch p.GetType() {
 	case models.ProofCA_ECDSA, models.ProofCA_ECDSA_PIDSALTED:
-		bundlePub, err := ethereum.PubKeyFromSignature(ethereum.BuildVocdoniMessage(cspBundle), p.GetSignature())
+		bundlePub, err := ethereum.PubKeyFromSignature(cspBundle, p.GetSignature())
 		if err != nil {
 			return false, nil, fmt.Errorf("cannot fetch CSP public key from signature: %w", err)
 		}

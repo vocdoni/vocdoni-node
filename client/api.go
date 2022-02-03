@@ -329,7 +329,7 @@ func (c *Client) GetCSPproofBatch(signers []*ethereum.SignKeys,
 		if err != nil {
 			log.Fatal(err)
 		}
-		signature, err := ca.SignVocdoniMsg(bundleBytes)
+		signature, err := ca.SignEthereum(bundleBytes)
 		if err != nil {
 			log.Fatal(err)
 		}
