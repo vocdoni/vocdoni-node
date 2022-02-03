@@ -345,7 +345,7 @@ var mumbai = Specs{
 	NetworkId:     80001,
 	StartingBlock: 24526634,
 	BootNodes:     nil,
-	NetworkSource: models.SourceNetworkId_POLYGON,
+	NetworkSource: models.SourceNetworkId_POLYGON_MUMBAI,
 	Contracts: map[string]*ethereumhandler.EthereumContract{
 		ethereumhandler.ContractNameProcesses: {
 			Domain:          types.ProcessesDevelopmentDomain,
