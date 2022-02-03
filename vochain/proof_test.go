@@ -210,7 +210,7 @@ func TestCAProof(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		signature, err := ca.SignVocdoniMsg(bundleBytes)
+		signature, err := ca.SignEthereum(bundleBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -240,7 +240,7 @@ func TestCAProof(t *testing.T) {
 	if err := ca2.Generate(); err != nil {
 		t.Fatal(err)
 	}
-	signature, err := ca2.SignVocdoniMsg(bundleBytes)
+	signature, err := ca2.SignEthereum(bundleBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
