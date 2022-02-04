@@ -14,10 +14,13 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/libs/service"
+	mempl "github.com/tendermint/tendermint/mempool"
+	nm "github.com/tendermint/tendermint/node"
 	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
-	tmcli "github.com/tendermint/tendermint/rpc/client/local"
-	ctypes "github.com/tendermint/tendermint/rpc/coretypes"
+
+	// ctypes "github.com/tendermint/tendermint/rpc/coretypes" // TENDERMINT 0.35
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+
 	tmtypes "github.com/tendermint/tendermint/types"
 	snarkTypes "github.com/vocdoni/go-snark/types"
 	zkartifacts "go.vocdoni.io/dvote/crypto/zk/artifacts"
@@ -34,9 +37,10 @@ import (
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
-	State   *State
-	Service service.Service
-	Node    *tmcli.Local
+	State *State
+	// Service service.Service TENDERMINT 0.35
+	// Node    *tmcli.Local TENDERMINT 0.35
+	Node *nm.Node
 
 	IsSynchronizing func() bool
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
@@ -125,6 +129,7 @@ func (app *BaseApplication) LoadZkVKs(ctx context.Context) error {
 	return nil
 }
 
+/* TENDERMINT 0.35
 func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byte) error {
 	var err error
 	if app.Service, err = newTendermint(app, vochaincfg, genesis); err != nil {
@@ -214,6 +219,82 @@ func (app *BaseApplication) isSynchronizingTendermint() bool {
 	}
 	return status.SyncInfo.CatchingUp
 }
+*/
+
+// isSynchronizingTendermint informes if the blockchain is synchronizing or not.
+func (app *BaseApplication) isSynchronizingTendermint() bool {
+	app.isSyncLock.Lock()
+	defer app.isSyncLock.Unlock()
+	return app.Node.ConsensusReactor().WaitSync()
+}
+
+func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byte) error {
+	var err error
+	if app.Node, err = newTendermint(app, vochaincfg, genesis); err != nil {
+		return fmt.Errorf("could not set application Node: %s", err)
+	}
+	app.chainId = app.Node.GenesisDoc().ChainID
+	return nil
+}
+
+// SetDefaultMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use the
+// BlockStore from app.Node to load blocks. Assumes app.Node has been set.
+func (app *BaseApplication) SetDefaultMethods() {
+	if app.Node == nil {
+		log.Error("Cannot assign block getters: App Node is not initialized")
+		return
+	}
+	app.SetFnGetBlockByHash(app.Node.BlockStore().LoadBlockByHash)
+	app.SetFnGetBlockByHeight(app.Node.BlockStore().LoadBlock)
+	app.IsSynchronizing = app.isSynchronizingTendermint
+	app.SetFnGetTx(app.getTxTendermint)
+	app.SetFnGetTxHash(app.getTxHashTendermint)
+	app.SetFnMempoolSize(app.Node.Mempool().Size)
+	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+		resCh := make(chan *abcitypes.Response, 1)
+		defer close(resCh)
+		err := app.Node.Mempool().CheckTx(tx, func(res *abcitypes.Response) {
+			resCh <- res
+		}, mempl.TxInfo{})
+		if err != nil {
+			return nil, err
+		}
+		res := <-resCh
+		r := res.GetCheckTx()
+		return &ctypes.ResultBroadcastTx{
+			Code: r.Code,
+			Data: r.Data,
+			Log:  r.Log,
+			Hash: tmtypes.Tx(tx).Hash(),
+		}, nil
+	})
+}
+
+// SetTestingMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use mockBlockStore
+func (app *BaseApplication) SetTestingMethods() {
+	mockBlockStore := new(testutil.MockBlockStore)
+	mockBlockStore.Init()
+	app.SetFnGetBlockByHash(mockBlockStore.GetByHash)
+	app.SetFnGetBlockByHeight(mockBlockStore.Get)
+	app.SetFnGetTx(app.getTxTendermint)
+	app.SetFnGetTxHash(app.getTxHashTendermint)
+	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+		mockBlockStore.Add(&tmtypes.Block{Data: tmtypes.Data{Txs: []tmtypes.Tx{tx}}})
+		return nil, nil
+	})
+	app.SetFnMempoolSize(func() int { return 0 })
+	app.IsSynchronizing = func() bool { return false }
+
+	// For tests, we begin at block 2.
+	// The last block we finished was 1, and we did so 10s ago.
+	app.height = 1
+	now := time.Now()
+	app.endBlockTimestamp = now.Add(-10 * time.Second).Unix()
+	app.BeginBlock(abcitypes.RequestBeginBlock{Header: tmprototypes.Header{
+		Time:   now,
+		Height: 2,
+	}})
+}
 
 // Height returns the current blockchain height
 func (app *BaseApplication) Height() uint32 {
@@ -247,6 +328,13 @@ func (app *BaseApplication) ChainID() string {
 // MempoolSize returns the size of the transaction mempool
 func (app *BaseApplication) MempoolSize() int {
 	return app.fnMempoolSize()
+}
+
+// ONLY TENDERMINT 0.34
+// MempoolRemoveTx removes a transaction (identifier by its vochain.TxKey() hash)
+// from the Tendermint mempool.
+func (app *BaseApplication) MempoolRemoveTx(txKey [32]byte) {
+	app.Node.Mempool().(*mempl.CListMempool).RemoveTxByKey(txKey, false)
 }
 
 // GetBlockByHeight retrieves a full Tendermint block indexed by its height.
@@ -431,6 +519,12 @@ func (app *BaseApplication) AdvanceTestBlock() {
 		Time:   nextStartTime,
 		Height: nextHeight,
 	}})
+}
+
+// ONLY FOR TENDERMINT 0.34
+// SetOption does nothing
+func (*BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
+	return abcitypes.ResponseSetOption{}
 }
 
 // CheckTx unmarshals req.Tx and checks its validity

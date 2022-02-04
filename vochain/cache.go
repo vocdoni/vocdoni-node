@@ -1,6 +1,8 @@
 package vochain
 
 import (
+	"time"
+
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -85,8 +87,11 @@ func (v *State) CachePurge(height uint32) {
 	if height%18 != 0 { // TODO(pau): do not use height but time
 		return
 	}
+	start := time.Now()
+
 	keys := v.voteCache.Keys()
-	removed := 0
+	removeFromMempool := make([][32]byte, 0, len(keys))
+
 	for _, id := range keys {
 		record, ok := v.voteCache.Get(id)
 		if !ok {
@@ -97,6 +102,7 @@ func (v *State) CachePurge(height uint32) {
 		if !ok {
 			continue
 		}
+		vid, ok := id.([32]byte)
 		if !ok {
 			log.Warn("vote cache index is not [32]byte")
 			continue
@@ -104,14 +110,21 @@ func (v *State) CachePurge(height uint32) {
 		if vote.Height+voteCachePurgeThreshold >= height {
 			v.voteCache.Remove(cacheGetNullifierKey(vote.Nullifier))
 			v.voteCache.Remove(id)
-			removed++
+			removeFromMempool = append(removeFromMempool, vid)
 		}
 	}
-	log.Debugf("removed %d votes from cache", removed)
+	if len(removeFromMempool) > 0 && v.mempoolRemoveTxKeys != nil {
+		v.mempoolRemoveTxKeys(removeFromMempool, true)
+		log.Debugf("[txcache] purged %d transactions, took %s",
+			len(removeFromMempool), time.Since(start))
+	}
 }
 
 // SetCacheSize sets the size for the vote LRU cache.
 func (v *State) SetCacheSize(size int) {
+	if v.cacheDisabled() {
+		return
+	}
 	v.voteCache.Resize(size)
 }
 
