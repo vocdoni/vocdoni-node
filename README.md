@@ -3,25 +3,44 @@
 > *arbo*: tree in Esperanto.
 
 MerkleTree implementation in Go. Compatible with the circomlib implementation of
-the MerkleTree, following the specification from
-https://docs.iden3.io/publications/pdfs/Merkle-Tree.pdf and
-https://eprint.iacr.org/2018/955.
+the MerkleTree. Specification: https://docs.iden3.io/publications/pdfs/Merkle-Tree.pdf and https://eprint.iacr.org/2018/955.
 
-Allows to define which hash function to use. So for example, when working with
-zkSnarks the Poseidon hash function can be used, but when not, it can be used
-the Blake2b hash function, which has much faster computation time.
+Main characteristics of arbo are:
+- Allows to define which hash function to use.
+	- So for example, when working with zkSnarks the [Poseidon hash](https://eprint.iacr.org/2019/458.pdf) function can be used, but when not, it can be used the [Blake2b hash](https://www.blake2.net/blake2.pdf) function, which has much faster computation time.
+	- New hash functions can be plugged by just implementing the interface
+- Parallelizes computation by CPUs
+	- See [AddBatch section](https://github.com/vocdoni/arbo#addbatch)
 
 ## AddBatch
 The method `tree.AddBatch` is designed for the cases where there is a big amount of key-values to be added in the tree. It has the following characteristics:
-
-- Makes a copy of the tree in memory (*VirtualTree*)
-- The *VirtualTree* does not compute any hash, only the relations between the nodes of the tree
-	- This step (computing the *VirtualTree*) is done in parallel in each available CPU until level *log2(nCPU)*
-- Once the *VirtualTree* is updated with all the new leafs (key-values) in each corresponent position, it *computes all the hashes* of each node until the root
-	- In this way, each node hash is computed only once, while when adding many key-values using `tree.Add` method, most of the intermediate nodes will be recalculated each time that a new leaf is added
-	- This step (*computing all the hashes*) is done in parallel in each available CPU
+- Parallelizes by available CPUs
+	- If the tree size is not too big (under the configured threshold):
+		- Makes a copy of the tree in memory (*VirtualTree*)
+		- The *VirtualTree* does not compute any hash, only the relations between the nodes of the tree
+			- This step (computing the *VirtualTree*) is done in parallel in each available CPU until level *log2(nCPU)*
+		- Once the *VirtualTree* is updated with all the new leafs (key-values) in each corresponent position, it *computes all the hashes* of each node until the root
+			- In this way, each node hash is computed only once, while when adding many key-values using `tree.Add` method, most of the intermediate nodes will be recalculated each time that a new leaf is added
+			- This step (*computing all the hashes*) is done in parallel in each available CPU
+	- If the tree size is avobe the configured threshold:
+		- Virtually splits the tree in `n` sub-trees, where `n` is the number of available CPUs
+		- Each CPU adds the corresponent new leaves into each sub-tree (working in a db tx)
+		- Once all sub-trees are updated, puts them together again to compute the new tree root
 
 As result, the method `tree.AddBatch` goes way faster thant looping over `tree.Add`, and can compute the tree with parallelization, so as more available CPUs, faster will do the computation.
+
+As an example, this is the benchmark for adding `10k leaves` (with `4 CPU cores`, `AddBatch` would get faster with more CPUs (powers of 2)):
+```
+Intel(R) Core(TM) i5-7200U CPU @ 2.50GHz with 8GB of RAM
+nCPU: 4, nLeafs: 10_000
+
+Using Poseidon hash function:
+(go) arbo.AddBatch:	436.866007ms
+(go) arbo.Add loop:	5.341122678s
+(go) iden3.Add loop:	8.581494317s
+(js) circomlibjs:	2m09.351s
+```
+And, for example, if instead of using Poseidon hash function we use Blake2b, time is reduced to `80.862805ms`.
 
 ## Usage
 

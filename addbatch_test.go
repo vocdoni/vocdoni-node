@@ -17,7 +17,7 @@ import (
 	"go.vocdoni.io/dvote/db/pebbledb"
 )
 
-var debug = true
+var debug = false
 
 func printTestContext(prefix string, nLeafs int, hashName, dbName string) {
 	if debug {
