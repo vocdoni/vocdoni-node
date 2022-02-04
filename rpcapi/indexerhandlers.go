@@ -1,7 +1,6 @@
 package rpcapi
 
 import (
-	"context"
 	"fmt"
 
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -36,11 +35,8 @@ func (r *RPCAPI) getStats(request *api.APIrequest) (*api.APIresponse, error) {
 	stats.BlockTime = *r.vocinfo.BlockTimes()
 	stats.ChainID = r.vocapp.ChainID()
 	if r.vocapp.Node != nil {
-		gn, err := r.vocapp.Node.Genesis(context.Background())
-		if err != nil {
-			return nil, err
-		}
-		stats.GenesisTimeStamp = gn.Genesis.GenesisTime
+		gn := r.vocapp.Node.GenesisDoc()
+		stats.GenesisTimeStamp = gn.GenesisTime
 	}
 	stats.Syncing = r.vocapp.IsSynchronizing()
 

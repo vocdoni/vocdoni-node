@@ -34,12 +34,11 @@ docker-compose build
 docker-compose up -d
 
 echo "### Waiting for test suite to be ready ###"
-for i in {1..5}; do
-	docker-compose run test curl --fail http://gateway:9090/dvote \
+for i in {1..20}; do
+	docker-compose run test curl -s --fail http://gateway:9090/dvote \
 		-X POST \
-		-d '{"id": "req00'$RANDOM'", "request": {"method": "getInfo", "timestamp":'$(date +%s)'}}' && break || sleep 5
+		-d '{"id": "req00'$RANDOM'", "request": {"method": "genProof", "timestamp":'$(date +%s)'}}' 2>/dev/null && break || sleep 2
 done
-sleep 10 # extra wait to ensure all gateways API methods have been started
 
 testid="/tmp/.vochaintest$RANDOM"
 

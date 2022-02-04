@@ -294,12 +294,13 @@ type State struct {
 	// by processing Vochain transactions), parallel calls of Tendermint
 	// CheckTx happen (which read the temporary state kept in the Tx to
 	// validate Vochain transactions).
-	Tx                treeTxWithMutex
-	mainTreeViewValue atomic.Value
-	DisableVoteCache  atomic.Value
-	voteCache         *lru.Cache
-	txCounter         int32
-	eventListeners    []EventListener
+	Tx                  treeTxWithMutex
+	mainTreeViewValue   atomic.Value
+	DisableVoteCache    atomic.Value
+	voteCache           *lru.Cache
+	mempoolRemoveTxKeys func([][32]byte, bool)
+	txCounter           int32
+	eventListeners      []EventListener
 	// currentHeight is the height of the current started block
 	currentHeight uint32
 }

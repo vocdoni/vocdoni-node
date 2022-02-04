@@ -54,10 +54,12 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 
 	minerPVs := make([]privval.FilePV, mCount)
 	for i := range minerPVs {
-		pv, err := privval.GenFilePV("", "", tmtypes.ABCIPubKeyTypeEd25519)
-		if err != nil {
-			return err
-		}
+		// TENDERMINT 0.35
+		//pv, err := privval.GenFilePV("", "", tmtypes.ABCIPubKeyTypeEd25519)
+		//if err != nil {
+		//	return err
+		//}
+		pv := privval.GenFilePV("", "")
 		minerPVs[i] = *pv
 		prettyHeader(fmt.Sprintf("Miner #%d", i+1))
 		fmt.Printf("Address: %s\n", au.Yellow(minerPVs[i].Key.Address))
