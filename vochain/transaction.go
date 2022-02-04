@@ -660,7 +660,7 @@ func SetTransactionCostsTxCheck(vtx *models.Tx, txBytes, signature []byte, state
 	}
 	// check nonce
 	if tx.Nonce != treasurer.Nonce {
-		return 0, fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce+1)
+		return 0, fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce)
 	}
 	// check valid tx type
 	if _, ok := TxTypeCostToStateKey[tx.Txtype]; !ok {

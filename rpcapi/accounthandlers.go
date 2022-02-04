@@ -40,8 +40,7 @@ func (r *RPCAPI) getAccount(request *api.APIrequest) (*api.APIresponse, error) {
 }
 
 func (r *RPCAPI) getTreasurer(request *api.APIrequest) (*api.APIresponse, error) {
-
-	// try get treasyrer and send reply
+	// try get treasurer and send reply
 	var response api.APIresponse
 	t, err := r.vocapp.State.Treasurer(true)
 	if err != nil {

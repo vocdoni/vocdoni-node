@@ -556,6 +556,7 @@ func (v *State) setTreasurer(address common.Address) error {
 	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
 }
 
+// Treasurer returns the address and the Treasurer nonce
 func (v *State) Treasurer(isQuery bool) (*models.Treasurer, error) {
 	if !isQuery {
 		v.Tx.RLock()
@@ -576,6 +577,7 @@ func (v *State) Treasurer(isQuery bool) (*models.Treasurer, error) {
 	return &t, nil
 }
 
+// IsTreasurer returns true if the given address matches the Treasurer address
 func (v *State) IsTreasurer(addr common.Address) (bool, error) {
 	t, err := v.Treasurer(false)
 	if err != nil {
@@ -585,6 +587,7 @@ func (v *State) IsTreasurer(addr common.Address) (bool, error) {
 	return addr == tAddr, nil
 }
 
+// incrementTreasurerNonce increments the treasurer nonce
 func (v *State) incrementTreasurerNonce() error {
 	t, err := v.Treasurer(false)
 	if err != nil {
@@ -600,6 +603,7 @@ func (v *State) incrementTreasurerNonce() error {
 	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
 }
 
+// SetTxCost sets the given transaction cost
 func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
 	key, ok := TxTypeCostToStateKey[txType]
 	if !ok {
@@ -613,6 +617,7 @@ func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
 	return v.Tx.DeepSet([]byte(key), costBytes[:], ExtraCfg)
 }
 
+// TxCost returns the cost of a given transaction
 func (v *State) TxCost(txType models.TxType, isQuery bool) (uint64, error) {
 	key, ok := TxTypeCostToStateKey[txType]
 	if !ok {
@@ -667,8 +672,9 @@ func (v *State) SetFaucetNonce(key []byte) error {
 	return v.Tx.DeepSet(key, nil, FaucetNonceCfg)
 }
 
-func (v *State) substractTxCostIncrementNonce(accoutAddress common.Address, value uint64) error {
-	acc, err := v.GetAccount(accoutAddress, false)
+// substractTxCostIncrementNonce substracts the tx cost from the account balance and increments the nonce
+func (v *State) substractTxCostIncrementNonce(accountAddress common.Address, value uint64) error {
+	acc, err := v.GetAccount(accountAddress, false)
 	if err != nil {
 		return err
 	}
@@ -677,7 +683,7 @@ func (v *State) substractTxCostIncrementNonce(accoutAddress common.Address, valu
 	}
 	acc.Nonce++
 	acc.Balance -= value
-	return v.SetAccount(accoutAddress, acc)
+	return v.SetAccount(accountAddress, acc)
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey

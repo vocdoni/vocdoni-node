@@ -237,6 +237,7 @@ func (v *State) AccountFromSignature(message, signature []byte) (common.Address,
 	return address, acc, nil
 }
 
+// SetAccountInfoURI sets a given account infoURI
 func (v *State) SetAccountInfoURI(accountAddress, txSender common.Address, infoURI string) error {
 	acc, err := v.GetAccount(accountAddress, false)
 	if err != nil {
@@ -287,6 +288,7 @@ func (v *State) SetAccountInfoURI(accountAddress, txSender common.Address, infoU
 	return v.Tx.DeepSet(txSender.Bytes(), senderBytes, AccountsCfg)
 }
 
+// Create account creates an account
 func (v *State) CreateAccount(accountAddress common.Address, infoURI string, delegates []common.Address, initBalance uint64, faucetSender common.Address, faucetNonce uint64) error {
 	// check valid address
 	if accountAddress.String() == types.EthereumZeroAddressString {
@@ -468,6 +470,7 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	return returnValues, nil
 }
 
+// MintTokensTxCheck checks if a given MintTokensTx and its data are valid
 func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, uint64, error) {
 	tx := vtx.GetMintTokens()
 	// check signature available
@@ -508,6 +511,7 @@ func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	return common.BytesToAddress(tx.To), tx.Value, nil
 }
 
+// SetAccountDelegateTxCheck checks if a SetAccountDelegateTx and its data are valid
 func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, common.Address, error) {
 	tx := vtx.GetSetAccountDelegateTx()
 	// check signature available
@@ -556,6 +560,7 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	}
 }
 
+// SetDelegate sets a delegate for a given account
 func (v *State) SetDelegate(accountAddr, delegateAddr common.Address, txType models.TxType) error {
 	// get account
 	acc, err := v.GetAccount(accountAddr, false)
@@ -587,6 +592,7 @@ func (v *State) SetDelegate(accountAddr, delegateAddr common.Address, txType mod
 	}
 }
 
+// SendTokensTxCheck checks if a given SendTokensTx and its data are valid
 func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (*sendTokensTxCheckValues, error) {
 	tx := vtx.GetSendTokens()
 	// check signature available
@@ -644,6 +650,7 @@ func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	return &sendTokensTxCheckValues{sigAddress, txToAddress, tx.Value, tx.Nonce}, nil
 }
 
+// CollectFaucetTxCheck checks if a given CollectFaucetTx and its data are valid
 func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, error) {
 	tx := vtx.GetCollectFaucet()
 	// check signature available
@@ -704,6 +711,7 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	return issuerAddress, nil
 }
 
+// SetAccount sets the given account data to the state
 func (v *State) SetAccount(accountAddress common.Address, account *Account) error {
 	accBytes, err := proto.Marshal(account)
 	if err != nil {
