@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"io"
 
-	"go.vocdoni.io/dvote/log"
 	"golang.org/x/crypto/nacl/secretbox"
 )
 

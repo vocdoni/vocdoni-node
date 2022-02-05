@@ -21,7 +21,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 
 	"go.vocdoni.io/dvote/types"

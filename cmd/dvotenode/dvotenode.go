@@ -71,8 +71,9 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"use developer mode (less security)")
 	globalCfg.PprofPort = *flag.Int("pprof", 0,
 		"pprof port for runtime profiling data (zero is disabled)")
-	globalCfg.LogLevel = *flag.StringP("logLevel", "l", "info",
-		"log level (debug, info, warn, error, fatal)")
+	globalCfg.LogLevel = *flag.StringSliceP("logLevel", "l", []string{"info"},
+		"log level for each subsystem, in format [<subsystem|*>:]<debug|info|warn|error|fatal>\n"+
+			"subsystems: "+strings.Join(log.GetSubsystems(), ","))
 	globalCfg.LogOutput = *flag.String("logOutput", "stdout",
 		"log output (stdout, stderr or filepath)")
 	globalCfg.LogErrorFile = *flag.String("logErrorFile", "",
@@ -361,7 +362,7 @@ func main() {
 	if globalCfg == nil {
 		log.Fatal("cannot read configuration")
 	}
-	log.Init(globalCfg.LogLevel, globalCfg.LogOutput)
+	log.Init(strings.Join(globalCfg.LogLevel, ","), globalCfg.LogOutput)
 	if path := globalCfg.LogErrorFile; path != "" {
 		if err := log.SetFileErrorLog(path); err != nil {
 			log.Fatal(err)

@@ -12,7 +12,6 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	multiaddr "github.com/multiformats/go-multiaddr"
-	"go.vocdoni.io/dvote/log"
 )
 
 // setupDiscovery creates a DHT discovery service and attaches it to the libp2p Host.

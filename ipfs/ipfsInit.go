@@ -10,8 +10,6 @@ import (
 	config "github.com/ipfs/go-ipfs-config"
 	"github.com/ipfs/go-ipfs/plugin/loader"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
-
-	"go.vocdoni.io/dvote/log"
 )
 
 var pluginOnce sync.Once

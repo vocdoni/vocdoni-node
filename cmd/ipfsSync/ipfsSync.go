@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	flag "github.com/spf13/pflag"
@@ -34,7 +35,7 @@ func main() {
 		log.Fatal(err)
 	}
 	userDir := home + "/.ipfs"
-	logLevel := flag.String("logLevel", "info", "log level")
+	logLevel := flag.StringSlice("logLevel", []string{"info"}, "log level")
 	dataDir := flag.String("dataDir", userDir, "directory for storing data")
 	key := flag.String("key", "vocdoni", "secret shared group key for the sync cluster")
 	nodeKey := flag.String("nodeKey", "", "custom private hexadecimal 256 bit key for p2p identity")
@@ -54,7 +55,7 @@ func main() {
 	flag.CommandLine.SetNormalizeFunc(deprecatedFlagsFunc)
 	flag.Parse()
 
-	log.Init(*logLevel, "stdout")
+	log.Init(strings.Join(*logLevel, ","), "stdout")
 	ipfsStore := data.IPFSNewConfig(*dataDir)
 	storage, err := data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
 	if err != nil {

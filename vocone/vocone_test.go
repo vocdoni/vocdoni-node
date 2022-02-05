@@ -13,7 +13,6 @@ import (
 )
 
 func TestVocone(t *testing.T) {
-	//log.Init("info", "stdout")
 	dir := t.TempDir()
 
 	oracle := ethereum.SignKeys{}

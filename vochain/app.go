@@ -30,7 +30,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/db/metadb"
-	"go.vocdoni.io/dvote/log"
+	logger "go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	models "go.vocdoni.io/proto/build/go/models"
 )
@@ -565,7 +565,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	defer app.State.TxCounterAdd()
 	tx := new(VochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
-		log.Debugf("deliver tx: %s", log.FormatProto(tx.Tx))
+		log.Debugf("deliver tx: %s", logger.FormatProto(tx.Tx))
 		if data, err = app.AddTx(tx, true); err != nil {
 			log.Debugf("rejected tx: %v", err)
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}

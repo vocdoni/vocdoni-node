@@ -10,7 +10,6 @@ import (
 
 	libpeer "github.com/libp2p/go-libp2p-core/peer"
 	"go.vocdoni.io/dvote/ipfssync/subpub"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 )
 
@@ -51,8 +50,6 @@ func startNodes(ctx context.Context, num int, bootNodes []*subpub.SubPub) (nodes
 }
 
 func TestSubPub(t *testing.T) {
-	log.Init("warn", "stdout")
-
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 

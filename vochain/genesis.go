@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
-	"go.vocdoni.io/dvote/log"
 )
 
 type VochainGenesis struct {

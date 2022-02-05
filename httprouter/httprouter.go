@@ -24,6 +24,9 @@ import (
 	"golang.org/x/net/http2"
 )
 
+// register subsystem name to allow setting its logLevel
+var _ = log.Named("httprouter.req")
+
 const (
 	desiredSoMaxConn = 4096
 )
@@ -84,7 +87,7 @@ func (r *HTTProuter) Init(host string, port int) error {
 	// If we want rich logging (e.g. with fields), we could implement our
 	// own version of DefaultLogFormatter.
 	r.Mux.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
-		Logger:  stdLogger{log.Logger()},
+		Logger:  stdLogger{log.Named("httprouter.req")},
 		NoColor: true,
 	}))
 	r.Mux.Use(middleware.Recoverer)

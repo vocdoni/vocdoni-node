@@ -3,12 +3,11 @@ package log
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 var (
@@ -22,26 +21,60 @@ func init() {
 	// Always initializing the logger is also useful to avoid panics when
 	// logging if the logger is nil.
 	level := "error"
-	if s := os.Getenv("LOG_LEVEL"); s != "" {
-		level = s
+	if env, found := os.LookupEnv("LOG_LEVEL"); found {
+		level = env
 	}
+
 	Init(level, "stderr")
 }
 
-func Logger() *zap.SugaredLogger { return log }
-
-// Init initializes the logger. Output can be either "stdout/stderr/filePath"
-func Init(logLevel string, output string) {
-	cfg := newConfig(logLevel, output)
-
-	logger, err := cfg.Build()
-	if err != nil {
-		panic(err)
+// Init initializes the logger.
+//
+// logLevels is a comma-separated string like "somename:debug,*:info"
+// (for backwards-compatibility, the "*:" is optional, so "warn" is interpreted as "*:warn")
+//
+// output can be either "stdout", "stderr" or "/path/to/file" and it's a global setting.
+//
+// It's safe to use concurrently.
+func Init(logLevels string, output string) {
+	cfg := Config{
+		Output:          output,
+		SubsystemLevels: map[string]zapcore.Level{},
 	}
-	defer logger.Sync()
-	withOptions := logger.WithOptions(zap.AddCallerSkip(1))
-	log = withOptions.Sugar()
-	log.Infof("logger construction succeeded at level %s with output %s", logLevel, output)
+
+	for _, ll := range strings.Split(logLevels, ",") {
+		kv := strings.Split(ll, ":")
+
+		var s, l string
+		switch len(kv) {
+		case 1: // backwards compatibility: --logLevel=error is equivalent to --logLevel="*:error"
+			s, l = "*", kv[0]
+		case 2: // kv[0] is subsystem name, kv[1] is level
+			s, l = kv[0], kv[1]
+		default:
+			fmt.Println("warning: couldn't split log level: ", ll)
+			continue
+		}
+
+		level, err := levelFromString(l)
+		if err != nil {
+			fmt.Println("warning: ", err)
+			continue
+		}
+
+		if s == "*" {
+			cfg.Level = level
+		} else {
+			cfg.SubsystemLevels[s] = level
+		}
+	}
+
+	SetupLogging(cfg)
+
+	log = Named("main").Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar()
+
+	log.Infof("logger construction succeeded at default level %s with output %s", config.Level, output)
+	log.Infof("logger subsystems: %v", levels)
 }
 
 // SetFileErrorLog if set writes the Warning and Error messages to a file.
@@ -50,54 +83,6 @@ func SetFileErrorLog(path string) error {
 	var err error
 	errorLog, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	return err
-}
-
-func levelFromString(logLevel string) zapcore.Level {
-	switch logLevel {
-	case "debug":
-		return zap.DebugLevel
-	case "info":
-		return zap.InfoLevel
-	case "warn":
-		return zap.WarnLevel
-	case "error":
-		return zap.ErrorLevel
-	case "fatal":
-		return zap.FatalLevel
-	default:
-		return zap.InfoLevel
-	}
-}
-
-func newConfig(logLevel, output string) zap.Config {
-	encoderCfg := zapcore.EncoderConfig{
-		// Keys can be anything except the empty string.
-		TimeKey:  "ts",
-		LevelKey: "level",
-		//	NameKey:        "logger",
-		CallerKey:     "caller",
-		MessageKey:    "msg",
-		StacktraceKey: "stacktrace",
-		LineEnding:    zapcore.DefaultLineEnding,
-		EncodeLevel:   zapcore.CapitalColorLevelEncoder,
-		EncodeTime: func(ts time.Time, encoder zapcore.PrimitiveArrayEncoder) {
-			encoder.AppendString(ts.Local().Format(time.RFC3339))
-		},
-		EncodeDuration: zapcore.SecondsDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
-	}
-	cfg := zap.Config{
-		Level:    zap.NewAtomicLevelAt(levelFromString(logLevel)),
-		Encoding: "console",
-		Sampling: &zap.SamplingConfig{
-			Initial:    100,
-			Thereafter: 100,
-		},
-		EncoderConfig:    encoderCfg,
-		OutputPaths:      []string{output},
-		ErrorOutputPaths: []string{output},
-	}
-	return cfg
 }
 
 func writeErrorToFile(msg string) {
@@ -138,15 +123,6 @@ func Fatal(args ...interface{}) {
 	// staticcheck see that, in this package, Fatal will always exit the
 	// entire program.
 	panic("unreachable")
-}
-
-func FormatProto(arg protoreflect.ProtoMessage) string {
-	pj := protojson.MarshalOptions{
-		AllowPartial:    true,
-		Multiline:       false,
-		EmitUnpopulated: true,
-	}
-	return pj.Format(arg)
 }
 
 // Debugf sends a formatted debug level log message

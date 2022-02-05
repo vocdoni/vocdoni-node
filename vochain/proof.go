@@ -7,7 +7,6 @@ import (
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/saltedkey"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/tree"
 	"google.golang.org/protobuf/proto"
 

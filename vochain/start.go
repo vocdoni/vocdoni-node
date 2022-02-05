@@ -23,8 +23,10 @@ import (
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
-	"go.vocdoni.io/dvote/log"
+	logger "go.vocdoni.io/dvote/log"
 )
+
+var log = logger.Named("vochain")
 
 const downloadZkVKsTimeout = 1 * time.Minute
 

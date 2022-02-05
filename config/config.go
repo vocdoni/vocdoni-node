@@ -20,7 +20,7 @@ type DvoteCfg struct {
 	// Metrics config options
 	Metrics *MetricsCfg
 	// LogLevel logging level
-	LogLevel string
+	LogLevel []string
 	// LogOutput logging output
 	LogOutput string
 	// ErrorLogFile for logging warning, error and fatal messages

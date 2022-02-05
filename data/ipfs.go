@@ -27,9 +27,14 @@ import (
 	crypto "go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/ipfs"
-	"go.vocdoni.io/dvote/log"
+	logger "go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 )
+
+var log = logger.Named("ipfs")
+
+// register subsystem name to allow setting its logLevel
+var _ = logger.Named("ipfs.daemon")
 
 const (
 	MaxFileSizeBytes      = 1024 * 1024 * 50 // 50 MB
@@ -40,7 +45,6 @@ type IPFSHandle struct {
 	Node         *ipfscore.IpfsNode
 	CoreAPI      coreiface.CoreAPI
 	DataDir      string
-	LogLevel     string
 	retriveCache *lru.Cache
 
 	// cancel helps us stop extra goroutines and listeners which complement
@@ -50,10 +54,11 @@ type IPFSHandle struct {
 }
 
 func (i *IPFSHandle) Init(d *types.DataStore) error {
-	if i.LogLevel == "" {
-		i.LogLevel = "ERROR"
+	l, found := logger.GetLogLevel("ipfs.daemon")
+	if !found || l == "" { // default to ERROR LogLevel
+		l = "ERROR"
 	}
-	ipfslog.SetLogLevel("*", i.LogLevel)
+	ipfslog.SetLogLevel("*", l)
 	ipfs.InstallDatabasePlugins()
 	ipfs.ConfigRoot = d.Datadir
 

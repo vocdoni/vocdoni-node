@@ -14,8 +14,10 @@ import (
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 
-	"go.vocdoni.io/dvote/log"
+	logger "go.vocdoni.io/dvote/log"
 )
+
+var log = logger.Named("ipfs")
 
 var ConfigRoot string
 

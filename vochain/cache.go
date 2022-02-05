@@ -3,7 +3,6 @@ package vochain
 import (
 	"time"
 
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )

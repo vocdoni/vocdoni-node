@@ -20,8 +20,10 @@ import (
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/log"
+	logger "go.vocdoni.io/dvote/log"
 )
+
+var log = logger.Named("ipfssync")
 
 // UnicastBufSize is the number of unicast incoming messages to buffer.
 const UnicastBufSize = 128

@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	models "go.vocdoni.io/proto/build/go/models"
 )

@@ -8,7 +8,7 @@ import (
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db/metadb"
-	"go.vocdoni.io/dvote/log"
+	logger "go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -61,7 +61,7 @@ func TestMerkleTreeProof(t *testing.T) {
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
-	t.Logf("adding process %s", log.FormatProto(process))
+	t.Logf("adding process %s", logger.FormatProto(process))
 	if err := app.State.AddProcess(process); err != nil {
 		t.Fatal(err)
 	}

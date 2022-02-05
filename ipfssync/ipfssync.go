@@ -20,9 +20,11 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/data"
-	"go.vocdoni.io/dvote/log"
+	logger "go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedblegacy/gravitonstate"
 )
+
+var log = logger.Named("ipfssync")
 
 const (
 	MaxKeySize = 64

@@ -7,7 +7,6 @@ import (
 
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"

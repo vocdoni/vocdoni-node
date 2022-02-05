@@ -12,7 +12,6 @@ import (
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"

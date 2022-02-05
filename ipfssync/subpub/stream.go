@@ -8,7 +8,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/network"
 	libpeer "github.com/libp2p/go-libp2p-core/peer"
-	"go.vocdoni.io/dvote/log"
 )
 
 // bufioWithMutex is a *bufio.Writer with methods Lock() and Unlock()
