@@ -28,7 +28,15 @@ func init() {
 	Init(level, "stderr")
 }
 
-func Logger() *zap.SugaredLogger { return log }
+func Logger() *zap.SugaredLogger {
+	// since we're returning an unwrapped logger, we need to revert the AddCallerSkip() we did in Init()
+	// else, the caller annotations are all wrong
+	return log.Desugar().WithOptions(zap.AddCallerSkip(-1)).Sugar()
+}
+
+func LoggerWithLevel(logLevel string) *zap.SugaredLogger {
+	return Logger().Desugar().WithOptions(zap.IncreaseLevel(levelFromString(logLevel))).Sugar()
+}
 
 // Init initializes the logger. Output can be either "stdout/stderr/filePath"
 func Init(logLevel string, output string) {
@@ -69,12 +77,17 @@ func levelFromString(logLevel string) zapcore.Level {
 	}
 }
 
+// bracketedFullNameEncoder serializes the logger name enclosed in brackets.
+func bracketedFullNameEncoder(loggerName string, enc zapcore.PrimitiveArrayEncoder) {
+	enc.AppendString("[" + loggerName + "]")
+}
+
 func newConfig(logLevel, output string) zap.Config {
 	encoderCfg := zapcore.EncoderConfig{
 		// Keys can be anything except the empty string.
-		TimeKey:  "ts",
-		LevelKey: "level",
-		//	NameKey:        "logger",
+		TimeKey:       "ts",
+		LevelKey:      "level",
+		NameKey:       "logger",
 		CallerKey:     "caller",
 		MessageKey:    "msg",
 		StacktraceKey: "stacktrace",
@@ -85,6 +98,7 @@ func newConfig(logLevel, output string) zap.Config {
 		},
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
+		EncodeName:     bracketedFullNameEncoder,
 	}
 	cfg := zap.Config{
 		Level:    zap.NewAtomicLevelAt(levelFromString(logLevel)),
