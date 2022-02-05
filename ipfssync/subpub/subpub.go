@@ -19,9 +19,11 @@ import (
 	libpeer "github.com/libp2p/go-libp2p-core/peer"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"go.uber.org/zap"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/log"
 )
+
+var log *zap.SugaredLogger = zap.NewNop().Sugar()
 
 // UnicastBufSize is the number of unicast incoming messages to buffer.
 const UnicastBufSize = 128
@@ -105,6 +107,11 @@ func NewSubPub(hexKey string, groupKey []byte, port int32, private bool) *SubPub
 	bare.MaxUnmarshalBytes(bareMaxUnmarshalBytes)
 
 	return ps
+}
+
+// SetLogger allows a logger with different options to be set
+func (ps *SubPub) SetLogger(logger *zap.SugaredLogger) {
+	log = logger
 }
 
 // Start connects the SubPub networking stack

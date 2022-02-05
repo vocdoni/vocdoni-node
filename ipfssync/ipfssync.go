@@ -14,15 +14,17 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"go.uber.org/zap"
 	"go.vocdoni.io/dvote/ipfssync/subpub"
 	statedb "go.vocdoni.io/dvote/statedblegacy"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/data"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedblegacy/gravitonstate"
 )
+
+var log *zap.SugaredLogger = zap.NewNop().Sugar()
 
 const (
 	MaxKeySize = 64
@@ -81,6 +83,11 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 		is.private = true
 	}
 	return is
+}
+
+// SetLogger allows a logger with different options to be set
+func (is *IPFSsync) SetLogger(logger *zap.SugaredLogger) {
+	log = logger
 }
 
 // myPins return the list of local stored pins
@@ -355,6 +362,9 @@ func (is *IPFSsync) unicastMsg(address string, imsg *models.IpfsSync) error {
 func (is *IPFSsync) Start() {
 	var err error
 
+	// prefix our logs with [ipfssync]
+	log = log.Named("ipfssync")
+
 	// Init pin storage
 	log.Infof("initializing new pin storage")
 	dbDir := path.Join(is.DataDir, "db")
@@ -376,6 +386,7 @@ func (is *IPFSsync) Start() {
 	// Init SubPub
 	is.Transport = subpub.NewSubPub(is.PrivKey, []byte(is.GroupKey), int32(is.Port), is.private)
 	is.Transport.BootNodes = is.Bootnodes
+	is.Transport.SetLogger(log)
 	is.Transport.Start(context.Background(), is.Messages)
 	// end Init SubPub
 

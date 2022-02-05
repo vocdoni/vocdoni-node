@@ -116,6 +116,8 @@ type IPFSCfg struct {
 	NoInit    bool
 	SyncKey   string
 	SyncPeers []string
+	// LogLevel used by ipfssync code. Inherits global if unset
+	SyncLogLevel string
 }
 
 // EthCfg stores global configs for ethereum bockchain

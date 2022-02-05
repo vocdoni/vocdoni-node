@@ -6,7 +6,6 @@ import (
 	"git.sr.ht/~sircmpwn/go-bare"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"go.vocdoni.io/dvote/log"
 )
 
 // GossipBufSize is the number of incoming messages to buffer for each topic.

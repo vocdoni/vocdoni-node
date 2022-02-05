@@ -120,6 +120,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"enable IPFS cluster synchronization using the given secret key")
 	globalCfg.Ipfs.SyncPeers = *flag.StringSlice("ipfsSyncPeers", []string{},
 		"use custom ipfsSync peers/bootnodes for accessing the DHT (comma-separated)")
+	globalCfg.Ipfs.SyncLogLevel = *flag.String("ipfsSyncLogLevel", "",
+		"log level for ipfsSync component (debug, info, warn, error, fatal) (by default, inherits --logLevel)")
 	// vochain
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656",
 		"p2p host and port to listent for the voting chain")
@@ -232,6 +234,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("ipfs.NoInit", flag.Lookup("ipfsNoInit"))
 	viper.BindPFlag("ipfs.SyncKey", flag.Lookup("ipfsSyncKey"))
 	viper.BindPFlag("ipfs.SyncPeers", flag.Lookup("ipfsSyncPeers"))
+	viper.BindPFlag("ipfs.SyncLogLevel", flag.Lookup("ipfsSyncLogLevel"))
 
 	// vochain
 	viper.Set("vochainConfig.DataDir", globalCfg.DataDir+"/vochain")

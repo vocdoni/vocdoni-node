@@ -111,6 +111,7 @@ func main() {
 	} else {
 		is.Bootnodes = *bootnodes
 	}
+	is.SetLogger(log.Logger())
 	is.Start()
 	for _, peer := range *peers {
 		time.Sleep(2 * time.Second)

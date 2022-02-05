@@ -48,6 +48,11 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys,
 				log.Debugf("using custom ipfs sync bootnodes %s", ipfsconfig.SyncPeers)
 				storageSync.Transport.BootNodes = ipfsconfig.SyncPeers
 			}
+			if ipfsconfig.SyncLogLevel != "" {
+				storageSync.SetLogger(log.LoggerWithLevel(ipfsconfig.SyncLogLevel))
+			} else {
+				storageSync.SetLogger(log.Logger())
+			}
 			storageSync.Start()
 		}
 	}
