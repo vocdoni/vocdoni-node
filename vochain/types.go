@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	voteCachePurgeThreshold = uint32(60) // in blocks, 10 minutes
-	voteCacheSize           = 50000
+	voteCachePurgeThreshold = uint32(180) // in blocks about 30 minutes
+	voteCacheSize           = 100000
 	NewProcessCost          = 0
 	SetProcessCost          = 0
 )
