@@ -534,7 +534,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		return abcitypes.ResponseCheckTx{Code: 0, Data: data}
 	}
-	tx := new(vochainTx)
+	tx := new(VochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
 		if data, err = app.AddTx(tx, false); err != nil {
 			if errors.Is(err, ErrorAlreadyExistInCache) {
@@ -555,9 +555,9 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	var err error
 	// Increase Tx counter on return since the index 0 is valid
 	defer app.State.TxCounterAdd()
-	tx := new(vochainTx)
+	tx := new(VochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
-		log.Debugf("deliver tx: %s", log.FormatProto(tx.tx))
+		log.Debugf("deliver tx: %s", log.FormatProto(tx.Tx))
 		if data, err = app.AddTx(tx, true); err != nil {
 			log.Debugf("rejected tx: %v", err)
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}

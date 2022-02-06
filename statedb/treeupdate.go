@@ -384,6 +384,10 @@ func (v *treeUpdateView) Dump() ([]byte, error) {
 	return (*TreeUpdate)(v).Dump()
 }
 
+func (v *treeUpdateView) PrintGraphviz() error {
+	return v.tree.PrintGraphviz()
+}
+
 // verify that treeUpdateView fulfills the TreeViewer interface.
 var _ TreeViewer = (*treeUpdateView)(nil)
 
