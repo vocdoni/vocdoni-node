@@ -263,3 +263,7 @@ func (t *Tree) Dump() ([]byte, error) {
 func (t *Tree) ImportDump(b []byte) error {
 	return t.tree.ImportDump(b)
 }
+
+func (t *Tree) PrintGraphviz() error {
+	return t.tree.PrintGraphviz(nil)
+}

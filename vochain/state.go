@@ -714,6 +714,7 @@ func (v *State) AddVote(vote *models.Vote) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal vote: %w", err)
 	}
+	// TO-DO (pau): Why are we storing processID and nullifier?
 	sdbVote := models.StateDBVote{
 		VoteHash:  ethereum.HashRaw(voteBytes),
 		ProcessId: vote.ProcessId,
