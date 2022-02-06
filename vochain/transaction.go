@@ -231,8 +231,14 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		// started in BaseApplication.BeginBlock.
 		vote = app.State.CacheGetCopy(txID)
 
-		// if vote is in cache, lazy check and remove it from cache
-		if forCommit && vote != nil {
+		// if vote is in cache, lazy check
+		if vote != nil {
+			// if not forCommit, it is a mempool check,
+			// reject it since we already processed the transaction before.
+			if !forCommit {
+				return nil, ErrorAlreadyExistInCache
+			}
+
 			vote.Height = height // update vote height
 			defer app.State.CacheDel(txID)
 			if exist, err := app.State.EnvelopeExists(vote.ProcessId,
@@ -243,12 +249,6 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 				return nil, fmt.Errorf("vote %x already exists", vote.Nullifier)
 			}
 			return vote, nil
-		}
-
-		// if not forCommit, it is a mempool check,
-		// reject it since we already processed the transaction before.
-		if !forCommit && vote != nil {
-			return nil, ErrorAlreadyExistInCache
 		}
 
 		// Supports Groth16 proof generated from circom snark compatible
@@ -265,11 +265,6 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		// ve.Nullifier is encoded in little-endian
 		nullifierBI := arbo.BytesToBigInt(ve.Nullifier)
 
-		// check that nullifier does not exist in cache already, this avoids
-		// processing multiple transactions with same nullifier.
-		if app.State.CacheHasNullifier(ve.Nullifier) {
-			return nil, fmt.Errorf("nullifier %x already exists in cache", ve.Nullifier)
-		}
 		// check if vote already exists
 		if exist, err := app.State.EnvelopeExists(ve.ProcessId,
 			ve.Nullifier, false); err != nil || exist {
@@ -278,7 +273,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			}
 			return nil, fmt.Errorf("vote %x already exists", ve.Nullifier)
 		}
-		log.Debugf("new vote %x for process %x", ve.Nullifier, ve.ProcessId)
+		log.Debugf("new zk vote %x for process %x", ve.Nullifier, ve.ProcessId)
 
 		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVKs) {
 			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d of %d", proofZkSNARK.CircuitParametersIndex, len(app.ZkVKs))
@@ -329,8 +324,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			}
 			vote.EncryptionKeyIndexes = ve.EncryptionKeyIndexes
 		}
-	} else {
-		// Signature based voting
+	} else { // Signature based voting
 		if signature == nil {
 			return nil, fmt.Errorf("signature missing on voteTx")
 		}
@@ -344,12 +338,20 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		// concurrent reads to the votes in the cache which happen in
 		// in State.CachePurge run via a goroutine in
 		// started in BaseApplication.BeginBlock.
+		// Warning: vote cache might change during the execution of this function
 		vote = app.State.CacheGetCopy(txID)
 
-		// if vote is in cache, lazy check and remove it from cache
-		if forCommit && vote != nil {
-			vote.Height = height // update vote height
+		// if the vote exists in cache
+		if vote != nil {
+			// if not forCommit, it is a mempool check,
+			// reject it since we already processed the transaction before.
+			if !forCommit {
+				return nil, fmt.Errorf("vote %x already exists in cache", vote.Nullifier)
+			}
+
+			// if we are on DeliverTx and the vote is in cache, lazy check
 			defer app.State.CacheDel(txID)
+			vote.Height = height // update vote height
 			if exist, err := app.State.EnvelopeExists(vote.ProcessId,
 				vote.Nullifier, false); err != nil || exist {
 				if err != nil {
@@ -364,24 +366,20 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			return vote, nil
 		}
 
-		// if not forCommit, it is a mempool check,
-		// reject it since we already processed the transaction before.
-		if !forCommit && vote != nil {
-			return nil, fmt.Errorf("vote %x already exists in cache", vote.Nullifier)
-		}
-
 		// if not in cache, full check
 		// extract pubKey, generate nullifier and check census proof.
 		// add the transaction in the cache
-		if ve.Proof == nil {
-			return nil, fmt.Errorf("proof not found on transaction")
-		}
-
 		vote = &models.Vote{
 			Height:      height,
 			ProcessId:   ve.ProcessId,
 			VotePackage: ve.VotePackage,
 		}
+
+		// check proof is nil
+		if ve.Proof == nil {
+			return nil, fmt.Errorf("proof not found on transaction")
+		}
+
 		// If process encrypted, check the vote is encrypted (includes at least one key index)
 		if process.EnvelopeType.EncryptedVotes {
 			if len(ve.EncryptionKeyIndexes) == 0 {
@@ -400,12 +398,6 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 
 		// assign a nullifier
 		vote.Nullifier = GenerateNullifier(addr, vote.ProcessId)
-
-		// check that nullifier does not exist in cache already, this avoids
-		// processing multiple transactions with same nullifier.
-		if app.State.CacheHasNullifier(vote.Nullifier) {
-			return nil, fmt.Errorf("nullifier %x already exists in cache", vote.Nullifier)
-		}
 
 		// check if vote already exists
 		if exist, err := app.State.EnvelopeExists(vote.ProcessId,
