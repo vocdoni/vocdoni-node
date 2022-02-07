@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/crypto/ed25519"
@@ -14,6 +15,19 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/vochain"
 )
+
+type keypair struct {
+	Address string `json:"address"`
+	PrivKey string `json:"priv_key"`
+}
+
+type keyring struct {
+	Seeds   []keypair `json:"seeds"`
+	Miners  []keypair `json:"miners"`
+	Oracles []keypair `json:"oracles"`
+	// Treasurer is unique
+	Treasurer keypair `json:"treasurer"`
+}
 
 var genesisGenCmd = &cobra.Command{
 	Use:   "genesis",
@@ -29,10 +43,14 @@ func init() {
 	genesisGenCmd.Flags().String("treasurer", "", "address of the treasurer")
 	genesisGenCmd.Flags().String("chainId", "",
 		"an ID name for the genesis chain to generate (required)")
+	genesisGenCmd.Flags().BoolP("json", "j", false, "output a JSON document")
+	genesisGenCmd.Flags().StringP("file", "w", "", "write genesis to <file> instead of stdout")
 	cobra.CheckErr(genesisGenCmd.MarkFlagRequired("chainId"))
 }
 
 func genesisGen(cmd *cobra.Command, args []string) error {
+	var keys keyring
+
 	// Generate seeds
 	sCount, _ := cmd.Flags().GetInt("seeds")
 
@@ -40,17 +58,14 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 	for i := range seedPKs {
 		pk := ed25519.GenPrivKey()
 		seedPKs[i] = pk
-		prettyHeader(fmt.Sprintf("Seed #%d", i+1))
-		fmt.Printf("Address: %s\n", au.Yellow(hex.EncodeToString(seedPKs[i].PubKey().Address())))
-		fmt.Printf("Private Key: %s\n", au.Yellow(hex.EncodeToString(seedPKs[i])))
+		keys.Seeds = append(keys.Seeds, keypair{
+			Address: hex.EncodeToString(seedPKs[i].PubKey().Address()),
+			PrivKey: hex.EncodeToString(seedPKs[i]),
+		})
 	}
-	fmt.Println()
 
 	// Generate miners
-	mCount, err := cmd.Flags().GetInt("miners")
-	if err != nil {
-		return err
-	}
+	mCount, _ := cmd.Flags().GetInt("miners")
 
 	minerPVs := make([]privval.FilePV, mCount)
 	for i := range minerPVs {
@@ -61,11 +76,11 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 		//}
 		pv := privval.GenFilePV("", "")
 		minerPVs[i] = *pv
-		prettyHeader(fmt.Sprintf("Miner #%d", i+1))
-		fmt.Printf("Address: %s\n", au.Yellow(minerPVs[i].Key.Address))
-		fmt.Printf("Private Key: %x\n", au.Yellow(minerPVs[i].Key.PrivKey))
+		keys.Miners = append(keys.Miners, keypair{
+			Address: fmt.Sprintf("%s", minerPVs[i].Key.Address),
+			PrivKey: fmt.Sprintf("%x", minerPVs[i].Key.PrivKey),
+		})
 	}
-	fmt.Println()
 
 	// Generate oracles
 	oCount, _ := cmd.Flags().GetInt("oracles")
@@ -78,13 +93,12 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 		}
 
 		oracles[i] = oKeys[i].AddressString()
-
-		prettyHeader(fmt.Sprintf("Oracle #%d", i+1))
 		_, priv := oKeys[i].HexString()
-		fmt.Printf("Address: %s\n", au.Yellow(oKeys[i].AddressString()))
-		fmt.Printf("Private Key: %x\n", au.Yellow(priv))
+		keys.Oracles = append(keys.Oracles, keypair{
+			Address: oKeys[i].AddressString(),
+			PrivKey: priv,
+		})
 	}
-	fmt.Println()
 
 	// Generate genesis
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
@@ -93,11 +107,8 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 		Validator: vochain.ValidatorParams(tmConsensusParams.Validator),
 	}
 
-	// Get treasurer
-	treasurer, err := cmd.Flags().GetString("treasurer")
-	if err != nil {
-		return err
-	}
+	// Get or generate treasurer
+	treasurer, _ := cmd.Flags().GetString("treasurer")
 	t := &ethereum.SignKeys{}
 	if treasurer == "" {
 		// generate new treasurer
@@ -110,10 +121,11 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	prettyHeader("Treasurer")
-	fmt.Printf("Address: %s\n", au.Yellow(t.Address().String()))
 	_, priv := t.HexString()
-	fmt.Printf("Private Key: %x\n", au.Yellow(priv))
+	keys.Treasurer = keypair{
+		Address: t.Address().String(),
+		PrivKey: priv,
+	}
 
 	// Get chainID
 	chainID, _ := cmd.Flags().GetString("chainId")
@@ -127,12 +139,53 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	prettyHeader("Genesis JSON")
-	fmt.Printf("%s\n ", data)
+
+	printJson, _ := cmd.Flags().GetBool("json")
+
+	if printJson {
+		bytes, err := json.MarshalIndent(keys, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s\n", bytes)
+	} else {
+		prettyPrintKeyring(keys)
+	}
+
+	fmt.Println()
+
+	if file, _ := cmd.Flags().GetString("file"); file != "" {
+		if err := os.WriteFile(file, data.Bytes(), 0o600); err != nil {
+			return err
+		}
+	} else {
+		if !printJson {
+			prettyHeader("Genesis JSON")
+		}
+		fmt.Printf("%s\n ", data)
+	}
 
 	return nil
 }
 
 func prettyHeader(text string) {
 	fmt.Println(au.Red(">>>"), au.Blue(text))
+}
+
+func prettyPrintKeyring(keys keyring) {
+	prettyPrint(keys.Seeds, "Seed")
+	prettyPrint(keys.Miners, "Miner")
+	prettyPrint(keys.Oracles, "Oracle")
+	prettyPrint([]keypair{keys.Treasurer}, "Treasurer")
+}
+
+func prettyPrint(k []keypair, label string) {
+	for i, item := range k {
+		if i == 0 {
+			fmt.Println()
+		}
+		prettyHeader(fmt.Sprintf("%s #%d", label, i))
+		fmt.Printf("Address: %s\n", au.Yellow(item.Address))
+		fmt.Printf("Private Key: %s\n", au.Yellow(item.PrivKey))
+	}
 }

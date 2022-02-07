@@ -130,43 +130,43 @@
         "power": "10",
         "name": ""
       },
-    {
-      "address": "D96C74AEC40A747E26D95A00BF4F0A3699204574",
-      "pub_key": {
-        "type": "tendermint/PubKeyEd25519",
-        "value": "L9A9XLcLntzrSYLCbGIEFA7nhJepkyJf0Q9h2M3feWM="
+      {
+        "address": "D96C74AEC40A747E26D95A00BF4F0A3699204574",
+        "pub_key": {
+          "type": "tendermint/PubKeyEd25519",
+          "value": "L9A9XLcLntzrSYLCbGIEFA7nhJepkyJf0Q9h2M3feWM="
+        },
+        "power": "10",
+        "name": ""
       },
-      "power": "10",
-      "name": ""
-    },
-    {
-      "address": "0250FEA5B8510C689655F6086D83805684A40FD5",
-      "pub_key": {
-        "type": "tendermint/PubKeyEd25519",
-        "value": "xRfs+muLKFYUD0KAELq0pg5zsiNpRlRKeYMtFEmuvOI="
+      {
+        "address": "0250FEA5B8510C689655F6086D83805684A40FD5",
+        "pub_key": {
+          "type": "tendermint/PubKeyEd25519",
+          "value": "xRfs+muLKFYUD0KAELq0pg5zsiNpRlRKeYMtFEmuvOI="
+        },
+        "power": "10",
+        "name": ""
       },
-      "power": "10",
-      "name": ""
-    },
-    {
-      "address": "814F00193B1DCA1D61818D6F0F6F8A681186F07B",
-      "pub_key": {
-        "type": "tendermint/PubKeyEd25519",
-        "value": "1obMVOuPVnjE46Bg+DdEZC00uEaBh/L3koaKI9RlYwI="
+      {
+        "address": "814F00193B1DCA1D61818D6F0F6F8A681186F07B",
+        "pub_key": {
+          "type": "tendermint/PubKeyEd25519",
+          "value": "1obMVOuPVnjE46Bg+DdEZC00uEaBh/L3koaKI9RlYwI="
+        },
+        "power": "10",
+        "name": ""
       },
-      "power": "10",
-      "name": ""
-    },
-    {
-      "address": "EBD9D0A23050DFA6D93CB07BD75656B4791986D4",
-      "pub_key": {
-        "type": "tendermint/PubKeyEd25519",
-        "value": "JdLWNSSsQgw1GSv9I+lM2zJg3O5H3KvXeKvzggdiuTI="
-      },
-      "power": "10",
-      "name": ""
-    }
-	],
+      {
+        "address": "EBD9D0A23050DFA6D93CB07BD75656B4791986D4",
+        "pub_key": {
+          "type": "tendermint/PubKeyEd25519",
+          "value": "JdLWNSSsQgw1GSv9I+lM2zJg3O5H3KvXeKvzggdiuTI="
+        },
+        "power": "10",
+        "name": ""
+      }
+    ],
     "oracles": [
       "0xf7FB77ee1F309D9468fB6DCB71aDD0f934a33c6B"
     ],
