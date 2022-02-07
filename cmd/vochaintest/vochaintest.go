@@ -22,11 +22,12 @@ import (
 )
 
 var ops = map[string]bool{
-	"vtest":          true,
-	"cspvoting":      true,
-	"anonvoting":     true,
-	"censusImport":   true,
-	"censusGenerate": true,
+	"vtest":             true,
+	"cspvoting":         true,
+	"anonvoting":        true,
+	"censusImport":      true,
+	"censusGenerate":    true,
+	"tokentransactions": true,
 }
 
 func opsAvailable() (opsav []string) {
@@ -42,6 +43,7 @@ func main() {
 	loglevel := flag.String("logLevel", "info", "log level")
 	opmode := flag.String("operation", "vtest", fmt.Sprintf("set operation mode: %v", opsAvailable()))
 	oraclePrivKey := flag.String("oracleKey", "", "hexadecimal oracle private key")
+	treasurerPrivKey := flag.String("treasurerKey", "", "hexadecimal treasurer private key")
 	entityPrivKey := flag.String("entityKey", "", "hexadecimal entity private key")
 	host := flag.String("gwHost", "http://127.0.0.1:9090/dvote", "gateway websockets endpoint")
 	electionType := flag.String("electionType", "encrypted-poll", "encrypted-poll or poll-vote")
@@ -78,6 +80,12 @@ func main() {
 		fmt.Fprintf(os.Stderr,
 			"\t./test --operation=censusGenerate --gwHost "+
 				"wss://gw1test.vocdoni.net/dvote --electionSize=10000 --keysFile=keys.json\n")
+		fmt.Fprintf(os.Stderr,
+			"=> tokentransactions\n\tTests all token "+
+				"related transactions\n")
+		fmt.Fprintf(os.Stderr,
+			"\t./test --operation=tokentransactions --gwHost "+
+				"wss://gw1test.vocdoni.net/dvote\n")
 	}
 	flag.Parse()
 
@@ -147,11 +155,9 @@ func main() {
 		censusImport(*host, entityKey)
 	case "censusGenerate":
 		censusGenerate(*host, entityKey, *electionSize, *keysfile, 1)
-	case "testtxs":
+	case "tokentransactions":
 		// end-user voting is not tested here
-		testAllTransactions(*host,
-			*oraclePrivKey,
-		)
+		testTokenTransactions(*host, *treasurerPrivKey)
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
@@ -955,14 +961,13 @@ func cspVoteTest(
 }
 
 // enduser voting is not tested here
-func testAllTransactions(
+func testTokenTransactions(
 	host,
-	oraclePrivKey string,
+	treasurerPrivKey string,
 ) {
-	// oracle is also the treasurer
 	var err error
-	oracleSigner := ethereum.NewSignKeys()
-	if err := oracleSigner.AddHexKey(oraclePrivKey); err != nil {
+	treasurerSigner := ethereum.NewSignKeys()
+	if err := treasurerSigner.AddHexKey(treasurerPrivKey); err != nil {
 		log.Fatal(err)
 	}
 
@@ -986,25 +991,25 @@ func testAllTransactions(
 	if err != nil {
 		log.Fatal(err)
 	}
-	oracleSigner.VocdoniChainID = chainId
+	treasurerSigner.VocdoniChainID = chainId
 
 	// check set transaction cost
-	if err := testSetTxCost(mainClient, oracleSigner); err != nil {
+	if err := testSetTxCost(mainClient, treasurerSigner); err != nil {
 		log.Fatal(err)
 	}
 
 }
 
-func testSetTxCost(mainClient *client.Client, oracleSigner *ethereum.SignKeys) error {
+func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys) error {
 	// get treasurer
-	treasurer, err := mainClient.GetTreasurer(oracleSigner)
+	treasurer, err := mainClient.GetTreasurer(treasurerSigner)
 	if err != nil {
 		return err
 	}
 	log.Infof("treasurer fetched %s with nonce %d", common.BytesToAddress(treasurer.Address), treasurer.Nonce)
 
 	// get current tx cost
-	txCost, err := mainClient.GetTransactionCost(oracleSigner, models.TxType_SET_ACCOUNT_INFO)
+	txCost, err := mainClient.GetTransactionCost(treasurerSigner, models.TxType_SET_ACCOUNT_INFO)
 	if err != nil {
 		return err
 	}
@@ -1015,7 +1020,7 @@ func testSetTxCost(mainClient *client.Client, oracleSigner *ethereum.SignKeys) e
 		return fmt.Errorf("cannot get current height")
 	}
 	// set tx cost
-	if err := mainClient.SetTransactionCost(oracleSigner,
+	if err := mainClient.SetTransactionCost(treasurerSigner,
 		models.TxType_SET_ACCOUNT_INFO,
 		1000,
 		treasurer.Nonce); err != nil {
@@ -1036,11 +1041,11 @@ func testSetTxCost(mainClient *client.Client, oracleSigner *ethereum.SignKeys) e
 	}
 
 	// check tx cost changed and treasurer nonce incremented
-	treasurer2, err := mainClient.GetTreasurer(oracleSigner)
+	treasurer2, err := mainClient.GetTreasurer(treasurerSigner)
 	if err != nil {
 		return err
 	}
-	newTxCost, err := mainClient.GetTransactionCost(oracleSigner, models.TxType_SET_ACCOUNT_INFO)
+	newTxCost, err := mainClient.GetTransactionCost(treasurerSigner, models.TxType_SET_ACCOUNT_INFO)
 	if err != nil {
 		return err
 	}

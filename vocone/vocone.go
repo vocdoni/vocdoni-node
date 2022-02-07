@@ -198,17 +198,23 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 
 // SetTreasurer configures the vocone treasurer account address
 func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
-	return vc.app.State.SetTreasurer(treasurer)
+	return vc.app.State.SetTreasurer(treasurer, 0)
 }
 
 // MintTokens mints tokens to the given account address
 func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
-	return vc.app.State.MintBalance(to, amount)
+	if err := vc.app.State.MintBalance(to, amount); err != nil {
+		return err
+	}
+	return vc.app.State.IncrementTreasurerNonce()
 }
 
 // SetTxCost configures the transaction cost for the given tx type
 func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
-	return vc.app.State.SetTxCost(txType, cost)
+	if err := vc.app.State.SetTxCost(txType, cost); err != nil {
+		return err
+	}
+	return vc.app.State.IncrementTreasurerNonce()
 }
 
 func (vc *Vocone) setDefaultMethods() {

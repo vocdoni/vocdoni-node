@@ -304,7 +304,7 @@ func TestStateTreasurer(t *testing.T) {
 		Address: tAddr.Bytes(),
 		Nonce:   0,
 	}
-	qt.Assert(t, s.SetTreasurer(tAddr), qt.IsNil)
+	qt.Assert(t, s.SetTreasurer(tAddr, 0), qt.IsNil)
 
 	fetchedTreasurer, err := s.Treasurer(false)
 	qt.Assert(t, err, qt.IsNil)
@@ -333,7 +333,7 @@ func TestStateIsTreasurer(t *testing.T) {
 	s.SetHeight(height)
 
 	tAddr := common.HexToAddress("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d")
-	qt.Assert(t, s.SetTreasurer(tAddr), qt.IsNil)
+	qt.Assert(t, s.SetTreasurer(tAddr, 0), qt.IsNil)
 	r, err := s.IsTreasurer(tAddr)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, r, qt.IsTrue)
@@ -342,6 +342,29 @@ func TestStateIsTreasurer(t *testing.T) {
 	r, err = s.IsTreasurer(common.HexToAddress(notTreasurer))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, r, qt.IsFalse)
+}
+
+func TestIncrementTreasurerNonce(t *testing.T) {
+	log.Init("info", "stdout")
+	s, err := NewState(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	defer s.Close()
+
+	var height uint32 = 1
+	s.Rollback()
+	s.SetHeight(height)
+
+	tAddr := common.HexToAddress("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d")
+	qt.Assert(t, s.SetTreasurer(tAddr, 0), qt.IsNil)
+	r, err := s.IsTreasurer(tAddr)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, r, qt.IsTrue)
+
+	err = s.IncrementTreasurerNonce()
+	qt.Assert(t, err, qt.IsNil)
+	treasurer, err := s.Treasurer(false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, treasurer.Nonce, qt.Equals, uint32(1))
 }
 
 func TestStateSetGetTxCostByTxType(t *testing.T) {

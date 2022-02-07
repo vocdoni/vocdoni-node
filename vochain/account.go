@@ -256,6 +256,9 @@ func (v *State) CreateAccount(address common.Address, infoURI string, delegates 
 // SetAccountInfoTxCheck is an abstraction of ABCI checkTx for an setAccountInfoTx transaction
 // If the bool returned is true means that the account does not exist and is going to be created
 func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, bool, error) {
+	if vtx == nil {
+		return common.Address{}, false, ErrNilTx
+	}
 	tx := vtx.GetSetAccountInfo()
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {

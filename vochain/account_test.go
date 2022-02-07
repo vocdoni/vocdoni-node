@@ -72,12 +72,12 @@ func TestSetTransactionsCosts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// set tx cost for Tx: SendTokens
+	// set tx cost for Tx
 	if err := app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 10); err != nil {
 		t.Fatal(err)
 	}
 	// set treasurer account (same as signer for testing purposes)
-	if err := app.State.SetTreasurer(signer.Address()); err != nil {
+	if err := app.State.SetTreasurer(signer.Address(), 0); err != nil {
 		t.Fatal(err)
 	}
 
