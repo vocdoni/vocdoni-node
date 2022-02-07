@@ -476,7 +476,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		log.Fatalf("treasurer should be a valid Ethereum address: %s", err)
 	}
 	log.Infof("adding genesis treasurer %s", genesisAppState.Treasurer)
-	if err := app.State.SetTreasurer(ethcommon.HexToAddress(genesisAppState.Treasurer)); err != nil {
+	if err := app.State.SetTreasurer(ethcommon.HexToAddress(genesisAppState.Treasurer), 0); err != nil {
 		log.Fatalf("could not set State.Treasurer from genesis file: %s", err)
 	}
 

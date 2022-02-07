@@ -520,11 +520,11 @@ func (v *State) IsOracle(addr common.Address) (bool, error) {
 }
 
 // setTreasurer saves the Treasurer address to the state
-func (v *State) SetTreasurer(address common.Address) error {
+func (v *State) SetTreasurer(address common.Address, nonce uint32) error {
 	tBytes, err := proto.Marshal(
 		&models.Treasurer{
 			Address: address.Bytes(),
-			Nonce:   0,
+			Nonce:   nonce,
 		},
 	)
 	if err != nil {
@@ -562,23 +562,22 @@ func (v *State) IsTreasurer(addr common.Address) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	tAddr := common.BytesToAddress(t.Address)
-	return addr == tAddr, nil
+	return addr == common.BytesToAddress(t.Address), nil
 }
 
-// incrementTreasurerNonce increments the treasurer nonce
-func (v *State) incrementTreasurerNonce() error {
+// IncrementTreasurerNonce increments the treasurer nonce
+func (v *State) IncrementTreasurerNonce() error {
 	t, err := v.Treasurer(false)
 	if err != nil {
-		return err
-	}
-	t.Nonce++
-	tBytes, err := proto.Marshal(t)
-	if err != nil {
-		return err
+		return fmt.Errorf("incrementTreasurerNonce(): %w", err)
 	}
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
+	t.Nonce++
+	tBytes, err := proto.Marshal(t)
+	if err != nil {
+		return fmt.Errorf("incrementTreasurerNonce(): %w", err)
+	}
 	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
 }
 
@@ -591,7 +590,7 @@ func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 
-	costBytes := [8]byte{}
+	costBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(costBytes[:], cost)
 	return v.Tx.DeepSet([]byte(key), costBytes[:], ExtraCfg)
 }

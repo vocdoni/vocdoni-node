@@ -24,6 +24,8 @@ var (
 	ErrProcessNotFound     = fmt.Errorf("process not found")
 	ErrBalanceOverflow     = fmt.Errorf("balance overflow")
 	ErrAccountBalanceZero  = fmt.Errorf("zero balance account not valid")
+	ErrAccountNotExist     = fmt.Errorf("account does not exist")
+	ErrNilTx               = fmt.Errorf("nil transaction")
 	// keys; not constants because of []byte
 	voteCountKey = []byte("voteCount")
 )
@@ -91,6 +93,7 @@ func (t *TransactionCosts) AsMap() map[models.TxType]uint64 {
 	return b
 }
 
+// TxCostNameToTxTypeMap maps a valid string to a txType
 var TxCostNameToTxTypeMap = map[string]models.TxType{
 	"SetProcessStatus":        models.TxType_SET_PROCESS_STATUS,
 	"SetProcessCensus":        models.TxType_SET_PROCESS_CENSUS,
@@ -105,6 +108,7 @@ var TxCostNameToTxTypeMap = map[string]models.TxType{
 	"CollectFaucet":           models.TxType_COLLECT_FAUCET,
 }
 
+// TxCostNameToTxType converts a valid string to a txType
 func TxCostNameToTxType(key string) models.TxType {
 	if _, ok := TxCostNameToTxTypeMap[key]; ok {
 		return TxCostNameToTxTypeMap[key]
@@ -112,6 +116,7 @@ func TxCostNameToTxType(key string) models.TxType {
 	return models.TxType_TX_UNKNOWN
 }
 
+// TxTypeToCostNameMap maps a valid txType to a string
 var TxTypeToCostNameMap = map[models.TxType]string{
 	models.TxType_SET_PROCESS_STATUS:         "SetProcessStatus",
 	models.TxType_SET_PROCESS_CENSUS:         "SetProcessCensus",
@@ -126,6 +131,7 @@ var TxTypeToCostNameMap = map[models.TxType]string{
 	models.TxType_COLLECT_FAUCET:             "CollectFaucet",
 }
 
+// TxTypeToCostName converts a valid txType to a string
 func TxTypeToCostName(txType models.TxType) string {
 	if _, ok := TxTypeToCostNameMap[txType]; ok {
 		return TxTypeToCostNameMap[txType]
