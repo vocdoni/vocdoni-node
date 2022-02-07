@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	flag "github.com/spf13/pflag"
 
 	"go.vocdoni.io/dvote/client"
@@ -146,6 +147,11 @@ func main() {
 		censusImport(*host, entityKey)
 	case "censusGenerate":
 		censusGenerate(*host, entityKey, *electionSize, *keysfile, 1)
+	case "testtxs":
+		// end-user voting is not tested here
+		testAllTransactions(*host,
+			*oraclePrivKey,
+		)
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
@@ -946,4 +952,105 @@ func cspVoteTest(
 		log.Infof("results: %+v", r)
 	}
 	log.Infof("all done!")
+}
+
+// enduser voting is not tested here
+func testAllTransactions(
+	host,
+	oraclePrivKey string,
+) {
+	// oracle is also the treasurer
+	var err error
+	oracleSigner := ethereum.NewSignKeys()
+	if err := oracleSigner.AddHexKey(oraclePrivKey); err != nil {
+		log.Fatal(err)
+	}
+
+	log.Infof("connecting to main gateway %s", host)
+	// add the first connection, this will be the main connection
+	var mainClient *client.Client
+
+	for tries := 10; tries > 0; tries-- {
+		mainClient, err = client.New(host)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer mainClient.Close()
+
+	chainId, err := mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+	oracleSigner.VocdoniChainID = chainId
+
+	// check set transaction cost
+	if err := testSetTxCost(mainClient, oracleSigner); err != nil {
+		log.Fatal(err)
+	}
+
+}
+
+func testSetTxCost(mainClient *client.Client, oracleSigner *ethereum.SignKeys) error {
+	// get treasurer
+	treasurer, err := mainClient.GetTreasurer(oracleSigner)
+	if err != nil {
+		return err
+	}
+	log.Infof("treasurer fetched %s with nonce %d", common.BytesToAddress(treasurer.Address), treasurer.Nonce)
+
+	// get current tx cost
+	txCost, err := mainClient.GetTransactionCost(oracleSigner, models.TxType_SET_ACCOUNT_INFO)
+	if err != nil {
+		return err
+	}
+	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO, txCost)
+
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	// set tx cost
+	if err := mainClient.SetTransactionCost(oracleSigner,
+		models.TxType_SET_ACCOUNT_INFO,
+		1000,
+		treasurer.Nonce); err != nil {
+		return fmt.Errorf("cannot set transaction cost: %v", err)
+	}
+
+	log.Infof("waiting for new block ...")
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+
+	// check tx cost changed and treasurer nonce incremented
+	treasurer2, err := mainClient.GetTreasurer(oracleSigner)
+	if err != nil {
+		return err
+	}
+	newTxCost, err := mainClient.GetTransactionCost(oracleSigner, models.TxType_SET_ACCOUNT_INFO)
+	if err != nil {
+		return err
+	}
+	if treasurer2.Nonce != treasurer.Nonce+1 {
+		return fmt.Errorf("treasurer nonce expected to be %d got %d", treasurer.Nonce+1, treasurer2.Nonce)
+	}
+	if newTxCost != 1000 {
+		return fmt.Errorf("newProcessTx cost expected to be %d got %d", newTxCost, txCost)
+	}
+	log.Infof("tx cost of %s changed successfully from %d to %d", models.TxType_SET_ACCOUNT_INFO, txCost, newTxCost)
+	log.Infof("treasurer nonce changed successfully from %d to %d", treasurer.Nonce, treasurer2.Nonce)
+	return nil
 }
