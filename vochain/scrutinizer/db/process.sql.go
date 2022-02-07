@@ -150,7 +150,7 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 
 const searchProcesses = `-- name: SearchProcesses :many
 SELECT ID FROM processes
-WHERE (LENGTH(?) = 0 OR entity_id = ?)
+WHERE (LENGTH(?) = 0 OR LOWER(HEX(entity_id)) = ?)
 	AND (? = 0 OR namespace = ?)
 	AND (? = 0 OR status = ?)
 	AND (? = "" OR source_network_id = ?)
@@ -175,6 +175,8 @@ type SearchProcessesParams struct {
 	Offset          int32
 }
 
+// TODO(mvdan): drop the hex conversion on entity_id once we can use BLOB for
+// the column and parameter; see sqlc.yaml
 func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams) ([]types.ProcessID, error) {
 	rows, err := q.db.QueryContext(ctx, searchProcesses,
 		arg.EntityID,

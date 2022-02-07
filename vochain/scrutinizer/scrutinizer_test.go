@@ -364,6 +364,16 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected %d processes, got %d", len(endedPIDs), len(list))
 	}
 
+	// Search with an exact Entity ID, but starting with a null byte.
+	// This can trip up sqlite, as it assumes TEXT strings are NUL-terminated.
+	list, err = sc.ProcessList([]byte("\x00foobar"), 0, 100, "", 0, "", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("expected zero processes, got %d", len(list))
+	}
+
 	// list all processes, with a max of 10
 	list, err = sc.ProcessList(nil, 0, 10, "", 0, "", "", false)
 	qt.Assert(t, err, qt.IsNil)
