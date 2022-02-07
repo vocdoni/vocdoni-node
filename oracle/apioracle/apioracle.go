@@ -32,6 +32,7 @@ var srcNetworkIds = map[string]models.SourceNetworkId{
 	"mainnet":   models.SourceNetworkId_ETH_MAINNET_SIGNALING,
 	"homestead": models.SourceNetworkId_ETH_MAINNET_SIGNALING,
 	"rinkeby":   models.SourceNetworkId_ETH_RINKEBY_SIGNALING,
+	"matic":     models.SourceNetworkId_POLYGON,
 }
 
 type APIoracle struct {
