@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/enriquebris/goconcurrentqueue"
+	"github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 
@@ -193,6 +194,21 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 		}
 	}
 	return nil
+}
+
+// SetTreasurer configures the vocone treasurer account address
+func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
+	return vc.app.State.SetTreasurer(treasurer)
+}
+
+// MintTokens mints tokens to the given account address
+func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
+	return vc.app.State.MintBalance(to, amount)
+}
+
+// SetTxCost configures the transaction cost for the given tx type
+func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
+	return vc.app.State.SetTxCost(txType, cost)
 }
 
 func (vc *Vocone) setDefaultMethods() {
