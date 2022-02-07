@@ -2,6 +2,7 @@ package processarchive
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,9 +34,18 @@ type Process struct {
 	EndDate     *time.Time            `json:"endDate,omitempty"`
 }
 
+type Index struct {
+	Entities map[string][]*IndexProcess `json:"entities"`
+}
+
+type IndexProcess struct {
+	ProcessID types.HexBytes `json:"processId"`
+}
+
 type jsonStorage struct {
 	datadir string
 	lock    sync.RWMutex
+	index   *Index
 }
 
 // NewJsonStorage opens a new jsonStorage file at the location provided by datadir
@@ -44,7 +54,19 @@ func NewJsonStorage(datadir string) (*jsonStorage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &jsonStorage{datadir: datadir}, nil
+	i := &Index{
+		Entities: make(map[string][]*IndexProcess),
+	}
+	indexFile := filepath.Join(datadir, "index.json")
+	indexData, err := os.ReadFile(indexFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	} else if err == nil {
+		if err := json.Unmarshal(indexData, i); err != nil {
+			return nil, err
+		}
+	}
+	return &jsonStorage{datadir: datadir, index: i}, nil
 }
 
 // AddProcess adds an entire process to js
@@ -52,14 +74,33 @@ func (js *jsonStorage) AddProcess(p *Process) error {
 	if p == nil || p.ProcessInfo == nil || len(p.ProcessInfo.ID) != types.ProcessIDsize {
 		return fmt.Errorf("process not valid")
 	}
-	data, err := json.MarshalIndent(p, " ", " ")
+	procData, err := json.MarshalIndent(p, " ", " ")
 	if err != nil {
 		return err
 	}
 	js.lock.Lock()
 	defer js.lock.Unlock()
+	procPath := filepath.Join(js.datadir, fmt.Sprintf("%x", p.ProcessInfo.ID))
+
+	// If process file does not exist it means it is a new process, so we add it to the index
+	if _, err := os.Stat(procPath); errors.Is(err, os.ErrNotExist) {
+		eid := fmt.Sprintf("%x", p.ProcessInfo.EntityID)
+		if js.index.Entities[eid] == nil {
+			js.index.Entities[eid] = []*IndexProcess{}
+		}
+		js.index.Entities[eid] = append(js.index.Entities[eid], &IndexProcess{ProcessID: p.ProcessInfo.ID})
+		indexData, err := json.MarshalIndent(js.index, " ", " ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(js.datadir, "index.json"), indexData, 0o644); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
 	// TO-DO: use https://github.com/google/renameio
-	return os.WriteFile(filepath.Join(js.datadir, fmt.Sprintf("%x", p.ProcessInfo.ID)), data, 0o644)
+	return os.WriteFile(procPath, procData, 0o644)
 }
 
 // GetProcess retreives a process from the js storage
