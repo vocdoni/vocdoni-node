@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -44,11 +46,6 @@ func testSetAccountInfoTx(t *testing.T,
 	signer *ethereum.SignKeys,
 	app *BaseApplication,
 	infoURI string) error {
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
-	var stx models.SignedTx
 	var err error
 
 	tx := &models.SetAccountInfoTx{
@@ -56,28 +53,100 @@ func testSetAccountInfoTx(t *testing.T,
 		InfoURI: infoURI,
 	}
 
+	stx := &models.SignedTx{}
 	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{SetAccountInfo: tx}}); err != nil {
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
+	if err := sendTx(app, signer, stx); err != nil {
+		return err
+	}
+	app.Commit()
+	return nil
+}
+
+func TestSetTransactionsCosts(t *testing.T) {
+	app := TestBaseApplication(t)
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
 		t.Fatal(err)
 	}
 
-	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
+	// set tx cost for Tx: SendTokens
+	if err := app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 10); err != nil {
 		t.Fatal(err)
 	}
+	// set treasurer account (same as signer for testing purposes)
+	if err := app.State.setTreasurer(signer.Address()); err != nil {
+		t.Fatal(err)
+	}
+
+	// should change tx cost if treasurer
+	if err := testSetTransactionCostsTx(t, app, &signer, 0, 20); err != nil {
+		t.Fatal(err)
+	}
+	// should not change tx costs if not treasurer
+	if err := testSetTransactionCostsTx(t, app, &signer, 0, 20); err == nil {
+		t.Fatal(err)
+	}
+
+	if cost, err := app.State.TxCost(models.TxType_COLLECT_FAUCET, false); err != nil {
+		t.Fatal(err)
+	} else {
+		qt.Assert(t, cost, qt.Equals, uint64(20))
+	}
+}
+
+func testSetTransactionCostsTx(t *testing.T,
+	app *BaseApplication,
+	signer *ethereum.SignKeys,
+	nonce uint32,
+	cost uint64) error {
+	var err error
+
+	// tx
+	tx := &models.SetTransactionCostsTx{
+		Txtype: models.TxType_COLLECT_FAUCET,
+		Nonce:  nonce,
+		Value:  cost,
+	}
+
+	stx := &models.SignedTx{}
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetTransactionCosts{SetTransactionCosts: tx}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := sendTx(app, signer, stx); err != nil {
+		return err
+	}
+	app.Commit()
+	return nil
+}
+
+// sendTx signs and sends a vochain transaction
+func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedTx) error {
+	var cktx abcitypes.RequestCheckTx
+	var detx abcitypes.RequestDeliverTx
+	var cktxresp abcitypes.ResponseCheckTx
+	var detxresp abcitypes.ResponseDeliverTx
+	var err error
+
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
+		return err
+	}
+	stxBytes, err := proto.Marshal(stx)
+	if err != nil {
+		return err
+	}
+
+	cktx.Tx = stxBytes
 	cktxresp = app.CheckTx(cktx)
 	if cktxresp.Code != 0 {
 		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
 	}
-	if detx.Tx, err = proto.Marshal(&stx); err != nil {
-		t.Fatal(err)
-	}
+	detx.Tx = stxBytes
 	detxresp = app.DeliverTx(detx)
 	if detxresp.Code != 0 {
 		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
 	}
-	app.Commit()
 	return nil
 }

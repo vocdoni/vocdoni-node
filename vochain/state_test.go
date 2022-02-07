@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"testing"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
@@ -299,14 +299,18 @@ func TestStateTreasurer(t *testing.T) {
 	s.Rollback()
 	s.SetHeight(height)
 
-	treasurer := "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"
-	qt.Assert(t, s.setTreasurer(ethcommon.HexToAddress(treasurer)), qt.IsNil)
+	tAddr := common.HexToAddress("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d")
+	treasurer := &models.Treasurer{
+		Address: tAddr.Bytes(),
+		Nonce:   0,
+	}
+	qt.Assert(t, s.setTreasurer(tAddr), qt.IsNil)
 
 	fetchedTreasurer, err := s.Treasurer(false)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, fetchedTreasurer.String(), qt.CmpEquals(), treasurer)
+	qt.Assert(t, fetchedTreasurer.Address, qt.CmpEquals(), treasurer.Address)
 
-	fetchedTreasurer, err = s.Treasurer(true)
+	_, err = s.Treasurer(true)
 	// key does not exist yet
 	qt.Assert(t, err, qt.IsNotNil)
 
@@ -315,7 +319,7 @@ func TestStateTreasurer(t *testing.T) {
 
 	fetchedTreasurer, err = s.Treasurer(true)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, fetchedTreasurer.String(), qt.CmpEquals(), treasurer)
+	qt.Assert(t, fetchedTreasurer.Address, qt.CmpEquals(), treasurer.Address)
 }
 
 func TestStateIsTreasurer(t *testing.T) {
@@ -328,14 +332,30 @@ func TestStateIsTreasurer(t *testing.T) {
 	s.Rollback()
 	s.SetHeight(height)
 
-	treasurer := "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"
-	qt.Assert(t, s.setTreasurer(ethcommon.HexToAddress(treasurer)), qt.IsNil)
-	r, err := s.IsTreasurer(ethcommon.HexToAddress(treasurer))
+	tAddr := common.HexToAddress("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d")
+	qt.Assert(t, s.setTreasurer(tAddr), qt.IsNil)
+	r, err := s.IsTreasurer(tAddr)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, r, qt.IsTrue)
 
 	notTreasurer := "0x000000000000000000000000000000000000dead"
-	r, err = s.IsTreasurer(ethcommon.HexToAddress(notTreasurer))
+	r, err = s.IsTreasurer(common.HexToAddress(notTreasurer))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, r, qt.IsFalse)
+}
+
+func TestStateSetGetTxCostByTxType(t *testing.T) {
+	log.Init("info", "stdout")
+	s, err := NewState(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	defer s.Close()
+
+	var height uint32 = 1
+	s.Rollback()
+	s.SetHeight(height)
+
+	qt.Assert(t, s.SetTxCost(models.TxType_SET_PROCESS_CENSUS, 100), qt.IsNil)
+	cost, err := s.TxCost(models.TxType_SET_PROCESS_CENSUS, false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, cost, qt.Equals, uint64(100))
 }
