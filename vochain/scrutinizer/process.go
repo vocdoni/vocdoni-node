@@ -214,6 +214,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 		IDSubstr:        searchTerm,
 		Offset:          int32(from),
 		Limit:           int32(max),
+		WithResults:     withResults,
 	})
 	log.Debugf("ProcessList sqlite took %s", time.Since(sqlStartTime))
 	if err != nil {

@@ -280,6 +280,8 @@ func TestProcessSearch(t *testing.T) {
 		"8011d50537fa164b6fef261141797bbe4014526e",
 		"9011d50537fa164b6fef261141797bbe4014526e",
 	}
+	pidExact := processIds[3]
+	pidExactEncrypted := processIds[5]
 	// For a entity, add 25 processes (this will be the queried entity)
 	eidTest := util.RandomBytes(20)
 	for i, process := range processIds {
@@ -287,12 +289,13 @@ func TestProcessSearch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		encrypted := process == pidExactEncrypted
 		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
 			EntityId:     eidTest,
 			BlockCount:   10,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
+			EnvelopeType: &models.EnvelopeType{EncryptedVotes: encrypted},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -328,8 +331,16 @@ func TestProcessSearch(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Exact process search
-	list, err := sc.ProcessList(eidTest, 0, 10,
-		"4011d50537fa164b6fef261141797bbe4014526e", 0, "", "", false)
+	list, err := sc.ProcessList(eidTest, 0, 10, pidExact, 0, "", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) < 1 {
+		t.Fatalf("expected 1 process, got %d", len(list))
+	}
+	// Exact process search, with it being encrypted.
+	// This once caused a sqlite bug due to a mistake in the SQL query.
+	list, err = sc.ProcessList(eidTest, 0, 10, pidExactEncrypted, 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
