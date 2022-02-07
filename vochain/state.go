@@ -34,6 +34,22 @@ import (
 // arbo.HashFunctionBlake2b.Len()
 const defaultHashLen = 32
 
+// TxTypeCostToStateKey translates models.TxType to a string which the State uses
+// as a key internally under the Extra tree
+var TxTypeCostToStateKey = map[models.TxType]string{
+	models.TxType_SET_PROCESS_STATUS:         "c_setProcessStatus",
+	models.TxType_SET_PROCESS_CENSUS:         "c_setProcessCensus",
+	models.TxType_SET_PROCESS_QUESTION_INDEX: "c_setProcessResults",
+	models.TxType_SET_PROCESS_RESULTS:        "c_setProcessQuestionIndex",
+	models.TxType_REGISTER_VOTER_KEY:         "c_registerKey",
+	models.TxType_NEW_PROCESS:                "c_newProcess",
+	models.TxType_SEND_TOKENS:                "c_sendTokens",
+	models.TxType_SET_ACCOUNT_INFO:           "c_setAccountInfo",
+	models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "c_addDelegateForAccount",
+	models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   "c_delDelegateForAccount",
+	models.TxType_COLLECT_FAUCET:             "c_collectFaucet",
+}
+
 // rootLeafGetRoot is the GetRootFn function for a leaf that is the root
 // itself.
 func rootLeafGetRoot(value []byte) ([]byte, error) {
@@ -505,36 +521,100 @@ func (v *State) IsOracle(addr common.Address) (bool, error) {
 
 // setTreasurer saves the Treasurer address to the state
 func (v *State) setTreasurer(address common.Address) error {
+	tBytes, err := proto.Marshal(
+		&models.Treasurer{
+			Address: address.Bytes(),
+			Nonce:   0,
+		},
+	)
+	if err != nil {
+		return err
+	}
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	return v.Tx.DeepSet([]byte(TreasurerKey), address.Bytes(), ExtraCfg)
+	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
 }
 
-func (v *State) Treasurer(isQuery bool) (common.Address, error) {
+// Treasurer returns the address and the Treasurer nonce
+func (v *State) Treasurer(isQuery bool) (*models.Treasurer, error) {
 	if !isQuery {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-
 	extraTree, err := v.mainTreeViewer(isQuery).SubTree(ExtraCfg)
 	if err != nil {
-		return common.Address{}, err
+		return nil, err
 	}
-
 	var rawTreasurer []byte
 	if rawTreasurer, err = extraTree.Get([]byte(TreasurerKey)); err != nil {
-		return common.Address{}, err
+		return nil, err
 	}
-	return common.BytesToAddress(rawTreasurer), nil
+	var t models.Treasurer
+	if err := proto.Unmarshal(rawTreasurer, &t); err != nil {
+		return nil, err
+	}
+	return &t, nil
 }
 
+// IsTreasurer returns true if the given address matches the Treasurer address
 func (v *State) IsTreasurer(addr common.Address) (bool, error) {
-	tAddr, err := v.Treasurer(false)
+	t, err := v.Treasurer(false)
 	if err != nil {
 		return false, err
 	}
-
+	tAddr := common.BytesToAddress(t.Address)
 	return addr == tAddr, nil
+}
+
+// incrementTreasurerNonce increments the treasurer nonce
+func (v *State) incrementTreasurerNonce() error {
+	t, err := v.Treasurer(false)
+	if err != nil {
+		return err
+	}
+	t.Nonce++
+	tBytes, err := proto.Marshal(t)
+	if err != nil {
+		return err
+	}
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
+}
+
+// SetTxCost sets the given transaction cost
+func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
+	key, ok := TxTypeCostToStateKey[txType]
+	if !ok {
+		return fmt.Errorf("txType %v shouldn't cost anything", txType)
+	}
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+
+	costBytes := [8]byte{}
+	binary.LittleEndian.PutUint64(costBytes[:], cost)
+	return v.Tx.DeepSet([]byte(key), costBytes[:], ExtraCfg)
+}
+
+// TxCost returns the cost of a given transaction
+func (v *State) TxCost(txType models.TxType, isQuery bool) (uint64, error) {
+	key, ok := TxTypeCostToStateKey[txType]
+	if !ok {
+		return 0, fmt.Errorf("txType %v shouldn't cost anything", txType)
+	}
+	if !isQuery {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	extraTree, err := v.mainTreeViewer(isQuery).SubTree(ExtraCfg)
+	if err != nil {
+		return 0, err
+	}
+	var cost []byte
+	if cost, err = extraTree.Get([]byte(key)); err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint64(cost), nil
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey

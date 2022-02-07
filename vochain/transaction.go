@@ -177,6 +177,18 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			return vtx.TxID[:], app.State.SetAccountInfoURI(accountAddr, vtx.Tx.GetSetAccountInfo().GetInfoURI())
 		}
 
+	case *models.Tx_SetTransactionCosts:
+		cost, err := SetTransactionCostsTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		if err != nil {
+			return []byte{}, fmt.Errorf("setTransactionCostsTx: %w", err)
+		}
+		if commit {
+			if err := app.State.SetTxCost(vtx.Tx.GetSetTransactionCosts().Txtype, cost); err != nil {
+				return []byte{}, fmt.Errorf("setTransactionCosts: %w", err)
+			}
+			return vtx.TxID[:], app.State.incrementTreasurerNonce()
+		}
+
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
 	}
@@ -584,4 +596,44 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		}
 	}
 	return nil
+}
+
+func SetTransactionCostsTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (uint64, error) {
+	tx := vtx.GetSetTransactionCosts()
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return 0, fmt.Errorf("missing signature and/or transaction")
+	}
+	// check value
+	if tx.Value <= 0 {
+		return 0, fmt.Errorf("invalid value")
+	}
+	// get address from signature
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
+	if err != nil {
+		return 0, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	sigAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return 0, fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	// get treasurer
+	treasurer, err := state.Treasurer(false)
+	if err != nil {
+		return 0, err
+	}
+	// check signature recovered address
+	tAddr := common.BytesToAddress(treasurer.Address)
+	if tAddr != sigAddress {
+		return 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", treasurer.String(), sigAddress.String())
+	}
+	// check nonce
+	if tx.Nonce != treasurer.Nonce {
+		return 0, fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce)
+	}
+	// check valid tx type
+	if _, ok := TxTypeCostToStateKey[tx.Txtype]; !ok {
+		return 0, fmt.Errorf("tx type not supported")
+	}
+	return tx.Value, nil
 }
