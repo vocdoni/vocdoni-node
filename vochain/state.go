@@ -503,8 +503,8 @@ func (v *State) IsOracle(addr common.Address) (bool, error) {
 	}(), nil
 }
 
-// setTreasurer saves the Treasurer address to the state
-func (v *State) setTreasurer(address common.Address) error {
+// SetTreasurer saves the Treasurer address to the state
+func (v *State) SetTreasurer(address common.Address) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 	return v.Tx.DeepSet([]byte(TreasurerKey), address.Bytes(), ExtraCfg)
