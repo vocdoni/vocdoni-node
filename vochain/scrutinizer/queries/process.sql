@@ -28,7 +28,9 @@ LIMIT 1;
 
 -- name: SearchProcesses :many
 SELECT ID FROM processes
-WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
+-- TODO(mvdan): drop the hex conversion on entity_id once we can use BLOB for
+-- the column and parameter; see sqlc.yaml
+WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR LOWER(HEX(entity_id)) = sqlc.arg(entity_id))
 	AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
 	AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
 	AND (sqlc.arg(source_network_id) = "" OR source_network_id = sqlc.arg(source_network_id))

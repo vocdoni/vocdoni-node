@@ -207,7 +207,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 	}
 	sqlStartTime := time.Now()
 	sqlProcs, err := queries.SearchProcesses(ctx, scrutinizerdb.SearchProcessesParams{
-		EntityID:        string(entityID),
+		EntityID:        hex.EncodeToString(entityID), // NOTE: we search as hex string instead of []byte; see sqlc.yaml
 		Namespace:       int64(namespace),
 		Status:          int64(statusnum),
 		SourceNetworkID: srcNetworkIdstr,
@@ -444,7 +444,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 	defer cancel()
 	if _, err := queries.CreateProcess(ctx, scrutinizerdb.CreateProcessParams{
 		ID:                pid,
-		EntityID:          string(eid), // NOTE: we use string instead of []byte; see sqlc.yaml
+		EntityID:          string(eid), // NOTE: we store as string instead of []byte; see sqlc.yaml
 		EntityIndex:       int64(entity.ProcessCount),
 		StartBlock:        int64(p.GetStartBlock()),
 		EndBlock:          int64(p.GetBlockCount() + p.GetStartBlock()),
