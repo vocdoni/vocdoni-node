@@ -168,6 +168,7 @@ type APIresponse struct {
 	CircuitIndex         *int                             `json:"circuitIndex,omitempty"`
 	CircuitConfig        *artifacts.CircuitConfig         `json:"circuitConfig,omitempty"`
 	Content              []byte                           `json:"content,omitempty"`
+	Amount               *uint64                          `json:"amount,omitempty"`
 	CreationTime         int64                            `json:"creationTime,omitempty"`
 	Delegates            []string                         `json:"delegates,omitempty"`
 	EncryptionPrivKeys   []Key                            `json:"encryptionPrivKeys,omitempty"`

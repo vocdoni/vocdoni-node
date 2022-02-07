@@ -6,8 +6,10 @@ set -x
 #  2: run encrypted vote test
 #  3: run anonymous vote test
 #  4: run csp vote test
+#  5: run all transactions test (end-user voting is not included)
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
+ORACLE_KEY=${TESTSUITE_ORACLE_KEY:-6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223}
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
 ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 TEST=${1:-0}
@@ -24,7 +26,12 @@ test_anon() {
 }
 
 test_csp() {
-	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway:9090/dvote --logLevel=$LOGLEVEL --operation=cspvoting --electionType=$1
+	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway0:9090/dvote --logLevel=$LOGLEVEL --operation=cspvoting --electionType=$1
+	echo $? >$1
+}
+
+test_txs() {
+	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --gwHost http://gateway0:9090/dvote --logLevel=$LOGLEVEL --operation=testtxs
 	echo $? >$1
 }
 
@@ -67,10 +74,18 @@ testid="/tmp/.vochaintest$RANDOM"
 	test test_csp ${testid}4 &
 } || echo 0 >${testid}4
 
-echo "### Waiting for tests ###"
+echo "### Waiting for voting process tests ###"
 wait
 
-[ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" -a "$(cat ${testid}3)" == "0" -a "$(cat ${testid}4)" == "0" ] && {
+[ $TEST -eq 5 -o $TEST -eq 0 ] && {
+	echo "### Running test 5 ###"
+	test_txs ${testid}5 &
+} || echo 0 >${testid}5
+
+echo "### Waiting for all state txs tests ###"
+wait
+
+[ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" -a "$(cat ${testid}3)" == "0" -a "$(cat ${testid}4)" == "0" -a "$(cat ${testid}5)" == "0" ] && {
 	echo "Vochain test finished correctly!"
 	RET=0
 } || {
@@ -85,5 +100,5 @@ wait
 	docker-compose down -v --remove-orphans
 }
 
-rm -f ${testid}1 ${testid}2 ${testid}3 ${testid}4
+rm -f ${testid}1 ${testid}2 ${testid}3 ${testid}4 ${testid}5
 exit $RET

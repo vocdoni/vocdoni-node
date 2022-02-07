@@ -23,6 +23,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -1289,4 +1290,75 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 		return nil, "", err
 	}
 	return resp.Root, uri, nil
+}
+
+// GetTreasurer returns information about the treasurer
+func (c *Client) GetTreasurer(signer *ethereum.SignKeys) (*models.Treasurer, error) {
+	req := api.APIrequest{Method: "getTreasurer"}
+	resp, err := c.Request(req, signer)
+	treasurer := &models.Treasurer{}
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Ok {
+		return nil, fmt.Errorf("cannot not get treasurer: %s", resp.Message)
+	}
+	if resp.EntityID != "" {
+		treasurer.Address = common.HexToAddress(resp.EntityID).Bytes()
+	}
+	if resp.Nonce != nil {
+		treasurer.Nonce = *resp.Nonce
+	}
+	return treasurer, nil
+}
+
+// GetTreasurer returns information about the treasurer
+func (c *Client) GetTransactionCost(signer *ethereum.SignKeys, txType models.TxType) (uint64, error) {
+	req := api.APIrequest{Method: "getTxCost", Type: vochain.TxTypeToCostName(txType)}
+	resp, err := c.Request(req, signer)
+	if err != nil {
+		return 0, err
+	}
+	if !resp.Ok {
+		return 0, fmt.Errorf("cannot get tx cost: %s", resp.Message)
+	}
+	return *resp.Amount, nil
+}
+
+// SetTransactionCost sets the transaction cost of a given transaction
+func (c *Client) SetTransactionCost(signer *ethereum.SignKeys, txType models.TxType, cost uint64, nonce uint32) error {
+	var err error
+
+	tx := &models.SetTransactionCostsTx{
+		Txtype: models.TxType_SET_ACCOUNT_INFO,
+		Nonce:  nonce,
+		Value:  cost,
+	}
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetTransactionCosts{SetTransactionCosts: tx}})
+	if err != nil {
+		return err
+	}
+	resp, err := c.SubmitRawTx(signer, &stx)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("submitRawTx failed: %s", resp.Message)
+	}
+	return nil
+}
+
+// SubmitRawTx signs and sends a vochain transaction
+func (c *Client) SubmitRawTx(signer *ethereum.SignKeys, stx *models.SignedTx) (*api.APIresponse, error) {
+	var err error
+	var req api.APIrequest
+	req.Method = "submitRawTx"
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
+		return nil, err
+	}
+	if req.Payload, err = proto.Marshal(stx); err != nil {
+		return nil, err
+	}
+	return c.Request(req, nil)
 }

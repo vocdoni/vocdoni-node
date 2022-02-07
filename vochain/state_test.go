@@ -304,7 +304,7 @@ func TestStateTreasurer(t *testing.T) {
 		Address: tAddr.Bytes(),
 		Nonce:   0,
 	}
-	qt.Assert(t, s.setTreasurer(tAddr), qt.IsNil)
+	qt.Assert(t, s.SetTreasurer(tAddr), qt.IsNil)
 
 	fetchedTreasurer, err := s.Treasurer(false)
 	qt.Assert(t, err, qt.IsNil)
@@ -333,7 +333,7 @@ func TestStateIsTreasurer(t *testing.T) {
 	s.SetHeight(height)
 
 	tAddr := common.HexToAddress("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d")
-	qt.Assert(t, s.setTreasurer(tAddr), qt.IsNil)
+	qt.Assert(t, s.SetTreasurer(tAddr), qt.IsNil)
 	r, err := s.IsTreasurer(tAddr)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, r, qt.IsTrue)

@@ -77,7 +77,7 @@ func TestSetTransactionsCosts(t *testing.T) {
 		t.Fatal(err)
 	}
 	// set treasurer account (same as signer for testing purposes)
-	if err := app.State.setTreasurer(signer.Address()); err != nil {
+	if err := app.State.SetTreasurer(signer.Address()); err != nil {
 		t.Fatal(err)
 	}
 
