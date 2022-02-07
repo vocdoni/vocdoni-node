@@ -34,41 +34,57 @@ import (
 func main() {
 	var dataDir, chain, action, logLevel, pid string
 	var blockHeight int
-	flag.StringVar(&dataDir, "dataDir", "", "data directory")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("cannot get user home directory with error: %v", err)
+	}
+	dataDir = filepath.Join(home, ".dvote", chain, "vochain")
+	flag.StringVar(&dataDir, "dataDir", dataDir, "vochain data directory (absolute path)")
 	flag.StringVar(&logLevel, "logLevel", "info", "log level [error,warn,info,debug]")
 	flag.StringVar(&chain, "chain", "stage", "chain [stage,dev,prod]")
-	flag.StringVar(&action, "action", "sync", "action to execute [sync,block,blockList,listProcess,listVotes]")
+	flag.StringVar(&action, "action", "sync", `action to execute: 
+	sync = synchronize the blockchain
+	block = print a block from the blockstore
+	blockList = list blocks and numfer of transactions
+	listProcess = list voting processes from the state at specific height
+	listVotes = list votes from the state at specific height
+	listBlockVotes = list existing votes from a block (with nullifier)
+	stateGraph = prints the graphViz of the state main tree`)
 	flag.IntVar(&blockHeight, "height", 0, "height block to inspect")
 	flag.StringVar(&pid, "processId", "", "processId as hexadecimal string")
 
 	flag.Parse()
 	log.Init(logLevel, "stdout")
 
-	if dataDir == "" {
-		// get current user home dir
-		home, err := os.UserHomeDir()
-		if err != nil {
-			log.Fatalf("cannot get user home directory with error: %v", err)
-		}
-		dataDir = filepath.Join(home, ".dvote", chain, "vochain")
-	}
-
 	switch action {
 	case "listProcess":
 		if blockHeight == 0 {
 			log.Fatal("listProcess requires a heigh value")
 		}
-		path := filepath.Join(dataDir, "data", "blockStore.db")
+		path := filepath.Join(dataDir, "data", "vcstate")
 		log.Infof("opening state database path %s", path)
-		listStateProcesses(int64(blockHeight), filepath.Join(dataDir, "data", "vcstate"))
+		listStateProcesses(int64(blockHeight), path)
 
 	case "listVotes":
 		if blockHeight == 0 {
 			log.Fatal("listVotes requires a heigh value")
 		}
-		path := filepath.Join(dataDir, "data", "blockStore.db")
+		path := filepath.Join(dataDir, "data", "vcstate")
 		log.Infof("opening state database path %s", path)
-		listStateVotes(pid, int64(blockHeight), filepath.Join(dataDir, "data", "vcstate"))
+		listStateVotes(pid, int64(blockHeight), path)
+
+	case "listBlockVotes":
+		if blockHeight == 0 {
+			log.Fatal("listBlockVotes requires a heigh value")
+		}
+		listBlockVotes(int64(blockHeight), dataDir)
+
+	case "stateGraph":
+		if blockHeight == 0 {
+			log.Fatal("stateGraph requires a heigh value")
+		}
+		path := filepath.Join(dataDir, "data", "vcstate")
+		graphVizMainTree(int64(blockHeight), path)
 
 	case "sync":
 		vnode := newVochain(chain, dataDir)
@@ -190,7 +206,7 @@ func voteID(pid, nullifier []byte) ([]byte, error) {
 	return vid.Sum(nil), nil
 }
 
-func listVotes(height int64, blockStoreDir string) {
+func listBlockVotes(height int64, blockStoreDir string) {
 	cfg := tmcfg.DefaultConfig()
 	cfg.RootDir = blockStoreDir
 	blockStoreDB, err := node.DefaultDBProvider(&node.DBContext{ID: "blockstore", Config: cfg})
@@ -198,9 +214,15 @@ func listVotes(height int64, blockStoreDir string) {
 		log.Fatal("Can't open blockstore")
 	}
 	blockStore := store.NewBlockStore(blockStoreDB)
+	if blockStore == nil {
+		log.Fatal("Blockstore is nil")
+	}
 	block := blockStore.LoadBlock(height)
+	if block == nil {
+		log.Fatal("Block is nil")
+	}
 	fmt.Printf("Block txs: %v\n", len(block.Data.Txs))
-	for _, blockTx := range block.Data.Txs {
+	for i, blockTx := range block.Data.Txs {
 		tx := new(vochain.VochainTx)
 		if err := tx.Unmarshal(blockTx, ""); err != nil {
 			log.Error(err)
@@ -226,7 +248,8 @@ func listVotes(height int64, blockStoreDir string) {
 		if err != nil {
 			log.Fatalf("cannot get voteID: %v", err)
 		}
-		fmt.Printf("%x\n", vid)
+
+		fmt.Printf("vote %d pid:%x vid:%x proofType:%s\n", i, vote.ProcessId, vid, reflect.TypeOf(vote.Proof.Payload))
 	}
 }
 
