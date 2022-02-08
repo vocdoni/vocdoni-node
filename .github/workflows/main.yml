@@ -8,7 +8,8 @@ jobs:
     runs-on: self-hosted
     container:
       image: golang:1.17.4
-      options: --user 1000
+      # options: --user 1000
+      options: --user 0 # Running as root to avoid permissions issues
     if: github.repository == 'vocdoni/vocdoni-node'
     defaults:
       run:
