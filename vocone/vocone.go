@@ -217,6 +217,19 @@ func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 	return vc.app.State.IncrementTreasurerNonce()
 }
 
+// SetBulkTxCosts configures the transaction cost for all transaction types that have a cost
+func (vc *Vocone) SetBulkTxCosts(txCosts uint64) error {
+	for k := range vochain.TxTypeCostToStateKey {
+		log.Debugf("setting tx cost for txtype %s", models.TxType_name[int32(k)])
+		err := vc.app.State.SetTxCost(k, txCosts)
+		if err != nil {
+			return err
+		}
+
+	}
+	return vc.app.State.IncrementTreasurerNonce()
+}
+
 func (vc *Vocone) setDefaultMethods() {
 	vc.app.IsSynchronizing = func() bool { return false }
 	vc.app.SetFnSendTx(vc.addTx)
