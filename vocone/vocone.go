@@ -198,7 +198,13 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 
 // SetTreasurer configures the vocone treasurer account address
 func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
-	return vc.app.State.SetTreasurer(treasurer, 0)
+	if err := vc.app.State.SetTreasurer(treasurer, 0); err != nil {
+		return err
+	}
+	if _, err := vc.app.State.Save(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // MintTokens mints tokens to the given account address
@@ -206,7 +212,13 @@ func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
 	if err := vc.app.State.MintBalance(to, amount); err != nil {
 		return err
 	}
-	return vc.app.State.IncrementTreasurerNonce()
+	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
+		return err
+	}
+	if _, err := vc.app.State.Save(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetTxCost configures the transaction cost for the given tx type
@@ -214,20 +226,30 @@ func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 	if err := vc.app.State.SetTxCost(txType, cost); err != nil {
 		return err
 	}
-	return vc.app.State.IncrementTreasurerNonce()
+	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
+		return err
+	}
+	if _, err := vc.app.State.Save(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetBulkTxCosts configures the transaction cost for all transaction types that have a cost
 func (vc *Vocone) SetBulkTxCosts(txCosts uint64) error {
 	for k := range vochain.TxTypeCostToStateKey {
 		log.Debugf("setting tx cost for txtype %s", models.TxType_name[int32(k)])
-		err := vc.app.State.SetTxCost(k, txCosts)
-		if err != nil {
+		if err := vc.app.State.SetTxCost(k, txCosts); err != nil {
 			return err
 		}
-
 	}
-	return vc.app.State.IncrementTreasurerNonce()
+	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
+		return err
+	}
+	if _, err := vc.app.State.Save(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (vc *Vocone) setDefaultMethods() {
