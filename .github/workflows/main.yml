@@ -16,16 +16,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Go test
+      - name: gofmt
+        # Run gofmt first, as it's quick and issues are common.
+        run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
+      - name: go test
         run: |
           # we run vet in another step
           go test -vet=off -timeout=1m -coverprofile=covprofile ./...
           # -race can easily make the crypto stuff 10x slower
           go test -vet=off -timeout=15m -race ./...
-      - name: Go analyze
+      - name: go vet
+        run: go vet ./...
+      - name: staticcheck
         run: |
-          diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
-          go vet ./...
           curl -L https://github.com/dominikh/go-tools/releases/download/2021.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
           ./staticcheck/staticcheck ./...
       - name: Go build for Mac
