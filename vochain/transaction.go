@@ -177,6 +177,18 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			return vtx.TxID[:], app.State.SetAccountInfoURI(accountAddr, vtx.Tx.GetSetAccountInfo().GetInfoURI())
 		}
 
+	case *models.Tx_SetTransactionCosts:
+		cost, err := SetTransactionCostsTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		if err != nil {
+			return []byte{}, fmt.Errorf("setTransactionCostsTx: %w", err)
+		}
+		if commit {
+			if err := app.State.SetTxCost(vtx.Tx.GetSetTransactionCosts().Txtype, cost); err != nil {
+				return []byte{}, fmt.Errorf("setTransactionCosts: %w", err)
+			}
+			return vtx.TxID[:], app.State.IncrementTreasurerNonce()
+		}
+
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
 	}
@@ -429,6 +441,9 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
 func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
+	if vtx == nil {
+		return ErrNilTx
+	}
 	tx := vtx.GetAdmin()
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {
@@ -541,6 +556,9 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 }
 
 func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
+	if tx == nil {
+		return ErrNilTx
+	}
 	if tx.KeyIndex == nil {
 		return fmt.Errorf("key index is nil")
 	}
@@ -558,6 +576,12 @@ func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
 }
 
 func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
+	if tx == nil {
+		return ErrNilTx
+	}
+	if process == nil {
+		return fmt.Errorf("process is nil")
+	}
 	if tx.KeyIndex == nil {
 		return fmt.Errorf("key index is nil")
 	}
@@ -584,4 +608,43 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		}
 	}
 	return nil
+}
+
+// SetTransactionCostsTxCheck is an abstraction of ABCI checkTx for a SetTransactionCosts transaction
+func SetTransactionCostsTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (uint64, error) {
+	if vtx == nil {
+		return 0, ErrNilTx
+	}
+	tx := vtx.GetSetTransactionCosts()
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return 0, fmt.Errorf("missing signature and/or transaction")
+	}
+	// get treasurer
+	treasurer, err := state.Treasurer(false)
+	if err != nil {
+		return 0, err
+	}
+	// check nonce
+	if tx.Nonce != treasurer.Nonce {
+		return 0, fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce)
+	}
+	// check valid tx type
+	if _, ok := TxTypeCostToStateKey[tx.Txtype]; !ok {
+		return 0, fmt.Errorf("tx type not supported")
+	}
+	// get address from signature
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
+	if err != nil {
+		return 0, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	sigAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return 0, fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	// check signature recovered address
+	if common.BytesToAddress(treasurer.Address) != sigAddress {
+		return 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", treasurer.String(), sigAddress.String())
+	}
+	return tx.Value, nil
 }

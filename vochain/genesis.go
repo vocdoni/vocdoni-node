@@ -186,8 +186,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2022-02-04T09:43:28.668436552Z",
-   "chain_id":"vocdoni-development-61",
+   "genesis_time":"2022-02-06T09:43:28.668436552Z",
+   "chain_id":"vocdoni-development-62",
    "consensus_params":{
       "block":{
          "max_bytes":"5120000",
@@ -288,12 +288,16 @@ var Genesis = map[string]VochainGenesis{
       ],
       "treasurer": "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d",
       "tx_cost": {
-         "Tx_SetProcess": 100,
+         "Tx_SetProcessStatus": 100,
+         "Tx_SetProcessCensus": 100,
+         "Tx_SetProcessResults": 100,
+         "Tx_SetProcessQuestionIndex": 100,
          "Tx_RegisterKey": 100,
          "Tx_NewProcess": 100,
          "Tx_SendTokens": 100,
          "Tx_SetAccountInfo": 100,
-         "Tx_SetAccountDelegate": 100,
+         "Tx_AddDelegateForAccount": 100,
+         "Tx_DelDelegateForAccount": 100,
          "Tx_CollectFaucet": 100
        }
    }
@@ -339,8 +343,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2022-02-07T14:00:01.055210151Z",
-   "chain_id":"vocdoni-stage-20",
+   "genesis_time":"2022-02-07T16:00:01.055210151Z",
+   "chain_id":"vocdoni-stage-21",
    "consensus_params":{
       "block":{
          "max_bytes":"2048000",
@@ -442,12 +446,16 @@ var Genesis = map[string]VochainGenesis{
       ],
       "treasurer": "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d",
       "tx_cost": {
-         "Tx_SetProcess": 100,
+         "Tx_SetProcessStatus": 100,
+         "Tx_SetProcessCensus": 100,
+         "Tx_SetProcessResults": 100,
+         "Tx_SetProcessQuestionIndex": 100,
          "Tx_RegisterKey": 100,
          "Tx_NewProcess": 100,
          "Tx_SendTokens": 100,
          "Tx_SetAccountInfo": 100,
-         "Tx_SetAccountDelegate": 100,
+         "Tx_AddDelegateForAccount": 100,
+         "Tx_DelDelegateForAccount": 100,
          "Tx_CollectFaucet": 100
        }
    }

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	flag "github.com/spf13/pflag"
 
 	"go.vocdoni.io/dvote/client"
@@ -21,11 +22,12 @@ import (
 )
 
 var ops = map[string]bool{
-	"vtest":          true,
-	"cspvoting":      true,
-	"anonvoting":     true,
-	"censusImport":   true,
-	"censusGenerate": true,
+	"vtest":             true,
+	"cspvoting":         true,
+	"anonvoting":        true,
+	"censusImport":      true,
+	"censusGenerate":    true,
+	"tokentransactions": true,
 }
 
 func opsAvailable() (opsav []string) {
@@ -41,6 +43,7 @@ func main() {
 	loglevel := flag.String("logLevel", "info", "log level")
 	opmode := flag.String("operation", "vtest", fmt.Sprintf("set operation mode: %v", opsAvailable()))
 	oraclePrivKey := flag.String("oracleKey", "", "hexadecimal oracle private key")
+	treasurerPrivKey := flag.String("treasurerKey", "", "hexadecimal treasurer private key")
 	entityPrivKey := flag.String("entityKey", "", "hexadecimal entity private key")
 	host := flag.String("gwHost", "http://127.0.0.1:9090/dvote", "gateway websockets endpoint")
 	electionType := flag.String("electionType", "encrypted-poll", "encrypted-poll or poll-vote")
@@ -77,6 +80,12 @@ func main() {
 		fmt.Fprintf(os.Stderr,
 			"\t./test --operation=censusGenerate --gwHost "+
 				"wss://gw1test.vocdoni.net/dvote --electionSize=10000 --keysFile=keys.json\n")
+		fmt.Fprintf(os.Stderr,
+			"=> tokentransactions\n\tTests all token "+
+				"related transactions\n")
+		fmt.Fprintf(os.Stderr,
+			"\t./test --operation=tokentransactions --gwHost "+
+				"wss://gw1test.vocdoni.net/dvote\n")
 	}
 	flag.Parse()
 
@@ -146,6 +155,9 @@ func main() {
 		censusImport(*host, entityKey)
 	case "censusGenerate":
 		censusGenerate(*host, entityKey, *electionSize, *keysfile, 1)
+	case "tokentransactions":
+		// end-user voting is not tested here
+		testTokenTransactions(*host, *treasurerPrivKey)
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
@@ -946,4 +958,104 @@ func cspVoteTest(
 		log.Infof("results: %+v", r)
 	}
 	log.Infof("all done!")
+}
+
+// enduser voting is not tested here
+func testTokenTransactions(
+	host,
+	treasurerPrivKey string,
+) {
+	var err error
+	treasurerSigner := ethereum.NewSignKeys()
+	if err := treasurerSigner.AddHexKey(treasurerPrivKey); err != nil {
+		log.Fatal(err)
+	}
+
+	log.Infof("connecting to main gateway %s", host)
+	// add the first connection, this will be the main connection
+	var mainClient *client.Client
+
+	for tries := 10; tries > 0; tries-- {
+		mainClient, err = client.New(host)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer mainClient.Close()
+
+	chainId, err := mainClient.GetChainID()
+	if err != nil {
+		log.Fatal(err)
+	}
+	treasurerSigner.VocdoniChainID = chainId
+
+	// check set transaction cost
+	if err := testSetTxCost(mainClient, treasurerSigner); err != nil {
+		log.Fatal(err)
+	}
+
+}
+
+func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys) error {
+	// get treasurer
+	treasurer, err := mainClient.GetTreasurer(treasurerSigner)
+	if err != nil {
+		return err
+	}
+	log.Infof("treasurer fetched %s with nonce %d", common.BytesToAddress(treasurer.Address), treasurer.Nonce)
+
+	// get current tx cost
+	txCost, err := mainClient.GetTransactionCost(treasurerSigner, models.TxType_SET_ACCOUNT_INFO)
+	if err != nil {
+		return err
+	}
+	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO, txCost)
+
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	// set tx cost
+	if err := mainClient.SetTransactionCost(treasurerSigner,
+		models.TxType_SET_ACCOUNT_INFO,
+		1000,
+		treasurer.Nonce); err != nil {
+		return fmt.Errorf("cannot set transaction cost: %v", err)
+	}
+
+	log.Infof("waiting for new block ...")
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+
+	// check tx cost changed and treasurer nonce incremented
+	treasurer2, err := mainClient.GetTreasurer(treasurerSigner)
+	if err != nil {
+		return err
+	}
+	newTxCost, err := mainClient.GetTransactionCost(treasurerSigner, models.TxType_SET_ACCOUNT_INFO)
+	if err != nil {
+		return err
+	}
+	if treasurer2.Nonce != treasurer.Nonce+1 {
+		return fmt.Errorf("treasurer nonce expected to be %d got %d", treasurer.Nonce+1, treasurer2.Nonce)
+	}
+	if newTxCost != 1000 {
+		return fmt.Errorf("newProcessTx cost expected to be %d got %d", newTxCost, txCost)
+	}
+	log.Infof("tx cost of %s changed successfully from %d to %d", models.TxType_SET_ACCOUNT_INFO, txCost, newTxCost)
+	log.Infof("treasurer nonce changed successfully from %d to %d", treasurer.Nonce, treasurer2.Nonce)
+	return nil
 }
