@@ -18,7 +18,7 @@ CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-info}
 test() {
 	docker-compose run test timeout 300 ./vochaintest --oracleKey=$ORACLE_KEY --electionSize=$ELECTION_SIZE --gwHost http://gateway0:9090/dvote --logLevel=$LOGLEVEL --operation=vtest --electionType=$1 --withWeight=2
-	echo $? >$1
+	echo $? >$2
 }
 
 test_anon() {
@@ -57,33 +57,30 @@ testid="/tmp/.vochaintest$RANDOM"
 
 [ $TEST -eq 1 -o $TEST -eq 0 ] && {
 	echo "### Running test 1 ###"
-	poll-vote ${testid}1 &
+	test poll-vote ${testid}1 &
 } || echo 0 >${testid}1
 
 [ $TEST -eq 2 -o $TEST -eq 0 ] && {
 	echo "### Running test 2 ###"
-	encrypted-poll ${testid}2 &
+	test encrypted-poll ${testid}2 &
 } || echo 0 >${testid}2
 
 [ $TEST -eq 3 -o $TEST -eq 0 ] && {
 	echo "### Running test 3 ###"
-	test_anon ${testid}3 &
+	test test_anon ${testid}3 &
 } || echo 0 >${testid}3
 
 [ $TEST -eq 4 -o $TEST -eq 0 ] && {
 	echo "### Running test 4 ###"
-	test_csp ${testid}4 &
+	test test_csp ${testid}4 &
 } || echo 0 >${testid}4
-
-echo "### Waiting for voting process tests ###"
-wait
 
 [ $TEST -eq 5 -o $TEST -eq 0 ] && {
 	echo "### Running test 5 ###"
-	test_token_transactions ${testid}5 &
+	test test_token_transactions ${testid}5 &
 } || echo 0 >${testid}5
 
-echo "### Waiting for token transactions test ###"
+echo "### Waiting for tests to finish ###"
 wait
 
 [ "$(cat ${testid}1)" == "0" -a "$(cat ${testid}2)" == "0" -a "$(cat ${testid}3)" == "0" \
@@ -94,7 +91,7 @@ wait
 	echo "Vochain test failed!"
 	RET=1
 	echo "### Post run logs ###"
-	#docker-compose logs --tail 1000
+	docker-compose logs --tail 1000
 }
 
 [ $CLEAN -eq 1 ] && {
