@@ -1362,3 +1362,30 @@ func (c *Client) SubmitRawTx(signer *ethereum.SignKeys, stx *models.SignedTx) (*
 	}
 	return c.Request(req, nil)
 }
+
+func (c *Client) MintTokens(treasurer *ethereum.SignKeys, accountAddr common.Address, treasurerNonce uint32, amount uint64) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.MintTokensTx{
+		Txtype: models.TxType_MINT_TOKENS,
+		Nonce:  treasurerNonce,
+		To:     accountAddr.Bytes(),
+		Value:  amount,
+	}
+
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_MintTokens{MintTokens: tx}})
+	if err != nil {
+		return err
+	}
+	resp, err := c.SubmitRawTx(treasurer, &stx)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("submitRawTx failed: %s", resp.Message)
+	}
+	return nil
+}
