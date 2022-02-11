@@ -165,16 +165,51 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 		}
 
 	case *models.Tx_SetAccountInfo:
-		accountAddr, create, err := SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		txValues, err := SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
-			return []byte{}, fmt.Errorf("cannot set account: %w", err)
+			return []byte{}, fmt.Errorf("setAccountInfoTxCheck: %w", err)
 		}
 		if commit {
-			if create {
-				return vtx.TxID[:], app.State.CreateAccount(accountAddr,
-					vtx.Tx.GetSetAccountInfo().GetInfoURI(), make([]common.Address, 0), 0)
+			// create account
+			if txValues.Create {
+				// with faucet payload provided
+				if txValues.FaucetPayloadSigner != types.EthereumZeroAddressBytes {
+					// create account
+					if err := app.State.CreateAccount(
+						txValues.TxSender,
+						vtx.Tx.GetSetAccountInfo().GetInfoURI(),
+						make([]common.Address, 0),
+						0,
+					); err != nil {
+						return []byte{}, fmt.Errorf("setAccountInfoTxCheck: createAccount %w", err)
+					}
+					// consume provided faucet payload
+					return vtx.TxID[:], app.State.ConsumeFaucetPayload(
+						txValues.FaucetPayloadSigner,
+						&models.FaucetPayload{
+							Identifier: txValues.FaucetPayload.Identifier,
+							To:         txValues.FaucetPayload.To,
+							Amount:     txValues.FaucetPayload.Amount,
+						},
+						true,
+					)
+				}
+				// any faucet payload provided, just create account
+				return vtx.TxID[:], app.State.CreateAccount(txValues.TxSender,
+					vtx.Tx.GetSetAccountInfo().GetInfoURI(),
+					make([]common.Address, 0),
+					0,
+				)
 			}
-			return vtx.TxID[:], app.State.SetAccountInfoURI(accountAddr, vtx.Tx.GetSetAccountInfo().GetInfoURI())
+			// account already created, change infoURI
+			if err := app.State.SetAccountInfoURI(
+				txValues.Account,
+				vtx.Tx.GetSetAccountInfo().GetInfoURI(),
+			); err != nil {
+				return []byte{}, fmt.Errorf("setAccountInfoURI: %w", err)
+			}
+			// substract tx costs and increment nonce
+			return vtx.TxID[:], app.State.SubstractCostIncrementNonce(txValues.TxSender, models.TxType_SET_ACCOUNT_INFO)
 		}
 
 	case *models.Tx_SetTransactionCosts:

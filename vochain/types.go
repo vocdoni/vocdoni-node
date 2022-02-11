@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -30,6 +31,8 @@ var (
 	voteCountKey = []byte("voteCount")
 )
 
+var BurnAddress = common.HexToAddress("0xffffffffffffffffffffffffffffffffffffffff")
+
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
 var PrefixDBCacheSize = 0
 
@@ -47,6 +50,12 @@ func UniqID(tx *models.SignedTx, isAnonymous bool) string {
 		}
 	}
 	return ""
+}
+
+type setAccountInfoTxCheckValues struct {
+	Account, TxSender, FaucetPayloadSigner common.Address
+	FaucetPayload                          *models.FaucetPayload
+	Create                                 bool
 }
 
 // ________________________ QUERIES ________________________

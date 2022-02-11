@@ -18,6 +18,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -971,6 +972,18 @@ func testTokenTransactions(
 		log.Fatal(err)
 	}
 
+	// create main signer
+	mainSigner := &ethereum.SignKeys{}
+	if err := mainSigner.Generate(); err != nil {
+		log.Fatal(err)
+	}
+
+	// create other signer
+	otherSigner := &ethereum.SignKeys{}
+	if err := otherSigner.Generate(); err != nil {
+		log.Fatal(err)
+	}
+
 	log.Infof("connecting to main gateway %s", host)
 	// add the first connection, this will be the main connection
 	var mainClient *client.Client
@@ -992,12 +1005,17 @@ func testTokenTransactions(
 		log.Fatal(err)
 	}
 	treasurerSigner.VocdoniChainID = chainId
+	mainSigner.VocdoniChainID = chainId
 
 	// check set transaction cost
 	if err := testSetTxCost(mainClient, treasurerSigner); err != nil {
 		log.Fatal(err)
 	}
 
+	// check create and set account
+	if err := testCreateAndSetAccount(mainClient, treasurerSigner, mainSigner, otherSigner); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys) error {
@@ -1057,5 +1075,138 @@ func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys
 	}
 	log.Infof("tx cost of %s changed successfully from %d to %d", models.TxType_SET_ACCOUNT_INFO, txCost, newTxCost)
 	log.Infof("treasurer nonce changed successfully from %d to %d", treasurer.Nonce, treasurer2.Nonce)
+	return nil
+}
+
+func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signer2 *ethereum.SignKeys) error {
+	// get current tx cost
+	txCost, err := mainClient.GetTransactionCost(signer, models.TxType_SET_ACCOUNT_INFO)
+	if err != nil {
+		return err
+	}
+	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO, txCost)
+
+	// get current block
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	// create account without faucet package
+	if err := mainClient.CreateOrSetAccount(signer,
+		common.Address{},
+		"ipfs://",
+		0,
+		nil); err != nil {
+		return fmt.Errorf("cannot create account: %v", err)
+	}
+	// mint tokens for the created account
+	treasurerAcc, err := mainClient.GetTreasurer(signer)
+	if err != nil {
+		return fmt.Errorf("cannot get treasurer %v", err)
+	}
+	if err := mainClient.MintTokens(treasurer, signer.Address(), treasurerAcc.Nonce, 1000); err != nil {
+		return fmt.Errorf("cannot mint tokens for account %s: %v", signer.Address(), err)
+	}
+	// wait for new block
+	log.Infof("waiting for new block ...")
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	// check account created
+	acc, err := mainClient.GetAccount(signer, signer.Address())
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("account %s succesfully created: %+v", signer.Address(), acc)
+	// try set own account info
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	if err := mainClient.CreateOrSetAccount(signer,
+		common.Address{},
+		"ipfs://XXX",
+		0,
+		nil); err != nil {
+		return fmt.Errorf("cannot set account info: %v", err)
+	}
+	// wait for new block
+	log.Infof("waiting for new block ...")
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	// check account info changed
+	acc, err = mainClient.GetAccount(signer, signer.Address())
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return vochain.ErrAccountNotExist
+	}
+	if acc.InfoURI != "ipfs://XXX" {
+		return fmt.Errorf("expected account infoURI to be %s got %s", "ipfs://XXX", acc.InfoURI)
+	}
+	log.Infof("account %s infoURI succesfully changed to %+v", signer.Address(), acc)
+	// create account with faucet package
+	faucetPkg, err := mainClient.GenerateFaucetPackage(signer, signer2.Address(), 500)
+	if err != nil {
+		return fmt.Errorf("cannot generate faucet package %v", err)
+	}
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	if err := mainClient.CreateOrSetAccount(signer2,
+		common.Address{},
+		"ipfs://",
+		0,
+		faucetPkg); err != nil {
+		return fmt.Errorf("cannot create account: %v", err)
+	}
+	// wait for new block
+	log.Infof("waiting for new block ...")
+	for {
+		time.Sleep(time.Millisecond * 500)
+		if h2, err := mainClient.GetCurrentBlock(); err != nil {
+			log.Warnf("error getting current height: %v", err)
+			continue
+		} else {
+			if h2 > h {
+				break
+			}
+		}
+	}
+	// check account created
+	acc2, err := mainClient.GetAccount(signer2, signer2.Address())
+	if err != nil {
+		return err
+	}
+	if acc2 == nil {
+		return vochain.ErrAccountNotExist
+	}
+	// check balance added from payload
+	if acc2.Balance != 500 {
+		return fmt.Errorf("expected balance for account %s is %d but got %d", signer2.Address(), 500, acc2.Balance)
+	}
+	log.Infof("account %s succesfully created: %+v", signer2.Address(), acc2)
 	return nil
 }
