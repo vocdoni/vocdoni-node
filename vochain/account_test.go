@@ -122,6 +122,80 @@ func testSetTransactionCostsTx(t *testing.T,
 	return nil
 }
 
+func TestMintTokensTx(t *testing.T) {
+	app := TestBaseApplication(t)
+	signer := ethereum.SignKeys{}
+	if err := signer.Generate(); err != nil {
+		t.Fatal(err)
+	}
+
+	app.State.SetTreasurer(signer.Address(), 0)
+	err := app.State.CreateAccount(signer.Address(), "ipfs://", make([]common.Address, 0), 0)
+	qt.Assert(t, err, qt.IsNil)
+	toAccAddr := common.HexToAddress(randomEthAccount)
+	err = app.State.CreateAccount(toAccAddr, "ipfs://", make([]common.Address, 0), 0)
+	qt.Assert(t, err, qt.IsNil)
+	app.Commit()
+
+	// should mint
+	if err := testMintTokensTx(t, &signer, app, randomEthAccount, 100, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	// should fail minting
+	if err := testMintTokensTx(t, &signer, app, randomEthAccount, 0, 0); err == nil {
+		t.Fatal(err)
+	}
+
+	// get account
+	toAcc, err := app.State.GetAccount(toAccAddr, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if toAcc == nil {
+		t.Fatal(ErrAccountNotExist)
+	}
+	if toAcc.Balance != 100 {
+		t.Fatal(fmt.Sprintf("infoURI missmatch, got %d expected %d", toAcc.Balance, 100))
+	}
+	// get treasurer
+	treasurer, err := app.State.Treasurer(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// check nonce incremented
+	qt.Assert(t, treasurer.Nonce, qt.Equals, uint32(1))
+}
+
+func testMintTokensTx(t *testing.T,
+	signer *ethereum.SignKeys,
+	app *BaseApplication,
+	to string,
+	value uint64,
+	nonce uint32) error {
+	var err error
+
+	toAddr := common.HexToAddress(to)
+	// tx
+	tx := &models.MintTokensTx{
+		Txtype: models.TxType_MINT_TOKENS,
+		To:     toAddr.Bytes(),
+		Value:  value,
+		Nonce:  nonce,
+	}
+
+	stx := &models.SignedTx{}
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_MintTokens{MintTokens: tx}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := sendTx(app, signer, stx); err != nil {
+		return err
+	}
+	app.Commit()
+	return nil
+}
+
 // sendTx signs and sends a vochain transaction
 func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedTx) error {
 	var cktx abcitypes.RequestCheckTx

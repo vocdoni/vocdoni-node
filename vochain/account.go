@@ -136,26 +136,18 @@ func (v *State) MintBalance(address common.Address, amount uint64) error {
 	if amount == 0 {
 		return fmt.Errorf("cannot mint a zero amount balance")
 	}
-	var acc Account
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	raw, err := v.Tx.DeepGet(address.Bytes(), AccountsCfg)
-	if err != nil && !errors.Is(err, arbo.ErrKeyNotFound) {
-		return err
-	} else if err == nil {
-		if err := acc.Unmarshal(raw); err != nil {
-			return err
-		}
+	acc, err := v.GetAccount(address, false)
+	if err != nil {
+		return fmt.Errorf("mintBalance (%w)", err)
+	}
+	if acc == nil {
+		return ErrAccountNotExist
 	}
 	if acc.Balance+amount <= acc.Balance {
 		return ErrBalanceOverflow
 	}
 	acc.Balance += amount
-	accBytes, err := acc.Marshal()
-	if err != nil {
-		return err
-	}
-	return v.Tx.DeepSet(address.Bytes(), accBytes, AccountsCfg)
+	return v.SetAccount(address, acc)
 }
 
 // GetAccount retrives the Account for an address.
