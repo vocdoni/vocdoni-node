@@ -488,6 +488,11 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		}
 	}
 
+	// create burn account
+	if err := app.State.SetAccount(BurnAddress, &Account{}); err != nil {
+		log.Fatal("unable to set burn address")
+	}
+
 	// Is this save needed?
 	if _, err := app.State.Save(); err != nil {
 		log.Fatalf("cannot save state: %s", err)

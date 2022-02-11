@@ -1349,6 +1349,68 @@ func (c *Client) SetTransactionCost(signer *ethereum.SignKeys, txType models.TxT
 	return nil
 }
 
+// CreateOrSetAccount creates or sets the infoURI of a Vochain account
+func (c *Client) CreateOrSetAccount(signer *ethereum.SignKeys, to common.Address, infoURI string, nonce uint32, faucetPkg *models.FaucetPackage) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.SetAccountInfoTx{
+		Txtype:        models.TxType_SET_ACCOUNT_INFO,
+		Nonce:         nonce,
+		InfoURI:       infoURI,
+		Account:       to.Bytes(),
+		FaucetPackage: faucetPkg,
+	}
+
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{SetAccountInfo: tx}})
+	if err != nil {
+		return err
+	}
+	resp, err := c.SubmitRawTx(signer, &stx)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("submitRawTx failed: %s", resp.Message)
+	}
+	return nil
+}
+
+// GetAccount returns information of a given account
+func (c *Client) GetAccount(signer *ethereum.SignKeys, accountAddr common.Address) (*vochain.Account, error) {
+	req := api.APIrequest{Method: "getAccount", EntityId: accountAddr.Bytes()}
+	resp, err := c.Request(req, signer)
+	acc := &vochain.Account{}
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Ok {
+		return nil, fmt.Errorf("could not get account: %s", resp.Message)
+	}
+	if resp.Balance != nil {
+		acc.Balance = *resp.Balance
+	}
+	if resp.Nonce != nil {
+		acc.Nonce = *resp.Nonce
+	}
+	if resp.InfoURI != "" {
+		acc.InfoURI = resp.InfoURI
+	}
+	if len(resp.Delegates) > 0 {
+		for _, v := range resp.Delegates {
+			acc.DelegateAddrs = append(acc.DelegateAddrs, common.HexToAddress(v).Bytes())
+		}
+	}
+	return acc, nil
+}
+
+// GenerateFaucetPackage generates a faucet package
+func (*Client) GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value uint64) (*models.FaucetPackage, error) {
+	return vochain.GenerateFaucetPackage(from, to, value)
+}
+
 // SubmitRawTx signs and sends a vochain transaction
 func (c *Client) SubmitRawTx(signer *ethereum.SignKeys, stx *models.SignedTx) (*api.APIresponse, error) {
 	var err error
