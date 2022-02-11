@@ -7,7 +7,7 @@ jobs:
   go-tests:
     runs-on: self-hosted
     container:
-      image: golang:1.17.4
+      image: golang:1.17.7
       options: --user 1000
     if: github.repository == 'vocdoni/vocdoni-node'
     defaults:
