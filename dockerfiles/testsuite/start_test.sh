@@ -6,6 +6,7 @@
 #  anonvoting: run anonymous vote test
 #  cspvoting: run csp vote test
 #  tokentransactions: run token transactions test (end-user voting is not included)
+#  vocli: test the CLI tool
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
@@ -38,6 +39,7 @@ tests_to_run=(
 	"cspvoting"
 	"anonvoting"
 	"merkle_vote_encrypted"
+	"vocli"
 )
 
 # if any arg is passed, treat them as the tests to run, overriding the default list
@@ -106,6 +108,14 @@ tokentransactions() {
 		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $4}')
 }
 
+vocli() {
+	docker-compose run test timeout 300 \
+		./vochaintest --gwHost $GWHOST \
+		  --logLevel=$LOGLEVEL \
+		  --operation=vocli \
+		  --treasurerKey=$TREASURER_KEY
+}
+
 ### end tests definition
 
 # useful for debugging bash flow
@@ -155,7 +165,7 @@ for test in ${tests_to_run[@]} ; do
 	else
 		echo "Vochain test $test failed!"
 		echo "### Post run logs ###"
-		docker-compose logs --tail 1000
+		docker-compose logs
 		break
 	fi
 done

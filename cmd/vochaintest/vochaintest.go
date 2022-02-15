@@ -2,19 +2,27 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"os"
+	"path"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	ethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
 	"go.vocdoni.io/dvote/client"
+	vocli "go.vocdoni.io/dvote/cmd/vocli/commands"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
@@ -32,6 +40,9 @@ var ops = map[string]bool{
 	"tokentransactions": true,
 	"initaccounts":      true,
 }
+
+var addressRegexp = regexp.MustCompile("Public address of the key:.*")
+var pathRegexp = regexp.MustCompile("Path of the secret key file:.*")
 
 func opsAvailable() (opsav []string) {
 	for k := range ops {
@@ -89,9 +100,13 @@ func main() {
 		fmt.Fprintf(os.Stderr,
 			"\t./test --operation=tokentransactions --gwHost "+
 				"wss://gw1test.vocdoni.net/dvote\n")
+		fmt.Fprintf(os.Stderr,
+			"=> testvocli\n\tTests major vocli functionalities\n")
+		fmt.Fprintf(os.Stderr,
+			"\t./test --operation=testvocli --treasurerKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223"+
+				"--gwHost wss://gw1test.vocdoni.net/dvote\n")
 	}
 	flag.Parse()
-
 	log.Init(*loglevel, "stdout")
 	rand.Seed(time.Now().UnixNano())
 
@@ -160,6 +175,8 @@ func main() {
 	case "tokentransactions":
 		// end-user voting is not tested here
 		testTokenTransactions(*host, *treasurerPrivKey)
+	case "vocli":
+		testVocli(*host, *treasurerPrivKey)
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
@@ -1507,4 +1524,276 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accTo.Balance)
 
 	return nil
+}
+
+func testVocli(url, treasurerPrivKey string) {
+	blockPeriod := time.Second * 5
+	vocli.SetupLogPackage = false
+	var executeCommand = func(root *cobra.Command, args []string, input string, verbose bool) (*cobra.Command, string, string, error) {
+		// setup stdout/stderr redirection.
+		var stdoutBuf = new(bytes.Buffer)
+		var stderrBuf = new(bytes.Buffer)
+		vocli.Stdout = stdoutBuf
+		vocli.Stderr = stderrBuf
+
+		stdinReader, stdinWriter, err := os.Pipe()
+		if err != nil {
+			return root, "", "", err
+		}
+		stdinWriter.Write([]byte(input))
+		vocli.Stdin = stdinReader
+
+		// cobra.Command.SetOut/SetErr() is actually useless for most purposes as it
+		// only includes the usage messages printed to stdout/stderr. For full
+		// stdout/stderr capture it's still best to use vocli.Stdout/Stderr. Let's
+		// just mock it out anyway.
+		root.SetOut(stdoutBuf)
+		root.SetErr(stderrBuf)
+		root.SetArgs(args)
+		c, err := root.ExecuteC()
+
+		if verbose {
+			log.Debug("vocli ", strings.Join(args, " "))
+			log.Debugf("stdout(%s)\tstderr(%s)", stdoutBuf, stderrBuf)
+		}
+
+		root.SetOut(os.Stdout)
+		root.SetErr(os.Stderr)
+		root.SetArgs([]string{})
+		return c, stdoutBuf.String(), stderrBuf.String(), err
+	}
+	var parseImportOutput = func(stdout string) (address, keyPath string) {
+		a := strings.TrimSpace(addressRegexp.FindString(stdout))
+		a2 := strings.Split(a, " ")
+		newAddr := a2[len(a2)-1]
+
+		k := strings.TrimSpace(pathRegexp.FindString(stdout))
+		k2 := strings.Split(k, " ")
+		keyPath = k2[len(k2)-1]
+		return newAddr, keyPath
+	}
+	var ensureSetAccountInfoMined = func(address string, stdArgs []string) {
+		// 50% of the time the SetAccountInfoTx doesn't get mined even in 2, 3x the block period
+		// so keep polling until we finally confirm the account has been created
+		for i := 1; i < 10; i++ {
+			fmt.Printf("waiting for SetAccountInfoTx on %s to be mined\n", address)
+			_, _, _, err := executeCommand(vocli.RootCmd, append([]string{"account", "info", address}, stdArgs...), "", false)
+			if err == nil {
+				break
+			}
+			time.Sleep(blockPeriod * 3)
+		}
+	}
+	var generateKeyAndReturnAddress = func(url string, stdArgs []string) (address, keyPath string, err error) {
+		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "new", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", false)
+		if err != nil {
+			return
+		}
+		address, keyPath = parseImportOutput(stdout)
+		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", keyPath, "ipfs://", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", false)
+		if err != nil {
+			return
+		}
+
+		ensureSetAccountInfoMined(address, stdArgs)
+		return
+	}
+
+	dir, err := ioutil.TempDir("", "testvoclihome")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	stdArgs := []string{"--password=password", fmt.Sprintf("--home=%s", dir), fmt.Sprintf("-u=%s", url)}
+
+	log.Info("vocli keys import alicePrivateKey")
+	if err := ioutil.WriteFile(path.Join(dir, "alicePrivateKey"), []byte(treasurerPrivKey), 0700); err != nil {
+		log.Fatal(err)
+	}
+	_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "import", path.Join(dir, "/alicePrivateKey")}, stdArgs...), "", true)
+	if err != nil {
+		log.Fatal(err)
+	}
+	alice, aliceKeyPath := parseImportOutput(stdout)
+	if !strings.Contains(stdout, dir) {
+		log.Fatalf("vocli import should report that the imported key was stored in directory %s", dir)
+	}
+
+	log.Info("vocli keys list")
+	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"keys", "list"}, stdArgs...), "", true)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !strings.Contains(stdout, dir) {
+		log.Fatalf("vocli list should have found and shown a key in dir %s", dir)
+	}
+
+	log.Info("vocli account set alice")
+	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", aliceKeyPath, "ipfs://aliceinwonderland"}, stdArgs...), "", true)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !strings.Contains(stdout, fmt.Sprintf("created/updated on chain %s", url)) {
+		log.Fatalf("stdout should mention that alice's account was created on the chain, but instead: %s", stdout)
+	}
+	ensureSetAccountInfoMined(alice, stdArgs)
+
+	log.Info("vocli account mint alice (this lets one reuse node states across test runs, because subsequent SetAccountInfoTxs are not free")
+	_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"mint", aliceKeyPath, alice, "1000"}, stdArgs...), "", true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	func() {
+		log.Info("vocli keys changepassword (a new key)")
+		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "new", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		_, keyPath := parseImportOutput(stdout)
+
+		_, _, _, err = executeCommand(vocli.RootCmd, []string{"keys", "changepassword", keyPath, "--password=password"}, "fdsa\n", true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		k, err := ioutil.ReadFile(keyPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if _, err = ethkeystore.DecryptKey(k, "fdsa"); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	func() {
+		log.Info("vocli mint alice -> newAccount")
+		var newAccount string
+		if newAccount, _, err = generateKeyAndReturnAddress(url, stdArgs); err != nil {
+			log.Fatal(err)
+		}
+		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"mint", aliceKeyPath, newAccount, "100"}, stdArgs...), "", true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		time.Sleep(blockPeriod * 3)
+
+		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "info", newAccount}, stdArgs...), "", true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !strings.Contains(stdout, "100") {
+			log.Fatalf("newAccount should now have 100 coins but apparently he doesn't: %s", stdout)
+		}
+	}()
+	func() {
+		log.Info("vocli send a -> b")
+		a, aKeyPath, err := generateKeyAndReturnAddress(url, stdArgs)
+		if err != nil {
+			log.Fatal(err)
+		}
+		b, _, err := generateKeyAndReturnAddress(url, stdArgs)
+		if err != nil {
+			log.Fatal(err)
+		}
+		time.Sleep(blockPeriod * 3)
+		if _, _, _, err = executeCommand(vocli.RootCmd, append([]string{"mint", aliceKeyPath, a, "1000"}, stdArgs...), "", true); err != nil {
+			log.Fatal(err)
+		}
+		time.Sleep(blockPeriod * 3)
+
+		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"send", aKeyPath, b, "98"}, stdArgs...), "", true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		time.Sleep(blockPeriod * 3)
+
+		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "info", b}, stdArgs...), "", true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !strings.Contains(stdout, "98") {
+			log.Fatalf("newAccount should now have 98 coins but apparently he doesn't: %s", stdout)
+		}
+	}()
+	func() {
+		log.Info("vocli genfaucet/claimfaucet a -> b")
+		a, aKeyPath, err := generateKeyAndReturnAddress(url, stdArgs)
+		if err != nil {
+			log.Fatal(err)
+		}
+		b, bKeyPath, err := generateKeyAndReturnAddress(url, stdArgs)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if _, _, _, err := executeCommand(vocli.RootCmd, append([]string{"mint", aliceKeyPath, a, "1000"}, stdArgs...), "", true); err != nil {
+			log.Fatal(err)
+		}
+		time.Sleep(blockPeriod * 3)
+
+		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"genfaucet", aKeyPath, b, "800"}, stdArgs...), "", true) // leave plenty of spare coins for differing txCosts
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"claimfaucet", bKeyPath, strings.TrimSpace(stdout)}, stdArgs...), "", true)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	func() {
+		log.Info("vocli txcost get * , set AddDelegate,CollectFaucet... 1-2-3-4-5-6...")
+
+		// get Treasurer's nonce so we can send many txs at once
+		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"account", "treasurer", aliceKeyPath}, stdArgs...), "", true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// parse stdout to find the line with "nonce 1"
+		r := regexp.MustCompile("nonce [0-9]*")
+		nonceLine := r.FindString(stdout)
+		if nonceLine == "" {
+			log.Fatal("supposed to find a line with 'nonce' in stdout but got this: %s", stdout)
+		}
+		nonce, err := strconv.ParseUint(strings.Split(nonceLine, " ")[1], 10, 64)
+		if err != nil {
+			log.Fatalf("could not parse nonce from nonceLine: %s", nonceLine)
+		}
+
+		// finally we can get the initial txcosts. this is not used by the test,
+		// just for the human to read
+		if _, _, _, err := executeCommand(vocli.RootCmd, append([]string{"txcost", "get", aliceKeyPath}, stdArgs...), "", true); err != nil {
+			log.Fatal(err)
+		}
+
+		var txTypeExpectedCosts = make(map[string]string)
+		for idx, txType := range []string{"AddDelegateForAccount", "CollectFaucet", "DelDelegateForAccount", "NewProcess", "RegisterKey", "SendTokens", "SetAccountInfo", "SetProcessCensus", "SetProcessQuestionIndex", "SetProcessResults", "SetProcessStatus"} {
+			_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "set", aliceKeyPath, txType, fmt.Sprintf("%d", idx+1), "--nonce", fmt.Sprintf("%v", nonce)}, stdArgs...), "", true)
+			if err != nil {
+				log.Fatal(err)
+			}
+			nonce++
+
+			// even though we're manually incrementing the nonce, if the node
+			// still thinks nonce=5 it will reject a tx with nonce=6. So wait
+			// for it to catch up
+			time.Sleep(blockPeriod * 2)
+
+			// record the expected txtype costs to verify later
+			txTypeExpectedCosts[txType] = fmt.Sprintf("%d", idx+1)
+		}
+		time.Sleep(blockPeriod * 1)
+
+		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "get", aliceKeyPath}, stdArgs...), "", true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		finalTxCosts := strings.Split(strings.TrimSpace(stdout), "\n")
+		for _, t := range finalTxCosts {
+			line := strings.Split(t, " ") // ["AddDelegateForAccount", "20"]
+			if txTypeExpectedCosts[line[0]] != line[1] {
+				log.Errorf("txtype %s should have txcost %s, but got %s", line[0], txTypeExpectedCosts[line[0]], line[1])
+			}
+		}
+
+	}()
 }
