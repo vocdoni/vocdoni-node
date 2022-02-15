@@ -21,13 +21,13 @@ func (c *Client) WaitUntilBlock(block uint32) {
 		cb, err := c.GetCurrentBlock()
 		if err != nil {
 			log.Error(err)
-			time.Sleep(5 * time.Second)
+			time.Sleep(6 * time.Second)
 			continue
 		}
 		if cb >= block {
 			break
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(6 * time.Second)
 		log.Infof("remaining blocks: %d", block-cb)
 	}
 }

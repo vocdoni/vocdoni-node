@@ -110,7 +110,7 @@ for test in ${tests_to_run[@]}; do
 	( $test ; echo $? > $results/$test ) &
 done
 
-echo "### Waiting for tests to finish ###"
+echo "### Waiting for token transaction tests to finish ###"
 wait
 
 for test in ${tests_to_run[@]} ; do

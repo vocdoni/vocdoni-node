@@ -1006,6 +1006,7 @@ func testTokenTransactions(
 	}
 	treasurerSigner.VocdoniChainID = chainId
 	mainSigner.VocdoniChainID = chainId
+	otherSigner.VocdoniChainID = chainId
 
 	// check set transaction cost
 	if err := testSetTxCost(mainClient, treasurerSigner); err != nil {
@@ -1033,10 +1034,6 @@ func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys
 	}
 	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO, txCost)
 
-	h, err := mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
 	// set tx cost
 	if err := mainClient.SetTransactionCost(treasurerSigner,
 		models.TxType_SET_ACCOUNT_INFO,
@@ -1045,19 +1042,11 @@ func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys
 		return fmt.Errorf("cannot set transaction cost: %v", err)
 	}
 
-	log.Infof("waiting for new block ...")
-	for {
-		time.Sleep(time.Millisecond * 500)
-		if h2, err := mainClient.GetCurrentBlock(); err != nil {
-			log.Warnf("error getting current height: %v", err)
-			continue
-		} else {
-			if h2 > h {
-				break
-			}
-		}
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
 	}
-
+	mainClient.WaitUntilBlock(h + 2)
 	// check tx cost changed and treasurer nonce incremented
 	treasurer2, err := mainClient.GetTreasurer(treasurerSigner)
 	if err != nil {
@@ -1067,11 +1056,8 @@ func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys
 	if err != nil {
 		return err
 	}
-	if treasurer2.Nonce != treasurer.Nonce+1 {
-		return fmt.Errorf("treasurer nonce expected to be %d got %d", treasurer.Nonce+1, treasurer2.Nonce)
-	}
 	if newTxCost != 1000 {
-		return fmt.Errorf("newProcessTx cost expected to be %d got %d", newTxCost, txCost)
+		return fmt.Errorf("newProcessTx cost expected to be %d got %d", 1000, newTxCost)
 	}
 	log.Infof("tx cost of %s changed successfully from %d to %d", models.TxType_SET_ACCOUNT_INFO, txCost, newTxCost)
 	log.Infof("treasurer nonce changed successfully from %d to %d", treasurer.Nonce, treasurer2.Nonce)
@@ -1086,11 +1072,6 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	}
 	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO, txCost)
 
-	// get current block
-	h, err := mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
 	// create account without faucet package
 	if err := mainClient.CreateOrSetAccount(signer,
 		common.Address{},
@@ -1099,27 +1080,29 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 		nil); err != nil {
 		return fmt.Errorf("cannot create account: %v", err)
 	}
+	// get current block
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
 	// mint tokens for the created account
 	treasurerAcc, err := mainClient.GetTreasurer(signer)
 	if err != nil {
 		return fmt.Errorf("cannot get treasurer %v", err)
 	}
-	if err := mainClient.MintTokens(treasurer, signer.Address(), treasurerAcc.Nonce, 1000); err != nil {
+
+	// mint tokens to signer
+	if err := mainClient.MintTokens(treasurer, signer.Address(), treasurerAcc.Nonce, 10000); err != nil {
 		return fmt.Errorf("cannot mint tokens for account %s: %v", signer.Address(), err)
 	}
-	// wait for new block
-	log.Infof("waiting for new block ...")
-	for {
-		time.Sleep(time.Millisecond * 500)
-		if h2, err := mainClient.GetCurrentBlock(); err != nil {
-			log.Warnf("error getting current height: %v", err)
-			continue
-		} else {
-			if h2 > h {
-				break
-			}
-		}
+	log.Infof("minted 10000 tokens to %s", signer.Address())
+	// get current block
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
 	}
+	mainClient.WaitUntilBlock(h + 2)
 	// check account created
 	acc, err := mainClient.GetAccount(signer, signer.Address())
 	if err != nil {
@@ -1130,10 +1113,6 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	}
 	log.Infof("account %s succesfully created: %+v", signer.Address(), acc)
 	// try set own account info
-	h, err = mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
 	if err := mainClient.CreateOrSetAccount(signer,
 		common.Address{},
 		"ipfs://XXX",
@@ -1141,19 +1120,11 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 		nil); err != nil {
 		return fmt.Errorf("cannot set account info: %v", err)
 	}
-	// wait for new block
-	log.Infof("waiting for new block ...")
-	for {
-		time.Sleep(time.Millisecond * 500)
-		if h2, err := mainClient.GetCurrentBlock(); err != nil {
-			log.Warnf("error getting current height: %v", err)
-			continue
-		} else {
-			if h2 > h {
-				break
-			}
-		}
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
 	}
+	mainClient.WaitUntilBlock(h + 2)
 	// check account info changed
 	acc, err = mainClient.GetAccount(signer, signer.Address())
 	if err != nil {
@@ -1171,10 +1142,6 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	if err != nil {
 		return fmt.Errorf("cannot generate faucet package %v", err)
 	}
-	h, err = mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
 	if err := mainClient.CreateOrSetAccount(signer2,
 		common.Address{},
 		"ipfs://",
@@ -1182,19 +1149,11 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 		faucetPkg); err != nil {
 		return fmt.Errorf("cannot create account: %v", err)
 	}
-	// wait for new block
-	log.Infof("waiting for new block ...")
-	for {
-		time.Sleep(time.Millisecond * 500)
-		if h2, err := mainClient.GetCurrentBlock(); err != nil {
-			log.Warnf("error getting current height: %v", err)
-			continue
-		} else {
-			if h2 > h {
-				break
-			}
-		}
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
 	}
+	mainClient.WaitUntilBlock(h + 2)
 	// check account created
 	acc2, err := mainClient.GetAccount(signer2, signer2.Address())
 	if err != nil {
@@ -1207,6 +1166,6 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	if acc2.Balance != 500 {
 		return fmt.Errorf("expected balance for account %s is %d but got %d", signer2.Address(), 500, acc2.Balance)
 	}
-	log.Infof("account %s succesfully created: %+v", signer2.Address(), acc2)
+	log.Infof("account %s (%+v) succesfully created with payload signed by %s", signer2.Address(), acc2, signer.Address())
 	return nil
 }
