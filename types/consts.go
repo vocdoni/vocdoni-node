@@ -1,6 +1,10 @@
 package types
 
-import "time"
+import (
+	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+)
 
 func Bool(b bool) *bool { return &b }
 
@@ -9,7 +13,7 @@ func Bool(b bool) *bool { return &b }
 var (
 	False                    = Bool(false)
 	True                     = Bool(true)
-	EthereumZeroAddressBytes = [20]byte{}
+	EthereumZeroAddressBytes = common.Address{}
 )
 
 const (
