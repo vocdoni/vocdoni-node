@@ -119,37 +119,31 @@ func TestBalanceTransfer(t *testing.T) {
 	b1, err := s.GetAccount(addr1.Address(), true)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b1.Balance, qt.Equals, uint64(50))
-	qt.Assert(t, b1.Nonce, qt.Equals, uint32(0))
 
-	err = s.TransferBalance(addr1.Address(), addr2.Address(), 20, 0)
+	err = s.TransferBalance(addr1.Address(), addr2.Address(), 20)
 	qt.Assert(t, err, qt.IsNil)
 
 	b2, err := s.GetAccount(addr2.Address(), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b2.Balance, qt.Equals, uint64(20))
 
-	err = s.TransferBalance(addr1.Address(), addr2.Address(), 20, 2)
+	err = s.TransferBalance(addr1.Address(), addr2.Address(), 40)
 	qt.Assert(t, err, qt.IsNotNil)
 
-	err = s.TransferBalance(addr1.Address(), addr2.Address(), 40, 1)
-	qt.Assert(t, err, qt.IsNotNil)
-
-	err = s.TransferBalance(addr2.Address(), addr1.Address(), 10, 0)
+	err = s.TransferBalance(addr2.Address(), addr1.Address(), 10)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = s.TransferBalance(addr2.Address(), addr1.Address(), 5, 1)
+	err = s.TransferBalance(addr2.Address(), addr1.Address(), 5)
 	qt.Assert(t, err, qt.IsNil)
 
 	b1, err = s.GetAccount(addr1.Address(), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b1.Balance, qt.Equals, uint64(45))
-	qt.Assert(t, b1.Nonce, qt.Equals, uint32(1))
 
 	s.Save()
 	b2, err = s.GetAccount(addr2.Address(), true)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b2.Balance, qt.Equals, uint64(5))
-	qt.Assert(t, b2.Nonce, qt.Equals, uint32(2))
 
 }
 

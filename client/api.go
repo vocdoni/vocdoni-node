@@ -1451,3 +1451,31 @@ func (c *Client) MintTokens(treasurer *ethereum.SignKeys, accountAddr common.Add
 	}
 	return nil
 }
+
+func (c *Client) SendTokens(signer *ethereum.SignKeys, accountAddr common.Address, nonce uint32, amount uint64) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.SendTokensTx{
+		Txtype: models.TxType_SEND_TOKENS,
+		From:   signer.Address().Bytes(),
+		Nonce:  nonce,
+		To:     accountAddr.Bytes(),
+		Value:  amount,
+	}
+
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SendTokens{SendTokens: tx}})
+	if err != nil {
+		return err
+	}
+	resp, err := c.SubmitRawTx(signer, &stx)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("submitRawTx failed: %s", resp.Message)
+	}
+	return nil
+}

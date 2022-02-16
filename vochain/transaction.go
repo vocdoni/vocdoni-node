@@ -173,7 +173,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			// create account
 			if txValues.Create {
 				// with faucet payload provided
-				if txValues.FaucetPayloadSigner != types.EthereumZeroAddressBytes {
+				if txValues.FaucetPayloadSigner != types.EthereumZeroAddress {
 					// create account
 					if err := app.State.CreateAccount(
 						txValues.TxSender,
@@ -234,6 +234,19 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 				return []byte{}, fmt.Errorf("mintTokensTx: %w", err)
 			}
 			return vtx.TxID[:], app.State.IncrementTreasurerNonce()
+		}
+	case *models.Tx_SendTokens:
+		txValues, err := SendTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		if err != nil {
+			return []byte{}, fmt.Errorf("sendTokensTxCheck: %w", err)
+		}
+		if commit {
+			err := app.State.TransferBalance(txValues.From, txValues.To, txValues.Value)
+			if err != nil {
+				return []byte{}, fmt.Errorf("sendTokensTx: transferBalance: %w", err)
+			}
+			// substract tx costs and increment nonce
+			return vtx.TxID[:], app.State.SubstractCostIncrementNonce(txValues.From, models.TxType_SEND_TOKENS)
 		}
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
