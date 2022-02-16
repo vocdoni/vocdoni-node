@@ -29,6 +29,7 @@ Currently dvotenode can operate in three modes:
 - **gateway** mode provides an entry point to the P2P networks for the clients (APP or Web), it uses most of the components from go-dvote. Detailed information can be found [here](https://docs.vocdoni.io/architecture/services/gateway.html)
 
 - **miner** mode provides a block validation node (full node) of the Vochain (Tendermint based blockchain for voting). Detailed information can be found [here](https://docs.vocdoni.io/architecture/services/vochain.html)
+
 - **oracle** mode provides a bridge between Ethereum and the Vochain
 
 One of the design primitives of go-dvote is to run everything as a single daemon in order to have complete control over the components and avoid local RPC or IPC connections. So unlike other projects, go-dvote uses go-ethereum, go-ipfs and tendermint as GoLang libraries.
