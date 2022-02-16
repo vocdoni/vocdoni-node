@@ -58,6 +58,12 @@ type setAccountInfoTxCheckValues struct {
 	Create                                 bool
 }
 
+type sendTokensTxCheckValues struct {
+	From, To common.Address
+	Value    uint64
+	Nonce    uint32
+}
+
 // ________________________ QUERIES ________________________
 
 // QueryData is an abstraction of any kind of data a query request could have

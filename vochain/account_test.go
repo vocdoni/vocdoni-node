@@ -273,6 +273,90 @@ func testMintTokensTx(t *testing.T,
 	return nil
 }
 
+func TestSendTokensTx(t *testing.T) {
+	app := TestBaseApplication(t)
+
+	signer := ethereum.SignKeys{}
+	err := signer.Generate()
+	qt.Assert(t, err, qt.IsNil)
+
+	app.State.SetAccount(BurnAddress, &Account{})
+
+	err = app.State.SetTreasurer(signer.Address(), 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.SetTxCost(models.TxType_SEND_TOKENS, 10)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.CreateAccount(signer.Address(), "ipfs://", make([]common.Address, 0), 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	toAccAddr := common.HexToAddress(randomEthAccount)
+	err = app.State.CreateAccount(toAccAddr, "ipfs://", make([]common.Address, 0), 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.MintBalance(signer.Address(), 1000)
+	qt.Assert(t, err, qt.IsNil)
+	app.Commit()
+
+	// should send
+	err = testSendTokensTx(t, &signer, app, toAccAddr.String(), 100, 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	// should fail sending if incorrect nonce
+	err = testSendTokensTx(t, &signer, app, randomEthAccount, 100, 0)
+	qt.Assert(t, err, qt.IsNotNil)
+	// should fail sending if to acc does not exist
+	noAccount := ethereum.SignKeys{}
+	err = noAccount.Generate()
+	qt.Assert(t, err, qt.IsNil)
+	err = testSendTokensTx(t, &signer, app, noAccount.Address().String(), 100, 1)
+	qt.Assert(t, err, qt.IsNotNil)
+	// should fail sending if not enought balance
+	err = testSendTokensTx(t, &signer, app, randomEthAccount, 1000, 1)
+	qt.Assert(t, err, qt.IsNotNil)
+	// get to account
+	toAcc, err := app.State.GetAccount(toAccAddr, false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, toAcc, qt.IsNotNil)
+	qt.Assert(t, toAcc.Balance, qt.Equals, uint64(100))
+	// get from acc
+	fromAcc, err := app.State.GetAccount(signer.Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, fromAcc, qt.IsNotNil)
+	qt.Assert(t, fromAcc.Balance, qt.Equals, uint64(890))
+}
+
+func testSendTokensTx(t *testing.T,
+	signer *ethereum.SignKeys,
+	app *BaseApplication,
+	to string,
+	value uint64,
+	nonce uint32) error {
+	var err error
+
+	toAddr := common.HexToAddress(to)
+	// tx
+	tx := &models.SendTokensTx{
+		Txtype: models.TxType_SEND_TOKENS,
+		From:   signer.Address().Bytes(),
+		To:     toAddr.Bytes(),
+		Value:  value,
+		Nonce:  nonce,
+	}
+
+	stx := &models.SignedTx{}
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SendTokens{SendTokens: tx}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := sendTx(app, signer, stx); err != nil {
+		return err
+	}
+	app.Commit()
+	return nil
+}
+
 // sendTx signs and sends a vochain transaction
 func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedTx) error {
 	var cktx abcitypes.RequestCheckTx

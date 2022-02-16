@@ -1017,6 +1017,11 @@ func testTokenTransactions(
 	if err := testCreateAndSetAccount(mainClient, treasurerSigner, mainSigner, otherSigner); err != nil {
 		log.Fatal(err)
 	}
+
+	// check send tokens
+	if err := testSendTokens(mainClient, treasurerSigner, mainSigner, otherSigner); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys) error {
@@ -1136,7 +1141,7 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	if acc.InfoURI != "ipfs://XXX" {
 		return fmt.Errorf("expected account infoURI to be %s got %s", "ipfs://XXX", acc.InfoURI)
 	}
-	log.Infof("account %s infoURI succesfully changed to %+v", signer.Address(), acc)
+	log.Infof("account %s infoURI succesfully changed to %+v", signer.Address(), acc.InfoURI)
 	// create account with faucet package
 	faucetPkg, err := mainClient.GenerateFaucetPackage(signer, signer2.Address(), 500)
 	if err != nil {
@@ -1167,5 +1172,59 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 		return fmt.Errorf("expected balance for account %s is %d but got %d", signer2.Address(), 500, acc2.Balance)
 	}
 	log.Infof("account %s (%+v) succesfully created with payload signed by %s", signer2.Address(), acc2, signer.Address())
+	return nil
+}
+
+func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 *ethereum.SignKeys) error {
+	txCost, err := mainClient.GetTransactionCost(treasurerSigner, models.TxType_SEND_TOKENS)
+	if err != nil {
+		return err
+	}
+	log.Infof("tx cost of %s is %d", models.TxType_SEND_TOKENS, txCost)
+	acc, err := mainClient.GetAccount(signer, signer.Address())
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("fetched from account %s with nonce %d and balance %d", signer.Address(), acc.Nonce, acc.Balance)
+	// try send tokens
+	if err := mainClient.SendTokens(signer,
+		signer2.Address(),
+		acc.Nonce,
+		100); err != nil {
+		return fmt.Errorf("cannot set account info: %v", err)
+	}
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
+	acc2, err := mainClient.GetAccount(signer2, signer2.Address())
+	if err != nil {
+		return err
+	}
+	if acc2 == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("fetched from account %s with nonce %d and balance %d", signer2.Address(), acc2.Nonce, acc2.Balance)
+	if acc2.Balance != 600 {
+		log.Fatalf("expected %s to have balance %d got %d", signer2.Address(), 600, acc2.Balance)
+	}
+	acc3, err := mainClient.GetAccount(signer, signer.Address())
+	if err != nil {
+		return err
+	}
+	if acc3 == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("fetched from account %s with nonce %d and balance %d", signer.Address(), acc3.Nonce, acc3.Balance)
+	if acc.Balance-110 != acc3.Balance {
+		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Balance-110, acc3.Balance)
+	}
+	if acc.Nonce+1 != acc3.Nonce {
+		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Nonce+1, acc3.Nonce)
+	}
 	return nil
 }
