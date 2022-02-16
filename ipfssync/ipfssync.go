@@ -353,8 +353,6 @@ func (is *IPFSsync) unicastMsg(address string, imsg *models.IpfsSync) error {
 
 // Start initializes and start an IPFSsync instance
 func (is *IPFSsync) Start() {
-	var err error
-
 	// Init pin storage
 	log.Infof("initializing new pin storage")
 	dbDir := path.Join(is.DataDir, "db")
@@ -362,10 +360,10 @@ func (is *IPFSsync) Start() {
 		log.Fatal(err)
 	}
 	is.state = &gravitonstate.GravitonState{}
-	if err = is.state.Init(dbDir, "disk"); err != nil {
+	if err := is.state.Init(dbDir, "disk"); err != nil {
 		log.Fatal(err)
 	}
-	if err = is.state.AddTree("ipfsSync"); err != nil {
+	if err := is.state.AddTree("ipfsSync"); err != nil {
 		log.Fatal(err)
 	}
 	is.hashTree = is.state.Tree("ipfsSync")
