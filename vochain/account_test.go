@@ -357,6 +357,92 @@ func testSendTokensTx(t *testing.T,
 	return nil
 }
 
+func TestSetAccountDelegateTx(t *testing.T) {
+	app := TestBaseApplication(t)
+
+	signer := ethereum.SignKeys{}
+	err := signer.Generate()
+	qt.Assert(t, err, qt.IsNil)
+
+	app.State.SetAccount(BurnAddress, &Account{})
+
+	err = app.State.SetTreasurer(signer.Address(), 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.SetTxCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 10)
+	qt.Assert(t, err, qt.IsNil)
+	err = app.State.SetTxCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, 10)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.CreateAccount(signer.Address(), "ipfs://", make([]common.Address, 0), 0)
+	qt.Assert(t, err, qt.IsNil)
+	toAccAddr := common.HexToAddress(randomEthAccount)
+	err = app.State.CreateAccount(toAccAddr, "ipfs://", make([]common.Address, 0), 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.MintBalance(signer.Address(), 1000)
+	qt.Assert(t, err, qt.IsNil)
+	app.Commit()
+
+	// should add delegate if owner
+	err = testSetAccountDelegateTx(t, &signer, app, toAccAddr, true, 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	// should fail if delegate already added
+	err = testSetAccountDelegateTx(t, &signer, app, toAccAddr, true, 1)
+	qt.Assert(t, err, qt.IsNotNil)
+
+	// get from acc
+	acc, err := app.State.GetAccount(signer.Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, acc, qt.IsNotNil)
+	qt.Assert(t, acc.DelegateAddrs[0], qt.DeepEquals, toAccAddr.Bytes())
+
+	// should del an existing delegate
+	err = testSetAccountDelegateTx(t, &signer, app, toAccAddr, false, 1)
+	qt.Assert(t, err, qt.IsNil)
+
+	// should fail deleting a non existent delegate
+	err = testSetAccountDelegateTx(t, &signer, app, toAccAddr, false, 1)
+	qt.Assert(t, err, qt.IsNotNil)
+
+	// get from acc
+	acc, err = app.State.GetAccount(signer.Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, acc, qt.IsNotNil)
+	qt.Assert(t, len(acc.DelegateAddrs), qt.Equals, 0)
+}
+
+func testSetAccountDelegateTx(t *testing.T,
+	signer *ethereum.SignKeys,
+	app *BaseApplication,
+	delegate common.Address,
+	op bool, // true == add, false == del
+	nonce uint32) error {
+	var err error
+
+	// tx
+	tx := &models.SetAccountDelegateTx{
+		Delegate: delegate.Bytes(),
+		Nonce:    nonce,
+		Txtype:   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
+	}
+	if !op {
+		tx.Txtype = models.TxType_DEL_DELEGATE_FOR_ACCOUNT
+	}
+
+	stx := &models.SignedTx{}
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountDelegateTx{SetAccountDelegateTx: tx}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := sendTx(app, signer, stx); err != nil {
+		return err
+	}
+	app.Commit()
+	return nil
+}
+
 // sendTx signs and sends a vochain transaction
 func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedTx) error {
 	var cktx abcitypes.RequestCheckTx

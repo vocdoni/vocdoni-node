@@ -612,6 +612,86 @@ func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	return &sendTokensTxCheckValues{sigAddress, txToAddress, tx.Value, tx.Nonce}, nil
 }
 
+// SetAccountDelegateTxCheck checks if a SetAccountDelegateTx and its data are valid
+func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (*setAccountDelegateTxCheckValues, error) {
+	if vtx == nil {
+		return nil, fmt.Errorf("transaction is nil")
+	}
+	tx := vtx.GetSetAccountDelegateTx()
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return nil, fmt.Errorf("missing signature and/or transaction")
+	}
+	// check delegate
+	delAcc := common.BytesToAddress(tx.Delegate)
+	if delAcc == types.EthereumZeroAddress {
+		return nil, fmt.Errorf("invalid delegate address")
+	}
+	// get sender
+	sigAddress, acc, err := state.AccountFromSignature(txBytes, signature)
+	if err != nil {
+		return nil, err
+	}
+	// check delegate to add is not itself
+	if delAcc == *sigAddress {
+		return nil, fmt.Errorf("cannot add self to delegates list")
+	}
+	// check nonce
+	if tx.Nonce != acc.Nonce {
+		return nil, fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
+	}
+	// check tx cost
+	cost, err := state.TxCost(tx.Txtype, false)
+	if err != nil {
+		return nil, err
+	}
+	if acc.Balance < cost {
+		return nil, ErrNotEnoughBalance
+	}
+	// check tx type
+	switch tx.Txtype {
+	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
+		if acc.IsDelegate(delAcc) {
+			return nil, fmt.Errorf("already added")
+		}
+		return &setAccountDelegateTxCheckValues{From: *sigAddress, Delegate: delAcc}, nil
+	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+		for i := 0; i < len(acc.DelegateAddrs); i++ {
+			delegateToCmp := common.BytesToAddress(acc.DelegateAddrs[i])
+			if delegateToCmp == delAcc {
+				return &setAccountDelegateTxCheckValues{From: *sigAddress, Delegate: delAcc}, nil
+			}
+		}
+		return nil, fmt.Errorf("cannot remove a non existent delegate")
+	default:
+		return nil, fmt.Errorf("unsupported SetAccountDelegate operation")
+	}
+}
+
+// SetDelegate sets a delegate for a given account
+func (v *State) SetAccountDelegate(accountAddr, delegateAddr common.Address, txType models.TxType) error {
+	// get account
+	acc, err := v.GetAccount(accountAddr, false)
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return ErrAccountNotExist
+	}
+	switch txType {
+	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
+		if err := acc.AddDelegate(delegateAddr); err != nil {
+			return fmt.Errorf("cannot add delegate, AddDelegate: %w", err)
+		}
+		return v.SetAccount(accountAddr, acc)
+	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+		acc.DelDelegate(delegateAddr)
+		return v.SetAccount(accountAddr, acc)
+	default:
+		return fmt.Errorf("invalid setDelegate tx type")
+	}
+}
+
 // GenerateFaucetPackage generates a faucet package
 func GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value uint64) (*models.FaucetPackage, error) {
 	rand.Seed(time.Now().UnixNano())

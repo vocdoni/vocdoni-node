@@ -1425,6 +1425,7 @@ func (c *Client) SubmitRawTx(signer *ethereum.SignKeys, stx *models.SignedTx) (*
 	return c.Request(req, nil)
 }
 
+// MintTokens sends a mint tokens transaction
 func (c *Client) MintTokens(treasurer *ethereum.SignKeys, accountAddr common.Address, treasurerNonce uint32, amount uint64) error {
 	var req api.APIrequest
 	var err error
@@ -1452,6 +1453,7 @@ func (c *Client) MintTokens(treasurer *ethereum.SignKeys, accountAddr common.Add
 	return nil
 }
 
+// SendTokens sends a send tokens transaction
 func (c *Client) SendTokens(signer *ethereum.SignKeys, accountAddr common.Address, nonce uint32, amount uint64) error {
 	var req api.APIrequest
 	var err error
@@ -1467,6 +1469,36 @@ func (c *Client) SendTokens(signer *ethereum.SignKeys, accountAddr common.Addres
 
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SendTokens{SendTokens: tx}})
+	if err != nil {
+		return err
+	}
+	resp, err := c.SubmitRawTx(signer, &stx)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("submitRawTx failed: %s", resp.Message)
+	}
+	return nil
+}
+
+// SetDelegate sends a set delegate transaction, if op == true adds a delegate, deletes a delegate otherwise
+func (c *Client) SetAccountDelegate(signer *ethereum.SignKeys, delegate common.Address, op bool, nonce uint32) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.SetAccountDelegateTx{
+		Txtype:   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
+		Nonce:    nonce,
+		Delegate: delegate.Bytes(),
+	}
+	if !op {
+		tx.Txtype = models.TxType_DEL_DELEGATE_FOR_ACCOUNT
+	}
+
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountDelegateTx{SetAccountDelegateTx: tx}})
 	if err != nil {
 		return err
 	}
