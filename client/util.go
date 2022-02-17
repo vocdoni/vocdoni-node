@@ -15,19 +15,21 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 )
 
+const TimeBetweenBlocks = 6 * time.Second
+
 func (c *Client) WaitUntilBlock(block uint32) {
 	log.Infof("waiting for block %d...", block)
 	for {
 		cb, err := c.GetCurrentBlock()
 		if err != nil {
 			log.Error(err)
-			time.Sleep(6 * time.Second)
+			time.Sleep(TimeBetweenBlocks)
 			continue
 		}
 		if cb >= block {
 			break
 		}
-		time.Sleep(6 * time.Second)
+		time.Sleep(TimeBetweenBlocks)
 		log.Infof("remaining blocks: %d", block-cb)
 	}
 }

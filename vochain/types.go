@@ -64,6 +64,10 @@ type sendTokensTxCheckValues struct {
 	Nonce    uint32
 }
 
+type setAccountDelegateTxCheckValues struct {
+	From, Delegate common.Address
+}
+
 // ________________________ QUERIES ________________________
 
 // QueryData is an abstraction of any kind of data a query request could have

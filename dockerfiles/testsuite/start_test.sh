@@ -120,7 +120,7 @@ for test in ${tests_to_run[@]} ; do
 	else
 		echo "Vochain test $test failed!"
 		echo "### Post run logs ###"
-		docker-compose logs --tail 1000
+		#docker-compose logs --tail 1000
 		break
 	fi
 done

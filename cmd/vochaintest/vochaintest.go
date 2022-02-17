@@ -1022,6 +1022,11 @@ func testTokenTransactions(
 	if err := testSendTokens(mainClient, treasurerSigner, mainSigner, otherSigner); err != nil {
 		log.Fatal(err)
 	}
+
+	// check set account delegate
+	if err := testSetAccountDelegate(mainClient, mainSigner, otherSigner); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys) error {
@@ -1225,6 +1230,86 @@ func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 
 	}
 	if acc.Nonce+1 != acc3.Nonce {
 		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Nonce+1, acc3.Nonce)
+	}
+	return nil
+}
+
+func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum.SignKeys) error {
+	txCostAdd, err := mainClient.GetTransactionCost(signer, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
+	if err != nil {
+		return err
+	}
+	txCostDel, err := mainClient.GetTransactionCost(signer, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
+	if err != nil {
+		return err
+	}
+	log.Infof("tx cost of %s is %d", models.TxType_ADD_DELEGATE_FOR_ACCOUNT, txCostAdd)
+	log.Infof("tx cost of %s is %d", models.TxType_DEL_DELEGATE_FOR_ACCOUNT, txCostDel)
+
+	acc, err := mainClient.GetAccount(signer, signer.Address())
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("fetched from account %s with nonce %d and delegates %v", signer.Address(), acc.Nonce, acc.DelegateAddrs)
+	// add delegate
+	if err := mainClient.SetAccountDelegate(signer,
+		signer2.Address(),
+		true,
+		acc.Nonce); err != nil {
+		return fmt.Errorf("cannot set account delegate: %v", err)
+	}
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
+	acc, err = mainClient.GetAccount(signer, signer.Address())
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("fetched account %s with nonce %d and delegates %v", signer.Address(), acc.Nonce, acc.DelegateAddrs)
+	if len(acc.DelegateAddrs) != 1 {
+		log.Fatalf("expected %s to have 1 delegate got %d", signer.Address(), len(acc.DelegateAddrs))
+	}
+	addedDelegate := common.BytesToAddress(acc.DelegateAddrs[0])
+	if addedDelegate != signer2.Address() {
+		log.Fatalf("expeted delegate to be %s got %s", signer2.Address(), addedDelegate)
+	}
+	// delete delegate
+	acc, err = mainClient.GetAccount(signer, signer.Address())
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return vochain.ErrAccountNotExist
+	}
+	if err := mainClient.SetAccountDelegate(signer,
+		signer2.Address(),
+		false,
+		acc.Nonce); err != nil {
+		return fmt.Errorf("cannot set account delegate: %v", err)
+	}
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
+	acc, err = mainClient.GetAccount(signer, signer.Address())
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("fetched account %s with nonce %d and delegates %v", signer.Address(), acc.Nonce, acc.DelegateAddrs)
+	if len(acc.DelegateAddrs) != 0 {
+		log.Fatalf("expected %s to have 0 delegates got %d", signer.Address(), len(acc.DelegateAddrs))
 	}
 	return nil
 }
