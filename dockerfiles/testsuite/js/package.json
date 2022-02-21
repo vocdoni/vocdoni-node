@@ -8,7 +8,7 @@
   },
   "license": "GPL-3.0",
   "dependencies": {
-    "axios": "^0.24.0",
+    "axios": "^0.26.0",
     "ffjavascript": "0.2.39",
     "snarkjs": "0.4.10"
   },
