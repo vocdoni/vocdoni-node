@@ -719,7 +719,7 @@ func (v *State) RemoveValidator(address []byte) error {
 	return validators.Set(address, nil)
 }
 
-// Validators returns a list of the validators saved on persistent storage
+// Validators returns a list of the chain validators
 // TODO: do 'saved on persistent storage' make sense also when committed == false?
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
