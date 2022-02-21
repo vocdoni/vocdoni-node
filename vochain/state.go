@@ -454,12 +454,12 @@ func (v *State) setMainTreeView(treeView *statedb.TreeView) {
 	v.mainTreeViewValue.Store(treeView)
 }
 
-// mainTreeViewer returns the mainTree as a treeViewer.  When isQuery is false,
-// the mainTree returned is the not yet commited one from the currently open
-// StateDB transaction.  When isQuery is true, the mainTree returned is the
-// last commited version.
-func (v *State) mainTreeViewer(isQuery bool) statedb.TreeViewer {
-	if isQuery {
+// mainTreeViewer returns the mainTree as a treeViewer.
+// When committed is false, the mainTree returned is the not yet commited one
+// from the currently open StateDB transaction.
+// When committed is true, the mainTree returned is the last commited version.
+func (v *State) mainTreeViewer(committed bool) statedb.TreeViewer {
+	if committed {
 		return v.MainTreeView()
 	}
 	return v.Tx.AsTreeView()
@@ -496,14 +496,17 @@ func (v *State) RemoveOracle(address common.Address) error {
 	return oracles.Set(address.Bytes(), nil)
 }
 
-// Oracles returns the current oracle list
-func (v *State) Oracles(isQuery bool) ([]common.Address, error) {
-	if !isQuery {
+// Oracles returns the current oracles list
+// When committed is false, the operation is executed also on not yet commited
+// data from the currently open StateDB transaction.
+// When committed is true, the operation is executed on the last commited version.
+func (v *State) Oracles(committed bool) ([]common.Address, error) {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
 
-	oraclesTree, err := v.mainTreeViewer(isQuery).SubTree(OraclesCfg)
+	oraclesTree, err := v.mainTreeViewer(committed).SubTree(OraclesCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -555,12 +558,15 @@ func (v *State) SetTreasurer(address common.Address, nonce uint32) error {
 }
 
 // Treasurer returns the address and the Treasurer nonce
-func (v *State) Treasurer(isQuery bool) (*models.Treasurer, error) {
-	if !isQuery {
+// When committed is false, the operation is executed also on not yet commited
+// data from the currently open StateDB transaction.
+// When committed is true, the operation is executed on the last commited version.
+func (v *State) Treasurer(committed bool) (*models.Treasurer, error) {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	extraTree, err := v.mainTreeViewer(isQuery).SubTree(ExtraCfg)
+	extraTree, err := v.mainTreeViewer(committed).SubTree(ExtraCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -615,16 +621,19 @@ func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
 }
 
 // TxCost returns the cost of a given transaction
-func (v *State) TxCost(txType models.TxType, isQuery bool) (uint64, error) {
+// When committed is false, the operation is executed also on not yet commited
+// data from the currently open StateDB transaction.
+// When committed is true, the operation is executed on the last commited version.
+func (v *State) TxCost(txType models.TxType, committed bool) (uint64, error) {
 	key, ok := TxTypeCostToStateKey[txType]
 	if !ok {
 		return 0, fmt.Errorf("txType %v shouldn't cost anything", txType)
 	}
-	if !isQuery {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	extraTree, err := v.mainTreeViewer(isQuery).SubTree(ExtraCfg)
+	extraTree, err := v.mainTreeViewer(committed).SubTree(ExtraCfg)
 	if err != nil {
 		return 0, err
 	}
@@ -711,13 +720,17 @@ func (v *State) RemoveValidator(address []byte) error {
 }
 
 // Validators returns a list of the validators saved on persistent storage
-func (v *State) Validators(isQuery bool) ([]*models.Validator, error) {
-	if !isQuery {
+// TODO: do 'saved on persistent storage' make sense also when committed == false?
+// When committed is false, the operation is executed also on not yet commited
+// data from the currently open StateDB transaction.
+// When committed is true, the operation is executed on the last commited version.
+func (v *State) Validators(committed bool) ([]*models.Validator, error) {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
 
-	validatorsTree, err := v.mainTreeViewer(isQuery).SubTree(ValidatorsCfg)
+	validatorsTree, err := v.mainTreeViewer(committed).SubTree(ValidatorsCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -803,12 +816,15 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 }
 
 // VoteCount return the global vote count.
-func (v *State) VoteCount(isQuery bool) (uint64, error) {
-	if !isQuery {
+// When committed is false, the operation is executed also on not yet commited
+// data from the currently open StateDB transaction.
+// When committed is true, the operation is executed on the last commited version.
+func (v *State) VoteCount(committed bool) (uint64, error) {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	noState := v.mainTreeViewer(isQuery).NoState()
+	noState := v.mainTreeViewer(committed).NoState()
 	voteCountLE, err := noState.Get(voteCountKey)
 	if errors.Is(err, db.ErrKeyNotFound) {
 		return 0, nil
@@ -891,16 +907,19 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 }
 
 // Envelope returns the hash of a stored vote if exists.
-func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ []byte, err error) {
+// When committed is false, the operation is executed also on not yet commited
+// data from the currently open StateDB transaction.
+// When committed is true, the operation is executed on the last commited version.
+func (v *State) Envelope(processID, nullifier []byte, committed bool) (_ []byte, err error) {
 	vid, err := v.voteID(processID, nullifier)
 	if err != nil {
 		return nil, err
 	}
-	if !isQuery {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock() // needs to be deferred due to the recover above
 	}
-	votesTree, err := v.mainTreeViewer(isQuery).DeepSubTree(
+	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
 		ProcessesCfg, VotesCfg.WithKey(processID))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, ErrProcessNotFound
@@ -921,8 +940,11 @@ func (v *State) Envelope(processID, nullifier []byte, isQuery bool) (_ []byte, e
 }
 
 // EnvelopeExists returns true if the envelope identified with voteID exists
-func (v *State) EnvelopeExists(processID, nullifier []byte, isQuery bool) (bool, error) {
-	_, err := v.Envelope(processID, nullifier, isQuery)
+// When committed is false, the operation is executed also on not yet commited
+// data from the currently open StateDB transaction.
+// When committed is true, the operation is executed on the last commited version.
+func (v *State) EnvelopeExists(processID, nullifier []byte, committed bool) (bool, error) {
+	_, err := v.Envelope(processID, nullifier, committed)
 	if errors.Is(err, ErrProcessNotFound) {
 		return false, nil
 	} else if errors.Is(err, ErrVoteDoesNotExist) {
@@ -934,14 +956,18 @@ func (v *State) EnvelopeExists(processID, nullifier []byte, isQuery bool) (bool,
 }
 
 // iterateVotes iterates fn over state tree entries with the processID prefix.
-// if isQuery, the IAVL tree is used, otherwise the AVL tree is used.
+// if committed is true, the IAVL tree is used, otherwise the AVL tree is used.
+// TODO: does previous line is more descriptive then the followings 3 ?
+// When committed is false, the operation is executed also on not yet commited
+// data from the currently open StateDB transaction.
+// When committed is true, the operation is executed on the last commited version.
 func (v *State) iterateVotes(processID []byte,
-	fn func(vid []byte, sdbVote *models.StateDBVote) bool, isQuery bool) error {
-	if !isQuery {
+	fn func(vid []byte, sdbVote *models.StateDBVote) bool, committed bool) error {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	votesTree, err := v.mainTreeViewer(isQuery).DeepSubTree(
+	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
 		ProcessesCfg, VotesCfg.WithKey(processID))
 	if err != nil {
 		return err
@@ -964,19 +990,25 @@ func (v *State) iterateVotes(processID []byte,
 }
 
 // CountVotes returns the number of votes registered for a given process id
-func (v *State) CountVotes(processID []byte, isQuery bool) uint32 {
+// When committed is false, the operation is executed also on not yet commited
+// data from the currently open StateDB transaction.
+// When committed is true, the operation is executed on the last commited version.
+func (v *State) CountVotes(processID []byte, committed bool) uint32 {
 	var count uint32
 	// TODO: Once statedb.TreeView.Size() works, replace this by that.
 	v.iterateVotes(processID, func(vid []byte, sdbVote *models.StateDBVote) bool {
 		count++
 		return false
-	}, isQuery)
+	}, committed)
 	return count
 }
 
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
+// When committed is false, the operation is executed also on not yet commited
+// data from the currently open StateDB transaction.
+// When committed is true, the operation is executed on the last commited version.
 func (v *State) EnvelopeList(processID []byte, from, listSize int,
-	isQuery bool) (nullifiers [][]byte) {
+	committed bool) (nullifiers [][]byte) {
 	idx := 0
 	v.iterateVotes(processID, func(vid []byte, sdbVote *models.StateDBVote) bool {
 		if idx >= from+listSize {
@@ -987,7 +1019,7 @@ func (v *State) EnvelopeList(processID []byte, from, listSize int,
 		}
 		idx++
 		return false
-	}, isQuery)
+	}, committed)
 	return nullifiers
 }
 
