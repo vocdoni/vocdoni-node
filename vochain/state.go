@@ -720,7 +720,6 @@ func (v *State) RemoveValidator(address []byte) error {
 }
 
 // Validators returns a list of the chain validators
-// TODO: do 'saved on persistent storage' make sense also when committed == false?
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
@@ -956,8 +955,6 @@ func (v *State) EnvelopeExists(processID, nullifier []byte, committed bool) (boo
 }
 
 // iterateVotes iterates fn over state tree entries with the processID prefix.
-// if committed is true, the IAVL tree is used, otherwise the AVL tree is used.
-// TODO: does previous line is more descriptive then the followings 3 ?
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
