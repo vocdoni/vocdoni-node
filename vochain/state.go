@@ -646,12 +646,13 @@ func (v *State) TxCost(txType models.TxType, committed bool) (uint64, error) {
 
 // FaucetNonce returns true if the key is found in the subtree
 // key == hash(address, nonce)
-func (v *State) FaucetNonce(key []byte, isQuery bool) (bool, error) {
-	if !isQuery {
+// committed is relative to the state on which the function is executed
+func (v *State) FaucetNonce(key []byte, committed bool) (bool, error) {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	faucetNonceTree, err := v.mainTreeViewer(isQuery).SubTree(FaucetNonceCfg)
+	faucetNonceTree, err := v.mainTreeViewer(committed).SubTree(FaucetNonceCfg)
 	if err != nil {
 		return false, err
 	}

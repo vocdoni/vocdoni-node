@@ -134,13 +134,14 @@ func (v *State) MintBalance(address common.Address, amount uint64) error {
 
 // GetAccount retrives the Account for an address.
 // Returns a nil account and no error if the account does not exist.
-func (v *State) GetAccount(address common.Address, isQuery bool) (*Account, error) {
+// committed is relative to the state on which the function is executed
+func (v *State) GetAccount(address common.Address, committed bool) (*Account, error) {
 	var acc Account
-	if !isQuery {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	raw, err := v.mainTreeViewer(isQuery).DeepGet(address.Bytes(), AccountsCfg)
+	raw, err := v.mainTreeViewer(committed).DeepGet(address.Bytes(), AccountsCfg)
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, nil
 	} else if err != nil {

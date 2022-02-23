@@ -113,22 +113,22 @@ func getProcess(mainTreeView statedb.TreeViewer, pid []byte) (*models.Process, e
 }
 
 // Process returns a process info given a processId if exists
-func (v *State) Process(pid []byte, isQuery bool) (*models.Process, error) {
-	if !isQuery {
+func (v *State) Process(pid []byte, committed bool) (*models.Process, error) {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	return getProcess(v.mainTreeViewer(isQuery), pid)
+	return getProcess(v.mainTreeViewer(committed), pid)
 }
 
 // CountProcesses returns the overall number of processes the vochain has
-func (v *State) CountProcesses(isQuery bool) (uint64, error) {
+func (v *State) CountProcesses(committed bool) (uint64, error) {
 	// TODO: Once statedb.TreeView.Size() works, replace this by that.
-	if !isQuery {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	processesTree, err := v.mainTreeViewer(isQuery).SubTree(ProcessesCfg)
+	processesTree, err := v.mainTreeViewer(committed).SubTree(ProcessesCfg)
 	if err != nil {
 		return 0, err
 	}
