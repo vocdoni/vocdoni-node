@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/config"
@@ -97,7 +98,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 		case "vote":
 			d.VochainAPP = NewMockVochainNode(tb, d)
 			vi := vochaininfo.NewVochainInfo(d.VochainAPP)
-			go vi.Start(10)
+			go vi.Start(10 * time.Second)
 			d.Scrutinizer = NewMockScrutinizer(tb, d, d.VochainAPP)
 			rpc.EnableVoteAPI(d.VochainAPP, vi)
 			rpc.EnableResultsAPI(d.VochainAPP, d.Scrutinizer)

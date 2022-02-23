@@ -89,7 +89,7 @@ func main() {
 	case "sync":
 		vnode := newVochain(chain, dataDir)
 		vi := vochaininfo.NewVochainInfo(vnode)
-		go vi.Start(10)
+		go vi.Start(10 * time.Second)
 		go service.VochainPrintInfo(20, vi)
 
 		defer func() {

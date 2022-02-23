@@ -167,7 +167,7 @@ func Vochain(vs *VochainService) (
 
 	// Vochain info
 	vi := vochaininfo.NewVochainInfo(vnode)
-	go vi.Start(10)
+	go vi.Start(10 * time.Second)
 
 	// Grab metrics
 	go vi.CollectMetrics(vs.MetricsAgent)

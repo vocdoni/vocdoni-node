@@ -105,7 +105,7 @@ func NewVocone(dataDir string, oracleKey *ethereum.SignKeys) (*Vocone, error) {
 
 	// Create vochain metrics collector
 	vc.appInfo = vochaininfo.NewVochainInfo(vc.app)
-	go vc.appInfo.Start(10)
+	go vc.appInfo.Start(10 * time.Second)
 
 	// Create the IPFS storage layer
 	vc.storage, err = service.IPFS(&config.IPFSCfg{
