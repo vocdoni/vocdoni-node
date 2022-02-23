@@ -186,8 +186,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2022-02-06T09:43:28.668436552Z",
-   "chain_id":"vocdoni-development-62",
+   "genesis_time":"2022-03-24T09:43:28.668436552Z",
+   "chain_id":"vocdoni-development-64",
    "consensus_params":{
       "block":{
          "max_bytes":"5120000",
@@ -288,17 +288,17 @@ var Genesis = map[string]VochainGenesis{
       ],
       "treasurer": "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d",
       "tx_cost": {
-         "Tx_SetProcessStatus": 100,
-         "Tx_SetProcessCensus": 100,
-         "Tx_SetProcessResults": 100,
-         "Tx_SetProcessQuestionIndex": 100,
-         "Tx_RegisterKey": 100,
-         "Tx_NewProcess": 100,
-         "Tx_SendTokens": 100,
-         "Tx_SetAccountInfo": 100,
-         "Tx_AddDelegateForAccount": 100,
-         "Tx_DelDelegateForAccount": 100,
-         "Tx_CollectFaucet": 100
+         "Tx_SetProcessStatus": 10,
+         "Tx_SetProcessCensus": 10,
+         "Tx_SetProcessResults": 10,
+         "Tx_SetProcessQuestionIndex": 10,
+         "Tx_RegisterKey": 10,
+         "Tx_NewProcess": 10,
+         "Tx_SendTokens": 10,
+         "Tx_SetAccountInfo": 10,
+         "Tx_AddDelegateForAccount": 10,
+         "Tx_DelDelegateForAccount": 10,
+         "Tx_CollectFaucet": 10
        }
    }
 }
