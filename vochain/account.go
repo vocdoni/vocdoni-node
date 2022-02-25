@@ -296,7 +296,7 @@ func (v *State) ConsumeFaucetPayload(from common.Address, faucetPayload *models.
 	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
 	key := from.Bytes()
 	key = append(key, b...)
-	if err := v.Tx.DeepSet(crypto.Sha256(key), nil, FaucetNonceCfg); err != nil {
+	if err := v.SetFaucetNonce(crypto.Sha256(key)); err != nil {
 		return err
 	}
 
