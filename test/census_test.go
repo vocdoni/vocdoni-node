@@ -43,12 +43,14 @@ import (
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 
 	"go.vocdoni.io/dvote/test/testcommon"
 )
 
 var censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")
+var censusWeight = flag.Int("censusWeight", 20, "weight of each census entry")
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -87,6 +89,7 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.CensusKey = []byte("hello")
 	req.Digested = true
+	req.Weight = (&types.BigInt{}).SetUint64(uint64(*censusWeight))
 	resp = doRequest("addClaim", signer2)
 	if !resp.Ok {
 		t.Logf("%s", resp.Message)
@@ -97,6 +100,7 @@ func TestCensus(t *testing.T) {
 	req.CensusID = censusID
 	req.Method = "addClaim"
 	req.CensusKey = []byte("hello2")
+	req.Weight = (&types.BigInt{}).SetUint64(uint64(*censusWeight))
 	resp, err = cl.Request(req, signer1)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, resp.Ok, qt.IsFalse)
@@ -138,6 +142,7 @@ func TestCensus(t *testing.T) {
 		qt.Assert(t, err, qt.IsNil)
 		qt.Assert(t, claim, qt.Not(qt.HasLen), 0)
 		claims = append(claims, claim)
+		req.Weights = append(req.Weights, (&types.BigInt{}).SetUint64(uint64(*censusWeight)))
 	}
 	req.CensusKeys = claims
 	resp = doRequest("addClaimBulk", signer2)
@@ -152,6 +157,7 @@ func TestCensus(t *testing.T) {
 
 	// CheckProof valid
 	req.ProofData = siblings
+	req.CensusValue = arbo.BigIntToBytes(32, req.Weight.ToInt())
 	resp = doRequest("checkProof", nil)
 	qt.Assert(t, *resp.ValidProof, qt.IsTrue)
 
@@ -199,6 +205,10 @@ func TestCensus(t *testing.T) {
 	req.RootHash = nil
 	resp = doRequest("getSize", nil)
 	qt.Assert(t, *resp.Size, qt.Equals, int64(*censusSize))
+
+	// getCensusWeight
+	resp = doRequest("getCensusWeight", nil)
+	qt.Assert(t, resp.Weight.ToInt().Int64(), qt.Equals, int64(*censusSize)*int64(*censusWeight))
 
 	// get census list
 	resp = doRequest("getCensusList", signer2)
