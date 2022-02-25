@@ -115,7 +115,7 @@ func TestBalanceTransfer(t *testing.T) {
 	err = s.CreateAccount(addr2.Address(), "ipfs://", make([]common.Address, 0), 0)
 	qt.Assert(t, err, qt.IsNil)
 
-	s.Save() // Save to test isQuery value on next call
+	s.Save() // Save to test committed value on next call
 	b1, err := s.GetAccount(addr1.Address(), true)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b1.Balance, qt.Equals, uint64(50))

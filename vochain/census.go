@@ -81,12 +81,12 @@ func getRollingCensusSize(mainTreeView statedb.TreeViewer, pid []byte) (uint64, 
 	return censusLen, nil
 }
 
-func (v *State) GetRollingCensusSize(pid []byte, isQuery bool) (uint64, error) {
-	if !isQuery {
+func (v *State) GetRollingCensusSize(pid []byte, committed bool) (uint64, error) {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	return getRollingCensusSize(v.mainTreeViewer(isQuery), pid)
+	return getRollingCensusSize(v.mainTreeViewer(committed), pid)
 }
 
 // PurgeRollingCensus removes a rolling census from the permanent store
@@ -96,12 +96,13 @@ func (s *State) PurgeRollingCensus(pid []byte) error {
 }
 
 // GetRollingCensusRoot returns the last rolling census root for a process id
-func (v *State) GetRollingCensusRoot(pid []byte, isQuery bool) ([]byte, error) {
-	if !isQuery {
+func (v *State) GetRollingCensusRoot(pid []byte, committed bool) ([]byte, error) {
+	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	census, err := v.mainTreeViewer(isQuery).DeepSubTree(ProcessesCfg, CensusPoseidonCfg.WithKey(pid))
+	census, err := v.mainTreeViewer(committed).DeepSubTree(
+		ProcessesCfg, CensusPoseidonCfg.WithKey(pid))
 	if err != nil {
 		return nil, fmt.Errorf("cannot open rolling census with pid %x: %w", pid, err)
 	}
