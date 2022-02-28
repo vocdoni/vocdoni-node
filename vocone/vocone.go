@@ -84,6 +84,11 @@ func NewVocone(dataDir string, oracleKey *ethereum.SignKeys) (*Vocone, error) {
 		return nil, err
 	}
 
+	// Create burn account
+	if err := vc.CreateAccount(vochain.BurnAddress, &vochain.Account{}); err != nil {
+		return nil, err
+	}
+
 	// Create scrutinizer
 	if vc.sc, err = scrutinizer.NewScrutinizer(
 		filepath.Join(dataDir, "scrutinizer"),
@@ -192,6 +197,16 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 		if _, err := vc.app.State.Save(); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (vc *Vocone) CreateAccount(key common.Address, acc *vochain.Account) error {
+	if err := vc.app.State.SetAccount(key, acc); err != nil {
+		return err
+	}
+	if _, err := vc.app.State.Save(); err != nil {
+		return err
 	}
 	return nil
 }
