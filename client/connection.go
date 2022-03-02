@@ -60,7 +60,7 @@ func (c *Client) CheckClose(err *error) {
 // Request makes a request to the previously connected endpoint
 func (c *Client) Request(req api.APIrequest, signer *ethereum.SignKeys) (*api.APIresponse, error) {
 	method := req.Method
-	req.Timestamp = int32(time.Now().Unix())
+	req.Timestamp = time.Now().Unix()
 	reqInner, err := crypto.SortedMarshalJSON(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", method, err)
@@ -122,7 +122,7 @@ func (c *Client) ForTest(tb testing.TB, req *api.APIrequest) func(
 			tb.Fatalf("request is nil")
 		}
 		req.Method = method
-		req.Timestamp = int32(time.Now().Unix())
+		req.Timestamp = time.Now().Unix()
 		resp, err := c.Request(*req, signer)
 		if err != nil {
 			tb.Fatal(err)

@@ -13,7 +13,7 @@ import (
 // MessageAPI inteface defines the methods that the SignedJRPC custom message type must contain.
 type MessageAPI interface {
 	SetID(string)
-	SetTimestamp(int32)
+	SetTimestamp(int64)
 	SetError(string)
 	GetMethod() string
 }
@@ -40,7 +40,7 @@ func BuildReply(signer *ethereum.SignKeys, msg MessageAPI, requestID string) ([]
 	var err error
 	respRequest := &ResponseMessage{ID: requestID}
 	msg.SetID(requestID)
-	msg.SetTimestamp(int32(time.Now().Unix()))
+	msg.SetTimestamp(time.Now().Unix())
 	respRequest.MessageAPI, err = crypto.SortedMarshalJSON(msg)
 	if err != nil {
 		return nil, err

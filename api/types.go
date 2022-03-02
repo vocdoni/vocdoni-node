@@ -75,7 +75,7 @@ type APIrequest struct {
 	Signature    types.HexBytes                 `json:"signature,omitempty"`
 	SrcNetId     string                         `json:"sourceNetworkId,omitempty"`
 	Status       string                         `json:"status,omitempty"`
-	Timestamp    int32                          `json:"timestamp"`
+	Timestamp    int64                          `json:"timestamp,string"`
 	TxIndex      int32                          `json:"txIndex,omitempty"`
 	Type         string                         `json:"type,omitempty"`
 	URI          string                         `json:"uri,omitempty"`
@@ -98,7 +98,7 @@ func (a *APIrequest) SetAddress(addr *common.Address) {
 func (a *APIrequest) SetID(id string) {
 }
 
-func (a *APIrequest) SetTimestamp(ts int32) {
+func (a *APIrequest) SetTimestamp(ts int64) {
 	a.Timestamp = ts
 }
 
@@ -204,7 +204,7 @@ type APIresponse struct {
 	Size                 *int64                           `json:"size,omitempty"`
 	State                string                           `json:"state,omitempty"`
 	Stats                *VochainStats                    `json:"stats,omitempty"`
-	Timestamp            int32                            `json:"timestamp"`
+	Timestamp            int64                            `json:"timestamp,string"`
 	Type                 string                           `json:"type,omitempty"`
 	Tx                   *indexertypes.TxPackage          `json:"tx,omitempty"`
 	TxList               []*indexertypes.TxMetadata       `json:"txList,omitempty"`
@@ -214,7 +214,7 @@ type APIresponse struct {
 	Weight               *types.BigInt                    `json:"weight,omitempty"`
 }
 
-func (a *APIresponse) SetTimestamp(ts int32) {
+func (a *APIresponse) SetTimestamp(ts int64) {
 	a.Timestamp = ts
 }
 

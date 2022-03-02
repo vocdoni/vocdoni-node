@@ -100,7 +100,7 @@ type API struct {
 	ID        string `json:"id"`
 	Ok        bool   `json:"ok,omitempty"`
 	Error     string `json:"error,omitempty"`
-	Timestamp int32  `json:"timestamp"`
+	Timestamp int64  `json:"timestamp,string"`
 }
 
 func (a *API) GetMethod() string {
@@ -115,7 +115,7 @@ func (a *API) SetError(errorMsg string) {
 	a.Error = errorMsg
 }
 
-func (a *API) SetTimestamp(ts int32) {
+func (a *API) SetTimestamp(ts int64) {
 	a.Timestamp = ts
 }
 

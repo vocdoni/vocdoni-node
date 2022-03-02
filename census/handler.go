@@ -32,7 +32,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 	// Process data
 	log.Debugf("processing data %s", r.String())
 	resp.Ok = true
-	resp.Timestamp = int32(time.Now().Unix())
+	resp.Timestamp = time.Now().Unix()
 
 	// Trim Hex on censusID and RootHash
 	if len(r.CensusID) > 0 {
