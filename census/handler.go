@@ -324,16 +324,11 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		return resp, nil
 
 	case "getCensusWeight":
-		resp.Weight = &types.BigInt{}
-		getWeightCallback := func(key, value []byte) bool {
-			weight := tr.BytesToBigInt(value)
-			resp.Weight = resp.Weight.Add((*types.BigInt)(weight), resp.Weight)
-			return true
-		}
-		err := tr.IterateLeaves(getWeightCallback)
+		weight, err := tr.GetCensusWeight()
 		if err != nil {
 			return nil, err
 		}
+		resp.Weight = (*types.BigInt)(weight)
 		return resp, nil
 
 	case "dumpPlain":

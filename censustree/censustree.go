@@ -1,6 +1,7 @@
 package censustree
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -12,6 +13,8 @@ import (
 	"go.vocdoni.io/dvote/tree"
 	"go.vocdoni.io/proto/build/go/models"
 )
+
+var censusWeightKey = []byte("censusWeight")
 
 // Tree implements the Merkle Tree used for census
 // Concurrent updates to the tree.Tree can lead to losing some of the updates,
@@ -153,6 +156,22 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 func (t *Tree) Add(key, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
+
+	// Create a db write tx to update the census weight
+	write := t.tree.DB().WriteTx()
+	defer write.Discard()
+
+	weightBytes, err := write.Get(censusWeightKey)
+	if err != nil && !errors.Is(err, db.ErrKeyNotFound) {
+		return fmt.Errorf("could not get census weight: %w", err)
+	}
+	weight := big.NewInt(0).Add(t.BytesToBigInt(weightBytes), t.BytesToBigInt(value))
+	if err := write.Set(censusWeightKey, t.BigIntToBytes(weight)); err != nil {
+		return fmt.Errorf("could not set census weight: %w", err)
+	}
+	if err := write.Commit(); err != nil {
+		return fmt.Errorf("could not set census weight: %w", err)
+	}
 	return t.tree.Add(nil, key, value)
 }
 
@@ -161,4 +180,19 @@ func (t *Tree) ImportDump(b []byte) error {
 	t.Lock()
 	defer t.Unlock()
 	return t.tree.ImportDump(b)
+}
+
+// GetCensusWeight returns the current weight of the census.
+func (t *Tree) GetCensusWeight() (*big.Int, error) {
+	t.Lock()
+	defer t.Unlock()
+	weight, err := t.tree.DB().ReadTx().Get(censusWeightKey)
+	if errors.Is(err, db.ErrKeyNotFound) {
+		return big.NewInt(0), nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not get census weight: %w", err)
+	}
+
+	return t.BytesToBigInt(weight), nil
 }
