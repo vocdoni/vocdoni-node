@@ -97,9 +97,16 @@ func (r *RPCAPI) getBlockList(request *api.APIrequest) (*api.APIresponse, error)
 		if uint32(request.From)+uint32(i) > r.vocapp.Height() {
 			break
 		}
-		response.BlockList = append(response.BlockList,
-			blockMetadataFromBlockModel(r.scrutinizer.App.
-				GetBlockByHeight(int64(request.From)+int64(i)), true, true))
+		blkMeta := blockMetadataFromBlockModel(
+			r.scrutinizer.App.GetBlockByHeight(
+				int64(request.From)+int64(i),
+			),
+			true,
+			true,
+		)
+		if blkMeta != nil {
+			response.BlockList = append(response.BlockList, blkMeta)
+		}
 	}
 	return &response, nil
 }
