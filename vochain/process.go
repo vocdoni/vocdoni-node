@@ -389,8 +389,8 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	if tx.Process.VoteOptions == nil || tx.Process.EnvelopeType == nil || tx.Process.Mode == nil {
 		return nil, fmt.Errorf("missing required fields (voteOptions, envelopeType or processMode)")
 	}
-	if tx.Process.VoteOptions.MaxCount == 0 || tx.Process.VoteOptions.MaxValue == 0 {
-		return nil, fmt.Errorf("missing vote options parameters (maxCount or maxValue)")
+	if tx.Process.VoteOptions.MaxCount == 0 {
+		return nil, fmt.Errorf("missing vote maxCount parameter")
 	}
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {
