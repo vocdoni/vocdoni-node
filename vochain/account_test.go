@@ -9,6 +9,7 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -437,6 +438,138 @@ func testSetAccountDelegateTx(t *testing.T,
 	}
 
 	if err := sendTx(app, signer, stx); err != nil {
+		return err
+	}
+	app.Commit()
+	return nil
+}
+
+func TestCollectFaucetTx(t *testing.T) {
+	app := TestBaseApplication(t)
+
+	signer := ethereum.SignKeys{}
+	err := signer.Generate()
+	qt.Assert(t, err, qt.IsNil)
+
+	toSigner := ethereum.SignKeys{}
+	err = toSigner.Generate()
+	qt.Assert(t, err, qt.IsNil)
+
+	app.State.SetAccount(BurnAddress, &Account{})
+
+	err = app.State.SetTreasurer(signer.Address(), 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 10)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.CreateAccount(signer.Address(), "ipfs://", make([]common.Address, 0), 0)
+	qt.Assert(t, err, qt.IsNil)
+	err = app.State.CreateAccount(toSigner.Address(), "ipfs://", make([]common.Address, 0), 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.MintBalance(signer.Address(), 1000)
+	qt.Assert(t, err, qt.IsNil)
+	app.Commit()
+
+	randomIdentifier := uint64(util.RandomInt(0, 10000000))
+	// should work if all data and tx are valid
+	err = testCollectFaucetTx(t, &signer, &toSigner, app, 0, 900, randomIdentifier)
+	qt.Assert(t, err, qt.IsNil)
+	acc, err := app.State.GetAccount(toSigner.Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, acc.Balance, qt.Equals, uint64(900))
+	qt.Assert(t, acc.Nonce, qt.Equals, uint32(1))
+	signerAcc, err := app.State.GetAccount(signer.Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(90))
+	qt.Assert(t, signerAcc.Nonce, qt.Equals, uint32(0))
+	burnAcc, err := app.State.GetAccount(BurnAddress, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, burnAcc.Balance, qt.Equals, uint64(10))
+
+	// should fail if identifier is already used
+	err = testCollectFaucetTx(t, &signer, &toSigner, app, 1, 1, randomIdentifier)
+	qt.Assert(t, err, qt.IsNotNil)
+	qt.Assert(t, err, qt.ErrorMatches, ".* nonce .* already used")
+
+	// should fail if to acc does not exist
+	nonExistentAccount := ethereum.SignKeys{}
+	err = nonExistentAccount.Generate()
+	qt.Assert(t, err, qt.IsNil)
+
+	err = testCollectFaucetTx(t, &signer, &nonExistentAccount, app, 1, 1, randomIdentifier+1)
+	qt.Assert(t, err, qt.IsNotNil)
+	qt.Assert(t, err, qt.ErrorMatches, ".* account does not exist")
+
+	// should fail if from acc does not exist
+	err = testCollectFaucetTx(t, &nonExistentAccount, &toSigner, app, 1, 1, randomIdentifier+1)
+	qt.Assert(t, err, qt.IsNotNil)
+	qt.Assert(t, err, qt.ErrorMatches, ".* the account signing the faucet payload does not exist")
+
+	// should fail if amount is not valid
+	err = testCollectFaucetTx(t, &signer, &toSigner, app, 2, 0, randomIdentifier+1)
+	qt.Assert(t, err, qt.IsNotNil)
+	qt.Assert(t, err, qt.ErrorMatches, ".* invalid faucet package payload amount")
+
+	// should fail if tx sender nonce is not valid
+	err = testCollectFaucetTx(t, &signer, &toSigner, app, 0, 1, randomIdentifier+1)
+	qt.Assert(t, err, qt.IsNotNil)
+	qt.Assert(t, err, qt.ErrorMatches, ".* invalid nonce")
+
+	// should fail if from acc does not have enough balance
+	err = testCollectFaucetTx(t, &signer, &toSigner, app, 1, 100000, randomIdentifier+1)
+	qt.Assert(t, err, qt.IsNotNil)
+	qt.Assert(t, err, qt.ErrorMatches, ".* faucet does not have enough balance .*")
+
+	// check any value changed after tx failures
+	acc, err = app.State.GetAccount(toSigner.Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, acc.Balance, qt.Equals, uint64(900))
+	qt.Assert(t, acc.Nonce, qt.Equals, uint32(1))
+	signerAcc, err = app.State.GetAccount(signer.Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(90))
+	qt.Assert(t, signerAcc.Nonce, qt.Equals, uint32(0))
+	burnAcc, err = app.State.GetAccount(BurnAddress, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, burnAcc.Balance, qt.Equals, uint64(10))
+}
+
+func testCollectFaucetTx(t *testing.T,
+	signer,
+	to *ethereum.SignKeys,
+	app *BaseApplication,
+	nonce uint32,
+	amount,
+	identifier uint64) error {
+	var err error
+
+	// tx
+	faucetPayload := &models.FaucetPayload{
+		Identifier: identifier,
+		To:         to.Address().Bytes(),
+		Amount:     amount,
+	}
+	faucetPayloadBytes, err := proto.Marshal(faucetPayload)
+	qt.Assert(t, err, qt.IsNil)
+	faucetPayloadSignature, err := signer.SignEthereum(faucetPayloadBytes)
+	qt.Assert(t, err, qt.IsNil)
+	faucetPkg := &models.FaucetPackage{
+		Payload:   faucetPayload,
+		Signature: faucetPayloadSignature,
+	}
+	tx := &models.CollectFaucetTx{
+		TxType:        models.TxType_COLLECT_FAUCET,
+		FaucetPackage: faucetPkg,
+		Nonce:         nonce,
+	}
+	stx := &models.SignedTx{}
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_CollectFaucet{CollectFaucet: tx}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := sendTx(app, to, stx); err != nil {
 		return err
 	}
 	app.Commit()

@@ -191,7 +191,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 							To:         txValues.FaucetPayload.To,
 							Amount:     txValues.FaucetPayload.Amount,
 						},
-						true,
+						models.TxType_SET_ACCOUNT_INFO,
 					)
 				}
 				// any faucet payload provided, just create account
@@ -276,8 +276,28 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			default:
 				return []byte{}, fmt.Errorf("setAccountDelegate: invalid transaction type")
 			}
-			// substract tx costs and increment nonce
 			return vtx.TxID[:], err
+		}
+	case *models.Tx_CollectFaucet:
+		fromAcc, err := CollectFaucetTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		if err != nil {
+			return []byte{}, fmt.Errorf("collectFaucetTxCheck: %w", err)
+		}
+		if commit {
+			txValues := vtx.Tx.GetCollectFaucet()
+			if err := app.State.ConsumeFaucetPayload(
+				*fromAcc,
+				&models.FaucetPayload{
+					Identifier: txValues.FaucetPackage.Payload.Identifier,
+					To:         txValues.FaucetPackage.Payload.To,
+					Amount:     txValues.FaucetPackage.Payload.Amount,
+				},
+				models.TxType_COLLECT_FAUCET,
+			); err != nil {
+				return []byte{}, fmt.Errorf("collectFaucetTx: %w", err)
+			}
+			// substract tx costs and increment nonce
+			return vtx.TxID[:], app.State.SubstractCostIncrementNonce(*fromAcc, models.TxType_COLLECT_FAUCET)
 		}
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
