@@ -1,8 +1,10 @@
 package censustree
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -145,11 +147,62 @@ func (t *Tree) IterateLeaves(callback func(key, value []byte) bool) error {
 	return t.tree.IterateLeaves(nil, callback)
 }
 
+func (t *Tree) updateCensusWeight(wTx db.WriteTx, w []byte) error {
+	weightBytes, err := wTx.Get(censusWeightKey)
+	if err != nil && !errors.Is(err, db.ErrKeyNotFound) {
+		return fmt.Errorf("could not get census weight: %w", err)
+	}
+	weight := new(big.Int).Add(t.BytesToBigInt(weightBytes), t.BytesToBigInt(w))
+	if err := wTx.Set(censusWeightKey, t.BigIntToBytes(weight)); err != nil {
+		return fmt.Errorf("could not set census weight: %w", err)
+	}
+	return nil
+}
+
 // AddBatch wraps t.tree.AddBatch while acquiring the lock.
 func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 	t.Lock()
 	defer t.Unlock()
-	return t.tree.AddBatch(nil, keys, values)
+
+	wTx := t.tree.DB().WriteTx()
+	defer wTx.Discard()
+
+	invalids, err := t.tree.AddBatch(wTx, keys, values)
+	if err != nil {
+		return invalids, err
+	}
+
+	if values == nil || len(values) != len(keys) {
+		if err := wTx.Commit(); err != nil {
+			return nil, err
+		}
+		return invalids, err
+	}
+
+	// TODO Warning, this CensusWeight update should be done only for the
+	// censuses that have weight. Other kind of censuses (eg.
+	// AnonymousVoting) do not use the value parameter of the leaves as
+	// weight, as it's used for other stuff, so the CensusWeight in those
+	// cases would get wrong values.
+
+	// get value of all added keys
+	addedWeight := big.NewInt(0)
+	for i := 0; i < len(keys); i++ {
+		addedWeight = new(big.Int).Add(addedWeight, t.BytesToBigInt(values[i]))
+	}
+	// remove weight of invalid leafs
+	for i := 0; i < len(invalids); i++ {
+		addedWeight = new(big.Int).Sub(addedWeight, t.BytesToBigInt(values[invalids[i]]))
+	}
+
+	if err := t.updateCensusWeight(wTx, t.BigIntToBytes(addedWeight)); err != nil {
+		return nil, err
+	}
+
+	if err := wTx.Commit(); err != nil {
+		return nil, err
+	}
+	return invalids, err
 }
 
 // Add wraps t.tree.Add while acquiring the lock.
@@ -157,29 +210,75 @@ func (t *Tree) Add(key, value []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
-	// Create a db write tx to update the census weight
-	write := t.tree.DB().WriteTx()
-	defer write.Discard()
+	wTx := t.tree.DB().WriteTx()
+	defer wTx.Discard()
 
-	weightBytes, err := write.Get(censusWeightKey)
-	if err != nil && !errors.Is(err, db.ErrKeyNotFound) {
-		return fmt.Errorf("could not get census weight: %w", err)
+	// TODO Warning, this CensusWeight update should be done only for the
+	// censuses that have weight. Other kind of censuses (eg.
+	// AnonymousVoting) do not use the value parameter of the leaves as
+	// weight, as it's used for other stuff, so the CensusWeight in those
+	// cases would get wrong values.
+	if err := t.updateCensusWeight(wTx, value); err != nil {
+		return err
 	}
-	weight := big.NewInt(0).Add(t.BytesToBigInt(weightBytes), t.BytesToBigInt(value))
-	if err := write.Set(censusWeightKey, t.BigIntToBytes(weight)); err != nil {
-		return fmt.Errorf("could not set census weight: %w", err)
+
+	if err := t.tree.Add(wTx, key, value); err != nil {
+		return err
 	}
-	if err := write.Commit(); err != nil {
-		return fmt.Errorf("could not set census weight: %w", err)
-	}
-	return t.tree.Add(nil, key, value)
+	return wTx.Commit()
 }
 
 // ImportDump wraps t.tree.ImportDump while acquiring the lock.
 func (t *Tree) ImportDump(b []byte) error {
 	t.Lock()
 	defer t.Unlock()
-	return t.tree.ImportDump(b)
+
+	err := t.tree.ImportDump(b)
+	if err != nil {
+		return err
+	}
+
+	// TODO Warning, this CensusWeight update should be done only for the
+	// censuses that have weight. Other kind of censuses (eg.
+	// AnonymousVoting) do not use the value parameter of the leaves as
+	// weight, as it's used for other stuff, so the CensusWeight in those
+	// cases would get wrong values.
+
+	// get the total addedWeight from parsing the dump byte array, and
+	// adding the weight of its values
+	addedWeight := big.NewInt(0)
+	r := bytes.NewReader(b)
+	for {
+		l := make([]byte, 2)
+		_, err := io.ReadFull(r, l)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+		k := make([]byte, l[0])
+		_, err = io.ReadFull(r, k)
+		if err != nil {
+			return err
+		}
+		v := make([]byte, l[1])
+		_, err = io.ReadFull(r, v)
+		if err != nil {
+			return err
+		}
+		// add the weight (value of the leaf)
+		addedWeight = new(big.Int).Add(addedWeight, t.BytesToBigInt(v))
+	}
+
+	wTx := t.tree.DB().WriteTx()
+	defer wTx.Discard()
+	if err := t.updateCensusWeight(wTx, t.BigIntToBytes(addedWeight)); err != nil {
+		return err
+	}
+	if err := wTx.Commit(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetCensusWeight returns the current weight of the census.
