@@ -106,6 +106,17 @@ func main() {
 		}
 	}
 
+	oracleKey := ethereum.NewSignKeys()
+	if len(*oraclePrivKey) > 0 {
+		if err := oracleKey.AddHexKey(*oraclePrivKey); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		if err := oracleKey.Generate(); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	switch *opmode {
 	case "anonvoting":
 		mkTreeAnonVoteTest(*host,
@@ -159,6 +170,21 @@ func main() {
 		censusGenerate(*host, entityKey, *electionSize, *keysfile, 1)
 	case "tokentransactions":
 		// end-user voting is not tested here
+		if len(*treasurerPrivKey) == 0 {
+			log.Fatal("missing required treasurerKey parameter")
+		}
+
+		treasurerKey := ethereum.NewSignKeys()
+		if err := treasurerKey.AddHexKey(*treasurerPrivKey); err != nil {
+			log.Fatal(err)
+		}
+
+		// set accounts
+		// oracle is also the treasurer
+		if err := initAccounts(treasurerKey, oracleKey, entityKey, *host); err != nil {
+			log.Fatalf("cannot init accounts: %w", err)
+		}
+
 		testTokenTransactions(*host, *treasurerPrivKey)
 	default:
 		log.Fatal("no valid operation mode specified")
@@ -236,6 +262,99 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 		log.Fatal(err)
 	}
 	log.Infof("Census created and published\nRoot: %s\nURI: %s", root, uri)
+}
+
+func waitUntilNextBlock(mainClient *client.Client) error {
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height: %w", err)
+	}
+	mainClient.WaitUntilBlock(h + 1)
+	return nil
+}
+
+func initAccounts(treasurer, oracle, mainSigner *ethereum.SignKeys, host string) error {
+	var err error
+	log.Infof("connecting to main gateway %s", host)
+	// connecting to endpoint
+	var mainClient *client.Client
+	for tries := 10; tries > 0; tries-- {
+		mainClient, err = client.New(host)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer mainClient.Close()
+
+	retries := 5
+	// create and top up accounts
+	if err := ensureAccountExists(mainClient, oracle, retries); err != nil {
+		log.Fatal(err)
+	}
+	if err := ensureAccountExists(mainClient, mainSigner, retries); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := ensureAccountHasTokens(mainClient, treasurer, oracle.Address(), 10000, retries); err != nil {
+		log.Fatalf("cannot mint tokens for account %s with treasurer %s: %w", oracle.Address(), treasurer.Address(), err)
+	}
+	if err := ensureAccountHasTokens(mainClient, treasurer, mainSigner.Address(), 10000, retries); err != nil {
+		log.Fatalf("cannot mint tokens for account %s with treasurer %s: %w", mainSigner.Address(), treasurer.Address(), err)
+	}
+
+	return nil
+}
+
+func ensureAccountExists(mainClient *client.Client, account *ethereum.SignKeys, retries int) error {
+	for i := 0; i <= retries; i++ {
+		// if account exists, we're done
+		if acct, _ := mainClient.GetAccount(nil, account.Address()); acct != nil {
+			return nil
+		}
+		if i == retries { // that was the last chance, break and fail immediately
+			break
+		}
+
+		if err := mainClient.CreateOrSetAccount(account, common.Address{}, "ipfs://", 0, nil); err != nil {
+			if strings.Contains(err.Error(), "tx already exists in cache") {
+				// don't worry then, someone else created it in a race, nevermind, job done.
+			} else {
+				return fmt.Errorf("cannot create account %s: %s", account.Address(), err)
+			}
+		}
+
+		waitUntilNextBlock(mainClient)
+	}
+	return fmt.Errorf("cannot create account %s after %d retries", account.Address(), retries)
+}
+
+func ensureAccountHasTokens(mainClient *client.Client, treasurer *ethereum.SignKeys, accountAddr common.Address, amount uint64, retries int) error {
+	for i := 0; i <= retries; i++ {
+		// if balance is enough, we're done
+		if acct, _ := mainClient.GetAccount(nil, accountAddr); acct != nil && acct.Balance >= amount {
+			return nil
+		}
+		if i == retries { // that was the last chance, break and fail immediately
+			break
+		}
+
+		// else, try to mint with treasurer
+		treasurerAccount, err := mainClient.GetTreasurer(treasurer)
+		if err != nil {
+			return fmt.Errorf("cannot get treasurer: %w", err)
+		}
+
+		// MintTokens can return OK and then the tx be rejected anyway later.
+		// So, ignore errors, we only care that accountHasTokens in the end
+		_ = mainClient.MintTokens(treasurer, accountAddr, treasurerAccount.GetNonce(), amount)
+
+		waitUntilNextBlock(mainClient)
+	}
+	return fmt.Errorf("tried to mint %d times, yet balance still not enough", retries)
 }
 
 func mkTreeVoteTest(host,
