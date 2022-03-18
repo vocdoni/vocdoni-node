@@ -18,6 +18,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -1027,6 +1028,11 @@ func testTokenTransactions(
 	if err := testSetAccountDelegate(mainClient, mainSigner, otherSigner); err != nil {
 		log.Fatal(err)
 	}
+
+	// check collect faucet tx
+	if err := testCollectFaucet(mainClient, mainSigner, otherSigner); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys) error {
@@ -1311,5 +1317,71 @@ func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum
 	if len(acc.DelegateAddrs) != 0 {
 		log.Fatalf("expected %s to have 0 delegates got %d", signer.Address(), len(acc.DelegateAddrs))
 	}
+	return nil
+}
+
+func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) error {
+	// get tx cost
+	txCost, err := mainClient.GetTransactionCost(from, models.TxType_COLLECT_FAUCET)
+	if err != nil {
+		return err
+	}
+	log.Infof("tx cost of %s is %d", models.TxType_COLLECT_FAUCET, txCost)
+	// fetch from account
+	accFrom, err := mainClient.GetAccount(from, from.Address())
+	if err != nil {
+		return err
+	}
+	if accFrom == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("fetched from account %s with nonce %d and balance %d", from.Address(), accFrom.Nonce, accFrom.Balance)
+
+	// fetch to account
+	accTo, err := mainClient.GetAccount(to, to.Address())
+	if err != nil {
+		return err
+	}
+	if accTo == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accFrom.Balance)
+
+	// collect faucet tx
+	if err := mainClient.CollectFaucet(from,
+		to,
+		10,
+		uint64(util.RandomInt(0, 10000000)),
+		accTo.Nonce); err != nil {
+		return fmt.Errorf("error on collect faucet tx: %v", err)
+	}
+
+	// wait until tx is mined
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
+
+	// check values changed corretly on both from and to accounts
+	accFrom, err = mainClient.GetAccount(from, from.Address())
+	if err != nil {
+		return err
+	}
+	if accFrom == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("fetched from account %s with nonce %d and balance %d", from.Address(), accFrom.Nonce, accFrom.Balance)
+
+	// fetch to account
+	accTo, err = mainClient.GetAccount(to, to.Address())
+	if err != nil {
+		return err
+	}
+	if accTo == nil {
+		return vochain.ErrAccountNotExist
+	}
+	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accTo.Balance)
+
 	return nil
 }
