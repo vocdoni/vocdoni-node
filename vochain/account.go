@@ -159,7 +159,7 @@ func (v *State) VerifyAccountBalance(message, signature []byte, amount uint64) (
 	}
 	acc, err := v.GetAccount(address, false)
 	if err != nil {
-		return false, address, fmt.Errorf("VerifyAccountWithAmmount: %v", err)
+		return false, address, fmt.Errorf("VerifyAccountWithAmmount: %w", err)
 	}
 	if acc == nil {
 		return false, address, nil
@@ -182,7 +182,7 @@ func (v *State) AccountFromSignature(message, signature []byte) (*common.Address
 	}
 	acc, err := v.GetAccount(address, false)
 	if err != nil {
-		return &common.Address{}, nil, fmt.Errorf("cannot get account: %v", err)
+		return &common.Address{}, nil, fmt.Errorf("cannot get account: %w", err)
 	}
 	if acc == nil {
 		return &common.Address{}, nil, ErrAccountNotExist
@@ -216,7 +216,7 @@ func (v *State) CreateAccount(accountAddress common.Address,
 	// check not created
 	acc, err := v.GetAccount(accountAddress, false)
 	if err != nil {
-		return fmt.Errorf("cannot create account %s: %v", accountAddress.String(), err)
+		return fmt.Errorf("cannot create account %s: %w", accountAddress.String(), err)
 	}
 	if acc != nil {
 		return fmt.Errorf("account %s already exists", accountAddress.String())
@@ -349,13 +349,13 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	// get txSender account
 	txSender, err := state.GetAccount(returnValues.TxSender, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot check if account %s exists: %v", returnValues.TxSender.String(), err)
+		return nil, fmt.Errorf("cannot check if account %s exists: %w", returnValues.TxSender.String(), err)
 	}
 	// check tx.Account exists
 	returnValues.Account = common.BytesToAddress(tx.Account)
 	acc, err := state.GetAccount(returnValues.Account, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot check if account %s exists: %v", tx.Account, err)
+		return nil, fmt.Errorf("cannot check if account %s exists: %w", tx.Account, err)
 	}
 	if acc == nil {
 		returnValues.Account = returnValues.TxSender
@@ -376,7 +376,7 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 		faucetPkgPayload := tx.FaucetPackage.GetPayload()
 		faucetPackageBytes, err := proto.Marshal(faucetPkgPayload)
 		if err != nil {
-			return nil, fmt.Errorf("cannot extract faucet package payload: %v", err)
+			return nil, fmt.Errorf("cannot extract faucet package payload: %w", err)
 		}
 		issuerAddress, err := ethereum.AddrFromSignature(faucetPackageBytes, tx.FaucetPackage.Signature)
 		if err != nil {
@@ -389,7 +389,7 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 		key = append(key, b...)
 		used, err := state.FaucetNonce(crypto.Sha256(key), false)
 		if err != nil {
-			return nil, fmt.Errorf("cannot check faucet nonce: %v", err)
+			return nil, fmt.Errorf("cannot check faucet nonce: %w", err)
 		}
 		if used {
 			return nil, fmt.Errorf("nonce %d already used", faucetPkgPayload.Identifier)
@@ -397,7 +397,7 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 		// check issuer have enough funds
 		issuerAcc, err := state.GetAccount(issuerAddress, false)
 		if err != nil {
-			return nil, fmt.Errorf("cannot get faucet account: %v", err)
+			return nil, fmt.Errorf("cannot get faucet account: %w", err)
 		}
 		if issuerAcc == nil {
 			return nil, fmt.Errorf("the account signing the faucet payload does not exist")
@@ -589,7 +589,7 @@ func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	txToAddress := common.BytesToAddress(tx.To)
 	toTxAccount, err := state.GetAccount(txToAddress, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get to account info: %v", err)
+		return nil, fmt.Errorf("cannot get to account info: %w", err)
 	}
 	if toTxAccount == nil {
 		return nil, ErrAccountNotExist
@@ -597,7 +597,7 @@ func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	// check nonce
 	acc, err := state.GetAccount(sigAddress, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get account info: %v", err)
+		return nil, fmt.Errorf("cannot get account info: %w", err)
 	}
 	if acc == nil {
 		return nil, ErrAccountNotExist
@@ -733,7 +733,7 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	// extract the account that generated the payload
 	faucetPackageBytes, err := proto.Marshal(faucetPkg.Payload)
 	if err != nil {
-		return nil, fmt.Errorf("cannot extract faucet package payload: %v", err)
+		return nil, fmt.Errorf("cannot extract faucet package payload: %w", err)
 	}
 	fromAddr, err := ethereum.AddrFromSignature(faucetPackageBytes, tx.FaucetPackage.Signature)
 	if err != nil {
@@ -746,7 +746,7 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	key = append(key, b...)
 	used, err := state.FaucetNonce(crypto.Sha256(key), false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot check faucet nonce: %v", err)
+		return nil, fmt.Errorf("cannot check faucet nonce: %w", err)
 	}
 	if used {
 		return nil, fmt.Errorf("nonce %d already used", faucetPkg.Payload.Identifier)
@@ -754,7 +754,7 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	// check issuer have enough funds
 	issuerAcc, err := state.GetAccount(fromAddr, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get faucet account: %v", err)
+		return nil, fmt.Errorf("cannot get faucet account: %w", err)
 	}
 	if issuerAcc == nil {
 		return nil, fmt.Errorf("the account signing the faucet payload does not exist")
@@ -776,7 +776,7 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	// get txSender account
 	txSender, err := state.GetAccount(toAddr, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot check if account %s exists: %v", toAddr.String(), err)
+		return nil, fmt.Errorf("cannot check if account %s exists: %w", toAddr.String(), err)
 	}
 	if txSender == nil {
 		return nil, ErrAccountNotExist
