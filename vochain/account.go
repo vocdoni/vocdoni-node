@@ -768,7 +768,7 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	}
 	// check tx sender is the same as the one contained in the payload
 	if !bytes.Equal(toAddr.Bytes(), faucetPkg.Payload.To) {
-		return nil, fmt.Errorf("txSender %s and faucet payload To %s missmatch",
+		return nil, fmt.Errorf("txSender %x and faucet payload To %x mismatch",
 			toAddr,
 			common.BytesToAddress(faucetPkg.Payload.To),
 		)
