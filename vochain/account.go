@@ -763,7 +763,7 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	if err != nil {
 		return nil, fmt.Errorf("cannot get %s tx cost: %w", models.TxType_COLLECT_FAUCET, err)
 	}
-	if (issuerAcc.Balance) < faucetPkg.Payload.Amount+cost {
+	if issuerAcc.Balance < faucetPkg.Payload.Amount+cost {
 		return nil, fmt.Errorf("faucet does not have enough balance %d < %d", issuerAcc.Balance, faucetPkg.Payload.Amount+cost)
 	}
 	// check tx sender is the same as the one contained in the payload
