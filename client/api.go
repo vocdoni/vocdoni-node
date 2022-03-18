@@ -1512,8 +1512,8 @@ func (c *Client) SetAccountDelegate(signer *ethereum.SignKeys, delegate common.A
 	return nil
 }
 
-// SetDelegate sends a set delegate transaction, if op == true adds a delegate, deletes a delegate otherwise
-func (c *Client) CollectFaucetTx(from, to *ethereum.SignKeys, amount, identifier uint64, nonce uint32) error {
+// CollectFaucetTx sends a collect faucet transaction
+func (c *Client) CollectFaucet(from, to *ethereum.SignKeys, amount, identifier uint64, nonce uint32) error {
 	var req api.APIrequest
 	var err error
 	req.Method = "submitRawTx"

@@ -1348,7 +1348,7 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accFrom.Balance)
 
 	// collect faucet tx
-	if err := mainClient.CollectFaucetTx(from,
+	if err := mainClient.CollectFaucet(from,
 		to,
 		10,
 		uint64(util.RandomInt(0, 10000000)),
