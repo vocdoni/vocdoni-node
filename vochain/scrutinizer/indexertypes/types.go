@@ -173,7 +173,7 @@ type EnvelopePackage struct {
 // TxPackage contains a SignedTx and auxiliary information for the Transaction api
 type TxPackage struct {
 	Tx          []byte         `json:"tx"`
-	Height      uint32         `json:"height,omitempty"`
+	ID          uint32         `json:"id,omitempty"`
 	BlockHeight uint32         `json:"block_height,omitempty"`
 	Index       int32          `json:"index,omitempty"`
 	Hash        types.HexBytes `json:"hash"`

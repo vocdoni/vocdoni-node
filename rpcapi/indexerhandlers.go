@@ -126,11 +126,11 @@ func (r *RPCAPI) getTx(request *api.APIrequest) (*api.APIresponse, error) {
 	return &response, nil
 }
 
-func (r *RPCAPI) getTxByHeight(request *api.APIrequest) (*api.APIresponse, error) {
+func (r *RPCAPI) getTxById(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
-	txRef, err := r.scrutinizer.GetTxReference(uint64(request.Height))
+	txRef, err := r.scrutinizer.GetTxReference(uint64(request.ID))
 	if err != nil {
-		return nil, fmt.Errorf("cannot get tx reference for height %d: %w", request.Height, err)
+		return nil, fmt.Errorf("cannot get tx reference with ID %d: %w", request.ID, err)
 	}
 	tx, hash, err := r.scrutinizer.App.GetTxHash(txRef.BlockHeight, txRef.TxBlockIndex)
 	if err != nil {
@@ -138,7 +138,7 @@ func (r *RPCAPI) getTxByHeight(request *api.APIrequest) (*api.APIresponse, error
 	}
 	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
-		Height:      uint32(txRef.Index),
+		ID:          uint32(txRef.Index),
 		Index:       txRef.TxBlockIndex,
 		BlockHeight: txRef.BlockHeight,
 		Hash:        hash,
@@ -159,7 +159,7 @@ func (r *RPCAPI) getTxByHash(request *api.APIrequest) (*api.APIresponse, error) 
 	}
 	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
-		Height:      uint32(txRef.Index),
+		ID:          uint32(txRef.Index),
 		Index:       txRef.TxBlockIndex,
 		BlockHeight: txRef.BlockHeight,
 		Hash:        request.Hash,
