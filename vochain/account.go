@@ -282,10 +282,9 @@ func (v *State) ConsumeFaucetPayload(from common.Address, faucetPayload *models.
 		return fmt.Errorf("cannot transfer balance: %w", err)
 	}
 
-	// transfer tx cost to burn address
-	// if tx is set account info (create fresh account) burn tokens here
-	// other case is collect faucet Tx where tokens are burned in a different function
-	// if tx is not set account (no new account) increment nonce of the tx sender
+	// burn the tx fee (by sending to burn address)
+	// SetAccountInfo: burn tokens
+	// CollectFaucetTx: tokens are burned elsewhere, so just increment the sender's nonce
 	if txType == models.TxType_SET_ACCOUNT_INFO {
 		collectFaucetCost, err := v.TxCost(models.TxType_COLLECT_FAUCET, false)
 		if err != nil {
@@ -447,12 +446,12 @@ func (v *State) SetAccount(accountAddress common.Address, account *Account) erro
 	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
 }
 
-// SubstractCostIncrementNonce
-func (v *State) SubstractCostIncrementNonce(accountAddress common.Address, txType models.TxType) error {
+// SubtractCostIncrementNonce
+func (v *State) SubtractCostIncrementNonce(accountAddress common.Address, txType models.TxType) error {
 	// get account
 	acc, err := v.GetAccount(accountAddress, false)
 	if err != nil {
-		return fmt.Errorf("substractCostIncrementNonce: %w", err)
+		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
 	}
 	if acc == nil {
 		return ErrAccountNotExist
@@ -460,7 +459,7 @@ func (v *State) SubstractCostIncrementNonce(accountAddress common.Address, txTyp
 	// get tx cost
 	cost, err := v.TxCost(txType, false)
 	if err != nil {
-		return fmt.Errorf("substractCostIncrementNonce: %w", err)
+		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
 	}
 	// increment nonce
 	if txType != models.TxType_COLLECT_FAUCET {
@@ -469,20 +468,20 @@ func (v *State) SubstractCostIncrementNonce(accountAddress common.Address, txTyp
 	// send cost to burn address
 	burnAcc, err := v.GetAccount(BurnAddress, false)
 	if err != nil {
-		return fmt.Errorf("substractCostIncrementNonce: %w", err)
+		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
 	}
 	if burnAcc == nil {
-		return fmt.Errorf("substractCostIncrementNonce: burn account does not exist")
+		return fmt.Errorf("subtractCostIncrementNonce: burn account does not exist")
 	}
 	if err := acc.Transfer(burnAcc, cost); err != nil {
-		return fmt.Errorf("substractCostIncrementNonce: %w", err)
+		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
 	}
 	// set accounts
 	if err := v.SetAccount(accountAddress, acc); err != nil {
-		return fmt.Errorf("substractCostIncrementNonce: %w", err)
+		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
 	}
 	if err := v.SetAccount(BurnAddress, burnAcc); err != nil {
-		return fmt.Errorf("substractCostIncrementNonce: %w", err)
+		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
 	}
 	return nil
 }

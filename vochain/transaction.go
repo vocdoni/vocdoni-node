@@ -208,8 +208,8 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			); err != nil {
 				return []byte{}, fmt.Errorf("setAccountInfoURI: %w", err)
 			}
-			// substract tx costs and increment nonce
-			return vtx.TxID[:], app.State.SubstractCostIncrementNonce(txValues.TxSender, models.TxType_SET_ACCOUNT_INFO)
+			// subtract tx costs and increment nonce
+			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(txValues.TxSender, models.TxType_SET_ACCOUNT_INFO)
 		}
 
 	case *models.Tx_SetTransactionCosts:
@@ -245,8 +245,8 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			if err != nil {
 				return []byte{}, fmt.Errorf("sendTokensTx: transferBalance: %w", err)
 			}
-			// substract tx costs and increment nonce
-			return vtx.TxID[:], app.State.SubstractCostIncrementNonce(txValues.From, models.TxType_SEND_TOKENS)
+			// subtract tx costs and increment nonce
+			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_SEND_TOKENS)
 		}
 	case *models.Tx_SetAccountDelegateTx:
 		txValues, err := SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
@@ -263,7 +263,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 				); err != nil {
 					return []byte{}, fmt.Errorf("setAccountDelegate: %w", err)
 				}
-				err = app.State.SubstractCostIncrementNonce(txValues.From, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
+				err = app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
 			case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
 				if err := app.State.SetAccountDelegate(
 					txValues.From,
@@ -272,7 +272,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 				); err != nil {
 					return []byte{}, fmt.Errorf("setAccountDelegate: %w", err)
 				}
-				err = app.State.SubstractCostIncrementNonce(txValues.From, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
+				err = app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
 			default:
 				return []byte{}, fmt.Errorf("setAccountDelegate: invalid transaction type")
 			}
@@ -296,8 +296,8 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			); err != nil {
 				return []byte{}, fmt.Errorf("collectFaucetTx: %w", err)
 			}
-			// substract tx costs and increment nonce
-			return vtx.TxID[:], app.State.SubstractCostIncrementNonce(*fromAcc, models.TxType_COLLECT_FAUCET)
+			// subtract tx costs and increment nonce
+			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(*fromAcc, models.TxType_COLLECT_FAUCET)
 		}
 	default:
 		return []byte{}, fmt.Errorf("invalid transaction type")
