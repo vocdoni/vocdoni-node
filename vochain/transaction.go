@@ -68,7 +68,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 		txVote := vtx.Tx.GetVote()
 		v, err := app.VoteEnvelopeCheck(txVote, vtx.SignedBody, vtx.Signature, vtx.TxID, commit)
 		if err != nil || v == nil {
-			return []byte{}, fmt.Errorf("voteTxCheck: %w", err)
+			return nil, fmt.Errorf("voteTxCheck: %w", err)
 		}
 		if commit {
 			return v.Nullifier, app.State.AddVote(v)
@@ -76,7 +76,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 		return v.Nullifier, nil
 	case *models.Tx_Admin:
 		if err := AdminTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State); err != nil {
-			return []byte{}, fmt.Errorf("adminTxChek: %w", err)
+			return nil, fmt.Errorf("adminTxChek: %w", err)
 		}
 		tx := vtx.Tx.GetAdmin()
 		if commit {
@@ -89,7 +89,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 				pk, err := hexPubKeyToTendermintEd25519(fmt.Sprintf("%x", tx.PublicKey))
 				if err == nil {
 					if tx.Power == nil {
-						return []byte{}, fmt.Errorf("power not specified on addValidator transaction")
+						return nil, fmt.Errorf("power not specified on addValidator transaction")
 					}
 					validator := &models.Validator{
 						Address: pk.Address().Bytes(),
@@ -99,7 +99,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 					return vtx.TxID[:], app.State.AddValidator(validator)
 
 				}
-				return []byte{}, fmt.Errorf("addValidator: %w", err)
+				return nil, fmt.Errorf("addValidator: %w", err)
 
 			case models.TxType_REMOVE_VALIDATOR:
 				return vtx.TxID[:], app.State.RemoveValidator(tx.Address)
@@ -115,51 +115,51 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			if commit {
 				tx := vtx.Tx.GetNewProcess()
 				if tx.Process == nil {
-					return []byte{}, fmt.Errorf("newProcess process is empty")
+					return nil, fmt.Errorf("newProcess process is empty")
 				}
 				return vtx.TxID[:], app.State.AddProcess(p)
 			}
 		} else {
-			return []byte{}, fmt.Errorf("newProcess: %w", err)
+			return nil, fmt.Errorf("newProcess: %w", err)
 		}
 
 	case *models.Tx_SetProcess:
 		if err := SetProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State); err != nil {
-			return []byte{}, fmt.Errorf("setProcess: %w", err)
+			return nil, fmt.Errorf("setProcess: %w", err)
 		}
 		if commit {
 			tx := vtx.Tx.GetSetProcess()
 			switch tx.Txtype {
 			case models.TxType_SET_PROCESS_STATUS:
 				if tx.GetStatus() == models.ProcessStatus_PROCESS_UNKNOWN {
-					return []byte{}, fmt.Errorf("set process status, status unknown")
+					return nil, fmt.Errorf("set process status, status unknown")
 				}
 				return vtx.TxID[:], app.State.SetProcessStatus(tx.ProcessId, *tx.Status, true)
 			case models.TxType_SET_PROCESS_RESULTS:
 				if tx.GetResults() == nil {
-					return []byte{}, fmt.Errorf("set process results, results is nil")
+					return nil, fmt.Errorf("set process results, results is nil")
 				}
 				return vtx.TxID[:], app.State.SetProcessResults(tx.ProcessId, tx.Results, true)
 			case models.TxType_SET_PROCESS_CENSUS:
 				if tx.GetCensusRoot() == nil {
-					return []byte{}, fmt.Errorf("set process census, census root is nil")
+					return nil, fmt.Errorf("set process census, census root is nil")
 				}
 				return vtx.TxID[:], app.State.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true)
 			default:
-				return []byte{}, fmt.Errorf("unknown set process tx type")
+				return nil, fmt.Errorf("unknown set process tx type")
 			}
 		}
 
 	case *models.Tx_RegisterKey:
 		if err := app.State.RegisterKeyTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State,
 			commit); err != nil {
-			return []byte{}, fmt.Errorf("registerKeyTx %w", err)
+			return nil, fmt.Errorf("registerKeyTx %w", err)
 		}
 		if commit {
 			tx := vtx.Tx.GetRegisterKey()
 			weight, ok := new(big.Int).SetString(tx.Weight, 10)
 			if !ok {
-				return []byte{}, fmt.Errorf("cannot parse weight %s", weight)
+				return nil, fmt.Errorf("cannot parse weight %s", weight)
 			}
 			return vtx.TxID[:], app.State.AddToRollingCensus(tx.ProcessId, tx.NewKey, weight)
 		}
@@ -167,7 +167,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 	case *models.Tx_SetAccountInfo:
 		txValues, err := SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
-			return []byte{}, fmt.Errorf("setAccountInfoTxCheck: %w", err)
+			return nil, fmt.Errorf("setAccountInfoTxCheck: %w", err)
 		}
 		if commit {
 			// create account
@@ -181,7 +181,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 						make([]common.Address, 0),
 						0,
 					); err != nil {
-						return []byte{}, fmt.Errorf("setAccountInfoTxCheck: createAccount %w", err)
+						return nil, fmt.Errorf("setAccountInfoTxCheck: createAccount %w", err)
 					}
 					// consume provided faucet payload
 					return vtx.TxID[:], app.State.ConsumeFaucetPayload(
@@ -206,7 +206,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 				txValues.Account,
 				vtx.Tx.GetSetAccountInfo().GetInfoURI(),
 			); err != nil {
-				return []byte{}, fmt.Errorf("setAccountInfoURI: %w", err)
+				return nil, fmt.Errorf("setAccountInfoURI: %w", err)
 			}
 			// subtract tx costs and increment nonce
 			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(txValues.TxSender, models.TxType_SET_ACCOUNT_INFO)
@@ -215,11 +215,11 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 	case *models.Tx_SetTransactionCosts:
 		cost, err := SetTransactionCostsTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
-			return []byte{}, fmt.Errorf("setTransactionCostsTx: %w", err)
+			return nil, fmt.Errorf("setTransactionCostsTx: %w", err)
 		}
 		if commit {
 			if err := app.State.SetTxCost(vtx.Tx.GetSetTransactionCosts().Txtype, cost); err != nil {
-				return []byte{}, fmt.Errorf("setTransactionCosts: %w", err)
+				return nil, fmt.Errorf("setTransactionCosts: %w", err)
 			}
 			return vtx.TxID[:], app.State.IncrementTreasurerNonce()
 		}
@@ -227,23 +227,23 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 	case *models.Tx_MintTokens:
 		address, amount, err := MintTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
-			return []byte{}, fmt.Errorf("mintTokensTx: %w", err)
+			return nil, fmt.Errorf("mintTokensTx: %w", err)
 		}
 		if commit {
 			if err := app.State.MintBalance(address, amount); err != nil {
-				return []byte{}, fmt.Errorf("mintTokensTx: %w", err)
+				return nil, fmt.Errorf("mintTokensTx: %w", err)
 			}
 			return vtx.TxID[:], app.State.IncrementTreasurerNonce()
 		}
 	case *models.Tx_SendTokens:
 		txValues, err := SendTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
-			return []byte{}, fmt.Errorf("sendTokensTxCheck: %w", err)
+			return nil, fmt.Errorf("sendTokensTxCheck: %w", err)
 		}
 		if commit {
 			err := app.State.TransferBalance(txValues.From, txValues.To, txValues.Value)
 			if err != nil {
-				return []byte{}, fmt.Errorf("sendTokensTx: transferBalance: %w", err)
+				return nil, fmt.Errorf("sendTokensTx: transferBalance: %w", err)
 			}
 			// subtract tx costs and increment nonce
 			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_SEND_TOKENS)
@@ -251,7 +251,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 	case *models.Tx_SetAccountDelegateTx:
 		txValues, err := SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
-			return []byte{}, fmt.Errorf("setAccountDelegateTxCheck: %w", err)
+			return nil, fmt.Errorf("setAccountDelegateTxCheck: %w", err)
 		}
 		if commit {
 			switch vtx.Tx.GetSetAccountDelegateTx().Txtype {
@@ -261,7 +261,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 					txValues.Delegate,
 					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
 				); err != nil {
-					return []byte{}, fmt.Errorf("setAccountDelegate: %w", err)
+					return nil, fmt.Errorf("setAccountDelegate: %w", err)
 				}
 				err = app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
 			case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
@@ -270,18 +270,18 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 					txValues.Delegate,
 					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
 				); err != nil {
-					return []byte{}, fmt.Errorf("setAccountDelegate: %w", err)
+					return nil, fmt.Errorf("setAccountDelegate: %w", err)
 				}
 				err = app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
 			default:
-				return []byte{}, fmt.Errorf("setAccountDelegate: invalid transaction type")
+				return nil, fmt.Errorf("setAccountDelegate: invalid transaction type")
 			}
 			return vtx.TxID[:], err
 		}
 	case *models.Tx_CollectFaucet:
 		fromAcc, err := CollectFaucetTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
-			return []byte{}, fmt.Errorf("collectFaucetTxCheck: %w", err)
+			return nil, fmt.Errorf("collectFaucetTxCheck: %w", err)
 		}
 		if commit {
 			txValues := vtx.Tx.GetCollectFaucet()
@@ -294,13 +294,13 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 				},
 				models.TxType_COLLECT_FAUCET,
 			); err != nil {
-				return []byte{}, fmt.Errorf("collectFaucetTx: %w", err)
+				return nil, fmt.Errorf("collectFaucetTx: %w", err)
 			}
 			// subtract tx costs and increment nonce
 			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(*fromAcc, models.TxType_COLLECT_FAUCET)
 		}
 	default:
-		return []byte{}, fmt.Errorf("invalid transaction type")
+		return nil, fmt.Errorf("invalid transaction type")
 	}
 	return vtx.TxID[:], nil
 }

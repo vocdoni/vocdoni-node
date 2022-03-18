@@ -172,7 +172,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 	for idx, val := range validators {
 		pubk, err := val.GetPubKey()
 		if err != nil {
-			return []byte{}, err
+			return nil, err
 		}
 		appState.Validators[idx] = GenesisValidator{
 			Address: val.GetAddress().Bytes(),
@@ -185,7 +185,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 	appState.Treasurer = treasurer
 	appStateBytes, err := tmjson.Marshal(appState)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	genDoc := GenesisDoc{
 		ChainID:         chainID,
@@ -199,7 +199,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 	// which expects amino-flavored json. We can't use encoding/json.
 	genBytes, err := tmjson.Marshal(genDoc)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	return genBytes, nil
