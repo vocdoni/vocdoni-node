@@ -47,6 +47,7 @@ func (r *RPCAPI) EnableCensusAPI(cm *census.Manager) error {
 	r.RegisterPublic("getRoot", false, r.censusLocal)
 	r.RegisterPrivate("dump", r.censusLocal)
 	r.RegisterPublic("getSize", false, r.censusLocal)
+	r.RegisterPublic("getCensusWeight", false, r.censusLocal)
 	r.RegisterPublic("genProof", false, r.censusLocal)
 	r.RegisterPublic("checkProof", false, r.censusLocal)
 	if r.allowPrivate {

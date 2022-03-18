@@ -323,6 +323,14 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		resp.Size = &sizeInt64
 		return resp, nil
 
+	case "getCensusWeight":
+		weight, err := tr.GetCensusWeight()
+		if err != nil {
+			return nil, err
+		}
+		resp.Weight = (*types.BigInt)(weight)
+		return resp, nil
+
 	case "dumpPlain":
 		return nil, fmt.Errorf("dumpPlain is deprecated, dump should be used instead")
 
