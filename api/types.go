@@ -59,6 +59,7 @@ type APIrequest struct {
 	EthProof     *ethstorageproof.StorageResult `json:"storageProof,omitempty"`
 	Hash         types.HexBytes                 `json:"hash,omitempty"`
 	Height       uint32                         `json:"height,omitempty"`
+	ID           uint32                         `json:"id,omitempty"`
 	From         int                            `json:"from,omitempty"`
 	ListSize     int                            `json:"listSize,omitempty"`
 	Method       string                         `json:"method"`
