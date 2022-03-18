@@ -279,7 +279,7 @@ func (v *State) ConsumeFaucetPayload(from common.Address, faucetPayload *models.
 
 	// transfer amout to faucetPayload.To
 	if err := accFrom.Transfer(accTo, faucetPayload.Amount); err != nil {
-		return fmt.Errorf("cannot transfer balance: %w", err)
+		return fmt.Errorf("cannot transfer balance to burn account: %w", err)
 	}
 
 	// burn the tx fee (by sending to burn address)
@@ -291,7 +291,7 @@ func (v *State) ConsumeFaucetPayload(from common.Address, faucetPayload *models.
 			return err
 		}
 		if err := accFrom.Transfer(burnAcc, collectFaucetCost); err != nil {
-			return fmt.Errorf("cannot transfer balance: %w", err)
+			return fmt.Errorf("cannot transfer balance to burn account: %w", err)
 		}
 	} else {
 		accTo.Nonce++
