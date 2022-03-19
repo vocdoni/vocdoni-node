@@ -1154,7 +1154,7 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	}
 	log.Infof("account %s infoURI succesfully changed to %+v", signer.Address(), acc.InfoURI)
 	// create account with faucet package
-	faucetPkg, err := mainClient.GenerateFaucetPackage(signer, signer2.Address(), 500)
+	faucetPkg, err := mainClient.GenerateFaucetPackage(signer, signer2.Address(), 500, rand.Uint64())
 	if err != nil {
 		return fmt.Errorf("cannot generate faucet package %v", err)
 	}
@@ -1347,12 +1347,14 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 	}
 	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accFrom.Balance)
 
+	// generate faucet pkg
+	faucetPkg, err := mainClient.GenerateFaucetPackage(from, to.Address(), 10, uint64(util.RandomInt(0, 10000000)))
+	if err != nil {
+		return err
+	}
+
 	// collect faucet tx
-	if err := mainClient.CollectFaucet(from,
-		to,
-		10,
-		uint64(util.RandomInt(0, 10000000)),
-		accTo.Nonce); err != nil {
+	if err := mainClient.CollectFaucet(to, accTo.Nonce, faucetPkg); err != nil {
 		return fmt.Errorf("error on collect faucet tx: %v", err)
 	}
 

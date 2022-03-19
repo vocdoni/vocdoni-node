@@ -1407,8 +1407,8 @@ func (c *Client) GetAccount(signer *ethereum.SignKeys, accountAddr common.Addres
 }
 
 // GenerateFaucetPackage generates a faucet package
-func (*Client) GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value uint64) (*models.FaucetPackage, error) {
-	return vochain.GenerateFaucetPackage(from, to, value)
+func (*Client) GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value, identifier uint64) (*models.FaucetPackage, error) {
+	return vochain.GenerateFaucetPackage(from, to, value, identifier)
 }
 
 // SubmitRawTx signs and sends a vochain transaction
@@ -1513,28 +1513,11 @@ func (c *Client) SetAccountDelegate(signer *ethereum.SignKeys, delegate common.A
 }
 
 // CollectFaucetTx sends a collect faucet transaction
-func (c *Client) CollectFaucet(from, to *ethereum.SignKeys, amount, identifier uint64, nonce uint32) error {
+func (c *Client) CollectFaucet(signer *ethereum.SignKeys, nonce uint32, faucetPkg *models.FaucetPackage) error {
 	var req api.APIrequest
 	var err error
 	req.Method = "submitRawTx"
 
-	faucetPayload := &models.FaucetPayload{
-		Identifier: identifier,
-		To:         to.Address().Bytes(),
-		Amount:     amount,
-	}
-	faucetPayloadBytes, err := proto.Marshal(faucetPayload)
-	if err != nil {
-		return err
-	}
-	faucetPayloadSignature, err := from.SignEthereum(faucetPayloadBytes)
-	if err != nil {
-		return err
-	}
-	faucetPkg := &models.FaucetPackage{
-		Payload:   faucetPayload,
-		Signature: faucetPayloadSignature,
-	}
 	tx := &models.CollectFaucetTx{
 		FaucetPackage: faucetPkg,
 		Nonce:         nonce,
@@ -1546,7 +1529,7 @@ func (c *Client) CollectFaucet(from, to *ethereum.SignKeys, amount, identifier u
 	if err != nil {
 		return err
 	}
-	resp, err := c.SubmitRawTx(to, &stx)
+	resp, err := c.SubmitRawTx(signer, &stx)
 	if err != nil {
 		return err
 	}

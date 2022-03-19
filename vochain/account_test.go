@@ -2,6 +2,7 @@ package vochain
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -59,7 +60,7 @@ func TestSetAccountInfoTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	faucetPkg, err := GenerateFaucetPackage(&signer, signer3.Address(), 100)
+	faucetPkg, err := GenerateFaucetPackage(&signer, signer3.Address(), 100, rand.Uint64())
 	if err != nil {
 		t.Fatal(err)
 	}
