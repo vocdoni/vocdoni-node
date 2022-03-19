@@ -603,6 +603,7 @@ func (v *State) IncrementTreasurerNonce() error {
 	if err != nil {
 		return fmt.Errorf("incrementTreasurerNonce(): %w", err)
 	}
+	log.Debugf("incrementing treasurer nonce, new nonce is %d", t.Nonce)
 	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
 }
 
@@ -614,7 +615,7 @@ func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
 	}
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-
+	log.Debugf("setting tx cost %d for tx %s", cost, txType.String())
 	costBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(costBytes[:], cost)
 	return v.Tx.DeepSet([]byte(key), costBytes[:], ExtraCfg)

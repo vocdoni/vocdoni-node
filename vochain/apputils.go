@@ -215,3 +215,11 @@ func GetFriendlyResults(results []*models.QuestionResult) [][]string {
 	}
 	return r
 }
+
+func printPrettierDelegates(delegates [][]byte) []string {
+	prettierDelegates := make([]string, len(delegates))
+	for _, delegate := range delegates {
+		prettierDelegates = append(prettierDelegates, ethcommon.BytesToAddress(delegate).String())
+	}
+	return prettierDelegates
+}
