@@ -789,10 +789,10 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 }
 
 // GenerateFaucetPackage generates a faucet package
-func GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value uint64) (*models.FaucetPackage, error) {
+func GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value, identifier uint64) (*models.FaucetPackage, error) {
 	rand.Seed(time.Now().UnixNano())
 	payload := &models.FaucetPayload{
-		Identifier: rand.Uint64(),
+		Identifier: identifier,
 		To:         to.Bytes(),
 		Amount:     value,
 	}
