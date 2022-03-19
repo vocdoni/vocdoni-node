@@ -12,6 +12,7 @@ import (
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -104,6 +105,7 @@ func (v *State) TransferBalance(from, to common.Address, amount uint64) error {
 	if err := accFrom.Transfer(accTo, amount); err != nil {
 		return err
 	}
+	log.Debugf("transferring %d tokens from %s to %s", amount, from.String(), to.String())
 	if err := v.SetAccount(from, accFrom); err != nil {
 		return err
 	}
@@ -129,6 +131,7 @@ func (v *State) MintBalance(address common.Address, amount uint64) error {
 		return ErrBalanceOverflow
 	}
 	acc.Balance += amount
+	log.Debugf("minting %d tokens to account %s", amount, address.String())
 	return v.SetAccount(address, acc)
 }
 
@@ -200,6 +203,7 @@ func (v *State) SetAccountInfoURI(accountAddress common.Address, infoURI string)
 		return ErrAccountNotExist
 	}
 	acc.InfoURI = infoURI
+	log.Debugf("setting account %s infoURI %s", accountAddress.String(), infoURI)
 	return v.SetAccount(accountAddress, acc)
 }
 
@@ -234,6 +238,13 @@ func (v *State) CreateAccount(accountAddress common.Address,
 			}
 		}
 	}
+	log.Debugf("creating account %s with infoURI %s balance %d nonce %d and delegates %+v",
+		accountAddress.String(),
+		acc.InfoURI,
+		acc.Balance,
+		acc.Nonce,
+		printPrettierDelegates(acc.DelegateAddrs),
+	)
 	return v.SetAccount(accountAddress, acc)
 }
 
@@ -302,9 +313,18 @@ func (v *State) ConsumeFaucetPayload(from common.Address, faucetPayload *models.
 	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
 	key := from.Bytes()
 	key = append(key, b...)
-	if err := v.SetFaucetNonce(crypto.Sha256(key)); err != nil {
+	keyHash := crypto.Sha256(key)
+	if err := v.SetFaucetNonce(keyHash); err != nil {
 		return err
 	}
+
+	log.Debugf("account %s consuming faucet payload created by %s with amount %d and identifier %d (keyHash: %x)",
+		accToAddr.String(),
+		from.String(),
+		faucetPayload.Amount,
+		faucetPayload.Identifier,
+		keyHash,
+	)
 
 	// set accounts
 	if err := v.SetAccount(from, accFrom); err != nil {
@@ -443,6 +463,13 @@ func (v *State) SetAccount(accountAddress common.Address, account *Account) erro
 	}
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
+	log.Debugf("setAccount: {address %s, nonce %d, infoURI %s, balance: %d, delegates: %+v}",
+		accountAddress.String(),
+		account.Nonce,
+		account.InfoURI,
+		account.Balance,
+		printPrettierDelegates(account.DelegateAddrs),
+	)
 	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
 }
 
@@ -476,6 +503,7 @@ func (v *State) SubtractCostIncrementNonce(accountAddress common.Address, txType
 	if err := acc.Transfer(burnAcc, cost); err != nil {
 		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
 	}
+	log.Debugf("burning fee for tx %s with cost %d from account %s", txType.String(), cost, accountAddress.String())
 	// set accounts
 	if err := v.SetAccount(accountAddress, acc); err != nil {
 		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
@@ -685,11 +713,13 @@ func (v *State) SetAccountDelegate(accountAddr, delegateAddr common.Address, txT
 	}
 	switch txType {
 	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
+		log.Debugf("adding delegate %s for account %s", delegateAddr.String(), accountAddr.String())
 		if err := acc.AddDelegate(delegateAddr); err != nil {
 			return fmt.Errorf("cannot add delegate, AddDelegate: %w", err)
 		}
 		return v.SetAccount(accountAddr, acc)
 	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+		log.Debugf("deleting delegate %s for account %s", delegateAddr.String(), accountAddr.String())
 		acc.DelDelegate(delegateAddr)
 		return v.SetAccount(accountAddr, acc)
 	default:
