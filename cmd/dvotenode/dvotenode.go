@@ -540,9 +540,6 @@ func main() {
 			log.Infof("[vochain info] replaying height %d at %d blocks/s",
 				h, (h-hPrev)/5)
 		}
-		if signer != nil {
-			signer.VocdoniChainID = vochainApp.ChainID()
-		}
 		log.Infof("vochain chainID %s", vochainApp.ChainID())
 	}
 

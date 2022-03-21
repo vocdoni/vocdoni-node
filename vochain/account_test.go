@@ -585,7 +585,7 @@ func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedT
 	var detxresp abcitypes.ResponseDeliverTx
 	var err error
 
-	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
 		return err
 	}
 	stxBytes, err := proto.Marshal(stx)

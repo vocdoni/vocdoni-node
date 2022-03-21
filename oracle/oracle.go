@@ -92,7 +92,7 @@ func (o *Oracle) NewProcess(process *models.Process) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal newProcess tx: %w", err)
 	}
-	stx.Signature, err = o.signer.SignVocdoniTx(stx.Tx)
+	stx.Signature, err = o.signer.SignVocdoniTx(stx.Tx, o.VochainApp.ChainID())
 	if err != nil {
 		return fmt.Errorf("cannot sign oracle tx: %w", err)
 	}
@@ -175,7 +175,7 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 		log.Errorf("cannot marshal setProcessResults tx: %v", err)
 		return
 	}
-	if stx.Signature, err = o.signer.SignVocdoniTx(stx.Tx); err != nil {
+	if stx.Signature, err = o.signer.SignVocdoniTx(stx.Tx, o.VochainApp.ChainID()); err != nil {
 		log.Errorf("cannot sign oracle tx: %v", err)
 		return
 	}

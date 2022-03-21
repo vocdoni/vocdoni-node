@@ -29,11 +29,10 @@ const SigningPrefix = "\u0019Ethereum Signed Message:\n"
 // SignKeys represents an ECDSA pair of keys for signing.
 // Authorized addresses is a list of Ethereum like addresses which are checked on Verify
 type SignKeys struct {
-	Public         ecdsa.PublicKey
-	Private        ecdsa.PrivateKey
-	Authorized     map[ethcommon.Address]bool
-	Lock           sync.RWMutex
-	VocdoniChainID string
+	Public     ecdsa.PublicKey
+	Private    ecdsa.PrivateKey
+	Authorized map[ethcommon.Address]bool
+	Lock       sync.RWMutex
 }
 
 // NewSignKeys creates an ECDSA pair of keys for signing
@@ -133,11 +132,11 @@ func (k *SignKeys) SignEthereum(message []byte) ([]byte, error) {
 }
 
 // SignVocdoniTx signs a vocdoni transaction. TxData is the full transaction payload (no HexString nor a Hash)
-func (k *SignKeys) SignVocdoniTx(txData []byte) ([]byte, error) {
+func (k *SignKeys) SignVocdoniTx(txData []byte, chainID string) ([]byte, error) {
 	if k.Private.D == nil {
 		return nil, errors.New("no private key available")
 	}
-	signature, err := ethcrypto.Sign(Hash(BuildVocdoniTransaction(txData, k.VocdoniChainID)), &k.Private)
+	signature, err := ethcrypto.Sign(Hash(BuildVocdoniTransaction(txData, chainID)), &k.Private)
 	if err != nil {
 		return nil, err
 	}
