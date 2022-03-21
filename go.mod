@@ -49,7 +49,7 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.12.3-0.20210722180723-7706c7bcfdc7
 	github.com/libp2p/go-reuseport v0.0.2
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/mattn/go-sqlite3 v1.14.11
+	github.com/mattn/go-sqlite3 v1.14.12
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/pressly/goose/v3 v3.3.1
 	github.com/prometheus/client_golang v1.12.1

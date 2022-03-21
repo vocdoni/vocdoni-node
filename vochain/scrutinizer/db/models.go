@@ -36,3 +36,12 @@ type Process struct {
 	SourceBlockHeight int64
 	SourceNetworkID   string
 }
+
+type VoteReference struct {
+	Nullifier    types.Nullifier
+	ProcessID    types.ProcessID
+	Height       int64
+	Weight       string
+	TxIndex      int64
+	CreationTime time.Time
+}
