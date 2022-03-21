@@ -33,8 +33,7 @@ func TestVocdoniSignature(t *testing.T) {
 	qt.Assert(t, fmt.Sprintf("%x", extractedPubKey), qt.DeepEquals, pub)
 
 	t.Logf("Transaction to sign: %s", message)
-	s.VocdoniChainID = "chain-123"
-	signature, err = s.SignVocdoniTx(message)
+	signature, err = s.SignVocdoniTx(message, "chain-123")
 	qt.Assert(t, err, qt.IsNil)
 	t.Logf("Signature for transaction is %x", signature)
 

@@ -103,7 +103,7 @@ func testEthSendVotes(t *testing.T, s testStorageProof,
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
 		t.Fatal(err)
 	}
 

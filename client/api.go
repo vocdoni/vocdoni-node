@@ -590,7 +590,11 @@ func (c *Client) TestPreRegisterKeys(
 			return 0, err
 		}
 
-		if stx.Signature, err = s.SignVocdoniTx(stx.Tx); err != nil {
+		chainID, err := c.GetChainID()
+		if err != nil {
+			return 0, err
+		}
+		if stx.Signature, err = s.SignVocdoniTx(stx.Tx, chainID); err != nil {
 			return 0, err
 		}
 		if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -637,7 +641,11 @@ func (c *Client) TestPreRegisterKeys(
 			if err != nil {
 				return 0, err
 			}
-			if stx.Signature, err = s.SignVocdoniTx(stx.Tx); err != nil {
+			chainID, err := c.GetChainID()
+			if err != nil {
+				return 0, err
+			}
+			if stx.Signature, err = s.SignVocdoniTx(stx.Tx, chainID); err != nil {
 				return 0, err
 			}
 			if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -787,8 +795,11 @@ func (c *Client) TestSendVotes(
 		if err != nil {
 			return 0, err
 		}
-
-		if stx.Signature, err = s.SignVocdoniTx(stx.Tx); err != nil {
+		chainID, err := c.GetChainID()
+		if err != nil {
+			return 0, err
+		}
+		if stx.Signature, err = s.SignVocdoniTx(stx.Tx, chainID); err != nil {
 			return 0, err
 		}
 		if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -958,8 +969,11 @@ func (c *Client) TestSendAnonVotes(
 		if err != nil {
 			return 0, err
 		}
-
-		if stx.Signature, err = s.SignVocdoniTx(stx.Tx); err != nil {
+		chainID, err := c.GetChainID()
+		if err != nil {
+			return 0, err
+		}
+		if stx.Signature, err = s.SignVocdoniTx(stx.Tx, chainID); err != nil {
 			return 0, err
 		}
 		if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1101,7 +1115,11 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 	if err != nil {
 		return 0, err
 	}
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx); err != nil {
+	chainID, err := c.GetChainID()
+	if err != nil {
+		return 0, err
+	}
+	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, chainID); err != nil {
 		return 0, err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1144,7 +1162,11 @@ func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
 	if err != nil {
 		return err
 	}
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx); err != nil {
+	chainID, err := c.GetChainID()
+	if err != nil {
+		return err
+	}
+	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, chainID); err != nil {
 		return err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {
@@ -1416,7 +1438,11 @@ func (c *Client) SubmitRawTx(signer *ethereum.SignKeys, stx *models.SignedTx) (*
 	var err error
 	var req api.APIrequest
 	req.Method = "submitRawTx"
-	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx); err != nil {
+	chainID, err := c.GetChainID()
+	if err != nil {
+		return nil, err
+	}
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx, chainID); err != nil {
 		return nil, err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {

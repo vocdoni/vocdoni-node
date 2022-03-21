@@ -96,7 +96,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 		if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: tx}}); err != nil {
 			b.Fatal(err)
 		}
-		if stx.Signature, err = s.SignVocdoniTx(stx.Tx); err != nil {
+		if stx.Signature, err = s.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
 			b.Fatal(err)
 		}
 		voters = append(voters, &stx)
