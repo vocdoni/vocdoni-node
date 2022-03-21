@@ -170,14 +170,15 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			return nil, fmt.Errorf("setAccountInfoTxCheck: %w", err)
 		}
 		if commit {
+			tx := vtx.Tx.GetSetAccountInfo()
 			// create account
-			if txValues.Create {
+			if txValues.CreateAccount {
 				// with faucet payload provided
-				if txValues.FaucetPayloadSigner != types.EthereumZeroAddress {
+				if txValues.CreateAccountWithFaucet {
 					// create account
 					if err := app.State.CreateAccount(
 						txValues.TxSender,
-						vtx.Tx.GetSetAccountInfo().GetInfoURI(),
+						tx.GetInfoURI(),
 						make([]common.Address, 0),
 						0,
 					); err != nil {
@@ -187,16 +188,16 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 					return vtx.TxID[:], app.State.ConsumeFaucetPayload(
 						txValues.FaucetPayloadSigner,
 						&models.FaucetPayload{
-							Identifier: txValues.FaucetPayload.Identifier,
-							To:         txValues.FaucetPayload.To,
-							Amount:     txValues.FaucetPayload.Amount,
+							Identifier: tx.GetFaucetPackage().GetPayload().GetIdentifier(),
+							To:         tx.GetFaucetPackage().GetPayload().GetTo(),
+							Amount:     tx.GetFaucetPackage().GetPayload().GetAmount(),
 						},
 						models.TxType_SET_ACCOUNT_INFO,
 					)
 				}
 				// any faucet payload provided, just create account
 				return vtx.TxID[:], app.State.CreateAccount(txValues.TxSender,
-					vtx.Tx.GetSetAccountInfo().GetInfoURI(),
+					tx.GetInfoURI(),
 					make([]common.Address, 0),
 					0,
 				)
@@ -204,7 +205,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			// account already created, change infoURI
 			if err := app.State.SetAccountInfoURI(
 				txValues.Account,
-				vtx.Tx.GetSetAccountInfo().GetInfoURI(),
+				tx.GetInfoURI(),
 			); err != nil {
 				return nil, fmt.Errorf("setAccountInfoURI: %w", err)
 			}

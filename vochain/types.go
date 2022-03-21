@@ -54,8 +54,8 @@ func UniqID(tx *models.SignedTx, isAnonymous bool) string {
 
 type setAccountInfoTxCheckValues struct {
 	Account, TxSender, FaucetPayloadSigner common.Address
-	FaucetPayload                          *models.FaucetPayload
-	Create                                 bool
+	CreateAccount                          bool
+	CreateAccountWithFaucet                bool
 }
 
 type sendTokensTxCheckValues struct {

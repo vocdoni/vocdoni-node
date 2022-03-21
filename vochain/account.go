@@ -382,10 +382,11 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	}
 	// if not exist create new one
 	if txSender == nil {
-		returnValues.Create = true
+		returnValues.CreateAccount = true
 		if tx.FaucetPackage == nil {
 			return returnValues, nil
 		}
+		returnValues.CreateAccountWithFaucet = true
 		if tx.FaucetPackage.Payload == nil {
 			return nil, fmt.Errorf("faucet payload is nil")
 		}
@@ -412,7 +413,7 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 			return nil, fmt.Errorf("cannot check faucet nonce: %w", err)
 		}
 		if used {
-			return nil, fmt.Errorf("nonce %d already used", faucetPkgPayload.Identifier)
+			return nil, fmt.Errorf("faucet package identifier %d already used", faucetPkgPayload.Identifier)
 		}
 		// check issuer have enough funds
 		issuerAcc, err := state.GetAccount(issuerAddress, false)
@@ -426,11 +427,10 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 		if err != nil {
 			return nil, fmt.Errorf("cannot get %s tx cost: %w", models.TxType_COLLECT_FAUCET, err)
 		}
-		if (issuerAcc.Balance) < faucetPkgPayload.Amount+cost {
+		if issuerAcc.Balance < faucetPkgPayload.Amount+cost {
 			return nil, fmt.Errorf("faucet does not have enough balance %d < %d", issuerAcc.Balance, faucetPkgPayload.Amount+cost)
 		}
 		returnValues.FaucetPayloadSigner = issuerAddress
-		returnValues.FaucetPayload = tx.GetFaucetPackage().Payload
 		return returnValues, nil
 	}
 	// check if delegate
