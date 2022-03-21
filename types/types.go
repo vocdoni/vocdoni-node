@@ -15,3 +15,5 @@ type CensusRoot = []byte
 // TODO: consider using a database/sql interface instead?
 
 type EncodedProtoBuf = []byte
+
+type Nullifier = []byte

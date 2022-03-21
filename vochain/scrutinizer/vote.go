@@ -10,6 +10,7 @@ import (
 	"time"
 
 	badger "github.com/dgraph-io/badger/v3"
+	"github.com/google/go-cmp/cmp"
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -19,6 +20,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
 
@@ -32,10 +34,31 @@ var ErrNotFoundInDatabase = badgerhold.ErrNotFound
 // Getindexertypes.VoteReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
 func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
-	startTime := time.Now()
-	defer func() { log.Debugf("GetEnvelopeReference took %s", time.Since(startTime)) }()
+	bhStartTime := time.Now()
 	txRef := &indexertypes.VoteReference{}
-	return txRef, s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier))
+	if err := s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier)); err != nil {
+		return nil, err
+	}
+	log.Debugf("GetEnvelopeReference badgerhold took %s", time.Since(bhStartTime))
+
+	sqlStartTime := time.Now()
+
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	sqlTxRefInner, err := queries.GetVoteReference(ctx, nullifier)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugf("GetEnvelopeReference sqlite took %s", time.Since(sqlStartTime))
+	sqlTxRef := indexertypes.VoteReferenceFromDB(&sqlTxRefInner)
+	if false { // TODO(mvdan): reenable when we're finished porting votes to sqlite
+		if diff := cmp.Diff(txRef, sqlTxRef); diff != "" {
+			sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", nullifier, diff)
+		}
+	}
+
+	return txRef, nil
 }
 
 // GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
@@ -401,26 +424,49 @@ func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.In
 // If txn is provided the vote will be added on the transaction (without performing a commit).
 func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 	weight []byte, txIndex int32, txn *badger.Txn) error {
-	if txn != nil {
-		return s.db.TxInsert(txn, nullifier, &indexertypes.VoteReference{
-			Nullifier:    nullifier,
-			ProcessID:    pid,
-			Height:       blockHeight,
-			Weight:       new(types.BigInt).SetBytes(weight),
-			TxIndex:      txIndex,
-			CreationTime: time.Now(),
-		})
+	weightInt := new(types.BigInt).SetBytes(weight)
+	weightStr, err := weightInt.MarshalText()
+	if err != nil {
+		panic(err) // should never happen
 	}
-	return s.queryWithRetries(func() error {
-		return s.db.Insert(nullifier, &indexertypes.VoteReference{
-			Nullifier:    nullifier,
-			ProcessID:    pid,
-			Height:       blockHeight,
-			Weight:       new(types.BigInt).SetBytes(weight),
-			TxIndex:      txIndex,
-			CreationTime: time.Now(),
-		})
-	})
+	creationTime := time.Now()
+	bhVoteRef := &indexertypes.VoteReference{
+		Nullifier:    nullifier,
+		ProcessID:    pid,
+		Height:       blockHeight,
+		Weight:       weightInt,
+		TxIndex:      txIndex,
+		CreationTime: creationTime,
+	}
+	if txn != nil {
+		if err := s.db.TxInsert(txn, nullifier, bhVoteRef); err != nil {
+			return err
+		}
+	} else {
+		if err := s.queryWithRetries(func() error {
+			return s.db.Insert(nullifier, bhVoteRef)
+		}); err != nil {
+			return err
+		}
+	}
+
+	sqlStartTime := time.Now()
+
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	if _, err := queries.CreateVoteReference(ctx, scrutinizerdb.CreateVoteReferenceParams{
+		Nullifier:    nullifier,
+		ProcessID:    pid,
+		Height:       int64(blockHeight),
+		Weight:       string(weightStr),
+		TxIndex:      int64(txIndex),
+		CreationTime: creationTime,
+	}); err != nil {
+		return err
+	}
+
+	log.Debugf("addVoteIndex sqlite took %s", time.Since(sqlStartTime))
+	return nil
 }
 
 // addProcessToLiveResults adds the process id to the liveResultsProcs map

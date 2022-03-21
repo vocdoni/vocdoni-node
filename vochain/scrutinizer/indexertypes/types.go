@@ -151,6 +151,21 @@ type VoteReference struct {
 	CreationTime time.Time
 }
 
+func VoteReferenceFromDB(dbvote *scrutinizerdb.VoteReference) *VoteReference {
+	weightInt := new(types.BigInt)
+	if err := weightInt.UnmarshalText([]byte(dbvote.Weight)); err != nil {
+		panic(err) // should never happen
+	}
+	return &VoteReference{
+		Nullifier:    dbvote.Nullifier,
+		ProcessID:    dbvote.ProcessID,
+		Height:       uint32(dbvote.Height),
+		Weight:       weightInt,
+		TxIndex:      int32(dbvote.TxIndex),
+		CreationTime: dbvote.CreationTime,
+	}
+}
+
 // EnvelopeMetadata contains vote information for the EnvelopeList api
 type EnvelopeMetadata struct {
 	ProcessId types.HexBytes `json:"process_id"`
