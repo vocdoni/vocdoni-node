@@ -2,6 +2,15 @@
 name: Main
 
 on: [push, pull_request]
+# Actually we don't want to run unconditionally on every push and pull_request:
+# 1. We want this to run on any push to any branch in *our* repo, but not in personal forks
+#   since they don't run on our significantly faster nodes, so they fail and cause confusion.
+#   i.e. github.event_name == 'push' && github.event.repository.fork == 'false'
+# 2. We also want to run on external PRs, but not on our own internal PRs as they'll be run
+#   by the push to the branch (which would cause duplicate jobs)
+#   In internal PRs, github.event.pull_request.head.repo.full_name == github.repository (i.e. vocdoni/vocdoni-node)
+#   In external PRs, github.event.pull_request.head.repo.full_name == <fork>/vocdoni-node
+# All this is handled with the 'if:' in each job.
 
 jobs:
   go-tests:
@@ -9,51 +18,51 @@ jobs:
     container:
       image: golang:1.17.7
       options: --user 1000
-    if: github.repository == 'vocdoni/vocdoni-node'
+    if: ( github.event_name == 'push' && github.event.repository.fork == 'false' ) || ( github.event.pull_request.head.repo.full_name != github.repository )
     defaults:
       run:
         shell: bash
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: gofmt
-        # Run gofmt first, as it's quick and issues are common.
-        run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
-      - name: go test
-        run: |
-          # we run vet in another step
-          go test -vet=off -timeout=1m -coverprofile=covprofile ./...
-          # -race can easily make the crypto stuff 10x slower
-          go test -vet=off -timeout=15m -race ./...
-      - name: go vet
-        run: go vet ./...
-      - name: staticcheck
-        run: |
-          curl -L https://github.com/dominikh/go-tools/releases/download/2021.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
-          ./staticcheck/staticcheck ./...
-      - name: Go build for Mac
-        run: |
-          # Some of our devs are on Mac. Ensure it builds.
-          # It's surprisingly hard with some deps like bazil.org/fuse.
-          GOOS=darwin go build ./...
+      # - name: gofmt
+      #   # Run gofmt first, as it's quick and issues are common.
+      #   run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
+      # - name: go test
+      #   run: |
+      #     # we run vet in another step
+      #     go test -vet=off -timeout=1m -coverprofile=covprofile ./...
+      #     # -race can easily make the crypto stuff 10x slower
+      #     go test -vet=off -timeout=15m -race ./...
+      # - name: go vet
+      #   run: go vet ./...
+      # - name: staticcheck
+      #   run: |
+      #     curl -L https://github.com/dominikh/go-tools/releases/download/2021.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
+      #     ./staticcheck/staticcheck ./...
+      # - name: Go build for Mac
+      #   run: |
+      #     # Some of our devs are on Mac. Ensure it builds.
+      #     # It's surprisingly hard with some deps like bazil.org/fuse.
+      #     GOOS=darwin go build ./...
 
   compose-test:
     runs-on: self-hosted
-    if: github.repository == 'vocdoni/vocdoni-node'
+    if: ( github.event_name == 'push' && github.event.repository.fork == 'false' ) || ( github.event.pull_request.head.repo.full_name != github.repository )
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
-      - name: Run compose script
-        run: |
-          export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
-          export DOCKER_CLI_EXPERIMENTAL=enabled
-          export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
-          export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
-          export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
-          export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
-          cd dockerfiles/testsuite
-          docker-compose build
-          ./start_test.sh
+      # - name: Run compose script
+      #   run: |
+      #     export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
+      #     export DOCKER_CLI_EXPERIMENTAL=enabled
+      #     export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
+      #     export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
+      #     export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
+      #     export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
+      #     cd dockerfiles/testsuite
+      #     docker-compose build
+      #     ./start_test.sh
 
   docker-release:
     runs-on: self-hosted
@@ -113,3 +122,12 @@ jobs:
           tags: |
             vocdoni/go-dvote:latest-race, vocdoni/go-dvote:${{ steps.var.outputs.branch }}-race,
             ghcr.io/vocdoni/go-dvote:latest-race,ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch }}-race
+
+
+  context:
+    runs-on: self-hosted
+    steps:
+      - name: Inspect contexts
+        run: |
+          echo "The github context is:"
+          echo "${{ toJson(github) }}"
