@@ -1512,7 +1512,7 @@ func (c *Client) SetAccountDelegate(signer *ethereum.SignKeys, delegate common.A
 	return nil
 }
 
-// CollectFaucetTx sends a collect faucet transaction
+// CollectFaucet sends a collect faucet transaction
 func (c *Client) CollectFaucet(signer *ethereum.SignKeys, nonce uint32, faucetPkg *models.FaucetPackage) error {
 	var req api.APIrequest
 	var err error
