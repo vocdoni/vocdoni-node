@@ -115,7 +115,7 @@ mkdir -p $results
 
 for test in ${tests_to_run[@]}; do
 	echo "### Running test $test ###"
-	( $test ; echo $? > $results/$test ) &
+	( $test ; echo $? > $results/$test )
 done
 
 echo "### Waiting for tests to finish ###"
