@@ -18,7 +18,9 @@ jobs:
     container:
       image: golang:1.17.7
       options: --user 1000
-    if: ( github.event_name == 'push' && github.event.repository.fork == 'false' ) || ( github.event.pull_request.head.repo.full_name != github.repository )
+    if: |
+      false &&
+      ( github.event_name == 'push' && github.event.repository.fork == 'false' ) || ( github.event.pull_request.head.repo.full_name != github.repository )
     defaults:
       run:
         shell: bash
@@ -131,3 +133,8 @@ jobs:
         run: |
           echo "The github context is:"
           echo "${{ toJson(github) }}"
+      - run: |
+          echo event_name "${{ toJson(github.event_name) }}"
+          echo fork "${{ toJson(github.event.repository.fork) }}"
+          echo full_name "${{ toJson(github.event.pull_request.head.repo.full_name) }}"
+          echo repository "${{ toJson(github.repository) }}"
