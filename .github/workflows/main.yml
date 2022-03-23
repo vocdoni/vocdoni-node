@@ -2,6 +2,15 @@
 name: Main
 
 on: [push, pull_request]
+# Actually we don't want to run unconditionally on every push and pull_request:
+# 1. We want this to run on any push to any branch in *our* repo, but not in personal forks
+#   since they don't run on our significantly faster nodes, so they fail and cause confusion.
+#   i.e. github.event_name == 'push' && github.event.repository.fork == false
+# 2. We also want to run on external PRs, but not on our own internal PRs as they'll be run
+#   by the push to the branch (which would cause duplicate jobs)
+#   In internal PRs, github.event.pull_request.head.repo.full_name == github.repository (i.e. 'vocdoni/vocdoni-node')
+#   In external PRs, github.event.pull_request.head.repo.full_name == '<fork>/vocdoni-node'
+# All this is handled with the 'if:' in each job.
 
 jobs:
   go-tests:
@@ -9,7 +18,9 @@ jobs:
     container:
       image: golang:1.17.7
       options: --user 1000
-    if: github.repository == 'vocdoni/vocdoni-node'
+    if: |
+      ( github.event_name == 'push' && github.event.repository.fork == false )
+      || ( github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository )
     defaults:
       run:
         shell: bash
@@ -39,7 +50,9 @@ jobs:
 
   compose-test:
     runs-on: self-hosted
-    if: github.repository == 'vocdoni/vocdoni-node'
+    if: |
+      ( github.event_name == 'push' && github.event.repository.fork == false )
+      || ( github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository )
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
