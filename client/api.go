@@ -680,6 +680,7 @@ func (c *Client) TestPreRegisterKeys(
 		if weight.String() == registerKeyWeight {
 			break
 		}
+		// TODO: replace this time.Sleep() which many times is not enough with waitOneBlock()
 		time.Sleep(1 * time.Second)
 	}
 	if tries == 0 {
