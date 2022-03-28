@@ -111,20 +111,24 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 		}
 
 	case *models.Tx_NewProcess:
-		if p, err := app.NewProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State); err == nil {
+		if p, txSender, err := app.NewProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State); err == nil {
 			if commit {
 				tx := vtx.Tx.GetNewProcess()
 				if tx.Process == nil {
 					return nil, fmt.Errorf("newProcess process is empty")
 				}
-				return vtx.TxID[:], app.State.AddProcess(p)
+				if err := app.State.AddProcess(p); err != nil {
+					return nil, fmt.Errorf("newProcess: addProcess: %s", err)
+				}
+				return vtx.TxID[:], app.State.SubtractCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
 			}
 		} else {
 			return nil, fmt.Errorf("newProcess: %w", err)
 		}
 
 	case *models.Tx_SetProcess:
-		if err := SetProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State); err != nil {
+		txSender, err := SetProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		if err != nil {
 			return nil, fmt.Errorf("setProcess: %w", err)
 		}
 		if commit {
@@ -134,20 +138,27 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 				if tx.GetStatus() == models.ProcessStatus_PROCESS_UNKNOWN {
 					return nil, fmt.Errorf("set process status, status unknown")
 				}
-				return vtx.TxID[:], app.State.SetProcessStatus(tx.ProcessId, *tx.Status, true)
+				if err := app.State.SetProcessStatus(tx.ProcessId, *tx.Status, true); err != nil {
+					return nil, fmt.Errorf("setProcessStatus: %s", err)
+				}
 			case models.TxType_SET_PROCESS_RESULTS:
 				if tx.GetResults() == nil {
 					return nil, fmt.Errorf("set process results, results is nil")
 				}
-				return vtx.TxID[:], app.State.SetProcessResults(tx.ProcessId, tx.Results, true)
+				if err := app.State.SetProcessResults(tx.ProcessId, tx.Results, true); err != nil {
+					return nil, fmt.Errorf("setProcessResults: %s", err)
+				}
 			case models.TxType_SET_PROCESS_CENSUS:
 				if tx.GetCensusRoot() == nil {
 					return nil, fmt.Errorf("set process census, census root is nil")
 				}
-				return vtx.TxID[:], app.State.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true)
+				if err := app.State.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true); err != nil {
+					return nil, fmt.Errorf("setProcessCensus: %s", err)
+				}
 			default:
 				return nil, fmt.Errorf("unknown set process tx type")
 			}
+			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(txSender, tx.Txtype)
 		}
 
 	case *models.Tx_RegisterKey:
