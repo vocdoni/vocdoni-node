@@ -67,9 +67,10 @@ type BaseApplication struct {
 	ZkVKs []*snarkTypes.Vk
 }
 
+// Ensure that BaseApplication implements abcitypes.Application.
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
-// NewBaseApplication creates a new BaseApplication given a name an a DB backend.
+// NewBaseApplication creates a new BaseApplication given a name and a DB backend.
 // Node still needs to be initialized with SetNode
 // Callback functions still need to be initialized
 func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
