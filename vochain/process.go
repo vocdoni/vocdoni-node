@@ -419,29 +419,23 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 		return nil, common.Address{}, err
 	}
 	// check balance and nonce
-	authorized := acc.Balance >= cost && acc.Nonce == tx.Nonce
-	if authorized {
-		// If owner authorized, check NewProcessTxCheckeck entityId matches with owner address
-		if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) {
-			return nil, common.Address{}, fmt.Errorf("process entityID and transaction owner do not match")
-		}
-	} else {
+	if acc.Balance < cost {
+		return nil, common.Address{}, ErrNotEnoughBalance
+	}
+	if acc.Nonce != tx.Nonce {
+		return nil, common.Address{}, ErrAccountNonceInvalid
+	}
+	// check if process entityID matches tx sender
+	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) {
 		// Check if the transaction comes from an oracle
 		// Oracles can create processes with any entityID
 		isOracle, err := state.IsOracle(*addr)
 		if err != nil {
 			return nil, common.Address{}, err
 		}
-		// check is oracle
-		authorized = isOracle && acc.Balance >= cost && acc.Nonce == tx.Nonce
-	}
-	// If owner without balance and not an oracle, fail
-	if !authorized {
-		return nil, common.Address{}, fmt.Errorf("unauthorized to create a process, recovered acc %s: {balance: %d, nonce: %d}",
-			addr.String(),
-			acc.Balance,
-			acc.Nonce,
-		)
+		if !isOracle {
+			return nil, common.Address{}, fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
+		}
 	}
 	// get process
 	_, err = state.Process(tx.Process.ProcessId, false)
@@ -507,36 +501,36 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	// get tx cost
 	cost, err := state.TxCost(tx.Txtype, false)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("cannot get NewProcessTx transaction cost: %w", err)
+		return common.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype.String(), err)
 	}
 	addr, acc, err := state.AccountFromSignature(txBytes, signature)
 	if err != nil {
 		return common.Address{}, err
 	}
 	// check balance and nonce
-	authorized := acc.Balance >= cost && acc.Nonce == tx.Nonce
+	if acc.Balance < cost {
+		return common.Address{}, ErrNotEnoughBalance
+	}
+	if acc.Nonce != tx.Nonce {
+		return common.Address{}, ErrAccountNonceInvalid
+	}
 	// get process
 	process, err := state.Process(tx.ProcessId, false)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
 	}
+	// check process entityID matches tx sender
 	isOracle := false
-	if authorized {
-		// If owner authorized, check entityId matches with owner address
-		if !bytes.Equal(process.EntityId, addr.Bytes()) {
-			return common.Address{}, fmt.Errorf("process entityID and transaction owner do not match")
-		}
-	} else {
+	if !bytes.Equal(process.EntityId, addr.Bytes()) {
 		// Check if the transaction comes from an oracle
 		// Oracles can create processes with any entityID
-		if isOracle, err = state.IsOracle(*addr); err != nil {
+		isOracle, err = state.IsOracle(*addr)
+		if err != nil {
 			return common.Address{}, err
 		}
-	}
-
-	// If owner without balance and not an oracle, fail
-	if !authorized && !isOracle {
-		return common.Address{}, fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
+		if !isOracle {
+			return common.Address{}, fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
+		}
 	}
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_RESULTS:

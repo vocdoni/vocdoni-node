@@ -20,7 +20,6 @@ func TestVocone(t *testing.T) {
 	if err := oracle.Generate(); err != nil {
 		t.Fatal(err)
 	}
-
 	vc, err := NewVocone(dir, &oracle)
 	if err != nil {
 		t.Fatal(err)

@@ -556,7 +556,7 @@ func (c *Client) TestPreRegisterKeys(
 		s := signers[i]
 		zkCensusKey, _ := testGetZKCensusKey(s)
 		v := &models.RegisterKeyTx{
-			Nonce:     util.RandomBytes(32),
+			Nonce:     0, // TODO: @jordipainan change register key for account based tx
 			ProcessId: pid,
 			NewKey:    zkCensusKey,
 			Weight:    registerKeyWeight,
@@ -1104,12 +1104,19 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 8},
 		MaxCensusSize: &maxCensusSize,
 	}
+	// get oracle account
+	acc, err := c.GetAccount(oracle, oracle.Address())
+	if err != nil {
+		return 0, fmt.Errorf("cannot get account")
+	}
+	if acc == nil {
+		return 0, vochain.ErrAccountNotExist
+	}
 	p := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
-		Nonce:   util.RandomBytes(32),
+		Nonce:   acc.Nonce,
 		Process: processData,
 	}
-	var err error
 	stx := &models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: p}})
 	if err != nil {
@@ -1151,11 +1158,19 @@ func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
 	var err error
 	req.Method = "submitRawTx"
 	status := models.ProcessStatus_ENDED
+	// get oracle account
+	acc, err := c.GetAccount(oracle, oracle.Address())
+	if err != nil {
+		return fmt.Errorf("cannot get account")
+	}
+	if acc == nil {
+		return vochain.ErrAccountNotExist
+	}
 	p := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_STATUS,
 		ProcessId: pid,
 		Status:    &status,
-		Nonce:     util.RandomBytes(32),
+		Nonce:     acc.Nonce,
 	}
 	stx := &models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: p}})

@@ -8,7 +8,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
@@ -76,13 +75,21 @@ func (o *Oracle) NewProcess(process *models.Process) error {
 		return nil
 	}
 
+	// get oracle account
+	acc, err := o.VochainApp.State.GetAccount(o.signer.Address(), false)
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return fmt.Errorf("oracle account does not exist")
+	}
 	// Create, sign a send NewProcess transaction
 	processTx := &models.NewProcessTx{
 		Process: process,
-		Nonce:   util.RandomBytes(32),
+		Nonce:   acc.Nonce,
 		Txtype:  models.TxType_NEW_PROCESS,
 	}
-	var err error
+
 	stx := &models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_NewProcess{
@@ -137,14 +144,23 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 			results.ProcessID, vocProcessData.Status)
 		return
 	}
-
+	// get oracle account
+	acc, err := o.VochainApp.State.GetAccount(o.signer.Address(), false)
+	if err != nil {
+		log.Errorf("error fetching oracle account: %s", err)
+		return
+	}
+	if acc == nil {
+		log.Errorf("oracle account does not exist")
+		return
+	}
 	// create setProcessTx
 	setprocessTxArgs := &models.SetProcessTx{
 		ProcessId: results.ProcessID,
 		Results:   scrutinizer.BuildProcessResult(results, vocProcessData.EntityId),
 		Status:    models.ProcessStatus_RESULTS.Enum(),
 		Txtype:    models.TxType_SET_PROCESS_RESULTS,
-		Nonce:     util.RandomBytes(32),
+		Nonce:     acc.Nonce,
 	}
 
 	// add the signature to the results and own address
