@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -54,6 +55,7 @@ type Vocone struct {
 	lastBlockTime   time.Time
 	blockTimeTarget time.Duration
 	txsPerBlock     int
+	vcMtx           sync.Mutex
 }
 
 // NewVocone returns a ready Vocone instance.
@@ -146,6 +148,7 @@ func (vc *Vocone) Start() {
 
 	for {
 		// Begin block
+		vc.vcMtx.Lock()
 		bblock := abcitypes.RequestBeginBlock{
 			Header: tmprototypes.Header{
 				Time:   time.Now(),
@@ -158,6 +161,7 @@ func (vc *Vocone) Start() {
 		comres := vc.app.Commit()
 		log.Debugf("commit hash for block %d: %x", bblock.Header.Height, comres.Data)
 		vc.app.EndBlock(abcitypes.RequestEndBlock{Height: bblock.Header.Height})
+		vc.vcMtx.Unlock()
 
 		// Waiting time
 		sinceLast := time.Since(vc.lastBlockTime)
@@ -195,6 +199,8 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 	if !oracleExist {
 		log.Warnf("adding new oracle key %s", oracleKey.Address())
 		vc.app.State.AddOracle(oracleKey.Address())
+		vc.vcMtx.Lock()
+		defer vc.vcMtx.Unlock()
 		if _, err := vc.app.State.Save(); err != nil {
 			return err
 		}
@@ -206,6 +212,8 @@ func (vc *Vocone) CreateAccount(key common.Address, acc *vochain.Account) error 
 	if err := vc.app.State.SetAccount(key, acc); err != nil {
 		return err
 	}
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
 	}
@@ -217,6 +225,8 @@ func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
 	if err := vc.app.State.SetTreasurer(treasurer, 0); err != nil {
 		return err
 	}
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
 	}
@@ -231,6 +241,8 @@ func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
 	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
 	}
@@ -245,6 +257,8 @@ func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
 	}
@@ -262,6 +276,8 @@ func (vc *Vocone) SetBulkTxCosts(txCosts uint64) error {
 	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
 	}
