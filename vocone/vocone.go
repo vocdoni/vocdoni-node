@@ -62,7 +62,7 @@ type Vocone struct {
 }
 
 // NewVocone returns a ready Vocone instance.
-func NewVocone(dataDir string, oracleKey *ethereum.SignKeys) (*Vocone, error) {
+func NewVocone(dataDir string, oracleKey *ethereum.SignKeys, disableIpfs bool) (*Vocone, error) {
 	vc := &Vocone{}
 	var err error
 	vc.app, err = vochain.NewBaseApplication(db.TypePebble, dataDir)
@@ -136,7 +136,7 @@ func NewVocone(dataDir string, oracleKey *ethereum.SignKeys) (*Vocone, error) {
 
 	// Create the IPFS storage layer
 	vc.storage, err = service.IPFS(&config.IPFSCfg{
-		ConfigPath: filepath.Join(dataDir, "ipfs"),
+		ConfigPath: filepath.Join(dataDir, "ipfs"), NoInit: disableIpfs,
 	}, nil, nil)
 
 	return vc, err

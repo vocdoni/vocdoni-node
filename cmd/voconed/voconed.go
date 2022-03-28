@@ -19,6 +19,7 @@ type VoconeConfig struct {
 	logLevel, dir, oracle, path, treasurer string
 	port, blockSeconds, blockSize          int
 	txCosts                                uint64
+	disableIpfs                            bool
 }
 
 func main() {
@@ -36,6 +37,7 @@ func main() {
 	flag.IntVar(&config.blockSeconds, "blockPeriod", int(vocone.DefaultBlockTimeTarget.Seconds()), "block time target in seconds")
 	flag.IntVar(&config.blockSize, "blockSize", int(vocone.DefaultTxsPerBlock), "max number of transactions per block")
 	flag.Uint64Var(&config.txCosts, "txCosts", vocone.DefaultTxCosts, "transaction cost for every transaction type")
+	flag.BoolVar(&config.disableIpfs, "disableIpfs", false, "disable built-in IPFS node")
 	flag.CommandLine.SortFlags = false
 	flag.Parse()
 
@@ -98,7 +100,7 @@ func main() {
 		}
 	}
 
-	vc, err := vocone.NewVocone(config.dir, &oracle)
+	vc, err := vocone.NewVocone(config.dir, &oracle, config.disableIpfs)
 	if err != nil {
 		log.Fatal(err)
 	}
