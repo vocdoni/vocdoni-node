@@ -13,11 +13,15 @@ ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-info}
 GWHOST="http://gateway0:9090/dvote"
-. env.oracle0key # contains var DVOTE_ETHCONFIG_SIGNINGKEY, import into current env
+. env.oracle0key # contains var DVOTE_ETHCONFIG_ORACLEKEY, import into current env
 ORACLE_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 [ -n "$TESTSUITE_ORACLE_KEY" ] && ORACLE_KEY="$TESTSUITE_ORACLE_KEY"
+. env.treasurerkey # contains var DVOTE_ETHCONFIG_SIGNINGKEY, import into current env
 TREASURER_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 [ -n "$TESTSUITE_TREASURER_KEY" ] && TREASURER_KEY="$TESTSUITE_TREASURER_KEY"
+. env.entity0key # contains var DVOTE_ETHCONFIG_SIGNINGKEY, import into current env
+ENTITY_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
+[ -n "$TESTSUITE_ENTITY_KEY" ] && ENTITY_KEY="$TESTSUITE_ENTITY_KEY"
 
 ### if you want to add a new test:
 ### add "newtest" to tests_to_run array (as well as a comment at the head of the file)
@@ -38,12 +42,12 @@ tests_to_run=(
 merkle_vote() {
 	docker-compose run test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
-		--logLevel=$LOGLEVEL \
-		--operation=vtest \
-		--oracleKey=$ORACLE_KEY \
-		--electionSize=$ELECTION_SIZE \
-		--electionType=$1 \
-		--withWeight=2
+		  --logLevel=$LOGLEVEL \
+		  --operation=vtest \
+		  --oracleKey=$ORACLE_KEY \
+		  --electionSize=$ELECTION_SIZE \
+		  --electionType=$1 \
+		  --withWeight=2 \
 }
 
 merkle_vote_plaintext() {
@@ -60,7 +64,7 @@ anonvoting() {
 		  --logLevel=$LOGLEVEL \
 		  --operation=anonvoting \
 		  --oracleKey=$ORACLE_KEY \
-		  --electionSize=$ELECTION_SIZE_ANON
+		  --electionSize=$ELECTION_SIZE_ANON \
 }
 
 cspvoting() {
@@ -69,7 +73,7 @@ cspvoting() {
 		  --logLevel=$LOGLEVEL \
 		  --operation=cspvoting \
 		  --oracleKey=$ORACLE_KEY \
-		  --electionSize=$ELECTION_SIZE
+		  --electionSize=$ELECTION_SIZE \
 }
 
 tokentransactions() {
@@ -77,7 +81,9 @@ tokentransactions() {
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=tokentransactions \
-		  --treasurerKey=$TREASURER_KEY
+		  --oracleKey=$ORACLE_KEY \
+		  --treasurerKey=$TREASURER_KEY \
+		  --entityKey=$ENTITY_KEY \
 }
 
 ### end tests definition
@@ -107,10 +113,10 @@ mkdir -p $results
 
 for test in ${tests_to_run[@]}; do
 	echo "### Running test $test ###"
-	( $test ; echo $? > $results/$test ) &
+	( $test ; echo $? > $results/$test )
 done
 
-echo "### Waiting for token transaction tests to finish ###"
+echo "### Waiting for tests to finish ###"
 wait
 
 for test in ${tests_to_run[@]} ; do

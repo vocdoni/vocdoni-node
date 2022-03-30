@@ -86,14 +86,17 @@ services:
 
   gateway0:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.gateway"
+    env_file:
+      - "${COMPOSE_HOST_PATH:-.}/env.gateway0"
+      - "${COMPOSE_HOST_PATH:-.}/env.entity0key"
     ports:
       - "${COMPOSE_DVOTE_PORT_MAPPING:-9090:9090}"
     volumes:
-      - data-gateway:/app/run/
+      - data-gateway0:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
     links:
       - seed
+  
 
   test:
     image: "dvotenode-test:${TESTSUITE_BUILD_TAG:-latest}"
@@ -114,4 +117,4 @@ volumes:
   data-miner5: {}
   data-miner6: {}
   data-oracle: {}
-  data-gateway: {}
+  data-gateway0: {}
