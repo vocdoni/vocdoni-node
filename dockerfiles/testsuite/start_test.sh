@@ -47,7 +47,7 @@ merkle_vote() {
 		  --oracleKey=$ORACLE_KEY \
 		  --electionSize=$ELECTION_SIZE \
 		  --electionType=$1 \
-		  --withWeight=2 \
+		  --withWeight=2
 }
 
 merkle_vote_plaintext() {
@@ -64,7 +64,7 @@ anonvoting() {
 		  --logLevel=$LOGLEVEL \
 		  --operation=anonvoting \
 		  --oracleKey=$ORACLE_KEY \
-		  --electionSize=$ELECTION_SIZE_ANON \
+		  --electionSize=$ELECTION_SIZE_ANON
 }
 
 cspvoting() {
@@ -73,7 +73,7 @@ cspvoting() {
 		  --logLevel=$LOGLEVEL \
 		  --operation=cspvoting \
 		  --oracleKey=$ORACLE_KEY \
-		  --electionSize=$ELECTION_SIZE \
+		  --electionSize=$ELECTION_SIZE
 }
 
 tokentransactions() {
@@ -83,7 +83,7 @@ tokentransactions() {
 		  --operation=tokentransactions \
 		  --oracleKey=$ORACLE_KEY \
 		  --treasurerKey=$TREASURER_KEY \
-		  --entityKey=$ENTITY_KEY \
+		  --entityKey=$ENTITY_KEY
 }
 
 ### end tests definition
