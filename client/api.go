@@ -1352,7 +1352,7 @@ func (c *Client) SetTransactionCost(signer *ethereum.SignKeys, txType models.TxT
 	var err error
 
 	tx := &models.SetTransactionCostsTx{
-		Txtype: models.TxType_SET_ACCOUNT_INFO,
+		Txtype: txType,
 		Nonce:  nonce,
 		Value:  cost,
 	}
