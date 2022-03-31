@@ -981,14 +981,14 @@ func testTokenTransactions(
 
 func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys) error {
 	// get treasurer
-	treasurer, err := mainClient.GetTreasurer(treasurerSigner)
+	treasurer, err := mainClient.GetTreasurer()
 	if err != nil {
 		return err
 	}
 	log.Infof("treasurer fetched %s with nonce %d", common.BytesToAddress(treasurer.Address), treasurer.Nonce)
 
 	// get current tx cost
-	txCost, err := mainClient.GetTransactionCost(treasurerSigner, models.TxType_SET_ACCOUNT_INFO)
+	txCost, err := mainClient.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
 	if err != nil {
 		return err
 	}
@@ -1008,11 +1008,11 @@ func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys
 	}
 	mainClient.WaitUntilBlock(h + 2)
 	// check tx cost changed and treasurer nonce incremented
-	treasurer2, err := mainClient.GetTreasurer(treasurerSigner)
+	treasurer2, err := mainClient.GetTreasurer()
 	if err != nil {
 		return err
 	}
-	newTxCost, err := mainClient.GetTransactionCost(treasurerSigner, models.TxType_SET_ACCOUNT_INFO)
+	newTxCost, err := mainClient.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
 	if err != nil {
 		return err
 	}
@@ -1026,7 +1026,7 @@ func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys
 
 func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signer2 *ethereum.SignKeys) error {
 	// get current tx cost
-	txCost, err := mainClient.GetTransactionCost(signer, models.TxType_SET_ACCOUNT_INFO)
+	txCost, err := mainClient.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
 	if err != nil {
 		return err
 	}
@@ -1047,7 +1047,7 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	}
 	mainClient.WaitUntilBlock(h + 2)
 	// mint tokens for the created account
-	treasurerAcc, err := mainClient.GetTreasurer(signer)
+	treasurerAcc, err := mainClient.GetTreasurer()
 	if err != nil {
 		return fmt.Errorf("cannot get treasurer %v", err)
 	}
@@ -1064,7 +1064,7 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	}
 	mainClient.WaitUntilBlock(h + 2)
 	// check account created
-	acc, err := mainClient.GetAccount(signer, signer.Address())
+	acc, err := mainClient.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1086,7 +1086,7 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	}
 	mainClient.WaitUntilBlock(h + 2)
 	// check account info changed
-	acc, err = mainClient.GetAccount(signer, signer.Address())
+	acc, err = mainClient.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1115,7 +1115,7 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	}
 	mainClient.WaitUntilBlock(h + 2)
 	// check account created
-	acc2, err := mainClient.GetAccount(signer2, signer2.Address())
+	acc2, err := mainClient.GetAccount(signer2.Address())
 	if err != nil {
 		return err
 	}
@@ -1131,12 +1131,12 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 }
 
 func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 *ethereum.SignKeys) error {
-	txCost, err := mainClient.GetTransactionCost(treasurerSigner, models.TxType_SEND_TOKENS)
+	txCost, err := mainClient.GetTransactionCost(models.TxType_SEND_TOKENS)
 	if err != nil {
 		return err
 	}
 	log.Infof("tx cost of %s is %d", models.TxType_SEND_TOKENS, txCost)
-	acc, err := mainClient.GetAccount(signer, signer.Address())
+	acc, err := mainClient.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1156,7 +1156,7 @@ func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 
 		return fmt.Errorf("cannot get current height")
 	}
 	mainClient.WaitUntilBlock(h + 2)
-	acc2, err := mainClient.GetAccount(signer2, signer2.Address())
+	acc2, err := mainClient.GetAccount(signer2.Address())
 	if err != nil {
 		return err
 	}
@@ -1167,7 +1167,7 @@ func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 
 	if acc2.Balance != 600 {
 		log.Fatalf("expected %s to have balance %d got %d", signer2.Address(), 600, acc2.Balance)
 	}
-	acc3, err := mainClient.GetAccount(signer, signer.Address())
+	acc3, err := mainClient.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1185,18 +1185,18 @@ func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 
 }
 
 func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum.SignKeys) error {
-	txCostAdd, err := mainClient.GetTransactionCost(signer, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
+	txCostAdd, err := mainClient.GetTransactionCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
 	if err != nil {
 		return err
 	}
-	txCostDel, err := mainClient.GetTransactionCost(signer, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
+	txCostDel, err := mainClient.GetTransactionCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
 	if err != nil {
 		return err
 	}
 	log.Infof("tx cost of %s is %d", models.TxType_ADD_DELEGATE_FOR_ACCOUNT, txCostAdd)
 	log.Infof("tx cost of %s is %d", models.TxType_DEL_DELEGATE_FOR_ACCOUNT, txCostDel)
 
-	acc, err := mainClient.GetAccount(signer, signer.Address())
+	acc, err := mainClient.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1216,7 +1216,7 @@ func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum
 		return fmt.Errorf("cannot get current height")
 	}
 	mainClient.WaitUntilBlock(h + 2)
-	acc, err = mainClient.GetAccount(signer, signer.Address())
+	acc, err = mainClient.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1232,7 +1232,7 @@ func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum
 		log.Fatalf("expeted delegate to be %s got %s", signer2.Address(), addedDelegate)
 	}
 	// delete delegate
-	acc, err = mainClient.GetAccount(signer, signer.Address())
+	acc, err = mainClient.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1250,7 +1250,7 @@ func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum
 		return fmt.Errorf("cannot get current height")
 	}
 	mainClient.WaitUntilBlock(h + 2)
-	acc, err = mainClient.GetAccount(signer, signer.Address())
+	acc, err = mainClient.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1266,13 +1266,13 @@ func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum
 
 func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) error {
 	// get tx cost
-	txCost, err := mainClient.GetTransactionCost(from, models.TxType_COLLECT_FAUCET)
+	txCost, err := mainClient.GetTransactionCost(models.TxType_COLLECT_FAUCET)
 	if err != nil {
 		return err
 	}
 	log.Infof("tx cost of %s is %d", models.TxType_COLLECT_FAUCET, txCost)
 	// fetch from account
-	accFrom, err := mainClient.GetAccount(from, from.Address())
+	accFrom, err := mainClient.GetAccount(from.Address())
 	if err != nil {
 		return err
 	}
@@ -1282,7 +1282,7 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 	log.Infof("fetched from account %s with nonce %d and balance %d", from.Address(), accFrom.Nonce, accFrom.Balance)
 
 	// fetch to account
-	accTo, err := mainClient.GetAccount(to, to.Address())
+	accTo, err := mainClient.GetAccount(to.Address())
 	if err != nil {
 		return err
 	}
@@ -1310,7 +1310,7 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 	mainClient.WaitUntilBlock(h + 2)
 
 	// check values changed corretly on both from and to accounts
-	accFrom, err = mainClient.GetAccount(from, from.Address())
+	accFrom, err = mainClient.GetAccount(from.Address())
 	if err != nil {
 		return err
 	}
@@ -1320,7 +1320,7 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 	log.Infof("fetched from account %s with nonce %d and balance %d", from.Address(), accFrom.Nonce, accFrom.Balance)
 
 	// fetch to account
-	accTo, err = mainClient.GetAccount(to, to.Address())
+	accTo, err = mainClient.GetAccount(to.Address())
 	if err != nil {
 		return err
 	}

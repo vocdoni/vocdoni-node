@@ -1315,9 +1315,9 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 }
 
 // GetTreasurer returns information about the treasurer
-func (c *Client) GetTreasurer(signer *ethereum.SignKeys) (*models.Treasurer, error) {
+func (c *Client) GetTreasurer() (*models.Treasurer, error) {
 	req := api.APIrequest{Method: "getTreasurer"}
-	resp, err := c.Request(req, signer)
+	resp, err := c.Request(req, nil)
 	treasurer := &models.Treasurer{}
 	if err != nil {
 		return nil, err
@@ -1335,9 +1335,9 @@ func (c *Client) GetTreasurer(signer *ethereum.SignKeys) (*models.Treasurer, err
 }
 
 // GetTreasurer returns information about the treasurer
-func (c *Client) GetTransactionCost(signer *ethereum.SignKeys, txType models.TxType) (uint64, error) {
+func (c *Client) GetTransactionCost(txType models.TxType) (uint64, error) {
 	req := api.APIrequest{Method: "getTxCost", Type: vochain.TxTypeToCostName(txType)}
-	resp, err := c.Request(req, signer)
+	resp, err := c.Request(req, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -1401,9 +1401,9 @@ func (c *Client) CreateOrSetAccount(signer *ethereum.SignKeys, to common.Address
 }
 
 // GetAccount returns information of a given account
-func (c *Client) GetAccount(signer *ethereum.SignKeys, accountAddr common.Address) (*vochain.Account, error) {
+func (c *Client) GetAccount(accountAddr common.Address) (*vochain.Account, error) {
 	req := api.APIrequest{Method: "getAccount", EntityId: accountAddr.Bytes()}
-	resp, err := c.Request(req, signer)
+	resp, err := c.Request(req, nil)
 	acc := &vochain.Account{}
 	if err != nil {
 		return nil, err
