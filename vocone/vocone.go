@@ -55,7 +55,10 @@ type Vocone struct {
 	lastBlockTime   time.Time
 	blockTimeTarget time.Duration
 	txsPerBlock     int
-	vcMtx           sync.Mutex
+	// vcMtx is a lock on modification to the app state.
+	// this enables direct calls to vochain functions from the vocone
+	//  without causing race conditions
+	vcMtx sync.Mutex
 }
 
 // NewVocone returns a ready Vocone instance.
@@ -198,9 +201,9 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 	}
 	if !oracleExist {
 		log.Warnf("adding new oracle key %s", oracleKey.Address())
-		vc.app.State.AddOracle(oracleKey.Address())
 		vc.vcMtx.Lock()
 		defer vc.vcMtx.Unlock()
+		vc.app.State.AddOracle(oracleKey.Address())
 		if _, err := vc.app.State.Save(); err != nil {
 			return err
 		}
@@ -209,11 +212,11 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 }
 
 func (vc *Vocone) CreateAccount(key common.Address, acc *vochain.Account) error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
 	if err := vc.app.State.SetAccount(key, acc); err != nil {
 		return err
 	}
-	vc.vcMtx.Lock()
-	defer vc.vcMtx.Unlock()
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
 	}
@@ -222,11 +225,11 @@ func (vc *Vocone) CreateAccount(key common.Address, acc *vochain.Account) error 
 
 // SetTreasurer configures the vocone treasurer account address
 func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
 	if err := vc.app.State.SetTreasurer(treasurer, 0); err != nil {
 		return err
 	}
-	vc.vcMtx.Lock()
-	defer vc.vcMtx.Unlock()
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
 	}
@@ -235,14 +238,14 @@ func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
 
 // MintTokens mints tokens to the given account address
 func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
 	if err := vc.app.State.MintBalance(to, amount); err != nil {
 		return err
 	}
 	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
-	vc.vcMtx.Lock()
-	defer vc.vcMtx.Unlock()
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
 	}
@@ -251,14 +254,14 @@ func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
 
 // SetTxCost configures the transaction cost for the given tx type
 func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
 	if err := vc.app.State.SetTxCost(txType, cost); err != nil {
 		return err
 	}
 	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
-	vc.vcMtx.Lock()
-	defer vc.vcMtx.Unlock()
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
 	}
@@ -267,6 +270,8 @@ func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 
 // SetBulkTxCosts configures the transaction cost for all transaction types that have a cost
 func (vc *Vocone) SetBulkTxCosts(txCosts uint64) error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
 	for k := range vochain.TxTypeCostToStateKey {
 		log.Debugf("setting tx cost for txtype %s", models.TxType_name[int32(k)])
 		if err := vc.app.State.SetTxCost(k, txCosts); err != nil {
@@ -276,8 +281,6 @@ func (vc *Vocone) SetBulkTxCosts(txCosts uint64) error {
 	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
-	vc.vcMtx.Lock()
-	defer vc.vcMtx.Unlock()
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
 	}
