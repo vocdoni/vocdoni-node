@@ -119,10 +119,11 @@ func (r *RPCAPI) getTx(request *api.APIrequest) (*api.APIresponse, error) {
 	}
 	response.Tx = &indexertypes.TxPackage{
 		Tx:        tx.Tx,
-		Index:     request.TxIndex,
+		Index:     new(int32),
 		Hash:      hash,
 		Signature: tx.Signature,
 	}
+	*response.Tx.Index = request.TxIndex
 	return &response, nil
 }
 
@@ -139,11 +140,12 @@ func (r *RPCAPI) getTxById(request *api.APIrequest) (*api.APIresponse, error) {
 	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
 		ID:          uint32(txRef.Index),
-		Index:       txRef.TxBlockIndex,
+		Index:       new(int32),
 		BlockHeight: txRef.BlockHeight,
 		Hash:        hash,
 		Signature:   tx.Signature,
 	}
+	*response.Tx.Index = txRef.TxBlockIndex
 	return &response, nil
 }
 
@@ -160,11 +162,12 @@ func (r *RPCAPI) getTxByHash(request *api.APIrequest) (*api.APIresponse, error) 
 	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
 		ID:          uint32(txRef.Index),
-		Index:       txRef.TxBlockIndex,
+		Index:       new(int32),
 		BlockHeight: txRef.BlockHeight,
 		Hash:        request.Hash,
 		Signature:   tx.Signature,
 	}
+	*response.Tx.Index = txRef.TxBlockIndex
 	return &response, nil
 }
 

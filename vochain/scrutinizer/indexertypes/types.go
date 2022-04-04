@@ -190,7 +190,7 @@ type TxPackage struct {
 	Tx          []byte         `json:"tx"`
 	ID          uint32         `json:"id,omitempty"`
 	BlockHeight uint32         `json:"block_height,omitempty"`
-	Index       int32          `json:"index,omitempty"`
+	Index       *int32         `json:"index,omitempty"`
 	Hash        types.HexBytes `json:"hash"`
 	Signature   types.HexBytes `json:"signature"`
 }
