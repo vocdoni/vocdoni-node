@@ -116,6 +116,7 @@ mkdir -p $results
 for test in ${tests_to_run[@]}; do
 	echo "### Running test $test ###"
 	( $test | tee $results/$test.log ; echo ${PIPESTATUS[0]} > $results/$test ) &
+	sleep 2 # don't start all tests at the same time
 done
 
 echo "### Waiting for tests to finish ###"
