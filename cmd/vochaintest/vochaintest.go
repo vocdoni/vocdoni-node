@@ -923,7 +923,7 @@ func cspVoteTest(
 
 	// Create process
 	pid := client.Random(32)
-	log.Infof("creating process with entityID: %s", entityKey.AddressString())
+	log.Infof("creating process %s with entityID: %s (oracle %s)", pid, entityKey.AddressString(), oracleKey.AddressString())
 	start, err := mainClient.CreateProcess(
 		oracleKey,
 		entityKey.Address().Bytes(),
