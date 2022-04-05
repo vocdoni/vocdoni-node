@@ -530,7 +530,7 @@ func (c *Client) TestPreRegisterKeys(
 		proc, err := c.GetProcessInfo(pid)
 		if err != nil {
 			log.Infof("Process not yet available: %v", err)
-			time.Sleep(5 * time.Second)
+			c.WaitNBlocks(1)
 			continue
 		}
 		log.Infof("Process: %+v\n", proc)
@@ -670,7 +670,7 @@ func (c *Client) TestPreRegisterKeys(
 		}
 	}
 
-	tries := 10
+	tries := 5
 	log.Infof("checking first pre-registered key")
 	for ; tries >= 0; tries-- {
 		weight, err := c.GetRollingCensusVoterWeight(pid, signers[0].Address())
@@ -680,8 +680,7 @@ func (c *Client) TestPreRegisterKeys(
 		if weight.String() == registerKeyWeight {
 			break
 		}
-		// TODO: replace this time.Sleep() which many times is not enough with waitOneBlock()
-		time.Sleep(1 * time.Second)
+		c.WaitNBlocks(1)
 	}
 	if tries == 0 {
 		return 0, fmt.Errorf("could not get pre-register key")
@@ -1135,8 +1134,8 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 		return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	if startBlockIncrement == 0 {
-		for i := 0; i < 10; i++ {
-			time.Sleep(2 * time.Second)
+		for i := 0; i < 5; i++ {
+			c.WaitNBlocks(1)
 			p, err := c.GetProcessInfo(pid)
 			if err == nil && p != nil {
 				return p.StartBlock, nil

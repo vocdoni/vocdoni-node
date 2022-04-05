@@ -34,6 +34,20 @@ func (c *Client) WaitUntilBlock(block uint32) {
 	}
 }
 
+// WaitNBlocks checks current height and waits until height+n block appears
+func (c *Client) WaitNBlocks(n uint32) {
+	for {
+		cb, err := c.GetCurrentBlock()
+		if err != nil {
+			log.Error(err)
+			time.Sleep(time.Second)
+			continue
+		}
+		c.WaitUntilBlock(cb + n)
+		break
+	}
+}
+
 func CreateEthRandomKeysBatch(n int) []*ethereum.SignKeys {
 	s := make([]*ethereum.SignKeys, n)
 	for i := 0; i < n; i++ {
