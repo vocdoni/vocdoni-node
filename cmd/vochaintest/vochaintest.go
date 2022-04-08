@@ -11,7 +11,6 @@ import (
 	"os"
 	"path"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1741,40 +1740,21 @@ func testVocli(url, treasurerPrivKey string) {
 	}()
 	func() {
 		log.Info("vocli txcost get * , set AddDelegate,CollectFaucet... 1-2-3-4-5-6...")
-
-		// get Treasurer's nonce so we can send many txs at once
-		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"account", "treasurer", aliceKeyPath}, stdArgs...), "", true)
-		if err != nil {
-			log.Fatal(err)
-		}
-		// parse stdout to find the line with "nonce 1"
-		r := regexp.MustCompile("nonce [0-9]*")
-		nonceLine := r.FindString(stdout)
-		if nonceLine == "" {
-			log.Fatal("supposed to find a line with 'nonce' in stdout but got this: %s", stdout)
-		}
-		nonce, err := strconv.ParseUint(strings.Split(nonceLine, " ")[1], 10, 64)
-		if err != nil {
-			log.Fatalf("could not parse nonce from nonceLine: %s", nonceLine)
-		}
-
-		// finally we can get the initial txcosts. this is not used by the test,
-		// just for the human to read
+		// get the initial txcosts. this is not used by the test, just for the
+		// human to read
 		if _, _, _, err := executeCommand(vocli.RootCmd, append([]string{"txcost", "get", aliceKeyPath}, stdArgs...), "", true); err != nil {
 			log.Fatal(err)
 		}
 
 		var txTypeExpectedCosts = make(map[string]string)
 		for idx, txType := range []string{"AddDelegateForAccount", "CollectFaucet", "DelDelegateForAccount", "NewProcess", "RegisterKey", "SendTokens", "SetAccountInfo", "SetProcessCensus", "SetProcessQuestionIndex", "SetProcessResults", "SetProcessStatus"} {
-			_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "set", aliceKeyPath, txType, fmt.Sprintf("%d", idx+1), "--nonce", fmt.Sprintf("%v", nonce)}, stdArgs...), "", true)
+			_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "set", aliceKeyPath, txType, fmt.Sprintf("%d", idx+1)}, stdArgs...), "", true)
 			if err != nil {
 				log.Fatal(err)
 			}
-			nonce++
 
-			// even though we're manually incrementing the nonce, if the node
-			// still thinks nonce=5 it will reject a tx with nonce=6. So wait
-			// for it to catch up
+			// wait a bit for the tx to be mined and the node to increment the
+			// account's nonce
 			time.Sleep(blockPeriod * 2)
 
 			// record the expected txtype costs to verify later
