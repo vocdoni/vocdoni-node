@@ -343,12 +343,14 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 	height := app.State.CurrentHeight()
 	endBlock := process.StartBlock + process.BlockCount
 
-	if height < process.StartBlock || height > endBlock {
-		return nil, fmt.Errorf("process %x not started or finished", ve.ProcessId)
+	if height < process.StartBlock {
+		return nil, fmt.Errorf("process %x starts at height %d, current height is %d", ve.ProcessId, process.StartBlock, height)
+	} else if height > endBlock {
+		return nil, fmt.Errorf("process %x finished at height %d, current height is %d", ve.ProcessId, endBlock, height)
 	}
 
 	if process.Status != models.ProcessStatus_READY {
-		return nil, fmt.Errorf("process %x not in READY state", ve.ProcessId)
+		return nil, fmt.Errorf("process %x not in READY state - current state: %s", ve.ProcessId, process.Status.String())
 	}
 
 	// Check in case of keys required, they have been sent by some keykeeper
@@ -827,7 +829,7 @@ func SetTransactionCostsTxCheck(vtx *models.Tx, txBytes, signature []byte, state
 	}
 	// check signature recovered address
 	if common.BytesToAddress(treasurer.Address) != sigAddress {
-		return 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", treasurer.String(), sigAddress.String())
+		return 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", common.BytesToAddress(treasurer.Address), sigAddress.String())
 	}
 	return tx.Value, nil
 }

@@ -3,10 +3,12 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -174,18 +176,36 @@ func BenchmarkVochain(b *testing.B) {
 	}
 
 	// check if process is created
-	log.Infof("check if process was created")
+	log.Infof("check if process %s was created", hexProcessID)
 	reset(req)
 	req.ProcessID = processID
 	failures := 20
 	for {
 		resp = doRequest("getProcessInfo", nil)
 		if resp.Ok {
+			log.Infof("process %s successfully created", hexProcessID)
 			break
 		}
 		failures--
 		if failures == 0 {
-			b.Fatalf("processID does not exist in the blockchain")
+			b.Fatalf("processID %s does not exist in the blockchain", hexProcessID)
+		}
+		time.Sleep(time.Second)
+	}
+	log.Info("waiting for the process to start")
+	for {
+		procInfo := doRequest("getProcessInfo", nil)
+		if procInfo.Ok {
+			if procInfo.Process.Status == int32(models.ProcessStatus_READY) {
+				height := doRequest("getBlockHeight", nil)
+				if *height.Height >= procInfo.Process.StartBlock {
+					break
+				}
+			}
+		}
+		failures--
+		if failures == 0 {
+			b.Fatalf("processID %s should be started by now", hexProcessID)
 		}
 		time.Sleep(time.Second)
 	}
@@ -203,6 +223,7 @@ func BenchmarkVochain(b *testing.B) {
 		for pb.Next() {
 			voteBench(b,
 				cl,
+				dvoteServer.VochainAPP.ChainID(),
 				keySet[atomic.AddInt32(&count, 1)],
 				censusRoot,
 				processID)
@@ -210,7 +231,7 @@ func BenchmarkVochain(b *testing.B) {
 	})
 }
 
-func voteBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys,
+func voteBench(b *testing.B, cl *client.Client, chainID string, s *ethereum.SignKeys,
 	censusRoot, processID []byte) {
 	// API requests
 	req := &api.APIrequest{}
@@ -225,10 +246,11 @@ func voteBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys,
 
 	pub, _ := s.HexString()
 	// generate envelope proof
-	log.Infof("generating proof for key %s", pub)
+	log.Infof("generating proof that address %s with public key %s is in the census", s.AddressString(), pub)
 	req.CensusID = fmt.Sprintf("%x", censusRoot)
 	req.CensusKey = s.PublicKey()
 	req.Digested = false
+	req.CensusType = models.Census_ARBO_BLAKE2B
 	resp := doRequest("genProof", nil)
 	if len(resp.Siblings) == 0 {
 		b.Fatalf("proof not generated while it should be generated correctly: %v", resp.Message)
@@ -248,8 +270,10 @@ func voteBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys,
 		Nonce:     util.RandomBytes(32),
 		ProcessId: processID,
 		Proof: &models.Proof{
-			Payload: &models.Proof_Graviton{
-				Graviton: &models.ProofGraviton{
+			Payload: &models.Proof_Arbo{
+				Arbo: &models.ProofArbo{
+					Type:     models.ProofArbo_BLAKE2B,
+					Value:    arbo.BigIntToBytes(32, big.NewInt(1)),
 					Siblings: resp.Siblings,
 				},
 			},
@@ -262,7 +286,7 @@ func voteBench(b *testing.B, cl *client.Client, s *ethereum.SignKeys,
 	if err != nil {
 		b.Fatal(err)
 	}
-	stx.Signature, err = s.SignVocdoniTx(stx.Tx, "")
+	stx.Signature, err = s.SignVocdoniTx(stx.Tx, chainID)
 	if err != nil {
 		b.Fatal(err)
 	}
