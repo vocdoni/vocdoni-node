@@ -15,136 +15,172 @@ type VochainGenesis struct {
 	Genesis           string
 }
 
+// GenesisAvailableChains returns the list of hardcoded chains
+func GenesisAvailableChains() []string {
+	chains := []string{}
+	for k := range Genesis {
+		chains = append(chains, k)
+	}
+	return chains
+}
+
 // Genesis is a map containing the defaut Genesis details
 var Genesis = map[string]VochainGenesis{
 
-	// Production Network
-	"main": {
+	// Azeno production Network
+	"azeno": {
 		AutoUpdateGenesis: false,
-		SeedNodes:         []string{"121e65eb5994874d9c05cd8d584a54669d23f294@seed.vocdoni.net:26656"},
+		SeedNodes:         []string{"1612de9353b4bd5891981c69f554e56e07733870@seed.azeno.vocdoni.net:26656"},
+		CircuitsConfig: []artifacts.CircuitConfig{
+			{ // index: 0, size: 1024
+				URI: "https://raw.githubusercontent.com/vocdoni/" +
+					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
+				CircuitPath: "zkcensusproof/dev/1024",
+				Parameters:  []int64{1024},
+				LocalDir:    "zkCircuits",
+				ZKeyHash:    hexToBytes("0x1cd0c9225210700d4d6307493bbe5f98554e29339daba6d9bd08a4e0e78df443"),
+				WitnessHash: hexToBytes("0x61b40e11ece8de3fbfaf27dbd984e0e0b1fa05ee72d4faa0c2be06c1d7a9b845"),
+				VKHash:      hexToBytes("0xaed892ff98ab37b877cfcb678cb5f48f1be9d09dbbaf74b5877f46b54d10f9ad"),
+			},
+			{ // index: 1, size: 65k
+				URI: "https://raw.githubusercontent.com/vocdoni/" +
+					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
+				CircuitPath: "zkcensusproof/dev/65536",
+				Parameters:  []int64{65536},
+				LocalDir:    "zkCircuits",
+				ZKeyHash:    hexToBytes("0xb7fb6f74ecf56e41de103e679c76c45a1bde99e2203b2ab6928396020f4d4ab6"),
+				WitnessHash: hexToBytes("0x1d975d68220d1f10bd54e2f53ea9526ce8f916efb15a2079edc3db9403a78278"),
+				VKHash:      hexToBytes("0x50029154e81a2078eff83751454bb3ece2cf9391103cc17306d47f7d4461b0b6"),
+			},
+		},
 		Genesis: `
-   {
-      "genesis_time":"2021-05-12T12:38:33.672114557Z",
-      "chain_id":"vocdoni-release-1.0.1",
-      "consensus_params":{
-         "block":{
-            "max_bytes":"10485760",
-            "max_gas":"-1",
-            "time_iota_ms":"10000"
-         },
-         "evidence":{
-            "max_age_num_blocks":"100000",
-            "max_age_duration":"10000"
-         },
-         "validator":{
-            "pub_key_types":[
+      {
+         "genesis_time": "2022-05-02T17:00:33.672114557Z",
+         "chain_id": "azeno",
+         "consensus_params": {
+           "block": {
+             "max_bytes": "5242880",
+             "max_gas": "-1",
+             "time_iota_ms": "10000"
+           },
+           "evidence": {
+             "max_age_num_blocks": "100000",
+             "max_age_duration": "10000"
+           },
+           "validator": {
+             "pub_key_types": [
                "ed25519"
-            ]
-         }
-      },
-      "validators":[
-         {
-            "address":"6DB4FEE1D370907B31196B493714FC0F45C62DED",
-            "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
-               "value":"R7U+HxyTrvlXccEm1sc80ww83Fpp4xg247nmpjmkYTc="
-            },
-            "power":"10",
-            "name":"miner1"
+             ]
+           }
          },
-         {
-            "address":"71AA2FEFA96447BC5AEF9FD928F3F8ED57E695CF",
-            "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
-               "value":"ixI91P+MP1jiVIy1JwQqwRdZIZxsVI0WrytAzohMGCk="
-            },
-            "power":"10",
-            "name":"miner2"
-         },
-         {
-            "address":"AA9CC01B46BDD1AC9E2197BB9B84993CCDF880B2",
-            "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
-               "value":"H6oEMFrNFeQemr9Kgxjq/wVk1kZQ1VE/J1wVnVJ+K9I="
-            },
-            "power":"10",
-            "name":"miner3"
-         },
-         {
-            "address":"314D17BBE991FBD3D234E5C62CFD5D0717123C95",
-            "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
-               "value":"FLEg/pgdF4dZ060mved/z99p/EJePu9kSsyLnrsRNC0="
-            },
-            "power":"10",
-            "name":"miner4"
-         },
-         {
-            "address":"34B048A4A720E6B3918CF8B75CF12555080465E5",
-            "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
-               "value":"aF/+WaNs5tknRMRpTPO49TJZLmDctO+JH8uckE5fTNU="
-            },
-            "power":"10",
-            "name":"miner5"
-         }
-      ],
-      "app_hash":"",
-      "app_state":{
-         "validators":[
-            {
-               "address":"6DB4FEE1D370907B31196B493714FC0F45C62DED",
-               "pub_key":{
-                  "type":"tendermint/PubKeyEd25519",
-                  "value":"R7U+HxyTrvlXccEm1sc80ww83Fpp4xg247nmpjmkYTc="
-               },
-               "power":"10",
-               "name":"miner1"
-            },
-            {
-               "address":"71AA2FEFA96447BC5AEF9FD928F3F8ED57E695CF",
-               "pub_key":{
-                  "type":"tendermint/PubKeyEd25519",
-                  "value":"ixI91P+MP1jiVIy1JwQqwRdZIZxsVI0WrytAzohMGCk="
-               },
-               "power":"10",
-               "name":"miner2"
-            },
-            {
-               "address":"AA9CC01B46BDD1AC9E2197BB9B84993CCDF880B2",
-               "pub_key":{
-                  "type":"tendermint/PubKeyEd25519",
-                  "value":"H6oEMFrNFeQemr9Kgxjq/wVk1kZQ1VE/J1wVnVJ+K9I="
-               },
-               "power":"10",
-               "name":"miner3"
-            },
-            {
-               "address":"314D17BBE991FBD3D234E5C62CFD5D0717123C95",
-               "pub_key":{
-                  "type":"tendermint/PubKeyEd25519",
-                  "value":"FLEg/pgdF4dZ060mved/z99p/EJePu9kSsyLnrsRNC0="
-               },
-               "power":"10",
-               "name":"miner4"
-            },
-            {
-               "address":"34B048A4A720E6B3918CF8B75CF12555080465E5",
-               "pub_key":{
-                  "type":"tendermint/PubKeyEd25519",
-                  "value":"aF/+WaNs5tknRMRpTPO49TJZLmDctO+JH8uckE5fTNU="
-               },
-               "power":"10",
-               "name":"miner5"
-            }
+         "validators": [
+           {
+             "address": "24B62525552021A3E1970D933B4DB3E8B7927B8E",
+             "pub_key": {
+               "type": "tendermint/PubKeyEd25519",
+               "value": "HZVyxtbiSAMTWFweTBVEUHh23bzJjr68iFUW5+P5MQc="
+             },
+             "power": "10",
+             "name": "miner1"
+           },
+           {
+             "address": "211D1922E2E5DCB6EEC60D69AA96F06BFCCFC85C",
+             "pub_key": {
+               "type": "tendermint/PubKeyEd25519",
+               "value": "0KOkL5fhisXw4IUy8zv+s+FjMbk8gDnkWbCMgbbhL98="
+             },
+             "power": "10",
+             "name": "miner2"
+           },
+           {
+             "address": "EEE718BF22A3274753822E6A159258D9460A8FA1",
+             "pub_key": {
+               "type": "tendermint/PubKeyEd25519",
+               "value": "0u+bXcCPBO+eTCWiildX5c4HM7cYJ9SbkU5ylzxPMDg="
+             },
+             "power": "10",
+             "name": "miner3"
+           },
+           {
+             "address": "12D60983CA24ACB37F14693671A2A81FD34FF7F2",
+             "pub_key": {
+               "type": "tendermint/PubKeyEd25519",
+               "value": "wI/kn3XyPEQiiIVOjH9Ll3vUZyZK0zBY3Kho5qlx/nA="
+             },
+             "power": "10",
+             "name": "miner4"
+           }
          ],
-         "oracles":[
-            "0xc2e396d6e6ae9b12551f0c6111f9766bec926bfe",
-            "0x1a361c26e04a33effbf3bd8617b1e3e0aa6b704f"
-         ]
-      }
-   }
- `,
+         "app_hash": "",
+         "app_state": {
+           "validators": [
+             {
+               "address": "24B62525552021A3E1970D933B4DB3E8B7927B8E",
+               "pub_key": {
+                 "type": "tendermint/PubKeyEd25519",
+                 "value": "HZVyxtbiSAMTWFweTBVEUHh23bzJjr68iFUW5+P5MQc="
+               },
+               "power": "10",
+               "name": "miner1"
+             },
+             {
+               "address": "211D1922E2E5DCB6EEC60D69AA96F06BFCCFC85C",
+               "pub_key": {
+                 "type": "tendermint/PubKeyEd25519",
+                 "value": "0KOkL5fhisXw4IUy8zv+s+FjMbk8gDnkWbCMgbbhL98="
+               },
+               "power": "10",
+               "name": "miner2"
+             },
+             {
+               "address": "EEE718BF22A3274753822E6A159258D9460A8FA1",
+               "pub_key": {
+                 "type": "tendermint/PubKeyEd25519",
+                 "value": "0u+bXcCPBO+eTCWiildX5c4HM7cYJ9SbkU5ylzxPMDg="
+               },
+               "power": "10",
+               "name": "miner3"
+             },
+             {
+               "address": "12D60983CA24ACB37F14693671A2A81FD34FF7F2",
+               "pub_key": {
+                 "type": "tendermint/PubKeyEd25519",
+                 "value": "wI/kn3XyPEQiiIVOjH9Ll3vUZyZK0zBY3Kho5qlx/nA="
+               },
+               "power": "10",
+               "name": "miner4"
+             }
+           ],
+           "oracles": [
+             "0xe0c941dd44ff4c43fc4683088b846ddb3234d169",
+             "0x2c5066b71521dd5f2875cc2af226c2365b0dc7e8"
+           ],
+           "accounts": [
+             {
+               "address": "0xe0c941dd44ff4c43fc4683088b846ddb3234d169",
+               "balance": 10000
+             },
+             {
+               "address": "0x2c5066b71521dd5f2875cc2af226c2365b0dc7e8",
+               "balance": 10000
+             }
+           ],
+           "treasurer": "0x83832aa14c2d6a7fce927573b7a5607224f1e541",
+           "tx_cost": {
+             "Tx_SetProcessStatus": 1,
+             "Tx_SetProcessCensus": 1,
+             "Tx_SetProcessResults": 1,
+             "Tx_SetProcessQuestionIndex": 1,
+             "Tx_RegisterKey": 1,
+             "Tx_NewProcess": 10,
+             "Tx_SendTokens": 1,
+             "Tx_SetAccountInfo": 5,
+             "Tx_AddDelegateForAccount": 5,
+             "Tx_DelDelegateForAccount": 5,
+             "Tx_CollectFaucet": 0
+           }
+         }
+      }`,
 	},
 
 	// Development network
