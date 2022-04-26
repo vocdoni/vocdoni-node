@@ -17,6 +17,9 @@ func TestAddOracle(t *testing.T) {
 	if err := oracle.Generate(); err != nil {
 		t.Fatal(err)
 	}
+	if err := app.State.SetTreasurer(common.HexToAddress(oracle.AddressString()), 0); err != nil {
+		t.Fatal(err)
+	}
 	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +92,9 @@ func TestRemoveOracle(t *testing.T) {
 	if err := oracle.Generate(); err != nil {
 		t.Fatal(err)
 	}
-
+	if err := app.State.SetTreasurer(common.HexToAddress(oracle.AddressString()), 0); err != nil {
+		t.Fatal(err)
+	}
 	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
 		t.Fatal(err)
 	}

@@ -572,19 +572,25 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 	if signature == nil || tx == nil || txBytes == nil {
 		return fmt.Errorf("missing signature and/or admin transaction")
 	}
-	// get oracles
-	oracles, err := state.Oracles(false)
-	if err != nil || len(oracles) == 0 {
-		return fmt.Errorf("cannot check authorization against a nil or empty oracle list")
+	// get treasurer
+	treasurer, err := state.Treasurer(false)
+	if err != nil {
+		return fmt.Errorf("cannot check authorization")
 	}
 
-	if authorized, addr, err := verifySignatureAgainstOracles(
-		oracles, txBytes, signature); err != nil {
-		return err
-	} else if !authorized {
-		return fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
+	if err != nil {
+		return fmt.Errorf("cannot extract public key from signature: %w", err)
 	}
-
+	addr, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	log.Debugf("checking admin signed tx %+v by addr %s", tx, addr.String())
+	log.Debugf("got treasurer addr %s", common.BytesToAddress(treasurer.Address).String())
+	if !bytes.Equal(addr.Bytes(), treasurer.Address) {
+		return fmt.Errorf("signature extracted address does not match with treasurer address")
+	}
 	switch tx.Txtype {
 	case models.TxType_ADD_PROCESS_KEYS, models.TxType_REVEAL_PROCESS_KEYS:
 		if tx.ProcessId == nil {
@@ -652,6 +658,10 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 			(bytes.Equal(tx.Address, common.Address{}.Bytes())) {
 			return fmt.Errorf("invalid oracle address: %x", tx.Address)
 		}
+		oracles, err := state.Oracles(false)
+		if err != nil {
+			return fmt.Errorf("cannot get oracles")
+		}
 		for idx, oracle := range oracles {
 			if oracle == common.BytesToAddress(tx.Address) {
 				return fmt.Errorf("oracle already added to oracle list at position %d", idx)
@@ -663,6 +673,10 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 			(len(tx.Address) != types.EthereumAddressSize) ||
 			(bytes.Equal(tx.Address, common.Address{}.Bytes())) {
 			return fmt.Errorf("invalid oracle address: %x", tx.Address)
+		}
+		oracles, err := state.Oracles(false)
+		if err != nil {
+			return fmt.Errorf("cannot get oracles")
 		}
 		var found bool
 		for _, oracle := range oracles {
