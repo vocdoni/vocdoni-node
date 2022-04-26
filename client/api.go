@@ -544,7 +544,7 @@ func (c *Client) TestPreRegisterKeys(
 
 	// Send votes
 	log.Infof("sending pre-register keys")
-	timeDeadLine := time.Second * 200
+	timeDeadLine := time.Second * 400
 	if len(signers) > 1000 {
 		timeDeadLine = time.Duration(len(signers)/5) * time.Second
 	}
@@ -556,7 +556,7 @@ func (c *Client) TestPreRegisterKeys(
 		s := signers[i]
 		zkCensusKey, _ := testGetZKCensusKey(s)
 		v := &models.RegisterKeyTx{
-			Nonce:     0, // TODO: @jordipainan change register key for account based tx
+			Nonce:     uint32(util.RandomInt(0, 1000000)), // TODO: @jordipainan change register key for account based tx
 			ProcessId: pid,
 			NewKey:    zkCensusKey,
 			Weight:    registerKeyWeight,
@@ -680,7 +680,7 @@ func (c *Client) TestPreRegisterKeys(
 		if weight.String() == registerKeyWeight {
 			break
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(4 * time.Second)
 	}
 	if tries == 0 {
 		return 0, fmt.Errorf("could not get pre-register key")
@@ -746,7 +746,7 @@ func (c *Client) TestSendVotes(
 	}
 	// Send votes
 	log.Infof("sending votes")
-	timeDeadLine := time.Second * 200
+	timeDeadLine := time.Second * 400
 	if len(signers) > 1000 {
 		timeDeadLine = time.Duration(len(signers)/5) * time.Second
 	}
@@ -921,7 +921,7 @@ func (c *Client) TestSendAnonVotes(
 
 	// Send votes
 	log.Infof("sending votes")
-	timeDeadLine := time.Second * 200
+	timeDeadLine := time.Second * 400
 	if len(signers) > 1000 {
 		timeDeadLine = time.Duration(len(signers)/5) * time.Second
 	}

@@ -600,7 +600,7 @@ func mkTreeVoteTest(host string,
 	wg.Wait()
 
 	log.Infof("waiting for all votes to be validated...")
-	timeDeadLine := time.Second * 200
+	timeDeadLine := time.Second * 400
 	if electionSize > 1000 {
 		timeDeadLine = time.Duration(electionSize/5) * time.Second
 	}
@@ -712,7 +712,7 @@ func mkTreeAnonVoteTest(host string,
 		&models.EnvelopeType{Anonymous: true},
 		&models.ProcessMode{AutoStart: true, Interruptible: true, PreRegister: true},
 		models.CensusOrigin_OFF_CHAIN_TREE,
-		3,
+		7,
 		procDuration,
 		uint64(electionSize),
 		5,
@@ -895,7 +895,7 @@ func mkTreeAnonVoteTest(host string,
 	wg.Wait()
 
 	log.Infof("waiting for all votes to be validated...")
-	timeDeadLine := time.Second * 200
+	timeDeadLine := time.Second * 400
 	if electionSize > 1000 {
 		timeDeadLine = time.Duration(electionSize/5) * time.Second
 	}
