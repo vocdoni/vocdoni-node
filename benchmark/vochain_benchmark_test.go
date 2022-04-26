@@ -147,7 +147,7 @@ func BenchmarkVochain(b *testing.B) {
 	}
 	process := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
-		Nonce:   util.RandomBytes(32),
+		Nonce:   0,
 		Process: processData,
 	}
 
