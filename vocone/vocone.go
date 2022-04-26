@@ -90,6 +90,22 @@ func NewVocone(dataDir string, oracleKey *ethereum.SignKeys) (*Vocone, error) {
 		return nil, err
 	}
 
+	oracleAcc := &vochain.Account{}
+	oracleAcc.Balance = 10000
+	if err := vc.app.State.SetAccount(oracleKey.Address(), oracleAcc); err != nil {
+		return nil, err
+	}
+	// set tx cost
+	if err := vc.app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
+		return nil, err
+	}
+	if err := vc.app.State.SetTxCost(models.TxType_SET_PROCESS_RESULTS, 10); err != nil {
+		return nil, err
+	}
+	if err := vc.app.State.SetTxCost(models.TxType_SET_PROCESS_STATUS, 10); err != nil {
+		return nil, err
+	}
+
 	// Create burn account
 	if err := vc.CreateAccount(vochain.BurnAddress, &vochain.Account{}); err != nil {
 		return nil, err
