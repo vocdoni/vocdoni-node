@@ -611,7 +611,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 			}
 			// endblock is always greater than start block so that case is also included here
 			if height > process.StartBlock {
-				return fmt.Errorf("cannot add process keys to a process that has started or finished")
+				return fmt.Errorf("cannot add process keys to a process that has started or finished status (%s)", process.Status.String())
 			}
 			// process is not canceled
 			if process.Status == models.ProcessStatus_CANCELED ||

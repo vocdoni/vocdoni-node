@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -53,25 +52,26 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 		return nil, err
 	}
 	log.Debugf("ProcessInfo badgerhold took %s", time.Since(bhStartTime))
+	/*
+		sqlStartTime := time.Now()
 
-	sqlStartTime := time.Now()
+		queries, ctx, cancel := s.timeoutQueries()
+		defer cancel()
+		sqlProcInner, err := queries.GetProcess(ctx, pid)
+		if err != nil {
+			return nil, err
+		}
+		log.Debugf("ProcessInfo sqlite took %s", time.Since(sqlStartTime))
+		sqlProc := indexertypes.ProcessFromDB(&sqlProcInner)
 
-	queries, ctx, cancel := s.timeoutQueries()
-	defer cancel()
-	sqlProcInner, err := queries.GetProcess(ctx, pid)
-	if err != nil {
-		return nil, err
-	}
-	log.Debugf("ProcessInfo sqlite took %s", time.Since(sqlStartTime))
-	sqlProc := indexertypes.ProcessFromDB(&sqlProcInner)
-	if diff := cmp.Diff(proc, sqlProc, cmpopts.IgnoreUnexported(
-		models.EnvelopeType{},
-		models.ProcessMode{},
-		models.ProcessVoteOptions{},
-	)); diff != "" {
-		sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", pid, diff)
-	}
-
+		if diff := cmp.Diff(proc, sqlProc, cmpopts.IgnoreUnexported(
+			models.EnvelopeType{},
+			models.ProcessMode{},
+			models.ProcessVoteOptions{},
+		)); diff != "" {
+			sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", pid, diff)
+		}
+	*/
 	return proc, nil
 }
 

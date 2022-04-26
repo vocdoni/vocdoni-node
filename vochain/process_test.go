@@ -18,14 +18,28 @@ const ipfsUrl = "ipfs://123456789"
 
 func TestProcessSetStatusTransition(t *testing.T) {
 	app := TestBaseApplication(t)
+	// create burn account
+	if err := app.State.SetAccount(BurnAddress, &Account{}); err != nil {
+		t.Fatal(err)
+	}
+	// create oracle
 	oracle := ethereum.SignKeys{}
 	if err := oracle.Generate(); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
+	if err := app.State.AddOracle(oracle.Address()); err != nil {
 		t.Fatal(err)
 	}
-
+	oracleAcc := &Account{}
+	oracleAcc.Balance = 10000
+	if err := app.State.SetAccount(oracle.Address(), oracleAcc); err != nil {
+		t.Fatal(err)
+	}
+	// set tx cost
+	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_STATUS, 10); err != nil {
+		t.Fatal(err)
+	}
+	app.Commit()
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
@@ -176,9 +190,16 @@ func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 	var stx models.SignedTx
 	var err error
 
+	oracleAcc, err := app.State.GetAccount(oracle.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oracleAcc == nil {
+		t.Fatal(ErrAccountNotExist)
+	}
 	tx := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_STATUS,
-		Nonce:     util.RandomBytes(32),
+		Nonce:     oracleAcc.Nonce,
 		ProcessId: pid,
 		Status:    status,
 	}
@@ -212,6 +233,11 @@ func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 func TestProcessSetResultsTransition(t *testing.T) {
 	var oracle, oracle2 ethereum.SignKeys
 	app := TestBaseApplication(t)
+	// create burn account
+	if err := app.State.SetAccount(BurnAddress, &Account{}); err != nil {
+		t.Fatal(err)
+	}
+	// create oracles
 	if err := oracle.Generate(); err != nil {
 		t.Fatal(err)
 	}
@@ -224,6 +250,22 @@ func TestProcessSetResultsTransition(t *testing.T) {
 	if err := app.State.AddOracle(common.HexToAddress(oracle2.AddressString())); err != nil {
 		t.Fatal(err)
 	}
+	oracleAcc := &Account{}
+	oracleAcc.Balance = 10000
+	if err := app.State.SetAccount(oracle.Address(), oracleAcc); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.SetAccount(oracle2.Address(), oracleAcc); err != nil {
+		t.Fatal(err)
+	}
+	// set tx cost
+	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_STATUS, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_RESULTS, 10); err != nil {
+		t.Fatal(err)
+	}
+	app.Commit()
 
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
@@ -324,9 +366,16 @@ func testSetProcessResults(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 	var stx models.SignedTx
 	var err error
 
+	oracleAcc, err := app.State.GetAccount(oracle.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oracleAcc == nil {
+		t.Fatal(ErrAccountNotExist)
+	}
 	tx := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_RESULTS,
-		Nonce:     util.RandomBytes(32),
+		Nonce:     oracleAcc.Nonce,
 		ProcessId: pid,
 		Results:   results,
 	}
@@ -358,13 +407,31 @@ func testSetProcessResults(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 
 func TestProcessSetCensusTransition(t *testing.T) {
 	app := TestBaseApplication(t)
-	oracle := ethereum.SignKeys{}
+	// create burn account
+	if err := app.State.SetAccount(BurnAddress, &Account{}); err != nil {
+		t.Fatal(err)
+	}
+	var oracle ethereum.SignKeys
+	// create oracles
 	if err := oracle.Generate(); err != nil {
 		t.Fatal(err)
 	}
 	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
 		t.Fatal(err)
 	}
+	oracleAcc := &Account{}
+	oracleAcc.Balance = 10000
+	if err := app.State.SetAccount(oracle.Address(), oracleAcc); err != nil {
+		t.Fatal(err)
+	}
+	// set tx cost
+	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_STATUS, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_CENSUS, 10); err != nil {
+		t.Fatal(err)
+	}
+	app.Commit()
 
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
@@ -452,9 +519,16 @@ func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 	var stx models.SignedTx
 	var err error
 
+	oracleAcc, err := app.State.GetAccount(oracle.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oracleAcc == nil {
+		t.Fatal(ErrAccountNotExist)
+	}
 	tx := &models.SetProcessTx{
 		Txtype:     models.TxType_SET_PROCESS_CENSUS,
-		Nonce:      util.RandomBytes(32),
+		Nonce:      oracleAcc.Nonce,
 		ProcessId:  pid,
 		CensusRoot: censusRoot,
 		CensusURI:  censusURI,
