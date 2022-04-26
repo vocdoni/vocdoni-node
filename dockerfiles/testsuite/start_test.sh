@@ -12,10 +12,14 @@ ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
 ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-info}
+CONCURRENT=${CONCURRENT:-1}
+DEFAULT_ENTITY_KEYS="73ac72a16ea84dd1f76b62663d2aa380253aec4386935e460dad55d4293a0b11,be9248891bd6c220d013afb4b002f72c8c22cbad9c02003c19729bcbd6962e52,cb595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a48d,ab595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a56a"
+ENTITY_KEYS=${ENTITY_KEYS:-$DEFAULT_ENTITY_KEYS}
 GWHOST="http://gateway0:9090/dvote"
-. env.oracle0key # contains var DVOTE_ETHCONFIG_SIGNINGKEY, import into current env
+. env.oracle0key # contains var DVOTE_ETHCONFIG_ORACLEKEY, import into current env
 ORACLE_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 [ -n "$TESTSUITE_ORACLE_KEY" ] && ORACLE_KEY="$TESTSUITE_ORACLE_KEY"
+. env.treasurerkey # contains var DVOTE_ETHCONFIG_SIGNINGKEY, import into current env
 TREASURER_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 [ -n "$TESTSUITE_TREASURER_KEY" ] && TREASURER_KEY="$TESTSUITE_TREASURER_KEY"
 
@@ -25,25 +29,37 @@ TREASURER_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 ### newtest() { whatever ; }
 
 tests_to_run=(
-	"merkle_vote_plaintext"
-	"merkle_vote_encrypted"
-	"anonvoting"
-	"cspvoting"
 	"tokentransactions"
+	"merkle_vote_plaintext"
+	"cspvoting"
+	"anonvoting"
+	"merkle_vote_encrypted"
 )
 
 # if any arg is passed, treat them as the tests to run, overriding the default list
 [ $# != 0 ] && tests_to_run=($@)
 
+initaccounts() {
+	docker-compose run test timeout 300 \
+		./vochaintest --gwHost $GWHOST \
+		  --logLevel=$LOGLEVEL \
+		  --operation=initaccounts \
+		  --oracleKey=$ORACLE_KEY \
+		  --treasurerKey=$TREASURER_KEY \
+		  --entityKeys=$ENTITY_KEYS
+}
+
 merkle_vote() {
 	docker-compose run test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
-		--logLevel=$LOGLEVEL \
-		--operation=vtest \
-		--oracleKey=$ORACLE_KEY \
-		--electionSize=$ELECTION_SIZE \
-		--electionType=$1 \
-		--withWeight=2
+		  --logLevel=$LOGLEVEL \
+		  --operation=vtest \
+		  --oracleKey=$ORACLE_KEY \
+		  --treasurerKey=$TREASURER_KEY \
+		  --electionSize=$ELECTION_SIZE \
+		  --electionType=$1 \
+		  --withWeight=2 \
+		  --entityKeys=$ENTITY_KEYS
 }
 
 merkle_vote_plaintext() {
@@ -60,7 +76,9 @@ anonvoting() {
 		  --logLevel=$LOGLEVEL \
 		  --operation=anonvoting \
 		  --oracleKey=$ORACLE_KEY \
-		  --electionSize=$ELECTION_SIZE_ANON
+		  --treasurerKey=$TREASURER_KEY \
+		  --electionSize=$ELECTION_SIZE_ANON \
+		  --entityKeys=$ENTITY_KEYS
 }
 
 cspvoting() {
@@ -69,7 +87,9 @@ cspvoting() {
 		  --logLevel=$LOGLEVEL \
 		  --operation=cspvoting \
 		  --oracleKey=$ORACLE_KEY \
-		  --electionSize=$ELECTION_SIZE
+		  --treasurerKey=$TREASURER_KEY \
+		  --electionSize=$ELECTION_SIZE \
+		  --entityKeys=$ENTITY_KEYS
 }
 
 tokentransactions() {
@@ -77,7 +97,9 @@ tokentransactions() {
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=tokentransactions \
-		  --treasurerKey=$TREASURER_KEY
+		  --oracleKey=$ORACLE_KEY \
+		  --treasurerKey=$TREASURER_KEY \
+		  --entityKeys=$ENTITY_KEYS
 }
 
 ### end tests definition
@@ -98,19 +120,28 @@ check_gw_is_up() {
 
 echo "### Waiting for test suite to be ready ###"
 for i in {1..20}; do
-	if check_gw_is_up ; then break ; else sleep 2 ; fi
+	check_gw_is_up && break || sleep 2
 done
 
 # create temp dir
 results="/tmp/.vochaintest$RANDOM"
 mkdir -p $results
 
+initaccounts
+
+echo "### Test suite ready ###"
 for test in ${tests_to_run[@]}; do
-	echo "### Running test $test ###"
-	( $test ; echo $? > $results/$test ) &
+	[ $CONCURRENT -eq 1 ] && {
+		echo "### Running test $test concurrently with others ###"
+		( $test ; echo $? > $results/$test ) &
+		sleep 6
+	} || {
+		echo "### Running test $test ###"
+		( $test ; echo $? > $results/$test )
+	}
 done
 
-echo "### Waiting for token transaction tests to finish ###"
+echo "### Waiting for tests to finish ###"
 wait
 
 for test in ${tests_to_run[@]} ; do
@@ -120,13 +151,13 @@ for test in ${tests_to_run[@]} ; do
 	else
 		echo "Vochain test $test failed!"
 		echo "### Post run logs ###"
-		docker-compose logs --tail 1000
+		#docker-compose logs
 		break
 	fi
 done
 
 # remove temp dir
-rm -rf $results
+# rm -rf $results
 
 [ $CLEAN -eq 1 ] && {
 	echo "### Cleaning docker environment ###"

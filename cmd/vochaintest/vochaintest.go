@@ -30,6 +30,7 @@ var ops = map[string]bool{
 	"censusImport":      true,
 	"censusGenerate":    true,
 	"tokentransactions": true,
+	"initaccounts":      true,
 }
 
 func opsAvailable() (opsav []string) {
@@ -46,7 +47,7 @@ func main() {
 	opmode := flag.String("operation", "vtest", fmt.Sprintf("set operation mode: %v", opsAvailable()))
 	oraclePrivKey := flag.String("oracleKey", "", "hexadecimal oracle private key")
 	treasurerPrivKey := flag.String("treasurerKey", "", "hexadecimal treasurer private key")
-	entityPrivKey := flag.String("entityKey", "", "hexadecimal entity private key")
+	entityPrivKeys := flag.StringSlice("entityKeys", []string{}, "hexadecimal entities private keys array")
 	host := flag.String("gwHost", "http://127.0.0.1:9090/dvote", "gateway websockets endpoint")
 	electionType := flag.String("electionType", "encrypted-poll", "encrypted-poll or poll-vote")
 	electionSize := flag.Int("electionSize", 100, "election census size")
@@ -94,23 +95,44 @@ func main() {
 	log.Init(*loglevel, "stdout")
 	rand.Seed(time.Now().UnixNano())
 
-	// create entity key
-	entityKey := ethereum.NewSignKeys()
-	if len(*entityPrivKey) > 0 {
-		if err := entityKey.AddHexKey(*entityPrivKey); err != nil {
+	// create entity keys
+	entityKeys := make([]*ethereum.SignKeys, len(*entityPrivKeys))
+	for i, key := range *entityPrivKeys {
+		entityKeys[i] = ethereum.NewSignKeys()
+		if err := entityKeys[i].AddHexKey(key); err != nil {
+			log.Fatalf("error adding provided key %s", key)
+		}
+	}
+	// create oracle key
+	oracleKey := ethereum.NewSignKeys()
+	if len(*oraclePrivKey) > 0 {
+		if err := oracleKey.AddHexKey(*oraclePrivKey); err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		if err := entityKey.Generate(); err != nil {
+		if err := oracleKey.Generate(); err != nil {
 			log.Fatal(err)
 		}
 	}
+	// create treasurer key
+	if len(*treasurerPrivKey) == 0 {
+		log.Fatal("missing required treasurerKey parameter")
+	}
+	treasurerKey := ethereum.NewSignKeys()
+	if err := treasurerKey.AddHexKey(*treasurerPrivKey); err != nil {
+		log.Fatal(err)
+	}
 
 	switch *opmode {
+	case "initaccounts":
+		log.Infof("initializing accounts ...")
+		if err := initAccounts(treasurerKey, oracleKey, entityKeys, *host); err != nil {
+			log.Fatalf("cannot init accounts: %s", err)
+		}
 	case "anonvoting":
 		mkTreeAnonVoteTest(*host,
-			*oraclePrivKey,
-			entityKey,
+			oracleKey,
+			entityKeys[1],
 			*electionSize,
 			*procDuration,
 			*parallelCons,
@@ -123,9 +145,9 @@ func main() {
 			false)
 	case "vtest":
 		mkTreeVoteTest(*host,
-			*oraclePrivKey,
+			oracleKey,
 			*electionType == "encrypted-poll",
-			entityKey,
+			entityKeys[2],
 			*electionSize,
 			*procDuration,
 			*parallelCons,
@@ -142,9 +164,9 @@ func main() {
 			log.Fatal(err)
 		}
 		cspVoteTest(*host,
-			*oraclePrivKey,
+			oracleKey,
 			*electionType == "encrypted-poll",
-			entityKey,
+			entityKeys[3],
 			cspKey,
 			*electionSize,
 			*procDuration,
@@ -154,9 +176,9 @@ func main() {
 			*gateways,
 		)
 	case "censusImport":
-		censusImport(*host, entityKey)
+		censusImport(*host, entityKeys[0])
 	case "censusGenerate":
-		censusGenerate(*host, entityKey, *electionSize, *keysfile, 1)
+		censusGenerate(*host, entityKeys[0], *electionSize, *keysfile, 1)
 	case "tokentransactions":
 		// end-user voting is not tested here
 		testTokenTransactions(*host, *treasurerPrivKey)
@@ -238,8 +260,177 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 	log.Infof("Census created and published\nRoot: %s\nURI: %s", root, uri)
 }
 
-func mkTreeVoteTest(host,
-	oraclePrivKey string,
+func waitUntilNextBlock(mainClient *client.Client) error {
+	h, err := mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height: %w", err)
+	}
+	mainClient.WaitUntilBlock(h + 1)
+	return nil
+}
+
+func ensureProcessCreated(
+	mainClient *client.Client,
+	signer *ethereum.SignKeys,
+	entityID common.Address,
+	censusRoot []byte,
+	censusURI string,
+	pid []byte,
+	envelopeType *models.EnvelopeType,
+	mode *models.ProcessMode,
+	censusOrigin models.CensusOrigin,
+	startBlockIncrement int,
+	duration int,
+	maxCensusSize uint64,
+	retries int) (uint32, error) {
+	for i := 0; i <= retries; i++ {
+		start, err := mainClient.CreateProcess(
+			signer,
+			entityID.Bytes(),
+			censusRoot,
+			censusURI,
+			pid,
+			envelopeType,
+			mode,
+			censusOrigin,
+			startBlockIncrement,
+			duration,
+			maxCensusSize)
+		if err != nil {
+			log.Warnf("ensureProcessCreated: cannot create process: %s", err.Error())
+			time.Sleep(time.Second * 10)
+			continue
+		}
+		waitUntilNextBlock(mainClient)
+		p, err := mainClient.GetProcessInfo(pid)
+		if err != nil {
+			log.Warnf("ensureProcessCreated: cannot get process %x (%s)", pid, err.Error())
+		}
+		if p != nil {
+			log.Infof("ensureProcessCreated: got process %x info %+v", pid, p)
+			return start, nil
+		}
+		if i == retries { // that was the last chance, break and fail immediately
+			break
+		}
+
+	}
+	return 0, fmt.Errorf("ensureProcessCreated: process may not be created after %d blocks", retries)
+}
+
+func ensureProcessEnded(mainClient *client.Client, signer *ethereum.SignKeys, processID types.ProcessID, retries int) error {
+	for i := 0; i <= retries; i++ {
+		_ = mainClient.EndProcess(signer, processID)
+		waitUntilNextBlock(mainClient)
+		p, err := mainClient.GetProcessInfo(processID)
+		if err != nil {
+			log.Warnf("ensureProcessEnded: cannot force end process: cannot get process %x info: %s", processID, err.Error())
+		}
+		log.Infof("ensureProcessEnded: got process %x info %+v", processID, p)
+		if p != nil && p.Status == int32(models.ProcessStatus_ENDED) || p.Status == int32(models.ProcessStatus_RESULTS) {
+			return nil
+		}
+		if i == retries { // that was the last chance, break and fail immediately
+			break
+		}
+	}
+	return fmt.Errorf("ensureProcessEnded: process may not be ended after %d blocks", retries)
+}
+func initAccounts(treasurer, oracle *ethereum.SignKeys, entityKeys []*ethereum.SignKeys, host string) error {
+	var err error
+	log.Infof("connecting to main gateway %s", host)
+	// connecting to endpoint
+	var mainClient *client.Client
+	for tries := 10; tries > 0; tries-- {
+		mainClient, err = client.New(host)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer mainClient.Close()
+
+	retries := 10
+	// create and top up accounts
+	if err := ensureAccountExists(mainClient, oracle, retries); err != nil {
+		log.Fatal(err)
+	}
+	log.Infof("created oracle account with address %s", oracle.Address())
+	if err := ensureAccountHasTokens(mainClient, treasurer, oracle.Address(), 100000, retries); err != nil {
+		log.Fatalf("cannot mint tokens for account %s with treasurer %s: %w", oracle.Address(), treasurer.Address(), err)
+	}
+	log.Infof("minted 100000 tokens to oracle")
+
+	for _, k := range entityKeys {
+		waitUntilNextBlock(mainClient)
+		if err := ensureAccountExists(mainClient, k, retries); err != nil {
+			log.Fatal(err)
+		}
+		log.Infof("created entity key account with addresses: %s", k.Address())
+		if err := ensureAccountHasTokens(mainClient, treasurer, k.Address(), 100000, retries); err != nil {
+			log.Fatalf("cannot mint tokens for account %s with treasurer %s: %w", k.Address(), treasurer.Address(), err)
+		}
+		log.Infof("minted 100000 tokens to account %s", k.Address())
+	}
+	return nil
+}
+
+func ensureAccountExists(mainClient *client.Client, account *ethereum.SignKeys, retries int) error {
+	for i := 0; i <= retries; i++ {
+		// if account exists, we're done
+		if acct, _ := mainClient.GetAccount(account.Address()); acct != nil {
+			return nil
+		}
+		if i == retries { // that was the last chance, break and fail immediately
+			break
+		}
+
+		if err := mainClient.CreateOrSetAccount(account, common.Address{}, "ipfs://", 0, nil); err != nil {
+			if strings.Contains(err.Error(), "tx already exists in cache") {
+				// don't worry then, someone else created it in a race, nevermind, job done.
+			} else {
+				return fmt.Errorf("cannot create account %s: %s", account.Address(), err)
+			}
+		}
+		waitUntilNextBlock(mainClient)
+	}
+	return fmt.Errorf("cannot create account %s after %d retries", account.Address(), retries)
+}
+
+func ensureAccountHasTokens(mainClient *client.Client,
+	treasurer *ethereum.SignKeys,
+	accountAddr common.Address,
+	amount uint64,
+	retries int) error {
+	for i := 0; i <= retries; i++ {
+		// if balance is enough, we're done
+		if acct, _ := mainClient.GetAccount(accountAddr); acct != nil && acct.Balance > 1000 {
+			return nil
+		}
+		if i == retries { // that was the last chance, break and fail immediately
+			break
+		}
+
+		// else, try to mint with treasurer
+		treasurerAccount, err := mainClient.GetTreasurer()
+		if err != nil {
+			return fmt.Errorf("cannot get treasurer: %w", err)
+		}
+
+		// MintTokens can return OK and then the tx be rejected anyway later.
+		// So, ignore errors, we only care that accountHasTokens in the end
+		_ = mainClient.MintTokens(treasurer, accountAddr, treasurerAccount.GetNonce(), 100000)
+
+		waitUntilNextBlock(mainClient)
+	}
+	return fmt.Errorf("tried to mint %d times, yet balance still not enough", retries)
+}
+
+func mkTreeVoteTest(host string,
+	oracleKey *ethereum.SignKeys,
 	encryptedVotes bool,
 	entityKey *ethereum.SignKeys,
 	electionSize,
@@ -256,11 +447,6 @@ func mkTreeVoteTest(host,
 	var err error
 	var censusRoot []byte
 	censusURI := ""
-
-	oracleKey := ethereum.NewSignKeys()
-	if err := oracleKey.AddHexKey(oraclePrivKey); err != nil {
-		log.Fatal(err)
-	}
 
 	// Try to reuse previous census and keys
 	censusKeys, proofs, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
@@ -299,22 +485,24 @@ func mkTreeVoteTest(host,
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := mainClient.CreateProcess(
-		oracleKey,
-		entityKey.Address().Bytes(),
+	start, err := ensureProcessCreated(
+		mainClient,
+		entityKey,
+		entityKey.Address(),
 		censusRoot,
 		censusURI,
 		pid,
 		&models.EnvelopeType{EncryptedVotes: encryptedVotes},
-		nil,
+		&models.ProcessMode{Interruptible: true},
 		models.CensusOrigin_OFF_CHAIN_TREE,
 		0,
 		procDuration,
-		uint64(electionSize))
+		uint64(electionSize),
+		5,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	log.Infof("created process with ID: %x", pid)
 	// Create the websockets connections for sending the votes
 	gwList := append(gateways, host)
@@ -404,7 +592,6 @@ func mkTreeVoteTest(host,
 				&proofsReadyWG); err != nil {
 				log.Fatalf("[%s] %s", cl.Addr, err)
 			}
-			log.Infof("gateway %d %s has ended its job", gw, cl.Addr)
 		}()
 		i += p
 	}
@@ -440,7 +627,7 @@ func mkTreeVoteTest(host,
 	}
 
 	log.Infof("ending process in order to fetch the results")
-	if err := mainClient.EndProcess(oracleKey, pid); err != nil {
+	if err := ensureProcessEnded(mainClient, oracleKey, pid, 5); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)
@@ -459,8 +646,8 @@ func mkTreeVoteTest(host,
 	log.Infof("all done!")
 }
 
-func mkTreeAnonVoteTest(host,
-	oraclePrivKey string,
+func mkTreeAnonVoteTest(host string,
+	oracleKey,
 	entityKey *ethereum.SignKeys,
 	electionSize,
 	procDuration,
@@ -477,11 +664,6 @@ func mkTreeAnonVoteTest(host,
 	var err error
 	var censusRoot []byte
 	censusURI := ""
-
-	oracleKey := ethereum.NewSignKeys()
-	if err := oracleKey.AddHexKey(oraclePrivKey); err != nil {
-		log.Fatal(err)
-	}
 
 	// Try to reuse previous census and keys
 	censusKeys, proofs, censusRoot, censusURI, err = client.LoadKeysBatch(keysfile)
@@ -520,22 +702,24 @@ func mkTreeAnonVoteTest(host,
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := mainClient.CreateProcess(
-		oracleKey,
-		entityKey.Address().Bytes(),
+	start, err := ensureProcessCreated(
+		mainClient,
+		entityKey,
+		entityKey.Address(),
 		censusRoot,
 		censusURI,
 		pid,
 		&models.EnvelopeType{Anonymous: true},
 		&models.ProcessMode{AutoStart: true, Interruptible: true, PreRegister: true},
 		models.CensusOrigin_OFF_CHAIN_TREE,
-		5,
+		3,
 		procDuration,
-		uint64(electionSize))
+		uint64(electionSize),
+		5,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	log.Infof("created process with ID: %x", pid)
 	// Create the websockets connections for sending the votes
 	gwList := append(gateways, host)
@@ -655,7 +839,7 @@ func mkTreeAnonVoteTest(host,
 	log.Infof("the pre-register process took %s", maxRegKeyTime)
 
 	log.Infof("Waiting for start block...")
-	mainClient.WaitUntilBlock(start)
+	mainClient.WaitUntilBlock(start + 2)
 
 	//
 	// End of pre-registration.  Now we do the voting step with a SNARK
@@ -738,7 +922,8 @@ func mkTreeAnonVoteTest(host,
 	}
 
 	log.Infof("ending process in order to fetch the results")
-	if err := mainClient.EndProcess(oracleKey, pid); err != nil {
+	// also checks oracle permissions
+	if err := ensureProcessEnded(mainClient, oracleKey, pid, 5); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)
@@ -758,8 +943,8 @@ func mkTreeAnonVoteTest(host,
 }
 
 func cspVoteTest(
-	host,
-	oraclePrivKey string,
+	host string,
+	oracleKey *ethereum.SignKeys,
 	encryptedVotes bool,
 	entityKey,
 	cspKey *ethereum.SignKeys,
@@ -778,11 +963,6 @@ func cspVoteTest(
 		if err := voters[i].Generate(); err != nil {
 			log.Fatal(err)
 		}
-	}
-
-	oracleKey := ethereum.NewSignKeys()
-	if err := oracleKey.AddHexKey(oraclePrivKey); err != nil {
-		log.Fatal(err)
 	}
 
 	log.Infof("connecting to main gateway %s", host)
@@ -805,22 +985,24 @@ func cspVoteTest(
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := mainClient.CreateProcess(
-		oracleKey,
-		entityKey.Address().Bytes(),
+	start, err := ensureProcessCreated(
+		mainClient,
+		entityKey,
+		entityKey.Address(),
 		cspKey.PublicKey(),
 		"https://dumycsp.foo",
 		pid,
 		&models.EnvelopeType{EncryptedVotes: encryptedVotes},
-		nil,
+		&models.ProcessMode{Interruptible: true},
 		models.CensusOrigin_OFF_CHAIN_CA,
 		0,
 		procDuration,
-		uint64(electionSize))
+		uint64(electionSize),
+		5,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	log.Infof("created process with ID: %x", pid)
 	// Create the websockets connections for sending the votes
 	gwList := append(gateways, host)
@@ -895,7 +1077,7 @@ func cspVoteTest(
 	wg.Wait()
 
 	log.Infof("ending process in order to fetch the results")
-	if err := mainClient.EndProcess(oracleKey, pid); err != nil {
+	if err := ensureProcessEnded(mainClient, oracleKey, pid, 5); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)
@@ -1021,6 +1203,20 @@ func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys
 	}
 	log.Infof("tx cost of %s changed successfully from %d to %d", models.TxType_SET_ACCOUNT_INFO, txCost, newTxCost)
 	log.Infof("treasurer nonce changed successfully from %d to %d", treasurer.Nonce, treasurer2.Nonce)
+
+	// set tx cost back to default
+	if err := mainClient.SetTransactionCost(treasurerSigner,
+		models.TxType_SET_ACCOUNT_INFO,
+		10,
+		treasurer2.Nonce); err != nil {
+		return fmt.Errorf("cannot set transaction cost: %v", err)
+	}
+
+	h, err = mainClient.GetCurrentBlock()
+	if err != nil {
+		return fmt.Errorf("cannot get current height")
+	}
+	mainClient.WaitUntilBlock(h + 2)
 	return nil
 }
 
