@@ -529,6 +529,7 @@ func (eh *EthereumHandler) GetTokenBalanceMappingPosition(ctx context.Context, a
 
 // GENESIS WRAPPER
 
+/* DEPRECATED
 // AddOracleTxArgs returns an Admin tx instance with the oracle address to add
 func (eh *EthereumHandler) AddOracleTxArgs(ctx context.Context, oracleAddress common.Address, chainId uint32) (tx *models.AdminTx, err error) {
 	genesis, err := eh.Genesis.Get(&ethbind.CallOpts{Context: ctx}, chainId)
@@ -569,7 +570,7 @@ func (eh *EthereumHandler) RemoveOracleTxArgs(ctx context.Context, oracleAddress
 	}
 	return removeOracleTxArgs, nil
 }
-
+*/
 // RESULTS WRAPPER
 
 // ENS WRAPPER
