@@ -527,52 +527,6 @@ func (eh *EthereumHandler) GetTokenBalanceMappingPosition(ctx context.Context, a
 	return tokenInfo.BalanceMappingPosition, nil
 }
 
-// GENESIS WRAPPER
-
-/* DEPRECATED
-// AddOracleTxArgs returns an Admin tx instance with the oracle address to add
-func (eh *EthereumHandler) AddOracleTxArgs(ctx context.Context, oracleAddress common.Address, chainId uint32) (tx *models.AdminTx, err error) {
-	genesis, err := eh.Genesis.Get(&ethbind.CallOpts{Context: ctx}, chainId)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get genesis %d: %w", chainId, err)
-	}
-	var found bool
-	for _, oracle := range genesis.Oracles {
-		if oracle == oracleAddress {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return nil, fmt.Errorf("cannot fetch added oracle from ethereum")
-	}
-	addOracleTxArgs := &models.AdminTx{
-		Address: oracleAddress.Bytes(),
-		Txtype:  models.TxType_ADD_ORACLE,
-	}
-	return addOracleTxArgs, nil
-}
-
-// RemoveOracleTxArgs returns an Admin tx instance with the oracle address to remove
-func (eh *EthereumHandler) RemoveOracleTxArgs(ctx context.Context, oracleAddress common.Address, chainId uint32) (tx *models.AdminTx, err error) {
-	genesis, err := eh.Genesis.Get(&ethbind.CallOpts{Context: ctx}, chainId)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get genesis %d: %w", chainId, err)
-	}
-	for _, oracle := range genesis.Oracles {
-		if oracle == oracleAddress {
-			return nil, fmt.Errorf("cannot remove oracle: the oracle should not be on ethereum")
-		}
-	}
-	removeOracleTxArgs := &models.AdminTx{
-		Address: oracleAddress.Bytes(),
-		Txtype:  models.TxType_REMOVE_ORACLE,
-	}
-	return removeOracleTxArgs, nil
-}
-*/
-// RESULTS WRAPPER
-
 // ENS WRAPPER
 
 // ENSCallerHandler contains the contracts and their addresses and an eth client

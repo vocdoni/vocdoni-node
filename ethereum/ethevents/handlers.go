@@ -250,96 +250,6 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 		}
 		log.Infof("oracle transaction sent, hash: %x", res.Hash)
-		/* DEPRECATED
-		case ethereumEventList["genesisOracleAdded"]:
-			log.Infof("executing GenesisOracleAdd event")
-			tctx, cancel := context.WithTimeout(ctx, time.Minute)
-			defer cancel()
-			addOracleTx, err := genesisOracleAddedMeta(tctx,
-				&e.ContractsInfo[ethereumhandler.ContractNameGenesis].ABI, event.Data, e.VotingHandle)
-			if err != nil {
-				return fmt.Errorf("cannot obtain addOracle data for creating the transaction: %w", err)
-			}
-			log.Infof("found add oracle %x genesis event on ethereum", addOracleTx.Address)
-			oracles, err := e.VochainApp.State.Oracles(true)
-			if err != nil {
-				return fmt.Errorf("cannot fetch the oracle list from the Vochain: %w", err)
-			}
-			// check oracle not already on the Vochain
-			for idx, o := range oracles {
-				if o == common.BytesToAddress(addOracleTx.Address) {
-					return fmt.Errorf("cannot add oracle, already exists on the Vochain at position: %d", idx)
-				}
-			}
-			// create admin tx
-			stx := &models.SignedTx{}
-			stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Admin{Admin: addOracleTx}})
-			if err != nil {
-				return fmt.Errorf("cannot marshal admin tx (addOracle): %w", err)
-			}
-			stx.Signature, err = e.Signer.SignVocdoniTx(stx.Tx, e.VochainApp.ChainID())
-			if err != nil {
-				return fmt.Errorf("cannot sign oracle tx: %w", err)
-			}
-			tx, err := proto.Marshal(stx)
-			if err != nil {
-				return fmt.Errorf("error marshaling admin tx (addOracle) tx: %w", err)
-			}
-			log.Debugf("broadcasting tx: %s", log.FormatProto(addOracleTx))
-
-			res, err := e.VochainApp.SendTx(tx)
-			if err != nil || res == nil {
-				return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
-			}
-			log.Infof("oracle transaction sent, hash: %x", res.Hash)
-		case ethereumEventList["genesisOracleRemoved"]:
-			log.Infof("executing GenesisOracleRemove event")
-			tctx, cancel := context.WithTimeout(ctx, time.Minute)
-			defer cancel()
-			removeOracleTx, err := genesisOracleRemovedMeta(tctx,
-				&e.ContractsInfo[ethereumhandler.ContractNameGenesis].ABI, event.Data, e.VotingHandle)
-			if err != nil {
-				return fmt.Errorf("cannot obtain removeOracle data for creating the transaction: %w", err)
-			}
-			log.Infof("found remove oracle %x genesis event on ethereum", removeOracleTx.Address)
-			oracles, err := e.VochainApp.State.Oracles(true)
-			if err != nil {
-				return fmt.Errorf("cannot fetch the oracle list from the Vochain: %w", err)
-			}
-			// check oracle is on the Vochain
-			var found bool
-			for idx, o := range oracles {
-				if o == common.BytesToAddress(removeOracleTx.Address) {
-					found = true
-					log.Debugf("found oracle at position %d, creating remove tx", idx)
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("oracle not found, cannot be removed")
-			}
-			// create admin tx
-			stx := &models.SignedTx{}
-			stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Admin{Admin: removeOracleTx}})
-			if err != nil {
-				return fmt.Errorf("cannot marshal admin tx (removeOracle): %w", err)
-			}
-			stx.Signature, err = e.Signer.SignVocdoniTx(stx.Tx, e.VochainApp.ChainID())
-			if err != nil {
-				return fmt.Errorf("cannot sign oracle tx: %w", err)
-			}
-			tx, err := proto.Marshal(stx)
-			if err != nil {
-				return fmt.Errorf("error marshaling admin tx (removeOracle) tx: %w", err)
-			}
-			log.Debugf("broadcasting tx: %s", log.FormatProto(removeOracleTx))
-
-			res, err := e.VochainApp.SendTx(tx)
-			if err != nil || res == nil {
-				return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
-			}
-			log.Infof("oracle transaction sent, hash: %x", res.Hash)
-		*/
 	default:
 		log.Debugf("no event configured for %s", event.Topics[0].Hex())
 	}
@@ -388,36 +298,6 @@ func processCensusUpdatedMeta(
 	log.Debugf("processCensusUpdated eventData: %+v", structuredData)
 	return ph.SetCensusTxArgs(ctx, structuredData.ProcessId, structuredData.Namespace)
 }
-
-/* DEPRECATED
-func genesisOracleAddedMeta(
-	ctx context.Context,
-	contractABI *abi.ABI,
-	eventData []byte,
-	ph *ethereumhandler.EthereumHandler,
-) (*models.AdminTx, error) {
-	structuredData := &contracts.GenesisOracleAdded{}
-	if err := contractABI.UnpackIntoInterface(structuredData, "OracleAdded", eventData); err != nil {
-		return nil, fmt.Errorf("cannot unpack OracleAdded event: %w", err)
-	}
-	log.Debugf("genesisOracleAdded eventData: %+v", structuredData)
-	return ph.AddOracleTxArgs(ctx, structuredData.OracleAddress, structuredData.ChainId)
-}
-
-func genesisOracleRemovedMeta(
-	ctx context.Context,
-	contractABI *abi.ABI,
-	eventData []byte,
-	ph *ethereumhandler.EthereumHandler,
-) (*models.AdminTx, error) {
-	structuredData := &contracts.GenesisOracleRemoved{}
-	if err := contractABI.UnpackIntoInterface(structuredData, "OracleRemoved", eventData); err != nil {
-		return nil, fmt.Errorf("cannot unpack OracleRemoved event: %w", err)
-	}
-	log.Debugf("genesisOracleRemoved eventData: %+v", structuredData)
-	return ph.RemoveOracleTxArgs(ctx, structuredData.OracleAddress, structuredData.ChainId)
-}
-*/
 
 func checkEthereumTxCreator(
 	ctx context.Context,

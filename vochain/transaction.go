@@ -586,10 +586,10 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 	if err != nil {
 		return fmt.Errorf("cannot extract address from public key: %w", err)
 	}
-	log.Debugf("checking admin signed tx %+v by addr %s", tx, addr.String())
-	log.Debugf("got treasurer addr %s", common.BytesToAddress(treasurer.Address).String())
+	log.Debugf("checking admin signed tx %+v by addr %x", tx, addr)
+	log.Debugf("got treasurer addr %x", treasurer.Address)
 	if !bytes.Equal(addr.Bytes(), treasurer.Address) {
-		return fmt.Errorf("signature extracted address does not match with treasurer address")
+		return fmt.Errorf("not authorized for executing admin transactions")
 	}
 	switch tx.Txtype {
 	case models.TxType_ADD_PROCESS_KEYS, models.TxType_REVEAL_PROCESS_KEYS:
