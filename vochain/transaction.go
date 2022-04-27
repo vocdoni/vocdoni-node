@@ -75,38 +75,35 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 		}
 		return v.Nullifier, nil
 	case *models.Tx_Admin:
-		if err := AdminTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State); err != nil {
-			return nil, fmt.Errorf("adminTxChek: %w", err)
+		_, err := AdminTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		if err != nil {
+			return nil, fmt.Errorf("adminTxCheck: %w", err)
 		}
-		tx := vtx.Tx.GetAdmin()
 		if commit {
+			tx := vtx.Tx.GetAdmin()
 			switch tx.Txtype {
 			case models.TxType_ADD_ORACLE:
-				return vtx.TxID[:], app.State.AddOracle(common.BytesToAddress(tx.Address))
-			case models.TxType_REMOVE_ORACLE:
-				return vtx.TxID[:], app.State.RemoveOracle(common.BytesToAddress(tx.Address))
-			case models.TxType_ADD_VALIDATOR:
-				pk, err := hexPubKeyToTendermintEd25519(fmt.Sprintf("%x", tx.PublicKey))
-				if err == nil {
-					if tx.Power == nil {
-						return nil, fmt.Errorf("power not specified on addValidator transaction")
-					}
-					validator := &models.Validator{
-						Address: pk.Address().Bytes(),
-						PubKey:  pk.Bytes(),
-						Power:   *tx.Power,
-					}
-					return vtx.TxID[:], app.State.AddValidator(validator)
-
+				if err := app.State.AddOracle(common.BytesToAddress(tx.Address)); err != nil {
+					return nil, fmt.Errorf("addOracle: %w", err)
 				}
-				return nil, fmt.Errorf("addValidator: %w", err)
-
-			case models.TxType_REMOVE_VALIDATOR:
-				return vtx.TxID[:], app.State.RemoveValidator(tx.Address)
+				return vtx.TxID[:], app.State.IncrementTreasurerNonce()
+			case models.TxType_REMOVE_ORACLE:
+				if err := app.State.RemoveOracle(common.BytesToAddress(tx.Address)); err != nil {
+					return nil, fmt.Errorf("removeOracle: %w", err)
+				}
+				return vtx.TxID[:], app.State.IncrementTreasurerNonce()
+			// TODO: @jordipainan No cost applied, no nonce increased
 			case models.TxType_ADD_PROCESS_KEYS:
-				return vtx.TxID[:], app.State.AddProcessKeys(tx)
+				if err := app.State.AddProcessKeys(tx); err != nil {
+					return nil, fmt.Errorf("addProcessKeys: %w", err)
+				}
+			// TODO: @jordipainan No cost applied, no nonce increased
 			case models.TxType_REVEAL_PROCESS_KEYS:
-				return vtx.TxID[:], app.State.RevealProcessKeys(tx)
+				if err := app.State.RevealProcessKeys(tx); err != nil {
+					return nil, fmt.Errorf("revealProcessKeys: %w", err)
+				}
+			default:
+				return nil, fmt.Errorf("tx not supported")
 			}
 		}
 
@@ -563,120 +560,157 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
-func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
+func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, error) {
 	if vtx == nil {
-		return ErrNilTx
+		return common.Address{}, ErrNilTx
 	}
 	tx := vtx.GetAdmin()
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {
-		return fmt.Errorf("missing signature and/or admin transaction")
-	}
-	// get treasurer
-	treasurer, err := state.Treasurer(false)
-	if err != nil {
-		return fmt.Errorf("cannot check authorization")
+		return common.Address{}, fmt.Errorf("missing signature and/or admin transaction")
 	}
 
 	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 	if err != nil {
-		return fmt.Errorf("cannot extract public key from signature: %w", err)
+		return common.Address{}, fmt.Errorf("cannot extract public key from signature: %w", err)
 	}
 	addr, err := ethereum.AddrFromPublicKey(pubKey)
 	if err != nil {
-		return fmt.Errorf("cannot extract address from public key: %w", err)
+		return common.Address{}, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
-	log.Debugf("checking admin signed tx %+v by addr %x", tx, addr)
-	log.Debugf("got treasurer addr %x", treasurer.Address)
-	if !bytes.Equal(addr.Bytes(), treasurer.Address) {
-		return fmt.Errorf("not authorized for executing admin transactions")
-	}
+	log.Debugf("checking admin signed tx %s by addr %x", log.FormatProto(tx), addr)
+
 	switch tx.Txtype {
+	// TODO: @jordipainan make keykeeper independent of oracles
 	case models.TxType_ADD_PROCESS_KEYS, models.TxType_REVEAL_PROCESS_KEYS:
 		if tx.ProcessId == nil {
-			return fmt.Errorf("missing processId on AdminTxCheck")
+			return common.Address{}, fmt.Errorf("missing processId on AdminTxCheck")
 		}
 		// check process exists
 		process, err := state.Process(tx.ProcessId, false)
 		if err != nil {
-			return err
+			return common.Address{}, err
 		}
 		if process == nil {
-			return fmt.Errorf("process with id (%x) does not exist", tx.ProcessId)
+			return common.Address{}, fmt.Errorf("process with id (%x) does not exist", tx.ProcessId)
 		}
 		// check process actually requires keys
 		if !process.EnvelopeType.EncryptedVotes && !process.EnvelopeType.Anonymous {
-			return fmt.Errorf("process does not require keys")
+			return common.Address{}, fmt.Errorf("process does not require keys")
 		}
-
+		// get oracles
+		oracles, err := state.Oracles(false)
+		if err != nil || len(oracles) == 0 {
+			return common.Address{}, fmt.Errorf("cannot check authorization against a nil or empty oracle list")
+		}
+		// check if sender authorized
+		authorized, addr, err := verifySignatureAgainstOracles(oracles, txBytes, signature)
+		if err != nil {
+			return common.Address{}, err
+		}
+		if !authorized {
+			return common.Address{}, fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())
+		}
+		// check oracle account
+		oracleAcc, err := state.GetAccount(addr, false)
+		if err != nil {
+			return common.Address{}, fmt.Errorf("cannot get oracle account: %w", err)
+		}
+		if oracleAcc == nil {
+			return common.Address{}, ErrAccountNotExist
+		}
+		/* TODO: @jordipainan activate if cost and nonce on add or reveal process keys
+		// check nonce
+		if oracleAcc.Nonce != tx.Nonce {
+			return common.Address{}, ErrAccountNonceInvalid
+		}
+		// get tx cost
+			cost, err := state.TxCost(tx.Txtype, false)
+			if err != nil {
+				return common.Address{}, fmt.Errorf("cannot get tx %s cost", tx.Txtype.String())
+			}
+			// check enough balance
+			if oracleAcc.Balance < cost {
+				return common.Address{}, ErrNotEnoughBalance
+			}
+		*/
+		// get current height
 		height := state.CurrentHeight()
 		// Specific checks
 		switch tx.Txtype {
 		case models.TxType_ADD_PROCESS_KEYS:
 			if tx.KeyIndex == nil {
-				return fmt.Errorf("missing keyIndex on AdminTxCheck")
+				return common.Address{}, fmt.Errorf("missing keyIndex on AdminTxCheck")
 			}
 			// endblock is always greater than start block so that case is also included here
 			if height > process.StartBlock {
-				return fmt.Errorf("cannot add process keys to a process that has started or finished status (%s)", process.Status.String())
+				return common.Address{}, fmt.Errorf("cannot add process keys to a process that has started or finished status (%s)", process.Status.String())
 			}
 			// process is not canceled
 			if process.Status == models.ProcessStatus_CANCELED ||
 				process.Status == models.ProcessStatus_ENDED ||
 				process.Status == models.ProcessStatus_RESULTS {
-				return fmt.Errorf("cannot add process keys to a %s process", process.Status)
+				return common.Address{}, fmt.Errorf("cannot add process keys to a %s process", process.Status)
 			}
 			if len(process.EncryptionPublicKeys[*tx.KeyIndex]) > 0 {
-				return fmt.Errorf("keys for process %x already revealed", tx.ProcessId)
+				return common.Address{}, fmt.Errorf("keys for process %x already revealed", tx.ProcessId)
 			}
 			// check included keys and keyindex are valid
 			if err := checkAddProcessKeys(tx, process); err != nil {
-				return err
+				return common.Address{}, err
 			}
 		case models.TxType_REVEAL_PROCESS_KEYS:
 			if tx.KeyIndex == nil {
-				return fmt.Errorf("missing keyIndex on AdminTxCheck")
+				return common.Address{}, fmt.Errorf("missing keyIndex on AdminTxCheck")
 			}
 			// check process is finished
 			if height < process.StartBlock+process.BlockCount &&
 				!(process.Status == models.ProcessStatus_ENDED ||
 					process.Status == models.ProcessStatus_CANCELED) {
-				return fmt.Errorf("cannot reveal keys before the process is finished")
+				return common.Address{}, fmt.Errorf("cannot reveal keys before the process is finished")
 			}
 			if len(process.EncryptionPrivateKeys[*tx.KeyIndex]) > 0 {
-				return fmt.Errorf("keys for process %x already revealed", tx.ProcessId)
+				return common.Address{}, fmt.Errorf("keys for process %x already revealed", tx.ProcessId)
 			}
 			// check the keys are valid
 			if err := checkRevealProcessKeys(tx, process); err != nil {
-				return err
+				return common.Address{}, err
 			}
 		}
 	case models.TxType_ADD_ORACLE:
+		err := state.VerifyTreasurer(addr, tx.Nonce)
+		if err != nil {
+			return common.Address{}, fmt.Errorf("tx sender not authorized: %w", err)
+		}
 		// check not empty, correct length and not 0x0 addr
 		if (bytes.Equal(tx.Address, []byte{})) ||
 			(len(tx.Address) != types.EthereumAddressSize) ||
 			(bytes.Equal(tx.Address, common.Address{}.Bytes())) {
-			return fmt.Errorf("invalid oracle address: %x", tx.Address)
+			return common.Address{}, fmt.Errorf("invalid oracle address: %x", tx.Address)
 		}
 		oracles, err := state.Oracles(false)
 		if err != nil {
-			return fmt.Errorf("cannot get oracles")
+			return common.Address{}, fmt.Errorf("cannot get oracles")
 		}
 		for idx, oracle := range oracles {
 			if oracle == common.BytesToAddress(tx.Address) {
-				return fmt.Errorf("oracle already added to oracle list at position %d", idx)
+				return common.Address{}, fmt.Errorf("oracle already added to oracle list at position %d", idx)
 			}
 		}
 	case models.TxType_REMOVE_ORACLE:
+		err := state.VerifyTreasurer(addr, tx.Nonce)
+		if err != nil {
+			return common.Address{}, fmt.Errorf("tx sender not authorized: %w", err)
+		}
 		// check not empty, correct length and not 0x0 addr
 		if (bytes.Equal(tx.Address, []byte{})) ||
 			(len(tx.Address) != types.EthereumAddressSize) ||
 			(bytes.Equal(tx.Address, common.Address{}.Bytes())) {
-			return fmt.Errorf("invalid oracle address: %x", tx.Address)
+			return common.Address{}, fmt.Errorf("invalid oracle address: %x", tx.Address)
 		}
 		oracles, err := state.Oracles(false)
 		if err != nil {
-			return fmt.Errorf("cannot get oracles")
+			return common.Address{}, fmt.Errorf("cannot get oracles")
 		}
 		var found bool
 		for _, oracle := range oracles {
@@ -686,10 +720,12 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error
 			}
 		}
 		if !found {
-			return fmt.Errorf("cannot remove oracle, not found")
+			return common.Address{}, fmt.Errorf("cannot remove oracle, not found")
 		}
+	default:
+		return common.Address{}, fmt.Errorf("tx not supported")
 	}
-	return nil
+	return addr, nil
 }
 
 func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
