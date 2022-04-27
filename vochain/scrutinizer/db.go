@@ -8,7 +8,7 @@ import (
 	"github.com/timshannon/badgerhold/v3"
 )
 
-//go:generate go run github.com/kyleconroy/sqlc/cmd/sqlc@v1.12.0 generate
+//go:generate go run github.com/kyleconroy/sqlc/cmd/sqlc@v1.13.0 generate
 
 // The string to search on the KV database error to identify a transaction conflict.
 // If the KV (currently badger) returns this error, it is considered non fatal and the

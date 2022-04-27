@@ -448,9 +448,14 @@ func (s *Scrutinizer) Commit(height uint32) error {
 			nvotes, height, time.Since(startTime))
 	}
 
-	// Check if there are processes that need results computing
-	// this can be run async
-	go s.computePendingProcesses(height)
+	// Check if there are processes that need results computing.
+	// This can be run asynchronously.
+	// Note that we skip it if height==0, as some tests like TestResults use
+	// an initial results height of 0, and we don't want to compute results
+	// for such an initial height.
+	if height > 0 {
+		go s.computePendingProcesses(height)
+	}
 	return nil
 }
 
