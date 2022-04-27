@@ -510,6 +510,10 @@ func TestResults(t *testing.T) {
 	vp, err = priv.Encrypt(vp, nil)
 	qt.Assert(t, err, qt.IsNil)
 
+	// TODO: note how we have the TestBaseApplication with an initial height
+	// of 3 and increments via AdvanceTestBlock, and the loop here with
+	// commits of blocks with heights 0-300. The two are parallel and should
+	// probably be joined.
 	for i := int32(0); i < 300; i++ {
 		sc.Rollback()
 		vote := &models.VoteEnvelope{

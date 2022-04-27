@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
@@ -52,26 +54,24 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 		return nil, err
 	}
 	log.Debugf("ProcessInfo badgerhold took %s", time.Since(bhStartTime))
-	/*
-		sqlStartTime := time.Now()
+	sqlStartTime := time.Now()
 
-		queries, ctx, cancel := s.timeoutQueries()
-		defer cancel()
-		sqlProcInner, err := queries.GetProcess(ctx, pid)
-		if err != nil {
-			return nil, err
-		}
-		log.Debugf("ProcessInfo sqlite took %s", time.Since(sqlStartTime))
-		sqlProc := indexertypes.ProcessFromDB(&sqlProcInner)
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	sqlProcInner, err := queries.GetProcess(ctx, pid)
+	if err != nil {
+		return nil, err
+	}
+	log.Debugf("ProcessInfo sqlite took %s", time.Since(sqlStartTime))
+	sqlProc := indexertypes.ProcessFromDB(&sqlProcInner)
 
-		if diff := cmp.Diff(proc, sqlProc, cmpopts.IgnoreUnexported(
-			models.EnvelopeType{},
-			models.ProcessMode{},
-			models.ProcessVoteOptions{},
-		)); diff != "" {
-			sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", pid, diff)
-		}
-	*/
+	if diff := cmp.Diff(proc, sqlProc, cmpopts.IgnoreUnexported(
+		models.EnvelopeType{},
+		models.ProcessMode{},
+		models.ProcessVoteOptions{},
+	)); diff != "" {
+		sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", pid, diff)
+	}
 	return proc, nil
 }
 
@@ -307,6 +307,12 @@ func (s *Scrutinizer) isOpenProcess(processID []byte) (bool, error) {
 
 // compute results if the current heigh has scheduled ending processes
 func (s *Scrutinizer) computePendingProcesses(height uint32) {
+	// We wait a random number of blocks (between 0 and 5) in order to decrease the collision risk
+	// between several Oracles.
+	targetHeight := s.App.Height() + uint32(util.RandomInt(0, 5))
+	for s.App.Height() < targetHeight {
+		time.Sleep(5 * time.Second)
+	}
 	if err := s.db.ForEach(badgerhold.Where("Rheight").Eq(height).Index("Rheight"),
 		func(p *indexertypes.Process) error {
 			initT := time.Now()
@@ -557,6 +563,13 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
 		p.GetStatus() == models.ProcessStatus_CANCELED {
 
+		// We use two SQL queries, so use a transaction to apply them together.
+		tx, err := s.sqlDB.Begin()
+		if err != nil {
+			return err
+		}
+		queries = queries.WithTx(tx)
+
 		if _, err := queries.SetProcessResultsHeight(ctx, scrutinizerdb.SetProcessResultsHeightParams{
 			ID:            pid,
 			ResultsHeight: 0,
@@ -564,6 +577,9 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 			return err
 		}
 		if _, err := queries.SetProcessResultsCancelled(ctx, pid); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
 			return err
 		}
 	}

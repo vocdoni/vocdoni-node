@@ -18,7 +18,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
@@ -261,12 +260,6 @@ func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 // ComputeResult process a finished voting, compute the results and saves it in the Storage.
 // Once this function is called, any future live vote event for the processId will be discarted.
 func (s *Scrutinizer) ComputeResult(processID []byte) error {
-	// We wait a random number of blocks (between 0 and 5) in order to decrease the collision risk
-	// between several Oracles.
-	targetHeight := s.App.Height() + uint32(util.RandomInt(0, 5))
-	for targetHeight < s.App.Height() {
-		time.Sleep(5 * time.Second)
-	}
 	height := s.App.Height()
 	log.Debugf("computing results on height %d for %x", height, processID)
 
