@@ -263,7 +263,6 @@ func (r *RPCAPI) getProcessCircuitConfig(request *api.APIrequest) (*api.APIrespo
 	if genesis, ok := vochain.Genesis[r.vocapp.ChainID()]; ok {
 		circuits = genesis.CircuitsConfig
 	} else {
-		log.Warn("Using dev network genesis CircuitsConfig")
 		circuits = vochain.Genesis["dev"].CircuitsConfig
 	}
 	for i, cfg := range circuits {

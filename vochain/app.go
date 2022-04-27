@@ -63,6 +63,7 @@ type BaseApplication struct {
 	// abcitypes.RequestBeginBlock.Header.Time
 	startBlockTimestamp int64
 	chainId             string
+	dataDir             string
 	// ZkVKs contains the VerificationKey for each circuit parameters index
 	ZkVKs []*snarkTypes.Vk
 }
@@ -82,6 +83,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	return &BaseApplication{
 		State:      state,
 		blockCache: lru.NewAtomic(32),
+		dataDir:    dbpath,
 	}, nil
 }
 
@@ -106,7 +108,7 @@ func (app *BaseApplication) LoadZkVKs(ctx context.Context) error {
 	if genesis, ok := Genesis[app.chainId]; ok {
 		circuits = genesis.CircuitsConfig
 	} else {
-		log.Warn("Using dev network genesis CircuitsConfig")
+		log.Info("using dev genesis zkSnarks circuits")
 		circuits = Genesis["dev"].CircuitsConfig
 	}
 	for i, cc := range circuits {
@@ -115,6 +117,7 @@ func (app *BaseApplication) LoadZkVKs(ctx context.Context) error {
 		// download VKs from CircuitsConfig
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
 		defer cancel()
+		cc.LocalDir = filepath.Join(app.dataDir, cc.LocalDir)
 		if err := zkartifacts.DownloadVKFile(ctx, cc); err != nil {
 			return err
 		}
