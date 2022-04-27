@@ -153,23 +153,6 @@ func (v *State) GetAccount(address common.Address, committed bool) (*Account, er
 	return &acc, acc.Unmarshal(raw)
 }
 
-// VerifyAccountBalance extracts an account address from a signed message, and verifies if
-// there is enough balance to cover an amount expense
-func (v *State) VerifyAccountBalance(message, signature []byte, amount uint64) (bool, common.Address, error) {
-	address, err := ethereum.AddrFromSignature(message, signature)
-	if err != nil {
-		return false, address, err
-	}
-	acc, err := v.GetAccount(address, false)
-	if err != nil {
-		return false, address, fmt.Errorf("VerifyAccountWithAmmount: %w", err)
-	}
-	if acc == nil {
-		return false, address, nil
-	}
-	return acc.Balance >= amount, address, nil
-}
-
 // AccountFromSignature extracts an address from a signed message and returns an account if exists
 func (v *State) AccountFromSignature(message, signature []byte) (*common.Address, *Account, error) {
 	pubKey, err := ethereum.PubKeyFromSignature(message, signature)
