@@ -47,7 +47,7 @@ func main() {
 	opmode := flag.String("operation", "vtest", fmt.Sprintf("set operation mode: %v", opsAvailable()))
 	oraclePrivKey := flag.String("oracleKey", "", "hexadecimal oracle private key")
 	treasurerPrivKey := flag.String("treasurerKey", "", "hexadecimal treasurer private key")
-	entityPrivKeys := flag.StringSlice("entityKeys", []string{}, "hexadecimal entities private keys array")
+	accountPrivKeys := flag.StringSlice("accountKeys", []string{}, "hexadecimal account private keys array")
 	host := flag.String("gwHost", "http://127.0.0.1:9090/dvote", "gateway websockets endpoint")
 	electionType := flag.String("electionType", "encrypted-poll", "encrypted-poll or poll-vote")
 	electionSize := flag.Int("electionSize", 100, "election census size")
@@ -95,44 +95,24 @@ func main() {
 	log.Init(*loglevel, "stdout")
 	rand.Seed(time.Now().UnixNano())
 
-	// create entity keys
-	entityKeys := make([]*ethereum.SignKeys, len(*entityPrivKeys))
-	for i, key := range *entityPrivKeys {
-		entityKeys[i] = ethereum.NewSignKeys()
-		if err := entityKeys[i].AddHexKey(key); err != nil {
-			log.Fatalf("error adding provided key %s", key)
-		}
-	}
-	// create oracle key
-	oracleKey := ethereum.NewSignKeys()
-	if len(*oraclePrivKey) > 0 {
-		if err := oracleKey.AddHexKey(*oraclePrivKey); err != nil {
+	accountKeys := make([]*ethereum.SignKeys, len(*accountPrivKeys))
+	for i, key := range *accountPrivKeys {
+		ak, err := privKeyToSigner(key)
+		if err != nil {
 			log.Fatal(err)
 		}
-	} else {
-		if err := oracleKey.Generate(); err != nil {
-			log.Fatal(err)
-		}
-	}
-	// create treasurer key
-	if len(*treasurerPrivKey) == 0 {
-		log.Fatal("missing required treasurerKey parameter")
-	}
-	treasurerKey := ethereum.NewSignKeys()
-	if err := treasurerKey.AddHexKey(*treasurerPrivKey); err != nil {
-		log.Fatal(err)
+		accountKeys[i] = ak
 	}
 
 	switch *opmode {
 	case "initaccounts":
 		log.Infof("initializing accounts ...")
-		if err := initAccounts(treasurerKey, oracleKey, entityKeys, *host); err != nil {
+		if err := initAccounts(*treasurerPrivKey, *oraclePrivKey, accountKeys, *host); err != nil {
 			log.Fatalf("cannot init accounts: %s", err)
 		}
 	case "anonvoting":
 		mkTreeAnonVoteTest(*host,
-			oracleKey,
-			entityKeys[1],
+			accountKeys[0],
 			*electionSize,
 			*procDuration,
 			*parallelCons,
@@ -145,9 +125,8 @@ func main() {
 			false)
 	case "vtest":
 		mkTreeVoteTest(*host,
-			oracleKey,
 			*electionType == "encrypted-poll",
-			entityKeys[2],
+			accountKeys[0],
 			*electionSize,
 			*procDuration,
 			*parallelCons,
@@ -164,9 +143,8 @@ func main() {
 			log.Fatal(err)
 		}
 		cspVoteTest(*host,
-			oracleKey,
 			*electionType == "encrypted-poll",
-			entityKeys[3],
+			accountKeys[0],
 			cspKey,
 			*electionSize,
 			*procDuration,
@@ -176,15 +154,26 @@ func main() {
 			*gateways,
 		)
 	case "censusImport":
-		censusImport(*host, entityKeys[0])
+		censusImport(*host, accountKeys[0])
 	case "censusGenerate":
-		censusGenerate(*host, entityKeys[0], *electionSize, *keysfile, 1)
+		censusGenerate(*host, accountKeys[0], *electionSize, *keysfile, 1)
 	case "tokentransactions":
 		// end-user voting is not tested here
 		testTokenTransactions(*host, *treasurerPrivKey)
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
+}
+
+func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
+	var skey *ethereum.SignKeys
+	if len(key) > 0 {
+		skey = ethereum.NewSignKeys()
+		if err := skey.AddHexKey(key); err != nil {
+			return nil, fmt.Errorf("cannot create key %s with err %s", key, err)
+		}
+	}
+	return skey, nil
 }
 
 func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath string, withWeight uint64) {
@@ -269,8 +258,7 @@ func waitUntilNextBlock(mainClient *client.Client) error {
 	return nil
 }
 
-func ensureProcessCreated(
-	mainClient *client.Client,
+func ensureProcessCreated(mainClient *client.Client,
 	signer *ethereum.SignKeys,
 	entityID common.Address,
 	censusRoot []byte,
@@ -283,7 +271,7 @@ func ensureProcessCreated(
 	duration int,
 	maxCensusSize uint64,
 	retries int) (uint32, error) {
-	for i := 0; i <= retries; i++ {
+	for i := 0; i < retries; i++ {
 		start, err := mainClient.CreateProcess(
 			signer,
 			entityID.Bytes(),
@@ -297,23 +285,19 @@ func ensureProcessCreated(
 			duration,
 			maxCensusSize)
 		if err != nil {
-			log.Warnf("ensureProcessCreated: cannot create process: %s", err.Error())
+			log.Warnf("ensureProcessCreated: cannot create process: %s", err)
 			time.Sleep(time.Second * 10)
 			continue
 		}
 		waitUntilNextBlock(mainClient)
 		p, err := mainClient.GetProcessInfo(pid)
 		if err != nil {
-			log.Warnf("ensureProcessCreated: cannot get process %x (%s)", pid, err.Error())
+			log.Warnf("ensureProcessCreated: cannot get process %x (%s)", pid, err)
 		}
 		if p != nil {
 			log.Infof("ensureProcessCreated: got process %x info %+v", pid, p)
 			return start, nil
 		}
-		if i == retries { // that was the last chance, break and fail immediately
-			break
-		}
-
 	}
 	return 0, fmt.Errorf("ensureProcessCreated: process may not be created after %d blocks", retries)
 }
@@ -336,8 +320,16 @@ func ensureProcessEnded(mainClient *client.Client, signer *ethereum.SignKeys, pr
 	}
 	return fmt.Errorf("ensureProcessEnded: process may not be ended after %d blocks", retries)
 }
-func initAccounts(treasurer, oracle *ethereum.SignKeys, entityKeys []*ethereum.SignKeys, host string) error {
+func initAccounts(treasurer, oracle string, accountKeys []*ethereum.SignKeys, host string) error {
 	var err error
+	treasurerSigner, err := privKeyToSigner(treasurer)
+	if err != nil {
+		log.Fatal(err)
+	}
+	oracleSigner, err := privKeyToSigner(oracle)
+	if err != nil {
+		log.Fatal(err)
+	}
 	log.Infof("connecting to main gateway %s", host)
 	// connecting to endpoint
 	var mainClient *client.Client
@@ -355,23 +347,23 @@ func initAccounts(treasurer, oracle *ethereum.SignKeys, entityKeys []*ethereum.S
 
 	retries := 10
 	// create and top up accounts
-	if err := ensureAccountExists(mainClient, oracle, retries); err != nil {
+	if err := ensureAccountExists(mainClient, oracleSigner, retries); err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("created oracle account with address %s", oracle.Address())
-	if err := ensureAccountHasTokens(mainClient, treasurer, oracle.Address(), 100000, retries); err != nil {
-		log.Fatalf("cannot mint tokens for account %s with treasurer %s: %w", oracle.Address(), treasurer.Address(), err)
+	log.Infof("created oracle account with address %s", oracleSigner.Address())
+	if err := ensureAccountHasTokens(mainClient, treasurerSigner, oracleSigner.Address(), 100000, retries); err != nil {
+		return fmt.Errorf("cannot mint tokens for account %s with treasurer %s: %w", oracleSigner.Address(), treasurerSigner.Address(), err)
 	}
 	log.Infof("minted 100000 tokens to oracle")
 
-	for _, k := range entityKeys {
+	for _, k := range accountKeys {
 		waitUntilNextBlock(mainClient)
 		if err := ensureAccountExists(mainClient, k, retries); err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("cannot check if account exists: %w", err)
 		}
 		log.Infof("created entity key account with addresses: %s", k.Address())
-		if err := ensureAccountHasTokens(mainClient, treasurer, k.Address(), 100000, retries); err != nil {
-			log.Fatalf("cannot mint tokens for account %s with treasurer %s: %w", k.Address(), treasurer.Address(), err)
+		if err := ensureAccountHasTokens(mainClient, treasurerSigner, k.Address(), 100000, retries); err != nil {
+			return fmt.Errorf("cannot mint tokens for account %s with treasurer %s: %w", k.Address(), treasurerSigner.Address(), err)
 		}
 		log.Infof("minted 100000 tokens to account %s", k.Address())
 	}
@@ -379,20 +371,17 @@ func initAccounts(treasurer, oracle *ethereum.SignKeys, entityKeys []*ethereum.S
 }
 
 func ensureAccountExists(mainClient *client.Client, account *ethereum.SignKeys, retries int) error {
-	for i := 0; i <= retries; i++ {
+	for i := 0; i < retries; i++ {
 		// if account exists, we're done
 		if acct, _ := mainClient.GetAccount(account.Address()); acct != nil {
 			return nil
-		}
-		if i == retries { // that was the last chance, break and fail immediately
-			break
 		}
 
 		if err := mainClient.CreateOrSetAccount(account, common.Address{}, "ipfs://", 0, nil); err != nil {
 			if strings.Contains(err.Error(), "tx already exists in cache") {
 				// don't worry then, someone else created it in a race, nevermind, job done.
 			} else {
-				return fmt.Errorf("cannot create account %s: %s", account.Address(), err)
+				return fmt.Errorf("cannot create account %s: %w", account.Address(), err)
 			}
 		}
 		waitUntilNextBlock(mainClient)
@@ -405,13 +394,10 @@ func ensureAccountHasTokens(mainClient *client.Client,
 	accountAddr common.Address,
 	amount uint64,
 	retries int) error {
-	for i := 0; i <= retries; i++ {
+	for i := 0; i < retries; i++ {
 		// if balance is enough, we're done
 		if acct, _ := mainClient.GetAccount(accountAddr); acct != nil && acct.Balance > 1000 {
 			return nil
-		}
-		if i == retries { // that was the last chance, break and fail immediately
-			break
 		}
 
 		// else, try to mint with treasurer
@@ -430,7 +416,6 @@ func ensureAccountHasTokens(mainClient *client.Client,
 }
 
 func mkTreeVoteTest(host string,
-	oracleKey *ethereum.SignKeys,
 	encryptedVotes bool,
 	entityKey *ethereum.SignKeys,
 	electionSize,
@@ -627,7 +612,7 @@ func mkTreeVoteTest(host string,
 	}
 
 	log.Infof("ending process in order to fetch the results")
-	if err := ensureProcessEnded(mainClient, oracleKey, pid, 5); err != nil {
+	if err := ensureProcessEnded(mainClient, entityKey, pid, 5); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)
@@ -647,7 +632,6 @@ func mkTreeVoteTest(host string,
 }
 
 func mkTreeAnonVoteTest(host string,
-	oracleKey,
 	entityKey *ethereum.SignKeys,
 	electionSize,
 	procDuration,
@@ -923,7 +907,7 @@ func mkTreeAnonVoteTest(host string,
 
 	log.Infof("ending process in order to fetch the results")
 	// also checks oracle permissions
-	if err := ensureProcessEnded(mainClient, oracleKey, pid, 5); err != nil {
+	if err := ensureProcessEnded(mainClient, entityKey, pid, 5); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)
@@ -944,7 +928,6 @@ func mkTreeAnonVoteTest(host string,
 
 func cspVoteTest(
 	host string,
-	oracleKey *ethereum.SignKeys,
 	encryptedVotes bool,
 	entityKey,
 	cspKey *ethereum.SignKeys,
@@ -1077,7 +1060,7 @@ func cspVoteTest(
 	wg.Wait()
 
 	log.Infof("ending process in order to fetch the results")
-	if err := ensureProcessEnded(mainClient, oracleKey, pid, 5); err != nil {
+	if err := ensureProcessEnded(mainClient, entityKey, pid, 5); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)
@@ -1101,12 +1084,10 @@ func testTokenTransactions(
 	host,
 	treasurerPrivKey string,
 ) {
-	var err error
-	treasurerSigner := ethereum.NewSignKeys()
-	if err := treasurerSigner.AddHexKey(treasurerPrivKey); err != nil {
+	treasurerSigner, err := privKeyToSigner(treasurerPrivKey)
+	if err != nil {
 		log.Fatal(err)
 	}
-
 	// create main signer
 	mainSigner := &ethereum.SignKeys{}
 	if err := mainSigner.Generate(); err != nil {

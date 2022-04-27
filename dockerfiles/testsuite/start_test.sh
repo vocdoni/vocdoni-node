@@ -13,8 +13,12 @@ ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-info}
 CONCURRENT=${CONCURRENT:-1}
-DEFAULT_ENTITY_KEYS="73ac72a16ea84dd1f76b62663d2aa380253aec4386935e460dad55d4293a0b11,be9248891bd6c220d013afb4b002f72c8c22cbad9c02003c19729bcbd6962e52,cb595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a48d,ab595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a56a"
-ENTITY_KEYS=${ENTITY_KEYS:-$DEFAULT_ENTITY_KEYS}
+### must be splited by lines
+DEFAULT_ACCOUNT_KEYS="73ac72a16ea84dd1f76b62663d2aa380253aec4386935e460dad55d4293a0b11
+be9248891bd6c220d013afb4b002f72c8c22cbad9c02003c19729bcbd6962e52
+cb595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a48d
+ab595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a56a"
+ACCOUNT_KEYS=${ACCOUNT_KEYS:-$DEFAULT_ACCOUNT_KEYS}
 GWHOST="http://gateway0:9090/dvote"
 . env.oracle0key # contains var DVOTE_ETHCONFIG_ORACLEKEY, import into current env
 ORACLE_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
@@ -46,7 +50,7 @@ initaccounts() {
 		  --operation=initaccounts \
 		  --oracleKey=$ORACLE_KEY \
 		  --treasurerKey=$TREASURER_KEY \
-		  --entityKeys=$ENTITY_KEYS
+		  --accountKeys=$(echo -n "$ACCOUNT_KEYS" | tr -d ' ','\t' | tr '\n' ',')
 }
 
 merkle_vote() {
@@ -59,7 +63,7 @@ merkle_vote() {
 		  --electionSize=$ELECTION_SIZE \
 		  --electionType=$1 \
 		  --withWeight=2 \
-		  --entityKeys=$ENTITY_KEYS
+		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $1}')
 }
 
 merkle_vote_plaintext() {
@@ -78,7 +82,7 @@ anonvoting() {
 		  --oracleKey=$ORACLE_KEY \
 		  --treasurerKey=$TREASURER_KEY \
 		  --electionSize=$ELECTION_SIZE_ANON \
-		  --entityKeys=$ENTITY_KEYS
+		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $2}')
 }
 
 cspvoting() {
@@ -89,7 +93,7 @@ cspvoting() {
 		  --oracleKey=$ORACLE_KEY \
 		  --treasurerKey=$TREASURER_KEY \
 		  --electionSize=$ELECTION_SIZE \
-		  --entityKeys=$ENTITY_KEYS
+		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $3}')
 }
 
 tokentransactions() {
@@ -99,7 +103,7 @@ tokentransactions() {
 		  --operation=tokentransactions \
 		  --oracleKey=$ORACLE_KEY \
 		  --treasurerKey=$TREASURER_KEY \
-		  --entityKeys=$ENTITY_KEYS
+		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $4}')
 }
 
 ### end tests definition
@@ -157,7 +161,7 @@ for test in ${tests_to_run[@]} ; do
 done
 
 # remove temp dir
-# rm -rf $results
+rm -rf $results
 
 [ $CLEAN -eq 1 ] && {
 	echo "### Cleaning docker environment ###"
