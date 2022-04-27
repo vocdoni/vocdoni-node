@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -60,7 +61,7 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 // For tendermint 0.34
 func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
 	// creating new vochain app
-	app, err := NewBaseApplication(vochaincfg.DBType, vochaincfg.DataDir+"/data")
+	app, err := NewBaseApplication(vochaincfg.DBType, filepath.Join(vochaincfg.DataDir, "data"))
 	if err != nil {
 		log.Fatalf("cannot initialize vochain application: %s", err)
 	}

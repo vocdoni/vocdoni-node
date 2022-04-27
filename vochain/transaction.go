@@ -409,7 +409,8 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		}
 		log.Debugf("new zk vote %x for process %x", ve.Nullifier, ve.ProcessId)
 
-		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVKs) {
+		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVKs) ||
+			int(proofZkSNARK.CircuitParametersIndex) < 0 {
 			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d of %d", proofZkSNARK.CircuitParametersIndex, len(app.ZkVKs))
 		}
 		verificationKey := app.ZkVKs[proofZkSNARK.CircuitParametersIndex]
