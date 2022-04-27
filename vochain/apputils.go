@@ -195,6 +195,16 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 	return genBytes, nil
 }
 
+// verifySignatureAgainstOracles verifies that a signature match with one of the oracles
+func verifySignatureAgainstOracles(oracles []ethcommon.Address, message,
+	signature []byte) (bool, ethcommon.Address, error) {
+	signKeys := ethereum.NewSignKeys()
+	for _, oracle := range oracles {
+		signKeys.AddAuthKey(oracle)
+	}
+	return signKeys.VerifySender(message, signature)
+}
+
 func GetFriendlyResults(results []*models.QuestionResult) [][]string {
 	r := [][]string{}
 	for i := range results {

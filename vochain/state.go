@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"path"
@@ -15,8 +14,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru"
-	tmcrypto "github.com/tendermint/tendermint/crypto"
-	ed25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
@@ -681,6 +678,7 @@ func (v *State) SetFaucetNonce(key []byte) error {
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
+/*
 func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
 	var tmkey ed25519.PubKey
 	pubKeyBytes, err := hex.DecodeString(pubKey)
@@ -693,6 +691,7 @@ func hexPubKeyToTendermintEd25519(pubKey string) (tmcrypto.PubKey, error) {
 	copy(tmkey[:], pubKeyBytes[:])
 	return tmkey, nil
 }
+*/
 
 // AddValidator adds a tendemint validator if it is not already added
 func (v *State) AddValidator(validator *models.Validator) error {
@@ -1210,4 +1209,23 @@ func (v *State) TxCounterAdd() {
 // TxCounter returns the current tx count
 func (v *State) TxCounter() int32 {
 	return atomic.LoadInt32(&v.txCounter)
+}
+
+// VerifyTreasurer checks is an address is the treasurer and the
+// nonce provided is the expected one
+func (v *State) VerifyTreasurer(addr common.Address, txNonce uint32) error {
+	// get treasurer
+	treasurer, err := v.Treasurer(false)
+	if err != nil {
+		return fmt.Errorf("cannot check authorization")
+	}
+	log.Debugf("got treasurer addr %x", treasurer.Address)
+	if !bytes.Equal(addr.Bytes(), treasurer.Address) {
+		return fmt.Errorf("not authorized for executing admin transactions")
+	}
+	// check treasurer account
+	if treasurer.Nonce != txNonce {
+		return ErrAccountNonceInvalid
+	}
+	return nil
 }

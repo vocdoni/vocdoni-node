@@ -235,7 +235,7 @@ func TestMintTokensTx(t *testing.T) {
 		t.Fatal(ErrAccountNotExist)
 	}
 	if toAcc.Balance != 100 {
-		t.Fatal(fmt.Sprintf("infoURI missmatch, got %d expected %d", toAcc.Balance, 100))
+		t.Fatalf("infoURI missmatch, got %d expected %d", toAcc.Balance, 100)
 	}
 	// get treasurer
 	treasurer, err := app.State.Treasurer(false)
