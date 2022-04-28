@@ -10,13 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/storage-proofs-eth-go/token/mapbased"
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	chain "go.vocdoni.io/dvote/ethereum"
 	ethereumhandler "go.vocdoni.io/dvote/ethereum/handler"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/oracle"
 	"go.vocdoni.io/dvote/rpcapi"
-	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -96,13 +94,6 @@ func (a *APIoracle) handleNewEthProcess(req *api.APIrequest) (*api.APIresponse, 
 		return nil, fmt.Errorf("no source height provided")
 	}
 
-	pidseed := fmt.Sprintf("%d%d%x%x",
-		a.Namespace,
-		req.NewProcess.StartBlock,
-		req.NewProcess.EntityID,
-		util.RandomBytes(32),
-	)
-
 	p := &models.Process{
 		EntityId:          req.NewProcess.EntityID,
 		StartBlock:        req.NewProcess.StartBlock,
@@ -113,7 +104,6 @@ func (a *APIoracle) handleNewEthProcess(req *api.APIrequest) (*api.APIresponse, 
 		EthIndexSlot:      req.NewProcess.EthIndexSlot,
 		SourceBlockHeight: req.NewProcess.SourceHeight,
 		Metadata:          &req.NewProcess.Metadata,
-		ProcessId:         ethereum.HashRaw([]byte(pidseed)),
 		Status:            models.ProcessStatus_READY,
 		Namespace:         a.Namespace,
 		CensusOrigin:      models.CensusOrigin_ERC20,
@@ -142,16 +132,19 @@ func (a *APIoracle) handleNewEthProcess(req *api.APIrequest) (*api.APIresponse, 
 	if err != nil {
 		return nil, fmt.Errorf("proof is not valid: %v", err)
 	}
-	if err := a.oracle.NewProcess(p); err != nil {
+	processID, err := a.oracle.NewProcess(p)
+	if err != nil {
 		return nil, err
 	}
-
+	if processID == nil {
+		return nil, fmt.Errorf("processID is nil")
+	}
 	// Check the ACL
 	if err := a.erc20proposalACL.add(p.Owner, p.EntityId); err != nil {
 		return nil, err
 	}
 
-	return &api.APIresponse{ProcessID: p.ProcessId}, nil
+	return &api.APIresponse{ProcessID: processID}, nil
 }
 
 func (a *APIoracle) getIndexSlot(ctx context.Context, contractAddr []byte,

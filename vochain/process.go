@@ -409,7 +409,7 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 		return nil, common.Address{}, fmt.Errorf(
 			"cannot add process with duration lower than or equal to the current height")
 	}
-	// get tx cost
+	// check tx cost
 	cost, err := state.TxCost(models.TxType_NEW_PROCESS, false)
 	if err != nil {
 		return nil, common.Address{}, fmt.Errorf("cannot get NewProcessTx transaction cost: %w", err)
@@ -418,6 +418,9 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	if err != nil {
 		return nil, common.Address{}, err
 	}
+	if addr == nil {
+		return nil, common.Address{}, fmt.Errorf("cannot get account from signature, nil result")
+	}
 	// check balance and nonce
 	if acc.Balance < cost {
 		return nil, common.Address{}, ErrNotEnoughBalance
@@ -425,19 +428,38 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	if acc.Nonce != tx.Nonce {
 		return nil, common.Address{}, ErrAccountNonceInvalid
 	}
+
+	isOracle, err := state.IsOracle(*addr)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+
 	// check if process entityID matches tx sender
-	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) {
+	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) && !isOracle {
 		// Check if the transaction comes from an oracle
 		// Oracles can create processes with any entityID
-		isOracle, err := state.IsOracle(*addr)
-		if err != nil {
-			return nil, common.Address{}, err
-		}
-		if !isOracle {
-			return nil, common.Address{}, fmt.Errorf("unauthorized to create a new process, recovered addr is %s", addr.Hex())
-		}
+		return nil, common.Address{}, fmt.Errorf(
+			"unauthorized to create a new process, recovered addr is %s", addr.Hex())
 	}
-	// get process
+
+	// if no Oracle, build the processID (Oracles are allowed to use any processID)
+	if !isOracle || tx.Process.ProcessId == nil {
+		// if Oracle but processID empty, switch the entityID temporary to the Oracle address
+		// this way we ensure the account creating the process exists
+		entityID := tx.Process.EntityId
+		if isOracle {
+			tx.Process.EntityId = addr.Bytes()
+		}
+		pid, err := app.BuildProcessID(tx.Process)
+		if err != nil {
+			return nil, common.Address{}, fmt.Errorf("cannot build processID: %w", err)
+		}
+		tx.Process.ProcessId = pid.Marshal()
+		// restore original entityID
+		tx.Process.EntityId = entityID
+	}
+
+	// check if process already exists
 	_, err = state.Process(tx.Process.ProcessId, false)
 	if err == nil {
 		return nil, common.Address{}, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)

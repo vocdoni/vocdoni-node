@@ -8,7 +8,12 @@
 #  tokentransactions: run token transactions test (end-user voting is not included)
 #  vocli: test the CLI tool
 
-export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
+
+COMPOSE_CMD=${COMPOSE_CMD:-"docker-compose"}
+COMPOSE_CMD_RUN="$COMPOSE_CMD run"
+[ -n "$NOTTY" ] && COMPOSE_CMD_RUN="$COMPOSE_CMD_RUN -T"
+
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
 ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 CLEAN=${CLEAN:-1}
@@ -45,7 +50,7 @@ tests_to_run=(
 [ $# != 0 ] && tests_to_run=($@)
 
 initaccounts() {
-	docker-compose run test timeout 300 \
+	$COMPOSE_CMD_RUN test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=initaccounts \
@@ -55,7 +60,7 @@ initaccounts() {
 }
 
 merkle_vote() {
-	docker-compose run test timeout 300 \
+	$COMPOSE_CMD_RUN test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=vtest \
@@ -76,7 +81,7 @@ merkle_vote_encrypted() {
 }
 
 anonvoting() {
-	docker-compose run test timeout 300 \
+	$COMPOSE_CMD_RUN test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=anonvoting \
@@ -87,7 +92,7 @@ anonvoting() {
 }
 
 cspvoting() {
-	docker-compose run test timeout 300 \
+	$COMPOSE_CMD_RUN test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=cspvoting \
@@ -98,7 +103,7 @@ cspvoting() {
 }
 
 tokentransactions() {
-	docker-compose run test timeout 300 \
+	$COMPOSE_CMD_RUN test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=tokentransactions \
@@ -120,11 +125,11 @@ vocli() {
 # docker-compose() { echo "# would do: docker-compose $@" ; sleep 0.2 ;}
 
 echo "### Starting test suite ###"
-docker-compose build
-docker-compose up -d
+$COMPOSE_CMD build
+$COMPOSE_CMD up -d
 
 check_gw_is_up() {
-	docker-compose run test \
+	$COMPOSE_CMD_RUN test \
 		curl -s --fail $GWHOST \
 		  -X POST \
 		  -d '{"id": "req00'$RANDOM'", "request": {"method": "genProof", "timestamp":'$(date +%s)'}}' 2>/dev/null
@@ -167,7 +172,7 @@ for test in ${tests_to_run[@]} ; do
 	else
 		echo "Vochain test $test failed!"
 		echo "### Post run logs ###"
-		docker-compose logs --tail 1000
+		$COMPOSE_CMD logs --tail 1000
 		break
 	fi
 done
@@ -177,7 +182,7 @@ rm -rf $results
 
 [ $CLEAN -eq 1 ] && {
 	echo "### Cleaning docker environment ###"
-	docker-compose down -v --remove-orphans
+	$COMPOSE_CMD down -v --remove-orphans
 }
 
 exit $RET

@@ -29,7 +29,8 @@ func (r *RPCAPI) submitRawTx(request *api.APIrequest) (*api.APIresponse, error) 
 	}
 	log.Debugf("broadcasting tx hash:%s", res.Hash)
 	// return nullifier or other info
-	return &api.APIresponse{Payload: fmt.Sprintf("%x", res.Data)}, nil
+	// TODO @pau: replace Payload by something else more descriptive and using types.HexBytes
+	return &api.APIresponse{Payload: fmt.Sprintf("%x", res.Data), Hash: res.Hash.Bytes()}, nil
 }
 
 func (a *RPCAPI) submitEnvelope(request *api.APIrequest) (*api.APIresponse, error) {

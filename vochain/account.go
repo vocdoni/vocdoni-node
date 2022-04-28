@@ -190,7 +190,25 @@ func (v *State) SetAccountInfoURI(accountAddress common.Address, infoURI string)
 	return v.SetAccount(accountAddress, acc)
 }
 
-// Create account creates an account
+// IncrementAccountProcessIndex increments the process index by one and stores the value
+func (v *State) IncrementAccountProcessIndex(accountAddress common.Address) error {
+	acc, err := v.GetAccount(accountAddress, false)
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return ErrAccountNotExist
+	}
+	// safety check for overflow protection, we allow a maximum of 4M of processes per account
+	if acc.ProcessIndex > 1<<22 {
+		acc.ProcessIndex = 0
+	}
+	acc.ProcessIndex++
+	log.Debugf("setting account %s process index to %d", accountAddress.String(), acc.ProcessIndex)
+	return v.SetAccount(accountAddress, acc)
+}
+
+// CreateAccount creates an account
 func (v *State) CreateAccount(accountAddress common.Address,
 	infoURI string,
 	delegates []common.Address,
@@ -456,7 +474,7 @@ func (v *State) SetAccount(accountAddress common.Address, account *Account) erro
 	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
 }
 
-// SubtractCostIncrementNonce
+// SubtractCostIncrementNonce reduces the transaction cost from the account balance and increments nonce
 func (v *State) SubtractCostIncrementNonce(accountAddress common.Address, txType models.TxType) error {
 	// get account
 	acc, err := v.GetAccount(accountAddress, false)
@@ -684,7 +702,7 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	}
 }
 
-// SetDelegate sets a delegate for a given account
+// SetAccountDelegate sets a delegate for a given account
 func (v *State) SetAccountDelegate(accountAddr, delegateAddr common.Address, txType models.TxType) error {
 	// get account
 	acc, err := v.GetAccount(accountAddr, false)

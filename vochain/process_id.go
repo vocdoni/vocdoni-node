@@ -176,3 +176,22 @@ func (p *ProcessID) EnvelopeType() *models.EnvelopeType {
 		CostFromWeight: p.envType&byte(0b00010000) > 0,
 	}
 }
+
+func (a *BaseApplication) BuildProcessID(proc *models.Process) (*ProcessID, error) {
+	pid := new(ProcessID)
+	pid.SetChainID(a.ChainID())
+	if err := pid.SetEnvelopeType(proc.EnvelopeType); err != nil {
+		return nil, err
+	}
+	if err := pid.SetCensusOrigin(proc.CensusOrigin); err != nil {
+		return nil, err
+	}
+	addr := common.BytesToAddress(proc.EntityId)
+	acc, err := a.State.GetAccount(addr, false)
+	if err != nil {
+		return nil, err
+	}
+	pid.SetAddr(addr)
+	pid.SetNonce(acc.GetProcessIndex())
+	return pid, nil
+}

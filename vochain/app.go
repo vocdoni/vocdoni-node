@@ -2,6 +2,7 @@ package vochain
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -265,11 +266,15 @@ func (app *BaseApplication) SetDefaultMethods() {
 		}
 		res := <-resCh
 		r := res.GetCheckTx()
+		txHash, err := hex.DecodeString(r.Info)
+		if err != nil {
+			return nil, fmt.Errorf("no tx hash received")
+		}
 		return &ctypes.ResultBroadcastTx{
 			Code: r.Code,
 			Data: r.Data,
 			Log:  r.Log,
-			Hash: tmtypes.Tx(tx).Hash(),
+			Hash: txHash,
 		}, nil
 	})
 }
@@ -546,14 +551,14 @@ func (*BaseApplication) SetOption(req abcitypes.RequestSetOption) abcitypes.Resp
 
 // CheckTx unmarshals req.Tx and checks its validity
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
-	var data []byte
+	var response *AddTxResponse
 	var err error
 	if req.Type == abcitypes.CheckTxType_Recheck {
-		return abcitypes.ResponseCheckTx{Code: 0, Data: data}
+		return abcitypes.ResponseCheckTx{Code: 0}
 	}
 	tx := new(VochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
-		if data, err = app.AddTx(tx, false); err != nil {
+		if response, err = app.AddTx(tx, false); err != nil {
 			if errors.Is(err, ErrorAlreadyExistInCache) {
 				return abcitypes.ResponseCheckTx{Code: 0}
 			}
@@ -563,19 +568,24 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 	} else {
 		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}
 	}
-	return abcitypes.ResponseCheckTx{Code: 0, Data: data}
+	return abcitypes.ResponseCheckTx{
+		Code: 0,
+		Data: response.Data,
+		Info: fmt.Sprintf("%x", response.TxHash),
+		Log:  response.Log,
+	}
 }
 
 // DeliverTx unmarshals req.Tx and adds it to the State if it is valid
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	var data []byte
+	var response *AddTxResponse
 	var err error
 	// Increase Tx counter on return since the index 0 is valid
 	defer app.State.TxCounterAdd()
 	tx := new(VochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
 		log.Debugf("deliver tx: %s", log.FormatProto(tx.Tx))
-		if data, err = app.AddTx(tx, true); err != nil {
+		if response, err = app.AddTx(tx, true); err != nil {
 			log.Debugf("rejected tx: %v", err)
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
@@ -585,7 +595,12 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	} else {
 		return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 	}
-	return abcitypes.ResponseDeliverTx{Code: 0, Data: data}
+	return abcitypes.ResponseDeliverTx{
+		Code: 0,
+		Data: response.Data,
+		Info: fmt.Sprintf("%x", response.TxHash),
+		Log:  response.Log,
+	}
 }
 
 // Commit saves the current vochain state and returns a commit hash

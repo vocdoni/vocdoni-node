@@ -279,21 +279,19 @@ func ensureProcessCreated(mainClient *client.Client,
 	entityID common.Address,
 	censusRoot []byte,
 	censusURI string,
-	pid []byte,
 	envelopeType *models.EnvelopeType,
 	mode *models.ProcessMode,
 	censusOrigin models.CensusOrigin,
 	startBlockIncrement int,
 	duration int,
 	maxCensusSize uint64,
-	retries int) (uint32, error) {
+	retries int) (uint32, []byte, error) {
 	for i := 0; i < retries; i++ {
-		start, err := mainClient.CreateProcess(
+		start, pid, err := mainClient.CreateProcess(
 			signer,
 			entityID.Bytes(),
 			censusRoot,
 			censusURI,
-			pid,
 			envelopeType,
 			mode,
 			censusOrigin,
@@ -311,10 +309,10 @@ func ensureProcessCreated(mainClient *client.Client,
 		}
 		if p != nil {
 			log.Infof("ensureProcessCreated: got process %x info %+v", pid, p)
-			return start, nil
+			return start, pid, nil
 		}
 	}
-	return 0, fmt.Errorf("ensureProcessCreated: process may not be created after %d blocks", retries)
+	return 0, nil, fmt.Errorf("ensureProcessCreated: process may not be created after %d blocks", retries)
 }
 
 func ensureProcessEnded(mainClient *client.Client, signer *ethereum.SignKeys, processID types.ProcessID, retries int) error {
@@ -485,13 +483,12 @@ func mkTreeVoteTest(host string,
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := ensureProcessCreated(
+	start, pid, err := ensureProcessCreated(
 		mainClient,
 		entityKey,
 		entityKey.Address(),
 		censusRoot,
 		censusURI,
-		pid,
 		&models.EnvelopeType{EncryptedVotes: encryptedVotes},
 		&models.ProcessMode{Interruptible: true},
 		models.CensusOrigin_OFF_CHAIN_TREE,
@@ -699,15 +696,13 @@ func mkTreeAnonVoteTest(host string,
 	defer mainClient.Close()
 
 	// Create process
-	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := ensureProcessCreated(
+	start, pid, err := ensureProcessCreated(
 		mainClient,
 		entityKey,
 		entityKey.Address(),
 		censusRoot,
 		censusURI,
-		pid,
 		&models.EnvelopeType{Anonymous: true},
 		&models.ProcessMode{AutoStart: true, Interruptible: true, PreRegister: true},
 		models.CensusOrigin_OFF_CHAIN_TREE,
@@ -983,13 +978,12 @@ func cspVoteTest(
 	// Create process
 	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, err := ensureProcessCreated(
+	start, pid, err := ensureProcessCreated(
 		mainClient,
 		entityKey,
 		entityKey.Address(),
 		cspKey.PublicKey(),
 		"https://dumycsp.foo",
-		pid,
 		&models.EnvelopeType{EncryptedVotes: encryptedVotes},
 		&models.ProcessMode{Interruptible: true},
 		models.CensusOrigin_OFF_CHAIN_CA,

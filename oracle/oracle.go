@@ -37,51 +37,38 @@ func (o *Oracle) EnableResults(scr *scrutinizer.Scrutinizer) {
 	scr.AddEventListener(o)
 }
 
-func (o *Oracle) NewProcess(process *models.Process) error {
+func (o *Oracle) NewProcess(process *models.Process) ([]byte, error) {
 	// Sanity checks
 	if process == nil {
-		return fmt.Errorf("process is nil")
+		return nil, fmt.Errorf("process is nil")
 	}
 	if process.Status != models.ProcessStatus_READY && process.Status != models.ProcessStatus_PAUSED {
-		return fmt.Errorf("invalid process status on process creation: %d", process.Status)
-	}
-	if len(process.ProcessId) != types.ProcessIDsize {
-		return fmt.Errorf("processId size is wrong")
+		return nil, fmt.Errorf("invalid process status on process creation: %d", process.Status)
 	}
 	if len(process.EntityId) != types.EntityIDsize {
-		return fmt.Errorf("entityId size is wrong")
+		return nil, fmt.Errorf("entityId size is wrong")
 	}
 	if _, ok := vochain.CensusOrigins[process.CensusOrigin]; !ok {
-		return fmt.Errorf("census origin: %d not supported", process.CensusOrigin)
+		return nil, fmt.Errorf("census origin: %d not supported", process.CensusOrigin)
 	}
 	if vochain.CensusOrigins[process.CensusOrigin].NeedsURI && process.CensusURI == nil {
-		return fmt.Errorf("census %s needs URI but none has been provided",
+		return nil, fmt.Errorf("census %s needs URI but none has been provided",
 			vochain.CensusOrigins[process.CensusOrigin].Name)
 	}
 	if process.BlockCount < types.ProcessesContractMinBlockCount {
-		return fmt.Errorf("block count is too low")
+		return nil, fmt.Errorf("block count is too low")
 	}
 	if vochain.CensusOrigins[process.CensusOrigin].NeedsIndexSlot && process.EthIndexSlot == nil {
-		return fmt.Errorf("censusOrigin needs index slot (not provided)")
-	}
-
-	// Check if process already exist
-	if _, err := o.VochainApp.State.Process(process.ProcessId, true); err != nil {
-		if err != vochain.ErrProcessNotFound {
-			return err
-		}
-	} else {
-		log.Infof("process %x already exists, skipping", process.ProcessId)
-		return nil
+		return nil, fmt.Errorf("censusOrigin needs index slot (not provided)")
 	}
 
 	// get oracle account
 	acc, err := o.VochainApp.State.GetAccount(o.signer.Address(), false)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if acc == nil {
-		return fmt.Errorf("oracle account does not exist")
+		return nil, fmt.Errorf("oracle account does not exist")
 	}
 	// Create, sign a send NewProcess transaction
 	processTx := &models.NewProcessTx{
@@ -97,24 +84,24 @@ func (o *Oracle) NewProcess(process *models.Process) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("cannot marshal newProcess tx: %w", err)
+		return nil, fmt.Errorf("cannot marshal newProcess tx: %w", err)
 	}
 	stx.Signature, err = o.signer.SignVocdoniTx(stx.Tx, o.VochainApp.ChainID())
 	if err != nil {
-		return fmt.Errorf("cannot sign oracle tx: %w", err)
+		return nil, fmt.Errorf("cannot sign oracle tx: %w", err)
 	}
 	txb, err := proto.Marshal(stx)
 	if err != nil {
-		return fmt.Errorf("error marshaling process tx: %w", err)
+		return nil, fmt.Errorf("error marshaling process tx: %w", err)
 	}
 	log.Debugf("broadcasting tx: %s", log.FormatProto(processTx))
 
 	res, err := o.VochainApp.SendTx(txb)
 	if err != nil || res == nil {
-		return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
+		return nil, fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
 	}
-	log.Infof("newProcess transaction sent, hash: %x", res.Hash)
-	return nil
+	log.Infof("newProcess transaction sent, processID: %x", res.Data.Bytes())
+	return res.Data.Bytes(), nil
 }
 
 // OnComputeResults is called once a process result is computed by the scrutinizer.
