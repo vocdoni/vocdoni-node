@@ -136,6 +136,11 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			processTx.Process.StartBlock = e.VochainApp.Height() + processStartBlockDelay
 		}
 
+		oracle, err := e.getAccount(e.Signer.Address())
+		if err != nil {
+			return fmt.Errorf("newProcess handle: %w", err)
+		}
+		processTx.Nonce = oracle.GetNonce()
 		stx := &models.SignedTx{}
 		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: processTx}})
 		if err != nil {
@@ -176,6 +181,11 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			log.Infof("process already canceled or ended, skipping")
 			return nil
 		}
+		oracle, err := e.getAccount(e.Signer.Address())
+		if err != nil {
+			return fmt.Errorf("set process handle: %w", err)
+		}
+		setProcessTx.Nonce = oracle.GetNonce()
 		stx := &models.SignedTx{}
 		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: setProcessTx}})
 		if err != nil {
@@ -230,6 +240,11 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 				p.CensusOrigin.String())
 		}
 
+		oracle, err := e.getAccount(e.Signer.Address())
+		if err != nil {
+			return fmt.Errorf("set census handle: %w", err)
+		}
+		setProcessTx.Nonce = oracle.GetNonce()
 		stx := &models.SignedTx{}
 		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: setProcessTx}})
 		if err != nil {
@@ -323,4 +338,15 @@ func checkEthereumTxCreator(
 		return fmt.Errorf("recovered address not in ethereum whitelist")
 	}
 	return nil
+}
+
+func (e *EthereumEvents) getAccount(addr common.Address) (*vochain.Account, error) {
+	acc, err := e.VochainApp.State.GetAccount(e.Signer.Address(), false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get account")
+	}
+	if acc == nil {
+		return nil, fmt.Errorf("account does not exist")
+	}
+	return acc, nil
 }
