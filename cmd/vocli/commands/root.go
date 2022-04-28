@@ -8,7 +8,6 @@ import (
 	"os"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
@@ -225,25 +224,18 @@ var mintCmd = &cobra.Command{
 // getNonce calls Client.GetAccount to get the current information of a normal
 // account. It is not to be used for the treasurer account.
 func getNonce(c *client.Client, address string) (uint32, error) {
-	if nonce != 0 {
-		return nonce, nil
-	}
-
 	resp, err := c.GetAccount(common.HexToAddress(address))
-	if err != nil && strings.Contains(err.Error(), "account does not exist") {
+	if err != nil {
 		return 0, nil
-	} else if err != nil {
-		return 0, fmt.Errorf("could not lookup the nonce for %s, try specifying manually: %s", address, err)
+	}
+	if resp == nil {
+		return 0, vochain.ErrAccountNotExist
 	}
 	return resp.Account.Nonce, nil
 }
 
 // getTreasurerNonce is like getNonce but only for the treasurer
 func getTreasurerNonce(c *client.Client) (uint32, error) {
-	if nonce != 0 {
-		return nonce, nil
-	}
-
 	resp, err := c.GetTreasurer()
 	if err != nil {
 		return 0, fmt.Errorf("could not lookup the treasurer's nonce, try specifying manually: %s", err)

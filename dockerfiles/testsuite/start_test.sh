@@ -17,8 +17,7 @@ CONCURRENT=${CONCURRENT:-1}
 ### must be splited by lines
 DEFAULT_ACCOUNT_KEYS="73ac72a16ea84dd1f76b62663d2aa380253aec4386935e460dad55d4293a0b11
 be9248891bd6c220d013afb4b002f72c8c22cbad9c02003c19729bcbd6962e52
-cb595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a48d
-ab595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a56a"
+cb595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a48d"
 ACCOUNT_KEYS=${ACCOUNT_KEYS:-$DEFAULT_ACCOUNT_KEYS}
 GWHOST="http://gateway0:9090/dvote"
 . env.oracle0key # contains var DVOTE_ETHCONFIG_ORACLEKEY, import into current env
@@ -34,12 +33,12 @@ TREASURER_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 ### newtest() { whatever ; }
 
 tests_to_run=(
+	"vocli"
 	"tokentransactions"
 	"merkle_vote_plaintext"
 	"cspvoting"
 	"anonvoting"
 	"merkle_vote_encrypted"
-	"vocli"
 )
 
 # if any arg is passed, treat them as the tests to run, overriding the default list
@@ -104,8 +103,7 @@ tokentransactions() {
 		  --logLevel=$LOGLEVEL \
 		  --operation=tokentransactions \
 		  --oracleKey=$ORACLE_KEY \
-		  --treasurerKey=$TREASURER_KEY \
-		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $4}')
+		  --treasurerKey=$TREASURER_KEY
 }
 
 vocli() {
@@ -146,13 +144,17 @@ initaccounts
 echo "### Test suite ready ###"
 for test in ${tests_to_run[@]}; do
 	[ $CONCURRENT -eq 1 ] && {
-		echo "### Running test $test concurrently with others ###"
-		( $test ; echo $? > $results/$test ) &
-		sleep 6
+		[ ${test[0]} == "vocli" ] && {
+			( $test ; echo $? > $results/$test )
+		} || {
+			echo "### Running test $test concurrently with others ###"
+			( $test ; echo $? > $results/$test ) &
+		}
 	} || {
 		echo "### Running test $test ###"
 		( $test ; echo $? > $results/$test )
 	}
+	sleep 6
 done
 
 echo "### Waiting for tests to finish ###"
@@ -165,7 +167,7 @@ for test in ${tests_to_run[@]} ; do
 	else
 		echo "Vochain test $test failed!"
 		echo "### Post run logs ###"
-		docker-compose logs
+		docker-compose logs --tail 1000
 		break
 	fi
 done
