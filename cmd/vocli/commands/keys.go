@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 	"golang.org/x/term"
 	"google.golang.org/protobuf/proto"
@@ -230,8 +231,9 @@ func createAccount(key *ethkeystore.Key, gatewayRpc, infoUri, faucetPkg string) 
 	if err != nil {
 		return err
 	}
+
 	nonce, err := getNonce(client, key.Address.Hex())
-	if err != nil {
+	if err != nil && err != vochain.ErrAccountNotExist {
 		return err
 	}
 
