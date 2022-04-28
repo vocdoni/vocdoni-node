@@ -1149,7 +1149,6 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 				return p.StartBlock, nil
 			}
 		}
-		log.Warn(c.GetCurrentBlock()) //debug
 		return 0, fmt.Errorf("process was not created")
 	}
 	return startBlock, nil

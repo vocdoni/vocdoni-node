@@ -285,14 +285,13 @@ func ensureProcessCreated(mainClient *client.Client,
 			duration,
 			maxCensusSize)
 		if err != nil {
-			log.Warnf("ensureProcessCreated: cannot create process: %s", err)
-			time.Sleep(time.Second * 10)
+			time.Sleep(time.Second * 8)
 			continue
 		}
 		waitUntilNextBlock(mainClient)
 		p, err := mainClient.GetProcessInfo(pid)
 		if err != nil {
-			log.Warnf("ensureProcessCreated: cannot get process %x (%s)", pid, err)
+			log.Infof("ensureProcessCreated: process %x not yet available ... (%s)", pid, err)
 		}
 		if p != nil {
 			log.Infof("ensureProcessCreated: got process %x info %+v", pid, p)
