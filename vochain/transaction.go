@@ -31,6 +31,13 @@ type VochainTx struct {
 	TxID       [32]byte
 }
 
+// AddTxResponse is the data returned by AddTx()
+type AddTxResponse struct {
+	TxHash []byte
+	Data   []byte
+	Log    string
+}
+
 // Unmarshal unarshal the content of a bytes serialized transaction.
 // Returns the transaction struct, the original bytes and the signature
 // of those bytes.
@@ -58,10 +65,11 @@ func TxKey(tx tmtypes.Tx) [32]byte {
 // It returns a bytes value which depends on the transaction type:
 //  Tx_Vote: vote nullifier
 //  default: []byte{}
-func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
+func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, error) {
 	if vtx.Tx == nil || app.State == nil || vtx.Tx.Payload == nil {
 		return nil, fmt.Errorf("transaction, state, and/or transaction payload is nil")
 	}
+	response := &AddTxResponse{TxHash: vtx.TxID[:]}
 	switch vtx.Tx.Payload.(type) {
 	case *models.Tx_Vote:
 		// get VoteEnvelope from tx
@@ -70,10 +78,11 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 		if err != nil || v == nil {
 			return nil, fmt.Errorf("voteTxCheck: %w", err)
 		}
+		response.Data = v.Nullifier
 		if commit {
-			return v.Nullifier, app.State.AddVote(v)
+			return response, app.State.AddVote(v)
 		}
-		return v.Nullifier, nil
+		return response, nil
 	case *models.Tx_Admin:
 		_, err := AdminTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
@@ -86,12 +95,12 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 				if err := app.State.AddOracle(common.BytesToAddress(tx.Address)); err != nil {
 					return nil, fmt.Errorf("addOracle: %w", err)
 				}
-				return vtx.TxID[:], app.State.IncrementTreasurerNonce()
+				return response, app.State.IncrementTreasurerNonce()
 			case models.TxType_REMOVE_ORACLE:
 				if err := app.State.RemoveOracle(common.BytesToAddress(tx.Address)); err != nil {
 					return nil, fmt.Errorf("removeOracle: %w", err)
 				}
-				return vtx.TxID[:], app.State.IncrementTreasurerNonce()
+				return response, app.State.IncrementTreasurerNonce()
 			// TODO: @jordipainan No cost applied, no nonce increased
 			case models.TxType_ADD_PROCESS_KEYS:
 				if err := app.State.AddProcessKeys(tx); err != nil {
@@ -108,20 +117,24 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 		}
 
 	case *models.Tx_NewProcess:
-		if p, txSender, err := app.NewProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State); err == nil {
-			if commit {
-				tx := vtx.Tx.GetNewProcess()
-				if tx.Process == nil {
-					return nil, fmt.Errorf("newProcess process is empty")
-				}
-				if err := app.State.AddProcess(p); err != nil {
-					return nil, fmt.Errorf("newProcess: addProcess: %s", err)
-				}
-				return vtx.TxID[:], app.State.SubtractCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
-			}
-		} else {
+		p, txSender, err := app.NewProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		if err != nil {
 			return nil, fmt.Errorf("newProcess: %w", err)
 		}
+		if commit {
+			tx := vtx.Tx.GetNewProcess()
+			if tx.Process == nil {
+				return nil, fmt.Errorf("newProcess process is empty")
+			}
+			if err := app.State.AddProcess(p); err != nil {
+				return nil, fmt.Errorf("newProcess: addProcess: %w", err)
+			}
+			if err := app.State.IncrementAccountProcessIndex(txSender); err != nil {
+				return nil, fmt.Errorf("newProcess: cannot increment process index: %w", err)
+			}
+		}
+		response.Data = p.ProcessId
+		return response, app.State.SubtractCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
 
 	case *models.Tx_SetProcess:
 		txSender, err := SetProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
@@ -155,7 +168,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			default:
 				return nil, fmt.Errorf("unknown set process tx type")
 			}
-			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(txSender, tx.Txtype)
+			return response, app.State.SubtractCostIncrementNonce(txSender, tx.Txtype)
 		}
 
 	case *models.Tx_RegisterKey:
@@ -169,7 +182,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			if !ok {
 				return nil, fmt.Errorf("cannot parse weight %s", weight)
 			}
-			return vtx.TxID[:], app.State.AddToRollingCensus(tx.ProcessId, tx.NewKey, weight)
+			return response, app.State.AddToRollingCensus(tx.ProcessId, tx.NewKey, weight)
 		}
 
 	case *models.Tx_SetAccountInfo:
@@ -193,7 +206,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 						return nil, fmt.Errorf("setAccountInfoTxCheck: createAccount %w", err)
 					}
 					// consume provided faucet payload
-					return vtx.TxID[:], app.State.ConsumeFaucetPayload(
+					return response, app.State.ConsumeFaucetPayload(
 						txValues.FaucetPayloadSigner,
 						&models.FaucetPayload{
 							Identifier: tx.GetFaucetPackage().GetPayload().GetIdentifier(),
@@ -204,21 +217,18 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 					)
 				}
 				// any faucet payload provided, just create account
-				return vtx.TxID[:], app.State.CreateAccount(txValues.TxSender,
+				return response, app.State.CreateAccount(txValues.TxSender,
 					tx.GetInfoURI(),
 					make([]common.Address, 0),
 					0,
 				)
 			}
 			// account already created, change infoURI
-			if err := app.State.SetAccountInfoURI(
-				txValues.Account,
-				tx.GetInfoURI(),
-			); err != nil {
+			if err := app.State.SetAccountInfoURI(txValues.Account, tx.GetInfoURI()); err != nil {
 				return nil, fmt.Errorf("setAccountInfoURI: %w", err)
 			}
 			// subtract tx costs and increment nonce
-			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(txValues.TxSender, models.TxType_SET_ACCOUNT_INFO)
+			return response, app.State.SubtractCostIncrementNonce(txValues.TxSender, models.TxType_SET_ACCOUNT_INFO)
 		}
 
 	case *models.Tx_SetTransactionCosts:
@@ -230,7 +240,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			if err := app.State.SetTxCost(vtx.Tx.GetSetTransactionCosts().Txtype, cost); err != nil {
 				return nil, fmt.Errorf("setTransactionCosts: %w", err)
 			}
-			return vtx.TxID[:], app.State.IncrementTreasurerNonce()
+			return response, app.State.IncrementTreasurerNonce()
 		}
 
 	case *models.Tx_MintTokens:
@@ -242,7 +252,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			if err := app.State.MintBalance(address, amount); err != nil {
 				return nil, fmt.Errorf("mintTokensTx: %w", err)
 			}
-			return vtx.TxID[:], app.State.IncrementTreasurerNonce()
+			return response, app.State.IncrementTreasurerNonce()
 		}
 	case *models.Tx_SendTokens:
 		txValues, err := SendTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
@@ -255,7 +265,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 				return nil, fmt.Errorf("sendTokensTx: transferBalance: %w", err)
 			}
 			// subtract tx costs and increment nonce
-			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_SEND_TOKENS)
+			return response, app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_SEND_TOKENS)
 		}
 	case *models.Tx_SetAccountDelegateTx:
 		txValues, err := SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
@@ -285,7 +295,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 			default:
 				return nil, fmt.Errorf("setAccountDelegate: invalid transaction type")
 			}
-			return vtx.TxID[:], err
+			return response, err
 		}
 	case *models.Tx_CollectFaucet:
 		fromAcc, err := CollectFaucetTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
@@ -306,12 +316,12 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) ([]byte, error) {
 				return nil, fmt.Errorf("collectFaucetTx: %w", err)
 			}
 			// subtract tx costs and increment nonce
-			return vtx.TxID[:], app.State.SubtractCostIncrementNonce(*fromAcc, models.TxType_COLLECT_FAUCET)
+			return response, app.State.SubtractCostIncrementNonce(*fromAcc, models.TxType_COLLECT_FAUCET)
 		}
 	default:
 		return nil, fmt.Errorf("invalid transaction type")
 	}
-	return vtx.TxID[:], nil
+	return response, nil
 }
 
 // VoteEnvelopeCheck is an abstraction of ABCI checkTx for submitting a vote

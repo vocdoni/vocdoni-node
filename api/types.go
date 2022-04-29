@@ -181,6 +181,7 @@ type APIresponse struct {
 	Files                []byte                           `json:"files,omitempty"`
 	Final                *bool                            `json:"final,omitempty"`
 	Finished             *bool                            `json:"finished,omitempty"`
+	Hash                 types.HexBytes                   `json:"hash,omitempty"`
 	Health               int32                            `json:"health,omitempty"`
 	Height               *uint32                          `json:"height,omitempty"`
 	InvalidClaims        []int                            `json:"invalidClaims,omitempty"`

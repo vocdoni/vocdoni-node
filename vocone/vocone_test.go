@@ -44,17 +44,15 @@ func testCSPvote(oracle *ethereum.SignKeys, url string) error {
 	cspKey.Generate()
 	entityID := util.RandomBytes(20)
 	censusRoot := cspKey.PublicKey()
-	processID := util.RandomBytes(32)
 	envelope := new(models.EnvelopeType)
 	censusOrigin := models.CensusOrigin_OFF_CHAIN_CA
 	duration := 100
 	censusSize := 10
-	startBlock, err := cli.CreateProcess(
+	startBlock, processID, err := cli.CreateProcess(
 		oracle,
 		entityID,
 		censusRoot,
 		"",
-		processID,
 		envelope,
 		nil,
 		censusOrigin,
@@ -65,7 +63,6 @@ func testCSPvote(oracle *ethereum.SignKeys, url string) error {
 	if err != nil {
 		return err
 	}
-
 	voterKeys := util.CreateEthRandomKeysBatch(censusSize)
 	proofs, err := cli.GetCSPproofBatch(voterKeys, &cspKey, processID)
 	if err != nil {

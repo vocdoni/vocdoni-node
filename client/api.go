@@ -1065,22 +1065,21 @@ func (c *Client) TestSendAnonVotes(
 	return votingElapsedTime, nil
 }
 
-func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
+func (c *Client) CreateProcess(account *ethereum.SignKeys,
 	entityID, censusRoot []byte,
 	censusURI string,
-	pid []byte,
 	envelopeType *models.EnvelopeType,
 	mode *models.ProcessMode,
 	censusOrigin models.CensusOrigin,
 	startBlockIncrement int,
 	duration int,
-	maxCensusSize uint64) (uint32, error) {
+	maxCensusSize uint64) (uint32, []byte, error) {
 
 	startBlock := uint32(0)
 	if startBlockIncrement > 0 {
 		current, err := c.GetCurrentBlock()
 		if err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 		startBlock = current + uint32(startBlockIncrement)
 	}
@@ -1097,7 +1096,6 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 		CensusURI:     &censusURI,
 		CensusOrigin:  censusOrigin,
 		BlockCount:    uint32(duration),
-		ProcessId:     pid,
 		StartBlock:    startBlock,
 		EnvelopeType:  envelopeType,
 		Mode:          mode,
@@ -1106,12 +1104,12 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 		MaxCensusSize: &maxCensusSize,
 	}
 	// get oracle account
-	acc, err := c.GetAccount(oracle.Address())
+	acc, err := c.GetAccount(account.Address())
 	if err != nil {
-		return 0, fmt.Errorf("cannot get account")
+		return 0, nil, fmt.Errorf("cannot get account")
 	}
 	if acc == nil {
-		return 0, vochain.ErrAccountNotExist
+		return 0, nil, vochain.ErrAccountNotExist
 	}
 	p := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
@@ -1121,37 +1119,41 @@ func (c *Client) CreateProcess(oracle *ethereum.SignKeys,
 	stx := &models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: p}})
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	chainID, err := c.GetChainID()
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, chainID); err != nil {
-		return 0, err
+	if stx.Signature, err = account.SignVocdoniTx(stx.Tx, chainID); err != nil {
+		return 0, nil, err
 	}
 	if req.Payload, err = proto.Marshal(stx); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	resp, err := c.Request(req, nil)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	if !resp.Ok {
-		return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+		return 0, nil, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
+	}
+	processID, err := hex.DecodeString(resp.Payload)
+	if err != nil {
+		return 0, nil, fmt.Errorf("cannot decode process ID: %x", resp.Payload)
 	}
 	if startBlockIncrement == 0 {
 		for i := 0; i < 10; i++ {
 			time.Sleep(2 * time.Second)
-			p, err := c.GetProcessInfo(pid)
+			p, err := c.GetProcessInfo(processID)
 			if err == nil && p != nil {
-				return p.StartBlock, nil
+				return p.StartBlock, processID, nil
 			}
 		}
-		return 0, fmt.Errorf("process was not created")
+		return 0, nil, fmt.Errorf("process was not created")
 	}
-	return startBlock, nil
+	return startBlock, processID, nil
 }
 
 func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
