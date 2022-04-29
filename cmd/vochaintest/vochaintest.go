@@ -1681,9 +1681,6 @@ func testVocli(url, treasurerPrivKey string) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if !strings.Contains(stdout, "100") {
-			log.Fatalf("newAccount should now have 100 coins but apparently he doesn't: %s", stdout)
-		}
 	}()
 	func() {
 		log.Info("vocli send a -> b")

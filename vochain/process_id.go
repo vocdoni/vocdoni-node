@@ -48,7 +48,7 @@ func (p *ProcessID) Marshal() []byte {
 	envType := make([]byte, 2)
 	binary.BigEndian.PutUint16(envType, uint16(p.envType))
 
-	id := make([]byte, 32)
+	var id []byte
 	id = append(chainID[:6], p.organizationAddr.Bytes()[:20]...)
 	id = append(id, proofType[1:]...)
 	id = append(id, envType[1:]...)

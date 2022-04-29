@@ -183,7 +183,17 @@ func (app *BaseApplication) SetDefaultMethods() {
 	})
 
 	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
-		return app.Node.BroadcastTxSync(context.Background(), tx)
+		r, err := return app.Node.BroadcastTxSync(context.Background(), tx)
+		txHash, err := hex.DecodeString(r.Info)
+		if err != nil {
+			return nil, fmt.Errorf("no tx hash received")
+		}
+		return &ctypes.ResultBroadcastTx{
+			Code: r.Code,
+			Data: r.Data,
+			Log:  r.Log,
+			Hash: txHash,
+		}, nil
 	})
 }
 
