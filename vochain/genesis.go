@@ -176,7 +176,7 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2022-04-29T20:43:28.668436552Z",
+   "genesis_time":"2022-05-02T09:43:28.668436552Z",
    "chain_id":"vocdoni-development-67",
    "consensus_params":{
       "block":{
@@ -274,7 +274,17 @@ var Genesis = map[string]VochainGenesis{
       ],
       "oracles":[
          "0xb926be24A9ca606B515a835E91298C7cF0f2846f",
-         "0x2f4ed2773dcf7ad0ec15eb84ec896f4eebe0e08a"
+	 "0x4a081070E9D555b5D19629a6bcc8B77f4aE6d39c"
+      ],
+      "accounts":[
+         { 
+            "address":"0xb926be24A9ca606B515a835E91298C7cF0f2846f", 
+            "balance":10000 
+         },
+         { 
+            "address":"0x4a081070E9D555b5D19629a6bcc8B77f4aE6d39c", 
+            "balance":10000 
+         }
       ],
       "treasurer": "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d",
       "tx_cost": {

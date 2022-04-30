@@ -171,8 +171,18 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 			Name:    strconv.Itoa(rand.Int()),
 		}
 	}
-	appState.Oracles = oracles
-	appState.Treasurer = treasurer
+	for _, os := range oracles {
+		os, err := hex.DecodeString(util.TrimHex(os))
+		if err != nil {
+			return nil, err
+		}
+		appState.Oracles = append(appState.Oracles, os)
+	}
+	tb, err := hex.DecodeString(util.TrimHex(treasurer))
+	if err != nil {
+		return nil, err
+	}
+	appState.Treasurer = tb
 	appStateBytes, err := tmjson.Marshal(appState)
 	if err != nil {
 		return nil, err

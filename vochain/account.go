@@ -224,7 +224,7 @@ func (v *State) CreateAccount(accountAddress common.Address,
 		return fmt.Errorf("cannot create account %s: %w", accountAddress.String(), err)
 	}
 	if acc != nil {
-		return fmt.Errorf("account %s already exists", accountAddress.String())
+		return ErrAccountAlreadyExists
 	}
 	acc = &Account{}
 	// account not found, creating it
@@ -239,11 +239,10 @@ func (v *State) CreateAccount(accountAddress common.Address,
 			}
 		}
 	}
-	log.Debugf("creating account %s with infoURI %s balance %d nonce %d and delegates %+v",
+	log.Debugf("creating account %s with infoURI %s balance %d and delegates %+v",
 		accountAddress.String(),
 		acc.InfoURI,
 		acc.Balance,
-		acc.Nonce,
 		printPrettierDelegates(acc.DelegateAddrs),
 	)
 	return v.SetAccount(accountAddress, acc)

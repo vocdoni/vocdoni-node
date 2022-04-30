@@ -46,6 +46,19 @@ tests_to_run=(
 	"merkle_vote_encrypted"
 )
 
+# print help
+[ "$1" == "-h" -o "$1" == "--help" ] && {
+  echo "$0 <test_to_run>"
+  echo "availabe tests: ${tests_to_run[@]}"
+  echo "env vars:"
+  echo "  CLEAN=1"
+  echo "  ELECTION_SIZE=300"
+  echo "  ELECTION_SIZE_ANON=10"
+  echo "  LOGLEVEL=info"
+  echo "  GWHOST=http://gateway0:9090/dvote"
+  exit 0
+}
+
 # if any arg is passed, treat them as the tests to run, overriding the default list
 [ $# != 0 ] && tests_to_run=($@)
 
@@ -143,8 +156,6 @@ done
 # create temp dir
 results="/tmp/.vochaintest$RANDOM"
 mkdir -p $results
-
-initaccounts
 
 echo "### Test suite ready ###"
 for test in ${tests_to_run[@]}; do

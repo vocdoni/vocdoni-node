@@ -468,10 +468,25 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 	// get oracles
 	for _, v := range genesisAppState.Oracles {
-		log.Infof("adding genesis oracle %s", v)
-		if err := app.State.AddOracle(ethcommon.HexToAddress(v)); err != nil {
+		log.Infof("adding genesis oracle %x", v)
+		addr := ethcommon.BytesToAddress(v)
+		if err := app.State.AddOracle(addr); err != nil {
 			log.Fatalf("cannot add oracles: %v", err)
 		}
+		app.State.CreateAccount(addr, "", nil, 100)
+	}
+	// create accounts
+	for _, acc := range genesisAppState.Accounts {
+		addr := ethcommon.BytesToAddress(acc.Address)
+		if err := app.State.CreateAccount(addr, "", nil, acc.Balance); err != nil {
+			if err != ErrAccountAlreadyExists {
+				log.Fatalf("cannot create acount %x %v", addr, err)
+			}
+			if err := app.State.MintBalance(addr, acc.Balance); err != nil {
+				log.Fatal(err)
+			}
+		}
+		log.Infof("creatred acccount %x with %d tokens", addr, acc.Balance)
 	}
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
@@ -491,11 +506,8 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 
 	// set treasurer address
-	if !ethcommon.IsHexAddress(genesisAppState.Treasurer) {
-		log.Fatalf("treasurer should be a valid Ethereum address: %s", err)
-	}
-	log.Infof("adding genesis treasurer %s", genesisAppState.Treasurer)
-	if err := app.State.SetTreasurer(ethcommon.HexToAddress(genesisAppState.Treasurer), 0); err != nil {
+	log.Infof("adding genesis treasurer %x", genesisAppState.Treasurer)
+	if err := app.State.SetTreasurer(ethcommon.BytesToAddress(genesisAppState.Treasurer), 0); err != nil {
 		log.Fatalf("could not set State.Treasurer from genesis file: %s", err)
 	}
 

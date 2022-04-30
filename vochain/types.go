@@ -17,14 +17,15 @@ const (
 )
 
 var (
-	ErrVoteDoesNotExist    = fmt.Errorf("vote does not exist")
-	ErrNotEnoughBalance    = fmt.Errorf("not enough balance to transfer")
-	ErrAccountNonceInvalid = fmt.Errorf("invalid account nonce")
-	ErrProcessNotFound     = fmt.Errorf("process not found")
-	ErrBalanceOverflow     = fmt.Errorf("balance overflow")
-	ErrAccountBalanceZero  = fmt.Errorf("zero balance account not valid")
-	ErrAccountNotExist     = fmt.Errorf("account does not exist")
-	ErrNilTx               = fmt.Errorf("nil transaction")
+	ErrVoteDoesNotExist     = fmt.Errorf("vote does not exist")
+	ErrNotEnoughBalance     = fmt.Errorf("not enough balance to transfer")
+	ErrAccountNonceInvalid  = fmt.Errorf("invalid account nonce")
+	ErrProcessNotFound      = fmt.Errorf("process not found")
+	ErrBalanceOverflow      = fmt.Errorf("balance overflow")
+	ErrAccountBalanceZero   = fmt.Errorf("zero balance account not valid")
+	ErrAccountNotExist      = fmt.Errorf("account does not exists")
+	ErrAccountAlreadyExists = fmt.Errorf("account already exists")
+	ErrNilTx                = fmt.Errorf("nil transaction")
 	// keys; not constants because of []byte
 	voteCountKey = []byte("voteCount")
 )
@@ -161,9 +162,13 @@ func TxTypeToCostName(txType models.TxType) string {
 // GenesisAppState application state in genesis
 type GenesisAppState struct {
 	Validators []GenesisValidator `json:"validators"`
-	Oracles    []string           `json:"oracles"`
-	Treasurer  string             `json:"treasurer"`
-	TxCost     TransactionCosts   `json:"tx_cost"`
+	Oracles    []types.HexBytes   `json:"oracles"`
+	Accounts   []struct {
+		Address types.HexBytes `json:"address"`
+		Balance uint64         `json:"balance"`
+	} `json:"accounts"`
+	Treasurer types.HexBytes   `json:"treasurer"`
+	TxCost    TransactionCosts `json:"tx_cost"`
 }
 
 // The rest of these genesis app state types are copied from
