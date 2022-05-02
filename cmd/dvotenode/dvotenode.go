@@ -65,7 +65,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"directory where data is stored")
 	flag.StringVarP(&globalCfg.VochainConfig.DBType, "dbType", "t", db.TypePebble,
 		fmt.Sprintf("key-value db type (%s, %s)", db.TypePebble, db.TypeBadger))
-	flag.StringVarP(&globalCfg.VochainConfig.Chain, "vochain", "v", "dev",
+	flag.StringVarP(&globalCfg.VochainConfig.Chain, "vochain", "v", "azeno",
 		fmt.Sprintf("vocdoni blockchain to connect with: %q", vochain.GenesisAvailableChains()))
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
 		"use developer mode (less security)")
@@ -109,7 +109,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.EthConfig.SigningKey = *flag.StringP("ethSigningKey", "k", "",
 		"signing private Key (if not specified the Ethereum keystore will be used)")
 	// ethereum web3
-	globalCfg.W3Config.ChainType = *flag.StringP("ethChain", "c", "rinkeby",
+	globalCfg.W3Config.ChainType = *flag.StringP("ethChain", "c", "xdai",
 		fmt.Sprintf("Ethereum blockchain to use: %s", ethchain.AvailableChains))
 	globalCfg.W3Config.W3External = *flag.StringSliceP("w3External", "w", []string{},
 		"comma-separated list of ethereum web3 endpoints. Supported protocols: http(s)://, ws(s):// and IPC filepath")

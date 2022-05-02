@@ -29,7 +29,7 @@ var Genesis = map[string]VochainGenesis{
 
 	// Azeno production Network
 	"azeno": {
-		AutoUpdateGenesis: false,
+		AutoUpdateGenesis: true,
 		SeedNodes:         []string{"1612de9353b4bd5891981c69f554e56e07733870@seed.azeno.vocdoni.net:26656"},
 		CircuitsConfig: []artifacts.CircuitConfig{
 			{ // index: 0, size: 1024
