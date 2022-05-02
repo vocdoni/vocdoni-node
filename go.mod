@@ -21,6 +21,7 @@ require (
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210406120253-ab86bc2846d9
 	github.com/766b/chi-prometheus v0.0.0-20211217152057-87afa9aa2ca8
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20211204171003-644e7408753f
+	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/cockroachdb/pebble v0.0.0-20220224015757-894b57aa32be
 	github.com/cosmos/iavl v0.15.3
 	github.com/deroproject/graviton v0.0.0-20201218180342-ab474f4c94d2

@@ -160,6 +160,10 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"enables the process archiver component")
 	globalCfg.VochainConfig.ProcessArchiveKey = *flag.String("processArchiveKey", "",
 		"IPFS base64 encoded private key for process archive IPNS")
+	globalCfg.VochainConfig.SnapshotURL = *flag.String("snapshotURL", "",
+		"starts the vochain importing a vochain state snapshot from the given local path or remote")
+	globalCfg.VochainConfig.ForceResync = *flag.Bool("vochainForceResync", false,
+		"if enabled overrides the node data with the content fetched from --snapshotURL")
 
 	// metrics
 	globalCfg.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
@@ -256,6 +260,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.Set("vochainConfig.ProcessArchiveDataDir", globalCfg.DataDir+"/archive")
 	viper.BindPFlag("vochainConfig.ProcessArchive", flag.Lookup("processArchive"))
 	viper.BindPFlag("vochainConfig.ProcessArchiveKey", flag.Lookup("processArchiveKey"))
+	viper.BindPFlag("vochainConfig.SnapshotURL", flag.Lookup("snapshotURL"))
+	viper.BindPFlag("vochainConfig.ForceResync", flag.Lookup("vochainForceResync"))
 
 	// metrics
 	viper.BindPFlag("metrics.Enabled", flag.Lookup("metricsEnabled"))

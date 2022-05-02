@@ -60,6 +60,19 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 // NewVochain starts a node with an ABCI application
 // For tendermint 0.34
 func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
+	if vochaincfg.SnapshotURL != "" {
+		log.Infof("importing snapshot...")
+		snapshotPath, err := FetchFile(filepath.Join(vochaincfg.DataDir, "snapshot"), vochaincfg.SnapshotURL)
+		if err != nil {
+			log.Fatalf("cannot import snapshot: %s", err)
+		}
+		log.Infof("snapshot successfully imported !")
+		if vochaincfg.ForceResync {
+			if err := restoreStateFromSnapshot(filepath.Join(vochaincfg.DataDir, "data"), snapshotPath); err != nil {
+				log.Fatalf("cannot restore state from snapshot: %s", err)
+			}
+		}
+	}
 	// creating new vochain app
 	app, err := NewBaseApplication(vochaincfg.DBType, filepath.Join(vochaincfg.DataDir, "data"))
 	if err != nil {
@@ -643,4 +656,24 @@ func AminoKeys(key crypto25519.PrivKey) (private, public []byte, err error) {
 // Tendermint like amino format useful for creating genesis files.
 func AminoPubKey(pubkey []byte) ([]byte, error) {
 	return tmjson.Marshal(pubkey)
+}
+
+// restoreStateFromSnapshot overrides the node data with a given snapshot
+func restoreStateFromSnapshot(dataDir, src string) error {
+	log.Infof("deleting old datadir ... %s", dataDir)
+	if _, err := os.Stat(dataDir); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("cannot check if destination directory exists")
+	} else if err != nil {
+		if err := os.RemoveAll(dataDir); err != nil {
+			return fmt.Errorf("cannot clean directory before applying the snapshot")
+		}
+	}
+	log.Infof("decompressing snapshot ...")
+	if err := Untar(
+		src,
+		strings.TrimSuffix(dataDir, "/data"),
+	); err != nil {
+		return fmt.Errorf("error decompressing snapshot %w", err)
+	}
+	return nil
 }

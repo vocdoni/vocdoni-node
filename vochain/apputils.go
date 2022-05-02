@@ -1,20 +1,27 @@
 package vochain
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 
+	"github.com/cavaliergopher/grab/v3"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	cfg "github.com/tendermint/tendermint/config"
@@ -232,4 +239,100 @@ func printPrettierDelegates(delegates [][]byte) []string {
 		prettierDelegates = append(prettierDelegates, ethcommon.BytesToAddress(delegate).String())
 	}
 	return prettierDelegates
+}
+
+// Untar decompress a tar archived file into a given destination
+func Untar(src string, destination string) error {
+	r, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("cannot open file %s: %w", src, err)
+	}
+	uncompressedStream, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("cannot read file %s: %w", src, err)
+	}
+	// untar
+	tr := tar.NewReader(uncompressedStream)
+	// uncompress each element
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		target := header.Name
+		// validate name against path traversal
+		if header.Name == "" || strings.Contains(header.Name, `\`) ||
+			strings.HasPrefix(header.Name, "/") || strings.Contains(header.Name, "../") {
+			return fmt.Errorf("tar contained invalid name error %q", target)
+		}
+		// add dst + re-format slashes according to system
+		target = filepath.Join(destination, header.Name)
+		// check the type
+		switch header.Typeflag {
+		// if its a dir and it doesn't exist create it (with 0755 permission)
+		case tar.TypeDir:
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
+			}
+		// if it's a file create it (with same permission)
+		case tar.TypeReg:
+			fileToWrite, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+			// copy over contents
+			if _, err := io.Copy(fileToWrite, tr); err != nil {
+				return err
+			}
+			// manually close here after each file operation; defering would cause each file close
+			// to wait until all operations have completed.
+			fileToWrite.Close()
+		}
+	}
+	if err := r.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// FetchFile downloads a file from a given URL
+func FetchFile(destDir, url string) (string, error) {
+	// check if dest dir exists
+	if _, err := os.Stat(destDir); err != nil && os.IsNotExist(err) {
+		if err := os.MkdirAll(destDir, 0o777); err != nil {
+			return "", fmt.Errorf("cannot create destination directory: %w", err)
+		}
+	} else if err != nil {
+		return "", fmt.Errorf("cannot check if destination directory exists")
+	}
+	client := grab.NewClient()
+	req, _ := grab.NewRequest(destDir, url)
+	log.Infof("downloading from %v...", req.URL())
+	resp := client.Do(req)
+	t := time.NewTicker(time.Second * 5)
+	defer t.Stop()
+loop:
+	for {
+		select {
+		case <-t.C:
+			log.Infof("transferred %d / %d bytes (%.2f%%)",
+				resp.BytesComplete(),
+				resp.Size,
+				100*resp.Progress(),
+			)
+
+		case <-resp.Done:
+			// download complete
+			break loop
+		}
+	}
+	if err := resp.Err(); err != nil {
+		return "", fmt.Errorf("download failed: %w", err)
+	}
+	return resp.Filename, nil
 }
