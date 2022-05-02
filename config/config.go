@@ -180,6 +180,12 @@ type VochainCfg struct {
 	ProcessArchiveDataDir string
 	// Scrutinizer holds the configuration regarding the scrutinizer component
 	Scrutinizer ScrutinizerCfg
+	// SnapshotURL imports a compressed file that contains a snapshot
+	// of the state
+	SnapshotURL string
+	// ForceResync forces the node to start with the data fetched from SnapshotURL.
+	// Overrides the node data
+	ForceResync bool
 }
 
 // ScrutinizerCfg handles the configuration options of the scrutinizer
