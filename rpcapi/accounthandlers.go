@@ -26,11 +26,12 @@ func (r *RPCAPI) getAccount(request *api.APIrequest) (*api.APIresponse, error) {
 	if acc == nil {
 		return nil, vochain.ErrAccountNotExist
 	}
-	response := api.APIresponse{InfoURI: acc.InfoURI}
-	response.Balance = new(uint64)
-	*response.Balance = acc.Balance
-	response.Nonce = new(uint32)
-	*response.Nonce = acc.Nonce
+	response := api.APIresponse{
+		InfoURI:      acc.InfoURI,
+		Balance:      &acc.Balance,
+		Nonce:        &acc.Nonce,
+		ProcessNonce: &acc.ProcessIndex,
+	}
 	if len(acc.DelegateAddrs) > 0 {
 		for _, v := range acc.DelegateAddrs {
 			response.Delegates = append(response.Delegates, common.BytesToAddress(v).String())

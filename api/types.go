@@ -198,6 +198,7 @@ type APIresponse struct {
 	ProcessIDs           []string                         `json:"processIds,omitempty"`
 	Process              *indexertypes.Process            `json:"process,omitempty"`
 	ProcessList          []string                         `json:"processList,omitempty"`
+	ProcessNonce         *uint32                          `json:"processNonce,omitempty"`
 	Registered           *bool                            `json:"registered,omitempty"`
 	Request              string                           `json:"request"`
 	Results              [][]string                       `json:"results,omitempty"`
