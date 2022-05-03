@@ -486,7 +486,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 				log.Fatal(err)
 			}
 		}
-		log.Infof("creatred acccount %x with %d tokens", addr, acc.Balance)
+		log.Infof("created acccount %x with %d tokens", addr, acc.Balance)
 	}
 	// get validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
