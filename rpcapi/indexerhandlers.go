@@ -5,9 +5,9 @@ import (
 
 	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	models "go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -111,12 +111,28 @@ func (r *RPCAPI) getBlockList(request *api.APIrequest) (*api.APIresponse, error)
 	return &response, nil
 }
 
+func protoFormat(tx []byte) string {
+	ptx := models.Tx{}
+	if err := proto.Unmarshal(tx, &ptx); err != nil {
+		return ""
+	}
+	pj := protojson.MarshalOptions{
+		Multiline: false,
+		Indent:    "",
+	}
+	return pj.Format(&ptx)
+}
+
 func (r *RPCAPI) getTx(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	tx, hash, err := r.scrutinizer.App.GetTxHash(request.Height, request.TxIndex)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx: %w", err)
 	}
+	response.Payload = protoFormat(tx.Tx)
+	ptx := models.Tx{}
+	proto.Unmarshal(tx.Tx, &ptx)
+
 	response.Tx = &indexertypes.TxPackage{
 		Tx:        tx.Tx,
 		Index:     new(int32),
@@ -127,6 +143,7 @@ func (r *RPCAPI) getTx(request *api.APIrequest) (*api.APIresponse, error) {
 	return &response, nil
 }
 
+// TODO @pau: the transaction payload is returned twice, base64 and json
 func (r *RPCAPI) getTxById(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	txRef, err := r.scrutinizer.GetTxReference(uint64(request.ID))
@@ -137,6 +154,7 @@ func (r *RPCAPI) getTxById(request *api.APIrequest) (*api.APIresponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx: %w", err)
 	}
+	response.Payload = protoFormat(tx.Tx)
 	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
 		ID:          uint32(txRef.Index),
@@ -159,6 +177,7 @@ func (r *RPCAPI) getTxByHash(request *api.APIrequest) (*api.APIresponse, error) 
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx: %w", err)
 	}
+	response.Payload = protoFormat(tx.Tx)
 	response.Tx = &indexertypes.TxPackage{
 		Tx:          tx.Tx,
 		ID:          uint32(txRef.Index),
@@ -191,19 +210,10 @@ func (r *RPCAPI) getTxListForBlock(request *api.APIrequest) (*api.APIresponse, e
 		if err = proto.Unmarshal(signedTx.Tx, tx); err != nil {
 			return nil, fmt.Errorf("cannot get tx: %w", err)
 		}
-		var txType string
-		switch tx.Payload.(type) {
-		case *models.Tx_Vote:
-			txType = types.TxVote
-		case *models.Tx_NewProcess:
-			txType = types.TxNewProcess
-		case *models.Tx_Admin:
-			txType = tx.Payload.(*models.Tx_Admin).Admin.GetTxtype().String()
-		case *models.Tx_SetProcess:
-			txType = types.TxSetProcess
-		default:
-			txType = "unknown"
-		}
+		txType := string(
+			tx.ProtoReflect().WhichOneof(
+				tx.ProtoReflect().Descriptor().Oneofs().Get(0)).Name())
+
 		response.TxList = append(response.TxList, &indexertypes.TxMetadata{
 			Type:  txType,
 			Index: int32(i),
