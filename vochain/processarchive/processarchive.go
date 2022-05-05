@@ -54,19 +54,8 @@ func NewJsonStorage(datadir string) (*jsonStorage, error) {
 	if err != nil {
 		return nil, err
 	}
-	i := &Index{
-		Entities: make(map[string][]*IndexProcess),
-	}
-	indexFile := filepath.Join(datadir, "index.json")
-	indexData, err := os.ReadFile(indexFile)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	} else if err == nil {
-		if err := json.Unmarshal(indexData, i); err != nil {
-			return nil, err
-		}
-	}
-	return &jsonStorage{datadir: datadir, index: i}, nil
+	i, err := BuildIndex(datadir)
+	return &jsonStorage{datadir: datadir, index: i}, err
 }
 
 // AddProcess adds an entire process to js
@@ -129,6 +118,42 @@ func (js *jsonStorage) ProcessExist(pid []byte) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// BuildIndex scans the archive directory and builds the JSON storage index
+func BuildIndex(datadir string) (*Index, error) {
+	i := &Index{
+		Entities: make(map[string][]*IndexProcess),
+	}
+	count := 0
+	if err := filepath.Walk(datadir, func(path string, info os.FileInfo, err error) error {
+		if len(info.Name()) == 64 {
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if content == nil {
+				log.Warnf("archive file %s is empty", path)
+				return nil
+			}
+			count++
+			p := &Process{}
+			if err := json.Unmarshal(content, p); err != nil {
+				return err
+			}
+			eid := fmt.Sprintf("%x", p.ProcessInfo.EntityID)
+			i.Entities[eid] = append(i.Entities[eid], &IndexProcess{ProcessID: p.ProcessInfo.ID})
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	indexData, err := json.MarshalIndent(i, " ", " ")
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("archive index build with %d processes", count)
+	return i, os.WriteFile(filepath.Join(datadir, "index.json"), indexData, 0o644)
 }
 
 // NewProcessArchive creates a new instance of the process archiver.
