@@ -64,9 +64,9 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 		log.Infof("importing snapshot...")
 		snapshotPath, err := FetchFile(filepath.Join(vochaincfg.DataDir, "snapshot"), vochaincfg.SnapshotURL)
 		if err != nil {
-			log.Fatalf("cannot import snapshot: %s", err)
+			log.Fatalf("cannot download snapshot: %s", err)
 		}
-		log.Infof("snapshot successfully imported !")
+		log.Infof("snapshot successfully downloaded!")
 		if vochaincfg.ForceResync {
 			if err := restoreStateFromSnapshot(filepath.Join(vochaincfg.DataDir, "data"), snapshotPath); err != nil {
 				log.Fatalf("cannot restore state from snapshot: %s", err)
@@ -660,13 +660,9 @@ func AminoPubKey(pubkey []byte) ([]byte, error) {
 
 // restoreStateFromSnapshot overrides the node data with a given snapshot
 func restoreStateFromSnapshot(dataDir, src string) error {
-	log.Infof("deleting old datadir ... %s", dataDir)
-	if _, err := os.Stat(dataDir); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("cannot check if destination directory exists")
-	} else if err != nil {
-		if err := os.RemoveAll(dataDir); err != nil {
-			return fmt.Errorf("cannot clean directory before applying the snapshot")
-		}
+	log.Infof("cleaning up old datadir %s before applying the snapshot", dataDir)
+	if err := os.RemoveAll(dataDir); err != nil {
+		return fmt.Errorf("cannot clean old datadir: %w", err)
 	}
 	log.Infof("decompressing snapshot ...")
 	if err := Untar(
