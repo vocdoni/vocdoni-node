@@ -337,13 +337,8 @@ func Untar(src string, destination string) error {
 
 // FetchFile downloads a file from a given URL
 func FetchFile(destDir, url string) (string, error) {
-	// check if dest dir exists
-	if _, err := os.Stat(destDir); err != nil && os.IsNotExist(err) {
-		if err := os.MkdirAll(destDir, 0o777); err != nil {
-			return "", fmt.Errorf("cannot create destination directory: %w", err)
-		}
-	} else if err != nil {
-		return "", fmt.Errorf("cannot check if destination directory exists")
+	if err := os.MkdirAll(destDir, 0o777); err != nil {
+		return "", fmt.Errorf("cannot create destination directory: %w", err)
 	}
 	client := grab.NewClient()
 	req, _ := grab.NewRequest(destDir, url)
@@ -369,5 +364,6 @@ loop:
 	if err := resp.Err(); err != nil {
 		return "", fmt.Errorf("download failed: %w", err)
 	}
+	log.Infof("%s saved at %s", filepath.Base(resp.Filename), destDir)
 	return resp.Filename, nil
 }
