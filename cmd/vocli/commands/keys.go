@@ -221,13 +221,13 @@ func PromptPassword(prompt string) (string, error) {
 	return password, nil
 }
 
-func createAccount(key *ethkeystore.Key, gatewayRpc, infoUri, faucetPkg string) error {
-	fmt.Fprintf(Stdout, "Sending SetAccountInfo for key %s on %s\n", key.Address.String(), gatewayRpc)
+func createAccount(key *ethkeystore.Key, url, infoUri, faucetPkg string) error {
+	fmt.Fprintf(Stdout, "Sending SetAccountInfo for key %s on %s\n", key.Address.String(), url)
 
 	signer := ethereum.NewSignKeys()
 	signer.Private = *key.PrivateKey
 	signer.Public = key.PrivateKey.PublicKey
-	client, err := client.New(gatewayRpc)
+	client, err := client.New(url)
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func createAccount(key *ethkeystore.Key, gatewayRpc, infoUri, faucetPkg string) 
 		}
 	}
 
-	fmt.Fprintf(Stdout, "Account created/updated on chain %s\n", gatewayRpc)
+	fmt.Fprintf(Stdout, "Account created/updated on chain %s\n", v.GetString(urlKey))
 	return nil
 }
 
