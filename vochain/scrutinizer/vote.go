@@ -1,16 +1,19 @@
 package scrutinizer
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	badger "github.com/dgraph-io/badger/v3"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -35,6 +38,7 @@ var ErrNotFoundInDatabase = badgerhold.ErrNotFound
 func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
 	bhStartTime := time.Now()
 	txRef := &indexertypes.VoteReference{}
+	// TODO(sqlite): reimplement
 	if err := s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier)); err != nil {
 		return nil, err
 	}
@@ -114,6 +118,7 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 	const limitConcurrentProcessing = 20
 	semaphore := make(chan bool, limitConcurrentProcessing)
 
+	// TODO(sqlite): reimplement
 	err := s.db.ForEach(
 		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
 		func(txRef *indexertypes.VoteReference) error {
@@ -160,6 +165,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 	}
 	envelopes := []*indexertypes.EnvelopeMetadata{}
 	var err error
+	// TODO(sqlite): reimplement
 	// check pid
 	if len(processId) == types.ProcessIDsize {
 		err = s.db.ForEach(
@@ -230,6 +236,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 // GetEnvelopeHeight returns the number of envelopes for a processId.
 // If processId is empty, returns the total number of envelopes.
 func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
+	// TODO(sqlite): reimplement
 	startTime := time.Now()
 	defer func() { log.Debugf("GetEnvelopeHeight took %s", time.Since(startTime)) }()
 	if len(processID) == 0 {
@@ -263,6 +270,8 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	height := s.App.Height()
 	log.Debugf("computing results on height %d for %x", height, processID)
 
+	// TODO(sqlite): use a single tx for everything here
+
 	// Get process from database
 	p, err := s.ProcessInfo(processID)
 	if err != nil {
@@ -274,35 +283,46 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 		return err
 	}
 
-	// We need to use UpdateMatching here because of a race condition between ComputeResult and
-	// updateProcess. If we fetch the process, compute the results, then update the process,
-	// ComputeResult can override the process status set by updateProcess. UpdateMatching
-	// gets rid of the time between fetching and updating the process, eliminating this race.
-	if err := s.queryWithRetries(func() error {
-		return s.db.UpdateMatching(&indexertypes.Process{},
-			badgerhold.Where(badgerhold.Key).Eq(processID),
-			func(record interface{}) error {
-				update, ok := record.(*indexertypes.Process)
-				if !ok {
-					return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
-				}
-				update.HaveResults = true
-				update.FinalResults = true
-				return nil
-			},
-		)
-	}); err != nil {
-		return fmt.Errorf("computeResult: cannot update processID %x: %v", processID, err)
+	if enableBadgerhold {
+		// We need to use UpdateMatching here because of a race condition between ComputeResult and
+		// updateProcess. If we fetch the process, compute the results, then update the process,
+		// ComputeResult can override the process status set by updateProcess. UpdateMatching
+		// gets rid of the time between fetching and updating the process, eliminating this race.
+		if err := s.queryWithRetries(func() error {
+			return s.db.UpdateMatching(&indexertypes.Process{},
+				badgerhold.Where(badgerhold.Key).Eq(processID),
+				func(record interface{}) error {
+					update, ok := record.(*indexertypes.Process)
+					if !ok {
+						return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+					}
+					update.HaveResults = true
+					update.FinalResults = true
+					return nil
+				},
+			)
+		}); err != nil {
+			return fmt.Errorf("computeResult: cannot update processID %x: %v", processID, err)
+		}
 	}
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-	if _, err := queries.SetProcessResultsReady(ctx, processID); err != nil {
+	if _, err := queries.SetProcessResultsReady(ctx, scrutinizerdb.SetProcessResultsReadyParams{
+		ID:             processID,
+		Votes:          encodeVotes(results.Votes),
+		Weight:         results.Weight.String(),
+		EnvelopeHeight: int64(results.EnvelopeHeight),
+		Signatures:     joinHexBytes(results.Signatures),
+		BlockHeight:    int64(results.BlockHeight),
+	}); err != nil {
 		return err
 	}
-	s.addVoteLock.Lock()
-	defer s.addVoteLock.Unlock()
-	if err := s.queryWithRetries(func() error { return s.db.Upsert(processID, results) }); err != nil {
-		return err
+	if enableBadgerhold {
+		s.addVoteLock.Lock()
+		defer s.addVoteLock.Unlock()
+		if err := s.queryWithRetries(func() error { return s.db.Upsert(processID, results) }); err != nil {
+			return err
+		}
 	}
 
 	// Execute callbacks
@@ -312,34 +332,66 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	return nil
 }
 
+func joinHexBytes(list []types.HexBytes) string {
+	strs := make([]string, len(list))
+	for i, b := range list {
+		strs[i] = hex.EncodeToString(b)
+	}
+	return strings.Join(strs, ",")
+}
+
 // GetResults returns the current result for a processId
 func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error) {
-	startTime := time.Now()
-	defer func() { log.Debugf("GetResults took %s", time.Since(startTime)) }()
-	// Check if results are in cache and return them.
-	// Note that we don't use an atomic cache,
-	// since that would mean always inserting into the cache.
-	// TODO: remove this cache once we replace badgerhold
-	val := s.resultsCache.Get(string(processID))
-	if val != nil {
-		return val.(*indexertypes.Results), nil
-	}
-	// If not in cache, execute the expensive query
-	s.addVoteLock.RLock()
-	defer s.addVoteLock.RUnlock()
 	results := &indexertypes.Results{}
-	if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).
-		Eq(processID)); err != nil {
-		if errors.Is(err, badgerhold.ErrNotFound) {
-			return nil, ErrNoResultsYet
+	if enableBadgerhold {
+		startTime := time.Now()
+		defer func() { log.Debugf("GetResults took %s", time.Since(startTime)) }()
+		// Check if results are in cache and return them.
+		// Note that we don't use an atomic cache,
+		// since that would mean always inserting into the cache.
+		// TODO: remove this cache once we replace badgerhold
+		val := s.resultsCache.Get(string(processID))
+		if val != nil {
+			return val.(*indexertypes.Results), nil
 		}
+		// If not in cache, execute the expensive query
+		s.addVoteLock.RLock()
+		defer s.addVoteLock.RUnlock()
+		if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).
+			Eq(processID)); err != nil {
+			if errors.Is(err, badgerhold.ErrNotFound) {
+				return nil, ErrNoResultsYet
+			}
+			return nil, err
+		}
+		// If results are final, store in cache for next queries
+		if results.Final {
+			s.resultsCache.Add(string(processID), results)
+		}
+	}
+	startTime := time.Now()
+	defer func() { log.Debugf("GetResults sqlite took %s", time.Since(startTime)) }()
+
+	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
+	// does not matter much in the end
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	sqlProcInner, err := queries.GetProcess(ctx, processID)
+	if err != nil {
 		return nil, err
 	}
-	// If results are final, store in cache for next queries
-	if results.Final {
-		s.resultsCache.Add(string(processID), results)
+	sqlResults := indexertypes.ResultsFromDB(&sqlProcInner)
+
+	if enableBadgerhold {
+		if diff := cmp.Diff(results, sqlResults, cmpopts.IgnoreUnexported(
+			models.EnvelopeType{},
+			models.ProcessVoteOptions{},
+		)); diff != "" {
+			sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", processID, diff)
+		}
+		sqlResults = results // do not rely on sqlite yet
 	}
-	return results, nil
+	return sqlResults, nil
 }
 
 // GetResultsWeight returns the current weight of cast votes for a processId.
@@ -423,23 +475,25 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 		panic(err) // should never happen
 	}
 	creationTime := time.Now()
-	bhVoteRef := &indexertypes.VoteReference{
-		Nullifier:    nullifier,
-		ProcessID:    pid,
-		Height:       blockHeight,
-		Weight:       weightInt,
-		TxIndex:      txIndex,
-		CreationTime: creationTime,
-	}
-	if txn != nil {
-		if err := s.db.TxInsert(txn, nullifier, bhVoteRef); err != nil {
-			return err
+	if enableBadgerhold {
+		bhVoteRef := &indexertypes.VoteReference{
+			Nullifier:    nullifier,
+			ProcessID:    pid,
+			Height:       blockHeight,
+			Weight:       weightInt,
+			TxIndex:      txIndex,
+			CreationTime: creationTime,
 		}
-	} else {
-		if err := s.queryWithRetries(func() error {
-			return s.db.Insert(nullifier, bhVoteRef)
-		}); err != nil {
-			return err
+		if txn != nil {
+			if err := s.db.TxInsert(txn, nullifier, bhVoteRef); err != nil {
+				return err
+			}
+		} else {
+			if err := s.queryWithRetries(func() error {
+				return s.db.Insert(nullifier, bhVoteRef)
+			}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -495,24 +549,49 @@ func (s *Scrutinizer) commitVotes(pid []byte,
 // commitVotesUnsafe does the same as commitVotes but it does not use locks.
 func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 	partialResults *indexertypes.Results, height uint32) error {
-	update := func(record interface{}) error {
-		stored, ok := record.(*indexertypes.Results)
-		if !ok {
-			return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+
+	if enableBadgerhold {
+		update := func(record interface{}) error {
+			stored, ok := record.(*indexertypes.Results)
+			if !ok {
+				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
+			}
+			// If already final, don't update.
+			if stored.Final {
+				return nil
+			}
+			return stored.Add(partialResults)
 		}
-		// If already final, don't update.
-		if stored.Final {
-			return nil
+
+		if err := s.queryWithRetries(func() error {
+			return s.db.UpdateMatching(&indexertypes.Results{},
+				badgerhold.Where(badgerhold.Key).Eq(pid), update)
+		}); err != nil {
+			log.Debugf("saved %d votes with total weight of %s on process %x", len(partialResults.Votes),
+				partialResults.Weight, pid)
+			return err
 		}
-		return stored.Add(partialResults)
 	}
 
-	if err := s.queryWithRetries(func() error {
-		return s.db.UpdateMatching(&indexertypes.Results{},
-			badgerhold.Where(badgerhold.Key).Eq(pid), update)
+	// TODO(sqlite): use a tx
+	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
+	// does not matter much in the end
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	sqlProcInner, err := queries.GetProcess(ctx, pid)
+	if err != nil {
+		return err
+	}
+	results := indexertypes.ResultsFromDB(&sqlProcInner)
+	results.Add(partialResults)
+
+	if _, err := queries.UpdateProcessResults(ctx, scrutinizerdb.UpdateProcessResultsParams{
+		ID:             pid,
+		Votes:          encodeVotes(results.Votes),
+		Weight:         results.Weight.String(),
+		EnvelopeHeight: int64(results.EnvelopeHeight),
+		BlockHeight:    int64(results.BlockHeight),
 	}); err != nil {
-		log.Debugf("saved %d votes with total weight of %s on process %x", len(partialResults.Votes),
-			partialResults.Weight, pid)
 		return err
 	}
 	return nil
