@@ -330,7 +330,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 		// Add process to live results so new votes will be added
 		s.addProcessToLiveResults(p)
 	}
-	log.Infof("live resuts recovery computation finished, took %s", time.Since(startTime))
+	log.Infof("live results recovery computation finished, took %s", time.Since(startTime))
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain
