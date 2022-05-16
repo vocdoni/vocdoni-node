@@ -11,32 +11,37 @@ import (
 )
 
 type Process struct {
-	ID                types.ProcessID
-	EntityID          string
-	EntityIndex       int64
-	StartBlock        int64
-	EndBlock          int64
-	ResultsHeight     int64
-	HaveResults       bool
-	FinalResults      bool
-	CensusRoot        types.CensusRoot
-	RollingCensusRoot types.CensusRoot
-	RollingCensusSize int64
-	MaxCensusSize     int64
-	CensusUri         string
-	Metadata          string
-	CensusOrigin      int64
-	Status            int64
-	Namespace         int64
-	EnvelopePb        types.EncodedProtoBuf
-	ModePb            types.EncodedProtoBuf
-	VoteOptsPb        types.EncodedProtoBuf
-	PrivateKeys       string
-	PublicKeys        string
-	QuestionIndex     int64
-	CreationTime      time.Time
-	SourceBlockHeight int64
-	SourceNetworkID   string
+	ID                    types.ProcessID
+	EntityID              string
+	EntityIndex           int64
+	StartBlock            int64
+	EndBlock              int64
+	ResultsHeight         int64
+	HaveResults           bool
+	FinalResults          bool
+	CensusRoot            types.CensusRoot
+	RollingCensusRoot     types.CensusRoot
+	RollingCensusSize     int64
+	MaxCensusSize         int64
+	CensusUri             string
+	Metadata              string
+	CensusOrigin          int64
+	Status                int64
+	Namespace             int64
+	EnvelopePb            types.EncodedProtoBuf
+	ModePb                types.EncodedProtoBuf
+	VoteOptsPb            types.EncodedProtoBuf
+	PrivateKeys           string
+	PublicKeys            string
+	QuestionIndex         int64
+	CreationTime          time.Time
+	SourceBlockHeight     int64
+	SourceNetworkID       string
+	ResultsVotes          string
+	ResultsWeight         string
+	ResultsEnvelopeHeight int64
+	ResultsSignatures     string
+	ResultsBlockHeight    int64
 }
 
 type VoteReference struct {

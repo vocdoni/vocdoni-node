@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"sync"
 	"time"
 
@@ -27,6 +28,8 @@ import (
 	// _ "modernc.org/sqlite"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+var enableBadgerhold = os.Getenv("DISABLE_BADGERHOLD") != "true"
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
@@ -166,63 +169,65 @@ func (s *Scrutinizer) timeoutQueries() (*scrutinizerdb.Queries, context.Context,
 func (s *Scrutinizer) retrieveCounts() (map[uint8]uint64, error) {
 	var err error
 	txCountStore := new(indexertypes.CountStore)
-	if err = s.db.Get(indexertypes.CountStoreTransactions, txCountStore); err != nil {
-		log.Warnf("could not get the transaction count: %v", err)
-		count, err := s.db.Count(&indexertypes.TxReference{}, &badgerhold.Query{})
-		if err != nil {
-			if err != badger.ErrKeyNotFound {
-				return nil, fmt.Errorf("could not count total transactions: %v", err)
-			}
-			// If keyNotFound error, ensure count is 0
-			count = 0
-		}
-		// Store new countStore value
-		txCountStore.Count = uint64(count)
-		txCountStore.Type = indexertypes.CountStoreTransactions
-		if err := s.db.Upsert(txCountStore.Type, txCountStore); err != nil {
-			return nil, fmt.Errorf("could not store transaction count: %v", err)
-		}
-	}
 	envelopeCountStore := new(indexertypes.CountStore)
-	if err = s.db.Get(indexertypes.CountStoreEnvelopes, envelopeCountStore); err != nil {
-		log.Warnf("could not get the envelope count: %v", err)
-		count, err := s.db.Count(&indexertypes.VoteReference{}, &badgerhold.Query{})
-		if err != nil && err != badger.ErrKeyNotFound {
-			return nil, fmt.Errorf("could not count total envelopes: %v", err)
-		}
-		// Store new countStore value
-		envelopeCountStore.Count = uint64(count)
-		envelopeCountStore.Type = indexertypes.CountStoreEnvelopes
-		if err := s.db.Upsert(envelopeCountStore.Type, envelopeCountStore); err != nil {
-			return nil, fmt.Errorf("could not store envelope count: %v", err)
-		}
-	}
 	processCountStore := new(indexertypes.CountStore)
-	if err = s.db.Get(indexertypes.CountStoreProcesses, processCountStore); err != nil {
-		log.Warnf("could not get the process count: %v", err)
-		count, err := s.db.Count(&indexertypes.Process{}, &badgerhold.Query{})
-		if err != nil && err != badger.ErrKeyNotFound {
-			return nil, fmt.Errorf("could not count total processes: %v", err)
-		}
-		// Store new countStore value
-		processCountStore.Count = uint64(count)
-		processCountStore.Type = indexertypes.CountStoreProcesses
-		if err := s.db.Upsert(processCountStore.Type, processCountStore); err != nil {
-			return nil, fmt.Errorf("could not store process count: %v", err)
-		}
-	}
 	entityCountStore := new(indexertypes.CountStore)
-	if err = s.db.Get(indexertypes.CountStoreEntities, entityCountStore); err != nil {
-		log.Warnf("could not get the entity count: %v", err)
-		count, err := s.db.Count(&indexertypes.Entity{}, &badgerhold.Query{})
-		if err != nil && err != badger.ErrKeyNotFound {
-			return nil, fmt.Errorf("could not count total entities: %v", err)
+	if enableBadgerhold {
+		if err = s.db.Get(indexertypes.CountStoreTransactions, txCountStore); err != nil {
+			log.Warnf("could not get the transaction count: %v", err)
+			count, err := s.db.Count(&indexertypes.TxReference{}, &badgerhold.Query{})
+			if err != nil {
+				if err != badger.ErrKeyNotFound {
+					return nil, fmt.Errorf("could not count total transactions: %v", err)
+				}
+				// If keyNotFound error, ensure count is 0
+				count = 0
+			}
+			// Store new countStore value
+			txCountStore.Count = uint64(count)
+			txCountStore.Type = indexertypes.CountStoreTransactions
+			if err := s.db.Upsert(txCountStore.Type, txCountStore); err != nil {
+				return nil, fmt.Errorf("could not store transaction count: %v", err)
+			}
 		}
-		// Store new countStore value
-		entityCountStore.Count = uint64(count)
-		entityCountStore.Type = indexertypes.CountStoreEntities
-		if err := s.db.Upsert(entityCountStore.Type, entityCountStore); err != nil {
-			return nil, fmt.Errorf("could not store entity count: %v", err)
+		if err = s.db.Get(indexertypes.CountStoreEnvelopes, envelopeCountStore); err != nil {
+			log.Warnf("could not get the envelope count: %v", err)
+			count, err := s.db.Count(&indexertypes.VoteReference{}, &badgerhold.Query{})
+			if err != nil && err != badger.ErrKeyNotFound {
+				return nil, fmt.Errorf("could not count total envelopes: %v", err)
+			}
+			// Store new countStore value
+			envelopeCountStore.Count = uint64(count)
+			envelopeCountStore.Type = indexertypes.CountStoreEnvelopes
+			if err := s.db.Upsert(envelopeCountStore.Type, envelopeCountStore); err != nil {
+				return nil, fmt.Errorf("could not store envelope count: %v", err)
+			}
+		}
+		if err = s.db.Get(indexertypes.CountStoreProcesses, processCountStore); err != nil {
+			log.Warnf("could not get the process count: %v", err)
+			count, err := s.db.Count(&indexertypes.Process{}, &badgerhold.Query{})
+			if err != nil && err != badger.ErrKeyNotFound {
+				return nil, fmt.Errorf("could not count total processes: %v", err)
+			}
+			// Store new countStore value
+			processCountStore.Count = uint64(count)
+			processCountStore.Type = indexertypes.CountStoreProcesses
+			if err := s.db.Upsert(processCountStore.Type, processCountStore); err != nil {
+				return nil, fmt.Errorf("could not store process count: %v", err)
+			}
+		}
+		if err = s.db.Get(indexertypes.CountStoreEntities, entityCountStore); err != nil {
+			log.Warnf("could not get the entity count: %v", err)
+			count, err := s.db.Count(&indexertypes.Entity{}, &badgerhold.Query{})
+			if err != nil && err != badger.ErrKeyNotFound {
+				return nil, fmt.Errorf("could not count total entities: %v", err)
+			}
+			// Store new countStore value
+			entityCountStore.Count = uint64(count)
+			entityCountStore.Type = indexertypes.CountStoreEntities
+			if err := s.db.Upsert(entityCountStore.Type, entityCountStore); err != nil {
+				return nil, fmt.Errorf("could not store entity count: %v", err)
+			}
 		}
 	}
 	return map[uint8]uint64{
@@ -241,6 +246,10 @@ func (s *Scrutinizer) retrieveCounts() (map[uint8]uint64, error) {
 func (s *Scrutinizer) AfterSyncBootstrap() {
 	// if no live results, we don't need the bootstraping
 	if s.ignoreLiveResults {
+		return
+	}
+	if !enableBadgerhold {
+		// TODO(sqlite): needs to be reimplemented
 		return
 	}
 	// During the first seconds/milliseconds of the Vochain startup, Tendermint might report that
@@ -393,18 +402,20 @@ func (s *Scrutinizer) Commit(height uint32) error {
 		log.Infof("indexed %d new envelopes, took %s",
 			len(s.voteIndexPool), time.Since(startTime))
 
-		if err := s.db.UpdateMatching(&indexertypes.CountStore{},
-			badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStoreEnvelopes),
-			func(record interface{}) error {
-				update, ok := record.(*indexertypes.CountStore)
-				if !ok {
-					return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
-				}
-				update.Count += uint64(len(s.voteIndexPool))
-				return nil
-			},
-		); err != nil {
-			log.Errorf("could not get envelope count: %v", err)
+		if enableBadgerhold {
+			if err := s.db.UpdateMatching(&indexertypes.CountStore{},
+				badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStoreEnvelopes),
+				func(record interface{}) error {
+					update, ok := record.(*indexertypes.CountStore)
+					if !ok {
+						return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
+					}
+					update.Count += uint64(len(s.voteIndexPool))
+					return nil
+				},
+			); err != nil {
+				log.Errorf("could not get envelope count: %v", err)
+			}
 		}
 	}
 	txn.Discard()

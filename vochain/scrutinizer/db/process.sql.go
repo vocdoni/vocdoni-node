@@ -23,7 +23,10 @@ INSERT INTO processes (
 	envelope_pb, mode_pb, vote_opts_pb,
 	private_keys, public_keys,
 	question_index, creation_time,
-	source_block_height, source_network_id
+	source_block_height, source_network_id,
+
+	results_votes, results_weight, results_envelope_height,
+	results_signatures, results_block_height
 ) VALUES (
 	?, ?, ?, ?, ?,
 	?, ?, ?,
@@ -33,7 +36,10 @@ INSERT INTO processes (
 	?, ?, ?,
 	?, ?,
 	?, ?,
-	?, ?
+	?, ?,
+
+	?, "0", 0,
+	"", 0
 )
 `
 
@@ -64,6 +70,7 @@ type CreateProcessParams struct {
 	CreationTime      time.Time
 	SourceBlockHeight int64
 	SourceNetworkID   string
+	ResultsVotes      string
 }
 
 func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (sql.Result, error) {
@@ -94,11 +101,12 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.CreationTime,
 		arg.SourceBlockHeight,
 		arg.SourceNetworkID,
+		arg.ResultsVotes,
 	)
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, entity_index, start_block, end_block, results_height, have_results, final_results, census_root, rolling_census_root, rolling_census_size, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope_pb, mode_pb, vote_opts_pb, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id FROM processes
+SELECT id, entity_id, entity_index, start_block, end_block, results_height, have_results, final_results, census_root, rolling_census_root, rolling_census_size, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope_pb, mode_pb, vote_opts_pb, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, results_votes, results_weight, results_envelope_height, results_signatures, results_block_height FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -133,6 +141,11 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.CreationTime,
 		&i.SourceBlockHeight,
 		&i.SourceNetworkID,
+		&i.ResultsVotes,
+		&i.ResultsWeight,
+		&i.ResultsEnvelopeHeight,
+		&i.ResultsSignatures,
+		&i.ResultsBlockHeight,
 	)
 	return i, err
 }
@@ -243,12 +256,33 @@ func (q *Queries) SetProcessResultsHeight(ctx context.Context, arg SetProcessRes
 
 const setProcessResultsReady = `-- name: SetProcessResultsReady :execresult
 UPDATE processes
-SET have_results = TRUE, final_results = TRUE
+SET have_results = TRUE, final_results = TRUE,
+	results_votes = ?,
+	results_weight = ?,
+	results_envelope_height = ?,
+	results_signatures = ?,
+	results_block_height = ?
 WHERE id = ?
 `
 
-func (q *Queries) SetProcessResultsReady(ctx context.Context, id types.ProcessID) (sql.Result, error) {
-	return q.db.ExecContext(ctx, setProcessResultsReady, id)
+type SetProcessResultsReadyParams struct {
+	Votes          string
+	Weight         string
+	EnvelopeHeight int64
+	Signatures     string
+	BlockHeight    int64
+	ID             types.ProcessID
+}
+
+func (q *Queries) SetProcessResultsReady(ctx context.Context, arg SetProcessResultsReadyParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, setProcessResultsReady,
+		arg.Votes,
+		arg.Weight,
+		arg.EnvelopeHeight,
+		arg.Signatures,
+		arg.BlockHeight,
+		arg.ID,
+	)
 }
 
 const updateProcessFromState = `-- name: UpdateProcessFromState :execresult
@@ -289,6 +323,33 @@ func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessF
 		arg.Metadata,
 		arg.RollingCensusSize,
 		arg.Status,
+		arg.ID,
+	)
+}
+
+const updateProcessResults = `-- name: UpdateProcessResults :execresult
+UPDATE processes
+SET results_votes = ?,
+	results_weight = ?,
+	results_envelope_height = ?,
+	results_block_height = ?
+WHERE id = ? AND final_results = FALSE
+`
+
+type UpdateProcessResultsParams struct {
+	Votes          string
+	Weight         string
+	EnvelopeHeight int64
+	BlockHeight    int64
+	ID             types.ProcessID
+}
+
+func (q *Queries) UpdateProcessResults(ctx context.Context, arg UpdateProcessResultsParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateProcessResults,
+		arg.Votes,
+		arg.Weight,
+		arg.EnvelopeHeight,
+		arg.BlockHeight,
 		arg.ID,
 	)
 }
