@@ -160,12 +160,8 @@ mkdir -p $results
 echo "### Test suite ready ###"
 for test in ${tests_to_run[@]}; do
 	[ $CONCURRENT -eq 1 ] && {
-		[ ${test[0]} == "vocli" ] && {
-			( $test ; echo $? > $results/$test )
-		} || {
-			echo "### Running test $test concurrently with others ###"
-			( $test ; echo $? > $results/$test ) &
-		}
+		echo "### Running test $test concurrently with others ###"
+		( $test ; echo $? > $results/$test ) &
 	} || {
 		echo "### Running test $test ###"
 		( $test ; echo $? > $results/$test )
