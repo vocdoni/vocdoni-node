@@ -48,22 +48,22 @@ tests_to_run=(
 
 # print help
 [ "$1" == "-h" -o "$1" == "--help" ] && {
-  echo "$0 <test_to_run>"
-  echo "availabe tests: ${tests_to_run[@]}"
-  echo "env vars:"
-  echo "  CLEAN=1"
-  echo "  ELECTION_SIZE=300"
-  echo "  ELECTION_SIZE_ANON=10"
-  echo "  LOGLEVEL=info"
-  echo "  GWHOST=http://gateway0:9090/dvote"
-  exit 0
+	echo "$0 <test_to_run>"
+	echo "available tests: ${tests_to_run[@]}"
+	echo "env vars:"
+	echo "  CLEAN=1"
+	echo "  ELECTION_SIZE=300"
+	echo "  ELECTION_SIZE_ANON=10"
+	echo "  LOGLEVEL=info"
+	echo "  GWHOST=http://gateway0:9090/dvote"
+	exit 0
 }
 
 # if any arg is passed, treat them as the tests to run, overriding the default list
 [ $# != 0 ] && tests_to_run=($@)
 
 initaccounts() {
-	$COMPOSE_CMD_RUN test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=initaccounts \
@@ -73,7 +73,7 @@ initaccounts() {
 }
 
 merkle_vote() {
-	$COMPOSE_CMD_RUN test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]}-$1 test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=vtest \
@@ -94,7 +94,7 @@ merkle_vote_encrypted() {
 }
 
 anonvoting() {
-	$COMPOSE_CMD_RUN test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=anonvoting \
@@ -105,7 +105,7 @@ anonvoting() {
 }
 
 cspvoting() {
-	$COMPOSE_CMD_RUN test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=cspvoting \
@@ -116,7 +116,7 @@ cspvoting() {
 }
 
 tokentransactions() {
-	$COMPOSE_CMD_RUN test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=tokentransactions \
@@ -125,7 +125,7 @@ tokentransactions() {
 }
 
 vocli() {
-	docker-compose run test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=vocli \
