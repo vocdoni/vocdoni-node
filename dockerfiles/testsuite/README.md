@@ -8,9 +8,9 @@ docker-compose up -d
 go run ../../cmd/vochaintest/vochaintest.go --oracleKey $(. env.oracle0key; echo $DVOTE_ETHCONFIG_SIGNINGKEY) --electionSize=1000
 ```
 
-there's also a bash script:
+there's also a bash script, which prefers to be run with `NOTTY=1`
 ```
-./start-test.sh
+NOTTY=1 ./start-test.sh
 ```
 
 ## Default testnet components
@@ -29,6 +29,42 @@ the seed node will serve to bootstrap the network: it'll just wait for incoming 
 the miners will first connect to the seed node, get the list of peers, and connect to each other. when there are at least 4 miners online, they can reach consensus and start producing blocks.
 
 when the network is up and running, the tool `vochaintest` is used to simulate a voting process, interacting with the gateway node. To create the voting process (something only the oracles are entitled to do), `vochaintest` needs to know the private key of the oracle (passed in `--oracleKey`), in order to sign the transaction.
+
+## Developing
+### Connecting to docker-compose network to run vochaintest locally
+Gateway is exposed on `localhost:9090`.
+```
+$ cd dockerfiles/testsuite && docker-compose up
+vochaintest --oracleKey=... --treasurerKey=... --gwHost=http://localhost:9090/dvote --operation=tokentransactions
+```
+The oracle and treasurer keys are in the `env.oracle0key` and `env.treasurerkey` files.
+
+
+### Adding integration tests
+When adding a new integration test to `start_test.sh`, please name the container after your test. Example:
+```
+merkle_vote_plaintext() {
+	merkle_vote poll-vote
+}
+...
+merkle_vote() {
+	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]}-$1 test timeout 300 \
+		./vochaintest --gwHost $GWHOST \
+		  --logLevel=$LOGLEVEL \
+    ...
+}
+```
+`${FUNCNAME[0]}` is the name of the current bash function, and `$1` is the argument passed to it. The container's name will be `merkle_vote-poll-vote`.
+
+### Debugging failures
+When tests fail, the logs is too polluted with output from miners to be useful. By passing `CLEAN=0` as an envvar, the docker containers are not deleted after the script finishes and you can inspect their logs with `docker logs <container name>`
+
+```
+NOTTY=1 CLEAN=0 ./start_test.sh
+docker ps -a
+docker logs <container name>
+```
+
 ## Generate custom testnet
 
 if you want to generate a custom-sized testnet (with X miners, Y gateways, Z oracles, and so on), check the `ansible` directory:
