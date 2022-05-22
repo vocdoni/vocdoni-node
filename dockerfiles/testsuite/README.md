@@ -8,9 +8,9 @@ docker-compose up -d
 go run ../../cmd/vochaintest/vochaintest.go --oracleKey $(. env.oracle0key; echo $DVOTE_ETHCONFIG_SIGNINGKEY) --electionSize=1000
 ```
 
-there's also a bash script, which prefers to be run with `NOTTY=1`
+there's also a bash script
 ```
-NOTTY=1 ./start-test.sh
+./start-test.sh
 ```
 
 ## Default testnet components
@@ -60,7 +60,7 @@ merkle_vote() {
 When tests fail, the logs is too polluted with output from miners to be useful. By passing `CLEAN=0` as an envvar, the docker containers are not deleted after the script finishes and you can inspect their logs with `docker logs <container name>`
 
 ```
-NOTTY=1 CLEAN=0 ./start_test.sh
+CLEAN=0 ./start_test.sh
 docker ps -a
 docker logs <container name>
 ```
