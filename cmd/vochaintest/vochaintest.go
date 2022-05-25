@@ -1361,8 +1361,8 @@ func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 
 		return vochain.ErrAccountNotExist
 	}
 	log.Infof("fetched from account %s with nonce %d and balance %d", signer.Address(), acc3.Nonce, acc3.Balance)
-	if acc.Balance-110 != acc3.Balance {
-		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Balance-110, acc3.Balance)
+	if acc.Balance-(100+txCost) != acc3.Balance {
+		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Balance-(100+txCost), acc3.Balance)
 	}
 	if acc.Nonce+1 != acc3.Nonce {
 		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Nonce+1, acc3.Nonce)
@@ -1566,14 +1566,14 @@ func testVocli(url, treasurerPrivKey string) {
 	var ensureSetAccountInfoMined = func(address string, stdArgs []string) (string, error) {
 		// 50% of the time the SetAccountInfoTx doesn't get mined even in 2, 3x the block period
 		// so keep polling until we finally confirm the account has been created
-		for i := 1; i < 10; i++ {
+		for i := 1; i < 20; i++ {
 			_, stout, _, err := executeCommand(vocli.RootCmd, append([]string{"account", "info", address}, stdArgs...), "", false)
 			if err == nil {
 				return stout, nil
 			}
 			time.Sleep(time.Second * 10)
 		}
-		return "", fmt.Errorf("cannot ensure account was mined after 10 attemps")
+		return "", fmt.Errorf("cannot ensure account was mined after 20 attempts")
 	}
 	var generateKeyAndReturnAddress = func(url string, stdArgs []string) (address, keyPath string, err error) {
 		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "new", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", false)
