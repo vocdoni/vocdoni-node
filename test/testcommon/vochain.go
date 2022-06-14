@@ -218,14 +218,14 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	d.VochainCfg.NoWaitSync = true
 	d.VochainCfg.MempoolSize = 20000
 	d.VochainCfg.MinerTargetBlockTimeSeconds = 3
+	d.VochainCfg.DBType = "pebble"
 
 	// run node
 	d.VochainCfg.MinerKey = fmt.Sprintf("%x", validator.Key.PrivKey)
 	vnode := vochain.NewVochain(d.VochainCfg, genBytes)
 	tb.Cleanup(func() {
-		vnode.Node.Stop()
 		if err := vnode.Node.Stop(); err != nil {
-			tb.Error(err)
+			tb.Fatal(err)
 		}
 		vnode.Node.Wait()
 	})

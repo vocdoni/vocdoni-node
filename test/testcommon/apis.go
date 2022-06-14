@@ -69,7 +69,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 		}
 	})
 
-	httpRouter := httprouter.HTTProuter{}
+	httpRouter := httprouter.HTTProuter{PrometheusID: d.Signer.AddressString()}
 	if err := httpRouter.Init("127.0.0.1", 0); err != nil {
 		log.Fatal(err)
 	}

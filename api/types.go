@@ -92,6 +92,10 @@ func (a *APIrequest) Address() *common.Address {
 	return a.address
 }
 
+func (a *APIrequest) Reset() {
+	a = &APIrequest{}
+}
+
 func (a *APIrequest) SetAddress(addr *common.Address) {
 	a.address = addr
 }
