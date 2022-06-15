@@ -93,7 +93,7 @@ func (a *APIrequest) Address() *common.Address {
 }
 
 func (a *APIrequest) Reset() {
-	a = &APIrequest{}
+	*a = APIrequest{}
 }
 
 func (a *APIrequest) SetAddress(addr *common.Address) {
