@@ -13,7 +13,7 @@ var accInfoCmd = &cobra.Command{
 	Short: "Get information about an account from the vochain.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := client.New(gatewayRpc)
+		c, err := client.New(v.GetString(urlKey))
 		if err != nil {
 			return err
 		}
@@ -37,7 +37,7 @@ var accSetInfoCmd = &cobra.Command{
 		}
 		infoUri := args[1]
 
-		if err := createAccount(key, gatewayRpc, infoUri, faucetHex); err != nil {
+		if err := createAccount(key, v.GetString(urlKey), infoUri, faucetHex); err != nil {
 			return err
 		}
 		return nil
@@ -49,7 +49,7 @@ var accTreasurerCmd = &cobra.Command{
 	Short: "Get information about the treasurer account (a special account) on the vochain.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := client.New(gatewayRpc)
+		c, err := client.New(v.GetString(urlKey))
 		if err != nil {
 			return err
 		}
@@ -69,7 +69,7 @@ var accAddDelegateCmd = &cobra.Command{
 	Short: "Add a delegate address for an account",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := client.New(gatewayRpc)
+		c, err := client.New(v.GetString(urlKey))
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ var accDelDelegateCmd = &cobra.Command{
 	Short: "Remove a delegate address for an account",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := client.New(gatewayRpc)
+		c, err := client.New(v.GetString(urlKey))
 		if err != nil {
 			return err
 		}

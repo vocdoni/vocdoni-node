@@ -28,6 +28,7 @@ type Client struct {
 // Supported protocols are ws(s):// and http(s)://
 func New(addr string) (*Client, error) {
 	cli := &Client{Addr: addr}
+	log.Debugf("connecting to %s", addr)
 	if strings.HasPrefix(addr, "ws") {
 		return nil, fmt.Errorf("websockets not supported")
 	} else if strings.HasPrefix(addr, "http") {

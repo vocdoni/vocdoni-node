@@ -36,7 +36,7 @@ var txCostGetCmd = &cobra.Command{
 		},
 	),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := client.New(gatewayRpc)
+		c, err := client.New(v.GetString(urlKey))
 		if err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ var txCostSetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		c, err := client.New(gatewayRpc)
+		c, err := client.New(v.GetString(urlKey))
 		if err != nil {
 			return err
 		}

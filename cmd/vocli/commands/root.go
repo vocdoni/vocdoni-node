@@ -6,19 +6,22 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
 	"google.golang.org/protobuf/proto"
 )
 
-var gatewayRpc string
-var debug bool
+const envPrefix = "VOCHAIN"
+const urlKey = "url"
+
 var nonce uint32
 var home string
 var password string
@@ -31,6 +34,7 @@ var SetupLogPackage bool
 var Stdout io.Writer
 var Stderr io.Writer
 var Stdin *os.File
+var v *viper.Viper
 
 var txTypes []string
 
@@ -40,10 +44,23 @@ func init() {
 	Stdin = os.Stdin
 	RootCmd.CompletionOptions.DisableDefaultCmd = true
 	SetupLogPackage = true
-	RootCmd.PersistentFlags().StringVarP(&gatewayRpc, "url", "u", "https://gw1.dev.vocdoni.net/dvote", "Gateway RPC URL")
-	RootCmd.PersistentFlags().StringVar(&home, "home", "", "root directory where all vochain files are stored (normally ~/.dvote)")
+
+	v = viper.New()
+	v.SetConfigName("vocli")
+	v.SetConfigType("yaml")
+	v.AddConfigPath(home)
+	v.AddConfigPath(".")
+	v.SetEnvPrefix(envPrefix)
+	v.AutomaticEnv() // viper.Get("url") -> VOCHAIN_URL envvar
+
+	RootCmd.PersistentFlags().StringP("url", "u", "https://gw1.dev.vocdoni.net/dvote", "Gateway RPC URL; $VOCHAIN_URL")
+	v.BindPFlag("url", RootCmd.PersistentFlags().Lookup("url")) // viper.Get("url") -> cobra flags --url
+	RootCmd.PersistentFlags().StringVar(&home, "home", path.Join(os.Getenv("HOME"), ".dvote"),
+		"root directory where all vochain files are stored; $VOCHAIN_HOME")
+	v.BindPFlag("home", RootCmd.PersistentFlags().Lookup("home"))
 	RootCmd.PersistentFlags().StringVar(&password, "password", "", "supply the password as an argument instead of prompting")
-	RootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "prints additional information")
+	RootCmd.PersistentFlags().BoolP("debug", "d", false, "prints additional information; $VOCHAIN_DEBUG")
+	v.BindPFlag("debug", RootCmd.PersistentFlags().Lookup("debug"))
 	RootCmd.PersistentFlags().Uint32VarP(&nonce, "nonce", "n", 0, `account nonce to use when sending transaction
 	(useful when it cannot be queried ahead of time, e.g. offline transaction signing)`)
 	RootCmd.AddCommand(accCmd)
@@ -75,6 +92,9 @@ func init() {
 	}
 	sort.Strings(txTypes)
 
+	if err := viper.ReadInConfig(); err != nil {
+		log.Warnf("could not find configuration file %s", err)
+	}
 }
 
 func Execute() {
@@ -89,12 +109,13 @@ var RootCmd = &cobra.Command{
 	Short: "vocli is a convenience CLI that helps you do things on Vochain",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if SetupLogPackage {
-			if debug {
+			if v.GetBool("debug") {
 				log.Init("debug", "stdout")
 			} else {
 				log.Init("error", "stdout")
 			}
 		}
+		log.Debugf("vocli config: %v", v.AllSettings())
 	},
 }
 
@@ -112,7 +133,7 @@ var sendCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("could not open keyfile %s", err)
 		}
-		c, err := client.New(gatewayRpc)
+		c, err := client.New(v.GetString(urlKey))
 		if err != nil {
 			return err
 		}
@@ -137,7 +158,7 @@ var claimFaucetCmd = &cobra.Command{
 			return err
 		}
 
-		c, err := client.New(gatewayRpc)
+		c, err := client.New(v.GetString(urlKey))
 		if err != nil {
 			return err
 		}
@@ -173,7 +194,7 @@ var genFaucetCmd = &cobra.Command{
 			return fmt.Errorf("sorry, what amount did you say again? %s", err)
 		}
 
-		c, err := client.New(gatewayRpc)
+		c, err := client.New(v.GetString(urlKey))
 		if err != nil {
 			return err
 		}
@@ -201,7 +222,7 @@ var mintCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("sorry, what amount did you say again? %s", err)
 		}
-		c, err := client.New(gatewayRpc)
+		c, err := client.New(v.GetString(urlKey))
 		if err != nil {
 			return err
 		}
