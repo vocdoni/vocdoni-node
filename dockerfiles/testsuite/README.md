@@ -41,14 +41,14 @@ The oracle and treasurer keys are in the `env.oracle0key` and `env.treasurerkey`
 
 
 ### Adding integration tests
-When adding a new integration test to `start_test.sh`, please name the container after your test. Example:
+When adding a new integration test to `start_test.sh`, please name the container after your test, including the RANDOMID to allow concurrent test runs in CI servers. Example:
 ```
 merkle_vote_plaintext() {
 	merkle_vote poll-vote
 }
 ...
 merkle_vote() {
-	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]}-$1 test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${1}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
     ...
