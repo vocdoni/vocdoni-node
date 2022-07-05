@@ -1739,7 +1739,7 @@ func testVocli(url, treasurerPrivKey string) {
 		log.Info("vocli txcost get NewProcess")
 		// get the initial txcosts. this is not used by the test, just for the
 		// human to read
-		if _, _, _, err := executeCommand(vocli.RootCmd, append([]string{"txcost", "get", aliceKeyPath}, stdArgs...), "", true); err != nil {
+		if _, _, _, err := executeCommand(vocli.RootCmd, append([]string{"txcost", "get"}, stdArgs...), "", true); err != nil {
 			log.Fatal(err)
 		}
 		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "set", aliceKeyPath, "RegisterKey", "50"}, stdArgs...), "", true)
@@ -1749,7 +1749,7 @@ func testVocli(url, treasurerPrivKey string) {
 		// wait a bit for the tx to be mined and the node to increment the
 		// account's nonce
 		time.Sleep(time.Second * 20)
-		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "get", aliceKeyPath}, stdArgs...), "", true)
+		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "get"}, stdArgs...), "", true)
 		if err != nil {
 			log.Fatal(err)
 		}

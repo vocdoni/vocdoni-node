@@ -24,9 +24,9 @@ var txCostGetCmd = &cobra.Command{
 	NewProcess, RegisterKey, SendTokens, SetAccountInfo, SetProcessCensus, SetProcessQuestionIndex,
 	SetProcessResults, SetProcessStatus`,
 	Args: cobra.MatchAll(
-		cobra.MinimumNArgs(1),
+		cobra.MinimumNArgs(0),
 		func(cmd *cobra.Command, args []string) error {
-			for _, t := range args[1:] {
+			for _, t := range args {
 				a := vochain.TxCostNameToTxType(t)
 				if a == models.TxType_TX_UNKNOWN {
 					return fmt.Errorf("%s is not a valid TxType; valid TxTypes are %v", t, txTypes)
@@ -42,10 +42,10 @@ var txCostGetCmd = &cobra.Command{
 		}
 
 		var txTypesToQuery []string
-		if len(args[1:]) == 0 {
+		if len(args) == 0 {
 			txTypesToQuery = txTypes
 		} else {
-			txTypesToQuery = args[1:]
+			txTypesToQuery = args
 		}
 
 		for _, t := range txTypesToQuery {
