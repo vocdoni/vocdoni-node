@@ -31,6 +31,8 @@ ORACLE_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 . env.treasurerkey # contains var DVOTE_ETHCONFIG_SIGNINGKEY, import into current env
 TREASURER_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 [ -n "$TESTSUITE_TREASURER_KEY" ] && TREASURER_KEY="$TESTSUITE_TREASURER_KEY"
+TEST_PREFIX="testsuite_test"
+RANDOMID="${RANDOM}${RANDOM}"
 
 ### if you want to add a new test:
 ### add "newtest" to tests_to_run array (as well as a comment at the head of the file)
@@ -63,7 +65,7 @@ tests_to_run=(
 [ $# != 0 ] && tests_to_run=($@)
 
 initaccounts() {
-	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]} test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=initaccounts \
@@ -73,7 +75,7 @@ initaccounts() {
 }
 
 merkle_vote() {
-	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]}-$1 test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${1}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=vtest \
@@ -94,7 +96,7 @@ merkle_vote_encrypted() {
 }
 
 anonvoting() {
-	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]} test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=anonvoting \
@@ -105,7 +107,7 @@ anonvoting() {
 }
 
 cspvoting() {
-	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]} test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=cspvoting \
@@ -116,7 +118,7 @@ cspvoting() {
 }
 
 tokentransactions() {
-	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]} test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=tokentransactions \
@@ -125,7 +127,7 @@ tokentransactions() {
 }
 
 vocli() {
-	$COMPOSE_CMD_RUN --name ${FUNCNAME[0]} test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=vocli \
