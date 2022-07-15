@@ -26,7 +26,7 @@ require (
 	github.com/deroproject/graviton v0.0.0-20201218180342-ab474f4c94d2
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/enriquebris/goconcurrentqueue v0.6.0
-	github.com/ethereum/go-ethereum v1.10.17
+	github.com/ethereum/go-ethereum v1.10.20
 	github.com/frankban/quicktest v1.14.2
 	github.com/glendc/go-external-ip v0.1.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -66,13 +66,14 @@ require (
 	go.uber.org/zap v1.19.1
 	go.vocdoni.io/proto v1.13.3-0.20220427175359-1eda30cea4bc
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
+	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171
 	google.golang.org/protobuf v1.27.1
 )
 
 require (
-	github.com/btcsuite/btcd/btcec/v2 v2.1.2 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/deepmap/oapi-codegen v1.8.2 // indirect
@@ -89,10 +90,12 @@ require (
 	github.com/influxdata/line-protocol v0.0.0-20210311194329-9aa0e372d097 // indirect
 	github.com/mitchellh/pointerstructure v1.2.0 // indirect
 	github.com/peterh/liner v1.1.1-0.20190123174540-a2c9a5303de7 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
+	github.com/urfave/cli/v2 v2.10.2 // indirect
+	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
-	gopkg.in/urfave/cli.v1 v1.20.0 // indirect
 )
 
 require (
@@ -131,7 +134,7 @@ require (
 	github.com/facebookgo/atomicfile v0.0.0-20151019160806-2de1f203e7d5 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
-	github.com/fsnotify/fsnotify v1.5.1 // indirect
+	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.1.2 // indirect
 	github.com/getsentry/sentry-go v0.12.0 // indirect
 	github.com/go-bindata/go-bindata/v3 v3.1.3 // indirect
@@ -158,7 +161,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/hcl v1.0.1-vault-3 // indirect
-	github.com/huin/goupnp v1.0.3-0.20220313090229-ca81a64b4204 // indirect
+	github.com/huin/goupnp v1.0.3 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitswap v0.3.4 // indirect
@@ -311,7 +314,7 @@ require (
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
-	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
+	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	github.com/tklauser/numcpus v0.3.0 // indirect
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc // indirect
@@ -330,15 +333,15 @@ require (
 	go.uber.org/fx v1.13.1 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
 	go4.org v0.0.0-20201209231011-d4a079459e60 // indirect
-	golang.org/x/exp v0.0.0-20220218215828-6cf2b201936e // indirect
+	golang.org/x/exp v0.0.0-20220426173459-3bcf042a4bf5 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20211013180041-c96bc1413d57 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220224120231-95c6836cb0e7 // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.9 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220222213610-43724f9ea8cf // indirect
 	google.golang.org/grpc v1.44.0 // indirect
