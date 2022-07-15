@@ -192,7 +192,7 @@ func (b *BearerStandardAPI) GetAuthTokens(bearerToken string) int64 {
 	return ts.(int64)
 }
 
-// EnableVerboseAuthLog prints on stdout the details of every requres performed with auth token.
+// EnableVerboseAuthLog prints on stdout the details of every request performed with auth token.
 // It can be used for keeping track of private/admin actions on a service.
 func (b *BearerStandardAPI) EnableVerboseAuthLog() {
 	b.verboseAuthLog = true
