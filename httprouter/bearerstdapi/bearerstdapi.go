@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/log"
@@ -36,6 +37,7 @@ type BearerStandardAPI struct {
 	authTokens     sync.Map
 	adminToken     string
 	adminTokenLock sync.RWMutex
+	verboseAuthLog bool
 }
 
 // BearerStandardAPIdata is the data type used by the BearerStandardAPI.
@@ -107,18 +109,21 @@ func (b *BearerStandardAPI) AuthorizeRequest(data interface{},
 // ProcessData is a function for the RouterNamespace interface.
 // The body of the http requests and the bearer auth token are readed.
 func (b *BearerStandardAPI) ProcessData(req *http.Request) (interface{}, error) {
-	//req.URL.Path
-	respBody, err := io.ReadAll(req.Body)
+	reqBody, err := io.ReadAll(req.Body)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP connection closed: (%v)", err)
 	}
-	if len(respBody) > 0 {
-		log.Debugf("request: %s", respBody)
+	if len(reqBody) > 0 {
+		log.Debugf("request: %s", reqBody)
 	}
-	return &BearerStandardAPIdata{
-		Data:      respBody,
+	msg := &BearerStandardAPIdata{
+		Data:      reqBody,
 		AuthToken: strings.TrimPrefix(req.Header.Get("Authorization"), bearerPrefix),
-	}, nil
+	}
+	if b.verboseAuthLog && msg.AuthToken != "" {
+		fmt.Printf("[BearerAPI/%d/%s] %s {%s}\n", time.Now().Unix(), msg.AuthToken, req.URL.RequestURI(), reqBody)
+	}
+	return msg, nil
 }
 
 // RegisterMethod adds a new method under the URL pattern.
@@ -185,4 +190,10 @@ func (b *BearerStandardAPI) GetAuthTokens(bearerToken string) int64 {
 		return 0
 	}
 	return ts.(int64)
+}
+
+// EnableVerboseAuthLog prints on stdout the details of every requres performed with auth token.
+// It can be used for keeping track of private/admin actions on a service.
+func (b *BearerStandardAPI) EnableVerboseAuthLog() {
+	b.verboseAuthLog = true
 }
