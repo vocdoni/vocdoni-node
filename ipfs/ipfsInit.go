@@ -7,7 +7,7 @@ import (
 	"path"
 	"sync"
 
-	config "github.com/ipfs/go-ipfs-config"
+	config "github.com/ipfs/go-ipfs/config"
 	"github.com/ipfs/go-ipfs/plugin/loader"
 	"github.com/ipfs/go-ipfs/repo/fsrepo"
 
@@ -55,7 +55,7 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 	conf.Swarm.ConnMgr.HighWater = 100
 	conf.Swarm.ConnMgr.GracePeriod = "2s"
 	conf.Swarm.DisableBandwidthMetrics = true
-	conf.Swarm.EnableAutoRelay = false
+	conf.Swarm.RelayClient.Enabled = config.True
 	conf.Swarm.Transports.Network.Relay = 0
 	conf.Datastore.GCPeriod = "5m"
 	conf.Discovery.MDNS.Enabled = false

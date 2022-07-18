@@ -154,7 +154,7 @@ func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (string, error) {
 
 func (i *IPFSHandle) AddAndPin(ctx context.Context, root string) (rootHash string, err error) {
 
-	defer i.Node.Blockstore.PinLock().Unlock()
+	defer i.Node.Blockstore.PinLock(ctx).Unlock(ctx)
 	stat, err := os.Lstat(root)
 	if err != nil {
 		return "", err
@@ -170,7 +170,7 @@ func (i *IPFSHandle) AddAndPin(ctx context.Context, root string) (rootHash strin
 		return "", err
 	}
 
-	node, err := fileAdder.AddAllAndPin(f)
+	node, err := fileAdder.AddAllAndPin(ctx, f)
 	if err != nil {
 		return "", err
 	}
