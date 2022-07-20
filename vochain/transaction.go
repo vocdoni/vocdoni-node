@@ -82,7 +82,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 		if commit {
 			return response, app.State.AddVote(v)
 		}
-		return response, nil
+
 	case *models.Tx_Admin:
 		_, err := AdminTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
@@ -132,9 +132,10 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			if err := app.State.IncrementAccountProcessIndex(txSender); err != nil {
 				return nil, fmt.Errorf("newProcess: cannot increment process index: %w", err)
 			}
+
+			response.Data = p.ProcessId
+			return response, app.State.SubtractCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
 		}
-		response.Data = p.ProcessId
-		return response, app.State.SubtractCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
 
 	case *models.Tx_SetProcess:
 		txSender, err := SetProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
@@ -254,6 +255,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			}
 			return response, app.State.IncrementTreasurerNonce()
 		}
+
 	case *models.Tx_SendTokens:
 		txValues, err := SendTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
@@ -267,6 +269,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			// subtract tx costs and increment nonce
 			return response, app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_SEND_TOKENS)
 		}
+
 	case *models.Tx_SetAccountDelegateTx:
 		txValues, err := SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
@@ -297,6 +300,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			}
 			return response, err
 		}
+
 	case *models.Tx_CollectFaucet:
 		fromAcc, err := CollectFaucetTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
@@ -318,9 +322,11 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			// subtract tx costs and increment nonce
 			return response, app.State.SubtractCostIncrementNonce(*fromAcc, models.TxType_COLLECT_FAUCET)
 		}
+
 	default:
 		return nil, fmt.Errorf("invalid transaction type")
 	}
+
 	return response, nil
 }
 
