@@ -121,6 +121,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 		if err != nil {
 			return nil, fmt.Errorf("newProcess: %w", err)
 		}
+		response.Data = p.ProcessId
 		if commit {
 			tx := vtx.Tx.GetNewProcess()
 			if tx.Process == nil {
@@ -132,8 +133,6 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			if err := app.State.IncrementAccountProcessIndex(txSender); err != nil {
 				return nil, fmt.Errorf("newProcess: cannot increment process index: %w", err)
 			}
-
-			response.Data = p.ProcessId
 			return response, app.State.SubtractCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
 		}
 
