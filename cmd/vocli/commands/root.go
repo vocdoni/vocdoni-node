@@ -70,6 +70,7 @@ func init() {
 	RootCmd.AddCommand(mintCmd)
 	RootCmd.AddCommand(keysCmd)
 	RootCmd.AddCommand(txCostCmd)
+	RootCmd.AddCommand(processCmd)
 	accCmd.AddCommand(accInfoCmd)
 	accCmd.AddCommand(accSetInfoCmd)
 	accCmd.AddCommand(accTreasurerCmd)
@@ -82,6 +83,7 @@ func init() {
 	keysCmd.AddCommand(keysShowPrivKeyCmd)
 	txCostCmd.AddCommand(txCostGetCmd)
 	txCostCmd.AddCommand(txCostSetCmd)
+	processCmd.AddCommand(setProcessCmd)
 
 	keysNewCmd.Flags().StringVar(&faucetHex, "faucet", "", `specify an optional hex-encoded faucet payload to immediately top up
 	the new account with tokens`)
