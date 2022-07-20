@@ -1590,3 +1590,34 @@ func (c *Client) CollectFaucet(signer *ethereum.SignKeys, nonce uint32, faucetPk
 	}
 	return nil
 }
+
+// SetOracle sends an Add/Remove Oracle transaction, if op == false -> remove, else add
+func (c *Client) SetOracle(treasurer *ethereum.SignKeys, oracleAddress common.Address, treasurerNonce uint32, op bool) error {
+	var req api.APIrequest
+	var err error
+	req.Method = "submitRawTx"
+
+	tx := &models.AdminTx{
+		Txtype:  models.TxType_ADD_ORACLE,
+		Nonce:   treasurerNonce,
+		Address: oracleAddress.Bytes(),
+	}
+
+	if !op {
+		tx.Txtype = models.TxType_REMOVE_ORACLE
+	}
+
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Admin{Admin: tx}})
+	if err != nil {
+		return err
+	}
+	resp, err := c.SubmitRawTx(treasurer, &stx)
+	if err != nil {
+		return err
+	}
+	if !resp.Ok {
+		return fmt.Errorf("submitRawTx failed: %s", resp.Message)
+	}
+	return nil
+}
