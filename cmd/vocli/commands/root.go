@@ -70,6 +70,7 @@ func init() {
 	RootCmd.AddCommand(mintCmd)
 	RootCmd.AddCommand(keysCmd)
 	RootCmd.AddCommand(txCostCmd)
+	RootCmd.AddCommand(adminCmd)
 	RootCmd.AddCommand(processCmd)
 	accCmd.AddCommand(accInfoCmd)
 	accCmd.AddCommand(accSetInfoCmd)
@@ -83,6 +84,7 @@ func init() {
 	keysCmd.AddCommand(keysShowPrivKeyCmd)
 	txCostCmd.AddCommand(txCostGetCmd)
 	txCostCmd.AddCommand(txCostSetCmd)
+	adminCmd.AddCommand(setOracleCmd)
 	processCmd.AddCommand(setProcessCmd)
 
 	keysNewCmd.Flags().StringVar(&faucetHex, "faucet", "", `specify an optional hex-encoded faucet payload to immediately top up
