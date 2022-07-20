@@ -1156,11 +1156,15 @@ func (c *Client) CreateProcess(account *ethereum.SignKeys,
 	return startBlock, processID, nil
 }
 
-func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
+func (c *Client) SetProcessStatus(oracle *ethereum.SignKeys, pid []byte, status string) error {
+	s, ok := models.ProcessStatus_value[status]
+	if !ok {
+		return fmt.Errorf("invalid process status specified - refer to vochain.pb.go:ProcessStatus_name for valid statuses")
+	}
+	statusInt := models.ProcessStatus(s)
 	var req api.APIrequest
 	var err error
 	req.Method = "submitRawTx"
-	status := models.ProcessStatus_ENDED
 	// get oracle account
 	acc, err := c.GetAccount(oracle.Address())
 	if err != nil {
@@ -1172,7 +1176,7 @@ func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
 	p := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_STATUS,
 		ProcessId: pid,
-		Status:    &status,
+		Status:    &statusInt,
 		Nonce:     acc.Nonce,
 	}
 	stx := &models.SignedTx{}
@@ -1199,6 +1203,10 @@ func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
 		return fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
 	return nil
+}
+
+func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
+	return c.SetProcessStatus(oracle, pid, "ENDED")
 }
 
 func (c *Client) GetCurrentBlock() (uint32, error) {
