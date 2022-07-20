@@ -195,6 +195,7 @@ type APIresponse struct {
 	Nullifier            string                           `json:"nullifier,omitempty"`
 	Nullifiers           *[]string                        `json:"nullifiers,omitempty"`
 	Ok                   bool                             `json:"ok"`
+	OracleList           *[]string                        `json:"oracles,omitempty"`
 	Paused               *bool                            `json:"paused,omitempty"`
 	Payload              string                           `json:"payload,omitempty"`
 	ProcessSummary       *ProcessSummary                  `json:"processSummary,omitempty"`
