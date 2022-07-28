@@ -316,7 +316,7 @@ func (ev *EthereumEvents) runEventProcessor(ctx context.Context) {
 					ev.EventProcessor.del(&event)
 				} else {
 					if event.BlockNumber == 0 {
-						log.Fatalf("unexpected event block number 0", event)
+						log.Fatalf("unexpected event block number 0: %s", evtJSON)
 					}
 					log.Debugf("queued event log: %s", evtJSON)
 					ev.EventProcessor.add(&event)

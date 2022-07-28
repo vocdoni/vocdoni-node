@@ -262,7 +262,7 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("Census created and published\nRoot: %s\nURI: %s", root, uri)
+	log.Infof("Census created and published\nRoot: %x\nURI: %s", root, uri)
 }
 
 func waitUntilNextBlock(mainClient *client.Client) error {
@@ -1622,7 +1622,7 @@ func testVocli(url, treasurerPrivKey string) {
 	if !strings.Contains(stdout, dir) {
 		log.Fatalf("vocli list should have found and shown a key in dir %s", dir)
 	}
-	log.Info("key list: %s", stdout)
+	log.Infof("key list: %s", stdout)
 
 	log.Info("vocli account set alice")
 	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", aliceKeyPath, "ipfs://aliceinwonderland"}, stdArgs...), "", true)

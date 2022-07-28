@@ -297,7 +297,7 @@ func listStateProcesses(height int64, stateDir string) {
 	processes.Iterate(func(pid, processBytes []byte) bool {
 		var process models.StateDBProcess
 		if err := proto.Unmarshal(processBytes, &process); err != nil {
-			log.Fatalf("Cannot unmarshal process (%s): %w", pid, err)
+			log.Fatalf("Cannot unmarshal process (%s): %v", pid, err)
 		}
 		votes := countVotes(snapshot, pid)
 		fmt.Printf("eid: %x, pid: %x, census: %x, votesHash: %x, votes: %d\n",

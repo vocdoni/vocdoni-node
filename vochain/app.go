@@ -493,7 +493,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		log.Infof("adding genesis validator %x", genesisAppState.Validators[i].Address)
 		pwr, err := strconv.ParseUint(genesisAppState.Validators[i].Power, 10, 64)
 		if err != nil {
-			log.Fatal("cannot decode validator power: %s", err)
+			log.Fatalf("cannot decode validator power: %s", err)
 		}
 		v := &models.Validator{
 			Address: genesisAppState.Validators[i].Address,

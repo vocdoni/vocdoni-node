@@ -581,7 +581,7 @@ func (c *Client) TestPreRegisterKeys(
 			v.Proof = &models.Proof{Payload: &models.Proof_Ca{Ca: p}}
 
 		default:
-			log.Fatal("censusOrigin %s not supported", censusOrigin.String())
+			log.Fatalf("censusOrigin %s not supported", censusOrigin.String())
 		}
 
 		stx := &models.SignedTx{}
@@ -787,7 +787,7 @@ func (c *Client) TestSendVotes(
 			v.Proof = &models.Proof{Payload: &models.Proof_Ca{Ca: p}}
 
 		default:
-			log.Fatal("censusOrigin %s not supported", censusOrigin.String())
+			log.Fatalf("censusOrigin %s not supported", censusOrigin.String())
 		}
 
 		stx := &models.SignedTx{}
