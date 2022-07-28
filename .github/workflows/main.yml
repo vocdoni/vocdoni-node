@@ -21,6 +21,8 @@ jobs:
         run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
       - name: go test
         run: |
+          # check that log lines contains no invalid chars (evidence of format mismatch)
+          export LOG_PANIC_ON_INVALIDCHARS=true
           # we run vet in another step
           go test -vet=off -timeout=1m -coverprofile=covprofile ./...
           # -race can easily make the crypto stuff 10x slower
@@ -51,6 +53,7 @@ jobs:
           export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
           export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
           export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
+          export LOG_PANIC_ON_INVALIDCHARS=true
           cd dockerfiles/testsuite
           docker-compose build
           ./start_test.sh
