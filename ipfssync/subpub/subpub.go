@@ -146,7 +146,7 @@ func (ps *SubPub) Start(ctx context.Context, receiver chan *Message) {
 
 	log.Debugf("libp2p config: %+v", c)
 	// Note that we don't use ctx here, since we stop via the Close method.
-	ps.Host, err = c.NewNode(context.Background())
+	ps.Host, err = c.NewNode()
 	if err != nil {
 		log.Fatal(err)
 	}
