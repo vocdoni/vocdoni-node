@@ -55,7 +55,7 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 	conf.Swarm.ConnMgr.HighWater = 100
 	conf.Swarm.ConnMgr.GracePeriod = "2s"
 	conf.Swarm.DisableBandwidthMetrics = true
-	conf.Swarm.RelayClient.Enabled = config.True
+	conf.Swarm.RelayClient.Enabled = config.False
 	conf.Swarm.Transports.Network.Relay = 0
 	conf.Datastore.GCPeriod = "5m"
 	conf.Discovery.MDNS.Enabled = false
