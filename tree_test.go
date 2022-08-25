@@ -1,9 +1,12 @@
 package arbo
 
 import (
+	"bufio"
 	"encoding/hex"
 	"math"
 	"math/big"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -458,6 +461,14 @@ func TestGenProofAndVerify(t *testing.T) {
 }
 
 func TestDumpAndImportDump(t *testing.T) {
+	testDumpAndImportDump(t, false)
+}
+
+func TestDumpAndImportDumpInFile(t *testing.T) {
+	testDumpAndImportDump(t, true)
+}
+
+func testDumpAndImportDump(t *testing.T, inFile bool) {
 	c := qt.New(t)
 	database1, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
@@ -475,8 +486,19 @@ func TestDumpAndImportDump(t *testing.T) {
 		}
 	}
 
-	e, err := tree1.Dump(nil)
-	c.Assert(err, qt.IsNil)
+	var e []byte
+	filePath := c.TempDir()
+	fileName := filepath.Join(filePath, "dump.bin")
+	if inFile {
+		f, err := os.Create(fileName)
+		c.Assert(err, qt.IsNil)
+		w := bufio.NewWriter(f)
+		err = tree1.DumpWriter(nil, w)
+		c.Assert(err, qt.IsNil)
+	} else {
+		e, err = tree1.Dump(nil)
+		c.Assert(err, qt.IsNil)
+	}
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
@@ -484,8 +506,17 @@ func TestDumpAndImportDump(t *testing.T) {
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	defer tree2.db.Close() //nolint:errcheck
-	err = tree2.ImportDump(e)
-	c.Assert(err, qt.IsNil)
+
+	if inFile {
+		f, err := os.Open(filepath.Clean(fileName))
+		c.Assert(err, qt.IsNil)
+		r := bufio.NewReader(f)
+		err = tree2.ImportDumpReader(r)
+		c.Assert(err, qt.IsNil)
+	} else {
+		err = tree2.ImportDump(e)
+		c.Assert(err, qt.IsNil)
+	}
 
 	root1, err := tree1.Root()
 	c.Assert(err, qt.IsNil)

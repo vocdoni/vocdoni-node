@@ -11,6 +11,7 @@ the Blake2b hash function, which has much faster computation time.
 package arbo
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
@@ -1320,12 +1321,26 @@ func (t *Tree) iter(rTx db.ReadTx, k []byte, f func([]byte, []byte)) error {
 	return t.iterWithStop(rTx, k, 0, f2)
 }
 
-// Dump exports all the Tree leafs in a byte array of length:
-// [ N * (2+len(k+v)) ]. Where N is the number of key-values, and for each k+v:
+// Dump exports all the Tree leafs in a byte array
+func (t *Tree) Dump(fromRoot []byte) ([]byte, error) {
+	return t.dump(fromRoot, nil)
+}
+
+// DumpWriter exports all the Tree leafs writing the bytes in the given Writer
+func (t *Tree) DumpWriter(fromRoot []byte, w *bufio.Writer) error {
+	_, err := t.dump(fromRoot, w)
+	return err
+}
+
+// dump exports all the Tree leafs. If the given w is nil, it will return a
+// byte array with the dump, if w contains a *bufio.Writer, it will write the
+// dump in w.
+// The format of the dump is the following:
+// Dump length: [ N * (2+len(k+v)) ]. Where N is the number of key-values, and for each k+v:
 // [ 1 byte | 1 byte | S bytes | len(v) bytes ]
 // [ len(k) | len(v) |   key   |     value    ]
 // Where S is the size of the output of the hash function used for the Tree.
-func (t *Tree) Dump(fromRoot []byte) ([]byte, error) {
+func (t *Tree) dump(fromRoot []byte, w *bufio.Writer) ([]byte, error) {
 	// allow to define which root to use
 	if fromRoot == nil {
 		var err error
@@ -1357,7 +1372,25 @@ func (t *Tree) Dump(fromRoot []byte) ([]byte, error) {
 		kv[1] = byte(len(leafV))
 		copy(kv[2:2+len(leafK)], leafK)
 		copy(kv[2+len(leafK):], leafV)
-		b = append(b, kv...)
+
+		if w == nil {
+			b = append(b, kv...)
+		} else {
+			n, err := w.Write(kv)
+			if err != nil {
+				callbackErr = fmt.Errorf("dump: w.Write, %s", err)
+				return true
+			}
+			if n != len(kv) {
+				callbackErr = fmt.Errorf("dump: w.Write n!=len(kv), %s", err)
+				return true
+			}
+			err = w.Flush()
+			if err != nil {
+				callbackErr = fmt.Errorf("dump: w.Flush, %s", err)
+				return true
+			}
+		}
 		return false
 	})
 	if callbackErr != nil {
@@ -1367,8 +1400,16 @@ func (t *Tree) Dump(fromRoot []byte) ([]byte, error) {
 }
 
 // ImportDump imports the leafs (that have been exported with the Dump method)
-// in the Tree.
+// in the Tree, reading them from the given byte array.
 func (t *Tree) ImportDump(b []byte) error {
+	bytesReader := bytes.NewReader(b)
+	r := bufio.NewReader(bytesReader)
+	return t.ImportDumpReader(r)
+}
+
+// ImportDumpReader imports the leafs (that have been exported with the Dump
+// method) in the Tree, reading them from the given reader.
+func (t *Tree) ImportDumpReader(r *bufio.Reader) error {
 	if !t.editable() {
 		return ErrSnapshotNotEditable
 	}
@@ -1380,7 +1421,6 @@ func (t *Tree) ImportDump(b []byte) error {
 		return ErrTreeNotEmpty
 	}
 
-	r := bytes.NewReader(b)
 	var keys, values [][]byte
 	for {
 		l := make([]byte, 2)
