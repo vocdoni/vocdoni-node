@@ -1,7 +1,6 @@
 package arbo
 
 import (
-	"bufio"
 	"encoding/hex"
 	"math"
 	"math/big"
@@ -492,8 +491,7 @@ func testDumpAndImportDump(t *testing.T, inFile bool) {
 	if inFile {
 		f, err := os.Create(fileName)
 		c.Assert(err, qt.IsNil)
-		w := bufio.NewWriter(f)
-		err = tree1.DumpWriter(nil, w)
+		err = tree1.DumpWriter(nil, f)
 		c.Assert(err, qt.IsNil)
 	} else {
 		e, err = tree1.Dump(nil)
@@ -510,8 +508,7 @@ func testDumpAndImportDump(t *testing.T, inFile bool) {
 	if inFile {
 		f, err := os.Open(filepath.Clean(fileName))
 		c.Assert(err, qt.IsNil)
-		r := bufio.NewReader(f)
-		err = tree2.ImportDumpReader(r)
+		err = tree2.ImportDumpReader(f)
 		c.Assert(err, qt.IsNil)
 	} else {
 		err = tree2.ImportDump(e)

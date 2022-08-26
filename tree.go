@@ -1327,7 +1327,7 @@ func (t *Tree) Dump(fromRoot []byte) ([]byte, error) {
 }
 
 // DumpWriter exports all the Tree leafs writing the bytes in the given Writer
-func (t *Tree) DumpWriter(fromRoot []byte, w *bufio.Writer) error {
+func (t *Tree) DumpWriter(fromRoot []byte, w io.Writer) error {
 	_, err := t.dump(fromRoot, w)
 	return err
 }
@@ -1340,7 +1340,7 @@ func (t *Tree) DumpWriter(fromRoot []byte, w *bufio.Writer) error {
 // [ 1 byte | 1 byte | S bytes | len(v) bytes ]
 // [ len(k) | len(v) |   key   |     value    ]
 // Where S is the size of the output of the hash function used for the Tree.
-func (t *Tree) dump(fromRoot []byte, w *bufio.Writer) ([]byte, error) {
+func (t *Tree) dump(fromRoot []byte, w io.Writer) ([]byte, error) {
 	// allow to define which root to use
 	if fromRoot == nil {
 		var err error
@@ -1385,11 +1385,6 @@ func (t *Tree) dump(fromRoot []byte, w *bufio.Writer) ([]byte, error) {
 				callbackErr = fmt.Errorf("dump: w.Write n!=len(kv), %s", err)
 				return true
 			}
-			err = w.Flush()
-			if err != nil {
-				callbackErr = fmt.Errorf("dump: w.Flush, %s", err)
-				return true
-			}
 		}
 		return false
 	})
@@ -1409,7 +1404,7 @@ func (t *Tree) ImportDump(b []byte) error {
 
 // ImportDumpReader imports the leafs (that have been exported with the Dump
 // method) in the Tree, reading them from the given reader.
-func (t *Tree) ImportDumpReader(r *bufio.Reader) error {
+func (t *Tree) ImportDumpReader(r io.Reader) error {
 	if !t.editable() {
 		return ErrSnapshotNotEditable
 	}
