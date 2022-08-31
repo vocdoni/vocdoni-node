@@ -382,7 +382,9 @@ func (r *RPCAPI) getEntityList(request *api.APIrequest) (*api.APIresponse, error
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize
 	}
-	response.EntityIDs = r.scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
+	response.EntityIDs = new([]string)
+	eids := r.scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
+	response.EntityIDs = &eids
 	return &response, nil
 }
 
