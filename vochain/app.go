@@ -702,3 +702,8 @@ func (app *BaseApplication) SetFnGetTxHash(fn func(height uint32, txIndex int32)
 func (app *BaseApplication) SetFnMempoolSize(fn func() int) {
 	app.fnMempoolSize = fn
 }
+
+// SetChainID sets the app chainID
+func (app *BaseApplication) SetChainID(chainId string) {
+	app.chainId = chainId
+}
