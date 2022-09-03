@@ -50,6 +50,10 @@ func keysValuesToKvs(maxLevels int, ks, vs [][]byte) ([]kv, []Invalid, error) {
 			invalids = append(invalids, Invalid{i, err})
 			continue
 		}
+		if err := checkKeyValueLen(ks[i], vs[i]); err != nil {
+			invalids = append(invalids, Invalid{i, err})
+			continue
+		}
 
 		var kvsI kv
 		kvsI.pos = i
@@ -378,6 +382,10 @@ func (t *vt) computeHashes() ([][2][]byte, error) {
 }
 
 func newLeafNode(p *params, k, v []byte) (*node, error) {
+	if err := checkKeyValueLen(k, v); err != nil {
+		return nil, err
+	}
+
 	keyPath, err := keyPathFromKey(p.maxLevels, k)
 	if err != nil {
 		return nil, err

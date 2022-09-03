@@ -42,7 +42,9 @@ const (
 	// nChars is used to crop the Graphviz nodes labels
 	nChars = 4
 
-	maxUint8  = int(^uint8(0))  // 2**8 -1
+	// maxUint8 is the max size of key length
+	maxUint8 = int(^uint8(0)) // 2**8 -1
+	// maxUint16 is the max size of value length
 	maxUint16 = int(^uint16(0)) // 2**16 -1
 )
 
@@ -579,7 +581,28 @@ func keyPathFromKey(maxLevels int, k []byte) ([]byte, error) {
 	return keyPath, nil
 }
 
+// checkKeyValueLen checks the key length and value length. This method is used
+// when adding single leafs and also when adding a batch. The limits of lengths
+// used are derived from the encoding of tree dumps: 1 byte to define the
+// length of the keys (2^8-1 bytes length)), and 2 bytes to define the length
+// of the values (2^16-1 bytes length).
+func checkKeyValueLen(k, v []byte) error {
+	if len(k) > maxUint8 {
+		return fmt.Errorf("len(k)=%v, can not be bigger than %v",
+			len(k), maxUint8)
+	}
+	if len(v) > maxUint16 {
+		return fmt.Errorf("len(v)=%v, can not be bigger than %v",
+			len(v), maxUint16)
+	}
+	return nil
+}
+
 func (t *Tree) add(wTx db.WriteTx, root []byte, fromLvl int, k, v []byte) ([]byte, error) {
+	if err := checkKeyValueLen(k, v); err != nil {
+		return nil, err
+	}
+
 	keyPath, err := keyPathFromKey(t.maxLevels, k)
 	if err != nil {
 		return nil, err
@@ -754,15 +777,15 @@ func (t *Tree) newLeafValue(k, v []byte) ([]byte, []byte, error) {
 // [     1 byte   |     1 byte    | N bytes | M bytes ]
 // [ type of node | length of key |   key   |  value  ]
 func newLeafValue(hashFunc HashFunction, k, v []byte) ([]byte, []byte, error) {
+	if err := checkKeyValueLen(k, v); err != nil {
+		return nil, nil, err
+	}
 	leafKey, err := hashFunc.Hash(k, v, []byte{1})
 	if err != nil {
 		return nil, nil, err
 	}
 	var leafValue []byte
 	leafValue = append(leafValue, byte(PrefixValueLeaf))
-	if len(k) > maxUint8 {
-		return nil, nil, fmt.Errorf("newLeafValue: len(k) > %v", maxUint8)
-	}
 	leafValue = append(leafValue, byte(len(k)))
 	leafValue = append(leafValue, k...)
 	leafValue = append(leafValue, v...)
@@ -1336,8 +1359,8 @@ func (t *Tree) DumpWriter(fromRoot []byte, w io.Writer) error {
 // byte array with the dump, if w contains a *bufio.Writer, it will write the
 // dump in w.
 // The format of the dump is the following:
-// Dump length: [ N * (2+len(k+v)) ]. Where N is the number of key-values, and for each k+v:
-// [ 1 byte | 1 byte | S bytes | len(v) bytes ]
+// Dump length: [ N * (3+len(k+v)) ]. Where N is the number of key-values, and for each k+v:
+// [ 1 byte | 2 byte | S bytes | len(v) bytes ]
 // [ len(k) | len(v) |   key   |     value    ]
 // Where S is the size of the output of the hash function used for the Tree.
 func (t *Tree) dump(fromRoot []byte, w io.Writer) ([]byte, error) {
@@ -1350,8 +1373,10 @@ func (t *Tree) dump(fromRoot []byte, w io.Writer) ([]byte, error) {
 		}
 	}
 
-	// WARNING current encoding only supports key & values of 255 bytes each
-	// (due using only 1 byte for the length headers).
+	// WARNING current encoding only supports keys of 255 bytes and values
+	// of 65535 bytes each (due using only 1 and 2 bytes for the length
+	// headers). These lengths are checked on leaf addition by the function
+	// checkKeyValueLen.
 	var b []byte
 	var callbackErr error
 	err := t.IterateWithStop(fromRoot, func(_ int, k, v []byte) bool {
@@ -1359,19 +1384,19 @@ func (t *Tree) dump(fromRoot []byte, w io.Writer) ([]byte, error) {
 			return false
 		}
 		leafK, leafV := ReadLeafValue(v)
-		kv := make([]byte, 2+len(leafK)+len(leafV))
+		kv := make([]byte, 3+len(leafK)+len(leafV))
 		if len(leafK) > maxUint8 {
 			callbackErr = fmt.Errorf("len(leafK) > %v", maxUint8)
 			return true
 		}
 		kv[0] = byte(len(leafK))
-		if len(leafV) > maxUint8 {
-			callbackErr = fmt.Errorf("len(leafV) > %v", maxUint8)
+		if len(leafV) > maxUint16 {
+			callbackErr = fmt.Errorf("len(leafV) > %v", maxUint16)
 			return true
 		}
-		kv[1] = byte(len(leafV))
-		copy(kv[2:2+len(leafK)], leafK)
-		copy(kv[2+len(leafK):], leafV)
+		binary.LittleEndian.PutUint16(kv[1:3], uint16(len(leafV)))
+		copy(kv[3:3+len(leafK)], leafK)
+		copy(kv[3+len(leafK):], leafV)
 
 		if w == nil {
 			b = append(b, kv...)
@@ -1418,19 +1443,21 @@ func (t *Tree) ImportDumpReader(r io.Reader) error {
 
 	var keys, values [][]byte
 	for {
-		l := make([]byte, 2)
+		l := make([]byte, 3)
 		_, err = io.ReadFull(r, l)
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
 		}
-		k := make([]byte, l[0])
+		lenK := int(l[0])
+		k := make([]byte, lenK)
 		_, err = io.ReadFull(r, k)
 		if err != nil {
 			return err
 		}
-		v := make([]byte, l[1])
+		lenV := binary.LittleEndian.Uint16(l[1:3])
+		v := make([]byte, lenV)
 		_, err = io.ReadFull(r, v)
 		if err != nil {
 			return err
