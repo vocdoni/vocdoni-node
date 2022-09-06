@@ -27,10 +27,26 @@ jobs:
           go test -vet=off -timeout=15m -race ./...
       - name: go vet
         run: go vet ./...
-      - name: staticcheck
+      - name: Download staticcheck
         run: |
           curl -L https://github.com/dominikh/go-tools/releases/download/2022.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
-          ./staticcheck/staticcheck ./...
+      - name: staticcheck
+        run: |
+          ./staticcheck/staticcheck ./... 2> staticcheck/stderr
+      - name:  check staticcheck stderr
+        run: |
+          if cat staticcheck/stderr | grep "matched no packages" ; then
+            echo "staticcheck step did nothing, due to https://github.com/vocdoni/vocdoni-node/issues/444"
+            echo "Please re-run job."
+            # seize the opportunity to fix the underlying problem: a permissions error in ~/.cache
+            epoch=$(date +%s)
+            # if any file is reported by find, grep returns true and the mv is done
+            if [ -d ~/.cache ] && find ~/.cache -not -user `id --user` -print0 | grep -qz . ; then
+              echo "~/.cache had broken permissions, moving it away... (cache will be rebuilt with usage)"
+              mv -v ~/.cache ~/.cache-broken-by-root-$epoch
+            fi
+            exit 2
+          fi
       - name: Go build for Mac
         run: |
           # Some of our devs are on Mac. Ensure it builds.
