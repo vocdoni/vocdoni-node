@@ -74,13 +74,13 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 	case *models.Tx_Vote:
 		// get VoteEnvelope from tx
 		txVote := vtx.Tx.GetVote()
-		v, err := app.VoteEnvelopeCheck(txVote, vtx.SignedBody, vtx.Signature, vtx.TxID, commit)
+		v, voterID, err := app.VoteEnvelopeCheck(txVote, vtx.SignedBody, vtx.Signature, vtx.TxID, commit)
 		if err != nil || v == nil {
 			return nil, fmt.Errorf("voteTxCheck: %w", err)
 		}
 		response.Data = v.Nullifier
 		if commit {
-			return response, app.State.AddVote(v)
+			return response, app.State.AddVote(v, voterID)
 		}
 
 	case *models.Tx_Admin:
@@ -332,37 +332,37 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 // VoteEnvelopeCheck is an abstraction of ABCI checkTx for submitting a vote
 // All hexadecimal strings should be already sanitized (without 0x)
 func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, signature []byte,
-	txID [32]byte, forCommit bool) (*models.Vote, error) {
-
+	txID [32]byte, forCommit bool) (*models.Vote, []byte, error) {
+	voterID := make([]byte, 0)
 	// Perform basic/general checks
 	if ve == nil {
-		return nil, fmt.Errorf("vote envelope is nil")
+		return nil, voterID, fmt.Errorf("vote envelope is nil")
 	}
 	process, err := app.State.Process(ve.ProcessId, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot fetch processId: %w", err)
+		return nil, voterID, fmt.Errorf("cannot fetch processId: %w", err)
 	}
 	if process == nil || process.EnvelopeType == nil || process.Mode == nil {
-		return nil, fmt.Errorf("process %x malformed", ve.ProcessId)
+		return nil, voterID, fmt.Errorf("process %x malformed", ve.ProcessId)
 	}
 	height := app.State.CurrentHeight()
 	endBlock := process.StartBlock + process.BlockCount
 
 	if height < process.StartBlock {
-		return nil, fmt.Errorf("process %x starts at height %d, current height is %d", ve.ProcessId, process.StartBlock, height)
+		return nil, voterID, fmt.Errorf("process %x starts at height %d, current height is %d", ve.ProcessId, process.StartBlock, height)
 	} else if height > endBlock {
-		return nil, fmt.Errorf("process %x finished at height %d, current height is %d", ve.ProcessId, endBlock, height)
+		return nil, voterID, fmt.Errorf("process %x finished at height %d, current height is %d", ve.ProcessId, endBlock, height)
 	}
 
 	if process.Status != models.ProcessStatus_READY {
-		return nil, fmt.Errorf("process %x not in READY state - current state: %s", ve.ProcessId, process.Status.String())
+		return nil, voterID, fmt.Errorf("process %x not in READY state - current state: %s", ve.ProcessId, process.Status.String())
 	}
 
 	// Check in case of keys required, they have been sent by some keykeeper
 	if process.EnvelopeType.EncryptedVotes &&
 		process.KeyIndex != nil &&
 		*process.KeyIndex < 1 {
-		return nil, fmt.Errorf("no keys available, voting is not possible")
+		return nil, voterID, fmt.Errorf("no keys available, voting is not possible")
 	}
 
 	var vote *models.Vote
@@ -384,7 +384,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			// if not forCommit, it is a mempool check,
 			// reject it since we already processed the transaction before.
 			if !forCommit {
-				return nil, ErrorAlreadyExistInCache
+				return nil, voterID, ErrorAlreadyExistInCache
 			}
 
 			vote.Height = height // update vote height
@@ -392,22 +392,22 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			if exist, err := app.State.EnvelopeExists(vote.ProcessId,
 				vote.Nullifier, false); err != nil || exist {
 				if err != nil {
-					return nil, err
+					return nil, voterID, err
 				}
-				return nil, fmt.Errorf("vote %x already exists", vote.Nullifier)
+				return nil, voterID, fmt.Errorf("vote %x already exists", vote.Nullifier)
 			}
-			return vote, nil
+			return vote, voterID, nil
 		}
 
 		// Supports Groth16 proof generated from circom snark compatible
 		// prover
 		proofZkSNARK := ve.Proof.GetZkSnark()
 		if proofZkSNARK == nil {
-			return nil, fmt.Errorf("zkSNARK proof is empty")
+			return nil, voterID, fmt.Errorf("zkSNARK proof is empty")
 		}
 		proof, _, err := zk.ProtobufZKProofToCircomProof(proofZkSNARK)
 		if err != nil {
-			return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
+			return nil, voterID, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
 		}
 
 		// ve.Nullifier is encoded in little-endian
@@ -417,15 +417,15 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		if exist, err := app.State.EnvelopeExists(ve.ProcessId,
 			ve.Nullifier, false); err != nil || exist {
 			if err != nil {
-				return nil, err
+				return nil, voterID, err
 			}
-			return nil, fmt.Errorf("vote %x already exists", ve.Nullifier)
+			return nil, voterID, fmt.Errorf("vote %x already exists", ve.Nullifier)
 		}
 		log.Debugf("new zk vote %x for process %x", ve.Nullifier, ve.ProcessId)
 
 		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVKs) ||
 			int(proofZkSNARK.CircuitParametersIndex) < 0 {
-			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d of %d", proofZkSNARK.CircuitParametersIndex, len(app.ZkVKs))
+			return nil, voterID, fmt.Errorf("invalid CircuitParametersIndex: %d of %d", proofZkSNARK.CircuitParametersIndex, len(app.ZkVKs))
 		}
 		verificationKey := app.ZkVKs[proofZkSNARK.CircuitParametersIndex]
 
@@ -450,7 +450,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 
 		// check zkSnark proof
 		if !verifier.Verify(verificationKey, proof, publicInputs) {
-			return nil, fmt.Errorf("zkSNARK proof verification failed")
+			return nil, voterID, fmt.Errorf("zkSNARK proof verification failed")
 		}
 
 		// TODO the next 12 lines of code are the same than a little
@@ -469,13 +469,13 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		// If process encrypted, check the vote is encrypted (includes at least one key index)
 		if process.EnvelopeType.EncryptedVotes {
 			if len(ve.EncryptionKeyIndexes) == 0 {
-				return nil, fmt.Errorf("no key indexes provided on vote package")
+				return nil, voterID, fmt.Errorf("no key indexes provided on vote package")
 			}
 			vote.EncryptionKeyIndexes = ve.EncryptionKeyIndexes
 		}
 	} else { // Signature based voting
 		if signature == nil {
-			return nil, fmt.Errorf("signature missing on voteTx")
+			return nil, voterID, fmt.Errorf("signature missing on voteTx")
 		}
 		// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
 		// An element can only be added to the vote cache during checkTx.
@@ -495,7 +495,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			// if not forCommit, it is a mempool check,
 			// reject it since we already processed the transaction before.
 			if !forCommit {
-				return nil, fmt.Errorf("vote %x already exists in cache", vote.Nullifier)
+				return nil, voterID, fmt.Errorf("vote %x already exists in cache", vote.Nullifier)
 			}
 
 			// if we are on DeliverTx and the vote is in cache, lazy check
@@ -504,15 +504,15 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			if exist, err := app.State.EnvelopeExists(vote.ProcessId,
 				vote.Nullifier, false); err != nil || exist {
 				if err != nil {
-					return nil, err
+					return nil, voterID, err
 				}
-				return nil, fmt.Errorf("vote %x already exists", vote.Nullifier)
+				return nil, voterID, fmt.Errorf("vote %x already exists", vote.Nullifier)
 			}
 			if height > process.GetStartBlock()+process.GetBlockCount() ||
 				process.GetStatus() != models.ProcessStatus_READY {
-				return nil, fmt.Errorf("vote %x is not longer valid", vote.Nullifier)
+				return nil, voterID, fmt.Errorf("vote %x is not longer valid", vote.Nullifier)
 			}
-			return vote, nil
+			return vote, voterID, nil
 		}
 
 		// if not in cache, full check
@@ -526,25 +526,25 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 
 		// check proof is nil
 		if ve.Proof == nil {
-			return nil, fmt.Errorf("proof not found on transaction")
+			return nil, voterID, fmt.Errorf("proof not found on transaction")
 		}
 
 		// If process encrypted, check the vote is encrypted (includes at least one key index)
 		if process.EnvelopeType.EncryptedVotes {
 			if len(ve.EncryptionKeyIndexes) == 0 {
-				return nil, fmt.Errorf("no key indexes provided on vote package")
+				return nil, voterID, fmt.Errorf("no key indexes provided on vote package")
 			}
 			vote.EncryptionKeyIndexes = ve.EncryptionKeyIndexes
 		}
 		pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 		if err != nil {
-			return nil, fmt.Errorf("cannot extract public key from signature: %w", err)
+			return nil, voterID, fmt.Errorf("cannot extract public key from signature: %w", err)
 		}
 		addr, err := ethereum.AddrFromPublicKey(pubKey)
 		if err != nil {
-			return nil, fmt.Errorf("cannot extract address from public key: %w", err)
+			return nil, voterID, fmt.Errorf("cannot extract address from public key: %w", err)
 		}
-
+		voterID = addr.Bytes()
 		// assign a nullifier
 		vote.Nullifier = GenerateNullifier(addr, vote.ProcessId)
 
@@ -552,9 +552,9 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		if exist, err := app.State.EnvelopeExists(vote.ProcessId,
 			vote.Nullifier, false); err != nil || exist {
 			if err != nil {
-				return nil, err
+				return nil, voterID, err
 			}
-			return nil, fmt.Errorf("vote %x already exists", vote.Nullifier)
+			return nil, voterID, fmt.Errorf("vote %x already exists", vote.Nullifier)
 		}
 		log.Debugf("new vote %x for address %s and process %x", vote.Nullifier, addr.Hex(), ve.ProcessId)
 
@@ -562,10 +562,10 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			process.CensusOrigin, process.CensusRoot, process.ProcessId,
 			pubKey, addr)
 		if err != nil {
-			return nil, err
+			return nil, voterID, err
 		}
 		if !valid {
-			return nil, fmt.Errorf("proof not valid")
+			return nil, voterID, fmt.Errorf("proof not valid")
 		}
 		vote.Weight = weight.Bytes()
 	}
@@ -573,7 +573,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		// add the vote to cache
 		app.State.CacheAdd(txID, vote)
 	}
-	return vote, nil
+	return vote, voterID, nil
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction

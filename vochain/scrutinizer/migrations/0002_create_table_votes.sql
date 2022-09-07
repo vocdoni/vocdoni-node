@@ -5,6 +5,7 @@ CREATE TABLE vote_references (
   height        INTEGER NOT NULL,
   weight        TEXT NOT NULL, -- a bigint in Go, so we store via MarshalText
   tx_index      INTEGER NOT NULL,
+  voter_id      BLOB NOT NULL,
   creation_time DATETIME NOT NULL,
 
   FOREIGN KEY(process_id) REFERENCES processes(id)

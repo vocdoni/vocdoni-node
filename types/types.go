@@ -12,6 +12,8 @@ type EntityID = []byte
 
 type CensusRoot = []byte
 
+type VoterID = []byte
+
 // TODO: consider using a database/sql interface instead?
 
 type EncodedProtoBuf = []byte

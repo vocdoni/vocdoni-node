@@ -212,6 +212,7 @@ type VotePackage struct {
 type VoteReference struct {
 	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
 	ProcessID    types.HexBytes `badgerholdIndex:"ProcessID"`
+	VoterID      types.HexBytes
 	Height       uint32
 	Weight       *types.BigInt
 	TxIndex      int32
@@ -226,6 +227,7 @@ func VoteReferenceFromDB(dbvote *scrutinizerdb.VoteReference) *VoteReference {
 	return &VoteReference{
 		Nullifier:    dbvote.Nullifier,
 		ProcessID:    dbvote.ProcessID,
+		VoterID:      dbvote.VoterID,
 		Height:       uint32(dbvote.Height),
 		Weight:       weightInt,
 		TxIndex:      int32(dbvote.TxIndex),
@@ -237,6 +239,7 @@ func VoteReferenceFromDB(dbvote *scrutinizerdb.VoteReference) *VoteReference {
 type EnvelopeMetadata struct {
 	ProcessId types.HexBytes `json:"process_id"`
 	Nullifier types.HexBytes `json:"nullifier"`
+	VoterID   types.HexBytes `json:"voter_id"`
 	TxIndex   int32          `json:"tx_index"`
 	Height    uint32         `json:"height"`
 	TxHash    types.HexBytes `json:"tx_hash"`

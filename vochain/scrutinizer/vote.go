@@ -96,6 +96,7 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePacka
 		Meta: indexertypes.EnvelopeMetadata{
 			ProcessId: envelope.ProcessId,
 			Nullifier: nullifier,
+			VoterID:   voteRef.VoterID,
 			TxIndex:   voteRef.TxIndex,
 			Height:    voteRef.Height,
 			TxHash:    txHash,
@@ -191,6 +192,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 				envelopes = append(envelopes, &indexertypes.EnvelopeMetadata{
 					ProcessId: processId,
 					Nullifier: txRef.Nullifier,
+					VoterID:   txRef.VoterID,
 					TxIndex:   txRef.TxIndex,
 					Height:    txRef.Height,
 					TxHash:    txHash,
@@ -468,7 +470,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.In
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
 func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
-	weight []byte, txIndex int32, txn *badger.Txn) error {
+	weight []byte, txIndex int32, voterID []byte, txn *badger.Txn) error {
 	weightInt := new(types.BigInt).SetBytes(weight)
 	weightStr, err := weightInt.MarshalText()
 	if err != nil {
@@ -479,6 +481,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 		bhVoteRef := &indexertypes.VoteReference{
 			Nullifier:    nullifier,
 			ProcessID:    pid,
+			VoterID:      voterID,
 			Height:       blockHeight,
 			Weight:       weightInt,
 			TxIndex:      txIndex,
@@ -507,6 +510,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 		Height:       int64(blockHeight),
 		Weight:       string(weightStr),
 		TxIndex:      int64(txIndex),
+		VoterID:      voterID,
 		CreationTime: creationTime,
 	}); err != nil {
 		return err

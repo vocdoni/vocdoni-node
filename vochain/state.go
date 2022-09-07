@@ -276,7 +276,7 @@ var (
 // in the blockchain. This event relays on the event handlers to decide if results are
 // valid or not since the Vochain State do not validate results.
 type EventListener interface {
-	OnVote(vote *models.Vote, txIndex int32)
+	OnVote(vote *models.Vote, voterID []byte, txIndex int32)
 	OnNewTx(hash []byte, blockHeight uint32, txIndex int32)
 	OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)
 	OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32)
@@ -851,7 +851,7 @@ func (v *State) voteCountInc() error {
 
 // AddVote adds a new vote to a process and call the even listeners to OnVote.
 // This method does not check if the vote already exist!
-func (v *State) AddVote(vote *models.Vote) error {
+func (v *State) AddVote(vote *models.Vote, voterID []byte) error {
 	vid, err := v.voteID(vote.ProcessId, vote.Nullifier)
 	if err != nil {
 		return err
@@ -885,7 +885,7 @@ func (v *State) AddVote(vote *models.Vote) error {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnVote(vote, v.TxCounter())
+		l.OnVote(vote, voterID, v.TxCounter())
 	}
 	return nil
 }

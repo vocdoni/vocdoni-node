@@ -140,7 +140,7 @@ func TestAddVote(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	err := s.AddVote(testcommon.NewVoteHardcoded())
+	err := s.AddVote(testcommon.NewVoteHardcoded(), nil)
 	qt.Assert(t, err, qt.IsNil)
 }
 
@@ -148,7 +148,7 @@ func TestGetEnvelope(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	err := s.AddVote(testcommon.NewVoteHardcoded())
+	err := s.AddVote(testcommon.NewVoteHardcoded(), nil)
 	qt.Assert(t, err, qt.IsNil)
 	_, err = s.Envelope(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		testutil.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), false)
@@ -159,7 +159,7 @@ func TestCountVotes(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	err := s.AddVote(testcommon.NewVoteHardcoded())
+	err := s.AddVote(testcommon.NewVoteHardcoded(), nil)
 	qt.Assert(t, err, qt.IsNil)
 	_, err = s.Envelope(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		testutil.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), false)
@@ -172,7 +172,7 @@ func TestGetEnvelopeList(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	err := s.AddVote(testcommon.NewVoteHardcoded())
+	err := s.AddVote(testcommon.NewVoteHardcoded(), nil)
 	qt.Assert(t, err, qt.IsNil)
 	_, err = s.Envelope(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		testutil.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), false)

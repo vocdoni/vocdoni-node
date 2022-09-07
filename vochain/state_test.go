@@ -56,7 +56,7 @@ func TestStateBasic(t *testing.T) {
 				Nullifier:   rng.RandomBytes(32),
 				VotePackage: []byte(fmt.Sprintf("%d%d", i, j)),
 			}
-			if err := s.AddVote(v); err != nil {
+			if err := s.AddVote(v, []byte{}); err != nil {
 				t.Error(err)
 			}
 		}
@@ -151,7 +151,7 @@ type Listener struct {
 	processStart [][][]byte
 }
 
-func (l *Listener) OnVote(vote *models.Vote, txIndex int32)                                      {}
+func (l *Listener) OnVote(vote *models.Vote, voterID []byte, txIndex int32)                      {}
 func (l *Listener) OnNewTx(hash []byte, blockHeight uint32, txIndex int32)                       {}
 func (l *Listener) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)       {}
 func (l *Listener) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32) {}
@@ -270,7 +270,7 @@ func TestBlockMemoryUsage(t *testing.T) {
 			Nullifier:   rng.RandomBytes(32),
 			VotePackage: rng.RandomBytes(64),
 		}
-		qt.Assert(t, s.AddVote(v), qt.IsNil)
+		qt.Assert(t, s.AddVote(v, []byte{}), qt.IsNil)
 
 		if i%1_000 == 0 {
 			runtime.GC()

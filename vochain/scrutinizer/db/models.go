@@ -50,5 +50,6 @@ type VoteReference struct {
 	Height       int64
 	Weight       string
 	TxIndex      int64
+	VoterID      types.VoterID
 	CreationTime time.Time
 }

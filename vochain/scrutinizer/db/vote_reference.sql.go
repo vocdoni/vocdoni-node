@@ -16,10 +16,10 @@ import (
 const createVoteReference = `-- name: CreateVoteReference :execresult
 INSERT INTO vote_references (
 	nullifier, process_id, height, weight,
-	tx_index, creation_time
+	tx_index, voter_id, creation_time
 ) VALUES (
 	?, ?, ?, ?,
-	?, ?
+	?, ?, ?
 )
 `
 
@@ -29,6 +29,7 @@ type CreateVoteReferenceParams struct {
 	Height       int64
 	Weight       string
 	TxIndex      int64
+	VoterID      types.VoterID
 	CreationTime time.Time
 }
 
@@ -39,12 +40,13 @@ func (q *Queries) CreateVoteReference(ctx context.Context, arg CreateVoteReferen
 		arg.Height,
 		arg.Weight,
 		arg.TxIndex,
+		arg.VoterID,
 		arg.CreationTime,
 	)
 }
 
 const getVoteReference = `-- name: GetVoteReference :one
-SELECT nullifier, process_id, height, weight, tx_index, creation_time FROM vote_references
+SELECT nullifier, process_id, height, weight, tx_index, voter_id, creation_time FROM vote_references
 WHERE nullifier = ?
 LIMIT 1
 `
@@ -58,6 +60,7 @@ func (q *Queries) GetVoteReference(ctx context.Context, nullifier types.Nullifie
 		&i.Height,
 		&i.Weight,
 		&i.TxIndex,
+		&i.VoterID,
 		&i.CreationTime,
 	)
 	return i, err
