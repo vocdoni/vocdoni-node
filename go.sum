@@ -2636,6 +2636,8 @@ github.com/vocdoni/arbo v0.0.0-20210616072504-a8c7ea980892/go.mod h1:Pikn2YIz/Rt
 github.com/vocdoni/arbo v0.0.0-20210927131431-d7c756341372/go.mod h1:qJqeB/91mJfvNHaJf04iyLpCZoroqrrjOrQFlDUn0ko=
 github.com/vocdoni/arbo v0.0.0-20220204101222-688a2e814db0 h1:XkX+MXxpwn14mE5daeEZnfXodXS8l8p29kOJi3IAdn4=
 github.com/vocdoni/arbo v0.0.0-20220204101222-688a2e814db0/go.mod h1:4WbFeRVFdXmBwlAe6fYFj2YbF/vVecDvCVfPkfE8B24=
+github.com/vocdoni/arbo v0.0.0-20220903144204-c3e910e2afc6 h1:xcDY7xXcJgBCjlO8Pluff3BrUOwtbWlzZ8GYnvJ48yY=
+github.com/vocdoni/arbo v0.0.0-20220903144204-c3e910e2afc6/go.mod h1:4WbFeRVFdXmBwlAe6fYFj2YbF/vVecDvCVfPkfE8B24=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f h1:z7CK3k1yIutKycPY8s2ZbtwUBKMy3xPcLMh12QukLRY=
 github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f/go.mod h1:BoN7UMTA/JcgmNPaoUQq6RwuixhgSrk5PmCMVMKLxpc=
 github.com/vocdoni/blind-ca v0.1.4/go.mod h1:4ouWDqlvXrrNS0Csf3hKA3cuDTmKh6nP7kSXF39nT4s=

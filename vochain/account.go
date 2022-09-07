@@ -144,7 +144,7 @@ func (v *State) GetAccount(address common.Address, committed bool) (*Account, er
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	raw, err := v.mainTreeViewer(committed).DeepGet(address.Bytes(), AccountsCfg)
+	raw, err := v.mainTreeViewer(committed).DeepGet(address.Bytes(), StateTreeCfg(TreeAccounts))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, nil
 	} else if err != nil {
@@ -470,7 +470,7 @@ func (v *State) SetAccount(accountAddress common.Address, account *Account) erro
 		account.Balance,
 		printPrettierDelegates(account.DelegateAddrs),
 	)
-	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
+	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, StateTreeCfg(TreeAccounts))
 }
 
 // SubtractCostIncrementNonce reduces the transaction cost from the account balance and increments nonce

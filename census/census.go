@@ -318,12 +318,20 @@ func (m *Manager) DelNamespace(name string) error {
 
 func (m *Manager) save() error {
 	log.Debug("saving namespaces")
+	if err := os.MkdirAll(m.StorageDir, 0o750); err != nil {
+		return err
+	}
 	nsConfig := filepath.Join(m.StorageDir, "namespaces.json")
 	data, err := json.Marshal(m.Census)
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshaling census file: %w", err)
 	}
-	return os.WriteFile(nsConfig, data, 0o600)
+	log.Warnf("NSCONFIG: %s", nsConfig)
+	if err := os.WriteFile(nsConfig, data, 0o600); err != nil {
+		log.Warnf("ERROR: %v", err)
+	}
+
+	return nil
 }
 
 // Count returns the number of local created, external imported and loaded/active census

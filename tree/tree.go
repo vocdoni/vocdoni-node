@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
@@ -256,6 +257,11 @@ func (t *Tree) SetRoot(wTx db.WriteTx, root []byte) error {
 // Dump exports all the Tree leafs in a byte array.
 func (t *Tree) Dump() ([]byte, error) {
 	return t.tree.Dump(nil)
+}
+
+// DumpWriter exports all the Tree leafs in a byte writer.
+func (t *Tree) DumpWriter(w io.Writer) error {
+	return t.tree.DumpWriter(nil, w)
 }
 
 // ImportDump imports the leafs (that have been exported with the Dump method)

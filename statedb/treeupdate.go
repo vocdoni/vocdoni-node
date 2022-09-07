@@ -2,7 +2,7 @@ package statedb
 
 import (
 	"bytes"
-	"fmt"
+	"io"
 	"path"
 	"sync"
 
@@ -92,11 +92,10 @@ func (u *TreeUpdate) GenProof(key []byte) ([]byte, []byte, error) {
 	return u.tree.GenProof(u.tree.tx, key)
 }
 
-// Dump exports all the tree leafs in a byte array.
+// Dump exports all the tree leafs.
 // Unimplemented because arbo.Tree.Dump doesn't take db.ReadTx as input.
-func (u *TreeUpdate) Dump() ([]byte, error) {
-	// return u.tree.Dump(u.tree.tx)
-	return nil, fmt.Errorf("unimplemented because arbo.Tree.Dump doesn't take db.ReadTx as input")
+func (u *TreeUpdate) Dump(w io.Writer) error {
+	return u.tree.DumpWriter(w)
 }
 
 // NoState returns a key-value database associated with this tree that doesn't
@@ -379,9 +378,9 @@ func (v *treeUpdateView) GenProof(key []byte) ([]byte, []byte, error) {
 	return (*TreeUpdate)(v).GenProof(key)
 }
 
-// Dump exports all the tree leafs in a byte array.
-func (v *treeUpdateView) Dump() ([]byte, error) {
-	return (*TreeUpdate)(v).Dump()
+// Dump exports all the tree leafs.
+func (v *treeUpdateView) Dump(w io.Writer) error {
+	return (*TreeUpdate)(v).Dump(w)
 }
 
 func (v *treeUpdateView) PrintGraphviz() error {

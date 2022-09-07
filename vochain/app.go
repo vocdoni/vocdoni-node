@@ -629,7 +629,15 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	data, err := app.State.Save()
 	if err != nil {
-		log.Fatalf("cannot save state: %s", err)
+		log.Fatalf("cannot save state: %v", err)
+	}
+	if app.Height()%50000 == 0 && !app.IsSynchronizing() {
+		startTime := time.Now()
+		log.Infof("performing a state snapshot on block %d", app.Height())
+		if err := app.State.Snapshot(); err != nil {
+			log.Fatalf("cannot make state snapshot: %v", err)
+		}
+		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
 	}
 	return abcitypes.ResponseCommit{
 		Data: data,
