@@ -163,10 +163,10 @@ echo "### Test suite ready ###"
 for test in ${tests_to_run[@]}; do
 	[ $CONCURRENT -eq 1 ] && {
 		echo "### Running test $test concurrently with others ###"
-		( $test ; echo $? > $results/$test ) &
+		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval ) &
 	} || {
 		echo "### Running test $test ###"
-		( $test ; echo $? > $results/$test )
+		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval )
 	}
 	sleep 6
 done
@@ -174,24 +174,31 @@ done
 echo "### Waiting for tests to finish ###"
 wait
 
+failed=""
 for test in ${tests_to_run[@]} ; do
-	RET=$(cat $results/$test)
+	RET=$(cat $results/$test.retval)
 	if [ "$RET" == "0" ] ; then
 		echo "Vochain test $test finished correctly!"
 	else
 		echo "Vochain test $test failed!"
 		echo "### Post run logs ###"
 		$COMPOSE_CMD logs --tail 1000
+		failed="$test"
 		break
 	fi
 done
-
-# remove temp dir
-rm -rf $results
 
 [ $CLEAN -eq 1 ] && {
 	echo "### Cleaning docker environment ###"
 	$COMPOSE_CMD down -v --remove-orphans
 }
+
+if [ -n "$failed" ]; then
+  echo "### Logs from failed test ($test) ###"
+  cat $results/$failed.stdout
+fi
+
+# remove temp dir
+rm -rf $results
 
 exit $RET
