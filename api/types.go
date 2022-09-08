@@ -154,7 +154,7 @@ func (a APIrequest) String() string {
 	return b.String()
 }
 
-// APIresponse contains all of the possible request fields.
+// APIresponse contains all of the possible response fields.
 // Fields must be in alphabetical order
 // Those fields with valid zero-values (such as bool) must be pointers
 type APIresponse struct {
