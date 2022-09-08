@@ -491,9 +491,15 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, t
 
 // OnVote scrutinizer stores the votes if the processId is live results (on going)
 // and the blockchain is not synchronizing.
+// voterID is the identifier of the voter, the most common case is an ethereum address
+// but can be any kind of id expressed as bytes.
 func (s *Scrutinizer) OnVote(v *models.Vote, voterID []byte, txIndex int32) {
 	if !s.ignoreLiveResults && s.isProcessLiveResults(v.ProcessId) {
 		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
+	}
+	// voterID cannot be null as defined into the db schema
+	if len(voterID) == 0 {
+		voterID = []byte{}
 	}
 	s.voteIndexPool = append(s.voteIndexPool, &VoteWithIndex{vote: v, voterID: voterID, txIndex: txIndex})
 }
