@@ -326,12 +326,7 @@ func (m *Manager) save() error {
 	if err != nil {
 		return fmt.Errorf("error marshaling census file: %w", err)
 	}
-	log.Warnf("NSCONFIG: %s", nsConfig)
-	if err := os.WriteFile(nsConfig, data, 0o600); err != nil {
-		log.Warnf("ERROR: %v", err)
-	}
-
-	return nil
+	return os.WriteFile(nsConfig, data, 0o600)
 }
 
 // Count returns the number of local created, external imported and loaded/active census
