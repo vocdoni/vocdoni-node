@@ -212,7 +212,7 @@ type VotePackage struct {
 type VoteReference struct {
 	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
 	ProcessID    types.HexBytes `badgerholdIndex:"ProcessID"`
-	VoterID      types.HexBytes
+	VoterID      types.VoterID
 	Height       uint32
 	Weight       *types.BigInt
 	TxIndex      int32

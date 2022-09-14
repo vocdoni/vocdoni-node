@@ -106,7 +106,7 @@ type Scrutinizer struct {
 // VoteWithIndex holds a Vote and a txIndex. Model for the VotePool.
 type VoteWithIndex struct {
 	vote    *models.Vote
-	voterID []byte
+	voterID types.VoterID
 	txIndex int32
 }
 
@@ -493,13 +493,9 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, t
 // and the blockchain is not synchronizing.
 // voterID is the identifier of the voter, the most common case is an ethereum address
 // but can be any kind of id expressed as bytes.
-func (s *Scrutinizer) OnVote(v *models.Vote, voterID []byte, txIndex int32) {
+func (s *Scrutinizer) OnVote(v *models.Vote, voterID types.VoterID, txIndex int32) {
 	if !s.ignoreLiveResults && s.isProcessLiveResults(v.ProcessId) {
 		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
-	}
-	// voterID cannot be null as defined into the db schema
-	if len(voterID) == 0 {
-		voterID = []byte{}
 	}
 	s.voteIndexPool = append(s.voteIndexPool, &VoteWithIndex{vote: v, voterID: voterID, txIndex: txIndex})
 }

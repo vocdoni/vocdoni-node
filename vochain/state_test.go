@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -56,7 +57,7 @@ func TestStateBasic(t *testing.T) {
 				Nullifier:   rng.RandomBytes(32),
 				VotePackage: []byte(fmt.Sprintf("%d%d", i, j)),
 			}
-			if err := s.AddVote(v, []byte{}); err != nil {
+			if err := s.AddVote(v, types.VoterID{}.Nil()); err != nil {
 				t.Error(err)
 			}
 		}
@@ -151,7 +152,7 @@ type Listener struct {
 	processStart [][][]byte
 }
 
-func (l *Listener) OnVote(vote *models.Vote, voterID []byte, txIndex int32)                      {}
+func (l *Listener) OnVote(vote *models.Vote, voterID types.VoterID, txIndex int32)               {}
 func (l *Listener) OnNewTx(hash []byte, blockHeight uint32, txIndex int32)                       {}
 func (l *Listener) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)       {}
 func (l *Listener) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32) {}
@@ -270,7 +271,7 @@ func TestBlockMemoryUsage(t *testing.T) {
 			Nullifier:   rng.RandomBytes(32),
 			VotePackage: rng.RandomBytes(64),
 		}
-		qt.Assert(t, s.AddVote(v, []byte{}), qt.IsNil)
+		qt.Assert(t, s.AddVote(v, types.VoterID{}.Nil()), qt.IsNil)
 
 		if i%1_000 == 0 {
 			runtime.GC()

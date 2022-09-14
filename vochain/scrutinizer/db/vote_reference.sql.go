@@ -46,7 +46,7 @@ func (q *Queries) CreateVoteReference(ctx context.Context, arg CreateVoteReferen
 }
 
 const getVoteReference = `-- name: GetVoteReference :one
-SELECT nullifier, process_id, height, weight, tx_index, voter_id, creation_time FROM vote_references
+SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id FROM vote_references
 WHERE nullifier = ?
 LIMIT 1
 `
@@ -60,8 +60,8 @@ func (q *Queries) GetVoteReference(ctx context.Context, nullifier types.Nullifie
 		&i.Height,
 		&i.Weight,
 		&i.TxIndex,
-		&i.VoterID,
 		&i.CreationTime,
+		&i.VoterID,
 	)
 	return i, err
 }
