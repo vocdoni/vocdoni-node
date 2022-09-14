@@ -504,14 +504,14 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
 		var circuits []artifacts.CircuitConfig
-		if genesis, ok := Genesis[app.chainId]; ok {
+		if genesis, ok := Genesis[app.chainID]; ok {
 			circuits = genesis.CircuitsConfig
 		} else {
 			log.Warn("Using dev network genesis CircuitsConfig")
 			circuits = Genesis["dev"].CircuitsConfig
 		}
 		if len(circuits) == 0 {
-			return nil, common.Address{}, fmt.Errorf("no circuit configs in the %v genesis", app.chainId)
+			return nil, common.Address{}, fmt.Errorf("no circuit configs in the %v genesis", app.chainID)
 		}
 		if tx.Process.MaxCensusSize == nil {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize is not provided")

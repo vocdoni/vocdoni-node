@@ -584,7 +584,7 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("cannot unmarshal genesis file for fetching chainID")
 	}
 	log.Infof("found chainID %s", genesisCID.ChainID)
-	app.chainId = genesisCID.ChainID
+	app.SetChainID(genesisCID.ChainID)
 
 	// create node
 	node, err := nm.NewNode(

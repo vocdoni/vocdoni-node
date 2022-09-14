@@ -2,6 +2,7 @@ package statedb
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"path"
 
@@ -45,7 +46,9 @@ type TreeViewer interface {
 	Iterate(callback func(key, value []byte) bool) error
 	// Dump exports all the tree leafs into a writer buffer.
 	Dump(w io.Writer) error
-	// Root returns the root of the tree, which cryptographically summarises the
+	// Import writes a buffer containing all the tree leafs.
+	Import(r io.Reader) error
+	/// Root returns the root of the tree, which cryptographically summarises the
 	// state of the tree.
 	Root() ([]byte, error)
 	// Size returns the number of leafs (key-values) that this tree contains.
@@ -134,6 +137,11 @@ func (v *TreeView) GenProof(key []byte) ([]byte, []byte, error) {
 // Dump exports all the tree leafs.
 func (v *TreeView) Dump(w io.Writer) error {
 	return v.tree.DumpWriter(w)
+}
+
+// Import does nothing.
+func (v *TreeView) Import(r io.Reader) error {
+	return fmt.Errorf("tree is not writable")
 }
 
 // SubTree is used to open the subTree (singleton and non-singleton) as a

@@ -1,13 +1,9 @@
 package vochain
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/vocdoni/arbo"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 )
 
@@ -164,92 +160,4 @@ func StateParentChildTreeCfg(parent, child string, key []byte) (statedb.TreeConf
 	parentTree := StateTreeCfg(parent)
 	childTree := StateChildTreeCfg(child)
 	return parentTree, childTree.WithKey(key)
-}
-
-// Snapshot performs a snapshot of the last commited state for all trees.
-func (v *State) Snapshot() error {
-	t := v.MainTreeView()
-	height, err := v.LastHeight()
-	if err != nil {
-		return err
-	}
-	root, err := t.Root()
-	if err != nil {
-		return err
-	}
-	err = os.MkdirAll(filepath.Join(
-		v.dataDir,
-		storageDirectory,
-		snapshotsDirectory,
-		fmt.Sprintf("%d_%x", height, root)),
-		0750)
-	if err != nil {
-		return err
-	}
-
-	dumpTree := func(name string, tr statedb.TreeViewer) error {
-		log.Debugf("dumping subtree %s", name)
-
-		file, err := os.Create(filepath.Join(
-			v.dataDir,
-			storageDirectory,
-			snapshotsDirectory,
-			fmt.Sprintf("%d_%x", height, root),
-			fmt.Sprintf("%s.arbo", name),
-		))
-		if err != nil {
-			return err
-		}
-		if err := tr.Dump(file); err != nil {
-			return fmt.Errorf("cannot dump tree: %w", err)
-		}
-		return file.Close()
-	}
-
-	// dump main tree
-	if err := dumpTree("Main", v.mainTreeViewer(true)); err != nil {
-		return err
-	}
-
-	// dump main subtrees
-	for k := range MainTrees {
-		t, err := v.mainTreeViewer(true).SubTree(StateTreeCfg(k))
-		if err != nil {
-			return err
-		}
-		if err := dumpTree(k, t); err != nil {
-			return err
-		}
-	}
-
-	// dump child trees that depend on process
-	pids, err := v.ListProcessIDs(true)
-	if err != nil {
-		return err
-	}
-	log.Debugf("found %d processes", len(pids))
-	for name := range ChildTrees {
-		for _, p := range pids {
-			childTreeCfg := StateChildTreeCfg(name)
-			processTree, err := v.mainTreeViewer(true).SubTree(StateTreeCfg(TreeProcess))
-			if err != nil {
-				return fmt.Errorf("cannot load process tree: %w", err)
-			}
-			childTree, err := processTree.SubTree(childTreeCfg.WithKey(p))
-			if err != nil {
-				// key might not exist (i.e process does not have census)
-				if !errors.Is(err, arbo.ErrKeyNotFound) &&
-					!errors.Is(err, ErrProcessChildLeafRootUnknown) &&
-					!errors.Is(err, statedb.ErrEmptyTree) {
-					return fmt.Errorf("child tree (%s) cannot be loaded with key %x: %w", name, p, err)
-				}
-				continue
-			}
-			if err := dumpTree(fmt.Sprintf("%s.%x", name, p), childTree); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }

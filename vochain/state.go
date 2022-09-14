@@ -236,6 +236,8 @@ type State struct {
 	eventListeners      []EventListener
 	// currentHeight is the height of the current started block
 	currentHeight uint32
+	// chainID identifies the blockchain
+	chainID string
 }
 
 // NewState creates a new State
@@ -355,6 +357,11 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	}
 
 	return sdb, update.Commit(0)
+}
+
+// SetChainID sets the blockchain identifier.
+func (v *State) SetChainID(chID string) {
+	v.chainID = chID
 }
 
 // MainTreeView is a thread-safe function to obtain a pointer to the last

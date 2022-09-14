@@ -63,7 +63,7 @@ type BaseApplication struct {
 	// startBlockTimestamp is the current block timestamp from tendermint's
 	// abcitypes.RequestBeginBlock.Header.Time
 	startBlockTimestamp int64
-	chainId             string
+	chainID             string
 	dataDir             string
 	// ZkVKs contains the VerificationKey for each circuit parameters index
 	ZkVKs []*snarkTypes.Vk
@@ -106,7 +106,7 @@ func TestBaseApplication(tb testing.TB) *BaseApplication {
 func (app *BaseApplication) LoadZkVKs(ctx context.Context) error {
 	app.ZkVKs = []*snarkTypes.Vk{}
 	var circuits []zkartifacts.CircuitConfig
-	if genesis, ok := Genesis[app.chainId]; ok {
+	if genesis, ok := Genesis[app.chainID]; ok {
 		circuits = genesis.CircuitsConfig
 	} else {
 		log.Info("using dev genesis zkSnarks circuits")
@@ -248,7 +248,8 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 	if app.Node, err = newTendermint(app, vochaincfg, genesis); err != nil {
 		return fmt.Errorf("could not set application Node: %s", err)
 	}
-	app.chainId = app.Node.GenesisDoc().ChainID
+	app.SetChainID(app.Node.GenesisDoc().ChainID)
+
 	return nil
 }
 
@@ -341,7 +342,7 @@ func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
 
 // ChainID returns the Node ChainID
 func (app *BaseApplication) ChainID() string {
-	return app.chainId
+	return app.chainID
 }
 
 // MempoolSize returns the size of the transaction mempool
@@ -634,10 +635,11 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	if app.Height()%50000 == 0 && !app.IsSynchronizing() {
 		startTime := time.Now()
 		log.Infof("performing a state snapshot on block %d", app.Height())
-		if err := app.State.Snapshot(); err != nil {
+		if _, err := app.State.snapshot(); err != nil {
 			log.Fatalf("cannot make state snapshot: %v", err)
 		}
 		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
+		log.Debugf("%+v", app.State.listSnapshots())
 	}
 	return abcitypes.ResponseCommit{
 		Data: data,
@@ -711,7 +713,8 @@ func (app *BaseApplication) SetFnMempoolSize(fn func() int) {
 	app.fnMempoolSize = fn
 }
 
-// SetChainID sets the app chainID
+// SetChainID sets the app and state chainID
 func (app *BaseApplication) SetChainID(chainId string) {
-	app.chainId = chainId
+	app.chainID = chainId
+	app.State.SetChainID(chainId)
 }

@@ -100,7 +100,7 @@ func TestMerkleTreeProof(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if stx.Signature, err = s.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
+		if stx.Signature, err = s.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -147,7 +147,7 @@ func TestMerkleTreeProof(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if stx.Signature, err = lastKey.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
+		if stx.Signature, err = lastKey.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -379,7 +379,7 @@ func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignK
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
 		t.Fatal(err)
 	}
 

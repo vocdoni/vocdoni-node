@@ -98,6 +98,16 @@ func (u *TreeUpdate) Dump(w io.Writer) error {
 	return u.tree.DumpWriter(w)
 }
 
+// Import writes the content exported with Dump.
+// TODO: use io.Reader once implemented in Arbo.
+func (u *TreeUpdate) Import(r io.Reader) error {
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		return err
+	}
+	return u.tree.ImportDump(buf.Bytes())
+}
+
 // NoState returns a key-value database associated with this tree that doesn't
 // affect the cryptographic integrity of the StateDB.  Writing to this database
 // won't change the StateDB.Root.
@@ -381,6 +391,11 @@ func (v *treeUpdateView) GenProof(key []byte) ([]byte, []byte, error) {
 // Dump exports all the tree leafs.
 func (v *treeUpdateView) Dump(w io.Writer) error {
 	return (*TreeUpdate)(v).Dump(w)
+}
+
+// Import writes all the tree leafs.
+func (v *treeUpdateView) Import(r io.Reader) error {
+	return (*TreeUpdate)(v).Import(r)
 }
 
 func (v *treeUpdateView) PrintGraphviz() error {
