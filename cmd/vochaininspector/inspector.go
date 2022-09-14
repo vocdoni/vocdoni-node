@@ -13,11 +13,7 @@ import (
 	"time"
 
 	flag "github.com/spf13/pflag"
-	tmcfg "github.com/tendermint/tendermint/config"
-	"github.com/tendermint/tendermint/node"
-	"github.com/tendermint/tendermint/store"
 	"go.vocdoni.io/dvote/config"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
@@ -207,50 +203,51 @@ func voteID(pid, nullifier []byte) ([]byte, error) {
 }
 
 func listBlockVotes(height int64, blockStoreDir string) {
-	cfg := tmcfg.DefaultConfig()
-	cfg.RootDir = blockStoreDir
-	blockStoreDB, err := node.DefaultDBProvider(&node.DBContext{ID: "blockstore", Config: cfg})
-	if err != nil {
-		log.Fatal("Can't open blockstore")
-	}
-	blockStore := store.NewBlockStore(blockStoreDB)
-	if blockStore == nil {
-		log.Fatal("Blockstore is nil")
-	}
-	block := blockStore.LoadBlock(height)
-	if block == nil {
-		log.Fatal("Block is nil")
-	}
-	fmt.Printf("Block txs: %v\n", len(block.Data.Txs))
-	for i, blockTx := range block.Data.Txs {
-		tx := new(vochain.VochainTx)
-		if err := tx.Unmarshal(blockTx, ""); err != nil {
-			log.Error(err)
-			continue
-		}
+	log.Fatal("listBlockVotes is not yet implemented since tendermint v0.35")
+	// cfg := tmcfg.DefaultConfig()
+	// cfg.RootDir = blockStoreDir
+	// blockStoreDB, err := node.DefaultDBProvider(&node.DBContext{ID: "blockstore", Config: cfg})
+	// if err != nil {
+	// 	log.Fatal("Can't open blockstore")
+	// }
+	// blockStore := store.NewBlockStore(blockStoreDB)
+	// if blockStore == nil {
+	// 	log.Fatal("Blockstore is nil")
+	// }
+	// block := blockStore.LoadBlock(height)
+	// if block == nil {
+	// 	log.Fatal("Block is nil")
+	// }
+	// fmt.Printf("Block txs: %v\n", len(block.Data.Txs))
+	// for i, blockTx := range block.Data.Txs {
+	// 	tx := new(vochain.VochainTx)
+	// 	if err := tx.Unmarshal(blockTx, ""); err != nil {
+	// 		log.Error(err)
+	// 		continue
+	// 	}
 
-		//	fmt.Printf("%+v\n", tx)
-		vote := tx.Tx.GetVote()
-		if vote == nil {
-			continue
-		}
-		pubKey, err := ethereum.PubKeyFromSignature(tx.SignedBody, tx.Signature)
-		if err != nil {
-			log.Fatalf("cannot extract public key from signature: %v", err)
-		}
-		addr, err := ethereum.AddrFromPublicKey(pubKey)
-		if err != nil {
-			log.Fatalf("cannot extract address from public key: %v", err)
-		}
-		vote.Nullifier = vochain.GenerateNullifier(addr, vote.ProcessId)
-		// fmt.Printf("%+v\n", vote)
-		vid, err := voteID(vote.ProcessId, vote.Nullifier)
-		if err != nil {
-			log.Fatalf("cannot get voteID: %v", err)
-		}
+	// 	//	fmt.Printf("%+v\n", tx)
+	// 	vote := tx.Tx.GetVote()
+	// 	if vote == nil {
+	// 		continue
+	// 	}
+	// 	pubKey, err := ethereum.PubKeyFromSignature(tx.SignedBody, tx.Signature)
+	// 	if err != nil {
+	// 		log.Fatalf("cannot extract public key from signature: %v", err)
+	// 	}
+	// 	addr, err := ethereum.AddrFromPublicKey(pubKey)
+	// 	if err != nil {
+	// 		log.Fatalf("cannot extract address from public key: %v", err)
+	// 	}
+	// 	vote.Nullifier = vochain.GenerateNullifier(addr, vote.ProcessId)
+	// 	// fmt.Printf("%+v\n", vote)
+	// 	vid, err := voteID(vote.ProcessId, vote.Nullifier)
+	// 	if err != nil {
+	// 		log.Fatalf("cannot get voteID: %v", err)
+	// 	}
 
-		fmt.Printf("vote %d pid:%x vid:%x proofType:%s\n", i, vote.ProcessId, vid, reflect.TypeOf(vote.Proof.Payload))
-	}
+	// 	fmt.Printf("vote %d pid:%x vid:%x proofType:%s\n", i, vote.ProcessId, vid, reflect.TypeOf(vote.Proof.Payload))
+	// }
 }
 
 func openStateAtHeight(height int64, stateDir string) *statedb.TreeView {
