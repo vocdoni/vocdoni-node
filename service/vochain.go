@@ -122,8 +122,7 @@ func Vochain(vs *VochainService) (
 
 	// If seed mode, we are finished
 	if vs.Config.IsSeedNode {
-		// return vnode, nil, nil, vnode.Node.Start() TENDERMINT 0.35
-		return vnode, nil, nil, nil
+		return vnode, nil, nil, vnode.Service.Start()
 	}
 
 	// Scrutinizer
@@ -172,11 +171,10 @@ func Vochain(vs *VochainService) (
 	// Grab metrics
 	go vi.CollectMetrics(vs.MetricsAgent)
 
-	// TENDERMINT 0.35
 	// Start the vochain node
-	//if err := vnode.Node.Start(); err != nil {
-	//	return nil, nil, nil, err
-	//}
+	if err := vnode.Service.Start(); err != nil {
+		return nil, nil, nil, err
+	}
 
 	if !vs.Config.NoWaitSync {
 		log.Infof("waiting for vochain to synchronize")
@@ -194,6 +192,10 @@ func Vochain(vs *VochainService) (
 		log.Infof("vochain fastsync completed!")
 	}
 	go VochainPrintInfo(20, vi)
+
+	if vs.Config.LogLevel == "debug" {
+		go vochainPrintPeers(20*time.Second, vi)
+	}
 
 	return vnode, sc, vi, nil
 }
@@ -235,7 +237,6 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 	}
 }
 
-/* TENDERMINT 0.35
 // vochainPrintPeers prints the peers to log, for debugging tendermint PEX
 func vochainPrintPeers(interval time.Duration, vi *vochaininfo.VochainInfo) {
 	t := time.NewTicker(interval)
@@ -252,4 +253,3 @@ func vochainPrintPeers(interval time.Duration, vi *vochaininfo.VochainInfo) {
 		}
 	}
 }
-*/

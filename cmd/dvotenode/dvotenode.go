@@ -524,11 +524,8 @@ func main() {
 			log.Fatal(err)
 		}
 		defer func() {
-			// TENDERMINT 0.35
-			//vochainApp.Service.Stop()
-			//vochainApp.Service.Wait()
-			vochainApp.Node.Stop()
-			vochainApp.Node.Wait()
+			vochainApp.Service.Stop()
+			vochainApp.Service.Wait()
 		}()
 
 		// Wait for Vochain to be ready

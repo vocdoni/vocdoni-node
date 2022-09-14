@@ -2,12 +2,11 @@ package vochain
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
-	"os"
 	"strconv"
 
 	"go.vocdoni.io/dvote/config"
@@ -20,12 +19,9 @@ import (
 	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"
-
-	// tmtime "github.com/tendermint/tendermint/libs/time" TENDERMINT 0.35
-	tmtime "github.com/tendermint/tendermint/types/time"
-
-	"github.com/tendermint/tendermint/p2p"
+	tmtime "github.com/tendermint/tendermint/libs/time"
 	"github.com/tendermint/tendermint/privval"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -38,7 +34,6 @@ func GenerateNullifier(address ethcommon.Address, processID []byte) []byte {
 	return ethereum.HashRaw(nullifier.Bytes())
 }
 
-/* TENDERMINT 0.35
 // NewPrivateValidator returns a tendermint file private validator (key and state)
 // if tmPrivKey not specified, uses the existing one or generates a new one
 func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV, error) {
@@ -65,61 +60,7 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 	}
 	return pv, nil
 }
-*/
 
-// NewPrivateValidator returns a tendermint file private validator (key and state)
-// if tmPrivKey not specified, uses the existing one or generates a new one
-func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV, error) {
-	stateFile := &privval.FilePVLastSignState{}
-	f, err := os.OpenFile(tconfig.PrivValidatorStateFile(), os.O_RDONLY|os.O_CREATE, 0o666)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Error(err)
-		}
-	}()
-
-	stateJSONBytes, err := os.ReadFile(tconfig.PrivValidatorStateFile())
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = json.Unmarshal(stateJSONBytes, stateFile)
-	if err != nil || len(stateJSONBytes) == 0 {
-		log.Debugf("priv_validator_state.json is empty, adding default values")
-		jsonBytes, err := tmjson.MarshalIndent(stateFile, "", "  ")
-		if err != nil {
-			log.Fatalf("cannot create priv_validator_state.json: %s", err)
-		}
-		err = os.WriteFile(tconfig.PrivValidatorStateFile(), jsonBytes, 0o600)
-		if err != nil {
-			log.Fatalf("cannot create priv_validator_state.json: %s", err)
-		}
-	}
-
-	pv := privval.LoadOrGenFilePV(
-		tconfig.PrivValidatorKeyFile(),
-		tconfig.PrivValidatorStateFile(),
-	)
-	if len(tmPrivKey) > 0 {
-		var privKey crypto25519.PrivKey
-		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
-		if err != nil {
-			return nil, fmt.Errorf("cannot decode private key: (%s)", err)
-		}
-		privKey = make([]byte, 64)
-		if n := copy(privKey[:], keyBytes[:]); n != 64 {
-			return nil, fmt.Errorf("incorrect private key length (got %d, need 64)", n)
-		}
-		pv.Key.Address = privKey.PubKey().Address()
-		pv.Key.PrivKey = privKey
-		pv.Key.PubKey = privKey.PubKey()
-	}
-	return pv, nil
-}
-
-/* TENDERMINT 0.35
 // NewNodeKey returns and saves to the disk storage a tendermint node key
 func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*tmtypes.NodeKey, error) {
 	if tmPrivKey == "" {
@@ -135,23 +76,6 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*tmtypes.NodeKey, error)
 	// Write nodeKey to disk
 	return nodeKey, nodeKey.SaveAs(tconfig.NodeKeyFile())
 }
-*/
-
-// NewNodeKey returns and saves to the disk storage a tendermint node key
-func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*p2p.NodeKey, error) {
-	keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
-	if err != nil {
-		return nil, fmt.Errorf("cannot decode private key: (%s)", err)
-	}
-	nodeKey := &p2p.NodeKey{
-		PrivKey: crypto25519.PrivKey(keyBytes),
-	}
-	// Write nodeKey to disk
-	if err := nodeKey.SaveAs(tconfig.NodeKeyFile()); err != nil {
-		return nil, err
-	}
-	return nodeKey, nil
-}
 
 // NewGenesis creates a new genesis and return its bytes
 func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *ConsensusParams,
@@ -160,7 +84,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 	appState := new(GenesisAppState)
 	appState.Validators = make([]GenesisValidator, len(validators))
 	for idx, val := range validators {
-		pubk, err := val.GetPubKey()
+		pubk, err := val.GetPubKey(context.Background())
 		if err != nil {
 			return nil, err
 		}
