@@ -220,12 +220,8 @@ func (s *StateSnapshot) Save() error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	file, err := os.Create(s.path)
-	defer func() {
-		if err := file.Close(); err != nil {
-			log.Warn(err)
-		}
-	}()
+	finalFile, err := os.Create(s.path)
+	defer finalFile.Close()
 	if err != nil {
 		return err
 	}
@@ -239,22 +235,23 @@ func (s *StateSnapshot) Save() error {
 	// write the size of the header in the first 32 bytes
 	headerSize := make([]byte, 32)
 	binary.LittleEndian.PutUint32(headerSize, uint32(buf.Len()))
-	_, err = file.Write(headerSize)
+	_, err = finalFile.Write(headerSize)
 	if err != nil {
 		return err
 	}
 	// write the header
-	hs, err := file.Write(buf.Bytes())
+	hs, err := finalFile.Write(buf.Bytes())
 	if err != nil {
 		return err
 	}
 	log.Debugf("snapshot header size is %d bytes", hs)
 
 	// write the trees (by copying the tmpFile)
-	if _, err := s.file.Seek(0, 0); err != nil {
+	if _, err := s.file.Seek(io.SeekStart, 0); err != nil {
 		return err
 	}
-	bs, err := io.Copy(file, s.file)
+
+	bs, err := io.Copy(finalFile, s.file)
 	if err != nil {
 		return err
 	}

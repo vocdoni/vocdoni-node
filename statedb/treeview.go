@@ -44,9 +44,10 @@ type TreeViewer interface {
 	// Iterate iterates over all leafs of this tree.  When callback returns true,
 	// the iteration is stopped and this function returns.
 	Iterate(callback func(key, value []byte) bool) error
-	// Dump exports all the tree leafs into a writer buffer.
+	// Dump exports all the tree leafs into a writer buffer. The leaves can be read
+	// again via Import.
 	Dump(w io.Writer) error
-	// Import writes a buffer containing all the tree leafs.
+	// Import reads exported tree leaves from r.
 	Import(r io.Reader) error
 	/// Root returns the root of the tree, which cryptographically summarises the
 	// state of the tree.
