@@ -24,10 +24,6 @@ const (
 	snapshotHeaderLenSize = 32
 )
 
-// ErrTreeNotYetFullyRead is returned if FetchNextTree is called before the current
-// tree is fully read.
-var ErrTreeNotYetFullyRead = fmt.Errorf("current tree is not yet fully read")
-
 // A StateSnapshot is a copy in a specific point in time of the blockchain state.
 // The state is supposed to be a list of nested merkle trees.
 // The StateSnapshot contains the methods for building a single file snapshot of
@@ -44,14 +40,13 @@ var ErrTreeNotYetFullyRead = fmt.Errorf("current tree is not yet fully read")
 //
 // - treeN is the raw bytes dump of all trees.
 type StateSnapshot struct {
-	path               string
-	file               *os.File
-	lock               sync.Mutex
-	header             SnapshotHeader
-	headerSize         uint32
-	currentTree        int // indicates the current tree
-	treeReadPointer    int // points to the last read byte
-	currentTreeReadEnd int // points to the last byte of the current tree
+	path                  string
+	file                  *os.File
+	lock                  sync.Mutex
+	header                SnapshotHeader
+	headerSize            uint32
+	currentTree           int       // indicates the current tree
+	currentTreeReadBuffer io.Reader // the buffer for reading the current tree
 }
 
 // SnapshotHeader is the header structure of StateSnapshot containing the list of merkle trees.
@@ -61,7 +56,6 @@ type SnapshotHeader struct {
 	ChainID string
 	Height  uint32
 	Trees   []SnapshotHeaderTree
-	// checksum?
 }
 
 // SnapshotHeaderTree represents a merkle tree of the StateSnapshot.
@@ -94,80 +88,81 @@ func (s *StateSnapshot) SetChainID(chainID string) {
 // This method performs the opposite operation of `Create`, one of both needs
 // to be called (but not both).
 func (s *StateSnapshot) Open(filePath string) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	var err error
 	s.path = filePath
 	s.file, err = os.Open(filePath)
 	if err != nil {
 		return err
 	}
-	headerSizeBytes := make([]byte, 32)
-	if _, err = s.file.Read(headerSizeBytes); err != nil {
+	headerSizeBytes := make([]byte, snapshotHeaderLenSize)
+	if _, err = io.ReadFull(s.file, headerSizeBytes); err != nil {
 		return err
 	}
 	s.headerSize = binary.LittleEndian.Uint32(headerSizeBytes)
-	headerBytes := make([]byte, int(s.headerSize))
-	if _, err = s.file.Read(headerBytes); err != nil {
+	if _, err := s.file.Seek(snapshotHeaderLenSize, 0); err != nil {
 		return err
 	}
-	decoder := gob.NewDecoder(bytes.NewBuffer(headerBytes))
+	decoder := gob.NewDecoder(io.LimitReader(s.file, int64(s.headerSize)))
 	if err := decoder.Decode(&s.header); err != nil {
 		return fmt.Errorf("cannot decode header: %w", err)
 	}
-	s.treeReadPointer = snapshotHeaderLenSize + int(s.headerSize)
+	if s.header.Version != snapshotHeaderVersion {
+		return fmt.Errorf("snapshot version not compatible")
+	}
+	// we call FetchNextTree which increase s.currentTree, so we set
+	// currentTree to -1 value (thus the first tree with index 0 is loaded)
 	s.currentTree--
 	return s.FetchNextTree()
 }
 
 // FetchNextTree prepares everything for reading the next tree.
-// It returns ErrTreeNotYetFullyRead if the current tree has still
-// pending bytes for read. Returns io.EOF when there are no more trees.
+// Returns io.EOF when there are no more trees.
 func (s *StateSnapshot) FetchNextTree() error {
-	if s.treeReadPointer < s.currentTreeReadEnd {
-		return ErrTreeNotYetFullyRead
-	}
-	s.currentTree++
-	if len(s.header.Trees) == s.currentTree {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	// check if no more trees available
+	if s.currentTree >= len(s.header.Trees)-1 {
 		return io.EOF
 	}
-	s.currentTreeReadEnd = s.treeReadPointer +
-		int(s.header.Trees[s.currentTree].Size)
-	_, err := s.file.Seek(int64(s.treeReadPointer), 0)
+	s.currentTree++
+
+	// move the pointer is in the start of the next tree
+	seekPointer := snapshotHeaderLenSize + int(s.headerSize)
+	for i := 0; i < s.currentTree; i++ {
+		seekPointer += int(s.header.Trees[i].Size)
+	}
+	_, err := s.file.Seek(int64(seekPointer), io.SeekStart)
+
+	// update the buffer Reader
+	s.currentTreeReadBuffer = io.LimitReader(
+		s.file,
+		int64(s.header.Trees[s.currentTree].Size),
+	)
 	return err
 }
 
 // Read implements the io.Reader interface. Returns io.EOF error when no
 // more bytes available in the current three.
 func (s *StateSnapshot) Read(b []byte) (int, error) {
-	if s.currentTreeReadEnd == s.treeReadPointer {
-		return 0, io.EOF
-	}
-	// shrink b if its too big an return io.EOF
-	if s.treeReadPointer+len(b) > s.currentTreeReadEnd {
-		b = append([]byte{}, b[:s.currentTreeReadEnd-s.treeReadPointer]...)
-		n, err := s.file.Read(b)
-		s.treeReadPointer += n
-		if err == nil {
-			err = io.EOF
-		}
-		return n, err
-	}
-	n, err := s.file.Read(b)
-	s.treeReadPointer += n
-	return n, err
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.currentTreeReadBuffer.Read(b)
 }
 
 // ReadAll reads the full content of the current tree and returns its bytes.
 // io.EOF error is returned if the bytes have been already read.
 func (s *StateSnapshot) ReadAll() ([]byte, error) {
-	if s.currentTreeReadEnd == s.treeReadPointer {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	b, err := io.ReadAll(s.currentTreeReadBuffer)
+	if err != nil {
+		return nil, err
+	}
+	if len(b) == 0 {
 		return nil, io.EOF
 	}
-	b := make([]byte, s.currentTreeReadEnd-s.treeReadPointer)
-	n, err := s.file.Read(b)
-	s.treeReadPointer += n
-	return b, err
+	return b, nil
 }
 
 // Header returns the header for the snapshot containing the information
@@ -189,6 +184,8 @@ func (s *StateSnapshot) Path() string {
 // Create starts the creation of a new snapshot as a disk file.
 // This method must be called only once and its operation is oposed to `Open`.
 func (s *StateSnapshot) Create(filePath string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	var err error
 	s.header.Version = snapshotHeaderVersion
 	s.file, err = os.Create(filePath + ".tmp")
@@ -220,11 +217,12 @@ func (s *StateSnapshot) Save() error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	// create the final file
 	finalFile, err := os.Create(s.path)
-	defer finalFile.Close()
 	if err != nil {
 		return err
 	}
+	defer finalFile.Close()
 
 	// build the header
 	var buf bytes.Buffer
@@ -232,13 +230,15 @@ func (s *StateSnapshot) Save() error {
 	if err := enc.Encode(s.header); err != nil {
 		return err
 	}
+
 	// write the size of the header in the first 32 bytes
-	headerSize := make([]byte, 32)
+	headerSize := make([]byte, snapshotHeaderLenSize)
 	binary.LittleEndian.PutUint32(headerSize, uint32(buf.Len()))
 	_, err = finalFile.Write(headerSize)
 	if err != nil {
 		return err
 	}
+
 	// write the header
 	hs, err := finalFile.Write(buf.Bytes())
 	if err != nil {
@@ -247,10 +247,9 @@ func (s *StateSnapshot) Save() error {
 	log.Debugf("snapshot header size is %d bytes", hs)
 
 	// write the trees (by copying the tmpFile)
-	if _, err := s.file.Seek(io.SeekStart, 0); err != nil {
+	if _, err := s.file.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-
 	bs, err := io.Copy(finalFile, s.file)
 	if err != nil {
 		return err
@@ -261,11 +260,10 @@ func (s *StateSnapshot) Save() error {
 	if err := s.file.Close(); err != nil {
 		return err
 	}
-	if err := os.Remove(s.file.Name()); err != nil {
+	if err := finalFile.Close(); err != nil {
 		return err
 	}
-
-	return nil
+	return os.Remove(s.file.Name())
 }
 
 // Write implements the io.Writer interface.
