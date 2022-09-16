@@ -172,7 +172,7 @@ func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 	if err = s.Tx.DeepSet(
 		testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		processBytes,
-		vochain.ProcessesCfg); err != nil {
+		vochain.StateTreeCfg(vochain.TreeProcess)); err != nil {
 		tb.Fatal(err)
 	}
 	return s

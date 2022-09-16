@@ -64,7 +64,7 @@ func testAddOracle(t *testing.T,
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
+	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -141,7 +141,7 @@ func testRemoveOracle(t *testing.T, oracle *ethereum.SignKeys,
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
+	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
 		t.Fatal(err)
 	}
 

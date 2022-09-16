@@ -290,7 +290,7 @@ func graphVizMainTree(height int64, stateDir string) {
 func listStateProcesses(height int64, stateDir string) {
 	log.Infof("listing state processes for height %d", height)
 	snapshot := openStateAtHeight(height, stateDir)
-	processes, err := snapshot.DeepSubTree(vochain.ProcessesCfg)
+	processes, err := snapshot.DeepSubTree(vochain.StateTreeCfg(vochain.TreeProcess))
 	if err != nil {
 		log.Fatalf("Can't get Processes: %v", err)
 	}
@@ -307,7 +307,8 @@ func listStateProcesses(height int64, stateDir string) {
 }
 
 func countVotes(snapshot *statedb.TreeView, processID []byte) int64 {
-	votes, err := snapshot.DeepSubTree(vochain.ProcessesCfg, vochain.VotesCfg.WithKey(processID))
+	treeCfg := vochain.MainTrees[vochain.ChildTreeVotes]
+	votes, err := snapshot.DeepSubTree(vochain.StateTreeCfg(vochain.TreeProcess), treeCfg.WithKey(processID))
 	if err != nil {
 		if errors.Is(err, statedb.ErrEmptyTree) {
 			return 0
@@ -328,7 +329,8 @@ func listStateVotes(processID string, height int64, stateDir string) {
 	if err != nil {
 		panic(err)
 	}
-	votes, err := snapshot.DeepSubTree(vochain.ProcessesCfg, vochain.VotesCfg.WithKey(pid))
+	treeCfg := vochain.MainTrees[vochain.ChildTreeVotes]
+	votes, err := snapshot.DeepSubTree(vochain.StateTreeCfg(vochain.TreeProcess), treeCfg.WithKey(pid))
 	if err != nil {
 		log.Fatalf("Can't get Votes: %v", err)
 	}

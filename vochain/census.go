@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -36,7 +37,10 @@ func (v *State) AddToRollingCensus(pid []byte, key []byte, weight *big.Int) erro
 	if err != nil {
 		return fmt.Errorf("cannot open process with pid %x: %w", pid, err)
 	}
-	census, err := v.Tx.DeepSubTree(ProcessesCfg, CensusPoseidonCfg.WithKey(pid))
+	census, err := v.Tx.DeepSubTree(
+		StateTreeCfg(TreeProcess),
+		StateChildTreeCfg(ChildTreeCensusPoseidon).WithKey(pid),
+	)
 	if err != nil {
 		return fmt.Errorf("cannot open rolling census with pid %x: %w", pid, err)
 	}
@@ -69,7 +73,10 @@ func (v *State) AddToRollingCensus(pid []byte, key []byte, weight *big.Int) erro
 }
 
 func getRollingCensusSize(mainTreeView statedb.TreeViewer, pid []byte) (uint64, error) {
-	census, err := mainTreeView.DeepSubTree(ProcessesCfg, CensusPoseidonCfg.WithKey(pid))
+	census, err := mainTreeView.DeepSubTree(
+		StateTreeCfg(TreeProcess),
+		StateChildTreeCfg(ChildTreeCensusPoseidon).WithKey(pid),
+	)
 	if err != nil {
 		return 0, fmt.Errorf("cannot open rolling census with pid %x: %w", pid, err)
 	}
@@ -102,7 +109,7 @@ func (v *State) GetRollingCensusRoot(pid []byte, committed bool) ([]byte, error)
 		defer v.Tx.RUnlock()
 	}
 	census, err := v.mainTreeViewer(committed).DeepSubTree(
-		ProcessesCfg, CensusPoseidonCfg.WithKey(pid))
+		StateParentChildTreeCfg(TreeProcess, ChildTreeCensusPoseidon, pid))
 	if err != nil {
 		return nil, fmt.Errorf("cannot open rolling census with pid %x: %w", pid, err)
 	}
@@ -118,8 +125,8 @@ type RollingCensus struct {
 }
 
 func (v *State) DumpRollingCensus(pid []byte) (*RollingCensus, error) {
-	census, err := v.MainTreeView().DeepSubTree(ProcessesCfg,
-		CensusPoseidonCfg.WithKey(pid))
+	census, err := v.MainTreeView().DeepSubTree(
+		StateParentChildTreeCfg(TreeProcess, ChildTreeCensusPoseidon, pid))
 	if err != nil {
 		return nil, fmt.Errorf("cannot access rolling census with pid %x: %w", pid, err)
 	}
@@ -138,14 +145,16 @@ func (v *State) DumpRollingCensus(pid []byte) (*RollingCensus, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get census with pid %x root: %w", pid, err)
 	}
-	dumpData, err := census.Dump()
-	if err != nil {
+
+	var buf bytes.Buffer
+	if err := census.Dump(&buf); err != nil {
 		return nil, fmt.Errorf("cannot dump census with pid %x: %w", pid, err)
 	}
+
 	censusID := hex.EncodeToString(dumpRoot)
 	return &RollingCensus{
 		CensusID: censusID,
-		DumpData: dumpData,
+		DumpData: buf.Bytes(),
 		DumpRoot: dumpRoot,
 		// IndexKeys: indexKeys,
 		Type: models.Census_ARBO_POSEIDON,
@@ -261,12 +270,19 @@ func (v *State) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, st
 }
 
 func (v *State) setPreRegisterAddrUsedWeight(pid []byte, addr common.Address, weight *big.Int) error {
-	return v.Tx.DeepSet(GenerateNullifier(addr, pid), weight.Bytes(), ProcessesCfg, PreRegisterNullifiersCfg.WithKey(pid))
+	return v.Tx.DeepSet(
+		GenerateNullifier(addr, pid),
+		weight.Bytes(),
+		StateTreeCfg(TreeProcess),
+		StateChildTreeCfg(ChildTreePreRegisterNullifiers).WithKey(pid),
+	)
 }
 
 // GetPreRegisterAddrUsedWeight returns the weight used by the address for a process ID on pre-register census
 func (v *State) GetPreRegisterAddrUsedWeight(pid []byte, addr common.Address) (*big.Int, error) {
-	weightBytes, err := v.Tx.DeepGet(GenerateNullifier(addr, pid), ProcessesCfg, PreRegisterNullifiersCfg.WithKey(pid))
+	weightBytes, err := v.Tx.DeepGet(GenerateNullifier(addr, pid),
+		StateTreeCfg(TreeProcess),
+		StateChildTreeCfg(ChildTreePreRegisterNullifiers).WithKey(pid))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return big.NewInt(0), nil
 	} else if err != nil {

@@ -29,11 +29,12 @@ func TestVochainState(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, exists, qt.Equals, false)
 
-	s.Tx.Add(vochain.ProcessesCfg.Key(), make([]byte, vochain.ProcessesCfg.HashFunc().Len()))
+	treeCfg := vochain.StateTreeCfg(vochain.TreeProcess)
+	s.Tx.Add(treeCfg.Key(), make([]byte, treeCfg.HashFunc().Len()))
 	for i := 0; i < 10; i++ {
 		s.Tx.Add([]byte(fmt.Sprintf("%d", i)), []byte(fmt.Sprintf("number %d", i)))
 		s.Tx.DeepAdd([]byte(fmt.Sprintf("%d", i+1)),
-			[]byte(fmt.Sprintf("number %d", i+1)), vochain.ProcessesCfg)
+			[]byte(fmt.Sprintf("number %d", i+1)), treeCfg)
 	}
 	s.Save()
 

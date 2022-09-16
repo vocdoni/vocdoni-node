@@ -123,7 +123,7 @@ func testMinimeSendVotes(t *testing.T, s ethstorageproof.StorageProof, addr comm
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
+	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
 		t.Fatal(err)
 	}
 

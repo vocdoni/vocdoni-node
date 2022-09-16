@@ -59,7 +59,7 @@ require (
 	github.com/tendermint/tendermint v0.34.15
 	github.com/tendermint/tm-db v0.6.7
 	github.com/timshannon/badgerhold/v3 v3.0.0
-	github.com/vocdoni/arbo v0.0.0-20220204101222-688a2e814db0
+	github.com/vocdoni/arbo v0.0.0-20220903144204-c3e910e2afc6
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.uber.org/zap v1.21.0

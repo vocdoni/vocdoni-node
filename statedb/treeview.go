@@ -2,6 +2,8 @@ package statedb
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"path"
 
 	"go.vocdoni.io/dvote/db"
@@ -42,9 +44,12 @@ type TreeViewer interface {
 	// Iterate iterates over all leafs of this tree.  When callback returns true,
 	// the iteration is stopped and this function returns.
 	Iterate(callback func(key, value []byte) bool) error
-	// Dump exports all the tree leafs in a byte array.
-	Dump() ([]byte, error)
-	// Root returns the root of the tree, which cryptographically summarises the
+	// Dump exports all the tree leafs into a writer buffer. The leaves can be read
+	// again via Import.
+	Dump(w io.Writer) error
+	// Import reads exported tree leaves from r.
+	Import(r io.Reader) error
+	/// Root returns the root of the tree, which cryptographically summarises the
 	// state of the tree.
 	Root() ([]byte, error)
 	// Size returns the number of leafs (key-values) that this tree contains.
@@ -130,9 +135,14 @@ func (v *TreeView) GenProof(key []byte) ([]byte, []byte, error) {
 	return v.tree.GenProof(nil, key)
 }
 
-// Dump exports all the tree leafs in a byte array.
-func (v *TreeView) Dump() ([]byte, error) {
-	return v.tree.Dump()
+// Dump exports all the tree leafs.
+func (v *TreeView) Dump(w io.Writer) error {
+	return v.tree.DumpWriter(w)
+}
+
+// Import does nothing.
+func (v *TreeView) Import(r io.Reader) error {
+	return fmt.Errorf("tree is not writable")
 }
 
 // SubTree is used to open the subTree (singleton and non-singleton) as a

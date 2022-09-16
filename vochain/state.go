@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"sync"
@@ -26,32 +27,46 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// defaultHashLen is the most common default hash length for Arbo hashes.  This
-// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
-// arbo.HashFunctionBlake2b.Len()
-const defaultHashLen = 32
+const (
+	// defaultHashLen is the most common default hash length for Arbo hashes.  This
+	// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
+	// arbo.HashFunctionBlake2b.Len()
+	defaultHashLen = 32
+	// storageDirectory is the final directory name where all files are stored.
+	storageDirectory = "vcstate"
+	// snapshotsDirectory is the final directory name where the snapshots are stored.
+	snapshotsDirectory = "snapshots"
+	// treasurerKey is the key representing the Treasurer entry on the Extra subtree
+	treasurerKey = "treasurer"
+)
 
 // TxTypeCostToStateKey translates models.TxType to a string which the State uses
 // as a key internally under the Extra tree
-var TxTypeCostToStateKey = map[models.TxType]string{
-	models.TxType_SET_PROCESS_STATUS:         "c_setProcessStatus",
-	models.TxType_SET_PROCESS_CENSUS:         "c_setProcessCensus",
-	models.TxType_SET_PROCESS_QUESTION_INDEX: "c_setProcessResults",
-	models.TxType_SET_PROCESS_RESULTS:        "c_setProcessQuestionIndex",
-	models.TxType_REGISTER_VOTER_KEY:         "c_registerKey",
-	models.TxType_NEW_PROCESS:                "c_newProcess",
-	models.TxType_SEND_TOKENS:                "c_sendTokens",
-	models.TxType_SET_ACCOUNT_INFO:           "c_setAccountInfo",
-	models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "c_addDelegateForAccount",
-	models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   "c_delDelegateForAccount",
-	models.TxType_COLLECT_FAUCET:             "c_collectFaucet",
-}
+var (
+	TxTypeCostToStateKey = map[models.TxType]string{
+		models.TxType_SET_PROCESS_STATUS:         "c_setProcessStatus",
+		models.TxType_SET_PROCESS_CENSUS:         "c_setProcessCensus",
+		models.TxType_SET_PROCESS_QUESTION_INDEX: "c_setProcessResults",
+		models.TxType_SET_PROCESS_RESULTS:        "c_setProcessQuestionIndex",
+		models.TxType_REGISTER_VOTER_KEY:         "c_registerKey",
+		models.TxType_NEW_PROCESS:                "c_newProcess",
+		models.TxType_SEND_TOKENS:                "c_sendTokens",
+		models.TxType_SET_ACCOUNT_INFO:           "c_setAccountInfo",
+		models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "c_addDelegateForAccount",
+		models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   "c_delDelegateForAccount",
+		models.TxType_COLLECT_FAUCET:             "c_collectFaucet",
+	}
+	ErrProcessChildLeafRootUnknown = fmt.Errorf("process child leaf root is unkown")
+)
 
 // rootLeafGetRoot is the GetRootFn function for a leaf that is the root
 // itself.
 func rootLeafGetRoot(value []byte) ([]byte, error) {
 	if len(value) != defaultHashLen {
-		return nil, fmt.Errorf("len(value) = %v != %v", len(value), defaultHashLen)
+		return nil, fmt.Errorf("len(value) = %v != %v: %w",
+			len(value),
+			defaultHashLen,
+			ErrProcessChildLeafRootUnknown)
 	}
 	return value, nil
 }
@@ -73,8 +88,9 @@ func processGetCensusRoot(value []byte) ([]byte, error) {
 		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
 	}
 	if len(sdbProc.Process.RollingCensusRoot) != defaultHashLen {
-		return nil, fmt.Errorf("len(sdbProc.Process.RollingCensusRoot) != %v",
-			defaultHashLen)
+		return nil, fmt.Errorf("len(sdbProc.Process.RollingCensusRoot) != %v: %w",
+			defaultHashLen,
+			ErrProcessChildLeafRootUnknown)
 	}
 	return sdbProc.Process.RollingCensusRoot, nil
 }
@@ -102,8 +118,10 @@ func processGetPreRegisterNullifiersRoot(value []byte) ([]byte, error) {
 		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
 	}
 	if len(sdbProc.Process.NullifiersRoot) != defaultHashLen {
-		return nil, fmt.Errorf("len(sdbProc.Process.NullifiersRoot) != %v",
-			defaultHashLen)
+		return nil, fmt.Errorf("len(sdbProc.Process.NullifiersRoot) != %v: %w",
+			defaultHashLen,
+			ErrProcessChildLeafRootUnknown,
+		)
 	}
 	return sdbProc.Process.NullifiersRoot, nil
 }
@@ -131,7 +149,10 @@ func processGetVotesRoot(value []byte) ([]byte, error) {
 		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
 	}
 	if len(sdbProc.VotesRoot) != defaultHashLen {
-		return nil, fmt.Errorf("len(sdbProc.VotesRoot) != %v", defaultHashLen)
+		return nil, fmt.Errorf(
+			"len(sdbProc.VotesRoot) != %v: %w",
+			defaultHashLen,
+			ErrProcessChildLeafRootUnknown)
 	}
 	return sdbProc.VotesRoot, nil
 }
@@ -150,118 +171,6 @@ func processSetVotesRoot(value []byte, root []byte) ([]byte, error) {
 	}
 	return newValue, nil
 }
-
-// StateDB Tree hierarchy
-// - Main
-//   - Extra (key: string, value: []byte)
-//   - Oracles (key: address, value: []byte{1} if exists)
-//   - Validators (key: address, value: models.Validator)
-//   - Accounts (key: address, value: models.Account)
-//   - Processes (key: ProcessId, value: models.StateDBProcess)
-//     - CensusPoseidon (key: sequential index 64 bits little endian, value: zkCensusKey)
-//     - Nullifiers (key: pre-census user nullifier, value: weight used)
-//     - Votes (key: VoteId, value: models.StateDBVote)
-
-var (
-	// TreasurerKey is the key representing the Treasurer entry on the Extra subtree
-	TreasurerKey = "treasurer"
-	// ExtraCfg is the Extra subTree configuration.
-	ExtraCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
-		HashFunc:          arbo.HashFunctionSha256,
-		KindID:            "xtra",
-		MaxLevels:         256,
-		ParentLeafGetRoot: rootLeafGetRoot,
-		ParentLeafSetRoot: rootLeafSetRoot,
-	})
-
-	// OraclesCfg is the Oracles subTree configuration.
-	OraclesCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
-		HashFunc:          arbo.HashFunctionSha256,
-		KindID:            "oracs",
-		MaxLevels:         256,
-		ParentLeafGetRoot: rootLeafGetRoot,
-		ParentLeafSetRoot: rootLeafSetRoot,
-	})
-
-	// ValidatorsCfg is the Validators subTree configuration.
-	ValidatorsCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
-		HashFunc:          arbo.HashFunctionSha256,
-		KindID:            "valids",
-		MaxLevels:         256,
-		ParentLeafGetRoot: rootLeafGetRoot,
-		ParentLeafSetRoot: rootLeafSetRoot,
-	})
-
-	// ProcessesCfg is the Processes subTree configuration.
-	ProcessesCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
-		HashFunc:          arbo.HashFunctionSha256,
-		KindID:            "procs",
-		MaxLevels:         256,
-		ParentLeafGetRoot: rootLeafGetRoot,
-		ParentLeafSetRoot: rootLeafSetRoot,
-	})
-
-	// CensusCfg is the Rolling census subTree (found under a Process leaf)
-	// configuration for a process that supports non-anonymous voting with
-	// rolling census.
-	CensusCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
-		HashFunc:          arbo.HashFunctionSha256,
-		KindID:            "cen",
-		MaxLevels:         256,
-		ParentLeafGetRoot: processGetCensusRoot,
-		ParentLeafSetRoot: processSetCensusRoot,
-	})
-
-	// CensusPoseidonCfg is the Rolling census subTree (found under a
-	// Process leaf) configuration when the process supports anonymous
-	// voting with rolling census.  This Census subTree uses the SNARK
-	// friendly hash function Poseidon.
-	CensusPoseidonCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
-		HashFunc:          arbo.HashFunctionPoseidon,
-		KindID:            "cenPos",
-		MaxLevels:         64,
-		ParentLeafGetRoot: processGetCensusRoot,
-		ParentLeafSetRoot: processSetCensusRoot,
-	})
-	// PreRegisterNullifiersCfg is the Nullifiers subTree (found under a
-	// Process leaf) configuration when the process supports anonymous
-	// voting with rolling census.  This tree contains the pre-census
-	// nullifiers that have pre-registered.
-	PreRegisterNullifiersCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
-		HashFunc:          arbo.HashFunctionSha256,
-		KindID:            "prNul",
-		MaxLevels:         256,
-		ParentLeafGetRoot: processGetPreRegisterNullifiersRoot,
-		ParentLeafSetRoot: processSetPreRegisterNullifiersRoot,
-	})
-
-	// VotesCfg is the Votes subTree (found under a Process leaf) configuration.
-	VotesCfg = statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
-		HashFunc:          arbo.HashFunctionSha256,
-		KindID:            "votes",
-		MaxLevels:         256,
-		ParentLeafGetRoot: processGetVotesRoot,
-		ParentLeafSetRoot: processSetVotesRoot,
-	})
-
-	// AccountsCfg is the Accounts subTree configuration.
-	AccountsCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
-		HashFunc:          arbo.HashFunctionSha256,
-		KindID:            "balan",
-		MaxLevels:         256,
-		ParentLeafGetRoot: rootLeafGetRoot,
-		ParentLeafSetRoot: rootLeafSetRoot,
-	})
-
-	// FaucetNonceCfg is the Accounts used Faucet Nonce subTree configuration
-	FaucetNonceCfg = statedb.NewTreeSingletonConfig(statedb.TreeParams{
-		HashFunc:          arbo.HashFunctionSha256,
-		KindID:            "faucet",
-		MaxLevels:         256,
-		ParentLeafGetRoot: rootLeafGetRoot,
-		ParentLeafSetRoot: rootLeafSetRoot,
-	})
-)
 
 // EventListener is an interface used for executing custom functions during the
 // events of the block creation process.
@@ -305,6 +214,8 @@ type treeTxWithMutex struct {
 
 // State represents the state of the vochain application
 type State struct {
+	// data directory for storing files
+	dataDir string
 	// db is the underlying key-value database used by the StateDB
 	db db.Database
 	// Store contains the StateDB.  We match every StateDB commit version
@@ -325,11 +236,13 @@ type State struct {
 	eventListeners      []EventListener
 	// currentHeight is the height of the current started block
 	currentHeight uint32
+	// chainID identifies the blockchain
+	chainID string
 }
 
 // NewState creates a new State
 func NewState(dbType, dataDir string) (*State, error) {
-	database, err := metadb.New(dbType, filepath.Join(dataDir, "vcstate"))
+	database, err := metadb.New(dbType, filepath.Join(dataDir, storageDirectory))
 	if err != nil {
 		return nil, err
 	}
@@ -360,6 +273,7 @@ func NewState(dbType, dataDir string) (*State, error) {
 		return nil, err
 	}
 	s := &State{
+		dataDir:   dataDir,
 		db:        database,
 		Store:     sdb,
 		Tx:        treeTxWithMutex{TreeTx: tx},
@@ -367,7 +281,7 @@ func NewState(dbType, dataDir string) (*State, error) {
 	}
 	s.DisableVoteCache.Store(false)
 	s.setMainTreeView(mainTreeView)
-	return s, nil
+	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0775)
 }
 
 // initStateDB initializes the StateDB with the default subTrees
@@ -393,50 +307,61 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	// mainTree) by adding leaves in the mainTree that contain the
 	// corresponding tree roots, and opening the subTrees for the first
 	// time.
-	if err := update.Add(ExtraCfg.Key(),
-		make([]byte, ExtraCfg.HashFunc().Len())); err != nil {
+	treeCfg := StateTreeCfg(TreeExtra)
+	if err := update.Add(treeCfg.Key(),
+		make([]byte, treeCfg.HashFunc().Len())); err != nil {
 		return nil, err
 	}
-	if _, err := update.SubTree(ExtraCfg); err != nil {
+	if _, err := update.SubTree(treeCfg); err != nil {
 		return nil, err
 	}
-	if err := update.Add(OraclesCfg.Key(),
-		make([]byte, OraclesCfg.HashFunc().Len())); err != nil {
+	treeCfg = StateTreeCfg(TreeOracles)
+	if err := update.Add(treeCfg.Key(),
+		make([]byte, treeCfg.HashFunc().Len())); err != nil {
 		return nil, err
 	}
-	if _, err := update.SubTree(OraclesCfg); err != nil {
+	if _, err := update.SubTree(treeCfg); err != nil {
 		return nil, err
 	}
-	if err := update.Add(ValidatorsCfg.Key(),
-		make([]byte, ValidatorsCfg.HashFunc().Len())); err != nil {
+	treeCfg = StateTreeCfg(TreeValidators)
+	if err := update.Add(treeCfg.Key(),
+		make([]byte, treeCfg.HashFunc().Len())); err != nil {
 		return nil, err
 	}
-	if _, err := update.SubTree(ValidatorsCfg); err != nil {
+	if _, err := update.SubTree(treeCfg); err != nil {
 		return nil, err
 	}
-	if err := update.Add(ProcessesCfg.Key(),
-		make([]byte, ProcessesCfg.HashFunc().Len())); err != nil {
+	treeCfg = StateTreeCfg(TreeProcess)
+	if err := update.Add(treeCfg.Key(),
+		make([]byte, treeCfg.HashFunc().Len())); err != nil {
 		return nil, err
 	}
-	if _, err := update.SubTree(ProcessesCfg); err != nil {
+	if _, err := update.SubTree(treeCfg); err != nil {
 		return nil, err
 	}
-	if err := update.Add(AccountsCfg.Key(),
-		make([]byte, AccountsCfg.HashFunc().Len())); err != nil {
+	treeCfg = StateTreeCfg(TreeAccounts)
+	if err := update.Add(treeCfg.Key(),
+		make([]byte, treeCfg.HashFunc().Len())); err != nil {
 		return nil, err
 	}
-	if _, err := update.SubTree(AccountsCfg); err != nil {
+	if _, err := update.SubTree(treeCfg); err != nil {
 		return nil, err
 	}
-	if err := update.Add(FaucetNonceCfg.Key(),
-		make([]byte, FaucetNonceCfg.HashFunc().Len())); err != nil {
+	treeCfg = StateTreeCfg(TreeFaucet)
+	if err := update.Add(treeCfg.Key(),
+		make([]byte, treeCfg.HashFunc().Len())); err != nil {
 		return nil, err
 	}
-	if _, err := update.SubTree(FaucetNonceCfg); err != nil {
+	if _, err := update.SubTree(treeCfg); err != nil {
 		return nil, err
 	}
 
 	return sdb, update.Commit(0)
+}
+
+// SetChainID sets the blockchain identifier.
+func (v *State) SetChainID(chID string) {
+	v.chainID = chID
 }
 
 // MainTreeView is a thread-safe function to obtain a pointer to the last
@@ -474,14 +399,14 @@ var exist = []byte{1}
 func (v *State) AddOracle(address common.Address) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	return v.Tx.DeepSet(address.Bytes(), exist, OraclesCfg)
+	return v.Tx.DeepSet(address.Bytes(), exist, StateTreeCfg(TreeOracles))
 }
 
 // RemoveOracle removes a trusted oracle given its address if exists
 func (v *State) RemoveOracle(address common.Address) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	oracles, err := v.Tx.SubTree(OraclesCfg)
+	oracles, err := v.Tx.SubTree(StateTreeCfg(TreeOracles))
 	if err != nil {
 		return err
 	}
@@ -503,7 +428,7 @@ func (v *State) Oracles(committed bool) ([]common.Address, error) {
 		defer v.Tx.RUnlock()
 	}
 
-	oraclesTree, err := v.mainTreeViewer(committed).SubTree(OraclesCfg)
+	oraclesTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeOracles))
 	if err != nil {
 		return nil, err
 	}
@@ -538,7 +463,7 @@ func (v *State) IsOracle(addr common.Address) (bool, error) {
 	}(), nil
 }
 
-// setTreasurer saves the Treasurer address to the state
+// SetTreasurer saves the Treasurer address to the state
 func (v *State) SetTreasurer(address common.Address, nonce uint32) error {
 	tBytes, err := proto.Marshal(
 		&models.Treasurer{
@@ -551,7 +476,7 @@ func (v *State) SetTreasurer(address common.Address, nonce uint32) error {
 	}
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
+	return v.Tx.DeepSet([]byte(treasurerKey), tBytes, StateTreeCfg(TreeExtra))
 }
 
 // Treasurer returns the address and the Treasurer nonce
@@ -563,12 +488,12 @@ func (v *State) Treasurer(committed bool) (*models.Treasurer, error) {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	extraTree, err := v.mainTreeViewer(committed).SubTree(ExtraCfg)
+	extraTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeExtra))
 	if err != nil {
 		return nil, err
 	}
 	var rawTreasurer []byte
-	if rawTreasurer, err = extraTree.Get([]byte(TreasurerKey)); err != nil {
+	if rawTreasurer, err = extraTree.Get([]byte(treasurerKey)); err != nil {
 		return nil, err
 	}
 	var t models.Treasurer
@@ -601,7 +526,7 @@ func (v *State) IncrementTreasurerNonce() error {
 		return fmt.Errorf("incrementTreasurerNonce(): %w", err)
 	}
 	log.Debugf("incrementing treasurer nonce, new nonce is %d", t.Nonce)
-	return v.Tx.DeepSet([]byte(TreasurerKey), tBytes, ExtraCfg)
+	return v.Tx.DeepSet([]byte(treasurerKey), tBytes, StateTreeCfg(TreeExtra))
 }
 
 // SetTxCost sets the given transaction cost
@@ -615,7 +540,7 @@ func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
 	log.Debugf("setting tx cost %d for tx %s", cost, txType.String())
 	costBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(costBytes[:], cost)
-	return v.Tx.DeepSet([]byte(key), costBytes[:], ExtraCfg)
+	return v.Tx.DeepSet([]byte(key), costBytes[:], StateTreeCfg(TreeExtra))
 }
 
 // TxCost returns the cost of a given transaction
@@ -631,7 +556,7 @@ func (v *State) TxCost(txType models.TxType, committed bool) (uint64, error) {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	extraTree, err := v.mainTreeViewer(committed).SubTree(ExtraCfg)
+	extraTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeExtra))
 	if err != nil {
 		return 0, err
 	}
@@ -650,7 +575,7 @@ func (v *State) FaucetNonce(key []byte, committed bool) (bool, error) {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	faucetNonceTree, err := v.mainTreeViewer(committed).SubTree(FaucetNonceCfg)
+	faucetNonceTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeFaucet))
 	if err != nil {
 		return false, err
 	}
@@ -674,7 +599,7 @@ func (v *State) FaucetNonce(key []byte, committed bool) (bool, error) {
 func (v *State) SetFaucetNonce(key []byte) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	return v.Tx.DeepSet(key, nil, FaucetNonceCfg)
+	return v.Tx.DeepSet(key, nil, StateTreeCfg(TreeFaucet))
 }
 
 // hexPubKeyToTendermintEd25519 decodes a pubKey string to a ed25519 pubKey
@@ -701,14 +626,14 @@ func (v *State) AddValidator(validator *models.Validator) error {
 	if err != nil {
 		return err
 	}
-	return v.Tx.DeepSet(validator.Address, validatorBytes, ValidatorsCfg)
+	return v.Tx.DeepSet(validator.Address, validatorBytes, StateTreeCfg(TreeValidators))
 }
 
 // RemoveValidator removes a tendermint validator identified by its address
 func (v *State) RemoveValidator(address []byte) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	validators, err := v.Tx.SubTree(ValidatorsCfg)
+	validators, err := v.Tx.SubTree(StateTreeCfg(TreeValidators))
 	if err != nil {
 		return err
 	}
@@ -730,7 +655,7 @@ func (v *State) Validators(committed bool) ([]*models.Validator, error) {
 		defer v.Tx.RUnlock()
 	}
 
-	validatorsTree, err := v.mainTreeViewer(committed).SubTree(ValidatorsCfg)
+	validatorsTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeValidators))
 	if err != nil {
 		return nil, err
 	}
@@ -874,8 +799,9 @@ func (v *State) AddVote(vote *models.Vote) error {
 	}
 	v.Tx.Lock()
 	err = func() error {
+		treeCfg := StateChildTreeCfg(ChildTreeVotes)
 		if err := v.Tx.DeepAdd(vid, sdbVoteBytes,
-			ProcessesCfg, VotesCfg.WithKey(vote.ProcessId)); err != nil {
+			StateTreeCfg(TreeProcess), treeCfg.WithKey(vote.ProcessId)); err != nil {
 			return err
 		}
 		return v.voteCountInc()
@@ -919,8 +845,9 @@ func (v *State) Envelope(processID, nullifier []byte, committed bool) (_ []byte,
 		v.Tx.RLock()
 		defer v.Tx.RUnlock() // needs to be deferred due to the recover above
 	}
+	treeCfg := StateChildTreeCfg(ChildTreeVotes)
 	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
-		ProcessesCfg, VotesCfg.WithKey(processID))
+		StateTreeCfg(TreeProcess), treeCfg.WithKey(processID))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, ErrProcessNotFound
 	} else if err != nil {
@@ -965,8 +892,9 @@ func (v *State) iterateVotes(processID []byte,
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
+	treeCfg := StateChildTreeCfg(ChildTreeVotes)
 	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
-		ProcessesCfg, VotesCfg.WithKey(processID))
+		StateTreeCfg(TreeProcess), treeCfg.WithKey(processID))
 	if err != nil {
 		return err
 	}

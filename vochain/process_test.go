@@ -208,7 +208,7 @@ func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
+	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -384,7 +384,7 @@ func testSetProcessResults(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
+	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
 		t.Fatal(err)
 	}
 	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
@@ -539,7 +539,7 @@ func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
 		t.Fatal(err)
 	}
 
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainId); err != nil {
+	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
 		t.Fatal(err)
 	}
 
