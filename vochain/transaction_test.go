@@ -206,6 +206,6 @@ func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
 	txID := [32]byte{}
 	commit := false
 
-	_, err = app.VoteEnvelopeCheck(vtx, txBytes, signature, txID, commit)
+	_, _, err = app.VoteEnvelopeCheck(vtx, txBytes, signature, txID, commit)
 	qt.Assert(t, err, qt.IsNil)
 }

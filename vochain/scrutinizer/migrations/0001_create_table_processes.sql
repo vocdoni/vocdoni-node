@@ -30,16 +30,8 @@ CREATE TABLE processes (
   question_index      INTEGER NOT NULL,
   creation_time       DATETIME NOT NULL,
   source_block_height INTEGER NOT NULL,
-  source_network_id   TEXT NOT NULL, -- TODO: integer?
+  source_network_id   TEXT NOT NULL -- TODO: integer?
 
-  -- results columns; in badgerhold these were a separate table
-
-  results_votes           TEXT NOT NULL, -- [][]big.Int encoded as "a,b,c x,y,z ..."
-  results_weight          TEXT NOT NULL, -- big.Int
-  results_envelope_height INTEGER NOT NULL,
-
-  results_signatures   TEXT NOT NULL, -- comma-separated list of hex strings
-  results_block_height INTEGER NOT NULL
 );
 
 CREATE INDEX index_processes_entity_id

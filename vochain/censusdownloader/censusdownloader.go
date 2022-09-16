@@ -7,6 +7,7 @@ import (
 
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
@@ -80,11 +81,11 @@ func (c *CensusDownloader) OnProcess(pid, eid []byte, censusRoot, censusURI stri
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
-func (c *CensusDownloader) OnCancel(pid []byte, txindex int32)                     {}
-func (c *CensusDownloader) OnVote(v *models.Vote, txindex int32)                   {}
-func (c *CensusDownloader) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {}
-func (c *CensusDownloader) OnProcessKeys(pid []byte, pub string, txindex int32)    {}
-func (c *CensusDownloader) OnRevealKeys(pid []byte, priv string, txindex int32)    {}
+func (c *CensusDownloader) OnCancel(pid []byte, txindex int32)                          {}
+func (c *CensusDownloader) OnVote(v *models.Vote, voterID types.VoterID, txindex int32) {}
+func (c *CensusDownloader) OnNewTx(hash []byte, blockHeight uint32, txIndex int32)      {}
+func (c *CensusDownloader) OnProcessKeys(pid []byte, pub string, txindex int32)         {}
+func (c *CensusDownloader) OnRevealKeys(pid []byte, priv string, txindex int32)         {}
 func (c *CensusDownloader) OnProcessStatusChange(pid []byte,
 	status models.ProcessStatus, txindex int32) {
 }

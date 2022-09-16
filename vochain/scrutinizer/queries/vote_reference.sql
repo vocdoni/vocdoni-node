@@ -1,10 +1,10 @@
 -- name: CreateVoteReference :execresult
 INSERT INTO vote_references (
 	nullifier, process_id, height, weight,
-	tx_index, creation_time
+	tx_index, voter_id, creation_time
 ) VALUES (
 	?, ?, ?, ?,
-	?, ?
+	?, ?, ?
 );
 
 -- name: GetVoteReference :one

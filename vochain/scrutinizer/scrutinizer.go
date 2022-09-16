@@ -106,6 +106,7 @@ type Scrutinizer struct {
 // VoteWithIndex holds a Vote and a txIndex. Model for the VotePool.
 type VoteWithIndex struct {
 	vote    *models.Vote
+	voterID types.VoterID
 	txIndex int32
 }
 
@@ -383,7 +384,9 @@ func (s *Scrutinizer) Commit(height uint32) error {
 			v.vote.ProcessId,
 			height,
 			v.vote.Weight,
-			v.txIndex, txn); err != nil {
+			v.txIndex,
+			v.voterID,
+			txn); err != nil {
 			log.Warn(err)
 		}
 	}
@@ -488,11 +491,13 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, t
 
 // OnVote scrutinizer stores the votes if the processId is live results (on going)
 // and the blockchain is not synchronizing.
-func (s *Scrutinizer) OnVote(v *models.Vote, txIndex int32) {
+// voterID is the identifier of the voter, the most common case is an ethereum address
+// but can be any kind of id expressed as bytes.
+func (s *Scrutinizer) OnVote(v *models.Vote, voterID types.VoterID, txIndex int32) {
 	if !s.ignoreLiveResults && s.isProcessLiveResults(v.ProcessId) {
 		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
 	}
-	s.voteIndexPool = append(s.voteIndexPool, &VoteWithIndex{vote: v, txIndex: txIndex})
+	s.voteIndexPool = append(s.voteIndexPool, &VoteWithIndex{vote: v, voterID: voterID, txIndex: txIndex})
 }
 
 // OnCancel scrutinizer stores the processID and entityID

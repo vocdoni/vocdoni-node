@@ -87,7 +87,7 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePacka
 		return nil, fmt.Errorf("transaction is not an Envelope")
 	}
 	log.Debugf("getEnvelope took %s", time.Since(t))
-	return &indexertypes.EnvelopePackage{
+	envelopePackage := &indexertypes.EnvelopePackage{
 		Nonce:                envelope.Nonce,
 		VotePackage:          envelope.VotePackage,
 		EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
@@ -100,7 +100,12 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePacka
 			Height:    voteRef.Height,
 			TxHash:    txHash,
 		},
-	}, nil
+	}
+	envelopePackage.Meta.VoterID, err = voteRef.VoterID.Address()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get voterID from public key: %w", err)
+	}
+	return envelopePackage, nil
 }
 
 // WalkEnvelopes executes callback for each envelopes of the ProcessId.
@@ -188,13 +193,18 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 					return fmt.Errorf("transaction is not an Envelope")
 				}
 				envelope.Nullifier = txRef.Nullifier
-				envelopes = append(envelopes, &indexertypes.EnvelopeMetadata{
+				envelopeMetadata := &indexertypes.EnvelopeMetadata{
 					ProcessId: processId,
 					Nullifier: txRef.Nullifier,
 					TxIndex:   txRef.TxIndex,
 					Height:    txRef.Height,
 					TxHash:    txHash,
-				})
+				}
+				envelopeMetadata.VoterID, err = txRef.VoterID.Address()
+				if err != nil {
+					return fmt.Errorf("cannot get voterID from pubkey: %w", err)
+				}
+				envelopes = append(envelopes, envelopeMetadata)
 				return nil
 			})
 	} else if len(searchTerm) > 0 { // Search nullifiers without process id
@@ -218,13 +228,18 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 					return fmt.Errorf("transaction is not an Envelope")
 				}
 				envelope.Nullifier = txRef.Nullifier
-				envelopes = append(envelopes, &indexertypes.EnvelopeMetadata{
+				envelopeMetadata := &indexertypes.EnvelopeMetadata{
 					ProcessId: processId,
 					Nullifier: txRef.Nullifier,
 					TxIndex:   txRef.TxIndex,
 					Height:    txRef.Height,
 					TxHash:    txHash,
-				})
+				}
+				envelopeMetadata.VoterID, err = txRef.VoterID.Address()
+				if err != nil {
+					return fmt.Errorf("cannot get voterID from pubkey: %w", err)
+				}
+				envelopes = append(envelopes, envelopeMetadata)
 				return nil
 			})
 	} else {
@@ -468,7 +483,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.In
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
 func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
-	weight []byte, txIndex int32, txn *badger.Txn) error {
+	weight []byte, txIndex int32, voterID types.VoterID, txn *badger.Txn) error {
 	weightInt := new(types.BigInt).SetBytes(weight)
 	weightStr, err := weightInt.MarshalText()
 	if err != nil {
@@ -479,6 +494,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 		bhVoteRef := &indexertypes.VoteReference{
 			Nullifier:    nullifier,
 			ProcessID:    pid,
+			VoterID:      voterID,
 			Height:       blockHeight,
 			Weight:       weightInt,
 			TxIndex:      txIndex,
@@ -507,6 +523,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 		Height:       int64(blockHeight),
 		Weight:       string(weightStr),
 		TxIndex:      int64(txIndex),
+		VoterID:      voterID,
 		CreationTime: creationTime,
 	}); err != nil {
 		return err
