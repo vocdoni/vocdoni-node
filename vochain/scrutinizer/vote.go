@@ -94,11 +94,12 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePacka
 		Weight:               voteRef.Weight.String(),
 		Signature:            stx.Signature,
 		Meta: indexertypes.EnvelopeMetadata{
-			ProcessId: envelope.ProcessId,
-			Nullifier: nullifier,
-			TxIndex:   voteRef.TxIndex,
-			Height:    voteRef.Height,
-			TxHash:    txHash,
+			ProcessId:    envelope.ProcessId,
+			Nullifier:    nullifier,
+			TxIndex:      voteRef.TxIndex,
+			Height:       voteRef.Height,
+			CreationTime: voteRef.CreationTime,
+			TxHash:       txHash,
 		},
 	}
 	envelopePackage.Meta.VoterID, err = voteRef.VoterID.Address()

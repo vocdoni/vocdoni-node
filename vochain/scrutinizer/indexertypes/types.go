@@ -237,12 +237,13 @@ func VoteReferenceFromDB(dbvote *scrutinizerdb.VoteReference) *VoteReference {
 
 // EnvelopeMetadata contains vote information for the EnvelopeList api
 type EnvelopeMetadata struct {
-	ProcessId types.HexBytes `json:"process_id"`
-	Nullifier types.HexBytes `json:"nullifier"`
-	VoterID   types.HexBytes `json:"voter_id"`
-	TxIndex   int32          `json:"tx_index"`
-	Height    uint32         `json:"height"`
-	TxHash    types.HexBytes `json:"tx_hash"`
+	ProcessId    types.HexBytes `json:"process_id"`
+	Nullifier    types.HexBytes `json:"nullifier"`
+	VoterID      types.HexBytes `json:"voter_id"`
+	TxIndex      int32          `json:"tx_index"`
+	Height       uint32         `json:"height"`
+	CreationTime time.Time      `json:"creation_time,omitempty"`
+	TxHash       types.HexBytes `json:"tx_hash"`
 }
 
 // EnvelopePackage contains a VoteEnvelope and auxiliary information for the Envelope api
