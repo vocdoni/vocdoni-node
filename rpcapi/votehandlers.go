@@ -92,12 +92,12 @@ func (r *RPCAPI) getEnvelope(request *api.APIrequest) (*api.APIresponse, error) 
 	if len(request.Nullifier) != types.VoteNullifierSize {
 		return nil, fmt.Errorf("cannot get envelope: (malformed nullifier)")
 	}
-	env, err := r.scrutinizer.GetEnvelope(request.Nullifier)
+	envelopePackage, err := r.scrutinizer.GetEnvelope(request.Nullifier)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get envelope: %w", err)
 	}
 	var response api.APIresponse
-	response.Envelope = env
+	response.Envelope = envelopePackage
 	response.Registered = types.True
 	return &response, nil
 }
