@@ -171,9 +171,10 @@ func newTendermint(app *BaseApplication,
 	tconfig.Consensus.TimeoutPrecommit = time.Second * 1
 	tconfig.Consensus.TimeoutCommit = time.Second * time.Duration(blockTime)
 
-	// Enable only FastSync (until StateSync is implemented)
+	// Enable FastSync
 	tconfig.BlockSync.Enable = true
-	tconfig.StateSync.Enable = false
+	// Enable StateSync if flag was passed
+	tconfig.StateSync.Enable = localConfig.StateSyncEnable
 
 	// if gateway or oracle
 	tconfig.Mode = tmcfg.ModeFull
