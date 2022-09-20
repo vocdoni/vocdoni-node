@@ -175,6 +175,12 @@ func newTendermint(app *BaseApplication,
 	tconfig.BlockSync.Enable = true
 	// Enable StateSync if flag was passed
 	tconfig.StateSync.Enable = localConfig.StateSync
+	//tconfig.StateSync.UseP2P = true
+	tconfig.StateSync.RPCServers = []string{"miner0:26657", "miner1:26657"}
+	tconfig.StateSync.TrustHeight = 100
+	tconfig.StateSync.TrustHash = "369CEC2566EEEC18C20E8A364DD017D0ADBC8AD639A37806C43B6C28BDA08E45"
+	// TrustPeriod TBD: this is supposed to be 2/3 of unbonding time. 300h is just random
+	tconfig.StateSync.TrustPeriod = time.Hour * 300
 
 	// if gateway or oracle
 	tconfig.Mode = tmcfg.ModeFull
