@@ -145,8 +145,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"if defined, Tendermint node will open a port and wait for a remote private validator connection (example: tcp://0.0.0.0:26658)")
 	globalCfg.VochainConfig.NoWaitSync = *flag.Bool("vochainNoWaitSync", false,
 		"do not wait for Vochain to synchronize (for testing only)")
-	globalCfg.VochainConfig.StateSyncEnable = *flag.Bool("vochainStateSync", false,
-		"enable state sync snapshots")
+	globalCfg.VochainConfig.StateSync = *flag.Bool("vochainStateSync", false,
+		"enable state sync snapshots system")
 	globalCfg.VochainConfig.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
 	globalCfg.VochainConfig.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
@@ -250,6 +250,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.NodeKey", flag.Lookup("vochainNodeKey"))
 	viper.BindPFlag("vochainConfig.PrivValidatorListenAddr", flag.Lookup("vochainPrivValidator"))
 	viper.BindPFlag("vochainConfig.NoWaitSync", flag.Lookup("vochainNoWaitSync"))
+	viper.BindPFlag("vochainConfig.StateSync", flag.Lookup("vochainStateSync"))
 	viper.BindPFlag("vochainConfig.MempoolSize", flag.Lookup("vochainMempoolSize"))
 	viper.BindPFlag("vochainConfig.MinerTargetBlockTimeSeconds", flag.Lookup("vochainBlockTime"))
 	viper.BindPFlag("vochainConfig.KeyKeeperIndex", flag.Lookup("keyKeeperIndex"))

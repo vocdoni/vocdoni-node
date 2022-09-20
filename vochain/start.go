@@ -174,7 +174,7 @@ func newTendermint(app *BaseApplication,
 	// Enable FastSync
 	tconfig.BlockSync.Enable = true
 	// Enable StateSync if flag was passed
-	tconfig.StateSync.Enable = localConfig.StateSyncEnable
+	tconfig.StateSync.Enable = localConfig.StateSync
 
 	// if gateway or oracle
 	tconfig.Mode = tmcfg.ModeFull

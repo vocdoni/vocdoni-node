@@ -198,8 +198,8 @@ type VochainCfg struct {
 	Scrutinizer ScrutinizerCfg
 	// IsSeedNode specifies if the node is configured to act as a seed node
 	IsSeedNode bool
-	// StateSyncEnable configures the node to use state sync snapshots
-	StateSyncEnable bool
+	// StateSync configures the node to use state sync snapshots
+	StateSync bool
 }
 
 // ScrutinizerCfg handles the configuration options of the scrutinizer
