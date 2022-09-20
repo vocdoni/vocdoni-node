@@ -299,12 +299,14 @@ func (app *BaseApplication) getTxTendermint(height uint32, txIndex int32) (*mode
 
 // GetTxHash retrieves a vochain transaction, with its hash, from the blockstore
 func (app *BaseApplication) GetTxHash(height uint32,
-	txIndex int32) (*models.SignedTx, []byte, error) {
+	txIndex int32,
+) (*models.SignedTx, []byte, error) {
 	return app.fnGetTxHash(height, txIndex)
 }
 
 func (app *BaseApplication) getTxHashTendermint(height uint32,
-	txIndex int32) (*models.SignedTx, []byte, error) {
+	txIndex int32,
+) (*models.SignedTx, []byte, error) {
 	block := app.GetBlockByHeight(int64(height))
 	if block == nil {
 		return nil, nil, fmt.Errorf("unable to get block by height: %d", height)
@@ -435,7 +437,8 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 // The LastCommitInfo and ByzantineValidators can be used to determine rewards and
 // punishments for the validators.
 func (app *BaseApplication) BeginBlock(
-	req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
+	req abcitypes.RequestBeginBlock,
+) abcitypes.ResponseBeginBlock {
 	app.State.Rollback()
 	atomic.StoreInt64(&app.startBlockTimestamp, req.Header.GetTime().Unix())
 	height := uint32(req.Header.GetHeight())
@@ -554,22 +557,26 @@ func (app *BaseApplication) endBlock(height int64, timestamp time.Time) abcitype
 }
 
 func (app *BaseApplication) ApplySnapshotChunk(
-	req abcitypes.RequestApplySnapshotChunk) abcitypes.ResponseApplySnapshotChunk {
+	req abcitypes.RequestApplySnapshotChunk,
+) abcitypes.ResponseApplySnapshotChunk {
 	return abcitypes.ResponseApplySnapshotChunk{}
 }
 
 func (app *BaseApplication) ListSnapshots(
-	req abcitypes.RequestListSnapshots) abcitypes.ResponseListSnapshots {
+	req abcitypes.RequestListSnapshots,
+) abcitypes.ResponseListSnapshots {
 	return abcitypes.ResponseListSnapshots{}
 }
 
 func (app *BaseApplication) LoadSnapshotChunk(
-	req abcitypes.RequestLoadSnapshotChunk) abcitypes.ResponseLoadSnapshotChunk {
+	req abcitypes.RequestLoadSnapshotChunk,
+) abcitypes.ResponseLoadSnapshotChunk {
 	return abcitypes.ResponseLoadSnapshotChunk{}
 }
 
 func (app *BaseApplication) OfferSnapshot(
-	req abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
+	req abcitypes.RequestOfferSnapshot,
+) abcitypes.ResponseOfferSnapshot {
 	return abcitypes.ResponseOfferSnapshot{}
 }
 
