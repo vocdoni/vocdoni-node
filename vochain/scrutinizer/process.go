@@ -297,7 +297,7 @@ func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []string {
 		// TODO(sqlite): reimplement
 		return nil
 	}
-	entities := []string{}
+	entities := []string{} // TODO: return []types.HexBytes
 	if err := s.db.ForEach(
 		badgerhold.Where("ID").MatchFunc(searchMatchFunc(searchTerm)).
 			SortBy("CreationTime", "ID").

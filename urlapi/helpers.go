@@ -12,19 +12,19 @@ func (u *URLAPI) getProcessSummaryList(pids ...[]byte) ([]*ProcessSummary, error
 	for _, p := range pids {
 		procInfo, err := u.scrutinizer.ProcessInfo(p)
 		if err != nil {
-			return nil, fmt.Errorf("cannot fetch process info: %w", err)
+			return nil, fmt.Errorf("cannot fetch election info: %w", err)
 		}
 		processes = append(processes, &ProcessSummary{
-			ProcessID: procInfo.ID,
-			Status:    models.ProcessStatus_name[procInfo.Status],
-			StartDate: procInfo.CreationTime,
-			EndDate:   u.vocinfo.HeightTime(int64(procInfo.EndBlock)),
+			ElectionID: procInfo.ID,
+			Status:     models.ProcessStatus_name[procInfo.Status],
+			StartDate:  procInfo.CreationTime,
+			EndDate:    u.vocinfo.HeightTime(int64(procInfo.EndBlock)),
 		})
 	}
 	return processes, nil
 }
 
-func (u *URLAPI) formatProcessType(et *models.EnvelopeType) string {
+func (u *URLAPI) formatElectionType(et *models.EnvelopeType) string {
 	ptype := strings.Builder{}
 
 	if et.Anonymous {
@@ -43,4 +43,26 @@ func (u *URLAPI) formatProcessType(et *models.EnvelopeType) string {
 		ptype.WriteString(" single")
 	}
 	return ptype.String()
+}
+
+func censusTypeToOrigin(ctype CensusType) (models.CensusOrigin, []byte, error) {
+	var origin models.CensusOrigin
+	var root []byte
+	switch ctype.Type {
+	case "csp":
+		origin = models.CensusOrigin_OFF_CHAIN_CA
+		root = ctype.PublicKey
+	case "census":
+		origin = models.CensusOrigin_OFF_CHAIN_TREE
+		root = ctype.RootHash
+	case "censusWeighted":
+		origin = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
+		root = ctype.RootHash
+	default:
+		return 0, nil, fmt.Errorf("census type %q is unknown", ctype)
+	}
+	if root == nil {
+		return 0, nil, fmt.Errorf("census root is not correctyl specified")
+	}
+	return origin, root, nil
 }

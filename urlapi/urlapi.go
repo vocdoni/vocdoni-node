@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/metrics"
@@ -12,6 +13,10 @@ import (
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
+// MaxPageSize defines the maximum number of results returned by the paginated endpoints
+const MaxPageSize = 10
+
+// URLAPI is the URL based REST API supporting bearer authentication.
 type URLAPI struct {
 	PrivateCalls uint64
 	PublicCalls  uint64
@@ -21,11 +26,13 @@ type URLAPI struct {
 	api         *bearerstdapi.BearerStandardAPI
 	scrutinizer *scrutinizer.Scrutinizer
 	vocapp      *vochain.BaseApplication
+	storage     data.Storage
 	//lint:ignore U1000 unused
 	metricsagent *metrics.Agent
 	vocinfo      *vochaininfo.VochainInfo
 }
 
+// NewURLAPI creates a new instance of the URLAPI.  Attach must be called next.
 func NewURLAPI(router *httprouter.HTTProuter, baseRoute string) (*URLAPI, error) {
 	if router == nil {
 		return nil, fmt.Errorf("httprouter is nil")
@@ -48,4 +55,40 @@ func NewURLAPI(router *httprouter.HTTProuter, baseRoute string) (*URLAPI, error)
 	}
 
 	return &urlapi, nil
+}
+
+// Attach takes a list of modules which are used by the handlers in order to interact with the system.
+// Attach must be called before EnableHandlers.
+func (u *URLAPI) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochaininfo.VochainInfo,
+	scrutinizer *scrutinizer.Scrutinizer, data data.Storage) {
+	u.vocapp = vocdoniAPP
+	u.vocinfo = vocdoniInfo
+	u.scrutinizer = scrutinizer
+	u.storage = data
+}
+
+// EnableHandlers enables the list of handlers. Attach must be called before.
+func (u *URLAPI) EnableHandlers(handlers ...string) error {
+	for _, h := range handlers {
+		switch h {
+		case VoteHandler:
+			if u.vocapp == nil || u.scrutinizer == nil {
+				return fmt.Errorf("missing modules attached for enabling vote handler")
+			}
+			u.enableVoteHandlers()
+		case ElectionHandler:
+			if u.scrutinizer == nil || u.vocinfo == nil || u.storage == nil {
+				return fmt.Errorf("missing modules attached for enabling election handler")
+			}
+			u.enableElectionHandlers()
+		case ChainHandler:
+			if u.scrutinizer == nil {
+				return fmt.Errorf("missing modules attached for enabling chain handler")
+			}
+			u.enableChainHandlers()
+		default:
+			return fmt.Errorf("handler unknown %s", h)
+		}
+	}
+	return nil
 }

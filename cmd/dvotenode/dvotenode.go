@@ -91,7 +91,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"enable the results API")
 	globalCfg.API.Indexer = *flag.Bool("indexerApi", false,
 		"enable the indexer API (required for explorer)")
-	globalCfg.API.URL = *flag.Bool("urlApi", false, "enable the url API")
+	globalCfg.API.URL = *flag.Bool("urlApi", true, "enable the url API")
 	globalCfg.API.Route = *flag.String("apiRoute", "/",
 		"dvote HTTP API base route")
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false,
@@ -650,11 +650,16 @@ func main() {
 		}
 		if globalCfg.API.URL {
 			log.Info("enabling URL API")
-			uAPI, err := urlapi.NewURLAPI(&httpRouter, "/v1/pub")
+			uAPI, err := urlapi.NewURLAPI(&httpRouter, "/v2")
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := uAPI.EnableVotingHandlers(vochainApp, vochainInfo, scrutinizer); err != nil {
+			uAPI.Attach(vochainApp, vochainInfo, scrutinizer, storage)
+			if err := uAPI.EnableHandlers(
+				urlapi.ElectionHandler,
+				urlapi.VoteHandler,
+				urlapi.ChainHandler,
+			); err != nil {
 				log.Fatal(err)
 			}
 		}
