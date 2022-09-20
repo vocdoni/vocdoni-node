@@ -559,25 +559,40 @@ func (app *BaseApplication) endBlock(height int64, timestamp time.Time) abcitype
 func (app *BaseApplication) ApplySnapshotChunk(
 	req abcitypes.RequestApplySnapshotChunk,
 ) abcitypes.ResponseApplySnapshotChunk {
+	log.Warn("ApplySnapshotChunk:", req)
+
 	return abcitypes.ResponseApplySnapshotChunk{}
 }
 
 func (app *BaseApplication) ListSnapshots(
 	req abcitypes.RequestListSnapshots,
 ) abcitypes.ResponseListSnapshots {
-	return abcitypes.ResponseListSnapshots{}
+	log.Warn("Snapshot list requested:", req)
+	list := abcitypes.ResponseListSnapshots{}
+	list.Snapshots = append(list.Snapshots, &abcitypes.Snapshot{
+		Height:   1,
+		Format:   2,
+		Chunks:   3,
+		Hash:     []byte{0xff},
+		Metadata: []byte{'h', 'e', 'l', 'l', 'o'},
+	})
+	return list
 }
 
 func (app *BaseApplication) LoadSnapshotChunk(
 	req abcitypes.RequestLoadSnapshotChunk,
 ) abcitypes.ResponseLoadSnapshotChunk {
+	log.Warn("LoadSnapshotChunk:", req)
 	return abcitypes.ResponseLoadSnapshotChunk{}
 }
 
 func (app *BaseApplication) OfferSnapshot(
 	req abcitypes.RequestOfferSnapshot,
 ) abcitypes.ResponseOfferSnapshot {
-	return abcitypes.ResponseOfferSnapshot{}
+	log.Warn("Snapshot offered:", req)
+	r := abcitypes.ResponseOfferSnapshot{}
+	r.Size()
+	return r
 }
 
 // SetFnGetBlockByHash sets the getter for blocks by hash
