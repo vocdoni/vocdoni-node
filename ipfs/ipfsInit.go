@@ -7,9 +7,9 @@ import (
 	"path"
 	"sync"
 
-	config "github.com/ipfs/go-ipfs/config"
-	"github.com/ipfs/go-ipfs/plugin/loader"
-	"github.com/ipfs/go-ipfs/repo/fsrepo"
+	config "github.com/ipfs/kubo/config"
+	"github.com/ipfs/kubo/plugin/loader"
+	"github.com/ipfs/kubo/repo/fsrepo"
 
 	"go.vocdoni.io/dvote/log"
 )
@@ -61,7 +61,7 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 	conf.Discovery.MDNS.Enabled = false
 
 	// Prevent from scanning local networks which can trigger netscan alerts.
-	// See: https://github.com/ipfs/go-ipfs/issues/7985
+	// See: https://github.com/ipfs/kubo/issues/7985
 	conf.Swarm.AddrFilters = []string{
 		"/ip4/10.0.0.0/ipcidr/8",
 		"/ip4/100.64.0.0/ipcidr/10",

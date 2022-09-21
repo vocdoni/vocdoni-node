@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ipfs/go-ipfs/commands"
-	ipfscore "github.com/ipfs/go-ipfs/core"
-	ipfsapi "github.com/ipfs/go-ipfs/core/coreapi"
-	"github.com/ipfs/go-ipfs/repo/fsrepo"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
+	"github.com/ipfs/kubo/commands"
+	ipfscore "github.com/ipfs/kubo/core"
+	ipfsapi "github.com/ipfs/kubo/core/coreapi"
+	"github.com/ipfs/kubo/repo/fsrepo"
 
 	"go.vocdoni.io/dvote/log"
 )
