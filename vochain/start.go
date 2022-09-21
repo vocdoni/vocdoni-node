@@ -15,7 +15,6 @@ import (
 	abciclient "github.com/tendermint/tendermint/abci/client"
 	tmcfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	"github.com/tendermint/tendermint/privval"
 
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -240,20 +239,8 @@ func newTendermint(app *BaseApplication,
 		log.Errorf("failed to parse log level: %v", err)
 	}
 
-	// pv will contain a local private validator,
-	// if PrivValidatorListenAddr is defined, there's no need to initialize it since nm.NewNode() will ignore it
-	var pv *privval.FilePV
-
-	// TO-DO: check if current tendermint version supports hardware wallets
-	// if PrivValidatorListenAddr is defined, use a remote private validator, like TMKMS which allows signing with Ledger
-	// else, use a local private validator
-	//	if len(localConfig.PrivValidatorListenAddr) > 0 {
-	//		log.Info("PrivValidatorListenAddr defined, Tendermint will wait for a remote private validator connection")
-	//		tconfig.PrivValidatorListenAddr = localConfig.PrivValidatorListenAddr
-	//	} else {
-
 	// read or create local private validator
-	pv, err = NewPrivateValidator(localConfig.MinerKey, tconfig)
+	pv, err := NewPrivateValidator(localConfig.MinerKey, tconfig)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
 	}
@@ -328,24 +315,6 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}
 
-	// Disabled until hardware wallet support is back
-	// If using a remote private validator, the pubkeys are only available after nm.NewNode()
-	// In that case, print them now, for debugging purposes
-	/*	if len(localConfig.PrivValidatorListenAddr) > 0 {
-			pv := node.PrivValidator()
-			pubKey, err := pv.GetPubKey()
-			if err != nil {
-				log.Warnf("failed to get pubkey from private validator: %v", err)
-			}
-			log.Infof("tendermint address: %v", pubKey.Address())
-
-			aminoPubKey, err := AminoPubKey(pubKey.Bytes())
-			if err != nil {
-				log.Warnf("failed to get amino public key: %v", err)
-			}
-			log.Infof("amino public key: %s", aminoPubKey)
-		}
-	*/
 	return service, nil
 }
 
