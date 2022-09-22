@@ -461,14 +461,14 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	// check if recovered address is an Oracle and if not
 	// check if recovered address is a delegate of the entityID provided
 	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) && !isOracle {
-		entityIDAddress := common.BytesToAddress(tx.Process.EntityId)
-		entityIDAccount, err := state.GetAccount(entityIDAddress, true)
+		entityAddress := common.BytesToAddress(tx.Process.EntityId)
+		entityAccount, err := state.GetAccount(entityAddress, true)
 		if err != nil {
 			return nil, common.Address{}, fmt.Errorf(
-				"cannot get entityID account for checking if the sender is a delegate: %w", err,
+				"cannot get entity account for checking if the sender is a delegate: %w", err,
 			)
 		}
-		if !entityIDAccount.IsDelegate(*addr) {
+		if !entityAccount.IsDelegate(*addr) {
 			return nil, common.Address{}, fmt.Errorf(
 				"unauthorized to create a new process, recovered addr is %s", addr.Hex())
 		}

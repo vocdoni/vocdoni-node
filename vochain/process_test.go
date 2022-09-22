@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -16,31 +15,10 @@ import (
 
 const ipfsUrl = "ipfs://123456789"
 
-func TestProcessSetStatusTransition(t *testing.T) {
-	app := TestBaseApplication(t)
-	// create burn account
-	if err := app.State.SetAccount(BurnAddress, &Account{}); err != nil {
-		t.Fatal(err)
-	}
-	// create oracle
-	oracle := ethereum.SignKeys{}
-	if err := oracle.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := app.State.AddOracle(oracle.Address()); err != nil {
-		t.Fatal(err)
-	}
-	oracleAcc := &Account{}
-	oracleAcc.Balance = 10000
-	if err := app.State.SetAccount(oracle.Address(), oracleAcc); err != nil {
-		t.Fatal(err)
-	}
-	// set tx cost
-	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_STATUS, 10); err != nil {
-		t.Fatal(err)
-	}
-	app.Commit()
-	// Add a process with status=READY and interruptible=true
+func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
+	app, accounts := createTestBaseApplicationAndAccounts(t, 10)
+
+	// define process
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
@@ -50,46 +28,135 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		Mode:         &models.ProcessMode{Interruptible: true},
 		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     accounts[1].Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
-	t.Logf("adding READY process %x", process.ProcessId)
-	if err := app.State.AddProcess(process); err != nil {
-		t.Fatal(err)
+
+	// create process with entityID (should work)
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process), qt.IsNil)
+	// all get accounts assume account is not nil
+	entityAcc, err := app.State.GetAccount(accounts[1].Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, entityAcc.Balance, qt.Equals, uint64(9990))
+	qt.Assert(t, entityAcc.Nonce, qt.Equals, uint32(1))
+	qt.Assert(t, entityAcc.ProcessIndex, qt.Equals, uint32(1))
+
+	// create process with oracle (should work)
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[0], app, process), qt.IsNil)
+	entityAcc, err = app.State.GetAccount(accounts[1].Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, entityAcc.Balance, qt.Equals, uint64(9990))
+	qt.Assert(t, entityAcc.Nonce, qt.Equals, uint32(1))
+	qt.Assert(t, entityAcc.ProcessIndex, qt.Equals, uint32(2))
+	oracleAcc, err := app.State.GetAccount(accounts[0].Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, oracleAcc.Balance, qt.Equals, uint64(9990))
+	qt.Assert(t, oracleAcc.Nonce, qt.Equals, uint32(1))
+	qt.Assert(t, oracleAcc.ProcessIndex, qt.Equals, uint32(0))
+
+	// create process with delegate (should work)
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[2], app, process), qt.IsNil)
+	entityAcc, err = app.State.GetAccount(accounts[1].Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, entityAcc.Balance, qt.Equals, uint64(9990))
+	qt.Assert(t, entityAcc.Nonce, qt.Equals, uint32(1))
+	qt.Assert(t, entityAcc.ProcessIndex, qt.Equals, uint32(3))
+	delegateAcc, err := app.State.GetAccount(accounts[2].Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, delegateAcc.Balance, qt.Equals, uint64(9990))
+	qt.Assert(t, delegateAcc.Nonce, qt.Equals, uint32(1))
+	qt.Assert(t, delegateAcc.ProcessIndex, qt.Equals, uint32(0))
+
+	// create process with a non delegate to another entityID (should not work)
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[4], app, process), qt.IsNotNil)
+	entityAcc, err = app.State.GetAccount(accounts[1].Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, entityAcc.Balance, qt.Equals, uint64(9990))
+	qt.Assert(t, entityAcc.Nonce, qt.Equals, uint32(1))
+	qt.Assert(t, entityAcc.ProcessIndex, qt.Equals, uint32(3))
+	randomAcc, err := app.State.GetAccount(accounts[4].Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, randomAcc.Balance, qt.Equals, uint64(10000))
+	qt.Assert(t, randomAcc.Nonce, qt.Equals, uint32(0))
+	qt.Assert(t, randomAcc.ProcessIndex, qt.Equals, uint32(0))
+}
+
+func testNewProcess(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
+	app *BaseApplication, process *models.Process) error {
+	var stx models.SignedTx
+	var err error
+
+	// assumes account is not nil
+	txSenderAcc, err := app.State.GetAccount(txSender.Address(), false)
+	if err != nil {
+		return fmt.Errorf("cannot get tx sender account %s with error %w", txSender.Address(), err)
 	}
+	// create tx
+	tx := &models.NewProcessTx{
+		Txtype:  models.TxType_NEW_PROCESS,
+		Nonce:   txSenderAcc.Nonce,
+		Process: process,
+	}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: tx}})
+	if err != nil {
+		return fmt.Errorf("cannot mashal tx %w", err)
+	}
+	if stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
+		return fmt.Errorf("cannot sign tx %+v with error %w", tx, err)
+	}
+
+	return testCheckTxDeliverTxCommit(t, app, &stx)
+}
+
+func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+	// add a process with status=READY and interruptible=true
+	censusURI := ipfsUrl
+	pid := util.RandomBytes(types.ProcessIDsize)
+	process := &models.Process{
+		ProcessId:    pid,
+		StartBlock:   0,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Mode:         &models.ProcessMode{Interruptible: true},
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		Status:       models.ProcessStatus_READY,
+		EntityId:     keys[1].Address().Bytes(),
+		CensusRoot:   util.RandomBytes(32),
+		CensusURI:    &censusURI,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:   1024,
+	}
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
 
 	// Set it to PAUSE (should work)
 	status := models.ProcessStatus_PAUSED
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
 	// Set it to READY (should work)
 	status = models.ProcessStatus_READY
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+
+	// Set it to PAUSED by delegate (should work)
+	status = models.ProcessStatus_PAUSED
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[2], app, &status), qt.IsNil)
+	// Set it to READY by delegate (should work)
+	status = models.ProcessStatus_READY
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[2], app, &status), qt.IsNil)
 
 	// Set it to ENDED (should work)
 	status = models.ProcessStatus_ENDED
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
 	// Set it to RESULTS (should work)
 	status = models.ProcessStatus_RESULTS
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
 	// Set it to READY (should fail)
 	status = models.ProcessStatus_READY
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err == nil {
-		t.Fatal("results to ready should not be valid")
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
 
 	// Add a process with status=PAUSED and interruptible=true
 	censusURI = ipfsUrl
@@ -100,46 +167,34 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_PAUSED,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     keys[1].Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
 	t.Logf("adding PAUSED process %x", process.ProcessId)
-	if err := app.State.AddProcess(process); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
 
 	// Set it to READY (should work)
 	status = models.ProcessStatus_READY
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
 	// Set it to PAUSED (should work)
 	status = models.ProcessStatus_PAUSED
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
 	// Set it to ENDED (should fail)
 	status = models.ProcessStatus_ENDED
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err == nil {
-		t.Fatal("paused to ended should not be valid")
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
 
 	// Set it to CANCELED (should work)
 	status = models.ProcessStatus_CANCELED
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
 	// Set it to READY (should fail)
 	status = models.ProcessStatus_READY
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err == nil {
-		t.Fatal("cancel to ready should not be valid")
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
 
 	// Add a process with status=PAUSE and interruptible=false
 	censusURI = ipfsUrl
@@ -150,124 +205,63 @@ func TestProcessSetStatusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: false, AutoStart: false},
 		Status:       models.ProcessStatus_PAUSED,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     keys[1].Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
 	t.Logf("adding PAUSED process %x", process.ProcessId)
-	if err := app.State.AddProcess(process); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
 
 	// Set it to READY (should work)
 	status = models.ProcessStatus_READY
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
 	// Set it to PAUSE (should fail)
 	status = models.ProcessStatus_PAUSED
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err == nil {
-		t.Fatal("ready to paused should not be possible if interruptible=false")
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
 
 	// Set it to ENDED (should fail)
 	status = models.ProcessStatus_ENDED
 	t.Logf("height: %d", app.State.CurrentHeight())
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err == nil {
-		t.Fatal("ready to ended should not be valid if interruptible=false")
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
 }
 
-func testSetProcessStatus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
+func testSetProcessStatus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 	app *BaseApplication, status *models.ProcessStatus) error {
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
 	var stx models.SignedTx
 	var err error
 
-	oracleAcc, err := app.State.GetAccount(oracle.Address(), false)
+	// assume account is not nil
+	txSenderAcc, err := app.State.GetAccount(txSender.Address(), false)
 	if err != nil {
-		t.Fatal(err)
+		return fmt.Errorf("cannot get tx sender account %s with error %w", txSender.Address(), err)
 	}
-	if oracleAcc == nil {
-		t.Fatal(ErrAccountNotExist)
-	}
+	// create tx
 	tx := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_STATUS,
-		Nonce:     oracleAcc.Nonce,
+		Nonce:     txSenderAcc.Nonce,
 		ProcessId: pid,
 		Status:    status,
 	}
-
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}})
 	if err != nil {
-		t.Fatal(err)
+		return fmt.Errorf("cannot mashal tx %w", err)
 	}
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
-		t.Fatal(err)
+	if stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
+		return fmt.Errorf("cannot sign tx %+v with error %w", tx, err)
 	}
 
-	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
-		t.Fatal(err)
-	}
-	cktxresp = app.CheckTx(cktx)
-	if cktxresp.Code != 0 {
-		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
-	}
-	if detx.Tx, err = proto.Marshal(&stx); err != nil {
-		t.Fatal(err)
-	}
-	detxresp = app.DeliverTx(detx)
-	if detxresp.Code != 0 {
-		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
-	}
-	app.Commit()
-	return nil
+	return testCheckTxDeliverTxCommit(t, app, &stx)
 }
 
-func TestProcessSetResultsTransition(t *testing.T) {
-	var oracle, oracle2 ethereum.SignKeys
-	app := TestBaseApplication(t)
-	// create burn account
-	if err := app.State.SetAccount(BurnAddress, &Account{}); err != nil {
-		t.Fatal(err)
-	}
-	// create oracles
-	if err := oracle.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := oracle2.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
-		t.Fatal(err)
-	}
-	if err := app.State.AddOracle(common.HexToAddress(oracle2.AddressString())); err != nil {
-		t.Fatal(err)
-	}
-	oracleAcc := &Account{}
-	oracleAcc.Balance = 10000
-	if err := app.State.SetAccount(oracle.Address(), oracleAcc); err != nil {
-		t.Fatal(err)
-	}
-	if err := app.State.SetAccount(oracle2.Address(), oracleAcc); err != nil {
-		t.Fatal(err)
-	}
-	// set tx cost
-	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_STATUS, 10); err != nil {
-		t.Fatal(err)
-	}
-	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_RESULTS, 10); err != nil {
-		t.Fatal(err)
-	}
+func TestProcessSetResultsCheckTxDeliverTxCommitTransitions(t *testing.T) {
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+	qt.Assert(t, app.State.AddOracle(keys[4].Address()), qt.IsNil)
 	app.Commit()
 
-	// Add a process with status=READY and interruptible=true
+	// add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
@@ -276,16 +270,13 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     keys[1].Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
-	if err := app.State.AddProcess(process); err != nil {
-		t.Fatal(err)
-	}
-
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
 	t.Log(app.State.Process(process.ProcessId, false))
 
 	// Set results  (should not work)
@@ -298,140 +289,72 @@ func TestProcessSetResultsTransition(t *testing.T) {
 		EntityId:  process.EntityId,
 		Votes:     votes,
 	}
-	results.OracleAddress = oracle.Address().Bytes()
+	results.OracleAddress = keys[0].Address().Bytes()
 
 	// Set results (should not work)
-	if err := testSetProcessResults(t, pid, &oracle, app, results); err == nil {
-		t.Fatal("adding results while process ready but end block not reached should not work")
-	}
+	qt.Assert(t, testSetProcessResults(t, pid, keys[0], app, results), qt.IsNotNil)
 
 	// Set it to PAUSE
 	status := models.ProcessStatus_PAUSED
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
 	// Set results  (should not work)
-	if err := testSetProcessResults(t, pid, &oracle, app, results); err == nil {
-		t.Fatal("adding results while process paused should not work")
-	}
+	qt.Assert(t, testSetProcessResults(t, pid, keys[0], app, results), qt.IsNotNil)
 
 	// Set it to READY
 	status = models.ProcessStatus_READY
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
 	// Set it to ENDED
 	status = models.ProcessStatus_ENDED
-	if err := testSetProcessStatus(t, pid, &oracle, app, &status); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
 	// set results should work if process ended
-	if err := testSetProcessResults(t, pid, &oracle, app, results); err != nil {
-		t.Fatal("adding results while process ended should work")
-	}
+	qt.Assert(t, testSetProcessResults(t, pid, keys[0], app, results), qt.IsNil)
 
 	// status results already added by the previous tx
 
 	// Set results  (should not work)
-	if err := testSetProcessResults(t, pid, &oracle, app, results); err == nil {
-		t.Error("adding results cannot be added twice")
-	}
+	qt.Assert(t, testSetProcessResults(t, pid, keys[0], app, results), qt.IsNotNil)
 
 	// the second Oracle should be able to set the results
-	results.OracleAddress = oracle2.Address().Bytes()
-	if err := testSetProcessResults(t, pid, &oracle2, app, results); err != nil {
-		t.Error("second oracle should be able to set results")
-	}
+	results.OracleAddress = keys[4].Address().Bytes()
+	qt.Assert(t, testSetProcessResults(t, pid, keys[4], app, results), qt.IsNil)
 
 	// a non oracle address should not be able to add results
-	nonOracle := ethereum.SignKeys{}
-	if err := nonOracle.Generate(); err != nil {
-		t.Fatal("cannot generate key")
-	}
-	results.OracleAddress = nonOracle.Address().Bytes()
-	if err := testSetProcessResults(t, pid, &oracle2, app, results); err == nil {
-		t.Error("a non oracle address should not be able to set results")
-	}
+	qt.Assert(t, testSetProcessResults(t, pid, keys[1], app, results), qt.IsNotNil)
 }
 
-func testSetProcessResults(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
+func testSetProcessResults(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 	app *BaseApplication, results *models.ProcessResult) error {
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
 	var stx models.SignedTx
 	var err error
 
-	oracleAcc, err := app.State.GetAccount(oracle.Address(), false)
+	// assume account is not nil
+	txSenderAcc, err := app.State.GetAccount(txSender.Address(), false)
 	if err != nil {
-		t.Fatal(err)
-	}
-	if oracleAcc == nil {
-		t.Fatal(ErrAccountNotExist)
+		return fmt.Errorf("cannot get tx sender account %s with error %w", txSender.Address(), err)
 	}
 	tx := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_RESULTS,
-		Nonce:     oracleAcc.Nonce,
+		Nonce:     txSenderAcc.Nonce,
 		ProcessId: pid,
 		Results:   results,
 	}
 
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}})
 	if err != nil {
-		t.Fatal(err)
+		return fmt.Errorf("cannot mashal tx %w", err)
 	}
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
-		t.Fatal(err)
+	if stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
+		return fmt.Errorf("cannot sign tx %+v with error %w", tx, err)
 	}
-	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
-		t.Fatal(err)
-	}
-	cktxresp = app.CheckTx(cktx)
-	if cktxresp.Code != 0 {
-		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
-	}
-	if detx.Tx, err = proto.Marshal(&stx); err != nil {
-		t.Fatal(err)
-	}
-	detxresp = app.DeliverTx(detx)
-	if detxresp.Code != 0 {
-		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
-	}
-	app.Commit()
-	return nil
+
+	return testCheckTxDeliverTxCommit(t, app, &stx)
 }
 
-func TestProcessSetCensusTransition(t *testing.T) {
-	app := TestBaseApplication(t)
-	// create burn account
-	if err := app.State.SetAccount(BurnAddress, &Account{}); err != nil {
-		t.Fatal(err)
-	}
-	var oracle ethereum.SignKeys
-	// create oracles
-	if err := oracle.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := app.State.AddOracle(common.HexToAddress(oracle.AddressString())); err != nil {
-		t.Fatal(err)
-	}
-	oracleAcc := &Account{}
-	oracleAcc.Balance = 10000
-	if err := app.State.SetAccount(oracle.Address(), oracleAcc); err != nil {
-		t.Fatal(err)
-	}
-	// set tx cost
-	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_STATUS, 10); err != nil {
-		t.Fatal(err)
-	}
-	if err := app.State.SetTxCost(models.TxType_SET_PROCESS_CENSUS, 10); err != nil {
-		t.Fatal(err)
-	}
-	app.Commit()
+func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
 
 	// Add a process with status=READY and interruptible=true
 	censusURI := ipfsUrl
@@ -445,7 +368,7 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true, DynamicCensus: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     keys[1].Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -458,7 +381,7 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     keys[1].Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI2,
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
@@ -471,94 +394,59 @@ func TestProcessSetCensusTransition(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{Interruptible: true, DynamicCensus: true},
 		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
+		EntityId:     keys[1].Address().Bytes(),
 		CensusRoot:   util.RandomBytes(32),
 		CensusURI:    &censusURI2,
 		CensusOrigin: models.CensusOrigin_ERC20,
 		BlockCount:   1024,
 	}
 	t.Logf("adding READY process %x", process.ProcessId)
-	if err := app.State.AddProcess(process); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
 	t.Logf("adding READY process %x", process2.ProcessId)
-	if err := app.State.AddProcess(process2); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, app.State.AddProcess(process2), qt.IsNil)
 	t.Logf("adding READY process %x", process3.ProcessId)
-	if err := app.State.AddProcess(process3); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, app.State.AddProcess(process3), qt.IsNil)
 
 	// Set census  (should work)
-	if err := testSetProcessCensus(t, pid, &oracle, app, []byte{1, 2, 3}, &censusURI2); err != nil {
-		t.Fatalf("update census should work if dynamic and off chain census: %s", err)
-	}
+	qt.Assert(t, testSetProcessCensus(t, pid, keys[0], app, []byte{1, 2, 3}, &censusURI2), qt.IsNil)
+
+	// Set census by delegate (should work)
+	qt.Assert(t, testSetProcessCensus(t, pid, keys[2], app, []byte{3, 2, 1}, &censusURI2), qt.IsNil)
 
 	// Set census  (should not work)
-	if err := testSetProcessCensus(t, pid2, &oracle, app, []byte{1, 2, 3}, &censusURI2); err != nil {
-		t.Logf("update census should not work if dynamic census is set to false: %s", err)
-	} else {
-		t.Fatal("update census should not work if dynamic census is set to false")
-	}
+	qt.Assert(t, testSetProcessCensus(t, pid2, keys[0], app, []byte{1, 2, 3}, &censusURI2), qt.IsNotNil)
 
 	// Set census  (should not work)
-	if err := testSetProcessCensus(t, pid3, &oracle, app, []byte{1, 2, 3}, &censusURI2); err != nil {
-		t.Logf("update census should not work if on chain census: %s", err)
-	} else {
-		t.Fatal("update census should not work if on chain census")
-	}
+	qt.Assert(t, testSetProcessCensus(t, pid3, keys[4], app, []byte{1, 2, 3}, &censusURI2), qt.IsNotNil)
 }
 
-func testSetProcessCensus(t *testing.T, pid []byte, oracle *ethereum.SignKeys,
+func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 	app *BaseApplication, censusRoot []byte, censusURI *string) error {
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
 	var stx models.SignedTx
 	var err error
 
-	oracleAcc, err := app.State.GetAccount(oracle.Address(), false)
+	txSenderAcc, err := app.State.GetAccount(txSender.Address(), false)
 	if err != nil {
-		t.Fatal(err)
+		return fmt.Errorf("cannot get tx sender account %s with error %w", txSender.Address(), err)
 	}
-	if oracleAcc == nil {
-		t.Fatal(ErrAccountNotExist)
-	}
+
 	tx := &models.SetProcessTx{
 		Txtype:     models.TxType_SET_PROCESS_CENSUS,
-		Nonce:      oracleAcc.Nonce,
+		Nonce:      txSenderAcc.Nonce,
 		ProcessId:  pid,
 		CensusRoot: censusRoot,
 		CensusURI:  censusURI,
 	}
-
 	if stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_SetProcess{SetProcess: tx}}); err != nil {
-		t.Fatal(err)
+		Payload: &models.Tx_SetProcess{SetProcess: tx}},
+	); err != nil {
+		return fmt.Errorf("cannot mashal tx %w", err)
+	}
+	if stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
+		return fmt.Errorf("cannot sign tx %+v with error %w", tx, err)
 	}
 
-	if stx.Signature, err = oracle.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
-		t.Fatal(err)
-	}
-
-	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
-		t.Fatal(err)
-	}
-	cktxresp = app.CheckTx(cktx)
-	if cktxresp.Code != 0 {
-		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
-	}
-	if detx.Tx, err = proto.Marshal(&stx); err != nil {
-		t.Fatal(err)
-	}
-	detxresp = app.DeliverTx(detx)
-	if detxresp.Code != 0 {
-		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
-	}
-	app.Commit()
-	return nil
+	return testCheckTxDeliverTxCommit(t, app, &stx)
 }
 
 func TestCount(t *testing.T) {
@@ -570,4 +458,88 @@ func TestCount(t *testing.T) {
 	count, err = app.State.CountProcesses(true)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, count, qt.Equals, uint64(0))
+}
+
+// creates a test vochain application and returns the following keys:
+// [oracle, entity, delegate, treasurer, random]
+// the application will have the accounts of the keys already initialized, as well as
+// the burn account and all tx costs set to txCostNumber
+func createTestBaseApplicationAndAccounts(t *testing.T,
+	txCostNumber uint64) (*BaseApplication, []*ethereum.SignKeys) {
+	app := TestBaseApplication(t)
+	keys := make([]*ethereum.SignKeys, 0)
+	for i := 0; i < int(5); i++ {
+		key := &ethereum.SignKeys{}
+		qt.Assert(t, key.Generate(), qt.IsNil)
+		keys = append(keys, key)
+	}
+	// create burn account
+	qt.Assert(t, app.State.SetAccount(BurnAddress, &Account{}), qt.IsNil)
+
+	// create oracle account
+	qt.Assert(t, app.State.SetAccount(keys[0].Address(),
+		&Account{Account: models.Account{Balance: 10000}},
+	), qt.IsNil)
+	// add oracle to oracle list
+	qt.Assert(t, app.State.AddOracle(keys[0].Address()), qt.IsNil)
+
+	// create delegate
+	qt.Assert(t, app.State.SetAccount(keys[2].Address(),
+		&Account{Account: models.Account{Balance: 10000}},
+	), qt.IsNil)
+
+	// create entity account and add delegate
+	delegates := make([][]byte, 1)
+	delegates[0] = keys[2].Address().Bytes()
+	qt.Assert(t, app.State.SetAccount(keys[1].Address(),
+		&Account{Account: models.Account{
+			Balance:       10000,
+			DelegateAddrs: delegates,
+		}},
+	), qt.IsNil)
+
+	// create treasurer
+	qt.Assert(t, app.State.SetTreasurer(keys[3].Address(), 0), qt.IsNil)
+
+	// create random account
+	qt.Assert(t, app.State.SetAccount(keys[4].Address(),
+		&Account{Account: models.Account{Balance: 10000}},
+	), qt.IsNil)
+
+	// set tx costs
+	for _, cost := range TxCostNameToTxTypeMap {
+		qt.Assert(t, app.State.SetTxCost(cost, txCostNumber), qt.IsNil)
+
+	}
+	app.Commit()
+	return app, keys
+}
+
+func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) error {
+	var cktx abcitypes.RequestCheckTx
+	var detx abcitypes.RequestDeliverTx
+	var cktxresp abcitypes.ResponseCheckTx
+	var detxresp abcitypes.ResponseDeliverTx
+	var err error
+	// checkTx()
+	cktx.Tx, err = proto.Marshal(stx)
+	if err != nil {
+		return fmt.Errorf("mashaling failed: %w", err)
+	}
+	cktxresp = app.CheckTx(cktx)
+	if cktxresp.Code != 0 {
+		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
+	}
+	// deliverTx()
+	detx.Tx, err = proto.Marshal(stx)
+	if err != nil {
+		return fmt.Errorf("mashaling failed: %w", err)
+	}
+	detxresp = app.DeliverTx(detx)
+	if detxresp.Code != 0 {
+		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
+	}
+	// commit()
+	app.Commit()
+	return nil
 }
