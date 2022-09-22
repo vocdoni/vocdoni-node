@@ -39,6 +39,7 @@ func TestSetAccountInfoTx(t *testing.T) {
 	// set tx costs
 	app.State.SetTxCost(models.TxType_SET_ACCOUNT_INFO, 100)
 	app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 100)
+	app.State.SetTxCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 100)
 
 	// should create an account
 	if err := testSetAccountInfoTx(t, &signer, common.Address{}, nil, app, infoURI); err != nil {
@@ -49,17 +50,19 @@ func TestSetAccountInfoTx(t *testing.T) {
 	if err := testSetAccountInfoTx(t, &signer, common.Address{}, nil, app, ""); err == nil {
 		t.Fatal(err)
 	}
+	if err := app.State.MintBalance(signer.Address(), 1000); err != nil {
+		t.Fatal(err)
+	}
 
 	// should always create an account for the tx sender without taking into account the Account field
 	if err := testSetAccountInfoTx(t, &signer2, signer.Address(), nil, app, infoURI); err != nil {
 		t.Fatal(err)
 	}
-
-	// should create an account with tokens if faucet pkg is provided
-	err := app.State.MintBalance(signer.Address(), 1000)
-	if err != nil {
+	if err := app.State.MintBalance(signer2.Address(), 1000); err != nil {
 		t.Fatal(err)
 	}
+
+	// should create an account with tokens if faucet pkg is provided
 	faucetPkg, err := GenerateFaucetPackage(&signer, signer3.Address(), 100, rand.Uint64())
 	if err != nil {
 		t.Fatal(err)
@@ -91,6 +94,38 @@ func TestSetAccountInfoTx(t *testing.T) {
 	if acc2 == nil {
 		t.Fatal(ErrAccountNotExist)
 	}
+	if acc2.Balance != 1000 {
+		t.Fatalf("expected balance to be %d got %d", 1000, acc2.Balance)
+	}
+
+	// set account2 as account delegate
+	testSetAccountDelegateTx(t, &signer, app, signer2.Address(), true, acc2.Nonce)
+	// change info to account with account2 as delegate
+	if err := testSetAccountInfoTx(t, &signer2, signer.Address(), nil, app, "changed"); err != nil {
+		t.Fatal(err)
+	}
+	// check delegate can change infoURI
+	acc, err = app.State.GetAccount(signer.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if acc.InfoURI != "changed" {
+		t.Fatalf("expected infoURI to be %s got %s", "changed", acc.InfoURI)
+	}
+	// get account2 and check delegate assumed tx costs
+	acc2, err = app.State.GetAccount(signer2.Address(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if acc2 == nil {
+		t.Fatal(ErrAccountNotExist)
+	}
+	if acc2.Balance != 900 {
+		t.Fatalf("expected balance to be %d got %d", 900, acc2.Balance)
+	}
+	if acc2.Nonce != 1 {
+		t.Fatalf("expected nonce to be %d got %d", 1, acc2.Nonce)
+	}
 
 	// get account3
 	acc3, err := app.State.GetAccount(signer3.Address(), false)
@@ -112,8 +147,8 @@ func TestSetAccountInfoTx(t *testing.T) {
 	if burnAcc == nil {
 		t.Fatal(ErrAccountNotExist)
 	}
-	if burnAcc.Balance != 100 {
-		t.Fatalf("expected balance to be %d got %d", 100, burnAcc.Balance)
+	if burnAcc.Balance != 300 {
+		t.Fatalf("expected balance to be %d got %d", 300, burnAcc.Balance)
 	}
 }
 
