@@ -453,18 +453,25 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	if acc.Nonce != tx.Nonce {
 		return nil, common.Address{}, ErrAccountNonceInvalid
 	}
-
 	isOracle, err := state.IsOracle(*addr)
 	if err != nil {
 		return nil, common.Address{}, err
 	}
-
-	// check if process entityID matches tx sender
+	// check if process entityID matches tx sender, if not
+	// check if recovered address is an Oracle and if not
+	// check if recovered address is a delegate of the entityID provided
 	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) && !isOracle {
-		// Check if the transaction comes from an oracle
-		// Oracles can create processes with any entityID
-		return nil, common.Address{}, fmt.Errorf(
-			"unauthorized to create a new process, recovered addr is %s", addr.Hex())
+		entityIDAddress := common.BytesToAddress(tx.Process.EntityId)
+		entityIDAccount, err := state.GetAccount(entityIDAddress, true)
+		if err != nil {
+			return nil, common.Address{}, fmt.Errorf(
+				"cannot get entityID account for checking if the sender is a delegate: %w", err,
+			)
+		}
+		if !entityIDAccount.IsDelegate(*addr) {
+			return nil, common.Address{}, fmt.Errorf(
+				"unauthorized to create a new process, recovered addr is %s", addr.Hex())
+		}
 	}
 
 	// if no Oracle, build the processID (Oracles are allowed to use any processID)
@@ -576,19 +583,25 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 			return common.Address{}, err
 		}
 		if !isOracle {
-			return common.Address{}, fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
-		}
+			// check if delegate
+			entityIDAddress := common.BytesToAddress(process.EntityId)
+			entityIDAccount, err := state.GetAccount(entityIDAddress, true)
+			if err != nil {
+				return common.Address{}, fmt.Errorf(
+					"cannot get entityID account for checking if the sender is a delegate: %w", err,
+				)
+			}
+			if !entityIDAccount.IsDelegate(*addr) {
+				return common.Address{}, fmt.Errorf(
+					"unauthorized to set process status, recovered addr is %s", addr.Hex(),
+				)
+			} // is delegate
+		} // is oracle
 	}
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_RESULTS:
 		if !isOracle {
 			return common.Address{}, fmt.Errorf("only oracles can execute set process results transaction")
-		}
-		if acc.Balance < cost {
-			return common.Address{}, ErrNotEnoughBalance
-		}
-		if acc.Nonce != tx.Nonce {
-			return common.Address{}, ErrAccountNonceInvalid
 		}
 		results := tx.GetResults()
 		if !bytes.Equal(results.OracleAddress, addr.Bytes()) {
