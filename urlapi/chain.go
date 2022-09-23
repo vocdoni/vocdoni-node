@@ -39,6 +39,14 @@ func (u *URLAPI) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
+	if err := u.api.RegisterMethod(
+		"/chain/info",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		u.chainInfoHandler,
+	); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -82,6 +90,25 @@ func (u *URLAPI) organizationCountHandler(msg *bearerstdapi.BearerStandardAPIdat
 	count := u.scrutinizer.EntityCount()
 	organization := &Organization{Count: &count}
 	data, err := json.Marshal(organization)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+
+}
+
+// /chain/info
+// returns the chain ID, blocktimes, timestamp and height of the blockchain
+func (u *URLAPI) chainInfoHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	blockTimes := u.vocinfo.BlockTimes()
+	height := u.vocapp.Height()
+	timestamp := u.vocapp.Timestamp()
+	data, err := json.Marshal(ChainInfo{
+		ID:        u.vocapp.ChainID(),
+		BlockTime: blockTimes,
+		Height:    &height,
+		Timestamp: &timestamp,
+	})
 	if err != nil {
 		return err
 	}
