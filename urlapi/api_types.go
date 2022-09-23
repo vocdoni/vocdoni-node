@@ -96,8 +96,10 @@ type ElectionMode struct {
 }
 
 type Transaction struct {
-	Payload   []byte         `json:"payload,omitempty"`
-	Signature types.HexBytes `json:"signature,omitempty"`
+	Payload  []byte         `json:"payload,omitempty"`
+	Hash     types.HexBytes `json:"hash,omitempty"`
+	Response []byte         `json:"response,omitempty"`
+	Code     *uint32        `json:"code,omitempty"`
 }
 
 type ChainInfo struct {

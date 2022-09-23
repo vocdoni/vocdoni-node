@@ -60,7 +60,7 @@ func (u *URLAPI) submitVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 		return fmt.Errorf("%s", string(res.Data))
 	}
 	var data []byte
-	if data, err = json.Marshal(Vote{TxHash: res.Data.Bytes(), VoteID: res.Hash.Bytes()}); err != nil {
+	if data, err = json.Marshal(Vote{VoteID: res.Data.Bytes(), TxHash: res.Hash.Bytes()}); err != nil {
 		return err
 	}
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)

@@ -47,6 +47,14 @@ func (u *URLAPI) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
+	if err := u.api.RegisterMethod(
+		"/chain/transaction/submit",
+		"POST",
+		bearerstdapi.MethodAccessTypePublic,
+		u.chainSendTxHandler,
+	); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -113,5 +121,32 @@ func (u *URLAPI) chainInfoHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return err
 	}
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+}
 
+// /chain/transaction/submit
+// submits a blockchain transaction
+func (u *URLAPI) chainSendTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	req := &Transaction{}
+	if err := json.Unmarshal(msg.Data, req); err != nil {
+		return err
+	}
+	res, err := u.vocapp.SendTx(req.Payload)
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		return fmt.Errorf("no reply from vochain")
+	}
+	if res.Code != 0 {
+		return fmt.Errorf("%s", string(res.Data))
+	}
+	var data []byte
+	if data, err = json.Marshal(Transaction{
+		Response: res.Data.Bytes(),
+		Code:     &res.Code,
+		Hash:     res.Hash.Bytes(),
+	}); err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
