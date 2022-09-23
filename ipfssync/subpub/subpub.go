@@ -17,8 +17,8 @@ import (
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	libpeer "github.com/libp2p/go-libp2p-core/peer"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	discrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 )
@@ -61,7 +61,7 @@ type SubPub struct {
 	close   chan bool
 	privKey string
 	dht     *dht.IpfsDHT
-	routing *discovery.RoutingDiscovery
+	routing *discrouting.RoutingDiscovery
 
 	// These are used in testing
 	OnPeerAdd    func(id libpeer.ID)

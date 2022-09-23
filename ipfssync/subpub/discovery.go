@@ -8,9 +8,10 @@ import (
 	corediscovery "github.com/libp2p/go-libp2p-core/discovery"
 	libpeer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
+	discrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	discutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 	multiaddr "github.com/multiformats/go-multiaddr"
 	"go.vocdoni.io/dvote/log"
 )
@@ -92,8 +93,8 @@ func (ps *SubPub) setupDiscovery(ctx context.Context) {
 	// We use a rendezvous point "meet me here" to announce our location.
 	// This is like telling your friends to meet you at the Eiffel Tower.
 	log.Infof("advertising myself periodically in topic %s", ps.Topic)
-	ps.routing = discovery.NewRoutingDiscovery(ps.dht)
-	discovery.Advertise(ctx, ps.routing, ps.Topic)
+	ps.routing = discrouting.NewRoutingDiscovery(ps.dht)
+	discutil.Advertise(ctx, ps.routing, ps.Topic)
 
 	// Discover new peers periodically
 	go func() { // this spawns a single background task per IPFSsync instance

@@ -44,7 +44,6 @@ require (
 	github.com/libp2p/go-libp2p v0.21.0
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
 	github.com/libp2p/go-libp2p-core v0.19.1
-	github.com/libp2p/go-libp2p-discovery v0.7.0
 	github.com/libp2p/go-libp2p-kad-dht v0.17.0
 	github.com/libp2p/go-reuseport v0.2.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
@@ -106,6 +105,7 @@ require (
 	github.com/ipfs/go-unixfsnode v1.4.0 // indirect
 	github.com/ipld/edelweiss v0.1.4 // indirect
 	github.com/ipld/go-car/v2 v2.4.0 // indirect
+	github.com/libp2p/go-libp2p-discovery v0.7.0 // indirect
 	github.com/libp2p/go-libp2p-resource-manager v0.5.3 // indirect
 	github.com/libp2p/go-yamux/v3 v3.1.2 // indirect
 	github.com/libp2p/zeroconf/v2 v2.1.1 // indirect
