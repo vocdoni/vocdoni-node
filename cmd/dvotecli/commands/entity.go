@@ -43,7 +43,7 @@ func entityList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf(resp.Message)
 	}
 
-	entities := append([]string{}, resp.EntityIDs...)
+	entities := append([]string{}, *resp.EntityIDs...)
 	if len(entities) == rpcapi.MaxListSize {
 		for i, count := 1, len(entities); count > 0 && i < MaxListIterations; i++ {
 			req.From = i * rpcapi.MaxListSize
@@ -51,8 +51,8 @@ func entityList(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return err
 			}
-			entities = append(entities, resp.EntityIDs...)
-			count = len(resp.EntityIDs)
+			entities = append(entities, *resp.EntityIDs...)
+			count = len(*resp.EntityIDs)
 		}
 	}
 

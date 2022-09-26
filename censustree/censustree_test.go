@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db/metadb"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -27,6 +29,62 @@ func TestPublish(t *testing.T) {
 
 	censusTree.Unpublish()
 	qt.Assert(t, censusTree.IsPublic(), qt.IsFalse)
+}
+
+func TestImport(t *testing.T) {
+	db := metadb.NewTest(t)
+	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
+		CensusType: models.Census_ARBO_BLAKE2B})
+	qt.Assert(t, err, qt.IsNil)
+
+	rnd := testutil.NewRandom(0)
+	totalWeight := big.NewInt(0)
+
+	// add a bunch of keys and values (weights)
+	for i := 1; i < 11; i++ {
+		h, err := arbo.HashFunctionBlake2b.Hash(rnd.RandomBytes(32))
+		qt.Assert(t, err, qt.IsNil)
+		qt.Assert(t, h, qt.Not(qt.HasLen), 0)
+		censusTree.Add(h, censusTree.BigIntToBytes(new(big.Int).SetInt64(int64(i))))
+		qt.Assert(t, err, qt.IsNil)
+		totalWeight.Add(totalWeight, big.NewInt(int64(i)))
+	}
+
+	// check the total weight is correctly calculated
+	weight, err := censusTree.GetCensusWeight()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, weight.Cmp(totalWeight), qt.Equals, 0)
+
+	// dump the tree
+	dump, err := censusTree.Dump()
+	qt.Assert(t, err, qt.IsNil)
+
+	// import into a new tree
+	censusTree2, err := New(Options{Name: "test2", ParentDB: db, MaxLevels: 256,
+		CensusType: models.Census_ARBO_BLAKE2B})
+	qt.Assert(t, err, qt.IsNil)
+
+	err = censusTree2.ImportDump(dump)
+	qt.Assert(t, err, qt.IsNil)
+
+	// check the weight is still the same
+	weight, err = censusTree2.GetCensusWeight()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, weight.Cmp(totalWeight), qt.Equals, 0)
+
+	// check root is the same after adding a new leaf
+	k, v := rnd.RandomBytes(32), rnd.RandomBytes(32)
+	err = censusTree.Add(k, v)
+	qt.Assert(t, err, qt.IsNil)
+	err = censusTree2.Add(k, v)
+	qt.Assert(t, err, qt.IsNil)
+
+	r1, err := censusTree.Root()
+	qt.Assert(t, err, qt.IsNil)
+	r2, err := censusTree2.Root()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, r1, qt.DeepEquals, r2)
+
 }
 
 func TestGetCensusWeight(t *testing.T) {

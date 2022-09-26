@@ -1,10 +1,8 @@
 package censustree
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -102,7 +100,7 @@ func (t *Tree) Publish() {
 	atomic.StoreUint32(&t.public, 1)
 }
 
-// UnPublish makes a merkle tree not available for queries.
+// Unpublish makes a merkle tree not available for queries.
 func (t *Tree) Unpublish() {
 	atomic.StoreUint32(&t.public, 0)
 }
@@ -122,7 +120,7 @@ func (t *Tree) Get(key []byte) ([]byte, error) {
 	return t.tree.Get(nil, key)
 }
 
-// Root wraps t.tree.VerifyProof.
+// VerifyProof wraps t.tree.VerifyProof.
 func (t *Tree) VerifyProof(key, value, proof, root []byte) (bool, error) {
 	return t.tree.VerifyProof(key, value, proof, root)
 }
@@ -233,9 +231,8 @@ func (t *Tree) ImportDump(b []byte) error {
 	t.Lock()
 	defer t.Unlock()
 
-	err := t.tree.ImportDump(b)
-	if err != nil {
-		return err
+	if err := t.tree.ImportDump(b); err != nil {
+		return fmt.Errorf("could not import dump: %w", err)
 	}
 
 	// TODO Warning, this CensusWeight update should be done only for the
@@ -247,36 +244,21 @@ func (t *Tree) ImportDump(b []byte) error {
 	// get the total addedWeight from parsing the dump byte array, and
 	// adding the weight of its values
 	addedWeight := big.NewInt(0)
-	r := bytes.NewReader(b)
-	for {
-		l := make([]byte, 2)
-		_, err := io.ReadFull(r, l)
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-		k := make([]byte, l[0])
-		_, err = io.ReadFull(r, k)
-		if err != nil {
-			return err
-		}
-		v := make([]byte, l[1])
-		_, err = io.ReadFull(r, v)
-		if err != nil {
-			return err
-		}
+	if err := t.tree.IterateLeaves(t.tree.DB().ReadTx(), func(key, value []byte) bool {
 		// add the weight (value of the leaf)
-		addedWeight = new(big.Int).Add(addedWeight, t.BytesToBigInt(v))
+		addedWeight = new(big.Int).Add(addedWeight, t.BytesToBigInt(value))
+		return false
+	}); err != nil {
+		return fmt.Errorf("could not add weight: %w", err)
 	}
 
 	wTx := t.tree.DB().WriteTx()
 	defer wTx.Discard()
 	if err := t.updateCensusWeight(wTx, t.BigIntToBytes(addedWeight)); err != nil {
-		return err
+		return fmt.Errorf("could not update census weight: %w", err)
 	}
 	if err := wTx.Commit(); err != nil {
-		return err
+		return fmt.Errorf("could not commit transaction: %w", err)
 	}
 	return nil
 }

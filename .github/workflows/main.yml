@@ -7,7 +7,7 @@ jobs:
   go-tests:
     runs-on: self-hosted
     container:
-      image: golang:1.17.7
+      image: golang:1.17.11
       options: --user 1000
     if: github.repository == 'vocdoni/vocdoni-node'
     defaults:
@@ -15,22 +15,40 @@ jobs:
         shell: bash
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: gofmt
         # Run gofmt first, as it's quick and issues are common.
         run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
       - name: go test
         run: |
+          # check that log lines contains no invalid chars (evidence of format mismatch)
+          export LOG_PANIC_ON_INVALIDCHARS=true
           # we run vet in another step
           go test -vet=off -timeout=1m -coverprofile=covprofile ./...
           # -race can easily make the crypto stuff 10x slower
           go test -vet=off -timeout=15m -race ./...
       - name: go vet
         run: go vet ./...
+      - name: Download staticcheck
+        run: |
+          curl -L https://github.com/dominikh/go-tools/releases/download/2022.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
       - name: staticcheck
         run: |
-          curl -L https://github.com/dominikh/go-tools/releases/download/2021.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
-          ./staticcheck/staticcheck ./...
+          ./staticcheck/staticcheck ./... 2> staticcheck/stderr
+      - name:  check staticcheck stderr
+        run: |
+          if cat staticcheck/stderr | grep "matched no packages" ; then
+            echo "staticcheck step did nothing, due to https://github.com/vocdoni/vocdoni-node/issues/444"
+            echo "Please re-run job."
+            # seize the opportunity to fix the underlying problem: a permissions error in ~/.cache
+            epoch=$(date +%s)
+            # if any file is reported by find, grep returns true and the mv is done
+            if [ -d ~/.cache ] && find ~/.cache -not -user `id --user` -print0 | grep -qz . ; then
+              echo "~/.cache had broken permissions, moving it away... (cache will be rebuilt with usage)"
+              mv -v ~/.cache ~/.cache-broken-by-root-$epoch
+            fi
+            exit 2
+          fi
       - name: Go build for Mac
         run: |
           # Some of our devs are on Mac. Ensure it builds.
@@ -42,7 +60,7 @@ jobs:
     if: github.repository == 'vocdoni/vocdoni-node'
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Run compose script
         run: |
           export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
@@ -51,6 +69,7 @@ jobs:
           export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
           export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
           export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
+          export LOG_PANIC_ON_INVALIDCHARS=true
           cd dockerfiles/testsuite
           docker-compose build
           ./start_test.sh
@@ -61,7 +80,7 @@ jobs:
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/ethless'
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - uses: docker/setup-buildx-action@v1
       # - name: Set up QEMU
       #   id: qemu

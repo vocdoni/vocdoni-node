@@ -55,8 +55,8 @@ For running dvotenode in gateway mode, 8GB of ram is recommended (4GB works but 
 - [x] Tendermint voting blockchain implementation
 - [x] Vote Scrutinizer
 - [x] BabyJubJub signature and hashing (ZK-snark friendly)
-- [ ] ZK-snark integration
-- [ ] BootNode automatic discovery
+- [x] ZK-snark integration
+- [ ] Bootnode automatic discovery
 
 #### Compile and run
 

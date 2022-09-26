@@ -1,6 +1,7 @@
 package indexertypes
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -108,6 +109,56 @@ func ProcessFromDB(dbproc *scrutinizerdb.Process) *Process {
 	return proc
 }
 
+func decodeVotes(input string) [][]*types.BigInt {
+	// "a,b,c x,y,z ..."
+	var votes [][]*types.BigInt
+	for _, group := range strings.Split(input, " ") {
+		var element []*types.BigInt
+		for _, s := range strings.Split(group, ",") {
+			n := new(types.BigInt)
+			if err := n.UnmarshalText([]byte(s)); err != nil {
+				panic(err) // TODO(mvdan): propagate errors via a database/sql interface?
+			}
+			element = append(element, n)
+		}
+		votes = append(votes, element)
+	}
+	return votes
+}
+
+func ResultsFromDB(dbproc *scrutinizerdb.Process) *Results {
+	results := &Results{
+		ProcessID:      dbproc.ID,
+		Votes:          decodeVotes(dbproc.ResultsVotes),
+		Weight:         decodeBigint(dbproc.ResultsWeight),
+		EnvelopeHeight: uint64(dbproc.ResultsEnvelopeHeight),
+		Signatures:     hexSplit(dbproc.ResultsSignatures),
+		Final:          dbproc.FinalResults,
+		BlockHeight:    uint32(dbproc.ResultsBlockHeight),
+	}
+	// Note that the old DB does not seem to keep a nil Envelope.
+	// TODO(mvdan): when we drop badgerhold, consider removing this alloc.
+	results.EnvelopeType = new(models.EnvelopeType)
+	if err := proto.Unmarshal(dbproc.EnvelopePb, results.EnvelopeType); err != nil {
+		panic(err)
+	}
+	if len(dbproc.VoteOptsPb) > 0 {
+		results.VoteOpts = new(models.ProcessVoteOptions)
+		if err := proto.Unmarshal(dbproc.VoteOptsPb, results.VoteOpts); err != nil {
+			panic(err)
+		}
+	}
+	return results
+}
+
+func decodeBigint(s string) *types.BigInt {
+	n := new(types.BigInt)
+	if err := n.UnmarshalText([]byte(s)); err != nil {
+		panic(err)
+	}
+	return n
+}
+
 func nonEmptyBytes(p []byte) []byte {
 	if len(p) == 0 {
 		return nil
@@ -119,6 +170,22 @@ func nonEmptySplit(s, sep string) []string {
 	list := strings.Split(s, sep)
 	if len(list) == 1 && list[0] == "" {
 		return nil // avoid []string{""} for s==""
+	}
+	return list
+}
+
+func hexSplit(joined string) []types.HexBytes {
+	if joined == "" {
+		return nil // match badgerhold
+	}
+	strs := strings.Split(joined, ",")
+	list := make([]types.HexBytes, len(strs))
+	for i, s := range strs {
+		b, err := hex.DecodeString(s)
+		if err != nil {
+			panic(err) // should never happen
+		}
+		list[i] = b
 	}
 	return list
 }
@@ -145,6 +212,7 @@ type VotePackage struct {
 type VoteReference struct {
 	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
 	ProcessID    types.HexBytes `badgerholdIndex:"ProcessID"`
+	VoterID      types.VoterID
 	Height       uint32
 	Weight       *types.BigInt
 	TxIndex      int32
@@ -159,6 +227,7 @@ func VoteReferenceFromDB(dbvote *scrutinizerdb.VoteReference) *VoteReference {
 	return &VoteReference{
 		Nullifier:    dbvote.Nullifier,
 		ProcessID:    dbvote.ProcessID,
+		VoterID:      dbvote.VoterID,
 		Height:       uint32(dbvote.Height),
 		Weight:       weightInt,
 		TxIndex:      int32(dbvote.TxIndex),
@@ -170,6 +239,7 @@ func VoteReferenceFromDB(dbvote *scrutinizerdb.VoteReference) *VoteReference {
 type EnvelopeMetadata struct {
 	ProcessId types.HexBytes `json:"process_id"`
 	Nullifier types.HexBytes `json:"nullifier"`
+	VoterID   types.HexBytes `json:"voter_id"`
 	TxIndex   int32          `json:"tx_index"`
 	Height    uint32         `json:"height"`
 	TxHash    types.HexBytes `json:"tx_hash"`

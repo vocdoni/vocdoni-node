@@ -31,6 +31,8 @@ ORACLE_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 . env.treasurerkey # contains var DVOTE_ETHCONFIG_SIGNINGKEY, import into current env
 TREASURER_KEY="$DVOTE_ETHCONFIG_SIGNINGKEY"
 [ -n "$TESTSUITE_TREASURER_KEY" ] && TREASURER_KEY="$TESTSUITE_TREASURER_KEY"
+TEST_PREFIX="testsuite_test"
+RANDOMID="${RANDOM}${RANDOM}"
 
 ### if you want to add a new test:
 ### add "newtest" to tests_to_run array (as well as a comment at the head of the file)
@@ -48,22 +50,22 @@ tests_to_run=(
 
 # print help
 [ "$1" == "-h" -o "$1" == "--help" ] && {
-  echo "$0 <test_to_run>"
-  echo "availabe tests: ${tests_to_run[@]}"
-  echo "env vars:"
-  echo "  CLEAN=1"
-  echo "  ELECTION_SIZE=300"
-  echo "  ELECTION_SIZE_ANON=10"
-  echo "  LOGLEVEL=info"
-  echo "  GWHOST=http://gateway0:9090/dvote"
-  exit 0
+	echo "$0 <test_to_run>"
+	echo "available tests: ${tests_to_run[@]}"
+	echo "env vars:"
+	echo "  CLEAN=1"
+	echo "  ELECTION_SIZE=300"
+	echo "  ELECTION_SIZE_ANON=10"
+	echo "  LOGLEVEL=info"
+	echo "  GWHOST=http://gateway0:9090/dvote"
+	exit 0
 }
 
 # if any arg is passed, treat them as the tests to run, overriding the default list
 [ $# != 0 ] && tests_to_run=($@)
 
 initaccounts() {
-	$COMPOSE_CMD_RUN test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=initaccounts \
@@ -73,7 +75,7 @@ initaccounts() {
 }
 
 merkle_vote() {
-	$COMPOSE_CMD_RUN test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${1}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=vtest \
@@ -94,7 +96,7 @@ merkle_vote_encrypted() {
 }
 
 anonvoting() {
-	$COMPOSE_CMD_RUN test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=anonvoting \
@@ -105,7 +107,7 @@ anonvoting() {
 }
 
 cspvoting() {
-	$COMPOSE_CMD_RUN test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=cspvoting \
@@ -116,7 +118,7 @@ cspvoting() {
 }
 
 tokentransactions() {
-	$COMPOSE_CMD_RUN test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=tokentransactions \
@@ -125,7 +127,7 @@ tokentransactions() {
 }
 
 vocli() {
-	docker-compose run test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=vocli \
@@ -160,15 +162,11 @@ mkdir -p $results
 echo "### Test suite ready ###"
 for test in ${tests_to_run[@]}; do
 	[ $CONCURRENT -eq 1 ] && {
-		[ ${test[0]} == "vocli" ] && {
-			( $test ; echo $? > $results/$test )
-		} || {
-			echo "### Running test $test concurrently with others ###"
-			( $test ; echo $? > $results/$test ) &
-		}
+		echo "### Running test $test concurrently with others ###"
+		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval ) &
 	} || {
 		echo "### Running test $test ###"
-		( $test ; echo $? > $results/$test )
+		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval )
 	}
 	sleep 6
 done
@@ -176,24 +174,31 @@ done
 echo "### Waiting for tests to finish ###"
 wait
 
+failed=""
 for test in ${tests_to_run[@]} ; do
-	RET=$(cat $results/$test)
+	RET=$(cat $results/$test.retval)
 	if [ "$RET" == "0" ] ; then
 		echo "Vochain test $test finished correctly!"
 	else
 		echo "Vochain test $test failed!"
 		echo "### Post run logs ###"
 		$COMPOSE_CMD logs --tail 1000
+		failed="$test"
 		break
 	fi
 done
-
-# remove temp dir
-rm -rf $results
 
 [ $CLEAN -eq 1 ] && {
 	echo "### Cleaning docker environment ###"
 	$COMPOSE_CMD down -v --remove-orphans
 }
+
+if [ -n "$failed" ]; then
+  echo "### Logs from failed test ($test) ###"
+  cat $results/$failed.stdout
+fi
+
+# remove temp dir
+rm -rf $results
 
 exit $RET

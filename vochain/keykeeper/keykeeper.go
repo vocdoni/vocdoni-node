@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/badgerdb"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -243,7 +244,7 @@ func (k *KeyKeeper) Commit(height uint32) error {
 }
 
 // OnVote is not used by the KeyKeeper
-func (k *KeyKeeper) OnVote(v *models.Vote, txindex int32) {
+func (k *KeyKeeper) OnVote(v *models.Vote, voterID types.VoterID, txindex int32) {
 	// do nothing
 }
 

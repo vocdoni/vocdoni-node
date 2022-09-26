@@ -92,6 +92,10 @@ func (a *APIrequest) Address() *common.Address {
 	return a.address
 }
 
+func (a *APIrequest) Reset() {
+	*a = APIrequest{}
+}
+
 func (a *APIrequest) SetAddress(addr *common.Address) {
 	a.address = addr
 }
@@ -150,7 +154,7 @@ func (a APIrequest) String() string {
 	return b.String()
 }
 
-// APIresponse contains all of the possible request fields.
+// APIresponse contains all of the possible response fields.
 // Fields must be in alphabetical order
 // Those fields with valid zero-values (such as bool) must be pointers
 type APIresponse struct {
@@ -175,7 +179,7 @@ type APIresponse struct {
 	EncryptionPrivKeys   []Key                            `json:"encryptionPrivKeys,omitempty"`
 	EncryptionPublicKeys []Key                            `json:"encryptionPubKeys,omitempty"`
 	EntityID             string                           `json:"entityId,omitempty"`
-	EntityIDs            []string                         `json:"entityIds,omitempty"`
+	EntityIDs            *[]string                        `json:"entityIds,omitempty"`
 	Envelope             *indexertypes.EnvelopePackage    `json:"envelope,omitempty"`
 	Envelopes            []*indexertypes.EnvelopeMetadata `json:"envelopes,omitempty"`
 	Files                []byte                           `json:"files,omitempty"`

@@ -74,7 +74,6 @@ func TestRollingCensus(t *testing.T) {
 	censusID := fmt.Sprintf("%x", process.RollingCensusRoot)
 	census, ok := cm.Trees[censusID]
 	qt.Assert(t, ok, qt.Equals, true)
-
 	for i, key := range keys {
 		indexLE, err := cm.KeyToIndex(censusID, key)
 		qt.Assert(t, err, qt.IsNil)

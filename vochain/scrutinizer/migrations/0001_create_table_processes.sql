@@ -8,7 +8,7 @@ CREATE TABLE processes (
 
   results_height      INTEGER NOT NULL, -- formerly "rheight"
   have_results        BOOLEAN NOT NULL,
-  final_results       BOOLEAN NOT NULL,
+  final_results       BOOLEAN NOT NULL, -- formerly also results.final, now deduplicated
 
   census_root         BLOB NOT NULL,
   rolling_census_root BLOB NOT NULL,
@@ -31,6 +31,7 @@ CREATE TABLE processes (
   creation_time       DATETIME NOT NULL,
   source_block_height INTEGER NOT NULL,
   source_network_id   TEXT NOT NULL -- TODO: integer?
+
 );
 
 CREATE INDEX index_processes_entity_id

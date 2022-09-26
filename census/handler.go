@@ -143,7 +143,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			if err != nil {
 				return nil, err
 			}
-			log.Infof("%d claims addedd successfully", len(r.CensusKeys)-len(invalidClaims))
+			log.Infof("%d claims added successfully", len(r.CensusKeys)-len(invalidClaims))
 		} else {
 			return nil, fmt.Errorf("invalid authentication")
 		}

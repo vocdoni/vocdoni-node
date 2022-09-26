@@ -15,9 +15,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var emptyVotesRoot = make([]byte, VotesCfg.HashFunc().Len())
-var emptyCensusRoot = make([]byte, CensusCfg.HashFunc().Len())
-var emptyPreRegisterNullifiersRoot = make([]byte, PreRegisterNullifiersCfg.HashFunc().Len())
+var emptyVotesRoot = make([]byte, StateChildTreeCfg(ChildTreeVotes).HashFunc().Len())
+var emptyCensusRoot = make([]byte, StateChildTreeCfg(ChildTreeCensus).HashFunc().Len())
+var emptyPreRegisterNullifiersRoot = make([]byte, StateChildTreeCfg(ChildTreePreRegisterNullifiers).HashFunc().Len())
 
 // AddProcess adds a new process to the vochain.  Adding a process with a
 // ProcessId that already exists will return an error.
@@ -36,14 +36,17 @@ func (v *State) AddProcess(p *models.Process) error {
 	}
 	v.Tx.Lock()
 	err = func() error {
-		if err := v.Tx.DeepAdd(p.ProcessId, newProcessBytes, ProcessesCfg); err != nil {
+		if err := v.Tx.DeepAdd(p.ProcessId, newProcessBytes, StateTreeCfg(TreeProcess)); err != nil {
 			return err
 		}
 		// If Mode.PreRegister && EnvelopeType.Anonymous we create (by
 		// opening) a new empty poseidon census tree and nullifier tree
 		// at p.ProcessId.
 		if preRegister && anonymous {
-			census, err := v.Tx.DeepSubTree(ProcessesCfg, CensusPoseidonCfg.WithKey(p.ProcessId))
+			census, err := v.Tx.DeepSubTree(
+				StateTreeCfg(TreeProcess),
+				StateChildTreeCfg(ChildTreeCensusPoseidon).WithKey(p.ProcessId),
+			)
 			if err != nil {
 				return err
 			}
@@ -51,8 +54,8 @@ func (v *State) AddProcess(p *models.Process) error {
 			if err := statedb.SetUint64(census.NoState(), keyCensusLen, 0); err != nil {
 				return err
 			}
-			if _, err = v.Tx.DeepSubTree(ProcessesCfg,
-				PreRegisterNullifiersCfg.WithKey(p.ProcessId)); err != nil {
+			if _, err = v.Tx.DeepSubTree(StateTreeCfg(TreeProcess),
+				StateChildTreeCfg(ChildTreePreRegisterNullifiers).WithKey(p.ProcessId)); err != nil {
 				return err
 			}
 		}
@@ -87,7 +90,7 @@ func (v *State) CancelProcess(pid []byte) error { // LEGACY
 		return fmt.Errorf("cannot marshal updated process bytes: %w", err)
 	}
 	v.Tx.Lock()
-	err = v.Tx.DeepSet(pid, updatedProcessBytes, ProcessesCfg)
+	err = v.Tx.DeepSet(pid, updatedProcessBytes, StateTreeCfg(TreeProcess))
 	v.Tx.Unlock()
 	if err != nil {
 		return err
@@ -99,7 +102,7 @@ func (v *State) CancelProcess(pid []byte) error { // LEGACY
 }
 
 func getProcess(mainTreeView statedb.TreeViewer, pid []byte) (*models.Process, error) {
-	processBytes, err := mainTreeView.DeepGet(pid, ProcessesCfg)
+	processBytes, err := mainTreeView.DeepGet(pid, StateTreeCfg(TreeProcess))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, ErrProcessNotFound
 	} else if err != nil {
@@ -129,7 +132,7 @@ func (v *State) CountProcesses(committed bool) (uint64, error) {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	processesTree, err := v.mainTreeViewer(committed).SubTree(ProcessesCfg)
+	processesTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeProcess))
 	if err != nil {
 		return 0, err
 	}
@@ -143,8 +146,30 @@ func (v *State) CountProcesses(committed bool) (uint64, error) {
 	return count, nil
 }
 
+// ListProcessIDs returns the full list of process identifiers (pid).
+func (v *State) ListProcessIDs(committed bool) ([][]byte, error) {
+	if !committed {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	processesTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeProcess))
+	if err != nil {
+		return nil, err
+	}
+	var pids [][]byte
+	if err := processesTree.Iterate(func(key []byte, value []byte) bool {
+		p := make([]byte, len(key))
+		copy(p, key)
+		pids = append(pids, p)
+		return false
+	}); err != nil {
+		return nil, err
+	}
+	return pids, nil
+}
+
 func updateProcess(tx *treeTxWithMutex, p *models.Process, pid []byte) error {
-	processesTree, err := tx.SubTree(ProcessesCfg)
+	processesTree, err := tx.SubTree(StateTreeCfg(TreeProcess))
 	if err != nil {
 		return err
 	}
@@ -479,14 +504,14 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
 		var circuits []artifacts.CircuitConfig
-		if genesis, ok := Genesis[app.chainId]; ok {
+		if genesis, ok := Genesis[app.chainID]; ok {
 			circuits = genesis.CircuitsConfig
 		} else {
 			log.Warn("Using dev network genesis CircuitsConfig")
 			circuits = Genesis["dev"].CircuitsConfig
 		}
 		if len(circuits) == 0 {
-			return nil, common.Address{}, fmt.Errorf("no circuit configs in the %v genesis", app.chainId)
+			return nil, common.Address{}, fmt.Errorf("no circuit configs in the %v genesis", app.chainID)
 		}
 		if tx.Process.MaxCensusSize == nil {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize is not provided")

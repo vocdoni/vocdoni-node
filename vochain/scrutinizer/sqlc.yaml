@@ -15,6 +15,8 @@ overrides:
     go_type: "go.vocdoni.io/dvote/types.ProcessID"
   - column: "vote_references.process_id"
     go_type: "go.vocdoni.io/dvote/types.ProcessID"
+  # - column: "results.process_id"
+  #   go_type: "go.vocdoni.io/dvote/types.ProcessID"
   # TODO: breaks sqlc generate for some reason.
   # For the time being, we store the bytes in the default TEXT form.
   # This works fine, but note that builtins can choke on null bytes;
@@ -33,6 +35,13 @@ overrides:
     go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
   - column: "processes.vote_opts_pb"
     go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
+  # - column: "results.envelope_pb"
+  #   go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
+  # - column: "results.vote_opts_pb"
+  #   go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
 
   - column: "vote_references.nullifier"
     go_type: "go.vocdoni.io/dvote/types.Nullifier"
+  
+  - column: "vote_references.voter_id"
+    go_type: "go.vocdoni.io/dvote/types.VoterID"

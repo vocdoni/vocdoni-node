@@ -450,3 +450,8 @@ func vochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 		time.Sleep(time.Duration(sleepSecs) * time.Second)
 	}
 }
+
+// SetChainID sets the chainID for the vocone instance
+func (vc *Vocone) SetChainID(chainID string) {
+	vc.app.SetChainID(chainID)
+}

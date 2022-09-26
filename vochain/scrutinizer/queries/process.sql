@@ -8,7 +8,10 @@ INSERT INTO processes (
 	envelope_pb, mode_pb, vote_opts_pb,
 	private_keys, public_keys,
 	question_index, creation_time,
-	source_block_height, source_network_id
+	source_block_height, source_network_id,
+
+	results_votes, results_weight, results_envelope_height,
+	results_signatures, results_block_height
 ) VALUES (
 	?, ?, ?, ?, ?,
 	?, ?, ?,
@@ -18,7 +21,10 @@ INSERT INTO processes (
 	?, ?, ?,
 	?, ?,
 	?, ?,
-	?, ?
+	?, ?,
+
+	?, "0", 0,
+	"", 0
 );
 
 -- name: GetProcess :one
@@ -67,9 +73,22 @@ UPDATE processes
 SET results_height = sqlc.arg(results_height)
 WHERE id = sqlc.arg(id);
 
+-- name: UpdateProcessResults :execresult
+UPDATE processes
+SET results_votes = sqlc.arg(votes),
+	results_weight = sqlc.arg(weight),
+	results_envelope_height = sqlc.arg(envelope_height),
+	results_block_height = sqlc.arg(block_height)
+WHERE id = sqlc.arg(id) AND final_results = FALSE;
+
 -- name: SetProcessResultsReady :execresult
 UPDATE processes
-SET have_results = TRUE, final_results = TRUE
+SET have_results = TRUE, final_results = TRUE,
+	results_votes = sqlc.arg(votes),
+	results_weight = sqlc.arg(weight),
+	results_envelope_height = sqlc.arg(envelope_height),
+	results_signatures = sqlc.arg(signatures),
+	results_block_height = sqlc.arg(block_height)
 WHERE id = sqlc.arg(id);
 
 -- name: SetProcessResultsCancelled :execresult

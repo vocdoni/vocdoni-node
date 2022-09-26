@@ -27,7 +27,7 @@ func (r *RPCAPI) submitRawTx(request *api.APIrequest) (*api.APIresponse, error) 
 	if res.Code != 0 {
 		return nil, fmt.Errorf("%s", string(res.Data))
 	}
-	log.Debugf("broadcasting tx hash:%s", res.Hash)
+	log.Debugf("broadcasting tx hash: %x", res.Hash)
 	// return nullifier or other info
 	// TODO @pau: replace Payload by something else more descriptive and using types.HexBytes
 	return &api.APIresponse{Payload: fmt.Sprintf("%x", res.Data), Hash: res.Hash.Bytes()}, nil
@@ -60,7 +60,7 @@ func (a *RPCAPI) submitEnvelope(request *api.APIrequest) (*api.APIresponse, erro
 	if res.Code != 0 {
 		return nil, fmt.Errorf("%v", res.Data)
 	}
-	log.Infof("broadcasting vochain tx hash: %s code: %d", res.Hash, res.Code)
+	log.Infof("broadcasting vochain tx hash: %x code: %d", res.Hash, res.Code)
 	return &api.APIresponse{Nullifier: fmt.Sprintf("%x", res.Data)}, nil
 }
 
@@ -382,7 +382,9 @@ func (r *RPCAPI) getEntityList(request *api.APIrequest) (*api.APIresponse, error
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize
 	}
-	response.EntityIDs = r.scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
+	response.EntityIDs = new([]string)
+	eids := r.scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
+	response.EntityIDs = &eids
 	return &response, nil
 }
 

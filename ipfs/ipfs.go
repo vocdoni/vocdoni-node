@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 
-	ipfsconfig "github.com/ipfs/go-ipfs-config"
 	"github.com/ipfs/go-ipfs/commands"
 	ipfscore "github.com/ipfs/go-ipfs/core"
 	ipfsapi "github.com/ipfs/go-ipfs/core/coreapi"
@@ -89,9 +88,6 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 func CmdCtx(node *ipfscore.IpfsNode, repoPath string) commands.Context {
 	return commands.Context{
 		ConfigRoot: repoPath,
-		LoadConfig: func(path string) (*ipfsconfig.Config, error) {
-			return node.Repo.Config()
-		},
 		ConstructNode: func() (*ipfscore.IpfsNode, error) {
 			return node, nil
 		},

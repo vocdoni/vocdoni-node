@@ -262,7 +262,7 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("Census created and published\nRoot: %s\nURI: %s", root, uri)
+	log.Infof("Census created and published\nRoot: %x\nURI: %s", root, uri)
 }
 
 func waitUntilNextBlock(mainClient *client.Client) error {
@@ -1361,8 +1361,8 @@ func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 
 		return vochain.ErrAccountNotExist
 	}
 	log.Infof("fetched from account %s with nonce %d and balance %d", signer.Address(), acc3.Nonce, acc3.Balance)
-	if acc.Balance-110 != acc3.Balance {
-		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Balance-110, acc3.Balance)
+	if acc.Balance-(100+txCost) != acc3.Balance {
+		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Balance-(100+txCost), acc3.Balance)
 	}
 	if acc.Nonce+1 != acc3.Nonce {
 		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Nonce+1, acc3.Nonce)
@@ -1566,14 +1566,14 @@ func testVocli(url, treasurerPrivKey string) {
 	var ensureSetAccountInfoMined = func(address string, stdArgs []string) (string, error) {
 		// 50% of the time the SetAccountInfoTx doesn't get mined even in 2, 3x the block period
 		// so keep polling until we finally confirm the account has been created
-		for i := 1; i < 10; i++ {
+		for i := 1; i < 20; i++ {
 			_, stout, _, err := executeCommand(vocli.RootCmd, append([]string{"account", "info", address}, stdArgs...), "", false)
 			if err == nil {
 				return stout, nil
 			}
 			time.Sleep(time.Second * 10)
 		}
-		return "", fmt.Errorf("cannot ensure account was mined after 10 attemps")
+		return "", fmt.Errorf("cannot ensure account was mined after 20 attempts")
 	}
 	var generateKeyAndReturnAddress = func(url string, stdArgs []string) (address, keyPath string, err error) {
 		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "new", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", false)
@@ -1622,7 +1622,7 @@ func testVocli(url, treasurerPrivKey string) {
 	if !strings.Contains(stdout, dir) {
 		log.Fatalf("vocli list should have found and shown a key in dir %s", dir)
 	}
-	log.Info("key list: %s", stdout)
+	log.Infof("key list: %s", stdout)
 
 	log.Info("vocli account set alice")
 	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", aliceKeyPath, "ipfs://aliceinwonderland"}, stdArgs...), "", true)
@@ -1739,7 +1739,7 @@ func testVocli(url, treasurerPrivKey string) {
 		log.Info("vocli txcost get NewProcess")
 		// get the initial txcosts. this is not used by the test, just for the
 		// human to read
-		if _, _, _, err := executeCommand(vocli.RootCmd, append([]string{"txcost", "get", aliceKeyPath}, stdArgs...), "", true); err != nil {
+		if _, _, _, err := executeCommand(vocli.RootCmd, append([]string{"txcost", "get"}, stdArgs...), "", true); err != nil {
 			log.Fatal(err)
 		}
 		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "set", aliceKeyPath, "RegisterKey", "50"}, stdArgs...), "", true)
@@ -1749,7 +1749,7 @@ func testVocli(url, treasurerPrivKey string) {
 		// wait a bit for the tx to be mined and the node to increment the
 		// account's nonce
 		time.Sleep(time.Second * 20)
-		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "get", aliceKeyPath}, stdArgs...), "", true)
+		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "get"}, stdArgs...), "", true)
 		if err != nil {
 			log.Fatal(err)
 		}

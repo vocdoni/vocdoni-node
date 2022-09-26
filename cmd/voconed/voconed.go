@@ -16,10 +16,10 @@ import (
 
 // VoconeConfig contains the basic configuration for the voconed
 type VoconeConfig struct {
-	logLevel, dir, oracle, path, treasurer string
-	port, blockSeconds, blockSize          int
-	txCosts                                uint64
-	disableIpfs                            bool
+	logLevel, dir, oracle, path, treasurer, chainID string
+	port, blockSeconds, blockSize                   int
+	txCosts                                         uint64
+	disableIpfs                                     bool
 }
 
 func main() {
@@ -32,6 +32,7 @@ func main() {
 	flag.StringVar(&config.oracle, "oracle", "", "oracle private hexadecimal key")
 	flag.StringVar(&config.treasurer, "treasurer", "", "treasurer public address")
 	flag.StringVar(&config.logLevel, "logLevel", "info", "log level (info, debug, warn, error)")
+	flag.StringVar(&config.chainID, "chainID", "vocone", "defines the chainID")
 	flag.IntVar(&config.port, "port", 9095, "network port for the HTTP API")
 	flag.StringVar(&config.path, "urlPath", "/dvote", "HTTP path for the API rest")
 	flag.IntVar(&config.blockSeconds, "blockPeriod", int(vocone.DefaultBlockTimeTarget.Seconds()), "block time target in seconds")
@@ -53,6 +54,8 @@ func main() {
 	config.dir = viper.GetString("dir")
 	viper.BindPFlag("oracle", flag.Lookup("oracle"))
 	config.oracle = viper.GetString("oracle")
+	viper.BindPFlag("chainID", flag.Lookup("chainID"))
+	config.chainID = viper.GetString("chainID")
 	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
 	config.logLevel = viper.GetString("logLevel")
 	viper.BindPFlag("port", flag.Lookup("port"))
@@ -104,6 +107,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	vc.SetChainID(config.chainID)
+	log.Infof("using chainID: %s", config.chainID)
 
 	if len(config.treasurer) > 0 {
 		log.Infof("setting treasurer %s", config.treasurer)

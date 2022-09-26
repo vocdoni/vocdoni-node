@@ -3,6 +3,8 @@ package log
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -14,6 +16,8 @@ import (
 var (
 	log      *zap.SugaredLogger
 	errorLog *os.File
+	// panicOnInvalidChars is set based on env LOG_PANIC_ON_INVALIDCHARS (parsed as bool)
+	panicOnInvalidChars bool
 )
 
 func init() {
@@ -42,6 +46,12 @@ func Init(logLevel string, output string) {
 	withOptions := logger.WithOptions(zap.AddCallerSkip(1))
 	log = withOptions.Sugar()
 	log.Infof("logger construction succeeded at level %s with output %s", logLevel, output)
+
+	if s := os.Getenv("LOG_PANIC_ON_INVALIDCHARS"); s != "" {
+		// ignore ParseBool errors, if anything fails panicOnInvalidChars will stay false which is good
+		b, _ := strconv.ParseBool(s)
+		panicOnInvalidChars = b
+	}
 }
 
 // SetFileErrorLog if set writes the Warning and Error messages to a file.
@@ -109,31 +119,54 @@ func writeErrorToFile(msg string) {
 	go errorLog.WriteString(fmt.Sprintf("[%s] %s\n", time.Now().Format("2006/0102/150405"), msg))
 }
 
+// checkInvalidChars checks if the formatted string contains the Unicode replacement char (U+FFFD)
+// and panics if env LOG_PANIC_ON_INVALIDCHARS bool is true.
+//
+// In production (LOG_PANIC_ON_INVALIDCHARS != true), this function returns immediately,
+// i.e. no performance hit
+//
+// If the log string contains the "replacement char"
+// https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+// this most likely means a bug in the caller (a format mismatch in fmt.Sprintf())
+func checkInvalidChars(args ...interface{}) {
+	if panicOnInvalidChars {
+		s := fmt.Sprint(args...)
+		if strings.ContainsRune(s, '\uFFFD') {
+			panic(fmt.Sprintf("log line with invalid chars: %s", s))
+		}
+	}
+}
+
 // Debug sends a debug level log message
 func Debug(args ...interface{}) {
 	log.Debug(args...)
+	checkInvalidChars(args...)
 }
 
 // Info sends an info level log message
 func Info(args ...interface{}) {
 	log.Info(args...)
+	checkInvalidChars(args...)
 }
 
 // Warn sends a warn level log message
 func Warn(args ...interface{}) {
 	log.Warn(args...)
 	writeErrorToFile(fmt.Sprint(args...))
+	checkInvalidChars(args...)
 }
 
 // Error sends an error level log message
 func Error(args ...interface{}) {
 	log.Error(args...)
 	writeErrorToFile(fmt.Sprint(args...))
+	checkInvalidChars(args...)
 }
 
 // Fatal sends a fatal level log message
 func Fatal(args ...interface{}) {
 	log.Fatal(args...)
+	checkInvalidChars(args...)
 	// We don't support log levels lower than "fatal". Help analyzers like
 	// staticcheck see that, in this package, Fatal will always exit the
 	// entire program.
@@ -152,28 +185,33 @@ func FormatProto(arg protoreflect.ProtoMessage) string {
 // Debugf sends a formatted debug level log message
 func Debugf(template string, args ...interface{}) {
 	log.Debugf(template, args...)
+	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Infof sends a formatted info level log message
 func Infof(template string, args ...interface{}) {
 	log.Infof(template, args...)
+	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Warnf sends a formatted warn level log message
 func Warnf(template string, args ...interface{}) {
 	log.Warnf(template, args...)
 	writeErrorToFile(fmt.Sprintf(template, args...))
+	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Errorf sends a formatted error level log message
 func Errorf(template string, args ...interface{}) {
 	log.Errorf(template, args...)
 	writeErrorToFile(fmt.Sprintf(template, args...))
+	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Fatalf sends a formatted fatal level log message
 func Fatalf(template string, args ...interface{}) {
 	log.Fatalf(template, args...)
+	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Debugw sends a key-value formatted debug level log message

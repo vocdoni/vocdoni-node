@@ -144,7 +144,7 @@ func (v *State) GetAccount(address common.Address, committed bool) (*Account, er
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
 	}
-	raw, err := v.mainTreeViewer(committed).DeepGet(address.Bytes(), AccountsCfg)
+	raw, err := v.mainTreeViewer(committed).DeepGet(address.Bytes(), StateTreeCfg(TreeAccounts))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, nil
 	} else if err != nil {
@@ -470,7 +470,7 @@ func (v *State) SetAccount(accountAddress common.Address, account *Account) erro
 		account.Balance,
 		printPrettierDelegates(account.DelegateAddrs),
 	)
-	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, AccountsCfg)
+	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, StateTreeCfg(TreeAccounts))
 }
 
 // SubtractCostIncrementNonce reduces the transaction cost from the account balance and increments nonce
@@ -492,23 +492,24 @@ func (v *State) SubtractCostIncrementNonce(accountAddress common.Address, txType
 	if txType != models.TxType_COLLECT_FAUCET {
 		acc.Nonce++
 	}
-	// send cost to burn address
-	burnAcc, err := v.GetAccount(BurnAddress, false)
-	if err != nil {
-		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
+	if cost != 0 {
+		// send cost to burn address
+		burnAcc, err := v.GetAccount(BurnAddress, false)
+		if err != nil {
+			return fmt.Errorf("subtractCostIncrementNonce: %w", err)
+		}
+		if burnAcc == nil {
+			return fmt.Errorf("subtractCostIncrementNonce: burn account does not exist")
+		}
+		if err := acc.Transfer(burnAcc, cost); err != nil {
+			return fmt.Errorf("subtractCostIncrementNonce: %w", err)
+		}
+		log.Debugf("burning fee for tx %s with cost %d from account %s", txType.String(), cost, accountAddress.String())
+		if err := v.SetAccount(BurnAddress, burnAcc); err != nil {
+			return fmt.Errorf("subtractCostIncrementNonce: %w", err)
+		}
 	}
-	if burnAcc == nil {
-		return fmt.Errorf("subtractCostIncrementNonce: burn account does not exist")
-	}
-	if err := acc.Transfer(burnAcc, cost); err != nil {
-		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
-	}
-	log.Debugf("burning fee for tx %s with cost %d from account %s", txType.String(), cost, accountAddress.String())
-	// set accounts
 	if err := v.SetAccount(accountAddress, acc); err != nil {
-		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
-	}
-	if err := v.SetAccount(BurnAddress, burnAcc); err != nil {
 		return fmt.Errorf("subtractCostIncrementNonce: %w", err)
 	}
 	return nil

@@ -172,7 +172,7 @@ func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 	if err = s.Tx.DeepSet(
 		testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		processBytes,
-		vochain.ProcessesCfg); err != nil {
+		vochain.StateTreeCfg(vochain.TreeProcess)); err != nil {
 		tb.Fatal(err)
 	}
 	return s
@@ -218,14 +218,14 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	d.VochainCfg.NoWaitSync = true
 	d.VochainCfg.MempoolSize = 20000
 	d.VochainCfg.MinerTargetBlockTimeSeconds = 3
+	d.VochainCfg.DBType = "pebble"
 
 	// run node
 	d.VochainCfg.MinerKey = fmt.Sprintf("%x", validator.Key.PrivKey)
 	vnode := vochain.NewVochain(d.VochainCfg, genBytes)
 	tb.Cleanup(func() {
-		vnode.Node.Stop()
 		if err := vnode.Node.Stop(); err != nil {
-			tb.Error(err)
+			tb.Fatal(err)
 		}
 		vnode.Node.Wait()
 	})

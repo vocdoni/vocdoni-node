@@ -56,7 +56,7 @@ func (m *Manager) importTree(tree []byte, cid string) error {
 	if err := json.Unmarshal(tree, &dump); err != nil {
 		return fmt.Errorf("retrieved census does not have a valid format: (%s)", err)
 	}
-	log.Debugf("retrieved census with rootHash %s and size %d bytes", dump.RootHash, len(tree))
+	log.Debugf("retrieved census with rootHash %x and size %d bytes", dump.RootHash, len(tree))
 	if fmt.Sprintf("%x", dump.RootHash) != util.TrimHex(cid) {
 		return fmt.Errorf("dump root Hash and census ID root hash do not match, aborting import")
 	}
