@@ -3,6 +3,7 @@ package urlapi
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 )
@@ -59,17 +60,16 @@ type Vote struct {
 }
 
 type ElectionDescription struct {
-	OrganizationID types.HexBytes `json:"organizationId,omitempty"`
-	Title          string         `json:"title,omitempty"`
-	Description    string         `json:"description,omitempty"`
-	Header         string         `json:"header,omitempty"`
-	StreamURI      string         `json:"streamUri,omitempty"`
-	StartDate      time.Time      `json:"startDate,omitempty"`
-	EndDate        time.Time      `json:"endDate,omitempty"`
-	VoteType       VoteType       `json:"voteType,omitempty"`
-	ElectionMode   ElectionMode   `json:"electionMode,omitempty"`
-	Questions      []Question     `json:"questions,omitempty"`
-	Census         CensusType     `json:"census,omitempty"`
+	Title        string       `json:"title,omitempty"`
+	Description  string       `json:"description,omitempty"`
+	Header       string       `json:"header,omitempty"`
+	StreamURI    string       `json:"streamUri,omitempty"`
+	StartDate    time.Time    `json:"startDate,omitempty"`
+	EndDate      time.Time    `json:"endDate,omitempty"`
+	VoteType     VoteType     `json:"voteType,omitempty"`
+	ElectionMode ElectionMode `json:"electionMode,omitempty"`
+	Questions    []Question   `json:"questions,omitempty"`
+	Census       CensusType   `json:"census,omitempty"`
 }
 
 type CensusType struct {
@@ -97,12 +97,13 @@ type ElectionMode struct {
 }
 
 type Transaction struct {
-	Payload  []byte            `json:"payload,omitempty"`
-	Hash     types.HexBytes    `json:"hash,omitempty"`
-	Response []byte            `json:"response,omitempty"`
-	Code     *uint32           `json:"code,omitempty"`
-	Costs    map[string]uint64 `json:"costs,omitempty"`
-	Address  types.HexBytes    `json:"address,omitempty"`
+	Payload   []byte            `json:"payload,omitempty"`
+	Hash      types.HexBytes    `json:"hash,omitempty"`
+	Response  []byte            `json:"response,omitempty"`
+	Code      *uint32           `json:"code,omitempty"`
+	Costs     map[string]uint64 `json:"costs,omitempty"`
+	Address   types.HexBytes    `json:"address,omitempty"`
+	ProcessID types.HexBytes    `json:"processId,omitempty"`
 }
 
 type ChainInfo struct {
@@ -116,4 +117,5 @@ type Account struct {
 	Address types.HexBytes   `json:"address,omitempty"`
 	Account *vochain.Account `json:"account,omitempty"`
 	Balance *uint64          `json:"balance,omitempty"`
+	Token   *uuid.UUID       `json:"token,omitempty"`
 }

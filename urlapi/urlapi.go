@@ -2,9 +2,12 @@ package urlapi
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/metrics"
@@ -30,10 +33,12 @@ type URLAPI struct {
 	//lint:ignore U1000 unused
 	metricsagent *metrics.Agent
 	vocinfo      *vochaininfo.VochainInfo
+
+	db db.Database
 }
 
 // NewURLAPI creates a new instance of the URLAPI.  Attach must be called next.
-func NewURLAPI(router *httprouter.HTTProuter, baseRoute string) (*URLAPI, error) {
+func NewURLAPI(router *httprouter.HTTProuter, baseRoute, dataDir string) (*URLAPI, error) {
 	if router == nil {
 		return nil, fmt.Errorf("httprouter is nil")
 	}
@@ -50,6 +55,11 @@ func NewURLAPI(router *httprouter.HTTProuter, baseRoute string) (*URLAPI, error)
 	}
 	var err error
 	urlapi.api, err = bearerstdapi.NewBearerStandardAPI(router, baseRoute)
+	if err != nil {
+		return nil, err
+	}
+	// Create local key value database
+	urlapi.db, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "urlapi"))
 	if err != nil {
 		return nil, err
 	}

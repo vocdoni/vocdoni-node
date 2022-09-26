@@ -187,13 +187,10 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.Dev = viper.GetBool("dev")
 	viper.BindPFlag("pprofPort", flag.Lookup("pprof"))
 
-	// Use different datadirs for non main chains
-	if globalCfg.VochainConfig.Chain != "main" {
-		globalCfg.DataDir += "/" + globalCfg.VochainConfig.Chain
-	}
+	// use different datadirs for different chains
+	globalCfg.DataDir = filepath.Join(globalCfg.DataDir, globalCfg.VochainConfig.Chain)
 
 	// Add viper config path (now we know it)
-	globalCfg.DataDir = filepath.Clean(globalCfg.DataDir)
 	viper.AddConfigPath(globalCfg.DataDir)
 
 	// binding flags to viper
@@ -650,7 +647,7 @@ func main() {
 		}
 		if globalCfg.API.URL {
 			log.Info("enabling URL API")
-			uAPI, err := urlapi.NewURLAPI(&httpRouter, "/v2")
+			uAPI, err := urlapi.NewURLAPI(&httpRouter, "/v2", globalCfg.DataDir)
 			if err != nil {
 				log.Fatal(err)
 			}
