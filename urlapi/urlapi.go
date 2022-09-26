@@ -86,6 +86,16 @@ func (u *URLAPI) EnableHandlers(handlers ...string) error {
 				return fmt.Errorf("missing modules attached for enabling chain handler")
 			}
 			u.enableChainHandlers()
+		case WalletHandler:
+			if u.vocapp == nil {
+				return fmt.Errorf("missing modules attached for enabling wallet handler")
+			}
+			u.enableWalletHandlers()
+		case AccountHandler:
+			if u.vocapp == nil {
+				return fmt.Errorf("missing modules attached for enabling account handler")
+			}
+			u.enableAccountHandlers()
 		default:
 			return fmt.Errorf("handler unknown %s", h)
 		}

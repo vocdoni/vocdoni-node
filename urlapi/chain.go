@@ -8,6 +8,7 @@ import (
 
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 const (
@@ -48,6 +49,14 @@ func (u *URLAPI) enableChainHandlers() error {
 		return err
 	}
 	if err := u.api.RegisterMethod(
+		"/chain/transaction/cost",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		u.chainTxCostHandler,
+	); err != nil {
+		return err
+	}
+	if err := u.api.RegisterMethod(
 		"/chain/transaction/submit",
 		"POST",
 		bearerstdapi.MethodAccessTypePublic,
@@ -70,7 +79,6 @@ func (u *URLAPI) organizationListHandler(msg *bearerstdapi.BearerStandardAPIdata
 			return fmt.Errorf("cannot parse page number")
 		}
 	}
-
 	page = page * MaxPageSize
 	organization := &Organization{}
 	list := u.scrutinizer.EntityList(MaxPageSize, page, "")
@@ -146,6 +154,26 @@ func (u *URLAPI) chainSendTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 		Code:     &res.Code,
 		Hash:     res.Hash.Bytes(),
 	}); err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+}
+
+// /chain/transaction/cost
+// returns de list of transactions and its cost
+func (u *URLAPI) chainTxCostHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	txCosts := &Transaction{
+		Costs: make(map[string]uint64),
+	}
+	var err error
+	for k, v := range vochain.TxCostNameToTxTypeMap {
+		txCosts.Costs[k], err = u.vocapp.State.TxCost(v, true)
+		if err != nil {
+			return err
+		}
+	}
+	var data []byte
+	if data, err = json.Marshal(txCosts); err != nil {
 		return err
 	}
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)

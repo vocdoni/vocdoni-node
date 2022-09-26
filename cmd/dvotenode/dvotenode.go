@@ -659,6 +659,8 @@ func main() {
 				urlapi.ElectionHandler,
 				urlapi.VoteHandler,
 				urlapi.ChainHandler,
+				urlapi.WalletHandler,
+				urlapi.AccountHandler,
 			); err != nil {
 				log.Fatal(err)
 			}

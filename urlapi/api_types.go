@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 type Organization struct {
@@ -96,10 +97,12 @@ type ElectionMode struct {
 }
 
 type Transaction struct {
-	Payload  []byte         `json:"payload,omitempty"`
-	Hash     types.HexBytes `json:"hash,omitempty"`
-	Response []byte         `json:"response,omitempty"`
-	Code     *uint32        `json:"code,omitempty"`
+	Payload  []byte            `json:"payload,omitempty"`
+	Hash     types.HexBytes    `json:"hash,omitempty"`
+	Response []byte            `json:"response,omitempty"`
+	Code     *uint32           `json:"code,omitempty"`
+	Costs    map[string]uint64 `json:"costs,omitempty"`
+	Address  types.HexBytes    `json:"address,omitempty"`
 }
 
 type ChainInfo struct {
@@ -107,4 +110,10 @@ type ChainInfo struct {
 	BlockTime *[5]int32 `json:"blockTime,omitempty"`
 	Height    *uint32   `json:"height,omitempty"`
 	Timestamp *int64    `json:"blockTimestamp,omitempty"`
+}
+
+type Account struct {
+	Address types.HexBytes   `json:"address,omitempty"`
+	Account *vochain.Account `json:"account,omitempty"`
+	Balance *uint64          `json:"balance,omitempty"`
 }
