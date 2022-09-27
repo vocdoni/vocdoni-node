@@ -107,7 +107,7 @@ func (v *State) CachePurge(height uint32) {
 			log.Warn("vote cache index is not [32]byte")
 			continue
 		}
-		if vote.Height+voteCachePurgeThreshold >= height {
+		if height >= vote.Height+voteCachePurgeThreshold {
 			v.voteCache.Remove(cacheGetNullifierKey(vote.Nullifier))
 			v.voteCache.Remove(id)
 			removeFromMempool = append(removeFromMempool, vid)
