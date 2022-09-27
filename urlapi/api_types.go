@@ -10,7 +10,7 @@ import (
 
 type Organization struct {
 	OrganizationID types.HexBytes      `json:"organizationID,omitempty"`
-	Elections      []*ProcessSummary   `json:"elections,omitempty"`
+	Elections      []*ElectionSummary  `json:"elections,omitempty"`
 	Organizations  []*OrganizationList `json:"organizations,omitempty"`
 	Count          *uint64             `json:"count,omitempty"`
 }
@@ -20,7 +20,7 @@ type OrganizationList struct {
 	ElectionCount  uint64         `json:"electionCount"`
 }
 
-type ProcessSummary struct {
+type ElectionSummary struct {
 	ElectionID types.HexBytes `json:"electionId,omitempty"`
 	Status     string         `json:"status,omitempty"`
 	StartDate  time.Time      `json:"startDate,omitempty"`
@@ -60,16 +60,16 @@ type Vote struct {
 }
 
 type ElectionDescription struct {
-	Title        string       `json:"title,omitempty"`
-	Description  string       `json:"description,omitempty"`
-	Header       string       `json:"header,omitempty"`
-	StreamURI    string       `json:"streamUri,omitempty"`
-	StartDate    time.Time    `json:"startDate,omitempty"`
-	EndDate      time.Time    `json:"endDate,omitempty"`
-	VoteType     VoteType     `json:"voteType,omitempty"`
-	ElectionMode ElectionMode `json:"electionMode,omitempty"`
-	Questions    []Question   `json:"questions,omitempty"`
-	Census       CensusType   `json:"census,omitempty"`
+	Title        LanguageString `json:"title,omitempty"`
+	Description  LanguageString `json:"description,omitempty"`
+	Header       string         `json:"header,omitempty"`
+	StreamURI    string         `json:"streamUri,omitempty"`
+	StartDate    time.Time      `json:"startDate,omitempty"`
+	EndDate      time.Time      `json:"endDate,omitempty"`
+	VoteType     VoteType       `json:"voteType,omitempty"`
+	ElectionMode ElectionMode   `json:"electionMode,omitempty"`
+	Questions    []Question     `json:"questions,omitempty"`
+	Census       CensusType     `json:"census,omitempty"`
 }
 
 type CensusType struct {

@@ -348,7 +348,7 @@ func (u *URLAPI) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 
 	// Prepare the election metadata information
 	metadata := ElectionMetadata{
-		Description: map[string]string{"default": description.Description},
+		Description: description.Description,
 		Media: ProcessMedia{
 			Header:    description.Header,
 			StreamURI: description.StreamURI,
@@ -359,7 +359,7 @@ func (u *URLAPI) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 			Aggregation: "discrete-values",
 			Display:     "multiple-choice",
 		},
-		Title:   map[string]string{"default": description.Title},
+		Title:   description.Title,
 		Version: "1.0",
 	}
 

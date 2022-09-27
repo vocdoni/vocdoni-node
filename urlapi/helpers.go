@@ -7,14 +7,14 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-func (u *URLAPI) getProcessSummaryList(pids ...[]byte) ([]*ProcessSummary, error) {
-	processes := []*ProcessSummary{}
+func (u *URLAPI) getProcessSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
+	processes := []*ElectionSummary{}
 	for _, p := range pids {
 		procInfo, err := u.scrutinizer.ProcessInfo(p)
 		if err != nil {
 			return nil, fmt.Errorf("cannot fetch election info: %w", err)
 		}
-		processes = append(processes, &ProcessSummary{
+		processes = append(processes, &ElectionSummary{
 			ElectionID: procInfo.ID,
 			Status:     models.ProcessStatus_name[procInfo.Status],
 			StartDate:  procInfo.CreationTime,
