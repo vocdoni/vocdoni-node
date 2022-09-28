@@ -188,7 +188,7 @@ func (u *URLAPI) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 		ElectionMode:  ElectionMode{ProcessMode: proc.Mode},
 		TallyMode:     TallyMode{ProcessVoteOptions: proc.VoteOpts},
 		Census: &Census{
-			CensusOrigin:           models.CensusOrigin(proc.CensusOrigin),
+			CensusOrigin:           models.CensusOrigin_name[proc.CensusOrigin],
 			CensusRoot:             proc.CensusRoot,
 			PostRegisterCensusRoot: proc.RollingCensusRoot,
 			CensusURL:              proc.CensusURI,
