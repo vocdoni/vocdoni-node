@@ -6,6 +6,8 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type Organization struct {
@@ -21,24 +23,65 @@ type OrganizationList struct {
 }
 
 type ElectionSummary struct {
-	ElectionID types.HexBytes `json:"electionId,omitempty"`
-	Status     string         `json:"status,omitempty"`
-	StartDate  time.Time      `json:"startDate,omitempty"`
-	EndDate    time.Time      `json:"endDate,omitempty"`
+	ElectionID   types.HexBytes `json:"electionId"`
+	Type         string         `json:"type"`
+	Status       string         `json:"status"`
+	StartDate    time.Time      `json:"startDate"`
+	EndDate      time.Time      `json:"endDate"`
+	VoteCount    uint64         `json:"voteCount"`
+	FinalResults bool           `json:"finalResults"`
+	Results      []Result       `json:"result,omitempty"`
 }
 
 type Election struct {
-	Type        string   `json:"type,omitempty"`
-	Status      string   `json:"status,omitempty"`
-	VoteCount   *uint64  `json:"voteCount,omitempty"`
-	Results     []Result `json:"result,omitempty"`
-	Count       *uint64  `json:"count,omitempty"`
-	PublicKeys  []Key    `json:"publicKeys,omitempty"`
-	PrivateKeys []Key    `json:"privateKeys,omitempty"`
+	ElectionSummary
+	ElectionCount uint32       `json:"electionCount"`
+	Census        *Census      `json:"census,omitempty"`
+	MetadataURL   string       `json:"metadataURL"`
+	CreationTime  time.Time    `json:"creationTime"`
+	PublicKeys    []Key        `json:"publicKeys,omitempty"`
+	PrivateKeys   []Key        `json:"privateKeys,omitempty"`
+	VoteMode      VoteMode     `json:"voteMode,omitempty"`
+	ElectionMode  ElectionMode `json:"electionMode,omitempty"`
+	TallyMode     TallyMode    `json:"tallyMode,omitempty"`
+}
+
+type VoteMode struct {
+	*models.EnvelopeType
+}
+
+func (v VoteMode) MarshalJSON() ([]byte, error) {
+	m := protojson.MarshalOptions{EmitUnpopulated: true, UseEnumNumbers: false}
+	return m.Marshal(&v)
+}
+
+type ElectionMode struct {
+	*models.ProcessMode
+}
+
+func (e ElectionMode) MarshalJSON() ([]byte, error) {
+	m := protojson.MarshalOptions{EmitUnpopulated: true, UseEnumNumbers: false}
+	return m.Marshal(&e)
+}
+
+type TallyMode struct {
+	*models.ProcessVoteOptions
+}
+
+func (t TallyMode) MarshalJSON() ([]byte, error) {
+	m := protojson.MarshalOptions{EmitUnpopulated: true, UseEnumNumbers: false}
+	return m.Marshal(&t)
+}
+
+type Census struct {
+	CensusOrigin           models.CensusOrigin `json:"censusOrigin"`
+	CensusRoot             types.HexBytes      `json:"censusRoot"`
+	PostRegisterCensusRoot types.HexBytes      `json:"postRegisterCensusRoot"`
+	CensusURL              string              `json:"censusURL"`
 }
 
 type Result struct {
-	Title []string `json:"title"`
+	Title []string `json:"title,omitempty"`
 	Value []string `json:"value"`
 }
 
@@ -60,19 +103,19 @@ type Vote struct {
 }
 
 type ElectionDescription struct {
-	Title        LanguageString `json:"title,omitempty"`
-	Description  LanguageString `json:"description,omitempty"`
-	Header       string         `json:"header,omitempty"`
-	StreamURI    string         `json:"streamUri,omitempty"`
-	StartDate    time.Time      `json:"startDate,omitempty"`
-	EndDate      time.Time      `json:"endDate,omitempty"`
-	VoteType     VoteType       `json:"voteType,omitempty"`
-	ElectionMode ElectionMode   `json:"electionMode,omitempty"`
-	Questions    []Question     `json:"questions,omitempty"`
-	Census       CensusType     `json:"census,omitempty"`
+	Title        LanguageString        `json:"title,omitempty"`
+	Description  LanguageString        `json:"description,omitempty"`
+	Header       string                `json:"header,omitempty"`
+	StreamURI    string                `json:"streamUri,omitempty"`
+	StartDate    time.Time             `json:"startDate,omitempty"`
+	EndDate      time.Time             `json:"endDate,omitempty"`
+	VoteType     VoteType              `json:"voteType,omitempty"`
+	ElectionType ElectionType          `json:"electionType,omitempty"`
+	Questions    []Question            `json:"questions,omitempty"`
+	Census       CensusTypeDescription `json:"census,omitempty"`
 }
 
-type CensusType struct {
+type CensusTypeDescription struct {
 	Type      string         `json:"type,omitempty"`
 	URL       string         `json:"url,omitempty"`
 	PublicKey types.HexBytes `json:"publicKey,omitempty"`
@@ -88,7 +131,7 @@ type VoteType struct {
 	MaxValue          int  `json:"maxValue,omitempty"`
 }
 
-type ElectionMode struct {
+type ElectionType struct {
 	Autostart         bool `json:"autostart,omitempty"`
 	Interruptible     bool `json:"interruptible,omitempty"`
 	DynamicCensus     bool `json:"dynamicCensus,omitempty"`

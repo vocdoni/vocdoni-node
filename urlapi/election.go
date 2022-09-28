@@ -166,26 +166,48 @@ func (u *URLAPI) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 	if err != nil {
 		return fmt.Errorf("cannot fetch electionID %x: %w", electionID, err)
 	}
-
-	var jElection Election
-	jElection.Status = models.ProcessStatus_name[proc.Status]
-	jElection.Type = u.formatElectionType(proc.Envelope)
 	count, err := u.scrutinizer.GetEnvelopeHeight(electionID)
 	if err != nil {
 		return fmt.Errorf("cannot get envelope height: %w", err)
 	}
-	jElection.VoteCount = &count
+
+	election := Election{
+		ElectionSummary: ElectionSummary{
+			ElectionID:   electionID,
+			Status:       models.ProcessStatus_name[proc.Status],
+			Type:         u.formatElectionType(proc.Envelope),
+			StartDate:    u.vocinfo.HeightTime(int64(proc.StartBlock)),
+			EndDate:      u.vocinfo.HeightTime(int64(proc.EndBlock)),
+			FinalResults: proc.FinalResults,
+			VoteCount:    count,
+		},
+		MetadataURL:   proc.Metadata,
+		ElectionCount: proc.EntityIndex,
+		CreationTime:  proc.CreationTime,
+		VoteMode:      VoteMode{EnvelopeType: proc.Envelope},
+		ElectionMode:  ElectionMode{ProcessMode: proc.Mode},
+		TallyMode:     TallyMode{ProcessVoteOptions: proc.VoteOpts},
+		Census: &Census{
+			CensusOrigin:           models.CensusOrigin(proc.CensusOrigin),
+			CensusRoot:             proc.CensusRoot,
+			PostRegisterCensusRoot: proc.RollingCensusRoot,
+			CensusURL:              proc.CensusURI,
+		},
+	}
+	election.Status = models.ProcessStatus_name[proc.Status]
+	election.Type = u.formatElectionType(proc.Envelope)
+
 	if proc.HaveResults {
 		results, err := u.scrutinizer.GetResults(electionID)
 		if err != nil {
 			return fmt.Errorf("cannot get envelope height: %w", err)
 		}
 		for _, r := range scrutinizer.GetFriendlyResults(results.Votes) {
-			jElection.Results = append(jElection.Results, Result{Value: r})
+			election.Results = append(election.Results, Result{Value: r})
 		}
 	}
 
-	data, err := json.Marshal(jElection)
+	data, err := json.Marshal(election)
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
@@ -199,10 +221,10 @@ func (u *URLAPI) electionCountHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 		return fmt.Errorf("organizationID (%q) cannot be decoded", ctx.URLParam("organizationID"))
 	}
 	count := u.scrutinizer.ProcessCount(organizationID)
-	election := Election{
-		Count: &count,
-	}
-	data, err := json.Marshal(election)
+
+	data, err := json.Marshal(
+		struct{ Count uint64 }{Count: count},
+	)
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}

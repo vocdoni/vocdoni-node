@@ -45,17 +45,17 @@ func (u *URLAPI) formatElectionType(et *models.EnvelopeType) string {
 	return ptype.String()
 }
 
-func censusTypeToOrigin(ctype CensusType) (models.CensusOrigin, []byte, error) {
+func censusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byte, error) {
 	var origin models.CensusOrigin
 	var root []byte
 	switch ctype.Type {
 	case "csp":
 		origin = models.CensusOrigin_OFF_CHAIN_CA
 		root = ctype.PublicKey
-	case "census":
+	case "tree":
 		origin = models.CensusOrigin_OFF_CHAIN_TREE
 		root = ctype.RootHash
-	case "censusWeighted":
+	case "treeWeighted":
 		origin = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
 		root = ctype.RootHash
 	default:

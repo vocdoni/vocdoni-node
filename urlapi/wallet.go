@@ -334,16 +334,16 @@ func (u *URLAPI) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 	// Set the envelope and process models
 	envelopeType := &models.EnvelopeType{
 		Serial:         false,
-		Anonymous:      description.ElectionMode.Anonymous,
-		EncryptedVotes: description.ElectionMode.SecretUntilTheEnd,
+		Anonymous:      description.ElectionType.Anonymous,
+		EncryptedVotes: description.ElectionType.SecretUntilTheEnd,
 		UniqueValues:   description.VoteType.UniqueChoices,
 		CostFromWeight: description.VoteType.CostFromWeight,
 	}
 
 	processMode := &models.ProcessMode{
-		AutoStart:     description.ElectionMode.Autostart,
-		Interruptible: description.ElectionMode.Interruptible,
-		DynamicCensus: description.ElectionMode.DynamicCensus,
+		AutoStart:     description.ElectionType.Autostart,
+		Interruptible: description.ElectionType.Interruptible,
+		DynamicCensus: description.ElectionType.DynamicCensus,
 	}
 
 	// Prepare the election metadata information
