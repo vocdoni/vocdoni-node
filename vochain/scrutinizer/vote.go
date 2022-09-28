@@ -101,9 +101,11 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePacka
 			TxHash:    txHash,
 		},
 	}
-	envelopePackage.Meta.VoterID, err = voteRef.VoterID.Address()
-	if err != nil {
-		return nil, fmt.Errorf("cannot get voterID from public key: %w", err)
+	if len(envelopePackage.Meta.VoterID) > 0 {
+		envelopePackage.Meta.VoterID, err = voteRef.VoterID.Address()
+		if err != nil {
+			return nil, fmt.Errorf("cannot get voterID from public key: %w", err)
+		}
 	}
 	return envelopePackage, nil
 }
@@ -200,9 +202,11 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 					Height:    txRef.Height,
 					TxHash:    txHash,
 				}
-				envelopeMetadata.VoterID, err = txRef.VoterID.Address()
-				if err != nil {
-					return fmt.Errorf("cannot get voterID from pubkey: %w", err)
+				if len(txRef.VoterID) > 0 {
+					envelopeMetadata.VoterID, err = txRef.VoterID.Address()
+					if err != nil {
+						return fmt.Errorf("cannot get voterID from pubkey: %w", err)
+					}
 				}
 				envelopes = append(envelopes, envelopeMetadata)
 				return nil
@@ -235,9 +239,11 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 					Height:    txRef.Height,
 					TxHash:    txHash,
 				}
-				envelopeMetadata.VoterID, err = txRef.VoterID.Address()
-				if err != nil {
-					return fmt.Errorf("cannot get voterID from pubkey: %w", err)
+				if len(txRef.VoterID) > 0 {
+					envelopeMetadata.VoterID, err = txRef.VoterID.Address()
+					if err != nil {
+						return fmt.Errorf("cannot get voterID from pubkey: %w", err)
+					}
 				}
 				envelopes = append(envelopes, envelopeMetadata)
 				return nil
