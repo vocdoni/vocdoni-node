@@ -237,12 +237,12 @@ func createAccount(key *ethkeystore.Key, url, infoUri, faucetPkg string) error {
 		return err
 	}
 
-	if faucetHex != "" {
-		faucetPkg, err := parseFaucetPayloadHex(faucetHex)
+	if faucetPkg != "" {
+		faucetPkgObject, err := parseFaucetPayloadHex(faucetPkg)
 		if err != nil {
 			return err
 		}
-		err = client.CreateOrSetAccount(signer, signer.Address(), infoUri, nonce, faucetPkg)
+		err = client.CreateOrSetAccount(signer, signer.Address(), infoUri, nonce, faucetPkgObject)
 		if err != nil {
 			return err
 		}
