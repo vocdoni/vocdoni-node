@@ -23,7 +23,7 @@ var (
 	ErrProcessNotFound      = fmt.Errorf("process not found")
 	ErrBalanceOverflow      = fmt.Errorf("balance overflow")
 	ErrAccountBalanceZero   = fmt.Errorf("zero balance account not valid")
-	ErrAccountNotExist      = fmt.Errorf("account does not exists")
+	ErrAccountNotExist      = fmt.Errorf("account does not exist")
 	ErrAccountAlreadyExists = fmt.Errorf("account already exists")
 	ErrNilTx                = fmt.Errorf("nil transaction")
 	// keys; not constants because of []byte
@@ -52,9 +52,8 @@ func UniqID(tx *models.SignedTx, isAnonymous bool) string {
 }
 
 type setAccountInfoTxCheckValues struct {
-	Account, TxSender, FaucetPayloadSigner common.Address
-	CreateAccount                          bool
-	CreateAccountWithFaucet                bool
+	TxAccount, TxSender, FaucetPayloadSigner common.Address
+	CreateAccount                            bool // If true signal for creating a new account
 }
 
 type sendTokensTxCheckValues struct {
