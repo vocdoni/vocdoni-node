@@ -173,9 +173,9 @@ func main() {
 		censusGenerate(*host, accountKeys[0], *electionSize, *keysfile, 1)
 	case "tokentransactions":
 		// end-user voting is not tested here
-		testTokenTransactions(*host, *treasurerPrivKey)
+		testTokenTransactions(*host, *treasurerPrivKey, *oraclePrivKey)
 	case "vocli":
-		testVocli(*host, *treasurerPrivKey)
+		testVocli(*host, *treasurerPrivKey, *oraclePrivKey)
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
@@ -1091,12 +1091,19 @@ func cspVoteTest(
 // enduser voting is not tested here
 func testTokenTransactions(
 	host,
-	treasurerPrivKey string,
+	treasurerPrivKey,
+	oraclePrivKey string,
 ) {
 	treasurerSigner, err := privKeyToSigner(treasurerPrivKey)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	oracleSigner, err := privKeyToSigner(oraclePrivKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// create main signer
 	mainSigner := &ethereum.SignKeys{}
 	if err := mainSigner.Generate(); err != nil {
@@ -1131,22 +1138,22 @@ func testTokenTransactions(
 	}
 
 	// check create and set account
-	if err := testCreateAndSetAccount(mainClient, treasurerSigner, mainSigner, otherSigner); err != nil {
+	if err := testCreateAndSetAccount(mainClient, treasurerSigner, oracleSigner, mainSigner); err != nil {
 		log.Fatal(err)
 	}
 
 	// check send tokens
-	if err := testSendTokens(mainClient, treasurerSigner, mainSigner, otherSigner); err != nil {
+	if err := testSendTokens(mainClient, treasurerSigner, oracleSigner, mainSigner); err != nil {
 		log.Fatal(err)
 	}
 
 	// check set account delegate
-	if err := testSetAccountDelegate(mainClient, mainSigner, otherSigner); err != nil {
+	if err := testSetAccountDelegate(mainClient, oracleSigner, mainSigner); err != nil {
 		log.Fatal(err)
 	}
 
 	// check collect faucet tx
-	if err := testCollectFaucet(mainClient, mainSigner, otherSigner); err != nil {
+	if err := testCollectFaucet(mainClient, oracleSigner, mainSigner); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -1211,40 +1218,32 @@ func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys
 }
 
 func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signer2 *ethereum.SignKeys) error {
-	// get current tx cost
+	// get current tx costs
 	txCost, err := mainClient.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
 	if err != nil {
 		return err
 	}
 	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO, txCost)
+	txCost, err = mainClient.GetTransactionCost(models.TxType_COLLECT_FAUCET)
+	if err != nil {
+		return err
+	}
+	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_COLLECT_FAUCET, txCost)
 
-	// create account without faucet package
-	if err := mainClient.CreateOrSetAccount(signer,
+	// create account with faucet package
+	faucetPkg, err := mainClient.GenerateFaucetPackage(signer, signer2.Address(), 5000, rand.Uint64())
+	if err != nil {
+		return fmt.Errorf("cannot generate faucet package %v", err)
+	}
+	if err := mainClient.CreateOrSetAccount(signer2,
 		common.Address{},
 		"ipfs://",
 		0,
-		nil); err != nil {
+		faucetPkg); err != nil {
 		return fmt.Errorf("cannot create account: %v", err)
 	}
 	// get current block
 	h, err := mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
-	mainClient.WaitUntilBlock(h + 2)
-	// mint tokens for the created account
-	treasurerAcc, err := mainClient.GetTreasurer()
-	if err != nil {
-		return fmt.Errorf("cannot get treasurer %v", err)
-	}
-
-	// mint tokens to signer
-	if err := mainClient.MintTokens(treasurer, signer.Address(), treasurerAcc.Nonce, 1000000); err != nil {
-		return fmt.Errorf("cannot mint tokens for account %s: %v", signer.Address(), err)
-	}
-	log.Infof("minted 10000 tokens to %s", signer.Address())
-	// get current block
-	h, err = mainClient.GetCurrentBlock()
 	if err != nil {
 		return fmt.Errorf("cannot get current height")
 	}
@@ -1257,7 +1256,12 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	if acc == nil {
 		return vochain.ErrAccountNotExist
 	}
+	// check balance added from payload
+	if acc.Balance != 5000 {
+		return fmt.Errorf("expected balance for account %s is %d but got %d", signer2.Address(), 5000, acc.Balance)
+	}
 	log.Infof("account %s succesfully created: %+v", signer.Address(), acc)
+
 	// try set own account info
 	if err := mainClient.CreateOrSetAccount(signer,
 		common.Address{},
@@ -1271,6 +1275,7 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 		return fmt.Errorf("cannot get current height")
 	}
 	mainClient.WaitUntilBlock(h + 2)
+
 	// check account info changed
 	acc, err = mainClient.GetAccount(signer.Address())
 	if err != nil {
@@ -1283,36 +1288,6 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 		return fmt.Errorf("expected account infoURI to be %s got %s", "ipfs://XXX", acc.InfoURI)
 	}
 	log.Infof("account %s infoURI succesfully changed to %+v", signer.Address(), acc.InfoURI)
-	// create account with faucet package
-	faucetPkg, err := mainClient.GenerateFaucetPackage(signer, signer2.Address(), 5000, rand.Uint64())
-	if err != nil {
-		return fmt.Errorf("cannot generate faucet package %v", err)
-	}
-	if err := mainClient.CreateOrSetAccount(signer2,
-		common.Address{},
-		"ipfs://",
-		0,
-		faucetPkg); err != nil {
-		return fmt.Errorf("cannot create account: %v", err)
-	}
-	h, err = mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
-	mainClient.WaitUntilBlock(h + 2)
-	// check account created
-	acc2, err := mainClient.GetAccount(signer2.Address())
-	if err != nil {
-		return err
-	}
-	if acc2 == nil {
-		return vochain.ErrAccountNotExist
-	}
-	// check balance added from payload
-	if acc2.Balance != 5000 {
-		return fmt.Errorf("expected balance for account %s is %d but got %d", signer2.Address(), 5000, acc2.Balance)
-	}
-	log.Infof("account %s (%+v) succesfully created with payload signed by %s", signer2.Address(), acc2, signer.Address())
 	return nil
 }
 
@@ -1518,7 +1493,7 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 	return nil
 }
 
-func testVocli(url, treasurerPrivKey string) {
+func testVocli(url, treasurerPrivKey, oraclePrivateKey string) {
 	vocli.SetupLogPackage = false
 	var executeCommand = func(root *cobra.Command, args []string, input string, verbose bool) (*cobra.Command, string, string, error) {
 		// setup stdout/stderr redirection.
@@ -1567,30 +1542,16 @@ func testVocli(url, treasurerPrivKey string) {
 		// 50% of the time the SetAccountInfoTx doesn't get mined even in 2, 3x the block period
 		// so keep polling until we finally confirm the account has been created
 		for i := 1; i < 20; i++ {
+			log.Infof("fetching account info for %s", address)
 			_, stout, _, err := executeCommand(vocli.RootCmd, append([]string{"account", "info", address}, stdArgs...), "", false)
 			if err == nil {
 				return stout, nil
+			} else {
+				log.Infof("%s", err)
 			}
 			time.Sleep(time.Second * 10)
 		}
 		return "", fmt.Errorf("cannot ensure account was mined after 20 attempts")
-	}
-	var generateKeyAndReturnAddress = func(url string, stdArgs []string) (address, keyPath string, err error) {
-		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "new", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", false)
-		if err != nil {
-			return
-		}
-		address, keyPath = parseImportOutput(stdout)
-		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", keyPath, "ipfs://", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", false)
-		if err != nil {
-			return
-		}
-		out, err := ensureSetAccountInfoMined(address, stdArgs)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Infof("account %s fetched: %s", address, out)
-		return
 	}
 
 	dir, err := ioutil.TempDir("", "testvoclihome")
@@ -1614,6 +1575,20 @@ func testVocli(url, treasurerPrivKey string) {
 	}
 	log.Infof("alice key path: %s", aliceKeyPath)
 
+	if err := ioutil.WriteFile(path.Join(dir, "oraclePrivateKey"), []byte(oraclePrivateKey), 0700); err != nil {
+		log.Fatal(err)
+	}
+	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"keys", "import", path.Join(dir, "/oraclePrivateKey")}, stdArgs...), "", true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	oracle, oracleKeyPath := parseImportOutput(stdout)
+	if !strings.Contains(stdout, dir) {
+		log.Fatalf("vocli import should report that the imported key was stored in directory %s", dir)
+	}
+	log.Infof("oracle key path: %s", oracleKeyPath)
+
 	log.Info("vocli keys list")
 	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"keys", "list"}, stdArgs...), "", true)
 	if err != nil {
@@ -1624,13 +1599,35 @@ func testVocli(url, treasurerPrivKey string) {
 	}
 	log.Infof("key list: %s", stdout)
 
-	log.Info("vocli account set alice")
-	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", aliceKeyPath, "ipfs://aliceinwonderland"}, stdArgs...), "", true)
+	var generateKeyAndReturnAddress = func(url string, stdArgs []string) (address, keyPath string, err error) {
+		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "new", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", false)
+		if err != nil {
+			return
+		}
+		address, keyPath = parseImportOutput(stdout)
+		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"genfaucet", oracleKeyPath, address, "800"}, stdArgs...), "", true) // leave plenty of spare coins for differing txCosts
+		if err != nil {
+			log.Fatal(err)
+		}
+		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", keyPath, "ipfs://", fmt.Sprintf("-u=%s", url), strings.TrimSpace(stdout)}, stdArgs...), "", false)
+		if err != nil {
+			return
+		}
+		out, err := ensureSetAccountInfoMined(address, stdArgs)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Infof("account %s fetched: %s", address, out)
+		return
+	}
+
+	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"genfaucet", oracleKeyPath, alice, "800"}, stdArgs...), "", true) // leave plenty of spare coins for differing txCosts
 	if err != nil {
 		log.Fatal(err)
 	}
-	if !strings.Contains(stdout, fmt.Sprintf("created/updated on chain %s", url)) {
-		log.Fatalf("stdout should mention that alice's account was created on the chain, but instead: %s", stdout)
+	_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", aliceKeyPath, "ipfs://", strings.TrimSpace(stdout)}, stdArgs...), "", true)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	out, err := ensureSetAccountInfoMined(alice, stdArgs)
@@ -1638,6 +1635,20 @@ func testVocli(url, treasurerPrivKey string) {
 		log.Fatal(err)
 	}
 	log.Infof("account %s fetched: %s", alice, out)
+	out, err = ensureSetAccountInfoMined(oracle, stdArgs)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Infof("account %s fetched: %s", oracle, out)
+
+	log.Info("vocli account set alice")
+	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", aliceKeyPath, "ipfs://aliceinwonderland", ""}, stdArgs...), "", true)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !strings.Contains(stdout, fmt.Sprintf("created/updated on chain %s", url)) {
+		log.Fatalf("stdout should mention that alice's account was created on the chain, but instead: %s", stdout)
+	}
 
 	log.Info("vocli account mint alice (this lets one reuse node states across test runs, because subsequent SetAccountInfoTxs are not free")
 	_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"mint", aliceKeyPath, alice, "1000"}, stdArgs...), "", true)
