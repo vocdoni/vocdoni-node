@@ -131,7 +131,8 @@ vocli() {
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=vocli \
-		  --treasurerKey=$TREASURER_KEY
+		  --treasurerKey=$TREASURER_KEY \
+		  --oracleKey=$ORACLE_KEY
 }
 
 ### end tests definition
