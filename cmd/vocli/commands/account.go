@@ -27,17 +27,15 @@ var accInfoCmd = &cobra.Command{
 }
 
 var accSetInfoCmd = &cobra.Command{
-	Use:   "set <keystore, ipfs://info-URI>",
-	Short: "Create/Update an account on the vochain",
-	Args:  cobra.ExactArgs(2),
+	Use:   "set <keystore, ipfs://info-URI, faucetPackage>",
+	Short: "Create/Update an account on the vochain, if create a valid faucet package must be provided",
+	Args:  cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key, _, err := openKeyfile(args[0], "Please unlock your key: ")
 		if err != nil {
 			return err
 		}
-		infoUri := args[1]
-
-		if err := createAccount(key, v.GetString(urlKey), infoUri, faucetHex); err != nil {
+		if err := createAccount(key, v.GetString(urlKey), args[1], args[2]); err != nil {
 			return err
 		}
 		return nil
