@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
@@ -33,6 +34,7 @@ type URLAPI struct {
 	//lint:ignore U1000 unused
 	metricsagent *metrics.Agent
 	vocinfo      *vochaininfo.VochainInfo
+	censusMap    sync.Map
 
 	db db.Database
 }
@@ -106,6 +108,11 @@ func (u *URLAPI) EnableHandlers(handlers ...string) error {
 				return fmt.Errorf("missing modules attached for enabling account handler")
 			}
 			u.enableAccountHandlers()
+		case CensusHandler:
+			if u.storage == nil {
+				return fmt.Errorf("missing modules attached for enabling census handler")
+			}
+			u.enableCensusHandlers()
 		default:
 			return fmt.Errorf("handler unknown %s", h)
 		}

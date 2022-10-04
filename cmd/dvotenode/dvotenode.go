@@ -658,6 +658,7 @@ func main() {
 				urlapi.ChainHandler,
 				urlapi.WalletHandler,
 				urlapi.AccountHandler,
+				urlapi.CensusHandler,
 			); err != nil {
 				log.Fatal(err)
 			}

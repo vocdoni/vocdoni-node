@@ -72,6 +72,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
 
+	tr.Publish()
 	var stx models.SignedTx
 	var proof []byte
 	vp := []byte("[1,2,3,4]")

@@ -35,45 +35,18 @@ type ElectionSummary struct {
 
 type Election struct {
 	ElectionSummary
-	ElectionCount uint32       `json:"electionCount"`
-	Census        *Census      `json:"census,omitempty"`
-	MetadataURL   string       `json:"metadataURL"`
-	CreationTime  time.Time    `json:"creationTime"`
-	PublicKeys    []Key        `json:"publicKeys,omitempty"`
-	PrivateKeys   []Key        `json:"privateKeys,omitempty"`
-	VoteMode      VoteMode     `json:"voteMode,omitempty"`
-	ElectionMode  ElectionMode `json:"electionMode,omitempty"`
-	TallyMode     TallyMode    `json:"tallyMode,omitempty"`
+	ElectionCount uint32          `json:"electionCount"`
+	Census        *ElectionCensus `json:"census,omitempty"`
+	MetadataURL   string          `json:"metadataURL"`
+	CreationTime  time.Time       `json:"creationTime"`
+	PublicKeys    []Key           `json:"publicKeys,omitempty"`
+	PrivateKeys   []Key           `json:"privateKeys,omitempty"`
+	VoteMode      VoteMode        `json:"voteMode,omitempty"`
+	ElectionMode  ElectionMode    `json:"electionMode,omitempty"`
+	TallyMode     TallyMode       `json:"tallyMode,omitempty"`
 }
 
-type VoteMode struct {
-	*models.EnvelopeType
-}
-
-func (v VoteMode) MarshalJSON() ([]byte, error) {
-	m := protojson.MarshalOptions{EmitUnpopulated: true, UseEnumNumbers: false}
-	return m.Marshal(&v)
-}
-
-type ElectionMode struct {
-	*models.ProcessMode
-}
-
-func (e ElectionMode) MarshalJSON() ([]byte, error) {
-	m := protojson.MarshalOptions{EmitUnpopulated: true, UseEnumNumbers: false}
-	return m.Marshal(&e)
-}
-
-type TallyMode struct {
-	*models.ProcessVoteOptions
-}
-
-func (t TallyMode) MarshalJSON() ([]byte, error) {
-	m := protojson.MarshalOptions{EmitUnpopulated: true, UseEnumNumbers: false}
-	return m.Marshal(&t)
-}
-
-type Census struct {
+type ElectionCensus struct {
 	CensusOrigin           string         `json:"censusOrigin"`
 	CensusRoot             types.HexBytes `json:"censusRoot"`
 	PostRegisterCensusRoot types.HexBytes `json:"postRegisterCensusRoot"`
@@ -161,4 +134,52 @@ type Account struct {
 	Account *vochain.Account `json:"account,omitempty"`
 	Balance *uint64          `json:"balance,omitempty"`
 	Token   *uuid.UUID       `json:"token,omitempty"`
+}
+
+type Census struct {
+	CensusID types.HexBytes `json:"censusID,omitempty"`
+	Root     types.HexBytes `json:"root,omitempty"`
+	Weight   *types.BigInt  `json:"weight,omitempty"`
+	Key      types.HexBytes `json:"key,omitempty"`
+	Proof    types.HexBytes `json:"proof,omitempty"`
+	Value    types.HexBytes `json:"value,omitempty"`
+	Size     uint64         `json:"size,omitempty"`
+	Valid    bool           `json:"valid,omitempty"`
+	URI      string         `json:"uri,omitempty"`
+}
+
+type CensusDump struct {
+	Type     models.Census_Type `json:"type"`
+	RootHash []byte             `json:"rootHash"`
+	Data     []byte             `json:"data"`
+	Indexed  bool               `json:"indexed"`
+}
+
+// Protobuf wrappers
+
+type VoteMode struct {
+	*models.EnvelopeType
+}
+
+func (v VoteMode) MarshalJSON() ([]byte, error) {
+	m := protojson.MarshalOptions{EmitUnpopulated: true, UseEnumNumbers: false}
+	return m.Marshal(&v)
+}
+
+type ElectionMode struct {
+	*models.ProcessMode
+}
+
+func (e ElectionMode) MarshalJSON() ([]byte, error) {
+	m := protojson.MarshalOptions{EmitUnpopulated: true, UseEnumNumbers: false}
+	return m.Marshal(&e)
+}
+
+type TallyMode struct {
+	*models.ProcessVoteOptions
+}
+
+func (t TallyMode) MarshalJSON() ([]byte, error) {
+	m := protojson.MarshalOptions{EmitUnpopulated: true, UseEnumNumbers: false}
+	return m.Marshal(&t)
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/log"
@@ -61,7 +62,7 @@ func (u *URLAPI) enableElectionHandlers() error {
 	}
 
 	if err := u.api.RegisterMethod(
-		"/election/{electionID}/count",
+		"/election/count/{organizationID}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
 		u.electionCountHandler,
@@ -187,7 +188,7 @@ func (u *URLAPI) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 		VoteMode:      VoteMode{EnvelopeType: proc.Envelope},
 		ElectionMode:  ElectionMode{ProcessMode: proc.Mode},
 		TallyMode:     TallyMode{ProcessVoteOptions: proc.VoteOpts},
-		Census: &Census{
+		Census: &ElectionCensus{
 			CensusOrigin:           models.CensusOrigin_name[proc.CensusOrigin],
 			CensusRoot:             proc.CensusRoot,
 			PostRegisterCensusRoot: proc.RollingCensusRoot,
@@ -214,16 +215,23 @@ func (u *URLAPI) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
 
-// /election/<organizationID>/count
+// /election/count/<organizationID>
 func (u *URLAPI) electionCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
 		return fmt.Errorf("organizationID (%q) cannot be decoded", ctx.URLParam("organizationID"))
 	}
-	count := u.scrutinizer.ProcessCount(organizationID)
-
+	acc, err := u.vocapp.State.GetAccount(common.BytesToAddress(organizationID), true)
+	if acc == nil {
+		return fmt.Errorf("organization not found")
+	}
+	if err != nil {
+		return err
+	}
 	data, err := json.Marshal(
-		struct{ Count uint64 }{Count: count},
+		struct {
+			Count uint32 `json:"count"`
+		}{Count: acc.GetProcessIndex()},
 	)
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)

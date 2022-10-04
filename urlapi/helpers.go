@@ -1,9 +1,19 @@
 package urlapi
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"path"
 	"strings"
+	"testing"
+	"time"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -65,4 +75,45 @@ func censusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 		return 0, nil, fmt.Errorf("census root is not correctyl specified")
 	}
 	return origin, root, nil
+}
+
+type testHTTPclient struct {
+	c     *http.Client
+	token *uuid.UUID
+	addr  *url.URL
+	t     *testing.T
+}
+
+func (c *testHTTPclient) request(method string, body []byte, urlPath ...string) ([]byte, int) {
+	u, err := url.Parse(c.addr.String())
+	qt.Assert(c.t, err, qt.IsNil)
+	u.Path = path.Join(u.Path, path.Join(urlPath...))
+	headers := http.Header{}
+	if c.token != nil {
+		headers = http.Header{"Authorization": []string{"Bearer " + c.token.String()}}
+	}
+	resp, err := c.c.Do(&http.Request{
+		Method: method,
+		URL:    u,
+		Header: headers,
+		Body:   io.NopCloser(bytes.NewBuffer(body)),
+	})
+	qt.Assert(c.t, err, qt.IsNil)
+	data, err := ioutil.ReadAll(resp.Body)
+	qt.Assert(c.t, err, qt.IsNil)
+	return data, resp.StatusCode
+}
+
+func newTestHTTPclient(t *testing.T, addr *url.URL, bearerToken *uuid.UUID) *testHTTPclient {
+	tr := &http.Transport{
+		MaxIdleConns:       10,
+		IdleConnTimeout:    5 * time.Second,
+		DisableCompression: false,
+	}
+	return &testHTTPclient{
+		c:     &http.Client{Transport: tr, Timeout: time.Second * 8},
+		token: bearerToken,
+		addr:  addr,
+		t:     t,
+	}
 }
