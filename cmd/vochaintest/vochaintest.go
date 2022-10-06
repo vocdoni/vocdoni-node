@@ -1,3 +1,4 @@
+//nolint:lll
 package main
 
 import (
@@ -40,8 +41,22 @@ var ops = map[string]bool{
 	"initaccounts":      true,
 }
 
-var addressRegexp = regexp.MustCompile("Public address of the key:.*")
-var pathRegexp = regexp.MustCompile("Path of the secret key file:.*")
+var (
+	addressRegexp = regexp.MustCompile("Public address of the key:.*")
+	pathRegexp    = regexp.MustCompile("Path of the secret key file:.*")
+)
+
+// how many times to retry flaky transactions
+// * amount of blocks to wait for a transaction to be mined before giving up
+// * how many times to retry opening a connection to an endpoint before giving up
+const retries = 10
+
+// testClient is a *client.Client but with additional methods
+// that are useful only in tests,
+// like waitUntilAccountExists or ensureProcessCreated
+type testClient struct {
+	*client.Client
+}
 
 func opsAvailable() (opsav []string) {
 	for k := range ops {
@@ -192,6 +207,20 @@ func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
 	return skey, nil
 }
 
+// newTestClient will open a connection to addr.
+// If it fails, it will retry 10 times (with 1s interval)
+// before giving up
+func newTestClient(addr string) (*testClient, error) {
+	for tries := retries; tries > 0; tries-- {
+		c, err := client.New(addr)
+		if err == nil {
+			return &testClient{c}, nil
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return nil, fmt.Errorf("couldn't connect to gateway, tried %d times", retries)
+}
+
 func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath string, withWeight uint64) {
 	cl, err := client.New(host)
 	if err != nil {
@@ -222,17 +251,8 @@ func censusGenerate(host string, signer *ethereum.SignKeys, size int, filepath s
 }
 
 func censusImport(host string, signer *ethereum.SignKeys) {
-	var cl *client.Client
-	var err error
-
 	// Connect
-	for tries := 10; tries > 0; tries-- {
-		cl, err = client.New(host)
-		if err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
+	cl, err := newTestClient(host)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -265,16 +285,43 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 	log.Infof("Census created and published\nRoot: %x\nURI: %s", root, uri)
 }
 
-func waitUntilNextBlock(mainClient *client.Client) error {
-	h, err := mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height: %w", err)
+func (c *testClient) ensureTxCostEquals(signer *ethereum.SignKeys, txType models.TxType, cost uint64) error {
+	for i := 0; i < retries; i++ {
+		// if cost equals expected, we're done
+		newTxCost, err := c.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
+		if err != nil {
+			log.Warn(err)
+		}
+		if newTxCost == cost {
+			return nil
+		}
+
+		// else, try to set
+		treasurerAccount, err := c.GetTreasurer()
+		if err != nil {
+			return fmt.Errorf("cannot get treasurer: %w", err)
+		}
+
+		log.Infof("will set %s txcost=%d (treasurer nonce: %d)", txType, cost, treasurerAccount.Nonce)
+		txhash, err := c.SetTransactionCost(
+			signer,
+			txType,
+			cost,
+			treasurerAccount.Nonce)
+		if err != nil {
+			log.Warn(err)
+			time.Sleep(time.Second)
+			continue
+		}
+		err = c.WaitUntilTxMined(txhash)
+		if err != nil {
+			log.Warn(err)
+		}
 	}
-	mainClient.WaitUntilBlock(h + 1)
-	return nil
+	return fmt.Errorf("tried to set %s txcost=%d but failed %d times", txType, cost, retries)
 }
 
-func ensureProcessCreated(mainClient *client.Client,
+func (c *testClient) ensureProcessCreated(
 	signer *ethereum.SignKeys,
 	entityID common.Address,
 	censusRoot []byte,
@@ -285,9 +332,9 @@ func ensureProcessCreated(mainClient *client.Client,
 	startBlockIncrement int,
 	duration int,
 	maxCensusSize uint64,
-	retries int) (uint32, []byte, error) {
+) (uint32, []byte, error) {
 	for i := 0; i < retries; i++ {
-		start, pid, err := mainClient.CreateProcess(
+		start, pid, err := c.CreateProcess(
 			signer,
 			entityID.Bytes(),
 			censusRoot,
@@ -299,40 +346,46 @@ func ensureProcessCreated(mainClient *client.Client,
 			duration,
 			maxCensusSize)
 		if err != nil {
-			time.Sleep(time.Second * 8)
+			log.Warnf("CreateProcess: %v", err)
+			c.WaitUntilNextBlock()
 			continue
 		}
-		waitUntilNextBlock(mainClient)
-		p, err := mainClient.GetProcessInfo(pid)
+
+		p, err := c.WaitUntilProcessAvailable(pid)
 		if err != nil {
-			log.Infof("ensureProcessCreated: process %x not yet available ... (%s)", pid, err)
+			log.Infof("ensureProcessCreated: process %x not yet available: %s", pid, err)
+			continue
 		}
-		if p != nil {
-			log.Infof("ensureProcessCreated: got process %x info %+v", pid, p)
-			return start, pid, nil
-		}
+		log.Infof("ensureProcessCreated: got process %x info %+v", pid, p)
+		return start, pid, nil
 	}
-	return 0, nil, fmt.Errorf("ensureProcessCreated: process may not be created after %d blocks", retries)
+	return 0, nil, fmt.Errorf("ensureProcessCreated: process could not be created after %d retries", retries)
 }
 
-func ensureProcessEnded(mainClient *client.Client, signer *ethereum.SignKeys, processID types.ProcessID, retries int) error {
+func (c *testClient) ensureProcessEnded(signer *ethereum.SignKeys, processID types.ProcessID) error {
 	for i := 0; i <= retries; i++ {
-		_ = mainClient.EndProcess(signer, processID)
-		waitUntilNextBlock(mainClient)
-		p, err := mainClient.GetProcessInfo(processID)
+		p, err := c.GetProcessInfo(processID)
 		if err != nil {
 			log.Warnf("ensureProcessEnded: cannot force end process: cannot get process %x info: %s", processID, err.Error())
+			c.WaitUntilNextBlock()
+			continue
 		}
 		log.Infof("ensureProcessEnded: got process %x info %+v", processID, p)
-		if p != nil && p.Status == int32(models.ProcessStatus_ENDED) || p.Status == int32(models.ProcessStatus_RESULTS) {
+		if p != nil && (p.Status == int32(models.ProcessStatus_ENDED) || p.Status == int32(models.ProcessStatus_RESULTS)) {
 			return nil
 		}
-		if i == retries { // that was the last chance, break and fail immediately
-			break
+
+		err = c.EndProcess(signer, processID)
+		if err != nil {
+			log.Warnf("EndProcess(%x): %v", processID, err)
+			c.WaitUntilNextBlock()
+			continue
 		}
+		c.WaitUntilNextBlock()
 	}
-	return fmt.Errorf("ensureProcessEnded: process may not be ended after %d blocks", retries)
+	return fmt.Errorf("ensureProcessEnded: process could not be ended after %d retries", retries)
 }
+
 func initAccounts(treasurer, oracle string, accountKeys []*ethereum.SignKeys, host string) error {
 	var err error
 	treasurerSigner, err := privKeyToSigner(treasurer)
@@ -345,37 +398,28 @@ func initAccounts(treasurer, oracle string, accountKeys []*ethereum.SignKeys, ho
 	}
 	log.Infof("connecting to main gateway %s", host)
 	// connecting to endpoint
-	var mainClient *client.Client
-	for tries := 10; tries > 0; tries-- {
-		mainClient, err = client.New(host)
-		if err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
+	c, err := newTestClient(host)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer mainClient.Close()
+	defer func() { _ = c.Close() }()
 
-	retries := 10
 	// create and top up accounts
-	if err := ensureAccountExists(mainClient, oracleSigner, retries); err != nil {
+	if err := c.ensureAccountExists(oracleSigner, nil); err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("created oracle account with address %s", oracleSigner.Address())
-	if err := ensureAccountHasTokens(mainClient, treasurerSigner, oracleSigner.Address(), 100000, retries); err != nil {
+	if err := c.ensureAccountHasTokens(treasurerSigner, oracleSigner.Address(), 100000); err != nil {
 		return fmt.Errorf("cannot mint tokens for account %s with treasurer %s: %w", oracleSigner.Address(), treasurerSigner.Address(), err)
 	}
 	log.Infof("minted 100000 tokens to oracle")
 
 	for _, k := range accountKeys {
-		waitUntilNextBlock(mainClient)
-		if err := ensureAccountExists(mainClient, k, retries); err != nil {
+		if err := c.ensureAccountExists(k, nil); err != nil {
 			return fmt.Errorf("cannot check if account exists: %w", err)
 		}
 		log.Infof("created entity key account with addresses: %s", k.Address())
-		if err := ensureAccountHasTokens(mainClient, treasurerSigner, k.Address(), 100000, retries); err != nil {
+		if err := c.ensureAccountHasTokens(treasurerSigner, k.Address(), 100000); err != nil {
 			return fmt.Errorf("cannot mint tokens for account %s with treasurer %s: %w", k.Address(), treasurerSigner.Address(), err)
 		}
 		log.Infof("minted 100000 tokens to account %s", k.Address())
@@ -383,47 +427,84 @@ func initAccounts(treasurer, oracle string, accountKeys []*ethereum.SignKeys, ho
 	return nil
 }
 
-func ensureAccountExists(mainClient *client.Client, account *ethereum.SignKeys, retries int) error {
+func (c *testClient) ensureAccountInfoEquals(account *ethereum.SignKeys, infoURI string) error {
 	for i := 0; i < retries; i++ {
-		// if account exists, we're done
-		if acct, _ := mainClient.GetAccount(account.Address()); acct != nil {
+		// if account InfoURI is as expected, we're done
+		acct, err := c.GetAccount(account.Address())
+		if err != nil {
+			log.Debugf("GetAccount try %d: %v", i, err)
+		}
+		if acct != nil && acct.InfoURI == infoURI {
 			return nil
 		}
 
-		if err := mainClient.CreateOrSetAccount(account, common.Address{}, "ipfs://", 0, nil); err != nil {
+		// else, set it
+		// CreateOrSetAccount can return OK and then the tx be rejected anyway later.
+		// So, don't panic on errors, we only care about GetAccount in the next loop
+		err = c.CreateOrSetAccount(account, common.Address{}, infoURI, acct.Nonce, nil)
+		if err != nil {
+			log.Debugf("CreateOrSetAccount try %d: %v", i, err)
+		}
+
+		c.WaitUntilNextBlock()
+	}
+	return fmt.Errorf("tried to set account %s InfoURI=%s, yet didn't happen after %d blocks", account.Address(), infoURI, retries)
+}
+
+func (c *testClient) ensureAccountExists(account *ethereum.SignKeys, faucetPkg *models.FaucetPackage) error {
+	for i := 0; i < retries; i++ {
+		acct, err := c.GetAccount(account.Address())
+		if err != nil {
+			log.Debugf("GetAccount try %d: %v", i, err)
+		}
+		// if account exists, we're done
+		if acct != nil {
+			return nil
+		}
+
+		err = c.CreateOrSetAccount(account, common.Address{}, "ipfs://", 0, faucetPkg)
+		if err != nil {
 			if strings.Contains(err.Error(), "tx already exists in cache") {
 				// don't worry then, someone else created it in a race, nevermind, job done.
 			} else {
 				return fmt.Errorf("cannot create account %s: %w", account.Address(), err)
 			}
 		}
-		waitUntilNextBlock(mainClient)
+
+		c.WaitUntilNextBlock()
 	}
 	return fmt.Errorf("cannot create account %s after %d retries", account.Address(), retries)
 }
 
-func ensureAccountHasTokens(mainClient *client.Client,
+func (c *testClient) ensureAccountHasTokens(
 	treasurer *ethereum.SignKeys,
 	accountAddr common.Address,
 	amount uint64,
-	retries int) error {
+) error {
 	for i := 0; i < retries; i++ {
+		acct, err := c.GetAccount(accountAddr)
+		if err != nil {
+			log.Debugf("GetAccount try %d: %v", i, err)
+		}
 		// if balance is enough, we're done
-		if acct, _ := mainClient.GetAccount(accountAddr); acct != nil && acct.Balance > 1000 {
+		if acct != nil && acct.Balance >= amount {
 			return nil
 		}
 
 		// else, try to mint with treasurer
-		treasurerAccount, err := mainClient.GetTreasurer()
+		treasurerAccount, err := c.GetTreasurer()
 		if err != nil {
 			return fmt.Errorf("cannot get treasurer: %w", err)
 		}
 
 		// MintTokens can return OK and then the tx be rejected anyway later.
-		// So, ignore errors, we only care that accountHasTokens in the end
-		_ = mainClient.MintTokens(treasurer, accountAddr, treasurerAccount.GetNonce(), 100000)
+		// So, don't panic on errors, we only care about acct.Balance in the end
+		err = c.MintTokens(treasurer, accountAddr, treasurerAccount.GetNonce(), amount)
+		if err != nil {
+			log.Debugf("MintTokens try %d: %v", i, err)
+		}
 
-		waitUntilNextBlock(mainClient)
+		c.WaitUntilNextBlock()
 	}
 	return fmt.Errorf("tried to mint %d times, yet balance still not enough", retries)
 }
@@ -438,8 +519,8 @@ func mkTreeVoteTest(host string,
 	gateways []string,
 	keysfile string,
 	useLastCensus bool,
-	forceGatewaysGotCensus bool) {
-
+	forceGatewaysGotCensus bool,
+) {
 	var censusKeys []*ethereum.SignKeys
 	var proofs []*client.Proof
 	var err error
@@ -465,26 +546,17 @@ func mkTreeVoteTest(host string,
 
 	log.Infof("connecting to main gateway %s", host)
 	// Add the first connection, this will be the main connection
-	var mainClient *client.Client
-	var clients []*client.Client
+	var clients []*testClient
 
-	for tries := 10; tries > 0; tries-- {
-		mainClient, err = client.New(host)
-		if err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
+	mainClient, err := newTestClient(host)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer mainClient.Close()
 
 	// Create process
-	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, pid, err := ensureProcessCreated(
-		mainClient,
+	start, pid, err := mainClient.ensureProcessCreated(
 		entityKey,
 		entityKey.Address(),
 		censusRoot,
@@ -495,7 +567,6 @@ func mkTreeVoteTest(host string,
 		0,
 		procDuration,
 		uint64(electionSize),
-		5,
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -506,7 +577,7 @@ func mkTreeVoteTest(host string,
 
 	for i := 0; i < parallelCons; i++ {
 		log.Infof("opening gateway connection to %s", gwList[i%len(gwList)])
-		cl, err := client.New(gwList[i%len(gwList)])
+		cl, err := newTestClient(gwList[i%len(gwList)])
 		if err != nil {
 			log.Warn(err)
 			continue
@@ -624,7 +695,7 @@ func mkTreeVoteTest(host string,
 	}
 
 	log.Infof("ending process in order to fetch the results")
-	if err := ensureProcessEnded(mainClient, entityKey, pid, 5); err != nil {
+	if err := mainClient.ensureProcessEnded(entityKey, pid); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)
@@ -652,7 +723,8 @@ func mkTreeAnonVoteTest(host string,
 	gateways []string,
 	keysfile string,
 	useLastCensus bool,
-	forceGatewaysGotCensus bool) {
+	forceGatewaysGotCensus bool,
+) {
 	// log.Init("debug", "stdout")
 
 	var censusKeys []*ethereum.SignKeys
@@ -680,16 +752,8 @@ func mkTreeAnonVoteTest(host string,
 
 	log.Infof("connecting to main gateway %s", host)
 	// Add the first connection, this will be the main connection
-	var mainClient *client.Client
-	var clients []*client.Client
-
-	for tries := 10; tries > 0; tries-- {
-		mainClient, err = client.New(host)
-		if err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
+	var clients []*testClient
+	mainClient, err := newTestClient(host)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -697,8 +761,7 @@ func mkTreeAnonVoteTest(host string,
 
 	// Create process
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, pid, err := ensureProcessCreated(
-		mainClient,
+	start, pid, err := mainClient.ensureProcessCreated(
 		entityKey,
 		entityKey.Address(),
 		censusRoot,
@@ -709,7 +772,6 @@ func mkTreeAnonVoteTest(host string,
 		7,
 		procDuration,
 		uint64(electionSize),
-		5,
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -720,7 +782,7 @@ func mkTreeAnonVoteTest(host string,
 
 	for i := 0; i < parallelCons; i++ {
 		log.Infof("opening gateway connection to %s", gwList[i%len(gwList)])
-		cl, err := client.New(gwList[i%len(gwList)])
+		cl, err := newTestClient(gwList[i%len(gwList)])
 		if err != nil {
 			log.Warn(err)
 			continue
@@ -839,11 +901,11 @@ func mkTreeAnonVoteTest(host string,
 	// End of pre-registration.  Now we do the voting step with a SNARK
 	//
 
-	proc, err := mainClient.GetProcessInfo(pid)
+	proc, err := mainClient.WaitUntilProcessAvailable(pid)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("Process: %+v\n", proc)
+	log.Infof("Process: %+v", proc)
 	rollingCensusRoot := proc.RollingCensusRoot
 
 	// Send votes
@@ -917,7 +979,7 @@ func mkTreeAnonVoteTest(host string,
 
 	log.Infof("ending process in order to fetch the results")
 	// also checks oracle permissions
-	if err := ensureProcessEnded(mainClient, entityKey, pid, 5); err != nil {
+	if err := mainClient.ensureProcessEnded(entityKey, pid); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)
@@ -960,26 +1022,17 @@ func cspVoteTest(
 
 	log.Infof("connecting to main gateway %s", host)
 	// Add the first connection, this will be the main connection
-	var mainClient *client.Client
-	var clients []*client.Client
+	var clients []*testClient
 
-	for tries := 10; tries > 0; tries-- {
-		mainClient, err = client.New(host)
-		if err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
+	mainClient, err := newTestClient(host)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer mainClient.Close()
 
 	// Create process
-	pid := client.Random(32)
 	log.Infof("creating process with entityID: %s", entityKey.AddressString())
-	start, pid, err := ensureProcessCreated(
-		mainClient,
+	start, pid, err := mainClient.ensureProcessCreated(
 		entityKey,
 		entityKey.Address(),
 		cspKey.PublicKey(),
@@ -990,7 +1043,6 @@ func cspVoteTest(
 		0,
 		procDuration,
 		uint64(electionSize),
-		5,
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -1001,7 +1053,7 @@ func cspVoteTest(
 
 	for i := 0; i < parallelCons; i++ {
 		log.Infof("opening gateway connection to %s", gwList[i%len(gwList)])
-		cl, err := client.New(gwList[i%len(gwList)])
+		cl, err := newTestClient(gwList[i%len(gwList)])
 		if err != nil {
 			log.Warn(err)
 			continue
@@ -1012,7 +1064,7 @@ func cspVoteTest(
 
 	for i := 0; i < parallelCons; i++ {
 		log.Infof("opening gateway connection to %s", gwList[i%len(gwList)])
-		cl, err := client.New(gwList[i%len(gwList)])
+		cl, err := newTestClient(gwList[i%len(gwList)])
 		if err != nil {
 			log.Warn(err)
 			continue
@@ -1069,7 +1121,7 @@ func cspVoteTest(
 	wg.Wait()
 
 	log.Infof("ending process in order to fetch the results")
-	if err := ensureProcessEnded(mainClient, entityKey, pid, 5); err != nil {
+	if err := mainClient.ensureProcessEnded(entityKey, pid); err != nil {
 		log.Fatal(err)
 	}
 	maxVotingTime := time.Duration(0)
@@ -1110,169 +1162,106 @@ func testTokenTransactions(
 	}
 
 	log.Infof("connecting to main gateway %s", host)
-	// add the first connection, this will be the main connection
-	var mainClient *client.Client
-
-	for tries := 10; tries > 0; tries-- {
-		mainClient, err = client.New(host)
-		if err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
+	mainClient, err := newTestClient(host)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer mainClient.Close()
 
 	// check set transaction cost
-	if err := testSetTxCost(mainClient, treasurerSigner); err != nil {
+	if err := mainClient.testSetTxCost(treasurerSigner); err != nil {
 		log.Fatal(err)
 	}
 
 	// check create and set account
-	if err := testCreateAndSetAccount(mainClient, treasurerSigner, mainSigner, otherSigner); err != nil {
+	if err := mainClient.testCreateAndSetAccount(treasurerSigner, mainSigner, otherSigner); err != nil {
 		log.Fatal(err)
 	}
 
 	// check send tokens
-	if err := testSendTokens(mainClient, treasurerSigner, mainSigner, otherSigner); err != nil {
+	if err := mainClient.testSendTokens(treasurerSigner, mainSigner, otherSigner); err != nil {
 		log.Fatal(err)
 	}
 
 	// check set account delegate
-	if err := testSetAccountDelegate(mainClient, mainSigner, otherSigner); err != nil {
+	if err := mainClient.testSetAccountDelegate(mainSigner, otherSigner); err != nil {
 		log.Fatal(err)
 	}
 
 	// check collect faucet tx
-	if err := testCollectFaucet(mainClient, mainSigner, otherSigner); err != nil {
+	if err := mainClient.testCollectFaucet(mainSigner, otherSigner); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func testSetTxCost(mainClient *client.Client, treasurerSigner *ethereum.SignKeys) error {
-	// get treasurer
-	treasurer, err := mainClient.GetTreasurer()
+func (c *testClient) testSetTxCost(treasurerSigner *ethereum.SignKeys) error {
+	// get treasurer none
+	treasurer, err := c.GetTreasurer()
 	if err != nil {
 		return err
 	}
 	log.Infof("treasurer fetched %s with nonce %d", common.BytesToAddress(treasurer.Address), treasurer.Nonce)
 
 	// get current tx cost
-	txCost, err := mainClient.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
+	txCost, err := c.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
 	if err != nil {
 		return err
 	}
 	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO, txCost)
 
-	// set tx cost
-	if err := mainClient.SetTransactionCost(treasurerSigner,
-		models.TxType_SET_ACCOUNT_INFO,
-		1000,
-		treasurer.Nonce); err != nil {
-		return fmt.Errorf("cannot set transaction cost: %v", err)
+	// check tx cost changes
+	err = c.ensureTxCostEquals(treasurerSigner, models.TxType_SET_ACCOUNT_INFO, 1000)
+	if err != nil {
+		return err
 	}
+	log.Infof("tx cost of %s changed successfully from %d to %d", models.TxType_SET_ACCOUNT_INFO, txCost, 1000)
 
-	h, err := mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
-	mainClient.WaitUntilBlock(h + 2)
-	// check tx cost changed and treasurer nonce incremented
-	treasurer2, err := mainClient.GetTreasurer()
+	// get new treasurer nonce
+	treasurer2, err := c.GetTreasurer()
 	if err != nil {
 		return err
 	}
-	newTxCost, err := mainClient.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
-	if err != nil {
-		return err
-	}
-	if newTxCost != 1000 {
-		return fmt.Errorf("newProcessTx cost expected to be %d got %d", 1000, newTxCost)
-	}
-	log.Infof("tx cost of %s changed successfully from %d to %d", models.TxType_SET_ACCOUNT_INFO, txCost, newTxCost)
 	log.Infof("treasurer nonce changed successfully from %d to %d", treasurer.Nonce, treasurer2.Nonce)
 
 	// set tx cost back to default
-	if err := mainClient.SetTransactionCost(treasurerSigner,
-		models.TxType_SET_ACCOUNT_INFO,
-		10,
-		treasurer2.Nonce); err != nil {
+	err = c.ensureTxCostEquals(treasurerSigner, models.TxType_SET_ACCOUNT_INFO, 10)
+	if err != nil {
 		return fmt.Errorf("cannot set transaction cost: %v", err)
 	}
 
-	h, err = mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
-	mainClient.WaitUntilBlock(h + 2)
 	return nil
 }
 
-func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signer2 *ethereum.SignKeys) error {
-	// get current tx cost
-	txCost, err := mainClient.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
-	if err != nil {
-		return err
-	}
-	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO, txCost)
-
+func (c *testClient) testCreateAndSetAccount(treasurer, signer, signer2 *ethereum.SignKeys) error {
 	// create account without faucet package
-	if err := mainClient.CreateOrSetAccount(signer,
-		common.Address{},
-		"ipfs://",
-		0,
-		nil); err != nil {
-		return fmt.Errorf("cannot create account: %v", err)
-	}
-	// get current block
-	h, err := mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
-	mainClient.WaitUntilBlock(h + 2)
-	// mint tokens for the created account
-	treasurerAcc, err := mainClient.GetTreasurer()
-	if err != nil {
-		return fmt.Errorf("cannot get treasurer %v", err)
+	if err := c.ensureAccountExists(signer, nil); err != nil {
+		return err
 	}
 
 	// mint tokens to signer
-	if err := mainClient.MintTokens(treasurer, signer.Address(), treasurerAcc.Nonce, 1000000); err != nil {
+	if err := c.ensureAccountHasTokens(treasurer, signer.Address(), 1000000); err != nil {
 		return fmt.Errorf("cannot mint tokens for account %s: %v", signer.Address(), err)
 	}
-	log.Infof("minted 10000 tokens to %s", signer.Address())
-	// get current block
-	h, err = mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
-	mainClient.WaitUntilBlock(h + 2)
+	log.Infof("minted 1000000 tokens to %s", signer.Address())
+
 	// check account created
-	acc, err := mainClient.GetAccount(signer.Address())
+	acc, err := c.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
 	if acc == nil {
 		return vochain.ErrAccountNotExist
 	}
-	log.Infof("account %s succesfully created: %+v", signer.Address(), acc)
-	// try set own account info
-	if err := mainClient.CreateOrSetAccount(signer,
-		common.Address{},
-		"ipfs://XXX",
-		acc.Nonce,
-		nil); err != nil {
-		return fmt.Errorf("cannot set account info: %v", err)
-	}
-	h, err = mainClient.GetCurrentBlock()
+	log.Infof("account %s successfully created: %+v", signer.Address(), acc)
+
+	// now try set own account info
+	err = c.ensureAccountInfoEquals(signer, "ipfs://XXX")
 	if err != nil {
-		return fmt.Errorf("cannot get current height")
+		return err
 	}
-	mainClient.WaitUntilBlock(h + 2)
+
 	// check account info changed
-	acc, err = mainClient.GetAccount(signer.Address())
+	acc, err = c.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1282,26 +1271,20 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	if acc.InfoURI != "ipfs://XXX" {
 		return fmt.Errorf("expected account infoURI to be %s got %s", "ipfs://XXX", acc.InfoURI)
 	}
-	log.Infof("account %s infoURI succesfully changed to %+v", signer.Address(), acc.InfoURI)
+	log.Infof("account %s infoURI successfully changed to %+v", signer.Address(), acc.InfoURI)
+
 	// create account with faucet package
-	faucetPkg, err := mainClient.GenerateFaucetPackage(signer, signer2.Address(), 5000, rand.Uint64())
+	faucetPkg, err := c.GenerateFaucetPackage(signer, signer2.Address(), 5000, rand.Uint64())
 	if err != nil {
 		return fmt.Errorf("cannot generate faucet package %v", err)
 	}
-	if err := mainClient.CreateOrSetAccount(signer2,
-		common.Address{},
-		"ipfs://",
-		0,
-		faucetPkg); err != nil {
-		return fmt.Errorf("cannot create account: %v", err)
+
+	if err := c.ensureAccountExists(signer2, faucetPkg); err != nil {
+		return err
 	}
-	h, err = mainClient.GetCurrentBlock()
-	if err != nil {
-		return fmt.Errorf("cannot get current height")
-	}
-	mainClient.WaitUntilBlock(h + 2)
+
 	// check account created
-	acc2, err := mainClient.GetAccount(signer2.Address())
+	acc2, err := c.GetAccount(signer2.Address())
 	if err != nil {
 		return err
 	}
@@ -1312,17 +1295,17 @@ func testCreateAndSetAccount(mainClient *client.Client, treasurer, signer, signe
 	if acc2.Balance != 5000 {
 		return fmt.Errorf("expected balance for account %s is %d but got %d", signer2.Address(), 5000, acc2.Balance)
 	}
-	log.Infof("account %s (%+v) succesfully created with payload signed by %s", signer2.Address(), acc2, signer.Address())
+	log.Infof("account %s (%+v) successfully created with payload signed by %s", signer2.Address(), acc2, signer.Address())
 	return nil
 }
 
-func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 *ethereum.SignKeys) error {
-	txCost, err := mainClient.GetTransactionCost(models.TxType_SEND_TOKENS)
+func (c *testClient) testSendTokens(treasurerSigner, signer, signer2 *ethereum.SignKeys) error {
+	txCost, err := c.GetTransactionCost(models.TxType_SEND_TOKENS)
 	if err != nil {
 		return err
 	}
 	log.Infof("tx cost of %s is %d", models.TxType_SEND_TOKENS, txCost)
-	acc, err := mainClient.GetAccount(signer.Address())
+	acc, err := c.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1331,29 +1314,31 @@ func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 
 	}
 	log.Infof("fetched from account %s with nonce %d and balance %d", signer.Address(), acc.Nonce, acc.Balance)
 	// try send tokens
-	if err := mainClient.SendTokens(signer,
+	txhash, err := c.SendTokens(signer,
 		signer2.Address(),
 		acc.Nonce,
-		100); err != nil {
-		return fmt.Errorf("cannot set account info: %v", err)
-	}
-	h, err := mainClient.GetCurrentBlock()
+		100)
 	if err != nil {
-		return fmt.Errorf("cannot get current height")
+		return fmt.Errorf("cannot send tokens: %v", err)
 	}
-	mainClient.WaitUntilBlock(h + 2)
-	acc2, err := mainClient.GetAccount(signer2.Address())
+
+	err = c.WaitUntilTxMined(txhash)
+	if err != nil {
+		return err
+	}
+
+	acc2, err := c.GetAccount(signer2.Address())
 	if err != nil {
 		return err
 	}
 	if acc2 == nil {
 		return vochain.ErrAccountNotExist
 	}
-	log.Infof("fetched from account %s with nonce %d and balance %d", signer2.Address(), acc2.Nonce, acc2.Balance)
+	log.Infof("fetched to account %s with nonce %d and balance %d", signer2.Address(), acc2.Nonce, acc2.Balance)
 	if acc2.Balance != 5100 {
 		log.Fatalf("expected %s to have balance %d got %d", signer2.Address(), 5100, acc2.Balance)
 	}
-	acc3, err := mainClient.GetAccount(signer.Address())
+	acc3, err := c.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1370,19 +1355,19 @@ func testSendTokens(mainClient *client.Client, treasurerSigner, signer, signer2 
 	return nil
 }
 
-func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum.SignKeys) error {
-	txCostAdd, err := mainClient.GetTransactionCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
+func (c *testClient) testSetAccountDelegate(signer, signer2 *ethereum.SignKeys) error {
+	txCostAdd, err := c.GetTransactionCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
 	if err != nil {
 		return err
 	}
-	txCostDel, err := mainClient.GetTransactionCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
+	txCostDel, err := c.GetTransactionCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
 	if err != nil {
 		return err
 	}
 	log.Infof("tx cost of %s is %d", models.TxType_ADD_DELEGATE_FOR_ACCOUNT, txCostAdd)
 	log.Infof("tx cost of %s is %d", models.TxType_DEL_DELEGATE_FOR_ACCOUNT, txCostDel)
 
-	acc, err := mainClient.GetAccount(signer.Address())
+	acc, err := c.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1391,18 +1376,20 @@ func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum
 	}
 	log.Infof("fetched from account %s with nonce %d and delegates %v", signer.Address(), acc.Nonce, acc.DelegateAddrs)
 	// add delegate
-	if err := mainClient.SetAccountDelegate(signer,
+	txhash, err := c.SetAccountDelegate(signer,
 		signer2.Address(),
 		true,
-		acc.Nonce); err != nil {
+		acc.Nonce)
+	if err != nil {
 		return fmt.Errorf("cannot set account delegate: %v", err)
 	}
-	h, err := mainClient.GetCurrentBlock()
+
+	err = c.WaitUntilTxMined(txhash)
 	if err != nil {
-		return fmt.Errorf("cannot get current height")
+		return err
 	}
-	mainClient.WaitUntilBlock(h + 2)
-	acc, err = mainClient.GetAccount(signer.Address())
+
+	acc, err = c.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1418,25 +1405,27 @@ func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum
 		log.Fatalf("expeted delegate to be %s got %s", signer2.Address(), addedDelegate)
 	}
 	// delete delegate
-	acc, err = mainClient.GetAccount(signer.Address())
+	acc, err = c.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
 	if acc == nil {
 		return vochain.ErrAccountNotExist
 	}
-	if err := mainClient.SetAccountDelegate(signer,
+	txhash, err = c.SetAccountDelegate(signer,
 		signer2.Address(),
 		false,
-		acc.Nonce); err != nil {
+		acc.Nonce)
+	if err != nil {
 		return fmt.Errorf("cannot set account delegate: %v", err)
 	}
-	h, err = mainClient.GetCurrentBlock()
+
+	err = c.WaitUntilTxMined(txhash)
 	if err != nil {
-		return fmt.Errorf("cannot get current height")
+		return err
 	}
-	mainClient.WaitUntilBlock(h + 2)
-	acc, err = mainClient.GetAccount(signer.Address())
+
+	acc, err = c.GetAccount(signer.Address())
 	if err != nil {
 		return err
 	}
@@ -1450,15 +1439,15 @@ func testSetAccountDelegate(mainClient *client.Client, signer, signer2 *ethereum
 	return nil
 }
 
-func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) error {
+func (c *testClient) testCollectFaucet(from, to *ethereum.SignKeys) error {
 	// get tx cost
-	txCost, err := mainClient.GetTransactionCost(models.TxType_COLLECT_FAUCET)
+	txCost, err := c.GetTransactionCost(models.TxType_COLLECT_FAUCET)
 	if err != nil {
 		return err
 	}
 	log.Infof("tx cost of %s is %d", models.TxType_COLLECT_FAUCET, txCost)
 	// fetch from account
-	accFrom, err := mainClient.GetAccount(from.Address())
+	accFrom, err := c.GetAccount(from.Address())
 	if err != nil {
 		return err
 	}
@@ -1468,7 +1457,7 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 	log.Infof("fetched from account %s with nonce %d and balance %d", from.Address(), accFrom.Nonce, accFrom.Balance)
 
 	// fetch to account
-	accTo, err := mainClient.GetAccount(to.Address())
+	accTo, err := c.GetAccount(to.Address())
 	if err != nil {
 		return err
 	}
@@ -1478,25 +1467,25 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accFrom.Balance)
 
 	// generate faucet pkg
-	faucetPkg, err := mainClient.GenerateFaucetPackage(from, to.Address(), 10, uint64(util.RandomInt(0, 10000000)))
+	faucetPkg, err := c.GenerateFaucetPackage(from, to.Address(), 10, uint64(util.RandomInt(0, 10000000)))
 	if err != nil {
 		return err
 	}
 
 	// collect faucet tx
-	if err := mainClient.CollectFaucet(to, accTo.Nonce, faucetPkg); err != nil {
+	txhash, err := c.CollectFaucet(to, accTo.Nonce, faucetPkg)
+	if err != nil {
 		return fmt.Errorf("error on collect faucet tx: %v", err)
 	}
 
 	// wait until tx is mined
-	h, err := mainClient.GetCurrentBlock()
+	err = c.WaitUntilTxMined(txhash)
 	if err != nil {
-		return fmt.Errorf("cannot get current height")
+		return fmt.Errorf("CollectFaucet tx was never mined: %v", err)
 	}
-	mainClient.WaitUntilBlock(h + 2)
 
-	// check values changed corretly on both from and to accounts
-	accFrom, err = mainClient.GetAccount(from.Address())
+	// check values changed correctly on both from and to accounts
+	accFrom, err = c.GetAccount(from.Address())
 	if err != nil {
 		return err
 	}
@@ -1506,7 +1495,7 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 	log.Infof("fetched from account %s with nonce %d and balance %d", from.Address(), accFrom.Nonce, accFrom.Balance)
 
 	// fetch to account
-	accTo, err = mainClient.GetAccount(to.Address())
+	accTo, err = c.GetAccount(to.Address())
 	if err != nil {
 		return err
 	}
@@ -1520,40 +1509,15 @@ func testCollectFaucet(mainClient *client.Client, from, to *ethereum.SignKeys) e
 
 func testVocli(url, treasurerPrivKey string) {
 	vocli.SetupLogPackage = false
-	var executeCommand = func(root *cobra.Command, args []string, input string, verbose bool) (*cobra.Command, string, string, error) {
-		// setup stdout/stderr redirection.
-		var stdoutBuf = new(bytes.Buffer)
-		var stderrBuf = new(bytes.Buffer)
-		vocli.Stdout = stdoutBuf
-		vocli.Stderr = stderrBuf
 
-		stdinReader, stdinWriter, err := os.Pipe()
-		if err != nil {
-			return root, "", "", err
-		}
-		stdinWriter.Write([]byte(input))
-		vocli.Stdin = stdinReader
-
-		// cobra.Command.SetOut/SetErr() is actually useless for most purposes as it
-		// only includes the usage messages printed to stdout/stderr. For full
-		// stdout/stderr capture it's still best to use vocli.Stdout/Stderr. Let's
-		// just mock it out anyway.
-		root.SetOut(stdoutBuf)
-		root.SetErr(stderrBuf)
-		root.SetArgs(args)
-		c, err := root.ExecuteC()
-
-		if verbose {
-			log.Debug("vocli ", strings.Join(args, " "))
-			log.Debugf("stdout(%s)\tstderr(%s)", stdoutBuf, stderrBuf)
-		}
-
-		root.SetOut(os.Stdout)
-		root.SetErr(os.Stderr)
-		root.SetArgs([]string{})
-		return c, stdoutBuf.String(), stderrBuf.String(), err
+	log.Infof("connecting to main gateway %s", url)
+	c, err := newTestClient(url)
+	if err != nil {
+		log.Fatal(err)
 	}
-	var parseImportOutput = func(stdout string) (address, keyPath string) {
+	defer c.Close()
+
+	parseImportOutput := func(stdout string) (address, keyPath string) {
 		a := strings.TrimSpace(addressRegexp.FindString(stdout))
 		a2 := strings.Split(a, " ")
 		newAddr := a2[len(a2)-1]
@@ -1563,19 +1527,7 @@ func testVocli(url, treasurerPrivKey string) {
 		keyPath = k2[len(k2)-1]
 		return newAddr, keyPath
 	}
-	var ensureSetAccountInfoMined = func(address string, stdArgs []string) (string, error) {
-		// 50% of the time the SetAccountInfoTx doesn't get mined even in 2, 3x the block period
-		// so keep polling until we finally confirm the account has been created
-		for i := 1; i < 20; i++ {
-			_, stout, _, err := executeCommand(vocli.RootCmd, append([]string{"account", "info", address}, stdArgs...), "", false)
-			if err == nil {
-				return stout, nil
-			}
-			time.Sleep(time.Second * 10)
-		}
-		return "", fmt.Errorf("cannot ensure account was mined after 20 attempts")
-	}
-	var generateKeyAndReturnAddress = func(url string, stdArgs []string) (address, keyPath string, err error) {
+	generateKeyAndReturnAddress := func(url string, stdArgs []string) (address, keyPath string, err error) {
 		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "new", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", false)
 		if err != nil {
 			return
@@ -1585,11 +1537,11 @@ func testVocli(url, treasurerPrivKey string) {
 		if err != nil {
 			return
 		}
-		out, err := ensureSetAccountInfoMined(address, stdArgs)
+		out, err := c.vocliWaitUntilAccountExists(address, stdArgs)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Infof("account %s fetched: %s", address, out)
+		log.Infof("account %s info: %s", address, out)
 		return
 	}
 
@@ -1601,7 +1553,7 @@ func testVocli(url, treasurerPrivKey string) {
 	stdArgs := []string{"--password=password", fmt.Sprintf("--home=%s", dir), fmt.Sprintf("-u=%s", url)}
 
 	log.Info("vocli keys import alicePrivateKey")
-	if err := ioutil.WriteFile(path.Join(dir, "alicePrivateKey"), []byte(treasurerPrivKey), 0700); err != nil {
+	if err := ioutil.WriteFile(path.Join(dir, "alicePrivateKey"), []byte(treasurerPrivKey), 0o700); err != nil {
 		log.Fatal(err)
 	}
 	_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "import", path.Join(dir, "/alicePrivateKey")}, stdArgs...), "", true)
@@ -1626,21 +1578,21 @@ func testVocli(url, treasurerPrivKey string) {
 
 	log.Info("vocli account set alice")
 	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", aliceKeyPath, "ipfs://aliceinwonderland"}, stdArgs...), "", true)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "tx already exists in cache") {
 		log.Fatal(err)
 	}
 	if !strings.Contains(stdout, fmt.Sprintf("created/updated on chain %s", url)) {
 		log.Fatalf("stdout should mention that alice's account was created on the chain, but instead: %s", stdout)
 	}
 
-	out, err := ensureSetAccountInfoMined(alice, stdArgs)
+	out, err := c.vocliWaitUntilAccountExists(alice, stdArgs)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("account %s fetched: %s", alice, out)
 
 	log.Info("vocli account mint alice (this lets one reuse node states across test runs, because subsequent SetAccountInfoTxs are not free")
-	_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"mint", aliceKeyPath, alice, "1000"}, stdArgs...), "", true)
+	err = c.vocliEnsureAccountHasBalance(aliceKeyPath, alice, "1000", stdArgs)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1671,13 +1623,7 @@ func testVocli(url, treasurerPrivKey string) {
 		if newAccount, _, err = generateKeyAndReturnAddress(url, stdArgs); err != nil {
 			log.Fatal(err)
 		}
-		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"mint", aliceKeyPath, newAccount, "100"}, stdArgs...), "", true)
-		if err != nil {
-			log.Fatal(err)
-		}
-		time.Sleep(time.Second * 10)
-
-		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "info", newAccount}, stdArgs...), "", true)
+		err = c.vocliEnsureAccountHasBalance(aliceKeyPath, newAccount, "100", stdArgs)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -1692,21 +1638,18 @@ func testVocli(url, treasurerPrivKey string) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		time.Sleep(time.Second * 10)
-		if _, _, _, err = executeCommand(vocli.RootCmd, append([]string{"mint", aliceKeyPath, a, "1000"}, stdArgs...), "", true); err != nil {
+		// generateKeyAndReturnAddress only returns after the account was effectively mined.
+		err = c.vocliEnsureAccountHasBalance(aliceKeyPath, a, "1000", stdArgs)
+		if err != nil {
 			log.Fatal(err)
 		}
-		time.Sleep(time.Second * 10)
-
 		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"send", aKeyPath, b, "98"}, stdArgs...), "", true)
 		if err != nil {
 			log.Fatal(err)
 		}
-		time.Sleep(time.Second * 10)
-
-		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "info", b}, stdArgs...), "", true)
+		_, err = c.vocliWaitUntilAccountInfoContains(b, "balance:98", stdArgs)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("send a -> b failed, balance still not 98 (%v)", err)
 		}
 	}()
 	func() {
@@ -1719,11 +1662,10 @@ func testVocli(url, treasurerPrivKey string) {
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		if _, _, _, err := executeCommand(vocli.RootCmd, append([]string{"mint", aliceKeyPath, a, "1000"}, stdArgs...), "", true); err != nil {
+		err = c.vocliEnsureAccountHasBalance(aliceKeyPath, a, "1000", stdArgs)
+		if err != nil {
 			log.Fatal(err)
 		}
-		time.Sleep(time.Second * 10)
 
 		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"genfaucet", aKeyPath, b, "800"}, stdArgs...), "", true) // leave plenty of spare coins for differing txCosts
 		if err != nil {
@@ -1746,14 +1688,92 @@ func testVocli(url, treasurerPrivKey string) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		// wait a bit for the tx to be mined and the node to increment the
-		// account's nonce
-		time.Sleep(time.Second * 20)
-		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "get"}, stdArgs...), "", true)
+		stdout, err = c.vocliRepeatCmdUntilStdoutContains(append([]string{"txcost", "get"}, stdArgs...), "RegisterKey 50")
 		if err != nil {
 			log.Fatal(err)
 		}
 		finalTxCosts := strings.Split(strings.TrimSpace(stdout), "\n")
 		log.Infof("new tx cost: %+v", finalTxCosts)
 	}()
+}
+
+func (c *testClient) vocliEnsureAccountHasBalance(keyPath, account, amount string, stdArgs []string) error {
+	for i := 0; i < retries; i++ {
+		_, stdout, stderr, err := executeCommand(vocli.RootCmd, append([]string{"mint", keyPath, account, amount}, stdArgs...), "", true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if strings.Contains(stdout, "invalid nonce") || strings.Contains(stderr, "invalid nonce") {
+			// race happened, try again
+			time.Sleep(time.Second)
+			continue
+		}
+		_, err = c.vocliWaitUntilAccountInfoContains(account, "balance:", stdArgs)
+		if err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("mint failed: %s balance is still 0 (gave up after %d retries)", account, retries)
+}
+
+func (c *testClient) vocliRepeatCmdUntilStdoutContains(args []string, s string) (stdout string, err error) {
+	for i := 0; i < retries; i++ {
+		_, stdout, _, err := executeCommand(vocli.RootCmd, args, "", true)
+		if err == nil && strings.Contains(stdout, s) {
+			return stdout, nil
+		}
+		if err != nil {
+			log.Debug(err)
+		}
+		c.WaitUntilNextBlock()
+	}
+	return "", fmt.Errorf("gave up waiting after %d blocks", retries)
+}
+func (c *testClient) vocliWaitUntilAccountInfoContains(address string, s string, stdArgs []string) (stdout string, err error) {
+	return c.vocliRepeatCmdUntilStdoutContains(append([]string{"account", "info", address}, stdArgs...), s)
+}
+
+// vocliWaitUntilAccountExists executes "vocli account info <address>" until success or timeout
+// often, the SetAccountInfoTx doesn't get mined even in 2, 3x the block period
+// so keep polling until we finally confirm the account has been created
+func (c *testClient) vocliWaitUntilAccountExists(address string, stdArgs []string) (stdout string, err error) {
+	stdout, err = c.vocliWaitUntilAccountInfoContains(address, "infoURI:", stdArgs)
+	if err != nil {
+		return "", fmt.Errorf("account %s still doesn't exist: %v", address, err)
+	}
+	return stdout, nil
+}
+
+func executeCommand(root *cobra.Command, args []string, input string, verbose bool) (*cobra.Command, string, string, error) {
+	// setup stdout/stderr redirection.
+	stdoutBuf := new(bytes.Buffer)
+	stderrBuf := new(bytes.Buffer)
+	vocli.Stdout = stdoutBuf
+	vocli.Stderr = stderrBuf
+
+	stdinReader, stdinWriter, err := os.Pipe()
+	if err != nil {
+		return root, "", "", err
+	}
+	stdinWriter.Write([]byte(input))
+	vocli.Stdin = stdinReader
+
+	// cobra.Command.SetOut/SetErr() is actually useless for most purposes as it
+	// only includes the usage messages printed to stdout/stderr. For full
+	// stdout/stderr capture it's still best to use vocli.Stdout/Stderr. Let's
+	// just mock it out anyway.
+	root.SetOut(stdoutBuf)
+	root.SetErr(stderrBuf)
+	root.SetArgs(args)
+	c, err := root.ExecuteC()
+
+	if verbose {
+		log.Debug("vocli ", strings.Join(args, " "))
+		log.Debugf("stdout(%s)\tstderr(%s)", stdoutBuf, stderrBuf)
+	}
+
+	root.SetOut(os.Stdout)
+	root.SetErr(os.Stderr)
+	root.SetArgs([]string{})
+	return c, stdoutBuf.String(), stderrBuf.String(), err
 }
