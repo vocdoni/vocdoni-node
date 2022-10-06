@@ -147,7 +147,7 @@ var sendCmd = &cobra.Command{
 			return fmt.Errorf("could not lookup the account's nonce, try specifying manually: %s", err)
 		}
 
-		err = c.SendTokens(signer, common.HexToAddress(args[1]), nonce, amount)
+		_, err = c.SendTokens(signer, common.HexToAddress(args[1]), nonce, amount)
 		return err
 	},
 }
@@ -176,7 +176,7 @@ var claimFaucetCmd = &cobra.Command{
 			return fmt.Errorf("could not lookup the nonce for %s, try specifying manually: %s", signer.AddressString(), err)
 		}
 
-		err = c.CollectFaucet(signer, nonce, faucetPackage)
+		_, err = c.CollectFaucet(signer, nonce, faucetPackage)
 		if err != nil {
 			return err
 		}

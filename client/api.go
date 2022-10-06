@@ -231,26 +231,23 @@ func (c *Client) GetRollingCensusVoterWeight(pid []byte, address common.Address)
 	return resp.Weight.ToInt(), nil
 }
 
-func (c *Client) TestResults(pid []byte, totalVotes int, withWeight uint64) ([][]string, error) {
+func (c *Client) TestResults(pid []byte, totalVotes int, withWeight uint64) (results [][]string, err error) {
 	log.Infof("waiting for results...")
-	var err error
-	var results [][]string
-	var block uint32
 	var final bool
 	for {
-		block, err = c.GetCurrentBlock()
-		if err != nil {
-			return nil, err
-		}
-		c.WaitUntilBlock(block + 1)
+		c.WaitUntilNextBlock()
 		results, _, final, err = c.GetResults(pid)
 		if err != nil {
+			if strings.Contains(err.Error(), "database is locked") {
+				// temp problem, just try again
+				continue
+			}
 			return nil, err
 		}
 		if final {
 			break
 		}
-		log.Infof("no results yet at block %d", block+2)
+		log.Infof("no results yet")
 	}
 	total := fmt.Sprintf("%d", uint64(totalVotes)*withWeight)
 	if results[0][1] != total ||
@@ -525,17 +522,11 @@ func (c *Client) TestPreRegisterKeys(
 	wg.Wait()
 
 	// Wait for process to be registered
-	log.Infof("waiting for process %x to be registered...", pid)
-	for {
-		proc, err := c.GetProcessInfo(pid)
-		if err != nil {
-			log.Infof("Process not yet available: %v", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		log.Infof("Process: %+v\n", proc)
-		break
+	_, err = c.WaitUntilProcessAvailable(pid)
+	if err != nil {
+		log.Fatal(err)
 	}
+
 	cb, err := c.GetCurrentBlock()
 	if err != nil {
 		return 0, err
@@ -680,7 +671,7 @@ func (c *Client) TestPreRegisterKeys(
 		if weight.String() == registerKeyWeight {
 			break
 		}
-		time.Sleep(4 * time.Second)
+		c.WaitUntilNextBlock()
 	}
 	if tries == 0 {
 		return 0, fmt.Errorf("could not get pre-register key")
@@ -723,27 +714,23 @@ func (c *Client) TestSendVotes(
 	// Wait until all gateway connections are ready
 	wg.Done()
 	log.Infof("%s is waiting other gateways to be ready before it can start voting", c.Addr)
-	c.WaitUntilBlock(startBlock + 2)
 	wg.Wait()
+
+	// Wait for process to actually start
+	_, err = c.WaitUntilProcessReady(pid)
+	if err != nil {
+		return 0, err
+	}
 
 	// Get encryption keys
 	keyIndexes := []uint32{}
 	if encrypted {
-		if pk, err := c.GetKeys(pid, eid); err != nil {
-			return 0, fmt.Errorf("cannot get process keys: (%s)", err)
-		} else {
-			for _, k := range pk.pub {
-				if len(k.Key) > 0 {
-					keyIndexes = append(keyIndexes, uint32(k.Idx))
-					keys = append(keys, k.Key)
-				}
-			}
+		keys, keyIndexes, err = c.WaitUntilProcessKeys(pid, eid)
+		if err != nil {
+			return 0, err
 		}
-		if len(keys) == 0 {
-			return 0, fmt.Errorf("process keys is empty")
-		}
-		log.Infof("got encryption keys!")
 	}
+
 	// Send votes
 	log.Infof("sending votes")
 	timeDeadLine := time.Second * 400
@@ -809,6 +796,13 @@ func (c *Client) TestSendVotes(
 		log.Debugf("voting with pubKey:%s {%s}", pub, log.FormatProto(v))
 		resp, err := c.Request(req, nil)
 		if err != nil {
+			if strings.HasSuffix(err.Error(), "EOF") {
+				// not fatal, just try again
+				log.Warn(err)
+				time.Sleep(1 * time.Second)
+				i--
+				continue
+			}
 			return 0, err
 		}
 		if !resp.Ok {
@@ -816,6 +810,7 @@ func (c *Client) TestSendVotes(
 				log.Warnf("mempool is full, waiting and retrying")
 				time.Sleep(1 * time.Second)
 				i--
+				continue
 			} else {
 				return 0, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 			}
@@ -842,13 +837,13 @@ func (c *Client) TestSendVotes(
 	log.Infof("waiting for votes to be validated...")
 	for {
 		time.Sleep(time.Millisecond * 500)
-		if h, err := c.GetEnvelopeHeight(pid); err != nil {
+		h, err := c.GetEnvelopeHeight(pid)
+		if err != nil {
 			log.Warnf("error getting envelope height: %v", err)
 			continue
-		} else {
-			if h >= uint32(len(signers)) {
-				break
-			}
+		}
+		if h >= uint32(len(signers)) {
+			break
 		}
 		if time.Since(checkStart) > timeDeadLine {
 			return 0, fmt.Errorf("waiting for envelope height took longer than deadline, skipping")
@@ -908,8 +903,13 @@ func (c *Client) TestSendAnonVotes(
 	// Wait until all gateway connections are ready
 	wg.Done()
 	log.Infof("%s is waiting other gateways to be ready before it can start voting", c.Addr)
-	c.WaitUntilBlock(startBlock)
 	wg.Wait()
+
+	// Wait for process to actually start
+	_, err = c.WaitUntilProcessReady(pid)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Infof("Downloading Circuit Artifacts")
 	circuitConfig.LocalDir = "/tmp"
@@ -1016,29 +1016,20 @@ func (c *Client) TestSendAnonVotes(
 		}
 	}
 	log.Infof("votes submited! took %s", time.Since(start))
-	checkStart := time.Now()
-	registered := 0
-	log.Infof("waiting for votes to be validated...")
-	for {
-		time.Sleep(time.Millisecond * 500)
-		if h, err := c.GetEnvelopeHeight(pid); err != nil {
-			log.Warnf("error getting envelope height: %v", err)
-			continue
-		} else {
-			if h >= uint32(len(signers)) {
-				break
-			}
-		}
-		if time.Since(checkStart) > timeDeadLine {
-			return 0, fmt.Errorf("waiting for envelope height took longer than deadline, skipping")
-		}
+
+	err = c.WaitUntilEnvelopeHeight(pid, uint32(len(signers)), timeDeadLine)
+	if err != nil {
+		return 0, err
 	}
+
 	votingElapsedTime := time.Since(start)
 
 	if !checkNullifiers {
 		return votingElapsedTime, nil
 	}
 	// If checkNullifiers, wait until all votes have been verified
+	checkStart := time.Now()
+	registered := 0
 	for {
 		for i, nullHex := range nullifiers {
 			if nullHex == "registered" {
@@ -1065,7 +1056,10 @@ func (c *Client) TestSendAnonVotes(
 	return votingElapsedTime, nil
 }
 
-func (c *Client) CreateProcess(account *ethereum.SignKeys,
+// CreateProcess creates a process, returning the resulting startBlock
+// and the processID assigned
+func (c *Client) CreateProcess(
+	account *ethereum.SignKeys,
 	entityID, censusRoot []byte,
 	censusURI string,
 	envelopeType *models.EnvelopeType,
@@ -1073,9 +1067,15 @@ func (c *Client) CreateProcess(account *ethereum.SignKeys,
 	censusOrigin models.CensusOrigin,
 	startBlockIncrement int,
 	duration int,
-	maxCensusSize uint64) (uint32, []byte, error) {
+	maxCensusSize uint64,
+) (startBlock uint32, processID []byte, err error) {
+	// if envelopeType.EncryptedVotes is true, process keys are going to be generated
+	// and need to be added in a separate tx BEFORE the process is started.
+	// a few more blocks avoid a race condition https://github.com/vocdoni/vocdoni-node/issues/299
+	if startBlockIncrement < 5 && envelopeType.EncryptedVotes {
+		startBlockIncrement = 5
+	}
 
-	startBlock := uint32(0)
 	if startBlockIncrement > 0 {
 		current, err := c.GetCurrentBlock()
 		if err != nil {
@@ -1139,31 +1139,32 @@ func (c *Client) CreateProcess(account *ethereum.SignKeys,
 	if !resp.Ok {
 		return 0, nil, fmt.Errorf("%s failed: %s", req.Method, resp.Message)
 	}
-	processID, err := hex.DecodeString(resp.Payload)
+	processID, err = hex.DecodeString(resp.Payload)
 	if err != nil {
 		return 0, nil, fmt.Errorf("cannot decode process ID: %x", resp.Payload)
 	}
 	if startBlockIncrement == 0 {
-		for i := 0; i < 10; i++ {
-			time.Sleep(2 * time.Second)
-			p, err := c.GetProcessInfo(processID)
-			if err == nil && p != nil {
-				return p.StartBlock, processID, nil
-			}
+		p, err := c.WaitUntilProcessAvailable(processID)
+		if err != nil || p == nil {
+			return 0, nil, fmt.Errorf("process not created: %w", err)
 		}
-		return 0, nil, fmt.Errorf("process was not created")
+		return p.StartBlock, processID, nil
 	}
 	return startBlock, processID, nil
 }
 
-func (c *Client) SetProcessStatus(oracle *ethereum.SignKeys, pid []byte, status string) error {
+// SetProcessStatus changes the status of a process using the oracle account
+func (c *Client) SetProcessStatus(
+	oracle *ethereum.SignKeys,
+	pid []byte,
+	status string,
+) (err error) {
 	s, ok := models.ProcessStatus_value[status]
 	if !ok {
 		return fmt.Errorf("invalid process status specified - refer to vochain.pb.go:ProcessStatus_name for valid statuses")
 	}
 	statusInt := models.ProcessStatus(s)
 	var req api.APIrequest
-	var err error
 	req.Method = "submitRawTx"
 	// get oracle account
 	acc, err := c.GetAccount(oracle.Address())
@@ -1205,7 +1206,11 @@ func (c *Client) SetProcessStatus(oracle *ethereum.SignKeys, pid []byte, status 
 	return nil
 }
 
-func (c *Client) EndProcess(oracle *ethereum.SignKeys, pid []byte) error {
+// EndProcess ends a process identified by pid, using the oracle account
+func (c *Client) EndProcess(
+	oracle *ethereum.SignKeys,
+	pid []byte,
+) (err error) {
 	return c.SetProcessStatus(oracle, pid, "ENDED")
 }
 
@@ -1374,9 +1379,13 @@ func (c *Client) GetTransactionCost(txType models.TxType) (uint64, error) {
 }
 
 // SetTransactionCost sets the transaction cost of a given transaction
-func (c *Client) SetTransactionCost(signer *ethereum.SignKeys, txType models.TxType, cost uint64, nonce uint32) error {
-	var err error
-
+// and returns the txHash of the transaction, or nil and the error
+func (c *Client) SetTransactionCost(
+	signer *ethereum.SignKeys,
+	txType models.TxType,
+	cost uint64,
+	nonce uint32,
+) (txHash types.HexBytes, err error) {
 	tx := &models.SetTransactionCostsTx{
 		Txtype: txType,
 		Nonce:  nonce,
@@ -1385,22 +1394,27 @@ func (c *Client) SetTransactionCost(signer *ethereum.SignKeys, txType models.TxT
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetTransactionCosts{SetTransactionCosts: tx}})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resp, err := c.SubmitRawTx(signer, &stx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !resp.Ok {
-		return fmt.Errorf("submitRawTx failed: %s", resp.Message)
+		return nil, fmt.Errorf("submitRawTx failed: %s", resp.Message)
 	}
-	return nil
+	return resp.Hash, nil
 }
 
 // CreateOrSetAccount creates or sets the infoURI of a Vochain account
-func (c *Client) CreateOrSetAccount(signer *ethereum.SignKeys, to common.Address, infoURI string, nonce uint32, faucetPkg *models.FaucetPackage) error {
+func (c *Client) CreateOrSetAccount(
+	signer *ethereum.SignKeys,
+	to common.Address,
+	infoURI string,
+	nonce uint32,
+	faucetPkg *models.FaucetPackage,
+) (err error) {
 	var req api.APIrequest
-	var err error
 	req.Method = "submitRawTx"
 
 	tx := &models.SetAccountInfoTx{
@@ -1477,10 +1491,27 @@ func (c *Client) SubmitRawTx(signer *ethereum.SignKeys, stx *models.SignedTx) (*
 	return c.Request(req, nil)
 }
 
+// GetTxByHash looks up a transaction given its hash
+func (c *Client) GetTxByHash(txhash types.HexBytes) (*indexertypes.TxPackage, error) {
+	req := api.APIrequest{Method: "getTxByHash", Hash: txhash}
+	resp, err := c.Request(req, nil)
+	if err != nil {
+		return nil, err
+	}
+	if !resp.Ok {
+		return nil, fmt.Errorf("could not get tx: %s", resp.Message)
+	}
+	return resp.Tx, nil
+}
+
 // MintTokens sends a mint tokens transaction
-func (c *Client) MintTokens(treasurer *ethereum.SignKeys, accountAddr common.Address, treasurerNonce uint32, amount uint64) error {
+func (c *Client) MintTokens(
+	treasurer *ethereum.SignKeys,
+	accountAddr common.Address,
+	treasurerNonce uint32,
+	amount uint64,
+) (err error) {
 	var req api.APIrequest
-	var err error
 	req.Method = "submitRawTx"
 
 	tx := &models.MintTokensTx{
@@ -1506,9 +1537,14 @@ func (c *Client) MintTokens(treasurer *ethereum.SignKeys, accountAddr common.Add
 }
 
 // SendTokens sends a send tokens transaction
-func (c *Client) SendTokens(signer *ethereum.SignKeys, accountAddr common.Address, nonce uint32, amount uint64) error {
+// and returns the txHash of the transaction, or nil and the error
+func (c *Client) SendTokens(
+	signer *ethereum.SignKeys,
+	accountAddr common.Address,
+	nonce uint32,
+	amount uint64,
+) (txHash types.HexBytes, err error) {
 	var req api.APIrequest
-	var err error
 	req.Method = "submitRawTx"
 
 	tx := &models.SendTokensTx{
@@ -1522,22 +1558,27 @@ func (c *Client) SendTokens(signer *ethereum.SignKeys, accountAddr common.Addres
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SendTokens{SendTokens: tx}})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resp, err := c.SubmitRawTx(signer, &stx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !resp.Ok {
-		return fmt.Errorf("submitRawTx failed: %s", resp.Message)
+		return nil, fmt.Errorf("submitRawTx failed: %s", resp.Message)
 	}
-	return nil
+	return resp.Hash, nil
 }
 
-// SetDelegate sends a set delegate transaction, if op == true adds a delegate, deletes a delegate otherwise
-func (c *Client) SetAccountDelegate(signer *ethereum.SignKeys, delegate common.Address, op bool, nonce uint32) error {
+// SetAccountDelegate sends a set delegate transaction, if op == true adds a delegate, deletes a delegate otherwise
+// and returns the txHash of the transaction, or nil and the error
+func (c *Client) SetAccountDelegate(
+	signer *ethereum.SignKeys,
+	delegate common.Address,
+	op bool,
+	nonce uint32,
+) (txHash types.HexBytes, err error) {
 	var req api.APIrequest
-	var err error
 	req.Method = "submitRawTx"
 
 	tx := &models.SetAccountDelegateTx{
@@ -1552,22 +1593,26 @@ func (c *Client) SetAccountDelegate(signer *ethereum.SignKeys, delegate common.A
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountDelegateTx{SetAccountDelegateTx: tx}})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resp, err := c.SubmitRawTx(signer, &stx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !resp.Ok {
-		return fmt.Errorf("submitRawTx failed: %s", resp.Message)
+		return nil, fmt.Errorf("submitRawTx failed: %s", resp.Message)
 	}
-	return nil
+	return resp.Hash, nil
 }
 
 // CollectFaucet sends a collect faucet transaction
-func (c *Client) CollectFaucet(signer *ethereum.SignKeys, nonce uint32, faucetPkg *models.FaucetPackage) error {
+// and returns the txHash of the transaction, or nil and the error
+func (c *Client) CollectFaucet(
+	signer *ethereum.SignKeys,
+	nonce uint32,
+	faucetPkg *models.FaucetPackage,
+) (txHash types.HexBytes, err error) {
 	var req api.APIrequest
-	var err error
 	req.Method = "submitRawTx"
 
 	tx := &models.CollectFaucetTx{
@@ -1579,22 +1624,26 @@ func (c *Client) CollectFaucet(signer *ethereum.SignKeys, nonce uint32, faucetPk
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_CollectFaucet{CollectFaucet: tx}})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resp, err := c.SubmitRawTx(signer, &stx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !resp.Ok {
-		return fmt.Errorf("submitRawTx failed: %s", resp.Message)
+		return nil, fmt.Errorf("submitRawTx failed: %s", resp.Message)
 	}
-	return nil
+	return resp.Hash, nil
 }
 
 // SetOracle sends an Add/Remove Oracle transaction, if op == false -> remove, else add
-func (c *Client) SetOracle(treasurer *ethereum.SignKeys, oracleAddress common.Address, treasurerNonce uint32, op bool) error {
+func (c *Client) SetOracle(
+	treasurer *ethereum.SignKeys,
+	oracleAddress common.Address,
+	treasurerNonce uint32,
+	op bool,
+) (err error) {
 	var req api.APIrequest
-	var err error
 	req.Method = "submitRawTx"
 
 	tx := &models.AdminTx{

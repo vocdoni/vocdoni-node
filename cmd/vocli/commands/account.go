@@ -84,7 +84,8 @@ var accAddDelegateCmd = &cobra.Command{
 			return err
 		}
 
-		return c.SetAccountDelegate(signer, common.HexToAddress(args[1]), true, nonce)
+		_, err = c.SetAccountDelegate(signer, common.HexToAddress(args[1]), true, nonce)
+		return err
 	},
 }
 
@@ -108,7 +109,8 @@ var accDelDelegateCmd = &cobra.Command{
 			return err
 		}
 
-		return c.SetAccountDelegate(signer, common.HexToAddress(args[1]), false, nonce)
+		_, err = c.SetAccountDelegate(signer, common.HexToAddress(args[1]), false, nonce)
+		return err
 	},
 }
 var accCmd = &cobra.Command{

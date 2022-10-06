@@ -100,7 +100,7 @@ var txCostSetCmd = &cobra.Command{
 		}
 
 		a := vochain.TxCostNameToTxType(args[1])
-		err = c.SetTransactionCost(signer, a, cost, nonce)
+		_, err = c.SetTransactionCost(signer, a, cost, nonce)
 		if err != nil && strings.Contains(err.Error(), "TX_UNKNOWN") {
 			return fmt.Errorf("the node does not recognize this txtype: \"%s\"", err)
 		} else if err != nil {
