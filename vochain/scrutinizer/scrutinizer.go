@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dgraph-io/badger/v3"
@@ -103,6 +104,18 @@ type Scrutinizer struct {
 	recoveryBootLock sync.RWMutex
 	// ignoreLiveResults if true, partial/live results won't be calculated (only final results)
 	ignoreLiveResults bool
+
+	liveGoroutines int64 // atomic
+
+	// In the tests, the extra 5s sleeps can make CI really slow at times, to
+	// the point that it times out. Skip that in the tests.
+	skipTargetHeightSleeps bool
+
+	// Note that cancelling currently only stops asynchronous goroutines started
+	// by Commit. In the future we could make it stop all other work as well,
+	// like entire calls to Commit.
+	cancelCtx  context.Context
+	cancelFunc context.CancelFunc
 }
 
 // VoteWithIndex holds a Vote and a txIndex. Model for the VotePool.
@@ -115,7 +128,14 @@ type VoteWithIndex struct {
 // NewScrutinizer returns an instance of the Scrutinizer
 // using the local storage database of dbPath and integrated into the state vochain instance
 func NewScrutinizer(dbPath string, app *vochain.BaseApplication, countLiveResults bool) (*Scrutinizer, error) {
-	s := &Scrutinizer{App: app, ignoreLiveResults: !countLiveResults}
+	cancelCtx, cancelFunc := context.WithCancel(context.Background())
+	s := &Scrutinizer{
+		App:               app,
+		ignoreLiveResults: !countLiveResults,
+
+		cancelCtx:  cancelCtx,
+		cancelFunc: cancelFunc,
+	}
 	var err error
 	s.db, err = InitDB(dbPath)
 	if err != nil {
@@ -158,6 +178,42 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication, countLiveResult
 	s.envelopeHeightCache = lru.New(countEnvelopeCacheSize)
 	s.resultsCache = lru.New(resultsCacheSize)
 	return s, nil
+}
+
+func (s *Scrutinizer) Close() error {
+	s.cancelFunc()
+	s.WaitIdle()
+	// Try closing both before reporting errors.
+	err1 := s.db.Close()
+	err2 := s.sqlDB.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	return nil
+}
+
+// WaitIdle waits until there are no live asynchronous goroutines, such as those
+// started by the Commit method.
+//
+// Note that this method is racy by nature if the scrutinizer keeps committing
+// more blocks, as it simply waits for any goroutines already started to stop.
+func (s *Scrutinizer) WaitIdle() {
+	var slept time.Duration
+	for {
+		const debounce = 100 * time.Millisecond
+		time.Sleep(debounce)
+		slept += debounce
+		if atomic.LoadInt64(&s.liveGoroutines) == 0 {
+			break
+		}
+		if slept > 10*time.Second {
+			log.Warnf("giving up on WaitIdle after 10s")
+			return
+		}
+	}
 }
 
 func (s *Scrutinizer) timeoutQueries() (*scrutinizerdb.Queries, context.Context, context.CancelFunc) {
@@ -368,6 +424,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	}
 
 	// Index new transactions
+	atomic.AddInt64(&s.liveGoroutines, 1)
 	go s.indexNewTxs(s.newTxPool)
 
 	// Schedule results computation
@@ -472,6 +529,7 @@ func (s *Scrutinizer) Commit(height uint32) error {
 	// an initial results height of 0, and we don't want to compute results
 	// for such an initial height.
 	if height > 0 {
+		atomic.AddInt64(&s.liveGoroutines, 1)
 		go s.computePendingProcesses(height)
 	}
 	return nil

@@ -91,7 +91,11 @@ func TestBaseApplication(tb testing.TB) *BaseApplication {
 	app.SetTestingMethods()
 
 	// TODO: should this be a Close on the entire BaseApplication?
-	tb.Cleanup(func() { app.State.Close() })
+	tb.Cleanup(func() {
+		if err := app.State.Close(); err != nil {
+			tb.Error(err)
+		}
+	})
 	return app
 }
 
