@@ -161,13 +161,13 @@ mkdir -p $results
 
 echo "### Test suite ready ###"
 for test in ${tests_to_run[@]}; do
-	[ $CONCURRENT -eq 1 ] && {
-		echo "### Running test $test concurrently with others ###"
-		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval ) &
-	} || {
+	if [ $test == "vocli" ] || [ $test == "tokentransactions" ] || [ $CONCURRENT -eq 0 ] ; then
 		echo "### Running test $test ###"
 		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval )
-	}
+	else
+		echo "### Running test $test concurrently with others ###"
+		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval ) &
+	fi
 	sleep 6
 done
 
